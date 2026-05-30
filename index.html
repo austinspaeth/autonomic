@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Autonomic Journal</title>
+  <meta name="description" content="A private, offline journal for tracking autonomic recovery." />
+  <meta name="theme-color" content="#e03127" />
+  <link rel="icon" href="icons/favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- Top bar -->
+    <header class="topbar">
+      <div class="topbar-row">
+        <h1 class="brand">
+          <svg class="brand-mark" viewBox="0 0 512 512" aria-hidden="true">
+            <polyline points="41,266 179,266 200,225 220,307 246,92 272,420 297,240 317,266 471,266"
+              fill="none" stroke="currentColor" stroke-width="38"
+              stroke-linejoin="round" stroke-linecap="round"/>
+          </svg>
+          <span>Autonomic</span>
+        </h1>
+        <div class="topbar-actions">
+          <button id="themeBtn" class="icon-btn" title="Toggle light / dark" aria-label="Toggle theme"></button>
+          <button id="menuBtn" class="icon-btn" title="Menu" aria-label="Menu">&#9776;</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Journal view -->
+    <main id="journalView" class="view">
+      <!-- Date navigator -->
+      <div class="datebar">
+        <button id="prevDay" class="icon-btn" aria-label="Previous day">&#8249;</button>
+        <button id="dateLabel" class="date-label" aria-label="Pick a date"></button>
+        <button id="nextDay" class="icon-btn" aria-label="Next day">&#8250;</button>
+      </div>
+      <div id="dayContent"></div>
+    </main>
+
+    <!-- Analysis view -->
+    <main id="analysisView" class="view hidden">
+      <div id="analysisContent"></div>
+    </main>
+
+    <!-- Bottom tab bar -->
+    <nav class="tabbar">
+      <button class="tab active" data-view="journal">
+        <span class="tab-ico">&#9998;</span><span>Journal</span>
+      </button>
+      <button class="tab" data-view="analysis">
+        <span class="tab-ico">&#128202;</span><span>Analysis</span>
+      </button>
+    </nav>
+  </div>
+
+  <!-- Modal host -->
+  <div id="modalRoot"></div>
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
