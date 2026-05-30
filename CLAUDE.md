@@ -85,7 +85,10 @@ unless asked. Edit `index.html` directly.
   Save closes both, the ✕ pops back to the summary. Breathing HRV gets a rich
   summary (`breathingSummary`: validity, overall grade, autonomic composite,
   frequency peaks, power-distribution bar, per-metric rows); other types use
-  `genericReadingSummary`. (Historical 30-day graphs/trends are not built yet.)
+  `genericReadingSummary`. Each scorable metric row shows a **sparkline**
+  (`buildSpark` over `metricHistory`, last 30 of that type) with grade-zone
+  bands from the `BANDS` registry (`bandsFor`). (7-day trend arrows / personal
+  bests / secondary-peak detection are still TODO.)
 - **Reading scoring.** On save, `computeScores(r)` categorizes each scorable
   metric (great/good/ok/bad/crash|concerning, plus a `warning` blue zone for
   readiness) per the framework thresholds and stores them on `r.scores`. The

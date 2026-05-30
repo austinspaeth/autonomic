@@ -496,6 +496,8 @@
   .metric-name { flex: 1; font-size: 14px; }
   .metric-val { font-weight: 700; font-variant-numeric: tabular-nums; }
   .metric-explain { font-size: 12.5px; color: var(--text-dim); margin-top: 3px; }
+  .spark { margin-top: 7px; color: var(--text-dim); }
+  .spark svg { width: 100%; height: 42px; display: block; border-radius: 6px; }
   .powerbar { display: flex; height: 22px; border-radius: 6px; overflow: hidden; margin: 4px 0 6px; background: var(--surface-2); }
   .powerbar > div { display: flex; align-items: center; justify-content: center; font-size: 10px; color: #fff; font-weight: 700; min-width: 0; }
   .sum-legend { font-size: 12px; color: var(--text-dim); }
@@ -1524,7 +1526,7 @@
       else d.style.background = "var(--border)";
       return d;
     }
-    function metricRow(label, value, cat, explain) {
+    function metricRow(label, value, cat, explain, spark) {
       return el("div.metric", {}, [
         el("div.metric-head", {}, [
           scoreDot(cat),
@@ -1532,7 +1534,94 @@
           el("span.metric-val", { text: value == null || value === "" ? "—" : String(value) }),
         ]),
         explain ? el("div.metric-explain", { text: explain }) : null,
+        spark || null,
       ]);
+    }
+
+    /* ----- Sparklines: per-metric history with grade-zone bands ----- */
+    // Each band list is {max, cat} ascending; the final max is Infinity.
+    const BANDS = {
+      rmssdU: [{ max: 17, cat: "crash" }, { max: 22, cat: "bad" }, { max: 27, cat: "ok" }, { max: 34, cat: "good" }, { max: Infinity, cat: "great" }],
+      rmssdS: [{ max: 17, cat: "crash" }, { max: 22, cat: "bad" }, { max: 27, cat: "ok" }, { max: 32, cat: "good" }, { max: Infinity, cat: "great" }],
+      pnn50: [{ max: 2, cat: "crash" }, { max: 4, cat: "bad" }, { max: 7, cat: "ok" }, { max: 10, cat: "good" }, { max: Infinity, cat: "great" }],
+      sdnn: [{ max: 30, cat: "crash" }, { max: 40, cat: "bad" }, { max: 50, cat: "ok" }, { max: 60, cat: "good" }, { max: Infinity, cat: "great" }],
+      totalPower: [{ max: 800, cat: "crash" }, { max: 1500, cat: "bad" }, { max: 2200, cat: "ok" }, { max: 3500, cat: "good" }, { max: Infinity, cat: "great" }],
+      vlf: [{ max: 200, cat: "great" }, { max: 450, cat: "good" }, { max: 700, cat: "ok" }, { max: 1000, cat: "bad" }, { max: Infinity, cat: "crash" }],
+      lfPeak: [{ max: 0.045, cat: "concerning" }, { max: 0.060, cat: "bad" }, { max: 0.075, cat: "ok" }, { max: 0.090, cat: "good" }, { max: 0.105, cat: "great" }, { max: Infinity, cat: "good" }],
+      lfhf: [{ max: 1.5, cat: "great" }, { max: 3, cat: "good" }, { max: 5, cat: "ok" }, { max: 10, cat: "bad" }, { max: Infinity, cat: "concerning" }],
+      coherence: [{ max: 1, cat: "crash" }, { max: 2, cat: "bad" }, { max: 4, cat: "ok" }, { max: 7, cat: "good" }, { max: Infinity, cat: "great" }],
+      readiness: [{ max: 35, cat: "crash" }, { max: 50, cat: "bad" }, { max: 60, cat: "ok" }, { max: 70, cat: "good" }, { max: 86, cat: "great" }, { max: Infinity, cat: "warning" }],
+      spo2: [{ max: 92, cat: "concerning" }, { max: 94, cat: "bad" }, { max: 96, cat: "ok" }, { max: 98, cat: "good" }, { max: Infinity, cat: "great" }],
+      ectopic: [{ max: 1, cat: "great" }, { max: 3, cat: "good" }, { max: 6, cat: "ok" }, { max: 16, cat: "bad" }, { max: Infinity, cat: "concerning" }],
+      qtc: [{ max: 350, cat: "concerning" }, { max: 380, cat: "ok" }, { max: 420, cat: "great" }, { max: 440, cat: "good" }, { max: 450, cat: "ok" }, { max: 470, cat: "bad" }, { max: Infinity, cat: "concerning" }],
+      qrs: [{ max: 91, cat: "great" }, { max: 111, cat: "good" }, { max: 121, cat: "ok" }, { max: 131, cat: "bad" }, { max: Infinity, cat: "concerning" }],
+      pr: [{ max: 100, cat: "concerning" }, { max: 110, cat: "bad" }, { max: 120, cat: "ok" }, { max: 140, cat: "good" }, { max: 181, cat: "great" }, { max: 201, cat: "good" }, { max: 221, cat: "ok" }, { max: 241, cat: "bad" }, { max: Infinity, cat: "concerning" }],
+      sys: [{ max: 100, cat: "bad" }, { max: 108, cat: "ok" }, { max: 119, cat: "great" }, { max: 129, cat: "good" }, { max: 136, cat: "ok" }, { max: 150, cat: "bad" }, { max: Infinity, cat: "concerning" }],
+      dia: [{ max: 60, cat: "bad" }, { max: 65, cat: "ok" }, { max: 79, cat: "great" }, { max: 83, cat: "good" }, { max: 88, cat: "ok" }, { max: 95, cat: "bad" }, { max: Infinity, cat: "concerning" }],
+    };
+    function bandsFor(type, key) {
+      const map = {
+        hrv: { readiness: "readiness", rmssd: "rmssdU", sdnn: "sdnn" },
+        breathHrv: { sdnn: "sdnn", rmssd: "rmssdS", pnn50: "pnn50", vlowPower: "vlf", lfPeak: "lfPeak", coherence: "coherence" },
+        bp: { sys: "sys", dia: "dia" },
+        bloodO2: { value: "spo2" },
+        ecg: { qtc: "qtc", qrs: "qrs", pr: "pr", ectopic: "ectopic" },
+      };
+      const name = map[type] && map[type][key];
+      return name ? BANDS[name] : null;
+    }
+    const numEx = (key) => (rr) => { const v = parseFloat(rr[key]); return isNaN(v) ? null : v; };
+
+    // Chronological numeric history for one metric across all days (last `limit`).
+    function metricHistory(type, extractor, limit = 30) {
+      const out = [];
+      Object.keys(state.days).sort().forEach((dk) => {
+        const list = (state.days[dk].readings || []).filter((r) => r.type === type);
+        list.sort((a, b) => (a.time || "").localeCompare(b.time || ""));
+        list.forEach((r) => { const v = extractor(r); if (v != null && !isNaN(v)) out.push(v); });
+      });
+      return out.slice(-limit);
+    }
+
+    function buildSpark(values, rawBands) {
+      if (!values || values.length < 2) return null;
+      const W = 280, H = 42, padY = 4;
+      let min = Math.min(...values), max = Math.max(...values);
+      if (min === max) { min -= 1; max += 1; }
+      const rng = max - min; min -= rng * 0.12; max += rng * 0.12;
+      const xy = (i) => (i / (values.length - 1)) * W;
+      const y = (v) => padY + (1 - (v - min) / (max - min)) * (H - 2 * padY);
+      const ns = "http://www.w3.org/2000/svg";
+      const svg = document.createElementNS(ns, "svg");
+      svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+      svg.setAttribute("preserveAspectRatio", "none");
+      if (rawBands) {
+        let lo = -Infinity;
+        rawBands.forEach((b) => {
+          const top = Math.min(b.max, max), bot = Math.max(lo, min);
+          lo = b.max;
+          if (top <= bot) return;
+          const yT = y(top), yB = y(bot);
+          const rect = document.createElementNS(ns, "rect");
+          rect.setAttribute("x", 0); rect.setAttribute("width", W);
+          rect.setAttribute("y", yT); rect.setAttribute("height", Math.max(0, yB - yT));
+          rect.setAttribute("fill", SCORE_COLORS[b.cat] || "#888");
+          rect.setAttribute("opacity", "0.16");
+          svg.appendChild(rect);
+        });
+      }
+      const dStr = values.map((v, i) => `${i ? "L" : "M"}${xy(i).toFixed(1)} ${y(v).toFixed(1)}`).join(" ");
+      const path = document.createElementNS(ns, "path");
+      path.setAttribute("d", dStr); path.setAttribute("fill", "none");
+      path.setAttribute("stroke", "currentColor"); path.setAttribute("stroke-width", "1.5");
+      path.setAttribute("stroke-linejoin", "round"); path.setAttribute("stroke-linecap", "round");
+      path.setAttribute("vector-effect", "non-scaling-stroke");
+      svg.appendChild(path);
+      const c = document.createElementNS(ns, "circle");
+      c.setAttribute("cx", xy(values.length - 1)); c.setAttribute("cy", y(values[values.length - 1]));
+      c.setAttribute("r", "2.5"); c.setAttribute("fill", "currentColor");
+      svg.appendChild(c);
+      return el("div.spark", {}, [svg]);
     }
 
     function openReadingSummary(r) {
@@ -1557,7 +1646,8 @@
         }
         const v = r[f.key];
         if (v == null || v === "") return;
-        body.appendChild(metricRow(f.label, v + (f.unit ? ` ${f.unit}` : ""), s[f.key]));
+        const spark = buildSpark(metricHistory(r.type, numEx(f.key)), bandsFor(r.type, f.key));
+        body.appendChild(metricRow(f.label, v + (f.unit ? ` ${f.unit}` : ""), s[f.key], null, spark));
       });
     }
 
@@ -1581,6 +1671,8 @@
       const vlf = n("vlowPower"), lf = n("lowPower"), hf = n("highPower");
       const total = [vlf, lf, hf].some((v) => v != null) ? [vlf, lf, hf].reduce((a, b) => a + (b || 0), 0) : null;
       const lfhf = lf != null && hf ? lf / hf : null;
+      const sp = (ex, bands) => buildSpark(metricHistory("breathHrv", ex, 30), bands);
+      const lfhfEx = (rr) => { const a = parseFloat(rr.lowPower), b = parseFloat(rr.highPower); return (!isNaN(a) && !isNaN(b) && b !== 0) ? a / b : null; };
 
       // Validity banner
       let validity = "Valid", vCat = "great";
@@ -1622,16 +1714,16 @@
 
       // Breathing quality
       body.appendChild(el("div.sum-h3", { text: "Breathing quality" }));
-      body.appendChild(metricRow("Coherence", r.coherence, s.coherence, HRV_EXPLAIN.coherence));
+      body.appendChild(metricRow("Coherence", r.coherence, s.coherence, HRV_EXPLAIN.coherence, sp(numEx("coherence"), BANDS.coherence)));
       if (r.style) body.appendChild(metricRow("Breathing style", r.style, null, "Intended pace for this reading."));
 
       // Frequency peaks
       body.appendChild(el("div.sum-h3", { text: "Frequency peaks (baroreflex)" }));
       body.appendChild(metricRow("LF peak", r.lfPeak ? r.lfPeak + " Hz" : "", s.lfPeak,
-        "Baroreflex frequency. Target 0.08–0.10 Hz; shifting toward it is progress."));
+        "Baroreflex frequency. Target 0.08–0.10 Hz; shifting toward it is progress.", sp(numEx("lfPeak"), BANDS.lfPeak)));
       const e = expectedHf(r.style);
       body.appendChild(metricRow("HF peak", r.hfPeak ? r.hfPeak + " Hz" : "", s.hfPeak,
-        e ? `Expected ~${e[0]}–${e[1]} Hz for ${r.style} breathing; large deviation means the pace drifted.` : "Respiratory peak position."));
+        e ? `Expected ~${e[0]}–${e[1]} Hz for ${r.style} breathing; large deviation means the pace drifted.` : "Respiratory peak position.", sp(numEx("hfPeak"), null)));
 
       // Power distribution
       body.appendChild(el("div.sum-h3", { text: "Power distribution" }));
@@ -1643,23 +1735,23 @@
         body.appendChild(bar);
         body.appendChild(el("div.sum-legend", { text: `VLF ${pct(vlf)}% · LF ${pct(lf)}% · HF ${pct(hf)}%` }));
       }
-      body.appendChild(metricRow("Total power", total != null ? Math.round(total) : "", s.totalPower, "Total autonomic engagement across all frequencies."));
-      body.appendChild(metricRow("LF/HF ratio", lfhf != null ? lfhf.toFixed(2) : "", s.lfhf, "Sympathetic vs vagal balance. Balanced/low favors flexibility."));
-      body.appendChild(metricRow("VLF power", r.vlowPower, s.vlf, "Slow regulatory processes & stress load. Elevated = system stress."));
-      body.appendChild(metricRow("LF power", r.lowPower, null, "Baroreflex band — your training target."));
-      body.appendChild(metricRow("HF power", r.highPower, null, "Vagal activity tied to breathing. Higher = better recovery state."));
+      body.appendChild(metricRow("Total power", total != null ? Math.round(total) : "", s.totalPower, "Total autonomic engagement across all frequencies.", sp((rr) => totalPower(rr), BANDS.totalPower)));
+      body.appendChild(metricRow("LF/HF ratio", lfhf != null ? lfhf.toFixed(2) : "", s.lfhf, "Sympathetic vs vagal balance. Balanced/low favors flexibility.", sp(lfhfEx, BANDS.lfhf)));
+      body.appendChild(metricRow("VLF power", r.vlowPower, s.vlf, "Slow regulatory processes & stress load. Elevated = system stress.", sp(numEx("vlowPower"), BANDS.vlf)));
+      body.appendChild(metricRow("LF power", r.lowPower, null, "Baroreflex band — your training target.", sp(numEx("lowPower"), null)));
+      body.appendChild(metricRow("HF power", r.highPower, null, "Vagal activity tied to breathing. Higher = better recovery state.", sp(numEx("highPower"), null)));
 
       // Metrics
       body.appendChild(el("div.sum-h3", { text: "Metrics" }));
-      body.appendChild(metricRow("RMSSD", r.rmssd, s.rmssd, HRV_EXPLAIN.rmssd));
-      body.appendChild(metricRow("pNN50", r.pnn50 ? r.pnn50 + "%" : "", s.pnn50, HRV_EXPLAIN.pnn50));
-      body.appendChild(metricRow("SDNN", r.sdnn, s.sdnn, HRV_EXPLAIN.sdnn));
-      body.appendChild(metricRow("HR", r.hr, null, HRV_EXPLAIN.hr));
-      body.appendChild(metricRow("Mean RR", r.meanRr, null, HRV_EXPLAIN.meanRr));
-      body.appendChild(metricRow("MxDMn", r.mxdmn, null, HRV_EXPLAIN.mxdmn));
-      body.appendChild(metricRow("Mode", r.mode, null, HRV_EXPLAIN.mode));
-      body.appendChild(metricRow("AMo50", r.amo50, null, HRV_EXPLAIN.amo50));
-      body.appendChild(metricRow("CV", r.cv, null, HRV_EXPLAIN.cv));
+      body.appendChild(metricRow("RMSSD", r.rmssd, s.rmssd, HRV_EXPLAIN.rmssd, sp(numEx("rmssd"), BANDS.rmssdS)));
+      body.appendChild(metricRow("pNN50", r.pnn50 ? r.pnn50 + "%" : "", s.pnn50, HRV_EXPLAIN.pnn50, sp(numEx("pnn50"), BANDS.pnn50)));
+      body.appendChild(metricRow("SDNN", r.sdnn, s.sdnn, HRV_EXPLAIN.sdnn, sp(numEx("sdnn"), BANDS.sdnn)));
+      body.appendChild(metricRow("HR", r.hr, null, HRV_EXPLAIN.hr, sp(numEx("hr"), null)));
+      body.appendChild(metricRow("Mean RR", r.meanRr, null, HRV_EXPLAIN.meanRr, sp(numEx("meanRr"), null)));
+      body.appendChild(metricRow("MxDMn", r.mxdmn, null, HRV_EXPLAIN.mxdmn, sp(numEx("mxdmn"), null)));
+      body.appendChild(metricRow("Mode", r.mode, null, HRV_EXPLAIN.mode, sp(numEx("mode"), null)));
+      body.appendChild(metricRow("AMo50", r.amo50, null, HRV_EXPLAIN.amo50, sp(numEx("amo50"), null)));
+      body.appendChild(metricRow("CV", r.cv, null, HRV_EXPLAIN.cv, sp(numEx("cv"), null)));
 
       if (r.note) { body.appendChild(el("div.sum-h3", { text: "Notes" })); body.appendChild(el("div.sum-text", { text: r.note })); }
     }
