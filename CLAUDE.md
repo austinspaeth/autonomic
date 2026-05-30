@@ -45,7 +45,9 @@ unless asked. Edit `index.html` directly.
       "sleep":      { "bed": "HH:MM", "wake": "HH:MM", "quality": "good"|"interrupted" },
       // activities are logged entries from ACTIVITY_TYPES (programmatic, no
       // custom ones), each { id, type, time, note, ...templateFields } — same
-      // pattern as readings. meds/symptoms remain {defId:…} checkmark catalogs.
+      // pattern as readings. A type may set custom:"bike" to use a bespoke form
+      // (indoor bike: conditional resistance vs. repeatable interval cards) and
+      // summary()/detail() for its row. meds/symptoms remain {defId:…} catalogs.
       // Entries use an ordered, typed field schema (number / select / time /
       // check / textarea / {divider:true}); see READING_TYPES / ACTIVITY_TYPES
       // and buildFieldInputs(). Time + a Notes textarea are auto-added if a

@@ -495,6 +495,42 @@
     background: var(--border);
     margin: 4px 0 18px;
   }
+  /* Repeatable interval cards (indoor bike) */
+  .interval-card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px;
+    margin-bottom: 10px;
+  }
+  .interval-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-dim);
+  }
+  .interval-del {
+    background: none; border: none; cursor: pointer;
+    color: var(--text-dim);
+    width: 28px; height: 28px; padding: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .interval-del svg { width: 16px; height: 16px; }
+  .add-interval {
+    width: 100%;
+    border: 1.5px dashed var(--border);
+    background: transparent;
+    color: var(--accent);
+    border-radius: var(--radius-sm);
+    padding: 12px;
+    font-size: 14px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+  }
+  .add-interval:active { opacity: 0.6; }
   .field-inline { display: flex; gap: 10px; }
   .field-inline > .field { flex: 1; min-width: 0; }
   .field-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 10px; }
@@ -782,6 +818,11 @@
       legsUp: svgIcon('<circle cx="12" cy="12" r="9"/><path d="M8 12l4-4 4 4"/><path d="M12 16V8"/>'),
       activity: svgIcon('<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>'),
       heart: svgIcon('<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>'),
+      target: svgIcon('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/>'),
+      barbell: svgIcon('<path d="M4 9v6"/><path d="M7 7v10"/><path d="M17 7v10"/><path d="M20 9v6"/><path d="M7 12h10"/>'),
+      car: svgIcon('<path d="M5 13l1.5-4.5A2 2 0 0 1 8.4 7h7.2a2 2 0 0 1 1.9 1.5L19 13"/><path d="M5 13h14a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1"/><path d="M6 18H5a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1"/><circle cx="8" cy="18" r="1.5"/><circle cx="16" cy="18" r="1.5"/>'),
+      flame: svgIcon('<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>'),
+      zap: svgIcon('<path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/>'),
     };
 
     // Reading types. Order here is the order shown in the "Add reading" drawer.
@@ -882,9 +923,29 @@
     // activity is { id, type, time, note, ...fields }. `fields`/`checks` are the
     // per-activity capture template (TBD — filled in as templates are provided).
     const ACTIVITY_TYPES = {
-      indoorBike: { label: "Indoor bike", icon: ICONS.bike, fields: [] },
+      indoorBike: {
+        label: "Indoor bike",
+        icon: ICONS.bike,
+        custom: "bike", // uses bikeForm() instead of the generic schema form
+        summary: (r) => (r.duration ? `${r.duration} min` : (r.distance ? `${r.distance}` : "")),
+        detail: (r) => {
+          const p = [];
+          if (r.distance) p.push(`Dist ${r.distance}`);
+          if (r.avgHr) p.push(`Avg HR ${r.avgHr}`);
+          if (r.interval) p.push(`${(r.intervals || []).length} interval${(r.intervals || []).length === 1 ? "" : "s"}`);
+          else if (r.resistance) p.push(`Resistance ${r.resistance}`);
+          if (r.hr60) p.push(`HR@60s ${r.hr60}`);
+          return p.join(" · ");
+        },
+        fields: [],
+      },
       walk: { label: "Walk", icon: ICONS.footprints, fields: [] },
       legsUp: { label: "Legs up", icon: ICONS.legsUp, fields: [] },
+      coreWorkout: { label: "Core workout", icon: ICONS.target, fields: [] },
+      upperBody: { label: "Upper body strength", icon: ICONS.barbell, fields: [] },
+      carWash: { label: "Car wash", icon: ICONS.car, fields: [] },
+      strenuousWork: { label: "Strenuous work", icon: ICONS.flame, fields: [] },
+      stressfulWork: { label: "Stressful work", icon: ICONS.zap, fields: [] },
     };
 
     function defaultState() {
@@ -1425,7 +1486,10 @@
     }
 
     function readingForm(type, existing) { openEntryForm(READING_TYPES, "readings", type, existing); }
-    function activityForm(type, existing) { openEntryForm(ACTIVITY_TYPES, "activities", type, existing); }
+    function activityForm(type, existing) {
+      if (ACTIVITY_TYPES[type] && ACTIVITY_TYPES[type].custom === "bike") return bikeForm(existing);
+      openEntryForm(ACTIVITY_TYPES, "activities", type, existing);
+    }
 
     function field(label, input) {
       return el("div.field", {}, [el("label", { text: label }), input]);
@@ -1436,6 +1500,143 @@
         inputmode: "decimal",
         value: v ?? "",
         placeholder: "—",
+      });
+    }
+
+    // Indoor bike — custom form: a conditional section that is either a single
+    // Resistance field or a repeatable list of interval cards, depending on the
+    // Interval-training checkbox.
+    function bikeForm(existing) {
+      const r = existing
+        ? JSON.parse(JSON.stringify(existing))
+        : { id: uid(), type: "indoorBike", time: nowTime(), note: "", interval: false, intervals: [] };
+      if (!Array.isArray(r.intervals)) r.intervals = [];
+      openModal((body) => {
+        body.appendChild(el("h2", { text: (existing ? "Edit " : "") + "Indoor bike" }));
+
+        const time = el("input", { type: "time", value: r.time || nowTime() });
+        body.appendChild(field("Time", time));
+
+        const num = {};
+        const mk = (key, label, unit) => {
+          num[key] = numInput(r[key]);
+          return field(label + (unit ? ` (${unit})` : ""), num[key]);
+        };
+        body.appendChild(el("div.field-grid", {}, [
+          mk("duration", "Duration", "min"),
+          mk("distance", "Distance"),
+          mk("avgHr", "Avg HR"),
+          mk("maxHr", "Max HR"),
+          mk("minHr", "Min HR"),
+        ]));
+
+        const intervalCb = el("input", { type: "checkbox" });
+        intervalCb.checked = !!r.interval;
+        body.appendChild(el("div.field.field-check", {}, [
+          el("label", {}, [intervalCb, el("span", { text: "Interval training" })]),
+        ]));
+
+        body.appendChild(el("div.field-divider"));
+        const dyn = el("div");
+        body.appendChild(dyn);
+
+        let resistanceInput = null;
+        const rows = []; // { card, inp } for each interval
+        const renderDyn = () => {
+          dyn.innerHTML = "";
+          rows.length = 0;
+          if (!intervalCb.checked) {
+            resistanceInput = numInput(r.resistance);
+            dyn.appendChild(field("Resistance", resistanceInput));
+            return;
+          }
+          resistanceInput = null;
+          const list = el("div");
+          dyn.appendChild(list);
+          const renumber = () =>
+            rows.forEach((e, i) => { e.card.querySelector(".interval-head span").textContent = "Interval " + (i + 1); });
+          const addInterval = (data) => {
+            const iv = data || {};
+            const inp = {};
+            const grid = el("div.field-grid", {}, [
+              (() => { inp.length = numInput(iv.length); return field("Length (min)", inp.length); })(),
+              (() => { inp.resistance = numInput(iv.resistance); return field("Resistance", inp.resistance); })(),
+              (() => { inp.avgHr = numInput(iv.avgHr); return field("Avg HR", inp.avgHr); })(),
+              (() => { inp.maxHr = numInput(iv.maxHr); return field("Max HR", inp.maxHr); })(),
+            ]);
+            const del = el("button.interval-del", { type: "button", html: ICONS.x, "aria-label": "Remove interval" });
+            const card = el("div.interval-card", {}, [
+              el("div.interval-head", {}, [el("span"), del]),
+              grid,
+            ]);
+            const entry = { card, inp };
+            del.onclick = () => {
+              const idx = rows.indexOf(entry);
+              if (idx >= 0) rows.splice(idx, 1);
+              card.remove();
+              renumber();
+            };
+            rows.push(entry);
+            list.appendChild(card);
+            renumber();
+          };
+          (r.intervals || []).forEach(addInterval);
+          dyn.appendChild(el("button.add-interval", { type: "button", text: "+ Add interval", onclick: () => addInterval() }));
+        };
+        intervalCb.addEventListener("change", renderDyn);
+        renderDyn();
+
+        body.appendChild(el("div.field-divider"));
+        const hr60 = numInput(r.hr60);
+        body.appendChild(field("HR after 60 seconds", hr60));
+
+        const note = el("textarea", { placeholder: "Optional note" });
+        note.value = r.note || "";
+        body.appendChild(field("Notes", note));
+
+        body.appendChild(el("div.modal-actions", {}, [
+          existing
+            ? el("button.btn.btn-danger", {
+                text: "Delete",
+                onclick: () => {
+                  const d = day(currentKey, true);
+                  d.activities = d.activities.filter((x) => x.id !== r.id);
+                  save();
+                  closeAll();
+                  renderDay();
+                },
+              })
+            : null,
+          el("button.btn.btn-primary", {
+            text: "Save",
+            onclick: () => {
+              r.time = time.value;
+              ["duration", "distance", "avgHr", "maxHr", "minHr"].forEach((k) => { r[k] = num[k].value.trim(); });
+              r.interval = intervalCb.checked;
+              if (intervalCb.checked) {
+                r.intervals = rows.map((e) => ({
+                  length: e.inp.length.value.trim(),
+                  resistance: e.inp.resistance.value.trim(),
+                  avgHr: e.inp.avgHr.value.trim(),
+                  maxHr: e.inp.maxHr.value.trim(),
+                }));
+                r.resistance = "";
+              } else {
+                r.resistance = resistanceInput ? resistanceInput.value.trim() : "";
+                r.intervals = [];
+              }
+              r.hr60 = hr60.value.trim();
+              r.note = note.value.trim();
+              const d = day(currentKey, true);
+              const i = d.activities.findIndex((x) => x.id === r.id);
+              if (i >= 0) d.activities[i] = r;
+              else d.activities.push(r);
+              save();
+              closeAll();
+              renderDay();
+            },
+          }),
+        ]));
       });
     }
 
@@ -1458,14 +1659,16 @@
         list.forEach((a) => {
           const def = ACTIVITY_TYPES[a.type];
           if (!def) return;
-          const sub = [detailFields(def, a), a.note].filter(Boolean).join(" — ");
+          const headline = def.summary ? def.summary(a) : summarizeFields(def, a);
+          const details = def.detail ? def.detail(a) : detailFields(def, a);
+          const sub = [details, a.note].filter(Boolean).join(" — ");
           bodyEl.appendChild(
             el("div.row", { onclick: () => activityForm(a.type, a) }, [
               el("div.row-main", {}, [
                 el("div.row-title", { text: def.label }),
                 sub ? el("div.row-sub", { text: sub }) : null,
               ]),
-              el("div.row-val", { text: summarizeFields(def, a) }),
+              el("div.row-val", { text: headline }),
               a.time ? el("span.pill", { text: a.time }) : null,
             ])
           );
