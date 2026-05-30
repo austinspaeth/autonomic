@@ -46,11 +46,10 @@ unless asked. Edit `index.html` directly.
       // activities are logged entries from ACTIVITY_TYPES (programmatic, no
       // custom ones), each { id, type, time, note, ...templateFields } — same
       // pattern as readings. meds/symptoms remain {defId:…} checkmark catalogs.
-      // reading `type` is one of: hrv (Unstructured HRV), breathHrv,
-      // bp (Blood Pressure), bloodO2 (Blood Oxygen), ecg. Fields vary by type:
-      //   hrv: readiness, pns, sns, age, sdnn, rmssd, avgHr, stressIndex,
-      //        lowPower, highPower, swallowing(bool)
-      //   breathHrv / bloodO2: value     bp: sys, dia, pulse
+      // Entries use an ordered, typed field schema (number / select / time /
+      // check / textarea / {divider:true}); see READING_TYPES / ACTIVITY_TYPES
+      // and buildFieldInputs(). Time + a Notes textarea are auto-added if a
+      // type doesn't define them. reading `type` ∈ hrv, breathHrv, bp, bloodO2, ecg.
       "readings":   [ { "id", "type", "time", "note", ...fields } ],
       "activities": [ { "id", "type", "time", "note", ...fields } ],
       "meds":       { "<defId>": { "time", "dose?" } },
