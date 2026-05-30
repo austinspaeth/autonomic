@@ -35,27 +35,21 @@ unless asked. Edit `index.html` directly.
     "lastUpdated": "<ISO timestamp>",      // see rule below
     "lastImport":  { "name": "file.json", "at": "<ISO timestamp>" }
   },
-  "defs": {
-    "activities": [ { "id", "name", "archived" } ],
-    "meds":       [ { "id", "name", "archived", "dose?" } ],
-    "symptoms":   [ { "id", "name", "archived", "hasValue?" } ]
-  },
   "days": {
     "YYYY-MM-DD": {
-      "sleep":      { "bed": "HH:MM", "wake": "HH:MM", "quality": "good"|"interrupted" },
-      // activities are logged entries from ACTIVITY_TYPES (programmatic, no
-      // custom ones), each { id, type, time, note, ...templateFields } — same
-      // pattern as readings. A type may set custom:"bike" to use a bespoke form
-      // (indoor bike: conditional resistance vs. repeatable interval cards) and
-      // summary()/detail() for its row. meds/symptoms remain {defId:…} catalogs.
-      // Entries use an ordered, typed field schema (number / select / time /
-      // check / textarea / {divider:true}); see READING_TYPES / ACTIVITY_TYPES
-      // and buildFieldInputs(). Time + a Notes textarea are auto-added if a
-      // type doesn't define them. reading `type` ∈ hrv, breathHrv, bp, bloodO2, ecg.
+      "sleep":      { "bed": "HH:MM", "wake": "HH:MM", "quality": "good"|"interrupted", "hrLow?", "hrHigh?" },
+      // readings/activities/meds/symptoms are all logged-entry ARRAYS, each item
+      // { id, type, time, note, ...templateFields }, where `type` keys into a
+      // programmatic map (READING_TYPES / ACTIVITY_TYPES / MED_TYPES /
+      // SYMPTOM_TYPES) — no user-defined/custom items. Entries use an ordered,
+      // typed field schema (number / select / time / check / text / textarea /
+      // {divider:true}); see buildFieldInputs(). Time + a Notes textarea are
+      // auto-added when a type doesn't define them. A type may set custom:"bike"
+      // for a bespoke form (indoor bike) and summary()/detail() for its row.
       "readings":   [ { "id", "type", "time", "note", ...fields } ],
       "activities": [ { "id", "type", "time", "note", ...fields } ],
-      "meds":       { "<defId>": { "time", "dose?" } },
-      "symptoms":   { "<defId>": { "time", "value?" } }
+      "meds":       [ { "id", "type", "time", "amount", "note" } ],
+      "symptoms":   [ { "id", "type", "time", "note", ...fields } ]
     }
   }
 }
@@ -71,10 +65,11 @@ unless asked. Edit `index.html` directly.
   **menu drawer**, not in the header.
 - **Imports** record `meta.lastImport` (`{ name, at }`) before calling `save()`,
   and that filename is shown in the menu drawer footer.
-- **Removing a catalog item archives it** (`archived: true`) rather than deleting
-  it, so past days keep whatever was recorded. Archived items only disappear from
-  **today forward** (`visibleDefs()` still shows an archived item on any day that
-  already has a record for it).
+- **All four logged sections share one pattern**: a section lists the day's
+  entries; "+ Add" opens a filterable picker of programmatic types; choosing one
+  stacks its form (`openEntryForm` / `bikeForm`) to capture fields. There are no
+  user-defined/custom items and nothing to archive. To add a new type, add it to
+  the relevant `*_TYPES` map (and an icon).
 - **Drawers/modals are bottom sheets (~90% height) and stack iOS-style.**
   `openModal(build)` pushes a sheet (`sheetStack`); opening one while another is
   up scales the one beneath (`.behind`). Each sheet has a fixed ✕ (top-right) and,

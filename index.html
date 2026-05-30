@@ -192,6 +192,12 @@
     border-top: 1px solid var(--border);
   }
   .section-body > .row:first-child { border-top: none; }
+  .row-ico {
+    width: 26px; height: 26px; flex: none;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: var(--text-dim);
+  }
+  .row-ico svg { width: 21px; height: 21px; }
   .row-main { flex: 1; min-width: 0; }
   .row-title { font-size: 15px; }
   .row-sub { font-size: 12.5px; color: var(--text-dim); margin-top: 1px; }
@@ -841,6 +847,8 @@
       car: svgIcon('<path d="M5 13l1.5-4.5A2 2 0 0 1 8.4 7h7.2a2 2 0 0 1 1.9 1.5L19 13"/><path d="M5 13h14a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1"/><path d="M6 18H5a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1"/><circle cx="8" cy="18" r="1.5"/><circle cx="16" cy="18" r="1.5"/>'),
       flame: svgIcon('<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>'),
       zap: svgIcon('<path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/>'),
+      pill: svgIcon('<path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/>'),
+      alert: svgIcon('<circle cx="12" cy="12" r="9"/><path d="M12 8v4"/><path d="M12 16h.01"/>'),
     };
 
     // Reading types. Order here is the order shown in the "Add reading" drawer.
@@ -948,7 +956,7 @@
         summary: (r) => (r.duration ? `${r.duration} min` : (r.distance ? `${r.distance}` : "")),
         detail: (r) => {
           const p = [];
-          if (r.distance) p.push(`Dist ${r.distance}`);
+          if (r.distance) p.push(`Dist ${r.distance} mi`);
           if (r.avgHr) p.push(`Avg HR ${r.avgHr}`);
           if (r.interval) p.push(`${(r.intervals || []).length} interval${(r.intervals || []).length === 1 ? "" : "s"}`);
           else if (r.resistance) p.push(`Resistance ${r.resistance}`);
@@ -966,23 +974,47 @@
       stressfulWork: { label: "Stressful work", icon: ICONS.zap, fields: [] },
     };
 
+    // Medications & supplements — programmatic list (no custom adds). Each logged
+    // entry captures a time and an amount.
+    const med = (label) => ({
+      label,
+      icon: ICONS.pill,
+      fields: [
+        { type: "time", key: "time", label: "Time" },
+        { type: "text", key: "amount", label: "Amount", placeholder: "e.g. 5 mg, 1 tablet, 1 packet" },
+      ],
+    });
+    const MED_TYPES = {
+      allegra: med("Allegra"),
+      pepsidAc: med("Pepsid AC"),
+      magCitrate: med("Magnesium Citrate"),
+      magGlycinate: med("Magnesium Glycinate"),
+      coq10: med("CoQ10"),
+      omega3: med("Omega 3"),
+      vitB1: med("Vitamin B1"),
+      vitD3: med("Vitamin D3"),
+      liquidIv: med("Liquid IV"),
+      lmnt: med("LMNT"),
+      melatonin: med("Melatonin"),
+      gaviscon: med("Gaviscon"),
+    };
+
+    // Symptoms — programmatic list. Each is a logged entry; templates (per-symptom
+    // fields) can be added like readings. Time + Notes are auto-included.
+    const symptom = (label, fields) => ({ label, icon: ICONS.alert, fields: fields || [] });
+    const SYMPTOM_TYPES = {
+      highBp: symptom("High BP"),
+      pressure: symptom("Pressure"),
+      labileHr: symptom("Labile HR"),
+      lightHeaded: symptom("Light headed"),
+      sick: symptom("Sick"),
+    };
+
     function defaultState() {
-      const mk = (name, extra = {}) => ({ id: uid(), name, archived: false, ...extra });
       return {
         version: SCHEMA_VERSION,
         settings: { theme: matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light" },
         meta: { lastUpdated: null, lastImport: null },
-        defs: {
-          activities: [], // activities are programmatic (ACTIVITY_TYPES), not catalog defs
-          meds: [],
-          symptoms: [
-            mk("High BP", { hasValue: true }),
-            mk("Pressure"),
-            mk("Labile HR"),
-            mk("Light headed"),
-            mk("Sick"),
-          ],
-        },
         days: {},
       };
     }
@@ -1009,12 +1041,15 @@
       s.version = SCHEMA_VERSION;
       s.settings = Object.assign({}, base.settings, s.settings);
       s.meta = Object.assign({ lastUpdated: null, lastImport: null }, s.meta);
-      s.defs = Object.assign({ activities: [], meds: [], symptoms: [] }, s.defs);
+      delete s.defs; // catalogs removed — everything is programmatic now
       s.days = s.days || {};
-      // activities are now an array of logged entries (was a {defId:…} map)
+      // activities/meds/symptoms are now arrays of logged entries (were {defId:…} maps)
       Object.keys(s.days).forEach((k) => {
         const d = s.days[k];
-        if (d && !Array.isArray(d.activities)) d.activities = [];
+        if (!d) return;
+        if (!Array.isArray(d.activities)) d.activities = [];
+        if (!Array.isArray(d.meds)) d.meds = [];
+        if (!Array.isArray(d.symptoms)) d.symptoms = [];
       });
       return s;
     }
@@ -1040,27 +1075,13 @@
           sleep: { bed: "", wake: "" },
           readings: [],
           activities: [],
-          meds: {},
-          symptoms: {},
+          meds: [],
+          symptoms: [],
         };
       }
       return (
-        d || { sleep: { bed: "", wake: "" }, readings: [], activities: [], meds: {}, symptoms: {} }
+        d || { sleep: { bed: "", wake: "" }, readings: [], activities: [], meds: [], symptoms: [] }
       );
-    }
-
-    // Should a catalog item be shown for this day? Visible if active, or this
-    // day already has a record for it (so archiving never erases the past).
-    function visibleDefs(category, k) {
-      const d = state.days[k];
-      const recorded = (id) => {
-        if (!d) return false;
-        if (category === "activities") return id in d.activities;
-        if (category === "meds") return id in d.meds;
-        if (category === "symptoms") return id in d.symptoms;
-        return false;
-      };
-      return state.defs[category].filter((it) => !it.archived || recorded(it.id));
     }
 
     /* ---------------- Theme ---------------- */
@@ -1208,8 +1229,8 @@
       root.appendChild(renderSleep());
       root.appendChild(renderReadings());
       root.appendChild(renderActivities());
-      root.appendChild(renderCatalog("meds", "Medications & Supplements"));
-      root.appendChild(renderCatalog("symptoms", "Symptoms"));
+      root.appendChild(renderMeds());
+      root.appendChild(renderSymptoms());
     }
 
     function renderSleep() {
@@ -1358,10 +1379,12 @@
         bodyEl.appendChild(el("div.muted", { text: "No readings yet." }));
       } else {
         list.forEach((r) => {
+          const def = READING_TYPES[r.type];
           const val = readingRowValue(r);
           bodyEl.appendChild(
             el("div.row", { onclick: () => readingForm(r.type, r) }, [
-              el("div.row-main", {}, [el("div.row-title", { text: READING_TYPES[r.type].label })]),
+              el("span.row-ico", { html: def.icon }),
+              el("div.row-main", {}, [el("div.row-title", { text: def.label })]),
               el("div.row-val", {}, [typeof val === "string" ? document.createTextNode(val) : val]),
               r.time ? el("span.pill", { text: fmtTime12(r.time) }) : null,
             ])
@@ -1450,6 +1473,10 @@
           ta.value = r[f.key] || "";
           inputs[f.key] = ta;
           body.appendChild(field(f.label, ta));
+        } else if (f.type === "text") {
+          const ti = el("input", { type: "text", value: r[f.key] || "", placeholder: f.placeholder || "" });
+          inputs[f.key] = ti;
+          body.appendChild(field(f.label, ti));
         }
       });
       flushRun();
@@ -1549,7 +1576,7 @@
         };
         body.appendChild(el("div.field-grid", {}, [
           mk("duration", "Duration", "min"),
-          mk("distance", "Distance"),
+          mk("distance", "Distance", "mi"),
           mk("avgHr", "Avg HR"),
           mk("maxHr", "Max HR"),
           mk("minHr", "Min HR"),
@@ -1689,6 +1716,7 @@
           const sub = [details, a.note].filter(Boolean).join(" — ");
           bodyEl.appendChild(
             el("div.row", { onclick: () => activityForm(a.type, a) }, [
+              el("span.row-ico", { html: def.icon }),
               el("div.row-main", {}, [
                 el("div.row-title", { text: def.label }),
                 sub ? el("div.row-sub", { text: sub }) : null,
@@ -1735,181 +1763,79 @@
       });
     }
 
-    /* ----- Catalog sections (activities / meds / symptoms) ----- */
-    function renderCatalog(category, title) {
+    /* ----- Logged-list sections (meds & symptoms; same pattern as readings) ----- */
+    function renderMeds() {
+      return renderLoggedSection({
+        title: "Medications & Supplements", arrKey: "meds", typeMap: MED_TYPES,
+        addLabel: "Add medication or supplement", emptyText: "No medications or supplements taken yet.",
+        showValue: false, showTime: false,
+      });
+    }
+    function renderSymptoms() {
+      return renderLoggedSection({
+        title: "Symptoms", arrKey: "symptoms", typeMap: SYMPTOM_TYPES,
+        addLabel: "Add symptom", emptyText: "No symptoms logged yet.",
+        showValue: true, showTime: true,
+      });
+    }
+
+    function renderLoggedSection(opts) {
+      const d = day();
       const sec = el("div.section");
-      sec.appendChild(
-        sectionHead(
-          title,
-          false,
-          el("button.add-link", {
-            text: "+ Add",
-            onclick: () => defForm(category, null),
-          })
-        )
-      );
+      sec.appendChild(sectionHead(opts.title, false,
+        el("button.add-link", { text: "+ Add", onclick: () => logMenu(opts) })));
       const bodyEl = el("div.section-body");
-      const items = visibleDefs(category, currentKey);
-      if (!items.length) {
-        bodyEl.appendChild(el("div.muted", { text: "Nothing here yet. Tap “+ Add”." }));
+      const list = [...(d[opts.arrKey] || [])].sort((a, b) => (a.time || "").localeCompare(b.time || ""));
+      if (!list.length) {
+        bodyEl.appendChild(el("div.muted", { text: opts.emptyText }));
       } else {
-        items.forEach((it) => bodyEl.appendChild(catalogRow(category, it)));
+        list.forEach((m) => {
+          const def = opts.typeMap[m.type];
+          if (!def) return;
+          const children = [
+            el("span.row-ico", { html: def.icon }),
+            el("div.row-main", {}, [el("div.row-title", { text: def.label })]),
+          ];
+          if (opts.showValue) {
+            const v = def.summary ? def.summary(m) : summarizeFields(def, m);
+            children.push(el("div.row-val", { text: v }));
+          }
+          if (opts.showTime && m.time) children.push(el("span.pill", { text: fmtTime12(m.time) }));
+          bodyEl.appendChild(el("div.row", { onclick: () => openEntryForm(opts.typeMap, opts.arrKey, m.type, m) }, children));
+        });
       }
       sec.appendChild(bodyEl);
       return sec;
     }
 
-    function catalogRow(category, it) {
-      const d = day();
-      const rec = d[category][it.id];
-      const on = !!rec;
-      const check = el("button.check" + (on ? ".on" : ""), {
-        text: on ? "✓" : "",
-        "aria-label": "Toggle " + it.name,
-        onclick: () => toggleCatalog(category, it),
-      });
-      const sub = [];
-      if (on && rec.value) sub.push(rec.value);
-      if (on && rec.dose) sub.push(rec.dose);
-      if (on && rec.time) sub.push(fmtTime12(rec.time));
-      return el("div.row", {}, [
-        check,
-        el("div.row-main", { onclick: () => toggleCatalog(category, it) }, [
-          el("div.row-title", { text: it.name }),
-          sub.length ? el("div.row-sub", { text: sub.join(" · ") }) : null,
-        ]),
-        el("button.row-edit", {
-          text: "✎",
-          "aria-label": "Edit " + it.name,
-          onclick: (e) => {
-            e.stopPropagation();
-            defForm(category, it);
-          },
-        }),
-      ]);
-    }
-
-    function toggleCatalog(category, it) {
-      const d = day(currentKey, true);
-      const map = d[category];
-      if (it.id in map) {
-        delete map[it.id];
-        save();
-        renderDay();
-        return;
-      }
-      // turning on
-      if (category === "symptoms" && it.hasValue) {
-        promptValue(it.name, "", (val) => {
-          map[it.id] = { time: nowTime(), value: val };
-          save();
-          renderDay();
-        });
-        return;
-      }
-      if (category === "meds") {
-        map[it.id] = { time: nowTime(), dose: it.dose || "" };
-      } else {
-        map[it.id] = { time: nowTime() };
-      }
-      save();
-      renderDay();
-    }
-
-    function promptValue(name, current, onSave) {
+    // Filterable picker of programmatic types; choosing one stacks its form.
+    function logMenu(opts) {
       openModal((body) => {
-        body.appendChild(el("h2", { text: name }));
-        const input = el("input", {
-          type: "text",
-          inputmode: "decimal",
-          value: current || "",
-          placeholder: "e.g. 150/95",
-        });
-        body.appendChild(field("Reading / value (optional)", input));
-        body.appendChild(
-          el("div.modal-actions", {}, [
-            el("button.btn", { text: "Skip", onclick: () => { onSave(""); closeAll(); } }),
-            el("button.btn.btn-primary", {
-              text: "Save",
-              onclick: () => { onSave(input.value.trim()); closeAll(); },
-            }),
-          ])
-        );
-        setTimeout(() => input.focus(), 50);
+        body.appendChild(el("h2", { text: opts.addLabel }));
+        const filter = el("input", { type: "text", placeholder: "Filter…" });
+        body.appendChild(el("div.field", {}, [filter]));
+        const listWrap = el("div");
+        body.appendChild(listWrap);
+        const types = Object.keys(opts.typeMap);
+        const draw = () => {
+          const q = filter.value.trim().toLowerCase();
+          listWrap.innerHTML = "";
+          const matches = types.filter((t) => opts.typeMap[t].label.toLowerCase().includes(q));
+          if (!matches.length) { listWrap.appendChild(el("div.muted", { text: "No matches." })); return; }
+          matches.forEach((type) => {
+            listWrap.appendChild(
+              el("button.menu-item", {
+                onclick: () => openEntryForm(opts.typeMap, opts.arrKey, type, null),
+              }, [
+                el("span.mi-ico", { html: opts.typeMap[type].icon }),
+                el("div", {}, [el("div", { text: opts.typeMap[type].label })]),
+              ])
+            );
+          });
+        };
+        filter.addEventListener("input", draw);
+        draw();
       });
-    }
-
-    // Add / edit a catalog definition
-    function defForm(category, existing) {
-      const labels = {
-        activities: "Activity",
-        meds: "Medication / Supplement",
-        symptoms: "Symptom",
-      };
-      const it = existing ? { ...existing } : { id: uid(), name: "", archived: false };
-      openModal((body) => {
-        body.appendChild(el("h2", { text: (existing ? "Edit " : "Add ") + labels[category] }));
-        const name = el("input", { type: "text", value: it.name || "", placeholder: labels[category] });
-        body.appendChild(field("Name", name));
-
-        let doseInput = null;
-        let valueCheck = null;
-        if (category === "meds") {
-          doseInput = el("input", { type: "text", value: it.dose || "", placeholder: "e.g. 5 mg" });
-          body.appendChild(field("Default dose (optional)", doseInput));
-        }
-        if (category === "symptoms") {
-          valueCheck = el("input", { type: "checkbox" });
-          valueCheck.checked = !!it.hasValue;
-          body.appendChild(
-            el("div.field", {}, [
-              el("label", {}, [
-                valueCheck,
-                el("span", { text: " Record a value when logged (e.g. a BP number)", style: "margin-left:8px" }),
-              ]),
-            ])
-          );
-        }
-
-        body.appendChild(
-          el("div.modal-actions", {}, [
-            existing
-              ? el("button.btn.btn-danger", {
-                  text: "Delete",
-                  onclick: () => {
-                    it.archived = true; // preserves past records
-                    commitDef(category, it);
-                    closeAll();
-                    renderDay();
-                    toast("Removed — past entries kept");
-                  },
-                })
-              : null,
-            el("button.btn.btn-primary", {
-              text: "Save",
-              onclick: () => {
-                const nm = name.value.trim();
-                if (!nm) return toast("Enter a name");
-                it.name = nm;
-                if (doseInput) it.dose = doseInput.value.trim();
-                if (valueCheck) it.hasValue = valueCheck.checked;
-                commitDef(category, it);
-                closeAll();
-                renderDay();
-              },
-            }),
-          ])
-        );
-        setTimeout(() => name.focus(), 50);
-      });
-    }
-
-    function commitDef(category, it) {
-      const arr = state.defs[category];
-      const i = arr.findIndex((x) => x.id === it.id);
-      if (i >= 0) arr[i] = it;
-      else arr.push(it);
-      save();
     }
 
     /* ---------------- Calendar ---------------- */
@@ -1992,8 +1918,8 @@
       return (
         (d.readings && d.readings.length) ||
         (Array.isArray(d.activities) && d.activities.length) ||
-        Object.keys(d.meds || {}).length ||
-        Object.keys(d.symptoms || {}).length ||
+        (Array.isArray(d.meds) && d.meds.length) ||
+        (Array.isArray(d.symptoms) && d.symptoms.length) ||
         (d.sleep && (d.sleep.bed || d.sleep.wake))
       );
     }
@@ -2159,8 +2085,8 @@
       );
       root.appendChild(lineChartCard("Blood Oxygen", [{ data: spo2, color: "#16a34a" }]));
 
-      root.appendChild(freqCard("Symptoms", "symptoms", keys));
-      root.appendChild(freqCardActivities(keys));
+      root.appendChild(freqCardTyped("Symptoms", "symptoms", SYMPTOM_TYPES, keys));
+      root.appendChild(freqCardTyped("Activities", "activities", ACTIVITY_TYPES, keys));
     }
 
     function lineChartCard(title, series) {
@@ -2244,38 +2170,18 @@
       return el("div.chart", {}, [svg]);
     }
 
-    function freqCard(title, category, keys) {
+    // Frequency of logged entries (array), counted by type, labeled via typeMap.
+    function freqCardTyped(title, arrKey, typeMap, keys) {
       const card = el("div.chart-card", {}, [el("h3", { text: title })]);
       const counts = new Map();
       keys.forEach((k) => {
         const d = state.days[k];
-        Object.keys((d && d[category]) || {}).forEach((id) => counts.set(id, (counts.get(id) || 0) + 1));
-      });
-      const nameOf = (id) => {
-        const def = state.defs[category].find((x) => x.id === id);
-        return def ? def.name : "—";
-      };
-      const rows = [...counts.entries()].sort((a, b) => b[1] - a[1]);
-      if (!rows.length) {
-        card.appendChild(el("div.chart-empty", { text: "None logged in range." }));
-        return card;
-      }
-      renderFreqRows(card, rows.map(([id, c]) => [nameOf(id), c]));
-      return card;
-    }
-
-    // Activities are logged entries (array), counted by type.
-    function freqCardActivities(keys) {
-      const card = el("div.chart-card", {}, [el("h3", { text: "Activities" })]);
-      const counts = new Map();
-      keys.forEach((k) => {
-        const d = state.days[k];
-        (d && Array.isArray(d.activities) ? d.activities : []).forEach((a) =>
-          counts.set(a.type, (counts.get(a.type) || 0) + 1)
+        (d && Array.isArray(d[arrKey]) ? d[arrKey] : []).forEach((e) =>
+          counts.set(e.type, (counts.get(e.type) || 0) + 1)
         );
       });
       const rows = [...counts.entries()]
-        .map(([type, c]) => [ACTIVITY_TYPES[type] ? ACTIVITY_TYPES[type].label : type, c])
+        .map(([type, c]) => [typeMap[type] ? typeMap[type].label : type, c])
         .sort((a, b) => b[1] - a[1]);
       if (!rows.length) {
         card.appendChild(el("div.chart-empty", { text: "None logged in range." }));
