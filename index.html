@@ -484,11 +484,16 @@
   .field input[type="checkbox"] {
     width: 22px; height: 22px; accent-color: var(--accent); cursor: pointer;
   }
+  .field select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239a9aa0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 38px;
+  }
   .field-divider {
-    grid-column: 1 / -1;
     height: 1px;
     background: var(--border);
-    margin: 2px 0 16px;
+    margin: 4px 0 18px;
   }
   .field-inline { display: flex; gap: 10px; }
   .field-inline > .field { flex: 1; min-width: 0; }
@@ -796,32 +801,70 @@
           { key: "stressIndex", label: "Stress index" },
           { key: "lowPower", label: "Low power" },
           { key: "highPower", label: "High power" },
+          { type: "check", key: "swallowing", label: "Swallowing" },
         ],
-        checks: [{ key: "swallowing", label: "Swallowing" }],
       },
       breathHrv: {
         label: "Breathing HRV",
         icon: ICONS.wind,
-        fields: [{ key: "value", label: "Value" }],
+        fields: [
+          { type: "select", key: "style", label: "Breathing style", options: ["4/4", "4/5", "4/6", "5/5"] },
+          { type: "number", key: "coherence", label: "Coherence", unit: "%" },
+          { divider: true },
+          { type: "number", key: "sdnn", label: "SDNN" },
+          { type: "number", key: "hr", label: "HR" },
+          { type: "number", key: "meanRr", label: "Mean RR" },
+          { type: "number", key: "rmssd", label: "RMSSD" },
+          { type: "number", key: "pnn50", label: "pNN50" },
+          { type: "number", key: "mxdmn", label: "MxDMn" },
+          { type: "number", key: "mode", label: "Mode" },
+          { type: "number", key: "amo50", label: "AMo50" },
+          { type: "number", key: "cv", label: "CV" },
+          { type: "number", key: "vlowPower", label: "Very low power" },
+          { type: "number", key: "lowPower", label: "Low power" },
+          { type: "number", key: "highPower", label: "High power" },
+          { divider: true },
+          { type: "time", key: "time", label: "Time" },
+          { type: "select", key: "period", label: "Reading type", options: ["Morning", "Evening", "Random"] },
+          { type: "check", key: "swallowing", label: "Swallowing" },
+        ],
       },
       bp: {
         label: "Blood Pressure",
         icon: ICONS.droplet,
         fields: [
-          { key: "sys", label: "Systolic" },
-          { key: "dia", label: "Diastolic" },
-          { key: "pulse", label: "Pulse" },
+          { type: "number", key: "sys", label: "Systolic" },
+          { type: "number", key: "dia", label: "Diastolic" },
+          { type: "number", key: "pulse", label: "Pulse" },
+          { type: "select", key: "period", label: "Reading type", options: ["Morning", "Evening", "Random"] },
         ],
       },
       bloodO2: {
         label: "Blood Oxygen",
         icon: ICONS.gauge,
-        fields: [{ key: "value", label: "Blood oxygen", unit: "%" }],
+        fields: [
+          { type: "number", key: "value", label: "Blood oxygen", unit: "%" },
+          { type: "number", key: "perfusion", label: "Perfusion index" },
+          { type: "number", key: "pulse", label: "Pulse" },
+        ],
       },
       ecg: {
         label: "ECG",
         icon: ICONS.activity,
-        fields: [], // template TBD; logs time + note for now
+        fields: [
+          { type: "number", key: "hrv", label: "HRV" },
+          { type: "number", key: "hr", label: "HR" },
+          { type: "number", key: "qrs", label: "QRS" },
+          { type: "number", key: "qtc", label: "QTc" },
+          { type: "number", key: "pr", label: "PR" },
+          { type: "number", key: "ectopic", label: "Ectopic beats" },
+          { divider: true },
+          { type: "check", key: "sinus", label: "Sinus" },
+          { type: "check", key: "svt", label: "SVT" },
+          { type: "check", key: "otherArrhythmia", label: "Other" },
+          { type: "textarea", key: "note", label: "Notes", placeholder: "Optional notes" },
+          { type: "textarea", key: "techReview", label: "Technician review", placeholder: "Technician review" },
+        ],
       },
     };
 
@@ -1135,23 +1178,52 @@
       return wrap;
     }
 
-    // Shared helpers for field-based entries (readings & activities).
+    // ---- Generic entry schema (shared by readings & activities) ----
+    // Each field has a `type`: "number" (default for legacy {key,label}),
+    // "select", "time", "check", or a divider ({divider:true}). The ordered
+    // list drives both the form and the row summaries.
+    const isDivider = (f) => f.divider || f.type === "divider";
+    const isNumberField = (f) => f.type === "number" || (!f.type && f.key && !f.divider);
+    const fieldLabel = (f) => f.label + (f.unit ? ` (${f.unit})` : "");
+
+    // The fields to render. Auto-adds a Time input (before any free-text
+    // fields) and a trailing Notes textarea when the schema doesn't define them.
+    function entryFields(def) {
+      const fields = (def && def.fields ? def.fields : []).slice();
+      if (!fields.some((f) => f.type === "time")) {
+        const firstText = fields.findIndex((f) => f.type === "textarea");
+        const timeField = { type: "time", key: "time", label: "Time" };
+        if (firstText >= 0) fields.splice(firstText, 0, timeField);
+        else fields.push(timeField);
+      }
+      if (!fields.some((f) => f.key === "note")) {
+        fields.push({ type: "textarea", key: "note", label: "Notes", placeholder: "Optional note" });
+      }
+      return fields;
+    }
+
+    // Headline value shown on the right of a row = first filled number field.
     function summarizeFields(def, r) {
-      for (const f of (def && def.fields ? def.fields : [])) {
+      for (const f of entryFields(def)) {
+        if (!isNumberField(f)) continue;
         const v = r[f.key];
         if (v != null && v !== "") return v + (f.unit || "");
       }
       return "";
     }
+    // Secondary line = remaining filled fields (numbers/selects) + checked flags.
     function detailFields(def, r) {
       if (!def) return "";
       const parts = [];
-      (def.fields || []).forEach((f, i) => {
-        if (i === 0) return; // headline already shows the first field
+      let headlineSkipped = false;
+      for (const f of entryFields(def)) {
+        if (isDivider(f) || f.type === "time" || f.type === "textarea") continue;
+        if (f.type === "check") { if (r[f.key]) parts.push(f.label); continue; }
         const v = r[f.key];
-        if (v != null && v !== "") parts.push(`${f.label} ${v}${f.unit || ""}`);
-      });
-      (def.checks || []).forEach((c) => { if (r[c.key]) parts.push(c.label); });
+        if (v == null || v === "") continue;
+        if (isNumberField(f) && !headlineSkipped) { headlineSkipped = true; continue; }
+        parts.push(`${f.label} ${v}${f.unit || ""}`);
+      }
       return parts.join(" · ");
     }
 
@@ -1163,8 +1235,7 @@
         if (r.pulse) s += ` · ${r.pulse} bpm`;
         return s;
       }
-      const s = summarizeFields(def, r);
-      return s || (r.value != null && r.value !== "" ? String(r.value) : ""); // legacy
+      return summarizeFields(def, r) || (r.value != null && r.value !== "" ? String(r.value) : "");
     }
     function readingDetails(r) {
       const def = READING_TYPES[r.type];
@@ -1237,45 +1308,66 @@
       });
     }
 
-    function readingForm(type, existing) {
-      const def = READING_TYPES[type];
-      const r = existing
-        ? { ...existing }
-        : { id: uid(), type, time: nowTime(), note: "" };
+    // Render the ordered field schema into `body`, collecting controls into
+    // `inputs` (keyed by field key). Consecutive number fields are grouped into
+    // a 2-column grid; everything else (select/time/check/divider, and lone
+    // numbers) is rendered full width.
+    function buildFieldInputs(body, fields, r, inputs) {
+      let run = [];
+      const flushRun = () => {
+        if (!run.length) return;
+        if (run.length === 1) {
+          const f = run[0];
+          inputs[f.key] = numInput(r[f.key]);
+          body.appendChild(field(fieldLabel(f), inputs[f.key]));
+        } else {
+          const grid = el("div.field-grid");
+          run.forEach((f) => {
+            inputs[f.key] = numInput(r[f.key]);
+            grid.appendChild(field(fieldLabel(f), inputs[f.key]));
+          });
+          body.appendChild(grid);
+        }
+        run = [];
+      };
+      fields.forEach((f) => {
+        if (isNumberField(f)) { run.push(f); return; }
+        flushRun();
+        if (isDivider(f)) {
+          body.appendChild(el("div.field-divider"));
+        } else if (f.type === "select") {
+          const sel = el("select", {}, f.options.map((o) => el("option", { value: o, text: o })));
+          sel.value = r[f.key] != null && r[f.key] !== "" ? r[f.key] : f.options[0];
+          inputs[f.key] = sel;
+          body.appendChild(field(fieldLabel(f), sel));
+        } else if (f.type === "time") {
+          const t = el("input", { type: "time", value: r[f.key] || nowTime() });
+          inputs[f.key] = t;
+          body.appendChild(field(f.label || "Time", t));
+        } else if (f.type === "check") {
+          const cb = el("input", { type: "checkbox" });
+          cb.checked = !!r[f.key];
+          inputs[f.key] = cb;
+          body.appendChild(el("div.field.field-check", {}, [el("label", {}, [cb, el("span", { text: f.label })])]));
+        } else if (f.type === "textarea") {
+          const ta = el("textarea", { placeholder: f.placeholder || "" });
+          ta.value = r[f.key] || "";
+          inputs[f.key] = ta;
+          body.appendChild(field(f.label, ta));
+        }
+      });
+      flushRun();
+    }
+
+    // Generic add/edit form for a typed entry (reading or activity).
+    function openEntryForm(typeMap, arrKey, type, existing) {
+      const def = typeMap[type];
+      const r = existing ? { ...existing } : { id: uid(), type, time: nowTime(), note: "" };
+      const fields = entryFields(def);
       openModal((body) => {
         body.appendChild(el("h2", { text: (existing ? "Edit " : "") + def.label }));
         const inputs = {};
-        const addField = (f) => {
-          if (f.divider) return el("div.field-divider");
-          inputs[f.key] = numInput(r[f.key]);
-          return field(f.label + (f.unit ? ` (${f.unit})` : ""), inputs[f.key]);
-        };
-        if (def.fields.length > 1) {
-          // compact 2-column grid for multi-field readings (HRV, BP, …)
-          const grid = el("div.field-grid", {}, def.fields.map(addField));
-          body.appendChild(grid);
-        } else {
-          def.fields.forEach((f) => body.appendChild(addField(f)));
-        }
-
-        // optional boolean flags (e.g. swallowing)
-        const checks = {};
-        (def.checks || []).forEach((c) => {
-          const cb = el("input", { type: "checkbox" });
-          cb.checked = !!r[c.key];
-          checks[c.key] = cb;
-          body.appendChild(
-            el("div.field.field-check", {}, [
-              el("label", {}, [cb, el("span", { text: c.label })]),
-            ])
-          );
-        });
-
-        const time = el("input", { type: "time", value: r.time || nowTime() });
-        const note = el("textarea", { placeholder: "Optional note" });
-        note.value = r.note || "";
-        body.appendChild(field("Time", time));
-        body.appendChild(field("Note", note));
+        buildFieldInputs(body, fields, r, inputs);
 
         body.appendChild(
           el("div.modal-actions", {}, [
@@ -1284,7 +1376,7 @@
                   text: "Delete",
                   onclick: () => {
                     const d = day(currentKey, true);
-                    d.readings = d.readings.filter((x) => x.id !== r.id);
+                    d[arrKey] = d[arrKey].filter((x) => x.id !== r.id);
                     save();
                     closeAll();
                     renderDay();
@@ -1294,23 +1386,24 @@
             el("button.btn.btn-primary", {
               text: "Save",
               onclick: () => {
-                const hasFields = def.fields.some((f) => f.key);
-                const anyVal = def.fields.some((f) => f.key && inputs[f.key].value.trim() !== "");
-                const anyCheck = (def.checks || []).some((c) => checks[c.key].checked);
+                const numFields = fields.filter(isNumberField);
+                const anyNum = numFields.some((f) => String(inputs[f.key].value).trim() !== "");
+                const anyCheck = fields.filter((f) => f.type === "check").some((f) => inputs[f.key].checked);
                 if (type === "bp") {
                   if (!inputs.sys.value.trim() && !inputs.dia.value.trim())
                     return toast("Enter a blood pressure");
-                } else if (hasFields && !anyVal && !anyCheck) {
+                } else if (numFields.length && !anyNum && !anyCheck) {
                   return toast("Enter a value");
                 }
-                def.fields.forEach((f) => { if (f.key) r[f.key] = inputs[f.key].value.trim(); });
-                (def.checks || []).forEach((c) => { r[c.key] = checks[c.key].checked; });
-                r.time = time.value;
-                r.note = note.value.trim();
+                fields.forEach((f) => {
+                  if (isDivider(f)) return;
+                  if (f.type === "check") r[f.key] = inputs[f.key].checked;
+                  else r[f.key] = String(inputs[f.key].value).trim();
+                });
                 const d = day(currentKey, true);
-                const i = d.readings.findIndex((x) => x.id === r.id);
-                if (i >= 0) d.readings[i] = r;
-                else d.readings.push(r);
+                const i = d[arrKey].findIndex((x) => x.id === r.id);
+                if (i >= 0) d[arrKey][i] = r;
+                else d[arrKey].push(r);
                 save();
                 closeAll();
                 renderDay();
@@ -1320,6 +1413,9 @@
         );
       });
     }
+
+    function readingForm(type, existing) { openEntryForm(READING_TYPES, "readings", type, existing); }
+    function activityForm(type, existing) { openEntryForm(ACTIVITY_TYPES, "activities", type, existing); }
 
     function field(label, input) {
       return el("div.field", {}, [el("label", { text: label }), input]);
@@ -1398,70 +1494,6 @@
         };
         filter.addEventListener("input", draw);
         draw();
-      });
-    }
-
-    function activityForm(type, existing) {
-      const def = ACTIVITY_TYPES[type];
-      const r = existing ? { ...existing } : { id: uid(), type, time: nowTime(), note: "" };
-      openModal((body) => {
-        body.appendChild(el("h2", { text: (existing ? "Edit " : "") + def.label }));
-        const inputs = {};
-        const addField = (f) => {
-          if (f.divider) return el("div.field-divider");
-          inputs[f.key] = numInput(r[f.key]);
-          return field(f.label + (f.unit ? ` (${f.unit})` : ""), inputs[f.key]);
-        };
-        if ((def.fields || []).length > 1) {
-          body.appendChild(el("div.field-grid", {}, def.fields.map(addField)));
-        } else {
-          (def.fields || []).forEach((f) => body.appendChild(addField(f)));
-        }
-        const checks = {};
-        (def.checks || []).forEach((c) => {
-          const cb = el("input", { type: "checkbox" });
-          cb.checked = !!r[c.key];
-          checks[c.key] = cb;
-          body.appendChild(el("div.field.field-check", {}, [el("label", {}, [cb, el("span", { text: c.label })])]));
-        });
-        const time = el("input", { type: "time", value: r.time || nowTime() });
-        const note = el("textarea", { placeholder: "Optional note" });
-        note.value = r.note || "";
-        body.appendChild(field("Time", time));
-        body.appendChild(field("Note", note));
-
-        body.appendChild(
-          el("div.modal-actions", {}, [
-            existing
-              ? el("button.btn.btn-danger", {
-                  text: "Delete",
-                  onclick: () => {
-                    const d = day(currentKey, true);
-                    d.activities = d.activities.filter((x) => x.id !== r.id);
-                    save();
-                    closeAll();
-                    renderDay();
-                  },
-                })
-              : null,
-            el("button.btn.btn-primary", {
-              text: "Save",
-              onclick: () => {
-                (def.fields || []).forEach((f) => { if (f.key) r[f.key] = inputs[f.key].value.trim(); });
-                (def.checks || []).forEach((c) => { r[c.key] = checks[c.key].checked; });
-                r.time = time.value;
-                r.note = note.value.trim();
-                const d = day(currentKey, true);
-                const i = d.activities.findIndex((x) => x.id === r.id);
-                if (i >= 0) d.activities[i] = r;
-                else d.activities.push(r);
-                save();
-                closeAll();
-                renderDay();
-              },
-            }),
-          ])
-        );
       });
     }
 
@@ -1857,7 +1889,7 @@
         const d = state.days[k];
         (d.readings || []).forEach((r) => {
           if (r.type === "hrv") push(hrv, k, r.sdnn);
-          if (r.type === "breathHrv") push(breath, k, r.value);
+          if (r.type === "breathHrv") push(breath, k, r.coherence);
           if (r.type === "bloodO2") push(spo2, k, r.value);
           if (r.type === "bp") { push(sys, k, r.sys); push(dia, k, r.dia); }
         });
@@ -1873,14 +1905,14 @@
       root.appendChild(
         el("div.stat-grid", {}, [
           stat("Avg SDNN", avg(hrv)),
-          stat("Avg Breathing HRV", avg(breath)),
+          stat("Avg Coherence", avg(breath), avg(breath) != null ? "%" : ""),
           stat("Avg BP", avg(sys) != null ? `${avg(sys)}/${avg(dia)}` : null),
           stat("Avg Blood O₂", avg(spo2), avg(spo2) != null ? "%" : ""),
         ])
       );
 
       root.appendChild(lineChartCard("Unstructured HRV (SDNN)", [{ data: hrv, color: "var(--accent)" }]));
-      root.appendChild(lineChartCard("Breathing HRV", [{ data: breath, color: "#3b82f6" }]));
+      root.appendChild(lineChartCard("Breathing Coherence", [{ data: breath, color: "#3b82f6" }]));
       root.appendChild(
         lineChartCard("Blood Pressure", [
           { data: sys, color: "var(--accent)", label: "Sys" },
