@@ -1590,7 +1590,12 @@
       robinson: [{ max: 71, cat: "great" }, { max: 81, cat: "good" }, { max: 91, cat: "ok" }, { max: 101, cat: "bad" }, { max: Infinity, cat: "concerning" }],
       kvas: [{ max: 14, cat: "great" }, { max: 17, cat: "good" }, { max: 21, cat: "ok" }, { max: 26, cat: "bad" }, { max: Infinity, cat: "concerning" }],
       bce: [{ max: 2601, cat: "great" }, { max: 3001, cat: "good" }, { max: 3501, cat: "ok" }, { max: 4001, cat: "bad" }, { max: Infinity, cat: "concerning" }],
+      perfusion: [{ max: 1, cat: "concerning" }, { max: 2, cat: "bad" }, { max: 4, cat: "ok" }, { max: 5, cat: "good" }, { max: Infinity, cat: "great" }],
     };
+    // Resting-HR zones depend on body position.
+    const restingHrBands = (pos) => (!pos || /lay/i.test(pos))
+      ? [{ max: 63, cat: "great" }, { max: 69, cat: "good" }, { max: 76, cat: "ok" }, { max: 86, cat: "bad" }, { max: Infinity, cat: "concerning" }]
+      : [{ max: 69, cat: "great" }, { max: 79, cat: "good" }, { max: 89, cat: "ok" }, { max: 99, cat: "bad" }, { max: Infinity, cat: "concerning" }];
     // QTc norms run a little longer for females; shift the high-side thresholds.
     const qtcBands = (sex) => sex === "Female"
       ? BANDS.qtc.map((b) => ({ max: (b.max > 350 && isFinite(b.max)) ? b.max + 10 : b.max, cat: b.cat }))
@@ -1779,6 +1784,9 @@
         if (r.type === "breathHrv") breathingSummary(r, body);
         else if (r.type === "bp") bpSummary(r, body);
         else if (r.type === "ecg") ecgSummary(r, body);
+        else if (r.type === "restingHr") restingHrSummary(r, body);
+        else if (r.type === "bloodO2") bloodO2Summary(r, body);
+        else if (r.type === "hrv") unstructuredHrvSummary(r, body);
         else genericReadingSummary(r, body);
       }, { action: { icon: ICONS.edit, label: "Edit", onclick: () => readingForm(r.type, r) } });
     }
@@ -1981,6 +1989,84 @@
 
       if (r.note) { const nc = sumCard("Notes"); nc.appendChild(el("div.metric-card", {}, [el("div.sum-text", { text: r.note })])); body.appendChild(nc); }
       if (r.techReview) { const tc = sumCard("Technician review"); tc.appendChild(el("div.metric-card", {}, [el("div.sum-text", { text: r.techReview })])); body.appendChild(tc); }
+    }
+
+    const notesCard = (r, b) => { if (r.note) { const nc = sumCard("Notes"); nc.appendChild(el("div.metric-card", {}, [el("div.sum-text", { text: r.note })])); b.appendChild(nc); } };
+
+    function restingHrSummary(r, body) {
+      const cat = rowScoreCategory(r);
+      const verdict = {
+        great: "Resting heart rate is in a strong range.", good: "Resting heart rate is healthy.",
+        ok: "Slightly elevated for rest.", bad: "Elevated resting heart rate; note context.",
+        concerning: "High resting heart rate; consider rechecking and context.",
+      };
+      body.appendChild(heroCard({ cat, label: "Resting heart rate", big: r.hr || "", den: "bpm", sub: r.position || "", tip: verdict[cat] || "" }));
+      const band = restingHrBands(r.position);
+      const c = sumCard("Heart rate");
+      const hrCat = (r.hr !== "" && r.hr != null) ? catFromBands(+r.hr, band) : null;
+      c.appendChild(metricRow("HR", r.hr, hrCat, `Resting heart rate (${(r.position || "laying").toLowerCase()}). Lower generally reflects stronger parasympathetic tone.`, buildSpark(metricHistory("restingHr", numEx("hr")), band)));
+      c.appendChild(metricRow("Position", r.position, false, "Body position during the reading; thresholds differ for laying vs sitting."));
+      body.appendChild(c);
+      notesCard(r, body);
+    }
+
+    function bloodO2Summary(r, body) {
+      const s = computeScores(r);
+      const cat = rowScoreCategory(r);
+      const verdict = {
+        great: "Oxygen saturation is excellent.", good: "Oxygen saturation is good.",
+        ok: "Oxygen saturation is borderline.", bad: "Low oxygen saturation; recheck.",
+        concerning: "Low oxygen saturation; recheck and note context.",
+      };
+      body.appendChild(heroCard({ cat, label: "Blood oxygen", big: r.value ? r.value + "%" : "", sub: "SpO2", tip: verdict[cat] || "" }));
+      const ox = sumCard("Oxygenation");
+      ox.appendChild(metricRow("Blood oxygen", r.value ? r.value + "%" : "", s.value, "Percent of hemoglobin carrying oxygen. Use the left hand; the right can read low from peripheral vasoconstriction.", buildSpark(metricHistory("bloodO2", numEx("value")), BANDS.spo2)));
+      body.appendChild(ox);
+      const sq = sumCard("Signal quality");
+      const piCat = (r.perfusion !== "" && r.perfusion != null) ? catFromBands(+r.perfusion, BANDS.perfusion) : null;
+      sq.appendChild(metricRow("Perfusion index", r.perfusion, piCat, "Signal strength of the reading. 5+ trust it, 2-4 moderate confidence, under 2 is unreliable (try another finger or hand).", buildSpark(metricHistory("bloodO2", numEx("perfusion")), BANDS.perfusion)));
+      sq.appendChild(metricRow("Pulse", r.pulse, false, "Heart rate at the time of the reading.", buildSpark(metricHistory("bloodO2", numEx("pulse")), null)));
+      body.appendChild(sq);
+      notesCard(r, body);
+    }
+
+    function unstructuredHrvSummary(r, body) {
+      const s = computeScores(r);
+      const cat = rowScoreCategory(r);
+      const verdict = {
+        great: "Strong readiness today.", good: "Good readiness.", ok: "Moderate readiness; keep it easy.",
+        bad: "Low readiness; favor rest.", crash: "Very low readiness; prioritize rest.",
+        warning: "Readiness is unusually high (blue zone), which can signal fragility. Do less, not more.",
+      };
+      body.appendChild(heroCard({ cat, label: "Readiness", big: r.readiness ? r.readiness + "%" : "", sub: "Recovery readiness", tip: verdict[cat] || "" }));
+      const sp = (k, bands) => buildSpark(metricHistory("hrv", numEx(k)), bands);
+
+      const rc = sumCard("Readiness");
+      rc.appendChild(metricRow("Readiness", r.readiness ? r.readiness + "%" : "", s.readiness, "Device recovery readiness. 70-85% is ideal; 86%+ can paradoxically signal fragility.", sp("readiness", BANDS.readiness)));
+      body.appendChild(rc);
+
+      const ab = sumCard("Autonomic balance");
+      ab.appendChild(metricRow("PNS index", r.pns, false, "Parasympathetic (rest and recovery) activity. Higher means more vagal dominance.", sp("pns", null)));
+      ab.appendChild(metricRow("SNS index", r.sns, false, "Sympathetic (activation and stress) activity. Higher means more arousal.", sp("sns", null)));
+      ab.appendChild(metricRow("Stress index", r.stressIndex, false, "Baevsky stress index. Higher means more sympathetic strain and rigidity.", sp("stressIndex", null)));
+      body.appendChild(ab);
+
+      const va = sumCard("Variability");
+      va.appendChild(metricRow("RMSSD", r.rmssd, s.rmssd, HRV_EXPLAIN.rmssd, sp("rmssd", BANDS.rmssdU)));
+      va.appendChild(metricRow("SDNN", r.sdnn, s.sdnn, HRV_EXPLAIN.sdnn, sp("sdnn", BANDS.sdnn)));
+      va.appendChild(metricRow("Avg HR", r.avgHr, s.avgHr, "Average heart rate during the reading. Lower usually reflects more vagal tone.", sp("avgHr", BANDS.hrBreath)));
+      body.appendChild(va);
+
+      const pw = sumCard("Power");
+      pw.appendChild(metricRow("Low power", r.lowPower, false, "Low-frequency power (baroreflex and sympathovagal activity).", sp("lowPower", null)));
+      pw.appendChild(metricRow("High power", r.highPower, false, "High-frequency power (vagal, tied to breathing).", sp("highPower", null)));
+      body.appendChild(pw);
+
+      const det = sumCard("Details");
+      det.appendChild(metricRow("Physiological age", r.age, false, "Device-estimated physiological age (not your actual age)."));
+      det.appendChild(metricRow("Swallowing", r.swallowing ? "Yes" : "No", false));
+      body.appendChild(det);
+      notesCard(r, body);
     }
 
     function renderReadings() {
