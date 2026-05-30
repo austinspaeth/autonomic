@@ -270,6 +270,10 @@
     border-radius: var(--radius-sm);
     padding: 11px 10px;
     font-size: 15px;
+    line-height: 1.4;
+    /* keep height consistent whether or not a value is set (an empty
+       appearance:none time input would otherwise collapse) */
+    min-height: 44px;
     font-family: inherit;
   }
   .sleep-cell input::-webkit-date-and-time-value { text-align: left; margin: 0; }
@@ -443,6 +447,7 @@
     font-family: inherit;
   }
   .field textarea { min-height: 70px; resize: vertical; }
+  .field input[type="time"], .field input[type="date"] { min-height: 47px; }
   .field-inline { display: flex; gap: 10px; }
   .field-inline > .field { flex: 1; min-width: 0; }
   .field-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 10px; }
