@@ -931,7 +931,7 @@
           { type: "number", key: "meanRr", label: "Mean RR" },
           { type: "number", key: "rmssd", label: "RMSSD" },
           { type: "number", key: "pnn50", label: "pNN50" },
-          { type: "number", key: "mxdmn", label: "MxDMn" },
+          { type: "number", key: "mxdmn", label: "MxDMn", unit: "s" },
           { type: "number", key: "mode", label: "Mode" },
           { type: "number", key: "amo50", label: "AMo50" },
           { type: "number", key: "cv", label: "CV" },
@@ -1444,6 +1444,11 @@
     const sLfHf = (v) => { v = numOr(v); if (v == null) return null; if (v < 1.5) return "great"; if (v <= 3) return "good"; if (v <= 5) return "ok"; if (v <= 10) return "bad"; return "concerning"; };
     const expectedHf = (style) => ({ "4/4": [0.18, 0.21], "4/5": [0.17, 0.20], "4/6": [0.15, 0.18], "5/5": [0.16, 0.18] })[style] || null;
     const sHfPeak = (v, style) => { v = numOr(v); const e = expectedHf(style); if (v == null || !e) return null; if (v >= e[0] && v <= e[1]) return "great"; const d = v < e[0] ? e[0] - v : v - e[1]; return d <= 0.02 ? "good" : d <= 0.04 ? "ok" : "bad"; };
+    const sHR = (v) => { v = numOr(v); return v == null ? null : v <= 62 ? "great" : v <= 68 ? "good" : v <= 75 ? "ok" : v <= 85 ? "bad" : "concerning"; }; // lower better
+    const sRrMode = (v) => { v = numOr(v); if (v == null) return null; if (v < 720 || v > 1090) return "concerning"; if (v >= 950) return "great"; if (v >= 870) return "good"; if (v >= 790) return "ok"; return "bad"; };
+    const sMxDMn = (v) => { v = numOr(v); return v == null ? null : v >= 0.35 ? "great" : v >= 0.25 ? "good" : v >= 0.18 ? "ok" : v >= 0.12 ? "bad" : "crash"; }; // seconds
+    const sAMo50 = (v) => { v = numOr(v); return v == null ? null : v < 30 ? "great" : v < 40 ? "good" : v < 50 ? "ok" : v < 60 ? "bad" : "concerning"; }; // lower better
+    const sCV = (v) => { v = numOr(v); return v == null ? null : v >= 7 ? "great" : v >= 5.5 ? "good" : v >= 4.5 ? "ok" : v >= 3 ? "bad" : "crash"; };
     const sRhythm = (r) => (r.svt ? "concerning" : r.otherArrhythmia ? "bad" : r.sinus ? "great" : null);
     const sSys = (s) => { s = numOr(s); if (s == null) return null; if (s >= 150) return "concerning"; if (s >= 136) return "bad"; if (s >= 129) return "ok"; if (s >= 119) return "good"; if (s >= 108) return "great"; if (s >= 100) return "ok"; return "bad"; };
     const sDia = (d) => { d = numOr(d); if (d == null) return null; if (d >= 95) return "concerning"; if (d >= 88) return "bad"; if (d >= 83) return "ok"; if (d >= 79) return "good"; if (d >= 65) return "great"; if (d >= 60) return "ok"; return "bad"; };
@@ -1461,6 +1466,7 @@
           put("readiness", sReadiness(r.readiness));
           put("rmssd", sRMSSDu(r.rmssd));
           put("sdnn", sSDNN(r.sdnn));
+          put("avgHr", sHR(r.avgHr));
           break;
         case "breathHrv": {
           put("sdnn", sSDNN(r.sdnn));
@@ -1473,6 +1479,12 @@
           put("hfPeak", sHfPeak(r.hfPeak, r.style));
           const lf = parseFloat(r.lowPower), hf = parseFloat(r.highPower);
           if (!isNaN(lf) && !isNaN(hf) && hf !== 0) put("lfhf", sLfHf(lf / hf));
+          put("hr", sHR(r.hr));
+          put("meanRr", sRrMode(r.meanRr));
+          put("mode", sRrMode(r.mode));
+          put("mxdmn", sMxDMn(r.mxdmn));
+          put("amo50", sAMo50(r.amo50));
+          put("cv", sCV(r.cv));
           put("overall", worstCat([s.rmssd, s.pnn50, s.totalPower].filter(Boolean)));
           break;
         }
@@ -1565,11 +1577,16 @@
       pr: [{ max: 100, cat: "concerning" }, { max: 110, cat: "bad" }, { max: 120, cat: "ok" }, { max: 140, cat: "good" }, { max: 181, cat: "great" }, { max: 201, cat: "good" }, { max: 221, cat: "ok" }, { max: 241, cat: "bad" }, { max: Infinity, cat: "concerning" }],
       sys: [{ max: 100, cat: "bad" }, { max: 108, cat: "ok" }, { max: 119, cat: "great" }, { max: 129, cat: "good" }, { max: 136, cat: "ok" }, { max: 150, cat: "bad" }, { max: Infinity, cat: "concerning" }],
       dia: [{ max: 60, cat: "bad" }, { max: 65, cat: "ok" }, { max: 79, cat: "great" }, { max: 83, cat: "good" }, { max: 88, cat: "ok" }, { max: 95, cat: "bad" }, { max: Infinity, cat: "concerning" }],
+      hrBreath: [{ max: 63, cat: "great" }, { max: 69, cat: "good" }, { max: 76, cat: "ok" }, { max: 86, cat: "bad" }, { max: Infinity, cat: "concerning" }],
+      rrMode: [{ max: 720, cat: "concerning" }, { max: 790, cat: "bad" }, { max: 870, cat: "ok" }, { max: 950, cat: "good" }, { max: 1091, cat: "great" }, { max: Infinity, cat: "concerning" }],
+      mxdmn: [{ max: 0.12, cat: "crash" }, { max: 0.18, cat: "bad" }, { max: 0.25, cat: "ok" }, { max: 0.35, cat: "good" }, { max: Infinity, cat: "great" }],
+      amo50: [{ max: 30, cat: "great" }, { max: 40, cat: "good" }, { max: 50, cat: "ok" }, { max: 60, cat: "bad" }, { max: Infinity, cat: "concerning" }],
+      cv: [{ max: 3, cat: "crash" }, { max: 4.5, cat: "bad" }, { max: 5.5, cat: "ok" }, { max: 7, cat: "good" }, { max: Infinity, cat: "great" }],
     };
     function bandsFor(type, key) {
       const map = {
-        hrv: { readiness: "readiness", rmssd: "rmssdU", sdnn: "sdnn" },
-        breathHrv: { sdnn: "sdnn", rmssd: "rmssdS", pnn50: "pnn50", vlowPower: "vlf", lfPeak: "lfPeak", coherence: "coherence" },
+        hrv: { readiness: "readiness", rmssd: "rmssdU", sdnn: "sdnn", avgHr: "hrBreath" },
+        breathHrv: { sdnn: "sdnn", rmssd: "rmssdS", pnn50: "pnn50", vlowPower: "vlf", lfPeak: "lfPeak", coherence: "coherence", hr: "hrBreath", meanRr: "rrMode", mode: "rrMode", mxdmn: "mxdmn", amo50: "amo50", cv: "cv" },
         bp: { sys: "sys", dia: "dia" },
         bloodO2: { value: "spo2" },
         ecg: { qtc: "qtc", qrs: "qrs", pr: "pr", ectopic: "ectopic" },
@@ -1797,12 +1814,12 @@
       mc.appendChild(metricRow("RMSSD", r.rmssd, s.rmssd, HRV_EXPLAIN.rmssd, sp(numEx("rmssd"), BANDS.rmssdS)));
       mc.appendChild(metricRow("pNN50", r.pnn50 ? r.pnn50 + "%" : "", s.pnn50, HRV_EXPLAIN.pnn50, sp(numEx("pnn50"), BANDS.pnn50)));
       mc.appendChild(metricRow("SDNN", r.sdnn, s.sdnn, HRV_EXPLAIN.sdnn, sp(numEx("sdnn"), BANDS.sdnn)));
-      mc.appendChild(metricRow("HR", r.hr, null, HRV_EXPLAIN.hr, sp(numEx("hr"), null)));
-      mc.appendChild(metricRow("Mean RR", r.meanRr, null, HRV_EXPLAIN.meanRr, sp(numEx("meanRr"), null)));
-      mc.appendChild(metricRow("MxDMn", r.mxdmn, null, HRV_EXPLAIN.mxdmn, sp(numEx("mxdmn"), null)));
-      mc.appendChild(metricRow("Mode", r.mode, null, HRV_EXPLAIN.mode, sp(numEx("mode"), null)));
-      mc.appendChild(metricRow("AMo50", r.amo50, null, HRV_EXPLAIN.amo50, sp(numEx("amo50"), null)));
-      mc.appendChild(metricRow("CV", r.cv, null, HRV_EXPLAIN.cv, sp(numEx("cv"), null)));
+      mc.appendChild(metricRow("HR", r.hr, s.hr, HRV_EXPLAIN.hr, sp(numEx("hr"), BANDS.hrBreath)));
+      mc.appendChild(metricRow("Mean RR", r.meanRr, s.meanRr, HRV_EXPLAIN.meanRr, sp(numEx("meanRr"), BANDS.rrMode)));
+      mc.appendChild(metricRow("MxDMn", r.mxdmn, s.mxdmn, HRV_EXPLAIN.mxdmn, sp(numEx("mxdmn"), BANDS.mxdmn)));
+      mc.appendChild(metricRow("Mode", r.mode, s.mode, HRV_EXPLAIN.mode, sp(numEx("mode"), BANDS.rrMode)));
+      mc.appendChild(metricRow("AMo50", r.amo50, s.amo50, HRV_EXPLAIN.amo50, sp(numEx("amo50"), BANDS.amo50)));
+      mc.appendChild(metricRow("CV", r.cv, s.cv, HRV_EXPLAIN.cv, sp(numEx("cv"), BANDS.cv)));
       body.appendChild(mc);
 
       if (r.note) { const nc = sumCard("Notes"); nc.appendChild(el("div.sum-text", { text: r.note })); body.appendChild(nc); }
