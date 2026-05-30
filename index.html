@@ -603,6 +603,14 @@
   .field-inline { display: flex; gap: 10px; }
   .field-inline > .field { flex: 1; min-width: 0; }
   .field-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 10px; }
+  .signed-input { display: flex; gap: 6px; min-width: 0; }
+  .signed-input input { flex: 1; min-width: 0; }
+  .sign-btn {
+    flex: none; width: 42px; border: 1px solid var(--border); background: var(--surface-2);
+    color: var(--text); border-radius: var(--radius-sm); font-size: 18px; font-weight: 700;
+    cursor: pointer; font-family: inherit;
+  }
+  .sign-btn:active { opacity: 0.6; }
   .field-check label {
     display: flex; align-items: center; gap: 9px;
     color: var(--text); font-weight: 500; font-size: 15px; cursor: pointer;
@@ -928,8 +936,8 @@
         fields: [
           { key: "readiness", label: "Readiness", unit: "%" },
           { key: "age", label: "Age" },
-          { key: "pns", label: "PNS index" },
-          { key: "sns", label: "SNS index" },
+          { key: "pns", label: "PNS index", signed: true },
+          { key: "sns", label: "SNS index", signed: true },
           { divider: true },
           { key: "rmssd", label: "RMSSD" },
           { key: "sdnn", label: "SDNN" },
@@ -2277,19 +2285,28 @@
     // a 2-column grid; everything else (select/time/check/divider, and lone
     // numbers) is rendered full width.
     function buildFieldInputs(body, fields, r, inputs) {
+      // Number field -> .field; signed fields get a ± toggle (decimal keypads
+      // lack a minus key, so you type the magnitude and tap ± to negate).
+      const makeField = (f) => {
+        const inp = numInput(r[f.key]);
+        inputs[f.key] = inp;
+        if (f.signed) {
+          const btn = el("button.sign-btn", {
+            type: "button", text: "±", "aria-label": "Toggle negative",
+            onclick: () => { const v = inp.value.trim(); if (v === "" || v === "-") return; inp.value = v[0] === "-" ? v.slice(1) : "-" + v; },
+          });
+          return field(fieldLabel(f), el("div.signed-input", {}, [inp, btn]));
+        }
+        return field(fieldLabel(f), inp);
+      };
       let run = [];
       const flushRun = () => {
         if (!run.length) return;
         if (run.length === 1) {
-          const f = run[0];
-          inputs[f.key] = numInput(r[f.key]);
-          body.appendChild(field(fieldLabel(f), inputs[f.key]));
+          body.appendChild(makeField(run[0]));
         } else {
           const grid = el("div.field-grid");
-          run.forEach((f) => {
-            inputs[f.key] = numInput(r[f.key]);
-            grid.appendChild(field(fieldLabel(f), inputs[f.key]));
-          });
+          run.forEach((f) => grid.appendChild(makeField(f)));
           body.appendChild(grid);
         }
         run = [];
