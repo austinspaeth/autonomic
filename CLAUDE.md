@@ -56,12 +56,12 @@ unless asked. Edit `index.html` directly.
 
 - **Every change to the app must update `meta.lastUpdated`.** This is centralized
   in `save()` in `app.js`: it stamps `meta.lastUpdated = new Date().toISOString()`
-  on each call and then refreshes the on-screen status line. **Always persist
-  mutations by calling `save()`** — never write to `localStorage` directly — so
-  the timestamp stays accurate. The status line under the top buttons shows this
-  "Updated …" time plus the last imported filename.
+  on each call. **Always persist mutations by calling `save()`** — never write to
+  `localStorage` directly — so the timestamp stays accurate. The "Last updated …"
+  time (plus the last imported filename) is shown at the bottom of the hamburger
+  **menu drawer**, not in the header.
 - **Imports** record `meta.lastImport` (`{ name, at }`) before calling `save()`,
-  and that filename is shown in the status line.
+  and that filename is shown in the menu drawer footer.
 - **Removing a catalog item archives it** (`archived: true`) rather than deleting
   it, so past days keep whatever was recorded. Archived items only disappear from
   **today forward** (`visibleDefs()` still shows an archived item on any day that
