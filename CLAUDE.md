@@ -80,6 +80,12 @@ unless asked. Edit `index.html` directly.
 - **Icons must be monochrome** where they should inherit color (tab bar, theme
   toggle). Use inline SVG with `stroke="currentColor"`, or text-presentation
   glyphs (append U+FE0E), not colored emoji.
+- **Reading scoring.** On save, `computeScores(r)` categorizes each scorable
+  metric (great/good/ok/bad/crash|concerning, plus a `warning` blue zone for
+  readiness) per the framework thresholds and stores them on `r.scores`. The
+  summary row tints its single value via `SCORE_COLORS` (`rowScoreCategory`);
+  ECG shows a colored badge from its `overall` (worst sub-metric). To add/adjust
+  scoring, edit the `s*` helpers + `computeScores`.
 
 ## Running / testing
 
