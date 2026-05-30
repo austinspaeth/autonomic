@@ -113,6 +113,8 @@
     transition: background 0.15s;
   }
   .icon-btn:active { background: var(--surface-2); }
+  /* The text-presentation sun glyph renders small; bump it to match the moon. */
+  .icon-btn.is-sun { font-size: 26px; }
 
   /* ---------- Date bar ---------- */
   .datebar {
@@ -239,7 +241,7 @@
   /* Sleep row */
   .sleep-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     column-gap: 14px;
     padding-top: 4px;
   }
@@ -394,7 +396,13 @@
   }
   .field textarea { min-height: 70px; resize: vertical; }
   .field-inline { display: flex; gap: 10px; }
-  .field-inline > .field { flex: 1; }
+  .field-inline > .field { flex: 1; min-width: 0; }
+  .field-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 10px; }
+  .field-check label {
+    display: flex; align-items: center; gap: 9px;
+    color: var(--text); font-weight: 500; font-size: 15px; cursor: pointer;
+  }
+  .field-check input { width: 20px; height: 20px; }
   .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
   .modal-actions .btn { flex: 1; }
 
@@ -651,10 +659,43 @@
     }
 
     /* ---------------- State ---------------- */
+    // Reading types. Order here is the order shown in the "Add reading" drawer.
+    // Each numeric field: { key, label, unit? }. Optional `checks` are booleans.
     const READING_TYPES = {
-      hrv: { label: "HRV", unit: "", fields: ["value"] },
-      breathHrv: { label: "Breathing HRV", unit: "", fields: ["value"] },
-      bp: { label: "Blood Pressure", unit: "", fields: ["sys", "dia", "pulse"] },
+      hrv: {
+        label: "Unstructured HRV",
+        icon: "💗",
+        fields: [
+          { key: "readiness", label: "Readiness", unit: "%" },
+          { key: "pns", label: "PNS index" },
+          { key: "sns", label: "SNS index" },
+          { key: "age", label: "Age" },
+          { key: "sdnn", label: "SDNN" },
+          { key: "stressIndex", label: "Stress index" },
+          { key: "lowPower", label: "Low power" },
+          { key: "highPower", label: "High power" },
+        ],
+        checks: [{ key: "swallowing", label: "Swallowing" }],
+      },
+      breathHrv: {
+        label: "Breathing HRV",
+        icon: "💗",
+        fields: [{ key: "value", label: "Value" }],
+      },
+      bp: {
+        label: "Blood Pressure",
+        icon: "🩸",
+        fields: [
+          { key: "sys", label: "Systolic" },
+          { key: "dia", label: "Diastolic" },
+          { key: "pulse", label: "Pulse" },
+        ],
+      },
+      bloodO2: {
+        label: "Blood Oxygen",
+        icon: "🫁",
+        fields: [{ key: "value", label: "Blood oxygen", unit: "%" }],
+      },
     };
 
     function defaultState() {
@@ -756,6 +797,7 @@
       // Plain crescent moon (as before); sun uses the text-presentation
       // selector (U+FE0E) so it's monochrome, matching the moon's style/size.
       $("#themeBtn").textContent = t === "dark" ? "☀︎" : "☾";
+      $("#themeBtn").classList.toggle("is-sun", t === "dark");
       const meta = document.querySelector('meta[name="theme-color"]');
       if (meta) meta.setAttribute("content", t === "dark" ? "#000000" : "#e03127");
     }
@@ -865,13 +907,33 @@
       return sec;
     }
 
+    // Headline value shown on the right of a reading row.
     function readingSummary(r) {
+      const def = READING_TYPES[r.type];
       if (r.type === "bp") {
         let s = `${r.sys}/${r.dia}`;
         if (r.pulse) s += ` · ${r.pulse} bpm`;
         return s;
       }
-      return String(r.value ?? "");
+      for (const f of (def ? def.fields : [])) {
+        const v = r[f.key];
+        if (v != null && v !== "") return v + (f.unit || "");
+      }
+      return r.value != null && r.value !== "" ? String(r.value) : ""; // legacy
+    }
+
+    // Secondary line: remaining filled fields + any checked flags.
+    function readingDetails(r) {
+      const def = READING_TYPES[r.type];
+      if (!def || r.type === "bp") return "";
+      const parts = [];
+      def.fields.forEach((f, i) => {
+        if (i === 0) return; // headline already shows the first field
+        const v = r[f.key];
+        if (v != null && v !== "") parts.push(`${f.label} ${v}${f.unit || ""}`);
+      });
+      (def.checks || []).forEach((c) => { if (r[c.key]) parts.push(c.label); });
+      return parts.join(" · ");
     }
 
     function renderReadings() {
@@ -890,11 +952,12 @@
         bodyEl.appendChild(el("div.muted", { text: "No readings yet." }));
       } else {
         list.forEach((r) => {
+          const sub = [readingDetails(r), r.note].filter(Boolean).join(" — ");
           bodyEl.appendChild(
             el("div.row", { onclick: () => readingForm(r.type, r) }, [
               el("div.row-main", {}, [
                 el("div.row-title", { text: READING_TYPES[r.type].label }),
-                r.note ? el("div.row-sub", { text: r.note }) : null,
+                sub ? el("div.row-sub", { text: sub }) : null,
               ]),
               el("div.row-val", { text: readingSummary(r) }),
               r.time ? el("span.pill", { text: r.time }) : null,
@@ -909,19 +972,32 @@
     function readingMenu() {
       openModal((body) => {
         body.appendChild(el("h2", { text: "Add reading" }));
-        Object.keys(READING_TYPES).forEach((type) => {
-          body.appendChild(
-            el("button.menu-item", {
-              onclick: () => {
-                closeModal();
-                readingForm(type, null);
-              },
-            }, [
-              el("span.mi-ico", { text: type === "bp" ? "🩸" : "💗" }),
-              el("div", {}, [el("div", { text: READING_TYPES[type].label })]),
-            ])
-          );
-        });
+        const filter = el("input", { type: "text", placeholder: "Filter readings…" });
+        body.appendChild(el("div.field", {}, [filter]));
+        const listWrap = el("div");
+        body.appendChild(listWrap);
+        const types = Object.keys(READING_TYPES);
+        const draw = () => {
+          const q = filter.value.trim().toLowerCase();
+          listWrap.innerHTML = "";
+          const matches = types.filter((t) => READING_TYPES[t].label.toLowerCase().includes(q));
+          if (!matches.length) {
+            listWrap.appendChild(el("div.muted", { text: "No matches." }));
+            return;
+          }
+          matches.forEach((type) => {
+            listWrap.appendChild(
+              el("button.menu-item", {
+                onclick: () => { closeModal(); readingForm(type, null); },
+              }, [
+                el("span.mi-ico", { text: READING_TYPES[type].icon }),
+                el("div", {}, [el("div", { text: READING_TYPES[type].label })]),
+              ])
+            );
+          });
+        };
+        filter.addEventListener("input", draw);
+        draw();
       });
     }
 
@@ -933,18 +1009,31 @@
       openModal((body) => {
         body.appendChild(el("h2", { text: (existing ? "Edit " : "") + def.label }));
         const inputs = {};
-        if (type === "bp") {
+        const addField = (f) => {
+          inputs[f.key] = numInput(r[f.key]);
+          return field(f.label + (f.unit ? ` (${f.unit})` : ""), inputs[f.key]);
+        };
+        if (def.fields.length > 1) {
+          // compact 2-column grid for multi-field readings (HRV, BP, …)
+          const grid = el("div.field-grid", {}, def.fields.map(addField));
+          body.appendChild(grid);
+        } else {
+          def.fields.forEach((f) => body.appendChild(addField(f)));
+        }
+
+        // optional boolean flags (e.g. swallowing)
+        const checks = {};
+        (def.checks || []).forEach((c) => {
+          const cb = el("input", { type: "checkbox" });
+          cb.checked = !!r[c.key];
+          checks[c.key] = cb;
           body.appendChild(
-            el("div.field-inline", {}, [
-              field("Systolic", (inputs.sys = numInput(r.sys))),
-              field("Diastolic", (inputs.dia = numInput(r.dia))),
-              field("Pulse", (inputs.pulse = numInput(r.pulse))),
+            el("div.field.field-check", {}, [
+              el("label", {}, [cb, el("span", { text: c.label })]),
             ])
           );
-        } else {
-          inputs.value = numInput(r.value);
-          body.appendChild(field(def.label + " value", inputs.value));
-        }
+        });
+
         const time = el("input", { type: "time", value: r.time || nowTime() });
         const note = el("input", { type: "text", value: r.note || "", placeholder: "Optional note" });
         body.appendChild(field("Time", time));
@@ -967,15 +1056,16 @@
             el("button.btn.btn-primary", {
               text: "Save",
               onclick: () => {
+                const anyVal = def.fields.some((f) => inputs[f.key].value.trim() !== "");
+                const anyCheck = (def.checks || []).some((c) => checks[c.key].checked);
                 if (type === "bp") {
-                  r.sys = inputs.sys.value.trim();
-                  r.dia = inputs.dia.value.trim();
-                  r.pulse = inputs.pulse.value.trim();
-                  if (!r.sys && !r.dia) return toast("Enter a blood pressure");
-                } else {
-                  r.value = inputs.value.value.trim();
-                  if (r.value === "") return toast("Enter a value");
+                  if (!inputs.sys.value.trim() && !inputs.dia.value.trim())
+                    return toast("Enter a blood pressure");
+                } else if (!anyVal && !anyCheck) {
+                  return toast("Enter a value");
                 }
+                def.fields.forEach((f) => { r[f.key] = inputs[f.key].value.trim(); });
+                (def.checks || []).forEach((c) => { r[c.key] = checks[c.key].checked; });
                 r.time = time.value;
                 r.note = note.value.trim();
                 const d = day(currentKey, true);
@@ -1388,19 +1478,17 @@
         return;
       }
 
-      // collect series
-      const hrv = [], breath = [], sys = [], dia = [];
+      // collect series. Unstructured HRV is charted by SDNN (the time-domain
+      // HRV metric); Breathing HRV and Blood Oxygen by their single value.
+      const hrv = [], breath = [], sys = [], dia = [], spo2 = [];
+      const push = (arr, k, raw) => { const n = parseFloat(raw); if (!isNaN(n)) arr.push({ k, v: n }); };
       keys.forEach((k) => {
         const d = state.days[k];
         (d.readings || []).forEach((r) => {
-          const num = parseFloat(r.value);
-          if (r.type === "hrv" && !isNaN(num)) hrv.push({ k, v: num });
-          if (r.type === "breathHrv" && !isNaN(num)) breath.push({ k, v: num });
-          if (r.type === "bp") {
-            const s = parseFloat(r.sys), dd = parseFloat(r.dia);
-            if (!isNaN(s)) sys.push({ k, v: s });
-            if (!isNaN(dd)) dia.push({ k, v: dd });
-          }
+          if (r.type === "hrv") push(hrv, k, r.sdnn);
+          if (r.type === "breathHrv") push(breath, k, r.value);
+          if (r.type === "bloodO2") push(spo2, k, r.value);
+          if (r.type === "bp") { push(sys, k, r.sys); push(dia, k, r.dia); }
         });
       });
 
@@ -1413,14 +1501,14 @@
 
       root.appendChild(
         el("div.stat-grid", {}, [
-          stat("Avg HRV", avg(hrv)),
+          stat("Avg SDNN", avg(hrv)),
           stat("Avg Breathing HRV", avg(breath)),
           stat("Avg BP", avg(sys) != null ? `${avg(sys)}/${avg(dia)}` : null),
-          stat("Days tracked", keys.length),
+          stat("Avg Blood O₂", avg(spo2), avg(spo2) != null ? "%" : ""),
         ])
       );
 
-      root.appendChild(lineChartCard("HRV", [{ data: hrv, color: "var(--accent)" }]));
+      root.appendChild(lineChartCard("Unstructured HRV (SDNN)", [{ data: hrv, color: "var(--accent)" }]));
       root.appendChild(lineChartCard("Breathing HRV", [{ data: breath, color: "#3b82f6" }]));
       root.appendChild(
         lineChartCard("Blood Pressure", [
@@ -1428,6 +1516,7 @@
           { data: dia, color: "#3b82f6", label: "Dia" },
         ])
       );
+      root.appendChild(lineChartCard("Blood Oxygen", [{ data: spo2, color: "#16a34a" }]));
 
       root.appendChild(freqCard("Symptoms", "symptoms", keys));
       root.appendChild(freqCard("Activities", "activities", keys));
