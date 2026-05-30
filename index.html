@@ -502,6 +502,8 @@
   .metric-val { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
   .metric-explain { font-size: 12.5px; color: var(--text-dim); margin-top: 6px; line-height: 1.4; }
   .spark { margin-top: 16px; color: var(--text); }
+  .spark-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 16px; margin-bottom: 4px; }
+  .spark-zones-btn { background: none; border: none; color: var(--accent); font-size: 11px; font-weight: 600; cursor: pointer; padding: 2px 4px; font-family: inherit; flex: none; }
   .spark svg { display: block; width: 100%; height: 92px; background: var(--bg); border-radius: 10px; touch-action: pan-y; cursor: crosshair; }
   .spark-readout { font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; height: 16px; margin-bottom: 4px; }
   .spark-dates { display: flex; justify-content: space-between; font-size: 10px; color: var(--text-dim); margin-top: 3px; }
@@ -1657,37 +1659,65 @@
 
       const svg = mk("svg", { viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: "none" });
 
-      // grade-zone bands (clipped to plot x-range)
+      // Line is colored by a vertical gradient with hard stops at each zone
+      // boundary, so the line takes on the grade color at its current height.
+      let stroke = "currentColor";
       if (bands) {
-        let lo = -Infinity;
-        bands.forEach((b) => {
-          const top = Math.min(b.max, max), bot = Math.max(lo, min); lo = b.max;
-          if (top <= bot) return;
-          svg.appendChild(mk("rect", { x: padL, width: innerW, y: yAt(top), height: Math.max(0, yAt(bot) - yAt(top)), fill: SCORE_COLORS[b.cat] || "#888" }));
+        const gid = "spk" + (buildSpark._n = (buildSpark._n || 0) + 1);
+        const grad = mk("linearGradient", { id: gid, gradientUnits: "userSpaceOnUse", x1: 0, y1: padT, x2: 0, y2: H - padB });
+        const offAt = (v) => Math.max(0, Math.min(1, 1 - (v - min) / (max - min)));
+        const colAt = (v) => SCORE_COLORS[catFromBands(v, bands)] || "#888";
+        const addStop = (o, c) => grad.appendChild(mk("stop", { offset: o, "stop-color": c }));
+        addStop(0, colAt(max - 1e-9)); // top (highest value)
+        bands.map((b) => b.max).filter((m) => m > min && m < max).sort((a, b) => b - a).forEach((bv) => {
+          addStop(offAt(bv), colAt(bv + 1e-9)); // color above the boundary
+          addStop(offAt(bv), colAt(bv - 1e-9)); // color below the boundary
         });
+        addStop(1, colAt(min + 1e-9)); // bottom (lowest value)
+        const defs = mk("defs", {}); defs.appendChild(grad); svg.appendChild(defs);
+        stroke = `url(#${gid})`;
       }
+
       // y ticks + labels
       for (let t = min; t <= max + 1e-9; t += sc.step) {
         const yy = yAt(t);
-        svg.appendChild(mk("line", { x1: padL, x2: padL + innerW, y1: yy, y2: yy, stroke: "var(--border)", "stroke-width": 1, "vector-effect": "non-scaling-stroke", opacity: 0.7 }));
+        svg.appendChild(mk("line", { x1: padL, x2: padL + innerW, y1: yy, y2: yy, stroke: "var(--border)", "stroke-width": 1, "vector-effect": "non-scaling-stroke", opacity: 0.5 }));
         const tx = mk("text", { x: padL - 4, y: yy + 3, "text-anchor": "end", "font-size": 9, fill: "var(--text-dim)", style: "font-size:9px" });
         tx.textContent = fmtNum(t); svg.appendChild(tx);
       }
       // x ticks
       points.forEach((p, i) => svg.appendChild(mk("line", { x1: xAt(i), x2: xAt(i), y1: H - padB, y2: H - padB + 4, stroke: "var(--text-dim)", "stroke-width": 1, "vector-effect": "non-scaling-stroke", opacity: 0.6 })));
 
+      // Optional zone-boundary dashed lines (toggled by "Show zones")
+      let zonesG = null;
+      if (bands) {
+        zonesG = mk("g", {}); zonesG.style.display = "none";
+        bands.forEach((b) => {
+          if (b.max > min && b.max < max) {
+            zonesG.appendChild(mk("line", { x1: padL, x2: padL + innerW, y1: yAt(b.max), y2: yAt(b.max), stroke: SCORE_COLORS[b.cat] || "#888", "stroke-width": 1.5, "stroke-dasharray": "4 3", "vector-effect": "non-scaling-stroke", opacity: 0.95 }));
+          }
+        });
+        svg.appendChild(zonesG);
+      }
+
       const xy = points.map((p, i) => [xAt(i), yAt(p.v)]);
-      const path = mk("path", { d: smoothPath(xy), fill: "none", stroke: "currentColor", "stroke-width": 3.5, "vector-effect": "non-scaling-stroke", "stroke-linejoin": "round", "stroke-linecap": "round" });
+      const path = mk("path", { d: smoothPath(xy), fill: "none", stroke, "stroke-width": 3.5, "vector-effect": "non-scaling-stroke", "stroke-linejoin": "round", "stroke-linecap": "round" });
       svg.appendChild(path);
-      points.forEach((p, i) => svg.appendChild(mk("circle", { cx: xAt(i), cy: yAt(p.v), r: 2.6, fill: "currentColor" })));
+      points.forEach((p, i) => { const cat = catFromBands(p.v, bands); svg.appendChild(mk("circle", { cx: xAt(i), cy: yAt(p.v), r: 2.6, fill: cat && SCORE_COLORS[cat] ? SCORE_COLORS[cat] : "currentColor" })); });
       const marker = mk("line", { y1: padT, y2: H - padB, stroke: "var(--text)", "stroke-width": 1, "vector-effect": "non-scaling-stroke", opacity: 0 });
       const adot = mk("circle", { r: 3.6, opacity: 0 });
       svg.appendChild(marker); svg.appendChild(adot);
 
       const wrap = el("div.spark");
       const readout = el("div.spark-readout");
+      const headRow = el("div.spark-top", {}, [readout]);
+      if (zonesG) {
+        const btn = el("button.spark-zones-btn", { type: "button", text: "Show zones" });
+        btn.addEventListener("click", () => { const on = zonesG.style.display === "none"; zonesG.style.display = on ? "" : "none"; btn.textContent = on ? "Hide zones" : "Show zones"; });
+        headRow.appendChild(btn);
+      }
       const dates = el("div.spark-dates", {}, [el("span", { text: fmtShort(points[0].date) }), el("span", { text: fmtShort(points[points.length - 1].date) })]);
-      wrap.appendChild(readout); wrap.appendChild(svg); wrap.appendChild(dates);
+      wrap.appendChild(headRow); wrap.appendChild(svg); wrap.appendChild(dates);
 
       const show = (i) => {
         i = Math.max(0, Math.min(points.length - 1, i));
@@ -1696,7 +1726,7 @@
         readout.style.color = color;
         const x = xAt(i);
         marker.setAttribute("x1", x); marker.setAttribute("x2", x); marker.setAttribute("opacity", 0.35);
-        adot.setAttribute("cx", x); adot.setAttribute("cy", yAt(p.v)); adot.setAttribute("fill", "var(--text)"); adot.setAttribute("opacity", 1);
+        adot.setAttribute("cx", x); adot.setAttribute("cy", yAt(p.v)); adot.setAttribute("fill", color); adot.setAttribute("opacity", 1);
       };
       const idxFromEvent = (e) => { const rc = svg.getBoundingClientRect(); const px = ((e.clientX - rc.left) / (rc.width || 1)) * W; return Math.round(((px - padL) / innerW) * (points.length - 1)); };
       let active = false;
