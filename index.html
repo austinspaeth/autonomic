@@ -203,14 +203,6 @@
   .row-sub { font-size: 12.5px; color: var(--text-dim); margin-top: 1px; }
   .row-val { font-variant-numeric: tabular-nums; font-weight: 600; display: inline-flex; align-items: center; }
   .score-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; margin-right: 7px; }
-  .ecg-badge {
-    width: 24px; height: 24px; border-radius: 50%;
-    display: inline-flex; align-items: center; justify-content: center;
-    color: #fff;
-  }
-  .ecg-badge.good { background: #16a34a; }
-  .ecg-badge.bad { background: #d63b3b; }
-  .ecg-badge svg { width: 15px; height: 15px; }
 
   .muted { color: var(--text-dim); font-size: 14px; padding: 6px 0; }
 
@@ -805,6 +797,17 @@
       const d = new Date();
       return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
     };
+    // Actual age in years from a YYYY-MM-DD birthday.
+    function ageFromBirthday(bday, asOf) {
+      if (!bday) return null;
+      const b = dateFromKey(bday);
+      if (isNaN(b)) return null;
+      const d = asOf || new Date();
+      let a = d.getFullYear() - b.getFullYear();
+      const m = d.getMonth() - b.getMonth();
+      if (m < 0 || (m === 0 && d.getDate() < b.getDate())) a--;
+      return a >= 0 && a < 150 ? a : null;
+    }
     // "13:30" -> "1:30pm" for display (stored value stays 24h).
     const fmtTime12 = (t) => {
       const m = /^(\d{1,2}):(\d{2})/.exec(t || "");
@@ -899,6 +902,7 @@
       zap: svgIcon('<path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/>'),
       pill: svgIcon('<path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/>'),
       alert: svgIcon('<circle cx="12" cy="12" r="9"/><path d="M12 8v4"/><path d="M12 16h.01"/>'),
+      user: svgIcon('<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>'),
     };
 
     // Reading types. Order here is the order shown in the "Add reading" drawer.
@@ -1067,6 +1071,7 @@
         version: SCHEMA_VERSION,
         settings: { theme: matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light" },
         meta: { lastUpdated: null, lastImport: null },
+        profile: { sex: "", birthday: "", weight: "", height: "" },
         days: {},
       };
     }
@@ -1093,6 +1098,7 @@
       s.version = SCHEMA_VERSION;
       s.settings = Object.assign({}, base.settings, s.settings);
       s.meta = Object.assign({ lastUpdated: null, lastImport: null }, s.meta);
+      s.profile = Object.assign({ sex: "", birthday: "", weight: "", height: "" }, s.profile);
       delete s.defs; // catalogs removed - everything is programmatic now
       s.days = s.days || {};
       // activities/meds/symptoms are now arrays of logged entries (were {defId:…} maps)
@@ -1438,7 +1444,7 @@
         ? (v <= 62 ? "great" : v <= 68 ? "good" : v <= 75 ? "ok" : v <= 85 ? "bad" : "concerning")
         : (v <= 68 ? "great" : v <= 78 ? "good" : v <= 88 ? "ok" : v <= 98 ? "bad" : "concerning");
     };
-    const sQTc = (v) => { v = numOr(v); if (v == null) return null; if (v < 350 || v > 470) return "concerning"; if (v < 380) return "ok"; if (v <= 420) return "great"; if (v <= 440) return "good"; if (v <= 450) return "ok"; return "bad"; };
+    // QTc is scored via qtcBands(sex) (defined below) so the grade is sex-aware.
     const sQRS = (v) => { v = numOr(v); if (v == null) return null; if (v > 130) return "concerning"; if (v >= 121) return "bad"; if (v >= 111) return "ok"; if (v >= 91) return "good"; return "great"; };
     const sPR = (v) => { v = numOr(v); if (v == null) return null; if (v < 100 || v > 240) return "concerning"; if (v < 110 || v >= 221) return "bad"; if (v < 120 || v >= 201) return "ok"; if (v < 140 || v >= 181) return "good"; return "great"; };
     const sEctopic = (v) => { v = numOr(v); return v == null ? null : v === 0 ? "great" : v <= 2 ? "good" : v <= 5 ? "ok" : v <= 15 ? "bad" : "concerning"; };
@@ -1452,7 +1458,7 @@
     const sMxDMn = (v) => { v = numOr(v); return v == null ? null : v >= 0.35 ? "great" : v >= 0.25 ? "good" : v >= 0.18 ? "ok" : v >= 0.12 ? "bad" : "crash"; }; // seconds
     const sAMo50 = (v) => { v = numOr(v); return v == null ? null : v < 30 ? "great" : v < 40 ? "good" : v < 50 ? "ok" : v < 60 ? "bad" : "concerning"; }; // lower better
     const sCV = (v) => { v = numOr(v); return v == null ? null : v >= 7 ? "great" : v >= 5.5 ? "good" : v >= 4.5 ? "ok" : v >= 3 ? "bad" : "crash"; };
-    const sRhythm = (r) => (r.svt ? "concerning" : r.otherArrhythmia ? "bad" : r.sinus ? "great" : null);
+    const sRhythm = (r) => ((r.svt || r.otherArrhythmia) ? "concerning" : r.sinus ? "great" : null);
     const sSys = (s) => { s = numOr(s); if (s == null) return null; if (s >= 150) return "concerning"; if (s >= 136) return "bad"; if (s >= 129) return "ok"; if (s >= 119) return "good"; if (s >= 108) return "great"; if (s >= 100) return "ok"; return "bad"; };
     const sDia = (d) => { d = numOr(d); if (d == null) return null; if (d >= 95) return "concerning"; if (d >= 88) return "bad"; if (d >= 83) return "ok"; if (d >= 79) return "good"; if (d >= 65) return "great"; if (d >= 60) return "ok"; return "bad"; };
     const sBP = (sys, dia) => { const a = sSys(sys), b = sDia(dia); return a || b ? worstCat([a, b].filter(Boolean)) : null; };
@@ -1495,7 +1501,7 @@
         case "bloodO2": put("value", sSpo2(r.value)); break;
         case "restingHr": put("hr", sRestingHr(r.hr, r.position)); break;
         case "ecg":
-          put("qtc", sQTc(r.qtc));
+          { const q = numOr(r.qtc); if (q != null) put("qtc", catFromBands(q, qtcBands(state.profile && state.profile.sex))); }
           put("qrs", sQRS(r.qrs));
           put("pr", sPR(r.pr));
           put("ectopic", sEctopic(r.ectopic));
@@ -1521,21 +1527,14 @@
     }
 
     // Simplified value shown on the right of a reading row (one thing per type).
-    function ecgBadge(r) {
-      const s = computeScores(r);
-      const cat = s.overall || (r.svt || r.otherArrhythmia ? "concerning" : "great");
-      const bad = SCORE_RANK[cat] >= 3;
-      const badge = el("span.ecg-badge", { html: bad ? ICONS.x : ICONS.check });
-      badge.style.background = SCORE_COLORS[cat] || "#16a34a";
-      return badge;
-    }
+    const ecgPattern = (r) => (r.svt ? "SVT" : r.otherArrhythmia ? "Other" : r.sinus ? "Sinus" : "-");
     function readingRowValue(r) {
       switch (r.type) {
         case "hrv": return r.readiness ? r.readiness + "%" : "";
         case "breathHrv": return r.sdnn != null && r.sdnn !== "" ? String(r.sdnn) : "";
         case "bp": return r.sys || r.dia ? `${r.sys || "-"}/${r.dia || "-"}` : "";
         case "bloodO2": return r.value ? r.value + "%" : "";
-        case "ecg": return ecgBadge(r);
+        case "ecg": return ecgPattern(r);
         default: return summarizeFields(READING_TYPES[r.type], r);
       }
     }
@@ -1592,6 +1591,10 @@
       kvas: [{ max: 14, cat: "great" }, { max: 17, cat: "good" }, { max: 21, cat: "ok" }, { max: 26, cat: "bad" }, { max: Infinity, cat: "concerning" }],
       bce: [{ max: 2601, cat: "great" }, { max: 3001, cat: "good" }, { max: 3501, cat: "ok" }, { max: 4001, cat: "bad" }, { max: Infinity, cat: "concerning" }],
     };
+    // QTc norms run a little longer for females; shift the high-side thresholds.
+    const qtcBands = (sex) => sex === "Female"
+      ? BANDS.qtc.map((b) => ({ max: (b.max > 350 && isFinite(b.max)) ? b.max + 10 : b.max, cat: b.cat }))
+      : BANDS.qtc;
     function bandsFor(type, key) {
       const map = {
         hrv: { readiness: "readiness", rmssd: "rmssdU", sdnn: "sdnn", avgHr: "hrBreath" },
@@ -1775,6 +1778,7 @@
         body.appendChild(el("div.sum-meta", { text: r.time ? fmtTime12(r.time) : "" }));
         if (r.type === "breathHrv") breathingSummary(r, body);
         else if (r.type === "bp") bpSummary(r, body);
+        else if (r.type === "ecg") ecgSummary(r, body);
         else genericReadingSummary(r, body);
       }, { action: { icon: ICONS.edit, label: "Edit", onclick: () => readingForm(r.type, r) } });
     }
@@ -1940,6 +1944,43 @@
       body.appendChild(ix);
 
       if (r.note) { const nc = sumCard("Notes"); nc.appendChild(el("div.metric-card", {}, [el("div.sum-text", { text: r.note })])); body.appendChild(nc); }
+    }
+
+    function ecgSummary(r, body) {
+      const s = computeScores(r);
+      const verdict = {
+        great: "Clean reading - normal intervals and rhythm.",
+        good: "Largely normal intervals and rhythm.",
+        ok: "Minor findings worth monitoring.",
+        bad: "Abnormal findings; review context.",
+        concerning: "Significant findings; consider clinical follow-up.",
+      };
+      body.appendChild(heroCard({ cat: s.overall, label: "ECG", big: ecgPattern(r), sub: "Rhythm", tip: verdict[s.overall] || "" }));
+
+      const spk = (key, bands) => buildSpark(metricHistory("ecg", numEx(key)), bands);
+
+      // Rhythm (its own container)
+      const rhy = sumCard("Rhythm");
+      rhy.appendChild(metricRow("Pattern", ecgPattern(r), s.rhythm, "Recorded rhythm. Sinus is normal; SVT or any other pattern is flagged."));
+      rhy.appendChild(metricRow("Ectopic beats", r.ectopic, s.ectopic, "Extra beats in the reading. A few are common; many, or runs, are concerning.", spk("ectopic", BANDS.ectopic)));
+      body.appendChild(rhy);
+
+      // Intervals (its own container)
+      const iv = sumCard("Intervals");
+      iv.appendChild(metricRow("QRS", r.qrs, s.qrs, "Ventricular depolarization time. A wide QRS can indicate a conduction delay.", spk("qrs", BANDS.qrs)));
+      iv.appendChild(metricRow("QTc", r.qtc, s.qtc, "Heart-rate-corrected QT. Prolongation raises arrhythmia risk; very short is also abnormal.", spk("qtc", qtcBands(state.profile && state.profile.sex))));
+      iv.appendChild(metricRow("PR", r.pr, s.pr, "AV conduction time from atria to ventricles.", spk("pr", BANDS.pr)));
+      body.appendChild(iv);
+
+      // Rate & variability
+      const rate = sumCard("Rate & variability");
+      const hrCat = r.hr !== "" && r.hr != null ? catFromBands(+r.hr, BANDS.hrBreath) : null;
+      rate.appendChild(metricRow("HR", r.hr, hrCat, "Heart rate during the ECG.", spk("hr", BANDS.hrBreath)));
+      rate.appendChild(metricRow("HRV", r.hrv, false, "Beat-to-beat variability captured by the ECG.", spk("hrv", null)));
+      body.appendChild(rate);
+
+      if (r.note) { const nc = sumCard("Notes"); nc.appendChild(el("div.metric-card", {}, [el("div.sum-text", { text: r.note })])); body.appendChild(nc); }
+      if (r.techReview) { const tc = sumCard("Technician review"); tc.appendChild(el("div.metric-card", {}, [el("div.sum-text", { text: r.techReview })])); body.appendChild(tc); }
     }
 
     function renderReadings() {
@@ -2526,6 +2567,7 @@
             el("span.mi-ico", { html: ico }),
             el("div", {}, [el("div", { text: title }), sub ? el("div.mi-sub", { text: sub }) : null]),
           ]);
+        body.appendChild(item(ICONS.user, "Profile", "Sex, height, weight", () => openProfile())); // stacks on the menu
         body.appendChild(item(ICONS.download, "Export data", "Download everything as JSON", () => { closeAll(); exportData(); }));
         body.appendChild(item(ICONS.upload, "Import data", "Replace everything from a JSON file", () => { closeAll(); importData(); }));
 
@@ -2538,6 +2580,42 @@
           el("div", { style: "margin-top:22px;font-size:12px;color:var(--text-dim);text-align:center;line-height:1.6" },
             lines.map((t) => el("div", { text: t })))
         );
+      });
+    }
+
+    function openProfile() {
+      const p = Object.assign({ sex: "", birthday: "", weight: "", height: "" }, state.profile);
+      openModal((body) => {
+        body.appendChild(el("h2", { text: "Profile" }));
+        const sex = el("select", {}, ["", "Male", "Female", "Other"].map((o) => el("option", { value: o, text: o || "Not set" })));
+        sex.value = p.sex || "";
+        body.appendChild(field("Sex", sex));
+        const birthday = el("input", { type: "date", value: p.birthday || "" });
+        const ageLine = el("div.metric-explain");
+        const updAge = () => { const a = ageFromBirthday(birthday.value); ageLine.textContent = a != null ? `Age: ${a}` : "Age: not set"; };
+        birthday.addEventListener("input", updAge); updAge();
+        body.appendChild(field("Birthday", birthday));
+        body.appendChild(ageLine);
+        const weight = el("input", { type: "number", inputmode: "decimal", value: p.weight || "", placeholder: "lb" });
+        body.appendChild(field("Weight (lb)", weight));
+        const height = el("input", { type: "number", inputmode: "decimal", value: p.height || "", placeholder: "in" });
+        body.appendChild(field("Height (in)", height));
+        body.appendChild(el("div.metric-explain", { text: "Used to personalize reading scores (e.g. sex-adjusted QTc; birthday/height/weight for upcoming indexes)." }));
+        body.appendChild(
+          el("div.modal-actions", {}, [
+            el("button.btn.btn-primary", {
+              text: "Save",
+              onclick: () => {
+                state.profile = { sex: sex.value, birthday: birthday.value, weight: weight.value.trim(), height: height.value.trim() };
+                save();
+                closeAll();
+                if (!$("#analysisView").classList.contains("hidden")) renderAnalysis();
+                renderDay();
+              },
+            }),
+          ])
+        );
+        setTimeout(() => sex.focus(), 50);
       });
     }
 

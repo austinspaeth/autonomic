@@ -31,6 +31,7 @@ unless asked. Edit `index.html` directly.
 {
   "version": 1,
   "settings": { "theme": "light" | "dark" },
+  "profile": { "sex", "weight", "height" },  // edited via the hamburger menu's Profile drawer; feeds reading scores (e.g. sex-adjusted QTc)
   "meta": {
     "lastUpdated": "<ISO timestamp>",      // see rule below
     "lastImport":  { "name": "file.json", "at": "<ISO timestamp>" }
