@@ -501,7 +501,7 @@
   .metric-name { flex: 1; font-size: 15px; font-weight: 700; }
   .metric-val { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
   .metric-explain { font-size: 12.5px; color: var(--text-dim); margin-top: 6px; line-height: 1.4; }
-  .spark { margin-top: 16px; color: var(--text-dim); }
+  .spark { margin-top: 16px; color: var(--text); }
   .spark svg { display: block; width: 100%; height: 92px; background: var(--bg); border-radius: 10px; touch-action: pan-y; cursor: crosshair; }
   .spark-readout { font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; height: 16px; margin-bottom: 4px; }
   .spark-dates { display: flex; justify-content: space-between; font-size: 10px; color: var(--text-dim); margin-top: 3px; }
@@ -1663,7 +1663,7 @@
         bands.forEach((b) => {
           const top = Math.min(b.max, max), bot = Math.max(lo, min); lo = b.max;
           if (top <= bot) return;
-          svg.appendChild(mk("rect", { x: padL, width: innerW, y: yAt(top), height: Math.max(0, yAt(bot) - yAt(top)), fill: SCORE_COLORS[b.cat] || "#888", opacity: 0.15 }));
+          svg.appendChild(mk("rect", { x: padL, width: innerW, y: yAt(top), height: Math.max(0, yAt(bot) - yAt(top)), fill: SCORE_COLORS[b.cat] || "#888" }));
         });
       }
       // y ticks + labels
@@ -1677,9 +1677,9 @@
       points.forEach((p, i) => svg.appendChild(mk("line", { x1: xAt(i), x2: xAt(i), y1: H - padB, y2: H - padB + 4, stroke: "var(--text-dim)", "stroke-width": 1, "vector-effect": "non-scaling-stroke", opacity: 0.6 })));
 
       const xy = points.map((p, i) => [xAt(i), yAt(p.v)]);
-      const path = mk("path", { d: smoothPath(xy), fill: "none", stroke: "currentColor", "stroke-width": 2, "vector-effect": "non-scaling-stroke", "stroke-linejoin": "round", "stroke-linecap": "round" });
+      const path = mk("path", { d: smoothPath(xy), fill: "none", stroke: "currentColor", "stroke-width": 3.5, "vector-effect": "non-scaling-stroke", "stroke-linejoin": "round", "stroke-linecap": "round" });
       svg.appendChild(path);
-      points.forEach((p, i) => { const cat = catFromBands(p.v, bands); svg.appendChild(mk("circle", { cx: xAt(i), cy: yAt(p.v), r: 2.6, fill: cat && SCORE_COLORS[cat] ? SCORE_COLORS[cat] : "currentColor" })); });
+      points.forEach((p, i) => svg.appendChild(mk("circle", { cx: xAt(i), cy: yAt(p.v), r: 2.6, fill: "currentColor" })));
       const marker = mk("line", { y1: padT, y2: H - padB, stroke: "var(--text)", "stroke-width": 1, "vector-effect": "non-scaling-stroke", opacity: 0 });
       const adot = mk("circle", { r: 3.6, opacity: 0 });
       svg.appendChild(marker); svg.appendChild(adot);
@@ -1696,7 +1696,7 @@
         readout.style.color = color;
         const x = xAt(i);
         marker.setAttribute("x1", x); marker.setAttribute("x2", x); marker.setAttribute("opacity", 0.35);
-        adot.setAttribute("cx", x); adot.setAttribute("cy", yAt(p.v)); adot.setAttribute("fill", color); adot.setAttribute("opacity", 1);
+        adot.setAttribute("cx", x); adot.setAttribute("cy", yAt(p.v)); adot.setAttribute("fill", "var(--text)"); adot.setAttribute("opacity", 1);
       };
       const idxFromEvent = (e) => { const rc = svg.getBoundingClientRect(); const px = ((e.clientX - rc.left) / (rc.width || 1)) * W; return Math.round(((px - padL) / innerW) * (points.length - 1)); };
       let active = false;
@@ -1809,7 +1809,7 @@
 
       // Breathing quality
       const bq = sumCard("Breathing quality");
-      bq.appendChild(metricRow("Coherence", r.coherence, s.coherence, HRV_EXPLAIN.coherence, sp(numEx("coherence"), BANDS.coherence)));
+      bq.appendChild(metricRow("Coherence", r.coherence, s.coherence, HRV_EXPLAIN.coherence));
       if (r.style) bq.appendChild(metricRow("Breathing style", r.style, null, "Intended pace for this reading."));
       body.appendChild(bq);
 
