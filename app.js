@@ -91,6 +91,7 @@
     return {
       version: SCHEMA_VERSION,
       settings: { theme: matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light" },
+      meta: { lastUpdated: null, lastImport: null },
       defs: {
         activities: [mk("Indoor bike"), mk("Walk"), mk("Legs up")],
         meds: [],
@@ -127,14 +128,20 @@
     const base = defaultState();
     s.version = SCHEMA_VERSION;
     s.settings = Object.assign({}, base.settings, s.settings);
+    s.meta = Object.assign({ lastUpdated: null, lastImport: null }, s.meta);
     s.defs = Object.assign({ activities: [], meds: [], symptoms: [] }, s.defs);
     s.days = s.days || {};
     return s;
   }
 
+  // Centralized persistence. Every change to the app flows through here, so
+  // this is where we stamp meta.lastUpdated. (See CLAUDE.md.)
   function save() {
     try {
+      state.meta = state.meta || {};
+      state.meta.lastUpdated = new Date().toISOString();
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      renderStatus();
     } catch (e) {
       toast("Storage error — data may not be saved");
       console.error(e);
@@ -176,7 +183,9 @@
   function applyTheme() {
     const t = state.settings.theme;
     document.documentElement.setAttribute("data-theme", t);
-    $("#themeBtn").textContent = t === "dark" ? "☀" : "☾";
+    // ︎ forces text (monochrome) presentation so the glyph inherits
+    // currentColor instead of rendering as a colored emoji.
+    $("#themeBtn").textContent = t === "dark" ? "☀︎" : "☾︎";
     const meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute("content", t === "dark" ? "#000000" : "#e03127");
   }
@@ -186,9 +195,30 @@
     applyTheme();
   }
 
+  /* ---------------- Status line (last updated / last import) ---------------- */
+  function fmtStamp(iso) {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    if (isNaN(d)) return "—";
+    return d.toLocaleString(undefined, {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  }
+  function renderStatus() {
+    const node = document.getElementById("statusLine");
+    if (!node) return;
+    const m = state.meta || {};
+    const parts = ["Updated " + fmtStamp(m.lastUpdated)];
+    if (m.lastImport && m.lastImport.name) parts.push("Imported: " + m.lastImport.name);
+    node.textContent = parts.join("   ·   ");
+  }
+
   /* ---------------- Modal system ---------------- */
-  function openModal(buildBody, opts = {}) {
-    closeModal();
+  function openModal(buildBody) {
+    clearModal(); // replace any existing drawer instantly
     const body = el("div.modal", {}, [el("div.modal-grip")]);
     const overlay = el("div.modal-overlay", {
       onclick: (e) => {
@@ -199,9 +229,21 @@
     $("#modalRoot").appendChild(overlay);
     document.body.style.overflow = "hidden";
   }
-  function closeModal() {
+  function clearModal() {
     $("#modalRoot").innerHTML = "";
     document.body.style.overflow = "";
+  }
+  // Animate the drawer back down out of view, then remove it.
+  function closeModal() {
+    const overlay = $("#modalRoot").firstElementChild;
+    document.body.style.overflow = "";
+    if (!overlay) return;
+    if (overlay.dataset.closing) return;
+    overlay.dataset.closing = "1";
+    overlay.classList.add("closing");
+    const modal = overlay.querySelector(".modal");
+    if (modal) modal.classList.add("closing");
+    setTimeout(() => overlay.remove(), 240);
   }
 
   /* ---------------- Journal rendering ---------------- */
@@ -248,12 +290,12 @@
       el("div.section-body", {}, [
         el("div.sleep-grid", {}, [
           el("div.sleep-cell", {}, [
-            el("label", { text: "Bed time" }),
-            el("input", { type: "time", value: d.sleep.bed || "", onchange: onChange("bed") }),
-          ]),
-          el("div.sleep-cell", {}, [
             el("label", { text: "Wake time" }),
             el("input", { type: "time", value: d.sleep.wake || "", onchange: onChange("wake") }),
+          ]),
+          el("div.sleep-cell", {}, [
+            el("label", { text: "Bed time" }),
+            el("input", { type: "time", value: d.sleep.bed || "", onchange: onChange("bed") }),
           ]),
         ]),
       ])
@@ -674,9 +716,6 @@
         ]);
       body.appendChild(item("⬇", "Export data", "Download everything as JSON", () => { closeModal(); exportData(); }));
       body.appendChild(item("⬆", "Import data", "Replace everything from a JSON file", () => { closeModal(); importData(); }));
-      body.appendChild(
-        item(state.settings.theme === "dark" ? "☀" : "☾", "Toggle theme", "Switch light / dark", () => { toggleTheme(); closeModal(); })
-      );
       const days = Object.keys(state.days).length;
       body.appendChild(
         el("div", {
@@ -709,7 +748,7 @@
           const parsed = JSON.parse(reader.result);
           if (!parsed || typeof parsed !== "object" || !("days" in parsed))
             throw new Error("Not an Autonomic Journal file");
-          confirmImport(parsed);
+          confirmImport(parsed, file.name);
         } catch (e) {
           toast("Import failed: " + e.message);
         }
@@ -721,7 +760,7 @@
     input.remove();
   }
 
-  function confirmImport(parsed) {
+  function confirmImport(parsed, fileName) {
     openModal((body) => {
       body.appendChild(el("h2", { text: "Replace all data?" }));
       const days = Object.keys(parsed.days || {}).length;
@@ -738,6 +777,7 @@
             text: "Replace",
             onclick: () => {
               state = migrate(parsed);
+              state.meta.lastImport = { name: fileName || "(file)", at: new Date().toISOString() };
               currentKey = keyOf(new Date());
               save();
               applyTheme();
@@ -952,6 +992,7 @@
   /* ---------------- Wire up ---------------- */
   function init() {
     applyTheme();
+    renderStatus();
     renderDate();
     renderDay();
 
