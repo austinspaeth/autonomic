@@ -80,6 +80,15 @@ unless asked. Edit `index.html` directly.
 - **Icons must be monochrome** where they should inherit color (tab bar, theme
   toggle). Use inline SVG with `stroke="currentColor"`, or text-presentation
   glyphs (append U+FE0E), not colored emoji.
+- **Tapping a reading opens a read-only summary** (`openReadingSummary`) with an
+  Edit header button (`openModal`'s `opts.action`) that stacks the editable form;
+  Save closes both, the ✕ pops back to the summary. Breathing HRV gets a rich
+  summary (`breathingSummary`: validity, overall grade, autonomic composite,
+  frequency peaks, power-distribution bar, per-metric rows); other types use
+  `genericReadingSummary`. Each scorable metric row shows a **sparkline**
+  (`buildSpark` over `metricHistory`, last 30 of that type) with grade-zone
+  bands from the `BANDS` registry (`bandsFor`). (7-day trend arrows / personal
+  bests / secondary-peak detection are still TODO.)
 - **Reading scoring.** On save, `computeScores(r)` categorizes each scorable
   metric (great/good/ok/bad/crash|concerning, plus a `warning` blue zone for
   readiness) per the framework thresholds and stores them on `r.scores`. The
