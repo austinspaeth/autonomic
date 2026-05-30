@@ -203,6 +203,20 @@
   .row-sub { font-size: 12.5px; color: var(--text-dim); margin-top: 1px; }
   .row-val { font-variant-numeric: tabular-nums; font-weight: 600; display: inline-flex; align-items: center; }
   .score-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; margin-right: 7px; }
+  .stepper { display: inline-flex; align-items: center; gap: 12px; flex: none; }
+  .step-btn {
+    width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--border);
+    background: var(--surface-2); color: var(--text); font-size: 18px; line-height: 1;
+    cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+    font-family: inherit; padding: 0;
+  }
+  .step-btn:active { opacity: 0.6; }
+  .step-val { min-width: 46px; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .num-inline {
+    width: 96px; text-align: right; background: var(--surface-2); border: 1px solid var(--border);
+    color: var(--text); border-radius: var(--radius-sm); padding: 8px 10px; font-size: 15px; font-family: inherit;
+    appearance: none; -webkit-appearance: none;
+  }
 
   .muted { color: var(--text-dim); font-size: 14px; padding: 6px 0; }
 
@@ -1066,6 +1080,23 @@
       sick: symptom("Sick"),
     };
 
+    // Trigger foods/drinks (programmatic). Logged with an occurrence count per day.
+    const trig = (label) => ({ label, icon: ICONS.alert });
+    const TRIGGER_TYPES = {
+      histamine: trig("Histamine food"),
+      alcohol: trig("Alcohol"),
+      caffeine: trig("Caffeine"),
+      highSodium: trig("High sodium"),
+      sugar: trig("Sugar"),
+      dairy: trig("Dairy"),
+      gluten: trig("Gluten"),
+      agedCheese: trig("Aged cheese"),
+      fermented: trig("Fermented food"),
+      leftovers: trig("Leftovers"),
+      chocolate: trig("Chocolate"),
+      citrus: trig("Citrus"),
+    };
+
     function defaultState() {
       return {
         version: SCHEMA_VERSION,
@@ -1108,6 +1139,9 @@
         if (!Array.isArray(d.activities)) d.activities = [];
         if (!Array.isArray(d.meds)) d.meds = [];
         if (!Array.isArray(d.symptoms)) d.symptoms = [];
+        if (!d.food) d.food = { water: 0, calories: 0, triggers: {} };
+        if (!d.food.triggers) d.food.triggers = {};
+        if (!d.digestion) d.digestion = { bm: 0 };
       });
       return s;
     }
@@ -1125,21 +1159,15 @@
       }
     }
 
+    const blankDay = () => ({
+      sleep: { bed: "", wake: "" }, readings: [], activities: [], meds: [], symptoms: [],
+      food: { water: 0, calories: 0, triggers: {} }, digestion: { bm: 0 },
+    });
     // get or create a day record (does not save)
     function day(k = currentKey, create = false) {
       let d = state.days[k];
-      if (!d && create) {
-        d = state.days[k] = {
-          sleep: { bed: "", wake: "" },
-          readings: [],
-          activities: [],
-          meds: [],
-          symptoms: [],
-        };
-      }
-      return (
-        d || { sleep: { bed: "", wake: "" }, readings: [], activities: [], meds: [], symptoms: [] }
-      );
+      if (!d && create) d = state.days[k] = blankDay();
+      return d || blankDay();
     }
 
     /* ---------------- Theme ---------------- */
@@ -1295,6 +1323,92 @@
       root.appendChild(renderActivities());
       root.appendChild(renderMeds());
       root.appendChild(renderSymptoms());
+      root.appendChild(renderFoodDrink());
+      root.appendChild(renderDigestion());
+    }
+
+    // Reusable +/- stepper. onChange receives the new (non-negative) value.
+    function stepperEl(value, step, onChange, fmt) {
+      const v = +value || 0;
+      const round = (x) => Math.round(x * 100) / 100;
+      return el("div.stepper", {}, [
+        el("button.step-btn", { text: "−", "aria-label": "Decrease", onclick: () => onChange(Math.max(0, round(v - step))) }),
+        el("span.step-val", { text: fmt ? fmt(v) : String(v) }),
+        el("button.step-btn", { text: "+", "aria-label": "Increase", onclick: () => onChange(round(v + step)) }),
+      ]);
+    }
+    const stepperRow = (title, value, step, onChange, fmt) =>
+      el("div.row", {}, [el("div.row-main", {}, [el("div.row-title", { text: title })]), stepperEl(value, step, onChange, fmt)]);
+
+    function renderFoodDrink() {
+      const d = day();
+      const f = d.food || { water: 0, calories: 0, triggers: {} };
+      const sec = el("div.section");
+      sec.appendChild(sectionHead("Food & Drink"));
+      const b = el("div.section-body");
+      b.appendChild(stepperRow("Water", f.water || 0, 0.25, (v) => { day(currentKey, true).food.water = v; save(); renderDay(); }, (v) => `${+v} L`));
+      // Calories (typed)
+      const cal = el("input.num-inline", { type: "number", inputmode: "numeric", value: f.calories || 0 });
+      cal.addEventListener("change", () => { day(currentKey, true).food.calories = parseInt(cal.value, 10) || 0; save(); });
+      b.appendChild(el("div.row", {}, [el("div.row-main", {}, [el("div.row-title", { text: "Calories" })]), cal]));
+      // Triggers
+      b.appendChild(el("div.row", {}, [
+        el("div.row-main", {}, [el("div.row-title", { text: "Triggers" })]),
+        el("button.add-link", { text: "+ Add", onclick: () => triggerMenu() }),
+      ]));
+      const trigs = f.triggers || {};
+      const keys = Object.keys(trigs).filter((k) => trigs[k] > 0 && TRIGGER_TYPES[k]);
+      if (!keys.length) {
+        b.appendChild(el("div.muted", { text: "No triggers logged." }));
+      } else {
+        keys.forEach((k) => b.appendChild(
+          el("div.row", {}, [
+            el("span.row-ico", { html: TRIGGER_TYPES[k].icon }),
+            el("div.row-main", {}, [el("div.row-title", { text: TRIGGER_TYPES[k].label })]),
+            stepperEl(trigs[k], 1, (v) => {
+              const fd = day(currentKey, true).food;
+              if (v <= 0) delete fd.triggers[k]; else fd.triggers[k] = v;
+              save(); renderDay();
+            }),
+          ])
+        ));
+      }
+      sec.appendChild(b);
+      return sec;
+    }
+
+    function triggerMenu() {
+      openModal((body) => {
+        body.appendChild(el("h2", { text: "Add trigger" }));
+        const filter = el("input", { type: "text", placeholder: "Filter..." });
+        body.appendChild(el("div.field", {}, [filter]));
+        const wrap = el("div");
+        body.appendChild(wrap);
+        const types = Object.keys(TRIGGER_TYPES);
+        const draw = () => {
+          const q = filter.value.trim().toLowerCase();
+          wrap.innerHTML = "";
+          const matches = types.filter((t) => TRIGGER_TYPES[t].label.toLowerCase().includes(q));
+          if (!matches.length) { wrap.appendChild(el("div.muted", { text: "No matches." })); return; }
+          matches.forEach((t) => wrap.appendChild(
+            el("button.menu-item", {
+              onclick: () => { const fd = day(currentKey, true).food; fd.triggers[t] = (fd.triggers[t] || 0) + 1; save(); closeModal(); renderDay(); },
+            }, [el("span.mi-ico", { html: TRIGGER_TYPES[t].icon }), el("div", {}, [el("div", { text: TRIGGER_TYPES[t].label })])])
+          ));
+        };
+        filter.addEventListener("input", draw);
+        draw();
+      });
+    }
+
+    function renderDigestion() {
+      const d = day();
+      const sec = el("div.section");
+      sec.appendChild(sectionHead("Digestion"));
+      const b = el("div.section-body");
+      b.appendChild(stepperRow("Bowel movements", (d.digestion && d.digestion.bm) || 0, 1, (v) => { day(currentKey, true).digestion.bm = v; save(); renderDay(); }));
+      sec.appendChild(b);
+      return sec;
     }
 
     function renderSleep() {
@@ -1471,12 +1585,17 @@
       const s = {};
       const put = (k, c) => { if (c) s[k] = c; };
       switch (r.type) {
-        case "hrv":
+        case "hrv": {
           put("readiness", sReadiness(r.readiness));
           put("rmssd", sRMSSDu(r.rmssd));
           put("sdnn", sSDNN(r.sdnn));
           put("avgHr", sHR(r.avgHr));
+          const band = (k, b) => { const v = numOr(r[k]); if (v != null) put(k, catFromBands(v, b)); };
+          band("pns", BANDS.pns); band("sns", BANDS.sns); band("stressIndex", BANDS.stressIndex);
+          const lf = parseFloat(r.lowPower), hf = parseFloat(r.highPower);
+          if (!isNaN(lf) && !isNaN(hf) && hf !== 0) put("lfhf", catFromBands(lf / hf, BANDS.lfhf));
           break;
+        }
         case "breathHrv": {
           put("sdnn", sSDNN(r.sdnn));
           put("rmssd", sRMSSDs(r.rmssd));
@@ -1506,7 +1625,8 @@
           put("pr", sPR(r.pr));
           put("ectopic", sEctopic(r.ectopic));
           put("rhythm", sRhythm(r));
-          put("overall", worstCat(Object.values(s)));
+          { const h = numOr(r.hrv); if (h != null) put("hrv", catFromBands(h, BANDS.ecgHrv)); }
+          put("overall", worstCat([s.qtc, s.qrs, s.pr, s.ectopic, s.rhythm].filter(Boolean)));
           break;
       }
       return s;
@@ -1590,7 +1710,16 @@
       robinson: [{ max: 71, cat: "great" }, { max: 81, cat: "good" }, { max: 91, cat: "ok" }, { max: 101, cat: "bad" }, { max: Infinity, cat: "concerning" }],
       kvas: [{ max: 14, cat: "great" }, { max: 17, cat: "good" }, { max: 21, cat: "ok" }, { max: 26, cat: "bad" }, { max: Infinity, cat: "concerning" }],
       bce: [{ max: 2601, cat: "great" }, { max: 3001, cat: "good" }, { max: 3501, cat: "ok" }, { max: 4001, cat: "bad" }, { max: Infinity, cat: "concerning" }],
+      perfusion: [{ max: 1, cat: "concerning" }, { max: 2, cat: "bad" }, { max: 4, cat: "ok" }, { max: 5, cat: "good" }, { max: Infinity, cat: "great" }],
+      pns: [{ max: -1.5, cat: "crash" }, { max: -0.5, cat: "bad" }, { max: 0.3, cat: "ok" }, { max: 1.5, cat: "good" }, { max: Infinity, cat: "great" }],
+      sns: [{ max: -0.5, cat: "great" }, { max: 0.6, cat: "good" }, { max: 1.6, cat: "ok" }, { max: 3.01, cat: "bad" }, { max: Infinity, cat: "concerning" }],
+      stressIndex: [{ max: 100, cat: "great" }, { max: 201, cat: "good" }, { max: 351, cat: "ok" }, { max: 601, cat: "bad" }, { max: Infinity, cat: "concerning" }],
+      ecgHrv: [{ max: 15, cat: "crash" }, { max: 25, cat: "bad" }, { max: 35, cat: "ok" }, { max: 50, cat: "good" }, { max: Infinity, cat: "great" }],
     };
+    // Resting-HR zones depend on body position.
+    const restingHrBands = (pos) => (!pos || /lay/i.test(pos))
+      ? [{ max: 63, cat: "great" }, { max: 69, cat: "good" }, { max: 76, cat: "ok" }, { max: 86, cat: "bad" }, { max: Infinity, cat: "concerning" }]
+      : [{ max: 69, cat: "great" }, { max: 79, cat: "good" }, { max: 89, cat: "ok" }, { max: 99, cat: "bad" }, { max: Infinity, cat: "concerning" }];
     // QTc norms run a little longer for females; shift the high-side thresholds.
     const qtcBands = (sex) => sex === "Female"
       ? BANDS.qtc.map((b) => ({ max: (b.max > 350 && isFinite(b.max)) ? b.max + 10 : b.max, cat: b.cat }))
@@ -1779,6 +1908,9 @@
         if (r.type === "breathHrv") breathingSummary(r, body);
         else if (r.type === "bp") bpSummary(r, body);
         else if (r.type === "ecg") ecgSummary(r, body);
+        else if (r.type === "restingHr") restingHrSummary(r, body);
+        else if (r.type === "bloodO2") bloodO2Summary(r, body);
+        else if (r.type === "hrv") unstructuredHrvSummary(r, body);
         else genericReadingSummary(r, body);
       }, { action: { icon: ICONS.edit, label: "Edit", onclick: () => readingForm(r.type, r) } });
     }
@@ -1976,11 +2108,92 @@
       const rate = sumCard("Rate & variability");
       const hrCat = r.hr !== "" && r.hr != null ? catFromBands(+r.hr, BANDS.hrBreath) : null;
       rate.appendChild(metricRow("HR", r.hr, hrCat, "Heart rate during the ECG.", spk("hr", BANDS.hrBreath)));
-      rate.appendChild(metricRow("HRV", r.hrv, false, "Beat-to-beat variability captured by the ECG.", spk("hrv", null)));
+      rate.appendChild(metricRow("HRV", r.hrv, s.hrv, "Heart-rate variability captured by the ECG (SDNN-style).", spk("hrv", BANDS.ecgHrv)));
       body.appendChild(rate);
 
       if (r.note) { const nc = sumCard("Notes"); nc.appendChild(el("div.metric-card", {}, [el("div.sum-text", { text: r.note })])); body.appendChild(nc); }
       if (r.techReview) { const tc = sumCard("Technician review"); tc.appendChild(el("div.metric-card", {}, [el("div.sum-text", { text: r.techReview })])); body.appendChild(tc); }
+    }
+
+    const notesCard = (r, b) => { if (r.note) { const nc = sumCard("Notes"); nc.appendChild(el("div.metric-card", {}, [el("div.sum-text", { text: r.note })])); b.appendChild(nc); } };
+
+    function restingHrSummary(r, body) {
+      const cat = rowScoreCategory(r);
+      const verdict = {
+        great: "Resting heart rate is in a strong range.", good: "Resting heart rate is healthy.",
+        ok: "Slightly elevated for rest.", bad: "Elevated resting heart rate; note context.",
+        concerning: "High resting heart rate; consider rechecking and context.",
+      };
+      body.appendChild(heroCard({ cat, label: "Resting heart rate", big: r.hr || "", den: "bpm", sub: r.position || "", tip: verdict[cat] || "" }));
+      const band = restingHrBands(r.position);
+      const c = sumCard("Heart rate");
+      const hrCat = (r.hr !== "" && r.hr != null) ? catFromBands(+r.hr, band) : null;
+      c.appendChild(metricRow("HR", r.hr, hrCat, `Resting heart rate (${(r.position || "laying").toLowerCase()}). Lower generally reflects stronger parasympathetic tone.`, buildSpark(metricHistory("restingHr", numEx("hr")), band)));
+      c.appendChild(metricRow("Position", r.position, false, "Body position during the reading; thresholds differ for laying vs sitting."));
+      body.appendChild(c);
+      notesCard(r, body);
+    }
+
+    function bloodO2Summary(r, body) {
+      const s = computeScores(r);
+      const cat = rowScoreCategory(r);
+      const verdict = {
+        great: "Oxygen saturation is excellent.", good: "Oxygen saturation is good.",
+        ok: "Oxygen saturation is borderline.", bad: "Low oxygen saturation; recheck.",
+        concerning: "Low oxygen saturation; recheck and note context.",
+      };
+      body.appendChild(heroCard({ cat, label: "Blood oxygen", big: r.value ? r.value + "%" : "", sub: "SpO2", tip: verdict[cat] || "" }));
+      const ox = sumCard("Oxygenation");
+      ox.appendChild(metricRow("Blood oxygen", r.value ? r.value + "%" : "", s.value, "Percent of hemoglobin carrying oxygen. Use the left hand; the right can read low from peripheral vasoconstriction.", buildSpark(metricHistory("bloodO2", numEx("value")), BANDS.spo2)));
+      body.appendChild(ox);
+      const sq = sumCard("Signal quality");
+      const piCat = (r.perfusion !== "" && r.perfusion != null) ? catFromBands(+r.perfusion, BANDS.perfusion) : null;
+      sq.appendChild(metricRow("Perfusion index", r.perfusion, piCat, "Signal strength of the reading. 5+ trust it, 2-4 moderate confidence, under 2 is unreliable (try another finger or hand).", buildSpark(metricHistory("bloodO2", numEx("perfusion")), BANDS.perfusion)));
+      sq.appendChild(metricRow("Pulse", r.pulse, false, "Heart rate at the time of the reading.", buildSpark(metricHistory("bloodO2", numEx("pulse")), null)));
+      body.appendChild(sq);
+      notesCard(r, body);
+    }
+
+    function unstructuredHrvSummary(r, body) {
+      const s = computeScores(r);
+      const cat = rowScoreCategory(r);
+      const verdict = {
+        great: "Strong readiness today.", good: "Good readiness.", ok: "Moderate readiness; keep it easy.",
+        bad: "Low readiness; favor rest.", crash: "Very low readiness; prioritize rest.",
+        warning: "Readiness is unusually high (blue zone), which can signal fragility. Do less, not more.",
+      };
+      body.appendChild(heroCard({ cat, label: "Readiness", big: r.readiness ? r.readiness + "%" : "", sub: "Recovery readiness", tip: verdict[cat] || "" }));
+      const sp = (k, bands) => buildSpark(metricHistory("hrv", numEx(k)), bands);
+
+      const rc = sumCard("Readiness");
+      rc.appendChild(metricRow("Readiness", r.readiness ? r.readiness + "%" : "", s.readiness, "Device recovery readiness. 70-85% is ideal; 86%+ can paradoxically signal fragility.", sp("readiness", BANDS.readiness)));
+      body.appendChild(rc);
+
+      const ab = sumCard("Autonomic balance");
+      ab.appendChild(metricRow("PNS index", r.pns, s.pns, "Parasympathetic (rest and recovery) activity. Higher means more vagal dominance.", sp("pns", BANDS.pns)));
+      ab.appendChild(metricRow("SNS index", r.sns, s.sns, "Sympathetic (activation and stress) activity. Lower is calmer.", sp("sns", BANDS.sns)));
+      ab.appendChild(metricRow("Stress index", r.stressIndex, s.stressIndex, "Baevsky stress index. Higher means more sympathetic strain and rigidity.", sp("stressIndex", BANDS.stressIndex)));
+      body.appendChild(ab);
+
+      const va = sumCard("Variability");
+      va.appendChild(metricRow("RMSSD", r.rmssd, s.rmssd, HRV_EXPLAIN.rmssd, sp("rmssd", BANDS.rmssdU)));
+      va.appendChild(metricRow("SDNN", r.sdnn, s.sdnn, HRV_EXPLAIN.sdnn, sp("sdnn", BANDS.sdnn)));
+      va.appendChild(metricRow("Avg HR", r.avgHr, s.avgHr, "Average heart rate during the reading. Lower usually reflects more vagal tone.", sp("avgHr", BANDS.hrBreath)));
+      body.appendChild(va);
+
+      const pw = sumCard("Power");
+      pw.appendChild(metricRow("Low power", r.lowPower, false, "Low-frequency power (baroreflex and sympathovagal activity).", sp("lowPower", null)));
+      pw.appendChild(metricRow("High power", r.highPower, false, "High-frequency power (vagal, tied to breathing).", sp("highPower", null)));
+      const lfhfEx = (rr) => { const a = +rr.lowPower, b = +rr.highPower; return (!isNaN(a) && !isNaN(b) && b) ? a / b : null; };
+      const lfhfV = lfhfEx(r);
+      pw.appendChild(metricRow("LF/HF ratio", lfhfV != null ? fmtNum(lfhfV) : "", s.lfhf, "Sympathetic vs vagal balance. Balanced or low favors flexibility.", buildSpark(metricHistory("hrv", lfhfEx), BANDS.lfhf)));
+      body.appendChild(pw);
+
+      const det = sumCard("Details");
+      det.appendChild(metricRow("Physiological age", r.age, false, "Device-estimated physiological age (not your actual age)."));
+      det.appendChild(metricRow("Swallowing", r.swallowing ? "Yes" : "No", false));
+      body.appendChild(det);
+      notesCard(r, body);
     }
 
     function renderReadings() {
@@ -2554,7 +2767,9 @@
         (Array.isArray(d.activities) && d.activities.length) ||
         (Array.isArray(d.meds) && d.meds.length) ||
         (Array.isArray(d.symptoms) && d.symptoms.length) ||
-        (d.sleep && (d.sleep.bed || d.sleep.wake))
+        (d.sleep && (d.sleep.bed || d.sleep.wake)) ||
+        (d.food && (+d.food.water > 0 || +d.food.calories > 0 || Object.values(d.food.triggers || {}).some((c) => c > 0))) ||
+        (d.digestion && +d.digestion.bm > 0)
       );
     }
 
