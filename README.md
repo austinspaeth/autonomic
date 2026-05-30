@@ -46,11 +46,12 @@ replaces the current dataset (after a confirmation).
 
 ## Files
 
+Everything (markup, styles, and logic) is inlined in the single **`index.html`** —
+no separate `.css` or `.js` files.
+
 | File | Purpose |
 | --- | --- |
-| `index.html` | App shell (at repo root for GitHub Pages) |
-| `styles.css` | Theming + layout |
-| `app.js` | All logic (state, rendering, calendar, analysis) |
+| `index.html` | The whole app — markup + inline `<style>` + inline `<script>` (at repo root for GitHub Pages) |
 | `sw.js` | Service worker (offline cache) |
 | `manifest.webmanifest` | PWA manifest |
 | `icons/` | App icons + SVG favicon |

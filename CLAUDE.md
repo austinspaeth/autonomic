@@ -5,13 +5,16 @@ recovery. It is **pure static HTML / CSS / JS — no build step, no dependencies
 no backend.** It is served from the repo root via GitHub Pages, and all state
 lives in `localStorage` under the key `autonomic.journal.v1`.
 
+Everything (markup, CSS, and JS) lives in the single **`index.html`** — the CSS
+is in a `<style>` block in the `<head>` and the logic is in a `<script>` block
+(one IIFE, no framework) at the end of `<body>`. There are no separate `.css`
+or `.js` files; edit them inline in `index.html`.
+
 ## Files
 
 | File | Purpose |
 | --- | --- |
-| `index.html` | App shell (must stay at repo root for GitHub Pages) |
-| `styles.css` | Theming (CSS variables) + layout |
-| `app.js` | All logic — single IIFE, no framework |
+| `index.html` | The whole app — markup + inline `<style>` + inline `<script>` (must stay at repo root for GitHub Pages) |
 | `sw.js` | Service worker (offline cache) |
 | `manifest.webmanifest` | PWA manifest |
 | `icons/` | App icons + SVG favicon |
@@ -19,7 +22,8 @@ lives in `localStorage` under the key `autonomic.journal.v1`.
 | `.nojekyll` | Tells GitHub Pages to serve files as-is |
 
 Keep it dependency-free and build-free. Do not introduce a bundler, framework,
-or `package.json`. Edit the static files directly.
+or `package.json`, and do not split the CSS/JS back out into separate files
+unless asked. Edit `index.html` directly.
 
 ## State shape (the localStorage JSON)
 
