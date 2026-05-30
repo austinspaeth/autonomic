@@ -1837,10 +1837,12 @@
         tip: verdict[overall] || "",
       }));
 
-      // Breathing quality
-      const bq = sumCard("Breathing quality");
+      // Details
+      const bq = sumCard("Details");
       bq.appendChild(metricRow("Coherence", r.coherence, false, HRV_EXPLAIN.coherence));
       if (r.style) bq.appendChild(metricRow("Breathing style", r.style, false, "Intended pace for this reading."));
+      if (r.period) bq.appendChild(metricRow("Reading type", r.period, false));
+      bq.appendChild(metricRow("Swallowing", r.swallowing ? "Yes" : "No", false));
       body.appendChild(bq);
 
       // Power (frequency peaks folded in, below HF power)
