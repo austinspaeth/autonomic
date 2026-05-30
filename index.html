@@ -278,6 +278,40 @@
   }
   .sleep-cell input::-webkit-date-and-time-value { text-align: left; margin: 0; }
 
+  /* Segmented control (e.g. sleep quality) with a sliding pill */
+  .segmented {
+    position: relative;
+    display: grid;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 4px;
+    margin-top: 12px;
+  }
+  .seg-pill {
+    position: absolute;
+    top: 4px; bottom: 4px; left: 4px;
+    background: var(--accent);
+    border-radius: 999px;
+    z-index: 0;
+    transition: transform 0.4s cubic-bezier(0.34, 1.25, 0.5, 1);
+  }
+  .seg-opt {
+    position: relative;
+    z-index: 1;
+    background: none;
+    border: none;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-dim);
+    padding: 9px 4px;
+    cursor: pointer;
+    border-radius: 999px;
+    transition: color 0.25s ease;
+  }
+  .seg-opt.active { color: #fff; }
+
   /* ---------- Buttons ---------- */
   .btn {
     appearance: none;
@@ -392,6 +426,7 @@
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
+    overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
     padding: 20px 18px 22px;
   }
@@ -730,6 +765,9 @@
       download: svgIcon('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/>'),
       upload: svgIcon('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/>'),
       x: svgIcon('<path d="M18 6 6 18"/><path d="m6 6 12 12"/>'),
+      bike: svgIcon('<circle cx="18.5" cy="17.5" r="3.5"/><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="15" cy="5" r="1"/><path d="M12 17.5V14l-3-3 4-3 2 3h2"/>'),
+      footprints: svgIcon('<path d="M4 16v-2.4C4 11.5 3 10.5 3 8c0-2.7 1.5-6 4.5-6C9.4 2 10 3.8 10 5.5c0 3.1-2 5.7-2 8.7V16a2 2 0 1 1-4 0Z"/><path d="M20 20v-2.4c0-2.1 1-3.1 1-5.6 0-2.7-1.5-6-4.5-6C14.6 6 14 7.8 14 9.5c0 3.1 2 5.7 2 8.7V20a2 2 0 1 0 4 0Z"/><path d="M16 17h4"/><path d="M4 13h4"/>'),
+      legsUp: svgIcon('<circle cx="12" cy="12" r="9"/><path d="M8 12l4-4 4 4"/><path d="M12 16V8"/>'),
     };
 
     // Reading types. Order here is the order shown in the "Add reading" drawer.
@@ -773,6 +811,15 @@
       },
     };
 
+    // Activity types — programmatic only (no custom user-added ones). Each logged
+    // activity is { id, type, time, note, ...fields }. `fields`/`checks` are the
+    // per-activity capture template (TBD — filled in as templates are provided).
+    const ACTIVITY_TYPES = {
+      indoorBike: { label: "Indoor bike", icon: ICONS.bike, fields: [] },
+      walk: { label: "Walk", icon: ICONS.footprints, fields: [] },
+      legsUp: { label: "Legs up", icon: ICONS.legsUp, fields: [] },
+    };
+
     function defaultState() {
       const mk = (name, extra = {}) => ({ id: uid(), name, archived: false, ...extra });
       return {
@@ -780,7 +827,7 @@
         settings: { theme: matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light" },
         meta: { lastUpdated: null, lastImport: null },
         defs: {
-          activities: [mk("Indoor bike"), mk("Walk"), mk("Legs up")],
+          activities: [], // activities are programmatic (ACTIVITY_TYPES), not catalog defs
           meds: [],
           symptoms: [
             mk("High BP", { hasValue: true }),
@@ -818,6 +865,11 @@
       s.meta = Object.assign({ lastUpdated: null, lastImport: null }, s.meta);
       s.defs = Object.assign({ activities: [], meds: [], symptoms: [] }, s.defs);
       s.days = s.days || {};
+      // activities are now an array of logged entries (was a {defId:…} map)
+      Object.keys(s.days).forEach((k) => {
+        const d = s.days[k];
+        if (d && !Array.isArray(d.activities)) d.activities = [];
+      });
       return s;
     }
 
@@ -841,13 +893,13 @@
         d = state.days[k] = {
           sleep: { bed: "", wake: "" },
           readings: [],
-          activities: {},
+          activities: [],
           meds: {},
           symptoms: {},
         };
       }
       return (
-        d || { sleep: { bed: "", wake: "" }, readings: [], activities: {}, meds: {}, symptoms: {} }
+        d || { sleep: { bed: "", wake: "" }, readings: [], activities: [], meds: {}, symptoms: {} }
       );
     }
 
@@ -903,6 +955,25 @@
        `done` callback passed to the builder, which closes the whole stack. */
     const sheetStack = [];
 
+    // Lock background scroll while any sheet is open. Setting body overflow
+    // isn't enough on iOS, so we pin the body and restore scroll on unlock.
+    let scrollLockY = 0;
+    function lockScroll() {
+      scrollLockY = window.scrollY || document.documentElement.scrollTop || 0;
+      const b = document.body;
+      b.style.position = "fixed";
+      b.style.top = `-${scrollLockY}px`;
+      b.style.left = "0";
+      b.style.right = "0";
+      b.style.width = "100%";
+      b.style.overflow = "hidden";
+    }
+    function unlockScroll() {
+      const b = document.body;
+      b.style.position = b.style.top = b.style.left = b.style.right = b.style.width = b.style.overflow = "";
+      window.scrollTo(0, scrollLockY);
+    }
+
     function openModal(buildBody) {
       const prev = sheetStack[sheetStack.length - 1];
       const scroll = el("div.modal-scroll");
@@ -927,14 +998,14 @@
 
       $("#modalRoot").appendChild(overlay);
       sheetStack.push(overlay);
-      document.body.style.overflow = "hidden";
+      if (sheetStack.length === 1) lockScroll(); // first sheet locks the page
       if (prev) { const pc = prev.querySelector(".modal"); if (pc) pc.classList.add("behind"); }
     }
 
     // Pop the top sheet, revealing the one beneath.
     function closeModal() {
       const overlay = sheetStack[sheetStack.length - 1];
-      if (!overlay) { document.body.style.overflow = ""; return; }
+      if (!overlay) return;
       if (overlay.dataset.closing) return;
       overlay.dataset.closing = "1";
       overlay.classList.add("closing");
@@ -943,13 +1014,13 @@
       sheetStack.pop();
       const beneath = sheetStack[sheetStack.length - 1];
       if (beneath) { const bc = beneath.querySelector(".modal"); if (bc) bc.classList.remove("behind"); }
-      else document.body.style.overflow = "";
+      else unlockScroll();
       setTimeout(() => overlay.remove(), 280);
     }
 
     // Close every sheet (used after a completed action like Save).
     function closeAll() {
-      if (!sheetStack.length) { document.body.style.overflow = ""; return; }
+      if (!sheetStack.length) return;
       const top = sheetStack.pop();
       sheetStack.forEach((o) => o.remove()); // drop the ones beneath instantly
       sheetStack.length = 0;
@@ -960,7 +1031,7 @@
         if (card) card.classList.add("closing");
         setTimeout(() => top.remove(), 280);
       }
-      document.body.style.overflow = "";
+      unlockScroll();
     }
 
     /* ---------------- Journal rendering ---------------- */
@@ -990,7 +1061,7 @@
       root.innerHTML = "";
       root.appendChild(renderSleep());
       root.appendChild(renderReadings());
-      root.appendChild(renderCatalog("activities", "Activities"));
+      root.appendChild(renderActivities());
       root.appendChild(renderCatalog("meds", "Medications & Supplements"));
       root.appendChild(renderCatalog("symptoms", "Symptoms"));
     }
@@ -1003,6 +1074,11 @@
         day(currentKey, true).sleep[field] = e.target.value;
         save();
       };
+      const quality = segmented(
+        [{ val: "good", label: "Good sleep" }, { val: "interrupted", label: "Interrupted" }],
+        d.sleep.quality || "good",
+        (val) => { day(currentKey, true).sleep.quality = val; save(); }
+      );
       sec.appendChild(
         el("div.section-body", {}, [
           el("div.sleep-grid", {}, [
@@ -1015,9 +1091,54 @@
               el("input", { type: "time", value: d.sleep.bed || "", onchange: onChange("bed") }),
             ]),
           ]),
+          quality,
         ])
       );
       return sec;
+    }
+
+    // Segmented control with a sliding pill (tuned for 2 options, full width).
+    function segmented(opts, value, onChange) {
+      const n = opts.length;
+      const wrap = el("div.segmented", { style: `grid-template-columns: repeat(${n}, 1fr)` });
+      const pill = el("span.seg-pill", { style: `width: calc(${100 / n}% - 4px)` });
+      wrap.appendChild(pill);
+      const buttons = [];
+      const setActive = (val) => {
+        const idx = Math.max(0, opts.findIndex((o) => o.val === val));
+        pill.style.transform = `translateX(${idx * 100}%)`;
+        buttons.forEach((b, i) => b.classList.toggle("active", i === idx));
+      };
+      opts.forEach((o) => {
+        const b = el("button.seg-opt", {
+          type: "button", text: o.label,
+          onclick: () => { setActive(o.val); onChange(o.val); },
+        });
+        buttons.push(b);
+        wrap.appendChild(b);
+      });
+      setActive(value);
+      return wrap;
+    }
+
+    // Shared helpers for field-based entries (readings & activities).
+    function summarizeFields(def, r) {
+      for (const f of (def && def.fields ? def.fields : [])) {
+        const v = r[f.key];
+        if (v != null && v !== "") return v + (f.unit || "");
+      }
+      return "";
+    }
+    function detailFields(def, r) {
+      if (!def) return "";
+      const parts = [];
+      (def.fields || []).forEach((f, i) => {
+        if (i === 0) return; // headline already shows the first field
+        const v = r[f.key];
+        if (v != null && v !== "") parts.push(`${f.label} ${v}${f.unit || ""}`);
+      });
+      (def.checks || []).forEach((c) => { if (r[c.key]) parts.push(c.label); });
+      return parts.join(" · ");
     }
 
     // Headline value shown on the right of a reading row.
@@ -1028,25 +1149,13 @@
         if (r.pulse) s += ` · ${r.pulse} bpm`;
         return s;
       }
-      for (const f of (def ? def.fields : [])) {
-        const v = r[f.key];
-        if (v != null && v !== "") return v + (f.unit || "");
-      }
-      return r.value != null && r.value !== "" ? String(r.value) : ""; // legacy
+      const s = summarizeFields(def, r);
+      return s || (r.value != null && r.value !== "" ? String(r.value) : ""); // legacy
     }
-
-    // Secondary line: remaining filled fields + any checked flags.
     function readingDetails(r) {
       const def = READING_TYPES[r.type];
       if (!def || r.type === "bp") return "";
-      const parts = [];
-      def.fields.forEach((f, i) => {
-        if (i === 0) return; // headline already shows the first field
-        const v = r[f.key];
-        if (v != null && v !== "") parts.push(`${f.label} ${v}${f.unit || ""}`);
-      });
-      (def.checks || []).forEach((c) => { if (r[c.key]) parts.push(c.label); });
-      return parts.join(" · ");
+      return detailFields(def, r);
     }
 
     function renderReadings() {
@@ -1204,6 +1313,136 @@
         inputmode: "decimal",
         value: v ?? "",
         placeholder: "—",
+      });
+    }
+
+    /* ----- Activities (works like Readings: log entries from a fixed list) ----- */
+    function renderActivities() {
+      const d = day();
+      const sec = el("div.section");
+      sec.appendChild(
+        sectionHead(
+          "Activities",
+          false,
+          el("button.add-link", { text: "+ Add", onclick: () => activityMenu() })
+        )
+      );
+      const bodyEl = el("div.section-body");
+      const list = [...(d.activities || [])].sort((a, b) => (a.time || "").localeCompare(b.time || ""));
+      if (!list.length) {
+        bodyEl.appendChild(el("div.muted", { text: "No activities yet." }));
+      } else {
+        list.forEach((a) => {
+          const def = ACTIVITY_TYPES[a.type];
+          if (!def) return;
+          const sub = [detailFields(def, a), a.note].filter(Boolean).join(" — ");
+          bodyEl.appendChild(
+            el("div.row", { onclick: () => activityForm(a.type, a) }, [
+              el("div.row-main", {}, [
+                el("div.row-title", { text: def.label }),
+                sub ? el("div.row-sub", { text: sub }) : null,
+              ]),
+              el("div.row-val", { text: summarizeFields(def, a) }),
+              a.time ? el("span.pill", { text: a.time }) : null,
+            ])
+          );
+        });
+      }
+      sec.appendChild(bodyEl);
+      return sec;
+    }
+
+    function activityMenu() {
+      openModal((body) => {
+        body.appendChild(el("h2", { text: "Add activity" }));
+        const filter = el("input", { type: "text", placeholder: "Filter activities…" });
+        body.appendChild(el("div.field", {}, [filter]));
+        const listWrap = el("div");
+        body.appendChild(listWrap);
+        const types = Object.keys(ACTIVITY_TYPES);
+        const draw = () => {
+          const q = filter.value.trim().toLowerCase();
+          listWrap.innerHTML = "";
+          const matches = types.filter((t) => ACTIVITY_TYPES[t].label.toLowerCase().includes(q));
+          if (!matches.length) {
+            listWrap.appendChild(el("div.muted", { text: "No matches." }));
+            return;
+          }
+          matches.forEach((type) => {
+            listWrap.appendChild(
+              el("button.menu-item", {
+                onclick: () => activityForm(type, null), // stacks on top of this drawer
+              }, [
+                el("span.mi-ico", { html: ACTIVITY_TYPES[type].icon }),
+                el("div", {}, [el("div", { text: ACTIVITY_TYPES[type].label })]),
+              ])
+            );
+          });
+        };
+        filter.addEventListener("input", draw);
+        draw();
+      });
+    }
+
+    function activityForm(type, existing) {
+      const def = ACTIVITY_TYPES[type];
+      const r = existing ? { ...existing } : { id: uid(), type, time: nowTime(), note: "" };
+      openModal((body) => {
+        body.appendChild(el("h2", { text: (existing ? "Edit " : "") + def.label }));
+        const inputs = {};
+        const addField = (f) => {
+          inputs[f.key] = numInput(r[f.key]);
+          return field(f.label + (f.unit ? ` (${f.unit})` : ""), inputs[f.key]);
+        };
+        if ((def.fields || []).length > 1) {
+          body.appendChild(el("div.field-grid", {}, def.fields.map(addField)));
+        } else {
+          (def.fields || []).forEach((f) => body.appendChild(addField(f)));
+        }
+        const checks = {};
+        (def.checks || []).forEach((c) => {
+          const cb = el("input", { type: "checkbox" });
+          cb.checked = !!r[c.key];
+          checks[c.key] = cb;
+          body.appendChild(el("div.field.field-check", {}, [el("label", {}, [cb, el("span", { text: c.label })])]));
+        });
+        const time = el("input", { type: "time", value: r.time || nowTime() });
+        const note = el("input", { type: "text", value: r.note || "", placeholder: "Optional note" });
+        body.appendChild(field("Time", time));
+        body.appendChild(field("Note", note));
+
+        body.appendChild(
+          el("div.modal-actions", {}, [
+            existing
+              ? el("button.btn.btn-danger", {
+                  text: "Delete",
+                  onclick: () => {
+                    const d = day(currentKey, true);
+                    d.activities = d.activities.filter((x) => x.id !== r.id);
+                    save();
+                    closeAll();
+                    renderDay();
+                  },
+                })
+              : null,
+            el("button.btn.btn-primary", {
+              text: "Save",
+              onclick: () => {
+                (def.fields || []).forEach((f) => { r[f.key] = inputs[f.key].value.trim(); });
+                (def.checks || []).forEach((c) => { r[c.key] = checks[c.key].checked; });
+                r.time = time.value;
+                r.note = note.value.trim();
+                const d = day(currentKey, true);
+                const i = d.activities.findIndex((x) => x.id === r.id);
+                if (i >= 0) d.activities[i] = r;
+                else d.activities.push(r);
+                save();
+                closeAll();
+                renderDay();
+              },
+            }),
+          ])
+        );
       });
     }
 
@@ -1463,7 +1702,7 @@
       if (!d) return false;
       return (
         (d.readings && d.readings.length) ||
-        Object.keys(d.activities || {}).length ||
+        (Array.isArray(d.activities) && d.activities.length) ||
         Object.keys(d.meds || {}).length ||
         Object.keys(d.symptoms || {}).length ||
         (d.sleep && (d.sleep.bed || d.sleep.wake))
@@ -1632,7 +1871,7 @@
       root.appendChild(lineChartCard("Blood Oxygen", [{ data: spo2, color: "#16a34a" }]));
 
       root.appendChild(freqCard("Symptoms", "symptoms", keys));
-      root.appendChild(freqCard("Activities", "activities", keys));
+      root.appendChild(freqCardActivities(keys));
     }
 
     function lineChartCard(title, series) {
@@ -1732,17 +1971,42 @@
         card.appendChild(el("div.chart-empty", { text: "None logged in range." }));
         return card;
       }
+      renderFreqRows(card, rows.map(([id, c]) => [nameOf(id), c]));
+      return card;
+    }
+
+    // Activities are logged entries (array), counted by type.
+    function freqCardActivities(keys) {
+      const card = el("div.chart-card", {}, [el("h3", { text: "Activities" })]);
+      const counts = new Map();
+      keys.forEach((k) => {
+        const d = state.days[k];
+        (d && Array.isArray(d.activities) ? d.activities : []).forEach((a) =>
+          counts.set(a.type, (counts.get(a.type) || 0) + 1)
+        );
+      });
+      const rows = [...counts.entries()]
+        .map(([type, c]) => [ACTIVITY_TYPES[type] ? ACTIVITY_TYPES[type].label : type, c])
+        .sort((a, b) => b[1] - a[1]);
+      if (!rows.length) {
+        card.appendChild(el("div.chart-empty", { text: "None logged in range." }));
+        return card;
+      }
+      renderFreqRows(card, rows);
+      return card;
+    }
+
+    function renderFreqRows(card, rows) {
       const maxC = rows[0][1];
-      rows.forEach(([id, c]) => {
+      rows.forEach(([name, c]) => {
         card.appendChild(
           el("div.freq-row", {}, [
-            el("div.freq-name", { text: nameOf(id) }),
+            el("div.freq-name", { text: name }),
             el("div.freq-bar-wrap", {}, [el("div.freq-bar", { style: `width:${(c / maxC) * 100}%` })]),
             el("div.freq-count", { text: String(c) }),
           ])
         );
       });
-      return card;
     }
 
     /* ---------------- View switching ---------------- */

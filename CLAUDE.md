@@ -42,14 +42,17 @@ unless asked. Edit `index.html` directly.
   },
   "days": {
     "YYYY-MM-DD": {
-      "sleep":      { "bed": "HH:MM", "wake": "HH:MM" },
+      "sleep":      { "bed": "HH:MM", "wake": "HH:MM", "quality": "good"|"interrupted" },
+      // activities are logged entries from ACTIVITY_TYPES (programmatic, no
+      // custom ones), each { id, type, time, note, ...templateFields } — same
+      // pattern as readings. meds/symptoms remain {defId:…} checkmark catalogs.
       // reading `type` is one of: hrv (Unstructured HRV), breathHrv,
       // bp (Blood Pressure), bloodO2 (Blood Oxygen). Fields vary by type:
       //   hrv: readiness, pns, sns, age, sdnn, rmssd, avgHr, stressIndex,
       //        lowPower, highPower, swallowing(bool)
       //   breathHrv / bloodO2: value     bp: sys, dia, pulse
       "readings":   [ { "id", "type", "time", "note", ...fields } ],
-      "activities": { "<defId>": { "time" } },
+      "activities": [ { "id", "type", "time", "note", ...fields } ],
       "meds":       { "<defId>": { "time", "dose?" } },
       "symptoms":   { "<defId>": { "time", "value?" } }
     }
