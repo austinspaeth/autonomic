@@ -45,8 +45,8 @@ unless asked. Edit `index.html` directly.
       "sleep":      { "bed": "HH:MM", "wake": "HH:MM" },
       // reading `type` is one of: hrv (Unstructured HRV), breathHrv,
       // bp (Blood Pressure), bloodO2 (Blood Oxygen). Fields vary by type:
-      //   hrv: readiness, pns, sns, age, sdnn, stressIndex, lowPower,
-      //        highPower, swallowing(bool)
+      //   hrv: readiness, pns, sns, age, sdnn, rmssd, avgHr, stressIndex,
+      //        lowPower, highPower, swallowing(bool)
       //   breathHrv / bloodO2: value     bp: sys, dia, pulse
       "readings":   [ { "id", "type", "time", "note", ...fields } ],
       "activities": { "<defId>": { "time" } },
