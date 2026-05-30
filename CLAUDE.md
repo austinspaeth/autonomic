@@ -71,9 +71,13 @@ unless asked. Edit `index.html` directly.
   it, so past days keep whatever was recorded. Archived items only disappear from
   **today forward** (`visibleDefs()` still shows an archived item on any day that
   already has a record for it).
-- **Drawers/modals slide in and out from the bottom.** `openModal()` slides up;
-  `closeModal()` adds a `.closing` class to play the slide-down animation, then
-  removes the node. Keep this pattern for any new drawer.
+- **Drawers/modals are bottom sheets (~90% height) and stack iOS-style.**
+  `openModal(build)` pushes a sheet (`sheetStack`); opening one while another is
+  up scales the one beneath (`.behind`). Each sheet has a fixed ✕ (top-right) and,
+  if the builder added a `.modal-actions`, a fixed blurred footer. `closeModal()`
+  pops just the top sheet (the ✕ and backdrop use it); `closeAll()` closes the
+  whole stack and is what completion actions (Save, etc.) call. Builders append
+  content to a scrollable `.modal-scroll`.
 - **Icons must be monochrome** where they should inherit color (tab bar, theme
   toggle). Use inline SVG with `stroke="currentColor"`, or text-presentation
   glyphs (append U+FE0E), not colored emoji.

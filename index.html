@@ -114,7 +114,7 @@
   }
   .icon-btn:active { background: var(--surface-2); }
   /* The text-presentation sun glyph renders small; bump it to match the moon. */
-  .icon-btn.is-sun { font-size: 26px; }
+  .icon-btn.is-sun { font-size: 34px; }
 
   /* ---------- Date bar ---------- */
   .datebar {
@@ -244,6 +244,7 @@
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     column-gap: 14px;
     padding-top: 4px;
+    width: 100%;
   }
   .sleep-cell { min-width: 0; }
   .sleep-cell label {
@@ -255,9 +256,14 @@
   }
   .sleep-cell input {
     display: block;
+    box-sizing: border-box;
     width: 100%;
     max-width: 100%;
     min-width: 0;
+    /* WebKit time inputs keep an intrinsic min-width and ignore `width`
+       until appearance is reset — this is the real fix for the overflow. */
+    appearance: none;
+    -webkit-appearance: none;
     background: var(--surface-2);
     border: 1px solid var(--border);
     color: var(--text);
@@ -266,6 +272,7 @@
     font-size: 15px;
     font-family: inherit;
   }
+  .sleep-cell input::-webkit-date-and-time-value { text-align: left; margin: 0; }
 
   /* ---------- Buttons ---------- */
   .btn {
@@ -339,7 +346,7 @@
                 width 0.46s cubic-bezier(0.34, 1.25, 0.5, 1);
   }
 
-  /* ---------- Modal ---------- */
+  /* ---------- Modal / stacked sheets ---------- */
   .modal-overlay {
     position: fixed;
     inset: 0;
@@ -349,43 +356,84 @@
     align-items: flex-end;
     justify-content: center;
     padding: 0;
-    animation: fade 0.15s ease;
+    animation: fade 0.2s ease;
   }
   @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
   @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
   @keyframes slideup { from { transform: translateY(100%); } to { transform: translateY(0); } }
   @keyframes slidedown { from { transform: translateY(0); } to { transform: translateY(110%); } }
-  .modal-overlay.closing { animation: fadeOut 0.22s ease forwards; }
-  .modal.closing { animation: slidedown 0.24s cubic-bezier(0.4, 0, 1, 1) forwards; }
+  .modal-overlay.closing { animation: fadeOut 0.26s ease forwards; }
+  .modal.closing { animation: slidedown 0.28s cubic-bezier(0.4, 0, 1, 1) forwards; }
   .modal {
+    position: relative;
     background: var(--surface);
     width: 100%;
     max-width: var(--maxw);
+    height: 90vh;
+    height: 90dvh;
     border-radius: 18px 18px 0 0;
-    padding: 8px 18px calc(20px + env(safe-area-inset-bottom));
-    max-height: 92vh;
-    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.25);
     animation: slideup 0.42s cubic-bezier(0.34, 1.25, 0.5, 1);
+    transition: transform 0.36s cubic-bezier(0.32, 0.72, 0, 1);
   }
-  .modal-grip {
-    width: 38px;
-    height: 4px;
-    background: var(--border);
-    border-radius: 999px;
-    margin: 8px auto 14px;
+  /* Underlying sheet when another opens on top (iOS-style scale + lift). */
+  .modal.behind {
+    transform: translateY(-10px) scale(0.94);
+    transform-origin: top center;
   }
-  .modal h2 { font-size: 18px; margin: 0 0 16px; }
+  .modal-scroll {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    padding: 20px 18px 22px;
+  }
+  .modal.has-foot .modal-scroll { padding-bottom: 88px; }
+  .modal-close {
+    position: absolute;
+    top: 16px;
+    right: 14px;
+    z-index: 5;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: none;
+    background: var(--surface-2);
+    color: var(--text-dim);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+  }
+  .modal-close svg { width: 19px; height: 19px; display: block; }
+  .modal-foot {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    padding: 12px 18px calc(14px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--border);
+    background: var(--glass-bg);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+    backdrop-filter: blur(16px) saturate(160%);
+  }
+  .modal h2 { font-size: 18px; margin: 0 40px 16px 0; }
   .modal h3 {
     font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em;
     color: var(--text-dim); margin: 18px 0 8px;
   }
-  .field { margin-bottom: 14px; }
+  .field { margin-bottom: 14px; min-width: 0; }
   .field label {
     display: block; font-size: 13px; font-weight: 600;
     color: var(--text-dim); margin-bottom: 6px;
   }
   .field input, .field select, .field textarea {
     width: 100%;
+    min-width: 0;
+    appearance: none;
+    -webkit-appearance: none;
     background: var(--surface-2);
     border: 1px solid var(--border);
     color: var(--text);
@@ -404,6 +452,7 @@
   }
   .field-check input { width: 20px; height: 20px; }
   .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+  .modal-foot .modal-actions { margin-top: 0; }
   .modal-actions .btn { flex: 1; }
 
   .menu-item {
@@ -675,6 +724,7 @@
       gauge: svgIcon('<path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/>'),
       download: svgIcon('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/>'),
       upload: svgIcon('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/>'),
+      x: svgIcon('<path d="M18 6 6 18"/><path d="m6 6 12 12"/>'),
     };
 
     // Reading types. Order here is the order shown in the "Add reading" drawer.
@@ -840,34 +890,72 @@
       });
     }
 
-    /* ---------------- Modal system ---------------- */
+    /* ---------------- Modal system (iOS-style stacked sheets) ----------------
+       Each openModal pushes a sheet onto the stack. Opening a sheet while one
+       is already up scales the one beneath down (and the new backdrop darkens
+       it). Tapping the backdrop or the ✕ pops just the top sheet; the ✕ /
+       backdrop reveal the sheet beneath. Action buttons (Save, etc.) call the
+       `done` callback passed to the builder, which closes the whole stack. */
+    const sheetStack = [];
+
     function openModal(buildBody) {
-      clearModal(); // replace any existing drawer instantly
-      const body = el("div.modal", {}, [el("div.modal-grip")]);
+      const prev = sheetStack[sheetStack.length - 1];
+      const scroll = el("div.modal-scroll");
+      const card = el("div.modal", {}, [scroll]);
       const overlay = el("div.modal-overlay", {
-        onclick: (e) => {
-          if (e.target === overlay) closeModal();
-        },
-      }, [body]);
-      buildBody(body, closeModal);
+        onclick: (e) => { if (e.target === overlay) closeModal(); },
+      }, [card]);
+
+      buildBody(scroll, closeAll);
+
+      // Move any .modal-actions into a fixed, blurred footer.
+      let actions = null;
+      for (const ch of scroll.children) {
+        if (ch.classList && ch.classList.contains("modal-actions")) { actions = ch; break; }
+      }
+      if (actions) {
+        card.classList.add("has-foot");
+        card.appendChild(el("div.modal-foot", {}, [actions]));
+      }
+      // Close ✕ (top-right, aligned with the title).
+      card.appendChild(el("button.modal-close", { html: ICONS.x, "aria-label": "Close", onclick: closeModal }));
+
       $("#modalRoot").appendChild(overlay);
+      sheetStack.push(overlay);
       document.body.style.overflow = "hidden";
+      if (prev) { const pc = prev.querySelector(".modal"); if (pc) pc.classList.add("behind"); }
     }
-    function clearModal() {
-      $("#modalRoot").innerHTML = "";
-      document.body.style.overflow = "";
-    }
-    // Animate the drawer back down out of view, then remove it.
+
+    // Pop the top sheet, revealing the one beneath.
     function closeModal() {
-      const overlay = $("#modalRoot").firstElementChild;
-      document.body.style.overflow = "";
-      if (!overlay) return;
+      const overlay = sheetStack[sheetStack.length - 1];
+      if (!overlay) { document.body.style.overflow = ""; return; }
       if (overlay.dataset.closing) return;
       overlay.dataset.closing = "1";
       overlay.classList.add("closing");
-      const modal = overlay.querySelector(".modal");
-      if (modal) modal.classList.add("closing");
-      setTimeout(() => overlay.remove(), 240);
+      const card = overlay.querySelector(".modal");
+      if (card) card.classList.add("closing");
+      sheetStack.pop();
+      const beneath = sheetStack[sheetStack.length - 1];
+      if (beneath) { const bc = beneath.querySelector(".modal"); if (bc) bc.classList.remove("behind"); }
+      else document.body.style.overflow = "";
+      setTimeout(() => overlay.remove(), 280);
+    }
+
+    // Close every sheet (used after a completed action like Save).
+    function closeAll() {
+      if (!sheetStack.length) { document.body.style.overflow = ""; return; }
+      const top = sheetStack.pop();
+      sheetStack.forEach((o) => o.remove()); // drop the ones beneath instantly
+      sheetStack.length = 0;
+      if (top && !top.dataset.closing) {
+        top.dataset.closing = "1";
+        top.classList.add("closing");
+        const card = top.querySelector(".modal");
+        if (card) card.classList.add("closing");
+        setTimeout(() => top.remove(), 280);
+      }
+      document.body.style.overflow = "";
     }
 
     /* ---------------- Journal rendering ---------------- */
@@ -1008,7 +1096,7 @@
           matches.forEach((type) => {
             listWrap.appendChild(
               el("button.menu-item", {
-                onclick: () => { closeModal(); readingForm(type, null); },
+                onclick: () => readingForm(type, null), // stacks on top of this drawer
               }, [
                 el("span.mi-ico", { html: READING_TYPES[type].icon }),
                 el("div", {}, [el("div", { text: READING_TYPES[type].label })]),
@@ -1068,7 +1156,7 @@
                     const d = day(currentKey, true);
                     d.readings = d.readings.filter((x) => x.id !== r.id);
                     save();
-                    closeModal();
+                    closeAll();
                     renderDay();
                   },
                 })
@@ -1093,7 +1181,7 @@
                 if (i >= 0) d.readings[i] = r;
                 else d.readings.push(r);
                 save();
-                closeModal();
+                closeAll();
                 renderDay();
               },
             }),
@@ -1207,10 +1295,10 @@
         body.appendChild(field("Reading / value (optional)", input));
         body.appendChild(
           el("div.modal-actions", {}, [
-            el("button.btn", { text: "Skip", onclick: () => { onSave(""); closeModal(); } }),
+            el("button.btn", { text: "Skip", onclick: () => { onSave(""); closeAll(); } }),
             el("button.btn.btn-primary", {
               text: "Save",
-              onclick: () => { onSave(input.value.trim()); closeModal(); },
+              onclick: () => { onSave(input.value.trim()); closeAll(); },
             }),
           ])
         );
@@ -1258,7 +1346,7 @@
                   onclick: () => {
                     it.archived = true; // preserves past records
                     commitDef(category, it);
-                    closeModal();
+                    closeAll();
                     renderDay();
                     toast("Removed — past entries kept");
                   },
@@ -1273,7 +1361,7 @@
                 if (doseInput) it.dose = doseInput.value.trim();
                 if (valueCheck) it.hasValue = valueCheck.checked;
                 commitDef(category, it);
-                closeModal();
+                closeAll();
                 renderDay();
               },
             }),
@@ -1332,7 +1420,7 @@
               text: String(dn),
               onclick: () => {
                 currentKey = dk;
-                closeModal();
+                closeAll();
                 renderDate();
                 renderDay();
               },
@@ -1355,7 +1443,7 @@
               text: "Jump to Today",
               onclick: () => {
                 currentKey = keyOf(new Date());
-                closeModal();
+                closeAll();
                 renderDate();
                 renderDay();
               },
@@ -1386,8 +1474,8 @@
             el("span.mi-ico", { html: ico }),
             el("div", {}, [el("div", { text: title }), sub ? el("div.mi-sub", { text: sub }) : null]),
           ]);
-        body.appendChild(item(ICONS.download, "Export data", "Download everything as JSON", () => { closeModal(); exportData(); }));
-        body.appendChild(item(ICONS.upload, "Import data", "Replace everything from a JSON file", () => { closeModal(); importData(); }));
+        body.appendChild(item(ICONS.download, "Export data", "Download everything as JSON", () => { closeAll(); exportData(); }));
+        body.appendChild(item(ICONS.upload, "Import data", "Replace everything from a JSON file", () => { closeAll(); importData(); }));
 
         // Footer: last updated + last imported file
         const m = state.meta || {};
@@ -1459,7 +1547,7 @@
                 renderDate();
                 renderDay();
                 renderAnalysis();
-                closeModal();
+                closeAll();
                 toast("Imported");
               },
             }),
