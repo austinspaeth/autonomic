@@ -1551,7 +1551,7 @@
     function metricRow(label, value, cat, explain, spark) {
       return el("div.metric-card", {}, [
         el("div.metric-head", {}, [
-          scoreDot(cat),
+          cat === false ? null : scoreDot(cat),
           el("span.metric-name", { text: label }),
           el("span.metric-val", { text: value == null || value === "" ? "-" : String(value) }),
         ]),
@@ -1839,8 +1839,8 @@
 
       // Breathing quality
       const bq = sumCard("Breathing quality");
-      bq.appendChild(metricRow("Coherence", r.coherence, s.coherence, HRV_EXPLAIN.coherence));
-      if (r.style) bq.appendChild(metricRow("Breathing style", r.style, null, "Intended pace for this reading."));
+      bq.appendChild(metricRow("Coherence", r.coherence, false, HRV_EXPLAIN.coherence));
+      if (r.style) bq.appendChild(metricRow("Breathing style", r.style, false, "Intended pace for this reading."));
       body.appendChild(bq);
 
       // Power (frequency peaks folded in, below HF power)
