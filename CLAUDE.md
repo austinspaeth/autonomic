@@ -47,7 +47,7 @@ unless asked. Edit `index.html` directly.
       // custom ones), each { id, type, time, note, ...templateFields } — same
       // pattern as readings. meds/symptoms remain {defId:…} checkmark catalogs.
       // reading `type` is one of: hrv (Unstructured HRV), breathHrv,
-      // bp (Blood Pressure), bloodO2 (Blood Oxygen). Fields vary by type:
+      // bp (Blood Pressure), bloodO2 (Blood Oxygen), ecg. Fields vary by type:
       //   hrv: readiness, pns, sns, age, sdnn, rmssd, avgHr, stressIndex,
       //        lowPower, highPower, swallowing(bool)
       //   breathHrv / bloodO2: value     bp: sys, dia, pulse
