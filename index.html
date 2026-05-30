@@ -492,15 +492,17 @@
   .sum-hero-den { font-size: 16px; font-weight: 700; color: var(--text-dim); margin-left: 3px; }
   .sum-hero-sub { font-size: 12.5px; color: var(--text-dim); margin-top: 6px; }
   .sum-hero-tip { font-size: 14px; font-weight: 600; margin-top: 12px; line-height: 1.45; }
-  /* Section headings + per-metric cards */
-  .sum-h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); font-weight: 700; margin: 22px 0 10px; }
-  .metric-card { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; margin-bottom: 12px; }
+  /* Section (parent) cards with metric cards nested inside */
+  .sum-card { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 6px 12px 12px; margin-bottom: 16px; }
+  .sum-card-title { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); font-weight: 700; padding: 10px 2px 8px; }
+  .metric-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px; margin-bottom: 10px; }
+  .metric-card:last-child { margin-bottom: 0; }
   .metric-head { display: flex; align-items: center; gap: 9px; }
   .metric-name { flex: 1; font-size: 15px; font-weight: 700; }
   .metric-val { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
   .metric-explain { font-size: 12.5px; color: var(--text-dim); margin-top: 6px; line-height: 1.4; }
-  .spark { margin-top: 16px; color: var(--text-dim); overflow-x: auto; -webkit-overflow-scrolling: touch; }
-  .spark svg { display: block; background: var(--surface); border-radius: 10px; touch-action: pan-y; cursor: crosshair; }
+  .spark { margin-top: 16px; color: var(--text-dim); }
+  .spark svg { display: block; width: 100%; height: 92px; background: var(--bg); border-radius: 10px; touch-action: pan-y; cursor: crosshair; }
   .spark-readout { font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; height: 16px; margin-bottom: 4px; }
   .spark-dates { display: flex; justify-content: space-between; font-size: 10px; color: var(--text-dim); margin-top: 3px; }
   .powerbar { display: flex; height: 24px; border-radius: 6px; overflow: hidden; margin: 2px 0 8px; background: var(--surface); }
@@ -1555,7 +1557,6 @@
         spark || null,
       ]);
     }
-    const sumHeading = (t) => el("div.sum-h3", { text: t });
 
     /* ----- Sparklines: per-metric history with grade-zone bands ----- */
     // Each band list is {max, cat} ascending; the final max is Infinity.
@@ -1648,13 +1649,13 @@
       const vals = points.map((p) => p.v);
       const sc = niceScale(Math.min(...vals), Math.max(...vals), 4);
       const min = sc.min, max = sc.max;
-      const spacing = 18, padL = 30, padR = 10, padT = 8, padB = 16;
-      const innerW = (points.length - 1) * spacing;
-      const W = padL + innerW + padR, H = 78, plotH = H - padT - padB;
-      const xAt = (i) => padL + i * spacing;
-      const yAt = (v) => padT + (1 - (v - min) / (max - min)) * plotH;
+      // Fixed viewBox; the SVG scales to fill the card width (preserveAspectRatio none).
+      const W = 320, H = 90, padL = 30, padR = 10, padT = 10, padB = 18;
+      const innerW = W - padL - padR;
+      const xAt = (i) => padL + (points.length === 1 ? innerW / 2 : (i / (points.length - 1)) * innerW);
+      const yAt = (v) => padT + (1 - (v - min) / (max - min)) * (H - padT - padB);
 
-      const svg = mk("svg", { viewBox: `0 0 ${W} ${H}`, width: W, height: H });
+      const svg = mk("svg", { viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: "none" });
 
       // grade-zone bands (clipped to plot x-range)
       if (bands) {
@@ -1668,24 +1669,24 @@
       // y ticks + labels
       for (let t = min; t <= max + 1e-9; t += sc.step) {
         const yy = yAt(t);
-        svg.appendChild(mk("line", { x1: padL, x2: padL + innerW, y1: yy, y2: yy, stroke: "var(--border)", "stroke-width": 0.5, opacity: 0.7 }));
-        const tx = mk("text", { x: padL - 4, y: yy + 3, "text-anchor": "end", "font-size": 8, fill: "var(--text-dim)" });
+        svg.appendChild(mk("line", { x1: padL, x2: padL + innerW, y1: yy, y2: yy, stroke: "var(--border)", "stroke-width": 1, "vector-effect": "non-scaling-stroke", opacity: 0.7 }));
+        const tx = mk("text", { x: padL - 4, y: yy + 3, "text-anchor": "end", "font-size": 9, fill: "var(--text-dim)", style: "font-size:9px" });
         tx.textContent = fmtNum(t); svg.appendChild(tx);
       }
       // x ticks
-      points.forEach((p, i) => svg.appendChild(mk("line", { x1: xAt(i), x2: xAt(i), y1: H - padB, y2: H - padB + 3, stroke: "var(--text-dim)", "stroke-width": 0.5, opacity: 0.6 })));
+      points.forEach((p, i) => svg.appendChild(mk("line", { x1: xAt(i), x2: xAt(i), y1: H - padB, y2: H - padB + 4, stroke: "var(--text-dim)", "stroke-width": 1, "vector-effect": "non-scaling-stroke", opacity: 0.6 })));
 
       const xy = points.map((p, i) => [xAt(i), yAt(p.v)]);
-      const path = mk("path", { d: smoothPath(xy), fill: "none", stroke: "currentColor", "stroke-width": 1.6, "stroke-linejoin": "round", "stroke-linecap": "round" });
+      const path = mk("path", { d: smoothPath(xy), fill: "none", stroke: "currentColor", "stroke-width": 2, "vector-effect": "non-scaling-stroke", "stroke-linejoin": "round", "stroke-linecap": "round" });
       svg.appendChild(path);
-      points.forEach((p, i) => { const cat = catFromBands(p.v, bands); svg.appendChild(mk("circle", { cx: xAt(i), cy: yAt(p.v), r: 2.2, fill: cat && SCORE_COLORS[cat] ? SCORE_COLORS[cat] : "currentColor" })); });
-      const marker = mk("line", { y1: padT, y2: H - padB, stroke: "var(--text)", "stroke-width": 1, opacity: 0 });
-      const adot = mk("circle", { r: 3.4, opacity: 0 });
+      points.forEach((p, i) => { const cat = catFromBands(p.v, bands); svg.appendChild(mk("circle", { cx: xAt(i), cy: yAt(p.v), r: 2.6, fill: cat && SCORE_COLORS[cat] ? SCORE_COLORS[cat] : "currentColor" })); });
+      const marker = mk("line", { y1: padT, y2: H - padB, stroke: "var(--text)", "stroke-width": 1, "vector-effect": "non-scaling-stroke", opacity: 0 });
+      const adot = mk("circle", { r: 3.6, opacity: 0 });
       svg.appendChild(marker); svg.appendChild(adot);
 
       const wrap = el("div.spark");
       const readout = el("div.spark-readout");
-      const dates = el("div.spark-dates", { style: `width:${W}px` }, [el("span", { text: fmtShort(points[0].date) }), el("span", { text: fmtShort(points[points.length - 1].date) })]);
+      const dates = el("div.spark-dates", {}, [el("span", { text: fmtShort(points[0].date) }), el("span", { text: fmtShort(points[points.length - 1].date) })]);
       wrap.appendChild(readout); wrap.appendChild(svg); wrap.appendChild(dates);
 
       const show = (i) => {
@@ -1697,7 +1698,7 @@
         marker.setAttribute("x1", x); marker.setAttribute("x2", x); marker.setAttribute("opacity", 0.35);
         adot.setAttribute("cx", x); adot.setAttribute("cy", yAt(p.v)); adot.setAttribute("fill", color); adot.setAttribute("opacity", 1);
       };
-      const idxFromEvent = (e) => { const rc = svg.getBoundingClientRect(); const px = (e.clientX - rc.left) * (W / rc.width); return Math.round((px - padL) / spacing); };
+      const idxFromEvent = (e) => { const rc = svg.getBoundingClientRect(); const px = ((e.clientX - rc.left) / (rc.width || 1)) * W; return Math.round(((px - padL) / innerW) * (points.length - 1)); };
       let active = false;
       svg.addEventListener("pointerdown", (e) => { active = true; try { svg.setPointerCapture(e.pointerId); } catch (_) {} show(idxFromEvent(e)); });
       svg.addEventListener("pointermove", (e) => { if (active) show(idxFromEvent(e)); });
@@ -1708,6 +1709,12 @@
     }
 
     const hexA = (hex, a) => { const m = /^#?([0-9a-f]{6})$/i.exec(hex); if (!m) return hex; const n = parseInt(m[1], 16); return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`; };
+    // Parent section card; metric cards are nested inside it.
+    function sumCard(title) {
+      const c = el("div.sum-card");
+      if (title) c.appendChild(el("div.sum-card-title", { text: title }));
+      return c;
+    }
     // Colored "hero" header tinted by the rating, with a solid rating chip.
     function heroCard(o) {
       const color = SCORE_COLORS[o.cat] || "#9aa0a6";
@@ -1740,18 +1747,20 @@
       const s = computeScores(r);
       const rv = readingRowValue(r);
       body.appendChild(heroCard({ cat: rowScoreCategory(r), big: typeof rv === "string" ? rv : "", label: "Result" }));
+      const card = sumCard("Details");
       entryFields(def).forEach((f) => {
         if (isDivider(f) || f.type === "time") return;
-        if (f.type === "check") { body.appendChild(metricRow(f.label, r[f.key] ? "Yes" : "No", r[f.key] ? (f.key === "sinus" ? "great" : "bad") : null)); return; }
+        if (f.type === "check") { card.appendChild(metricRow(f.label, r[f.key] ? "Yes" : "No", r[f.key] ? (f.key === "sinus" ? "great" : "bad") : null)); return; }
         if (f.type === "textarea") {
-          if (r[f.key]) { const c = el("div.metric-card", {}, [el("div.metric-name", { text: f.label }), el("div.sum-text", { text: r[f.key] })]); body.appendChild(c); }
+          if (r[f.key]) card.appendChild(el("div.metric-card", {}, [el("div.metric-name", { text: f.label }), el("div.sum-text", { text: r[f.key] })]));
           return;
         }
         const v = r[f.key];
         if (v == null || v === "") return;
         const spark = buildSpark(metricHistory(r.type, numEx(f.key)), bandsFor(r.type, f.key));
-        body.appendChild(metricRow(f.label, v + (f.unit ? ` ${f.unit}` : ""), s[f.key], null, spark));
+        card.appendChild(metricRow(f.label, v + (f.unit ? ` ${f.unit}` : ""), s[f.key], null, spark));
       });
+      body.appendChild(card);
     }
 
     const HRV_EXPLAIN = {
@@ -1799,43 +1808,46 @@
       }));
 
       // Breathing quality
-      body.appendChild(sumHeading("Breathing quality"));
-      body.appendChild(metricRow("Coherence", r.coherence, s.coherence, HRV_EXPLAIN.coherence, sp(numEx("coherence"), BANDS.coherence)));
-      if (r.style) body.appendChild(metricRow("Breathing style", r.style, null, "Intended pace for this reading."));
+      const bq = sumCard("Breathing quality");
+      bq.appendChild(metricRow("Coherence", r.coherence, s.coherence, HRV_EXPLAIN.coherence, sp(numEx("coherence"), BANDS.coherence)));
+      if (r.style) bq.appendChild(metricRow("Breathing style", r.style, null, "Intended pace for this reading."));
+      body.appendChild(bq);
 
       // Power (frequency peaks folded in, below HF power)
-      body.appendChild(sumHeading("Power"));
+      const pc = sumCard("Power");
       if (total) {
         const pct = (x) => Math.round(((x || 0) / total) * 100);
         const bar = el("div.powerbar");
         const seg = (v, color, lab) => { if (v == null) return; const p = pct(v); const d = el("div", { style: `width:${p}%;background:${color}` }); if (p >= 12) d.textContent = `${lab} ${p}%`; bar.appendChild(d); };
         seg(vlf, "#f59e0b", "VLF"); seg(lf, "#6366f1", "LF"); seg(hf, "#22c55e", "HF");
-        body.appendChild(el("div.metric-card", {}, [bar, el("div.sum-legend", { text: `VLF ${pct(vlf)}% · LF ${pct(lf)}% · HF ${pct(hf)}%` })]));
+        pc.appendChild(el("div.metric-card", {}, [bar, el("div.sum-legend", { text: `VLF ${pct(vlf)}% · LF ${pct(lf)}% · HF ${pct(hf)}%` })]));
       }
-      body.appendChild(metricRow("Total power", total != null ? Math.round(total) : "", s.totalPower, "Total autonomic engagement across all frequencies.", sp((rr) => totalPower(rr), BANDS.totalPower)));
-      body.appendChild(metricRow("LF/HF ratio", lfhf != null ? lfhf.toFixed(2) : "", s.lfhf, "Sympathetic vs vagal balance. Balanced or low favors flexibility.", sp(lfhfEx, BANDS.lfhf)));
-      body.appendChild(metricRow("VLF power", r.vlowPower, s.vlf, "Slow regulatory processes and stress load. Elevated means system stress.", sp(numEx("vlowPower"), BANDS.vlf)));
-      body.appendChild(metricRow("LF power", r.lowPower, null, "Baroreflex band, your training target.", sp(numEx("lowPower"), null)));
-      body.appendChild(metricRow("HF power", r.highPower, null, "Vagal activity tied to breathing. Higher means better recovery state.", sp(numEx("highPower"), null)));
-      body.appendChild(metricRow("LF peak", r.lfPeak ? r.lfPeak + " Hz" : "", s.lfPeak,
+      pc.appendChild(metricRow("Total power", total != null ? Math.round(total) : "", s.totalPower, "Total autonomic engagement across all frequencies.", sp((rr) => totalPower(rr), BANDS.totalPower)));
+      pc.appendChild(metricRow("LF/HF ratio", lfhf != null ? lfhf.toFixed(2) : "", s.lfhf, "Sympathetic vs vagal balance. Balanced or low favors flexibility.", sp(lfhfEx, BANDS.lfhf)));
+      pc.appendChild(metricRow("VLF power", r.vlowPower, s.vlf, "Slow regulatory processes and stress load. Elevated means system stress.", sp(numEx("vlowPower"), BANDS.vlf)));
+      pc.appendChild(metricRow("LF power", r.lowPower, null, "Baroreflex band, your training target.", sp(numEx("lowPower"), null)));
+      pc.appendChild(metricRow("HF power", r.highPower, null, "Vagal activity tied to breathing. Higher means better recovery state.", sp(numEx("highPower"), null)));
+      pc.appendChild(metricRow("LF peak", r.lfPeak ? r.lfPeak + " Hz" : "", s.lfPeak,
         "Baroreflex frequency. Target 0.08 to 0.10 Hz; shifting toward it is progress.", sp(numEx("lfPeak"), BANDS.lfPeak)));
       const e = expectedHf(r.style);
-      body.appendChild(metricRow("HF peak", r.hfPeak ? r.hfPeak + " Hz" : "", s.hfPeak,
+      pc.appendChild(metricRow("HF peak", r.hfPeak ? r.hfPeak + " Hz" : "", s.hfPeak,
         e ? `Expected about ${e[0]} to ${e[1]} Hz for ${r.style} breathing; large deviation means the pace drifted.` : "Respiratory peak position.", sp(numEx("hfPeak"), null)));
+      body.appendChild(pc);
 
       // Metrics
-      body.appendChild(sumHeading("Metrics"));
-      body.appendChild(metricRow("RMSSD", r.rmssd, s.rmssd, HRV_EXPLAIN.rmssd, sp(numEx("rmssd"), BANDS.rmssdS)));
-      body.appendChild(metricRow("pNN50", r.pnn50 ? r.pnn50 + "%" : "", s.pnn50, HRV_EXPLAIN.pnn50, sp(numEx("pnn50"), BANDS.pnn50)));
-      body.appendChild(metricRow("SDNN", r.sdnn, s.sdnn, HRV_EXPLAIN.sdnn, sp(numEx("sdnn"), BANDS.sdnn)));
-      body.appendChild(metricRow("HR", r.hr, s.hr, HRV_EXPLAIN.hr, sp(numEx("hr"), BANDS.hrBreath)));
-      body.appendChild(metricRow("Mean RR", r.meanRr, s.meanRr, HRV_EXPLAIN.meanRr, sp(numEx("meanRr"), BANDS.rrMode)));
-      body.appendChild(metricRow("MxDMn", r.mxdmn, s.mxdmn, HRV_EXPLAIN.mxdmn, sp(numEx("mxdmn"), BANDS.mxdmn)));
-      body.appendChild(metricRow("Mode", r.mode, s.mode, HRV_EXPLAIN.mode, sp(numEx("mode"), BANDS.rrMode)));
-      body.appendChild(metricRow("AMo50", r.amo50, s.amo50, HRV_EXPLAIN.amo50, sp(numEx("amo50"), BANDS.amo50)));
-      body.appendChild(metricRow("CV", r.cv, s.cv, HRV_EXPLAIN.cv, sp(numEx("cv"), BANDS.cv)));
+      const mc = sumCard("Metrics");
+      mc.appendChild(metricRow("RMSSD", r.rmssd, s.rmssd, HRV_EXPLAIN.rmssd, sp(numEx("rmssd"), BANDS.rmssdS)));
+      mc.appendChild(metricRow("pNN50", r.pnn50 ? r.pnn50 + "%" : "", s.pnn50, HRV_EXPLAIN.pnn50, sp(numEx("pnn50"), BANDS.pnn50)));
+      mc.appendChild(metricRow("SDNN", r.sdnn, s.sdnn, HRV_EXPLAIN.sdnn, sp(numEx("sdnn"), BANDS.sdnn)));
+      mc.appendChild(metricRow("HR", r.hr, s.hr, HRV_EXPLAIN.hr, sp(numEx("hr"), BANDS.hrBreath)));
+      mc.appendChild(metricRow("Mean RR", r.meanRr, s.meanRr, HRV_EXPLAIN.meanRr, sp(numEx("meanRr"), BANDS.rrMode)));
+      mc.appendChild(metricRow("MxDMn", r.mxdmn, s.mxdmn, HRV_EXPLAIN.mxdmn, sp(numEx("mxdmn"), BANDS.mxdmn)));
+      mc.appendChild(metricRow("Mode", r.mode, s.mode, HRV_EXPLAIN.mode, sp(numEx("mode"), BANDS.rrMode)));
+      mc.appendChild(metricRow("AMo50", r.amo50, s.amo50, HRV_EXPLAIN.amo50, sp(numEx("amo50"), BANDS.amo50)));
+      mc.appendChild(metricRow("CV", r.cv, s.cv, HRV_EXPLAIN.cv, sp(numEx("cv"), BANDS.cv)));
+      body.appendChild(mc);
 
-      if (r.note) { body.appendChild(sumHeading("Notes")); body.appendChild(el("div.metric-card", {}, [el("div.sum-text", { text: r.note })])); }
+      if (r.note) { const nc = sumCard("Notes"); nc.appendChild(el("div.metric-card", {}, [el("div.sum-text", { text: r.note })])); body.appendChild(nc); }
     }
 
     function renderReadings() {
