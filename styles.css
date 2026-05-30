@@ -16,6 +16,9 @@ html[data-theme="light"] {
   --text-dim: #6b6b70;
   --border: #e3e3e8;
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --glass-bg: rgba(255, 255, 255, 0.55);
+  --glass-border: rgba(255, 255, 255, 0.7);
+  --glass-active: rgba(0, 0, 0, 0.07);
 }
 html[data-theme="dark"] {
   --bg: #000000;
@@ -25,6 +28,9 @@ html[data-theme="dark"] {
   --text-dim: #9a9aa0;
   --border: #303034;
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --glass-bg: rgba(28, 28, 30, 0.55);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-active: rgba(255, 255, 255, 0.14);
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -46,7 +52,7 @@ body {
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  padding-bottom: calc(64px + env(safe-area-inset-bottom));
+  padding-bottom: calc(96px + env(safe-area-inset-bottom));
 }
 
 /* ---------- Top bar ---------- */
@@ -74,6 +80,16 @@ body {
 }
 .brand-mark { width: 26px; height: 26px; color: var(--accent); }
 .topbar-actions { display: flex; gap: 6px; }
+
+.statusline {
+  padding: 0 16px 8px;
+  font-size: 11px;
+  color: var(--text-dim);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  min-height: 13px;
+  line-height: 1.3;
+}
 
 .icon-btn {
   appearance: none;
@@ -216,8 +232,8 @@ body {
 }
 
 /* Sleep row */
-.sleep-grid { display: flex; gap: 10px; padding-top: 4px; }
-.sleep-cell { flex: 1; }
+.sleep-grid { display: flex; gap: 12px; padding-top: 4px; }
+.sleep-cell { flex: 1 1 0; min-width: 0; }
 .sleep-cell label {
   display: block;
   font-size: 12px;
@@ -227,11 +243,12 @@ body {
 }
 .sleep-cell input {
   width: 100%;
+  min-width: 0;
   background: var(--surface-2);
   border: 1px solid var(--border);
   color: var(--text);
   border-radius: var(--radius-sm);
-  padding: 9px 10px;
+  padding: 11px 10px;
   font-size: 15px;
   font-family: inherit;
 }
@@ -256,37 +273,41 @@ body {
 .btn-danger { color: #fff; background: #d63b3b; border-color: #d63b3b; }
 .btn-row { display: flex; gap: 10px; }
 
-/* ---------- Tab bar ---------- */
+/* ---------- Floating glass tab bar ---------- */
 .tabbar {
   position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  right: 16px;
+  left: auto;
   z-index: 30;
   display: flex;
-  background: var(--surface);
-  border-top: 1px solid var(--border);
-  padding-bottom: env(safe-area-inset-bottom);
-  max-width: var(--maxw);
-  margin: 0 auto;
+  gap: 4px;
+  padding: 5px;
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(18px) saturate(170%);
+  backdrop-filter: blur(18px) saturate(170%);
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22);
 }
 .tab {
-  flex: 1;
-  background: none;
+  background: transparent;
   border: none;
   color: var(--text-dim);
   font-size: 11px;
   font-weight: 600;
-  padding: 9px 0 8px;
+  padding: 8px 16px;
   cursor: pointer;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 3px;
   font-family: inherit;
+  border-radius: 999px;
+  transition: background 0.15s, color 0.15s;
 }
-.tab.active { color: var(--accent); }
-.tab-ico { font-size: 20px; line-height: 1; }
+.tab.active { color: var(--text); background: var(--glass-active); }
+.tab-ico { width: 22px; height: 22px; display: block; }
 
 /* ---------- Modal ---------- */
 .modal-overlay {
@@ -301,7 +322,11 @@ body {
   animation: fade 0.15s ease;
 }
 @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
-@keyframes slideup { from { transform: translateY(20px); } to { transform: translateY(0); } }
+@keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+@keyframes slideup { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes slidedown { from { transform: translateY(0); } to { transform: translateY(110%); } }
+.modal-overlay.closing { animation: fadeOut 0.22s ease forwards; }
+.modal.closing { animation: slidedown 0.24s cubic-bezier(0.4, 0, 1, 1) forwards; }
 .modal {
   background: var(--surface);
   width: 100%;
@@ -310,7 +335,7 @@ body {
   padding: 8px 18px calc(20px + env(safe-area-inset-bottom));
   max-height: 92vh;
   overflow-y: auto;
-  animation: slideup 0.2s ease;
+  animation: slideup 0.26s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .modal-grip {
   width: 38px;

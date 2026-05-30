@@ -32,6 +32,7 @@
           <button id="menuBtn" class="icon-btn" title="Menu" aria-label="Menu">&#9776;</button>
         </div>
       </div>
+      <div id="statusLine" class="statusline"></div>
     </header>
 
     <!-- Journal view -->
@@ -50,13 +51,22 @@
       <div id="analysisContent"></div>
     </main>
 
-    <!-- Bottom tab bar -->
+    <!-- Floating glass tab bar -->
     <nav class="tabbar">
-      <button class="tab active" data-view="journal">
-        <span class="tab-ico">&#9998;</span><span>Journal</span>
+      <button class="tab active" data-view="journal" aria-label="Journal">
+        <svg class="tab-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M5 4a1 1 0 0 1 1-1h11a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1z"/>
+          <path d="M5 7h13"/><path d="M9 12h6"/><path d="M9 16h4"/>
+        </svg>
+        <span>Journal</span>
       </button>
-      <button class="tab" data-view="analysis">
-        <span class="tab-ico">&#128202;</span><span>Analysis</span>
+      <button class="tab" data-view="analysis" aria-label="Analysis">
+        <svg class="tab-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 20h16"/><path d="M6 20v-6"/><path d="M12 20V8"/><path d="M18 20v-9"/>
+        </svg>
+        <span>Analysis</span>
       </button>
     </nav>
   </div>
