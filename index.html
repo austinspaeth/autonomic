@@ -422,7 +422,12 @@
     text-align: left;
   }
   .menu-item:first-of-type { border-top: none; }
-  .menu-item .mi-ico { font-size: 20px; width: 24px; text-align: center; }
+  .menu-item .mi-ico {
+    width: 24px; height: 24px; flex: none;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: var(--text-dim);
+  }
+  .menu-item .mi-ico svg { width: 22px; height: 22px; display: block; }
   .menu-item .mi-sub { font-size: 12.5px; color: var(--text-dim); }
 
   /* Manage list */
@@ -659,12 +664,25 @@
     }
 
     /* ---------------- State ---------------- */
+    // Inline outline icons (stroke = currentColor), used in drawers instead of
+    // colored emoji. Each value is an SVG string set via innerHTML.
+    const svgIcon = (paths) =>
+      `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
+    const ICONS = {
+      heartPulse: svgIcon('<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/><path d="M3.22 12H9.5l.6-1.3 1.9 4.6 2-7 1.5 3.7h5.27"/>'),
+      wind: svgIcon('<path d="M12.8 19.6A2 2 0 1 0 14 16H2"/><path d="M17.5 8a2.5 2.5 0 1 1 2 4H2"/><path d="M9.8 4.4A2 2 0 1 1 11 8H2"/>'),
+      droplet: svgIcon('<path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>'),
+      gauge: svgIcon('<path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/>'),
+      download: svgIcon('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/>'),
+      upload: svgIcon('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/>'),
+    };
+
     // Reading types. Order here is the order shown in the "Add reading" drawer.
     // Each numeric field: { key, label, unit? }. Optional `checks` are booleans.
     const READING_TYPES = {
       hrv: {
         label: "Unstructured HRV",
-        icon: "💗",
+        icon: ICONS.heartPulse,
         fields: [
           { key: "readiness", label: "Readiness", unit: "%" },
           { key: "pns", label: "PNS index" },
@@ -679,12 +697,12 @@
       },
       breathHrv: {
         label: "Breathing HRV",
-        icon: "💗",
+        icon: ICONS.wind,
         fields: [{ key: "value", label: "Value" }],
       },
       bp: {
         label: "Blood Pressure",
-        icon: "🩸",
+        icon: ICONS.droplet,
         fields: [
           { key: "sys", label: "Systolic" },
           { key: "dia", label: "Diastolic" },
@@ -693,7 +711,7 @@
       },
       bloodO2: {
         label: "Blood Oxygen",
-        icon: "🫁",
+        icon: ICONS.gauge,
         fields: [{ key: "value", label: "Blood oxygen", unit: "%" }],
       },
     };
@@ -990,7 +1008,7 @@
               el("button.menu-item", {
                 onclick: () => { closeModal(); readingForm(type, null); },
               }, [
-                el("span.mi-ico", { text: READING_TYPES[type].icon }),
+                el("span.mi-ico", { html: READING_TYPES[type].icon }),
                 el("div", {}, [el("div", { text: READING_TYPES[type].label })]),
               ])
             );
@@ -1363,11 +1381,11 @@
         body.appendChild(el("h2", { text: "Menu" }));
         const item = (ico, title, sub, onclick) =>
           el("button.menu-item", { onclick }, [
-            el("span.mi-ico", { text: ico }),
+            el("span.mi-ico", { html: ico }),
             el("div", {}, [el("div", { text: title }), sub ? el("div.mi-sub", { text: sub }) : null]),
           ]);
-        body.appendChild(item("⬇", "Export data", "Download everything as JSON", () => { closeModal(); exportData(); }));
-        body.appendChild(item("⬆", "Import data", "Replace everything from a JSON file", () => { closeModal(); importData(); }));
+        body.appendChild(item(ICONS.download, "Export data", "Download everything as JSON", () => { closeModal(); exportData(); }));
+        body.appendChild(item(ICONS.upload, "Import data", "Replace everything from a JSON file", () => { closeModal(); importData(); }));
 
         // Footer: last updated + last imported file
         const m = state.meta || {};
