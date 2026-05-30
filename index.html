@@ -797,6 +797,17 @@
       const d = new Date();
       return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
     };
+    // Actual age in years from a YYYY-MM-DD birthday.
+    function ageFromBirthday(bday, asOf) {
+      if (!bday) return null;
+      const b = dateFromKey(bday);
+      if (isNaN(b)) return null;
+      const d = asOf || new Date();
+      let a = d.getFullYear() - b.getFullYear();
+      const m = d.getMonth() - b.getMonth();
+      if (m < 0 || (m === 0 && d.getDate() < b.getDate())) a--;
+      return a >= 0 && a < 150 ? a : null;
+    }
     // "13:30" -> "1:30pm" for display (stored value stays 24h).
     const fmtTime12 = (t) => {
       const m = /^(\d{1,2}):(\d{2})/.exec(t || "");
@@ -1060,7 +1071,7 @@
         version: SCHEMA_VERSION,
         settings: { theme: matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light" },
         meta: { lastUpdated: null, lastImport: null },
-        profile: { sex: "", weight: "", height: "" },
+        profile: { sex: "", birthday: "", weight: "", height: "" },
         days: {},
       };
     }
@@ -1087,7 +1098,7 @@
       s.version = SCHEMA_VERSION;
       s.settings = Object.assign({}, base.settings, s.settings);
       s.meta = Object.assign({ lastUpdated: null, lastImport: null }, s.meta);
-      s.profile = Object.assign({ sex: "", weight: "", height: "" }, s.profile);
+      s.profile = Object.assign({ sex: "", birthday: "", weight: "", height: "" }, s.profile);
       delete s.defs; // catalogs removed - everything is programmatic now
       s.days = s.days || {};
       // activities/meds/symptoms are now arrays of logged entries (were {defId:…} maps)
@@ -2573,23 +2584,29 @@
     }
 
     function openProfile() {
-      const p = Object.assign({ sex: "", weight: "", height: "" }, state.profile);
+      const p = Object.assign({ sex: "", birthday: "", weight: "", height: "" }, state.profile);
       openModal((body) => {
         body.appendChild(el("h2", { text: "Profile" }));
         const sex = el("select", {}, ["", "Male", "Female", "Other"].map((o) => el("option", { value: o, text: o || "Not set" })));
         sex.value = p.sex || "";
         body.appendChild(field("Sex", sex));
+        const birthday = el("input", { type: "date", value: p.birthday || "" });
+        const ageLine = el("div.metric-explain");
+        const updAge = () => { const a = ageFromBirthday(birthday.value); ageLine.textContent = a != null ? `Age: ${a}` : "Age: not set"; };
+        birthday.addEventListener("input", updAge); updAge();
+        body.appendChild(field("Birthday", birthday));
+        body.appendChild(ageLine);
         const weight = el("input", { type: "number", inputmode: "decimal", value: p.weight || "", placeholder: "lb" });
         body.appendChild(field("Weight (lb)", weight));
         const height = el("input", { type: "number", inputmode: "decimal", value: p.height || "", placeholder: "in" });
         body.appendChild(field("Height (in)", height));
-        body.appendChild(el("div.metric-explain", { text: "Used to personalize reading scores (e.g. sex-adjusted QTc; height/weight for upcoming indexes)." }));
+        body.appendChild(el("div.metric-explain", { text: "Used to personalize reading scores (e.g. sex-adjusted QTc; birthday/height/weight for upcoming indexes)." }));
         body.appendChild(
           el("div.modal-actions", {}, [
             el("button.btn.btn-primary", {
               text: "Save",
               onclick: () => {
-                state.profile = { sex: sex.value, weight: weight.value.trim(), height: height.value.trim() };
+                state.profile = { sex: sex.value, birthday: birthday.value, weight: weight.value.trim(), height: height.value.trim() };
                 save();
                 closeAll();
                 if (!$("#analysisView").classList.contains("hidden")) renderAnalysis();
