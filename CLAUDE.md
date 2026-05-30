@@ -50,7 +50,9 @@ unless asked. Edit `index.html` directly.
       "readings":   [ { "id", "type", "time", "note", ...fields } ],
       "activities": [ { "id", "type", "time", "note", ...fields } ],
       "meds":       [ { "id", "type", "time", "amount", "note" } ],
-      "symptoms":   [ { "id", "type", "time", "note", ...fields } ]
+      "symptoms":   [ { "id", "type", "time", "note", ...fields } ],
+      "food":       { "water": 0, "calories": 0, "triggers": { "<triggerType>": count } },
+      "digestion":  { "bm": 0 }
     }
   }
 }
