@@ -482,22 +482,28 @@
   .modal-headbtn svg { width: 17px; height: 17px; display: block; }
   /* Reading summary drawer */
   .sum-meta { color: var(--text-dim); font-size: 13px; margin: -8px 0 14px; }
-  .sum-banner { color: #fff; font-weight: 700; font-size: 13px; padding: 8px 12px; border-radius: var(--radius-sm); margin-bottom: 14px; }
-  .sum-section { margin-bottom: 16px; }
-  .sum-verdict { font-size: 15px; line-height: 1.5; margin: 10px 0 0; }
-  .grade-pill { display: inline-block; padding: 3px 12px; border-radius: 999px; color: #fff; font-size: 12px; font-weight: 700; }
-  .sum-h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); margin: 20px 0 6px; font-weight: 700; }
   .sum-text { font-size: 14px; white-space: pre-wrap; }
-  .sum-card { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 10px; }
-  .sum-card h4 { margin: 0; font-size: 13px; color: var(--text-dim); font-weight: 700; }
-  .sum-card .big { font-size: 26px; font-weight: 700; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  /* Colored hero header (rating) */
+  .sum-hero { position: relative; border: 1px solid; border-radius: var(--radius); padding: 16px; margin-bottom: 14px; }
+  .sum-hero-rating { position: absolute; top: 14px; right: 16px; font-size: 14px; font-weight: 800; }
+  .sum-hero-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); font-weight: 700; }
+  .sum-hero-score { margin-top: 3px; }
+  .sum-hero-num { font-size: 38px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
+  .sum-hero-den { font-size: 16px; font-weight: 700; color: var(--text-dim); margin-left: 3px; }
+  .sum-hero-sub { font-size: 12.5px; color: var(--text-dim); margin-top: 6px; }
+  .sum-hero-tip { font-size: 14px; font-weight: 600; margin-top: 12px; line-height: 1.45; }
+  /* Section cards */
+  .sum-card { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 4px 14px 12px; margin-bottom: 14px; }
+  .sum-card-title { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); font-weight: 700; padding: 12px 0 2px; }
   .metric { padding: 9px 0; border-top: 1px solid var(--border); }
   .metric-head { display: flex; align-items: center; gap: 8px; }
   .metric-name { flex: 1; font-size: 14px; }
   .metric-val { font-weight: 700; font-variant-numeric: tabular-nums; }
   .metric-explain { font-size: 12.5px; color: var(--text-dim); margin-top: 3px; }
   .spark { margin-top: 7px; color: var(--text-dim); }
-  .spark svg { width: 100%; height: 42px; display: block; border-radius: 6px; }
+  .spark svg { width: 100%; height: 46px; display: block; border-radius: 6px; touch-action: pan-y; cursor: crosshair; }
+  .spark-readout { font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums; height: 15px; }
+  .spark-dates { display: flex; justify-content: space-between; font-size: 10px; color: var(--text-dim); margin-top: 2px; }
   .powerbar { display: flex; height: 22px; border-radius: 6px; overflow: hidden; margin: 4px 0 6px; background: var(--surface-2); }
   .powerbar > div { display: flex; align-items: center; justify-content: center; font-size: 10px; color: #fff; font-weight: 700; min-width: 0; }
   .sum-legend { font-size: 12px; color: var(--text-dim); }
@@ -1467,6 +1473,7 @@
           put("hfPeak", sHfPeak(r.hfPeak, r.style));
           const lf = parseFloat(r.lowPower), hf = parseFloat(r.highPower);
           if (!isNaN(lf) && !isNaN(hf) && hf !== 0) put("lfhf", sLfHf(lf / hf));
+          put("overall", worstCat([s.rmssd, s.pnn50, s.totalPower].filter(Boolean)));
           break;
         }
         case "bp": put("sys", sSys(r.sys)); put("dia", sDia(r.dia)); put("bp", sBP(r.sys, r.dia)); break;
@@ -1489,7 +1496,7 @@
       const s = r.scores || computeScores(r);
       switch (r.type) {
         case "hrv": return s.readiness;
-        case "breathHrv": return s.sdnn;
+        case "breathHrv": return s.overall || s.sdnn;
         case "bp": return s.bp;
         case "bloodO2": return s.value;
         case "restingHr": return s.hr;
@@ -1571,57 +1578,115 @@
       return name ? BANDS[name] : null;
     }
     const numEx = (key) => (rr) => { const v = parseFloat(rr[key]); return isNaN(v) ? null : v; };
+    const catFromBands = (v, bands) => { if (!bands) return null; for (const b of bands) if (v < b.max) return b.cat; return bands[bands.length - 1].cat; };
+    const fmtShort = (dk) => dateFromKey(dk).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    const fmtNum = (v) => { if (v == null) return "—"; if (Number.isInteger(v)) return String(v); return Math.abs(v) < 1 ? v.toFixed(3) : v.toFixed(1); };
 
-    // Chronological numeric history for one metric across all days (last `limit`).
+    // Chronological history for one metric across all days (last `limit`):
+    // returns [{ v, date }] oldest→newest.
     function metricHistory(type, extractor, limit = 30) {
       const out = [];
       Object.keys(state.days).sort().forEach((dk) => {
         const list = (state.days[dk].readings || []).filter((r) => r.type === type);
         list.sort((a, b) => (a.time || "").localeCompare(b.time || ""));
-        list.forEach((r) => { const v = extractor(r); if (v != null && !isNaN(v)) out.push(v); });
+        list.forEach((r) => { const v = extractor(r); if (v != null && !isNaN(v)) out.push({ v, date: dk }); });
       });
       return out.slice(-limit);
     }
 
-    function buildSpark(values, rawBands) {
-      if (!values || values.length < 2) return null;
-      const W = 280, H = 42, padY = 4;
-      let min = Math.min(...values), max = Math.max(...values);
+    // Sparkline with grade-zone bands, color-coded points, a draggable readout,
+    // and start/end date labels.
+    function buildSpark(points, bands) {
+      if (!points || points.length < 2) return null;
+      const vals = points.map((p) => p.v);
+      const W = 300, H = 46, padY = 6;
+      let min = Math.min(...vals), max = Math.max(...vals);
       if (min === max) { min -= 1; max += 1; }
-      const rng = max - min; min -= rng * 0.12; max += rng * 0.12;
-      const xy = (i) => (i / (values.length - 1)) * W;
-      const y = (v) => padY + (1 - (v - min) / (max - min)) * (H - 2 * padY);
+      const rng = max - min; min -= rng * 0.15; max += rng * 0.15;
+      const xAt = (i) => (i / (points.length - 1)) * W;
+      const yAt = (v) => padY + (1 - (v - min) / (max - min)) * (H - 2 * padY);
       const ns = "http://www.w3.org/2000/svg";
       const svg = document.createElementNS(ns, "svg");
       svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
       svg.setAttribute("preserveAspectRatio", "none");
-      if (rawBands) {
+
+      if (bands) {
         let lo = -Infinity;
-        rawBands.forEach((b) => {
-          const top = Math.min(b.max, max), bot = Math.max(lo, min);
-          lo = b.max;
+        bands.forEach((b) => {
+          const top = Math.min(b.max, max), bot = Math.max(lo, min); lo = b.max;
           if (top <= bot) return;
-          const yT = y(top), yB = y(bot);
           const rect = document.createElementNS(ns, "rect");
           rect.setAttribute("x", 0); rect.setAttribute("width", W);
-          rect.setAttribute("y", yT); rect.setAttribute("height", Math.max(0, yB - yT));
-          rect.setAttribute("fill", SCORE_COLORS[b.cat] || "#888");
-          rect.setAttribute("opacity", "0.16");
+          rect.setAttribute("y", yAt(top)); rect.setAttribute("height", Math.max(0, yAt(bot) - yAt(top)));
+          rect.setAttribute("fill", SCORE_COLORS[b.cat] || "#888"); rect.setAttribute("opacity", "0.16");
           svg.appendChild(rect);
         });
       }
-      const dStr = values.map((v, i) => `${i ? "L" : "M"}${xy(i).toFixed(1)} ${y(v).toFixed(1)}`).join(" ");
       const path = document.createElementNS(ns, "path");
-      path.setAttribute("d", dStr); path.setAttribute("fill", "none");
-      path.setAttribute("stroke", "currentColor"); path.setAttribute("stroke-width", "1.5");
-      path.setAttribute("stroke-linejoin", "round"); path.setAttribute("stroke-linecap", "round");
-      path.setAttribute("vector-effect", "non-scaling-stroke");
+      path.setAttribute("d", vals.map((v, i) => `${i ? "L" : "M"}${xAt(i).toFixed(1)} ${yAt(v).toFixed(1)}`).join(" "));
+      path.setAttribute("fill", "none"); path.setAttribute("stroke", "currentColor"); path.setAttribute("stroke-width", "1.5");
+      path.setAttribute("stroke-linejoin", "round"); path.setAttribute("stroke-linecap", "round"); path.setAttribute("vector-effect", "non-scaling-stroke");
       svg.appendChild(path);
-      const c = document.createElementNS(ns, "circle");
-      c.setAttribute("cx", xy(values.length - 1)); c.setAttribute("cy", y(values[values.length - 1]));
-      c.setAttribute("r", "2.5"); c.setAttribute("fill", "currentColor");
-      svg.appendChild(c);
-      return el("div.spark", {}, [svg]);
+      points.forEach((p, i) => {
+        const c = document.createElementNS(ns, "circle");
+        c.setAttribute("cx", xAt(i)); c.setAttribute("cy", yAt(p.v)); c.setAttribute("r", "2");
+        const cat = catFromBands(p.v, bands);
+        c.setAttribute("fill", cat && SCORE_COLORS[cat] ? SCORE_COLORS[cat] : "currentColor");
+        svg.appendChild(c);
+      });
+      const marker = document.createElementNS(ns, "line");
+      marker.setAttribute("y1", 0); marker.setAttribute("y2", H); marker.setAttribute("stroke", "var(--text)");
+      marker.setAttribute("stroke-width", "1"); marker.setAttribute("vector-effect", "non-scaling-stroke"); marker.setAttribute("opacity", "0");
+      svg.appendChild(marker);
+      const adot = document.createElementNS(ns, "circle");
+      adot.setAttribute("r", "3.4"); adot.setAttribute("opacity", "0");
+      svg.appendChild(adot);
+
+      const wrap = el("div.spark");
+      const readout = el("div.spark-readout");
+      const dates = el("div.spark-dates", {}, [el("span", { text: fmtShort(points[0].date) }), el("span", { text: fmtShort(points[points.length - 1].date) })]);
+      wrap.appendChild(readout); wrap.appendChild(svg); wrap.appendChild(dates);
+
+      const show = (i) => {
+        i = Math.max(0, Math.min(points.length - 1, i));
+        const p = points[i], cat = catFromBands(p.v, bands), color = cat && SCORE_COLORS[cat] ? SCORE_COLORS[cat] : "var(--text)";
+        readout.textContent = `${fmtShort(p.date)} · ${fmtNum(p.v)}`;
+        readout.style.color = color;
+        const x = xAt(i);
+        marker.setAttribute("x1", x); marker.setAttribute("x2", x); marker.setAttribute("opacity", "0.35");
+        adot.setAttribute("cx", x); adot.setAttribute("cy", yAt(p.v)); adot.setAttribute("fill", color); adot.setAttribute("opacity", "1");
+      };
+      const idxFromEvent = (e) => { const rc = svg.getBoundingClientRect(); return Math.round(((e.clientX - rc.left) / rc.width) * (points.length - 1)); };
+      let active = false;
+      svg.addEventListener("pointerdown", (e) => { active = true; try { svg.setPointerCapture(e.pointerId); } catch (_) {} show(idxFromEvent(e)); });
+      svg.addEventListener("pointermove", (e) => { if (active) show(idxFromEvent(e)); });
+      const end = () => { active = false; };
+      svg.addEventListener("pointerup", end); svg.addEventListener("pointercancel", end);
+      show(points.length - 1); // default to latest
+      return wrap;
+    }
+
+    const hexA = (hex, a) => { const m = /^#?([0-9a-f]{6})$/i.exec(hex); if (!m) return hex; const n = parseInt(m[1], 16); return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`; };
+    function sumCard(title) {
+      const c = el("div.sum-card");
+      if (title) c.appendChild(el("div.sum-card-title", { text: title }));
+      return c;
+    }
+    // Colored "hero" header tinted by the rating.
+    function heroCard(o) {
+      const color = SCORE_COLORS[o.cat] || "#9aa0a6";
+      const hero = el("div.sum-hero");
+      hero.style.background = hexA(color, 0.15);
+      hero.style.borderColor = hexA(color, 0.45);
+      if (o.cat) { const rt = el("span.sum-hero-rating", { text: GRADE_LABEL[o.cat] || "" }); rt.style.color = color; hero.appendChild(rt); }
+      if (o.label) hero.appendChild(el("div.sum-hero-label", { text: o.label }));
+      hero.appendChild(el("div.sum-hero-score", {}, [
+        el("span.sum-hero-num", { text: o.big != null && o.big !== "" ? String(o.big) : "—" }),
+        o.den ? el("span.sum-hero-den", { text: o.den }) : null,
+      ]));
+      if (o.sub) hero.appendChild(el("div.sum-hero-sub", { text: o.sub }));
+      if (o.tip) hero.appendChild(el("div.sum-hero-tip", { text: o.tip }));
+      return hero;
     }
 
     function openReadingSummary(r) {
@@ -1637,18 +1702,22 @@
     function genericReadingSummary(r, body) {
       const def = READING_TYPES[r.type];
       const s = r.scores || computeScores(r);
+      const rv = readingRowValue(r);
+      body.appendChild(heroCard({ cat: rowScoreCategory(r), big: typeof rv === "string" ? rv : "", label: "Result" }));
+      const card = sumCard();
       entryFields(def).forEach((f) => {
         if (isDivider(f) || f.type === "time") return;
-        if (f.type === "check") { body.appendChild(metricRow(f.label, r[f.key] ? "Yes" : "No", r[f.key] ? (f.key === "sinus" ? "great" : "bad") : null)); return; }
+        if (f.type === "check") { card.appendChild(metricRow(f.label, r[f.key] ? "Yes" : "No", r[f.key] ? (f.key === "sinus" ? "great" : "bad") : null)); return; }
         if (f.type === "textarea") {
-          if (r[f.key]) { body.appendChild(el("div.sum-h3", { text: f.label })); body.appendChild(el("div.sum-text", { text: r[f.key] })); }
+          if (r[f.key]) { card.appendChild(el("div.sum-card-title", { text: f.label })); card.appendChild(el("div.sum-text", { text: r[f.key] })); }
           return;
         }
         const v = r[f.key];
         if (v == null || v === "") return;
         const spark = buildSpark(metricHistory(r.type, numEx(f.key)), bandsFor(r.type, f.key));
-        body.appendChild(metricRow(f.label, v + (f.unit ? ` ${f.unit}` : ""), s[f.key], null, spark));
+        card.appendChild(metricRow(f.label, v + (f.unit ? ` ${f.unit}` : ""), s[f.key], null, spark));
       });
+      body.appendChild(card);
     }
 
     const HRV_EXPLAIN = {
@@ -1674,16 +1743,7 @@
       const sp = (ex, bands) => buildSpark(metricHistory("breathHrv", ex, 30), bands);
       const lfhfEx = (rr) => { const a = parseFloat(rr.lowPower), b = parseFloat(rr.highPower); return (!isNaN(a) && !isNaN(b) && b !== 0) ? a / b : null; };
 
-      // Validity banner
-      let validity = "Valid", vCat = "great";
-      if (r.swallowing) { validity = "Questionable"; vCat = "bad"; }
-      else if (s.coherence === "bad" || s.coherence === "crash") { validity = "Questionable"; vCat = "bad"; }
-      else if (s.coherence === "ok") { validity = "Likely valid"; vCat = "ok"; }
-      const banner = el("div.sum-banner", { text: "Reading validity: " + validity });
-      banner.style.background = SCORE_COLORS[vCat];
-      body.appendChild(banner);
-
-      // Overall assessment (worst of RMSSD / pNN50 / Total Power)
+      // Hero: autonomic composite (0–100) colored by overall rating
       const overall = worstCat([s.rmssd, s.pnn50, s.totalPower].filter(Boolean));
       const verdict = {
         great: "Strong parasympathetic reserves today — fine for your normal protocol or intervals.",
@@ -1692,68 +1752,60 @@
         bad: "Low reserves — favor rest and gentle activity today.",
         crash: "Very low reserves — prioritize rest and recovery.",
       };
-      const head = el("div.sum-section");
-      const pill = el("span.grade-pill", { text: GRADE_LABEL[overall] || "—" });
-      pill.style.background = SCORE_COLORS[overall] || "var(--text-dim)";
-      head.appendChild(pill);
-      head.appendChild(el("p.sum-verdict", { text: verdict[overall] || "" }));
-      body.appendChild(head);
-
-      // Autonomic composite (0–100), weighted; no trend (history TODO)
       const weights = { rmssd: 25, pnn50: 15, totalPower: 15, lfPeak: 20, hfPeak: 15, lfhf: 10 };
       let sum = 0, wsum = 0;
       Object.keys(weights).forEach((k) => { const c = s[k]; if (c && CAT_POINTS[c] != null) { sum += CAT_POINTS[c] * weights[k]; wsum += weights[k]; } });
-      if (wsum) {
-        const score = Math.round(sum / wsum);
-        const card = el("div.sum-card");
-        card.appendChild(el("h4", { text: "Autonomic score" }));
-        card.appendChild(el("div.big", { text: String(score) }));
-        card.appendChild(el("div.metric-explain", { text: "Composite of vagal tone, power, and baroreflex position (0–100)." }));
-        body.appendChild(card);
-      }
+      body.appendChild(heroCard({
+        cat: overall,
+        label: "Autonomic score",
+        big: wsum ? Math.round(sum / wsum) : "—",
+        den: wsum ? "/100" : "",
+        sub: "Composite of vagal tone, power, and baroreflex position.",
+        tip: verdict[overall] || "",
+      }));
 
       // Breathing quality
-      body.appendChild(el("div.sum-h3", { text: "Breathing quality" }));
-      body.appendChild(metricRow("Coherence", r.coherence, s.coherence, HRV_EXPLAIN.coherence, sp(numEx("coherence"), BANDS.coherence)));
-      if (r.style) body.appendChild(metricRow("Breathing style", r.style, null, "Intended pace for this reading."));
+      const bq = sumCard("Breathing quality");
+      bq.appendChild(metricRow("Coherence", r.coherence, s.coherence, HRV_EXPLAIN.coherence, sp(numEx("coherence"), BANDS.coherence)));
+      if (r.style) bq.appendChild(metricRow("Breathing style", r.style, null, "Intended pace for this reading."));
+      body.appendChild(bq);
 
-      // Frequency peaks
-      body.appendChild(el("div.sum-h3", { text: "Frequency peaks (baroreflex)" }));
-      body.appendChild(metricRow("LF peak", r.lfPeak ? r.lfPeak + " Hz" : "", s.lfPeak,
-        "Baroreflex frequency. Target 0.08–0.10 Hz; shifting toward it is progress.", sp(numEx("lfPeak"), BANDS.lfPeak)));
-      const e = expectedHf(r.style);
-      body.appendChild(metricRow("HF peak", r.hfPeak ? r.hfPeak + " Hz" : "", s.hfPeak,
-        e ? `Expected ~${e[0]}–${e[1]} Hz for ${r.style} breathing; large deviation means the pace drifted.` : "Respiratory peak position.", sp(numEx("hfPeak"), null)));
-
-      // Power distribution
-      body.appendChild(el("div.sum-h3", { text: "Power distribution" }));
+      // Power (frequency peaks folded in, below HF power)
+      const pc = sumCard("Power");
       if (total) {
         const pct = (x) => Math.round(((x || 0) / total) * 100);
         const bar = el("div.powerbar");
         const seg = (v, color, lab) => { if (v == null) return; const p = pct(v); const d = el("div", { style: `width:${p}%;background:${color}` }); if (p >= 12) d.textContent = `${lab} ${p}%`; bar.appendChild(d); };
         seg(vlf, "#f59e0b", "VLF"); seg(lf, "#6366f1", "LF"); seg(hf, "#22c55e", "HF");
-        body.appendChild(bar);
-        body.appendChild(el("div.sum-legend", { text: `VLF ${pct(vlf)}% · LF ${pct(lf)}% · HF ${pct(hf)}%` }));
+        pc.appendChild(bar);
+        pc.appendChild(el("div.sum-legend", { text: `VLF ${pct(vlf)}% · LF ${pct(lf)}% · HF ${pct(hf)}%` }));
       }
-      body.appendChild(metricRow("Total power", total != null ? Math.round(total) : "", s.totalPower, "Total autonomic engagement across all frequencies.", sp((rr) => totalPower(rr), BANDS.totalPower)));
-      body.appendChild(metricRow("LF/HF ratio", lfhf != null ? lfhf.toFixed(2) : "", s.lfhf, "Sympathetic vs vagal balance. Balanced/low favors flexibility.", sp(lfhfEx, BANDS.lfhf)));
-      body.appendChild(metricRow("VLF power", r.vlowPower, s.vlf, "Slow regulatory processes & stress load. Elevated = system stress.", sp(numEx("vlowPower"), BANDS.vlf)));
-      body.appendChild(metricRow("LF power", r.lowPower, null, "Baroreflex band — your training target.", sp(numEx("lowPower"), null)));
-      body.appendChild(metricRow("HF power", r.highPower, null, "Vagal activity tied to breathing. Higher = better recovery state.", sp(numEx("highPower"), null)));
+      pc.appendChild(metricRow("Total power", total != null ? Math.round(total) : "", s.totalPower, "Total autonomic engagement across all frequencies.", sp((rr) => totalPower(rr), BANDS.totalPower)));
+      pc.appendChild(metricRow("LF/HF ratio", lfhf != null ? lfhf.toFixed(2) : "", s.lfhf, "Sympathetic vs vagal balance. Balanced/low favors flexibility.", sp(lfhfEx, BANDS.lfhf)));
+      pc.appendChild(metricRow("VLF power", r.vlowPower, s.vlf, "Slow regulatory processes & stress load. Elevated = system stress.", sp(numEx("vlowPower"), BANDS.vlf)));
+      pc.appendChild(metricRow("LF power", r.lowPower, null, "Baroreflex band — your training target.", sp(numEx("lowPower"), null)));
+      pc.appendChild(metricRow("HF power", r.highPower, null, "Vagal activity tied to breathing. Higher = better recovery state.", sp(numEx("highPower"), null)));
+      pc.appendChild(metricRow("LF peak", r.lfPeak ? r.lfPeak + " Hz" : "", s.lfPeak,
+        "Baroreflex frequency. Target 0.08–0.10 Hz; shifting toward it is progress.", sp(numEx("lfPeak"), BANDS.lfPeak)));
+      const e = expectedHf(r.style);
+      pc.appendChild(metricRow("HF peak", r.hfPeak ? r.hfPeak + " Hz" : "", s.hfPeak,
+        e ? `Expected ~${e[0]}–${e[1]} Hz for ${r.style} breathing; large deviation means the pace drifted.` : "Respiratory peak position.", sp(numEx("hfPeak"), null)));
+      body.appendChild(pc);
 
       // Metrics
-      body.appendChild(el("div.sum-h3", { text: "Metrics" }));
-      body.appendChild(metricRow("RMSSD", r.rmssd, s.rmssd, HRV_EXPLAIN.rmssd, sp(numEx("rmssd"), BANDS.rmssdS)));
-      body.appendChild(metricRow("pNN50", r.pnn50 ? r.pnn50 + "%" : "", s.pnn50, HRV_EXPLAIN.pnn50, sp(numEx("pnn50"), BANDS.pnn50)));
-      body.appendChild(metricRow("SDNN", r.sdnn, s.sdnn, HRV_EXPLAIN.sdnn, sp(numEx("sdnn"), BANDS.sdnn)));
-      body.appendChild(metricRow("HR", r.hr, null, HRV_EXPLAIN.hr, sp(numEx("hr"), null)));
-      body.appendChild(metricRow("Mean RR", r.meanRr, null, HRV_EXPLAIN.meanRr, sp(numEx("meanRr"), null)));
-      body.appendChild(metricRow("MxDMn", r.mxdmn, null, HRV_EXPLAIN.mxdmn, sp(numEx("mxdmn"), null)));
-      body.appendChild(metricRow("Mode", r.mode, null, HRV_EXPLAIN.mode, sp(numEx("mode"), null)));
-      body.appendChild(metricRow("AMo50", r.amo50, null, HRV_EXPLAIN.amo50, sp(numEx("amo50"), null)));
-      body.appendChild(metricRow("CV", r.cv, null, HRV_EXPLAIN.cv, sp(numEx("cv"), null)));
+      const mc = sumCard("Metrics");
+      mc.appendChild(metricRow("RMSSD", r.rmssd, s.rmssd, HRV_EXPLAIN.rmssd, sp(numEx("rmssd"), BANDS.rmssdS)));
+      mc.appendChild(metricRow("pNN50", r.pnn50 ? r.pnn50 + "%" : "", s.pnn50, HRV_EXPLAIN.pnn50, sp(numEx("pnn50"), BANDS.pnn50)));
+      mc.appendChild(metricRow("SDNN", r.sdnn, s.sdnn, HRV_EXPLAIN.sdnn, sp(numEx("sdnn"), BANDS.sdnn)));
+      mc.appendChild(metricRow("HR", r.hr, null, HRV_EXPLAIN.hr, sp(numEx("hr"), null)));
+      mc.appendChild(metricRow("Mean RR", r.meanRr, null, HRV_EXPLAIN.meanRr, sp(numEx("meanRr"), null)));
+      mc.appendChild(metricRow("MxDMn", r.mxdmn, null, HRV_EXPLAIN.mxdmn, sp(numEx("mxdmn"), null)));
+      mc.appendChild(metricRow("Mode", r.mode, null, HRV_EXPLAIN.mode, sp(numEx("mode"), null)));
+      mc.appendChild(metricRow("AMo50", r.amo50, null, HRV_EXPLAIN.amo50, sp(numEx("amo50"), null)));
+      mc.appendChild(metricRow("CV", r.cv, null, HRV_EXPLAIN.cv, sp(numEx("cv"), null)));
+      body.appendChild(mc);
 
-      if (r.note) { body.appendChild(el("div.sum-h3", { text: "Notes" })); body.appendChild(el("div.sum-text", { text: r.note })); }
+      if (r.note) { const nc = sumCard("Notes"); nc.appendChild(el("div.sum-text", { text: r.note })); body.appendChild(nc); }
     }
 
     function renderReadings() {
