@@ -276,7 +276,7 @@
     max-width: 100%;
     min-width: 0;
     /* WebKit time inputs keep an intrinsic min-width and ignore `width`
-       until appearance is reset — this is the real fix for the overflow. */
+       until appearance is reset - this is the real fix for the overflow. */
     appearance: none;
     -webkit-appearance: none;
     background: var(--surface-2);
@@ -409,7 +409,7 @@
     align-items: flex-end;
     justify-content: center;
     padding: 0;
-    /* no fade — the backdrop appears with the sliding card */
+    /* no fade - the backdrop appears with the sliding card */
   }
   @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
   @keyframes slideup { from { transform: translateY(100%); } to { transform: translateY(0); } }
@@ -484,27 +484,26 @@
   .sum-meta { color: var(--text-dim); font-size: 13px; margin: -8px 0 14px; }
   .sum-text { font-size: 14px; white-space: pre-wrap; }
   /* Colored hero header (rating) */
-  .sum-hero { position: relative; border: 1px solid; border-radius: var(--radius); padding: 16px; margin-bottom: 14px; }
-  .sum-hero-rating { position: absolute; top: 14px; right: 16px; font-size: 14px; font-weight: 800; }
+  .sum-hero { position: relative; border: 1px solid; border-radius: var(--radius); padding: 16px; margin-bottom: 16px; }
+  .sum-hero-rating { position: absolute; top: 14px; right: 14px; font-size: 12px; font-weight: 800; color: #fff; padding: 4px 11px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.03em; }
   .sum-hero-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); font-weight: 700; }
   .sum-hero-score { margin-top: 3px; }
-  .sum-hero-num { font-size: 38px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
+  .sum-hero-num { font-size: 40px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
   .sum-hero-den { font-size: 16px; font-weight: 700; color: var(--text-dim); margin-left: 3px; }
   .sum-hero-sub { font-size: 12.5px; color: var(--text-dim); margin-top: 6px; }
   .sum-hero-tip { font-size: 14px; font-weight: 600; margin-top: 12px; line-height: 1.45; }
-  /* Section cards */
-  .sum-card { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 4px 14px 12px; margin-bottom: 14px; }
-  .sum-card-title { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); font-weight: 700; padding: 12px 0 2px; }
-  .metric { padding: 9px 0; border-top: 1px solid var(--border); }
-  .metric-head { display: flex; align-items: center; gap: 8px; }
-  .metric-name { flex: 1; font-size: 14px; }
-  .metric-val { font-weight: 700; font-variant-numeric: tabular-nums; }
-  .metric-explain { font-size: 12.5px; color: var(--text-dim); margin-top: 3px; }
-  .spark { margin-top: 7px; color: var(--text-dim); }
-  .spark svg { width: 100%; height: 46px; display: block; border-radius: 6px; touch-action: pan-y; cursor: crosshair; }
-  .spark-readout { font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums; height: 15px; }
-  .spark-dates { display: flex; justify-content: space-between; font-size: 10px; color: var(--text-dim); margin-top: 2px; }
-  .powerbar { display: flex; height: 22px; border-radius: 6px; overflow: hidden; margin: 4px 0 6px; background: var(--surface-2); }
+  /* Section headings + per-metric cards */
+  .sum-h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); font-weight: 700; margin: 22px 0 10px; }
+  .metric-card { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; margin-bottom: 12px; }
+  .metric-head { display: flex; align-items: center; gap: 9px; }
+  .metric-name { flex: 1; font-size: 15px; font-weight: 700; }
+  .metric-val { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .metric-explain { font-size: 12.5px; color: var(--text-dim); margin-top: 6px; line-height: 1.4; }
+  .spark { margin-top: 16px; color: var(--text-dim); overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .spark svg { display: block; background: var(--surface); border-radius: 10px; touch-action: pan-y; cursor: crosshair; }
+  .spark-readout { font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; height: 16px; margin-bottom: 4px; }
+  .spark-dates { display: flex; justify-content: space-between; font-size: 10px; color: var(--text-dim); margin-top: 3px; }
+  .powerbar { display: flex; height: 24px; border-radius: 6px; overflow: hidden; margin: 2px 0 8px; background: var(--surface); }
   .powerbar > div { display: flex; align-items: center; justify-content: center; font-size: 10px; color: #fff; font-weight: 700; min-width: 0; }
   .sum-legend { font-size: 12px; color: var(--text-dim); }
   .modal-foot {
@@ -779,7 +778,7 @@
   <div id="toast" class="toast hidden"></div>
 
   <script>
-  /* Autonomic Journal — offline PWA, no backend. All state in localStorage. */
+  /* Autonomic Journal - offline PWA, no backend. All state in localStorage. */
   (() => {
     "use strict";
 
@@ -994,9 +993,9 @@
       },
     };
 
-    // Activity types — programmatic only (no custom user-added ones). Each logged
+    // Activity types - programmatic only (no custom user-added ones). Each logged
     // activity is { id, type, time, note, ...fields }. `fields`/`checks` are the
-    // per-activity capture template (TBD — filled in as templates are provided).
+    // per-activity capture template (TBD - filled in as templates are provided).
     const ACTIVITY_TYPES = {
       indoorBike: {
         label: "Indoor bike",
@@ -1023,7 +1022,7 @@
       stressfulWork: { label: "Stressful work", icon: ICONS.zap, fields: [] },
     };
 
-    // Medications & supplements — programmatic list (no custom adds). Each logged
+    // Medications & supplements - programmatic list (no custom adds). Each logged
     // entry captures a time and an amount.
     const med = (label) => ({
       label,
@@ -1048,7 +1047,7 @@
       gaviscon: med("Gaviscon"),
     };
 
-    // Symptoms — programmatic list. Each is a logged entry; templates (per-symptom
+    // Symptoms - programmatic list. Each is a logged entry; templates (per-symptom
     // fields) can be added like readings. Time + Notes are auto-included.
     const symptom = (label, fields) => ({ label, icon: ICONS.alert, fields: fields || [] });
     const SYMPTOM_TYPES = {
@@ -1090,7 +1089,7 @@
       s.version = SCHEMA_VERSION;
       s.settings = Object.assign({}, base.settings, s.settings);
       s.meta = Object.assign({ lastUpdated: null, lastImport: null }, s.meta);
-      delete s.defs; // catalogs removed — everything is programmatic now
+      delete s.defs; // catalogs removed - everything is programmatic now
       s.days = s.days || {};
       // activities/meds/symptoms are now arrays of logged entries (were {defId:…} maps)
       Object.keys(s.days).forEach((k) => {
@@ -1111,7 +1110,7 @@
         state.meta.lastUpdated = new Date().toISOString();
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
       } catch (e) {
-        toast("Storage error — data may not be saved");
+        toast("Storage error - data may not be saved");
         console.error(e);
       }
     }
@@ -1152,9 +1151,9 @@
 
     // Human-readable timestamp (used in the menu drawer footer).
     function fmtStamp(iso) {
-      if (!iso) return "—";
+      if (!iso) return "-";
       const d = new Date(iso);
-      if (isNaN(d)) return "—";
+      if (isNaN(d)) return "-";
       return d.toLocaleString(undefined, {
         month: "short",
         day: "numeric",
@@ -1505,7 +1504,7 @@
 
     // Category used to tint the single value shown on a reading row.
     function rowScoreCategory(r) {
-      const s = r.scores || computeScores(r);
+      const s = computeScores(r);
       switch (r.type) {
         case "hrv": return s.readiness;
         case "breathHrv": return s.overall || s.sdnn;
@@ -1519,7 +1518,7 @@
 
     // Simplified value shown on the right of a reading row (one thing per type).
     function ecgBadge(r) {
-      const s = r.scores || computeScores(r);
+      const s = computeScores(r);
       const cat = s.overall || (r.svt || r.otherArrhythmia ? "concerning" : "great");
       const bad = SCORE_RANK[cat] >= 3;
       const badge = el("span.ecg-badge", { html: bad ? ICONS.x : ICONS.check });
@@ -1530,7 +1529,7 @@
       switch (r.type) {
         case "hrv": return r.readiness ? r.readiness + "%" : "";
         case "breathHrv": return r.sdnn != null && r.sdnn !== "" ? String(r.sdnn) : "";
-        case "bp": return r.sys || r.dia ? `${r.sys || "–"}/${r.dia || "–"}` : "";
+        case "bp": return r.sys || r.dia ? `${r.sys || "-"}/${r.dia || "-"}` : "";
         case "bloodO2": return r.value ? r.value + "%" : "";
         case "ecg": return ecgBadge(r);
         default: return summarizeFields(READING_TYPES[r.type], r);
@@ -1546,16 +1545,17 @@
       return d;
     }
     function metricRow(label, value, cat, explain, spark) {
-      return el("div.metric", {}, [
+      return el("div.metric-card", {}, [
         el("div.metric-head", {}, [
           scoreDot(cat),
           el("span.metric-name", { text: label }),
-          el("span.metric-val", { text: value == null || value === "" ? "—" : String(value) }),
+          el("span.metric-val", { text: value == null || value === "" ? "-" : String(value) }),
         ]),
         explain ? el("div.metric-explain", { text: explain }) : null,
         spark || null,
       ]);
     }
+    const sumHeading = (t) => el("div.sum-h3", { text: t });
 
     /* ----- Sparklines: per-metric history with grade-zone bands ----- */
     // Each band list is {max, cat} ascending; the final max is Infinity.
@@ -1597,11 +1597,11 @@
     const numEx = (key) => (rr) => { const v = parseFloat(rr[key]); return isNaN(v) ? null : v; };
     const catFromBands = (v, bands) => { if (!bands) return null; for (const b of bands) if (v < b.max) return b.cat; return bands[bands.length - 1].cat; };
     const fmtShort = (dk) => dateFromKey(dk).toLocaleDateString(undefined, { month: "short", day: "numeric" });
-    const fmtNum = (v) => { if (v == null) return "—"; if (Number.isInteger(v)) return String(v); return Math.abs(v) < 1 ? v.toFixed(3) : v.toFixed(1); };
+    const fmtNum = (v) => { if (v == null) return "-"; if (Number.isInteger(v)) return String(v); return Math.abs(v) < 1 ? v.toFixed(3) : v.toFixed(1); };
 
     // Chronological history for one metric across all days (last `limit`):
     // returns [{ v, date }] oldest→newest.
-    function metricHistory(type, extractor, limit = 30) {
+    function metricHistory(type, extractor, limit = 15) {
       const out = [];
       Object.keys(state.days).sort().forEach((dk) => {
         const list = (state.days[dk].readings || []).filter((r) => r.type === type);
@@ -1611,94 +1611,113 @@
       return out.slice(-limit);
     }
 
-    // Sparkline with grade-zone bands, color-coded points, a draggable readout,
-    // and start/end date labels.
+    // "Nice" axis numbers so the y-range extends out to round bounds with ticks.
+    const niceNum = (x, round) => {
+      if (x <= 0) return 1;
+      const exp = Math.floor(Math.log10(x)), f = x / Math.pow(10, exp);
+      const nf = round ? (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) : (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10);
+      return nf * Math.pow(10, exp);
+    };
+    function niceScale(dataMin, dataMax, ticks) {
+      let min = dataMin, max = dataMax;
+      if (min === max) { const d = Math.abs(min) || 1; min -= d; max += d; }
+      const pad = (max - min) * 0.5; min -= pad; max += pad; // extend the range out
+      const step = niceNum(niceNum(max - min, false) / (ticks - 1), true);
+      return { min: Math.floor(min / step) * step, max: Math.ceil(max / step) * step, step };
+    }
+    // Smooth (curved) path through points via Catmull-Rom → cubic béziers.
+    function smoothPath(pts) {
+      if (pts.length < 2) return "";
+      let d = `M${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}`;
+      const t = 0.16;
+      for (let i = 0; i < pts.length - 1; i++) {
+        const p0 = pts[i - 1] || pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] || p2;
+        const c1x = p1[0] + (p2[0] - p0[0]) * t, c1y = p1[1] + (p2[1] - p0[1]) * t;
+        const c2x = p2[0] - (p3[0] - p1[0]) * t, c2y = p2[1] - (p3[1] - p1[1]) * t;
+        d += ` C${c1x.toFixed(1)} ${c1y.toFixed(1)} ${c2x.toFixed(1)} ${c2y.toFixed(1)} ${p2[0].toFixed(1)} ${p2[1].toFixed(1)}`;
+      }
+      return d;
+    }
+
+    // Curved sparkline: fixed tick spacing (doesn't stretch full width), grade
+    // bands + y ticks, color-coded points, and a draggable date·value readout.
     function buildSpark(points, bands) {
       if (!points || points.length < 2) return null;
-      const vals = points.map((p) => p.v);
-      const W = 300, H = 46, padY = 6;
-      let min = Math.min(...vals), max = Math.max(...vals);
-      if (min === max) { min -= 1; max += 1; }
-      const rng = max - min; min -= rng * 0.15; max += rng * 0.15;
-      const xAt = (i) => (i / (points.length - 1)) * W;
-      const yAt = (v) => padY + (1 - (v - min) / (max - min)) * (H - 2 * padY);
       const ns = "http://www.w3.org/2000/svg";
-      const svg = document.createElementNS(ns, "svg");
-      svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
-      svg.setAttribute("preserveAspectRatio", "none");
+      const mk = (t, a) => { const e = document.createElementNS(ns, t); for (const k in a) e.setAttribute(k, a[k]); return e; };
+      const vals = points.map((p) => p.v);
+      const sc = niceScale(Math.min(...vals), Math.max(...vals), 4);
+      const min = sc.min, max = sc.max;
+      const spacing = 18, padL = 30, padR = 10, padT = 8, padB = 16;
+      const innerW = (points.length - 1) * spacing;
+      const W = padL + innerW + padR, H = 78, plotH = H - padT - padB;
+      const xAt = (i) => padL + i * spacing;
+      const yAt = (v) => padT + (1 - (v - min) / (max - min)) * plotH;
 
+      const svg = mk("svg", { viewBox: `0 0 ${W} ${H}`, width: W, height: H });
+
+      // grade-zone bands (clipped to plot x-range)
       if (bands) {
         let lo = -Infinity;
         bands.forEach((b) => {
           const top = Math.min(b.max, max), bot = Math.max(lo, min); lo = b.max;
           if (top <= bot) return;
-          const rect = document.createElementNS(ns, "rect");
-          rect.setAttribute("x", 0); rect.setAttribute("width", W);
-          rect.setAttribute("y", yAt(top)); rect.setAttribute("height", Math.max(0, yAt(bot) - yAt(top)));
-          rect.setAttribute("fill", SCORE_COLORS[b.cat] || "#888"); rect.setAttribute("opacity", "0.16");
-          svg.appendChild(rect);
+          svg.appendChild(mk("rect", { x: padL, width: innerW, y: yAt(top), height: Math.max(0, yAt(bot) - yAt(top)), fill: SCORE_COLORS[b.cat] || "#888", opacity: 0.15 }));
         });
       }
-      const path = document.createElementNS(ns, "path");
-      path.setAttribute("d", vals.map((v, i) => `${i ? "L" : "M"}${xAt(i).toFixed(1)} ${yAt(v).toFixed(1)}`).join(" "));
-      path.setAttribute("fill", "none"); path.setAttribute("stroke", "currentColor"); path.setAttribute("stroke-width", "1.5");
-      path.setAttribute("stroke-linejoin", "round"); path.setAttribute("stroke-linecap", "round"); path.setAttribute("vector-effect", "non-scaling-stroke");
+      // y ticks + labels
+      for (let t = min; t <= max + 1e-9; t += sc.step) {
+        const yy = yAt(t);
+        svg.appendChild(mk("line", { x1: padL, x2: padL + innerW, y1: yy, y2: yy, stroke: "var(--border)", "stroke-width": 0.5, opacity: 0.7 }));
+        const tx = mk("text", { x: padL - 4, y: yy + 3, "text-anchor": "end", "font-size": 8, fill: "var(--text-dim)" });
+        tx.textContent = fmtNum(t); svg.appendChild(tx);
+      }
+      // x ticks
+      points.forEach((p, i) => svg.appendChild(mk("line", { x1: xAt(i), x2: xAt(i), y1: H - padB, y2: H - padB + 3, stroke: "var(--text-dim)", "stroke-width": 0.5, opacity: 0.6 })));
+
+      const xy = points.map((p, i) => [xAt(i), yAt(p.v)]);
+      const path = mk("path", { d: smoothPath(xy), fill: "none", stroke: "currentColor", "stroke-width": 1.6, "stroke-linejoin": "round", "stroke-linecap": "round" });
       svg.appendChild(path);
-      points.forEach((p, i) => {
-        const c = document.createElementNS(ns, "circle");
-        c.setAttribute("cx", xAt(i)); c.setAttribute("cy", yAt(p.v)); c.setAttribute("r", "2");
-        const cat = catFromBands(p.v, bands);
-        c.setAttribute("fill", cat && SCORE_COLORS[cat] ? SCORE_COLORS[cat] : "currentColor");
-        svg.appendChild(c);
-      });
-      const marker = document.createElementNS(ns, "line");
-      marker.setAttribute("y1", 0); marker.setAttribute("y2", H); marker.setAttribute("stroke", "var(--text)");
-      marker.setAttribute("stroke-width", "1"); marker.setAttribute("vector-effect", "non-scaling-stroke"); marker.setAttribute("opacity", "0");
-      svg.appendChild(marker);
-      const adot = document.createElementNS(ns, "circle");
-      adot.setAttribute("r", "3.4"); adot.setAttribute("opacity", "0");
-      svg.appendChild(adot);
+      points.forEach((p, i) => { const cat = catFromBands(p.v, bands); svg.appendChild(mk("circle", { cx: xAt(i), cy: yAt(p.v), r: 2.2, fill: cat && SCORE_COLORS[cat] ? SCORE_COLORS[cat] : "currentColor" })); });
+      const marker = mk("line", { y1: padT, y2: H - padB, stroke: "var(--text)", "stroke-width": 1, opacity: 0 });
+      const adot = mk("circle", { r: 3.4, opacity: 0 });
+      svg.appendChild(marker); svg.appendChild(adot);
 
       const wrap = el("div.spark");
       const readout = el("div.spark-readout");
-      const dates = el("div.spark-dates", {}, [el("span", { text: fmtShort(points[0].date) }), el("span", { text: fmtShort(points[points.length - 1].date) })]);
+      const dates = el("div.spark-dates", { style: `width:${W}px` }, [el("span", { text: fmtShort(points[0].date) }), el("span", { text: fmtShort(points[points.length - 1].date) })]);
       wrap.appendChild(readout); wrap.appendChild(svg); wrap.appendChild(dates);
 
       const show = (i) => {
         i = Math.max(0, Math.min(points.length - 1, i));
         const p = points[i], cat = catFromBands(p.v, bands), color = cat && SCORE_COLORS[cat] ? SCORE_COLORS[cat] : "var(--text)";
-        readout.textContent = `${fmtShort(p.date)} · ${fmtNum(p.v)}`;
+        readout.textContent = `${fmtShort(p.date)}: ${fmtNum(p.v)}`;
         readout.style.color = color;
         const x = xAt(i);
-        marker.setAttribute("x1", x); marker.setAttribute("x2", x); marker.setAttribute("opacity", "0.35");
-        adot.setAttribute("cx", x); adot.setAttribute("cy", yAt(p.v)); adot.setAttribute("fill", color); adot.setAttribute("opacity", "1");
+        marker.setAttribute("x1", x); marker.setAttribute("x2", x); marker.setAttribute("opacity", 0.35);
+        adot.setAttribute("cx", x); adot.setAttribute("cy", yAt(p.v)); adot.setAttribute("fill", color); adot.setAttribute("opacity", 1);
       };
-      const idxFromEvent = (e) => { const rc = svg.getBoundingClientRect(); return Math.round(((e.clientX - rc.left) / rc.width) * (points.length - 1)); };
+      const idxFromEvent = (e) => { const rc = svg.getBoundingClientRect(); const px = (e.clientX - rc.left) * (W / rc.width); return Math.round((px - padL) / spacing); };
       let active = false;
       svg.addEventListener("pointerdown", (e) => { active = true; try { svg.setPointerCapture(e.pointerId); } catch (_) {} show(idxFromEvent(e)); });
       svg.addEventListener("pointermove", (e) => { if (active) show(idxFromEvent(e)); });
       const end = () => { active = false; };
       svg.addEventListener("pointerup", end); svg.addEventListener("pointercancel", end);
-      show(points.length - 1); // default to latest
+      show(points.length - 1);
       return wrap;
     }
 
     const hexA = (hex, a) => { const m = /^#?([0-9a-f]{6})$/i.exec(hex); if (!m) return hex; const n = parseInt(m[1], 16); return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`; };
-    function sumCard(title) {
-      const c = el("div.sum-card");
-      if (title) c.appendChild(el("div.sum-card-title", { text: title }));
-      return c;
-    }
-    // Colored "hero" header tinted by the rating.
+    // Colored "hero" header tinted by the rating, with a solid rating chip.
     function heroCard(o) {
       const color = SCORE_COLORS[o.cat] || "#9aa0a6";
       const hero = el("div.sum-hero");
       hero.style.background = hexA(color, 0.15);
       hero.style.borderColor = hexA(color, 0.45);
-      if (o.cat) { const rt = el("span.sum-hero-rating", { text: GRADE_LABEL[o.cat] || "" }); rt.style.color = color; hero.appendChild(rt); }
+      if (o.cat) { const rt = el("span.sum-hero-rating", { text: GRADE_LABEL[o.cat] || "" }); rt.style.background = color; hero.appendChild(rt); }
       if (o.label) hero.appendChild(el("div.sum-hero-label", { text: o.label }));
       hero.appendChild(el("div.sum-hero-score", {}, [
-        el("span.sum-hero-num", { text: o.big != null && o.big !== "" ? String(o.big) : "—" }),
+        el("span.sum-hero-num", { text: o.big != null && o.big !== "" ? String(o.big) : "-" }),
         o.den ? el("span.sum-hero-den", { text: o.den }) : null,
       ]));
       if (o.sub) hero.appendChild(el("div.sum-hero-sub", { text: o.sub }));
@@ -1718,56 +1737,54 @@
 
     function genericReadingSummary(r, body) {
       const def = READING_TYPES[r.type];
-      const s = r.scores || computeScores(r);
+      const s = computeScores(r);
       const rv = readingRowValue(r);
       body.appendChild(heroCard({ cat: rowScoreCategory(r), big: typeof rv === "string" ? rv : "", label: "Result" }));
-      const card = sumCard();
       entryFields(def).forEach((f) => {
         if (isDivider(f) || f.type === "time") return;
-        if (f.type === "check") { card.appendChild(metricRow(f.label, r[f.key] ? "Yes" : "No", r[f.key] ? (f.key === "sinus" ? "great" : "bad") : null)); return; }
+        if (f.type === "check") { body.appendChild(metricRow(f.label, r[f.key] ? "Yes" : "No", r[f.key] ? (f.key === "sinus" ? "great" : "bad") : null)); return; }
         if (f.type === "textarea") {
-          if (r[f.key]) { card.appendChild(el("div.sum-card-title", { text: f.label })); card.appendChild(el("div.sum-text", { text: r[f.key] })); }
+          if (r[f.key]) { const c = el("div.metric-card", {}, [el("div.metric-name", { text: f.label }), el("div.sum-text", { text: r[f.key] })]); body.appendChild(c); }
           return;
         }
         const v = r[f.key];
         if (v == null || v === "") return;
         const spark = buildSpark(metricHistory(r.type, numEx(f.key)), bandsFor(r.type, f.key));
-        card.appendChild(metricRow(f.label, v + (f.unit ? ` ${f.unit}` : ""), s[f.key], null, spark));
+        body.appendChild(metricRow(f.label, v + (f.unit ? ` ${f.unit}` : ""), s[f.key], null, spark));
       });
-      body.appendChild(card);
     }
 
     const HRV_EXPLAIN = {
-      rmssd: "Beat-to-beat parasympathetic activity — your most reliable vagal-tone indicator.",
+      rmssd: "Beat-to-beat parasympathetic activity - your most reliable vagal-tone indicator.",
       pnn50: "Percent of successive beats differing by 50ms+. Sensitive parasympathetic depth.",
       sdnn: "Overall heart-rate variability. Reflects total autonomic activity.",
       hr: "Beats per minute during the reading. Lower usually means more vagal dominance.",
       meanRr: "Average milliseconds between beats (inverse of HR).",
-      mxdmn: "Longest minus shortest RR interval — the range of variability.",
-      mode: "Most common RR interval — a stability indicator.",
+      mxdmn: "Longest minus shortest RR interval - the range of variability.",
+      mode: "Most common RR interval - a stability indicator.",
       amo50: "Stress-index marker. Higher suggests sympathetic dominance.",
       cv: "Relative variability. Higher is generally better.",
-      coherence: "Synchronization of heart rhythm with breathing — reflects vagal training.",
+      coherence: "Synchronization of heart rhythm with breathing - reflects vagal training.",
     };
     const CAT_POINTS = { great: 90, good: 75, ok: 55, bad: 38, crash: 18, concerning: 18, warning: 72 };
 
     function breathingSummary(r, body) {
-      const s = r.scores || computeScores(r);
+      const s = computeScores(r);
       const n = (k) => { const x = parseFloat(r[k]); return isNaN(x) ? null : x; };
       const vlf = n("vlowPower"), lf = n("lowPower"), hf = n("highPower");
       const total = [vlf, lf, hf].some((v) => v != null) ? [vlf, lf, hf].reduce((a, b) => a + (b || 0), 0) : null;
       const lfhf = lf != null && hf ? lf / hf : null;
-      const sp = (ex, bands) => buildSpark(metricHistory("breathHrv", ex, 30), bands);
+      const sp = (ex, bands) => buildSpark(metricHistory("breathHrv", ex, 15), bands);
       const lfhfEx = (rr) => { const a = parseFloat(rr.lowPower), b = parseFloat(rr.highPower); return (!isNaN(a) && !isNaN(b) && b !== 0) ? a / b : null; };
 
-      // Hero: autonomic composite (0–100) colored by overall rating
+      // Hero: autonomic composite colored by overall rating
       const overall = worstCat([s.rmssd, s.pnn50, s.totalPower].filter(Boolean));
       const verdict = {
-        great: "Strong parasympathetic reserves today — fine for your normal protocol or intervals.",
-        good: "Solid recovery state. Easy-to-normal activity is reasonable.",
+        great: "Strong parasympathetic reserves today. Fine for your normal protocol or intervals.",
+        good: "Solid recovery state. Easy to normal activity is reasonable.",
         ok: "Moderate reserves. Keep it easy and avoid pushing.",
-        bad: "Low reserves — favor rest and gentle activity today.",
-        crash: "Very low reserves — prioritize rest and recovery.",
+        bad: "Low reserves. Favor rest and gentle activity today.",
+        crash: "Very low reserves. Prioritize rest and recovery.",
       };
       const weights = { rmssd: 25, pnn50: 15, totalPower: 15, lfPeak: 20, hfPeak: 15, lfhf: 10 };
       let sum = 0, wsum = 0;
@@ -1775,54 +1792,50 @@
       body.appendChild(heroCard({
         cat: overall,
         label: "Autonomic score",
-        big: wsum ? Math.round(sum / wsum) : "—",
+        big: wsum ? Math.round(sum / wsum) : "-",
         den: wsum ? "/100" : "",
         sub: "Composite of vagal tone, power, and baroreflex position.",
         tip: verdict[overall] || "",
       }));
 
       // Breathing quality
-      const bq = sumCard("Breathing quality");
-      bq.appendChild(metricRow("Coherence", r.coherence, s.coherence, HRV_EXPLAIN.coherence, sp(numEx("coherence"), BANDS.coherence)));
-      if (r.style) bq.appendChild(metricRow("Breathing style", r.style, null, "Intended pace for this reading."));
-      body.appendChild(bq);
+      body.appendChild(sumHeading("Breathing quality"));
+      body.appendChild(metricRow("Coherence", r.coherence, s.coherence, HRV_EXPLAIN.coherence, sp(numEx("coherence"), BANDS.coherence)));
+      if (r.style) body.appendChild(metricRow("Breathing style", r.style, null, "Intended pace for this reading."));
 
       // Power (frequency peaks folded in, below HF power)
-      const pc = sumCard("Power");
+      body.appendChild(sumHeading("Power"));
       if (total) {
         const pct = (x) => Math.round(((x || 0) / total) * 100);
         const bar = el("div.powerbar");
         const seg = (v, color, lab) => { if (v == null) return; const p = pct(v); const d = el("div", { style: `width:${p}%;background:${color}` }); if (p >= 12) d.textContent = `${lab} ${p}%`; bar.appendChild(d); };
         seg(vlf, "#f59e0b", "VLF"); seg(lf, "#6366f1", "LF"); seg(hf, "#22c55e", "HF");
-        pc.appendChild(bar);
-        pc.appendChild(el("div.sum-legend", { text: `VLF ${pct(vlf)}% · LF ${pct(lf)}% · HF ${pct(hf)}%` }));
+        body.appendChild(el("div.metric-card", {}, [bar, el("div.sum-legend", { text: `VLF ${pct(vlf)}% · LF ${pct(lf)}% · HF ${pct(hf)}%` })]));
       }
-      pc.appendChild(metricRow("Total power", total != null ? Math.round(total) : "", s.totalPower, "Total autonomic engagement across all frequencies.", sp((rr) => totalPower(rr), BANDS.totalPower)));
-      pc.appendChild(metricRow("LF/HF ratio", lfhf != null ? lfhf.toFixed(2) : "", s.lfhf, "Sympathetic vs vagal balance. Balanced/low favors flexibility.", sp(lfhfEx, BANDS.lfhf)));
-      pc.appendChild(metricRow("VLF power", r.vlowPower, s.vlf, "Slow regulatory processes & stress load. Elevated = system stress.", sp(numEx("vlowPower"), BANDS.vlf)));
-      pc.appendChild(metricRow("LF power", r.lowPower, null, "Baroreflex band — your training target.", sp(numEx("lowPower"), null)));
-      pc.appendChild(metricRow("HF power", r.highPower, null, "Vagal activity tied to breathing. Higher = better recovery state.", sp(numEx("highPower"), null)));
-      pc.appendChild(metricRow("LF peak", r.lfPeak ? r.lfPeak + " Hz" : "", s.lfPeak,
-        "Baroreflex frequency. Target 0.08–0.10 Hz; shifting toward it is progress.", sp(numEx("lfPeak"), BANDS.lfPeak)));
+      body.appendChild(metricRow("Total power", total != null ? Math.round(total) : "", s.totalPower, "Total autonomic engagement across all frequencies.", sp((rr) => totalPower(rr), BANDS.totalPower)));
+      body.appendChild(metricRow("LF/HF ratio", lfhf != null ? lfhf.toFixed(2) : "", s.lfhf, "Sympathetic vs vagal balance. Balanced or low favors flexibility.", sp(lfhfEx, BANDS.lfhf)));
+      body.appendChild(metricRow("VLF power", r.vlowPower, s.vlf, "Slow regulatory processes and stress load. Elevated means system stress.", sp(numEx("vlowPower"), BANDS.vlf)));
+      body.appendChild(metricRow("LF power", r.lowPower, null, "Baroreflex band, your training target.", sp(numEx("lowPower"), null)));
+      body.appendChild(metricRow("HF power", r.highPower, null, "Vagal activity tied to breathing. Higher means better recovery state.", sp(numEx("highPower"), null)));
+      body.appendChild(metricRow("LF peak", r.lfPeak ? r.lfPeak + " Hz" : "", s.lfPeak,
+        "Baroreflex frequency. Target 0.08 to 0.10 Hz; shifting toward it is progress.", sp(numEx("lfPeak"), BANDS.lfPeak)));
       const e = expectedHf(r.style);
-      pc.appendChild(metricRow("HF peak", r.hfPeak ? r.hfPeak + " Hz" : "", s.hfPeak,
-        e ? `Expected ~${e[0]}–${e[1]} Hz for ${r.style} breathing; large deviation means the pace drifted.` : "Respiratory peak position.", sp(numEx("hfPeak"), null)));
-      body.appendChild(pc);
+      body.appendChild(metricRow("HF peak", r.hfPeak ? r.hfPeak + " Hz" : "", s.hfPeak,
+        e ? `Expected about ${e[0]} to ${e[1]} Hz for ${r.style} breathing; large deviation means the pace drifted.` : "Respiratory peak position.", sp(numEx("hfPeak"), null)));
 
       // Metrics
-      const mc = sumCard("Metrics");
-      mc.appendChild(metricRow("RMSSD", r.rmssd, s.rmssd, HRV_EXPLAIN.rmssd, sp(numEx("rmssd"), BANDS.rmssdS)));
-      mc.appendChild(metricRow("pNN50", r.pnn50 ? r.pnn50 + "%" : "", s.pnn50, HRV_EXPLAIN.pnn50, sp(numEx("pnn50"), BANDS.pnn50)));
-      mc.appendChild(metricRow("SDNN", r.sdnn, s.sdnn, HRV_EXPLAIN.sdnn, sp(numEx("sdnn"), BANDS.sdnn)));
-      mc.appendChild(metricRow("HR", r.hr, s.hr, HRV_EXPLAIN.hr, sp(numEx("hr"), BANDS.hrBreath)));
-      mc.appendChild(metricRow("Mean RR", r.meanRr, s.meanRr, HRV_EXPLAIN.meanRr, sp(numEx("meanRr"), BANDS.rrMode)));
-      mc.appendChild(metricRow("MxDMn", r.mxdmn, s.mxdmn, HRV_EXPLAIN.mxdmn, sp(numEx("mxdmn"), BANDS.mxdmn)));
-      mc.appendChild(metricRow("Mode", r.mode, s.mode, HRV_EXPLAIN.mode, sp(numEx("mode"), BANDS.rrMode)));
-      mc.appendChild(metricRow("AMo50", r.amo50, s.amo50, HRV_EXPLAIN.amo50, sp(numEx("amo50"), BANDS.amo50)));
-      mc.appendChild(metricRow("CV", r.cv, s.cv, HRV_EXPLAIN.cv, sp(numEx("cv"), BANDS.cv)));
-      body.appendChild(mc);
+      body.appendChild(sumHeading("Metrics"));
+      body.appendChild(metricRow("RMSSD", r.rmssd, s.rmssd, HRV_EXPLAIN.rmssd, sp(numEx("rmssd"), BANDS.rmssdS)));
+      body.appendChild(metricRow("pNN50", r.pnn50 ? r.pnn50 + "%" : "", s.pnn50, HRV_EXPLAIN.pnn50, sp(numEx("pnn50"), BANDS.pnn50)));
+      body.appendChild(metricRow("SDNN", r.sdnn, s.sdnn, HRV_EXPLAIN.sdnn, sp(numEx("sdnn"), BANDS.sdnn)));
+      body.appendChild(metricRow("HR", r.hr, s.hr, HRV_EXPLAIN.hr, sp(numEx("hr"), BANDS.hrBreath)));
+      body.appendChild(metricRow("Mean RR", r.meanRr, s.meanRr, HRV_EXPLAIN.meanRr, sp(numEx("meanRr"), BANDS.rrMode)));
+      body.appendChild(metricRow("MxDMn", r.mxdmn, s.mxdmn, HRV_EXPLAIN.mxdmn, sp(numEx("mxdmn"), BANDS.mxdmn)));
+      body.appendChild(metricRow("Mode", r.mode, s.mode, HRV_EXPLAIN.mode, sp(numEx("mode"), BANDS.rrMode)));
+      body.appendChild(metricRow("AMo50", r.amo50, s.amo50, HRV_EXPLAIN.amo50, sp(numEx("amo50"), BANDS.amo50)));
+      body.appendChild(metricRow("CV", r.cv, s.cv, HRV_EXPLAIN.cv, sp(numEx("cv"), BANDS.cv)));
 
-      if (r.note) { const nc = sumCard("Notes"); nc.appendChild(el("div.sum-text", { text: r.note })); body.appendChild(nc); }
+      if (r.note) { body.appendChild(sumHeading("Notes")); body.appendChild(el("div.metric-card", {}, [el("div.sum-text", { text: r.note })])); }
     }
 
     function renderReadings() {
@@ -2026,11 +2039,11 @@
         type: "number",
         inputmode: "decimal",
         value: v ?? "",
-        placeholder: "—",
+        placeholder: "-",
       });
     }
 
-    // Indoor bike — custom form: a conditional section that is either a single
+    // Indoor bike - custom form: a conditional section that is either a single
     // Resistance field or a repeatable list of interval cards, depending on the
     // Interval-training checkbox.
     function bikeForm(existing) {
@@ -2188,7 +2201,7 @@
           if (!def) return;
           const headline = def.summary ? def.summary(a) : summarizeFields(def, a);
           const details = def.detail ? def.detail(a) : detailFields(def, a);
-          const sub = [details, a.note].filter(Boolean).join(" — ");
+          const sub = [details, a.note].filter(Boolean).join(" - ");
           bodyEl.appendChild(
             el("div.row", { onclick: () => activityForm(a.type, a) }, [
               el("span.row-ico", { html: def.icon }),
@@ -2539,7 +2552,7 @@
       const stat = (label, val, sub) =>
         el("div.stat", {}, [
           el("div.stat-label", { text: label }),
-          el("div.stat-value", {}, [val == null ? "—" : String(val), sub ? el("small", { text: " " + sub }) : null]),
+          el("div.stat-value", {}, [val == null ? "-" : String(val), sub ? el("small", { text: " " + sub }) : null]),
         ]);
 
       root.appendChild(
