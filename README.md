@@ -1,14 +1,29 @@
 # Autonomic Journal
 
 A private, offline-first **PWA** for tracking autonomic-nervous-system recovery.
-No backend, no accounts — everything lives in your browser's `localStorage` and
-can be exported/imported as JSON. Installable to your home screen and works fully
-offline.
+**Pure HTML / CSS / JS — no build step, no dependencies, no backend.** Everything
+lives in your browser's `localStorage` and can be exported/imported as JSON.
+Installable to your home screen and works fully offline.
+
+## Run it
+
+It's just static files. Any of these work:
+
+- **GitHub Pages** — Settings → Pages → Build from branch → `main` / `/ (root)`.
+  The app is served from the repo root (`index.html`).
+- **Open locally** — double-click `index.html`. (Note: the offline service
+  worker only activates over `http(s)`, not `file://`, but the app still runs.)
+- **Local server** (enables full PWA/offline testing):
+  ```bash
+  python3 -m http.server 8000   # then open http://localhost:8000
+  ```
+
+Open it on your phone and **Add to Home Screen** to install.
 
 ## Features
 
 - **Journal view** — one day at a time, with `‹ / ›` arrows or a tap-to-open
-  **calendar** (days with data are dotted) to jump around.
+  **calendar** (days with data are dotted) to jump around. Arrow keys work too.
   - **Sleep** — bed time & wake time.
   - **Readings** — HRV, Breathing HRV, and Blood Pressure (systolic / diastolic /
     pulse). Add as many per day as you like, each with a time and optional note.
@@ -23,37 +38,20 @@ offline.
 - **Light & dark mode** (follows your system on first run; toggle any time).
 - **Import / Export** the full JSON dataset from the ☰ menu.
 
-## Run locally
-
-It's plain static files — serve the folder over HTTP (a service worker needs
-`http(s)`, not `file://`):
-
-```bash
-npm start          # python3 -m http.server 8000  ->  http://localhost:8000
-```
-
-Then open it on your phone and **Add to Home Screen** to install.
-
 ## Data
 
 Everything is one JSON blob under the `autonomic.journal.v1` key in
 `localStorage`. **Export regularly** — clearing site data wipes it. Import
 replaces the current dataset (after a confirmation).
 
-## Project layout
+## Files
 
 | File | Purpose |
 | --- | --- |
-| `index.html` | App shell |
+| `index.html` | App shell (at repo root for GitHub Pages) |
 | `styles.css` | Theming + layout |
 | `app.js` | All logic (state, rendering, calendar, analysis) |
 | `sw.js` | Service worker (offline cache) |
 | `manifest.webmanifest` | PWA manifest |
-| `icons/` | App icons + SVG favicon (regenerate with `npm run icons`) |
-| `tools/` | `gen_icons.py` (icon generator), `smoke.mjs` (jsdom tests) |
-
-## Test
-
-```bash
-npm test           # jsdom smoke test of the full render + interaction paths
-```
+| `icons/` | App icons + SVG favicon |
+| `tools/gen_icons.py` | Optional: regenerate the PNG icons (`python3 tools/gen_icons.py`) |
