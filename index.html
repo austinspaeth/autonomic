@@ -96,16 +96,6 @@
   .brand-mark { width: 26px; height: 26px; color: var(--accent); }
   .topbar-actions { display: flex; gap: 6px; }
 
-  .statusline {
-    padding: 0 16px 8px;
-    font-size: 11px;
-    color: var(--text-dim);
-    text-align: right;
-    font-variant-numeric: tabular-nums;
-    min-height: 13px;
-    line-height: 1.3;
-  }
-
   .icon-btn {
     appearance: none;
     border: none;
@@ -247,8 +237,13 @@
   }
 
   /* Sleep row */
-  .sleep-grid { display: flex; gap: 12px; padding-top: 4px; }
-  .sleep-cell { flex: 1 1 0; min-width: 0; }
+  .sleep-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 14px;
+    padding-top: 4px;
+  }
+  .sleep-cell { min-width: 0; }
   .sleep-cell label {
     display: block;
     font-size: 12px;
@@ -257,7 +252,9 @@
     font-weight: 600;
   }
   .sleep-cell input {
+    display: block;
     width: 100%;
+    max-width: 100%;
     min-width: 0;
     background: var(--surface-2);
     border: 1px solid var(--border);
@@ -306,6 +303,8 @@
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22);
   }
   .tab {
+    position: relative;
+    z-index: 1;
     background: transparent;
     border: none;
     color: var(--text-dim);
@@ -319,10 +318,24 @@
     gap: 3px;
     font-family: inherit;
     border-radius: 999px;
-    transition: background 0.15s, color 0.15s;
+    transition: color 0.3s ease;
   }
-  .tab.active { color: var(--text); background: var(--glass-active); }
+  .tab.active { color: var(--text); }
   .tab-ico { width: 22px; height: 22px; display: block; }
+  /* The highlight that slides (liquid, slight bounce) between the two tabs. */
+  .tab-indicator {
+    position: absolute;
+    top: 5px;
+    bottom: 5px;
+    left: 0;
+    width: 0;
+    z-index: 0;
+    background: var(--glass-active);
+    border-radius: 999px;
+    pointer-events: none;
+    transition: left 0.46s cubic-bezier(0.34, 1.25, 0.5, 1),
+                width 0.46s cubic-bezier(0.34, 1.25, 0.5, 1);
+  }
 
   /* ---------- Modal ---------- */
   .modal-overlay {
@@ -350,7 +363,7 @@
     padding: 8px 18px calc(20px + env(safe-area-inset-bottom));
     max-height: 92vh;
     overflow-y: auto;
-    animation: slideup 0.26s cubic-bezier(0.16, 1, 0.3, 1);
+    animation: slideup 0.42s cubic-bezier(0.34, 1.25, 0.5, 1);
   }
   .modal-grip {
     width: 38px;
@@ -512,7 +525,6 @@
           <button id="menuBtn" class="icon-btn" title="Menu" aria-label="Menu">&#9776;</button>
         </div>
       </div>
-      <div id="statusLine" class="statusline"></div>
     </header>
 
     <!-- Journal view -->
@@ -533,6 +545,7 @@
 
     <!-- Floating glass tab bar -->
     <nav class="tabbar">
+      <span class="tab-indicator" aria-hidden="true"></span>
       <button class="tab active" data-view="journal" aria-label="Journal">
         <svg class="tab-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"
              stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -699,7 +712,6 @@
         state.meta = state.meta || {};
         state.meta.lastUpdated = new Date().toISOString();
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-        renderStatus();
       } catch (e) {
         toast("Storage error — data may not be saved");
         console.error(e);
@@ -741,9 +753,9 @@
     function applyTheme() {
       const t = state.settings.theme;
       document.documentElement.setAttribute("data-theme", t);
-      // ︎ forces text (monochrome) presentation so the glyph inherits
-      // currentColor instead of rendering as a colored emoji.
-      $("#themeBtn").textContent = t === "dark" ? "☀︎" : "☾︎";
+      // Plain crescent moon (as before); sun uses the text-presentation
+      // selector (U+FE0E) so it's monochrome, matching the moon's style/size.
+      $("#themeBtn").textContent = t === "dark" ? "☀︎" : "☾";
       const meta = document.querySelector('meta[name="theme-color"]');
       if (meta) meta.setAttribute("content", t === "dark" ? "#000000" : "#e03127");
     }
@@ -753,7 +765,7 @@
       applyTheme();
     }
 
-    /* ---------------- Status line (last updated / last import) ---------------- */
+    // Human-readable timestamp (used in the menu drawer footer).
     function fmtStamp(iso) {
       if (!iso) return "—";
       const d = new Date(iso);
@@ -764,14 +776,6 @@
         hour: "numeric",
         minute: "2-digit",
       });
-    }
-    function renderStatus() {
-      const node = document.getElementById("statusLine");
-      if (!node) return;
-      const m = state.meta || {};
-      const parts = ["Updated " + fmtStamp(m.lastUpdated)];
-      if (m.lastImport && m.lastImport.name) parts.push("Imported: " + m.lastImport.name);
-      node.textContent = parts.join("   ·   ");
     }
 
     /* ---------------- Modal system ---------------- */
@@ -1274,12 +1278,15 @@
           ]);
         body.appendChild(item("⬇", "Export data", "Download everything as JSON", () => { closeModal(); exportData(); }));
         body.appendChild(item("⬆", "Import data", "Replace everything from a JSON file", () => { closeModal(); importData(); }));
-        const days = Object.keys(state.days).length;
+
+        // Footer: last updated + last imported file
+        const m = state.meta || {};
+        const lines = ["Last updated " + fmtStamp(m.lastUpdated)];
+        if (m.lastImport && m.lastImport.name)
+          lines.push("Last import: " + m.lastImport.name + " · " + fmtStamp(m.lastImport.at));
         body.appendChild(
-          el("div", {
-            style: "margin-top:18px;font-size:12.5px;color:var(--text-dim);text-align:center",
-            text: `Autonomic Journal · ${days} day${days === 1 ? "" : "s"} recorded · stored on this device`,
-          })
+          el("div", { style: "margin-top:22px;font-size:12px;color:var(--text-dim);text-align:center;line-height:1.6" },
+            lines.map((t) => el("div", { text: t })))
         );
       });
     }
@@ -1537,6 +1544,20 @@
     }
 
     /* ---------------- View switching ---------------- */
+    // Move the glass highlight to sit behind the active tab. When animate is
+    // false (initial layout / resize) it snaps without the bouncy transition.
+    function positionIndicator(animate = true) {
+      const bar = $(".tabbar");
+      if (!bar) return;
+      const ind = bar.querySelector(".tab-indicator");
+      const active = bar.querySelector(".tab.active");
+      if (!ind || !active) return;
+      if (!animate) ind.style.transition = "none";
+      ind.style.left = active.offsetLeft + "px";
+      ind.style.width = active.offsetWidth + "px";
+      if (!animate) { void ind.offsetWidth; ind.style.transition = ""; }
+    }
+
     function switchView(name) {
       const journal = name === "journal";
       $("#journalView").classList.toggle("hidden", !journal);
@@ -1544,13 +1565,13 @@
       document.querySelectorAll(".tab").forEach((t) =>
         t.classList.toggle("active", t.dataset.view === name)
       );
+      positionIndicator();
       if (!journal) renderAnalysis();
     }
 
     /* ---------------- Wire up ---------------- */
     function init() {
       applyTheme();
-      renderStatus();
       renderDate();
       renderDay();
 
@@ -1562,6 +1583,11 @@
       document.querySelectorAll(".tab").forEach((t) =>
         t.addEventListener("click", () => switchView(t.dataset.view))
       );
+
+      // Place the sliding tab highlight once layout is ready, and keep it
+      // aligned on resize.
+      requestAnimationFrame(() => positionIndicator(false));
+      window.addEventListener("resize", () => positionIndicator(false));
 
       // keyboard: left/right arrows change day
       document.addEventListener("keydown", (e) => {
