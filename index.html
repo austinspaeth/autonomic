@@ -1551,7 +1551,7 @@
     function metricRow(label, value, cat, explain, spark) {
       return el("div.metric-card", {}, [
         el("div.metric-head", {}, [
-          scoreDot(cat),
+          cat === false ? null : scoreDot(cat),
           el("span.metric-name", { text: label }),
           el("span.metric-val", { text: value == null || value === "" ? "-" : String(value) }),
         ]),
@@ -1585,6 +1585,12 @@
       mxdmn: [{ max: 0.12, cat: "crash" }, { max: 0.18, cat: "bad" }, { max: 0.25, cat: "ok" }, { max: 0.35, cat: "good" }, { max: Infinity, cat: "great" }],
       amo50: [{ max: 30, cat: "great" }, { max: 40, cat: "good" }, { max: 50, cat: "ok" }, { max: 60, cat: "bad" }, { max: Infinity, cat: "concerning" }],
       cv: [{ max: 3, cat: "crash" }, { max: 4.5, cat: "bad" }, { max: 5.5, cat: "ok" }, { max: 7, cat: "good" }, { max: Infinity, cat: "great" }],
+      map: [{ max: 65, cat: "concerning" }, { max: 70, cat: "bad" }, { max: 75, cat: "ok" }, { max: 80, cat: "good" }, { max: 96, cat: "great" }, { max: 101, cat: "good" }, { max: 106, cat: "ok" }, { max: 116, cat: "bad" }, { max: Infinity, cat: "concerning" }],
+      pp: [{ max: 20, cat: "concerning" }, { max: 25, cat: "bad" }, { max: 30, cat: "ok" }, { max: 35, cat: "good" }, { max: 51, cat: "great" }, { max: 56, cat: "good" }, { max: 61, cat: "ok" }, { max: 71, cat: "bad" }, { max: Infinity, cat: "concerning" }],
+      kerdo: [{ max: -45, cat: "concerning" }, { max: -30, cat: "bad" }, { max: -20, cat: "ok" }, { max: -10, cat: "good" }, { max: 11, cat: "great" }, { max: 21, cat: "good" }, { max: 31, cat: "ok" }, { max: 46, cat: "bad" }, { max: Infinity, cat: "concerning" }],
+      robinson: [{ max: 71, cat: "great" }, { max: 81, cat: "good" }, { max: 91, cat: "ok" }, { max: 101, cat: "bad" }, { max: Infinity, cat: "concerning" }],
+      kvas: [{ max: 14, cat: "great" }, { max: 17, cat: "good" }, { max: 21, cat: "ok" }, { max: 26, cat: "bad" }, { max: Infinity, cat: "concerning" }],
+      bce: [{ max: 2601, cat: "great" }, { max: 3001, cat: "good" }, { max: 3501, cat: "ok" }, { max: 4001, cat: "bad" }, { max: Infinity, cat: "concerning" }],
     };
     function bandsFor(type, key) {
       const map = {
@@ -1768,6 +1774,7 @@
         body.appendChild(el("h2", { text: def.label }));
         body.appendChild(el("div.sum-meta", { text: r.time ? fmtTime12(r.time) : "" }));
         if (r.type === "breathHrv") breathingSummary(r, body);
+        else if (r.type === "bp") bpSummary(r, body);
         else genericReadingSummary(r, body);
       }, { action: { icon: ICONS.edit, label: "Edit", onclick: () => readingForm(r.type, r) } });
     }
@@ -1837,10 +1844,12 @@
         tip: verdict[overall] || "",
       }));
 
-      // Breathing quality
-      const bq = sumCard("Breathing quality");
-      bq.appendChild(metricRow("Coherence", r.coherence, s.coherence, HRV_EXPLAIN.coherence));
-      if (r.style) bq.appendChild(metricRow("Breathing style", r.style, null, "Intended pace for this reading."));
+      // Details
+      const bq = sumCard("Details");
+      bq.appendChild(metricRow("Coherence", r.coherence, false, HRV_EXPLAIN.coherence));
+      if (r.style) bq.appendChild(metricRow("Breathing style", r.style, false, "Intended pace for this reading."));
+      if (r.period) bq.appendChild(metricRow("Reading type", r.period, false));
+      bq.appendChild(metricRow("Swallowing", r.swallowing ? "Yes" : "No", false));
       body.appendChild(bq);
 
       // Power (frequency peaks folded in, below HF power)
@@ -1876,6 +1885,59 @@
       mc.appendChild(metricRow("AMo50", r.amo50, s.amo50, HRV_EXPLAIN.amo50, sp(numEx("amo50"), BANDS.amo50)));
       mc.appendChild(metricRow("CV", r.cv, s.cv, HRV_EXPLAIN.cv, sp(numEx("cv"), BANDS.cv)));
       body.appendChild(mc);
+
+      if (r.note) { const nc = sumCard("Notes"); nc.appendChild(el("div.metric-card", {}, [el("div.sum-text", { text: r.note })])); body.appendChild(nc); }
+    }
+
+    // Derived blood-pressure metrics (from systolic, diastolic, pulse).
+    const bpMap = (rr) => { const s = +rr.sys, d = +rr.dia; return (!isNaN(s) && !isNaN(d)) ? (s + 2 * d) / 3 : null; };
+    const bpPP = (rr) => { const s = +rr.sys, d = +rr.dia; return (!isNaN(s) && !isNaN(d)) ? s - d : null; };
+    const bpKerdo = (rr) => { const d = +rr.dia, p = +rr.pulse; return (!isNaN(d) && !isNaN(p) && p) ? (1 - d / p) * 100 : null; };
+    const bpRobinson = (rr) => { const s = +rr.sys, p = +rr.pulse; return (!isNaN(s) && !isNaN(p)) ? (s * p) / 100 : null; };
+    const bpKvas = (rr) => { const s = +rr.sys, d = +rr.dia, p = +rr.pulse; const pp = s - d; return (!isNaN(p) && pp > 0) ? (10 * p) / pp : null; };
+    const bpBce = (rr) => { const s = +rr.sys, d = +rr.dia, p = +rr.pulse; return (!isNaN(s) && !isNaN(d) && !isNaN(p)) ? (s - d) * p : null; };
+
+    function bpSummary(r, body) {
+      const s = computeScores(r);
+      const cat = rowScoreCategory(r);
+      const verdict = {
+        great: "Pressure is in a healthy range.",
+        good: "Pressure is reasonable today.",
+        ok: "Slightly outside your ideal range; keep an eye on it.",
+        bad: "Out of range; note context like salt, fluids, meds, or stress.",
+        concerning: "Well outside range; consider rechecking and noting context.",
+      };
+      body.appendChild(heroCard({
+        cat, label: "Blood pressure",
+        big: r.sys || r.dia ? `${r.sys || "-"}/${r.dia || "-"}` : "",
+        sub: "Systolic / diastolic", tip: verdict[cat] || "",
+      }));
+
+      // value + grade + spark for a derived metric
+      const stat = (label, ex, bands, explain) => {
+        const v = ex(r);
+        const c = (v != null && bands) ? catFromBands(v, bands) : null;
+        return metricRow(label, v != null ? fmtNum(v) : "", c, explain, buildSpark(metricHistory("bp", ex), bands));
+      };
+
+      const det = sumCard("Details");
+      det.appendChild(metricRow("Systolic", r.sys, s.sys, "Peak arterial pressure during a heartbeat.", buildSpark(metricHistory("bp", numEx("sys")), BANDS.sys)));
+      det.appendChild(metricRow("Diastolic", r.dia, s.dia, "Arterial pressure between beats.", buildSpark(metricHistory("bp", numEx("dia")), BANDS.dia)));
+      det.appendChild(metricRow("Pulse", r.pulse, false, "Heart rate at the time of the reading.", buildSpark(metricHistory("bp", numEx("pulse")), null)));
+      if (r.period) det.appendChild(metricRow("Reading type", r.period, false));
+      body.appendChild(det);
+
+      const ps = sumCard("Pressure statistics");
+      ps.appendChild(stat("Mean arterial pressure", bpMap, BANDS.map, "Average pressure perfusing your organs and brain. Low MAP drives lightheadedness and poor cerebral perfusion in dysautonomia; very high strains the system."));
+      ps.appendChild(stat("Pulse pressure", bpPP, BANDS.pp, "Gap between systolic and diastolic. Low (under 30) suggests low stroke volume or dehydration; high (over 60) suggests arterial stiffness."));
+      body.appendChild(ps);
+
+      const ix = sumCard("Indexes");
+      ix.appendChild(stat("Kerdo index", bpKerdo, BANDS.kerdo, "Autonomic balance from pulse and diastolic. Positive means sympathetic dominance, negative means parasympathetic; near zero is balanced."));
+      ix.appendChild(stat("Robinson index", bpRobinson, BANDS.robinson, "Double product (systolic x pulse / 100): myocardial oxygen demand and cardiac workload at rest. Lower is more efficient."));
+      ix.appendChild(stat("BCE index", bpBce, BANDS.bce, "Blood-circulation economy (pulse pressure x pulse). Higher values mean a less economical, more strained circulation."));
+      ix.appendChild(stat("Kvas coefficient", bpKvas, BANDS.kvas, "Coefficient of endurance (10 x pulse / pulse pressure). Around 16 is typical; higher suggests cardiovascular fatigue, lower suggests stronger conditioning."));
+      body.appendChild(ix);
 
       if (r.note) { const nc = sumCard("Notes"); nc.appendChild(el("div.metric-card", {}, [el("div.sum-text", { text: r.note })])); body.appendChild(nc); }
     }
