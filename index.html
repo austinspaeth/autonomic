@@ -201,7 +201,8 @@
   .row-main { flex: 1; min-width: 0; }
   .row-title { font-size: 15px; }
   .row-sub { font-size: 12.5px; color: var(--text-dim); margin-top: 1px; }
-  .row-val { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .row-val { font-variant-numeric: tabular-nums; font-weight: 600; display: inline-flex; align-items: center; }
+  .score-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; margin-right: 7px; }
   .ecg-badge {
     width: 24px; height: 24px; border-radius: 50%;
     display: inline-flex; align-items: center; justify-content: center;
@@ -1347,10 +1348,105 @@
       return parts.join(" · ");
     }
 
+    /* ---------------- Scoring ----------------
+       Each metric is categorized great/good/ok/bad/crash|concerning (plus a
+       "warning" blue zone for readiness). computeScores(r) stores r.scores on
+       save; the summary value is tinted by its category. Thresholds come from
+       the personalized framework in the project notes. */
+    const SCORE_COLORS = {
+      great: "#38bdf8", good: "#4ade80", ok: "#eab308",
+      bad: "#f97316", crash: "#ef4444", concerning: "#ef4444", warning: "#a78bfa",
+    };
+    const SCORE_RANK = { great: 0, good: 1, ok: 2, warning: 2, bad: 3, crash: 4, concerning: 4 };
+    const worstCat = (cats) => {
+      let w = null, wr = -1;
+      cats.forEach((c) => { const r = SCORE_RANK[c]; if (r != null && r > wr) { wr = r; w = c; } });
+      return w;
+    };
+    const numOr = (v) => { const n = parseFloat(v); return isNaN(n) ? null : n; };
+
+    // higher-is-better metrics (terminal category = crash)
+    const sRMSSDu = (v) => { v = numOr(v); return v == null ? null : v >= 34 ? "great" : v >= 27 ? "good" : v >= 22 ? "ok" : v >= 17 ? "bad" : "crash"; };
+    const sRMSSDs = (v) => { v = numOr(v); return v == null ? null : v >= 32 ? "great" : v >= 27 ? "good" : v >= 22 ? "ok" : v >= 17 ? "bad" : "crash"; };
+    const sPNN50 = (v) => { v = numOr(v); return v == null ? null : v >= 10 ? "great" : v >= 7 ? "good" : v >= 4 ? "ok" : v >= 2 ? "bad" : "crash"; };
+    const sSDNN = (v) => { v = numOr(v); return v == null ? null : v >= 60 ? "great" : v >= 50 ? "good" : v >= 40 ? "ok" : v >= 30 ? "bad" : "crash"; };
+    const sTotalPower = (v) => { v = numOr(v); return v == null ? null : v >= 3500 ? "great" : v >= 2200 ? "good" : v >= 1500 ? "ok" : v >= 800 ? "bad" : "crash"; };
+    const sVLF = (v) => { v = numOr(v); return v == null ? null : v < 200 ? "great" : v <= 450 ? "good" : v <= 700 ? "ok" : v <= 1000 ? "bad" : "crash"; }; // lower better
+    const sReadiness = (v) => { v = numOr(v); if (v == null) return null; if (v >= 86) return "warning"; return v >= 70 ? "great" : v >= 60 ? "good" : v >= 50 ? "ok" : v >= 35 ? "bad" : "crash"; };
+    const sSpo2 = (v) => { v = numOr(v); return v == null ? null : v >= 98 ? "great" : v >= 96 ? "good" : v >= 94 ? "ok" : v >= 92 ? "bad" : "concerning"; };
+    const sRestingHr = (v, pos) => {
+      v = numOr(v); if (v == null) return null;
+      const lying = !pos || /lay/i.test(pos);
+      return lying
+        ? (v <= 62 ? "great" : v <= 68 ? "good" : v <= 75 ? "ok" : v <= 85 ? "bad" : "concerning")
+        : (v <= 68 ? "great" : v <= 78 ? "good" : v <= 88 ? "ok" : v <= 98 ? "bad" : "concerning");
+    };
+    const sQTc = (v) => { v = numOr(v); if (v == null) return null; if (v < 350 || v > 470) return "concerning"; if (v < 380) return "ok"; if (v <= 420) return "great"; if (v <= 440) return "good"; if (v <= 450) return "ok"; return "bad"; };
+    const sQRS = (v) => { v = numOr(v); if (v == null) return null; if (v > 130) return "concerning"; if (v >= 121) return "bad"; if (v >= 111) return "ok"; if (v >= 91) return "good"; return "great"; };
+    const sPR = (v) => { v = numOr(v); if (v == null) return null; if (v < 100 || v > 240) return "concerning"; if (v < 110 || v >= 221) return "bad"; if (v < 120 || v >= 201) return "ok"; if (v < 140 || v >= 181) return "good"; return "great"; };
+    const sEctopic = (v) => { v = numOr(v); return v == null ? null : v === 0 ? "great" : v <= 2 ? "good" : v <= 5 ? "ok" : v <= 15 ? "bad" : "concerning"; };
+    const sRhythm = (r) => (r.svt ? "concerning" : r.otherArrhythmia ? "bad" : r.sinus ? "great" : null);
+    const sSys = (s) => { s = numOr(s); if (s == null) return null; if (s >= 150) return "concerning"; if (s >= 136) return "bad"; if (s >= 129) return "ok"; if (s >= 119) return "good"; if (s >= 108) return "great"; if (s >= 100) return "ok"; return "bad"; };
+    const sDia = (d) => { d = numOr(d); if (d == null) return null; if (d >= 95) return "concerning"; if (d >= 88) return "bad"; if (d >= 83) return "ok"; if (d >= 79) return "good"; if (d >= 65) return "great"; if (d >= 60) return "ok"; return "bad"; };
+    const sBP = (sys, dia) => { const a = sSys(sys), b = sDia(dia); return a || b ? worstCat([a, b].filter(Boolean)) : null; };
+    const totalPower = (r) => {
+      const a = ["vlowPower", "lowPower", "highPower"].map((k) => parseFloat(r[k])).filter((n) => !isNaN(n));
+      return a.length ? a.reduce((x, y) => x + y, 0) : null;
+    };
+
+    function computeScores(r) {
+      const s = {};
+      const put = (k, c) => { if (c) s[k] = c; };
+      switch (r.type) {
+        case "hrv":
+          put("readiness", sReadiness(r.readiness));
+          put("rmssd", sRMSSDu(r.rmssd));
+          put("sdnn", sSDNN(r.sdnn));
+          break;
+        case "breathHrv":
+          put("sdnn", sSDNN(r.sdnn));
+          put("rmssd", sRMSSDs(r.rmssd));
+          put("pnn50", sPNN50(r.pnn50));
+          put("totalPower", sTotalPower(totalPower(r)));
+          put("vlf", sVLF(r.vlowPower));
+          break;
+        case "bp": put("bp", sBP(r.sys, r.dia)); break;
+        case "bloodO2": put("value", sSpo2(r.value)); break;
+        case "restingHr": put("hr", sRestingHr(r.hr, r.position)); break;
+        case "ecg":
+          put("qtc", sQTc(r.qtc));
+          put("qrs", sQRS(r.qrs));
+          put("pr", sPR(r.pr));
+          put("ectopic", sEctopic(r.ectopic));
+          put("rhythm", sRhythm(r));
+          put("overall", worstCat(Object.values(s)));
+          break;
+      }
+      return s;
+    }
+
+    // Category used to tint the single value shown on a reading row.
+    function rowScoreCategory(r) {
+      const s = r.scores || computeScores(r);
+      switch (r.type) {
+        case "hrv": return s.readiness;
+        case "breathHrv": return s.sdnn;
+        case "bp": return s.bp;
+        case "bloodO2": return s.value;
+        case "restingHr": return s.hr;
+        case "ecg": return s.overall;
+        default: return null;
+      }
+    }
+
     // Simplified value shown on the right of a reading row (one thing per type).
     function ecgBadge(r) {
-      const bad = !!(r.svt || r.otherArrhythmia);
-      return el("span.ecg-badge" + (bad ? ".bad" : ".good"), { html: bad ? ICONS.x : ICONS.check });
+      const s = r.scores || computeScores(r);
+      const cat = s.overall || (r.svt || r.otherArrhythmia ? "concerning" : "great");
+      const bad = SCORE_RANK[cat] >= 3;
+      const badge = el("span.ecg-badge", { html: bad ? ICONS.x : ICONS.check });
+      badge.style.background = SCORE_COLORS[cat] || "#16a34a";
+      return badge;
     }
     function readingRowValue(r) {
       switch (r.type) {
@@ -1381,11 +1477,23 @@
         list.forEach((r) => {
           const def = READING_TYPES[r.type];
           const val = readingRowValue(r);
+          const cat = rowScoreCategory(r);
+          const valEl = el("div.row-val");
+          if (typeof val === "string") {
+            if (val && cat && SCORE_COLORS[cat]) {
+              const dot = el("span.score-dot");
+              dot.style.background = SCORE_COLORS[cat];
+              valEl.appendChild(dot);
+            }
+            valEl.appendChild(document.createTextNode(val));
+          } else {
+            valEl.appendChild(val); // ECG badge (already colored)
+          }
           bodyEl.appendChild(
             el("div.row", { onclick: () => readingForm(r.type, r) }, [
               el("span.row-ico", { html: def.icon }),
               el("div.row-main", {}, [el("div.row-title", { text: def.label })]),
-              el("div.row-val", {}, [typeof val === "string" ? document.createTextNode(val) : val]),
+              valEl,
               r.time ? el("span.pill", { text: fmtTime12(r.time) }) : null,
             ])
           );
@@ -1523,6 +1631,7 @@
                   if (f.type === "check") r[f.key] = inputs[f.key].checked;
                   else r[f.key] = String(inputs[f.key].value).trim();
                 });
+                r.scores = computeScores(r); // store category scores with the entry
                 const d = day(currentKey, true);
                 const i = d[arrKey].findIndex((x) => x.id === r.id);
                 if (i >= 0) d[arrKey][i] = r;
@@ -1843,6 +1952,7 @@
       let view = dateFromKey(currentKey);
       view.setDate(1);
       openModal((body) => {
+        body.appendChild(el("h2", { text: "Select date" }));
         const wrap = el("div");
         body.appendChild(wrap);
         const draw = () => {
