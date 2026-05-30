@@ -1473,6 +1473,7 @@
           put("hfPeak", sHfPeak(r.hfPeak, r.style));
           const lf = parseFloat(r.lowPower), hf = parseFloat(r.highPower);
           if (!isNaN(lf) && !isNaN(hf) && hf !== 0) put("lfhf", sLfHf(lf / hf));
+          put("overall", worstCat([s.rmssd, s.pnn50, s.totalPower].filter(Boolean)));
           break;
         }
         case "bp": put("sys", sSys(r.sys)); put("dia", sDia(r.dia)); put("bp", sBP(r.sys, r.dia)); break;
@@ -1495,7 +1496,7 @@
       const s = r.scores || computeScores(r);
       switch (r.type) {
         case "hrv": return s.readiness;
-        case "breathHrv": return s.sdnn;
+        case "breathHrv": return s.overall || s.sdnn;
         case "bp": return s.bp;
         case "bloodO2": return s.value;
         case "restingHr": return s.hr;
