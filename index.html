@@ -196,6 +196,14 @@
   .row-title { font-size: 15px; }
   .row-sub { font-size: 12.5px; color: var(--text-dim); margin-top: 1px; }
   .row-val { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .ecg-badge {
+    width: 24px; height: 24px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: #fff;
+  }
+  .ecg-badge.good { background: #16a34a; }
+  .ecg-badge.bad { background: #d63b3b; }
+  .ecg-badge svg { width: 15px; height: 15px; }
 
   .muted { color: var(--text-dim); font-size: 14px; padding: 6px 0; }
 
@@ -742,6 +750,15 @@
       const d = new Date();
       return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
     };
+    // "13:30" -> "1:30pm" for display (stored value stays 24h).
+    const fmtTime12 = (t) => {
+      const m = /^(\d{1,2}):(\d{2})/.exec(t || "");
+      if (!m) return t || "";
+      let h = +m[1];
+      const ap = h >= 12 ? "pm" : "am";
+      h = h % 12 || 12;
+      return `${h}:${m[2]}${ap}`;
+    };
 
     const fmtDateLong = (k) => {
       const d = dateFromKey(k);
@@ -813,6 +830,7 @@
       download: svgIcon('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/>'),
       upload: svgIcon('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/>'),
       x: svgIcon('<path d="M18 6 6 18"/><path d="m6 6 12 12"/>'),
+      check: svgIcon('<path d="M20 6 9 17l-5-5"/>'),
       bike: svgIcon('<circle cx="18.5" cy="17.5" r="3.5"/><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="15" cy="5" r="1"/><path d="M12 17.5V14l-3-3 4-3 2 3h2"/>'),
       footprints: svgIcon('<path d="M4 16v-2.4C4 11.5 3 10.5 3 8c0-2.7 1.5-6 4.5-6C9.4 2 10 3.8 10 5.5c0 3.1-2 5.7-2 8.7V16a2 2 0 1 1-4 0Z"/><path d="M20 20v-2.4c0-2.1 1-3.1 1-5.6 0-2.7-1.5-6-4.5-6C14.6 6 14 7.8 14 9.5c0 3.1 2 5.7 2 8.7V20a2 2 0 1 0 4 0Z"/><path d="M16 17h4"/><path d="M4 13h4"/>'),
       legsUp: svgIcon('<circle cx="12" cy="12" r="9"/><path d="M8 12l4-4 4 4"/><path d="M12 16V8"/>'),
@@ -1220,6 +1238,16 @@
             ]),
           ]),
           quality,
+          el("div.sleep-grid", { style: "margin-top:12px" }, [
+            el("div.sleep-cell", {}, [
+              el("label", { text: "HR low" }),
+              el("input", { type: "number", inputmode: "decimal", value: d.sleep.hrLow || "", onchange: onChange("hrLow") }),
+            ]),
+            el("div.sleep-cell", {}, [
+              el("label", { text: "HR high" }),
+              el("input", { type: "number", inputmode: "decimal", value: d.sleep.hrHigh || "", onchange: onChange("hrHigh") }),
+            ]),
+          ]),
         ])
       );
       return sec;
@@ -1298,20 +1326,20 @@
       return parts.join(" · ");
     }
 
-    // Headline value shown on the right of a reading row.
-    function readingSummary(r) {
-      const def = READING_TYPES[r.type];
-      if (r.type === "bp") {
-        let s = `${r.sys}/${r.dia}`;
-        if (r.pulse) s += ` · ${r.pulse} bpm`;
-        return s;
-      }
-      return summarizeFields(def, r) || (r.value != null && r.value !== "" ? String(r.value) : "");
+    // Simplified value shown on the right of a reading row (one thing per type).
+    function ecgBadge(r) {
+      const bad = !!(r.svt || r.otherArrhythmia);
+      return el("span.ecg-badge" + (bad ? ".bad" : ".good"), { html: bad ? ICONS.x : ICONS.check });
     }
-    function readingDetails(r) {
-      const def = READING_TYPES[r.type];
-      if (!def || r.type === "bp") return "";
-      return detailFields(def, r);
+    function readingRowValue(r) {
+      switch (r.type) {
+        case "hrv": return r.readiness ? r.readiness + "%" : "";
+        case "breathHrv": return r.sdnn != null && r.sdnn !== "" ? String(r.sdnn) : "";
+        case "bp": return r.sys || r.dia ? `${r.sys || "–"}/${r.dia || "–"}` : "";
+        case "bloodO2": return r.value ? r.value + "%" : "";
+        case "ecg": return ecgBadge(r);
+        default: return summarizeFields(READING_TYPES[r.type], r);
+      }
     }
 
     function renderReadings() {
@@ -1330,15 +1358,12 @@
         bodyEl.appendChild(el("div.muted", { text: "No readings yet." }));
       } else {
         list.forEach((r) => {
-          const sub = [readingDetails(r), r.note].filter(Boolean).join(" — ");
+          const val = readingRowValue(r);
           bodyEl.appendChild(
             el("div.row", { onclick: () => readingForm(r.type, r) }, [
-              el("div.row-main", {}, [
-                el("div.row-title", { text: READING_TYPES[r.type].label }),
-                sub ? el("div.row-sub", { text: sub }) : null,
-              ]),
-              el("div.row-val", { text: readingSummary(r) }),
-              r.time ? el("span.pill", { text: r.time }) : null,
+              el("div.row-main", {}, [el("div.row-title", { text: READING_TYPES[r.type].label })]),
+              el("div.row-val", {}, [typeof val === "string" ? document.createTextNode(val) : val]),
+              r.time ? el("span.pill", { text: fmtTime12(r.time) }) : null,
             ])
           );
         });
@@ -1669,7 +1694,7 @@
                 sub ? el("div.row-sub", { text: sub }) : null,
               ]),
               el("div.row-val", { text: headline }),
-              a.time ? el("span.pill", { text: a.time }) : null,
+              a.time ? el("span.pill", { text: fmtTime12(a.time) }) : null,
             ])
           );
         });
@@ -1746,7 +1771,7 @@
       const sub = [];
       if (on && rec.value) sub.push(rec.value);
       if (on && rec.dose) sub.push(rec.dose);
-      if (on && rec.time) sub.push(rec.time);
+      if (on && rec.time) sub.push(fmtTime12(rec.time));
       return el("div.row", {}, [
         check,
         el("div.row-main", { onclick: () => toggleCatalog(category, it) }, [
