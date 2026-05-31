@@ -5198,7 +5198,7 @@
       // bottom edge of the card (the card clips it to its rounded corners).
       const pct = total ? Math.round((done / total) * 100) : 0;
       const header = acCard("Milestone Tracker", `${done} of ${total} achieved · progress beyond daily metrics`, [
-        el("div.ms-progress", { style: "position:absolute;left:0;right:0;bottom:0;height:4px;background:var(--surface-2)" }, [
+        el("div.ms-progress", { style: "height:4px;border-radius:999px;background:var(--surface-2);overflow:hidden;margin-top:14px" }, [
           el("i", { style: `display:block;height:100%;background:var(--accent);width:${pct}%` }),
         ]),
       ]);
