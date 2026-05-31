@@ -119,6 +119,9 @@
   .icon-btn:active { background: var(--surface-2); }
   /* The text-presentation sun glyph renders small; bump it to match the moon. */
   .icon-btn.is-sun { font-size: 34px; }
+  /* Header caution icon — only shown when there are active watch flags. */
+  .flags-btn { color: #f59e0b; }
+  .flags-btn svg { width: 22px; height: 22px; }
 
   /* ---------- Date bar ---------- */
   .datebar {
@@ -1060,6 +1063,7 @@
           <span>Autonomic</span>
         </h1>
         <div class="topbar-actions">
+          <button id="flagsBtn" class="icon-btn flags-btn hidden" title="Active watch flags" aria-label="Active watch flags"></button>
           <button id="themeBtn" class="icon-btn" title="Toggle light / dark" aria-label="Toggle theme"></button>
           <button id="menuBtn" class="icon-btn" title="Menu" aria-label="Menu">&#9776;</button>
         </div>
@@ -5308,6 +5312,31 @@
         wrap.appendChild(acCard(g.title, `${gdone} of ${g.items.length} achieved`, [list]));
       });
       return wrap;
+    }
+
+    // Active watch flags surface in the header (gold caution icon) rather than
+    // in the milestones view. The icon only appears when flags are active and
+    // opens a drawer listing them.
+    function activeFlags() {
+      const md = acMilestoneDays();
+      if (!md || !md.keys.length) return [];
+      return acRegressionWarnings(md);
+    }
+    function renderHeaderFlags() {
+      const btn = $("#flagsBtn");
+      if (!btn) return;
+      const flags = activeFlags();
+      if (!flags.length) { btn.classList.add("hidden"); btn.onclick = null; return; }
+      btn.innerHTML = ICONS.triangle;
+      btn.classList.remove("hidden");
+      btn.onclick = () => openFlagsDrawer(flags);
+    }
+    function openFlagsDrawer(flags) {
+      openModal((body) => {
+        body.appendChild(el("h2", { text: "Active watch flags" }));
+        body.appendChild(el("div.sum-meta", { text: `${flags.length} ${flags.length === 1 ? "flag needs" : "flags need"} attention` }));
+        flags.forEach((w) => body.appendChild(acInsight(w, "mod")));
+      });
     }
 
     function renderMilestones() {
