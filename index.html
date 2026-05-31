@@ -424,6 +424,7 @@
     border-radius: 999px;
     padding: 4px;
     margin-top: 12px;
+    margin-bottom: var(--gap);
   }
   .seg-pill {
     position: absolute;
@@ -546,7 +547,7 @@
     max-width: var(--maxw);
     height: 90vh;
     height: 90dvh;
-    border-radius: 18px 18px 0 0;
+    border-radius: 18px;
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -2623,7 +2624,10 @@
     function segmented(opts, value, onChange) {
       const n = opts.length;
       const wrap = el("div.segmented", { style: `grid-template-columns: repeat(${n}, 1fr)` });
-      const pill = el("span.seg-pill", { style: `width: calc(${100 / n}% - 4px)` });
+      // Pill width = one option column exactly ((track area − padding) / n), so
+      // translateX(idx*100%) lands it dead-center under each option for any n.
+      // (The old `100/n% - 4px` only aligned at n=2.)
+      const pill = el("span.seg-pill", { style: `width: calc((100% - 8px) / ${n})` });
       wrap.appendChild(pill);
       const buttons = [];
       const setActive = (val) => {
