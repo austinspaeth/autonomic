@@ -1579,6 +1579,15 @@
       ]),
       headache: symptom("Headache"),
       earRinging: symptom("Ear ringing"),
+      nerve: symptom("Nerve issues", [
+        { type: "select", key: "sensation", label: "Sensation", options: ["Pain", "Tingles", "Asleep"] },
+        { type: "select", key: "area", label: "Area of body", options: ["Face", "Head", "Neck", "Chest", "Shoulders", "Arms", "Legs"] },
+      ]),
+      twitching: symptom("Twitching", [
+        { type: "select", key: "area", label: "Area of body", options: ["Face", "Head", "Neck", "Chest", "Shoulders", "Arms", "Legs"] },
+        { type: "select", key: "severity", label: "Severity", options: ["Minor", "Severe"] },
+        { type: "number", key: "duration", label: "Duration", unit: "min" },
+      ]),
       sick: { label: "Sick", icon: ICONS.alert, fields: [], noTime: true },
     };
 
