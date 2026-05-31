@@ -3060,7 +3060,26 @@
       const def = READING_TYPES[r.type];
       const s = computeScores(r);
       const rv = readingRowValue(r);
-      body.appendChild(heroCard({ cat: rowScoreCategory(r), big: typeof rv === "string" ? rv : "", label: "Result" }));
+      if (r.type === "weight") {
+        const bmi = bmiFor(r.weight);
+        const z = bmi != null ? bmiZone(bmi) : null;
+        const verdict = {
+          Underweight: "Below the healthy BMI range.",
+          Healthy: "Weight is in the healthy BMI range.",
+          Overweight: "Above the healthy BMI range.",
+          Obese: "Well above the healthy BMI range.",
+        };
+        body.appendChild(heroCard({
+          cat: rowScoreCategory(r),
+          label: "Weight",
+          big: (r.weight != null && r.weight !== "") ? r.weight : "",
+          den: "lbs",
+          sub: z ? `BMI ${bmi.toFixed(1)} · ${z.zone}` : "Set your height in Profile for BMI",
+          tip: z ? (verdict[z.zone] || "") : "",
+        }));
+      } else {
+        body.appendChild(heroCard({ cat: rowScoreCategory(r), big: typeof rv === "string" ? rv : "", label: "Result" }));
+      }
       const card = sumCard("Details");
       entryFields(def).forEach((f) => {
         if (isDivider(f) || f.type === "time") return;
@@ -5017,38 +5036,40 @@
 
     function buildMilestoneGroups(md) {
       const first = (p) => () => msFirst(md, p), consec = (p, n) => () => msConsec(md, p, n);
+      // Like `first`, but also surfaces the metric value on the achievement day.
+      const firstV = (key, p) => () => { const dk = msFirst(md, p); return dk ? { date: dk, value: md.map[dk][key] } : null; };
       const defs = [
         ["HRV · RMSSD", [
-          ["First RMSSD 25+ (recovery threshold)", first((d) => d.rmssd != null && d.rmssd >= 25)],
-          ["First RMSSD 30+ (baseline recovery)", first((d) => d.rmssd != null && d.rmssd >= 30)],
-          ["First RMSSD 35+ (pre-illness territory)", first((d) => d.rmssd != null && d.rmssd >= 35)],
-          ["First RMSSD 40+ (exceptional)", first((d) => d.rmssd != null && d.rmssd >= 40)],
-          ["First RMSSD 50+ (elite)", first((d) => d.rmssd != null && d.rmssd >= 50)],
+          ["First RMSSD 25+ (recovery threshold)", firstV("rmssd", (d) => d.rmssd != null && d.rmssd >= 25)],
+          ["First RMSSD 30+ (baseline recovery)", firstV("rmssd", (d) => d.rmssd != null && d.rmssd >= 30)],
+          ["First RMSSD 35+ (pre-illness territory)", firstV("rmssd", (d) => d.rmssd != null && d.rmssd >= 35)],
+          ["First RMSSD 40+ (exceptional)", firstV("rmssd", (d) => d.rmssd != null && d.rmssd >= 40)],
+          ["First RMSSD 50+ (elite)", firstV("rmssd", (d) => d.rmssd != null && d.rmssd >= 50)],
           ["3 consecutive days RMSSD 30+", consec((d) => d.rmssd != null && d.rmssd >= 30, 3)],
           ["7 consecutive days RMSSD 30+", consec((d) => d.rmssd != null && d.rmssd >= 30, 7)],
           ["30-day average RMSSD 30+", () => msRollAvg(md, (d) => d.rmssd, 30, 30, "up")],
         ]],
         ["HRV · pNN50", [
-          ["First pNN50 7%+", first((d) => d.pnn50 != null && d.pnn50 >= 7)],
-          ["First pNN50 10%+", first((d) => d.pnn50 != null && d.pnn50 >= 10)],
-          ["First pNN50 15%+", first((d) => d.pnn50 != null && d.pnn50 >= 15)],
+          ["First pNN50 7%+", firstV("pnn50", (d) => d.pnn50 != null && d.pnn50 >= 7)],
+          ["First pNN50 10%+", firstV("pnn50", (d) => d.pnn50 != null && d.pnn50 >= 10)],
+          ["First pNN50 15%+", firstV("pnn50", (d) => d.pnn50 != null && d.pnn50 >= 15)],
           ["7 consecutive days pNN50 7%+", consec((d) => d.pnn50 != null && d.pnn50 >= 7, 7)],
           ["30-day average pNN50 7%+", () => msRollAvg(md, (d) => d.pnn50, 30, 7, "up")],
         ]],
         ["HRV · Power", [
-          ["First Total Power 2500+", first((d) => d.totalPower != null && d.totalPower >= 2500)],
-          ["First Total Power 3500+", first((d) => d.totalPower != null && d.totalPower >= 3500)],
-          ["First Total Power 5000+", first((d) => d.totalPower != null && d.totalPower >= 5000)],
+          ["First Total Power 2500+", firstV("totalPower", (d) => d.totalPower != null && d.totalPower >= 2500)],
+          ["First Total Power 3500+", firstV("totalPower", (d) => d.totalPower != null && d.totalPower >= 3500)],
+          ["First Total Power 5000+", firstV("totalPower", (d) => d.totalPower != null && d.totalPower >= 5000)],
           ["7 consecutive days Total Power 3000+", consec((d) => d.totalPower != null && d.totalPower >= 3000, 7)],
-          ["First VLF under 300 (low stress)", first((d) => d.vlf != null && d.vlf < 300)],
-          ["First VLF under 200 (excellent)", first((d) => d.vlf != null && d.vlf < 200)],
+          ["First VLF under 300 (low stress)", firstV("vlf", (d) => d.vlf != null && d.vlf < 300)],
+          ["First VLF under 200 (excellent)", firstV("vlf", (d) => d.vlf != null && d.vlf < 200)],
           ["7-day average VLF under 400", () => msRollAvg(md, (d) => d.vlf, 7, 400, "down")],
         ]],
         ["HRV · LF peak frequency", [
-          ["First LF peak at 0.075 Hz", first((d) => d.lfPeak != null && d.lfPeak >= 0.075)],
-          ["First LF peak at 0.082 Hz", first((d) => d.lfPeak != null && d.lfPeak >= 0.082)],
-          ["First LF peak at 0.090 Hz (target entry)", first((d) => d.lfPeak != null && d.lfPeak >= 0.090)],
-          ["First LF peak at 0.100 Hz (optimal)", first((d) => d.lfPeak != null && d.lfPeak >= 0.100)],
+          ["First LF peak at 0.075 Hz", firstV("lfPeak", (d) => d.lfPeak != null && d.lfPeak >= 0.075)],
+          ["First LF peak at 0.082 Hz", firstV("lfPeak", (d) => d.lfPeak != null && d.lfPeak >= 0.082)],
+          ["First LF peak at 0.090 Hz (target entry)", firstV("lfPeak", (d) => d.lfPeak != null && d.lfPeak >= 0.090)],
+          ["First LF peak at 0.100 Hz (optimal)", firstV("lfPeak", (d) => d.lfPeak != null && d.lfPeak >= 0.100)],
           ["3 consecutive readings in target zone", consec((d) => d.lfPeak != null && d.lfPeak >= 0.08 && d.lfPeak <= 0.10, 3)],
           ["30-day average LF peak 0.080+", () => msRollAvg(md, (d) => d.lfPeak, 30, 0.08, "up")],
         ]],
@@ -5058,22 +5079,22 @@
           ["7 consecutive HF-dominant mornings", consec((d) => d.hfDomMorning, 7)],
         ]],
         ["Heart rate", [
-          ["First resting lying HR 65 or below", first((d) => d.restHrLay != null && d.restHrLay <= 65)],
-          ["First resting lying HR 60 or below", first((d) => d.restHrLay != null && d.restHrLay <= 60)],
-          ["First resting lying HR 55 or below", first((d) => d.restHrLay != null && d.restHrLay <= 55)],
+          ["First resting lying HR 65 or below", firstV("restHrLay", (d) => d.restHrLay != null && d.restHrLay <= 65)],
+          ["First resting lying HR 60 or below", firstV("restHrLay", (d) => d.restHrLay != null && d.restHrLay <= 60)],
+          ["First resting lying HR 55 or below", firstV("restHrLay", (d) => d.restHrLay != null && d.restHrLay <= 55)],
           ["7-day average lying HR 65 or below", () => msRollAvg(md, (d) => d.restHrLay, 7, 65, "down")],
-          ["First walking HR in 80s", first((d) => d.walkHr != null && d.walkHr < 90)],
-          ["First walking HR in 70s", first((d) => d.walkHr != null && d.walkHr < 80)],
-          ["First walking HR in 60s", first((d) => d.walkHr != null && d.walkHr < 70)],
+          ["First walking HR in 80s", firstV("walkHr", (d) => d.walkHr != null && d.walkHr < 90)],
+          ["First walking HR in 70s", firstV("walkHr", (d) => d.walkHr != null && d.walkHr < 80)],
+          ["First walking HR in 60s", firstV("walkHr", (d) => d.walkHr != null && d.walkHr < 70)],
         ]],
         ["Orthostatic & recovery", [
-          ["First standing HR delta under 30 bpm", first((d) => d.orthoDelta != null && d.orthoDelta < 30)],
-          ["First standing HR delta under 20 bpm", first((d) => d.orthoDelta != null && d.orthoDelta < 20)],
+          ["First standing HR delta under 30 bpm", firstV("orthoDelta", (d) => d.orthoDelta != null && d.orthoDelta < 30)],
+          ["First standing HR delta under 20 bpm", firstV("orthoDelta", (d) => d.orthoDelta != null && d.orthoDelta < 20)],
           ["7 consecutive days no severe orthostatic event", consec((d) => !d.severeOrtho, 7)],
-          ["First 1-min recovery HR under 90", first((d) => d.hr60 != null && d.hr60 < 90)],
-          ["First 1-min recovery HR under 80", first((d) => d.hr60 != null && d.hr60 < 80)],
-          ["First 1-min recovery HR under 75", first((d) => d.hr60 != null && d.hr60 < 75)],
-          ["First 1-min recovery HR under 70", first((d) => d.hr60 != null && d.hr60 < 70)],
+          ["First 1-min recovery HR under 90", firstV("hr60", (d) => d.hr60 != null && d.hr60 < 90)],
+          ["First 1-min recovery HR under 80", firstV("hr60", (d) => d.hr60 != null && d.hr60 < 80)],
+          ["First 1-min recovery HR under 75", firstV("hr60", (d) => d.hr60 != null && d.hr60 < 75)],
+          ["First 1-min recovery HR under 70", firstV("hr60", (d) => d.hr60 != null && d.hr60 < 70)],
         ]],
         ["Blood pressure", [
           ["7 consecutive days BP under 130/85", consec((d) => d.bpGood === true, 7)],
@@ -5081,12 +5102,12 @@
           ["30-day average BP 110–120 / 70–80", () => { for (const dk of md.keys) { const end = dateFromKey(dk), vs = [], vd = []; for (let i = 0; i < 30; i++) { const dd = new Date(end); dd.setDate(end.getDate() - i); const day = md.map[keyOf(dd)]; if (day) { if (day.sys != null) vs.push(day.sys); if (day.dia != null) vd.push(day.dia); } } if (vs.length >= 10) { const as = vs.reduce((s, x) => s + x, 0) / vs.length, ad = vd.length ? vd.reduce((s, x) => s + x, 0) / vd.length : null; if (as >= 110 && as <= 120 && (ad == null || (ad >= 70 && ad <= 80))) return dk; } } return null; }],
         ]],
         ["Sleep", [
-          ["First 8+ hour night", first((d) => d.sleepH != null && d.sleepH >= 8)],
+          ["First 8+ hour night", firstV("sleepH", (d) => d.sleepH != null && d.sleepH >= 8)],
           ["7 consecutive 7+ hour nights", consec((d) => d.sleepH != null && d.sleepH >= 7, 7)],
           ["30-day average 7+ hours", () => msRollAvg(md, (d) => d.sleepH, 30, 7, "up")],
           ["First uninterrupted night", first((d) => d.sleepGood)],
           ["7 consecutive non-disrupted nights", consec((d) => d.sleepGood, 7)],
-          ["Sleep low HR under 55", first((d) => d.sleepLow != null && d.sleepLow < 55)],
+          ["Sleep low HR under 55", firstV("sleepLow", (d) => d.sleepLow != null && d.sleepLow < 55)],
         ]],
         ["Exercise", [
           ["First easy bike session", first((d) => d.bikeEasy)],
@@ -5110,9 +5131,9 @@
           ["90%+ clean days in a month", () => msCleanRate(md, 90)],
         ]],
         ["Autonomic score", [
-          ["First Autonomic Score 70+", first((d) => d.score != null && d.score >= 70)],
-          ["First Autonomic Score 80+", first((d) => d.score != null && d.score >= 80)],
-          ["First Autonomic Score 90+", first((d) => d.score != null && d.score >= 90)],
+          ["First Autonomic Score 70+", firstV("score", (d) => d.score != null && d.score >= 70)],
+          ["First Autonomic Score 80+", firstV("score", (d) => d.score != null && d.score >= 80)],
+          ["First Autonomic Score 90+", firstV("score", (d) => d.score != null && d.score >= 90)],
           ["7-day average score 70+", () => msRollAvg(md, (d) => d.score, 7, 70, "up")],
           ["30-day average score 70+", () => msRollAvg(md, (d) => d.score, 30, 70, "up")],
           ["7 consecutive Good-or-Great days", consec((d) => d.score != null && d.score >= 70, 7)],
@@ -5148,7 +5169,7 @@
           ["90 days post major illness", () => dateAt(90)],
         ]]);
       }
-      return defs.map(([title, items]) => ({ title, items: items.map(([label, fn]) => { const date = fn(); return { label, done: !!date, date }; }) }));
+      return defs.map(([title, items]) => ({ title, items: items.map(([label, fn]) => { const res = fn(); const date = res && typeof res === "object" ? res.date : res; const value = res && typeof res === "object" ? res.value : null; return { label, done: !!date, date, value }; }) }));
     }
 
     function acRegressionWarnings(md) {
@@ -5172,22 +5193,30 @@
       const groups = buildMilestoneGroups(md);
       let done = 0, total = 0; groups.forEach((g) => g.items.forEach((it) => { total++; if (it.done) done++; }));
       if (!total) return null;
-      const children = [];
+      const wrap = el("div");
+      // Header card: title + subtext, with a slim progress bar pinned to the
+      // bottom edge of the card (the card clips it to its rounded corners).
+      const pct = total ? Math.round((done / total) * 100) : 0;
+      const header = acCard("Milestone Tracker", `${done} of ${total} achieved · progress beyond daily metrics`, [
+        el("div.ms-progress", { style: "position:absolute;left:0;right:0;bottom:0;height:4px;background:var(--surface-2)" }, [
+          el("i", { style: `display:block;height:100%;background:var(--accent);width:${pct}%` }),
+        ]),
+      ]);
+      wrap.appendChild(header);
       const warns = acRegressionWarnings(md);
-      if (warns.length) children.push(el("div.ac-block", {}, [el("div.ac-block-label", { text: "⚠ Active watch flags" }), ...warns.map((w) => acInsight(w, "mod"))]));
+      if (warns.length) wrap.appendChild(acCard("⚠ Active watch flags", null, warns.map((w) => acInsight(w, "mod"))));
       groups.forEach((g) => {
         if (!g.items.length) return;
         const rows = g.items.slice().sort((a, b) => (b.done ? 1 : 0) - (a.done ? 1 : 0) || (a.date || "").localeCompare(b.date || ""));
-        children.push(el("div.ac-block", {}, [
-          el("div.ac-block-label", { text: g.title }),
-          el("div.ac-ms-list", {}, rows.map((it) => el("div.ac-ms-row" + (it.done ? ".done" : ""), {}, [
-            el("span.ac-ms-ic", it.done ? { html: ICONS.check } : { text: "" }),
-            el("div.ac-ms-label", { text: it.label }),
-            el("div.ac-ms-meta", { text: it.done ? ((it.value != null ? (typeof it.value === "number" ? fmtNum(it.value) : it.value) + " · " : "") + fmtShort(it.date)) : "" }),
-          ]))),
-        ]));
+        const list = el("div.ac-ms-list", {}, rows.map((it) => el("div.ac-ms-row" + (it.done ? ".done" : ""), {}, [
+          el("span.ac-ms-ic", it.done ? { html: ICONS.check } : { text: "" }),
+          el("div.ac-ms-label", { text: it.label }),
+          el("div.ac-ms-meta", { text: it.done ? ((it.value != null ? (typeof it.value === "number" ? fmtNum(it.value) : it.value) + " · " : "") + fmtShort(it.date)) : "" }),
+        ])));
+        const gdone = g.items.filter((it) => it.done).length;
+        wrap.appendChild(acCard(g.title, `${gdone} of ${g.items.length} achieved`, [list]));
       });
-      return acCard("Milestone Tracker", `${done} of ${total} achieved · progress beyond daily metrics`, children);
+      return wrap;
     }
 
     function renderMilestones() {
