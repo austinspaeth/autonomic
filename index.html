@@ -121,7 +121,7 @@
   .icon-btn.is-sun { font-size: 34px; }
   /* Header caution icon — only shown when there are active watch flags. */
   .flags-btn { color: #f59e0b; }
-  .flags-btn svg { width: 22px; height: 22px; display: block; }
+  .flags-btn svg { width: 22px; height: 22px; display: block; transform: translateY(4px); }
 
   /* ---------- Date bar ---------- */
   .datebar {
@@ -945,22 +945,6 @@
     width: 8px; height: 8px; border-radius: 50%; background: var(--accent);
   }
   /* ---------- Analytics (expanded) ---------- */
-  .range-pill {
-    position: relative; display: flex; gap: 2px;
-    background: var(--surface-2); border: 1px solid var(--border);
-    border-radius: 999px; padding: 4px; margin-bottom: var(--gap);
-  }
-  .range-pill .rp-thumb {
-    position: absolute; top: 4px; bottom: 4px; left: 4px; width: 0;
-    background: var(--accent); border-radius: 999px; box-shadow: var(--shadow); z-index: 0;
-    transition: left .34s cubic-bezier(.34,1.25,.5,1), width .34s cubic-bezier(.34,1.25,.5,1);
-  }
-  .rp-opt {
-    position: relative; z-index: 1; flex: 1; border: none; background: none;
-    font-family: inherit; font-weight: 600; font-size: 13px; color: var(--text-dim);
-    padding: 8px 0; border-radius: 999px; cursor: pointer; transition: color .25s;
-  }
-  .rp-opt.active { color: #fff; }
 
   .ac-sub {
     font-size: 11px; color: var(--text-dim); margin: -4px 0 12px;
@@ -1021,6 +1005,15 @@
     padding: 3px 9px 3px 7px; border-radius: 7px; background: var(--surface-2);
   }
   .ac-grade-chip b { font-variant-numeric: tabular-nums; }
+  /* Days-in-each-grade: horizontal bars with the count + grade name beside. */
+  .ac-grade-bars { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+  .ac-grade-bar-row { display: flex; align-items: center; gap: 10px; }
+  .ac-grade-bar-track { flex: 0 0 42%; height: 10px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
+  .ac-grade-bar-track i { display: block; height: 100%; border-radius: 999px; }
+  .ac-grade-bar-lbl { font-size: 13px; color: var(--text); }
+  .ac-grade-bar-lbl b { font-weight: 700; font-variant-numeric: tabular-nums; }
+  /* Full-width Direction card: label left, trend value right; a touch shorter. */
+  .ac-direction { display: flex; align-items: center; justify-content: space-between; padding: 11px 14px; margin: 14px 0; }
 
   .ac-cmp { display: flex; flex-direction: column; }
   .ac-cmp-row { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; padding: 9px 0; border-top: 1px solid var(--border); }
@@ -1029,9 +1022,14 @@
   .ac-cmp-vals { font-variant-numeric: tabular-nums; font-weight: 600; font-size: 13px; text-align: right; }
   .ac-cmp-vals .prev { color: var(--text-dim); font-weight: 500; }
 
-  .ac-heat { display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, 1fr); gap: 3px; margin-top: 4px; overflow-x: auto; padding-bottom: 4px; }
-  .ac-heat-cell { width: 13px; height: 13px; border-radius: 3px; background: var(--surface-2); position: relative; }
-  .ac-heat-cell.clean::after { content: ""; position: absolute; inset: 3px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,.85); }
+  /* Calendar heat map: 7-column week grid whose cells grow to fill the width
+     (no inter-column gaps / horizontal scroll) instead of fixed 13px squares. */
+  .ac-heat { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-top: 4px; }
+  .ac-heat-cell { aspect-ratio: 1; border-radius: 4px; background: var(--surface-2); position: relative; min-width: 0; cursor: pointer; }
+  .ac-heat-cell.sel { outline: 2px solid var(--text); outline-offset: 1px; }
+  .ac-heat-cell.clean::after { content: ""; position: absolute; inset: 30%; border-radius: 50%; border: 1.5px solid rgba(255,255,255,.85); }
+  .ac-heat-readout { margin-top: 9px; text-align: right; font-size: 13px; font-weight: 700; min-height: 18px; font-variant-numeric: tabular-nums; }
+  .ac-heat-readout .muted { color: var(--text-dim); font-weight: 600; }
   .ac-heat-legend { display: flex; align-items: center; gap: 5px; margin-top: 10px; font-size: 11px; color: var(--text-dim); }
 
   .ac-stack { display: flex; align-items: flex-end; gap: 3px; height: 110px; margin-top: 4px; }
@@ -1582,6 +1580,7 @@
       lmnt: med("LMNT"),
       melatonin: med("Melatonin"),
       gaviscon: med("Gaviscon"),
+      metamucil: med("Metamucil"),
     };
 
     // Symptoms - programmatic list. Each is a logged entry; templates (per-symptom
@@ -4396,7 +4395,14 @@
       const worst = daily.reduce((a, b) => (b.sc < a.sc ? b : a), daily[0]);
       const counts = {}; daily.forEach((x) => { const c = scoreCat(x.sc).short; counts[c] = (counts[c] || 0) + 1; });
       const order = SCORE_CATS.map((c) => c.short);
-      const grades = el("div.ac-grades", {}, order.filter((s) => counts[s]).map((s) => { const cat = SCORE_CATS.find((c) => c.short === s); return el("div.ac-grade-chip", { style: `box-shadow: inset 3px 0 0 ${cat.color}` }, [s, " ", el("b", { text: String(counts[s]) })]); }));
+      const gMax = Math.max(1, ...order.filter((s) => counts[s]).map((s) => counts[s]));
+      const grades = el("div.ac-grade-bars", {}, order.filter((s) => counts[s]).map((s) => {
+        const cat = SCORE_CATS.find((c) => c.short === s), n = counts[s];
+        return el("div.ac-grade-bar-row", {}, [
+          el("div.ac-grade-bar-track", {}, [el("i", { style: `width:${Math.round(n / gMax * 100)}%;background:${cat.color}` })]),
+          el("div.ac-grade-bar-lbl", {}, [el("b", { text: String(n) }), ` ${s.toLowerCase()} day${n === 1 ? "" : "s"}`]),
+        ]);
+      }));
       const delta = acDelta(roll.some((v) => v != null) ? roll : vals);
 
       return acCard("Autonomic Outlook", acRangeLabel(), [
@@ -4410,7 +4416,7 @@
           { label: "Best day", value: best.sc, sub: fmtShort(best.dk), color: scoreCat(best.sc).color },
           { label: "Worst day", value: worst.sc, sub: fmtShort(worst.dk), color: scoreCat(worst.sc).color },
         ]),
-        el("div.ac-block", { style: "display:flex;align-items:center;gap:10px;margin-top:-4px" }, [el("span", { text: "Direction", style: "font-size:13px;color:var(--text-dim)" }), acTrendChip(delta, { goodUp: true })].filter(Boolean)),
+        el("div.stat.ac-direction", {}, [el("div.stat-label", { text: "Direction" }), acTrendChip(delta, { goodUp: true }) || el("span.stat-value", { text: "—" })]),
         daily.length ? el("div.ac-block", {}, [el("div.ac-block-label", { text: "Days in each grade" }), grades]) : null,
       ]);
     }
@@ -4445,15 +4451,28 @@
       const today = new Date(); today.setHours(0, 0, 0, 0);
       const start = new Date(today); start.setDate(today.getDate() - (nDays - 1)); start.setDate(start.getDate() - start.getDay());
       const grid = el("div.ac-heat"); let any = false;
+      // Tapping a day shows its date + score (and grade) in a readout pinned to
+      // the bottom-right of the grid.
+      const readout = el("div.ac-heat-readout", { html: '<span class="muted">Tap a day for its score</span>' });
+      let selCell = null;
       for (let dt = new Date(start); dt <= today; dt.setDate(dt.getDate() + 1)) {
         const dk = keyOf(dt), d = state.days[dk], cell = el("div.ac-heat-cell", { title: dk });
-        if (d) { const sc = acDayScore(d, dk); if (sc != null) { cell.style.background = scoreCat(sc).color; cell.title = `${dk}: ${sc} (${scoreCat(sc).short})`; any = true; } const cl = dayCleanliness(dk); if (cl && cl.clean) cell.classList.add("clean"); }
+        let sc = null, cat = null;
+        if (d) { sc = acDayScore(d, dk); if (sc != null) { cat = scoreCat(sc); cell.style.background = cat.color; cell.title = `${dk}: ${sc} (${cat.short})`; any = true; } const cl = dayCleanliness(dk); if (cl && cl.clean) cell.classList.add("clean"); }
+        cell.addEventListener("click", () => {
+          if (selCell) selCell.classList.remove("sel");
+          selCell = cell; cell.classList.add("sel");
+          readout.innerHTML = sc == null
+            ? `${fmtShort(dk)} · <span class="muted">no score</span>`
+            : `${fmtShort(dk)} · <span style="color:${cat.color}">${sc} ${cat.short}</span>`;
+        });
         grid.appendChild(cell);
       }
       if (!any) return null;
       const swatches = [...SCORE_CATS].sort((a, b) => a.min - b.min).map((c) => el("span", { style: `width:11px;height:11px;border-radius:3px;display:inline-block;background:${c.color}`, title: c.short }));
       return acCard("Calendar Heat Map", `Last ${nDays} days · colored by autonomic score`, [
         grid,
+        readout,
         el("div.ac-heat-legend", {}, ["Crash", ...swatches, "Excellent"]),
         el("div.ac-heat-legend", {}, [el("span.ac-heat-cell.clean", { style: "background:var(--surface-2)" }), "ring = clean day"]),
       ]);
@@ -4777,18 +4796,21 @@
       ]);
     }
 
+    // Trigger-food counts over the last `days` days, as acBars rows.
+    function triggerRows(days = 30) {
+      const trig = {}; const end = new Date();
+      for (let i = 0; i < days; i++) { const dk = keyOf(new Date(end.getFullYear(), end.getMonth(), end.getDate() - i)); const f = state.days[dk] && state.days[dk].food; if (f) Object.keys(f.triggers || {}).forEach((k) => { if (f.triggers[k] > 0 && TRIGGER_TYPES[k]) trig[k] = (trig[k] || 0) + f.triggers[k]; }); }
+      return Object.entries(trig).map(([k, c]) => ({ name: TRIGGER_TYPES[k].label, count: c })).sort((a, b) => b.count - a.count);
+    }
+
     function acCleanDays() {
       const today = keyOf(new Date());
       const info = streakInfo(today);
       const tier = streakTier(info.current);
-      // trigger breakdown over last 30 days
-      const trig = {}; const end = new Date();
-      for (let i = 0; i < 30; i++) { const dk = keyOf(new Date(end.getFullYear(), end.getMonth(), end.getDate() - i)); const f = state.days[dk] && state.days[dk].food; if (f) Object.keys(f.triggers || {}).forEach((k) => { if (f.triggers[k] > 0 && TRIGGER_TYPES[k]) trig[k] = (trig[k] || 0) + f.triggers[k]; }); }
-      const trigRows = Object.entries(trig).map(([k, c]) => ({ name: TRIGGER_TYPES[k].label, count: c })).sort((a, b) => b.count - a.count);
+      // Trigger foods moved to Streak Analytics; Clean Days is streak-only now.
       return acCard("Clean Days", "Protocol streak tracking", [
         el("div.ac-streak-big", {}, [el("div.ac-streak-num", { text: String(info.current) }), el("div.ac-streak-cap", { text: info.current === 1 ? "day clean" : "days clean" }), el("div.ac-streak-tier", { text: tier.tier })]),
         acStats([{ label: "Longest streak", value: info.longest, sub: "days" }, { label: "30-day clean rate", value: info.rate, sub: info.rate != null ? "%" : "" }]),
-        trigRows.length ? el("div.ac-block", {}, [el("div.ac-block-label", { text: "Trigger foods (last 30 days)" }), acBars(trigRows, {})]) : null,
       ]);
     }
 
@@ -4802,7 +4824,8 @@
         else { if (run > 0) runs.push(run); run = 0; if (c) { anyBreak = true; breakDow[cd.getDay()]++; c.criteria.filter((cr) => !cr.pending && !cr.pass).forEach((cr) => { breaks[cr.label] = (breaks[cr.label] || 0) + 1; }); } }
       }
       if (run > 0) runs.push(run);
-      if (!runs.length && !anyBreak) return null;
+      const trigRows = triggerRows(30);
+      if (!runs.length && !anyBreak && !trigRows.length) return null;
       const buckets = { "1–2": 0, "3–6": 0, "7–13": 0, "14+": 0 };
       runs.forEach((r) => { buckets[r <= 2 ? "1–2" : r <= 6 ? "3–6" : r <= 13 ? "7–13" : "14+"]++; });
       const histRows = Object.entries(buckets).filter(([, c]) => c).map(([k, c]) => ({ name: k + " days", count: c }));
@@ -4813,6 +4836,7 @@
         histRows.length ? el("div.ac-block", {}, [el("div.ac-block-label", { text: "Streak length distribution" }), acBars(histRows, {})]) : null,
         breakRows.length ? el("div.ac-block", {}, [el("div.ac-block-label", { text: "Most common reasons streaks break" }), acBars(breakRows, {})]) : null,
         dowRows.length ? el("div.ac-block", {}, [el("div.ac-block-label", { text: "Day-of-week streaks break" }), acBars(dowRows, {})]) : null,
+        trigRows.length ? el("div.ac-block", {}, [el("div.ac-block-label", { text: "Trigger foods" }), acBars(trigRows, {})]) : null,
       ]);
     }
 
@@ -5388,22 +5412,24 @@
       else host.appendChild(el("div.muted", { text: "Log readings, sleep, and clean days to start unlocking recovery milestones." }));
     }
 
-    function positionRangePill(pill) {
-      const thumb = pill.querySelector(".rp-thumb"), active = pill.querySelector(".rp-opt.active");
-      if (!thumb || !active) return;
-      thumb.style.left = active.offsetLeft + "px"; thumb.style.width = active.offsetWidth + "px";
-    }
-
     function renderAnalysis() {
       const root = $("#analysisContent");
       root.innerHTML = "";
-      const pill = el("div.range-pill", {}, [el("span.rp-thumb")]);
-      [["day", "Day"], ["week", "Week"], ["month", "Month"], ["year", "Year"]].forEach(([m, lbl]) => {
-        pill.appendChild(el("button.rp-opt" + (analysisMode === m ? ".active" : ""), { text: lbl, onclick: () => { analysisMode = m; renderAnalysis(); } }));
-      });
-      root.appendChild(pill);
-      requestAnimationFrame(() => positionRangePill(pill));
+      const content = el("div");
+      // Reuse the shared segmented control (same one Insights uses); its pill
+      // tweens from the current option because only the thumb is transformed and
+      // the content re-renders on the next frame rather than rebuilding the pill.
+      root.appendChild(segmented(
+        [{ val: "day", label: "Day" }, { val: "week", label: "Week" }, { val: "month", label: "Month" }, { val: "year", label: "Year" }],
+        analysisMode,
+        (v) => { analysisMode = v; requestAnimationFrame(() => renderAnalysisContent(content)); }
+      ));
+      root.appendChild(content);
+      renderAnalysisContent(content);
+    }
 
+    function renderAnalysisContent(root) {
+      root.innerHTML = "";
       const buckets = acBuckets();
       if (!buckets.some((b) => b.days.length)) { root.appendChild(el("div.chart-empty", { text: "No data logged yet." })); return; }
 
@@ -6236,9 +6262,6 @@ Address each focus area as its own clearly-labeled top-level section in your res
     function renderReports() {
       const root = $("#reportsContent");
       root.innerHTML = "";
-      root.appendChild(el("div.report-intro", {
-        text: "1. Pick a time range. 2. Tap the reports you want — combine as many as you like to focus on exactly the data you care about. 3. Tap Generate Report Prompt to stitch them into one prompt, then paste it into Claude or ChatGPT.",
-      }));
       root.appendChild(segmented(
         [{ val: "day", label: "Day" }, { val: "week", label: "Week" }, { val: "month", label: "Month" }, { val: "year", label: "Year" }],
         reportRange,
@@ -6360,6 +6383,9 @@ Address each focus area as its own clearly-labeled top-level section in your res
       );
       positionIndicator();
       renderHeaderFlags();
+      // Each view starts scrolled to the top. Set scrollTop directly so the
+      // page's smooth-scroll behavior doesn't animate the jump.
+      document.documentElement.scrollTop = 0; window.scrollTo(0, 0);
       if (name === "analysis") renderAnalysis();
       if (name === "milestones") renderMilestones();
       if (name === "reports") renderReports();
