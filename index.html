@@ -1038,9 +1038,14 @@
   .ac-cmp-vals { font-variant-numeric: tabular-nums; font-weight: 600; font-size: 13px; text-align: right; }
   .ac-cmp-vals .prev { color: var(--text-dim); font-weight: 500; }
 
-  .ac-heat { display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, 1fr); gap: 3px; margin-top: 4px; overflow-x: auto; padding-bottom: 4px; }
-  .ac-heat-cell { width: 13px; height: 13px; border-radius: 3px; background: var(--surface-2); position: relative; }
-  .ac-heat-cell.clean::after { content: ""; position: absolute; inset: 3px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,.85); }
+  /* Calendar heat map: 7-column week grid whose cells grow to fill the width
+     (no inter-column gaps / horizontal scroll) instead of fixed 13px squares. */
+  .ac-heat { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-top: 4px; }
+  .ac-heat-cell { aspect-ratio: 1; border-radius: 4px; background: var(--surface-2); position: relative; min-width: 0; cursor: pointer; }
+  .ac-heat-cell.sel { outline: 2px solid var(--text); outline-offset: 1px; }
+  .ac-heat-cell.clean::after { content: ""; position: absolute; inset: 30%; border-radius: 50%; border: 1.5px solid rgba(255,255,255,.85); }
+  .ac-heat-readout { margin-top: 9px; text-align: right; font-size: 13px; font-weight: 700; min-height: 18px; font-variant-numeric: tabular-nums; }
+  .ac-heat-readout .muted { color: var(--text-dim); font-weight: 600; }
   .ac-heat-legend { display: flex; align-items: center; gap: 5px; margin-top: 10px; font-size: 11px; color: var(--text-dim); }
 
   .ac-stack { display: flex; align-items: flex-end; gap: 3px; height: 110px; margin-top: 4px; }
@@ -4807,18 +4812,21 @@
       ]);
     }
 
+    // Trigger-food counts over the last `days` days, as acBars rows.
+    function triggerRows(days = 30) {
+      const trig = {}; const end = new Date();
+      for (let i = 0; i < days; i++) { const dk = keyOf(new Date(end.getFullYear(), end.getMonth(), end.getDate() - i)); const f = state.days[dk] && state.days[dk].food; if (f) Object.keys(f.triggers || {}).forEach((k) => { if (f.triggers[k] > 0 && TRIGGER_TYPES[k]) trig[k] = (trig[k] || 0) + f.triggers[k]; }); }
+      return Object.entries(trig).map(([k, c]) => ({ name: TRIGGER_TYPES[k].label, count: c })).sort((a, b) => b.count - a.count);
+    }
+
     function acCleanDays() {
       const today = keyOf(new Date());
       const info = streakInfo(today);
       const tier = streakTier(info.current);
-      // trigger breakdown over last 30 days
-      const trig = {}; const end = new Date();
-      for (let i = 0; i < 30; i++) { const dk = keyOf(new Date(end.getFullYear(), end.getMonth(), end.getDate() - i)); const f = state.days[dk] && state.days[dk].food; if (f) Object.keys(f.triggers || {}).forEach((k) => { if (f.triggers[k] > 0 && TRIGGER_TYPES[k]) trig[k] = (trig[k] || 0) + f.triggers[k]; }); }
-      const trigRows = Object.entries(trig).map(([k, c]) => ({ name: TRIGGER_TYPES[k].label, count: c })).sort((a, b) => b.count - a.count);
+      // Trigger foods moved to Streak Analytics; Clean Days is streak-only now.
       return acCard("Clean Days", "Protocol streak tracking", [
         el("div.ac-streak-big", {}, [el("div.ac-streak-num", { text: String(info.current) }), el("div.ac-streak-cap", { text: info.current === 1 ? "day clean" : "days clean" }), el("div.ac-streak-tier", { text: tier.tier })]),
         acStats([{ label: "Longest streak", value: info.longest, sub: "days" }, { label: "30-day clean rate", value: info.rate, sub: info.rate != null ? "%" : "" }]),
-        trigRows.length ? el("div.ac-block", {}, [el("div.ac-block-label", { text: "Trigger foods (last 30 days)" }), acBars(trigRows, {})]) : null,
       ]);
     }
 
@@ -4832,7 +4840,8 @@
         else { if (run > 0) runs.push(run); run = 0; if (c) { anyBreak = true; breakDow[cd.getDay()]++; c.criteria.filter((cr) => !cr.pending && !cr.pass).forEach((cr) => { breaks[cr.label] = (breaks[cr.label] || 0) + 1; }); } }
       }
       if (run > 0) runs.push(run);
-      if (!runs.length && !anyBreak) return null;
+      const trigRows = triggerRows(30);
+      if (!runs.length && !anyBreak && !trigRows.length) return null;
       const buckets = { "1–2": 0, "3–6": 0, "7–13": 0, "14+": 0 };
       runs.forEach((r) => { buckets[r <= 2 ? "1–2" : r <= 6 ? "3–6" : r <= 13 ? "7–13" : "14+"]++; });
       const histRows = Object.entries(buckets).filter(([, c]) => c).map(([k, c]) => ({ name: k + " days", count: c }));
