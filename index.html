@@ -5388,22 +5388,45 @@
       else host.appendChild(el("div.muted", { text: "Log readings, sleep, and clean days to start unlocking recovery milestones." }));
     }
 
-    function positionRangePill(pill) {
+    function positionRangePill(pill, animate = true) {
       const thumb = pill.querySelector(".rp-thumb"), active = pill.querySelector(".rp-opt.active");
       if (!thumb || !active) return;
+      if (!animate) thumb.style.transition = "none";
       thumb.style.left = active.offsetLeft + "px"; thumb.style.width = active.offsetWidth + "px";
+      if (!animate) { void thumb.offsetWidth; thumb.style.transition = ""; }
     }
 
     function renderAnalysis() {
       const root = $("#analysisContent");
       root.innerHTML = "";
+      // The range pill is built once and persists across option changes — only
+      // its thumb is moved (so it tweens) and the content below is re-rendered.
+      // Rebuilding the pill each click would make a fresh thumb with nothing to
+      // animate from, which is why it used to jump instead of slide.
       const pill = el("div.range-pill", {}, [el("span.rp-thumb")]);
-      [["day", "Day"], ["week", "Week"], ["month", "Month"], ["year", "Year"]].forEach(([m, lbl]) => {
-        pill.appendChild(el("button.rp-opt" + (analysisMode === m ? ".active" : ""), { text: lbl, onclick: () => { analysisMode = m; renderAnalysis(); } }));
+      const opts = [["day", "Day"], ["week", "Week"], ["month", "Month"], ["year", "Year"]];
+      const btns = {};
+      opts.forEach(([m, lbl]) => {
+        const b = el("button.rp-opt" + (analysisMode === m ? ".active" : ""), { text: lbl, onclick: () => setMode(m) });
+        btns[m] = b; pill.appendChild(b);
       });
       root.appendChild(pill);
-      requestAnimationFrame(() => positionRangePill(pill));
+      const content = el("div");
+      root.appendChild(content);
+      requestAnimationFrame(() => positionRangePill(pill, false));
 
+      function setMode(m) {
+        if (m === analysisMode) return;
+        analysisMode = m;
+        opts.forEach(([k]) => btns[k].classList.toggle("active", k === m));
+        positionRangePill(pill, true);
+        renderAnalysisContent(content);
+      }
+      renderAnalysisContent(content);
+    }
+
+    function renderAnalysisContent(root) {
+      root.innerHTML = "";
       const buckets = acBuckets();
       if (!buckets.some((b) => b.days.length)) { root.appendChild(el("div.chart-empty", { text: "No data logged yet." })); return; }
 
