@@ -2024,16 +2024,23 @@
       const trigCount = Object.keys(triggers).reduce((s, k) => s + (triggers[k] > 0 ? triggers[k] : 0), 0);
       const water = (d.food && d.food.water) || 0;
       const hrs = sleepHours(dk);
+      const sleepLogged = hrs != null;
+      // Required meds — only the still-missing ones feed the "still needed" hint
+      // (`need`), while the full set stays the checklist label.
+      const medReq = [["allegra", "Allegra"], ["pepsidAc", "Pepcid"], ["magGlycinate", "Mag glycinate"]];
+      const missingMeds = medReq.filter(([t]) => !hasMed(t));
       // Dinner by 5pm, derived from logged meals: met if a dinner was eaten by
       // 5:00pm; broken if every logged dinner is later; pending until a dinner
       // is logged (so it neither counts nor breaks the day).
       const dinners = ((d.food && d.food.meals) || []).filter((m) => m.type === "dinner" && m.time);
+      // `broken` marks a hard criterion that has concretely failed (and so can't
+      // be recovered today) — distinct from one that just isn't logged yet.
       const criteria = [
-        { key: "triggers", label: "No trigger foods", pass: trigCount === 0, hard: true },
+        { key: "triggers", label: "No trigger foods", pass: trigCount === 0, hard: true, broken: trigCount > 0 },
         { key: "water", label: "Water (2.5 L)", pass: water >= 2.5 },
         { key: "dinner", label: "Dinner by 5pm", pass: dinners.some((m) => m.time <= "17:00"), pending: dinners.length === 0 },
-        { key: "meds", label: "Allegra, Pepcid, Mag glycinate", pass: hasMed("allegra") && hasMed("pepsidAc") && hasMed("magGlycinate") },
-        { key: "sleep", label: "Sleep 7h or more", pass: hrs != null && hrs >= 7, hard: true },
+        { key: "meds", label: "Allegra, Pepcid, Mag glycinate", pass: missingMeds.length === 0, need: missingMeds.map(([, n]) => n).join(", ") },
+        { key: "sleep", label: "Sleep 7h or more", pass: sleepLogged && hrs >= 7, hard: true, broken: sleepLogged && hrs < 7 },
       ];
       const clean = criteria.filter((c) => !c.pending).every((c) => c.pass);
       return { clean, criteria };
@@ -2192,15 +2199,22 @@
         if (c.clean) {
           sub = "Clean day. Streak continues.";
         } else {
-          const hardFail = c.criteria.some((x) => x.hard && !x.pass && !x.pending);
-          const needed = c.criteria.filter((x) => !x.pass && !x.pending && !x.hard).map((x) => x.label.toLowerCase());
+          // `broken` = a hard criterion that has concretely failed (can't be
+          // recovered today). Everything else not yet passing is "still needed",
+          // including dinner-not-logged and meds (which list only the missing
+          // ones via `need`).
+          const hardFail = c.criteria.some((x) => x.broken);
+          const needLabel = (x) => (x.need != null ? x.need : x.label).toLowerCase();
+          const needed = c.criteria.filter((x) => !x.pass && !x.broken).map(needLabel);
           if (si.isToday) {
             // Once a non-recoverable criterion is missed, the day can't be saved.
             sub = hardFail
               ? "Too late for today. Try again to start fresh tomorrow."
-              : `Today is day ${si.current + 1}. Still needed: ${needed.join(", ")}.`;
+              : needed.length
+                ? `Today is day ${si.current + 1}. Still needed: ${needed.join(", ")}.`
+                : `Today is day ${si.current + 1}.`;
           } else {
-            const reasons = c.criteria.filter((x) => !x.pass && !x.pending).map((x) => x.label.toLowerCase()).slice(0, 3).join(", ");
+            const reasons = c.criteria.filter((x) => !x.pass && !x.pending).map(needLabel).slice(0, 3).join(", ");
             sub = `Not a clean day. ${reasons}.`;
           }
         }
@@ -2227,7 +2241,7 @@
           let st;
           if (x.pending) st = "pending";
           else if (x.pass) st = "met";
-          else if (!si.isToday || x.hard) st = "broken";
+          else if (!si.isToday || x.broken) st = "broken";
           else st = "todo";
           list.appendChild(el("span.crit." + st, {}, [
             el("span.crit-dot", { text: st === "met" ? "✓" : "" }),
