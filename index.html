@@ -5298,8 +5298,8 @@
         ]),
       ]);
       wrap.appendChild(header);
-      const warns = acRegressionWarnings(md);
-      if (warns.length) wrap.appendChild(acCard("⚠ Active watch flags", null, warns.map((w) => acInsight(w, "mod"))));
+      // Active watch flags now surface via the header caution icon + drawer
+      // (renderHeaderFlags / openFlagsDrawer), not as a card here.
       groups.forEach((g) => {
         if (!g.items.length) return;
         const rows = g.items.slice().sort((a, b) => (b.done ? 1 : 0) - (a.done ? 1 : 0) || (a.date || "").localeCompare(b.date || ""));
@@ -6264,6 +6264,7 @@ Address each focus area as its own clearly-labeled top-level section in your res
         t.classList.toggle("active", t.dataset.view === name)
       );
       positionIndicator();
+      renderHeaderFlags();
       if (name === "analysis") renderAnalysis();
       if (name === "milestones") renderMilestones();
       if (name === "reports") renderReports();
@@ -6274,6 +6275,7 @@ Address each focus area as its own clearly-labeled top-level section in your res
       applyTheme();
       renderDate();
       renderDay();
+      renderHeaderFlags();
 
       $("#themeBtn").addEventListener("click", toggleTheme);
       $("#menuBtn").addEventListener("click", openMenu);
