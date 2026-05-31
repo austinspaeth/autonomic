@@ -121,7 +121,7 @@
   .icon-btn.is-sun { font-size: 34px; }
   /* Header caution icon — only shown when there are active watch flags. */
   .flags-btn { color: #f59e0b; }
-  .flags-btn svg { width: 22px; height: 22px; display: block; }
+  .flags-btn svg { width: 22px; height: 22px; display: block; transform: translateY(4px); }
 
   /* ---------- Date bar ---------- */
   .datebar {
@@ -1021,6 +1021,15 @@
     padding: 3px 9px 3px 7px; border-radius: 7px; background: var(--surface-2);
   }
   .ac-grade-chip b { font-variant-numeric: tabular-nums; }
+  /* Days-in-each-grade: horizontal bars with the count + grade name beside. */
+  .ac-grade-bars { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+  .ac-grade-bar-row { display: flex; align-items: center; gap: 10px; }
+  .ac-grade-bar-track { flex: 0 0 42%; height: 10px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
+  .ac-grade-bar-track i { display: block; height: 100%; border-radius: 999px; }
+  .ac-grade-bar-lbl { font-size: 13px; color: var(--text); }
+  .ac-grade-bar-lbl b { font-weight: 700; font-variant-numeric: tabular-nums; }
+  /* Full-width Direction card: label left, trend value right; a touch shorter. */
+  .ac-direction { display: flex; align-items: center; justify-content: space-between; padding: 11px 14px; margin: 14px 0; }
 
   .ac-cmp { display: flex; flex-direction: column; }
   .ac-cmp-row { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; padding: 9px 0; border-top: 1px solid var(--border); }
@@ -1582,6 +1591,7 @@
       lmnt: med("LMNT"),
       melatonin: med("Melatonin"),
       gaviscon: med("Gaviscon"),
+      metamucil: med("Metamucil"),
     };
 
     // Symptoms - programmatic list. Each is a logged entry; templates (per-symptom
@@ -4396,7 +4406,14 @@
       const worst = daily.reduce((a, b) => (b.sc < a.sc ? b : a), daily[0]);
       const counts = {}; daily.forEach((x) => { const c = scoreCat(x.sc).short; counts[c] = (counts[c] || 0) + 1; });
       const order = SCORE_CATS.map((c) => c.short);
-      const grades = el("div.ac-grades", {}, order.filter((s) => counts[s]).map((s) => { const cat = SCORE_CATS.find((c) => c.short === s); return el("div.ac-grade-chip", { style: `box-shadow: inset 3px 0 0 ${cat.color}` }, [s, " ", el("b", { text: String(counts[s]) })]); }));
+      const gMax = Math.max(1, ...order.filter((s) => counts[s]).map((s) => counts[s]));
+      const grades = el("div.ac-grade-bars", {}, order.filter((s) => counts[s]).map((s) => {
+        const cat = SCORE_CATS.find((c) => c.short === s), n = counts[s];
+        return el("div.ac-grade-bar-row", {}, [
+          el("div.ac-grade-bar-track", {}, [el("i", { style: `width:${Math.round(n / gMax * 100)}%;background:${cat.color}` })]),
+          el("div.ac-grade-bar-lbl", {}, [el("b", { text: String(n) }), ` ${s.toLowerCase()} day${n === 1 ? "" : "s"}`]),
+        ]);
+      }));
       const delta = acDelta(roll.some((v) => v != null) ? roll : vals);
 
       return acCard("Autonomic Outlook", acRangeLabel(), [
@@ -4410,7 +4427,7 @@
           { label: "Best day", value: best.sc, sub: fmtShort(best.dk), color: scoreCat(best.sc).color },
           { label: "Worst day", value: worst.sc, sub: fmtShort(worst.dk), color: scoreCat(worst.sc).color },
         ]),
-        el("div.ac-block", { style: "display:flex;align-items:center;gap:10px;margin-top:-4px" }, [el("span", { text: "Direction", style: "font-size:13px;color:var(--text-dim)" }), acTrendChip(delta, { goodUp: true })].filter(Boolean)),
+        el("div.stat.ac-direction", {}, [el("div.stat-label", { text: "Direction" }), acTrendChip(delta, { goodUp: true }) || el("span.stat-value", { text: "—" })]),
         daily.length ? el("div.ac-block", {}, [el("div.ac-block-label", { text: "Days in each grade" }), grades]) : null,
       ]);
     }
@@ -4445,15 +4462,28 @@
       const today = new Date(); today.setHours(0, 0, 0, 0);
       const start = new Date(today); start.setDate(today.getDate() - (nDays - 1)); start.setDate(start.getDate() - start.getDay());
       const grid = el("div.ac-heat"); let any = false;
+      // Tapping a day shows its date + score (and grade) in a readout pinned to
+      // the bottom-right of the grid.
+      const readout = el("div.ac-heat-readout", { html: '<span class="muted">Tap a day for its score</span>' });
+      let selCell = null;
       for (let dt = new Date(start); dt <= today; dt.setDate(dt.getDate() + 1)) {
         const dk = keyOf(dt), d = state.days[dk], cell = el("div.ac-heat-cell", { title: dk });
-        if (d) { const sc = acDayScore(d, dk); if (sc != null) { cell.style.background = scoreCat(sc).color; cell.title = `${dk}: ${sc} (${scoreCat(sc).short})`; any = true; } const cl = dayCleanliness(dk); if (cl && cl.clean) cell.classList.add("clean"); }
+        let sc = null, cat = null;
+        if (d) { sc = acDayScore(d, dk); if (sc != null) { cat = scoreCat(sc); cell.style.background = cat.color; cell.title = `${dk}: ${sc} (${cat.short})`; any = true; } const cl = dayCleanliness(dk); if (cl && cl.clean) cell.classList.add("clean"); }
+        cell.addEventListener("click", () => {
+          if (selCell) selCell.classList.remove("sel");
+          selCell = cell; cell.classList.add("sel");
+          readout.innerHTML = sc == null
+            ? `${fmtShort(dk)} · <span class="muted">no score</span>`
+            : `${fmtShort(dk)} · <span style="color:${cat.color}">${sc} ${cat.short}</span>`;
+        });
         grid.appendChild(cell);
       }
       if (!any) return null;
       const swatches = [...SCORE_CATS].sort((a, b) => a.min - b.min).map((c) => el("span", { style: `width:11px;height:11px;border-radius:3px;display:inline-block;background:${c.color}`, title: c.short }));
       return acCard("Calendar Heat Map", `Last ${nDays} days · colored by autonomic score`, [
         grid,
+        readout,
         el("div.ac-heat-legend", {}, ["Crash", ...swatches, "Excellent"]),
         el("div.ac-heat-legend", {}, [el("span.ac-heat-cell.clean", { style: "background:var(--surface-2)" }), "ring = clean day"]),
       ]);
