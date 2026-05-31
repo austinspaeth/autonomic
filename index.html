@@ -5436,32 +5436,37 @@
       if (!animate) { void thumb.offsetWidth; thumb.style.transition = ""; }
     }
 
+    // Shared segmented range pill (Analysis + Insights). Like the bottom-nav
+    // indicator, the thumb is moved rather than rebuilt, so it tweens from its
+    // current position. onPick runs on the next frame so a heavy re-render can't
+    // block the thumb's slide (which made Analysis appear to jump from "day").
+    function buildRangePill(modes, current, onPick) {
+      const pill = el("div.range-pill", {}, [el("span.rp-thumb")]);
+      const btns = {};
+      modes.forEach(([m, lbl]) => {
+        const b = el("button.rp-opt" + (current === m ? ".active" : ""), { text: lbl, onclick: () => {
+          if (b.classList.contains("active")) return;
+          modes.forEach(([k]) => btns[k].classList.toggle("active", k === m));
+          positionRangePill(pill, true);
+          requestAnimationFrame(() => onPick(m));
+        } });
+        btns[m] = b; pill.appendChild(b);
+      });
+      requestAnimationFrame(() => positionRangePill(pill, false));
+      return pill;
+    }
+
     function renderAnalysis() {
       const root = $("#analysisContent");
       root.innerHTML = "";
-      // The range pill is built once and persists across option changes — only
-      // its thumb is moved (so it tweens) and the content below is re-rendered.
-      // Rebuilding the pill each click would make a fresh thumb with nothing to
-      // animate from, which is why it used to jump instead of slide.
-      const pill = el("div.range-pill", {}, [el("span.rp-thumb")]);
-      const opts = [["day", "Day"], ["week", "Week"], ["month", "Month"], ["year", "Year"]];
-      const btns = {};
-      opts.forEach(([m, lbl]) => {
-        const b = el("button.rp-opt" + (analysisMode === m ? ".active" : ""), { text: lbl, onclick: () => setMode(m) });
-        btns[m] = b; pill.appendChild(b);
-      });
-      root.appendChild(pill);
       const content = el("div");
+      const pill = buildRangePill(
+        [["day", "Day"], ["week", "Week"], ["month", "Month"], ["year", "Year"]],
+        analysisMode,
+        (m) => { analysisMode = m; renderAnalysisContent(content); }
+      );
+      root.appendChild(pill);
       root.appendChild(content);
-      requestAnimationFrame(() => positionRangePill(pill, false));
-
-      function setMode(m) {
-        if (m === analysisMode) return;
-        analysisMode = m;
-        opts.forEach(([k]) => btns[k].classList.toggle("active", k === m));
-        positionRangePill(pill, true);
-        renderAnalysisContent(content);
-      }
       renderAnalysisContent(content);
     }
 
@@ -6423,6 +6428,9 @@ Address each focus area as its own clearly-labeled top-level section in your res
       );
       positionIndicator();
       renderHeaderFlags();
+      // Each view starts scrolled to the top. Set scrollTop directly so the
+      // page's smooth-scroll behavior doesn't animate the jump.
+      document.documentElement.scrollTop = 0; window.scrollTo(0, 0);
       if (name === "analysis") renderAnalysis();
       if (name === "milestones") renderMilestones();
       if (name === "reports") renderReports();
