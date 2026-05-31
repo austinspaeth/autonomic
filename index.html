@@ -945,22 +945,6 @@
     width: 8px; height: 8px; border-radius: 50%; background: var(--accent);
   }
   /* ---------- Analytics (expanded) ---------- */
-  .range-pill {
-    position: relative; display: flex; gap: 2px;
-    background: var(--surface-2); border: 1px solid var(--border);
-    border-radius: 999px; padding: 4px; margin-bottom: var(--gap);
-  }
-  .range-pill .rp-thumb {
-    position: absolute; top: 4px; bottom: 4px; left: 4px; width: 0;
-    background: var(--accent); border-radius: 999px; box-shadow: var(--shadow); z-index: 0;
-    transition: left .34s cubic-bezier(.34,1.25,.5,1), width .34s cubic-bezier(.34,1.25,.5,1);
-  }
-  .rp-opt {
-    position: relative; z-index: 1; flex: 1; border: none; background: none;
-    font-family: inherit; font-weight: 600; font-size: 13px; color: var(--text-dim);
-    padding: 8px 0; border-radius: 999px; cursor: pointer; transition: color .25s;
-  }
-  .rp-opt.active { color: #fff; }
 
   .ac-sub {
     font-size: 11px; color: var(--text-dim); margin: -4px 0 12px;
@@ -5426,14 +5410,6 @@
       const card = acMilestones();
       if (card) host.appendChild(card);
       else host.appendChild(el("div.muted", { text: "Log readings, sleep, and clean days to start unlocking recovery milestones." }));
-    }
-
-    function positionRangePill(pill, animate = true) {
-      const thumb = pill.querySelector(".rp-thumb"), active = pill.querySelector(".rp-opt.active");
-      if (!thumb || !active) return;
-      if (!animate) thumb.style.transition = "none";
-      thumb.style.left = active.offsetLeft + "px"; thumb.style.width = active.offsetWidth + "px";
-      if (!animate) { void thumb.offsetWidth; thumb.style.transition = ""; }
     }
 
     function renderAnalysis() {
