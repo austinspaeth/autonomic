@@ -966,8 +966,10 @@
   .ac-block { margin-bottom: 16px; }
   .ac-block:last-child { margin-bottom: 0; }
   .ac-block-label { font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
-  .ac-chart-wrap { width: 100%; }
-  .ac-svg { width: 100%; height: auto; display: block; overflow: visible; }
+  .ac-chart-wrap { width: 100%; -webkit-user-select: none; user-select: none; }
+  .ac-svg { width: 100%; height: auto; display: block; overflow: visible; touch-action: pan-y; cursor: crosshair; }
+  /* Shared axis-label style for every chart/sparkline */
+  .chart-axis { font-size: 9px; fill: var(--text-dim); }
   .ac-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; font-size: 11px; color: var(--text-dim); }
   .ac-leg { display: inline-flex; align-items: center; gap: 5px; }
   .ac-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
@@ -2961,7 +2963,7 @@
       for (let t = min; t <= max + 1e-9; t += sc.step) {
         const yy = yAt(t);
         svg.appendChild(mk("line", { x1: padL, x2: padL + innerW, y1: yy, y2: yy, stroke: "var(--border)", "stroke-width": 1, "vector-effect": "non-scaling-stroke", opacity: 0.5 }));
-        const tx = mk("text", { x: padL - 4, y: yy + 3, "text-anchor": "end", "font-size": 9, fill: "var(--text-dim)", style: "font-size:9px" });
+        const tx = mk("text", { x: padL - 4, y: yy + 3, "text-anchor": "end", class: "chart-axis" });
         tx.textContent = fmtNum(t); svg.appendChild(tx);
       }
       // x ticks
