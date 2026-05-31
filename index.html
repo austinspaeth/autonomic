@@ -4852,6 +4852,7 @@
         histRows.length ? el("div.ac-block", {}, [el("div.ac-block-label", { text: "Streak length distribution" }), acBars(histRows, {})]) : null,
         breakRows.length ? el("div.ac-block", {}, [el("div.ac-block-label", { text: "Most common reasons streaks break" }), acBars(breakRows, {})]) : null,
         dowRows.length ? el("div.ac-block", {}, [el("div.ac-block-label", { text: "Day-of-week streaks break" }), acBars(dowRows, {})]) : null,
+        trigRows.length ? el("div.ac-block", {}, [el("div.ac-block-label", { text: "Trigger foods" }), acBars(trigRows, {})]) : null,
       ]);
     }
 
