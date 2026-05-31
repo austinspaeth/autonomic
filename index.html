@@ -121,7 +121,7 @@
   .icon-btn.is-sun { font-size: 34px; }
   /* Header caution icon — only shown when there are active watch flags. */
   .flags-btn { color: #f59e0b; }
-  .flags-btn svg { width: 22px; height: 22px; }
+  .flags-btn svg { width: 22px; height: 22px; display: block; }
 
   /* ---------- Date bar ---------- */
   .datebar {
@@ -966,6 +966,29 @@
     font-size: 11px; color: var(--text-dim); margin: -4px 0 12px;
     font-weight: 600; letter-spacing: .02em;
   }
+  /* Analysis category navigation: a 3-per-row card grid that slides out to the
+     left as the chosen category's content slides in from the right. */
+  .ac-nav { overflow: hidden; }
+  .ac-track { display: flex; width: 200%; transform: translateX(0); transition: transform .32s ease, height .32s ease; }
+  .ac-track.show-detail { transform: translateX(-50%); }
+  .ac-track.no-anim { transition: none; }
+  .ac-cat-grid, .ac-cat-detail { width: 50%; flex: 0 0 50%; align-self: flex-start; }
+  .ac-cat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; align-content: start; }
+  .ac-cat-card {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 7px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 13px 12px; cursor: pointer; box-shadow: var(--shadow);
+    text-align: left; font-family: inherit; color: var(--text);
+  }
+  .ac-cat-card:active { background: var(--surface-2); }
+  .ac-cat-ic { color: var(--accent); }
+  .ac-cat-ic svg { width: 24px; height: 24px; display: block; }
+  .ac-cat-title { font-size: 13px; font-weight: 700; line-height: 1.15; }
+  .ac-cat-desc { font-size: 11px; color: var(--text-dim); line-height: 1.3; }
+  .ac-detail-head { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+  .ac-back-btn { flex: none; margin-left: -8px; }
+  .ac-back-btn svg { width: 22px; height: 22px; display: block; }
+  .ac-detail-title { font-size: 18px; font-weight: 700; }
   .ac-block { margin-bottom: 16px; }
   .ac-block:last-child { margin-bottom: 0; }
   .ac-block-label { font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
@@ -1288,6 +1311,7 @@
       moon: svgIcon('<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>'),
       user: svgIcon('<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>'),
       chevron: svgIcon('<path d="m6 9 6 6 6-6"/>'),
+      arrowLeft: svgIcon('<path d="M19 12H5"/><path d="m12 19-7-7 7-7"/>'),
       standing: svgIcon('<circle cx="12" cy="4" r="1.5"/><path d="m9 20 3-6 3 6"/><path d="m6 9 6 2 6-2"/><path d="M12 11v3"/>'),
       poop: svgIcon('<path d="M7.5 21h9a3 3 0 0 0 1.6-5.5A3 3 0 0 0 16 10a3 3 0 0 0-3-4 3 3 0 0 0-2 .8A3 3 0 0 0 8 10a3 3 0 0 0-2.1 5.5A3 3 0 0 0 7.5 21Z"/><path d="M10.5 15h.01"/><path d="M13.5 15h.01"/>'),
       cup: svgIcon('<path d="M6 3h12l-1.1 15.3a2 2 0 0 1-2 1.7H9.1a2 2 0 0 1-2-1.7L6 3Z"/><path d="M6.5 9.5h11"/>'),
@@ -1632,6 +1656,8 @@
     let state = load();
     let currentKey = keyOf(new Date());
     let analysisMode = "day"; // day | week | month | year
+    let analysisCat = null;   // open Analysis category id, or null for the card grid
+    let analysisEls = null;   // refs to the current Analysis nav panels (for sliding)
     let reportRange = "week"; // AI Insights time range: "day" | "week" | "month"
     const reportSelected = new Set(); // ids of report cards chosen for the combined prompt
 
@@ -1998,16 +2024,23 @@
       const trigCount = Object.keys(triggers).reduce((s, k) => s + (triggers[k] > 0 ? triggers[k] : 0), 0);
       const water = (d.food && d.food.water) || 0;
       const hrs = sleepHours(dk);
+      const sleepLogged = hrs != null;
+      // Required meds — only the still-missing ones feed the "still needed" hint
+      // (`need`), while the full set stays the checklist label.
+      const medReq = [["allegra", "Allegra"], ["pepsidAc", "Pepcid"], ["magGlycinate", "Mag glycinate"]];
+      const missingMeds = medReq.filter(([t]) => !hasMed(t));
       // Dinner by 5pm, derived from logged meals: met if a dinner was eaten by
       // 5:00pm; broken if every logged dinner is later; pending until a dinner
       // is logged (so it neither counts nor breaks the day).
       const dinners = ((d.food && d.food.meals) || []).filter((m) => m.type === "dinner" && m.time);
+      // `broken` marks a hard criterion that has concretely failed (and so can't
+      // be recovered today) — distinct from one that just isn't logged yet.
       const criteria = [
-        { key: "triggers", label: "No trigger foods", pass: trigCount === 0, hard: true },
+        { key: "triggers", label: "No trigger foods", pass: trigCount === 0, hard: true, broken: trigCount > 0 },
         { key: "water", label: "Water (2.5 L)", pass: water >= 2.5 },
         { key: "dinner", label: "Dinner by 5pm", pass: dinners.some((m) => m.time <= "17:00"), pending: dinners.length === 0 },
-        { key: "meds", label: "Allegra, Pepcid, Mag glycinate", pass: hasMed("allegra") && hasMed("pepsidAc") && hasMed("magGlycinate") },
-        { key: "sleep", label: "Sleep 7h or more", pass: hrs != null && hrs >= 7, hard: true },
+        { key: "meds", label: "Allegra, Pepcid, Mag glycinate", pass: missingMeds.length === 0, need: missingMeds.map(([, n]) => n).join(", ") },
+        { key: "sleep", label: "Sleep 7h or more", pass: sleepLogged && hrs >= 7, hard: true, broken: sleepLogged && hrs < 7 },
       ];
       const clean = criteria.filter((c) => !c.pending).every((c) => c.pass);
       return { clean, criteria };
@@ -2166,15 +2199,22 @@
         if (c.clean) {
           sub = "Clean day. Streak continues.";
         } else {
-          const hardFail = c.criteria.some((x) => x.hard && !x.pass && !x.pending);
-          const needed = c.criteria.filter((x) => !x.pass && !x.pending && !x.hard).map((x) => x.label.toLowerCase());
+          // `broken` = a hard criterion that has concretely failed (can't be
+          // recovered today). Everything else not yet passing is "still needed",
+          // including dinner-not-logged and meds (which list only the missing
+          // ones via `need`).
+          const hardFail = c.criteria.some((x) => x.broken);
+          const needLabel = (x) => (x.need != null ? x.need : x.label).toLowerCase();
+          const needed = c.criteria.filter((x) => !x.pass && !x.broken).map(needLabel);
           if (si.isToday) {
             // Once a non-recoverable criterion is missed, the day can't be saved.
             sub = hardFail
               ? "Too late for today. Try again to start fresh tomorrow."
-              : `Today is day ${si.current + 1}. Still needed: ${needed.join(", ")}.`;
+              : needed.length
+                ? `Today is day ${si.current + 1}. Still needed: ${needed.join(", ")}.`
+                : `Today is day ${si.current + 1}.`;
           } else {
-            const reasons = c.criteria.filter((x) => !x.pass && !x.pending).map((x) => x.label.toLowerCase()).slice(0, 3).join(", ");
+            const reasons = c.criteria.filter((x) => !x.pass && !x.pending).map(needLabel).slice(0, 3).join(", ");
             sub = `Not a clean day. ${reasons}.`;
           }
         }
@@ -2201,7 +2241,7 @@
           let st;
           if (x.pending) st = "pending";
           else if (x.pass) st = "met";
-          else if (!si.isToday || x.hard) st = "broken";
+          else if (!si.isToday || x.broken) st = "broken";
           else st = "todo";
           list.appendChild(el("span.crit." + st, {}, [
             el("span.crit-dot", { text: st === "met" ? "✓" : "" }),
@@ -5368,13 +5408,68 @@
       if (!buckets.some((b) => b.days.length)) { root.appendChild(el("div.chart-empty", { text: "No data logged yet." })); return; }
 
       const safe = (fn) => { try { return fn(); } catch (e) { console.error("analytics container failed", e); return null; } };
-      [
-        () => acAutonomicOutlook(buckets), () => acRecoveryPhase(), () => acComparison(buckets), () => acHeatMapCard(), () => acWeekPattern(),
-        () => acAllHrv(buckets), () => acStructuredHrv(buckets), () => acUnstructuredHrv(buckets), () => acSubjective(buckets), () => acMorning(buckets), () => acEvening(buckets),
-        () => acBloodPressure(buckets), () => acRestingHr(buckets), () => acBloodOxygen(buckets), () => acEcg(buckets), () => acOrthostatic(buckets), () => acExtremeEvents(),
-        () => acSleep(buckets), () => acActivity(buckets), () => acExerciseProgression(buckets), () => acHydration(buckets), () => acNutrition(buckets), () => acBowel(buckets), () => acMeds(buckets),
-        () => acCleanDays(), () => acStreakAnalytics(), () => acAdherence(buckets), () => acInterventionImpact(), () => acTriggerImpact(), () => acCorrelations(),
-      ].map(safe).filter(Boolean).forEach((c) => root.appendChild(c));
+
+      // Categories: each is a card in the grid; tapping one slides its sections
+      // in from the right. `sections` are thunks built lazily (and safely).
+      const CATS = [
+        { id: "outlook", icon: ICONS.gauge, title: "Autonomic Outlook", desc: "Recovery score, trends & adherence",
+          sections: [() => acAutonomicOutlook(buckets), () => acRecoveryPhase(), () => acComparison(buckets), () => acHeatMapCard(), () => acWeekPattern(),
+            () => acSubjective(buckets), () => acCleanDays(), () => acStreakAnalytics(), () => acAdherence(buckets), () => acInterventionImpact(), () => acCorrelations()] },
+        { id: "hrv", icon: ICONS.heartPulse, title: "HRV", desc: "Heart-rate variability readings",
+          sections: [() => acAllHrv(buckets), () => acStructuredHrv(buckets), () => acUnstructuredHrv(buckets), () => acMorning(buckets), () => acEvening(buckets)] },
+        { id: "vitals", icon: ICONS.heart, title: "Vitals", desc: "BP, heart rate, SpO₂ & ECG",
+          sections: [() => acBloodPressure(buckets), () => acRestingHr(buckets), () => acBloodOxygen(buckets), () => acEcg(buckets)] },
+        { id: "pots", icon: ICONS.standing, title: "POTS", desc: "Orthostatic & extreme events",
+          sections: [() => acOrthostatic(buckets), () => acExtremeEvents()] },
+        { id: "sleep", icon: ICONS.moon, title: "Sleep", desc: "Sleep duration & quality",
+          sections: [() => acSleep(buckets)] },
+        { id: "activity", icon: ICONS.bike, title: "Activity", desc: "Workouts & exercise progression",
+          sections: [() => acActivity(buckets), () => acExerciseProgression(buckets)] },
+        { id: "food", icon: ICONS.utensils, title: "Food & Drink", desc: "Hydration, nutrition & triggers",
+          sections: [() => acHydration(buckets), () => acNutrition(buckets), () => acBowel(buckets), () => acTriggerImpact()] },
+        { id: "supps", icon: ICONS.pill, title: "Supplements", desc: "Medications & supplements",
+          sections: [() => acMeds(buckets)] },
+      ];
+
+      const grid = el("div.ac-cat-grid", {}, CATS.map((c) =>
+        el("button.ac-cat-card", { type: "button", onclick: () => openCat(c.id) }, [
+          el("span.ac-cat-ic", { html: c.icon }),
+          el("span.ac-cat-title", { text: c.title }),
+          el("span.ac-cat-desc", { text: c.desc }),
+        ])));
+      const detail = el("div.ac-cat-detail");
+      const track = el("div.ac-track", {}, [grid, detail]);
+      root.appendChild(el("div.ac-nav", {}, [track]));
+      analysisEls = { track, detail, cats: CATS, safe };
+
+      function buildDetail(catId, animate) {
+        const cat = CATS.find((c) => c.id === catId); if (!cat) return;
+        detail.innerHTML = "";
+        detail.appendChild(el("div.ac-detail-head", {}, [
+          el("button.icon-btn.ac-back-btn", { type: "button", html: ICONS.arrowLeft, "aria-label": "Back to categories", onclick: goBack }),
+          el("div.ac-detail-title", { text: cat.title }),
+        ]));
+        const built = cat.sections.map(safe).filter(Boolean);
+        if (built.length) built.forEach((c) => detail.appendChild(c));
+        else detail.appendChild(el("div.chart-empty", { text: "No data logged yet for this category." }));
+        analysisCat = catId;
+        if (animate) {
+          requestAnimationFrame(() => track.classList.add("show-detail"));
+        } else {
+          track.classList.add("no-anim", "show-detail");
+          requestAnimationFrame(() => { void track.offsetWidth; track.classList.remove("no-anim"); });
+        }
+      }
+      function openCat(catId) { buildDetail(catId, true); }
+      function goBack() {
+        analysisCat = null;
+        track.classList.remove("show-detail");
+        setTimeout(() => { if (!analysisCat) detail.innerHTML = ""; }, 340);
+      }
+
+      // Re-entering the same category after a range/view change keeps you in place.
+      if (analysisCat && CATS.some((c) => c.id === analysisCat)) buildDetail(analysisCat, false);
+      else analysisCat = null;
     }
 
     /* ---------------- AI Insights (Reports) ----------------
