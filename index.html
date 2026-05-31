@@ -5436,36 +5436,18 @@
       if (!animate) { void thumb.offsetWidth; thumb.style.transition = ""; }
     }
 
-    // Shared segmented range pill (Analysis + Insights). Like the bottom-nav
-    // indicator, the thumb is moved rather than rebuilt, so it tweens from its
-    // current position. onPick runs on the next frame so a heavy re-render can't
-    // block the thumb's slide (which made Analysis appear to jump from "day").
-    function buildRangePill(modes, current, onPick) {
-      const pill = el("div.range-pill", {}, [el("span.rp-thumb")]);
-      const btns = {};
-      modes.forEach(([m, lbl]) => {
-        const b = el("button.rp-opt" + (current === m ? ".active" : ""), { text: lbl, onclick: () => {
-          if (b.classList.contains("active")) return;
-          modes.forEach(([k]) => btns[k].classList.toggle("active", k === m));
-          positionRangePill(pill, true);
-          requestAnimationFrame(() => onPick(m));
-        } });
-        btns[m] = b; pill.appendChild(b);
-      });
-      requestAnimationFrame(() => positionRangePill(pill, false));
-      return pill;
-    }
-
     function renderAnalysis() {
       const root = $("#analysisContent");
       root.innerHTML = "";
       const content = el("div");
-      const pill = buildRangePill(
-        [["day", "Day"], ["week", "Week"], ["month", "Month"], ["year", "Year"]],
+      // Reuse the shared segmented control (same one Insights uses); its pill
+      // tweens from the current option because only the thumb is transformed and
+      // the content re-renders on the next frame rather than rebuilding the pill.
+      root.appendChild(segmented(
+        [{ val: "day", label: "Day" }, { val: "week", label: "Week" }, { val: "month", label: "Month" }, { val: "year", label: "Year" }],
         analysisMode,
-        (m) => { analysisMode = m; renderAnalysisContent(content); }
-      );
-      root.appendChild(pill);
+        (v) => { analysisMode = v; requestAnimationFrame(() => renderAnalysisContent(content)); }
+      ));
       root.appendChild(content);
       renderAnalysisContent(content);
     }
@@ -6304,9 +6286,6 @@ Address each focus area as its own clearly-labeled top-level section in your res
     function renderReports() {
       const root = $("#reportsContent");
       root.innerHTML = "";
-      root.appendChild(el("div.report-intro", {
-        text: "1. Pick a time range. 2. Tap the reports you want — combine as many as you like to focus on exactly the data you care about. 3. Tap Generate Report Prompt to stitch them into one prompt, then paste it into Claude or ChatGPT.",
-      }));
       root.appendChild(segmented(
         [{ val: "day", label: "Day" }, { val: "week", label: "Week" }, { val: "month", label: "Month" }, { val: "year", label: "Year" }],
         reportRange,
