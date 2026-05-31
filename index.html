@@ -4170,6 +4170,10 @@
     }
 
     // ----- SVG line chart over buckets -----
+    // Mirrors the summary-drawer sparklines (buildSpark): no zone-fill
+    // backgrounds — single-metric lines take a vertical grade gradient, a
+    // "Show zones" link toggles dashed boundary lines, axis labels share one
+    // style, and you can drag/hover to read each bucket's value.
     function acChart(buckets, series, opts) {
       opts = opts || {};
       const ns = "http://www.w3.org/2000/svg";
@@ -4184,27 +4188,103 @@
       const innerW = W - padL - padR, n = buckets.length;
       const xAt = (i) => padL + (n <= 1 ? innerW / 2 : (i / (n - 1)) * innerW);
       const yAt = (v) => padT + (1 - (v - min) / (max - min)) * (H - padT - padB);
-      const clamp = (v) => Math.max(min, Math.min(max, v));
       const svg = mk("svg", { viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: "none", class: "ac-svg" });
+      const zones = (opts.zones && opts.zones.length) ? opts.zones : null;
+      const zoneColorAt = (v) => { if (!zones) return null; for (const z of zones) if (v >= z.from && v < z.to) return z.color; return zones[zones.length - 1].color; };
 
-      (opts.zones || []).forEach((z) => { const ya = yAt(clamp(z.to)), yb = yAt(clamp(z.from)); if (Math.abs(yb - ya) < 0.4) return; svg.appendChild(mk("rect", { x: padL, y: Math.min(ya, yb), width: innerW, height: Math.abs(yb - ya), fill: z.color, opacity: 0.10 })); });
-      if (opts.target) { const ya = yAt(clamp(opts.target.to)), yb = yAt(clamp(opts.target.from)); svg.appendChild(mk("rect", { x: padL, y: Math.min(ya, yb), width: innerW, height: Math.abs(yb - ya) || 1.5, fill: opts.target.color || "#3b82f6", opacity: 0.18 })); }
-
+      // y grid + labels
       [min, (min + max) / 2, max].forEach((val) => {
         const y = yAt(val);
         svg.appendChild(mk("line", { x1: padL, x2: W - padR, y1: y, y2: y, stroke: "var(--border)", "stroke-width": 1, "vector-effect": "non-scaling-stroke", opacity: 0.6 }));
-        const tx = mk("text", { x: padL - 4, y: y + 3, "text-anchor": "end", fill: "var(--text-dim)", style: "font-size:9px" }); tx.textContent = fmtNum(opts.integer ? Math.round(val) : val); svg.appendChild(tx);
+        const tx = mk("text", { x: padL - 4, y: y + 3, "text-anchor": "end", class: "chart-axis" }); tx.textContent = fmtNum(opts.integer ? Math.round(val) : val); svg.appendChild(tx);
       });
+      // x labels
       const step = Math.max(1, Math.ceil(n / 6));
-      buckets.forEach((b, i) => { if (i % step !== 0 && i !== n - 1) return; const tx = mk("text", { x: xAt(i), y: H - 6, "text-anchor": "middle", fill: "var(--text-dim)", style: "font-size:8px" }); tx.textContent = b.label; svg.appendChild(tx); });
+      buckets.forEach((b, i) => { if (i % step !== 0 && i !== n - 1) return; const tx = mk("text", { x: xAt(i), y: H - 6, "text-anchor": "middle", class: "chart-axis" }); tx.textContent = b.label; svg.appendChild(tx); });
+
+      // Optional zone-boundary dashed lines (toggled by "Show zones"), plus any
+      // target band shown as a pair of dashed lines in its color.
+      const guides = [];
+      if (zones) for (let i = 0; i < zones.length - 1; i++) { const bv = zones[i].to; if (bv > min && bv < max) guides.push({ v: bv, color: zones[i].color }); }
+      if (opts.target) [opts.target.from, opts.target.to].forEach((bv) => { if (bv > min && bv < max) guides.push({ v: bv, color: opts.target.color || "#3b82f6" }); });
+      let guideG = null;
+      if (guides.length) {
+        guideG = mk("g", {}); guideG.style.display = "none";
+        guides.forEach((g) => guideG.appendChild(mk("line", { x1: padL, x2: padL + innerW, y1: yAt(g.v), y2: yAt(g.v), stroke: g.color, "stroke-width": 1.5, "stroke-dasharray": "4 3", "vector-effect": "non-scaling-stroke", opacity: 0.95 })));
+        svg.appendChild(guideG);
+      }
+
+      // Single-metric charts get the grade gradient on the line (like the
+      // summary sparklines); multi-series comparisons keep distinct colors so
+      // the legend stays meaningful.
+      const mainSeries = series.filter((s) => !s.dashed);
+      const gradientSeries = (zones && mainSeries.length === 1) ? mainSeries[0] : null;
+      const dotColor = (s, v) => {
+        if (s.pointColorFn) return s.pointColorFn(v);
+        if (s.pointBands) { const c = catFromBands(v, s.pointBands); if (c && SCORE_COLORS[c]) return SCORE_COLORS[c]; }
+        if (s === gradientSeries) return zoneColorAt(v) || s.color;
+        return s.color;
+      };
 
       series.forEach((s) => {
         const pts = []; s.values.forEach((v, i) => { if (v != null && !isNaN(v)) pts.push([xAt(i), yAt(v), v]); });
         if (!pts.length) return;
-        if (pts.length >= 2) { const path = mk("path", { d: smoothPath(pts.map((p) => [p[0], p[1]])), fill: "none", stroke: s.color, "stroke-width": 2.4, "vector-effect": "non-scaling-stroke", "stroke-linejoin": "round", "stroke-linecap": "round" }); if (s.dashed) path.setAttribute("stroke-dasharray", "5 4"); svg.appendChild(path); }
-        pts.forEach((p) => { let col = s.color; if (s.pointColorFn) col = s.pointColorFn(p[2]); else if (s.pointBands) { const c = catFromBands(p[2], s.pointBands); if (c && SCORE_COLORS[c]) col = SCORE_COLORS[c]; } svg.appendChild(mk("circle", { cx: p[0], cy: p[1], r: pts.length > 20 ? 1.8 : 2.6, fill: col })); });
+        let stroke = s.color;
+        if (s === gradientSeries) {
+          const gid = "acg" + (acChart._n = (acChart._n || 0) + 1);
+          const grad = mk("linearGradient", { id: gid, gradientUnits: "userSpaceOnUse", x1: 0, y1: padT, x2: 0, y2: H - padB });
+          const offAt = (v) => Math.max(0, Math.min(1, 1 - (v - min) / (max - min)));
+          const addStop = (o, c) => grad.appendChild(mk("stop", { offset: o, "stop-color": c }));
+          addStop(0, zoneColorAt(max - 1e-9));
+          zones.map((z) => z.to).filter((m) => m > min && m < max).sort((a, b) => b - a).forEach((bv) => { addStop(offAt(bv), zoneColorAt(bv + 1e-9)); addStop(offAt(bv), zoneColorAt(bv - 1e-9)); });
+          addStop(1, zoneColorAt(min + 1e-9));
+          const defs = mk("defs", {}); defs.appendChild(grad); svg.appendChild(defs);
+          stroke = `url(#${gid})`;
+        }
+        if (pts.length >= 2) { const path = mk("path", { d: smoothPath(pts.map((p) => [p[0], p[1]])), fill: "none", stroke, "stroke-width": 2.4, "vector-effect": "non-scaling-stroke", "stroke-linejoin": "round", "stroke-linecap": "round" }); if (s.dashed) path.setAttribute("stroke-dasharray", "5 4"); svg.appendChild(path); }
+        pts.forEach((p) => svg.appendChild(mk("circle", { cx: p[0], cy: p[1], r: pts.length > 20 ? 1.8 : 2.6, fill: dotColor(s, p[2]) })));
       });
-      return el("div.ac-chart-wrap", {}, [svg]);
+
+      // Drag / hover readout: a marker line + a dot per series + a value line.
+      const marker = mk("line", { y1: padT, y2: H - padB, stroke: "var(--text)", "stroke-width": 1, "vector-effect": "non-scaling-stroke", opacity: 0 });
+      svg.appendChild(marker);
+      const hdots = series.map(() => { const c = mk("circle", { r: 3.4, opacity: 0 }); svg.appendChild(c); return c; });
+
+      const wrap = el("div.ac-chart-wrap");
+      const readout = el("div.spark-readout");
+      const top = el("div.spark-top", {}, [readout]);
+      if (guideG) {
+        const btn = el("button.spark-zones-btn", { type: "button", text: "Show zones" });
+        btn.addEventListener("click", () => { const on = guideG.style.display === "none"; guideG.style.display = on ? "" : "none"; btn.textContent = on ? "Hide zones" : "Show zones"; });
+        top.appendChild(btn);
+      }
+      wrap.appendChild(top); wrap.appendChild(svg);
+
+      const multi = series.filter((s) => s.label).length > 1;
+      const show = (i) => {
+        i = Math.max(0, Math.min(n - 1, i));
+        const x = xAt(i);
+        marker.setAttribute("x1", x); marker.setAttribute("x2", x); marker.setAttribute("opacity", 0.35);
+        const vals = [];
+        series.forEach((s, si) => {
+          const v = s.values[i];
+          if (v == null || isNaN(v)) { hdots[si].setAttribute("opacity", 0); return; }
+          const col = dotColor(s, v);
+          hdots[si].setAttribute("cx", x); hdots[si].setAttribute("cy", yAt(v)); hdots[si].setAttribute("fill", col); hdots[si].setAttribute("opacity", 1);
+          vals.push((multi && s.label ? s.label + " " : "") + fmtNum(opts.integer ? Math.round(v) : v));
+        });
+        readout.textContent = vals.length ? `${buckets[i].label}: ${vals.join(" · ")}` : buckets[i].label;
+      };
+      const idxFromEvent = (e) => { const rc = svg.getBoundingClientRect(); const px = ((e.clientX - rc.left) / (rc.width || 1)) * W; return Math.round(((px - padL) / innerW) * (n - 1)); };
+      let active = false;
+      svg.addEventListener("pointerdown", (e) => { active = true; try { svg.setPointerCapture(e.pointerId); } catch (_) {} show(idxFromEvent(e)); });
+      svg.addEventListener("pointermove", (e) => { if (active) show(idxFromEvent(e)); });
+      const end = () => { active = false; };
+      svg.addEventListener("pointerup", end); svg.addEventListener("pointercancel", end);
+      // Default the readout/marker to the latest bucket that has data.
+      let lastIdx = -1; for (let i = n - 1; i >= 0; i--) { if (series.some((s) => s.values[i] != null && !isNaN(s.values[i]))) { lastIdx = i; break; } }
+      if (lastIdx >= 0) show(lastIdx);
+      return wrap;
     }
 
     function acLegend(series) {
@@ -4833,7 +4913,7 @@
       const xAt = (v) => padL + (v - xmin) / (xmax - xmin) * (W - padL - padR);
       const yAt = (v) => padT + (1 - (v - ymin) / (ymax - ymin)) * (H - padT - padB);
       const svg = mk("svg", { viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: "none", class: "ac-svg" });
-      [ymin, (ymin + ymax) / 2, ymax].forEach((v) => { const y = yAt(v); svg.appendChild(mk("line", { x1: padL, x2: W - padR, y1: y, y2: y, stroke: "var(--border)", "stroke-width": 1, "vector-effect": "non-scaling-stroke", opacity: 0.5 })); const tx = mk("text", { x: padL - 4, y: y + 3, "text-anchor": "end", fill: "var(--text-dim)", style: "font-size:9px" }); tx.textContent = fmtNum(Math.round(v)); svg.appendChild(tx); });
+      [ymin, (ymin + ymax) / 2, ymax].forEach((v) => { const y = yAt(v); svg.appendChild(mk("line", { x1: padL, x2: W - padR, y1: y, y2: y, stroke: "var(--border)", "stroke-width": 1, "vector-effect": "non-scaling-stroke", opacity: 0.5 })); const tx = mk("text", { x: padL - 4, y: y + 3, "text-anchor": "end", class: "chart-axis" }); tx.textContent = fmtNum(Math.round(v)); svg.appendChild(tx); });
       points.forEach((p) => svg.appendChild(mk("circle", { cx: xAt(p.x), cy: yAt(p.y), r: 3, fill: "var(--accent)", opacity: 0.7 })));
       // simple regression line
       const r = acPearson(points.map((p) => [p.x, p.y]));
