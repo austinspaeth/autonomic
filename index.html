@@ -1367,6 +1367,8 @@
       standing: svgIcon('<circle cx="12" cy="4" r="1.5"/><path d="m9 20 3-6 3 6"/><path d="m6 9 6 2 6-2"/><path d="M12 11v3"/>'),
       poop: svgIcon('<path d="M7.5 21h9a3 3 0 0 0 1.6-5.5A3 3 0 0 0 16 10a3 3 0 0 0-3-4 3 3 0 0 0-2 .8A3 3 0 0 0 8 10a3 3 0 0 0-2.1 5.5A3 3 0 0 0 7.5 21Z"/><path d="M10.5 15h.01"/><path d="M13.5 15h.01"/>'),
       cup: svgIcon('<path d="M6 3h12l-1.1 15.3a2 2 0 0 1-2 1.7H9.1a2 2 0 0 1-2-1.7L6 3Z"/><path d="M6.5 9.5h11"/>'),
+      sun: svgIcon('<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>'),
+      snowflake: svgIcon('<path d="M12 2v20"/><path d="M2 12h20"/><path d="m4.9 4.9 14.2 14.2"/><path d="m19.1 4.9-14.2 14.2"/><path d="m9.5 4.5 2.5 2.5 2.5-2.5"/><path d="m9.5 19.5 2.5-2.5 2.5 2.5"/><path d="m4.5 9.5 2.5 2.5-2.5 2.5"/><path d="m19.5 9.5-2.5 2.5 2.5 2.5"/>'),
       utensils: svgIcon('<path d="M3 2v7c0 1.1.9 2 2 2h0c1.1 0 2-.9 2-2V2"/><path d="M5 11v11"/><path d="M19 2c-1.7 0-3 1.8-3 4v5h3"/><path d="M19 2v20"/>'),
       // ---- AI Insights / report card icons ----
       ai: svgIcon('<path d="M12 3l1.4 4.1L17.5 8l-3.6 1.4L12 13l-1.9-3.6L6.5 8l4.1-.9z"/><path d="M18.5 14l.8 2.3 2.2.8-2.2.8-.8 2.3-.8-2.3-2.2-.8 2.2-.8z"/><path d="M5 15l.6 1.6L7 17l-1.4.4L5 19l-.6-1.6L3 17l1.4-.4z"/>'),
@@ -1672,24 +1674,33 @@
       sick: { label: "Sick", icon: ICONS.alert, fields: [], noTime: true },
     };
 
-    // Trigger foods/drinks (programmatic). Logged with an occurrence count per day.
-    const trig = (label) => ({ label, icon: ICONS.alert });
+    // Triggers (programmatic). Logged with an occurrence count per day. Each
+    // carries an icon matching its kind: food (fork), drink (cup), or an
+    // environmental/weather glyph for the non-ingested triggers.
+    const trig = (label, icon) => ({ label, icon: icon || ICONS.utensils });
     const TRIGGER_TYPES = {
-      histamine: trig("Histamine food"),
-      alcohol: trig("Alcohol"),
-      caffeine: trig("Caffeine"),
-      highSodium: trig("High sodium"),
-      sugar: trig("Sugar"),
-      dairy: trig("Dairy"),
-      gluten: trig("Gluten"),
-      agedCheese: trig("Aged cheese"),
-      fermented: trig("Fermented food"),
-      leftovers: trig("Leftovers"),
-      chocolate: trig("Chocolate"),
-      citrus: trig("Citrus"),
-      pizza: trig("Pizza"),
-      friedFoods: trig("Fried foods"),
-      processedMeats: trig("Processed meats"),
+      // Food
+      histamine: trig("Histamine food", ICONS.utensils),
+      highSodium: trig("High sodium", ICONS.utensils),
+      sugar: trig("Sugar", ICONS.utensils),
+      dairy: trig("Dairy", ICONS.utensils),
+      gluten: trig("Gluten", ICONS.utensils),
+      agedCheese: trig("Aged cheese", ICONS.utensils),
+      fermented: trig("Fermented food", ICONS.utensils),
+      leftovers: trig("Leftovers", ICONS.utensils),
+      chocolate: trig("Chocolate", ICONS.utensils),
+      citrus: trig("Citrus", ICONS.utensils),
+      pizza: trig("Pizza", ICONS.utensils),
+      friedFoods: trig("Fried foods", ICONS.utensils),
+      processedMeats: trig("Processed meats", ICONS.utensils),
+      // Drink
+      alcohol: trig("Alcohol", ICONS.cup),
+      caffeine: trig("Caffeine", ICONS.cup),
+      // Environmental / weather
+      highHeat: trig("High heat", ICONS.sun),
+      humidity: trig("Humidity", ICONS.droplet),
+      coldExposure: trig("Cold exposure", ICONS.snowflake),
+      weatherChange: trig("Weather change", ICONS.wind),
     };
 
     // Meals: logged with a type, time eaten, calories, and notes. Calories sum
