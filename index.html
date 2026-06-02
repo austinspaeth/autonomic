@@ -1677,7 +1677,10 @@
     // Triggers (programmatic). Logged with an occurrence count per day. Each
     // carries an icon matching its kind: food (fork), drink (cup), or an
     // environmental/weather glyph for the non-ingested triggers.
-    const trig = (label, icon) => ({ label, icon: icon || ICONS.utensils });
+    // `env: true` marks environmental/weather triggers (not ingested, often
+    // outside your control) — these are excluded from the clean-day "no trigger
+    // foods" criterion but still counted in the Trigger Impact analytics.
+    const trig = (label, icon, env) => ({ label, icon: icon || ICONS.utensils, env: !!env });
     const TRIGGER_TYPES = {
       // Food
       histamine: trig("Histamine food", ICONS.utensils),
@@ -1697,10 +1700,10 @@
       alcohol: trig("Alcohol", ICONS.cup),
       caffeine: trig("Caffeine", ICONS.cup),
       // Environmental / weather
-      highHeat: trig("High heat", ICONS.sun),
-      humidity: trig("Humidity", ICONS.droplet),
-      coldExposure: trig("Cold exposure", ICONS.snowflake),
-      weatherChange: trig("Weather change", ICONS.wind),
+      highHeat: trig("High heat", ICONS.sun, true),
+      humidity: trig("Humidity", ICONS.droplet, true),
+      coldExposure: trig("Cold exposure", ICONS.snowflake, true),
+      weatherChange: trig("Weather change", ICONS.wind, true),
     };
 
     // Meals: logged with a type, time eaten, calories, and notes. Calories sum
@@ -2085,7 +2088,9 @@
       const meds = d.meds || [];
       const hasMed = (t) => meds.some((m) => m.type === t);
       const triggers = (d.food && d.food.triggers) || {};
-      const trigCount = Object.keys(triggers).reduce((s, k) => s + (triggers[k] > 0 ? triggers[k] : 0), 0);
+      // Only ingested (food/drink) triggers break a clean day — environmental
+      // ones like heat/weather are outside your control.
+      const trigCount = Object.keys(triggers).reduce((s, k) => { const def = TRIGGER_TYPES[k]; return s + (triggers[k] > 0 && def && !def.env ? triggers[k] : 0); }, 0);
       const water = (d.food && d.food.water) || 0;
       const hrs = sleepHours(dk);
       const sleepLogged = hrs != null;
@@ -5092,7 +5097,7 @@
       return acCard("Calories & Nutrition", acRangeLabel(), [
         acBlock("Calories", buckets, [{ values: cal, color: "var(--accent)" }], { integer: true }),
         acBlock("Last meal time (24h)", buckets, [{ values: lastMeal, color: "#f97316" }], {}),
-        trigRows.length ? el("div.ac-block", {}, [el("div.ac-block-label", { text: "Trigger foods" }), acBars(trigRows, {})]) : null,
+        trigRows.length ? el("div.ac-block", {}, [el("div.ac-block-label", { text: "Triggers" }), acBars(trigRows, {})]) : null,
         acStats([{ label: "Dinner by 5pm", value: dinnerBy5 || null, sub: "days" }]),
       ]);
     }
@@ -5163,7 +5168,7 @@
         histRows.length ? el("div.ac-block", {}, [el("div.ac-block-label", { text: "Streak length distribution" }), acBars(histRows, {})]) : null,
         breakRows.length ? el("div.ac-block", {}, [el("div.ac-block-label", { text: "Most common reasons streaks break" }), acBars(breakRows, {})]) : null,
         dowRows.length ? el("div.ac-block", {}, [el("div.ac-block-label", { text: "Day-of-week streaks break" }), acBars(dowRows, {})]) : null,
-        trigRows.length ? el("div.ac-block", {}, [el("div.ac-block-label", { text: "Trigger foods" }), acBars(trigRows, {})]) : null,
+        trigRows.length ? el("div.ac-block", {}, [el("div.ac-block-label", { text: "Triggers" }), acBars(trigRows, {})]) : null,
       ]);
     }
 
@@ -5219,7 +5224,7 @@
         ]))),
       ]);
       const costRows = rows.filter((r) => r.cost != null && r.cost < 0).map((r) => ({ name: r.name, count: Math.round(-r.cost * 10) / 10, color: SCORE_COLORS.bad }));
-      return acCard("Trigger Food Impact", "RMSSD cost = avg drop vs your baseline over trigger day + next day", [
+      return acCard("Trigger Impact", "RMSSD cost = avg drop vs your baseline over trigger day + next day", [
         table,
         costRows.length ? el("div.ac-block", { style: "margin-top:14px" }, [el("div.ac-block-label", { text: "RMSSD cost by trigger" }), acBars(costRows, {})]) : null,
       ]);
@@ -5241,8 +5246,8 @@
         { x: "sleepH", y: "mornRmssd", txt: (r, n) => `On nights you slept longer, next-morning structured RMSSD ran ${dir(r)} (r ${r.toFixed(2)}, ${n} days).` },
         { x: "sleepH", y: "score", txt: (r, n) => `More sleep tracked with a ${dir(r)} autonomic score (r ${r.toFixed(2)}, ${n} days).` },
         { x: "water", y: "score", txt: (r, n) => `Days you drank more water showed a ${dir(r)} autonomic score (r ${r.toFixed(2)}, ${n} days).` },
-        { x: "triggers", y: "score", txt: (r, n) => `More trigger foods correlated with a ${dir(r)} autonomic score (r ${r.toFixed(2)}, ${n} days).` },
-        { x: "triggers", y: "structRmssd", lag: true, txt: (r, n) => `Trigger foods one day tracked with ${dir(r)} structured RMSSD the next (r ${r.toFixed(2)}, ${n} day-pairs).` },
+        { x: "triggers", y: "score", txt: (r, n) => `More triggers correlated with a ${dir(r)} autonomic score (r ${r.toFixed(2)}, ${n} days).` },
+        { x: "triggers", y: "structRmssd", lag: true, txt: (r, n) => `Triggers one day tracked with ${dir(r)} structured RMSSD the next (r ${r.toFixed(2)}, ${n} day-pairs).` },
         { x: "restHr", y: "score", txt: (r, n) => `Higher morning lying HR went with a ${dir(r)} autonomic score (r ${r.toFixed(2)}, ${n} days).` },
         { x: "actMin", y: "score", txt: (r, n) => `More activity minutes tracked with a ${dir(r)} autonomic score (r ${r.toFixed(2)}, ${n} days).` },
         { x: "bm", y: "score", txt: (r, n) => `Bowel-movement count correlated with a ${dir(r)} autonomic score (r ${r.toFixed(2)}, ${n} days).` },
@@ -6067,7 +6072,7 @@
         });
         const trigs = f.triggers || {};
         const tlist = Object.keys(trigs).filter((t) => trigs[t] > 0 && TRIGGER_TYPES[t]).map((t) => `${TRIGGER_TYPES[t].label}${trigs[t] > 1 ? ` x${trigs[t]}` : ""}`);
-        if (tlist.length) lines.push(`[${k}] Trigger foods: ${tlist.join(", ")}`);
+        if (tlist.length) lines.push(`[${k}] Triggers: ${tlist.join(", ")}`);
       });
       return orNone(lines);
     }
