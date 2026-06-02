@@ -160,11 +160,20 @@
     font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
     font-weight: 700; color: var(--text-dim);
   }
+  .daycard-chiprow { position: absolute; top: 14px; right: 14px; display: flex; align-items: center; gap: 7px; z-index: 1; }
   .daycard-chip {
-    position: absolute; top: 14px; right: 14px; font-size: 11px; font-weight: 800;
+    font-size: 11px; font-weight: 800;
     color: #fff; padding: 4px 11px; border-radius: 999px;
     text-transform: uppercase; letter-spacing: 0.03em; white-space: nowrap;
   }
+  .daycard-info {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 24px; height: 24px; padding: 0; border-radius: 999px;
+    background: var(--surface-2); border: 1px solid var(--border);
+    color: var(--text-dim); cursor: pointer; -webkit-tap-highlight-color: transparent;
+  }
+  .daycard-info svg { width: 15px; height: 15px; }
+  .daycard-info:hover { color: var(--text); }
   .daycard-score { display: flex; align-items: baseline; gap: 8px; margin-top: 7px; }
   .daycard-num { font-size: 42px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
   .daycard-den { font-size: 15px; font-weight: 700; color: var(--text-dim); }
@@ -622,6 +631,12 @@
   .sum-card-title { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); font-weight: 700; padding: 10px 2px 8px; }
   .metric-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px; margin-bottom: 10px; }
   .metric-card:last-child { margin-bottom: 0; }
+  .ortho-duo { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .ortho-stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px 10px; text-align: center; }
+  .ortho-stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim); font-weight: 700; }
+  .ortho-stat-val { font-size: 30px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.1; margin-top: 4px; }
+  .ortho-stat-unit { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+  .score-method { font-size: 13.5px; color: var(--text-dim); line-height: 1.5; margin: 0 0 16px; }
   .metric-head { display: flex; align-items: center; gap: 9px; }
   .metric-name { flex: 1; font-size: 15px; font-weight: 700; }
   .metric-val { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
@@ -1288,6 +1303,7 @@
       wind: svgIcon('<path d="M12.8 19.6A2 2 0 1 0 14 16H2"/><path d="M17.5 8a2.5 2.5 0 1 1 2 4H2"/><path d="M9.8 4.4A2 2 0 1 1 11 8H2"/>'),
       droplet: svgIcon('<path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>'),
       gauge: svgIcon('<path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/>'),
+      info: svgIcon('<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>'),
       download: svgIcon('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/>'),
       upload: svgIcon('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/>'),
       x: svgIcon('<path d="M18 6 6 18"/><path d="m6 6 12 12"/>'),
@@ -1967,21 +1983,21 @@
       const ecgPts = ecg ? pts(computeScores(ecg).rhythm || computeScores(ecg).overall) : null;
 
       const comps = [
-        { w: 25, p: hrvPts },
-        { w: 15, p: sStruct ? pts(sStruct.totalPower) : null },
-        { w: 10, p: sStruct ? pts(sStruct.pnn50) : null },
-        { w: 10, p: sStruct ? pts(sStruct.vlf) : null },
-        { w: 10, p: sStruct ? pts(sStruct.lfPeak) : null },
-        { w: 8, p: bpPts },
-        { w: 7, p: rhrPts },
-        { w: 8, p: pts(sleepGrade(dk)) },
-        { w: 5, p: ecgPts },
-        { w: 2, p: pts(activityGrade(d.activities)) },
+        { w: 25, p: hrvPts, label: "HRV (RMSSD)" },
+        { w: 15, p: sStruct ? pts(sStruct.totalPower) : null, label: "Total power" },
+        { w: 10, p: sStruct ? pts(sStruct.pnn50) : null, label: "pNN50" },
+        { w: 10, p: sStruct ? pts(sStruct.vlf) : null, label: "VLF power" },
+        { w: 10, p: sStruct ? pts(sStruct.lfPeak) : null, label: "LF peak" },
+        { w: 8, p: bpPts, label: "Blood pressure" },
+        { w: 7, p: rhrPts, label: "Resting HR" },
+        { w: 8, p: pts(sleepGrade(dk)), label: "Sleep" },
+        { w: 5, p: ecgPts, label: "ECG rhythm" },
+        { w: 2, p: pts(activityGrade(d.activities)), label: "Activity" },
       ].filter((c) => c.p != null);
-      if (!comps.length) return { score: null, confidence: 0, hasStruct: !!sStruct, hasUnstruct: !!unstructured.length };
+      if (!comps.length) return { score: null, confidence: 0, hasStruct: !!sStruct, hasUnstruct: !!unstructured.length, comps: [] };
       const avail = comps.reduce((s, c) => s + c.w, 0);
       const sum = comps.reduce((s, c) => s + c.p * c.w, 0);
-      return { score: Math.round(sum / avail), confidence: Math.round(avail), hasStruct: !!sStruct, hasUnstruct: !!unstructured.length };
+      return { score: Math.round(sum / avail), confidence: Math.round(avail), hasStruct: !!sStruct, hasUnstruct: !!unstructured.length, comps };
     }
 
     // Blue-zone flag: high unstructured readiness masking a fragile structured RMSSD.
@@ -2130,7 +2146,11 @@
         hero.style.background = hexA(cat.color, 0.1);
         const chip = el("span.daycard-chip", { text: cat.short });
         chip.style.background = cat.color;
-        hero.appendChild(chip);
+        const info = el("button.daycard-info", {
+          html: ICONS.info, type: "button", "aria-label": "How this score was calculated",
+          onclick: (e) => { e.stopPropagation(); openScoreExplain(all, dk); },
+        });
+        hero.appendChild(el("div.daycard-chiprow", {}, [info, chip]));
         hero.appendChild(el("div.daycard-mode", { text: mode }));
 
         const scoreRow = el("div.daycard-score", {}, [
@@ -2257,6 +2277,78 @@
       card.appendChild(streak);
 
       return card;
+    }
+
+    // Per-component coaching used by the score-explanation drawer.
+    const SCORE_TIPS = {
+      "HRV (RMSSD)": "Vagal tone responds to rest, hydration, slow breathing, and avoiding triggers or over-exertion the day before.",
+      "Total power": "Low total power means little overall autonomic engagement — favor rest, fluids, and gentle movement over intensity.",
+      "pNN50": "Parasympathetic depth builds on genuine recovery days and consistent, earlier sleep.",
+      "VLF power": "Elevated VLF reflects stress load — cut late stimulation, manage stress, and wind down earlier.",
+      "LF peak": "Aim slow-breathing sessions toward about 0.08–0.10 Hz to train the baroreflex back into range.",
+      "Blood pressure": "Support pressure with fluids and electrolytes; note salt, meds, posture, and heat as context.",
+      "Resting HR": "A lower resting HR follows from hydration, rest, and avoiding stimulants and late activity.",
+      "Sleep": "Target 7h+ — an earlier, consistent bedtime is usually the single biggest lever here.",
+      "ECG rhythm": "Rhythm irregularities are worth flagging for your clinician; reduce stimulants and stress in the meantime.",
+      "Activity": "Match activity to today's capacity; pacing now prevents a post-exertional setback later.",
+    };
+
+    // Drawer explaining how the day's Autonomic Score was built: the method,
+    // what helped, what hurt, and where to focus. `all` is a scoreSet() result.
+    function openScoreExplain(all, dk) {
+      const cat = scoreCat(all.score);
+      const ptsToCat = (p) => (p >= 88 ? "great" : p >= 70 ? "good" : p >= 48 ? "ok" : p >= 23 ? "bad" : "crash");
+      const comps = (all.comps || []).map((c) => ({ ...c, cat: ptsToCat(c.p) }));
+      const byW = (a, b) => b.w - a.w;
+      const helped = comps.filter((c) => c.cat === "great" || c.cat === "good").sort(byW);
+      const hurt = comps.filter((c) => c.cat === "bad" || c.cat === "crash" || c.cat === "concerning").sort(byW);
+      const neutral = comps.filter((c) => c.cat === "ok" || c.cat === "warning").sort(byW);
+      const have = new Set(comps.map((c) => c.label));
+
+      openModal((body) => {
+        body.appendChild(el("h2", { text: "How this score was calculated" }));
+
+        const hero = el("div.sum-hero");
+        hero.style.background = hexA(cat.color, 0.15);
+        hero.style.borderColor = hexA(cat.color, 0.45);
+        const rt = el("span.sum-hero-rating", { text: cat.short }); rt.style.background = cat.color; hero.appendChild(rt);
+        hero.appendChild(el("div.sum-hero-label", { text: cat.label }));
+        hero.appendChild(el("div.sum-hero-score", {}, [el("span.sum-hero-num", { text: String(all.score) }), el("span.sum-hero-den", { text: "/ 100" })]));
+        hero.appendChild(el("div.sum-hero-sub", { text: `Confidence ${all.confidence}% — the share of the full input set that was available to score today.` }));
+        body.appendChild(hero);
+
+        body.appendChild(el("p.score-method", { text: "The Autonomic Score is a weighted blend of the day's readings. Each input is graded, turned into points, and combined by weight. Missing inputs drop out and the remaining weights are rescaled — that rescaling is the confidence percentage. The most recent reading of each type is used, and structured (breathing) HRV outranks the unstructured reading when both are present." }));
+
+        const compRow = (c) => metricRow(c.label, `${GRADE_LABEL[c.cat]} · weight ${c.w}%`, c.cat);
+        if (helped.length) { const card = sumCard("What helped"); helped.forEach((c) => card.appendChild(compRow(c))); body.appendChild(card); }
+        if (hurt.length) { const card = sumCard("What hurt"); hurt.forEach((c) => card.appendChild(compRow(c))); body.appendChild(card); }
+        if (neutral.length) { const card = sumCard("Middle of the range"); neutral.forEach((c) => card.appendChild(compRow(c))); body.appendChild(card); }
+
+        // How to improve: tips for whatever is dragging the score (or holding it back).
+        const focus = (hurt.length ? hurt : neutral).slice(0, 4).filter((c) => SCORE_TIPS[c.label]);
+        const improve = sumCard("How to improve");
+        if (focus.length) {
+          focus.forEach((c) => improve.appendChild(el("div.metric-card", {}, [
+            el("div.metric-head", {}, [scoreDot(c.cat), el("span.metric-name", { text: c.label })]),
+            el("div.metric-explain", { text: SCORE_TIPS[c.label] }),
+          ])));
+        } else {
+          improve.appendChild(el("div.metric-card", {}, [el("div.sum-text", { text: "Nothing is dragging the score down today. Keep the inputs consistent — steady sleep, hydration, and pacing hold a strong baseline." })]));
+        }
+        if (OUTLOOK_GUIDE[cat.short]) improve.appendChild(el("div.metric-card", {}, [el("div.sum-text", { text: OUTLOOK_GUIDE[cat.short] })]));
+        body.appendChild(improve);
+
+        // Confidence: nudge toward the high-weight inputs that are missing today.
+        const bigMissing = [];
+        if (!all.hasStruct) bigMissing.push("a structured breathing HRV reading");
+        if (!have.has("Blood pressure")) bigMissing.push("blood pressure");
+        if (!have.has("Sleep")) bigMissing.push("last night's sleep");
+        if (all.confidence < 100 && bigMissing.length) {
+          const mc = sumCard("Firm up the score");
+          mc.appendChild(el("div.metric-card", {}, [el("div.sum-text", { text: `Confidence is ${all.confidence}%. Logging ${bigMissing.join(", ")} would raise it and steady the number.` })]));
+          body.appendChild(mc);
+        }
+      });
     }
 
     function renderDay() {
@@ -2823,6 +2915,13 @@
           if (bmi != null) s.weight = bmiZone(bmi).cat;
           break;
         }
+        case "orthostatic": {
+          const before = numOr(r.beforeHr), after = numOr(r.afterHr), min1 = numOr(r.hr1min);
+          if (before != null && after != null) put("increase", catFromBands(after - before, BANDS.orthoIncrease));
+          if (after != null && min1 != null) put("recovery", catFromBands(after - min1, BANDS.orthoRecovery));
+          if (s.increase) s.overall = s.increase; // the event is rated on the standing rise
+          break;
+        }
       }
       return s;
     }
@@ -2839,6 +2938,7 @@
         case "ecg": return s.overall;
         case "mood": return s.mood;
         case "weight": return s.weight;
+        case "orthostatic": return s.overall || s.increase;
         default: return null;
       }
     }
@@ -2914,6 +3014,15 @@
       sns: [{ max: -0.5, cat: "great" }, { max: 0.6, cat: "good" }, { max: 1.6, cat: "ok" }, { max: 3.01, cat: "bad" }, { max: Infinity, cat: "concerning" }],
       stressIndex: [{ max: 100, cat: "great" }, { max: 201, cat: "good" }, { max: 351, cat: "ok" }, { max: 601, cat: "bad" }, { max: Infinity, cat: "concerning" }],
       ecgHrv: [{ max: 15, cat: "crash" }, { max: 25, cat: "bad" }, { max: 35, cat: "ok" }, { max: 50, cat: "good" }, { max: Infinity, cat: "great" }],
+      // Orthostatic HR rise on standing (after − before). 10–20 bpm is a normal
+      // physiologic response; a sustained ≥30 bpm (adults) is the POTS threshold
+      // and ≥40 bpm (teens 12–19) is markedly abnormal. Lower is better.
+      orthoIncrease: [{ max: 15, cat: "great" }, { max: 25, cat: "good" }, { max: 30, cat: "ok" }, { max: 40, cat: "bad" }, { max: Infinity, cat: "concerning" }],
+      // Recovery: how far HR fell from its standing peak after 1 min (after −
+      // hr1min). As BP rebounds HR should settle; a bigger drop is stronger
+      // baroreflex/vagal recovery, while little drop (or a further climb,
+      // negative) is an attenuated, dysautonomic response. Higher is better.
+      orthoRecovery: [{ max: 0, cat: "concerning" }, { max: 6, cat: "bad" }, { max: 12, cat: "ok" }, { max: 20, cat: "good" }, { max: Infinity, cat: "great" }],
     };
     // Resting-HR zones depend on body position.
     const restingHrBands = (pos) => (!pos || /lay/i.test(pos))
@@ -3110,6 +3219,7 @@
         else if (r.type === "restingHr") restingHrSummary(r, body);
         else if (r.type === "bloodO2") bloodO2Summary(r, body);
         else if (r.type === "hrv") unstructuredHrvSummary(r, body);
+        else if (r.type === "orthostatic") orthostaticSummary(r, body);
         else genericReadingSummary(r, body);
       }, { action: { icon: ICONS.edit, label: "Edit", onclick: () => readingForm(r.type, r) } });
     }
@@ -3161,6 +3271,70 @@
         }
       }
       body.appendChild(card);
+    }
+
+    // Orthostatic event: rated on the standing HR rise (POTS-style zones), with
+    // begin/peak values side by side, a sparked HR-increase card, the recorded
+    // 1-minute HR, and a sparked recovery (peak − 1 min) card.
+    function orthostaticSummary(r, body) {
+      const before = numOr(r.beforeHr), after = numOr(r.afterHr), min1 = numOr(r.hr1min);
+      const increase = (before != null && after != null) ? after - before : null;
+      const drop = (after != null && min1 != null) ? after - min1 : null;
+      const incCat = increase != null ? catFromBands(increase, BANDS.orthoIncrease) : null;
+      const dropCat = drop != null ? catFromBands(drop, BANDS.orthoRecovery) : null;
+      const signed = (v) => (v > 0 ? "+" + v : String(v));
+
+      const verdict = {
+        great: "Minimal heart-rate rise on standing — a healthy orthostatic response.",
+        good: "Normal orthostatic rise, within the expected physiologic range.",
+        ok: "Borderline rise at the upper end of normal. Worth keeping an eye on.",
+        bad: "Large rise — at or above the adult ≥30 bpm POTS-range threshold. Note context like hydration, heat, deconditioning, or meds.",
+        concerning: "Marked rise — at or above the ≥40 bpm threshold. Hydrate, sit or lie down, and log the surrounding context.",
+      };
+      body.appendChild(heroCard({
+        cat: incCat,
+        label: r.transition || "Orthostatic event",
+        big: increase != null ? signed(increase) : "",
+        den: "bpm rise",
+        sub: "Rated on the heart-rate increase from baseline to standing.",
+        tip: incCat ? verdict[incCat] : "Enter Before HR and After HR to rate this event.",
+      }));
+
+      // Begin / peak HR side by side — plain values, no spark.
+      const hrCard = sumCard("Heart rate");
+      hrCard.appendChild(el("div.ortho-duo", {}, [
+        el("div.ortho-stat", {}, [
+          el("div.ortho-stat-label", { text: "Before HR" }),
+          el("div.ortho-stat-val", { text: before != null ? String(before) : "-" }),
+          el("div.ortho-stat-unit", { text: "bpm · baseline" }),
+        ]),
+        el("div.ortho-stat", {}, [
+          el("div.ortho-stat-label", { text: "After HR" }),
+          el("div.ortho-stat-val", { text: after != null ? String(after) : "-" }),
+          el("div.ortho-stat-unit", { text: "bpm · standing" }),
+        ]),
+      ]));
+      body.appendChild(hrCard);
+
+      // HR increase — sparkline with zones; this is what rates the event.
+      const incEx = (rr) => { const b = numOr(rr.beforeHr), a = numOr(rr.afterHr); return (b != null && a != null) ? a - b : null; };
+      const incCard = sumCard("HR increase");
+      incCard.appendChild(metricRow("Standing HR increase", increase != null ? signed(increase) + " bpm" : "", incCat,
+        "After HR minus Before HR. A sustained rise of 30+ bpm (40+ in teens) within 10 minutes of standing is the POTS threshold; a 10–20 bpm rise is a normal response.",
+        buildSpark(metricHistory("orthostatic", incEx), BANDS.orthoIncrease)));
+      body.appendChild(incCard);
+
+      // Recovery: the recorded 1-minute HR (plain), then the drop from peak (spark + zones).
+      const dropEx = (rr) => { const a = numOr(rr.afterHr), m = numOr(rr.hr1min); return (a != null && m != null) ? a - m : null; };
+      const recCard = sumCard("Recovery after 1 minute");
+      recCard.appendChild(metricRow("HR after 1 min", min1 != null ? min1 + " bpm" : "", false,
+        "Heart rate one minute after standing, as recorded. As blood pressure rebounds a healthy response settles back toward baseline.", false));
+      recCard.appendChild(metricRow("HR drop by 1 min", drop != null ? drop + " bpm" : "", dropCat,
+        "How far HR fell from its standing peak after one minute (Peak − HR@1min). A larger settle-down means stronger baroreflex and vagal recovery; little or no drop — or a further climb — points to an attenuated, dysautonomic response.",
+        buildSpark(metricHistory("orthostatic", dropEx), BANDS.orthoRecovery)));
+      body.appendChild(recCard);
+
+      notesCard(r, body);
     }
 
     const HRV_EXPLAIN = {
@@ -4654,13 +4828,24 @@
     function acOrthostatic(buckets) {
       const has = Object.keys(state.days).some((dk) => (state.days[dk].readings || []).some((r) => r.type === "orthostatic"));
       if (!has) return null;
+      const incOf = (r) => { const a = parseFloat(r.afterHr), b = parseFloat(r.beforeHr); return (!isNaN(a) && !isNaN(b)) ? a - b : null; };
+      const dropOf = (r) => { const a = parseFloat(r.afterHr), m = parseFloat(r.hr1min); return (!isNaN(a) && !isNaN(m)) ? a - m : null; };
       const transitions = {};
-      Object.keys(state.days).forEach((dk) => (state.days[dk].readings || []).forEach((r) => { if (r.type === "orthostatic" && r.transition) transitions[r.transition] = (transitions[r.transition] || 0) + 1; }));
+      let potsN = 0;
+      Object.keys(state.days).forEach((dk) => (state.days[dk].readings || []).forEach((r) => {
+        if (r.type !== "orthostatic") return;
+        if (r.transition) transitions[r.transition] = (transitions[r.transition] || 0) + 1;
+        const inc = incOf(r); if (inc != null && inc >= 30) potsN++;
+      }));
+      const incVals = acAgg(buckets, (d) => (d.readings || []).filter((r) => r.type === "orthostatic").map(incOf).filter((v) => v != null));
+      const dropVals = acAgg(buckets, (d) => (d.readings || []).filter((r) => r.type === "orthostatic").map(dropOf).filter((v) => v != null));
       return acCard("Orthostatic Events", acRangeLabel(), [
         acBlock("Events per period", buckets, [{ values: acAggSum(buckets, (d) => (d.readings || []).filter((r) => r.type === "orthostatic").length || null), color: "var(--accent)" }], { integer: true }),
-        acBlock("HR spike magnitude (after − before)", buckets, [{ values: acAgg(buckets, (d) => (d.readings || []).filter((r) => r.type === "orthostatic").map((r) => { const a = parseFloat(r.afterHr), bb = parseFloat(r.beforeHr); return (!isNaN(a) && !isNaN(bb)) ? a - bb : null; }).filter((v) => v != null)), color: "#f97316" }], { integer: true }),
-        acBlock("Recovery HR (after 1 min)", buckets, [{ values: acAgg(buckets, (d) => acReadVals(d, "orthostatic", "hr1min")), color: "#38bdf8" }], { integer: true }),
+        acBlock("HR increase on standing (after − before)", buckets, [{ values: incVals, color: "#f97316", pointBands: BANDS.orthoIncrease }], { zones: acBandZones("orthoIncrease"), integer: true }),
+        acBlock("HR drop by 1 min (peak − 1 min)", buckets, [{ values: dropVals, color: "#38bdf8", pointBands: BANDS.orthoRecovery }], { zones: acBandZones("orthoRecovery"), integer: true }),
+        acBlock("HR after 1 min", buckets, [{ values: acAgg(buckets, (d) => acReadVals(d, "orthostatic", "hr1min")), color: "#a78bfa" }], { integer: true }),
         Object.keys(transitions).length ? el("div.ac-block", {}, [el("div.ac-block-label", { text: "Transition types" }), acBars(Object.entries(transitions).map(([k, c]) => ({ name: k, count: c })).sort((a, b) => b.count - a.count), {})]) : null,
+        potsN ? acInsight(`${potsN} event${potsN === 1 ? "" : "s"} reached a ≥30 bpm standing rise (the adult POTS-range threshold).`, "mod") : null,
       ]);
     }
 
