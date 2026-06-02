@@ -35,6 +35,7 @@
     --glass-bg: rgba(255, 255, 255, 0.55);
     --glass-border: rgba(255, 255, 255, 0.7);
     --glass-active: rgba(0, 0, 0, 0.07);
+    --gauge-track: #aaaaaa66;
   }
   html[data-theme="dark"] {
     --bg: #000000;
@@ -48,6 +49,7 @@
     --glass-bg: rgba(28, 28, 30, 0.55);
     --glass-border: rgba(255, 255, 255, 0.12);
     --glass-active: rgba(255, 255, 255, 0.14);
+    --gauge-track: #00000066;
   }
 
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -119,7 +121,7 @@
   .icon-btn:active { background: var(--surface-2); }
   /* The text-presentation sun glyph renders small; bump it to match the moon. */
   .icon-btn.is-sun { font-size: 34px; }
-  /* Header caution icon — only shown when there are active watch flags. */
+  /* Header caution icon - only shown when there are active watch flags. */
   .flags-btn { color: #f59e0b; }
   .flags-btn svg { width: 22px; height: 22px; display: block; transform: translateY(4px); }
 
@@ -155,31 +157,47 @@
     overflow: hidden;
     background: var(--surface);
   }
-  .daycard-hero { position: relative; padding: 16px; }
+  .daycard-hero { position: relative; padding: 18px 16px 16px; }
+  .daycard-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
   .daycard-mode {
     font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
     font-weight: 700; color: var(--text-dim);
   }
-  .daycard-chiprow { position: absolute; top: 14px; right: 14px; display: flex; align-items: center; gap: 7px; z-index: 1; }
+  .daycard-chiprow { display: flex; align-items: center; gap: 7px; z-index: 1; }
   .daycard-chip {
     font-size: 11px; font-weight: 800;
     color: #fff; padding: 4px 11px; border-radius: 999px;
     text-transform: uppercase; letter-spacing: 0.03em; white-space: nowrap;
   }
   .daycard-info {
-    display: inline-flex; align-items: center; justify-content: center;
-    width: 24px; height: 24px; padding: 0; border-radius: 999px;
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    height: 26px; padding: 0 11px 0 9px; border-radius: 999px;
     background: var(--surface-2); border: 1px solid var(--border);
     color: var(--text-dim); cursor: pointer; -webkit-tap-highlight-color: transparent;
+    font-size: 11px; font-weight: 600; white-space: nowrap;
   }
-  .daycard-info svg { width: 15px; height: 15px; }
+  .daycard-info svg { width: 15px; height: 15px; flex: none; }
   .daycard-info:hover { color: var(--text); }
+
+  /* Arc gauge hero */
+  .daycard-gauge-wrap { display: flex; justify-content: center; margin: 10px 0 2px; }
+  .daycard-gauge { position: relative; width: 176px; height: 176px; }
+  .daycard-gauge svg { width: 100%; height: 100%; display: block; }
+  .daycard-gauge-inner {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 0;
+  }
+  .daycard-gauge-num { font-size: 54px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+  .daycard-gauge-den { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; color: var(--text-dim); margin-top: 6px; }
+  .daycard-gauge-delta { font-size: 12px; font-weight: 800; margin-top: 8px; font-variant-numeric: tabular-nums; text-align: center; }
+
+  /* Legacy inline score (kept for the awaiting / number-style layout) */
   .daycard-score { display: flex; align-items: baseline; gap: 8px; margin-top: 7px; }
   .daycard-num { font-size: 42px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
   .daycard-den { font-size: 15px; font-weight: 700; color: var(--text-dim); }
   .daycard-trend { font-size: 18px; font-weight: 800; }
-  .daycard-status { font-size: 13px; color: var(--text-dim); margin-top: 7px; font-weight: 600; }
-  .daycard-guide { font-size: 14px; margin-top: 11px; line-height: 1.45; }
+  .daycard-status { font-size: 13px; color: var(--text-dim); margin-top: 10px; font-weight: 600; text-align: center; }
+  .daycard-guide { font-size: 14px; margin-top: 15px; line-height: 1.5; text-wrap: pretty; }
   .daycard-await-title { font-size: 17px; font-weight: 700; }
   .daycard-await-sub { font-size: 13.5px; color: var(--text-dim); margin-top: 5px; line-height: 1.4; }
   .daycard-flag {
@@ -635,6 +653,27 @@
   .metric-name { flex: 1; font-size: 15px; font-weight: 700; }
   .metric-val { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
   .metric-explain { font-size: 12.5px; color: var(--text-dim); margin-top: 6px; line-height: 1.4; }
+
+  /* Score-breakdown accordions (How this score was calculated) */
+  .comp-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); margin-bottom: 10px; overflow: hidden; }
+  .comp-card:last-child { margin-bottom: 0; }
+  .comp-head { width: 100%; display: flex; align-items: center; gap: 9px; background: none; border: none; cursor: pointer; text-align: left; color: var(--text); font-family: inherit; padding: 13px 14px; -webkit-tap-highlight-color: transparent; }
+  .comp-name { font-weight: 600; font-size: 14px; }
+  .comp-val { margin-left: auto; font-size: 13px; color: var(--text-dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .comp-caret { flex: none; color: var(--text-dim); display: inline-flex; transition: transform .2s; }
+  .comp-caret svg { width: 17px; height: 17px; }
+  .comp-card.open .comp-caret { transform: rotate(180deg); }
+  .comp-body { display: none; padding: 2px 14px 14px; }
+  .comp-card.open .comp-body { display: block; }
+  .comp-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .comp-tag { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+  .comp-tag.pos { background: rgba(74,222,128,.16); color: #4ade80; }
+  .comp-tag.neu { background: rgba(234,179,8,.16); color: #eab308; }
+  .comp-tag.neg { background: rgba(249,115,22,.16); color: #f97316; }
+  .comp-weight { font-size: 12px; color: var(--text-dim); }
+  .comp-line { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; margin-top: 10px; }
+  .comp-advice { font-size: 12.5px; color: var(--text-dim); line-height: 1.45; margin-top: 4px; }
+  .comp-tip { font-size: 12.5px; color: var(--text-dim); line-height: 1.45; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
   .spark { margin-top: 16px; color: var(--text); }
   .spark-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 16px; margin-bottom: 4px; }
   .spark-zones-btn { background: none; border: none; color: var(--accent); font-size: 11px; font-weight: 600; cursor: pointer; padding: 2px 4px; font-family: inherit; flex: none; }
@@ -885,7 +924,7 @@
   .report-card-check svg { width: 14px; height: 14px; display: block; }
   .report-card.selected .report-card-check { display: inline-flex; }
 
-  /* Raised, sliding Generate bar — appears once at least one report is picked,
+  /* Raised, sliding Generate bar - appears once at least one report is picked,
      sitting clear above the floating tab pill. */
   .report-genbar {
     position: fixed;
@@ -991,7 +1030,6 @@
     background: var(--bg-glass);
     -webkit-backdrop-filter: blur(18px) saturate(170%);
     backdrop-filter: blur(18px) saturate(170%);
-    border-bottom: 1px solid var(--border);
   }
   .ac-back-btn { flex: none; margin-left: -8px; }
   .ac-back-btn svg { width: 22px; height: 22px; display: block; }
@@ -1954,7 +1992,7 @@
       Bad: "Tomorrow likely Bad. Plan a rest day.",
       Crash: "Tomorrow Bad to Crash. Prepare for full rest.",
     };
-    // (hexA — hex → rgba — is defined alongside the reading-summary hero card.)
+    // (hexA - hex → rgba - is defined alongside the reading-summary hero card.)
 
     // Which part of the day a reading belongs to (explicit period wins over clock).
     function readingPeriod(r) {
@@ -2019,17 +2057,53 @@
       const ecg = last(readings.filter((r) => r.type === "ecg"));
       const ecgPts = ecg ? pts(computeScores(ecg).rhythm || computeScores(ecg).overall) : null;
 
+      // ---- Per-component detail (raw values + bands) for the score-explain drawer ----
+      const bs = last(structured), bu = last(unstructured);
+      const nv = (x) => { const v = parseFloat(x); return isNaN(v) ? null : v; };
+      const rmS = bs ? nv(bs.rmssd) : null, rmU = bu ? nv(bu.rmssd) : null;
+      const hrvMetrics = [];
+      if (rmS != null) hrvMetrics.push({ label: "RMSSD (structured)", raw: rmS, bands: BANDS.rmssdS, unit: "ms" });
+      if (rmU != null) hrvMetrics.push({ label: "RMSSD (unstructured)", raw: rmU, bands: BANDS.rmssdU, unit: "ms" });
+      const hrvDetail = { value: (rmS != null && rmU != null) ? `${rmS}/${rmU} ms` : (rmS != null ? `${rmS} ms` : rmU != null ? `${rmU} ms` : ""), metrics: hrvMetrics };
+
+      const tpV = bs ? totalPower(bs) : null, tpR = tpV != null ? Math.round(tpV) : null;
+      const tpDetail = { value: tpR != null ? `${tpR} ms²` : "", metrics: tpR != null ? [{ label: "Total power", raw: tpR, bands: BANDS.totalPower, unit: "ms²" }] : [] };
+      const pnV = bs ? nv(bs.pnn50) : null;
+      const pnDetail = { value: pnV != null ? `${pnV}%` : "", metrics: pnV != null ? [{ label: "pNN50", raw: pnV, bands: BANDS.pnn50, unit: "%" }] : [] };
+      const vlfV = bs ? nv(bs.vlowPower) : null;
+      const vlfDetail = { value: vlfV != null ? `${vlfV} ms²` : "", metrics: vlfV != null ? [{ label: "VLF power", raw: vlfV, bands: BANDS.vlf, unit: "ms²", lowerBetter: true }] : [] };
+      const lfV = bs ? nv(bs.lfPeak) : null;
+      const lfDetail = { value: lfV != null ? `${lfV} Hz` : "", metrics: lfV != null ? [{ label: "LF peak", raw: lfV, bands: BANDS.lfPeak, unit: "Hz" }] : [] };
+
+      const sysV = bp ? nv(bp.sys) : null, diaV = bp ? nv(bp.dia) : null;
+      const bpDetail = { value: bp ? `${sysV != null ? sysV : "-"}/${diaV != null ? diaV : "-"} mmHg` : "", metrics: [sysV != null ? { label: "Systolic", raw: sysV, bands: BANDS.sys, unit: "mmHg" } : null, diaV != null ? { label: "Diastolic", raw: diaV, bands: BANDS.dia, unit: "mmHg" } : null].filter(Boolean) };
+
+      let rhrV = null, rhrBands = null, rhrLabel = "Resting HR";
+      if (rhr) { rhrV = nv(rhr.hr); rhrBands = restingHrBands(rhr.position); if (rhr.position) rhrLabel = `Resting HR (${rhr.position})`; }
+      else if (bs) { rhrV = nv(bs.hr); rhrBands = BANDS.hrBreath; rhrLabel = "HR (from breathing HRV)"; }
+      else if (bu) { rhrV = nv(bu.avgHr); rhrBands = BANDS.hrBreath; rhrLabel = "Avg HR (from HRV)"; }
+      const rhrDetail = { value: rhrV != null ? `${rhrV} bpm` : "", metrics: rhrV != null ? [{ label: rhrLabel, raw: rhrV, bands: rhrBands, unit: "bpm", lowerBetter: true }] : [] };
+
+      const slH = sleepHours(dk), slInt = !!(d && d.sleep && d.sleep.quality === "interrupted");
+      const sleepDetail = { value: slH != null ? `${slH.toFixed(1)} h${slInt ? ", interrupted" : ""}` : "not logged", metrics: [], note: "Targets 7h or more for a good grade; 8h+ and uninterrupted scores best. An earlier, consistent bedtime is usually the single biggest lever." };
+
+      const rhy = ecg ? ecgPattern(ecg) : null;
+      const ecgDetail = { value: rhy || "", metrics: [], note: "Looking for normal sinus rhythm. SVT or other irregularities lower this and are worth flagging to your clinician; reducing stimulants and stress helps in the meantime." };
+
+      const actList = (d.activities || []).map((a) => (ACTIVITY_TYPES[a.type] && ACTIVITY_TYPES[a.type].label) || a.type);
+      const actDetail = { value: actList.length ? actList.join(", ") : "none logged", metrics: [], maxCat: "good", note: "Graded on pacing, not volume: a gentle or normal day scores good (the ceiling here); two heavy sessions drop it to ok, and strenuous work or three or more heavy sessions to bad. Match activity to today's capacity to avoid a later setback." };
+
       const comps = [
-        { w: 25, p: hrvPts, label: "HRV (RMSSD)" },
-        { w: 15, p: sStruct ? pts(sStruct.totalPower) : null, label: "Total power" },
-        { w: 10, p: sStruct ? pts(sStruct.pnn50) : null, label: "pNN50" },
-        { w: 10, p: sStruct ? pts(sStruct.vlf) : null, label: "VLF power" },
-        { w: 10, p: sStruct ? pts(sStruct.lfPeak) : null, label: "LF peak" },
-        { w: 8, p: bpPts, label: "Blood pressure" },
-        { w: 7, p: rhrPts, label: "Resting HR" },
-        { w: 8, p: pts(sleepGrade(dk)), label: "Sleep" },
-        { w: 5, p: ecgPts, label: "ECG rhythm" },
-        { w: 2, p: pts(activityGrade(d.activities)), label: "Activity" },
+        { w: 25, p: hrvPts, label: "HRV (RMSSD)", detail: hrvDetail },
+        { w: 15, p: sStruct ? pts(sStruct.totalPower) : null, label: "Total power", detail: tpDetail },
+        { w: 10, p: sStruct ? pts(sStruct.pnn50) : null, label: "pNN50", detail: pnDetail },
+        { w: 10, p: sStruct ? pts(sStruct.vlf) : null, label: "VLF power", detail: vlfDetail },
+        { w: 10, p: sStruct ? pts(sStruct.lfPeak) : null, label: "LF peak", detail: lfDetail },
+        { w: 8, p: bpPts, label: "Blood pressure", detail: bpDetail },
+        { w: 7, p: rhrPts, label: "Resting HR", detail: rhrDetail },
+        { w: 8, p: pts(sleepGrade(dk)), label: "Sleep", detail: sleepDetail },
+        { w: 5, p: ecgPts, label: "ECG rhythm", detail: ecgDetail },
+        { w: 2, p: pts(activityGrade(d.activities)), label: "Activity", detail: actDetail },
       ].filter((c) => c.p != null);
       if (!comps.length) return { score: null, confidence: 0, hasStruct: !!sStruct, hasUnstruct: !!unstructured.length, comps: [] };
       const avail = comps.reduce((s, c) => s + c.w, 0);
@@ -2051,8 +2125,8 @@
     // wake time (bed/wake are each recorded on their own day). The wake time is
     // taken as the first clock occurrence at or after the bedtime, so a late
     // AM bedtime (e.g. 12:30am = "went to bed super late") yields a short night
-    // rather than a full day. Returns null when either endpoint is missing — no
-    // defaults — which reads as "did not sleep 7h or more".
+    // rather than a full day. Returns null when either endpoint is missing - no
+    // defaults - which reads as "did not sleep 7h or more".
     function sleepHours(dk) {
       const d = state.days[dk];
       const wake = d && d.sleep ? d.sleep.wake : "";
@@ -2078,7 +2152,7 @@
       const water = (d.food && d.food.water) || 0;
       const hrs = sleepHours(dk);
       const sleepLogged = hrs != null;
-      // Required meds — only the still-missing ones feed the "still needed" hint
+      // Required meds - only the still-missing ones feed the "still needed" hint
       // (`need`), while the full set stays the checklist label.
       const medReq = [["allegra", "Allegra"], ["pepsidAc", "Pepcid"], ["magGlycinate", "Mag glycinate"]];
       const missingMeds = medReq.filter(([t]) => !hasMed(t));
@@ -2087,7 +2161,7 @@
       // is logged (so it neither counts nor breaks the day).
       const dinners = ((d.food && d.food.meals) || []).filter((m) => m.type === "dinner" && m.time);
       // `broken` marks a hard criterion that has concretely failed (and so can't
-      // be recovered today) — distinct from one that just isn't logged yet.
+      // be recovered today) - distinct from one that just isn't logged yet.
       const criteria = [
         { key: "triggers", label: "No trigger foods", pass: trigCount === 0, hard: true, broken: trigCount > 0 },
         { key: "water", label: "Water (2.5 L)", pass: water >= 2.5 },
@@ -2184,24 +2258,30 @@
         const chip = el("span.daycard-chip", { text: cat.short });
         chip.style.background = cat.color;
         const info = el("button.daycard-info", {
-          html: ICONS.info, type: "button", "aria-label": "How this score was calculated",
+          html: ICONS.info + "<span>What powers this</span>", type: "button",
+          "aria-label": "How this score was calculated",
           onclick: (e) => { e.stopPropagation(); openScoreExplain(all, dk); },
         });
-        hero.appendChild(el("div.daycard-chiprow", {}, [info, chip]));
-        hero.appendChild(el("div.daycard-mode", { text: mode }));
+        hero.appendChild(el("div.daycard-head", {}, [
+          el("div.daycard-mode", { text: mode }),
+          el("div.daycard-chiprow", {}, [info, chip]),
+        ]));
 
-        const scoreRow = el("div.daycard-score", {}, [
-          el("span.daycard-num", { text: String(all.score) }),
-          el("span.daycard-den", { text: "/ 100" }),
+        // Arc gauge: the 0–100 outlook as a zone-colored ring with the score centered.
+        const gauge = el("div.daycard-gauge", {}, [scoreGauge(all.score, cat.color)]);
+        const inner = el("div.daycard-gauge-inner", {}, [
+          el("div.daycard-gauge-num", { text: String(all.score) }),
+          el("div.daycard-gauge-den", { text: "OUT OF 100" }),
         ]);
+        gauge.appendChild(inner);
+        hero.appendChild(el("div.daycard-gauge-wrap", {}, [gauge]));
         if (delta != null && Math.abs(delta) >= 3) {
           const up = delta > 0;
-          const tr = el("span.daycard-trend", { text: up ? "▲" : "▼" });
+          const tr = el("div.daycard-gauge-delta", { text: (up ? "▲ " : "▼ ") + Math.abs(delta) + " vs AM" });
           tr.style.color = up ? SCORE_COLORS.good : SCORE_COLORS.bad;
-          scoreRow.appendChild(tr);
+          hero.appendChild(tr);
         }
-        hero.appendChild(scoreRow);
-        hero.appendChild(el("div.daycard-status", { text: `${cat.label} · Confidence ${all.confidence}%` }));
+        hero.appendChild(el("div.daycard-status", { text: `${cat.label} · ${all.confidence}% confidence` }));
 
         // Guidance: forward-looking for outlook, retrospective for reflectance.
         let guide;
@@ -2282,7 +2362,7 @@
       // Header row: initial view (count + sub) with the caret centered against it.
       right.appendChild(el("div.streak-header", {}, [main, el("span.streak-caret", { html: ICONS.chevron })]));
 
-      // Collapsible detail (stats + criteria) — hidden until the row is expanded.
+      // Collapsible detail (stats + criteria) - hidden until the row is expanded.
       const extra = el("div.streak-extra");
       const stats = [`Longest ${si.longest}`];
       if (si.rate != null) stats.push(`30-day clean ${si.rate}%`);
@@ -2319,16 +2399,83 @@
     // Per-component coaching used by the score-explanation drawer.
     const SCORE_TIPS = {
       "HRV (RMSSD)": "Vagal tone responds to rest, hydration, slow breathing, and avoiding triggers or over-exertion the day before.",
-      "Total power": "Low total power means little overall autonomic engagement — favor rest, fluids, and gentle movement over intensity.",
+      "Total power": "Low total power means little overall autonomic engagement - favor rest, fluids, and gentle movement over intensity.",
       "pNN50": "Parasympathetic depth builds on genuine recovery days and consistent, earlier sleep.",
-      "VLF power": "Elevated VLF reflects stress load — cut late stimulation, manage stress, and wind down earlier.",
+      "VLF power": "Elevated VLF reflects stress load - cut late stimulation, manage stress, and wind down earlier.",
       "LF peak": "Aim slow-breathing sessions toward about 0.08–0.10 Hz to train the baroreflex back into range.",
       "Blood pressure": "Support pressure with fluids and electrolytes; note salt, meds, posture, and heat as context.",
       "Resting HR": "A lower resting HR follows from hydration, rest, and avoiding stimulants and late activity.",
-      "Sleep": "Target 7h+ — an earlier, consistent bedtime is usually the single biggest lever here.",
+      "Sleep": "Target 7h+ - an earlier, consistent bedtime is usually the single biggest lever here.",
       "ECG rhythm": "Rhythm irregularities are worth flagging for your clinician; reduce stimulants and stress in the meantime.",
       "Activity": "Match activity to today's capacity; pacing now prevents a post-exertional setback later.",
     };
+
+    const fmtMetricVal = (v, u) => (v == null ? "-" : (Number.isInteger(v) ? String(v) : (Math.abs(v) < 1 ? v.toFixed(3) : v.toFixed(1)))) + (u ? ` ${u}` : "");
+
+    // Given a value + its grade bands, describe the ideal ("great") range and
+    // which way to move to reach it. Returns null when not banded.
+    function zoneAdvice(raw, bands, unit) {
+      if (raw == null || !bands) return null;
+      const cur = catFromBands(raw, bands);
+      let lo = -Infinity, hi = Infinity, prev = -Infinity, found = false;
+      for (const b of bands) {
+        if (b.cat === "great") { if (!found) { lo = prev; found = true; } hi = b.max; }
+        else if (found) break; // first contiguous "great" block
+        prev = b.max;
+      }
+      const fmtEdge = (x) => (Number.isInteger(x) ? String(x) : Math.abs(x) < 1 ? x.toFixed(3) : x.toFixed(1));
+      const u = unit ? ` ${unit}` : "";
+      let ideal;
+      if (!found) ideal = null;
+      else if (lo === -Infinity) ideal = `${fmtEdge(hi)}${u} or below`;
+      else if (hi === Infinity) ideal = `${fmtEdge(lo)}${u} or higher`;
+      else ideal = `${fmtEdge(lo)}–${fmtEdge(hi)}${u}`;
+      if (cur === "great") return { cur, ideal, done: true };
+      let dir = "into range";
+      if (found) { if (raw <= lo) dir = `higher (toward ${fmtEdge(lo)}${u} and up)`; else if (raw >= hi) dir = `lower (toward ${fmtEdge(hi)}${u} and below)`; }
+      return { cur, ideal, done: false, dir };
+    }
+
+    // One concrete "to improve this" sentence for a component.
+    function improveLine(c) {
+      const det = c.detail || {};
+      const m = (det.metrics || []).find((x) => x.raw != null && catFromBands(x.raw, x.bands) !== "great");
+      if (m) {
+        const adv = zoneAdvice(m.raw, m.bands, m.unit);
+        if (adv && !adv.done && adv.ideal) return `${m.label} is ${fmtMetricVal(m.raw, m.unit)} (${GRADE_LABEL[adv.cur]}). Move it ${adv.dir}; the ideal range is ${adv.ideal}.`;
+      }
+      return det.note || SCORE_TIPS[c.label] || "";
+    }
+
+    // Collapsible breakdown row for one scored component.
+    function compAccordion(c) {
+      const det = c.detail || {};
+      const card = el("div.comp-card");
+      const head = el("button.comp-head", { type: "button" }, [
+        scoreDot(c.cat),
+        el("span.comp-name", { text: c.label }),
+        el("span.comp-val", { text: det.value || "" }),
+        el("span.comp-caret", { html: ICONS.chevron }),
+      ]);
+      const bodyEl = el("div.comp-body");
+      const contrib = c.p >= 80 ? { t: "Lifting your score", cls: "pos" } : c.p >= 60 ? { t: "About neutral", cls: "neu" } : { t: "Pulling your score down", cls: "neg" };
+      bodyEl.appendChild(el("div.comp-meta", {}, [
+        el("span.comp-tag." + contrib.cls, { text: contrib.t }),
+        el("span.comp-weight", { text: `${GRADE_LABEL[c.cat]} · weight ${c.w}%` }),
+      ]));
+      (det.metrics || []).forEach((m) => {
+        if (m.raw == null) return;
+        const mcat = catFromBands(m.raw, m.bands);
+        bodyEl.appendChild(el("div.comp-line", {}, [scoreDot(mcat), el("span", { text: `${m.label}: ${fmtMetricVal(m.raw, m.unit)}` })]));
+        const adv = zoneAdvice(m.raw, m.bands, m.unit);
+        if (adv && adv.ideal) bodyEl.appendChild(el("div.comp-advice", { text: adv.done ? `In the ideal range (${adv.ideal}). Already at full points, so keep it steady.` : `Currently ${GRADE_LABEL[adv.cur].toLowerCase()}. Aim ${adv.dir}; ideal range is ${adv.ideal}.` }));
+      });
+      if (det.note) bodyEl.appendChild(el("div.comp-advice", { text: det.note }));
+      if (SCORE_TIPS[c.label]) bodyEl.appendChild(el("div.comp-tip", { text: SCORE_TIPS[c.label] }));
+      head.addEventListener("click", () => card.classList.toggle("open"));
+      card.appendChild(head); card.appendChild(bodyEl);
+      return card;
+    }
 
     // Drawer explaining how the day's Autonomic Score was built: the method,
     // what helped, what hurt, and where to focus. `all` is a scoreSet() result.
@@ -2351,26 +2498,30 @@
         const rt = el("span.sum-hero-rating", { text: cat.short }); rt.style.background = cat.color; hero.appendChild(rt);
         hero.appendChild(el("div.sum-hero-label", { text: cat.label }));
         hero.appendChild(el("div.sum-hero-score", {}, [el("span.sum-hero-num", { text: String(all.score) }), el("span.sum-hero-den", { text: "/ 100" })]));
-        hero.appendChild(el("div.sum-hero-sub", { text: `Confidence ${all.confidence}% — the share of the full input set that was available to score today.` }));
+        hero.appendChild(el("div.sum-hero-sub", { text: `Confidence ${all.confidence}% - the share of the full input set that was available to score today.` }));
         body.appendChild(hero);
 
-        body.appendChild(el("p.score-method", { text: "The Autonomic Score is a weighted blend of the day's readings. Each input is graded, turned into points, and combined by weight. Missing inputs drop out and the remaining weights are rescaled — that rescaling is the confidence percentage. The most recent reading of each type is used, and structured (breathing) HRV outranks the unstructured reading when both are present." }));
+        body.appendChild(el("p.score-method", { text: "The Autonomic Score is a weighted blend of the day's readings. Each input is graded, turned into points, and combined by weight. Missing inputs drop out and the remaining weights are rescaled - that rescaling is the confidence percentage. The most recent reading of each type is used, and structured (breathing) HRV outranks the unstructured reading when both are present." }));
 
-        const compRow = (c) => metricRow(c.label, `${GRADE_LABEL[c.cat]} · weight ${c.w}%`, c.cat);
-        if (helped.length) { const card = sumCard("What helped"); helped.forEach((c) => card.appendChild(compRow(c))); body.appendChild(card); }
-        if (hurt.length) { const card = sumCard("What hurt"); hurt.forEach((c) => card.appendChild(compRow(c))); body.appendChild(card); }
-        if (neutral.length) { const card = sumCard("Middle of the range"); neutral.forEach((c) => card.appendChild(compRow(c))); body.appendChild(card); }
+        body.appendChild(el("p.score-method", { text: "Tap any input below to see the actual values behind it, whether it is helping or hurting, and what it would take to push it higher." }));
+        if (helped.length) { const card = sumCard("What helped"); helped.forEach((c) => card.appendChild(compAccordion(c))); body.appendChild(card); }
+        if (hurt.length) { const card = sumCard("What hurt"); hurt.forEach((c) => card.appendChild(compAccordion(c))); body.appendChild(card); }
+        if (neutral.length) { const card = sumCard("Middle of the range"); neutral.forEach((c) => card.appendChild(compAccordion(c))); body.appendChild(card); }
 
-        // How to improve: tips for whatever is dragging the score (or holding it back).
-        const focus = (hurt.length ? hurt : neutral).slice(0, 4).filter((c) => SCORE_TIPS[c.label]);
-        const improve = sumCard("How to improve");
-        if (focus.length) {
-          focus.forEach((c) => improve.appendChild(el("div.metric-card", {}, [
-            el("div.metric-head", {}, [scoreDot(c.cat), el("span.metric-name", { text: c.label })]),
-            el("div.metric-explain", { text: SCORE_TIPS[c.label] }),
+        // What would raise the score: the inputs with the most headroom, ranked by
+        // the points each could still add (weight × gap to its top zone), with a
+        // concrete target - so even a high score shows where the next gains are.
+        const ceil = (c) => (c.detail && c.detail.maxCat ? GRADE_PTS[c.detail.maxCat] : 95);
+        const avail = all.confidence || 100;
+        const headroom = comps.map((c) => ({ c, gain: c.w * (ceil(c) - c.p) / avail })).filter((x) => x.gain > 0.05).sort((a, b) => b.gain - a.gain);
+        const improve = sumCard("What would raise your score");
+        if (headroom.length) {
+          headroom.slice(0, 4).forEach(({ c, gain }) => improve.appendChild(el("div.metric-card", {}, [
+            el("div.metric-head", {}, [scoreDot(c.cat), el("span.metric-name", { text: c.label }), el("span.metric-val", { text: `+${gain.toFixed(1)} pt` })]),
+            el("div.metric-explain", { text: improveLine(c) }),
           ])));
         } else {
-          improve.appendChild(el("div.metric-card", {}, [el("div.sum-text", { text: "Nothing is dragging the score down today. Keep the inputs consistent — steady sleep, hydration, and pacing hold a strong baseline." })]));
+          improve.appendChild(el("div.metric-card", {}, [el("div.sum-text", { text: "Every scored input is already in its top zone, so this is about as high as the score goes. Keep the inputs consistent to hold it." })]));
         }
         if (OUTLOOK_GUIDE[cat.short]) improve.appendChild(el("div.metric-card", {}, [el("div.sum-text", { text: OUTLOOK_GUIDE[cat.short] })]));
         body.appendChild(improve);
@@ -2422,7 +2573,7 @@
       sec.appendChild(sectionHead("Food & Drink"));
       const b = el("div.section-body");
 
-      // Water — display only; tap to open the cups drawer.
+      // Water - display only; tap to open the cups drawer.
       b.appendChild(
         el("div.row", { onclick: () => waterDrawer() }, [
           el("span.row-ico", { html: ICONS.cup }),
@@ -2431,7 +2582,7 @@
         ])
       );
 
-      // Meals — display-only total calories; tap to open the meals drawer.
+      // Meals - display-only total calories; tap to open the meals drawer.
       const meals = f.meals || [];
       const totalCal = meals.reduce((s, m) => s + (parseInt(m.calories, 10) || 0), 0);
       b.appendChild(el("div.row", { onclick: () => mealsDrawer() }, [
@@ -2444,7 +2595,7 @@
       return sec;
     }
 
-    // Triggers — now its own top-level section (below Symptoms), formatted like
+    // Triggers - now its own top-level section (below Symptoms), formatted like
     // the other logged sections. Stored under day.food.triggers as a per-type
     // count map (shared with the analytics), but surfaced as a standalone area
     // because it will grow to hold triggers that aren't food/drink related.
@@ -3135,6 +3286,27 @@
 
     // Curved sparkline: fixed tick spacing (doesn't stretch full width), grade
     // bands + y ticks, color-coded points, and a draggable date·value readout.
+    function scoreGauge(score, color) {
+      const ns = "http://www.w3.org/2000/svg";
+      const mk = (t, a) => { const e = document.createElementNS(ns, t); for (const k in a) e.setAttribute(k, a[k]); return e; };
+      const size = 176, cx = size / 2, cy = size / 2, r = 74, sw = 12;
+      const START = 135, SWEEP = 270; // bottom-left, clockwise over the top
+      const pol = (deg) => { const a = deg * Math.PI / 180; return [cx + r * Math.cos(a), cy + r * Math.sin(a)]; };
+      const arc = (frac) => {
+        const a1 = START + SWEEP * Math.max(0.0001, frac);
+        const [x0, y0] = pol(START), [x1, y1] = pol(a1);
+        const large = SWEEP * frac > 180 ? 1 : 0;
+        return `M ${x0} ${y0} A ${r} ${r} 0 ${large} 1 ${x1} ${y1}`;
+      };
+      const frac = Math.max(0, Math.min(1, (score || 0) / 100));
+      const svg = mk("svg", { viewBox: `0 0 ${size} ${size}` });
+      svg.appendChild(mk("path", { d: arc(1), fill: "none", stroke: "var(--gauge-track)", "stroke-width": sw, "stroke-linecap": "round" }));
+      // faint colored halo behind the value arc
+      svg.appendChild(mk("path", { d: arc(frac), fill: "none", stroke: color, "stroke-width": sw + 7, "stroke-linecap": "round", opacity: 0.16 }));
+      svg.appendChild(mk("path", { d: arc(frac), fill: "none", stroke: color, "stroke-width": sw, "stroke-linecap": "round" }));
+      return svg;
+    }
+
     function buildSpark(points, bands) {
       if (!points || points.length < 2) return null;
       const ns = "http://www.w3.org/2000/svg";
@@ -3312,7 +3484,7 @@
           const z = bmiZone(bmi);
           card.appendChild(metricRow("BMI", bmi.toFixed(1) + " · " + z.zone, z.cat, "Body Mass Index from this weight and the height set in Profile. Zones: under 18.5 underweight, 18.5–24.9 healthy, 25–29.9 overweight, 30+ obese.", null));
         } else {
-          card.appendChild(metricRow("BMI", "—", null, "Set your height in Profile to grade weight by BMI.", null));
+          card.appendChild(metricRow("BMI", "-", null, "Set your height in Profile to grade weight by BMI.", null));
         }
       }
       body.appendChild(card);
@@ -3330,11 +3502,11 @@
       const signed = (v) => (v > 0 ? "+" + v : String(v));
 
       const verdict = {
-        great: "Minimal heart-rate rise on standing — a healthy orthostatic response.",
+        great: "Minimal heart-rate rise on standing - a healthy orthostatic response.",
         good: "Normal orthostatic rise, within the expected physiologic range.",
         ok: "Borderline rise at the upper end of normal. Worth keeping an eye on.",
-        bad: "Large rise — at or above the adult ≥30 bpm POTS-range threshold. Note context like hydration, heat, deconditioning, or meds.",
-        concerning: "Marked rise — at or above the ≥40 bpm threshold. Hydrate, sit or lie down, and log the surrounding context.",
+        bad: "Large rise - at or above the adult ≥30 bpm POTS-range threshold. Note context like hydration, heat, deconditioning, or meds.",
+        concerning: "Marked rise - at or above the ≥40 bpm threshold. Hydrate, sit or lie down, and log the surrounding context.",
       };
       body.appendChild(heroCard({
         cat: incCat,
@@ -3345,7 +3517,7 @@
         tip: incCat ? verdict[incCat] : "Enter Before HR and After HR to rate this event.",
       }));
 
-      // Begin / peak HR side by side — plain values, no spark.
+      // Begin / peak HR side by side - plain values, no spark.
       const hrCard = sumCard("Heart rate");
       hrCard.appendChild(el("div.ortho-duo", {}, [
         el("div.ortho-stat", {}, [
@@ -3361,7 +3533,7 @@
       ]));
       body.appendChild(hrCard);
 
-      // HR increase — sparkline with zones; this is what rates the event.
+      // HR increase - sparkline with zones; this is what rates the event.
       const incEx = (rr) => { const b = numOr(rr.beforeHr), a = numOr(rr.afterHr); return (b != null && a != null) ? a - b : null; };
       const incCard = sumCard("HR increase");
       incCard.appendChild(metricRow("Standing HR increase", increase != null ? signed(increase) + " bpm" : "", incCat,
@@ -3375,7 +3547,7 @@
       recCard.appendChild(metricRow("HR after 1 min", min1 != null ? min1 + " bpm" : "", false,
         "Heart rate one minute after standing, as recorded. As blood pressure rebounds a healthy response settles back toward baseline.", false));
       recCard.appendChild(metricRow("HR drop by 1 min", drop != null ? drop + " bpm" : "", dropCat,
-        "How far HR fell from its standing peak after one minute (Peak − HR@1min). A larger settle-down means stronger baroreflex and vagal recovery; little or no drop — or a further climb — points to an attenuated, dysautonomic response.",
+        "How far HR fell from its standing peak after one minute (Peak − HR@1min). A larger settle-down means stronger baroreflex and vagal recovery; little or no drop - or a further climb - points to an attenuated, dysautonomic response.",
         buildSpark(metricHistory("orthostatic", dropEx), BANDS.orthoRecovery)));
       body.appendChild(recCard);
 
@@ -4356,7 +4528,7 @@
     /* ================= Analytics view ================= *
      * Animated Day/Week/Month/Year pill over a scrollable stack of analytics
      * containers. Each container is built from real logged data only and
-     * returns null (renders nothing) when it has no data in range — there are
+     * returns null (renders nothing) when it has no data in range - there are
      * no "needs more data" placeholders. Week/Month/Year bucket the days and
      * average within each bucket. Every builder is wrapped in safe() so a
      * single failure can't blank the whole view.
@@ -4446,7 +4618,7 @@
 
     // ----- SVG line chart over buckets -----
     // Mirrors the summary-drawer sparklines (buildSpark): no zone-fill
-    // backgrounds — single-metric lines take a vertical grade gradient, a
+    // backgrounds - single-metric lines take a vertical grade gradient, a
     // "Show zones" link toggles dashed boundary lines, axis labels share one
     // style, and you can drag/hover to read each bucket's value.
     function acChart(buckets, series, opts) {
@@ -4594,31 +4766,57 @@
       const step = Math.max(1, Math.ceil(n / 6));
       buckets.forEach((b, i) => { if (i % step !== 0 && i !== n - 1) return; const tx = mk("text", { x: xAt(i), y: H - 6, "text-anchor": "middle", class: "chart-axis" }); tx.textContent = b.label; svg.appendChild(tx); });
 
-      // One reusable top→bottom gradient (objectBoundingBox) for every bar.
-      const gid = "bpg" + (acBpBars._n = (acBpBars._n || 0) + 1);
-      const grad = mk("linearGradient", { id: gid, x1: 0, y1: 0, x2: 0, y2: 1 });
-      grad.appendChild(mk("stop", { offset: 0, "stop-color": sysColor }));
-      grad.appendChild(mk("stop", { offset: 1, "stop-color": diaColor }));
-      const defs = mk("defs", {}); defs.appendChild(grad); svg.appendChild(defs);
+      const defs = mk("defs", {}); svg.appendChild(defs);
 
-      // Bar width in viewBox units, sized to the bucket spacing.
+      // Bar width in viewBox units - ~25% of the old width so the dots stay the
+      // primary mark; still scaled to the bucket spacing.
       const gap = n > 1 ? innerW / (n - 1) : innerW;
-      const barW = Math.max(3, Math.min(9, gap * 0.42));
+      const barW = Math.max(1.5, Math.min(9, gap * 0.42) * 0.25);
       buckets.forEach((b, i) => {
         const s = sys[i], dv = dia[i];
         if (s == null || isNaN(s) || dv == null || isNaN(dv)) return;
         const x = xAt(i), yS = yAt(s), yD = yAt(dv);
-        svg.appendChild(mk("rect", { x: x - barW / 2, y: Math.min(yS, yD), width: barW, height: Math.max(1.5, Math.abs(yD - yS)), rx: barW / 2, fill: `url(#${gid})`, opacity: 0.92 }));
-        svg.appendChild(mk("circle", { cx: x, cy: yS, r: 2.4, fill: sysColor }));
-        svg.appendChild(mk("circle", { cx: x, cy: yD, r: 2.4, fill: diaColor }));
+        // Each value tinted by the zone it lands in (BP grade bands), not by a
+        // fixed sys/dia color. Top half = systolic zone, bottom half = diastolic.
+        const sCol = SCORE_COLORS[catFromBands(s, BANDS.sys)] || sysColor;
+        const dCol = SCORE_COLORS[catFromBands(dv, BANDS.dia)] || diaColor;
+        const gid = "bpg" + (acBpBars._n = (acBpBars._n || 0) + 1);
+        const grad = mk("linearGradient", { id: gid, x1: 0, y1: 0, x2: 0, y2: 1 });
+        [[0, sCol], [0.5, sCol], [0.5, dCol], [1, dCol]].forEach(([o, c]) => grad.appendChild(mk("stop", { offset: o, "stop-color": c })));
+        defs.appendChild(grad);
+        svg.appendChild(mk("rect", { x: x - barW / 2, y: Math.min(yS, yD), width: barW, height: Math.max(1.5, Math.abs(yD - yS)), rx: barW / 2, fill: `url(#${gid})`, opacity: 0.95 }));
+        svg.appendChild(mk("circle", { cx: x, cy: yS, r: 2.4, fill: sCol }));
+        svg.appendChild(mk("circle", { cx: x, cy: yD, r: 2.4, fill: dCol }));
       });
+
+      // "Show zones": dashed grade-band boundaries for systolic (S) and
+      // diastolic (D), each colored by the zone below it - the areas each
+      // value should sit in.
+      const zoneLines = [];
+      const addZoneLines = (band, label) => band.forEach((seg) => { const bv = seg.max; if (bv !== Infinity && bv > min && bv < max) zoneLines.push({ v: bv, color: SCORE_COLORS[seg.cat] || "#888", label }); });
+      addZoneLines(BANDS.sys, "S"); addZoneLines(BANDS.dia, "D");
+      let zonesG = null;
+      if (zoneLines.length) {
+        zonesG = mk("g", {}); zonesG.style.display = "none";
+        zoneLines.forEach((g) => {
+          zonesG.appendChild(mk("line", { x1: padL, x2: W - padR, y1: yAt(g.v), y2: yAt(g.v), stroke: g.color, "stroke-width": 1.5, "stroke-dasharray": "4 3", "vector-effect": "non-scaling-stroke", opacity: 0.9 }));
+          const tx = mk("text", { x: W - padR - 1, y: yAt(g.v) - 2, "text-anchor": "end", class: "chart-axis" }); tx.textContent = g.label; zonesG.appendChild(tx);
+        });
+        svg.appendChild(zonesG);
+      }
 
       // Drag / hover readout: marker line + the bucket's sys/dia.
       const marker = mk("line", { y1: padT, y2: H - padB, stroke: "var(--text)", "stroke-width": 1, "vector-effect": "non-scaling-stroke", opacity: 0 });
       svg.appendChild(marker);
       const wrap = el("div.ac-chart-wrap");
       const readout = el("div.spark-readout");
-      wrap.appendChild(el("div.spark-top", {}, [readout])); wrap.appendChild(svg);
+      const top = el("div.spark-top", {}, [readout]);
+      if (zonesG) {
+        const btn = el("button.spark-zones-btn", { type: "button", text: "Show zones" });
+        btn.addEventListener("click", () => { const on = zonesG.style.display === "none"; zonesG.style.display = on ? "" : "none"; btn.textContent = on ? "Hide zones" : "Show zones"; });
+        top.appendChild(btn);
+      }
+      wrap.appendChild(top); wrap.appendChild(svg);
       const show = (i) => {
         i = Math.max(0, Math.min(n - 1, i));
         const x = xAt(i);
@@ -4715,7 +4913,7 @@
           { label: "Best day", value: best.sc, sub: fmtShort(best.dk), color: scoreCat(best.sc).color },
           { label: "Worst day", value: worst.sc, sub: fmtShort(worst.dk), color: scoreCat(worst.sc).color },
         ]),
-        el("div.stat.ac-direction", {}, [el("div.stat-label", { text: "Direction" }), acTrendChip(delta, { goodUp: true }) || el("span.stat-value", { text: "—" })]),
+        el("div.stat.ac-direction", {}, [el("div.stat-label", { text: "Direction" }), acTrendChip(delta, { goodUp: true }) || el("span.stat-value", { text: "-" })]),
         daily.length ? el("div.ac-block", {}, [el("div.ac-block-label", { text: "Days in each grade" }), grades]) : null,
       ]);
     }
@@ -4892,7 +5090,7 @@
       const bpBlock = bpChart ? el("div.ac-block", {}, [
         el("div.ac-block-label", { text: "Systolic / diastolic spread" }),
         bpChart,
-        acLegend([{ values: sys, color: "var(--accent)", label: "Systolic" }, { values: dia, color: "#3b82f6", label: "Diastolic" }]),
+        el("div.ac-sub", { text: "Top of each bar = systolic, bottom = diastolic; color shows each one's zone." }),
       ]) : null;
       return acCard("Blood Pressure", acRangeLabel(), [
         bpBlock,
@@ -4921,7 +5119,7 @@
       if (!blocks.some(Boolean)) return null;
       return acCard("Resting Heart Rate", acRangeLabel(), [
         ...blocks,
-        layAvg != null ? acInsight(`Morning lying HR averages ${Math.round(layAvg)} — pre-illness baseline was trending toward 60–65.`, layAvg <= 67 ? "strong" : null) : null,
+        layAvg != null ? acInsight(`Morning lying HR averages ${Math.round(layAvg)} - pre-illness baseline was trending toward 60–65.`, layAvg <= 67 ? "strong" : null) : null,
       ]);
     }
 
@@ -5132,12 +5330,12 @@
 
     function acStreakAnalytics() {
       const keys = Object.keys(state.days).sort(); if (keys.length < 3) return null;
-      const runs = []; let run = 0; const breaks = {}; const breakDow = [0, 0, 0, 0, 0, 0, 0]; let anyBreak = false;
+      const runs = []; let run = 0; const breaks = {}; let anyBreak = false;
       const start = dateFromKey(keys[0]), end = dateFromKey(keys[keys.length - 1]);
       for (let cd = new Date(start); cd <= end; cd.setDate(cd.getDate() + 1)) {
         const dk = keyOf(cd), c = dayCleanliness(dk);
         if (c && c.clean) { run++; }
-        else { if (run > 0) runs.push(run); run = 0; if (c) { anyBreak = true; breakDow[cd.getDay()]++; c.criteria.filter((cr) => !cr.pending && !cr.pass).forEach((cr) => { breaks[cr.label] = (breaks[cr.label] || 0) + 1; }); } }
+        else { if (run > 0) runs.push(run); run = 0; if (c) { anyBreak = true; c.criteria.filter((cr) => !cr.pending && !cr.pass).forEach((cr) => { breaks[cr.label] = (breaks[cr.label] || 0) + 1; }); } }
       }
       if (run > 0) runs.push(run);
       const trigRows = triggerRows(30);
@@ -5146,12 +5344,9 @@
       runs.forEach((r) => { buckets[r <= 2 ? "1–2" : r <= 6 ? "3–6" : r <= 13 ? "7–13" : "14+"]++; });
       const histRows = Object.entries(buckets).filter(([, c]) => c).map(([k, c]) => ({ name: k + " days", count: c }));
       const breakRows = Object.entries(breaks).map(([k, c]) => ({ name: k, count: c })).sort((a, b) => b.count - a.count);
-      const names = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-      const dowRows = names.map((nm, i) => breakDow[i] ? { name: nm, count: breakDow[i] } : null).filter(Boolean);
       return acCard("Streak Analytics", "What sustains and breaks streaks", [
         histRows.length ? el("div.ac-block", {}, [el("div.ac-block-label", { text: "Streak length distribution" }), acBars(histRows, {})]) : null,
         breakRows.length ? el("div.ac-block", {}, [el("div.ac-block-label", { text: "Most common reasons streaks break" }), acBars(breakRows, {})]) : null,
-        dowRows.length ? el("div.ac-block", {}, [el("div.ac-block-label", { text: "Day-of-week streaks break" }), acBars(dowRows, {})]) : null,
         trigRows.length ? el("div.ac-block", {}, [el("div.ac-block-label", { text: "Trigger foods" }), acBars(trigRows, {})]) : null,
       ]);
     }
@@ -5356,7 +5551,7 @@
         if (cur != null && base !== 0) ratios.push(Math.max(0, Math.min(def.goodUp ? cur / base : base / cur, 1.2)));
         rows.push(el("div.ac-cmp-row", {}, [
           el("div.ac-cmp-name", { text: def.label }),
-          el("div.ac-cmp-vals", {}, [el("span.prev", { text: `${fmtNum(roundTo(base, def.round))} → ` }), cur == null ? "—" : fmtNum(roundTo(cur, def.round))]),
+          el("div.ac-cmp-vals", {}, [el("span.prev", { text: `${fmtNum(roundTo(base, def.round))} → ` }), cur == null ? "-" : fmtNum(roundTo(cur, def.round))]),
           cur != null ? (acTrendChip(def.goodUp ? cur - base : base - cur, { goodUp: true, eps: def.round === 3 ? 0.003 : 0.5 }) || el("span")) : el("span"),
         ]));
       });
@@ -5370,7 +5565,7 @@
         rows.length ? el("div.ac-block", {}, [el("div.ac-block-label", { text: "Pre-illness baseline → recent" }), el("div.ac-cmp", {}, rows)]) : null,
       ];
       if (!stillSick) children.push(el("div.ac-grades", {}, [30, 60, 90].map((n) => el("div.ac-grade-chip", { style: `box-shadow: inset 3px 0 0 ${sinceEnd >= n ? "#16a34a" : "var(--border)"}` }, [(sinceEnd >= n ? "✓ " : "") + `${n}d post-illness`]))));
-      children.push(acInsight(stillSick ? `Illness started ${fmtShort(ep.start)} — still logging "Sick".` : `Illness ran ${fmtShort(ep.start)} → ${fmtShort(ep.end)}.${eps.length > 1 ? ` ${eps.length} episodes logged.` : ""}`));
+      children.push(acInsight(stillSick ? `Illness started ${fmtShort(ep.start)} - still logging "Sick".` : `Illness ran ${fmtShort(ep.start)} → ${fmtShort(ep.end)}.${eps.length > 1 ? ` ${eps.length} episodes logged.` : ""}`));
       return acCard("Recovery Phase", stillSick ? "Tracking the current illness" : "Restoration vs your pre-illness baseline", children);
     }
 
@@ -5424,8 +5619,8 @@
           { label: "Felt better than data", value: better || null, sub: "days" },
           { label: "Aligned", value: aligned || null, sub: "days" },
         ]),
-        worse >= 3 && worse > better ? acInsight(`You felt worse than your measurements on ${worse} days — possible anxiety amplification when the data was actually okay.`, "mod") : null,
-        better >= 3 && better > worse ? acInsight(`You felt better than your measurements on ${better} days — watch for early illness the data may catch before you feel it.`, "mod") : null,
+        worse >= 3 && worse > better ? acInsight(`You felt worse than your measurements on ${worse} days - possible anxiety amplification when the data was actually okay.`, "mod") : null,
+        better >= 3 && better > worse ? acInsight(`You felt better than your measurements on ${better} days - watch for early illness the data may catch before you feel it.`, "mod") : null,
       ]);
     }
 
@@ -5661,7 +5856,7 @@
         warns.push({
           key: "rmssdDecline",
           html: `RMSSD has declined three readings in a row (${b(seq[0])} → ${b(seq[1])} → ${b(seq[2])} ms).`,
-          explain: "RMSSD reflects beat-to-beat parasympathetic (vagal, “rest-and-digest”) tone. Three straight drops is a trend, not an off day — usually accumulating load from poor sleep, exertion, illness or a trigger, with the vagal brake easing off and the system tilting toward sympathetic dominance. This is the kind of slide that often precedes a crash, so it’s worth easing load now.",
+          explain: "RMSSD reflects beat-to-beat parasympathetic (vagal, “rest-and-digest”) tone. Three straight drops is a trend, not an off day - usually accumulating load from poor sleep, exertion, illness or a trigger, with the vagal brake easing off and the system tilting toward sympathetic dominance. This is the kind of slide that often precedes a crash, so it’s worth easing load now.",
           focus: `My RMSSD has dropped three readings in a row (${seq.join(" → ")} ms), suggesting declining parasympathetic tone and accumulating autonomic load.`,
         });
       }
@@ -5669,8 +5864,8 @@
       if (ss.length === 2 && ss.every((d) => d.score < 40)) {
         warns.push({
           key: "lowScores",
-          html: `Two consecutive low-score days (${b(ss[0].score)} and ${b(ss[1].score)} / 100) — load may be accumulating.`,
-          explain: "The daily Autonomic Score blends HRV, resting HR, symptoms and adherence into a 0–100 readiness figure. Two days running below 40 (“Compromised” or worse) means reserves didn’t rebuild overnight — the system is staying stressed instead of bouncing back. This is the window to pull back load before it compounds into a longer setback.",
+          html: `Two consecutive low-score days (${b(ss[0].score)} and ${b(ss[1].score)} / 100) - load may be accumulating.`,
+          explain: "The daily Autonomic Score blends HRV, resting HR, symptoms and adherence into a 0–100 readiness figure. Two days running below 40 (“Compromised” or worse) means reserves didn’t rebuild overnight - the system is staying stressed instead of bouncing back. This is the window to pull back load before it compounds into a longer setback.",
           focus: `My autonomic score has been low two days running (${ss[0].score} then ${ss[1].score} out of 100), so reserves aren’t recovering between days.`,
         });
       }
@@ -5679,7 +5874,7 @@
         const h = fmtNum(roundTo(sl.sleepH, 1));
         warns.push({
           key: "shortSleep",
-          html: `Last logged night was ${b(h + "h")} — under 6 hours.`,
+          html: `Last logged night was ${b(h + "h")} - under 6 hours.`,
           explain: "Sleep is when the parasympathetic system does most of its repair and when HRV rebuilds. A night under 6 hours blunts next-day vagal tone, raises resting heart rate, lowers orthostatic tolerance, and makes symptoms and triggers hit harder. For dysautonomia recovery, consistent 7+ hour nights are one of the highest-leverage levers you have.",
           focus: `My most recent night of sleep was only ${h} hours (under 6), which tends to blunt my next-day HRV and orthostatic tolerance.`,
         });
@@ -5689,8 +5884,8 @@
         const v = Math.round(vl.vlf);
         warns.push({
           key: "highVlf",
-          html: `VLF power is elevated (${b(v)}, over 700) — rising sympathetic load.`,
-          explain: "Very-low-frequency power reflects slower regulatory processes — thermoregulation, the renin-angiotensin system, and sympathetic/inflammatory activity. Sustained elevation (>700) often signals rising physiological stress or inflammatory load and tracks with worse recovery. In your context it tends to accompany sympathetic over-activation and an impending dip.",
+          html: `VLF power is elevated (${b(v)}, over 700) - rising sympathetic load.`,
+          explain: "Very-low-frequency power reflects slower regulatory processes - thermoregulation, the renin-angiotensin system, and sympathetic/inflammatory activity. Sustained elevation (>700) often signals rising physiological stress or inflammatory load and tracks with worse recovery. In your context it tends to accompany sympathetic over-activation and an impending dip.",
           focus: `My VLF power is elevated (${v}, above the 700 threshold), pointing to rising sympathetic or inflammatory load.`,
         });
       }
@@ -5700,7 +5895,7 @@
         warns.push({
           key: "lfPeakShift",
           html: `LF peak shifted to a lower frequency (${b(a + " Hz")} → ${b(c + " Hz")}) vs the prior reading.`,
-          explain: "The low-frequency peak sits near the baroreflex resonance (~0.1 Hz). A downward shift suggests the baroreflex is operating more sluggishly — slower blood-pressure regulation on standing — which in POTS/dysautonomia often accompanies reduced orthostatic tolerance and more lightheadedness. Worth watching alongside resting HR and standing symptoms.",
+          explain: "The low-frequency peak sits near the baroreflex resonance (~0.1 Hz). A downward shift suggests the baroreflex is operating more sluggishly - slower blood-pressure regulation on standing - which in POTS/dysautonomia often accompanies reduced orthostatic tolerance and more lightheadedness. Worth watching alongside resting HR and standing symptoms.",
           focus: `My LF (baroreflex) peak shifted to a lower frequency (${a} → ${c} Hz), which can mean slower blood-pressure regulation and reduced orthostatic tolerance.`,
         });
       }
@@ -5790,7 +5985,7 @@
       const { keys: allKeys, rangeText } = reportDateRange("week");
       const keys = allKeys.filter((k) => state.days[k]).sort();
       const header = universalHeader(rangeText);
-      const focus = `FLAGGED PROBLEM TO FOCUS ON:\n${flag.focus}\n\nThe app surfaced this as an active "watch flag." Examine my full week of data below, confirm or challenge this finding with the actual numbers, explain the most likely drivers, and give me a concrete, prioritized plan to correct it (noting where I should check with a doctor first). Be specific and use my real data — don't generalize.`;
+      const focus = `FLAGGED PROBLEM TO FOCUS ON:\n${flag.focus}\n\nThe app surfaced this as an active "watch flag." Examine my full week of data below, confirm or challenge this finding with the actual numbers, explain the most likely drivers, and give me a concrete, prioritized plan to correct it (noting where I should check with a doctor first). Be specific and use my real data - don't generalize.`;
       const data = `DATA FOR PERIOD:\n\n${renderSections(keys, ["scores", "hrv", "sleep", "bp", "rhr", "orthostatic", "symptoms", "activities", "food", "meds", "supplements", "cleanDays"])}`;
       const prompt = `${header}\n\n${focus}\n\n${data}`;
       openPromptDrawer("Improve this metric", rangeText, prompt);
@@ -5894,7 +6089,7 @@
     /* ---------------- AI Insights (Reports) ----------------
        Builds a customized analysis prompt from the user's data over a chosen
        time range that they can paste into Claude or ChatGPT. Pure text
-       generation — no network, no AI runs here. */
+       generation - no network, no AI runs here. */
 
     // Which MED_TYPES count as "medications" vs "supplements" for prompt grouping.
     const MED_KEYS = new Set(["allegra", "pepsidAc", "gaviscon", "melatonin"]);
@@ -6126,7 +6321,7 @@
         if (!d) return;
         const ss = scoreSet(d.readings || [], d, k);
         if (ss.score == null) return;
-        lines.push(`[${k}] Autonomic Score: ${ss.score}/100 (confidence ${ss.confidence}%)${blueZone(d.readings || []) ? " [BLUE ZONE — high readiness masking fragile RMSSD]" : ""}`);
+        lines.push(`[${k}] Autonomic Score: ${ss.score}/100 (confidence ${ss.confidence}%)${blueZone(d.readings || []) ? " [BLUE ZONE - high readiness masking fragile RMSSD]" : ""}`);
       });
       return orNone(lines);
     }
@@ -6175,17 +6370,17 @@
       const sex = (state.profile && state.profile.sex) || "male";
       return `You are analyzing health data for someone with long COVID dysautonomia, POTS, MCAS, Roemheld syndrome, and suspected vestibular migraine. They are a ${age}-year-old ${sex}, 3+ years into long COVID recovery.
 
-Approach this analysis as an honest friend examining the data carefully — not blowing smoke or making them feel better artificially, but also not being brutally harsh. Be direct and accurate without unnecessary softening or unnecessary cruelty. They want truth delivered with care.
+Approach this analysis as an honest friend examining the data carefully - not blowing smoke or making them feel better artificially, but also not being brutally harsh. Be direct and accurate without unnecessary softening or unnecessary cruelty. They want truth delivered with care.
 
 REQUIREMENTS FOR YOUR ANALYSIS:
-- Be concise — no fluff or filler content
-- Be accurate — don't miss data points provided
-- Be honest — acknowledge both progress and setbacks truthfully
-- Be specific — use actual numbers from the data, not generalities
-- Be research-grounded — cite scientific evidence where relevant
-- Be careful with recommendations — if suggesting interventions, note they should discuss with a doctor first, especially for medications, supplements at therapeutic doses, or major protocol changes
-- Work hard — really think through the data, don't surface-level skim
-- Be rich and genuinely helpful — provide insights that matter
+- Be concise - no fluff or filler content
+- Be accurate - don't miss data points provided
+- Be honest - acknowledge both progress and setbacks truthfully
+- Be specific - use actual numbers from the data, not generalities
+- Be research-grounded - cite scientific evidence where relevant
+- Be careful with recommendations - if suggesting interventions, note they should discuss with a doctor first, especially for medications, supplements at therapeutic doses, or major protocol changes
+- Work hard - really think through the data, don't surface-level skim
+- Be rich and genuinely helpful - provide insights that matter
 
 STRUCTURE YOUR RESPONSE AS FOLLOWS:
 
@@ -6229,7 +6424,7 @@ PERIOD ANALYZED: ${rangeText}`;
         context: `KEY METRICS TO EXAMINE:
 - RMSSD trends (parasympathetic activity)
 - pNN50 patterns (vagal depth)
-- LF Peak Frequency progression (baroreflex training — target 0.08–0.10 Hz)
+- LF Peak Frequency progression (baroreflex training - target 0.08–0.10 Hz)
 - HF Peak Frequency (respiratory peak alignment)
 - LF/HF ratio dynamics (sympathovagal balance)
 - VLF Power patterns (stress signal)
@@ -6324,7 +6519,7 @@ Cite sleep and HRV research, sleep in chronic illness recovery, and circadian rh
         sections: ["bp", "rhr", "ecg", "orthostatic", "activities"],
         focus: "Analyze cardiovascular system function based on BP, HR, and ECG data, including exercise HR responses and orthostatic responses.",
         context: `HISTORICAL CONTEXT:
-- Clean cardiac workup: echo, bubble echo, MRI, CT — no structural abnormalities
+- Clean cardiac workup: echo, bubble echo, MRI, CT - no structural abnormalities
 - Documented rate-dependent ECG aberrancy
 - History of SVT episodes during illness
 - Labile hypertension during long COVID`,
@@ -6410,7 +6605,7 @@ Cite POTS research (blood volume protocols, compression therapy, exercise rehabi
         id: "mcas", icon: ICONS.cell, title: "MCAS Pattern Analysis",
         desc: "Histamine reactions, triggers, and MCAS-related symptom patterns.",
         sections: ["symptoms", "food", "meds", "scores"],
-        focus: "Identify mast cell activation patterns and triggers — reactions with timing, potential food/environmental/stress triggers, and treatment effectiveness.",
+        focus: "Identify mast cell activation patterns and triggers - reactions with timing, potential food/environmental/stress triggers, and treatment effectiveness.",
         context: `CURRENT TREATMENT:
 - Allegra 180mg (H1)
 - Pepcid (H2)
@@ -6432,7 +6627,7 @@ Discuss research on MCAS in long COVID, quercetin phytosome, DAO enzyme for diet
         id: "gut", icon: ICONS.gut, title: "Gut Health Connection",
         desc: "Bowel patterns, gut-vagus correlation, and digestive health impacts.",
         sections: ["bm", "food", "hrv", "scores"],
-        focus: "Analyze gut function and its connection to autonomic recovery — bowel movement frequency/quality and correlation with HRV.",
+        focus: "Analyze gut function and its connection to autonomic recovery - bowel movement frequency/quality and correlation with HRV.",
         context: `GUT-VAGUS CONNECTION:
 - Bowel movements strongly correlate with HRV improvement
 - Caffeine sometimes the only motility trigger
@@ -6476,7 +6671,7 @@ Cite autonomic nervous system research relevant to long COVID and dysautonomia.`
         id: "symptom", icon: ICONS.search, title: "Symptom Investigation",
         desc: "Deep dive into specific symptoms with potential causes and patterns.",
         sections: ["symptoms", "hrv", "bp", "rhr", "activities"],
-        focus: "Deep investigation of specific symptoms reported in the period — associated metrics when symptoms occurred and activities preceding them.",
+        focus: "Deep investigation of specific symptoms reported in the period - associated metrics when symptoms occurred and activities preceding them.",
         context: `POTENTIAL EXPLANATIONS TO CONSIDER: long COVID systemic manifestations, POTS-related symptoms, MCAS reactions, Roemheld (gastrocardiac), vestibular migraine, anxiety/sympathetic activation, sleep deprivation effects.`,
         instructions: `Analyze:
 - Symptom pattern recognition
@@ -6541,7 +6736,7 @@ Focus on actionable insights rather than just identifying that good days happene
         id: "meds", icon: ICONS.pill, title: "Medication & Supplement Review",
         desc: "Adherence patterns and apparent effectiveness of current protocol.",
         sections: ["meds", "supplements", "scores", "cleanDays"],
-        focus: "Effectiveness analysis of the current medication and supplement protocol — adherence per item and correlation with metric outcomes.",
+        focus: "Effectiveness analysis of the current medication and supplement protocol - adherence per item and correlation with metric outcomes.",
         context: `CURRENT PROTOCOL: Allegra 180mg, Pepcid, Magnesium glycinate 200mg evening, B1, CoQ10, Fish oil, Liquid IV, and others as logged.`,
         instructions: `Analyze:
 - Apparent effectiveness per item
@@ -6558,7 +6753,7 @@ Cite research on each major intervention's evidence base. Note clearly that medi
         id: "stress", icon: ICONS.brain, title: "Stress & Recovery Patterns",
         desc: "Work stress, life events, and recovery capacity analysis.",
         sections: ["activities", "symptoms", "hrv", "scores"],
-        focus: "Analyze how life stressors impact autonomic function and recovery patterns — stress events logged (stressful work, family events), their metric impact, and recovery time to baseline.",
+        focus: "Analyze how life stressors impact autonomic function and recovery patterns - stress events logged (stressful work, family events), their metric impact, and recovery time to baseline.",
         context: `PATTERNS TO EXAMINE: work stress impact, family obligation impact, social event recovery, stress accumulation, recovery practices effectiveness.`,
         instructions: `Analyze:
 - Stress tolerance current level
@@ -6612,7 +6807,7 @@ Format suitable for printing or sharing electronically with healthcare providers
     ];
 
     // Build a prompt covering one or more report cards. A single card produces
-    // a focused prompt; multiple cards are stitched into one combined report —
+    // a focused prompt; multiple cards are stitched into one combined report -
     // a shared data block (the union of every selected card's sections, each
     // rendered once) followed by a per-area focus section, so the user gets
     // exactly the analyses they picked without duplicated data dumps.
@@ -6621,7 +6816,7 @@ Format suitable for printing or sharing electronically with healthcare providers
       const keys = allKeys.filter((k) => state.days[k]).sort();
       const header = universalHeader(rangeText);
       const sparse = hasAnyData(keys) && entryCount(keys) < 4
-        ? "\n\nNOTE: Limited data available for this period — analysis may be less comprehensive.\n"
+        ? "\n\nNOTE: Limited data available for this period - analysis may be less comprehensive.\n"
         : "";
 
       if (cards.length === 1) {
@@ -6640,7 +6835,7 @@ Format suitable for printing or sharing electronically with healthcare providers
       const intro = `This is a CUSTOM, MULTI-PART report the user assembled, covering ${cards.length} focus areas:
 ${titles.map((t, i) => `${i + 1}. ${t}`).join("\n")}
 
-Address each focus area as its own clearly-labeled top-level section in your response, in the order listed, using the titles above as headings. Within each section, follow the response structure described above (Analysis, Trends Identified, Recovery Position, Projections, Recommendations, Citations) where relevant to that area. The shared data below covers all areas — the same data point may inform more than one. Don't repeat identical analysis across sections; cross-reference instead. End with a brief integrated summary that ties the focus areas together.`;
+Address each focus area as its own clearly-labeled top-level section in your response, in the order listed, using the titles above as headings. Within each section, follow the response structure described above (Analysis, Trends Identified, Recovery Position, Projections, Recommendations, Citations) where relevant to that area. The shared data below covers all areas - the same data point may inform more than one. Don't repeat identical analysis across sections; cross-reference instead. End with a brief integrated summary that ties the focus areas together.`;
       const data = `SHARED DATA FOR PERIOD (covers every focus area below):\n\n${renderSections(keys, sectionKeys)}`;
       const focusBlocks = cards.map((c, i) => {
         let b = `=== ${i + 1}. ${c.title.toUpperCase()} ===\nFOCUS: ${c.focus}`;
@@ -6747,7 +6942,7 @@ Address each focus area as its own clearly-labeled top-level section in your res
         document.body.removeChild(ta);
         done();
       } catch (e) {
-        toast("Copy failed — select the text and copy manually");
+        toast("Copy failed - select the text and copy manually");
       }
     }
 
