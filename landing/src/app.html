@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#050506" />
+    %sveltekit.head%
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <script>
+      document.documentElement.classList.add('has-js');
+    </script>
+  </head>
+  <body>
+    <div style="display: contents">%sveltekit.body%</div>
+
+    <!-- Site interactivity. The site ships with no framework runtime (csr is
+         off); this small guarded script wires the nav, FAQ, forms and copy
+         button on every page. -->
+    <script>
+      (function () {
+        'use strict';
+
+        function init() {
+          var yr = document.getElementById('yr');
+          if (yr) yr.textContent = String(new Date().getFullYear());
+
+          var nav = document.getElementById('nav');
+          if (nav) {
+            var onScroll = function () { nav.classList.toggle('scrolled', window.scrollY > 12); };
+            onScroll();
+            window.addEventListener('scroll', onScroll, { passive: true });
+
+            var burger = document.getElementById('burger');
+            if (burger) {
+              burger.addEventListener('click', function () {
+                var open = nav.classList.toggle('open');
+                burger.classList.toggle('open', open);
+                burger.setAttribute('aria-expanded', open ? 'true' : 'false');
+              });
+              nav.querySelectorAll('.nav-links a, .nav-cta a').forEach(function (a) {
+                a.addEventListener('click', function () {
+                  nav.classList.remove('open');
+                  burger.classList.remove('open');
+                  burger.setAttribute('aria-expanded', 'false');
+                });
+              });
+            }
+          }
+
+          document.querySelectorAll('.ai-chip').forEach(function (chip) {
+            chip.addEventListener('click', function () { chip.classList.toggle('selected'); });
+          });
+
+          // Waitlist forms — no backend yet; show inline confirmation.
+          // TODO: POST the form data to your waitlist endpoint where noted.
+          var heroForm = document.getElementById('heroForm');
+          var wlForm = document.getElementById('wlForm');
+          var wlSuccess = document.getElementById('wlSuccess');
+          if (heroForm) {
+            heroForm.addEventListener('submit', function (e) {
+              e.preventDefault();
+              var email = heroForm.email.value;
+              var target = document.getElementById('waitlist');
+              if (wlForm && email) wlForm.email.value = email;
+              if (target) target.scrollIntoView({ behavior: 'smooth' });
+              setTimeout(function () { if (wlForm && wlForm.name) wlForm.name.focus(); }, 650);
+            });
+          }
+          if (wlForm) {
+            wlForm.addEventListener('submit', function (e) {
+              e.preventDefault();
+              if (!wlForm.email.value) return;
+              // TODO: POST form data to your waitlist endpoint here.
+              wlForm.classList.add('hide');
+              if (wlSuccess) wlSuccess.classList.add('show');
+            });
+          }
+
+          var copyBtn = document.querySelector('.aip-copy');
+          if (copyBtn) {
+            var promptEl = document.querySelector('.aip-body');
+            copyBtn.addEventListener('click', function () {
+              var txt = promptEl ? promptEl.innerText : '';
+              var done = function () {
+                var prev = copyBtn.textContent;
+                copyBtn.textContent = 'Copied ✓';
+                setTimeout(function () { copyBtn.textContent = prev; }, 1600);
+              };
+              if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done, done);
+              else done();
+            });
+          }
+        }
+
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+        else init();
+      })();
+    </script>
+  </body>
+</html>
