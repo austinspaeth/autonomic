@@ -321,16 +321,10 @@
   .water-cup svg { width: 30px; height: 30px; }
   .water-cup.is-full { color: var(--accent); background: var(--accent-soft); border-color: var(--accent); }
 
-  /* Triggers card (nested at the end of Food & Drink) */
-  .trig-card { border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 14px 14px; margin-top: 12px; background: var(--surface-2); }
-  .trig-card-head { display: flex; align-items: center; gap: 10px; padding-bottom: 8px; }
-  .trig-card-title { flex: 1; font-size: 15px; font-weight: 600; }
-  .trig-item { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--border); }
-  .trig-item-label { flex: 1; font-size: 15px; }
+  /* Trigger row delete button (Triggers section) */
   .trig-del { appearance: none; border: none; background: none; color: var(--text-dim); cursor: pointer; padding: 4px; display: inline-flex; }
   .trig-del:active { color: var(--accent); }
   .trig-del svg { width: 18px; height: 18px; }
-  .trig-empty { color: var(--text-dim); font-size: 14px; padding: 8px 0 6px; border-top: 1px solid var(--border); }
 
   .muted { color: var(--text-dim); font-size: 14px; padding: 6px 0; }
 
@@ -953,7 +947,10 @@
   }
   /* Analysis category navigation: a 3-per-row card grid that slides out to the
      left as the chosen category's content slides in from the right. */
-  .ac-nav { overflow: hidden; }
+  /* overflow-x: clip (not hidden) clips the horizontal category slide without
+     establishing a scroll container, so the sticky detail head below can pin to
+     the viewport as you scroll. */
+  .ac-nav { overflow-x: clip; overflow-y: visible; }
   .ac-track { display: flex; width: 200%; transform: translateX(0); transition: transform .32s ease, height .32s ease; }
   .ac-track.show-detail { transform: translateX(-50%); }
   .ac-track.no-anim { transition: none; }
@@ -970,7 +967,17 @@
   .ac-cat-ic svg { width: 24px; height: 24px; display: block; }
   .ac-cat-title { font-size: 13px; font-weight: 700; line-height: 1.15; }
   .ac-cat-desc { font-size: 11px; color: var(--text-dim); line-height: 1.3; }
-  .ac-detail-head { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+  /* Sticks just beneath the top bar as the category content scrolls under it.
+     --topbar-h is measured in JS so it tracks the safe-area inset. */
+  .ac-detail-head {
+    display: flex; align-items: center; gap: 8px;
+    position: sticky; top: var(--topbar-h, 56px); z-index: 10;
+    padding: 8px 0 10px; margin-bottom: 6px;
+    background: var(--bg-glass);
+    -webkit-backdrop-filter: blur(18px) saturate(170%);
+    backdrop-filter: blur(18px) saturate(170%);
+    border-bottom: 1px solid var(--border);
+  }
   .ac-back-btn { flex: none; margin-left: -8px; }
   .ac-back-btn svg { width: 22px; height: 22px; display: block; }
   .ac-detail-title { font-size: 18px; font-weight: 700; }
@@ -994,6 +1001,36 @@
   .ac-insight-bar { width: 3px; border-radius: 2px; background: var(--accent); flex: none; }
   .ac-insight.s-strong .ac-insight-bar { background: #16a34a; }
   .ac-insight.s-mod .ac-insight-bar { background: #eab308; }
+
+  /* Watch-flag accordions (flags drawer) */
+  .flag-card {
+    background: var(--surface-2); border: 1px solid var(--border);
+    border-left: 3px solid #eab308; border-radius: var(--radius-sm);
+    margin-top: 10px; overflow: hidden;
+  }
+  .flag-head {
+    width: 100%; display: flex; align-items: center; gap: 10px;
+    background: none; border: none; cursor: pointer; text-align: left;
+    color: var(--text); font-family: inherit; font-size: 13px; line-height: 1.4;
+    padding: 12px 14px;
+  }
+  .flag-head-text { flex: 1; }
+  .flag-head-text strong { font-weight: 800; }
+  .flag-caret { flex: none; color: var(--text-dim); display: inline-flex; transition: transform .2s; }
+  .flag-caret svg { width: 18px; height: 18px; }
+  .flag-card.open .flag-caret { transform: rotate(180deg); }
+  .flag-body { display: none; padding: 0 14px 14px; }
+  .flag-card.open .flag-body { display: block; }
+  .flag-explain { margin: 0 0 12px; font-size: 13px; line-height: 1.5; color: var(--text-dim); }
+  .flag-ai-btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: var(--accent-soft); color: var(--accent);
+    border: 1px solid var(--accent); border-radius: 999px;
+    padding: 8px 14px; font-size: 13px; font-weight: 700; font-family: inherit; cursor: pointer;
+  }
+  .flag-ai-btn:active { background: var(--accent); color: #fff; }
+  .flag-ai-ic { display: inline-flex; }
+  .flag-ai-ic svg { width: 16px; height: 16px; }
 
   .ac-trend { display: inline-flex; align-items: center; font-size: 12px; font-weight: 700; padding: 2px 7px; border-radius: 999px; white-space: nowrap; }
   .ac-trend.up, .ac-trend.good { color: #16a34a; background: rgba(22,163,74,.13); }
@@ -2268,6 +2305,7 @@
       root.appendChild(renderActivities());
       root.appendChild(renderMeds());
       root.appendChild(renderSymptoms());
+      root.appendChild(renderTriggers());
       root.appendChild(renderFoodDrink());
       root.appendChild(renderDigestion());
     }
@@ -2310,21 +2348,30 @@
         el("div.row-val", { text: `${totalCal} cal` }),
       ]));
 
-      // Triggers — nested card with its own add + per-item delete.
-      const card = el("div.trig-card");
-      card.appendChild(el("div.trig-card-head", {}, [
-        el("span.row-ico", { html: ICONS.alert }),
-        el("div.trig-card-title", { text: "Triggers" }),
-        el("button.add-link", { text: "+ Add", onclick: () => triggerMenu() }),
-      ]));
+      sec.appendChild(b);
+      return sec;
+    }
+
+    // Triggers — now its own top-level section (below Symptoms), formatted like
+    // the other logged sections. Stored under day.food.triggers as a per-type
+    // count map (shared with the analytics), but surfaced as a standalone area
+    // because it will grow to hold triggers that aren't food/drink related.
+    function renderTriggers() {
+      const d = day();
+      const f = d.food || { triggers: {} };
+      const sec = el("div.section");
+      sec.appendChild(sectionHead("Triggers", false,
+        el("button.add-link", { text: "+ Add", onclick: () => triggerMenu() })));
+      const b = el("div.section-body");
       const trigs = f.triggers || {};
       const keys = Object.keys(trigs).filter((k) => trigs[k] > 0 && TRIGGER_TYPES[k]);
       if (!keys.length) {
-        card.appendChild(el("div.trig-empty", { text: "No triggers logged." }));
+        b.appendChild(el("div.muted", { text: "No triggers logged." }));
       } else {
-        keys.forEach((k) => card.appendChild(
-          el("div.trig-item", {}, [
-            el("div.trig-item-label", { text: TRIGGER_TYPES[k].label }),
+        keys.forEach((k) => b.appendChild(
+          el("div.row", {}, [
+            el("span.row-ico", { html: TRIGGER_TYPES[k].icon }),
+            el("div.row-main", {}, [el("div.row-title", { text: TRIGGER_TYPES[k].label })]),
             el("button.trig-del", {
               html: ICONS.x, "aria-label": "Delete",
               onclick: () => { delete day(currentKey, true).food.triggers[k]; save(); renderDay(); },
@@ -2332,8 +2379,6 @@
           ])
         ));
       }
-      b.appendChild(card);
-
       sec.appendChild(b);
       return sec;
     }
@@ -4343,6 +4388,82 @@
       return wrap;
     }
 
+    // Blood-pressure "spread" chart: instead of two lines, each bucket draws a
+    // single vertical bar spanning its diastolic→systolic values (a gradient
+    // from the diastolic color at the bottom to the systolic color at the top),
+    // capped with a dot at each end. Shares acChart's axes, grid and drag readout.
+    function acBpBars(buckets, sys, dia, opts) {
+      opts = opts || {};
+      const ns = "http://www.w3.org/2000/svg";
+      const mk = (t, a) => { const e = document.createElementNS(ns, t); for (const k in a) e.setAttribute(k, a[k]); return e; };
+      const all = [];
+      sys.concat(dia).forEach((v) => { if (v != null && !isNaN(v)) all.push(v); });
+      if (!all.length) return null;
+      let min = Math.min(...all), max = Math.max(...all);
+      if (min === max) { const e = (Math.abs(min) || 1) * 0.1 + 0.5; min -= e; max += e; }
+      const padv = (max - min) * 0.12; min -= padv; max += padv;
+      const W = 320, H = opts.height || 132, padL = 34, padR = 10, padT = 10, padB = 22;
+      const innerW = W - padL - padR, n = buckets.length;
+      const xAt = (i) => padL + (n <= 1 ? innerW / 2 : (i / (n - 1)) * innerW);
+      const yAt = (v) => padT + (1 - (v - min) / (max - min)) * (H - padT - padB);
+      const svg = mk("svg", { viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: "none", class: "ac-svg" });
+      const sysColor = opts.sysColor || "var(--accent)";
+      const diaColor = opts.diaColor || "#3b82f6";
+
+      // y grid + labels
+      [min, (min + max) / 2, max].forEach((val) => {
+        const y = yAt(val);
+        svg.appendChild(mk("line", { x1: padL, x2: W - padR, y1: y, y2: y, stroke: "var(--border)", "stroke-width": 1, "vector-effect": "non-scaling-stroke", opacity: 0.6 }));
+        const tx = mk("text", { x: padL - 4, y: y + 3, "text-anchor": "end", class: "chart-axis" }); tx.textContent = fmtNum(Math.round(val)); svg.appendChild(tx);
+      });
+      // x labels
+      const step = Math.max(1, Math.ceil(n / 6));
+      buckets.forEach((b, i) => { if (i % step !== 0 && i !== n - 1) return; const tx = mk("text", { x: xAt(i), y: H - 6, "text-anchor": "middle", class: "chart-axis" }); tx.textContent = b.label; svg.appendChild(tx); });
+
+      // One reusable top→bottom gradient (objectBoundingBox) for every bar.
+      const gid = "bpg" + (acBpBars._n = (acBpBars._n || 0) + 1);
+      const grad = mk("linearGradient", { id: gid, x1: 0, y1: 0, x2: 0, y2: 1 });
+      grad.appendChild(mk("stop", { offset: 0, "stop-color": sysColor }));
+      grad.appendChild(mk("stop", { offset: 1, "stop-color": diaColor }));
+      const defs = mk("defs", {}); defs.appendChild(grad); svg.appendChild(defs);
+
+      // Bar width in viewBox units, sized to the bucket spacing.
+      const gap = n > 1 ? innerW / (n - 1) : innerW;
+      const barW = Math.max(3, Math.min(9, gap * 0.42));
+      buckets.forEach((b, i) => {
+        const s = sys[i], dv = dia[i];
+        if (s == null || isNaN(s) || dv == null || isNaN(dv)) return;
+        const x = xAt(i), yS = yAt(s), yD = yAt(dv);
+        svg.appendChild(mk("rect", { x: x - barW / 2, y: Math.min(yS, yD), width: barW, height: Math.max(1.5, Math.abs(yD - yS)), rx: barW / 2, fill: `url(#${gid})`, opacity: 0.92 }));
+        svg.appendChild(mk("circle", { cx: x, cy: yS, r: 2.4, fill: sysColor }));
+        svg.appendChild(mk("circle", { cx: x, cy: yD, r: 2.4, fill: diaColor }));
+      });
+
+      // Drag / hover readout: marker line + the bucket's sys/dia.
+      const marker = mk("line", { y1: padT, y2: H - padB, stroke: "var(--text)", "stroke-width": 1, "vector-effect": "non-scaling-stroke", opacity: 0 });
+      svg.appendChild(marker);
+      const wrap = el("div.ac-chart-wrap");
+      const readout = el("div.spark-readout");
+      wrap.appendChild(el("div.spark-top", {}, [readout])); wrap.appendChild(svg);
+      const show = (i) => {
+        i = Math.max(0, Math.min(n - 1, i));
+        const x = xAt(i);
+        marker.setAttribute("x1", x); marker.setAttribute("x2", x); marker.setAttribute("opacity", 0.35);
+        const s = sys[i], dv = dia[i];
+        readout.textContent = (s != null && !isNaN(s) && dv != null && !isNaN(dv))
+          ? `${buckets[i].label}: ${Math.round(s)}/${Math.round(dv)}` : buckets[i].label;
+      };
+      const idxFromEvent = (e) => { const rc = svg.getBoundingClientRect(); const px = ((e.clientX - rc.left) / (rc.width || 1)) * W; return Math.round(((px - padL) / innerW) * (n - 1)); };
+      let active = false;
+      svg.addEventListener("pointerdown", (e) => { active = true; try { svg.setPointerCapture(e.pointerId); } catch (_) {} show(idxFromEvent(e)); });
+      svg.addEventListener("pointermove", (e) => { if (active) show(idxFromEvent(e)); });
+      const end = () => { active = false; };
+      svg.addEventListener("pointerup", end); svg.addEventListener("pointercancel", end);
+      let lastIdx = -1; for (let i = n - 1; i >= 0; i--) { if (sys[i] != null && !isNaN(sys[i]) && dia[i] != null && !isNaN(dia[i])) { lastIdx = i; break; } }
+      if (lastIdx >= 0) show(lastIdx);
+      return wrap;
+    }
+
     function acLegend(series) {
       const s = series.filter((x) => x.label); if (s.length < 2) return null;
       return el("div.ac-legend", {}, s.map((x) => el("span.ac-leg", {}, [el("span.ac-dot", { style: `background:${x.color}` }), x.label])));
@@ -4593,8 +4714,14 @@
       Object.keys(state.days).forEach((dk) => (state.days[dk].readings || []).forEach((r) => { if (r.type !== "bp") return; const s = parseFloat(r.sys), di = parseFloat(r.dia); if (!isNaN(s)) { allSys.push(s); if (s >= 136 || di >= 88) high++; if (s < 100) low++; } }));
       const mean = allSys.reduce((s, x) => s + x, 0) / (allSys.length || 1);
       const variance = allSys.length ? Math.sqrt(allSys.reduce((s, x) => s + (x - mean) * (x - mean), 0) / allSys.length) : null;
+      const bpChart = acBpBars(buckets, sys, dia, {});
+      const bpBlock = bpChart ? el("div.ac-block", {}, [
+        el("div.ac-block-label", { text: "Systolic / diastolic spread" }),
+        bpChart,
+        acLegend([{ values: sys, color: "var(--accent)", label: "Systolic" }, { values: dia, color: "#3b82f6", label: "Diastolic" }]),
+      ]) : null;
       return acCard("Blood Pressure", acRangeLabel(), [
-        acBlock("Systolic / diastolic", buckets, [{ values: sys, color: "var(--accent)", label: "Systolic" }, { values: dia, color: "#3b82f6", label: "Diastolic" }], {}),
+        bpBlock,
         acBlock("Pulse pressure (sys − dia)", buckets, [{ values: pp, color: "#a78bfa", pointBands: BANDS.pp }], { zones: acBandZones("pp") }),
         acStats([
           { label: "Avg morning", value: avgRound(acAgg(buckets, (d) => acReadVals(d, "bp", "sys", isMorning))), sub: "sys" },
@@ -5335,19 +5462,63 @@
       return defs.map(([title, items]) => ({ title, items: items.map(([label, fn]) => { const res = fn(); const date = res && typeof res === "object" ? res.date : res; const value = res && typeof res === "object" ? res.value : null; return { label, done: !!date, date, value }; }) }));
     }
 
+    // Each watch flag is a rich object: `html` (the one-line summary, with its
+    // values wrapped in <strong> for the accordion header), `explain` (what it
+    // means and how it impacts recovery), and `focus` (the problem statement fed
+    // into the per-flag AI prompt).
     function acRegressionWarnings(md) {
       const recent = md.keys.slice(-5).map((k) => md.map[k]); if (recent.length < 2) return [];
       const warns = [];
+      const b = (v) => `<strong>${v}</strong>`;
       const rs = recent.filter((d) => d.rmssd != null).slice(-3);
-      if (rs.length === 3 && rs[0].rmssd > rs[1].rmssd && rs[1].rmssd > rs[2].rmssd) warns.push("RMSSD has declined three readings in a row.");
+      if (rs.length === 3 && rs[0].rmssd > rs[1].rmssd && rs[1].rmssd > rs[2].rmssd) {
+        const seq = rs.map((d) => fmtNum(roundTo(d.rmssd, 1)));
+        warns.push({
+          key: "rmssdDecline",
+          html: `RMSSD has declined three readings in a row (${b(seq[0])} → ${b(seq[1])} → ${b(seq[2])} ms).`,
+          explain: "RMSSD reflects beat-to-beat parasympathetic (vagal, “rest-and-digest”) tone. Three straight drops is a trend, not an off day — usually accumulating load from poor sleep, exertion, illness or a trigger, with the vagal brake easing off and the system tilting toward sympathetic dominance. This is the kind of slide that often precedes a crash, so it’s worth easing load now.",
+          focus: `My RMSSD has dropped three readings in a row (${seq.join(" → ")} ms), suggesting declining parasympathetic tone and accumulating autonomic load.`,
+        });
+      }
       const ss = recent.filter((d) => d.score != null).slice(-2);
-      if (ss.length === 2 && ss.every((d) => d.score < 40)) warns.push("Two consecutive low-score days — load may be accumulating.");
+      if (ss.length === 2 && ss.every((d) => d.score < 40)) {
+        warns.push({
+          key: "lowScores",
+          html: `Two consecutive low-score days (${b(ss[0].score)} and ${b(ss[1].score)} / 100) — load may be accumulating.`,
+          explain: "The daily Autonomic Score blends HRV, resting HR, symptoms and adherence into a 0–100 readiness figure. Two days running below 40 (“Compromised” or worse) means reserves didn’t rebuild overnight — the system is staying stressed instead of bouncing back. This is the window to pull back load before it compounds into a longer setback.",
+          focus: `My autonomic score has been low two days running (${ss[0].score} then ${ss[1].score} out of 100), so reserves aren’t recovering between days.`,
+        });
+      }
       const sl = recent.filter((d) => d.sleepH != null).slice(-1)[0];
-      if (sl && sl.sleepH < 6) warns.push(`Last logged night was ${fmtNum(roundTo(sl.sleepH, 1))}h — under 6 hours.`);
+      if (sl && sl.sleepH < 6) {
+        const h = fmtNum(roundTo(sl.sleepH, 1));
+        warns.push({
+          key: "shortSleep",
+          html: `Last logged night was ${b(h + "h")} — under 6 hours.`,
+          explain: "Sleep is when the parasympathetic system does most of its repair and when HRV rebuilds. A night under 6 hours blunts next-day vagal tone, raises resting heart rate, lowers orthostatic tolerance, and makes symptoms and triggers hit harder. For dysautonomia recovery, consistent 7+ hour nights are one of the highest-leverage levers you have.",
+          focus: `My most recent night of sleep was only ${h} hours (under 6), which tends to blunt my next-day HRV and orthostatic tolerance.`,
+        });
+      }
       const vl = recent.filter((d) => d.vlf != null).slice(-1)[0];
-      if (vl && vl.vlf > 700) warns.push("VLF power is elevated (>700) — rising sympathetic load.");
+      if (vl && vl.vlf > 700) {
+        const v = Math.round(vl.vlf);
+        warns.push({
+          key: "highVlf",
+          html: `VLF power is elevated (${b(v)}, over 700) — rising sympathetic load.`,
+          explain: "Very-low-frequency power reflects slower regulatory processes — thermoregulation, the renin-angiotensin system, and sympathetic/inflammatory activity. Sustained elevation (>700) often signals rising physiological stress or inflammatory load and tracks with worse recovery. In your context it tends to accompany sympathetic over-activation and an impending dip.",
+          focus: `My VLF power is elevated (${v}, above the 700 threshold), pointing to rising sympathetic or inflammatory load.`,
+        });
+      }
       const lf = recent.filter((d) => d.lfPeak != null).slice(-2);
-      if (lf.length === 2 && lf[1].lfPeak < lf[0].lfPeak - 0.005) warns.push("LF peak shifted to a lower frequency vs the prior reading.");
+      if (lf.length === 2 && lf[1].lfPeak < lf[0].lfPeak - 0.005) {
+        const a = lf[0].lfPeak.toFixed(3), c = lf[1].lfPeak.toFixed(3);
+        warns.push({
+          key: "lfPeakShift",
+          html: `LF peak shifted to a lower frequency (${b(a + " Hz")} → ${b(c + " Hz")}) vs the prior reading.`,
+          explain: "The low-frequency peak sits near the baroreflex resonance (~0.1 Hz). A downward shift suggests the baroreflex is operating more sluggishly — slower blood-pressure regulation on standing — which in POTS/dysautonomia often accompanies reduced orthostatic tolerance and more lightheadedness. Worth watching alongside resting HR and standing symptoms.",
+          focus: `My LF (baroreflex) peak shifted to a lower frequency (${a} → ${c} Hz), which can mean slower blood-pressure regulation and reduced orthostatic tolerance.`,
+        });
+      }
       return warns;
     }
 
@@ -5403,8 +5574,41 @@
       openModal((body) => {
         body.appendChild(el("h2", { text: "Active watch flags" }));
         body.appendChild(el("div.sum-meta", { text: `${flags.length} ${flags.length === 1 ? "flag needs" : "flags need"} attention` }));
-        flags.forEach((w) => body.appendChild(acInsight(w, "mod")));
+        flags.forEach((flag) => body.appendChild(flagAccordion(flag)));
       });
+    }
+
+    // One watch flag as an accordion: the bold one-liner is the tap target; the
+    // expanded body explains what it means / how it impacts you and offers an AI
+    // button that stacks a copyable, data-rich prompt for the LLM of your choice.
+    function flagAccordion(flag) {
+      const card = el("div.flag-card");
+      const head = el("button.flag-head", { type: "button" }, [
+        el("span.flag-head-text", { html: flag.html }),
+        el("span.flag-caret", { html: ICONS.chevron }),
+      ]);
+      head.addEventListener("click", () => card.classList.toggle("open"));
+      card.appendChild(head);
+      card.appendChild(el("div.flag-body", {}, [
+        el("p.flag-explain", { text: flag.explain }),
+        el("button.flag-ai-btn", { type: "button", onclick: () => openFlagPromptDrawer(flag) }, [
+          el("span.flag-ai-ic", { html: ICONS.sparkles }),
+          el("span", { text: "How can I improve this?" }),
+        ]),
+      ]));
+      return card;
+    }
+
+    // Stacked drawer with a copyable prompt that hands the LLM the full past week
+    // of data and emphasizes this specific flagged problem and how to fix it.
+    function openFlagPromptDrawer(flag) {
+      const { keys: allKeys, rangeText } = reportDateRange("week");
+      const keys = allKeys.filter((k) => state.days[k]).sort();
+      const header = universalHeader(rangeText);
+      const focus = `FLAGGED PROBLEM TO FOCUS ON:\n${flag.focus}\n\nThe app surfaced this as an active "watch flag." Examine my full week of data below, confirm or challenge this finding with the actual numbers, explain the most likely drivers, and give me a concrete, prioritized plan to correct it (noting where I should check with a doctor first). Be specific and use my real data — don't generalize.`;
+      const data = `DATA FOR PERIOD:\n\n${renderSections(keys, ["scores", "hrv", "sleep", "bp", "rhr", "orthostatic", "symptoms", "activities", "food", "meds", "supplements", "cleanDays"])}`;
+      const prompt = `${header}\n\n${focus}\n\n${data}`;
+      openPromptDrawer("Improve this metric", rangeText, prompt);
     }
 
     function renderMilestones() {
@@ -6363,6 +6567,14 @@ Address each focus area as its own clearly-labeled top-level section in your res
     }
 
     /* ---------------- View switching ---------------- */
+    // Publish the sticky top bar's height (incl. safe-area inset) as a CSS var so
+    // the analysis detail head can pin directly beneath it.
+    function measureTopbar() {
+      const bar = $(".topbar");
+      if (!bar) return;
+      document.documentElement.style.setProperty("--topbar-h", bar.offsetHeight + "px");
+    }
+
     // Move the glass highlight to sit behind the active tab. When animate is
     // false (initial layout / resize) it snaps without the bouncy transition.
     function positionIndicator(animate = true) {
@@ -6414,8 +6626,8 @@ Address each focus area as its own clearly-labeled top-level section in your res
 
       // Place the sliding tab highlight once layout is ready, and keep it
       // aligned on resize.
-      requestAnimationFrame(() => positionIndicator(false));
-      window.addEventListener("resize", () => positionIndicator(false));
+      requestAnimationFrame(() => { positionIndicator(false); measureTopbar(); });
+      window.addEventListener("resize", () => { positionIndicator(false); measureTopbar(); });
 
       // keyboard: left/right arrows change day
       document.addEventListener("keydown", (e) => {
