@@ -3113,7 +3113,11 @@
     // returns [{ v, date }] oldest→newest.
     function metricHistory(type, extractor, limit = 15) {
       const out = [];
+      // Only include readings up to and including the day being viewed, so a
+      // past day's summary sparkline trends from that point backward — never
+      // showing readings logged after it.
       Object.keys(state.days).sort().forEach((dk) => {
+        if (dk > currentKey) return;
         const list = (state.days[dk].readings || []).filter((r) => r.type === type);
         list.sort((a, b) => (a.time || "").localeCompare(b.time || ""));
         list.forEach((r) => { const v = extractor(r); if (v != null && !isNaN(v)) out.push({ v, date: dk }); });
