@@ -36,6 +36,9 @@
     --glass-border: rgba(255, 255, 255, 0.7);
     --glass-active: rgba(0, 0, 0, 0.07);
     --gauge-track: #aaaaaa66;
+    /* Header: same frosted material as the bottom nav, tinted to the app bg. */
+    --header-glass: rgba(245, 245, 247, 0.88);
+    --header-line: #b8b8be;
   }
   html[data-theme="dark"] {
     --bg: #000000;
@@ -50,6 +53,9 @@
     --glass-border: rgba(255, 255, 255, 0.12);
     --glass-active: rgba(255, 255, 255, 0.14);
     --gauge-track: #00000066;
+    /* Header: same frosted material as the bottom nav, tinted to the app bg. */
+    --header-glass: rgba(0, 0, 0, 0.88);
+    --header-line: #4d4d50;
   }
 
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -79,11 +85,24 @@
     position: sticky;
     top: 0;
     z-index: 20;
-    background: var(--bg-glass);
+    background: var(--header-glass);
     -webkit-backdrop-filter: blur(18px) saturate(170%);
     backdrop-filter: blur(18px) saturate(170%);
     padding-top: env(safe-area-inset-top);
   }
+  /* Faint divider that fades in once the page is scrolled. Radial gradient:
+     grey at the center, fading to transparent toward both ends. */
+  .topbar::after {
+    content: "";
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 1px;
+    background: radial-gradient(50% 50% at 50% 50%, var(--header-line) 0%, transparent 100%);
+    opacity: 0;
+    transition: opacity 0.25s ease;
+    pointer-events: none;
+  }
+  .topbar.scrolled::after { opacity: 1; }
   .topbar-row {
     display: flex;
     align-items: center;
@@ -119,6 +138,7 @@
     transition: background 0.15s;
   }
   .icon-btn:active { background: var(--surface-2); }
+  .icon-btn:disabled { opacity: 0.3; cursor: default; pointer-events: none; }
   /* The text-presentation sun glyph renders small; bump it to match the moon. */
   .icon-btn.is-sun { font-size: 34px; }
   /* Header caution icon - only shown when there are active watch flags. */
@@ -178,9 +198,10 @@
   }
   .daycard-info svg { width: 15px; height: 15px; flex: none; }
   .daycard-info:hover { color: var(--text); }
+  .daycard-info-wrap { display: flex; justify-content: center; margin-top: 4px; }
 
   /* Arc gauge hero */
-  .daycard-gauge-wrap { display: flex; justify-content: center; margin: 10px 0 2px; }
+  .daycard-gauge-wrap { display: flex; justify-content: center; margin: 10px 0 -18px; }
   .daycard-gauge { position: relative; width: 176px; height: 176px; }
   .daycard-gauge svg { width: 100%; height: 100%; display: block; }
   .daycard-gauge-inner {
@@ -189,7 +210,7 @@
   }
   .daycard-gauge-num { font-size: 54px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
   .daycard-gauge-den { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; color: var(--text-dim); margin-top: 6px; }
-  .daycard-gauge-delta { font-size: 12px; font-weight: 800; margin-top: 8px; font-variant-numeric: tabular-nums; text-align: center; }
+  .daycard-gauge-delta { font-size: 12px; font-weight: 800; margin-top: 0; font-variant-numeric: tabular-nums; text-align: center; }
 
   /* Legacy inline score (kept for the awaiting / number-style layout) */
   .daycard-score { display: flex; align-items: baseline; gap: 8px; margin-top: 7px; }
@@ -1940,13 +1961,18 @@
     function renderDate() {
       const lbl = $("#dateLabel");
       lbl.textContent = fmtDateLong(currentKey);
-      lbl.classList.toggle("today", currentKey === keyOf(new Date()));
+      const isToday = currentKey === keyOf(new Date());
+      lbl.classList.toggle("today", isToday);
+      // No future days: dim/disable the forward arrow once we're on today.
+      $("#nextDay").disabled = isToday;
     }
 
     function shiftDay(delta) {
       const d = dateFromKey(currentKey);
       d.setDate(d.getDate() + delta);
-      currentKey = keyOf(d);
+      const k = keyOf(d);
+      if (k > keyOf(new Date())) return; // never navigate into the future
+      currentKey = k;
       renderDate();
       renderDay();
     }
@@ -2255,6 +2281,13 @@
         else mode = "Autonomic Outlook";
 
         hero.style.background = hexA(cat.color, 0.1);
+        // Status-color highlight on the top border edge, fading down the sides
+        // into the normal border — like light shining down on the card. Uses a
+        // gradient border (padding-box/border-box layering) so it follows the radius.
+        card.style.border = "1px solid transparent";
+        card.style.background =
+          `linear-gradient(var(--surface), var(--surface)) padding-box, ` +
+          `linear-gradient(165deg, ${cat.color} 0%, ${hexA(cat.color, 0.4)} 14%, var(--border) 100%) border-box`;
         const chip = el("span.daycard-chip", { text: cat.short });
         chip.style.background = cat.color;
         const info = el("button.daycard-info", {
@@ -2264,7 +2297,7 @@
         });
         hero.appendChild(el("div.daycard-head", {}, [
           el("div.daycard-mode", { text: mode }),
-          el("div.daycard-chiprow", {}, [info, chip]),
+          el("div.daycard-chiprow", {}, [chip]),
         ]));
 
         // Arc gauge: the 0–100 outlook as a zone-colored ring with the score centered.
@@ -2281,6 +2314,8 @@
           tr.style.color = up ? SCORE_COLORS.good : SCORE_COLORS.bad;
           hero.appendChild(tr);
         }
+        // "What powers this" sits centered below the score/delta (was top-right).
+        hero.appendChild(el("div.daycard-info-wrap", {}, [info]));
         hero.appendChild(el("div.daycard-status", { text: `${cat.label} · ${all.confidence}% confidence` }));
 
         // Guidance: forward-looking for outlook, retrospective for reflectance.
@@ -4319,11 +4354,16 @@
         const draw = () => {
           wrap.innerHTML = "";
           const monthName = view.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+          const now = new Date();
+          // True once the displayed month is the current month (or later) — there
+          // are no future days to show, so the forward chevron is disabled.
+          const atCurMonth = view.getFullYear() > now.getFullYear() ||
+            (view.getFullYear() === now.getFullYear() && view.getMonth() >= now.getMonth());
           wrap.appendChild(
             el("div", { style: "display:flex;align-items:center;justify-content:space-between;margin-bottom:12px" }, [
               el("button.icon-btn", { text: "‹", onclick: () => { view.setMonth(view.getMonth() - 1); draw(); } }),
               el("strong", { text: monthName, style: "font-size:16px" }),
-              el("button.icon-btn", { text: "›", onclick: () => { view.setMonth(view.getMonth() + 1); draw(); } }),
+              el("button.icon-btn", { text: "›", disabled: atCurMonth, onclick: atCurMonth ? null : () => { view.setMonth(view.getMonth() + 1); draw(); } }),
             ])
           );
           const grid = el("div", { style: "display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center" });
@@ -4339,16 +4379,19 @@
             const dk = keyOf(new Date(view.getFullYear(), view.getMonth(), dn));
             const isSel = dk === currentKey;
             const isToday = dk === todayKey;
+            const isFuture = dk > todayKey;
             const hasData = dayHasData(dk);
             const btn = el("button", {
+              disabled: isFuture, // no future days — not selectable
               style:
-                "position:relative;aspect-ratio:1;border-radius:50%;border:none;cursor:pointer;font-size:14px;font-family:inherit;" +
+                "position:relative;aspect-ratio:1;border-radius:50%;border:none;font-size:14px;font-family:inherit;" +
+                (isFuture ? "cursor:default;opacity:0.3;" : "cursor:pointer;") +
                 (isSel
                   ? "background:var(--accent);color:#fff;font-weight:700;"
                   : "background:transparent;color:var(--text);") +
                 (isToday && !isSel ? "outline:2px solid var(--accent);outline-offset:-2px;" : ""),
               text: String(dn),
-              onclick: () => {
+              onclick: isFuture ? null : () => {
                 currentKey = dk;
                 closeAll();
                 renderDate();
@@ -7008,6 +7051,12 @@ Address each focus area as its own clearly-labeled top-level section in your res
       // aligned on resize.
       requestAnimationFrame(() => { positionIndicator(false); measureTopbar(); });
       window.addEventListener("resize", () => { positionIndicator(false); measureTopbar(); });
+
+      // Fade in the header's divider line once the page starts scrolling.
+      const topbar = $(".topbar");
+      const onScroll = () => { if (topbar) topbar.classList.toggle("scrolled", window.scrollY > 0); };
+      window.addEventListener("scroll", onScroll, { passive: true });
+      onScroll();
 
       // keyboard: left/right arrows change day
       document.addEventListener("keydown", (e) => {
