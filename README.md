@@ -9,13 +9,13 @@ Installable to your home screen and works fully offline.
 
 It's just static files. Any of these work:
 
-- **GitHub Pages** — the app lives in and is served from the `pwa/` folder
-  (the GitHub Pages source is configured to point at `pwa/`).
-- **Open locally** — double-click `pwa/index.html`. (Note: the offline service
+- **GitHub Pages** — the app lives in and is served from the `docs/` folder
+  (the GitHub Pages source is configured to point at `docs/`).
+- **Open locally** — double-click `docs/index.html`. (Note: the offline service
   worker only activates over `http(s)`, not `file://`, but the app still runs.)
 - **Local server** (enables full PWA/offline testing):
   ```bash
-  cd pwa && python3 -m http.server 8000   # then open http://localhost:8000
+  cd docs && python3 -m http.server 8000   # then open http://localhost:8000
   ```
 
 Open it on your phone and **Add to Home Screen** to install.
@@ -46,13 +46,13 @@ replaces the current dataset (after a confirmation).
 
 ## Files
 
-Everything (markup, styles, and logic) is inlined in the single **`pwa/index.html`** —
+Everything (markup, styles, and logic) is inlined in the single **`docs/index.html`** —
 no separate `.css` or `.js` files.
 
 | File | Purpose |
 | --- | --- |
-| `pwa/index.html` | The whole app — markup + inline `<style>` + inline `<script>` |
-| `pwa/sw.js` | Service worker (offline cache) |
-| `pwa/manifest.webmanifest` | PWA manifest |
-| `pwa/icons/` | App icons + SVG favicon |
-| `pwa/tools/gen_icons.py` | Optional: regenerate the PNG icons (`python3 pwa/tools/gen_icons.py`) |
+| `docs/index.html` | The whole app — markup + inline `<style>` + inline `<script>` |
+| `docs/sw.js` | Service worker (offline cache) |
+| `docs/manifest.webmanifest` | PWA manifest |
+| `docs/icons/` | App icons + SVG favicon |
+| `docs/tools/gen_icons.py` | Optional: regenerate the PNG icons (`python3 docs/tools/gen_icons.py`) |
