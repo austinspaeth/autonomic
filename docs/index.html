@@ -1444,6 +1444,7 @@
       virus: svgIcon('<circle cx="12" cy="12" r="5"/><path d="M12 2v3"/><path d="M12 19v3"/><path d="M2 12h3"/><path d="M19 12h3"/><path d="m5 5 2 2"/><path d="m17 17 2 2"/><path d="m19 5-2 2"/><path d="m7 17-2 2"/>'),
       clipboard: svgIcon('<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1H9z"/><path d="M9 11h6"/><path d="M9 15h4"/>'),
       smile: svgIcon('<circle cx="12" cy="12" r="9"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><path d="M9 9h.01"/><path d="M15 9h.01"/>'),
+      lungs: svgIcon('<path d="M12 4v9"/><path d="M9 9c0 4-1 5.5-2.6 8C5 19 4 20.4 4 21h4.5a1 1 0 0 0 1-1v-7.2A3.2 3.2 0 0 0 9 9z"/><path d="M15 9c0 4 1 5.5 2.6 8 1.4 2 2.4 3.4 2.4 4h-4.5a1 1 0 0 1-1-1v-7.2A3.2 3.2 0 0 1 15 9z"/>'),
     };
 
     // Reading types. Order here is the order shown in the "Add reading" drawer.
@@ -1555,6 +1556,13 @@
           { type: "number", key: "beforeHr", label: "Before HR" },
           { type: "number", key: "afterHr", label: "After HR" },
           { type: "number", key: "hr1min", label: "HR after 1 min" },
+        ],
+      },
+      vo2max: {
+        label: "VO₂max",
+        icon: ICONS.lungs,
+        fields: [
+          { type: "number", key: "value", label: "VO₂max", unit: "mL/kg/min" },
         ],
       },
       weight: {
@@ -3131,6 +3139,14 @@
         case "mood": { const m = { "Feeling amazing": "great", "Feeling normal": "good", "Feeling bad": "bad", "Feeling like a crash": "crash" }[r.mood]; if (m) s.mood = m; break; }
         case "bp": put("sys", sSys(r.sys)); put("dia", sDia(r.dia)); put("bp", sBP(r.sys, r.dia)); break;
         case "bloodO2": put("value", sSpo2(r.value)); break;
+        case "vo2max": {
+          const v = numOr(r.value);
+          if (v != null) {
+            const p = state.profile || {};
+            put("value", catFromBands(v, vo2maxBands(p.sex, ageFromBirthday(p.birthday))));
+          }
+          break;
+        }
         case "restingHr": put("hr", sRestingHr(r.hr, r.position)); break;
         case "ecg":
           { const q = numOr(r.qtc); if (q != null) put("qtc", catFromBands(q, qtcBands(state.profile && state.profile.sex))); }
@@ -3165,6 +3181,7 @@
         case "breathHrv": return s.overall || s.sdnn;
         case "bp": return s.bp;
         case "bloodO2": return s.value;
+        case "vo2max": return s.value;
         case "restingHr": return s.hr;
         case "ecg": return s.overall;
         case "mood": return s.mood;
@@ -3182,6 +3199,7 @@
         case "breathHrv": return r.sdnn != null && r.sdnn !== "" ? r.sdnn + " SDNN" : "";
         case "bp": return r.sys || r.dia ? `${r.sys || "-"}/${r.dia || "-"}` : "";
         case "bloodO2": return r.value ? r.value + "%" : "";
+        case "vo2max": return r.value != null && r.value !== "" ? r.value + " VO₂" : "";
         case "restingHr": return r.hr != null && r.hr !== "" ? r.hr + " hr" : "";
         case "ecg": return ecgPattern(r);
         case "mood": return ({ "Feeling amazing": "Amazing", "Feeling normal": "Normal", "Feeling bad": "Bad", "Feeling like a crash": "Crash" })[r.mood] || r.mood || "";
@@ -3263,7 +3281,44 @@
     const qtcBands = (sex) => sex === "Female"
       ? BANDS.qtc.map((b) => ({ max: (b.max > 350 && isFinite(b.max)) ? b.max + 10 : b.max, cat: b.cat }))
       : BANDS.qtc;
+    // VO2max (mL/kg/min) cardiorespiratory-fitness zones, age- and sex-stratified
+    // (Cooper Institute / ACSM percentile norms). Higher is better. Each row's `t`
+    // is the four ascending cut points → five zones mapped to our grade scale:
+    // very poor→crash, poor→bad, fair→ok, good→good, excellent/superior→great.
+    const VO2MAX_NORMS = {
+      Male: [
+        { maxAge: 29, t: [32, 38, 44, 51] },
+        { maxAge: 39, t: [31, 36, 42, 48] },
+        { maxAge: 49, t: [29, 34, 40, 45] },
+        { maxAge: 59, t: [26, 31, 36, 43] },
+        { maxAge: Infinity, t: [22, 26, 31, 39] },
+      ],
+      Female: [
+        { maxAge: 29, t: [27, 33, 38, 44] },
+        { maxAge: 39, t: [26, 31, 36, 41] },
+        { maxAge: 49, t: [24, 28, 33, 38] },
+        { maxAge: 59, t: [21, 24, 28, 34] },
+        { maxAge: Infinity, t: [18, 21, 25, 31] },
+      ],
+    };
+    function vo2maxBands(sex, age) {
+      const table = VO2MAX_NORMS[sex] || VO2MAX_NORMS.Male;
+      const a = age == null ? 40 : age;
+      const row = table.find((r) => a <= r.maxAge) || table[table.length - 1];
+      const [c0, c1, c2, c3] = row.t;
+      return [
+        { max: c0, cat: "crash" },
+        { max: c1, cat: "bad" },
+        { max: c2, cat: "ok" },
+        { max: c3, cat: "good" },
+        { max: Infinity, cat: "great" },
+      ];
+    }
     function bandsFor(type, key) {
+      if (type === "vo2max" && key === "value") {
+        const p = state.profile || {};
+        return vo2maxBands(p.sex, ageFromBirthday(p.birthday));
+      }
       const map = {
         hrv: { readiness: "readiness", rmssd: "rmssdU", sdnn: "sdnn", avgHr: "hrBreath" },
         breathHrv: { sdnn: "sdnn", rmssd: "rmssdS", pnn50: "pnn50", vlowPower: "vlf", lfPeak: "lfPeak", coherence: "coherence", hr: "hrBreath", meanRr: "rrMode", mode: "rrMode", mxdmn: "mxdmn", amo50: "amo50", cv: "cv" },
