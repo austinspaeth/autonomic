@@ -78,6 +78,8 @@ export function TabBar({ items, active, onChange }: TabBarProps) {
         borderWidth: 1,
         borderColor: t.glassBorder,
         zIndex: 30,
+        // Legacy .tabbar: box-shadow: 0 10px 30px rgba(0,0,0,0.22)
+        boxShadow: '0px 10px 30px rgba(0, 0, 0, 0.22)',
       }}
     >
       <Animated.View
