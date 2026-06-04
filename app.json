@@ -1,0 +1,44 @@
+{
+  "expo": {
+    "name": "Autonomic Journal",
+    "slug": "autonomic",
+    "scheme": "autonomic",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.autonomic.journal"
+    },
+    "android": {
+      "package": "com.autonomic.journal",
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro",
+      "name": "Autonomic Journal",
+      "shortName": "Autonomic",
+      "description": "A private, offline journal for tracking autonomic recovery — HRV, blood pressure, activities, medications, and symptoms.",
+      "display": "standalone",
+      "orientation": "portrait",
+      "startUrl": "/",
+      "lang": "en",
+      "themeColor": "#e03127",
+      "backgroundColor": "#e03127"
+    },
+    "plugins": [
+      "expo-sqlite",
+      "expo-splash-screen",
+      "expo-sharing"
+    ]
+  }
+}
