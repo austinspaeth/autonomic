@@ -72,6 +72,12 @@ export function MilestonesScreen({ scrollY }: { scrollY: SharedValue<number> }) 
   );
 }
 
+// Done-milestone green — legacy uses a literal #16a34a (CSS lines 1180-1182),
+// not a SCORE_COLORS token, so it's inlined here to match exactly.
+const MS_DONE = '#16a34a';
+
+// .chart-card / .ac-card (docs CSS 870-877): surface bg, 1px border, radius 14,
+// padding 14, marginBottom var(--gap)=14, box-shadow var(--shadow).
 function Card({ children }: { children: React.ReactNode }) {
   const t = useTheme();
   return (
@@ -81,8 +87,8 @@ function Card({ children }: { children: React.ReactNode }) {
         borderWidth: 1,
         borderColor: t.border,
         borderRadius: t.radius,
+        padding: 14,
         marginBottom: t.gap,
-        overflow: 'hidden',
         ...t.shadow,
       }}
     >
@@ -91,15 +97,43 @@ function Card({ children }: { children: React.ReactNode }) {
   );
 }
 
-function CardHead({ title, sub }: { title: string; sub?: string }) {
+// .chart-card h3 (docs CSS 878-881): 13px / 700, uppercase, letter-spacing
+// 0.05em, color var(--text-dim), margin 0 0 10px.
+function CardTitle({ children }: { children: string }) {
   const t = useTheme();
   return (
-    <View style={{ paddingHorizontal: 14, paddingTop: 14 }}>
-      <Text style={{ fontSize: 16, fontWeight: '700', color: t.text }}>{title}</Text>
-      {sub ? (
-        <Text style={{ fontSize: 13, color: t.textDim, marginTop: 2 }}>{sub}</Text>
-      ) : null}
-    </View>
+    <Text
+      style={{
+        fontSize: 13,
+        fontWeight: '700',
+        textTransform: 'uppercase',
+        letterSpacing: 0.65, // 0.05em × 13px
+        color: t.textDim,
+        marginBottom: 10,
+      }}
+    >
+      {children}
+    </Text>
+  );
+}
+
+// .ac-sub (docs CSS 1019-1022): 11px / 600, color var(--text-dim),
+// letter-spacing 0.02em, margin -4px 0 12px.
+function CardSub({ children }: { children: string }) {
+  const t = useTheme();
+  return (
+    <Text
+      style={{
+        fontSize: 11,
+        fontWeight: '600',
+        color: t.textDim,
+        letterSpacing: 0.22, // 0.02em × 11px
+        marginTop: -4,
+        marginBottom: 12,
+      }}
+    >
+      {children}
+    </Text>
   );
 }
 
@@ -108,11 +142,10 @@ function HeaderCard({ done, total }: { done: number; total: number }) {
   const pct = total ? Math.round((done / total) * 100) : 0;
   return (
     <Card>
-      <CardHead
-        title="Milestone Tracker"
-        sub={`${done} of ${total} achieved · progress beyond daily metrics`}
-      />
-      {/* Slim progress bar pinned to the card's bottom edge. */}
+      <CardTitle>Milestone Tracker</CardTitle>
+      <CardSub>{`${done} of ${total} achieved · progress beyond daily metrics`}</CardSub>
+      {/* .ms-progress (docs 5958): height 4, radius 999, surface-2 track,
+          accent fill, margin-top 14. */}
       <View
         style={{
           height: 4,
@@ -140,17 +173,21 @@ function GroupCard({ group }: { group: MilestoneGroup }) {
   const gdone = group.items.filter((it) => it.done).length;
   return (
     <Card>
-      <CardHead title={group.title} sub={`${gdone} of ${group.items.length} achieved`} />
-      <View style={{ paddingHorizontal: 14, paddingTop: 10, paddingBottom: 6 }}>
+      <CardTitle>{group.title}</CardTitle>
+      <CardSub>{`${gdone} of ${group.items.length} achieved`}</CardSub>
+      {/* .ac-ms-list (docs 1173): a plain column; rows carry their own borders. */}
+      <View>
         {rows.map((it, i) => (
-          <MilestoneRow key={i} item={it} />
+          <MilestoneRow key={i} item={it} first={i === 0} />
         ))}
       </View>
     </Card>
   );
 }
 
-function MilestoneRow({ item }: { item: MilestoneItem }) {
+// .ac-ms-row (docs 1174-1182): grid 18px / 1fr / auto, gap 8, align center,
+// padding 7px 0, border-top 1px var(--border) (none on first child).
+function MilestoneRow({ item, first }: { item: MilestoneItem; first: boolean }) {
   const t = useTheme();
   const meta = item.done
     ? (item.value != null ? fmtNum(item.value) + ' · ' : '') +
@@ -161,17 +198,40 @@ function MilestoneRow({ item }: { item: MilestoneItem }) {
       style={{
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 8,
-        gap: 10,
+        paddingVertical: 7,
+        borderTopWidth: first ? 0 : 1,
+        borderTopColor: t.border,
       }}
     >
-      <View style={{ width: 18, alignItems: 'center' }}>
-        {item.done ? <Icon name="check" size={16} color={t.accent} /> : null}
+      {/* .ac-ms-ic: 16×16, color var(--border); .done → #16a34a. */}
+      <View style={{ width: 18, marginRight: 8 }}>
+        {item.done ? <Icon name="check" size={16} color={MS_DONE} /> : null}
       </View>
-      <Text style={{ flex: 1, fontSize: 14, color: item.done ? t.text : t.textDim }}>
+      {/* .ac-ms-label: 13px, var(--text-dim); .done → var(--text) + 500. */}
+      <Text
+        style={{
+          flex: 1,
+          marginRight: 8,
+          fontSize: 13,
+          color: item.done ? t.text : t.textDim,
+          fontWeight: item.done ? '500' : '400',
+        }}
+      >
         {item.label}
       </Text>
-      {meta ? <Text style={{ fontSize: 12, color: t.textDim }}>{meta}</Text> : null}
+      {/* .ac-ms-meta: 11px, var(--text-dim), tabular; .done → #16a34a + 600. */}
+      {meta ? (
+        <Text
+          style={{
+            fontSize: 11,
+            color: item.done ? MS_DONE : t.textDim,
+            fontWeight: item.done ? '600' : '400',
+            fontVariant: ['tabular-nums'],
+          }}
+        >
+          {meta}
+        </Text>
+      ) : null}
     </View>
   );
 }

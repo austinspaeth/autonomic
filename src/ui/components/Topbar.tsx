@@ -12,6 +12,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Box, Icon, Text } from '@ui/primitives';
 import { useTheme, useThemeContext } from '@ui/theme/ThemeProvider';
 import { GlassSurface } from '@ui/surfaces/GlassSurface';
+import { useRepoSelector } from '@data/RepositoryProvider';
+import { getActiveFlags, openFlags } from '@ui/screens/drawers/FlagsDrawer';
 import { IconButton } from './IconButton';
 
 export interface TopbarProps {
@@ -23,6 +25,12 @@ export function Topbar({ scrollY, onMenu }: TopbarProps) {
   const t = useTheme();
   const { name, toggleTheme } = useThemeContext();
   const insets = useSafeAreaInsets();
+
+  // Active watch flags (legacy renderHeaderFlags / activeFlags). The gold caution
+  // icon only appears when one or more flags are active; tapping opens the drawer.
+  const days = useRepoSelector((r) => r.allDays());
+  const profile = useRepoSelector((r) => r.getProfile());
+  const flags = getActiveFlags(days, profile);
 
   const dividerStyle = useAnimatedStyle(() => ({
     opacity: withTiming(scrollY.value > 0 ? 1 : 0, { duration: 250 }),
@@ -47,6 +55,33 @@ export function Topbar({ scrollY, onMenu }: TopbarProps) {
           </Text>
         </Box>
         <Box style={{ flexDirection: 'row', gap: 6 }}>
+          {flags.length > 0 ? (
+            <IconButton
+              accessibilityLabel={`${flags.length} active watch ${flags.length === 1 ? 'flag' : 'flags'}`}
+              onPress={() => openFlags(flags, days, profile)}
+            >
+              <Icon name="triangle" size={20} color="#eab308" />
+              {/* Small count badge pinned to the top-right of the icon. */}
+              <Box
+                style={{
+                  position: 'absolute',
+                  top: 6,
+                  right: 4,
+                  minWidth: 15,
+                  height: 15,
+                  paddingHorizontal: 3,
+                  borderRadius: 7.5,
+                  backgroundColor: '#eab308',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Text style={{ color: '#000', fontSize: 10, fontWeight: '800', lineHeight: 13 }}>
+                  {flags.length}
+                </Text>
+              </Box>
+            </IconButton>
+          ) : null}
           <IconButton accessibilityLabel="Toggle theme" onPress={toggleTheme}>
             <Icon name={name === 'dark' ? 'sun' : 'moon'} size={20} color={t.text} />
           </IconButton>

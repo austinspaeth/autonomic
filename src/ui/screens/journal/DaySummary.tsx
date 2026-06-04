@@ -816,72 +816,102 @@ function Streak({
 
 type ExplainComp = ScoreComp & { cat: ScoreCategory };
 
-function CompAccordion({ c }: { c: ExplainComp }) {
+function CompAccordion({ c, last }: { c: ExplainComp; last: boolean }) {
   const t = useTheme();
   const [open, setOpen] = useState(false);
   const det = (c.detail as CompDetail) || {};
+  // Legacy .comp-tag pos/neu/neg (verbatim rgba/hex from CSS lines 691-693).
   const contrib =
     c.p >= 80
-      ? { txt: 'Lifting your score', color: SCORE_COLORS.good }
+      ? { txt: 'Lifting your score', bg: 'rgba(74,222,128,.16)', color: '#4ade80' }
       : c.p >= 60
-        ? { txt: 'About neutral', color: t.textDim }
-        : { txt: 'Pulling your score down', color: SCORE_COLORS.bad };
+        ? { txt: 'About neutral', bg: 'rgba(234,179,8,.16)', color: '#eab308' }
+        : { txt: 'Pulling your score down', bg: 'rgba(249,115,22,.16)', color: '#f97316' };
+
+  // .comp-line items + advice (legacy comp-body content).
+  const lines = (det.metrics || [])
+    .map((m) => {
+      if (!m || m.raw == null) return null;
+      return { m, mcat: catFromBands(m.raw, m.bands), adv: zoneAdvice(m.raw, m.bands, m.unit) };
+    })
+    .filter((x): x is NonNullable<typeof x> => x != null);
 
   return (
+    /* .comp-card: bg var(--surface), 1px var(--border), radius var(--radius-sm),
+       margin-bottom 10 (0 on last), overflow hidden. */
     <Box
       style={{
+        backgroundColor: t.surface,
         borderWidth: 1,
         borderColor: t.border,
         borderRadius: t.radiusSm,
-        backgroundColor: t.surface2,
-        marginBottom: 8,
+        marginBottom: last ? 0 : 10,
         overflow: 'hidden',
       }}
     >
+      {/* .comp-head: gap 9, padding 13px 14px. */}
       <Pressable
         onPress={() => setOpen((o) => !o)}
-        style={{ flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12 }}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 13, paddingHorizontal: 14 }}
       >
         <Dot cat={c.cat} />
-        <Text style={{ flex: 1, fontSize: 15, color: t.text, fontWeight: '600' }}>{c.label}</Text>
-        <Text style={{ fontSize: 14, color: t.textDim }}>{det.value || ''}</Text>
-        <View style={{ transform: [{ rotate: open ? '90deg' : '0deg' }] }}>
-          <Icon name="chevron" size={16} color={t.textDim} />
+        {/* .comp-name: fw 600, fs 14. */}
+        <Text style={{ flex: 1, fontSize: 14, color: t.text, fontWeight: '600' }}>{c.label}</Text>
+        {/* .comp-val: fs 13, text-dim, nowrap. */}
+        <Text numberOfLines={1} style={{ fontSize: 13, color: t.textDim }}>{det.value || ''}</Text>
+        {/* .comp-caret: svg 17px, rotates 180° when open. */}
+        <View style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }}>
+          <Icon name="chevron" size={17} color={t.textDim} />
         </View>
       </Pressable>
       {open ? (
-        <View style={{ paddingHorizontal: 12, paddingBottom: 12, gap: 6 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Text style={{ fontSize: 12.5, fontWeight: '700', color: contrib.color }}>{contrib.txt}</Text>
-            <Text style={{ fontSize: 12.5, color: t.textDim }}>{`${GRADE_LABEL[c.cat]} · weight ${c.w}%`}</Text>
+        /* .comp-body: padding 2px 14px 14px. */
+        <View style={{ paddingTop: 2, paddingHorizontal: 14, paddingBottom: 14 }}>
+          {/* .comp-meta: flexWrap, gap 8, margin-bottom 4. */}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+            {/* .comp-tag: fs 11, fw 700, padding 3px 9px, radius 999. */}
+            <View style={{ backgroundColor: contrib.bg, borderRadius: 999, paddingVertical: 3, paddingHorizontal: 9 }}>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: contrib.color }}>{contrib.txt}</Text>
+            </View>
+            {/* .comp-weight: fs 12, text-dim. */}
+            <Text style={{ fontSize: 12, color: t.textDim }}>{`${GRADE_LABEL[c.cat]} · weight ${c.w}%`}</Text>
           </View>
-          {(det.metrics || []).map((m, i) => {
-            if (!m || m.raw == null) return null;
-            const mcat = catFromBands(m.raw, m.bands);
-            const adv = zoneAdvice(m.raw, m.bands, m.unit);
-            return (
-              <View key={i} style={{ gap: 3 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Dot cat={mcat} />
-                  <Text style={{ fontSize: 13.5, color: t.text }}>
-                    {`${m.label}: ${fmtMetricVal(m.raw, m.unit)}`}
-                  </Text>
-                </View>
-                {adv && adv.ideal ? (
-                  <Text style={{ fontSize: 12.5, color: t.textDim, lineHeight: 17, marginLeft: 18 }}>
-                    {adv.done
-                      ? `In the ideal range (${adv.ideal}). Already at full points, so keep it steady.`
-                      : `Currently ${GRADE_LABEL[adv.cur!].toLowerCase()}. Aim ${adv.dir}; ideal range is ${adv.ideal}.`}
-                  </Text>
-                ) : null}
+          {lines.map(({ m, mcat, adv }, i) => (
+            <View key={i}>
+              {/* .comp-line: gap 8, fs 13, fw 600, margin-top 10. */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 }}>
+                <Dot cat={mcat} />
+                <Text style={{ fontSize: 13, fontWeight: '600', color: t.text }}>
+                  {`${m.label}: ${fmtMetricVal(m.raw, m.unit)}`}
+                </Text>
               </View>
-            );
-          })}
+              {/* .comp-advice: fs 12.5, text-dim, line-height 1.45, margin-top 4. */}
+              {adv && adv.ideal ? (
+                <Text style={{ fontSize: 12.5, color: t.textDim, lineHeight: 18, marginTop: 4 }}>
+                  {adv.done
+                    ? `In the ideal range (${adv.ideal}). Already at full points, so keep it steady.`
+                    : `Currently ${GRADE_LABEL[adv.cur!].toLowerCase()}. Aim ${adv.dir}; ideal range is ${adv.ideal}.`}
+                </Text>
+              ) : null}
+            </View>
+          ))}
+          {/* .comp-advice (note): fs 12.5, text-dim, line-height 1.45, margin-top 4. */}
           {det.note ? (
-            <Text style={{ fontSize: 12.5, color: t.textDim, lineHeight: 17 }}>{det.note}</Text>
+            <Text style={{ fontSize: 12.5, color: t.textDim, lineHeight: 18, marginTop: 4 }}>{det.note}</Text>
           ) : null}
+          {/* .comp-tip: fs 12.5, text-dim, line-height 1.45, margin-top 10, padding-top 10, border-top 1px. */}
           {SCORE_TIPS[c.label] ? (
-            <Text style={{ fontSize: 12.5, color: t.textDim, fontStyle: 'italic', lineHeight: 17 }}>
+            <Text
+              style={{
+                fontSize: 12.5,
+                color: t.textDim,
+                lineHeight: 18,
+                marginTop: 10,
+                paddingTop: 10,
+                borderTopWidth: 1,
+                borderTopColor: t.border,
+              }}
+            >
               {SCORE_TIPS[c.label]}
             </Text>
           ) : null}
@@ -891,24 +921,42 @@ function CompAccordion({ c }: { c: ExplainComp }) {
   );
 }
 
+// .score-dot: 9px circle, margin-right 7 (legacy CSS line 339).
 function Dot({ cat }: { cat: ScoreCategory | null }) {
   const t = useTheme();
-  const color = cat ? SCORE_COLORS[cat] : t.textDim;
-  return <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: color }} />;
+  const color = cat && SCORE_COLORS[cat] ? SCORE_COLORS[cat] : t.border;
+  return <View style={{ width: 9, height: 9, borderRadius: 4.5, backgroundColor: color }} />;
 }
 
+// .sum-card: parent section card holding nested comp-card / metric-card sub-cards.
+//   bg var(--surface-2), 1px var(--border), radius var(--radius),
+//   padding 6px 12px 12px, margin-bottom 16. Title is .sum-card-title.
 function SumCard({ title, children }: { title: string; children: React.ReactNode }) {
   const t = useTheme();
   return (
-    <View style={{ marginBottom: 16 }}>
+    <View
+      style={{
+        backgroundColor: t.surface2,
+        borderWidth: 1,
+        borderColor: t.border,
+        borderRadius: t.radius,
+        paddingTop: 6,
+        paddingHorizontal: 12,
+        paddingBottom: 12,
+        marginBottom: 16,
+      }}
+    >
+      {/* .sum-card-title: fs 12, uppercase, ls 0.06em, text-dim, fw 700, padding 10px 2px 8px. */}
       <Text
         style={{
           fontSize: 12,
           textTransform: 'uppercase',
-          letterSpacing: 0.7,
+          letterSpacing: 0.72,
           color: t.textDim,
           fontWeight: '700',
-          marginBottom: 10,
+          paddingTop: 10,
+          paddingHorizontal: 2,
+          paddingBottom: 8,
         }}
       >
         {title}
@@ -918,17 +966,19 @@ function SumCard({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function MetricCard({ children }: { children: React.ReactNode }) {
+// .metric-card: bg var(--surface), 1px var(--border), radius var(--radius-sm),
+//   padding 14, margin-bottom 10 (0 on last).
+function MetricCard({ children, last }: { children: React.ReactNode; last?: boolean }) {
   const t = useTheme();
   return (
     <View
       style={{
+        backgroundColor: t.surface,
         borderWidth: 1,
         borderColor: t.border,
         borderRadius: t.radiusSm,
-        backgroundColor: t.surface2,
-        padding: 12,
-        marginBottom: 8,
+        padding: 14,
+        marginBottom: last ? 0 : 10,
       }}
     >
       {children}
@@ -992,72 +1042,81 @@ function ScoreExplainBody({ all }: { all: ScoreResult }) {
         </Text>
       </View>
 
-      <Text style={{ fontSize: 13.5, color: t.textDim, lineHeight: 19, marginBottom: 10 }}>
+      {/* .score-method: fs 13.5, text-dim, line-height 1.5, margin 0 0 16. */}
+      <Text style={{ fontSize: 13.5, color: t.textDim, lineHeight: 20, marginBottom: 16 }}>
         The Autonomic Score is a weighted blend of the day's readings. Each input is graded, turned into
         points, and combined by weight. Missing inputs drop out and the remaining weights are rescaled -
         that rescaling is the confidence percentage. The most recent reading of each type is used, and
         structured (breathing) HRV outranks the unstructured reading when both are present.
       </Text>
-      <Text style={{ fontSize: 13.5, color: t.textDim, lineHeight: 19, marginBottom: 16 }}>
+      <Text style={{ fontSize: 13.5, color: t.textDim, lineHeight: 20, marginBottom: 16 }}>
         Tap any input below to see the actual values behind it, whether it is helping or hurting, and what it
         would take to push it higher.
       </Text>
 
       {helped.length ? (
         <SumCard title="What helped">
-          {helped.map((c) => (
-            <CompAccordion key={c.label} c={c} />
+          {helped.map((c, i) => (
+            <CompAccordion key={c.label} c={c} last={i === helped.length - 1} />
           ))}
         </SumCard>
       ) : null}
       {hurt.length ? (
         <SumCard title="What hurt">
-          {hurt.map((c) => (
-            <CompAccordion key={c.label} c={c} />
+          {hurt.map((c, i) => (
+            <CompAccordion key={c.label} c={c} last={i === hurt.length - 1} />
           ))}
         </SumCard>
       ) : null}
       {neutral.length ? (
         <SumCard title="Middle of the range">
-          {neutral.map((c) => (
-            <CompAccordion key={c.label} c={c} />
+          {neutral.map((c, i) => (
+            <CompAccordion key={c.label} c={c} last={i === neutral.length - 1} />
           ))}
         </SumCard>
       ) : null}
 
       <SumCard title="What would raise your score">
         {headroom.length ? (
-          headroom.slice(0, 4).map(({ c, gain }) => (
-            <MetricCard key={c.label}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          headroom.slice(0, 4).map(({ c, gain }, i, arr) => (
+            <MetricCard
+              key={c.label}
+              last={i === arr.length - 1 && !OUTLOOK_GUIDE[cat.short]}
+            >
+              {/* .metric-head: gap 9. */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
                 <Dot cat={c.cat} />
-                <Text style={{ flex: 1, fontSize: 14, color: t.text, fontWeight: '600' }}>{c.label}</Text>
-                <Text style={{ fontSize: 13, color: t.textDim }}>{`+${gain.toFixed(1)} pt`}</Text>
+                {/* .metric-name: fs 15, fw 700. */}
+                <Text style={{ flex: 1, fontSize: 15, color: t.text, fontWeight: '700' }}>{c.label}</Text>
+                {/* .metric-val: fs 15, fw 700. */}
+                <Text style={{ fontSize: 15, color: t.text, fontWeight: '700' }}>{`+${gain.toFixed(1)} pt`}</Text>
               </View>
-              <Text style={{ fontSize: 12.5, color: t.textDim, lineHeight: 17, marginTop: 6 }}>
+              {/* .metric-explain: fs 12.5, text-dim, line-height 1.4, margin-top 6. */}
+              <Text style={{ fontSize: 12.5, color: t.textDim, lineHeight: 17.5, marginTop: 6 }}>
                 {improveLine(c)}
               </Text>
             </MetricCard>
           ))
         ) : (
-          <MetricCard>
-            <Text style={{ fontSize: 13, color: t.textDim, lineHeight: 18 }}>
+          <MetricCard last={!OUTLOOK_GUIDE[cat.short]}>
+            {/* .sum-text: fs 14. */}
+            <Text style={{ fontSize: 14, color: t.text }}>
               Every scored input is already in its top zone, so this is about as high as the score goes. Keep
               the inputs consistent to hold it.
             </Text>
           </MetricCard>
         )}
         {OUTLOOK_GUIDE[cat.short] ? (
-          <MetricCard>
-            <Text style={{ fontSize: 13, color: t.textDim, lineHeight: 18 }}>{OUTLOOK_GUIDE[cat.short]}</Text>
+          <MetricCard last>
+            <Text style={{ fontSize: 14, color: t.text }}>{OUTLOOK_GUIDE[cat.short]}</Text>
           </MetricCard>
         ) : null}
       </SumCard>
 
       {all.confidence < 100 && bigMissing.length ? (
         <SumCard title="Firm up the score">
-          <MetricCard>
-            <Text style={{ fontSize: 13, color: t.textDim, lineHeight: 18 }}>
+          <MetricCard last>
+            <Text style={{ fontSize: 14, color: t.text }}>
               {`Confidence is ${all.confidence}%. Logging ${bigMissing.join(', ')} would raise it and steady the number.`}
             </Text>
           </MetricCard>

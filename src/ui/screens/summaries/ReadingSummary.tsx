@@ -199,36 +199,70 @@ const hexA = (hex: string, a: number): string => {
   return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
 };
 
-// Parent section card; metric cards are nested inside it (legacy .sum-card).
+// Parent section card; metric cards are nested inside it (legacy .sum-card:
+// bg surface-2, 1px border, radius, padding 6/12/12, margin-bottom 16).
+// The last nested sub-card has its margin-bottom stripped (legacy :last-child),
+// done by cloning the final child with `last`.
 function SumCard({ title, children }: { title?: string; children: React.ReactNode }) {
   const t = useTheme();
+  const kids = React.Children.toArray(children).filter(Boolean);
+  const lastIdx = kids.length - 1;
   return (
     <Box
       style={{
-        backgroundColor: t.surface,
+        backgroundColor: t.surface2,
         borderWidth: 1,
         borderColor: t.border,
         borderRadius: t.radius,
-        padding: 12,
-        marginTop: 12,
+        paddingTop: 6,
+        paddingHorizontal: 12,
+        paddingBottom: 12,
+        marginBottom: 16,
       }}
     >
       {title ? (
+        // .sum-card-title: 12px, uppercase, .06em, text-dim, 700, padding 10/2/8.
         <Text
           style={{
             fontSize: 12,
             textTransform: 'uppercase',
-            letterSpacing: 0.7,
+            letterSpacing: 0.72,
             color: t.textDim,
             fontWeight: '700',
-            marginBottom: 4,
+            paddingTop: 10,
+            paddingHorizontal: 2,
+            paddingBottom: 8,
           }}
         >
           {title}
         </Text>
       ) : null}
-      {children}
+      {kids.map((child, i) =>
+        i === lastIdx && React.isValidElement(child)
+          ? React.cloneElement(child as React.ReactElement<{ last?: boolean }>, { last: true })
+          : child,
+      )}
     </Box>
+  );
+}
+
+// Sub-card wrapper (legacy .metric-card: bg surface, 1px border, radius-sm,
+// padding 14, margin-bottom 10 / 0 on last child).
+function MetricCard({ children, last }: { children: React.ReactNode; last?: boolean }) {
+  const t = useTheme();
+  return (
+    <View
+      style={{
+        backgroundColor: t.surface,
+        borderWidth: 1,
+        borderColor: t.border,
+        borderRadius: t.radiusSm,
+        padding: 14,
+        marginBottom: last ? 0 : 10,
+      }}
+    >
+      {children}
+    </View>
   );
 }
 
@@ -246,49 +280,73 @@ function HeroCard(o: HeroOpts) {
   const t = useTheme();
   const color = (o.cat && SCORE_COLORS[o.cat]) || '#9aa0a6';
   return (
+    // .sum-hero: 1px border, radius, padding 16, margin-bottom 16 (position relative).
     <Box
       style={{
+        position: 'relative',
         backgroundColor: hexA(color, 0.15),
         borderWidth: 1,
         borderColor: hexA(color, 0.45),
         borderRadius: t.radius,
         padding: 16,
-        marginTop: 4,
+        marginBottom: 16,
       }}
     >
       {o.cat ? (
-        <View style={{ flexDirection: 'row' }}>
-          <Text
-            style={{
-              backgroundColor: color,
-              color: '#fff',
-              fontSize: 12,
-              fontWeight: '700',
-              paddingHorizontal: 8,
-              paddingVertical: 3,
-              borderRadius: 999,
-              overflow: 'hidden',
-            }}
-          >
-            {GRADE_LABEL[o.cat] || ''}
-          </Text>
-        </View>
+        // .sum-hero-rating: absolute top/right 14, 12px/800 white pill, 4/11 pad, .03em.
+        <Text
+          style={{
+            position: 'absolute',
+            top: 14,
+            right: 14,
+            backgroundColor: color,
+            color: '#fff',
+            fontSize: 12,
+            fontWeight: '800',
+            paddingVertical: 4,
+            paddingHorizontal: 11,
+            borderRadius: 999,
+            textTransform: 'uppercase',
+            letterSpacing: 0.36,
+            overflow: 'hidden',
+          }}
+        >
+          {GRADE_LABEL[o.cat] || ''}
+        </Text>
       ) : null}
       {o.label ? (
-        <Text style={{ color: t.textDim, fontSize: 13, marginTop: o.cat ? 8 : 0 }}>{o.label}</Text>
+        // .sum-hero-label: 11px uppercase .06em text-dim 700.
+        <Text
+          style={{
+            color: t.textDim,
+            fontSize: 11,
+            textTransform: 'uppercase',
+            letterSpacing: 0.66,
+            fontWeight: '700',
+          }}
+        >
+          {o.label}
+        </Text>
       ) : null}
-      <View style={{ flexDirection: 'row', alignItems: 'flex-end', marginTop: 4 }}>
-        <Text style={{ color: t.text, fontSize: 34, fontWeight: '800', lineHeight: 38 }}>
+      {/* .sum-hero-score (margin-top 3): num 40px lh1 800, den 16px 700 dim. */}
+      <View style={{ flexDirection: 'row', alignItems: 'flex-end', marginTop: 3 }}>
+        <Text style={{ color: t.text, fontSize: 40, fontWeight: '800', lineHeight: 40 }}>
           {o.big != null && o.big !== '' ? String(o.big) : '-'}
         </Text>
         {o.den ? (
-          <Text style={{ color: t.textDim, fontSize: 14, marginLeft: 4, marginBottom: 5 }}>
+          <Text style={{ color: t.textDim, fontSize: 16, fontWeight: '700', marginLeft: 3 }}>
             {o.den}
           </Text>
         ) : null}
       </View>
-      {o.sub ? <Text style={{ color: t.textDim, fontSize: 13, marginTop: 2 }}>{o.sub}</Text> : null}
-      {o.tip ? <Text style={{ color: t.text, fontSize: 13, marginTop: 8 }}>{o.tip}</Text> : null}
+      {/* .sum-hero-sub: 12.5px dim, margin-top 6. */}
+      {o.sub ? <Text style={{ color: t.textDim, fontSize: 12.5, marginTop: 6 }}>{o.sub}</Text> : null}
+      {/* .sum-hero-tip: 14px 600 lh 1.45, margin-top 12. */}
+      {o.tip ? (
+        <Text style={{ color: t.text, fontSize: 14, fontWeight: '600', lineHeight: 20.3, marginTop: 12 }}>
+          {o.tip}
+        </Text>
+      ) : null}
     </Box>
   );
 }
@@ -301,52 +359,67 @@ function MetricRow({
   cat,
   explain,
   spark,
+  last,
 }: {
   label: string;
   value: string | number | null | undefined;
   cat?: ScoreCategory | null | false;
   explain?: string;
   spark?: React.ReactNode;
+  last?: boolean;
 }) {
   const t = useTheme();
   const dotColor = cat && SCORE_COLORS[cat] ? SCORE_COLORS[cat] : t.border;
   return (
-    <View
-      style={{
-        paddingVertical: 8,
-        borderTopWidth: 1,
-        borderTopColor: t.border,
-      }}
-    >
+    <MetricCard last={last}>
+      {/* .metric-head: align-items center, gap 9. */}
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
         {cat === false ? null : (
+          // .score-dot: 9px circle, margin-right 7.
           <View
             style={{
-              width: 8,
-              height: 8,
-              borderRadius: 4,
+              width: 9,
+              height: 9,
+              borderRadius: 4.5,
               backgroundColor: dotColor,
-              marginRight: 8,
+              // legacy: flex gap 9 + .score-dot margin-right 7.
+              marginRight: 16,
             }}
           />
         )}
-        <Text style={{ flex: 1, color: t.text, fontSize: 14 }}>{label}</Text>
-        <Text style={{ color: t.text, fontSize: 14, fontWeight: '600' }}>
+        {/* .metric-name: flex 1, 15px 700. */}
+        <Text style={{ flex: 1, color: t.text, fontSize: 15, fontWeight: '700', marginRight: 9 }}>
+          {label}
+        </Text>
+        {/* .metric-val: 15px 700. */}
+        <Text style={{ color: t.text, fontSize: 15, fontWeight: '700' }}>
           {value == null || value === '' ? '-' : String(value)}
         </Text>
       </View>
+      {/* .metric-explain: 12.5px dim, lh 1.4, margin-top 6. */}
       {explain ? (
-        <Text style={{ color: t.textDim, fontSize: 12, marginTop: 4 }}>{explain}</Text>
+        <Text style={{ color: t.textDim, fontSize: 12.5, lineHeight: 17.5, marginTop: 6 }}>
+          {explain}
+        </Text>
       ) : null}
-      {spark ? <View style={{ marginTop: 8 }}>{spark}</View> : null}
-    </View>
+      {/* .spark: margin-top 16. */}
+      {spark ? <View style={{ marginTop: 16 }}>{spark}</View> : null}
+    </MetricCard>
   );
 }
 
-// Free-text card content (legacy .sum-text inside a .metric-card).
-function SumText({ text }: { text: string }) {
+// Free-text block (legacy .sum-text: 14px, pre-wrap) wrapped in a .metric-card,
+// optionally with a .metric-name label above it (textarea fields).
+function SumText({ label, text, last }: { label?: string; text: string; last?: boolean }) {
   const t = useTheme();
-  return <Text style={{ color: t.text, fontSize: 14, lineHeight: 20 }}>{text}</Text>;
+  return (
+    <MetricCard last={last}>
+      {label ? (
+        <Text style={{ color: t.text, fontSize: 15, fontWeight: '700' }}>{label}</Text>
+      ) : null}
+      <Text style={{ color: t.text, fontSize: 14 }}>{text}</Text>
+    </MetricCard>
+  );
 }
 
 // Power-distribution bar (legacy .powerbar ~3648-3651).
@@ -355,11 +428,13 @@ function PowerBar({
   lf,
   hf,
   total,
+  last,
 }: {
   vlf: number | null;
   lf: number | null;
   hf: number | null;
   total: number;
+  last?: boolean;
 }) {
   const t = useTheme();
   const pct = (x: number | null): number => Math.round(((x || 0) / total) * 100);
@@ -369,14 +444,18 @@ function PowerBar({
     { v: hf, color: '#22c55e', lab: 'HF' },
   ];
   return (
-    <View>
+    // Legacy wraps the bar + legend in a .metric-card.
+    <MetricCard last={last}>
+      {/* .powerbar: height 24, radius 6, margin 2/0/8, bg surface. */}
       <View
         style={{
           flexDirection: 'row',
-          height: 22,
+          height: 24,
           borderRadius: 6,
           overflow: 'hidden',
-          marginTop: 4,
+          marginTop: 2,
+          marginBottom: 8,
+          backgroundColor: t.surface,
         }}
       >
         {segs.map((s, i) => {
@@ -399,10 +478,11 @@ function PowerBar({
           );
         })}
       </View>
-      <Text style={{ color: t.textDim, fontSize: 11, marginTop: 6 }}>
+      {/* .sum-legend: 12px dim. */}
+      <Text style={{ color: t.textDim, fontSize: 12 }}>
         {`VLF ${pct(vlf)}% · LF ${pct(lf)}% · HF ${pct(hf)}%`}
       </Text>
-    </View>
+    </MetricCard>
   );
 }
 
@@ -524,13 +604,7 @@ function renderDetailFields(
 }
 
 function TextAreaRow({ label, text }: { label: string; text: string }) {
-  const t = useTheme();
-  return (
-    <View style={{ paddingVertical: 8, borderTopWidth: 1, borderTopColor: t.border }}>
-      <Text style={{ color: t.text, fontSize: 14, fontWeight: '600', marginBottom: 4 }}>{label}</Text>
-      <SumText text={text} />
-    </View>
-  );
+  return <SumText label={label} text={text} />;
 }
 
 function NotesCard({ r }: { r: Reading }) {
@@ -620,15 +694,43 @@ function OrthostaticSummary({ r }: { r: Reading }) {
 
 function OrthoDuo({ before, after }: { before: string; after: string }) {
   const t = useTheme();
+  // .ortho-stat: bg surface, 1px border, radius-sm, padding 14/10, centered.
   const Stat = ({ label, val, unit }: { label: string; val: string; unit: string }) => (
-    <View style={{ flex: 1 }}>
-      <Text style={{ color: t.textDim, fontSize: 12 }}>{label}</Text>
-      <Text style={{ color: t.text, fontSize: 28, fontWeight: '800' }}>{val}</Text>
-      <Text style={{ color: t.textDim, fontSize: 11 }}>{unit}</Text>
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: t.surface,
+        borderWidth: 1,
+        borderColor: t.border,
+        borderRadius: t.radiusSm,
+        paddingVertical: 14,
+        paddingHorizontal: 10,
+        alignItems: 'center',
+      }}
+    >
+      {/* .ortho-stat-label: 11px uppercase .05em 700 dim. */}
+      <Text
+        style={{
+          color: t.textDim,
+          fontSize: 11,
+          textTransform: 'uppercase',
+          letterSpacing: 0.55,
+          fontWeight: '700',
+        }}
+      >
+        {label}
+      </Text>
+      {/* .ortho-stat-val: 30px 800 lh 1.1, margin-top 4. */}
+      <Text style={{ color: t.text, fontSize: 30, fontWeight: '800', lineHeight: 33, marginTop: 4 }}>
+        {val}
+      </Text>
+      {/* .ortho-stat-unit: 11px dim, margin-top 2. */}
+      <Text style={{ color: t.textDim, fontSize: 11, marginTop: 2 }}>{unit}</Text>
     </View>
   );
+  // .ortho-duo: 2-col grid, gap 10.
   return (
-    <View style={{ flexDirection: 'row', gap: 12, marginTop: 4 }}>
+    <View style={{ flexDirection: 'row', gap: 10 }}>
       <Stat label="Before HR" val={before} unit="bpm · baseline" />
       <Stat label="After HR" val={after} unit="bpm · standing" />
     </View>
@@ -1042,7 +1144,7 @@ function ReadingSummaryBody({ r }: { r: Reading }) {
     <>
       <H2>{def?.label ?? ''}</H2>
       {r.time ? (
-        <Text style={{ color: t.textDim, fontSize: 13, marginTop: -8, marginBottom: 8 }}>
+        <Text style={{ color: t.textDim, fontSize: 13, marginTop: -8, marginBottom: 14 }}>
           {fmtTime12(r.time)}
         </Text>
       ) : null}

@@ -10,7 +10,10 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.autonomic.journal"
+      "bundleIdentifier": "com.autonomic.journal",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.autonomic.journal",
@@ -39,6 +42,11 @@
       "expo-sqlite",
       "expo-splash-screen",
       "expo-sharing"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "1a3e094e-0db6-4470-8504-c22ecef85c4d"
+      }
+    }
   }
 }

@@ -29,6 +29,7 @@ export function Row({
   sub,
   value,
   valueColor,
+  scoreColor,
   pills,
   first,
   onPress,
@@ -38,6 +39,8 @@ export function Row({
   sub?: string;
   value?: string;
   valueColor?: string;
+  /** Legacy .score-dot color: a 9px dot left of the value + tints the value text. */
+  scoreColor?: string;
   pills?: string[];
   first?: boolean;
   onPress?: () => void;
@@ -66,7 +69,22 @@ export function Row({
         {sub ? <Text style={{ fontSize: 12.5, color: t.textDim, marginTop: 1 }}>{sub}</Text> : null}
       </Box>
       {value ? (
-        <Text style={{ fontWeight: '600', color: valueColor ?? t.text }}>{value}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          {scoreColor ? (
+            <View
+              style={{
+                width: 9,
+                height: 9,
+                borderRadius: 9,
+                marginRight: 7,
+                backgroundColor: scoreColor,
+              }}
+            />
+          ) : null}
+          <Text style={{ fontWeight: '600', color: scoreColor ?? valueColor ?? t.text }}>
+            {value}
+          </Text>
+        </View>
       ) : null}
       {pills?.map((p) => <Pill key={p} text={p} />)}
     </Pressable>

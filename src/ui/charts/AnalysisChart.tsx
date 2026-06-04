@@ -1,11 +1,15 @@
 // AnalysisChart — multi-series time-series line chart over buckets.
-// Ported verbatim from legacy acChart (docs/index.html:4667-4778). The
-// interactive drag/hover scrub (legacy ~4738-4776) is intentionally deferred:
-// this pass renders a static chart. The default-latest-bucket readout/marker is
-// also omitted (it was part of the scrub UI). All geometry — viewBox 320×H,
-// padL/padR/padT/padB, xAt/yAt, the y-pad (0.12), the grade gradient stop logic,
-// and number formatting — is preserved exactly.
+// Ported verbatim from legacy acChart (docs/index.html:4667-4778), including the
+// interactive drag/hover scrub (legacy ~4738-4776): a draggable marker line, a
+// highlight dot per series at the active bucket, and a value readout above the
+// chart that defaults to the latest bucket with data. All geometry — viewBox
+// 320×H, padL/padR/padT/padB, xAt/yAt, the y-pad (0.12), the grade gradient stop
+// logic, and number formatting — is preserved exactly. The legacy
+// getBoundingClientRect-based idxFromEvent is replaced by useChartScrub
+// (onLayout width → x→bucket index) so it works on web + native.
 import React from 'react';
+import { Text, View } from 'react-native';
+import { GestureDetector } from 'react-native-gesture-handler';
 import Svg, {
   Path,
   Line,
@@ -20,6 +24,7 @@ import { smoothPath } from '@core/date/math';
 import { catFromBands, type Bands } from '@core/scoring/bands';
 import { SCORE_COLORS } from '@core/scoring/colors';
 import { useTheme } from '@ui/theme/ThemeProvider';
+import { useChartScrub } from './useChartScrub';
 
 // Legacy fmtNum (docs/index.html:3280).
 const fmtNum = (v: number | null | undefined): string => {
@@ -63,8 +68,25 @@ export interface AnalysisChartProps {
 // Stable gradient id counter (legacy used acChart._n).
 let _gid = 0;
 
+// Fixed viewBox geometry (legacy constants); declared at module scope so the
+// scrub hook can reuse the exact xAt math via padL/innerW.
+const W = 320;
+const padL = 34;
+const padR = 10;
+const padT = 10;
+const padB = 22;
+const innerW = W - padL - padR;
+
 export function AnalysisChart({ buckets, series, opts = {} }: AnalysisChartProps) {
   const t = useTheme();
+  const n = buckets.length;
+
+  const { onLayout, gesture, activeIndex } = useChartScrub({
+    count: n,
+    viewW: W,
+    padL,
+    innerW,
+  });
 
   const all: number[] = [];
   series.forEach((s) => s.values.forEach((v) => { if (v != null && !isNaN(v)) all.push(v); }));
@@ -85,14 +107,7 @@ export function AnalysisChart({ buckets, series, opts = {} }: AnalysisChartProps
   min -= padv;
   max += padv;
 
-  const W = 320,
-    H = opts.height || 132,
-    padL = 34,
-    padR = 10,
-    padT = 10,
-    padB = 22;
-  const innerW = W - padL - padR,
-    n = buckets.length;
+  const H = opts.height || 132;
   const xAt = (i: number) => padL + (n <= 1 ? innerW / 2 : (i / (n - 1)) * innerW);
   const yAt = (v: number) => padT + (1 - (v - min) / (max - min)) * (H - padT - padB);
 
@@ -188,113 +203,170 @@ export function AnalysisChart({ buckets, series, opts = {} }: AnalysisChartProps
     });
   });
 
+  // Scrub readout: default to the latest bucket that has data (legacy lastIdx),
+  // override with the actively scrubbed index. The marker line + highlight dots
+  // only render while actively scrubbing (legacy marker opacity 0 → 0.35).
+  let lastIdx = -1;
+  for (let i = n - 1; i >= 0; i--) {
+    if (series.some((s) => { const v = s.values[i]; return v != null && !isNaN(v); })) {
+      lastIdx = i;
+      break;
+    }
+  }
+  const readoutIdx = activeIndex != null ? activeIndex : lastIdx;
+  const multi = series.filter((s) => s.label).length > 1;
+  // Active per-series highlight dots (only while scrubbing).
+  const activeDots: { x: number; y: number; color: string }[] = [];
+  let readoutText = '';
+  if (readoutIdx >= 0) {
+    const x = xAt(readoutIdx);
+    const vals: string[] = [];
+    series.forEach((s) => {
+      const v = s.values[readoutIdx];
+      if (v == null || isNaN(v)) return;
+      if (activeIndex != null) activeDots.push({ x, y: yAt(v), color: dotColor(s, v) });
+      vals.push((multi && s.label ? s.label + ' ' : '') + fmtNum(opts.integer ? Math.round(v) : v));
+    });
+    readoutText = vals.length
+      ? `${buckets[readoutIdx].label}: ${vals.join(' · ')}`
+      : buckets[readoutIdx].label;
+  }
+  const markerX = readoutIdx >= 0 ? xAt(readoutIdx) : 0;
+
   return (
-    <Svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
-      <Defs>
-        {rendered
-          .filter((r) => r.gradId)
-          .map((r) => (
-            <LinearGradient
-              key={r.gradId!}
-              id={r.gradId!}
-              gradientUnits="userSpaceOnUse"
-              x1={0}
-              y1={padT}
-              x2={0}
-              y2={H - padB}
-            >
-              {r.gradStops.map((st, k) => (
-                <Stop key={k} offset={st.offset} stopColor={st.color} />
-              ))}
-            </LinearGradient>
-          ))}
-      </Defs>
+    <View>
+      {/* Readout (legacy .spark-readout); shows the latest bucket when idle. */}
+      <Text style={{ fontSize: 12, fontWeight: '600', color: t.text, minHeight: 16 }}>
+        {readoutText}
+      </Text>
 
-      {/* y grid + labels */}
-      {gridVals.map((val, k) => {
-        const y = yAt(val);
-        return (
-          <G key={`g${k}`}>
-            <Line
-              x1={padL}
-              x2={W - padR}
-              y1={y}
-              y2={y}
-              stroke={t.border}
-              strokeWidth={1}
-              vectorEffect="non-scaling-stroke"
-              opacity={0.6}
-            />
-            <SvgText
-              x={padL - 4}
-              y={y + 3}
-              textAnchor="end"
-              fontSize={9}
-              fill={t.textDim}
-            >
-              {fmtNum(opts.integer ? Math.round(val) : val)}
-            </SvgText>
-          </G>
-        );
-      })}
+      <GestureDetector gesture={gesture}>
+        <View onLayout={onLayout}>
+          <Svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+            <Defs>
+              {rendered
+                .filter((r) => r.gradId)
+                .map((r) => (
+                  <LinearGradient
+                    key={r.gradId!}
+                    id={r.gradId!}
+                    gradientUnits="userSpaceOnUse"
+                    x1={0}
+                    y1={padT}
+                    x2={0}
+                    y2={H - padB}
+                  >
+                    {r.gradStops.map((st, k) => (
+                      <Stop key={k} offset={st.offset} stopColor={st.color} />
+                    ))}
+                  </LinearGradient>
+                ))}
+            </Defs>
 
-      {/* x labels */}
-      {buckets.map((b, i) => {
-        if (i % step !== 0 && i !== n - 1) return null;
-        return (
-          <SvgText
-            key={`x${i}`}
-            x={xAt(i)}
-            y={H - 6}
-            textAnchor="middle"
-            fontSize={9}
-            fill={t.textDim}
-          >
-            {b.label}
-          </SvgText>
-        );
-      })}
+            {/* y grid + labels */}
+            {gridVals.map((val, k) => {
+              const y = yAt(val);
+              return (
+                <G key={`g${k}`}>
+                  <Line
+                    x1={padL}
+                    x2={W - padR}
+                    y1={y}
+                    y2={y}
+                    stroke={t.border}
+                    strokeWidth={1}
+                    vectorEffect="non-scaling-stroke"
+                    opacity={0.6}
+                  />
+                  <SvgText
+                    x={padL - 4}
+                    y={y + 3}
+                    textAnchor="end"
+                    fontSize={9}
+                    fill={t.textDim}
+                  >
+                    {fmtNum(opts.integer ? Math.round(val) : val)}
+                  </SvgText>
+                </G>
+              );
+            })}
 
-      {/* zone/target guide lines (legacy toggled via "Show zones"; shown by
-          default here — TODO: wire a toggle once the scrub UI is ported) */}
-      {guides.map((g, k) => (
-        <Line
-          key={`guide${k}`}
-          x1={padL}
-          x2={padL + innerW}
-          y1={yAt(g.v)}
-          y2={yAt(g.v)}
-          stroke={g.color}
-          strokeWidth={1.5}
-          strokeDasharray="4 3"
-          vectorEffect="non-scaling-stroke"
-          opacity={0.95}
-        />
-      ))}
+            {/* x labels */}
+            {buckets.map((b, i) => {
+              if (i % step !== 0 && i !== n - 1) return null;
+              return (
+                <SvgText
+                  key={`x${i}`}
+                  x={xAt(i)}
+                  y={H - 6}
+                  textAnchor="middle"
+                  fontSize={9}
+                  fill={t.textDim}
+                >
+                  {b.label}
+                </SvgText>
+              );
+            })}
 
-      {/* series lines + points */}
-      {rendered.map((r) => (
-        <G key={`s${r.key}`}>
-          {r.d ? (
-            <Path
-              d={r.d}
-              fill="none"
-              stroke={r.strokeUrl || r.color}
-              strokeWidth={2.4}
-              vectorEffect="non-scaling-stroke"
-              strokeLinejoin="round"
-              strokeLinecap="round"
-              strokeDasharray={r.dashed ? '5 4' : undefined}
-            />
-          ) : null}
-          {r.pts.map((p, k) => (
-            <Circle key={k} cx={p[0]} cy={p[1]} r={r.dotR} fill={dotColor(series[r.key], p[2])} />
-          ))}
-        </G>
-      ))}
+            {/* zone/target guide lines (legacy toggled via "Show zones"; shown by
+                default here — TODO: wire a toggle once a zones button is ported) */}
+            {guides.map((g, k) => (
+              <Line
+                key={`guide${k}`}
+                x1={padL}
+                x2={padL + innerW}
+                y1={yAt(g.v)}
+                y2={yAt(g.v)}
+                stroke={g.color}
+                strokeWidth={1.5}
+                strokeDasharray="4 3"
+                vectorEffect="non-scaling-stroke"
+                opacity={0.95}
+              />
+            ))}
 
-      {/* TODO: interactive scrub (marker line + per-series hover dots + value
-          readout) — legacy docs/index.html:4738-4776. */}
-    </Svg>
+            {/* series lines + points */}
+            {rendered.map((r) => (
+              <G key={`s${r.key}`}>
+                {r.d ? (
+                  <Path
+                    d={r.d}
+                    fill="none"
+                    stroke={r.strokeUrl || r.color}
+                    strokeWidth={2.4}
+                    vectorEffect="non-scaling-stroke"
+                    strokeLinejoin="round"
+                    strokeLinecap="round"
+                    strokeDasharray={r.dashed ? '5 4' : undefined}
+                  />
+                ) : null}
+                {r.pts.map((p, k) => (
+                  <Circle key={k} cx={p[0]} cy={p[1]} r={r.dotR} fill={dotColor(series[r.key], p[2])} />
+                ))}
+              </G>
+            ))}
+
+            {/* scrub marker line + per-series highlight dots (active only) */}
+            {activeIndex != null && readoutIdx >= 0 && (
+              <>
+                <Line
+                  x1={markerX}
+                  x2={markerX}
+                  y1={padT}
+                  y2={H - padB}
+                  stroke={t.text}
+                  strokeWidth={1}
+                  vectorEffect="non-scaling-stroke"
+                  opacity={0.35}
+                />
+                {activeDots.map((d, k) => (
+                  <Circle key={`hd${k}`} cx={d.x} cy={d.y} r={3.4} fill={d.color} />
+                ))}
+              </>
+            )}
+          </Svg>
+        </View>
+      </GestureDetector>
+    </View>
   );
 }

@@ -152,6 +152,12 @@ function closeTop() {
 function ReportCardItem({ card, selected, onToggle }: { card: ReportCard; selected: boolean; onToggle: () => void }) {
   const t = useTheme();
   return (
+    // .report-card (docs CSS 913-946): border 1px var(--border), radius
+    // var(--radius)=14, surface bg, box-shadow var(--shadow), padding 14,
+    // flex column gap 7. .selected → border var(--accent), bg var(--accent-soft),
+    // box-shadow 0 0 0 1px var(--accent) (emulated via a second 1px border ring
+    // through borderColor=accent; the base 1px border already supplies the ring
+    // weight that the legacy adds on top of the default border).
     <Pressable
       onPress={onToggle}
       accessibilityRole="button"
@@ -160,24 +166,31 @@ function ReportCardItem({ card, selected, onToggle }: { card: ReportCard; select
       style={{
         flexBasis: '48%',
         flexGrow: 1,
-        backgroundColor: selected ? t.surface2 : t.surface,
-        borderWidth: 1.5,
+        flexDirection: 'column',
+        gap: 7,
+        backgroundColor: selected ? t.accentSoft : t.surface,
+        borderWidth: 1,
         borderColor: selected ? t.accent : t.border,
         borderRadius: t.radius,
         padding: 14,
         position: 'relative',
         ...t.shadow,
+        ...(selected
+          ? { boxShadow: `0px 0px 0px 1px ${t.accent}, 0px 1px 3px rgba(0,0,0,0.08)` }
+          : null),
       }}
     >
+      {/* .report-card-check (docs 939-946): top/right 12, 20×20, circle,
+          accent bg, white check svg 14. */}
       {selected ? (
         <View
           style={{
             position: 'absolute',
-            top: 10,
-            right: 10,
-            width: 22,
-            height: 22,
-            borderRadius: 11,
+            top: 12,
+            right: 12,
+            width: 20,
+            height: 20,
+            borderRadius: 10,
             backgroundColor: t.accent,
             alignItems: 'center',
             justifyContent: 'center',
@@ -186,13 +199,22 @@ function ReportCardItem({ card, selected, onToggle }: { card: ReportCard; select
           <Icon name="check" size={14} color="#fff" />
         </View>
       ) : null}
-      <View style={{ marginBottom: 8 }}>
-        <Icon name={card.icon} size={24} color={t.accent} />
-      </View>
-      <Text style={{ color: t.text, fontSize: 15, fontWeight: '700', marginBottom: 4, paddingRight: 22 }}>
+      {/* .report-card-ico (docs 935): 26×26, var(--accent). */}
+      <Icon name={card.icon} size={26} color={t.accent} />
+      {/* .report-card-title (docs 937): 14px / 700, line-height 1.2, pad-right 22. */}
+      <Text
+        style={{
+          color: t.text,
+          fontSize: 14,
+          fontWeight: '700',
+          lineHeight: 17, // 1.2 × 14
+          paddingRight: 22,
+        }}
+      >
         {card.title}
       </Text>
-      <Text style={{ color: t.textDim, fontSize: 12.5, lineHeight: 17 }}>{card.desc}</Text>
+      {/* .report-card-desc (docs 938): 11.5px, var(--text-dim), line-height 1.35. */}
+      <Text style={{ color: t.textDim, fontSize: 11.5, lineHeight: 15.5 }}>{card.desc}</Text>
     </Pressable>
   );
 }
@@ -244,7 +266,8 @@ export function ReportsScreen({ scrollY }: { scrollY: SharedValue<number> }) {
         value={range}
         onChange={setRange}
       />
-      <View style={{ height: 14 }} />
+      {/* .report-grid (docs 905-911): margin-top 10, gap 10, 2-col. */}
+      <View style={{ height: 10 }} />
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
         {REPORT_CARDS.map((card) => (
           <ReportCardItem key={card.id} card={card} selected={selected.has(card.id)} onToggle={() => toggle(card.id)} />

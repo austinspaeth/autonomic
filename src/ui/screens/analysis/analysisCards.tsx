@@ -22,10 +22,20 @@ import { Legend } from '@ui/charts/Legend';
 import { TrendChip } from '@ui/charts/TrendChip';
 import { BANDS } from '@core/scoring/bands';
 import { SCORE_COLORS, SCORE_CATS, scoreCat } from '@core/scoring/colors';
-import { acAgg, acAggSum, acReadVals, acTotalPower, acDayScore } from '@core/analytics/aggregate';
+import { acAgg, acAggSum, acReadVals, acTotalPower, acDayScore, acMeanOver } from '@core/analytics/aggregate';
 import { sleepHours, blueZone } from '@core/scoring/scoreSet';
 import { acRangeLabel, type AcBucket, type AnalysisMode } from '@core/analytics/buckets';
-import { dateFromKey } from '@core/date/dateUtils';
+import { dateFromKey, keyOf, fmtTime12 } from '@core/date/dateUtils';
+import {
+  dayCleanliness,
+  streakInfo,
+  streakTier,
+  acIllnessEpisodes,
+  acDayDiff,
+  acDaysBefore,
+  acRecentDays,
+  acWindowKeys,
+} from '@core/analytics/cleanliness';
 import { ACTIVITY_TYPES } from '@core/domain/activityTypes';
 import { MED_TYPES, TRIGGER_TYPES } from '@core/domain/otherTypes';
 import type { Day, Profile, Reading } from '@core/types';
@@ -36,21 +46,31 @@ import {
   AcInsight,
   AcBars,
   AcScatter,
+  AcStackBars,
+  AcStackLegend,
+  AcCmp,
+  AcHeatMap,
+  AcEvents,
+  AcStreakBig,
+  AcGradeChips,
   acBandZones,
   acScoreZones,
   acMean,
   acPresent,
   acDelta,
   avgRound,
+  roundTo,
   acPearson,
   acDailyMetrics,
   type DailyMetricRow,
+  type CmpRow,
+  type EventRow,
+  type BarRow,
   isMorning,
   isEvening,
   acToDec,
   acMinOf,
   fmtNum,
-  type BarRow,
 } from './acHelpers';
 
 export interface CardCtx {
@@ -65,9 +85,15 @@ export interface CardCtx {
 const fmtShort = (k: string): string =>
   dateFromKey(k).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 
+// legacy renders the BP note as a .ac-sub { font-size:11; color:text-dim;
+// font-weight:600; letter-spacing:.02em; margin:-4px 0 12px } (docs:5136).
 function DimNote({ text }: { text: string }) {
   const t = useTheme();
-  return <Text style={{ fontSize: 12, color: t.textDim, marginTop: 4 }}>{text}</Text>;
+  return (
+    <Text style={{ fontSize: 11, color: t.textDim, fontWeight: '600', letterSpacing: 0.02 * 11, marginTop: -4, marginBottom: 12 }}>
+      {text}
+    </Text>
+  );
 }
 
 // ===================== Autonomic Outlook =====================
@@ -128,21 +154,33 @@ export function acAutonomicOutlook(ctx: CardCtx): React.ReactElement | null {
 
 function DirectionRow({ delta }: { delta: number | null }) {
   const t = useTheme();
+  // legacy: .stat.ac-direction = a .stat card (surface/border/radius/shadow) with
+  // .ac-direction overrides { display:flex; align-items:center;
+  // justify-content:space-between; padding:11px 14px; margin:14px 0 }.
   return (
     <View
       style={{
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        marginTop: 12,
-        backgroundColor: t.surface2,
-        borderRadius: t.radiusSm,
-        paddingVertical: 10,
-        paddingHorizontal: 12,
+        marginVertical: 14,
+        backgroundColor: t.surface,
+        borderWidth: 1,
+        borderColor: t.border,
+        borderRadius: t.radius,
+        paddingVertical: 11,
+        paddingHorizontal: 14,
+        ...t.shadow,
       }}
     >
-      <Text style={{ fontSize: 11, color: t.textDim }}>Direction</Text>
-      {delta != null ? <TrendChip delta={delta} opts={{ goodUp: true }} /> : <Text style={{ color: t.textDim }}>-</Text>}
+      {/* .stat-label { font-size:12; color: var(--text-dim); font-weight:600 } */}
+      <Text style={{ fontSize: 12, color: t.textDim, fontWeight: '600' }}>Direction</Text>
+      {delta != null ? (
+        <TrendChip delta={delta} opts={{ goodUp: true }} />
+      ) : (
+        // fallback .stat-value
+        <Text style={{ fontSize: 26, fontWeight: '700', color: t.text }}>-</Text>
+      )}
     </View>
   );
 }
@@ -151,16 +189,20 @@ function GradeBars({ order, counts, gMax }: { order: string[]; counts: Record<st
   const t = useTheme();
   return (
     <AcBlock label="Days in each grade">
-      <View style={{ gap: 6 }}>
+      {/* legacy .ac-grade-bars { display:flex; flex-direction:column; gap:8; margin-top:8 } */}
+      <View style={{ gap: 8, marginTop: 8 }}>
         {order.filter((s) => counts[s]).map((s) => {
           const cat = SCORE_CATS.find((c) => c.short === s)!;
           const n = counts[s];
           return (
-            <View key={s} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <View style={{ flex: 1, height: 8, backgroundColor: t.surface2, borderRadius: 4, overflow: 'hidden' }}>
-                <View style={{ width: `${Math.round((n / gMax) * 100)}%`, height: 8, backgroundColor: cat.color, borderRadius: 4 }} />
+            // .ac-grade-bar-row { display:flex; align-items:center; gap:10 }
+            <View key={s} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              {/* .ac-grade-bar-track { flex:0 0 42%; height:10; background:surface-2; border-radius:999 } */}
+              <View style={{ flexGrow: 0, flexShrink: 0, flexBasis: '42%', height: 10, backgroundColor: t.surface2, borderRadius: 999, overflow: 'hidden' }}>
+                <View style={{ width: `${Math.round((n / gMax) * 100)}%`, height: '100%', backgroundColor: cat.color, borderRadius: 999 }} />
               </View>
-              <Text style={{ fontSize: 12, color: t.text, width: 130 }}>
+              {/* .ac-grade-bar-lbl { font-size:13; color:text }  b { font-weight:700 } */}
+              <Text style={{ fontSize: 13, color: t.text }}>
                 <Text style={{ fontWeight: '700', color: t.text }}>{String(n)}</Text>
                 {` ${s.toLowerCase()} day${n === 1 ? '' : 's'}`}
               </Text>
@@ -649,28 +691,62 @@ export function acTriggerImpact(ctx: CardCtx): React.ReactElement | null {
   );
 }
 
+// TriggerTable — legacy table.ac-table (docs/index.html:5439 + CSS 1158-1162).
+// .ac-table { width:100%; font-size:13; margin-top:4 }
+// th { text-align:left; font-size:11; text-transform:uppercase; letter-spacing:.04em;
+//      color:var(--text-dim); font-weight:700; padding:6px 8px; border-bottom:1px }
+// td { padding:8px; border-bottom:1px; font-variant-numeric:tabular-nums }
+//   first-child: normal numerics; tr:last-child td: no border-bottom.
 function TriggerTable({ rows }: { rows: { name: string; freq: number; cost: number | null; recovery: number | null }[] }) {
   const t = useTheme();
   const head = ['Trigger', 'Times', 'RMSSD cost', 'Recovery'];
+  // 4 columns; first (name) is widest. Legacy uses table auto-layout; approximate
+  // with flex weights (name gets 2x) — all cells are left-aligned like the legacy.
+  const flexOf = (i: number) => (i === 0 ? 2 : 1);
   return (
-    <View style={{ marginTop: 14 }}>
-      <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderColor: t.border, paddingBottom: 6 }}>
+    <View style={{ marginTop: 4 }}>
+      <View style={{ flexDirection: 'row' }}>
         {head.map((h, i) => (
-          <Text key={h} style={{ flex: i === 0 ? 2 : 1, fontSize: 11, fontWeight: '700', color: t.textDim, textAlign: i === 0 ? 'left' : 'right' }}>{h}</Text>
+          <Text
+            key={h}
+            style={{
+              flex: flexOf(i),
+              fontSize: 11,
+              fontWeight: '700',
+              textTransform: 'uppercase',
+              letterSpacing: 0.04 * 11,
+              color: t.textDim,
+              paddingHorizontal: 8,
+              paddingVertical: 6,
+              borderBottomWidth: 1,
+              borderBottomColor: t.border,
+            }}
+          >
+            {h}
+          </Text>
         ))}
       </View>
-      {rows.map((r, i) => (
-        <View key={i} style={{ flexDirection: 'row', paddingVertical: 6, borderBottomWidth: 1, borderColor: t.border }}>
-          <Text style={{ flex: 2, fontSize: 13, color: t.text }} numberOfLines={1}>{r.name}</Text>
-          <Text style={{ flex: 1, fontSize: 13, color: t.text, textAlign: 'right' }}>{String(r.freq)}</Text>
-          <Text style={{ flex: 1, fontSize: 13, color: r.cost != null && r.cost < 0 ? SCORE_COLORS.bad : t.text, textAlign: 'right' }}>
-            {r.cost == null ? '–' : (r.cost <= 0 ? '' : '+') + fmtNum(Math.round(r.cost * 10) / 10)}
-          </Text>
-          <Text style={{ flex: 1, fontSize: 13, color: t.text, textAlign: 'right' }}>
-            {r.recovery == null ? '–' : `${fmtNum(Math.round(r.recovery * 10) / 10)} d`}
-          </Text>
-        </View>
-      ))}
+      {rows.map((r, i) => {
+        const last = i === rows.length - 1;
+        const tdBase = {
+          padding: 8,
+          fontSize: 13,
+          borderBottomWidth: last ? 0 : 1,
+          borderBottomColor: t.border,
+        } as const;
+        return (
+          <View key={i} style={{ flexDirection: 'row' }}>
+            <Text style={[tdBase, { flex: 2, color: t.text }]} numberOfLines={1}>{r.name}</Text>
+            <Text style={[tdBase, { flex: 1, color: t.text }]}>{String(r.freq)}</Text>
+            <Text style={[tdBase, { flex: 1, color: r.cost != null && r.cost < 0 ? SCORE_COLORS.bad : t.text }]}>
+              {r.cost == null ? '–' : (r.cost <= 0 ? '' : '+') + fmtNum(Math.round(r.cost * 10) / 10)}
+            </Text>
+            <Text style={[tdBase, { flex: 1, color: t.text }]}>
+              {r.recovery == null ? '–' : `${fmtNum(Math.round(r.recovery * 10) / 10)} d`}
+            </Text>
+          </View>
+        );
+      })}
     </View>
   );
 }
@@ -757,6 +833,454 @@ export function acCorrelations(ctx: CardCtx): React.ReactElement | null {
   return (
     <AcCard title="Correlation Insights" sub="Pearson correlations · 14+ days, |r| ≥ 0.3">
       {found.slice(0, 10).map((f, i) => <AcInsight key={i} text={f.txt} strength={f.strength} />)}
+    </AcCard>
+  );
+}
+
+// ===================== Comparison (legacy 4964) =====================
+export function acComparison(ctx: CardCtx): React.ReactElement | null {
+  const { days, profile, mode, buckets } = ctx;
+  const present = buckets.filter((b) => b.days.length);
+  if (present.length < 2) return null;
+  const unit = mode === 'day' ? 'day' : mode === 'week' ? 'week' : mode === 'month' ? 'month' : 'year';
+  const defs: { name: string; v: (number | null)[]; goodUp: boolean }[] = [
+    { name: 'Autonomic score', v: acAgg(buckets, (d, dk) => acDayScore(d, dk, profile), days), goodUp: true },
+    { name: 'Structured RMSSD', v: acAgg(buckets, (d) => acReadVals(d, 'breathHrv', 'rmssd'), days), goodUp: true },
+    { name: 'Resting HR (laying)', v: acAgg(buckets, (d) => acReadVals(d, 'restingHr', 'hr', (r) => ((r as any).position || '') === 'Laying'), days), goodUp: false },
+    { name: 'Sleep hours', v: acAgg(buckets, (d) => sleepHours(d), days), goodUp: true },
+  ];
+  const rows: CmpRow[] = [];
+  defs.forEach((r) => {
+    const idx = r.v.map((v, i) => (v != null && !isNaN(v) ? i : -1)).filter((i) => i >= 0);
+    if (idx.length < 2) return;
+    const cur = r.v[idx[idx.length - 1]] as number;
+    const prev = r.v[idx[idx.length - 2]] as number;
+    const best = r.goodUp ? Math.max(...idx.map((i) => r.v[i] as number)) : Math.min(...idx.map((i) => r.v[i] as number));
+    rows.push({
+      name: r.name,
+      prevText: fmtNum(Math.round(prev * 10) / 10) + ' → ',
+      curText: fmtNum(Math.round(cur * 10) / 10) + ` (best ${fmtNum(Math.round(best * 10) / 10)})`,
+      delta: cur - prev,
+      goodUp: r.goodUp,
+    });
+  });
+  if (!rows.length) return null;
+  return (
+    <AcCard title="Comparison" sub={`This ${unit} vs last ${unit}`}>
+      <AcCmp rows={rows} />
+    </AcCard>
+  );
+}
+
+// ===================== Calendar Heat Map (legacy 4989) =====================
+export function acHeatMapCard(ctx: CardCtx): React.ReactElement | null {
+  const { days, profile, mode } = ctx;
+  const nDays = mode === 'day' ? 42 : mode === 'week' ? 84 : mode === 'month' ? 183 : 371;
+  // AcHeatMap returns null when no day in range has a score (legacy `any`).
+  let any = false;
+  Object.keys(days).forEach((dk) => { if (acDayScore(days[dk], dk, profile) != null) any = true; });
+  if (!any) return null;
+  return (
+    <AcCard title="Calendar Heat Map" sub={`Last ${nDays} days · colored by autonomic score`}>
+      <AcHeatMap days={days} profile={profile} nDays={nDays} fmtShort={fmtShort} />
+    </AcCard>
+  );
+}
+
+// ===================== Week Pattern (legacy 5021) =====================
+export function acWeekPattern(ctx: CardCtx): React.ReactElement | null {
+  const { days, profile } = ctx;
+  const dows: number[][] = [[], [], [], [], [], [], []];
+  Object.keys(days).forEach((dk) => {
+    const sc = acDayScore(days[dk], dk, profile);
+    if (sc != null) dows[dateFromKey(dk).getDay()].push(sc);
+  });
+  const total = dows.reduce((s, a) => s + a.length, 0);
+  if (total < 7) return null;
+  const names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const avgs = dows.map((a) => (a.length ? a.reduce((s, x) => s + x, 0) / a.length : null));
+  const rows: BarRow[] = names
+    .map((nm, i) => (avgs[i] == null ? null : { name: nm, count: Math.round(avgs[i] as number), color: scoreCat(avgs[i] as number).color }))
+    .filter(Boolean) as BarRow[];
+  const wk = [1, 2, 3, 4, 5].flatMap((i) => dows[i]);
+  const we = [0, 6].flatMap((i) => dows[i]);
+  const wkA = wk.length ? Math.round(wk.reduce((s, x) => s + x, 0) / wk.length) : null;
+  const weA = we.length ? Math.round(we.reduce((s, x) => s + x, 0) / we.length) : null;
+  const bestI = avgs.reduce<number>((bi, v, i) => (v != null && (bi < 0 || (v as number) > (avgs[bi] as number)) ? i : bi), -1);
+  const worstI = avgs.reduce<number>((wi, v, i) => (v != null && (wi < 0 || (v as number) < (avgs[wi] as number)) ? i : wi), -1);
+  return (
+    <AcCard title="Week Pattern" sub="Average autonomic score by day of week">
+      <AcBars rows={rows} />
+      <AcStats
+        items={[
+          { label: 'Weekday avg', value: wkA, color: wkA != null ? scoreCat(wkA).color : null },
+          { label: 'Weekend avg', value: weA, color: weA != null ? scoreCat(weA).color : null },
+        ]}
+      />
+      {bestI >= 0 && worstI >= 0 && bestI !== worstI ? (
+        <AcInsight text={`${names[bestI]} is your strongest day (avg ${Math.round(avgs[bestI] as number)}); ${names[worstI]} the weakest (avg ${Math.round(avgs[worstI] as number)}).`} />
+      ) : null}
+    </AcCard>
+  );
+}
+
+// ===================== Structured HRV (legacy 5066) =====================
+export function acStructuredHrv(ctx: CardCtx): React.ReactElement | null {
+  const { days, buckets } = ctx;
+  const colors = { vlf: '#a78bfa', lf: '#38bdf8', hf: '#4ade80' };
+  const cols = buckets.map((b) => {
+    const m = (k: string): number | null => {
+      const vs: number[] = [];
+      b.days.forEach((dk) => acReadVals(days[dk], 'breathHrv', k).forEach((v) => vs.push(v)));
+      return vs.length ? vs.reduce((s, x) => s + x, 0) / vs.length : null;
+    };
+    const vlf = m('vlowPower'), lf = m('lowPower'), hf = m('highPower');
+    return vlf == null && lf == null && hf == null ? null : { vlf: vlf || 0, lf: lf || 0, hf: hf || 0 };
+  });
+  const coherence = acAgg(buckets, (d) => acReadVals(d, 'breathHrv', 'coherence'), days);
+  const lfPeak = acAgg(buckets, (d) => acReadVals(d, 'breathHrv', 'lfPeak'), days);
+  const hasStack = cols.some(Boolean);
+  if (!acPresent(coherence).length && !acPresent(lfPeak).length && !hasStack) return null;
+  return (
+    <AcCard title="Structured HRV (4/5 breathing)" sub="Your most reliable readings">
+      <AcBlock label="Coherence">
+        <AnalysisChart buckets={buckets} series={[{ values: coherence, color: '#38bdf8', label: '' }]} opts={{ zones: acBandZones('coherence') || undefined }} />
+      </AcBlock>
+      <AcBlock label="LF peak progression">
+        <AnalysisChart buckets={buckets} series={[{ values: lfPeak, color: '#4ade80', label: '' }]} opts={{ zones: acBandZones('lfPeak') || undefined, target: { from: 0.08, to: 0.1, color: '#16a34a' } }} />
+      </AcBlock>
+      {hasStack ? (
+        <AcBlock label="Power distribution (VLF / LF / HF)">
+          <AcStackBars cols={cols} colors={colors} />
+          <AcStackLegend items={[{ label: 'VLF', color: colors.vlf }, { label: 'LF', color: colors.lf }, { label: 'HF', color: colors.hf }]} />
+        </AcBlock>
+      ) : null}
+    </AcCard>
+  );
+}
+
+// ===================== Morning / Evening filtered readings (legacy 5094-5121) =====================
+function filteredReadingBlocks(ctx: CardCtx, filt: (r: Reading) => boolean): React.ReactNode {
+  const { days, buckets } = ctx;
+  const rmssd = acAgg(buckets, (d) => acReadVals(d, 'breathHrv', 'rmssd', filt), days);
+  const tp = acAgg(buckets, (d) => acTotalPower(d, filt), days);
+  const lfPeak = acAgg(buckets, (d) => acReadVals(d, 'breathHrv', 'lfPeak', filt), days);
+  const sys = acAgg(buckets, (d) => acReadVals(d, 'bp', 'sys', filt), days);
+  const dia = acAgg(buckets, (d) => acReadVals(d, 'bp', 'dia', filt), days);
+  const restHr = acAgg(buckets, (d) => acReadVals(d, 'restingHr', 'hr', filt), days);
+  return (
+    <>
+      <AcBlock label="RMSSD (structured)">
+        <AnalysisChart buckets={buckets} series={[{ values: rmssd, color: '#4ade80', label: '' }]} opts={{ zones: acBandZones('rmssdS') || undefined }} />
+      </AcBlock>
+      <AcBlock label="Total power">
+        <AnalysisChart buckets={buckets} series={[{ values: tp, color: '#a78bfa', label: '' }]} opts={{ integer: true }} />
+      </AcBlock>
+      <AcBlock label="LF peak">
+        <AnalysisChart buckets={buckets} series={[{ values: lfPeak, color: '#38bdf8', label: '' }]} opts={{ zones: acBandZones('lfPeak') || undefined, target: { from: 0.08, to: 0.1, color: '#16a34a' } }} />
+      </AcBlock>
+      <AcBlock label="Blood pressure">
+        <AnalysisChart buckets={buckets} series={[{ values: sys, color: '#e03127', label: 'Sys' }, { values: dia, color: '#3b82f6', label: 'Dia' }]} />
+        <Legend series={[{ values: sys, color: '#e03127', label: 'Sys' }, { values: dia, color: '#3b82f6', label: 'Dia' }]} />
+      </AcBlock>
+      <AcBlock label="Resting HR">
+        <AnalysisChart buckets={buckets} series={[{ values: restHr, color: '#e03127', label: '' }]} />
+      </AcBlock>
+    </>
+  );
+}
+
+export function acMorning(ctx: CardCtx): React.ReactElement | null {
+  // legacy always returns the card (acFilteredReadings has no null guard).
+  return (
+    <AcCard title="Morning Readings" sub="Readings before 12pm">
+      {filteredReadingBlocks(ctx, isMorning)}
+    </AcCard>
+  );
+}
+
+export function acEvening(ctx: CardCtx): React.ReactElement | null {
+  const { days, buckets } = ctx;
+  // day cost: morning -> evening structured RMSSD drop
+  const costs = acAgg(buckets, (d) => {
+    const m = acReadVals(d, 'breathHrv', 'rmssd', isMorning);
+    const e = acReadVals(d, 'breathHrv', 'rmssd', isEvening);
+    if (!m.length || !e.length) return null;
+    return m.reduce((s, x) => s + x, 0) / m.length - e.reduce((s, x) => s + x, 0) / e.length;
+  }, days);
+  const avgCost = acMean(costs);
+  const hasCost = acPresent(costs).length > 0;
+  return (
+    <AcCard title="Evening Readings" sub="Readings after 6pm">
+      {filteredReadingBlocks(ctx, isEvening)}
+      {hasCost ? (
+        <AcBlock label="Day cost (morning → evening RMSSD drop)">
+          <AnalysisChart buckets={buckets} series={[{ values: costs, color: '#f97316', label: '' }]} opts={{ integer: true }} />
+        </AcBlock>
+      ) : null}
+      {hasCost && avgCost != null ? (
+        <AcInsight text={`Average day cost: structured RMSSD drops ${fmtNum(Math.round(avgCost * 10) / 10)} points from morning to evening.`} />
+      ) : null}
+    </AcCard>
+  );
+}
+
+// ===================== Extreme Event Log (legacy 5220) =====================
+export function acExtremeEvents(ctx: CardCtx): React.ReactElement | null {
+  const { days } = ctx;
+  const ev: EventRow[] = [];
+  Object.keys(days).forEach((dk) => {
+    const d = days[dk];
+    (d.symptoms || []).forEach((s) => {
+      const sa = s as any;
+      if (sa.type === 'highBp' && (parseFloat(sa.sys) >= 140 || parseFloat(sa.dia) >= 90))
+        ev.push({ dk, tag: 'BP spike', color: SCORE_COLORS.concerning, body: `${sa.sys || '?'}/${sa.dia || '?'}${sa.time ? ' at ' + fmtTime12(sa.time) : ''}` });
+      if (sa.type === 'labileHr' && parseFloat(sa.hr) >= 120)
+        ev.push({ dk, tag: 'HR surge', color: '#f97316', body: `${sa.hr} bpm${sa.position ? ' (' + sa.position + ')' : ''}` });
+      if (sa.type === 'sick') ev.push({ dk, tag: 'Sick', color: '#a78bfa', body: 'Illness logged' });
+    });
+    (d.readings || []).forEach((r) => {
+      const ra = r as any;
+      if (ra.type === 'ecg' && (ra.svt || ra.otherArrhythmia))
+        ev.push({ dk, tag: ra.svt ? 'SVT' : 'Arrhythmia', color: SCORE_COLORS.concerning, body: 'ECG rhythm abnormality' });
+      if (ra.type === 'bp' && parseFloat(ra.sys) >= 150) ev.push({ dk, tag: 'High BP', color: SCORE_COLORS.bad, body: `${ra.sys}/${ra.dia || '?'}` });
+    });
+  });
+  if (!ev.length) return null;
+  ev.sort((a, b) => b.dk.localeCompare(a.dk));
+  return (
+    <AcCard title="Extreme Event Log" sub={`${ev.length} notable event${ev.length === 1 ? '' : 's'}`}>
+      <AcEvents events={ev.slice(0, 25)} fmtShort={fmtShort} />
+    </AcCard>
+  );
+}
+
+// ===================== Exercise Progression (legacy 5293) =====================
+export function acExerciseProgression(ctx: CardCtx): React.ReactElement | null {
+  const { days, buckets } = ctx;
+  const walkHr = acAgg(buckets, (d) => (d.activities || []).filter((a) => a.type === 'walk').map((a) => parseFloat((a as any).avgHr)).filter((v) => !isNaN(v)), days);
+  const cycleHr = acAgg(buckets, (d) => (d.activities || []).filter((a) => a.type === 'indoorBike').map((a) => parseFloat((a as any).avgHr)).filter((v) => !isNaN(v)), days);
+  const recHr = acAgg(buckets, (d) => (d.activities || []).map((a) => parseFloat((a as any).hr60)).filter((v) => !isNaN(v)), days);
+  const peakHr = acAgg(buckets, (d) => (d.activities || []).filter((a) => a.type === 'indoorBike').flatMap((a) => ((a as any).intervals || []).map((iv: any) => parseFloat(iv.maxHr)).concat([parseFloat((a as any).maxHr)])).filter((v: number) => !isNaN(v)), days);
+  const blocks: { label: string; values: (number | null)[]; color: string }[] = [
+    { label: 'Walking HR', values: walkHr, color: '#16a34a' },
+    { label: 'Cycling HR', values: cycleHr, color: '#e03127' },
+    { label: 'Recovery HR (60s rest)', values: recHr, color: '#38bdf8' },
+    { label: 'Peak interval HR', values: peakHr, color: '#f97316' },
+  ].filter((b) => acPresent(b.values).length);
+  if (!blocks.length) return null;
+  return (
+    <AcCard title="Exercise Progression" sub="Real-world cardiovascular function">
+      {blocks.map((b) => (
+        <AcBlock key={b.label} label={b.label}>
+          <AnalysisChart buckets={buckets} series={[{ values: b.values, color: b.color, label: '' }]} />
+        </AcBlock>
+      ))}
+    </AcCard>
+  );
+}
+
+// ===================== Clean Days (legacy 5363) =====================
+export function acCleanDays(ctx: CardCtx): React.ReactElement | null {
+  const { days, todayKey } = ctx;
+  const info = streakInfo(days, todayKey);
+  const tier = streakTier(info.current);
+  return (
+    <AcCard title="Clean Days" sub="Protocol streak tracking">
+      <AcStreakBig num={info.current} cap={info.current === 1 ? 'day clean' : 'days clean'} tier={tier.tier} />
+      <AcStats
+        items={[
+          { label: 'Longest streak', value: info.longest, sub: 'days' },
+          { label: '30-day clean rate', value: info.rate, sub: info.rate != null ? '%' : '' },
+        ]}
+      />
+    </AcCard>
+  );
+}
+
+// triggerRows — trigger-food counts over the last `days` days (legacy 5357).
+function triggerRows(days: Record<string, Day>, n = 30): BarRow[] {
+  const trig: Record<string, number> = {};
+  const end = new Date();
+  for (let i = 0; i < n; i++) {
+    const key = keyOf(new Date(end.getFullYear(), end.getMonth(), end.getDate() - i));
+    const f = days[key] && days[key].food;
+    if (f) Object.keys(f.triggers || {}).forEach((k) => { if ((f.triggers as any)[k] > 0 && TRIGGER_TYPES[k]) trig[k] = (trig[k] || 0) + (f.triggers as any)[k]; });
+  }
+  return Object.entries(trig).map(([k, c]) => ({ name: TRIGGER_TYPES[k].label, count: c })).sort((a, b) => b.count - a.count);
+}
+
+// ===================== Streak Analytics (legacy 5374) =====================
+export function acStreakAnalytics(ctx: CardCtx): React.ReactElement | null {
+  const { days } = ctx;
+  const keys = Object.keys(days).sort();
+  if (keys.length < 3) return null;
+  const runs: number[] = [];
+  let run = 0;
+  const breaks: Record<string, number> = {};
+  let anyBreak = false;
+  const start = dateFromKey(keys[0]);
+  const end = dateFromKey(keys[keys.length - 1]);
+  for (let cd = new Date(start); cd <= end; cd.setDate(cd.getDate() + 1)) {
+    const dk = keyOf(cd);
+    const c = dayCleanliness(days, dk);
+    if (c && c.clean) run++;
+    else {
+      if (run > 0) runs.push(run);
+      run = 0;
+      if (c) {
+        anyBreak = true;
+        c.criteria.filter((cr) => !cr.pending && !cr.pass).forEach((cr) => { breaks[cr.label] = (breaks[cr.label] || 0) + 1; });
+      }
+    }
+  }
+  if (run > 0) runs.push(run);
+  const trigRows = triggerRows(days, 30);
+  if (!runs.length && !anyBreak && !trigRows.length) return null;
+  const dist: Record<string, number> = { '1–2': 0, '3–6': 0, '7–13': 0, '14+': 0 };
+  runs.forEach((r) => { dist[r <= 2 ? '1–2' : r <= 6 ? '3–6' : r <= 13 ? '7–13' : '14+']++; });
+  const histRows: BarRow[] = Object.entries(dist).filter(([, c]) => c).map(([k, c]) => ({ name: k + ' days', count: c }));
+  const breakRows: BarRow[] = Object.entries(breaks).map(([k, c]) => ({ name: k, count: c })).sort((a, b) => b.count - a.count);
+  return (
+    <AcCard title="Streak Analytics" sub="What sustains and breaks streaks">
+      {histRows.length ? <AcBlock label="Streak length distribution"><AcBars rows={histRows} /></AcBlock> : null}
+      {breakRows.length ? <AcBlock label="Most common reasons streaks break"><AcBars rows={breakRows} /></AcBlock> : null}
+      {trigRows.length ? <AcBlock label="Trigger foods"><AcBars rows={trigRows} /></AcBlock> : null}
+    </AcCard>
+  );
+}
+
+// ===================== Protocol Adherence (legacy 5397) =====================
+export function acAdherence(ctx: CardCtx): React.ReactElement | null {
+  const { days, buckets } = ctx;
+  const keyLabels: Record<string, string> = { triggers: 'No triggers', water: 'Water', dinner: 'Dinner by 5pm', meds: 'Meds', sleep: 'Sleep 7h+' };
+  const combined = buckets.map((b) => {
+    let sum = 0, n = 0;
+    b.days.forEach((dk) => {
+      const c = dayCleanliness(days, dk);
+      if (!c) return;
+      const crit = c.criteria.filter((x) => !x.pending);
+      if (!crit.length) return;
+      sum += (crit.filter((x) => x.pass).length / crit.length) * 100;
+      n++;
+    });
+    return n ? sum / n : null;
+  });
+  if (!acPresent(combined).length) return null;
+  const per: Record<string, number> = {};
+  const tot: Record<string, number> = {};
+  buckets.forEach((b) => b.days.forEach((dk) => {
+    const c = dayCleanliness(days, dk);
+    if (!c) return;
+    c.criteria.forEach((cr) => { if (cr.pending) return; tot[cr.key] = (tot[cr.key] || 0) + 1; if (cr.pass) per[cr.key] = (per[cr.key] || 0) + 1; });
+  }));
+  const stats = Object.keys(keyLabels).filter((k) => tot[k]).map((k) => ({ label: keyLabels[k], value: Math.round(((per[k] || 0) / tot[k]) * 100), sub: '%' }));
+  return (
+    <AcCard title="Protocol Adherence" sub={acRangeLabel(ctx.mode)}>
+      <AcBlock label="Combined adherence (%)">
+        <AnalysisChart buckets={buckets} series={[{ values: combined, color: '#16a34a', label: '' }]} opts={{ integer: true, target: { from: 80, to: 100, color: '#16a34a' } }} />
+      </AcBlock>
+      <AcStats items={stats} />
+    </AcCard>
+  );
+}
+
+// ===================== Recovery Phase (legacy 5576) =====================
+export function acRecoveryPhase(ctx: CardCtx): React.ReactElement | null {
+  const { days, profile, todayKey } = ctx;
+  const eps = acIllnessEpisodes(days);
+  if (!eps.length) return null;
+  const ep = eps[eps.length - 1];
+  const sinceEnd = acDayDiff(ep.end, todayKey);
+  const stillSick = sinceEnd <= 1;
+  const dur = acDayDiff(ep.start, ep.end) + 1;
+  const baseKeys = acDaysBefore(days, ep.start, 21);
+  const recentKeys = acRecentDays(days, 10).filter((k) => k > ep.end);
+  const defs: { label: string; val: (d: Day, dk: string) => number[] | number | null; goodUp: boolean; round: number }[] = [
+    { label: 'Autonomic score', val: (d, dk) => acDayScore(d, dk, profile), goodUp: true, round: 0 },
+    { label: 'Structured RMSSD', val: (d) => acReadVals(d, 'breathHrv', 'rmssd'), goodUp: true, round: 0 },
+    { label: 'Total power', val: (d) => acTotalPower(d), goodUp: true, round: 0 },
+    { label: 'LF peak', val: (d) => acReadVals(d, 'breathHrv', 'lfPeak'), goodUp: true, round: 3 },
+    { label: 'Resting HR (laying)', val: (d) => acReadVals(d, 'restingHr', 'hr', (r) => ((r as any).position || '') === 'Laying'), goodUp: false, round: 0 },
+  ];
+  const rows: CmpRow[] = [];
+  const ratios: number[] = [];
+  defs.forEach((def) => {
+    const base = acMeanOver(baseKeys, def.val, days);
+    const cur = acMeanOver(recentKeys, def.val, days);
+    if (base == null) return;
+    if (cur != null && base !== 0) ratios.push(Math.max(0, Math.min(def.goodUp ? cur / base : base / cur, 1.2)));
+    rows.push({
+      name: def.label,
+      prevText: `${fmtNum(roundTo(base, def.round))} → `,
+      curText: cur == null ? '-' : fmtNum(roundTo(cur, def.round)) || '-',
+      delta: cur != null ? (def.goodUp ? cur - base : base - cur) : null,
+      goodUp: true,
+      eps: def.round === 3 ? 0.003 : 0.5,
+    });
+  });
+  const restoration = ratios.length ? Math.round((ratios.reduce((s, x) => s + x, 0) / ratios.length) * 100) : null;
+  return (
+    <AcCard title="Recovery Phase" sub={stillSick ? 'Tracking the current illness' : 'Restoration vs your pre-illness baseline'}>
+      <AcStats
+        items={[
+          stillSick ? { label: 'Illness ongoing', value: dur, sub: 'days sick' } : { label: 'Days recovered', value: sinceEnd, sub: 'since last sick' },
+          { label: 'Episode length', value: dur, sub: 'days' },
+          restoration != null ? { label: 'Baseline restoration', value: restoration, sub: '%', color: restoration >= 95 ? '#16a34a' : restoration >= 80 ? '#84cc16' : '#f97316' } : null,
+        ]}
+      />
+      {rows.length ? <AcBlock label="Pre-illness baseline → recent"><AcCmp rows={rows} /></AcBlock> : null}
+      {!stillSick ? (
+        <AcGradeChips chips={[30, 60, 90].map((n) => ({ text: `${n}d post-illness`, active: sinceEnd >= n }))} />
+      ) : null}
+      <AcInsight
+        text={stillSick
+          ? `Illness started ${fmtShort(ep.start)} - still logging "Sick".`
+          : `Illness ran ${fmtShort(ep.start)} → ${fmtShort(ep.end)}.${eps.length > 1 ? ` ${eps.length} episodes logged.` : ''}`}
+      />
+    </AcCard>
+  );
+}
+
+// ===================== Intervention Impact (legacy 5615) =====================
+export function acInterventionImpact(ctx: CardCtx): React.ReactElement | null {
+  const { days, profile, todayKey } = ctx;
+  const keys = Object.keys(days).sort();
+  if (keys.length < 14) return null;
+  const firsts: Record<string, { date: string; label: string }> = {};
+  keys.forEach((dk) => {
+    (days[dk].meds || []).forEach((m) => { const id = 'med:' + m.type; if (!firsts[id]) firsts[id] = { date: dk, label: MED_TYPES[m.type] ? MED_TYPES[m.type].label : m.type }; });
+    (days[dk].activities || []).forEach((a) => { const id = 'act:' + a.type; if (!firsts[id]) firsts[id] = { date: dk, label: ACTIVITY_TYPES[a.type] ? ACTIVITY_TYPES[a.type].label : a.type }; });
+  });
+  const defs: { label: string; val: (d: Day, dk: string) => number[] | number | null; round: number }[] = [
+    { label: 'RMSSD', val: (d) => acReadVals(d, 'breathHrv', 'rmssd'), round: 0 },
+    { label: 'score', val: (d, dk) => acDayScore(d, dk, profile), round: 0 },
+    { label: 'LF peak', val: (d) => acReadVals(d, 'breathHrv', 'lfPeak'), round: 3 },
+    { label: 'resting HR', val: (d) => acReadVals(d, 'restingHr', 'hr', (r) => ((r as any).position || '') === 'Laying'), round: 0 },
+  ];
+  const cards: { date: string; txt: string; strength: string | null }[] = [];
+  Object.values(firsts).forEach((f) => {
+    if (acDayDiff(f.date, todayKey) < 10) return;
+    const beforeKeys = acWindowKeys(days, f.date, -21, -1);
+    const afterKeys = acWindowKeys(days, f.date, 0, 21);
+    if (beforeKeys.filter((k) => acDayScore(days[k], k, profile) != null).length < 4) return;
+    const parts: { label: string; delta: number; round: number }[] = [];
+    defs.forEach((def) => {
+      const b = acMeanOver(beforeKeys, def.val, days);
+      const a = acMeanOver(afterKeys, def.val, days);
+      if (b == null || a == null) return;
+      parts.push({ label: def.label, delta: a - b, round: def.round });
+    });
+    if (!parts.length) return;
+    const txt = `Since starting ${f.label} (${fmtShort(f.date)}): ` + parts.map((p) => `${p.label} ${p.delta >= 0 ? '+' : '−'}${fmtNum(roundTo(Math.abs(p.delta), p.round))}`).join(', ') + '.';
+    const sc = parts.find((p) => p.label === 'score');
+    cards.push({ date: f.date, txt, strength: sc ? (Math.abs(sc.delta) >= 8 ? 'strong' : Math.abs(sc.delta) >= 4 ? 'mod' : null) : null });
+  });
+  if (!cards.length) return null;
+  cards.sort((a, b) => b.date.localeCompare(a.date));
+  return (
+    <AcCard title="Intervention Impact" sub="First time you started each supplement / activity · ~3 weeks before vs after">
+      {cards.map((c, i) => <AcInsight key={i} text={c.txt} strength={c.strength} />)}
     </AcCard>
   );
 }

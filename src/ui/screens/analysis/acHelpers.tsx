@@ -6,8 +6,8 @@
 // time/period filters (isMorning/isEvening, acMinOf/acToDec, ~4612-4615).
 //
 // DOM/innerHTML construction is replaced with JSX; legacy var(--x) -> t.* tokens.
-import React from 'react';
-import { View } from 'react-native';
+import React, { useState } from 'react';
+import { View, Pressable } from 'react-native';
 import Svg, { Line, Circle, Text as SvgText } from 'react-native-svg';
 import { Box, Text } from '@ui/primitives';
 import { useTheme } from '@ui/theme/ThemeProvider';
@@ -16,7 +16,11 @@ import { SCORE_COLORS, SCORE_CATS } from '@core/scoring/colors';
 import type { AcZone } from '@ui/charts/AnalysisChart';
 import { acDayScore, acReadVals } from '@core/analytics/aggregate';
 import { sleepHours } from '@core/scoring/scoreSet';
+import { scoreCat } from '@core/scoring/colors';
+import { keyOf, dateFromKey } from '@core/date/dateUtils';
+import { dayCleanliness } from '@core/analytics/cleanliness';
 import type { Day, Profile, Reading } from '@core/types';
+import { TrendChip } from '@ui/charts/TrendChip';
 
 // ----- number formatting (legacy fmtNum, docs/index.html:3280) -----
 export const fmtNum = (v: number | null | undefined): string => {
@@ -63,6 +67,12 @@ export const avgRound = (vals: (number | null)[], dp?: number): number | null =>
   if (m == null) return null;
   const f = Math.pow(10, dp || 0);
   return Math.round(m * f) / f;
+};
+// legacy roundTo (docs/index.html:5559).
+export const roundTo = (v: number | null, dp?: number): number | null => {
+  if (v == null) return null;
+  const f = Math.pow(10, dp || 0);
+  return Math.round(v * f) / f;
 };
 
 // ----- grade zones (legacy acBandZones 4651 / acScoreZones 4657) -----
@@ -146,10 +156,12 @@ export function acDailyMetrics(days: Record<string, Day>, profile: Profile): Dai
 // (the card builders create the <AnalysisChart>/<BpBars> and any legend).
 export function AcBlock({ label, children }: { label?: string | null; children: React.ReactNode }) {
   const t = useTheme();
+  // legacy .ac-block { margin-bottom: 16px } + .ac-block-label { font-size:12;
+  // font-weight:600; color: var(--text); margin-bottom:6px }.
   return (
-    <View style={{ marginTop: 14 }}>
+    <View style={{ marginBottom: 16 }}>
       {label ? (
-        <Text style={{ fontSize: 12, fontWeight: '600', color: t.textDim, marginBottom: 4 }}>
+        <Text style={{ fontSize: 12, fontWeight: '600', color: t.text, marginBottom: 6 }}>
           {label}
         </Text>
       ) : null}
@@ -185,8 +197,34 @@ export function AcCard({
         ...t.shadow,
       }}
     >
-      <Text style={{ fontSize: 16, fontWeight: '700', color: t.text }}>{title}</Text>
-      {sub ? <Text style={{ fontSize: 12, color: t.textDim, marginTop: 2 }}>{sub}</Text> : null}
+      {/* legacy .chart-card h3 */}
+      <Text
+        style={{
+          fontSize: 13,
+          fontWeight: '700',
+          textTransform: 'uppercase',
+          letterSpacing: 0.05 * 13,
+          color: t.textDim,
+          marginBottom: sub ? 0 : 10,
+        }}
+      >
+        {title}
+      </Text>
+      {/* legacy .ac-sub { margin: -4px 0 12px } */}
+      {sub ? (
+        <Text
+          style={{
+            fontSize: 11,
+            color: t.textDim,
+            fontWeight: '600',
+            letterSpacing: 0.02 * 11,
+            marginTop: -4,
+            marginBottom: 12,
+          }}
+        >
+          {sub}
+        </Text>
+      ) : null}
       {kids}
     </Box>
   );
@@ -202,24 +240,32 @@ export function AcStats({ items }: { items: (StatItem | null | undefined | false
   const t = useTheme();
   const f = items.filter(Boolean) as StatItem[];
   if (!f.length) return null;
+  // legacy .stat-grid { grid-template-columns: repeat(2,1fr); gap: var(--gap) }
+  // inside .ac-card -> { margin-top: 4px; margin-bottom: 0 }.
   return (
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 14 }}>
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: t.gap, marginTop: 4 }}>
       {f.map((it, i) => (
         <View
           key={i}
           style={{
+            // 2-col grid: two cells per row with a t.gap (14) gutter.
             flexGrow: 1,
-            flexBasis: '45%',
-            backgroundColor: t.surface2,
-            borderRadius: t.radiusSm,
-            paddingVertical: 10,
-            paddingHorizontal: 12,
+            flexBasis: '47%',
+            backgroundColor: t.surface, // legacy .stat { background: var(--surface) }
+            borderWidth: 1,
+            borderColor: t.border,
+            borderRadius: t.radius,
+            padding: 14,
+            ...t.shadow,
           }}
         >
-          <Text style={{ fontSize: 11, color: t.textDim, marginBottom: 3 }}>{it.label}</Text>
-          <Text style={{ fontSize: 20, fontWeight: '700', color: it.color || t.text }}>
+          {/* .stat-label { font-size:12; color: var(--text-dim); font-weight:600 } */}
+          <Text style={{ fontSize: 12, color: t.textDim, fontWeight: '600' }}>{it.label}</Text>
+          {/* .stat-value { font-size:26; font-weight:700; margin-top:4 } */}
+          <Text style={{ fontSize: 26, fontWeight: '700', marginTop: 4, color: it.color || t.text }}>
             {it.value == null ? '-' : String(it.value)}
-            {it.sub ? <Text style={{ fontSize: 12, fontWeight: '400', color: t.textDim }}>{' ' + it.sub}</Text> : null}
+            {/* .stat-value small { font-size:13; color: var(--text-dim); font-weight:600 } */}
+            {it.sub ? <Text style={{ fontSize: 13, fontWeight: '600', color: t.textDim }}>{' ' + it.sub}</Text> : null}
           </Text>
         </View>
       ))}
@@ -229,19 +275,27 @@ export function AcStats({ items }: { items: (StatItem | null | undefined | false
 
 export function AcInsight({ text, strength }: { text: string; strength?: string | null }) {
   const t = useTheme();
-  const barColor = strength === 'strong' ? SCORE_COLORS.good : strength === 'mod' ? SCORE_COLORS.ok : t.accent;
+  // legacy: .ac-insight-bar default var(--accent); .s-strong -> #16a34a; .s-mod -> #eab308.
+  const barColor = strength === 'strong' ? '#16a34a' : strength === 'mod' ? '#eab308' : t.accent;
+  // legacy .ac-insight { display:flex; gap:10px; align-items:stretch;
+  // background:var(--surface-2); border-radius:var(--radius-sm);
+  // padding:10px 12px; margin-top:10px; font-size:13; line-height:1.4 }
   return (
     <View
       style={{
         flexDirection: 'row',
-        marginTop: 14,
+        alignItems: 'stretch',
+        gap: 10,
+        marginTop: 10,
         backgroundColor: t.surface2,
         borderRadius: t.radiusSm,
-        overflow: 'hidden',
+        paddingVertical: 10,
+        paddingHorizontal: 12,
       }}
     >
-      <View style={{ width: 3, backgroundColor: barColor }} />
-      <Text style={{ flex: 1, fontSize: 13, color: t.text, padding: 10, lineHeight: 18 }}>{text}</Text>
+      {/* .ac-insight-bar { width:3px; border-radius:2px } */}
+      <View style={{ width: 3, borderRadius: 2, backgroundColor: barColor }} />
+      <Text style={{ flex: 1, fontSize: 13, color: t.text, lineHeight: 13 * 1.4 }}>{text}</Text>
     </View>
   );
 }
@@ -255,24 +309,41 @@ export function AcBars({ rows, fmt }: { rows: BarRow[]; fmt?: (c: number) => str
   const t = useTheme();
   if (!rows.length) return null;
   const max = Math.max(...rows.map((r) => r.count)) || 1;
+  // legacy .ac-bars { margin-top:4px } wrapping .freq-row items.
   return (
-    <View style={{ marginTop: 4, gap: 6 }}>
+    <View style={{ marginTop: 4 }}>
       {rows.map((r, i) => (
-        <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Text style={{ width: 110, fontSize: 12, color: t.text }} numberOfLines={1}>
+        // .freq-row { display:flex; align-items:center; gap:10px; padding:8px 0;
+        //   border-top:1px solid var(--border) }  (first-child: no border-top)
+        <View
+          key={i}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 10,
+            paddingVertical: 8,
+            borderTopWidth: i === 0 ? 0 : 1,
+            borderTopColor: t.border,
+          }}
+        >
+          {/* .freq-name { width:38%; font-size:14 } */}
+          <Text style={{ width: '38%', fontSize: 14, color: t.text }} numberOfLines={1}>
             {r.name}
           </Text>
-          <View style={{ flex: 1, height: 8, backgroundColor: t.surface2, borderRadius: 4, overflow: 'hidden' }}>
+          {/* .freq-bar-wrap { flex:1; height:8px; background:surface-2; border-radius:999px } */}
+          <View style={{ flex: 1, height: 8, backgroundColor: t.surface2, borderRadius: 999, overflow: 'hidden' }}>
+            {/* .freq-bar { height:100%; background:accent; border-radius:999px } */}
             <View
               style={{
                 width: `${(r.count / max) * 100}%`,
-                height: 8,
+                height: '100%',
                 backgroundColor: r.color || t.accent,
-                borderRadius: 4,
+                borderRadius: 999,
               }}
             />
           </View>
-          <Text style={{ width: 44, textAlign: 'right', fontSize: 12, color: t.textDim }}>
+          {/* .freq-count { width:28px; text-align:right; font-weight:600; font-size:14 } */}
+          <Text style={{ width: 28, textAlign: 'right', fontSize: 14, fontWeight: '600', color: t.text }}>
             {fmt ? fmt(r.count) : String(r.count)}
           </Text>
         </View>
@@ -377,6 +448,276 @@ export function AcScatter({ points, xlabel, ylabel }: { points: ScatterPoint[]; 
           ))}
         </View>
       ) : null}
+    </View>
+  );
+}
+
+// acStackBars legend (legacy .ac-legend/.ac-leg/.ac-dot, CSS 1065-1067).
+export function AcStackLegend({ items }: { items: { label: string; color: string }[] }) {
+  const t = useTheme();
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 8 }}>
+      {items.map((it) => (
+        <View key={it.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+          <View style={{ width: 9, height: 9, borderRadius: 999, backgroundColor: it.color }} />
+          <Text style={{ fontSize: 11, color: t.textDim }}>{it.label}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+// =================== Comparison rows (legacy .ac-cmp/.ac-cmp-row, CSS 1130-1135) ===================
+export interface CmpRow {
+  name: string;
+  prevText: string; // e.g. "12.3 → "
+  curText: string; // e.g. "14.5 (best 18.2)"
+  delta: number | null;
+  goodUp?: boolean;
+  eps?: number;
+}
+export function AcCmp({ rows }: { rows: CmpRow[] }) {
+  const t = useTheme();
+  return (
+    <View>
+      {rows.map((r, i) => (
+        <View
+          key={i}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 10,
+            paddingVertical: 9,
+            borderTopWidth: i === 0 ? 0 : 1,
+            borderTopColor: t.border,
+          }}
+        >
+          {/* .ac-cmp-name { font-size:13 } — 1fr */}
+          <Text style={{ flex: 1, fontSize: 13, color: t.text }}>{r.name}</Text>
+          {/* .ac-cmp-vals { font-weight:600; font-size:13; text-align:right } — auto */}
+          <Text style={{ fontSize: 13, fontWeight: '600', color: t.text, textAlign: 'right' }}>
+            <Text style={{ color: t.textDim, fontWeight: '500' }}>{r.prevText}</Text>
+            {r.curText}
+          </Text>
+          {/* .ac-trend — auto */}
+          {r.delta != null ? (
+            <TrendChip delta={r.delta} opts={{ goodUp: r.goodUp !== false, eps: r.eps }} />
+          ) : (
+            <View />
+          )}
+        </View>
+      ))}
+    </View>
+  );
+}
+
+// =================== Calendar heat map (legacy acHeatMapCard, .ac-heat*, CSS 1139-1145) ===================
+export interface HeatDay {
+  dk: string;
+  score: number | null;
+  color: string | null;
+  short: string | null;
+  clean: boolean;
+}
+export function AcHeatMap({
+  days,
+  profile,
+  nDays,
+  fmtShort,
+}: {
+  days: Record<string, Day>;
+  profile: Profile;
+  nDays: number;
+  fmtShort: (dk: string) => string;
+}) {
+  const t = useTheme();
+  const [sel, setSel] = useState<string | null>(null);
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const start = new Date(today);
+  start.setDate(today.getDate() - (nDays - 1));
+  start.setDate(start.getDate() - start.getDay());
+
+  const cells: HeatDay[] = [];
+  let any = false;
+  for (let dt = new Date(start); dt <= today; dt.setDate(dt.getDate() + 1)) {
+    const dk = keyOf(dt);
+    const d = days[dk];
+    let sc: number | null = null;
+    let color: string | null = null;
+    let short: string | null = null;
+    let clean = false;
+    if (d) {
+      sc = acDayScore(d, dk, profile);
+      if (sc != null) { const cat = scoreCat(sc); color = cat.color; short = cat.short; any = true; }
+      const cl = dayCleanliness(days, dk);
+      if (cl && cl.clean) clean = true;
+    }
+    cells.push({ dk, score: sc, color, short, clean });
+  }
+  if (!any) return null;
+
+  const swatches = [...SCORE_CATS].sort((a, b) => a.min - b.min);
+  const selCell = sel ? cells.find((c) => c.dk === sel) : null;
+
+  return (
+    <View>
+      {/* .ac-heat { grid 7 cols, gap 4 } */}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 4 }}>
+        {cells.map((c) => {
+          const isSel = c.dk === sel;
+          return (
+            <View key={c.dk} style={{ width: `${100 / 7}%`, padding: 2 }}>
+              <Pressable
+                onPress={() => setSel(c.dk)}
+                accessibilityRole="button"
+                accessibilityLabel={c.short ? `${c.dk}: ${c.score} ${c.short}` : c.dk}
+                style={{
+                  aspectRatio: 1,
+                  borderRadius: 4,
+                  backgroundColor: c.color || t.surface2,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderWidth: isSel ? 2 : 0,
+                  borderColor: t.text,
+                }}
+              >
+                {/* .ac-heat-cell.clean::after — centered ring */}
+                {c.clean ? (
+                  <View
+                    style={{
+                      width: '40%',
+                      height: '40%',
+                      borderRadius: 999,
+                      borderWidth: 1.5,
+                      borderColor: 'rgba(255,255,255,0.85)',
+                    }}
+                  />
+                ) : null}
+              </Pressable>
+            </View>
+          );
+        })}
+      </View>
+      {/* .ac-heat-readout */}
+      <Text style={{ marginTop: 9, textAlign: 'right', fontSize: 13, fontWeight: '700', minHeight: 18 }}>
+        {selCell == null ? (
+          <Text style={{ color: t.textDim, fontWeight: '600' }}>Tap a day for its score</Text>
+        ) : selCell.score == null ? (
+          <Text style={{ color: t.text }}>
+            {fmtShort(selCell.dk)} · <Text style={{ color: t.textDim, fontWeight: '600' }}>no score</Text>
+          </Text>
+        ) : (
+          <Text style={{ color: t.text }}>
+            {fmtShort(selCell.dk)} · <Text style={{ color: selCell.color || t.text }}>{`${selCell.score} ${selCell.short}`}</Text>
+          </Text>
+        )}
+      </Text>
+      {/* .ac-heat-legend: Crash [swatches] Excellent */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 10 }}>
+        <Text style={{ fontSize: 11, color: t.textDim }}>Crash</Text>
+        {swatches.map((c) => (
+          <View key={c.short} style={{ width: 11, height: 11, borderRadius: 3, backgroundColor: c.color }} />
+        ))}
+        <Text style={{ fontSize: 11, color: t.textDim }}>Excellent</Text>
+      </View>
+      {/* ring legend */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 10 }}>
+        <View style={{ width: 14, height: 14, borderRadius: 4, backgroundColor: t.surface2, alignItems: 'center', justifyContent: 'center' }}>
+          <View style={{ width: '40%', height: '40%', borderRadius: 999, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.85)' }} />
+        </View>
+        <Text style={{ fontSize: 11, color: t.textDim }}>ring = clean day</Text>
+      </View>
+    </View>
+  );
+}
+
+// =================== Extreme event log (legacy .ac-events/.ac-event*, CSS 1164-1169) ===================
+export interface EventRow {
+  dk: string;
+  tag: string;
+  color: string;
+  body: string;
+}
+export function AcEvents({ events, fmtShort }: { events: EventRow[]; fmtShort: (dk: string) => string }) {
+  const t = useTheme();
+  return (
+    <View>
+      {events.map((e, i) => (
+        <View
+          key={i}
+          style={{
+            flexDirection: 'row',
+            gap: 10,
+            paddingVertical: 9,
+            borderTopWidth: i === 0 ? 0 : 1,
+            borderTopColor: t.border,
+            alignItems: 'baseline',
+          }}
+        >
+          {/* .ac-event-date */}
+          <Text style={{ fontSize: 12, color: t.textDim }}>{fmtShort(e.dk)}</Text>
+          {/* .ac-event-body */}
+          <Text style={{ flex: 1, fontSize: 13, color: t.text }}>
+            <Text
+              style={{
+                fontSize: 11,
+                fontWeight: '700',
+                color: '#fff',
+                backgroundColor: e.color,
+                borderRadius: 999,
+                overflow: 'hidden',
+                paddingHorizontal: 7,
+                paddingVertical: 1,
+              }}
+            >
+              {e.tag}
+            </Text>
+            {'  ' + e.body}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+// =================== Streak hero + grade chips (legacy .ac-streak-big / .ac-grades) ===================
+export function AcStreakBig({ num, cap, tier }: { num: number; cap: string; tier: string }) {
+  const t = useTheme();
+  return (
+    <View style={{ alignItems: 'center', paddingTop: 8, paddingBottom: 6 }}>
+      <Text style={{ fontSize: 56, fontWeight: '800', lineHeight: 56, color: t.accent }}>{String(num)}</Text>
+      <Text style={{ fontSize: 13, color: t.textDim, marginTop: 4, fontWeight: '600' }}>{cap}</Text>
+      <Text style={{ fontSize: 15, fontWeight: '700', marginTop: 8, color: t.text }}>{tier}</Text>
+    </View>
+  );
+}
+
+// .ac-grades row of inset-bordered chips (used by Recovery Phase post-illness markers).
+export function AcGradeChips({ chips }: { chips: { text: string; active: boolean }[] }) {
+  const t = useTheme();
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+      {chips.map((c, i) => (
+        <View
+          key={i}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 4,
+            paddingVertical: 3,
+            paddingRight: 9,
+            paddingLeft: 7,
+            borderRadius: 7,
+            backgroundColor: t.surface2,
+            borderLeftWidth: 3,
+            borderLeftColor: c.active ? '#16a34a' : t.border,
+          }}
+        >
+          <Text style={{ fontSize: 12, fontWeight: '600', color: t.text }}>{(c.active ? '✓ ' : '') + c.text}</Text>
+        </View>
+      ))}
     </View>
   );
 }
