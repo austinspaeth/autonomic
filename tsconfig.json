@@ -3,16 +3,26 @@
   "compilerOptions": {
     "strict": true,
     "paths": {
-      "@core/*": ["./src/core/*"],
-      "@data/*": ["./src/data/*"],
-      "@ui/*": ["./src/ui/*"]
+      "@core/*": [
+        "./src/core/*"
+      ],
+      "@data/*": [
+        "./src/data/*"
+      ],
+      "@ui/*": [
+        "./src/ui/*"
+      ]
     }
   },
   "include": [
     "**/*.ts",
-    "**/*.tsx",
-    ".expo/types/**/*.ts",
-    "expo-env.d.ts"
+    "**/*.tsx"
   ],
-  "exclude": ["node_modules", "docs", "landing", "ios", "android"]
+  "exclude": [
+    "node_modules",
+    "docs",
+    "landing",
+    "ios",
+    "android"
+  ]
 }

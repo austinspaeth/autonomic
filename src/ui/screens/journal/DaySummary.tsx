@@ -18,7 +18,8 @@
 //     local collapsible React components (compAccordion).
 //   - hexA (rgba-with-alpha) is reimplemented locally for the tinted hero.
 import React, { useState } from 'react';
-import { View, ScrollView } from 'react-native';
+import { View, ScrollView, StyleSheet } from 'react-native';
+import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import type { Day, DateKey, Profile, Reading, ScoreCategory } from '@core/types';
 import {
   scoreSet,
@@ -386,23 +387,9 @@ export function DaySummary({ dateKey }: { dateKey: DateKey }) {
 
   const hasScore = all.score != null && all.confidence >= 40;
 
+  const borderColor = hasScore ? scoreCat(all.score!).color : t.border;
   return (
-    <Box
-      style={[
-        {
-          backgroundColor: t.surface,
-          borderWidth: 1,
-          borderColor: t.border,
-          borderRadius: t.radius,
-          marginBottom: t.gap,
-          overflow: 'hidden',
-          ...t.shadow,
-        },
-        hasScore && {
-          borderColor: hexA(scoreCat(all.score!).color, 0.5),
-        },
-      ]}
-    >
+    <GradientBorderCard color={borderColor} t={t}>
       <Hero
         all={all}
         readings={readings}
@@ -416,7 +403,41 @@ export function DaySummary({ dateKey }: { dateKey: DateKey }) {
         t={t}
       />
       <Streak repo={repo} dateKey={dateKey} t={t} />
-    </Box>
+    </GradientBorderCard>
+  );
+}
+
+// Gradient border that follows the radius (legacy daycard padding-box/border-box
+// trick, docs/index.html:2287-2290): a status-color glow at the top-left fading
+// down into the normal border. RN has no gradient borders, so a gradient-filled
+// rounded layer sits behind an opaque inner card inset by 1px, leaving a 1px ring.
+function GradientBorderCard({
+  color,
+  t,
+  children,
+}: {
+  color: string;
+  t: Tokens;
+  children: React.ReactNode;
+}) {
+  return (
+    <View
+      style={{ borderRadius: t.radius, marginBottom: t.gap, overflow: 'hidden', ...t.shadow }}
+    >
+      <Svg style={StyleSheet.absoluteFill} width="100%" height="100%" viewBox="0 0 1 1" preserveAspectRatio="none">
+        <Defs>
+          <LinearGradient id="daycardBorder" gradientUnits="userSpaceOnUse" x1={0} y1={0} x2={0.32} y2={1}>
+            <Stop offset="0" stopColor={color} stopOpacity={1} />
+            <Stop offset="0.14" stopColor={color} stopOpacity={0.4} />
+            <Stop offset="1" stopColor={t.border} stopOpacity={1} />
+          </LinearGradient>
+        </Defs>
+        <Rect x={0} y={0} width={1} height={1} fill="url(#daycardBorder)" />
+      </Svg>
+      <View style={{ margin: 1, borderRadius: t.radius - 1, overflow: 'hidden', backgroundColor: t.surface }}>
+        {children}
+      </View>
+    </View>
   );
 }
 
