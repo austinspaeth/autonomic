@@ -1,5 +1,18 @@
 import React, { useEffect } from 'react';
+import { Text as RNText, TextInput as RNTextInput } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+
+// Match the original web app's fixed sizing: disable OS Dynamic Type scaling
+// app-wide so the native app renders at the same scale as the web PWA.
+type Scalable = { defaultProps?: { allowFontScaling?: boolean } };
+(RNText as unknown as Scalable).defaultProps = {
+  ...(RNText as unknown as Scalable).defaultProps,
+  allowFontScaling: false,
+};
+(RNTextInput as unknown as Scalable).defaultProps = {
+  ...(RNTextInput as unknown as Scalable).defaultProps,
+  allowFontScaling: false,
+};
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { ThemeProvider, useThemeContext } from '@ui/theme/ThemeProvider';

@@ -16,6 +16,9 @@ export const Text = React.forwardRef<RNText, TextProps>(function Text(
   return (
     <RNText
       ref={ref}
+      // Match the web app's fixed px sizing — don't scale with the OS Dynamic
+      // Type setting (the original web PWA ignores it).
+      allowFontScaling={false}
       style={[{ color: t.text, fontSize: 16 }, webFont, style]}
       {...rest}
     />

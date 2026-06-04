@@ -558,11 +558,21 @@ function Hero({
           style={{
             backgroundColor: cat.color,
             borderRadius: 999,
-            paddingVertical: 3,
+            paddingVertical: 4,
             paddingHorizontal: 11,
           }}
         >
-          <Text style={{ color: '#fff', fontSize: 12.5, fontWeight: '700' }}>{cat.short}</Text>
+          <Text
+            style={{
+              color: '#fff',
+              fontSize: 11,
+              fontWeight: '800',
+              textTransform: 'uppercase',
+              letterSpacing: 0.33,
+            }}
+          >
+            {cat.short}
+          </Text>
         </View>
       </View>
 

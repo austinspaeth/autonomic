@@ -25,6 +25,7 @@ export function AppInput(props: TextInputProps) {
   return (
     <TextInput
       placeholderTextColor={t.textDim}
+      allowFontScaling={false}
       {...props}
       style={[
         {
