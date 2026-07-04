@@ -1,0 +1,51 @@
+{
+  "expo": {
+    "name": "Autonomic",
+    "slug": "autonomic",
+    "version": "1.0.0",
+    "scheme": "autonomic",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "backgroundColor": "#000000"
+    },
+    "ios": {
+      "bundleIdentifier": "com.autonomic.journal",
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSBluetoothAlwaysUsageDescription": "Autonomic connects to your heart-rate chest strap to capture beat-to-beat data during HRV readings.",
+        "NSHealthShareUsageDescription": "Autonomic reads heart rate, HRV, sleep, blood pressure, blood oxygen and weight from Apple Health to prefill your journal.",
+        "NSHealthUpdateUsageDescription": "Autonomic can write your captured HRV readings, mindful minutes, weight, blood pressure and blood oxygen back to Apple Health.",
+        "UIBackgroundModes": ["bluetooth-central"]
+      },
+      "entitlements": {
+        "com.apple.developer.healthkit": true,
+        "com.apple.developer.healthkit.background-delivery": true
+      }
+    },
+    "android": {
+      "package": "com.autonomic.journal",
+      "permissions": [
+        "android.permission.BLUETOOTH_SCAN",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "react-native-ble-plx",
+        {
+          "isBackgroundEnabled": true,
+          "modes": ["central"],
+          "bluetoothAlwaysPermission": "Autonomic connects to your heart-rate chest strap to capture beat-to-beat data during HRV readings."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": false
+    }
+  }
+}
