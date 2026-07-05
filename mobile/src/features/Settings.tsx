@@ -38,7 +38,8 @@ export function MenuSheet({ controls }: { controls: SheetControls }) {
   const m = state.meta || {};
   return (
     <View>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, paddingTop: 16, paddingBottom: 22 }}>
+      {/* Full-bleed near-black header band (negative margins escape the sheet's 18px padding). */}
+      <View style={{ marginHorizontal: -18, marginTop: -8, marginBottom: 16, paddingVertical: 24, paddingHorizontal: 18, backgroundColor: '#08080a', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 }}>
         <BrandMark size={26} />
         <Text style={{ fontSize: 22, fontWeight: '800', color: p.text, letterSpacing: -0.3 }}>Autonomic</Text>
       </View>

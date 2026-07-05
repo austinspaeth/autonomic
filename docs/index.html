@@ -1004,41 +1004,35 @@
     font-size: 11px; color: var(--text-dim); margin: -4px 0 12px;
     font-weight: 600; letter-spacing: .02em;
   }
-  /* Analysis category navigation: a 3-per-row card grid that slides out to the
-     left as the chosen category's content slides in from the right. */
-  /* overflow-x: clip (not hidden) clips the horizontal category slide without
-     establishing a scroll container, so the sticky detail head below can pin to
-     the viewport as you scroll. */
-  .ac-nav { overflow-x: clip; overflow-y: visible; }
-  .ac-track { display: flex; width: 200%; transform: translateX(0); transition: transform .32s ease, height .32s ease; }
-  .ac-track.show-detail { transform: translateX(-50%); }
-  .ac-track.no-anim { transition: none; }
-  .ac-cat-grid, .ac-cat-detail { width: 50%; flex: 0 0 50%; align-self: flex-start; }
-  .ac-cat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; align-content: start; }
+  /* Analysis: a 3-per-row card grid that acts as a jump menu, followed by every
+     category rendered inline as one long document. Each section's header sticks
+     just beneath the top bar and is pushed out of view by the next section's
+     header as you scroll past it. */
+  .ac-cat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; align-content: start; margin-bottom: 22px; }
   .ac-cat-card {
     display: flex; flex-direction: column; align-items: flex-start; gap: 7px;
     background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
     padding: 13px 12px; cursor: pointer; box-shadow: var(--shadow);
     text-align: left; font-family: inherit; color: var(--text);
+    transition: border-color .2s ease, background .2s ease;
   }
   .ac-cat-card:active { background: var(--surface-2); }
+  .ac-cat-card.active { border-color: var(--accent); }
   .ac-cat-ic { color: var(--accent); }
   .ac-cat-ic svg { width: 24px; height: 24px; display: block; }
   .ac-cat-title { font-size: 13px; font-weight: 700; line-height: 1.15; }
   .ac-cat-desc { font-size: 11px; color: var(--text-dim); line-height: 1.3; }
-  /* Sticks just beneath the top bar as the category content scrolls under it.
-     --topbar-h is measured in JS so it tracks the safe-area inset. */
-  .ac-detail-head {
-    display: flex; align-items: center; gap: 8px;
+  /* One category. scroll-margin-top lands the sticky header just below the top
+     bar when scrolled to from a jump card. --topbar-h is measured in JS. */
+  .ac-sec { scroll-margin-top: var(--topbar-h, 56px); }
+  .ac-sec-head {
     position: sticky; top: var(--topbar-h, 56px); z-index: 10;
     padding: 8px 0 10px; margin-bottom: 6px;
+    font-size: 18px; font-weight: 700;
     background: var(--bg-glass);
     -webkit-backdrop-filter: blur(18px) saturate(170%);
     backdrop-filter: blur(18px) saturate(170%);
   }
-  .ac-back-btn { flex: none; margin-left: -8px; }
-  .ac-back-btn svg { width: 22px; height: 22px; display: block; }
-  .ac-detail-title { font-size: 18px; font-weight: 700; }
   .ac-block { margin-bottom: 16px; }
   .ac-block:last-child { margin-bottom: 0; }
   .ac-block-label { font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
@@ -1776,8 +1770,8 @@
     let state = load();
     let currentKey = keyOf(new Date());
     let analysisMode = "day"; // day | week | month | year
-    let analysisCat = null;   // open Analysis category id, or null for the card grid
-    let analysisEls = null;   // refs to the current Analysis nav panels (for sliding)
+    let analysisCat = null;        // last-visited Analysis category id (restores scroll on re-render)
+    let analysisObserver = null;   // IntersectionObserver tracking the pinned section header
     let reportRange = "week"; // AI Insights time range: "day" | "week" | "month"
     const reportSelected = new Set(); // ids of report cards chosen for the combined prompt
 
@@ -6124,45 +6118,58 @@
           sections: [() => acMeds(buckets)] },
       ];
 
-      const grid = el("div.ac-cat-grid", {}, CATS.map((c) =>
-        el("button.ac-cat-card", { type: "button", onclick: () => openCat(c.id) }, [
+      // Jump menu: tapping a card scrolls to that category's section below.
+      const cards = {};
+      const grid = el("div.ac-cat-grid", {}, CATS.map((c) => {
+        const card = el("button.ac-cat-card", { type: "button", onclick: () => scrollToSection(c.id) }, [
           el("span.ac-cat-ic", { html: c.icon }),
           el("span.ac-cat-title", { text: c.title }),
           el("span.ac-cat-desc", { text: c.desc }),
-        ])));
-      const detail = el("div.ac-cat-detail");
-      const track = el("div.ac-track", {}, [grid, detail]);
-      root.appendChild(el("div.ac-nav", {}, [track]));
-      analysisEls = { track, detail, cats: CATS, safe };
+        ]);
+        cards[c.id] = card;
+        return card;
+      }));
+      root.appendChild(grid);
 
-      function buildDetail(catId, animate) {
-        const cat = CATS.find((c) => c.id === catId); if (!cat) return;
-        detail.innerHTML = "";
-        detail.appendChild(el("div.ac-detail-head", {}, [
-          el("button.icon-btn.ac-back-btn", { type: "button", html: ICONS.arrowLeft, "aria-label": "Back to categories", onclick: goBack }),
-          el("div.ac-detail-title", { text: cat.title }),
-        ]));
+      // Every category rendered inline as one long document. Each gets a sticky
+      // header that the next section pushes out of view as you scroll past it.
+      const sections = {};
+      CATS.forEach((cat) => {
+        const body = el("div.ac-sec-body");
         const built = cat.sections.map(safe).filter(Boolean);
-        if (built.length) built.forEach((c) => detail.appendChild(c));
-        else detail.appendChild(el("div.chart-empty", { text: "No data logged yet for this category." }));
-        analysisCat = catId;
-        if (animate) {
-          requestAnimationFrame(() => track.classList.add("show-detail"));
-        } else {
-          track.classList.add("no-anim", "show-detail");
-          requestAnimationFrame(() => { void track.offsetWidth; track.classList.remove("no-anim"); });
-        }
-      }
-      function openCat(catId) { buildDetail(catId, true); }
-      function goBack() {
-        analysisCat = null;
-        track.classList.remove("show-detail");
-        setTimeout(() => { if (!analysisCat) detail.innerHTML = ""; }, 340);
+        if (built.length) built.forEach((c) => body.appendChild(c));
+        else body.appendChild(el("div.chart-empty", { text: "No data logged yet for this category." }));
+        const sec = el("section.ac-sec", { id: "ac-sec-" + cat.id }, [
+          el("div.ac-sec-head", { text: cat.title }),
+          body,
+        ]);
+        sections[cat.id] = sec;
+        root.appendChild(sec);
+      });
+
+      function scrollToSection(catId) {
+        const sec = sections[catId];
+        if (sec) { analysisCat = catId; sec.scrollIntoView({ behavior: "smooth", block: "start" }); }
       }
 
-      // Re-entering the same category after a range/view change keeps you in place.
-      if (analysisCat && CATS.some((c) => c.id === analysisCat)) buildDetail(analysisCat, false);
-      else analysisCat = null;
+      // Highlight the jump card for whichever section header is currently pinned,
+      // and remember it so a range/view change can restore your place.
+      if (analysisObserver) analysisObserver.disconnect();
+      analysisObserver = new IntersectionObserver((entries) => {
+        entries.forEach((e) => {
+          if (!e.isIntersecting) return;
+          const id = e.target.parentElement.id.replace("ac-sec-", "");
+          analysisCat = id;
+          Object.keys(cards).forEach((k) => cards[k].classList.toggle("active", k === id));
+        });
+      }, { rootMargin: `-${(getComputedStyle(document.documentElement).getPropertyValue("--topbar-h") || "56px").trim()} 0px -70% 0px` });
+      CATS.forEach((cat) => analysisObserver.observe(sections[cat.id].querySelector(".ac-sec-head")));
+
+      // Re-entering after a range/view change keeps you at the same category.
+      if (analysisCat && sections[analysisCat]) {
+        const sec = sections[analysisCat];
+        requestAnimationFrame(() => sec.scrollIntoView({ block: "start" }));
+      }
     }
 
     /* ---------------- AI Insights (Reports) ----------------
