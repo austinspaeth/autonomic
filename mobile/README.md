@@ -111,6 +111,21 @@ Welch FFT frequency-domain → coherence), fills the **same field keys a typed-i
 reading uses**, and shows the results screen (hero autonomic score, VLF/LF/HF
 power bar + peaks, HR-over-time tachogram, graded metric rows with sparklines).
 
+**Signal quality:** every RR interval that deviates from a local moving median
+(or falls outside 30–200 bpm) is flagged and interpolated; the reading reports an
+**artifact %** and refuses to grade above ~30% (with a live "adjust the strap"
+hint and a red progress ring during capture) rather than produce fake numbers.
+
+**Which fields it computes:** SDNN, RMSSD, pNN50, mean RR, HR/avg HR, CV, mode,
+AMo50, MxDMn, Baevsky stress index, **PNS & SNS indices** (Poincaré SD1/SD2 +
+z-score composites against healthy-adult norms — see `NORM` in `src/lib/hrv`),
+VLF/LF/HF power, LF & HF peaks, coherence, and LF/HF (derived at render). Every
+fill-in-the-blank field on the manual form is auto-filled **except physiological
+age**, which is a device-proprietary estimate not derivable from a 5-minute RR
+series and is left blank. The PNS/SNS composites are Kubios-style approximations;
+they track vagal/sympathetic balance but may not match a specific device's
+proprietary calibration to the decimal.
+
 ## Data model & import/export
 
 One JSON object persisted under `autonomic.journal.v1` (MMKV). Shape matches the

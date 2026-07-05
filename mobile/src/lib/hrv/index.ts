@@ -73,7 +73,27 @@ export interface TimeDomain {
   amo50: number;
   mxdmn: number; // seconds
   stressIndex: number;
+  sd1: number; // Poincaré short-term (ms)
+  sd2: number; // Poincaré long-term (ms)
+  pns: number; // parasympathetic index (z-score composite)
+  sns: number; // sympathetic index (z-score composite)
 }
+
+/**
+ * Generic healthy-adult resting reference means/SDs used to normalize the
+ * PNS/SNS composites. These are Kubios-style indices (a z-score blend of
+ * vagal / sympathetic markers) built from population norms — they approximate
+ * a device's PNS/SNS and are NOT guaranteed to match a specific device's
+ * proprietary calibration to the decimal.
+ */
+const NORM = {
+  meanRr: { m: 900, s: 110 },
+  rmssd: { m: 42, s: 20 },
+  sd1: { m: 30, s: 14 },
+  hr: { m: 67, s: 10 },
+  si: { m: 90, s: 45 }, // Baevsky stress index
+};
+const z = (x: number, ref: { m: number; s: number }) => (x - ref.m) / ref.s;
 
 export function timeDomain(rr: number[]): TimeDomain | null {
   const n = rr.length;
@@ -105,7 +125,16 @@ export function timeDomain(rr: number[]): TimeDomain | null {
   const moSec = mode / 1000;
   const stressIndex = moSec > 0 && mxdmn > 0 ? amo50 / (2 * moSec * mxdmn) : 0;
 
-  return { meanRr, hr, sdnn, rmssd, pnn50, cv, mode, amo50, mxdmn, stressIndex };
+  // Poincaré descriptors: SD1 (short-term, vagal) and SD2 (long-term).
+  const sd1 = rmssd / Math.SQRT2;
+  const sd2 = Math.sqrt(Math.max(0, 2 * sdnn * sdnn - sd1 * sd1));
+
+  // PNS (parasympathetic): higher mean RR, RMSSD and SD1 all raise it.
+  const pns = (z(meanRr, NORM.meanRr) + z(rmssd, NORM.rmssd) + z(sd1, NORM.sd1)) / 3;
+  // SNS (sympathetic): higher HR and stress index raise it; higher RMSSD lowers it.
+  const sns = (z(hr, NORM.hr) + z(stressIndex, NORM.si) - z(rmssd, NORM.rmssd)) / 3;
+
+  return { meanRr, hr, sdnn, rmssd, pnn50, cv, mode, amo50, mxdmn, stressIndex, sd1, sd2, pns, sns };
 }
 
 /* ---------- frequency-domain (Welch PSD over a 4 Hz resampled tachogram) ---------- */
@@ -252,6 +281,8 @@ export function computeHrv(rrRaw: number[], opts: { style?: string; maxArtifactP
     amo50: r0(time.amo50).toString(),
     mxdmn: r3(time.mxdmn).toString(),
     stressIndex: r0(time.stressIndex).toString(),
+    pns: Number(time.pns.toFixed(1)).toString(),
+    sns: Number(time.sns.toFixed(1)).toString(),
     vlowPower: r0(freq.vlowPower).toString(),
     lowPower: r0(freq.lowPower).toString(),
     highPower: r0(freq.highPower).toString(),

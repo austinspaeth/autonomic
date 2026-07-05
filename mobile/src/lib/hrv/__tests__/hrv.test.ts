@@ -66,6 +66,20 @@ describe('time domain on the fixture', () => {
     expect(td.mxdmn).toBeGreaterThan(0);
     expect(td.mxdmn).toBeLessThan(0.5);
   });
+  it('Poincaré SD1 = RMSSD/√2 and SD2 is real', () => {
+    expect(td.sd1).toBeCloseTo(td.rmssd / Math.SQRT2, 5);
+    expect(td.sd2).toBeGreaterThan(0);
+    expect(Number.isNaN(td.sd2)).toBe(false);
+  });
+  it('PNS/SNS composites are finite and move in opposite directions with vagal tone', () => {
+    expect(Number.isFinite(td.pns)).toBe(true);
+    expect(Number.isFinite(td.sns)).toBe(true);
+    // A high-RMSSD (vagal) series should read more parasympathetic than a low one.
+    const calm = timeDomain(new Array(120).fill(0).map((_, i) => 950 + 40 * Math.sin(i)))!;
+    const tense = timeDomain(new Array(120).fill(0).map((_, i) => 650 + 6 * Math.sin(i)))!;
+    expect(calm.pns).toBeGreaterThan(tense.pns);
+    expect(calm.sns).toBeLessThan(tense.sns);
+  });
 });
 
 describe('frequency domain on the fixture', () => {
@@ -112,6 +126,14 @@ describe('computeHrv end to end', () => {
     expect(Number(res.fields.hfPeak)).toBeGreaterThan(0.15);
     // fields are strings (PWA-compatible)
     expect(typeof res.fields.sdnn).toBe('string');
+  });
+  it('fills every manual number field except device-proprietary ones', () => {
+    // Auto-computed unstructured/breathing HRV fields:
+    ['sdnn', 'rmssd', 'pnn50', 'meanRr', 'hr', 'avgHr', 'cv', 'mode', 'amo50', 'mxdmn',
+      'stressIndex', 'pns', 'sns', 'vlowPower', 'lowPower', 'highPower', 'lfPeak', 'hfPeak', 'coherence']
+      .forEach((k) => expect(res.fields[k]).toBeDefined());
+    // "age" (physiological age) is a device estimate, not derivable from RR — left blank.
+    expect(res.fields.age).toBeUndefined();
   });
   it('rejects an all-noise series gracefully', () => {
     const noise = Array.from({ length: 200 }, (_, i) => (i % 2 ? 400 : 1500));
