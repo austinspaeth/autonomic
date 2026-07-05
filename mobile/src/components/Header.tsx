@@ -8,7 +8,7 @@
  * black) over the content — z-index below the nav bar, which the Tabs navigator
  * renders in its own layer above every screen. */
 import React, { useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { NativeScrollEvent, NativeSyntheticEvent, ScrollView, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 import Svg, { Defs, LinearGradient as SvgGradient, Rect, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -58,12 +58,20 @@ export function Screen({
   children,
   contentPadding = 16,
   bottomPad = 120,
+  scrollRef,
+  onScroll,
+  scrollEventThrottle,
+  onHeaderHeight,
 }: {
   header?: React.ReactNode;
   footer?: React.ReactNode;
   children: React.ReactNode;
   contentPadding?: number;
   bottomPad?: number;
+  scrollRef?: React.Ref<ScrollView>;
+  onScroll?: (e: NativeSyntheticEvent<NativeScrollEvent>) => void;
+  scrollEventThrottle?: number;
+  onHeaderHeight?: (h: number) => void;
 }) {
   const p = usePalette();
   const insets = useSafeAreaInsets();
@@ -73,6 +81,9 @@ export function Screen({
   return (
     <View style={{ flex: 1, backgroundColor: p.bg }}>
       <ScrollView
+        ref={scrollRef}
+        onScroll={onScroll}
+        scrollEventThrottle={scrollEventThrottle ?? 16}
         contentContainerStyle={{ paddingTop: headerH + contentPadding, paddingHorizontal: contentPadding, paddingBottom: bottomPad }}
         showsVerticalScrollIndicator={false}
       >
@@ -80,7 +91,7 @@ export function Screen({
       </ScrollView>
       <BottomFade />
       {footer}
-      <Header onHeight={setHeaderH}>{header}</Header>
+      <Header onHeight={(h) => { setHeaderH(h); onHeaderHeight?.(h); }}>{header}</Header>
     </View>
   );
 }

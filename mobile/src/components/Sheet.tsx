@@ -90,6 +90,9 @@ function SheetView({ entry, isTop, behind, isBase, onClose, closeAll }: {
   const p = usePalette();
   const insets = useSafeAreaInsets();
   const translateY = useSharedValue(SCREEN_H);
+  // 0 = front-most, 1 = pushed back behind a sheet stacked on top. Driven by the
+  // `behind` prop so the recede (scale-down + lift) tweens instead of snapping.
+  const recede = useSharedValue(behind ? 1 : 0);
   const [footer, setFooter] = useState<React.ReactNode>(null);
   const mounted = useRef(false);
   const full = entry.opts.fullscreen;
@@ -104,9 +107,15 @@ function SheetView({ entry, isTop, behind, isBase, onClose, closeAll }: {
   const sheetH = full ? SCREEN_H : Math.min(SCREEN_H * 0.92, SCREEN_H - insets.top - 8);
 
   React.useEffect(() => {
-    translateY.value = withSpring(0, { damping: 22, stiffness: 220 });
+    // Push up from the bottom with a slight elasticity (small overshoot, no big bounce).
+    translateY.value = withSpring(0, { damping: 18, stiffness: 200, mass: 0.9 });
     mounted.current = true;
   }, [translateY]);
+
+  // Tween the card back (and forward again) as sheets stack on top / pop off.
+  React.useEffect(() => {
+    recede.value = withSpring(behind ? 1 : 0, { damping: 24, stiffness: 240 });
+  }, [behind, recede]);
 
   const dismiss = () => {
     translateY.value = withTiming(SCREEN_H, { duration: 240 }, (fin) => { if (fin) runOnJS(onClose)(); });
@@ -126,8 +135,9 @@ function SheetView({ entry, isTop, behind, isBase, onClose, closeAll }: {
 
   const sheetStyle = useAnimatedStyle(() => ({
     transform: [
-      { translateY: translateY.value },
-      { scale: behind ? 0.94 : 1 },
+      // Recede lifts the card up and shrinks it as the next sheet takes its place.
+      { translateY: translateY.value - 16 * recede.value },
+      { scale: 1 - 0.06 * recede.value },
     ],
   }));
 
