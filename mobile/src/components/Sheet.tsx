@@ -5,7 +5,9 @@
  * Sheets stack (edit-over-summary): the one beneath scales back iOS-style.
  *
  * openSheet(builder, opts) pushes a sheet; the builder receives { close, closeAll }.
- * Implemented with RN Modal + Reanimated for reliable multi-level stacking.
+ * Implemented as a SINGLE RN Modal at the provider that holds the whole stack as
+ * absolutely-positioned Views. (iOS can only present one RN Modal at a time, so
+ * one-Modal-per-sheet silently fails to stack — the 2nd never appears.)
  */
 import React, { createContext, useContext, useRef, useState } from 'react';
 import {
@@ -57,16 +59,22 @@ export function SheetProvider({ children }: { children: React.ReactNode }) {
   return (
     <Ctx.Provider value={{ openSheet, closeSheet, closeAll }}>
       {children}
-      {stack.map((entry, i) => (
-        <SheetView
-          key={entry.id}
-          entry={entry}
-          isTop={i === stack.length - 1}
-          behind={i < stack.length - 1}
-          onClose={() => setStack((s) => s.filter((x) => x.id !== entry.id))}
-          closeAll={closeAll}
-        />
-      ))}
+      {stack.length > 0 && (
+        <Modal transparent visible animationType="none" statusBarTranslucent onRequestClose={closeSheet}>
+          <View style={StyleSheet.absoluteFill}>
+            {stack.map((entry, i) => (
+              <SheetView
+                key={entry.id}
+                entry={entry}
+                isTop={i === stack.length - 1}
+                behind={i < stack.length - 1}
+                onClose={() => setStack((s) => s.filter((x) => x.id !== entry.id))}
+                closeAll={closeAll}
+              />
+            ))}
+          </View>
+        </Modal>
+      )}
     </Ctx.Provider>
   );
 }
@@ -116,8 +124,10 @@ function SheetView({ entry, isTop, behind, onClose, closeAll }: {
   const content = entry.builder(controls);
 
   return (
-    <Modal transparent visible animationType="none" onRequestClose={dismiss} statusBarTranslucent>
-      <Pressable style={[styles.backdrop, { backgroundColor: full ? p.bg : p.overlay }]} onPress={full ? undefined : dismiss} />
+    <>
+      {isTop && (
+        <Pressable style={[styles.backdrop, { backgroundColor: full ? p.bg : p.overlay }]} onPress={full ? undefined : dismiss} />
+      )}
       <Animated.View
         pointerEvents={isTop ? 'auto' : 'none'}
         style={[
@@ -160,7 +170,7 @@ function SheetView({ entry, isTop, behind, onClose, closeAll }: {
           </View>
         )}
       </Animated.View>
-    </Modal>
+    </>
   );
 }
 
