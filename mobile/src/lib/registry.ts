@@ -17,10 +17,10 @@ export const READING_TYPES: Record<string, TypeDef> = {
     label: 'Unstructured HRV',
     icon: 'heartPulse',
     fields: [
-      { key: 'age', label: 'Age' },
       { key: 'pns', label: 'PNS index', signed: true },
       { key: 'sns', label: 'SNS index', signed: true },
       { key: 'stressIndex', label: 'Stress index' },
+      { type: 'number', key: 'coherence', label: 'Coherence', unit: '%' },
       { divider: true },
       { type: 'number', key: 'sdnn', label: 'SDNN' },
       { type: 'number', key: 'avgHr', label: 'Avg HR' },
@@ -48,6 +48,9 @@ export const READING_TYPES: Record<string, TypeDef> = {
     fields: [
       { type: 'select', key: 'style', label: 'Breathing style', options: ['4/4', '4/5', '4/6', '5/5'] },
       { type: 'number', key: 'coherence', label: 'Coherence', unit: '%' },
+      { key: 'pns', label: 'PNS index', signed: true },
+      { key: 'sns', label: 'SNS index', signed: true },
+      { key: 'stressIndex', label: 'Stress index' },
       { divider: true },
       { type: 'number', key: 'sdnn', label: 'SDNN' },
       { type: 'number', key: 'hr', label: 'HR' },

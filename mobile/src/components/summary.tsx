@@ -158,45 +158,41 @@ function Notes({ r }: { r: Entry }) {
   return <SumCard title="Notes"><MetricRow label="" value="" cat={false} /><TextBlock text={r.note as string} /></SumCard>;
 }
 
-export function BreathingSummary({ r, days, ctx }: SummaryProps) {
-  const { score, overall } = hrvComposite(r, ctx);
-  return (
-    <>
-      <HeroCard cat={overall} label="Autonomic score" big={score ?? '-'} den={score != null ? '/100' : ''} sub="Composite of vagal tone, power, and baroreflex position." tip={overall ? HRV_VERDICT[overall] : ''} />
-      <SumCard title="Details">
-        <MetricRow label="Coherence" value={r.coherence as string} cat={false} explain={HRV_EXPLAIN.coherence} />
-        {r.style ? <MetricRow label="Breathing style" value={r.style as string} cat={false} explain="Intended pace for this reading." /> : null}
-        {r.period ? <MetricRow label="Reading type" value={r.period as string} cat={false} /> : null}
-        <MetricRow label="Swallowing" value={r.swallowing ? 'Yes' : 'No'} cat={false} />
-      </SumCard>
-      <PowerSection r={r} days={days} ctx={ctx} type="breathHrv" />
-      <MetricsSection r={r} days={days} ctx={ctx} type="breathHrv" />
-      <Notes r={r} />
-    </>
-  );
-}
-
-export function UnstructuredSummary({ r, days, ctx }: SummaryProps) {
+/**
+ * Both HRV kinds render the identical set of measurements — the only
+ * difference is the breathing-style row (structured only) and which RMSSD/HR
+ * grade band applies (handled inside PowerSection/MetricsSection by `type`).
+ */
+function HrvSummaryBody({ r, days, ctx, type }: SummaryProps & { type: 'breathHrv' | 'hrv' }) {
   const s = computeScores(r, ctx);
   const { score, overall } = hrvComposite(r, ctx);
   return (
     <>
       <HeroCard cat={overall} label="Autonomic score" big={score ?? '-'} den={score != null ? '/100' : ''} sub="Composite of vagal tone, power, and baroreflex position." tip={overall ? HRV_VERDICT[overall] : ''} />
       <SumCard title="Details">
+        <MetricRow label="Coherence" value={r.coherence as string} cat={s.coherence} explain={HRV_EXPLAIN.coherence} spark={spark(days, type, numEx('coherence'), BANDS.coherence)} />
+        {type === 'breathHrv' ? <MetricRow label="Breathing style" value={(r.style as string) || '—'} cat={false} explain="Intended pace for this reading." /> : null}
         {r.period ? <MetricRow label="Reading type" value={r.period as string} cat={false} /> : null}
-        <MetricRow label="Physiological age" value={r.age as string} cat={false} explain="Device-estimated physiological age (not your actual age)." />
         <MetricRow label="Swallowing" value={r.swallowing ? 'Yes' : 'No'} cat={false} />
       </SumCard>
       <SumCard title="Autonomic balance">
-        <MetricRow label="PNS index" value={r.pns as string} cat={s.pns} explain="Parasympathetic (rest and recovery) activity. Higher means more vagal dominance." spark={spark(days, 'hrv', numEx('pns'), BANDS.pns)} />
-        <MetricRow label="SNS index" value={r.sns as string} cat={s.sns} explain="Sympathetic (activation and stress) activity. Lower is calmer." spark={spark(days, 'hrv', numEx('sns'), BANDS.sns)} />
-        <MetricRow label="Stress index" value={r.stressIndex as string} cat={s.stressIndex} explain="Baevsky stress index. Higher means more sympathetic strain and rigidity." spark={spark(days, 'hrv', numEx('stressIndex'), BANDS.stressIndex)} />
+        <MetricRow label="PNS index" value={r.pns as string} cat={s.pns} explain="Parasympathetic (rest and recovery) activity. Higher means more vagal dominance." spark={spark(days, type, numEx('pns'), BANDS.pns)} />
+        <MetricRow label="SNS index" value={r.sns as string} cat={s.sns} explain="Sympathetic (activation and stress) activity. Lower is calmer." spark={spark(days, type, numEx('sns'), BANDS.sns)} />
+        <MetricRow label="Stress index" value={r.stressIndex as string} cat={s.stressIndex} explain="Baevsky stress index. Higher means more sympathetic strain and rigidity." spark={spark(days, type, numEx('stressIndex'), BANDS.stressIndex)} />
       </SumCard>
-      <PowerSection r={r} days={days} ctx={ctx} type="hrv" />
-      <MetricsSection r={r} days={days} ctx={ctx} type="hrv" />
+      <PowerSection r={r} days={days} ctx={ctx} type={type} />
+      <MetricsSection r={r} days={days} ctx={ctx} type={type} />
       <Notes r={r} />
     </>
   );
+}
+
+export function BreathingSummary(props: SummaryProps) {
+  return <HrvSummaryBody {...props} type="breathHrv" />;
+}
+
+export function UnstructuredSummary(props: SummaryProps) {
+  return <HrvSummaryBody {...props} type="hrv" />;
 }
 
 export function BpSummary({ r, days, ctx }: SummaryProps) {

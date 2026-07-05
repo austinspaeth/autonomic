@@ -172,8 +172,8 @@ export const qtcBands = (sex?: string): Band[] =>
 
 export function bandsFor(type: string, key: string): Band[] | null {
   const map: Record<string, Record<string, string>> = {
-    hrv: { rmssd: 'rmssdU', sdnn: 'sdnn', avgHr: 'hrBreath', pnn50: 'pnn50', vlowPower: 'vlf', lfPeak: 'lfPeak', meanRr: 'rrMode', mode: 'rrMode', mxdmn: 'mxdmn', amo50: 'amo50', cv: 'cv', pns: 'pns', sns: 'sns', stressIndex: 'stressIndex' },
-    breathHrv: { sdnn: 'sdnn', rmssd: 'rmssdS', pnn50: 'pnn50', vlowPower: 'vlf', lfPeak: 'lfPeak', coherence: 'coherence', hr: 'hrBreath', meanRr: 'rrMode', mode: 'rrMode', mxdmn: 'mxdmn', amo50: 'amo50', cv: 'cv' },
+    hrv: { rmssd: 'rmssdU', sdnn: 'sdnn', avgHr: 'hrBreath', pnn50: 'pnn50', vlowPower: 'vlf', lfPeak: 'lfPeak', coherence: 'coherence', meanRr: 'rrMode', mode: 'rrMode', mxdmn: 'mxdmn', amo50: 'amo50', cv: 'cv', pns: 'pns', sns: 'sns', stressIndex: 'stressIndex' },
+    breathHrv: { sdnn: 'sdnn', rmssd: 'rmssdS', pnn50: 'pnn50', vlowPower: 'vlf', lfPeak: 'lfPeak', coherence: 'coherence', hr: 'hrBreath', meanRr: 'rrMode', mode: 'rrMode', mxdmn: 'mxdmn', amo50: 'amo50', cv: 'cv', pns: 'pns', sns: 'sns', stressIndex: 'stressIndex' },
     bp: { sys: 'sys', dia: 'dia' },
     bloodO2: { value: 'spo2' },
     ecg: { qtc: 'qtc', qrs: 'qrs', pr: 'pr', ectopic: 'ectopic' },
@@ -211,6 +211,7 @@ export function computeScores(r: Entry, ctx: ScoreContext = {}): Record<string, 
       put('mxdmn', sMxDMn(r.mxdmn));
       put('amo50', sAMo50(r.amo50));
       put('cv', sCV(r.cv));
+      put('coherence', sCoherence(r.coherence));
       const band = (k: string, b: Band[]) => { const v = numOr(r[k]); if (v != null) put(k, catFromBands(v, b)); };
       band('pns', BANDS.pns); band('sns', BANDS.sns); band('stressIndex', BANDS.stressIndex);
       const lf = parseFloat(r.lowPower as string), hf = parseFloat(r.highPower as string);
@@ -235,6 +236,9 @@ export function computeScores(r: Entry, ctx: ScoreContext = {}): Record<string, 
       put('mxdmn', sMxDMn(r.mxdmn));
       put('amo50', sAMo50(r.amo50));
       put('cv', sCV(r.cv));
+      // Autonomic-balance indices are captured/computed for both HRV kinds now.
+      const band = (k: string, b: Band[]) => { const v = numOr(r[k]); if (v != null) put(k, catFromBands(v, b)); };
+      band('pns', BANDS.pns); band('sns', BANDS.sns); band('stressIndex', BANDS.stressIndex);
       put('overall', worstCat([s.rmssd, s.pnn50, s.totalPower].filter(Boolean)));
       break;
     }

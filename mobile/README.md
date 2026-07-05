@@ -119,12 +119,20 @@ hint and a red progress ring during capture) rather than produce fake numbers.
 **Which fields it computes:** SDNN, RMSSD, pNN50, mean RR, HR/avg HR, CV, mode,
 AMo50, MxDMn, Baevsky stress index, **PNS & SNS indices** (Poincaré SD1/SD2 +
 z-score composites against healthy-adult norms — see `NORM` in `src/lib/hrv`),
-VLF/LF/HF power, LF & HF peaks, coherence, and LF/HF (derived at render). Every
-fill-in-the-blank field on the manual form is auto-filled **except physiological
-age**, which is a device-proprietary estimate not derivable from a 5-minute RR
-series and is left blank. The PNS/SNS composites are Kubios-style approximations;
-they track vagal/sympathetic balance but may not match a specific device's
-proprietary calibration to the decimal.
+VLF/LF/HF power, LF & HF peaks, coherence, and LF/HF (derived at render) — every
+fill-in-the-blank field on both HRV forms. The PNS/SNS composites are
+Kubios-style approximations; they track vagal/sympathetic balance but may not
+match a specific device's proprietary calibration to the decimal.
+
+**Unstructured and structured HRV report the identical measurements.** Both
+capture and compute the same metric set (including the PNS/SNS/stress balance
+indices and coherence) and grade them against the same bands; the only
+difference is the breathing-style row (structured only) and the RMSSD/HR grade
+band that applies per kind. The per-reading *composite score* still uses the two
+documented weightings (structured weights the HF peak, unstructured weights
+SDNN), since a paced reading has a defined respiratory peak and an unpaced one
+does not. There is no "physiological age" field — it was a device-proprietary
+estimate not derivable from an RR series, so it's been removed.
 
 ## Data model & import/export
 

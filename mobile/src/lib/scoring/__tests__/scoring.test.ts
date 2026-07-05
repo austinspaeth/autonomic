@@ -125,6 +125,15 @@ describe('unstructured HRV', () => {
     expect(s.sns).toBe('bad');
     expect(s.stressIndex).toBe('bad');
   });
+  it('both HRV kinds grade the same balance + coherence metrics', () => {
+    const fields = { pns: '1', sns: '0', stressIndex: '120', coherence: '5' };
+    const u = computeScores({ id: 'u', type: 'hrv', ...fields });
+    const b = computeScores({ id: 'b', type: 'breathHrv', ...fields });
+    (['pns', 'sns', 'stressIndex', 'coherence'] as const).forEach((k) => {
+      expect(u[k]).toBeDefined();
+      expect(b[k]).toBe(u[k]);
+    });
+  });
 });
 
 describe('BP / SpO2 / resting HR / ECG / orthostatic', () => {
