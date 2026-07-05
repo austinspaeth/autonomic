@@ -6096,8 +6096,12 @@
 
       const safe = (fn) => { try { return fn(); } catch (e) { console.error("analytics container failed", e); return null; } };
 
-      // Categories: each is a card in the grid; tapping one slides its sections
-      // in from the right. `sections` are thunks built lazily (and safely).
+      // If we're re-rendering (range/view change) while scrolled into the
+      // document, remember roughly where so we can restore it afterward.
+      const wasScrolled = window.scrollY > 40;
+
+      // Categories: each is a card in the jump grid and a titled section in the
+      // long document below. `sections` are thunks built lazily (and safely).
       const CATS = [
         { id: "outlook", icon: ICONS.gauge, title: "Autonomic Outlook", desc: "Recovery score, trends & adherence",
           sections: [() => acAutonomicOutlook(buckets), () => acRecoveryPhase(), () => acComparison(buckets), () => acHeatMapCard(), () => acWeekPattern(),
@@ -6165,8 +6169,10 @@
       }, { rootMargin: `-${(getComputedStyle(document.documentElement).getPropertyValue("--topbar-h") || "56px").trim()} 0px -70% 0px` });
       CATS.forEach((cat) => analysisObserver.observe(sections[cat.id].querySelector(".ac-sec-head")));
 
-      // Re-entering after a range/view change keeps you at the same category.
-      if (analysisCat && sections[analysisCat]) {
+      // Re-entering after a range/view change keeps you at the same category
+      // (only if you'd actually scrolled into the document, so toggling ranges
+      // at the top doesn't yank you down past the jump cards).
+      if (wasScrolled && analysisCat && sections[analysisCat]) {
         const sec = sections[analysisCat];
         requestAnimationFrame(() => sec.scrollIntoView({ block: "start" }));
       }
