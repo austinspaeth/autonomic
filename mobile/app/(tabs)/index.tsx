@@ -1,7 +1,6 @@
 import React from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Header } from '../../src/components/Header';
-import { BrandMark } from '../../src/components/Icon';
 import { useSheets } from '../../src/components/Sheet';
 import { DaySummary } from '../../src/features/DaySummary';
 import { JournalSections } from '../../src/features/JournalSections';
@@ -19,9 +18,8 @@ export default function JournalScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: p.bg }}>
       <Header>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingBottom: 12 }}>
-          <BrandMark size={24} />
-          <Pressable onPress={() => shiftCurrent(-1)} hitSlop={8} style={{ width: 32, height: 40, alignItems: 'center', justifyContent: 'center' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 16, paddingBottom: 12 }}>
+          <Pressable onPress={() => shiftCurrent(-1)} hitSlop={8} style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}>
             <Text style={{ color: p.text, fontSize: 25 }}>‹</Text>
           </Pressable>
           <Pressable onPress={() => openSheet((c) => <Calendar current={getCurrentKey()} onPick={setCurrentKey} controls={c} />)} style={{ flex: 1, maxWidth: 280, backgroundColor: p.surface, borderColor: p.border, borderWidth: 1, borderRadius: 14, paddingVertical: 10, paddingHorizontal: 14 }}>

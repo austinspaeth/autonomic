@@ -10,6 +10,7 @@ import { ScoreGauge } from '../components/charts';
 import { Icon } from '../components/Icon';
 import { SheetControls, useSheets } from '../components/Sheet';
 import { HeroCard, SumCard, MetricRow } from '../components/summary';
+import { MilestoneProgressCard } from './Milestones';
 import { Button } from '../components/ui';
 import { radius, usePalette } from '../theme';
 import { SCORE_COLORS, GRADE_LABEL, GRADE_PTS, catFromBands } from '../lib/scoring';
@@ -96,6 +97,7 @@ export function DaySummary({ dk }: { dk: string }) {
         )}
       </GradientBorderCard>
       <StreakCard dk={dk} />
+      <MilestoneProgressCard />
     </View>
   );
 }

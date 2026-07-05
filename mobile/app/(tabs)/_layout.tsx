@@ -1,20 +1,25 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { Tabs } from 'expo-router';
+import { BlurView } from 'expo-blur';
 import Svg, { Path } from 'react-native-svg';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
-import { Icon, IconName } from '../../src/components/Icon';
+import { BrandMark, Icon, IconName } from '../../src/components/Icon';
 import { useSheets } from '../../src/components/Sheet';
 import { MenuSheet } from '../../src/features/Settings';
 import { usePalette } from '../../src/theme';
 
 const TABS: { name: string; label: string; icon: IconName }[] = [
   { name: 'index', label: 'Journal', icon: 'clipboard' },
-  { name: 'analysis', label: 'Analysis', icon: 'chart' },
-  { name: 'milestones', label: 'Milestones', icon: 'star' },
+  { name: 'analysis', label: 'Progress', icon: 'chart' },
   { name: 'insights', label: 'Insights', icon: 'ai' },
 ];
+
+const PAD = 5; // bar inner padding; the highlight pill is inset by this top/bottom
+// Slight elastic bounce (damping ratio ~0.7) — a soft overshoot, not springy.
+const SPRING = { damping: 19, stiffness: 210, mass: 1 };
 
 // Solid (filled) cog — hollow center via even-odd fill. Opens the menu sheet.
 function SolidCog({ size = 22, color = '#000' }: { size?: number; color?: string }) {
@@ -34,15 +39,55 @@ function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
   const p = usePalette();
   const insets = useSafeAreaInsets();
   const { openSheet } = useSheets();
+  const tabRoutes = state.routes.filter((r) => TABS.some((t) => t.name === r.name));
+  const activeIndex = Math.max(0, tabRoutes.findIndex((r) => state.routes.indexOf(r) === state.index));
+
+  // Measured per-tab geometry drives the sliding highlight pill.
+  const [layouts, setLayouts] = useState<{ x: number; w: number }[]>([]);
+  const pillX = useSharedValue(0);
+  const pillW = useSharedValue(0);
+  useEffect(() => {
+    const l = layouts[activeIndex];
+    if (!l) return;
+    if (pillW.value === 0) { pillX.value = l.x; pillW.value = l.w; } // first measure: snap
+    else { pillX.value = withSpring(l.x, SPRING); pillW.value = withSpring(l.w, SPRING); }
+  }, [activeIndex, layouts]);
+  const pillStyle = useAnimatedStyle(() => ({ transform: [{ translateX: pillX.value }], width: pillW.value }));
+
   return (
     <View pointerEvents="box-none" style={{ position: 'absolute', bottom: insets.bottom + 12, left: 0, right: 0, alignItems: 'center' }}>
-      <View style={{ flexDirection: 'row', gap: 2, padding: 5, borderRadius: 999, backgroundColor: p.dark ? 'rgba(28,28,30,0.86)' : 'rgba(255,255,255,0.92)', borderWidth: 1, borderColor: p.border, shadowColor: '#000', shadowOpacity: 0.22, shadowRadius: 20, shadowOffset: { width: 0, height: 10 }, elevation: 8 }}>
-        {state.routes.filter((r) => TABS.some((t) => t.name === r.name)).map((route) => {
-          const idx = state.routes.indexOf(route);
-          const focused = state.index === idx;
+      <BlurView
+        intensity={40}
+        tint="dark"
+        style={{ borderRadius: 999, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 20, shadowOffset: { width: 0, height: 10 }, elevation: 8 }}
+      >
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, padding: PAD, backgroundColor: 'rgba(6,6,9,0.78)' }}>
+        <View style={{ paddingLeft: 8, paddingRight: 6, justifyContent: 'center' }}>
+          <BrandMark size={20} />
+        </View>
+        {/* Sliding highlight pill sits behind the tabs. */}
+        <Animated.View
+          pointerEvents="none"
+          style={[{ position: 'absolute', top: PAD, bottom: PAD, left: 0, borderRadius: 999, backgroundColor: p.dark ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.07)' }, pillStyle]}
+        />
+        {tabRoutes.map((route, i) => {
+          const focused = i === activeIndex;
           const tab = TABS.find((t) => t.name === route.name)!;
           return (
-            <Pressable key={route.key} onPress={() => navigation.navigate(route.name)} style={{ paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999, alignItems: 'center', backgroundColor: focused ? (p.dark ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.07)') : 'transparent' }}>
+            <Pressable
+              key={route.key}
+              onPress={() => navigation.navigate(route.name)}
+              onLayout={(e) => {
+                const { x, width } = e.nativeEvent.layout;
+                setLayouts((prev) => {
+                  if (prev[i] && prev[i].x === x && prev[i].w === width) return prev;
+                  const next = prev.slice();
+                  next[i] = { x, w: width };
+                  return next;
+                });
+              }}
+              style={{ paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999, alignItems: 'center' }}
+            >
               <Icon name={tab.icon} size={22} color={focused ? p.text : p.textDim} />
               <Text style={{ fontSize: 11, fontWeight: '600', color: focused ? p.text : p.textDim, marginTop: 3 }}>{tab.label}</Text>
             </Pressable>
@@ -58,6 +103,7 @@ function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
           <Text style={{ fontSize: 11, fontWeight: '600', color: p.textDim, marginTop: 3 }}>Menu</Text>
         </Pressable>
       </View>
+      </BlurView>
     </View>
   );
 }
@@ -67,7 +113,6 @@ export default function TabLayout() {
     <Tabs tabBar={(props) => <FloatingTabBar {...props} />} screenOptions={{ headerShown: false }}>
       <Tabs.Screen name="index" />
       <Tabs.Screen name="analysis" />
-      <Tabs.Screen name="milestones" />
       <Tabs.Screen name="insights" />
     </Tabs>
   );
