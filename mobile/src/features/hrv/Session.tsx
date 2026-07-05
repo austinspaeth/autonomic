@@ -138,14 +138,14 @@ export function HrvSession({ config, controls }: { config: SessionConfig; contro
             <BreathingViz inhaleSec={inS} exhaleSec={exS} running={connected || config.source === 'watch'} />
           ) : (
             <View style={{ alignItems: 'center' }}>
-              <Text style={{ color: '#fff', fontSize: 15, marginBottom: 8 }}>Stay still, breathe normally</Text>
-              <Text style={{ color: '#fff', fontSize: 56, fontWeight: '800', fontVariant: ['tabular-nums'] }}>{mmss}</Text>
+              <Text style={{ color: '#fff', fontSize: 16, marginBottom: 8 }}>Stay still, breathe normally</Text>
+              <Text style={{ color: '#fff', fontSize: 59, fontWeight: '800', fontVariant: ['tabular-nums'] }}>{mmss}</Text>
             </View>
           )}
         </View>
       </View>
 
-      {config.kind === 'breath' ? <Text style={{ color: '#fff', fontSize: 44, fontWeight: '800', fontVariant: ['tabular-nums'], marginTop: 12 }}>{mmss}</Text> : null}
+      {config.kind === 'breath' ? <Text style={{ color: '#fff', fontSize: 46, fontWeight: '800', fontVariant: ['tabular-nums'], marginTop: 12 }}>{mmss}</Text> : null}
 
       <View style={{ flexDirection: 'row', gap: 24, marginTop: 20 }}>
         <Stat label="HR" value={hr != null ? String(hr) : '—'} unit="bpm" />
@@ -168,7 +168,7 @@ function Stat({ label, value, unit }: { label: string; value: string; unit: stri
   return (
     <View style={{ alignItems: 'center' }}>
       <Text style={{ color: '#8a8a90', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '700' }}>{label}</Text>
-      <Text style={{ color: '#fff', fontSize: 28, fontWeight: '800', fontVariant: ['tabular-nums'] }}>{value}</Text>
+      <Text style={{ color: '#fff', fontSize: 29, fontWeight: '800', fontVariant: ['tabular-nums'] }}>{value}</Text>
       <Text style={{ color: '#8a8a90', fontSize: 11 }}>{unit}</Text>
     </View>
   );

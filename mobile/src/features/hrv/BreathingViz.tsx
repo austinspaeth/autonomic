@@ -73,5 +73,5 @@ const styles = StyleSheet.create({
   glow: { position: 'absolute', width: 220, height: 220, borderRadius: 110, backgroundColor: ACCENT },
   bar: { height: 300, width: 96, flexDirection: 'column-reverse', justifyContent: 'flex-start', gap: 4 },
   segment: { height: 14, borderRadius: 4 },
-  phaseText: { marginTop: 20, color: '#fff', fontSize: 20, fontWeight: '700', letterSpacing: 0.3 },
+  phaseText: { marginTop: 20, color: '#fff', fontSize: 21, fontWeight: '700', letterSpacing: 0.3 },
 });

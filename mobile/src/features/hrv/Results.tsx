@@ -78,15 +78,15 @@ export function HrvResults({ rr, hrSamples, config, durationSec, watchFallback, 
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: p.bg }} contentContainerStyle={{ padding: 18, paddingTop: insets.top + 12, paddingBottom: insets.bottom + 24 }} showsVerticalScrollIndicator={false}>
-      <Text style={{ fontSize: 24, fontWeight: '800', color: p.text, marginBottom: 4 }}>Reading complete</Text>
-      <Text style={{ color: p.textDim, fontSize: 13, marginBottom: 16 }}>
+      <Text style={{ fontSize: 25, fontWeight: '800', color: p.text, marginBottom: 4 }}>Reading complete</Text>
+      <Text style={{ color: p.textDim, fontSize: 14, marginBottom: 16 }}>
         {`${Math.floor(durationSec / 60)}:${String(durationSec % 60).padStart(2, '0')} captured · ${rr.length} beats · ${Math.round(result.artifactPct)}% artifacts`}
       </Text>
 
       {!enoughData ? (
         <View style={{ backgroundColor: p.surface2, borderRadius: 12, padding: 16, marginBottom: 16 }}>
           <Text style={{ color: p.text, fontWeight: '700', marginBottom: 4 }}>Not enough clean data</Text>
-          <Text style={{ color: p.textDim, fontSize: 13, lineHeight: 19 }}>{result.reason || 'Try again with the strap snug and stay still.'}</Text>
+          <Text style={{ color: p.textDim, fontSize: 14, lineHeight: 19 }}>{result.reason || 'Try again with the strap snug and stay still.'}</Text>
         </View>
       ) : null}
 

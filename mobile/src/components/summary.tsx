@@ -41,11 +41,11 @@ export function HeroCard({ cat, label, big, den, sub, tip }: {
       ) : null}
       {label ? <Text style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.6, color: p.textDim, fontWeight: '700' }}>{label}</Text> : null}
       <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 3 }}>
-        <Text style={{ fontSize: 40, fontWeight: '800', color: p.text, fontVariant: ['tabular-nums'] }}>{big != null && big !== '' ? String(big) : '-'}</Text>
-        {den ? <Text style={{ fontSize: 16, fontWeight: '700', color: p.textDim, marginLeft: 3 }}>{den}</Text> : null}
+        <Text style={{ fontSize: 42, fontWeight: '800', color: p.text, fontVariant: ['tabular-nums'] }}>{big != null && big !== '' ? String(big) : '-'}</Text>
+        {den ? <Text style={{ fontSize: 17, fontWeight: '700', color: p.textDim, marginLeft: 3 }}>{den}</Text> : null}
       </View>
-      {sub ? <Text style={{ fontSize: 12.5, color: p.textDim, marginTop: 6 }}>{sub}</Text> : null}
-      {tip ? <Text style={{ fontSize: 14, fontWeight: '600', color: p.text, marginTop: 12, lineHeight: 20 }}>{tip}</Text> : null}
+      {sub ? <Text style={{ fontSize: 13, color: p.textDim, marginTop: 6 }}>{sub}</Text> : null}
+      {tip ? <Text style={{ fontSize: 15, fontWeight: '600', color: p.text, marginTop: 12, lineHeight: 20 }}>{tip}</Text> : null}
     </View>
   );
 }
@@ -68,10 +68,10 @@ export function MetricRow({ label, value, cat, explain, spark }: {
     <View style={{ backgroundColor: p.surface, borderColor: p.border, borderWidth: 1, borderRadius: radius.control, padding: 14, marginBottom: 10 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
         {cat === false ? null : <ScoreDot cat={cat || null} />}
-        <Text style={{ flex: 1, fontSize: 15, fontWeight: '700', color: p.text }}>{label}</Text>
-        <Text style={{ fontSize: 15, fontWeight: '700', color: p.text, fontVariant: ['tabular-nums'] }}>{value == null || value === '' ? '-' : String(value)}</Text>
+        <Text style={{ flex: 1, fontSize: 16, fontWeight: '700', color: p.text }}>{label}</Text>
+        <Text style={{ fontSize: 16, fontWeight: '700', color: p.text, fontVariant: ['tabular-nums'] }}>{value == null || value === '' ? '-' : String(value)}</Text>
       </View>
-      {explain ? <Text style={{ fontSize: 12.5, color: p.textDim, marginTop: 6, lineHeight: 17 }}>{explain}</Text> : null}
+      {explain ? <Text style={{ fontSize: 13, color: p.textDim, marginTop: 6, lineHeight: 17 }}>{explain}</Text> : null}
       {spark}
     </View>
   );
@@ -79,7 +79,7 @@ export function MetricRow({ label, value, cat, explain, spark }: {
 
 function TextBlock({ text }: { text: string }) {
   const p = usePalette();
-  return <Text style={{ fontSize: 14, color: p.text, lineHeight: 20 }}>{text}</Text>;
+  return <Text style={{ fontSize: 15, color: p.text, lineHeight: 20 }}>{text}</Text>;
 }
 
 export interface SummaryProps { r: Entry; days: DaysMap; ctx: ScoreContext }
@@ -324,7 +324,7 @@ export function OrthostaticSummary({ r, days, ctx }: SummaryProps) {
   const stat = (label: string, val: number | null, unit: string) => (
     <View style={{ flex: 1, backgroundColor: p.surface, borderColor: p.border, borderWidth: 1, borderRadius: radius.control, padding: 14, alignItems: 'center' }}>
       <Text style={{ fontSize: 11, textTransform: 'uppercase', color: p.textDim, fontWeight: '700' }}>{label}</Text>
-      <Text style={{ fontSize: 30, fontWeight: '800', color: p.text, fontVariant: ['tabular-nums'] }}>{val != null ? String(val) : '-'}</Text>
+      <Text style={{ fontSize: 32, fontWeight: '800', color: p.text, fontVariant: ['tabular-nums'] }}>{val != null ? String(val) : '-'}</Text>
       <Text style={{ fontSize: 11, color: p.textDim }}>{unit}</Text>
     </View>
   );

@@ -33,10 +33,10 @@ export function Calendar({ current, onPick, controls }: { current: string; onPic
 
   return (
     <View>
-      <Text style={{ fontSize: 20, fontWeight: '700', color: p.text, marginBottom: 16 }}>Select date</Text>
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 16 }}>Select date</Text>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
         <Pressable onPress={() => setView(new Date(view.getFullYear(), view.getMonth() - 1, 1))} hitSlop={8}><Icon name="chevron" size={22} color={p.text} /></Pressable>
-        <Text style={{ fontSize: 16, fontWeight: '700', color: p.text }}>{view.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</Text>
+        <Text style={{ fontSize: 17, fontWeight: '700', color: p.text }}>{view.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</Text>
         <Pressable disabled={atCurMonth} onPress={() => setView(new Date(view.getFullYear(), view.getMonth() + 1, 1))} hitSlop={8} style={{ opacity: atCurMonth ? 0.3 : 1 }}><Icon name="chevronRight" size={22} color={p.text} /></Pressable>
       </View>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
@@ -48,7 +48,7 @@ export function Calendar({ current, onPick, controls }: { current: string; onPic
           return (
             <View key={dk} style={{ width: `${100 / 7}%`, aspectRatio: 1, padding: 2 }}>
               <Pressable disabled={isFuture} onPress={() => { onPick(dk); controls.close(); }} style={{ flex: 1, borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: isSel ? p.accent : 'transparent', opacity: isFuture ? 0.3 : 1, borderWidth: isToday && !isSel ? 2 : 0, borderColor: p.accent }}>
-                <Text style={{ color: isSel ? '#fff' : p.text, fontWeight: isSel ? '700' : '400', fontSize: 14 }}>{dn}</Text>
+                <Text style={{ color: isSel ? '#fff' : p.text, fontWeight: isSel ? '700' : '400', fontSize: 15 }}>{dn}</Text>
                 {has && !isSel ? <View style={{ position: 'absolute', bottom: 6, width: 5, height: 5, borderRadius: 3, backgroundColor: p.accent }} /> : null}
               </Pressable>
             </View>

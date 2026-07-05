@@ -20,8 +20,8 @@ export function HealthScreen() {
   if (Platform.OS !== 'ios' || !api.available) {
     return (
       <View>
-        <Text style={{ fontSize: 20, fontWeight: '700', color: p.text, marginBottom: 8 }}>Apple Health</Text>
-        <Text style={{ color: p.textDim, fontSize: 14, lineHeight: 20 }}>
+        <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 8 }}>Apple Health</Text>
+        <Text style={{ color: p.textDim, fontSize: 15, lineHeight: 20 }}>
           Apple Health is only available on iOS with a development build. On this platform it is disabled.
         </Text>
       </View>
@@ -72,8 +72,8 @@ export function HealthScreen() {
 
   return (
     <View>
-      <Text style={{ fontSize: 20, fontWeight: '700', color: p.text, marginBottom: 6 }}>Apple Health</Text>
-      <Text style={{ color: p.textDim, fontSize: 13, marginBottom: 16, lineHeight: 19 }}>
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 6 }}>Apple Health</Text>
+      <Text style={{ color: p.textDim, fontSize: 14, marginBottom: 16, lineHeight: 19 }}>
         {"Grant permission, then pull the current day's resting HR, HRV, blood pressure, SpO₂, weight and sleep into your journal. Existing manual entries are never overwritten."}
       </Text>
       <Button title={authed ? 'Health connected' : 'Connect Apple Health'} variant="primary" onPress={connect} />

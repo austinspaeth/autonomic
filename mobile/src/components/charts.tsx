@@ -315,11 +315,11 @@ export function Bars({ rows, fmt }: { rows: { name: string; count: number; color
     <View>
       {rows.map((r, i) => (
         <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 }}>
-          <RNText style={{ width: '38%', fontSize: 14, color: p.text }}>{r.name}</RNText>
+          <RNText style={{ width: '38%', fontSize: 15, color: p.text }}>{r.name}</RNText>
           <View style={{ flex: 1, height: 8, backgroundColor: p.surface2, borderRadius: 999, overflow: 'hidden' }}>
             <View style={{ height: '100%', width: `${(r.count / max) * 100}%`, backgroundColor: r.color || p.accent, borderRadius: 999 }} />
           </View>
-          <RNText style={{ width: 40, textAlign: 'right', fontVariant: ['tabular-nums'], fontWeight: '600', fontSize: 14, color: p.text }}>{fmt ? fmt(r.count) : String(r.count)}</RNText>
+          <RNText style={{ width: 40, textAlign: 'right', fontVariant: ['tabular-nums'], fontWeight: '600', fontSize: 15, color: p.text }}>{fmt ? fmt(r.count) : String(r.count)}</RNText>
         </View>
       ))}
     </View>

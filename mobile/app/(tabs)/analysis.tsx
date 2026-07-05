@@ -33,7 +33,7 @@ export default function AnalysisScreen() {
             {cats.map((c) => (
               <Pressable key={c.id} onPress={() => setOpen(c.id)} style={{ width: '31.5%', backgroundColor: p.surface, borderColor: p.border, borderWidth: 1, borderRadius: radius.card, padding: 12 }}>
                 <Icon name={c.icon as IconName} size={24} color={p.accent} />
-                <Text style={{ fontSize: 13, fontWeight: '700', color: p.text, marginTop: 7 }}>{c.title}</Text>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: p.text, marginTop: 7 }}>{c.title}</Text>
                 <Text style={{ fontSize: 11, color: p.textDim, marginTop: 2 }}>{c.desc}</Text>
               </Pressable>
             ))}
@@ -51,7 +51,7 @@ function CategoryDetail({ cat, onBack }: { cat: Category; onBack: () => void }) 
     <View>
       <Pressable onPress={onBack} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 }}>
         <Icon name="arrowLeft" size={22} color={p.text} />
-        <Text style={{ fontSize: 18, fontWeight: '700', color: p.text }}>{cat.title}</Text>
+        <Text style={{ fontSize: 19, fontWeight: '700', color: p.text }}>{cat.title}</Text>
       </Pressable>
       {cards.length === 0 ? <Text style={{ color: p.textDim }}>No data logged yet for this category.</Text> : cards.map((c, i) => <CardView key={i} card={c} buckets={cat.buckets} />)}
     </View>
@@ -62,7 +62,7 @@ function CardView({ card, buckets }: { card: AnalysisCard; buckets: { label: str
   const p = usePalette();
   return (
     <Card style={{ padding: 14 }}>
-      <Text style={{ fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, color: p.textDim }}>{card.title}</Text>
+      <Text style={{ fontSize: 14, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, color: p.textDim }}>{card.title}</Text>
       {card.sub ? <Text style={{ fontSize: 11, color: p.textDim, marginTop: 2, marginBottom: 8 }}>{card.sub}</Text> : null}
       {(card.charts || []).map((ch, i) => (
         <View key={i} style={{ marginTop: 12 }}>
@@ -91,7 +91,7 @@ function CardView({ card, buckets }: { card: AnalysisCard; buckets: { label: str
           {card.stats.map((s, i) => (
             <View key={i} style={{ flexGrow: 1, minWidth: '45%', backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.control, padding: 12 }}>
               <Text style={{ fontSize: 12, color: p.textDim, fontWeight: '600' }}>{s.label}</Text>
-              <Text style={{ fontSize: 24, fontWeight: '700', marginTop: 4, color: s.color || p.text, fontVariant: ['tabular-nums'] }}>{s.value == null ? '-' : String(s.value)}{s.sub ? <Text style={{ fontSize: 12, color: p.textDim }}>{` ${s.sub}`}</Text> : null}</Text>
+              <Text style={{ fontSize: 25, fontWeight: '700', marginTop: 4, color: s.color || p.text, fontVariant: ['tabular-nums'] }}>{s.value == null ? '-' : String(s.value)}{s.sub ? <Text style={{ fontSize: 12, color: p.textDim }}>{` ${s.sub}`}</Text> : null}</Text>
             </View>
           ))}
         </View>
@@ -99,7 +99,7 @@ function CardView({ card, buckets }: { card: AnalysisCard; buckets: { label: str
       {(card.insights || []).map((ins, i) => (
         <View key={i} style={{ flexDirection: 'row', gap: 10, backgroundColor: p.surface2, borderRadius: radius.control, padding: 12, marginTop: 10 }}>
           <View style={{ width: 3, borderRadius: 2, backgroundColor: ins.strength === 'strong' ? '#16a34a' : ins.strength === 'mod' ? '#eab308' : p.accent }} />
-          <Text style={{ flex: 1, fontSize: 13, color: p.text, lineHeight: 18 }}>{ins.text}</Text>
+          <Text style={{ flex: 1, fontSize: 14, color: p.text, lineHeight: 18 }}>{ins.text}</Text>
         </View>
       ))}
     </Card>

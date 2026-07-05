@@ -36,18 +36,18 @@ export function TypePicker({ title, typeMap, onPick }: { title: string; typeMap:
   const types = Object.keys(typeMap).filter((t) => typeMap[t].label.toLowerCase().includes(q.trim().toLowerCase()));
   return (
     <View>
-      <Text style={{ fontSize: 20, fontWeight: '700', color: p.text, marginBottom: 16 }}>{title}</Text>
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 16 }}>{title}</Text>
       <TextInput
         value={q}
         onChangeText={setQ}
         placeholder="Filter…"
         placeholderTextColor={p.textDim}
-        style={{ backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.control, padding: 12, fontSize: 16, color: p.text, marginBottom: 8 }}
+        style={{ backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.control, padding: 12, fontSize: 17, color: p.text, marginBottom: 8 }}
       />
       {types.length === 0 ? <Muted>No matches.</Muted> : types.map((t) => (
         <Pressable key={t} onPress={() => onPick(t)} style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 15, borderTopWidth: 1, borderTopColor: p.border }, pressed && { opacity: 0.5 }]}>
           <Icon name={typeMap[t].icon as never} size={22} color={p.textDim} />
-          <Text style={{ color: p.text, fontSize: 16 }}>{typeMap[t].label}</Text>
+          <Text style={{ color: p.text, fontSize: 17 }}>{typeMap[t].label}</Text>
         </Pressable>
       ))}
     </View>
@@ -61,20 +61,20 @@ function ReadingPicker({ onLive, onPick }: { onLive: () => void; onPick: (type: 
   const types = Object.keys(READING_TYPES).filter((t) => READING_TYPES[t].label.toLowerCase().includes(q.trim().toLowerCase()));
   return (
     <View>
-      <Text style={{ fontSize: 20, fontWeight: '700', color: p.text, marginBottom: 16 }}>Add reading</Text>
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 16 }}>Add reading</Text>
       <Pressable onPress={onLive} style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: radius.control, backgroundColor: p.accentSoft, borderWidth: 1, borderColor: p.accent, marginBottom: 8 }, pressed && { opacity: 0.7 }]}>
         <Icon name="heartPulse" size={24} color={p.accent} />
         <View style={{ flex: 1 }}>
-          <Text style={{ color: p.accent, fontWeight: '700', fontSize: 16 }}>Live HRV reading</Text>
-          <Text style={{ color: p.textDim, fontSize: 12.5 }}>Capture 5 min from a strap or Apple Watch</Text>
+          <Text style={{ color: p.accent, fontWeight: '700', fontSize: 17 }}>Live HRV reading</Text>
+          <Text style={{ color: p.textDim, fontSize: 13 }}>Capture 5 min from a strap or Apple Watch</Text>
         </View>
         <Icon name="chevronRight" size={20} color={p.accent} />
       </Pressable>
-      <TextInput value={q} onChangeText={setQ} placeholder="Or type a reading in manually…" placeholderTextColor={p.textDim} style={{ backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.control, padding: 12, fontSize: 16, color: p.text, marginBottom: 8 }} />
+      <TextInput value={q} onChangeText={setQ} placeholder="Or type a reading in manually…" placeholderTextColor={p.textDim} style={{ backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.control, padding: 12, fontSize: 17, color: p.text, marginBottom: 8 }} />
       {types.map((t) => (
         <Pressable key={t} onPress={() => onPick(t)} style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 15, borderTopWidth: 1, borderTopColor: p.border }, pressed && { opacity: 0.5 }]}>
           <Icon name={READING_TYPES[t].icon as never} size={22} color={p.textDim} />
-          <Text style={{ color: p.text, fontSize: 16 }}>{READING_TYPES[t].label}</Text>
+          <Text style={{ color: p.text, fontSize: 17 }}>{READING_TYPES[t].label}</Text>
         </Pressable>
       ))}
     </View>
@@ -119,7 +119,7 @@ export function EntryForm({ typeMap, arrKey, dk, type, existing, controls, onSav
 
   return (
     <View>
-      <Text style={{ fontSize: 20, fontWeight: '700', color: p.text, marginBottom: 16 }}>{(existing ? 'Edit ' : '') + def.label}</Text>
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 16 }}>{(existing ? 'Edit ' : '') + def.label}</Text>
       <FieldInputs fields={fields} form={form} set={set} />
       <SheetFooter>
         {existing ? <Button title="Delete" variant="danger" onPress={() => { deleteEntry(dk, arrKey, existing.id); controls.closeAll(); onSaved(); }} /> : null}
@@ -158,7 +158,7 @@ export function BikeForm({ dk, existing, controls, onSaved }: { dk: string; exis
 
   return (
     <View>
-      <Text style={{ fontSize: 20, fontWeight: '700', color: p.text, marginBottom: 16 }}>{(existing ? 'Edit ' : '') + 'Indoor bike'}</Text>
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 16 }}>{(existing ? 'Edit ' : '') + 'Indoor bike'}</Text>
       <TimeField label="Time" value={time} onChange={setTime} />
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
         {[['duration', 'Duration (min)'], ['distance', 'Distance (mi)'], ['avgHr', 'Avg HR'], ['maxHr', 'Max HR'], ['minHr', 'Min HR']].map(([k, lbl]) => (
@@ -169,14 +169,14 @@ export function BikeForm({ dk, existing, controls, onSaved }: { dk: string; exis
         <View style={{ width: 24, height: 24, borderRadius: 6, borderWidth: 2, borderColor: interval ? p.accent : p.border, backgroundColor: interval ? p.accent : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
           {interval ? <Icon name="check" size={14} color="#fff" /> : null}
         </View>
-        <Text style={{ color: p.text, fontSize: 15 }}>Interval training</Text>
+        <Text style={{ color: p.text, fontSize: 16 }}>Interval training</Text>
       </Pressable>
       {interval ? (
         <View>
           {intervals.map((iv, i) => (
             <View key={i} style={{ borderWidth: 1, borderColor: p.border, borderRadius: radius.control, padding: 12, marginBottom: 10 }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: p.textDim }}>{`Interval ${i + 1}`}</Text>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: p.textDim }}>{`Interval ${i + 1}`}</Text>
                 <Pressable onPress={() => setIntervals((prev) => prev.filter((_, j) => j !== i))}><Icon name="x" size={16} color={p.textDim} /></Pressable>
               </View>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
@@ -246,8 +246,8 @@ function ReadingSummarySheet({ r, dk, controls, onEdit }: { r: Entry; dk: string
   const ctx = { sex: state.profile.sex, height: state.profile.height };
   return (
     <ScrollView showsVerticalScrollIndicator={false}>
-      <Text style={{ fontSize: 20, fontWeight: '700', color: p.text }}>{def.label}</Text>
-      <Text style={{ color: p.textDim, fontSize: 13, marginTop: 2, marginBottom: 14 }}>{live.time ? fmtTime12(live.time as string) : ''}</Text>
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text }}>{def.label}</Text>
+      <Text style={{ color: p.textDim, fontSize: 14, marginTop: 2, marginBottom: 14 }}>{live.time ? fmtTime12(live.time as string) : ''}</Text>
       <ReadingSummary r={live} days={state.days} ctx={ctx} />
       <View style={{ height: 8 }} />
       <Button title="Edit" variant="default" onPress={onEdit} />

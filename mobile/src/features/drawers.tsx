@@ -29,7 +29,7 @@ function WaterDrawer({ dk, controls }: { dk: string; controls: SheetControls }) 
   const [liters, setLiters] = useState(+((getState().days[dk]?.food.water) || 0));
   return (
     <View>
-      <Text style={{ fontSize: 20, fontWeight: '700', color: p.text, marginBottom: 16 }}>Water</Text>
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 16 }}>Water</Text>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8, marginBottom: 22 }}>
         {[0, 1, 2, 3, 4].map((i) => {
           const full = liters >= i + 1;
@@ -56,7 +56,7 @@ function MealsDrawer({ dk }: { dk: string }) {
   const openForm = (m: Meal | null) => openSheet((c) => <MealForm dk={dk} existing={m} controls={c} onDone={() => force((x) => x + 1)} />);
   return (
     <View>
-      <Text style={{ fontSize: 20, fontWeight: '700', color: p.text, marginBottom: 16 }}>Meals</Text>
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 16 }}>Meals</Text>
       {meals.length === 0 ? <Muted>No meals logged yet.</Muted> : meals.map((m) => (
         <Row key={m.id} icon="utensils" title={MEAL_TYPES[m.type] || 'Meal'} sub={[m.time ? fmtTime12(m.time) : '', m.note].filter(Boolean).join(' · ')} right={<Text style={{ color: p.text, fontWeight: '600' }}>{`${parseInt(String(m.calories), 10) || 0} cal`}</Text>} onPress={() => openForm(m)} />
       ))}
@@ -83,8 +83,8 @@ function MealForm({ dk, existing, controls, onDone }: { dk: string; existing: Me
   };
   return (
     <View>
-      <Text style={{ fontSize: 20, fontWeight: '700', color: p.text, marginBottom: 16 }}>{existing ? 'Edit meal' : 'Add meal'}</Text>
-      <Text style={{ fontSize: 13, fontWeight: '600', color: p.textDim, marginBottom: 6 }}>Meal</Text>
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 16 }}>{existing ? 'Edit meal' : 'Add meal'}</Text>
+      <Text style={{ fontSize: 14, fontWeight: '600', color: p.textDim, marginBottom: 6 }}>Meal</Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
         {Object.keys(MEAL_TYPES).map((k) => (
           <Pressable key={k} onPress={() => setType(k)} style={{ paddingHorizontal: 14, paddingVertical: 10, borderRadius: radius.control, borderWidth: 1, borderColor: type === k ? p.accent : p.border, backgroundColor: type === k ? p.accentSoft : p.surface2 }}>
@@ -110,12 +110,12 @@ function TriggerPicker({ dk }: { dk: string }) {
   const types = Object.keys(TRIGGER_TYPES).filter((t) => TRIGGER_TYPES[t].label.toLowerCase().includes(q.trim().toLowerCase()));
   return (
     <View>
-      <Text style={{ fontSize: 20, fontWeight: '700', color: p.text, marginBottom: 16 }}>Add trigger</Text>
-      <TextInput value={q} onChangeText={setQ} placeholder="Filter…" placeholderTextColor={p.textDim} style={{ backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.control, padding: 12, fontSize: 16, color: p.text, marginBottom: 8 }} />
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 16 }}>Add trigger</Text>
+      <TextInput value={q} onChangeText={setQ} placeholder="Filter…" placeholderTextColor={p.textDim} style={{ backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.control, padding: 12, fontSize: 17, color: p.text, marginBottom: 8 }} />
       {types.map((t) => (
         <Pressable key={t} onPress={() => { ensureDay(dk).food.triggers[t] = 1; save(); closeSheet(); }} style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 15, borderTopWidth: 1, borderTopColor: p.border }, pressed && { opacity: 0.5 }]}>
           <Icon name="alert" size={22} color={p.textDim} />
-          <Text style={{ color: p.text, fontSize: 16 }}>{TRIGGER_TYPES[t].label}</Text>
+          <Text style={{ color: p.text, fontSize: 17 }}>{TRIGGER_TYPES[t].label}</Text>
         </Pressable>
       ))}
     </View>
@@ -141,7 +141,7 @@ function BowelForm({ dk, existing, controls }: { dk: string; existing: Movement 
   };
   return (
     <View>
-      <Text style={{ fontSize: 20, fontWeight: '700', color: p.text, marginBottom: 16 }}>{(existing ? 'Edit ' : '') + 'Bowel movement'}</Text>
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 16 }}>{(existing ? 'Edit ' : '') + 'Bowel movement'}</Text>
       <FieldInputs fields={BM_FIELDS} form={form} set={set} />
       <SheetFooter>
         {existing ? <Button title="Delete" variant="danger" onPress={() => { const dig = ensureDay(dk).digestion; dig.movements = dig.movements.filter((x) => x.id !== existing.id); save(); controls.closeAll(); }} /> : null}

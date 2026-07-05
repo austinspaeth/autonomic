@@ -2,9 +2,6 @@
  * Design system — ported from the PWA's CSS variables and refined into one
  * consistent spacing/type scale. Colors match the web app exactly.
  */
-import { useColorScheme } from 'react-native';
-import { useStore } from '../store/store';
-
 export const ACCENT = '#e03127';
 export const ACCENT_SOFT = 'rgba(224,49,39,0.12)';
 
@@ -33,20 +30,6 @@ export interface Palette {
   overlay: string;
 }
 
-const light: Palette = {
-  dark: false,
-  bg: '#f5f5f7',
-  surface: '#ffffff',
-  surface2: '#f0f0f3',
-  text: '#1c1c1e',
-  textDim: '#6b6b70',
-  border: '#e3e3e8',
-  accent: ACCENT,
-  accentSoft: ACCENT_SOFT,
-  gaugeTrack: 'rgba(170,170,170,0.4)',
-  overlay: 'rgba(0,0,0,0.45)',
-};
-
 const dark: Palette = {
   dark: true,
   bg: '#000000',
@@ -68,23 +51,21 @@ export const radius = { card: 14, control: 10, pill: 999 } as const;
 
 /** Type scale: hero number, card title, row label, caption. */
 export const type = {
-  hero: { fontSize: 54, fontWeight: '800' as const, letterSpacing: -1 },
-  h1: { fontSize: 28, fontWeight: '800' as const },
-  h2: { fontSize: 20, fontWeight: '700' as const },
-  title: { fontSize: 16, fontWeight: '600' as const },
-  body: { fontSize: 15, fontWeight: '400' as const },
-  label: { fontSize: 13, fontWeight: '600' as const },
+  hero: { fontSize: 57, fontWeight: '800' as const, letterSpacing: -1 },
+  h1: { fontSize: 29, fontWeight: '800' as const },
+  h2: { fontSize: 21, fontWeight: '700' as const },
+  title: { fontSize: 17, fontWeight: '600' as const },
+  body: { fontSize: 16, fontWeight: '400' as const },
+  label: { fontSize: 14, fontWeight: '600' as const },
   caption: { fontSize: 12, fontWeight: '500' as const },
-  section: { fontSize: 13, fontWeight: '700' as const, textTransform: 'uppercase' as const, letterSpacing: 0.6 },
+  section: { fontSize: 14, fontWeight: '700' as const, textTransform: 'uppercase' as const, letterSpacing: 0.6 },
 };
 
+/** Dark is the only theme now. */
 export function usePalette(): Palette {
-  const system = useColorScheme();
-  const theme = useStore((s) => s.state.settings.theme);
-  const resolved = theme === 'system' ? (system === 'dark' ? 'dark' : 'light') : theme;
-  return resolved === 'dark' ? dark : light;
+  return dark;
 }
 
-export function paletteFor(theme: 'light' | 'dark'): Palette {
-  return theme === 'dark' ? dark : light;
+export function paletteFor(_theme?: 'light' | 'dark'): Palette {
+  return dark;
 }

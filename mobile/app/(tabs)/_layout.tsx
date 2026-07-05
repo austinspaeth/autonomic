@@ -1,36 +1,107 @@
-import React from 'react';
-import { Pressable, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Pressable, Text, useWindowDimensions, View } from 'react-native';
 import { Tabs } from 'expo-router';
+import { BlurView } from 'expo-blur';
+import Svg, { Path } from 'react-native-svg';
+import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
-import { Icon, IconName } from '../../src/components/Icon';
-import { usePalette } from '../../src/theme';
+import { useSheets } from '../../src/components/Sheet';
+import { MenuSheet } from '../../src/features/Settings';
 
-const TABS: { name: string; label: string; icon: IconName }[] = [
-  { name: 'index', label: 'Journal', icon: 'clipboard' },
-  { name: 'analysis', label: 'Analysis', icon: 'chart' },
-  { name: 'milestones', label: 'Milestones', icon: 'star' },
-  { name: 'insights', label: 'Insights', icon: 'ai' },
+const TABS: { name: string; label: string }[] = [
+  { name: 'index', label: 'Journal' },
+  { name: 'analysis', label: 'Analysis' },
+  { name: 'milestones', label: 'Milestones' },
+  { name: 'insights', label: 'Insights' },
 ];
 
-function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
-  const p = usePalette();
-  const insets = useSafeAreaInsets();
+const PAD = 5; // inner padding of the bar; the sliding pill is inset by this on top/bottom
+
+// Solid (filled) cog — a hollow center via even-odd fill. Opens the same menu
+// sheet as the header hamburger.
+function SolidCog({ size = 18, color = '#fff' }: { size?: number; color?: string }) {
   return (
-    <View pointerEvents="box-none" style={{ position: 'absolute', bottom: insets.bottom + 12, left: 0, right: 0, alignItems: 'center' }}>
-      <View style={{ flexDirection: 'row', gap: 2, padding: 5, borderRadius: 999, backgroundColor: p.dark ? 'rgba(28,28,30,0.86)' : 'rgba(255,255,255,0.92)', borderWidth: 1, borderColor: p.border, shadowColor: '#000', shadowOpacity: 0.22, shadowRadius: 20, shadowOffset: { width: 0, height: 10 }, elevation: 8 }}>
-        {state.routes.filter((r) => TABS.some((t) => t.name === r.name)).map((route) => {
-          const idx = state.routes.indexOf(route);
-          const focused = state.index === idx;
-          const tab = TABS.find((t) => t.name === route.name)!;
-          return (
-            <Pressable key={route.key} onPress={() => navigation.navigate(route.name)} style={{ paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999, alignItems: 'center', backgroundColor: focused ? (p.dark ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.07)') : 'transparent' }}>
-              <Icon name={tab.icon} size={22} color={focused ? p.text : p.textDim} />
-              <Text style={{ fontSize: 11, fontWeight: '600', color: focused ? p.text : p.textDim, marginTop: 3 }}>{tab.label}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        fill={color}
+        d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96a7.03 7.03 0 0 0-1.62-.94l-.36-2.54a.48.48 0 0 0-.5-.42h-3.84a.48.48 0 0 0-.5.42l-.36 2.54c-.59.24-1.13.56-1.62.94l-2.39-.96a.48.48 0 0 0-.59.22L2.74 8.87a.49.49 0 0 0 .12.61l2.03 1.58c-.05.3-.07.62-.07.94 0 .32.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.14.24.42.34.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.25.42.5.42h3.84c.25 0 .46-.18.5-.42l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.17.07.45-.02.59-.22l1.92-3.32a.49.49 0 0 0-.12-.61l-2.03-1.58zM12 15.6a3.6 3.6 0 1 1 0-7.2 3.6 3.6 0 0 1 0 7.2z"
+      />
+    </Svg>
+  );
+}
+
+function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
+  const insets = useSafeAreaInsets();
+  const { width: screenW } = useWindowDimensions();
+  const { openSheet } = useSheets();
+  const tabRoutes = state.routes.filter((r) => TABS.some((t) => t.name === r.name));
+  const activeIndex = Math.max(0, tabRoutes.findIndex((r) => state.routes.indexOf(r) === state.index));
+
+  // Per-tab measured geometry, used to tween the highlight pill between tabs.
+  const [layouts, setLayouts] = useState<{ x: number; w: number }[]>([]);
+  const pillX = useSharedValue(0);
+  const pillW = useSharedValue(0);
+
+  useEffect(() => {
+    const l = layouts[activeIndex];
+    if (!l) return;
+    const cfg = { duration: 260, easing: Easing.out(Easing.cubic) };
+    // First real measurement: snap into place instead of sliding from 0.
+    if (pillW.value === 0) { pillX.value = l.x; pillW.value = l.w; }
+    else { pillX.value = withTiming(l.x, cfg); pillW.value = withTiming(l.w, cfg); }
+  }, [activeIndex, layouts]);
+
+  const pillStyle = useAnimatedStyle(() => ({ transform: [{ translateX: pillX.value }], width: pillW.value }));
+
+  return (
+    <View pointerEvents="box-none" style={{ position: 'absolute', bottom: insets.bottom + 4, left: 0, right: 0, alignItems: 'center' }}>
+      <BlurView
+        intensity={30}
+        tint="dark"
+        style={{ width: screenW - 24, borderRadius: 999, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 20, shadowOffset: { width: 0, height: 10 }, elevation: 8 }}
+      >
+        {/* space-between spreads items across the full bar width, so item spacing scales with the device. */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: PAD, backgroundColor: 'rgba(12,12,14,0.86)' }}>
+          <Animated.View
+            pointerEvents="none"
+            style={[{ position: 'absolute', top: PAD, bottom: PAD, left: 0, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.16)' }, pillStyle]}
+          />
+          {tabRoutes.map((route, i) => {
+            const tab = TABS.find((t) => t.name === route.name)!;
+            const focused = i === activeIndex;
+            return (
+              <Pressable
+                key={route.key}
+                onPress={() => navigation.navigate(route.name)}
+                onLayout={(e) => {
+                  const { x, width } = e.nativeEvent.layout;
+                  setLayouts((prev) => {
+                    if (prev[i] && prev[i].x === x && prev[i].w === width) return prev;
+                    const next = prev.slice();
+                    next[i] = { x, w: width };
+                    return next;
+                  });
+                }}
+                style={{ paddingHorizontal: 11, paddingVertical: 7, borderRadius: 999 }}
+              >
+                <Text style={{ fontSize: 13, fontWeight: '600', color: focused ? '#fff' : 'rgba(235,235,245,0.6)' }}>{tab.label}</Text>
+              </Pressable>
+            );
+          })}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Menu"
+            onPress={() => openSheet((c) => <MenuSheet controls={c} />)}
+            hitSlop={6}
+            style={{ paddingHorizontal: 8, paddingVertical: 7, borderRadius: 999, alignItems: 'center', justifyContent: 'center' }}
+          >
+            <SolidCog size={17} color="rgba(235,235,245,0.75)" />
+          </Pressable>
+        </View>
+      </BlurView>
     </View>
   );
 }

@@ -50,8 +50,8 @@ export function DevicesScreen() {
 
   return (
     <View>
-      <Text style={{ fontSize: 20, fontWeight: '700', color: p.text, marginBottom: 6 }}>Devices</Text>
-      <Text style={{ color: p.textDim, fontSize: 13, marginBottom: 16 }}>Connect a Bluetooth heart-rate strap (e.g. Polar H10) for live HRV readings.</Text>
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 6 }}>Devices</Text>
+      <Text style={{ color: p.textDim, fontSize: 14, marginBottom: 16 }}>Connect a Bluetooth heart-rate strap (e.g. Polar H10) for live HRV readings.</Text>
 
       {savedId ? (
         <View style={{ backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.card, padding: 14, marginBottom: 16 }}>

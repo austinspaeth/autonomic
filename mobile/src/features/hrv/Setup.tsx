@@ -46,8 +46,8 @@ export function HrvSetup({ controls }: { controls: SheetControls }) {
 
   return (
     <View>
-      <Text style={{ fontSize: 20, fontWeight: '700', color: p.text, marginBottom: 4 }}>Live HRV reading</Text>
-      <Text style={{ color: p.textDim, fontSize: 13, marginBottom: 18 }}>A 5-minute capture computed on-device.</Text>
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 4 }}>Live HRV reading</Text>
+      <Text style={{ color: p.textDim, fontSize: 14, marginBottom: 18 }}>A 5-minute capture computed on-device.</Text>
 
       <Label text="Reading kind" />
       <Segmented options={[{ val: 'unstructured', label: 'Unstructured' }, { val: 'breath', label: 'Breathing' }]} value={kind} onChange={setKind} />

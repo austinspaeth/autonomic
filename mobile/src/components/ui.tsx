@@ -39,7 +39,7 @@ export function AddButton({ onPress, label = '+ Add' }: { onPress: () => void; l
   const p = usePalette();
   return (
     <Pressable onPress={onPress} hitSlop={8} style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.5 }]}>
-      <Text style={{ color: p.accent, fontSize: 14, fontWeight: '600' }}>{label}</Text>
+      <Text style={{ color: p.accent, fontSize: 15, fontWeight: '600' }}>{label}</Text>
     </Pressable>
   );
 }
@@ -52,8 +52,8 @@ export function Row({ icon, title, sub, right, onPress, iconColor }: {
     <View style={[styles.row, { borderTopColor: p.border }]}>
       {icon && <View style={styles.rowIco}><Icon name={icon} size={21} color={iconColor || p.textDim} /></View>}
       <View style={styles.rowMain}>
-        <Text style={{ color: p.text, fontSize: 15 }}>{title}</Text>
-        {sub ? <Text style={{ color: p.textDim, fontSize: 12.5, marginTop: 1 }}>{sub}</Text> : null}
+        <Text style={{ color: p.text, fontSize: 16 }}>{title}</Text>
+        {sub ? <Text style={{ color: p.textDim, fontSize: 13, marginTop: 1 }}>{sub}</Text> : null}
       </View>
       {right}
     </View>
@@ -72,7 +72,7 @@ export function Pill({ text }: { text: string }) {
   const p = usePalette();
   return (
     <View style={{ backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 3, marginLeft: 6 }}>
-      <Text style={{ color: p.textDim, fontSize: 12.5, fontVariant: ['tabular-nums'] }}>{text}</Text>
+      <Text style={{ color: p.textDim, fontSize: 13, fontVariant: ['tabular-nums'] }}>{text}</Text>
     </View>
   );
 }
@@ -90,7 +90,7 @@ export function RowValue({ text, cat }: { text: string; cat?: ScoreCat | null })
 
 export function Muted({ children }: { children: React.ReactNode }) {
   const p = usePalette();
-  return <Text style={{ color: p.textDim, fontSize: 14, paddingVertical: 6 }}>{children}</Text>;
+  return <Text style={{ color: p.textDim, fontSize: 15, paddingVertical: 6 }}>{children}</Text>;
 }
 
 /* ---------- Segmented control with an animated pill ---------- */
@@ -120,7 +120,7 @@ export function Segmented<T extends string>({ options, value, onChange, style }:
         const active = o.val === value;
         return (
           <Pressable key={o.val} onPress={() => onChange(o.val)} style={{ flex: 1, paddingVertical: 9, alignItems: 'center', zIndex: 1 }}>
-            <Text style={{ color: active ? '#fff' : p.textDim, fontSize: 14, fontWeight: '600' }}>{o.label}</Text>
+            <Text style={{ color: active ? '#fff' : p.textDim, fontSize: 15, fontWeight: '600' }}>{o.label}</Text>
           </Pressable>
         );
       })}
@@ -134,7 +134,7 @@ export function Stepper({ value, step, onChange, format }: { value: number; step
   const round = (x: number) => Math.round(x * 100) / 100;
   const btn = (label: string, next: () => void) => (
     <Pressable onPress={next} style={({ pressed }) => [{ width: 30, height: 30, borderRadius: 15, borderWidth: 1, borderColor: p.border, backgroundColor: p.surface2, alignItems: 'center', justifyContent: 'center' }, pressed && { opacity: 0.6 }]}>
-      <Text style={{ color: p.text, fontSize: 18, lineHeight: 20 }}>{label}</Text>
+      <Text style={{ color: p.text, fontSize: 19, lineHeight: 20 }}>{label}</Text>
     </Pressable>
   );
   return (
@@ -163,7 +163,7 @@ export function Button({ title, onPress, variant = 'default', style }: {
         style,
       ]}
     >
-      <Text style={{ color, fontSize: 15, fontWeight: '600' }}>{title}</Text>
+      <Text style={{ color, fontSize: 16, fontWeight: '600' }}>{title}</Text>
     </Pressable>
   );
 }

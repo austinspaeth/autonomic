@@ -33,7 +33,7 @@ export function useFormState(fields: FieldDef[], initial: Entry): [FormState, (k
 
 export function FieldLabel({ children }: { children: React.ReactNode }) {
   const p = usePalette();
-  return <Text style={{ fontSize: 13, fontWeight: '600', color: p.textDim, marginBottom: 6 }}>{children}</Text>;
+  return <Text style={{ fontSize: 14, fontWeight: '600', color: p.textDim, marginBottom: 6 }}>{children}</Text>;
 }
 
 export function TextField({ label, value, onChange, keyboardType, placeholder, multiline, signed, onToggleSign }: {
@@ -51,7 +51,7 @@ export function TextField({ label, value, onChange, keyboardType, placeholder, m
       placeholderTextColor={p.textDim}
       multiline={multiline}
       style={[
-        { flex: 1, backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.control, padding: 12, fontSize: 16, color: p.text },
+        { flex: 1, backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.control, padding: 12, fontSize: 17, color: p.text },
         multiline && { minHeight: 80, textAlignVertical: 'top' },
       ]}
     />
@@ -63,7 +63,7 @@ export function TextField({ label, value, onChange, keyboardType, placeholder, m
         <View style={{ flexDirection: 'row', gap: 6 }}>
           {input}
           <Pressable onPress={onToggleSign} style={{ width: 42, borderWidth: 1, borderColor: p.border, backgroundColor: p.surface2, borderRadius: radius.control, alignItems: 'center', justifyContent: 'center' }}>
-            <Text style={{ color: p.text, fontSize: 18, fontWeight: '700' }}>±</Text>
+            <Text style={{ color: p.text, fontSize: 19, fontWeight: '700' }}>±</Text>
           </Pressable>
         </View>
       ) : input}
@@ -100,7 +100,7 @@ export function TimeField({ label, value, onChange }: { label: string; value: st
     <View style={{ marginBottom: 14, flex: 1 }}>
       <FieldLabel>{label}</FieldLabel>
       <Pressable onPress={() => setShow(true)} style={{ backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.control, padding: 13, minHeight: 47 }}>
-        <Text style={{ color: value ? p.text : p.textDim, fontSize: 16 }}>{value ? fmtTime12(value) : 'Set time'}</Text>
+        <Text style={{ color: value ? p.text : p.textDim, fontSize: 17 }}>{value ? fmtTime12(value) : 'Set time'}</Text>
       </Pressable>
       {show && (
         <DateTimePicker
@@ -126,7 +126,7 @@ export function CheckField({ label, value, onChange }: { label: string; value: b
   const p = usePalette();
   return (
     <View style={{ marginBottom: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-      <Text style={{ color: p.text, fontSize: 15 }}>{label}</Text>
+      <Text style={{ color: p.text, fontSize: 16 }}>{label}</Text>
       <Switch value={value} onValueChange={onChange} trackColor={{ true: p.accent }} />
     </View>
   );

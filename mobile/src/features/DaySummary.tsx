@@ -4,7 +4,8 @@
  * this" button opens the score-explanation sheet (openScoreExplain).
  */
 import React, { useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import Svg, { Defs, LinearGradient as SvgGradient, Rect, Stop } from 'react-native-svg';
 import { ScoreGauge } from '../components/charts';
 import { Icon } from '../components/Icon';
 import { SheetControls, useSheets } from '../components/Sheet';
@@ -27,6 +28,39 @@ const hexA = (hex: string, a: number) => {
   return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
 };
 
+// Status-color highlight on the top-left border edge, fading down the sides
+// into the normal border — like light shining onto the card. Mirrors the
+// webapp's gradient-border trick (linear-gradient 165deg, color → border) using
+// an SVG rounded-rect stroke overlay so it follows the corner radius. Pass
+// color=null to fall back to a plain border (awaiting / low-confidence state).
+let obId = 0;
+function GradientBorderCard({ color, style, children }: { color: string | null; style?: any; children: React.ReactNode }) {
+  const p = usePalette();
+  const [size, setSize] = useState({ w: 0, h: 0 });
+  const [gid] = useState(() => `ob${obId++}`);
+  const r = radius.card;
+  return (
+    <View
+      onLayout={(e) => { const { width, height } = e.nativeEvent.layout; setSize({ w: width, h: height }); }}
+      style={[{ borderRadius: r, backgroundColor: p.surface, overflow: 'hidden' }, color ? null : { borderWidth: 1, borderColor: p.border }, style]}
+    >
+      {children}
+      {color && size.w > 0 && (
+        <Svg width={size.w} height={size.h} style={StyleSheet.absoluteFill} pointerEvents="none">
+          <Defs>
+            <SvgGradient id={gid} x1={size.w * 0.12} y1={0} x2={size.w * 0.55} y2={size.h} gradientUnits="userSpaceOnUse">
+              <Stop offset="0" stopColor={color} stopOpacity={1} />
+              <Stop offset="0.14" stopColor={color} stopOpacity={0.4} />
+              <Stop offset="1" stopColor={p.border} stopOpacity={1} />
+            </SvgGradient>
+          </Defs>
+          <Rect x={0.5} y={0.5} width={size.w - 1} height={size.h - 1} rx={r - 0.5} ry={r - 0.5} fill="none" stroke={`url(#${gid})`} strokeWidth={1} />
+        </Svg>
+      )}
+    </View>
+  );
+}
+
 export function DaySummary({ dk }: { dk: string }) {
   const p = usePalette();
   const { openSheet } = useSheets();
@@ -39,19 +73,19 @@ export function DaySummary({ dk }: { dk: string }) {
 
   return (
     <View>
-      <View style={[cardStyle(p, all), { borderRadius: radius.card, marginBottom: 12, overflow: 'hidden' }]}>
+      <GradientBorderCard color={all.score == null || all.confidence < 40 ? null : scoreCat(all.score).color} style={{ marginBottom: 12 }}>
         {all.score == null || all.confidence < 40 ? (
           <View style={{ padding: 16 }}>
             <Text style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.6, fontWeight: '700', color: p.textDim }}>Autonomic Outlook</Text>
             {!readings.length ? (
               <>
-                <Text style={{ fontSize: 17, fontWeight: '700', color: p.text, marginTop: 6 }}>{dk > today ? 'Future day' : 'Awaiting morning data'}</Text>
-                <Text style={{ fontSize: 13.5, color: p.textDim, marginTop: 5, lineHeight: 19 }}>{dk > today ? 'Nothing logged yet for this day.' : "Add a morning HRV reading to see today's autonomic profile."}</Text>
+                <Text style={{ fontSize: 18, fontWeight: '700', color: p.text, marginTop: 6 }}>{dk > today ? 'Future day' : 'Awaiting morning data'}</Text>
+                <Text style={{ fontSize: 14, color: p.textDim, marginTop: 5, lineHeight: 19 }}>{dk > today ? 'Nothing logged yet for this day.' : "Add a morning HRV reading to see today's autonomic profile."}</Text>
               </>
             ) : (
               <>
-                <Text style={{ fontSize: 17, fontWeight: '700', color: p.text, marginTop: 6 }}>Insufficient data</Text>
-                <Text style={{ fontSize: 13.5, color: p.textDim, marginTop: 5, lineHeight: 19 }}>
+                <Text style={{ fontSize: 18, fontWeight: '700', color: p.text, marginTop: 6 }}>Insufficient data</Text>
+                <Text style={{ fontSize: 14, color: p.textDim, marginTop: 5, lineHeight: 19 }}>
                   {(all.score != null ? `Provisional ${all.score} / 100 at ${all.confidence}% confidence. ` : '') + (all.hasStruct ? 'Add more readings to firm up the score.' : all.hasUnstruct ? 'Awaiting a structured (breathing) reading for higher confidence.' : 'Add a morning HRV reading for higher confidence.')}
                 </Text>
               </>
@@ -60,16 +94,10 @@ export function DaySummary({ dk }: { dk: string }) {
         ) : (
           <ScoredHero dk={dk} readings={readings} d={d} all={all} ctx={ctx} onExplain={() => openSheet((c) => <ScoreExplain all={all} dk={dk} controls={c} />)} />
         )}
-      </View>
+      </GradientBorderCard>
       <StreakCard dk={dk} />
     </View>
   );
-}
-
-function cardStyle(p: ReturnType<typeof usePalette>, all: ScoreSetResult) {
-  if (all.score == null || all.confidence < 40) return { backgroundColor: p.surface, borderWidth: 1, borderColor: p.border };
-  const cat = scoreCat(all.score);
-  return { backgroundColor: p.surface, borderWidth: 1, borderColor: hexA(cat.color, 0.55) };
 }
 
 function ScoredHero({ dk, readings, d, all, ctx, onExplain }: { dk: string; readings: any[]; d: any; all: ScoreSetResult; ctx: any; onExplain: () => void }) {
@@ -106,7 +134,7 @@ function ScoredHero({ dk, readings, d, all, ctx, onExplain }: { dk: string; read
       </View>
       <View style={{ alignItems: 'center', marginVertical: 8 }}>
         <ScoreGauge score={all.score!} color={cat.color}>
-          <Text style={{ fontSize: 54, fontWeight: '800', color: p.text, fontVariant: ['tabular-nums'], letterSpacing: -1 }}>{all.score}</Text>
+          <Text style={{ fontSize: 57, fontWeight: '800', color: p.text, fontVariant: ['tabular-nums'], letterSpacing: -1 }}>{all.score}</Text>
           <Text style={{ fontSize: 10, fontWeight: '700', letterSpacing: 1, color: p.textDim, marginTop: 4 }}>OUT OF 100</Text>
         </ScoreGauge>
         {delta != null && Math.abs(delta) >= 3 ? (
@@ -119,8 +147,8 @@ function ScoredHero({ dk, readings, d, all, ctx, onExplain }: { dk: string; read
         <Icon name="info" size={15} color={p.textDim} />
         <Text style={{ color: p.textDim, fontSize: 11, fontWeight: '600' }}>What powers this</Text>
       </Pressable>
-      <Text style={{ textAlign: 'center', fontSize: 13, color: p.textDim, fontWeight: '600' }}>{`${cat.label} · ${all.confidence}% confidence`}</Text>
-      <Text style={{ fontSize: 14, marginTop: 14, lineHeight: 21, color: p.text }}>{guide}</Text>
+      <Text style={{ textAlign: 'center', fontSize: 14, color: p.textDim, fontWeight: '600' }}>{`${cat.label} · ${all.confidence}% confidence`}</Text>
+      <Text style={{ fontSize: 15, marginTop: 14, lineHeight: 21, color: p.text }}>{guide}</Text>
       {blueZone(readings, ctx) ? (
         <Flag color={SCORE_COLORS.warning} text="Blue-zone risk. High readiness may mask fragility, so do less today, not more." />
       ) : null}
@@ -133,7 +161,7 @@ function Flag({ color, text }: { color: string; text: string }) {
   return (
     <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start', marginTop: 11, padding: 10, borderRadius: radius.control, backgroundColor: hexA(color, 0.15) }}>
       <Icon name="alert" size={15} color={color} />
-      <Text style={{ flex: 1, fontSize: 12.5, lineHeight: 17, fontWeight: '600', color }}>{text}</Text>
+      <Text style={{ flex: 1, fontSize: 13, lineHeight: 17, fontWeight: '600', color }}>{text}</Text>
     </View>
   );
 }
@@ -169,12 +197,12 @@ function StreakCard({ dk }: { dk: string }) {
           <Icon name={icon} size={21} color={si.current > 0 ? '#f97316' : p.textDim} />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 14, color: p.text }}>
+          <Text style={{ fontSize: 15, color: p.text }}>
             <Text style={{ fontWeight: '800' }}>{si.current} </Text>
             {`clean day${si.current === 1 ? '' : 's'} · `}
             <Text style={{ color: p.textDim, fontWeight: '600' }}>{tier.tier}</Text>
           </Text>
-          <Text style={{ fontSize: 12.5, color: p.textDim, marginTop: 2, lineHeight: 17 }}>{sub}</Text>
+          <Text style={{ fontSize: 13, color: p.textDim, marginTop: 2, lineHeight: 17 }}>{sub}</Text>
           {expanded ? (
             <View style={{ marginTop: 10 }}>
               <Text style={{ fontSize: 11, color: p.textDim, fontVariant: ['tabular-nums'] }}>{stats.join(' · ')}</Text>
@@ -256,9 +284,9 @@ function ScoreExplain({ all, dk, controls }: { all: ScoreSetResult; dk: string; 
 
   return (
     <View>
-      <Text style={{ fontSize: 20, fontWeight: '700', color: p.text, marginBottom: 16 }}>How this score was calculated</Text>
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 16 }}>How this score was calculated</Text>
       <HeroCard cat={cat.short === 'Excellent' || cat.short === 'Good' ? 'great' : null} label={cat.label} big={all.score!} den="/ 100" sub={`Confidence ${all.confidence}% — the share of the full input set available to score today.`} />
-      <Text style={{ fontSize: 13.5, color: p.textDim, lineHeight: 20, marginBottom: 16 }}>
+      <Text style={{ fontSize: 14, color: p.textDim, lineHeight: 20, marginBottom: 16 }}>
         {"The Autonomic Score is a weighted blend of the day's readings. Each input is graded, turned into points, and combined by weight. Missing inputs drop out and the remaining weights are rescaled — that rescaling is the confidence percentage."}
       </Text>
       {helped.length ? <SumCard title="What helped">{helped.map((c) => <CompRow key={c.label} c={c} improveLine={improveLine} />)}</SumCard> : null}
@@ -284,8 +312,8 @@ function CompRow({ c, improveLine }: { c: any; improveLine: (c: any) => string }
     <View style={{ backgroundColor: p.surface, borderColor: p.border, borderWidth: 1, borderRadius: radius.control, marginBottom: 10, overflow: 'hidden' }}>
       <Pressable onPress={() => setOpen((v) => !v)} style={{ flexDirection: 'row', alignItems: 'center', gap: 9, padding: 13 }}>
         <View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: SCORE_COLORS[c.cat as keyof typeof SCORE_COLORS] || p.border }} />
-        <Text style={{ fontWeight: '600', fontSize: 14, color: p.text, flex: 1 }}>{c.label}</Text>
-        <Text style={{ fontSize: 13, color: p.textDim, fontVariant: ['tabular-nums'] }}>{c.detail.value || ''}</Text>
+        <Text style={{ fontWeight: '600', fontSize: 15, color: p.text, flex: 1 }}>{c.label}</Text>
+        <Text style={{ fontSize: 14, color: p.textDim, fontVariant: ['tabular-nums'] }}>{c.detail.value || ''}</Text>
         <Icon name="chevron" size={17} color={p.textDim} />
       </Pressable>
       {open ? (
@@ -294,7 +322,7 @@ function CompRow({ c, improveLine }: { c: any; improveLine: (c: any) => string }
             <View style={{ backgroundColor: contrib.bg, paddingHorizontal: 9, paddingVertical: 3, borderRadius: 999 }}><Text style={{ fontSize: 11, fontWeight: '700', color: contrib.col }}>{contrib.t}</Text></View>
             <Text style={{ fontSize: 12, color: p.textDim }}>{`${GRADE_LABEL[c.cat as keyof typeof GRADE_LABEL]} · weight ${c.w}%`}</Text>
           </View>
-          <Text style={{ fontSize: 12.5, color: p.textDim, lineHeight: 18 }}>{improveLine(c)}</Text>
+          <Text style={{ fontSize: 13, color: p.textDim, lineHeight: 18 }}>{improveLine(c)}</Text>
         </View>
       ) : null}
     </View>

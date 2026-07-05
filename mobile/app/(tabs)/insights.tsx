@@ -41,7 +41,7 @@ export default function InsightsScreen() {
       <Header />
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 140 }} showsVerticalScrollIndicator={false}>
         <Segmented options={[{ val: 'day', label: 'Day' }, { val: 'week', label: 'Week' }, { val: 'month', label: 'Month' }, { val: 'year', label: 'Year' }]} value={range} onChange={setRange} style={{ marginBottom: 8 }} />
-        <Text style={{ color: p.textDim, fontSize: 13, marginVertical: 8, lineHeight: 18 }}>Pick one or more reports, then generate a copyable analysis prompt for Claude or ChatGPT.</Text>
+        <Text style={{ color: p.textDim, fontSize: 14, marginVertical: 8, lineHeight: 18 }}>Pick one or more reports, then generate a copyable analysis prompt for Claude or ChatGPT.</Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
           {REPORT_CARDS.map((card) => {
             const sel = selected.has(card.id);
@@ -49,8 +49,8 @@ export default function InsightsScreen() {
               <Pressable key={card.id} onPress={() => toggle(card.id)} style={{ width: '47.5%', borderWidth: 1, borderRadius: radius.card, backgroundColor: sel ? p.accentSoft : p.surface, borderColor: sel ? p.accent : p.border, padding: 14 }}>
                 {sel ? <View style={{ position: 'absolute', top: 12, right: 12, width: 20, height: 20, borderRadius: 10, backgroundColor: p.accent, alignItems: 'center', justifyContent: 'center' }}><Icon name="check" size={14} color="#fff" /></View> : null}
                 <Icon name={card.icon as IconName} size={26} color={p.accent} />
-                <Text style={{ fontSize: 14, fontWeight: '700', color: p.text, marginTop: 8, paddingRight: 20 }}>{card.title}</Text>
-                <Text style={{ fontSize: 11.5, color: p.textDim, marginTop: 4, lineHeight: 15 }}>{card.desc}</Text>
+                <Text style={{ fontSize: 15, fontWeight: '700', color: p.text, marginTop: 8, paddingRight: 20 }}>{card.title}</Text>
+                <Text style={{ fontSize: 12, color: p.textDim, marginTop: 4, lineHeight: 15 }}>{card.desc}</Text>
               </Pressable>
             );
           })}
@@ -59,7 +59,7 @@ export default function InsightsScreen() {
       {selected.size > 0 ? (
         <View style={{ position: 'absolute', left: 16, right: 16, bottom: 88 }}>
           <Pressable onPress={generate} style={{ backgroundColor: p.accent, borderRadius: 999, paddingVertical: 15, alignItems: 'center', shadowColor: p.accent, shadowOpacity: 0.35, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 6 }}>
-            <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>{selected.size > 1 ? `Generate Report Prompt (${selected.size})` : 'Generate Report Prompt'}</Text>
+            <Text style={{ color: '#fff', fontSize: 17, fontWeight: '700' }}>{selected.size > 1 ? `Generate Report Prompt (${selected.size})` : 'Generate Report Prompt'}</Text>
           </Pressable>
         </View>
       ) : null}
@@ -80,8 +80,8 @@ function PromptSheet({ title, rangeText, prompt, controls }: { title: string; ra
   };
   return (
     <View>
-      <Text style={{ fontSize: 20, fontWeight: '700', color: p.text }}>{title}</Text>
-      <Text style={{ color: p.textDim, fontSize: 13, marginTop: 4 }}>Copy this prompt and paste it into Claude or ChatGPT.</Text>
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text }}>{title}</Text>
+      <Text style={{ color: p.textDim, fontSize: 14, marginTop: 4 }}>Copy this prompt and paste it into Claude or ChatGPT.</Text>
       <Text style={{ color: p.textDim, fontSize: 12, marginTop: 6, marginBottom: 10, fontVariant: ['tabular-nums'] }}>{`${rangeText} · ${prompt.length.toLocaleString()} characters`}</Text>
       <View style={{ backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.control, padding: 12, marginBottom: 16 }}>
         <Text style={{ color: p.text, fontFamily: 'Menlo', fontSize: 11, lineHeight: 16 }}>{prompt}</Text>

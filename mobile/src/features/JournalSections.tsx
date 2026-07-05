@@ -108,7 +108,7 @@ function SleepSection({ dk }: { dk: string }) {
     </Card>
   );
 }
-const inp = (p: ReturnType<typeof usePalette>) => ({ backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.control, padding: 11, fontSize: 15, color: p.text, minHeight: 44 });
+const inp = (p: ReturnType<typeof usePalette>) => ({ backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.control, padding: 11, fontSize: 16, color: p.text, minHeight: 44 });
 
 function LoggedSection({ title, dk, arr, typeMap, empty, onAdd, onOpen, showValue, showTime, showPeriod }: {
   title: string; dk: string; arr: 'meds' | 'symptoms'; typeMap: Record<string, { label: string; icon: string; summary?: (r: never) => string }>; empty: string;

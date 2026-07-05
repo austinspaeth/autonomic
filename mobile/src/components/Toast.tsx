@@ -28,7 +28,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       {msg && (
         <Animated.View pointerEvents="none" style={[styles.wrap, { bottom: 100 + insets.bottom, opacity }]}>
           <View style={[styles.toast, { backgroundColor: p.text }]}>
-            <Text style={{ color: p.bg, fontSize: 14, fontWeight: '600' }}>{msg}</Text>
+            <Text style={{ color: p.bg, fontSize: 15, fontWeight: '600' }}>{msg}</Text>
           </View>
         </Animated.View>
       )}
