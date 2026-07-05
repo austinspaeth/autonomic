@@ -58,7 +58,9 @@
           "bluetoothAlwaysPermission": "Autonomic connects to your heart-rate chest strap to capture beat-to-beat data during HRV readings."
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "expo-asset",
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": false
