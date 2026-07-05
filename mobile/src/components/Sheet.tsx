@@ -133,13 +133,20 @@ function SheetView({ entry, isTop, behind, isBase, onClose, closeAll }: {
     },
   });
 
-  const sheetStyle = useAnimatedStyle(() => ({
-    transform: [
-      // Recede lifts the card up and shrinks it as the next sheet takes its place.
-      { translateY: translateY.value - 16 * recede.value },
-      { scale: 1 - 0.06 * recede.value },
-    ],
-  }));
+  const sheetStyle = useAnimatedStyle(() => {
+    const scale = 1 - 0.08 * recede.value; // shrink to 0.92 when fully receded
+    // Scaling is centered, so it drops the top edge by (1-scale)*sheetH/2. Lift by
+    // that much PLUS a peek so the card's top rounds out above the incoming sheet
+    // — the iOS "stacked cards" look.
+    const peek = 22 * recede.value;
+    const lift = recede.value * 0.04 * sheetH + peek;
+    return {
+      transform: [
+        { translateY: translateY.value - lift },
+        { scale },
+      ],
+    };
+  });
 
   const controls: SheetControls = { close: dismiss, closeAll: () => { closeAll(); } };
   const content = entry.builder(controls);

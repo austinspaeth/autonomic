@@ -40,7 +40,7 @@ export function MenuSheet({ controls }: { controls: SheetControls }) {
     <View>
       {/* Near-black brand card, inset to match content: 18px left/right (content
           padding) and top (topPad is 24, so pull up 6 to match). */}
-      <View style={{ marginTop: -6, marginBottom: 16, paddingVertical: 24, borderRadius: radius.card, backgroundColor: '#08080a', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 }}>
+      <View style={{ marginTop: -6, marginBottom: 16, paddingVertical: 24, borderRadius: radius.card, backgroundColor: '#131315', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 }}>
         <BrandMark size={26} />
         <Text style={{ fontSize: 22, fontWeight: '800', color: p.text, letterSpacing: -0.3 }}>Autonomic</Text>
       </View>
