@@ -1,0 +1,65 @@
+name: EAS Update (OTA)
+
+# Publishes an over-the-air JS/asset bundle to Expo's CDN whenever the native
+# app changes land on main. Installed builds on the matching channel pick it up
+# on next launch — no App Store / Play Store release required.
+#
+# NOTE: OTA updates ship JavaScript and assets only. Adding or upgrading a
+# native module, changing permissions, or bumping the Expo SDK requires a new
+# native build (see eas-build.yml) submitted to the stores.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "mobile/**"
+      - ".github/workflows/eas-update.yml"
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "EAS Update branch to publish to"
+        default: "production"
+        required: true
+
+concurrency:
+  group: eas-update-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  update:
+    name: Publish OTA update
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Set up EAS CLI
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Publish update
+        # COMMIT_MESSAGE is passed via env (not string-interpolated into the
+        # script) so an arbitrary commit message can't inject shell.
+        env:
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+          UPDATE_BRANCH: ${{ github.event.inputs.branch || 'production' }}
+        run: |
+          eas update \
+            --branch "$UPDATE_BRANCH" \
+            --message "${COMMIT_MESSAGE:-Manual update ${{ github.sha }}}" \
+            --non-interactive
