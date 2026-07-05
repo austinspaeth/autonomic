@@ -70,6 +70,7 @@ export function SheetProvider({ children }: { children: React.ReactNode }) {
                 entry={entry}
                 isTop={i === stack.length - 1}
                 behind={i < stack.length - 1}
+                isBase={i === 0}
                 onClose={() => setStack((s) => s.filter((x) => x.id !== entry.id))}
                 closeAll={closeAll}
               />
@@ -83,8 +84,8 @@ export function SheetProvider({ children }: { children: React.ReactNode }) {
 
 const SCREEN_H = Dimensions.get('window').height;
 
-function SheetView({ entry, isTop, behind, onClose, closeAll }: {
-  entry: SheetEntry; isTop: boolean; behind: boolean; onClose: () => void; closeAll: () => void;
+function SheetView({ entry, isTop, behind, isBase, onClose, closeAll }: {
+  entry: SheetEntry; isTop: boolean; behind: boolean; isBase: boolean; onClose: () => void; closeAll: () => void;
 }) {
   const p = usePalette();
   const insets = useSafeAreaInsets();
@@ -93,6 +94,13 @@ function SheetView({ entry, isTop, behind, onClose, closeAll }: {
   const mounted = useRef(false);
   const full = entry.opts.fullscreen;
   const fit = entry.opts.fitContent && !full;
+  // Base sheets (bottom of the stack) can only be closed via the ✕ (or backdrop) —
+  // swipe-to-dismiss is reserved for stacked sheets, where swiping down naturally
+  // reveals the sheet beneath. So base sheets always show the ✕, even when fit.
+  const swipeable = !full && !isBase;
+  // With no grabber (non-swipeable sheets), reclaim the vertical space it used to
+  // occupy so content still clears the ✕.
+  const topPad = full ? insets.top + 12 : swipeable ? 8 : 24;
   const sheetH = full ? SCREEN_H : Math.min(SCREEN_H * 0.92, SCREEN_H - insets.top - 8);
 
   React.useEffect(() => {
@@ -140,7 +148,7 @@ function SheetView({ entry, isTop, behind, onClose, closeAll }: {
           sheetStyle,
         ]}
       >
-        {!full && (
+        {swipeable && (
           <PanGestureHandler onGestureEvent={gesture}>
             <Animated.View style={styles.grabArea}>
               <View style={[styles.grabber, { backgroundColor: p.border }]} />
@@ -149,13 +157,13 @@ function SheetView({ entry, isTop, behind, onClose, closeAll }: {
         )}
         <SheetContentContext.Provider value={{ setFooter }}>
           {fit ? (
-            <View style={{ padding: 18, paddingTop: 8, paddingBottom: footer ? 120 : 24 + insets.bottom }}>
+            <View style={{ padding: 18, paddingTop: topPad, paddingBottom: footer ? 120 : 24 + insets.bottom }}>
               {content}
             </View>
           ) : (
             <ScrollView
               style={{ flex: 1 }}
-              contentContainerStyle={{ padding: 18, paddingTop: full ? insets.top + 12 : 8, paddingBottom: footer ? 120 : 24 + insets.bottom }}
+              contentContainerStyle={{ padding: 18, paddingTop: topPad, paddingBottom: footer ? 120 : 24 + insets.bottom }}
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
             >
@@ -164,7 +172,7 @@ function SheetView({ entry, isTop, behind, onClose, closeAll }: {
           )}
         </SheetContentContext.Provider>
 
-        {!full && !fit && (
+        {!full && (!fit || isBase) && (
           <Pressable onPress={dismiss} style={[styles.closeBtn, { backgroundColor: p.surface2 }]} hitSlop={8}>
             <Icon name="x" size={18} color={p.textDim} />
           </Pressable>

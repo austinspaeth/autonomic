@@ -38,8 +38,10 @@ export function MenuSheet({ controls }: { controls: SheetControls }) {
   const m = state.meta || {};
   return (
     <View>
-      {/* Near-black header band, inset to match the other content, rounded corners. */}
-      <View style={{ marginBottom: 16, paddingVertical: 24, borderRadius: radius.card, backgroundColor: '#08080a', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 }}>
+      {/* Full-bleed near-black hero header flush with the sheet top. Negative
+          margins escape the content padding (topPad 24, horizontal 18); the
+          sheet's rounded top corners + overflow:hidden clip the band's top. */}
+      <View style={{ marginTop: -24, marginHorizontal: -18, marginBottom: 18, paddingVertical: 30, paddingHorizontal: 18, backgroundColor: '#08080a', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 }}>
         <BrandMark size={26} />
         <Text style={{ fontSize: 22, fontWeight: '800', color: p.text, letterSpacing: -0.3 }}>Autonomic</Text>
       </View>
