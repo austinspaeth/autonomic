@@ -95,12 +95,12 @@ function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
         })}
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Menu"
+          accessibilityLabel="Settings"
           onPress={() => openSheet((c) => <MenuSheet controls={c} />)}
           style={{ paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999, alignItems: 'center' }}
         >
           <SolidCog size={22} color={p.textDim} />
-          <Text style={{ fontSize: 11, fontWeight: '600', color: p.textDim, marginTop: 3 }}>Menu</Text>
+          <Text style={{ fontSize: 11, fontWeight: '600', color: p.textDim, marginTop: 3 }}>Settings</Text>
         </Pressable>
       </View>
       </BlurView>

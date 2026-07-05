@@ -22,7 +22,7 @@ export function Header({ children, onHeight }: { children?: React.ReactNode; onH
       intensity={40}
       tint="dark"
       onLayout={(e) => onHeight?.(e.nativeEvent.layout.height)}
-      style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, paddingTop: insets.top + 6, backgroundColor: 'rgba(6,6,9,0.6)', borderBottomWidth: 0.5, borderBottomColor: p.border }}
+      style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, paddingTop: insets.top + 6, backgroundColor: 'rgba(6,6,9,0.88)', borderBottomWidth: 0.5, borderBottomColor: p.border }}
     >
       {children}
     </BlurView>

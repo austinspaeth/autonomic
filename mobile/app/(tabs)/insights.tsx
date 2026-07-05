@@ -39,6 +39,11 @@ export default function InsightsScreen() {
   return (
     <Screen
       bottomPad={140}
+      header={
+        <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
+          <Segmented options={[{ val: 'day', label: 'Day' }, { val: 'week', label: 'Week' }, { val: 'month', label: 'Month' }, { val: 'year', label: 'Year' }]} value={range} onChange={setRange} />
+        </View>
+      }
       footer={
         selected.size > 0 ? (
           <View style={{ position: 'absolute', left: 16, right: 16, bottom: 88 }}>
@@ -49,8 +54,7 @@ export default function InsightsScreen() {
         ) : null
       }
     >
-      <Segmented options={[{ val: 'day', label: 'Day' }, { val: 'week', label: 'Week' }, { val: 'month', label: 'Month' }, { val: 'year', label: 'Year' }]} value={range} onChange={setRange} style={{ marginBottom: 8 }} />
-      <Text style={{ color: p.textDim, fontSize: 14, marginVertical: 8, lineHeight: 18 }}>Pick one or more reports, then generate a copyable analysis prompt for Claude or ChatGPT.</Text>
+      <Text style={{ color: p.textDim, fontSize: 14, marginBottom: 12, lineHeight: 18 }}>Pick one or more reports, then generate a copyable analysis prompt for Claude or ChatGPT.</Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
         {REPORT_CARDS.map((card) => {
           const sel = selected.has(card.id);

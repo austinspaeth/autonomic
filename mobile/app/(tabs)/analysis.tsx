@@ -20,8 +20,13 @@ export default function AnalysisScreen() {
   const cat = cats.find((c) => c.id === open) || null;
 
   return (
-    <Screen>
-      <Segmented options={[{ val: 'day', label: 'Day' }, { val: 'week', label: 'Week' }, { val: 'month', label: 'Month' }, { val: 'year', label: 'Year' }]} value={mode} onChange={setMode} style={{ marginBottom: 16 }} />
+    <Screen
+      header={
+        <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
+          <Segmented options={[{ val: 'day', label: 'Day' }, { val: 'week', label: 'Week' }, { val: 'month', label: 'Month' }, { val: 'year', label: 'Year' }]} value={mode} onChange={setMode} />
+        </View>
+      }
+    >
       {!hasData ? (
         <Text style={{ color: p.textDim, textAlign: 'center', marginTop: 40 }}>No data logged yet.</Text>
       ) : cat ? (
