@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
-import { Header } from '../../src/components/Header';
+import { Screen } from '../../src/components/Header';
 import { Icon, IconName } from '../../src/components/Icon';
 import { Button, Segmented } from '../../src/components/ui';
 import { SheetControls, useSheets } from '../../src/components/Sheet';
@@ -37,33 +37,34 @@ export default function InsightsScreen() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: p.bg }}>
-      <Header />
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 140 }} showsVerticalScrollIndicator={false}>
-        <Segmented options={[{ val: 'day', label: 'Day' }, { val: 'week', label: 'Week' }, { val: 'month', label: 'Month' }, { val: 'year', label: 'Year' }]} value={range} onChange={setRange} style={{ marginBottom: 8 }} />
-        <Text style={{ color: p.textDim, fontSize: 14, marginVertical: 8, lineHeight: 18 }}>Pick one or more reports, then generate a copyable analysis prompt for Claude or ChatGPT.</Text>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-          {REPORT_CARDS.map((card) => {
-            const sel = selected.has(card.id);
-            return (
-              <Pressable key={card.id} onPress={() => toggle(card.id)} style={{ width: '47.5%', borderWidth: 1, borderRadius: radius.card, backgroundColor: sel ? p.accentSoft : p.surface, borderColor: sel ? p.accent : p.border, padding: 14 }}>
-                {sel ? <View style={{ position: 'absolute', top: 12, right: 12, width: 20, height: 20, borderRadius: 10, backgroundColor: p.accent, alignItems: 'center', justifyContent: 'center' }}><Icon name="check" size={14} color="#fff" /></View> : null}
-                <Icon name={card.icon as IconName} size={26} color={p.accent} />
-                <Text style={{ fontSize: 15, fontWeight: '700', color: p.text, marginTop: 8, paddingRight: 20 }}>{card.title}</Text>
-                <Text style={{ fontSize: 12, color: p.textDim, marginTop: 4, lineHeight: 15 }}>{card.desc}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </ScrollView>
-      {selected.size > 0 ? (
-        <View style={{ position: 'absolute', left: 16, right: 16, bottom: 88 }}>
-          <Pressable onPress={generate} style={{ backgroundColor: p.accent, borderRadius: 999, paddingVertical: 15, alignItems: 'center', shadowColor: p.accent, shadowOpacity: 0.35, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 6 }}>
-            <Text style={{ color: '#fff', fontSize: 17, fontWeight: '700' }}>{selected.size > 1 ? `Generate Report Prompt (${selected.size})` : 'Generate Report Prompt'}</Text>
-          </Pressable>
-        </View>
-      ) : null}
-    </View>
+    <Screen
+      bottomPad={140}
+      footer={
+        selected.size > 0 ? (
+          <View style={{ position: 'absolute', left: 16, right: 16, bottom: 88 }}>
+            <Pressable onPress={generate} style={{ backgroundColor: p.accent, borderRadius: 999, paddingVertical: 15, alignItems: 'center', shadowColor: p.accent, shadowOpacity: 0.35, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 6 }}>
+              <Text style={{ color: '#fff', fontSize: 17, fontWeight: '700' }}>{selected.size > 1 ? `Generate Report Prompt (${selected.size})` : 'Generate Report Prompt'}</Text>
+            </Pressable>
+          </View>
+        ) : null
+      }
+    >
+      <Segmented options={[{ val: 'day', label: 'Day' }, { val: 'week', label: 'Week' }, { val: 'month', label: 'Month' }, { val: 'year', label: 'Year' }]} value={range} onChange={setRange} style={{ marginBottom: 8 }} />
+      <Text style={{ color: p.textDim, fontSize: 14, marginVertical: 8, lineHeight: 18 }}>Pick one or more reports, then generate a copyable analysis prompt for Claude or ChatGPT.</Text>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+        {REPORT_CARDS.map((card) => {
+          const sel = selected.has(card.id);
+          return (
+            <Pressable key={card.id} onPress={() => toggle(card.id)} style={{ width: '47.5%', borderWidth: 1, borderRadius: radius.card, backgroundColor: sel ? p.accentSoft : p.surface, borderColor: sel ? p.accent : p.border, padding: 14 }}>
+              {sel ? <View style={{ position: 'absolute', top: 12, right: 12, width: 20, height: 20, borderRadius: 10, backgroundColor: p.accent, alignItems: 'center', justifyContent: 'center' }}><Icon name="check" size={14} color="#fff" /></View> : null}
+              <Icon name={card.icon as IconName} size={26} color={p.accent} />
+              <Text style={{ fontSize: 15, fontWeight: '700', color: p.text, marginTop: 8, paddingRight: 20 }}>{card.title}</Text>
+              <Text style={{ fontSize: 12, color: p.textDim, marginTop: 4, lineHeight: 15 }}>{card.desc}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </Screen>
   );
 }
 

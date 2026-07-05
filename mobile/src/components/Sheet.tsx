@@ -28,6 +28,8 @@ export interface SheetControls {
 export interface SheetOptions {
   action?: { icon: 'edit'; onPress: () => void };
   fullscreen?: boolean;
+  /** Size the sheet to its content (up to ~90% cap) and hide the ✕. */
+  fitContent?: boolean;
 }
 type Builder = (c: SheetControls) => React.ReactNode;
 
@@ -90,6 +92,7 @@ function SheetView({ entry, isTop, behind, onClose, closeAll }: {
   const [footer, setFooter] = useState<React.ReactNode>(null);
   const mounted = useRef(false);
   const full = entry.opts.fullscreen;
+  const fit = entry.opts.fitContent && !full;
   const sheetH = full ? SCREEN_H : Math.min(SCREEN_H * 0.92, SCREEN_H - insets.top - 8);
 
   React.useEffect(() => {

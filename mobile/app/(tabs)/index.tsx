@@ -1,6 +1,6 @@
 import React from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
-import { Header } from '../../src/components/Header';
+import { Pressable, Text, View } from 'react-native';
+import { Screen } from '../../src/components/Header';
 import { useSheets } from '../../src/components/Sheet';
 import { DaySummary } from '../../src/features/DaySummary';
 import { JournalSections } from '../../src/features/JournalSections';
@@ -16,8 +16,8 @@ export default function JournalScreen() {
   const isToday = dk === todayKey();
 
   return (
-    <View style={{ flex: 1, backgroundColor: p.bg }}>
-      <Header>
+    <Screen
+      header={
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 16, paddingBottom: 12 }}>
           <Pressable onPress={() => shiftCurrent(-1)} hitSlop={8} style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}>
             <Text style={{ color: p.text, fontSize: 25 }}>‹</Text>
@@ -29,11 +29,10 @@ export default function JournalScreen() {
             <Text style={{ color: p.text, fontSize: 25 }}>›</Text>
           </Pressable>
         </View>
-      </Header>
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
-        <DaySummary dk={dk} />
-        <JournalSections dk={dk} />
-      </ScrollView>
-    </View>
+      }
+    >
+      <DaySummary dk={dk} />
+      <JournalSections dk={dk} />
+    </Screen>
   );
 }

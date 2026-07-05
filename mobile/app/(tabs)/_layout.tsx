@@ -61,7 +61,7 @@ function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
         tint="dark"
         style={{ borderRadius: 999, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 20, shadowOffset: { width: 0, height: 10 }, elevation: 8 }}
       >
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, padding: PAD, backgroundColor: 'rgba(6,6,9,0.78)' }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, padding: PAD, backgroundColor: 'rgba(6,6,9,0.55)' }}>
         <View style={{ paddingLeft: 8, paddingRight: 6, justifyContent: 'center' }}>
           <BrandMark size={20} />
         </View>

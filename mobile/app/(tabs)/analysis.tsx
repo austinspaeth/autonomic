@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
-import { Header } from '../../src/components/Header';
+import { Pressable, Text, View } from 'react-native';
+import { Screen } from '../../src/components/Header';
 import { Icon, IconName } from '../../src/components/Icon';
 import { Card, Segmented } from '../../src/components/ui';
 import { Bars, LineChart } from '../../src/components/charts';
@@ -20,27 +20,24 @@ export default function AnalysisScreen() {
   const cat = cats.find((c) => c.id === open) || null;
 
   return (
-    <View style={{ flex: 1, backgroundColor: p.bg }}>
-      <Header />
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
-        <Segmented options={[{ val: 'day', label: 'Day' }, { val: 'week', label: 'Week' }, { val: 'month', label: 'Month' }, { val: 'year', label: 'Year' }]} value={mode} onChange={setMode} style={{ marginBottom: 16 }} />
-        {!hasData ? (
-          <Text style={{ color: p.textDim, textAlign: 'center', marginTop: 40 }}>No data logged yet.</Text>
-        ) : cat ? (
-          <CategoryDetail cat={cat} onBack={() => setOpen(null)} />
-        ) : (
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-            {cats.map((c) => (
-              <Pressable key={c.id} onPress={() => setOpen(c.id)} style={{ width: '31.5%', backgroundColor: p.surface, borderColor: p.border, borderWidth: 1, borderRadius: radius.card, padding: 12 }}>
-                <Icon name={c.icon as IconName} size={24} color={p.accent} />
-                <Text style={{ fontSize: 14, fontWeight: '700', color: p.text, marginTop: 7 }}>{c.title}</Text>
-                <Text style={{ fontSize: 11, color: p.textDim, marginTop: 2 }}>{c.desc}</Text>
-              </Pressable>
-            ))}
-          </View>
-        )}
-      </ScrollView>
-    </View>
+    <Screen>
+      <Segmented options={[{ val: 'day', label: 'Day' }, { val: 'week', label: 'Week' }, { val: 'month', label: 'Month' }, { val: 'year', label: 'Year' }]} value={mode} onChange={setMode} style={{ marginBottom: 16 }} />
+      {!hasData ? (
+        <Text style={{ color: p.textDim, textAlign: 'center', marginTop: 40 }}>No data logged yet.</Text>
+      ) : cat ? (
+        <CategoryDetail cat={cat} onBack={() => setOpen(null)} />
+      ) : (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+          {cats.map((c) => (
+            <Pressable key={c.id} onPress={() => setOpen(c.id)} style={{ width: '31.5%', backgroundColor: p.surface, borderColor: p.border, borderWidth: 1, borderRadius: radius.card, padding: 12 }}>
+              <Icon name={c.icon as IconName} size={24} color={p.accent} />
+              <Text style={{ fontSize: 14, fontWeight: '700', color: p.text, marginTop: 7 }}>{c.title}</Text>
+              <Text style={{ fontSize: 11, color: p.textDim, marginTop: 2 }}>{c.desc}</Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
+    </Screen>
   );
 }
 
