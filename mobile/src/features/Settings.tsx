@@ -10,7 +10,7 @@ import * as Sharing from 'expo-sharing';
 import { SheetControls, useSheets } from '../components/Sheet';
 import { Button } from '../components/ui';
 import { TextField } from '../components/Field';
-import { Icon, IconName } from '../components/Icon';
+import { BrandMark, Icon, IconName } from '../components/Icon';
 import { useToast } from '../components/Toast';
 import { radius, usePalette } from '../theme';
 import { getState, replaceState, save, serializeState, useAppState } from '../store/store';
@@ -23,19 +23,29 @@ export function MenuSheet({ controls }: { controls: SheetControls }) {
   const { openSheet } = useSheets();
   const state = useAppState();
   const toast = useToast();
-  const item = (icon: IconName, title: string, sub: string, onPress: () => void) => (
+  const item = (icon: IconName, title: string, sub: string, onPress: () => void, connected?: boolean) => (
     <Pressable onPress={onPress} style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 15, borderTopWidth: 1, borderTopColor: p.border }, pressed && { opacity: 0.5 }]}>
       <Icon name={icon} size={22} color={p.textDim} />
-      <View><Text style={{ color: p.text, fontSize: 17 }}>{title}</Text><Text style={{ color: p.textDim, fontSize: 13 }}>{sub}</Text></View>
+      <View style={{ flex: 1 }}><Text style={{ color: p.text, fontSize: 17 }}>{title}</Text><Text style={{ color: p.textDim, fontSize: 13 }}>{sub}</Text></View>
+      {connected ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(34,197,94,0.15)', paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999 }}>
+          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#22c55e' }} />
+          <Text style={{ color: '#22c55e', fontSize: 12, fontWeight: '600' }}>Connected</Text>
+        </View>
+      ) : null}
     </Pressable>
   );
   const m = state.meta || {};
   return (
     <View>
-      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 8 }}>Menu</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, paddingTop: 16, paddingBottom: 22 }}>
+        <BrandMark size={26} />
+        <Text style={{ fontSize: 22, fontWeight: '800', color: p.text, letterSpacing: -0.3 }}>Autonomic</Text>
+      </View>
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 8 }}>Settings</Text>
       {item('user', 'Profile', 'Sex, birthday, height, weight', () => openSheet((c) => <ProfileSheet controls={c} />))}
-      {item('bluetooth', 'Devices', 'Heart-rate straps', () => openSheet(() => <DevicesScreen />))}
-      {item('heart', 'Apple Health', Platform.OS === 'ios' ? 'Read & write health data' : 'iOS only', () => openSheet(() => <HealthScreen />))}
+      {item('bluetooth', 'Devices', 'Heart-rate straps', () => openSheet(() => <DevicesScreen />), !!state.settings.lastBleDeviceId)}
+      {item('heart', 'Apple Health', Platform.OS === 'ios' ? 'Read & write health data' : 'iOS only', () => openSheet(() => <HealthScreen />), Platform.OS === 'ios' && !!state.settings.healthEnabled)}
       {item('download', 'Export data', 'Download everything as JSON', () => exportData(toast))}
       {item('upload', 'Import data', 'Replace everything from a JSON file', () => importData(controls, toast))}
       <View style={{ marginTop: 22 }}>
