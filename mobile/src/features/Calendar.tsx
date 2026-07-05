@@ -32,14 +32,14 @@ export function Calendar({ current, onPick, controls }: { current: string; onPic
   const cells: (number | null)[] = [...Array(startPad).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
 
   return (
-    <View>
-      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 16 }}>Select date</Text>
+    <View style={{ width: '100%' }}>
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginTop: 12, marginBottom: 16 }}>Select date</Text>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
         <Pressable onPress={() => setView(new Date(view.getFullYear(), view.getMonth() - 1, 1))} hitSlop={8}><Icon name="chevron" size={22} color={p.text} /></Pressable>
         <Text style={{ fontSize: 17, fontWeight: '700', color: p.text }}>{view.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</Text>
         <Pressable disabled={atCurMonth} onPress={() => setView(new Date(view.getFullYear(), view.getMonth() + 1, 1))} hitSlop={8} style={{ opacity: atCurMonth ? 0.3 : 1 }}><Icon name="chevronRight" size={22} color={p.text} /></Pressable>
       </View>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', width: '100%' }}>
         {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => <View key={i} style={{ width: `${100 / 7}%`, alignItems: 'center', paddingVertical: 4 }}><Text style={{ fontSize: 11, color: p.textDim, fontWeight: '700' }}>{d}</Text></View>)}
         {cells.map((dn, i) => {
           if (dn == null) return <View key={`e${i}`} style={{ width: `${100 / 7}%`, aspectRatio: 1 }} />;

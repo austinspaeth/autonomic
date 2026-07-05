@@ -135,7 +135,8 @@ function SheetView({ entry, isTop, behind, onClose, closeAll }: {
         pointerEvents={isTop ? 'auto' : 'none'}
         style={[
           styles.sheet,
-          { height: sheetH, backgroundColor: p.surface, borderColor: p.border, borderTopLeftRadius: full ? 0 : 18, borderTopRightRadius: full ? 0 : 18 },
+          fit ? { maxHeight: sheetH } : { height: sheetH },
+          { backgroundColor: p.surface, borderColor: p.border, borderTopLeftRadius: full ? 0 : 18, borderTopRightRadius: full ? 0 : 18 },
           sheetStyle,
         ]}
       >
@@ -147,17 +148,23 @@ function SheetView({ entry, isTop, behind, onClose, closeAll }: {
           </PanGestureHandler>
         )}
         <SheetContentContext.Provider value={{ setFooter }}>
-          <ScrollView
-            style={{ flex: 1 }}
-            contentContainerStyle={{ padding: 18, paddingTop: full ? insets.top + 12 : 8, paddingBottom: footer ? 120 : 24 + insets.bottom }}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
-            {content}
-          </ScrollView>
+          {fit ? (
+            <View style={{ padding: 18, paddingTop: 8, paddingBottom: footer ? 120 : 24 + insets.bottom }}>
+              {content}
+            </View>
+          ) : (
+            <ScrollView
+              style={{ flex: 1 }}
+              contentContainerStyle={{ padding: 18, paddingTop: full ? insets.top + 12 : 8, paddingBottom: footer ? 120 : 24 + insets.bottom }}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              {content}
+            </ScrollView>
+          )}
         </SheetContentContext.Provider>
 
-        {!full && (
+        {!full && !fit && (
           <Pressable onPress={dismiss} style={[styles.closeBtn, { backgroundColor: p.surface2 }]} hitSlop={8}>
             <Icon name="x" size={18} color={p.textDim} />
           </Pressable>

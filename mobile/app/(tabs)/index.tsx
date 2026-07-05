@@ -22,7 +22,7 @@ export default function JournalScreen() {
           <Pressable onPress={() => shiftCurrent(-1)} hitSlop={8} style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}>
             <Text style={{ color: p.text, fontSize: 25 }}>‹</Text>
           </Pressable>
-          <Pressable onPress={() => openSheet((c) => <Calendar current={getCurrentKey()} onPick={setCurrentKey} controls={c} />)} style={{ flex: 1, maxWidth: 280, backgroundColor: p.surface, borderColor: p.border, borderWidth: 1, borderRadius: 14, paddingVertical: 10, paddingHorizontal: 14 }}>
+          <Pressable onPress={() => openSheet((c) => <Calendar current={getCurrentKey()} onPick={setCurrentKey} controls={c} />, { fitContent: true })} style={{ flex: 1, maxWidth: 280, backgroundColor: p.surface, borderColor: p.border, borderWidth: 1, borderRadius: 14, paddingVertical: 10, paddingHorizontal: 14 }}>
             <Text style={{ color: isToday ? p.accent : p.text, fontSize: 17, fontWeight: '600', textAlign: 'center' }}>{fmtDateLong(dk)}</Text>
           </Pressable>
           <Pressable disabled={isToday} onPress={() => shiftCurrent(1)} hitSlop={8} style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center', opacity: isToday ? 0.3 : 1 }}>

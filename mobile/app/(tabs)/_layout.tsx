@@ -14,7 +14,7 @@ import { usePalette } from '../../src/theme';
 const TABS: { name: string; label: string; icon: IconName }[] = [
   { name: 'index', label: 'Journal', icon: 'clipboard' },
   { name: 'analysis', label: 'Progress', icon: 'chart' },
-  { name: 'insights', label: 'Insights', icon: 'ai' },
+  { name: 'insights', label: 'Insight', icon: 'ai' },
 ];
 
 const PAD = 5; // bar inner padding; the highlight pill is inset by this top/bottom
