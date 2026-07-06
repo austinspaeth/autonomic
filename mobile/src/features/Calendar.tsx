@@ -32,8 +32,9 @@ export function Calendar({ current, onPick, controls }: { current: string; onPic
   const cells: (number | null)[] = [...Array(startPad).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
 
   return (
-    <View style={{ width: '100%' }}>
-      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginTop: 12, marginBottom: 16 }}>Select date</Text>
+    <View style={{ width: '100%', maxWidth: 400, alignSelf: 'center' }}>
+      {/* Title vertically aligned with the sheet's ✕ (top:12, h:32 → centered on 28px). */}
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, lineHeight: 32, marginTop: -12, marginBottom: 16 }}>Select date</Text>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
         <Pressable onPress={() => setView(new Date(view.getFullYear(), view.getMonth() - 1, 1))} hitSlop={8}><Icon name="chevron" size={22} color={p.text} /></Pressable>
         <Text style={{ fontSize: 17, fontWeight: '700', color: p.text }}>{view.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</Text>

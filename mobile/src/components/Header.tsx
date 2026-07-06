@@ -31,15 +31,15 @@ export function Header({ children, onHeight }: { children?: React.ReactNode; onH
 
 /** Transparent → 100% black vertical fade, pinned to the bottom. SVG-based so it
  * needs no extra native dep (react-native-svg is already used app-wide). */
-export function BottomFade({ height = 180 }: { height?: number }) {
+export function BottomFade({ height = 140 }: { height?: number }) {
   return (
     <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height }}>
       <Svg width="100%" height="100%">
         <Defs>
           <SvgGradient id="bottomFade" x1="0" y1="0" x2="0" y2="1">
             <Stop offset="0" stopColor="#000000" stopOpacity={0} />
-            <Stop offset="0.55" stopColor="#000000" stopOpacity={0.72} />
-            <Stop offset="1" stopColor="#000000" stopOpacity={1} />
+            <Stop offset="0.7" stopColor="#000000" stopOpacity={0.38} />
+            <Stop offset="1" stopColor="#000000" stopOpacity={0.75} />
           </SvgGradient>
         </Defs>
         <Rect x="0" y="0" width="100%" height="100%" fill="url(#bottomFade)" />

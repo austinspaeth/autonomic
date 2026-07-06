@@ -3,9 +3,10 @@
  * flags, and the streak card — ported from renderDaySummary. The "What powers
  * this" button opens the score-explanation sheet (openScoreExplain).
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Defs, LinearGradient as SvgGradient, Rect, Stop } from 'react-native-svg';
+import Animated, { Easing, useAnimatedProps, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
 import { ScoreGauge } from '../components/charts';
 import { Icon } from '../components/Icon';
 import { SheetControls, useSheets } from '../components/Sheet';
@@ -35,11 +36,27 @@ const hexA = (hex: string, a: number) => {
 // an SVG rounded-rect stroke overlay so it follows the corner radius. Pass
 // color=null to fall back to a plain border (awaiting / low-confidence state).
 let obId = 0;
-function GradientBorderCard({ color, style, children }: { color: string | null; style?: any; children: React.ReactNode }) {
+const AnimatedRect = Animated.createAnimatedComponent(Rect);
+function GradientBorderCard({ color, trigger, style, children }: { color: string | null; trigger?: string; style?: any; children: React.ReactNode }) {
   const p = usePalette();
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [gid] = useState(() => `ob${obId++}`);
   const r = radius.card;
+  // Glow "explosion": on mount and whenever `trigger`/`color` changes, the whole
+  // border flashes full status color (thick + opaque), then eases down to reveal
+  // the resting top-left gradient underneath. `glow` runs 1 → 0 over the settle.
+  const glow = useSharedValue(0);
+  useEffect(() => {
+    if (!color) return;
+    glow.value = withSequence(
+      withTiming(1, { duration: 0 }),
+      withTiming(0, { duration: 3200, easing: Easing.out(Easing.cubic) }),
+    );
+  }, [color, trigger, glow]);
+  const glowProps = useAnimatedProps(() => ({
+    strokeOpacity: glow.value,
+    strokeWidth: 1 + glow.value * 2,
+  }));
   return (
     <View
       onLayout={(e) => { const { width, height } = e.nativeEvent.layout; setSize({ w: width, h: height }); }}
@@ -47,16 +64,19 @@ function GradientBorderCard({ color, style, children }: { color: string | null; 
     >
       {children}
       {color && size.w > 0 && (
-        <Svg width={size.w} height={size.h} style={StyleSheet.absoluteFill} pointerEvents="none">
-          <Defs>
-            <SvgGradient id={gid} x1={size.w * 0.12} y1={0} x2={size.w * 0.55} y2={size.h} gradientUnits="userSpaceOnUse">
-              <Stop offset="0" stopColor={color} stopOpacity={1} />
-              <Stop offset="0.14" stopColor={color} stopOpacity={0.4} />
-              <Stop offset="1" stopColor={p.border} stopOpacity={1} />
-            </SvgGradient>
-          </Defs>
-          <Rect x={0.5} y={0.5} width={size.w - 1} height={size.h - 1} rx={r - 0.5} ry={r - 0.5} fill="none" stroke={`url(#${gid})`} strokeWidth={1} />
-        </Svg>
+        <View style={StyleSheet.absoluteFill} pointerEvents="none">
+          <Svg width={size.w} height={size.h}>
+            <Defs>
+              <SvgGradient id={gid} x1={size.w * 0.12} y1={0} x2={size.w * 0.55} y2={size.h} gradientUnits="userSpaceOnUse">
+                <Stop offset="0" stopColor={color} stopOpacity={1} />
+                <Stop offset="0.14" stopColor={color} stopOpacity={0.4} />
+                <Stop offset="1" stopColor={p.border} stopOpacity={1} />
+              </SvgGradient>
+            </Defs>
+            <Rect x={0.5} y={0.5} width={size.w - 1} height={size.h - 1} rx={r - 0.5} ry={r - 0.5} fill="none" stroke={`url(#${gid})`} strokeWidth={1} />
+            <AnimatedRect x={0.5} y={0.5} width={size.w - 1} height={size.h - 1} rx={r - 0.5} ry={r - 0.5} fill="none" stroke={color} animatedProps={glowProps} />
+          </Svg>
+        </View>
       )}
     </View>
   );
@@ -74,7 +94,7 @@ export function DaySummary({ dk }: { dk: string }) {
 
   return (
     <View>
-      <GradientBorderCard color={all.score == null || all.confidence < 40 ? null : scoreCat(all.score).color} style={{ marginBottom: 12 }}>
+      <GradientBorderCard color={all.score == null || all.confidence < 40 ? null : scoreCat(all.score).color} trigger={dk} style={{ marginBottom: 12 }}>
         {all.score == null || all.confidence < 40 ? (
           <View style={{ padding: 16 }}>
             <Text style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.6, fontWeight: '700', color: p.textDim }}>Autonomic Outlook</Text>
@@ -127,7 +147,7 @@ function ScoredHero({ dk, readings, d, all, ctx, onExplain }: { dk: string; read
   }
 
   return (
-    <View style={{ padding: 16, backgroundColor: hexA(cat.color, 0.1) }}>
+    <Pressable onPress={onExplain} style={{ padding: 16, backgroundColor: hexA(cat.color, 0.1) }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
         <Text style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.6, fontWeight: '700', color: p.textDim }}>{mode}</Text>
         <View style={{ backgroundColor: cat.color, paddingHorizontal: 11, paddingVertical: 4, borderRadius: 999 }}>
@@ -145,17 +165,17 @@ function ScoredHero({ dk, readings, d, all, ctx, onExplain }: { dk: string; read
           </Text>
         ) : null}
       </View>
-      <Pressable onPress={onExplain} style={{ alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, paddingHorizontal: 11, paddingVertical: 6, borderRadius: 999, marginBottom: 6 }}>
+      <View style={{ alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, paddingHorizontal: 11, paddingVertical: 6, borderRadius: 999, marginBottom: 6 }}>
         <Icon name="info" size={15} color={p.textDim} />
         <Text style={{ color: p.textDim, fontSize: 11, fontWeight: '600' }}>What powers this</Text>
-      </Pressable>
+      </View>
       <Text style={{ textAlign: 'center', fontSize: 14, color: p.textDim, fontWeight: '600' }}>{`${cat.label} · ${all.confidence}% confidence`}</Text>
       <Text style={{ fontSize: 15, marginTop: 14, lineHeight: 21, color: p.text }}>{guide}</Text>
       {blueZone(readings, ctx) ? (
         <Flag color={SCORE_COLORS.warning} text="Blue-zone risk. High readiness may mask fragility, so do less today, not more." />
       ) : null}
       {cat.short === 'Crash' ? <Flag color={SCORE_COLORS.crash} text="Mandatory recovery day. Full rest, hydration, and protocol." /> : null}
-    </View>
+    </Pressable>
   );
 }
 

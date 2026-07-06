@@ -14,7 +14,6 @@ export default function AnalysisScreen() {
   const p = usePalette();
   const state = useAppState();
   const [mode, setMode] = useState<Mode>('day');
-  const hasData = Object.keys(state.days).length > 0;
   const sex = state.profile.sex;
   const height = state.profile.height;
 
@@ -24,6 +23,11 @@ export default function AnalysisScreen() {
     const cats = buildCategories(state.days, mode, { sex, height });
     return cats.map((c) => ({ id: c.id, icon: c.icon, title: c.title, desc: c.desc, buckets: c.buckets, cards: c.build() }));
   }, [state.days, mode, sex, height]);
+
+  // Outlook always synthesizes a score, so it isn't proof of real data. Treat the
+  // whole view as empty unless some *other* category has something logged — that's
+  // when the progress charts are actually meaningful.
+  const hasData = sections.some((s) => s.id !== 'outlook' && s.cards.length > 0);
 
   const scrollRef = useRef<ScrollView>(null);
   const offsets = useRef<Record<string, number>>({});   // section id -> y in the scroll content
@@ -59,6 +63,8 @@ export default function AnalysisScreen() {
     if (off != null) scrollRef.current?.scrollTo({ y: Math.max(0, off - headerH), animated: true });
   };
 
+  const scrollToTop = () => scrollRef.current?.scrollTo({ y: 0, animated: true });
+
   const activeTitle = sections.find((s) => s.id === activeId)?.title ?? null;
 
   return (
@@ -73,14 +79,19 @@ export default function AnalysisScreen() {
       }
       footer={
         activeTitle ? (
-          <BlurView intensity={40} tint="dark" style={{ position: 'absolute', top: headerH, left: 0, right: 0, paddingHorizontal: 16, paddingVertical: 10, backgroundColor: 'rgba(6,6,9,0.9)', borderBottomWidth: 0.5, borderBottomColor: p.border }}>
-            <Text style={{ fontSize: 19, fontWeight: '700', color: p.text }}>{activeTitle}</Text>
+          <BlurView intensity={50} tint="dark" style={{ position: 'absolute', top: headerH, left: 0, right: 0, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 16, backgroundColor: 'rgba(4,4,7,0.97)', borderBottomWidth: 0.5, borderBottomColor: p.border }}>
+            <Pressable onPress={scrollToTop} hitSlop={10} style={{ marginLeft: -4 }}>
+              <Icon name="arrowUp" size={22} color={p.text} />
+            </Pressable>
+            <Text style={{ fontSize: 20, fontWeight: '700', color: p.text }}>{activeTitle}</Text>
           </BlurView>
         ) : null
       }
     >
       {!hasData ? (
-        <Text style={{ color: p.textDim, textAlign: 'center', marginTop: 40 }}>No data logged yet.</Text>
+        <Text style={{ color: p.textDim, textAlign: 'center', marginTop: 48, paddingHorizontal: 24, fontSize: 15, lineHeight: 22 }}>
+          Nothing to show yet. Record readings, sleep, activities and more in your Journal and your progress will start populating here.
+        </Text>
       ) : (
         <>
           {/* Jump menu: tap a card to scroll to that category's section below. */}

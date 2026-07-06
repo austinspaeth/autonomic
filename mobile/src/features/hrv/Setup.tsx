@@ -40,7 +40,7 @@ export function HrvSetup({ controls }: { controls: SheetControls }) {
       return;
     }
     const config: SessionConfig = { kind, source, style: kind === 'breath' ? style : undefined };
-    openSheet((c) => <HrvSession config={config} controls={c} />, { fullscreen: true });
+    openSheet((c) => <HrvSession config={config} controls={c} />, { hideClose: true, fitContent: true });
     controls.close();
   };
 
@@ -72,7 +72,7 @@ export function HrvSetup({ controls }: { controls: SheetControls }) {
       <Label text="Signal source" top />
       <View style={{ gap: 8 }}>
         <SourceOption icon="bluetooth" title="Bluetooth strap" sub={savedName ? `Paired: ${savedName}` : 'Pair a strap in Devices'} active={source === 'polar'} onPress={() => setSource('polar')} />
-        <SourceOption icon="watch" title="Apple Watch" sub="Read beat-to-beat data via Apple Health" active={source === 'watch'} onPress={() => setSource('watch')} />
+        <SourceOption icon="watch" title="Apple Watch" sub="Breathing guide only — nothing is recorded" active={source === 'watch'} onPress={() => setSource('watch')} />
       </View>
 
       <View style={{ height: 20 }} />

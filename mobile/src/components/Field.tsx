@@ -5,9 +5,11 @@
  * form-state hook collects values keyed by field key.
  */
 import React, { useState } from 'react';
-import { Platform, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { radius, space, usePalette } from '../theme';
+import { Button } from './ui';
+import { SheetControls, useSheets } from './Sheet';
 import type { Entry, FieldDef } from '../lib/types';
 import { fieldLabel, isDivider, isNumberField } from '../lib/registry';
 import { fmtTime12, nowTime } from '../lib/dates';
@@ -90,34 +92,51 @@ export function SelectField({ label, value, options, onChange }: { label: string
   );
 }
 
+/** Contents of the time-picker sheet: spinner + full-width red Save. */
+function TimePickerSheet({ label, value, onChange, controls }: { label: string; value: string; onChange: (v: string) => void; controls: SheetControls }) {
+  const p = usePalette();
+  const [h, m] = (value || '00:00').split(':').map(Number);
+  const base = new Date();
+  base.setHours(h || 0, m || 0, 0, 0);
+  // Draft the spinner value locally so nothing commits until "Save".
+  const [draft, setDraft] = useState(base);
+  const commit = () => {
+    onChange(`${String(draft.getHours()).padStart(2, '0')}:${String(draft.getMinutes()).padStart(2, '0')}`);
+    controls.close();
+  };
+  return (
+    <View>
+      {/* Title vertically aligned with the sheet's ✕ (top:12, h:32 → centered on 28px). */}
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, lineHeight: 32, marginTop: -12, marginBottom: 12 }}>{label}</Text>
+      <DateTimePicker
+        value={draft}
+        mode="time"
+        display="spinner"
+        textColor="#ffffff"
+        themeVariant="dark"
+        style={{ height: 180 }}
+        onChange={(_, date) => { if (date) setDraft(date); }}
+      />
+      <View style={{ flexDirection: 'row', marginTop: 8 }}>
+        <Button title="Save" variant="primary" onPress={commit} />
+      </View>
+    </View>
+  );
+}
+
 export function TimeField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   const p = usePalette();
-  const [show, setShow] = useState(false);
-  const [h, m] = (value || '00:00').split(':').map(Number);
-  const d = new Date();
-  d.setHours(h || 0, m || 0, 0, 0);
+  const { openSheet } = useSheets();
+  const open = () => openSheet(
+    (c) => <TimePickerSheet label={label} value={value} onChange={onChange} controls={c} />,
+    { fitContent: true },
+  );
   return (
     <View style={{ marginBottom: 14, flex: 1 }}>
       <FieldLabel>{label}</FieldLabel>
-      <Pressable onPress={() => setShow(true)} style={{ backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.control, padding: 13, minHeight: 47 }}>
+      <Pressable onPress={open} style={{ backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.control, padding: 13, minHeight: 47 }}>
         <Text style={{ color: value ? p.text : p.textDim, fontSize: 17 }}>{value ? fmtTime12(value) : 'Set time'}</Text>
       </Pressable>
-      {show && (
-        <DateTimePicker
-          value={d}
-          mode="time"
-          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-          onChange={(_, date) => {
-            if (Platform.OS !== 'ios') setShow(false);
-            if (date) onChange(`${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`);
-          }}
-        />
-      )}
-      {show && Platform.OS === 'ios' && (
-        <Pressable onPress={() => setShow(false)} style={{ alignSelf: 'flex-end', padding: 8 }}>
-          <Text style={{ color: p.accent, fontWeight: '600' }}>Done</Text>
-        </Pressable>
-      )}
     </View>
   );
 }
@@ -139,15 +158,19 @@ export function FieldInputs({ fields, form, set }: { fields: FieldDef[]; form: F
   let run: FieldDef[] = [];
   const flush = () => {
     if (!run.length) return;
-    if (run.length === 1) {
-      const f = run[0];
-      out.push(<NumField key={f.key} f={f} form={form} set={set} />);
-    } else {
-      out.push(
-        <View key={`grid-${run[0].key}`} style={{ flexDirection: 'row', gap: 10 }}>
-          {run.map((f) => <NumField key={f.key} f={f} form={form} set={set} />)}
-        </View>,
-      );
+    // Chunk consecutive number fields into rows of at most 2.
+    for (let i = 0; i < run.length; i += 2) {
+      const pair = run.slice(i, i + 2);
+      if (pair.length === 1) {
+        const f = pair[0];
+        out.push(<NumField key={f.key} f={f} form={form} set={set} />);
+      } else {
+        out.push(
+          <View key={`grid-${pair[0].key}`} style={{ flexDirection: 'row', gap: 10 }}>
+            {pair.map((f) => <NumField key={f.key} f={f} form={form} set={set} />)}
+          </View>,
+        );
+      }
     }
     run = [];
   };

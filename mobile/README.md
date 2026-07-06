@@ -1,9 +1,9 @@
 # Autonomic (native)
 
-A native, iOS-first **Expo / React Native** rebuild of the Autonomic Journal PWA
-(`docs/index.html`) for tracking autonomic-nervous-system recovery. Offline-first,
-no backend, all data on-device — the same philosophy and the **same data model**
-as the web app, so a `export.json` from the PWA imports directly.
+A native, iOS-first **Expo / React Native** app for tracking
+autonomic-nervous-system recovery. Offline-first, no backend, all data on-device.
+It carries forward the **same data model** as the original web app, so an
+`export.json` from that app imports directly.
 
 The scoring/grading framework is ported **verbatim** from the web app (thresholds
 are the product). On top of it this app adds **live 5-minute HRV capture** from a

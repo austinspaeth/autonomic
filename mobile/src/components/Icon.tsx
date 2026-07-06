@@ -10,7 +10,7 @@ export type IconName =
   | 'x' | 'check' | 'edit' | 'bike' | 'footprints' | 'legsUp' | 'activity'
   | 'heart' | 'target' | 'barbell' | 'car' | 'flame' | 'zap' | 'pill' | 'alert'
   | 'sparkles' | 'rocket' | 'moon' | 'user' | 'chevron' | 'chevronRight'
-  | 'arrowLeft' | 'standing' | 'poop' | 'cup' | 'utensils' | 'scale' | 'search'
+  | 'arrowLeft' | 'arrowUp' | 'standing' | 'poop' | 'cup' | 'utensils' | 'scale' | 'search'
   | 'bulb' | 'star' | 'brain' | 'virus' | 'clipboard' | 'smile' | 'ai' | 'chart'
   | 'trendUp' | 'trendDown' | 'triangle' | 'checklist' | 'cell' | 'gut'
   | 'bluetooth' | 'watch' | 'plus' | 'trash' | 'settings' | 'sun' | 'play' | 'stop';
@@ -45,6 +45,7 @@ const P: Record<IconName, string[]> = {
   chevron: ['m6 9 6 6 6-6'],
   chevronRight: ['m9 18 6-6-6-6'],
   arrowLeft: ['M19 12H5', 'm12 19-7-7 7-7'],
+  arrowUp: ['M12 19V5', 'm5 12 7-7 7 7'],
   standing: ['m9 20 3-6 3 6', 'm6 9 6 2 6-2', 'M12 11v3'],
   poop: ['M7.5 21h9a3 3 0 0 0 1.6-5.5A3 3 0 0 0 16 10a3 3 0 0 0-3-4 3 3 0 0 0-2 .8A3 3 0 0 0 8 10a3 3 0 0 0-2.1 5.5A3 3 0 0 0 7.5 21Z', 'M10.5 15h.01', 'M13.5 15h.01'],
   cup: ['M6 3h12l-1.1 15.3a2 2 0 0 1-2 1.7H9.1a2 2 0 0 1-2-1.7L6 3Z', 'M6.5 9.5h11'],

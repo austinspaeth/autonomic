@@ -143,7 +143,7 @@ export function ScoreGauge({ score, color, size = 176, children }: { score: numb
   };
   const frac = Math.max(0, Math.min(1, (score || 0) / 100));
   return (
-    <View style={{ width: size, height: size }}>
+    <View style={{ width: size, height: size }} pointerEvents="none">
       <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
         <Path d={arc(1)} fill="none" stroke={p.gaugeTrack} strokeWidth={sw} strokeLinecap="round" />
         <Path d={arc(frac)} fill="none" stroke={color} strokeWidth={sw + 7} strokeLinecap="round" opacity={0.16} />

@@ -1,59 +1,65 @@
 # CLAUDE.md — project notes
 
-**Autonomic Journal** is a private, offline-first **PWA** for tracking autonomic
-recovery. It is **pure static HTML / CSS / JS — no build step, no dependencies,
-no backend.** It lives in and is served from the **`docs/`** folder (the GitHub
-Pages source points at `docs/`), and all state lives in `localStorage` under the
-key `autonomic.journal.v1`.
+**Autonomic Journal** is a private, offline-first app for tracking autonomic
+recovery. The app is a native **Expo / React Native (iOS-first)** build that lives
+in **`mobile/`**. There is **no backend** — all state is on-device. (A previous
+pure-static-HTML PWA under `docs/` has been removed; the mobile app is the app.)
 
-Everything (markup, CSS, and JS) lives in the single **`docs/index.html`** — the CSS
-is in a `<style>` block in the `<head>` and the logic is in a `<script>` block
-(one IIFE, no framework) at the end of `<body>`. There are no separate `.css`
-or `.js` files; edit them inline in `docs/index.html`.
+See `mobile/README.md` for a fuller map. This file is the quick orientation.
 
-## Files
+## Layout
 
-| File | Purpose |
+| Path | Purpose |
 | --- | --- |
-| `docs/index.html` | The whole app — markup + inline `<style>` + inline `<script>` |
-| `docs/sw.js` | Service worker (offline cache) |
-| `docs/manifest.webmanifest` | PWA manifest |
-| `docs/icons/` | App icons + SVG favicon |
-| `docs/tools/gen_icons.py` | Optional helper to regenerate the PNG icons (not part of the site) |
-| `docs/.nojekyll` | Tells GitHub Pages to serve files as-is |
+| `mobile/` | The app — Expo / React Native |
+| `landing/` | Marketing landing page (separate from the app) |
+| `FABLE_BUILD_PROMPT.md` | Historical build spec used to bootstrap the native app |
 
-Keep it dependency-free and build-free. Do not introduce a bundler, framework,
-or `package.json`, and do not split the CSS/JS back out into separate files
-unless asked. Edit `docs/index.html` directly.
+## Inside `mobile/`
 
-## State shape (the localStorage JSON)
+| Area | Location |
+| --- | --- |
+| Routes (Journal · Analysis · Milestones · Insights + full-screen HRV) | `app/` (expo-router) |
+| Type registry (`READING_TYPES` / `ACTIVITY_TYPES` / `MED_TYPES` / `SYMPTOM_TYPES` / `TRIGGER_TYPES` / `MEAL_TYPES`) + field/summary helpers | `src/lib/registry.ts` |
+| Scoring/grading (`computeScores`, `bandsFor`, `rowScoreCategory`, `hrvComposite`) | `src/lib/scoring/` |
+| HRV pipeline (artifact correction, time/frequency domain, coherence) | `src/lib/hrv/` |
+| Analysis / milestones / AI-insights builders | `src/lib/analysis/` |
+| BLE heart-rate manager (0x180D / 0x2A37 RR parsing) | `src/lib/ble/` |
+| Apple HealthKit wrapper (iOS-only, feature-flagged) | `src/lib/health/` |
+| MMKV store + `save()` | `src/store/store.ts` |
+| Theme (light/dark), component library, charts, sheets | `src/theme/`, `src/components/` |
+| Journal sections / summaries / forms / live capture / settings | `src/features/` |
+| Unit tests (scoring + HRV) | `src/lib/**/__tests__/` |
+
+## State shape (the persisted JSON)
+
+State is a single object persisted to **MMKV** under the key
+`autonomic.journal.v1` (`STORAGE_KEY` in `src/store/store.ts`), same schema as the
+old web app so old `export.json` files import directly.
 
 ```jsonc
 {
   "version": 1,
   "settings": { "theme": "light" | "dark" },
-  "profile": { "sex", "weight", "height" },  // edited via the hamburger menu's Profile drawer; feeds reading scores (e.g. sex-adjusted QTc)
+  "profile": { "sex", "weight", "height" },  // feeds reading scores (e.g. sex-adjusted QTc)
   "meta": {
-    "lastUpdated": "<ISO timestamp>",      // see rule below
+    "lastUpdated": "<ISO timestamp>",      // stamped by save(); see rule below
     "lastImport":  { "name": "file.json", "at": "<ISO timestamp>" }
   },
   "days": {
     "YYYY-MM-DD": {
-      "sleep":      { "bed": "HH:MM", "wake": "HH:MM", "quality": "good"|"interrupted", "hrLow?", "hrHigh?" },
-      // readings/activities/meds/symptoms are all logged-entry ARRAYS, each item
+      "sleep":      { "bed": "HH:MM", "wake": "HH:MM", "quality", "hrLow?", "hrHigh?" },
+      // readings/activities/meds/symptoms are logged-entry ARRAYS, each item
       // { id, type, time, note, ...templateFields }, where `type` keys into a
-      // programmatic map (READING_TYPES / ACTIVITY_TYPES / MED_TYPES /
-      // SYMPTOM_TYPES) — no user-defined/custom items. Entries use an ordered,
-      // typed field schema (number / select / time / check / text / textarea /
-      // {divider:true}); see buildFieldInputs(). Time + a Notes textarea are
-      // auto-added when a type doesn't define them. A type may set custom:"bike"
-      // for a bespoke form (indoor bike) and summary()/detail() for its row.
+      // registry map (READING_TYPES / ACTIVITY_TYPES / MED_TYPES / SYMPTOM_TYPES).
+      // No user-defined/custom types. Entries use an ordered, typed field schema
+      // (number / select / time / check / text / textarea / {divider:true}).
       "readings":   [ { "id", "type", "time", "note", ...fields } ],
       "activities": [ { "id", "type", "time", "note", ...fields } ],
       "meds":       [ { "id", "type", "time", "amount", "note" } ],
       "symptoms":   [ { "id", "type", "time", "note", ...fields } ],
-      "food":       { "water": 0, "calories": 0, "triggers": { "<triggerType>": count } },
-      "digestion":  { "bm": 0 }
+      "food":       { "water": 0, "meals": [], "triggers": { "<triggerType>": count } },
+      "digestion":  { "movements": [ { "id", "time", ...fields } ] }
     }
   }
 }
@@ -61,47 +67,37 @@ unless asked. Edit `docs/index.html` directly.
 
 ## Important behaviors / conventions
 
-- **Every change to the app must update `meta.lastUpdated`.** This is centralized
-  in `save()` in `app.js`: it stamps `meta.lastUpdated = new Date().toISOString()`
-  on each call. **Always persist mutations by calling `save()`** — never write to
-  `localStorage` directly — so the timestamp stays accurate. The "Last updated …"
-  time (plus the last imported filename) is shown at the bottom of the hamburger
-  **menu drawer**, not in the header.
-- **Imports** record `meta.lastImport` (`{ name, at }`) before calling `save()`,
-  and that filename is shown in the menu drawer footer.
-- **All four logged sections share one pattern**: a section lists the day's
-  entries; "+ Add" opens a filterable picker of programmatic types; choosing one
-  stacks its form (`openEntryForm` / `bikeForm`) to capture fields. There are no
-  user-defined/custom items and nothing to archive. To add a new type, add it to
-  the relevant `*_TYPES` map (and an icon).
-- **Drawers/modals are bottom sheets (~90% height) and stack iOS-style.**
-  `openModal(build)` pushes a sheet (`sheetStack`); opening one while another is
-  up scales the one beneath (`.behind`). Each sheet has a fixed ✕ (top-right) and,
-  if the builder added a `.modal-actions`, a fixed blurred footer. `closeModal()`
-  pops just the top sheet (the ✕ and backdrop use it); `closeAll()` closes the
-  whole stack and is what completion actions (Save, etc.) call. Builders append
-  content to a scrollable `.modal-scroll`.
-- **Icons must be monochrome** where they should inherit color (tab bar, theme
-  toggle). Use inline SVG with `stroke="currentColor"`, or text-presentation
-  glyphs (append U+FE0E), not colored emoji.
-- **Tapping a reading opens a read-only summary** (`openReadingSummary`) with an
-  Edit header button (`openModal`'s `opts.action`) that stacks the editable form;
-  Save closes both, the ✕ pops back to the summary. Breathing HRV gets a rich
-  summary (`breathingSummary`: validity, overall grade, autonomic composite,
-  frequency peaks, power-distribution bar, per-metric rows); other types use
-  `genericReadingSummary`. Each scorable metric row shows a **sparkline**
-  (`buildSpark` over `metricHistory`, last 30 of that type) with grade-zone
-  bands from the `BANDS` registry (`bandsFor`). (7-day trend arrows / personal
-  bests / secondary-peak detection are still TODO.)
-- **Reading scoring.** On save, `computeScores(r)` categorizes each scorable
-  metric (great/good/ok/bad/crash|concerning, plus a `warning` blue zone for
-  readiness) per the framework thresholds and stores them on `r.scores`. The
-  summary row tints its single value via `SCORE_COLORS` (`rowScoreCategory`);
-  ECG shows a colored badge from its `overall` (worst sub-metric). To add/adjust
-  scoring, edit the `s*` helpers + `computeScores`.
+- **Every mutation flows through `save()`** in `src/store/store.ts`, which stamps
+  `meta.lastUpdated = new Date().toISOString()`. **Never write MMKV directly** —
+  the store exposes an external store + `useSyncExternalStore` so React re-renders.
+- **Imports** record `meta.lastImport` (`{ name, at }`) before calling `save()`.
+- **Adding a type**: add it to the relevant `*_TYPES` map in `src/lib/registry.ts`
+  (and an icon in `src/components/Icon.tsx`). There are no user-defined types.
+- **All logged sections share one pattern**: a section lists the day's entries;
+  "+ Add" opens a `TypePicker` (or the bespoke `ReadingPicker`, which also offers
+  Live HRV) of registry types; choosing one stacks its `EntryForm` to capture
+  fields. See `src/features/forms.tsx` and `src/features/JournalSections.tsx`.
+- **Sheets are bottom sheets that stack iOS-style** via `useSheets` /
+  `src/components/Sheet.tsx` (`openSheet`, `closeSheet`, `closeAll`).
+- **Reading scoring**: on render, `computeScores(r, ctx)` categorizes each scorable
+  metric (great/good/ok/bad/crash|concerning, plus a `warning` blue zone) per the
+  framework thresholds; rows tint their value via the score category and sparklines
+  use grade-zone bands from `bandsFor`. Edit the `s*` helpers + `computeScores` in
+  `src/lib/scoring/` to adjust. Thresholds are the product — the scoring framework
+  is ported **verbatim** from the original web app.
 
 ## Running / testing
 
-No build. Open `docs/index.html`, or `cd docs && python3 -m http.server 8000`
-for full PWA/offline behavior. There is no committed test runner (keeping the repo
-dependency-free); verify changes by loading the app.
+Native modules (Bluetooth + HealthKit) mean **Expo Go will not work** — you need a
+development build.
+
+```bash
+cd mobile
+npm run ios      # expo run:ios (dev build on a simulator/device)
+npm start        # expo start --dev-client
+npm test         # jest (scoring + HRV unit tests)
+npm run lint     # eslint
+```
+
+Device builds ship via EAS — see `mobile/EAS_UPDATE.md` and the workflows in
+`.github/workflows/` (`eas-build.yml`, `eas-update.yml`).

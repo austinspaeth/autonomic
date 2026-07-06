@@ -41,7 +41,7 @@ const dark: Palette = {
   accent: ACCENT,
   accentSoft: ACCENT_SOFT,
   gaugeTrack: 'rgba(0,0,0,0.4)',
-  overlay: 'rgba(0,0,0,0.6)',
+  overlay: 'rgba(0,0,0,0.38)',
 };
 
 /** One consistent spacing scale (4/8/12/16/20/24). No ad-hoc margins. */

@@ -23,7 +23,7 @@
       "supportsTablet": false,
       "infoPlist": {
         "NSBluetoothAlwaysUsageDescription": "Autonomic connects to your heart-rate chest strap to capture beat-to-beat data during HRV readings.",
-        "NSHealthShareUsageDescription": "Autonomic reads heart rate, HRV, sleep, blood pressure, blood oxygen and weight from Apple Health to prefill your journal.",
+        "NSHealthShareUsageDescription": "Autonomic reads heart rate, HRV, sleep, blood pressure, blood oxygen, weight and ECG recordings from Apple Health to prefill your journal.",
         "NSHealthUpdateUsageDescription": "Autonomic can write your captured HRV readings, mindful minutes, weight, blood pressure and blood oxygen back to Apple Health.",
         "UIBackgroundModes": [
           "bluetooth-central",

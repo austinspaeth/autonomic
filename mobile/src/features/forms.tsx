@@ -17,6 +17,7 @@ import {
   SYMPTOM_TYPES,
 } from '../lib/registry';
 import { computeScores } from '../lib/scoring';
+import { health } from '../lib/health';
 import { deleteEntry, getState, upsertEntry, useAppState } from '../store/store';
 import { fmtTime12, nowTime, uid } from '../lib/dates';
 import { useToast } from '../components/Toast';
@@ -57,8 +58,7 @@ export function TypePicker({ title, typeMap, onPick }: { title: string; typeMap:
 /** Reading picker with a live-capture call-to-action above the manual list. */
 function ReadingPicker({ onLive, onPick }: { onLive: () => void; onPick: (type: string) => void }) {
   const p = usePalette();
-  const [q, setQ] = useState('');
-  const types = Object.keys(READING_TYPES).filter((t) => READING_TYPES[t].label.toLowerCase().includes(q.trim().toLowerCase()));
+  const types = Object.keys(READING_TYPES);
   return (
     <View>
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 16 }}>Add reading</Text>
@@ -70,9 +70,8 @@ function ReadingPicker({ onLive, onPick }: { onLive: () => void; onPick: (type: 
         </View>
         <Icon name="chevronRight" size={20} color={p.accent} />
       </Pressable>
-      <TextInput value={q} onChangeText={setQ} placeholder="Or type a reading in manually…" placeholderTextColor={p.textDim} style={{ backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.control, padding: 12, fontSize: 17, color: p.text, marginBottom: 8 }} />
-      {types.map((t) => (
-        <Pressable key={t} onPress={() => onPick(t)} style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 15, borderTopWidth: 1, borderTopColor: p.border }, pressed && { opacity: 0.5 }]}>
+      {types.map((t, i) => (
+        <Pressable key={t} onPress={() => onPick(t)} style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 15, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: p.border }, pressed && { opacity: 0.5 }]}>
           <Icon name={READING_TYPES[t].icon as never} size={22} color={p.textDim} />
           <Text style={{ color: p.text, fontSize: 17 }}>{READING_TYPES[t].label}</Text>
         </Pressable>
@@ -113,6 +112,16 @@ export function EntryForm({ typeMap, arrKey, dk, type, existing, controls, onSav
       st.profile = { ...st.profile, weight: String(r.weight).trim() };
     }
     upsertEntry(dk, arrKey, r);
+    // Auto-publish freshly-logged readings to Apple Health (fire-and-forget).
+    // Only new manual entries — never re-publish edits or Health-sourced rows.
+    if (arrKey === 'readings' && !existing && r.note !== 'From Apple Health' && getState().settings.healthEnabled) {
+      const api = health();
+      if (api.available) {
+        api.publishReading(r, dk)
+          .then((n) => { if (n > 0) toast('Saved to Apple Health'); })
+          .catch(() => { /* graceful */ });
+      }
+    }
     controls.closeAll();
     onSaved();
   };

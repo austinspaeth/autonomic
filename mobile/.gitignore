@@ -2,8 +2,9 @@ node_modules/
 .expo/
 dist/
 web-build/
-ios/
-android/
+/ios/
+/android/
 *.log
+*.swp
 .DS_Store
 expo-env.d.ts
