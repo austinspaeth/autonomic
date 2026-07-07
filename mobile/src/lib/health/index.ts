@@ -1,9 +1,9 @@
 /**
  * Apple HealthKit wrapper (iOS only).
  *
- * Read: resting/walking HR, HRV SDNN, respiratory rate, SpO2, blood pressure,
- * body mass, sleep (with overnight HR range). Write: HRV SDNN, resting/avg HR,
- * a Mindfulness session, weight, blood-oxygen, and blood pressure (as a proper
+ * Read: resting/walking HR, HRV SDNN, respiratory rate, blood pressure,
+ * body mass (profile weight only), sleep (with overnight HR range). Write: HRV
+ * SDNN, resting/avg HR, a Mindfulness session, and blood pressure (as a proper
  * correlation). `publishReading` maps an app journal entry to the right writes.
  *
  * IMPORTANT — this targets @kingstinct/react-native-healthkit v8, whose API
@@ -28,14 +28,14 @@ export interface HealthApi {
   /** Pull the day's relevant samples for a YYYY-MM-DD key. */
   readDay(dk: string): Promise<HealthDaySamples>;
   /**
-   * Per-sample, timestamped readings for a day (resting HR, BP, SpO₂, HRV) —
+   * Per-sample, timestamped readings for a day (resting HR, BP, HRV) —
    * each keeps its real clock time and a flag for whether this app authored it.
    */
   readImports(dk: string): Promise<ImportedReading[]>;
   /** Read the night that *ends* on `dk` (spans the prior evening → this morning). */
   readSleep(dk: string): Promise<SleepImport | null>;
   writeHrvSession(opts: { sdnnMs: number; avgHr: number; startISO: string; durationSec: number }): Promise<void>;
-  writeQuantity(kind: 'weight' | 'spo2' | 'systolic' | 'diastolic' | 'restingHr', value: number, when: Date): Promise<void>;
+  writeQuantity(kind: 'systolic' | 'diastolic' | 'restingHr', value: number, when: Date): Promise<void>;
   /** Publish an app journal reading to Health. Returns how many samples were written. */
   publishReading(entry: Entry, dk: string): Promise<number>;
 }
@@ -43,7 +43,6 @@ export interface HealthApi {
 export interface HealthDaySamples {
   restingHr: number | null;
   hrvSdnn: number | null;
-  spo2: number | null; // normalized to percent (0..100)
   systolic: number | null;
   diastolic: number | null;
   respiratoryRate: number | null;
@@ -52,7 +51,7 @@ export interface HealthDaySamples {
 }
 
 export interface ImportedReading {
-  type: 'restingHr' | 'bp' | 'bloodO2' | 'hrv';
+  type: 'restingHr' | 'bp' | 'hrv';
   time: string;   // HH:MM local, from the sample's real timestamp
   startMs: number; // epoch ms of the sample start, for dedup windows
   fields: Record<string, string>;
@@ -73,7 +72,7 @@ export interface SleepImport {
 }
 
 const emptyDay: HealthDaySamples = {
-  restingHr: null, hrvSdnn: null, spo2: null, systolic: null, diastolic: null,
+  restingHr: null, hrvSdnn: null, systolic: null, diastolic: null,
   respiratoryRate: null, weightLb: null, sleep: null,
 };
 
@@ -154,7 +153,6 @@ const QID = {
   heartRate: 'HKQuantityTypeIdentifierHeartRate',
   hrvSdnn: 'HKQuantityTypeIdentifierHeartRateVariabilitySDNN',
   respiratoryRate: 'HKQuantityTypeIdentifierRespiratoryRate',
-  spo2: 'HKQuantityTypeIdentifierOxygenSaturation',
   systolic: 'HKQuantityTypeIdentifierBloodPressureSystolic',
   diastolic: 'HKQuantityTypeIdentifierBloodPressureDiastolic',
   bodyMass: 'HKQuantityTypeIdentifierBodyMass',
@@ -167,11 +165,11 @@ const CORR = { bloodPressure: 'HKCorrelationTypeIdentifierBloodPressure' } as co
 const HEARTBEAT_SERIES = 'HKDataTypeIdentifierHeartbeatSeries';
 
 const READ_IDS = [
-  QID.restingHr, QID.heartRate, QID.hrvSdnn, QID.respiratoryRate, QID.spo2,
+  QID.restingHr, QID.heartRate, QID.hrvSdnn, QID.respiratoryRate,
   QID.systolic, QID.diastolic, QID.bodyMass, CID.sleep, HEARTBEAT_SERIES,
 ];
 const WRITE_IDS = [
-  QID.hrvSdnn, QID.restingHr, QID.heartRate, QID.bodyMass, QID.spo2,
+  QID.hrvSdnn, QID.restingHr, QID.heartRate,
   QID.systolic, QID.diastolic, CID.mindful,
 ];
 
@@ -230,11 +228,10 @@ function makeReal(mod: HkModule): HealthApi {
 
     async readDay(dk) {
       const { from, to } = dayBounds(dk);
-      const [restingHr, hrvSdnn, respiratoryRate, spo2raw, systolic, diastolic, weightKg] = await Promise.all([
+      const [restingHr, hrvSdnn, respiratoryRate, systolic, diastolic, weightKg] = await Promise.all([
         avgQ(QID.restingHr, from, to),
         avgQ(QID.hrvSdnn, from, to),
         avgQ(QID.respiratoryRate, from, to),
-        avgQ(QID.spo2, from, to),
         avgQ(QID.systolic, from, to),
         avgQ(QID.diastolic, from, to),
         avgQ(QID.bodyMass, from, to),
@@ -242,12 +239,10 @@ function makeReal(mod: HkModule): HealthApi {
       let sleep: HealthDaySamples['sleep'] = null;
       const s = await this.readSleep(dk);
       if (s) sleep = { bed: s.bed, wake: s.wake, interrupted: s.interrupted };
-      const spo2 = spo2raw == null ? null : spo2raw <= 1 ? spo2raw * 100 : spo2raw;
       return {
         restingHr: restingHr != null ? Math.round(restingHr) : null,
         hrvSdnn: hrvSdnn != null ? Math.round(hrvSdnn) : null,
         respiratoryRate,
-        spo2: spo2 != null ? Math.round(spo2) : null,
         systolic: systolic != null ? Math.round(systolic) : null,
         diastolic: diastolic != null ? Math.round(diastolic) : null,
         weightLb: weightKg != null ? Math.round(weightKg * 2.20462) : null,
@@ -260,16 +255,14 @@ function makeReal(mod: HkModule): HealthApi {
       const out: ImportedReading[] = [];
       const ts = (s: QSample) => ({ time: hhmm(s.startDate), startMs: s.startDate.getTime(), ownApp: isOwnSample(s.sourceRevision) });
 
-      const [rhr, ox, sys, dia, sdnn] = await Promise.all([
+      const [rhr, sys, dia, sdnn] = await Promise.all([
         samplesQ(QID.restingHr, from, to),
-        samplesQ(QID.spo2, from, to),
         samplesQ(QID.systolic, from, to),
         samplesQ(QID.diastolic, from, to),
         samplesQ(QID.hrvSdnn, from, to),
       ]);
 
       rhr.forEach((s) => out.push({ type: 'restingHr', ...ts(s), fields: { hr: String(Math.round(s.quantity)), position: 'Laying' } }));
-      ox.forEach((s) => { const v = s.quantity <= 1 ? s.quantity * 100 : s.quantity; out.push({ type: 'bloodO2', ...ts(s), fields: { value: String(Math.round(v)) } }); });
       // Pair systolic + diastolic by (near-)identical timestamps (saved together).
       sys.forEach((s) => {
         const m = dia.find((d) => Math.abs(d.startDate.getTime() - s.startDate.getTime()) < 2000);
@@ -341,8 +334,6 @@ function makeReal(mod: HkModule): HealthApi {
 
     async writeQuantity(kind, value, when) {
       const map: Record<string, [string, string, number]> = {
-        weight: [QID.bodyMass, 'lb', value],
-        spo2: [QID.spo2, '%', value / 100], // HealthKit percent unit is a 0..1 fraction
         systolic: [QID.systolic, 'mmHg', value],
         diastolic: [QID.diastolic, 'mmHg', value],
         restingHr: [QID.restingHr, 'count/min', value],
@@ -368,18 +359,6 @@ function makeReal(mod: HkModule): HealthApi {
             written += 1;
           } catch { /* graceful */ }
         }
-        return written;
-      }
-
-      if (entry.type === 'bloodO2') {
-        const v = num(entry.value);
-        if (v != null) written += (await saveQ(QID.spo2, '%', v / 100, when, when)) ? 1 : 0;
-        return written;
-      }
-
-      if (entry.type === 'weight') {
-        const v = num(entry.weight);
-        if (v != null) written += (await saveQ(QID.bodyMass, 'lb', v, when, when)) ? 1 : 0;
         return written;
       }
 

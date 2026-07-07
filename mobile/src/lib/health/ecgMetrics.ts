@@ -52,6 +52,31 @@ export function toImport(s: RawEcgSample): EcgImport {
   return { uuid: s.uuid, startISO: new Date(s.start).toISOString(), fields: metricsToFields(s, metrics), metrics };
 }
 
+/** Sampling rate: prefer the reported frequency, else infer from count / duration. */
+function sampleRate(s: RawEcgSample): number {
+  const durationSec = Math.max(0.001, (s.end - s.start) / 1000);
+  return s.samplingFrequency && s.samplingFrequency > 1 ? s.samplingFrequency : s.voltages.length / durationSec;
+}
+
+/**
+ * Beat-to-beat RR intervals (ms) from an ECG's lead-I waveform — the input the
+ * HRV pipeline wants. Only physiologic gaps (30–200 bpm) are kept; the HRV
+ * pipeline's artifact correction handles the rest.
+ */
+export function rrFromEcg(s: RawEcgSample): number[] {
+  const v = s.voltages;
+  if (!v || v.length < 100) return [];
+  const fs = sampleRate(s);
+  const signal = detrend(v, fs);
+  const peaks = detectRPeaks(signal, fs);
+  const rr: number[] = [];
+  for (let i = 1; i < peaks.length; i++) {
+    const ms = ((peaks[i] - peaks[i - 1]) / fs) * 1000;
+    if (ms > 250 && ms < 2500) rr.push(ms);
+  }
+  return rr;
+}
+
 /* ------------------------------------------------------------------ */
 /* Metric computation                                                  */
 /* ------------------------------------------------------------------ */
@@ -77,23 +102,35 @@ export function computeEcgMetrics(s: RawEcgSample): EcgMetrics {
   const rPeaks = detectRPeaks(signal, fs);
   base.beats = rPeaks.length;
 
-  // RR-based metrics (reliable).
-  const rr: number[] = []; // seconds
-  for (let i = 1; i < rPeaks.length; i++) rr.push((rPeaks[i] - rPeaks[i - 1]) / fs);
-  const rrValid = rr.filter((x) => x >= 0.3 && x <= 2.0); // 30–200 bpm
-  if (rrValid.length >= 2) {
-    const meanRr = mean(rrValid);
+  // Raw RR (seconds), then a physiologic + robust-deviation filter so a missed
+  // or doubled R-peak detection doesn't blow up SDNN/RMSSD (the "HRV 191"
+  // failure mode: one spurious interval dominates the spread).
+  const rrRaw: number[] = [];
+  for (let i = 1; i < rPeaks.length; i++) rrRaw.push((rPeaks[i] - rPeaks[i - 1]) / fs);
+  const physiologic = rrRaw.filter((x) => x >= 0.3 && x <= 2.0); // 30–200 bpm
+  const medRr = physiologic.length ? median(physiologic) : 1;
+  // Keep only normal-to-normal intervals: within 25% of the running median.
+  const rrNN = physiologic.filter((x) => Math.abs(x - medRr) / medRr <= 0.25);
+  if (rrNN.length >= 2) {
+    const meanRr = mean(rrNN);
     base.hr = Math.round(60 / meanRr);
-    base.sdnn = Math.round(std(rrValid) * 1000);
-    base.rmssd = Math.round(rmssd(rrValid) * 1000);
-    const medRr = median(rrValid);
-    base.ectopic = rr.filter((x) => x > 0 && x < 0.8 * medRr).length;
+    base.sdnn = Math.round(std(rrNN) * 1000);
+    base.rmssd = Math.round(rmssd(rrNN) * 1000);
+    base.ectopic = physiologic.filter((x) => x > 0 && x < 0.8 * medRr).length;
+  } else if (physiologic.length >= 2) {
+    base.hr = Math.round(60 / mean(physiologic));
   }
   // Apple's HR is authoritative when we couldn't derive one.
   if (base.hr == null && s.averageHeartRate) base.hr = Math.round(s.averageHeartRate);
 
-  // Interval estimates (approximate; single lead).
-  const iv = estimateIntervals(signal, fs, rPeaks, rr);
+  // Interval estimates from a SIGNAL-AVERAGED beat. Aligning every normal beat
+  // on its R peak and averaging cancels uncorrelated noise, so wave onsets and
+  // offsets (P, QRS, T) are far cleaner than any single beat on a wrist lead.
+  // NB: delineation runs on the RAW voltages (with per-beat baseline removal),
+  // NOT the high-passed `signal` — the 200 ms moving-average detrend used for
+  // peak detection depresses the isoelectric region around the QRS and would
+  // defeat amplitude-based onset/offset finding.
+  const iv = estimateIntervalsAveraged(v, fs, rPeaks, rrNN.length ? median(rrNN) : medRr);
   base.qrs = iv.qrs;
   base.pr = iv.pr;
   base.qtc = iv.qtc;
@@ -214,60 +251,81 @@ function refinePeak(signal: number[], center: number, win: number): number {
 }
 
 /**
- * Estimate median QRS, PR and QTc across beats. Best-effort single-lead
- * delineation; each interval is clamped to a physiologic range and dropped if
- * out of range. Requires ≥3 valid beats to report a value.
+ * Build a signal-averaged beat (ensemble average) and delineate P/QRS/T on it,
+ * returning QRS, PR and QTc in ms. Averaging every normal beat aligned on its R
+ * peak raises the SNR enormously, so amplitude-threshold onsets/offsets are
+ * stable in a way per-beat delineation on a wrist lead never is. Each interval
+ * is clamped to a physiologic range and dropped (null) if it lands out of range
+ * or too few beats were available.
  */
-function estimateIntervals(signal: number[], fs: number, rPeaks: number[], rrSec: number[]) {
-  const qrsVals: number[] = [];
-  const prVals: number[] = [];
-  const qtVals: number[] = []; // seconds, paired with rr for correction
-  const qtcVals: number[] = [];
+function estimateIntervalsAveraged(signal: number[], fs: number, rPeaks: number[], medRrSec: number) {
+  const pre = Math.round(0.35 * fs);   // samples kept before R (covers the P wave)
+  const post = Math.round(0.50 * fs);  // samples kept after R (covers the T wave)
+  const beatLen = pre + post + 1;
+  if (rPeaks.length < 3) return { qrs: null, pr: null, qtc: null };
 
-  for (let k = 0; k < rPeaks.length; k++) {
-    const r = rPeaks[k];
-    const nextR = k + 1 < rPeaks.length ? rPeaks[k + 1] : Math.min(signal.length - 1, r + Math.round(fs));
-    const rr = rrSec[k] ?? (nextR - r) / fs;
+  // Ensemble-average, baseline-correcting each beat on its PR/TP segment so
+  // wander doesn't bias the mean. Skip beats too close to the recording edges.
+  const acc = new Array<number>(beatLen).fill(0);
+  let used = 0;
+  const baseLo = 0, baseHi = Math.max(1, pre - Math.round(0.22 * fs)); // pre-P isoelectric region
+  for (const r of rPeaks) {
+    if (r - pre < 0 || r + post >= signal.length) continue;
+    let bl = 0;
+    for (let i = baseLo; i < baseHi; i++) bl += signal[r - pre + i];
+    bl /= (baseHi - baseLo);
+    for (let i = 0; i < beatLen; i++) acc[i] += signal[r - pre + i] - bl;
+    used++;
+  }
+  if (used < 3) return { qrs: null, pr: null, qtc: null };
+  const beat = acc.map((x) => x / used);
 
-    // Q and S troughs adjacent to R.
-    const qWin = Math.round(0.06 * fs);
-    const q = localMinIndex(signal, Math.max(0, r - qWin), r);
-    const s = localMinIndex(signal, r, Math.min(signal.length - 1, r + qWin));
+  const R = pre; // R peak sits at the alignment index
+  const rAmp = Math.abs(beat[R]) || 1;
 
-    // QRS onset/offset: walk out from Q/S until the slope flattens.
-    const onset = walkToFlat(signal, q, -1, Math.round(0.05 * fs));
-    const offset = walkToFlat(signal, s, +1, Math.round(0.05 * fs));
-    const qrs = ((offset - onset) / fs) * 1000;
-    if (qrs >= 40 && qrs <= 200) qrsVals.push(qrs);
+  // Q / S troughs immediately flanking R.
+  const qWin = Math.round(0.06 * fs);
+  const q = localMinIndex(beat, Math.max(0, R - qWin), R);
+  const s = localMinIndex(beat, R, Math.min(beatLen - 1, R + qWin));
 
-    // P wave before QRS onset.
-    const pHi = onset;
-    const pLo = Math.max(0, r - Math.round(0.28 * fs));
-    if (pHi - pLo > 3) {
-      const pPeak = maxAbsIndex(signal, pLo, pHi);
-      const pOnset = walkToFlat(signal, pPeak, -1, Math.round(0.06 * fs));
-      const pr = ((onset - pOnset) / fs) * 1000;
-      if (pr >= 80 && pr <= 320) prVals.push(pr);
-    }
+  // QRS onset/offset: nearest point outside Q/S where the trace settles back
+  // within a small band of the isoelectric baseline (0 after correction).
+  const qrsThr = 0.06 * rAmp;
+  const onset = returnToBaseline(beat, q, -1, qrsThr, Math.round(0.08 * fs));
+  const offset = returnToBaseline(beat, s, +1, qrsThr, Math.round(0.08 * fs));
+  const qrsMs = ((offset - onset) / fs) * 1000;
+  const qrs = qrsMs >= 40 && qrsMs <= 200 ? Math.round(qrsMs) : null;
 
-    // T wave after QRS offset → QT and QTc (Bazett).
-    const tLo = Math.min(signal.length - 1, offset + Math.round(0.05 * fs));
-    const tHi = Math.min(signal.length - 1, r + Math.round(Math.min(0.55, rr * 0.7) * fs));
-    if (tHi - tLo > 5) {
-      const tPeak = maxAbsIndex(signal, tLo, tHi);
-      const tEnd = tangentTEnd(signal, tPeak, tHi);
-      const qt = (tEnd - onset) / fs; // seconds
-      if (qt >= 0.25 && qt <= 0.6 && rr > 0.3) {
-        qtVals.push(qt);
-        const qtc = (qt / Math.sqrt(rr)) * 1000;
-        if (qtc >= 300 && qtc <= 650) qtcVals.push(qtc);
-      }
+  // P wave: the dominant deflection in the segment before QRS onset.
+  let pr: number | null = null;
+  const pLo = Math.max(0, R - Math.round(0.30 * fs));
+  const pHi = Math.max(pLo + 1, onset - Math.round(0.01 * fs));
+  if (pHi - pLo > 3) {
+    const pPeak = maxAbsIndex(beat, pLo, pHi);
+    const pAmp = Math.abs(beat[pPeak]) || 1;
+    // Only trust a P wave that's a real deflection, not baseline noise.
+    if (pAmp > 0.04 * rAmp) {
+      const pOnset = returnToBaseline(beat, pPeak, -1, 0.15 * pAmp, Math.round(0.08 * fs));
+      const prMs = ((onset - pOnset) / fs) * 1000;
+      if (prMs >= 80 && prMs <= 320) pr = Math.round(prMs);
     }
   }
 
-  const pick = (arr: number[]) => (arr.length >= 3 ? Math.round(median(arr)) : null);
-  void qtVals;
-  return { qrs: pick(qrsVals), pr: pick(prVals), qtc: pick(qtcVals) };
+  // T wave: the dominant deflection after QRS offset → QT (onset→T end), QTc Bazett.
+  let qtc: number | null = null;
+  const tLo = Math.min(beatLen - 1, offset + Math.round(0.04 * fs));
+  const tHi = Math.min(beatLen - 1, R + Math.round(Math.min(0.5, medRrSec * 0.65) * fs));
+  if (tHi - tLo > 5) {
+    const tPeak = maxAbsIndex(beat, tLo, tHi);
+    const tEnd = tangentTEnd(beat, tPeak, tHi);
+    const qt = (tEnd - onset) / fs; // seconds
+    if (qt >= 0.25 && qt <= 0.6 && medRrSec > 0.3) {
+      const qtcMs = (qt / Math.sqrt(medRrSec)) * 1000;
+      if (qtcMs >= 300 && qtcMs <= 650) qtc = Math.round(qtcMs);
+    }
+  }
+
+  return { qrs, pr, qtc };
 }
 
 function localMinIndex(x: number[], lo: number, hi: number): number {
@@ -280,16 +338,17 @@ function maxAbsIndex(x: number[], lo: number, hi: number): number {
   for (let i = lo; i <= hi; i++) { const a = Math.abs(x[i]); if (a > val) { val = a; idx = i; } }
   return idx;
 }
-/** Walk from `start` in `dir` until local slope drops near zero (wave boundary). */
-function walkToFlat(x: number[], start: number, dir: number, maxSteps: number): number {
+/**
+ * Walk from `start` in `dir` until the trace stays within `thr` of the
+ * (corrected) isoelectric baseline for two consecutive samples — the wave
+ * boundary. Falls back to the last stepped index if it never settles.
+ */
+function returnToBaseline(x: number[], start: number, dir: number, thr: number, maxSteps: number): number {
   let i = start;
-  let prevSlope = Infinity;
   for (let step = 0; step < maxSteps; step++) {
     const j = i + dir;
     if (j < 1 || j >= x.length - 1) break;
-    const slope = Math.abs(x[j + 1] - x[j - 1]);
-    if (slope < 0.15 * prevSlope) { i = j; break; }
-    prevSlope = Math.min(prevSlope, slope) || slope;
+    if (Math.abs(x[j]) < thr && Math.abs(x[j - dir]) < thr) return j;
     i = j;
   }
   return i;

@@ -92,16 +92,27 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
     const sys = acAgg(buckets, (d) => acReadVals(d, 'bp', 'sys'));
     const dia = acAgg(buckets, (d) => acReadVals(d, 'bp', 'dia'));
     const laying = acAgg(buckets, (d) => acReadVals(d, 'restingHr', 'hr', (r) => (r.position || '') === 'Laying'));
-    const spo2 = acAgg(buckets, (d) => acReadVals(d, 'bloodO2', 'value'));
-    const qtc = acAgg(buckets, (d) => acReadVals(d, 'ecg', 'qtc'));
     const cards: AnalysisCard[] = [];
     if (acPresent(sys).length) cards.push({ title: 'Blood Pressure', sub: range, charts: [
       // One connected systolic↕diastolic segment per reading, grade-gradient coloured.
       { label: 'Systolic / diastolic', series: [], dumbbell: { sys, dia } },
     ], stats: [{ label: 'Avg sys morning', value: avgRound(acAgg(buckets, (d) => acReadVals(d, 'bp', 'sys', isMorning))) }, { label: 'Avg sys evening', value: avgRound(acAgg(buckets, (d) => acReadVals(d, 'bp', 'sys', isEvening))) }] });
     if (acPresent(laying).length) cards.push({ title: 'Resting Heart Rate', sub: range, charts: [{ label: 'Laying HR', series: [series(laying, SCORE_COLORS.bad)] }], stats: [{ label: 'Avg laying HR', value: avgRound(laying) }] });
-    if (acPresent(spo2).length) cards.push({ title: 'Blood Oxygen', sub: range, charts: [{ label: 'SpO₂', series: [series(spo2, '#16a34a', undefined, { pointBands: BANDS.spo2 })], zones: acBandZones('spo2') }] });
-    if (acPresent(qtc).length) cards.push({ title: 'ECG', sub: range, charts: [{ label: 'QTc', series: [series(qtc, SCORE_COLORS.bad, undefined, { pointBands: BANDS.qtc })], zones: acBandZones('qtc'), integer: true }] });
+    // ECG: every recorded interval, not just QTc.
+    const ecgRows: { key: string; label: string; band: string | null; integer?: boolean }[] = [
+      { key: 'qtc', label: 'QTc', band: 'qtc', integer: true },
+      { key: 'qrs', label: 'QRS', band: 'qrs', integer: true },
+      { key: 'pr', label: 'PR', band: 'pr', integer: true },
+      { key: 'hr', label: 'HR', band: 'hrBreath', integer: true },
+      { key: 'hrv', label: 'HRV', band: 'ecgHrv', integer: true },
+      { key: 'ectopic', label: 'Ectopic beats', band: 'ectopic', integer: true },
+    ];
+    const ecgCharts = ecgRows.map((row) => {
+      const vals = acAgg(buckets, (d) => acReadVals(d, 'ecg', row.key));
+      if (!acPresent(vals).length) return null;
+      return { label: row.label, series: [series(vals, SCORE_COLORS.bad, undefined, { pointBands: row.band ? BANDS[row.band] : null })], zones: row.band ? acBandZones(row.band) : null, integer: row.integer };
+    }).filter((c): c is NonNullable<typeof c> => c != null);
+    if (ecgCharts.length) cards.push({ title: 'ECG', sub: range, charts: ecgCharts });
     return cards;
   };
 
@@ -146,15 +157,15 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
     }];
   };
 
-  const food = (): AnalysisCard[] => {
+  const triggers = (): AnalysisCard[] => {
     const water = acAgg(buckets, (d) => (d.food && +d.food.water > 0 ? +d.food.water : null));
     const trig: Record<string, number> = {};
     buckets.forEach((b) => b.days.forEach((dk) => { const f = days[dk].food; if (!f) return; Object.keys(f.triggers || {}).forEach((k) => { if (f.triggers[k] > 0 && TRIGGER_TYPES[k]) trig[k] = (trig[k] || 0) + f.triggers[k]; }); }));
     const trigRows = Object.entries(trig).map(([k, c]) => ({ name: TRIGGER_TYPES[k].label, count: c })).sort((a, b) => b.count - a.count);
     if (!acPresent(water).length && !trigRows.length) return [];
     const cards: AnalysisCard[] = [];
+    if (trigRows.length) cards.push({ title: 'Triggers', sub: 'Occurrences in range', bars: [{ label: 'All triggers', rows: trigRows }] });
     if (acPresent(water).length) cards.push({ title: 'Hydration', sub: range, charts: [{ label: 'Water (L/day)', series: [series(water, '#38bdf8')], target: { from: 2.5, to: 3.5, color: '#16a34a' } }], stats: [{ label: 'Avg water', value: avgRound(water, 1), sub: 'L' }] });
-    if (trigRows.length) cards.push({ title: 'Trigger Foods', sub: 'Occurrences in range', bars: [{ label: 'Trigger foods', rows: trigRows }] });
     return cards;
   };
 
@@ -174,7 +185,7 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
     { id: 'pots', icon: 'standing', title: 'POTS', desc: 'Orthostatic events', buckets: bl, build: () => nonEmpty(pots()) },
     { id: 'sleep', icon: 'moon', title: 'Sleep', desc: 'Duration & timing', buckets: bl, build: () => nonEmpty(sleep()) },
     { id: 'activity', icon: 'bike', title: 'Activity', desc: 'Workouts & exercise', buckets: bl, build: () => nonEmpty(activity()) },
-    { id: 'food', icon: 'utensils', title: 'Food', desc: 'Hydration & triggers', buckets: bl, build: () => nonEmpty(food()) },
+    { id: 'triggers', icon: 'triangle', title: 'Triggers', desc: 'Triggers & hydration', buckets: bl, build: () => nonEmpty(triggers()) },
     { id: 'supps', icon: 'pill', title: 'Supplements', desc: 'Meds & supplements', buckets: bl, build: () => nonEmpty(supps()) },
   ];
 }

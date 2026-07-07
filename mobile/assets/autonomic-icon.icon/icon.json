@@ -6,22 +6,9 @@
     {
       "layers" : [
         {
-          "blend-mode" : "lighten",
+          "blend-mode" : "normal",
           "fill" : {
-            "linear-gradient" : [
-              "display-p3:1.00000,0.00000,0.00000,0.00000",
-              "display-p3:0.95081,0.00000,0.01032,1.00000"
-            ],
-            "orientation" : {
-              "start" : {
-                "x" : 0.5,
-                "y" : 0.8925627443204357
-              },
-              "stop" : {
-                "x" : 0.5,
-                "y" : 0.2969874228089063
-              }
-            }
+            "solid" : "display-p3:0.95081,0.00000,0.01032,1.00000"
           },
           "glass" : false,
           "hidden" : false,

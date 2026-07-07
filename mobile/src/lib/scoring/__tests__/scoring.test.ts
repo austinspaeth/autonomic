@@ -5,7 +5,7 @@
  */
 import type { DayRecord, Entry } from '../../types';
 import {
-  BANDS, CAT_POINTS, GRADE_PTS, SCORE_RANK, bmiFor, bmiZone, bpBce, bpKerdo, bpKvas, bpMap,
+  BANDS, CAT_POINTS, GRADE_PTS, SCORE_RANK, bpBce, bpKerdo, bpKvas, bpMap,
   bpPP, bpRobinson, catFromBands, computeScores, expectedHf, hrvComposite, qtcBands,
   restingHrBands, rowScoreCategory, sHfPeak, sLfPeak, sPR, sSys, totalPower, worstCat,
 } from '../index';
@@ -134,7 +134,7 @@ describe('unstructured HRV', () => {
   });
 });
 
-describe('BP / SpO2 / resting HR / ECG / orthostatic', () => {
+describe('BP / resting HR / ECG / orthostatic', () => {
   it('sSys and sDia both-sided zones, sBP = worst', () => {
     expect(sSys('115')).toBe('great');
     expect(sSys('95')).toBe('bad');
@@ -144,10 +144,6 @@ describe('BP / SpO2 / resting HR / ECG / orthostatic', () => {
     expect(s.dia).toBe('bad');
     expect(s.bp).toBe('bad');
     expect(rowScoreCategory({ id: 'x', type: 'bp', sys: '115', dia: '92' })).toBe('bad');
-  });
-  it('spo2', () => {
-    expect(computeScores({ id: 'x', type: 'bloodO2', value: '98' }).value).toBe('great');
-    expect(computeScores({ id: 'x', type: 'bloodO2', value: '91' }).value).toBe('concerning');
   });
   it('resting HR depends on position', () => {
     expect(computeScores({ id: 'x', type: 'restingHr', hr: '70', position: 'Laying' }).hr).toBe('ok');
@@ -208,17 +204,6 @@ describe('sLfPeak / sHfPeak edges', () => {
     expect(sHfPeak('0.19', '4/6')).toBe('good'); // 0.01 over
     expect(sHfPeak('0.21', '4/6')).toBe('ok'); // 0.03 over
     expect(sHfPeak('0.25', '4/6')).toBe('bad');
-  });
-});
-
-describe('weight / BMI', () => {
-  it('bmiFor + zones', () => {
-    const bmi = bmiFor(150, 68);
-    expect(bmi).toBeCloseTo((703 * 150) / (68 * 68), 5);
-    expect(bmiZone(22).zone).toBe('Healthy');
-    expect(bmiZone(17).cat).toBe('warning');
-    expect(computeScores({ id: 'x', type: 'weight', weight: '150' }, { height: 68 }).weight).toBe('great');
-    expect(computeScores({ id: 'x', type: 'weight', weight: '150' }, {}).weight).toBeUndefined();
   });
 });
 

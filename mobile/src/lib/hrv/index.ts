@@ -208,6 +208,26 @@ export function frequencyDomain(rr: number[]): FrequencyDomain | null {
   };
 }
 
+/**
+ * Frequency/power spectral-density curve for plotting — the resampled tachogram
+ * run through the same Welch PSD as the metrics, trimmed to 0–0.5 Hz. Returns
+ * null when there aren't enough beats. Used by the power-spectrum chart so it
+ * shows the real distribution, not band rectangles.
+ */
+export function psdCurve(rr: number[]): { freqs: number[]; psd: number[] } | null {
+  const { clean } = correctArtifacts(rr);
+  const fd = frequencyDomain(clean);
+  if (!fd) return null;
+  const freqs: number[] = [];
+  const psd: number[] = [];
+  for (let i = 0; i < fd.freqs.length; i++) {
+    if (fd.freqs[i] > 0.5) break;
+    freqs.push(fd.freqs[i]);
+    psd.push(fd.psd[i]);
+  }
+  return { freqs, psd };
+}
+
 /* ---------- top-level: full result ---------- */
 export interface HrvResult {
   ok: boolean;

@@ -61,7 +61,6 @@ export const sSDNN = (v: unknown): ScoreCat | null => { const n = numOr(v); retu
 export const sTotalPower = (v: unknown): ScoreCat | null => { const n = numOr(v); return n == null ? null : n >= 3500 ? 'great' : n >= 2200 ? 'good' : n >= 1500 ? 'ok' : n >= 800 ? 'bad' : 'crash'; };
 export const sVLF = (v: unknown): ScoreCat | null => { const n = numOr(v); return n == null ? null : n < 200 ? 'great' : n <= 450 ? 'good' : n <= 700 ? 'ok' : n <= 1000 ? 'bad' : 'crash'; }; // lower better
 export const sReadiness = (v: unknown): ScoreCat | null => { const n = numOr(v); if (n == null) return null; if (n >= 86) return 'warning'; return n >= 70 ? 'great' : n >= 60 ? 'good' : n >= 50 ? 'ok' : n >= 35 ? 'bad' : 'crash'; };
-export const sSpo2 = (v: unknown): ScoreCat | null => { const n = numOr(v); return n == null ? null : n >= 98 ? 'great' : n >= 96 ? 'good' : n >= 94 ? 'ok' : n >= 92 ? 'bad' : 'concerning'; };
 export const sRestingHr = (v: unknown, pos?: unknown): ScoreCat | null => {
   const n = numOr(v);
   if (n == null) return null;
@@ -103,21 +102,6 @@ export const totalPower = (r: Entry): number | null => {
   return a.length ? a.reduce((x, y) => x + y, 0) : null;
 };
 
-/* ---------- BMI (weight reading grading) ---------- */
-export function bmiFor(weightLbs: unknown, heightIn: unknown): number | null {
-  const w = weightLbs == null || weightLbs === '' ? null : +(weightLbs as number);
-  const h = heightIn ? +(heightIn as number) : null;
-  if (w == null || isNaN(w) || !h || isNaN(h) || h <= 0) return null;
-  return (703 * w) / (h * h);
-}
-export const BMI_ZONES: { max: number; zone: string; cat: ScoreCat }[] = [
-  { max: 18.5, zone: 'Underweight', cat: 'warning' },
-  { max: 25, zone: 'Healthy', cat: 'great' },
-  { max: 30, zone: 'Overweight', cat: 'ok' },
-  { max: Infinity, zone: 'Obese', cat: 'bad' },
-];
-export const bmiZone = (bmi: number) => BMI_ZONES.find((z) => bmi < z.max) || BMI_ZONES[BMI_ZONES.length - 1];
-
 /* ---------- BANDS registry (sparkline grade zones) ---------- */
 export const BANDS: Record<string, Band[]> = {
   rmssdU: [{ max: 17, cat: 'crash' }, { max: 22, cat: 'bad' }, { max: 27, cat: 'ok' }, { max: 34, cat: 'good' }, { max: Infinity, cat: 'great' }],
@@ -127,9 +111,13 @@ export const BANDS: Record<string, Band[]> = {
   totalPower: [{ max: 800, cat: 'crash' }, { max: 1500, cat: 'bad' }, { max: 2200, cat: 'ok' }, { max: 3500, cat: 'good' }, { max: Infinity, cat: 'great' }],
   vlf: [{ max: 200, cat: 'great' }, { max: 450, cat: 'good' }, { max: 700, cat: 'ok' }, { max: 1000, cat: 'bad' }, { max: Infinity, cat: 'crash' }],
   lfPeak: [{ max: 0.045, cat: 'concerning' }, { max: 0.060, cat: 'bad' }, { max: 0.075, cat: 'ok' }, { max: 0.090, cat: 'good' }, { max: 0.105, cat: 'great' }, { max: Infinity, cat: 'good' }],
+  // Respiratory (HF) peak: a peak inside the HF band (0.15–0.40 Hz) reflects
+  // normal respiratory sinus arrhythmia; ~0.20–0.30 Hz (12–18 breaths/min) is
+  // the relaxed-breathing sweet spot. Used to give HF peak grade zones even for
+  // unstructured readings, where there's no target pace to compare against.
+  hfPeak: [{ max: 0.12, cat: 'bad' }, { max: 0.15, cat: 'ok' }, { max: 0.20, cat: 'good' }, { max: 0.32, cat: 'great' }, { max: 0.40, cat: 'good' }, { max: Infinity, cat: 'ok' }],
   lfhf: [{ max: 1.5, cat: 'great' }, { max: 3, cat: 'good' }, { max: 5, cat: 'ok' }, { max: 10, cat: 'bad' }, { max: Infinity, cat: 'concerning' }],
   readiness: [{ max: 35, cat: 'crash' }, { max: 50, cat: 'bad' }, { max: 60, cat: 'ok' }, { max: 70, cat: 'good' }, { max: 86, cat: 'great' }, { max: Infinity, cat: 'warning' }],
-  spo2: [{ max: 92, cat: 'concerning' }, { max: 94, cat: 'bad' }, { max: 96, cat: 'ok' }, { max: 98, cat: 'good' }, { max: Infinity, cat: 'great' }],
   ectopic: [{ max: 1, cat: 'great' }, { max: 3, cat: 'good' }, { max: 6, cat: 'ok' }, { max: 16, cat: 'bad' }, { max: Infinity, cat: 'concerning' }],
   qtc: [{ max: 350, cat: 'concerning' }, { max: 380, cat: 'ok' }, { max: 420, cat: 'great' }, { max: 440, cat: 'good' }, { max: 450, cat: 'ok' }, { max: 470, cat: 'bad' }, { max: Infinity, cat: 'concerning' }],
   qrs: [{ max: 91, cat: 'great' }, { max: 111, cat: 'good' }, { max: 121, cat: 'ok' }, { max: 131, cat: 'bad' }, { max: Infinity, cat: 'concerning' }],
@@ -147,7 +135,6 @@ export const BANDS: Record<string, Band[]> = {
   robinson: [{ max: 71, cat: 'great' }, { max: 81, cat: 'good' }, { max: 91, cat: 'ok' }, { max: 101, cat: 'bad' }, { max: Infinity, cat: 'concerning' }],
   kvas: [{ max: 14, cat: 'great' }, { max: 17, cat: 'good' }, { max: 21, cat: 'ok' }, { max: 26, cat: 'bad' }, { max: Infinity, cat: 'concerning' }],
   bce: [{ max: 2601, cat: 'great' }, { max: 3001, cat: 'good' }, { max: 3501, cat: 'ok' }, { max: 4001, cat: 'bad' }, { max: Infinity, cat: 'concerning' }],
-  perfusion: [{ max: 1, cat: 'concerning' }, { max: 2, cat: 'bad' }, { max: 4, cat: 'ok' }, { max: 5, cat: 'good' }, { max: Infinity, cat: 'great' }],
   pns: [{ max: -1.5, cat: 'crash' }, { max: -0.5, cat: 'bad' }, { max: 0.3, cat: 'ok' }, { max: 1.5, cat: 'good' }, { max: Infinity, cat: 'great' }],
   sns: [{ max: -0.5, cat: 'great' }, { max: 0.6, cat: 'good' }, { max: 1.6, cat: 'ok' }, { max: 3.01, cat: 'bad' }, { max: Infinity, cat: 'concerning' }],
   stressIndex: [{ max: 100, cat: 'great' }, { max: 201, cat: 'good' }, { max: 351, cat: 'ok' }, { max: 601, cat: 'bad' }, { max: Infinity, cat: 'concerning' }],
@@ -170,10 +157,9 @@ export const qtcBands = (sex?: string): Band[] =>
 
 export function bandsFor(type: string, key: string): Band[] | null {
   const map: Record<string, Record<string, string>> = {
-    hrv: { rmssd: 'rmssdU', sdnn: 'sdnn', avgHr: 'hrBreath', pnn50: 'pnn50', vlowPower: 'vlf', lfPeak: 'lfPeak', meanRr: 'rrMode', mode: 'rrMode', mxdmn: 'mxdmn', amo50: 'amo50', cv: 'cv', pns: 'pns', sns: 'sns', stressIndex: 'stressIndex' },
-    breathHrv: { sdnn: 'sdnn', rmssd: 'rmssdS', pnn50: 'pnn50', vlowPower: 'vlf', lfPeak: 'lfPeak', hr: 'hrBreath', meanRr: 'rrMode', mode: 'rrMode', mxdmn: 'mxdmn', amo50: 'amo50', cv: 'cv', pns: 'pns', sns: 'sns', stressIndex: 'stressIndex' },
+    hrv: { rmssd: 'rmssdU', sdnn: 'sdnn', avgHr: 'hrBreath', pnn50: 'pnn50', vlowPower: 'vlf', lfPeak: 'lfPeak', hfPeak: 'hfPeak', meanRr: 'rrMode', mode: 'rrMode', mxdmn: 'mxdmn', amo50: 'amo50', cv: 'cv', pns: 'pns', sns: 'sns', stressIndex: 'stressIndex' },
+    breathHrv: { sdnn: 'sdnn', rmssd: 'rmssdS', pnn50: 'pnn50', vlowPower: 'vlf', lfPeak: 'lfPeak', hfPeak: 'hfPeak', hr: 'hrBreath', meanRr: 'rrMode', mode: 'rrMode', mxdmn: 'mxdmn', amo50: 'amo50', cv: 'cv', pns: 'pns', sns: 'sns', stressIndex: 'stressIndex' },
     bp: { sys: 'sys', dia: 'dia' },
-    bloodO2: { value: 'spo2' },
     ecg: { qtc: 'qtc', qrs: 'qrs', pr: 'pr', ectopic: 'ectopic' },
   };
   const name = map[type] && map[type][key];
@@ -204,6 +190,7 @@ export function computeScores(r: Entry, ctx: ScoreContext = {}): Record<string, 
       put('totalPower', sTotalPower(totalPower(r)));
       put('vlf', sVLF(r.vlowPower));
       put('lfPeak', sLfPeak(r.lfPeak));
+      { const h = numOr(r.hfPeak); if (h != null) put('hfPeak', catFromBands(h, BANDS.hfPeak)); }
       put('meanRr', sRrMode(r.meanRr));
       put('mode', sRrMode(r.mode));
       put('mxdmn', sMxDMn(r.mxdmn));
@@ -238,16 +225,8 @@ export function computeScores(r: Entry, ctx: ScoreContext = {}): Record<string, 
       put('overall', worstCat([s.rmssd, s.pnn50, s.totalPower].filter(Boolean)));
       break;
     }
-    case 'mood': {
-      const m = ({ 'Feeling amazing': 'great', 'Feeling normal': 'good', 'Feeling bad': 'bad', 'Feeling like a crash': 'crash' } as Record<string, ScoreCat>)[r.mood as string];
-      if (m) s.mood = m;
-      break;
-    }
     case 'bp':
       put('sys', sSys(r.sys)); put('dia', sDia(r.dia)); put('bp', sBP(r.sys, r.dia));
-      break;
-    case 'bloodO2':
-      put('value', sSpo2(r.value));
       break;
     case 'restingHr':
       put('hr', sRestingHr(r.hr, r.position));
@@ -262,11 +241,6 @@ export function computeScores(r: Entry, ctx: ScoreContext = {}): Record<string, 
       const h = numOr(r.hrv);
       if (h != null) put('hrv', catFromBands(h, BANDS.ecgHrv));
       put('overall', worstCat([s.qtc, s.qrs, s.pr, s.ectopic, s.rhythm].filter(Boolean)));
-      break;
-    }
-    case 'weight': {
-      const bmi = bmiFor(r.weight, ctx.height);
-      if (bmi != null) s.weight = bmiZone(bmi).cat;
       break;
     }
     case 'orthostatic': {
@@ -287,11 +261,8 @@ export function rowScoreCategory(r: Entry, ctx: ScoreContext = {}): ScoreCat | n
     case 'hrv': return s.overall || s.sdnn || null;
     case 'breathHrv': return s.overall || s.sdnn || null;
     case 'bp': return s.bp || null;
-    case 'bloodO2': return s.value || null;
     case 'restingHr': return s.hr || null;
     case 'ecg': return s.overall || null;
-    case 'mood': return s.mood || null;
-    case 'weight': return s.weight || null;
     case 'orthostatic': return s.overall || s.increase || null;
     default: return null;
   }

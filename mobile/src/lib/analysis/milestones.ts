@@ -17,7 +17,7 @@ export interface MDay {
   sleepH: number | null; sleepGood: boolean; sleepLow: number | null; bm: number; score: number | null; clean: boolean;
   hfDom: boolean; hfDomMorning: boolean; symptomFree: boolean; bikeEasy: boolean; bikeInterval: boolean;
   core: boolean; upper: boolean; sessions: number; sys: number | null; dia: number | null;
-  medsSet: Set<string>; dinnerBy5: boolean; waterGood: boolean;
+  medsSet: Set<string>; waterGood: boolean;
 }
 
 export interface MilestoneItem { label: string; done: boolean; date: string | null; value: number | string | null }
@@ -43,7 +43,6 @@ export function buildMilestoneDays(days: DaysMap, ctx: ScoreContext): { map: Rec
     const ortho = rd.filter((r) => r.type === 'orthostatic').map((r) => { const a = parseFloat(r.afterHr as string), b = parseFloat(r.beforeHr as string); return !isNaN(a) && !isNaN(b) ? a - b : null; }).filter((v): v is number => v != null);
     const tp = readVals(d, 'breathHrv', 'vlowPower').map((_, i) => { const r = rd.filter((x) => x.type === 'breathHrv')[i]; const p = ['vlowPower', 'lowPower', 'highPower'].map((k) => parseFloat(r[k] as string)); return p.every((x) => !isNaN(x)) ? p[0] + p[1] + p[2] : null; }).filter((v): v is number => v != null);
     const bps = rd.filter((r) => r.type === 'bp');
-    const dinners = ((d.food && d.food.meals) || []).filter((m) => m.type === 'dinner' && m.time);
     const cln = dayCleanliness(days, dk);
     const bpAvg = (k: string) => { const v = readVals(d, 'bp', k); return v.length ? v.reduce((s, x) => s + x, 0) / v.length : null; };
     map[dk] = {
@@ -77,7 +76,6 @@ export function buildMilestoneDays(days: DaysMap, ctx: ScoreContext): { map: Rec
       sessions: acts.length,
       sys: bpAvg('sys'), dia: bpAvg('dia'),
       medsSet: new Set((d.meds || []).map((m) => m.type)),
-      dinnerBy5: dinners.some((m) => (m.time as string) <= '17:00'),
       waterGood: (d.food && +d.food.water >= 2.5) || false,
     };
   });
@@ -191,7 +189,6 @@ export function buildMilestoneGroups(md: MD): MilestoneGroup[] {
     ['Protocol adherence', [
       ['30 days never missing Allegra', consec((d) => d.medsSet.has('allegra'), 30)],
       ['30 days never missing magnesium', consec((d) => d.medsSet.has('magGlycinate') || d.medsSet.has('magCitrate'), 30)],
-      ['30 days dinner before 5pm every day', consec((d) => d.dinnerBy5, 30)],
       ['30 days hydration target hit daily', consec((d) => d.waterGood, 30)],
     ]],
   ];

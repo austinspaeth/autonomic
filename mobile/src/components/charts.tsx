@@ -4,14 +4,15 @@
  * PowerBar (VLF/LF/HF distribution), LineChart (analysis series), Tachogram.
  */
 import React, { useState } from 'react';
-import { LayoutChangeEvent, Text as RNText, View } from 'react-native';
+import { LayoutChangeEvent, Pressable, Text as RNText, View } from 'react-native';
 import Svg, {
-  Circle, Defs, G, Line, LinearGradient, Path, Stop, Text as SvgText,
+  Circle, Defs, G, Line, LinearGradient, Path, Rect, Stop, Text as SvgText,
 } from 'react-native-svg';
 import { fmtNum, fmtShort } from '../lib/dates';
 import { GRADE_COLORS, radius, usePalette } from '../theme';
 import type { Band, ScoreCat } from '../lib/types';
 import { BANDS, catFromBands } from '../lib/scoring';
+import { psdCurve } from '../lib/hrv';
 
 /* HRV frequency bands (Hz) — kept local to the chart so it has no lib/hrv dep. */
 const SPECTRUM_BANDS = [
@@ -50,16 +51,39 @@ export function smoothPath(pts: [number, number][]): string {
 
 let sparkId = 0;
 
+/** A right-aligned "Show zones / Hide zones" toggle link. */
+export function ZonesToggle({ on, onPress }: { on: boolean; onPress: () => void }) {
+  const p = usePalette();
+  return (
+    <Pressable onPress={onPress} hitSlop={8} style={({ pressed }) => [pressed && { opacity: 0.5 }]}>
+      <RNText style={{ fontSize: 12, fontWeight: '700', color: p.accent }}>{on ? 'Hide zones' : 'Show zones'}</RNText>
+    </Pressable>
+  );
+}
+
+/** Grade-zone boundary lines within [min,max]: {v, color, label}. */
+function zoneBoundaries(bands: Band[], min: number, max: number) {
+  const out: { v: number; color: string; label: ScoreCat }[] = [];
+  bands.forEach((b) => {
+    if (b.max > min && b.max < max && isFinite(b.max)) out.push({ v: b.max, color: GRADE_COLORS[b.cat] || '#888', label: b.cat });
+  });
+  return out;
+}
+
 /* ---------- Sparkline ---------- */
 export function Sparkline({ points, bands, height = 92 }: { points: { v: number; date: string }[]; bands?: Band[] | null; height?: number }) {
   const p = usePalette();
   const [sel, setSel] = useState<number>(points.length - 1);
   const [layoutW, setLayoutW] = useState(0);
+  const [showZones, setShowZones] = useState(false);
   if (!points || points.length < 2) return null;
   const gid = `spk${sparkId++}`;
   const vals = points.map((pt) => pt.v);
-  const sc = niceScale(Math.min(...vals), Math.max(...vals), 4);
-  const { min, max, step } = sc;
+  // Scale to the data's own min/max plus a 5% cushion on each side, so the trace
+  // fills the chart and its extremes match the readings (not a padded nice scale).
+  const dataMin = Math.min(...vals), dataMax = Math.max(...vals);
+  const span = dataMax - dataMin || Math.abs(dataMax) || 1;
+  const min = dataMin - span * 0.05, max = dataMax + span * 0.05;
   const W = 320, H = 90, padL = 30, padR = 10, padT = 10, padB = 18;
   const innerW = W - padL - padR;
   const xAt = (i: number) => padL + (points.length === 1 ? innerW / 2 : (i / (points.length - 1)) * innerW);
@@ -77,8 +101,8 @@ export function Sparkline({ points, bands, height = 92 }: { points: { v: number;
     stops.push({ o: 1, c: colAt(min + 1e-9) });
   }
 
-  const yticks: number[] = [];
-  for (let t = min; t <= max + 1e-9; t += step) yticks.push(t);
+  const yticks = [min, (min + max) / 2, max];
+  const zones = bands && showZones ? zoneBoundaries(bands, min, max) : [];
   const xy: [number, number][] = points.map((pt, i) => [xAt(i), yAt(pt.v)]);
 
   const selPt = points[Math.max(0, Math.min(points.length - 1, sel))];
@@ -94,9 +118,12 @@ export function Sparkline({ points, bands, height = 92 }: { points: { v: number;
 
   return (
     <View style={{ marginTop: 16 }}>
-      <RNText style={{ fontSize: 12, fontWeight: '700', color: selColor, height: 16, marginBottom: 4, fontVariant: ['tabular-nums'] }}>
-        {`${fmtShort(selPt.date)}: ${fmtNum(selPt.v)}`}
-      </RNText>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 16, marginBottom: 4 }}>
+        <RNText style={{ fontSize: 12, fontWeight: '700', color: selColor, fontVariant: ['tabular-nums'] }}>
+          {`${fmtShort(selPt.date)}: ${fmtNum(selPt.v)}`}
+        </RNText>
+        {bands ? <ZonesToggle on={showZones} onPress={() => setShowZones((v) => !v)} /> : null}
+      </View>
       <View
         onLayout={(e: LayoutChangeEvent) => setLayoutW(e.nativeEvent.layout.width)}
         onStartShouldSetResponder={() => true}
@@ -117,6 +144,12 @@ export function Sparkline({ points, bands, height = 92 }: { points: { v: number;
             <React.Fragment key={i}>
               <Line x1={padL} x2={padL + innerW} y1={yAt(t)} y2={yAt(t)} stroke={p.border} strokeWidth={1} opacity={0.5} />
               <SvgText x={padL - 4} y={yAt(t) + 3} textAnchor="end" fontSize={9} fill={p.textDim}>{fmtNum(t)}</SvgText>
+            </React.Fragment>
+          ))}
+          {zones.map((z, i) => (
+            <React.Fragment key={`z${i}`}>
+              <Line x1={padL} x2={padL + innerW} y1={yAt(z.v)} y2={yAt(z.v)} stroke={z.color} strokeWidth={1.2} strokeDasharray="4 3" opacity={0.9} />
+              <SvgText x={padL + innerW} y={yAt(z.v) - 2} textAnchor="end" fontSize={8} fontWeight="700" fill={z.color}>{fmtNum(z.v)}</SvgText>
             </React.Fragment>
           ))}
           <Path d={smoothPath(xy)} fill="none" stroke={bands ? `url(#${gid})` : p.text} strokeWidth={3.5} strokeLinejoin="round" strokeLinecap="round" />
@@ -190,47 +223,92 @@ export function PowerBar({ vlf, lf, hf }: { vlf: number | null; lf: number | nul
   );
 }
 
-/* ---------- Power spectrum (frequency-axis VLF/LF/HF distribution) ---------- */
+/* ---------- Power spectrum (frequency-axis PSD distribution) ---------- */
+const bandOf = (f: number) => (f < 0.04 ? SPECTRUM_BANDS[0] : f < 0.15 ? SPECTRUM_BANDS[1] : SPECTRUM_BANDS[2]);
+
 /**
- * Distribution of HRV power across the frequency spectrum. The x-axis is
- * frequency starting at 0 Hz; each band (VLF / LF / HF) is drawn at its true
- * frequency width with a height proportional to its power *density* (power ÷
- * bandwidth) so the filled area of each block reflects its share of total power.
+ * Distribution of HRV power across the frequency spectrum. When beat-to-beat
+ * `rr` is available the true power spectral density is drawn as a filled curve
+ * (band-coloured by frequency), matching the granular look the user asked for.
+ * Without RR (a typed-in reading) we reconstruct a smooth band-shaped curve from
+ * the three band powers so it still reads as a distribution, not blocks. The
+ * x-axis runs 0 → 0.5 Hz with 0.1 ticks; below it, a polished legend spells out
+ * Very low / Low / High power.
  */
-export function PowerSpectrum({ vlf, lf, hf }: { vlf: number | null; lf: number | null; hf: number | null }) {
+export function PowerSpectrum({ rr, vlf, lf, hf }: { rr?: number[] | null; vlf: number | null; lf: number | null; hf: number | null }) {
   const p = usePalette();
-  const vals: Record<string, number> = { vlf: vlf || 0, lf: lf || 0, hf: hf || 0 };
+  const curve = React.useMemo(() => (rr && rr.length >= 16 ? psdCurve(rr) : null), [rr]);
+  const vals = { vlf: vlf || 0, lf: lf || 0, hf: hf || 0 };
   const total = vals.vlf + vals.lf + vals.hf;
-  if (!total) return null;
-  const W = 320, H = 150, padL = 8, padR = 8, padT = 12, padB = 30;
-  const fMax = 0.4;
+  if (!total && !curve) return null;
+  const pct = (x: number) => (total ? Math.round((x / total) * 100) : 0);
+
+  const W = 320, H = 150, padL = 30, padR = 6, padT = 10, padB = 26;
+  const fMax = 0.5;
   const innerW = W - padL - padR;
-  const xAt = (f: number) => padL + (f / fMax) * innerW;
-  // density = power per Hz, so the block area encodes power share
-  const density = SPECTRUM_BANDS.map((b) => vals[b.key] / (b.hi - b.lo));
-  const dMax = Math.max(...density) || 1;
+  const xAt = (f: number) => padL + (Math.min(f, fMax) / fMax) * innerW;
+
+  // Build (freq, density) points: either the real PSD or a reconstructed curve.
+  let pts: { f: number; d: number }[];
+  if (curve) {
+    pts = curve.freqs.map((f, i) => ({ f, d: curve.psd[i] }));
+  } else {
+    // Reconstruct: sample a fine grid, each point = band power / bandwidth (flat
+    // density per band) lightly smoothed at the edges so it isn't a hard block.
+    const density = (f: number) => {
+      const b = bandOf(f);
+      const v = vals[b.key as 'vlf' | 'lf' | 'hf'];
+      return v / (b.hi - b.lo);
+    };
+    pts = [];
+    for (let f = 0.0033; f <= fMax; f += 0.004) pts.push({ f, d: density(f) });
+  }
+  const dMax = Math.max(...pts.map((q) => q.d)) || 1;
   const yAt = (d: number) => padT + (1 - d / dMax) * (H - padT - padB);
-  const pct = (x: number) => Math.round((x / total) * 100);
-  const ticks = [0, 0.04, 0.15, 0.4];
+  const baseY = H - padB;
+
+  // One filled sub-path per band so the fill colour changes at the band edges.
+  const segs: { color: string; d: string }[] = [];
+  SPECTRUM_BANDS.forEach((b) => {
+    const seg = pts.filter((q) => q.f >= b.lo && q.f <= b.hi);
+    if (seg.length < 2) return;
+    const line = seg.map((q, i) => `${i === 0 ? 'M' : 'L'}${xAt(q.f).toFixed(1)} ${yAt(q.d).toFixed(1)}`).join(' ');
+    const area = `M${xAt(seg[0].f).toFixed(1)} ${baseY} ${line.replace('M', 'L')} L${xAt(seg[seg.length - 1].f).toFixed(1)} ${baseY} Z`;
+    segs.push({ color: b.color, d: area });
+  });
+
+  const ticks = [0, 0.1, 0.2, 0.3, 0.4, 0.5];
+  const legend: { label: string; color: string; power: number }[] = [
+    { label: 'Very low', color: SPECTRUM_BANDS[0].color, power: vals.vlf },
+    { label: 'Low', color: SPECTRUM_BANDS[1].color, power: vals.lf },
+    { label: 'High', color: SPECTRUM_BANDS[2].color, power: vals.hf },
+  ];
+
   return (
     <View>
       <Svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
-        <Line x1={padL} x2={W - padR} y1={H - padB} y2={H - padB} stroke={p.border} strokeWidth={1} />
-        {SPECTRUM_BANDS.map((b, i) => {
-          const x0 = xAt(b.lo), x1 = xAt(b.hi), y = yAt(density[i]);
-          const w = Math.max(1, x1 - x0);
-          const cx = x0 + w / 2;
-          return (
-            <G key={b.key}>
-              <Path d={`M${x0} ${H - padB} L${x0} ${y} L${x1} ${y} L${x1} ${H - padB} Z`} fill={b.color} opacity={0.85} />
-              {w >= 26 ? <SvgText x={cx} y={y - 4} textAnchor="middle" fontSize={10} fontWeight="700" fill={p.text}>{`${pct(vals[b.key])}%`}</SvgText> : null}
-              <SvgText x={cx} y={H - padB + 20} textAnchor="middle" fontSize={9} fontWeight="700" fill={b.color}>{b.label}</SvgText>
-            </G>
-          );
-        })}
-        {ticks.map((t, i) => <SvgText key={i} x={Math.max(padL + 4, Math.min(W - padR - 4, xAt(t)))} y={H - padB + 10} textAnchor="middle" fontSize={8} fill={p.textDim}>{`${t}`}</SvgText>)}
+        <Line x1={padL} x2={W - padR} y1={baseY} y2={baseY} stroke={p.border} strokeWidth={1} />
+        {segs.map((s, i) => <Path key={i} d={s.d} fill={s.color} opacity={0.9} />)}
+        {ticks.map((t, i) => (
+          <React.Fragment key={i}>
+            <Line x1={xAt(t)} x2={xAt(t)} y1={padT} y2={baseY} stroke={p.border} strokeWidth={0.5} opacity={0.3} />
+            <SvgText x={xAt(t)} y={baseY + 14} textAnchor="middle" fontSize={9} fill={p.textDim}>{t.toFixed(1)}</SvgText>
+          </React.Fragment>
+        ))}
+        <SvgText x={padL} y={baseY + 24} textAnchor="start" fontSize={9} fill={p.textDim}>Frequency (Hz)</SvgText>
       </Svg>
-      <RNText style={{ fontSize: 12, color: p.textDim, textAlign: 'center' }}>{`Frequency (Hz) · VLF ${pct(vals.vlf)}% · LF ${pct(vals.lf)}% · HF ${pct(vals.hf)}%`}</RNText>
+      <View style={{ flexDirection: 'row', marginTop: 10, borderTopWidth: 1, borderTopColor: p.border, paddingTop: 10 }}>
+        {legend.map((l) => (
+          <View key={l.label} style={{ flex: 1, alignItems: 'center' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+              <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: l.color }} />
+              <RNText style={{ fontSize: 12, color: p.textDim, fontWeight: '600' }}>{l.label}</RNText>
+            </View>
+            <RNText style={{ fontSize: 17, fontWeight: '800', color: p.text, fontVariant: ['tabular-nums'], marginTop: 3 }}>{Math.round(l.power)}</RNText>
+            <RNText style={{ fontSize: 11, color: p.textDim }}>{`ms² · ${pct(l.power)}%`}</RNText>
+          </View>
+        ))}
+      </View>
     </View>
   );
 }
@@ -247,13 +325,15 @@ export function LineChart({ buckets, series, zones, integer, height = 140, targe
   const p = usePalette();
   const [layoutW, setLayoutW] = useState(0);
   const [sel, setSel] = useState<number>(-1);
+  const [showZones, setShowZones] = useState(false);
   const all: number[] = [];
   series.forEach((s) => s.values.forEach((v) => { if (v != null && !isNaN(v)) all.push(v); }));
   if (!all.length) return null;
   let min = Math.min(...all), max = Math.max(...all);
   if (target) { min = Math.min(min, target.from); max = Math.max(max, target.to); }
   if (min === max) { const e = (Math.abs(min) || 1) * 0.1 + 0.5; min -= e; max += e; }
-  const padv = (max - min) * 0.12; min -= padv; max += padv;
+  // 5% cushion each side so the series fills the chart and its extremes track the data.
+  const padv = (max - min) * 0.05; min -= padv; max += padv;
   const W = 320, H = height, padL = 34, padR = 10, padT = 10, padB = 22;
   const innerW = W - padL - padR, n = buckets.length;
   const xAt = (i: number) => padL + (n <= 1 ? innerW / 2 : (i / (n - 1)) * innerW);
@@ -288,9 +368,17 @@ export function LineChart({ buckets, series, zones, integer, height = 140, targe
     ? `${buckets[readoutIdx].label}: ${series.filter((s) => s.values[readoutIdx] != null).map((s) => (series.filter((x) => x.label).length > 1 && s.label ? s.label + ' ' : '') + fmtNum(integer ? Math.round(s.values[readoutIdx] as number) : (s.values[readoutIdx] as number))).join(' · ')}`
     : '';
 
+  // Grade-zone boundaries within range (the interior `.from` edges), for the overlay.
+  const zoneLines = zones && showZones
+    ? zones.map((z) => z.from).filter((v) => v > min && v < max).map((v, i) => ({ v, color: (zones.find((z) => z.from === v) || zones[0]).color, key: i }))
+    : [];
+
   return (
     <View>
-      <RNText style={{ fontSize: 12, fontWeight: '700', color: p.text, height: 16, marginBottom: 4, fontVariant: ['tabular-nums'] }}>{readout}</RNText>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 16, marginBottom: 4 }}>
+        <RNText style={{ flex: 1, fontSize: 12, fontWeight: '700', color: p.text, fontVariant: ['tabular-nums'] }} numberOfLines={1}>{readout}</RNText>
+        {zones ? <ZonesToggle on={showZones} onPress={() => setShowZones((v) => !v)} /> : null}
+      </View>
       <View
         onLayout={(e) => setLayoutW(e.nativeEvent.layout.width)}
         onStartShouldSetResponder={() => true}
@@ -313,6 +401,12 @@ export function LineChart({ buckets, series, zones, integer, height = 140, targe
             </React.Fragment>
           ))}
           {buckets.map((b, i) => (i % step === 0 || i === n - 1) ? <SvgText key={i} x={xAt(i)} y={H - 6} textAnchor="middle" fontSize={9} fill={p.textDim}>{b.label}</SvgText> : null)}
+          {zoneLines.map((z) => (
+            <React.Fragment key={`z${z.key}`}>
+              <Line x1={padL} x2={padL + innerW} y1={yAt(z.v)} y2={yAt(z.v)} stroke={z.color} strokeWidth={1.2} strokeDasharray="4 3" opacity={0.85} />
+              <SvgText x={padL + innerW} y={yAt(z.v) - 2} textAnchor="end" fontSize={8} fontWeight="700" fill={z.color}>{fmtNum(integer ? Math.round(z.v) : z.v)}</SvgText>
+            </React.Fragment>
+          ))}
           {target && [target.from, target.to].map((bv, i) => (bv > min && bv < max) ? <Line key={i} x1={padL} x2={padL + innerW} y1={yAt(bv)} y2={yAt(bv)} stroke={target.color} strokeWidth={1.2} strokeDasharray="4 3" opacity={0.6} /> : null)}
           {series.map((s, si) => {
             const pts: [number, number, number][] = [];
@@ -368,7 +462,9 @@ export function Waveform({ data, color, height = 120, label }: { data: number[];
 export function Tachogram({ rr, height = 132 }: { rr: number[]; height?: number }) {
   const p = usePalette();
   if (!rr || rr.length < 2) return null;
-  const min = Math.min(...rr), max = Math.max(...rr);
+  const dMin = Math.min(...rr), dMax = Math.max(...rr);
+  const span = dMax - dMin || 1;
+  const min = dMin - span * 0.05, max = dMax + span * 0.05;
   const range = max - min || 1;
   const W = 320, H = height, padL = 34, padR = 8, padT = 12, padB = 20;
   const innerW = W - padL - padR;
@@ -468,6 +564,81 @@ export function BpDumbbell({ buckets, sys, dia, height = 180 }: {
                 <Line x1={x} x2={x} y1={yAt(s)} y2={yAt(d)} stroke={`url(#bp${gid}_${i})`} strokeWidth={i === readoutIdx ? 5 : 3.4} strokeLinecap="round" />
                 <Circle cx={x} cy={yAt(s)} r={i === readoutIdx ? 4.5 : 3.4} fill={col(s, BANDS.sys)} />
                 <Circle cx={x} cy={yAt(d)} r={i === readoutIdx ? 4.5 : 3.4} fill={col(d, BANDS.dia)} />
+              </G>
+            );
+          })}
+        </Svg>
+      </View>
+    </View>
+  );
+}
+
+/* ---------- Stacked bars (per-bucket power distribution) ---------- */
+/**
+ * One vertical stacked bar per bucket, each split into coloured segments
+ * (e.g. VLF / LF / HF) whose combined height is the total. Tapping a bar shows
+ * its total and per-segment breakdown. Bars scale to the tallest total.
+ */
+export function StackedBars({ buckets, segments, height = 160, unit }: {
+  buckets: { label: string }[];
+  segments: { label: string; color: string; values: (number | null)[] }[];
+  height?: number; unit?: string;
+}) {
+  const p = usePalette();
+  const [layoutW, setLayoutW] = useState(0);
+  const [sel, setSel] = useState<number>(-1);
+  const n = buckets.length;
+  const totals = buckets.map((_, i) => segments.reduce((s, seg) => s + (seg.values[i] || 0), 0));
+  const max = Math.max(...totals, 0);
+  if (max <= 0) return null;
+  const W = 320, H = height, padL = 34, padR = 8, padT = 10, padB = 22;
+  const innerW = W - padL - padR;
+  const bandW = innerW / n;
+  const barW = Math.min(18, bandW * 0.7);
+  const xCenter = (i: number) => padL + bandW * (i + 0.5);
+  const yAt = (v: number) => padT + (1 - v / max) * (H - padT - padB);
+  const step = Math.max(1, Math.ceil(n / 6));
+  const onTouch = (x: number) => {
+    if (layoutW <= 0) return;
+    const px = (x / layoutW) * W;
+    setSel(Math.max(0, Math.min(n - 1, Math.floor((px - padL) / bandW))));
+  };
+  const readoutIdx = sel >= 0 ? sel : (() => { for (let i = n - 1; i >= 0; i--) if (totals[i] > 0) return i; return -1; })();
+  const readout = readoutIdx >= 0
+    ? `${buckets[readoutIdx].label}: ${Math.round(totals[readoutIdx])}${unit ? ' ' + unit : ''} · ${segments.map((s) => `${s.label} ${Math.round(s.values[readoutIdx] || 0)}`).join(' · ')}`
+    : '';
+  const yticks = [0, max / 2, max];
+  return (
+    <View>
+      <RNText style={{ fontSize: 12, fontWeight: '700', color: p.text, height: 16, marginBottom: 4, fontVariant: ['tabular-nums'] }} numberOfLines={1}>{readout}</RNText>
+      <View
+        onLayout={(e) => setLayoutW(e.nativeEvent.layout.width)}
+        onStartShouldSetResponder={() => true}
+        onMoveShouldSetResponder={() => true}
+        onResponderGrant={(e) => onTouch(e.nativeEvent.locationX)}
+        onResponderMove={(e) => onTouch(e.nativeEvent.locationX)}
+      >
+        <Svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+          {yticks.map((t, i) => (
+            <React.Fragment key={i}>
+              <Line x1={padL} x2={W - padR} y1={yAt(t)} y2={yAt(t)} stroke={p.border} strokeWidth={1} opacity={0.5} />
+              <SvgText x={padL - 4} y={yAt(t) + 3} textAnchor="end" fontSize={9} fill={p.textDim}>{Math.round(t)}</SvgText>
+            </React.Fragment>
+          ))}
+          {buckets.map((b, i) => {
+            let acc = 0;
+            const x = xCenter(i) - barW / 2;
+            return (
+              <G key={i}>
+                {segments.map((seg, si) => {
+                  const v = seg.values[i] || 0;
+                  if (v <= 0) return null;
+                  const y0 = yAt(acc);
+                  const y1 = yAt(acc + v);
+                  acc += v;
+                  return <Rect key={si} x={x} y={y1} width={barW} height={Math.max(0.5, y0 - y1)} fill={seg.color} opacity={i === readoutIdx ? 1 : 0.85} />;
+                })}
+                {(i % step === 0 || i === n - 1) ? <SvgText x={xCenter(i)} y={H - 6} textAnchor="middle" fontSize={9} fill={p.textDim}>{b.label}</SvgText> : null}
               </G>
             );
           })}

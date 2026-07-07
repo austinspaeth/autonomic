@@ -37,7 +37,7 @@ export function HrvSetup({ controls }: { controls: SheetControls }) {
       return;
     }
     if (source === 'watch' && !health().available) {
-      toast('Apple Watch reading needs an iOS build');
+      toast('Apple Watch readings need an iOS build');
       return;
     }
     const config: SessionConfig = { kind, source, period, style: kind === 'breath' ? style : undefined };
@@ -47,8 +47,8 @@ export function HrvSetup({ controls }: { controls: SheetControls }) {
 
   return (
     <View>
-      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 4 }}>Live HRV reading</Text>
-      <Text style={{ color: p.textDim, fontSize: 14, marginBottom: 18 }}>{kind === 'breath' ? 'A 5-minute capture computed on-device.' : 'A 2½-minute capture computed on-device.'}</Text>
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 4 }}>Capture live HRV reading</Text>
+      <Text style={{ color: p.textDim, fontSize: 14, marginBottom: 18 }}>Beat-to-beat capture, computed on-device.</Text>
 
       <Label text="Reading kind" />
       <Segmented options={[{ val: 'unstructured', label: 'Unstructured' }, { val: 'breath', label: 'Breathing' }]} value={kind} onChange={setKind} />
@@ -76,7 +76,7 @@ export function HrvSetup({ controls }: { controls: SheetControls }) {
       <Label text="Signal source" top />
       <View style={{ gap: 8 }}>
         <SourceOption icon="bluetooth" title="Bluetooth strap" sub={savedName ? `Paired: ${savedName}` : 'Pair a strap in Devices'} active={source === 'polar'} onPress={() => setSource('polar')} />
-        <SourceOption icon="watch" title="Apple Watch" sub="Breathing guide only — nothing is recorded" active={source === 'watch'} onPress={() => setSource('watch')} />
+        <SourceOption icon="watch" title="Apple Watch" sub="Record an ECG on your watch during the reading — it syncs in after" active={source === 'watch'} onPress={() => setSource('watch')} />
       </View>
 
       <View style={{ height: 20 }} />

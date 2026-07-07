@@ -9,11 +9,10 @@ import { TimeField } from '../components/Field';
 import { useToast } from '../components/Toast';
 import { usePalette } from '../theme';
 import { health, SleepImport } from '../lib/health';
-import { ecgAvailable, readEcgSince, requestEcgAuth } from '../lib/health/ecg';
 import { ensureDay, getState, save } from '../store/store';
 import { getCurrentKey } from '../store/nav';
 import { computeScores } from '../lib/scoring';
-import { fmtTime12, keyOf, pad, uid } from '../lib/dates';
+import { fmtTime12, uid } from '../lib/dates';
 
 export function HealthScreen() {
   const p = usePalette();
@@ -59,7 +58,7 @@ export function HealthScreen() {
       const imports = await api.readImports(dk);
       const toMin = (t?: string) => { const [h, m] = String(t || '').split(':').map(Number); return isNaN(h) ? null : h * 60 + m; };
       const valueKey = (type: string, get: (k: string) => unknown) =>
-        type === 'bp' ? `${get('sys')}/${get('dia')}` : type === 'bloodO2' ? String(get('value')) : type === 'restingHr' ? String(get('hr')) : String(get('sdnn'));
+        type === 'bp' ? `${get('sys')}/${get('dia')}` : type === 'restingHr' ? String(get('hr')) : String(get('sdnn'));
 
       for (const imp of imports) {
         // Skip anything this app authored (our own write-backs, round-tripped).
@@ -92,41 +91,6 @@ export function HealthScreen() {
     setBusy(false);
   };
 
-  const importEcg = async () => {
-    setBusy(true);
-    try {
-      const ok = await requestEcgAuth();
-      if (!ok) { setBusy(false); toast('ECG permission denied'); return; }
-      // Pull ECGs from the last 30 days, place each on the day it was recorded.
-      const items = await readEcgSince();
-      let added = 0;
-      for (const e of items) {
-        const start = new Date(e.startISO);
-        const dk = keyOf(start);
-        const d = ensureDay(dk);
-        if (d.readings.some((r) => r.type === 'ecg' && r.hkUuid === e.uuid)) continue;
-        const ctx = { sex: getState().profile.sex, height: getState().profile.height };
-        const r = {
-          id: uid(),
-          type: 'ecg',
-          time: `${pad(start.getHours())}:${pad(start.getMinutes())}`,
-          hkUuid: e.uuid,
-          source: 'watch',
-          ...e.fields,
-        } as never;
-        (r as { scores?: unknown }).scores = computeScores(r as never, ctx);
-        d.readings.push(r as never);
-        added++;
-      }
-      save();
-      setBusy(false);
-      toast(added ? `Imported ${added} ECG${added === 1 ? '' : 's'}` : 'No new ECGs found');
-    } catch {
-      setBusy(false);
-      toast('Could not read ECG');
-    }
-  };
-
   const importSleep = async () => {
     setBusy(true);
     try {
@@ -145,30 +109,22 @@ export function HealthScreen() {
     <View>
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 6 }}>Apple Health</Text>
       <Text style={{ color: p.textDim, fontSize: 14, marginBottom: 16, lineHeight: 19 }}>
-        {"Grant permission, then pull the current day's resting HR, HRV, blood pressure, SpO₂, weight and sleep into your journal. New readings you log are also written back to Health automatically. Existing manual entries are never overwritten."}
+        {"Grant permission, then pull the current day's resting HR, HRV, blood pressure and sleep into your journal. New readings you log are also written back to Health automatically. Existing manual entries are never overwritten."}
       </Text>
       <Button title={authed ? 'Health connected' : 'Connect Apple Health'} variant="primary" onPress={connect} />
       <View style={{ height: 12 }} />
       <Button title="Sync today from Health" onPress={sync} />
       <View style={{ height: 12 }} />
       <Button title="Import sleep from Health" onPress={importSleep} />
-      {ecgAvailable() ? (
-        <>
-          <View style={{ height: 12 }} />
-          <Button title="Import ECG from Health" onPress={importEcg} />
-          <Text style={{ color: p.textDim, fontSize: 12, marginTop: 8, lineHeight: 16 }}>
-            HR, HRV and rhythm come straight from Apple Health. QRS, QTc and PR are single-lead estimates — not clinical values.
-          </Text>
-        </>
-      ) : null}
       {busy ? <View style={{ alignItems: 'center', marginTop: 14 }}><ActivityIndicator color={p.accent} /></View> : null}
       <View style={{ height: 24 }} />
     </View>
   );
 }
 
-/** Review/edit the night Health reported before writing it into the day. */
-function SleepConfirmSheet({ dk, data, controls, onDone }: {
+/** Review/edit the night Health reported before writing it into the day.
+ *  Also used by the Journal sleep widget's "Check for updates" flow. */
+export function SleepConfirmSheet({ dk, data, controls, onDone }: {
   dk: string; data: SleepImport; controls: SheetControls; onDone: () => void;
 }) {
   const p = usePalette();

@@ -13,8 +13,8 @@ import { ReadingSummary } from '../components/summary';
 import { radius, usePalette } from '../theme';
 import type { Entry, TypeDef } from '../lib/types';
 import {
-  ACTIVITY_TYPES, entryFields, isDivider, isNumberField, MED_TYPES, READING_TYPES,
-  readingLabel, SYMPTOM_TYPES,
+  ACTIVITY_TYPES, entryFields, isDivider, isNumberField, LIVE_ONLY_READING_TYPES,
+  MED_TYPES, READING_TYPES, readingLabel, SYMPTOM_TYPES,
 } from '../lib/registry';
 import { computeScores } from '../lib/scoring';
 import { health } from '../lib/health';
@@ -55,18 +55,19 @@ export function TypePicker({ title, typeMap, onPick }: { title: string; typeMap:
   );
 }
 
-/** Reading picker with a live-capture call-to-action above the manual list. */
+/** Reading picker with a live-capture call-to-action above the manual list.
+ *  HRV kinds are live-capture only, so they are excluded from the manual list. */
 function ReadingPicker({ onLive, onPick }: { onLive: () => void; onPick: (type: string) => void }) {
   const p = usePalette();
-  const types = Object.keys(READING_TYPES);
+  const types = Object.keys(READING_TYPES).filter((t) => !LIVE_ONLY_READING_TYPES.has(t));
   return (
     <View>
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 16 }}>Add reading</Text>
       <Pressable onPress={onLive} style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: radius.control, backgroundColor: p.accentSoft, borderWidth: 1, borderColor: p.accent, marginBottom: 8 }, pressed && { opacity: 0.7 }]}>
         <Icon name="heartPulse" size={24} color={p.accent} />
         <View style={{ flex: 1 }}>
-          <Text style={{ color: p.accent, fontWeight: '700', fontSize: 17 }}>Live HRV reading</Text>
-          <Text style={{ color: p.textDim, fontSize: 13 }}>Capture 5 min from a strap or Apple Watch</Text>
+          <Text style={{ color: p.accent, fontWeight: '700', fontSize: 17 }}>Capture live HRV reading</Text>
+          <Text style={{ color: p.textDim, fontSize: 13 }}>From a chest strap or Apple Watch</Text>
         </View>
         <Icon name="chevronRight" size={20} color={p.accent} />
       </Pressable>
@@ -107,10 +108,6 @@ export function EntryForm({ typeMap, arrKey, dk, type, existing, controls, onSav
       else r[f.key] = String(form[f.key] ?? '').trim();
     });
     r.scores = computeScores(r, scoreCtx());
-    if (type === 'weight' && r.weight !== '' && r.weight != null) {
-      const st = getState();
-      st.profile = { ...st.profile, weight: String(r.weight).trim() };
-    }
     upsertEntry(dk, arrKey, r);
     // Auto-publish freshly-logged readings to Apple Health (fire-and-forget).
     // Only new manual entries — never re-publish edits or Health-sourced rows.

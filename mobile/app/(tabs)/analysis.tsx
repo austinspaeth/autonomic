@@ -9,6 +9,7 @@ import { radius, usePalette } from '../../src/theme';
 import { useAppState } from '../../src/store/store';
 import { buildCategories, type AnalysisCard } from '../../src/lib/analysis/categories';
 import type { Mode } from '../../src/lib/analysis/buckets';
+import { HrvProgress } from '../../src/features/HrvProgress';
 
 export default function AnalysisScreen() {
   const p = usePalette();
@@ -108,8 +109,10 @@ export default function AnalysisScreen() {
           {/* Every category inline as one long document with a titled section. */}
           {sections.map((s) => (
             <View key={s.id} onLayout={(e) => { offsets.current[s.id] = e.nativeEvent.layout.y; }} style={{ marginTop: 22 }}>
-              <Text style={{ fontSize: 19, fontWeight: '700', color: p.text, marginBottom: 8 }}>{s.title}</Text>
-              {s.cards.length === 0 ? (
+              <Text style={{ fontSize: 20, fontWeight: '700', color: p.text, marginBottom: 8 }}>{s.title}</Text>
+              {s.id === 'hrv' ? (
+                <HrvProgress days={state.days} mode={mode} ctx={{ sex, height }} />
+              ) : s.cards.length === 0 ? (
                 <Text style={{ color: p.textDim }}>No data logged yet for this category.</Text>
               ) : (
                 s.cards.map((card, i) => <CardView key={i} card={card} buckets={s.buckets} />)

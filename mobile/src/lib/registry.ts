@@ -6,13 +6,6 @@
 import type { Entry, FieldDef, TypeDef } from './types';
 
 export const READING_TYPES: Record<string, TypeDef> = {
-  mood: {
-    label: 'Mood',
-    icon: 'smile',
-    fields: [
-      { type: 'select', key: 'mood', label: 'How are you feeling?', options: ['Feeling amazing', 'Feeling normal', 'Feeling bad', 'Feeling like a crash'] },
-    ],
-  },
   hrv: {
     label: 'Unstructured HRV',
     icon: 'heartPulse',
@@ -38,7 +31,6 @@ export const READING_TYPES: Record<string, TypeDef> = {
       { divider: true },
       { type: 'time', key: 'time', label: 'Time' },
       { type: 'select', key: 'period', label: 'Reading type', options: ['Morning', 'Evening', 'Random'] },
-      { type: 'check', key: 'swallowing', label: 'Swallowing' },
     ],
   },
   breathHrv: {
@@ -67,7 +59,6 @@ export const READING_TYPES: Record<string, TypeDef> = {
       { divider: true },
       { type: 'time', key: 'time', label: 'Time' },
       { type: 'select', key: 'period', label: 'Reading type', options: ['Morning', 'Evening', 'Random'] },
-      { type: 'check', key: 'swallowing', label: 'Swallowing' },
     ],
   },
   bp: {
@@ -78,15 +69,6 @@ export const READING_TYPES: Record<string, TypeDef> = {
       { type: 'number', key: 'dia', label: 'Diastolic' },
       { type: 'number', key: 'pulse', label: 'Pulse' },
       { type: 'select', key: 'period', label: 'Reading type', options: ['Morning', 'Evening', 'Random'] },
-    ],
-  },
-  bloodO2: {
-    label: 'Blood Oxygen',
-    icon: 'gauge',
-    fields: [
-      { type: 'number', key: 'value', label: 'Blood oxygen', unit: '%' },
-      { type: 'number', key: 'perfusion', label: 'Perfusion index' },
-      { type: 'number', key: 'pulse', label: 'Pulse' },
     ],
   },
   ecg: {
@@ -126,15 +108,13 @@ export const READING_TYPES: Record<string, TypeDef> = {
       { type: 'number', key: 'hr1min', label: 'HR after 1 min' },
     ],
   },
-  weight: {
-    label: 'Weight',
-    icon: 'scale',
-    fields: [
-      { type: 'time', key: 'time', label: 'Time' },
-      { type: 'number', key: 'weight', label: 'Weight (lbs)', unit: ' lbs' },
-    ],
-  },
 };
+
+/**
+ * Reading types that can only be produced by a live capture (or an Apple
+ * Watch ECG sync) — hidden from the manual "+ Add" reading picker.
+ */
+export const LIVE_ONLY_READING_TYPES = new Set(['hrv', 'breathHrv']);
 
 export const ACTIVITY_TYPES: Record<string, TypeDef> = {
   indoorBike: {
@@ -319,10 +299,6 @@ export const TRIGGER_TYPES: Record<string, TypeDef> = {
   processedMeats: trig('Processed meats'),
 };
 
-export const MEAL_TYPES: Record<string, string> = {
-  breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', dessert: 'Dessert', snack: 'Snack',
-};
-
 /** Ordered field schema for a bowel-movement entry. */
 export const BM_FIELDS: FieldDef[] = [
   { type: 'time', key: 'time', label: 'Time' },
@@ -397,10 +373,8 @@ export function readingRowValue(r: Entry): string {
     case 'hrv':
     case 'breathHrv': return r.sdnn != null && r.sdnn !== '' ? `${r.sdnn} SDNN` : '';
     case 'bp': return r.sys || r.dia ? `${r.sys || '-'}/${r.dia || '-'}` : '';
-    case 'bloodO2': return r.value ? `${r.value}%` : '';
     case 'restingHr': return r.hr != null && r.hr !== '' ? `${r.hr} hr` : '';
     case 'ecg': return r.svt ? 'SVT' : r.otherArrhythmia ? 'Other' : r.sinus ? 'Sinus' : '-';
-    case 'mood': return ({ 'Feeling amazing': 'Amazing', 'Feeling normal': 'Normal', 'Feeling bad': 'Bad', 'Feeling like a crash': 'Crash' } as Record<string, string>)[r.mood as string] || (r.mood as string) || '';
     default: return summarizeFields(READING_TYPES[r.type], r);
   }
 }

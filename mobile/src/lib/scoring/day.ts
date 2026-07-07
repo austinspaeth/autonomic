@@ -248,11 +248,9 @@ export function dayCleanliness(days: DaysMap, dk: string): Cleanliness | null {
   const sleepLogged = hrs != null;
   const medReq: [string, string][] = [['allegra', 'Allegra'], ['pepsidAc', 'Pepcid'], ['magGlycinate', 'Mag glycinate']];
   const missingMeds = medReq.filter(([t]) => !hasMed(t));
-  const dinners = ((d.food && d.food.meals) || []).filter((m) => m.type === 'dinner' && m.time);
   const criteria: Criterion[] = [
-    { key: 'triggers', label: 'No trigger foods', pass: trigCount === 0, hard: true, broken: trigCount > 0 },
+    { key: 'triggers', label: 'No triggers', pass: trigCount === 0, hard: true, broken: trigCount > 0 },
     { key: 'water', label: 'Water (2.5 L)', pass: water >= 2.5 },
-    { key: 'dinner', label: 'Dinner by 5pm', pass: dinners.some((m) => (m.time as string) <= '17:00'), pending: dinners.length === 0 },
     { key: 'meds', label: 'Allegra, Pepcid, Mag glycinate', pass: missingMeds.length === 0, need: missingMeds.map(([, n]) => n).join(', ') },
     { key: 'sleep', label: 'Sleep 7h or more', pass: sleepLogged && hrs! >= 7, hard: true, broken: sleepLogged && hrs! < 7 },
   ];

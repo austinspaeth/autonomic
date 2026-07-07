@@ -9,7 +9,6 @@ import React, { useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 import { SheetControls } from '../../components/Sheet';
 import { Button } from '../../components/ui';
-import { Tachogram } from '../../components/charts';
 import { ReadingSummary } from '../../components/summary';
 import { useToast } from '../../components/Toast';
 import { usePalette } from '../../theme';
@@ -38,7 +37,7 @@ export function HrvResults({ rr, hrSamples, config, durationSec, watchFallback, 
     const type = config.kind === 'breath' ? 'breathHrv' : 'hrv';
     const base: Entry = {
       id: uid(), type, time: nowTime(),
-      period: config.period || 'Random', note: config.source === 'watch' ? 'Captured via Apple Watch' : 'Captured via chest strap',
+      period: config.period || 'Random', note: config.source === 'watch' ? 'Captured via Apple Watch ECG' : 'Captured via chest strap',
       source: config.source, durationSec,
       rrRaw: rr, rrClean: result.rrClean, sampledHr: hrSamples,
     };
@@ -95,20 +94,14 @@ export function HrvResults({ rr, hrSamples, config, durationSec, watchFallback, 
         </View>
       ) : null}
 
-      {result.rrClean.length > 2 ? (
-        <View style={{ marginBottom: 16 }}>
-          <Text style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.6, color: p.textDim, fontWeight: '700', marginBottom: 8 }}>Beat-to-beat intervals</Text>
-          <Tachogram rr={result.rrClean} />
-        </View>
-      ) : null}
-
       <ReadingSummary r={reading} days={daysWithCurrent} ctx={ctx} />
 
       <View style={{ flexDirection: 'row', gap: 12, marginTop: 4 }}>
         <Button title="Discard" variant="danger" onPress={() => controls.closeAll()} />
         <Button title="Save reading" variant="primary" onPress={save} />
       </View>
-      {health().available ? (
+      {/* Watch readings came FROM Apple Health — no need to write them back. */}
+      {health().available && config.source !== 'watch' ? (
         <Button title={writeHealth ? '✓ Will write to Apple Health' : 'Also write to Apple Health'} variant={writeHealth ? 'default' : 'ghost'} onPress={() => setWriteHealth((v) => !v)} style={{ marginTop: 12 }} />
       ) : null}
       <View style={{ height: 20 }} />

@@ -102,6 +102,27 @@ describe('computeEcgMetrics', () => {
     if (m.pr != null) { expect(m.pr).toBeGreaterThanOrEqual(80); expect(m.pr).toBeLessThanOrEqual(320); }
   });
 
+  it('recovers a plausible PR interval from the signal-averaged beat', () => {
+    // Synthetic P sits 0.16 s before R, so PR should land near 160 ms.
+    const m = computeEcgMetrics(sample(regular(0.85, 30), 30));
+    expect(m.pr).not.toBeNull();
+    expect(m.pr as number).toBeGreaterThanOrEqual(120);
+    expect(m.pr as number).toBeLessThanOrEqual(210);
+    // QRS stays in a realistic sub-120 ms band (not pinned at the 200 ms clamp).
+    expect(m.qrs as number).toBeLessThan(120);
+  });
+
+  it('ignores a spurious double-detected beat when computing HRV', () => {
+    // A clean 60 bpm strip with one extra R peak 0.2 s after beat 15 — a
+    // detection artifact. SDNN must stay low instead of exploding.
+    const times = regular(1.0, 30);
+    times.splice(15, 0, times[14] + 0.2);
+    const m = computeEcgMetrics(sample(times.sort((a, b) => a - b), 30));
+    expect(m.hr).toBeGreaterThanOrEqual(57);
+    expect(m.hr).toBeLessThanOrEqual(63);
+    expect(m.sdnn as number).toBeLessThan(30);
+  });
+
   it('falls back to Apple average HR when the waveform is too short', () => {
     const m = computeEcgMetrics({
       uuid: 'x', start: 0, end: 1000, classification: 'sinusRhythm', symptomsStatus: 'none',

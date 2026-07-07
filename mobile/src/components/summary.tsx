@@ -9,7 +9,7 @@ import { Text, View } from 'react-native';
 import { radius, usePalette } from '../theme';
 import type { Band, Entry, ScoreCat } from '../lib/types';
 import {
-  BANDS, GRADE_LABEL, HRV_EXPLAIN, SCORE_COLORS, bandsFor, bmiFor, bmiZone,
+  BANDS, GRADE_LABEL, HRV_EXPLAIN, SCORE_COLORS, bandsFor,
   bpBce, bpKerdo, bpKvas, bpMap, bpPP, bpRobinson, catFromBands, computeScores,
   ecgPattern, expectedHf, hrvComposite, numOr, qtcBands, restingHrBands,
   rowScoreCategory, totalPower, type ScoreContext,
@@ -17,7 +17,7 @@ import {
 import { metricHistory, numEx, type DaysMap } from '../lib/scoring/day';
 import { entryFields, isDivider, READING_TYPES } from '../lib/registry';
 import { fmtNum } from '../lib/dates';
-import { PowerSpectrum, Sparkline } from './charts';
+import { PowerSpectrum, Sparkline, Tachogram } from './charts';
 import { ScoreDot } from './ui';
 
 const hexA = (hex: string, a: number) => {
@@ -97,7 +97,6 @@ export function ReadingSummary({ r, days, ctx }: SummaryProps) {
     case 'bp': return <BpSummary r={r} days={days} ctx={ctx} />;
     case 'ecg': return <EcgSummary r={r} days={days} ctx={ctx} />;
     case 'restingHr': return <RestingHrSummary r={r} days={days} ctx={ctx} />;
-    case 'bloodO2': return <BloodO2Summary r={r} days={days} ctx={ctx} />;
     case 'orthostatic': return <OrthostaticSummary r={r} days={days} ctx={ctx} />;
     default: return <GenericSummary r={r} days={days} ctx={ctx} />;
   }
@@ -120,16 +119,17 @@ function PowerSection({ r, days, ctx, type }: { r: Entry; days: DaysMap; ctx: Sc
   const lfhf = lf != null && hf ? lf / hf : null;
   const lfhfEx = (rr: Entry) => { const a = parseFloat(rr.lowPower as string), b = parseFloat(rr.highPower as string); return !isNaN(a) && !isNaN(b) && b !== 0 ? a / b : null; };
   const e = expectedHf(r.style);
+  const rrClean = (r.rrClean as number[] | undefined) || (r.rrRaw as number[] | undefined) || null;
   return (
     <SumCard title="Power">
-      {total ? <View style={{ backgroundColor: p.surface, borderRadius: radius.control, padding: 14, marginBottom: 10 }}><PowerSpectrum vlf={vlf} lf={lf} hf={hf} /></View> : null}
+      {(total || (rrClean && rrClean.length >= 16)) ? <View style={{ backgroundColor: p.surface, borderRadius: radius.control, padding: 14, marginBottom: 10 }}><PowerSpectrum rr={rrClean} vlf={vlf} lf={lf} hf={hf} /></View> : null}
       <MetricRow label="Total power" value={total != null ? Math.round(total) : ''} cat={s.totalPower} explain="Total autonomic engagement across all frequencies." spark={spark(days, type, (rr) => totalPower(rr), BANDS.totalPower)} />
       <MetricRow label="LF/HF ratio" value={lfhf != null ? lfhf.toFixed(2) : ''} cat={s.lfhf} explain="Sympathetic vs vagal balance. Balanced or low favors flexibility." spark={spark(days, type, lfhfEx, BANDS.lfhf)} />
       <MetricRow label="VLF power" value={r.vlowPower as string} cat={s.vlf} explain="Slow regulatory processes and stress load. Elevated means system stress." spark={spark(days, type, numEx('vlowPower'), BANDS.vlf)} />
       <MetricRow label="LF power" value={r.lowPower as string} explain="Baroreflex band, your training target." spark={spark(days, type, numEx('lowPower'), null)} />
       <MetricRow label="HF power" value={r.highPower as string} explain="Vagal activity tied to breathing. Higher means better recovery state." spark={spark(days, type, numEx('highPower'), null)} />
       <MetricRow label="LF peak" value={r.lfPeak ? `${r.lfPeak} Hz` : ''} cat={s.lfPeak} explain="Baroreflex frequency. Target 0.08 to 0.10 Hz; shifting toward it is progress." spark={spark(days, type, numEx('lfPeak'), BANDS.lfPeak)} />
-      <MetricRow label="HF peak" value={r.hfPeak ? `${r.hfPeak} Hz` : ''} cat={type === 'breathHrv' ? s.hfPeak : false} explain={e ? `Expected about ${e[0]} to ${e[1]} Hz for ${r.style} breathing; large deviation means the pace drifted.` : 'Respiratory peak position.'} spark={spark(days, type, numEx('hfPeak'), null)} />
+      <MetricRow label="HF peak" value={r.hfPeak ? `${r.hfPeak} Hz` : ''} cat={s.hfPeak} explain={e ? `Expected about ${e[0]} to ${e[1]} Hz for ${r.style} breathing; large deviation means the pace drifted.` : 'Respiratory (breathing) peak. A peak inside 0.15–0.40 Hz reflects normal respiratory sinus arrhythmia.'} spark={spark(days, type, numEx('hfPeak'), BANDS.hfPeak)} />
     </SumCard>
   );
 }
@@ -164,15 +164,22 @@ function Notes({ r }: { r: Entry }) {
  * grade band applies (handled inside PowerSection/MetricsSection by `type`).
  */
 function HrvSummaryBody({ r, days, ctx, type }: SummaryProps & { type: 'breathHrv' | 'hrv' }) {
+  const p = usePalette();
   const s = computeScores(r, ctx);
   const { score, overall } = hrvComposite(r, ctx);
+  const rr = (r.rrClean as number[] | undefined) || (r.rrRaw as number[] | undefined) || null;
   return (
     <>
       <HeroCard cat={overall} label="Autonomic score" big={score ?? '-'} den={score != null ? '/100' : ''} sub="Composite of vagal tone, power, and baroreflex position." tip={overall ? HRV_VERDICT[overall] : ''} />
+      {rr && rr.length > 2 ? (
+        <View style={{ marginBottom: 16 }}>
+          <Text style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.6, color: p.textDim, fontWeight: '700', marginBottom: 8 }}>Beat-to-beat intervals</Text>
+          <Tachogram rr={rr} />
+        </View>
+      ) : null}
       <SumCard title="Details">
         {type === 'breathHrv' ? <MetricRow label="Breathing style" value={(r.style as string) || '—'} cat={false} explain="Intended pace for this reading." /> : null}
         {r.period ? <MetricRow label="Reading type" value={r.period as string} cat={false} /> : null}
-        <MetricRow label="Swallowing" value={r.swallowing ? 'Yes' : 'No'} cat={false} />
       </SumCard>
       <SumCard title="Autonomic balance">
         <MetricRow label="PNS index" value={r.pns as string} cat={s.pns} explain="Parasympathetic (rest and recovery) activity. Higher means more vagal dominance." spark={spark(days, type, numEx('pns'), BANDS.pns)} />
@@ -280,29 +287,6 @@ export function RestingHrSummary({ r, days, ctx }: SummaryProps) {
   );
 }
 
-export function BloodO2Summary({ r, days, ctx }: SummaryProps) {
-  const s = computeScores(r, ctx);
-  const cat = rowScoreCategory(r, ctx);
-  const verdict: Record<string, string> = {
-    great: 'Oxygen saturation is excellent.', good: 'Oxygen saturation is good.',
-    ok: 'Oxygen saturation is borderline.', bad: 'Low oxygen saturation; recheck.', concerning: 'Low oxygen saturation; recheck and note context.',
-  };
-  const piCat = r.perfusion !== '' && r.perfusion != null ? catFromBands(+(r.perfusion as number), BANDS.perfusion) : null;
-  return (
-    <>
-      <HeroCard cat={cat} label="Blood oxygen" big={r.value ? `${r.value}%` : ''} sub="SpO2" tip={cat ? verdict[cat] : ''} />
-      <SumCard title="Oxygenation">
-        <MetricRow label="Blood oxygen" value={r.value ? `${r.value}%` : ''} cat={s.value} explain="Percent of hemoglobin carrying oxygen. Use the left hand; the right can read low from peripheral vasoconstriction." spark={spark(days, 'bloodO2', numEx('value'), BANDS.spo2)} />
-      </SumCard>
-      <SumCard title="Signal quality">
-        <MetricRow label="Perfusion index" value={r.perfusion as string} cat={piCat} explain="Signal strength. 5+ trust it, 2-4 moderate, under 2 unreliable." spark={spark(days, 'bloodO2', numEx('perfusion'), BANDS.perfusion)} />
-        <MetricRow label="Pulse" value={r.pulse as string} cat={false} explain="Heart rate at the time of the reading." spark={spark(days, 'bloodO2', numEx('pulse'), null)} />
-      </SumCard>
-      <Notes r={r} />
-    </>
-  );
-}
-
 export function OrthostaticSummary({ r, days, ctx }: SummaryProps) {
   const before = numOr(r.beforeHr), after = numOr(r.afterHr), min1 = numOr(r.hr1min);
   const increase = before != null && after != null ? after - before : null;
@@ -352,19 +336,6 @@ export function GenericSummary({ r, days, ctx }: SummaryProps) {
   const p = usePalette();
   const def = READING_TYPES[r.type];
   const s = computeScores(r, ctx);
-  if (r.type === 'weight') {
-    const bmi = bmiFor(r.weight, ctx.height);
-    const z = bmi != null ? bmiZone(bmi) : null;
-    const verdict: Record<string, string> = { Underweight: 'Below the healthy BMI range.', Healthy: 'Weight is in the healthy BMI range.', Overweight: 'Above the healthy BMI range.', Obese: 'Well above the healthy BMI range.' };
-    return (
-      <>
-        <HeroCard cat={rowScoreCategory(r, ctx)} label="Weight" big={r.weight != null && r.weight !== '' ? (r.weight as string) : ''} den="lbs" sub={z ? `BMI ${bmi!.toFixed(1)} · ${z.zone}` : 'Set your height in Profile for BMI'} tip={z ? verdict[z.zone] : ''} />
-        <SumCard title="Details">
-          {bmi != null ? <MetricRow label="BMI" value={`${bmi.toFixed(1)} · ${bmiZone(bmi).zone}`} cat={bmiZone(bmi).cat} explain="Body Mass Index from this weight and the height set in Profile." /> : <MetricRow label="BMI" value="-" explain="Set your height in Profile to grade weight by BMI." />}
-        </SumCard>
-      </>
-    );
-  }
   return (
     <>
       <HeroCard cat={rowScoreCategory(r, ctx)} big="" label="Result" />
