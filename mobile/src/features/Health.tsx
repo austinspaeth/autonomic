@@ -47,22 +47,43 @@ export function HealthScreen() {
     setBusy(true);
     try {
       const dk = getCurrentKey();
-      const s = await api.readDay(dk);
       const d = ensureDay(dk);
       const ctx = { sex: getState().profile.sex, height: getState().profile.height };
       let added = 0;
-      // Weight -> profile + a weight reading if none exists
-      if (s.weightLb != null) { getState().profile.weight = String(s.weightLb); added++; }
-      const mk = (type: string, fields: Record<string, unknown>) => {
-        const r = { id: uid(), type, time: '09:00', note: 'From Apple Health', source: 'watch', ...fields } as never;
-        (r as { scores?: unknown }).scores = computeScores(r as never, ctx);
-        return r as never;
-      };
-      const has = (type: string) => d.readings.some((r) => r.type === type && r.note === 'From Apple Health');
-      if (s.restingHr != null && !has('restingHr')) { d.readings.push(mk('restingHr', { hr: String(s.restingHr), position: 'Laying' })); added++; }
-      if (s.systolic != null && s.diastolic != null && !has('bp')) { d.readings.push(mk('bp', { sys: String(s.systolic), dia: String(s.diastolic) })); added++; }
-      if (s.spo2 != null && !has('bloodO2')) { d.readings.push(mk('bloodO2', { value: String(s.spo2) })); added++; }
-      if (s.hrvSdnn != null && !has('hrv')) { d.readings.push(mk('hrv', { sdnn: String(s.hrvSdnn), avgHr: s.restingHr != null ? String(s.restingHr) : '' })); added++; }
+
+      // Weight -> profile (aggregate is fine; it's not a timestamped journal entry).
+      const day = await api.readDay(dk);
+      if (day.weightLb != null) { getState().profile.weight = String(day.weightLb); added++; }
+
+      // Timestamped readings, each at its real clock time (no more 9am placeholder).
+      const imports = await api.readImports(dk);
+      const toMin = (t?: string) => { const [h, m] = String(t || '').split(':').map(Number); return isNaN(h) ? null : h * 60 + m; };
+      const valueKey = (type: string, get: (k: string) => unknown) =>
+        type === 'bp' ? `${get('sys')}/${get('dia')}` : type === 'bloodO2' ? String(get('value')) : type === 'restingHr' ? String(get('hr')) : String(get('sdnn'));
+
+      for (const imp of imports) {
+        // Skip anything this app authored (our own write-backs, round-tripped).
+        if (imp.ownApp) continue;
+        // Backstop: skip if an equal reading of the same type already sits within
+        // 5 minutes of this one (covers manual entries that were pushed to Health
+        // and prior syncs of the same sample).
+        const impMin = toMin(imp.time);
+        const impVal = valueKey(imp.type, (k) => imp.fields[k]);
+        const dup = d.readings.some((r) => {
+          if (r.type !== imp.type) return false;
+          if (valueKey(imp.type, (k) => r[k]) !== impVal) return false;
+          const rm = toMin(r.time as string);
+          return rm != null && impMin != null && Math.abs(rm - impMin) <= 5;
+        });
+        if (dup) continue;
+
+        const r = { id: uid(), type: imp.type, time: imp.time, note: 'From Apple Health', source: 'watch', ...imp.fields } as Record<string, unknown>;
+        if (imp.rr) r.rrRaw = imp.rr;
+        if (imp.rrClean) r.rrClean = imp.rrClean;
+        r.scores = computeScores(r as never, ctx);
+        d.readings.push(r as never);
+        added++;
+      }
       save();
       toast(added ? `Synced ${added} item${added === 1 ? '' : 's'}` : 'Nothing new to sync');
     } catch {
@@ -182,8 +203,8 @@ function SleepConfirmSheet({ dk, data, controls, onDone }: {
         {data.minutesAsleep > 0 ? (data.interrupted ? ', interrupted).' : ').') : '.'}
         {' Adjust the times if that’s not right.'}
       </Text>
-      <TimeField label="Bedtime" value={bed} onChange={setBed} />
-      <TimeField label="Wake time" value={wake} onChange={setWake} />
+      <TimeField label="Bed (last night)" value={bed} onChange={setBed} />
+      <TimeField label="Woke (this morning)" value={wake} onChange={setWake} />
       {(data.hrLow != null || data.hrHigh != null) ? (
         <Text style={{ color: p.textDim, fontSize: 14, marginTop: 6 }}>
           {`Overnight heart rate ${data.hrLow ?? '–'}–${data.hrHigh ?? '–'} bpm`}

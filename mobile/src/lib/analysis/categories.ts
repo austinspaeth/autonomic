@@ -14,7 +14,7 @@ import {
 } from './buckets';
 import type { Series, Zone } from '../../components/charts';
 
-export interface Chart { label: string; series: Series[]; zones?: Zone[] | null; target?: { from: number; to: number; color: string }; integer?: boolean; legend?: [string, string][] }
+export interface Chart { label: string; series: Series[]; zones?: Zone[] | null; target?: { from: number; to: number; color: string }; integer?: boolean; legend?: [string, string][]; dumbbell?: { sys: (number | null)[]; dia: (number | null)[] } }
 export interface Stat { label: string; value: number | string | null; sub?: string; color?: string }
 export interface Insight { text: string; strength?: 'strong' | 'mod' | null }
 export interface BarGroup { label: string; rows: { name: string; count: number; color?: string }[]; fmt?: (c: number) => string }
@@ -96,8 +96,8 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
     const qtc = acAgg(buckets, (d) => acReadVals(d, 'ecg', 'qtc'));
     const cards: AnalysisCard[] = [];
     if (acPresent(sys).length) cards.push({ title: 'Blood Pressure', sub: range, charts: [
-      { label: 'Systolic', series: [series(sys, SCORE_COLORS.bad, undefined, { pointBands: BANDS.sys })], zones: acBandZones('sys'), integer: true },
-      { label: 'Diastolic', series: [series(dia, '#3b82f6', undefined, { pointBands: BANDS.dia })], zones: acBandZones('dia'), integer: true },
+      // One connected systolic↕diastolic segment per reading, grade-gradient coloured.
+      { label: 'Systolic / diastolic', series: [], dumbbell: { sys, dia } },
     ], stats: [{ label: 'Avg sys morning', value: avgRound(acAgg(buckets, (d) => acReadVals(d, 'bp', 'sys', isMorning))) }, { label: 'Avg sys evening', value: avgRound(acAgg(buckets, (d) => acReadVals(d, 'bp', 'sys', isEvening))) }] });
     if (acPresent(laying).length) cards.push({ title: 'Resting Heart Rate', sub: range, charts: [{ label: 'Laying HR', series: [series(laying, SCORE_COLORS.bad)] }], stats: [{ label: 'Avg laying HR', value: avgRound(laying) }] });
     if (acPresent(spo2).length) cards.push({ title: 'Blood Oxygen', sub: range, charts: [{ label: 'SpO₂', series: [series(spo2, '#16a34a', undefined, { pointBands: BANDS.spo2 })], zones: acBandZones('spo2') }] });

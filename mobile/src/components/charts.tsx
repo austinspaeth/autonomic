@@ -11,7 +11,14 @@ import Svg, {
 import { fmtNum, fmtShort } from '../lib/dates';
 import { GRADE_COLORS, radius, usePalette } from '../theme';
 import type { Band, ScoreCat } from '../lib/types';
-import { catFromBands } from '../lib/scoring';
+import { BANDS, catFromBands } from '../lib/scoring';
+
+/* HRV frequency bands (Hz) — kept local to the chart so it has no lib/hrv dep. */
+const SPECTRUM_BANDS = [
+  { key: 'vlf', label: 'VLF', lo: 0.0033, hi: 0.04, color: '#f59e0b' },
+  { key: 'lf', label: 'LF', lo: 0.04, hi: 0.15, color: '#6366f1' },
+  { key: 'hf', label: 'HF', lo: 0.15, hi: 0.4, color: '#22c55e' },
+] as const;
 
 /* ---------- math shared with the PWA ---------- */
 const niceNum = (x: number, round: boolean) => {
@@ -183,6 +190,51 @@ export function PowerBar({ vlf, lf, hf }: { vlf: number | null; lf: number | nul
   );
 }
 
+/* ---------- Power spectrum (frequency-axis VLF/LF/HF distribution) ---------- */
+/**
+ * Distribution of HRV power across the frequency spectrum. The x-axis is
+ * frequency starting at 0 Hz; each band (VLF / LF / HF) is drawn at its true
+ * frequency width with a height proportional to its power *density* (power ÷
+ * bandwidth) so the filled area of each block reflects its share of total power.
+ */
+export function PowerSpectrum({ vlf, lf, hf }: { vlf: number | null; lf: number | null; hf: number | null }) {
+  const p = usePalette();
+  const vals: Record<string, number> = { vlf: vlf || 0, lf: lf || 0, hf: hf || 0 };
+  const total = vals.vlf + vals.lf + vals.hf;
+  if (!total) return null;
+  const W = 320, H = 150, padL = 8, padR = 8, padT = 12, padB = 30;
+  const fMax = 0.4;
+  const innerW = W - padL - padR;
+  const xAt = (f: number) => padL + (f / fMax) * innerW;
+  // density = power per Hz, so the block area encodes power share
+  const density = SPECTRUM_BANDS.map((b) => vals[b.key] / (b.hi - b.lo));
+  const dMax = Math.max(...density) || 1;
+  const yAt = (d: number) => padT + (1 - d / dMax) * (H - padT - padB);
+  const pct = (x: number) => Math.round((x / total) * 100);
+  const ticks = [0, 0.04, 0.15, 0.4];
+  return (
+    <View>
+      <Svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+        <Line x1={padL} x2={W - padR} y1={H - padB} y2={H - padB} stroke={p.border} strokeWidth={1} />
+        {SPECTRUM_BANDS.map((b, i) => {
+          const x0 = xAt(b.lo), x1 = xAt(b.hi), y = yAt(density[i]);
+          const w = Math.max(1, x1 - x0);
+          const cx = x0 + w / 2;
+          return (
+            <G key={b.key}>
+              <Path d={`M${x0} ${H - padB} L${x0} ${y} L${x1} ${y} L${x1} ${H - padB} Z`} fill={b.color} opacity={0.85} />
+              {w >= 26 ? <SvgText x={cx} y={y - 4} textAnchor="middle" fontSize={10} fontWeight="700" fill={p.text}>{`${pct(vals[b.key])}%`}</SvgText> : null}
+              <SvgText x={cx} y={H - padB + 20} textAnchor="middle" fontSize={9} fontWeight="700" fill={b.color}>{b.label}</SvgText>
+            </G>
+          );
+        })}
+        {ticks.map((t, i) => <SvgText key={i} x={Math.max(padL + 4, Math.min(W - padR - 4, xAt(t)))} y={H - padB + 10} textAnchor="middle" fontSize={8} fill={p.textDim}>{`${t}`}</SvgText>)}
+      </Svg>
+      <RNText style={{ fontSize: 12, color: p.textDim, textAlign: 'center' }}>{`Frequency (Hz) · VLF ${pct(vals.vlf)}% · LF ${pct(vals.lf)}% · HF ${pct(vals.hf)}%`}</RNText>
+    </View>
+  );
+}
+
 /* ---------- Line chart (analysis) with grade-zone gradient + drag readout ---------- */
 export interface Series { values: (number | null)[]; color: string; label?: string; dashed?: boolean; pointBands?: Band[] | null }
 export interface Zone { from: number; to: number; color: string }
@@ -301,6 +353,125 @@ export function Waveform({ data, color, height = 120, label }: { data: number[];
       <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
         <RNText style={{ fontSize: 10, color: p.textDim }}>{Math.round(min)}</RNText>
         <RNText style={{ fontSize: 10, color: p.textDim }}>{Math.round(max)}</RNText>
+      </View>
+    </View>
+  );
+}
+
+/* ---------- Tachogram (beat-to-beat RR intervals) ---------- */
+/**
+ * Plots the RR intervals (ms) beat-by-beat with straight segments so the true
+ * ups and downs are crisp — unlike a per-second BPM waveform, which quantizes
+ * to whole beats and reads as a staircase. A faint area fill under the trace
+ * makes the swing easy to read.
+ */
+export function Tachogram({ rr, height = 132 }: { rr: number[]; height?: number }) {
+  const p = usePalette();
+  if (!rr || rr.length < 2) return null;
+  const min = Math.min(...rr), max = Math.max(...rr);
+  const range = max - min || 1;
+  const W = 320, H = height, padL = 34, padR = 8, padT = 12, padB = 20;
+  const innerW = W - padL - padR;
+  const xAt = (i: number) => padL + (i / (rr.length - 1)) * innerW;
+  const yAt = (v: number) => padT + (1 - (v - min) / range) * (H - padT - padB);
+  const line = rr.map((v, i) => `${i === 0 ? 'M' : 'L'}${xAt(i).toFixed(1)} ${yAt(v).toFixed(1)}`).join(' ');
+  const area = `${line} L${xAt(rr.length - 1).toFixed(1)} ${H - padB} L${padL} ${H - padB} Z`;
+  const ticks = [min, (min + max) / 2, max];
+  return (
+    <View style={{ backgroundColor: p.bg, borderRadius: radius.control, padding: 8 }}>
+      <RNText style={{ fontSize: 11, color: p.textDim, marginBottom: 4 }}>{`Beat-to-beat interval (ms) · ${rr.length} beats`}</RNText>
+      <Svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+        {ticks.map((t, i) => (
+          <React.Fragment key={i}>
+            <Line x1={padL} x2={W - padR} y1={yAt(t)} y2={yAt(t)} stroke={p.border} strokeWidth={1} opacity={0.4} />
+            <SvgText x={padL - 4} y={yAt(t) + 3} textAnchor="end" fontSize={9} fill={p.textDim}>{Math.round(t)}</SvgText>
+          </React.Fragment>
+        ))}
+        <Path d={area} fill={p.accent} opacity={0.12} />
+        <Path d={line} fill="none" stroke={p.accent} strokeWidth={1.6} strokeLinejoin="round" strokeLinecap="round" />
+      </Svg>
+    </View>
+  );
+}
+
+/* ---------- Blood-pressure dumbbell (systolic↕diastolic per reading) ---------- */
+/**
+ * One vertical segment per reading connecting its diastolic (bottom) to its
+ * systolic (top), with a dot at each. The segment is a vertical gradient from
+ * the systolic grade colour at the top to the diastolic grade colour at the
+ * bottom (blue = healthy → red = out of range), so a reading that is good on
+ * top and bad on the bottom gradients between the two.
+ */
+let bpId = 0;
+export function BpDumbbell({ buckets, sys, dia, height = 180 }: {
+  buckets: { label: string }[]; sys: (number | null)[]; dia: (number | null)[]; height?: number;
+}) {
+  const p = usePalette();
+  const [layoutW, setLayoutW] = useState(0);
+  const [sel, setSel] = useState<number>(-1);
+  const [gid] = useState(() => bpId++);
+  const all: number[] = [];
+  sys.forEach((v) => { if (v != null && !isNaN(v)) all.push(v); });
+  dia.forEach((v) => { if (v != null && !isNaN(v)) all.push(v); });
+  if (!all.length) return null;
+  let min = Math.min(...all), max = Math.max(...all);
+  const padv = (max - min) * 0.12 + 4; min -= padv; max += padv;
+  const W = 320, H = height, padL = 34, padR = 10, padT = 10, padB = 22;
+  const innerW = W - padL - padR, n = buckets.length;
+  const xAt = (i: number) => padL + (n <= 1 ? innerW / 2 : (i / (n - 1)) * innerW);
+  const yAt = (v: number) => padT + (1 - (v - min) / (max - min)) * (H - padT - padB);
+  const col = (v: number, bands: Band[]) => { const c = catFromBands(v, bands); return (c && GRADE_COLORS[c]) || p.text; };
+  const step = Math.max(1, Math.ceil(n / 6));
+  const onTouch = (x: number) => {
+    if (layoutW <= 0) return;
+    const px = (x / layoutW) * W;
+    setSel(Math.max(0, Math.min(n - 1, Math.round(((px - padL) / innerW) * (n - 1)))));
+  };
+  const readoutIdx = sel >= 0 ? sel : (() => { for (let i = n - 1; i >= 0; i--) if (sys[i] != null || dia[i] != null) return i; return -1; })();
+  const readout = readoutIdx >= 0 ? `${buckets[readoutIdx].label}: ${sys[readoutIdx] != null ? Math.round(sys[readoutIdx] as number) : '-'}/${dia[readoutIdx] != null ? Math.round(dia[readoutIdx] as number) : '-'}` : '';
+  return (
+    <View>
+      <RNText style={{ fontSize: 12, fontWeight: '700', color: p.text, height: 16, marginBottom: 4, fontVariant: ['tabular-nums'] }}>{readout}</RNText>
+      <View
+        onLayout={(e) => setLayoutW(e.nativeEvent.layout.width)}
+        onStartShouldSetResponder={() => true}
+        onMoveShouldSetResponder={() => true}
+        onResponderGrant={(e) => onTouch(e.nativeEvent.locationX)}
+        onResponderMove={(e) => onTouch(e.nativeEvent.locationX)}
+      >
+        <Svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+          <Defs>
+            {buckets.map((_, i) => {
+              const s = sys[i], d = dia[i];
+              if (s == null || d == null) return null;
+              return (
+                <LinearGradient key={i} id={`bp${gid}_${i}`} x1="0" y1={yAt(s)} x2="0" y2={yAt(d)} gradientUnits="userSpaceOnUse">
+                  <Stop offset={0} stopColor={col(s, BANDS.sys)} />
+                  <Stop offset={1} stopColor={col(d, BANDS.dia)} />
+                </LinearGradient>
+              );
+            })}
+          </Defs>
+          {[min, (min + max) / 2, max].map((val, i) => (
+            <React.Fragment key={i}>
+              <Line x1={padL} x2={W - padR} y1={yAt(val)} y2={yAt(val)} stroke={p.border} strokeWidth={1} opacity={0.5} />
+              <SvgText x={padL - 4} y={yAt(val) + 3} textAnchor="end" fontSize={9} fill={p.textDim}>{Math.round(val)}</SvgText>
+            </React.Fragment>
+          ))}
+          {buckets.map((b, i) => (i % step === 0 || i === n - 1) ? <SvgText key={i} x={xAt(i)} y={H - 6} textAnchor="middle" fontSize={9} fill={p.textDim}>{b.label}</SvgText> : null)}
+          {buckets.map((_, i) => {
+            const s = sys[i], d = dia[i];
+            if (s == null || d == null) return null;
+            const x = xAt(i);
+            return (
+              <G key={i}>
+                <Line x1={x} x2={x} y1={yAt(s)} y2={yAt(d)} stroke={`url(#bp${gid}_${i})`} strokeWidth={i === readoutIdx ? 5 : 3.4} strokeLinecap="round" />
+                <Circle cx={x} cy={yAt(s)} r={i === readoutIdx ? 4.5 : 3.4} fill={col(s, BANDS.sys)} />
+                <Circle cx={x} cy={yAt(d)} r={i === readoutIdx ? 4.5 : 3.4} fill={col(d, BANDS.dia)} />
+              </G>
+            );
+          })}
+        </Svg>
       </View>
     </View>
   );

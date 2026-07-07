@@ -54,7 +54,7 @@ describe('catFromBands', () => {
 describe('breathing HRV computeScores — fixture matches web categories', () => {
   // A realistic strong reading
   const r: Entry = {
-    id: 'a', type: 'breathHrv', style: '4/6', coherence: '8',
+    id: 'a', type: 'breathHrv', style: '4/6',
     sdnn: '62', hr: '61', meanRr: '980', rmssd: '35', pnn50: '12', mxdmn: '0.4',
     mode: '960', amo50: '28', cv: '7.5', vlowPower: '150', lowPower: '2500',
     highPower: '1200', lfPeak: '0.095', hfPeak: '0.16',
@@ -66,7 +66,6 @@ describe('breathing HRV computeScores — fixture matches web categories', () =>
     expect(s.pnn50).toBe('great');
     expect(s.totalPower).toBe('great'); // 3850
     expect(s.vlf).toBe('great');
-    expect(s.coherence).toBe('great');
     expect(s.lfPeak).toBe('great');
     expect(s.hfPeak).toBe('great'); // in [0.15, 0.18] for 4/6
     expect(s.lfhf).toBe('good'); // 2500/1200 = 2.08 -> <=3 good
@@ -90,7 +89,7 @@ describe('breathing HRV computeScores — fixture matches web categories', () =>
     const weak: Entry = {
       id: 'b', type: 'breathHrv', style: '4/5',
       sdnn: '25', rmssd: '15', pnn50: '1', vlowPower: '1200', lowPower: '300',
-      highPower: '25', lfPeak: '0.05', hfPeak: '0.30', coherence: '0.5',
+      highPower: '25', lfPeak: '0.05', hfPeak: '0.30',
       hr: '90', meanRr: '660', mode: '650', mxdmn: '0.1', amo50: '65', cv: '2',
     };
     const w = computeScores(weak);
@@ -99,7 +98,6 @@ describe('breathing HRV computeScores — fixture matches web categories', () =>
     expect(w.pnn50).toBe('crash');
     expect(w.totalPower).toBe('ok'); // 1525 >= 1500 -> ok
     expect(w.vlf).toBe('crash');
-    expect(w.coherence).toBe('crash');
     expect(w.lfPeak).toBe('bad');
     expect(w.hfPeak).toBe('bad'); // 0.30 vs [0.17,0.20] -> d=0.10
     expect(w.lfhf).toBe('concerning'); // 12
@@ -125,11 +123,11 @@ describe('unstructured HRV', () => {
     expect(s.sns).toBe('bad');
     expect(s.stressIndex).toBe('bad');
   });
-  it('both HRV kinds grade the same balance + coherence metrics', () => {
-    const fields = { pns: '1', sns: '0', stressIndex: '120', coherence: '5' };
+  it('both HRV kinds grade the same balance metrics', () => {
+    const fields = { pns: '1', sns: '0', stressIndex: '120' };
     const u = computeScores({ id: 'u', type: 'hrv', ...fields });
     const b = computeScores({ id: 'b', type: 'breathHrv', ...fields });
-    (['pns', 'sns', 'stressIndex', 'coherence'] as const).forEach((k) => {
+    (['pns', 'sns', 'stressIndex'] as const).forEach((k) => {
       expect(u[k]).toBeDefined();
       expect(b[k]).toBe(u[k]);
     });
@@ -249,18 +247,17 @@ describe('totalPower / worstCat', () => {
 });
 
 describe('day scoring', () => {
-  it('sleepHours spans midnight using prior day bedtime', () => {
+  it('sleepHours spans midnight (same-day bed last night -> wake this morning)', () => {
     const days = {
-      '2026-07-01': day({ sleep: { bed: '22:30', wake: '' } }),
-      '2026-07-02': day({ sleep: { bed: '', wake: '06:30' } }),
+      '2026-07-02': day({ sleep: { bed: '22:30', wake: '06:30' } }),
+      '2026-07-03': day({ sleep: { bed: '', wake: '06:30' } }),
     };
     expect(sleepHours(days, '2026-07-02')).toBe(8);
-    expect(sleepHours(days, '2026-07-01')).toBeNull();
+    expect(sleepHours(days, '2026-07-03')).toBeNull(); // no bedtime
   });
   it('sleepGrade thresholds', () => {
     const days = {
-      '2026-07-01': day({ sleep: { bed: '23:00', wake: '' } }),
-      '2026-07-02': day({ sleep: { bed: '', wake: '07:30', quality: 'good' } }),
+      '2026-07-02': day({ sleep: { bed: '23:00', wake: '07:30', quality: 'good' } }),
     };
     expect(sleepGrade(days, '2026-07-02')).toBe('great'); // 8.5h good
     days['2026-07-02'].sleep.quality = 'interrupted';
@@ -269,8 +266,7 @@ describe('day scoring', () => {
   it('sleepGrade interrupted 7h -> ok, 6h good -> ok, 5h -> bad, <5 -> crash', () => {
     const mk = (bed: string, wake: string, quality: 'good' | 'interrupted') => {
       const days = {
-        '2026-07-01': day({ sleep: { bed, wake: '' } }),
-        '2026-07-02': day({ sleep: { bed: '', wake, quality } }),
+        '2026-07-02': day({ sleep: { bed, wake, quality } }),
       };
       return sleepGrade(days, '2026-07-02');
     };
@@ -325,9 +321,8 @@ describe('day scoring', () => {
   });
   it('dayCleanliness criteria', () => {
     const days: Record<string, DayRecord> = {
-      '2026-07-01': day({ sleep: { bed: '21:30', wake: '' } }),
       '2026-07-02': day({
-        sleep: { bed: '', wake: '06:00' },
+        sleep: { bed: '22:00', wake: '06:00' },
         meds: [
           { id: '1', type: 'allegra' },
           { id: '2', type: 'pepsidAc' },
@@ -353,20 +348,20 @@ describe('day scoring', () => {
     expect(streakTier(45).tier).toBe('Elite');
   });
   it('streakInfo counts consecutive clean days', () => {
-    const clean = (bedPrev: string) =>
+    const clean = () =>
       day({
         sleep: { bed: '21:00', wake: '06:00' },
         meds: [{ id: '1', type: 'allegra' }, { id: '2', type: 'pepsidAc' }, { id: '3', type: 'magGlycinate' }] as Entry[],
         food: { water: 3, calories: 0, triggers: {}, meals: [{ id: 'm', type: 'dinner', time: '16:30' }] },
       });
     const days: Record<string, DayRecord> = {
-      '2026-06-29': clean('21:00'),
-      '2026-06-30': clean('21:00'),
-      '2026-07-01': clean('21:00'),
+      '2026-06-29': clean(),
+      '2026-06-30': clean(),
+      '2026-07-01': clean(),
     };
     const si = streakInfo(days, '2026-07-01');
-    // 6/29 has no prior bedtime so sleep is unlogged -> not clean; 6/30 & 7/1 are clean.
-    expect(si.current).toBe(2);
-    expect(si.longest).toBe(2);
+    // Each day now carries its own bed + wake (9h), so all three are clean.
+    expect(si.current).toBe(3);
+    expect(si.longest).toBe(3);
   });
 });

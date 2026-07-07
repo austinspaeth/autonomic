@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Animated as RNAnimated, Dimensions, Easing, Pressable, Text, View } from 'react-native';
 import { Tabs } from 'expo-router';
 import { BlurView } from 'expo-blur';
 import Svg, { Path } from 'react-native-svg';
@@ -7,6 +7,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-na
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { BrandMark, Icon, IconName } from '../../src/components/Icon';
+import { HeaderRule, headerHeight } from '../../src/components/Header';
 import { useSheets } from '../../src/components/Sheet';
 import { MenuSheet } from '../../src/features/Settings';
 import { usePalette } from '../../src/theme';
@@ -20,6 +21,27 @@ const TABS: { name: string; label: string; icon: IconName }[] = [
 const PAD = 5; // bar inner padding; the highlight pill is inset by this top/bottom
 // Slight elastic bounce (damping ratio ~0.7) — a soft overshoot, not springy.
 const SPRING = { damping: 19, stiffness: 210, mass: 1 };
+
+// Directional cross-slide between tabs: the outgoing view fades and pushes off
+// toward the tab you left; the incoming view fades in from the opposite side.
+// react-navigation feeds each scene a signed `progress` (0 = focused; +1 / -1
+// for tabs after / before the active one), so the sign already encodes direction.
+const SHIFT = Math.round(Dimensions.get('window').width * 0.32);
+const TAB_TRANSITION = {
+  animation: 'shift' as const,
+  transitionSpec: {
+    animation: 'timing' as const,
+    config: { duration: 190, easing: Easing.out(Easing.cubic) },
+  },
+  sceneStyleInterpolator: ({ current }: { current: { progress: RNAnimated.Value } }) => ({
+    sceneStyle: {
+      opacity: current.progress.interpolate({ inputRange: [-1, 0, 1], outputRange: [0, 1, 0] }),
+      transform: [{
+        translateX: current.progress.interpolate({ inputRange: [-1, 0, 1], outputRange: [-SHIFT, 0, SHIFT] }),
+      }],
+    },
+  }),
+};
 
 // Solid (filled) cog — hollow center via even-odd fill. Opens the menu sheet.
 function SolidCog({ size = 22, color = '#000' }: { size?: number; color?: string }) {
@@ -59,10 +81,10 @@ function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
       <BlurView
         intensity={40}
         tint="dark"
-        style={{ borderRadius: 999, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 20, shadowOffset: { width: 0, height: 10 }, elevation: 8 }}
+        style={{ borderRadius: 999, overflow: 'hidden', borderWidth: 1, borderColor: '#34343b', shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 20, shadowOffset: { width: 0, height: 10 }, elevation: 8 }}
       >
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, padding: PAD, backgroundColor: 'rgba(6,6,9,0.55)' }}>
-        <View style={{ paddingLeft: 8, paddingRight: 6, justifyContent: 'center' }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, padding: PAD, backgroundColor: 'rgba(6,6,9,0.82)' }}>
+        <View style={{ paddingLeft: 8, paddingRight: 6, marginRight: 8, justifyContent: 'center' }}>
           <BrandMark size={20} />
         </View>
         {/* Sliding highlight pill sits behind the tabs. */}
@@ -108,11 +130,19 @@ function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
 }
 
 export default function TabLayout() {
+  const insets = useSafeAreaInsets();
   return (
-    <Tabs tabBar={(props) => <FloatingTabBar {...props} />} screenOptions={{ headerShown: false }}>
-      <Tabs.Screen name="index" />
-      <Tabs.Screen name="analysis" />
-      <Tabs.Screen name="insights" />
-    </Tabs>
+    <View style={{ flex: 1 }}>
+      <Tabs tabBar={(props) => <FloatingTabBar {...props} />} screenOptions={{ headerShown: false, ...TAB_TRANSITION }}>
+        <Tabs.Screen name="index" />
+        <Tabs.Screen name="analysis" />
+        <Tabs.Screen name="insights" />
+      </Tabs>
+      {/* Fixed header rule: sits at the header's bottom edge, on top of the
+          sliding scenes, so the divider stays put during tab transitions. */}
+      <View pointerEvents="none" style={{ position: 'absolute', top: headerHeight(insets.top), left: 0, right: 0, height: 1 }}>
+        <HeaderRule />
+      </View>
+    </View>
   );
 }

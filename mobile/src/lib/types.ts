@@ -45,7 +45,7 @@ export interface Meal {
   id: string;
   type: string;
   time?: string;
-  calories?: string | number;
+  /** Free-text "what was eaten" (previously used for optional notes). */
   note?: string;
 }
 
@@ -87,6 +87,8 @@ export interface AppState {
   meta: {
     lastUpdated: string | null;
     lastImport: { name: string; at: string } | null;
+    /** Set once the sleep "bed = last night" reframing migration has run. */
+    sleepReframed?: boolean;
   };
   days: Record<string, DayRecord>;
 }

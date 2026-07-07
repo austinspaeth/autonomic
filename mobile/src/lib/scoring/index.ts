@@ -73,7 +73,6 @@ export const sRestingHr = (v: unknown, pos?: unknown): ScoreCat | null => {
 export const sQRS = (v: unknown): ScoreCat | null => { const n = numOr(v); if (n == null) return null; if (n > 130) return 'concerning'; if (n >= 121) return 'bad'; if (n >= 111) return 'ok'; if (n >= 91) return 'good'; return 'great'; };
 export const sPR = (v: unknown): ScoreCat | null => { const n = numOr(v); if (n == null) return null; if (n < 100 || n > 240) return 'concerning'; if (n < 110 || n >= 221) return 'bad'; if (n < 120 || n >= 201) return 'ok'; if (n < 140 || n >= 181) return 'good'; return 'great'; };
 export const sEctopic = (v: unknown): ScoreCat | null => { const n = numOr(v); return n == null ? null : n === 0 ? 'great' : n <= 2 ? 'good' : n <= 5 ? 'ok' : n <= 15 ? 'bad' : 'concerning'; };
-export const sCoherence = (v: unknown): ScoreCat | null => { const n = numOr(v); return n == null ? null : n >= 7 ? 'great' : n >= 4 ? 'good' : n >= 2 ? 'ok' : n >= 1 ? 'bad' : 'crash'; };
 export const sLfPeak = (v: unknown): ScoreCat | null => { const n = numOr(v); if (n == null) return null; if (n < 0.045) return 'concerning'; if (n < 0.060) return 'bad'; if (n < 0.075) return 'ok'; if (n < 0.090) return 'good'; if (n <= 0.105) return 'great'; return 'good'; };
 export const sLfHf = (v: unknown): ScoreCat | null => { const n = numOr(v); if (n == null) return null; if (n < 1.5) return 'great'; if (n <= 3) return 'good'; if (n <= 5) return 'ok'; if (n <= 10) return 'bad'; return 'concerning'; };
 export const expectedHf = (style?: unknown): [number, number] | null =>
@@ -129,7 +128,6 @@ export const BANDS: Record<string, Band[]> = {
   vlf: [{ max: 200, cat: 'great' }, { max: 450, cat: 'good' }, { max: 700, cat: 'ok' }, { max: 1000, cat: 'bad' }, { max: Infinity, cat: 'crash' }],
   lfPeak: [{ max: 0.045, cat: 'concerning' }, { max: 0.060, cat: 'bad' }, { max: 0.075, cat: 'ok' }, { max: 0.090, cat: 'good' }, { max: 0.105, cat: 'great' }, { max: Infinity, cat: 'good' }],
   lfhf: [{ max: 1.5, cat: 'great' }, { max: 3, cat: 'good' }, { max: 5, cat: 'ok' }, { max: 10, cat: 'bad' }, { max: Infinity, cat: 'concerning' }],
-  coherence: [{ max: 1, cat: 'crash' }, { max: 2, cat: 'bad' }, { max: 4, cat: 'ok' }, { max: 7, cat: 'good' }, { max: Infinity, cat: 'great' }],
   readiness: [{ max: 35, cat: 'crash' }, { max: 50, cat: 'bad' }, { max: 60, cat: 'ok' }, { max: 70, cat: 'good' }, { max: 86, cat: 'great' }, { max: Infinity, cat: 'warning' }],
   spo2: [{ max: 92, cat: 'concerning' }, { max: 94, cat: 'bad' }, { max: 96, cat: 'ok' }, { max: 98, cat: 'good' }, { max: Infinity, cat: 'great' }],
   ectopic: [{ max: 1, cat: 'great' }, { max: 3, cat: 'good' }, { max: 6, cat: 'ok' }, { max: 16, cat: 'bad' }, { max: Infinity, cat: 'concerning' }],
@@ -172,8 +170,8 @@ export const qtcBands = (sex?: string): Band[] =>
 
 export function bandsFor(type: string, key: string): Band[] | null {
   const map: Record<string, Record<string, string>> = {
-    hrv: { rmssd: 'rmssdU', sdnn: 'sdnn', avgHr: 'hrBreath', pnn50: 'pnn50', vlowPower: 'vlf', lfPeak: 'lfPeak', coherence: 'coherence', meanRr: 'rrMode', mode: 'rrMode', mxdmn: 'mxdmn', amo50: 'amo50', cv: 'cv', pns: 'pns', sns: 'sns', stressIndex: 'stressIndex' },
-    breathHrv: { sdnn: 'sdnn', rmssd: 'rmssdS', pnn50: 'pnn50', vlowPower: 'vlf', lfPeak: 'lfPeak', coherence: 'coherence', hr: 'hrBreath', meanRr: 'rrMode', mode: 'rrMode', mxdmn: 'mxdmn', amo50: 'amo50', cv: 'cv', pns: 'pns', sns: 'sns', stressIndex: 'stressIndex' },
+    hrv: { rmssd: 'rmssdU', sdnn: 'sdnn', avgHr: 'hrBreath', pnn50: 'pnn50', vlowPower: 'vlf', lfPeak: 'lfPeak', meanRr: 'rrMode', mode: 'rrMode', mxdmn: 'mxdmn', amo50: 'amo50', cv: 'cv', pns: 'pns', sns: 'sns', stressIndex: 'stressIndex' },
+    breathHrv: { sdnn: 'sdnn', rmssd: 'rmssdS', pnn50: 'pnn50', vlowPower: 'vlf', lfPeak: 'lfPeak', hr: 'hrBreath', meanRr: 'rrMode', mode: 'rrMode', mxdmn: 'mxdmn', amo50: 'amo50', cv: 'cv', pns: 'pns', sns: 'sns', stressIndex: 'stressIndex' },
     bp: { sys: 'sys', dia: 'dia' },
     bloodO2: { value: 'spo2' },
     ecg: { qtc: 'qtc', qrs: 'qrs', pr: 'pr', ectopic: 'ectopic' },
@@ -211,7 +209,6 @@ export function computeScores(r: Entry, ctx: ScoreContext = {}): Record<string, 
       put('mxdmn', sMxDMn(r.mxdmn));
       put('amo50', sAMo50(r.amo50));
       put('cv', sCV(r.cv));
-      put('coherence', sCoherence(r.coherence));
       const band = (k: string, b: Band[]) => { const v = numOr(r[k]); if (v != null) put(k, catFromBands(v, b)); };
       band('pns', BANDS.pns); band('sns', BANDS.sns); band('stressIndex', BANDS.stressIndex);
       const lf = parseFloat(r.lowPower as string), hf = parseFloat(r.highPower as string);
@@ -225,7 +222,6 @@ export function computeScores(r: Entry, ctx: ScoreContext = {}): Record<string, 
       put('pnn50', sPNN50(r.pnn50));
       put('totalPower', sTotalPower(totalPower(r)));
       put('vlf', sVLF(r.vlowPower));
-      put('coherence', sCoherence(r.coherence));
       put('lfPeak', sLfPeak(r.lfPeak));
       put('hfPeak', sHfPeak(r.hfPeak, r.style));
       const lf = parseFloat(r.lowPower as string), hf = parseFloat(r.highPower as string);
@@ -322,7 +318,6 @@ export const HRV_EXPLAIN: Record<string, string> = {
   mode: 'Most common RR interval - a stability indicator.',
   amo50: 'Stress-index marker. Higher suggests sympathetic dominance.',
   cv: 'Relative variability. Higher is generally better.',
-  coherence: 'Synchronization of heart rhythm with breathing - reflects vagal training.',
 };
 
 /** Autonomic composite weights per reading kind (per the framework). */

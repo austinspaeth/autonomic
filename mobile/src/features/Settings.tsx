@@ -38,13 +38,18 @@ export function MenuSheet({ controls }: { controls: SheetControls }) {
   const m = state.meta || {};
   return (
     <View>
+      {/* Title band: a 32px box matching the sheet's close ✕ box (absolute at
+          top:12, height:32). Content starts at the sheet's 24px top padding, so
+          marginTop:-12 lifts this box to top:12 — lining its centre up with the ✕. */}
+      <View style={{ height: 32, justifyContent: 'center', marginTop: -12, marginBottom: 16 }}>
+        <Text style={{ fontSize: 21, fontWeight: '700', color: p.text }}>Settings</Text>
+      </View>
       {/* Near-black brand card, inset to match content: 18px left/right (content
-          padding) and top (topPad is 24, so pull up 6 to match). */}
-      <View style={{ marginTop: -6, marginBottom: 16, paddingVertical: 24, borderRadius: radius.card, backgroundColor: '#131315', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 }}>
+          padding). */}
+      <View style={{ marginBottom: 16, paddingVertical: 24, borderRadius: radius.card, backgroundColor: '#131315', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 }}>
         <BrandMark size={26} />
         <Text style={{ fontSize: 22, fontWeight: '800', color: p.text, letterSpacing: -0.3 }}>Autonomic</Text>
       </View>
-      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 8 }}>Settings</Text>
       {item('user', 'Profile', 'Sex, birthday, height, weight', () => openSheet((c) => <ProfileSheet controls={c} />))}
       {item('bluetooth', 'Devices', 'Heart-rate straps', () => openSheet(() => <DevicesScreen />), !!state.settings.lastBleDeviceId)}
       {item('heart', 'Apple Health', Platform.OS === 'ios' ? 'Read & write health data' : 'iOS only', () => openSheet(() => <HealthScreen />), Platform.OS === 'ios' && !!state.settings.healthEnabled)}

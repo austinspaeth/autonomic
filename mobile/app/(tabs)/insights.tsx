@@ -12,7 +12,7 @@ import { useToast } from '../../src/components/Toast';
 import { radius, usePalette } from '../../src/theme';
 import { getState, useAppState } from '../../src/store/store';
 import { getCurrentKey } from '../../src/store/nav';
-import { REPORT_CARDS, ReportRange, buildPrompt, hasAnyData, reportDateRange } from '../../src/lib/analysis/reports';
+import { REPORT_CARDS, ReportRange, buildDataExport, buildPrompt, hasAnyData, reportDateRange } from '../../src/lib/analysis/reports';
 
 export default function InsightsScreen() {
   const p = usePalette();
@@ -42,11 +42,21 @@ export default function InsightsScreen() {
     openSheet((c) => <PromptSheet title={title} rangeText={rangeText} prompt={prompt} controls={c} />);
   };
 
+  const dataExport = () => {
+    const state = getState();
+    const { keys: allKeys, rangeText } = reportDateRange(range, getCurrentKey());
+    const keys = allKeys.filter((k) => state.days[k]);
+    if (!hasAnyData(state.days, keys)) { toast('No data available for this period'); return; }
+    const ctx = { sex: state.profile.sex, height: state.profile.height };
+    const text = buildDataExport(state, ctx, range, getCurrentKey());
+    openSheet((c) => <PromptSheet title="Data Export" rangeText={rangeText} prompt={text} controls={c} subtitle="Your raw logged data for this period — no analysis prompt attached. Copy or share it as-is." />);
+  };
+
   return (
     <Screen
       bottomPad={140}
       header={
-        <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
+        <View style={{ paddingHorizontal: 16 }}>
           <Segmented options={[{ val: 'day', label: 'Day' }, { val: 'week', label: 'Week' }, { val: 'month', label: 'Month' }, { val: 'year', label: 'Year' }]} value={range} onChange={setRange} />
         </View>
       }
@@ -80,16 +90,23 @@ export default function InsightsScreen() {
               );
             })}
           </View>
+          <Pressable onPress={dataExport} style={{ marginTop: 10, width: '100%', borderWidth: 1, borderRadius: radius.card, backgroundColor: p.surface, borderColor: p.border, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <Icon name="download" size={26} color={p.accent} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: p.text }}>Data Export (data only)</Text>
+              <Text style={{ fontSize: 12, color: p.textDim, marginTop: 4, lineHeight: 15 }}>Your raw logged data for this period, with no analysis prompt attached.</Text>
+            </View>
+          </Pressable>
         </>
       )}
     </Screen>
   );
 }
 
-function PromptSheet({ title, rangeText, prompt, controls }: { title: string; rangeText: string; prompt: string; controls: SheetControls }) {
+function PromptSheet({ title, rangeText, prompt, controls, subtitle }: { title: string; rangeText: string; prompt: string; controls: SheetControls; subtitle?: string }) {
   const p = usePalette();
   const toast = useToast();
-  const copy = async () => { await Clipboard.setStringAsync(prompt); toast('Prompt copied to clipboard'); };
+  const copy = async () => { await Clipboard.setStringAsync(prompt); toast(`${subtitle ? 'Data' : 'Prompt'} copied to clipboard`); };
   const share = async () => {
     try {
       const uri = `${FileSystem.cacheDirectory}autonomic-report.txt`;
@@ -100,14 +117,14 @@ function PromptSheet({ title, rangeText, prompt, controls }: { title: string; ra
   return (
     <View>
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text }}>{title}</Text>
-      <Text style={{ color: p.textDim, fontSize: 14, marginTop: 4 }}>Copy this prompt and paste it into Claude or ChatGPT.</Text>
+      <Text style={{ color: p.textDim, fontSize: 14, marginTop: 4 }}>{subtitle || 'Copy this prompt and paste it into Claude or ChatGPT.'}</Text>
       <Text style={{ color: p.textDim, fontSize: 12, marginTop: 6, marginBottom: 10, fontVariant: ['tabular-nums'] }}>{`${rangeText} · ${prompt.length.toLocaleString()} characters`}</Text>
       <View style={{ backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.control, padding: 12, marginBottom: 16 }}>
-        <Text style={{ color: p.text, fontFamily: 'Menlo', fontSize: 11, lineHeight: 16 }}>{prompt}</Text>
+        <Text selectable style={{ color: p.text, fontFamily: 'Menlo', fontSize: 11, lineHeight: 16 }}>{prompt}</Text>
       </View>
       <View style={{ flexDirection: 'row', gap: 10 }}>
         <Button title="Share" variant="ghost" onPress={share} />
-        <Button title="Copy prompt" variant="primary" onPress={copy} />
+        <Button title={subtitle ? 'Copy data' : 'Copy prompt'} variant="primary" onPress={copy} />
       </View>
       <View style={{ height: 24 }} />
     </View>

@@ -17,7 +17,7 @@ import {
 import { metricHistory, numEx, type DaysMap } from '../lib/scoring/day';
 import { entryFields, isDivider, READING_TYPES } from '../lib/registry';
 import { fmtNum } from '../lib/dates';
-import { PowerBar, Sparkline } from './charts';
+import { PowerSpectrum, Sparkline } from './charts';
 import { ScoreDot } from './ui';
 
 const hexA = (hex: string, a: number) => {
@@ -122,7 +122,7 @@ function PowerSection({ r, days, ctx, type }: { r: Entry; days: DaysMap; ctx: Sc
   const e = expectedHf(r.style);
   return (
     <SumCard title="Power">
-      {total ? <View style={{ backgroundColor: p.surface, borderRadius: radius.control, padding: 14, marginBottom: 10 }}><PowerBar vlf={vlf} lf={lf} hf={hf} /></View> : null}
+      {total ? <View style={{ backgroundColor: p.surface, borderRadius: radius.control, padding: 14, marginBottom: 10 }}><PowerSpectrum vlf={vlf} lf={lf} hf={hf} /></View> : null}
       <MetricRow label="Total power" value={total != null ? Math.round(total) : ''} cat={s.totalPower} explain="Total autonomic engagement across all frequencies." spark={spark(days, type, (rr) => totalPower(rr), BANDS.totalPower)} />
       <MetricRow label="LF/HF ratio" value={lfhf != null ? lfhf.toFixed(2) : ''} cat={s.lfhf} explain="Sympathetic vs vagal balance. Balanced or low favors flexibility." spark={spark(days, type, lfhfEx, BANDS.lfhf)} />
       <MetricRow label="VLF power" value={r.vlowPower as string} cat={s.vlf} explain="Slow regulatory processes and stress load. Elevated means system stress." spark={spark(days, type, numEx('vlowPower'), BANDS.vlf)} />
@@ -170,7 +170,6 @@ function HrvSummaryBody({ r, days, ctx, type }: SummaryProps & { type: 'breathHr
     <>
       <HeroCard cat={overall} label="Autonomic score" big={score ?? '-'} den={score != null ? '/100' : ''} sub="Composite of vagal tone, power, and baroreflex position." tip={overall ? HRV_VERDICT[overall] : ''} />
       <SumCard title="Details">
-        <MetricRow label="Coherence" value={r.coherence as string} cat={s.coherence} explain={HRV_EXPLAIN.coherence} spark={spark(days, type, numEx('coherence'), BANDS.coherence)} />
         {type === 'breathHrv' ? <MetricRow label="Breathing style" value={(r.style as string) || '—'} cat={false} explain="Intended pace for this reading." /> : null}
         {r.period ? <MetricRow label="Reading type" value={r.period as string} cat={false} /> : null}
         <MetricRow label="Swallowing" value={r.swallowing ? 'Yes' : 'No'} cat={false} />

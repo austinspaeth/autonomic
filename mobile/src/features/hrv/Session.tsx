@@ -18,17 +18,20 @@ import { ble } from '../../lib/ble/manager';
 import { correctArtifacts } from '../../lib/hrv';
 import { getState } from '../../store/store';
 
-const DURATION = 300; // 5 minutes
+// Breathing readings run the full 5 minutes; unstructured readings are 2:30.
+const durationFor = (kind: SessionConfig['kind']) => (kind === 'breath' ? 300 : 150);
 
 export interface SessionConfig {
   kind: 'breath' | 'unstructured';
   style?: string; // e.g. "4/6"
   source: 'polar' | 'watch';
+  period?: 'Morning' | 'Evening' | 'Random';
 }
 
 export function HrvSession({ config, controls }: { config: SessionConfig; controls: SheetControls }) {
   const p = usePalette();
   const { openSheet } = useSheets();
+  const DURATION = durationFor(config.kind);
   const [started, setStarted] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [hr, setHr] = useState<number | null>(null);
@@ -99,10 +102,12 @@ export function HrvSession({ config, controls }: { config: SessionConfig; contro
     if (config.source === 'watch') { controls.close(); return; }
 
     const rr = rrRef.current.slice();
+    // Open Results as a card stacked ON TOP of this one: this session card recedes
+    // (scales back + lifts) while Results rises over it. Save/Discard in Results
+    // calls closeAll(), so both cards animate out together. Leave this card mounted.
     openSheet((c) => (
-      <HrvResults rr={rr} hrSamples={hrRef.current} config={config} durationSec={elapsed} watchFallback={null} controls={c} rootControls={controls} />
-    ), { fullscreen: true });
-    controls.close();
+      <HrvResults rr={rr} hrSamples={hrRef.current} config={config} durationSec={elapsed} watchFallback={null} controls={c} />
+    ), { hideClose: true });
   };
 
   const frac = started ? elapsed / DURATION : 0;

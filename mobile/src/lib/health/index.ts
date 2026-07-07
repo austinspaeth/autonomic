@@ -17,12 +17,21 @@
  */
 import { Platform } from 'react-native';
 import type { Entry } from '../types';
+import { computeHrv } from '../hrv';
+
+/** This app's bundle id — used to skip re-importing our own write-backs. */
+const OWN_BUNDLE = 'com.autonomic.journal';
 
 export interface HealthApi {
   available: boolean;
   requestAuth(): Promise<boolean>;
   /** Pull the day's relevant samples for a YYYY-MM-DD key. */
   readDay(dk: string): Promise<HealthDaySamples>;
+  /**
+   * Per-sample, timestamped readings for a day (resting HR, BP, SpO₂, HRV) —
+   * each keeps its real clock time and a flag for whether this app authored it.
+   */
+  readImports(dk: string): Promise<ImportedReading[]>;
   /** Read the night that *ends* on `dk` (spans the prior evening → this morning). */
   readSleep(dk: string): Promise<SleepImport | null>;
   writeHrvSession(opts: { sdnnMs: number; avgHr: number; startISO: string; durationSec: number }): Promise<void>;
@@ -40,6 +49,16 @@ export interface HealthDaySamples {
   respiratoryRate: number | null;
   weightLb: number | null;
   sleep: { bed?: string; wake?: string; interrupted?: boolean } | null;
+}
+
+export interface ImportedReading {
+  type: 'restingHr' | 'bp' | 'bloodO2' | 'hrv';
+  time: string;   // HH:MM local, from the sample's real timestamp
+  startMs: number; // epoch ms of the sample start, for dedup windows
+  fields: Record<string, string>;
+  rr?: number[];        // beat-to-beat RR (ms), when derived from a heartbeat series
+  rrClean?: number[];
+  ownApp: boolean;      // true when this app authored the sample (skip on import)
 }
 
 export interface SleepImport {
@@ -62,6 +81,7 @@ const stub: HealthApi = {
   available: false,
   async requestAuth() { return false; },
   async readDay() { return emptyDay; },
+  async readImports() { return []; },
   async readSleep() { return null; },
   async writeHrvSession() { /* no-op */ },
   async writeQuantity() { /* no-op */ },
@@ -93,18 +113,41 @@ export function __setHealth(api: HealthApi | null) { cached = api; }
  * Loosely-typed surface over the healthkit module (v8). Queries/saves take Date
  * objects; requestAuthorization is (read, write).
  */
-type QSample = { quantity: number; startDate: Date; endDate: Date };
+type SourceRev = { source?: { bundleIdentifier?: string; name?: string } };
+type QSample = { quantity: number; startDate: Date; endDate: Date; uuid?: string; sourceRevision?: SourceRev };
 type CSample = { value: number; startDate: Date; endDate: Date };
+type Heartbeat = { timeSinceSeriesStart: number; precededByGap?: boolean };
+type HeartbeatSeries = { startDate: Date; endDate: Date; heartbeats: readonly Heartbeat[]; uuid?: string; sourceRevision?: SourceRev };
 type SaveSample = { quantityType: string; unit: string; quantity: number; startDate: Date; endDate: Date };
 interface HkModule {
   isHealthDataAvailable?: () => Promise<boolean>;
   requestAuthorization?: (read: string[], write: string[]) => Promise<boolean>;
   queryQuantitySamples?: (id: string, opts: Record<string, unknown>) => Promise<readonly QSample[]>;
   queryCategorySamples?: (id: string, opts: Record<string, unknown>) => Promise<readonly CSample[]>;
+  queryHeartbeatSeriesSamples?: (opts: Record<string, unknown>) => Promise<readonly HeartbeatSeries[]>;
   saveQuantitySample?: (id: string, unit: string, value: number, opts?: Record<string, unknown>) => Promise<boolean>;
   saveCategorySample?: (id: string, value: number, opts?: Record<string, unknown>) => Promise<boolean>;
   saveCorrelationSample?: (id: string, samples: SaveSample[], opts?: Record<string, unknown>) => Promise<boolean>;
 }
+
+/** True when a HealthKit sample was authored by this app (skip re-importing). */
+const isOwnSample = (rev?: SourceRev): boolean => {
+  const b = rev?.source?.bundleIdentifier;
+  const nm = rev?.source?.name || '';
+  return b === OWN_BUNDLE || /autonomic/i.test(nm);
+};
+
+/** RR intervals (ms) from a heartbeat series; drops beats flagged after a gap. */
+const rrFromSeries = (hb: HeartbeatSeries): number[] => {
+  const beats = hb.heartbeats || [];
+  const rr: number[] = [];
+  for (let i = 1; i < beats.length; i++) {
+    if (beats[i].precededByGap) continue;
+    const dt = (beats[i].timeSinceSeriesStart - beats[i - 1].timeSinceSeriesStart) * 1000;
+    if (dt > 250 && dt < 2500) rr.push(dt);
+  }
+  return rr;
+};
 
 const QID = {
   restingHr: 'HKQuantityTypeIdentifierRestingHeartRate',
@@ -121,10 +164,11 @@ const CID = {
   mindful: 'HKCategoryTypeIdentifierMindfulSession',
 } as const;
 const CORR = { bloodPressure: 'HKCorrelationTypeIdentifierBloodPressure' } as const;
+const HEARTBEAT_SERIES = 'HKDataTypeIdentifierHeartbeatSeries';
 
 const READ_IDS = [
   QID.restingHr, QID.heartRate, QID.hrvSdnn, QID.respiratoryRate, QID.spo2,
-  QID.systolic, QID.diastolic, QID.bodyMass, CID.sleep,
+  QID.systolic, QID.diastolic, QID.bodyMass, CID.sleep, HEARTBEAT_SERIES,
 ];
 const WRITE_IDS = [
   QID.hrvSdnn, QID.restingHr, QID.heartRate, QID.bodyMass, QID.spo2,
@@ -154,6 +198,11 @@ function makeReal(mod: HkModule): HealthApi {
       if (!rows.length) return null;
       return rows.reduce((s, r) => s + r.quantity, 0) / rows.length;
     } catch { return null; }
+  };
+  /** Raw per-sample rows (kept: timestamp + provenance), for timestamped imports. */
+  const samplesQ = async (id: string, from: Date, to: Date): Promise<readonly QSample[]> => {
+    try { return (await mod.queryQuantitySamples?.(id, { from, to, limit: 500 })) || []; }
+    catch { return []; }
   };
   const rangeQ = async (id: string, from: Date, to: Date): Promise<{ min: number; max: number } | null> => {
     try {
@@ -204,6 +253,50 @@ function makeReal(mod: HkModule): HealthApi {
         weightLb: weightKg != null ? Math.round(weightKg * 2.20462) : null,
         sleep,
       };
+    },
+
+    async readImports(dk) {
+      const { from, to } = dayBounds(dk);
+      const out: ImportedReading[] = [];
+      const ts = (s: QSample) => ({ time: hhmm(s.startDate), startMs: s.startDate.getTime(), ownApp: isOwnSample(s.sourceRevision) });
+
+      const [rhr, ox, sys, dia, sdnn] = await Promise.all([
+        samplesQ(QID.restingHr, from, to),
+        samplesQ(QID.spo2, from, to),
+        samplesQ(QID.systolic, from, to),
+        samplesQ(QID.diastolic, from, to),
+        samplesQ(QID.hrvSdnn, from, to),
+      ]);
+
+      rhr.forEach((s) => out.push({ type: 'restingHr', ...ts(s), fields: { hr: String(Math.round(s.quantity)), position: 'Laying' } }));
+      ox.forEach((s) => { const v = s.quantity <= 1 ? s.quantity * 100 : s.quantity; out.push({ type: 'bloodO2', ...ts(s), fields: { value: String(Math.round(v)) } }); });
+      // Pair systolic + diastolic by (near-)identical timestamps (saved together).
+      sys.forEach((s) => {
+        const m = dia.find((d) => Math.abs(d.startDate.getTime() - s.startDate.getTime()) < 2000);
+        if (m) out.push({ type: 'bp', ...ts(s), fields: { sys: String(Math.round(s.quantity)), dia: String(Math.round(m.quantity)) } });
+      });
+
+      // Beat-to-beat HRV from heartbeat series → full metrics (RMSSD, power, …).
+      const hrvSeriesTimes: number[] = [];
+      try {
+        const series = (await mod.queryHeartbeatSeriesSamples?.({ from, to, limit: 100 })) || [];
+        for (const hb of series) {
+          const rr = rrFromSeries(hb);
+          if (rr.length < 20) continue;
+          const res = computeHrv(rr);
+          if (!res.time || !Object.keys(res.fields).length) continue;
+          hrvSeriesTimes.push(hb.startDate.getTime());
+          out.push({ type: 'hrv', time: hhmm(hb.startDate), startMs: hb.startDate.getTime(), ownApp: isOwnSample(hb.sourceRevision), fields: res.fields, rr, rrClean: res.rrClean });
+        }
+      } catch { /* series unavailable */ }
+
+      // SDNN-only fallback where a beat series didn't already cover that moment.
+      sdnn.forEach((s) => {
+        if (hrvSeriesTimes.some((t) => Math.abs(t - s.startDate.getTime()) < 5 * 60000)) return;
+        out.push({ type: 'hrv', ...ts(s), fields: { sdnn: String(Math.round(s.quantity)) } });
+      });
+
+      return out;
     },
 
     async readSleep(dk) {

@@ -4,7 +4,7 @@
  * streakInfo/streakTier, blueZone, readingPeriod, scoreCat.
  * Pure: operates on a days map + score context, no store imports.
  */
-import { addDays, dateFromKey, keyOf, todayKey } from '../dates';
+import { dateFromKey, keyOf, todayKey } from '../dates';
 import type { Band, DayRecord, Entry, ScoreCat } from '../types';
 import {
   BANDS, GRADE_PTS, computeScores, ecgPattern, numOr, restingHrBands, totalPower,
@@ -66,14 +66,15 @@ export function readingPeriod(r: Entry): 'morning' | 'midday' | 'evening' {
 }
 
 /**
- * Hours slept the night before `dk`: prior day's bedtime to this day's wake.
+ * Hours slept the night that ended the morning of `dk`. Both endpoints live on
+ * the same day record: `bed` = last night's bedtime, `wake` = this morning's
+ * wake. The midnight wrap handles an evening bedtime → next-morning wake.
  * Returns null when either endpoint is missing.
  */
 export function sleepHours(days: DaysMap, dk: string): number | null {
   const d = days[dk];
+  const bed = d && d.sleep ? d.sleep.bed : '';
   const wake = d && d.sleep ? d.sleep.wake : '';
-  const prev = days[addDays(dk, -1)];
-  const bed = prev && prev.sleep ? prev.sleep.bed : '';
   if (!bed || !wake) return null;
   const [bh, bm] = bed.split(':').map(Number);
   const [wh, wm] = wake.split(':').map(Number);

@@ -10,7 +10,7 @@ import { TimeField } from '../components/Field';
 import { radius, usePalette } from '../theme';
 import {
   ACTIVITY_TYPES, MEAL_TYPES, MED_TYPES, READING_TYPES, SYMPTOM_TYPES, TRIGGER_TYPES,
-  bmLabel, readingRowValue, summarizeFields,
+  bmLabel, readingLabel, readingRowValue, summarizeFields,
 } from '../lib/registry';
 import { rowScoreCategory } from '../lib/scoring';
 import { ensureDay, save, useAppState } from '../store/store';
@@ -37,7 +37,7 @@ export function JournalSections({ dk }: { dk: string }) {
           {(day.readings || []).length === 0 ? <Muted>No readings yet.</Muted> : [...day.readings].sort((a, b) => ((a.time as string) || '').localeCompare((b.time as string) || '')).map((r) => {
             const def = READING_TYPES[r.type];
             if (!def) return null;
-            return <Row key={r.id} icon={def.icon as never} title={def.label} right={<View style={{ flexDirection: 'row', alignItems: 'center' }}><RowValue text={readingRowValue(r)} cat={rowScoreCategory(r, ctx)} />{r.time ? <Pill text={fmtTime12(r.time)} /> : null}</View>} onPress={() => forms.openReadingSummary(r)} />;
+            return <Row key={r.id} icon={def.icon as never} title={readingLabel(r)} right={<View style={{ flexDirection: 'row', alignItems: 'center' }}><RowValue text={readingRowValue(r)} cat={rowScoreCategory(r, ctx)} />{r.time ? <Pill text={fmtTime12(r.time)} /> : null}</View>} onPress={() => forms.openReadingSummary(r)} />;
           })}
         </View>
       </Card>
@@ -64,7 +64,7 @@ export function JournalSections({ dk }: { dk: string }) {
         <SectionHeader title="Food & Drink" />
         <View style={{ paddingHorizontal: 14, paddingBottom: 12 }}>
           <Row icon="cup" title="Water" right={<Text style={{ color: p.text, fontWeight: '600' }}>{`${+(day.food?.water || 0)} L`}</Text>} onPress={drawers.water} />
-          <Row icon="utensils" title="Meals" right={<Text style={{ color: p.text, fontWeight: '600' }}>{`${(day.food?.meals || []).reduce((s, m) => s + (parseInt(String(m.calories), 10) || 0), 0)} cal`}</Text>} onPress={drawers.meals} />
+          <Row icon="utensils" title="Meals" right={<Text style={{ color: p.text, fontWeight: '600' }}>{(() => { const n = (day.food?.meals || []).length; return n === 0 ? 'None' : `${n} logged`; })()}</Text>} onPress={drawers.meals} />
         </View>
       </Card>
       {/* Digestion */}
@@ -90,8 +90,8 @@ function SleepSection({ dk }: { dk: string }) {
       <SectionHeader title="Sleep" />
       <View style={{ paddingHorizontal: 14, paddingBottom: 14 }}>
         <View style={{ flexDirection: 'row', gap: 14 }}>
-          <View style={{ flex: 1 }}><TimeField label="Wake time" value={sleep.wake} onChange={(v) => setField('wake', v)} /></View>
-          <View style={{ flex: 1 }}><TimeField label="Bed time" value={sleep.bed} onChange={(v) => setField('bed', v)} /></View>
+          <View style={{ flex: 1 }}><TimeField label="Bed (last night)" value={sleep.bed} onChange={(v) => setField('bed', v)} /></View>
+          <View style={{ flex: 1 }}><TimeField label="Woke (this morning)" value={sleep.wake} onChange={(v) => setField('wake', v)} /></View>
         </View>
         <Segmented options={[{ val: 'good', label: 'Good sleep' }, { val: 'interrupted', label: 'Interrupted' }]} value={(sleep.quality as 'good' | 'interrupted') || 'good'} onChange={(v) => setField('quality', v)} style={{ marginBottom: 12 }} />
         <View style={{ flexDirection: 'row', gap: 14 }}>

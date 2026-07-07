@@ -6,7 +6,7 @@
  * artifacts. See makeFixture() below for the exact construction.
  */
 import {
-  breathTargetHz, coherence, computeHrv, correctArtifacts, fft, frequencyDomain,
+  computeHrv, correctArtifacts, fft, frequencyDomain,
   parseHeartRateMeasurement, resampleTachogram, timeDomain,
 } from '../index';
 
@@ -130,7 +130,7 @@ describe('computeHrv end to end', () => {
   it('fills every manual number field except device-proprietary ones', () => {
     // Auto-computed unstructured/breathing HRV fields:
     ['sdnn', 'rmssd', 'pnn50', 'meanRr', 'hr', 'avgHr', 'cv', 'mode', 'amo50', 'mxdmn',
-      'stressIndex', 'pns', 'sns', 'vlowPower', 'lowPower', 'highPower', 'lfPeak', 'hfPeak', 'coherence']
+      'stressIndex', 'pns', 'sns', 'vlowPower', 'lowPower', 'highPower', 'lfPeak', 'hfPeak']
       .forEach((k) => expect(res.fields[k]).toBeDefined());
     // "age" (physiological age) is a device estimate, not derivable from RR — left blank.
     expect(res.fields.age).toBeUndefined();
@@ -143,19 +143,6 @@ describe('computeHrv end to end', () => {
   });
 });
 
-describe('coherence', () => {
-  it('is higher for a clean paced oscillation than for noise', () => {
-    const fd = frequencyDomain(makeFixture())!;
-    const c = coherence(fd, breathTargetHz('5/5'));
-    expect(c).toBeGreaterThanOrEqual(0);
-    expect(c).toBeLessThanOrEqual(10);
-  });
-  it('breathTargetHz maps in/out seconds to frequency', () => {
-    expect(breathTargetHz('4/6')).toBeCloseTo(0.1);
-    expect(breathTargetHz('5/5')).toBeCloseTo(0.1);
-    expect(breathTargetHz('4/4')).toBeCloseTo(0.125);
-  });
-});
 
 describe('parseHeartRateMeasurement', () => {
   it('parses uint8 HR + RR intervals (1/1024 s units)', () => {

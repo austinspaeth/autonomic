@@ -20,7 +20,6 @@ export const READING_TYPES: Record<string, TypeDef> = {
       { key: 'pns', label: 'PNS index', signed: true },
       { key: 'sns', label: 'SNS index', signed: true },
       { key: 'stressIndex', label: 'Stress index' },
-      { type: 'number', key: 'coherence', label: 'Coherence', unit: '%' },
       { divider: true },
       { type: 'number', key: 'sdnn', label: 'SDNN' },
       { type: 'number', key: 'avgHr', label: 'Avg HR' },
@@ -47,7 +46,6 @@ export const READING_TYPES: Record<string, TypeDef> = {
     icon: 'wind',
     fields: [
       { type: 'select', key: 'style', label: 'Breathing style', options: ['4/4', '4/5', '4/6', '5/5'] },
-      { type: 'number', key: 'coherence', label: 'Coherence', unit: '%' },
       { key: 'pns', label: 'PNS index', signed: true },
       { key: 'sns', label: 'SNS index', signed: true },
       { key: 'stressIndex', label: 'Stress index' },
@@ -384,6 +382,16 @@ export function detailFields(def: TypeDef | undefined, r: Entry): string {
 }
 
 /** Simplified value shown on the right of a reading row (one thing per type). */
+/**
+ * Display name for a reading. An unstructured HRV that came from Apple Health /
+ * Apple Watch (source 'watch') is shown as "Apple Watch HRV" instead of the
+ * generic "Unstructured HRV"; everything else uses its registry label.
+ */
+export function readingLabel(r: Entry): string {
+  if (r.type === 'hrv' && r.source === 'watch') return 'Apple Watch HRV';
+  return READING_TYPES[r.type]?.label ?? r.type;
+}
+
 export function readingRowValue(r: Entry): string {
   switch (r.type) {
     case 'hrv':

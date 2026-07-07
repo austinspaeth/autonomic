@@ -28,6 +28,7 @@ export function HrvSetup({ controls }: { controls: SheetControls }) {
   const [kind, setKind] = useState<'unstructured' | 'breath'>('breath');
   const [style, setStyle] = useState('4/6');
   const [source, setSource] = useState<'polar' | 'watch'>('polar');
+  const [period, setPeriod] = useState<'Morning' | 'Evening' | 'Random'>('Random');
   const savedName = getState().settings.lastBleDeviceName;
 
   const start = () => {
@@ -39,18 +40,21 @@ export function HrvSetup({ controls }: { controls: SheetControls }) {
       toast('Apple Watch reading needs an iOS build');
       return;
     }
-    const config: SessionConfig = { kind, source, style: kind === 'breath' ? style : undefined };
-    openSheet((c) => <HrvSession config={config} controls={c} />, { hideClose: true, fitContent: true });
+    const config: SessionConfig = { kind, source, period, style: kind === 'breath' ? style : undefined };
+    openSheet((c) => <HrvSession config={config} controls={c} />, { hideClose: true });
     controls.close();
   };
 
   return (
     <View>
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 4 }}>Live HRV reading</Text>
-      <Text style={{ color: p.textDim, fontSize: 14, marginBottom: 18 }}>A 5-minute capture computed on-device.</Text>
+      <Text style={{ color: p.textDim, fontSize: 14, marginBottom: 18 }}>{kind === 'breath' ? 'A 5-minute capture computed on-device.' : 'A 2½-minute capture computed on-device.'}</Text>
 
       <Label text="Reading kind" />
       <Segmented options={[{ val: 'unstructured', label: 'Unstructured' }, { val: 'breath', label: 'Breathing' }]} value={kind} onChange={setKind} />
+
+      <Label text="When is this reading?" top />
+      <Segmented options={[{ val: 'Morning', label: 'Morning' }, { val: 'Evening', label: 'Evening' }, { val: 'Random', label: 'Random' }]} value={period} onChange={setPeriod} />
 
       {kind === 'breath' ? (
         <>

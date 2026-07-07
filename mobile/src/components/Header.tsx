@@ -14,18 +14,43 @@ import Svg, { Defs, LinearGradient as SvgGradient, Rect, Stop } from 'react-nati
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePalette } from '../theme';
 
+// Fixed height of the header content band (below the safe-area top inset), so
+// every screen's header bar is identical regardless of the injected node. Tall
+// enough to fully contain the Segmented pill (its labels were clipping at 52);
+// screens no longer add their own bottom padding — this band owns the spacing.
+export const HEADER_CONTENT_HEIGHT = 58;
+/** Total header height for a given top safe-area inset (paddingTop + band). */
+export const headerHeight = (insetTop: number) => insetTop + 6 + HEADER_CONTENT_HEIGHT;
+
 export function Header({ children, onHeight }: { children?: React.ReactNode; onHeight?: (h: number) => void }) {
-  const p = usePalette();
   const insets = useSafeAreaInsets();
   return (
     <BlurView
-      intensity={40}
+      intensity={30}
       tint="dark"
       onLayout={(e) => onHeight?.(e.nativeEvent.layout.height)}
-      style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, paddingTop: insets.top + 6, backgroundColor: 'rgba(6,6,9,0.88)', borderBottomWidth: 0.5, borderBottomColor: p.border }}
+      style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, paddingTop: insets.top + 6, backgroundColor: 'rgba(4,4,6,0.96)' }}
     >
-      {children}
+      <View style={{ height: HEADER_CONTENT_HEIGHT, justifyContent: 'center' }}>{children}</View>
     </BlurView>
+  );
+}
+
+/** The header's bottom rule — a hairline that's dark grey at center and fades
+ *  darker toward both edges. Rendered as *fixed* chrome by the tab layout (not
+ *  inside the sliding scene) so it stays put through tab transitions. */
+export function HeaderRule() {
+  return (
+    <Svg width="100%" height="100%">
+      <Defs>
+        <SvgGradient id="headerRule" x1="0" y1="0" x2="1" y2="0">
+          <Stop offset="0" stopColor="#161619" />
+          <Stop offset="0.5" stopColor="#3c3c44" />
+          <Stop offset="1" stopColor="#161619" />
+        </SvgGradient>
+      </Defs>
+      <Rect x="0" y="0" width="100%" height="100%" fill="url(#headerRule)" />
+    </Svg>
   );
 }
 

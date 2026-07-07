@@ -18,7 +18,7 @@ export default function JournalScreen() {
   return (
     <Screen
       header={
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 16, paddingBottom: 12 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 16 }}>
           <Pressable onPress={() => shiftCurrent(-1)} hitSlop={8} style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}>
             <Text style={{ color: p.text, fontSize: 25 }}>‹</Text>
           </Pressable>

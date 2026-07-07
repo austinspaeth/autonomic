@@ -208,39 +208,6 @@ export function frequencyDomain(rr: number[]): FrequencyDomain | null {
   };
 }
 
-/**
- * HeartMath-style coherence: ratio of peak power in a narrow band around the
- * paced breathing frequency to total power, mapped to a 0-10ish score.
- */
-export function coherence(fd: FrequencyDomain, targetHz: number): number {
-  const { freqs, psd } = fd;
-  const df = freqs.length > 1 ? freqs[1] - freqs[0] : FS / 256;
-  const window = 0.015; // ±0.015 Hz peak window
-  let peak = 0, peakF = targetHz;
-  for (let k = 0; k < psd.length; k++) {
-    if (freqs[k] >= 0.04 && freqs[k] <= 0.26 && psd[k] > peak) { peak = psd[k]; peakF = freqs[k]; }
-  }
-  let peakBand = 0, total = 0;
-  for (let k = 0; k < psd.length; k++) {
-    if (freqs[k] < 0.0033) continue;
-    const p = psd[k] * df;
-    total += p;
-    if (Math.abs(freqs[k] - peakF) <= window) peakBand += p;
-  }
-  if (total <= 0) return 0;
-  const ratio = peakBand / (total - peakBand || total);
-  // Compress the ratio into a 0-10 range comparable to device coherence scores.
-  return Math.max(0, Math.min(10, ratio * 6));
-}
-
-/** Target breathing frequency (Hz) for a "in/out" pattern like "4/6". */
-export function breathTargetHz(style?: string): number {
-  const m = /^(\d+)\/(\d+)$/.exec(style || '');
-  if (!m) return 0.1;
-  const period = (+m[1] + +m[2]); // seconds per full breath
-  return period > 0 ? 1 / period : 0.1;
-}
-
 /* ---------- top-level: full result ---------- */
 export interface HrvResult {
   ok: boolean;
@@ -249,7 +216,6 @@ export interface HrvResult {
   rrClean: number[];
   time: TimeDomain;
   freq: FrequencyDomain;
-  coherence: number;
   /** Fields ready to merge onto a reading (string values, PWA-compatible). */
   fields: Record<string, string>;
 }
@@ -265,10 +231,9 @@ export function computeHrv(rrRaw: number[], opts: { style?: string; maxArtifactP
   if (!time || !freq) {
     return {
       ok: false, reason: 'Not enough clean data to compute HRV.', artifactPct,
-      rrClean: clean, time: time as TimeDomain, freq: freq as FrequencyDomain, coherence: 0, fields: {},
+      rrClean: clean, time: time as TimeDomain, freq: freq as FrequencyDomain, fields: {},
     };
   }
-  const coh = coherence(freq, breathTargetHz(opts.style));
   const fields: Record<string, string> = {
     sdnn: r0(time.sdnn).toString(),
     rmssd: r0(time.rmssd).toString(),
@@ -288,12 +253,11 @@ export function computeHrv(rrRaw: number[], opts: { style?: string; maxArtifactP
     highPower: r0(freq.highPower).toString(),
     lfPeak: r3(freq.lfPeak).toString(),
     hfPeak: r3(freq.hfPeak).toString(),
-    coherence: r0(coh).toString(),
   };
   return {
     ok: artifactPct <= maxArt,
     reason: artifactPct > maxArt ? `Signal too noisy (${Math.round(artifactPct)}% artifacts). Adjust the strap and try again.` : undefined,
-    artifactPct, rrClean: clean, time, freq, coherence: coh, fields,
+    artifactPct, rrClean: clean, time, freq, fields,
   };
 }
 

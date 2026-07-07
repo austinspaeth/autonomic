@@ -58,7 +58,7 @@ function MealsDrawer({ dk }: { dk: string }) {
     <View>
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 16 }}>Meals</Text>
       {meals.length === 0 ? <Muted>No meals logged yet.</Muted> : meals.map((m) => (
-        <Row key={m.id} icon="utensils" title={MEAL_TYPES[m.type] || 'Meal'} sub={[m.time ? fmtTime12(m.time) : '', m.note].filter(Boolean).join(' · ')} right={<Text style={{ color: p.text, fontWeight: '600' }}>{`${parseInt(String(m.calories), 10) || 0} cal`}</Text>} onPress={() => openForm(m)} />
+        <Row key={m.id} icon="utensils" title={MEAL_TYPES[m.type] || 'Meal'} sub={m.time ? fmtTime12(m.time) : ''} right={m.note ? <Text style={{ color: p.text, fontWeight: '600', flexShrink: 1, textAlign: 'right' }} numberOfLines={1}>{m.note}</Text> : null} onPress={() => openForm(m)} />
       ))}
       <View style={{ height: 12 }} />
       <Button title="+ Add meal" variant="dashed" onPress={() => openForm(null)} />
@@ -70,11 +70,10 @@ function MealForm({ dk, existing, controls, onDone }: { dk: string; existing: Me
   const p = usePalette();
   const [type, setType] = useState(existing?.type || 'breakfast');
   const [time, setTime] = useState(existing?.time || nowTime());
-  const [cal, setCal] = useState(existing?.calories != null ? String(existing.calories) : '');
   const [note, setNote] = useState(existing?.note || '');
   const save2 = () => {
     const d = ensureDay(dk);
-    const m: Meal = { id: existing?.id || uid(), type, time, calories: cal.trim(), note: note.trim() };
+    const m: Meal = { id: existing?.id || uid(), type, time, note: note.trim() };
     const i = d.food.meals.findIndex((x) => x.id === m.id);
     if (i >= 0) d.food.meals[i] = m; else d.food.meals.push(m);
     save();
@@ -93,8 +92,7 @@ function MealForm({ dk, existing, controls, onDone }: { dk: string; existing: Me
         ))}
       </View>
       <TimeField label="Time eaten" value={time} onChange={setTime} />
-      <TextField label="Calories" value={cal} onChange={setCal} keyboardType="numeric" />
-      <TextField label="Notes" value={note} onChange={setNote} placeholder="Optional notes" multiline />
+      <TextField label="What was eaten" value={note} onChange={setNote} placeholder="e.g. Chicken, rice and broccoli" multiline />
       <SheetFooter>
         {existing ? <Button title="Delete" variant="danger" onPress={() => { const d = ensureDay(dk); d.food.meals = d.food.meals.filter((x) => x.id !== existing.id); save(); controls.close(); onDone(); }} /> : null}
         <Button title="Save" variant="primary" onPress={save2} />

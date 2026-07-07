@@ -6,7 +6,7 @@
  */
 import { useSyncExternalStore } from 'react';
 import { MMKV } from 'react-native-mmkv';
-import { keyOf } from '../lib/dates';
+import { addDays, keyOf } from '../lib/dates';
 import type { AppState, DayRecord, Entry } from '../lib/types';
 
 const STORAGE_KEY = 'autonomic.journal.v1';
@@ -53,11 +53,22 @@ export function migrate(s: unknown): AppState {
     days: {},
   };
   const days = (src.days || {}) as Record<string, Partial<DayRecord>>;
+  // One-time reframing: historically a day stored the bedtime entered that
+  // evening (the night *after* its morning). The app now treats a day's sleep as
+  // the night that *ended* that morning, so each day's bed becomes the previous
+  // day's stored bed (wake and overnight HR stay put). Guarded by a meta flag so
+  // it runs exactly once, and travels through export/import.
+  const reframeSleep = !(src.meta && src.meta.sleepReframed);
   Object.keys(days).forEach((k) => {
     const d = days[k];
     if (!d) return;
+    let sleep = d.sleep || { bed: '', wake: '' };
+    if (reframeSleep) {
+      const prev = days[addDays(k, -1)];
+      sleep = { ...sleep, bed: (prev && prev.sleep && prev.sleep.bed) || '' };
+    }
     out.days[k] = {
-      sleep: d.sleep || { bed: '', wake: '' },
+      sleep,
       readings: Array.isArray(d.readings) ? d.readings : [],
       activities: Array.isArray(d.activities) ? d.activities : [],
       meds: Array.isArray(d.meds) ? d.meds : [],
@@ -71,6 +82,7 @@ export function migrate(s: unknown): AppState {
       digestion: { movements: (d.digestion && Array.isArray(d.digestion.movements) ? d.digestion.movements : []) },
     };
   });
+  out.meta.sleepReframed = true;
   return out;
 }
 
@@ -78,7 +90,14 @@ function loadState(): AppState {
   try {
     const raw = kv().getString(STORAGE_KEY);
     if (!raw) return defaultState();
-    return migrate(JSON.parse(raw));
+    const parsed = JSON.parse(raw);
+    const migrated = migrate(parsed);
+    // If a one-time migration (e.g. sleep reframing) ran, persist immediately so
+    // it can't re-run and double-apply on the next launch.
+    if (!(parsed && parsed.meta && parsed.meta.sleepReframed)) {
+      try { kv().set(STORAGE_KEY, JSON.stringify(migrated)); } catch { /* keep in memory */ }
+    }
+    return migrated;
   } catch {
     return defaultState();
   }

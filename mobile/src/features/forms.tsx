@@ -14,7 +14,7 @@ import { radius, usePalette } from '../theme';
 import type { Entry, TypeDef } from '../lib/types';
 import {
   ACTIVITY_TYPES, entryFields, isDivider, isNumberField, MED_TYPES, READING_TYPES,
-  SYMPTOM_TYPES,
+  readingLabel, SYMPTOM_TYPES,
 } from '../lib/registry';
 import { computeScores } from '../lib/scoring';
 import { health } from '../lib/health';
@@ -250,12 +250,11 @@ function ReadingSummarySheet({ r, dk, controls, onEdit }: { r: Entry; dk: string
   const p = usePalette();
   useAppState(); // re-render on edits
   const state = getState();
-  const def = READING_TYPES[r.type];
   const live = (state.days[dk]?.readings || []).find((x) => x.id === r.id) || r;
   const ctx = { sex: state.profile.sex, height: state.profile.height };
   return (
     <ScrollView showsVerticalScrollIndicator={false}>
-      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text }}>{def.label}</Text>
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text }}>{readingLabel(live)}</Text>
       <Text style={{ color: p.textDim, fontSize: 14, marginTop: 2, marginBottom: 14 }}>{live.time ? fmtTime12(live.time as string) : ''}</Text>
       <ReadingSummary r={live} days={state.days} ctx={ctx} />
       <View style={{ height: 8 }} />

@@ -4,7 +4,7 @@ import { BlurView } from 'expo-blur';
 import { Screen } from '../../src/components/Header';
 import { Icon, IconName } from '../../src/components/Icon';
 import { Card, Segmented } from '../../src/components/ui';
-import { Bars, LineChart } from '../../src/components/charts';
+import { Bars, BpDumbbell, LineChart } from '../../src/components/charts';
 import { radius, usePalette } from '../../src/theme';
 import { useAppState } from '../../src/store/store';
 import { buildCategories, type AnalysisCard } from '../../src/lib/analysis/categories';
@@ -73,7 +73,7 @@ export default function AnalysisScreen() {
       onScroll={onScroll}
       onHeaderHeight={setHeaderH}
       header={
-        <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
+        <View style={{ paddingHorizontal: 16 }}>
           <Segmented options={[{ val: 'day', label: 'Day' }, { val: 'week', label: 'Week' }, { val: 'month', label: 'Month' }, { val: 'year', label: 'Year' }]} value={mode} onChange={setMode} />
         </View>
       }
@@ -131,7 +131,9 @@ const CardView = React.memo(function CardView({ card, buckets }: { card: Analysi
       {(card.charts || []).map((ch, i) => (
         <View key={i} style={{ marginTop: 12 }}>
           <Text style={{ fontSize: 12, color: p.text, marginBottom: 6, fontWeight: '600' }}>{ch.label}</Text>
-          <LineChart buckets={buckets} series={ch.series} zones={ch.zones} integer={ch.integer} target={ch.target} />
+          {ch.dumbbell
+            ? <BpDumbbell buckets={buckets} sys={ch.dumbbell.sys} dia={ch.dumbbell.dia} />
+            : <LineChart buckets={buckets} series={ch.series} zones={ch.zones} integer={ch.integer} target={ch.target} />}
           {ch.legend ? (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 8 }}>
               {ch.legend.map(([name, color]) => (

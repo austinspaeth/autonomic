@@ -3,7 +3,7 @@
  * copyable analysis prompt from the user's data over a range. Pure text, no
  * network. Sections are rendered as the same [stamp]-prefixed lines.
  */
-import { dateFromKey, fmtTime12, keyOf, ageFromBirthday } from '../dates';
+import { dateFromKey, fmtTime12, keyOf } from '../dates';
 import type { AppState, DayRecord } from '../types';
 import { blueZone, dayCleanliness, scoreSet, sleepHours, type DaysMap } from '../scoring/day';
 import { ACTIVITY_TYPES, MEAL_TYPES, MED_TYPES, SYMPTOM_TYPES, TRIGGER_TYPES, isDivider } from '../registry';
@@ -47,8 +47,8 @@ function secHRV(days: DaysMap, keys: string[]) {
   return orNone(eachEntry(days, keys, (d, k) => {
     const out: string[] = [];
     (d.readings || []).forEach((r) => {
-      if (r.type === 'hrv') out.push(`${stamp(k, r.time as string)} Type: Unstructured | HR: ${rv(r, 'avgHr') ?? '-'} | RMSSD: ${rv(r, 'rmssd') ?? '-'} | pNN50: ${rv(r, 'pnn50') ?? '-'} | SDNN: ${rv(r, 'sdnn') ?? '-'} | PNS: ${rv(r, 'pns') ?? '-'} | SNS: ${rv(r, 'sns') ?? '-'} | Stress: ${rv(r, 'stressIndex') ?? '-'} | VLF: ${rv(r, 'vlowPower') ?? '-'} | LF: ${rv(r, 'lowPower') ?? '-'} | HF: ${rv(r, 'highPower') ?? '-'}${noteSuffix(r)}`);
-      if (r.type === 'breathHrv') { const vlf = rv(r, 'vlowPower'), lf = rv(r, 'lowPower'), hf = rv(r, 'highPower'); const total = [vlf, lf, hf].map(Number).filter((n) => !isNaN(n)).reduce((s, n) => s + n, 0); out.push(`${stamp(k, r.time as string)} Type: Structured (${rv(r, 'style') ?? '?'}) | HR: ${rv(r, 'hr') ?? '-'} | RMSSD: ${rv(r, 'rmssd') ?? '-'} | pNN50: ${rv(r, 'pnn50') ?? '-'}% | SDNN: ${rv(r, 'sdnn') ?? '-'} | Power: ${total || '-'} | VLF: ${vlf ?? '-'} | LF: ${lf ?? '-'} | HF: ${hf ?? '-'} | LF Peak: ${rv(r, 'lfPeak') ?? '-'} Hz | HF Peak: ${rv(r, 'hfPeak') ?? '-'} Hz | Coherence: ${rv(r, 'coherence') ?? '-'}%${noteSuffix(r)}`); }
+      if (r.type === 'hrv') out.push(`${stamp(k, r.time as string)} Type: ${r.source === 'watch' ? 'Apple Watch' : 'Unstructured'} | HR: ${rv(r, 'avgHr') ?? '-'} | RMSSD: ${rv(r, 'rmssd') ?? '-'} | pNN50: ${rv(r, 'pnn50') ?? '-'} | SDNN: ${rv(r, 'sdnn') ?? '-'} | PNS: ${rv(r, 'pns') ?? '-'} | SNS: ${rv(r, 'sns') ?? '-'} | Stress: ${rv(r, 'stressIndex') ?? '-'} | VLF: ${rv(r, 'vlowPower') ?? '-'} | LF: ${rv(r, 'lowPower') ?? '-'} | HF: ${rv(r, 'highPower') ?? '-'}${noteSuffix(r)}`);
+      if (r.type === 'breathHrv') { const vlf = rv(r, 'vlowPower'), lf = rv(r, 'lowPower'), hf = rv(r, 'highPower'); const total = [vlf, lf, hf].map(Number).filter((n) => !isNaN(n)).reduce((s, n) => s + n, 0); out.push(`${stamp(k, r.time as string)} Type: Structured (${rv(r, 'style') ?? '?'}) | HR: ${rv(r, 'hr') ?? '-'} | RMSSD: ${rv(r, 'rmssd') ?? '-'} | pNN50: ${rv(r, 'pnn50') ?? '-'}% | SDNN: ${rv(r, 'sdnn') ?? '-'} | Power: ${total || '-'} | VLF: ${vlf ?? '-'} | LF: ${lf ?? '-'} | HF: ${hf ?? '-'} | LF Peak: ${rv(r, 'lfPeak') ?? '-'} Hz | HF Peak: ${rv(r, 'hfPeak') ?? '-'} Hz${noteSuffix(r)}`); }
     });
     return out;
   }));
@@ -59,13 +59,13 @@ const secRHR = (days: DaysMap, keys: string[]) => orNone(eachEntry(days, keys, (
 const secSPO2 = (days: DaysMap, keys: string[]) => orNone(eachEntry(days, keys, (d, k) => (d.readings || []).filter((r) => r.type === 'bloodO2').map((r) => `${stamp(k, r.time as string)} SPO2: ${rv(r, 'value') ?? '-'}% | PI: ${rv(r, 'perfusion') ?? '-'} | Pulse: ${rv(r, 'pulse') ?? '-'}${noteSuffix(r)}`)));
 function secSleep(days: DaysMap, keys: string[]) {
   const lines: string[] = [];
-  keys.forEach((k) => { const d = days[k]; if (!d || !d.sleep) return; const s = d.sleep; const pd = dateFromKey(k); pd.setDate(pd.getDate() - 1); const prev = days[keyOf(pd)]; const bed = prev && prev.sleep ? prev.sleep.bed : ''; if (!bed && !s.wake && !rv(s, 'hrLow') && !rv(s, 'hrHigh')) return; const hrs = sleepHours(days, k); lines.push(`[${k}] Bedtime: ${bed ? fmtTime12(bed) : '-'} | Wake: ${s.wake ? fmtTime12(s.wake) : '-'} | Duration: ${hrs != null ? hrs.toFixed(1) + ' hrs' : '-'} | Quality: ${s.quality === 'interrupted' ? 'Interrupted' : 'Good'} | Low HR: ${rv(s, 'hrLow') ?? '-'} | High HR: ${rv(s, 'hrHigh') ?? '-'}`); });
+  keys.forEach((k) => { const d = days[k]; if (!d || !d.sleep) return; const s = d.sleep; const bed = s.bed || ''; if (!bed && !s.wake && !rv(s, 'hrLow') && !rv(s, 'hrHigh')) return; const hrs = sleepHours(days, k); lines.push(`[${k}] Bed last night: ${bed ? fmtTime12(bed) : '-'} | Woke this morning: ${s.wake ? fmtTime12(s.wake) : '-'} | Duration: ${hrs != null ? hrs.toFixed(1) + ' hrs' : '-'} | Quality: ${s.quality === 'interrupted' ? 'Interrupted' : 'Good'} | Low HR: ${rv(s, 'hrLow') ?? '-'} | High HR: ${rv(s, 'hrHigh') ?? '-'}`); });
   return orNone(lines);
 }
 const secActivities = (days: DaysMap, keys: string[]) => orNone(eachEntry(days, keys, (d, k) => (d.activities || []).map((a) => { const def = ACTIVITY_TYPES[a.type]; const label = def ? def.label : a.type; const parts: string[] = []; if (def && def.custom === 'bike') { if (def.summary) { const sm = def.summary(a); if (sm) parts.push(sm); } if (def.detail) { const dt = def.detail(a); if (dt) parts.push(dt); } } else if (def) { (def.fields || []).forEach((f) => { if (isDivider(f) || f.type === 'time' || f.type === 'textarea' || f.type === 'check') return; const val = rv(a, f.key!); if (val != null) parts.push(`${f.label}: ${val}${f.unit ? f.unit : ''}`); }); (def.fields || []).filter((f) => f.type === 'check' && a[f.key!]).forEach((f) => parts.push(f.label!)); } if (a.note) parts.push(`Note: ${a.note}`); return `${stamp(k, a.time as string)} ${label}${parts.length ? ' | ' + parts.join(' | ') : ''}`; })));
 function secFood(days: DaysMap, keys: string[]) {
   const lines: string[] = [];
-  keys.forEach((k) => { const d = days[k]; if (!d || !d.food) return; const f = d.food; (f.meals || []).slice().sort((a, b) => (a.time || '').localeCompare(b.time || '')).forEach((m) => { const bits: string[] = []; if (m.calories) bits.push(`${m.calories} cal`); if (m.note) bits.push(m.note); lines.push(`${stamp(k, m.time)} Meal: ${MEAL_TYPES[m.type] || m.type}${bits.length ? ' | ' + bits.join(' | ') : ''}`); }); const trigs = f.triggers || {}; const tlist = Object.keys(trigs).filter((t) => trigs[t] > 0 && TRIGGER_TYPES[t]).map((t) => `${TRIGGER_TYPES[t].label}${trigs[t] > 1 ? ` x${trigs[t]}` : ''}`); if (tlist.length) lines.push(`[${k}] Trigger foods: ${tlist.join(', ')}`); });
+  keys.forEach((k) => { const d = days[k]; if (!d || !d.food) return; const f = d.food; (f.meals || []).slice().sort((a, b) => (a.time || '').localeCompare(b.time || '')).forEach((m) => { const eaten = (m.note as string) || ''; lines.push(`${stamp(k, m.time)} Meal: ${MEAL_TYPES[m.type] || m.type}${eaten ? ' | ' + eaten : ''}`); }); const trigs = f.triggers || {}; const tlist = Object.keys(trigs).filter((t) => trigs[t] > 0 && TRIGGER_TYPES[t]).map((t) => `${TRIGGER_TYPES[t].label}${trigs[t] > 1 ? ` x${trigs[t]}` : ''}`); if (tlist.length) lines.push(`[${k}] Trigger foods: ${tlist.join(', ')}`); });
   return orNone(lines);
 }
 const secMeds = (days: DaysMap, keys: string[], supplements: boolean) => orNone(eachEntry(days, keys, (d, k) => (d.meds || []).filter((m) => (supplements ? !MED_KEYS.has(m.type) : MED_KEYS.has(m.type))).map((m) => { const label = MED_TYPES[m.type] ? MED_TYPES[m.type].label : m.type; const bits: string[] = []; if (m.amount) bits.push(String(m.amount)); if (m.note) bits.push(m.note); return `${stamp(k, m.time as string)} ${label}${bits.length ? ' | ' + bits.join(' | ') : ''}`; })));
@@ -95,10 +95,8 @@ export function makeSectionRenderer(state: AppState, ctx: ScoreContext) {
   return (keys: string[], list: string[]) => list.map((key) => { const def = DEFS[key]; return def ? `${def[0]}:\n${def[1](keys)}` : ''; }).filter(Boolean).join('\n\n');
 }
 
-export function universalHeader(state: AppState, rangeText: string): string {
-  const age = ageFromBirthday(state.profile.birthday) || 37;
-  const sex = state.profile.sex || 'male';
-  return `You are analyzing health data for someone with long COVID dysautonomia, POTS, MCAS, Roemheld syndrome, and suspected vestibular migraine. They are a ${age}-year-old ${sex}, 3+ years into long COVID recovery.
+export function universalHeader(_state: AppState, rangeText: string): string {
+  return `You are analyzing autonomic and recovery health data logged by a person using a personal health-tracking app. Base every observation on the data provided below — do not assume a diagnosis, age, sex, or medical history that is not present in the data.
 
 Approach this analysis as an honest friend examining the data carefully - direct and accurate without unnecessary softening or cruelty.
 
@@ -113,18 +111,32 @@ export interface ReportCard { id: string; icon: string; title: string; desc: str
 
 export const REPORT_CARDS: ReportCard[] = [
   { id: 'overall', icon: 'chart', title: 'Overall Health Summary', desc: 'All metrics for the period with trends and recommendations.', sections: ['hrv', 'bp', 'ecg', 'rhr', 'spo2', 'sleep', 'activities', 'food', 'meds', 'supplements', 'symptoms', 'orthostatic', 'scores', 'cleanDays'], focus: 'Provide a comprehensive analysis of all health metrics for this period and how they interact.', instructions: 'Cover all systems and how they interact. Identify what is working and what is not.' },
-  { id: 'hrv', icon: 'heartPulse', title: 'HRV Deep Dive', desc: 'Autonomic analysis: RMSSD, power distribution, frequency peaks.', sections: ['hrv', 'scores'], focus: 'Deep analysis of autonomic nervous system function based on HRV data.', context: 'Pre-illness best RMSSD: 36; LF Peak: 0.102 Hz; Power: 4770. Target LF peak 0.08–0.10 Hz.', instructions: 'Analyze current autonomic function, recovery trajectory, baroreflex training, imbalances. Cite HRV/long COVID research.' },
+  { id: 'hrv', icon: 'heartPulse', title: 'HRV Deep Dive', desc: 'Autonomic analysis: RMSSD, power distribution, frequency peaks.', sections: ['hrv', 'scores'], focus: 'Deep analysis of autonomic nervous system function based on HRV data.', context: 'General reference: the LF (baroreflex) peak is typically targeted around 0.08–0.10 Hz.', instructions: 'Analyze current autonomic function, recovery trajectory, baroreflex training, imbalances. Cite HRV research.' },
   { id: 'trajectory', icon: 'trendUp', title: 'Recovery Trajectory', desc: 'Where you are in recovery and projected timeline.', sections: ['scores', 'hrv', 'rhr', 'sleep', 'symptoms', 'activities', 'cleanDays'], focus: 'Analyze position in long COVID recovery and provide realistic projections.', instructions: 'Position in recovery, markers achieved/needed, realistic timeline, accelerating/slowing factors. Cite recovery research.' },
-  { id: 'triggers', icon: 'triangle', title: 'Trigger Analysis', desc: 'Foods, activities and patterns causing setbacks.', sections: ['food', 'activities', 'symptoms', 'hrv', 'scores'], focus: 'Identify specific triggers causing setbacks based on data patterns.', context: 'Known triggers: pizza (MCAS), chocolate, processed meats (histamine), late dinners (Roemheld).', instructions: 'Identify triggers, magnitude, recovery time, compound effects. Cite MCAS/histamine research.' },
+  { id: 'triggers', icon: 'triangle', title: 'Trigger Analysis', desc: 'Foods, activities and patterns causing setbacks.', sections: ['food', 'activities', 'symptoms', 'hrv', 'scores'], focus: 'Identify specific triggers causing setbacks based on data patterns.', instructions: 'Identify triggers, magnitude, recovery time, compound effects. Cite relevant histamine/MCAS research where the data supports it.' },
   { id: 'sleep', icon: 'moon', title: 'Sleep Impact Report', desc: 'How sleep patterns affect autonomic function.', sections: ['sleep', 'hrv', 'scores'], focus: 'Correlate each night with the next morning HRV and the day score.', instructions: 'Sleep quality patterns, next-day impact, optimal parameters. Cite sleep/HRV research.' },
   { id: 'cardio', icon: 'heart', title: 'Cardiovascular Analysis', desc: 'BP, HR, ECG patterns.', sections: ['bp', 'rhr', 'ecg', 'orthostatic', 'activities'], focus: 'Analyze cardiovascular function from BP, HR, ECG and orthostatic responses.', instructions: 'BP regulation, HR response, orthostatic function, ectopics, exercise tolerance. Cite POTS/dysautonomia research.' },
   { id: 'pots', icon: 'standing', title: 'POTS/Orthostatic Patterns', desc: 'Orthostatic events and POTS severity.', sections: ['orthostatic', 'rhr', 'bp', 'symptoms', 'spo2'], focus: 'Examine orthostatic responses and POTS-related patterns.', context: 'POTS indicators: HR increase >30 bpm standing; asymmetric perfusion.', instructions: 'POTS severity, tolerance trends, triggers, recovery time. Cite POTS research; medication suggestions need a specialist.' },
-  { id: 'mcas', icon: 'cell', title: 'MCAS Pattern Analysis', desc: 'Histamine reactions and MCAS symptom patterns.', sections: ['symptoms', 'food', 'meds', 'scores'], focus: 'Identify mast cell activation patterns and triggers.', context: 'Treatment: Allegra 180mg (H1), Pepcid (H2), avoiding high-histamine foods.', instructions: 'Reaction frequency/severity, triggers, treatment effectiveness. Discuss MCAS research; prescriptions need physician guidance.' },
+  { id: 'mcas', icon: 'cell', title: 'MCAS Pattern Analysis', desc: 'Histamine reactions and MCAS symptom patterns.', sections: ['symptoms', 'food', 'meds', 'scores'], focus: 'Identify mast cell activation patterns and triggers.', instructions: 'Reaction frequency/severity, triggers, and any treatment effectiveness visible in the data. Discuss MCAS research; prescriptions need physician guidance.' },
   { id: 'crash', icon: 'trendDown', title: 'Crash Pattern Analysis', desc: 'What precedes crashes and how to prevent them.', sections: ['scores', 'hrv', 'activities', 'food', 'symptoms', 'sleep'], focus: 'Identify what precedes crashes and how to prevent them.', instructions: 'Crash precipitants, warning signs, recovery time, prevention. Cite PEM/pacing research.' },
   { id: 'bestdays', icon: 'star', title: 'Best Days Analysis', desc: 'What made your best days work.', sections: ['scores', 'sleep', 'food', 'activities', 'hrv', 'cleanDays'], focus: 'Determine what made the best days possible and how to replicate them.', instructions: 'Common factors, replicable conditions, a best-day formula. Focus on actionable insights.' },
   { id: 'longcovid', icon: 'virus', title: 'Long COVID Recovery Insights', desc: 'Where you are vs research benchmarks.', sections: ['scores', 'hrv', 'symptoms', 'rhr', 'sleep', 'activities'], focus: 'Position within long COVID recovery research and benchmarks.', instructions: 'Position in spectrum, comparison to trajectories, outlook. Heavily cite 2023–2026 research.' },
-  { id: 'doctor', icon: 'clipboard', title: 'Medical Summary For Doctor', desc: 'Structured summary for healthcare providers.', sections: ['hrv', 'bp', 'ecg', 'rhr', 'spo2', 'sleep', 'symptoms', 'orthostatic', 'meds', 'supplements', 'scores'], focus: 'Generate a structured medical summary suitable for sharing with providers.', context: 'Diagnosed: long COVID dysautonomia, POTS, MCAS, Roemheld, suspected vestibular migraine.', instructions: 'Chief complaints, history, recent metrics/trends, persisting symptoms, concerns, questions for physician. Professional tone.' },
+  { id: 'doctor', icon: 'clipboard', title: 'Medical Summary For Doctor', desc: 'Structured summary for healthcare providers.', sections: ['hrv', 'bp', 'ecg', 'rhr', 'spo2', 'sleep', 'symptoms', 'orthostatic', 'meds', 'supplements', 'scores'], focus: 'Generate a structured medical summary suitable for sharing with providers.', instructions: 'Summarize recent metrics/trends, persisting symptoms, and notable concerns from the data, plus questions for a physician. Professional tone; do not assert diagnoses not present in the data.' },
 ];
+
+/** Every data section, in a stable order — used by the "Data export only" item. */
+const ALL_SECTION_KEYS = ['scores', 'hrv', 'bp', 'ecg', 'rhr', 'spo2', 'sleep', 'orthostatic', 'activities', 'food', 'meds', 'supplements', 'symptoms', 'cleanDays'];
+
+/**
+ * Raw data export: just the rendered data sections for the period, with no
+ * prompt framing (no persona, focus, or instructions) — the numbers only.
+ */
+export function buildDataExport(state: AppState, ctx: ScoreContext, range: ReportRange, currentKey: string): string {
+  const { keys: allKeys, rangeText } = reportDateRange(range, currentKey);
+  const keys = allKeys.filter((k) => state.days[k]).sort();
+  const render = makeSectionRenderer(state, ctx);
+  return `DATA EXPORT\nPERIOD: ${rangeText}\n\n${render(keys, ALL_SECTION_KEYS)}`;
+}
 
 export function buildPrompt(state: AppState, ctx: ScoreContext, cards: ReportCard[], range: ReportRange, currentKey: string): string {
   const { keys: allKeys, rangeText } = reportDateRange(range, currentKey);
