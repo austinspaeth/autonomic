@@ -26,7 +26,8 @@ export function useDrawers(dk: string) {
 
 function WaterDrawer({ dk, controls }: { dk: string; controls: SheetControls }) {
   const p = usePalette();
-  const [liters, setLiters] = useState(+((getState().days[dk]?.food.water) || 0));
+  const [text, setText] = useState(String(+((getState().days[dk]?.food.water) || 0)));
+  const liters = Math.max(0, parseFloat(text) || 0);
   return (
     <View>
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 16 }}>Water</Text>
@@ -34,15 +35,15 @@ function WaterDrawer({ dk, controls }: { dk: string; controls: SheetControls }) 
         {[0, 1, 2, 3, 4].map((i) => {
           const full = liters >= i + 1;
           return (
-            <Pressable key={i} onPress={() => setLiters(liters === i + 1 ? i : i + 1)} style={{ flex: 1, aspectRatio: 1, borderWidth: 1, borderColor: full ? p.accent : p.border, backgroundColor: full ? p.accentSoft : p.surface2, borderRadius: radius.control, alignItems: 'center', justifyContent: 'center' }}>
+            <Pressable key={i} onPress={() => setText(String(liters === i + 1 ? i : i + 1))} style={{ flex: 1, aspectRatio: 1, borderWidth: 1, borderColor: full ? p.accent : p.border, backgroundColor: full ? p.accentSoft : p.surface2, borderRadius: radius.control, alignItems: 'center', justifyContent: 'center' }}>
               <Icon name="cup" size={30} color={full ? p.accent : p.textDim} />
             </Pressable>
           );
         })}
       </View>
-      <TextField label="Liters" value={String(liters)} onChange={(v) => setLiters(Math.max(0, +v || 0))} keyboardType="decimal-pad" />
+      <TextField label="Liters" value={text} onChange={setText} keyboardType="decimal-pad" />
       <SheetFooter>
-        <Button title="Save" variant="primary" onPress={() => { ensureDay(dk).food.water = Math.max(0, liters); save(); controls.closeAll(); }} />
+        <Button title="Save" variant="primary" onPress={() => { ensureDay(dk).food.water = liters; save(); controls.closeAll(); }} />
       </SheetFooter>
     </View>
   );
