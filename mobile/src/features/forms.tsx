@@ -4,7 +4,7 @@
  * a picker opens a form on top; Save closes the whole stack and refreshes.
  */
 import React, { useState } from 'react';
-import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { SheetControls, SheetFooter, useSheets } from '../components/Sheet';
 import { FieldInputs, TextField, TimeField, useFormState } from '../components/Field';
 import { Button, Muted } from '../components/ui';
@@ -18,6 +18,7 @@ import {
 } from '../lib/registry';
 import { computeScores } from '../lib/scoring';
 import { health } from '../lib/health';
+import { healthSourceFor, type HealthCandidate, type HealthSource } from '../lib/health/sources';
 import { deleteEntry, getState, upsertEntry, useAppState } from '../store/store';
 import { fmtTime12, nowTime, uid } from '../lib/dates';
 import { useToast } from '../components/Toast';
@@ -55,6 +56,60 @@ export function TypePicker({ title, typeMap, onPick }: { title: string; typeMap:
   );
 }
 
+/** Build a brand-new reading entry prefilled from an Apple Health candidate. */
+function healthPrefill(type: string, c: HealthCandidate): Entry {
+  return { id: uid(), type, time: c.time, note: '', source: 'health', ...c.entry } as Entry;
+}
+
+/** On-demand Apple Health import card. Lists the selected day's samples for one
+ *  reading type; tap one to review-and-save, or enter one manually. Opened only
+ *  for types Apple Health can supply (BP / ECG / Resting HR). */
+function ReadingImportSheet({ type, dk, source, onManual, onPick }: {
+  type: string; dk: string; source: HealthSource; onManual: () => void; onPick: (c: HealthCandidate) => void;
+}) {
+  const p = usePalette();
+  const def = READING_TYPES[type];
+  const [loading, setLoading] = useState(true);
+  const [cands, setCands] = useState<HealthCandidate[]>([]);
+  React.useEffect(() => {
+    let alive = true;
+    source.fetch(dk)
+      .then((c) => { if (alive) setCands(c); })
+      .catch(() => { /* graceful — falls through to the empty state */ })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, [source, dk]);
+  const lower = def.label.toLowerCase();
+  return (
+    <View>
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 4 }}>{`Add ${def.label}`}</Text>
+      <Text style={{ color: p.textDim, fontSize: 14, marginBottom: 16 }}>Import from Apple Health, or enter manually.</Text>
+      {loading ? (
+        <View style={{ alignItems: 'center', paddingVertical: 30, gap: 12 }}>
+          <ActivityIndicator color={p.accent} />
+          <Text style={{ color: p.textDim, fontSize: 14 }}>{`Getting ${lower} from Apple Health…`}</Text>
+        </View>
+      ) : cands.length === 0 ? (
+        <Muted>{`No ${lower} in Apple Health for this day. Enter one manually below.`}</Muted>
+      ) : (
+        cands.map((c, i) => (
+          <Pressable key={c.key} onPress={() => onPick(c)} style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: p.border }, pressed && { opacity: 0.5 }]}>
+            <Icon name={def.icon as never} size={22} color={p.accent} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: p.text, fontSize: 17, fontWeight: '600' }}>{c.label}</Text>
+              <Text style={{ color: p.textDim, fontSize: 13, marginTop: 1 }}>{c.sub}</Text>
+            </View>
+            <Icon name="chevronRight" size={20} color={p.textDim} />
+          </Pressable>
+        ))
+      )}
+      <SheetFooter>
+        <Button title="Enter manually" variant="default" onPress={onManual} />
+      </SheetFooter>
+    </View>
+  );
+}
+
 /** Reading picker with a live-capture call-to-action above the manual list.
  *  HRV kinds are live-capture only, so they are excluded from the manual list. */
 function ReadingPicker({ onLive, onPick }: { onLive: () => void; onPick: (type: string) => void }) {
@@ -81,15 +136,18 @@ function ReadingPicker({ onLive, onPick }: { onLive: () => void; onPick: (type: 
   );
 }
 
-/** The add/edit form for a typed entry. */
-export function EntryForm({ typeMap, arrKey, dk, type, existing, controls, onSaved }: {
-  typeMap: Record<string, TypeDef>; arrKey: ArrKey; dk: string; type: string; existing: Entry | null; controls: SheetControls; onSaved: () => void;
+/** The add/edit form for a typed entry.
+ *  `prefill` seeds a brand-new entry (e.g. a reading imported from Apple Health)
+ *  that is reviewed then saved as new — it is not treated as an edit (no Delete)
+ *  and, when `fromHealth`, is not re-published back to Health. */
+export function EntryForm({ typeMap, arrKey, dk, type, existing, prefill = null, fromHealth = false, controls, onSaved }: {
+  typeMap: Record<string, TypeDef>; arrKey: ArrKey; dk: string; type: string; existing: Entry | null; prefill?: Entry | null; fromHealth?: boolean; controls: SheetControls; onSaved: () => void;
 }) {
   const p = usePalette();
   const toast = useToast();
   const def = typeMap[type];
   const fields = entryFields(def);
-  const initial = existing || { id: uid(), type, time: nowTime(), note: '' };
+  const initial = existing || prefill || { id: uid(), type, time: nowTime(), note: '' };
   const [form, set] = useFormState(fields, initial);
 
   const save = () => {
@@ -110,8 +168,8 @@ export function EntryForm({ typeMap, arrKey, dk, type, existing, controls, onSav
     r.scores = computeScores(r, scoreCtx());
     upsertEntry(dk, arrKey, r);
     // Auto-publish freshly-logged readings to Apple Health (fire-and-forget).
-    // Only new manual entries — never re-publish edits or Health-sourced rows.
-    if (arrKey === 'readings' && !existing && r.note !== 'From Apple Health' && getState().settings.healthEnabled) {
+    // Only new *manual* entries — never re-publish edits or Health-sourced rows.
+    if (arrKey === 'readings' && !existing && !fromHealth && r.note !== 'From Apple Health' && getState().settings.healthEnabled) {
       const api = health();
       if (api.available) {
         api.publishReading(r, dk)
@@ -213,8 +271,25 @@ export function useEntryForms(dk: string) {
   const { openSheet } = useSheets();
   const refresh = () => { /* store change triggers re-render */ };
 
-  const openReadingForm = (type: string, existing: Entry | null) =>
-    openSheet((c) => <EntryForm typeMap={READING_TYPES} arrKey="readings" dk={dk} type={type} existing={existing} controls={c} onSaved={refresh} />);
+  const openReadingForm = (type: string, existing: Entry | null, prefill: Entry | null = null) =>
+    openSheet((c) => <EntryForm typeMap={READING_TYPES} arrKey="readings" dk={dk} type={type} existing={existing} prefill={prefill} fromHealth={!!prefill} controls={c} onSaved={refresh} />);
+
+  // Tapping a reading type: if Apple Health can supply it (and is connected),
+  // open the import card (pick a sample or enter manually); otherwise go straight
+  // to the blank manual form.
+  const pickReadingSource = (type: string) => {
+    const source = healthSourceFor(type);
+    if (!source || !health().available || !getState().settings.healthEnabled) { openReadingForm(type, null); return; }
+    openSheet(() => (
+      <ReadingImportSheet
+        type={type}
+        dk={dk}
+        source={source}
+        onManual={() => openReadingForm(type, null)}
+        onPick={(cand) => openReadingForm(type, null, healthPrefill(type, cand))}
+      />
+    ), { fitContent: true });
+  };
 
   const openActivityForm = (type: string, existing: Entry | null) => {
     if (ACTIVITY_TYPES[type]?.custom === 'bike') openSheet((c) => <BikeForm dk={dk} existing={existing} controls={c} onSaved={refresh} />);
@@ -230,7 +305,7 @@ export function useEntryForms(dk: string) {
   const pickReading = () => openSheet(() => (
     <ReadingPicker
       onLive={() => openSheet((c) => <HrvSetup controls={c} />)}
-      onPick={(t) => openReadingForm(t, null)}
+      onPick={(t) => pickReadingSource(t)}
     />
   ));
   const pickActivity = () => openSheet(() => <TypePicker title="Add activity" typeMap={ACTIVITY_TYPES} onPick={(t) => openActivityForm(t, null)} />);

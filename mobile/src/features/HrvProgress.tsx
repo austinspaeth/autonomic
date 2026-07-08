@@ -6,9 +6,8 @@
  * the section closes with the filtered overall autonomic score. Every line chart
  * carries the grade-zone toggle.
  */
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { Text, View } from 'react-native';
-import { Segmented } from '../components/ui';
 import { LineChart, StackedBars } from '../components/charts';
 import { radius, usePalette } from '../theme';
 import type { DayRecord, Entry } from '../lib/types';
@@ -18,7 +17,12 @@ import {
   acBandZones, acBuckets, acReadVals, isEvening, isMorning, makeAgg, type Mode,
 } from '../lib/analysis/buckets';
 
-type Filt = 'all' | 'morning' | 'night';
+export type Filt = 'all' | 'morning' | 'night';
+/** All/Morning/Night pill options — shared by the inline HRV header and the
+ * pinned progress header so both toggles drive the same filter. */
+export const HRV_FILTERS: { val: Filt; label: string }[] = [
+  { val: 'all', label: 'All' }, { val: 'morning', label: 'Morning' }, { val: 'night', label: 'Night' },
+];
 const STRUCT = '#4ade80';
 const UNSTRUCT = '#38bdf8';
 
@@ -52,9 +56,8 @@ function readAnyHrv(d: DayRecord, key: string, filt?: (r: Entry) => boolean): nu
   return out;
 }
 
-export function HrvProgress({ days, mode, ctx }: { days: DaysMap; mode: Mode; ctx: ScoreContext }) {
+export function HrvProgress({ days, mode, ctx, filt }: { days: DaysMap; mode: Mode; ctx: ScoreContext; filt: Filt }) {
   const p = usePalette();
-  const [filt, setFilt] = useState<Filt>('all');
 
   const view = useMemo(() => {
     const buckets = acBuckets(days, mode);
@@ -76,10 +79,11 @@ export function HrvProgress({ days, mode, ctx }: { days: DaysMap; mode: Mode; ct
     const hasPower = [vlf, lf, hf].some((arr) => arr.some((v) => v != null));
 
     // Overall autonomic score of the filtered set (mean composite over readings).
+    const rangeStart = buckets.length ? buckets[0].start : null;
+    const rangeEnd = buckets.length ? buckets[buckets.length - 1].end : null;
     let sum = 0, cnt = 0;
-    Object.keys(days).forEach((dk) => {
-      const b = buckets.length ? buckets[0].start : dk;
-      const inRange = dk >= b && dk <= buckets[buckets.length - 1].end;
+    if (rangeStart != null && rangeEnd != null) Object.keys(days).forEach((dk) => {
+      const inRange = dk >= rangeStart && dk <= rangeEnd;
       if (!inRange) return;
       (days[dk].readings || []).forEach((r) => {
         if (r.type !== 'hrv' && r.type !== 'breathHrv') return;
@@ -97,12 +101,6 @@ export function HrvProgress({ days, mode, ctx }: { days: DaysMap; mode: Mode; ct
 
   return (
     <View>
-      <Segmented
-        options={[{ val: 'all', label: 'All' }, { val: 'morning', label: 'Morning' }, { val: 'night', label: 'Night' }]}
-        value={filt}
-        onChange={setFilt}
-        style={{ marginBottom: 12 }}
-      />
       {!hasAny ? (
         <Text style={{ color: p.textDim }}>No {filt === 'all' ? '' : filt + ' '}HRV readings in this range.</Text>
       ) : (

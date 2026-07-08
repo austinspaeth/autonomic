@@ -94,8 +94,8 @@ export function Muted({ children }: { children: React.ReactNode }) {
 }
 
 /* ---------- Segmented control with an animated pill ---------- */
-export function Segmented<T extends string>({ options, value, onChange, style }: {
-  options: { val: T; label: string }[]; value: T; onChange: (v: T) => void; style?: StyleProp<ViewStyle>;
+export function Segmented<T extends string>({ options, value, onChange, style, compact }: {
+  options: { val: T; label: string }[]; value: T; onChange: (v: T) => void; style?: StyleProp<ViewStyle>; compact?: boolean;
 }) {
   const p = usePalette();
   const [w, setW] = React.useState(0);
@@ -105,22 +105,26 @@ export function Segmented<T extends string>({ options, value, onChange, style }:
   React.useEffect(() => {
     Animated.spring(anim, { toValue: idx, useNativeDriver: true, speed: 16, bounciness: 8 }).start();
   }, [idx, anim]);
-  const cell = w > 0 ? (w - 8) / n : 0;
+  // Compact variant (used inline beside a section title): tighter padding + type.
+  const pad = compact ? 3 : 4;
+  const padV = compact ? 5 : 9;
+  const font = compact ? 13 : 15;
+  const cell = w > 0 ? (w - pad * 2) / n : 0;
   return (
     <View
       onLayout={(e) => setW(e.nativeEvent.layout.width)}
-      style={[{ position: 'relative', flexDirection: 'row', backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.pill, padding: 4 }, style]}
+      style={[{ position: 'relative', flexDirection: 'row', backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.pill, padding: pad }, style]}
     >
       {cell > 0 && (
         <Animated.View
-          style={{ position: 'absolute', top: 4, bottom: 4, left: 4, width: cell, borderRadius: radius.pill, backgroundColor: p.accent, transform: [{ translateX: Animated.multiply(anim, cell) }] }}
+          style={{ position: 'absolute', top: pad, bottom: pad, left: pad, width: cell, borderRadius: radius.pill, backgroundColor: p.accent, transform: [{ translateX: Animated.multiply(anim, cell) }] }}
         />
       )}
       {options.map((o) => {
         const active = o.val === value;
         return (
-          <Pressable key={o.val} onPress={() => onChange(o.val)} style={{ flex: 1, paddingVertical: 9, alignItems: 'center', zIndex: 1 }}>
-            <Text style={{ color: active ? '#fff' : p.textDim, fontSize: 15, fontWeight: '600' }}>{o.label}</Text>
+          <Pressable key={o.val} onPress={() => onChange(o.val)} style={{ flex: 1, paddingVertical: padV, paddingHorizontal: compact ? 12 : 0, alignItems: 'center', zIndex: 1 }}>
+            <Text style={{ color: active ? '#fff' : p.textDim, fontSize: font, fontWeight: '600' }}>{o.label}</Text>
           </Pressable>
         );
       })}
