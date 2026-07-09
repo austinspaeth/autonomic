@@ -205,6 +205,72 @@ export const ACTIVITY_TYPES: Record<string, TypeDef> = {
       { key: 'maxHr', label: 'Max HR' },
     ],
   },
+  run: {
+    label: 'Run', icon: 'activity',
+    fields: [
+      { key: 'distance', label: 'Distance', unit: 'mi' },
+      { key: 'duration', label: 'Duration', unit: 'min' },
+      { key: 'avgHr', label: 'Avg HR' },
+      { key: 'minHr', label: 'Min HR' },
+      { key: 'maxHr', label: 'Max HR' },
+      { key: 'hr60', label: 'HR @60s rest' },
+    ],
+  },
+  hike: {
+    label: 'Hike', icon: 'footprints',
+    fields: [
+      { key: 'distance', label: 'Distance', unit: 'mi' },
+      { key: 'duration', label: 'Duration', unit: 'min' },
+      { key: 'avgHr', label: 'Avg HR' },
+      { key: 'maxHr', label: 'Max HR' },
+    ],
+  },
+  swim: {
+    label: 'Swim', icon: 'droplet',
+    fields: [
+      { key: 'duration', label: 'Duration', unit: 'min' },
+      { key: 'avgHr', label: 'Avg HR' },
+      { key: 'maxHr', label: 'Max HR' },
+    ],
+  },
+  lowerBody: {
+    label: 'Lower body strength', icon: 'barbell',
+    fields: [
+      { key: 'duration', label: 'Duration', unit: 'min' },
+      { key: 'minHr', label: 'Min HR' },
+      { key: 'maxHr', label: 'Max HR' },
+    ],
+  },
+  yoga: {
+    label: 'Yoga / stretching', icon: 'standing',
+    fields: [
+      { key: 'duration', label: 'Duration', unit: 'min' },
+      { key: 'minHr', label: 'Min HR' },
+      { key: 'maxHr', label: 'Max HR' },
+    ],
+  },
+  breathwork: {
+    label: 'Breathwork / meditation', icon: 'wind',
+    fields: [
+      { key: 'duration', label: 'Duration', unit: 'min' },
+      { key: 'minHr', label: 'Min HR' },
+    ],
+  },
+  shower: {
+    label: 'Hot shower / bath', icon: 'droplet',
+    fields: [
+      { key: 'duration', label: 'Duration', unit: 'min' },
+      { key: 'maxHr', label: 'Max HR' },
+    ],
+  },
+  errands: {
+    label: 'Errands / shopping', icon: 'car',
+    fields: [
+      { key: 'duration', label: 'Duration', unit: 'min' },
+      { key: 'avgHr', label: 'Avg HR' },
+      { key: 'maxHr', label: 'Max HR' },
+    ],
+  },
   otherExercise: {
     label: 'Other exercise', icon: 'activity',
     fields: [

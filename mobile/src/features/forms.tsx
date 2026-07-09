@@ -14,8 +14,10 @@ import { radius, usePalette } from '../theme';
 import type { Entry, TypeDef } from '../lib/types';
 import {
   ACTIVITY_TYPES, entryFields, isDivider, isNumberField, LIVE_ONLY_READING_TYPES,
-  MED_TYPES, READING_TYPES, readingLabel, SYMPTOM_TYPES,
+  READING_TYPES, readingLabel,
 } from '../lib/registry';
+import { typesFor, type TypeKind } from '../lib/typeCatalog';
+import { ManageTypesSheet } from './TypeManager';
 import { computeScores } from '../lib/scoring';
 import { health } from '../lib/health';
 import { healthSourceFor, type HealthCandidate, type HealthSource } from '../lib/health/sources';
@@ -31,10 +33,14 @@ function scoreCtx() {
   return { sex: p.sex, height: p.height };
 }
 
-/** Filterable picker of programmatic types; choosing one stacks its form. */
-export function TypePicker({ title, typeMap, onPick }: { title: string; typeMap: Record<string, TypeDef>; onPick: (type: string) => void }) {
+/** Filterable picker of catalog types; choosing one stacks its form. A fixed
+ *  footer lets the user create/manage their own types for this kind. */
+export function TypePicker({ title, kind, onPick, manageLabel }: { title: string; kind: TypeKind; onPick: (type: string) => void; manageLabel: string }) {
   const p = usePalette();
+  const state = useAppState();
+  const { openSheet } = useSheets();
   const [q, setQ] = useState('');
+  const typeMap = typesFor(state, kind);
   const types = Object.keys(typeMap).filter((t) => typeMap[t].label.toLowerCase().includes(q.trim().toLowerCase()));
   return (
     <View>
@@ -49,9 +55,17 @@ export function TypePicker({ title, typeMap, onPick }: { title: string; typeMap:
       {types.length === 0 ? <Muted>No matches.</Muted> : types.map((t) => (
         <Pressable key={t} onPress={() => onPick(t)} style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 15, borderTopWidth: 1, borderTopColor: p.border }, pressed && { opacity: 0.5 }]}>
           <Icon name={typeMap[t].icon as never} size={22} color={p.textDim} />
-          <Text style={{ color: p.text, fontSize: 17 }}>{typeMap[t].label}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: p.text, fontSize: 17 }}>{typeMap[t].label}</Text>
+            {typeMap[t].dosage ? <Text style={{ color: p.textDim, fontSize: 12.5, marginTop: 1 }}>{typeMap[t].dosage}</Text> : null}
+          </View>
         </Pressable>
       ))}
+      <SheetFooter>
+        <View style={{ flex: 1 }}>
+          <Button title={manageLabel} variant="default" onPress={() => openSheet(() => <ManageTypesSheet kind={kind} />)} />
+        </View>
+      </SheetFooter>
     </View>
   );
 }
@@ -293,7 +307,7 @@ export function useEntryForms(dk: string) {
 
   const openActivityForm = (type: string, existing: Entry | null) => {
     if (ACTIVITY_TYPES[type]?.custom === 'bike') openSheet((c) => <BikeForm dk={dk} existing={existing} controls={c} onSaved={refresh} />);
-    else openSheet((c) => <EntryForm typeMap={ACTIVITY_TYPES} arrKey="activities" dk={dk} type={type} existing={existing} controls={c} onSaved={refresh} />);
+    else openSheet((c) => <EntryForm typeMap={typesFor(getState(), 'activities')} arrKey="activities" dk={dk} type={type} existing={existing} controls={c} onSaved={refresh} />);
   };
 
   const openReadingSummary = (r: Entry) =>
@@ -302,20 +316,26 @@ export function useEntryForms(dk: string) {
       { action: { icon: 'edit', onPress: () => openReadingForm(r.type, r) } },
     );
 
+  const captureHrv = () => openSheet((c) => <HrvSetup controls={c} />);
   const pickReading = () => openSheet(() => (
     <ReadingPicker
-      onLive={() => openSheet((c) => <HrvSetup controls={c} />)}
+      onLive={captureHrv}
       onPick={(t) => pickReadingSource(t)}
     />
   ));
-  const pickActivity = () => openSheet(() => <TypePicker title="Add activity" typeMap={ACTIVITY_TYPES} onPick={(t) => openActivityForm(t, null)} />);
-  const pickMed = () => openSheet(() => <TypePicker title="Add medication or supplement" typeMap={MED_TYPES} onPick={(t) => openSheet((c) => <EntryForm typeMap={MED_TYPES} arrKey="meds" dk={dk} type={t} existing={null} controls={c} onSaved={refresh} />)} />);
-  const pickSymptom = () => openSheet(() => <TypePicker title="Add symptom" typeMap={SYMPTOM_TYPES} onPick={(t) => openSheet((c) => <EntryForm typeMap={SYMPTOM_TYPES} arrKey="symptoms" dk={dk} type={t} existing={null} controls={c} onSaved={refresh} />)} />);
+  const pickActivity = () => openSheet(() => <TypePicker title="Add activity" kind="activities" manageLabel="Add new activity type" onPick={(t) => openActivityForm(t, null)} />);
+  const pickMed = () => openSheet(() => <TypePicker title="Add medication or supplement" kind="meds" manageLabel="Add another medication" onPick={(t) => {
+    // A user-defined med with a saved dosage prefills the Amount field.
+    const def = typesFor(getState(), 'meds')[t];
+    const prefill = def?.dosage ? ({ id: uid(), type: t, time: nowTime(), note: '', amount: def.dosage } as Entry) : null;
+    openSheet((c) => <EntryForm typeMap={typesFor(getState(), 'meds')} arrKey="meds" dk={dk} type={t} existing={null} prefill={prefill} controls={c} onSaved={refresh} />);
+  }} />);
+  const pickSymptom = () => openSheet(() => <TypePicker title="Add symptom" kind="symptoms" manageLabel="Add another symptom" onPick={(t) => openSheet((c) => <EntryForm typeMap={typesFor(getState(), 'symptoms')} arrKey="symptoms" dk={dk} type={t} existing={null} controls={c} onSaved={refresh} />)} />);
 
-  const openMed = (r: Entry) => openSheet((c) => <EntryForm typeMap={MED_TYPES} arrKey="meds" dk={dk} type={r.type} existing={r} controls={c} onSaved={refresh} />);
-  const openSymptom = (r: Entry) => openSheet((c) => <EntryForm typeMap={SYMPTOM_TYPES} arrKey="symptoms" dk={dk} type={r.type} existing={r} controls={c} onSaved={refresh} />);
+  const openMed = (r: Entry) => openSheet((c) => <EntryForm typeMap={typesFor(getState(), 'meds')} arrKey="meds" dk={dk} type={r.type} existing={r} controls={c} onSaved={refresh} />);
+  const openSymptom = (r: Entry) => openSheet((c) => <EntryForm typeMap={typesFor(getState(), 'symptoms')} arrKey="symptoms" dk={dk} type={r.type} existing={r} controls={c} onSaved={refresh} />);
 
-  return { openReadingForm, openActivityForm, openReadingSummary, pickReading, pickActivity, pickMed, pickSymptom, openMed, openSymptom };
+  return { openReadingForm, openActivityForm, openReadingSummary, captureHrv, pickReading, pickActivity, pickMed, pickSymptom, openMed, openSymptom };
 }
 
 function ReadingSummarySheet({ r, dk, controls, onEdit }: { r: Entry; dk: string; controls: SheetControls; onEdit: () => void }) {

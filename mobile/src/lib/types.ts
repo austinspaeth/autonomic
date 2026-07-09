@@ -84,11 +84,17 @@ export interface AppState {
     healthEnabled?: boolean;
   };
   profile: Profile;
+  /** User-defined types layered on top of the registry maps (pure JSON defs). */
+  customTypes?: Partial<Record<'activities' | 'meds' | 'symptoms' | 'triggers', Record<string, TypeDef>>>;
+  /** Built-in registry types the user deleted (only allowed while unused). */
+  hiddenTypes?: Partial<Record<'activities' | 'meds' | 'symptoms' | 'triggers', string[]>>;
   meta: {
     lastUpdated: string | null;
     lastImport: { name: string; at: string } | null;
     /** Set once the sleep "bed = last night" reframing migration has run. */
     sleepReframed?: boolean;
+    /** ISO timestamp stamped when the first-run welcome flow completes. */
+    onboarded?: string;
   };
   days: Record<string, DayRecord>;
 }
@@ -118,6 +124,10 @@ export interface TypeDef {
   fields: FieldDef[];
   custom?: string;
   noTime?: boolean;
+  /** Default dose for a user-defined medication (e.g. "400mg"); prefills Amount. */
+  dosage?: string;
+  /** True for user-created types (stored in state.customTypes). */
+  userDefined?: boolean;
   summary?: (r: Entry) => string;
   detail?: (r: Entry) => string;
 }

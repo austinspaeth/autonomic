@@ -9,8 +9,10 @@ import { FieldInputs, TextField, useFormState } from '../components/Field';
 import { Button } from '../components/ui';
 import { Icon } from '../components/Icon';
 import { radius, usePalette } from '../theme';
-import { BM_FIELDS, TRIGGER_TYPES, bmLabel, isDivider } from '../lib/registry';
-import { ensureDay, getState, save } from '../store/store';
+import { BM_FIELDS, bmLabel, isDivider } from '../lib/registry';
+import { typesFor } from '../lib/typeCatalog';
+import { ManageTypesSheet } from './TypeManager';
+import { ensureDay, getState, save, useAppState } from '../store/store';
 import { nowTime, uid } from '../lib/dates';
 import type { Movement } from '../lib/types';
 
@@ -30,15 +32,23 @@ function WaterDrawer({ dk, controls }: { dk: string; controls: SheetControls }) 
   return (
     <View>
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 16 }}>Water</Text>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8, marginBottom: 22 }}>
-        {[0, 1, 2, 3, 4].map((i) => {
-          const full = liters >= i + 1;
-          return (
-            <Pressable key={i} onPress={() => setText(String(liters === i + 1 ? i : i + 1))} style={{ flex: 1, aspectRatio: 1, borderWidth: 1, borderColor: full ? p.accent : p.border, backgroundColor: full ? p.accentSoft : p.surface2, borderRadius: radius.control, alignItems: 'center', justifyContent: 'center' }}>
-              <Icon name="cup" size={30} color={full ? p.accent : p.textDim} />
-            </Pressable>
-          );
-        })}
+      {/* Two rows of cups, each cup = 0.5 L (10 cups = 5 L). Tapping the last
+          full cup takes that half-liter back off. */}
+      <View style={{ gap: 8, marginBottom: 22 }}>
+        {[0, 1].map((row) => (
+          <View key={row} style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
+            {[0, 1, 2, 3, 4].map((col) => {
+              const i = row * 5 + col;
+              const v = (i + 1) * 0.5;
+              const full = liters >= v;
+              return (
+                <Pressable key={i} onPress={() => setText(String(liters === v ? i * 0.5 : v))} style={{ flex: 1, aspectRatio: 1, borderWidth: 1, borderColor: full ? p.accent : p.border, backgroundColor: full ? p.accentSoft : p.surface2, borderRadius: radius.control, alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name="cup" size={26} color={full ? p.accent : p.textDim} />
+                </Pressable>
+              );
+            })}
+          </View>
+        ))}
       </View>
       <TextField label="Liters" value={text} onChange={setText} keyboardType="decimal-pad" />
       <SheetFooter>
@@ -50,9 +60,11 @@ function WaterDrawer({ dk, controls }: { dk: string; controls: SheetControls }) 
 
 function TriggerPicker({ dk }: { dk: string }) {
   const p = usePalette();
-  const { closeSheet } = useSheets();
+  const { closeSheet, openSheet } = useSheets();
+  const state = useAppState();
   const [q, setQ] = useState('');
-  const types = Object.keys(TRIGGER_TYPES).filter((t) => TRIGGER_TYPES[t].label.toLowerCase().includes(q.trim().toLowerCase()));
+  const trigTypes = typesFor(state, 'triggers');
+  const types = Object.keys(trigTypes).filter((t) => trigTypes[t].label.toLowerCase().includes(q.trim().toLowerCase()));
   return (
     <View>
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 16 }}>Add trigger</Text>
@@ -60,9 +72,14 @@ function TriggerPicker({ dk }: { dk: string }) {
       {types.map((t) => (
         <Pressable key={t} onPress={() => { ensureDay(dk).food.triggers[t] = 1; save(); closeSheet(); }} style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 15, borderTopWidth: 1, borderTopColor: p.border }, pressed && { opacity: 0.5 }]}>
           <Icon name="alert" size={22} color={p.textDim} />
-          <Text style={{ color: p.text, fontSize: 17 }}>{TRIGGER_TYPES[t].label}</Text>
+          <Text style={{ color: p.text, fontSize: 17 }}>{trigTypes[t].label}</Text>
         </Pressable>
       ))}
+      <SheetFooter>
+        <View style={{ flex: 1 }}>
+          <Button title="Add another trigger" variant="default" onPress={() => openSheet(() => <ManageTypesSheet kind="triggers" />)} />
+        </View>
+      </SheetFooter>
     </View>
   );
 }

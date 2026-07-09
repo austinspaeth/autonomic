@@ -4,16 +4,17 @@
  */
 import React, { useState } from 'react';
 import { ActivityIndicator, LayoutAnimation, Platform, Pressable, Text, TextInput, UIManager, View } from 'react-native';
-import { AddButton, Card, Muted, Pill, Row, RowValue, SectionHeader, Segmented } from '../components/ui';
+import { AddDashButton, Card, Pill, Row, RowValue, SectionHeader, Segmented } from '../components/ui';
 import { Icon } from '../components/Icon';
 import { TimeField } from '../components/Field';
 import { useSheets } from '../components/Sheet';
 import { useToast } from '../components/Toast';
 import { radius, usePalette } from '../theme';
 import {
-  ACTIVITY_TYPES, MED_TYPES, READING_TYPES, SYMPTOM_TYPES, TRIGGER_TYPES,
+  READING_TYPES,
   bmLabel, readingLabel, readingRowValue, summarizeFields,
 } from '../lib/registry';
+import { typesFor } from '../lib/typeCatalog';
 import { rowScoreCategory, SCORE_COLORS, GRADE_LABEL } from '../lib/scoring';
 import { sleepGrade, sleepHours } from '../lib/scoring/day';
 import { ensureDay, save, useAppState } from '../store/store';
@@ -47,47 +48,56 @@ export function JournalSections({ dk }: { dk: string }) {
       <SleepSection dk={dk} />
       {/* Readings */}
       <Card>
-        <SectionHeader title="Readings" action={<AddButton onPress={forms.pickReading} />} />
+        <SectionHeader title="Readings" />
         <View style={{ paddingHorizontal: 14, paddingBottom: 12 }}>
-          {(day.readings || []).length === 0 ? <Muted>No readings yet.</Muted> : [...day.readings].sort((a, b) => ((a.time as string) || '').localeCompare((b.time as string) || '')).map((r) => {
+          {[...(day.readings || [])].sort((a, b) => ((a.time as string) || '').localeCompare((b.time as string) || '')).map((r) => {
             const def = READING_TYPES[r.type];
             if (!def) return null;
             return <Row key={r.id} icon={def.icon as never} title={readingLabel(r)} right={<View style={{ flexDirection: 'row', alignItems: 'center' }}><RowValue text={readingRowValue(r)} cat={rowScoreCategory(r, ctx)} />{r.time ? <Pill text={fmtTime12(r.time)} /> : null}</View>} onPress={() => forms.openReadingSummary(r)} />;
           })}
+          <View style={{ gap: 8, marginTop: 6 }}>
+            <Pressable onPress={forms.captureHrv} style={({ pressed }) => [{ flexDirection: 'row', gap: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: p.accent, borderRadius: radius.control, paddingVertical: 13 }, pressed && { opacity: 0.7 }]}>
+              <Icon name="activity" size={18} color="#fff" />
+              <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>Capture HRV reading</Text>
+            </Pressable>
+            <AddDashButton onPress={forms.pickReading} label="+ Add reading" />
+          </View>
         </View>
       </Card>
       {/* Activities */}
       <Card>
-        <SectionHeader title="Activities" action={<AddButton onPress={forms.pickActivity} />} />
+        <SectionHeader title="Activities" />
         <View style={{ paddingHorizontal: 14, paddingBottom: 12 }}>
-          {(day.activities || []).length === 0 ? <Muted>No activities yet.</Muted> : [...day.activities].sort((a, b) => ((a.time as string) || '').localeCompare((b.time as string) || '')).map((a) => {
-            const def = ACTIVITY_TYPES[a.type];
+          {[...(day.activities || [])].sort((a, b) => ((a.time as string) || '').localeCompare((b.time as string) || '')).map((a) => {
+            const def = typesFor(state, 'activities')[a.type];
             if (!def) return null;
             const headline = def.summary ? def.summary(a) : summarizeFields(def, a);
             return <Row key={a.id} icon={def.icon as never} title={def.label} right={<View style={{ flexDirection: 'row', alignItems: 'center' }}>{headline ? <Text style={{ color: p.text, fontWeight: '600' }}>{headline}</Text> : null}{a.time ? <Pill text={fmtTime12(a.time)} /> : null}</View>} onPress={() => forms.openActivityForm(a.type, a)} />;
           })}
+          <View style={{ marginTop: 6 }}><AddDashButton onPress={forms.pickActivity} label="+ Add activity" /></View>
         </View>
       </Card>
       {/* Meds */}
-      <LoggedSection title="Medications & Supplements" dk={dk} arr="meds" typeMap={MED_TYPES} empty="No medications or supplements taken yet." onAdd={forms.pickMed} onOpen={forms.openMed} showPeriod />
+      <LoggedSection title="Medications & Supplements" dk={dk} arr="meds" typeMap={typesFor(state, 'meds')} onAdd={forms.pickMed} addLabel="+ Add medication" onOpen={forms.openMed} showPeriod />
       {/* Symptoms */}
-      <LoggedSection title="Symptoms" dk={dk} arr="symptoms" typeMap={SYMPTOM_TYPES} empty="No symptoms logged yet." onAdd={forms.pickSymptom} onOpen={forms.openSymptom} showValue showTime />
+      <LoggedSection title="Symptoms" dk={dk} arr="symptoms" typeMap={typesFor(state, 'symptoms')} onAdd={forms.pickSymptom} addLabel="+ Add symptom" onOpen={forms.openSymptom} showValue showTime />
       {/* Triggers */}
       <TriggerSection dk={dk} onAdd={drawers.triggers} />
       {/* Hydration */}
       <Card>
         <SectionHeader title="Hydration" />
         <View style={{ paddingHorizontal: 14, paddingBottom: 12 }}>
-          <Row icon="cup" title="Water" right={<Text style={{ color: p.text, fontWeight: '600' }}>{`${+(day.food?.water || 0)} L`}</Text>} onPress={drawers.water} />
+          <Row icon="cup" title="Water" noDivider right={<Text style={{ color: p.text, fontWeight: '600' }}>{`${+(day.food?.water || 0)} L`}</Text>} onPress={drawers.water} />
         </View>
       </Card>
       {/* Digestion */}
       <Card>
-        <SectionHeader title="Bowel Movements" action={<AddButton onPress={() => drawers.bowel(null)} />} />
+        <SectionHeader title="Bowel Movements" />
         <View style={{ paddingHorizontal: 14, paddingBottom: 12 }}>
-          {(day.digestion?.movements || []).length === 0 ? <Muted>No bowel movements logged.</Muted> : [...(day.digestion.movements)].sort((a, b) => (a.time || '').localeCompare(b.time || '')).map((m) => (
+          {[...(day.digestion?.movements || [])].sort((a, b) => (a.time || '').localeCompare(b.time || '')).map((m) => (
             <Row key={m.id} icon="poop" title={bmLabel(m)} right={m.time ? <Pill text={fmtTime12(m.time)} /> : undefined} onPress={() => drawers.bowel(m)} />
           ))}
+          <View style={{ marginTop: 6 }}><AddDashButton onPress={() => drawers.bowel(null)} label="+ Add bowel movement" /></View>
         </View>
       </Card>
     </>
@@ -136,7 +146,7 @@ function SleepSection({ dk }: { dk: string }) {
                 <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: p.surface2, borderRadius: radius.control, padding: 12, marginBottom: 12 }}>
                   <Icon name="moon" size={18} color={p.textDim} />
                   <Text style={{ flex: 1, color: p.textDim, fontSize: 13, lineHeight: 18 }}>
-                    Waiting for last night&rsquo;s sleep from Apple Health. It can take a while after you wake for the data to be ready — check back, or enter it yourself.
+                    Waiting for last night&rsquo;s sleep from Apple Health. It can take a while after you wake for the data to be ready. Check back, or enter it yourself.
                   </Text>
                 </View>
                 <View style={{ flexDirection: 'row', gap: 10 }}>
@@ -144,7 +154,7 @@ function SleepSection({ dk }: { dk: string }) {
                     {syncing ? <ActivityIndicator size="small" color={p.textDim} /> : <Icon name="download" size={16} color={p.text} />}
                     <Text style={{ color: p.text, fontWeight: '600' }}>{syncing ? 'Checking…' : 'Check for updates'}</Text>
                   </Pressable>
-                  <Pressable onPress={toggleManual} style={({ pressed }) => [{ flex: 1, justifyContent: 'center', alignItems: 'center', borderRadius: radius.control, borderWidth: 1, borderColor: manual ? p.accent : p.border, backgroundColor: manual ? p.accentSoft : p.surface2, paddingVertical: 12 }, pressed && { opacity: 0.6 }]}>
+                  <Pressable onPress={toggleManual} style={({ pressed }) => [{ justifyContent: 'center', alignItems: 'center', borderRadius: radius.control, borderWidth: 1, borderColor: manual ? p.accent : p.border, backgroundColor: manual ? p.accentSoft : p.surface2, paddingVertical: 12, paddingHorizontal: 16 }, pressed && { opacity: 0.6 }]}>
                     <Text style={{ color: manual ? p.accent : p.text, fontWeight: '600' }}>{manual ? 'Close' : 'Enter manually'}</Text>
                   </Pressable>
                 </View>
@@ -236,18 +246,18 @@ function SleepFields({ dk, sleep, startOpen, expanded, onToggle }: { dk: string;
 }
 const inp = (p: ReturnType<typeof usePalette>) => ({ backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.control, padding: 11, fontSize: 16, color: p.text, minHeight: 44 });
 
-function LoggedSection({ title, dk, arr, typeMap, empty, onAdd, onOpen, showValue, showTime, showPeriod }: {
-  title: string; dk: string; arr: 'meds' | 'symptoms'; typeMap: Record<string, { label: string; icon: string; summary?: (r: never) => string }>; empty: string;
-  onAdd: () => void; onOpen: (r: never) => void; showValue?: boolean; showTime?: boolean; showPeriod?: boolean;
+function LoggedSection({ title, dk, arr, typeMap, onAdd, addLabel, onOpen, showValue, showTime, showPeriod }: {
+  title: string; dk: string; arr: 'meds' | 'symptoms'; typeMap: Record<string, { label: string; icon: string; summary?: (r: never) => string }>;
+  onAdd: () => void; addLabel: string; onOpen: (r: never) => void; showValue?: boolean; showTime?: boolean; showPeriod?: boolean;
 }) {
   const state = useAppState();
   const p = usePalette();
   const list = [...(state.days[dk]?.[arr] || [])].sort((a, b) => ((a.time as string) || '').localeCompare((b.time as string) || ''));
   return (
     <Card>
-      <SectionHeader title={title} action={<AddButton onPress={onAdd} />} />
+      <SectionHeader title={title} />
       <View style={{ paddingHorizontal: 14, paddingBottom: 12 }}>
-        {list.length === 0 ? <Muted>{empty}</Muted> : list.map((m) => {
+        {list.map((m) => {
           const def = typeMap[m.type];
           if (!def) return null;
           const value = showValue ? summarizeFields(def as never, m) : '';
@@ -261,6 +271,7 @@ function LoggedSection({ title, dk, arr, typeMap, empty, onAdd, onOpen, showValu
               onPress={() => onOpen(m as never)} />
           );
         })}
+        <View style={{ marginTop: 6 }}><AddDashButton onPress={onAdd} label={addLabel} /></View>
       </View>
     </Card>
   );
@@ -269,15 +280,17 @@ function LoggedSection({ title, dk, arr, typeMap, empty, onAdd, onOpen, showValu
 function TriggerSection({ dk, onAdd }: { dk: string; onAdd: () => void }) {
   const p = usePalette();
   const state = useAppState();
+  const trigTypes = typesFor(state, 'triggers');
   const trigs = state.days[dk]?.food?.triggers || {};
-  const keys = Object.keys(trigs).filter((k) => trigs[k] > 0 && TRIGGER_TYPES[k]);
+  const keys = Object.keys(trigs).filter((k) => trigs[k] > 0 && trigTypes[k]);
   return (
     <Card>
-      <SectionHeader title="Triggers" action={<AddButton onPress={onAdd} />} />
+      <SectionHeader title="Triggers" />
       <View style={{ paddingHorizontal: 14, paddingBottom: 12 }}>
-        {keys.length === 0 ? <Muted>No triggers logged.</Muted> : keys.map((k) => (
-          <Row key={k} icon="alert" title={TRIGGER_TYPES[k].label} right={<Pressable onPress={() => { delete ensureDay(dk).food.triggers[k]; save(); }} hitSlop={8}><Icon name="x" size={18} color={p.textDim} /></Pressable>} />
+        {keys.map((k) => (
+          <Row key={k} icon="alert" title={trigTypes[k].label} right={<Pressable onPress={() => { delete ensureDay(dk).food.triggers[k]; save(); }} hitSlop={8}><Icon name="x" size={18} color={p.textDim} /></Pressable>} />
         ))}
+        <View style={{ marginTop: 6 }}><AddDashButton onPress={onAdd} label="+ Add trigger" /></View>
       </View>
     </Card>
   );

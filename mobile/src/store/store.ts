@@ -49,6 +49,8 @@ export function migrate(s: unknown): AppState {
     version: SCHEMA_VERSION,
     settings: { ...base.settings, ...(src.settings || {}) },
     profile: { ...base.profile, ...(src.profile || {}) },
+    customTypes: src.customTypes || {},
+    hiddenTypes: src.hiddenTypes || {},
     meta: { lastUpdated: null, lastImport: null, ...(src.meta || {}) },
     days: {},
   };

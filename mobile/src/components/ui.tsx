@@ -44,12 +44,22 @@ export function AddButton({ onPress, label = '+ Add' }: { onPress: () => void; l
   );
 }
 
-export function Row({ icon, title, sub, right, onPress, iconColor }: {
-  icon?: IconName; title: string; sub?: string; right?: React.ReactNode; onPress?: () => void; iconColor?: string;
+/** Full-width dashed add action at the foot of a section list. */
+export function AddDashButton({ onPress, label = '+ Add' }: { onPress: () => void; label?: string }) {
+  const p = usePalette();
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => [{ borderWidth: 1, borderStyle: 'dashed', borderColor: 'rgba(255,255,255,0.28)', borderRadius: radius.control, paddingVertical: 12, alignItems: 'center', justifyContent: 'center' }, pressed && { opacity: 0.6 }]}>
+      <Text style={{ color: p.textDim, fontSize: 15, fontWeight: '600' }}>{label}</Text>
+    </Pressable>
+  );
+}
+
+export function Row({ icon, title, sub, right, onPress, iconColor, noDivider }: {
+  icon?: IconName; title: string; sub?: string; right?: React.ReactNode; onPress?: () => void; iconColor?: string; noDivider?: boolean;
 }) {
   const p = usePalette();
   const content = (
-    <View style={[styles.row, { borderTopColor: p.border }]}>
+    <View style={[styles.row, { borderTopColor: p.border }, noDivider && { borderTopWidth: 0 }]}>
       {icon && <View style={styles.rowIco}><Icon name={icon} size={21} color={iconColor || p.textDim} /></View>}
       <View style={styles.rowMain}>
         <Text style={{ color: p.text, fontSize: 16 }}>{title}</Text>
