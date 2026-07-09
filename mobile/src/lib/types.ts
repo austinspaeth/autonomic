@@ -95,7 +95,8 @@ export interface AppState {
     sleepReframed?: boolean;
     /** ISO timestamp stamped when the first-run welcome flow completes. */
     onboarded?: string;
-    /** TEMPORARY (src/lib/devSeed.ts): day keys whose sleep/food were mock-seeded. */
+    /** Legacy flag from the retired dev seeder; presence triggers a one-time
+     *  mock-data purge in app/_layout.tsx, which then deletes it. */
     mockSeeded?: string[];
   };
   days: Record<string, DayRecord>;

@@ -12,8 +12,36 @@ import { SheetProvider } from '../src/components/Sheet';
 import { ToastProvider } from '../src/components/Toast';
 import { OnboardingGate } from '../src/features/Onboarding';
 import { runDailyBackup } from '../src/lib/backup';
-import { applyMockSeed } from '../src/lib/devSeed';
+import { getState, save } from '../src/store/store';
 import { usePalette } from '../src/theme';
+
+/**
+ * One-time cleanup of the retired dev mock-data seeder: strips any `mock-`
+ * prefixed entries and resets days whose sleep/food were mock-seeded. Guarded by
+ * `meta.mockSeeded`, which it deletes when done, so it no-ops on every launch
+ * after the first. Safe to remove once no install carries mock data.
+ */
+function purgeMockData() {
+  const s = getState();
+  const seeded = s.meta.mockSeeded;
+  if (!seeded) return;
+  const isMock = (x: { id?: unknown }) => typeof x.id === 'string' && x.id.startsWith('mock-');
+  Object.keys(s.days).forEach((dk) => {
+    const day = s.days[dk];
+    (['readings', 'activities', 'meds', 'symptoms'] as const).forEach((k) => {
+      day[k] = (day[k] || []).filter((x) => !isMock(x));
+    });
+    if (seeded.includes(dk)) {
+      day.sleep = { bed: '', wake: '' };
+      day.food = { water: 0, calories: 0, triggers: {}, meals: [] };
+      const empty = !day.readings.length && !day.activities.length && !day.meds.length
+        && !day.symptoms.length && !(day.digestion?.movements || []).length;
+      if (empty) delete s.days[dk];
+    }
+  });
+  delete s.meta.mockSeeded;
+  save();
+}
 
 function Themed({ children }: { children: React.ReactNode }) {
   const p = usePalette();
@@ -34,12 +62,10 @@ export default function RootLayout() {
     IBMPlexMono_400Regular,
   });
   useEffect(() => {
+    // Clear out any leftover mock data from the retired dev seeder (no-op once done).
+    purgeMockData();
     // First-launch-of-the-day JSON snapshot (rotating, kept in Documents/backups).
-    // Runs BEFORE the mock seed so today's backup stays clean of fake entries.
     runDailyBackup();
-    // TEMPORARY: mock readings for the last 5 days (see src/lib/devSeed.ts —
-    // flip SEED_MOCK_DATA to false to strip them back out on next launch).
-    applyMockSeed();
     // Pull any published EAS update in the background (preview + production
     // builds alike); a downloaded bundle applies on the next launch.
     (async () => {
