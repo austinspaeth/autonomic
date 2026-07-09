@@ -7,7 +7,7 @@
 import { dateFromKey, keyOf, todayKey } from '../dates';
 import type { Band, DayRecord, Entry, ScoreCat } from '../types';
 import {
-  BANDS, GRADE_PTS, computeScores, ecgPattern, numOr, restingHrBands, totalPower,
+  BANDS, GRADE_PTS, computeScores, numOr, restingHrBands, totalPower,
   type ScoreContext,
 } from './index';
 
@@ -51,7 +51,6 @@ export const SCORE_TIPS: Record<string, string> = {
   'Blood pressure': 'Support pressure with fluids and electrolytes; note salt, meds, posture, and heat as context.',
   'Resting HR': 'A lower resting HR follows from hydration, rest, and avoiding stimulants and late activity.',
   'Sleep': 'Target 7h+ - an earlier, consistent bedtime is usually the single biggest lever here.',
-  'ECG rhythm': 'Rhythm irregularities are worth flagging for your clinician; reduce stimulants and stress in the meantime.',
   'Activity': "Match activity to today's capacity; pacing now prevents a post-exertional setback later.",
 };
 
@@ -141,9 +140,6 @@ export function scoreSet(readings: Entry[], d: DayRecord, dk: string, days: Days
   if (rhrPts == null && sStruct) rhrPts = pts(sStruct.hr);
   if (rhrPts == null && sUn) rhrPts = pts(sUn.avgHr);
 
-  const ecg = last(readings.filter((r) => r.type === 'ecg'));
-  const ecgPts = ecg ? pts(computeScores(ecg, ctx).rhythm || computeScores(ecg, ctx).overall) : null;
-
   // ---- Per-component detail (raw values + bands) for the score-explain sheet ----
   const bs = last(structured), bu = last(unstructured);
   const nv = (x: unknown): number | null => { const v = parseFloat(x as string); return isNaN(v) ? null : v; };
@@ -191,9 +187,6 @@ export function scoreSet(readings: Entry[], d: DayRecord, dk: string, days: Days
     note: 'Targets 7h or more for a good grade; 8h+ and uninterrupted scores best. An earlier, consistent bedtime is usually the single biggest lever.',
   };
 
-  const rhy = ecg ? ecgPattern(ecg) : null;
-  const ecgDetail: CompDetail = { value: rhy || '', metrics: [], note: 'Looking for normal sinus rhythm. SVT or other irregularities lower this and are worth flagging to your clinician; reducing stimulants and stress helps in the meantime.' };
-
   const actDetail: CompDetail = {
     value: (d.activities || []).length ? String((d.activities || []).length) + ' logged' : 'none logged',
     metrics: [],
@@ -210,7 +203,6 @@ export function scoreSet(readings: Entry[], d: DayRecord, dk: string, days: Days
     { w: 8, p: bpPts, label: 'Blood pressure', detail: bpDetail },
     { w: 7, p: rhrPts, label: 'Resting HR', detail: rhrDetail },
     { w: 8, p: pts(sleepGrade(days, dk)), label: 'Sleep', detail: sleepDetail },
-    { w: 5, p: ecgPts, label: 'ECG rhythm', detail: ecgDetail },
     { w: 2, p: pts(activityGrade(d.activities)), label: 'Activity', detail: actDetail },
   ] as { w: number; p: number | null; label: string; detail: CompDetail }[]).filter((c) => c.p != null) as ScoreComp[];
 

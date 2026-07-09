@@ -3,12 +3,15 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { Button, Muted } from '../components/ui';
 import { Icon } from '../components/Icon';
+import type { SheetControls } from '../components/Sheet';
 import { useToast } from '../components/Toast';
 import { radius, usePalette } from '../theme';
 import { ble, type BleDevice } from '../lib/ble/manager';
 import { getState, save, useAppState } from '../store/store';
 
-export function DevicesScreen() {
+/** When opened mid-flow (HRV setup, onboarding), pass the sheet's `controls`
+ *  so pairing a strap closes this sheet and drops you back where you were. */
+export function DevicesScreen({ controls }: { controls?: SheetControls } = {}) {
   const p = usePalette();
   const toast = useToast();
   const state = useAppState();
@@ -39,6 +42,7 @@ export function DevicesScreen() {
     getState().settings.lastBleDeviceName = d.name;
     save();
     toast(`Saved ${d.name}`);
+    controls?.close();
   };
 
   const forget = () => {

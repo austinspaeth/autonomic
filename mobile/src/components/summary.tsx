@@ -11,7 +11,7 @@ import type { Band, Entry, ScoreCat } from '../lib/types';
 import {
   BANDS, GRADE_LABEL, HRV_EXPLAIN, SCORE_COLORS, bandsFor,
   bpBce, bpKerdo, bpKvas, bpMap, bpPP, bpRobinson, catFromBands, computeScores,
-  ecgPattern, expectedHf, hrvComposite, numOr, qtcBands, restingHrBands,
+  expectedHf, hrvComposite, numOr, restingHrBands,
   rowScoreCategory, totalPower, type ScoreContext,
 } from '../lib/scoring';
 import { metricHistory, numEx, type DaysMap } from '../lib/scoring/day';
@@ -95,7 +95,6 @@ export function ReadingSummary({ r, days, ctx }: SummaryProps) {
     case 'breathHrv': return <BreathingSummary r={r} days={days} ctx={ctx} />;
     case 'hrv': return <UnstructuredSummary r={r} days={days} ctx={ctx} />;
     case 'bp': return <BpSummary r={r} days={days} ctx={ctx} />;
-    case 'ecg': return <EcgSummary r={r} days={days} ctx={ctx} />;
     case 'restingHr': return <RestingHrSummary r={r} days={days} ctx={ctx} />;
     case 'orthostatic': return <OrthostaticSummary r={r} days={days} ctx={ctx} />;
     default: return <GenericSummary r={r} days={days} ctx={ctx} />;
@@ -238,34 +237,6 @@ export function BpSummary({ r, days, ctx }: SummaryProps) {
   );
 }
 
-export function EcgSummary({ r, days, ctx }: SummaryProps) {
-  const s = computeScores(r, ctx);
-  const verdict: Record<string, string> = {
-    great: 'Clean reading - normal intervals and rhythm.', good: 'Largely normal intervals and rhythm.',
-    ok: 'Minor findings worth monitoring.', bad: 'Abnormal findings; review context.', concerning: 'Significant findings; consider clinical follow-up.',
-  };
-  const hrCat = r.hr !== '' && r.hr != null ? catFromBands(+(r.hr as number), BANDS.hrBreath) : null;
-  return (
-    <>
-      <HeroCard cat={s.overall} label="ECG" big={ecgPattern(r)} sub="Rhythm" tip={s.overall ? verdict[s.overall] : ''} />
-      <SumCard title="Rhythm">
-        <MetricRow label="Pattern" value={ecgPattern(r)} cat={s.rhythm} explain="Recorded rhythm. Sinus is normal; SVT or any other pattern is flagged." />
-        <MetricRow label="Ectopic beats" value={r.ectopic as string} cat={s.ectopic} explain="Extra beats in the reading. A few are common; many, or runs, are concerning." spark={spark(days, 'ecg', numEx('ectopic'), BANDS.ectopic)} />
-      </SumCard>
-      <SumCard title="Intervals">
-        <MetricRow label="QRS" value={r.qrs as string} cat={s.qrs} explain="Ventricular depolarization time. A wide QRS can indicate a conduction delay." spark={spark(days, 'ecg', numEx('qrs'), BANDS.qrs)} />
-        <MetricRow label="QTc" value={r.qtc as string} cat={s.qtc} explain="Heart-rate-corrected QT. Prolongation raises arrhythmia risk; very short is also abnormal." spark={spark(days, 'ecg', numEx('qtc'), qtcBands(ctx.sex))} />
-        <MetricRow label="PR" value={r.pr as string} cat={s.pr} explain="AV conduction time from atria to ventricles." spark={spark(days, 'ecg', numEx('pr'), BANDS.pr)} />
-      </SumCard>
-      <SumCard title="Rate & variability">
-        <MetricRow label="HR" value={r.hr as string} cat={hrCat} explain="Heart rate during the ECG." spark={spark(days, 'ecg', numEx('hr'), BANDS.hrBreath)} />
-        <MetricRow label="HRV" value={r.hrv as string} cat={s.hrv} explain="Heart-rate variability captured by the ECG (SDNN-style)." spark={spark(days, 'ecg', numEx('hrv'), BANDS.ecgHrv)} />
-      </SumCard>
-      <Notes r={r} />
-      {r.techReview ? <SumCard title="Technician review"><TextBlock text={r.techReview as string} /></SumCard> : null}
-    </>
-  );
-}
 
 export function RestingHrSummary({ r, days, ctx }: SummaryProps) {
   const cat = rowScoreCategory(r, ctx);

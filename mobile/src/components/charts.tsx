@@ -9,7 +9,7 @@ import Svg, {
   Circle, Defs, G, Line, LinearGradient, Path, Rect, Stop, Text as SvgText,
 } from 'react-native-svg';
 import { fmtNum, fmtShort } from '../lib/dates';
-import { GRADE_COLORS, radius, usePalette } from '../theme';
+import { GRADE_COLORS, fonts, radius, usePalette } from '../theme';
 import type { Band, ScoreCat } from '../lib/types';
 import { BANDS, catFromBands } from '../lib/scoring';
 import { psdCurve } from '../lib/hrv';
@@ -319,13 +319,21 @@ export interface Zone { from: number; to: number; color: string }
 
 let lcId = 0;
 
-export function LineChart({ buckets, series, zones, integer, height = 140, target }: {
+export function LineChart({ buckets, series, zones, integer, height = 140, target, zonesOn, hideHeader, onSelect }: {
   buckets: { label: string }[]; series: Series[]; zones?: Zone[] | null; integer?: boolean; height?: number; target?: { from: number; to: number; color: string };
+  /** Controlled "show zones" — when provided, the internal toggle link is hidden
+   *  and the caller owns the state (used by card headers that host the link). */
+  zonesOn?: boolean;
+  /** Hide the readout/toggle row above the plot (caller renders its own header). */
+  hideHeader?: boolean;
+  /** Reports drag/tap selection so a card header can mirror the value. */
+  onSelect?: (idx: number) => void;
 }) {
   const p = usePalette();
   const [layoutW, setLayoutW] = useState(0);
   const [sel, setSel] = useState<number>(-1);
-  const [showZones, setShowZones] = useState(false);
+  const [showZonesInt, setShowZonesInt] = useState(false);
+  const showZones = zonesOn ?? showZonesInt;
   const all: number[] = [];
   series.forEach((s) => s.values.forEach((v) => { if (v != null && !isNaN(v)) all.push(v); }));
   if (!all.length) return null;
@@ -361,7 +369,9 @@ export function LineChart({ buckets, series, zones, integer, height = 140, targe
   const onTouch = (x: number) => {
     if (layoutW <= 0) return;
     const px = (x / layoutW) * W;
-    setSel(Math.max(0, Math.min(n - 1, Math.round(((px - padL) / innerW) * (n - 1)))));
+    const i = Math.max(0, Math.min(n - 1, Math.round(((px - padL) / innerW) * (n - 1))));
+    setSel(i);
+    onSelect?.(i);
   };
   const readoutIdx = sel >= 0 ? sel : (() => { for (let i = n - 1; i >= 0; i--) if (series.some((s) => s.values[i] != null)) return i; return -1; })();
   const readout = readoutIdx >= 0
@@ -375,10 +385,12 @@ export function LineChart({ buckets, series, zones, integer, height = 140, targe
 
   return (
     <View>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 16, marginBottom: 4 }}>
-        <RNText style={{ flex: 1, fontSize: 12, fontWeight: '700', color: p.text, fontVariant: ['tabular-nums'] }} numberOfLines={1}>{readout}</RNText>
-        {zones ? <ZonesToggle on={showZones} onPress={() => setShowZones((v) => !v)} /> : null}
-      </View>
+      {!hideHeader ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 16, marginBottom: 4 }}>
+          <RNText style={{ flex: 1, fontSize: 12, fontWeight: '700', color: p.text, fontVariant: ['tabular-nums'] }} numberOfLines={1}>{readout}</RNText>
+          {zones && zonesOn === undefined ? <ZonesToggle on={showZones} onPress={() => setShowZonesInt((v) => !v)} /> : null}
+        </View>
+      ) : null}
       <View
         onLayout={(e) => setLayoutW(e.nativeEvent.layout.width)}
         onStartShouldSetResponder={() => true}
@@ -396,11 +408,11 @@ export function LineChart({ buckets, series, zones, integer, height = 140, targe
           )}
           {[min, (min + max) / 2, max].map((val, i) => (
             <React.Fragment key={i}>
-              <Line x1={padL} x2={W - padR} y1={yAt(val)} y2={yAt(val)} stroke={p.border} strokeWidth={1} opacity={0.6} />
-              <SvgText x={padL - 4} y={yAt(val) + 3} textAnchor="end" fontSize={9} fill={p.textDim}>{fmtNum(integer ? Math.round(val) : val)}</SvgText>
+              <Line x1={padL} x2={W - padR} y1={yAt(val)} y2={yAt(val)} stroke={p.border} strokeWidth={1} strokeDasharray="3 4" opacity={0.55} />
+              <SvgText x={padL - 4} y={yAt(val) + 3} textAnchor="end" fontSize={9} fontFamily={fonts.mono} fill={p.textDim}>{fmtNum(integer ? Math.round(val) : val)}</SvgText>
             </React.Fragment>
           ))}
-          {buckets.map((b, i) => (i % step === 0 || i === n - 1) ? <SvgText key={i} x={xAt(i)} y={H - 6} textAnchor="middle" fontSize={9} fill={p.textDim}>{b.label}</SvgText> : null)}
+          {buckets.map((b, i) => (i % step === 0 || i === n - 1) ? <SvgText key={i} x={xAt(i)} y={H - 6} textAnchor="middle" fontSize={9} fontFamily={fonts.mono} fill={p.textDim}>{b.label}</SvgText> : null)}
           {zoneLines.map((z) => (
             <React.Fragment key={`z${z.key}`}>
               <Line x1={padL} x2={padL + innerW} y1={yAt(z.v)} y2={yAt(z.v)} stroke={z.color} strokeWidth={1.2} strokeDasharray="4 3" opacity={0.85} />
@@ -420,7 +432,9 @@ export function LineChart({ buckets, series, zones, integer, height = 140, targe
               </G>
             );
           })}
-          {readoutIdx >= 0 && <Line x1={xAt(readoutIdx)} x2={xAt(readoutIdx)} y1={padT} y2={H - padB} stroke={p.text} strokeWidth={1} opacity={0.35} />}
+          {/* Selection cursor only once the user has actually touched the chart —
+              nothing is highlighted in the initial view. */}
+          {sel >= 0 && <Line x1={xAt(sel)} x2={xAt(sel)} y1={padT} y2={H - padB} stroke={p.text} strokeWidth={1} opacity={0.35} />}
         </Svg>
       </View>
     </View>
@@ -551,10 +565,10 @@ export function BpDumbbell({ buckets, sys, dia, height = 180 }: {
           {[min, (min + max) / 2, max].map((val, i) => (
             <React.Fragment key={i}>
               <Line x1={padL} x2={W - padR} y1={yAt(val)} y2={yAt(val)} stroke={p.border} strokeWidth={1} opacity={0.5} />
-              <SvgText x={padL - 4} y={yAt(val) + 3} textAnchor="end" fontSize={9} fill={p.textDim}>{Math.round(val)}</SvgText>
+              <SvgText x={padL - 4} y={yAt(val) + 3} textAnchor="end" fontSize={9} fontFamily={fonts.mono} fill={p.textDim}>{Math.round(val)}</SvgText>
             </React.Fragment>
           ))}
-          {buckets.map((b, i) => (i % step === 0 || i === n - 1) ? <SvgText key={i} x={xAt(i)} y={H - 6} textAnchor="middle" fontSize={9} fill={p.textDim}>{b.label}</SvgText> : null)}
+          {buckets.map((b, i) => (i % step === 0 || i === n - 1) ? <SvgText key={i} x={xAt(i)} y={H - 6} textAnchor="middle" fontSize={9} fontFamily={fonts.mono} fill={p.textDim}>{b.label}</SvgText> : null)}
           {buckets.map((_, i) => {
             const s = sys[i], d = dia[i];
             if (s == null || d == null) return null;
@@ -579,10 +593,14 @@ export function BpDumbbell({ buckets, sys, dia, height = 180 }: {
  * (e.g. VLF / LF / HF) whose combined height is the total. Tapping a bar shows
  * its total and per-segment breakdown. Bars scale to the tallest total.
  */
-export function StackedBars({ buckets, segments, height = 160, unit }: {
+export function StackedBars({ buckets, segments, height = 160, unit, hideHeader, onSelect }: {
   buckets: { label: string }[];
   segments: { label: string; color: string; values: (number | null)[] }[];
   height?: number; unit?: string;
+  /** Hide the readout row (caller renders its own header + legend values). */
+  hideHeader?: boolean;
+  /** Reports drag/tap selection so a card header can mirror the totals. */
+  onSelect?: (idx: number) => void;
 }) {
   const p = usePalette();
   const [layoutW, setLayoutW] = useState(0);
@@ -594,14 +612,17 @@ export function StackedBars({ buckets, segments, height = 160, unit }: {
   const W = 320, H = height, padL = 34, padR = 8, padT = 10, padB = 22;
   const innerW = W - padL - padR;
   const bandW = innerW / n;
-  const barW = Math.min(18, bandW * 0.7);
+  const barW = Math.min(16, bandW * 0.62);
+  const SEG_GAP = 2;         // vertical gap between stacked segments (mock look)
   const xCenter = (i: number) => padL + bandW * (i + 0.5);
   const yAt = (v: number) => padT + (1 - v / max) * (H - padT - padB);
   const step = Math.max(1, Math.ceil(n / 6));
   const onTouch = (x: number) => {
     if (layoutW <= 0) return;
     const px = (x / layoutW) * W;
-    setSel(Math.max(0, Math.min(n - 1, Math.floor((px - padL) / bandW))));
+    const i = Math.max(0, Math.min(n - 1, Math.floor((px - padL) / bandW)));
+    setSel(i);
+    onSelect?.(i);
   };
   const readoutIdx = sel >= 0 ? sel : (() => { for (let i = n - 1; i >= 0; i--) if (totals[i] > 0) return i; return -1; })();
   const readout = readoutIdx >= 0
@@ -610,7 +631,9 @@ export function StackedBars({ buckets, segments, height = 160, unit }: {
   const yticks = [0, max / 2, max];
   return (
     <View>
-      <RNText style={{ fontSize: 12, fontWeight: '700', color: p.text, height: 16, marginBottom: 4, fontVariant: ['tabular-nums'] }} numberOfLines={1}>{readout}</RNText>
+      {!hideHeader ? (
+        <RNText style={{ fontSize: 12, fontWeight: '700', color: p.text, height: 16, marginBottom: 4, fontVariant: ['tabular-nums'] }} numberOfLines={1}>{readout}</RNText>
+      ) : null}
       <View
         onLayout={(e) => setLayoutW(e.nativeEvent.layout.width)}
         onStartShouldSetResponder={() => true}
@@ -621,8 +644,8 @@ export function StackedBars({ buckets, segments, height = 160, unit }: {
         <Svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
           {yticks.map((t, i) => (
             <React.Fragment key={i}>
-              <Line x1={padL} x2={W - padR} y1={yAt(t)} y2={yAt(t)} stroke={p.border} strokeWidth={1} opacity={0.5} />
-              <SvgText x={padL - 4} y={yAt(t) + 3} textAnchor="end" fontSize={9} fill={p.textDim}>{Math.round(t)}</SvgText>
+              <Line x1={padL} x2={W - padR} y1={yAt(t)} y2={yAt(t)} stroke={p.border} strokeWidth={1} strokeDasharray="3 4" opacity={0.55} />
+              <SvgText x={padL - 4} y={yAt(t) + 3} textAnchor="end" fontSize={9} fontFamily={fonts.mono} fill={p.textDim}>{Math.round(t)}</SvgText>
             </React.Fragment>
           ))}
           {buckets.map((b, i) => {
@@ -636,9 +659,13 @@ export function StackedBars({ buckets, segments, height = 160, unit }: {
                   const y0 = yAt(acc);
                   const y1 = yAt(acc + v);
                   acc += v;
-                  return <Rect key={si} x={x} y={y1} width={barW} height={Math.max(0.5, y0 - y1)} fill={seg.color} opacity={i === readoutIdx ? 1 : 0.85} />;
+                  // Rounded segment with a small gap to the one below it. Bars
+                  // render uniformly until the user selects one by touch.
+                  const h = Math.max(1.5, y0 - y1 - SEG_GAP);
+                  const op = sel >= 0 ? (i === sel ? 1 : 0.55) : 0.9;
+                  return <Rect key={si} x={x} y={y1} width={barW} height={h} rx={Math.min(3, h / 2)} fill={seg.color} opacity={op} />;
                 })}
-                {(i % step === 0 || i === n - 1) ? <SvgText x={xCenter(i)} y={H - 6} textAnchor="middle" fontSize={9} fill={p.textDim}>{b.label}</SvgText> : null}
+                {(i % step === 0 || i === n - 1) ? <SvgText x={xCenter(i)} y={H - 6} textAnchor="middle" fontSize={9} fontFamily={fonts.mono} fill={p.textDim}>{b.label}</SvgText> : null}
               </G>
             );
           })}

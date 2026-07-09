@@ -49,6 +49,19 @@ export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 24 } as const;
 
 export const radius = { card: 14, control: 10, pill: 999 } as const;
 
+/**
+ * Custom type faces (loaded in app/_layout.tsx via expo-font). Manrope gives the
+ * big Progress readout numbers a rounder, more deliberate look; IBM Plex Mono is
+ * used for chart tick/axis figures. Reference these family names rather than the
+ * raw strings so a weight swap is one edit.
+ */
+export const fonts = {
+  numHeavy: 'Manrope_800ExtraBold',
+  numBold: 'Manrope_700Bold',
+  numMed: 'Manrope_600SemiBold',
+  mono: 'IBMPlexMono_400Regular',
+} as const;
+
 /** Type scale: hero number, card title, row label, caption. */
 export const type = {
   hero: { fontSize: 57, fontWeight: '800' as const, letterSpacing: -1 },

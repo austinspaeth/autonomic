@@ -3,7 +3,7 @@
  * Import/Export uses the exact PWA JSON format via the document picker + share.
  */
 import React, { useState } from 'react';
-import { Alert, Platform, Pressable, Text, View } from 'react-native';
+import { Alert, Linking, Platform, Pressable, Text, View } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
@@ -17,6 +17,10 @@ import { getState, replaceState, save, serializeState, useAppState } from '../st
 import { ageFromBirthday, fmtStamp, keyOf } from '../lib/dates';
 import { DevicesScreen } from './Devices';
 import { HealthScreen } from './Health';
+import { showWelcomeAgain } from './Onboarding';
+
+const PRIVACY_URL = 'https://autonomic.care/privacy-policy/';
+const TERMS_URL = 'https://autonomic.care/terms-of-service/';
 
 export function MenuSheet({ controls }: { controls: SheetControls }) {
   const p = usePalette();
@@ -55,6 +59,8 @@ export function MenuSheet({ controls }: { controls: SheetControls }) {
       {item('heart', 'Apple Health', Platform.OS === 'ios' ? 'Read & write health data' : 'iOS only', () => openSheet(() => <HealthScreen />), Platform.OS === 'ios' && !!state.settings.healthEnabled)}
       {item('download', 'Export data', 'Download everything as JSON', () => exportData(toast))}
       {item('upload', 'Import data', 'Replace everything from a JSON file', () => importData(controls, toast))}
+      {item('sparkles', 'Show welcome screen', 'Replay the first-run guide', () => { controls.closeAll(); showWelcomeAgain(); })}
+      {item('info', 'Legal information', 'Disclaimer, privacy & terms', () => openSheet((c) => <LegalSheet controls={c} />))}
       <View style={{ marginTop: 22 }}>
         <Text style={{ fontSize: 12, color: p.textDim, textAlign: 'center' }}>{`Last updated ${fmtStamp(m.lastUpdated)}`}</Text>
         {m.lastImport?.name ? <Text style={{ fontSize: 12, color: p.textDim, textAlign: 'center', marginTop: 4 }}>{`Last import: ${m.lastImport.name} · ${fmtStamp(m.lastImport.at)}`}</Text> : null}
@@ -91,6 +97,27 @@ function ProfileSheet({ controls }: { controls: SheetControls }) {
       <TextField label="Height (in)" value={height} onChange={setHeight} keyboardType="decimal-pad" />
       <Text style={{ color: p.textDim, fontSize: 13, marginBottom: 12 }}>Used to personalize reading scores (sex-adjusted QTc, BMI from height/weight).</Text>
       <Button title="Save" variant="primary" onPress={() => { getState().profile = { sex, birthday, weight: weight.trim(), height: height.trim() }; save(); controls.close(); }} />
+      <View style={{ height: 20 }} />
+    </View>
+  );
+}
+
+function LegalSheet({ controls }: { controls: SheetControls }) {
+  const p = usePalette();
+  const para = (t: string) => <Text style={{ color: p.textDim, fontSize: 14, lineHeight: 21, marginBottom: 14 }}>{t}</Text>;
+  return (
+    <View>
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 14 }}>Legal Information</Text>
+      {para('Autonomic is a personal logging and educational tool. It is not a medical device, and it does not diagnose, treat, cure, or prevent any condition or provide medical advice. Scores, thresholds, and charts are for education and self-tracking only.')}
+      {para('Always talk to your doctor before starting, stopping, or changing medications, supplements, exercise, or any part of your protocol. Never disregard professional medical advice because of something you saw in this app.')}
+      {para('AI insights are prompts you paste into a third-party AI service of your choice (Claude, ChatGPT, Gemini, or others). Anything those services say comes from them, not from Autonomic — we only assemble your logged data for analysis.')}
+      {para('Your data stays on this device. Autonomic has no accounts, no servers, and no analytics; nothing is collected or transmitted unless you export or share it yourself.')}
+      <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+        <Button title="Privacy Policy" variant="ghost" onPress={() => Linking.openURL(PRIVACY_URL)} />
+        <Button title="Terms of Service" variant="ghost" onPress={() => Linking.openURL(TERMS_URL)} />
+      </View>
+      <View style={{ height: 8 }} />
+      <Button title="Done" variant="primary" onPress={controls.close} />
       <View style={{ height: 20 }} />
     </View>
   );

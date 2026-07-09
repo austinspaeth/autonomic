@@ -10,8 +10,9 @@ import { Button, Segmented } from '../../components/ui';
 import { Icon } from '../../components/Icon';
 import { useToast } from '../../components/Toast';
 import { radius, usePalette } from '../../theme';
-import { getState } from '../../store/store';
+import { getState, useAppState } from '../../store/store';
 import { health } from '../../lib/health';
+import { DevicesScreen } from '../Devices';
 import { HrvSession, type SessionConfig } from './Session';
 
 const STYLES = [
@@ -29,7 +30,16 @@ export function HrvSetup({ controls }: { controls: SheetControls }) {
   const [style, setStyle] = useState('4/6');
   const [source, setSource] = useState<'polar' | 'watch'>('polar');
   const [period, setPeriod] = useState<'Morning' | 'Evening' | 'Random'>('Random');
-  const savedName = getState().settings.lastBleDeviceName;
+  // Reactive so the "Paired: …" subtitle updates the moment a strap is saved
+  // from the pairing sheet stacked on top of this one.
+  const savedName = useAppState().settings.lastBleDeviceName;
+
+  // With no strap saved yet, choosing Bluetooth opens the pairing sheet right
+  // here; saving a device closes it and drops back onto this setup sheet.
+  const pickBluetooth = () => {
+    setSource('polar');
+    if (!getState().settings.lastBleDeviceId) openSheet((c) => <DevicesScreen controls={c} />);
+  };
 
   const start = () => {
     if (source === 'polar' && !getState().settings.lastBleDeviceId) {
@@ -75,7 +85,7 @@ export function HrvSetup({ controls }: { controls: SheetControls }) {
 
       <Label text="Signal source" top />
       <View style={{ gap: 8 }}>
-        <SourceOption icon="bluetooth" title="Bluetooth strap" sub={savedName ? `Paired: ${savedName}` : 'Pair a strap in Devices'} active={source === 'polar'} onPress={() => setSource('polar')} />
+        <SourceOption icon="bluetooth" title="Bluetooth strap" sub={savedName ? `Paired: ${savedName}` : 'Tap to pair a strap'} active={source === 'polar'} onPress={pickBluetooth} />
         <SourceOption icon="watch" title="Apple Watch" sub="Record an ECG on your watch during the reading — it syncs in after" active={source === 'watch'} onPress={() => setSource('watch')} />
       </View>
 

@@ -62,8 +62,8 @@ export function HealthScreen() {
 
       for (const imp of imports) {
         // Troubleshooting bulk pull is intentionally "smart": it brings HR, BP and
-        // weight, but NOT the noisy per-sample sources (HRV, ECG) — those are
-        // imported one-at-a-time from the reading picker instead.
+        // weight, but NOT the noisy per-sample HRV source — that is imported
+        // one-at-a-time from the reading picker instead.
         if (imp.type === 'hrv') continue;
         // Skip anything this app authored (our own write-backs, round-tripped).
         if (imp.ownApp) continue;
@@ -119,7 +119,7 @@ export function HealthScreen() {
       <View style={{ height: 20 }} />
       <Text style={{ color: p.textDim, fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Troubleshooting</Text>
       <Text style={{ color: p.textDim, fontSize: 13, marginBottom: 10, lineHeight: 18 }}>
-        {"Bulk-pull the current day's resting HR, blood pressure and weight in one go. Skips HRV and ECG (import those individually to avoid noise)."}
+        {"Bulk-pull the current day's resting HR, blood pressure and weight in one go. Skips HRV (import it individually to avoid noise)."}
       </Text>
       <Button title="Sync day from Health" onPress={sync} />
       <View style={{ height: 12 }} />

@@ -10,6 +10,7 @@ import {
 import { GRADE_COLORS, radius, space, type as T, usePalette } from '../theme';
 import type { ScoreCat } from '../lib/types';
 import { Icon, IconName } from './Icon';
+import { useSheets } from './Sheet';
 
 export function ThemedText({ style, dim, children, ...rest }: { style?: StyleProp<TextStyle>; dim?: boolean; children: React.ReactNode } & React.ComponentProps<typeof Text>) {
   const p = usePalette();
@@ -109,31 +110,61 @@ export function Segmented<T extends string>({ options, value, onChange, style, c
 }) {
   const p = usePalette();
   const [w, setW] = React.useState(0);
+  // Compact cells hug their labels, so the pill has to chase measured rects
+  // (a width animation — JS driver) instead of sliding across uniform cells.
+  const [cells, setCells] = React.useState<{ x: number; w: number }[]>([]);
   const n = options.length;
   const idx = Math.max(0, options.findIndex((o) => o.val === value));
   const anim = useRef(new Animated.Value(idx)).current;
   React.useEffect(() => {
-    Animated.spring(anim, { toValue: idx, useNativeDriver: true, speed: 16, bounciness: 8 }).start();
-  }, [idx, anim]);
-  // Compact variant (used inline beside a section title): tighter padding + type.
-  const pad = compact ? 3 : 4;
-  const padV = compact ? 5 : 9;
-  const font = compact ? 13 : 15;
+    Animated.spring(anim, { toValue: idx, useNativeDriver: !compact, speed: 16, bounciness: 8 }).start();
+  }, [idx, anim, compact]);
+  // Compact variant (used inline beside a section title): tighter padding + type,
+  // small enough to sit right-aligned next to a 20pt title without overflowing.
+  const pad = compact ? 2 : 4;
+  const padV = compact ? 6 : 9;
+  const font = compact ? 12 : 15;
   const cell = w > 0 ? (w - pad * 2) / n : 0;
+  const measured = compact && n > 1 && cells.filter(Boolean).length === n;
   return (
     <View
       onLayout={(e) => setW(e.nativeEvent.layout.width)}
       style={[{ position: 'relative', flexDirection: 'row', backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.pill, padding: pad }, style]}
     >
-      {cell > 0 && (
-        <Animated.View
-          style={{ position: 'absolute', top: pad, bottom: pad, left: pad, width: cell, borderRadius: radius.pill, backgroundColor: p.accent, transform: [{ translateX: Animated.multiply(anim, cell) }] }}
-        />
+      {compact ? (
+        measured && (
+          <Animated.View
+            style={{
+              position: 'absolute', top: pad, bottom: pad, left: 0, borderRadius: radius.pill, backgroundColor: p.accent,
+              width: anim.interpolate({ inputRange: options.map((_, i) => i), outputRange: cells.map((c) => c.w) }),
+              transform: [{ translateX: anim.interpolate({ inputRange: options.map((_, i) => i), outputRange: cells.map((c) => c.x) }) }],
+            }}
+          />
+        )
+      ) : (
+        cell > 0 && (
+          <Animated.View
+            style={{ position: 'absolute', top: pad, bottom: pad, left: pad, width: cell, borderRadius: radius.pill, backgroundColor: p.accent, transform: [{ translateX: Animated.multiply(anim, cell) }] }}
+          />
+        )
       )}
-      {options.map((o) => {
+      {options.map((o, i) => {
         const active = o.val === value;
         return (
-          <Pressable key={o.val} onPress={() => onChange(o.val)} style={{ flex: 1, paddingVertical: padV, paddingHorizontal: compact ? 12 : 0, alignItems: 'center', zIndex: 1 }}>
+          <Pressable
+            key={o.val}
+            onPress={() => onChange(o.val)}
+            onLayout={compact ? (e) => {
+              const { x, width } = e.nativeEvent.layout;
+              setCells((prev) => {
+                if (prev[i] && prev[i].x === x && prev[i].w === width) return prev;
+                const next = prev.slice();
+                next[i] = { x, w: width };
+                return next;
+              });
+            } : undefined}
+            style={{ paddingVertical: padV, paddingHorizontal: compact ? 13 : 0, alignItems: 'center', zIndex: 1, ...(compact ? null : { flex: 1 }) }}
+          >
             <Text style={{ color: active ? '#fff' : p.textDim, fontSize: font, fontWeight: '600' }}>{o.label}</Text>
           </Pressable>
         );
@@ -179,6 +210,29 @@ export function Button({ title, onPress, variant = 'default', style }: {
     >
       <Text style={{ color, fontSize: 16, fontWeight: '600' }}>{title}</Text>
     </Pressable>
+  );
+}
+
+/* ---------- Help dot ---------- */
+/** Circled "?" beside a section title; opens a small sheet with an explanation. */
+export function HelpDot({ title, text }: { title: string; text: string }) {
+  const p = usePalette();
+  const { openSheet } = useSheets();
+  const open = () => openSheet(() => <HelpSheet title={title} text={text} />, { fitContent: true });
+  return (
+    <Pressable onPress={open} hitSlop={8} style={{ width: 19, height: 19, borderRadius: 10, borderWidth: 1.2, borderColor: p.textDim, alignItems: 'center', justifyContent: 'center', marginLeft: 8, opacity: 0.75 }}>
+      <Text style={{ fontSize: 11, fontWeight: '700', color: p.textDim, lineHeight: 13 }}>?</Text>
+    </Pressable>
+  );
+}
+function HelpSheet({ title, text }: { title: string; text: string }) {
+  const p = usePalette();
+  return (
+    <View>
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 10 }}>{title}</Text>
+      <Text style={{ color: p.textDim, fontSize: 14.5, lineHeight: 22 }}>{text}</Text>
+      <View style={{ height: 10 }} />
+    </View>
   );
 }
 

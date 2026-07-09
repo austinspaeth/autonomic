@@ -7,7 +7,7 @@ import * as FileSystem from 'expo-file-system';
 import { Screen } from '../../src/components/Header';
 import { Icon, IconName } from '../../src/components/Icon';
 import { Button, Segmented } from '../../src/components/ui';
-import { SheetControls, useSheets } from '../../src/components/Sheet';
+import { SheetControls, SheetFooter, useSheets } from '../../src/components/Sheet';
 import { useToast } from '../../src/components/Toast';
 import { radius, usePalette } from '../../src/theme';
 import { getState, useAppState } from '../../src/store/store';
@@ -76,7 +76,16 @@ export default function InsightsScreen() {
         </Text>
       ) : (
         <>
-          <Text style={{ color: p.textDim, fontSize: 14, marginBottom: 12, lineHeight: 18 }}>Pick one or more reports, then generate a copyable analysis prompt for Claude or ChatGPT.</Text>
+          <Text style={{ color: p.textDim, fontSize: 14, marginBottom: 12, lineHeight: 19 }}>
+            Insight turns your journal into ready-to-paste prompts for the AI you already use — Claude, ChatGPT, Gemini, or any other provider. Pick one or more report areas, generate a prompt, and paste it into your AI of choice to look for patterns, gauge your progress, and surface connections worth discussing with your doctor.
+          </Text>
+          <Pressable onPress={dataExport} style={{ marginBottom: 10, width: '100%', borderWidth: 1, borderRadius: radius.card, backgroundColor: p.surface, borderColor: p.border, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <Icon name="download" size={26} color={p.accent} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: p.text }}>Data Export (data only)</Text>
+              <Text style={{ fontSize: 12, color: p.textDim, marginTop: 4, lineHeight: 15 }}>Your raw logged data for this period, with no analysis prompt attached.</Text>
+            </View>
+          </Pressable>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 10 }}>
             {REPORT_CARDS.map((card) => {
               const sel = selected.has(card.id);
@@ -90,13 +99,6 @@ export default function InsightsScreen() {
               );
             })}
           </View>
-          <Pressable onPress={dataExport} style={{ marginTop: 10, width: '100%', borderWidth: 1, borderRadius: radius.card, backgroundColor: p.surface, borderColor: p.border, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-            <Icon name="download" size={26} color={p.accent} />
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 15, fontWeight: '700', color: p.text }}>Data Export (data only)</Text>
-              <Text style={{ fontSize: 12, color: p.textDim, marginTop: 4, lineHeight: 15 }}>Your raw logged data for this period, with no analysis prompt attached.</Text>
-            </View>
-          </Pressable>
         </>
       )}
     </Screen>
@@ -106,7 +108,11 @@ export default function InsightsScreen() {
 function PromptSheet({ title, rangeText, prompt, controls, subtitle }: { title: string; rangeText: string; prompt: string; controls: SheetControls; subtitle?: string }) {
   const p = usePalette();
   const toast = useToast();
-  const copy = async () => { await Clipboard.setStringAsync(prompt); toast(`${subtitle ? 'Data' : 'Prompt'} copied to clipboard`); };
+  const copy = async () => {
+    await Clipboard.setStringAsync(prompt);
+    controls.close();
+    toast('Copied to clipboard');
+  };
   const share = async () => {
     try {
       const uri = `${FileSystem.cacheDirectory}autonomic-report.txt`;
@@ -117,16 +123,32 @@ function PromptSheet({ title, rangeText, prompt, controls, subtitle }: { title: 
   return (
     <View>
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text }}>{title}</Text>
-      <Text style={{ color: p.textDim, fontSize: 14, marginTop: 4 }}>{subtitle || 'Copy this prompt and paste it into Claude or ChatGPT.'}</Text>
+      <Text style={{ color: p.textDim, fontSize: 14, marginTop: 4 }}>{subtitle || 'Copy this prompt and paste it into Claude, ChatGPT, Gemini, or your AI of choice.'}</Text>
       <Text style={{ color: p.textDim, fontSize: 12, marginTop: 6, marginBottom: 10, fontVariant: ['tabular-nums'] }}>{`${rangeText} · ${prompt.length.toLocaleString()} characters`}</Text>
-      <View style={{ backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.control, padding: 12, marginBottom: 16 }}>
+      <View style={{ backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.control, padding: 12 }}>
         <Text selectable style={{ color: p.text, fontFamily: 'Menlo', fontSize: 11, lineHeight: 16 }}>{prompt}</Text>
       </View>
-      <View style={{ flexDirection: 'row', gap: 10 }}>
-        <Button title="Share" variant="ghost" onPress={share} />
-        <Button title={subtitle ? 'Copy data' : 'Copy prompt'} variant="primary" onPress={copy} />
-      </View>
-      <View style={{ height: 24 }} />
+      {/* Extra tail room: the pinned footer (disclaimer + buttons) is taller than
+          the sheet's default footer clearance. */}
+      <View style={{ height: 70 }} />
+      {/* Copy/Share stay pinned in the sheet's fixed footer so they're always in
+          view, with the AI disclaimer riding directly above them. */}
+      <SheetFooter>
+        <View style={{ flex: 1 }}>
+          {!subtitle ? (
+            <View style={{ flexDirection: 'row', gap: 9, alignItems: 'flex-start', backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.control, padding: 10, marginBottom: 10 }}>
+              <View style={{ marginTop: 1 }}><Icon name="info" size={15} color={p.textDim} /></View>
+              <Text style={{ flex: 1, color: p.textDim, fontSize: 11.5, lineHeight: 16 }}>
+                Any analysis or advice comes from the AI service you paste this into — Autonomic only assembles your logged data. Talk to your doctor before acting on its suggestions.
+              </Text>
+            </View>
+          ) : null}
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <Button title="Share" variant="ghost" onPress={share} />
+            <Button title={subtitle ? 'Copy data' : 'Copy prompt'} variant="primary" onPress={copy} />
+          </View>
+        </View>
+      </SheetFooter>
     </View>
   );
 }

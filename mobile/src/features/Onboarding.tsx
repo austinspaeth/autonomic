@@ -1,14 +1,16 @@
 /**
- * First-run welcome wizard — shown once, before any data exists. Five steps:
- * Welcome → Private & on-device → Disclaimer (gated acknowledge) → Connect data
- * (Apple Health / heart-rate strap, both optional) → You're set. Completing it
- * stamps `meta.onboarded`, fades to black, then fades the app UI in beneath.
+ * First-run welcome wizard — shown once, before any data exists. Six steps:
+ * Welcome → Private & on-device → Disclaimer (gated acknowledge) → About you
+ * (profile basics, skippable) → Connect data (Apple Health / heart-rate strap,
+ * both optional) → You're set. Completing it stamps `meta.onboarded`, fades to
+ * black, then fades the app UI in beneath. Settings can re-show it any time via
+ * `showWelcomeAgain()`.
  *
  * The wizard renders as an absolute-fill overlay above the tab UI (mounted in
  * app/_layout.tsx), so the app is already live underneath when the reveal runs.
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import Animated, {
   Easing, FadeIn, FadeInLeft, FadeInRight, FadeOut, FadeOutLeft, FadeOutRight,
   interpolateColor, runOnJS, useAnimatedStyle, useSharedValue, withDelay, withTiming,
@@ -40,18 +42,32 @@ const C = {
   accentWash: 'rgba(224,49,39,0.07)',
 };
 
-const STEPS = 5;
-const PRIMARY_LABELS = ['Get started', 'Continue', 'I understand', 'Continue', 'Start logging'];
+const STEPS = 6;
+const PRIMARY_LABELS = ['Get started', 'Continue', 'I understand', 'Continue', 'Continue', 'Start logging'];
 const STEP_DUR = 280;
 
-/** Mounts the wizard only for a fresh install (no completed flow, no prior data). */
+/** Steps that show the top-right Skip (About you + Connect data). */
+const SKIPPABLE = new Set([3, 4]);
+
+// Settings → "Show welcome guide" re-mounts the wizard through this tiny event.
+const welcomeListeners = new Set<() => void>();
+export function showWelcomeAgain() { welcomeListeners.forEach((l) => l()); }
+
+/** Mounts the wizard for a fresh install (no completed flow, no prior data) —
+ *  or on demand when Settings asks for it again. */
 export function OnboardingGate() {
   const [show, setShow] = useState(() => {
     const s = getState();
     return !s.meta.onboarded && !s.meta.lastUpdated;
   });
+  const [runId, setRunId] = useState(0);
+  useEffect(() => {
+    const l = () => { setRunId((i) => i + 1); setShow(true); };
+    welcomeListeners.add(l);
+    return () => { welcomeListeners.delete(l); };
+  }, []);
   if (!show) return null;
-  return <Onboarding onDone={() => setShow(false)} />;
+  return <Onboarding key={runId} onDone={() => setShow(false)} />;
 }
 
 /* ---------- small stroke-icon helper (paths from the design comp) ---------- */
@@ -172,6 +188,16 @@ function Onboarding({ onDone }: { onDone: () => void }) {
   const strapOn = !!state.settings.lastBleDeviceId;
   const gated = step === 2 && !ack;
 
+  // About-you profile fields — prefilled so re-running the wizard shows what's set.
+  const prof = getState().profile;
+  const [sex, setSex] = useState(prof.sex || '');
+  const [birthday, setBirthday] = useState(prof.birthday || '');
+  const [weight, setWeight] = useState(prof.weight || '');
+  const [height, setHeight] = useState(prof.height || '');
+  const saveProfile = () => {
+    mutate((s) => { s.profile = { sex, birthday: birthday.trim(), weight: weight.trim(), height: height.trim() }; });
+  };
+
   // Step navigation. Direction is committed a frame before the step so the
   // outgoing view's `exiting` preset matches the direction of travel.
   const go = (n: number) => {
@@ -181,9 +207,11 @@ function Onboarding({ onDone }: { onDone: () => void }) {
   };
   const next = () => {
     if (gated || finishing) return;
+    if (step === 3) saveProfile(); // Continue commits the profile; Skip doesn't
     if (step >= STEPS - 1) finish();
     else go(step + 1);
   };
+  const skip = () => { if (!finishing && step < STEPS - 1) go(step + 1); };
   const back = () => { if (step > 0 && !finishing) go(step - 1); };
 
   // Finish: fade to black over the wizard, stamp the flag while the screen is
@@ -213,14 +241,14 @@ function Onboarding({ onDone }: { onDone: () => void }) {
     if (ok) { getState().settings.healthEnabled = true; save(); toast('Health connected'); }
     else toast('Permission denied');
   };
-  const connectStrap = () => openSheet(() => <DevicesScreen />);
+  const connectStrap = () => openSheet((c) => <DevicesScreen controls={c} />);
 
   /* ---------- animated chrome ---------- */
   const backO = useSharedValue(0);
   const skipO = useSharedValue(0);
   const primO = useSharedValue(1);
   useEffect(() => { backO.value = withTiming(step > 0 ? 1 : 0, { duration: 200 }); }, [step, backO]);
-  useEffect(() => { skipO.value = withTiming(step === 3 ? 1 : 0, { duration: 200 }); }, [step, skipO]);
+  useEffect(() => { skipO.value = withTiming(SKIPPABLE.has(step) ? 1 : 0, { duration: 200 }); }, [step, skipO]);
   useEffect(() => { primO.value = withTiming(gated ? 0.4 : 1, { duration: 200 }); }, [gated, primO]);
   const backStyle = useAnimatedStyle(() => ({ opacity: backO.value }));
   const skipStyle = useAnimatedStyle(() => ({ opacity: skipO.value }));
@@ -285,7 +313,62 @@ function Onboarding({ onDone }: { onDone: () => void }) {
         <AckRow on={ack} onPress={() => setAck(!ack)} />
       </View>
     );
-    if (step === 3) return (
+    if (step === 3) {
+      const sexPill = (o: string) => {
+        const on = sex === o;
+        return (
+          <Pressable
+            key={o}
+            onPress={() => setSex(on ? '' : o)}
+            style={{ flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: 12, borderWidth: 1, backgroundColor: on ? C.accentWash : C.row, borderColor: on ? C.accentBorder : C.rowBorder }}
+          >
+            <Text style={{ fontSize: 14, fontWeight: '600', color: on ? C.text : C.dim }}>{o}</Text>
+          </Pressable>
+        );
+      };
+      return (
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingTop: 24, gap: 22, paddingBottom: 24 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          <View style={[st.tile, { width: 64, height: 64, borderRadius: 18 }]}>
+            <Glyph size={30} d={['M16 8a4 4 0 1 1-8 0 4 4 0 0 1 8 0', 'M4 21a8 8 0 0 1 16 0']} />
+          </View>
+          <View>
+            <Text style={st.h2}>About you</Text>
+            <Text style={st.para}>
+              A few basics personalize your scores — sex-adjusted QTc, BMI, and age-aware context.
+              All optional, stored only on your device, and editable anytime in Settings.
+            </Text>
+          </View>
+          <View style={{ gap: 14 }}>
+            <View>
+              <Text style={st.fieldLabel}>Sex</Text>
+              <View style={{ flexDirection: 'row', gap: 8 }}>{['Male', 'Female', 'Other'].map(sexPill)}</View>
+            </View>
+            <View>
+              <Text style={st.fieldLabel}>Birthday</Text>
+              <TextInput
+                value={birthday}
+                onChangeText={setBirthday}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor={C.chevron}
+                keyboardType="numbers-and-punctuation"
+                style={st.input}
+              />
+            </View>
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={st.fieldLabel}>Height (in)</Text>
+                <TextInput value={height} onChangeText={setHeight} placeholder="68" placeholderTextColor={C.chevron} keyboardType="decimal-pad" style={st.input} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={st.fieldLabel}>Weight (lb)</Text>
+                <TextInput value={weight} onChangeText={setWeight} placeholder="150" placeholderTextColor={C.chevron} keyboardType="decimal-pad" style={st.input} />
+              </View>
+            </View>
+          </View>
+        </ScrollView>
+      );
+    }
+    if (step === 4) return (
       <View style={{ flex: 1, paddingTop: 24, gap: 22 }}>
         <View style={[st.tile, { width: 64, height: 64, borderRadius: 18 }]}>
           <Glyph size={30} d={['M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71', 'M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71']} />
@@ -368,8 +451,8 @@ function Onboarding({ onDone }: { onDone: () => void }) {
         <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 7 }}>
           {Array.from({ length: STEPS }, (_, i) => <Dot key={i} i={i} step={step} />)}
         </View>
-        <Animated.View style={skipStyle} pointerEvents={step === 3 ? 'auto' : 'none'}>
-          <Pressable onPress={next} hitSlop={8}>
+        <Animated.View style={skipStyle} pointerEvents={SKIPPABLE.has(step) ? 'auto' : 'none'}>
+          <Pressable onPress={skip} hitSlop={8}>
             <Text style={{ color: C.faint, fontSize: 14, fontWeight: '600', paddingVertical: 6 }}>Skip</Text>
           </Pressable>
         </Animated.View>
@@ -422,6 +505,8 @@ const st = StyleSheet.create({
   para: { fontSize: 15, lineHeight: 24, color: C.dim },
   privRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 14, paddingVertical: 6, paddingHorizontal: 2 },
   privLabel: { fontSize: 14, lineHeight: 20, color: C.text },
+  fieldLabel: { fontSize: 12, letterSpacing: 0.6, textTransform: 'uppercase', color: C.faint, fontWeight: '700', marginBottom: 7 },
+  input: { backgroundColor: C.row, borderWidth: 1, borderColor: C.rowBorder, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15, color: C.text },
   note: { flexDirection: 'row', gap: 11, backgroundColor: C.accentWash, borderWidth: 1, borderColor: 'rgba(224,49,39,0.19)', borderRadius: 12, padding: 14 },
   backBtn: { width: 34, height: 34, borderRadius: 999, borderWidth: 1, borderColor: C.tileBorder, backgroundColor: C.row, alignItems: 'center', justifyContent: 'center' },
 });

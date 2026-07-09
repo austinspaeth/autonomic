@@ -19,6 +19,8 @@ export async function GET() {
   const urls = [
     { loc: `${BASE}/`, priority: '1.0' },
     { loc: `${BASE}/blog/`, priority: '0.7' },
+    { loc: `${BASE}/privacy-policy/`, priority: '0.3' },
+    { loc: `${BASE}/terms-of-service/`, priority: '0.3' },
     ...articles.map((a) => ({ loc: `${BASE}/blog/${a.slug}/`, lastmod: a.date, priority: '0.6' }))
   ];
 

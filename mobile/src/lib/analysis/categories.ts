@@ -18,7 +18,15 @@ export interface Chart { label: string; series: Series[]; zones?: Zone[] | null;
 export interface Stat { label: string; value: number | string | null; sub?: string; color?: string }
 export interface Insight { text: string; strength?: 'strong' | 'mod' | null }
 export interface BarGroup { label: string; rows: { name: string; count: number; color?: string }[]; fmt?: (c: number) => string }
-export interface AnalysisCard { title: string; sub?: string; charts?: Chart[]; stats?: Stat[]; insights?: Insight[]; bars?: BarGroup[] }
+export interface AnalysisCard {
+  title: string;
+  sub?: string;
+  /** One-line description shown under the section header (design-comp style). */
+  desc?: string;
+  /** Longer copy for the "?" help sheet next to the title. */
+  help?: string;
+  charts?: Chart[]; stats?: Stat[]; insights?: Insight[]; bars?: BarGroup[];
+}
 export interface Category { id: string; icon: string; title: string; desc: string; buckets: { label: string }[]; build: () => AnalysisCard[] }
 
 export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): Category[] {
@@ -41,16 +49,23 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
     const avg = acMean(vals)!;
     const cards: AnalysisCard[] = [{
       title: 'Autonomic Outlook', sub: range,
+      desc: 'Your daily autonomic score over the range, with a rolling average to smooth the noise.',
+      help: 'Each day is scored 0–100 from everything you logged that day — HRV readings, vitals, symptoms and sleep — using the recovery framework\'s thresholds. The dashed line is a rolling average, which is usually the better trend to watch: single days swing, the rolling line tells the story.',
       charts: [{ label: 'Daily score', series: [series(vals, SCORE_COLORS.great, 'Score', { pointBands: null }), series(roll, '#9a9aa0', `${win}-pt avg`, { dashed: true })], zones: acScoreZones(), integer: true }],
       stats: [
         { label: 'Average', value: Math.round(avg), color: scoreCat(avg).color },
-        best ? { label: 'Best day', value: best.sc, sub: best.dk.slice(5), color: scoreCat(best.sc).color } : null,
-        worst ? { label: 'Worst day', value: worst.sc, sub: worst.dk.slice(5), color: scoreCat(worst.sc).color } : null,
+        best ? { label: `Best day · ${best.dk.slice(5)}`, value: best.sc, color: scoreCat(best.sc).color } : null,
+        worst ? { label: `Worst day · ${worst.dk.slice(5)}`, value: worst.sc, color: scoreCat(worst.sc).color } : null,
       ].filter(Boolean) as Stat[],
     }];
     // correlations
     const corr = correlations(days, ctx);
-    if (corr.length) cards.push({ title: 'Correlation Insights', sub: 'Pearson · 14+ days, |r| ≥ 0.3', insights: corr });
+    if (corr.length) cards.push({
+      title: 'Correlation Insights',
+      desc: 'Patterns between your habits and your autonomic score.',
+      help: 'Pearson correlations between paired daily values (sleep vs next-morning RMSSD, water vs score, and so on), reported only with at least 14 days of overlap and |r| ≥ 0.3. Correlation is not causation — treat these as leads worth testing, not conclusions.',
+      insights: corr,
+    });
     return cards;
   };
 
@@ -58,7 +73,9 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
     const streak = streakInfo(days, new Date().toISOString().slice(0, 10));
     const tier = streakTier(streak.current);
     return {
-      title: 'Clean Days', sub: 'Protocol streak tracking',
+      title: 'Clean Days',
+      desc: 'Days in a row without breaking your protocol.',
+      help: 'A "clean" day is one with no logged trigger foods. The streak counts consecutive clean days ending today; the 30-day rate shows what share of the last month stayed clean. Streaks build tolerance slowly — a broken streak is data, not failure.',
       stats: [
         { label: 'Current streak', value: streak.current, sub: 'days', color: SCORE_COLORS.great },
         { label: 'Longest', value: streak.longest, sub: 'days' },
@@ -93,26 +110,23 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
     const dia = acAgg(buckets, (d) => acReadVals(d, 'bp', 'dia'));
     const laying = acAgg(buckets, (d) => acReadVals(d, 'restingHr', 'hr', (r) => (r.position || '') === 'Laying'));
     const cards: AnalysisCard[] = [];
-    if (acPresent(sys).length) cards.push({ title: 'Blood Pressure', sub: range, charts: [
-      // One connected systolic↕diastolic segment per reading, grade-gradient coloured.
-      { label: 'Systolic / diastolic', series: [], dumbbell: { sys, dia } },
-    ], stats: [{ label: 'Avg sys morning', value: avgRound(acAgg(buckets, (d) => acReadVals(d, 'bp', 'sys', isMorning))) }, { label: 'Avg sys evening', value: avgRound(acAgg(buckets, (d) => acReadVals(d, 'bp', 'sys', isEvening))) }] });
-    if (acPresent(laying).length) cards.push({ title: 'Resting Heart Rate', sub: range, charts: [{ label: 'Laying HR', series: [series(laying, SCORE_COLORS.bad)] }], stats: [{ label: 'Avg laying HR', value: avgRound(laying) }] });
-    // ECG: every recorded interval, not just QTc.
-    const ecgRows: { key: string; label: string; band: string | null; integer?: boolean }[] = [
-      { key: 'qtc', label: 'QTc', band: 'qtc', integer: true },
-      { key: 'qrs', label: 'QRS', band: 'qrs', integer: true },
-      { key: 'pr', label: 'PR', band: 'pr', integer: true },
-      { key: 'hr', label: 'HR', band: 'hrBreath', integer: true },
-      { key: 'hrv', label: 'HRV', band: 'ecgHrv', integer: true },
-      { key: 'ectopic', label: 'Ectopic beats', band: 'ectopic', integer: true },
-    ];
-    const ecgCharts = ecgRows.map((row) => {
-      const vals = acAgg(buckets, (d) => acReadVals(d, 'ecg', row.key));
-      if (!acPresent(vals).length) return null;
-      return { label: row.label, series: [series(vals, SCORE_COLORS.bad, undefined, { pointBands: row.band ? BANDS[row.band] : null })], zones: row.band ? acBandZones(row.band) : null, integer: row.integer };
-    }).filter((c): c is NonNullable<typeof c> => c != null);
-    if (ecgCharts.length) cards.push({ title: 'ECG', sub: range, charts: ecgCharts });
+    if (acPresent(sys).length) cards.push({
+      title: 'Blood Pressure', sub: range,
+      desc: 'Each reading as a systolic-to-diastolic span, coloured by grade at each end.',
+      help: 'Every bar connects a reading\'s diastolic (bottom) to its systolic (top), tinted by how each value grades against the framework thresholds. Watch for the spread as well as the level — a narrowing pulse pressure on standing is a common dysautonomia pattern worth showing your doctor.',
+      charts: [
+        // One connected systolic↕diastolic segment per reading, grade-gradient coloured.
+        { label: 'Systolic / diastolic', series: [], dumbbell: { sys, dia } },
+      ],
+      stats: [{ label: 'Avg sys morning', value: avgRound(acAgg(buckets, (d) => acReadVals(d, 'bp', 'sys', isMorning))) }, { label: 'Avg sys evening', value: avgRound(acAgg(buckets, (d) => acReadVals(d, 'bp', 'sys', isEvening))) }],
+    });
+    if (acPresent(laying).length) cards.push({
+      title: 'Resting Heart Rate', sub: range,
+      desc: 'Laying heart rate over the range.',
+      help: 'Heart rate measured while laying down — the cleanest resting baseline. A gradually falling laying HR usually accompanies improving autonomic recovery; a sustained unexplained rise is worth noting alongside symptoms and sleep.',
+      charts: [{ label: 'Laying HR', series: [series(laying, SCORE_COLORS.bad)] }],
+      stats: [{ label: 'Avg laying HR', value: avgRound(laying) }],
+    });
     return cards;
   };
 
@@ -124,6 +138,8 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
     Object.keys(days).forEach((dk) => (days[dk].readings || []).forEach((r) => { if (r.type === 'orthostatic') { const v = incOf(r); if (v != null && v >= 30) potsN++; } }));
     return [{
       title: 'Orthostatic Events', sub: range,
+      desc: 'How much your heart rate rises when you stand.',
+      help: 'The heart-rate increase from resting to standing for each logged orthostatic event. A sustained rise of 30 bpm or more (40 in adolescents) within 10 minutes of standing is the adult POTS-range criterion — the zones shade that threshold. Trends matter more than any single stand.',
       charts: [{ label: 'HR increase on standing', series: [series(inc, '#f97316', undefined, { pointBands: BANDS.orthoIncrease })], zones: acBandZones('orthoIncrease'), integer: true }],
       insights: potsN ? [{ text: `${potsN} event${potsN === 1 ? '' : 's'} reached a ≥30 bpm standing rise (the adult POTS-range threshold).`, strength: 'mod' }] : [],
     }];
@@ -134,6 +150,8 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
     if (!acPresent(dur).length) return [];
     return [{
       title: 'Sleep', sub: range,
+      desc: 'How long you slept and when, night by night.',
+      help: 'Duration is the night that ended that morning; the dashed band marks the 7–9 hour target. The timing chart plots bedtime and wake time on a 24-hour scale — consistency of timing often moves HRV as much as raw duration does.',
       charts: [
         { label: 'Duration (hours)', series: [series(dur, '#38bdf8')], target: { from: 7, to: 9, color: '#16a34a' } },
         { label: 'Bedtime vs wake (24h)', series: [series(acAgg(buckets, (d) => { const t = acToDec(d.sleep?.bed); return t == null ? null : t < 12 ? t + 24 : t; }), '#a78bfa', 'Bed'), series(acAgg(buckets, (d) => acToDec(d.sleep?.wake)), '#f97316', 'Wake')], legend: [['Bed', '#a78bfa'], ['Wake', '#f97316']] },
@@ -151,6 +169,8 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
     if (!rows.length) return [];
     return [{
       title: 'Activity', sub: range,
+      desc: 'Exercise minutes over the range and what kinds of sessions they were.',
+      help: 'Total logged exercise minutes per bucket, plus a breakdown of session types and the balance of active versus rest days. In autonomic recovery, consistency at a tolerable dose beats intensity — watch how your score and symptoms respond in the day or two after harder sessions.',
       charts: [{ label: 'Total exercise minutes', series: [series(mins, SCORE_COLORS.bad)], integer: true }],
       bars: [{ label: 'Activity types', rows }],
       stats: [{ label: 'Active days', value: activeDays || null }, { label: 'Rest days', value: restDays || null }],
@@ -164,8 +184,19 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
     const trigRows = Object.entries(trig).map(([k, c]) => ({ name: TRIGGER_TYPES[k].label, count: c })).sort((a, b) => b.count - a.count);
     if (!acPresent(water).length && !trigRows.length) return [];
     const cards: AnalysisCard[] = [];
-    if (trigRows.length) cards.push({ title: 'Triggers', sub: 'Occurrences in range', bars: [{ label: 'All triggers', rows: trigRows }] });
-    if (acPresent(water).length) cards.push({ title: 'Hydration', sub: range, charts: [{ label: 'Water (L/day)', series: [series(water, '#38bdf8')], target: { from: 2.5, to: 3.5, color: '#16a34a' } }], stats: [{ label: 'Avg water', value: avgRound(water, 1), sub: 'L' }] });
+    if (trigRows.length) cards.push({
+      title: 'Triggers',
+      desc: 'How often each trigger food showed up in this range.',
+      help: 'Counts of every logged trigger (histamine foods, caffeine, alcohol and the rest). Pair this with the Outlook correlations: if a trigger keeps landing before bad days, that\'s a pattern worth testing with an elimination window.',
+      bars: [{ label: 'All triggers', rows: trigRows }],
+    });
+    if (acPresent(water).length) cards.push({
+      title: 'Hydration', sub: range,
+      desc: 'Daily water intake against the target band.',
+      help: 'Litres of water per day; the dashed band marks the 2.5–3.5 L range commonly recommended alongside electrolytes for orthostatic conditions. Fluid only holds where salt allows — if you chase volume, discuss electrolyte targets with your doctor.',
+      charts: [{ label: 'Water (L/day)', series: [series(water, '#38bdf8')], target: { from: 2.5, to: 3.5, color: '#16a34a' } }],
+      stats: [{ label: 'Avg water', value: avgRound(water, 1), sub: 'L' }],
+    });
     return cards;
   };
 
@@ -174,14 +205,19 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
     buckets.forEach((b) => b.days.forEach((dk) => { const meds = days[dk].meds || []; if (meds.length) anyMeds = true; new Set(meds.map((m) => m.type)).forEach((t) => { counts[t] = (counts[t] || 0) + 1; }); }));
     if (!anyMeds) return [];
     const rows = Object.entries(counts).map(([t, c]) => ({ name: MED_TYPES[t]?.label || t, count: c })).sort((a, b) => b.count - a.count);
-    return [{ title: 'Medications & Supplements', sub: 'Days taken in range', bars: [{ label: '', rows, fmt: (c) => `${c} d` }] }];
+    return [{
+      title: 'Medications & Supplements',
+      desc: 'How many days each was taken in this range.',
+      help: 'Days-taken counts for every medication and supplement you logged. Consistent daily bars make it easy to spot missed stretches — and to line adherence up against score changes when you and your doctor adjust the protocol.',
+      bars: [{ label: '', rows, fmt: (c) => `${c} d` }],
+    }];
   };
 
   const bl = buckets.map((b) => ({ label: b.label }));
   return [
     { id: 'outlook', icon: 'gauge', title: 'Outlook', desc: 'Recovery score & trends', buckets: bl, build: () => nonEmpty([...outlook(), heat()]) },
     { id: 'hrv', icon: 'heartPulse', title: 'HRV', desc: 'Heart-rate variability', buckets: bl, build: () => nonEmpty(hrv()) },
-    { id: 'vitals', icon: 'heart', title: 'Vitals', desc: 'BP, HR, SpO₂ & ECG', buckets: bl, build: () => nonEmpty(vitals()) },
+    { id: 'vitals', icon: 'heart', title: 'Vitals', desc: 'Blood pressure & heart rate', buckets: bl, build: () => nonEmpty(vitals()) },
     { id: 'pots', icon: 'standing', title: 'POTS', desc: 'Orthostatic events', buckets: bl, build: () => nonEmpty(pots()) },
     { id: 'sleep', icon: 'moon', title: 'Sleep', desc: 'Duration & timing', buckets: bl, build: () => nonEmpty(sleep()) },
     { id: 'activity', icon: 'bike', title: 'Activity', desc: 'Workouts & exercise', buckets: bl, build: () => nonEmpty(activity()) },

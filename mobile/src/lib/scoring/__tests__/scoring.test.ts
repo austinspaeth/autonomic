@@ -6,8 +6,8 @@
 import type { DayRecord, Entry } from '../../types';
 import {
   BANDS, CAT_POINTS, GRADE_PTS, SCORE_RANK, bpBce, bpKerdo, bpKvas, bpMap,
-  bpPP, bpRobinson, catFromBands, computeScores, expectedHf, hrvComposite, qtcBands,
-  restingHrBands, rowScoreCategory, sHfPeak, sLfPeak, sPR, sSys, totalPower, worstCat,
+  bpPP, bpRobinson, catFromBands, computeScores, expectedHf, hrvComposite,
+  restingHrBands, rowScoreCategory, sHfPeak, sLfPeak, sSys, totalPower, worstCat,
 } from '../index';
 import {
   activityGrade, blueZone, dayCleanliness, scoreCat, scoreSet, sleepGrade, sleepHours,
@@ -134,7 +134,7 @@ describe('unstructured HRV', () => {
   });
 });
 
-describe('BP / resting HR / ECG / orthostatic', () => {
+describe('BP / resting HR / orthostatic', () => {
   it('sSys and sDia both-sided zones, sBP = worst', () => {
     expect(sSys('115')).toBe('great');
     expect(sSys('95')).toBe('bad');
@@ -152,26 +152,6 @@ describe('BP / resting HR / ECG / orthostatic', () => {
   it('restingHrBands lay vs sit', () => {
     expect(catFromBands(66, restingHrBands('Laying'))).toBe('good');
     expect(catFromBands(66, restingHrBands('Sitting'))).toBe('great');
-  });
-  it('ECG: qtc sex-adjusted, overall = worst sub-metric', () => {
-    // QTc 445: male -> ok (>=440 <450), female -> good (shifted +10 => <450 good)
-    expect(catFromBands(445, qtcBands('Male'))).toBe('ok');
-    expect(catFromBands(445, qtcBands('Female'))).toBe('good');
-    const s = computeScores({ id: 'x', type: 'ecg', qtc: '410', qrs: '95', pr: '160', ectopic: '0', sinus: true }, { sex: 'Male' });
-    expect(s.qtc).toBe('great');
-    expect(s.qrs).toBe('good');
-    expect(s.pr).toBe('great');
-    expect(s.ectopic).toBe('great');
-    expect(s.rhythm).toBe('great');
-    expect(s.overall).toBe('good');
-    const svt = computeScores({ id: 'x', type: 'ecg', svt: true }, {});
-    expect(svt.rhythm).toBe('concerning');
-    expect(svt.overall).toBe('concerning');
-  });
-  it('sPR double-sided', () => {
-    expect(sPR('150')).toBe('great');
-    expect(sPR('205')).toBe('ok');
-    expect(sPR('250')).toBe('concerning');
   });
   it('orthostatic increase + recovery', () => {
     const s = computeScores({ id: 'x', type: 'orthostatic', beforeHr: '65', afterHr: '95', hr1min: '80' });

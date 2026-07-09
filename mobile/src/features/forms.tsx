@@ -77,7 +77,7 @@ function healthPrefill(type: string, c: HealthCandidate): Entry {
 
 /** On-demand Apple Health import card. Lists the selected day's samples for one
  *  reading type; tap one to review-and-save, or enter one manually. Opened only
- *  for types Apple Health can supply (BP / ECG / Resting HR). */
+ *  for types Apple Health can supply (BP / Resting HR). */
 function ReadingImportSheet({ type, dk, source, onManual, onPick }: {
   type: string; dk: string; source: HealthSource; onManual: () => void; onPick: (c: HealthCandidate) => void;
 }) {

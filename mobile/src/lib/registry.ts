@@ -71,24 +71,6 @@ export const READING_TYPES: Record<string, TypeDef> = {
       { type: 'select', key: 'period', label: 'Reading type', options: ['Morning', 'Evening', 'Random'] },
     ],
   },
-  ecg: {
-    label: 'ECG',
-    icon: 'activity',
-    fields: [
-      { type: 'number', key: 'hrv', label: 'HRV' },
-      { type: 'number', key: 'hr', label: 'HR' },
-      { type: 'number', key: 'qrs', label: 'QRS' },
-      { type: 'number', key: 'qtc', label: 'QTc' },
-      { type: 'number', key: 'pr', label: 'PR' },
-      { type: 'number', key: 'ectopic', label: 'Ectopic beats' },
-      { divider: true },
-      { type: 'check', key: 'sinus', label: 'Sinus' },
-      { type: 'check', key: 'svt', label: 'SVT' },
-      { type: 'check', key: 'otherArrhythmia', label: 'Other' },
-      { type: 'textarea', key: 'note', label: 'Notes', placeholder: 'Optional notes' },
-      { type: 'textarea', key: 'techReview', label: 'Technician review', placeholder: 'Technician review' },
-    ],
-  },
   restingHr: {
     label: 'Resting Heart Rate',
     icon: 'heart',
@@ -440,7 +422,6 @@ export function readingRowValue(r: Entry): string {
     case 'breathHrv': return r.sdnn != null && r.sdnn !== '' ? `${r.sdnn} SDNN` : '';
     case 'bp': return r.sys || r.dia ? `${r.sys || '-'}/${r.dia || '-'}` : '';
     case 'restingHr': return r.hr != null && r.hr !== '' ? `${r.hr} hr` : '';
-    case 'ecg': return r.svt ? 'SVT' : r.otherArrhythmia ? 'Other' : r.sinus ? 'Sinus' : '-';
     default: return summarizeFields(READING_TYPES[r.type], r);
   }
 }

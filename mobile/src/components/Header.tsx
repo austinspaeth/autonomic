@@ -7,9 +7,10 @@
  * inset to the measured header height and lays a `BottomFade` (transparent → 100%
  * black) over the content — z-index below the nav bar, which the Tabs navigator
  * renders in its own layer above every screen. */
-import React, { useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { NativeScrollEvent, NativeSyntheticEvent, ScrollView, View } from 'react-native';
 import { BlurView } from 'expo-blur';
+import { useFocusEffect } from 'expo-router';
 import Svg, { Defs, LinearGradient as SvgGradient, Rect, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePalette } from '../theme';
@@ -103,10 +104,22 @@ export function Screen({
   // Seed the top inset with an estimate so content doesn't flash under the
   // header on first paint; the measured height takes over immediately after.
   const [headerH, setHeaderH] = useState(insets.top + 6);
+  // Tab scenes stay mounted, so keep our own handle on the scroll view (merged
+  // with any caller-provided ref) and snap back to the top whenever the screen
+  // regains focus — switching tabs always starts you at the top.
+  const innerRef = useRef<ScrollView | null>(null);
+  const setScrollRef = useCallback((node: ScrollView | null) => {
+    innerRef.current = node;
+    if (typeof scrollRef === 'function') scrollRef(node);
+    else if (scrollRef) (scrollRef as React.MutableRefObject<ScrollView | null>).current = node;
+  }, [scrollRef]);
+  useFocusEffect(useCallback(() => {
+    innerRef.current?.scrollTo({ y: 0, animated: false });
+  }, []));
   return (
     <View style={{ flex: 1, backgroundColor: p.bg }}>
       <ScrollView
-        ref={scrollRef}
+        ref={setScrollRef}
         onScroll={onScroll}
         scrollEventThrottle={scrollEventThrottle ?? 16}
         contentContainerStyle={{ paddingTop: headerH + contentPadding, paddingHorizontal: contentPadding, paddingBottom: bottomPad }}

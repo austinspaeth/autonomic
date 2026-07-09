@@ -69,9 +69,6 @@ export const sRestingHr = (v: unknown, pos?: unknown): ScoreCat | null => {
     ? (n <= 62 ? 'great' : n <= 68 ? 'good' : n <= 75 ? 'ok' : n <= 85 ? 'bad' : 'concerning')
     : (n <= 68 ? 'great' : n <= 78 ? 'good' : n <= 88 ? 'ok' : n <= 98 ? 'bad' : 'concerning');
 };
-export const sQRS = (v: unknown): ScoreCat | null => { const n = numOr(v); if (n == null) return null; if (n > 130) return 'concerning'; if (n >= 121) return 'bad'; if (n >= 111) return 'ok'; if (n >= 91) return 'good'; return 'great'; };
-export const sPR = (v: unknown): ScoreCat | null => { const n = numOr(v); if (n == null) return null; if (n < 100 || n > 240) return 'concerning'; if (n < 110 || n >= 221) return 'bad'; if (n < 120 || n >= 201) return 'ok'; if (n < 140 || n >= 181) return 'good'; return 'great'; };
-export const sEctopic = (v: unknown): ScoreCat | null => { const n = numOr(v); return n == null ? null : n === 0 ? 'great' : n <= 2 ? 'good' : n <= 5 ? 'ok' : n <= 15 ? 'bad' : 'concerning'; };
 export const sLfPeak = (v: unknown): ScoreCat | null => { const n = numOr(v); if (n == null) return null; if (n < 0.045) return 'concerning'; if (n < 0.060) return 'bad'; if (n < 0.075) return 'ok'; if (n < 0.090) return 'good'; if (n <= 0.105) return 'great'; return 'good'; };
 export const sLfHf = (v: unknown): ScoreCat | null => { const n = numOr(v); if (n == null) return null; if (n < 1.5) return 'great'; if (n <= 3) return 'good'; if (n <= 5) return 'ok'; if (n <= 10) return 'bad'; return 'concerning'; };
 export const expectedHf = (style?: unknown): [number, number] | null =>
@@ -89,7 +86,6 @@ export const sRrMode = (v: unknown): ScoreCat | null => { const n = numOr(v); if
 export const sMxDMn = (v: unknown): ScoreCat | null => { const n = numOr(v); return n == null ? null : n >= 0.35 ? 'great' : n >= 0.25 ? 'good' : n >= 0.18 ? 'ok' : n >= 0.12 ? 'bad' : 'crash'; }; // seconds
 export const sAMo50 = (v: unknown): ScoreCat | null => { const n = numOr(v); return n == null ? null : n < 30 ? 'great' : n < 40 ? 'good' : n < 50 ? 'ok' : n < 60 ? 'bad' : 'concerning'; }; // lower better
 export const sCV = (v: unknown): ScoreCat | null => { const n = numOr(v); return n == null ? null : n >= 7 ? 'great' : n >= 5.5 ? 'good' : n >= 4.5 ? 'ok' : n >= 3 ? 'bad' : 'crash'; };
-export const sRhythm = (r: Entry): ScoreCat | null => ((r.svt || r.otherArrhythmia) ? 'concerning' : r.sinus ? 'great' : null);
 export const sSys = (s: unknown): ScoreCat | null => { const n = numOr(s); if (n == null) return null; if (n >= 150) return 'concerning'; if (n >= 136) return 'bad'; if (n >= 129) return 'ok'; if (n >= 119) return 'good'; if (n >= 108) return 'great'; if (n >= 100) return 'ok'; return 'bad'; };
 export const sDia = (d: unknown): ScoreCat | null => { const n = numOr(d); if (n == null) return null; if (n >= 95) return 'concerning'; if (n >= 88) return 'bad'; if (n >= 83) return 'ok'; if (n >= 79) return 'good'; if (n >= 65) return 'great'; if (n >= 60) return 'ok'; return 'bad'; };
 export const sBP = (sys: unknown, dia: unknown): ScoreCat | null => {
@@ -149,18 +145,11 @@ export const restingHrBands = (pos?: unknown): Band[] =>
     ? [{ max: 63, cat: 'great' }, { max: 69, cat: 'good' }, { max: 76, cat: 'ok' }, { max: 86, cat: 'bad' }, { max: Infinity, cat: 'concerning' }]
     : [{ max: 69, cat: 'great' }, { max: 79, cat: 'good' }, { max: 89, cat: 'ok' }, { max: 99, cat: 'bad' }, { max: Infinity, cat: 'concerning' }];
 
-/** QTc norms run a little longer for females; shift the high-side thresholds. */
-export const qtcBands = (sex?: string): Band[] =>
-  sex === 'Female'
-    ? BANDS.qtc.map((b) => ({ max: b.max > 350 && isFinite(b.max) ? b.max + 10 : b.max, cat: b.cat }))
-    : BANDS.qtc;
-
 export function bandsFor(type: string, key: string): Band[] | null {
   const map: Record<string, Record<string, string>> = {
     hrv: { rmssd: 'rmssdU', sdnn: 'sdnn', avgHr: 'hrBreath', pnn50: 'pnn50', vlowPower: 'vlf', lfPeak: 'lfPeak', hfPeak: 'hfPeak', meanRr: 'rrMode', mode: 'rrMode', mxdmn: 'mxdmn', amo50: 'amo50', cv: 'cv', pns: 'pns', sns: 'sns', stressIndex: 'stressIndex' },
     breathHrv: { sdnn: 'sdnn', rmssd: 'rmssdS', pnn50: 'pnn50', vlowPower: 'vlf', lfPeak: 'lfPeak', hfPeak: 'hfPeak', hr: 'hrBreath', meanRr: 'rrMode', mode: 'rrMode', mxdmn: 'mxdmn', amo50: 'amo50', cv: 'cv', pns: 'pns', sns: 'sns', stressIndex: 'stressIndex' },
     bp: { sys: 'sys', dia: 'dia' },
-    ecg: { qtc: 'qtc', qrs: 'qrs', pr: 'pr', ectopic: 'ectopic' },
   };
   const name = map[type] && map[type][key];
   return name ? BANDS[name] : null;
@@ -231,18 +220,6 @@ export function computeScores(r: Entry, ctx: ScoreContext = {}): Record<string, 
     case 'restingHr':
       put('hr', sRestingHr(r.hr, r.position));
       break;
-    case 'ecg': {
-      const q = numOr(r.qtc);
-      if (q != null) put('qtc', catFromBands(q, qtcBands(ctx.sex)));
-      put('qrs', sQRS(r.qrs));
-      put('pr', sPR(r.pr));
-      put('ectopic', sEctopic(r.ectopic));
-      put('rhythm', sRhythm(r));
-      const h = numOr(r.hrv);
-      if (h != null) put('hrv', catFromBands(h, BANDS.ecgHrv));
-      put('overall', worstCat([s.qtc, s.qrs, s.pr, s.ectopic, s.rhythm].filter(Boolean)));
-      break;
-    }
     case 'orthostatic': {
       const before = numOr(r.beforeHr), after = numOr(r.afterHr), min1 = numOr(r.hr1min);
       if (before != null && after != null) put('increase', catFromBands(after - before, BANDS.orthoIncrease));
@@ -262,13 +239,10 @@ export function rowScoreCategory(r: Entry, ctx: ScoreContext = {}): ScoreCat | n
     case 'breathHrv': return s.overall || s.sdnn || null;
     case 'bp': return s.bp || null;
     case 'restingHr': return s.hr || null;
-    case 'ecg': return s.overall || null;
     case 'orthostatic': return s.overall || s.increase || null;
     default: return null;
   }
 }
-
-export const ecgPattern = (r: Entry) => (r.svt ? 'SVT' : r.otherArrhythmia ? 'Other' : r.sinus ? 'Sinus' : '-');
 
 /* ---------- derived blood-pressure metrics ---------- */
 export const bpMap = (rr: Entry) => { const s = +(rr.sys as number), d = +(rr.dia as number); return !isNaN(s) && !isNaN(d) ? (s + 2 * d) / 3 : null; };

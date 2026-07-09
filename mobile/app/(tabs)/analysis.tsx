@@ -3,13 +3,13 @@ import { Animated, Easing, NativeScrollEvent, NativeSyntheticEvent, Pressable, S
 import { BlurView } from 'expo-blur';
 import { Screen } from '../../src/components/Header';
 import { Icon, IconName } from '../../src/components/Icon';
-import { Card, Segmented } from '../../src/components/ui';
+import { HelpDot, Segmented } from '../../src/components/ui';
 import { Bars, BpDumbbell, LineChart } from '../../src/components/charts';
-import { radius, usePalette } from '../../src/theme';
+import { fonts, radius, usePalette } from '../../src/theme';
 import { useAppState } from '../../src/store/store';
 import { buildCategories, type AnalysisCard } from '../../src/lib/analysis/categories';
 import type { Mode } from '../../src/lib/analysis/buckets';
-import { HrvProgress, HRV_FILTERS, type Filt } from '../../src/features/HrvProgress';
+import { HrvFilterLinks, HrvProgress, type Filt } from '../../src/features/HrvProgress';
 
 export default function AnalysisScreen() {
   const p = usePalette();
@@ -56,6 +56,9 @@ export default function AnalysisScreen() {
   // (or past) the bottom of the top bar. This is the manual equivalent of the
   // sticky-header handoff: as one title slides behind the blur, the pinned bar
   // adopts it; the next section then takes over when its title reaches the line.
+  // HANDOFF_LEAD makes the swap fire as the inline title *touches* the bar
+  // (roughly one title-height early) instead of after it has fully slid under.
+  const HANDOFF_LEAD = 28;
   const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const y = e.nativeEvent.contentOffset.y;
     const dy = y - lastY.current;
@@ -65,7 +68,7 @@ export default function AnalysisScreen() {
     for (const s of sections) {
       const off = offsets.current[s.id];
       if (off == null) continue;
-      if (off - y <= headerH + 1) active = s.id;
+      if (off - y <= headerH + HANDOFF_LEAD) active = s.id;
       else break;
     }
     if (active !== activeRef.current) { activeRef.current = active; setActiveId(active); }
@@ -123,14 +126,17 @@ export default function AnalysisScreen() {
           {sections.map((s) => (
             <View key={s.id} onLayout={(e) => { offsets.current[s.id] = e.nativeEvent.layout.y; }} style={{ marginTop: 22 }}>
               {s.id === 'hrv' ? (
-                // HRV keeps its All/Morning/Night pills inline with the title (small);
+                // HRV keeps its All/Morning/Night pills inline with the title —
+                // small and right-aligned so they never overrun the container;
                 // the same toggle also rides in the pinned bar once this section pins.
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, minHeight: 34 }}>
-                  <Text style={{ fontSize: 20, fontWeight: '700', color: p.text }}>{s.title}</Text>
-                  <Segmented compact options={HRV_FILTERS} value={hrvFilt} onChange={setHrvFilt} />
+                  <Text style={{ fontSize: SECTION_TITLE_SIZE, fontWeight: '700', color: p.text }}>{s.title}</Text>
+                  <View style={{ flexShrink: 1, marginLeft: 12, alignItems: 'flex-end' }}>
+                    <HrvFilterLinks value={hrvFilt} onChange={setHrvFilt} />
+                  </View>
                 </View>
               ) : (
-                <Text style={{ fontSize: 20, fontWeight: '700', color: p.text, marginBottom: 8 }}>{s.title}</Text>
+                <Text style={{ fontSize: SECTION_TITLE_SIZE, fontWeight: '700', color: p.text, marginBottom: 8 }}>{s.title}</Text>
               )}
               {s.id === 'hrv' ? (
                 <HrvProgress days={state.days} mode={mode} ctx={{ sex, height }} filt={hrvFilt} />
@@ -148,6 +154,10 @@ export default function AnalysisScreen() {
 }
 
 type Active = { id: string; title: string } | null;
+
+// One size for section titles everywhere — the inline headers in the document
+// and the pinned bar's title must read as the *same* element trading places.
+const SECTION_TITLE_SIZE = 20;
 
 /**
  * The pinned section bar under the top header. Always mounted (it fades in/out
@@ -205,8 +215,12 @@ function StickyBar({ headerH, active, dir, onUp, hrvFilt, setHrvFilt }: {
     >
       {a ? (
         <>
-          <Text numberOfLines={1} style={{ flexShrink: 1, fontSize: 20, fontWeight: '700', color: p.text }}>{a.title}</Text>
-          {a.id === 'hrv' ? <Segmented compact options={HRV_FILTERS} value={hrvFilt} onChange={setHrvFilt} /> : null}
+          <Text numberOfLines={1} style={{ flexShrink: 1, fontSize: SECTION_TITLE_SIZE, fontWeight: '700', color: p.text }}>{a.title}</Text>
+          {a.id === 'hrv' ? (
+            <View style={{ flexShrink: 1, marginLeft: 12, alignItems: 'flex-end' }}>
+              <HrvFilterLinks value={hrvFilt} onChange={setHrvFilt} />
+            </View>
+          ) : null}
         </>
       ) : null}
     </Animated.View>
@@ -227,24 +241,47 @@ function StickyBar({ headerH, active, dir, onUp, hrvFilt, setHrvFilt }: {
   );
 }
 
+/**
+ * Card container holding the flat section design: an uppercase title + "?" help
+ * dot, big flat stat values, a one-line description, then the charts — all on a
+ * surface card.
+ */
 const CardView = React.memo(function CardView({ card, buckets }: { card: AnalysisCard; buckets: { label: string }[] }) {
   const p = usePalette();
   return (
-    <Card style={{ padding: 14 }}>
-      <Text style={{ fontSize: 14, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, color: p.textDim }}>{card.title}</Text>
-      {card.sub ? <Text style={{ fontSize: 11, color: p.textDim, marginTop: 2, marginBottom: 8 }}>{card.sub}</Text> : null}
+    <View style={{ backgroundColor: p.surface, borderColor: p.border, borderWidth: 1, borderRadius: radius.card, padding: 16, marginBottom: 12 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <Text style={{ flexShrink: 1, fontSize: 15, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, color: p.textDim }}>{card.title}</Text>
+        {card.help ? <HelpDot title={card.title} text={card.help} /> : null}
+      </View>
+      {card.stats && card.stats.length ? (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: 28, rowGap: 12, marginTop: 8 }}>
+          {card.stats.map((s, i) => (
+            <View key={i}>
+              <Text style={{ fontSize: 25, fontFamily: fonts.numHeavy, color: s.color || p.text, fontVariant: ['tabular-nums'] }}>
+                {s.value == null ? '–' : String(s.value)}
+                {s.sub ? <Text style={{ fontSize: 13, fontWeight: '600', fontFamily: undefined, color: p.textDim }}>{` ${s.sub}`}</Text> : null}
+              </Text>
+              <Text style={{ fontSize: 12, color: p.textDim, marginTop: 2 }}>{s.label}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+      {card.desc || card.sub ? (
+        <Text style={{ color: p.textDim, fontSize: 13, lineHeight: 19, marginTop: 8 }}>{card.desc || card.sub}</Text>
+      ) : null}
       {(card.charts || []).map((ch, i) => (
-        <View key={i} style={{ marginTop: 12 }}>
+        <View key={i} style={{ marginTop: 14 }}>
           <Text style={{ fontSize: 12, color: p.text, marginBottom: 6, fontWeight: '600' }}>{ch.label}</Text>
           {ch.dumbbell
             ? <BpDumbbell buckets={buckets} sys={ch.dumbbell.sys} dia={ch.dumbbell.dia} />
             : <LineChart buckets={buckets} series={ch.series} zones={ch.zones} integer={ch.integer} target={ch.target} />}
           {ch.legend ? (
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 8 }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 14, marginTop: 8 }}>
               {ch.legend.map(([name, color]) => (
-                <View key={name} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                <View key={name} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: color }} />
-                  <Text style={{ fontSize: 11, color: p.textDim }}>{name}</Text>
+                  <Text style={{ fontSize: 12, color: p.textDim, fontWeight: '600' }}>{name}</Text>
                 </View>
               ))}
             </View>
@@ -252,27 +289,17 @@ const CardView = React.memo(function CardView({ card, buckets }: { card: Analysi
         </View>
       ))}
       {(card.bars || []).map((bg, i) => (
-        <View key={i} style={{ marginTop: 12 }}>
+        <View key={i} style={{ marginTop: 14 }}>
           {bg.label ? <Text style={{ fontSize: 12, color: p.text, marginBottom: 6, fontWeight: '600' }}>{bg.label}</Text> : null}
           <Bars rows={bg.rows} fmt={bg.fmt} />
         </View>
       ))}
-      {card.stats && card.stats.length ? (
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 14 }}>
-          {card.stats.map((s, i) => (
-            <View key={i} style={{ flexGrow: 1, minWidth: '45%', backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.control, padding: 12 }}>
-              <Text style={{ fontSize: 12, color: p.textDim, fontWeight: '600' }}>{s.label}</Text>
-              <Text style={{ fontSize: 25, fontWeight: '700', marginTop: 4, color: s.color || p.text, fontVariant: ['tabular-nums'] }}>{s.value == null ? '-' : String(s.value)}{s.sub ? <Text style={{ fontSize: 12, color: p.textDim }}>{` ${s.sub}`}</Text> : null}</Text>
-            </View>
-          ))}
-        </View>
-      ) : null}
       {(card.insights || []).map((ins, i) => (
         <View key={i} style={{ flexDirection: 'row', gap: 10, backgroundColor: p.surface2, borderRadius: radius.control, padding: 12, marginTop: 10 }}>
           <View style={{ width: 3, borderRadius: 2, backgroundColor: ins.strength === 'strong' ? '#16a34a' : ins.strength === 'mod' ? '#eab308' : p.accent }} />
           <Text style={{ flex: 1, fontSize: 14, color: p.text, lineHeight: 18 }}>{ins.text}</Text>
         </View>
       ))}
-    </Card>
+    </View>
   );
 });
