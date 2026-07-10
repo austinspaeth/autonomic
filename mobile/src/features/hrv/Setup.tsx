@@ -87,7 +87,7 @@ export function HrvSetup({ controls }: { controls: SheetControls }) {
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 6 }}>Capture an HRV reading</Text>
       <Text style={{ color: p.textDim, fontSize: 14, lineHeight: 20, marginBottom: 18 }}>{HELP.main}</Text>
 
-      <Label text="How will you breathe?" help={HELP.kind} />
+      <Label text="Breathing type" help={HELP.kind} />
       <Segmented options={[{ val: 'unstructured', label: 'Unstructured' }, { val: 'breath', label: 'Structured' }]} value={kind} onChange={setKind} />
 
       <Label text="When is this reading?" help={HELP.period} top />
