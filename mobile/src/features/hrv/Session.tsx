@@ -168,7 +168,7 @@ export function HrvSession({ config, controls }: { config: SessionConfig; contro
   return (
     <View style={{ alignItems: 'center', paddingTop: 8 }}>
       <Text style={{ color: p.textDim, fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, fontWeight: '700' }}>
-        {config.kind === 'breath' ? `Breathing HRV · ${config.style}` : 'Unstructured HRV'}
+        {config.kind === 'breath' ? `Structured HRV · ${config.style}` : 'Unstructured HRV'}
       </Text>
 
       <View style={{ width: ringSize, height: ringSize, marginTop: 18, alignItems: 'center', justifyContent: 'center' }}>

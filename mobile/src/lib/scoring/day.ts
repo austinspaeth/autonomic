@@ -176,7 +176,7 @@ export function scoreSet(readings: Entry[], d: DayRecord, dk: string, days: Days
   if (rhr) {
     rhrV = nv(rhr.hr); rhrBands = restingHrBands(rhr.position);
     if (rhr.position) rhrLabel = `Resting HR (${rhr.position})`;
-  } else if (bs) { rhrV = nv(bs.hr); rhrBands = BANDS.hrBreath; rhrLabel = 'HR (from breathing HRV)'; }
+  } else if (bs) { rhrV = nv(bs.hr); rhrBands = BANDS.hrBreath; rhrLabel = 'HR (from structured HRV)'; }
   else if (bu) { rhrV = nv(bu.avgHr); rhrBands = BANDS.hrBreath; rhrLabel = 'Avg HR (from HRV)'; }
   const rhrDetail: CompDetail = { value: rhrV != null ? `${rhrV} bpm` : '', metrics: rhrV != null ? [{ label: rhrLabel, raw: rhrV, bands: rhrBands, unit: 'bpm', lowerBetter: true }] : [] };
 

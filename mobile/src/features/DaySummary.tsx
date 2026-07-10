@@ -108,7 +108,7 @@ export function DaySummary({ dk }: { dk: string }) {
               <>
                 <Text style={{ fontSize: 18, fontWeight: '700', color: p.text, marginTop: 6 }}>Insufficient data</Text>
                 <Text style={{ fontSize: 14, color: p.textDim, marginTop: 5, lineHeight: 19 }}>
-                  {(all.score != null ? `Provisional ${all.score} / 100 at ${all.confidence}% confidence. ` : '') + (all.hasStruct ? 'Add more readings to firm up the score.' : all.hasUnstruct ? 'Awaiting a structured (breathing) reading for higher confidence.' : 'Add a morning HRV reading for higher confidence.')}
+                  {(all.score != null ? `Provisional ${all.score} / 100 at ${all.confidence}% confidence. ` : '') + (all.hasStruct ? 'Add more readings to firm up the score.' : all.hasUnstruct ? 'Awaiting a structured reading for higher confidence.' : 'Add a morning HRV reading for higher confidence.')}
                 </Text>
               </>
             )}
