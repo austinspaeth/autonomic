@@ -61,6 +61,13 @@ export const fmtDateLong = (k: string) => {
 export const fmtShort = (dk: string) =>
   dateFromKey(dk).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 
+/** "1990-01-31" -> "January 31, 1990" for display (stored value stays ISO). */
+export const fmtDateFull = (k: string) => {
+  const d = dateFromKey(k);
+  if (isNaN(d.getTime())) return k;
+  return d.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
+};
+
 /** Human-readable timestamp (menu footer). */
 export const fmtStamp = (iso?: string | null) => {
   if (!iso) return '-';

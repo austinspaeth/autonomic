@@ -3,9 +3,72 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#050506" />
+    <meta name="theme-color" content="#050506" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="application-name" content="Autonomic" />
+    <meta name="apple-mobile-web-app-title" content="Autonomic" />
+
+    <!-- Google Analytics (GA4). Plain script in the shell so it runs on every
+         page regardless of SvelteKit's csr setting. Pageviews (incl. enhanced
+         measurement) fire automatically; custom events are dispatched via the
+         global gtag() below and from the homepage waitlist form. -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-3R3E75CLGQ"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-3R3E75CLGQ');
+    </script>
+
+    <!-- Site-wide social/brand defaults. Per-page <svelte:head> sets og:title,
+         og:description, og:image and canonical; these single-purpose tags never
+         collide with those, so they apply to every page. -->
+    <meta property="og:site_name" content="Autonomic" />
+    <meta property="og:locale" content="en_US" />
+    <meta name="publisher" content="Autonomic" />
+
     %sveltekit.head%
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/favicon-512.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="alternate" type="application/rss+xml" title="The Autonomic Blog" href="/rss.xml" />
+
+    <!-- Site-wide Organization + WebSite structured data (constant across every
+         page) so search engines can build a brand entity and understand the site
+         as a whole. Per-page JSON-LD (Article, FAQ, Breadcrumb…) is additive. -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Organization",
+            "@id": "https://autonomic.care/#organization",
+            "name": "Autonomic",
+            "url": "https://autonomic.care/",
+            "logo": {
+              "@type": "ImageObject",
+              "url": "https://autonomic.care/favicon-512.png",
+              "width": 512,
+              "height": 512
+            },
+            "image": "https://autonomic.care/og.png",
+            "description": "A private, offline iOS journal that scores daily HRV, blood pressure, sleep and orthostatic readings against medical thresholds, for recovery from POTS, dysautonomia and post-viral illness.",
+            "slogan": "See your nervous system recover."
+          },
+          {
+            "@type": "WebSite",
+            "@id": "https://autonomic.care/#website",
+            "url": "https://autonomic.care/",
+            "name": "Autonomic",
+            "description": "Score your daily HRV, blood pressure, sleep and orthostatic readings against medical thresholds to track recovery from POTS, dysautonomia and post-viral illness.",
+            "inLanguage": "en-US",
+            "publisher": { "@id": "https://autonomic.care/#organization" }
+          }
+        ]
+      }
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -57,30 +120,18 @@
             chip.addEventListener('click', function () { chip.classList.toggle('selected'); });
           });
 
-          // Waitlist forms — no backend yet; show inline confirmation.
-          // TODO: POST the form data to your waitlist endpoint where noted.
-          var heroForm = document.getElementById('heroForm');
-          var wlForm = document.getElementById('wlForm');
-          var wlSuccess = document.getElementById('wlSuccess');
-          if (heroForm) {
-            heroForm.addEventListener('submit', function (e) {
-              e.preventDefault();
-              var email = heroForm.email.value;
-              var target = document.getElementById('waitlist');
-              if (wlForm && email) wlForm.email.value = email;
-              if (target) target.scrollIntoView({ behavior: 'smooth' });
-              setTimeout(function () { if (wlForm && wlForm.name) wlForm.name.focus(); }, 650);
+          // The waitlist forms are owned by the homepage Svelte component
+          // (they POST to FlowForm on submit). No handler needed here.
+
+          // Track App Store CTA clicks site-wide (these buttons appear in the
+          // nav, blog end-CTA and insights sidebar as well as the homepage).
+          document.querySelectorAll('.btn-appstore, .dl-ios-badge').forEach(function (el) {
+            el.addEventListener('click', function () {
+              if (typeof gtag === 'function') {
+                gtag('event', 'app_store_click', { location: window.location.pathname });
+              }
             });
-          }
-          if (wlForm) {
-            wlForm.addEventListener('submit', function (e) {
-              e.preventDefault();
-              if (!wlForm.email.value) return;
-              // TODO: POST form data to your waitlist endpoint here.
-              wlForm.classList.add('hide');
-              if (wlSuccess) wlSuccess.classList.add('show');
-            });
-          }
+          });
 
           var copyBtn = document.querySelector('.aip-copy');
           if (copyBtn) {

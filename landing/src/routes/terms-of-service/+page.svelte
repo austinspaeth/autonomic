@@ -4,12 +4,19 @@
 </script>
 
 <svelte:head>
-  <title>Terms of Service — Autonomic</title>
+  <title>Terms of Service | Autonomic</title>
   <meta
     name="description"
-    content="Autonomic's terms of service. Autonomic is an educational logging tool — not a medical device — and does not diagnose, treat, or provide medical advice."
+    content="Autonomic's terms of service. Autonomic is an educational logging tool, not a medical device, and does not diagnose, treat, or provide medical advice."
   />
   <link rel="canonical" href={canonical} />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content={canonical} />
+  <meta property="og:title" content="Terms of Service | Autonomic" />
+  <meta property="og:description" content="Autonomic is an educational logging tool, not a medical device. It does not diagnose, treat, or provide medical advice." />
+  <meta property="og:image" content="https://autonomic.care/og.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:image" content="https://autonomic.care/og.png" />
 </svelte:head>
 
 <section class="legal">
@@ -25,17 +32,17 @@
         agree to these Terms. If you do not agree, do not use Autonomic.
       </p>
 
-      <h2>1. What Autonomic is — and is not</h2>
+      <h2>1. What Autonomic is, and is not</h2>
       <p>
         Autonomic is a <strong>personal logging and educational tool</strong>. It lets you record
-        health-related observations — heart-rate variability, sleep, symptoms, medications,
-        activities, and similar entries — and view charts, scores, and summaries of what you
+        health-related observations, heart-rate variability, sleep, symptoms, medications,
+        activities, and similar entries, and view charts, scores, and summaries of what you
         logged. It is provided <strong>for educational and informational purposes only</strong>.
       </p>
       <p>
         <strong>Autonomic is not a medical device.</strong> It has not been evaluated, cleared, or
-        approved by the FDA or any other regulatory body. Autonomic does not — and is not intended
-        to — <strong>diagnose, treat, cure, mitigate, or prevent any disease or condition</strong>,
+        approved by the FDA or any other regulatory body. Autonomic does not, and is not intended
+        to, <strong>diagnose, treat, cure, mitigate, or prevent any disease or condition</strong>,
         and nothing in the app or on this site constitutes medical advice, a medical opinion, or a
         clinical assessment of any kind.
       </p>
@@ -43,7 +50,7 @@
       <h2>2. Talk to your doctor</h2>
       <p>
         Always consult a qualified healthcare professional before starting, stopping, or changing
-        any medication, supplement, exercise program, diet, or treatment — including anything you
+        any medication, supplement, exercise program, diet, or treatment, including anything you
         decide to try after looking at your own logged data. Never disregard, or delay seeking,
         professional medical advice because of something displayed in Autonomic.
       </p>
@@ -58,7 +65,7 @@
         The scores, grades, zones, and reference ranges shown in Autonomic are simplified,
         general-population heuristics applied to data you entered. They may be wrong for you, and
         readings from consumer sensors (chest straps, watches, cuffs) can be inaccurate or
-        incomplete. They are conversation starters for you and your clinician — not clinical
+        incomplete. They are conversation starters for you and your clinician, not clinical
         measurements or conclusions.
       </p>
 
@@ -106,8 +113,8 @@
       <h2>9. Limitation of liability</h2>
       <p>
         TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE DEVELOPER OF AUTONOMIC SHALL NOT BE LIABLE FOR
-        ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR EXEMPLARY DAMAGES — INCLUDING PERSONAL
-        INJURY, HEALTH OUTCOMES, LOST DATA, OR LOST PROFITS — ARISING OUT OF OR RELATING TO YOUR USE
+        ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR EXEMPLARY DAMAGES, INCLUDING PERSONAL
+        INJURY, HEALTH OUTCOMES, LOST DATA, OR LOST PROFITS, ARISING OUT OF OR RELATING TO YOUR USE
         OF, OR INABILITY TO USE, AUTONOMIC, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES. IN
         NO EVENT SHALL TOTAL AGGREGATE LIABILITY EXCEED THE AMOUNT YOU PAID FOR THE APP IN THE
         TWELVE MONTHS PRECEDING THE CLAIM. YOU USE AUTONOMIC AT YOUR OWN RISK, AND DECISIONS YOU
@@ -130,15 +137,15 @@
 
       <h2>12. Governing law</h2>
       <p>
-        These Terms are governed by the laws of the United States and of the developer's state of
-        residence, without regard to conflict-of-law rules. If any provision is found
-        unenforceable, the remainder stays in effect.
+        These Terms are governed by the laws of the State of South Carolina, United States, without
+        regard to conflict-of-law rules. If any provision is found unenforceable, the remainder
+        stays in effect.
       </p>
 
       <h2>Contact</h2>
       <p>
-        Questions about these Terms can be raised through the app's App Store listing or the
-        channels on this site.
+        Questions about these Terms can be raised through the app's App Store listing or by emailing
+        <a href="mailto:austin@discoverymark.com">austin@discoverymark.com</a>.
       </p>
     </div>
   </div>

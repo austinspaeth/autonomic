@@ -38,6 +38,8 @@ export interface LiveHrvExtras {
   rrClean?: number[];
   durationSec?: number;
   sampledHr?: { t: number; bpm: number }[];
+  /** Rolling SDNN (trailing ~60 s window) sampled through the session. */
+  sampledSdnn?: { t: number; sdnn: number }[];
   artifactPct?: number;
 }
 
@@ -75,6 +77,23 @@ export interface DayRecord {
   digestion: { movements: Movement[]; bm?: number };
 }
 
+/** User-configurable definition of a "clean day" (the streak protocol). Each
+ *  requirement can be toggled on/off; enabled ones become clean-day criteria.
+ *  `types` hold registry keys (meds/triggers/activities). See DEFAULT_PROTOCOL
+ *  + dayCleanliness in scoring/day.ts. */
+export interface Protocol {
+  /** Avoid triggers. Empty `types` = avoid ALL triggers; else only these. */
+  triggers: { enabled: boolean; types: string[] };
+  /** Minimum daily water (litres). */
+  water: { enabled: boolean; liters: number };
+  /** Medications/supplements that must be logged. */
+  meds: { enabled: boolean; types: string[] };
+  /** Activities that must be logged. */
+  activities: { enabled: boolean; types: string[] };
+  /** Minimum sleep (hours). */
+  sleep: { enabled: boolean; hours: number };
+}
+
 export interface AppState {
   version: number;
   settings: {
@@ -82,6 +101,8 @@ export interface AppState {
     lastBleDeviceId?: string;
     lastBleDeviceName?: string;
     healthEnabled?: boolean;
+    /** Clean-day protocol; undefined falls back to DEFAULT_PROTOCOL. */
+    protocol?: Protocol;
   };
   profile: Profile;
   /** User-defined types layered on top of the registry maps (pure JSON defs). */
@@ -95,6 +116,9 @@ export interface AppState {
     sleepReframed?: boolean;
     /** ISO timestamp stamped when the first-run welcome flow completes. */
     onboarded?: string;
+    /** Dev-only: day keys the mock seeder claimed (blank days it wrote sleep/food
+     *  onto), so flipping SEED_MOCK_DATA off cleans them back out. See devSeed.ts. */
+    mockSeeded?: string[];
   };
   days: Record<string, DayRecord>;
 }

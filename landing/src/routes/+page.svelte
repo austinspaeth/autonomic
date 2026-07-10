@@ -1,14 +1,58 @@
 <script lang="ts">
   import { BRAND_POLYLINE } from '$lib/site';
 
+  // The site is prerendered with csr disabled, so no Svelte runtime hydrates.
+  // The waitlist forms therefore ship as plain HTML with a native FlowForm POST
+  // fallback, progressively enhanced by the inline script below (emitted via
+  // {@html waitlistScript} at the end of the page). The script is embedded in
+  // the prerendered HTML and runs with no framework JS on the client.
+  //  - fetch(no-cors) posts to FlowForm without leaving the page
+  //  - on success it swaps the form for the in-place confirmation
+  //  - it fires a GA `waitlist_signup` event (location: hero | android)
+  const waitlistScript = `<script>
+(function () {
+  var ENDPOINT = 'https://flowform.to/austin@discoverymark.com';
+  function track(location) {
+    if (typeof window.gtag === 'function') {
+      window.gtag('event', 'waitlist_signup', { location: location });
+    }
+  }
+  function wire(form, location, onDone) {
+    if (!form) return;
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var button = form.querySelector('button[type="submit"]');
+      var label = button ? button.textContent : '';
+      if (button) { button.disabled = true; button.textContent = 'Joining…'; }
+      fetch(ENDPOINT, { method: 'POST', mode: 'no-cors', body: new FormData(form) })
+        .then(function () { form.reset(); track(location); onDone(); })
+        .catch(function () {
+          if (button) { button.disabled = false; button.textContent = label; }
+          alert('Sorry, something went wrong. Please try again or email austin@discoverymark.com.');
+        });
+    });
+  }
+  wire(document.getElementById('heroForm'), 'hero', function () {
+    var f = document.getElementById('heroForm');
+    var s = document.getElementById('heroSuccess');
+    if (f) f.style.display = 'none';
+    if (s) s.style.display = 'flex';
+  });
+  wire(document.getElementById('wlForm'), 'android', function () {
+    var s = document.getElementById('wlSuccess');
+    if (s) s.classList.add('show');
+  });
+})();
+<\/script>`;
+
   const softwareLd = {
     '@context': 'https://schema.org',
     '@type': 'SoftwareApplication',
     name: 'Autonomic',
     applicationCategory: 'HealthApplication',
-    operatingSystem: 'iOS, Android, Web (PWA)',
+    operatingSystem: 'iOS',
     description:
-      'A private, offline journal that scores daily autonomic readings — HRV, blood pressure, ECG, SpO2, resting heart rate and orthostatic tests — against medical thresholds to track recovery from POTS, dysautonomia and post-illness conditions.',
+      'A private, offline journal that scores daily autonomic readings, HRV, blood pressure, SpO2, resting heart rate and orthostatic tests, against medical thresholds to track recovery from POTS, dysautonomia and post-illness conditions.',
     offers: {
       '@type': 'Offer',
       price: '50',
@@ -16,7 +60,7 @@
       description: '$50/year with a 7-day free trial'
     },
     featureList:
-      'HRV scoring, blood pressure tracking, ECG rhythm logging, orthostatic testing, sleep and symptom logging, trend analysis, clean-day streaks, AI insight reports, offline-first storage'
+      'HRV scoring, blood pressure tracking, orthostatic testing, sleep and symptom logging, trend analysis, clean-day streaks, AI insight reports, offline-first storage'
   };
 
   const faqLd = {
@@ -24,29 +68,36 @@
     '@type': 'FAQPage',
     mainEntity: [
       { '@type': 'Question', name: 'How much does Autonomic cost?', acceptedAnswer: { '@type': 'Answer', text: 'Every plan starts with a 7-day free trial, then it is $50 per year for full access including AI reports and all future updates. Your data stays private on your device and is never sold. Join the waitlist to lock in founding-member pricing.' } },
-      { '@type': 'Question', name: 'Does it work offline?', acceptedAnswer: { '@type': 'Answer', text: 'Completely. Autonomic is an offline-first PWA. All scoring, trends and reports are computed locally, so it works on a plane, in a clinic basement, or anywhere without signal.' } },
+      { '@type': 'Question', name: 'Does it work offline?', acceptedAnswer: { '@type': 'Answer', text: 'Completely. Autonomic is a fully offline iOS app. All scoring, trends and reports are computed locally, so it works on a plane, in a clinic basement, or anywhere without signal.' } },
       { '@type': 'Question', name: 'Which conditions is it for?', acceptedAnswer: { '@type': 'Answer', text: 'It is built for people managing POTS, dysautonomia, long COVID and post-viral or post-illness autonomic recovery, where day-to-day HRV, heart rate and orthostatic patterns matter.' } },
-      { '@type': 'Question', name: 'Do I need a wearable?', acceptedAnswer: { '@type': 'Answer', text: 'No. You can type readings from any source — a chest strap, a ring, a blood-pressure cuff, an ECG device, or a fingertip pulse oximeter. Autonomic scores whatever you log.' } },
+      { '@type': 'Question', name: 'Do I need a wearable?', acceptedAnswer: { '@type': 'Answer', text: 'No. You can type readings from any source, a chest strap, a ring, a blood-pressure cuff, or a fingertip pulse oximeter. Autonomic scores whatever you log.' } },
       { '@type': 'Question', name: 'How do the AI insights work?', acceptedAnswer: { '@type': 'Answer', text: 'Autonomic assembles your logged data over a date range into a structured analysis prompt that you copy into Claude, Gemini or ChatGPT. The text is generated locally; nothing is sent automatically.' } }
     ]
   };
 </script>
 
 <svelte:head>
-  <title>Autonomic — Private HRV, POTS &amp; Dysautonomia Recovery Journal</title>
+  <title>Autonomic | Private HRV, POTS &amp; Dysautonomia Recovery Journal</title>
   <meta
     name="description"
-    content="Autonomic is a private, offline journal that scores your daily HRV, blood pressure, ECG, sleep and orthostatic readings against medical thresholds — so people recovering from POTS, dysautonomia and post-viral illness can see what's helping and what's hurting."
+    content="Autonomic is a private, offline journal that scores your daily HRV, blood pressure, sleep and orthostatic readings against medical thresholds, so people recovering from POTS, dysautonomia and post-viral illness can see what's helping and what's hurting."
   />
-  <link rel="canonical" href="https://autonomic.app/" />
+  <link rel="canonical" href="https://autonomic.care/" />
 
   <meta property="og:type" content="website" />
-  <meta property="og:title" content="Autonomic — Read your nervous system like a recovery instrument" />
+  <meta property="og:url" content="https://autonomic.care/" />
+  <meta property="og:title" content="Autonomic | See your nervous system recover" />
   <meta property="og:description" content="Medically-scored daily readings, trend analysis, and AI-ready insight reports for autonomic recovery. Private, offline, on-device." />
-  <meta property="og:image" content="https://autonomic.app/og.png" />
+  <meta property="og:image" content="https://autonomic.care/og.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:alt" content="Autonomic: see your nervous system recover. A private journal that scores your daily HRV, blood pressure, sleep and orthostatic readings." />
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Autonomic — Private autonomic recovery journal" />
-  <meta name="twitter:description" content="Score your HRV, BP, ECG, sleep & orthostatic data. Spot trends. Generate doctor-ready and AI-ready reports. Offline and private." />
+  <meta name="twitter:title" content="Autonomic | Private autonomic recovery journal" />
+  <meta name="twitter:description" content="Score your HRV, BP, sleep & orthostatic data. Spot trends. Generate doctor-ready and AI-ready reports. Offline and private." />
+  <meta name="twitter:image" content="https://autonomic.care/og.png" />
+  <meta name="twitter:image:alt" content="Autonomic: private, offline autonomic recovery journal for POTS, dysautonomia and long COVID." />
 
   {@html `<script type="application/ld+json">${JSON.stringify(softwareLd)}<\/script>`}
   {@html `<script type="application/ld+json">${JSON.stringify(faqLd)}<\/script>`}
@@ -62,12 +113,14 @@
   <div class="wrap hero-grid">
     <div class="hero-copy">
       <p class="eyebrow">Private · Offline · On-device</p>
-      <h1 class="hero-h1">Read your nervous&nbsp;system like a recovery instrument.</h1>
-      <p class="hero-lead">Autonomic turns your daily <strong>HRV, blood pressure, ECG, sleep and orthostatic</strong> readings into clear, medically-scored signals — so anyone recovering from <strong>POTS, dysautonomia</strong> or post-viral illness can finally see what helps and what hurts.</p>
-      <form class="hero-waitlist" id="heroForm">
+      <h1 class="hero-h1">See your nervous&nbsp;system recover.</h1>
+      <p class="hero-lead">Autonomic turns your daily <strong>HRV, blood pressure, sleep and orthostatic</strong> readings into clear, medically-scored signals, so anyone recovering from <strong>POTS, dysautonomia</strong> or post-viral illness can finally see what helps and what hurts.</p>
+      <form class="hero-waitlist" id="heroForm" action="https://flowform.to/austin@discoverymark.com" method="POST">
+        <input type="hidden" name="_subject" value="Autonomic Waitlist Signup" />
         <input type="email" name="email" required placeholder="you@email.com" aria-label="Email address" />
         <button class="btn btn-primary btn-lg" type="submit">Join the waitlist</button>
       </form>
+      <p class="hero-waitlist" role="status" id="heroSuccess" style="display: none; color: var(--green); font-weight: 600;">✓ You're on the list. Check your inbox for your early-access invite.</p>
       <p class="hero-microcopy"><b>7-day free trial</b> at launch, then $50/year. No card to join the list.</p>
       <ul class="hero-trust">
         <li>7-day free trial</li>
@@ -129,28 +182,28 @@
     <div class="section-head">
       <p class="eyebrow">The loop</p>
       <h2 class="h2">Four steps, every day. The rest is automatic.</h2>
-      <p class="lead">You log a few readings. Autonomic does the grading, the trends, and the “what changed” — quietly, on your device.</p>
+      <p class="lead">You log a few readings. Autonomic does the grading, the trends, and the “what changed”, quietly, on your device.</p>
     </div>
     <ol class="loop">
       <li class="loop-step">
         <span class="loop-n">01</span>
-        <h3 class="loop-t">Log</h3>
-        <p>Capture HRV, BP, ECG, SpO₂, orthostatic tests, sleep, meds, food and symptoms from any device — typed in seconds.</p>
+        <h3 class="loop-t">Log &amp; Capture</h3>
+        <p>Capture live HRV, and log BP, orthostatic tests, sleep, meds, triggers and symptoms from a number of Bluetooth devices and Apple Health.</p>
       </li>
       <li class="loop-step">
         <span class="loop-n">02</span>
-        <h3 class="loop-t">Score</h3>
-        <p>Each reading is graded against medical thresholds and rolled into one 0–100 Autonomic Outlook with a confidence level.</p>
+        <h3 class="loop-t">Processed &amp; Scored</h3>
+        <p>Each reading is broken down into its key metrics, graded against medical thresholds, and rolled into one 0–100 Autonomic Outlook with a confidence level.</p>
       </li>
       <li class="loop-step">
         <span class="loop-n">03</span>
-        <h3 class="loop-t">Trend</h3>
-        <p>Sparklines, zone bands, heat maps and correlations reveal the patterns moving your recovery up or down.</p>
+        <h3 class="loop-t">Milestones &amp; Trends</h3>
+        <p>Milestones to keep you motivated. Sparklines, zone bands, heat maps and more reveal the patterns moving your recovery up or down.</p>
       </li>
       <li class="loop-step">
         <span class="loop-n">04</span>
-        <h3 class="loop-t">Act</h3>
-        <p>Get plain-language coaching, recovery milestones, and AI- or doctor-ready reports you can act on.</p>
+        <h3 class="loop-t">Insights &amp; Action</h3>
+        <p>Get structured prompts packed with your data to share with your AI provider (ChatGPT, Claude, etc) or doctor, so you can find what's working and what's not.</p>
       </li>
     </ol>
   </div>
@@ -162,23 +215,23 @@
     <div class="feature-copy">
       <p class="eyebrow">Capture</p>
       <h2 class="h2">Everything that moves the needle, in one place.</h2>
-      <p class="lead">A guided log built around real autonomic data — not a generic habit tracker. Add a reading and Autonomic knows exactly which fields and thresholds apply.</p>
+      <p class="lead">A guided log built around real autonomic data, not a generic habit tracker. Add a reading and Autonomic knows exactly which fields and thresholds apply.</p>
       <ul class="ticks">
-        <li><b>HRV, both ways</b> — quick unstructured reads and full breathing sessions with LF/HF power, RMSSD, pNN50 and baroreflex peak.</li>
-        <li><b>Cardio &amp; vitals</b> — blood pressure spread, resting heart rate, SpO₂, and ECG with Sinus / SVT / Other rhythm badges.</li>
-        <li><b>Orthostatic tests</b> — lying-to-standing heart-rate jumps and one-minute recovery, scored for POTS patterns.</li>
-        <li><b>Context that explains it</b> — sleep, activity, meds &amp; supplements, food, hydration, symptoms and digestion.</li>
+        <li><b>HRV, both ways</b>, quick unstructured reads and full breathing sessions with LF/HF power, RMSSD, pNN50 and baroreflex peak.</li>
+        <li><b>Cardio &amp; vitals</b>, blood pressure spread and resting heart rate.</li>
+        <li><b>Orthostatic tests</b>, lying-to-standing heart-rate jumps and one-minute recovery, scored for POTS patterns.</li>
+        <li><b>Context that explains it</b>, sleep, activity, meds &amp; supplements, food, hydration, symptoms and digestion.</li>
       </ul>
     </div>
     <div class="feature-art">
       <div class="card-mock">
         <div class="cm-head"><span>Add reading</span><span class="cm-x">✕</span></div>
         <div class="cm-list">
-          <div class="cm-item"><span class="cm-ic">≈</span><div><b>Breathing HRV</b><small>Coherence, power spectrum, RMSSD</small></div></div>
-          <div class="cm-item"><span class="cm-ic">◔</span><div><b>Blood Pressure</b><small>Systolic / diastolic / pulse</small></div></div>
-          <div class="cm-item"><span class="cm-ic">⌁</span><div><b>ECG</b><small>HR · QTc · rhythm badge</small></div></div>
-          <div class="cm-item"><span class="cm-ic">⇡</span><div><b>Orthostatic Event</b><small>Stand test · HR rise · recovery</small></div></div>
-          <div class="cm-item"><span class="cm-ic">○</span><div><b>Blood Oxygen</b><small>SpO₂ · perfusion · pulse</small></div></div>
+          <div class="cm-item"><span class="cm-ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" /><path d="M3.22 12H9.5l.6-1.3 1.9 4.6 2-7 1.5 3.7h5.27" /></svg></span><div><b>Unstructured HRV</b><small>Quick read · RMSSD · pNN50</small></div></div>
+          <div class="cm-item"><span class="cm-ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.8 19.6A2 2 0 1 0 14 16H2" /><path d="M17.5 8a2.5 2.5 0 1 1 2 4H2" /><path d="M9.8 4.4A2 2 0 1 1 11 8H2" /></svg></span><div><b>Breathing HRV</b><small>Coherence, power spectrum, RMSSD</small></div></div>
+          <div class="cm-item"><span class="cm-ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z" /></svg></span><div><b>Blood Pressure</b><small>Systolic / diastolic / pulse</small></div></div>
+          <div class="cm-item"><span class="cm-ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" /></svg></span><div><b>Resting Heart Rate</b><small>Resting HR · trend</small></div></div>
+          <div class="cm-item"><span class="cm-ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="4" r="1.5" /><path d="m9 20 3-6 3 6" /><path d="m6 9 6 2 6-2" /><path d="M12 11v3" /></svg></span><div><b>Orthostatic Event</b><small>Stand test · HR rise · recovery</small></div></div>
         </div>
       </div>
     </div>
@@ -191,7 +244,7 @@
     <div class="feature-copy">
       <p class="eyebrow">Scoring</p>
       <h2 class="h2">Every number, graded against medical thresholds.</h2>
-      <p class="lead">No more guessing whether a reading is “good.” Each metric lands in a clinical zone — from great to crash — and combines into a single daily Outlook with a confidence score that reflects how much you logged.</p>
+      <p class="lead">No more guessing whether a reading is “good.” Each metric lands in a clinical zone, from great to crash, and combines into a single daily Outlook with a confidence score that reflects how much you logged.</p>
       <div class="zone-legend">
         <span class="zl"><i style="background:var(--sky)"></i>Great</span>
         <span class="zl"><i style="background:var(--green)"></i>Good</span>
@@ -207,7 +260,7 @@
           <span class="mk-chip" style="background:#16a34a">Excellent</span>
           <div class="em-label">Excellent Autonomic Day</div>
           <div class="em-num">85<small>/ 100</small></div>
-          <div class="em-sub">Confidence 95% — the share of the full input set scored today.</div>
+          <div class="em-sub">Confidence 95%, the share of the full input set scored today.</div>
         </div>
         <div class="em-group">What helped</div>
         <div class="em-metric"><i class="dot" style="background:var(--sky)"></i><b>HRV (RMSSD)</b><span>Great · 25%</span></div>
@@ -224,12 +277,12 @@
   <div class="wrap feature">
     <div class="feature-copy">
       <p class="eyebrow">Analyze</p>
-      <h2 class="h2">See what’s helping or hurting — across days, weeks, months.</h2>
+      <h2 class="h2">See what’s helping or hurting, across days, weeks, months.</h2>
       <p class="lead">Switch from a single day to the long view. Zone-banded sparklines show each point in its medical context, with an average baseline so you always know if today beat your own norm.</p>
       <ul class="ticks">
         <li><b>Trend sparklines</b> with grade-zone fills and a current-zone tag.</li>
         <li><b>Heat maps</b> of clean days and recovery across the calendar.</li>
-        <li><b>Correlations &amp; intervention impact</b> — which changes actually moved the needle.</li>
+        <li><b>Correlations &amp; intervention impact</b>, which changes actually moved the needle.</li>
       </ul>
     </div>
     <div class="feature-art">
@@ -262,19 +315,19 @@
     <div class="section-head center">
       <p class="eyebrow">AI insights · doctor-ready</p>
       <h2 class="h2">Bring your own AI in for a deeper read.</h2>
-      <p class="lead">Autonomic assembles your data into a rich, structured prompt — then hands it to the model you already trust. Trends, triggers, and a clear “here’s what to tell your doctor,” generated locally and copied in one tap.</p>
+      <p class="lead">Autonomic assembles your data into a rich, structured prompt, then hands it to the model you already trust. Trends, triggers, and a clear “here’s what to tell your doctor,” generated locally and copied in one tap.</p>
     </div>
 
     <div class="ai-grid">
       <div class="ai-reports">
         <span class="ai-card-tag">Pick a report</span>
-        <div class="ai-chips">
-          <button class="ai-chip selected"><span class="ai-chip-ic">✦</span>Overall health summary<i class="ai-check">✓</i></button>
-          <button class="ai-chip"><span class="ai-chip-ic">↗</span>Recovery trajectory</button>
-          <button class="ai-chip"><span class="ai-chip-ic">⚠</span>Trigger analysis</button>
-          <button class="ai-chip selected"><span class="ai-chip-ic">＋</span>What to tell your doctor<i class="ai-check">✓</i></button>
-          <button class="ai-chip"><span class="ai-chip-ic">☾</span>Sleep impact report</button>
-          <button class="ai-chip"><span class="ai-chip-ic">♡</span>Cardiovascular analysis</button>
+        <div class="ai-chips" aria-hidden="true">
+          <div class="ai-chip selected"><span class="ai-chip-ic">✦</span>Overall health summary<i class="ai-check">✓</i></div>
+          <div class="ai-chip"><span class="ai-chip-ic">↗</span>Recovery trajectory</div>
+          <div class="ai-chip"><span class="ai-chip-ic">⚠</span>Trigger analysis</div>
+          <div class="ai-chip"><span class="ai-chip-ic">＋</span>What to tell your doctor</div>
+          <div class="ai-chip"><span class="ai-chip-ic">☾</span>Sleep impact report</div>
+          <div class="ai-chip"><span class="ai-chip-ic">♡</span>Cardiovascular analysis</div>
         </div>
         <div class="ai-llms">
           <span class="ai-llm">Claude</span>
@@ -283,21 +336,31 @@
         </div>
       </div>
 
+      <div class="ai-prompt-cell">
       <div class="ai-prompt">
-        <div class="aip-bar"><span class="aip-dot"></span><span class="aip-dot"></span><span class="aip-dot"></span><span class="aip-title">analysis-prompt · week of Jun 2</span></div>
-        <pre class="aip-body"><span class="c-key">ROLE</span> You are a cardiologist reviewing autonomic
-recovery data for a patient managing POTS.
+        <div class="aip-bar"><span class="aip-dot"></span><span class="aip-dot"></span><span class="aip-dot"></span><span class="aip-title">analysis-prompt · Jul 8, 2026</span></div>
+        <pre class="aip-body"><span class="c-key">ROLE</span> You are a health analyst reviewing one day of
+autonomic recovery data for someone managing POTS.
 
-<span class="c-key">DATA</span> 7 days · 41 readings · 100% adherence
-  HRV RMSSD   28 → 34   (+21%, trending up)
-  Orthostatic  +34 → +22 bpm rise
-  VLF power   elevated 3 of 7 mornings
-  Sleep        avg 7.9h · 1 interrupted night
+<span class="c-key">DATA</span> Jul 8, 2026 · 1 day
+  HRV · AM     RMSSD 41 · 07:12 · lying, rested
+  HRV · PM     RMSSD 29 · 22:40 · before bed
+  Orthostatic  +31 bpm · 06:55
+               note: "dizzy getting out of bed"
+  Blood pres.  118/76 · 62 bpm · 07:20
+  Sleep        7.8h · 1 interruption · HR 52–92
+  Triggers     pizza (dinner)
+  Meds         Quercetin · Pepcid AC · Allegra
 
-<span class="c-key">ASK</span> Summarize the trajectory, flag anything
-worth raising with my clinician, and list the
-top 3 levers improving my recovery.</pre>
+<span class="c-key">ASK</span> Give me an overall health summary for this day.
+Start with how my autonomic nervous system looked
+overall, then explain the drop from my morning to my
+evening HRV and whether the pizza or my sleep is the
+likelier driver. Note whether the +31 bpm orthostatic
+rise and 118/76 reading sit in a healthy range for POTS,
+and</pre>
         <div class="aip-foot"><span>Generated on-device</span><button class="aip-copy">Copy prompt</button></div>
+      </div>
       </div>
     </div>
   </div>
@@ -309,7 +372,7 @@ top 3 levers improving my recovery.</pre>
     <div class="feature-copy">
       <p class="eyebrow">Momentum</p>
       <h2 class="h2">Watch recovery actually add up.</h2>
-      <p class="lead">Recovery is slow and easy to miss. Autonomic tracks clean-day streaks and earns you milestones the moment your data crosses a real threshold — so progress beyond the daily number stays visible.</p>
+      <p class="lead">Recovery is slow and easy to miss. Autonomic tracks clean-day streaks and earns you milestones the moment your data crosses a real threshold, so progress beyond the daily number stays visible.</p>
       <ul class="ticks">
         <li><b>Clean-day streaks</b> with tiers that escalate as you hold the line.</li>
         <li><b>88 milestones</b> across HRV, power, POTS, sleep and consistency.</li>
@@ -336,9 +399,9 @@ top 3 levers improving my recovery.</pre>
     </div>
     <p class="eyebrow">Privacy by architecture</p>
     <h2 class="h2">Your most sensitive data never leaves your phone.</h2>
-    <p class="lead">No account. No cloud. No analytics. Autonomic stores everything in local storage on your device, computes every score and report offline, and gives you a one-tap JSON export you fully control. Privacy isn’t a setting here — it’s how the app is built.</p>
+    <p class="lead">No account. No cloud. No analytics. Autonomic stores everything in local storage on your device, computes every score and report offline, and gives you a one-tap JSON export you fully control. It can even back up automatically to your own iCloud, so your data stays with you, not us. Privacy isn’t a setting here, it’s how the app is built.</p>
     <div class="privacy-pills">
-      <span>100% on-device</span><span>No sign-up</span><span>No tracking</span><span>Offline-first</span><span>Export anytime</span>
+      <span>100% on-device</span><span>No sign-up</span><span>No tracking</span><span>iCloud backup</span><span>Export anytime</span>
     </div>
   </div>
 </section>
@@ -348,18 +411,14 @@ top 3 levers improving my recovery.</pre>
   <div class="wrap">
     <div class="section-head">
       <p class="eyebrow">Depth, on tap</p>
-      <h2 class="h2">A clinician’s worth of detail — only when you want it.</h2>
+      <h2 class="h2">A clinician’s worth of detail, only when you want it.</h2>
       <p class="lead">The surface stays calm. Underneath sits the instrumentation serious recovery needs.</p>
     </div>
     <div class="grid-cards">
-      <div class="gc"><span class="gc-ic">⌁</span><h3>ECG rhythm badges</h3><p>Sinus, SVT or Other, with QTc, QRS, PR and ectopic-beat scoring.</p></div>
       <div class="gc"><span class="gc-ic">≈</span><h3>Breathing HRV deep-dive</h3><p>Coherence %, LF/HF/VLF power bar, RMSSD, pNN50 and baroreflex peak.</p></div>
       <div class="gc"><span class="gc-ic">⇡</span><h3>Orthostatic / POTS</h3><p>Side-by-side stand-test stats and extreme-event flags.</p></div>
       <div class="gc"><span class="gc-ic">◔</span><h3>BP spread bars</h3><p>Systolic and diastolic visualized against healthy ranges.</p></div>
       <div class="gc"><span class="gc-ic">☾</span><h3>Sleep impact</h3><p>How last night’s sleep bends today’s autonomic score.</p></div>
-      <div class="gc"><span class="gc-ic">⚑</span><h3>Watch flags</h3><p>Amber alerts surface readings worth a closer look.</p></div>
-      <div class="gc"><span class="gc-ic">⊞</span><h3>Calendar heat maps</h3><p>Clean days and recovery zones across weeks and months.</p></div>
-      <div class="gc"><span class="gc-ic">◐</span><h3>Light &amp; dark</h3><p>An OLED-friendly dark mode and a soft, calm light theme.</p></div>
     </div>
   </div>
 </section>
@@ -372,11 +431,12 @@ top 3 levers improving my recovery.</pre>
       <h2 class="h2">Good to know.</h2>
     </div>
     <div class="faq">
-      <details><summary>How much does it cost, and is my data private?<span class="fq-i">+</span></summary><p>Every plan starts with a 7-day free trial, then it’s a simple $50/year for everything — all reading types, scoring, analysis and AI reports, plus future updates. Your data is always private: stored on your device, never sold, never sent to a server. Waitlist members lock in founding-member pricing.</p></details>
-      <details><summary>Does it really work offline?<span class="fq-i">+</span></summary><p>Completely. It’s an offline-first PWA. Scoring, trends and reports are computed locally, so it works anywhere — no signal required.</p></details>
-      <details><summary>Which conditions is it built for?<span class="fq-i">+</span></summary><p>POTS, dysautonomia, long COVID and post-viral or post-illness recovery — anywhere daily HRV, heart-rate and orthostatic patterns matter.</p></details>
-      <details><summary>Do I need a wearable or special hardware?<span class="fq-i">+</span></summary><p>No. Type readings from any source — a ring, chest strap, BP cuff, ECG device or pulse oximeter. Autonomic scores whatever you log.</p></details>
-      <details><summary>How do the AI insights work?<span class="fq-i">+</span></summary><p>Autonomic builds a structured analysis prompt from your data over a date range. You copy it into Claude, Gemini or ChatGPT — the text is generated on-device, nothing is sent automatically.</p></details>
+      <details><summary>How much does it cost, and is my data private?<span class="fq-i">+</span></summary><p>Every plan starts with a 7-day free trial, then it’s a simple $50/year for everything, all reading types, scoring, analysis and AI reports, plus future updates. Your data is always private: stored on your device, never sold, never sent to a server. Waitlist members lock in founding-member pricing.</p></details>
+      <details><summary>Does it really work offline?<span class="fq-i">+</span></summary><p>Completely. It’s a fully offline iOS app. Scoring, trends and reports are computed locally, so it works anywhere, no signal required.</p></details>
+      <details><summary>Which conditions is it built for?<span class="fq-i">+</span></summary><p>POTS, dysautonomia, long COVID and post-viral or post-illness recovery, anywhere daily HRV, heart-rate and orthostatic patterns matter.</p></details>
+      <details><summary>Is Autonomic available on Android?<span class="fq-i">+</span></summary><p>Not yet. Autonomic is iOS-only for now. An Android version is coming soon, join the waitlist and we’ll let you know the moment it lands.</p></details>
+      <details><summary>Do I need a wearable or special hardware?<span class="fq-i">+</span></summary><p>No, you don’t. You can type readings in by hand from any source. That said, tools like a Polar H10 chest strap, an Apple Watch or a blood pressure cuff make Autonomic far more powerful, the more data you feed it, the better you understand how your body is doing.</p></details>
+      <details><summary>How do the AI insights work?<span class="fq-i">+</span></summary><p>Autonomic builds a structured analysis prompt from your data over a date range. You copy it into Claude, Gemini or ChatGPT, the text is generated on-device, nothing is sent automatically.</p></details>
       <details><summary>Is this medical advice?<span class="fq-i">+</span></summary><p>No. Autonomic is a personal tracking and reflection tool. It helps you organize data and conversations, but it doesn’t diagnose or treat. Always work with your clinician.</p></details>
     </div>
   </div>
@@ -390,17 +450,43 @@ top 3 levers improving my recovery.</pre>
       <svg class="cta-mark" viewBox="0 0 512 512" aria-hidden="true" style="margin-bottom:22px"><polyline points={BRAND_POLYLINE} fill="none" stroke="currentColor" stroke-width="38" stroke-linejoin="round" stroke-linecap="round" /></svg>
       <p class="eyebrow">Join the waitlist</p>
       <h2 class="cta-h">Be first to read your recovery clearly.</h2>
-      <p class="cta-sub">Autonomic is in private build. Join the waitlist for early access, founding-member pricing, and a say in what we ship next.</p>
+      <p class="cta-sub">Autonomic is available now on the Apple App Store, with Android coming soon. Join the waitlist to be first to get the Android release and to lock in founding-member pricing.</p>
+    </div>
+
+    <div class="dl-ios">
+      <div class="dl-ios-copy">
+        <h3 class="dl-ios-h">Download for iOS now</h3>
+        <p class="dl-ios-p">Autonomic is live on iPhone. Get it from the App Store today.</p>
+      </div>
+      <a class="dl-ios-badge" href="#" aria-label="Download on the App Store">
+        <svg viewBox="0 0 120 40" role="img" aria-label="Download on the App Store" xmlns="http://www.w3.org/2000/svg">
+          <rect x="0.5" y="0.5" width="119" height="39" rx="6.5" fill="#000" stroke="rgba(255,255,255,0.4)" />
+          <path transform="translate(10,7.5) scale(0.05)" fill="#fff" d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5c0 26.2 4.8 53.3 14.4 81.2 12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 20-27.8 44.7-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z" />
+          <text x="35" y="16" fill="#fff" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="7.5">Download on the</text>
+          <text x="34" y="31" fill="#fff" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="16" font-weight="600" letter-spacing="-0.3">App Store</text>
+        </svg>
+      </a>
     </div>
 
     <div class="waitlist-grid">
       <div class="wl-form">
+        <div class="wl-head">
+          <svg class="wl-android" viewBox="0 0 24 24" aria-hidden="true">
+            <path fill="#3DDC84" d="M6 11a6 6 0 0 1 12 0H6z" />
+            <line x1="8" y1="4.4" x2="9.4" y2="6.5" stroke="#3DDC84" stroke-width="1.1" stroke-linecap="round" />
+            <line x1="16" y1="4.4" x2="14.6" y2="6.5" stroke="#3DDC84" stroke-width="1.1" stroke-linecap="round" />
+            <circle cx="9.6" cy="8.6" r="0.85" fill="#fff" />
+            <circle cx="14.4" cy="8.6" r="0.85" fill="#fff" />
+          </svg>
+          <span>Android Waitlist</span>
+        </div>
         <div class="wl-success" id="wlSuccess">
           <div class="wl-check" aria-hidden="true">✓</div>
           <h3 style="font-family: var(--display); font-size: 22px; margin: 0 0 8px;">You're on the list.</h3>
           <p style="color: var(--dim); margin: 0; font-size: 15px;">We'll email your early-access invite and founding-member link. Welcome aboard.</p>
         </div>
-        <form id="wlForm" class="wl-fields">
+        <form id="wlForm" class="wl-fields" action="https://flowform.to/austin@discoverymark.com" method="POST">
+          <input type="hidden" name="_subject" value="Autonomic Waitlist Signup" />
           <div class="wl-field">
             <label for="wl-email">Email</label>
             <input id="wl-email" type="email" name="email" required placeholder="you@email.com" />
@@ -425,7 +511,7 @@ top 3 levers improving my recovery.</pre>
             <label for="wl-tracks">What do you track today? <span style="color:var(--dim-2)">(optional)</span></label>
             <input id="wl-tracks" type="text" name="tracks" placeholder="e.g. HRV ring, BP cuff, symptom notes" />
           </div>
-          <button class="btn btn-primary btn-lg" type="submit">Join the waitlist</button>
+          <button class="btn btn-primary btn-lg" type="submit">Join the Android waitlist</button>
           <p class="wl-note">No charge today · 7-day free trial at launch · Unsubscribe anytime</p>
         </form>
       </div>
@@ -435,13 +521,15 @@ top 3 levers improving my recovery.</pre>
         <div class="pricing-price"><span class="amt">$50</span><span class="per">/ year</span></div>
         <p class="pricing-trial">Starts with a <b>7-day free trial</b></p>
         <ul class="pricing-list">
-          <li>Full access — every reading type, score and report</li>
+          <li>Full access, every reading type, score and report</li>
           <li>Unlimited AI insight &amp; doctor-ready reports</li>
           <li>All future updates included, no add-ons</li>
-          <li>Private &amp; offline forever — no ads, no data sale</li>
+          <li>Private &amp; offline forever, no ads, no data sale</li>
           <li>Waitlist members lock in this launch price for life</li>
         </ul>
       </aside>
     </div>
   </div>
 </section>
+
+{@html waitlistScript}

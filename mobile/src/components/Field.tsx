@@ -12,10 +12,17 @@ import { Button } from './ui';
 import { SheetControls, useSheets } from './Sheet';
 import type { Entry, FieldDef } from '../lib/types';
 import { fieldLabel, isDivider, isNumberField } from '../lib/registry';
-import { fmtTime12, nowTime } from '../lib/dates';
+import { dateFromKey, fmtDateFull, fmtTime12, keyOf, nowTime } from '../lib/dates';
 
 
 export type FormState = Record<string, string | boolean>;
+
+/** Keep only a positive decimal: digits plus a single leading dot. */
+export const onlyNumeric = (t: string) => {
+  const cleaned = t.replace(/[^\d.]/g, '');
+  const i = cleaned.indexOf('.');
+  return i === -1 ? cleaned : cleaned.slice(0, i + 1) + cleaned.slice(i + 1).replace(/\./g, '');
+};
 
 export function useFormState(fields: FieldDef[], initial: Entry): [FormState, (k: string, v: string | boolean) => void] {
   const [state, setState] = useState<FormState>(() => {
@@ -49,6 +56,7 @@ export function TextField({ label, value, onChange, keyboardType, placeholder, m
       value={value}
       onChangeText={onChange}
       keyboardType={keyboardType || 'default'}
+      keyboardAppearance="dark"
       placeholder={placeholder || '-'}
       placeholderTextColor={p.textDim}
       multiline={multiline}
@@ -136,6 +144,120 @@ export function TimeField({ label, value, onChange }: { label: string; value: st
       <FieldLabel>{label}</FieldLabel>
       <Pressable onPress={open} style={{ backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.control, padding: 13, minHeight: 47 }}>
         <Text style={{ color: value ? p.text : p.textDim, fontSize: 17 }}>{value ? fmtTime12(value) : 'Set time'}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+/** "68" (inches) -> `5' 8"` for display; '' when unparseable. */
+export function fmtHeight(value?: string): string {
+  const n = Number(value);
+  if (!value || !Number.isFinite(n) || n <= 0) return '';
+  const ft = Math.floor(n / 12);
+  const inch = Math.round(n % 12);
+  return `${ft}′ ${inch}″`;
+}
+
+const FEET = [3, 4, 5, 6, 7];
+const INCHES = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+
+/** Contents of the height-picker sheet: feet + inches pill selectors + Save. */
+export function HeightPickerSheet({ label, value, onChange, controls }: { label: string; value: string; onChange: (v: string) => void; controls: SheetControls }) {
+  const p = usePalette();
+  const start = Number(value);
+  const startOk = Number.isFinite(start) && start > 0;
+  const [ft, setFt] = useState(startOk ? Math.floor(start / 12) : 5);
+  const [inch, setInch] = useState(startOk ? Math.round(start % 12) % 12 : 8);
+  const pill = (active: boolean) => ({
+    minWidth: 44, alignItems: 'center' as const, paddingHorizontal: 12, paddingVertical: 10,
+    borderRadius: radius.control, borderWidth: 1,
+    borderColor: active ? p.accent : p.border, backgroundColor: active ? p.accentSoft : p.surface2,
+  });
+  return (
+    <View>
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, lineHeight: 32, marginTop: -12, marginBottom: 16 }}>{label}</Text>
+      <FieldLabel>Feet</FieldLabel>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+        {FEET.map((f) => (
+          <Pressable key={f} onPress={() => setFt(f)} style={pill(f === ft)}>
+            <Text style={{ color: f === ft ? p.accent : p.text, fontWeight: f === ft ? '700' : '500', fontSize: 16 }}>{f}′</Text>
+          </Pressable>
+        ))}
+      </View>
+      <FieldLabel>Inches</FieldLabel>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 18 }}>
+        {INCHES.map((i) => (
+          <Pressable key={i} onPress={() => setInch(i)} style={pill(i === inch)}>
+            <Text style={{ color: i === inch ? p.accent : p.text, fontWeight: i === inch ? '700' : '500', fontSize: 16 }}>{i}″</Text>
+          </Pressable>
+        ))}
+      </View>
+      <Button title="Save" variant="primary" onPress={() => { onChange(String(ft * 12 + inch)); controls.close(); }} />
+    </View>
+  );
+}
+
+export function HeightField({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string }) {
+  const p = usePalette();
+  const { openSheet } = useSheets();
+  const open = () => openSheet(
+    (c) => <HeightPickerSheet label={label} value={value} onChange={onChange} controls={c} />,
+    { fitContent: true },
+  );
+  const shown = fmtHeight(value);
+  return (
+    <View style={{ marginBottom: 14, flex: 1 }}>
+      <FieldLabel>{label}</FieldLabel>
+      <Pressable onPress={open} style={{ backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.control, padding: 13, minHeight: 47 }}>
+        <Text style={{ color: shown ? p.text : p.textDim, fontSize: 17 }}>{shown || (placeholder || 'Set height')}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+/** Contents of the date-picker sheet: spinner + full-width red Save. */
+export function DatePickerSheet({ label, value, onChange, controls }: { label: string; value: string; onChange: (v: string) => void; controls: SheetControls }) {
+  const p = usePalette();
+  const base = value ? dateFromKey(value) : new Date(1990, 0, 1);
+  // Draft the spinner value locally so nothing commits until "Save".
+  const [draft, setDraft] = useState(isNaN(base.getTime()) ? new Date(1990, 0, 1) : base);
+  const commit = () => {
+    onChange(keyOf(draft));
+    controls.close();
+  };
+  return (
+    <View>
+      {/* Title vertically aligned with the sheet's ✕ (top:12, h:32 → centered on 28px). */}
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, lineHeight: 32, marginTop: -12, marginBottom: 12 }}>{label}</Text>
+      <DateTimePicker
+        value={draft}
+        mode="date"
+        display="spinner"
+        maximumDate={new Date()}
+        textColor="#ffffff"
+        themeVariant="dark"
+        style={{ height: 180 }}
+        onChange={(_, date) => { if (date) setDraft(date); }}
+      />
+      <View style={{ flexDirection: 'row', marginTop: 8 }}>
+        <Button title="Save" variant="primary" onPress={commit} />
+      </View>
+    </View>
+  );
+}
+
+export function DateField({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string }) {
+  const p = usePalette();
+  const { openSheet } = useSheets();
+  const open = () => openSheet(
+    (c) => <DatePickerSheet label={label} value={value} onChange={onChange} controls={c} />,
+    { fitContent: true },
+  );
+  return (
+    <View style={{ marginBottom: 14 }}>
+      <FieldLabel>{label}</FieldLabel>
+      <Pressable onPress={open} style={{ backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.control, padding: 13, minHeight: 47 }}>
+        <Text style={{ color: value ? p.text : p.textDim, fontSize: 17 }}>{value ? fmtDateFull(value) : (placeholder || 'Set date')}</Text>
       </Pressable>
     </View>
   );

@@ -21,8 +21,9 @@ import { nowTime, todayKey, uid } from '../../lib/dates';
 import type { DayRecord, Entry } from '../../lib/types';
 import type { SessionConfig } from './Session';
 
-export function HrvResults({ rr, hrSamples, config, durationSec, watchFallback, controls }: {
-  rr: number[]; hrSamples: { t: number; bpm: number }[]; config: SessionConfig; durationSec: number;
+export function HrvResults({ rr, hrSamples, sdnnSamples, config, durationSec, watchFallback, controls }: {
+  rr: number[]; hrSamples: { t: number; bpm: number }[]; sdnnSamples?: { t: number; sdnn: number }[];
+  config: SessionConfig; durationSec: number;
   watchFallback: { sdnn?: number; hr?: number } | null; controls: SheetControls;
 }) {
   const p = usePalette();
@@ -37,10 +38,11 @@ export function HrvResults({ rr, hrSamples, config, durationSec, watchFallback, 
     const type = config.kind === 'breath' ? 'breathHrv' : 'hrv';
     const base: Entry = {
       id: uid(), type, time: nowTime(),
-      period: config.period || 'Random', note: config.source === 'watch' ? 'Captured via Apple Watch ECG' : 'Captured via chest strap',
+      period: config.period || 'Other', note: config.source === 'watch' ? 'Captured via Apple Watch ECG' : 'Captured via chest strap',
       source: config.source, durationSec,
       rrRaw: rr, rrClean: result.rrClean, sampledHr: hrSamples,
     };
+    if (sdnnSamples && sdnnSamples.length) base.sampledSdnn = sdnnSamples;
     if (config.kind === 'breath' && config.style) base.style = config.style;
     if (result.ok || Object.keys(result.fields).length) {
       Object.assign(base, result.fields);

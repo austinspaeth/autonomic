@@ -84,7 +84,7 @@ export const READING_TYPES: Record<string, TypeDef> = {
     label: 'Orthostatic Event',
     icon: 'standing',
     fields: [
-      { type: 'select', key: 'transition', label: 'Transition', options: ['Laying to standing', 'Sitting to standing', 'Climbing stairs'] },
+      { type: 'select', key: 'transition', label: 'Transition', options: ['Laying to standing', 'Sitting to standing', 'Climbing stairs', 'Other'] },
       { type: 'number', key: 'beforeHr', label: 'Before HR' },
       { type: 'number', key: 'afterHr', label: 'After HR' },
       { type: 'number', key: 'hr1min', label: 'HR after 1 min' },

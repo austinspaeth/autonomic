@@ -10,10 +10,11 @@ import { radius, usePalette } from '../theme';
 import { fmtNum, fmtShort } from '../lib/dates';
 import { useAppState } from '../store/store';
 import { buildMilestoneDays, buildMilestoneGroups } from '../lib/analysis/milestones';
+import { resolveProtocol } from '../lib/scoring/day';
 
 export function useMilestones() {
   const state = useAppState();
-  const ctx = { sex: state.profile.sex, height: state.profile.height };
+  const ctx = { sex: state.profile.sex, height: state.profile.height, protocol: resolveProtocol(state.settings.protocol) };
   const md = buildMilestoneDays(state.days, ctx);
   const groups = md.keys.length ? buildMilestoneGroups(md) : [];
   let done = 0, total = 0;
@@ -22,28 +23,49 @@ export function useMilestones() {
   return { groups, done, total, pct };
 }
 
-/** Compact card for the journal view; taps open the full tracker in a sheet. */
-export function MilestoneProgressCard() {
+/** Compact card for the journal view; taps open the full tracker in a sheet.
+ * When milestones were unlocked on `dk`, a divider + checklist of them appears
+ * below the progress row. */
+export function MilestoneProgressCard({ dk }: { dk?: string }) {
   const p = usePalette();
   const { openSheet } = useSheets();
-  const { done, total, pct } = useMilestones();
+  const { groups, done, total, pct } = useMilestones();
   if (!total) return null;
+  const achievedToday = dk ? groups.flatMap((g) => g.items).filter((it) => it.done && it.date === dk) : [];
   return (
     <Pressable
       onPress={() => openSheet(() => <MilestonesSheet />)}
-      style={{ flexDirection: 'row', alignItems: 'center', gap: 13, borderWidth: 1, borderColor: p.border, borderRadius: radius.card, backgroundColor: p.surface, marginBottom: 12, padding: 15 }}
+      style={{ borderWidth: 1, borderColor: p.border, borderRadius: radius.card, backgroundColor: p.surface, marginBottom: 12, padding: 15 }}
     >
-      <View style={{ width: 42, height: 42, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(224,49,39,0.12)' }}>
-        <Icon name="star" size={21} color={p.accent} />
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={{ fontSize: 15, color: p.text, fontWeight: '700' }}>Milestones</Text>
-        <Text style={{ fontSize: 13, color: p.textDim, marginTop: 2 }}>{`${done} of ${total} achieved`}</Text>
-        <View style={{ height: 4, borderRadius: 999, backgroundColor: p.surface2, overflow: 'hidden', marginTop: 10 }}>
-          <View style={{ height: '100%', width: `${pct}%`, backgroundColor: p.accent }} />
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 13 }}>
+        <View style={{ width: 42, height: 42, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(224,49,39,0.12)' }}>
+          <Icon name="star" size={21} color={p.accent} />
         </View>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 15, color: p.text, fontWeight: '700' }}>Milestones</Text>
+          <Text style={{ fontSize: 13, color: p.textDim, marginTop: 2 }}>{`${done} of ${total} achieved`}</Text>
+          <View style={{ height: 4, borderRadius: 999, backgroundColor: p.surface2, overflow: 'hidden', marginTop: 10 }}>
+            <View style={{ height: '100%', width: `${pct}%`, backgroundColor: p.accent }} />
+          </View>
+        </View>
+        <Icon name="chevronRight" size={18} color={p.textDim} />
       </View>
-      <Icon name="chevronRight" size={18} color={p.textDim} />
+      {achievedToday.length ? (
+        <>
+          <View style={{ height: 1, backgroundColor: p.border, marginTop: 15 }} />
+          <Text style={{ fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, color: p.textDim, marginTop: 13, marginBottom: 11 }}>
+            {achievedToday.length === 1 ? 'Unlocked today' : `${achievedToday.length} unlocked today`}
+          </Text>
+          <View style={{ gap: 11 }}>
+            {achievedToday.map((it, i) => (
+              <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <Icon name="check" size={16} color="#16a34a" />
+                <Text style={{ flex: 1, fontSize: 14, color: p.text, fontWeight: '500' }}>{it.label}</Text>
+              </View>
+            ))}
+          </View>
+        </>
+      ) : null}
     </Pressable>
   );
 }

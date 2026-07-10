@@ -7,9 +7,10 @@ import { Alert, Linking, Platform, Pressable, Text, View } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import Constants from 'expo-constants';
 import { SheetControls, useSheets } from '../components/Sheet';
 import { Button } from '../components/ui';
-import { TextField } from '../components/Field';
+import { DateField, HeightField, TextField, onlyNumeric } from '../components/Field';
 import { BrandMark, Icon, IconName } from '../components/Icon';
 import { useToast } from '../components/Toast';
 import { radius, usePalette } from '../theme';
@@ -40,6 +41,7 @@ export function MenuSheet({ controls }: { controls: SheetControls }) {
     </Pressable>
   );
   const m = state.meta || {};
+  const appVer = Constants.expoConfig?.version ?? '1.0.0';
   return (
     <View>
       {/* Title band: a 32px box matching the sheet's close ✕ box (absolute at
@@ -62,7 +64,8 @@ export function MenuSheet({ controls }: { controls: SheetControls }) {
       {item('sparkles', 'Show welcome screen', 'Replay the first-run guide', () => { controls.closeAll(); showWelcomeAgain(); })}
       {item('info', 'Legal information', 'Disclaimer, privacy & terms', () => openSheet((c) => <LegalSheet controls={c} />))}
       <View style={{ marginTop: 22 }}>
-        <Text style={{ fontSize: 12, color: p.textDim, textAlign: 'center' }}>{`Last updated ${fmtStamp(m.lastUpdated)}`}</Text>
+        <Text style={{ fontSize: 12, color: p.textDim, textAlign: 'center' }}>{`Data last updated ${fmtStamp(m.lastUpdated)}`}</Text>
+        <Text style={{ fontSize: 12, color: p.textDim, textAlign: 'center', marginTop: 4 }}>{`Autonomic v${appVer}`}</Text>
         {m.lastImport?.name ? <Text style={{ fontSize: 12, color: p.textDim, textAlign: 'center', marginTop: 4 }}>{`Last import: ${m.lastImport.name} · ${fmtStamp(m.lastImport.at)}`}</Text> : null}
         <Text style={{ fontSize: 11, color: p.textDim, textAlign: 'center', marginTop: 16, lineHeight: 16 }}>
           Autonomic is a personal tracking tool, not a medical device. It does not diagnose or treat any condition. Discuss changes to medication, supplements, or your protocol with a clinician.
@@ -91,10 +94,10 @@ function ProfileSheet({ controls }: { controls: SheetControls }) {
           </Pressable>
         ))}
       </View>
-      <TextField label="Birthday (YYYY-MM-DD)" value={birthday} onChange={setBirthday} placeholder="1990-01-31" />
+      <DateField label="Birthday" value={birthday} onChange={setBirthday} placeholder="Set birthday" />
       {age != null ? <Text style={{ color: p.textDim, fontSize: 13, marginTop: -8, marginBottom: 10 }}>{`Age: ${age}`}</Text> : null}
-      <TextField label="Weight (lb)" value={weight} onChange={setWeight} keyboardType="decimal-pad" />
-      <TextField label="Height (in)" value={height} onChange={setHeight} keyboardType="decimal-pad" />
+      <HeightField label="Height" value={height} onChange={setHeight} placeholder="Set height" />
+      <TextField label="Weight (lb)" value={weight} onChange={(t) => setWeight(onlyNumeric(t))} keyboardType="decimal-pad" />
       <Text style={{ color: p.textDim, fontSize: 13, marginBottom: 12 }}>Used to personalize reading scores (sex-adjusted QTc, BMI from height/weight).</Text>
       <Button title="Save" variant="primary" onPress={() => { getState().profile = { sex, birthday, weight: weight.trim(), height: height.trim() }; save(); controls.close(); }} />
       <View style={{ height: 20 }} />
@@ -110,7 +113,7 @@ function LegalSheet({ controls }: { controls: SheetControls }) {
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 14 }}>Legal Information</Text>
       {para('Autonomic is a personal logging and educational tool. It is not a medical device, and it does not diagnose, treat, cure, or prevent any condition or provide medical advice. Scores, thresholds, and charts are for education and self-tracking only.')}
       {para('Always talk to your doctor before starting, stopping, or changing medications, supplements, exercise, or any part of your protocol. Never disregard professional medical advice because of something you saw in this app.')}
-      {para('AI insights are prompts you paste into a third-party AI service of your choice (Claude, ChatGPT, Gemini, or others). Anything those services say comes from them, not from Autonomic — we only assemble your logged data for analysis.')}
+      {para('AI insights are prompts you paste into a third-party AI service of your choice (Claude, ChatGPT, Gemini, or others). Anything those services say comes from them, not from Autonomic. We only assemble your logged data for analysis.')}
       {para('Your data stays on this device. Autonomic has no accounts, no servers, and no analytics; nothing is collected or transmitted unless you export or share it yourself.')}
       <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
         <Button title="Privacy Policy" variant="ghost" onPress={() => Linking.openURL(PRIVACY_URL)} />

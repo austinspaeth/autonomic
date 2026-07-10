@@ -13,6 +13,7 @@ import { radius, usePalette } from '../../src/theme';
 import { getState, useAppState } from '../../src/store/store';
 import { getCurrentKey } from '../../src/store/nav';
 import { REPORT_CARDS, ReportRange, buildDataExport, buildPrompt, hasAnyData, reportDateRange } from '../../src/lib/analysis/reports';
+import { resolveProtocol } from '../../src/lib/scoring/day';
 
 export default function InsightsScreen() {
   const p = usePalette();
@@ -24,7 +25,7 @@ export default function InsightsScreen() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   // Nothing to analyze until something real is logged, so hide the report picker
-  // and point people back to the Journal — same gate the Progress view uses.
+  // and point people back to the Journal, same gate the Progress view uses.
   const hasData = hasAnyData(state.days, Object.keys(state.days));
 
   const toggle = (id: string) => setSelected((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
@@ -36,7 +37,7 @@ export default function InsightsScreen() {
     const { keys: allKeys, rangeText } = reportDateRange(range, getCurrentKey());
     const keys = allKeys.filter((k) => state.days[k]);
     if (!hasAnyData(state.days, keys)) { toast('No data available for this period'); return; }
-    const ctx = { sex: state.profile.sex, height: state.profile.height };
+    const ctx = { sex: state.profile.sex, height: state.profile.height, protocol: resolveProtocol(state.settings.protocol) };
     const prompt = buildPrompt(state, ctx, cards, range, getCurrentKey());
     const title = cards.length === 1 ? cards[0].title : `Custom Report · ${cards.length} areas`;
     openSheet((c) => <PromptSheet title={title} rangeText={rangeText} prompt={prompt} controls={c} />);
@@ -47,9 +48,9 @@ export default function InsightsScreen() {
     const { keys: allKeys, rangeText } = reportDateRange(range, getCurrentKey());
     const keys = allKeys.filter((k) => state.days[k]);
     if (!hasAnyData(state.days, keys)) { toast('No data available for this period'); return; }
-    const ctx = { sex: state.profile.sex, height: state.profile.height };
+    const ctx = { sex: state.profile.sex, height: state.profile.height, protocol: resolveProtocol(state.settings.protocol) };
     const text = buildDataExport(state, ctx, range, getCurrentKey());
-    openSheet((c) => <PromptSheet title="Data Export" rangeText={rangeText} prompt={text} controls={c} subtitle="Your raw logged data for this period — no analysis prompt attached. Copy or share it as-is." />);
+    openSheet((c) => <PromptSheet title="Metrics Export" rangeText={rangeText} prompt={text} controls={c} subtitle="Your raw logged data for this period, no analysis prompt attached. Copy or share it as-is." />);
   };
 
   return (
@@ -77,12 +78,12 @@ export default function InsightsScreen() {
       ) : (
         <>
           <Text style={{ color: p.textDim, fontSize: 14, marginBottom: 12, lineHeight: 19 }}>
-            Insight turns your journal into ready-to-paste prompts for the AI you already use — Claude, ChatGPT, Gemini, or any other provider. Pick one or more report areas, generate a prompt, and paste it into your AI of choice to look for patterns, gauge your progress, and surface connections worth discussing with your doctor.
+            Pick a report area, tap Generate Report Prompt, then paste it into Claude, ChatGPT, Gemini, or any other provider to discover patterns, spot trends, gauge your progress, and surface what's worth discussing with your doctor.
           </Text>
           <Pressable onPress={dataExport} style={{ marginBottom: 10, width: '100%', borderWidth: 1, borderRadius: radius.card, backgroundColor: p.surface, borderColor: p.border, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
             <Icon name="download" size={26} color={p.accent} />
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 15, fontWeight: '700', color: p.text }}>Data Export (data only)</Text>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: p.text }}>Metrics Export (data only)</Text>
               <Text style={{ fontSize: 12, color: p.textDim, marginTop: 4, lineHeight: 15 }}>Your raw logged data for this period, with no analysis prompt attached.</Text>
             </View>
           </Pressable>
@@ -139,7 +140,7 @@ function PromptSheet({ title, rangeText, prompt, controls, subtitle }: { title: 
             <View style={{ flexDirection: 'row', gap: 9, alignItems: 'flex-start', backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.control, padding: 10, marginBottom: 10 }}>
               <View style={{ marginTop: 1 }}><Icon name="info" size={15} color={p.textDim} /></View>
               <Text style={{ flex: 1, color: p.textDim, fontSize: 11.5, lineHeight: 16 }}>
-                Any analysis or advice comes from the AI service you paste this into — Autonomic only assembles your logged data. Talk to your doctor before acting on its suggestions.
+                Any analysis or advice comes from the AI service you paste this into. Autonomic only assembles your logged data. Talk to your doctor before acting on its suggestions.
               </Text>
             </View>
           ) : null}

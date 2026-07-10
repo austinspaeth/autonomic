@@ -1,10 +1,10 @@
 export const site = {
   name: 'Autonomic',
-  url: 'https://autonomic.app',
-  tagline: 'Read your nervous system like a recovery instrument.',
+  url: 'https://autonomic.care',
+  tagline: 'See your nervous system recover.',
   description:
-    "Autonomic is a private, offline journal that scores your daily HRV, blood pressure, ECG, sleep and orthostatic readings against medical thresholds — so people recovering from POTS, dysautonomia and post-viral illness can see what's helping and what's hurting.",
-  ogImage: 'https://autonomic.app/og.png',
+    "Autonomic is a private, offline journal that scores your daily HRV, blood pressure, sleep and orthostatic readings against medical thresholds, so people recovering from POTS, dysautonomia and post-viral illness can see what's helping and what's hurting.",
+  ogImage: 'https://autonomic.care/og.png',
   price: 50,
   currency: 'USD'
 };
@@ -13,16 +13,81 @@ export const site = {
 export const BRAND_POLYLINE =
   '41,266 179,266 200,225 220,307 246,92 272,420 297,240 317,266 471,266';
 
+/** Canonical article URL: nested under its primary topic, e.g. /insights/hrv/<slug>/. */
+export const articleHref = (a: { categories?: string[]; slug: string }): string =>
+  `/insights/${a.categories?.[0] ?? 'basics'}/${a.slug}/`;
+
+/**
+ * The cornerstone "pillar" articles, in the exact order they should appear in the
+ * "Start here" rail. Each entry is an article slug; the sidebar resolves it to the
+ * live article record so titles/links stay in sync with the markdown frontmatter.
+ * Order encodes the site's spine: understand → measure → who → recover → the tool.
+ */
+export const PILLARS: string[] = [
+  'autonomic-nervous-system-and-dysautonomia-guide',
+  'hrv-complete-guide',
+  'pots-long-covid-and-mcas-overlap',
+  'recovery-from-post-viral-dysautonomia',
+  'autonomic-app-measure-analyze-monitor-act'
+];
+
+/** Short "Start here" labels for the pillars, keyed by slug (kept terse for the rail). */
+export const PILLAR_LABELS: Record<string, string> = {
+  'autonomic-nervous-system-and-dysautonomia-guide': 'What dysautonomia is',
+  'hrv-complete-guide': 'How to measure HRV',
+  'pots-long-covid-and-mcas-overlap': 'POTS, Long COVID & MCAS',
+  'recovery-from-post-viral-dysautonomia': 'How recovery works',
+  'autonomic-app-measure-analyze-monitor-act': 'How Autonomic helps'
+};
+
 /** Display labels for the category slugs used in article frontmatter. */
 export const CATEGORY_LABELS: Record<string, string> = {
   hrv: 'HRV',
+  food: 'Food',
   pots: 'POTS',
-  basics: 'Basics',
-  orthostatic: 'Orthostatic',
+  postviral: 'Long COVID',
   recovery: 'Recovery',
+  app: 'The app',
+  research: 'Research',
+  basics: 'Basics',
+  // legacy slugs, kept so older references still resolve to a friendly label
+  metrics: 'Metrics',
+  orthostatic: 'Orthostatic',
   ai: 'AI insights'
 };
 
 /** Pretty label for a category slug, falling back to a humanized form. */
 export const categoryLabel = (slug?: string): string =>
   !slug ? '' : CATEGORY_LABELS[slug] ?? slug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+
+/**
+ * Format an article date for display. Frontmatter dates arrive in two shapes:
+ * a `Date` on the article page (raw mdsvex metadata) or an ISO string over the
+ * JSON API. Unquoted YAML parses `2026-05-28` as UTC midnight, so we extract the
+ * calendar Y-M-D and rebuild a *local* date to avoid a timezone off-by-one.
+ */
+export function formatDate(input?: string | Date, style: 'long' | 'short' = 'long'): string {
+  const d = toDate(input);
+  if (!d) return '';
+  return d.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: style === 'short' ? 'short' : 'long',
+    day: 'numeric'
+  });
+}
+
+/** Same date as a machine-readable `YYYY-MM-DD` (for `<time>`, sitemaps, feeds). */
+export function isoDate(input?: string | Date): string {
+  const m = String(input instanceof Date ? input.toISOString() : input ?? '').match(
+    /(\d{4})-(\d{2})-(\d{2})/
+  );
+  return m ? `${m[1]}-${m[2]}-${m[3]}` : '';
+}
+
+function toDate(input?: string | Date): Date | null {
+  if (!input) return null;
+  const iso = input instanceof Date ? input.toISOString() : String(input);
+  const m = iso.match(/(\d{4})-(\d{2})-(\d{2})/);
+  const d = m ? new Date(+m[1], +m[2] - 1, +m[3]) : new Date(iso);
+  return Number.isNaN(d.getTime()) ? null : d;
+}

@@ -1,4 +1,38 @@
+# Autonomic — https://autonomic.care
+# Everything is public and crawlable, including AI/LLM crawlers.
 User-agent: *
 Allow: /
 
-Sitemap: https://autonomic.app/sitemap.xml
+# Named AI/answer-engine crawlers (explicitly welcomed so the content can be
+# cited and surfaced in AI answers).
+User-agent: GPTBot
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Claude-Web
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Applebot
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+Sitemap: https://autonomic.care/sitemap.xml

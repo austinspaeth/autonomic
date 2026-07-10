@@ -141,7 +141,7 @@ export function computeEcgMetrics(s: RawEcgSample): EcgMetrics {
 /** Map metrics onto the registry `ecg` reading fields. */
 function metricsToFields(s: RawEcgSample, m: EcgMetrics): Record<string, string | boolean> {
   const cls = m.classification;
-  const parts: string[] = [`Apple Watch ECG — ${humanClass(cls)}`];
+  const parts: string[] = [`Apple Watch ECG: ${humanClass(cls)}`];
   if (m.symptomsStatus === 'present') parts.push('symptoms present');
   const est: string[] = [];
   if (m.qrs != null || m.qtc != null || m.pr != null) est.push('QRS/QTc/PR are single-lead estimates, not clinical values.');

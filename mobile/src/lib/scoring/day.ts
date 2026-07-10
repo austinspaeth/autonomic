@@ -5,7 +5,8 @@
  * Pure: operates on a days map + score context, no store imports.
  */
 import { dateFromKey, keyOf, todayKey } from '../dates';
-import type { Band, DayRecord, Entry, ScoreCat } from '../types';
+import { ACTIVITY_TYPES, MED_TYPES, TRIGGER_TYPES } from '../registry';
+import type { Band, DayRecord, Entry, Protocol, ScoreCat } from '../types';
 import {
   BANDS, GRADE_PTS, computeScores, numOr, restingHrBands, totalPower,
   type ScoreContext,
@@ -228,25 +229,77 @@ export interface Criterion {
 }
 export interface Cleanliness { clean: boolean; criteria: Criterion[] }
 
-export function dayCleanliness(days: DaysMap, dk: string): Cleanliness | null {
+/** Baseline protocol a user gets before ever opening the editor: 8h sleep,
+ *  2.5 L water, no triggers. Meds/activities start off (types kept so they
+ *  prefill if the user turns meds on later). */
+export const DEFAULT_PROTOCOL: Protocol = {
+  triggers: { enabled: true, types: [] },
+  water: { enabled: true, liters: 2.5 },
+  meds: { enabled: false, types: ['allegra', 'pepsidAc', 'magGlycinate'] },
+  activities: { enabled: false, types: [] },
+  sleep: { enabled: true, hours: 8 },
+};
+
+/** Fill a (possibly partial/absent) stored protocol with defaults. */
+export function resolveProtocol(p?: Partial<Protocol> | null): Protocol {
+  if (!p) return DEFAULT_PROTOCOL;
+  return {
+    triggers: { ...DEFAULT_PROTOCOL.triggers, ...p.triggers },
+    water: { ...DEFAULT_PROTOCOL.water, ...p.water },
+    meds: { ...DEFAULT_PROTOCOL.meds, ...p.meds },
+    activities: { ...DEFAULT_PROTOCOL.activities, ...p.activities },
+    sleep: { ...DEFAULT_PROTOCOL.sleep, ...p.sleep },
+  };
+}
+
+const typeLabel = (map: Record<string, { label: string }>, k: string) => map[k]?.label || k;
+const joinLabels = (map: Record<string, { label: string }>, keys: string[]) => keys.map((k) => typeLabel(map, k)).join(', ');
+
+export function dayCleanliness(days: DaysMap, dk: string, protocol: Protocol = DEFAULT_PROTOCOL): Cleanliness | null {
   const d = days[dk];
   if (!d) return null;
-  const meds = d.meds || [];
-  const hasMed = (t: string) => meds.some((m) => m.type === t);
-  const triggers = (d.food && d.food.triggers) || {};
-  const trigCount = Object.keys(triggers).reduce((s, k) => s + (triggers[k] > 0 ? triggers[k] : 0), 0);
-  const water = (d.food && d.food.water) || 0;
-  const hrs = sleepHours(days, dk);
-  const sleepLogged = hrs != null;
-  const medReq: [string, string][] = [['allegra', 'Allegra'], ['pepsidAc', 'Pepcid'], ['magGlycinate', 'Mag glycinate']];
-  const missingMeds = medReq.filter(([t]) => !hasMed(t));
-  const criteria: Criterion[] = [
-    { key: 'triggers', label: 'No triggers', pass: trigCount === 0, hard: true, broken: trigCount > 0 },
-    { key: 'water', label: 'Water (2.5 L)', pass: water >= 2.5 },
-    { key: 'meds', label: 'Allegra, Pepcid, Mag glycinate', pass: missingMeds.length === 0, need: missingMeds.map(([, n]) => n).join(', ') },
-    { key: 'sleep', label: 'Sleep 7h or more', pass: sleepLogged && hrs! >= 7, hard: true, broken: sleepLogged && hrs! < 7 },
-  ];
-  const clean = criteria.filter((c) => !c.pending).every((c) => c.pass);
+  const criteria: Criterion[] = [];
+
+  // Triggers (hard — logging one can't be undone for the day). Empty selection
+  // means "avoid all triggers"; a selection narrows it to those specific ones.
+  if (protocol.triggers.enabled) {
+    const triggers = (d.food && d.food.triggers) || {};
+    const count = (k: string) => (triggers[k] > 0 ? triggers[k] : 0);
+    const sel = protocol.triggers.types;
+    const logged = (sel.length ? sel : Object.keys(triggers)).reduce((s, k) => s + count(k), 0);
+    const label = sel.length ? `No ${joinLabels(TRIGGER_TYPES, sel)}` : 'No triggers';
+    criteria.push({ key: 'triggers', label, pass: logged === 0, hard: true, broken: logged > 0 });
+  }
+
+  if (protocol.water.enabled) {
+    const water = (d.food && d.food.water) || 0;
+    criteria.push({ key: 'water', label: `Water (${protocol.water.liters} L)`, pass: water >= protocol.water.liters });
+  }
+
+  // Each required medication/activity is its own criterion (own checkmark).
+  if (protocol.meds.enabled) {
+    const meds = d.meds || [];
+    protocol.meds.types.forEach((t) => {
+      const label = typeLabel(MED_TYPES, t);
+      criteria.push({ key: `meds:${t}`, label, pass: meds.some((m) => m.type === t) });
+    });
+  }
+
+  if (protocol.activities.enabled) {
+    const acts = d.activities || [];
+    protocol.activities.types.forEach((t) => {
+      const label = typeLabel(ACTIVITY_TYPES, t);
+      criteria.push({ key: `activities:${t}`, label, pass: acts.some((a) => a.type === t) });
+    });
+  }
+
+  if (protocol.sleep.enabled) {
+    const hrs = sleepHours(days, dk);
+    const sleepLogged = hrs != null;
+    criteria.push({ key: 'sleep', label: `Sleep ${protocol.sleep.hours}h or more`, pass: sleepLogged && hrs! >= protocol.sleep.hours, hard: true, broken: sleepLogged && hrs! < protocol.sleep.hours });
+  }
+
+  const clean = criteria.length > 0 && criteria.filter((c) => !c.pending).every((c) => c.pass);
   return { clean, criteria };
 }
 
@@ -263,14 +316,14 @@ export interface StreakInfo {
   today: Cleanliness | null; isToday: boolean;
 }
 
-export function streakInfo(days: DaysMap, dk: string): StreakInfo {
+export function streakInfo(days: DaysMap, dk: string, protocol: Protocol = DEFAULT_PROTOCOL): StreakInfo {
   const today = todayKey();
-  const cur = dayCleanliness(days, dk);
+  const cur = dayCleanliness(days, dk, protocol);
   const cursor = dateFromKey(dk);
   if (dk === today && (!cur || !cur.clean)) cursor.setDate(cursor.getDate() - 1);
   let current = 0;
   for (;;) {
-    const c = dayCleanliness(days, keyOf(cursor));
+    const c = dayCleanliness(days, keyOf(cursor), protocol);
     if (!c || !c.clean) break;
     current++;
     cursor.setDate(cursor.getDate() - 1);
@@ -280,7 +333,7 @@ export function streakInfo(days: DaysMap, dk: string): StreakInfo {
   if (keys.length) {
     const end = dateFromKey(dk);
     for (let cd = dateFromKey(keys[0]); cd <= end; cd.setDate(cd.getDate() + 1)) {
-      const c = dayCleanliness(days, keyOf(cd));
+      const c = dayCleanliness(days, keyOf(cd), protocol);
       if (c && c.clean) { run++; if (run > longest) longest = run; }
       else run = 0;
     }
@@ -288,7 +341,7 @@ export function streakInfo(days: DaysMap, dk: string): StreakInfo {
   let cleanN = 0, total = 0;
   const e = dateFromKey(dk);
   for (let i = 0; i < 30; i++) {
-    const c = dayCleanliness(days, keyOf(new Date(e.getFullYear(), e.getMonth(), e.getDate() - i)));
+    const c = dayCleanliness(days, keyOf(new Date(e.getFullYear(), e.getMonth(), e.getDate() - i)), protocol);
     if (c) { total++; if (c.clean) cleanN++; }
   }
   return { current, longest, rate: total ? Math.round((cleanN / total) * 100) : null, today: cur, isToday: dk === today };

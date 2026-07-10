@@ -7,7 +7,7 @@ import { ActivityIndicator, LayoutAnimation, Platform, Pressable, Text, TextInpu
 import { AddDashButton, Card, Pill, Row, RowValue, SectionHeader, Segmented } from '../components/ui';
 import { Icon } from '../components/Icon';
 import { TimeField } from '../components/Field';
-import { useSheets } from '../components/Sheet';
+import { useSheets, SheetFooter, type SheetControls } from '../components/Sheet';
 import { useToast } from '../components/Toast';
 import { radius, usePalette } from '../theme';
 import {
@@ -104,8 +104,6 @@ export function JournalSections({ dk }: { dk: string }) {
   );
 }
 
-const GRADE_SLEEP_LABEL: Record<string, string> = { great: 'Great', good: 'Good', ok: 'OK', bad: 'Poor', crash: 'Very poor' };
-
 function SleepSection({ dk }: { dk: string }) {
   const p = usePalette();
   const state = useAppState();
@@ -167,7 +165,16 @@ function SleepSection({ dk }: { dk: string }) {
             )}
           </View>
         )}
-        {(manual || hasData) ? <SleepFields dk={dk} sleep={sleep} startOpen={hasData} expanded={manual} onToggle={toggleManual} /> : null}
+        {hasData ? (
+          <Pressable
+            onPress={() => openSheet((c) => <SleepEditSheet dk={dk} controls={c} />, { fitContent: true })}
+            style={({ pressed }) => [{ marginTop: 12, alignItems: 'center', justifyContent: 'center', borderRadius: radius.control, borderWidth: 1, borderColor: p.border, backgroundColor: p.surface2, paddingVertical: 12 }, pressed && { opacity: 0.6 }]}
+          >
+            <Text style={{ color: p.text, fontWeight: '600' }}>Edit sleep details</Text>
+          </Pressable>
+        ) : manual ? (
+          <SleepFields dk={dk} sleep={sleep} onDone={toggleManual} />
+        ) : null}
       </View>
     </Card>
   );
@@ -187,7 +194,7 @@ function SleepGrade({ dk, sleep }: { dk: string; sleep: { bed: string; wake: str
     <View style={{ borderWidth: 1, borderRadius: radius.card, padding: 14, marginBottom: 2, backgroundColor: hexA(color, 0.12), borderColor: hexA(color, 0.4) }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <Text style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.6, color: p.textDim, fontWeight: '700' }}>Last night&rsquo;s sleep</Text>
-        {grade ? <View style={{ backgroundColor: color, paddingHorizontal: 11, paddingVertical: 4, borderRadius: 999 }}><Text style={{ color: '#fff', fontSize: 12, fontWeight: '800', textTransform: 'uppercase' }}>{GRADE_SLEEP_LABEL[grade] || GRADE_LABEL[grade]}</Text></View> : null}
+        {grade ? <View style={{ backgroundColor: color, paddingHorizontal: 11, paddingVertical: 4, borderRadius: 999 }}><Text style={{ color: '#fff', fontSize: 12, fontWeight: '800', textTransform: 'uppercase' }}>{GRADE_LABEL[grade]}</Text></View> : null}
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 6 }}>
         <Text style={{ fontSize: 38, fontWeight: '800', color: p.text, fontVariant: ['tabular-nums'] }}>{hrs != null ? hrs.toFixed(1) : '–'}</Text>
@@ -202,45 +209,60 @@ function SleepGrade({ dk, sleep }: { dk: string; sleep: { bed: string; wake: str
   );
 }
 
-/** The editable sleep fields, shown in the manual editor and when data exists. */
-function SleepFields({ dk, sleep, startOpen, expanded, onToggle }: { dk: string; sleep: { bed: string; wake: string; quality?: string; hrLow?: string | number; hrHigh?: string | number }; startOpen: boolean; expanded: boolean; onToggle: () => void }) {
+type SleepShape = { bed: string; wake: string; quality?: string; hrLow?: string | number; hrHigh?: string | number };
+
+/** Bed/wake/quality/HR inputs — shared by the inline manual editor and the edit sheet. */
+function SleepEditFields({ dk, sleep }: { dk: string; sleep: SleepShape }) {
   const p = usePalette();
   const setField = (field: string, v: string) => { (ensureDay(dk).sleep as never as Record<string, string>)[field] = v; save(); };
-  // When data already exists, show a compact "Edit" affordance that expands the
-  // fields; when the user tapped "Enter manually" (no data), show them directly.
-  const show = startOpen ? expanded : true;
   return (
-    <View style={{ marginTop: startOpen ? 10 : 12 }}>
-      {startOpen ? (
-        <Pressable onPress={onToggle} hitSlop={6} style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start' }, pressed && { opacity: 0.5 }]}>
-          <Icon name={expanded ? 'chevron' : 'edit'} size={15} color={p.accent} />
-          <Text style={{ color: p.accent, fontWeight: '600', fontSize: 13 }}>{expanded ? 'Done editing' : 'Edit sleep details'}</Text>
-        </Pressable>
-      ) : null}
-      {show ? (
-        <View style={{ marginTop: startOpen ? 12 : 0 }}>
-          <View style={{ flexDirection: 'row', gap: 14 }}>
-            <View style={{ flex: 1 }}><TimeField label="Bed (last night)" value={sleep.bed} onChange={(v) => setField('bed', v)} /></View>
-            <View style={{ flex: 1 }}><TimeField label="Woke (this morning)" value={sleep.wake} onChange={(v) => setField('wake', v)} /></View>
-          </View>
-          <Segmented options={[{ val: 'good', label: 'Good sleep' }, { val: 'interrupted', label: 'Interrupted' }]} value={(sleep.quality as 'good' | 'interrupted') || 'good'} onChange={(v) => setField('quality', v)} style={{ marginBottom: 12 }} />
-          <View style={{ flexDirection: 'row', gap: 14 }}>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 12, color: p.textDim, marginBottom: 4, fontWeight: '600' }}>HR low</Text>
-              <TextInput keyboardType="decimal-pad" defaultValue={sleep.hrLow != null ? String(sleep.hrLow) : ''} onEndEditing={(e) => setField('hrLow', e.nativeEvent.text)} style={inp(p)} placeholderTextColor={p.textDim} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 12, color: p.textDim, marginBottom: 4, fontWeight: '600' }}>HR high</Text>
-              <TextInput keyboardType="decimal-pad" defaultValue={sleep.hrHigh != null ? String(sleep.hrHigh) : ''} onEndEditing={(e) => setField('hrHigh', e.nativeEvent.text)} style={inp(p)} placeholderTextColor={p.textDim} />
-            </View>
-          </View>
-          {!startOpen ? (
-            <Pressable onPress={onToggle} style={({ pressed }) => [{ marginTop: 14, borderRadius: radius.control, backgroundColor: p.accent, paddingVertical: 13, alignItems: 'center' }, pressed && { opacity: 0.7 }]}>
-              <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>Save sleep</Text>
-            </Pressable>
-          ) : null}
+    <>
+      <View style={{ flexDirection: 'row', gap: 14 }}>
+        <View style={{ flex: 1 }}><TimeField label="Bed (last night)" value={sleep.bed} onChange={(v) => setField('bed', v)} /></View>
+        <View style={{ flex: 1 }}><TimeField label="Woke (this morning)" value={sleep.wake} onChange={(v) => setField('wake', v)} /></View>
+      </View>
+      <Segmented options={[{ val: 'good', label: 'Good sleep' }, { val: 'interrupted', label: 'Interrupted' }]} value={(sleep.quality as 'good' | 'interrupted') || 'good'} onChange={(v) => setField('quality', v)} style={{ marginBottom: 12 }} />
+      <View style={{ flexDirection: 'row', gap: 14 }}>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 12, color: p.textDim, marginBottom: 4, fontWeight: '600' }}>HR low</Text>
+          <TextInput keyboardType="decimal-pad" defaultValue={sleep.hrLow != null ? String(sleep.hrLow) : ''} onEndEditing={(e) => setField('hrLow', e.nativeEvent.text)} style={inp(p)} placeholderTextColor={p.textDim} />
         </View>
-      ) : null}
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 12, color: p.textDim, marginBottom: 4, fontWeight: '600' }}>HR high</Text>
+          <TextInput keyboardType="decimal-pad" defaultValue={sleep.hrHigh != null ? String(sleep.hrHigh) : ''} onEndEditing={(e) => setField('hrHigh', e.nativeEvent.text)} style={inp(p)} placeholderTextColor={p.textDim} />
+        </View>
+      </View>
+    </>
+  );
+}
+
+/** Inline editor shown when entering a night manually (no Apple Health data yet). */
+function SleepFields({ dk, sleep, onDone }: { dk: string; sleep: SleepShape; onDone: () => void }) {
+  const p = usePalette();
+  return (
+    <View style={{ marginTop: 12 }}>
+      <SleepEditFields dk={dk} sleep={sleep} />
+      <Pressable onPress={onDone} style={({ pressed }) => [{ marginTop: 14, borderRadius: radius.control, backgroundColor: p.accent, paddingVertical: 13, alignItems: 'center' }, pressed && { opacity: 0.7 }]}>
+        <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>Save sleep</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+/** Card-modal editor for a night that already has data — opened from "Edit sleep details". */
+function SleepEditSheet({ dk, controls }: { dk: string; controls: SheetControls }) {
+  const p = usePalette();
+  const state = useAppState();
+  const sleep = state.days[dk]?.sleep || { bed: '', wake: '' };
+  return (
+    <View>
+      <Text style={{ fontSize: 20, fontWeight: '700', color: p.text, marginBottom: 16 }}>Edit sleep details</Text>
+      <SleepEditFields dk={dk} sleep={sleep} />
+      <SheetFooter>
+        <Pressable onPress={controls.close} style={({ pressed }) => [{ flex: 1, borderRadius: radius.control, backgroundColor: p.accent, paddingVertical: 13, alignItems: 'center' }, pressed && { opacity: 0.7 }]}>
+          <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>Done</Text>
+        </Pressable>
+      </SheetFooter>
     </View>
   );
 }

@@ -8,9 +8,11 @@
   export let category: string | undefined = undefined;
   /** Set true for above-the-fold covers (featured) so they aren't lazy-loaded. */
   export let eager = false;
+  /** Overlay the category pill on the image. Off for the featured card, which shows the topic in its meta row. */
+  export let showTag = true;
 
   // Deterministic per-article variation for the branded fallback cover, so each
-  // article reads differently without any external image. No randomness — keeps
+  // article reads differently without any external image. No randomness - keeps
   // prerender stable.
   const hash = (s: string) => {
     let h = 0;
@@ -27,7 +29,7 @@
 {#if photoLocation}
   <div class="cover">
     <img class="cover-img" src={photoLocation} alt={photoAttribution || title} loading={eager ? 'eager' : 'lazy'} />
-    {#if label}<span class="cover-tag">{label}</span>{/if}
+    {#if label && showTag}<span class="cover-tag">{label}</span>{/if}
   </div>
 {:else}
   <div class="cover cover-gen" style="--glow-x:{glowX}%; --tint:{tint};" aria-hidden="true">
@@ -42,7 +44,7 @@
         stroke-linecap="round"
       />
     </svg>
-    {#if label}<span class="cover-tag">{label}</span>{/if}
+    {#if label && showTag}<span class="cover-tag">{label}</span>{/if}
   </div>
 {/if}
 
@@ -56,7 +58,7 @@
   }
   .cover-img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
-  /* Branded, image-free fallback: OLED panel + soft accent glow + ECG line. */
+  /* Branded, image-free fallback: OLED panel + soft accent glow + pulse line. */
   .cover-gen {
     background:
       radial-gradient(120% 90% at var(--glow-x) -10%, color-mix(in srgb, var(--tint) 22%, transparent), transparent 60%),

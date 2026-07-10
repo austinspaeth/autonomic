@@ -49,8 +49,8 @@ export function AddButton({ onPress, label = '+ Add' }: { onPress: () => void; l
 export function AddDashButton({ onPress, label = '+ Add' }: { onPress: () => void; label?: string }) {
   const p = usePalette();
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [{ borderWidth: 1, borderStyle: 'dashed', borderColor: 'rgba(255,255,255,0.28)', borderRadius: radius.control, paddingVertical: 12, alignItems: 'center', justifyContent: 'center' }, pressed && { opacity: 0.6 }]}>
-      <Text style={{ color: p.textDim, fontSize: 15, fontWeight: '600' }}>{label}</Text>
+    <Pressable onPress={onPress} style={({ pressed }) => [{ borderWidth: 1, borderColor: p.border, backgroundColor: p.surface2, borderRadius: radius.control, paddingVertical: 12, alignItems: 'center', justifyContent: 'center' }, pressed && { opacity: 0.6 }]}>
+      <Text style={{ color: p.text, fontSize: 15, fontWeight: '600' }}>{label}</Text>
     </Pressable>
   );
 }

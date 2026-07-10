@@ -5,15 +5,16 @@
 export const ACCENT = '#e03127';
 export const ACCENT_SOFT = 'rgba(224,49,39,0.12)';
 
-/** Grade / score color scale — identical to SCORE_COLORS in the scoring engine. */
+/** Grade / score color scale — identical to SCORE_COLORS in the scoring engine.
+ *  Unified with the day-score bands: Excellent → Crash (see SCORE_COLORS). */
 export const GRADE_COLORS = {
-  great: '#38bdf8',
-  good: '#4ade80',
-  ok: '#eab308',
-  bad: '#f97316',
-  crash: '#ef4444',
-  concerning: '#ef4444',
-  warning: '#a78bfa',
+  great: '#16a34a',       // Excellent
+  good: '#22c55e',        // Good
+  ok: '#eab308',          // Moderate
+  bad: '#f97316',         // Compromised
+  crash: '#ef4444',       // Bad
+  concerning: '#b91c1c',  // Crash
+  warning: '#a78bfa',     // Warning (kept violet)
 } as const;
 
 export interface Palette {

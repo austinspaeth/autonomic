@@ -8,6 +8,7 @@ import { Bars, BpDumbbell, LineChart } from '../../src/components/charts';
 import { fonts, radius, usePalette } from '../../src/theme';
 import { useAppState } from '../../src/store/store';
 import { buildCategories, type AnalysisCard } from '../../src/lib/analysis/categories';
+import { resolveProtocol } from '../../src/lib/scoring/day';
 import type { Mode } from '../../src/lib/analysis/buckets';
 import { HrvFilterLinks, HrvProgress, type Filt } from '../../src/features/HrvProgress';
 
@@ -24,9 +25,9 @@ export default function AnalysisScreen() {
   // Build every category's cards once per (days, mode, profile). Memoized so the
   // scroll-driven "active section" re-render doesn't rebuild all the charts.
   const sections = useMemo(() => {
-    const cats = buildCategories(state.days, mode, { sex, height });
+    const cats = buildCategories(state.days, mode, { sex, height, protocol: resolveProtocol(state.settings.protocol) });
     return cats.map((c) => ({ id: c.id, icon: c.icon, title: c.title, desc: c.desc, buckets: c.buckets, cards: c.build() }));
-  }, [state.days, mode, sex, height]);
+  }, [state.days, mode, sex, height, state.settings.protocol]);
 
   // Outlook always synthesizes a score, so it isn't proof of real data. Treat the
   // whole view as empty unless some *other* category has something logged — that's
@@ -248,34 +249,71 @@ function StickyBar({ headerH, active, dir, onUp, hrvFilt, setHrvFilt }: {
  */
 const CardView = React.memo(function CardView({ card, buckets }: { card: AnalysisCard; buckets: { label: string }[] }) {
   const p = usePalette();
+  // A `selectStat` chart drives the card's first stat: dragging the chart swaps
+  // the range average for that bucket's value with its date in parentheses.
+  const [sel, setSel] = useState<number>(-1);
+  const selChart = (card.charts || []).find((c) => c.selectStat);
+  const selSeries = selChart?.series.find((s) => !s.dashed) ?? selChart?.series[0];
+  const stats = useMemo(() => {
+    const st = card.stats ? card.stats.slice() : [];
+    if (selChart && selSeries && sel >= 0 && st.length) {
+      const v = selSeries.values[sel];
+      if (v != null && !isNaN(v)) {
+        st[0] = {
+          ...st[0],
+          label: st[0].label.replace(/^avg\s+/i, ''),
+          value: selChart.integer ? Math.round(v) : Math.round(v * 10) / 10,
+          sub: `(${buckets[sel]?.label ?? ''})`,
+        };
+      }
+    }
+    return st;
+  }, [card.stats, selChart, selSeries, sel, buckets]);
   return (
     <View style={{ backgroundColor: p.surface, borderColor: p.border, borderWidth: 1, borderRadius: radius.card, padding: 16, marginBottom: 12 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
         <Text style={{ flexShrink: 1, fontSize: 15, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, color: p.textDim }}>{card.title}</Text>
         {card.help ? <HelpDot title={card.title} text={card.help} /> : null}
       </View>
-      {card.stats && card.stats.length ? (
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: 28, rowGap: 12, marginTop: 8 }}>
-          {card.stats.map((s, i) => (
-            <View key={i}>
-              <Text style={{ fontSize: 25, fontFamily: fonts.numHeavy, color: s.color || p.text, fontVariant: ['tabular-nums'] }}>
-                {s.value == null ? '–' : String(s.value)}
-                {s.sub ? <Text style={{ fontSize: 13, fontWeight: '600', fontFamily: undefined, color: p.textDim }}>{` ${s.sub}`}</Text> : null}
-              </Text>
-              <Text style={{ fontSize: 12, color: p.textDim, marginTop: 2 }}>{s.label}</Text>
-            </View>
-          ))}
-        </View>
+      {card.tiles && (card.desc || card.sub) ? (
+        <Text style={{ color: p.textDim, fontSize: 13, lineHeight: 19, marginTop: 8 }}>{card.desc || card.sub}</Text>
       ) : null}
-      {card.desc || card.sub ? (
+      {stats.length ? (
+        card.tiles ? (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 12, marginBottom: 6 }}>
+            {stats.map((s, i) => (
+              <View key={i} style={{ flex: 1, minWidth: 96, backgroundColor: p.bg, borderColor: p.border, borderWidth: 1, borderRadius: radius.card, paddingVertical: 12, paddingHorizontal: 14 }}>
+                <Text style={{ fontSize: 25, fontFamily: fonts.numHeavy, color: s.color || p.text, fontVariant: ['tabular-nums'] }}>
+                  {s.value == null ? '–' : String(s.value)}
+                  {s.sub ? <Text style={{ fontSize: 13, fontWeight: '600', fontFamily: undefined, color: p.textDim }}>{` ${s.sub}`}</Text> : null}
+                </Text>
+                <Text style={{ fontSize: 12, color: p.textDim, marginTop: 2 }}>{s.label}</Text>
+              </View>
+            ))}
+          </View>
+        ) : (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: 28, rowGap: 12, marginTop: 8 }}>
+            {stats.map((s, i) => (
+              <View key={i}>
+                <Text style={{ fontSize: 25, fontFamily: fonts.numHeavy, color: s.color || p.text, fontVariant: ['tabular-nums'] }}>
+                  {s.value == null ? '–' : String(s.value)}
+                  {s.sub ? <Text style={{ fontSize: 13, fontWeight: '600', fontFamily: undefined, color: p.textDim }}>{` ${s.sub}`}</Text> : null}
+                </Text>
+                <Text style={{ fontSize: 12, color: p.textDim, marginTop: 2 }}>{s.label}</Text>
+              </View>
+            ))}
+          </View>
+        )
+      ) : null}
+      {!card.tiles && (card.desc || card.sub) ? (
         <Text style={{ color: p.textDim, fontSize: 13, lineHeight: 19, marginTop: 8 }}>{card.desc || card.sub}</Text>
       ) : null}
       {(card.charts || []).map((ch, i) => (
         <View key={i} style={{ marginTop: 14 }}>
-          <Text style={{ fontSize: 12, color: p.text, marginBottom: 6, fontWeight: '600' }}>{ch.label}</Text>
+          {ch.label ? <Text style={{ fontSize: 12, color: p.text, marginBottom: 6, fontWeight: '600' }}>{ch.label}</Text> : null}
           {ch.dumbbell
             ? <BpDumbbell buckets={buckets} sys={ch.dumbbell.sys} dia={ch.dumbbell.dia} />
-            : <LineChart buckets={buckets} series={ch.series} zones={ch.zones} integer={ch.integer} target={ch.target} />}
+            : <LineChart buckets={buckets} series={ch.series} zones={ch.zones} integer={ch.integer} target={ch.target} hideHeader={ch.selectStat} onSelect={ch.selectStat ? setSel : undefined} />}
           {ch.legend ? (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 14, marginTop: 8 }}>
               {ch.legend.map(([name, color]) => (

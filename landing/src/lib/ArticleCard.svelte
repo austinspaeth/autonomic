@@ -1,14 +1,12 @@
 <script lang="ts">
   import type { Article } from '../routes/api/articles/types';
   import ArticleCover from './ArticleCover.svelte';
+  import { formatDate, articleHref } from './site';
 
   export let article: Article;
-
-  const fmtDate = (d: string) =>
-    new Date(d + 'T00:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 </script>
 
-<a class="blog-card" href={`/blog/${article.slug}/`}>
+<a class="blog-card" href={articleHref(article)}>
   <ArticleCover
     photoLocation={article.photoLocation}
     photoAttribution={article.photoAttribution}
@@ -17,7 +15,7 @@
     category={article.categories?.[0]}
   />
   <div class="bc-body">
-    <p class="bc-meta">{fmtDate(article.date)} · {article.author}</p>
+    <p class="bc-meta">{formatDate(article.date, 'short')} · {article.author}</p>
     <h2>{article.title}</h2>
     <p class="bc-sum">{article.summary}</p>
     <span class="bc-more">Read article →</span>

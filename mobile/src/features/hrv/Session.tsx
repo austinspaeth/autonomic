@@ -20,7 +20,7 @@ import { BreathingViz } from './BreathingViz';
 import { HrvResults } from './Results';
 import { EcgSyncSheet } from './EcgSync';
 import { ble } from '../../lib/ble/manager';
-import { correctArtifacts } from '../../lib/hrv';
+import { correctArtifacts, std } from '../../lib/hrv';
 import { getState } from '../../store/store';
 
 // Breathing readings run the full 5 minutes; unstructured readings are 2:30.
@@ -39,7 +39,7 @@ export interface SessionConfig {
   kind: 'breath' | 'unstructured';
   style?: string; // e.g. "4/6"
   source: 'polar' | 'watch';
-  period?: 'Morning' | 'Evening' | 'Random';
+  period?: 'Morning' | 'Evening' | 'Other';
 }
 
 export function HrvSession({ config, controls }: { config: SessionConfig; controls: SheetControls }) {
@@ -50,11 +50,13 @@ export function HrvSession({ config, controls }: { config: SessionConfig; contro
   const [finished, setFinished] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [hr, setHr] = useState<number | null>(null);
+  const [liveSdnn, setLiveSdnn] = useState<number | null>(null);
   const [connected, setConnected] = useState(false);
   const [artifactHint, setArtifactHint] = useState(false);
   const [phase, setPhase] = useState<'in' | 'out'>('in');
   const rrRef = useRef<number[]>([]);
   const hrRef = useRef<{ t: number; bpm: number }[]>([]);
+  const sdnnRef = useRef<{ t: number; sdnn: number }[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startedAtRef = useRef<number>(0);
   const finishedRef = useRef(false);
@@ -92,6 +94,19 @@ export function HrvSession({ config, controls }: { config: SessionConfig; contro
             if (recentRr.current.length >= 6) {
               const { artifactPct } = correctArtifacts(recentRr.current);
               setArtifactHint(artifactPct > 20);
+            }
+            // Rolling SDNN over the trailing ~60 s of beats (artifact-corrected),
+            // sampled once per BLE notification (~1 Hz).
+            if (s.rr.length) {
+              const all = rrRef.current;
+              let sum = 0, i = all.length;
+              while (i > 0 && sum < 60000) { i--; sum += all[i]; }
+              const win = all.slice(i);
+              if (win.length >= 10) {
+                const sdnn = Math.round(std(correctArtifacts(win).clean));
+                setLiveSdnn(sdnn);
+                sdnnRef.current.push({ t: now, sdnn });
+              }
             }
           }, () => setConnected(false));
         } catch { setConnected(false); }
@@ -139,7 +154,7 @@ export function HrvSession({ config, controls }: { config: SessionConfig; contro
     // (scales back + lifts) while Results rises over it. Save/Discard in Results
     // calls closeAll(), so both cards animate out together. Leave this card mounted.
     openSheet((c) => (
-      <HrvResults rr={rr} hrSamples={hrRef.current} config={config} durationSec={elapsed} watchFallback={null} controls={c} />
+      <HrvResults rr={rr} hrSamples={hrRef.current} sdnnSamples={sdnnRef.current} config={config} durationSec={elapsed} watchFallback={null} controls={c} />
     ), { hideClose: true });
   };
 
@@ -176,15 +191,16 @@ export function HrvSession({ config, controls }: { config: SessionConfig; contro
       <Text style={{ color: p.text, fontSize: 52, fontWeight: '800', fontVariant: ['tabular-nums'], marginTop: config.kind === 'breath' ? 10 : 18 }}>{mmss}</Text>
 
       {config.source === 'watch' ? null : (
-        <View style={{ flexDirection: 'row', gap: 40, marginTop: 22 }}>
+        <View style={{ flexDirection: 'row', gap: 32, marginTop: 22 }}>
           <Stat label="HR" value={hr != null ? String(hr) : '—'} unit="bpm" />
+          <Stat label="HRV" value={liveSdnn != null ? String(liveSdnn) : '—'} unit="SDNN ms" />
           <Stat label="Beats" value={String(rrRef.current.length)} unit="RR" />
         </View>
       )}
 
       <View style={{ minHeight: 22, marginTop: 14, alignItems: 'center' }}>
         {started && !connected && config.source === 'polar' ? <Text style={{ color: GRADE_COLORS.ok }}>Connecting to strap…</Text> : null}
-        {artifactHint ? <Text style={{ color: GRADE_COLORS.bad }}>Signal noisy — adjust the strap</Text> : null}
+        {artifactHint ? <Text style={{ color: GRADE_COLORS.bad }}>Signal noisy, adjust the strap</Text> : null}
         {started && !finished && config.source === 'watch' ? <Text style={{ color: p.textDim, textAlign: 'center', paddingHorizontal: 24 }}>Record an ECG on your Apple Watch now (open the ECG app and hold the crown). It syncs in when the reading ends.</Text> : null}
       </View>
 

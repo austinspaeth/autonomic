@@ -73,7 +73,7 @@ const secOrthostatic = (days: DaysMap, keys: string[]) => orNone(eachEntry(days,
 export function makeSectionRenderer(state: AppState, ctx: ScoreContext) {
   const days = state.days;
   const secScores = (keys: string[]) => { const lines: string[] = []; keys.forEach((k) => { const d = days[k]; if (!d) return; const ss = scoreSet(d.readings || [], d, k, days, ctx); if (ss.score == null) return; lines.push(`[${k}] Autonomic Score: ${ss.score}/100 (confidence ${ss.confidence}%)${blueZone(d.readings || [], ctx) ? ' [BLUE ZONE]' : ''}`); }); return orNone(lines); };
-  const secCleanDays = (keys: string[]) => { const lines: string[] = []; keys.forEach((k) => { const c = dayCleanliness(days, k); if (!c) return; const missed = c.criteria.filter((x: { pending?: boolean; pass: boolean }) => !x.pending && !x.pass).map((x: { label: string }) => x.label); lines.push(`[${k}] Clean day: ${c.clean ? 'YES' : 'NO'}${missed.length ? ` (missed: ${missed.join(', ')})` : ''}`); }); return orNone(lines); };
+  const secCleanDays = (keys: string[]) => { const lines: string[] = []; keys.forEach((k) => { const c = dayCleanliness(days, k, ctx.protocol); if (!c) return; const missed = c.criteria.filter((x: { pending?: boolean; pass: boolean }) => !x.pending && !x.pass).map((x: { label: string }) => x.label); lines.push(`[${k}] Clean day: ${c.clean ? 'YES' : 'NO'}${missed.length ? ` (missed: ${missed.join(', ')})` : ''}`); }); return orNone(lines); };
   const DEFS: Record<string, [string, (keys: string[]) => string]> = {
     hrv: ['HRV READINGS (structured + unstructured)', (k) => secHRV(days, k)],
     bp: ['BLOOD PRESSURE READINGS', (k) => secBP(days, k)],
@@ -92,11 +92,11 @@ export function makeSectionRenderer(state: AppState, ctx: ScoreContext) {
 }
 
 export function universalHeader(_state: AppState, rangeText: string): string {
-  return `You are analyzing autonomic and recovery health data logged by a person using a personal health-tracking app. Base every observation on the data provided below — do not assume a diagnosis, age, sex, or medical history that is not present in the data.
+  return `You are analyzing autonomic and recovery health data logged by a person using a personal health-tracking app. Base every observation on the data provided below. Do not assume a diagnosis, age, sex, or medical history that is not present in the data.
 
 Approach this analysis as an honest friend examining the data carefully - direct and accurate without unnecessary softening or cruelty.
 
-REQUIREMENTS: Be concise, accurate, honest, specific (use actual numbers), research-grounded, and careful with recommendations (note doctor consultation for medications, therapeutic-dose supplements, or major protocol changes).
+REQUIREMENTS: Be concise, accurate, honest, specific (use actual numbers), research-grounded, and careful with recommendations (note doctor consultation for medications, therapeutic-dose supplements, or major protocol changes). Do not use em dashes anywhere in your response; use commas, colons, parentheses, or separate sentences instead.
 
 STRUCTURE YOUR RESPONSE: Analysis; Trends Identified; Recovery Position; Projections; Recommendations; Citations.
 
@@ -139,7 +139,7 @@ export function buildPrompt(state: AppState, ctx: ScoreContext, cards: ReportCar
   const keys = allKeys.filter((k) => state.days[k]).sort();
   const render = makeSectionRenderer(state, ctx);
   const header = universalHeader(state, rangeText);
-  const sparse = hasAnyData(state.days, keys) && entryCount(state.days, keys) < 4 ? '\n\nNOTE: Limited data available for this period — analysis may be less comprehensive.\n' : '';
+  const sparse = hasAnyData(state.days, keys) && entryCount(state.days, keys) < 4 ? '\n\nNOTE: Limited data available for this period, analysis may be less comprehensive.\n' : '';
   if (cards.length === 1) {
     const card = cards[0];
     let body = `FOCUS: ${card.focus}`;

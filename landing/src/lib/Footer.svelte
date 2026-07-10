@@ -19,11 +19,11 @@
     </nav>
     <nav class="footer-col" aria-label="More">
       <h4>More</h4>
-      <a href="/#milestones">Milestones</a><a href="/#privacy">Privacy</a><a href="/blog/">Blog</a><a href="/#faq">FAQ</a><a href="/privacy-policy/">Privacy Policy</a><a href="/terms-of-service/">Terms of Service</a>
+      <a href="/#milestones">Milestones</a><a href="/#privacy">Privacy</a><a href="/insights/">Blog</a><a href="/#faq">FAQ</a><a href="/privacy-policy/">Privacy Policy</a><a href="/terms-of-service/">Terms of Service</a>
     </nav>
   </div>
   <div class="wrap footer-base">
-    <span>© <span id="yr">2026</span> Autonomic</span>
+    <span>© <span id="yr">2026</span> DiscoveryMark LLC</span>
     <span class="footer-disc">Not a medical device. Autonomic does not diagnose, treat, or provide medical advice.</span>
   </div>
 </footer>

@@ -10,7 +10,7 @@
  * app/_layout.tsx), so the app is already live underneath when the reveal runs.
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import Animated, {
   Easing, FadeIn, FadeInLeft, FadeInRight, FadeOut, FadeOutLeft, FadeOutRight,
   interpolateColor, runOnJS, useAnimatedStyle, useSharedValue, withDelay, withTiming,
@@ -18,6 +18,8 @@ import Animated, {
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BrandMark, Icon } from '../components/Icon';
+import { DatePickerSheet, HeightPickerSheet, fmtHeight, onlyNumeric } from '../components/Field';
+import { fmtDateFull } from '../lib/dates';
 import { useSheets } from '../components/Sheet';
 import { useToast } from '../components/Toast';
 import { ACCENT } from '../theme';
@@ -184,6 +186,32 @@ function Onboarding({ onDone }: { onDone: () => void }) {
   const mounted = useRef(false);
   useEffect(() => { mounted.current = true; }, []);
 
+  // Keyboard tracking so the bottom action bar floats above the keyboard and can
+  // offer a hide-keyboard button — mirrors the sheet footer pattern. Only the
+  // About-you step has an input (weight); scroll it into view when the kb opens.
+  const scrollRef = useRef<ScrollView>(null);
+  const kb = useSharedValue(0);
+  const [kbOpen, setKbOpen] = useState(false);
+  useEffect(() => {
+    const ios = Platform.OS === 'ios';
+    const onShow = (e: { endCoordinates: { height: number }; duration?: number }) => {
+      kb.value = withTiming(e.endCoordinates.height, { duration: e.duration || 250, easing: Easing.out(Easing.cubic) });
+      setKbOpen(true);
+      requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
+    };
+    const onHide = (e?: { duration?: number }) => {
+      kb.value = withTiming(0, { duration: (e && e.duration) || 250, easing: Easing.out(Easing.cubic) });
+      setKbOpen(false);
+    };
+    const s = Keyboard.addListener(ios ? 'keyboardWillShow' : 'keyboardDidShow', onShow);
+    const h = Keyboard.addListener(ios ? 'keyboardWillHide' : 'keyboardDidHide', onHide);
+    return () => { s.remove(); h.remove(); };
+  }, [kb]);
+  const actionBarStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: -kb.value }],
+    paddingBottom: 12 + (insets.bottom - 4) * (1 - Math.min(1, kb.value / 24)),
+  }));
+
   const healthOn = !!state.settings.healthEnabled;
   const strapOn = !!state.settings.lastBleDeviceId;
   const gated = step === 2 && !ack;
@@ -327,14 +355,14 @@ function Onboarding({ onDone }: { onDone: () => void }) {
         );
       };
       return (
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingTop: 24, gap: 22, paddingBottom: 24 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <ScrollView ref={scrollRef} style={{ flex: 1 }} contentContainerStyle={{ paddingTop: 24, gap: 22, paddingBottom: 88 }} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" automaticallyAdjustKeyboardInsets showsVerticalScrollIndicator={false}>
           <View style={[st.tile, { width: 64, height: 64, borderRadius: 18 }]}>
             <Glyph size={30} d={['M16 8a4 4 0 1 1-8 0 4 4 0 0 1 8 0', 'M4 21a8 8 0 0 1 16 0']} />
           </View>
           <View>
             <Text style={st.h2}>About you</Text>
             <Text style={st.para}>
-              A few basics personalize your scores — sex-adjusted QTc, BMI, and age-aware context.
+              A few basics personalize your scores: sex-adjusted QTc, BMI, and age-aware context.
               All optional, stored only on your device, and editable anytime in Settings.
             </Text>
           </View>
@@ -345,23 +373,26 @@ function Onboarding({ onDone }: { onDone: () => void }) {
             </View>
             <View>
               <Text style={st.fieldLabel}>Birthday</Text>
-              <TextInput
-                value={birthday}
-                onChangeText={setBirthday}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor={C.chevron}
-                keyboardType="numbers-and-punctuation"
+              <Pressable
+                onPress={() => openSheet((c) => <DatePickerSheet label="Birthday" value={birthday} onChange={setBirthday} controls={c} />, { fitContent: true })}
                 style={st.input}
-              />
+              >
+                <Text style={{ fontSize: 15, color: birthday ? C.text : C.chevron }}>{birthday ? fmtDateFull(birthday) : 'Set birthday'}</Text>
+              </Pressable>
             </View>
             <View style={{ flexDirection: 'row', gap: 12 }}>
               <View style={{ flex: 1 }}>
-                <Text style={st.fieldLabel}>Height (in)</Text>
-                <TextInput value={height} onChangeText={setHeight} placeholder="68" placeholderTextColor={C.chevron} keyboardType="decimal-pad" style={st.input} />
+                <Text style={st.fieldLabel}>Height</Text>
+                <Pressable
+                  onPress={() => openSheet((c) => <HeightPickerSheet label="Height" value={height} onChange={setHeight} controls={c} />, { fitContent: true })}
+                  style={st.input}
+                >
+                  <Text style={{ fontSize: 15, color: fmtHeight(height) ? C.text : C.chevron }}>{fmtHeight(height) || 'Set height'}</Text>
+                </Pressable>
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={st.fieldLabel}>Weight (lb)</Text>
-                <TextInput value={weight} onChangeText={setWeight} placeholder="150" placeholderTextColor={C.chevron} keyboardType="decimal-pad" style={st.input} />
+                <TextInput value={weight} onChangeText={(t) => setWeight(onlyNumeric(t))} placeholder="150" placeholderTextColor={C.chevron} keyboardType="decimal-pad" keyboardAppearance="dark" style={st.input} />
               </View>
             </View>
           </View>
@@ -369,7 +400,7 @@ function Onboarding({ onDone }: { onDone: () => void }) {
       );
     }
     if (step === 4) return (
-      <View style={{ flex: 1, paddingTop: 24, gap: 22 }}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingTop: 24, gap: 22, paddingBottom: 24, flexGrow: 1 }} showsVerticalScrollIndicator={false}>
         <View style={[st.tile, { width: 64, height: 64, borderRadius: 18 }]}>
           <Glyph size={30} d={['M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71', 'M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71']} />
         </View>
@@ -402,10 +433,10 @@ function Onboarding({ onDone }: { onDone: () => void }) {
             Works with Apple Watch without pairing to the app, but Bluetooth chest straps will get more accurate data.
           </Text>
         </View>
-      </View>
+      </ScrollView>
     );
     return (
-      <View style={{ flex: 1, paddingTop: 24, gap: 22 }}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingTop: 24, gap: 22, paddingBottom: 24, flexGrow: 1 }} showsVerticalScrollIndicator={false}>
         <View style={{ width: 64, height: 64, borderRadius: 18, backgroundColor: 'rgba(224,49,39,0.09)', borderWidth: 1, borderColor: 'rgba(224,49,39,0.25)', alignItems: 'center', justifyContent: 'center' }}>
           <Glyph size={30} w={2.4} d={['M20 6L9 17l-5-5']} />
         </View>
@@ -433,7 +464,7 @@ function Onboarding({ onDone }: { onDone: () => void }) {
             Tap the <Text style={{ fontWeight: '700' }}>?</Text> icons whenever you need help.
           </Bullet>
         </View>
-      </View>
+      </ScrollView>
     );
   };
 
@@ -470,14 +501,19 @@ function Onboarding({ onDone }: { onDone: () => void }) {
         </Animated.View>
       </View>
 
-      {/* Bottom action */}
-      <View style={{ paddingHorizontal: 26, paddingTop: 12, paddingBottom: insets.bottom + 8 }}>
+      {/* Bottom action — floats above the keyboard; hide-keyboard button when open */}
+      <Animated.View style={[{ paddingHorizontal: 26, paddingTop: 12, flexDirection: 'row', gap: 10 }, actionBarStyle]}>
+        {kbOpen && (
+          <Pressable onPress={() => Keyboard.dismiss()} hitSlop={6} accessibilityRole="button" accessibilityLabel="Hide keyboard" style={{ width: 48, height: 54, borderRadius: 14, borderWidth: 1, borderColor: C.tileBorder, backgroundColor: C.row, alignItems: 'center', justifyContent: 'center' }}>
+            <Icon name="chevron" size={22} color={C.dim} />
+          </Pressable>
+        )}
         <AnimatedPressable
           onPress={next}
           disabled={gated || finishing}
           onPressIn={() => { primScale.value = withTiming(0.97, { duration: 90 }); }}
           onPressOut={() => { primScale.value = withTiming(1, { duration: 140 }); }}
-          style={[{ height: 54, borderRadius: 14, backgroundColor: ACCENT, overflow: 'hidden' }, primStyle]}
+          style={[{ flex: 1, height: 54, borderRadius: 14, backgroundColor: ACCENT, overflow: 'hidden' }, primStyle]}
         >
           <Animated.View
             key={label}
@@ -488,7 +524,7 @@ function Onboarding({ onDone }: { onDone: () => void }) {
             <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700', letterSpacing: -0.2 }}>{label}</Text>
           </Animated.View>
         </AnimatedPressable>
-      </View>
+      </Animated.View>
 
       {/* Fade-to-black cover for the finish sequence (absorbs touches while up) */}
       <AnimatedPressable

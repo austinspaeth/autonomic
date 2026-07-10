@@ -6,22 +6,23 @@
 import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Defs, LinearGradient as SvgGradient, Rect, Stop } from 'react-native-svg';
-import Animated, { Easing, useAnimatedProps, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
+import Animated, { Easing, useAnimatedProps, useAnimatedStyle, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
 import { ScoreGauge } from '../components/charts';
 import { Icon } from '../components/Icon';
-import { SheetControls, useSheets } from '../components/Sheet';
+import { SheetControls, SheetFooter, useSheets } from '../components/Sheet';
 import { HeroCard, SumCard, MetricRow } from '../components/summary';
 import { MilestoneProgressCard } from './Milestones';
-import { Button } from '../components/ui';
+import { Button, Stepper } from '../components/ui';
 import { radius, usePalette } from '../theme';
 import { SCORE_COLORS, GRADE_LABEL, GRADE_PTS, catFromBands } from '../lib/scoring';
 import {
-  OUTLOOK_GUIDE, TOMORROW, SCORE_TIPS, blueZone, readingPeriod,
+  OUTLOOK_GUIDE, TOMORROW, SCORE_TIPS, blueZone, readingPeriod, resolveProtocol,
   scoreCat, scoreSet, streakInfo, streakTier, type ScoreComp, type ScoreSetResult,
 } from '../lib/scoring/day';
-import { getState, useAppState } from '../store/store';
+import { typesFor } from '../lib/typeCatalog';
+import { getState, mutate, useAppState } from '../store/store';
 
-import type { Band, ScoreCat } from '../lib/types';
+import type { Band, Protocol, ScoreCat } from '../lib/types';
 
 const hexA = (hex: string, a: number) => {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex);
@@ -117,7 +118,7 @@ export function DaySummary({ dk }: { dk: string }) {
         )}
       </GradientBorderCard>
       <StreakCard dk={dk} />
-      <MilestoneProgressCard />
+      <MilestoneProgressCard dk={dk} />
     </View>
   );
 }
@@ -190,22 +191,38 @@ function Flag({ color, text }: { color: string; text: string }) {
 
 function StreakCard({ dk }: { dk: string }) {
   const p = usePalette();
+  const { openSheet } = useSheets();
   const [expanded, setExpanded] = useState(false);
-  const state = getState();
-  const si = streakInfo(state.days, dk);
+  const state = useAppState();
+  const si = streakInfo(state.days, dk, resolveProtocol(state.settings.protocol));
   const tier = streakTier(si.current);
   const icon = si.current >= 14 ? 'moon' : si.current >= 7 ? 'rocket' : si.current >= 3 ? 'flame' : 'sparkles';
   const c = si.today;
+
+  // Rotate the (down-pointing) chevron in place: -90° = pointing right when
+  // collapsed, easing to 0° = pointing down when expanded. Position never moves.
+  const rot = useSharedValue(0);
+  useEffect(() => { rot.value = withTiming(expanded ? 1 : 0, { duration: 220 }); }, [expanded, rot]);
+  const chevStyle = useAnimatedStyle(() => ({ transform: [{ rotate: `${-90 + rot.value * 90}deg` }] }));
+
+  // Accordion the body open/closed by animating its measured height. The body
+  // stays mounted (clipped to 0 height while collapsed) so onLayout can report
+  // its natural height; `open` drives height 0 → contentH and a fade in step.
+  const [contentH, setContentH] = useState(0);
+  const open = useSharedValue(0);
+  useEffect(() => { open.value = withTiming(expanded ? 1 : 0, { duration: 260, easing: Easing.out(Easing.cubic) }); }, [expanded, open]);
+  const bodyStyle = useAnimatedStyle(() => ({
+    height: open.value * contentH,
+    opacity: open.value,
+  }));
 
   let sub = tier.msg;
   if (c) {
     if (c.clean) sub = 'Clean day. Streak continues.';
     else {
       const hardFail = c.criteria.some((x) => x.broken);
-      const needLabel = (x: any) => (x.need != null ? x.need : x.label).toLowerCase();
-      const needed = c.criteria.filter((x) => !x.pass && !x.broken).map(needLabel);
-      if (si.isToday) sub = hardFail ? 'Too late for today. Try again to start fresh tomorrow.' : needed.length ? `Today is day ${si.current + 1}. Still needed: ${needed.join(', ')}.` : `Today is day ${si.current + 1}.`;
-      else sub = `Not a clean day. ${c.criteria.filter((x) => !x.pass && !x.pending).map(needLabel).slice(0, 3).join(', ')}.`;
+      if (si.isToday) sub = hardFail ? 'Too late for today. Try again to start fresh tomorrow.' : `Today is day ${si.current + 1}.`;
+      else sub = 'Not a clean day.';
     }
   } else sub = 'No data logged for this day.';
 
@@ -214,45 +231,182 @@ function StreakCard({ dk }: { dk: string }) {
 
   return (
     <View style={{ borderWidth: 1, borderColor: p.border, borderRadius: radius.card, backgroundColor: p.surface, marginBottom: 12, overflow: 'hidden' }}>
-      <Pressable onPress={() => setExpanded((v) => !v)} style={{ flexDirection: 'row', gap: 13, alignItems: 'flex-start', padding: 15 }}>
-        <View style={{ width: 42, height: 42, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: si.current > 0 ? 'rgba(249,115,22,0.14)' : p.surface2 }}>
-          <Icon name={icon} size={21} color={si.current > 0 ? '#f97316' : p.textDim} />
+      <Pressable onPress={() => setExpanded((v) => !v)} style={{ padding: 15 }}>
+        {/* Header row: always vertically centered, so the chevron never shifts. */}
+        <View style={{ flexDirection: 'row', gap: 13, alignItems: 'center' }}>
+          <View style={{ width: 42, height: 42, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: si.current > 0 ? 'rgba(249,115,22,0.14)' : p.surface2 }}>
+            <Icon name={icon} size={21} color={si.current > 0 ? '#f97316' : p.textDim} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 15, color: p.text }}>
+              <Text style={{ fontWeight: '800' }}>{si.current} </Text>
+              {`clean day${si.current === 1 ? '' : 's'} · `}
+              <Text style={{ color: p.textDim, fontWeight: '600' }}>{tier.tier}</Text>
+            </Text>
+            <Text style={{ fontSize: 13, color: p.textDim, marginTop: 2, lineHeight: 17 }}>{sub}</Text>
+          </View>
+          <Animated.View style={chevStyle}>
+            <Icon name="chevron" size={18} color={p.textDim} />
+          </Animated.View>
         </View>
-        <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 15, color: p.text }}>
-            <Text style={{ fontWeight: '800' }}>{si.current} </Text>
-            {`clean day${si.current === 1 ? '' : 's'} · `}
-            <Text style={{ color: p.textDim, fontWeight: '600' }}>{tier.tier}</Text>
-          </Text>
-          <Text style={{ fontSize: 13, color: p.textDim, marginTop: 2, lineHeight: 17 }}>{sub}</Text>
-          {expanded ? (
-            <View style={{ marginTop: 10 }}>
-              <Text style={{ fontSize: 11, color: p.textDim, fontVariant: ['tabular-nums'] }}>{stats.join(' · ')}</Text>
-              {c ? (
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
-                  {c.criteria.map((x) => {
-                    let st: 'pending' | 'met' | 'broken' | 'todo';
-                    if (x.pending) st = 'pending';
-                    else if (x.pass) st = 'met';
-                    else if (!si.isToday || x.broken) st = 'broken';
-                    else st = 'todo';
-                    const dotColor = st === 'met' ? '#22c55e' : st === 'broken' ? '#ef4444' : p.surface2;
-                    return (
-                      <View key={x.key} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <View style={{ width: 15, height: 15, borderRadius: 8, backgroundColor: dotColor, borderWidth: 1, borderColor: st === 'met' || st === 'broken' ? dotColor : p.border, alignItems: 'center', justifyContent: 'center' }}>
-                          {st === 'met' ? <Icon name="check" size={9} color="#fff" /> : null}
-                        </View>
-                        <Text style={{ fontSize: 12, color: st === 'met' || st === 'broken' ? p.text : p.textDim }}>{x.label}</Text>
+        <Animated.View style={[{ overflow: 'hidden' }, bodyStyle]}>
+          <View onLayout={(e) => setContentH(e.nativeEvent.layout.height)} style={{ paddingTop: 12 }}>
+            <Text style={{ fontSize: 11, color: p.textDim, fontVariant: ['tabular-nums'] }}>{stats.join(' · ')}</Text>
+            {c ? (
+              <View style={{ marginTop: 12, gap: 9 }}>
+                {c.criteria.map((x) => {
+                  let st: 'pending' | 'met' | 'broken' | 'todo';
+                  if (x.pending) st = 'pending';
+                  else if (x.pass) st = 'met';
+                  else if (!si.isToday || x.broken) st = 'broken';
+                  else st = 'todo';
+                  const dotColor = st === 'met' ? '#22c55e' : st === 'broken' ? '#ef4444' : p.surface2;
+                  return (
+                    <View key={x.key} style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
+                      <View style={{ width: 16, height: 16, borderRadius: 8, backgroundColor: dotColor, borderWidth: 1, borderColor: st === 'met' || st === 'broken' ? dotColor : p.border, alignItems: 'center', justifyContent: 'center' }}>
+                        {st === 'met' ? <Icon name="check" size={10} color="#fff" /> : null}
                       </View>
-                    );
-                  })}
-                </View>
-              ) : null}
-            </View>
-          ) : null}
-        </View>
-        <Icon name="chevron" size={18} color={p.textDim} />
+                      <Text style={{ flex: 1, fontSize: 13, color: st === 'met' || st === 'broken' ? p.text : p.textDim }}>{x.label}</Text>
+                    </View>
+                  );
+                })}
+              </View>
+            ) : null}
+            <Pressable
+              onPress={() => openSheet((ctl) => <ProtocolEditor controls={ctl} />)}
+              style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, marginTop: 14, paddingVertical: 10, borderRadius: radius.control, borderWidth: 1, borderColor: p.border, backgroundColor: p.surface2 }, pressed && { opacity: 0.7 }]}
+            >
+              <Icon name="settings" size={15} color={p.textDim} />
+              <Text style={{ fontSize: 13, fontWeight: '600', color: p.text }}>Modify protocol</Text>
+            </Pressable>
+          </View>
+        </Animated.View>
       </Pressable>
+    </View>
+  );
+}
+
+/* ---------- Protocol editor sheet ---------- */
+function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
+  const p = usePalette();
+  return (
+    <Pressable onPress={() => onChange(!value)} hitSlop={6} style={{ width: 46, height: 28, borderRadius: 14, padding: 3, justifyContent: 'center', backgroundColor: value ? p.accent : p.surface2, borderWidth: 1, borderColor: value ? p.accent : p.border }}>
+      <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: '#fff', alignSelf: value ? 'flex-end' : 'flex-start' }} />
+    </Pressable>
+  );
+}
+
+function CheckRow({ label, checked, onToggle }: { label: string; checked: boolean; onToggle: () => void }) {
+  const p = usePalette();
+  return (
+    <Pressable onPress={onToggle} style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 11, paddingVertical: 9 }, pressed && { opacity: 0.6 }]}>
+      <View style={{ width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: checked ? p.accent : p.border, backgroundColor: checked ? p.accent : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
+        {checked ? <Icon name="check" size={13} color="#fff" /> : null}
+      </View>
+      <Text style={{ flex: 1, fontSize: 15, color: p.text }}>{label}</Text>
+    </Pressable>
+  );
+}
+
+/** One protocol requirement: title + on/off toggle, with config UI shown while on. */
+function ReqSection({ title, desc, enabled, onToggle, children }: { title: string; desc: string; enabled: boolean; onToggle: (v: boolean) => void; children?: React.ReactNode }) {
+  const p = usePalette();
+  return (
+    <View style={{ borderWidth: 1, borderColor: p.border, borderRadius: radius.card, backgroundColor: p.surface, padding: 14, marginBottom: 12 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 16, fontWeight: '700', color: p.text }}>{title}</Text>
+          <Text style={{ fontSize: 12, color: p.textDim, marginTop: 2, lineHeight: 16 }}>{desc}</Text>
+        </View>
+        <Toggle value={enabled} onChange={onToggle} />
+      </View>
+      {enabled && children ? <View style={{ marginTop: 10, borderTopWidth: 1, borderTopColor: p.border, paddingTop: 4 }}>{children}</View> : null}
+    </View>
+  );
+}
+
+function ProtocolEditor({ controls }: { controls: SheetControls }) {
+  const p = usePalette();
+  const state = useAppState();
+  const [proto, setProto] = useState<Protocol>(() => resolveProtocol(state.settings.protocol));
+
+  const medTypes = typesFor(state, 'meds');
+  const actTypes = typesFor(state, 'activities');
+  const toggleKey = (list: string[], k: string) => (list.includes(k) ? list.filter((x) => x !== k) : [...list, k]);
+
+  const onSave = () => {
+    mutate((s) => { s.settings.protocol = proto; });
+    controls.close();
+  };
+  const onReset = () => setProto(resolveProtocol(null));
+
+  return (
+    <View>
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 6 }}>Clean-day protocol</Text>
+      <Text style={{ fontSize: 14, color: p.textDim, lineHeight: 20, marginBottom: 18 }}>
+        Choose what a clean day means for you. A day counts toward your streak when every requirement you turn on is met.
+      </Text>
+
+      <ReqSection
+        title="No triggers"
+        desc="Any logged trigger breaks the day."
+        enabled={proto.triggers.enabled}
+        onToggle={(v) => setProto((x) => ({ ...x, triggers: { ...x.triggers, enabled: v } }))}
+      />
+
+      <ReqSection
+        title="Water"
+        desc="Hit a minimum daily water intake."
+        enabled={proto.water.enabled}
+        onToggle={(v) => setProto((x) => ({ ...x, water: { ...x.water, enabled: v } }))}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 }}>
+          <Text style={{ fontSize: 15, color: p.text }}>Daily goal</Text>
+          <Stepper value={proto.water.liters} step={0.25} format={(v) => `${v} L`} onChange={(v) => setProto((x) => ({ ...x, water: { ...x.water, liters: v } }))} />
+        </View>
+      </ReqSection>
+
+      <ReqSection
+        title="Medications"
+        desc="Choose which medications you must take."
+        enabled={proto.meds.enabled}
+        onToggle={(v) => setProto((x) => ({ ...x, meds: { ...x.meds, enabled: v } }))}
+      >
+        {Object.entries(medTypes).map(([k, def]) => (
+          <CheckRow key={k} label={def.label} checked={proto.meds.types.includes(k)} onToggle={() => setProto((x) => ({ ...x, meds: { ...x.meds, types: toggleKey(x.meds.types, k) } }))} />
+        ))}
+      </ReqSection>
+
+      <ReqSection
+        title="Activities"
+        desc="Select the activities you must complete."
+        enabled={proto.activities.enabled}
+        onToggle={(v) => setProto((x) => ({ ...x, activities: { ...x.activities, enabled: v } }))}
+      >
+        {Object.entries(actTypes).map(([k, def]) => (
+          <CheckRow key={k} label={def.label} checked={proto.activities.types.includes(k)} onToggle={() => setProto((x) => ({ ...x, activities: { ...x.activities, types: toggleKey(x.activities.types, k) } }))} />
+        ))}
+      </ReqSection>
+
+      <ReqSection
+        title="Sleep"
+        desc="Sleep at least this many hours."
+        enabled={proto.sleep.enabled}
+        onToggle={(v) => setProto((x) => ({ ...x, sleep: { ...x.sleep, enabled: v } }))}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 }}>
+          <Text style={{ fontSize: 15, color: p.text }}>Minimum</Text>
+          <Stepper value={proto.sleep.hours} step={0.5} format={(v) => `${v} h`} onChange={(v) => setProto((x) => ({ ...x, sleep: { ...x.sleep, hours: v } }))} />
+        </View>
+      </ReqSection>
+
+      <Pressable onPress={onReset} style={({ pressed }) => [{ alignSelf: 'center', paddingVertical: 8 }, pressed && { opacity: 0.6 }]}>
+        <Text style={{ fontSize: 13, fontWeight: '600', color: p.textDim }}>Reset to default</Text>
+      </Pressable>
+
+      <SheetFooter>
+        <Button title="Save protocol" variant="primary" onPress={onSave} />
+      </SheetFooter>
     </View>
   );
 }
@@ -307,9 +461,9 @@ function ScoreExplain({ all, dk, controls }: { all: ScoreSetResult; dk: string; 
   return (
     <View>
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 16 }}>How this score was calculated</Text>
-      <HeroCard cat={cat.short === 'Excellent' || cat.short === 'Good' ? 'great' : null} label={cat.label} big={all.score!} den="/ 100" sub={`Confidence ${all.confidence}% — the share of the full input set available to score today.`} />
+      <HeroCard cat={cat.short === 'Excellent' || cat.short === 'Good' ? 'great' : null} label={cat.label} big={all.score!} den="/ 100" sub={`Confidence ${all.confidence}%, the share of the full input set available to score today.`} />
       <Text style={{ fontSize: 14, color: p.textDim, lineHeight: 20, marginBottom: 16 }}>
-        {"The Autonomic Score is a weighted blend of the day's readings. Each input is graded, turned into points, and combined by weight. Missing inputs drop out and the remaining weights are rescaled — that rescaling is the confidence percentage."}
+        {"The Autonomic Score is a weighted blend of the day's readings. Each input is graded, turned into points, and combined by weight. Missing inputs drop out and the remaining weights are rescaled, and that rescaling is the confidence percentage."}
       </Text>
       {helped.length ? <SumCard title="What helped">{helped.map((c) => <CompRow key={c.label} c={c} improveLine={improveLine} />)}</SumCard> : null}
       {hurt.length ? <SumCard title="What hurt">{hurt.map((c) => <CompRow key={c.label} c={c} improveLine={improveLine} />)}</SumCard> : null}

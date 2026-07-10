@@ -91,7 +91,7 @@ export function EcgSyncSheet({ windowStartMs, windowEndMs, config, controls }: {
           <ActivityIndicator size="large" color={p.accent} />
           <Text style={{ color: p.textDim, fontSize: 14, lineHeight: 20, textAlign: 'center', paddingHorizontal: 28, marginTop: 22 }}>
             Looking in Apple Health for the ECG you recorded during this reading. The watch can take a moment to hand it over
-            {waitedSec >= 20 ? ' — still checking' : ''}…
+            {waitedSec >= 20 ? ', still checking' : ''}…
           </Text>
         </>
       ) : (
@@ -99,7 +99,7 @@ export function EcgSyncSheet({ windowStartMs, windowEndMs, config, controls }: {
           <Icon name="alert" size={40} color={p.textDim} />
           <Text style={{ color: p.textDim, fontSize: 14, lineHeight: 20, textAlign: 'center', paddingHorizontal: 28, marginTop: 14 }}>
             {phase === 'unavailable'
-              ? 'ECG import needs an iOS build with the ECG module — it is unavailable here.'
+              ? 'ECG import needs an iOS build with the ECG module, which is unavailable here.'
               : 'Health denied ECG access. Allow Electrocardiogram data for Autonomic in the Health app, then try again.'}
           </Text>
         </>

@@ -5,16 +5,19 @@
  */
 import type { Entry } from '../types';
 import { SCORE_COLORS } from '../scoring';
-import { scoreCat, scoreSet, sleepHours, streakInfo, streakTier, type DaysMap } from '../scoring/day';
+import { scoreCat, sleepHours, streakInfo, type DaysMap } from '../scoring/day';
 import { ACTIVITY_TYPES, MED_TYPES, TRIGGER_TYPES } from '../registry';
 import {
   BANDS, Mode, acBandZones, acBuckets, acMean, acPresent, acRangeLabel,
-  acReadVals, acScoreZones, acToDec, acTotalPower, avgRound, isEvening, isMorning, makeAgg,
+  acReadVals, acScoreZones, acTotalPower, avgRound, makeAgg,
   type ScoreContext,
 } from './buckets';
 import type { Series, Zone } from '../../components/charts';
 
-export interface Chart { label: string; series: Series[]; zones?: Zone[] | null; target?: { from: number; to: number; color: string }; integer?: boolean; legend?: [string, string][]; dumbbell?: { sys: (number | null)[]; dia: (number | null)[] } }
+export interface Chart { label: string; series: Series[]; zones?: Zone[] | null; target?: { from: number; to: number; color: string }; integer?: boolean; legend?: [string, string][]; dumbbell?: { sys: (number | null)[]; dia: (number | null)[] };
+  /** Hide the chart's own readout and instead drive the card's first stat:
+   *  average by default, the dragged bucket's value with its date on select. */
+  selectStat?: boolean; }
 export interface Stat { label: string; value: number | string | null; sub?: string; color?: string }
 export interface Insight { text: string; strength?: 'strong' | 'mod' | null }
 export interface BarGroup { label: string; rows: { name: string; count: number; color?: string }[]; fmt?: (c: number) => string }
@@ -26,6 +29,8 @@ export interface AnalysisCard {
   /** Longer copy for the "?" help sheet next to the title. */
   help?: string;
   charts?: Chart[]; stats?: Stat[]; insights?: Insight[]; bars?: BarGroup[];
+  /** Render stats as darker rounded tiles (squircles) instead of a flat row. */
+  tiles?: boolean;
 }
 export interface Category { id: string; icon: string; title: string; desc: string; buckets: { label: string }[]; build: () => AnalysisCard[] }
 
@@ -47,41 +52,34 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
     const best = daily.reduce((a, b) => (b.sc > a.sc ? b : a), daily[0]);
     const worst = daily.reduce((a, b) => (b.sc < a.sc ? b : a), daily[0]);
     const avg = acMean(vals)!;
+    const mdy = (dk: string) => `${+dk.slice(5, 7)}/${+dk.slice(8, 10)}`; // "2026-07-30" → "7/30"
     const cards: AnalysisCard[] = [{
       title: 'Autonomic Outlook', sub: range,
       desc: 'Your daily autonomic score over the range, with a rolling average to smooth the noise.',
-      help: 'Each day is scored 0–100 from everything you logged that day — HRV readings, vitals, symptoms and sleep — using the recovery framework\'s thresholds. The dashed line is a rolling average, which is usually the better trend to watch: single days swing, the rolling line tells the story.',
+      help: 'Each day is scored 0–100 from everything you logged that day (HRV readings, vitals, symptoms and sleep) using the recovery framework\'s thresholds. The dashed line is a rolling average, which is usually the better trend to watch: single days swing, the rolling line tells the story.',
       charts: [{ label: 'Daily score', series: [series(vals, SCORE_COLORS.great, 'Score', { pointBands: null }), series(roll, '#9a9aa0', `${win}-pt avg`, { dashed: true })], zones: acScoreZones(), integer: true }],
+      tiles: true,
       stats: [
         { label: 'Average', value: Math.round(avg), color: scoreCat(avg).color },
-        best ? { label: `Best day · ${best.dk.slice(5)}`, value: best.sc, color: scoreCat(best.sc).color } : null,
-        worst ? { label: `Worst day · ${worst.dk.slice(5)}`, value: worst.sc, color: scoreCat(worst.sc).color } : null,
+        best ? { label: `Best · ${mdy(best.dk)}`, value: best.sc, color: scoreCat(best.sc).color } : null,
+        worst ? { label: `Worst · ${mdy(worst.dk)}`, value: worst.sc, color: scoreCat(worst.sc).color } : null,
       ].filter(Boolean) as Stat[],
     }];
-    // correlations
-    const corr = correlations(days, ctx);
-    if (corr.length) cards.push({
-      title: 'Correlation Insights',
-      desc: 'Patterns between your habits and your autonomic score.',
-      help: 'Pearson correlations between paired daily values (sleep vs next-morning RMSSD, water vs score, and so on), reported only with at least 14 days of overlap and |r| ≥ 0.3. Correlation is not causation — treat these as leads worth testing, not conclusions.',
-      insights: corr,
-    });
     return cards;
   };
 
   const heat = (): AnalysisCard | null => {
-    const streak = streakInfo(days, new Date().toISOString().slice(0, 10));
-    const tier = streakTier(streak.current);
+    const streak = streakInfo(days, new Date().toISOString().slice(0, 10), ctx.protocol);
     return {
       title: 'Clean Days',
       desc: 'Days in a row without breaking your protocol.',
-      help: 'A "clean" day is one with no logged trigger foods. The streak counts consecutive clean days ending today; the 30-day rate shows what share of the last month stayed clean. Streaks build tolerance slowly — a broken streak is data, not failure.',
+      help: 'A "clean" day is one that meets your protocol. The streak counts consecutive clean days ending today; the 30-day rate shows what share of the last month stayed clean. Streaks build tolerance slowly; a broken streak is data, not failure.',
+      tiles: true,
       stats: [
         { label: 'Current streak', value: streak.current, sub: 'days', color: SCORE_COLORS.great },
         { label: 'Longest', value: streak.longest, sub: 'days' },
         { label: '30-day clean', value: streak.rate, sub: streak.rate != null ? '%' : '' },
       ],
-      insights: [{ text: `${tier.tier}. ${tier.msg}` }],
     };
   };
 
@@ -113,18 +111,22 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
     if (acPresent(sys).length) cards.push({
       title: 'Blood Pressure', sub: range,
       desc: 'Each reading as a systolic-to-diastolic span, coloured by grade at each end.',
-      help: 'Every bar connects a reading\'s diastolic (bottom) to its systolic (top), tinted by how each value grades against the framework thresholds. Watch for the spread as well as the level — a narrowing pulse pressure on standing is a common dysautonomia pattern worth showing your doctor.',
+      help: 'Every bar connects a reading\'s diastolic (bottom) to its systolic (top), tinted by how each value grades against the framework thresholds. Watch for the spread as well as the level; a narrowing pulse pressure on standing is a common dysautonomia pattern worth showing your doctor.',
+      tiles: true,
       charts: [
         // One connected systolic↕diastolic segment per reading, grade-gradient coloured.
-        { label: 'Systolic / diastolic', series: [], dumbbell: { sys, dia } },
+        { label: '', series: [], dumbbell: { sys, dia } },
       ],
-      stats: [{ label: 'Avg sys morning', value: avgRound(acAgg(buckets, (d) => acReadVals(d, 'bp', 'sys', isMorning))) }, { label: 'Avg sys evening', value: avgRound(acAgg(buckets, (d) => acReadVals(d, 'bp', 'sys', isEvening))) }],
+      stats: [
+        { label: 'Avg systolic', value: avgRound(sys) },
+        { label: 'Avg diastolic', value: avgRound(dia) },
+      ],
     });
     if (acPresent(laying).length) cards.push({
       title: 'Resting Heart Rate', sub: range,
       desc: 'Laying heart rate over the range.',
-      help: 'Heart rate measured while laying down — the cleanest resting baseline. A gradually falling laying HR usually accompanies improving autonomic recovery; a sustained unexplained rise is worth noting alongside symptoms and sleep.',
-      charts: [{ label: 'Laying HR', series: [series(laying, SCORE_COLORS.bad)] }],
+      help: 'Heart rate measured while laying down, the cleanest resting baseline. A gradually falling laying HR usually accompanies improving autonomic recovery; a sustained unexplained rise is worth noting alongside symptoms and sleep.',
+      charts: [{ label: '', series: [series(laying, SCORE_COLORS.bad)], integer: true, selectStat: true }],
       stats: [{ label: 'Avg laying HR', value: avgRound(laying) }],
     });
     return cards;
@@ -139,7 +141,7 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
     return [{
       title: 'Orthostatic Events', sub: range,
       desc: 'How much your heart rate rises when you stand.',
-      help: 'The heart-rate increase from resting to standing for each logged orthostatic event. A sustained rise of 30 bpm or more (40 in adolescents) within 10 minutes of standing is the adult POTS-range criterion — the zones shade that threshold. Trends matter more than any single stand.',
+      help: 'The heart-rate increase from resting to standing for each logged orthostatic event. A sustained rise of 30 bpm or more (40 in adolescents) within 10 minutes of standing is the adult POTS-range criterion, and the zones shade that threshold. Trends matter more than any single stand.',
       charts: [{ label: 'HR increase on standing', series: [series(inc, '#f97316', undefined, { pointBands: BANDS.orthoIncrease })], zones: acBandZones('orthoIncrease'), integer: true }],
       insights: potsN ? [{ text: `${potsN} event${potsN === 1 ? '' : 's'} reached a ≥30 bpm standing rise (the adult POTS-range threshold).`, strength: 'mod' }] : [],
     }];
@@ -148,16 +150,31 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
   const sleep = (): AnalysisCard[] => {
     const dur = acAgg(buckets, (d, dk) => sleepHours(days, dk));
     if (!acPresent(dur).length) return [];
-    return [{
-      title: 'Sleep', sub: range,
+    const cards: AnalysisCard[] = [{
+      title: 'Duration', sub: range,
       desc: 'How long you slept and when, night by night.',
-      help: 'Duration is the night that ended that morning; the dashed band marks the 7–9 hour target. The timing chart plots bedtime and wake time on a 24-hour scale — consistency of timing often moves HRV as much as raw duration does.',
+      help: 'Duration is the night that ended that morning; the dashed band marks the 7–9 hour target. Consistency of timing often moves HRV as much as raw duration does.',
       charts: [
-        { label: 'Duration (hours)', series: [series(dur, '#38bdf8')], target: { from: 7, to: 9, color: '#16a34a' } },
-        { label: 'Bedtime vs wake (24h)', series: [series(acAgg(buckets, (d) => { const t = acToDec(d.sleep?.bed); return t == null ? null : t < 12 ? t + 24 : t; }), '#a78bfa', 'Bed'), series(acAgg(buckets, (d) => acToDec(d.sleep?.wake)), '#f97316', 'Wake')], legend: [['Bed', '#a78bfa'], ['Wake', '#f97316']] },
+        { label: '', series: [series(dur, '#38bdf8')], target: { from: 7, to: 9, color: '#16a34a' }, selectStat: true },
       ],
       stats: [{ label: 'Avg sleep', value: avgRound(dur, 1), sub: 'h' }],
     }];
+    const num = (v: string | number | undefined) => { const n = parseFloat(v as string); return isNaN(n) ? null : n; };
+    const hrLow = acAgg(buckets, (d) => num(d.sleep?.hrLow));
+    const hrHigh = acAgg(buckets, (d) => num(d.sleep?.hrHigh));
+    if (acPresent(hrLow).length || acPresent(hrHigh).length) cards.push({
+      title: 'Sleeping HR', sub: range,
+      desc: 'Your lowest and highest heart rate through the night.',
+      help: 'The low and high heart rate recorded during sleep. The overnight low is one of the cleanest resting-HR readings you get; the high reflects arousals and dreams. A gradually falling overnight low usually tracks improving autonomic recovery.',
+      charts: [
+        { label: '', integer: true, series: [series(hrLow, '#38bdf8', 'Low'), series(hrHigh, '#f97316', 'High')], legend: [['Low', '#38bdf8'], ['High', '#f97316']] },
+      ],
+      stats: [
+        { label: 'Avg low', value: avgRound(hrLow) },
+        { label: 'Avg high', value: avgRound(hrHigh) },
+      ],
+    });
+    return cards;
   };
 
   const activity = (): AnalysisCard[] => {
@@ -170,7 +187,7 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
     return [{
       title: 'Activity', sub: range,
       desc: 'Exercise minutes over the range and what kinds of sessions they were.',
-      help: 'Total logged exercise minutes per bucket, plus a breakdown of session types and the balance of active versus rest days. In autonomic recovery, consistency at a tolerable dose beats intensity — watch how your score and symptoms respond in the day or two after harder sessions.',
+      help: 'Total logged exercise minutes per bucket, plus a breakdown of session types and the balance of active versus rest days. In autonomic recovery, consistency at a tolerable dose beats intensity. Watch how your score and symptoms respond in the day or two after harder sessions.',
       charts: [{ label: 'Total exercise minutes', series: [series(mins, SCORE_COLORS.bad)], integer: true }],
       bars: [{ label: 'Activity types', rows }],
       stats: [{ label: 'Active days', value: activeDays || null }, { label: 'Rest days', value: restDays || null }],
@@ -186,14 +203,14 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
     const cards: AnalysisCard[] = [];
     if (trigRows.length) cards.push({
       title: 'Triggers',
-      desc: 'How often each trigger food showed up in this range.',
+      desc: 'How often each trigger showed up in this range.',
       help: 'Counts of every logged trigger (histamine foods, caffeine, alcohol and the rest). Pair this with the Outlook correlations: if a trigger keeps landing before bad days, that\'s a pattern worth testing with an elimination window.',
       bars: [{ label: 'All triggers', rows: trigRows }],
     });
     if (acPresent(water).length) cards.push({
       title: 'Hydration', sub: range,
       desc: 'Daily water intake against the target band.',
-      help: 'Litres of water per day; the dashed band marks the 2.5–3.5 L range commonly recommended alongside electrolytes for orthostatic conditions. Fluid only holds where salt allows — if you chase volume, discuss electrolyte targets with your doctor.',
+      help: 'Litres of water per day; the dashed band marks the 2.5–3.5 L range commonly recommended alongside electrolytes for orthostatic conditions. Fluid only holds where salt allows. If you chase volume, discuss electrolyte targets with your doctor.',
       charts: [{ label: 'Water (L/day)', series: [series(water, '#38bdf8')], target: { from: 2.5, to: 3.5, color: '#16a34a' } }],
       stats: [{ label: 'Avg water', value: avgRound(water, 1), sub: 'L' }],
     });
@@ -208,7 +225,7 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
     return [{
       title: 'Medications & Supplements',
       desc: 'How many days each was taken in this range.',
-      help: 'Days-taken counts for every medication and supplement you logged. Consistent daily bars make it easy to spot missed stretches — and to line adherence up against score changes when you and your doctor adjust the protocol.',
+      help: 'Days-taken counts for every medication and supplement you logged. Consistent daily bars make it easy to spot missed stretches, and to line adherence up against score changes when you and your doctor adjust the protocol.',
       bars: [{ label: '', rows, fmt: (c) => `${c} d` }],
     }];
   };
@@ -226,45 +243,3 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
   ];
 }
 
-/* ---------- correlations (ported acCorrelations, simplified) ---------- */
-function pearson(pairs: [number, number][]): number | null {
-  const n = pairs.length; if (n < 3) return null;
-  let sx = 0, sy = 0, sxx = 0, syy = 0, sxy = 0;
-  pairs.forEach(([x, y]) => { sx += x; sy += y; sxx += x * x; syy += y * y; sxy += x * y; });
-  const cov = sxy - (sx * sy) / n, vx = sxx - (sx * sx) / n, vy = syy - (sy * sy) / n;
-  if (vx <= 0 || vy <= 0) return null;
-  return cov / Math.sqrt(vx * vy);
-}
-
-function correlations(days: DaysMap, ctx: ScoreContext): Insight[] {
-  const rows = Object.keys(days).sort().map((dk) => {
-    const d = days[dk];
-    const avg = (type: string, key: string, filt?: (r: Entry) => boolean) => { const v = acReadVals(d, type, key, filt); return v.length ? v.reduce((s, x) => s + x, 0) / v.length : null; };
-    return {
-      score: scoreSet(d.readings || [], d, dk, days, ctx).score as number | null,
-      mornRmssd: avg('breathHrv', 'rmssd', isMorning),
-      restHr: avg('restingHr', 'hr', (r) => (r.position || '') === 'Laying'),
-      sleepH: sleepHours(days, dk) as number | null,
-      water: d.food && +d.food.water > 0 ? +d.food.water : null,
-      triggers: d.food && d.food.triggers ? Object.values(d.food.triggers).reduce((s, c) => s + (c > 0 ? c : 0), 0) : 0,
-      actMin: (d.activities || []).reduce((s, a) => s + (parseFloat(a.duration as string) || 0), 0) || null,
-    };
-  });
-  const dir = (r: number) => (r > 0 ? 'higher' : 'lower');
-  const defs: { x: string; y: string; txt: (r: number, n: number) => string }[] = [
-    { x: 'sleepH', y: 'mornRmssd', txt: (r, n) => `On nights you slept longer, next-morning structured RMSSD ran ${dir(r)} (r ${r.toFixed(2)}, ${n} days).` },
-    { x: 'sleepH', y: 'score', txt: (r, n) => `More sleep tracked with a ${dir(r)} autonomic score (r ${r.toFixed(2)}, ${n} days).` },
-    { x: 'water', y: 'score', txt: (r, n) => `Days you drank more water showed a ${dir(r)} autonomic score (r ${r.toFixed(2)}, ${n} days).` },
-    { x: 'triggers', y: 'score', txt: (r, n) => `More trigger foods correlated with a ${dir(r)} autonomic score (r ${r.toFixed(2)}, ${n} days).` },
-    { x: 'restHr', y: 'score', txt: (r, n) => `Higher morning lying HR went with a ${dir(r)} autonomic score (r ${r.toFixed(2)}, ${n} days).` },
-    { x: 'actMin', y: 'score', txt: (r, n) => `More activity minutes tracked with a ${dir(r)} autonomic score (r ${r.toFixed(2)}, ${n} days).` },
-  ];
-  const found: Insight[] = [];
-  defs.forEach((def) => {
-    const pairs: [number, number][] = [];
-    rows.forEach((r) => { const x = (r as never as Record<string, number | null>)[def.x], y = (r as never as Record<string, number | null>)[def.y]; if (x != null && !isNaN(x) && y != null && !isNaN(y)) pairs.push([x, y]); });
-    const rr = pearson(pairs);
-    if (rr != null && pairs.length >= 14 && Math.abs(rr) >= 0.3) found.push({ text: def.txt(rr, pairs.length), strength: Math.abs(rr) >= 0.6 ? 'strong' : Math.abs(rr) >= 0.45 ? 'mod' : null });
-  });
-  return found.slice(0, 8);
-}

@@ -71,11 +71,19 @@ function zoneBoundaries(bands: Band[], min: number, max: number) {
 }
 
 /* ---------- Sparkline ---------- */
-export function Sparkline({ points, bands, height = 92 }: { points: { v: number; date: string }[]; bands?: Band[] | null; height?: number }) {
+export function Sparkline({ points, bands, height = 92, onSelect, showReadout = true, hideHeader, zonesOn }: {
+  points: { v: number; date: string }[]; bands?: Band[] | null; height?: number;
+  onSelect?: (pt: { v: number; date: string }) => void; showReadout?: boolean;
+  /** Hide the readout/zones-toggle row entirely — the host renders its own header. */
+  hideHeader?: boolean;
+  /** Controlled zones visibility (pairs with hideHeader); overrides the internal toggle. */
+  zonesOn?: boolean;
+}) {
   const p = usePalette();
   const [sel, setSel] = useState<number>(points.length - 1);
   const [layoutW, setLayoutW] = useState(0);
-  const [showZones, setShowZones] = useState(false);
+  const [showZonesState, setShowZonesState] = useState(false);
+  const showZones = zonesOn ?? showZonesState;
   if (!points || points.length < 2) return null;
   const gid = `spk${sparkId++}`;
   const vals = points.map((pt) => pt.v);
@@ -112,25 +120,30 @@ export function Sparkline({ points, bands, height = 92 }: { points: { v: number;
   const onTouch = (x: number) => {
     if (layoutW <= 0) return;
     const px = (x / layoutW) * W;
-    const i = Math.round(((px - padL) / innerW) * (points.length - 1));
-    setSel(Math.max(0, Math.min(points.length - 1, i)));
+    const i = Math.max(0, Math.min(points.length - 1, Math.round(((px - padL) / innerW) * (points.length - 1))));
+    setSel(i);
+    onSelect?.(points[i]);
   };
 
   return (
     <View style={{ marginTop: 16 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 16, marginBottom: 4 }}>
-        <RNText style={{ fontSize: 12, fontWeight: '700', color: selColor, fontVariant: ['tabular-nums'] }}>
-          {`${fmtShort(selPt.date)}: ${fmtNum(selPt.v)}`}
-        </RNText>
-        {bands ? <ZonesToggle on={showZones} onPress={() => setShowZones((v) => !v)} /> : null}
-      </View>
+      {!hideHeader ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 16, marginBottom: 4 }}>
+          {showReadout ? (
+            <RNText style={{ fontSize: 12, fontWeight: '700', color: selColor, fontVariant: ['tabular-nums'] }}>
+              {`${fmtShort(selPt.date)}: ${fmtNum(selPt.v)}`}
+            </RNText>
+          ) : <View />}
+          {bands ? <ZonesToggle on={showZones} onPress={() => setShowZonesState((v) => !v)} /> : null}
+        </View>
+      ) : null}
       <View
         onLayout={(e: LayoutChangeEvent) => setLayoutW(e.nativeEvent.layout.width)}
         onStartShouldSetResponder={() => true}
         onMoveShouldSetResponder={() => true}
         onResponderGrant={(e) => onTouch(e.nativeEvent.locationX)}
         onResponderMove={(e) => onTouch(e.nativeEvent.locationX)}
-        style={{ backgroundColor: p.bg, borderRadius: 10, height }}
+        style={{ height }}
       >
         <Svg width="100%" height={height} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
           {bands && (
@@ -263,6 +276,23 @@ export function PowerSpectrum({ rr, vlf, lf, hf }: { rr?: number[] | null; vlf: 
     pts = [];
     for (let f = 0.0033; f <= fMax; f += 0.004) pts.push({ f, d: density(f) });
   }
+
+  // Round the peaks off: a triangular moving average over the density trace
+  // (wider for the reconstructed block curve so band edges become soft
+  // shoulders), then bezier segments below instead of straight lines.
+  const win = curve ? 3 : 6;
+  const smoothed = pts.map((_, i) => {
+    let s = 0, ws = 0;
+    for (let k = -win; k <= win; k++) {
+      const j = i + k;
+      if (j < 0 || j >= pts.length) continue;
+      const wt = win + 1 - Math.abs(k);
+      s += pts[j].d * wt; ws += wt;
+    }
+    return s / ws;
+  });
+  pts = pts.map((q, i) => ({ f: q.f, d: smoothed[i] }));
+
   const dMax = Math.max(...pts.map((q) => q.d)) || 1;
   const yAt = (d: number) => padT + (1 - d / dMax) * (H - padT - padB);
   const baseY = H - padB;
@@ -272,8 +302,9 @@ export function PowerSpectrum({ rr, vlf, lf, hf }: { rr?: number[] | null; vlf: 
   SPECTRUM_BANDS.forEach((b) => {
     const seg = pts.filter((q) => q.f >= b.lo && q.f <= b.hi);
     if (seg.length < 2) return;
-    const line = seg.map((q, i) => `${i === 0 ? 'M' : 'L'}${xAt(q.f).toFixed(1)} ${yAt(q.d).toFixed(1)}`).join(' ');
-    const area = `M${xAt(seg[0].f).toFixed(1)} ${baseY} ${line.replace('M', 'L')} L${xAt(seg[seg.length - 1].f).toFixed(1)} ${baseY} Z`;
+    const xy: [number, number][] = seg.map((q) => [xAt(q.f), Math.min(baseY, yAt(q.d))]);
+    const line = smoothPath(xy);
+    const area = `M${xy[0][0].toFixed(1)} ${baseY} ${line.replace('M', 'L')} L${xy[xy.length - 1][0].toFixed(1)} ${baseY} Z`;
     segs.push({ color: b.color, d: area });
   });
 
@@ -526,7 +557,7 @@ export function BpDumbbell({ buckets, sys, dia, height = 180 }: {
   if (!all.length) return null;
   let min = Math.min(...all), max = Math.max(...all);
   const padv = (max - min) * 0.12 + 4; min -= padv; max += padv;
-  const W = 320, H = height, padL = 34, padR = 10, padT = 10, padB = 22;
+  const W = 320, H = height, padL = 22, padR = 10, padT = 10, padB = 22;
   const innerW = W - padL - padR, n = buckets.length;
   const xAt = (i: number) => padL + (n <= 1 ? innerW / 2 : (i / (n - 1)) * innerW);
   const yAt = (v: number) => padT + (1 - (v - min) / (max - min)) * (H - padT - padB);
@@ -537,11 +568,19 @@ export function BpDumbbell({ buckets, sys, dia, height = 180 }: {
     const px = (x / layoutW) * W;
     setSel(Math.max(0, Math.min(n - 1, Math.round(((px - padL) / innerW) * (n - 1)))));
   };
-  const readoutIdx = sel >= 0 ? sel : (() => { for (let i = n - 1; i >= 0; i--) if (sys[i] != null || dia[i] != null) return i; return -1; })();
-  const readout = readoutIdx >= 0 ? `${buckets[readoutIdx].label}: ${sys[readoutIdx] != null ? Math.round(sys[readoutIdx] as number) : '-'}/${dia[readoutIdx] != null ? Math.round(dia[readoutIdx] as number) : '-'}` : '';
+  // Readout mirrors the metric cards: the range average by default, then the
+  // dragged bucket's reading with its date in parentheses.
+  const avgOf = (arr: (number | null)[]) => { const v = arr.filter((x): x is number => x != null && !isNaN(x)); return v.length ? Math.round(v.reduce((s, x) => s + x, 0) / v.length) : null; };
+  const fmt = (v: number | null | undefined) => (v != null && !isNaN(v) ? Math.round(v) : '–');
+  const rSys = sel >= 0 ? sys[sel] : avgOf(sys);
+  const rDia = sel >= 0 ? dia[sel] : avgOf(dia);
+  const suffix = sel >= 0 ? `(${buckets[sel].label})` : 'avg';
   return (
     <View>
-      <RNText style={{ fontSize: 12, fontWeight: '700', color: p.text, height: 16, marginBottom: 4, fontVariant: ['tabular-nums'] }}>{readout}</RNText>
+      <RNText style={{ fontSize: 25, fontFamily: fonts.numHeavy, color: p.text, marginBottom: 6, fontVariant: ['tabular-nums'] }}>
+        {`${fmt(rSys)}/${fmt(rDia)}`}
+        <RNText style={{ fontSize: 13, fontWeight: '600', fontFamily: undefined, color: p.textDim }}>{`  ${suffix}`}</RNText>
+      </RNText>
       <View
         onLayout={(e) => setLayoutW(e.nativeEvent.layout.width)}
         onStartShouldSetResponder={() => true}
@@ -575,9 +614,9 @@ export function BpDumbbell({ buckets, sys, dia, height = 180 }: {
             const x = xAt(i);
             return (
               <G key={i}>
-                <Line x1={x} x2={x} y1={yAt(s)} y2={yAt(d)} stroke={`url(#bp${gid}_${i})`} strokeWidth={i === readoutIdx ? 5 : 3.4} strokeLinecap="round" />
-                <Circle cx={x} cy={yAt(s)} r={i === readoutIdx ? 4.5 : 3.4} fill={col(s, BANDS.sys)} />
-                <Circle cx={x} cy={yAt(d)} r={i === readoutIdx ? 4.5 : 3.4} fill={col(d, BANDS.dia)} />
+                <Line x1={x} x2={x} y1={yAt(s)} y2={yAt(d)} stroke={`url(#bp${gid}_${i})`} strokeWidth={i === sel ? 5 : 3.4} strokeLinecap="round" />
+                <Circle cx={x} cy={yAt(s)} r={i === sel ? 4.5 : 3.4} fill={col(s, BANDS.sys)} />
+                <Circle cx={x} cy={yAt(d)} r={i === sel ? 4.5 : 3.4} fill={col(d, BANDS.dia)} />
               </G>
             );
           })}

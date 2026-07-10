@@ -43,7 +43,7 @@ export function buildMilestoneDays(days: DaysMap, ctx: ScoreContext): { map: Rec
     const ortho = rd.filter((r) => r.type === 'orthostatic').map((r) => { const a = parseFloat(r.afterHr as string), b = parseFloat(r.beforeHr as string); return !isNaN(a) && !isNaN(b) ? a - b : null; }).filter((v): v is number => v != null);
     const tp = readVals(d, 'breathHrv', 'vlowPower').map((_, i) => { const r = rd.filter((x) => x.type === 'breathHrv')[i]; const p = ['vlowPower', 'lowPower', 'highPower'].map((k) => parseFloat(r[k] as string)); return p.every((x) => !isNaN(x)) ? p[0] + p[1] + p[2] : null; }).filter((v): v is number => v != null);
     const bps = rd.filter((r) => r.type === 'bp');
-    const cln = dayCleanliness(days, dk);
+    const cln = dayCleanliness(days, dk, ctx.protocol);
     const bpAvg = (k: string) => { const v = readVals(d, 'bp', k); return v.length ? v.reduce((s, x) => s + x, 0) / v.length : null; };
     map[dk] = {
       dk,

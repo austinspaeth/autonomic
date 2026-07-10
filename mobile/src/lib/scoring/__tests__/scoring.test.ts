@@ -3,15 +3,15 @@
  * (docs/index.html) produces. Expected values were derived by hand from the
  * web app's s* thresholds — do not change them without changing the web app.
  */
-import type { DayRecord, Entry } from '../../types';
+import type { DayRecord, Entry, Protocol } from '../../types';
 import {
   BANDS, CAT_POINTS, GRADE_PTS, SCORE_RANK, bpBce, bpKerdo, bpKvas, bpMap,
   bpPP, bpRobinson, catFromBands, computeScores, expectedHf, hrvComposite,
   restingHrBands, rowScoreCategory, sHfPeak, sLfPeak, sSys, totalPower, worstCat,
 } from '../index';
 import {
-  activityGrade, blueZone, dayCleanliness, scoreCat, scoreSet, sleepGrade, sleepHours,
-  streakInfo, streakTier,
+  DEFAULT_PROTOCOL, activityGrade, blueZone, dayCleanliness, resolveProtocol, scoreCat,
+  scoreSet, sleepGrade, sleepHours, streakInfo, streakTier,
 } from '../day';
 
 const day = (over: Partial<DayRecord> = {}): DayRecord => ({
@@ -303,6 +303,54 @@ describe('day scoring', () => {
     const c2 = dayCleanliness(days, '2026-07-02')!;
     expect(c2.clean).toBe(false);
     expect(c2.criteria.find((x) => x.key === 'triggers')!.broken).toBe(true);
+  });
+  it('dayCleanliness honors a custom protocol', () => {
+    const days: Record<string, DayRecord> = {
+      '2026-07-02': day({
+        sleep: { bed: '23:30', wake: '05:00' }, // 5.5h
+        activities: [{ id: 'a', type: 'walk' }] as Entry[],
+        food: { water: 1.5, calories: 0, triggers: { caffeine: 1 }, meals: [] },
+      }),
+    };
+    // Default protocol: fails (no meds, low water, <7h sleep, a trigger logged).
+    expect(dayCleanliness(days, '2026-07-02')!.clean).toBe(false);
+    // Custom protocol: only require a walk + 1L water, everything else off.
+    const proto: Protocol = {
+      triggers: { enabled: false, types: [] },
+      water: { enabled: true, liters: 1 },
+      meds: { enabled: false, types: [] },
+      activities: { enabled: true, types: ['walk'] },
+      sleep: { enabled: false, hours: 7 },
+    };
+    const c = dayCleanliness(days, '2026-07-02', proto)!;
+    expect(c.clean).toBe(true);
+    expect(c.criteria.map((x) => x.key).sort()).toEqual(['activities:walk', 'water']);
+  });
+  it('each required medication is its own criterion', () => {
+    const days: Record<string, DayRecord> = {
+      '2026-07-02': day({ meds: [{ id: '1', type: 'allegra' }] as Entry[] }),
+    };
+    const proto: Protocol = { ...DEFAULT_PROTOCOL, triggers: { enabled: false, types: [] }, water: { enabled: false, liters: 0 }, sleep: { enabled: false, hours: 0 }, meds: { enabled: true, types: ['allegra', 'pepsidAc', 'magGlycinate'] } };
+    const c = dayCleanliness(days, '2026-07-02', proto)!;
+    const medCrit = c.criteria.filter((x) => x.key.startsWith('meds:'));
+    expect(medCrit.map((x) => x.key)).toEqual(['meds:allegra', 'meds:pepsidAc', 'meds:magGlycinate']);
+    expect(medCrit.find((x) => x.key === 'meds:allegra')!.pass).toBe(true);
+    expect(medCrit.find((x) => x.key === 'meds:pepsidAc')!.pass).toBe(false);
+  });
+  it('protocol trigger selection narrows which triggers break the day', () => {
+    const days: Record<string, DayRecord> = {
+      '2026-07-02': day({ food: { water: 5, calories: 0, triggers: { caffeine: 1 }, meals: [] } }),
+    };
+    const only = (types: string[]): Protocol => ({ ...DEFAULT_PROTOCOL, triggers: { enabled: true, types }, water: { enabled: false, liters: 0 }, meds: { enabled: false, types: [] }, sleep: { enabled: false, hours: 0 } });
+    // Caffeine logged but we only avoid alcohol -> triggers criterion passes.
+    expect(dayCleanliness(days, '2026-07-02', only(['alcohol']))!.criteria.find((x) => x.key === 'triggers')!.pass).toBe(true);
+    // Now avoiding caffeine -> broken.
+    expect(dayCleanliness(days, '2026-07-02', only(['caffeine']))!.criteria.find((x) => x.key === 'triggers')!.broken).toBe(true);
+  });
+  it('resolveProtocol fills defaults and DEFAULT_PROTOCOL matches legacy rules', () => {
+    expect(resolveProtocol(null)).toEqual(DEFAULT_PROTOCOL);
+    expect(resolveProtocol({ water: { enabled: true, liters: 3 } }).water.liters).toBe(3);
+    expect(resolveProtocol({ water: { enabled: true, liters: 3 } }).meds.types).toEqual(['allegra', 'pepsidAc', 'magGlycinate']);
   });
   it('streakTier labels', () => {
     expect(streakTier(0).tier).toBe('Start fresh');

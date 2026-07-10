@@ -6,16 +6,19 @@
  * Pure module: no UI or store imports. Anything needing profile data
  * (height for BMI, sex for QTc) takes it as an argument.
  */
-import type { Band, Entry, ScoreCat } from '../types';
+import type { Band, Entry, Protocol, ScoreCat } from '../types';
 
+// One unified grade scale shared with the day-score bands (SCORE_CATS in day.ts):
+// each ScoreCat maps to the day-scale level with the same color. The internal keys
+// are legacy (great/ok/crash) but the DISPLAYED vocabulary is Excellent → Crash.
 export const SCORE_COLORS: Record<ScoreCat, string> = {
-  great: '#38bdf8',
-  good: '#4ade80',
-  ok: '#eab308',
-  bad: '#f97316',
-  crash: '#ef4444',
-  concerning: '#ef4444',
-  warning: '#a78bfa',
+  great: '#16a34a',       // Excellent
+  good: '#22c55e',        // Good
+  ok: '#eab308',          // Moderate
+  bad: '#f97316',         // Compromised
+  crash: '#ef4444',       // Bad
+  concerning: '#b91c1c',  // Crash
+  warning: '#a78bfa',     // Warning (blue-zone / too-high flag) — kept violet
 };
 
 export const SCORE_RANK: Record<ScoreCat, number> = {
@@ -23,7 +26,7 @@ export const SCORE_RANK: Record<ScoreCat, number> = {
 };
 
 export const GRADE_LABEL: Record<ScoreCat, string> = {
-  great: 'Great', good: 'Good', ok: 'OK', bad: 'Bad', crash: 'Crash', concerning: 'Concerning', warning: 'Warning',
+  great: 'Excellent', good: 'Good', ok: 'Moderate', bad: 'Compromised', crash: 'Bad', concerning: 'Crash', warning: 'Warning',
 };
 
 /** Grade -> 0-100 points (day composite). */
@@ -165,6 +168,8 @@ export const catFromBands = (v: number, bands?: Band[] | null): ScoreCat | null 
 export interface ScoreContext {
   sex?: string;
   height?: string | number;
+  /** Clean-day protocol used by dayCleanliness/streakInfo (defaults applied). */
+  protocol?: Protocol;
 }
 
 export function computeScores(r: Entry, ctx: ScoreContext = {}): Record<string, ScoreCat> {
@@ -263,6 +268,34 @@ export const HRV_EXPLAIN: Record<string, string> = {
   mode: 'Most common RR interval - a stability indicator.',
   amo50: 'Stress-index marker. Higher suggests sympathetic dominance.',
   cv: 'Relative variability. Higher is generally better.',
+};
+
+/** Longer copy for the "?" help sheets — shared by the reading summaries and
+ *  the Progress view's HRV cards, so both surfaces explain each metric the
+ *  same way. */
+export const HRV_HELP: Record<string, string> = {
+  score: 'A weighted 0–100 composite of the reading\'s key metrics, vagal tone (RMSSD, pNN50), total power and baroreflex position (LF peak), graded against the recovery framework\'s thresholds. Treat it as the single "how recovered am I?" number, and use the sections below to see why.',
+  tachogram: 'Every beat-to-beat (RR) interval in the reading, in order. A healthy trace looks like rolling waves, breathing rhythmically speeding and slowing the heart. A flat trace means low variability; isolated spikes are usually artifacts rather than real beats.',
+  balance: 'These three numbers describe the two branches of your autonomic nervous system and how hard the system is working. The PNS and SNS indices are scored like a z-score against a healthy reference population, so zero means average and the sign tells you which side of average you sit on.\n\nPNS index tracks your parasympathetic ("rest and recover") branch, built from mean RR, RMSSD and SD1. A positive value means more vagal, rest-state activity than the average person, which is what you want, and higher is better. Zero is average. A negative value means below-average vagal tone: the rest-and-recover side is underperforming, and deeply negative readings point to poor recovery, fatigue, or illness.\n\nSNS index tracks your sympathetic ("fight or flight") branch, built from heart rate, the Baevsky stress index and RMSSD. The sign reads the opposite way here: a negative value means below-average activation, a calm and settled system, which is the good direction. A positive value means more activation than average, and large positive values point to stress, exertion, or strain. The sympathetic branch is the accelerator that raises heart rate and mobilizes energy, so at rest you generally want it low.\n\nStress index (the Baevsky strain index) is always a positive number, not centered on zero. It climbs steeply as the heart rhythm becomes rigid and concentrated under sympathetic load, so low and stable is the goal and spikes flag stress, illness, or overreaching.\n\nHow they relate: PNS and SNS are the two halves of one system and usually move like a see-saw. When you are recovered, PNS sits positive while SNS sits negative and the stress index stays low. Under load the pattern flips: SNS and the stress index rise together (they share inputs) while PNS falls. They are not perfect mirror images, and both can be suppressed after a hard day or a bad night, but a positive PNS paired with a negative SNS and a low stress index is the balanced, well-recovered signature to look for.',
+  pns: 'Parasympathetic nervous system index, a composite of mean RR, RMSSD and SD1 compared against population norms. Zero is the population average: values above zero mean more rest-and-recover (vagal) activity than average and are the good direction, while negative values mean below-average vagal tone. A rising trend usually tracks improving recovery.',
+  sns: 'Sympathetic nervous system index, a composite of heart rate, the Baevsky stress index and RMSSD compared against population norms. Zero is the population average: negative values mean below-average fight-or-flight activation (calmer, the good direction), while positive values mean more activation than average. Lower and stable is calmer.',
+  stressIndex: 'A composite of AMo50, mode, and MxDMn that rises steeply as the rhythm becomes rigid. Low and stable is the goal; spikes typically accompany stress, illness, or overreaching, and often lead symptoms by a day or two.',
+  power: 'Total spectral power of the reading, split into very-low (VLF), low (LF) and high (HF) frequency bands. A higher total is generally better: it means the heart rhythm is varying freely, which is the sign of an adaptable, well-regulated autonomic system. But the mix matters as much as the total; a healthy reading spreads power across the bands rather than piling it into one.\n\nHF (0.15–0.4 Hz) is the fast, breath-linked band. It rides almost purely on parasympathetic (vagal) tone, the "rest and digest" branch, so strong HF means good recovery and calm. LF (0.04–0.15 Hz) is the slower baroreflex band around blood-pressure regulation; it carries a mix of both branches but leans sympathetic (the "fight or flight" side) when you are stressed or standing. Note that slow paced breathing deliberately pumps LF up, so a big LF share during a breathing exercise is expected, not a warning.\n\nVLF (below 0.04 Hz) reflects slow regulatory waves tied to thermoregulation, hormones and vascular tone. A VLF share that dominates the reading (with little HF) can point to poor vagal engagement, physical or emotional stress, poor sleep, inflammation, or simply a reading that was too short or too noisy to resolve the faster bands cleanly. Occasional high VLF is normal; a persistent pattern of high VLF with suppressed HF is worth watching. Growing total power with a balanced spread over weeks is a common recovery pattern.',
+  vlf: 'Very-low-frequency power (below 0.04 Hz) reflects slow regulatory waves tied to thermoregulation, hormones and vascular tone. Occasional high VLF is normal; a persistent pattern of high VLF with suppressed HF can point to stress, poor sleep, or inflammation, or simply a reading that was too short or noisy to resolve the faster bands.',
+  lf: 'Low-frequency power (0.04–0.15 Hz) is the baroreflex band around blood-pressure regulation. It carries a mix of both branches but leans sympathetic when you are stressed or standing. Slow paced breathing deliberately pumps LF up, so a big LF share during a breathing exercise is expected, not a warning.',
+  hf: 'High-frequency power (0.15–0.4 Hz) is the fast, breath-linked band. It rides almost purely on parasympathetic (vagal) tone, the "rest and digest" branch, so strong HF generally means good recovery and calm.',
+  lfhf: 'The ratio of low-frequency to high-frequency power, a rough sympathetic-versus-vagal balance marker. Slow paced breathing deliberately inflates LF, so judge this mainly on unstructured readings, and on trends rather than single values.',
+  sdnn: 'Standard deviation of all RR intervals in the reading. SDNN captures every rhythm influence (breathing, blood-pressure waves, slower autonomic swings), so it summarizes total variability rather than just vagal activity. In short readings it runs lower than 24-hour figures you may see quoted elsewhere.',
+  rmssd: 'Root mean square of successive RR-interval differences. RMSSD is the workhorse HRV metric: it reflects parasympathetic (vagal) activity, and higher values generally mean better recovery capacity. Compare readings taken at the same time of day and in the same position. A consistent morning reading is the most reliable trend line.',
+  pnn50: 'The percentage of successive heartbeat intervals that differ by more than 50 ms. Like RMSSD it tracks vagal tone, but it saturates at the extremes, so expect it to move together with RMSSD, and treat sustained changes as more meaningful than single readings.',
+  hr: 'Mean heart rate during the capture. A drifting resting rate is one of the simplest autonomic signals: a falling trend usually accompanies improving recovery, while an unexplained sustained rise is worth noting alongside symptoms.',
+  meanRr: 'The mean interval between successive beats. It is the same information as average heart rate seen from the other side (60,000 ÷ HR), but HRV work is done in RR space, so it is shown in milliseconds here.',
+  mxdmn: 'The difference between the maximum and minimum RR interval in the reading. A wide spread generally reflects healthy variability; a narrow one a rigid rhythm. It is sensitive to stray artifacts, so a single odd value matters less than the trend.',
+  mode: 'The most frequently occurring RR interval. Together with AMo50 it describes the shape of your beat-interval distribution: the mode is its centre, and shifts in the mode track shifts in your underlying resting rate.',
+  amo50: 'The share of beats falling in the modal 50 ms bin. When the autonomic system is under strain the rhythm concentrates around one interval and AMo50 climbs; relaxed states spread the distribution out and it falls.',
+  cv: 'Coefficient of variation: SDNN divided by the mean RR, as a percentage. Because it is normalized by heart rate it makes readings taken at different rates more comparable than raw SDNN.',
+  lfPeak: 'The frequency with the most power between 0.04 and 0.15 Hz. During paced breathing the LF peak generally mirrors your breathing pace, so it lands close to your breathing frequency. A 4/6 pattern (four seconds in, six out) is one breath every ten seconds, or 0.1 Hz, which is near the resonance frequency for most people. A clean session concentrates power at that peak, so an LF peak near your pacing frequency is a sign of good coherence.',
+  hfPeak: 'The frequency with the most power between 0.15 and 0.4 Hz. At rest this band is driven by respiration (each breath speeds and slows the heart slightly), so the HF peak usually sits at your breathing rate.',
 };
 
 /** Autonomic composite weights per reading kind (per the framework). */
