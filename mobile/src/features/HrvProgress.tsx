@@ -300,10 +300,13 @@ function MetricSection({ m, structured, unstructured, buckets }: {
 
   // Big value: range average of the primary displayed series (structured when
   // comparing both), or the drag-selected bucket's value with its label.
+  // A selection can outlive its dataset (Day→Week shrinks `buckets` while this
+  // instance is reused), so an out-of-range index falls back to the average.
+  const selIdx = sel != null && sel < buckets.length ? sel : null;
   const primary = series.find((s) => s.values.some((v) => v != null))?.values ?? [];
-  const raw = sel != null ? primary[sel] : meanOf(primary);
+  const raw = selIdx != null ? primary[selIdx] : meanOf(primary);
   const value = raw == null ? null : fmtNum(m.integer ? Math.round(raw) : raw);
-  const suffix = sel != null ? `(${buckets[sel]?.label ?? ''})` : 'avg';
+  const suffix = selIdx != null ? `(${buckets[selIdx]?.label ?? ''})` : 'avg';
   const zones = acBandZones(m.band);
 
   return (
@@ -351,10 +354,12 @@ function PowerSection({ bl, vlf, lf, hf }: {
     const parts = [vlf[i], lf[i], hf[i]].filter((v): v is number => v != null);
     return parts.length ? parts.reduce((s, x) => s + x, 0) : null;
   });
-  const raw = sel != null ? totals[sel] : meanOf(totals);
+  // Same stale-selection fallback as MetricSection — out-of-range → average.
+  const selIdx = sel != null && sel < bl.length ? sel : null;
+  const raw = selIdx != null ? totals[selIdx] : meanOf(totals);
   // Per-band breakdown mirrors the header: range average until a bar is
   // selected, then that bucket's values.
-  const bandVal = (arr: (number | null)[]) => (sel != null ? arr[sel] : meanOf(arr));
+  const bandVal = (arr: (number | null)[]) => (selIdx != null ? arr[selIdx] : meanOf(arr));
   const bands = [
     { label: 'Very low', color: VLF, power: bandVal(vlf) },
     { label: 'Low', color: LF, power: bandVal(lf) },
@@ -368,7 +373,7 @@ function PowerSection({ bl, vlf, lf, hf }: {
         title="Power distribution"
         help={POWER_HELP}
         value={raw == null ? null : String(Math.round(raw))}
-        suffix={sel != null ? `ms² · (${bl[sel]?.label ?? ''})` : 'ms² · avg'}
+        suffix={selIdx != null ? `ms² · (${bl[selIdx]?.label ?? ''})` : 'ms² · avg'}
         desc="Total HRV power split across the VLF, LF and HF frequency bands."
       />
       <StackedBars

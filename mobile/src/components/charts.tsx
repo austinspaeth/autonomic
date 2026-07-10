@@ -375,6 +375,10 @@ export function LineChart({ buckets, series, zones, integer, height = 140, targe
   const padv = (max - min) * 0.05; min -= padv; max += padv;
   const W = 320, H = height, padL = 34, padR = 10, padT = 10, padB = 22;
   const innerW = W - padL - padR, n = buckets.length;
+  // Selection can outlive its dataset: switching Day→Week shrinks `buckets`
+  // while this component instance (and its `sel`) is reused, so treat any
+  // out-of-range index as "no selection" instead of indexing past the end.
+  const selIdx = sel < n ? sel : -1;
   const xAt = (i: number) => padL + (n <= 1 ? innerW / 2 : (i / (n - 1)) * innerW);
   const yAt = (v: number) => padT + (1 - (v - min) / (max - min)) * (H - padT - padB);
   const zoneColorAt = (v: number) => { if (!zones) return null; for (const z of zones) if (v >= z.from && v < z.to) return z.color; return zones[zones.length - 1].color; };
@@ -404,9 +408,9 @@ export function LineChart({ buckets, series, zones, integer, height = 140, targe
     setSel(i);
     onSelect?.(i);
   };
-  const readoutIdx = sel >= 0 ? sel : (() => { for (let i = n - 1; i >= 0; i--) if (series.some((s) => s.values[i] != null)) return i; return -1; })();
+  const readoutIdx = selIdx >= 0 ? selIdx : (() => { for (let i = n - 1; i >= 0; i--) if (series.some((s) => s.values[i] != null)) return i; return -1; })();
   const readout = readoutIdx >= 0
-    ? `${buckets[readoutIdx].label}: ${series.filter((s) => s.values[readoutIdx] != null).map((s) => (series.filter((x) => x.label).length > 1 && s.label ? s.label + ' ' : '') + fmtNum(integer ? Math.round(s.values[readoutIdx] as number) : (s.values[readoutIdx] as number))).join(' · ')}`
+    ? `${buckets[readoutIdx]?.label ?? ''}: ${series.filter((s) => s.values[readoutIdx] != null).map((s) => (series.filter((x) => x.label).length > 1 && s.label ? s.label + ' ' : '') + fmtNum(integer ? Math.round(s.values[readoutIdx] as number) : (s.values[readoutIdx] as number))).join(' · ')}`
     : '';
 
   // Grade-zone boundaries within range (the interior `.from` edges), for the overlay.
@@ -465,7 +469,7 @@ export function LineChart({ buckets, series, zones, integer, height = 140, targe
           })}
           {/* Selection cursor only once the user has actually touched the chart —
               nothing is highlighted in the initial view. */}
-          {sel >= 0 && <Line x1={xAt(sel)} x2={xAt(sel)} y1={padT} y2={H - padB} stroke={p.text} strokeWidth={1} opacity={0.35} />}
+          {selIdx >= 0 && <Line x1={xAt(selIdx)} x2={xAt(selIdx)} y1={padT} y2={H - padB} stroke={p.text} strokeWidth={1} opacity={0.35} />}
         </Svg>
       </View>
     </View>
@@ -559,6 +563,9 @@ export function BpDumbbell({ buckets, sys, dia, height = 180 }: {
   const padv = (max - min) * 0.12 + 4; min -= padv; max += padv;
   const W = 320, H = height, padL = 22, padR = 10, padT = 10, padB = 22;
   const innerW = W - padL - padR, n = buckets.length;
+  // Same stale-selection guard as LineChart: `sel` survives a range change
+  // that shrinks `buckets`, so an out-of-range index means "no selection".
+  const selIdx = sel < n ? sel : -1;
   const xAt = (i: number) => padL + (n <= 1 ? innerW / 2 : (i / (n - 1)) * innerW);
   const yAt = (v: number) => padT + (1 - (v - min) / (max - min)) * (H - padT - padB);
   const col = (v: number, bands: Band[]) => { const c = catFromBands(v, bands); return (c && GRADE_COLORS[c]) || p.text; };
@@ -572,9 +579,9 @@ export function BpDumbbell({ buckets, sys, dia, height = 180 }: {
   // dragged bucket's reading with its date in parentheses.
   const avgOf = (arr: (number | null)[]) => { const v = arr.filter((x): x is number => x != null && !isNaN(x)); return v.length ? Math.round(v.reduce((s, x) => s + x, 0) / v.length) : null; };
   const fmt = (v: number | null | undefined) => (v != null && !isNaN(v) ? Math.round(v) : '–');
-  const rSys = sel >= 0 ? sys[sel] : avgOf(sys);
-  const rDia = sel >= 0 ? dia[sel] : avgOf(dia);
-  const suffix = sel >= 0 ? `(${buckets[sel].label})` : 'avg';
+  const rSys = selIdx >= 0 ? sys[selIdx] : avgOf(sys);
+  const rDia = selIdx >= 0 ? dia[selIdx] : avgOf(dia);
+  const suffix = selIdx >= 0 ? `(${buckets[selIdx]?.label ?? ''})` : 'avg';
   return (
     <View>
       <RNText style={{ fontSize: 25, fontFamily: fonts.numHeavy, color: p.text, marginBottom: 6, fontVariant: ['tabular-nums'] }}>
@@ -614,9 +621,9 @@ export function BpDumbbell({ buckets, sys, dia, height = 180 }: {
             const x = xAt(i);
             return (
               <G key={i}>
-                <Line x1={x} x2={x} y1={yAt(s)} y2={yAt(d)} stroke={`url(#bp${gid}_${i})`} strokeWidth={i === sel ? 5 : 3.4} strokeLinecap="round" />
-                <Circle cx={x} cy={yAt(s)} r={i === sel ? 4.5 : 3.4} fill={col(s, BANDS.sys)} />
-                <Circle cx={x} cy={yAt(d)} r={i === sel ? 4.5 : 3.4} fill={col(d, BANDS.dia)} />
+                <Line x1={x} x2={x} y1={yAt(s)} y2={yAt(d)} stroke={`url(#bp${gid}_${i})`} strokeWidth={i === selIdx ? 5 : 3.4} strokeLinecap="round" />
+                <Circle cx={x} cy={yAt(s)} r={i === selIdx ? 4.5 : 3.4} fill={col(s, BANDS.sys)} />
+                <Circle cx={x} cy={yAt(d)} r={i === selIdx ? 4.5 : 3.4} fill={col(d, BANDS.dia)} />
               </G>
             );
           })}
@@ -645,6 +652,9 @@ export function StackedBars({ buckets, segments, height = 160, unit, hideHeader,
   const [layoutW, setLayoutW] = useState(0);
   const [sel, setSel] = useState<number>(-1);
   const n = buckets.length;
+  // Same stale-selection guard as LineChart: `sel` survives a range change
+  // that shrinks `buckets`, so an out-of-range index means "no selection".
+  const selIdx = sel < n ? sel : -1;
   const totals = buckets.map((_, i) => segments.reduce((s, seg) => s + (seg.values[i] || 0), 0));
   const max = Math.max(...totals, 0);
   if (max <= 0) return null;
@@ -663,9 +673,9 @@ export function StackedBars({ buckets, segments, height = 160, unit, hideHeader,
     setSel(i);
     onSelect?.(i);
   };
-  const readoutIdx = sel >= 0 ? sel : (() => { for (let i = n - 1; i >= 0; i--) if (totals[i] > 0) return i; return -1; })();
+  const readoutIdx = selIdx >= 0 ? selIdx : (() => { for (let i = n - 1; i >= 0; i--) if (totals[i] > 0) return i; return -1; })();
   const readout = readoutIdx >= 0
-    ? `${buckets[readoutIdx].label}: ${Math.round(totals[readoutIdx])}${unit ? ' ' + unit : ''} · ${segments.map((s) => `${s.label} ${Math.round(s.values[readoutIdx] || 0)}`).join(' · ')}`
+    ? `${buckets[readoutIdx]?.label ?? ''}: ${Math.round(totals[readoutIdx])}${unit ? ' ' + unit : ''} · ${segments.map((s) => `${s.label} ${Math.round(s.values[readoutIdx] || 0)}`).join(' · ')}`
     : '';
   const yticks = [0, max / 2, max];
   return (
@@ -701,7 +711,7 @@ export function StackedBars({ buckets, segments, height = 160, unit, hideHeader,
                   // Rounded segment with a small gap to the one below it. Bars
                   // render uniformly until the user selects one by touch.
                   const h = Math.max(1.5, y0 - y1 - SEG_GAP);
-                  const op = sel >= 0 ? (i === sel ? 1 : 0.55) : 0.9;
+                  const op = selIdx >= 0 ? (i === selIdx ? 1 : 0.55) : 0.9;
                   return <Rect key={si} x={x} y={y1} width={barW} height={h} rx={Math.min(3, h / 2)} fill={seg.color} opacity={op} />;
                 })}
                 {(i % step === 0 || i === n - 1) ? <SvgText x={xCenter(i)} y={H - 6} textAnchor="middle" fontSize={9} fontFamily={fonts.mono} fill={p.textDim}>{b.label}</SvgText> : null}

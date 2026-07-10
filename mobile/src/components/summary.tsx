@@ -276,12 +276,12 @@ function HrvSummaryBody({ r, days, ctx, type }: SummaryProps & { type: 'breathHr
         <SectionHead title="Balance" help={HRV_HELP.balance} />
         <View style={{ marginTop: 12 }}>
           <MetricRow
-            label="PNS index" value={r.pns as string} cat={s.pns}
+            bare label="PNS index" value={r.pns as string} cat={s.pns}
             explain="Parasympathetic (rest and recovery) activity versus average. Zero is average, positive is above and better, negative is below."
             spark={spark(days, type, numEx('pns'), BANDS.pns)}
           />
           <MetricRow
-            label="SNS index" value={r.sns as string} cat={s.sns}
+            bare label="SNS index" value={r.sns as string} cat={s.sns}
             explain="Sympathetic (activation and stress) activity versus average. Negative is calm and good, positive means more activation."
             spark={spark(days, type, numEx('sns'), BANDS.sns)}
           />
