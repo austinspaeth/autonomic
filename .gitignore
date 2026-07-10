@@ -1,2 +1,8 @@
 node_modules/
 .DS_Store
+
+# Build output generated at the repo root (mirrors mobile/.gitignore)
+/.expo/
+/android/
+/ios/
+/dist/
