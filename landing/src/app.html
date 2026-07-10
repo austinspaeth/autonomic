@@ -116,9 +116,31 @@
             }
           }
 
-          document.querySelectorAll('.ai-chip').forEach(function (chip) {
-            chip.addEventListener('click', function () { chip.classList.toggle('selected'); });
-          });
+          // AI report picker: clicking a chip swaps the mocked prompt (title +
+          // body) to that report's full, pasteable prompt. Each chip carries its
+          // prompt + title in data-prompt / data-title attributes.
+          (function () {
+            var chips = document.querySelectorAll('.ai-chip[data-prompt]');
+            var bodyEl = document.querySelector('.aip-body');
+            var titleEl = document.querySelector('.aip-title');
+            if (!chips.length || !bodyEl) return;
+            function esc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+            function previewOf(t) { var i = t.indexOf('FOCUS:'); return i >= 0 ? t.slice(i) : t; }
+            function render(chip) {
+              var text = chip.getAttribute('data-prompt') || '';
+              bodyEl.innerHTML = esc(previewOf(text)).replace(/^([A-Z][A-Z0-9 ()/&.'-]*?:)/gm, '<span class="c-key">$1<\/span>');
+              bodyEl.setAttribute('data-copy', text);
+              if (titleEl) titleEl.textContent = chip.getAttribute('data-title') || '';
+              chips.forEach(function (c) { c.classList.toggle('selected', c === chip); });
+            }
+            chips.forEach(function (c) {
+              c.addEventListener('click', function () { render(c); });
+            });
+            // Seed data-copy from the initial (statically-rendered) report so the
+            // copy button grabs the full prompt even before any click.
+            var start = document.querySelector('.ai-chip.selected[data-prompt]') || chips[0];
+            if (start) bodyEl.setAttribute('data-copy', start.getAttribute('data-prompt') || '');
+          })();
 
           // The waitlist forms are owned by the homepage Svelte component
           // (they POST to FlowForm on submit). No handler needed here.
@@ -137,7 +159,7 @@
           if (copyBtn) {
             var promptEl = document.querySelector('.aip-body');
             copyBtn.addEventListener('click', function () {
-              var txt = promptEl ? promptEl.innerText : '';
+              var txt = promptEl ? (promptEl.getAttribute('data-copy') || promptEl.innerText) : '';
               var done = function () {
                 var prev = copyBtn.textContent;
                 copyBtn.textContent = 'Copied ✓';

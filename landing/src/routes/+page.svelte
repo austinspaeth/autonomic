@@ -1,6 +1,7 @@
 <script lang="ts">
   import { BRAND_POLYLINE } from '$lib/site';
   import BrandMark from '$lib/BrandMark.svelte';
+  import { demoReports as reports } from '$lib/demoPrompts';
 
   // The site is prerendered with csr disabled, so no Svelte runtime hydrates.
   // The waitlist forms therefore ship as plain HTML with a native FlowForm POST
@@ -75,10 +76,26 @@
       { '@type': 'Question', name: 'How do the AI insights work?', acceptedAnswer: { '@type': 'Answer', text: 'Autonomic assembles your logged data over a date range into a structured analysis prompt that you copy into Claude, Gemini or ChatGPT. The text is generated locally; nothing is sent automatically.' } }
     ]
   };
+
+  // The AI-report picker. Each report is the REAL prompt the Autonomic iOS app
+  // builds, run over a fabricated week of sample data (see src/lib/demoPrompts.ts).
+  // The prompt rides on the chip as a data-prompt attribute (Svelte escapes it);
+  // the site script in app.html swaps it into the mock on click.
+
+  // Accent the prompt's structural labels (UPPERCASE line-leading "LABEL:" and the
+  // [date ...] stamps) for the statically-rendered default. app.html re-applies the
+  // same highlighting on click. Kept in sync with the render() regex there.
+  const escHtml = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const highlight = (t: string) =>
+    escHtml(t).replace(/^([A-Z][A-Z0-9 ()/&.'-]*?:)/gm, '<span class="c-key">$1</span>');
+  // The preview leads with the report-specific part (FOCUS + this report's data),
+  // dropping the shared persona/requirements header from view. Copy still grabs
+  // the full prompt. Kept in sync with previewOf() in app.html.
+  const previewOf = (t: string) => { const i = t.indexOf('FOCUS:'); return i >= 0 ? t.slice(i) : t; };
 </script>
 
 <svelte:head>
-  <title>Autonomic | Private HRV, POTS &amp; Dysautonomia Recovery Journal</title>
+  <title>Autonomic for iOS | Private HRV, POTS &amp; Dysautonomia Recovery App</title>
   <meta
     name="description"
     content="Autonomic is a private, offline journal that scores your daily HRV, blood pressure, sleep and orthostatic readings against medical thresholds, so people recovering from POTS, dysautonomia and post-viral illness can see what's helping and what's hurting."
@@ -87,7 +104,7 @@
 
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://autonomic.care/" />
-  <meta property="og:title" content="Autonomic | See your nervous system recover" />
+  <meta property="og:title" content="Autonomic for iOS | See your nervous system recover" />
   <meta property="og:description" content="Medically-scored daily readings, trend analysis, and AI-ready insight reports for autonomic recovery. Private, offline, on-device." />
   <meta property="og:image" content="https://autonomic.care/og.png" />
   <meta property="og:image:width" content="1200" />
@@ -95,7 +112,7 @@
   <meta property="og:image:type" content="image/png" />
   <meta property="og:image:alt" content="Autonomic: see your nervous system recover. A private journal that scores your daily HRV, blood pressure, sleep and orthostatic readings." />
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Autonomic | Private autonomic recovery journal" />
+  <meta name="twitter:title" content="Autonomic for iOS | Private autonomic recovery app" />
   <meta name="twitter:description" content="Score your HRV, BP, sleep & orthostatic data. Spot trends. Generate doctor-ready and AI-ready reports. Offline and private." />
   <meta name="twitter:image" content="https://autonomic.care/og.png" />
   <meta name="twitter:image:alt" content="Autonomic: private, offline autonomic recovery journal for POTS, dysautonomia and long COVID." />
@@ -352,13 +369,10 @@
     <div class="ai-grid">
       <div class="ai-reports">
         <span class="ai-card-tag">Pick a report</span>
-        <div class="ai-chips" aria-hidden="true">
-          <div class="ai-chip selected"><span class="ai-chip-ic">✦</span>Overall health summary<i class="ai-check">✓</i></div>
-          <div class="ai-chip"><span class="ai-chip-ic">↗</span>Recovery trajectory</div>
-          <div class="ai-chip"><span class="ai-chip-ic">⚠</span>Trigger analysis</div>
-          <div class="ai-chip"><span class="ai-chip-ic">＋</span>What to tell your doctor</div>
-          <div class="ai-chip"><span class="ai-chip-ic">☾</span>Sleep impact report</div>
-          <div class="ai-chip"><span class="ai-chip-ic">♡</span>Cardiovascular analysis</div>
+        <div class="ai-chips">
+          {#each reports as r, i}
+            <button type="button" class="ai-chip{i === 0 ? ' selected' : ''}" data-report={r.key} data-title={r.title} data-prompt={r.prompt}><span class="ai-chip-ic">{r.icon}</span>{r.label}<i class="ai-check">✓</i></button>
+          {/each}
         </div>
         <div class="ai-llms">
           <span class="ai-llm">Claude</span>
@@ -369,31 +383,15 @@
 
       <div class="ai-prompt-cell">
       <div class="ai-prompt">
-        <div class="aip-bar"><span class="aip-dot"></span><span class="aip-dot"></span><span class="aip-dot"></span><span class="aip-title">analysis-prompt · Jul 8, 2026</span></div>
-        <pre class="aip-body"><span class="c-key">ROLE</span> You are a health analyst reviewing one day of
-autonomic recovery data for someone managing POTS.
-
-<span class="c-key">DATA</span> Jul 8, 2026 · 1 day
-  HRV · AM     RMSSD 41 · 07:12 · lying, rested
-  HRV · PM     RMSSD 29 · 22:40 · before bed
-  Orthostatic  +31 bpm · 06:55
-               note: "dizzy getting out of bed"
-  Blood pres.  118/76 · 62 bpm · 07:20
-  Sleep        7.8h · 1 interruption · HR 52–92
-  Triggers     pizza (dinner)
-  Meds         Quercetin · Pepcid AC · Allegra
-
-<span class="c-key">ASK</span> Give me an overall health summary for this day.
-Start with how my autonomic nervous system looked
-overall, then explain the drop from my morning to my
-evening HRV and whether the pizza or my sleep is the
-likelier driver. Note whether the +31 bpm orthostatic
-rise and 118/76 reading sit in a healthy range for POTS,
-and</pre>
-        <div class="aip-foot"><span>Generated on-device</span><button class="aip-copy">Copy prompt</button></div>
+        <div class="aip-bar"><span class="aip-dot"></span><span class="aip-dot"></span><span class="aip-dot"></span><span class="aip-title">{reports[0].title}</span></div>
+        <pre class="aip-body" data-copy={reports[0].prompt}>{@html highlight(previewOf(reports[0].prompt))}</pre>
+        <div class="aip-foot"><span>Generated on-device · demo data</span><button class="aip-copy">Copy &amp; try it</button></div>
       </div>
       </div>
     </div>
+
+    <p class="ai-try">Pick a report, copy the prompt, and paste it into ChatGPT or Claude to see the kind of read-out Autonomic gives you. It runs on realistic sample data, so you get a real feel for the reports before you ever log a thing.</p>
+
   </div>
 </section>
 
@@ -471,7 +469,7 @@ and</pre>
           <BrandMark size={22} class="cmp-mark" />
           <b>Autonomic</b>
         </div>
-        <div class="cmp-price"><span class="cmp-amt">$5</span><span class="cmp-per">/mo</span></div>
+        <div class="cmp-price"><span class="cmp-amt">$8</span><span class="cmp-per">/mo</span></div>
         <div class="cmp-price-sub">or $50 / year</div>
       </div>
       <div class="cmp-cell cmp-head cmp-them">
@@ -637,11 +635,11 @@ and</pre>
     </div>
 
     <div class="journey-copy">
-      <p>For more than <strong>four years</strong>, I’ve been living with long COVID. It started with blood pressure that spiked out of nowhere, a heart that raced the moment I stood up, brain fog that swallowed whole days, and a long list of symptoms that never quite fit together. I saw specialist after specialist in <strong>cardiology, neurology and beyond</strong>, and kept leaving with the same thing: no real answers.</p>
+      <p>For more than four years, I’ve been living with long COVID. It started with blood pressure that spiked out of nowhere, a heart that raced the moment I stood up, brain fog that swallowed whole days, and a long list of symptoms that never quite fit together. I saw specialist after specialist in cardiology, neurology and beyond, and kept leaving with the same thing: no real answers.</p>
 
-      <p>So I started tracking it myself: <strong>HRV, blood pressure, heart rate, sleep</strong>, what I ate, the days I crashed. Slowly, patterns surfaced. I found small things that made life more livable, and I got a little better. I’m not healed, and I won’t pretend otherwise. But over the <strong>two years</strong> I’ve used my own early version of Autonomic, I’ve been able to see what genuinely helps and reach a far better place than I’d been in for a long time.</p>
+      <p>So I started tracking it myself: HRV, blood pressure, heart rate, sleep, what I ate, the days I crashed. Slowly, patterns surfaced. I found small things that made life more livable, and I got a little better. I’m not healed, and I won’t pretend otherwise. But over the two years I’ve used my own early version of Autonomic, I’ve been able to see what genuinely helps and reach a far better place than I’d been in for a long time.</p>
 
-      <p>I’m not a doctor. I’m not an expert. I’m just someone on this road, in <strong>South Carolina, raising six kids</strong>, figuring out my own recovery one reading at a time. Autonomic is the tool I built to make sense of it. If it helps you spot your own patterns, find your own answers, and feel a little more in control of your journey too, then it’s done exactly what I hoped.</p>
+      <p>I’m not a doctor. I’m not an expert. I’m just someone on this road, in South Carolina, raising six kids, figuring out my own recovery one reading at a time. Autonomic is the tool I built to make sense of it. If it helps you spot your own patterns, find your own answers, and feel a little more in control of your journey too, then it’s done exactly what I hoped.</p>
 
       <div class="journey-sign">
         <img class="journey-avatar" src="/me.jpg" width="340" height="340" alt="" loading="lazy" />
