@@ -1,5 +1,6 @@
 <script lang="ts">
   import { BRAND_POLYLINE } from '$lib/site';
+  import BrandMark from '$lib/BrandMark.svelte';
 
   // The site is prerendered with csr disabled, so no Svelte runtime hydrates.
   // The waitlist forms therefore ship as plain HTML with a native FlowForm POST
@@ -67,7 +68,7 @@
     '@context': 'https://schema.org',
     '@type': 'FAQPage',
     mainEntity: [
-      { '@type': 'Question', name: 'How much does Autonomic cost?', acceptedAnswer: { '@type': 'Answer', text: 'Every plan starts with a 7-day free trial, then it is $50 per year for full access including AI reports and all future updates. Your data stays private on your device and is never sold. Join the waitlist to lock in founding-member pricing.' } },
+      { '@type': 'Question', name: 'How much does Autonomic cost?', acceptedAnswer: { '@type': 'Answer', text: 'Every plan starts with a 7-day free trial, then it is $50 per year for full access including AI reports and all future updates. Your data stays private on your device and is never sold.' } },
       { '@type': 'Question', name: 'Does it work offline?', acceptedAnswer: { '@type': 'Answer', text: 'Completely. Autonomic is a fully offline iOS app. All scoring, trends and reports are computed locally, so it works on a plane, in a clinic basement, or anywhere without signal.' } },
       { '@type': 'Question', name: 'Which conditions is it for?', acceptedAnswer: { '@type': 'Answer', text: 'It is built for people managing POTS, dysautonomia, long COVID and post-viral or post-illness autonomic recovery, where day-to-day HRV, heart rate and orthostatic patterns matter.' } },
       { '@type': 'Question', name: 'Do I need a wearable?', acceptedAnswer: { '@type': 'Answer', text: 'No. You can type readings from any source, a chest strap, a ring, a blood-pressure cuff, or a fingertip pulse oximeter. Autonomic scores whatever you log.' } },
@@ -115,13 +116,34 @@
       <p class="eyebrow">Private · Offline · On-device</p>
       <h1 class="hero-h1">See your nervous&nbsp;system recover.</h1>
       <p class="hero-lead">Autonomic turns your daily <strong>HRV, blood pressure, sleep and orthostatic</strong> readings into clear, medically-scored signals, so anyone recovering from <strong>POTS, dysautonomia</strong> or post-viral illness can finally see what helps and what hurts.</p>
-      <form class="hero-waitlist" id="heroForm" action="https://flowform.to/austin@discoverymark.com" method="POST">
-        <input type="hidden" name="_subject" value="Autonomic Waitlist Signup" />
-        <input type="email" name="email" required placeholder="you@email.com" aria-label="Email address" />
-        <button class="btn btn-primary btn-lg" type="submit">Join the waitlist</button>
-      </form>
-      <p class="hero-waitlist" role="status" id="heroSuccess" style="display: none; color: var(--green); font-weight: 600;">✓ You're on the list. Check your inbox for your early-access invite.</p>
-      <p class="hero-microcopy"><b>7-day free trial</b> at launch, then $50/year. No card to join the list.</p>
+      <div class="hero-cta">
+        <div class="hero-cta-col hero-cta-ios">
+          <span class="hero-cta-eyebrow"><i class="hero-cta-dot"></i>Available now on iOS</span>
+          <!-- TODO: point href at the live App Store URL (also update the badge in the #waitlist section). -->
+          <a class="hero-appstore" href="#" aria-label="Download Autonomic on the App Store">
+            <svg viewBox="0 0 120 40" role="img" aria-label="Download on the App Store" xmlns="http://www.w3.org/2000/svg">
+              <rect x="0.5" y="0.5" width="119" height="39" rx="6.5" fill="#000" stroke="rgba(255,255,255,0.4)" />
+              <path transform="translate(10,7.5) scale(0.05)" fill="#fff" d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5c0 26.2 4.8 53.3 14.4 81.2 12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 20-27.8 44.7-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z" />
+              <text x="35" y="16" fill="#fff" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="7.5">Download on the</text>
+              <text x="34" y="31" fill="#fff" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="16" font-weight="600" letter-spacing="-0.3">App Store</text>
+            </svg>
+          </a>
+          <p class="hero-cta-note"><b>7-day free trial</b>, then $50/year.</p>
+        </div>
+
+        <div class="hero-cta-col hero-cta-android">
+          <span class="hero-cta-eyebrow">Coming soon on Android</span>
+          <a class="hero-android-link" href="#waitlist">
+            <svg class="hero-android-ic" viewBox="5.5 3.8 13 8" aria-hidden="true">
+              <path fill="#3DDC84" d="M6 11a6 6 0 0 1 12 0H6z" />
+              <line x1="8" y1="4.4" x2="9.4" y2="6.5" stroke="#3DDC84" stroke-width="1.1" stroke-linecap="round" />
+              <line x1="16" y1="4.4" x2="14.6" y2="6.5" stroke="#3DDC84" stroke-width="1.1" stroke-linecap="round" />
+              <circle cx="9.6" cy="8.6" r="0.85" fill="#fff" />
+              <circle cx="14.4" cy="8.6" r="0.85" fill="#fff" />
+            </svg>Join the waitlist <span aria-hidden="true">→</span></a>
+          <p class="hero-cta-note">Be first when it lands.</p>
+        </div>
+      </div>
       <ul class="hero-trust">
         <li>7-day free trial</li>
         <li>Works offline</li>
@@ -173,6 +195,15 @@
     <ul class="strip-tags">
       <li>POTS</li><li>Dysautonomia</li><li>Long COVID</li><li>Post-viral fatigue</li><li>MCAS patterns</li><li>Orthostatic intolerance</li>
     </ul>
+  </div>
+</section>
+
+<!-- ============ FOUNDER TRUST BAR ============ -->
+<section class="trustbar" aria-label="From the founder">
+  <div class="wrap trustbar-row">
+    <img class="trustbar-avatar" src="/me.jpg" width="340" height="340" alt="Austin, founder of Autonomic" loading="lazy" />
+    <p class="trustbar-text"><b>“I’ve used Autonomic for two years to manage my own long COVID.”</b> It’s how I found what actually helps, and got to a much better place than I’d been in for years.</p>
+    <a class="trustbar-link" href="#journey">Read my story <span aria-hidden="true">→</span></a>
   </div>
 </section>
 
@@ -423,6 +454,64 @@ and</pre>
   </div>
 </section>
 
+<!-- ============ COMPARISON: AUTONOMIC vs WELLTORY ============ -->
+<section class="section compare" id="compare">
+  <div class="wrap">
+    <div class="section-head center">
+      <p class="eyebrow">Autonomic vs Welltory</p>
+      <h2 class="h2">More of what matters, at less than half the price.</h2>
+      <p class="lead">The same clinical grade HRV from your Apple Watch or a chest strap, without the tracking, the lock in, or the $120 a year bill.</p>
+    </div>
+
+    <div class="cmp-table">
+      <div class="cmp-cell cmp-corner"></div>
+      <div class="cmp-cell cmp-head cmp-us">
+        <span class="cmp-badge">Save $70 / year</span>
+        <div class="cmp-brand">
+          <BrandMark size={22} class="cmp-mark" />
+          <b>Autonomic</b>
+        </div>
+        <div class="cmp-price"><span class="cmp-amt">$5</span><span class="cmp-per">/mo</span></div>
+        <div class="cmp-price-sub">or $50 / year</div>
+      </div>
+      <div class="cmp-cell cmp-head cmp-them">
+        <div class="cmp-brand cmp-brand-them">
+          <img class="cmp-logo-them" src="/welltory.png" width="512" height="512" alt="" loading="lazy" />
+          <b>Welltory</b>
+        </div>
+        <div class="cmp-price"><span class="cmp-amt">$19.99</span><span class="cmp-per">/mo</span></div>
+        <div class="cmp-price-sub">or $119.99 / year</div>
+      </div>
+
+      <div class="cmp-cell cmp-feat">Focus of the app</div>
+      <div class="cmp-cell cmp-val cmp-us"><svg class="cmp-ic yes" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg><span>Long COVID &amp; autonomic recovery</span></div>
+      <div class="cmp-cell cmp-val cmp-them"><svg class="cmp-ic dash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14" /></svg><span>General wellness</span></div>
+
+      <div class="cmp-cell cmp-feat">HRV from Apple Watch &amp; BLE straps</div>
+      <div class="cmp-cell cmp-val cmp-us"><svg class="cmp-ic yes" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg><span>Fully supported</span></div>
+      <div class="cmp-cell cmp-val cmp-them"><svg class="cmp-ic yes-dim" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg><span>Supported</span></div>
+
+      <div class="cmp-cell cmp-feat">Your data stays on your device</div>
+      <div class="cmp-cell cmp-val cmp-us"><svg class="cmp-ic yes" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg><span>We never see it</span></div>
+      <div class="cmp-cell cmp-val cmp-them"><svg class="cmp-ic no" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg><span>Stored on their servers</span></div>
+
+      <div class="cmp-cell cmp-feat">Zero tracking</div>
+      <div class="cmp-cell cmp-val cmp-us"><svg class="cmp-ic yes" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg><span>None, ever</span></div>
+      <div class="cmp-cell cmp-val cmp-them"><svg class="cmp-ic no" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg><span>Tracks your activity</span></div>
+
+      <div class="cmp-cell cmp-feat">Use your own AI (Claude · Gemini · ChatGPT)</div>
+      <div class="cmp-cell cmp-val cmp-us"><svg class="cmp-ic yes" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg><span>Your provider, your choice</span></div>
+      <div class="cmp-cell cmp-val cmp-them"><svg class="cmp-ic no" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg><span>Locked to Welltory’s AI</span></div>
+
+      <div class="cmp-cell cmp-feat cmp-feat-last">Export all your data</div>
+      <div class="cmp-cell cmp-val cmp-us cmp-us-last"><svg class="cmp-ic yes" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg><span>Everything, anytime</span></div>
+      <div class="cmp-cell cmp-val cmp-them cmp-them-last"><svg class="cmp-ic no" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg><span>Not available</span></div>
+    </div>
+
+    <p class="cmp-foot">Same readings. Your data, your AI, fully exportable, for less than half the price.</p>
+  </div>
+</section>
+
 <!-- ============ FAQ ============ -->
 <section class="section" id="faq">
   <div class="wrap faq-wrap">
@@ -431,7 +520,7 @@ and</pre>
       <h2 class="h2">Good to know.</h2>
     </div>
     <div class="faq">
-      <details><summary>How much does it cost, and is my data private?<span class="fq-i">+</span></summary><p>Every plan starts with a 7-day free trial, then it’s a simple $50/year for everything, all reading types, scoring, analysis and AI reports, plus future updates. Your data is always private: stored on your device, never sold, never sent to a server. Waitlist members lock in founding-member pricing.</p></details>
+      <details><summary>How much does it cost, and is my data private?<span class="fq-i">+</span></summary><p>Every plan starts with a 7-day free trial, then it’s a simple $50/year for everything, all reading types, scoring, analysis and AI reports, plus future updates. Your data is always private: stored on your device, never sold, never sent to a server.</p></details>
       <details><summary>Does it really work offline?<span class="fq-i">+</span></summary><p>Completely. It’s a fully offline iOS app. Scoring, trends and reports are computed locally, so it works anywhere, no signal required.</p></details>
       <details><summary>Which conditions is it built for?<span class="fq-i">+</span></summary><p>POTS, dysautonomia, long COVID and post-viral or post-illness recovery, anywhere daily HRV, heart-rate and orthostatic patterns matter.</p></details>
       <details><summary>Is Autonomic available on Android?<span class="fq-i">+</span></summary><p>Not yet. Autonomic is iOS-only for now. An Android version is coming soon, join the waitlist and we’ll let you know the moment it lands.</p></details>
@@ -447,10 +536,10 @@ and</pre>
   <div class="cta-glow" aria-hidden="true"></div>
   <div class="wrap">
     <div class="section-head center" style="margin-bottom: 38px;">
-      <svg class="cta-mark" viewBox="0 0 512 512" aria-hidden="true" style="margin-bottom:22px"><polyline points={BRAND_POLYLINE} fill="none" stroke="currentColor" stroke-width="38" stroke-linejoin="round" stroke-linecap="round" /></svg>
+      <BrandMark size={40} class="cta-mark" />
       <p class="eyebrow">Join the waitlist</p>
       <h2 class="cta-h">Be first to read your recovery clearly.</h2>
-      <p class="cta-sub">Autonomic is available now on the Apple App Store, with Android coming soon. Join the waitlist to be first to get the Android release and to lock in founding-member pricing.</p>
+      <p class="cta-sub">Autonomic is available now on the Apple App Store, with Android coming soon. Join the waitlist to be first to get the Android release.</p>
     </div>
 
     <div class="dl-ios">
@@ -471,7 +560,7 @@ and</pre>
     <div class="waitlist-grid">
       <div class="wl-form">
         <div class="wl-head">
-          <svg class="wl-android" viewBox="0 0 24 24" aria-hidden="true">
+          <svg class="wl-android" viewBox="5.5 3.8 13 8" aria-hidden="true">
             <path fill="#3DDC84" d="M6 11a6 6 0 0 1 12 0H6z" />
             <line x1="8" y1="4.4" x2="9.4" y2="6.5" stroke="#3DDC84" stroke-width="1.1" stroke-linecap="round" />
             <line x1="16" y1="4.4" x2="14.6" y2="6.5" stroke="#3DDC84" stroke-width="1.1" stroke-linecap="round" />
@@ -483,7 +572,7 @@ and</pre>
         <div class="wl-success" id="wlSuccess">
           <div class="wl-check" aria-hidden="true">✓</div>
           <h3 style="font-family: var(--display); font-size: 22px; margin: 0 0 8px;">You're on the list.</h3>
-          <p style="color: var(--dim); margin: 0; font-size: 15px;">We'll email your early-access invite and founding-member link. Welcome aboard.</p>
+          <p style="color: var(--dim); margin: 0; font-size: 15px;">We'll email your early access invite and lock in your price for life. Welcome aboard.</p>
         </div>
         <form id="wlForm" class="wl-fields" action="https://flowform.to/austin@discoverymark.com" method="POST">
           <input type="hidden" name="_subject" value="Autonomic Waitlist Signup" />
@@ -517,7 +606,7 @@ and</pre>
       </div>
 
       <aside class="pricing">
-        <p class="pricing-tag">Founding-member pricing</p>
+        <p class="pricing-tag">Lock in your price for life</p>
         <div class="pricing-price"><span class="amt">$50</span><span class="per">/ year</span></div>
         <p class="pricing-trial">Starts with a <b>7-day free trial</b></p>
         <ul class="pricing-list">
@@ -528,6 +617,39 @@ and</pre>
           <li>Waitlist members lock in this launch price for life</li>
         </ul>
       </aside>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FOUNDER JOURNEY ============ -->
+<section class="section journey" id="journey">
+  <div class="wrap">
+    <div class="section-head center">
+      <p class="eyebrow">The story behind Autonomic</p>
+      <h2 class="h2">I built this because I needed it.</h2>
+    </div>
+
+    <div class="journey-photo-wrap">
+      <div class="journey-photo-glow" style="background-image:url(/journey-family.jpg)" aria-hidden="true"></div>
+      <figure class="journey-photo">
+        <img src="/journey-family.jpg" width="900" height="377" alt="Austin, founder of Autonomic, with his wife and six children in South Carolina" loading="lazy" />
+      </figure>
+    </div>
+
+    <div class="journey-copy">
+      <p>For more than <strong>four years</strong>, I’ve been living with long COVID. It started with blood pressure that spiked out of nowhere, a heart that raced the moment I stood up, brain fog that swallowed whole days, and a long list of symptoms that never quite fit together. I saw specialist after specialist in <strong>cardiology, neurology and beyond</strong>, and kept leaving with the same thing: no real answers.</p>
+
+      <p>So I started tracking it myself: <strong>HRV, blood pressure, heart rate, sleep</strong>, what I ate, the days I crashed. Slowly, patterns surfaced. I found small things that made life more livable, and I got a little better. I’m not healed, and I won’t pretend otherwise. But over the <strong>two years</strong> I’ve used my own early version of Autonomic, I’ve been able to see what genuinely helps and reach a far better place than I’d been in for a long time.</p>
+
+      <p>I’m not a doctor. I’m not an expert. I’m just someone on this road, in <strong>South Carolina, raising six kids</strong>, figuring out my own recovery one reading at a time. Autonomic is the tool I built to make sense of it. If it helps you spot your own patterns, find your own answers, and feel a little more in control of your journey too, then it’s done exactly what I hoped.</p>
+
+      <div class="journey-sign">
+        <img class="journey-avatar" src="/me.jpg" width="340" height="340" alt="" loading="lazy" />
+        <div class="journey-sign-meta">
+          <span class="journey-sign-name">Austin</span>
+          <span class="journey-sign-role">Founder of Autonomic · long hauler · dad of six, South Carolina</span>
+        </div>
+      </div>
     </div>
   </div>
 </section>
