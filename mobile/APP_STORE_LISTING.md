@@ -114,7 +114,7 @@ see your numbers climb. Private and on-device. For long-haul & POTS.*
 
 Both stay "long-haul" in this visible field and keep "long covid" in the hidden
 keyword field only (see the compliance note in §0). This field is editable
-without re-review, so rotate it — seasonal hooks, a new metric, a review quote.
+without re-review, so rotate it: seasonal hooks, a new metric, a review quote.
 
 ---
 
@@ -150,13 +150,13 @@ BUILD YOUR PROTOCOL, KEEP YOUR STREAK
 ━━━━━━━━━━━━━━━━━━━━
 • Define your own "clean day": a hydration target, sleep hours, the meds and supplements to take, the triggers to avoid
 • Every day is matched against your protocol automatically, so you see at a glance whether you stayed on plan
-• Clean days build a streak, with your longest run and a 30-day consistency rate — the discipline that actually drives recovery
+• Clean days build a streak, with your longest run and a 30-day consistency rate: the discipline that actually drives recovery
 
 ━━━━━━━━━━━━━━━━━━━━
 TRACK EVERYTHING THAT MOVES THE NEEDLE
 ━━━━━━━━━━━━━━━━━━━━
 • Water, meals and food triggers, medications and supplements, symptoms, activities, sleep, blood pressure and orthostatic stand tests
-• Digestion and bowel movements too — the whole picture, not just heart rate
+• Digestion and bowel movements too: the whole picture, not just heart rate
 • Make it yours: add your own meds, supplements, symptoms and triggers as custom types
 
 ━━━━━━━━━━━━━━━━━━━━
@@ -191,7 +191,7 @@ the disclaimer up top of the legal zone where Apple review reads it.
 Most installs are decided on the **first 2-3 screenshots** in the search results
 carousel, before anyone reads a word. So the set does double duty: the first
 three each stand alone as a reason to install, **and** all eight read as one
-narrative — the arc from *"I'm lost in my symptoms"* to *"I can see myself
+narrative: the arc from *"I'm lost in my symptoms"* to *"I can see myself
 getting better."* People buy the ending. Show them reaching it.
 
 The eight beats:
@@ -200,19 +200,19 @@ The eight beats:
 | --- | --- | --- | --- |
 | **1** | **The promise** | Live HRV session: full-screen glowing breathing ring + 5:00 timer + live HR | **"See your nervous system recover"** |
 | **2** | **Measure** | HRV results: hero Autonomic Score + graded metric rows + LF/HF power bar | **"A clinical HRV lab in your pocket"** |
-| **3** | **Understand** | Same results scrolled to the day's outlook + grade bands | **"Every reading graded — and what today is good for"** |
+| **3** | **Understand** | Same results scrolled to the day's outlook + grade bands | **"Every reading graded, and what today is good for"** |
 | **4** | **Make a plan** | Protocol editor: hydration target, sleep hours, meds to take, triggers to avoid | **"Build your own recovery protocol"** |
-| **5** | **Live it** | Journal day: water ring, meds, symptoms, a logged bowel movement, triggers | **"Track it all — water, meds, symptoms, even digestion"** |
+| **5** | **Live it** | Journal day: water ring, meds, symptoms, a logged bowel movement, triggers | **"Track it all: water, meds, symptoms, even digestion"** |
 | **6** | **Stay consistent** | Streak screen: current streak, longest run, 30-day clean rate, tier | **"Clean days become a streak"** |
 | **7** | **The payoff** | Analysis: RMSSD/HRV trend climbing across weeks over grade-zone bands | **"And watch your numbers climb"** |
 | **8** | **Trust** | Privacy / offline statement frame | **"100% on your phone. No cloud, no account."** |
 
 Why this order wins: it opens on the single most *distinctive* thing you own
-(the glowing live-HRV screen — nothing else in the category looks like it),
+(the glowing live-HRV screen, the one nothing else in the category looks like it),
 proves the clinical credibility (2-3), reveals the feature no competitor has
 (your protocol, 4), shows the daily habit is effortless (5), turns discipline
 into a visible win (6), then delivers the emotional payoff every long-hauler is
-searching for — **numbers going the right way** (7) — before closing on the trust
+searching for, **numbers going the right way** (7), before closing on the trust
 that seals a chronically-ill buyer (8).
 
 Craft notes:
@@ -222,11 +222,11 @@ Craft notes:
   either theme after.
 - **Add a small sub-caption** under a few headlines to name the audience and catch
   skimmers: *"For long-haul, POTS & dysautonomia recovery."* Screenshot text
-  isn't indexed — write it for humans, not the algorithm.
+  isn't indexed, so write it for humans, not the algorithm.
 - **Sizes:** 6.9" (iPhone 16 Pro Max) and 6.5" sets are required; Apple scales the
   rest. Portrait only (the app is portrait-locked).
 
-**App Preview video (high ROI):** a 15-30s recording that walks the same arc —
+**App Preview video (high ROI):** a 15-30s recording that walks the same arc:
 one live breathing capture → the graded score → a glance at the protocol streak →
 the climbing trend line. That 15 seconds is the whole story in motion, and almost
 no competitor has an equivalent.
@@ -301,8 +301,8 @@ HRV app (Elite HRV, HRV4Training, Welltory, Visible, Bearable) does *all* of it:
    niche, not a general wellness app bolting on a condition tag.
 5. **Full frequency-domain + PNS/SNS/coherence math** most consumer apps never
    expose, in language this audience already reads (they know what RMSSD is).
-6. **Your own protocol, not the app's.** You define the "clean day" — hydration,
-   sleep, meds, triggers — and the app holds you to it with streaks and a
+6. **Your own protocol, not the app's.** You define the "clean day" (hydration,
+   sleep, meds, triggers) and the app holds you to it with streaks and a
    consistency rate. HRV apps measure; almost none help you *stick to a plan*.
 
 ---
