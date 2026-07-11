@@ -135,14 +135,28 @@ GRADED LIKE A CLINICIAN WOULD
 ━━━━━━━━━━━━━━━━━━━━
 • Every number is scored great / good / ok / warning / crash against real thresholds, with no mystery "readiness" black box
 • One daily Autonomic Score that rolls up HRV, sleep, symptoms, blood pressure and more
-• Log readings, meds, symptoms, activities, meals, triggers, hydration, digestion and orthostatic stand tests
+• A plain-language outlook for the day: what your body is ready for, from a full workout to a rest day
+
+━━━━━━━━━━━━━━━━━━━━
+BUILD YOUR PROTOCOL, KEEP YOUR STREAK
+━━━━━━━━━━━━━━━━━━━━
+• Define your own "clean day": a hydration target, sleep hours, the meds and supplements to take, the triggers to avoid
+• Every day is matched against your protocol automatically, so you see at a glance whether you stayed on plan
+• Clean days build a streak, with your longest run and a 30-day consistency rate — the discipline that actually drives recovery
+
+━━━━━━━━━━━━━━━━━━━━
+TRACK EVERYTHING THAT MOVES THE NEEDLE
+━━━━━━━━━━━━━━━━━━━━
+• Water, meals and food triggers, medications and supplements, symptoms, activities, sleep, blood pressure and orthostatic stand tests
+• Digestion and bowel movements too — the whole picture, not just heart rate
+• Make it yours: add your own meds, supplements, symptoms and triggers as custom types
 
 ━━━━━━━━━━━━━━━━━━━━
 FIND WHAT HELPS OR HURTS
 ━━━━━━━━━━━━━━━━━━━━
 • Analysis across days, weeks and months: spot the salt, sleep, pacing or medication changes that move your numbers
 • On-device correlations surface your real triggers over time
-• Milestones and streaks so recovery actually adds up
+• Milestones so recovery actually adds up
 • Optional: bring your own AI for a deeper written read of your data
 
 ━━━━━━━━━━━━━━━━━━━━
@@ -164,39 +178,50 @@ the disclaimer up top of the legal zone where Apple review reads it.
 
 ---
 
-## 6. Screenshots: the real conversion driver
+## 6. Screenshots: tell the recovery story
 
 Most installs are decided on the **first 2-3 screenshots** in the search results
-carousel, before anyone reads a word of description. Rules:
-- **Caption every screenshot** with a big bold benefit line above the device
-  frame; don't ship bare app screens. ~60-70% of the frame is the phone, top
-  third is the caption band.
-- Use your dark theme for screens 1-2 (the glowing HRV visualizer pops on dark)
-  and prove the "graded against thresholds" story visually.
-- 6.9" (iPhone 16 Pro Max) and 6.5" sets are required; Apple scales down.
-  Portrait only (the app is portrait-locked).
+carousel, before anyone reads a word. So the set does double duty: the first
+three each stand alone as a reason to install, **and** all eight read as one
+narrative — the arc from *"I'm lost in my symptoms"* to *"I can see myself
+getting better."* People buy the ending. Show them reaching it.
 
-Recommended order (first three are the ones that matter most):
+The eight beats:
 
-| # | Screen to show | Caption (bold, benefit-led) |
-| --- | --- | --- |
-| **1** | Live HRV session: full-screen glowing breathing visualizer + 5:00 ring + live HR | **"A 5-minute HRV lab in your pocket"** |
-| **2** | HRV results screen: hero Autonomic Score + graded metric rows + LF/HF power bar | **"Every number graded like a clinician would"** |
-| **3** | Journal day view: readings, symptoms, meds, the daily score | **"Track everything that moves your recovery"** |
-| **4** | Analysis / correlations: trend charts across weeks with grade-zone bands | **"See what's helping or hurting over time"** |
-| **5** | Frequency-domain / tachogram detail (VLF/LF/HF, coherence) | **"Real HRV science: SDNN, RMSSD, PNS/SNS, coherence"** |
-| **6** | Apple Health + chest-strap pairing screen | **"Works with your chest strap & Apple Watch"** |
-| **7** | Privacy / offline screen (or a plain statement frame) | **"100% on your phone. No cloud. No account."** |
-| **8** *(optional)* | Milestones / streaks | **"Watch recovery actually add up"** |
+| # | Story beat | Screen to show | Caption (bold, benefit-led) |
+| --- | --- | --- | --- |
+| **1** | **The promise** | Live HRV session: full-screen glowing breathing ring + 5:00 timer + live HR | **"See your nervous system recover"** |
+| **2** | **Measure** | HRV results: hero Autonomic Score + graded metric rows + LF/HF power bar | **"A clinical HRV lab in your pocket"** |
+| **3** | **Understand** | Same results scrolled to the day's outlook + grade bands | **"Every reading graded — and what today is good for"** |
+| **4** | **Make a plan** | Protocol editor: hydration target, sleep hours, meds to take, triggers to avoid | **"Build your own recovery protocol"** |
+| **5** | **Live it** | Journal day: water ring, meds, symptoms, a logged bowel movement, triggers | **"Track it all — water, meds, symptoms, even digestion"** |
+| **6** | **Stay consistent** | Streak screen: current streak, longest run, 30-day clean rate, tier | **"Clean days become a streak"** |
+| **7** | **The payoff** | Analysis: RMSSD/HRV trend climbing across weeks over grade-zone bands | **"And watch your numbers climb"** |
+| **8** | **Trust** | Privacy / offline statement frame | **"100% on your phone. No cloud, no account."** |
 
-Micro-copy for the sub-caption line (smaller, under the headline) can name the
-audience explicitly to catch skimmers: *"For long-haul, POTS & dysautonomia
-recovery."* Screenshot text is **not** indexed for search, so this is purely for
-humans: say what converts, not what ranks.
+Why this order wins: it opens on the single most *distinctive* thing you own
+(the glowing live-HRV screen — nothing else in the category looks like it),
+proves the clinical credibility (2-3), reveals the feature no competitor has
+(your protocol, 4), shows the daily habit is effortless (5), turns discipline
+into a visible win (6), then delivers the emotional payoff every long-hauler is
+searching for — **numbers going the right way** (7) — before closing on the trust
+that seals a chronically-ill buyer (8).
 
-**App Preview video (optional, high ROI):** 15-30s screen recording of one live
-breathing HRV capture flowing into the graded results screen. This single flow
-is your entire pitch; nothing a competitor ships looks like it.
+Craft notes:
+- **Caption band on top, ~⅓ of the frame**, phone fills the rest. Never ship bare
+  screenshots; captioned sets consistently out-convert them.
+- **Dark theme for 1-4** (the ring, protocol and grade colors glow on black);
+  either theme after.
+- **Add a small sub-caption** under a few headlines to name the audience and catch
+  skimmers: *"For long-haul, POTS & dysautonomia recovery."* Screenshot text
+  isn't indexed — write it for humans, not the algorithm.
+- **Sizes:** 6.9" (iPhone 16 Pro Max) and 6.5" sets are required; Apple scales the
+  rest. Portrait only (the app is portrait-locked).
+
+**App Preview video (high ROI):** a 15-30s recording that walks the same arc —
+one live breathing capture → the graded score → a glance at the protocol streak →
+the climbing trend line. That 15 seconds is the whole story in motion, and almost
+no competitor has an equivalent.
 
 ---
 
@@ -234,7 +259,7 @@ first; you will not beat entrenched apps for "heart rate" on day one.
 
 **Tier 1: high-intent, winnable (spend your best fields here):**
 `pots tracker` · `dysautonomia` · `hrv tracker` · `long covid` · `post viral` ·
-`vagal tone` · `orthostatic` · `me cfs` · `pacing` · `rmssd`
+`vagal tone` · `orthostatic` · `me cfs` · `pacing` · `rmssd` · `symptom tracker`
 
 **Tier 2: strong support (keyword field + description):**
 `heart rate variability` · `sdnn` · `pnn50` · `chest strap hrv` · `resonance
@@ -268,6 +293,9 @@ HRV app (Elite HRV, HRV4Training, Welltory, Visible, Bearable) does *all* of it:
    niche, not a general wellness app bolting on a condition tag.
 5. **Full frequency-domain + PNS/SNS/coherence math** most consumer apps never
    expose, in language this audience already reads (they know what RMSSD is).
+6. **Your own protocol, not the app's.** You define the "clean day" — hydration,
+   sleep, meds, triggers — and the app holds you to it with streaks and a
+   consistency rate. HRV apps measure; almost none help you *stick to a plan*.
 
 ---
 
