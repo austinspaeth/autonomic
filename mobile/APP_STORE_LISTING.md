@@ -82,16 +82,19 @@ assumes the ⭐ Name + ⭐ Subtitle above (so it omits: autonomic, hrv, pots,
 tracker, dysautonomia, post-viral, care).
 
 ```
-long,covid,heart rate variability,vagal tone,rmssd,sdnn,me cfs,pacing,vagus,chest strap,orthostatic
+long,covid,heart rate variability,vagal tone,rmssd,sdnn,cfs,pacing,symptom,chest strap,orthostatic
 ```
 
-Char count: **99/100.** Notes:
+Char count: **98/100.** Notes:
 - `long` + `covid` as separate tokens let Apple recombine into "long covid"
   (and also match "covid recovery", "long haul") while keeping COVID out of the
   *visible* fields per the risk note above.
+- `symptom` + `Tracker` (from the app name) wins "symptom tracker" — one of the
+  highest-volume searches for this audience, and the app genuinely is one.
 - `heart rate variability` is spelled out **once**; combined with `hrv` in the
   name you cover both the acronym and the phrase.
-- `me cfs` matches "me/cfs", "cfs", and "chronic fatigue" adjacency.
+- `cfs` covers ME/CFS searches; dropped `vagus` (redundant with `vagal tone`) and
+  shortened `me cfs` to make room for `symptom`.
 - Dropped low-value fillers ("health", "wellness", "app", plurals) on purpose.
 
 **Alternate keyword set** if you'd rather chase the biofeedback / breathing
