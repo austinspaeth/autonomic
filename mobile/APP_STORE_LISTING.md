@@ -246,14 +246,40 @@ no competitor has an equivalent.
 - **Privacy "nutrition label":** select **"Data Not Collected."** The app is
   offline-first with no account and `NSPrivacyTracking: false`, so this is a
   genuine, rare, and *marketable* answer. Make sure the label matches.
-- **App Review notes (paste in App Store Connect):**
-  > Autonomic is an offline, on-device personal journal for autonomic-nervous-
-  > system recovery (HRV, symptoms, vitals). No account or login is required and
-  > no data leaves the device or is collected by us. It is not a medical device
-  > and makes no diagnostic or treatment claims; it does not report on COVID-19
-  > case/testing data. HRV is captured from a Bluetooth heart-rate strap or read
-  > from Apple Health. To test live HRV without hardware, use Menu > (demo/sample
-  > data) > [add the exact path or a demo toggle here before submitting].
+- **App Review notes (paste in App Store Connect).** The key risk: live HRV
+  capture is *hardware-only* (`hrv` / `breathHrv` are live-capture types — there
+  is no manual type-in), so a reviewer with no chest strap and no paired Apple
+  Watch cannot exercise the flagship feature. Head that off by stating the
+  hardware requirement and linking a demonstration video (your App Preview works).
+  **Replace `[VIDEO URL]` before submitting.**
+  > Autonomic is an offline, on-device journal for tracking autonomic-nervous-
+  > system recovery (HRV, symptoms, vitals, hydration, sleep, digestion).
+  >
+  > ACCESS: No account, login, or credentials are required — open the app and use
+  > it immediately. There is no backend; no data leaves the device and none is
+  > collected by us.
+  >
+  > TESTING WITHOUT HARDWARE: The app is fully functional with no accessory. You
+  > can create journal entries; log symptoms, meds, water and bowel movements;
+  > build a recovery "protocol" (Settings) and track its streak; and view Analysis
+  > and Milestones — all without hardware.
+  >
+  > The flagship "Live HRV" capture reads beat-to-beat intervals from an external
+  > Bluetooth heart-rate chest strap or an Apple Watch, so it cannot be exercised
+  > on a device without that accessory. Because you are unlikely to have one on
+  > hand, here is a demonstration video of the full live-capture flow: [VIDEO URL]
+  > (in-app path: Readings > + Add > Live HRV reading > source Bluetooth strap or
+  > Apple Watch).
+  >
+  > APPLE HEALTH (optional, user-initiated): with permission the app reads resting
+  > HR, HRV, sleep, blood pressure, blood oxygen and weight to prefill the journal,
+  > and can write back a captured HRV reading and a Mindfulness session. It is
+  > never used for advertising or tracking and stays off until the user connects
+  > it (Menu > Apple Health). Bluetooth is used solely to connect a heart-rate
+  > chest strap.
+  >
+  > Not a medical device; it does not diagnose or treat, and does not report on
+  > COVID-19 case/testing data.
 - **Support URL / Marketing URL:** point at `https://autonomic.care` (the
   landing site); its 50 SEO articles double as your App Store support content.
 - **Keyword localization tip:** you get a *fresh* 100-char keyword field per
