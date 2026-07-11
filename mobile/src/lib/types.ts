@@ -116,6 +116,9 @@ export interface AppState {
     sleepReframed?: boolean;
     /** ISO timestamp stamped when the first-run welcome flow completes. */
     onboarded?: string;
+    /** ISO timestamp stamped after the one-time onboarding "import your Apple
+     *  Health history" runs. Guards it from ever running again. */
+    healthHistoryImported?: string;
     /** Dev-only: day keys the mock seeder claimed (blank days it wrote sleep/food
      *  onto), so flipping SEED_MOCK_DATA off cleans them back out. See devSeed.ts. */
     mockSeeded?: string[];
