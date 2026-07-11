@@ -89,7 +89,7 @@ Char count: **98/100.** Notes:
 - `long` + `covid` as separate tokens let Apple recombine into "long covid"
   (and also match "covid recovery", "long haul") while keeping COVID out of the
   *visible* fields per the risk note above.
-- `symptom` + `Tracker` (from the app name) wins "symptom tracker" — one of the
+- `symptom` + `Tracker` (from the app name) wins "symptom tracker", one of the
   highest-volume searches for this audience, and the app genuinely is one.
 - `heart rate variability` is spelled out **once**; combined with `hrv` in the
   name you cover both the acronym and the phrase.
@@ -129,7 +129,7 @@ fold carry the whole first impression; they're written to earn the tap.
 ```
 See your nervous system actually recover.
 
-No chest strap? No problem. Rest a fingertip on your phone's camera and Autonomic reads a full 5-minute HRV lab from your pulse — or pair a Bluetooth strap or Apple Watch if you have one. Then it grades every reading against the same medical thresholds a specialist would use, so you finally know whether today was a good day or a warning sign.
+No chest strap? No problem. Rest a fingertip on your phone's camera and Autonomic reads a full 5-minute HRV lab from your pulse, or pair a Bluetooth strap or Apple Watch if you have one. Then it grades every reading against the same medical thresholds a specialist would use, so you finally know whether today was a good day or a warning sign.
 
 Built for the long haul: long-hauler and post-viral recovery, POTS and dysautonomia, ME/CFS, and anyone rebuilding their autonomic nervous system one day at a time.
 
@@ -254,13 +254,13 @@ no competitor has an equivalent.
   offline-first with no account and `NSPrivacyTracking: false`, so this is a
   genuine, rare, and *marketable* answer. Make sure the label matches.
 - **App Review notes (paste in App Store Connect).** Good news: the reviewer can
-  fully test live HRV with **no accessory** — the phone-camera (fingertip PPG)
+  fully test live HRV with **no accessory**: the phone-camera (fingertip PPG)
   source works on any iPhone, so there's no Guideline 2.1 hardware blocker. The
   notes below hand them the exact path.
   > Autonomic is an offline, on-device journal for tracking autonomic-nervous-
   > system recovery (HRV, symptoms, vitals, hydration, sleep, digestion).
   >
-  > ACCESS: No account, login, or credentials are required — open the app and use
+  > ACCESS: No account, login, or credentials are required. Open the app and use
   > it immediately. There is no backend; no data leaves the device and none is
   > collected by us.
   >
@@ -328,7 +328,7 @@ When you're deciding what to cut, keep whatever hits one of these. No mainstream
 HRV app (Elite HRV, HRV4Training, Welltory, Visible, Bearable) does *all* of it:
 
 1. **No equipment needed.** Measure clinical HRV with just the phone camera and a
-   fingertip — most rivals (Elite HRV, HRV4Training) require an $80+ chest strap
+   fingertip. Most rivals (Elite HRV, HRV4Training) require an $80+ chest strap
    to start. You also *support* straps and Apple Watch for accuracy, so you win
    both the curious newcomer and the serious tracker.
 2. **Clinical-threshold grading, not a black-box "readiness" number.** You show
