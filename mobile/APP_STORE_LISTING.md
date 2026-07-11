@@ -104,9 +104,17 @@ long,covid,heart rate variability,vagal tone,rmssd,sdnn,coherence,breathing,biof
 
 Put your freshest hook here; you can change it without resubmitting.
 
-> **Live 5-minute HRV from your chest strap or Apple Watch. Every metric graded
-> against medical thresholds, all on your phone. Built for long-haul & POTS
-> recovery.** (159 chars)
+> **Live 5-minute HRV graded like a clinician would, then build your own recovery
+> protocol and watch your numbers climb. 100% private, on your phone. For long-haul
+> & POTS.** (167 chars)
+
+Runner-up if you'd rather foreground the streak (168 chars): *Clinical-grade HRV,
+graded against real thresholds. Build your recovery protocol, keep the streak,
+see your numbers climb. Private and on-device. For long-haul & POTS.*
+
+Both stay "long-haul" in this visible field and keep "long covid" in the hidden
+keyword field only (see the compliance note in §0). This field is editable
+without re-review, so rotate it — seasonal hooks, a new metric, a review quote.
 
 ---
 
