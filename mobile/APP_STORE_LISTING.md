@@ -1,10 +1,11 @@
-# App Store listing & ASO kit — Autonomic
+# App Store listing & ASO kit: Autonomic
 
 Ready-to-paste copy and a screenshot plan for the App Store Connect listing.
 Targets: **long COVID**, **HRV capture**, **POTS/dysautonomia**, and the
 adjacent recovery audience (ME/CFS, post-viral, vagal tone). Written to match
 the landing brand voice ("See your nervous system recover") and the shipping
-feature set. Not a medical device — copy avoids diagnose/treat claims on purpose.
+feature set. Not a medical device, so the copy avoids diagnose/treat claims on
+purpose.
 
 ---
 
@@ -28,12 +29,12 @@ Three consequences that drive every choice below:
 2. **Apple tokenizes and recombines across fields.** If "long" appears in the
    subtitle and "covid" in the keyword field, you rank for "long covid" without
    spending the whole phrase twice. So **never repeat a word** across
-   Name/Subtitle/Keywords — each duplicate is wasted index space.
+   Name/Subtitle/Keywords; each duplicate is wasted index space.
 3. **The keyword field has no spaces after commas**, no plurals if the singular
    is present (Apple stems), no "app", and no category words ("health",
    "fitness"). Every wasted character is a lost keyword.
 
-⚠️ **COVID compliance risk — decide before you submit.** Apple Review Guideline
+⚠️ **COVID compliance risk: decide before you submit.** Apple Review Guideline
 5.1.1(ix) restricts apps using **COVID-19** themes to "recognized entities"
 (governments, hospitals, medical/credentialed institutions). A solo-dev wellness
 app naming COVID prominently can draw a rejection or a request for credentials.
@@ -41,7 +42,7 @@ Two mitigations, in order of safety:
    - **Safer:** lead with **"post-viral"**, **"long-haul"**, **"post-COVID
      recovery"** framing in visible fields, keep **"long covid"** only in the
      hidden keyword field, and make the medical disclaimer explicit in the
-     description + review notes. Apple has been far more permissive about *long
+     description and review notes. Apple has been far more permissive about *long
      COVID / post-viral recovery* tracking than about COVID-19 *testing/tracing*.
    - **If rejected:** reply in Resolution Center that the app is a personal
      symptom/HRV journal, stores everything on-device, makes no diagnostic
@@ -49,23 +50,23 @@ Two mitigations, in order of safety:
 
 ---
 
-## 1. App Name (30 chars) — pick one
+## 1. App Name (30 chars): pick one
 
-Brand + your single most valuable keyword. POTS and HRV are high-intent and
+Brand plus your single most valuable keyword. POTS and HRV are high-intent and
 lower-competition than "long covid"; put one of them here.
 
 | Option | Chars | Notes |
 | --- | --- | --- |
 | **`Autonomic: HRV & POTS Tracker`** ⭐ | 29 | Recommended. Brand + two strongest keywords. |
-| `Autonomic — HRV for Recovery` | 28 | Softer, broader; drops POTS to keywords. |
+| `Autonomic: HRV for Recovery` | 27 | Softer, broader; drops POTS to keywords. |
 | `Autonomic: HRV, POTS & Vagal` | 29 | Adds vagal-tone crowd; "Tracker" moves to subtitle. |
 
-> ⭐ = recommended. "Tracker" is worth keeping in the name — it's a real search
+> ⭐ = recommended. "Tracker" is worth keeping in the name: it's a real search
 > term ("pots tracker", "hrv tracker") and it tells a browsing user what this is.
 
-## 2. Subtitle (30 chars) — pick one
+## 2. Subtitle (30 chars): pick one
 
-Different words from the name. This is where dysautonomia + the post-viral
+Different words from the name. This is where dysautonomia and the post-viral
 audience live.
 
 | Option | Chars | Notes |
@@ -74,7 +75,7 @@ audience live.
 | `Post-viral HRV & symptom log` | 28 | Adds "symptom log" intent. |
 | `Track dysautonomia recovery` | 27 | Simplest; "recovery" reinforces the promise. |
 
-## 3. Keyword field (100 chars) — paste exactly
+## 3. Keyword field (100 chars): paste exactly
 
 Comma-separated, **no spaces**, no words already used in Name/Subtitle. This set
 assumes the ⭐ Name + ⭐ Subtitle above (so it omits: autonomic, hrv, pots,
@@ -85,12 +86,12 @@ long,covid,heart rate variability,vagal tone,rmssd,sdnn,me cfs,pacing,vagus,ches
 ```
 
 Char count: **99/100.** Notes:
-- `long` + `covid` as separate tokens → Apple recombines into "long covid"
-  (and also lets you match "covid recovery", "long haul") while keeping COVID
-  out of the *visible* fields per the risk note above.
+- `long` + `covid` as separate tokens let Apple recombine into "long covid"
+  (and also match "covid recovery", "long haul") while keeping COVID out of the
+  *visible* fields per the risk note above.
 - `heart rate variability` is spelled out **once**; combined with `hrv` in the
   name you cover both the acronym and the phrase.
-- `me cfs` → matches "me/cfs", "cfs", "chronic fatigue" adjacency.
+- `me cfs` matches "me/cfs", "cfs", and "chronic fatigue" adjacency.
 - Dropped low-value fillers ("health", "wellness", "app", plurals) on purpose.
 
 **Alternate keyword set** if you'd rather chase the biofeedback / breathing
@@ -99,25 +100,25 @@ crowd instead of ME/CFS:
 long,covid,heart rate variability,vagal tone,rmssd,sdnn,coherence,breathing,biofeedback,chest strap
 ```
 
-## 4. Promotional text (170 chars) — updatable anytime, no review
+## 4. Promotional text (170 chars): updatable anytime, no review
 
 Put your freshest hook here; you can change it without resubmitting.
 
-> **Live 5-minute HRV from your chest strap or Apple Watch — every metric graded
+> **Live 5-minute HRV from your chest strap or Apple Watch. Every metric graded
 > against medical thresholds, all on your phone. Built for long-haul & POTS
-> recovery.** (160 chars)
+> recovery.** (159 chars)
 
 ---
 
 ## 5. Description (the conversion copy)
 
 Apple shows only the **first ~3 lines** before "more". Those lines below the
-fold carry the whole first impression — they're written to earn the tap.
+fold carry the whole first impression; they're written to earn the tap.
 
 ```
 See your nervous system actually recover.
 
-Autonomic turns a heart-rate chest strap or your Apple Watch into a clinical-grade HRV lab in your pocket — then grades every reading against the same medical thresholds a specialist would use, so you finally know whether today was a good day or a warning sign.
+Autonomic turns a heart-rate chest strap or your Apple Watch into a clinical-grade HRV lab in your pocket, then grades every reading against the same medical thresholds a specialist would use, so you finally know whether today was a good day or a warning sign.
 
 Built for the long haul: long-hauler and post-viral recovery, POTS and dysautonomia, ME/CFS, and anyone rebuilding their autonomic nervous system one day at a time.
 
@@ -127,19 +128,19 @@ LIVE 5-MINUTE HRV, DONE RIGHT
 • Capture beat-to-beat RR intervals live from a Bluetooth chest strap or Apple Watch
 • A full-screen guided session with a 5:00 ring, live heart rate, and a paced breathing visualizer (4/6 resonance breathing and more)
 • Every metric computed on-device: SDNN, RMSSD, pNN50, mean RR, PNS & SNS index, Baevsky stress index, VLF/LF/HF power, LF/HF, coherence, and more
-• Honest signal quality — artifacts are flagged and corrected, and a noisy reading refuses to fake a score instead of lying to you
+• Honest signal quality: artifacts are flagged and corrected, and a noisy reading refuses to fake a score instead of lying to you
 
 ━━━━━━━━━━━━━━━━━━━━
 GRADED LIKE A CLINICIAN WOULD
 ━━━━━━━━━━━━━━━━━━━━
-• Every number is scored great / good / ok / warning / crash against real thresholds — no mystery "readiness" black box
+• Every number is scored great / good / ok / warning / crash against real thresholds, with no mystery "readiness" black box
 • One daily Autonomic Score that rolls up HRV, sleep, symptoms, blood pressure and more
 • Log readings, meds, symptoms, activities, meals, triggers, hydration, digestion and orthostatic stand tests
 
 ━━━━━━━━━━━━━━━━━━━━
 FIND WHAT HELPS OR HURTS
 ━━━━━━━━━━━━━━━━━━━━
-• Analysis across days, weeks and months — spot the salt, sleep, pacing or medication changes that move your numbers
+• Analysis across days, weeks and months: spot the salt, sleep, pacing or medication changes that move your numbers
 • On-device correlations surface your real triggers over time
 • Milestones and streaks so recovery actually adds up
 • Optional: bring your own AI for a deeper written read of your data
@@ -147,7 +148,7 @@ FIND WHAT HELPS OR HURTS
 ━━━━━━━━━━━━━━━━━━━━
 YOUR DATA NEVER LEAVES YOUR PHONE
 ━━━━━━━━━━━━━━━━━━━━
-• 100% offline-first — no account, no cloud, no tracking, no ads
+• 100% offline-first: no account, no cloud, no tracking, no ads
 • Everything is stored on-device; you own it and can export it anytime
 • Reads & writes Apple Health (HRV, resting HR, sleep, blood pressure, SpO₂, weight) only when you ask it to
 
@@ -157,20 +158,20 @@ Autonomic is a personal journal and education tool, not a medical device. It doe
 ```
 
 Why this works: benefit-first opening line, the differentiators the competition
-can't match (on-device clinical grading + honest artifact rejection + true
+can't match (on-device clinical grading, honest artifact rejection, and true
 privacy), plausible medical-adjacent authority *without* a diagnostic claim, and
 the disclaimer up top of the legal zone where Apple review reads it.
 
 ---
 
-## 6. Screenshots — the real conversion driver
+## 6. Screenshots: the real conversion driver
 
-Most installs are decided on the **first 2–3 screenshots** in the search results
+Most installs are decided on the **first 2-3 screenshots** in the search results
 carousel, before anyone reads a word of description. Rules:
 - **Caption every screenshot** with a big bold benefit line above the device
-  frame — don't ship bare app screens. ~60–70% of the frame is the phone, top
+  frame; don't ship bare app screens. ~60-70% of the frame is the phone, top
   third is the caption band.
-- Use your dark theme for screens 1–2 (the glowing HRV visualizer pops on dark)
+- Use your dark theme for screens 1-2 (the glowing HRV visualizer pops on dark)
   and prove the "graded against thresholds" story visually.
 - 6.9" (iPhone 16 Pro Max) and 6.5" sets are required; Apple scales down.
   Portrait only (the app is portrait-locked).
@@ -179,10 +180,10 @@ Recommended order (first three are the ones that matter most):
 
 | # | Screen to show | Caption (bold, benefit-led) |
 | --- | --- | --- |
-| **1** | Live HRV session — full-screen glowing breathing visualizer + 5:00 ring + live HR | **"A 5-minute HRV lab in your pocket"** |
-| **2** | HRV results screen — hero Autonomic Score + graded metric rows + LF/HF power bar | **"Every number graded like a clinician would"** |
-| **3** | Journal day view — readings, symptoms, meds, the daily score | **"Track everything that moves your recovery"** |
-| **4** | Analysis / correlations — trend charts across weeks with grade-zone bands | **"See what's helping — or hurting — over time"** |
+| **1** | Live HRV session: full-screen glowing breathing visualizer + 5:00 ring + live HR | **"A 5-minute HRV lab in your pocket"** |
+| **2** | HRV results screen: hero Autonomic Score + graded metric rows + LF/HF power bar | **"Every number graded like a clinician would"** |
+| **3** | Journal day view: readings, symptoms, meds, the daily score | **"Track everything that moves your recovery"** |
+| **4** | Analysis / correlations: trend charts across weeks with grade-zone bands | **"See what's helping or hurting over time"** |
 | **5** | Frequency-domain / tachogram detail (VLF/LF/HF, coherence) | **"Real HRV science: SDNN, RMSSD, PNS/SNS, coherence"** |
 | **6** | Apple Health + chest-strap pairing screen | **"Works with your chest strap & Apple Watch"** |
 | **7** | Privacy / offline screen (or a plain statement frame) | **"100% on your phone. No cloud. No account."** |
@@ -191,9 +192,9 @@ Recommended order (first three are the ones that matter most):
 Micro-copy for the sub-caption line (smaller, under the headline) can name the
 audience explicitly to catch skimmers: *"For long-haul, POTS & dysautonomia
 recovery."* Screenshot text is **not** indexed for search, so this is purely for
-humans — say what converts, not what ranks.
+humans: say what converts, not what ranks.
 
-**App Preview video (optional, high ROI):** 15–30s screen recording of one live
+**App Preview video (optional, high ROI):** 15-30s screen recording of one live
 breathing HRV capture flowing into the graded results screen. This single flow
 is your entire pitch; nothing a competitor ships looks like it.
 
@@ -207,7 +208,7 @@ is your entire pitch; nothing a competitor ships looks like it.
 - **Age rating:** 4+ (no objectionable content). Note "Infrequent/Mild Medical
   Information" if the questionnaire asks.
 - **Privacy "nutrition label":** select **"Data Not Collected."** The app is
-  offline-first with no account and `NSPrivacyTracking: false` — this is a
+  offline-first with no account and `NSPrivacyTracking: false`, so this is a
   genuine, rare, and *marketable* answer. Make sure the label matches.
 - **App Review notes (paste in App Store Connect):**
   > Autonomic is an offline, on-device personal journal for autonomic-nervous-
@@ -215,56 +216,56 @@ is your entire pitch; nothing a competitor ships looks like it.
   > no data leaves the device or is collected by us. It is not a medical device
   > and makes no diagnostic or treatment claims; it does not report on COVID-19
   > case/testing data. HRV is captured from a Bluetooth heart-rate strap or read
-  > from Apple Health. To test live HRV without hardware, use Menu → (demo/sample
-  > data) — [add the exact path or a demo toggle here before submitting].
+  > from Apple Health. To test live HRV without hardware, use Menu > (demo/sample
+  > data) > [add the exact path or a demo toggle here before submitting].
 - **Support URL / Marketing URL:** point at `https://autonomic.care` (the
-  landing site) — its 50 SEO articles double as your App Store support content.
+  landing site); its 50 SEO articles double as your App Store support content.
 - **Keyword localization tip:** you get a *fresh* 100-char keyword field per
   localization. Adding **English (UK)** or **English (AU)** as an extra
   localization effectively **doubles your keyword budget** for the same English
-  audience — put the ME/CFS set in one and the biofeedback set in the other.
+  audience: put the ME/CFS set in one and the biofeedback set in the other.
 
 ---
 
-## 8. Keyword research — grouped by intent & competition
+## 8. Keyword research: grouped by intent & competition
 
 Ranked roughly by (relevance × searchability ÷ competition). Chase the mid-tail
 first; you will not beat entrenched apps for "heart rate" on day one.
 
-**Tier 1 — high-intent, winnable (spend your best fields here):**
+**Tier 1: high-intent, winnable (spend your best fields here):**
 `pots tracker` · `dysautonomia` · `hrv tracker` · `long covid` · `post viral` ·
 `vagal tone` · `orthostatic` · `me cfs` · `pacing` · `rmssd`
 
-**Tier 2 — strong support (keyword field + description):**
+**Tier 2: strong support (keyword field + description):**
 `heart rate variability` · `sdnn` · `pnn50` · `chest strap hrv` · `resonance
 breathing` · `coherence` · `vagus nerve` · `resting heart rate` · `stand test` ·
 `symptom tracker` · `post exertional malaise` · `pem`
 
-**Tier 3 — broad / aspirational (don't overspend; high competition):**
+**Tier 3: broad / aspirational (don't overspend; high competition):**
 `hrv` · `heart rate` · `breathing` · `recovery` · `wellness` · `biofeedback` ·
 `nervous system` · `stress`
 
 **Long-tail to seed in the description + landing content (free organic reach):**
 "is it long covid or POTS", "how to measure HRV at home", "chest strap HRV app",
-"HRV biofeedback for long covid", "POTS symptom tracker offline" — you already
+"HRV biofeedback for long covid", "POTS symptom tracker offline". You already
 have articles for most of these in `landing/articles/`; link the App Store
 support URL to them so the funnel closes.
 
 ---
 
-## 9. Your unfair advantages — lead with these everywhere
+## 9. Your unfair advantages: lead with these everywhere
 
 When you're deciding what to cut, keep whatever hits one of these. No mainstream
 HRV app (Elite HRV, HRV4Training, Welltory, Visible, Bearable) does *all* of it:
 
 1. **Clinical-threshold grading, not a black-box "readiness" number.** You show
    the actual bands. That's trust.
-2. **Honest artifact rejection** — refuses to fake a score on a noisy reading.
+2. **Honest artifact rejection:** refuses to fake a score on a noisy reading.
    Nobody advertises this because nobody else does it.
-3. **True on-device privacy** — no account, no cloud, "Data Not Collected." For
+3. **True on-device privacy:** no account, no cloud, "Data Not Collected." For
    a chronically-ill audience burned by data-hungry apps, this *is* the pitch.
 4. **Built by someone who needed it**, for the exact long-haul/POTS/dysautonomia
-   niche — not a general wellness app bolting on a condition tag.
+   niche, not a general wellness app bolting on a condition tag.
 5. **Full frequency-domain + PNS/SNS/coherence math** most consumer apps never
    expose, in language this audience already reads (they know what RMSSD is).
 
