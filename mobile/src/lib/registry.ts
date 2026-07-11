@@ -34,7 +34,7 @@ export const READING_TYPES: Record<string, TypeDef> = {
     ],
   },
   breathHrv: {
-    label: 'Breathing HRV',
+    label: 'Structured HRV',
     icon: 'wind',
     fields: [
       { type: 'select', key: 'style', label: 'Breathing style', options: ['4/4', '4/5', '4/6', '5/5'] },

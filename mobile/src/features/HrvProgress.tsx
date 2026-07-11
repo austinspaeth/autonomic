@@ -3,7 +3,7 @@
  * comp: flat sections against the screen background separated by hairline
  * rules (no cards), each with an uppercase title + "?" help dot, a big value
  * line ("37 avg"), a one-line description, and — for metrics — a text-link
- * kind toggle (Unstructured / Breathing / Both) plus a "Show zones" link.
+ * kind toggle (Unstructured / Structured / Both) plus a "Show zones" link.
  * "Both" overlays the two kinds in blue/green comparison colours; a single
  * kind draws one trace tinted by the grade-zone gradient. Power is a stacked
  * VLF/LF/HF bar per bucket. The big value shows the range average by default
@@ -211,7 +211,7 @@ export function HrvProgress({ days, mode, ctx, filt }: { days: DaysMap; mode: Mo
 /** Which HRV kind a metric section is showing. */
 type Kind = 'hrv' | 'breath' | 'both';
 const KIND_OPTS: { val: Kind; label: string }[] = [
-  { val: 'breath', label: 'Breathing' }, { val: 'hrv', label: 'Unstructured' }, { val: 'both', label: 'Both' },
+  { val: 'breath', label: 'Structured' }, { val: 'hrv', label: 'Unstructured' }, { val: 'both', label: 'Both' },
 ];
 
 /** Text-link kind toggle (per the design comp) — active option in bright white
@@ -294,7 +294,7 @@ function MetricSection({ m, structured, unstructured, buckets }: {
       { values: unstructured, color: UNSTRUCT, label: 'Unstructured' },
     ]
     : kind === 'breath'
-      ? [{ values: structured, color: STRUCT, label: 'Breathing' }]
+      ? [{ values: structured, color: STRUCT, label: 'Structured' }]
       : [{ values: unstructured, color: UNSTRUCT, label: 'Unstructured' }];
   const empty = !series.some((s) => s.values.some((v) => v != null));
 
@@ -324,7 +324,7 @@ function MetricSection({ m, structured, unstructured, buckets }: {
       </View>
       {empty ? (
         <Text style={{ color: p.textDim, fontSize: 13 }}>
-          No {kind === 'breath' ? 'breathing' : 'unstructured'} readings in this range.
+          No {kind === 'breath' ? 'structured' : 'unstructured'} readings in this range.
         </Text>
       ) : (
         <>

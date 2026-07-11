@@ -1,6 +1,6 @@
 /**
  * HRV setup sheet — the entry point for a live 5-minute capture. Choose kind
- * (Unstructured vs Breathing), a breathing pattern (4/4, 4/5, 4/6 recommended,
+ * (Unstructured vs Structured), a breathing pattern (4/4, 4/5, 4/6 recommended,
  * 5/5), and a signal source (Bluetooth strap or Apple Watch), then Start.
  */
 import React, { useState } from 'react';
@@ -27,7 +27,7 @@ const HELP = {
   main:
     'A 5 minute read of how your nervous system is balancing stress and recovery. Same time daily shows your trend.',
   kind:
-    'Unstructured is a 2.5 minute reading that captures your current baseline while you rest and breathe naturally. Breathing guides you through a slow, paced pattern for 5 minutes. This trains your baroreflex and helps build stronger autonomic responses.',
+    'Unstructured is a 2.5 minute reading that captures your current baseline while you rest and breathe naturally. Structured guides you through a slow, paced breathing pattern for 5 minutes. This trains your baroreflex and helps build stronger autonomic responses.',
   breath:
     'The two numbers are seconds to inhale then exhale. For most people 4 / 6 matches their resonant frequency, the breathing rate where the baroreflex (your body’s blood pressure regulator) swings in sync with each breath and HRV peaks. That makes it the most effective pattern to train.',
   period:
@@ -87,8 +87,8 @@ export function HrvSetup({ controls }: { controls: SheetControls }) {
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 6 }}>Capture an HRV reading</Text>
       <Text style={{ color: p.textDim, fontSize: 14, lineHeight: 20, marginBottom: 18 }}>{HELP.main}</Text>
 
-      <Label text="Reading type" help={HELP.kind} />
-      <Segmented options={[{ val: 'unstructured', label: 'Unstructured' }, { val: 'breath', label: 'Breathing' }]} value={kind} onChange={setKind} />
+      <Label text="Breathing type" help={HELP.kind} />
+      <Segmented options={[{ val: 'unstructured', label: 'Unstructured' }, { val: 'breath', label: 'Structured' }]} value={kind} onChange={setKind} />
 
       <Label text="When is this reading?" help={HELP.period} top />
       <Segmented options={[{ val: 'Morning', label: 'Morning' }, { val: 'Evening', label: 'Evening' }, { val: 'Other', label: 'Other' }]} value={period} onChange={setPeriod} />
