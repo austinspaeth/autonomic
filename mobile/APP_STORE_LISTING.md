@@ -129,14 +129,14 @@ fold carry the whole first impression; they're written to earn the tap.
 ```
 See your nervous system actually recover.
 
-Autonomic turns a heart-rate chest strap or your Apple Watch into a clinical-grade HRV lab in your pocket, then grades every reading against the same medical thresholds a specialist would use, so you finally know whether today was a good day or a warning sign.
+No chest strap? No problem. Rest a fingertip on your phone's camera and Autonomic reads a full 5-minute HRV lab from your pulse — or pair a Bluetooth strap or Apple Watch if you have one. Then it grades every reading against the same medical thresholds a specialist would use, so you finally know whether today was a good day or a warning sign.
 
 Built for the long haul: long-hauler and post-viral recovery, POTS and dysautonomia, ME/CFS, and anyone rebuilding their autonomic nervous system one day at a time.
 
 ━━━━━━━━━━━━━━━━━━━━
 LIVE 5-MINUTE HRV, DONE RIGHT
 ━━━━━━━━━━━━━━━━━━━━
-• Capture beat-to-beat RR intervals live from a Bluetooth chest strap or Apple Watch
+• Measure HRV three ways: your phone camera and fingertip (no equipment needed), a Bluetooth chest strap, or your Apple Watch
 • A full-screen guided session with a 5:00 ring, live heart rate, and a paced breathing visualizer (4/6 resonance breathing and more)
 • Every metric computed on-device: SDNN, RMSSD, pNN50, mean RR, PNS & SNS index, Baevsky stress index, VLF/LF/HF power, LF/HF, coherence, and more
 • Honest signal quality: artifacts are flagged and corrected, and a noisy reading refuses to fake a score instead of lying to you
@@ -193,30 +193,37 @@ the disclaimer up top of the legal zone where Apple review reads it.
 
 Most installs are decided on the **first 2-3 screenshots** in the search results
 carousel, before anyone reads a word. So the set does double duty: the first
-three each stand alone as a reason to install, **and** all eight read as one
+three each stand alone as a reason to install, **and** together they read as one
 narrative: the arc from *"I'm lost in my symptoms"* to *"I can see myself
 getting better."* People buy the ending. Show them reaching it.
 
-The eight beats:
+The nine beats (App Store allows up to 10 screenshots):
 
 | # | Story beat | Screen to show | Caption (bold, benefit-led) |
 | --- | --- | --- | --- |
 | **1** | **The promise** | Live HRV session: full-screen glowing breathing ring + 5:00 timer + live HR | **"See your nervous system recover"** |
-| **2** | **Measure** | HRV results: hero Autonomic Score + graded metric rows + LF/HF power bar | **"A clinical HRV lab in your pocket"** |
-| **3** | **Understand** | Same results scrolled to the day's outlook + grade bands | **"Every reading graded, and what today is good for"** |
-| **4** | **Make a plan** | Protocol editor: hydration target, sleep hours, meds to take, triggers to avoid | **"Build your own recovery protocol"** |
-| **5** | **Live it** | Journal day: water ring, meds, symptoms, a logged bowel movement, triggers | **"Track it all: water, meds, symptoms, even digestion"** |
-| **6** | **Stay consistent** | Streak screen: current streak, longest run, 30-day clean rate, tier | **"Clean days become a streak"** |
-| **7** | **The payoff** | Analysis: RMSSD/HRV trend climbing across weeks over grade-zone bands | **"And watch your numbers climb"** |
-| **8** | **Trust** | Privacy / offline statement frame | **"100% on your phone. No cloud, no account."** |
+| **2** | **No equipment** | Camera-PPG capture: fingertip over the rear camera, flash on, signal locked | **"No chest strap? Measure HRV with your phone"** |
+| **3** | **Measure** | HRV results: hero Autonomic Score + graded metric rows + LF/HF power bar | **"A clinical HRV lab in your pocket"** |
+| **4** | **Understand** | Results scrolled to the day's outlook + grade bands | **"Every reading graded, and what today is good for"** |
+| **5** | **Make a plan** | Protocol editor: hydration target, sleep hours, meds to take, triggers to avoid | **"Build your own recovery protocol"** |
+| **6** | **Live it** | Journal day: water ring, meds, symptoms, a logged bowel movement, triggers | **"Track it all: water, meds, symptoms, even digestion"** |
+| **7** | **Stay consistent** | Streak screen: current streak, longest run, 30-day clean rate, tier | **"Clean days become a streak"** |
+| **8** | **The payoff** | Analysis: RMSSD/HRV trend climbing across weeks over grade-zone bands | **"And watch your numbers climb"** |
+| **9** | **Trust** | Privacy / offline statement frame | **"100% on your phone. No cloud, no account."** |
+
+The **No equipment** frame (2) is new and earns its front-row spot: it kills the
+biggest objection this audience has, *"I don't own a chest strap."* If you'd
+rather ship 8, merge **Measure** + **Understand** into one results frame, but
+keep frame 2.
 
 Why this order wins: it opens on the single most *distinctive* thing you own
 (the glowing live-HRV screen, the one nothing else in the category looks like it),
-proves the clinical credibility (2-3), reveals the feature no competitor has
-(your protocol, 4), shows the daily habit is effortless (5), turns discipline
-into a visible win (6), then delivers the emotional payoff every long-hauler is
-searching for, **numbers going the right way** (7), before closing on the trust
-that seals a chronically-ill buyer (8).
+removes the #1 objection with no-equipment camera capture (2), proves the clinical
+credibility (3-4), reveals the feature no competitor has (your protocol, 5), shows
+the daily habit is effortless (6), turns discipline into a visible win (7), then
+delivers the emotional payoff every long-hauler is searching for, **numbers going
+the right way** (8), before closing on the trust that seals a chronically-ill
+buyer (9).
 
 Craft notes:
 - **Caption band on top, ~⅓ of the frame**, phone fills the rest. Never ship bare
@@ -246,12 +253,10 @@ no competitor has an equivalent.
 - **Privacy "nutrition label":** select **"Data Not Collected."** The app is
   offline-first with no account and `NSPrivacyTracking: false`, so this is a
   genuine, rare, and *marketable* answer. Make sure the label matches.
-- **App Review notes (paste in App Store Connect).** The key risk: live HRV
-  capture is *hardware-only* (`hrv` / `breathHrv` are live-capture types — there
-  is no manual type-in), so a reviewer with no chest strap and no paired Apple
-  Watch cannot exercise the flagship feature. Head that off by stating the
-  hardware requirement and linking a demonstration video (your App Preview works).
-  **Replace `[VIDEO URL]` before submitting.**
+- **App Review notes (paste in App Store Connect).** Good news: the reviewer can
+  fully test live HRV with **no accessory** — the phone-camera (fingertip PPG)
+  source works on any iPhone, so there's no Guideline 2.1 hardware blocker. The
+  notes below hand them the exact path.
   > Autonomic is an offline, on-device journal for tracking autonomic-nervous-
   > system recovery (HRV, symptoms, vitals, hydration, sleep, digestion).
   >
@@ -259,24 +264,26 @@ no competitor has an equivalent.
   > it immediately. There is no backend; no data leaves the device and none is
   > collected by us.
   >
-  > TESTING WITHOUT HARDWARE: The app is fully functional with no accessory. You
-  > can create journal entries; log symptoms, meds, water and bowel movements;
-  > build a recovery "protocol" (Settings) and track its streak; and view Analysis
-  > and Milestones — all without hardware.
+  > TEST LIVE HRV WITH NO ACCESSORY: The flagship HRV capture works using only the
+  > iPhone. Go to Readings > + Add > Live HRV reading, pick a type, set Signal
+  > source to "Phone camera," tap Start, and rest a fingertip over the rear camera
+  > (the flash turns on). HRV is computed on-device and the graded results appear.
+  > (Two other sources, a Bluetooth chest strap and Apple Watch ECG, are optional
+  > and require that hardware.)
   >
-  > The flagship "Live HRV" capture reads beat-to-beat intervals from an external
-  > Bluetooth heart-rate chest strap or an Apple Watch, so it cannot be exercised
-  > on a device without that accessory. Because you are unlikely to have one on
-  > hand, here is a demonstration video of the full live-capture flow: [VIDEO URL]
-  > (in-app path: Readings > + Add > Live HRV reading > source Bluetooth strap or
-  > Apple Watch).
+  > Everything else is testable with no hardware too: journal entries; symptoms,
+  > meds, water and bowel movements; a recovery "protocol" (Settings) and its
+  > streak; Analysis and Milestones.
   >
   > APPLE HEALTH (optional, user-initiated): with permission the app reads resting
   > HR, HRV, sleep, blood pressure, blood oxygen and weight to prefill the journal,
-  > and can write back a captured HRV reading and a Mindfulness session. It is
-  > never used for advertising or tracking and stays off until the user connects
-  > it (Menu > Apple Health). Bluetooth is used solely to connect a heart-rate
-  > chest strap.
+  > and can write back a captured HRV reading and a Mindfulness session. Never used
+  > for advertising or tracking; off until the user connects it (Menu > Apple
+  > Health).
+  >
+  > PERMISSIONS: Camera and flash are used only to read fingertip pulse (PPG) for
+  > HRV. The microphone permission is required by the camera library, but no audio
+  > is ever recorded. Bluetooth is used only to connect a heart-rate chest strap.
   >
   > Not a medical device; it does not diagnose or treat, and does not report on
   > COVID-19 case/testing data.
@@ -320,17 +327,21 @@ support URL to them so the funnel closes.
 When you're deciding what to cut, keep whatever hits one of these. No mainstream
 HRV app (Elite HRV, HRV4Training, Welltory, Visible, Bearable) does *all* of it:
 
-1. **Clinical-threshold grading, not a black-box "readiness" number.** You show
+1. **No equipment needed.** Measure clinical HRV with just the phone camera and a
+   fingertip — most rivals (Elite HRV, HRV4Training) require an $80+ chest strap
+   to start. You also *support* straps and Apple Watch for accuracy, so you win
+   both the curious newcomer and the serious tracker.
+2. **Clinical-threshold grading, not a black-box "readiness" number.** You show
    the actual bands. That's trust.
-2. **Honest artifact rejection:** refuses to fake a score on a noisy reading.
+3. **Honest artifact rejection:** refuses to fake a score on a noisy reading.
    Nobody advertises this because nobody else does it.
-3. **True on-device privacy:** no account, no cloud, "Data Not Collected." For
+4. **True on-device privacy:** no account, no cloud, "Data Not Collected." For
    a chronically-ill audience burned by data-hungry apps, this *is* the pitch.
-4. **Built by someone who needed it**, for the exact long-haul/POTS/dysautonomia
+5. **Built by someone who needed it**, for the exact long-haul/POTS/dysautonomia
    niche, not a general wellness app bolting on a condition tag.
-5. **Full frequency-domain + PNS/SNS/coherence math** most consumer apps never
+6. **Full frequency-domain + PNS/SNS/coherence math** most consumer apps never
    expose, in language this audience already reads (they know what RMSSD is).
-6. **Your own protocol, not the app's.** You define the "clean day" (hydration,
+7. **Your own protocol, not the app's.** You define the "clean day" (hydration,
    sleep, meds, triggers) and the app holds you to it with streaks and a
    consistency rate. HRV apps measure; almost none help you *stick to a plan*.
 
