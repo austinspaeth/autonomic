@@ -5,11 +5,15 @@
 export const ACCENT = '#e03127';
 export const ACCENT_SOFT = 'rgba(224,49,39,0.12)';
 
+/** Hydration — water amounts/progress render in blue, not the red accent. */
+export const WATER_BLUE = '#4a9de0';
+export const WATER_BLUE_SOFT = 'rgba(74,157,224,0.14)';
+
 /** Grade / score color scale — identical to SCORE_COLORS in the scoring engine.
  *  Unified with the day-score bands: Excellent → Crash (see SCORE_COLORS). */
 export const GRADE_COLORS = {
-  great: '#16a34a',       // Excellent
-  good: '#22c55e',        // Good
+  great: '#2ee06a',       // Excellent (bright luminous green — the peak tier pops)
+  good: '#16a34a',        // Good (deep solid green)
   ok: '#eab308',          // Moderate
   bad: '#f97316',         // Compromised
   crash: '#ef4444',       // Bad

@@ -4,19 +4,20 @@
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, LayoutAnimation, Platform, Pressable, Text, TextInput, UIManager, View } from 'react-native';
-import { AddDashButton, Card, Pill, Row, RowValue, SectionHeader, Segmented } from '../components/ui';
+import { AddDashButton, Card, Pill, ProgressBar, Row, RowValue, SectionHeader, Segmented } from '../components/ui';
 import { Icon } from '../components/Icon';
 import { TimeField } from '../components/Field';
 import { useSheets, SheetFooter, type SheetControls } from '../components/Sheet';
 import { useToast } from '../components/Toast';
-import { radius, usePalette } from '../theme';
+import { WATER_BLUE, radius, usePalette } from '../theme';
 import {
   READING_TYPES,
   bmLabel, readingLabel, readingRowValue, summarizeFields,
 } from '../lib/registry';
 import { typesFor } from '../lib/typeCatalog';
 import { rowScoreCategory, SCORE_COLORS, GRADE_LABEL } from '../lib/scoring';
-import { sleepGrade, sleepHours } from '../lib/scoring/day';
+import { sleepGrade, sleepHours, waterGoalL, type DaysMap } from '../lib/scoring/day';
+import type { SleepStages } from '../lib/types';
 import { ensureDay, getState, save, useAppState } from '../store/store';
 import { fmtTime12, periodOf } from '../lib/dates';
 import { health } from '../lib/health';
@@ -27,13 +28,6 @@ import { useDrawers } from './drawers';
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
-const hexA = (hex: string, a: number) => {
-  const m = /^#?([0-9a-f]{6})$/i.exec(hex);
-  if (!m) return hex;
-  const n = parseInt(m[1], 16);
-  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
-};
-
 export function JournalSections({ dk }: { dk: string }) {
   const p = usePalette();
   const state = useAppState();
@@ -42,7 +36,6 @@ export function JournalSections({ dk }: { dk: string }) {
   const forms = useEntryForms(dk);
   const drawers = useDrawers(dk);
   const day = d || { readings: [], activities: [], meds: [], symptoms: [], sleep: { bed: '', wake: '' }, food: { water: 0, meals: [], triggers: {} }, digestion: { movements: [] } };
-
   return (
     <>
       <SleepSection dk={dk} />
@@ -84,12 +77,7 @@ export function JournalSections({ dk }: { dk: string }) {
       {/* Triggers */}
       <TriggerSection dk={dk} onAdd={drawers.triggers} />
       {/* Hydration */}
-      <Card>
-        <SectionHeader title="Hydration" />
-        <View style={{ paddingHorizontal: 14, paddingBottom: 12 }}>
-          <Row icon="cup" title="Water" noDivider right={<Text style={{ color: p.text, fontWeight: '600' }}>{`${+(day.food?.water || 0)} L`}</Text>} onPress={drawers.water} />
-        </View>
-      </Card>
+      <HydrationSection water={+(day.food?.water || 0)} onPress={drawers.water} />
       {/* Digestion */}
       <Card>
         <SectionHeader title="Bowel Movements" />
@@ -103,6 +91,37 @@ export function JournalSections({ dk }: { dk: string }) {
       {/* Notes */}
       <NotesSection dk={dk} />
     </>
+  );
+}
+
+/** Water logged vs the daily goal (clean-day protocol amount, else 2.5 L).
+ *  Tapping anywhere opens the water drawer. */
+function HydrationSection({ water, onPress }: { water: number; onPress: () => void }) {
+  const p = usePalette();
+  const state = useAppState();
+  const goal = waterGoalL(state.settings.protocol);
+  const pct = Math.min(1, water / goal);
+  return (
+    <Card>
+      <SectionHeader title="Hydration" />
+      <Pressable onPress={onPress} style={({ pressed }) => [{ paddingHorizontal: 14, paddingBottom: 14 }, pressed && { opacity: 0.6 }]}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <Icon name="cup" size={21} color={p.textDim} />
+          {/* Sized like the other section rows (see Row / med line items): 16pt
+              regular title, 14pt regular value — no bold, no oversized number. */}
+          <Text style={{ color: p.text, fontSize: 16, flex: 1 }}>Water</Text>
+          <Text style={{ fontSize: 14, color: WATER_BLUE, fontVariant: ['tabular-nums'] }}>
+            {water}
+            <Text style={{ color: p.text }}>{` Liter${water === 1 ? '' : 's'}`}</Text>
+          </Text>
+        </View>
+        <ProgressBar pct={pct} color={WATER_BLUE} track={p.surface2} style={{ marginTop: 12 }} />
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
+          <Text style={{ color: p.textDim, fontSize: 13 }}>{`${water} L logged`}</Text>
+          <Text style={{ color: p.textDim, fontSize: 13 }}>{`Goal ${goal} L`}</Text>
+        </View>
+      </Pressable>
+    </Card>
   );
 }
 
@@ -233,31 +252,114 @@ function SleepSection({ dk }: { dk: string }) {
   );
 }
 
-/** Graded summary of a night with data: colored fill, grade chip, hours + HR range. */
-function SleepGrade({ dk, sleep }: { dk: string; sleep: { bed: string; wake: string; quality?: string; hrLow?: string | number; hrHigh?: string | number } }) {
+/** Sleep-stage colors (Apple-Health-like: deep violet → REM light blue → core
+ *  blue, awake neutral). Validated for CVD separation + contrast on the dark
+ *  surface; identity is also carried by the labeled legend, never color alone. */
+const STAGE_COLORS = { deep: '#8b5cf6', rem: '#3d93ee', core: '#2f66d0', awake: '#71717a' } as const;
+const STAGE_ORDER = ['deep', 'rem', 'core', 'awake'] as const;
+const STAGE_LABEL = { deep: 'Deep', rem: 'REM', core: 'Core', awake: 'Awake' } as const;
+
+const fmtMin = (min: number) => {
+  const h = Math.floor(min / 60), m = min % 60;
+  return h ? (m ? `${h}h ${m}m` : `${h}h`) : `${m}m`;
+};
+
+/** Typical overnight low HR: median of prior nights' hrLow (needs 3+ nights). */
+function typicalHrLow(days: DaysMap, dk: string): number | null {
+  const vals = Object.keys(days)
+    .filter((k) => k < dk)
+    .sort()
+    .slice(-30)
+    .map((k) => parseFloat(String(days[k]?.sleep?.hrLow ?? '')))
+    .filter((v) => Number.isFinite(v) && v > 0);
+  if (vals.length < 3) return null;
+  const s = [...vals].sort((a, b) => a - b);
+  return s[Math.floor(s.length / 2)];
+}
+
+/** Why the night graded the way it did — shown under the divider when there's
+ *  something worth flagging (short/interrupted night, elevated overnight HR). */
+function sleepNote(days: DaysMap, dk: string, hrs: number | null, interrupted: boolean, hrLow: number | null): string | null {
+  const reasons: string[] = [];
+  if (hrs != null && hrs < 7) reasons.push(hrs < 5 ? 'very short duration' : 'short duration');
+  if (interrupted) reasons.push('interrupted sleep');
+  const typical = typicalHrLow(days, dk);
+  if (hrLow != null && typical != null && hrLow >= typical + 5) {
+    reasons.push(`elevated overnight HR (${hrLow} bpm vs ${Math.round(typical)} typical)`);
+  }
+  if (!reasons.length) return null;
+  const joined = reasons.length > 1 ? `${reasons.slice(0, -1).join(', ')} and ${reasons[reasons.length - 1]}` : reasons[0];
+  return joined.charAt(0).toUpperCase() + joined.slice(1) + '.';
+}
+
+/** Graded summary of a night with data: grade chip, hours asleep, stage bar. */
+function SleepGrade({ dk, sleep }: { dk: string; sleep: { bed: string; wake: string; quality?: string; hrLow?: string | number; hrHigh?: string | number; stages?: SleepStages } }) {
   const p = usePalette();
   const state = useAppState();
   const grade = sleepGrade(state.days, dk);
-  const hrs = sleepHours(state.days, dk);
+  const stages = sleep.stages;
+  const asleepMin = stages ? stages.deep + stages.rem + stages.core : null;
+  const hrs = asleepMin != null ? asleepMin / 60 : sleepHours(state.days, dk);
   const color = grade ? SCORE_COLORS[grade] : p.textDim;
+  const interrupted = sleep.quality === 'interrupted';
+  const hrLowN = parseFloat(String(sleep.hrLow ?? ''));
+  const note = sleepNote(state.days as never, dk, hrs, interrupted, Number.isFinite(hrLowN) ? hrLowN : null);
   const hrRange = sleep.hrLow != null && sleep.hrLow !== '' && sleep.hrHigh != null && sleep.hrHigh !== ''
     ? `${sleep.hrLow}–${sleep.hrHigh} bpm`
     : sleep.hrLow != null && sleep.hrLow !== '' ? `${sleep.hrLow} bpm low` : null;
   return (
-    <View style={{ borderWidth: 1, borderRadius: radius.card, padding: 14, marginBottom: 2, backgroundColor: hexA(color, 0.12), borderColor: hexA(color, 0.4) }}>
+    <View style={{ borderWidth: 1, borderRadius: radius.card, padding: 14, marginBottom: 2, backgroundColor: p.surface2, borderColor: p.border }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Text style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.6, color: p.textDim, fontWeight: '700' }}>Last night&rsquo;s sleep</Text>
-        {grade ? <View style={{ backgroundColor: color, paddingHorizontal: 11, paddingVertical: 4, borderRadius: 999 }}><Text style={{ color: '#fff', fontSize: 12, fontWeight: '800', textTransform: 'uppercase' }}>{GRADE_LABEL[grade]}</Text></View> : null}
+        <Text style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.6, color: p.textDim, fontWeight: '700' }}>Last night</Text>
+        {grade ? (
+          <View style={{ backgroundColor: color, paddingHorizontal: 11, paddingVertical: 4, borderRadius: 999 }}>
+            <Text style={{ color: '#fff', fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.4 }}>{GRADE_LABEL[grade]}</Text>
+          </View>
+        ) : null}
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 6 }}>
         <Text style={{ fontSize: 38, fontWeight: '800', color: p.text, fontVariant: ['tabular-nums'] }}>{hrs != null ? hrs.toFixed(1) : '–'}</Text>
-        <Text style={{ fontSize: 16, fontWeight: '700', color: p.textDim, marginLeft: 4 }}>hours</Text>
+        <Text style={{ fontSize: 16, fontWeight: '700', color: p.textDim, marginLeft: 6 }}>hrs asleep</Text>
       </View>
       <Text style={{ fontSize: 13, color: p.textDim, marginTop: 4 }}>
         {`${fmtTime12(sleep.bed)} → ${fmtTime12(sleep.wake)}`}
-        {sleep.quality === 'interrupted' ? ' · Interrupted' : ''}
+        {interrupted ? ' · Interrupted' : ''}
         {hrRange ? ` · HR ${hrRange}` : ''}
       </Text>
+      {stages ? <StageBar stages={stages} /> : null}
+      {note ? (
+        <>
+          <View style={{ height: 1, backgroundColor: p.border, marginTop: 14 }} />
+          <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start', marginTop: 12 }}>
+            <View style={{ marginTop: 1 }}><Icon name="info" size={15} color={color} /></View>
+            <Text style={{ flex: 1, fontSize: 13, lineHeight: 18, color: p.textDim }}>{note}</Text>
+          </View>
+        </>
+      ) : null}
+    </View>
+  );
+}
+
+/** Stacked stage bar + legend (Deep / REM / Core / Awake with minutes). */
+function StageBar({ stages }: { stages: SleepStages }) {
+  const p = usePalette();
+  const total = STAGE_ORDER.reduce((s, k) => s + stages[k], 0);
+  if (!total) return null;
+  return (
+    <View style={{ marginTop: 12 }}>
+      <View style={{ flexDirection: 'row', height: 10, gap: 2 }}>
+        {STAGE_ORDER.filter((k) => stages[k] > 0).map((k) => (
+          <View key={k} style={{ flexGrow: stages[k], flexBasis: 0, backgroundColor: STAGE_COLORS[k], borderRadius: 3 }} />
+        ))}
+      </View>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: 16, rowGap: 6, marginTop: 10 }}>
+        {STAGE_ORDER.map((k) => (
+          <View key={k} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <View style={{ width: 9, height: 9, borderRadius: 2.5, backgroundColor: STAGE_COLORS[k] }} />
+            <Text style={{ fontSize: 13, color: p.text, fontWeight: '500' }}>{`${STAGE_LABEL[k]} ${fmtMin(stages[k])}`}</Text>
+          </View>
+        ))}
+      </View>
     </View>
   );
 }

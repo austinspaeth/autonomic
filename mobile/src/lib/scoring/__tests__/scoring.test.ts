@@ -350,7 +350,8 @@ describe('day scoring', () => {
   it('resolveProtocol fills defaults and DEFAULT_PROTOCOL matches legacy rules', () => {
     expect(resolveProtocol(null)).toEqual(DEFAULT_PROTOCOL);
     expect(resolveProtocol({ water: { enabled: true, liters: 3 } }).water.liters).toBe(3);
-    expect(resolveProtocol({ water: { enabled: true, liters: 3 } }).meds.types).toEqual(['allegra', 'pepsidAc', 'magGlycinate']);
+    // No default drugs: users pick their own meds, so the prefill list is empty.
+    expect(resolveProtocol({ water: { enabled: true, liters: 3 } }).meds.types).toEqual([]);
   });
   it('streakTier labels', () => {
     expect(streakTier(0).tier).toBe('Start fresh');

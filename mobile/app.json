@@ -2,7 +2,7 @@
   "expo": {
     "name": "Autonomic",
     "slug": "autonomic",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "scheme": "autonomic",
     "orientation": "portrait",
     "icon": "./assets/autonomic-icon.png",
@@ -26,6 +26,7 @@
       "infoPlist": {
         "NSBluetoothAlwaysUsageDescription": "Autonomic connects to your heart-rate chest strap to capture beat-to-beat data during HRV readings.",
         "NSCameraUsageDescription": "Autonomic reads your pulse through your fingertip placed over the rear camera and flash during camera HRV readings.",
+        "NSMicrophoneUsageDescription": "Autonomic does not record audio. This permission is required by the camera library used for fingertip pulse readings.",
         "NSHealthShareUsageDescription": "Autonomic reads heart rate, HRV, sleep, blood pressure, blood oxygen, weight and ECG recordings from Apple Health to prefill your journal.",
         "NSHealthUpdateUsageDescription": "Autonomic can write your captured HRV readings, mindful minutes, weight, blood pressure and blood oxygen back to Apple Health.",
         "UIBackgroundModes": [

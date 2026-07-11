@@ -16,6 +16,11 @@ export const nowTime = () => {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
 
+/** Default clock time for a new entry on day `dk`: the current time when
+ *  logging today; 23:59 when back-filling a past day (e.g. logging just after
+ *  midnight for yesterday) so the entry sorts inside that day. */
+export const defaultTimeFor = (dk: string) => (dk === todayKey() ? nowTime() : '23:59');
+
 export const addDays = (k: string, delta: number) => {
   const d = dateFromKey(k);
   d.setDate(d.getDate() + delta);

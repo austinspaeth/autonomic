@@ -48,7 +48,8 @@ old web app so old `export.json` files import directly.
   },
   "days": {
     "YYYY-MM-DD": {
-      "sleep":      { "bed": "HH:MM", "wake": "HH:MM", "quality", "hrLow?", "hrHigh?" },
+      "sleep":      { "bed": "HH:MM", "wake": "HH:MM", "quality", "hrLow?", "hrHigh?",
+                      "stages?": { "deep": 0, "rem": 0, "core": 0, "awake": 0 } },  // minutes, Health-staged nights only
       // readings/activities/meds/symptoms are logged-entry ARRAYS, each item
       // { id, type, time, note, ...templateFields }, where `type` keys into a
       // registry map (READING_TYPES / ACTIVITY_TYPES / MED_TYPES / SYMPTOM_TYPES).

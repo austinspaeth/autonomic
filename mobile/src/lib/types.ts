@@ -9,12 +9,23 @@ export interface Profile {
   height: string;
 }
 
+/** Per-stage minutes for a night, when the Health source recorded stages
+ *  (Apple Watch on watchOS 9+, Oura, etc). Absent for manual entries and
+ *  sources that only log a single asleep block. */
+export interface SleepStages {
+  deep: number;
+  rem: number;
+  core: number;
+  awake: number;
+}
+
 export interface SleepRecord {
   bed: string;
   wake: string;
   quality?: 'good' | 'interrupted';
   hrLow?: string | number;
   hrHigh?: string | number;
+  stages?: SleepStages;
 }
 
 /**
@@ -56,7 +67,8 @@ export interface Movement {
   id: string;
   time?: string;
   kind?: string;
-  straining?: boolean;
+  /** Legacy entries stored a boolean; new entries store 'mild' | 'severe' (false/absent = none). */
+  straining?: boolean | 'mild' | 'severe';
   volume?: string;
   note?: string;
 }

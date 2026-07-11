@@ -12,7 +12,6 @@ import { Icon } from '../components/Icon';
 import { SheetControls, SheetFooter, useSheets } from '../components/Sheet';
 import { HeroCard, SumCard, MetricRow } from '../components/summary';
 import { MilestoneProgressCard } from './Milestones';
-import { HrvSetup } from './hrv/Setup';
 import { Button, Stepper } from '../components/ui';
 import { radius, type as T, usePalette } from '../theme';
 import { SCORE_COLORS, GRADE_LABEL, GRADE_PTS, catFromBands } from '../lib/scoring';
@@ -104,16 +103,11 @@ export function DaySummary({ dk }: { dk: string }) {
             {!readings.length ? (
               <>
                 <Text style={{ fontSize: 22, fontWeight: '700', color: p.text, marginTop: 6 }}>{dk > today ? 'Future day' : 'Awaiting morning data'}</Text>
-                <Text style={{ fontSize: 14, color: p.textDim, marginTop: 5, lineHeight: 19 }}>{dk > today ? 'Nothing logged yet for this day.' : "Add a morning HRV reading to see today's autonomic profile."}</Text>
-                {dk === today ? (
-                  <Pressable
-                    onPress={() => openSheet((c) => <HrvSetup controls={c} />)}
-                    style={({ pressed }) => [{ flexDirection: 'row', gap: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: p.accent, borderRadius: radius.control, paddingVertical: 13, marginTop: 14 }, pressed && { opacity: 0.7 }]}
-                  >
-                    <Icon name="activity" size={18} color="#fff" />
-                    <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>Capture HRV reading</Text>
-                  </Pressable>
-                ) : null}
+                {/* No capture button here — the Readings section below owns that
+                    action; this card just points the way, plainly. */}
+                <Text style={{ fontSize: 15, color: dk > today ? p.textDim : p.text, marginTop: 6, lineHeight: 21, fontWeight: dk > today ? '400' : '600' }}>
+                  {dk > today ? 'Nothing logged yet for this day.' : 'Capture an HRV reading below, under Readings, to unlock today’s autonomic outlook.'}
+                </Text>
               </>
             ) : (
               <>

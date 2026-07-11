@@ -124,6 +124,9 @@ export function Screen({
         scrollEventThrottle={scrollEventThrottle ?? 16}
         contentContainerStyle={{ paddingTop: headerH + contentPadding, paddingHorizontal: contentPadding, paddingBottom: bottomPad }}
         showsVerticalScrollIndicator={false}
+        // iOS: inset the scroll for the keyboard so inline inputs (e.g. the
+        // journal Notes box at the bottom) stay visible while typing.
+        automaticallyAdjustKeyboardInsets
       >
         {children}
       </ScrollView>

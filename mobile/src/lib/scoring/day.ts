@@ -17,8 +17,8 @@ export type DaysMap = Record<string, DayRecord>;
 /* ---------- final-score bands ---------- */
 export interface DayCat { min: number; label: string; short: string; color: string }
 export const SCORE_CATS: DayCat[] = [
-  { min: 85, label: 'Excellent Autonomic Day', short: 'Excellent', color: '#16a34a' },
-  { min: 70, label: 'Good Autonomic Day', short: 'Good', color: '#22c55e' },
+  { min: 85, label: 'Excellent Autonomic Day', short: 'Excellent', color: '#2ee06a' },
+  { min: 70, label: 'Good Autonomic Day', short: 'Good', color: '#16a34a' },
   { min: 55, label: 'Moderate Autonomic Day', short: 'Moderate', color: '#eab308' },
   { min: 40, label: 'Compromised Day', short: 'Compromised', color: '#f97316' },
   { min: 25, label: 'Bad Day', short: 'Bad', color: '#ef4444' },
@@ -83,17 +83,33 @@ export function sleepHours(days: DaysMap, dk: string): number | null {
   return mins / 60;
 }
 
-/** Sleep recovery grade for the night before `dk`. */
+/** Sleep recovery grade for the night before `dk`. Duration + quality set the
+ *  base grade; an elevated overnight heart rate then caps it — a long night
+ *  spent at a high rate is not restorative sleep. The sleeping low is the
+ *  strongest signal (a low that never dropped under ~65 bpm means the system
+ *  never settled); a very high overnight peak also costs a step. */
 export function sleepGrade(days: DaysMap, dk: string): ScoreCat | null {
   const dur = sleepHours(days, dk);
   if (dur == null) return null;
   const d = days[dk];
   const good = !(d && d.sleep && d.sleep.quality === 'interrupted');
-  if (dur >= 8 && good) return 'great';
-  if (dur >= 7) return good ? 'good' : 'ok';
-  if (dur >= 6) return good ? 'ok' : 'bad';
-  if (dur >= 5) return 'bad';
-  return 'crash';
+  let cat: ScoreCat;
+  if (dur >= 8 && good) cat = 'great';
+  else if (dur >= 7) cat = good ? 'good' : 'ok';
+  else if (dur >= 6) cat = good ? 'ok' : 'bad';
+  else if (dur >= 5) cat = 'bad';
+  else cat = 'crash';
+  const num = (x: unknown) => { const v = parseFloat(String(x)); return isNaN(v) ? null : v; };
+  const lo = d && d.sleep ? num(d.sleep.hrLow) : null;
+  const hi = d && d.sleep ? num(d.sleep.hrHigh) : null;
+  let demote = 0;
+  if (lo != null) demote = lo >= 75 ? 2 : lo >= 65 ? 1 : 0;
+  if (hi != null && hi >= 110) demote = Math.max(demote, 1);
+  if (demote) {
+    const order: ScoreCat[] = ['great', 'good', 'ok', 'bad', 'crash'];
+    cat = order[Math.min(order.length - 1, order.indexOf(cat) + demote)];
+  }
+  return cat;
 }
 
 /** Behaviour grade from logged activity load (lightly weighted). */
@@ -185,7 +201,7 @@ export function scoreSet(readings: Entry[], d: DayRecord, dk: string, days: Days
   const sleepDetail: CompDetail = {
     value: slH != null ? `${slH.toFixed(1)} h${slInt ? ', interrupted' : ''}` : 'not logged',
     metrics: [],
-    note: 'Targets 7h or more for a good grade; 8h+ and uninterrupted scores best. An earlier, consistent bedtime is usually the single biggest lever.',
+    note: 'Targets 7h or more for a good grade; 8h+ and uninterrupted scores best. An elevated overnight heart rate (sleeping low of 65+ bpm) lowers the grade, since restorative sleep needs the rate to settle. An earlier, consistent bedtime is usually the single biggest lever.',
   };
 
   const actDetail: CompDetail = {
@@ -230,12 +246,12 @@ export interface Criterion {
 export interface Cleanliness { clean: boolean; criteria: Criterion[] }
 
 /** Baseline protocol a user gets before ever opening the editor: 8h sleep,
- *  2.5 L water, no triggers. Meds/activities start off (types kept so they
- *  prefill if the user turns meds on later). */
+ *  2.5 L water, no triggers. Meds/activities start off and empty — users pick
+ *  their own meds in the editor (there are no default drugs any more). */
 export const DEFAULT_PROTOCOL: Protocol = {
   triggers: { enabled: true, types: [] },
   water: { enabled: true, liters: 2.5 },
-  meds: { enabled: false, types: ['allegra', 'pepsidAc', 'magGlycinate'] },
+  meds: { enabled: false, types: [] },
   activities: { enabled: false, types: [] },
   sleep: { enabled: true, hours: 8 },
 };
@@ -250,6 +266,13 @@ export function resolveProtocol(p?: Partial<Protocol> | null): Protocol {
     activities: { ...DEFAULT_PROTOCOL.activities, ...p.activities },
     sleep: { ...DEFAULT_PROTOCOL.sleep, ...p.sleep },
   };
+}
+
+/** Daily water goal (liters): the clean-day protocol amount when one is set,
+ *  otherwise the 2.5 L default. */
+export function waterGoalL(p?: Partial<Protocol> | null): number {
+  const w = resolveProtocol(p).water;
+  return w.enabled && w.liters > 0 ? w.liters : DEFAULT_PROTOCOL.water.liters;
 }
 
 const typeLabel = (map: Record<string, { label: string }>, k: string) => map[k]?.label || k;

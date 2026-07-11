@@ -109,9 +109,19 @@ function entriesFor(dk: string, i: number): Partial<DayRecord> {
   if (v.dip) symptoms.push(e('lightHeaded', 'dizzy', { time: '09:20' }), e('headache', 'ha', { time: '15:00' }));
   if (i % 6 === 2) symptoms.push(e('labileHr', 'hihr', { time: '13:40', hr: '104', position: 'Standing', hr5: '86' }));
 
+  // Health-style stage split of the night: ~15% deep / 22% REM, awake padding
+  // grows on dip (interrupted) nights, core is the remainder.
+  const [bh, bm] = v.bed.split(':').map(Number);
+  const [wh, wm] = v.wake.split(':').map(Number);
+  const nightMin = ((wh * 60 + wm) - (bh * 60 + bm) + 1440) % 1440;
+  const awake = v.dip ? 45 + (i % 3) * 10 : 8 + (i % 4) * 4;
+  const deep = Math.round((nightMin - awake) * (0.15 - (v.dip ? 0.05 : 0)));
+  const rem = Math.round((nightMin - awake) * (0.22 - (v.dip ? 0.06 : 0)));
+  const stages = { deep, rem, core: nightMin - awake - deep - rem, awake };
+
   return {
     readings, activities, meds, symptoms,
-    sleep: { bed: v.bed, wake: v.wake, quality: v.dip ? 'interrupted' : 'good', hrLow: s(v.hr - 8), hrHigh: s(v.hr + 12) },
+    sleep: { bed: v.bed, wake: v.wake, quality: v.dip ? 'interrupted' : 'good', hrLow: s(v.hr - 8), hrHigh: s(v.hr + 12), stages },
     food: { water: v.water, calories: 0, meals: [], triggers: v.dip ? { caffeine: 1, sugar: 1 } : i % 2 === 1 ? { caffeine: 1 } : {} },
   };
 }

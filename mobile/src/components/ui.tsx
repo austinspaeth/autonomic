@@ -7,6 +7,9 @@ import React, { useRef } from 'react';
 import {
   Animated, Pressable, StyleProp, StyleSheet, Text, TextStyle, View, ViewStyle,
 } from 'react-native';
+import Reanimated, {
+  Easing as REasing, useAnimatedStyle, useSharedValue, withTiming,
+} from 'react-native-reanimated';
 import { GRADE_COLORS, radius, space, type as T, usePalette } from '../theme';
 import type { ScoreCat } from '../lib/types';
 import { Icon, IconName } from './Icon';
@@ -169,6 +172,25 @@ export function Segmented<T extends string>({ options, value, onChange, style, c
           </Pressable>
         );
       })}
+    </View>
+  );
+}
+
+/* ---------- Progress bar ---------- */
+/** Slim rounded bar whose fill tweens to each new value instead of jumping. */
+export function ProgressBar({ pct, color, track, height = 6, style }: {
+  pct: number; color: string; track: string; height?: number; style?: StyleProp<ViewStyle>;
+}) {
+  const clamp = (x: number) => Math.max(0, Math.min(1, x));
+  const v = useSharedValue(clamp(pct));
+  React.useEffect(() => {
+    v.value = withTiming(clamp(pct), { duration: 350, easing: REasing.out(REasing.cubic) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pct]);
+  const fill = useAnimatedStyle(() => ({ width: `${v.value * 100}%` }));
+  return (
+    <View style={[{ height, borderRadius: height / 2, backgroundColor: track, overflow: 'hidden' }, style]}>
+      <Reanimated.View style={[{ height: '100%', borderRadius: height / 2, backgroundColor: color }, fill]} />
     </View>
   );
 }

@@ -12,8 +12,8 @@ import type { Band, Entry, Protocol, ScoreCat } from '../types';
 // each ScoreCat maps to the day-scale level with the same color. The internal keys
 // are legacy (great/ok/crash) but the DISPLAYED vocabulary is Excellent → Crash.
 export const SCORE_COLORS: Record<ScoreCat, string> = {
-  great: '#16a34a',       // Excellent
-  good: '#22c55e',        // Good
+  great: '#2ee06a',       // Excellent (bright luminous green — the peak tier pops)
+  good: '#16a34a',        // Good (deep solid green)
   ok: '#eab308',          // Moderate
   bad: '#f97316',         // Compromised
   crash: '#ef4444',       // Bad

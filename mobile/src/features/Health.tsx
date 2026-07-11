@@ -153,6 +153,10 @@ export function SleepConfirmSheet({ dk, data, controls, onDone }: {
       ...(data.hrLow != null ? { hrLow: data.hrLow } : {}),
       ...(data.hrHigh != null ? { hrHigh: data.hrHigh } : {}),
     };
+    // Stages describe the imported night; drop any from a previous import
+    // rather than mixing them with the new times.
+    if (data.stages) d.sleep.stages = data.stages;
+    else delete d.sleep.stages;
     save();
     controls.closeAll();
     onDone();

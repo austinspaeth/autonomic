@@ -243,7 +243,8 @@ export function PowerBar({ vlf, lf, hf }: { vlf: number | null; lf: number | nul
  * with adjacent bands butting against each other (segments share their exact
  * band-edge point so there is no gap between fills). With beat-to-beat `rr`
  * the true power spectral density is drawn (linearly interpolated onto a fine
- * grid — no smoothing, so peaks stay peaks). Without RR (a typed-in reading)
+ * grid, then lightly smoothed so the peaks keep their shape but their tips
+ * round off instead of reading as polygon vertices). Without RR (a typed-in reading)
  * we reconstruct one peak per band at its typical frequency, scaled to the
  * band's power. The x-axis runs 0 → 0.5 Hz; below it, the power readouts.
  */
@@ -288,9 +289,15 @@ export function PowerSpectrum({ rr, vlf, lf, hf }: { rr?: number[] | null; vlf: 
   // adjacent bands share the edge sample, so their fills touch with no gap.
   const bandPts = SPECTRUM_BANDS.map((b) => {
     const lo = b.lo, hi = Math.min(b.hi, fMax);
-    const M = Math.max(8, Math.round(((hi - lo) / fMax) * 160));
+    const M = Math.max(8, Math.round(((hi - lo) / fMax) * 110));
     const seg: { f: number; d: number }[] = [];
     for (let i = 0; i <= M; i++) { const f = lo + ((hi - lo) * i) / M; seg.push({ f, d: densAt(f) }); }
+    // Two light binomial passes (endpoints pinned) round the tips of the peaks
+    // so the trace reads as a curve, not a polygon — the shape stays put.
+    for (let pass = 0; pass < 2; pass++) {
+      const s = seg.map((q) => q.d);
+      for (let i = 1; i < seg.length - 1; i++) seg[i].d = 0.25 * s[i - 1] + 0.5 * s[i] + 0.25 * s[i + 1];
+    }
     return seg;
   });
 
@@ -298,13 +305,15 @@ export function PowerSpectrum({ rr, vlf, lf, hf }: { rr?: number[] | null; vlf: 
   const yAt = (d: number) => padT + (1 - d / dMax) * (H - padT - padB);
   const baseY = H - padB;
 
-  // One filled sub-path per band; straight segments keep the peaks defined.
+  // One filled sub-path per band; a soft curve along the top edge keeps the
+  // peaks defined but rounds their tips.
   const segs: { color: string; d: string }[] = [];
   SPECTRUM_BANDS.forEach((b, bi) => {
     const seg = bandPts[bi];
     if (seg.length < 2) return;
-    const xy = seg.map((q) => `${xAt(q.f).toFixed(2)} ${Math.min(baseY, yAt(q.d)).toFixed(2)}`);
-    const area = `M${xAt(seg[0].f).toFixed(2)} ${baseY} L${xy.join(' L')} L${xAt(seg[seg.length - 1].f).toFixed(2)} ${baseY} Z`;
+    const xy: [number, number][] = seg.map((q) => [xAt(q.f), Math.min(baseY, yAt(q.d))]);
+    const top = smoothPath(xy); // "Mx y Cx1 y1 …"
+    const area = `M${xy[0][0].toFixed(2)} ${baseY} L${top.slice(1)} L${xy[xy.length - 1][0].toFixed(2)} ${baseY} Z`;
     segs.push({ color: b.color, d: area });
   });
 

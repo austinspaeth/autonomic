@@ -116,6 +116,9 @@ function SheetView({ entry, isTop, behind, closing, requestClose, onExited, clos
   const [kbOpen, setKbOpen] = useState(false);
   const isTopRef = useRef(isTop); isTopRef.current = isTop;
   const [footer, setFooter] = useState<React.ReactNode>(null);
+  // Measured footer height so scroll content clears it exactly — footers can be
+  // taller than one row (e.g. the results card's stacked button cluster).
+  const [footerH, setFooterH] = useState(0);
   const mounted = useRef(false);
   const full = entry.opts.fullscreen;
   const fit = entry.opts.fitContent && !full;
@@ -242,13 +245,13 @@ function SheetView({ entry, isTop, behind, closing, requestClose, onExited, clos
       >
         <SheetContentContext.Provider value={ctxValue}>
           {fit ? (
-            <View style={{ padding: 18, paddingTop: topPad, paddingBottom: footer ? 120 : 24 + insets.bottom }}>
+            <View style={{ padding: 18, paddingTop: topPad, paddingBottom: footer ? Math.max(120, footerH + 20) : 24 + insets.bottom }}>
               {content}
             </View>
           ) : (
             <ScrollView
               style={{ flex: 1 }}
-              contentContainerStyle={{ padding: 18, paddingTop: topPad, paddingBottom: footer ? 120 : 24 + insets.bottom }}
+              contentContainerStyle={{ padding: 18, paddingTop: topPad, paddingBottom: footer ? Math.max(120, footerH + 20) : 24 + insets.bottom }}
               keyboardShouldPersistTaps="handled"
               keyboardDismissMode="on-drag"
               showsVerticalScrollIndicator={false}
@@ -278,7 +281,7 @@ function SheetView({ entry, isTop, behind, closing, requestClose, onExited, clos
           </View>
         )}
         {footer && (
-          <Animated.View style={[styles.footer, { backgroundColor: p.surface, borderTopColor: p.border }, footerStyle]}>
+          <Animated.View onLayout={(e) => setFooterH(e.nativeEvent.layout.height)} style={[styles.footer, { backgroundColor: p.surface, borderTopColor: p.border }, footerStyle]}>
             {kbOpen && (
               <Pressable onPress={() => Keyboard.dismiss()} style={[styles.kbDismiss, { backgroundColor: p.surface2, borderColor: p.border }]} hitSlop={6}>
                 <Icon name="chevron" size={20} color={p.textDim} />

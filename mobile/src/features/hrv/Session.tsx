@@ -21,7 +21,7 @@ import Svg, { Circle } from 'react-native-svg';
 import { SheetControls, SheetFooter, useSheets } from '../../components/Sheet';
 import { Button } from '../../components/ui';
 import { usePalette, GRADE_COLORS } from '../../theme';
-import { BreathingViz } from './BreathingViz';
+import { BreathingViz, parsePattern, type BreathPhase } from './BreathingViz';
 import { HrvResults } from './Results';
 import { EcgSyncSheet } from './EcgSync';
 import { ble } from '../../lib/ble/manager';
@@ -30,8 +30,17 @@ import { PpgCameraView } from '../../lib/ppg/CameraView';
 import { correctArtifacts, std } from '../../lib/hrv';
 import { getState } from '../../store/store';
 
-// Breathing readings run the full 5 minutes; unstructured readings are 2:30.
-const durationFor = (kind: SessionConfig['kind']) => (kind === 'breath' ? 300 : 150);
+// Every reading — structured or unstructured — runs the full 5 minutes.
+const durationFor = (_kind: SessionConfig['kind']) => 300;
+
+/** The three structured breathing patterns. `val` is the stored style string
+ *  (in/hold/out/hold seconds — see parsePattern); shared by Setup + Session. */
+export const BREATH_STYLES: { val: string; title: string; sub: string; badge?: string }[] = [
+  { val: '4/6', title: '4 / 6 breathing', badge: 'Recommended', sub: 'In 4s · out 6s. Resonant-frequency pacing that trains the baroreflex.' },
+  { val: '4/4/4/4', title: 'Box breathing', sub: 'In 4s · hold 4s · out 4s · hold 4s. A steady square rhythm for calm focus.' },
+  { val: '4/7/8', title: '4-7-8 breathing', sub: 'In 4s · hold 7s · out 8s. A long exhale that leans into the vagal brake.' },
+];
+export const styleTitle = (val?: string) => BREATH_STYLES.find((s) => s.val === val)?.title || (val || '');
 
 /** ~1 s strong buzz: expo-haptics has no long-duration vibration on iOS, so a
  *  dense train of heavy impacts reads as one sustained buzz. */
@@ -60,7 +69,7 @@ export function HrvSession({ config, controls }: { config: SessionConfig; contro
   const [liveSdnn, setLiveSdnn] = useState<number | null>(null);
   const [connected, setConnected] = useState(false);
   const [artifactHint, setArtifactHint] = useState(false);
-  const [phase, setPhase] = useState<'in' | 'out'>('in');
+  const [phase, setPhase] = useState<BreathPhase>('in');
   // Camera source: finger-placement signal (drives the pre-start lock and the
   // finger-lifted warning mid-reading).
   const [signal, setSignal] = useState<PpgSignal>({ locked: false, quality: 'none' });
@@ -78,7 +87,7 @@ export function HrvSession({ config, controls }: { config: SessionConfig; contro
   // ECG sync stack on top of it, so it covers those too).
   useKeepAwake();
 
-  const [inS, exS] = (config.style || '4/6').split('/').map(Number);
+  const pattern = parsePattern(config.style);
 
   // Shared RR/HR/SDNN collection — both the BLE strap and the camera PPG
   // stream emit the same { hr, rr[] } sample shape into this.
@@ -108,6 +117,43 @@ export function HrvSession({ config, controls }: { config: SessionConfig; contro
     }
   };
 
+  // BLE source: connect to the saved strap the moment this card opens, so the
+  // link is already up when Start is pressed instead of initializing during
+  // the reading. Live HR shows pre-start as a connection cue; RR collection is
+  // still gated on Start. Retries quietly until the strap answers.
+  useEffect(() => {
+    if (config.source !== 'polar') return;
+    const saved = getState().settings.lastBleDeviceId;
+    const mgr = ble();
+    if (!saved || !mgr.available) return;
+    let alive = true;
+    let retry: ReturnType<typeof setTimeout> | null = null;
+    const attempt = async () => {
+      if (!alive || finishedRef.current) return;
+      try {
+        await mgr.requestPermissions();
+        await mgr.connect(
+          saved,
+          (s) => {
+            setConnected(true);
+            if (s.hr) setHr(s.hr);
+            if (startedRef.current && !finishedRef.current) collect(s);
+          },
+          () => {
+            setConnected(false);
+            if (alive && !finishedRef.current) retry = setTimeout(attempt, 2000);
+          },
+        );
+      } catch {
+        setConnected(false);
+        if (alive && !finishedRef.current) retry = setTimeout(attempt, 3000);
+      }
+    };
+    attempt();
+    return () => { alive = false; if (retry) clearTimeout(retry); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Camera source: start the camera + torch immediately so the finger can be
   // placed and the pulse locked BEFORE the reading begins. Samples are only
   // collected once Start is pressed (startedRef gates them).
@@ -134,20 +180,9 @@ export function HrvSession({ config, controls }: { config: SessionConfig; contro
     setStarted(true);
     startedRef.current = true;
     startedAtRef.current = Date.now();
-    // watch: the ECG is recorded on the wrist; camera: already streaming since mount.
+    // watch: the ECG is recorded on the wrist; camera + BLE: already streaming
+    // since mount (their samples start being collected now).
     if (config.source === 'watch' || config.source === 'camera') setConnected(true);
-    // BLE path: connect + collect RR
-    if (config.source === 'polar') {
-      const saved = getState().settings.lastBleDeviceId;
-      const mgr = ble();
-      (async () => {
-        if (!saved || !mgr.available) { setConnected(false); return; }
-        try {
-          await mgr.requestPermissions();
-          await mgr.connect(saved, (s) => { setConnected(true); collect(s); }, () => setConnected(false));
-        } catch { setConnected(false); }
-      })();
-    }
     // tick every second
     timerRef.current = setInterval(() => {
       setElapsed((e) => {
@@ -204,6 +239,8 @@ export function HrvSession({ config, controls }: { config: SessionConfig; contro
   const ringSize = 2 * (R + SW);
 
   const cameraLockPending = config.source === 'camera' && !started && !signal.locked;
+  // The strap connects while this card sits open; don't start until it's live.
+  const strapPending = config.source === 'polar' && !started && !connected;
 
   return (
     <View style={{ alignItems: 'center', paddingTop: 8 }}>
@@ -211,7 +248,7 @@ export function HrvSession({ config, controls }: { config: SessionConfig; contro
           camera session so the pre-start lock and the reading share one stream. */}
       {config.source === 'camera' ? <PpgCameraView /> : null}
       <Text style={{ color: p.textDim, fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, fontWeight: '700' }}>
-        {config.kind === 'breath' ? `Structured HRV · ${config.style}` : 'Unstructured HRV'}
+        {config.kind === 'breath' ? `Structured HRV · ${styleTitle(config.style)}` : 'Unstructured HRV'}
       </Text>
 
       <View style={{ width: ringSize, height: ringSize, marginTop: 18, alignItems: 'center', justifyContent: 'center' }}>
@@ -220,7 +257,7 @@ export function HrvSession({ config, controls }: { config: SessionConfig; contro
           <Circle cx={R + SW} cy={R + SW} r={R} stroke={artifactHint ? GRADE_COLORS.bad : p.accent} strokeWidth={SW} fill="none" strokeLinecap="round" strokeDasharray={`${C}`} strokeDashoffset={C * (1 - frac)} transform={`rotate(-90 ${R + SW} ${R + SW})`} />
         </Svg>
         {config.kind === 'breath' ? (
-          <BreathingViz inhaleSec={inS} exhaleSec={exS} running={!finished} onPhase={setPhase} />
+          <BreathingViz pattern={pattern} running={!finished} onPhase={setPhase} />
         ) : (
           <Text style={{ color: p.textDim, fontSize: 16, textAlign: 'center', paddingHorizontal: 40 }}>Stay still,{'\n'}breathe normally</Text>
         )}
@@ -228,7 +265,7 @@ export function HrvSession({ config, controls }: { config: SessionConfig; contro
 
       {config.kind === 'breath' ? (
         <Text style={{ color: p.accent, fontSize: 18, fontWeight: '700', letterSpacing: 0.3, marginTop: 18 }}>
-          {finished ? 'Done' : phase === 'in' ? 'Breathe in' : 'Breathe out'}
+          {finished ? 'Done' : phase === 'in' ? 'Breathe in' : phase === 'out' ? 'Breathe out' : 'Hold'}
         </Text>
       ) : null}
       <Text style={{ color: p.text, fontSize: 52, fontWeight: '800', fontVariant: ['tabular-nums'], marginTop: config.kind === 'breath' ? 10 : 18 }}>{mmss}</Text>
@@ -242,7 +279,10 @@ export function HrvSession({ config, controls }: { config: SessionConfig; contro
       )}
 
       <View style={{ minHeight: 22, marginTop: 14, alignItems: 'center' }}>
-        {started && !connected && config.source === 'polar' ? <Text style={{ color: GRADE_COLORS.ok }}>Connecting to strap…</Text> : null}
+        {!finished && !connected && config.source === 'polar' ? <Text style={{ color: GRADE_COLORS.ok }}>Connecting to strap…</Text> : null}
+        {!started && connected && config.source === 'polar' ? (
+          <Text style={{ color: GRADE_COLORS.good, fontWeight: '600' }}>✓ Strap connected</Text>
+        ) : null}
         {artifactHint ? (
           <Text style={{ color: GRADE_COLORS.bad, textAlign: 'center', paddingHorizontal: 24 }}>
             {config.source === 'camera' ? 'Signal noisy — steady your finger, ease the pressure' : 'Signal noisy, adjust the strap'}
@@ -274,8 +314,8 @@ export function HrvSession({ config, controls }: { config: SessionConfig; contro
         ) : (
           <>
             <Button title="Cancel" variant="ghost" onPress={() => controls.close()} />
-            {/* A 5-minute camera reading must not start on garbage signal. */}
-            <Button title="Start reading" variant="primary" onPress={begin} disabled={cameraLockPending} />
+            {/* A 5-minute reading must not start on garbage signal or before the strap answers. */}
+            <Button title="Start reading" variant="primary" onPress={begin} disabled={cameraLockPending || strapPending} />
           </>
         )}
       </SheetFooter>

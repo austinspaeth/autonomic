@@ -54,8 +54,9 @@ export function DevicesScreen({ controls }: { controls?: SheetControls } = {}) {
 
   return (
     <View>
-      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 6 }}>Devices</Text>
-      <Text style={{ color: p.textDim, fontSize: 14, marginBottom: 16 }}>Connect a Bluetooth heart-rate strap (e.g. Polar H10) for live HRV readings.</Text>
+      {/* Inset the header text so it clears the floating ✕ pill. */}
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 6, paddingRight: 58 }}>Devices</Text>
+      <Text style={{ color: p.textDim, fontSize: 14, marginBottom: 16, paddingRight: 58 }}>Connect a Bluetooth heart-rate strap (e.g. Polar H10) for live HRV readings.</Text>
 
       {savedId ? (
         <View style={{ backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.card, padding: 14, marginBottom: 16 }}>

@@ -37,7 +37,7 @@ export const READING_TYPES: Record<string, TypeDef> = {
     label: 'Structured HRV',
     icon: 'wind',
     fields: [
-      { type: 'select', key: 'style', label: 'Breathing style', options: ['4/4', '4/5', '4/6', '5/5'] },
+      { type: 'select', key: 'style', label: 'Breathing style', options: ['4/6', '4/4/4/4', '4/7/8'] },
       { key: 'pns', label: 'PNS index', signed: true },
       { key: 'sns', label: 'SNS index', signed: true },
       { key: 'stressIndex', label: 'Stress index' },
@@ -347,13 +347,19 @@ export const TRIGGER_TYPES: Record<string, TypeDef> = {
   processedMeats: trig('Processed meats'),
 };
 
-/** Ordered field schema for a bowel-movement entry. */
-export const BM_FIELDS: FieldDef[] = [
-  { type: 'time', key: 'time', label: 'Time' },
-  { type: 'select', key: 'kind', label: 'Type', options: ['Loose', 'Formed', 'Hard', 'Diarrhea'] },
-  { type: 'check', key: 'straining', label: 'Straining' },
-  { type: 'select', key: 'volume', label: 'Volume', options: ['Small pieces', 'Small', 'Medium', 'Large'] },
-];
+/** Bowel-movement option sets (the bespoke BowelForm renders these as cards). */
+export const BM_KINDS = [
+  { val: 'Loose', bristol: 'Bristol 5–6' },
+  { val: 'Formed', bristol: 'Bristol 3–4' },
+  { val: 'Hard', bristol: 'Bristol 1–2' },
+  { val: 'Diarrhea', bristol: 'Bristol 7' },
+] as const;
+export const BM_VOLUMES = [
+  { val: 'Small pieces', dot: 8 },
+  { val: 'Small', dot: 13 },
+  { val: 'Medium', dot: 19 },
+  { val: 'Large', dot: 26 },
+] as const;
 
 /* ---------- generic field-schema helpers (shared by forms & rows) ---------- */
 export const isDivider = (f: FieldDef) => !!f.divider || f.type === 'divider';
@@ -426,12 +432,15 @@ export function readingRowValue(r: Entry): string {
   }
 }
 
-/** Row label for a bowel movement, e.g. "Loose + Medium Volume · Straining". */
-export function bmLabel(m: { kind?: string; volume?: string; straining?: boolean }): string {
+/** Row label for a bowel movement, e.g. "Loose + Medium Volume · Mild straining". */
+export function bmLabel(m: { kind?: string; volume?: string; straining?: boolean | 'mild' | 'severe' }): string {
   const parts: string[] = [];
   if (m.kind) parts.push(m.kind);
   if (m.volume) parts.push(`${m.volume} Volume`);
   let s = parts.join(' + ');
-  if (m.straining) s += (s ? ' · ' : '') + 'Straining';
+  const strain = m.straining === 'mild' ? 'Mild straining'
+    : m.straining === 'severe' ? 'Severe straining'
+    : m.straining ? 'Straining' : '';
+  if (strain) s += (s ? ' · ' : '') + strain;
   return s || 'Bowel movement';
 }

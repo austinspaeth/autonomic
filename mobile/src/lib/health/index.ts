@@ -16,7 +16,7 @@
  * with `available: false`. The module is loaded lazily.
  */
 import { Platform } from 'react-native';
-import type { Entry } from '../types';
+import type { Entry, SleepStages } from '../types';
 import { computeHrv } from '../hrv';
 import { keyOf } from '../dates';
 
@@ -82,6 +82,9 @@ export interface SleepImport {
   hrHigh: number | null;
   interrupted: boolean;
   minutesAsleep: number;
+  /** Per-stage minutes when the source recorded stages; null when every
+   *  sample is plain asleepUnspecified (manual logs, older sources). */
+  stages: SleepStages | null;
 }
 
 const emptyDay: HealthDaySamples = {
@@ -379,6 +382,17 @@ function makeReal(mod: HkModule): HealthApi {
           asleep.reduce((s, r) => s + (r.endDate.getTime() - r.startDate.getTime()), 0) / 60000,
         );
         const awakeSegments = rows.filter((r) => r.value === 2 && r.startDate >= bed && r.endDate <= wake);
+        // Per-stage minutes — only meaningful when the source staged the night;
+        // a night of plain asleepUnspecified samples reports no stages.
+        const minsOf = (rs: typeof rows) =>
+          Math.round(rs.reduce((s, r) => s + (r.endDate.getTime() - r.startDate.getTime()), 0) / 60000);
+        const staged: SleepStages = {
+          core: minsOf(asleep.filter((r) => r.value === 3)),
+          deep: minsOf(asleep.filter((r) => r.value === 4)),
+          rem: minsOf(asleep.filter((r) => r.value === 5)),
+          awake: minsOf(awakeSegments),
+        };
+        const stages = staged.core + staged.deep + staged.rem > 0 ? staged : null;
         const hr = await rangeQ(QID.heartRate, bed, wake);
         return {
           bed: hhmm(bed),
@@ -389,6 +403,7 @@ function makeReal(mod: HkModule): HealthApi {
           hrHigh: hr ? Math.round(hr.max) : null,
           interrupted: awakeSegments.length >= 2,
           minutesAsleep,
+          stages,
         };
       } catch { return null; }
     },

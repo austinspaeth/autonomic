@@ -7,7 +7,7 @@
  */
 import React, { useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
-import { SheetControls } from '../../components/Sheet';
+import { SheetControls, SheetFooter } from '../../components/Sheet';
 import { Button } from '../../components/ui';
 import { ReadingSummary } from '../../components/summary';
 import { useToast } from '../../components/Toast';
@@ -17,7 +17,7 @@ import { computeScores } from '../../lib/scoring';
 import { getState, upsertEntry } from '../../store/store';
 import { getCurrentKey } from '../../store/nav';
 import { health } from '../../lib/health';
-import { nowTime, todayKey, uid } from '../../lib/dates';
+import { addDays, defaultTimeFor, fmtTime12, nowTime, todayKey, uid } from '../../lib/dates';
 import type { DayRecord, Entry } from '../../lib/types';
 import type { SessionConfig } from './Session';
 
@@ -36,12 +36,18 @@ export function HrvResults({ rr, hrSamples, sdnnSamples, config, durationSec, wa
   // Build the reading with the same keys the manual form uses.
   const reading = useMemo<Entry>(() => {
     const type = config.kind === 'breath' ? 'breathHrv' : 'hrv';
+    const dk = getCurrentKey();
+    // Capturing for yesterday just after midnight: pin the time to 23:59 so
+    // the reading sorts inside that day, and note the real clock time.
+    const afterMidnight = dk !== todayKey() && dk === addDays(todayKey(), -1) && new Date().getHours() < 6;
+    let note = config.source === 'watch' ? 'Captured via Apple Watch ECG'
+      : config.source === 'camera' ? 'Captured via phone camera (PPG)'
+      : 'Captured via chest strap';
+    if (afterMidnight) note += ` · Taken after midnight (actual time ${fmtTime12(nowTime())})`;
     const base: Entry = {
-      id: uid(), type, time: nowTime(),
+      id: uid(), type, time: defaultTimeFor(dk),
       period: config.period || 'Other',
-      note: config.source === 'watch' ? 'Captured via Apple Watch ECG'
-        : config.source === 'camera' ? 'Captured via phone camera (PPG)'
-        : 'Captured via chest strap',
+      note,
       // Capture source is stamped on the reading so camera (PPG) readings stay
       // distinguishable downstream (filtering / de-weighting in Analysis later).
       source: config.source, durationSec,
@@ -103,15 +109,22 @@ export function HrvResults({ rr, hrSamples, sdnnSamples, config, durationSec, wa
 
       <ReadingSummary r={reading} days={daysWithCurrent} ctx={ctx} />
 
-      <View style={{ flexDirection: 'row', gap: 12, marginTop: 4 }}>
-        <Button title="Discard" variant="danger" onPress={() => controls.closeAll()} />
-        <Button title="Save reading" variant="primary" onPress={save} />
-      </View>
-      {/* Watch readings came FROM Apple Health — no need to write them back. */}
-      {health().available && config.source !== 'watch' ? (
-        <Button title={writeHealth ? '✓ Will write to Apple Health' : 'Also write to Apple Health'} variant={writeHealth ? 'default' : 'ghost'} onPress={() => setWriteHealth((v) => !v)} style={{ marginTop: 12 }} />
-      ) : null}
-      <View style={{ height: 20 }} />
+      {/* The whole action cluster rides the fixed footer — no scrolling to
+          the bottom to find Save. */}
+      <SheetFooter>
+        <View style={{ flex: 1 }}>
+          {/* Watch readings came FROM Apple Health — no need to write them back. */}
+          {health().available && config.source !== 'watch' ? (
+            <View style={{ flexDirection: 'row', marginBottom: 10 }}>
+              <Button title={writeHealth ? '✓ Will write to Apple Health' : 'Also write to Apple Health'} variant={writeHealth ? 'default' : 'ghost'} onPress={() => setWriteHealth((v) => !v)} />
+            </View>
+          ) : null}
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            <Button title="Discard" variant="danger" onPress={() => controls.closeAll()} />
+            <Button title="Save reading" variant="primary" onPress={save} />
+          </View>
+        </View>
+      </SheetFooter>
     </View>
   );
 }

@@ -7,6 +7,7 @@
 import { useSyncExternalStore } from 'react';
 import { MMKV } from 'react-native-mmkv';
 import { addDays, keyOf } from '../lib/dates';
+import { MED_TYPES } from '../lib/registry';
 import type { AppState, DayRecord, Entry } from '../lib/types';
 
 const STORAGE_KEY = 'autonomic.journal.v1';
@@ -23,6 +24,10 @@ function defaultState(): AppState {
     version: SCHEMA_VERSION,
     settings: { theme: 'system' },
     profile: { sex: '', birthday: '', weight: '', height: '' },
+    // Fresh installs start with an empty medication catalog — the built-in med
+    // types exist only so long-standing journals keep their labels. New users
+    // add their own meds; imported journals keep whatever they had visible.
+    hiddenTypes: { meds: Object.keys(MED_TYPES) },
     meta: { lastUpdated: null, lastImport: null },
     days: {},
   };
@@ -118,11 +123,18 @@ function emit() {
   listeners.forEach((l) => l());
 }
 
-/** Centralized persistence — stamps meta.lastUpdated on every call. */
+/** Centralized persistence — stamps meta.lastUpdated on every call.
+ *  Re-wraps `state` (and the days map) in fresh objects before emitting:
+ *  mutations happen in place, so without new references useSyncExternalStore
+ *  consumers and any useMemo keyed on `state.days` would never see a change
+ *  (readings used to appear in Progress only after an unrelated re-render). */
 export function save() {
+  state = {
+    ...state,
+    days: { ...state.days },
+    meta: { ...(state.meta || { lastImport: null }), lastUpdated: new Date().toISOString() },
+  };
   try {
-    state.meta = state.meta || { lastUpdated: null, lastImport: null };
-    state.meta.lastUpdated = new Date().toISOString();
     kv().set(STORAGE_KEY, JSON.stringify(state));
   } catch {
     // storage error — state stays in memory

@@ -22,7 +22,7 @@ import { computeScores } from '../lib/scoring';
 import { health } from '../lib/health';
 import { healthSourceFor, type HealthCandidate, type HealthSource } from '../lib/health/sources';
 import { deleteEntry, getState, upsertEntry, useAppState } from '../store/store';
-import { fmtTime12, nowTime, uid } from '../lib/dates';
+import { defaultTimeFor, fmtTime12, uid } from '../lib/dates';
 import { useToast } from '../components/Toast';
 import { HrvSetup } from './hrv/Setup';
 
@@ -161,7 +161,7 @@ export function EntryForm({ typeMap, arrKey, dk, type, existing, prefill = null,
   const toast = useToast();
   const def = typeMap[type];
   const fields = entryFields(def);
-  const initial = existing || prefill || { id: uid(), type, time: nowTime(), note: '' };
+  const initial = existing || prefill || { id: uid(), type, time: defaultTimeFor(dk), note: '' };
   const [form, set] = useFormState(fields, initial);
 
   const save = () => {
@@ -210,8 +210,8 @@ export function EntryForm({ typeMap, arrKey, dk, type, existing, prefill = null,
 /** Indoor-bike bespoke form (conditional Resistance vs interval list). */
 export function BikeForm({ dk, existing, controls, onSaved }: { dk: string; existing: Entry | null; controls: SheetControls; onSaved: () => void }) {
   const p = usePalette();
-  const init = existing ? (JSON.parse(JSON.stringify(existing)) as Entry) : { id: uid(), type: 'indoorBike', time: nowTime(), note: '', interval: false, intervals: [] as unknown[] };
-  const [time, setTime] = useState((init.time as string) || nowTime());
+  const init = existing ? (JSON.parse(JSON.stringify(existing)) as Entry) : { id: uid(), type: 'indoorBike', time: defaultTimeFor(dk), note: '', interval: false, intervals: [] as unknown[] };
+  const [time, setTime] = useState((init.time as string) || defaultTimeFor(dk));
   const [num, setNum] = useState<Record<string, string>>({
     duration: (init.duration as string) || '', distance: (init.distance as string) || '', avgHr: (init.avgHr as string) || '',
     maxHr: (init.maxHr as string) || '', minHr: (init.minHr as string) || '', resistance: (init.resistance as string) || '', hr60: (init.hr60 as string) || '',
@@ -327,7 +327,7 @@ export function useEntryForms(dk: string) {
   const pickMed = () => openSheet(() => <TypePicker title="Add medication or supplement" kind="meds" manageLabel="Add another medication" onPick={(t) => {
     // A user-defined med with a saved dosage prefills the Amount field.
     const def = typesFor(getState(), 'meds')[t];
-    const prefill = def?.dosage ? ({ id: uid(), type: t, time: nowTime(), note: '', amount: def.dosage } as Entry) : null;
+    const prefill = def?.dosage ? ({ id: uid(), type: t, time: defaultTimeFor(dk), note: '', amount: def.dosage } as Entry) : null;
     openSheet((c) => <EntryForm typeMap={typesFor(getState(), 'meds')} arrKey="meds" dk={dk} type={t} existing={null} prefill={prefill} controls={c} onSaved={refresh} />);
   }} />);
   const pickSymptom = () => openSheet(() => <TypePicker title="Add symptom" kind="symptoms" manageLabel="Add another symptom" onPick={(t) => openSheet((c) => <EntryForm typeMap={typesFor(getState(), 'symptoms')} arrKey="symptoms" dk={dk} type={t} existing={null} controls={c} onSaved={refresh} />)} />);
@@ -346,8 +346,9 @@ function ReadingSummarySheet({ r, dk }: { r: Entry; dk: string }) {
   const ctx = { sex: state.profile.sex, height: state.profile.height };
   return (
     <ScrollView showsVerticalScrollIndicator={false}>
-      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text }}>{readingLabel(live)}</Text>
-      <Text style={{ color: p.textDim, fontSize: 14, marginTop: 2, marginBottom: 14 }}>{live.time ? fmtTime12(live.time as string) : ''}</Text>
+      {/* The edit + close pill floats top-right — keep the header text clear of it. */}
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, paddingRight: 100 }}>{readingLabel(live)}</Text>
+      <Text style={{ color: p.textDim, fontSize: 14, marginTop: 2, marginBottom: 14, paddingRight: 100 }}>{live.time ? fmtTime12(live.time as string) : ''}</Text>
       <ReadingSummary r={live} days={state.days} ctx={ctx} />
       <View style={{ height: 24 }} />
     </ScrollView>
