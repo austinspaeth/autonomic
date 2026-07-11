@@ -6,6 +6,10 @@
  * black, then fades the app UI in beneath. Settings can re-show it any time via
  * `showWelcomeAgain()`.
  *
+ * Connecting Apple Health in the Connect-data step pops a one-time confirmation
+ * card offering to backfill history (RR-based HRV, blood pressure, resting HR).
+ * That import is guarded by `meta.healthHistoryImported` so it runs at most once.
+ *
  * The wizard renders as an absolute-fill overlay above the tab UI (mounted in
  * app/_layout.tsx), so the app is already live underneath when the reveal runs.
  */
@@ -18,13 +22,15 @@ import Animated, {
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BrandMark, Icon } from '../components/Icon';
+import { Button } from '../components/ui';
 import { DatePickerSheet, HeightPickerSheet, fmtHeight, onlyNumeric } from '../components/Field';
-import { fmtDateFull } from '../lib/dates';
-import { useSheets } from '../components/Sheet';
+import { fmtDateFull, uid } from '../lib/dates';
+import { SheetControls, useSheets } from '../components/Sheet';
 import { useToast } from '../components/Toast';
-import { ACCENT } from '../theme';
+import { ACCENT, radius, usePalette } from '../theme';
 import { health } from '../lib/health';
-import { getState, mutate, save, useAppState } from '../store/store';
+import { computeScores } from '../lib/scoring';
+import { blankDay, getState, mutate, save, useAppState } from '../store/store';
 import { DevicesScreen } from './Devices';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -50,6 +56,44 @@ const STEP_DUR = 280;
 
 /** Steps that show the top-right Skip (About you + Connect data). */
 const SKIPPABLE = new Set([3, 4]);
+
+/** Historical import floor — early enough to cover any HealthKit-era data. */
+const HISTORY_SINCE = new Date(2014, 0, 1);
+
+/**
+ * One-time backfill of Apple Health history into the journal: RR-based HRV,
+ * blood pressure, and resting heart rate, each written into the day it was
+ * recorded and scored like a live capture. Assumes read permission is already
+ * granted. Idempotent — stamps (and is guarded by) meta.healthHistoryImported,
+ * so it can never double-import. Returns how many readings were added.
+ */
+async function importAppleHealthHistory(): Promise<number> {
+  const api = health();
+  if (!api.available) return 0;
+  const readings = await api.readHistory({
+    fromISO: HISTORY_SINCE.toISOString(),
+    toISO: new Date().toISOString(),
+  });
+  const ctx = { sex: getState().profile.sex, height: getState().profile.height };
+  let added = 0;
+  mutate((s) => {
+    if (s.meta.healthHistoryImported) return;          // already ran — no-op
+    for (const r of readings) {
+      if (r.ownApp) continue;                           // skip our own write-backs
+      if (!s.days[r.dayKey]) s.days[r.dayKey] = blankDay();
+      const entry: Record<string, unknown> = {
+        id: uid(), type: r.type, time: r.time, note: 'From Apple Health', source: 'watch', ...r.fields,
+      };
+      if (r.rr) entry.rrRaw = r.rr;
+      if (r.rrClean) entry.rrClean = r.rrClean;
+      entry.scores = computeScores(entry as never, ctx);
+      s.days[r.dayKey].readings.push(entry as never);
+      added++;
+    }
+    s.meta.healthHistoryImported = new Date().toISOString();
+  });
+  return added;
+}
 
 // Settings → "Show welcome guide" re-mounts the wizard through this tiny event.
 const welcomeListeners = new Set<() => void>();
@@ -173,6 +217,53 @@ function Bullet({ icon, children }: { icon: React.ReactNode; children: React.Rea
   );
 }
 
+/* ---------- one-time "import your history?" confirmation card ---------- */
+function HistoryImportSheet({ controls, onImported }: {
+  controls: SheetControls; onImported: (n: number | null) => void;
+}) {
+  const p = usePalette();
+  const [busy, setBusy] = useState(false);
+  // App-themed sheet (rendered above the dark wizard), so it uses the palette.
+  const run = async () => {
+    if (busy) return;
+    setBusy(true);
+    let n: number | null;
+    try { n = await importAppleHealthHistory(); } catch { n = null; }
+    setBusy(false);
+    onImported(n);
+    controls.close();
+  };
+  return (
+    <View style={{ gap: 16 }}>
+      <View style={{ width: 54, height: 54, borderRadius: 15, backgroundColor: p.surface2, alignItems: 'center', justifyContent: 'center' }}>
+        <Glyph size={26} color={p.accent} d={['M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4', 'M7 10l5 5 5-5', 'M12 15V3']} />
+      </View>
+      <View style={{ gap: 8 }}>
+        <Text style={{ fontSize: 21, fontWeight: '700', letterSpacing: -0.3, color: p.text }}>Import your history?</Text>
+        <Text style={{ fontSize: 14.5, lineHeight: 22, color: p.textDim }}>
+          Bring your past HRV, blood pressure, and resting heart rate from Apple Health into your journal so your
+          trends start full. This is a one-time import — new readings sync automatically as you go.
+        </Text>
+        <Text style={{ fontSize: 12.5, lineHeight: 18, color: p.textDim, opacity: 0.85 }}>
+          Only HRV recordings with beat-to-beat detail come in, so the full variability panel is available.
+        </Text>
+      </View>
+      <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+        <Button title="Not now" onPress={() => { if (!busy) controls.close(); }} />
+        <Pressable
+          onPress={run}
+          disabled={busy}
+          style={{ flex: 1, borderRadius: radius.control, backgroundColor: p.accent, paddingVertical: 13, alignItems: 'center', justifyContent: 'center', opacity: busy ? 0.85 : 1 }}
+        >
+          {busy
+            ? <ActivityIndicator color="#fff" />
+            : <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>Import</Text>}
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
 function Onboarding({ onDone }: { onDone: () => void }) {
   const insets = useSafeAreaInsets();
   const toast = useToast();
@@ -266,8 +357,23 @@ function Onboarding({ onDone }: { onDone: () => void }) {
     setHealthBusy(true);
     const ok = await api.requestAuth();
     setHealthBusy(false);
-    if (ok) { getState().settings.healthEnabled = true; save(); toast('Health connected'); }
-    else toast('Permission denied');
+    if (!ok) { toast('Permission denied'); return; }
+    getState().settings.healthEnabled = true; save(); toast('Health connected');
+    // Offer the one-time historical backfill right after connecting (once only).
+    if (!getState().meta.healthHistoryImported) {
+      openSheet(
+        (c) => (
+          <HistoryImportSheet
+            controls={c}
+            onImported={(n) => {
+              if (n == null) toast('Import failed');
+              else toast(n ? `Imported ${n} reading${n === 1 ? '' : 's'}` : 'No history found in Apple Health');
+            }}
+          />
+        ),
+        { fitContent: true, hideClose: true },
+      );
+    }
   };
   const connectStrap = () => openSheet((c) => <DevicesScreen controls={c} />);
 

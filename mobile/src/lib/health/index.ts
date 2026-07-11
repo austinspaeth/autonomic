@@ -18,6 +18,7 @@
 import { Platform } from 'react-native';
 import type { Entry } from '../types';
 import { computeHrv } from '../hrv';
+import { keyOf } from '../dates';
 
 /** This app's bundle id — used to skip re-importing our own write-backs. */
 const OWN_BUNDLE = 'com.autonomic.journal';
@@ -34,6 +35,13 @@ export interface HealthApi {
   readImports(dk: string): Promise<ImportedReading[]>;
   /** Read the night that *ends* on `dk` (spans the prior evening → this morning). */
   readSleep(dk: string): Promise<SleepImport | null>;
+  /**
+   * One-shot historical import across a date range (used once, from onboarding):
+   * RR-based HRV, blood pressure, and resting heart rate, each tagged with the
+   * local day it belongs to. HRV comes only from heartbeat series (real
+   * beat-to-beat RR); plain SDNN-only samples are intentionally excluded.
+   */
+  readHistory(opts: { fromISO: string; toISO: string }): Promise<HistoryReading[]>;
   writeHrvSession(opts: { sdnnMs: number; avgHr: number; startISO: string; durationSec: number }): Promise<void>;
   writeQuantity(kind: 'systolic' | 'diastolic' | 'restingHr', value: number, when: Date): Promise<void>;
   /** Publish an app journal reading to Health. Returns how many samples were written. */
@@ -60,6 +68,11 @@ export interface ImportedReading {
   ownApp: boolean;      // true when this app authored the sample (skip on import)
 }
 
+/** An {@link ImportedReading} from the historical sweep, tagged with its day. */
+export interface HistoryReading extends ImportedReading {
+  dayKey: string;       // YYYY-MM-DD (local) the sample belongs to
+}
+
 export interface SleepImport {
   bed: string;        // HH:MM local
   wake: string;       // HH:MM local
@@ -81,6 +94,7 @@ const stub: HealthApi = {
   async requestAuth() { return false; },
   async readDay() { return emptyDay; },
   async readImports() { return []; },
+  async readHistory() { return []; },
   async readSleep() { return null; },
   async writeHrvSession() { /* no-op */ },
   async writeQuantity() { /* no-op */ },
@@ -288,6 +302,61 @@ function makeReal(mod: HkModule): HealthApi {
         if (hrvSeriesTimes.some((t) => Math.abs(t - s.startDate.getTime()) < 5 * 60000)) return;
         out.push({ type: 'hrv', ...ts(s), fields: { sdnn: String(Math.round(s.quantity)) } });
       });
+
+      return out;
+    },
+
+    async readHistory({ fromISO, toISO }) {
+      const from = new Date(fromISO);
+      const to = new Date(toISO);
+      const out: HistoryReading[] = [];
+      // Generous cap: resting HR is ~1/day, so this comfortably spans years.
+      const LIMIT = 50000;
+
+      // Resting HR — one reading each, at its real timestamp.
+      try {
+        const rows = (await mod.queryQuantitySamples?.(QID.restingHr, { from, to, limit: LIMIT })) || [];
+        for (const s of rows) {
+          out.push({
+            type: 'restingHr', time: hhmm(s.startDate), startMs: s.startDate.getTime(),
+            ownApp: isOwnSample(s.sourceRevision), dayKey: keyOf(s.startDate),
+            fields: { hr: String(Math.round(s.quantity)), position: 'Laying' },
+          });
+        }
+      } catch { /* resting HR unavailable */ }
+
+      // Blood pressure — pair systolic + diastolic saved at (near-)identical times.
+      try {
+        const [sys, dia] = await Promise.all([
+          mod.queryQuantitySamples?.(QID.systolic, { from, to, limit: LIMIT }),
+          mod.queryQuantitySamples?.(QID.diastolic, { from, to, limit: LIMIT }),
+        ]);
+        for (const s of sys || []) {
+          const m = (dia || []).find((d) => Math.abs(d.startDate.getTime() - s.startDate.getTime()) < 2000);
+          if (!m) continue;
+          out.push({
+            type: 'bp', time: hhmm(s.startDate), startMs: s.startDate.getTime(),
+            ownApp: isOwnSample(s.sourceRevision), dayKey: keyOf(s.startDate),
+            fields: { sys: String(Math.round(s.quantity)), dia: String(Math.round(m.quantity)) },
+          });
+        }
+      } catch { /* blood pressure unavailable */ }
+
+      // HRV — heartbeat series only, so every reading carries real RR intervals.
+      try {
+        const series = (await mod.queryHeartbeatSeriesSamples?.({ from, to, limit: LIMIT })) || [];
+        for (const hb of series) {
+          const rr = rrFromSeries(hb);
+          if (rr.length < 20) continue;
+          const res = computeHrv(rr);
+          if (!res.time || !Object.keys(res.fields).length) continue;
+          out.push({
+            type: 'hrv', time: hhmm(hb.startDate), startMs: hb.startDate.getTime(),
+            ownApp: isOwnSample(hb.sourceRevision), dayKey: keyOf(hb.startDate),
+            fields: res.fields, rr, rrClean: res.rrClean,
+          });
+        }
+      } catch { /* heartbeat series unavailable */ }
 
       return out;
     },
