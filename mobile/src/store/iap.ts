@@ -23,6 +23,7 @@ import {
   getAvailablePurchases, finishTransaction, purchaseUpdatedListener,
   purchaseErrorListener, deepLinkToSubscriptions, type Subscription,
 } from 'react-native-iap';
+import { isTestFlightBuild } from '../../modules/app-env';
 
 /** App Store Connect product IDs. Create both in ASC under one subscription
  *  group (with a 7-day free-trial intro offer on whichever plans should have
@@ -36,9 +37,19 @@ const isProSku = (id?: string) => !!id && PRO_SKUS.includes(id);
 export const FALLBACK_PRICE: Record<string, string> = { [YEARLY_SKU]: '$49.99', [MONTHLY_SKU]: '$7.99' };
 
 /** Let a local dev build through the paywall so you're never locked out of your
- *  own app before the products exist in App Store Connect. Real gating still
- *  applies in TestFlight / the App Store (those builds are not __DEV__). */
+ *  own app before the products exist in App Store Connect. */
 const BYPASS_IN_DEV = true;
+
+/** Let TestFlight builds through the paywall too, so beta testers can use the
+ *  app before the App Store Connect subscription products exist. TestFlight and
+ *  the App Store ship the *same* production binary, so we can't key this off a
+ *  build flag — we detect the sandbox receipt at runtime (see modules/app-env).
+ *  The real App Store build has a production receipt and stays gated. */
+const BYPASS_IN_TESTFLIGHT = true;
+
+/** Whether this build should skip the paywall entirely (treated as Pro). */
+const shouldBypassPaywall = () =>
+  (BYPASS_IN_DEV && __DEV__) || (BYPASS_IN_TESTFLIGHT && isTestFlightBuild());
 
 /** TEMP (dev only): force the paywall to show with fallback prices and no
  *  StoreKit calls, so it can be previewed in a simulator without a native
@@ -66,7 +77,7 @@ export async function initIap() {
   if (started) return;
   started = true;
   if (__DEV__ && PREVIEW_PAYWALL) { set({ ready: true, isPro: false, products: [] }); return; }
-  if (Platform.OS !== 'ios' || (BYPASS_IN_DEV && __DEV__)) {
+  if (Platform.OS !== 'ios' || shouldBypassPaywall()) {
     set({ ready: true, isPro: true });
     return;
   }
@@ -95,7 +106,7 @@ export async function initIap() {
  *  either SKU == an active entitlement (paid or in the free-trial window). */
 export async function refreshEntitlement(): Promise<boolean> {
   if (__DEV__ && PREVIEW_PAYWALL) return false;   // preview: never call StoreKit
-  if (Platform.OS !== 'ios' || (BYPASS_IN_DEV && __DEV__)) return state.isPro;
+  if (Platform.OS !== 'ios' || shouldBypassPaywall()) return state.isPro;
   try {
     const active = await getAvailablePurchases({ onlyIncludeActiveItems: true });
     const hit = active.find((p) => isProSku(p.productId));

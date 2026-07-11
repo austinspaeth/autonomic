@@ -127,11 +127,11 @@ function SubscriptionSheet({ controls }: { controls: SheetControls }) {
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 14 }}>Subscription</Text>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 }}>
         <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: isPro ? '#22c55e' : p.textDim }} />
-        <Text style={{ color: p.text, fontSize: 15, fontWeight: '600' }}>{isPro ? 'Autonomic Pro — active' : 'No active subscription'}</Text>
+        <Text style={{ color: p.text, fontSize: 15, fontWeight: '600' }}>{isPro ? 'Subscription active' : 'No active subscription'}</Text>
       </View>
       <Text style={{ color: p.textDim, fontSize: 14, lineHeight: 21, marginBottom: 16 }}>
         {isPro
-          ? `${price ? `Your plan renews ${period}ly at ${price}. ` : ''}Change your plan or cancel anytime in the App Store — cancelling keeps access until the period ends.`
+          ? `${price ? `Your plan renews ${period}ly at ${price}. ` : ''}Change your plan or cancel anytime in the App Store. Cancelling keeps access until the period ends.`
           : 'You have no active plan. Restore a previous purchase, or manage plans in the App Store.'}
       </Text>
       <View style={{ gap: 10 }}>
