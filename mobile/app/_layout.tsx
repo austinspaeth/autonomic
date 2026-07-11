@@ -12,7 +12,6 @@ import { SheetProvider } from '../src/components/Sheet';
 import { ToastProvider } from '../src/components/Toast';
 import { OnboardingGate } from '../src/features/Onboarding';
 import { runDailyBackup } from '../src/lib/backup';
-import { applyMockSeed } from '../src/lib/devSeed';
 import { usePalette } from '../src/theme';
 
 function Themed({ children }: { children: React.ReactNode }) {
@@ -34,8 +33,6 @@ export default function RootLayout() {
     IBMPlexMono_400Regular,
   });
   useEffect(() => {
-    // Dev-only: populate/clean the last 14 days of mock data (see devSeed.ts).
-    if (__DEV__) applyMockSeed();
     // First-launch-of-the-day JSON snapshot (rotating, kept in Documents/backups).
     runDailyBackup();
     // Pull any published EAS update in the background (preview + production
