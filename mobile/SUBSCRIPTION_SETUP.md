@@ -17,7 +17,7 @@ trial period counts as active). If not entitled, the paywall covers the app.
 
 ---
 
-## Part A — App Store Connect (config, no code)
+## Part A: App Store Connect (config, no code)
 
 **A0. Sign the Paid Apps Agreement (the #1 blocker).** Business → Agreements →
 accept **Paid Applications Agreement** and complete **banking + tax**. In-app
@@ -37,7 +37,7 @@ problems are just this.
 → new subscribers.
 
 **A4. Subscription metadata.** Localized display name ("Autonomic Pro"),
-description, and a **review screenshot of the paywall** (required — capture it
+description, and a **review screenshot of the paywall** (required, capture it
 once the paywall UI below runs).
 
 **A5.** Leave it in "Ready to Submit"; it gets reviewed **with** your first app
@@ -45,7 +45,7 @@ build that contains it.
 
 ---
 
-## Part B — Install
+## Part B: Install
 
 ```bash
 cd mobile
@@ -59,9 +59,9 @@ In-App Purchase capability automatically once your Paid Apps Agreement is active
 
 ---
 
-## Part C — Code
+## Part C: Code
 
-### 1. `src/store/iap.ts` — the StoreKit 2 module
+### 1. `src/store/iap.ts`: the StoreKit 2 module
 
 ```ts
 import { useSyncExternalStore } from 'react';
@@ -99,7 +99,7 @@ export async function initIap() {
     set({ product: subs[0] });
     await refreshEntitlement();
   } catch {
-    // swallow — treated as not-Pro
+    // swallow; treated as not-Pro
   } finally {
     set({ ready: true });
   }
@@ -139,7 +139,7 @@ export function useIap() {
 }
 ```
 
-### 2. `src/features/SubscriptionGate.tsx` — the paywall overlay
+### 2. `src/features/SubscriptionGate.tsx`: the paywall overlay
 
 Matches the `OnboardingGate` pattern (absolute-fill, `usePalette`, `Button`).
 Give it a lower `zIndex` (90) than onboarding (100) so a first-run user sees the
@@ -234,28 +234,28 @@ Linking.openURL('https://apps.apple.com/account/subscriptions');
 
 ---
 
-## Part D — Test (real device, free sandbox)
+## Part D: Test (real device, free sandbox)
 
 1. App Store Connect → Users and Access → **Sandbox** → add a sandbox tester
    (a fresh email, not your real Apple ID).
 2. Build to a real device (`expo run:ios` or a TestFlight build) and sign into
    the sandbox account when the purchase sheet asks.
 3. Verify: paywall shows the price and "7 days free"; "Start free trial" opens
-   the sheet; after confirming, the paywall disappears; kill and relaunch — still
+   the sheet; after confirming, the paywall disappears; kill and relaunch, still
    Pro (entitlement persists); "Restore purchases" works on a fresh install.
 4. Sandbox subscriptions renew on an accelerated clock (a year = minutes), so you
    can watch it renew and expire.
 
 ---
 
-## Part E — Submit
+## Part E: Submit
 
 - Attach the subscription to the app version (Pricing/In-App Purchases section of
   the version) so it is reviewed **with** the build.
 - The paywall screen must show, and Apple checks for: the **price**, the
   **trial + renewal terms**, a **Restore** control, and **Terms + Privacy**
   links. The code above has all four.
-- Privacy label stays **"Data Not Collected"** — StoreKit purchases are between
+- Privacy label stays **"Data Not Collected"**. StoreKit purchases are between
   the app and Apple; no third party is involved, so nothing changes there.
 - App Store Server Notifications URL and app-specific shared secret: **leave both
   blank.** On-device StoreKit 2 does not use them.
@@ -264,7 +264,7 @@ Linking.openURL('https://apps.apple.com/account/subscriptions');
 
 ## Gotchas checklist
 
-- [ ] Paid Apps Agreement active (A0) — else products return empty and the
+- [ ] Paid Apps Agreement active (A0); else products return empty and the
       paywall shows no price.
 - [ ] Product ID in App Store Connect **exactly** equals `PRO_SKU`.
 - [ ] Tested with a **sandbox** account on a **real device** (simulator can't buy).
