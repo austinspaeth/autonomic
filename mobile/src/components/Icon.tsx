@@ -13,7 +13,8 @@ export type IconName =
   | 'arrowLeft' | 'arrowUp' | 'standing' | 'poop' | 'cup' | 'utensils' | 'scale' | 'search'
   | 'bulb' | 'star' | 'brain' | 'virus' | 'clipboard' | 'smile' | 'ai' | 'chart'
   | 'trendUp' | 'trendDown' | 'triangle' | 'checklist' | 'cell' | 'gut'
-  | 'bluetooth' | 'watch' | 'plus' | 'trash' | 'settings' | 'sun' | 'play' | 'stop';
+  | 'bluetooth' | 'watch' | 'plus' | 'trash' | 'settings' | 'sun' | 'play' | 'stop'
+  | 'camera';
 
 const P: Record<IconName, string[]> = {
   heartPulse: ['M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z', 'M3.22 12H9.5l.6-1.3 1.9 4.6 2-7 1.5 3.7h5.27'],
@@ -74,6 +75,7 @@ const P: Record<IconName, string[]> = {
   sun: ['M12 1v2', 'M12 21v2', 'M4.2 4.2l1.4 1.4', 'M18.4 18.4l1.4 1.4', 'M1 12h2', 'M21 12h2', 'M4.2 19.8l1.4-1.4', 'M18.4 5.6l1.4-1.4'],
   play: ['M6 4l14 8-14 8z'],
   stop: [],
+  camera: ['M14.5 4h-5L7.5 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3.5z'],
 };
 
 // Icons that need extra <circle>/<rect> elements beyond the path list.
@@ -99,6 +101,7 @@ export function Icon({ name, size = 22, color = '#000', strokeWidth = 1.9 }: { n
       {name === 'chart' && <Rect x={3} y={3} width={18} height={18} rx={2} {...common} />}
       {name === 'watch' && <Rect x={7} y={7} width={10} height={10} rx={2} {...common} />}
       {name === 'stop' && <Rect x={6} y={6} width={12} height={12} rx={2} {...common} />}
+      {name === 'camera' && <Circle cx={12} cy={13} r={3.5} {...common} />}
       {EXTRAS[name]}
       {P[name].map((d, i) => (<Path key={i} d={d} {...common} />))}
     </Svg>

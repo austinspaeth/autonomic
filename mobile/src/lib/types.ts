@@ -33,7 +33,8 @@ export interface Entry {
 
 /** Extra fields carried by a live-captured HRV reading. */
 export interface LiveHrvExtras {
-  source?: 'polar' | 'watch' | 'manual';
+  /** Capture source ('polar' = Bluetooth strap, best; 'camera' = phone PPG, lowest quality). */
+  source?: 'polar' | 'watch' | 'camera' | 'manual';
   rrRaw?: number[];
   rrClean?: number[];
   durationSec?: number;

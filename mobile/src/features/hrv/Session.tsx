@@ -5,8 +5,13 @@
  * the timer and RR/HR collection do not begin until Start is pressed. Once
  * running, a single "Finish now" ends early; it also auto-finishes at the full
  * duration. On finish the breathing guide (and its haptics) stops, a strong
- * ~1 s buzz marks completion, and either the results card (strap) or the
+ * ~1 s buzz marks completion, and either the results card (strap/camera) or the
  * Apple-Health ECG sync card (watch) rises over this one.
+ *
+ * Camera (PPG) source: the camera + torch start on mount so finger placement
+ * can lock BEFORE the reading — "Start reading" stays disabled until a steady
+ * pulse is detected. Samples stream in the same { hr, rr[] } shape as BLE and
+ * flow through the same collection path.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
@@ -20,6 +25,8 @@ import { BreathingViz } from './BreathingViz';
 import { HrvResults } from './Results';
 import { EcgSyncSheet } from './EcgSync';
 import { ble } from '../../lib/ble/manager';
+import { ppg, type PpgSignal } from '../../lib/ppg/camera';
+import { PpgCameraView } from '../../lib/ppg/CameraView';
 import { correctArtifacts, std } from '../../lib/hrv';
 import { getState } from '../../store/store';
 
@@ -38,7 +45,7 @@ async function completionBuzz() {
 export interface SessionConfig {
   kind: 'breath' | 'unstructured';
   style?: string; // e.g. "4/6"
-  source: 'polar' | 'watch';
+  source: 'polar' | 'watch' | 'camera';
   period?: 'Morning' | 'Evening' | 'Other';
 }
 
@@ -54,11 +61,15 @@ export function HrvSession({ config, controls }: { config: SessionConfig; contro
   const [connected, setConnected] = useState(false);
   const [artifactHint, setArtifactHint] = useState(false);
   const [phase, setPhase] = useState<'in' | 'out'>('in');
+  // Camera source: finger-placement signal (drives the pre-start lock and the
+  // finger-lifted warning mid-reading).
+  const [signal, setSignal] = useState<PpgSignal>({ locked: false, quality: 'none' });
   const rrRef = useRef<number[]>([]);
   const hrRef = useRef<{ t: number; bpm: number }[]>([]);
   const sdnnRef = useRef<{ t: number; sdnn: number }[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startedAtRef = useRef<number>(0);
+  const startedRef = useRef(false);
   const finishedRef = useRef(false);
   const recentRr = useRef<number[]>([]);
 
@@ -69,12 +80,62 @@ export function HrvSession({ config, controls }: { config: SessionConfig; contro
 
   const [inS, exS] = (config.style || '4/6').split('/').map(Number);
 
+  // Shared RR/HR/SDNN collection — both the BLE strap and the camera PPG
+  // stream emit the same { hr, rr[] } sample shape into this.
+  const collect = (s: { hr: number; rr: number[] }) => {
+    if (s.hr) { setHr(s.hr); }
+    const now = Date.now();
+    if (s.hr) hrRef.current.push({ t: now, bpm: s.hr });
+    s.rr.forEach((v) => rrRef.current.push(v));
+    // live artifact hint over the last ~10 beats
+    recentRr.current = [...recentRr.current, ...s.rr].slice(-12);
+    if (recentRr.current.length >= 6) {
+      const { artifactPct } = correctArtifacts(recentRr.current);
+      setArtifactHint(artifactPct > 20);
+    }
+    // Rolling SDNN over the trailing ~60 s of beats (artifact-corrected),
+    // sampled once per notification (~1 Hz).
+    if (s.rr.length) {
+      const all = rrRef.current;
+      let sum = 0, i = all.length;
+      while (i > 0 && sum < 60000) { i--; sum += all[i]; }
+      const win = all.slice(i);
+      if (win.length >= 10) {
+        const sdnn = Math.round(std(correctArtifacts(win).clean));
+        setLiveSdnn(sdnn);
+        sdnnRef.current.push({ t: now, sdnn });
+      }
+    }
+  };
+
+  // Camera source: start the camera + torch immediately so the finger can be
+  // placed and the pulse locked BEFORE the reading begins. Samples are only
+  // collected once Start is pressed (startedRef gates them).
+  useEffect(() => {
+    if (config.source !== 'camera') return;
+    const mgr = ppg();
+    if (!mgr.available) return;
+    (async () => {
+      try {
+        await mgr.requestPermissions();
+        await mgr.start(
+          (s) => { if (startedRef.current && !finishedRef.current) collect(s); },
+          (sig) => setSignal(sig),
+        );
+      } catch { /* stub or permission denied — the lock text stays on "Place your finger" */ }
+    })();
+    return () => { mgr.stop().catch(() => {}); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Collection + timer only begin on Start. The breathing guide runs regardless.
   const begin = () => {
     if (started) return;
     setStarted(true);
+    startedRef.current = true;
     startedAtRef.current = Date.now();
-    if (config.source === 'watch') setConnected(true);
+    // watch: the ECG is recorded on the wrist; camera: already streaming since mount.
+    if (config.source === 'watch' || config.source === 'camera') setConnected(true);
     // BLE path: connect + collect RR
     if (config.source === 'polar') {
       const saved = getState().settings.lastBleDeviceId;
@@ -83,32 +144,7 @@ export function HrvSession({ config, controls }: { config: SessionConfig; contro
         if (!saved || !mgr.available) { setConnected(false); return; }
         try {
           await mgr.requestPermissions();
-          await mgr.connect(saved, (s) => {
-            setConnected(true);
-            if (s.hr) { setHr(s.hr); }
-            const now = Date.now();
-            if (s.hr) hrRef.current.push({ t: now, bpm: s.hr });
-            s.rr.forEach((v) => rrRef.current.push(v));
-            // live artifact hint over the last ~10 beats
-            recentRr.current = [...recentRr.current, ...s.rr].slice(-12);
-            if (recentRr.current.length >= 6) {
-              const { artifactPct } = correctArtifacts(recentRr.current);
-              setArtifactHint(artifactPct > 20);
-            }
-            // Rolling SDNN over the trailing ~60 s of beats (artifact-corrected),
-            // sampled once per BLE notification (~1 Hz).
-            if (s.rr.length) {
-              const all = rrRef.current;
-              let sum = 0, i = all.length;
-              while (i > 0 && sum < 60000) { i--; sum += all[i]; }
-              const win = all.slice(i);
-              if (win.length >= 10) {
-                const sdnn = Math.round(std(correctArtifacts(win).clean));
-                setLiveSdnn(sdnn);
-                sdnnRef.current.push({ t: now, sdnn });
-              }
-            }
-          }, () => setConnected(false));
+          await mgr.connect(saved, (s) => { setConnected(true); collect(s); }, () => setConnected(false));
         } catch { setConnected(false); }
       })();
     }
@@ -137,6 +173,7 @@ export function HrvSession({ config, controls }: { config: SessionConfig; contro
     completionBuzz();
     if (timerRef.current) clearInterval(timerRef.current);
     if (config.source === 'polar') await ble().disconnect().catch(() => {});
+    if (config.source === 'camera') await ppg().stop().catch(() => {});
 
     // Apple Watch path: the wearer recorded an ECG during the reading. Stack a
     // syncing card on top that pulls that ECG from Apple Health, evaluates it,
@@ -149,6 +186,7 @@ export function HrvSession({ config, controls }: { config: SessionConfig; contro
       return;
     }
 
+    // Strap and camera both finish with the RR array in hand — same Results path.
     const rr = rrRef.current.slice();
     // Open Results as a card stacked ON TOP of this one: this session card recedes
     // (scales back + lifts) while Results rises over it. Save/Discard in Results
@@ -165,8 +203,13 @@ export function HrvSession({ config, controls }: { config: SessionConfig; contro
   const R = 108, SW = 9, C = 2 * Math.PI * R;
   const ringSize = 2 * (R + SW);
 
+  const cameraLockPending = config.source === 'camera' && !started && !signal.locked;
+
   return (
     <View style={{ alignItems: 'center', paddingTop: 8 }}>
+      {/* Invisible 1×1 camera feeding the PPG manager; mounted for the whole
+          camera session so the pre-start lock and the reading share one stream. */}
+      {config.source === 'camera' ? <PpgCameraView /> : null}
       <Text style={{ color: p.textDim, fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, fontWeight: '700' }}>
         {config.kind === 'breath' ? `Structured HRV · ${config.style}` : 'Unstructured HRV'}
       </Text>
@@ -200,8 +243,29 @@ export function HrvSession({ config, controls }: { config: SessionConfig; contro
 
       <View style={{ minHeight: 22, marginTop: 14, alignItems: 'center' }}>
         {started && !connected && config.source === 'polar' ? <Text style={{ color: GRADE_COLORS.ok }}>Connecting to strap…</Text> : null}
-        {artifactHint ? <Text style={{ color: GRADE_COLORS.bad }}>Signal noisy, adjust the strap</Text> : null}
+        {artifactHint ? (
+          <Text style={{ color: GRADE_COLORS.bad, textAlign: 'center', paddingHorizontal: 24 }}>
+            {config.source === 'camera' ? 'Signal noisy — steady your finger, ease the pressure' : 'Signal noisy, adjust the strap'}
+          </Text>
+        ) : null}
         {started && !finished && config.source === 'watch' ? <Text style={{ color: p.textDim, textAlign: 'center', paddingHorizontal: 24 }}>Record an ECG on your Apple Watch now (open the ECG app and hold the crown). It syncs in when the reading ends.</Text> : null}
+        {/* Camera pre-start: placement guidance + live lock status. */}
+        {config.source === 'camera' && !started ? (
+          <>
+            <Text style={{ color: p.textDim, textAlign: 'center', paddingHorizontal: 24 }}>
+              Cover the rear camera and flash with your fingertip. Rest your hand, light pressure.
+            </Text>
+            <Text style={{ color: signal.locked ? GRADE_COLORS.good : GRADE_COLORS.ok, fontWeight: '600', marginTop: 6 }}>
+              {signal.locked ? '✓ Pulse detected' : signal.quality === 'weak' ? 'Hold still — finding your pulse…' : 'Place your finger…'}
+            </Text>
+          </>
+        ) : null}
+        {/* Finger lifted mid-reading: warn instead of silently collecting junk. */}
+        {config.source === 'camera' && started && !finished && !signal.locked && !artifactHint ? (
+          <Text style={{ color: GRADE_COLORS.bad, textAlign: 'center', paddingHorizontal: 24 }}>
+            Pulse lost — cover the camera and flash with your fingertip
+          </Text>
+        ) : null}
       </View>
 
       <SheetFooter>
@@ -210,7 +274,8 @@ export function HrvSession({ config, controls }: { config: SessionConfig; contro
         ) : (
           <>
             <Button title="Cancel" variant="ghost" onPress={() => controls.close()} />
-            <Button title="Start reading" variant="primary" onPress={begin} />
+            {/* A 5-minute camera reading must not start on garbage signal. */}
+            <Button title="Start reading" variant="primary" onPress={begin} disabled={cameraLockPending} />
           </>
         )}
       </SheetFooter>

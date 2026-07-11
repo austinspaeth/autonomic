@@ -39,7 +39,7 @@ const spark = (days: DaysMap, type: string, ex: (r: Entry) => number | null, ban
 };
 
 /** Map a reading's capture source to a human label for the Details card. */
-const SOURCE_LABEL: Record<string, string> = { polar: 'Bluetooth device', watch: 'Apple Watch', manual: 'Manual entry' };
+const SOURCE_LABEL: Record<string, string> = { polar: 'Bluetooth device', watch: 'Apple Watch', camera: 'Camera (PPG)', manual: 'Manual entry' };
 
 /* ---------- legacy primitives (still used by DaySummary) ---------- */
 

@@ -38,7 +38,12 @@ export function HrvResults({ rr, hrSamples, sdnnSamples, config, durationSec, wa
     const type = config.kind === 'breath' ? 'breathHrv' : 'hrv';
     const base: Entry = {
       id: uid(), type, time: nowTime(),
-      period: config.period || 'Other', note: config.source === 'watch' ? 'Captured via Apple Watch ECG' : 'Captured via chest strap',
+      period: config.period || 'Other',
+      note: config.source === 'watch' ? 'Captured via Apple Watch ECG'
+        : config.source === 'camera' ? 'Captured via phone camera (PPG)'
+        : 'Captured via chest strap',
+      // Capture source is stamped on the reading so camera (PPG) readings stay
+      // distinguishable downstream (filtering / de-weighting in Analysis later).
       source: config.source, durationSec,
       rrRaw: rr, rrClean: result.rrClean, sampledHr: hrSamples,
     };
@@ -86,7 +91,7 @@ export function HrvResults({ rr, hrSamples, sdnnSamples, config, durationSec, wa
     <View>
       <Text style={{ fontSize: 25, fontWeight: '800', color: p.text, marginBottom: 4 }}>Reading complete</Text>
       <Text style={{ color: p.textDim, fontSize: 14, marginBottom: 16 }}>
-        {`${Math.floor(durationSec / 60)}:${String(durationSec % 60).padStart(2, '0')} captured · ${rr.length} beats · ${Math.round(result.artifactPct)}% artifacts`}
+        {`${Math.floor(durationSec / 60)}:${String(durationSec % 60).padStart(2, '0')} captured · ${rr.length} beats · ${Math.round(result.artifactPct)}% artifacts${config.source === 'camera' ? ' · Camera (PPG)' : ''}`}
       </Text>
 
       {!enoughData ? (

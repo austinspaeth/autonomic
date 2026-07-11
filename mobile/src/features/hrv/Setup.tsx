@@ -1,7 +1,8 @@
 /**
  * HRV setup sheet — the entry point for a live 5-minute capture. Choose kind
  * (Unstructured vs Structured), a breathing pattern (4/4, 4/5, 4/6 recommended,
- * 5/5), and a signal source (Bluetooth strap or Apple Watch), then Start.
+ * 5/5), and a signal source (Bluetooth strap, Apple Watch, or the phone camera),
+ * then Start.
  */
 import React, { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
@@ -13,6 +14,7 @@ import { radius, usePalette } from '../../theme';
 import { getState, useAppState } from '../../store/store';
 import { getCurrentKey } from '../../store/nav';
 import { health } from '../../lib/health';
+import { ppg } from '../../lib/ppg/camera';
 import { DevicesScreen } from '../Devices';
 import { HrvSession, type SessionConfig } from './Session';
 
@@ -33,7 +35,7 @@ const HELP = {
   period:
     'Tagging the time of day keeps like readings comparable. Morning readings taken right after waking are the most consistent baseline; evening readings show how the day wound down.',
   source:
-    'Where the heartbeat signal comes from. A Bluetooth chest strap is the most accurate. Apple Watch uses an ECG you record on your watch during the reading, which syncs in afterward.',
+    'Where the heartbeat signal comes from. A Bluetooth chest strap is the most accurate. Apple Watch uses an ECG you record on your watch during the reading, which syncs in afterward. Phone camera reads your pulse through your fingertip over the rear camera and flash — no device needed, but it is the least accurate option.',
 };
 
 export function HrvSetup({ controls }: { controls: SheetControls }) {
@@ -42,7 +44,7 @@ export function HrvSetup({ controls }: { controls: SheetControls }) {
   const { openSheet } = useSheets();
   const [kind, setKind] = useState<'unstructured' | 'breath'>('breath');
   const [style, setStyle] = useState('4/6');
-  const [source, setSource] = useState<'polar' | 'watch'>('polar');
+  const [source, setSource] = useState<'polar' | 'watch' | 'camera'>('polar');
   // Default the time-of-day from the clock: before 11am (and no morning reading
   // yet today) → Morning, after 7pm → Evening, else Other.
   const [period, setPeriod] = useState<'Morning' | 'Evening' | 'Other'>(() => {
@@ -75,6 +77,10 @@ export function HrvSetup({ controls }: { controls: SheetControls }) {
     }
     if (source === 'watch' && !health().available) {
       toast('Apple Watch readings need an iOS build');
+      return;
+    }
+    if (source === 'camera' && !ppg().available) {
+      toast('Camera readings need an iOS device build');
       return;
     }
     const config: SessionConfig = { kind, source, period, style: kind === 'breath' ? style : undefined };
@@ -112,8 +118,9 @@ export function HrvSetup({ controls }: { controls: SheetControls }) {
 
       <Label text="Signal source" help={HELP.source} top />
       <View style={{ gap: 8 }}>
-        <SourceOption icon="bluetooth" title="Bluetooth device" sub={savedName ? `Paired: ${savedName}` : 'Tap to pair a device'} active={source === 'polar'} onPress={pickBluetooth} />
-        <SourceOption icon="watch" title="Apple Watch" sub="Record an ECG on your watch during the reading, it syncs in after" active={source === 'watch'} onPress={() => setSource('watch')} />
+        <SourceOption icon="bluetooth" title="Bluetooth device" badge="Best accuracy" sub={savedName ? `Paired: ${savedName}` : 'Tap to pair a device'} active={source === 'polar'} onPress={pickBluetooth} />
+        <SourceOption icon="watch" title="Apple Watch" badge="High accuracy" sub="Record an ECG on your watch during the reading, it syncs in after" active={source === 'watch'} onPress={() => setSource('watch')} />
+        <SourceOption icon="camera" title="Phone camera" badge="Lower accuracy" sub="No device needed · fingertip over the rear camera" active={source === 'camera'} onPress={() => setSource('camera')} />
       </View>
 
       <View style={{ height: 20 }} />
@@ -133,13 +140,18 @@ function Label({ text, help, top }: { text: string; help?: string; top?: boolean
   );
 }
 
-function SourceOption({ icon, title, sub, active, onPress }: { icon: 'bluetooth' | 'watch'; title: string; sub: string; active: boolean; onPress: () => void }) {
+function SourceOption({ icon, title, badge, sub, active, onPress }: { icon: 'bluetooth' | 'watch' | 'camera'; title: string; badge: string; sub: string; active: boolean; onPress: () => void }) {
   const p = usePalette();
   return (
     <Pressable onPress={onPress} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: radius.control, borderWidth: 1, borderColor: active ? p.accent : p.border, backgroundColor: active ? p.accentSoft : p.surface2 }}>
       <Icon name={icon} size={22} color={active ? p.accent : p.textDim} />
       <View style={{ flex: 1 }}>
-        <Text style={{ color: active ? p.accent : p.text, fontWeight: '700' }}>{title}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Text style={{ color: active ? p.accent : p.text, fontWeight: '700' }}>{title}</Text>
+          <View style={{ paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999, borderWidth: 1, borderColor: active ? p.accent : p.border }}>
+            <Text style={{ color: active ? p.accent : p.textDim, fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 }}>{badge}</Text>
+          </View>
+        </View>
         <Text style={{ color: p.textDim, fontSize: 12 }}>{sub}</Text>
       </View>
       {active ? <Icon name="check" size={18} color={p.accent} /> : null}

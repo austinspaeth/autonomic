@@ -192,8 +192,8 @@ export function Stepper({ value, step, onChange, format }: { value: number; step
 }
 
 /* ---------- Buttons ---------- */
-export function Button({ title, onPress, variant = 'default', style }: {
-  title: string; onPress: () => void; variant?: 'default' | 'primary' | 'ghost' | 'danger' | 'dashed'; style?: StyleProp<ViewStyle>;
+export function Button({ title, onPress, variant = 'default', style, disabled }: {
+  title: string; onPress: () => void; variant?: 'default' | 'primary' | 'ghost' | 'danger' | 'dashed'; style?: StyleProp<ViewStyle>; disabled?: boolean;
 }) {
   const p = usePalette();
   const bg = variant === 'primary' ? p.accent : variant === 'danger' ? '#d63b3b' : variant === 'ghost' || variant === 'dashed' ? 'transparent' : p.surface2;
@@ -202,8 +202,10 @@ export function Button({ title, onPress, variant = 'default', style }: {
   return (
     <Pressable
       onPress={onPress}
+      disabled={disabled}
       style={({ pressed }) => [
         { flex: 1, borderRadius: radius.control, borderWidth: variant === 'dashed' ? 1.5 : 1, borderStyle: variant === 'dashed' ? 'dashed' : 'solid', backgroundColor: bg, borderColor: border, paddingVertical: 13, alignItems: 'center' },
+        disabled && { opacity: 0.45 },
         pressed && { opacity: 0.7 },
         style,
       ]}

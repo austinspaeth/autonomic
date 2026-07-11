@@ -78,7 +78,7 @@ export default function InsightsScreen() {
       ) : (
         <>
           <Text style={{ color: p.textDim, fontSize: 14, marginBottom: 12, lineHeight: 19 }}>
-            Pick a report area, tap Generate Report Prompt, then paste it into Claude, ChatGPT, Gemini, or any other provider to discover patterns, spot trends, gauge your progress, and surface what's worth discussing with your doctor.
+            Pick a report area, tap Generate Report Prompt, then paste it into Claude, ChatGPT, Gemini, or any other provider to discover patterns, spot trends, gauge your progress, and surface what&apos;s worth discussing with your doctor.
           </Text>
           <Pressable onPress={dataExport} style={{ marginBottom: 10, width: '100%', borderWidth: 1, borderRadius: radius.card, backgroundColor: p.surface, borderColor: p.border, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
             <Icon name="download" size={26} color={p.accent} />
