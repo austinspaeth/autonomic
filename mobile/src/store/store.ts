@@ -148,6 +148,17 @@ export function mutate(fn: (s: AppState) => void) {
   save();
 }
 
+/** DEV-ONLY (screenshot scenes): swap the live state in memory and notify WITHOUT
+ *  persisting to MMKV, returning a restore fn. Lets a scene render real components
+ *  against crafted data and put the real data back on unmount — the on-disk store
+ *  is never touched. */
+export function __devSwapState(next: AppState): () => void {
+  const prev = state;
+  state = next;
+  emit();
+  return () => { state = prev; emit(); };
+}
+
 export function getState(): AppState {
   return state;
 }

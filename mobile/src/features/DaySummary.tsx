@@ -17,7 +17,7 @@ import { radius, type as T, usePalette } from '../theme';
 import { SCORE_COLORS, GRADE_LABEL, GRADE_PTS, catFromBands } from '../lib/scoring';
 import {
   OUTLOOK_GUIDE, TOMORROW, SCORE_TIPS, blueZone, readingPeriod, resolveProtocol,
-  scoreCat, scoreSet, streakInfo, streakTier, type ScoreComp, type ScoreSetResult,
+  scoreCat, scoreSet, streakInfo, streakTier, type DaysMap, type ScoreComp, type ScoreSetResult,
 } from '../lib/scoring/day';
 import { typesFor } from '../lib/typeCatalog';
 import { todayKey } from '../lib/dates';
@@ -39,7 +39,7 @@ const hexA = (hex: string, a: number) => {
 // color=null to fall back to a plain border (awaiting / low-confidence state).
 let obId = 0;
 const AnimatedRect = Animated.createAnimatedComponent(Rect);
-function GradientBorderCard({ color, trigger, style, children }: { color: string | null; trigger?: string; style?: any; children: React.ReactNode }) {
+export function GradientBorderCard({ color, trigger, style, children }: { color: string | null; trigger?: string; style?: any; children: React.ReactNode }) {
   const p = usePalette();
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [gid] = useState(() => `ob${obId++}`);
@@ -128,14 +128,14 @@ export function DaySummary({ dk }: { dk: string }) {
   );
 }
 
-function ScoredHero({ dk, readings, d, all, ctx, onExplain }: { dk: string; readings: any[]; d: any; all: ScoreSetResult; ctx: any; onExplain: () => void }) {
+export function ScoredHero({ dk, readings, d, all, ctx, onExplain, days }: { dk: string; readings: any[]; d: any; all: ScoreSetResult; ctx: any; onExplain: () => void; days?: DaysMap }) {
   const p = usePalette();
   const today = todayKey();
   const cat = scoreCat(all.score!);
   const morning = readings.filter((r) => readingPeriod(r) === 'morning');
   const evening = readings.filter((r) => readingPeriod(r) === 'evening');
   const hasEvening = evening.length > 0;
-  const mornScore = morning.length ? scoreSet(morning, d, dk, getState().days, ctx).score : null;
+  const mornScore = morning.length ? scoreSet(morning, d, dk, days || getState().days, ctx).score : null;
   const delta = mornScore != null ? all.score! - mornScore : null;
   const mode = hasEvening ? (dk < today ? 'Day Complete' : 'Reflectance') : 'Autonomic Outlook';
 
@@ -330,7 +330,7 @@ function ReqSection({ title, desc, enabled, onToggle, children }: { title: strin
   );
 }
 
-function ProtocolEditor({ controls }: { controls: SheetControls }) {
+export function ProtocolEditor({ controls }: { controls: SheetControls }) {
   const p = usePalette();
   const state = useAppState();
   const [proto, setProto] = useState<Protocol>(() => resolveProtocol(state.settings.protocol));
@@ -441,7 +441,12 @@ function zoneAdvice(raw: number | null, bands: Band[] | null, unit?: string) {
   return { cur, ideal, done: false, dir };
 }
 
-function ScoreExplain({ all, dk, controls }: { all: ScoreSetResult; dk: string; controls: SheetControls }) {
+export function ScoreExplain({ all, dk, controls, hero, hideIntro, hideClose }: {
+  all: ScoreSetResult; dk: string; controls: SheetControls;
+  /** Override the hero card (label / grade tint+tag / guidance tip). */
+  hero?: { label?: string; cat?: ScoreCat | null; tip?: string };
+  hideIntro?: boolean; hideClose?: boolean;
+}) {
   const p = usePalette();
   const cat = scoreCat(all.score!);
   const ptsToCat = (pt: number): ScoreCat => (pt >= 88 ? 'great' : pt >= 70 ? 'good' : pt >= 48 ? 'ok' : pt >= 23 ? 'bad' : 'crash');
@@ -466,10 +471,17 @@ function ScoreExplain({ all, dk, controls }: { all: ScoreSetResult; dk: string; 
   return (
     <View>
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 16 }}>How this score was calculated</Text>
-      <HeroCard cat={cat.short === 'Excellent' || cat.short === 'Good' ? 'great' : null} label={cat.label} big={all.score!} den="/ 100" sub={`Confidence ${all.confidence}%, the share of the full input set available to score today.`} />
-      <Text style={{ fontSize: 14, color: p.textDim, lineHeight: 20, marginBottom: 16 }}>
-        {"The Autonomic Score is a weighted blend of the day's readings. Each input is graded, turned into points, and combined by weight. Missing inputs drop out and the remaining weights are rescaled, and that rescaling is the confidence percentage."}
-      </Text>
+      <HeroCard
+        cat={hero ? (hero.cat ?? null) : (cat.short === 'Excellent' || cat.short === 'Good' ? 'great' : null)}
+        label={hero?.label ?? cat.label} big={all.score!} den="/ 100"
+        sub={`Confidence ${all.confidence}%, the share of the full input set available to score today.`}
+        tip={hero?.tip}
+      />
+      {hideIntro ? null : (
+        <Text style={{ fontSize: 14, color: p.textDim, lineHeight: 20, marginBottom: 16 }}>
+          {"The Autonomic Score is a weighted blend of the day's readings. Each input is graded, turned into points, and combined by weight. Missing inputs drop out and the remaining weights are rescaled, and that rescaling is the confidence percentage."}
+        </Text>
+      )}
       {helped.length ? <SumCard title="What helped">{helped.map((c) => <CompRow key={c.label} c={c} improveLine={improveLine} />)}</SumCard> : null}
       {hurt.length ? <SumCard title="What hurt">{hurt.map((c) => <CompRow key={c.label} c={c} improveLine={improveLine} />)}</SumCard> : null}
       {neutral.length ? <SumCard title="Middle of the range">{neutral.map((c) => <CompRow key={c.label} c={c} improveLine={improveLine} />)}</SumCard> : null}
@@ -478,9 +490,13 @@ function ScoreExplain({ all, dk, controls }: { all: ScoreSetResult; dk: string; 
           <MetricRow key={c.label} label={c.label} value={`+${gain.toFixed(1)} pt`} cat={c.cat} explain={improveLine(c)} />
         )) : <MetricRow label="At the ceiling" value="" cat={false} explain="Every scored input is already in its top zone. Keep the inputs consistent to hold it." />}
       </SumCard>
-      <View style={{ height: 8 }} />
-      <Button title="Close" onPress={controls.close} />
-      <View style={{ height: 24 }} />
+      {hideClose ? null : (
+        <>
+          <View style={{ height: 8 }} />
+          <Button title="Close" onPress={controls.close} />
+          <View style={{ height: 24 }} />
+        </>
+      )}
     </View>
   );
 }

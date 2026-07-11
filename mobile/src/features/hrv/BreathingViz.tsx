@@ -48,8 +48,11 @@ const PHASE_HAPTIC: Record<BreathPhase, Haptics.ImpactFeedbackStyle> = {
   holdOut: Haptics.ImpactFeedbackStyle.Soft,
 };
 
-export function BreathingViz({ pattern, running, onPhase }: {
+export function BreathingViz({ pattern, running, onPhase, frozenProgress, frozenGlow = 0 }: {
   pattern: BreathPattern; running: boolean; onPhase?: (p: BreathPhase) => void;
+  /** Screenshot/preview mode: render the rings statically at this progress
+   *  (0 exhaled → 1 inhale peak) with no animation, ignoring `running`. */
+  frozenProgress?: number; frozenGlow?: number;
 }) {
   const p = usePalette();
   // progress: 0 (exhaled, glow at center) -> 1 (inhaled, glow reaching the outer ring)
@@ -59,6 +62,7 @@ export function BreathingViz({ pattern, running, onPhase }: {
   const onPhaseRef = useRef(onPhase); onPhaseRef.current = onPhase;
 
   useEffect(() => {
+    if (frozenProgress != null) return; // static render — no clock, no animation
     if (!running) {
       cancelAnimation(progress); cancelAnimation(glow);
       progress.value = 0; glow.value = 0;
@@ -108,10 +112,37 @@ export function BreathingViz({ pattern, running, onPhase }: {
       <Svg width={SIZE} height={SIZE}>
         {Array.from({ length: RINGS }).map((_, i) => {
           const r = INNER_R + (OUTER_R - INNER_R) * (i / (RINGS - 1));
+          if (frozenProgress != null) return <StaticRing key={i} index={i} radius={r} progress={frozenProgress} glow={frozenGlow} accent={p.accent} track={p.border} />;
           return <Ring key={i} index={i} radius={r} progress={progress} glow={glow} accent={p.accent} track={p.border} />;
         })}
       </Svg>
     </View>
+  );
+}
+
+/** Two-hex lerp (#rrggbb), for the frozen hold-glow tint. */
+function lerpHex(a: string, b: string, t: number): string {
+  const pa = [1, 3, 5].map((i) => parseInt(a.slice(i, i + 2), 16));
+  const pb = [1, 3, 5].map((i) => parseInt(b.slice(i, i + 2), 16));
+  const c = pa.map((x, i) => Math.round(x + (pb[i] - x) * t).toString(16).padStart(2, '0'));
+  return `#${c.join('')}`;
+}
+
+/** Non-animated twin of `Ring` — same opacity/width/colour formula frozen at a
+ *  given progress + glow. Used by the screenshot scenes. */
+function StaticRing({ index, radius, progress, glow, accent, track }: {
+  index: number; radius: number; progress: number; glow: number; accent: string; track: string;
+}) {
+  const threshold = (index + 1) / RINGS;
+  const near = Math.max(0, Math.min(1, (progress - (threshold - 1 / RINGS)) / (1 / RINGS)));
+  const opacity = Math.min(1, 0.12 + near * 0.88 + glow * 0.22);
+  const strokeWidth = 2 + near * 3 + glow * 1.4;
+  const stroke = glow > 0 ? lerpHex(accent, GLOW_ACCENT, glow) : accent;
+  return (
+    <>
+      <Circle cx={CENTER} cy={CENTER} r={radius} stroke={track} strokeWidth={2} fill="none" opacity={0.35} />
+      <Circle cx={CENTER} cy={CENTER} r={radius} stroke={stroke} strokeWidth={strokeWidth} fill="none" opacity={opacity} />
+    </>
   );
 }
 

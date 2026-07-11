@@ -8,6 +8,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import Constants from 'expo-constants';
+import { useRouter } from 'expo-router';
 import { SheetControls, useSheets } from '../components/Sheet';
 import { Button } from '../components/ui';
 import { DateField, HeightField, TextField, onlyNumeric } from '../components/Field';
@@ -28,6 +29,7 @@ export function MenuSheet({ controls }: { controls: SheetControls }) {
   const { openSheet } = useSheets();
   const state = useAppState();
   const toast = useToast();
+  const router = useRouter();
   const item = (icon: IconName, title: string, sub: string, onPress: () => void, connected?: boolean) => (
     <Pressable onPress={onPress} style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 15, borderTopWidth: 1, borderTopColor: p.border }, pressed && { opacity: 0.5 }]}>
       <Icon name={icon} size={22} color={p.textDim} />
@@ -63,6 +65,7 @@ export function MenuSheet({ controls }: { controls: SheetControls }) {
       {item('upload', 'Import data', 'Replace everything from a JSON file', () => importData(controls, toast))}
       {item('sparkles', 'Show welcome screen', 'Replay the first-run guide', () => { controls.closeAll(); showWelcomeAgain(); })}
       {item('info', 'Legal information', 'Disclaimer, privacy & terms', () => openSheet((c) => <LegalSheet controls={c} />))}
+      {__DEV__ ? item('camera', 'Screenshot scenes', 'Dev-only marketing captures', () => { controls.closeAll(); router.push('/screenshots' as never); }) : null}
       <View style={{ marginTop: 22 }}>
         <Text style={{ fontSize: 12, color: p.textDim, textAlign: 'center' }}>{`Data last updated ${fmtStamp(m.lastUpdated)}`}</Text>
         <Text style={{ fontSize: 12, color: p.textDim, textAlign: 'center', marginTop: 4 }}>{`Autonomic v${appVer}`}</Text>

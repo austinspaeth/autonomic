@@ -1,0 +1,48 @@
+/**
+ * Screenshot scenes — DEV-ONLY marketing captures.
+ *
+ * These routes render the app's real screens frozen in an ideal state on pure
+ * black, with a marketing headline (Space Grotesk) baked in, so the iOS
+ * simulator screenshot IS the finished App Store asset. Reached from the dev
+ * link in the Settings menu (only shown under __DEV__). Nothing here ships.
+ */
+import React from 'react';
+import { Text, useWindowDimensions, View } from 'react-native';
+
+/** Space Grotesk faces (loaded in ./_layout). Titles/captions only — in-app UI
+ *  keeps its own type so the screens stay pixel-faithful. */
+export const SG = {
+  bold: 'SpaceGrotesk_700Bold',
+  semi: 'SpaceGrotesk_600SemiBold',
+  med: 'SpaceGrotesk_500Medium',
+} as const;
+
+/** The scene catalogue (drives the index list + ordering). */
+export const SCENES: { slug: string; n: number; title: string; caption: string }[] = [
+  { slug: 'promise', n: 1, title: 'See your nervous system recover', caption: 'For long COVID, POTS & dysautonomia recovery.' },
+  { slug: 'measure', n: 2, title: 'A clinical HRV lab in your pocket', caption: 'Every metric, computed on-device.' },
+  { slug: 'understand', n: 3, title: 'Every reading graded, and what today is good for', caption: 'A plain-language read on your day.' },
+  { slug: 'plan', n: 4, title: 'Build your own recovery protocol', caption: 'You define the clean day. The app holds you to it.' },
+  { slug: 'live', n: 5, title: 'Track it all: water, meds, even digestion', caption: 'One tap. The whole body, not just heart rate.' },
+  { slug: 'payoff', n: 7, title: 'And watch your numbers climb', caption: '12 weeks of real recovery.' },
+  { slug: 'trust', n: 8, title: '100% on your phone. No cloud, no account, no tracking.', caption: 'Your most sensitive data never leaves your device.' },
+];
+
+/** Marketing headline block shared across scenes. Type scales with the device
+ *  width so it reads the same on every simulator size. */
+export function Headline({ title, caption, center, titleScale = 1 }: { title: string; caption: string; center?: boolean; titleScale?: number }) {
+  const { width } = useWindowDimensions();
+  const titleSize = Math.round(width * 0.084 * titleScale);
+  const capSize = Math.round(width * 0.039);
+  const align = center ? 'center' : 'left';
+  return (
+    <View>
+      <Text style={{ color: '#f2f2f5', fontFamily: SG.bold, fontSize: titleSize, lineHeight: Math.round(titleSize * 1.12), letterSpacing: -0.5, textAlign: align }}>
+        {title}
+      </Text>
+      <Text style={{ color: '#9a9aa0', fontFamily: SG.med, fontSize: capSize, lineHeight: Math.round(capSize * 1.35), marginTop: 10, textAlign: align }}>
+        {caption}
+      </Text>
+    </View>
+  );
+}

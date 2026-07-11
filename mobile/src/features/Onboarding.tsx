@@ -264,12 +264,12 @@ function HistoryImportSheet({ controls, onImported }: {
   );
 }
 
-function Onboarding({ onDone }: { onDone: () => void }) {
+export function Onboarding({ onDone, initialStep = 0 }: { onDone: () => void; initialStep?: number }) {
   const insets = useSafeAreaInsets();
   const toast = useToast();
   const { openSheet } = useSheets();
   const state = useAppState();
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState(initialStep);
   const [dir, setDir] = useState(1);
   const [ack, setAck] = useState(false);
   const [healthBusy, setHealthBusy] = useState(false);
@@ -407,28 +407,7 @@ function Onboarding({ onDone }: { onDone: () => void }) {
         </Text>
       </View>
     );
-    if (step === 1) return (
-      <View style={{ flex: 1, paddingTop: 24, gap: 22 }}>
-        <View style={[st.tile, { width: 72, height: 72, borderRadius: 20 }]}>
-          <Glyph size={34} d={['M12 2l8 3v6c0 5-3.4 8.2-8 9-4.6-.8-8-4-8-9V5z', 'M9 12l2 2 4-4']} />
-        </View>
-        <View>
-          <Text style={st.h2}>Private &amp; on-device</Text>
-          <Text style={st.para}>Everything stays on your device. Your data never leaves your phone unless you export it.</Text>
-        </View>
-        <View style={{ gap: 12 }}>
-          <Bullet icon={<Glyph size={24} rect={{ x: 4, y: 10, wd: 16, ht: 10, rx: 2 }} d={['M8 10V7a4 4 0 0 1 8 0v3']} />}>
-            No account and no cloud
-          </Bullet>
-          <Bullet icon={<Glyph size={24} w={1.3} circle={{ r: 9, w: 1.8 }} d={['M4.5 8h15M4.5 16h15M12 3c-2.5 3-2.5 15 0 18M12 3c2.5 3 2.5 15 0 18']} />}>
-            No tracking, ever
-          </Bullet>
-          <Bullet icon={<Glyph size={24} d={['M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4', 'M7 10l5 5 5-5', 'M12 15V3']} />}>
-            Yours to export anytime
-          </Bullet>
-        </View>
-      </View>
-    );
+    if (step === 1) return <PrivateOnDeviceStep />;
     if (step === 2) return (
       <View style={{ flex: 1 }}>
         <View style={{ flex: 1, paddingTop: 24, gap: 22 }}>
@@ -652,3 +631,30 @@ const st = StyleSheet.create({
   note: { flexDirection: 'row', gap: 11, backgroundColor: C.accentWash, borderWidth: 1, borderColor: 'rgba(224,49,39,0.19)', borderRadius: 12, padding: 14 },
   backBtn: { width: 34, height: 34, borderRadius: 999, borderWidth: 1, borderColor: C.tileBorder, backgroundColor: C.row, alignItems: 'center', justifyContent: 'center' },
 });
+
+/** Onboarding "Private & on-device" step — extracted so the screenshot scene can
+ *  render the exact same content (see app/screenshots). */
+export function PrivateOnDeviceStep() {
+  return (
+    <View style={{ flex: 1, paddingTop: 24, gap: 22 }}>
+      <View style={[st.tile, { width: 72, height: 72, borderRadius: 20 }]}>
+        <Glyph size={34} d={['M12 2l8 3v6c0 5-3.4 8.2-8 9-4.6-.8-8-4-8-9V5z', 'M9 12l2 2 4-4']} />
+      </View>
+      <View>
+        <Text style={st.h2}>Private &amp; on-device</Text>
+        <Text style={st.para}>Everything stays on your device. Your data never leaves your phone unless you export it.</Text>
+      </View>
+      <View style={{ gap: 12 }}>
+        <Bullet icon={<Glyph size={24} rect={{ x: 4, y: 10, wd: 16, ht: 10, rx: 2 }} d={['M8 10V7a4 4 0 0 1 8 0v3']} />}>
+          No account and no cloud
+        </Bullet>
+        <Bullet icon={<Glyph size={24} w={1.3} circle={{ r: 9, w: 1.8 }} d={['M4.5 8h15M4.5 16h15M12 3c-2.5 3-2.5 15 0 18M12 3c2.5 3 2.5 15 0 18']} />}>
+          No tracking, ever
+        </Bullet>
+        <Bullet icon={<Glyph size={24} d={['M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4', 'M7 10l5 5 5-5', 'M12 15V3']} />}>
+          Yours to export anytime
+        </Bullet>
+      </View>
+    </View>
+  );
+}
