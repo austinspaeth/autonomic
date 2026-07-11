@@ -24,8 +24,16 @@ accept **Paid Applications Agreement** and complete **banking + tax**. In-app
 purchases do not load at all until this is Active. Most first-launch subscription
 problems are just this.
 
-**A1. Subscription group.** App → Autonomic → Subscriptions → create group
-`Autonomic Pro`.
+**A0b. Set the APP itself to Free.** Apps → Autonomic → **Pricing and
+Availability** → Price = **Free** ($0). The app downloads free; the $49.99 lives
+only on the subscription (below), never on the app. Do not set a paid app price.
+While here: set **Availability** (all countries, or deselect the EU if you don't
+want public DSA trader info), leave **Pre-Orders** off, keep distribution
+**Public on the App Store**, and accept the default **Tax Category**.
+
+**A1. Subscription group.** App → Autonomic → (Monetization) → Subscriptions →
+create group, Reference Name `Autonomic Pro`, and set the group's **App Store
+Display Name** (what users see in Settings → Subscriptions) to "Autonomic Pro".
 
 **A2. Auto-renewable subscription.** Inside the group, add:
 - Reference Name: `Autonomic Pro Yearly`
@@ -38,10 +46,14 @@ problems are just this.
 
 **A4. Subscription metadata.** Localized display name ("Autonomic Pro"),
 description, and a **review screenshot of the paywall** (required, capture it
-once the paywall UI below runs).
+once the paywall UI below runs). Leave **Family Sharing** off.
 
-**A5.** Leave it in "Ready to Submit"; it gets reviewed **with** your first app
-build that contains it.
+**A5. Attach it to the app version.** On the app version page, in the In-App
+Purchases / Subscriptions section, **add this subscription to the version** so it
+is reviewed **with** your first build that contains it (new subscriptions must
+ride along with a binary the first time). When price, localization, and the
+review screenshot are all done, status flips to **"Ready to Submit."** If it is
+stuck on "Missing Metadata," you skipped one of those three.
 
 ---
 
