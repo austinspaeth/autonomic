@@ -4,12 +4,12 @@
  * the PWA: a few good charts + stat tiles per category, grade-zone shaded.
  */
 import type { Entry } from '../types';
-import { SCORE_COLORS } from '../scoring';
+import { SCORE_COLORS, restingHrBands } from '../scoring';
 import { scoreCat, sleepHours, streakInfo, type DaysMap } from '../scoring/day';
 import { ACTIVITY_TYPES, MED_TYPES, TRIGGER_TYPES } from '../registry';
 import {
-  BANDS, Mode, acBandZones, acBuckets, acMean, acPresent, acRangeLabel,
-  acReadVals, acScoreZones, acTotalPower, avgRound, makeAgg,
+  BANDS, Mode, acBandZones, acBandsToZones, acBuckets, acMean, acPresent, acRangeLabel,
+  acReadVals, acScoreZones, acTotalPower, avgRound, isEvening, isMorning, makeAgg,
   type ScoreContext,
 } from './buckets';
 import type { Series, Zone } from '../../components/charts';
@@ -18,6 +18,9 @@ export interface Chart { label: string; series: Series[]; zones?: Zone[] | null;
   /** Hide the chart's own readout and instead drive the card's first stat:
    *  average by default, the dragged bucket's value with its date on select. */
   selectStat?: boolean; }
+/** Which readings a blood-pressure card is filtered to. */
+export type BpPeriod = 'all' | 'morning' | 'evening';
+export interface BpSeries { sys: (number | null)[]; dia: (number | null)[] }
 export interface Stat { label: string; value: number | string | null; sub?: string; color?: string }
 export interface Insight { text: string; strength?: 'strong' | 'mod' | null }
 export interface BarGroup { label: string; rows: { name: string; count: number; color?: string }[]; fmt?: (c: number) => string }
@@ -31,6 +34,9 @@ export interface AnalysisCard {
   charts?: Chart[]; stats?: Stat[]; insights?: Insight[]; bars?: BarGroup[];
   /** Render stats as darker rounded tiles (squircles) instead of a flat row. */
   tiles?: boolean;
+  /** Blood-pressure period variants. When set, the card shows an
+   *  All/Morning/Evening link toggle that swaps the dumbbell + avg stats. */
+  bpFilter?: Record<BpPeriod, BpSeries>;
 }
 export interface Category { id: string; icon: string; title: string; desc: string; buckets: { label: string }[]; build: () => AnalysisCard[] }
 
@@ -104,14 +110,20 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
   };
 
   const vitals = (): AnalysisCard[] => {
-    const sys = acAgg(buckets, (d) => acReadVals(d, 'bp', 'sys'));
-    const dia = acAgg(buckets, (d) => acReadVals(d, 'bp', 'dia'));
+    // Systolic/diastolic per bucket, sliced by time of day so the card's
+    // All/Morning/Evening toggle can swap which readings it draws.
+    const bpSpan = (f?: (r: Entry) => boolean): BpSeries => ({
+      sys: acAgg(buckets, (d) => acReadVals(d, 'bp', 'sys', f)),
+      dia: acAgg(buckets, (d) => acReadVals(d, 'bp', 'dia', f)),
+    });
+    const bpFilter: Record<BpPeriod, BpSeries> = { all: bpSpan(), morning: bpSpan(isMorning), evening: bpSpan(isEvening) };
+    const { sys, dia } = bpFilter.all;
     const laying = acAgg(buckets, (d) => acReadVals(d, 'restingHr', 'hr', (r) => (r.position || '') === 'Laying'));
     const cards: AnalysisCard[] = [];
     if (acPresent(sys).length) cards.push({
       title: 'Blood Pressure', sub: range,
       desc: 'Each reading as a systolic-to-diastolic span, coloured by grade at each end.',
-      help: 'Every bar connects a reading\'s diastolic (bottom) to its systolic (top), tinted by how each value grades against the framework thresholds. Watch for the spread as well as the level; a narrowing pulse pressure on standing is a common dysautonomia pattern worth showing your doctor.',
+      help: 'Every bar connects a reading\'s diastolic (bottom) to its systolic (top), tinted by how each value grades against the framework thresholds. Watch for the spread as well as the level; a narrowing pulse pressure on standing is a common dysautonomia pattern worth showing your doctor. The All/Morning/Evening toggle limits the chart to readings from that time of day.',
       tiles: true,
       charts: [
         // One connected systolic↕diastolic segment per reading, grade-gradient coloured.
@@ -121,12 +133,13 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
         { label: 'Avg systolic', value: avgRound(sys) },
         { label: 'Avg diastolic', value: avgRound(dia) },
       ],
+      bpFilter,
     });
     if (acPresent(laying).length) cards.push({
       title: 'Resting Heart Rate', sub: range,
       desc: 'Laying heart rate over the range.',
       help: 'Heart rate measured while laying down, the cleanest resting baseline. A gradually falling laying HR usually accompanies improving autonomic recovery; a sustained unexplained rise is worth noting alongside symptoms and sleep.',
-      charts: [{ label: '', series: [series(laying, SCORE_COLORS.bad)], integer: true, selectStat: true }],
+      charts: [{ label: '', series: [series(laying, SCORE_COLORS.bad)], zones: acBandsToZones(restingHrBands('Laying')), integer: true, selectStat: true }],
       stats: [{ label: 'Avg laying HR', value: avgRound(laying) }],
     });
     return cards;
@@ -153,9 +166,9 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
     const cards: AnalysisCard[] = [{
       title: 'Duration', sub: range,
       desc: 'How long you slept and when, night by night.',
-      help: 'Duration is the night that ended that morning; the dashed band marks the 7–9 hour target. Consistency of timing often moves HRV as much as raw duration does.',
+      help: 'Duration is the night that ended that morning, coloured by grade the same way each night is scored: 8h+ reads as great, 7h good, 6h ok, and it falls off below that. Tap "Show zones" for the grade thresholds. Consistency of timing often moves HRV as much as raw duration does.',
       charts: [
-        { label: '', series: [series(dur, '#38bdf8')], target: { from: 7, to: 9, color: '#16a34a' }, selectStat: true },
+        { label: '', series: [series(dur, '#38bdf8')], zones: acBandZones('sleepDur') },
       ],
       stats: [{ label: 'Avg sleep', value: avgRound(dur, 1), sub: 'h' }],
     }];
@@ -239,7 +252,7 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
     { id: 'sleep', icon: 'moon', title: 'Sleep', desc: 'Duration & timing', buckets: bl, build: () => nonEmpty(sleep()) },
     { id: 'activity', icon: 'bike', title: 'Activity', desc: 'Workouts & exercise', buckets: bl, build: () => nonEmpty(activity()) },
     { id: 'triggers', icon: 'triangle', title: 'Triggers', desc: 'Triggers & hydration', buckets: bl, build: () => nonEmpty(triggers()) },
-    { id: 'supps', icon: 'pill', title: 'Supplements', desc: 'Meds & supplements', buckets: bl, build: () => nonEmpty(supps()) },
+    { id: 'supps', icon: 'pill', title: 'Meds', desc: 'Meds & supplements', buckets: bl, build: () => nonEmpty(supps()) },
   ];
 }
 

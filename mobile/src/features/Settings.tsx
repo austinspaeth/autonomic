@@ -16,6 +16,7 @@ import { useToast } from '../components/Toast';
 import { radius, usePalette } from '../theme';
 import { getState, replaceState, save, serializeState, useAppState } from '../store/store';
 import { ageFromBirthday, fmtStamp, keyOf } from '../lib/dates';
+import { useIap, manageSubscription, restore, MONTHLY_SKU } from '../store/iap';
 import { DevicesScreen } from './Devices';
 import { HealthScreen } from './Health';
 import { showWelcomeAgain } from './Onboarding';
@@ -59,6 +60,7 @@ export function MenuSheet({ controls }: { controls: SheetControls }) {
       {item('user', 'Profile', 'Sex, birthday, height, weight', () => openSheet((c) => <ProfileSheet controls={c} />))}
       {item('bluetooth', 'Devices', 'Heart-rate straps', () => openSheet(() => <DevicesScreen />), !!state.settings.lastBleDeviceId)}
       {item('heart', 'Apple Health', Platform.OS === 'ios' ? 'Read & write health data' : 'iOS only', () => openSheet(() => <HealthScreen />), Platform.OS === 'ios' && !!state.settings.healthEnabled)}
+      {Platform.OS === 'ios' ? item('star', 'Subscription', 'Manage plan or restore', () => openSheet((c) => <SubscriptionSheet controls={c} />)) : null}
       {item('download', 'Export data', 'Download everything as JSON', () => exportData(toast))}
       {item('upload', 'Import data', 'Replace everything from a JSON file', () => importData(controls, toast))}
       {item('sparkles', 'Show welcome screen', 'Replay the first-run guide', () => { controls.closeAll(); showWelcomeAgain(); })}
@@ -100,6 +102,42 @@ function ProfileSheet({ controls }: { controls: SheetControls }) {
       <TextField label="Weight (lb)" value={weight} onChange={(t) => setWeight(onlyNumeric(t))} keyboardType="decimal-pad" />
       <Text style={{ color: p.textDim, fontSize: 13, marginBottom: 12 }}>Used to personalize reading scores (sex-adjusted QTc, BMI from height/weight).</Text>
       <Button title="Save" variant="primary" onPress={() => { getState().profile = { sex, birthday, weight: weight.trim(), height: height.trim() }; save(); controls.close(); }} />
+      <View style={{ height: 20 }} />
+    </View>
+  );
+}
+
+function SubscriptionSheet({ controls }: { controls: SheetControls }) {
+  const p = usePalette();
+  const toast = useToast();
+  const { isPro, products, activeSku } = useIap();
+  const [busy, setBusy] = useState(false);
+  const active = products.find((s) => s.productId === activeSku);
+  const price = active && 'localizedPrice' in active ? active.localizedPrice : undefined;
+  const period = activeSku === MONTHLY_SKU ? 'month' : 'year';
+  const onRestore = async () => {
+    if (busy) return;
+    setBusy(true);
+    const ok = await restore();
+    setBusy(false);
+    toast(ok ? 'Subscription restored' : 'No active subscription found');
+  };
+  return (
+    <View>
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 14 }}>Subscription</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: isPro ? '#22c55e' : p.textDim }} />
+        <Text style={{ color: p.text, fontSize: 15, fontWeight: '600' }}>{isPro ? 'Autonomic Pro — active' : 'No active subscription'}</Text>
+      </View>
+      <Text style={{ color: p.textDim, fontSize: 14, lineHeight: 21, marginBottom: 16 }}>
+        {isPro
+          ? `${price ? `Your plan renews ${period}ly at ${price}. ` : ''}Change your plan or cancel anytime in the App Store — cancelling keeps access until the period ends.`
+          : 'You have no active plan. Restore a previous purchase, or manage plans in the App Store.'}
+      </Text>
+      <View style={{ gap: 10 }}>
+        <Button title="Manage in App Store" variant="primary" onPress={() => manageSubscription()} />
+        <Button title={busy ? 'Restoring…' : 'Restore purchase'} variant="default" disabled={busy} onPress={onRestore} />
+      </View>
       <View style={{ height: 20 }} />
     </View>
   );

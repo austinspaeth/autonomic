@@ -11,6 +11,8 @@ import { IBMPlexMono_400Regular } from '@expo-google-fonts/ibm-plex-mono';
 import { SheetProvider } from '../src/components/Sheet';
 import { ToastProvider } from '../src/components/Toast';
 import { OnboardingGate } from '../src/features/Onboarding';
+import { SubscriptionGate } from '../src/features/SubscriptionGate';
+import { initIap } from '../src/store/iap';
 import { runDailyBackup } from '../src/lib/backup';
 import { usePalette } from '../src/theme';
 
@@ -33,6 +35,8 @@ export default function RootLayout() {
     IBMPlexMono_400Regular,
   });
   useEffect(() => {
+    // Open the StoreKit connection and read the current Pro entitlement.
+    initIap();
     // First-launch-of-the-day JSON snapshot (rotating, kept in Documents/backups).
     runDailyBackup();
     // Pull any published EAS update in the background (preview + production
@@ -57,6 +61,10 @@ export default function RootLayout() {
           <ToastProvider>
             <SheetProvider>
               <Slot />
+              {/* Paywall — covers the app whenever the user is not Pro (zIndex
+                  90). Sits below onboarding so a fresh install sees Welcome
+                  first, then the trial offer. */}
+              <SubscriptionGate />
               {/* First-run welcome wizard — overlays the tabs until completed,
                   then fades to black and reveals the app beneath. */}
               <OnboardingGate />

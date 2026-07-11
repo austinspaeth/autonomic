@@ -20,6 +20,7 @@ import Animated, {
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { radius, usePalette } from '../theme';
+import { notifyChartsBlur } from './charts';
 import { Icon } from './Icon';
 
 export interface SheetControls {
@@ -76,7 +77,13 @@ export function SheetProvider({ children }: { children: React.ReactNode }) {
       {children}
       {stack.length > 0 && (
         <Modal transparent visible animationType="none" statusBarTranslucent onRequestClose={closeTop}>
-          <View style={StyleSheet.absoluteFill}>
+          {/* Capture-phase touch hook (never claims the responder): any touch in
+              the sheet stack blurs chart selections; a touched chart re-selects
+              in the same event, so only taps *outside* a chart deselect. */}
+          <View
+            style={StyleSheet.absoluteFill}
+            onStartShouldSetResponderCapture={() => { notifyChartsBlur(); return false; }}
+          >
             {stack.map((entry, i) => (
               <SheetView
                 key={entry.id}

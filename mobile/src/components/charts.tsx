@@ -3,7 +3,7 @@
  * Sparkline (grade-zone gradient + draggable readout), ScoreGauge (270° arc),
  * PowerBar (VLF/LF/HF distribution), LineChart (analysis series), Tachogram.
  */
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { LayoutChangeEvent, Pressable, Text as RNText, View } from 'react-native';
 import Svg, {
   Circle, Defs, G, Line, LinearGradient, Path, Rect, Stop, Text as SvgText,
@@ -51,6 +51,22 @@ export function smoothPath(pts: [number, number][]): string {
 
 let sparkId = 0;
 
+/* ---------- tap-away deselect ----------
+ * Hosts (the Screen scaffold, the sheet stack) call notifyChartsBlur() from a
+ * capture-phase touch handler, so every touch anywhere fires it before any
+ * child responds. Each mounted chart clears its selection back to the default
+ * readout (average / latest); a touch that lands on a chart re-selects in the
+ * same event via its own responder grant, so charts never flicker — the net
+ * effect is that tapping anywhere *outside* a chart blurs its selection. */
+const chartBlurListeners = new Set<() => void>();
+export function notifyChartsBlur() { chartBlurListeners.forEach((fn) => fn()); }
+function useChartsBlur(onBlur: () => void) {
+  useEffect(() => {
+    chartBlurListeners.add(onBlur);
+    return () => { chartBlurListeners.delete(onBlur); };
+  }, [onBlur]);
+}
+
 /** A right-aligned "Show zones / Hide zones" toggle link. */
 export function ZonesToggle({ on, onPress }: { on: boolean; onPress: () => void }) {
   const p = usePalette();
@@ -73,7 +89,8 @@ function zoneBoundaries(bands: Band[], min: number, max: number) {
 /* ---------- Sparkline ---------- */
 export function Sparkline({ points, bands, height = 92, onSelect, showReadout = true, hideHeader, zonesOn }: {
   points: { v: number; date: string }[]; bands?: Band[] | null; height?: number;
-  onSelect?: (pt: { v: number; date: string }) => void; showReadout?: boolean;
+  /** Reports drag/tap selection (null when a tap elsewhere blurs it). */
+  onSelect?: (pt: { v: number; date: string } | null) => void; showReadout?: boolean;
   /** Hide the readout/zones-toggle row entirely — the host renders its own header. */
   hideHeader?: boolean;
   /** Controlled zones visibility (pairs with hideHeader); overrides the internal toggle. */
@@ -84,6 +101,7 @@ export function Sparkline({ points, bands, height = 92, onSelect, showReadout = 
   const [layoutW, setLayoutW] = useState(0);
   const [showZonesState, setShowZonesState] = useState(false);
   const showZones = zonesOn ?? showZonesState;
+  useChartsBlur(useCallback(() => { setSel(points.length - 1); onSelect?.(null); }, [points.length, onSelect]));
   if (!points || points.length < 2) return null;
   const gid = `spk${sparkId++}`;
   const vals = points.map((pt) => pt.v);
@@ -363,14 +381,16 @@ export function LineChart({ buckets, series, zones, integer, height = 140, targe
   zonesOn?: boolean;
   /** Hide the readout/toggle row above the plot (caller renders its own header). */
   hideHeader?: boolean;
-  /** Reports drag/tap selection so a card header can mirror the value. */
-  onSelect?: (idx: number) => void;
+  /** Reports drag/tap selection so a card header can mirror the value
+   *  (null when a tap elsewhere blurs the selection). */
+  onSelect?: (idx: number | null) => void;
 }) {
   const p = usePalette();
   const [layoutW, setLayoutW] = useState(0);
   const [sel, setSel] = useState<number>(-1);
   const [showZonesInt, setShowZonesInt] = useState(false);
   const showZones = zonesOn ?? showZonesInt;
+  useChartsBlur(useCallback(() => { setSel(-1); onSelect?.(null); }, [onSelect]));
   const all: number[] = [];
   series.forEach((s) => s.values.forEach((v) => { if (v != null && !isNaN(v)) all.push(v); }));
   if (!all.length) return null;
@@ -545,6 +565,178 @@ export function Tachogram({ rr, height = 132 }: { rr: number[]; height?: number 
   );
 }
 
+/* ---------- Autonomic balance (PNS vs SNS with balance-coloured fill) ---------- */
+/**
+ * PNS and SNS index across the reading history as two smoothed lines, with the
+ * area between them filled by a horizontal gradient that encodes autonomic
+ * balance along the time axis: green where PNS sits well above SNS (recovered),
+ * amber at the neutral crossing, red where SNS climbs above PNS (stressed). The
+ * fill colour at each moment is that sample's signed gap (pns − sns) graded
+ * through BALANCE_BANDS, so balance drift reads left→right at a glance. The
+ * closed band pinches to a point at a crossover and reopens on the far side,
+ * passing through the neutral amber band exactly at the crossing.
+ */
+// gap g = pns − sns, higher is better (the mirror of BANDS.sns's direction).
+const BALANCE_BANDS: Band[] = [
+  { max: -1.5, cat: 'concerning' },
+  { max: -0.5, cat: 'bad' },
+  { max: 0.5, cat: 'ok' },
+  { max: 1.5, cat: 'good' },
+  { max: Infinity, cat: 'great' },
+];
+const PNS_LINE = '#60a5fa'; // blue — parasympathetic (matches the app's HRV chart blue)
+const SNS_LINE = '#a855f7'; // purple — sympathetic
+/** Grade the autonomic balance gap (pns − sns); higher is better. Shared so a
+ *  card header can show the matching grade dot beside the "Balance" title. */
+export const balanceCat = (pns: number, sns: number): ScoreCat | null =>
+  catFromBands(pns - sns, BALANCE_BANDS) as ScoreCat | null;
+let balId = 0;
+export function BalanceChart({ pns, sns, height = 168, values, desc, defaultLabel }: {
+  pns: { v: number; date: string }[];  // aligned index-for-index with sns
+  sns: { v: number; date: string }[];
+  height?: number;
+  /** Default PNS/SNS readouts for the header numbers (this reading's value in a
+   *  summary, the range average in Progress). A drag selection overrides them
+   *  with the touched point's values. */
+  values?: { pns?: string | number | null; sns?: string | number | null };
+  /** Explainer paragraph, rendered below the PNS/SNS numbers like other cards. */
+  desc?: string;
+  /** Label shown after the SNS number when nothing is selected (e.g. "avg" in
+   *  Progress; omitted in the reading summary, which shows this reading). A drag
+   *  selection replaces it with the touched point's date. */
+  defaultLabel?: string;
+}) {
+  const p = usePalette();
+  const [layoutW, setLayoutW] = useState(0);
+  const [sel, setSel] = useState<number>(-1);
+  useChartsBlur(useCallback(() => setSel(-1), []));
+  // metricHistory returns pns/sns in the same day/time order, so equal indices
+  // align. A reading that logs one index but not the other makes the lengths
+  // differ, so pair index-for-index up to the shorter of the two.
+  const n = Math.min(pns.length, sns.length);
+  const gid = `bal${balId++}`;
+  const fmtV = (v?: string | number | null) =>
+    v == null || v === '' ? '–' : typeof v === 'number' ? fmtNum(Number(v.toFixed(1))) : v;
+  // Bucket labels arrive pre-formatted from Progress; ISO dates come from the
+  // reading summary and get shortened. Detect and only format the latter.
+  const xLabel = (d: string) => (/^\d{4}-\d{2}-\d{2}/.test(d) ? fmtShort(d) : d);
+
+  const pv = pns.slice(0, n).map((d) => d.v);
+  const sv = sns.slice(0, n).map((d) => d.v);
+  const selIdx = sel >= 0 && sel < n ? sel : -1;
+
+  let chart: React.ReactNode = null;
+  if (n >= 2) {
+    // Domain spans both series and always includes 0 (the neutral axis) plus a
+    // 5% cushion, so the dashed zero line stays on-chart.
+    const dataMin = Math.min(0, ...pv, ...sv), dataMax = Math.max(0, ...pv, ...sv);
+    const span = dataMax - dataMin || 1;
+    const min = dataMin - span * 0.05, max = dataMax + span * 0.05;
+    const W = 320, H = height, padL = 32, padR = 10, padT = 12, padB = 22;
+    const innerW = W - padL - padR;
+    const xAt = (i: number) => padL + (i / (n - 1)) * innerW;
+    const yAt = (v: number) => padT + (1 - (v - min) / (max - min)) * (H - padT - padB);
+    const pnsXY = pv.map((v, i) => [xAt(i), yAt(v)] as [number, number]);
+    const snsXY = sv.map((v, i) => [xAt(i), yAt(v)] as [number, number]);
+    const pnsPath = smoothPath(pnsXY);
+    const snsPath = smoothPath(snsXY);
+    // Closed band: trace PNS left→right, then SNS right→left (its smooth path
+    // reversed, leading "M" swapped for "L" so it continues the same subpath), Z.
+    const fill = `${pnsPath} ${smoothPath(snsXY.slice().reverse()).replace(/^M/, 'L')} Z`;
+    // One stop per sample: a horizontal gradient colours purely by x, so each
+    // moment gets its own balance colour and the transitions interpolate free.
+    const stops = pv.map((v, i) => ({
+      o: i / (n - 1),
+      c: GRADE_COLORS[catFromBands(v - sv[i], BALANCE_BANDS) as ScoreCat] || '#888',
+    }));
+    const zeroY = yAt(0);
+    const step = Math.max(1, Math.ceil(n / 6));
+    const onTouch = (x: number) => {
+      if (layoutW <= 0) return;
+      const px = (x / layoutW) * W;
+      setSel(Math.max(0, Math.min(n - 1, Math.round(((px - padL) / innerW) * (n - 1)))));
+    };
+    chart = (
+      <View
+        onLayout={(e) => setLayoutW(e.nativeEvent.layout.width)}
+        onStartShouldSetResponder={() => true}
+        onMoveShouldSetResponder={() => true}
+        onResponderGrant={(e) => onTouch(e.nativeEvent.locationX)}
+        onResponderMove={(e) => onTouch(e.nativeEvent.locationX)}
+      >
+        <Svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+          <Defs>
+            <LinearGradient id={gid} x1={padL} y1={0} x2={W - padR} y2={0} gradientUnits="userSpaceOnUse">
+              {stops.map((s, i) => <Stop key={i} offset={s.o} stopColor={s.c} />)}
+            </LinearGradient>
+          </Defs>
+          {/* Y grid + value labels (min/mid/max). */}
+          {[min, (min + max) / 2, max].map((val, i) => (
+            <React.Fragment key={i}>
+              <Line x1={padL} x2={W - padR} y1={yAt(val)} y2={yAt(val)} stroke={p.border} strokeWidth={1} strokeDasharray="3 4" opacity={0.5} />
+              <SvgText x={padL - 4} y={yAt(val) + 3} textAnchor="end" fontSize={9} fontFamily={fonts.mono} fill={p.textDim}>{fmtNum(Number(val.toFixed(1)))}</SvgText>
+            </React.Fragment>
+          ))}
+          {/* Zero line — the neutral axis. */}
+          {min < 0 && max > 0 ? (
+            <Line x1={padL} x2={W - padR} y1={zeroY} y2={zeroY} stroke={p.textDim} strokeWidth={1} strokeDasharray="2 3" opacity={0.7} />
+          ) : null}
+          {/* X date labels. */}
+          {pns.slice(0, n).map((d, i) => (i % step === 0 || i === n - 1) ? <SvgText key={i} x={xAt(i)} y={H - 6} textAnchor="middle" fontSize={9} fontFamily={fonts.mono} fill={p.textDim}>{xLabel(d.date)}</SvgText> : null)}
+          {/* Balance fill, then the two lines on top. */}
+          <Path d={fill} fill={`url(#${gid})`} opacity={0.42} />
+          <Path d={pnsPath} fill="none" stroke={PNS_LINE} strokeWidth={1.8} strokeLinejoin="round" strokeLinecap="round" />
+          <Path d={snsPath} fill="none" stroke={SNS_LINE} strokeWidth={1.8} strokeLinejoin="round" strokeLinecap="round" />
+          {/* Point dots. */}
+          {pnsXY.map((pt, i) => <Circle key={`p${i}`} cx={pt[0]} cy={pt[1]} r={n > 20 ? 1.8 : 2.6} fill={PNS_LINE} />)}
+          {snsXY.map((pt, i) => <Circle key={`s${i}`} cx={pt[0]} cy={pt[1]} r={n > 20 ? 1.8 : 2.6} fill={SNS_LINE} />)}
+          {/* Selection: cursor line + emphasized rings on the touched points. */}
+          {selIdx >= 0 ? (
+            <G>
+              <Line x1={xAt(selIdx)} x2={xAt(selIdx)} y1={padT} y2={H - padB} stroke={p.text} strokeWidth={1} opacity={0.35} />
+              <Circle cx={pnsXY[selIdx][0]} cy={pnsXY[selIdx][1]} r={4} fill={PNS_LINE} stroke={p.surface2} strokeWidth={1.5} />
+              <Circle cx={snsXY[selIdx][0]} cy={snsXY[selIdx][1]} r={4} fill={SNS_LINE} stroke={p.surface2} strokeWidth={1.5} />
+            </G>
+          ) : null}
+        </Svg>
+      </View>
+    );
+  }
+
+  const readouts = values ?? {};
+  // The numbers reflect the selected point when dragging, else the defaults.
+  const pnsShown = selIdx >= 0 ? pv[selIdx] : readouts.pns;
+  const snsShown = selIdx >= 0 ? sv[selIdx] : readouts.sns;
+  // Suffix after the SNS number: the touched point's date in parentheses when
+  // selected (matching other cards), else the caller's default ("avg" in
+  // Progress, nothing in the reading summary).
+  const suffixLabel = selIdx >= 0 ? `(${xLabel(pns[selIdx].date)})` : defaultLabel;
+  return (
+    <View>
+      {/* PNS/SNS legend + big numbers (main-metric size), then the date/label. */}
+      <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 10 }}>
+        <View style={{ flexDirection: 'row', gap: 28 }}>
+          {([['PNS', PNS_LINE, pnsShown], ['SNS', SNS_LINE, snsShown]] as const).map(([label, color, val]) => (
+            <View key={label}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color }} />
+                <RNText style={{ fontSize: 12, color: p.textDim, fontWeight: '700', letterSpacing: 0.5 }}>{label}</RNText>
+              </View>
+              <RNText style={{ fontSize: 27, fontFamily: fonts.numHeavy, color, fontVariant: ['tabular-nums'], marginTop: 4 }}>{fmtV(val)}</RNText>
+            </View>
+          ))}
+        </View>
+        {suffixLabel ? <RNText style={{ fontSize: 13, fontWeight: '600', color: p.textDim, marginBottom: 5 }}>{suffixLabel}</RNText> : null}
+      </View>
+      {/* Explainer below the numbers, like other cards. */}
+      {desc ? <RNText style={{ color: p.textDim, fontSize: 13, lineHeight: 19, marginTop: 8 }}>{desc}</RNText> : null}
+      <View style={{ marginTop: 12 }}>
+        {chart ?? <RNText style={{ fontSize: 12, color: p.textDim }}>Not enough history yet to chart.</RNText>}
+      </View>
+    </View>
+  );
+}
+
 /* ---------- Blood-pressure dumbbell (systolic↕diastolic per reading) ---------- */
 /**
  * One vertical segment per reading connecting its diastolic (bottom) to its
@@ -561,6 +753,7 @@ export function BpDumbbell({ buckets, sys, dia, height = 180 }: {
   const [layoutW, setLayoutW] = useState(0);
   const [sel, setSel] = useState<number>(-1);
   const [gid] = useState(() => bpId++);
+  useChartsBlur(useCallback(() => setSel(-1), []));
   const all: number[] = [];
   sys.forEach((v) => { if (v != null && !isNaN(v)) all.push(v); });
   dia.forEach((v) => { if (v != null && !isNaN(v)) all.push(v); });
@@ -651,12 +844,14 @@ export function StackedBars({ buckets, segments, height = 160, unit, hideHeader,
   height?: number; unit?: string;
   /** Hide the readout row (caller renders its own header + legend values). */
   hideHeader?: boolean;
-  /** Reports drag/tap selection so a card header can mirror the totals. */
-  onSelect?: (idx: number) => void;
+  /** Reports drag/tap selection so a card header can mirror the totals
+   *  (null when a tap elsewhere blurs the selection). */
+  onSelect?: (idx: number | null) => void;
 }) {
   const p = usePalette();
   const [layoutW, setLayoutW] = useState(0);
   const [sel, setSel] = useState<number>(-1);
+  useChartsBlur(useCallback(() => { setSel(-1); onSelect?.(null); }, [onSelect]));
   const n = buckets.length;
   // Same stale-selection guard as LineChart: `sel` survives a range change
   // that shrinks `buckets`, so an out-of-range index means "no selection".

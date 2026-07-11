@@ -37,14 +37,14 @@ export const fmtTime12 = (t?: string) => {
   return `${h}:${m[2]}${ap}`;
 };
 
-/** Time-of-day bucket: Morning < 10:30am, Afternoon < 4pm, else Night. */
+/** Time-of-day bucket: Morning < 10:30am, Afternoon < 4pm, else Evening. */
 export const periodOf = (t?: string) => {
   const m = /^(\d{1,2}):(\d{2})/.exec(t || '');
   if (!m) return '';
   const mins = +m[1] * 60 + +m[2];
   if (mins < 630) return 'Morning';
   if (mins < 960) return 'Afternoon';
-  return 'Night';
+  return 'Evening';
 };
 
 export const fmtDateLong = (k: string) => {

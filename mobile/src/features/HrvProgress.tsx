@@ -11,22 +11,22 @@
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Pressable, Text, View } from 'react-native';
-import { LineChart, StackedBars, ZonesToggle } from '../components/charts';
-import { HelpDot } from '../components/ui';
+import { BalanceChart, LineChart, StackedBars, ZonesToggle, balanceCat } from '../components/charts';
+import { HelpDot, ScoreDot } from '../components/ui';
 import { fonts, radius, usePalette } from '../theme';
 import { fmtNum } from '../lib/dates';
-import type { DayRecord, Entry } from '../lib/types';
-import { type ScoreContext } from '../lib/scoring';
+import type { DayRecord, Entry, ScoreCat } from '../lib/types';
+import { BANDS, catFromBands, HRV_HELP, type ScoreContext } from '../lib/scoring';
 import { type DaysMap } from '../lib/scoring/day';
 import {
   acBandZones, acBuckets, acReadVals, isEvening, isMorning, makeAgg, type Mode,
 } from '../lib/analysis/buckets';
 
-export type Filt = 'all' | 'morning' | 'night';
-/** All/Morning/Night options — shared by the inline HRV header and the pinned
+export type Filt = 'all' | 'morning' | 'evening';
+/** All/Morning/Evening options — shared by the inline HRV header and the pinned
  * progress header so both toggles drive the same filter. */
 export const HRV_FILTERS: { val: Filt; label: string }[] = [
-  { val: 'all', label: 'All' }, { val: 'morning', label: 'Morning' }, { val: 'night', label: 'Night' },
+  { val: 'all', label: 'All' }, { val: 'morning', label: 'Morning' }, { val: 'evening', label: 'Evening' },
 ];
 const STRUCT = '#60a5fa';   // structured — blue
 const UNSTRUCT = '#a855f7'; // unstructured — purple
@@ -130,11 +130,6 @@ const METRICS: { label: string; s: string; u: string; band: string; integer?: bo
     help: 'Coefficient of variation: SDNN divided by the mean RR, as a percentage. Because it is normalized by heart rate it makes readings taken at different rates more comparable than raw SDNN.',
   },
   {
-    label: 'Stress index', s: 'stressIndex', u: 'stressIndex', band: 'stressIndex', integer: true,
-    desc: 'Baevsky strain index that climbs when the rhythm turns rigid under sympathetic load.',
-    help: 'A composite of AMo50, mode, and MxDMn that rises steeply as the rhythm becomes rigid. Low and stable is the goal; spikes typically accompany stress, illness, or overreaching, and often lead symptoms by a day or two.',
-  },
-  {
     label: 'LF peak', s: 'lfPeak', u: 'lfPeak', band: 'lfPeak',
     desc: 'Dominant frequency in the low band; with slow breathing it should track your breath pace.',
     help: 'The frequency with the most power between 0.04 and 0.15 Hz. During paced breathing the LF peak generally mirrors your breathing pace, so it lands close to your breathing frequency. A 4/6 pattern (four seconds in, six out) is one breath every ten seconds, or 0.1 Hz, which is near the resonance frequency for most people. A clean session concentrates power at that peak, so an LF peak near your pacing frequency is a sign of good coherence.',
@@ -144,11 +139,18 @@ const METRICS: { label: string; s: string; u: string; band: string; integer?: bo
     desc: 'Dominant frequency in the high band, usually your natural breathing rate.',
     help: 'The frequency with the most power between 0.15 and 0.4 Hz. At rest this band is driven by respiration (each breath speeds and slows the heart slightly), so the HF peak usually sits at your breathing rate.',
   },
+  // Kept last so the Balance chart (rendered just before it) closes out the deep
+  // dives; see the `m.s === 'stressIndex'` branch in HrvProgress.
+  {
+    label: 'Stress index', s: 'stressIndex', u: 'stressIndex', band: 'stressIndex', integer: true,
+    desc: 'Baevsky strain index that climbs when the rhythm turns rigid under sympathetic load.',
+    help: 'A composite of AMo50, mode, and MxDMn that rises steeply as the rhythm becomes rigid. Low and stable is the goal; spikes typically accompany stress, illness, or overreaching, and often lead symptoms by a day or two.',
+  },
 ];
 
 const POWER_HELP = 'Total spectral power of the reading, split into very-low (VLF), low (LF) and high (HF) frequency bands. Bar height is the total in ms², and a higher total is generally better: it means the heart rhythm is varying freely, which is the sign of an adaptable, well-regulated autonomic system. But the mix matters as much as the total; a healthy reading spreads power across the bands rather than piling it into one.\n\nHF (0.15–0.4 Hz) is the fast, breath-linked band. It rides almost purely on parasympathetic (vagal) tone, the "rest and digest" branch, so strong HF means good recovery and calm. LF (0.04–0.15 Hz) is the slower baroreflex band around blood-pressure regulation; it carries a mix of both branches but leans sympathetic (the "fight or flight" side) when you are stressed or standing. Note that slow paced breathing deliberately pumps LF up, so a big LF share during a breathing exercise is expected, not a warning.\n\nVLF (below 0.04 Hz) reflects slow regulatory waves tied to thermoregulation, hormones and vascular tone. A VLF share that dominates the reading (with little HF) can point to poor vagal engagement, physical or emotional stress, poor sleep, inflammation, or simply a reading that was too short or too noisy to resolve the faster bands cleanly. Occasional high VLF is normal; a persistent pattern of high VLF with suppressed HF is worth watching. Growing total power with a balanced spread over weeks is a common recovery pattern.';
 
-const filterFor = (f: Filt) => (f === 'morning' ? isMorning : f === 'night' ? isEvening : undefined);
+const filterFor = (f: Filt) => (f === 'morning' ? isMorning : f === 'evening' ? isEvening : undefined);
 
 /** Read a numeric key from readings of BOTH HRV kinds (for power). */
 function readAnyHrv(d: DayRecord, key: string, filt?: (r: Entry) => boolean): number[] {
@@ -184,7 +186,13 @@ export function HrvProgress({ days, mode, ctx, filt }: { days: DaysMap; mode: Mo
     const hf = acAgg(buckets, (d) => readAnyHrv(d, 'highPower', f));
     const hasPower = [vlf, lf, hf].some((arr) => arr.some((v) => v != null));
 
-    return { bl, metricCharts, vlf, lf, hf, hasPower };
+    // Balance: average PNS/SNS per bucket over both HRV kinds → the two-line
+    // band chart. Needs ≥2 buckets where both indices resolved.
+    const pnsB = acAgg(buckets, (d) => readAnyHrv(d, 'pns', f));
+    const snsB = acAgg(buckets, (d) => readAnyHrv(d, 'sns', f));
+    const hasBalance = bl.filter((_, i) => pnsB[i] != null && snsB[i] != null).length >= 2;
+
+    return { bl, metricCharts, vlf, lf, hf, hasPower, pnsB, snsB, hasBalance };
   }, [days, mode, ctx, filt]);
 
   const hasAny = view.metricCharts.length > 0 || view.hasPower;
@@ -200,7 +208,12 @@ export function HrvProgress({ days, mode, ctx, filt }: { days: DaysMap; mode: Mo
           ) : null}
 
           {view.metricCharts.map(({ m, structured, unstructured }) => (
-            <MetricSection key={m.label} m={m} structured={structured} unstructured={unstructured} buckets={view.bl} />
+            <React.Fragment key={m.label}>
+              {m.s === 'stressIndex' && view.hasBalance ? (
+                <BalanceSection bl={view.bl} pns={view.pnsB} sns={view.snsB} />
+              ) : null}
+              <MetricSection m={m} structured={structured} unstructured={unstructured} buckets={view.bl} />
+            </React.Fragment>
           ))}
         </>
       )}
@@ -241,13 +254,14 @@ function Section({ children }: { children: React.ReactNode }) {
 
 /** Section header per the comp: uppercase title + "?" (left), optional action
  *  (right); beneath it the big value with its dim suffix, then a description. */
-function SectionHead({ title, help, value, suffix, desc, right }: {
-  title: string; help: string; value: string | null; suffix: string; desc: string; right?: React.ReactNode;
+function SectionHead({ title, help, value, suffix, desc, right, cat }: {
+  title: string; help: string; value: string | null; suffix: string; desc?: string; right?: React.ReactNode; cat?: ScoreCat | null;
 }) {
   const p = usePalette();
   return (
     <View style={{ marginBottom: 12 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        {cat ? <View style={{ marginRight: 7 }}><ScoreDot cat={cat} size={10} /></View> : null}
         <Text style={{ flexShrink: 1, fontSize: 15, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, color: p.textDim }}>{title}</Text>
         <HelpDot title={title} text={help} />
         <View style={{ flex: 1 }} />
@@ -259,7 +273,7 @@ function SectionHead({ title, help, value, suffix, desc, right }: {
           <Text style={{ fontSize: 13, fontWeight: '600', color: p.textDim }}>{suffix}</Text>
         </View>
       ) : null}
-      <Text style={{ color: p.textDim, fontSize: 13, lineHeight: 19, marginTop: 8 }}>{desc}</Text>
+      {desc ? <Text style={{ color: p.textDim, fontSize: 13, lineHeight: 19, marginTop: 8 }}>{desc}</Text> : null}
     </View>
   );
 }
@@ -308,12 +322,16 @@ function MetricSection({ m, structured, unstructured, buckets }: {
   const value = raw == null ? null : fmtNum(m.integer ? Math.round(raw) : raw);
   const suffix = selIdx != null ? `(${buckets[selIdx]?.label ?? ''})` : 'avg';
   const zones = acBandZones(m.band);
+  // Grade dot for the displayed value (range average or dragged bucket), so the
+  // Progress cards read their grade at a glance like the reading deep-dive.
+  const cat = raw != null && BANDS[m.band] ? catFromBands(raw, BANDS[m.band]) : null;
 
   return (
     <Section>
       <SectionHead
         title={m.label}
         help={m.help}
+        cat={cat}
         value={value}
         suffix={suffix}
         desc={m.desc}
@@ -340,6 +358,40 @@ function MetricSection({ m, structured, unstructured, buckets }: {
           {kind === 'both' ? <Legend items={[['Structured', STRUCT], ['Unstructured', UNSTRUCT]]} /> : null}
         </>
       )}
+    </Section>
+  );
+}
+
+/** Autonomic balance section: PNS vs SNS per bucket with the balance-coloured
+ *  band fill. Only buckets where both indices resolved are plotted, so the band
+ *  stays continuous. */
+function BalanceSection({ bl, pns, sns }: {
+  bl: { label: string }[];
+  pns: (number | null)[]; sns: (number | null)[];
+}) {
+  const pnsPts: { v: number; date: string }[] = [];
+  const snsPts: { v: number; date: string }[] = [];
+  bl.forEach((b, i) => {
+    const pv = pns[i], sv = sns[i];
+    if (pv != null && sv != null) {
+      pnsPts.push({ v: pv, date: b.label });
+      snsPts.push({ v: sv, date: b.label });
+    }
+  });
+  if (pnsPts.length < 2) return null;
+  const avg = (arr: { v: number }[]) => arr.reduce((sum, x) => sum + x.v, 0) / arr.length;
+  const pnsAvg = avg(pnsPts), snsAvg = avg(snsPts);
+  return (
+    <Section>
+      <SectionHead title="Balance" help={HRV_HELP.balance} value={null} suffix="" cat={balanceCat(pnsAvg, snsAvg)} />
+      <View style={{ marginTop: 16 }}>
+        <BalanceChart
+          pns={pnsPts} sns={snsPts}
+          values={{ pns: pnsAvg, sns: snsAvg }}
+          defaultLabel="avg"
+          desc="PNS and SNS index across the range. The fill turns green when you are recovered and red when stress takes over."
+        />
+      </View>
     </Section>
   );
 }

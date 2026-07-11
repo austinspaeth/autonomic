@@ -38,7 +38,7 @@ const durationFor = (_kind: SessionConfig['kind']) => 300;
 export const BREATH_STYLES: { val: string; title: string; sub: string; badge?: string }[] = [
   { val: '4/6', title: '4 / 6 breathing', badge: 'Recommended', sub: 'In 4s · out 6s. Resonant-frequency pacing that trains the baroreflex.' },
   { val: '4/4/4/4', title: 'Box breathing', sub: 'In 4s · hold 4s · out 4s · hold 4s. A steady square rhythm for calm focus.' },
-  { val: '4/7/8', title: '4-7-8 breathing', sub: 'In 4s · hold 7s · out 8s. A long exhale that leans into the vagal brake.' },
+  { val: '4/7/8', title: '4 / 7 / 8 breathing', sub: 'In 4s · hold 7s · out 8s. A long exhale that leans into the vagal brake.' },
 ];
 export const styleTitle = (val?: string) => BREATH_STYLES.find((s) => s.val === val)?.title || (val || '');
 

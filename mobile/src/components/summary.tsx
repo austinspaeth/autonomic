@@ -22,7 +22,7 @@ import {
 import { metricHistory, numEx, type DaysMap } from '../lib/scoring/day';
 import { entryFields, isDivider, READING_TYPES } from '../lib/registry';
 import { fmtNum, fmtShort } from '../lib/dates';
-import { PowerSpectrum, Sparkline, Tachogram, ZonesToggle } from './charts';
+import { BalanceChart, PowerSpectrum, Sparkline, Tachogram, ZonesToggle, balanceCat } from './charts';
 import { HelpDot, ScoreDot } from './ui';
 
 const hexA = (hex: string, a: number) => {
@@ -30,12 +30,6 @@ const hexA = (hex: string, a: number) => {
   if (!m) return hex;
   const n = parseInt(m[1], 16);
   return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
-};
-
-/** Non-interactive history sparkline for the grouped-row cards (Balance). */
-const spark = (days: DaysMap, type: string, ex: (r: Entry) => number | null, bands: Band[] | null, limit = 15) => {
-  const hist = metricHistory(days, type, ex, limit);
-  return hist.length >= 2 ? <Sparkline points={hist} bands={bands} /> : null;
 };
 
 /** Map a reading's capture source to a human label for the Details card. */
@@ -182,7 +176,15 @@ function MetricSection({ label, value, suffix, cat, desc, help, days, type, ex, 
         value={shown} suffix={shownSuffix} desc={desc}
         right={!hero && hasSpark && bands ? <ZonesToggle on={showZones} onPress={() => setShowZones((v) => !v)} /> : undefined}
       />
-      {hasSpark ? <Sparkline points={hist} bands={bands} hideHeader zonesOn={showZones} onSelect={setSel} /> : null}
+      {/* Hero cards wear the grade tag in the header's corner, so the zones
+          link moves down to the sparkline's own header row instead. */}
+      {hasSpark ? (
+        <Sparkline
+          points={hist} bands={bands} onSelect={setSel}
+          hideHeader={!(hero && bands)} showReadout={false}
+          zonesOn={hero ? undefined : showZones}
+        />
+      ) : null}
     </Section>
   );
 }
@@ -239,6 +241,10 @@ function HrvSummaryBody({ r, days, ctx, type }: SummaryProps & { type: 'breathHr
   const lfhf = lf != null && hf ? lf / hf : null;
   const lfhfEx = (rr2: Entry) => { const a = parseFloat(rr2.lowPower as string), b = parseFloat(rr2.highPower as string); return !isNaN(a) && !isNaN(b) && b !== 0 ? a / b : null; };
   const e = expectedHf(r.style);
+  const pnsHist = metricHistory(days, type, numEx('pns'));
+  const snsHist = metricHistory(days, type, numEx('sns'));
+  const pnsNum = n('pns'), snsNum = n('sns');
+  const balCat = pnsNum != null && snsNum != null ? balanceCat(pnsNum, snsNum) : undefined;
   const sourceLabel = r.source ? SOURCE_LABEL[r.source as string] : undefined;
   const hasDetails = !!sourceLabel || type === 'breathHrv' || !!r.period;
   return (
@@ -271,27 +277,6 @@ function HrvSummaryBody({ r, days, ctx, type }: SummaryProps & { type: 'breathHr
           <View style={{ marginTop: 12 }}><Tachogram rr={rr} /></View>
         </Section>
       ) : null}
-
-      <Section>
-        <SectionHead title="Balance" help={HRV_HELP.balance} />
-        <View style={{ marginTop: 12 }}>
-          <MetricRow
-            bare label="PNS index" value={r.pns as string} cat={s.pns}
-            explain="Parasympathetic (rest and recovery) activity versus average. Zero is average, positive is above and better, negative is below."
-            spark={spark(days, type, numEx('pns'), BANDS.pns)}
-          />
-          <MetricRow
-            bare label="SNS index" value={r.sns as string} cat={s.sns}
-            explain="Sympathetic (activation and stress) activity versus average. Negative is calm and good, positive means more activation."
-            spark={spark(days, type, numEx('sns'), BANDS.sns)}
-          />
-          <MetricRow
-            bare label="Stress index" value={r.stressIndex as string} cat={s.stressIndex}
-            explain="Baevsky strain index that climbs when the rhythm turns rigid under sympathetic load. Always positive; lower is calmer."
-            spark={spark(days, type, numEx('stressIndex'), BANDS.stressIndex)}
-          />
-        </View>
-      </Section>
 
       <MetricSection
         label="SDNN" value={r.sdnn as string} suffix="ms" cat={s.sdnn} days={days} type={type} ex={numEx('sdnn')} bands={BANDS.sdnn}
@@ -370,6 +355,24 @@ function HrvSummaryBody({ r, days, ctx, type }: SummaryProps & { type: 'breathHr
         label="HF peak" value={r.hfPeak as string} suffix="Hz" cat={s.hfPeak} days={days} type={type} ex={numEx('hfPeak')} bands={BANDS.hfPeak}
         desc={e ? `Expected about ${e[0]} to ${e[1]} Hz for ${r.style} breathing; large deviation means the pace drifted.` : 'Respiratory peak, usually sits at your natural breathing rate.'}
         help={HRV_HELP.hfPeak}
+      />
+      {pnsNum != null || snsNum != null || (pnsHist.length >= 2 && snsHist.length >= 2) ? (
+        <Section>
+          <SectionHead title="Balance" help={HRV_HELP.balance} cat={balCat} />
+          <View style={{ marginTop: 16 }}>
+            <BalanceChart
+              pns={pnsHist} sns={snsHist}
+              values={{ pns: r.pns as string, sns: r.sns as string }}
+              desc="PNS and SNS index over recent readings. The fill turns green when you are recovered and red when stress takes over."
+            />
+          </View>
+        </Section>
+      ) : null}
+
+      <MetricSection
+        label="Stress index" value={r.stressIndex as string} cat={s.stressIndex} days={days} type={type}
+        ex={numEx('stressIndex')} bands={BANDS.stressIndex}
+        desc={HRV_EXPLAIN.stressIndex} help={HRV_HELP.stressIndex}
       />
       <Notes r={r} />
     </>

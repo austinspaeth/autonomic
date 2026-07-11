@@ -1,7 +1,7 @@
 /**
  * HRV setup sheet — the entry point for a live 5-minute capture. Choose kind
  * (Unstructured vs Structured), a breathing pattern (4/6 recommended, box
- * breathing, or 4-7-8), and a signal source (Bluetooth strap, Apple Watch, or
+ * breathing, or 4/7/8), and a signal source (Bluetooth strap, Apple Watch, or
  * the phone camera), then Start.
  */
 import React, { useEffect, useRef, useState } from 'react';
@@ -24,7 +24,7 @@ const HELP = {
   kind:
     'Both kinds run 5 minutes. Unstructured captures your current baseline while you rest and breathe naturally. Structured guides you through a paced breathing pattern, which trains your baroreflex and helps build stronger autonomic responses.',
   breath:
-    'The numbers are seconds to inhale, hold, and exhale. For most people 4 / 6 matches their resonant frequency, the breathing rate where the baroreflex (your body’s blood pressure regulator) swings in sync with each breath and HRV peaks. That makes it the most effective pattern to train. Box breathing and 4-7-8 add breath holds, which deepen the calming effect.',
+    'The numbers are seconds to inhale, hold, and exhale. For most people 4 / 6 matches their resonant frequency, the breathing rate where the baroreflex (your body’s blood pressure regulator) swings in sync with each breath and HRV peaks. That makes it the most effective pattern to train. Box breathing and 4 / 7 / 8 add breath holds, which deepen the calming effect.',
   period:
     'Tagging the time of day keeps like readings comparable. Morning readings taken right after waking are the most consistent baseline; evening readings show how the day wound down.',
   source:

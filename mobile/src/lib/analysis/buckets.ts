@@ -4,7 +4,7 @@
  * within each bucket. Pure over a days map + score context.
  */
 import { keyOf } from '../dates';
-import type { DayRecord, Entry } from '../types';
+import type { Band, DayRecord, Entry } from '../types';
 import { BANDS, SCORE_COLORS, catFromBands, type ScoreContext } from '../scoring';
 import { SCORE_CATS, scoreSet, blueZone, type DaysMap } from '../scoring/day';
 
@@ -75,11 +75,14 @@ export const acMean = (vals: (number | null)[]) => { const p = acPresent(vals); 
 export const avgRound = (vals: (number | null)[], dp = 0) => { const m = acMean(vals); if (m == null) return null; const f = Math.pow(10, dp); return Math.round(m * f) / f; };
 export const acDelta = (vals: (number | null)[]) => { const idx = vals.map((v, i) => (v != null && !isNaN(v) ? i : -1)).filter((i) => i >= 0); if (idx.length < 2) return null; return (vals[idx[idx.length - 1]] as number) - (vals[idx[0]] as number); };
 
-export function acBandZones(bandName: string): { from: number; to: number; color: string }[] | null {
-  const b = BANDS[bandName]; if (!b) return null;
+export function acBandsToZones(b: Band[] | null | undefined): { from: number; to: number; color: string }[] | null {
+  if (!b) return null;
   const out: { from: number; to: number; color: string }[] = []; let prev = -1e9;
   b.forEach((seg) => { const to = seg.max === Infinity ? 1e9 : seg.max; out.push({ from: prev, to, color: SCORE_COLORS[seg.cat] || '#888' }); prev = seg.max; });
   return out;
+}
+export function acBandZones(bandName: string): { from: number; to: number; color: string }[] | null {
+  return acBandsToZones(BANDS[bandName]);
 }
 export function acScoreZones() {
   const cats = [...SCORE_CATS].sort((a, b) => a.min - b.min);

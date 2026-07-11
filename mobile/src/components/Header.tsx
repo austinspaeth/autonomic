@@ -14,6 +14,7 @@ import { useFocusEffect } from 'expo-router';
 import Svg, { Defs, LinearGradient as SvgGradient, Rect, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePalette } from '../theme';
+import { notifyChartsBlur } from './charts';
 
 // Fixed height of the header content band (below the safe-area top inset), so
 // every screen's header bar is identical regardless of the injected node. Tall
@@ -117,7 +118,13 @@ export function Screen({
     innerRef.current?.scrollTo({ y: 0, animated: false });
   }, []));
   return (
-    <View style={{ flex: 1, backgroundColor: p.bg }}>
+    // Capture-phase touch hook (never claims the responder): any touch on the
+    // screen blurs chart selections; a chart that is touched re-selects in the
+    // same event, so this only deselects taps *outside* a chart.
+    <View
+      style={{ flex: 1, backgroundColor: p.bg }}
+      onStartShouldSetResponderCapture={() => { notifyChartsBlur(); return false; }}
+    >
       <ScrollView
         ref={setScrollRef}
         onScroll={onScroll}
@@ -125,8 +132,12 @@ export function Screen({
         contentContainerStyle={{ paddingTop: headerH + contentPadding, paddingHorizontal: contentPadding, paddingBottom: bottomPad }}
         showsVerticalScrollIndicator={false}
         // iOS: inset the scroll for the keyboard so inline inputs (e.g. the
-        // journal Notes box at the bottom) stay visible while typing.
+        // journal Notes box at the bottom) stay visible while typing. Pair it
+        // with on-drag dismissal so the inset collapses when you scroll away —
+        // otherwise the keyboard-height inset lingers as dead scroll space
+        // below the content on a real device.
         automaticallyAdjustKeyboardInsets
+        keyboardDismissMode="on-drag"
       >
         {children}
       </ScrollView>

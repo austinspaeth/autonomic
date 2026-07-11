@@ -2,7 +2,7 @@
  * Breathing visualizer — concentric hollow rings that glow outward toward the
  * surrounding progress ring on the inhale and drain back to the middle on the
  * exhale, paced to the chosen pattern with an eased sine curve. Patterns may
- * include holds (box breathing, 4-7-8): while you hold, the rings brighten —
+ * include holds (box breathing, 4/7/8): while you hold, the rings brighten —
  * the stroke warms toward a hotter red and thickens — then ease back to their
  * resting colour through the following exhale (or inhale, after a bottom
  * hold). Ring position runs on the UI thread via Reanimated; the phase clock

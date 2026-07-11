@@ -4,19 +4,19 @@ import { BlurView } from 'expo-blur';
 import { Screen } from '../../src/components/Header';
 import { Icon, IconName } from '../../src/components/Icon';
 import { HelpDot, Segmented } from '../../src/components/ui';
-import { Bars, BpDumbbell, LineChart } from '../../src/components/charts';
+import { Bars, BpDumbbell, LineChart, ZonesToggle } from '../../src/components/charts';
 import { fonts, radius, usePalette } from '../../src/theme';
 import { useAppState } from '../../src/store/store';
-import { buildCategories, type AnalysisCard } from '../../src/lib/analysis/categories';
+import { buildCategories, type AnalysisCard, type BpPeriod } from '../../src/lib/analysis/categories';
 import { resolveProtocol } from '../../src/lib/scoring/day';
-import type { Mode } from '../../src/lib/analysis/buckets';
+import { avgRound, type Mode } from '../../src/lib/analysis/buckets';
 import { HrvFilterLinks, HrvProgress, type Filt } from '../../src/features/HrvProgress';
 
 export default function AnalysisScreen() {
   const p = usePalette();
   const state = useAppState();
   const [mode, setMode] = useState<Mode>('day');
-  // HRV filter lives here (not inside HrvProgress) so the same All/Morning/Night
+  // HRV filter lives here (not inside HrvProgress) so the same All/Morning/Evening
   // toggle can appear both inline beside the section title and in the pinned bar.
   const [hrvFilt, setHrvFilt] = useState<Filt>('all');
   const sex = state.profile.sex;
@@ -77,7 +77,13 @@ export default function AnalysisScreen() {
 
   const goTo = (id: string) => {
     const off = offsets.current[id];
-    if (off != null) scrollRef.current?.scrollTo({ y: Math.max(0, off - headerH), animated: true });
+    if (off == null) return;
+    // `off - headerH` lands the section *title* flush under the top header,
+    // which pins the bar but tucks the first card partly under it (the bar is
+    // taller than the title). Nudge the scroll down so the first card clears the
+    // bar's bottom with a small gap, while staying inside the pin handoff line.
+    const clear = STICKY_BAR_H - SECTION_TITLE_SIZE - 6;   // ≈ 26, < HANDOFF_LEAD
+    scrollRef.current?.scrollTo({ y: Math.max(0, off - headerH - clear), animated: true });
   };
 
   const scrollToTop = () => scrollRef.current?.scrollTo({ y: 0, animated: true });
@@ -127,7 +133,7 @@ export default function AnalysisScreen() {
           {sections.map((s) => (
             <View key={s.id} onLayout={(e) => { offsets.current[s.id] = e.nativeEvent.layout.y; }} style={{ marginTop: 22 }}>
               {s.id === 'hrv' ? (
-                // HRV keeps its All/Morning/Night pills inline with the title —
+                // HRV keeps its All/Morning/Evening pills inline with the title —
                 // small and right-aligned so they never overrun the container;
                 // the same toggle also rides in the pinned bar once this section pins.
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, minHeight: 34 }}>
@@ -159,6 +165,9 @@ type Active = { id: string; title: string } | null;
 // One size for section titles everywhere — the inline headers in the document
 // and the pinned bar's title must read as the *same* element trading places.
 const SECTION_TITLE_SIZE = 20;
+// Height of the pinned section bar. Shared so `goTo` can land a section's first
+// card just below the bar rather than tucked under it.
+const STICKY_BAR_H = 52;
 
 /**
  * The pinned section bar under the top header. Always mounted (it fades in/out
@@ -175,7 +184,7 @@ function StickyBar({ headerH, active, dir, onUp, hrvFilt, setHrvFilt }: {
   headerH: number; active: Active; dir: number; onUp: () => void; hrvFilt: Filt; setHrvFilt: (f: Filt) => void;
 }) {
   const p = usePalette();
-  const BAR_H = 52, SLIDE = 16;
+  const BAR_H = STICKY_BAR_H, SLIDE = 16;
   const shown = active != null;
 
   // Container fade — presence of any pinned section.
@@ -247,16 +256,53 @@ function StickyBar({ headerH, active, dir, onUp, hrvFilt, setHrvFilt }: {
  * dot, big flat stat values, a one-line description, then the charts — all on a
  * surface card.
  */
+const BP_PERIODS: { val: BpPeriod; label: string }[] = [
+  { val: 'all', label: 'All' }, { val: 'morning', label: 'Morning' }, { val: 'evening', label: 'Evening' },
+];
+
+/** Text-link period toggle (matching the HRV structured/unstructured/both
+ *  style): the active option in bright white with a short underline beneath. */
+function BpFilterLinks({ value, onChange }: { value: BpPeriod; onChange: (v: BpPeriod) => void }) {
+  const p = usePalette();
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+      {BP_PERIODS.map((o) => {
+        const on = o.val === value;
+        return (
+          <Pressable key={o.val} onPress={() => onChange(o.val)} hitSlop={6} style={{ alignItems: 'center' }}>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: on ? '#fff' : p.textDim }}>{o.label}</Text>
+            <View style={{ height: 2, borderRadius: 1, alignSelf: 'stretch', marginTop: 3, backgroundColor: on ? '#fff' : 'transparent' }} />
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
 const CardView = React.memo(function CardView({ card, buckets }: { card: AnalysisCard; buckets: { label: string }[] }) {
   const p = usePalette();
   // A `selectStat` chart drives the card's first stat: dragging the chart swaps
-  // the range average for that bucket's value with its date in parentheses.
-  const [sel, setSel] = useState<number>(-1);
+  // the range average for that bucket's value with its date in parentheses;
+  // tapping anywhere outside the chart blurs (null) back to the average.
+  const [sel, setSel] = useState<number | null>(null);
   const selChart = (card.charts || []).find((c) => c.selectStat);
   const selSeries = selChart?.series.find((s) => !s.dashed) ?? selChart?.series[0];
+  // A selectStat chart hides its own readout/toggle row, so when it has grade
+  // zones the card header hosts the "Show zones" link instead.
+  const [showZones, setShowZones] = useState(false);
+  const zonesChart = selChart?.zones ? selChart : null;
+  // Blood-pressure period filter: swaps the dumbbell + avg stats between all,
+  // morning-only and evening-only readings. Inert on non-BP cards.
+  const [bpFilt, setBpFilt] = useState<BpPeriod>('all');
+  const bpSpan = card.bpFilter ? card.bpFilter[bpFilt] : null;
   const stats = useMemo(() => {
     const st = card.stats ? card.stats.slice() : [];
-    if (selChart && selSeries && sel >= 0 && st.length) {
+    // BP: the two avg tiles follow the selected period's readings.
+    if (bpSpan && st.length >= 2) {
+      st[0] = { ...st[0], value: avgRound(bpSpan.sys) };
+      st[1] = { ...st[1], value: avgRound(bpSpan.dia) };
+    }
+    if (selChart && selSeries && sel != null && sel >= 0 && st.length) {
       const v = selSeries.values[sel];
       if (v != null && !isNaN(v)) {
         st[0] = {
@@ -268,12 +314,18 @@ const CardView = React.memo(function CardView({ card, buckets }: { card: Analysi
       }
     }
     return st;
-  }, [card.stats, selChart, selSeries, sel, buckets]);
+  }, [card.stats, selChart, selSeries, sel, buckets, bpSpan]);
   return (
     <View style={{ backgroundColor: p.surface, borderColor: p.border, borderWidth: 1, borderRadius: radius.card, padding: 16, marginBottom: 12 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
         <Text style={{ flexShrink: 1, fontSize: 15, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, color: p.textDim }}>{card.title}</Text>
         {card.help ? <HelpDot title={card.title} text={card.help} /> : null}
+        {zonesChart ? (
+          <>
+            <View style={{ flex: 1 }} />
+            <ZonesToggle on={showZones} onPress={() => setShowZones((v) => !v)} />
+          </>
+        ) : null}
       </View>
       {card.tiles && (card.desc || card.sub) ? (
         <Text style={{ color: p.textDim, fontSize: 13, lineHeight: 19, marginTop: 8 }}>{card.desc || card.sub}</Text>
@@ -305,6 +357,11 @@ const CardView = React.memo(function CardView({ card, buckets }: { card: Analysi
           </View>
         )
       ) : null}
+      {card.bpFilter ? (
+        <View style={{ marginTop: 12 }}>
+          <BpFilterLinks value={bpFilt} onChange={setBpFilt} />
+        </View>
+      ) : null}
       {!card.tiles && (card.desc || card.sub) ? (
         <Text style={{ color: p.textDim, fontSize: 13, lineHeight: 19, marginTop: 8 }}>{card.desc || card.sub}</Text>
       ) : null}
@@ -312,8 +369,10 @@ const CardView = React.memo(function CardView({ card, buckets }: { card: Analysi
         <View key={i} style={{ marginTop: 14 }}>
           {ch.label ? <Text style={{ fontSize: 12, color: p.text, marginBottom: 6, fontWeight: '600' }}>{ch.label}</Text> : null}
           {ch.dumbbell
-            ? <BpDumbbell buckets={buckets} sys={ch.dumbbell.sys} dia={ch.dumbbell.dia} />
-            : <LineChart buckets={buckets} series={ch.series} zones={ch.zones} integer={ch.integer} target={ch.target} hideHeader={ch.selectStat} onSelect={ch.selectStat ? setSel : undefined} />}
+            ? (bpSpan && !bpSpan.sys.some((v) => v != null) && !bpSpan.dia.some((v) => v != null)
+              ? <Text style={{ color: p.textDim, fontSize: 13, marginTop: 4 }}>No {bpFilt} readings in this range.</Text>
+              : <BpDumbbell buckets={buckets} sys={bpSpan ? bpSpan.sys : ch.dumbbell.sys} dia={bpSpan ? bpSpan.dia : ch.dumbbell.dia} />)
+            : <LineChart buckets={buckets} series={ch.series} zones={ch.zones} integer={ch.integer} target={ch.target} hideHeader={ch.selectStat} zonesOn={ch === zonesChart ? showZones : undefined} onSelect={ch.selectStat ? setSel : undefined} />}
           {ch.legend ? (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 14, marginTop: 8 }}>
               {ch.legend.map(([name, color]) => (

@@ -10,7 +10,7 @@ import Animated, { Easing, useAnimatedProps, useAnimatedStyle, useSharedValue, w
 import { ScoreGauge } from '../components/charts';
 import { Icon } from '../components/Icon';
 import { SheetControls, SheetFooter, useSheets } from '../components/Sheet';
-import { HeroCard, SumCard, MetricRow } from '../components/summary';
+import { SumCard, MetricRow } from '../components/summary';
 import { MilestoneProgressCard } from './Milestones';
 import { Button, Stepper } from '../components/ui';
 import { radius, type as T, usePalette } from '../theme';
@@ -465,11 +465,22 @@ function ScoreExplain({ all, dk, controls }: { all: ScoreSetResult; dk: string; 
 
   return (
     <View>
-      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 16 }}>How this score was calculated</Text>
-      <HeroCard cat={cat.short === 'Excellent' || cat.short === 'Good' ? 'great' : null} label={cat.label} big={all.score!} den="/ 100" sub={`Confidence ${all.confidence}%, the share of the full input set available to score today.`} />
-      <Text style={{ fontSize: 14, color: p.textDim, lineHeight: 20, marginBottom: 16 }}>
-        {"The Autonomic Score is a weighted blend of the day's readings. Each input is graded, turned into points, and combined by weight. Missing inputs drop out and the remaining weights are rescaled, and that rescaling is the confidence percentage."}
-      </Text>
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 16 }}>How this was calculated</Text>
+      <View style={{ borderRadius: radius.card, padding: 16, marginBottom: 16, backgroundColor: hexA(cat.color, 0.1), borderWidth: 1, borderColor: hexA(cat.color, 0.45) }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Text style={[T.section, { color: p.textDim }]}>Your Score</Text>
+          <View style={{ backgroundColor: cat.color, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 999 }}>
+            <Text style={{ color: '#fff', fontSize: 13, fontWeight: '800', textTransform: 'uppercase' }}>{cat.short}</Text>
+          </View>
+        </View>
+        <View style={{ alignItems: 'center', marginVertical: 8 }}>
+          <ScoreGauge score={all.score!} color={cat.color}>
+            <Text style={{ fontSize: 57, fontWeight: '800', color: p.text, fontVariant: ['tabular-nums'], letterSpacing: -1 }}>{all.score}</Text>
+            <Text style={{ fontSize: 10, fontWeight: '700', letterSpacing: 1, color: p.textDim, marginTop: 4 }}>OUT OF 100</Text>
+          </ScoreGauge>
+        </View>
+        <Text style={{ textAlign: 'center', fontSize: 13, color: p.textDim, fontWeight: '600' }}>{`Confidence ${all.confidence}%, the share of the full input set available to score today.`}</Text>
+      </View>
       {helped.length ? <SumCard title="What helped">{helped.map((c) => <CompRow key={c.label} c={c} improveLine={improveLine} />)}</SumCard> : null}
       {hurt.length ? <SumCard title="What hurt">{hurt.map((c) => <CompRow key={c.label} c={c} improveLine={improveLine} />)}</SumCard> : null}
       {neutral.length ? <SumCard title="Middle of the range">{neutral.map((c) => <CompRow key={c.label} c={c} improveLine={improveLine} />)}</SumCard> : null}
