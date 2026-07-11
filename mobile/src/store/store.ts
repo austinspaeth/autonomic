@@ -82,6 +82,7 @@ export function migrate(s: unknown): AppState {
         meals: (d.food && Array.isArray(d.food.meals) ? d.food.meals : []),
       },
       digestion: { movements: (d.digestion && Array.isArray(d.digestion.movements) ? d.digestion.movements : []) },
+      ...(typeof d.notes === 'string' && d.notes ? { notes: d.notes } : {}),
     };
   });
   out.meta.sleepReframed = true;

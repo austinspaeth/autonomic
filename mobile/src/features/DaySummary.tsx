@@ -12,14 +12,16 @@ import { Icon } from '../components/Icon';
 import { SheetControls, SheetFooter, useSheets } from '../components/Sheet';
 import { HeroCard, SumCard, MetricRow } from '../components/summary';
 import { MilestoneProgressCard } from './Milestones';
+import { HrvSetup } from './hrv/Setup';
 import { Button, Stepper } from '../components/ui';
-import { radius, usePalette } from '../theme';
+import { radius, type as T, usePalette } from '../theme';
 import { SCORE_COLORS, GRADE_LABEL, GRADE_PTS, catFromBands } from '../lib/scoring';
 import {
   OUTLOOK_GUIDE, TOMORROW, SCORE_TIPS, blueZone, readingPeriod, resolveProtocol,
   scoreCat, scoreSet, streakInfo, streakTier, type ScoreComp, type ScoreSetResult,
 } from '../lib/scoring/day';
 import { typesFor } from '../lib/typeCatalog';
+import { todayKey } from '../lib/dates';
 import { getState, mutate, useAppState } from '../store/store';
 
 import type { Band, Protocol, ScoreCat } from '../lib/types';
@@ -89,7 +91,7 @@ export function DaySummary({ dk }: { dk: string }) {
   const state = useAppState();
   const ctx = { sex: state.profile.sex, height: state.profile.height };
   const d = state.days[dk] || { readings: [], activities: [] } as never;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayKey();
   const readings = (d.readings || []).slice().sort((a, b) => ((a.time as string) || '').localeCompare((b.time as string) || ''));
   const all = scoreSet(readings, d, dk, state.days, ctx);
 
@@ -98,15 +100,24 @@ export function DaySummary({ dk }: { dk: string }) {
       <GradientBorderCard color={all.score == null || all.confidence < 40 ? null : scoreCat(all.score).color} trigger={dk} style={{ marginBottom: 12 }}>
         {all.score == null || all.confidence < 40 ? (
           <View style={{ padding: 16 }}>
-            <Text style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.6, fontWeight: '700', color: p.textDim }}>Autonomic Outlook</Text>
+            <Text style={[T.section, { color: p.textDim }]}>Autonomic Outlook</Text>
             {!readings.length ? (
               <>
-                <Text style={{ fontSize: 18, fontWeight: '700', color: p.text, marginTop: 6 }}>{dk > today ? 'Future day' : 'Awaiting morning data'}</Text>
+                <Text style={{ fontSize: 22, fontWeight: '700', color: p.text, marginTop: 6 }}>{dk > today ? 'Future day' : 'Awaiting morning data'}</Text>
                 <Text style={{ fontSize: 14, color: p.textDim, marginTop: 5, lineHeight: 19 }}>{dk > today ? 'Nothing logged yet for this day.' : "Add a morning HRV reading to see today's autonomic profile."}</Text>
+                {dk === today ? (
+                  <Pressable
+                    onPress={() => openSheet((c) => <HrvSetup controls={c} />)}
+                    style={({ pressed }) => [{ flexDirection: 'row', gap: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: p.accent, borderRadius: radius.control, paddingVertical: 13, marginTop: 14 }, pressed && { opacity: 0.7 }]}
+                  >
+                    <Icon name="activity" size={18} color="#fff" />
+                    <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>Capture HRV reading</Text>
+                  </Pressable>
+                ) : null}
               </>
             ) : (
               <>
-                <Text style={{ fontSize: 18, fontWeight: '700', color: p.text, marginTop: 6 }}>Insufficient data</Text>
+                <Text style={{ fontSize: 22, fontWeight: '700', color: p.text, marginTop: 6 }}>Insufficient data</Text>
                 <Text style={{ fontSize: 14, color: p.textDim, marginTop: 5, lineHeight: 19 }}>
                   {(all.score != null ? `Provisional ${all.score} / 100 at ${all.confidence}% confidence. ` : '') + (all.hasStruct ? 'Add more readings to firm up the score.' : all.hasUnstruct ? 'Awaiting a structured reading for higher confidence.' : 'Add a morning HRV reading for higher confidence.')}
                 </Text>
@@ -125,7 +136,7 @@ export function DaySummary({ dk }: { dk: string }) {
 
 function ScoredHero({ dk, readings, d, all, ctx, onExplain }: { dk: string; readings: any[]; d: any; all: ScoreSetResult; ctx: any; onExplain: () => void }) {
   const p = usePalette();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayKey();
   const cat = scoreCat(all.score!);
   const morning = readings.filter((r) => readingPeriod(r) === 'morning');
   const evening = readings.filter((r) => readingPeriod(r) === 'evening');
@@ -150,9 +161,9 @@ function ScoredHero({ dk, readings, d, all, ctx, onExplain }: { dk: string; read
   return (
     <Pressable onPress={onExplain} style={{ padding: 16, backgroundColor: hexA(cat.color, 0.1) }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Text style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.6, fontWeight: '700', color: p.textDim }}>{mode}</Text>
-        <View style={{ backgroundColor: cat.color, paddingHorizontal: 11, paddingVertical: 4, borderRadius: 999 }}>
-          <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800', textTransform: 'uppercase' }}>{cat.short}</Text>
+        <Text style={[T.section, { color: p.textDim }]}>{mode}</Text>
+        <View style={{ backgroundColor: cat.color, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 999 }}>
+          <Text style={{ color: '#fff', fontSize: 13, fontWeight: '800', textTransform: 'uppercase' }}>{cat.short}</Text>
         </View>
       </View>
       <View style={{ alignItems: 'center', marginVertical: 8 }}>

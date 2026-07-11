@@ -396,34 +396,34 @@ function Onboarding({ onDone }: { onDone: () => void }) {
     if (step === 0) return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: 22 }}>
         <View style={{ alignItems: 'center' }}>
-          <Text style={{ fontSize: 12, letterSpacing: 2.6, color: C.faint, fontWeight: '700', marginBottom: 12 }}>WELCOME TO</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-            <BrandMark size={26} />
-            <Text style={{ fontSize: 40, fontWeight: '800', letterSpacing: -1.2, color: C.text }}>Autonomic</Text>
+          <Text style={{ fontSize: 13.5, letterSpacing: 2.9, color: C.faint, fontWeight: '700', marginBottom: 13 }}>WELCOME TO</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 13 }}>
+            <BrandMark size={30} />
+            <Text style={{ fontSize: 46, fontWeight: '800', letterSpacing: -1.4, color: C.text }}>Autonomic</Text>
           </View>
         </View>
-        <Text style={{ fontSize: 16, lineHeight: 25, color: C.dim, textAlign: 'center', maxWidth: 290 }}>
+        <Text style={{ fontSize: 18, lineHeight: 28, color: C.dim, textAlign: 'center', maxWidth: 330 }}>
           Track your autonomic recovery: heart-rate variability, symptoms, sleep, and more, in one private journal.
         </Text>
       </View>
     );
     if (step === 1) return (
       <View style={{ flex: 1, paddingTop: 24, gap: 22 }}>
-        <View style={[st.tile, { width: 64, height: 64, borderRadius: 18 }]}>
-          <Glyph size={30} d={['M12 2l8 3v6c0 5-3.4 8.2-8 9-4.6-.8-8-4-8-9V5z', 'M9 12l2 2 4-4']} />
+        <View style={[st.tile, { width: 72, height: 72, borderRadius: 20 }]}>
+          <Glyph size={34} d={['M12 2l8 3v6c0 5-3.4 8.2-8 9-4.6-.8-8-4-8-9V5z', 'M9 12l2 2 4-4']} />
         </View>
         <View>
           <Text style={st.h2}>Private &amp; on-device</Text>
           <Text style={st.para}>Everything stays on your device. Your data never leaves your phone unless you export it.</Text>
         </View>
         <View style={{ gap: 12 }}>
-          <Bullet icon={<Glyph rect={{ x: 4, y: 10, wd: 16, ht: 10, rx: 2 }} d={['M8 10V7a4 4 0 0 1 8 0v3']} />}>
+          <Bullet icon={<Glyph size={24} rect={{ x: 4, y: 10, wd: 16, ht: 10, rx: 2 }} d={['M8 10V7a4 4 0 0 1 8 0v3']} />}>
             No account and no cloud
           </Bullet>
-          <Bullet icon={<Glyph w={1.3} circle={{ r: 9, w: 1.8 }} d={['M4.5 8h15M4.5 16h15M12 3c-2.5 3-2.5 15 0 18M12 3c2.5 3 2.5 15 0 18']} />}>
+          <Bullet icon={<Glyph size={24} w={1.3} circle={{ r: 9, w: 1.8 }} d={['M4.5 8h15M4.5 16h15M12 3c-2.5 3-2.5 15 0 18M12 3c2.5 3 2.5 15 0 18']} />}>
             No tracking, ever
           </Bullet>
-          <Bullet icon={<Glyph d={['M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4', 'M7 10l5 5 5-5', 'M12 15V3']} />}>
+          <Bullet icon={<Glyph size={24} d={['M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4', 'M7 10l5 5 5-5', 'M12 15V3']} />}>
             Yours to export anytime
           </Bullet>
         </View>
@@ -432,8 +432,8 @@ function Onboarding({ onDone }: { onDone: () => void }) {
     if (step === 2) return (
       <View style={{ flex: 1 }}>
         <View style={{ flex: 1, paddingTop: 24, gap: 22 }}>
-          <View style={[st.tile, { width: 64, height: 64, borderRadius: 18 }]}>
-            <Glyph size={30} circle={{ r: 9 }} d={['M12 8h.01M11 12h1v4h1']} />
+          <View style={[st.tile, { width: 72, height: 72, borderRadius: 20 }]}>
+            <Glyph size={34} circle={{ r: 9 }} d={['M12 8h.01M11 12h1v4h1']} />
           </View>
           <View>
             <Text style={st.h2}>Before you begin</Text>
@@ -462,8 +462,8 @@ function Onboarding({ onDone }: { onDone: () => void }) {
       };
       return (
         <ScrollView ref={scrollRef} style={{ flex: 1 }} contentContainerStyle={{ paddingTop: 24, gap: 22, paddingBottom: 88 }} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" automaticallyAdjustKeyboardInsets showsVerticalScrollIndicator={false}>
-          <View style={[st.tile, { width: 64, height: 64, borderRadius: 18 }]}>
-            <Glyph size={30} d={['M16 8a4 4 0 1 1-8 0 4 4 0 0 1 8 0', 'M4 21a8 8 0 0 1 16 0']} />
+          <View style={[st.tile, { width: 72, height: 72, borderRadius: 20 }]}>
+            <Glyph size={34} d={['M16 8a4 4 0 1 1-8 0 4 4 0 0 1 8 0', 'M4 21a8 8 0 0 1 16 0']} />
           </View>
           <View>
             <Text style={st.h2}>About you</Text>
@@ -507,8 +507,8 @@ function Onboarding({ onDone }: { onDone: () => void }) {
     }
     if (step === 4) return (
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingTop: 24, gap: 22, paddingBottom: 24, flexGrow: 1 }} showsVerticalScrollIndicator={false}>
-        <View style={[st.tile, { width: 64, height: 64, borderRadius: 18 }]}>
-          <Glyph size={30} d={['M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71', 'M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71']} />
+        <View style={[st.tile, { width: 72, height: 72, borderRadius: 20 }]}>
+          <Glyph size={34} d={['M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71', 'M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71']} />
         </View>
         <View>
           <Text style={st.h2}>Connect your data</Text>
@@ -543,8 +543,8 @@ function Onboarding({ onDone }: { onDone: () => void }) {
     );
     return (
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingTop: 24, gap: 22, paddingBottom: 24, flexGrow: 1 }} showsVerticalScrollIndicator={false}>
-        <View style={{ width: 64, height: 64, borderRadius: 18, backgroundColor: 'rgba(224,49,39,0.09)', borderWidth: 1, borderColor: 'rgba(224,49,39,0.25)', alignItems: 'center', justifyContent: 'center' }}>
-          <Glyph size={30} w={2.4} d={['M20 6L9 17l-5-5']} />
+        <View style={{ width: 72, height: 72, borderRadius: 20, backgroundColor: 'rgba(224,49,39,0.09)', borderWidth: 1, borderColor: 'rgba(224,49,39,0.25)', alignItems: 'center', justifyContent: 'center' }}>
+          <Glyph size={34} w={2.4} d={['M20 6L9 17l-5-5']} />
         </View>
         <View>
           <Text style={st.h2}>You&apos;re all set</Text>
@@ -554,19 +554,19 @@ function Onboarding({ onDone }: { onDone: () => void }) {
           </Text>
         </View>
         <View style={{ gap: 14 }}>
-          <Bullet icon={<Icon name="clipboard" size={22} color={ACCENT} />}>
-            <Text style={{ fontWeight: '700' }}>Journal</Text> is your day-to-day log: HRV readings, sleep, activities, meds, and food.
+          <Bullet icon={<Icon name="clipboard" size={25} color={ACCENT} />}>
+            <Text style={{ fontWeight: '700' }}>Journal</Text> is your day-to-day health log.
           </Bullet>
-          <Bullet icon={<Icon name="chart" size={22} color={ACCENT} />}>
-            <Text style={{ fontWeight: '700' }}>Progress</Text> charts your trends so you can see how you progress over time.
+          <Bullet icon={<Icon name="chart" size={25} color={ACCENT} />}>
+            <Text style={{ fontWeight: '700' }}>Progress</Text> charts your trends over time.
           </Bullet>
-          <Bullet icon={<Icon name="ai" size={22} color={ACCENT} />}>
-            <Text style={{ fontWeight: '700' }}>Insight</Text> turns your data into ready-made prompts for your own AI provider to find patterns, progress, and more.
+          <Bullet icon={<Icon name="ai" size={25} color={ACCENT} />}>
+            <Text style={{ fontWeight: '700' }}>Insight</Text> turns your data into AI prompts.
           </Bullet>
-          <Bullet icon={<Icon name="plus" size={22} color={ACCENT} />}>
+          <Bullet icon={<Icon name="plus" size={25} color={ACCENT} />}>
             Tap <Text style={{ fontWeight: '700' }}>+</Text> on any section to log a reading.
           </Bullet>
-          <Bullet icon={<Glyph size={22} circle={{ r: 9 }} d={['M9.4 9.2a2.6 2.6 0 0 1 5.1.9c0 1.7-2.5 2.3-2.5 2.3', 'M12 16h.01']} />}>
+          <Bullet icon={<Glyph size={25} circle={{ r: 9 }} d={['M9.4 9.2a2.6 2.6 0 0 1 5.1.9c0 1.7-2.5 2.3-2.5 2.3', 'M12 16h.01']} />}>
             Tap the <Text style={{ fontWeight: '700' }}>?</Text> icons whenever you need help.
           </Bullet>
         </View>
@@ -643,10 +643,10 @@ function Onboarding({ onDone }: { onDone: () => void }) {
 
 const st = StyleSheet.create({
   tile: { backgroundColor: C.tile, borderWidth: 1, borderColor: C.tileBorder, alignItems: 'center', justifyContent: 'center' },
-  h2: { fontSize: 27, fontWeight: '700', letterSpacing: -0.5, color: C.text, marginBottom: 8 },
-  para: { fontSize: 15, lineHeight: 24, color: C.dim },
+  h2: { fontSize: 31, fontWeight: '700', letterSpacing: -0.6, color: C.text, marginBottom: 9 },
+  para: { fontSize: 17, lineHeight: 26, color: C.dim },
   privRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 14, paddingVertical: 6, paddingHorizontal: 2 },
-  privLabel: { fontSize: 14, lineHeight: 20, color: C.text },
+  privLabel: { fontSize: 16, lineHeight: 23, color: C.text },
   fieldLabel: { fontSize: 12, letterSpacing: 0.6, textTransform: 'uppercase', color: C.faint, fontWeight: '700', marginBottom: 7 },
   input: { backgroundColor: C.row, borderWidth: 1, borderColor: C.rowBorder, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15, color: C.text },
   note: { flexDirection: 'row', gap: 11, backgroundColor: C.accentWash, borderWidth: 1, borderColor: 'rgba(224,49,39,0.19)', borderRadius: 12, padding: 14 },

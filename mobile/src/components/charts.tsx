@@ -237,16 +237,15 @@ export function PowerBar({ vlf, lf, hf }: { vlf: number | null; lf: number | nul
 }
 
 /* ---------- Power spectrum (frequency-axis PSD distribution) ---------- */
-const bandOf = (f: number) => (f < 0.04 ? SPECTRUM_BANDS[0] : f < 0.15 ? SPECTRUM_BANDS[1] : SPECTRUM_BANDS[2]);
-
 /**
- * Distribution of HRV power across the frequency spectrum. When beat-to-beat
- * `rr` is available the true power spectral density is drawn as a filled curve
- * (band-coloured by frequency), matching the granular look the user asked for.
- * Without RR (a typed-in reading) we reconstruct a smooth band-shaped curve from
- * the three band powers so it still reads as a distribution, not blocks. The
- * x-axis runs 0 → 0.5 Hz with 0.1 ticks; below it, a polished legend spells out
- * Very low / Low / High power.
+ * Distribution of HRV power across the frequency spectrum, Welltory-style: a
+ * continuous curve with sharp, well-defined peaks, band-coloured by frequency,
+ * with adjacent bands butting against each other (segments share their exact
+ * band-edge point so there is no gap between fills). With beat-to-beat `rr`
+ * the true power spectral density is drawn (linearly interpolated onto a fine
+ * grid — no smoothing, so peaks stay peaks). Without RR (a typed-in reading)
+ * we reconstruct one peak per band at its typical frequency, scaled to the
+ * band's power. The x-axis runs 0 → 0.5 Hz; below it, the power readouts.
  */
 export function PowerSpectrum({ rr, vlf, lf, hf }: { rr?: number[] | null; vlf: number | null; lf: number | null; hf: number | null }) {
   const p = usePalette();
@@ -256,55 +255,56 @@ export function PowerSpectrum({ rr, vlf, lf, hf }: { rr?: number[] | null; vlf: 
   if (!total && !curve) return null;
   const pct = (x: number) => (total ? Math.round((x / total) * 100) : 0);
 
-  const W = 320, H = 150, padL = 30, padR = 6, padT = 10, padB = 26;
+  const W = 320, H = 150, padL = 8, padR = 6, padT = 10, padB = 26;
   const fMax = 0.5;
   const innerW = W - padL - padR;
   const xAt = (f: number) => padL + (Math.min(f, fMax) / fMax) * innerW;
 
-  // Build (freq, density) points: either the real PSD or a reconstructed curve.
-  let pts: { f: number; d: number }[];
+  // Density at any frequency: linear interpolation of the real PSD, or a
+  // reconstructed sum of one peak per band (centred at the band's typical
+  // frequency, height ∝ band power / bandwidth) when only totals are known.
+  let densAt: (f: number) => number;
   if (curve) {
-    pts = curve.freqs.map((f, i) => ({ f, d: curve.psd[i] }));
-  } else {
-    // Reconstruct: sample a fine grid, each point = band power / bandwidth (flat
-    // density per band) lightly smoothed at the edges so it isn't a hard block.
-    const density = (f: number) => {
-      const b = bandOf(f);
-      const v = vals[b.key as 'vlf' | 'lf' | 'hf'];
-      return v / (b.hi - b.lo);
+    const fs = curve.freqs, ps = curve.psd;
+    densAt = (f: number) => {
+      if (!fs.length) return 0;
+      if (f <= fs[0]) return ps[0];
+      if (f >= fs[fs.length - 1]) return ps[ps.length - 1];
+      let i = 0;
+      while (i < fs.length - 2 && fs[i + 1] < f) i++;
+      const t = (f - fs[i]) / (fs[i + 1] - fs[i] || 1);
+      return ps[i] + t * (ps[i + 1] - ps[i]);
     };
-    pts = [];
-    for (let f = 0.0033; f <= fMax; f += 0.004) pts.push({ f, d: density(f) });
+  } else {
+    const peaks = [
+      { c: 0.015, s: 0.011, v: vals.vlf / 0.0367 },
+      { c: 0.1, s: 0.028, v: vals.lf / 0.11 },
+      { c: 0.25, s: 0.06, v: vals.hf / 0.25 },
+    ];
+    densAt = (f: number) => peaks.reduce((s, pk) => s + pk.v * Math.exp(-((f - pk.c) ** 2) / (2 * pk.s * pk.s)), 0);
   }
 
-  // Round the peaks off: a triangular moving average over the density trace
-  // (wider for the reconstructed block curve so band edges become soft
-  // shoulders), then bezier segments below instead of straight lines.
-  const win = curve ? 3 : 6;
-  const smoothed = pts.map((_, i) => {
-    let s = 0, ws = 0;
-    for (let k = -win; k <= win; k++) {
-      const j = i + k;
-      if (j < 0 || j >= pts.length) continue;
-      const wt = win + 1 - Math.abs(k);
-      s += pts[j].d * wt; ws += wt;
-    }
-    return s / ws;
+  // Sample each band on its own sub-grid, endpoints exactly on the band edges —
+  // adjacent bands share the edge sample, so their fills touch with no gap.
+  const bandPts = SPECTRUM_BANDS.map((b) => {
+    const lo = b.lo, hi = Math.min(b.hi, fMax);
+    const M = Math.max(8, Math.round(((hi - lo) / fMax) * 160));
+    const seg: { f: number; d: number }[] = [];
+    for (let i = 0; i <= M; i++) { const f = lo + ((hi - lo) * i) / M; seg.push({ f, d: densAt(f) }); }
+    return seg;
   });
-  pts = pts.map((q, i) => ({ f: q.f, d: smoothed[i] }));
 
-  const dMax = Math.max(...pts.map((q) => q.d)) || 1;
+  const dMax = Math.max(...bandPts.flat().map((q) => q.d)) || 1;
   const yAt = (d: number) => padT + (1 - d / dMax) * (H - padT - padB);
   const baseY = H - padB;
 
-  // One filled sub-path per band so the fill colour changes at the band edges.
+  // One filled sub-path per band; straight segments keep the peaks defined.
   const segs: { color: string; d: string }[] = [];
-  SPECTRUM_BANDS.forEach((b) => {
-    const seg = pts.filter((q) => q.f >= b.lo && q.f <= b.hi);
+  SPECTRUM_BANDS.forEach((b, bi) => {
+    const seg = bandPts[bi];
     if (seg.length < 2) return;
-    const xy: [number, number][] = seg.map((q) => [xAt(q.f), Math.min(baseY, yAt(q.d))]);
-    const line = smoothPath(xy);
-    const area = `M${xy[0][0].toFixed(1)} ${baseY} ${line.replace('M', 'L')} L${xy[xy.length - 1][0].toFixed(1)} ${baseY} Z`;
+    const xy = seg.map((q) => `${xAt(q.f).toFixed(2)} ${Math.min(baseY, yAt(q.d)).toFixed(2)}`);
+    const area = `M${xAt(seg[0].f).toFixed(2)} ${baseY} L${xy.join(' L')} L${xAt(seg[seg.length - 1].f).toFixed(2)} ${baseY} Z`;
     segs.push({ color: b.color, d: area });
   });
 
@@ -321,10 +321,7 @@ export function PowerSpectrum({ rr, vlf, lf, hf }: { rr?: number[] | null; vlf: 
         <Line x1={padL} x2={W - padR} y1={baseY} y2={baseY} stroke={p.border} strokeWidth={1} />
         {segs.map((s, i) => <Path key={i} d={s.d} fill={s.color} opacity={0.9} />)}
         {ticks.map((t, i) => (
-          <React.Fragment key={i}>
-            <Line x1={xAt(t)} x2={xAt(t)} y1={padT} y2={baseY} stroke={p.border} strokeWidth={0.5} opacity={0.3} />
-            <SvgText x={xAt(t)} y={baseY + 14} textAnchor="middle" fontSize={9} fill={p.textDim}>{t.toFixed(1)}</SvgText>
-          </React.Fragment>
+          <SvgText key={i} x={xAt(t)} y={baseY + 14} textAnchor={i === 0 ? 'start' : i === ticks.length - 1 ? 'end' : 'middle'} fontSize={9} fill={p.textDim}>{t.toFixed(1)}</SvgText>
         ))}
         <SvgText x={padL} y={baseY + 24} textAnchor="start" fontSize={9} fill={p.textDim}>Frequency (Hz)</SvgText>
       </Svg>

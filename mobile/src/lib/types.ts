@@ -76,6 +76,8 @@ export interface DayRecord {
   symptoms: Entry[];
   food: FoodRecord;
   digestion: { movements: Movement[]; bm?: number };
+  /** Free-text day notes; only surfaced in AI-insights prompts. */
+  notes?: string;
 }
 
 /** User-configurable definition of a "clean day" (the streak protocol). Each

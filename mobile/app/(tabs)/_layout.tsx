@@ -133,7 +133,10 @@ export default function TabLayout() {
   const insets = useSafeAreaInsets();
   return (
     <View style={{ flex: 1 }}>
-      <Tabs tabBar={(props) => <FloatingTabBar {...props} />} screenOptions={{ headerShown: false, ...TAB_TRANSITION }}>
+      {/* lazy: false pre-mounts every scene at startup, mirroring the journal's
+          day-change rule (render first, then animate): switching tabs slides in
+          an already-rendered tree instead of mounting heavy charts mid-transition. */}
+      <Tabs tabBar={(props) => <FloatingTabBar {...props} />} screenOptions={{ headerShown: false, lazy: false, ...TAB_TRANSITION }}>
         <Tabs.Screen name="index" />
         <Tabs.Screen name="analysis" />
         <Tabs.Screen name="insights" />

@@ -17,6 +17,7 @@ import {
 import Animated, {
   Easing, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming,
 } from 'react-native-reanimated';
+import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { radius, usePalette } from '../theme';
 import { Icon } from './Icon';
@@ -258,15 +259,23 @@ function SheetView({ entry, isTop, behind, closing, requestClose, onExited, clos
           )}
         </SheetContentContext.Provider>
 
-        {!full && !hideClose && (
-          <Pressable onPress={dismiss} style={[styles.closeBtn, { backgroundColor: p.surface2 }]} hitSlop={8}>
-            <Icon name="x" size={18} color={p.textDim} />
-          </Pressable>
-        )}
-        {entry.opts.action && (
-          <Pressable onPress={entry.opts.action.onPress} style={[styles.actionBtn, { backgroundColor: p.surface2 }]} hitSlop={8}>
-            <Icon name={entry.opts.action.icon} size={16} color={p.textDim} />
-          </Pressable>
+        {/* Close (and optional edit) live together in one tinted-glass pill:
+            blurred background, near-black tint, dark grey border. */}
+        {((!full && !hideClose) || entry.opts.action) && (
+          <View style={[styles.headerPill, { borderColor: '#46464e' }]}>
+            <BlurView intensity={45} tint="dark" style={StyleSheet.absoluteFill} />
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(6,6,8,0.78)' }]} />
+            {entry.opts.action && (
+              <Pressable onPress={entry.opts.action.onPress} style={[styles.pillBtn, { backgroundColor: p.surface2 }]} hitSlop={8}>
+                <Icon name={entry.opts.action.icon} size={16} color={p.textDim} />
+              </Pressable>
+            )}
+            {!full && !hideClose && (
+              <Pressable onPress={dismiss} style={[styles.pillBtn, { backgroundColor: p.surface2 }]} hitSlop={8}>
+                <Icon name="x" size={18} color={p.textDim} />
+              </Pressable>
+            )}
+          </View>
         )}
         {footer && (
           <Animated.View style={[styles.footer, { backgroundColor: p.surface, borderTopColor: p.border }, footerStyle]}>
@@ -297,8 +306,8 @@ export function SheetFooter({ children }: { children: React.ReactNode }) {
 const styles = StyleSheet.create({
   backdrop: { ...StyleSheet.absoluteFillObject },
   sheet: { position: 'absolute', left: 0, right: 0, bottom: 0, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
-  closeBtn: { position: 'absolute', top: 12, right: 14, width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  actionBtn: { position: 'absolute', top: 12, right: 54, width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  headerPill: { position: 'absolute', top: 14, right: 14, flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 999, borderWidth: 1, overflow: 'hidden' },
+  pillBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   footer: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 18, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: 10 },
   kbDismiss: { width: 46, borderRadius: radius.control, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
 });

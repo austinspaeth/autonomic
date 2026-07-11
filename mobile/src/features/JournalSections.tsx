@@ -2,7 +2,7 @@
  * The Journal sections: Sleep, Readings, Activities, Meds, Symptoms,
  * Triggers, Hydration, Digestion — each a Card with a header + "+ Add".
  */
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, LayoutAnimation, Platform, Pressable, Text, TextInput, UIManager, View } from 'react-native';
 import { AddDashButton, Card, Pill, Row, RowValue, SectionHeader, Segmented } from '../components/ui';
 import { Icon } from '../components/Icon';
@@ -17,7 +17,7 @@ import {
 import { typesFor } from '../lib/typeCatalog';
 import { rowScoreCategory, SCORE_COLORS, GRADE_LABEL } from '../lib/scoring';
 import { sleepGrade, sleepHours } from '../lib/scoring/day';
-import { ensureDay, save, useAppState } from '../store/store';
+import { ensureDay, getState, save, useAppState } from '../store/store';
 import { fmtTime12, periodOf } from '../lib/dates';
 import { health } from '../lib/health';
 import { SleepConfirmSheet } from './Health';
@@ -100,7 +100,60 @@ export function JournalSections({ dk }: { dk: string }) {
           <View style={{ marginTop: 6 }}><AddDashButton onPress={() => drawers.bowel(null)} label="+ Add bowel movement" /></View>
         </View>
       </Card>
+      {/* Notes */}
+      <NotesSection dk={dk} />
     </>
+  );
+}
+
+/** Free-text day notes. Auto-saves as you type (no save button); the text is
+ *  only surfaced when building AI-insights prompts. */
+function NotesSection({ dk }: { dk: string }) {
+  const p = usePalette();
+  const [text, setText] = useState(() => getState().days[dk]?.notes || '');
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pending = useRef<string | null>(null);
+
+  const commit = (v: string) => {
+    if (timer.current) { clearTimeout(timer.current); timer.current = null; }
+    pending.current = null;
+    const d = ensureDay(dk);
+    if ((d.notes || '') === v) return;
+    d.notes = v;
+    save();
+  };
+
+  // Swap in the new day's note on day change; flush any pending write for the
+  // old day first (the cleanup closure still holds the old `commit`/`dk`).
+  useEffect(() => {
+    setText(getState().days[dk]?.notes || '');
+    return () => { if (pending.current != null) commit(pending.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dk]);
+
+  const onChange = (v: string) => {
+    setText(v);
+    pending.current = v;
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => commit(v), 500);
+  };
+
+  return (
+    <Card>
+      <SectionHeader title="Notes" />
+      <View style={{ paddingHorizontal: 14, paddingBottom: 14 }}>
+        <TextInput
+          value={text}
+          onChangeText={onChange}
+          onEndEditing={() => commit(text)}
+          multiline
+          keyboardAppearance="dark"
+          placeholder="Write anything about your health or experiences today."
+          placeholderTextColor={p.textDim}
+          style={{ backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.control, padding: 12, fontSize: 15, lineHeight: 21, color: p.text, minHeight: 90, textAlignVertical: 'top' }}
+        />
+      </View>
+    </Card>
   );
 }
 

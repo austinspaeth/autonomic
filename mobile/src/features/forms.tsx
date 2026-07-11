@@ -312,7 +312,7 @@ export function useEntryForms(dk: string) {
 
   const openReadingSummary = (r: Entry) =>
     openSheet(
-      (c) => <ReadingSummarySheet r={r} dk={dk} controls={c} onEdit={() => openReadingForm(r.type, r)} />,
+      () => <ReadingSummarySheet r={r} dk={dk} />,
       { action: { icon: 'edit', onPress: () => openReadingForm(r.type, r) } },
     );
 
@@ -338,7 +338,7 @@ export function useEntryForms(dk: string) {
   return { openReadingForm, openActivityForm, openReadingSummary, captureHrv, pickReading, pickActivity, pickMed, pickSymptom, openMed, openSymptom };
 }
 
-function ReadingSummarySheet({ r, dk, controls, onEdit }: { r: Entry; dk: string; controls: SheetControls; onEdit: () => void }) {
+function ReadingSummarySheet({ r, dk }: { r: Entry; dk: string }) {
   const p = usePalette();
   useAppState(); // re-render on edits
   const state = getState();
@@ -349,8 +349,6 @@ function ReadingSummarySheet({ r, dk, controls, onEdit }: { r: Entry; dk: string
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text }}>{readingLabel(live)}</Text>
       <Text style={{ color: p.textDim, fontSize: 14, marginTop: 2, marginBottom: 14 }}>{live.time ? fmtTime12(live.time as string) : ''}</Text>
       <ReadingSummary r={live} days={state.days} ctx={ctx} />
-      <View style={{ height: 8 }} />
-      <Button title="Edit" variant="default" onPress={onEdit} />
       <View style={{ height: 24 }} />
     </ScrollView>
   );

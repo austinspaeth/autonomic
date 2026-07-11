@@ -68,6 +68,7 @@ function secTriggers(days: DaysMap, keys: string[]) {
 }
 const secMeds = (days: DaysMap, keys: string[], supplements: boolean) => orNone(eachEntry(days, keys, (d, k) => (d.meds || []).filter((m) => (supplements ? !MED_KEYS.has(m.type) : MED_KEYS.has(m.type))).map((m) => { const label = MED_TYPES[m.type] ? MED_TYPES[m.type].label : m.type; const bits: string[] = []; if (m.amount) bits.push(String(m.amount)); if (m.note) bits.push(m.note); return `${stamp(k, m.time as string)} ${label}${bits.length ? ' | ' + bits.join(' | ') : ''}`; })));
 const secSymptoms = (days: DaysMap, keys: string[]) => orNone(eachEntry(days, keys, (d, k) => (d.symptoms || []).map((s) => { const def = SYMPTOM_TYPES[s.type]; const label = def ? def.label : s.type; const parts: string[] = []; if (def) (def.fields || []).forEach((f) => { if (isDivider(f) || f.type === 'time' || f.type === 'textarea') return; const v = rv(s, f.key!); if (v != null) parts.push(`${f.label}: ${v}`); }); if (s.note) parts.push(`Note: ${s.note}`); return `${stamp(k, s.time as string)} ${label}${parts.length ? ' | ' + parts.join(' | ') : ''}`; })));
+const secNotes = (days: DaysMap, keys: string[]) => orNone(eachEntry(days, keys, (d, k) => (d.notes && d.notes.trim() ? [`[${k}] ${d.notes.trim()}`] : [])));
 const secOrthostatic = (days: DaysMap, keys: string[]) => orNone(eachEntry(days, keys, (d, k) => { const out: string[] = []; (d.readings || []).filter((r) => r.type === 'orthostatic').forEach((r) => out.push(`${stamp(k, r.time as string)} ${rv(r, 'transition') ?? 'Position change'} | Before HR: ${rv(r, 'beforeHr') ?? '-'} | After HR: ${rv(r, 'afterHr') ?? '-'} | HR @1min: ${rv(r, 'hr1min') ?? '-'}${noteSuffix(r)}`)); (d.symptoms || []).filter((s) => s.type === 'labileHr').forEach((s) => out.push(`${stamp(k, s.time as string)} High HR event | HR: ${rv(s, 'hr') ?? '-'} | Position: ${rv(s, 'position') ?? '-'}${noteSuffix(s)}`)); return out; }));
 
 export function makeSectionRenderer(state: AppState, ctx: ScoreContext) {
@@ -87,6 +88,7 @@ export function makeSectionRenderer(state: AppState, ctx: ScoreContext) {
     orthostatic: ['ORTHOSTATIC / HR EVENTS', (k) => secOrthostatic(days, k)],
     scores: ['DAILY AUTONOMIC SCORES', secScores],
     cleanDays: ['CLEAN DAY STATUS', secCleanDays],
+    notes: ['DAILY NOTES', (k) => secNotes(days, k)],
   };
   return (keys: string[], list: string[]) => list.map((key) => { const def = DEFS[key]; return def ? `${def[0]}:\n${def[1](keys)}` : ''; }).filter(Boolean).join('\n\n');
 }
@@ -121,7 +123,7 @@ export const REPORT_CARDS: ReportCard[] = [
 ];
 
 /** Every data section, in a stable order — used by the "Data export only" item. */
-const ALL_SECTION_KEYS = ['scores', 'hrv', 'bp', 'rhr', 'sleep', 'orthostatic', 'activities', 'triggers', 'meds', 'supplements', 'symptoms', 'cleanDays'];
+const ALL_SECTION_KEYS = ['scores', 'hrv', 'bp', 'rhr', 'sleep', 'orthostatic', 'activities', 'triggers', 'meds', 'supplements', 'symptoms', 'cleanDays', 'notes'];
 
 /**
  * Raw data export: just the rendered data sections for the period, with no
@@ -144,12 +146,13 @@ export function buildPrompt(state: AppState, ctx: ScoreContext, cards: ReportCar
     const card = cards[0];
     let body = `FOCUS: ${card.focus}`;
     if (card.context) body += `\n\n${card.context}`;
-    body += `\n\nDATA FOR PERIOD:\n\n${render(keys, card.sections)}`;
+    body += `\n\nDATA FOR PERIOD:\n\n${render(keys, [...card.sections, 'notes'])}`;
     if (card.instructions) body += `\n\n${card.instructions}`;
     return `${header}${sparse}\n\n${body}`;
   }
   const sectionKeys: string[] = [];
   cards.forEach((c) => c.sections.forEach((s) => { if (!sectionKeys.includes(s)) sectionKeys.push(s); }));
+  sectionKeys.push('notes');
   const titles = cards.map((c) => c.title);
   const intro = `This is a CUSTOM, MULTI-PART report covering ${cards.length} focus areas:\n${titles.map((t, i) => `${i + 1}. ${t}`).join('\n')}\n\nAddress each as its own labeled section, in order. The shared data below covers all areas. End with an integrated summary.`;
   const data = `SHARED DATA FOR PERIOD:\n\n${render(keys, sectionKeys)}`;
