@@ -24,6 +24,13 @@ struct ContentView: View {
             }
         }
         .onAppear { WorkoutManager.shared.requestAuthorization() }
+        .onOpenURL { url in
+            // Complication tap: straight into the capture flow — unless a
+            // test is already running (mode .pots keeps its own state).
+            if url.host == "pots" || url.path.contains("pots") {
+                mode = .pots
+            }
+        }
     }
 
     // MARK: - Home

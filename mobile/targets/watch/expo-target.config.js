@@ -9,6 +9,8 @@ module.exports = {
   icon: '../../assets/autonomic-icon.png',
   entitlements: {
     'com.apple.developer.healthkit': true,
+    // Shared with the complication widget (last result + live session state).
+    'com.apple.security.application-groups': ['group.com.autonomic.journal'],
   },
   images: {
     // White waveform logo mark (from /logo.svg), template-tinted in SwiftUI.

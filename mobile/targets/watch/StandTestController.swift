@@ -61,6 +61,7 @@ final class StandTestController: ObservableObject {
         maxHrSeen = 0
         deltaBuzzers = Haptics.makeDeltaBuzzers()
         stage = .resting
+        ComplicationStore.sessionUpdate(stage: "resting", delta: nil, hr: nil, endsAt: Date().addingTimeInterval(TimeInterval(Self.restingDuration)))
         ticker = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             self?.tick()
         }
@@ -86,6 +87,7 @@ final class StandTestController: ObservableObject {
         ticker?.invalidate()
         ticker = nil
         WorkoutManager.shared.stop()
+        ComplicationStore.clearSession()
         stage = .intro
         stageElapsed = 0
         series = []
@@ -98,6 +100,7 @@ final class StandTestController: ObservableObject {
         stage = .prompt
         stageElapsed = 0
         Haptics.buzz(.directionUp)
+        ComplicationStore.sessionUpdate(stage: "stand up", delta: nil, hr: nil, endsAt: nil)
     }
 
     private func enterStanding() {
@@ -107,6 +110,7 @@ final class StandTestController: ObservableObject {
         peakHr = baseline ?? 0
         peakDelta = 0
         deltaBuzzers.forEach { $0.reset() }
+        ComplicationStore.sessionUpdate(stage: "standing", delta: 0, hr: WorkoutManager.shared.hr.map { Int($0.rounded()) }, endsAt: Date().addingTimeInterval(TimeInterval(Self.standingDuration)))
     }
 
     private func complete(early: Bool) {
@@ -116,6 +120,7 @@ final class StandTestController: ObservableObject {
         Haptics.buzz(.success)
         buildResult(early: early)
         WorkoutManager.shared.stop()
+        ComplicationStore.recordResult(delta: (lastResult?["sustainedDelta"] as? Int) ?? (lastResult?["peakDelta"] as? Int))
         if let result = lastResult {
             PhoneRelay.shared.send(result: result)
         }
@@ -149,6 +154,17 @@ final class StandTestController: ObservableObject {
             }
         } else if stage == .standing || stage == .prompt {
             delta = nil // sensor gap — never fake a delta
+        }
+
+        // Refresh the complication's live delta every 30 s while standing
+        // (the countdown self-updates; only the delta snapshot goes stale).
+        if stage == .standing && stageElapsed > 0 && stageElapsed % 30 == 0 {
+            ComplicationStore.sessionUpdate(
+                stage: "standing",
+                delta: delta.map { Int($0.rounded()) },
+                hr: WorkoutManager.shared.hr.map { Int($0.rounded()) },
+                endsAt: Date().addingTimeInterval(TimeInterval(Self.standingDuration - stageElapsed))
+            )
         }
 
         switch stage {
