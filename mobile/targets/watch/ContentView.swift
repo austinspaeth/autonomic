@@ -29,26 +29,33 @@ struct ContentView: View {
     // MARK: - Home
 
     private var home: some View {
-        VStack(spacing: 8) {
-            VStack(spacing: 1) {
-                BeatingHeart(size: 20, beating: false)
-                Text("Autonomic")
-                    .font(.system(size: 15, weight: .heavy))
-                Text(gated ? "Subscription required" : "Choose a mode")
-                    .font(.system(size: 11))
-                    .foregroundStyle(DS.dim)
-            }
-            if gated {
-                lockCard
-            } else {
-                modeButton(
-                    title: "HR Monitor", subtitle: "Live heart rate",
-                    icon: "heart.fill", tint: DS.accent
-                ) { mode = .hr }
-                modeButton(
-                    title: "POTS Reading", subtitle: "Lie and stand test",
-                    icon: "figure.stand", tint: DS.blue
-                ) { mode = .pots }
+        ScrollView {
+            VStack(spacing: 8) {
+                VStack(spacing: 2) {
+                    Image("logo")
+                        .renderingMode(.template)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 84)
+                        .foregroundStyle(DS.accent)
+                    Text("Autonomic")
+                        .font(.system(size: 15, weight: .heavy))
+                    Text(gated ? "Subscription required" : "Choose a mode")
+                        .font(.system(size: 11))
+                        .foregroundStyle(DS.dim)
+                }
+                if gated {
+                    lockCard
+                } else {
+                    modeButton(
+                        title: "HR Monitor", subtitle: "Live heart rate",
+                        icon: "heart.fill", tint: DS.accent
+                    ) { mode = .hr }
+                    modeButton(
+                        title: "POTS Reading", subtitle: "Lie and stand test",
+                        icon: "figure.stand", tint: DS.blue
+                    ) { mode = .pots }
+                }
             }
         }
     }
@@ -67,6 +74,7 @@ struct ContentView: View {
                 .font(.system(size: 12.5))
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.primary.opacity(0.85))
+                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 18)

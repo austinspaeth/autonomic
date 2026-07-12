@@ -10,6 +10,10 @@ module.exports = {
   entitlements: {
     'com.apple.developer.healthkit': true,
   },
+  images: {
+    // White waveform logo mark (from /logo.svg), template-tinted in SwiftUI.
+    logo: '../../assets/watch-logo.png',
+  },
   colors: {
     // The design's palette, available as Color("...") in SwiftUI.
     accent: '#e03127',
