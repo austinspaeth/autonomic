@@ -59,7 +59,13 @@ export function initWatchReceiver() {
   const bridge = watchBridge();
   if (!bridge) return;
   bridge.addListener('onUserInfo', receive);
-  bridge.addListener('onStateChange', pushContext);
+  bridge.addListener('onStateChange', () => {
+    // Session state changed (activation, watch app installed, reachability).
+    // A context set before the watch app existed may never have landed, so
+    // bypass the dedupe and re-send unconditionally.
+    lastContext = '';
+    pushContext();
+  });
   subscribeIap(pushContext);
   subscribeStore(pushContext);
   // Drain results that arrived before JS attached (background deliveries).
