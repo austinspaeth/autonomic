@@ -260,6 +260,23 @@ app" human-interest pitches. All powered by the founder story + a good press kit
 autonomic.care (screenshots, data-flow diagram showing nothing leaves the device, founder
 photos, boilerplate).
 
+**Second track — privacy & tech press (the same product, a different story):** health
+apps are a running privacy scandal beat (period-tracker/Dobbs discourse, Flo's FTC
+settlement, data brokers buying health signals, AI companies hoovering health chats).
+Autonomic is the clean counter-example a reporter needs: *"a health app that
+architecturally cannot leak your data — no account, no cloud, no AI training set."*
+- **Targets:** The Markup, 404 Media, The Verge / TechCrunch privacy desks, Wired
+  security/privacy writers, EFF-adjacent newsletters, Lifehacker/How-To Geek service
+  pieces ("private alternatives to X"), privacy directories and communities
+  (privacytools.io's health-app criteria read like Autonomic's spec sheet — request
+  listing; RestorePrivacy-class review sites; r/privacy with the engineering framing).
+- **Pitch hooks:** "the health app designed so its own developer can't see your data";
+  "why a chronic-illness app refuses to have a backend in the AI era"; disability +
+  insurance data-anxiety angle (why this audience specifically fears health-data leaks).
+- **Timing:** pair with the Show HN window (month 2–3) so coverage, HN discussion, and
+  the privacytools-style listings reinforce each other, then re-pitch during any national
+  health-data-breach news cycle (prepared reactive quote from the founder).
+
 ### 6.3 Patient organizations (the unlocked channel)
 - **Dysautonomia International:** conference exhibitor table (DysConf 2027; densest
   possible concentration of ICP + the clinicians who treat them), awareness-month
@@ -348,7 +365,10 @@ entire discover category; and published analysis shows 79% of POTS TikTok is
 non-clinician content with low information quality — **a credibility vacuum a
 data-driven app fills.**
 
-### 8.1 Owned formats (founder account, 3×/week, batch-recorded)
+**TikTok is the primary owned social channel** — post everything there first, recut for
+Reels/Shorts. Cadence: 3×/week baseline, daily during October and any launch window.
+
+### 8.1 Owned formats (founder account, batch-recorded)
 1. **"Watch my heart rate when I stand up"** — live HRV screen during a stand test. The
    most-replicated POTS format on the platform; our product *is* the payoff shot.
 2. **Graph reveals:** "my HRV the week before vs after a crash," "what salt loading did
