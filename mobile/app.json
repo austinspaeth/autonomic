@@ -115,7 +115,7 @@
       [
         "@bacons/apple-targets",
         {
-          "appleTeamId": "DXAX68X974"
+          "appleTeamId": "L3YCKS64HC"
         }
       ],
       "./plugins/withWatchBuildVersion"
