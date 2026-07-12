@@ -6,7 +6,7 @@
 import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Defs, LinearGradient as SvgGradient, Rect, Stop } from 'react-native-svg';
-import Animated, { Easing, useAnimatedProps, useAnimatedStyle, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
+import Animated, { Easing, Extrapolation, interpolate, useAnimatedProps, useAnimatedStyle, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
 import { ScoreGauge } from '../components/charts';
 import { Icon } from '../components/Icon';
 import { SheetControls, SheetFooter, useSheets } from '../components/Sheet';
@@ -215,10 +215,18 @@ function StreakCard({ dk }: { dk: string }) {
   // its natural height; `open` drives height 0 → contentH and a fade in step.
   const [contentH, setContentH] = useState(0);
   const open = useSharedValue(0);
-  useEffect(() => { open.value = withTiming(expanded ? 1 : 0, { duration: 260, easing: Easing.out(Easing.cubic) }); }, [expanded, open]);
+  // Open eases out; close uses in-out so the height doesn't crawl sub-pixel
+  // through its last frames (that tail read as jank). Fading the body out over
+  // the top of the close keeps the crawl invisible either way.
+  useEffect(() => {
+    open.value = withTiming(
+      expanded ? 1 : 0,
+      expanded ? { duration: 260, easing: Easing.out(Easing.cubic) } : { duration: 220, easing: Easing.inOut(Easing.cubic) },
+    );
+  }, [expanded, open]);
   const bodyStyle = useAnimatedStyle(() => ({
     height: open.value * contentH,
-    opacity: open.value,
+    opacity: interpolate(open.value, [0.35, 1], [0, 1], Extrapolation.CLAMP),
   }));
 
   let sub = tier.msg;

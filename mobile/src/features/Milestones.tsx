@@ -4,10 +4,10 @@
 import React from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { Icon } from '../components/Icon';
-import { Card } from '../components/ui';
+import { Card, Segmented } from '../components/ui';
 import { useSheets } from '../components/Sheet';
 import { radius, usePalette } from '../theme';
-import { fmtNum, fmtShort } from '../lib/dates';
+import { fmtNum, fmtShort, todayKey } from '../lib/dates';
 import { useAppState } from '../store/store';
 import { buildMilestoneDays, buildMilestoneGroups } from '../lib/analysis/milestones';
 import { resolveProtocol } from '../lib/scoring/day';
@@ -57,13 +57,16 @@ export function MilestoneProgressCard({ dk }: { dk?: string }) {
             {achievedToday.length === 1 ? 'Unlocked today' : `${achievedToday.length} unlocked today`}
           </Text>
           <View style={{ gap: 11 }}>
-            {achievedToday.map((it, i) => (
+            {achievedToday.slice(0, 3).map((it, i) => (
               <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                 <Icon name="check" size={16} color="#16a34a" />
                 <Text style={{ flex: 1, fontSize: 14, color: p.text, fontWeight: '500' }}>{it.label}</Text>
               </View>
             ))}
           </View>
+          {achievedToday.length > 3 ? (
+            <Text style={{ fontSize: 12, color: p.textDim, fontWeight: '600', marginTop: 10 }}>{`+ ${achievedToday.length - 3} more`}</Text>
+          ) : null}
         </>
       ) : null}
     </Pressable>
@@ -75,12 +78,33 @@ export function MilestoneProgressCard({ dk }: { dk?: string }) {
 export function MilestonesSheet() {
   const p = usePalette();
   const { groups, done, total, pct } = useMilestones();
+  const [filter, setFilter] = React.useState<'all' | 'done' | 'next'>('all');
   if (!total) {
     return <Text style={{ color: p.textDim, textAlign: 'center', marginTop: 40, paddingHorizontal: 20, lineHeight: 20 }}>Log readings, sleep, and clean days to start unlocking recovery milestones.</Text>;
   }
+  const today = todayKey();
+  const completedToday = groups.flatMap((g) => g.items).filter((it) => it.done && it.date === today);
+  const shown = groups
+    .map((g) => ({ ...g, rows: g.items.filter((it) => (filter === 'all' ? true : filter === 'done' ? it.done : !it.done)) }))
+    .filter((g) => g.rows.length);
   return (
     <>
       <Text style={{ fontSize: 21, fontWeight: '800', color: p.text, marginBottom: 14 }}>Milestones</Text>
+      {completedToday.length ? (
+        <Card style={{ padding: 14 }}>
+          <Text style={{ fontSize: 14, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, color: p.textDim }}>
+            {completedToday.length === 1 ? 'Completed Today' : `Completed Today · ${completedToday.length}`}
+          </Text>
+          <View style={{ gap: 12, marginTop: 13 }}>
+            {completedToday.map((it, i) => (
+              <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <Icon name="check" size={18} color="#16a34a" />
+                <Text style={{ flex: 1, fontSize: 16, color: p.text, fontWeight: '600' }}>{it.label}</Text>
+              </View>
+            ))}
+          </View>
+        </Card>
+      ) : null}
       <Card style={{ padding: 14 }}>
         <Text style={{ fontSize: 14, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, color: p.textDim }}>Milestone Tracker</Text>
         <Text style={{ fontSize: 11, color: p.textDim, marginTop: 2 }}>{`${done} of ${total} achieved · progress beyond daily metrics`}</Text>
@@ -88,9 +112,15 @@ export function MilestonesSheet() {
           <View style={{ height: '100%', width: `${pct}%`, backgroundColor: p.accent }} />
         </View>
       </Card>
-      {groups.map((g) => {
+      <Segmented
+        options={[{ val: 'all', label: 'All' }, { val: 'done', label: 'Completed' }, { val: 'next', label: 'Up next' }]}
+        value={filter}
+        onChange={setFilter}
+        style={{ marginBottom: 12 }}
+      />
+      {shown.map((g) => {
         const gdone = g.items.filter((it) => it.done).length;
-        const rows = g.items.slice().sort((a, b) => (b.done ? 1 : 0) - (a.done ? 1 : 0) || (a.date || '').localeCompare(b.date || ''));
+        const rows = g.rows.slice().sort((a, b) => (b.done ? 1 : 0) - (a.done ? 1 : 0) || (a.date || '').localeCompare(b.date || ''));
         return (
           <Card key={g.title} style={{ padding: 14 }}>
             <Text style={{ fontSize: 14, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, color: p.textDim }}>{g.title}</Text>
@@ -105,6 +135,11 @@ export function MilestonesSheet() {
           </Card>
         );
       })}
+      {!shown.length ? (
+        <Text style={{ color: p.textDim, textAlign: 'center', marginTop: 24, paddingHorizontal: 20, lineHeight: 20 }}>
+          {filter === 'done' ? 'Nothing completed yet. Achieved milestones will show up here.' : 'Everything is complete. No milestones left to chase.'}
+        </Text>
+      ) : null}
     </>
   );
 }
