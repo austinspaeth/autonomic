@@ -118,14 +118,22 @@ export default function AnalysisScreen() {
         </Text>
       ) : (
         <>
-          {/* Jump menu: tap a card to scroll to that category's section below. */}
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-            {sections.map((s) => (
-              <Pressable key={s.id} onPress={() => goTo(s.id)} style={{ width: '31.5%', backgroundColor: p.surface, borderColor: activeId === s.id ? p.accent : p.border, borderWidth: 1, borderRadius: radius.card, padding: 12 }}>
-                <Icon name={s.icon as IconName} size={24} color={p.accent} />
-                <Text style={{ fontSize: 14, fontWeight: '700', color: p.text, marginTop: 7 }}>{s.title}</Text>
-                <Text style={{ fontSize: 11, color: p.textDim, marginTop: 2 }}>{s.desc}</Text>
-              </Pressable>
+          {/* Jump menu: tap a card to scroll to that category's section below.
+              Explicit rows of three flexing cards rather than percentage widths —
+              31.5% + gaps overflowed by ~1pt on narrow screens (iPhone mini) and
+              wrapped the third column. flex: 1 shrinks to fit any viewport. */}
+          <View style={{ gap: 10 }}>
+            {Array.from({ length: Math.ceil(sections.length / 3) }, (_, ri) => sections.slice(ri * 3, ri * 3 + 3)).map((row, ri) => (
+              <View key={ri} style={{ flexDirection: 'row', gap: 10 }}>
+                {row.map((s) => (
+                  <Pressable key={s.id} onPress={() => goTo(s.id)} style={{ flex: 1, backgroundColor: p.surface, borderColor: activeId === s.id ? p.accent : p.border, borderWidth: 1, borderRadius: radius.card, padding: 12 }}>
+                    <Icon name={s.icon as IconName} size={24} color={p.accent} />
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: p.text, marginTop: 7 }}>{s.title}</Text>
+                    <Text style={{ fontSize: 11, color: p.textDim, marginTop: 2 }}>{s.desc}</Text>
+                  </Pressable>
+                ))}
+                {row.length < 3 ? Array.from({ length: 3 - row.length }, (_, i) => <View key={`sp${i}`} style={{ flex: 1 }} />) : null}
+              </View>
             ))}
           </View>
 
