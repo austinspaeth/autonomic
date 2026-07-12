@@ -24,7 +24,7 @@ import { entryFields, isDivider, READING_TYPES } from '../lib/registry';
 import { fmtNum, fmtShort } from '../lib/dates';
 import { correctArtifacts } from '../lib/hrv';
 import { getWaveform } from '../store/store';
-import { BalanceChart, PowerSpectrum, Sparkline, Tachogram, ZonesToggle, balanceCat } from './charts';
+import { BalanceChart, PowerSpectrum, Sparkline, StandHrChart, Tachogram, ZonesToggle, balanceCat } from './charts';
 import { HelpDot, ScoreDot } from './ui';
 
 const hexA = (hex: string, a: number) => {
@@ -219,6 +219,7 @@ export function ReadingSummary({ r, days, ctx }: SummaryProps) {
     case 'bp': return <BpSummary r={r} days={days} ctx={ctx} />;
     case 'restingHr': return <RestingHrSummary r={r} days={days} ctx={ctx} />;
     case 'orthostatic': return <OrthostaticSummary r={r} days={days} ctx={ctx} />;
+    case 'standTest': return <StandTestSummary r={r} days={days} ctx={ctx} />;
     default: return <GenericSummary r={r} days={days} ctx={ctx} />;
   }
 }
@@ -573,6 +574,84 @@ export function OrthostaticSummary({ r, days, ctx: _ctx }: SummaryProps) {
         help={ORTHO_HELP.recovery}
       />
       <Notes r={r} />
+    </>
+  );
+}
+
+/* ---------- Watch stand test (POTS) ---------- */
+
+const STAND_HELP: Record<string, string> = {
+  rise: 'The sustained heart-rate rise: the average increase over the final minute of standing, compared against the resting (supine) baseline. A sustained rise of 30 bpm or more (40 in ages 12-19) within 10 minutes of standing is the adult POTS-range criterion. One test is a data point, not a diagnosis; trends across tests under similar conditions matter most.',
+  hr: 'The numbers behind this test: the supine baseline (last two minutes of lying down), the standing peak, and the largest single rise above baseline.',
+  curve: 'The full heart-rate trace from the watch, sampled every second: resting phase, the stand moment (marked), and the standing response. The dashed line is the supine baseline.',
+};
+
+const STAND_DISCLAIMER = 'Wellness screening only. This test is HR-based; it does not measure blood pressure, and a POTS assessment also requires ruling out orthostatic hypotension (a BP drop), which a watch cannot detect. Not a diagnosis. Discuss results with your doctor.';
+
+export function StandTestSummary({ r, days, ctx: _ctx }: SummaryProps) {
+  const p = usePalette();
+  const baseline = numOr(r.baselineHr), peak = numOr(r.peakHr);
+  const peakDelta = numOr(r.peakDelta), sustained = numOr(r.sustainedDelta);
+  const susCat = sustained != null ? catFromBands(sustained, BANDS.standDelta) : null;
+  const maxReached = numOr(r.maxHrReached), maxComputed = numOr(r.maxHrComputed);
+  const signed = (v: number) => (v > 0 ? '+' + v : String(v));
+  const verdict: Record<string, string> = {
+    great: 'Minimal sustained rise on standing - a healthy orthostatic response.',
+    good: 'Normal sustained rise, within the expected physiologic range.',
+    ok: 'Borderline sustained rise at the upper end of normal. Worth keeping an eye on.',
+    bad: 'Sustained rise at or above the adult ≥30 bpm POTS-range threshold. Note context and discuss the trend with your doctor.',
+    crash: 'Marked sustained rise of 40 bpm or more. Hydrate, sit or lie down, and log context.',
+  };
+  const susEx = (rr: Entry) => numOr(rr.sustainedDelta);
+  const waveform = getWaveform(String(r.id));
+  const hrCurve = waveform?.sampledHr && waveform.sampledHr.length >= 2 ? waveform.sampledHr : null;
+  const cols: { label: string; val: number | null; unit: string }[] = [
+    { label: 'Baseline', val: baseline, unit: 'bpm · supine' },
+    { label: 'Peak', val: peak, unit: 'bpm · standing' },
+    { label: 'Peak Δ', val: peakDelta, unit: 'bpm · rise' },
+  ];
+  const flags: { label: string; value: string }[] = [];
+  flags.push({ label: 'POTS threshold met', value: r.metThreshold ? 'Yes' : 'No' });
+  if (maxReached != null) flags.push({ label: 'Max HR reached', value: maxComputed != null ? `${maxReached} of ${maxComputed}` : String(maxReached) });
+  if (r.endedEarly) flags.push({ label: 'Ended early', value: 'Yes' });
+  if (r.baselineUnstable) flags.push({ label: 'Short resting phase', value: 'Baseline may be unreliable' });
+  return (
+    <>
+      <MetricSection
+        hero label="Sustained HR rise" value={sustained != null ? signed(sustained) : null} suffix="bpm" cat={susCat}
+        days={days} type="standTest" ex={susEx} bands={BANDS.standDelta}
+        desc={susCat ? verdict[susCat] : 'No sustained figure was captured for this test.'}
+        help={STAND_HELP.rise}
+      />
+      {hrCurve ? (
+        <Section>
+          <SectionHead title="Heart rate over time" help={STAND_HELP.curve} />
+          <View style={{ marginTop: 12 }}>
+            <StandHrChart samples={hrCurve} standAt={numOr(r.standAt)} baseline={baseline} />
+          </View>
+        </Section>
+      ) : null}
+      <Section>
+        <SectionHead title="Heart rate" help={STAND_HELP.hr} desc="Supine baseline, standing peak, and the largest rise." />
+        <View style={{ flexDirection: 'row', marginTop: 12, borderTopWidth: 1, borderTopColor: p.border, paddingTop: 12 }}>
+          {cols.map((c) => (
+            <View key={c.label} style={{ flex: 1, alignItems: 'center' }}>
+              <Text style={{ fontSize: 12, color: p.textDim, fontWeight: '600' }}>{c.label}</Text>
+              <Text style={{ fontSize: 20, fontFamily: fonts.numHeavy, color: p.text, fontVariant: ['tabular-nums'], marginTop: 3 }}>{c.val != null ? String(c.val) : '–'}</Text>
+              <Text style={{ fontSize: 11, color: p.textDim }}>{c.unit}</Text>
+            </View>
+          ))}
+        </View>
+      </Section>
+      <Section>
+        <SectionHead title="Details" />
+        <View style={{ marginTop: 12 }}>
+          {flags.map((f) => <MetricRow key={f.label} label={f.label} value={f.value} cat={false} />)}
+          <MetricRow label="Source" value="Apple Watch" cat={false} />
+        </View>
+      </Section>
+      <Notes r={r} />
+      <Text style={{ fontSize: 12, color: p.textDim, lineHeight: 17, marginBottom: 16, paddingHorizontal: 4 }}>{STAND_DISCLAIMER}</Text>
     </>
   );
 }

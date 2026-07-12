@@ -14,6 +14,7 @@ import { OnboardingGate } from '../src/features/Onboarding';
 import { RestoreGate } from '../src/features/RestoreGate';
 import { SubscriptionGate } from '../src/features/SubscriptionGate';
 import { initIap } from '../src/store/iap';
+import { initWatchReceiver } from '../src/lib/watch/receiver';
 import { runDailyBackup } from '../src/lib/backup';
 import { loadIssue } from '../src/store/store';
 import { usePalette } from '../src/theme';
@@ -44,6 +45,8 @@ export default function RootLayout() {
   useEffect(() => {
     // Open the StoreKit connection and read the current Pro entitlement.
     initIap();
+    // Watch companion: drain queued stand-test results + relay entitlement.
+    initWatchReceiver();
     // First-launch-of-the-day JSON snapshot (rotating, kept in Documents/backups).
     runDailyBackup();
     // Pull any published EAS update in the background (preview + production

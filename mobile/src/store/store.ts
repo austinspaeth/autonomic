@@ -368,6 +368,13 @@ export function deleteEntry(dk: string, arrKey: 'readings' | 'activities' | 'med
   save();
 }
 
+/** Non-React subscription to any store change (used by the watch relay to
+ *  re-push profile context). Returns the unsubscribe. */
+export function subscribeStore(cb: () => void): () => void {
+  listeners.add(cb);
+  return () => listeners.delete(cb);
+}
+
 /* ---------- React binding ---------- */
 export function useStore<T>(selector: (snap: { state: AppState; v: number }) => T): T {
   return useSyncExternalStore(

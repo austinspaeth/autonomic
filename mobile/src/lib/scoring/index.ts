@@ -140,6 +140,9 @@ export const BANDS: Record<string, Band[]> = {
   ecgHrv: [{ max: 15, cat: 'crash' }, { max: 25, cat: 'bad' }, { max: 35, cat: 'ok' }, { max: 50, cat: 'good' }, { max: Infinity, cat: 'great' }],
   orthoIncrease: [{ max: 15, cat: 'great' }, { max: 25, cat: 'good' }, { max: 30, cat: 'ok' }, { max: 40, cat: 'bad' }, { max: Infinity, cat: 'concerning' }],
   orthoRecovery: [{ max: 0, cat: 'concerning' }, { max: 6, cat: 'bad' }, { max: 12, cat: 'ok' }, { max: 20, cat: 'good' }, { max: Infinity, cat: 'great' }],
+  // Watch stand test: HR rise on standing (bpm). ≥30 sustained is the adult
+  // POTS threshold, so it sits at the bad boundary.
+  standDelta: [{ max: 10, cat: 'great' }, { max: 20, cat: 'good' }, { max: 30, cat: 'ok' }, { max: 40, cat: 'bad' }, { max: Infinity, cat: 'crash' }],
   // Sleep duration (hours) — mirrors sleepGrade's duration steps so the Analysis
   // trend colours match how each night is graded (8h+ great, 7 good, 6 ok, 5 bad).
   sleepDur: [{ max: 5, cat: 'crash' }, { max: 6, cat: 'bad' }, { max: 7, cat: 'ok' }, { max: 8, cat: 'good' }, { max: Infinity, cat: 'great' }],
@@ -156,6 +159,7 @@ export function bandsFor(type: string, key: string): Band[] | null {
     hrv: { rmssd: 'rmssdU', sdnn: 'sdnn', avgHr: 'hrBreath', pnn50: 'pnn50', vlowPower: 'vlf', lfPeak: 'lfPeak', hfPeak: 'hfPeak', meanRr: 'rrMode', mode: 'rrMode', mxdmn: 'mxdmn', amo50: 'amo50', cv: 'cv', pns: 'pns', sns: 'sns', stressIndex: 'stressIndex' },
     breathHrv: { sdnn: 'sdnn', rmssd: 'rmssdS', pnn50: 'pnn50', vlowPower: 'vlf', lfPeak: 'lfPeak', hfPeak: 'hfPeak', hr: 'hrBreath', meanRr: 'rrMode', mode: 'rrMode', mxdmn: 'mxdmn', amo50: 'amo50', cv: 'cv', pns: 'pns', sns: 'sns', stressIndex: 'stressIndex' },
     bp: { sys: 'sys', dia: 'dia' },
+    standTest: { sustainedDelta: 'standDelta', peakDelta: 'standDelta' },
   };
   const name = map[type] && map[type][key];
   return name ? BANDS[name] : null;
@@ -235,6 +239,15 @@ export function computeScores(r: Entry, ctx: ScoreContext = {}): Record<string, 
       if (s.increase) s.overall = s.increase; // the event is rated on the standing rise
       break;
     }
+    case 'standTest': {
+      const sustained = numOr(r.sustainedDelta), peak = numOr(r.peakDelta);
+      if (sustained != null) put('sustainedDelta', catFromBands(sustained, BANDS.standDelta));
+      if (peak != null) put('peakDelta', catFromBands(peak, BANDS.standDelta));
+      // The test is rated on the sustained rise (last minute of standing);
+      // the peak only decides when no sustained figure was captured.
+      put('overall', s.sustainedDelta || s.peakDelta || null);
+      break;
+    }
   }
   return s;
 }
@@ -248,6 +261,7 @@ export function rowScoreCategory(r: Entry, ctx: ScoreContext = {}): ScoreCat | n
     case 'bp': return s.bp || null;
     case 'restingHr': return s.hr || null;
     case 'orthostatic': return s.overall || s.increase || null;
+    case 'standTest': return s.overall || null;
     default: return null;
   }
 }

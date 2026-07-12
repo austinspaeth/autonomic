@@ -2,7 +2,7 @@
   "expo": {
     "name": "Autonomic",
     "slug": "autonomic",
-    "version": "1.3.0",
+    "version": "1.4.0",
     "scheme": "autonomic",
     "orientation": "portrait",
     "icon": "./assets/autonomic-icon.png",
@@ -111,7 +111,14 @@
       "expo-font",
       "react-native-iap",
       "./plugins/withFmtConstevalFix",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "@bacons/apple-targets",
+        {
+          "appleTeamId": "DXAX68X974"
+        }
+      ],
+      "./plugins/withWatchBuildVersion"
     ],
     "experiments": {
       "typedRoutes": false

@@ -568,6 +568,73 @@ export function Tachogram({ rr, height = 132 }: { rr: number[]; height?: number 
   );
 }
 
+/* ---------- Stand-test HR curve (1 Hz heart rate vs elapsed time) ---------- */
+/**
+ * The watch stand test's full HR trace: resting phase, the stand moment
+ * (vertical marker with the standing side faintly tinted), and the standing
+ * response. A dashed line marks the supine baseline so the rise reads
+ * directly off the chart. Sensor-dropout gaps (missing 1 Hz samples) break
+ * the path rather than interpolating across them.
+ */
+export function StandHrChart({ samples, standAt, baseline, height = 150 }: {
+  samples: { t: number; bpm: number }[];
+  /** Seconds from test start when standing began (the stand cue). */
+  standAt?: number | null;
+  baseline?: number | null;
+  height?: number;
+}) {
+  const p = usePalette();
+  if (!samples || samples.length < 2) return null;
+  const bpms = samples.map((s) => s.bpm);
+  const dMin = Math.min(...bpms, baseline ?? Infinity), dMax = Math.max(...bpms, baseline ?? -Infinity);
+  const span = dMax - dMin || 1;
+  const min = dMin - span * 0.08, max = dMax + span * 0.08;
+  const range = max - min || 1;
+  const t0 = samples[0].t, t1 = samples[samples.length - 1].t;
+  const tSpan = t1 - t0 || 1;
+  const W = 320, H = height, padL = 34, padR = 8, padT = 12, padB = 20;
+  const innerW = W - padL - padR;
+  const xAt = (t: number) => padL + ((t - t0) / tSpan) * innerW;
+  const yAt = (v: number) => padT + (1 - (v - min) / range) * (H - padT - padB);
+  // Break the trace across dropout gaps (>3 s between 1 Hz samples).
+  let line = '';
+  samples.forEach((s, i) => {
+    const gap = i === 0 || s.t - samples[i - 1].t > 3;
+    line += `${gap ? 'M' : 'L'}${xAt(s.t).toFixed(1)} ${yAt(s.bpm).toFixed(1)} `;
+  });
+  const ticks = [min, (min + max) / 2, max];
+  const fmtT = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, '0')}`;
+  const standX = standAt != null && standAt > t0 && standAt < t1 ? xAt(standAt) : null;
+  return (
+    <View style={{ backgroundColor: p.bg, borderRadius: radius.control, padding: 8 }}>
+      <RNText style={{ fontSize: 11, color: p.textDim, marginBottom: 4 }}>{`Heart rate (bpm) · ${fmtT(tSpan)} test`}</RNText>
+      <Svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+        {standX != null ? (
+          <Rect x={standX} y={padT} width={W - padR - standX} height={H - padT - padB} fill={p.accent} opacity={0.06} />
+        ) : null}
+        {ticks.map((t, i) => (
+          <React.Fragment key={i}>
+            <Line x1={padL} x2={W - padR} y1={yAt(t)} y2={yAt(t)} stroke={p.border} strokeWidth={1} opacity={0.4} />
+            <SvgText x={padL - 4} y={yAt(t) + 3} textAnchor="end" fontSize={9} fill={p.textDim}>{Math.round(t)}</SvgText>
+          </React.Fragment>
+        ))}
+        {baseline != null ? (
+          <Line x1={padL} x2={W - padR} y1={yAt(baseline)} y2={yAt(baseline)} stroke={p.textDim} strokeWidth={1} strokeDasharray="4 3" opacity={0.7} />
+        ) : null}
+        {standX != null ? (
+          <Line x1={standX} x2={standX} y1={padT} y2={H - padB} stroke={p.accent} strokeWidth={1.4} strokeDasharray="2 3" opacity={0.9} />
+        ) : null}
+        <Path d={line.trim()} fill="none" stroke={p.accent} strokeWidth={1.6} strokeLinejoin="round" strokeLinecap="round" />
+      </Svg>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+        <RNText style={{ fontSize: 10, color: p.textDim }}>0:00</RNText>
+        {standX != null ? <RNText style={{ fontSize: 10, color: p.textDim }}>stood {fmtT(standAt! - t0)}</RNText> : null}
+        <RNText style={{ fontSize: 10, color: p.textDim }}>{fmtT(t1 - t0)}</RNText>
+      </View>
+    </View>
+  );
+}
+
 /* ---------- Autonomic balance (PNS vs SNS with balance-coloured fill) ---------- */
 /**
  * PNS and SNS index across the reading history as two smoothed lines, with the

@@ -151,3 +151,10 @@ export function useIap(): IapState {
     () => state,
   );
 }
+
+/** Non-React access for the watch entitlement relay (src/lib/watch). */
+export const getIapState = (): IapState => state;
+export function subscribeIap(cb: () => void): () => void {
+  listeners.add(cb);
+  return () => listeners.delete(cb);
+}

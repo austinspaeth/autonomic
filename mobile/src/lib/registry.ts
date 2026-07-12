@@ -90,13 +90,27 @@ export const READING_TYPES: Record<string, TypeDef> = {
       { type: 'number', key: 'hr1min', label: 'HR after 1 min' },
     ],
   },
+  standTest: {
+    label: 'POTS Stand Test',
+    icon: 'standing',
+    fields: [
+      { type: 'number', key: 'baselineHr', label: 'Baseline HR' },
+      { type: 'number', key: 'peakHr', label: 'Peak HR' },
+      { type: 'number', key: 'peakDelta', label: 'Peak Δ', signed: true },
+      { type: 'number', key: 'sustainedDelta', label: 'Sustained Δ', signed: true },
+      { type: 'check', key: 'metThreshold', label: 'POTS threshold met' },
+      { divider: true },
+      { type: 'number', key: 'maxHrReached', label: 'Max HR reached' },
+      { type: 'time', key: 'time', label: 'Time' },
+    ],
+  },
 };
 
 /**
  * Reading types that can only be produced by a live capture (or an Apple
  * Watch ECG sync) — hidden from the manual "+ Add" reading picker.
  */
-export const LIVE_ONLY_READING_TYPES = new Set(['hrv', 'breathHrv']);
+export const LIVE_ONLY_READING_TYPES = new Set(['hrv', 'breathHrv', 'standTest']);
 
 export const ACTIVITY_TYPES: Record<string, TypeDef> = {
   indoorBike: {
@@ -428,6 +442,10 @@ export function readingRowValue(r: Entry): string {
     case 'breathHrv': return r.sdnn != null && r.sdnn !== '' ? `${r.sdnn} SDNN` : '';
     case 'bp': return r.sys || r.dia ? `${r.sys || '-'}/${r.dia || '-'}` : '';
     case 'restingHr': return r.hr != null && r.hr !== '' ? `${r.hr} hr` : '';
+    case 'standTest': {
+      const d = r.sustainedDelta ?? r.peakDelta;
+      return d != null && d !== '' ? `+${d} Δ` : '';
+    }
     default: return summarizeFields(READING_TYPES[r.type], r);
   }
 }
