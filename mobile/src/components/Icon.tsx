@@ -9,7 +9,7 @@ export type IconName =
   | 'heartPulse' | 'wind' | 'droplet' | 'gauge' | 'info' | 'download' | 'upload'
   | 'x' | 'check' | 'edit' | 'bike' | 'footprints' | 'legsUp' | 'activity'
   | 'heart' | 'target' | 'barbell' | 'car' | 'flame' | 'zap' | 'pill' | 'alert'
-  | 'sparkles' | 'rocket' | 'moon' | 'user' | 'chevron' | 'chevronRight'
+  | 'sparkles' | 'rocket' | 'moon' | 'user' | 'chevron' | 'chevronLeft' | 'chevronRight'
   | 'arrowLeft' | 'arrowUp' | 'standing' | 'poop' | 'cup' | 'utensils' | 'scale' | 'search'
   | 'bulb' | 'star' | 'brain' | 'virus' | 'clipboard' | 'smile' | 'ai' | 'chart'
   | 'trendUp' | 'trendDown' | 'triangle' | 'checklist' | 'cell' | 'gut'
@@ -44,6 +44,7 @@ const P: Record<IconName, string[]> = {
   moon: ['M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z'],
   user: ['M4 21a8 8 0 0 1 16 0'],
   chevron: ['m6 9 6 6 6-6'],
+  chevronLeft: ['m15 18-6-6 6-6'],
   chevronRight: ['m9 18 6-6-6-6'],
   arrowLeft: ['M19 12H5', 'm12 19-7-7 7-7'],
   arrowUp: ['M12 19V5', 'm5 12 7-7 7 7'],

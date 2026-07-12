@@ -6,7 +6,7 @@
  * running, a single "Finish now" ends early; it also auto-finishes at the full
  * duration. On finish the breathing guide (and its haptics) stops, a strong
  * ~1 s buzz marks completion, and either the results card (strap/camera) or the
- * Apple-Health ECG sync card (watch) rises over this one.
+ * Apple-Health watch sync card rises over this one.
  *
  * Camera (PPG) source: the camera + torch start on mount so finger placement
  * can lock BEFORE the reading — "Start reading" stays disabled until a steady
@@ -14,7 +14,7 @@
  * flow through the same collection path.
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { Text, View } from 'react-native';
+import { AppState, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useKeepAwake } from 'expo-keep-awake';
 import Svg, { Circle } from 'react-native-svg';
@@ -23,7 +23,7 @@ import { Button } from '../../components/ui';
 import { usePalette, GRADE_COLORS } from '../../theme';
 import { BreathingViz, parsePattern, type BreathPhase } from './BreathingViz';
 import { HrvResults } from './Results';
-import { EcgSyncSheet } from './EcgSync';
+import { WatchSyncSheet } from './WatchSync';
 import { ble } from '../../lib/ble/manager';
 import { ppg, type PpgSignal } from '../../lib/ppg/camera';
 import { PpgCameraView } from '../../lib/ppg/CameraView';
@@ -137,6 +137,10 @@ export function HrvSession({ config, controls }: { config: SessionConfig; contro
           (s) => {
             setConnected(true);
             if (s.hr) setHr(s.hr);
+            // Backgrounded, the 1 s interval is frozen but BLE samples still
+            // arrive — drive the clock from them so the reading finishes on
+            // time instead of over-collecting until the app returns.
+            syncRef.current();
             if (startedRef.current && !finishedRef.current) collect(s);
           },
           () => {
@@ -174,6 +178,28 @@ export function HrvSession({ config, controls }: { config: SessionConfig; contro
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Elapsed time is derived from the wall clock, not counted interval ticks:
+  // iOS suspends JS timers while the app is backgrounded (fully so for the
+  // watch source, which holds no BLE/camera session), and tick-counting made
+  // the reading appear to pause until the app returned. BLE samples keep
+  // flowing in the background (bluetooth-central mode), so the reading itself
+  // never stopped — only the clock did.
+  const syncElapsed = () => {
+    if (!startedRef.current || finishedRef.current) return;
+    const e = Math.floor((Date.now() - startedAtRef.current) / 1000);
+    setElapsed(Math.min(e, DURATION));
+    if (e >= DURATION) finish();
+  };
+  const syncRef = useRef(syncElapsed);
+  syncRef.current = syncElapsed;
+
+  // Returning to the foreground: re-sync immediately (and auto-finish if the
+  // duration passed while backgrounded) instead of waiting for the next tick.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (s) => { if (s === 'active') syncRef.current(); });
+    return () => sub.remove();
+  }, []);
+
   // Collection + timer only begin on Start. The breathing guide runs regardless.
   const begin = () => {
     if (started) return;
@@ -183,14 +209,7 @@ export function HrvSession({ config, controls }: { config: SessionConfig; contro
     // watch: the ECG is recorded on the wrist; camera + BLE: already streaming
     // since mount (their samples start being collected now).
     if (config.source === 'watch' || config.source === 'camera') setConnected(true);
-    // tick every second
-    timerRef.current = setInterval(() => {
-      setElapsed((e) => {
-        const next = e + 1;
-        if (next >= DURATION) finish();
-        return Math.min(next, DURATION);
-      });
-    }, 1000);
+    timerRef.current = setInterval(() => syncRef.current(), 1000);
   };
 
   useEffect(() => () => {
@@ -202,6 +221,9 @@ export function HrvSession({ config, controls }: { config: SessionConfig; contro
   const finish = async () => {
     if (finishedRef.current) return;
     finishedRef.current = true;
+    // Wall-clock capture length (auto-finish may fire from a closure whose
+    // `elapsed` state is stale, and long after the duration if backgrounded).
+    const capturedSec = Math.min(DURATION, Math.max(0, Math.round((Date.now() - startedAtRef.current) / 1000)));
     // Stop the breathing guide (and its in/out haptics) immediately, then mark
     // completion with one strong sustained buzz.
     setFinished(true);
@@ -210,13 +232,16 @@ export function HrvSession({ config, controls }: { config: SessionConfig; contro
     if (config.source === 'polar') await ble().disconnect().catch(() => {});
     if (config.source === 'camera') await ppg().stop().catch(() => {});
 
-    // Apple Watch path: the wearer recorded an ECG during the reading. Stack a
-    // syncing card on top that pulls that ECG from Apple Health, evaluates it,
-    // and shows the results.
+    // Apple Watch path: the wearer took a reading on the watch (Mindfulness
+    // breathing HRV or ECG) during the session. Stack a syncing card on top
+    // that pulls it from Apple Health, evaluates it, and shows the results.
+    // The window ends when the reading did, not when the app came back to the
+    // foreground.
     if (config.source === 'watch') {
       const startMs = startedAtRef.current || Date.now();
+      const endMs = Math.min(Date.now(), startMs + DURATION * 1000);
       openSheet((c) => (
-        <EcgSyncSheet windowStartMs={startMs} windowEndMs={Date.now()} config={config} controls={c} />
+        <WatchSyncSheet windowStartMs={startMs} windowEndMs={endMs} config={config} controls={c} />
       ), { hideClose: true });
       return;
     }
@@ -227,7 +252,7 @@ export function HrvSession({ config, controls }: { config: SessionConfig; contro
     // (scales back + lifts) while Results rises over it. Save/Discard in Results
     // calls closeAll(), so both cards animate out together. Leave this card mounted.
     openSheet((c) => (
-      <HrvResults rr={rr} hrSamples={hrRef.current} sdnnSamples={sdnnRef.current} config={config} durationSec={elapsed} watchFallback={null} controls={c} />
+      <HrvResults rr={rr} hrSamples={hrRef.current} sdnnSamples={sdnnRef.current} config={config} durationSec={capturedSec} watchFallback={null} controls={c} />
     ), { hideClose: true });
   };
 
@@ -288,7 +313,7 @@ export function HrvSession({ config, controls }: { config: SessionConfig; contro
             {config.source === 'camera' ? 'Signal noisy — steady your finger, ease the pressure' : 'Signal noisy, adjust the strap'}
           </Text>
         ) : null}
-        {started && !finished && config.source === 'watch' ? <Text style={{ color: p.textDim, textAlign: 'center', paddingHorizontal: 24 }}>Record an ECG on your Apple Watch now (open the ECG app and hold the crown). It syncs in when the reading ends.</Text> : null}
+        {started && !finished && config.source === 'watch' ? <Text style={{ color: p.textDim, textAlign: 'center', paddingHorizontal: 24 }}>On your watch, start a Mindfulness breathing session now (or record an ECG). It syncs in when the reading ends.</Text> : null}
         {/* Camera pre-start: placement guidance + live lock status. */}
         {config.source === 'camera' && !started ? (
           <>

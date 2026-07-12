@@ -131,12 +131,9 @@ export function Screen({
         scrollEventThrottle={scrollEventThrottle ?? 16}
         contentContainerStyle={{ paddingTop: headerH + contentPadding, paddingHorizontal: contentPadding, paddingBottom: bottomPad }}
         showsVerticalScrollIndicator={false}
-        // iOS: inset the scroll for the keyboard so inline inputs (e.g. the
-        // journal Notes box at the bottom) stay visible while typing. Pair it
-        // with on-drag dismissal so the inset collapses when you scroll away —
-        // otherwise the keyboard-height inset lingers as dead scroll space
-        // below the content on a real device.
-        automaticallyAdjustKeyboardInsets
+        // No keyboard-inset handling here on purpose: nothing inline needs it
+        // (day notes edit in a sheet), and iOS's automaticallyAdjustKeyboardInsets
+        // left a keyboard-sized void under the content after on-drag dismissal.
         keyboardDismissMode="on-drag"
       >
         {children}

@@ -2,7 +2,7 @@
  * The Journal sections: Sleep, Readings, Activities, Meds, Symptoms,
  * Triggers, Hydration, Digestion — each a Card with a header + "+ Add".
  */
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { ActivityIndicator, LayoutAnimation, Platform, Pressable, Text, TextInput, UIManager, View } from 'react-native';
 import { AddDashButton, Card, Pill, ProgressBar, Row, RowValue, SectionHeader, Segmented } from '../components/ui';
 import { Icon } from '../components/Icon';
@@ -19,7 +19,7 @@ import { rowScoreCategory, SCORE_COLORS, GRADE_LABEL } from '../lib/scoring';
 import { sleepGrade, sleepHours, waterGoalL, type DaysMap } from '../lib/scoring/day';
 import type { SleepStages } from '../lib/types';
 import { ensureDay, getState, save, useAppState } from '../store/store';
-import { fmtTime12, periodOf } from '../lib/dates';
+import { fmtDateLong, fmtTime12, periodOf } from '../lib/dates';
 import { health } from '../lib/health';
 import { SleepConfirmSheet } from './Health';
 import { useEntryForms } from './forms';
@@ -125,54 +125,62 @@ function HydrationSection({ water, onPress }: { water: number; onPress: () => vo
   );
 }
 
-/** Free-text day notes. Auto-saves as you type (no save button); the text is
- *  only surfaced when building AI-insights prompts. */
+/** Free-text day notes. The journal shows the note read-only (the box grows to
+ *  fit the full text); tapping it opens a card-modal editor with a Save button
+ *  pinned above the keyboard. The text is only surfaced when building
+ *  AI-insights prompts. */
 function NotesSection({ dk }: { dk: string }) {
   const p = usePalette();
-  const [text, setText] = useState(() => getState().days[dk]?.notes || '');
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pending = useRef<string | null>(null);
-
-  const commit = (v: string) => {
-    if (timer.current) { clearTimeout(timer.current); timer.current = null; }
-    pending.current = null;
-    const d = ensureDay(dk);
-    if ((d.notes || '') === v) return;
-    d.notes = v;
-    save();
-  };
-
-  // Swap in the new day's note on day change; flush any pending write for the
-  // old day first (the cleanup closure still holds the old `commit`/`dk`).
-  useEffect(() => {
-    setText(getState().days[dk]?.notes || '');
-    return () => { if (pending.current != null) commit(pending.current); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dk]);
-
-  const onChange = (v: string) => {
-    setText(v);
-    pending.current = v;
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => commit(v), 500);
-  };
-
+  const { openSheet } = useSheets();
+  const note = useAppState().days[dk]?.notes || '';
   return (
     <Card>
       <SectionHeader title="Notes" />
       <View style={{ paddingHorizontal: 14, paddingBottom: 14 }}>
-        <TextInput
-          value={text}
-          onChangeText={onChange}
-          onEndEditing={() => commit(text)}
-          multiline
-          keyboardAppearance="dark"
-          placeholder="Write anything about your health or experiences today."
-          placeholderTextColor={p.textDim}
-          style={{ backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.control, padding: 12, fontSize: 15, lineHeight: 21, color: p.text, minHeight: 90, textAlignVertical: 'top' }}
-        />
+        <Pressable
+          onPress={() => openSheet((c) => <NotesSheet dk={dk} controls={c} />)}
+          style={({ pressed }) => [
+            { backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.control, padding: 12, minHeight: 90 },
+            pressed && { opacity: 0.6 },
+          ]}
+        >
+          <Text style={{ fontSize: 15, lineHeight: 21, color: note ? p.text : p.textDim }}>
+            {note || 'Write anything about your health or experiences today.'}
+          </Text>
+        </Pressable>
       </View>
     </Card>
+  );
+}
+
+/** Card-modal note editor. Save (pinned above the keyboard, next to the
+ *  standard minimize-keyboard chevron) commits the draft and closes. */
+function NotesSheet({ dk, controls }: { dk: string; controls: SheetControls }) {
+  const p = usePalette();
+  const [text, setText] = useState(() => getState().days[dk]?.notes || '');
+  const save_ = () => {
+    const d = ensureDay(dk);
+    if ((d.notes || '') !== text) { d.notes = text; save(); }
+    controls.close();
+  };
+  return (
+    <View>
+      <Text style={{ fontSize: 20, fontWeight: '700', color: p.text, marginBottom: 16 }}>{`Notes for ${fmtDateLong(dk)}`}</Text>
+      <TextInput
+        value={text}
+        onChangeText={setText}
+        multiline
+        keyboardAppearance="dark"
+        placeholder="Write anything about your health or experiences today."
+        placeholderTextColor={p.textDim}
+        style={{ backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.control, padding: 12, fontSize: 15, lineHeight: 21, color: p.text, minHeight: 180, textAlignVertical: 'top' }}
+      />
+      <SheetFooter>
+        <Pressable onPress={save_} style={({ pressed }) => [{ flex: 1, borderRadius: radius.control, backgroundColor: p.accent, paddingVertical: 13, alignItems: 'center' }, pressed && { opacity: 0.7 }]}>
+          <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>Save</Text>
+        </Pressable>
+      </SheetFooter>
+    </View>
   );
 }
 

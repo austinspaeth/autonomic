@@ -254,8 +254,10 @@ function Section({ children }: { children: React.ReactNode }) {
 
 /** Section header per the comp: uppercase title + "?" (left), optional action
  *  (right); beneath it the big value with its dim suffix, then a description. */
-function SectionHead({ title, help, value, suffix, desc, right, cat }: {
-  title: string; help: string; value: string | null; suffix: string; desc?: string; right?: React.ReactNode; cat?: ScoreCat | null;
+function SectionHead({ title, help, value, valueColor, value2, suffix, desc, right, cat }: {
+  title: string; help: string; value: string | null; valueColor?: string;
+  value2?: { text: string; color: string } | null;
+  suffix: string; desc?: string; right?: React.ReactNode; cat?: ScoreCat | null;
 }) {
   const p = usePalette();
   return (
@@ -268,9 +270,12 @@ function SectionHead({ title, help, value, suffix, desc, right, cat }: {
         {right}
       </View>
       {value != null ? (
-        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 7, marginTop: 6 }}>
-          <Text style={{ fontSize: 27, fontFamily: fonts.numHeavy, color: p.text, fontVariant: ['tabular-nums'] }}>{value}</Text>
-          <Text style={{ fontSize: 13, fontWeight: '600', color: p.textDim }}>{suffix}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 6 }}>
+          <Text style={{ fontSize: 27, fontFamily: fonts.numHeavy, color: valueColor ?? p.text, fontVariant: ['tabular-nums'] }}>{value}</Text>
+          {value2 ? (
+            <Text style={{ fontSize: 27, fontFamily: fonts.numHeavy, color: value2.color, fontVariant: ['tabular-nums'], marginLeft: 14 }}>{value2.text}</Text>
+          ) : null}
+          <Text style={{ fontSize: 13, fontWeight: '600', color: p.textDim, marginLeft: 7 }}>{suffix}</Text>
         </View>
       ) : null}
       {desc ? <Text style={{ color: p.textDim, fontSize: 13, lineHeight: 19, marginTop: 8 }}>{desc}</Text> : null}
@@ -312,14 +317,21 @@ function MetricSection({ m, structured, unstructured, buckets }: {
       : [{ values: unstructured, color: UNSTRUCT, label: 'Unstructured' }];
   const empty = !series.some((s) => s.values.some((v) => v != null));
 
-  // Big value: range average of the primary displayed series (structured when
-  // comparing both), or the drag-selected bucket's value with its label.
+  // Big value: range average, or the drag-selected bucket's value with its
+  // label. In "Both" mode the structured and unstructured values sit side by
+  // side, each tinted its series colour, with the label/avg after the pair.
   // A selection can outlive its dataset (Day→Week shrinks `buckets` while this
   // instance is reused), so an out-of-range index falls back to the average.
   const selIdx = sel != null && sel < buckets.length ? sel : null;
-  const primary = series.find((s) => s.values.some((v) => v != null))?.values ?? [];
-  const raw = selIdx != null ? primary[selIdx] : meanOf(primary);
-  const value = raw == null ? null : fmtNum(m.integer ? Math.round(raw) : raw);
+  const pickVal = (vals: (number | null)[]) => (selIdx != null ? vals[selIdx] : meanOf(vals));
+  const fmtVal = (v: number | null) => (v == null ? null : fmtNum(m.integer ? Math.round(v) : v));
+  const sRaw = pickVal(structured);
+  const uRaw = pickVal(unstructured);
+  const both = kind === 'both' && (sRaw != null || uRaw != null);
+  const raw = kind === 'both' ? (sRaw ?? uRaw) : kind === 'breath' ? sRaw : uRaw;
+  const value = both ? (fmtVal(sRaw) ?? '–') : fmtVal(raw);
+  const valueColor = both ? STRUCT : undefined;
+  const value2 = both ? { text: fmtVal(uRaw) ?? '–', color: UNSTRUCT } : null;
   const suffix = selIdx != null ? `(${buckets[selIdx]?.label ?? ''})` : 'avg';
   const zones = acBandZones(m.band);
   // Grade dot for the displayed value (range average or dragged bucket), so the
@@ -333,6 +345,8 @@ function MetricSection({ m, structured, unstructured, buckets }: {
         help={m.help}
         cat={cat}
         value={value}
+        valueColor={valueColor}
+        value2={value2}
         suffix={suffix}
         desc={m.desc}
         right={!empty && zones ? <ZonesToggle on={showZones} onPress={() => setShowZones((v) => !v)} /> : undefined}

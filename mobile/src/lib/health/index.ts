@@ -42,6 +42,12 @@ export interface HealthApi {
    * beat-to-beat RR); plain SDNN-only samples are intentionally excluded.
    */
   readHistory(opts: { fromISO: string; toISO: string }): Promise<HistoryReading[]>;
+  /**
+   * Heartbeat-series readings (real beat-to-beat RR) overlapping a time window,
+   * newest first — what an Apple Watch Mindfulness/Breathe session produces.
+   * Excludes samples this app authored and series with too few beats.
+   */
+  readHrvSessions(opts: { fromMs: number; toMs: number }): Promise<WatchHrvSample[]>;
   writeHrvSession(opts: { sdnnMs: number; avgHr: number; startISO: string; durationSec: number }): Promise<void>;
   writeQuantity(kind: 'systolic' | 'diastolic' | 'restingHr', value: number, when: Date): Promise<void>;
   /** Publish an app journal reading to Health. Returns how many samples were written. */
@@ -73,6 +79,14 @@ export interface HistoryReading extends ImportedReading {
   dayKey: string;       // YYYY-MM-DD (local) the sample belongs to
 }
 
+/** A watch heartbeat-series reading pulled for the live-capture sync flow. */
+export interface WatchHrvSample {
+  startMs: number;
+  endMs: number;
+  rr: number[];         // beat-to-beat RR (ms)
+  sourceName: string;   // e.g. "Apple Watch"
+}
+
 export interface SleepImport {
   bed: string;        // HH:MM local
   wake: string;       // HH:MM local
@@ -98,6 +112,7 @@ const stub: HealthApi = {
   async readDay() { return emptyDay; },
   async readImports() { return []; },
   async readHistory() { return []; },
+  async readHrvSessions() { return []; },
   async readSleep() { return null; },
   async writeHrvSession() { /* no-op */ },
   async writeQuantity() { /* no-op */ },
@@ -362,6 +377,27 @@ function makeReal(mod: HkModule): HealthApi {
       } catch { /* heartbeat series unavailable */ }
 
       return out;
+    },
+
+    async readHrvSessions({ fromMs, toMs }) {
+      try {
+        // predicateForSamples matches on overlap, so a Breathe session that
+        // started slightly before the window still comes back.
+        const series = (await mod.queryHeartbeatSeriesSamples?.({ from: new Date(fromMs), to: new Date(toMs), limit: 50 })) || [];
+        const out: WatchHrvSample[] = [];
+        for (const hb of series) {
+          if (isOwnSample(hb.sourceRevision)) continue;
+          const rr = rrFromSeries(hb);
+          if (rr.length < 20) continue;
+          out.push({
+            startMs: hb.startDate.getTime(),
+            endMs: hb.endDate.getTime(),
+            rr,
+            sourceName: hb.sourceRevision?.source?.name || 'Apple Watch',
+          });
+        }
+        return out.sort((a, b) => b.startMs - a.startMs);
+      } catch { return []; }
     },
 
     async readSleep(dk) {

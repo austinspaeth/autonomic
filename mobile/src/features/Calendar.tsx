@@ -53,10 +53,11 @@ export function Calendar({ current, onPick, controls }: { current: string; onPic
 
   return (
     <View style={{ width: '100%', maxWidth: 400, alignSelf: 'center' }}>
-      {/* Title vertically aligned with the sheet's ✕ (top:12, h:32 → centered on 28px). */}
-      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, lineHeight: 32, marginTop: -12, marginBottom: 16 }}>Select date</Text>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-        <Pressable onPress={() => setView(new Date(view.getFullYear(), view.getMonth() - 1, 1))} hitSlop={8}><Icon name="chevron" size={22} color={p.text} /></Pressable>
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, lineHeight: 32, marginBottom: 16 }}>Select date</Text>
+      {/* Month nav sits fully below the sheet's ✕ pill — the extra top margin
+          keeps the next-month chevron from crowding the close button. */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, marginBottom: 12 }}>
+        <Pressable onPress={() => setView(new Date(view.getFullYear(), view.getMonth() - 1, 1))} hitSlop={8}><Icon name="chevronLeft" size={22} color={p.text} /></Pressable>
         <Text style={{ fontSize: 17, fontWeight: '700', color: p.text }}>{view.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</Text>
         <Pressable disabled={atCurMonth} onPress={() => setView(new Date(view.getFullYear(), view.getMonth() + 1, 1))} hitSlop={8} style={{ opacity: atCurMonth ? 0.3 : 1 }}><Icon name="chevronRight" size={22} color={p.text} /></Pressable>
       </View>

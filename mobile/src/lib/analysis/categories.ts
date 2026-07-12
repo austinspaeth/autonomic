@@ -3,13 +3,13 @@
  * renders these generically with LineChart / Bars / stat tiles. Simplified from
  * the PWA: a few good charts + stat tiles per category, grade-zone shaded.
  */
-import type { Entry } from '../types';
-import { SCORE_COLORS, restingHrBands } from '../scoring';
+import type { Band, Entry, ScoreCat } from '../types';
+import { SCORE_COLORS, restingHrBands, sBP, worstCat } from '../scoring';
 import { scoreCat, sleepHours, streakInfo, type DaysMap } from '../scoring/day';
 import { ACTIVITY_TYPES, MED_TYPES, TRIGGER_TYPES } from '../registry';
 import {
   BANDS, Mode, acBandZones, acBandsToZones, acBuckets, acMean, acPresent, acRangeLabel,
-  acReadVals, acScoreZones, acTotalPower, avgRound, isEvening, isMorning, makeAgg,
+  acReadVals, acScoreZones, acTotalPower, avgRound, catFromBands, isEvening, isMorning, makeAgg,
   type ScoreContext,
 } from './buckets';
 import type { Series, Zone } from '../../components/charts';
@@ -20,7 +20,7 @@ export interface Chart { label: string; series: Series[]; zones?: Zone[] | null;
   selectStat?: boolean; }
 /** Which readings a blood-pressure card is filtered to. */
 export type BpPeriod = 'all' | 'morning' | 'evening';
-export interface BpSeries { sys: (number | null)[]; dia: (number | null)[] }
+export interface BpSeries { sys: (number | null)[]; dia: (number | null)[]; cat?: ScoreCat | null }
 export interface Stat { label: string; value: number | string | null; sub?: string; color?: string }
 export interface Insight { text: string; strength?: 'strong' | 'mod' | null }
 export interface BarGroup { label: string; rows: { name: string; count: number; color?: string }[]; fmt?: (c: number) => string }
@@ -37,6 +37,11 @@ export interface AnalysisCard {
   /** Blood-pressure period variants. When set, the card shows an
    *  All/Morning/Evening link toggle that swaps the dumbbell + avg stats. */
   bpFilter?: Record<BpPeriod, BpSeries>;
+  /** Grade dot beside the title, like the HRV Progress sections. Cards with
+   *  several graded values (e.g. BP's systolic + diastolic) take the worst. */
+  cat?: ScoreCat | null;
+  /** Bands for re-grading the dot when a `selectStat` chart is dragged. */
+  catBands?: Band[] | null;
 }
 export interface Category { id: string; icon: string; title: string; desc: string; buckets: { label: string }[]; build: () => AnalysisCard[] }
 
@@ -112,16 +117,19 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
   const vitals = (): AnalysisCard[] => {
     // Systolic/diastolic per bucket, sliced by time of day so the card's
     // All/Morning/Evening toggle can swap which readings it draws.
-    const bpSpan = (f?: (r: Entry) => boolean): BpSeries => ({
-      sys: acAgg(buckets, (d) => acReadVals(d, 'bp', 'sys', f)),
-      dia: acAgg(buckets, (d) => acReadVals(d, 'bp', 'dia', f)),
-    });
+    const bpSpan = (f?: (r: Entry) => boolean): BpSeries => {
+      const sys = acAgg(buckets, (d) => acReadVals(d, 'bp', 'sys', f));
+      const dia = acAgg(buckets, (d) => acReadVals(d, 'bp', 'dia', f));
+      // Grade dot for the period: the worse of the systolic/diastolic averages.
+      return { sys, dia, cat: sBP(avgRound(sys), avgRound(dia)) };
+    };
     const bpFilter: Record<BpPeriod, BpSeries> = { all: bpSpan(), morning: bpSpan(isMorning), evening: bpSpan(isEvening) };
     const { sys, dia } = bpFilter.all;
     const laying = acAgg(buckets, (d) => acReadVals(d, 'restingHr', 'hr', (r) => (r.position || '') === 'Laying'));
     const cards: AnalysisCard[] = [];
     if (acPresent(sys).length) cards.push({
       title: 'Blood Pressure', sub: range,
+      cat: bpFilter.all.cat,
       desc: 'Each reading as a systolic-to-diastolic span, coloured by grade at each end.',
       help: 'Every bar connects a reading\'s diastolic (bottom) to its systolic (top), tinted by how each value grades against the framework thresholds. Watch for the spread as well as the level; a narrowing pulse pressure on standing is a common dysautonomia pattern worth showing your doctor. The All/Morning/Evening toggle limits the chart to readings from that time of day.',
       tiles: true,
@@ -135,8 +143,11 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
       ],
       bpFilter,
     });
+    const layingAvg = acMean(laying);
     if (acPresent(laying).length) cards.push({
       title: 'Resting Heart Rate', sub: range,
+      cat: layingAvg != null ? catFromBands(layingAvg, restingHrBands('Laying')) : null,
+      catBands: restingHrBands('Laying'),
       desc: 'Laying heart rate over the range.',
       help: 'Heart rate measured while laying down, the cleanest resting baseline. A gradually falling laying HR usually accompanies improving autonomic recovery; a sustained unexplained rise is worth noting alongside symptoms and sleep.',
       charts: [{ label: '', series: [series(laying, SCORE_COLORS.bad)], zones: acBandsToZones(restingHrBands('Laying')), integer: true, selectStat: true }],
@@ -147,12 +158,20 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
 
   const pots = (): AnalysisCard[] => {
     const incOf = (r: Entry) => { const a = parseFloat(r.afterHr as string), b = parseFloat(r.beforeHr as string); return !isNaN(a) && !isNaN(b) ? a - b : null; };
+    const recOf = (r: Entry) => { const a = parseFloat(r.afterHr as string), m = parseFloat(r.hr1min as string); return !isNaN(a) && !isNaN(m) ? a - m : null; };
     const inc = acAgg(buckets, (d) => (d.readings || []).filter((r) => r.type === 'orthostatic').map(incOf).filter((v): v is number => v != null));
+    const rec = acAgg(buckets, (d) => (d.readings || []).filter((r) => r.type === 'orthostatic').map(recOf).filter((v): v is number => v != null));
     if (!acPresent(inc).length) return [];
     let potsN = 0;
     Object.keys(days).forEach((dk) => (days[dk].readings || []).forEach((r) => { if (r.type === 'orthostatic') { const v = incOf(r); if (v != null && v >= 30) potsN++; } }));
+    // Grade dot: worst of the standing-rise and 1-minute-recovery averages.
+    const incAvg = acMean(inc), recAvg = acMean(rec);
     return [{
       title: 'Orthostatic Events', sub: range,
+      cat: worstCat([
+        incAvg != null ? catFromBands(incAvg, BANDS.orthoIncrease) : null,
+        recAvg != null ? catFromBands(recAvg, BANDS.orthoRecovery) : null,
+      ]),
       desc: 'How much your heart rate rises when you stand.',
       help: 'The heart-rate increase from resting to standing for each logged orthostatic event. A sustained rise of 30 bpm or more (40 in adolescents) within 10 minutes of standing is the adult POTS-range criterion, and the zones shade that threshold. Trends matter more than any single stand.',
       charts: [{ label: 'HR increase on standing', series: [series(inc, '#f97316', undefined, { pointBands: BANDS.orthoIncrease })], zones: acBandZones('orthoIncrease'), integer: true }],
@@ -163,8 +182,10 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
   const sleep = (): AnalysisCard[] => {
     const dur = acAgg(buckets, (d, dk) => sleepHours(days, dk));
     if (!acPresent(dur).length) return [];
+    const durAvg = acMean(dur);
     const cards: AnalysisCard[] = [{
       title: 'Duration', sub: range,
+      cat: durAvg != null ? catFromBands(durAvg, BANDS.sleepDur) : null,
       desc: 'How long you slept and when, night by night.',
       help: 'Duration is the night that ended that morning, coloured by grade the same way each night is scored: 8h+ reads as great, 7h good, 6h ok, and it falls off below that. Tap "Show zones" for the grade thresholds. Consistency of timing often moves HRV as much as raw duration does.',
       charts: [

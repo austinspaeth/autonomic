@@ -40,7 +40,7 @@ export function HrvResults({ rr, hrSamples, sdnnSamples, config, durationSec, wa
     // Capturing for yesterday just after midnight: pin the time to 23:59 so
     // the reading sorts inside that day, and note the real clock time.
     const afterMidnight = dk !== todayKey() && dk === addDays(todayKey(), -1) && new Date().getHours() < 6;
-    let note = config.source === 'watch' ? 'Captured via Apple Watch ECG'
+    let note = config.source === 'watch' ? 'Captured via Apple Watch'
       : config.source === 'camera' ? 'Captured via phone camera (PPG)'
       : 'Captured via chest strap';
     if (afterMidnight) note += ` · Taken after midnight (actual time ${fmtTime12(nowTime())})`;

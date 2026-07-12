@@ -28,7 +28,7 @@ const HELP = {
   period:
     'Tagging the time of day keeps like readings comparable. Morning readings taken right after waking are the most consistent baseline; evening readings show how the day wound down.',
   source:
-    'Where the heartbeat signal comes from. A Bluetooth chest strap is the most accurate. Apple Watch uses an ECG you record on your watch during the reading, which syncs in afterward. Phone camera reads your pulse through your fingertip over the rear camera and flash — no device needed, but it is the least accurate option.',
+    'Where the heartbeat signal comes from. A Bluetooth chest strap is the most accurate. Apple Watch uses a reading you take on your watch during the session, a Mindfulness breathing session or an ECG, which syncs in afterward. Phone camera reads your pulse through your fingertip over the rear camera and flash — no device needed, but it is the least accurate option.',
 };
 
 // The sheet's ✕ pill floats top-right; inset the title + subtitle so neither
@@ -140,7 +140,7 @@ export function HrvSetup({ controls }: { controls: SheetControls }) {
       <Label text="Signal source" help={HELP.source} top />
       <View style={{ gap: 8 }}>
         <SourceOption icon="bluetooth" title="Bluetooth device" badge="Best accuracy" sub={savedName ? `Paired: ${savedName}` : 'Tap to pair a device'} active={source === 'polar'} onPress={pickBluetooth} />
-        <SourceOption icon="watch" title="Apple Watch" badge="High accuracy" sub="Record your HRV, it syncs after completion" active={source === 'watch'} onPress={() => setSource('watch')} />
+        <SourceOption icon="watch" title="Apple Watch" badge="High accuracy" sub="Breathe or ECG on the watch, syncs in after" active={source === 'watch'} onPress={() => setSource('watch')} />
         <SourceOption icon="camera" title="Phone camera" badge="Lower accuracy" sub="No device needed · fingertip over the rear camera" active={source === 'camera'} onPress={() => setSource('camera')} />
       </View>
 

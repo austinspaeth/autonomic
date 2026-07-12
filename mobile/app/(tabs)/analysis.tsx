@@ -3,13 +3,13 @@ import { Animated, Easing, NativeScrollEvent, NativeSyntheticEvent, Pressable, S
 import { BlurView } from 'expo-blur';
 import { Screen } from '../../src/components/Header';
 import { Icon, IconName } from '../../src/components/Icon';
-import { HelpDot, Segmented } from '../../src/components/ui';
+import { HelpDot, ScoreDot, Segmented } from '../../src/components/ui';
 import { Bars, BpDumbbell, LineChart, ZonesToggle } from '../../src/components/charts';
 import { fonts, radius, usePalette } from '../../src/theme';
 import { useAppState } from '../../src/store/store';
 import { buildCategories, type AnalysisCard, type BpPeriod } from '../../src/lib/analysis/categories';
 import { resolveProtocol } from '../../src/lib/scoring/day';
-import { avgRound, type Mode } from '../../src/lib/analysis/buckets';
+import { avgRound, catFromBands, type Mode } from '../../src/lib/analysis/buckets';
 import { HrvFilterLinks, HrvProgress, type Filt } from '../../src/features/HrvProgress';
 
 export default function AnalysisScreen() {
@@ -315,9 +315,15 @@ const CardView = React.memo(function CardView({ card, buckets }: { card: Analysi
     }
     return st;
   }, [card.stats, selChart, selSeries, sel, buckets, bpSpan]);
+  // Grade dot beside the title, like the HRV Progress sections: BP follows the
+  // period filter, a dragged selectStat chart re-grades the selected bucket,
+  // otherwise the range average's grade from the builder.
+  const selVal = selChart && selSeries && sel != null && sel >= 0 ? selSeries.values[sel] : null;
+  const cat = bpSpan ? bpSpan.cat : selVal != null && card.catBands ? catFromBands(selVal, card.catBands) : card.cat;
   return (
     <View style={{ backgroundColor: p.surface, borderColor: p.border, borderWidth: 1, borderRadius: radius.card, padding: 16, marginBottom: 12 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        {cat ? <View style={{ marginRight: 7 }}><ScoreDot cat={cat} size={10} /></View> : null}
         <Text style={{ flexShrink: 1, fontSize: 15, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, color: p.textDim }}>{card.title}</Text>
         {card.help ? <HelpDot title={card.title} text={card.help} /> : null}
         {zonesChart ? (
