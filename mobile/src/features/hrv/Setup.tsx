@@ -17,6 +17,7 @@ import { health } from '../../lib/health';
 import { ppg } from '../../lib/ppg/camera';
 import { DevicesScreen } from '../Devices';
 import { BREATH_STYLES, HrvSession, type SessionConfig } from './Session';
+import { WatchPrep } from './WatchPrep';
 
 const HELP = {
   main:
@@ -91,6 +92,13 @@ export function HrvSetup({ controls }: { controls: SheetControls }) {
       return;
     }
     const config: SessionConfig = { kind, source, period, style: kind === 'breath' ? style : undefined };
+    // Watch readings are taken by the Mindfulness app on the wrist, so a prep
+    // card walks through getting it ready first; its Start opens the session
+    // already running. This sheet stays underneath so ✕ backs out to it.
+    if (source === 'watch') {
+      openSheet((c) => <WatchPrep config={config} controls={c} />);
+      return;
+    }
     openSheet((c) => <HrvSession config={config} controls={c} />, { hideClose: true });
     controls.close();
   };

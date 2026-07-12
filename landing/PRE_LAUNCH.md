@@ -14,9 +14,9 @@ are open. Verified against source on 2026-07-10.
       copy says "available now on the Apple App Store," "Download for iOS now,"
       and "live on iPhone" — while the hero + CTA also say "Join the waitlist."
       Decide which is true:
-  - If **iOS is live**: point the badge at the real App Store URL, add
-        `"downloadUrl"`/`"installUrl"` to the `SoftwareApplication` JSON-LD, and
-        decide whether the waitlist becomes Android-only.
+  - If **iOS is live**: point the badge at the real App Store URL and add
+        `"downloadUrl"`/`"installUrl"` to the `SoftwareApplication` JSON-LD.
+        (The waitlist is already Android-only.)
   - If **not live yet**: soften the "available now / live on iPhone" copy back to
         waitlist framing (and note Google can flag a `SoftwareApplication` whose
         `offers` price isn't actually purchasable).
@@ -76,9 +76,18 @@ are open. Verified against source on 2026-07-10.
 
 - **Canonical domain is `autonomic.care`** across `site.ts`, every canonical/OG
   tag, all JSON-LD, RSS, and the sitemap `BASE`.
-- **Waitlist forms wired** — hero + Android forms POST to FlowForm and fire a GA
+- **Android waitlist form wired** — POSTs to FlowForm and fires a GA
   `waitlist_signup` event; App Store badge fires an `app_store_click` event.
-- **Analytics live** — GA4 (`G-3R3E75CLGQ`) configured site-wide in `app.html`.
+  (The hero form was replaced by the App Store badge + an anchor link to the
+  Android waitlist section.)
+- **Waitlist form collects no health data** — the "What are you managing?"
+  condition dropdown and the "What do you track today?" free-text field were
+  removed (2026-07-12); the form now asks for email + optional first name only.
+  The Privacy Policy's "The website" section discloses the form and FlowForm
+  delivery, and must stay in sync if fields ever change.
+- **Analytics live** — GA4 (`G-3R3E75CLGQ`) configured site-wide in `app.html`,
+  gated by the cookie banner (opt-out: loads by default, "Block cookies"
+  disables it now and on future visits), as described in the Privacy Policy.
 - **Branded 404** — `static/404.html` (noindex, styled, favicons, Autonomic
   title).
 - **SEO / structured data**: site-wide Organization + WebSite JSON-LD;

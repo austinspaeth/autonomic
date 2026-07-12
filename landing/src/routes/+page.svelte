@@ -4,13 +4,16 @@
   import { demoReports as reports } from '$lib/demoPrompts';
 
   // The site is prerendered with csr disabled, so no Svelte runtime hydrates.
-  // The waitlist forms therefore ship as plain HTML with a native FlowForm POST
-  // fallback, progressively enhanced by the inline script below (emitted via
-  // {@html waitlistScript} at the end of the page). The script is embedded in
-  // the prerendered HTML and runs with no framework JS on the client.
+  // The Android waitlist form therefore ships as plain HTML with a native
+  // FlowForm POST fallback, progressively enhanced by the inline script below
+  // (emitted via {@html waitlistScript} at the end of the page). The script is
+  // embedded in the prerendered HTML and runs with no framework JS on the client.
   //  - fetch(no-cors) posts to FlowForm without leaving the page
   //  - on success it swaps the form for the in-place confirmation
-  //  - it fires a GA `waitlist_signup` event (location: hero | android)
+  //  - it fires a GA `waitlist_signup` event (location: android)
+  // The form collects email + optional first name ONLY — no health/condition
+  // questions; the privacy policy's "The website" section documents exactly this
+  // and must be kept in sync if fields change.
   const waitlistScript = `<script>
 (function () {
   var ENDPOINT = 'https://flowform.to/austin@discoverymark.com';
@@ -34,12 +37,6 @@
         });
     });
   }
-  wire(document.getElementById('heroForm'), 'hero', function () {
-    var f = document.getElementById('heroForm');
-    var s = document.getElementById('heroSuccess');
-    if (f) f.style.display = 'none';
-    if (s) s.style.display = 'flex';
-  });
   wire(document.getElementById('wlForm'), 'android', function () {
     var s = document.getElementById('wlSuccess');
     if (s) s.classList.add('show');
@@ -581,22 +578,6 @@
           <div class="wl-field">
             <label for="wl-name">Name <span style="color:var(--dim-2)">(optional)</span></label>
             <input id="wl-name" type="text" name="name" placeholder="First name" />
-          </div>
-          <div class="wl-field">
-            <label for="wl-cond">What are you managing?</label>
-            <select id="wl-cond" name="condition">
-              <option value="">Select one…</option>
-              <option>POTS</option>
-              <option>Dysautonomia</option>
-              <option>Long COVID</option>
-              <option>Post-viral fatigue</option>
-              <option>MCAS</option>
-              <option>Other / prefer not to say</option>
-            </select>
-          </div>
-          <div class="wl-field">
-            <label for="wl-tracks">What do you track today? <span style="color:var(--dim-2)">(optional)</span></label>
-            <input id="wl-tracks" type="text" name="tracks" placeholder="e.g. HRV ring, BP cuff, symptom notes" />
           </div>
           <button class="btn btn-primary btn-lg" type="submit">Join the Android waitlist</button>
           <p class="wl-note">No charge today · 7-day free trial at launch · Unsubscribe anytime</p>

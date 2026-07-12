@@ -6,7 +6,11 @@
  * running, a single "Finish now" ends early; it also auto-finishes at the full
  * duration. On finish the breathing guide (and its haptics) stops, a strong
  * ~1 s buzz marks completion, and either the results card (strap/camera) or the
- * Apple-Health watch sync card rises over this one.
+ * Apple-Health watch sync card rises over this one. Because haptics only play
+ * while the JS process is running (BLE keeps it alive in the background; watch
+ * and camera sessions are suspended), Start also schedules a local
+ * notification at the end time as a backstop buzz — cancelled whenever the
+ * in-app finish actually runs. See src/lib/notify.ts.
  *
  * Camera (PPG) source: the camera + torch start on mount so finger placement
  * can lock BEFORE the reading — "Start reading" stays disabled until a steady
@@ -28,6 +32,7 @@ import { ble } from '../../lib/ble/manager';
 import { ppg, type PpgSignal } from '../../lib/ppg/camera';
 import { PpgCameraView } from '../../lib/ppg/CameraView';
 import { correctArtifacts, std } from '../../lib/hrv';
+import { scheduleReadingDone, cancelReadingDone } from '../../lib/notify';
 import { getState } from '../../store/store';
 
 // Every reading — structured or unstructured — runs the full 5 minutes.
@@ -58,7 +63,7 @@ export interface SessionConfig {
   period?: 'Morning' | 'Evening' | 'Other';
 }
 
-export function HrvSession({ config, controls }: { config: SessionConfig; controls: SheetControls }) {
+export function HrvSession({ config, controls, autoStart }: { config: SessionConfig; controls: SheetControls; autoStart?: boolean }) {
   const p = usePalette();
   const { openSheet } = useSheets();
   const DURATION = durationFor(config.kind);
@@ -80,6 +85,7 @@ export function HrvSession({ config, controls }: { config: SessionConfig; contro
   const startedAtRef = useRef<number>(0);
   const startedRef = useRef(false);
   const finishedRef = useRef(false);
+  const notifIdRef = useRef<string | null>(null);
   const recentRr = useRef<number[]>([]);
 
   // The phone must not sleep mid-reading — the timer, BLE stream and breathing
@@ -210,11 +216,27 @@ export function HrvSession({ config, controls }: { config: SessionConfig; contro
     // since mount (their samples start being collected now).
     if (config.source === 'watch' || config.source === 'camera') setConnected(true);
     timerRef.current = setInterval(() => syncRef.current(), 1000);
+    // Backstop buzz for a backgrounded finish: watch (and camera) sessions are
+    // fully suspended off-screen, so the in-app haptic can't fire at the end.
+    // Scheduled a beat past the duration so an in-app finish cancels it first.
+    scheduleReadingDone(startedAtRef.current + (DURATION + 2) * 1000).then((id) => {
+      notifIdRef.current = id;
+      if (finishedRef.current) cancelReadingDone(id);
+    });
   };
+
+  // Watch flow: the prep card's Start button doubles as this card's — the
+  // wearer just tapped Breathe on the wrist, so the timer is already running
+  // when this card rises.
+  useEffect(() => {
+    if (autoStart) begin();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => () => {
     if (timerRef.current) clearInterval(timerRef.current);
     if (config.source === 'polar') ble().disconnect().catch(() => {});
+    cancelReadingDone(notifIdRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -225,9 +247,11 @@ export function HrvSession({ config, controls }: { config: SessionConfig; contro
     // `elapsed` state is stale, and long after the duration if backgrounded).
     const capturedSec = Math.min(DURATION, Math.max(0, Math.round((Date.now() - startedAtRef.current) / 1000)));
     // Stop the breathing guide (and its in/out haptics) immediately, then mark
-    // completion with one strong sustained buzz.
+    // completion with one strong sustained buzz. The scheduled backstop
+    // notification is only needed when this code can't run (app suspended).
     setFinished(true);
     completionBuzz();
+    cancelReadingDone(notifIdRef.current);
     if (timerRef.current) clearInterval(timerRef.current);
     if (config.source === 'polar') await ble().disconnect().catch(() => {});
     if (config.source === 'camera') await ppg().stop().catch(() => {});
@@ -313,7 +337,7 @@ export function HrvSession({ config, controls }: { config: SessionConfig; contro
             {config.source === 'camera' ? 'Signal noisy — steady your finger, ease the pressure' : 'Signal noisy, adjust the strap'}
           </Text>
         ) : null}
-        {started && !finished && config.source === 'watch' ? <Text style={{ color: p.textDim, textAlign: 'center', paddingHorizontal: 24 }}>On your watch, start a Mindfulness breathing session now (or record an ECG). It syncs in when the reading ends.</Text> : null}
+        {started && !finished && config.source === 'watch' ? <Text style={{ color: p.textDim, textAlign: 'center', paddingHorizontal: 24 }}>Sit still and follow the breathing session on your watch. It syncs in when the reading ends.</Text> : null}
         {/* Camera pre-start: placement guidance + live lock status. */}
         {config.source === 'camera' && !started ? (
           <>

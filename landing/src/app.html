@@ -10,16 +10,29 @@
     <meta name="application-name" content="Autonomic" />
     <meta name="apple-mobile-web-app-title" content="Autonomic" />
 
-    <!-- Google Analytics (GA4). Plain script in the shell so it runs on every
-         page regardless of SvelteKit's csr setting. Pageviews (incl. enhanced
-         measurement) fire automatically; custom events are dispatched via the
-         global gtag() below and from the homepage waitlist form. -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-3R3E75CLGQ"></script>
+    <!-- Google Analytics (GA4), opt-out. The script loads by default; the
+         cookie banner (bottom of <body>) lets visitors block it. Blocking
+         persists in localStorage, stops the script from loading on future
+         visits, disables the already-loaded tag for the current page, and
+         drops all gtag() calls. Plain script in the shell so it runs on every
+         page regardless of SvelteKit's csr setting; custom events are
+         dispatched via the global gtag() below and from the homepage waitlist
+         form. -->
     <script>
       window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-      gtag('config', 'G-3R3E75CLGQ');
+      function _ajBlocked() {
+        if (window.location.hostname === 'localhost') return true;
+        try { return localStorage.getItem('aj-cookie-consent') === 'blocked'; } catch (e) { return true; }
+      }
+      function gtag(){ if (!_ajBlocked()) dataLayer.push(arguments); }
+      if (!_ajBlocked()) {
+        var s = document.createElement('script');
+        s.async = true;
+        s.src = 'https://www.googletagmanager.com/gtag/js?id=G-3R3E75CLGQ';
+        document.head.appendChild(s);
+        gtag('js', new Date());
+        gtag('config', 'G-3R3E75CLGQ');
+      }
     </script>
 
     <!-- Site-wide social/brand defaults. Per-page <svelte:head> sets og:title,
@@ -81,6 +94,36 @@
   </head>
   <body>
     <div style="display: contents">%sveltekit.body%</div>
+
+    <!-- Cookie-consent banner. Analytics is opt-out: GA loads by default (see
+         the loader in <head>); "Block cookies" persists the opt-out, disables
+         the already-loaded tag for this page, and stops it loading on future
+         visits. -->
+    <div id="aj-cookie-banner" role="dialog" aria-live="polite" aria-label="Cookie notice" style="display:none;position:fixed;left:16px;right:16px;bottom:16px;z-index:9999;max-width:360px;margin-left:auto;background:var(--panel,#131316);border:1px solid var(--line-2,rgba(255,255,255,0.14));border-radius:var(--r,16px);padding:16px 18px;box-shadow:0 12px 32px rgba(0,0,0,0.45);font-family:var(--body,sans-serif);color:var(--text,#f5f5f7);">
+      <p style="margin:0 0 12px;font-size:14px;line-height:1.5;color:var(--dim,#9a9aa3);">We use Google Analytics cookies to see which pages help people. Block them and we won't track you at all. <a href="/privacy-policy/" style="color:var(--accent-2,#ff6a5c);text-decoration:underline;">Privacy Policy</a></p>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button id="aj-cookie-block" type="button" style="background:transparent;color:var(--dim,#9a9aa3);border:1px solid var(--line-2,rgba(255,255,255,0.14));border-radius:10px;padding:8px 14px;font-size:13px;font-family:inherit;cursor:pointer;">Block cookies</button>
+        <button id="aj-cookie-accept" type="button" style="background:var(--accent,#e03127);color:#fff;border:1px solid var(--accent,#e03127);border-radius:10px;padding:8px 14px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;">Accept</button>
+      </div>
+    </div>
+    <script>
+      (function () {
+        try {
+          if (window.location.hostname === 'localhost') return;
+          if (localStorage.getItem('aj-cookie-consent')) return;
+          var banner = document.getElementById('aj-cookie-banner');
+          if (!banner) return;
+          banner.style.display = 'block';
+          function choose(value) {
+            try { localStorage.setItem('aj-cookie-consent', value); } catch (e) {}
+            banner.style.display = 'none';
+            if (value === 'blocked') window['ga-disable-G-3R3E75CLGQ'] = true;
+          }
+          document.getElementById('aj-cookie-accept').addEventListener('click', function () { choose('accepted'); });
+          document.getElementById('aj-cookie-block').addEventListener('click', function () { choose('blocked'); });
+        } catch (e) { /* localStorage disabled: no banner shows and nothing is tracked */ }
+      })();
+    </script>
 
     <!-- Site interactivity. The site ships with no framework runtime (csr is
          off); this small guarded script wires the nav, FAQ, forms and copy

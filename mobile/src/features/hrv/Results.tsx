@@ -2,7 +2,8 @@
  * Results screen after a live reading: runs the HRV pipeline on the collected
  * RR, builds a reading identical to a typed-in one (same field keys), and shows
  * the hero autonomic score, power distribution, tachogram waveform, and graded
- * metric rows. Save writes it to today's readings (with raw data); optional
+ * metric rows. Save writes the metrics to today's readings and the raw arrays
+ * to the waveform sidecar (the journal blob never carries them); optional
  * "Write to Apple Health" logs SDNN + a mindful session.
  */
 import React, { useMemo, useState } from 'react';
@@ -14,7 +15,8 @@ import { useToast } from '../../components/Toast';
 import { usePalette } from '../../theme';
 import { computeHrv } from '../../lib/hrv';
 import { computeScores } from '../../lib/scoring';
-import { getState, upsertEntry } from '../../store/store';
+import { getState, storeWaveform, upsertEntry } from '../../store/store';
+import { splitWaveform } from '../../lib/waveforms';
 import { getCurrentKey } from '../../store/nav';
 import { health } from '../../lib/health';
 import { addDays, defaultTimeFor, fmtTime12, nowTime, todayKey, uid } from '../../lib/dates';
@@ -41,8 +43,8 @@ export function HrvResults({ rr, hrSamples, sdnnSamples, config, durationSec, wa
     // the reading sorts inside that day, and note the real clock time.
     const afterMidnight = dk !== todayKey() && dk === addDays(todayKey(), -1) && new Date().getHours() < 6;
     let note = config.source === 'watch' ? 'Captured via Apple Watch'
-      : config.source === 'camera' ? 'Captured via phone camera (PPG)'
-      : 'Captured via chest strap';
+      : config.source === 'camera' ? 'Captured via device camera (PPG)'
+      : `Captured via ${getState().settings.lastBleDeviceName || 'Bluetooth device'}`;
     if (afterMidnight) note += ` · Taken after midnight (actual time ${fmtTime12(nowTime())})`;
     const base: Entry = {
       id: uid(), type, time: defaultTimeFor(dk),
@@ -53,6 +55,9 @@ export function HrvResults({ rr, hrSamples, sdnnSamples, config, durationSec, wa
       source: config.source, durationSec,
       rrRaw: rr, rrClean: result.rrClean, sampledHr: hrSamples,
     };
+    if (config.source === 'polar' && getState().settings.lastBleDeviceName) {
+      base.sourceName = getState().settings.lastBleDeviceName;
+    }
     if (sdnnSamples && sdnnSamples.length) base.sampledSdnn = sdnnSamples;
     if (config.kind === 'breath' && config.style) base.style = config.style;
     if (result.ok || Object.keys(result.fields).length) {
@@ -77,13 +82,18 @@ export function HrvResults({ rr, hrSamples, sdnnSamples, config, durationSec, wa
   }, [reading]);
 
   const save = async () => {
-    upsertEntry(getCurrentKey(), 'readings', reading);
+    // The preview `reading` carries its arrays inline (ReadingSummary renders
+    // from them pre-save); persisting splits them into the waveform sidecar,
+    // written before the entry so the journal never references a missing blob.
+    const { entry, waveform } = splitWaveform(reading);
+    if (waveform) storeWaveform(entry.id, waveform);
+    upsertEntry(getCurrentKey(), 'readings', entry);
     if (writeHealth && health().available) {
       const sdnn = parseFloat(reading.sdnn as string);
       const hr = parseFloat((reading.hr || reading.avgHr) as string);
       if (!isNaN(sdnn)) {
         try {
-          await health().writeHrvSession({ sdnnMs: sdnn, avgHr: isNaN(hr) ? 60 : hr, startISO: new Date(Date.now() - durationSec * 1000).toISOString(), durationSec });
+          await health().writeHrvSession({ sdnnMs: sdnn, avgHr: isNaN(hr) ? undefined : hr, startISO: new Date(Date.now() - durationSec * 1000).toISOString(), durationSec });
         } catch { /* graceful */ }
       }
     }

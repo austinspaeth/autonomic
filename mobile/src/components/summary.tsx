@@ -9,7 +9,7 @@
  * HeroCard / SumCard / MetricRow further down are the older row primitives,
  * kept for the day-score breakdown (DaySummary).
  */
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 import { fonts, radius, usePalette } from '../theme';
 import type { Band, Entry, ScoreCat } from '../lib/types';
@@ -22,6 +22,8 @@ import {
 import { metricHistory, numEx, type DaysMap } from '../lib/scoring/day';
 import { entryFields, isDivider, READING_TYPES } from '../lib/registry';
 import { fmtNum, fmtShort } from '../lib/dates';
+import { correctArtifacts } from '../lib/hrv';
+import { getWaveform } from '../store/store';
 import { BalanceChart, PowerSpectrum, Sparkline, Tachogram, ZonesToggle, balanceCat } from './charts';
 import { HelpDot, ScoreDot } from './ui';
 
@@ -32,8 +34,15 @@ const hexA = (hex: string, a: number) => {
   return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
 };
 
-/** Map a reading's capture source to a human label for the Details card. */
-const SOURCE_LABEL: Record<string, string> = { polar: 'Bluetooth device', watch: 'Apple Watch', camera: 'Camera (PPG)', manual: 'Manual entry' };
+/** Map a reading's capture source to a human label for the Details card.
+ *  Bluetooth ('polar') readings prefer the stamped device name (`sourceName`);
+ *  this map is the fallback for readings captured before names were stamped. */
+const SOURCE_LABEL: Record<string, string> = { polar: 'Bluetooth device', watch: 'Apple Watch', camera: 'Device camera', manual: 'Manual entry' };
+
+function sourceLabelFor(r: Entry): string | undefined {
+  if (r.source === 'polar' && r.sourceName) return String(r.sourceName);
+  return r.source ? SOURCE_LABEL[r.source as string] : undefined;
+}
 
 /* ---------- legacy primitives (still used by DaySummary) ---------- */
 
@@ -83,7 +92,7 @@ export function MetricRow({ label, value, cat, explain, spark, bare }: {
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
         {cat === false ? null : <ScoreDot cat={cat || null} />}
         <Text style={{ flex: 1, fontSize: 16, fontWeight: '700', color: p.text }}>{label}</Text>
-        <Text style={{ fontSize: 16, fontWeight: '700', color: p.text, fontVariant: ['tabular-nums'] }}>{value == null || value === '' ? '-' : String(value)}</Text>
+        <Text numberOfLines={1} ellipsizeMode="tail" style={{ fontSize: 16, fontWeight: '700', color: p.text, fontVariant: ['tabular-nums'], maxWidth: '70%' }}>{value == null || value === '' ? '-' : String(value)}</Text>
       </View>
       {explain ? <Text style={{ fontSize: 13, color: p.textDim, marginTop: 6, lineHeight: 17 }}>{explain}</Text> : null}
       {spark}
@@ -232,7 +241,16 @@ const HRV_VERDICT: Record<string, string> = {
 function HrvSummaryBody({ r, days, ctx, type }: SummaryProps & { type: 'breathHrv' | 'hrv' }) {
   const s = computeScores(r, ctx);
   const { score, overall } = hrvComposite(r, ctx);
-  const rr = (r.rrClean as number[] | undefined) || (r.rrRaw as number[] | undefined) || null;
+  // Waveforms live in the sidecar store keyed by reading id — inline fields
+  // exist only on pre-save live previews (and old imports mid-migration). The
+  // cleaned series isn't stored at all; it's re-derived from rrRaw on demand.
+  const rr = useMemo(() => {
+    const w = getWaveform(String(r.id));
+    const clean = (w && w.rrClean) || (r.rrClean as number[] | undefined);
+    if (clean && clean.length) return clean;
+    const raw = (w && w.rrRaw) || (r.rrRaw as number[] | undefined);
+    return raw && raw.length ? correctArtifacts(raw).clean : null;
+  }, [r]);
   const rmssdBand = type === 'breathHrv' ? BANDS.rmssdS : BANDS.rmssdU;
   const hrKey = type === 'breathHrv' ? 'hr' : 'avgHr';
   const n = (k: string) => { const x = parseFloat(r[k] as string); return isNaN(x) ? null : x; };
@@ -245,7 +263,7 @@ function HrvSummaryBody({ r, days, ctx, type }: SummaryProps & { type: 'breathHr
   const snsHist = metricHistory(days, type, numEx('sns'));
   const pnsNum = n('pns'), snsNum = n('sns');
   const balCat = pnsNum != null && snsNum != null ? balanceCat(pnsNum, snsNum) : undefined;
-  const sourceLabel = r.source ? SOURCE_LABEL[r.source as string] : undefined;
+  const sourceLabel = sourceLabelFor(r);
   const hasDetails = !!sourceLabel || type === 'breathHrv' || !!r.period;
   return (
     <>

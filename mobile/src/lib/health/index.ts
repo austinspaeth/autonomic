@@ -19,6 +19,7 @@ import { Platform } from 'react-native';
 import type { Entry, SleepStages } from '../types';
 import { computeHrv } from '../hrv';
 import { keyOf } from '../dates';
+import { summarizeSleep } from './sleepSummary';
 
 /** This app's bundle id — used to skip re-importing our own write-backs. */
 const OWN_BUNDLE = 'com.autonomic.journal';
@@ -48,7 +49,7 @@ export interface HealthApi {
    * Excludes samples this app authored and series with too few beats.
    */
   readHrvSessions(opts: { fromMs: number; toMs: number }): Promise<WatchHrvSample[]>;
-  writeHrvSession(opts: { sdnnMs: number; avgHr: number; startISO: string; durationSec: number }): Promise<void>;
+  writeHrvSession(opts: { sdnnMs: number; avgHr?: number; startISO: string; durationSec: number }): Promise<void>;
   writeQuantity(kind: 'systolic' | 'diastolic' | 'restingHr', value: number, when: Date): Promise<void>;
   /** Publish an app journal reading to Health. Returns how many samples were written. */
   publishReading(entry: Entry, dk: string): Promise<number>;
@@ -402,44 +403,28 @@ function makeReal(mod: HkModule): HealthApi {
 
     async readSleep(dk) {
       // A night that ends on `dk` usually starts the previous evening. Query a
-      // generous window (prev-day 18:00 → this-day 14:00) and pick the main block.
+      // generous window (prev-day 18:00 → this-day 14:00); summarizeSleep picks
+      // the main session out of it (so a nap doesn't skew bed/wake) and
+      // measures minutes on the interval union (so overlapping iPhone + Watch
+      // samples don't double-count).
       const [y, m, d] = dk.split('-').map(Number);
       const from = new Date(y, m - 1, d - 1, 18, 0, 0);
       const to = new Date(y, m - 1, d, 14, 0, 0);
       try {
         const rows = (await mod.queryCategorySamples?.(CID.sleep, { from, to, limit: 400 })) || [];
-        // HKCategoryValueSleepAnalysis: 0 inBed, 1 asleepUnspecified, 2 awake,
-        // 3 asleepCore, 4 asleepDeep, 5 asleepREM.
-        const asleep = rows.filter((r) => r.value === 1 || r.value === 3 || r.value === 4 || r.value === 5);
-        if (!asleep.length) return null;
-        const bed = asleep.reduce((a, b) => (a.startDate < b.startDate ? a : b)).startDate;
-        const wake = asleep.reduce((a, b) => (a.endDate > b.endDate ? a : b)).endDate;
-        const minutesAsleep = Math.round(
-          asleep.reduce((s, r) => s + (r.endDate.getTime() - r.startDate.getTime()), 0) / 60000,
-        );
-        const awakeSegments = rows.filter((r) => r.value === 2 && r.startDate >= bed && r.endDate <= wake);
-        // Per-stage minutes — only meaningful when the source staged the night;
-        // a night of plain asleepUnspecified samples reports no stages.
-        const minsOf = (rs: typeof rows) =>
-          Math.round(rs.reduce((s, r) => s + (r.endDate.getTime() - r.startDate.getTime()), 0) / 60000);
-        const staged: SleepStages = {
-          core: minsOf(asleep.filter((r) => r.value === 3)),
-          deep: minsOf(asleep.filter((r) => r.value === 4)),
-          rem: minsOf(asleep.filter((r) => r.value === 5)),
-          awake: minsOf(awakeSegments),
-        };
-        const stages = staged.core + staged.deep + staged.rem > 0 ? staged : null;
-        const hr = await rangeQ(QID.heartRate, bed, wake);
+        const night = summarizeSleep(rows);
+        if (!night) return null;
+        const hr = await rangeQ(QID.heartRate, night.bed, night.wake);
         return {
-          bed: hhmm(bed),
-          wake: hhmm(wake),
-          bedISO: bed.toISOString(),
-          wakeISO: wake.toISOString(),
+          bed: hhmm(night.bed),
+          wake: hhmm(night.wake),
+          bedISO: night.bed.toISOString(),
+          wakeISO: night.wake.toISOString(),
           hrLow: hr ? Math.round(hr.min) : null,
           hrHigh: hr ? Math.round(hr.max) : null,
-          interrupted: awakeSegments.length >= 2,
-          minutesAsleep,
-          stages,
+          interrupted: night.interrupted,
+          minutesAsleep: night.minutesAsleep,
+          stages: night.stages,
         };
       } catch { return null; }
     },
@@ -448,7 +433,10 @@ function makeReal(mod: HkModule): HealthApi {
       const start = new Date(startISO);
       const end = new Date(start.getTime() + durationSec * 1000);
       await saveQ(QID.hrvSdnn, 'ms', sdnnMs, start, end);
-      if (Number.isFinite(avgHr) && avgHr > 0) await saveQ(QID.restingHr, 'count/min', avgHr, start, end);
+      // Session-average HR is a HeartRate sample, NOT RestingHeartRate — that
+      // identifier is Apple's derived all-day metric and writing to it skews
+      // every consumer of resting HR (including our own readAll/import).
+      if (avgHr != null && Number.isFinite(avgHr) && avgHr > 0) await saveQ(QID.heartRate, 'count/min', avgHr, start, end);
       try { await mod.saveCategorySample?.(CID.mindful, 0, { start, end }); } catch { /* graceful */ }
     },
 

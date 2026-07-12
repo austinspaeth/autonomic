@@ -16,6 +16,7 @@ import { useToast } from '../components/Toast';
 import { radius, usePalette } from '../theme';
 import { getState, replaceState, save, serializeState, useAppState } from '../store/store';
 import { ageFromBirthday, fmtStamp, keyOf } from '../lib/dates';
+import { DATE_KEY_RE, assertImportVersion, isPlainObject } from '../lib/migrate';
 import { useIap, manageSubscription, restore, MONTHLY_SKU } from '../store/iap';
 import { DevicesScreen } from './Devices';
 import { HealthScreen } from './Health';
@@ -45,12 +46,7 @@ export function MenuSheet({ controls }: { controls: SheetControls }) {
   const appVer = Constants.expoConfig?.version ?? '1.0.0';
   return (
     <View>
-      {/* Title band: a 32px box matching the sheet's close ✕ box (absolute at
-          top:12, height:32). Content starts at the sheet's 24px top padding, so
-          marginTop:-12 lifts this box to top:12 — lining its centre up with the ✕. */}
-      <View style={{ height: 32, justifyContent: 'center', marginTop: -12, marginBottom: 16 }}>
-        <Text style={{ fontSize: 21, fontWeight: '700', color: p.text }}>Settings</Text>
-      </View>
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 16 }}>Settings</Text>
       {/* Near-black brand card, inset to match content: 18px left/right (content
           padding). */}
       <View style={{ marginBottom: 16, paddingVertical: 24, borderRadius: radius.card, backgroundColor: '#131315', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 }}>
@@ -166,14 +162,17 @@ function LegalSheet({ controls }: { controls: SheetControls }) {
 
 /* ---------- import / export ---------- */
 async function exportData(toast: (m: string) => void) {
+  const uri = `${FileSystem.cacheDirectory}autonomic-journal-${keyOf(new Date())}.json`;
   try {
     const json = serializeState();
-    const uri = `${FileSystem.cacheDirectory}autonomic-journal-${keyOf(new Date())}.json`;
     await FileSystem.writeAsStringAsync(uri, json);
     if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(uri, { mimeType: 'application/json', dialogTitle: 'Export Autonomic data' });
     else toast('Sharing unavailable');
   } catch {
     toast('Export failed');
+  } finally {
+    // The exported file is the user's full plaintext journal; don't leave it in cache.
+    await FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
   }
 }
 
@@ -183,9 +182,15 @@ async function importData(controls: SheetControls, toast: (m: string) => void) {
     if (res.canceled || !res.assets?.[0]) return;
     const asset = res.assets[0];
     const text = await FileSystem.readAsStringAsync(asset.uri);
-    const parsed = JSON.parse(text);
-    if (!parsed || typeof parsed !== 'object' || !('days' in parsed)) throw new Error('Not an Autonomic Journal file');
-    const nDays = Object.keys(parsed.days || {}).length;
+    // The picker copied the journal file into our cache; remove it now that it's read.
+    await FileSystem.deleteAsync(asset.uri, { idempotent: true }).catch(() => {});
+    const parsed: unknown = JSON.parse(text);
+    // Structure check only — replaceState() runs the file through migrate(),
+    // which sanitizes day keys and entries before anything reaches MMKV.
+    const days = isPlainObject(parsed) ? parsed.days : undefined;
+    if (!isPlainObject(days)) throw new Error('Not an Autonomic Journal file');
+    assertImportVersion(parsed);
+    const nDays = Object.keys(days).filter((k) => DATE_KEY_RE.test(k)).length;
     Alert.alert('Replace all data?', `This replaces everything on this device with the imported file (${nDays} day${nDays === 1 ? '' : 's'}). This cannot be undone.`, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Replace', style: 'destructive', onPress: () => { replaceState(parsed, asset.name); controls.closeAll(); toast('Imported'); } },

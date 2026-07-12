@@ -35,6 +35,22 @@ export default function JournalScreen() {
   const { openSheet } = useSheets();
   const isToday = dk === todayKey();
 
+  // TEMP AUTO-DRIVE (verification only, remove): open the time-picker sheet on
+  // launch to confirm the upgraded native DateTimePicker renders.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const { TimePickerSheet } = require('../../src/components/Field');
+      openSheet(
+        (c: { close: () => void; closeAll: () => void }) => (
+          <TimePickerSheet label="Bed (last night)" value="21:30" onChange={(v: string) => console.log('TEMP-PICK committed:', v)} controls={c} />
+        ),
+        { fitContent: true },
+      );
+    }, 2500);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Content renders `shownDk`, which trails `dk` by one out-animation.
   const [shownDk, setShownDk] = useState(dk);
   const scrollRef = useRef<ScrollView>(null);

@@ -12,7 +12,7 @@
  */
 import React, { createContext, useContext, useRef, useState } from 'react';
 import {
-  Dimensions, Keyboard, Modal, Platform, Pressable, ScrollView, StyleSheet, View,
+  Dimensions, Keyboard, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View,
 } from 'react-native';
 import Animated, {
   Easing, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming,
@@ -120,12 +120,20 @@ function SheetView({ entry, isTop, behind, closing, requestClose, onExited, clos
   // Height of the on-screen keyboard, tweened in from the OS event so the sticky
   // footer rides just above it and the scroll content gains room to clear it.
   const kb = useSharedValue(0);
+  // Same height but applied to the tail spacer INSTANTLY on show — the auto-scroll
+  // below needs the extra scroll room to exist before scrollTo, or iOS clamps it.
+  const kbSpace = useSharedValue(0);
   const [kbOpen, setKbOpen] = useState(false);
   const isTopRef = useRef(isTop); isTopRef.current = isTop;
   const [footer, setFooter] = useState<React.ReactNode>(null);
   // Measured footer height so scroll content clears it exactly — footers can be
   // taller than one row (e.g. the results card's stacked button cluster).
   const [footerH, setFooterH] = useState(0);
+  const scrollRef = useRef<ScrollView>(null);
+  const scrollY = useRef(0);
+  // Live mirrors for the keyboard listener (registered once, deps [kb]).
+  const footerHRef = useRef(0);
+  const hasFooterRef = useRef(false); hasFooterRef.current = !!footer;
   const mounted = useRef(false);
   const full = entry.opts.fullscreen;
   const fit = entry.opts.fitContent && !full;
@@ -154,19 +162,36 @@ function SheetView({ entry, isTop, behind, closing, requestClose, onExited, clos
   // their footer put.
   React.useEffect(() => {
     const ios = Platform.OS === 'ios';
-    const onShow = (e: { endCoordinates: { height: number }; duration?: number }) => {
+    const onShow = (e: { endCoordinates: { height: number; screenY?: number }; duration?: number }) => {
       if (!isTopRef.current) return;
       kb.value = withTiming(e.endCoordinates.height, { duration: e.duration || 250, easing: Easing.out(Easing.cubic) });
+      kbSpace.value = e.endCoordinates.height; // instant — see declaration
       setKbOpen(true);
+      // Auto-scroll the focused field clear of the keyboard AND the raised footer
+      // (fields near the sheet bottom are otherwise typed into blind). iOS refires
+      // will-show on every focus change, so hopping between fields re-runs this.
+      const input = TextInput.State.currentlyFocusedInput();
+      const kbTop = e.endCoordinates.screenY ?? SCREEN_H - e.endCoordinates.height;
+      if (input && scrollRef.current) {
+        // Small delay so the spacer's new height has landed in the content size.
+        setTimeout(() => {
+          input.measureInWindow((_x, y, _w, h) => {
+            const clearBottom = kbTop - (hasFooterRef.current ? footerHRef.current : 0) - 12;
+            const overlap = y + h - clearBottom;
+            if (overlap > 0) scrollRef.current?.scrollTo({ y: scrollY.current + overlap, animated: true });
+          });
+        }, 60);
+      }
     };
     const onHide = (e?: { duration?: number }) => {
       kb.value = withTiming(0, { duration: (e && e.duration) || 250, easing: Easing.out(Easing.cubic) });
+      kbSpace.value = withTiming(0, { duration: (e && e.duration) || 250, easing: Easing.out(Easing.cubic) });
       setKbOpen(false);
     };
     const s = Keyboard.addListener(ios ? 'keyboardWillShow' : 'keyboardDidShow', onShow);
     const h = Keyboard.addListener(ios ? 'keyboardWillHide' : 'keyboardDidHide', onHide);
     return () => { s.remove(); h.remove(); };
-  }, [kb]);
+  }, [kb, kbSpace]);
 
   // Play the exit the moment we're flagged closing. The card beneath is already
   // returning (its `behind` flipped false), so the two animate simultaneously.
@@ -215,7 +240,7 @@ function SheetView({ entry, isTop, behind, closing, requestClose, onExited, clos
   }));
   // Spacer at the tail of the scroll content so a focused field can scroll clear
   // of both the keyboard and the raised footer.
-  const spacerStyle = useAnimatedStyle(() => ({ height: kb.value }));
+  const spacerStyle = useAnimatedStyle(() => ({ height: kbSpace.value }));
 
   const controls = React.useMemo<SheetControls>(() => ({
     close: () => requestCloseRef.current(),
@@ -257,10 +282,15 @@ function SheetView({ entry, isTop, behind, closing, requestClose, onExited, clos
             </View>
           ) : (
             <ScrollView
+              ref={scrollRef}
               style={{ flex: 1 }}
               contentContainerStyle={{ padding: 18, paddingTop: topPad, paddingBottom: footer ? Math.max(120, footerH + 20) : 24 + insets.bottom }}
               keyboardShouldPersistTaps="handled"
-              keyboardDismissMode="on-drag"
+              // "interactive" (iOS) keeps the keyboard up while scrolling the form —
+              // it only dismisses when dragged down over the keyboard itself.
+              keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+              onScroll={(e) => { scrollY.current = e.nativeEvent.contentOffset.y; }}
+              scrollEventThrottle={16}
               showsVerticalScrollIndicator={false}
             >
               {content}
@@ -288,7 +318,7 @@ function SheetView({ entry, isTop, behind, closing, requestClose, onExited, clos
           </View>
         )}
         {footer && (
-          <Animated.View onLayout={(e) => setFooterH(e.nativeEvent.layout.height)} style={[styles.footer, { backgroundColor: p.surface, borderTopColor: p.border }, footerStyle]}>
+          <Animated.View onLayout={(e) => { setFooterH(e.nativeEvent.layout.height); footerHRef.current = e.nativeEvent.layout.height; }} style={[styles.footer, { backgroundColor: p.surface, borderTopColor: p.border }, footerStyle]}>
             {kbOpen && (
               <Pressable onPress={() => Keyboard.dismiss()} style={[styles.kbDismiss, { backgroundColor: p.surface2, borderColor: p.border }]} hitSlop={6}>
                 <Icon name="chevron" size={20} color={p.textDim} />
@@ -316,7 +346,7 @@ export function SheetFooter({ children }: { children: React.ReactNode }) {
 const styles = StyleSheet.create({
   backdrop: { ...StyleSheet.absoluteFillObject },
   sheet: { position: 'absolute', left: 0, right: 0, bottom: 0, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
-  headerPill: { position: 'absolute', top: 14, right: 14, flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 999, borderWidth: 1, overflow: 'hidden' },
+  headerPill: { position: 'absolute', top: 10, right: 14, flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 999, borderWidth: 1, overflow: 'hidden' },
   pillBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   footer: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 18, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: 10 },
   kbDismiss: { width: 46, borderRadius: radius.control, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },

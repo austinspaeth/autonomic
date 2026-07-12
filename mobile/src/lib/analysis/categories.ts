@@ -4,6 +4,7 @@
  * the PWA: a few good charts + stat tiles per category, grade-zone shaded.
  */
 import type { Band, Entry, ScoreCat } from '../types';
+import { todayKey } from '../dates';
 import { SCORE_COLORS, restingHrBands, sBP, worstCat } from '../scoring';
 import { scoreCat, sleepHours, streakInfo, type DaysMap } from '../scoring/day';
 import { ACTIVITY_TYPES, MED_TYPES, TRIGGER_TYPES } from '../registry';
@@ -80,7 +81,7 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
   };
 
   const heat = (): AnalysisCard | null => {
-    const streak = streakInfo(days, new Date().toISOString().slice(0, 10), ctx.protocol);
+    const streak = streakInfo(days, todayKey(), ctx.protocol);
     return {
       title: 'Clean Days',
       desc: 'Days in a row without breaking your protocol.',

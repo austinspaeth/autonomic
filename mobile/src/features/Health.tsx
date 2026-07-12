@@ -9,7 +9,7 @@ import { TimeField } from '../components/Field';
 import { useToast } from '../components/Toast';
 import { usePalette } from '../theme';
 import { health, SleepImport } from '../lib/health';
-import { ensureDay, getState, save } from '../store/store';
+import { ensureDay, getState, save, storeWaveform } from '../store/store';
 import { getCurrentKey } from '../store/nav';
 import { computeScores } from '../lib/scoring';
 import { fmtTime12, uid } from '../lib/dates';
@@ -81,8 +81,9 @@ export function HealthScreen() {
         if (dup) continue;
 
         const r = { id: uid(), type: imp.type, time: imp.time, note: 'From Apple Health', source: 'watch', ...imp.fields } as Record<string, unknown>;
-        if (imp.rr) r.rrRaw = imp.rr;
-        if (imp.rrClean) r.rrClean = imp.rrClean;
+        // RR series goes to the waveform sidecar, never inline on the entry
+        // (rrClean is derived — recomputed on view, not stored).
+        if (imp.rr) storeWaveform(r.id as string, { rrRaw: imp.rr });
         r.scores = computeScores(r as never, ctx);
         d.readings.push(r as never);
         added++;

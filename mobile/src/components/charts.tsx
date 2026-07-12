@@ -431,6 +431,9 @@ export function LineChart({ buckets, series, zones, integer, height = 140, targe
     if (layoutW <= 0) return;
     const px = (x / layoutW) * W;
     const i = Math.max(0, Math.min(n - 1, Math.round(((px - padL) / innerW) * (n - 1))));
+    // Only data-bearing buckets are selectable — a touch over an empty bucket
+    // leaves the current selection (and the header readout) untouched.
+    if (!series.some((s) => { const v = s.values[i]; return v != null && !isNaN(v); })) return;
     setSel(i);
     onSelect?.(i);
   };
@@ -772,7 +775,11 @@ export function BpDumbbell({ buckets, sys, dia, height = 180 }: {
   const onTouch = (x: number) => {
     if (layoutW <= 0) return;
     const px = (x / layoutW) * W;
-    setSel(Math.max(0, Math.min(n - 1, Math.round(((px - padL) / innerW) * (n - 1)))));
+    const i = Math.max(0, Math.min(n - 1, Math.round(((px - padL) / innerW) * (n - 1))));
+    // Only buckets with a drawn segment (both values) are selectable.
+    const s = sys[i], d = dia[i];
+    if (s == null || isNaN(s) || d == null || isNaN(d)) return;
+    setSel(i);
   };
   // Readout mirrors the metric cards: the range average by default, then the
   // dragged bucket's reading with its date in parentheses.
@@ -871,6 +878,9 @@ export function StackedBars({ buckets, segments, height = 160, unit, hideHeader,
     if (layoutW <= 0) return;
     const px = (x / layoutW) * W;
     const i = Math.max(0, Math.min(n - 1, Math.floor((px - padL) / bandW)));
+    // Only buckets with a drawn bar are selectable — touching an empty band
+    // leaves the current selection (and the header totals) untouched.
+    if (!(totals[i] > 0)) return;
     setSel(i);
     onSelect?.(i);
   };

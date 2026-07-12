@@ -71,6 +71,15 @@ old web app so old `export.json` files import directly.
 - **Every mutation flows through `save()`** in `src/store/store.ts`, which stamps
   `meta.lastUpdated = new Date().toISOString()`. **Never write MMKV directly** —
   the store exposes an external store + `useSyncExternalStore` so React re-renders.
+  The disk write is **debounced** (`src/lib/persist.ts`) and flushed whenever the
+  app leaves the foreground; call `flushSave()` if a write must not wait.
+- **HRV waveform arrays never live in the journal.** `rrRaw` / `sampledHr` /
+  `sampledSdnn` go to a sidecar MMKV instance keyed by reading id — write via
+  `storeWaveform()`, read via `getWaveform()` (`src/lib/waveforms.ts` has the pure
+  split/extract/import helpers). `rrClean` isn't stored at all (re-derived via
+  `correctArtifacts`). Exports carry a top-level `waveforms` map; old exports with
+  embedded arrays still import. A dev-build warning fires if an inline array ever
+  reaches the persisted journal.
 - **Imports** record `meta.lastImport` (`{ name, at }`) before calling `save()`.
 - **Adding a type**: add it to the relevant `*_TYPES` map in `src/lib/registry.ts`
   (and an icon in `src/components/Icon.tsx`). There are no user-defined types.

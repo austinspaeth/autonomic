@@ -11,7 +11,7 @@ import { SheetControls, SheetFooter, useSheets } from '../../src/components/Shee
 import { useToast } from '../../src/components/Toast';
 import { radius, usePalette } from '../../src/theme';
 import { getState, useAppState } from '../../src/store/store';
-import { getCurrentKey } from '../../src/store/nav';
+import { todayKey } from '../../src/lib/dates';
 import { REPORT_CARDS, ReportRange, buildDataExport, buildPrompt, hasAnyData, reportDateRange } from '../../src/lib/analysis/reports';
 import { resolveProtocol } from '../../src/lib/scoring/day';
 
@@ -34,22 +34,22 @@ export default function InsightsScreen() {
     const state = getState();
     const cards = REPORT_CARDS.filter((c) => selected.has(c.id));
     if (!cards.length) return;
-    const { keys: allKeys, rangeText } = reportDateRange(range, getCurrentKey());
+    const { keys: allKeys, rangeText } = reportDateRange(range, todayKey());
     const keys = allKeys.filter((k) => state.days[k]);
     if (!hasAnyData(state.days, keys)) { toast('No data available for this period'); return; }
     const ctx = { sex: state.profile.sex, height: state.profile.height, protocol: resolveProtocol(state.settings.protocol) };
-    const prompt = buildPrompt(state, ctx, cards, range, getCurrentKey());
+    const prompt = buildPrompt(state, ctx, cards, range, todayKey());
     const title = cards.length === 1 ? cards[0].title : `Custom Report · ${cards.length} areas`;
     openSheet((c) => <PromptSheet title={title} rangeText={rangeText} prompt={prompt} controls={c} />);
   };
 
   const dataExport = () => {
     const state = getState();
-    const { keys: allKeys, rangeText } = reportDateRange(range, getCurrentKey());
+    const { keys: allKeys, rangeText } = reportDateRange(range, todayKey());
     const keys = allKeys.filter((k) => state.days[k]);
     if (!hasAnyData(state.days, keys)) { toast('No data available for this period'); return; }
     const ctx = { sex: state.profile.sex, height: state.profile.height, protocol: resolveProtocol(state.settings.protocol) };
-    const text = buildDataExport(state, ctx, range, getCurrentKey());
+    const text = buildDataExport(state, ctx, range, todayKey());
     openSheet((c) => <PromptSheet title="Metrics Export" rangeText={rangeText} prompt={text} controls={c} subtitle="Your raw logged data for this period, no analysis prompt attached. Copy or share it as-is." />);
   };
 
@@ -115,11 +115,15 @@ function PromptSheet({ title, rangeText, prompt, controls, subtitle }: { title: 
     toast('Copied to clipboard');
   };
   const share = async () => {
+    const uri = `${FileSystem.cacheDirectory}autonomic-report.txt`;
     try {
-      const uri = `${FileSystem.cacheDirectory}autonomic-report.txt`;
       await FileSystem.writeAsStringAsync(uri, prompt);
       if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(uri, { mimeType: 'text/plain', dialogTitle: title });
     } catch { toast('Share failed'); }
+    finally {
+      // The report contains the user's health data in plaintext; don't leave it in cache.
+      await FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
+    }
   };
   return (
     <View>

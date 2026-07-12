@@ -23,7 +23,7 @@
   <div class="wrap legal-wrap">
     <p class="eyebrow">Legal</p>
     <h1 class="h2">Privacy Policy</h1>
-    <p class="legal-updated">Last updated: July 10, 2026</p>
+    <p class="legal-updated">Last updated: July 12, 2026</p>
 
     <div class="article-prose">
       <p>
@@ -46,16 +46,19 @@
       <p>
         Everything you log, journal entries, HRV readings, sleep, symptoms, medications, profile
         details such as sex, birthday, height, and weight, is stored locally on your device in the
-        app's private storage. It never leaves your device unless <em>you</em> deliberately export
+        app's private storage. The journal database is encrypted at rest with a key held in your
+        device's Keychain. It never leaves your device unless <em>you</em> deliberately export
         or share it.
       </p>
       <ul>
         <li>
           <strong>Local backups.</strong> The app keeps a small rotation of automatic JSON snapshots
           of your journal inside its own Documents folder on your device, so your data can survive
-          reinstalls via a device restore. These files are part of your device storage and, if you
-          have iCloud Backup enabled, are included in your device's iCloud backup under
-          <em>Apple's</em> terms and encryption, not on any server of ours.
+          reinstalls via a device restore. Unlike the journal database, these snapshots are plain
+          readable JSON, so you can always recover your data yourself from the Files app. They are
+          part of your device storage and, if you have iCloud Backup enabled, are included in your
+          device's iCloud backup under <em>Apple's</em> terms and encryption (end-to-end encrypted
+          only if you enable Advanced Data Protection), not on any server of ours.
         </li>
         <li>
           <strong>Apple Health.</strong> If you connect Apple Health, readings are exchanged with
@@ -92,10 +95,25 @@
         read and roughly where visitors come from, so we can improve the site. Google Analytics sets
         cookies and processes information like your IP address, device, and browser under
         <a href="https://policies.google.com/privacy" rel="noopener" target="_blank">Google's own
-        privacy policy</a>. This applies only to your visits to the website, never to anything you do
-        inside the app, and it never touches health data, which does not exist on the website. You
-        can block it at any time with a content or cookie blocker, or your browser's tracking
-        controls.
+        privacy policy</a>.
+      </p>
+      <p>
+        You can <strong>opt out</strong> at any time. On your first visit the site shows a cookie
+        banner; choose <em>Block cookies</em> and Google Analytics is disabled immediately and never
+        loads again on future visits, we don't track you at all. Your choice is saved in your
+        browser, and you can change your mind by clearing this site's data. You can also block
+        analytics with a content or cookie blocker or your browser's tracking controls. This applies
+        only to your visits to the website, never to anything you do inside the app, and Google
+        Analytics never sees what you type into the waitlist form.
+      </p>
+      <p>
+        The website also has an <strong>Android waitlist form</strong>. If you join it, we collect
+        your email address and, optionally, your first name. We ask nothing about your health or
+        medical conditions. The submission is delivered to our email by
+        <a href="https://flowform.to" rel="noopener" target="_blank">FlowForm</a>, a third-party
+        form-forwarding service that transmits it under its own privacy practices. We use your
+        submission only to send your early-access invite and launch updates, we never sell or share
+        it, and you can ask us to delete it at any time using the contact below.
       </p>
 
       <h2>Children</h2>

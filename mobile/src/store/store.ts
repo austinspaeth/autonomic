@@ -3,110 +3,235 @@
  * Every mutation flows through `save()`, which stamps meta.lastUpdated — never
  * write MMKV directly. A tiny external store + useSyncExternalStore gives React
  * components a synchronous, always-current view.
+ *
+ * The disk write is debounced (src/lib/persist.ts): save() updates memory and
+ * notifies React synchronously, while the stringify + MMKV write coalesces
+ * behind a short trailing delay, flushed whenever the app leaves the
+ * foreground. HRV waveform arrays (rrRaw, sampledHr, …) live OUTSIDE the
+ * journal in a sidecar MMKV instance keyed by reading id (src/lib/waveforms.ts),
+ * so the per-mutation stringify stays O(journal-without-waveforms) — small —
+ * no matter how many live sessions accumulate.
  */
 import { useSyncExternalStore } from 'react';
+import { AppState as RNAppState } from 'react-native';
 import { MMKV } from 'react-native-mmkv';
-import { addDays, keyOf } from '../lib/dates';
-import { MED_TYPES } from '../lib/registry';
+import { keyOf } from '../lib/dates';
+import { SCHEMA_VERSION, assertImportVersion, blankDay, defaultState, isPlainObject, migrate } from '../lib/migrate';
+import { createDebouncedWriter } from '../lib/persist';
+import { migrateLegacyJournal } from '../lib/storeMigration';
 import type { AppState, DayRecord, Entry } from '../lib/types';
+import {
+  collectImportWaveforms, extractWaveforms, findEmbeddedWaveform, readingIds,
+  type WaveformData,
+} from '../lib/waveforms';
 
 const STORAGE_KEY = 'autonomic.journal.v1';
-const SCHEMA_VERSION = 1;
+// Raw copy of a blob loadState() could not honor (newer schema, or unparseable),
+// stashed before the normalized state overwrites the original on the next save().
+const RECOVERY_KEY = 'autonomic.journal.v1.recovery';
+
+/* ---------- encryption at rest ----------
+ * The journal is health data, so the MMKV store is encrypted with a random key
+ * held in the iOS Keychain. AFTER_FIRST_UNLOCK matches the sandbox's default
+ * file protection (the store must stay readable during background BLE / Health
+ * work) and — critically — migrates with encrypted device backups, so a journal
+ * restored onto a new phone can still be decrypted. The daily JSON snapshots in
+ * src/lib/backup.ts stay deliberately plaintext as the user-recoverable escape
+ * hatch (see the note there). */
+const KEYCHAIN_ENTRY = 'autonomic.mmkv.key';
+const LEGACY_ID = 'autonomic';
+const SECURE_ID = 'autonomic.secure';
+
+// Both modules were added after the first shipped binaries. A static `import`
+// throws at module load on any binary that predates them (old dev clients,
+// web, jest), so require them guardedly and degrade to the plaintext store.
+let SecureStore: typeof import('expo-secure-store') | null = null;
+let getRandomBytes: ((byteCount: number) => Uint8Array) | null = null;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  SecureStore = require('expo-secure-store');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  getRandomBytes = (require('expo-crypto') as typeof import('expo-crypto')).getRandomBytes;
+} catch {
+  // native modules unavailable — encryption off, same behavior as before
+}
+// Guarded separately: file scrubbing is optional even when encryption works.
+let FSNext: typeof import('expo-file-system/next') | null = null;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  FSNext = require('expo-file-system/next');
+} catch {
+  // sync file API unavailable — migration still runs, remnants stay until it is
+}
+
+/** Best-effort handle on the legacy store's on-disk files (react-native-mmkv
+ * keeps stores under `<Documents>/mmkv`). Lets kv() skip the migration once the
+ * plaintext files are gone, and scrub the remnants clearAll() leaves in the
+ * mmap page — deleted only after migrateLegacyJournal says they're disposable. */
+function legacyStoreFiles(): { exists: boolean; remove(): void } | null {
+  if (!FSNext) return null;
+  try {
+    const { File, Paths } = FSNext;
+    const files = [LEGACY_ID, `${LEGACY_ID}.crc`].map((n) => new File(Paths.document, 'mmkv', n));
+    return {
+      exists: files[0].exists,
+      remove: () => files.forEach((f) => { try { f.delete(); } catch { /* already gone */ } }),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function encryptionKey(): string | null {
+  if (!SecureStore || !getRandomBytes) return null;
+  try {
+    const opts = { keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK };
+    const existing = SecureStore.getItem(KEYCHAIN_ENTRY, opts);
+    if (existing) return existing;
+    // MMKV caps encryption keys at 16 bytes; 16 chars over 64 symbols = 96 bits.
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+    const key = Array.from(getRandomBytes(16), (b) => chars[b % 64]).join('');
+    SecureStore.setItem(KEYCHAIN_ENTRY, key, opts);
+    return key;
+  } catch {
+    return null; // Keychain unavailable — fall back to the plaintext store
+  }
+}
 
 let mmkv: MMKV | null = null;
 function kv(): MMKV {
-  if (!mmkv) mmkv = new MMKV({ id: 'autonomic' });
+  if (mmkv) return mmkv;
+  const key = encryptionKey();
+  if (key) {
+    try {
+      const secure = new MMKV({ id: SECURE_ID, encryptionKey: key });
+      const legacyFiles = legacyStoreFiles();
+      if (!legacyFiles || legacyFiles.exists) {
+        try {
+          if (migrateLegacyJournal(new MMKV({ id: LEGACY_ID }), secure, STORAGE_KEY)) {
+            legacyFiles?.remove();
+          }
+        } catch {
+          // nothing readable to migrate
+        }
+      }
+      mmkv = secure;
+      return mmkv;
+    } catch {
+      // encrypted store unavailable — fall through to the legacy plaintext store
+    }
+  }
+  mmkv = new MMKV({ id: LEGACY_ID });
   return mmkv;
 }
 
-function defaultState(): AppState {
-  return {
-    version: SCHEMA_VERSION,
-    settings: { theme: 'system' },
-    profile: { sex: '', birthday: '', weight: '', height: '' },
-    // Fresh installs start with an empty medication catalog — the built-in med
-    // types exist only so long-standing journals keep their labels. New users
-    // add their own meds; imported journals keep whatever they had visible.
-    hiddenTypes: { meds: Object.keys(MED_TYPES) },
-    meta: { lastUpdated: null, lastImport: null },
-    days: {},
-  };
-}
-
-export function blankDay(): DayRecord {
-  return {
-    sleep: { bed: '', wake: '' },
-    readings: [],
-    activities: [],
-    meds: [],
-    symptoms: [],
-    food: { water: 0, calories: 0, triggers: {}, meals: [] },
-    digestion: { movements: [] },
-  };
-}
-
-/** Normalize any parsed object into the current shape (import + load path). */
-export function migrate(s: unknown): AppState {
-  const base = defaultState();
-  if (!s || typeof s !== 'object') return base;
-  const src = s as Partial<AppState>;
-  const out: AppState = {
-    version: SCHEMA_VERSION,
-    settings: { ...base.settings, ...(src.settings || {}) },
-    profile: { ...base.profile, ...(src.profile || {}) },
-    customTypes: src.customTypes || {},
-    hiddenTypes: src.hiddenTypes || {},
-    meta: { lastUpdated: null, lastImport: null, ...(src.meta || {}) },
-    days: {},
-  };
-  const days = (src.days || {}) as Record<string, Partial<DayRecord>>;
-  // One-time reframing: historically a day stored the bedtime entered that
-  // evening (the night *after* its morning). The app now treats a day's sleep as
-  // the night that *ended* that morning, so each day's bed becomes the previous
-  // day's stored bed (wake and overnight HR stay put). Guarded by a meta flag so
-  // it runs exactly once, and travels through export/import.
-  const reframeSleep = !(src.meta && src.meta.sleepReframed);
-  Object.keys(days).forEach((k) => {
-    const d = days[k];
-    if (!d) return;
-    let sleep = d.sleep || { bed: '', wake: '' };
-    if (reframeSleep) {
-      const prev = days[addDays(k, -1)];
-      sleep = { ...sleep, bed: (prev && prev.sleep && prev.sleep.bed) || '' };
+/* ---------- waveform sidecar ----------
+ * Separate MMKV instance (same Keychain key) holding one JSON blob per HRV
+ * reading id: { rrRaw, sampledHr, sampledSdnn } — see src/lib/waveforms.ts.
+ * Kept out of the journal instance so the journal's mmap file stays tiny, and
+ * out of `state` so waveform history never sits in the JS heap. Reads happen
+ * lazily (the HRV detail view); writes happen once, when a reading is saved. */
+const WAVE_ID = 'autonomic.waveforms';
+let waveKv: MMKV | null = null;
+function wkv(): MMKV {
+  if (waveKv) return waveKv;
+  const key = encryptionKey();
+  if (key) {
+    try {
+      waveKv = new MMKV({ id: WAVE_ID, encryptionKey: key });
+      return waveKv;
+    } catch {
+      // encrypted sidecar unavailable — fall back like kv() does
     }
-    out.days[k] = {
-      sleep,
-      readings: Array.isArray(d.readings) ? d.readings : [],
-      activities: Array.isArray(d.activities) ? d.activities : [],
-      meds: Array.isArray(d.meds) ? d.meds : [],
-      symptoms: Array.isArray(d.symptoms) ? d.symptoms : [],
-      food: {
-        water: (d.food && d.food.water) || 0,
-        calories: (d.food && d.food.calories) || 0,
-        triggers: (d.food && d.food.triggers) || {},
-        meals: (d.food && Array.isArray(d.food.meals) ? d.food.meals : []),
-      },
-      digestion: { movements: (d.digestion && Array.isArray(d.digestion.movements) ? d.digestion.movements : []) },
-      ...(typeof d.notes === 'string' && d.notes ? { notes: d.notes } : {}),
-    };
-  });
-  out.meta.sleepReframed = true;
-  return out;
+  }
+  waveKv = new MMKV({ id: WAVE_ID });
+  return waveKv;
 }
+
+function putWaveform(id: string, data: WaveformData) {
+  try { wkv().set(id, JSON.stringify(data)); } catch { /* plots degrade, journal unaffected */ }
+}
+
+/** Sidecar waveform for a reading, or null (never saved / pruned / unreadable).
+ *  Callers fall back to any inline fields — pre-save live previews still carry
+ *  them, as do imported-but-not-yet-migrated entries. */
+export function getWaveform(id: string): WaveformData | null {
+  try {
+    const raw = wkv().getString(id);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return isPlainObject(parsed) ? (parsed as WaveformData) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Persist a reading's waveform arrays. Write this BEFORE upserting the entry
+ *  so the journal never references a waveform that isn't on disk yet. */
+export function storeWaveform(id: string, data: WaveformData) {
+  putWaveform(id, data);
+}
+
+/** Drop sidecar blobs whose reading no longer exists (deleted while the
+ *  journal write raced a crash, or left behind by an older build). */
+function pruneWaveforms(s: AppState) {
+  try {
+    const ids = readingIds(s);
+    for (const k of wkv().getAllKeys()) {
+      if (!ids.has(k)) wkv().delete(k);
+    }
+  } catch {
+    // best effort — strays cost bytes, not correctness
+  }
+}
+
+// State normalization (the import + load funnel) lives in src/lib/migrate.ts
+// so it stays pure and unit-testable; re-exported here for existing callers.
+export { blankDay, migrate };
+
+/** Set when launch found no persisted journal ('fresh') or an unreadable one
+ *  ('corrupt', with the raw blob when it could at least be read). RestoreGate
+ *  checks this to offer the on-device backup snapshots before onboarding. */
+export let loadIssue: { kind: 'fresh' | 'corrupt'; raw?: string } | null = null;
 
 function loadState(): AppState {
+  let raw: string | undefined;
   try {
-    const raw = kv().getString(STORAGE_KEY);
-    if (!raw) return defaultState();
+    raw = kv().getString(STORAGE_KEY);
+    if (!raw) {
+      loadIssue = { kind: 'fresh' };
+      return defaultState();
+    }
     const parsed = JSON.parse(raw);
+    // A blob stamped with a newer schema (device-backup restore onto an older
+    // binary) is about to be normalized down to this build's shape, dropping
+    // fields this build doesn't know. Keep the original bytes recoverable —
+    // the daily backups can't cover this: they snapshot post-migrate state and
+    // rotate the pre-strip copies out within KEEP days.
+    if (isPlainObject(parsed) && typeof parsed.version === 'number' && parsed.version > SCHEMA_VERSION) {
+      try { kv().set(RECOVERY_KEY, raw); } catch { /* best effort */ }
+    }
     const migrated = migrate(parsed);
-    // If a one-time migration (e.g. sleep reframing) ran, persist immediately so
-    // it can't re-run and double-apply on the next launch.
-    if (!(parsed && parsed.meta && parsed.meta.sleepReframed)) {
+    // Waveform arrays historically lived inline on HRV readings. Move them to
+    // the sidecar (sidecar written first, journal persisted after — a crash in
+    // between just re-runs the idempotent move next launch), then drop sidecar
+    // blobs whose reading is gone.
+    const movedWaveforms = extractWaveforms(migrated, putWaveform);
+    pruneWaveforms(migrated);
+    // If a one-time migration (sleep reframing, waveform extraction) ran,
+    // persist immediately so it can't re-run and double-apply on the next launch.
+    if (movedWaveforms || !(parsed && parsed.meta && parsed.meta.sleepReframed)) {
       try { kv().set(STORAGE_KEY, JSON.stringify(migrated)); } catch { /* keep in memory */ }
     }
     return migrated;
   } catch {
+    loadIssue = { kind: 'corrupt', raw };
+    // Stash the unreadable blob before the next save() overwrites it, so the
+    // data stays recoverable (e.g. by a future parser fix) even after the app
+    // starts writing a fresh journal over STORAGE_KEY.
+    if (raw) {
+      try { kv().set(RECOVERY_KEY, raw); } catch { /* best-effort */ }
+    }
     return defaultState();
   }
 }
@@ -123,7 +248,27 @@ function emit() {
   listeners.forEach((l) => l());
 }
 
+function persistNow() {
+  if (__DEV__) {
+    // Tripwire: every write path must route waveform arrays through the
+    // sidecar (storeWaveform) — an inline array here means one was missed and
+    // the journal blob is growing again.
+    const offender = findEmbeddedWaveform(state);
+    if (offender) console.warn(`[store] inline waveform persisted on ${offender} — route it through storeWaveform()`);
+  }
+  try {
+    kv().set(STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // storage error — state stays in memory
+  }
+}
+
+// Persist is debounced so a tap never pays for stringifying the journal; the
+// app leaving the foreground is the durability backstop (see flushSave).
+const persister = createDebouncedWriter(persistNow, 400);
+
 /** Centralized persistence — stamps meta.lastUpdated on every call.
+ *  Memory + React notification are synchronous; the disk write is debounced.
  *  Re-wraps `state` (and the days map) in fresh objects before emitting:
  *  mutations happen in place, so without new references useSyncExternalStore
  *  consumers and any useMemo keyed on `state.days` would never see a change
@@ -134,12 +279,31 @@ export function save() {
     days: { ...state.days },
     meta: { ...(state.meta || { lastImport: null }), lastUpdated: new Date().toISOString() },
   };
+  persister.schedule();
+  // A save issued while the app isn't foregrounded can't trust the debounce
+  // timer — iOS freezes timers on suspend — so it writes through immediately.
   try {
-    kv().set(STORAGE_KEY, JSON.stringify(state));
-  } catch {
-    // storage error — state stays in memory
-  }
+    if (RNAppState.currentState !== 'active') persister.flush();
+  } catch { /* no AppState here (jest / bare node) */ }
   emit();
+}
+
+/** Force any debounced journal write to disk now. Called on every foreground
+ *  exit; exposed for the rare caller that must not ride the debounce window. */
+export function flushSave() {
+  persister.flush();
+}
+
+// iOS delivers 'inactive' (app-switcher, lock, incoming call overlay) before
+// 'background' — flushing on the first non-active transition means even an
+// app-switcher swipe-kill persists the last edit. Guarded: AppState is absent
+// under jest / bare node.
+try {
+  RNAppState.addEventListener('change', (next) => {
+    if (next !== 'active') persister.flush();
+  });
+} catch {
+  // no AppState here — flushSave() remains available to callers
 }
 
 /** Apply a mutation to state and persist. */
@@ -152,11 +316,27 @@ export function getState(): AppState {
   return state;
 }
 
-/** Replace all state (import). Records lastImport, persists, notifies. */
+/** Replace all state (import). Records lastImport, persists, notifies.
+ *  Throws (before touching anything) on a newer-schema file — UI callers
+ *  should pre-check with assertImportVersion() for a friendly error. */
 export function replaceState(parsed: unknown, importName?: string) {
+  assertImportVersion(parsed);
   state = migrate(parsed);
+  // Rebuild the waveform sidecar to match the imported journal: old exports
+  // embed arrays per entry (stripped out here), new exports carry a top-level
+  // `waveforms` map keyed by reading id — both shapes import.
+  try {
+    wkv().clearAll();
+    extractWaveforms(state, putWaveform);
+    const imported = collectImportWaveforms(parsed, readingIds(state));
+    for (const id of Object.keys(imported)) putWaveform(id, imported[id]);
+  } catch {
+    // waveforms are best-effort — the journal itself is intact without them
+  }
   if (importName) state.meta.lastImport = { name: importName, at: new Date().toISOString() };
   save();
+  // Imports are rare and irreversible-feeling — don't ride the debounce window.
+  persister.flush();
 }
 
 /* ---------- day accessors ---------- */
@@ -181,6 +361,10 @@ export function upsertEntry(dk: string, arrKey: 'readings' | 'activities' | 'med
 export function deleteEntry(dk: string, arrKey: 'readings' | 'activities' | 'meds' | 'symptoms', id: string) {
   const d = ensureDay(dk);
   d[arrKey] = d[arrKey].filter((x) => x.id !== id);
+  // Only readings carry sidecar waveforms; drop the blob with its entry.
+  if (arrKey === 'readings') {
+    try { wkv().delete(id); } catch { /* stray blob — pruned on next launch */ }
+  }
   save();
 }
 
@@ -198,8 +382,25 @@ export function useAppState(): AppState {
   return useStore((s) => s.state);
 }
 
+/** Full journal as export JSON. Exports stay one self-contained file: sidecar
+ *  waveforms ride along under a top-level `waveforms` map keyed by reading id
+ *  (filtered to ids that exist, so a stray blob can't bloat exports forever).
+ *  replaceState() accepts this shape and the old embedded-arrays shape alike. */
 export function serializeState(): string {
-  return JSON.stringify(state, null, 2);
+  const out: Record<string, unknown> = { ...state };
+  try {
+    const ids = readingIds(state);
+    const waveforms: Record<string, WaveformData> = {};
+    for (const id of wkv().getAllKeys()) {
+      if (!ids.has(id)) continue;
+      const w = getWaveform(id);
+      if (w) waveforms[id] = w;
+    }
+    if (Object.keys(waveforms).length) out.waveforms = waveforms;
+  } catch {
+    // export without waveforms rather than fail the export
+  }
+  return JSON.stringify(out, null, 2);
 }
 
 export { STORAGE_KEY, keyOf };

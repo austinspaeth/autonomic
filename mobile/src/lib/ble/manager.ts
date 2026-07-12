@@ -78,6 +78,16 @@ export function createBle(): BleManagerApi {
   let connectedId: string | null = null;
   let monitorSub: { remove: () => void } | null = null;
   let disconnectSub: { remove: () => void } | null = null;
+  // Bumped by every connect()/disconnect(); an in-flight connect that awakes to
+  // a different epoch has been superseded and must release whatever it holds.
+  let connectEpoch = 0;
+
+  const teardown = () => {
+    try { monitorSub?.remove(); } catch { /* ignore */ }
+    try { disconnectSub?.remove(); } catch { /* ignore */ }
+    monitorSub = null;
+    disconnectSub = null;
+  };
 
   const waitReady = () => new Promise<void>((resolve) => {
     const sub = manager.onStateChange((s) => { if (s === State.PoweredOn) { sub.remove(); resolve(); } }, true);
@@ -112,11 +122,30 @@ export function createBle(): BleManagerApi {
     },
     stopScan() { try { manager.stopDeviceScan(); } catch { /* ignore */ } },
     async connect(id, onSample, onDisconnect) {
+      const epoch = ++connectEpoch;
       manager.stopDeviceScan();
+      // Retire the previous link's callbacks first — reconnect retries would
+      // otherwise stack live monitor + disconnect listeners per attempt.
+      teardown();
+      // If a disconnect()/newer connect() arrived while an await below was
+      // pending, this attempt lost the link — release it rather than leak a
+      // connected strap with no owner.
+      const cancelled = async () => {
+        if (epoch === connectEpoch) return false;
+        if (connectedId !== id) { try { await manager.cancelDeviceConnection(id); } catch { /* ignore */ } }
+        return true;
+      };
       const device = await manager.connectToDevice(id, { requestMTU: 64 });
+      if (await cancelled()) throw new Error('Connection superseded');
       await device.discoverAllServicesAndCharacteristics();
+      if (await cancelled()) throw new Error('Connection superseded');
       connectedId = id;
-      disconnectSub = manager.onDeviceDisconnected(id, () => { connectedId = null; onDisconnect(); });
+      disconnectSub = manager.onDeviceDisconnected(id, () => {
+        if (epoch !== connectEpoch) return;
+        connectedId = null;
+        teardown();
+        onDisconnect();
+      });
       monitorSub = device.monitorCharacteristicForService(HR_SERVICE, HR_MEASUREMENT, (error, ch) => {
         if (error || !ch?.value) return;
         const bytes = base64ToBytes(ch.value);
@@ -135,10 +164,17 @@ export function createBle(): BleManagerApi {
       }
     },
     async disconnect() {
-      try { monitorSub?.remove(); disconnectSub?.remove(); if (connectedId) await manager.cancelDeviceConnection(connectedId); } catch { /* ignore */ }
+      connectEpoch++; // invalidates any in-flight connect
+      teardown();
+      const id = connectedId;
       connectedId = null;
+      if (id) { try { await manager.cancelDeviceConnection(id); } catch { /* ignore */ } }
     },
-    destroy() { try { monitorSub?.remove(); disconnectSub?.remove(); manager.destroy(); } catch { /* ignore */ } },
+    destroy() {
+      connectEpoch++;
+      teardown();
+      try { manager.destroy(); } catch { /* ignore */ }
+    },
   };
 }
 

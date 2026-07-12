@@ -30,7 +30,7 @@ import { useToast } from '../components/Toast';
 import { ACCENT, radius, usePalette } from '../theme';
 import { health } from '../lib/health';
 import { computeScores } from '../lib/scoring';
-import { blankDay, getState, mutate, save, useAppState } from '../store/store';
+import { blankDay, getState, mutate, save, storeWaveform, useAppState } from '../store/store';
 import { DevicesScreen } from './Devices';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -84,8 +84,9 @@ async function importAppleHealthHistory(): Promise<number> {
       const entry: Record<string, unknown> = {
         id: uid(), type: r.type, time: r.time, note: 'From Apple Health', source: 'watch', ...r.fields,
       };
-      if (r.rr) entry.rrRaw = r.rr;
-      if (r.rrClean) entry.rrClean = r.rrClean;
+      // RR series goes to the waveform sidecar, never inline on the entry
+      // (rrClean is derived — recomputed on view, not stored).
+      if (r.rr) storeWaveform(entry.id as string, { rrRaw: r.rr });
       entry.scores = computeScores(entry as never, ctx);
       s.days[r.dayKey].readings.push(entry as never);
       added++;

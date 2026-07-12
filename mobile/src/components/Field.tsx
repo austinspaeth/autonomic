@@ -4,7 +4,7 @@
  * fields are grouped 2-up; everything else is full width. A tiny controlled
  * form-state hook collects values keyed by field key.
  */
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { radius, space, usePalette } from '../theme';
@@ -101,15 +101,21 @@ export function SelectField({ label, value, options, onChange }: { label: string
 }
 
 /** Contents of the time-picker sheet: spinner + full-width red Save. */
-function TimePickerSheet({ label, value, onChange, controls }: { label: string; value: string; onChange: (v: string) => void; controls: SheetControls }) {
+export function TimePickerSheet({ label, value, onChange, controls }: { label: string; value: string; onChange: (v: string) => void; controls: SheetControls }) {
   const p = usePalette();
   const [h, m] = (value || '00:00').split(':').map(Number);
   const base = new Date();
   base.setHours(h || 0, m || 0, 0, 0);
   // Draft the spinner value locally so nothing commits until "Save".
   const [draft, setDraft] = useState(base);
+  // iOS delivers a wheel's change event only after its settle animation, so a
+  // quick AM/PM tap → Save can land the event after commit ran. Once saved,
+  // write any late event straight through instead of dropping it.
+  const saved = useRef(false);
+  const commitDate = (d: Date) => onChange(`${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`);
   const commit = () => {
-    onChange(`${String(draft.getHours()).padStart(2, '0')}:${String(draft.getMinutes()).padStart(2, '0')}`);
+    saved.current = true;
+    commitDate(draft);
     controls.close();
   };
   return (
@@ -123,7 +129,7 @@ function TimePickerSheet({ label, value, onChange, controls }: { label: string; 
         textColor="#ffffff"
         themeVariant="dark"
         style={{ height: 180 }}
-        onChange={(_, date) => { if (date) setDraft(date); }}
+        onChange={(_, date) => { if (date) { setDraft(date); if (saved.current) commitDate(date); } }}
       />
       <View style={{ flexDirection: 'row', marginTop: 8 }}>
         <Button title="Save" variant="primary" onPress={commit} />
@@ -221,8 +227,13 @@ export function DatePickerSheet({ label, value, onChange, controls }: { label: s
   const base = value ? dateFromKey(value) : new Date(1990, 0, 1);
   // Draft the spinner value locally so nothing commits until "Save".
   const [draft, setDraft] = useState(isNaN(base.getTime()) ? new Date(1990, 0, 1) : base);
+  // Same late-event write-through as TimePickerSheet: a wheel change event that
+  // lands after "Save" (settle animation) must not be dropped.
+  const saved = useRef(false);
+  const commitDate = (d: Date) => onChange(keyOf(d));
   const commit = () => {
-    onChange(keyOf(draft));
+    saved.current = true;
+    commitDate(draft);
     controls.close();
   };
   return (
@@ -237,7 +248,7 @@ export function DatePickerSheet({ label, value, onChange, controls }: { label: s
         textColor="#ffffff"
         themeVariant="dark"
         style={{ height: 180 }}
-        onChange={(_, date) => { if (date) setDraft(date); }}
+        onChange={(_, date) => { if (date) { setDraft(date); if (saved.current) commitDate(date); } }}
       />
       <View style={{ flexDirection: 'row', marginTop: 8 }}>
         <Button title="Save" variant="primary" onPress={commit} />

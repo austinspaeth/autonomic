@@ -42,10 +42,18 @@ export interface Entry {
   [key: string]: unknown;
 }
 
-/** Extra fields carried by a live-captured HRV reading. */
+/** Extra fields carried by a live-captured HRV reading.
+ *
+ *  The array fields (rrRaw, rrClean, sampledHr, sampledSdnn) are NOT persisted
+ *  on the entry — they live in the waveform sidecar store keyed by reading id
+ *  (src/lib/waveforms.ts) so the journal blob stays small. Inline they exist
+ *  only on a pre-save live preview or in a not-yet-migrated import; the store
+ *  strips them on load, and persisting one trips a dev warning. */
 export interface LiveHrvExtras {
   /** Capture source ('polar' = Bluetooth strap, best; 'camera' = phone PPG, lowest quality). */
   source?: 'polar' | 'watch' | 'camera' | 'manual';
+  /** Bluetooth device name at capture time (source 'polar' only) — shown as the Source detail. */
+  sourceName?: string;
   rrRaw?: number[];
   rrClean?: number[];
   durationSec?: number;

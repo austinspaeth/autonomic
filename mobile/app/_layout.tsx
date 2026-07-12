@@ -11,9 +11,11 @@ import { IBMPlexMono_400Regular } from '@expo-google-fonts/ibm-plex-mono';
 import { SheetProvider } from '../src/components/Sheet';
 import { ToastProvider } from '../src/components/Toast';
 import { OnboardingGate } from '../src/features/Onboarding';
+import { RestoreGate } from '../src/features/RestoreGate';
 import { SubscriptionGate } from '../src/features/SubscriptionGate';
 import { initIap } from '../src/store/iap';
 import { runDailyBackup } from '../src/lib/backup';
+import { loadIssue } from '../src/store/store';
 import { usePalette } from '../src/theme';
 
 function Themed({ children }: { children: React.ReactNode }) {
@@ -27,6 +29,11 @@ function Themed({ children }: { children: React.ReactNode }) {
 }
 
 export default function RootLayout() {
+  // When launch found no journal (or an unreadable one), hold onboarding back
+  // and let RestoreGate offer the on-device snapshots first. Restoring fills
+  // the store before OnboardingGate mounts, so the wizard is skipped; starting
+  // fresh (or having no snapshots) falls through to it.
+  const [restoreResolved, setRestoreResolved] = React.useState(() => !loadIssue);
   // Custom faces for numeric readouts (Manrope) and chart ticks (IBM Plex Mono).
   const [fontsLoaded] = useFonts({
     Manrope_600SemiBold,
@@ -66,8 +73,9 @@ export default function RootLayout() {
                   first, then the trial offer. */}
               <SubscriptionGate />
               {/* First-run welcome wizard — overlays the tabs until completed,
-                  then fades to black and reveals the app beneath. */}
-              <OnboardingGate />
+                  then fades to black and reveals the app beneath. Deferred
+                  until any launch-time restore offer is resolved. */}
+              {restoreResolved ? <OnboardingGate /> : <RestoreGate onDone={() => setRestoreResolved(true)} />}
             </SheetProvider>
           </ToastProvider>
         </Themed>

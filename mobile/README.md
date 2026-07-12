@@ -139,12 +139,19 @@ estimate not derivable from an RR series, so it's been removed.
 One JSON object persisted under `autonomic.journal.v1` (MMKV). Shape matches the
 PWA (`version`, `settings`, `profile`, `meta`, `days[YYYY-MM-DD]{sleep, readings,
 activities, meds, symptoms, food, digestion}`), extended so a live HRV reading
-also stores `rrRaw` / `rrClean` / `sampledHr` / `source` / `durationSec`. Import
-and Export use the **exact PWA format** (Menu → Import / Export data), so you can
-move data off the web app and back.
+also stores `source` / `durationSec` plus computed metrics. The big capture
+arrays (`rrRaw` / `sampledHr` / `sampledSdnn`) live in a **waveform sidecar** —
+a second MMKV instance keyed by reading id (`storeWaveform` / `getWaveform` in
+`src/store/store.ts`, pure helpers in `src/lib/waveforms.ts`) — so the journal
+blob stays small no matter how many sessions accumulate; `rrClean` is re-derived
+from `rrRaw` on view. Import and Export still use one self-contained file (Menu →
+Import / Export data): exports append a top-level `waveforms` map, and imports
+accept both that shape and old files with arrays embedded on entries.
 
 **Every mutation goes through `save()`** (`src/store/store.ts`), which stamps
-`meta.lastUpdated` — never write MMKV directly.
+`meta.lastUpdated` — never write MMKV directly. The disk write is debounced
+(`src/lib/persist.ts`) and flushed when the app leaves the foreground; call
+`flushSave()` if a write must not wait.
 
 ## Notes on fidelity
 
