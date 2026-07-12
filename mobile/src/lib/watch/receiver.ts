@@ -34,6 +34,10 @@ function pushContext() {
   const key = JSON.stringify(context);
   if (key === lastContext) return; // journal churn — nothing the watch cares about
   lastContext = key;
+  // sentAt makes each payload unique: WCSession silently skips delivery of an
+  // applicationContext identical to the previous one, which strands a watch
+  // whose app was installed after the first push. Excluded from the dedupe key.
+  context.sentAt = new Date().toISOString();
   bridge.updateContext(context).catch(() => { lastContext = ''; }); // not activated yet — retry on next change
 }
 
