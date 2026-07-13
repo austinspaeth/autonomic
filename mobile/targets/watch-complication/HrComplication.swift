@@ -121,8 +121,11 @@ private struct HrDeltaText: View {
     }
 }
 
-/// Range arc: 270° sweep from bottom-left to bottom-right, dot at the current
-/// HR's position, min/max labels tucked under the open ends.
+/// Range arc: ~200° sweep over the top, dot at the current HR's position,
+/// min/max labels in the wide bottom opening.
+private let HR_ARC_SWEEP: Double = 200
+private let HR_ARC_START: Double = 90 + (360 - HR_ARC_SWEEP) / 2
+
 private struct HrCircularView: View {
     let state: HrComplicationState
 
@@ -134,19 +137,20 @@ private struct HrCircularView: View {
                     let side = min(geo.size.width, geo.size.height)
                     let r = (side - stroke) / 2 - 1
                     let center = CGPoint(x: geo.size.width / 2, y: geo.size.height / 2)
-                    let angle = (135 + 270 * state.position) * .pi / 180
+                    let angle = (HR_ARC_START + HR_ARC_SWEEP * state.position) * .pi / 180
 
                     Circle()
-                        .trim(from: 0, to: 0.75)
+                        .trim(from: 0, to: HR_ARC_SWEEP / 360)
                         .stroke(HR_ACCENT.opacity(state.active ? 1 : 0.45),
                                 style: StrokeStyle(lineWidth: stroke, lineCap: .round))
-                        .rotationEffect(.degrees(135))
+                        .rotationEffect(.degrees(HR_ARC_START))
                         .padding(stroke / 2 + 1)
-                    // Dot matches the arc's stroke; the black ring under it cuts
-                    // a gap in the arc so the line reads as broken at the dot.
+                    // Dot slightly larger than the arc's stroke, over a black
+                    // outline ring that cuts a clear gap in the line so the dot
+                    // never merges with it.
                     ZStack {
-                        Circle().fill(.black).frame(width: stroke + 4, height: stroke + 4)
-                        Circle().fill(.white).frame(width: stroke, height: stroke)
+                        Circle().fill(.black).frame(width: stroke + 8, height: stroke + 8)
+                        Circle().fill(.white).frame(width: stroke + 2, height: stroke + 2)
                     }
                     .position(x: center.x + r * cos(angle), y: center.y + r * sin(angle))
                 }
@@ -164,20 +168,22 @@ private struct HrCircularView: View {
             .overlay(alignment: .bottom) {
                 if let low = state.low, let high = state.high, high > low {
                     // Spacer(minLength: 0) + lineLimit — the default spacer
-                    // minimum wraps a 3-digit max label onto two lines.
+                    // minimum wraps a 3-digit max label onto two lines. The
+                    // ~200° arc leaves a wide bottom opening, so the labels sit
+                    // higher and read larger than the old 270° layout allowed.
                     HStack {
                         Text("\(low)")
                         Spacer(minLength: 0)
                         Text("\(high)")
                     }
-                    .font(.system(size: 7, weight: .bold))
+                    .font(.system(size: 9, weight: .bold))
                     .monospacedDigit()
                     .lineLimit(1)
                     .foregroundStyle(.secondary)
-                    // Tucked into the arc's bottom opening — far enough in that
-                    // the face's circular mask doesn't clip them.
-                    .padding(.horizontal, 12)
-                    .padding(.bottom, 1)
+                    // Tucked low in the arc's bottom opening — below the Δ line
+                    // (bottom > 4 collides with it) but inside the circular mask.
+                    .padding(.horizontal, 9)
+                    .padding(.bottom, 3)
                 }
             }
         } else {

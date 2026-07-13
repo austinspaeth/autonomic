@@ -75,6 +75,7 @@ final class OrthostaticController: ObservableObject {
     private var afterHr: Double?
     private var transitionAt: Int?   // t when the transition began (before → during)
     private var completedAt: Int?    // t when the transition finished (during → recovery)
+    private var lastComplicationBand: String?
     private(set) var lastResult: [String: Any]?
 
     // MARK: - Transitions
@@ -103,7 +104,9 @@ final class OrthostaticController: ObservableObject {
         afterHr = nil
         transitionAt = nil
         completedAt = nil
+        lastComplicationBand = nil
         stage = .baseline
+        ComplicationStore.sessionUpdate(stage: "baseline", delta: nil, hr: nil, endsAt: nil)
         ticker = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             self?.tick()
         }
@@ -117,6 +120,7 @@ final class OrthostaticController: ObservableObject {
         }
         transitionAt = elapsed
         stage = .during
+        pushComplicationDelta(force: true)
         Haptics.buzz(.start)
     }
 
@@ -127,6 +131,7 @@ final class OrthostaticController: ObservableObject {
         completedAt = elapsed
         stage = .recovery
         stageElapsed = 0
+        pushComplicationDelta(force: true)
         Haptics.buzz(.directionUp)
     }
 
@@ -140,6 +145,7 @@ final class OrthostaticController: ObservableObject {
         ticker?.invalidate()
         ticker = nil
         WorkoutManager.shared.stop()
+        ComplicationStore.clearSession()
         stage = .picker
         eventType = nil
         delta = nil
@@ -155,6 +161,7 @@ final class OrthostaticController: ObservableObject {
     private func complete() {
         ticker?.invalidate()
         ticker = nil
+        ComplicationStore.clearSession()
         stage = .complete
         Haptics.buzz(.success)
         buildResult()
@@ -179,9 +186,33 @@ final class OrthostaticController: ObservableObject {
         } else if stage == .during || stage == .recovery {
             delta = nil // sensor gap — never fake a delta
         }
+        // Keep the complication's live Δ fresh: reload the moment its color
+        // band flips, otherwise every ~15 s.
+        if stage == .during || stage == .recovery {
+            pushComplicationDelta(force: stageElapsed % 15 == 0)
+        }
         if stage == .recovery && stageElapsed >= Self.recoveryDuration {
             complete()
         }
+    }
+
+    /// Mirrors the live delta into the shared app group for the POTS Episode
+    /// complication. Reloads on band changes (that's the POTS-critical signal)
+    /// or when forced; skips the write otherwise to spare the widget budget.
+    private func pushComplicationDelta(force: Bool) {
+        let d = delta.map { Int($0.rounded()) }
+        let band = d.map { $0 > 30 ? "red" : $0 > 20 ? "orange" : "default" } ?? "none"
+        guard force || band != lastComplicationBand else { return }
+        lastComplicationBand = band
+        let ends = stage == .recovery
+            ? Date().addingTimeInterval(TimeInterval(Self.recoveryDuration - stageElapsed))
+            : nil
+        ComplicationStore.sessionUpdate(
+            stage: stage == .recovery ? "recovery" : "during",
+            delta: d,
+            hr: WorkoutManager.shared.hr.map { Int($0.rounded()) },
+            endsAt: ends
+        )
     }
 
     // MARK: - Result payload (maps to the app's `orthostatic` reading type)

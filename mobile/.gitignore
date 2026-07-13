@@ -8,3 +8,4 @@ web-build/
 *.swp
 .DS_Store
 expo-env.d.ts
+*.ipa

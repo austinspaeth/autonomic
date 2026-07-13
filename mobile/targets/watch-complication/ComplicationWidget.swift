@@ -2,35 +2,28 @@ import WidgetKit
 import SwiftUI
 
 /**
- * Quick-capture complication, per the imported redlines (Watch
- * Complications.dc.html): a one-tap launcher into the POTS test plus a
- * last-result glance. The delta is the hero everywhere; its color carries
- * the meaning (≤20 default · >20 orange · >30 red). Idle shows the last
- * stand-test delta against the +30 threshold; while a session runs the
- * complication switches to the live delta and stage countdown (countdown
- * text/rings self-update — no timeline spam; the app reloads the timeline
- * on stage changes). Never a live-HR readout when idle.
+ * POTS Episode complication — a one-tap launcher into the episode tracker.
+ * Idle it is just the stairs figure (the same icon/purple as the watch app's
+ * POTS Episode button); while a session runs it is the live Δ and nothing
+ * else — no ring, no countdown, no labels. Δ color carries the meaning
+ * (≤20 default · >20 orange · >30 red). Tap always deep-links to the
+ * episode flow.
  */
 
 private let APP_GROUP = "group.com.autonomic.journal"
 private let DEEP_LINK = URL(string: "autonomic://episode")!
+private let EPISODE_PURPLE = Color(red: 0.62, green: 0.42, blue: 0.96)  // DS.purple #9d6bf5
 
 struct ComplicationState {
-    var lastDelta: Int?
     var active = false
-    var stage: String?
     var liveDelta: Int?
-    var liveHr: Int?
     var stageEndsAt: Date?
 
     static func load() -> ComplicationState {
         guard let d = UserDefaults(suiteName: APP_GROUP) else { return ComplicationState() }
         var s = ComplicationState()
-        if d.object(forKey: "last.delta") != nil { s.lastDelta = d.integer(forKey: "last.delta") }
         s.active = d.bool(forKey: "session.active")
-        s.stage = d.string(forKey: "session.stage")
         if d.object(forKey: "session.delta") != nil { s.liveDelta = d.integer(forKey: "session.delta") }
-        if d.object(forKey: "session.hr") != nil { s.liveHr = d.integer(forKey: "session.hr") }
         let ends = d.double(forKey: "session.endsAt")
         if ends > 0 { s.stageEndsAt = Date(timeIntervalSince1970: ends) }
         return s
@@ -54,22 +47,23 @@ struct ComplicationEntry: TimelineEntry {
 
 struct ComplicationProvider: TimelineProvider {
     func placeholder(in context: Context) -> ComplicationEntry {
-        ComplicationEntry(date: .now, state: ComplicationState(lastDelta: 38))
+        ComplicationEntry(date: .now, state: ComplicationState())
     }
 
     func getSnapshot(in context: Context, completion: @escaping (ComplicationEntry) -> Void) {
-        completion(ComplicationEntry(date: .now, state: context.isPreview ? ComplicationState(lastDelta: 38) : .load()))
+        completion(ComplicationEntry(date: .now, state: context.isPreview ? ComplicationState() : .load()))
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<ComplicationEntry>) -> Void) {
         let state = ComplicationState.load()
         let entry = ComplicationEntry(date: .now, state: state)
-        // Countdown text/gauges self-update; the app reloads the timeline on
-        // stage changes and completion. A stale-session backstop entry clears
-        // the active look if the app dies without cleaning up.
-        if state.active, let ends = state.stageEndsAt {
+        // The app reloads the timeline as the live delta changes; a stale-session
+        // backstop entry drops back to the idle icon if the app dies without
+        // cleaning up.
+        if state.active {
             var cleared = state
             cleared.active = false
+            let ends = state.stageEndsAt ?? Date.now.addingTimeInterval(600)
             let fallback = ComplicationEntry(date: ends.addingTimeInterval(120), state: cleared)
             completion(Timeline(entries: [entry, fallback], policy: .atEnd))
         } else {
@@ -112,46 +106,24 @@ private struct DeltaText: View {
     }
 }
 
+private struct StairsIcon: View {
+    var size: CGFloat
+
+    var body: some View {
+        Image(systemName: "figure.stairs")
+            .font(.system(size: size, weight: .semibold))
+            .foregroundStyle(EPISODE_PURPLE)
+    }
+}
+
 private struct CircularView: View {
     let state: ComplicationState
 
     var body: some View {
         if state.active {
-            // Live: ring drains with the stage countdown, live Δ hero.
-            ZStack {
-                if let ends = state.stageEndsAt, ends > .now {
-                    ProgressView(timerInterval: Date.now...ends, countsDown: true) { EmptyView() } currentValueLabel: { EmptyView() }
-                        .progressViewStyle(.circular)
-                        .tint(state.liveDelta.map { deltaColor($0) } ?? .primary)
-                }
-                VStack(spacing: 0) {
-                    DeltaText(value: state.liveDelta ?? 0, size: 20)
-                    if let ends = state.stageEndsAt, ends > .now {
-                        Text(timerInterval: Date.now...ends, countsDown: true)
-                            .font(.system(size: 11, weight: .bold))
-                            .monospacedDigit()
-                            .multilineTextAlignment(.center)
-                    }
-                }
-            }
-        } else if let last = state.lastDelta {
-            // Idle: last delta vs the +30 POTS threshold.
-            Gauge(value: min(Double(last), 40), in: 0...40) { EmptyView() } currentValueLabel: {
-                VStack(spacing: 0) {
-                    DeltaText(value: last, size: 19)
-                    Text("LAST").font(.system(size: 7, weight: .semibold)).foregroundStyle(.secondary)
-                }
-            }
-            .gaugeStyle(.accessoryCircularCapacity)
-            .tint(deltaColor(last))
+            DeltaText(value: state.liveDelta ?? 0, size: 26)
         } else {
-            // Never used: no launcher icon substitute needed beyond the mark.
-            Image("logo")
-                .renderingMode(.template)
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .padding(8)
-                .foregroundStyle(Color(red: 0.878, green: 0.192, blue: 0.153))
+            StairsIcon(size: 24)
         }
     }
 }
@@ -161,30 +133,10 @@ private struct CornerView: View {
 
     var body: some View {
         if state.active {
-            DeltaText(value: state.liveDelta ?? 0, size: 18)
+            DeltaText(value: state.liveDelta ?? 0, size: 20)
                 .widgetCurvesContent()
-                .widgetLabel {
-                    if let ends = state.stageEndsAt, ends > .now {
-                        Text(timerInterval: Date.now...ends, countsDown: true)
-                            .monospacedDigit()
-                    } else {
-                        Text("running")
-                    }
-                }
-        } else if let last = state.lastDelta {
-            DeltaText(value: last, size: 18)
-                .widgetCurvesContent()
-                .widgetLabel {
-                    Gauge(value: min(Double(last), 40), in: 0...40) { Text("last Δ") }
-                        .tint(deltaColor(last))
-                }
         } else {
-            Image("logo")
-                .renderingMode(.template)
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .foregroundStyle(Color(red: 0.878, green: 0.192, blue: 0.153))
-                .widgetLabel { Text("POTS Test") }
+            StairsIcon(size: 20)
         }
     }
 }
@@ -192,69 +144,11 @@ private struct CornerView: View {
 private struct RectangularView: View {
     let state: ComplicationState
 
-    private var accent = Color(red: 0.878, green: 0.192, blue: 0.153)
-
-    init(state: ComplicationState) { self.state = state }
-
     var body: some View {
         if state.active {
-            HStack(spacing: 10) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill((state.liveDelta.map { deltaColor($0) } ?? accent).opacity(0.16))
-                        .frame(width: 34, height: 34)
-                    Circle()
-                        .fill(state.liveDelta.map { deltaColor($0) } ?? accent)
-                        .frame(width: 7, height: 7)
-                }
-                VStack(alignment: .leading, spacing: 1) {
-                    HStack {
-                        Text((state.stage ?? "session").uppercased())
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        if let ends = state.stageEndsAt, ends > .now {
-                            (Text(timerInterval: Date.now...ends, countsDown: true) + Text(" left"))
-                                .font(.system(size: 10, weight: .bold))
-                                .monospacedDigit()
-                        }
-                    }
-                    HStack(alignment: .lastTextBaseline, spacing: 6) {
-                        DeltaText(value: state.liveDelta ?? 0, size: 19)
-                        if let hr = state.liveHr {
-                            Text("\(hr) bpm").font(.system(size: 10.5)).foregroundStyle(.secondary)
-                        }
-                    }
-                }
-            }
+            DeltaText(value: state.liveDelta ?? 0, size: 26)
         } else {
-            HStack(spacing: 10) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(accent.opacity(0.14))
-                        .frame(width: 34, height: 34)
-                    Image("logo")
-                        .renderingMode(.template)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 24)
-                        .foregroundStyle(accent)
-                }
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("POTS TEST")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                    HStack(alignment: .lastTextBaseline, spacing: 6) {
-                        if let last = state.lastDelta {
-                            DeltaText(value: last, size: 19)
-                            Text("· tap to start").font(.system(size: 10.5)).foregroundStyle(.secondary)
-                        } else {
-                            Text("Tap to start").font(.system(size: 15, weight: .bold))
-                        }
-                    }
-                }
-                Spacer(minLength: 0)
-            }
+            StairsIcon(size: 26)
         }
     }
 }
@@ -266,8 +160,8 @@ struct AutonomicComplication: Widget {
         StaticConfiguration(kind: "AutonomicComplication", provider: ComplicationProvider()) { entry in
             ComplicationView(entry: entry)
         }
-        .configurationDisplayName("POTS Test")
-        .description("Your last stand-test delta. Tap to start a reading.")
+        .configurationDisplayName("POTS Episode")
+        .description("Tap to track a POTS episode. Shows the live delta while one runs.")
         .supportedFamilies([.accessoryCircular, .accessoryCorner, .accessoryRectangular])
     }
 }
