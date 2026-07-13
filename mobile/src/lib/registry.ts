@@ -126,7 +126,88 @@ export const READING_TYPES: Record<string, TypeDef> = {
  */
 export const LIVE_ONLY_READING_TYPES = new Set(['hrv', 'breathHrv', 'standTest']);
 
+/** Alphabetical by label ("Other exercise" stays last as the catch-all);
+ *  pickers render in this insertion order. Covers the Apple Workout app's
+ *  default types (strength maps to the upper/lower split). */
 export const ACTIVITY_TYPES: Record<string, TypeDef> = {
+  breathwork: {
+    label: 'Breathwork / meditation', icon: 'wind',
+    fields: [
+      { key: 'duration', label: 'Duration', unit: 'min' },
+      { key: 'minHr', label: 'Min HR' },
+    ],
+  },
+  carWash: {
+    label: 'Car wash', icon: 'car',
+    fields: [
+      { key: 'duration', label: 'Duration', unit: 'min' },
+      { key: 'avgHr', label: 'Avg HR' },
+      { key: 'maxHr', label: 'Max HR' },
+    ],
+  },
+  cooldown: {
+    label: 'Cooldown', icon: 'wind',
+    fields: [
+      { key: 'duration', label: 'Duration', unit: 'min' },
+      { key: 'minHr', label: 'Min HR' },
+    ],
+  },
+  coreWorkout: {
+    label: 'Core workout', icon: 'target',
+    fields: [
+      { key: 'duration', label: 'Duration', unit: 'min' },
+      { key: 'minHr', label: 'Min HR' },
+      { key: 'maxHr', label: 'Max HR' },
+    ],
+  },
+  dance: {
+    label: 'Dance', icon: 'sparkles',
+    fields: [
+      { key: 'duration', label: 'Duration', unit: 'min' },
+      { key: 'avgHr', label: 'Avg HR' },
+      { key: 'maxHr', label: 'Max HR' },
+    ],
+  },
+  elliptical: {
+    label: 'Elliptical', icon: 'activity',
+    fields: [
+      { key: 'duration', label: 'Duration', unit: 'min' },
+      { key: 'avgHr', label: 'Avg HR' },
+      { key: 'maxHr', label: 'Max HR' },
+    ],
+  },
+  errands: {
+    label: 'Errands / shopping', icon: 'car',
+    fields: [
+      { key: 'duration', label: 'Duration', unit: 'min' },
+      { key: 'avgHr', label: 'Avg HR' },
+      { key: 'maxHr', label: 'Max HR' },
+    ],
+  },
+  hiit: {
+    label: 'HIIT', icon: 'flame',
+    fields: [
+      { key: 'duration', label: 'Duration', unit: 'min' },
+      { key: 'avgHr', label: 'Avg HR' },
+      { key: 'maxHr', label: 'Max HR' },
+    ],
+  },
+  hike: {
+    label: 'Hike', icon: 'footprints',
+    fields: [
+      { key: 'distance', label: 'Distance', unit: 'mi' },
+      { key: 'duration', label: 'Duration', unit: 'min' },
+      { key: 'avgHr', label: 'Avg HR' },
+      { key: 'maxHr', label: 'Max HR' },
+    ],
+  },
+  shower: {
+    label: 'Hot shower / bath', icon: 'droplet',
+    fields: [
+      { key: 'duration', label: 'Duration', unit: 'min' },
+      { key: 'maxHr', label: 'Max HR' },
+    ],
+  },
   indoorBike: {
     label: 'Indoor bike',
     icon: 'bike',
@@ -144,20 +225,12 @@ export const ACTIVITY_TYPES: Record<string, TypeDef> = {
     },
     fields: [],
   },
-  walk: {
-    label: 'Walk', icon: 'footprints',
+  kickboxing: {
+    label: 'Kickboxing', icon: 'target',
     fields: [
-      { key: 'distance', label: 'Distance', unit: 'mi' },
       { key: 'duration', label: 'Duration', unit: 'min' },
       { key: 'avgHr', label: 'Avg HR' },
       { key: 'maxHr', label: 'Max HR' },
-      { key: 'minHr', label: 'Min HR' },
-      { key: 'hr60', label: 'HR @60s rest' },
-      { type: 'time', key: 'time', label: 'Time' },
-      { divider: true },
-      { type: 'check', key: 'hotTemp', label: 'Hot temp' },
-      { type: 'check', key: 'highHumidity', label: 'High humidity' },
-      { type: 'check', key: 'palpitations', label: 'Palpitations' },
     ],
   },
   legsUp: {
@@ -167,24 +240,60 @@ export const ACTIVITY_TYPES: Record<string, TypeDef> = {
       { key: 'lowHr', label: 'Low HR' },
     ],
   },
-  coreWorkout: {
-    label: 'Core workout', icon: 'target',
+  lowerBody: {
+    label: 'Lower body strength', icon: 'barbell',
     fields: [
       { key: 'duration', label: 'Duration', unit: 'min' },
       { key: 'minHr', label: 'Min HR' },
       { key: 'maxHr', label: 'Max HR' },
     ],
   },
-  upperBody: {
-    label: 'Upper body strength', icon: 'barbell',
+  cycle: {
+    label: 'Outdoor bike', icon: 'bike',
+    fields: [
+      { key: 'distance', label: 'Distance', unit: 'mi' },
+      { key: 'duration', label: 'Duration', unit: 'min' },
+      { key: 'avgHr', label: 'Avg HR' },
+      { key: 'maxHr', label: 'Max HR' },
+    ],
+  },
+  pilates: {
+    label: 'Pilates', icon: 'standing',
     fields: [
       { key: 'duration', label: 'Duration', unit: 'min' },
       { key: 'minHr', label: 'Min HR' },
       { key: 'maxHr', label: 'Max HR' },
     ],
   },
-  carWash: {
-    label: 'Car wash', icon: 'car',
+  rower: {
+    label: 'Rowing', icon: 'activity',
+    fields: [
+      { key: 'duration', label: 'Duration', unit: 'min' },
+      { key: 'avgHr', label: 'Avg HR' },
+      { key: 'maxHr', label: 'Max HR' },
+    ],
+  },
+  run: {
+    label: 'Run', icon: 'activity',
+    fields: [
+      { key: 'distance', label: 'Distance', unit: 'mi' },
+      { key: 'duration', label: 'Duration', unit: 'min' },
+      { key: 'avgHr', label: 'Avg HR' },
+      { key: 'minHr', label: 'Min HR' },
+      { key: 'maxHr', label: 'Max HR' },
+      { key: 'hr60', label: 'HR @60s rest' },
+    ],
+  },
+  sex: {
+    label: 'Sex', icon: 'heart',
+    fields: [
+      { key: 'duration', label: 'Duration', unit: 'min' },
+      { key: 'avgHr', label: 'Avg HR' },
+      { key: 'maxHr', label: 'Max HR' },
+    ],
+  },
+  stairStepper: {
+    label: 'Stair stepper', icon: 'stairs',
     fields: [
       { key: 'duration', label: 'Duration', unit: 'min' },
       { key: 'avgHr', label: 'Avg HR' },
@@ -207,34 +316,6 @@ export const ACTIVITY_TYPES: Record<string, TypeDef> = {
       { key: 'maxHr', label: 'Max HR' },
     ],
   },
-  sex: {
-    label: 'Sex', icon: 'heart',
-    fields: [
-      { key: 'duration', label: 'Duration', unit: 'min' },
-      { key: 'avgHr', label: 'Avg HR' },
-      { key: 'maxHr', label: 'Max HR' },
-    ],
-  },
-  run: {
-    label: 'Run', icon: 'activity',
-    fields: [
-      { key: 'distance', label: 'Distance', unit: 'mi' },
-      { key: 'duration', label: 'Duration', unit: 'min' },
-      { key: 'avgHr', label: 'Avg HR' },
-      { key: 'minHr', label: 'Min HR' },
-      { key: 'maxHr', label: 'Max HR' },
-      { key: 'hr60', label: 'HR @60s rest' },
-    ],
-  },
-  hike: {
-    label: 'Hike', icon: 'footprints',
-    fields: [
-      { key: 'distance', label: 'Distance', unit: 'mi' },
-      { key: 'duration', label: 'Duration', unit: 'min' },
-      { key: 'avgHr', label: 'Avg HR' },
-      { key: 'maxHr', label: 'Max HR' },
-    ],
-  },
   swim: {
     label: 'Swim', icon: 'droplet',
     fields: [
@@ -243,12 +324,36 @@ export const ACTIVITY_TYPES: Record<string, TypeDef> = {
       { key: 'maxHr', label: 'Max HR' },
     ],
   },
-  lowerBody: {
-    label: 'Lower body strength', icon: 'barbell',
+  taiChi: {
+    label: 'Tai chi', icon: 'wind',
     fields: [
       { key: 'duration', label: 'Duration', unit: 'min' },
       { key: 'minHr', label: 'Min HR' },
       { key: 'maxHr', label: 'Max HR' },
+    ],
+  },
+  upperBody: {
+    label: 'Upper body strength', icon: 'barbell',
+    fields: [
+      { key: 'duration', label: 'Duration', unit: 'min' },
+      { key: 'minHr', label: 'Min HR' },
+      { key: 'maxHr', label: 'Max HR' },
+    ],
+  },
+  walk: {
+    label: 'Walk', icon: 'footprints',
+    fields: [
+      { key: 'distance', label: 'Distance', unit: 'mi' },
+      { key: 'duration', label: 'Duration', unit: 'min' },
+      { key: 'avgHr', label: 'Avg HR' },
+      { key: 'maxHr', label: 'Max HR' },
+      { key: 'minHr', label: 'Min HR' },
+      { key: 'hr60', label: 'HR @60s rest' },
+      { type: 'time', key: 'time', label: 'Time' },
+      { divider: true },
+      { type: 'check', key: 'hotTemp', label: 'Hot temp' },
+      { type: 'check', key: 'highHumidity', label: 'High humidity' },
+      { type: 'check', key: 'palpitations', label: 'Palpitations' },
     ],
   },
   yoga: {
@@ -256,28 +361,6 @@ export const ACTIVITY_TYPES: Record<string, TypeDef> = {
     fields: [
       { key: 'duration', label: 'Duration', unit: 'min' },
       { key: 'minHr', label: 'Min HR' },
-      { key: 'maxHr', label: 'Max HR' },
-    ],
-  },
-  breathwork: {
-    label: 'Breathwork / meditation', icon: 'wind',
-    fields: [
-      { key: 'duration', label: 'Duration', unit: 'min' },
-      { key: 'minHr', label: 'Min HR' },
-    ],
-  },
-  shower: {
-    label: 'Hot shower / bath', icon: 'droplet',
-    fields: [
-      { key: 'duration', label: 'Duration', unit: 'min' },
-      { key: 'maxHr', label: 'Max HR' },
-    ],
-  },
-  errands: {
-    label: 'Errands / shopping', icon: 'car',
-    fields: [
-      { key: 'duration', label: 'Duration', unit: 'min' },
-      { key: 'avgHr', label: 'Avg HR' },
       { key: 'maxHr', label: 'Max HR' },
     ],
   },
@@ -324,55 +407,106 @@ export const MED_TYPES: Record<string, TypeDef> = {
 };
 
 const symptom = (label: string, fields?: FieldDef[]): TypeDef => ({ label, icon: 'alert', fields: fields || [] });
+/** Alphabetical by label; pickers render in this insertion order. Covers the
+ *  common POTS / long-COVID / MCAS symptom set. */
 export const SYMPTOM_TYPES: Record<string, TypeDef> = {
+  adrenalineSurge: symptom('Adrenaline surge'),
+  anxiety: symptom('Anxiety'),
+  bloating: symptom('Bloating'),
+  bloodPooling: symptom('Blood pooling'),
+  blurredVision: symptom('Blurred vision'),
+  brainFog: symptom('Brain fog'),
+  chestPain: symptom('Chest pain / tightness'),
+  chills: symptom('Chills'),
+  coatHanger: symptom('Coat hanger pain'),
+  coldExtremities: symptom('Cold hands / feet'),
+  congestion: symptom('Congestion / runny nose'),
+  earRinging: symptom('Ear ringing'),
+  sweating: symptom('Excess sweating'),
+  syncope: symptom('Fainting'),
+  fatigue: symptom('Fatigue'),
+  flushing: symptom('Flushing'),
+  pressure: symptom('Head pressure'),
+  headache: symptom('Headache'),
+  heatIntolerance: symptom('Heat intolerance'),
   highBp: symptom('High BP', [
     { type: 'number', key: 'sys', label: 'Systolic' },
     { type: 'number', key: 'dia', label: 'Diastolic' },
     { type: 'time', key: 'time', label: 'Time' },
     { type: 'select', key: 'position', label: 'Position', options: ['Laying', 'Sitting'] },
   ]),
-  pressure: symptom('Head pressure'),
   labileHr: symptom('High HR', [
     { type: 'number', key: 'hr', label: 'HR' },
     { type: 'select', key: 'position', label: 'Position', options: ['Sitting', 'Standing'] },
     { type: 'number', key: 'hr5', label: 'HR after 5 min rest' },
     { type: 'time', key: 'time', label: 'Time' },
   ]),
+  hives: symptom('Hives / itching'),
+  insomnia: symptom('Insomnia / poor sleep'),
+  jointPain: symptom('Joint pain'),
   lightHeaded: symptom('Light Headed/Dizzy'),
   muscleFatigue: symptom('Muscle fatigue', [
     { type: 'select', key: 'part', label: 'Body part', options: ['All', 'Arms', 'Legs', 'Core', 'Back', 'Neck'] },
   ]),
-  headache: symptom('Headache'),
-  earRinging: symptom('Ear ringing'),
+  nausea: symptom('Nausea'),
+  presyncope: symptom('Near faint / presyncope'),
   nerve: symptom('Nerve issues', [
     { type: 'select', key: 'sensation', label: 'Sensation', options: ['Pain', 'Tingles', 'Asleep'] },
     { type: 'select', key: 'area', label: 'Area of body', options: ['Face', 'Head', 'Neck', 'Chest', 'Shoulders', 'Arms', 'Legs'] },
   ]),
+  palpitations: symptom('Palpitations'),
+  pem: symptom('Post-exertional malaise'),
+  reflux: symptom('Reflux / heartburn'),
+  shortnessOfBreath: symptom('Shortness of breath'),
+  sick: { label: 'Sick', icon: 'alert', fields: [], noTime: true },
+  soreThroat: symptom('Sore throat'),
+  stomachPain: symptom('Stomach pain'),
+  tempDysregulation: symptom('Temperature swings'),
+  throatTightness: symptom('Throat tightness'),
+  tremor: symptom('Tremor / shakiness'),
   twitching: symptom('Twitching', [
     { type: 'select', key: 'area', label: 'Area of body', options: ['Face', 'Head', 'Neck', 'Chest', 'Shoulders', 'Arms', 'Legs'] },
     { type: 'select', key: 'severity', label: 'Severity', options: ['Minor', 'Severe'] },
     { type: 'number', key: 'duration', label: 'Duration', unit: 'min' },
   ]),
-  sick: { label: 'Sick', icon: 'alert', fields: [], noTime: true },
 };
 
 const trig = (label: string): TypeDef => ({ label, icon: 'alert', fields: [] });
+/** Alphabetical by label; pickers render in this insertion order. Food plus the
+ *  common non-food POTS / MCAS triggers (heat, stress, exertion, standing). */
 export const TRIGGER_TYPES: Record<string, TypeDef> = {
-  histamine: trig('Histamine food'),
-  alcohol: trig('Alcohol'),
-  caffeine: trig('Caffeine'),
-  highSodium: trig('High sodium'),
-  sugar: trig('Sugar'),
-  dairy: trig('Dairy'),
-  gluten: trig('Gluten'),
   agedCheese: trig('Aged cheese'),
-  fermented: trig('Fermented food'),
-  leftovers: trig('Leftovers'),
+  alcohol: trig('Alcohol'),
+  artificialSweeteners: trig('Artificial sweeteners'),
+  caffeine: trig('Caffeine'),
   chocolate: trig('Chocolate'),
   citrus: trig('Citrus'),
-  pizza: trig('Pizza'),
+  dairy: trig('Dairy'),
+  dehydration: trig('Dehydration'),
+  eggs: trig('Eggs'),
+  fermented: trig('Fermented food'),
+  foodAdditives: trig('Food dyes / additives'),
+  fragrances: trig('Fragrances / chemicals'),
   friedFoods: trig('Fried foods'),
+  gluten: trig('Gluten'),
+  heat: trig('Heat / hot weather'),
+  highSodium: trig('High sodium'),
+  highCarb: trig('High-carb meal'),
+  histamine: trig('Histamine food'),
+  largeMeal: trig('Large meal'),
+  leftovers: trig('Leftovers'),
+  msg: trig('MSG'),
+  nightshades: trig('Nightshades'),
+  nuts: trig('Nuts'),
+  overexertion: trig('Overexertion'),
+  pizza: trig('Pizza'),
   processedMeats: trig('Processed meats'),
+  prolongedStanding: trig('Prolonged standing'),
+  shellfish: trig('Shellfish'),
+  soy: trig('Soy'),
+  spicyFood: trig('Spicy food'),
+  stress: trig('Stress'),
+  sugar: trig('Sugar'),
 };
 
 /** Bowel-movement option sets (the bespoke BowelForm renders these as cards). */

@@ -245,7 +245,7 @@ export interface Criterion {
 }
 export interface Cleanliness { clean: boolean; criteria: Criterion[] }
 
-/** Baseline protocol a user gets before ever opening the editor: 8h sleep,
+/** Baseline protocol a user gets before ever opening the editor: 7h sleep,
  *  2.5 L water, no triggers. Meds/activities start off and empty — users pick
  *  their own meds in the editor (there are no default drugs any more). */
 export const DEFAULT_PROTOCOL: Protocol = {
@@ -253,7 +253,7 @@ export const DEFAULT_PROTOCOL: Protocol = {
   water: { enabled: true, liters: 2.5 },
   meds: { enabled: false, types: [] },
   activities: { enabled: false, types: [] },
-  sleep: { enabled: true, hours: 8 },
+  sleep: { enabled: true, hours: 7 },
 };
 
 /** Fill a (possibly partial/absent) stored protocol with defaults. */

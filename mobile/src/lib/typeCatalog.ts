@@ -40,12 +40,22 @@ const CUSTOM_ICON: Record<TypeKind, string> = {
   activities: 'activity', meds: 'pill', symptoms: 'alert', triggers: 'alert',
 };
 
-/** Registry + user-defined types, minus deleted built-ins. */
+/** Registry + user-defined types, minus deleted built-ins. Alphabetical by
+ *  label so user-created types slot in among the built-ins; "Other …"
+ *  catch-alls sink to the bottom. */
 export function typesFor(state: AppState, kind: TypeKind): Record<string, TypeDef> {
   const hidden = new Set(state.hiddenTypes?.[kind] || []);
+  const merged: Record<string, TypeDef> = {};
+  Object.keys(BUILTIN[kind]).forEach((k) => { if (!hidden.has(k)) merged[k] = BUILTIN[kind][k]; });
+  Object.assign(merged, state.customTypes?.[kind] || {});
+  const isOther = (t: TypeDef) => /^other\b/i.test(t.label);
   const out: Record<string, TypeDef> = {};
-  Object.keys(BUILTIN[kind]).forEach((k) => { if (!hidden.has(k)) out[k] = BUILTIN[kind][k]; });
-  Object.assign(out, state.customTypes?.[kind] || {});
+  Object.keys(merged)
+    .sort((a, b) => {
+      if (isOther(merged[a]) !== isOther(merged[b])) return isOther(merged[a]) ? 1 : -1;
+      return merged[a].label.localeCompare(merged[b].label, undefined, { sensitivity: 'base' });
+    })
+    .forEach((k) => { out[k] = merged[k]; });
   return out;
 }
 

@@ -142,15 +142,19 @@ private struct HrCircularView: View {
                                 style: StrokeStyle(lineWidth: stroke, lineCap: .round))
                         .rotationEffect(.degrees(135))
                         .padding(stroke / 2 + 1)
+                    // Dot matches the arc's stroke; the black ring under it cuts
+                    // a gap in the arc so the line reads as broken at the dot.
                     ZStack {
-                        Circle().fill(.black).frame(width: 13, height: 13)
-                        Circle().fill(.white).frame(width: 9, height: 9)
+                        Circle().fill(.black).frame(width: stroke + 4, height: stroke + 4)
+                        Circle().fill(.white).frame(width: stroke, height: stroke)
                     }
                     .position(x: center.x + r * cos(angle), y: center.y + r * sin(angle))
                 }
-                VStack(spacing: -1) {
+                VStack(spacing: -5) {
                     Text("\(hr)")
-                        .font(.system(size: 20, weight: .heavy))
+                        // Drop a couple of points at triple digits so the number
+                        // stays inside the arc instead of relying on scale-down.
+                        .font(.system(size: hr >= 100 ? 17 : 20, weight: .bold))
                         .monospacedDigit()
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
@@ -159,13 +163,16 @@ private struct HrCircularView: View {
             }
             .overlay(alignment: .bottom) {
                 if let low = state.low, let high = state.high, high > low {
+                    // Spacer(minLength: 0) + lineLimit — the default spacer
+                    // minimum wraps a 3-digit max label onto two lines.
                     HStack {
                         Text("\(low)")
-                        Spacer()
+                        Spacer(minLength: 0)
                         Text("\(high)")
                     }
                     .font(.system(size: 7, weight: .bold))
                     .monospacedDigit()
+                    .lineLimit(1)
                     .foregroundStyle(.secondary)
                     // Tucked into the arc's bottom opening — far enough in that
                     // the face's circular mask doesn't clip them.
