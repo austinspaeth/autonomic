@@ -1,4 +1,4 @@
-import { mapStandTestPayload } from '../payload';
+import { mapStandTestPayload, mapSymptomPayload, mapOrthostaticPayload, mapWatchPayload } from '../payload';
 import { BANDS, catFromBands, computeScores, rowScoreCategory } from '../../scoring';
 import { readingRowValue } from '../../registry';
 import type { Entry } from '../../types';
@@ -97,5 +97,76 @@ describe('standTest scoring', () => {
     expect(readingRowValue(entry())).toBe('+38 Δ');
     expect(readingRowValue(entry({ sustainedDelta: undefined }))).toBe('+44 Δ');
     expect(readingRowValue(entry({ sustainedDelta: undefined, peakDelta: undefined }))).toBe('');
+  });
+});
+
+describe('mapSymptomPayload', () => {
+  const sym = (over: Record<string, unknown> = {}) => ({
+    id: 'sym-1', type: 'symptom', schemaVersion: 1,
+    symptomType: 'lightHeaded', time: '2026-07-12T14:05:00', hr: 78, ...over,
+  });
+
+  it('maps a valid symptom to a symptoms-section entry with HR in the note', () => {
+    const m = mapWatchPayload(sym())!;
+    expect(m.section).toBe('symptoms');
+    expect(m.dayKey).toBe('2026-07-12');
+    expect(m.waveform).toBeNull();
+    expect(m.entry).toMatchObject({
+      id: 'sym-1', type: 'lightHeaded', time: '14:05', source: 'watch', note: 'HR 78 bpm',
+    });
+  });
+
+  it('omits the HR note when no hr is given', () => {
+    expect(mapSymptomPayload(sym({ hr: undefined }))!.entry.note).toBe('');
+  });
+
+  it('drops unknown symptom types, bad ids, future schema, unparseable time', () => {
+    expect(mapSymptomPayload(sym({ symptomType: 'notAThing' }))).toBeNull();
+    expect(mapSymptomPayload(sym({ id: '' }))).toBeNull();
+    expect(mapSymptomPayload(sym({ schemaVersion: 2 }))).toBeNull();
+    expect(mapSymptomPayload(sym({ time: 'nope' }))).toBeNull();
+    expect(mapSymptomPayload({ type: 'other' })).toBeNull();
+  });
+
+  it('mapWatchPayload still routes stand tests to the readings section', () => {
+    const m = mapWatchPayload({
+      id: 'st-1', type: 'standTest', time: '2026-07-12T09:30:00', schemaVersion: 1,
+    })!;
+    expect(m.section).toBe('readings');
+    expect(m.entry.type).toBe('standTest');
+  });
+});
+
+describe('mapOrthostaticPayload', () => {
+  const ev = (over: Record<string, unknown> = {}) => ({
+    id: 'ev-1', type: 'orthostatic', schemaVersion: 1,
+    transition: 'Climbing stairs', time: '2026-07-12T15:20:00',
+    beforeHr: 70, afterHr: 118, hr1min: 92, transitionAt: 30, completedAt: 55,
+    hrSeries: [{ t: 0, hr: 70 }, { t: 1, hr: 118 }], ...over,
+  });
+
+  it('maps a valid event to an orthostatic reading with before/after/1-min HR + markers', () => {
+    const m = mapWatchPayload(ev())!;
+    expect(m.section).toBe('readings');
+    expect(m.dayKey).toBe('2026-07-12');
+    expect(m.entry).toMatchObject({
+      id: 'ev-1', type: 'orthostatic', time: '15:20', source: 'watch',
+      transition: 'Climbing stairs', beforeHr: 70, afterHr: 118, hr1min: 92,
+      transitionAt: 30, completedAt: 55,
+    });
+    expect(m.entry.hrSeries).toBeUndefined();
+    expect(m.waveform).toEqual({ sampledHr: [{ t: 0, bpm: 70 }, { t: 1, bpm: 118 }] });
+  });
+
+  it('tolerates missing HR fields and rejects bad envelopes', () => {
+    const partial = mapOrthostaticPayload(ev({ afterHr: undefined, hr1min: 'x', hrSeries: undefined }))!;
+    expect(partial.entry.afterHr).toBeUndefined();
+    expect(partial.entry.hr1min).toBeUndefined();
+    expect(partial.entry.beforeHr).toBe(70);
+    expect(partial.waveform).toBeNull();
+    expect(mapOrthostaticPayload(ev({ id: '' }))).toBeNull();
+    expect(mapOrthostaticPayload(ev({ schemaVersion: 2 }))).toBeNull();
+    expect(mapOrthostaticPayload(ev({ time: 'nope' }))).toBeNull();
+    expect(mapOrthostaticPayload({ type: 'symptom' })).toBeNull();
   });
 });

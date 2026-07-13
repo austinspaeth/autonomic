@@ -1,6 +1,12 @@
 import Foundation
 import WatchConnectivity
 
+/// A quick-loggable symptom mirrored from the phone's registry (id + label).
+struct SymptomType: Identifiable, Equatable {
+    let id: String
+    let label: String
+}
+
 /**
  * Watch side of the phone link.
  *
@@ -25,6 +31,8 @@ final class PhoneRelay: NSObject, ObservableObject, WCSessionDelegate {
     @Published var pro: Bool?
     @Published var age: Int?
     @Published var sex: String?
+    /// Quick-log symptom list mirrored from the phone (empty until first sync).
+    @Published var symptomTypes: [SymptomType] = []
 
     override private init() {
         super.init()
@@ -32,6 +40,16 @@ final class PhoneRelay: NSObject, ObservableObject, WCSessionDelegate {
             pro = defaults.bool(forKey: "ctx.pro")
             age = defaults.object(forKey: "ctx.age") as? Int
             sex = defaults.string(forKey: "ctx.sex")
+        }
+        if let raw = defaults.array(forKey: "ctx.symptomTypes") as? [[String: Any]] {
+            symptomTypes = Self.parseSymptomTypes(raw)
+        }
+    }
+
+    private static func parseSymptomTypes(_ raw: [[String: Any]]) -> [SymptomType] {
+        raw.compactMap { d in
+            guard let id = d["id"] as? String, let label = d["label"] as? String else { return nil }
+            return SymptomType(id: id, label: label)
         }
     }
 
@@ -88,10 +106,16 @@ final class PhoneRelay: NSObject, ObservableObject, WCSessionDelegate {
         defaults.set(proFlag, forKey: "ctx.pro")
         if let a = context["age"] as? Int { defaults.set(a, forKey: "ctx.age") } else { defaults.removeObject(forKey: "ctx.age") }
         if let s = context["sex"] as? String { defaults.set(s, forKey: "ctx.sex") } else { defaults.removeObject(forKey: "ctx.sex") }
+        var parsedSymptoms: [SymptomType]?
+        if let raw = context["symptomTypes"] as? [[String: Any]] {
+            defaults.set(raw, forKey: "ctx.symptomTypes")
+            parsedSymptoms = Self.parseSymptomTypes(raw)
+        }
         DispatchQueue.main.async {
             self.pro = proFlag
             self.age = context["age"] as? Int
             self.sex = context["sex"] as? String
+            if let parsedSymptoms { self.symptomTypes = parsedSymptoms }
         }
     }
 

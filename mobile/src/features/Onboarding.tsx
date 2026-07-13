@@ -397,11 +397,8 @@ function Onboarding({ onDone }: { onDone: () => void }) {
     if (step === 0) return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: 22 }}>
         <View style={{ alignItems: 'center' }}>
-          <Text style={{ fontSize: 13.5, letterSpacing: 2.9, color: C.faint, fontWeight: '700', marginBottom: 13 }}>WELCOME TO</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 13 }}>
-            <BrandMark size={30} />
-            <Text style={{ fontSize: 46, fontWeight: '800', letterSpacing: -1.4, color: C.text }}>Autonomic</Text>
-          </View>
+          <View style={{ marginBottom: -2 }}><BrandMark size={64} /></View>
+          <Text style={{ fontSize: 46, fontWeight: '800', letterSpacing: -1.4, color: C.text }}>Autonomic</Text>
         </View>
         <Text style={{ fontSize: 18, lineHeight: 28, color: C.dim, textAlign: 'center', maxWidth: 330 }}>
           Track your autonomic recovery: heart-rate variability, symptoms, sleep, and more, in one private journal.

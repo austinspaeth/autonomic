@@ -100,7 +100,9 @@ final class WorkoutManager: NSObject, ObservableObject {
         }
         lastSampleAt = Date()
         recent.append(bpm)
-        if recent.count > 5 { recent.removeFirst(recent.count - 5) }
+        // Median of the last 3 samples — enough to reject a single spurious
+        // reading without adding the lag of a wider window.
+        if recent.count > 3 { recent.removeFirst(recent.count - 3) }
         let smoothed = recent.sorted(by: <)[recent.count / 2]
         DispatchQueue.main.async {
             self.hr = smoothed

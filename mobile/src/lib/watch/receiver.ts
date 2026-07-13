@@ -17,11 +17,24 @@ import { watchBridge, type WatchUserInfo } from '../../../modules/watch-bridge';
 import { getIapState, subscribeIap } from '../../store/iap';
 import { flushSave, getState, storeWaveform, subscribeStore, upsertEntry } from '../../store/store';
 import { ageFromBirthday } from '../dates';
+import { SYMPTOM_TYPES } from '../registry';
 import { computeScores } from '../scoring';
-import { mapStandTestPayload } from './payload';
+import type { Entry } from '../types';
+import { mapWatchPayload } from './payload';
 
 let started = false;
 let lastContext = '';
+
+/** Readings that arrive from the watch while the app is running: the UI
+ *  subscribes to auto-open the results card. Only live deliveries notify —
+ *  the launch-time backlog drain would otherwise stack a sheet per queued
+ *  result over onboarding/paywall gates. */
+type ArrivalListener = (dayKey: string, entry: Entry) => void;
+const arrivalListeners = new Set<ArrivalListener>();
+export function subscribeWatchArrivals(fn: ArrivalListener): () => void {
+  arrivalListeners.add(fn);
+  return () => { arrivalListeners.delete(fn); };
+}
 
 function pushContext() {
   const bridge = watchBridge();
@@ -31,6 +44,8 @@ function pushContext() {
   const context: Record<string, unknown> = { pro: getIapState().isPro };
   if (age != null) context.age = age;
   if (profile?.sex) context.sex = profile.sex;
+  // The quick-log symptom list the watch mirrors — id + label in registry order.
+  context.symptomTypes = Object.entries(SYMPTOM_TYPES).map(([id, def]) => ({ id, label: def.label }));
   const key = JSON.stringify(context);
   if (key === lastContext) return; // journal churn — nothing the watch cares about
   lastContext = key;
@@ -41,19 +56,25 @@ function pushContext() {
   bridge.updateContext(context).catch(() => { lastContext = ''; }); // not activated yet — retry on next change
 }
 
-function receive(info: WatchUserInfo) {
+function receive(info: WatchUserInfo, live = false) {
   const bridge = watchBridge();
   if (!bridge) return;
-  const mapped = mapStandTestPayload(info);
+  const mapped = mapWatchPayload(info);
   if (!mapped) return;
+  // A failed ack makes the watch re-send an id we already hold — upserting is
+  // harmless, but only a genuinely new reading should pop the results card.
+  const fresh = !(getState().days[mapped.dayKey]?.[mapped.section] || []).some((e) => e.id === mapped.entry.id);
   // Sidecar first, then the journal entry, then flush — only after the entry
   // is on disk is it safe to ack (the watch never re-sends an acked id).
   if (mapped.waveform) storeWaveform(mapped.entry.id, mapped.waveform);
-  const profile = getState().profile;
-  mapped.entry.scores = computeScores(mapped.entry, { sex: profile?.sex, height: profile?.height });
-  upsertEntry(mapped.dayKey, 'readings', mapped.entry);
+  if (mapped.section === 'readings') {
+    const profile = getState().profile;
+    mapped.entry.scores = computeScores(mapped.entry, { sex: profile?.sex, height: profile?.height });
+  }
+  upsertEntry(mapped.dayKey, mapped.section, mapped.entry);
   flushSave();
   bridge.sendAck(mapped.entry.id).catch(() => { /* still inboxed natively; retried next launch */ });
+  if (live && fresh && mapped.section === 'readings') arrivalListeners.forEach((fn) => fn(mapped.dayKey, mapped.entry));
 }
 
 /** Call once at app start (alongside initIap). No-op without the native module. */
@@ -62,7 +83,7 @@ export function initWatchReceiver() {
   started = true;
   const bridge = watchBridge();
   if (!bridge) return;
-  bridge.addListener('onUserInfo', receive);
+  bridge.addListener('onUserInfo', (info) => receive(info, true));
   bridge.addListener('onStateChange', () => {
     // Session state changed (activation, watch app installed, reachability).
     // A context set before the watch app existed may never have landed, so
@@ -73,6 +94,6 @@ export function initWatchReceiver() {
   subscribeIap(pushContext);
   subscribeStore(pushContext);
   // Drain results that arrived before JS attached (background deliveries).
-  bridge.pendingUserInfo().then((list) => list.forEach(receive)).catch(() => {});
+  bridge.pendingUserInfo().then((list) => list.forEach((info) => receive(info))).catch(() => {});
   pushContext();
 }

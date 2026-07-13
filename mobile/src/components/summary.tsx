@@ -24,7 +24,7 @@ import { entryFields, isDivider, READING_TYPES } from '../lib/registry';
 import { fmtNum, fmtShort } from '../lib/dates';
 import { correctArtifacts } from '../lib/hrv';
 import { getWaveform } from '../store/store';
-import { BalanceChart, PowerSpectrum, Sparkline, StandHrChart, Tachogram, ZonesToggle, balanceCat } from './charts';
+import { BalanceChart, OrthoHrChart, PowerSpectrum, Sparkline, StandHrChart, Tachogram, ZonesToggle, balanceCat } from './charts';
 import { HelpDot, ScoreDot } from './ui';
 
 const hexA = (hex: string, a: number) => {
@@ -515,7 +515,17 @@ const ORTHO_HELP: Record<string, string> = {
   rise: 'The heart-rate increase from resting baseline to standing. A sustained rise of 30 bpm or more (40 in adolescents) within 10 minutes of standing is the adult POTS-range criterion. Trends matter more than any single stand. Repeat under similar conditions to compare.',
   hr: 'The raw numbers behind this event: heart rate before standing, the standing peak, and where it settled one minute later.',
   recovery: 'How far your heart rate fell back from its standing peak within the first minute. A larger settle-down reflects a stronger baroreflex and faster vagal recovery.',
+  curve: 'The heart-rate trace from the capture, sampled every second. Purple through the resting phase before the transition, then POTS-graded once you move. Markers show the transition start, its completion, and the one-minute recovery point; the dashed line is the resting baseline.',
 };
+
+/** Waveforms live in the sidecar keyed by reading id — inline `sampledHr`
+ *  exists only on pre-save live previews (strap captures reviewing results). */
+function hrCurveFor(r: Entry): { t: number; bpm: number }[] | null {
+  const stored = getWaveform(String(r.id))?.sampledHr;
+  if (stored && stored.length >= 2) return stored;
+  const inline = r.sampledHr as { t: number; bpm: number }[] | undefined;
+  return Array.isArray(inline) && inline.length >= 2 ? inline : null;
+}
 
 export function OrthostaticSummary({ r, days, ctx: _ctx }: SummaryProps) {
   const p = usePalette();
@@ -534,6 +544,8 @@ export function OrthostaticSummary({ r, days, ctx: _ctx }: SummaryProps) {
   };
   const incEx = (rr: Entry) => { const b = numOr(rr.beforeHr), a = numOr(rr.afterHr); return b != null && a != null ? a - b : null; };
   const dropEx = (rr: Entry) => { const a = numOr(rr.afterHr), m = numOr(rr.hr1min); return a != null && m != null ? a - m : null; };
+  const hrCurve = hrCurveFor(r);
+  const sourceLabel = sourceLabelFor(r);
   const cols: { label: string; val: number | null; unit: string }[] = [
     { label: 'Before', val: before, unit: 'bpm · baseline' },
     { label: 'After', val: after, unit: 'bpm · standing' },
@@ -547,11 +559,20 @@ export function OrthostaticSummary({ r, days, ctx: _ctx }: SummaryProps) {
         desc={incCat ? verdict[incCat] : 'Enter Before HR and After HR to rate this event.'}
         help={ORTHO_HELP.rise}
       />
-      {r.transition ? (
+      {r.transition || sourceLabel ? (
         <Section>
           <SectionHead title="Details" />
           <View style={{ marginTop: 12 }}>
-            <MetricRow label="Transition" value={r.transition as string} cat={false} />
+            {r.transition ? <MetricRow label="Transition" value={r.transition as string} cat={false} /> : null}
+            {sourceLabel ? <MetricRow label="Source" value={sourceLabel} cat={false} /> : null}
+          </View>
+        </Section>
+      ) : null}
+      {hrCurve ? (
+        <Section>
+          <SectionHead title="Heart rate over time" help={ORTHO_HELP.curve} />
+          <View style={{ marginTop: 12 }}>
+            <OrthoHrChart samples={hrCurve} baseline={before} transitionAt={numOr(r.transitionAt)} completedAt={numOr(r.completedAt)} />
           </View>
         </Section>
       ) : null}
@@ -583,17 +604,17 @@ export function OrthostaticSummary({ r, days, ctx: _ctx }: SummaryProps) {
 const STAND_HELP: Record<string, string> = {
   rise: 'The sustained heart-rate rise: the average increase over the final minute of standing, compared against the resting (supine) baseline. A sustained rise of 30 bpm or more (40 in ages 12-19) within 10 minutes of standing is the adult POTS-range criterion. One test is a data point, not a diagnosis; trends across tests under similar conditions matter most.',
   hr: 'The numbers behind this test: the supine baseline (last two minutes of lying down), the standing peak, and the largest single rise above baseline.',
-  curve: 'The full heart-rate trace from the watch, sampled every second: resting phase, the stand moment (marked), and the standing response. The dashed line is the supine baseline.',
+  curve: 'The full heart-rate trace from the test, sampled every second: resting phase, the stand moment (marked), and the standing response. The dashed line is the supine baseline.',
 };
 
-const STAND_DISCLAIMER = 'Wellness screening only. This test is HR-based; it does not measure blood pressure, and a POTS assessment also requires ruling out orthostatic hypotension (a BP drop), which a watch cannot detect. Not a diagnosis. Discuss results with your doctor.';
+const STAND_DISCLAIMER = 'Wellness screening only. This test is HR-based; it does not measure blood pressure, and a POTS assessment also requires ruling out orthostatic hypotension (a BP drop), which this test cannot detect. Not a diagnosis. Discuss results with your doctor.';
 
 export function StandTestSummary({ r, days, ctx: _ctx }: SummaryProps) {
   const p = usePalette();
   const baseline = numOr(r.baselineHr), peak = numOr(r.peakHr);
   const peakDelta = numOr(r.peakDelta), sustained = numOr(r.sustainedDelta);
   const susCat = sustained != null ? catFromBands(sustained, BANDS.standDelta) : null;
-  const maxReached = numOr(r.maxHrReached), maxComputed = numOr(r.maxHrComputed);
+  const maxReached = numOr(r.maxHrReached);
   const signed = (v: number) => (v > 0 ? '+' + v : String(v));
   const verdict: Record<string, string> = {
     great: 'Minimal sustained rise on standing - a healthy orthostatic response.',
@@ -603,8 +624,7 @@ export function StandTestSummary({ r, days, ctx: _ctx }: SummaryProps) {
     crash: 'Marked sustained rise of 40 bpm or more. Hydrate, sit or lie down, and log context.',
   };
   const susEx = (rr: Entry) => numOr(rr.sustainedDelta);
-  const waveform = getWaveform(String(r.id));
-  const hrCurve = waveform?.sampledHr && waveform.sampledHr.length >= 2 ? waveform.sampledHr : null;
+  const hrCurve = hrCurveFor(r);
   const cols: { label: string; val: number | null; unit: string }[] = [
     { label: 'Baseline', val: baseline, unit: 'bpm · supine' },
     { label: 'Peak', val: peak, unit: 'bpm · standing' },
@@ -612,7 +632,7 @@ export function StandTestSummary({ r, days, ctx: _ctx }: SummaryProps) {
   ];
   const flags: { label: string; value: string }[] = [];
   flags.push({ label: 'POTS threshold met', value: r.metThreshold ? 'Yes' : 'No' });
-  if (maxReached != null) flags.push({ label: 'Max HR reached', value: maxComputed != null ? `${maxReached} of ${maxComputed}` : String(maxReached) });
+  if (maxReached != null) flags.push({ label: 'Max HR reached', value: String(maxReached) });
   if (r.endedEarly) flags.push({ label: 'Ended early', value: 'Yes' });
   if (r.baselineUnstable) flags.push({ label: 'Short resting phase', value: 'Baseline may be unreliable' });
   return (
@@ -647,7 +667,8 @@ export function StandTestSummary({ r, days, ctx: _ctx }: SummaryProps) {
         <SectionHead title="Details" />
         <View style={{ marginTop: 12 }}>
           {flags.map((f) => <MetricRow key={f.label} label={f.label} value={f.value} cat={false} />)}
-          <MetricRow label="Source" value="Apple Watch" cat={false} />
+          {/* Legacy watch results predate the `source` stamp — default there. */}
+          <MetricRow label="Source" value={sourceLabelFor(r) || 'Apple Watch'} cat={false} />
         </View>
       </Section>
       <Notes r={r} />

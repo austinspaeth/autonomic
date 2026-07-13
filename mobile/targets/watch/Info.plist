@@ -11,6 +11,12 @@
 	<array>
 		<string>workout-processing</string>
 	</array>
+	<!-- Manrope faces, matching the phone app's metric numerals. -->
+	<key>UIAppFonts</key>
+	<array>
+		<string>Manrope_800ExtraBold.ttf</string>
+		<string>Manrope_700Bold.ttf</string>
+	</array>
 	<key>NSHealthShareUsageDescription</key>
 	<string>Autonomic reads your live heart rate during HR monitoring and stand tests.</string>
 	<key>NSHealthUpdateUsageDescription</key>

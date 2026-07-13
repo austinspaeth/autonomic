@@ -10,7 +10,7 @@ export type IconName =
   | 'x' | 'check' | 'edit' | 'bike' | 'footprints' | 'legsUp' | 'activity'
   | 'heart' | 'target' | 'barbell' | 'car' | 'flame' | 'zap' | 'pill' | 'alert'
   | 'sparkles' | 'rocket' | 'moon' | 'user' | 'chevron' | 'chevronLeft' | 'chevronRight'
-  | 'arrowLeft' | 'arrowUp' | 'standing' | 'poop' | 'cup' | 'utensils' | 'scale' | 'search'
+  | 'arrowLeft' | 'arrowUp' | 'standing' | 'stairs' | 'poop' | 'cup' | 'utensils' | 'scale' | 'search'
   | 'bulb' | 'star' | 'brain' | 'virus' | 'clipboard' | 'smile' | 'ai' | 'chart'
   | 'trendUp' | 'trendDown' | 'triangle' | 'checklist' | 'cell' | 'gut'
   | 'bluetooth' | 'watch' | 'plus' | 'trash' | 'settings' | 'sun' | 'play' | 'stop'
@@ -49,6 +49,7 @@ const P: Record<IconName, string[]> = {
   arrowLeft: ['M19 12H5', 'm12 19-7-7 7-7'],
   arrowUp: ['M12 19V5', 'm5 12 7-7 7 7'],
   standing: ['m9 20 3-6 3 6', 'm6 9 6 2 6-2', 'M12 11v3'],
+  stairs: ['M11 6v4', 'M8 8l3-1 3 1.5', 'M11 10l-2.5 4', 'M11 10l3-1 1.5 4', 'M3 20h4v-3h4v-3h4v-3h4'],
   poop: ['M7.5 21h9a3 3 0 0 0 1.6-5.5A3 3 0 0 0 16 10a3 3 0 0 0-3-4 3 3 0 0 0-2 .8A3 3 0 0 0 8 10a3 3 0 0 0-2.1 5.5A3 3 0 0 0 7.5 21Z', 'M10.5 15h.01', 'M13.5 15h.01'],
   cup: ['M6 3h12l-1.1 15.3a2 2 0 0 1-2 1.7H9.1a2 2 0 0 1-2-1.7L6 3Z', 'M6.5 9.5h11'],
   utensils: ['M3 2v7c0 1.1.9 2 2 2h0c1.1 0 2-.9 2-2V2', 'M5 11v11', 'M19 2c-1.7 0-3 1.8-3 4v5h3', 'M19 2v20'],
@@ -92,6 +93,7 @@ export function Icon({ name, size = 22, color = '#000', strokeWidth = 1.9 }: { n
       {name === 'gauge' && null}
       {name === 'info' && <Circle cx={12} cy={12} r={10} {...common} />}
       {name === 'standing' && <Circle cx={12} cy={4} r={1.5} {...common} />}
+      {name === 'stairs' && <Circle cx={11} cy={4} r={1.6} {...common} />}
       {name === 'legsUp' && <Circle cx={12} cy={12} r={9} {...common} />}
       {name === 'user' && <Circle cx={12} cy={8} r={4} {...common} />}
       {name === 'smile' && <Circle cx={12} cy={12} r={9} {...common} />}

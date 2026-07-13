@@ -572,10 +572,17 @@ export function Tachogram({ rr, height = 132 }: { rr: number[]; height?: number 
 /**
  * The watch stand test's full HR trace: resting phase, the stand moment
  * (vertical marker with the standing side faintly tinted), and the standing
- * response. A dashed line marks the supine baseline so the rise reads
- * directly off the chart. Sensor-dropout gaps (missing 1 Hz samples) break
- * the path rather than interpolating across them.
+ * response. The trace is lightly rounded (strided + two binomial passes, then
+ * the shared smooth curve) so the integer 1 Hz samples don't read as a
+ * staircase, and it is split at the stand: the resting side draws purple, the
+ * standing side takes a vertical gradient through the POTS grade colours
+ * (each height's colour is its rise above baseline graded via standDelta), so
+ * what happened after standing reads with what it means. A "Show zones" link
+ * marks the grade boundaries above baseline. Dashed line = supine baseline;
+ * sensor-dropout gaps still break the path rather than interpolating.
  */
+const STAND_PURPLE = '#a78bfa';
+let standId = 0;
 export function StandHrChart({ samples, standAt, baseline, height = 150 }: {
   samples: { t: number; bpm: number }[];
   /** Seconds from test start when standing began (the stand cue). */
@@ -584,33 +591,88 @@ export function StandHrChart({ samples, standAt, baseline, height = 150 }: {
   height?: number;
 }) {
   const p = usePalette();
+  const [showZones, setShowZones] = useState(false);
+  const [gid] = useState(() => `sh${standId++}`);
   if (!samples || samples.length < 2) return null;
-  const bpms = samples.map((s) => s.bpm);
+  // Stride long traces down (~300 pts), split into continuous runs at dropout
+  // gaps, then round each run: two light binomial passes (endpoints pinned).
+  const stride = Math.max(1, Math.ceil(samples.length / 300));
+  const kept = samples.filter((_, i) => i % stride === 0 || i === samples.length - 1);
+  const runs: { t: number; bpm: number }[][] = [];
+  kept.forEach((s, i) => {
+    if (i === 0 || s.t - kept[i - 1].t > 3 * stride + 1) runs.push([]);
+    runs[runs.length - 1].push({ t: s.t, bpm: s.bpm });
+  });
+  runs.forEach((run) => {
+    for (let pass = 0; pass < 2; pass++) {
+      const src = run.map((q) => q.bpm);
+      for (let i = 1; i < run.length - 1; i++) run[i].bpm = 0.25 * src[i - 1] + 0.5 * src[i] + 0.25 * src[i + 1];
+    }
+  });
+  const bpms = runs.flat().map((q) => q.bpm);
   const dMin = Math.min(...bpms, baseline ?? Infinity), dMax = Math.max(...bpms, baseline ?? -Infinity);
   const span = dMax - dMin || 1;
   const min = dMin - span * 0.08, max = dMax + span * 0.08;
   const range = max - min || 1;
-  const t0 = samples[0].t, t1 = samples[samples.length - 1].t;
+  const t0 = kept[0].t, t1 = kept[kept.length - 1].t;
   const tSpan = t1 - t0 || 1;
   const W = 320, H = height, padL = 34, padR = 8, padT = 12, padB = 20;
   const innerW = W - padL - padR;
   const xAt = (t: number) => padL + ((t - t0) / tSpan) * innerW;
   const yAt = (v: number) => padT + (1 - (v - min) / range) * (H - padT - padB);
-  // Break the trace across dropout gaps (>3 s between 1 Hz samples).
-  let line = '';
-  samples.forEach((s, i) => {
-    const gap = i === 0 || s.t - samples[i - 1].t > 3;
-    line += `${gap ? 'M' : 'L'}${xAt(s.t).toFixed(1)} ${yAt(s.bpm).toFixed(1)} `;
-  });
   const ticks = [min, (min + max) / 2, max];
   const fmtT = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, '0')}`;
   const standX = standAt != null && standAt > t0 && standAt < t1 ? xAt(standAt) : null;
+  // Cut each run at the stand, sharing an interpolated point so the purple
+  // resting trace and the graded standing trace meet exactly at the marker.
+  // Without a baseline the grade gradient is meaningless, so it all stays purple.
+  const split = standX != null && baseline != null;
+  const pre: { t: number; bpm: number }[][] = [], post: { t: number; bpm: number }[][] = [];
+  runs.forEach((run) => {
+    if (!split) { pre.push(run); return; }
+    const a = run.filter((q) => q.t <= standAt!), b = run.filter((q) => q.t >= standAt!);
+    if (a.length && b.length && a[a.length - 1].t !== b[0].t) {
+      const q0 = a[a.length - 1], q1 = b[0];
+      const f = (standAt! - q0.t) / (q1.t - q0.t || 1);
+      const mid = { t: standAt!, bpm: q0.bpm + f * (q1.bpm - q0.bpm) };
+      a.push(mid); b.unshift(mid);
+    }
+    if (a.length >= 2) pre.push(a);
+    if (b.length >= 2) post.push(b);
+  });
+  const pathOf = (segs: { t: number; bpm: number }[][]) =>
+    segs.map((run) => smoothPath(run.map((q) => [xAt(q.t), yAt(q.bpm)] as [number, number]))).join(' ');
+  // Standing-side gradient: colour purely by height, banded at baseline+standDelta.
+  const colAt = (v: number) => (baseline != null && GRADE_COLORS[catFromBands(v - baseline, BANDS.standDelta) as ScoreCat]) || STAND_PURPLE;
+  const offAt = (v: number) => Math.max(0, Math.min(1, 1 - (v - min) / range));
+  const stops: { o: number; c: string }[] = [];
+  if (split) {
+    stops.push({ o: 0, c: colAt(max - 1e-9) });
+    BANDS.standDelta.map((b) => baseline! + b.max).filter((v) => isFinite(v) && v > min && v < max).sort((a, b) => b - a).forEach((v) => {
+      stops.push({ o: offAt(v), c: colAt(v + 1e-9) });
+      stops.push({ o: offAt(v), c: colAt(v - 1e-9) });
+    });
+    stops.push({ o: 1, c: colAt(min + 1e-9) });
+  }
+  const zones = baseline != null && showZones
+    ? BANDS.standDelta.filter((b) => isFinite(b.max)).map((b) => ({ v: baseline + b.max, d: b.max, color: GRADE_COLORS[b.cat as ScoreCat] || '#888' })).filter((z) => z.v > min && z.v < max)
+    : [];
   return (
     <View style={{ backgroundColor: p.bg, borderRadius: radius.control, padding: 8 }}>
-      <RNText style={{ fontSize: 11, color: p.textDim, marginBottom: 4 }}>{`Heart rate (bpm) · ${fmtT(tSpan)} test`}</RNText>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+        <RNText style={{ fontSize: 11, color: p.textDim }}>{`Heart rate (bpm) · ${fmtT(tSpan)} test`}</RNText>
+        {baseline != null ? <ZonesToggle on={showZones} onPress={() => setShowZones((v) => !v)} /> : null}
+      </View>
       <Svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+        {split ? (
+          <Defs>
+            <LinearGradient id={gid} x1="0" y1={padT} x2="0" y2={H - padB} gradientUnits="userSpaceOnUse">
+              {stops.map((s, i) => <Stop key={i} offset={s.o} stopColor={s.c} />)}
+            </LinearGradient>
+          </Defs>
+        ) : null}
         {standX != null ? (
-          <Rect x={standX} y={padT} width={W - padR - standX} height={H - padT - padB} fill={p.accent} opacity={0.06} />
+          <Rect x={standX} y={padT} width={W - padR - standX} height={H - padT - padB} fill={STAND_PURPLE} opacity={0.06} />
         ) : null}
         {ticks.map((t, i) => (
           <React.Fragment key={i}>
@@ -618,18 +680,254 @@ export function StandHrChart({ samples, standAt, baseline, height = 150 }: {
             <SvgText x={padL - 4} y={yAt(t) + 3} textAnchor="end" fontSize={9} fill={p.textDim}>{Math.round(t)}</SvgText>
           </React.Fragment>
         ))}
+        {zones.map((z, i) => (
+          <React.Fragment key={`z${i}`}>
+            <Line x1={padL} x2={W - padR} y1={yAt(z.v)} y2={yAt(z.v)} stroke={z.color} strokeWidth={1.2} strokeDasharray="4 3" opacity={0.85} />
+            <SvgText x={W - padR} y={yAt(z.v) - 2} textAnchor="end" fontSize={8} fontWeight="700" fill={z.color}>{`+${z.d}`}</SvgText>
+          </React.Fragment>
+        ))}
         {baseline != null ? (
           <Line x1={padL} x2={W - padR} y1={yAt(baseline)} y2={yAt(baseline)} stroke={p.textDim} strokeWidth={1} strokeDasharray="4 3" opacity={0.7} />
         ) : null}
         {standX != null ? (
-          <Line x1={standX} x2={standX} y1={padT} y2={H - padB} stroke={p.accent} strokeWidth={1.4} strokeDasharray="2 3" opacity={0.9} />
+          <Line x1={standX} x2={standX} y1={padT} y2={H - padB} stroke={STAND_PURPLE} strokeWidth={1.4} strokeDasharray="2 3" opacity={0.9} />
         ) : null}
-        <Path d={line.trim()} fill="none" stroke={p.accent} strokeWidth={1.6} strokeLinejoin="round" strokeLinecap="round" />
+        {pre.length ? <Path d={pathOf(pre)} fill="none" stroke={STAND_PURPLE} strokeWidth={1.8} strokeLinejoin="round" strokeLinecap="round" /> : null}
+        {post.length ? <Path d={pathOf(post)} fill="none" stroke={`url(#${gid})`} strokeWidth={1.8} strokeLinejoin="round" strokeLinecap="round" /> : null}
       </Svg>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
         <RNText style={{ fontSize: 10, color: p.textDim }}>0:00</RNText>
         {standX != null ? <RNText style={{ fontSize: 10, color: p.textDim }}>stood {fmtT(standAt! - t0)}</RNText> : null}
         <RNText style={{ fontSize: 10, color: p.textDim }}>{fmtT(t1 - t0)}</RNText>
+      </View>
+    </View>
+  );
+}
+
+let orthoId = 0;
+/**
+ * HR-over-time trace for a POTS episode. Purple through the resting "before"
+ * phase, then a POTS-graded gradient from the moment the transition begins.
+ * Three vertical markers: the transition start, its completion, and the 1-min
+ * (60 s after) recovery point. Dashed line is the resting baseline.
+ */
+export function OrthoHrChart({ samples, baseline, transitionAt, completedAt, height = 150 }: {
+  samples: { t: number; bpm: number }[];
+  baseline?: number | null;
+  /** Seconds from start when the transition began (before → during). */
+  transitionAt?: number | null;
+  /** Seconds from start when the transition completed (during → recovery). */
+  completedAt?: number | null;
+  height?: number;
+}) {
+  const p = usePalette();
+  const [showZones, setShowZones] = useState(false);
+  const [gid] = useState(() => `oh${orthoId++}`);
+  if (!samples || samples.length < 2) return null;
+  const stride = Math.max(1, Math.ceil(samples.length / 300));
+  const kept = samples.filter((_, i) => i % stride === 0 || i === samples.length - 1);
+  const runs: { t: number; bpm: number }[][] = [];
+  kept.forEach((s, i) => {
+    if (i === 0 || s.t - kept[i - 1].t > 3 * stride + 1) runs.push([]);
+    runs[runs.length - 1].push({ t: s.t, bpm: s.bpm });
+  });
+  runs.forEach((run) => {
+    for (let pass = 0; pass < 2; pass++) {
+      const src = run.map((q) => q.bpm);
+      for (let i = 1; i < run.length - 1; i++) run[i].bpm = 0.25 * src[i - 1] + 0.5 * src[i] + 0.25 * src[i + 1];
+    }
+  });
+  const bpms = runs.flat().map((q) => q.bpm);
+  const dMin = Math.min(...bpms, baseline ?? Infinity), dMax = Math.max(...bpms, baseline ?? -Infinity);
+  const span = dMax - dMin || 1;
+  const min = dMin - span * 0.08, max = dMax + span * 0.08;
+  const range = max - min || 1;
+  const t0 = kept[0].t, t1 = kept[kept.length - 1].t;
+  const tSpan = t1 - t0 || 1;
+  const W = 320, H = height, padL = 34, padR = 8, padT = 12, padB = 20;
+  const innerW = W - padL - padR;
+  const xAt = (t: number) => padL + ((t - t0) / tSpan) * innerW;
+  const yAt = (v: number) => padT + (1 - (v - min) / range) * (H - padT - padB);
+  const ticks = [min, (min + max) / 2, max];
+  const fmtT = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, '0')}`;
+  const inRange = (t?: number | null) => (t != null && t > t0 && t < t1 ? xAt(t) : null);
+  const splitX = inRange(transitionAt);
+  const split = splitX != null && baseline != null;
+  // Cut each run at the transition so the purple "before" trace and the graded
+  // trace meet exactly at the marker. Without a baseline the grade is undefined.
+  const pre: { t: number; bpm: number }[][] = [], post: { t: number; bpm: number }[][] = [];
+  runs.forEach((run) => {
+    if (!split) { pre.push(run); return; }
+    const a = run.filter((q) => q.t <= transitionAt!), b = run.filter((q) => q.t >= transitionAt!);
+    if (a.length && b.length && a[a.length - 1].t !== b[0].t) {
+      const q0 = a[a.length - 1], q1 = b[0];
+      const f = (transitionAt! - q0.t) / (q1.t - q0.t || 1);
+      const mid = { t: transitionAt!, bpm: q0.bpm + f * (q1.bpm - q0.bpm) };
+      a.push(mid); b.unshift(mid);
+    }
+    if (a.length >= 2) pre.push(a);
+    if (b.length >= 2) post.push(b);
+  });
+  const pathOf = (segs: { t: number; bpm: number }[][]) =>
+    segs.map((run) => smoothPath(run.map((q) => [xAt(q.t), yAt(q.bpm)] as [number, number]))).join(' ');
+  const colAt = (v: number) => (baseline != null && GRADE_COLORS[catFromBands(v - baseline, BANDS.orthoIncrease) as ScoreCat]) || STAND_PURPLE;
+  const offAt = (v: number) => Math.max(0, Math.min(1, 1 - (v - min) / range));
+  const stops: { o: number; c: string }[] = [];
+  if (split) {
+    stops.push({ o: 0, c: colAt(max - 1e-9) });
+    BANDS.orthoIncrease.map((b) => baseline! + b.max).filter((v) => isFinite(v) && v > min && v < max).sort((a, b) => b - a).forEach((v) => {
+      stops.push({ o: offAt(v), c: colAt(v + 1e-9) });
+      stops.push({ o: offAt(v), c: colAt(v - 1e-9) });
+    });
+    stops.push({ o: 1, c: colAt(min + 1e-9) });
+  }
+  const zones = baseline != null && showZones
+    ? BANDS.orthoIncrease.filter((b) => isFinite(b.max)).map((b) => ({ v: baseline + b.max, d: b.max, color: GRADE_COLORS[b.cat as ScoreCat] || '#888' })).filter((z) => z.v > min && z.v < max)
+    : [];
+  // Vertical phase markers: transition start, completion, and the 1-min point.
+  // Markers may sit on the right edge (the 1-min point is the trace's end), so
+  // they allow t == t1, unlike the purple→gradient split.
+  const markerX = (t?: number | null) => (t != null && t > t0 && t <= t1 ? xAt(t) : null);
+  const markers = [
+    { x: splitX, label: 'start', color: STAND_PURPLE, strong: true },
+    { x: markerX(completedAt), label: 'done', color: p.textDim, strong: false },
+    { x: markerX(completedAt != null ? completedAt + 60 : null), label: '1 min', color: p.textDim, strong: false },
+  ].filter((m) => m.x != null) as { x: number; label: string; color: string; strong: boolean }[];
+  return (
+    <View style={{ backgroundColor: p.bg, borderRadius: radius.control, padding: 8 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+        <RNText style={{ fontSize: 11, color: p.textDim }}>{`Heart rate (bpm) · ${fmtT(tSpan)} event`}</RNText>
+        {baseline != null ? <ZonesToggle on={showZones} onPress={() => setShowZones((v) => !v)} /> : null}
+      </View>
+      <Svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+        {split ? (
+          <Defs>
+            <LinearGradient id={gid} x1="0" y1={padT} x2="0" y2={H - padB} gradientUnits="userSpaceOnUse">
+              {stops.map((s, i) => <Stop key={i} offset={s.o} stopColor={s.c} />)}
+            </LinearGradient>
+          </Defs>
+        ) : null}
+        {splitX != null ? (
+          <Rect x={splitX} y={padT} width={W - padR - splitX} height={H - padT - padB} fill={STAND_PURPLE} opacity={0.06} />
+        ) : null}
+        {ticks.map((t, i) => (
+          <React.Fragment key={i}>
+            <Line x1={padL} x2={W - padR} y1={yAt(t)} y2={yAt(t)} stroke={p.border} strokeWidth={1} opacity={0.4} />
+            <SvgText x={padL - 4} y={yAt(t) + 3} textAnchor="end" fontSize={9} fill={p.textDim}>{Math.round(t)}</SvgText>
+          </React.Fragment>
+        ))}
+        {zones.map((z, i) => (
+          <React.Fragment key={`z${i}`}>
+            <Line x1={padL} x2={W - padR} y1={yAt(z.v)} y2={yAt(z.v)} stroke={z.color} strokeWidth={1.2} strokeDasharray="4 3" opacity={0.85} />
+            <SvgText x={W - padR} y={yAt(z.v) - 2} textAnchor="end" fontSize={8} fontWeight="700" fill={z.color}>{`+${z.d}`}</SvgText>
+          </React.Fragment>
+        ))}
+        {baseline != null ? (
+          <Line x1={padL} x2={W - padR} y1={yAt(baseline)} y2={yAt(baseline)} stroke={p.textDim} strokeWidth={1} strokeDasharray="4 3" opacity={0.7} />
+        ) : null}
+        {markers.map((m, i) => (
+          <React.Fragment key={`m${i}`}>
+            <Line x1={m.x} x2={m.x} y1={padT} y2={H - padB} stroke={m.color} strokeWidth={m.strong ? 1.4 : 1} strokeDasharray="2 3" opacity={m.strong ? 0.9 : 0.6} />
+            <SvgText x={m.x} y={padT - 3} textAnchor="middle" fontSize={8} fontWeight="700" fill={m.color}>{m.label}</SvgText>
+          </React.Fragment>
+        ))}
+        {pre.length ? <Path d={pathOf(pre)} fill="none" stroke={STAND_PURPLE} strokeWidth={1.8} strokeLinejoin="round" strokeLinecap="round" /> : null}
+        {post.length ? <Path d={pathOf(post)} fill="none" stroke={`url(#${gid})`} strokeWidth={1.8} strokeLinejoin="round" strokeLinecap="round" /> : null}
+      </Svg>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+        <RNText style={{ fontSize: 10, color: p.textDim }}>0:00</RNText>
+        <RNText style={{ fontSize: 10, color: p.textDim }}>{fmtT(t1 - t0)}</RNText>
+      </View>
+    </View>
+  );
+}
+
+/* ---------- Stand-test curve overlay (recent tests, aligned at the stand) ---------- */
+/**
+ * The last few stand tests' HR traces on one plot, aligned at the stand moment
+ * (x = 0) and normalized to each test's own supine baseline (y = bpm above
+ * baseline), so the *shape* of the standing response is comparable across
+ * days. Older tests fade back; the latest draws bold in the accent colour. A
+ * dashed line marks the +30 bpm POTS-range criterion. The resting phase is
+ * clipped to the final minute before the stand — the long flat baseline
+ * carries no information and would crush the standing response.
+ */
+export function StandOverlay({ tests, height = 170 }: {
+  tests: { samples: { t: number; bpm: number }[]; standAt: number; baseline: number; date: string }[];
+  height?: number;
+}) {
+  const p = usePalette();
+  const PRE = 60; // seconds of resting phase kept before the stand
+  const curves = tests
+    .map((t) => {
+      const pts = (t.samples || [])
+        .map((s) => ({ x: s.t - t.standAt, y: s.bpm - t.baseline }))
+        .filter((s) => s.x >= -PRE);
+      // Downsample long 1 Hz traces so several curves stay light to draw.
+      const stride = Math.max(1, Math.ceil(pts.length / 240));
+      return { date: t.date, pts: pts.filter((_, i) => i % stride === 0), gapS: stride * 3 + 1 };
+    })
+    .filter((c) => c.pts.length >= 2);
+  if (!curves.length) return null;
+  const xs = curves.flatMap((c) => [c.pts[0].x, c.pts[c.pts.length - 1].x]);
+  const ys = curves.flatMap((c) => c.pts.map((q) => q.y));
+  const xMin = Math.min(...xs), xMax = Math.max(...xs);
+  // Domain always includes the baseline (0) and the +30 criterion line.
+  const dMin = Math.min(...ys, -5), dMax = Math.max(...ys, 35);
+  const span = dMax - dMin || 1;
+  const min = dMin - span * 0.06, max = dMax + span * 0.06;
+  const W = 320, H = height, padL = 34, padR = 8, padT = 14, padB = 20;
+  const innerW = W - padL - padR;
+  const xAt = (x: number) => padL + ((x - xMin) / ((xMax - xMin) || 1)) * innerW;
+  const yAt = (v: number) => padT + (1 - (v - min) / (max - min)) * (H - padT - padB);
+  const fmtT = (sec: number) => `${sec < 0 ? '-' : ''}${Math.floor(Math.abs(sec) / 60)}:${String(Math.round(Math.abs(sec) % 60)).padStart(2, '0')}`;
+  const pathOf = (c: { pts: { x: number; y: number }[]; gapS: number }) => {
+    let d = '';
+    c.pts.forEach((q, i) => {
+      // Break the trace across sensor-dropout gaps rather than interpolating.
+      const gap = i === 0 || q.x - c.pts[i - 1].x > c.gapS;
+      d += `${gap ? 'M' : 'L'}${xAt(q.x).toFixed(1)} ${yAt(q.y).toFixed(1)} `;
+    });
+    return d.trim();
+  };
+  const last = curves.length - 1;
+  const colorOf = (i: number) => (i === last ? p.accent : p.textDim);
+  const opacityOf = (i: number) => (i === last ? 1 : 0.25 + (i / Math.max(1, last)) * 0.3);
+  const standX = xMin < 0 && xMax > 0 ? xAt(0) : null;
+  const threshold = GRADE_COLORS.bad || '#ef4444';
+  return (
+    <View style={{ backgroundColor: p.bg, borderRadius: radius.control, padding: 8 }}>
+      <Svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+        {/* Baseline (0) and the +30 bpm POTS-range criterion. */}
+        <Line x1={padL} x2={W - padR} y1={yAt(0)} y2={yAt(0)} stroke={p.textDim} strokeWidth={1} strokeDasharray="4 3" opacity={0.6} />
+        <SvgText x={padL - 4} y={yAt(0) + 3} textAnchor="end" fontSize={9} fill={p.textDim}>0</SvgText>
+        <Line x1={padL} x2={W - padR} y1={yAt(30)} y2={yAt(30)} stroke={threshold} strokeWidth={1.2} strokeDasharray="4 3" opacity={0.8} />
+        <SvgText x={padL - 4} y={yAt(30) + 3} textAnchor="end" fontSize={9} fontWeight="700" fill={threshold}>+30</SvgText>
+        <SvgText x={padL - 4} y={yAt(max) + 8} textAnchor="end" fontSize={9} fill={p.textDim}>{`+${Math.round(max)}`}</SvgText>
+        {/* The stand moment: everything right of this line is standing. */}
+        {standX != null ? (
+          <>
+            <Rect x={standX} y={padT} width={W - padR - standX} height={H - padT - padB} fill={p.accent} opacity={0.05} />
+            <Line x1={standX} x2={standX} y1={padT} y2={H - padB} stroke={p.accent} strokeWidth={1.4} strokeDasharray="2 3" opacity={0.9} />
+            <SvgText x={standX + 4} y={padT + 8} textAnchor="start" fontSize={9} fill={p.textDim}>stand</SvgText>
+          </>
+        ) : null}
+        {/* Oldest first so the latest test draws on top. */}
+        {curves.map((c, i) => (
+          <Path key={i} d={pathOf(c)} fill="none" stroke={colorOf(i)} strokeWidth={i === last ? 2 : 1.4} opacity={opacityOf(i)} strokeLinejoin="round" strokeLinecap="round" />
+        ))}
+      </Svg>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+        <RNText style={{ fontSize: 10, color: p.textDim }}>{fmtT(xMin)}</RNText>
+        <RNText style={{ fontSize: 10, color: p.textDim }}>{`+${fmtT(xMax)} standing`}</RNText>
+      </View>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: 14, rowGap: 4, marginTop: 8 }}>
+        {curves.map((c, i) => (
+          <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, opacity: opacityOf(i) }}>
+            <View style={{ width: 12, height: 3, borderRadius: 2, backgroundColor: colorOf(i) }} />
+            <RNText style={{ fontSize: 11, color: i === last ? p.text : p.textDim, fontWeight: i === last ? '700' : '400' }}>{fmtShort(c.date)}</RNText>
+          </View>
+        ))}
       </View>
     </View>
   );

@@ -300,9 +300,10 @@ function SheetView({ entry, isTop, behind, closing, requestClose, onExited, clos
         </SheetContentContext.Provider>
 
         {/* Close (and optional edit) live together in one tinted-glass pill:
-            blurred background, near-black tint, dark grey border. */}
+            blurred background, near-black tint, dark grey border. A lone button
+            gets equal padding all round so the pill is a circle, not an egg. */}
         {((!full && !hideClose) || entry.opts.action) && (
-          <View style={[styles.headerPill, { borderColor: '#46464e' }]}>
+          <View style={[styles.headerPill, !(entry.opts.action && !full && !hideClose) && { paddingHorizontal: 6 }, { borderColor: '#46464e' }]}>
             <BlurView intensity={45} tint="dark" style={StyleSheet.absoluteFill} />
             <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(6,6,8,0.78)' }]} />
             {entry.opts.action && (

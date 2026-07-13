@@ -29,28 +29,67 @@ private struct IntroView: View {
     let onExit: () -> Void
 
     var body: some View {
-        VStack(spacing: 10) {
-            Text("POTS READING")
-                .font(.system(size: 11, weight: .bold))
-                .kerning(1)
-                .foregroundStyle(DS.dim)
-            Image(systemName: "figure.stand")
-                .font(.system(size: 34))
-                .foregroundStyle(DS.blue)
-                .frame(width: 62, height: 62)
-                .background(DS.blue.opacity(0.1), in: RoundedRectangle(cornerRadius: 18))
-            Text("Lie down and rest quietly. We'll record your resting heart rate, then tell you when to stand.")
-                .font(.system(size: 13))
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.primary.opacity(0.85))
-            Text("5 minutes lying down, then 10 minutes standing.")
-                .font(.system(size: 11))
-                .multilineTextAlignment(.center)
-                .foregroundStyle(DS.dim)
-            Spacer(minLength: 0)
-            PrimaryButton(title: "Start") { test.begin() }
-            SecondaryButton(title: "Back") { onExit() }
+        // Fill one screenful so Start sits at the bottom fold; Back scrolls in below.
+        GeometryReader { geo in
+            ScrollView {
+                VStack(spacing: 0) {
+                    VStack(spacing: 10) {
+                        Text("POTS READING")
+                            .font(.system(size: 11, weight: .bold))
+                            .kerning(1)
+                            .foregroundStyle(DS.dim)
+                        Image("potsIcon")
+                            .renderingMode(.template)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 40)
+                            .foregroundStyle(DS.blue)
+                            .frame(width: 64, height: 44)
+                            .background(DS.blue.opacity(0.1), in: RoundedRectangle(cornerRadius: 14))
+                        Text("Lie down and rest quietly. We'll tell you when to stand.")
+                            .font(.system(size: 13))
+                            .multilineTextAlignment(.center)
+                            .foregroundStyle(.primary.opacity(0.85))
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 12)
+                        PrimaryButton(title: "Start") { test.begin() }
+                    }
+                    // Leave clearance below Start so the device's rounded corners
+                    // don't clip it (fills just under one screenful, not flush).
+                    .frame(minHeight: geo.size.height - 30)
+                    // Matches the Start button's size (secondary styling).
+                    Button { onExit() } label: {
+                        Text("Back")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundStyle(DS.dim)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(DS.card, in: RoundedRectangle(cornerRadius: 16))
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, 10)
+                }
+            }
         }
+    }
+}
+
+/// HR number that never shows "searching": grey "00" before the first reading,
+/// the live value in `liveColor` once found, and — if the signal later drops —
+/// the last value held and greyed until a new sample arrives. Metric number font.
+struct HrReadout: View {
+    let hr: Double?
+    let searching: Bool
+    var size: CGFloat = 15
+    var liveColor: Color = DS.dim
+
+    var body: some View {
+        let hasReading = hr != nil
+        let stale = !hasReading || searching
+        Text(hasReading ? "\(Int((hr ?? 0).rounded()))" : "00")
+            .font(DS.number(size))
+            .monospacedDigit()
+            .foregroundStyle(stale ? DS.faint : liveColor)
     }
 }
 
@@ -59,38 +98,47 @@ private struct RestingView: View {
     @ObservedObject var workout: WorkoutManager
 
     var body: some View {
-        VStack(spacing: 4) {
-            Text("RESTING")
-                .font(.system(size: 11, weight: .bold))
-                .kerning(1)
-                .foregroundStyle(DS.blue)
-            Text("Lie still & relax")
-                .font(.system(size: 12))
-                .foregroundStyle(DS.dim)
-            ZStack {
-                RingProgress(
-                    progress: Double(test.stageElapsed) / Double(StandTestController.restingDuration),
-                    color: DS.blue
-                )
-                VStack(spacing: 3) {
-                    Text(fmtCountdown(StandTestController.restingDuration - test.stageElapsed))
-                        .font(.system(size: 34, weight: .heavy, design: .rounded))
-                        .monospacedDigit()
-                    HStack(spacing: 4) {
-                        if workout.searching {
-                            Text("searching…").font(.system(size: 11)).foregroundStyle(DS.dim)
-                        } else {
-                            BeatingHeart(size: 11)
-                            Text("\(Int((workout.hr ?? 0).rounded())) bpm")
-                                .font(.system(size: 12))
-                                .monospacedDigit()
-                                .foregroundStyle(DS.dim)
+        // Header + ring fit one screen; Skip sits below the fold (scroll to reveal).
+        GeometryReader { geo in
+            let circleD = min(geo.size.width - 24, geo.size.height - 40)
+            ScrollView {
+                VStack(spacing: 0) {
+                    VStack(spacing: 6) {
+                        Text("RESTING")
+                            .font(.system(size: 11, weight: .bold))
+                            .kerning(1)
+                            .foregroundStyle(DS.blue)
+                        Text("Lie still & relax")
+                            .font(.system(size: 12))
+                            .foregroundStyle(DS.dim)
+                        ZStack {
+                            RingProgress(
+                                progress: Double(test.stageElapsed) / Double(StandTestController.restingDuration),
+                                color: DS.blue
+                            )
+                            VStack(spacing: 4) {
+                                Text(fmtCountdown(StandTestController.restingDuration - test.stageElapsed))
+                                    .font(DS.number(32))
+                                    .monospacedDigit()
+                                HStack(spacing: 4) {
+                                    BeatingHeart(size: 12, bpm: workout.searching ? nil : workout.hr)
+                                    HrReadout(hr: workout.hr, searching: workout.searching, size: 15)
+                                    Text("bpm")
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundStyle(DS.dim)
+                                }
+                            }
+                            .padding(.horizontal, 12)   // keep the readout clear of the ring
                         }
+                        .frame(width: circleD, height: circleD)
+                        .padding(.top, 6)               // spacing above the circle
                     }
+                    .frame(minHeight: geo.size.height, alignment: .top)
+                    SecondaryButton(title: "Skip to standing") { test.skipToStanding() }
+                        .padding(.top, 12)
+                        .padding(.horizontal, 4)
                 }
             }
-            .padding(.vertical, 6)
-            SecondaryButton(title: "Skip to standing") { test.skipToStanding() }
         }
     }
 }
@@ -134,41 +182,48 @@ private struct StandingView: View {
     @ObservedObject var workout: WorkoutManager
 
     var body: some View {
-        VStack(spacing: 4) {
-            Text("STANDING")
-                .font(.system(size: 11, weight: .bold))
-                .kerning(1)
-                .foregroundStyle(DS.accent)
-            Text("Hold still, don't move")
-                .font(.system(size: 12))
-                .foregroundStyle(DS.dim)
-            ZStack {
-                RingProgress(
-                    progress: Double(test.stageElapsed) / Double(StandTestController.standingDuration),
-                    color: DS.accent
-                )
-                VStack(spacing: 4) {
-                    if workout.searching {
-                        Text("searching…").font(.system(size: 15, weight: .semibold)).foregroundStyle(DS.dim)
-                    } else {
-                        HStack(alignment: .lastTextBaseline, spacing: 3) {
-                            Text("\(Int((workout.hr ?? 0).rounded()))")
-                                .font(.system(size: 32, weight: .heavy, design: .rounded))
-                                .monospacedDigit()
-                            Text("bpm")
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundStyle(DS.dim)
+        // Header + ring fit one screen; Finish sits below the fold (scroll to reveal).
+        GeometryReader { geo in
+            let circleD = min(geo.size.width - 24, geo.size.height - 40)
+            ScrollView {
+                VStack(spacing: 0) {
+                    VStack(spacing: 6) {
+                        Text("STANDING")
+                            .font(.system(size: 11, weight: .bold))
+                            .kerning(1)
+                            .foregroundStyle(DS.accent)
+                        Text("Hold still, don't move")
+                            .font(.system(size: 12))
+                            .foregroundStyle(DS.dim)
+                        ZStack {
+                            RingProgress(
+                                progress: Double(test.stageElapsed) / Double(StandTestController.standingDuration),
+                                color: DS.accent
+                            )
+                            VStack(spacing: 4) {
+                                HStack(alignment: .lastTextBaseline, spacing: 3) {
+                                    HrReadout(hr: workout.hr, searching: workout.searching, size: 28, liveColor: .primary)
+                                    Text("bpm")
+                                        .font(.system(size: 11, weight: .bold))
+                                        .foregroundStyle(DS.dim)
+                                }
+                                DeltaChip(delta: test.delta)
+                                Text("\(fmtCountdown(StandTestController.standingDuration - test.stageElapsed)) left")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .monospacedDigit()
+                                    .foregroundStyle(DS.dim)
+                            }
+                            .padding(.horizontal, 10)   // keep the readout clear of the ring
                         }
+                        .frame(width: circleD, height: circleD)
+                        .padding(.top, 6)               // spacing above the circle
                     }
-                    DeltaChip(delta: test.delta)
-                    Text("\(fmtCountdown(StandTestController.standingDuration - test.stageElapsed)) left")
-                        .font(.system(size: 12, weight: .semibold))
-                        .monospacedDigit()
-                        .foregroundStyle(DS.dim)
+                    .frame(minHeight: geo.size.height, alignment: .top)
+                    SecondaryButton(title: "Finish now") { test.finishStanding() }
+                        .padding(.top, 12)
+                        .padding(.horizontal, 4)
                 }
             }
-            .padding(.vertical, 6)
-            SecondaryButton(title: "Finish now") { test.finishStanding() }
         }
     }
 }
@@ -182,7 +237,7 @@ private struct ResultsView: View {
             Text(label).font(.system(size: 12.5)).foregroundStyle(color ?? DS.dim)
             Spacer()
             Text(value)
-                .font(.system(size: 15, weight: .bold))
+                .font(DS.number(15))
                 .monospacedDigit()
                 .foregroundStyle(color ?? .primary)
         }
@@ -202,14 +257,14 @@ private struct ResultsView: View {
                     .font(.system(size: 15, weight: .heavy))
                     .padding(.bottom, 4)
 
-                let baseline = test.baseline.map { String(Int($0.rounded())) + " bpm" } ?? "—"
-                let peak = test.peakHr > 0 ? String(Int(test.peakHr.rounded())) + " bpm" : "—"
+                let baseline = test.baseline.map { String(Int($0.rounded())) + " bpm" } ?? "00 bpm"
+                let peak = test.peakHr > 0 ? String(Int(test.peakHr.rounded())) + " bpm" : "00 bpm"
                 let deltaColor = DS.deltaColor(Double(test.sustainedDeltaForDisplay ?? Int(test.peakDelta.rounded())))
                 row("Resting HR", baseline)
                 row("Peak standing", peak)
                 row(
                     "Sustained rise",
-                    test.sustainedDeltaForDisplay.map { "Δ \($0 >= 0 ? "+" : "")\($0) bpm" } ?? "—",
+                    test.sustainedDeltaForDisplay.map { "Δ \($0 >= 0 ? "+" : "")\($0) bpm" } ?? "Δ 00 bpm",
                     color: deltaColor
                 )
                 row("Max increase", "Δ +\(Int(test.peakDelta.rounded())) bpm")
@@ -217,9 +272,9 @@ private struct ResultsView: View {
                 Text("Check the Autonomic app for more details.")
                     .font(.system(size: 11))
                     .multilineTextAlignment(.center)
-                    .foregroundStyle(DS.dim)
+                    .foregroundStyle(.white)
                     .padding(.top, 6)
-                Text("Wellness screening only — HR-based, does not measure blood pressure, and is not a diagnosis. Discuss with your doctor.")
+                Text("Wellness screening only. HR-based, does not measure blood pressure, and is not a diagnosis. Discuss with your doctor.")
                     .font(.system(size: 10))
                     .multilineTextAlignment(.center)
                     .foregroundStyle(DS.dim.opacity(0.8))

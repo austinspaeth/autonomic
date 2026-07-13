@@ -22,6 +22,14 @@ export interface Chart { label: string; series: Series[]; zones?: Zone[] | null;
 /** Which readings a blood-pressure card is filtered to. */
 export type BpPeriod = 'all' | 'morning' | 'evening';
 export interface BpSeries { sys: (number | null)[]; dia: (number | null)[]; cat?: ScoreCat | null }
+/** Which transition an Orthostatic Events card is filtered to. */
+export type OrthoTransition = 'all' | 'lay' | 'sit' | 'stairs';
+/** One transition-filter variant of the Orthostatic Events card: the view swaps
+ *  charts/stats/insights/grade wholesale when the filter changes. */
+export interface OrthoVariant { cat: ScoreCat | null; charts: Chart[]; stats: Stat[]; insights: Insight[] }
+/** A stand test whose HR trace joins the card's curve overlay. The waveform
+ *  itself stays in the sidecar; the view resolves it by reading id. */
+export interface StandCurveRef { id: string; date: string; standAt: number; baseline: number }
 export interface Stat { label: string; value: number | string | null; sub?: string; color?: string }
 export interface Insight { text: string; strength?: 'strong' | 'mod' | null }
 export interface BarGroup { label: string; rows: { name: string; count: number; color?: string }[]; fmt?: (c: number) => string }
@@ -38,6 +46,11 @@ export interface AnalysisCard {
   /** Blood-pressure period variants. When set, the card shows an
    *  All/Morning/Evening link toggle that swaps the dumbbell + avg stats. */
   bpFilter?: Record<BpPeriod, BpSeries>;
+  /** Orthostatic-event transition variants. When set, the card shows an
+   *  All/Lay/Sit/Stairs link toggle that swaps charts, stats and the grade. */
+  orthoFilter?: Record<OrthoTransition, OrthoVariant>;
+  /** Stand tests (oldest → newest) to draw as an aligned HR-curve overlay. */
+  standCurves?: StandCurveRef[];
   /** Grade dot beside the title, like the HRV Progress sections. Cards with
    *  several graded values (e.g. BP's systolic + diastolic) take the worst. */
   cat?: ScoreCat | null;
@@ -157,26 +170,115 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
     return cards;
   };
 
-  const pots = (): AnalysisCard[] => {
+  /** The controlled watch stand test: same protocol every time, so tests are
+   *  directly comparable test to test. This is the "is my physiology actually
+   *  improving" card; everyday events answer "is daily life getting easier". */
+  const standTest = (): AnalysisCard[] => {
+    const num = (v: unknown) => { const n = parseFloat(v as string); return isNaN(n) ? null : n; };
+    const sus = acAgg(buckets, (d) => acReadVals(d, 'standTest', 'sustainedDelta'));
+    const peak = acAgg(buckets, (d) => acReadVals(d, 'standTest', 'peakDelta'));
+    const base = acAgg(buckets, (d) => acReadVals(d, 'standTest', 'baselineHr'));
+    if (!acPresent(sus).length && !acPresent(peak).length) return [];
+    // Every test in range, oldest → newest (bucket days are already sorted).
+    const tests: { dk: string; r: Entry }[] = [];
+    buckets.forEach((b) => b.days.forEach((dk) => (days[dk].readings || []).forEach((r) => { if (r.type === 'standTest') tests.push({ dk, r }); })));
+    const susSeq = tests.map((t) => num(t.r.sustainedDelta)).filter((v): v is number => v != null);
+    // Grade dot follows the latest test, not the range average: this is a
+    // progress card, and a bad month shouldn't drag on a recovered one.
+    const latestSus = susSeq.length ? susSeq[susSeq.length - 1] : null;
+    const latestCat = latestSus != null ? catFromBands(latestSus, BANDS.standDelta) : null;
+    const met = tests.filter((t) => t.r.metThreshold === true).length;
+    const insights: Insight[] = [];
+    if (susSeq.length >= 2) {
+      const d = Math.round(susSeq[susSeq.length - 1] - susSeq[0]);
+      if (Math.abs(d) >= 3) insights.push({
+        text: d < 0
+          ? `Sustained rise improved ${Math.abs(d)} bpm across ${susSeq.length} tests in this range.`
+          : `Sustained rise is up ${d} bpm across ${susSeq.length} tests in this range.`,
+        strength: d < 0 ? 'strong' : 'mod',
+      });
+    }
+    const standCurves: StandCurveRef[] = tests
+      .filter((t) => num(t.r.standAt) != null && num(t.r.baselineHr) != null)
+      .slice(-5)
+      .map((t) => ({ id: String(t.r.id), date: t.dk, standAt: num(t.r.standAt)!, baseline: num(t.r.baselineHr)! }));
+    return [{
+      title: 'POTS Test', sub: range,
+      cat: latestCat,
+      desc: 'Your guided lay-to-stand tests. Same protocol every time, so these are directly comparable.',
+      help: 'Each point is one watch stand test. Sustained is the average rise over the final minute of standing versus the supine baseline; a sustained rise of 30 bpm or more (40 in ages 12-19) is the adult POTS-range criterion, and the zones shade it. Peak is the largest single rise. The response curves draw your recent tests aligned at the stand moment, as HR above each test\'s own baseline: watch the standing plateau flatten as recovery progresses. The grade dot follows your latest test.',
+      tiles: true,
+      stats: [
+        { label: 'Last sustained rise', value: latestSus != null ? Math.round(latestSus) : null, sub: 'bpm', color: latestCat ? SCORE_COLORS[latestCat] : undefined },
+        { label: 'Avg baseline', value: avgRound(base), sub: 'bpm' },
+        { label: 'Met POTS threshold', value: tests.length ? `${met} of ${tests.length}` : null },
+      ],
+      charts: [{
+        label: 'Sustained vs peak rise (bpm)',
+        series: [series(sus, '#f97316', 'Sustained', { pointBands: BANDS.standDelta }), series(peak, '#a78bfa', 'Peak')],
+        zones: acBandZones('standDelta'), integer: true,
+        legend: [['Sustained', '#f97316'], ['Peak', '#a78bfa']],
+      }],
+      standCurves,
+      insights,
+    }];
+  };
+
+  /** Everyday orthostatic events (stairs, sit to stand, lay to stand). These
+   *  are noisy, context-dependent samples, so the card filters by transition:
+   *  stairs always spike, and a trend only means something like for like. */
+  const ortho = (): AnalysisCard[] => {
     const incOf = (r: Entry) => { const a = parseFloat(r.afterHr as string), b = parseFloat(r.beforeHr as string); return !isNaN(a) && !isNaN(b) ? a - b : null; };
     const recOf = (r: Entry) => { const a = parseFloat(r.afterHr as string), m = parseFloat(r.hr1min as string); return !isNaN(a) && !isNaN(m) ? a - m : null; };
-    const inc = acAgg(buckets, (d) => (d.readings || []).filter((r) => r.type === 'orthostatic').map(incOf).filter((v): v is number => v != null));
-    const rec = acAgg(buckets, (d) => (d.readings || []).filter((r) => r.type === 'orthostatic').map(recOf).filter((v): v is number => v != null));
-    if (!acPresent(inc).length) return [];
-    let potsN = 0;
-    Object.keys(days).forEach((dk) => (days[dk].readings || []).forEach((r) => { if (r.type === 'orthostatic') { const v = incOf(r); if (v != null && v >= 30) potsN++; } }));
-    // Grade dot: worst of the standing-rise and 1-minute-recovery averages.
-    const incAvg = acMean(inc), recAvg = acMean(rec);
+    const TRANSITIONS: Record<OrthoTransition, (r: Entry) => boolean> = {
+      all: () => true,
+      lay: (r) => r.transition === 'Laying to standing',
+      sit: (r) => r.transition === 'Sitting to standing',
+      stairs: (r) => r.transition === 'Climbing stairs',
+    };
+    const variant = (filt: OrthoTransition): OrthoVariant => {
+      const f = TRANSITIONS[filt];
+      const inc = acAgg(buckets, (d) => (d.readings || []).filter((r) => r.type === 'orthostatic' && f(r)).map(incOf).filter((v): v is number => v != null));
+      const rec = acAgg(buckets, (d) => (d.readings || []).filter((r) => r.type === 'orthostatic' && f(r)).map(recOf).filter((v): v is number => v != null));
+      let n = 0, potsN = 0;
+      buckets.forEach((b) => b.days.forEach((dk) => (days[dk].readings || []).forEach((r) => {
+        if (r.type !== 'orthostatic' || !f(r)) return;
+        const v = incOf(r); if (v == null) return;
+        n++; if (v >= 30) potsN++;
+      })));
+      const incAvg = acMean(inc), recAvg = acMean(rec);
+      // The ≥30 bpm POTS criterion only applies to standing up, so the rise
+      // chart drops its zones and grading on the stairs view.
+      const graded = filt !== 'stairs';
+      return {
+        cat: worstCat([
+          incAvg != null && graded ? catFromBands(incAvg, BANDS.orthoIncrease) : null,
+          recAvg != null ? catFromBands(recAvg, BANDS.orthoRecovery) : null,
+        ]),
+        charts: [
+          { label: 'HR rise (bpm)', series: [series(inc, '#f97316', undefined, { pointBands: graded ? BANDS.orthoIncrease : null })], zones: graded ? acBandZones('orthoIncrease') : null, integer: true },
+          { label: 'HR drop by 1 min (bpm)', series: [series(rec, '#38bdf8', undefined, { pointBands: BANDS.orthoRecovery })], zones: acBandZones('orthoRecovery'), integer: true },
+        ],
+        stats: [
+          { label: 'Avg rise', value: avgRound(inc), sub: 'bpm' },
+          { label: 'Avg 1 min drop', value: avgRound(rec), sub: 'bpm' },
+          { label: 'Events', value: n || null },
+        ],
+        insights: potsN && graded ? [{ text: `${potsN} of ${n} event${n === 1 ? '' : 's'} reached a ≥30 bpm rise (the adult POTS-range threshold).`, strength: 'mod' }] : [],
+      };
+    };
+    const orthoFilter: Record<OrthoTransition, OrthoVariant> = { all: variant('all'), lay: variant('lay'), sit: variant('sit'), stairs: variant('stairs') };
+    const all = orthoFilter.all;
+    if (!all.charts.some((c) => c.series.some((s) => acPresent(s.values).length))) return [];
     return [{
-      title: 'Orthostatic Events', sub: range,
-      cat: worstCat([
-        incAvg != null ? catFromBands(incAvg, BANDS.orthoIncrease) : null,
-        recAvg != null ? catFromBands(recAvg, BANDS.orthoRecovery) : null,
-      ]),
-      desc: 'How much your heart rate rises when you stand.',
-      help: 'The heart-rate increase from resting to standing for each logged orthostatic event. A sustained rise of 30 bpm or more (40 in adolescents) within 10 minutes of standing is the adult POTS-range criterion, and the zones shade that threshold. Trends matter more than any single stand.',
-      charts: [{ label: 'HR increase on standing', series: [series(inc, '#f97316', undefined, { pointBands: BANDS.orthoIncrease })], zones: acBandZones('orthoIncrease'), integer: true }],
-      insights: potsN ? [{ text: `${potsN} event${potsN === 1 ? '' : 's'} reached a ≥30 bpm standing rise (the adult POTS-range threshold).`, strength: 'mod' }] : [],
+      title: 'POTS Episodes', sub: range,
+      cat: all.cat,
+      desc: 'How your heart rate reacts to everyday position changes, and how fast it settles.',
+      help: 'Each event logs your HR before and after a transition, plus one minute in. The rise chart is the jump on the change; for the stand-up transitions the zones shade the ≥30 bpm adult POTS-range criterion (stairs always spike, so they are not graded). The 1 min drop shows how quickly HR settles back from its peak; a bigger drop means faster vagal recovery, and for everyday events it is often the cleaner progress signal. Use the transition links to compare like with like.',
+      charts: all.charts,
+      stats: all.stats,
+      insights: all.insights,
+      orthoFilter,
     }];
   };
 
@@ -270,7 +372,7 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
     { id: 'outlook', icon: 'gauge', title: 'Outlook', desc: 'Recovery score & trends', buckets: bl, build: () => nonEmpty([...outlook(), heat()]) },
     { id: 'hrv', icon: 'heartPulse', title: 'HRV', desc: 'Heart-rate variability', buckets: bl, build: () => nonEmpty(hrv()) },
     { id: 'vitals', icon: 'heart', title: 'Vitals', desc: 'Blood pressure & heart rate', buckets: bl, build: () => nonEmpty(vitals()) },
-    { id: 'pots', icon: 'standing', title: 'POTS', desc: 'Orthostatic events', buckets: bl, build: () => nonEmpty(pots()) },
+    { id: 'pots', icon: 'standing', title: 'POTS', desc: 'Stand tests & events', buckets: bl, build: () => nonEmpty([...standTest(), ...ortho()]) },
     { id: 'sleep', icon: 'moon', title: 'Sleep', desc: 'Duration & timing', buckets: bl, build: () => nonEmpty(sleep()) },
     { id: 'activity', icon: 'bike', title: 'Activity', desc: 'Workouts & exercise', buckets: bl, build: () => nonEmpty(activity()) },
     { id: 'triggers', icon: 'triangle', title: 'Triggers', desc: 'Triggers & hydration', buckets: bl, build: () => nonEmpty(triggers()) },

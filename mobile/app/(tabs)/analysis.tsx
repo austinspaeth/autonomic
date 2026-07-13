@@ -4,10 +4,10 @@ import { BlurView } from 'expo-blur';
 import { Screen } from '../../src/components/Header';
 import { Icon, IconName } from '../../src/components/Icon';
 import { HelpDot, ScoreDot, Segmented } from '../../src/components/ui';
-import { Bars, BpDumbbell, LineChart, ZonesToggle } from '../../src/components/charts';
+import { Bars, BpDumbbell, LineChart, StandOverlay, ZonesToggle } from '../../src/components/charts';
 import { fonts, radius, usePalette } from '../../src/theme';
-import { useAppState } from '../../src/store/store';
-import { buildCategories, type AnalysisCard, type BpPeriod } from '../../src/lib/analysis/categories';
+import { getWaveform, useAppState } from '../../src/store/store';
+import { buildCategories, type AnalysisCard, type BpPeriod, type OrthoTransition } from '../../src/lib/analysis/categories';
 import { resolveProtocol } from '../../src/lib/scoring/day';
 import { avgRound, catFromBands, type Mode } from '../../src/lib/analysis/buckets';
 import { HrvFilterLinks, HrvProgress, type Filt } from '../../src/features/HrvProgress';
@@ -267,14 +267,18 @@ function StickyBar({ headerH, active, dir, onUp, hrvFilt, setHrvFilt }: {
 const BP_PERIODS: { val: BpPeriod; label: string }[] = [
   { val: 'all', label: 'All' }, { val: 'morning', label: 'Morning' }, { val: 'evening', label: 'Evening' },
 ];
+const ORTHO_TRANSITIONS: { val: OrthoTransition; label: string }[] = [
+  { val: 'all', label: 'All' }, { val: 'lay', label: 'Lay→stand' }, { val: 'sit', label: 'Sit→stand' }, { val: 'stairs', label: 'Stairs' },
+];
 
-/** Text-link period toggle (matching the HRV structured/unstructured/both
- *  style): the active option in bright white with a short underline beneath. */
-function BpFilterLinks({ value, onChange }: { value: BpPeriod; onChange: (v: BpPeriod) => void }) {
+/** Text-link filter toggle (matching the HRV structured/unstructured/both
+ *  style): the active option in bright white with a short underline beneath.
+ *  Shared by the BP period filter and the orthostatic transition filter. */
+function FilterLinks<T extends string>({ options, value, onChange }: { options: { val: T; label: string }[]; value: T; onChange: (v: T) => void }) {
   const p = usePalette();
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
-      {BP_PERIODS.map((o) => {
+      {options.map((o) => {
         const on = o.val === value;
         return (
           <Pressable key={o.val} onPress={() => onChange(o.val)} hitSlop={6} style={{ alignItems: 'center' }}>
@@ -303,8 +307,27 @@ const CardView = React.memo(function CardView({ card, buckets }: { card: Analysi
   // morning-only and evening-only readings. Inert on non-BP cards.
   const [bpFilt, setBpFilt] = useState<BpPeriod>('all');
   const bpSpan = card.bpFilter ? card.bpFilter[bpFilt] : null;
+  // Orthostatic transition filter: each variant carries its own charts, stats,
+  // insights and grade, so the view swaps them wholesale. Inert elsewhere.
+  const [orthoFilt, setOrthoFilt] = useState<OrthoTransition>('all');
+  const orthoSpan = card.orthoFilter ? card.orthoFilter[orthoFilt] : null;
+  const charts = orthoSpan ? orthoSpan.charts : (card.charts || []);
+  const insights = orthoSpan ? orthoSpan.insights : (card.insights || []);
+  const orthoEmpty = !!orthoSpan && !charts.some((c) => c.series.some((s) => s.values.some((v) => v != null && !isNaN(v))));
+  // Stand-test curve overlay: resolve each referenced test's 1 Hz HR trace
+  // from the waveform sidecar at render time (the card only carries refs).
+  const standTests = useMemo(() => {
+    if (!card.standCurves?.length) return null;
+    const t = card.standCurves
+      .map((c) => {
+        const samples = getWaveform(c.id)?.sampledHr;
+        return samples && samples.length >= 2 ? { samples, standAt: c.standAt, baseline: c.baseline, date: c.date } : null;
+      })
+      .filter((x): x is NonNullable<typeof x> => x != null);
+    return t.length ? t : null;
+  }, [card.standCurves]);
   const stats = useMemo(() => {
-    const st = card.stats ? card.stats.slice() : [];
+    const st = orthoSpan ? orthoSpan.stats.slice() : card.stats ? card.stats.slice() : [];
     // BP: the two avg tiles follow the selected period's readings.
     if (bpSpan && st.length >= 2) {
       st[0] = { ...st[0], value: avgRound(bpSpan.sys) };
@@ -322,12 +345,12 @@ const CardView = React.memo(function CardView({ card, buckets }: { card: Analysi
       }
     }
     return st;
-  }, [card.stats, selChart, selSeries, sel, buckets, bpSpan]);
-  // Grade dot beside the title, like the HRV Progress sections: BP follows the
-  // period filter, a dragged selectStat chart re-grades the selected bucket,
+  }, [card.stats, selChart, selSeries, sel, buckets, bpSpan, orthoSpan]);
+  // Grade dot beside the title, like the HRV Progress sections: BP/ortho follow
+  // their filter, a dragged selectStat chart re-grades the selected bucket,
   // otherwise the range average's grade from the builder.
   const selVal = selChart && selSeries && sel != null && sel >= 0 ? selSeries.values[sel] : null;
-  const cat = bpSpan ? bpSpan.cat : selVal != null && card.catBands ? catFromBands(selVal, card.catBands) : card.cat;
+  const cat = orthoSpan ? orthoSpan.cat : bpSpan ? bpSpan.cat : selVal != null && card.catBands ? catFromBands(selVal, card.catBands) : card.cat;
   return (
     <View style={{ backgroundColor: p.surface, borderColor: p.border, borderWidth: 1, borderRadius: radius.card, padding: 16, marginBottom: 12 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -373,13 +396,23 @@ const CardView = React.memo(function CardView({ card, buckets }: { card: Analysi
       ) : null}
       {card.bpFilter ? (
         <View style={{ marginTop: 12 }}>
-          <BpFilterLinks value={bpFilt} onChange={setBpFilt} />
+          <FilterLinks options={BP_PERIODS} value={bpFilt} onChange={setBpFilt} />
         </View>
       ) : null}
       {!card.tiles && (card.desc || card.sub) ? (
         <Text style={{ color: p.textDim, fontSize: 13, lineHeight: 19, marginTop: 8 }}>{card.desc || card.sub}</Text>
       ) : null}
-      {(card.charts || []).map((ch, i) => (
+      {card.orthoFilter ? (
+        <View style={{ marginTop: 12 }}>
+          <FilterLinks options={ORTHO_TRANSITIONS} value={orthoFilt} onChange={setOrthoFilt} />
+        </View>
+      ) : null}
+      {orthoEmpty ? (
+        <Text style={{ color: p.textDim, fontSize: 13, marginTop: 14 }}>
+          {`No ${(ORTHO_TRANSITIONS.find((o) => o.val === orthoFilt)?.label || '').toLowerCase()} events in this range.`}
+        </Text>
+      ) : null}
+      {(orthoEmpty ? [] : charts).map((ch, i) => (
         <View key={i} style={{ marginTop: 14 }}>
           {ch.label ? <Text style={{ fontSize: 12, color: p.text, marginBottom: 6, fontWeight: '600' }}>{ch.label}</Text> : null}
           {ch.dumbbell
@@ -399,13 +432,19 @@ const CardView = React.memo(function CardView({ card, buckets }: { card: Analysi
           ) : null}
         </View>
       ))}
+      {standTests ? (
+        <View style={{ marginTop: 14 }}>
+          <Text style={{ fontSize: 12, color: p.text, marginBottom: 6, fontWeight: '600' }}>Response curves · HR above baseline (bpm)</Text>
+          <StandOverlay tests={standTests} />
+        </View>
+      ) : null}
       {(card.bars || []).map((bg, i) => (
         <View key={i} style={{ marginTop: 14 }}>
           {bg.label ? <Text style={{ fontSize: 12, color: p.text, marginBottom: 6, fontWeight: '600' }}>{bg.label}</Text> : null}
           <Bars rows={bg.rows} fmt={bg.fmt} />
         </View>
       ))}
-      {(card.insights || []).map((ins, i) => (
+      {insights.map((ins, i) => (
         <View key={i} style={{ flexDirection: 'row', gap: 10, backgroundColor: p.surface2, borderRadius: radius.control, padding: 12, marginTop: 10 }}>
           <View style={{ width: 3, borderRadius: 2, backgroundColor: ins.strength === 'strong' ? '#16a34a' : ins.strength === 'mod' ? '#eab308' : p.accent }} />
           <Text style={{ flex: 1, fontSize: 14, color: p.text, lineHeight: 18 }}>{ins.text}</Text>

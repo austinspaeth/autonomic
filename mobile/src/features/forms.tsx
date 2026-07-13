@@ -13,7 +13,7 @@ import { ReadingSummary } from '../components/summary';
 import { radius, usePalette } from '../theme';
 import type { Entry, TypeDef } from '../lib/types';
 import {
-  ACTIVITY_TYPES, entryFields, isDivider, isNumberField, LIVE_ONLY_READING_TYPES,
+  ACTIVITY_TYPES, entryFields, isDivider, isNumberField,
   READING_TYPES, readingLabel,
 } from '../lib/registry';
 import { typesFor, type TypeKind } from '../lib/typeCatalog';
@@ -25,6 +25,10 @@ import { deleteEntry, getState, upsertEntry, useAppState } from '../store/store'
 import { defaultTimeFor, fmtTime12, uid } from '../lib/dates';
 import { useToast } from '../components/Toast';
 import { HrvSetup } from './hrv/Setup';
+import { OrthostaticIntroSheet } from './OrthostaticIntro';
+import { DevicesScreen } from './Devices';
+import { StandTestSession } from './pots/StandTestSession';
+import { OrthostaticSession } from './pots/OrthostaticSession';
 
 type ArrKey = 'readings' | 'activities' | 'meds' | 'symptoms';
 
@@ -124,28 +128,68 @@ function ReadingImportSheet({ type, dk, source, onManual, onPick }: {
   );
 }
 
-/** Reading picker with a live-capture call-to-action above the manual list.
- *  HRV kinds are live-capture only, so they are excluded from the manual list. */
+/** Add-reading picker labels: the stand test reads more descriptively here
+ *  than the registry label the journal rows and summaries use. */
+const PICKER_LABELS: Record<string, string> = { standTest: 'POTS Standing Test' };
+const pickerLabel = (t: string) => PICKER_LABELS[t] || READING_TYPES[t].label;
+
+/** Watch companion tints for the two POTS captures, matched to the watch home
+ *  screen (DS.blue / DS.purple) so the phone and watch read as one product. */
+const POTS_BLUE = '#4aa3f0';
+const POTS_PURPLE = '#9d6bf5';
+const BP_GOLD = '#e0a030'; // watch DS.amber — the goldish-orange blood-pressure tint
+
+/** A 6-digit hex tint → its semi-transparent chip fill (the faded square the
+ *  solid icon sits on, matching the milestone cards' icon treatment). */
+function softTint(hex: string): string {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, 0.15)`;
+}
+
+/** Reading picker styled after the watch home screen: a stack of grey card
+ *  buttons, each with a tinted icon chip (semi-transparent square + solid icon,
+ *  as on the milestone cards). HRV is the live-capture call-to-action; the two
+ *  POTS captures carry their watch tints (blue / purple), the plain readings a
+ *  neutral grey. HRV kinds are live-capture only, so the manual list starts at
+ *  Blood Pressure. */
 function ReadingPicker({ onLive, onPick }: { onLive: () => void; onPick: (type: string) => void }) {
   const p = usePalette();
-  const types = Object.keys(READING_TYPES).filter((t) => !LIVE_ONLY_READING_TYPES.has(t));
+  const tintFor = (t: string) => (t === 'standTest' ? POTS_BLUE : t === 'orthostatic' ? POTS_PURPLE : t === 'bp' ? BP_GOLD : p.textDim);
+  const subFor: Record<string, string> = {
+    bp: 'Systolic, diastolic, pulse',
+    restingHr: 'At rest, laying or sitting',
+    standTest: 'Lie and stand test',
+    orthostatic: 'Stairs or other events',
+  };
+  // The two POTS captures lead the manual list (the stand test is live-only but
+  // stays in, pointing at the watch app); BP and resting HR follow.
+  const manual = ['standTest', 'orthostatic', 'bp', 'restingHr'];
+  const readingRow = (t: string) => ({ key: t, title: pickerLabel(t), sub: subFor[t] || '', icon: READING_TYPES[t].icon as string, tint: tintFor(t), onPress: () => onPick(t) });
+  const rows: { key: string; title: string; sub: string; icon: string; tint: string; onPress: () => void }[] = [
+    { key: 'hrv', title: 'HRV Reading', sub: 'From a chest strap or Apple Watch', icon: 'heartPulse', tint: p.accent, onPress: onLive },
+    ...manual.map(readingRow),
+  ];
   return (
     <View>
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 16 }}>Add reading</Text>
-      <Pressable onPress={onLive} style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: radius.control, backgroundColor: p.accentSoft, borderWidth: 1, borderColor: p.accent, marginBottom: 8 }, pressed && { opacity: 0.7 }]}>
-        <Icon name="heartPulse" size={24} color={p.accent} />
-        <View style={{ flex: 1 }}>
-          <Text style={{ color: p.accent, fontWeight: '700', fontSize: 17 }}>Capture live HRV reading</Text>
-          <Text style={{ color: p.textDim, fontSize: 13 }}>From a chest strap or Apple Watch</Text>
-        </View>
-        <Icon name="chevronRight" size={20} color={p.accent} />
-      </Pressable>
-      {types.map((t, i) => (
-        <Pressable key={t} onPress={() => onPick(t)} style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 15, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: p.border }, pressed && { opacity: 0.5 }]}>
-          <Icon name={READING_TYPES[t].icon as never} size={22} color={p.textDim} />
-          <Text style={{ color: p.text, fontSize: 17 }}>{READING_TYPES[t].label}</Text>
-        </Pressable>
-      ))}
+      <View style={{ gap: 10 }}>
+        {rows.map((r) => (
+          <Pressable
+            key={r.key}
+            onPress={r.onPress}
+            style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 13, padding: 12, borderRadius: radius.card, backgroundColor: p.surface2 }, pressed && { opacity: 0.6 }]}
+          >
+            <View style={{ width: 40, height: 40, borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: softTint(r.tint) }}>
+              <Icon name={r.icon as never} size={21} color={r.tint} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: p.text, fontSize: 16, fontWeight: '700' }}>{r.title}</Text>
+              {r.sub ? <Text style={{ color: p.textDim, fontSize: 12.5, marginTop: 1 }}>{r.sub}</Text> : null}
+            </View>
+            <Icon name="chevronRight" size={18} color={p.textDim} />
+          </Pressable>
+        ))}
+      </View>
     </View>
   );
 }
@@ -155,7 +199,9 @@ function ReadingPicker({ onLive, onPick }: { onLive: () => void; onPick: (type: 
  *  that is reviewed then saved as new — it is not treated as an edit (no Delete)
  *  and, when `fromHealth`, is not re-published back to Health. */
 export function EntryForm({ typeMap, arrKey, dk, type, existing, prefill = null, fromHealth = false, controls, onSaved }: {
-  typeMap: Record<string, TypeDef>; arrKey: ArrKey; dk: string; type: string; existing: Entry | null; prefill?: Entry | null; fromHealth?: boolean; controls: SheetControls; onSaved: () => void;
+  typeMap: Record<string, TypeDef>; arrKey: ArrKey; dk: string; type: string; existing: Entry | null; prefill?: Entry | null; fromHealth?: boolean; controls: SheetControls;
+  /** Called after a save (with the saved entry) or a delete (with nothing). */
+  onSaved: (saved?: Entry) => void;
 }) {
   const p = usePalette();
   const toast = useToast();
@@ -192,7 +238,7 @@ export function EntryForm({ typeMap, arrKey, dk, type, existing, prefill = null,
       }
     }
     controls.closeAll();
-    onSaved();
+    onSaved(r);
   };
 
   return (
@@ -286,12 +332,60 @@ export function useEntryForms(dk: string) {
   const refresh = () => { /* store change triggers re-render */ };
 
   const openReadingForm = (type: string, existing: Entry | null, prefill: Entry | null = null) =>
-    openSheet((c) => <EntryForm typeMap={READING_TYPES} arrKey="readings" dk={dk} type={type} existing={existing} prefill={prefill} fromHealth={!!prefill} controls={c} onSaved={refresh} />);
+    openSheet((c) => (
+      <EntryForm
+        typeMap={READING_TYPES} arrKey="readings" dk={dk} type={type} existing={existing} prefill={prefill} fromHealth={!!prefill} controls={c}
+        onSaved={(saved) => {
+          refresh();
+          // A freshly logged orthostatic event pops its results card, so the
+          // rise/recovery grades are seen right after entry.
+          if (saved && !existing && type === 'orthostatic') openReadingSummary(saved);
+        }}
+      />
+    ));
+
+  // The in-app live POTS captures (Bluetooth strap): same stacked-card modal
+  // treatment as a live HRV session. With no strap saved yet, the pairing
+  // sheet opens first; saving a device there flows straight into the session.
+  const startPotsLive = (type: string) => {
+    const open = () => openSheet(
+      (c) => (type === 'standTest' ? <StandTestSession controls={c} /> : <OrthostaticSession controls={c} />),
+      { hideClose: true },
+    );
+    if (!getState().settings.lastBleDeviceId) {
+      openSheet((c) => (
+        <DevicesScreen controls={{
+          close: () => { c.close(); if (getState().settings.lastBleDeviceId) open(); },
+          closeAll: c.closeAll,
+        }} />
+      ));
+      return;
+    }
+    open();
+  };
 
   // Tapping a reading type: if Apple Health can supply it (and is connected),
   // open the import card (pick a sample or enter manually); otherwise go straight
-  // to the blank manual form.
+  // to the blank manual form. Orthostatic gets its own card pointing at the
+  // watch app's guided stand test (which syncs in by itself) — plus an in-app
+  // strap capture — before manual entry.
   const pickReadingSource = (type: string) => {
+    // Both POTS types share the watch-pointer card, each with a live strap
+    // capture behind it. The episode keeps a manual form too; the stand test
+    // is live-only, so no manual fallback.
+    if (type === 'orthostatic' || type === 'standTest') {
+      openSheet(() => (
+        <OrthostaticIntroSheet
+          title={`Add ${pickerLabel(type)}`}
+          subtitle={type === 'orthostatic'
+            ? 'Capture live from your watch or a chest strap, or enter an event manually.'
+            : 'Run the guided test from your Apple Watch or with a Bluetooth chest strap.'}
+          onManual={type === 'orthostatic' ? () => openReadingForm(type, null) : undefined}
+          onStrap={() => startPotsLive(type)}
+        />
+      ), { fitContent: true });
+      return;
+    }
     const source = healthSourceFor(type);
     if (!source || !health().available || !getState().settings.healthEnabled) { openReadingForm(type, null); return; }
     openSheet(() => (
@@ -338,7 +432,7 @@ export function useEntryForms(dk: string) {
   return { openReadingForm, openActivityForm, openReadingSummary, captureHrv, pickReading, pickActivity, pickMed, pickSymptom, openMed, openSymptom };
 }
 
-function ReadingSummarySheet({ r, dk }: { r: Entry; dk: string }) {
+export function ReadingSummarySheet({ r, dk }: { r: Entry; dk: string }) {
   const p = usePalette();
   useAppState(); // re-render on edits
   const state = getState();

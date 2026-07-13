@@ -80,18 +80,8 @@ export const READING_TYPES: Record<string, TypeDef> = {
       { type: 'select', key: 'position', label: 'Position', options: ['Laying', 'Sitting'] },
     ],
   },
-  orthostatic: {
-    label: 'Orthostatic Event',
-    icon: 'standing',
-    fields: [
-      { type: 'select', key: 'transition', label: 'Transition', options: ['Laying to standing', 'Sitting to standing', 'Climbing stairs', 'Other'] },
-      { type: 'number', key: 'beforeHr', label: 'Before HR' },
-      { type: 'number', key: 'afterHr', label: 'After HR' },
-      { type: 'number', key: 'hr1min', label: 'HR after 1 min' },
-    ],
-  },
   standTest: {
-    label: 'POTS Stand Test',
+    label: 'POTS Test',
     icon: 'standing',
     fields: [
       { type: 'number', key: 'baselineHr', label: 'Baseline HR' },
@@ -102,6 +92,16 @@ export const READING_TYPES: Record<string, TypeDef> = {
       { divider: true },
       { type: 'number', key: 'maxHrReached', label: 'Max HR reached' },
       { type: 'time', key: 'time', label: 'Time' },
+    ],
+  },
+  orthostatic: {
+    label: 'POTS Episode',
+    icon: 'stairs',
+    fields: [
+      { type: 'select', key: 'transition', label: 'Transition', options: ['Laying to standing', 'Sitting to standing', 'Climbing stairs', 'Other'] },
+      { type: 'number', key: 'beforeHr', label: 'Before HR' },
+      { type: 'number', key: 'afterHr', label: 'After HR' },
+      { type: 'number', key: 'hr1min', label: 'HR after 1 min' },
     ],
   },
 };

@@ -11,6 +11,7 @@ import { IBMPlexMono_400Regular } from '@expo-google-fonts/ibm-plex-mono';
 import { SheetProvider } from '../src/components/Sheet';
 import { ToastProvider } from '../src/components/Toast';
 import { OnboardingGate } from '../src/features/Onboarding';
+import { WatchArrivalCards } from '../src/features/WatchArrivals';
 import { RestoreGate } from '../src/features/RestoreGate';
 import { SubscriptionGate } from '../src/features/SubscriptionGate';
 import { initIap } from '../src/store/iap';
@@ -71,6 +72,8 @@ export default function RootLayout() {
           <ToastProvider>
             <SheetProvider>
               <Slot />
+              {/* Pops the results card when a watch reading lands mid-session. */}
+              <WatchArrivalCards />
               {/* Paywall — covers the app whenever the user is not Pro (zIndex
                   90). Sits below onboarding so a fresh install sees Welcome
                   first, then the trial offer. */}

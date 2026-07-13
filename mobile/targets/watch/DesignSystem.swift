@@ -10,14 +10,21 @@ enum DS {
     static let blue = Color("accentBlue")        // #4aa3f0
     static let amber = Color("accentAmber")      // #e0a030
     static let green = Color("accentGreen")      // #3ec46d
+    static let purple = Color(red: 0.62, green: 0.42, blue: 0.96)  // #9d6bf5 — orthostatic events
     static let card = Color("cardBg")            // #161618
     static let tile = Color("tileBg")            // #131315
     static let dim = Color("textDim")            // #8a8a92
+    /// Dark grey for held-but-stale data: shown while no HR signal / signal dropped.
+    static let faint = Color.white.opacity(0.3)
 
     /// Shared delta color rule: <20 green · 20–29 amber · ≥30 red.
     static func deltaColor(_ delta: Double) -> Color {
         delta >= 30 ? accent : delta >= 20 ? amber : green
     }
+
+    /// Metric numerals — Manrope ExtraBold, matching the phone app's readouts
+    /// (`fonts.numHeavy`). Bundled via the watch Info.plist UIAppFonts.
+    static func number(_ size: CGFloat) -> Font { .custom("Manrope-ExtraBold", size: size) }
 }
 
 struct PrimaryButton: View {
@@ -66,7 +73,7 @@ struct StatTile: View {
                 .kerning(0.5)
                 .foregroundStyle(DS.dim)
             Text(value)
-                .font(.system(size: 20, weight: .heavy, design: .rounded))
+                .font(DS.number(20))
                 .foregroundStyle(valueColor)
                 .monospacedDigit()
         }
@@ -84,10 +91,10 @@ struct RingProgress: View {
 
     var body: some View {
         ZStack {
-            Circle().stroke(Color.white.opacity(0.07), lineWidth: 9)
+            Circle().stroke(Color.white.opacity(0.07), lineWidth: 5)
             Circle()
                 .trim(from: 0, to: max(0.001, min(1, progress)))
-                .stroke(color, style: StrokeStyle(lineWidth: 9, lineCap: .round))
+                .stroke(color, style: StrokeStyle(lineWidth: 5, lineCap: .round))
                 .rotationEffect(.degrees(-90))
                 .animation(.linear(duration: 0.9), value: progress)
         }
@@ -99,9 +106,9 @@ struct DeltaChip: View {
 
     var body: some View {
         let color = delta.map { DS.deltaColor($0) } ?? DS.dim
-        let text = delta.map { "Δ \($0 >= 0 ? "+" : "")\(Int($0.rounded())) bpm" } ?? "Δ —"
+        let text = delta.map { "Δ \($0 >= 0 ? "+" : "")\(Int($0.rounded()))" } ?? "Δ 00"
         Text(text)
-            .font(.system(size: 12.5, weight: .heavy))
+            .font(DS.number(12.5))
             .monospacedDigit()
             .foregroundStyle(color)
             .padding(.horizontal, 11)
@@ -113,18 +120,36 @@ struct DeltaChip: View {
 
 struct BeatingHeart: View {
     var size: CGFloat = 26
+    /// Live BPM — drives the beat rate (one contraction per cardiac cycle).
+    /// nil falls back to a gentle idle pulse.
+    var bpm: Double? = nil
     var beating = true
     @State private var beat = false
+
+    /// Bucket BPM to the nearest 5 so the repeating animation only restarts on a
+    /// meaningful rate change, not on every 1 Hz sample.
+    private var bucket: Int { bpm.map { Int(($0 / 5).rounded()) * 5 } ?? 0 }
+
+    /// Half-cycle duration: a full up→down (autoreverse) equals one beat period
+    /// (60/bpm). Clamped so extreme rates stay legible.
+    private var halfCycle: Double {
+        guard let bpm, bpm > 20 else { return 0.5 }
+        return max(0.16, min(0.9, 30.0 / bpm))
+    }
 
     var body: some View {
         Image(systemName: "heart.fill")
             .font(.system(size: size))
             .foregroundStyle(DS.accent)
             .scaleEffect(beat ? 1.18 : 1.0)
-            .onAppear {
-                guard beating else { return }
-                withAnimation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true)) { beat = true }
-            }
+            .onAppear { restart() }
+            .onChange(of: bucket) { _, _ in restart() }
+    }
+
+    private func restart() {
+        guard beating else { return }
+        beat = false
+        withAnimation(.easeInOut(duration: halfCycle).repeatForever(autoreverses: true)) { beat = true }
     }
 }
 

@@ -13,7 +13,7 @@ import SwiftUI
  */
 
 private let APP_GROUP = "group.com.autonomic.journal"
-private let DEEP_LINK = URL(string: "autonomic://pots")!
+private let DEEP_LINK = URL(string: "autonomic://episode")!
 
 struct ComplicationState {
     var lastDelta: Int?

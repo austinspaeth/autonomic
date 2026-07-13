@@ -2,14 +2,15 @@ import SwiftUI
 
 /**
  * Mode router + home screen. Deliberately NOT a NavigationStack: once a mode
- * is running there is no back gesture or chevron — HR Monitor exits only via
- * End, the stand test only via its own buttons — so a stray swipe can't
- * abandon a session. The whole watch app is gated by the phone subscription
+ * is running there is no back gesture — HR Monitor ends only via the End
+ * button on its controls page (one swipe right), the stand test only via its
+ * own buttons — so a stray swipe can't abandon a session. The whole watch app
+ * is gated by the phone subscription
  * (mirrored over applicationContext); before the first context ever arrives
  * it asks the user to open the iPhone app.
  */
 struct ContentView: View {
-    enum Mode { case home, hr, pots }
+    enum Mode { case home, hr, pots, orthostatic }
 
     @State private var mode: Mode = .home
     @EnvironmentObject private var relay: PhoneRelay
@@ -21,14 +22,14 @@ struct ContentView: View {
             case .home: home
             case .hr: HrMonitorView { mode = .home }
             case .pots: StandTestView { mode = .home }
+            case .orthostatic: OrthostaticView { mode = .home }
             }
         }
         .onAppear { WorkoutManager.shared.requestAuthorization() }
         .onOpenURL { url in
-            // Complication tap: straight into the capture flow — unless a
-            // test is already running (mode .pots keeps its own state).
-            if url.host == "pots" || url.path.contains("pots") {
-                mode = .pots
+            // Complication tap: straight into the POTS Episode flow.
+            if url.host == "episode" || url.path.contains("episode") {
+                mode = .orthostatic
             }
         }
     }
@@ -43,25 +44,26 @@ struct ContentView: View {
                         .renderingMode(.template)
                         .resizable()
                         .aspectRatio(contentMode: .fit)
-                        .frame(width: 84)
+                        .frame(width: 64)
                         .foregroundStyle(DS.accent)
                     Text("Autonomic")
                         .font(.system(size: 15, weight: .heavy))
-                    Text(gated ? "Subscription required" : "Choose a mode")
-                        .font(.system(size: 11))
-                        .foregroundStyle(DS.dim)
                 }
                 if gated {
                     lockCard
                 } else {
                     modeButton(
-                        title: "HR Monitor", subtitle: "Live heart rate",
+                        title: "HR Monitor", subtitle: "Persistent heart rate",
                         icon: "heart.fill", tint: DS.accent
                     ) { mode = .hr }
                     modeButton(
-                        title: "POTS Reading", subtitle: "Lie and stand test",
+                        title: "POTS Test", subtitle: "Lie and stand test",
                         icon: "figure.stand", tint: DS.blue
                     ) { mode = .pots }
+                    modeButton(
+                        title: "POTS Episode", subtitle: "Stairs or other events",
+                        icon: "figure.stairs", tint: DS.purple
+                    ) { mode = .orthostatic }
                 }
             }
         }
@@ -93,21 +95,24 @@ struct ContentView: View {
         Button(action: action) {
             HStack(spacing: 11) {
                 Image(systemName: icon)
-                    .font(.system(size: 18))
+                    .font(.system(size: 15))
                     .foregroundStyle(tint)
-                    .frame(width: 38, height: 38)
-                    .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+                    .frame(width: 30, height: 30)
+                    .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 9))
                 VStack(alignment: .leading, spacing: 0) {
                     Text(title).font(.system(size: 15, weight: .bold))
+                        .lineLimit(1).minimumScaleFactor(0.8)
                     Text(subtitle).font(.system(size: 11)).foregroundStyle(DS.dim)
+                        .lineLimit(1).minimumScaleFactor(0.8)
                 }
                 Spacer(minLength: 0)
                 Image(systemName: "chevron.right")
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(DS.dim.opacity(0.7))
             }
-            .padding(12)
-            .background(DS.card, in: RoundedRectangle(cornerRadius: 20))
+            .padding(.vertical, 9)
+            .padding(.horizontal, 11)
+            .background(DS.card, in: RoundedRectangle(cornerRadius: 16))
         }
         .buttonStyle(.plain)
     }

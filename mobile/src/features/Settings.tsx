@@ -62,12 +62,19 @@ export function MenuSheet({ controls }: { controls: SheetControls }) {
       {item('sparkles', 'Show welcome screen', 'Replay the first-run guide', () => { controls.closeAll(); showWelcomeAgain(); })}
       {item('info', 'Legal information', 'Disclaimer, privacy & terms', () => openSheet((c) => <LegalSheet controls={c} />))}
       <View style={{ marginTop: 22 }}>
+        <Text style={{ fontSize: 12.5, color: p.textDim, textAlign: 'center', lineHeight: 18 }}>
+          We appreciate you for using Autonomic, we hope it genuinely helps you in your journey!
+        </Text>
+        <Text style={{ fontSize: 12.5, color: p.textDim, textAlign: 'center', marginTop: 4 }}>- Autonomic team</Text>
+        <View style={{ height: 1, backgroundColor: p.border, marginVertical: 16 }} />
         <Text style={{ fontSize: 12, color: p.textDim, textAlign: 'center' }}>{`Data last updated ${fmtStamp(m.lastUpdated)}`}</Text>
         <Text style={{ fontSize: 12, color: p.textDim, textAlign: 'center', marginTop: 4 }}>{`Autonomic v${appVer}`}</Text>
         {m.lastImport?.name ? <Text style={{ fontSize: 12, color: p.textDim, textAlign: 'center', marginTop: 4 }}>{`Last import: ${m.lastImport.name} · ${fmtStamp(m.lastImport.at)}`}</Text> : null}
         <Text style={{ fontSize: 11, color: p.textDim, textAlign: 'center', marginTop: 16, lineHeight: 16 }}>
           Autonomic is a personal tracking tool, not a medical device. It does not diagnose or treat any condition. Discuss changes to medication, supplements, or your protocol with a clinician.
         </Text>
+        <Text style={{ fontSize: 12, color: p.textDim, textAlign: 'center', marginTop: 16 }}>Built in Charleston, South Carolina 🇺🇸</Text>
+        <Text style={{ fontSize: 12, color: p.textDim, textAlign: 'center', marginTop: 4 }}>© 2026 DiscoveryMark LLC</Text>
       </View>
     </View>
   );
