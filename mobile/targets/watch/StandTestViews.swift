@@ -75,17 +75,18 @@ private struct IntroView: View {
 }
 
 /// HR number that never shows "searching": grey "00" before the first reading,
-/// the live value in `liveColor` once found, and — if the signal later drops —
-/// the last value held and greyed until a new sample arrives. Metric number font.
+/// the live value in `liveColor` once found, and — if the signal drops past the
+/// 5 s grace window (`WorkoutManager.signalLost`) — the last value held and
+/// greyed until a new sample arrives. Metric number font.
 struct HrReadout: View {
     let hr: Double?
-    let searching: Bool
+    let signalLost: Bool
     var size: CGFloat = 15
     var liveColor: Color = DS.dim
 
     var body: some View {
         let hasReading = hr != nil
-        let stale = !hasReading || searching
+        let stale = !hasReading || signalLost
         Text(hasReading ? "\(Int((hr ?? 0).rounded()))" : "00")
             .font(DS.number(size))
             .monospacedDigit()
@@ -121,8 +122,8 @@ private struct RestingView: View {
                                     .font(DS.number(32))
                                     .monospacedDigit()
                                 HStack(spacing: 4) {
-                                    BeatingHeart(size: 12, bpm: workout.searching ? nil : workout.hr)
-                                    HrReadout(hr: workout.hr, searching: workout.searching, size: 15)
+                                    BeatingHeart(size: 12, bpm: workout.signalLost ? nil : workout.hr)
+                                    HrReadout(hr: workout.hr, signalLost: workout.signalLost, size: 15)
                                     Text("bpm")
                                         .font(.system(size: 11, weight: .semibold))
                                         .foregroundStyle(DS.dim)
@@ -202,7 +203,7 @@ private struct StandingView: View {
                             )
                             VStack(spacing: 4) {
                                 HStack(alignment: .lastTextBaseline, spacing: 3) {
-                                    HrReadout(hr: workout.hr, searching: workout.searching, size: 28, liveColor: .primary)
+                                    HrReadout(hr: workout.hr, signalLost: workout.signalLost, size: 28, liveColor: .primary)
                                     Text("bpm")
                                         .font(.system(size: 11, weight: .bold))
                                         .foregroundStyle(DS.dim)

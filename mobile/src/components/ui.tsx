@@ -5,7 +5,7 @@
  */
 import React, { useRef } from 'react';
 import {
-  Animated, Pressable, StyleProp, StyleSheet, Text, TextStyle, View, ViewStyle,
+  Animated, Pressable, StyleProp, StyleSheet, Text, View, ViewStyle,
 } from 'react-native';
 import Reanimated, {
   Easing as REasing, useAnimatedStyle, useSharedValue, withTiming,
@@ -14,11 +14,6 @@ import { GRADE_COLORS, radius, space, type as T, usePalette } from '../theme';
 import type { ScoreCat } from '../lib/types';
 import { Icon, IconName } from './Icon';
 import { useSheets } from './Sheet';
-
-export function ThemedText({ style, dim, children, ...rest }: { style?: StyleProp<TextStyle>; dim?: boolean; children: React.ReactNode } & React.ComponentProps<typeof Text>) {
-  const p = usePalette();
-  return <Text style={[{ color: dim ? p.textDim : p.text }, style]} {...rest}>{children}</Text>;
-}
 
 export function Card({ children, style }: { children: React.ReactNode; style?: StyleProp<ViewStyle> }) {
   const p = usePalette();
@@ -36,15 +31,6 @@ export function SectionHeader({ title, action }: { title: string; action?: React
       <Text style={[T.section, { color: p.textDim }]}>{title}</Text>
       {action}
     </View>
-  );
-}
-
-export function AddButton({ onPress, label = '+ Add' }: { onPress: () => void; label?: string }) {
-  const p = usePalette();
-  return (
-    <Pressable onPress={onPress} hitSlop={8} style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.5 }]}>
-      <Text style={{ color: p.accent, fontSize: 15, fontWeight: '600' }}>{label}</Text>
-    </Pressable>
   );
 }
 
@@ -272,7 +258,6 @@ export function Chip({ text, color }: { text: string; color: string }) {
 const styles = StyleSheet.create({
   card: { borderWidth: 1, borderRadius: radius.card, marginBottom: space.md, overflow: 'hidden' },
   sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: space.lg, paddingVertical: space.md },
-  addBtn: { paddingHorizontal: 6, paddingVertical: 4 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 9, borderTopWidth: StyleSheet.hairlineWidth },
   rowIco: { width: 26, alignItems: 'center' },
   rowMain: { flex: 1, minWidth: 0 },

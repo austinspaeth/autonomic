@@ -159,9 +159,6 @@ export function healthAppName(): string {
   return Platform.OS === 'android' ? 'Health Connect' : 'Apple Health';
 }
 
-/** For tests: force a specific implementation (or reset). */
-export function __setHealth(api: HealthApi | null) { cached = api; }
-
 /**
  * Loosely-typed surface over the healthkit module (v8). Queries/saves take Date
  * objects; requestAuthorization is (read, write).

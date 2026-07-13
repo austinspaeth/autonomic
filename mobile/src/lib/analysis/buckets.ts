@@ -41,7 +41,6 @@ export function acBuckets(days: DaysMap, mode: Mode): Bucket[] {
 }
 
 export const acMinOf = (t?: string) => { const m = /^(\d{1,2}):(\d{2})/.exec(t || ''); return m ? +m[1] * 60 + +m[2] : null; };
-export const acToDec = (t?: string) => { const mo = acMinOf(t); return mo == null ? null : mo / 60; };
 export const isMorning = (r: Entry) => { const mo = acMinOf(r.time as string); if (mo != null) return mo < 720; return (r.period || '') === 'Morning'; };
 export const isEvening = (r: Entry) => { const mo = acMinOf(r.time as string); if (mo != null) return mo >= 1080; return (r.period || '') === 'Evening'; };
 
@@ -73,7 +72,6 @@ export function makeAgg(days: DaysMap, ctx: ScoreContext) {
 export const acPresent = (vals: (number | null)[]) => vals.filter((v): v is number => v != null && !isNaN(v));
 export const acMean = (vals: (number | null)[]) => { const p = acPresent(vals); return p.length ? p.reduce((s, x) => s + x, 0) / p.length : null; };
 export const avgRound = (vals: (number | null)[], dp = 0) => { const m = acMean(vals); if (m == null) return null; const f = Math.pow(10, dp); return Math.round(m * f) / f; };
-export const acDelta = (vals: (number | null)[]) => { const idx = vals.map((v, i) => (v != null && !isNaN(v) ? i : -1)).filter((i) => i >= 0); if (idx.length < 2) return null; return (vals[idx[idx.length - 1]] as number) - (vals[idx[0]] as number); };
 
 export function acBandsToZones(b: Band[] | null | undefined): { from: number; to: number; color: string }[] | null {
   if (!b) return null;

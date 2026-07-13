@@ -14,13 +14,20 @@ import { resolveProtocol } from '../lib/scoring/day';
 
 export function useMilestones() {
   const state = useAppState();
-  const ctx = { sex: state.profile.sex, height: state.profile.height, protocol: resolveProtocol(state.settings.protocol) };
-  const md = buildMilestoneDays(state.days, ctx);
-  const groups = md.keys.length ? buildMilestoneGroups(md) : [];
-  let done = 0, total = 0;
-  groups.forEach((g) => g.items.forEach((it) => { total++; if (it.done) done++; }));
-  const pct = total ? Math.round((done / total) * 100) : 0;
-  return { groups, done, total, pct };
+  const { days, customTypes } = state;
+  const { sex, height } = state.profile;
+  const { protocol } = state.settings;
+  // Rebuilding every milestone from all days is O(days × milestones) — memoize
+  // so unrelated re-renders (theme, sheet state) don't recompute it.
+  return React.useMemo(() => {
+    const ctx = { sex, height, protocol: resolveProtocol(protocol), customTypes };
+    const md = buildMilestoneDays(days, ctx);
+    const groups = md.keys.length ? buildMilestoneGroups(md) : [];
+    let done = 0, total = 0;
+    groups.forEach((g) => g.items.forEach((it) => { total++; if (it.done) done++; }));
+    const pct = total ? Math.round((done / total) * 100) : 0;
+    return { groups, done, total, pct };
+  }, [days, sex, height, protocol, customTypes]);
 }
 
 /** Compact card for the journal view; taps open the full tracker in a sheet.

@@ -263,8 +263,12 @@ function HrvSummaryBody({ r, days, ctx, type }: SummaryProps & { type: 'breathHr
   const lfhf = lf != null && hf ? lf / hf : null;
   const lfhfEx = (rr2: Entry) => { const a = parseFloat(rr2.lowPower as string), b = parseFloat(rr2.highPower as string); return !isNaN(a) && !isNaN(b) && b !== 0 ? a / b : null; };
   const e = expectedHf(r.style);
-  const pnsHist = metricHistory(days, type, numEx('pns'));
-  const snsHist = metricHistory(days, type, numEx('sns'));
+  // Each metricHistory scans (and per-day sorts) the whole journal; cache while
+  // the sheet re-renders without a data change.
+  const [pnsHist, snsHist] = useMemo(
+    () => [metricHistory(days, type, numEx('pns')), metricHistory(days, type, numEx('sns'))],
+    [days, type],
+  );
   const pnsNum = n('pns'), snsNum = n('sns');
   const balCat = pnsNum != null && snsNum != null ? balanceCat(pnsNum, snsNum) : undefined;
   const sourceLabel = sourceLabelFor(r);

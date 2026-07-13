@@ -120,12 +120,6 @@ export const READING_TYPES: Record<string, TypeDef> = {
   },
 };
 
-/**
- * Reading types that can only be produced by a live capture (or an Apple
- * Watch ECG sync) — hidden from the manual "+ Add" reading picker.
- */
-export const LIVE_ONLY_READING_TYPES = new Set(['hrv', 'breathHrv', 'standTest']);
-
 /** Alphabetical by label ("Other exercise" stays last as the catch-all);
  *  pickers render in this insertion order. Covers the Apple Workout app's
  *  default types (strength maps to the upper/lower split). */
@@ -555,22 +549,6 @@ export function summarizeFields(def: TypeDef | undefined, r: Entry): string {
     if (v != null && v !== '') return String(v) + (f.unit || '');
   }
   return '';
-}
-
-/** Secondary line = remaining filled fields (numbers/selects) + checked flags. */
-export function detailFields(def: TypeDef | undefined, r: Entry): string {
-  if (!def) return '';
-  const parts: string[] = [];
-  let headlineSkipped = false;
-  for (const f of entryFields(def)) {
-    if (isDivider(f) || f.type === 'time' || f.type === 'textarea') continue;
-    if (f.type === 'check') { if (r[f.key!]) parts.push(f.label || ''); continue; }
-    const v = r[f.key!];
-    if (v == null || v === '') continue;
-    if (isNumberField(f) && !headlineSkipped) { headlineSkipped = true; continue; }
-    parts.push(`${f.label} ${v}${f.unit || ''}`);
-  }
-  return parts.join(' · ');
 }
 
 /** Simplified value shown on the right of a reading row (one thing per type). */

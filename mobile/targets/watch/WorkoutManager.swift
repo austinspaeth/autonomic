@@ -9,8 +9,12 @@ import HealthKit
  * live stream, not Health workout entries).
  *
  * `hr` is lightly smoothed (median of the last 5 raw samples). `searching`
- * flips when the sensor loses contact (no fresh sample in 5 s, or a 0 value);
- * consumers suspend delta math + buzzes while it's true.
+ * flips when the sensor loses contact (no fresh sample in 5 s); consumers
+ * suspend delta math + buzzes while it's true. `signalLost` is the visual
+ * version: it lags `searching` by a further 5 s grace window so a brief
+ * dropout never greys the screen — UI code greys on `signalLost`, never on
+ * `searching`. Spurious 0-bpm samples are ignored outright (the stale timer
+ * catches a genuine loss).
  *
  * Self-heal: watchOS occasionally kills or ends the workout session in the
  * background (returning to the monitor shows no sensor light and a greyed
@@ -35,19 +39,16 @@ final class WorkoutManager: NSObject, ObservableObject {
 
     @Published var hr: Double?
     @Published var searching = true
+    /// Visual-only signal loss: `searching` held true past a 5 s grace window.
+    /// UI greys on this so a short dropout looks like an unbroken connection.
+    @Published var signalLost = false
     @Published var running = false
-    @Published var authorized: Bool?
 
     func requestAuthorization() {
-        guard HKHealthStore.isHealthDataAvailable() else {
-            DispatchQueue.main.async { self.authorized = false }
-            return
-        }
+        guard HKHealthStore.isHealthDataAvailable() else { return }
         let read: Set<HKObjectType> = [HKQuantityType.quantityType(forIdentifier: .heartRate)!]
         let share: Set<HKSampleType> = [HKObjectType.workoutType()]
-        store.requestAuthorization(toShare: share, read: read) { ok, _ in
-            DispatchQueue.main.async { self.authorized = ok }
-        }
+        store.requestAuthorization(toShare: share, read: read) { _, _ in }
     }
 
     func start() {
@@ -58,6 +59,7 @@ final class WorkoutManager: NSObject, ObservableObject {
         DispatchQueue.main.async {
             self.running = true
             self.searching = true
+            self.signalLost = false
         }
         staleTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             self?.checkStale()
@@ -101,6 +103,7 @@ final class WorkoutManager: NSObject, ObservableObject {
                 self?.lastSampleAt = nil
                 self?.hr = nil
                 self?.searching = true
+                self?.signalLost = false
                 self?.running = false
             }
         }
@@ -113,6 +116,12 @@ final class WorkoutManager: NSObject, ObservableObject {
         let sinceSample = Date().timeIntervalSince(lastSampleAt ?? sessionBeganAt ?? Date())
         if sinceSample > 5 {
             DispatchQueue.main.async { self.searching = true }
+        }
+        // Grey the UI only after a further 5 s grace on top of loss detection —
+        // a dropout that recovers inside the window never shows on screen.
+        let lostVisually = lastSampleAt != nil && sinceSample > 10
+        if lostVisually != signalLost {
+            DispatchQueue.main.async { self.signalLost = lostVisually }
         }
         let sessionDead = session.map { $0.state == .ended || $0.state == .stopped } ?? true
         // Longer leash before the first-ever sample: initial sensor lock can be
@@ -140,10 +149,9 @@ final class WorkoutManager: NSObject, ObservableObject {
     }
 
     private func ingest(_ bpm: Double) {
-        guard bpm > 0 else {
-            DispatchQueue.main.async { self.searching = true }
-            return
-        }
+        // A 0-bpm sample is sensor noise, not proof of loss — drop it and let
+        // the stale timer decide (it flips `searching` after 5 s of silence).
+        guard bpm > 0 else { return }
         lastSampleAt = Date()
         recent.append(bpm)
         // Median of the last 3 samples — enough to reject a single spurious
@@ -153,6 +161,7 @@ final class WorkoutManager: NSObject, ObservableObject {
         DispatchQueue.main.async {
             self.hr = smoothed
             self.searching = false
+            self.signalLost = false
         }
     }
 }

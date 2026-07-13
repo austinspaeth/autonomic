@@ -3,7 +3,7 @@
  * flags, and the streak card — ported from renderDaySummary. The "What powers
  * this" button opens the score-explanation sheet (openScoreExplain).
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Defs, LinearGradient as SvgGradient, Rect, Stop } from 'react-native-svg';
 import Animated, { Easing, Extrapolation, interpolate, useAnimatedProps, useAnimatedStyle, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
@@ -88,11 +88,16 @@ export function DaySummary({ dk }: { dk: string }) {
   const p = usePalette();
   const { openSheet } = useSheets();
   const state = useAppState();
-  const ctx = { sex: state.profile.sex, height: state.profile.height };
-  const d = state.days[dk] || { readings: [], activities: [] } as never;
+  const { sex, height } = state.profile;
+  const ctx = useMemo(() => ({ sex, height }), [sex, height]);
   const today = todayKey();
-  const readings = (d.readings || []).slice().sort((a, b) => ((a.time as string) || '').localeCompare((b.time as string) || ''));
-  const all = scoreSet(readings, d, dk, state.days, ctx);
+  // scoreSet makes several passes over the day's readings; memoize so renders
+  // not caused by a data change (sheets, animations) don't re-score.
+  const { d, readings, all } = useMemo(() => {
+    const day = state.days[dk] || ({ readings: [], activities: [] } as never);
+    const rs = (day.readings || []).slice().sort((a, b) => ((a.time as string) || '').localeCompare((b.time as string) || ''));
+    return { d: day, readings: rs, all: scoreSet(rs, day, dk, state.days, ctx) };
+  }, [state.days, dk, ctx]);
 
   return (
     <View>
@@ -135,7 +140,13 @@ function ScoredHero({ dk, readings, d, all, ctx, onExplain }: { dk: string; read
   const morning = readings.filter((r) => readingPeriod(r) === 'morning');
   const evening = readings.filter((r) => readingPeriod(r) === 'evening');
   const hasEvening = evening.length > 0;
-  const mornScore = morning.length ? scoreSet(morning, d, dk, getState().days, ctx).score : null;
+  // Second full scoreSet just for the AM delta; `readings` gets a fresh identity
+  // whenever the day data changes, so it's a sufficient cache key.
+  const mornScore = useMemo(
+    () => (morning.length ? scoreSet(morning, d, dk, getState().days, ctx).score : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [readings, d, dk, ctx],
+  );
   const delta = mornScore != null ? all.score! - mornScore : null;
   const mode = hasEvening ? (dk < today ? 'Day Complete' : 'Reflectance') : 'Autonomic Outlook';
 
@@ -199,7 +210,12 @@ function StreakCard({ dk }: { dk: string }) {
   const { openSheet } = useSheets();
   const [expanded, setExpanded] = useState(false);
   const state = useAppState();
-  const si = streakInfo(state.days, dk, resolveProtocol(state.settings.protocol));
+  // streakInfo walks the whole day history; don't redo it for the accordion
+  // toggle re-renders below.
+  const si = useMemo(
+    () => streakInfo(state.days, dk, resolveProtocol(state.settings.protocol), state.customTypes),
+    [state.days, dk, state.settings.protocol, state.customTypes],
+  );
   const tier = streakTier(si.current);
   const icon = si.current >= 14 ? 'moon' : si.current >= 7 ? 'rocket' : si.current >= 3 ? 'flame' : 'sparkles';
   const c = si.today;

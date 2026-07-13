@@ -34,6 +34,9 @@ export interface SheetOptions {
   fitContent?: boolean;
   /** Hide the ✕ and make the backdrop non-dismissing — the sheet closes itself. */
   hideClose?: boolean;
+  /** Stretch the scroll content to fill the sheet so content can bottom-pin
+   *  (e.g. via marginTop: 'auto') just above the footer divider. */
+  grow?: boolean;
 }
 type Builder = (c: SheetControls) => React.ReactNode;
 
@@ -324,7 +327,7 @@ function SheetView({ entry, isTop, behind, closing, requestClose, onExited, clos
             <ScrollView
               ref={scrollRef}
               style={{ flex: 1 }}
-              contentContainerStyle={{ padding: 18, paddingTop: topPad, paddingBottom: footer ? Math.max(120, footerH + 20) : 24 + insets.bottom }}
+              contentContainerStyle={{ padding: 18, paddingTop: topPad, paddingBottom: footer ? Math.max(120, footerH + 20) : 24 + insets.bottom, ...(entry.opts.grow ? { flexGrow: 1 } : null) }}
               keyboardShouldPersistTaps="handled"
               // "interactive" (iOS) keeps the keyboard up while scrolling the form —
               // it only dismisses when dragged down over the keyboard itself.

@@ -1,5 +1,5 @@
 /** Month calendar picker sheet — ported from openCalendar. */
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { SheetControls } from '../components/Sheet';
 import { Button } from '../components/ui';
@@ -51,6 +51,21 @@ export function Calendar({ current, onPick, controls }: { current: string; onPic
   const daysInMonth = new Date(view.getFullYear(), view.getMonth() + 1, 0).getDate();
   const cells: (number | null)[] = [...Array(startPad).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
 
+  // Each scored cell runs a full scoreSet; cache the month's cell states so
+  // month-nav / theme re-renders don't re-score ~31 days. `days` (fresh identity
+  // per store mutation) keeps the recompute-when-data-changed semantics.
+  const days = getState().days;
+  const cellInfo = useMemo(() => {
+    const map: Record<string, { has: boolean; color: string | null }> = {};
+    for (let dn = 1; dn <= daysInMonth; dn++) {
+      const dk = keyOf(new Date(view.getFullYear(), view.getMonth(), dn));
+      map[dk] = { has: dayHasData(dk), color: dayColor(dk) };
+    }
+    return map;
+    // `days` IS a real input — dayHasData/dayColor read it via getState().
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, daysInMonth, days]);
+
   return (
     <View style={{ width: '100%', maxWidth: 400, alignSelf: 'center' }}>
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, lineHeight: 32, marginBottom: 16 }}>Select date</Text>
@@ -66,8 +81,8 @@ export function Calendar({ current, onPick, controls }: { current: string; onPic
         {cells.map((dn, i) => {
           if (dn == null) return <View key={`e${i}`} style={{ width: `${100 / 7}%`, aspectRatio: 1 }} />;
           const dk = keyOf(new Date(view.getFullYear(), view.getMonth(), dn));
-          const isSel = dk === current, isFuture = dk > tk, has = dayHasData(dk);
-          const color = dayColor(dk);
+          const isSel = dk === current, isFuture = dk > tk;
+          const { has, color } = cellInfo[dk];
           return (
             <View key={dk} style={{ width: `${100 / 7}%`, aspectRatio: 1, padding: 2 }}>
               {/* Squircle cell: tinted with the day's autonomic-outlook color when

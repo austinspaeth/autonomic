@@ -337,6 +337,18 @@ describe('day scoring', () => {
     expect(medCrit.find((x) => x.key === 'meds:allegra')!.pass).toBe(true);
     expect(medCrit.find((x) => x.key === 'meds:pepsidAc')!.pass).toBe(false);
   });
+  it('criteria label custom types by their user-given name, not the key', () => {
+    const days: Record<string, DayRecord> = {
+      '2026-07-02': day({ meds: [{ id: '1', type: 'custom-magnesium' }] as Entry[] }),
+    };
+    const proto: Protocol = { ...DEFAULT_PROTOCOL, triggers: { enabled: false, types: [] }, water: { enabled: false, liters: 0 }, sleep: { enabled: false, hours: 0 }, meds: { enabled: true, types: ['custom-magnesium'] } };
+    const custom = { meds: { 'custom-magnesium': { label: 'Magnesium', icon: 'pill', fields: [], userDefined: true } } };
+    const crit = dayCleanliness(days, '2026-07-02', proto, custom)!.criteria.find((x) => x.key === 'meds:custom-magnesium')!;
+    expect(crit.label).toBe('Magnesium');
+    expect(crit.pass).toBe(true);
+    // Without the custom map it can only fall back to the raw key.
+    expect(dayCleanliness(days, '2026-07-02', proto)!.criteria[0].label).toBe('custom-magnesium');
+  });
   it('protocol trigger selection narrows which triggers break the day', () => {
     const days: Record<string, DayRecord> = {
       '2026-07-02': day({ food: { water: 5, calories: 0, triggers: { caffeine: 1 }, meals: [] } }),

@@ -6,7 +6,7 @@
  * Pure module: no UI or store imports. Anything needing profile data
  * (height for BMI, sex for QTc) takes it as an argument.
  */
-import type { Band, Entry, Protocol, ScoreCat } from '../types';
+import type { Band, CustomTypes, Entry, Protocol, ScoreCat } from '../types';
 
 // One unified grade scale shared with the day-score bands (SCORE_CATS in day.ts):
 // each ScoreCat maps to the day-scale level with the same color. The internal keys
@@ -63,7 +63,6 @@ export const sPNN50 = (v: unknown): ScoreCat | null => { const n = numOr(v); ret
 export const sSDNN = (v: unknown): ScoreCat | null => { const n = numOr(v); return n == null ? null : n >= 60 ? 'great' : n >= 50 ? 'good' : n >= 40 ? 'ok' : n >= 30 ? 'bad' : 'crash'; };
 export const sTotalPower = (v: unknown): ScoreCat | null => { const n = numOr(v); return n == null ? null : n >= 3500 ? 'great' : n >= 2200 ? 'good' : n >= 1500 ? 'ok' : n >= 800 ? 'bad' : 'crash'; };
 export const sVLF = (v: unknown): ScoreCat | null => { const n = numOr(v); return n == null ? null : n < 200 ? 'great' : n <= 450 ? 'good' : n <= 700 ? 'ok' : n <= 1000 ? 'bad' : 'crash'; }; // lower better
-export const sReadiness = (v: unknown): ScoreCat | null => { const n = numOr(v); if (n == null) return null; if (n >= 86) return 'warning'; return n >= 70 ? 'great' : n >= 60 ? 'good' : n >= 50 ? 'ok' : n >= 35 ? 'bad' : 'crash'; };
 export const sRestingHr = (v: unknown, pos?: unknown): ScoreCat | null => {
   const n = numOr(v);
   if (n == null) return null;
@@ -177,6 +176,8 @@ export interface ScoreContext {
   height?: string | number;
   /** Clean-day protocol used by dayCleanliness/streakInfo (defaults applied). */
   protocol?: Protocol;
+  /** state.customTypes, so labels resolve for user-created types too. */
+  customTypes?: CustomTypes;
 }
 
 export function computeScores(r: Entry, ctx: ScoreContext = {}): Record<string, ScoreCat> {

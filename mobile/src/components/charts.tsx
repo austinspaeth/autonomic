@@ -22,20 +22,6 @@ const SPECTRUM_BANDS = [
 ] as const;
 
 /* ---------- math shared with the PWA ---------- */
-const niceNum = (x: number, round: boolean) => {
-  if (x <= 0) return 1;
-  const exp = Math.floor(Math.log10(x));
-  const f = x / Math.pow(10, exp);
-  const nf = round ? (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) : (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10);
-  return nf * Math.pow(10, exp);
-};
-export function niceScale(dataMin: number, dataMax: number, ticks: number) {
-  let min = dataMin, max = dataMax;
-  if (min === max) { const d = Math.abs(min) || 1; min -= d; max += d; }
-  const pad = (max - min) * 0.5; min -= pad; max += pad;
-  const step = niceNum(niceNum(max - min, false) / (ticks - 1), true);
-  return { min: Math.floor(min / step) * step, max: Math.ceil(max / step) * step, step };
-}
 export function smoothPath(pts: [number, number][]): string {
   if (pts.length < 2) return '';
   let d = `M${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}`;
@@ -836,97 +822,6 @@ export function OrthoHrChart({ samples, baseline, transitionAt, completedAt, hei
       <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
         <RNText style={{ fontSize: 10, color: p.textDim }}>0:00</RNText>
         <RNText style={{ fontSize: 10, color: p.textDim }}>{fmtT(t1 - t0)}</RNText>
-      </View>
-    </View>
-  );
-}
-
-/* ---------- Stand-test curve overlay (recent tests, aligned at the stand) ---------- */
-/**
- * The last few stand tests' HR traces on one plot, aligned at the stand moment
- * (x = 0) and normalized to each test's own supine baseline (y = bpm above
- * baseline), so the *shape* of the standing response is comparable across
- * days. Older tests fade back; the latest draws bold in the accent colour. A
- * dashed line marks the +30 bpm POTS-range criterion. The resting phase is
- * clipped to the final minute before the stand — the long flat baseline
- * carries no information and would crush the standing response.
- */
-export function StandOverlay({ tests, height = 170 }: {
-  tests: { samples: { t: number; bpm: number }[]; standAt: number; baseline: number; date: string }[];
-  height?: number;
-}) {
-  const p = usePalette();
-  const PRE = 60; // seconds of resting phase kept before the stand
-  const curves = tests
-    .map((t) => {
-      const pts = (t.samples || [])
-        .map((s) => ({ x: s.t - t.standAt, y: s.bpm - t.baseline }))
-        .filter((s) => s.x >= -PRE);
-      // Downsample long 1 Hz traces so several curves stay light to draw.
-      const stride = Math.max(1, Math.ceil(pts.length / 240));
-      return { date: t.date, pts: pts.filter((_, i) => i % stride === 0), gapS: stride * 3 + 1 };
-    })
-    .filter((c) => c.pts.length >= 2);
-  if (!curves.length) return null;
-  const xs = curves.flatMap((c) => [c.pts[0].x, c.pts[c.pts.length - 1].x]);
-  const ys = curves.flatMap((c) => c.pts.map((q) => q.y));
-  const xMin = Math.min(...xs), xMax = Math.max(...xs);
-  // Domain always includes the baseline (0) and the +30 criterion line.
-  const dMin = Math.min(...ys, -5), dMax = Math.max(...ys, 35);
-  const span = dMax - dMin || 1;
-  const min = dMin - span * 0.06, max = dMax + span * 0.06;
-  const W = 320, H = height, padL = 34, padR = 8, padT = 14, padB = 20;
-  const innerW = W - padL - padR;
-  const xAt = (x: number) => padL + ((x - xMin) / ((xMax - xMin) || 1)) * innerW;
-  const yAt = (v: number) => padT + (1 - (v - min) / (max - min)) * (H - padT - padB);
-  const fmtT = (sec: number) => `${sec < 0 ? '-' : ''}${Math.floor(Math.abs(sec) / 60)}:${String(Math.round(Math.abs(sec) % 60)).padStart(2, '0')}`;
-  const pathOf = (c: { pts: { x: number; y: number }[]; gapS: number }) => {
-    let d = '';
-    c.pts.forEach((q, i) => {
-      // Break the trace across sensor-dropout gaps rather than interpolating.
-      const gap = i === 0 || q.x - c.pts[i - 1].x > c.gapS;
-      d += `${gap ? 'M' : 'L'}${xAt(q.x).toFixed(1)} ${yAt(q.y).toFixed(1)} `;
-    });
-    return d.trim();
-  };
-  const last = curves.length - 1;
-  const colorOf = (i: number) => (i === last ? p.accent : p.textDim);
-  const opacityOf = (i: number) => (i === last ? 1 : 0.25 + (i / Math.max(1, last)) * 0.3);
-  const standX = xMin < 0 && xMax > 0 ? xAt(0) : null;
-  const threshold = GRADE_COLORS.bad || '#ef4444';
-  return (
-    <View style={{ backgroundColor: p.bg, borderRadius: radius.control, padding: 8 }}>
-      <Svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
-        {/* Baseline (0) and the +30 bpm POTS-range criterion. */}
-        <Line x1={padL} x2={W - padR} y1={yAt(0)} y2={yAt(0)} stroke={p.textDim} strokeWidth={1} strokeDasharray="4 3" opacity={0.6} />
-        <SvgText x={padL - 4} y={yAt(0) + 3} textAnchor="end" fontSize={9} fill={p.textDim}>0</SvgText>
-        <Line x1={padL} x2={W - padR} y1={yAt(30)} y2={yAt(30)} stroke={threshold} strokeWidth={1.2} strokeDasharray="4 3" opacity={0.8} />
-        <SvgText x={padL - 4} y={yAt(30) + 3} textAnchor="end" fontSize={9} fontWeight="700" fill={threshold}>+30</SvgText>
-        <SvgText x={padL - 4} y={yAt(max) + 8} textAnchor="end" fontSize={9} fill={p.textDim}>{`+${Math.round(max)}`}</SvgText>
-        {/* The stand moment: everything right of this line is standing. */}
-        {standX != null ? (
-          <>
-            <Rect x={standX} y={padT} width={W - padR - standX} height={H - padT - padB} fill={p.accent} opacity={0.05} />
-            <Line x1={standX} x2={standX} y1={padT} y2={H - padB} stroke={p.accent} strokeWidth={1.4} strokeDasharray="2 3" opacity={0.9} />
-            <SvgText x={standX + 4} y={padT + 8} textAnchor="start" fontSize={9} fill={p.textDim}>stand</SvgText>
-          </>
-        ) : null}
-        {/* Oldest first so the latest test draws on top. */}
-        {curves.map((c, i) => (
-          <Path key={i} d={pathOf(c)} fill="none" stroke={colorOf(i)} strokeWidth={i === last ? 2 : 1.4} opacity={opacityOf(i)} strokeLinejoin="round" strokeLinecap="round" />
-        ))}
-      </Svg>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-        <RNText style={{ fontSize: 10, color: p.textDim }}>{fmtT(xMin)}</RNText>
-        <RNText style={{ fontSize: 10, color: p.textDim }}>{`+${fmtT(xMax)} standing`}</RNText>
-      </View>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: 14, rowGap: 4, marginTop: 8 }}>
-        {curves.map((c, i) => (
-          <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, opacity: opacityOf(i) }}>
-            <View style={{ width: 12, height: 3, borderRadius: 2, backgroundColor: colorOf(i) }} />
-            <RNText style={{ fontSize: 11, color: i === last ? p.text : p.textDim, fontWeight: i === last ? '700' : '400' }}>{fmtShort(c.date)}</RNText>
-          </View>
-        ))}
       </View>
     </View>
   );

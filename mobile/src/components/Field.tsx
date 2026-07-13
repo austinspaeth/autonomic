@@ -5,9 +5,9 @@
  * form-state hook collects values keyed by field key.
  */
 import React, { useRef, useState } from 'react';
-import { Platform, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Platform, Pressable, Switch, Text, TextInput, View } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { radius, space, usePalette } from '../theme';
+import { radius, usePalette } from '../theme';
 import { Button } from './ui';
 import { SheetControls, useSheets } from './Sheet';
 import type { Entry, FieldDef } from '../lib/types';
@@ -403,5 +403,3 @@ function NumField({ f, form, set, numInputs, advanceFrom }: {
     />
   );
 }
-
-export const fieldStyles = StyleSheet.create({ pad: { padding: space.md } });

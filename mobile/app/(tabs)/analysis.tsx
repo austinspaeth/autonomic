@@ -25,9 +25,9 @@ export default function AnalysisScreen() {
   // Build every category's cards once per (days, mode, profile). Memoized so the
   // scroll-driven "active section" re-render doesn't rebuild all the charts.
   const sections = useMemo(() => {
-    const cats = buildCategories(state.days, mode, { sex, height, protocol: resolveProtocol(state.settings.protocol) });
+    const cats = buildCategories(state.days, mode, { sex, height, protocol: resolveProtocol(state.settings.protocol), customTypes: state.customTypes });
     return cats.map((c) => ({ id: c.id, icon: c.icon, title: c.title, desc: c.desc, buckets: c.buckets, cards: c.build() }));
-  }, [state.days, mode, sex, height, state.settings.protocol]);
+  }, [state.days, mode, sex, height, state.settings.protocol, state.customTypes]);
 
   // Outlook always synthesizes a score, so it isn't proof of real data. Treat the
   // whole view as empty unless some *other* category has something logged — that's

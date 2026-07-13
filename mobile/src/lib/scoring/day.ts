@@ -6,7 +6,7 @@
  */
 import { dateFromKey, keyOf, todayKey } from '../dates';
 import { ACTIVITY_TYPES, MED_TYPES, TRIGGER_TYPES } from '../registry';
-import type { Band, DayRecord, Entry, Protocol, ScoreCat } from '../types';
+import type { Band, CustomTypes, DayRecord, Entry, Protocol, ScoreCat } from '../types';
 import {
   BANDS, GRADE_PTS, computeScores, numOr, restingHrBands, totalPower,
   type ScoreContext,
@@ -275,10 +275,10 @@ export function waterGoalL(p?: Partial<Protocol> | null): number {
   return w.enabled && w.liters > 0 ? w.liters : DEFAULT_PROTOCOL.water.liters;
 }
 
-const typeLabel = (map: Record<string, { label: string }>, k: string) => map[k]?.label || k;
-const joinLabels = (map: Record<string, { label: string }>, keys: string[]) => keys.map((k) => typeLabel(map, k)).join(', ');
+const typeLabel = (map: Record<string, { label: string }>, k: string, custom?: Record<string, { label: string }>) => custom?.[k]?.label || map[k]?.label || k;
+const joinLabels = (map: Record<string, { label: string }>, keys: string[], custom?: Record<string, { label: string }>) => keys.map((k) => typeLabel(map, k, custom)).join(', ');
 
-export function dayCleanliness(days: DaysMap, dk: string, protocol: Protocol = DEFAULT_PROTOCOL): Cleanliness | null {
+export function dayCleanliness(days: DaysMap, dk: string, protocol: Protocol = DEFAULT_PROTOCOL, custom?: CustomTypes): Cleanliness | null {
   const d = days[dk];
   if (!d) return null;
   const criteria: Criterion[] = [];
@@ -290,7 +290,7 @@ export function dayCleanliness(days: DaysMap, dk: string, protocol: Protocol = D
     const count = (k: string) => (triggers[k] > 0 ? triggers[k] : 0);
     const sel = protocol.triggers.types;
     const logged = (sel.length ? sel : Object.keys(triggers)).reduce((s, k) => s + count(k), 0);
-    const label = sel.length ? `No ${joinLabels(TRIGGER_TYPES, sel)}` : 'No triggers';
+    const label = sel.length ? `No ${joinLabels(TRIGGER_TYPES, sel, custom?.triggers)}` : 'No triggers';
     criteria.push({ key: 'triggers', label, pass: logged === 0, hard: true, broken: logged > 0 });
   }
 
@@ -303,7 +303,7 @@ export function dayCleanliness(days: DaysMap, dk: string, protocol: Protocol = D
   if (protocol.meds.enabled) {
     const meds = d.meds || [];
     protocol.meds.types.forEach((t) => {
-      const label = typeLabel(MED_TYPES, t);
+      const label = typeLabel(MED_TYPES, t, custom?.meds);
       criteria.push({ key: `meds:${t}`, label, pass: meds.some((m) => m.type === t) });
     });
   }
@@ -311,7 +311,7 @@ export function dayCleanliness(days: DaysMap, dk: string, protocol: Protocol = D
   if (protocol.activities.enabled) {
     const acts = d.activities || [];
     protocol.activities.types.forEach((t) => {
-      const label = typeLabel(ACTIVITY_TYPES, t);
+      const label = typeLabel(ACTIVITY_TYPES, t, custom?.activities);
       criteria.push({ key: `activities:${t}`, label, pass: acts.some((a) => a.type === t) });
     });
   }
@@ -339,9 +339,9 @@ export interface StreakInfo {
   today: Cleanliness | null; isToday: boolean;
 }
 
-export function streakInfo(days: DaysMap, dk: string, protocol: Protocol = DEFAULT_PROTOCOL): StreakInfo {
+export function streakInfo(days: DaysMap, dk: string, protocol: Protocol = DEFAULT_PROTOCOL, custom?: CustomTypes): StreakInfo {
   const today = todayKey();
-  const cur = dayCleanliness(days, dk, protocol);
+  const cur = dayCleanliness(days, dk, protocol, custom);
   const cursor = dateFromKey(dk);
   if (dk === today && (!cur || !cur.clean)) cursor.setDate(cursor.getDate() - 1);
   let current = 0;

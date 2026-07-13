@@ -122,6 +122,9 @@ export interface Protocol {
   sleep: { enabled: boolean; hours: number };
 }
 
+/** User-defined type defs per kind (state.customTypes shape). */
+export type CustomTypes = Partial<Record<'activities' | 'meds' | 'symptoms' | 'triggers', Record<string, TypeDef>>>;
+
 export interface AppState {
   version: number;
   settings: {
@@ -137,7 +140,7 @@ export interface AppState {
   };
   profile: Profile;
   /** User-defined types layered on top of the registry maps (pure JSON defs). */
-  customTypes?: Partial<Record<'activities' | 'meds' | 'symptoms' | 'triggers', Record<string, TypeDef>>>;
+  customTypes?: CustomTypes;
   /** Built-in registry types the user deleted (only allowed while unused). */
   hiddenTypes?: Partial<Record<'activities' | 'meds' | 'symptoms' | 'triggers', string[]>>;
   meta: {

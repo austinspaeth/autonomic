@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
@@ -26,7 +26,7 @@ export default function InsightsScreen() {
 
   // Nothing to analyze until something real is logged, so hide the report picker
   // and point people back to the Journal, same gate the Progress view uses.
-  const hasData = hasAnyData(state.days, Object.keys(state.days));
+  const hasData = useMemo(() => hasAnyData(state.days, Object.keys(state.days)), [state.days]);
 
   const toggle = (id: string) => setSelected((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 

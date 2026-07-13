@@ -90,7 +90,7 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
   };
 
   const heat = (): AnalysisCard | null => {
-    const streak = streakInfo(days, todayKey(), ctx.protocol);
+    const streak = streakInfo(days, todayKey(), ctx.protocol, ctx.customTypes);
     return {
       title: 'Clean Days',
       desc: 'Days in a row without breaking your protocol.',
@@ -318,7 +318,7 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
     const typeCounts: Record<string, number> = {};
     let activeDays = 0, restDays = 0;
     buckets.forEach((b) => b.days.forEach((dk) => { const acts = days[dk].activities || []; if (acts.length) { activeDays++; acts.forEach((a) => { typeCounts[a.type] = (typeCounts[a.type] || 0) + 1; }); } else restDays++; }));
-    const rows = Object.entries(typeCounts).map(([t, c]) => ({ name: ACTIVITY_TYPES[t]?.label || t, count: c })).sort((a, b) => b.count - a.count);
+    const rows = Object.entries(typeCounts).map(([t, c]) => ({ name: ctx.customTypes?.activities?.[t]?.label || ACTIVITY_TYPES[t]?.label || t, count: c })).sort((a, b) => b.count - a.count);
     if (!rows.length) return [];
     return [{
       title: 'Activity', sub: range,
@@ -333,8 +333,9 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
   const triggers = (): AnalysisCard[] => {
     const water = acAgg(buckets, (d) => (d.food && +d.food.water > 0 ? +d.food.water : null));
     const trig: Record<string, number> = {};
-    buckets.forEach((b) => b.days.forEach((dk) => { const f = days[dk].food; if (!f) return; Object.keys(f.triggers || {}).forEach((k) => { if (f.triggers[k] > 0 && TRIGGER_TYPES[k]) trig[k] = (trig[k] || 0) + f.triggers[k]; }); }));
-    const trigRows = Object.entries(trig).map(([k, c]) => ({ name: TRIGGER_TYPES[k].label, count: c })).sort((a, b) => b.count - a.count);
+    const trigLabel = (k: string) => ctx.customTypes?.triggers?.[k]?.label || TRIGGER_TYPES[k]?.label;
+    buckets.forEach((b) => b.days.forEach((dk) => { const f = days[dk].food; if (!f) return; Object.keys(f.triggers || {}).forEach((k) => { if (f.triggers[k] > 0 && trigLabel(k)) trig[k] = (trig[k] || 0) + f.triggers[k]; }); }));
+    const trigRows = Object.entries(trig).map(([k, c]) => ({ name: trigLabel(k)!, count: c })).sort((a, b) => b.count - a.count);
     if (!acPresent(water).length && !trigRows.length) return [];
     const cards: AnalysisCard[] = [];
     if (trigRows.length) cards.push({
@@ -357,7 +358,7 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
     const counts: Record<string, number> = {}; let anyMeds = false;
     buckets.forEach((b) => b.days.forEach((dk) => { const meds = days[dk].meds || []; if (meds.length) anyMeds = true; new Set(meds.map((m) => m.type)).forEach((t) => { counts[t] = (counts[t] || 0) + 1; }); }));
     if (!anyMeds) return [];
-    const rows = Object.entries(counts).map(([t, c]) => ({ name: MED_TYPES[t]?.label || t, count: c })).sort((a, b) => b.count - a.count);
+    const rows = Object.entries(counts).map(([t, c]) => ({ name: ctx.customTypes?.meds?.[t]?.label || MED_TYPES[t]?.label || t, count: c })).sort((a, b) => b.count - a.count);
     return [{
       title: 'Medications & Supplements',
       desc: 'How many days each was taken in this range.',

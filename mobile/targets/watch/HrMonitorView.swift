@@ -8,8 +8,9 @@ import WatchKit
  *
  * Signal handling: the last good HR is held on screen. Before the first ever
  * reading the value shows a grey "00"; once a reading lands it snaps to its
- * live colour. If contact is later lost the last value simply greys out (no
- * "searching" text, no re-render) and the 2-min avg + delta freeze until a new
+ * live colour. If contact is later lost the value holds in live colour through
+ * a 5 s grace window (WorkoutManager.signalLost) and only then greys out (no
+ * "searching" text, no re-render); the 2-min avg + delta freeze until a new
  * reading arrives. Always-on: in luminance-reduced (wrist-down) state the
  * display updates every 5 s instead of every second; the sensor keeps
  * streaming underneath so buzzes stay timely.
@@ -100,8 +101,10 @@ final class HrMonitorModel: ObservableObject {
                     self.atMax = liveHr >= maxHr
                 }
             } else {
-                // No live signal: hold the last HR/avg/delta, just grey them out.
-                self.signalLost = self.everHadReading
+                // No live signal: hold the last HR/avg/delta in place. Grey only
+                // once the 5 s grace in WorkoutManager expires (signalLost), so a
+                // blip reads as an unbroken connection.
+                self.signalLost = self.everHadReading && wm.signalLost
                 self.nearMax = false
                 self.atMax = false
             }

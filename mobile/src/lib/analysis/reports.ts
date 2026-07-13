@@ -4,7 +4,7 @@
  * network. Sections are rendered as the same [stamp]-prefixed lines.
  */
 import { dateFromKey, fmtTime12, keyOf } from '../dates';
-import type { AppState, DayRecord } from '../types';
+import type { AppState, CustomTypes, DayRecord } from '../types';
 import { blueZone, dayCleanliness, scoreSet, sleepHours, type DaysMap } from '../scoring/day';
 import { ACTIVITY_TYPES, MED_TYPES, SYMPTOM_TYPES, TRIGGER_TYPES, isDivider } from '../registry';
 import type { ScoreContext } from '../scoring';
@@ -60,31 +60,33 @@ function secSleep(days: DaysMap, keys: string[]) {
   keys.forEach((k) => { const d = days[k]; if (!d || !d.sleep) return; const s = d.sleep; const bed = s.bed || ''; if (!bed && !s.wake && !rv(s, 'hrLow') && !rv(s, 'hrHigh')) return; const hrs = sleepHours(days, k); lines.push(`[${k}] Bed last night: ${bed ? fmtTime12(bed) : '-'} | Woke this morning: ${s.wake ? fmtTime12(s.wake) : '-'} | Duration: ${hrs != null ? hrs.toFixed(1) + ' hrs' : '-'} | Quality: ${s.quality === 'interrupted' ? 'Interrupted' : 'Good'} | Low HR: ${rv(s, 'hrLow') ?? '-'} | High HR: ${rv(s, 'hrHigh') ?? '-'}`); });
   return orNone(lines);
 }
-const secActivities = (days: DaysMap, keys: string[]) => orNone(eachEntry(days, keys, (d, k) => (d.activities || []).map((a) => { const def = ACTIVITY_TYPES[a.type]; const label = def ? def.label : a.type; const parts: string[] = []; if (def && def.custom === 'bike') { if (def.summary) { const sm = def.summary(a); if (sm) parts.push(sm); } if (def.detail) { const dt = def.detail(a); if (dt) parts.push(dt); } } else if (def) { (def.fields || []).forEach((f) => { if (isDivider(f) || f.type === 'time' || f.type === 'textarea' || f.type === 'check') return; const val = rv(a, f.key!); if (val != null) parts.push(`${f.label}: ${val}${f.unit ? f.unit : ''}`); }); (def.fields || []).filter((f) => f.type === 'check' && a[f.key!]).forEach((f) => parts.push(f.label!)); } if (a.note) parts.push(`Note: ${a.note}`); return `${stamp(k, a.time as string)} ${label}${parts.length ? ' | ' + parts.join(' | ') : ''}`; })));
-function secTriggers(days: DaysMap, keys: string[]) {
+const secActivities = (days: DaysMap, keys: string[], custom?: CustomTypes) => orNone(eachEntry(days, keys, (d, k) => (d.activities || []).map((a) => { const def = custom?.activities?.[a.type] || ACTIVITY_TYPES[a.type]; const label = def ? def.label : a.type; const parts: string[] = []; if (def && def.custom === 'bike') { if (def.summary) { const sm = def.summary(a); if (sm) parts.push(sm); } if (def.detail) { const dt = def.detail(a); if (dt) parts.push(dt); } } else if (def) { (def.fields || []).forEach((f) => { if (isDivider(f) || f.type === 'time' || f.type === 'textarea' || f.type === 'check') return; const val = rv(a, f.key!); if (val != null) parts.push(`${f.label}: ${val}${f.unit ? f.unit : ''}`); }); (def.fields || []).filter((f) => f.type === 'check' && a[f.key!]).forEach((f) => parts.push(f.label!)); } if (a.note) parts.push(`Note: ${a.note}`); return `${stamp(k, a.time as string)} ${label}${parts.length ? ' | ' + parts.join(' | ') : ''}`; })));
+function secTriggers(days: DaysMap, keys: string[], custom?: CustomTypes) {
   const lines: string[] = [];
-  keys.forEach((k) => { const d = days[k]; if (!d || !d.food) return; const trigs = d.food.triggers || {}; const tlist = Object.keys(trigs).filter((t) => trigs[t] > 0 && TRIGGER_TYPES[t]).map((t) => `${TRIGGER_TYPES[t].label}${trigs[t] > 1 ? ` x${trigs[t]}` : ''}`); if (tlist.length) lines.push(`[${k}] Triggers: ${tlist.join(', ')}`); const water = d.food.water; if (water > 0) lines.push(`[${k}] Water: ${water} L`); });
+  const trigLabel = (t: string) => custom?.triggers?.[t]?.label || TRIGGER_TYPES[t]?.label;
+  keys.forEach((k) => { const d = days[k]; if (!d || !d.food) return; const trigs = d.food.triggers || {}; const tlist = Object.keys(trigs).filter((t) => trigs[t] > 0 && trigLabel(t)).map((t) => `${trigLabel(t)}${trigs[t] > 1 ? ` x${trigs[t]}` : ''}`); if (tlist.length) lines.push(`[${k}] Triggers: ${tlist.join(', ')}`); const water = d.food.water; if (water > 0) lines.push(`[${k}] Water: ${water} L`); });
   return orNone(lines);
 }
-const secMeds = (days: DaysMap, keys: string[], supplements: boolean) => orNone(eachEntry(days, keys, (d, k) => (d.meds || []).filter((m) => (supplements ? !MED_KEYS.has(m.type) : MED_KEYS.has(m.type))).map((m) => { const label = MED_TYPES[m.type] ? MED_TYPES[m.type].label : m.type; const bits: string[] = []; if (m.amount) bits.push(String(m.amount)); if (m.note) bits.push(m.note); return `${stamp(k, m.time as string)} ${label}${bits.length ? ' | ' + bits.join(' | ') : ''}`; })));
-const secSymptoms = (days: DaysMap, keys: string[]) => orNone(eachEntry(days, keys, (d, k) => (d.symptoms || []).map((s) => { const def = SYMPTOM_TYPES[s.type]; const label = def ? def.label : s.type; const parts: string[] = []; if (def) (def.fields || []).forEach((f) => { if (isDivider(f) || f.type === 'time' || f.type === 'textarea') return; const v = rv(s, f.key!); if (v != null) parts.push(`${f.label}: ${v}`); }); if (s.note) parts.push(`Note: ${s.note}`); return `${stamp(k, s.time as string)} ${label}${parts.length ? ' | ' + parts.join(' | ') : ''}`; })));
+const secMeds = (days: DaysMap, keys: string[], supplements: boolean, custom?: CustomTypes) => orNone(eachEntry(days, keys, (d, k) => (d.meds || []).filter((m) => (supplements ? !MED_KEYS.has(m.type) : MED_KEYS.has(m.type))).map((m) => { const label = custom?.meds?.[m.type]?.label || MED_TYPES[m.type]?.label || m.type; const bits: string[] = []; if (m.amount) bits.push(String(m.amount)); if (m.note) bits.push(m.note); return `${stamp(k, m.time as string)} ${label}${bits.length ? ' | ' + bits.join(' | ') : ''}`; })));
+const secSymptoms = (days: DaysMap, keys: string[], custom?: CustomTypes) => orNone(eachEntry(days, keys, (d, k) => (d.symptoms || []).map((s) => { const def = custom?.symptoms?.[s.type] || SYMPTOM_TYPES[s.type]; const label = def ? def.label : s.type; const parts: string[] = []; if (def) (def.fields || []).forEach((f) => { if (isDivider(f) || f.type === 'time' || f.type === 'textarea') return; const v = rv(s, f.key!); if (v != null) parts.push(`${f.label}: ${v}`); }); if (s.note) parts.push(`Note: ${s.note}`); return `${stamp(k, s.time as string)} ${label}${parts.length ? ' | ' + parts.join(' | ') : ''}`; })));
 const secNotes = (days: DaysMap, keys: string[]) => orNone(eachEntry(days, keys, (d, k) => (d.notes && d.notes.trim() ? [`[${k}] ${d.notes.trim()}`] : [])));
 const secOrthostatic = (days: DaysMap, keys: string[]) => orNone(eachEntry(days, keys, (d, k) => { const out: string[] = []; (d.readings || []).filter((r) => r.type === 'orthostatic').forEach((r) => out.push(`${stamp(k, r.time as string)} ${rv(r, 'transition') ?? 'Position change'} | Before HR: ${rv(r, 'beforeHr') ?? '-'} | After HR: ${rv(r, 'afterHr') ?? '-'} | HR @1min: ${rv(r, 'hr1min') ?? '-'}${noteSuffix(r)}`)); (d.symptoms || []).filter((s) => s.type === 'labileHr').forEach((s) => out.push(`${stamp(k, s.time as string)} High HR event | HR: ${rv(s, 'hr') ?? '-'} | Position: ${rv(s, 'position') ?? '-'}${noteSuffix(s)}`)); return out; }));
 
 export function makeSectionRenderer(state: AppState, ctx: ScoreContext) {
   const days = state.days;
+  const custom = state.customTypes;
   const secScores = (keys: string[]) => { const lines: string[] = []; keys.forEach((k) => { const d = days[k]; if (!d) return; const ss = scoreSet(d.readings || [], d, k, days, ctx); if (ss.score == null) return; lines.push(`[${k}] Autonomic Score: ${ss.score}/100 (confidence ${ss.confidence}%)${blueZone(d.readings || [], ctx) ? ' [BLUE ZONE]' : ''}`); }); return orNone(lines); };
-  const secCleanDays = (keys: string[]) => { const lines: string[] = []; keys.forEach((k) => { const c = dayCleanliness(days, k, ctx.protocol); if (!c) return; const missed = c.criteria.filter((x: { pending?: boolean; pass: boolean }) => !x.pending && !x.pass).map((x: { label: string }) => x.label); lines.push(`[${k}] Clean day: ${c.clean ? 'YES' : 'NO'}${missed.length ? ` (missed: ${missed.join(', ')})` : ''}`); }); return orNone(lines); };
+  const secCleanDays = (keys: string[]) => { const lines: string[] = []; keys.forEach((k) => { const c = dayCleanliness(days, k, ctx.protocol, custom); if (!c) return; const missed = c.criteria.filter((x: { pending?: boolean; pass: boolean }) => !x.pending && !x.pass).map((x: { label: string }) => x.label); lines.push(`[${k}] Clean day: ${c.clean ? 'YES' : 'NO'}${missed.length ? ` (missed: ${missed.join(', ')})` : ''}`); }); return orNone(lines); };
   const DEFS: Record<string, [string, (keys: string[]) => string]> = {
     hrv: ['HRV READINGS (structured + unstructured)', (k) => secHRV(days, k)],
     bp: ['BLOOD PRESSURE READINGS', (k) => secBP(days, k)],
     rhr: ['RESTING HEART RATE', (k) => secRHR(days, k)],
     sleep: ['SLEEP DATA', (k) => secSleep(days, k)],
-    activities: ['ACTIVITIES', (k) => secActivities(days, k)],
-    triggers: ['TRIGGERS & HYDRATION', (k) => secTriggers(days, k)],
-    meds: ['MEDICATIONS TAKEN', (k) => secMeds(days, k, false)],
-    supplements: ['SUPPLEMENTS TAKEN', (k) => secMeds(days, k, true)],
-    symptoms: ['SYMPTOMS NOTED', (k) => secSymptoms(days, k)],
+    activities: ['ACTIVITIES', (k) => secActivities(days, k, custom)],
+    triggers: ['TRIGGERS & HYDRATION', (k) => secTriggers(days, k, custom)],
+    meds: ['MEDICATIONS TAKEN', (k) => secMeds(days, k, false, custom)],
+    supplements: ['SUPPLEMENTS TAKEN', (k) => secMeds(days, k, true, custom)],
+    symptoms: ['SYMPTOMS NOTED', (k) => secSymptoms(days, k, custom)],
     orthostatic: ['ORTHOSTATIC / HR EVENTS', (k) => secOrthostatic(days, k)],
     scores: ['DAILY AUTONOMIC SCORES', secScores],
     cleanDays: ['CLEAN DAY STATUS', secCleanDays],

@@ -134,8 +134,8 @@ private struct OrthoMeasureView: View {
             Spacer(minLength: 6)
             VStack(spacing: 4) {
                 HStack(alignment: .lastTextBaseline, spacing: 4) {
-                    BeatingHeart(size: 16, bpm: workout.searching ? nil : workout.hr)
-                    HrReadout(hr: workout.hr, searching: workout.searching, size: 40, liveColor: .primary)
+                    BeatingHeart(size: 16, bpm: workout.signalLost ? nil : workout.hr)
+                    HrReadout(hr: workout.hr, signalLost: workout.signalLost, size: 40, liveColor: .primary)
                     Text("bpm")
                         .font(.system(size: 12, weight: .bold))
                         .foregroundStyle(DS.dim)
@@ -182,7 +182,7 @@ private struct OrthoRecoveryView: View {
                             )
                             VStack(spacing: 4) {
                                 HStack(alignment: .lastTextBaseline, spacing: 3) {
-                                    HrReadout(hr: workout.hr, searching: workout.searching, size: 28, liveColor: .primary)
+                                    HrReadout(hr: workout.hr, signalLost: workout.signalLost, size: 28, liveColor: .primary)
                                     Text("bpm")
                                         .font(.system(size: 11, weight: .bold))
                                         .foregroundStyle(DS.dim)

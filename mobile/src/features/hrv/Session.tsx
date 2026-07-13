@@ -12,18 +12,21 @@
  * app returns (no notifications; the app deliberately sends none).
  *
  * Camera (PPG) source: the camera + torch start on mount so finger placement
- * can lock BEFORE the reading — "Start reading" stays disabled until a steady
- * pulse is detected. Samples stream in the same { hr, rr[] } shape as BLE and
- * flow through the same collection path.
+ * can lock BEFORE the reading. There is no Start button for finger readings —
+ * only Cancel — the reading begins itself the moment a steady pulse is
+ * detected, and runs a shorter 2-minute capture (holding a fingertip still on
+ * the lens for 5 is unrealistic). Samples stream in the same { hr, rr[] }
+ * shape as BLE and flow through the same collection path.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { AppState, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useKeepAwake } from 'expo-keep-awake';
 import Svg, { Circle } from 'react-native-svg';
+import Animated, { Easing, cancelAnimation, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 import { SheetControls, SheetFooter, useSheets } from '../../components/Sheet';
 import { Button } from '../../components/ui';
-import { usePalette, GRADE_COLORS } from '../../theme';
+import { radius, usePalette, GRADE_COLORS } from '../../theme';
 import { BreathingViz, parsePattern, type BreathPhase } from './BreathingViz';
 import { HrvResults } from './Results';
 import { WatchSyncSheet } from './WatchSync';
@@ -34,8 +37,9 @@ import { PpgCameraView } from '../../lib/ppg/CameraView';
 import { correctArtifacts, std } from '../../lib/hrv';
 import { getState } from '../../store/store';
 
-// Every reading — structured or unstructured — runs the full 5 minutes.
-const durationFor = (_kind: SessionConfig['kind']) => 300;
+// Strap and watch readings — structured or unstructured — run the full
+// 5 minutes. Camera (finger) readings cap at 2 on both platforms.
+const durationFor = (config: SessionConfig) => (config.source === 'camera' ? 120 : 300);
 
 /** The three structured breathing patterns. `val` is the stored style string
  *  (in/hold/out/hold seconds — see parsePattern); shared by Setup + Session. */
@@ -65,7 +69,7 @@ export interface SessionConfig {
 export function HrvSession({ config, controls, autoStart }: { config: SessionConfig; controls: SheetControls; autoStart?: boolean }) {
   const p = usePalette();
   const { openSheet } = useSheets();
-  const DURATION = durationFor(config.kind);
+  const DURATION = durationFor(config);
   const [started, setStarted] = useState(false);
   const [finished, setFinished] = useState(false);
   const [elapsed, setElapsed] = useState(0);
@@ -224,6 +228,13 @@ export function HrvSession({ config, controls, autoStart }: { config: SessionCon
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Camera flow has no Start button: the reading begins itself the moment the
+  // finger signal locks (a steady pulse is detected).
+  useEffect(() => {
+    if (config.source === 'camera' && signal.locked && !startedRef.current && !finishedRef.current) begin();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [signal.locked]);
+
   useEffect(() => () => {
     if (timerRef.current) clearInterval(timerRef.current);
     if (config.source === 'polar') ble().disconnect().catch(() => {});
@@ -276,12 +287,13 @@ export function HrvSession({ config, controls, autoStart }: { config: SessionCon
   const R = 108, SW = 9, C = 2 * Math.PI * R;
   const ringSize = 2 * (R + SW);
 
-  const cameraLockPending = config.source === 'camera' && !started && !signal.locked;
   // The strap connects while this card sits open; don't start until it's live.
   const strapPending = config.source === 'polar' && !started && !connected;
 
   return (
-    <View style={{ alignItems: 'center', paddingTop: 8 }}>
+    // flexGrow + the sheet's `grow` option let the placement squircle below
+    // bottom-pin (marginTop: 'auto') just above the footer divider.
+    <View style={{ alignItems: 'center', paddingTop: 8, flexGrow: 1 }}>
       {/* Invisible 1×1 camera feeding the PPG manager; mounted for the whole
           camera session so the pre-start lock and the reading share one stream. */}
       {config.source === 'camera' ? <PpgCameraView /> : null}
@@ -327,17 +339,6 @@ export function HrvSession({ config, controls, autoStart }: { config: SessionCon
           </Text>
         ) : null}
         {started && !finished && config.source === 'watch' ? <Text style={{ color: p.textDim, textAlign: 'center', paddingHorizontal: 24 }}>Sit still and follow the breathing session on your watch. It syncs in when the reading ends.</Text> : null}
-        {/* Camera pre-start: placement guidance + live lock status. */}
-        {config.source === 'camera' && !started ? (
-          <>
-            <Text style={{ color: p.textDim, textAlign: 'center', paddingHorizontal: 24 }}>
-              Cover the rear camera and flash with your fingertip. Rest your hand, light pressure.
-            </Text>
-            <Text style={{ color: signal.locked ? GRADE_COLORS.good : GRADE_COLORS.ok, fontWeight: '600', marginTop: 6 }}>
-              {signal.locked ? '✓ Pulse detected' : signal.quality === 'weak' ? 'Hold still — finding your pulse…' : 'Place your finger…'}
-            </Text>
-          </>
-        ) : null}
         {/* Finger lifted mid-reading: warn instead of silently collecting junk. */}
         {config.source === 'camera' && started && !finished && !signal.locked && !artifactHint ? (
           <Text style={{ color: GRADE_COLORS.bad, textAlign: 'center', paddingHorizontal: 24 }}>
@@ -346,18 +347,48 @@ export function HrvSession({ config, controls, autoStart }: { config: SessionCon
         ) : null}
       </View>
 
+      {/* Camera pre-start: placement guidance in a full-width squircle that
+          bottom-pins to the card body, just above the footer divider + Cancel. */}
+      {config.source === 'camera' && !started ? (
+        <View style={{ alignSelf: 'stretch', marginTop: 'auto', padding: 16, borderRadius: radius.card, borderCurve: 'continuous', borderWidth: 1, borderColor: p.border, backgroundColor: p.surface2, alignItems: 'center' }}>
+          <Text style={{ color: p.textDim, fontSize: 14, lineHeight: 20, textAlign: 'center' }}>
+            Cover the rear camera and flash with your fingertip. Rest your hand, light pressure.
+          </Text>
+          <PulsingHint text={signal.quality === 'weak' ? 'Hold still, finding your pulse…' : 'Place your finger…'} />
+        </View>
+      ) : null}
+
       <SheetFooter>
         {started ? (
           <Button title="Finish now" variant="primary" onPress={finish} />
+        ) : config.source === 'camera' ? (
+          // Finger readings have no Start button — they begin on pulse lock.
+          <Button title="Cancel" variant="ghost" onPress={() => controls.close()} />
         ) : (
           <>
             <Button title="Cancel" variant="ghost" onPress={() => controls.close()} />
-            {/* A 5-minute reading must not start on garbage signal or before the strap answers. */}
-            <Button title="Start reading" variant="primary" onPress={begin} disabled={cameraLockPending || strapPending} />
+            {/* A 5-minute reading must not start before the strap answers. */}
+            <Button title="Start reading" variant="primary" onPress={begin} disabled={strapPending} />
           </>
         )}
       </SheetFooter>
     </View>
+  );
+}
+
+/** Bright red, gently pulsing finger-placement prompt shown until the pulse
+ *  locks. Deliberately hotter than GRADE_COLORS.crash so it reads as a call to
+ *  action, not a score. */
+const HINT_RED = '#ff3b30';
+function PulsingHint({ text }: { text: string }) {
+  const opacity = useSharedValue(1);
+  useEffect(() => {
+    opacity.value = withRepeat(withTiming(0.35, { duration: 700, easing: Easing.inOut(Easing.quad) }), -1, true);
+    return () => cancelAnimation(opacity);
+  }, [opacity]);
+  const style = useAnimatedStyle(() => ({ opacity: opacity.value }));
+  return (
+    <Animated.Text style={[{ color: HINT_RED, fontWeight: '700', marginTop: 8 }, style]}>{text}</Animated.Text>
   );
 }
 

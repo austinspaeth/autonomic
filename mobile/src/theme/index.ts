@@ -83,7 +83,3 @@ export const type = {
 export function usePalette(): Palette {
   return dark;
 }
-
-export function paletteFor(_theme?: 'light' | 'dark'): Palette {
-  return dark;
-}
