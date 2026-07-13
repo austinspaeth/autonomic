@@ -1,9 +1,14 @@
 # CLAUDE.md — project notes
 
 **Autonomic Journal** is a private, offline-first app for tracking autonomic
-recovery. The app is a native **Expo / React Native (iOS-first)** build that lives
-in **`mobile/`**. There is **no backend** — all state is on-device. (A previous
-pure-static-HTML PWA under `docs/` has been removed; the mobile app is the app.)
+recovery. The app is a native **Expo / React Native (iOS + Android)** build that
+lives in **`mobile/`**. There is **no backend** — all state is on-device. (A
+previous pure-static-HTML PWA under `docs/` has been removed; the mobile app is
+the app.) Platform split: the Apple Watch companion, HealthKit and ECG are
+iOS-only; Android uses **Health Connect** (`src/lib/health/healthConnect.ts`,
+same `HealthApi`) and hides every watch surface behind `Platform.OS === 'ios'`.
+Both platforms share BLE strap + camera-PPG capture and the Play/App Store
+subscription paywall (`src/store/iap.ts`).
 
 See `mobile/README.md` for a fuller map. This file is the quick orientation.
 
@@ -26,7 +31,7 @@ See `mobile/README.md` for a fuller map. This file is the quick orientation.
 | HRV pipeline (artifact correction, time/frequency domain, coherence) | `src/lib/hrv/` |
 | Analysis / milestones / AI-insights builders | `src/lib/analysis/` |
 | BLE heart-rate manager (0x180D / 0x2A37 RR parsing) | `src/lib/ble/` |
-| Apple HealthKit wrapper (iOS-only, feature-flagged) | `src/lib/health/` |
+| Health wrapper (HealthKit on iOS · Health Connect on Android, one `HealthApi`) | `src/lib/health/` |
 | MMKV store + `save()` | `src/store/store.ts` |
 | Theme (light/dark), component library, charts, sheets | `src/theme/`, `src/components/` |
 | Journal sections / summaries / forms / live capture / settings | `src/features/` |

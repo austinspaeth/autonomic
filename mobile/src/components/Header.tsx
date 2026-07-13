@@ -8,7 +8,7 @@
  * black) over the content — z-index below the nav bar, which the Tabs navigator
  * renders in its own layer above every screen. */
 import React, { useCallback, useRef, useState } from 'react';
-import { NativeScrollEvent, NativeSyntheticEvent, ScrollView, View } from 'react-native';
+import { NativeScrollEvent, NativeSyntheticEvent, Platform, ScrollView, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { useFocusEffect } from 'expo-router';
 import Svg, { Defs, LinearGradient as SvgGradient, Rect, Stop } from 'react-native-svg';
@@ -26,14 +26,22 @@ export const headerHeight = (insetTop: number) => insetTop + 6 + HEADER_CONTENT_
 
 export function Header({ children, onHeight }: { children?: React.ReactNode; onHeight?: (h: number) => void }) {
   const insets = useSafeAreaInsets();
+  const barStyle = { position: 'absolute' as const, top: 0, left: 0, right: 0, zIndex: 10, paddingTop: insets.top + 6 };
+  const onLayout = (e: { nativeEvent: { layout: { height: number } } }) => onHeight?.(e.nativeEvent.layout.height);
+  const band = <View style={{ height: HEADER_CONTENT_HEIGHT, justifyContent: 'center' }}>{children}</View>;
+  // expo-blur has no real blur on Android (it renders plain translucency), so
+  // the header is a solid bar there; iOS keeps the dark glass.
+  if (Platform.OS === 'android') {
+    return <View onLayout={onLayout} style={[barStyle, { backgroundColor: '#040406' }]}>{band}</View>;
+  }
   return (
     <BlurView
       intensity={30}
       tint="dark"
-      onLayout={(e) => onHeight?.(e.nativeEvent.layout.height)}
-      style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, paddingTop: insets.top + 6, backgroundColor: 'rgba(4,4,6,0.96)' }}
+      onLayout={onLayout}
+      style={[barStyle, { backgroundColor: 'rgba(4,4,6,0.96)' }]}
     >
-      <View style={{ height: HEADER_CONTENT_HEIGHT, justifyContent: 'center' }}>{children}</View>
+      {band}
     </BlurView>
   );
 }

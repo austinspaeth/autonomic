@@ -218,6 +218,7 @@ export function migrate(s: unknown): AppState {
   if (settings.lastBleDeviceId !== undefined && typeof settings.lastBleDeviceId !== 'string') delete settings.lastBleDeviceId;
   if (settings.lastBleDeviceName !== undefined && typeof settings.lastBleDeviceName !== 'string') delete settings.lastBleDeviceName;
   if (settings.healthEnabled !== undefined) settings.healthEnabled = !!settings.healthEnabled;
+  if (settings.lastHrvSource !== undefined && !['polar', 'watch', 'camera'].includes(settings.lastHrvSource as string)) delete settings.lastHrvSource;
 
   const profile: Record<string, unknown> = isPlainObject(src.profile) ? src.profile : {};
   const meta: Record<string, unknown> = isPlainObject(src.meta) ? src.meta : {};

@@ -1,6 +1,7 @@
-/** Apple Health settings: permission, "Sync today from Health", and a
- *  bedtime-confirmation flow that reads last night's sleep + overnight HR and
- *  lets you review/edit it before it lands in the journal. */
+/** Health settings (Apple Health on iOS, Health Connect on Android):
+ *  permission, "Sync today from Health", and a bedtime-confirmation flow that
+ *  reads last night's sleep + overnight HR and lets you review/edit it before
+ *  it lands in the journal. */
 import React, { useState } from 'react';
 import { ActivityIndicator, Platform, Text, View } from 'react-native';
 import { Button } from '../components/ui';
@@ -8,7 +9,7 @@ import { SheetControls, SheetFooter, useSheets } from '../components/Sheet';
 import { TimeField } from '../components/Field';
 import { useToast } from '../components/Toast';
 import { usePalette } from '../theme';
-import { health, SleepImport } from '../lib/health';
+import { health, healthAppName, SleepImport } from '../lib/health';
 import { ensureDay, getState, save, storeWaveform } from '../store/store';
 import { getCurrentKey } from '../store/nav';
 import { computeScores } from '../lib/scoring';
@@ -22,12 +23,12 @@ export function HealthScreen() {
   const [busy, setBusy] = useState(false);
   const api = health();
 
-  if (Platform.OS !== 'ios' || !api.available) {
+  if (!api.available) {
     return (
       <View>
-        <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 8 }}>Apple Health</Text>
+        <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 8 }}>{healthAppName()}</Text>
         <Text style={{ color: p.textDim, fontSize: 15, lineHeight: 20 }}>
-          Apple Health is only available on iOS with a development build. On this platform it is disabled.
+          {`${healthAppName()} needs a full app build. On this platform it is disabled.`}
         </Text>
       </View>
     );
@@ -80,7 +81,7 @@ export function HealthScreen() {
         });
         if (dup) continue;
 
-        const r = { id: uid(), type: imp.type, time: imp.time, note: 'From Apple Health', source: 'watch', imported: true, ...imp.fields } as Record<string, unknown>;
+        const r = { id: uid(), type: imp.type, time: imp.time, note: `From ${healthAppName()}`, source: Platform.OS === 'android' ? 'health' : 'watch', imported: true, ...imp.fields } as Record<string, unknown>;
         // RR series goes to the waveform sidecar, never inline on the entry
         // (rrClean is derived — recomputed on view, not stored).
         if (imp.rr) storeWaveform(r.id as string, { rrRaw: imp.rr });
@@ -112,11 +113,11 @@ export function HealthScreen() {
 
   return (
     <View>
-      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 6 }}>Apple Health</Text>
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 6 }}>{healthAppName()}</Text>
       <Text style={{ color: p.textDim, fontSize: 14, marginBottom: 16, lineHeight: 19 }}>
         {"Grant permission, then import readings one at a time from the reading picker (tap a reading type to choose a sample from Health, or enter it manually). New readings you log are also written back to Health automatically. Existing entries are never overwritten."}
       </Text>
-      <Button title={authed ? 'Health connected' : 'Connect Apple Health'} variant="primary" onPress={connect} />
+      <Button title={authed ? 'Health connected' : `Connect ${healthAppName()}`} variant="primary" onPress={connect} />
       <View style={{ height: 20 }} />
       <Text style={{ color: p.textDim, fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Troubleshooting</Text>
       <Text style={{ color: p.textDim, fontSize: 13, marginBottom: 10, lineHeight: 18 }}>
@@ -167,7 +168,7 @@ export function SleepConfirmSheet({ dk, data, controls, onDone }: {
     <View>
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 6 }}>Confirm sleep</Text>
       <Text style={{ color: p.textDim, fontSize: 14, lineHeight: 20, marginBottom: 16 }}>
-        {`Apple Health shows you were asleep from ${fmtTime12(data.bed)} to ${fmtTime12(data.wake)}`}
+        {`${healthAppName()} shows you were asleep from ${fmtTime12(data.bed)} to ${fmtTime12(data.wake)}`}
         {data.minutesAsleep > 0 ? ` (${hours}h ${mins}m` : ''}
         {data.minutesAsleep > 0 ? (data.interrupted ? ', interrupted).' : ').') : '.'}
         {' Adjust the times if that’s not right.'}

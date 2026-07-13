@@ -2,7 +2,7 @@
   "expo": {
     "name": "Autonomic",
     "slug": "autonomic",
-    "version": "1.7.0",
+    "version": "1.8.0",
     "scheme": "autonomic",
     "orientation": "portrait",
     "icon": "./assets/autonomic-icon.png",
@@ -79,12 +79,31 @@
     },
     "android": {
       "package": "com.autonomic.journal",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundColor": "#0B0B0C"
+      },
+      "edgeToEdgeEnabled": true,
       "permissions": [
         "android.permission.BLUETOOTH_SCAN",
         "android.permission.BLUETOOTH_CONNECT",
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.BLUETOOTH",
-        "android.permission.BLUETOOTH_ADMIN"
+        "android.permission.BLUETOOTH_ADMIN",
+        "android.permission.health.READ_HEART_RATE",
+        "android.permission.health.READ_RESTING_HEART_RATE",
+        "android.permission.health.READ_HEART_RATE_VARIABILITY",
+        "android.permission.health.READ_RESPIRATORY_RATE",
+        "android.permission.health.READ_BLOOD_PRESSURE",
+        "android.permission.health.READ_WEIGHT",
+        "android.permission.health.READ_SLEEP",
+        "android.permission.health.WRITE_HEART_RATE",
+        "android.permission.health.WRITE_RESTING_HEART_RATE",
+        "android.permission.health.WRITE_HEART_RATE_VARIABILITY",
+        "android.permission.health.WRITE_BLOOD_PRESSURE"
+      ],
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "plugins": [
@@ -111,6 +130,15 @@
       "expo-font",
       "react-native-iap",
       "./plugins/withFmtConstevalFix",
+      "./plugins/withHealthConnect",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 26
+          }
+        }
+      ],
       "expo-secure-store",
       [
         "@bacons/apple-targets",

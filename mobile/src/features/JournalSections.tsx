@@ -20,7 +20,7 @@ import { sleepGrade, sleepHours, waterGoalL, type DaysMap } from '../lib/scoring
 import type { SleepStages } from '../lib/types';
 import { ensureDay, getState, getWaveform, save, useAppState } from '../store/store';
 import { fmtDateLong, fmtTime12, periodOf } from '../lib/dates';
-import { health } from '../lib/health';
+import { health, healthAppName } from '../lib/health';
 import { SleepConfirmSheet } from './Health';
 import { useEntryForms } from './forms';
 import { useDrawers } from './drawers';
@@ -196,7 +196,7 @@ function SleepSection({ dk }: { dk: string }) {
   const sleep = state.days[dk]?.sleep || { bed: '', wake: '' };
   const hasData = !!(sleep.bed && sleep.wake);
   const api = health();
-  const canHealth = api.available && Platform.OS === 'ios';
+  const canHealth = api.available;
 
   const [manual, setManual] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -208,7 +208,7 @@ function SleepSection({ dk }: { dk: string }) {
     try {
       const s = await api.readSleep(dk);
       setSyncing(false);
-      if (!s) { toast('No sleep data from Apple Health yet'); return; }
+      if (!s) { toast(`No sleep data from ${healthAppName()} yet`); return; }
       // Even when found, still confirm the asleep window before writing it.
       openSheet((c) => <SleepConfirmSheet dk={dk} data={s} controls={c} onDone={() => toast('Sleep saved')} />);
     } catch {
@@ -228,7 +228,7 @@ function SleepSection({ dk }: { dk: string }) {
                 <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: p.surface2, borderRadius: radius.control, padding: 12, marginBottom: 12 }}>
                   <Icon name="moon" size={18} color={p.textDim} />
                   <Text style={{ flex: 1, color: p.textDim, fontSize: 13, lineHeight: 18 }}>
-                    Waiting for last night&rsquo;s sleep from Apple Health. It can take a while after you wake for the data to be ready. Check back, or enter it yourself.
+                    {`Waiting for last night’s sleep from ${healthAppName()}. It can take a while after you wake for the data to be ready. Check back, or enter it yourself.`}
                   </Text>
                 </View>
                 <View style={{ flexDirection: 'row', gap: 10 }}>

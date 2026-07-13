@@ -3,7 +3,7 @@
  * Import/Export uses the exact PWA JSON format via the document picker + share.
  */
 import React, { useState } from 'react';
-import { Alert, Linking, Platform, Pressable, Text, View } from 'react-native';
+import { Alert, Linking, Pressable, Text, View } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
@@ -17,7 +17,8 @@ import { radius, usePalette } from '../theme';
 import { getState, replaceState, save, serializeState, useAppState } from '../store/store';
 import { ageFromBirthday, fmtStamp, keyOf } from '../lib/dates';
 import { DATE_KEY_RE, assertImportVersion, isPlainObject } from '../lib/migrate';
-import { useIap, manageSubscription, restore, MONTHLY_SKU } from '../store/iap';
+import { useIap, manageSubscription, restore, priceOf, storeName, MONTHLY_SKU, YEARLY_SKU } from '../store/iap';
+import { healthAppName } from '../lib/health';
 import { DevicesScreen } from './Devices';
 import { HealthScreen } from './Health';
 import { showWelcomeAgain } from './Onboarding';
@@ -55,8 +56,8 @@ export function MenuSheet({ controls }: { controls: SheetControls }) {
       </View>
       {item('user', 'Profile', 'Sex, birthday, height, weight', () => openSheet((c) => <ProfileSheet controls={c} />))}
       {item('bluetooth', 'Devices', 'Heart-rate straps', () => openSheet(() => <DevicesScreen />), !!state.settings.lastBleDeviceId)}
-      {item('heart', 'Apple Health', Platform.OS === 'ios' ? 'Read & write health data' : 'iOS only', () => openSheet(() => <HealthScreen />), Platform.OS === 'ios' && !!state.settings.healthEnabled)}
-      {Platform.OS === 'ios' ? item('star', 'Subscription', 'Manage plan or restore', () => openSheet((c) => <SubscriptionSheet controls={c} />)) : null}
+      {item('heart', healthAppName(), 'Read & write health data', () => openSheet(() => <HealthScreen />), !!state.settings.healthEnabled)}
+      {item('star', 'Subscription', 'Manage plan or restore', () => openSheet((c) => <SubscriptionSheet controls={c} />))}
       {item('download', 'Export data', 'Download everything as JSON', () => exportData(toast))}
       {item('upload', 'Import data', 'Replace everything from a JSON file', () => importData(controls, toast))}
       {item('sparkles', 'Show welcome screen', 'Replay the first-run guide', () => { controls.closeAll(); showWelcomeAgain(); })}
@@ -116,7 +117,7 @@ function SubscriptionSheet({ controls }: { controls: SheetControls }) {
   const { isPro, products, activeSku } = useIap();
   const [busy, setBusy] = useState(false);
   const active = products.find((s) => s.productId === activeSku);
-  const price = active && 'localizedPrice' in active ? active.localizedPrice : undefined;
+  const price = active ? priceOf(active, activeSku ?? YEARLY_SKU) : undefined;
   const period = activeSku === MONTHLY_SKU ? 'month' : 'year';
   const onRestore = async () => {
     if (busy) return;
@@ -134,11 +135,11 @@ function SubscriptionSheet({ controls }: { controls: SheetControls }) {
       </View>
       <Text style={{ color: p.textDim, fontSize: 14, lineHeight: 21, marginBottom: 16 }}>
         {isPro
-          ? `${price ? `Your plan renews ${period}ly at ${price}. ` : ''}Change your plan or cancel anytime in the App Store. Cancelling keeps access until the period ends.`
-          : 'You have no active plan. Restore a previous purchase, or manage plans in the App Store.'}
+          ? `${price ? `Your plan renews ${period}ly at ${price}. ` : ''}Change your plan or cancel anytime in ${storeName()}. Cancelling keeps access until the period ends.`
+          : `You have no active plan. Restore a previous purchase, or manage plans in ${storeName()}.`}
       </Text>
       <View style={{ gap: 10 }}>
-        <Button title="Manage in App Store" variant="primary" onPress={() => manageSubscription()} />
+        <Button title={`Manage in ${storeName()}`} variant="primary" onPress={() => manageSubscription()} />
         <Button title={busy ? 'Restoring…' : 'Restore purchase'} variant="default" disabled={busy} onPress={onRestore} />
       </View>
       <View style={{ height: 20 }} />

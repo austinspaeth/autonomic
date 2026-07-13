@@ -5,7 +5,7 @@
  * form-state hook collects values keyed by field key.
  */
 import React, { useRef, useState } from 'react';
-import { Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { radius, space, usePalette } from '../theme';
 import { Button } from './ui';
@@ -101,7 +101,24 @@ export function SelectField({ label, value, options, onChange }: { label: string
   );
 }
 
-/** Contents of the time-picker sheet: spinner + full-width red Save. */
+const hhmmOf = (d: Date) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+
+/** Android's DateTimePicker is always a system dialog (it renders nothing
+ *  inline — mounting it opens the dialog, and it must unmount after the first
+ *  change event or a re-render reopens it). The picker sheets therefore show
+ *  the drafted value as a tappable row on Android, with the dialog on top. */
+function AndroidPickerRow({ shown, onPress }: { shown: string; onPress: () => void }) {
+  const p = usePalette();
+  return (
+    <Pressable onPress={onPress} style={{ backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.control, padding: 14, alignItems: 'center', marginBottom: 4 }}>
+      <Text style={{ color: p.text, fontSize: 21, fontWeight: '700' }}>{shown}</Text>
+      <Text style={{ color: p.textDim, fontSize: 12.5, marginTop: 3 }}>Tap to change</Text>
+    </Pressable>
+  );
+}
+
+/** Contents of the time-picker sheet: spinner (iOS) / system dialog (Android)
+ *  + full-width red Save. */
 export function TimePickerSheet({ label, value, onChange, controls }: { label: string; value: string; onChange: (v: string) => void; controls: SheetControls }) {
   const p = usePalette();
   const [h, m] = (value || '00:00').split(':').map(Number);
@@ -109,11 +126,12 @@ export function TimePickerSheet({ label, value, onChange, controls }: { label: s
   base.setHours(h || 0, m || 0, 0, 0);
   // Draft the spinner value locally so nothing commits until "Save".
   const [draft, setDraft] = useState(base);
+  const [dialogOpen, setDialogOpen] = useState(Platform.OS === 'android');
   // iOS delivers a wheel's change event only after its settle animation, so a
   // quick AM/PM tap → Save can land the event after commit ran. Once saved,
   // write any late event straight through instead of dropping it.
   const saved = useRef(false);
-  const commitDate = (d: Date) => onChange(`${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`);
+  const commitDate = (d: Date) => onChange(hhmmOf(d));
   const commit = () => {
     saved.current = true;
     commitDate(draft);
@@ -123,15 +141,29 @@ export function TimePickerSheet({ label, value, onChange, controls }: { label: s
     <View>
       {/* Title vertically aligned with the sheet's ✕ (top:12, h:32 → centered on 28px). */}
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, lineHeight: 32, marginTop: -12, marginBottom: 12 }}>{label}</Text>
-      <DateTimePicker
-        value={draft}
-        mode="time"
-        display="spinner"
-        textColor="#ffffff"
-        themeVariant="dark"
-        style={{ height: 180 }}
-        onChange={(_, date) => { if (date) { setDraft(date); if (saved.current) commitDate(date); } }}
-      />
+      {Platform.OS === 'ios' ? (
+        <DateTimePicker
+          value={draft}
+          mode="time"
+          display="spinner"
+          textColor="#ffffff"
+          themeVariant="dark"
+          style={{ height: 180 }}
+          onChange={(_, date) => { if (date) { setDraft(date); if (saved.current) commitDate(date); } }}
+        />
+      ) : (
+        <>
+          <AndroidPickerRow shown={fmtTime12(hhmmOf(draft))} onPress={() => setDialogOpen(true)} />
+          {dialogOpen ? (
+            <DateTimePicker
+              value={draft}
+              mode="time"
+              display="spinner"
+              onChange={(e, date) => { setDialogOpen(false); if (e.type === 'set' && date) setDraft(date); }}
+            />
+          ) : null}
+        </>
+      )}
       <View style={{ flexDirection: 'row', marginTop: 8 }}>
         <Button title="Save" variant="primary" onPress={commit} />
       </View>
@@ -222,12 +254,14 @@ export function HeightField({ label, value, onChange, placeholder }: { label: st
   );
 }
 
-/** Contents of the date-picker sheet: spinner + full-width red Save. */
+/** Contents of the date-picker sheet: spinner (iOS) / system dialog (Android)
+ *  + full-width red Save. */
 export function DatePickerSheet({ label, value, onChange, controls }: { label: string; value: string; onChange: (v: string) => void; controls: SheetControls }) {
   const p = usePalette();
   const base = value ? dateFromKey(value) : new Date(1990, 0, 1);
   // Draft the spinner value locally so nothing commits until "Save".
   const [draft, setDraft] = useState(isNaN(base.getTime()) ? new Date(1990, 0, 1) : base);
+  const [dialogOpen, setDialogOpen] = useState(Platform.OS === 'android');
   // Same late-event write-through as TimePickerSheet: a wheel change event that
   // lands after "Save" (settle animation) must not be dropped.
   const saved = useRef(false);
@@ -241,16 +275,31 @@ export function DatePickerSheet({ label, value, onChange, controls }: { label: s
     <View>
       {/* Title vertically aligned with the sheet's ✕ (top:12, h:32 → centered on 28px). */}
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, lineHeight: 32, marginTop: -12, marginBottom: 12 }}>{label}</Text>
-      <DateTimePicker
-        value={draft}
-        mode="date"
-        display="spinner"
-        maximumDate={new Date()}
-        textColor="#ffffff"
-        themeVariant="dark"
-        style={{ height: 180 }}
-        onChange={(_, date) => { if (date) { setDraft(date); if (saved.current) commitDate(date); } }}
-      />
+      {Platform.OS === 'ios' ? (
+        <DateTimePicker
+          value={draft}
+          mode="date"
+          display="spinner"
+          maximumDate={new Date()}
+          textColor="#ffffff"
+          themeVariant="dark"
+          style={{ height: 180 }}
+          onChange={(_, date) => { if (date) { setDraft(date); if (saved.current) commitDate(date); } }}
+        />
+      ) : (
+        <>
+          <AndroidPickerRow shown={fmtDateFull(keyOf(draft))} onPress={() => setDialogOpen(true)} />
+          {dialogOpen ? (
+            <DateTimePicker
+              value={draft}
+              mode="date"
+              display="spinner"
+              maximumDate={new Date()}
+              onChange={(e, date) => { setDialogOpen(false); if (e.type === 'set' && date) setDraft(date); }}
+            />
+          ) : null}
+        </>
+      )}
       <View style={{ flexDirection: 'row', marginTop: 8 }}>
         <Button title="Save" variant="primary" onPress={commit} />
       </View>

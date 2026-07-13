@@ -8,22 +8,26 @@
       "developmentClient": true,
       "distribution": "internal",
       "channel": "development",
-      "ios": { "image": "latest" }
+      "ios": { "image": "latest" },
+      "android": { "buildType": "apk", "image": "latest" }
     },
     "preview": {
       "distribution": "internal",
       "channel": "preview",
-      "ios": { "image": "latest" }
+      "ios": { "image": "latest" },
+      "android": { "buildType": "apk", "image": "latest" }
     },
     "production": {
       "autoIncrement": true,
       "channel": "production",
-      "ios": { "image": "latest" }
+      "ios": { "image": "latest" },
+      "android": { "image": "latest" }
     }
   },
   "submit": {
     "production": {
-      "ios": { "ascAppId": "6789786971" }
+      "ios": { "ascAppId": "6789786971" },
+      "android": { "track": "internal" }
     }
   }
 }

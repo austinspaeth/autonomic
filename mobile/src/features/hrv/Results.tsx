@@ -18,7 +18,7 @@ import { computeScores } from '../../lib/scoring';
 import { getState, storeWaveform, upsertEntry } from '../../store/store';
 import { splitWaveform } from '../../lib/waveforms';
 import { getCurrentKey } from '../../store/nav';
-import { health } from '../../lib/health';
+import { health, healthAppName } from '../../lib/health';
 import { addDays, defaultTimeFor, fmtTime12, nowTime, todayKey, uid } from '../../lib/dates';
 import type { DayRecord, Entry } from '../../lib/types';
 import type { SessionConfig } from './Session';
@@ -90,10 +90,19 @@ export function HrvResults({ rr, hrSamples, sdnnSamples, config, durationSec, wa
     upsertEntry(getCurrentKey(), 'readings', entry);
     if (writeHealth && health().available) {
       const sdnn = parseFloat(reading.sdnn as string);
+      const rmssd = parseFloat(reading.rmssd as string);
       const hr = parseFloat((reading.hr || reading.avgHr) as string);
-      if (!isNaN(sdnn)) {
+      // iOS stores SDNN (HealthKit's HRV type), Android RMSSD (Health
+      // Connect's) — pass both and let the platform impl pick.
+      if (!isNaN(sdnn) || !isNaN(rmssd)) {
         try {
-          await health().writeHrvSession({ sdnnMs: sdnn, avgHr: isNaN(hr) ? undefined : hr, startISO: new Date(Date.now() - durationSec * 1000).toISOString(), durationSec });
+          await health().writeHrvSession({
+            sdnnMs: isNaN(sdnn) ? undefined : sdnn,
+            rmssdMs: isNaN(rmssd) ? undefined : rmssd,
+            avgHr: isNaN(hr) ? undefined : hr,
+            startISO: new Date(Date.now() - durationSec * 1000).toISOString(),
+            durationSec,
+          });
         } catch { /* graceful */ }
       }
     }
@@ -126,7 +135,7 @@ export function HrvResults({ rr, hrSamples, sdnnSamples, config, durationSec, wa
           {/* Watch readings came FROM Apple Health — no need to write them back. */}
           {health().available && config.source !== 'watch' ? (
             <View style={{ flexDirection: 'row', marginBottom: 10 }}>
-              <Button title={writeHealth ? '✓ Will write to Apple Health' : 'Also write to Apple Health'} variant={writeHealth ? 'default' : 'ghost'} onPress={() => setWriteHealth((v) => !v)} />
+              <Button title={writeHealth ? `✓ Will write to ${healthAppName()}` : `Also write to ${healthAppName()}`} variant={writeHealth ? 'default' : 'ghost'} onPress={() => setWriteHealth((v) => !v)} />
             </View>
           ) : null}
           <View style={{ flexDirection: 'row', gap: 12 }}>

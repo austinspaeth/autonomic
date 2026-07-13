@@ -9,34 +9,32 @@
  * src/store/iap.ts; this file is presentation only.
  */
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { Subscription } from 'react-native-iap';
 import { BrandMark, Icon, IconName } from '../components/Icon';
 import { Button } from '../components/ui';
 import { radius, usePalette } from '../theme';
 import {
   useIap, subscribe, restore, refreshEntitlement,
-  YEARLY_SKU, MONTHLY_SKU, FALLBACK_PRICE,
+  YEARLY_SKU, MONTHLY_SKU, priceOf, hasTrial,
 } from '../store/iap';
 
 const TERMS_URL = 'https://autonomic.care/terms-of-service/';
 const PRIVACY_URL = 'https://autonomic.care/privacy-policy/';
 
 const VALUE: { icon: IconName; title: string; sub: string }[] = [
-  { icon: 'activity', title: 'Lab-quality HRV', sub: 'RMSSD, frequency bands, and coherence from your strap or Apple Watch.' },
+  {
+    icon: 'activity', title: 'Lab-quality HRV',
+    sub: Platform.OS === 'ios'
+      ? 'RMSSD, frequency bands, and coherence from your strap or Apple Watch.'
+      : 'RMSSD, frequency bands, and coherence from your strap or camera.',
+  },
   { icon: 'chart', title: 'Every number graded', sub: 'Readings scored against research-backed thresholds, with trends over time.' },
   { icon: 'ai', title: 'AI-ready insights', sub: 'Turn your logged data into prompts for the AI service of your choice.' },
   { icon: 'heart', title: 'Private & on-device', sub: 'No account, no cloud. Your journal never leaves your phone.' },
 ];
 
-/** Local price of a plan, StoreKit's localized value if we have it. */
-const priceOf = (product: Subscription | undefined, sku: string) =>
-  product && 'localizedPrice' in product ? product.localizedPrice : FALLBACK_PRICE[sku];
 const numeric = (s: string) => parseFloat(s.replace(/[^0-9.]/g, '')) || 0;
-/** Does this iOS plan carry an introductory free-trial offer? */
-const hasTrial = (product: Subscription | undefined) =>
-  !!product && 'introductoryPricePaymentModeIOS' in product && product.introductoryPricePaymentModeIOS === 'FREETRIAL';
 
 function ValueRow({ icon, title, sub }: { icon: IconName; title: string; sub: string }) {
   const p = usePalette();
@@ -177,7 +175,9 @@ export function SubscriptionGate() {
         </View>
 
         <Text style={{ color: p.textDim, fontSize: 11, textAlign: 'center', lineHeight: 17, opacity: 0.85 }}>
-          Payment is charged to your Apple ID at confirmation. The subscription auto-renews unless canceled at least 24 hours before the period ends; manage or cancel in your App Store settings.{'  '}
+          {Platform.OS === 'ios'
+            ? 'Payment is charged to your Apple ID at confirmation. The subscription auto-renews unless canceled at least 24 hours before the period ends; manage or cancel in your App Store settings.'
+            : 'Payment is charged to your Google account at confirmation. The subscription auto-renews unless canceled before the period ends; manage or cancel in Google Play.'}{'  '}
           {link('Terms', TERMS_URL)}{'  ·  '}{link('Privacy', PRIVACY_URL)}
         </Text>
       </ScrollView>

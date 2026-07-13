@@ -3,7 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Slot } from 'expo-router';
-import { View } from 'react-native';
+import { Platform, View } from 'react-native';
 import * as Updates from 'expo-updates';
 import { useFonts } from 'expo-font';
 import { Manrope_600SemiBold, Manrope_700Bold, Manrope_800ExtraBold } from '@expo-google-fonts/manrope';
@@ -45,10 +45,11 @@ export default function RootLayout() {
     IBMPlexMono_400Regular,
   });
   useEffect(() => {
-    // Open the StoreKit connection and read the current Pro entitlement.
+    // Open the store connection and read the current Pro entitlement.
     initIap();
-    // Watch companion: drain queued stand-test results + relay entitlement.
-    initWatchReceiver();
+    // Watch companion (iOS only): drain queued stand-test results + relay
+    // entitlement. Safe elsewhere (the bridge no-ops), but don't even try.
+    if (Platform.OS === 'ios') initWatchReceiver();
     // First-launch-of-the-day JSON snapshot (rotating, kept in Documents/backups).
     runDailyBackup();
     // Pull any published EAS update in the background (preview + production
@@ -73,10 +74,10 @@ export default function RootLayout() {
           <ToastProvider>
             <SheetProvider>
               <Slot />
-              {/* Pops the results card when a watch reading lands mid-session. */}
-              <WatchArrivalCards />
-              {/* "Waiting for watch…" pill while the HRV sync card is minimized. */}
-              <WatchSyncPill />
+              {/* Watch companion overlays (iOS only): results card on arrival +
+                  "Waiting for watch…" pill while the sync card is minimized. */}
+              {Platform.OS === 'ios' ? <WatchArrivalCards /> : null}
+              {Platform.OS === 'ios' ? <WatchSyncPill /> : null}
               {/* Paywall — covers the app whenever the user is not Pro (zIndex
                   90). Sits below onboarding so a fresh install sees Welcome
                   first, then the trial offer. */}

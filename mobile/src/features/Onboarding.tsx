@@ -28,7 +28,7 @@ import { fmtDateFull, uid } from '../lib/dates';
 import { SheetControls, useSheets } from '../components/Sheet';
 import { useToast } from '../components/Toast';
 import { ACCENT, radius, usePalette } from '../theme';
-import { health } from '../lib/health';
+import { health, healthAppName } from '../lib/health';
 import { computeScores } from '../lib/scoring';
 import { blankDay, getState, mutate, save, storeWaveform, useAppState } from '../store/store';
 import { DevicesScreen } from './Devices';
@@ -82,7 +82,7 @@ async function importAppleHealthHistory(): Promise<number> {
       if (r.ownApp) continue;                           // skip our own write-backs
       if (!s.days[r.dayKey]) s.days[r.dayKey] = blankDay();
       const entry: Record<string, unknown> = {
-        id: uid(), type: r.type, time: r.time, note: 'From Apple Health', source: 'watch', imported: true, ...r.fields,
+        id: uid(), type: r.type, time: r.time, note: `From ${healthAppName()}`, source: Platform.OS === 'android' ? 'health' : 'watch', imported: true, ...r.fields,
       };
       // RR series goes to the waveform sidecar, never inline on the entry
       // (rrClean is derived — recomputed on view, not stored).
@@ -242,11 +242,12 @@ function HistoryImportSheet({ controls, onImported }: {
       <View style={{ gap: 8 }}>
         <Text style={{ fontSize: 21, fontWeight: '700', letterSpacing: -0.3, color: p.text }}>Import your history?</Text>
         <Text style={{ fontSize: 14.5, lineHeight: 22, color: p.textDim }}>
-          Bring your past HRV, blood pressure, and resting heart rate from Apple Health into your journal so your
-          trends start full. This is a one-time import — new readings sync automatically as you go.
+          {`Bring your past HRV, blood pressure, and resting heart rate from ${healthAppName()} into your journal so your trends start full. This is a one-time import — new readings sync automatically as you go.`}
         </Text>
         <Text style={{ fontSize: 12.5, lineHeight: 18, color: p.textDim, opacity: 0.85 }}>
-          Only HRV recordings with beat-to-beat detail come in, so the full variability panel is available.
+          {Platform.OS === 'ios'
+            ? 'Only HRV recordings with beat-to-beat detail come in, so the full variability panel is available.'
+            : 'HRV history comes in as RMSSD values from Health Connect.'}
         </Text>
       </View>
       <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
@@ -284,16 +285,24 @@ function Onboarding({ onDone }: { onDone: () => void }) {
   const scrollRef = useRef<ScrollView>(null);
   const kb = useSharedValue(0);
   const [kbOpen, setKbOpen] = useState(false);
+  // Android: no automaticallyAdjustKeyboardInsets, and with edge-to-edge the
+  // window doesn't resize either — pad the scroll content by the keyboard
+  // height ourselves so scrollToEnd can actually clear it.
+  const [kbPad, setKbPad] = useState(0);
   useEffect(() => {
     const ios = Platform.OS === 'ios';
     const onShow = (e: { endCoordinates: { height: number }; duration?: number }) => {
       kb.value = withTiming(e.endCoordinates.height, { duration: e.duration || 250, easing: Easing.out(Easing.cubic) });
       setKbOpen(true);
-      requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
+      if (!ios) setKbPad(e.endCoordinates.height);
+      // A frame late (two on Android, where the padding must land first) so the
+      // scroll range includes the new keyboard clearance.
+      requestAnimationFrame(() => requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true })));
     };
     const onHide = (e?: { duration?: number }) => {
       kb.value = withTiming(0, { duration: (e && e.duration) || 250, easing: Easing.out(Easing.cubic) });
       setKbOpen(false);
+      setKbPad(0);
     };
     const s = Keyboard.addListener(ios ? 'keyboardWillShow' : 'keyboardDidShow', onShow);
     const h = Keyboard.addListener(ios ? 'keyboardWillHide' : 'keyboardDidHide', onHide);
@@ -354,7 +363,7 @@ function Onboarding({ onDone }: { onDone: () => void }) {
   const connectHealth = async () => {
     if (healthOn || healthBusy) return;
     const api = health();
-    if (!api.available) { toast('Apple Health needs a development build'); return; }
+    if (!api.available) { toast(`${healthAppName()} needs a full app build`); return; }
     setHealthBusy(true);
     const ok = await api.requestAuth();
     setHealthBusy(false);
@@ -368,7 +377,7 @@ function Onboarding({ onDone }: { onDone: () => void }) {
             controls={c}
             onImported={(n) => {
               if (n == null) toast('Import failed');
-              else toast(n ? `Imported ${n} reading${n === 1 ? '' : 's'}` : 'No history found in Apple Health');
+              else toast(n ? `Imported ${n} reading${n === 1 ? '' : 's'}` : `No history found in ${healthAppName()}`);
             }}
           />
         ),
@@ -459,7 +468,7 @@ function Onboarding({ onDone }: { onDone: () => void }) {
         );
       };
       return (
-        <ScrollView ref={scrollRef} style={{ flex: 1 }} contentContainerStyle={{ paddingTop: 24, gap: 22, paddingBottom: 88 }} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" automaticallyAdjustKeyboardInsets showsVerticalScrollIndicator={false}>
+        <ScrollView ref={scrollRef} style={{ flex: 1 }} contentContainerStyle={{ paddingTop: 24, gap: 22, paddingBottom: 88 + kbPad }} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" automaticallyAdjustKeyboardInsets showsVerticalScrollIndicator={false}>
           <View style={[st.tile, { width: 72, height: 72, borderRadius: 20 }]}>
             <Glyph size={34} d={['M16 8a4 4 0 1 1-8 0 4 4 0 0 1 8 0', 'M4 21a8 8 0 0 1 16 0']} />
           </View>
@@ -515,8 +524,10 @@ function Onboarding({ onDone }: { onDone: () => void }) {
         <View style={{ gap: 12 }}>
           <ConnectRow
             glyph={<Glyph size={22} d={['M12 21c-5-3.5-8-6.6-8-10.3A4.7 4.7 0 0 1 12 7a4.7 4.7 0 0 1 8 3.7C20 14.4 17 17.5 12 21z']} />}
-            title="Connect Apple Health"
-            sub={healthOn ? 'Connected · SDNN available' : 'Recommended on iPhone'}
+            title={`Connect ${healthAppName()}`}
+            sub={healthOn
+              ? (Platform.OS === 'android' ? 'Connected · RMSSD available' : 'Connected · SDNN available')
+              : (Platform.OS === 'android' ? 'Recommended on Android' : 'Recommended on iPhone')}
             on={healthOn}
             busy={healthBusy}
             onPress={connectHealth}
@@ -534,7 +545,9 @@ function Onboarding({ onDone }: { onDone: () => void }) {
             <Glyph size={17} w={2} circle={{ r: 10, w: 2 }} d={['M12 16v-4M12 8h.01']} />
           </View>
           <Text style={{ flex: 1, fontSize: 12.5, lineHeight: 19, color: '#c9a3a0' }}>
-            Works with Apple Watch without pairing to the app, but Bluetooth chest straps will get more accurate data.
+            {Platform.OS === 'ios'
+              ? 'Works with Apple Watch without pairing to the app, but Bluetooth chest straps will get more accurate data.'
+              : 'A Bluetooth chest strap gets the most accurate data. You can also take readings with your phone camera.'}
           </Text>
         </View>
       </ScrollView>
@@ -564,9 +577,11 @@ function Onboarding({ onDone }: { onDone: () => void }) {
           <Bullet icon={<Icon name="plus" size={25} color={ACCENT} />}>
             Tap <Text style={{ fontWeight: '700' }}>+</Text> on any section to log a reading.
           </Bullet>
-          <Bullet icon={<Icon name="watch" size={25} color={ACCENT} />}>
-            Check your <Text style={{ fontWeight: '700' }}>Apple Watch</Text> to record POTS episodes or monitor your HR.
-          </Bullet>
+          {Platform.OS === 'ios' ? (
+            <Bullet icon={<Icon name="watch" size={25} color={ACCENT} />}>
+              Check your <Text style={{ fontWeight: '700' }}>Apple Watch</Text> to record POTS episodes or monitor your HR.
+            </Bullet>
+          ) : null}
           <Bullet icon={<Glyph size={25} circle={{ r: 9 }} d={['M9.4 9.2a2.6 2.6 0 0 1 5.1.9c0 1.7-2.5 2.3-2.5 2.3', 'M12 16h.01']} />}>
             Tap the <Text style={{ fontWeight: '700' }}>?</Text> icons whenever you need help.
           </Bullet>

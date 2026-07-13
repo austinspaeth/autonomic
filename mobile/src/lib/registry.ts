@@ -583,6 +583,7 @@ export function detailFields(def: TypeDef | undefined, r: Entry): string {
  */
 export function readingLabel(r: Entry): string {
   if (r.type === 'hrv' && r.source === 'watch' && r.imported) return 'Apple Watch HRV';
+  if (r.type === 'hrv' && r.source === 'health' && r.imported) return 'Imported HRV';
   return READING_TYPES[r.type]?.label ?? r.type;
 }
 

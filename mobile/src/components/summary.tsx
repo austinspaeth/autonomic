@@ -21,6 +21,7 @@ import {
 } from '../lib/scoring';
 import { metricHistory, numEx, type DaysMap } from '../lib/scoring/day';
 import { entryFields, isDivider, READING_TYPES } from '../lib/registry';
+import { healthAppName } from '../lib/health';
 import { fmtNum, fmtShort } from '../lib/dates';
 import { correctArtifacts } from '../lib/hrv';
 import { getWaveform } from '../store/store';
@@ -37,7 +38,9 @@ const hexA = (hex: string, a: number) => {
 /** Map a reading's capture source to a human label for the Details card.
  *  Bluetooth ('polar') readings prefer the stamped device name (`sourceName`);
  *  this map is the fallback for readings captured before names were stamped. */
-const SOURCE_LABEL: Record<string, string> = { polar: 'Bluetooth device', watch: 'Apple Watch', camera: 'Device camera', manual: 'Manual entry' };
+// 'health' = imported from the platform health store — named for the store on
+// THIS device (Apple Health / Health Connect).
+const SOURCE_LABEL: Record<string, string> = { polar: 'Bluetooth device', watch: 'Apple Watch', camera: 'Device camera', manual: 'Manual entry', health: healthAppName() };
 
 function sourceLabelFor(r: Entry): string | undefined {
   if (r.source === 'polar' && r.sourceName) return String(r.sourceName);

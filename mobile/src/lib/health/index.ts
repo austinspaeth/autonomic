@@ -1,10 +1,12 @@
 /**
- * Apple HealthKit wrapper (iOS only).
+ * Platform health wrapper — Apple HealthKit on iOS, Health Connect on Android
+ * (see ./healthConnect.ts). Both implement the same HealthApi so consumers
+ * never branch on platform; anything else gets a stub with `available: false`.
  *
- * Read: resting/walking HR, HRV SDNN, respiratory rate, blood pressure,
- * body mass (profile weight only), sleep (with overnight HR range). Write: HRV
- * SDNN, resting/avg HR, a Mindfulness session, and blood pressure (as a proper
- * correlation). `publishReading` maps an app journal entry to the right writes.
+ * Read: resting/walking HR, HRV (SDNN on iOS, RMSSD on Android), respiratory
+ * rate, blood pressure, body mass (profile weight only), sleep (with overnight
+ * HR range). Write: HRV, resting/avg HR, a Mindfulness session (iOS), and
+ * blood pressure. `publishReading` maps an app journal entry to the right writes.
  *
  * IMPORTANT — this targets @kingstinct/react-native-healthkit v8, whose API
  * differs from older majors: `requestAuthorization(read, write)` (read first),
@@ -49,7 +51,9 @@ export interface HealthApi {
    * Excludes samples this app authored and series with too few beats.
    */
   readHrvSessions(opts: { fromMs: number; toMs: number }): Promise<WatchHrvSample[]>;
-  writeHrvSession(opts: { sdnnMs: number; avgHr?: number; startISO: string; durationSec: number }): Promise<void>;
+  /** iOS writes SDNN (HealthKit's HRV type); Android writes RMSSD (Health
+   *  Connect's). Callers pass both when they have them. */
+  writeHrvSession(opts: { sdnnMs?: number; rmssdMs?: number; avgHr?: number; startISO: string; durationSec: number }): Promise<void>;
   writeQuantity(kind: 'systolic' | 'diastolic' | 'restingHr', value: number, when: Date): Promise<void>;
   /** Publish an app journal reading to Health. Returns how many samples were written. */
   publishReading(entry: Entry, dk: string): Promise<number>;
@@ -124,6 +128,18 @@ let cached: HealthApi | null = null;
 
 export function health(): HealthApi {
   if (cached) return cached;
+  if (Platform.OS === 'android') {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const hc = require('react-native-health-connect');
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { makeHealthConnect } = require('./healthConnect');
+      cached = makeHealthConnect(hc);
+    } catch {
+      cached = stub;
+    }
+    return cached!;
+  }
   if (Platform.OS !== 'ios') { cached = stub; return cached; }
   let hk: typeof import('@kingstinct/react-native-healthkit');
   try {
@@ -136,6 +152,11 @@ export function health(): HealthApi {
   const mod = (hk as { default?: unknown }).default ?? hk;
   cached = makeReal(mod as HkModule);
   return cached;
+}
+
+/** User-facing name of the platform health store, for UI copy. */
+export function healthAppName(): string {
+  return Platform.OS === 'android' ? 'Health Connect' : 'Apple Health';
 }
 
 /** For tests: force a specific implementation (or reset). */
@@ -432,7 +453,7 @@ function makeReal(mod: HkModule): HealthApi {
     async writeHrvSession({ sdnnMs, avgHr, startISO, durationSec }) {
       const start = new Date(startISO);
       const end = new Date(start.getTime() + durationSec * 1000);
-      await saveQ(QID.hrvSdnn, 'ms', sdnnMs, start, end);
+      if (sdnnMs != null && Number.isFinite(sdnnMs) && sdnnMs > 0) await saveQ(QID.hrvSdnn, 'ms', sdnnMs, start, end);
       // Session-average HR is a HeartRate sample, NOT RestingHeartRate — that
       // identifier is Apple's derived all-day metric and writing to it skews
       // every consumer of resting HR (including our own readAll/import).

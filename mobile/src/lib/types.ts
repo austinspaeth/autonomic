@@ -50,10 +50,12 @@ export interface Entry {
  *  only on a pre-save live preview or in a not-yet-migrated import; the store
  *  strips them on load, and persisting one trips a dev warning. */
 export interface LiveHrvExtras {
-  /** Capture source ('polar' = Bluetooth strap, best; 'camera' = phone PPG, lowest quality). */
-  source?: 'polar' | 'watch' | 'camera' | 'manual';
-  /** True when the entry was auto-imported from Apple Health (welcome backfill /
-   *  Health sync) rather than captured in-app — drives the "Apple Watch HRV" label. */
+  /** Capture source ('polar' = Bluetooth strap, best; 'camera' = phone PPG,
+   *  lowest quality; 'health' = imported via Health Connect on Android). */
+  source?: 'polar' | 'watch' | 'camera' | 'manual' | 'health';
+  /** True when the entry was auto-imported from the platform health store
+   *  (welcome backfill / Health sync) rather than captured in-app — drives the
+   *  "Apple Watch HRV" / "Imported HRV" label. */
   imported?: boolean;
   /** Bluetooth device name at capture time (source 'polar' only) — shown as the Source detail. */
   sourceName?: string;
@@ -127,6 +129,9 @@ export interface AppState {
     lastBleDeviceId?: string;
     lastBleDeviceName?: string;
     healthEnabled?: boolean;
+    /** Signal source of the last live HRV capture — seeds the setup sheet's
+     *  default so a deliberate choice (camera / watch) sticks across sessions. */
+    lastHrvSource?: 'polar' | 'watch' | 'camera';
     /** Clean-day protocol; undefined falls back to DEFAULT_PROTOCOL. */
     protocol?: Protocol;
   };

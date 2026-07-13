@@ -6,11 +6,10 @@
  * running, a single "Finish now" ends early; it also auto-finishes at the full
  * duration. On finish the breathing guide (and its haptics) stops, a strong
  * ~1 s buzz marks completion, and either the results card (strap/camera) or the
- * Apple-Health watch sync card rises over this one. Because haptics only play
- * while the JS process is running (BLE keeps it alive in the background; watch
- * and camera sessions are suspended), Start also schedules a local
- * notification at the end time as a backstop buzz — cancelled whenever the
- * in-app finish actually runs. See src/lib/notify.ts.
+ * Apple-Health watch sync card rises over this one. Haptics only play while
+ * the JS process is running (BLE keeps it alive in the background; watch and
+ * camera sessions are suspended) — a backgrounded finish is picked up when the
+ * app returns (no notifications; the app deliberately sends none).
  *
  * Camera (PPG) source: the camera + torch start on mount so finger placement
  * can lock BEFORE the reading — "Start reading" stays disabled until a steady
@@ -33,7 +32,6 @@ import { ble } from '../../lib/ble/manager';
 import { ppg, type PpgSignal } from '../../lib/ppg/camera';
 import { PpgCameraView } from '../../lib/ppg/CameraView';
 import { correctArtifacts, std } from '../../lib/hrv';
-import { scheduleReadingDone, cancelReadingDone } from '../../lib/notify';
 import { getState } from '../../store/store';
 
 // Every reading — structured or unstructured — runs the full 5 minutes.
@@ -86,7 +84,6 @@ export function HrvSession({ config, controls, autoStart }: { config: SessionCon
   const startedAtRef = useRef<number>(0);
   const startedRef = useRef(false);
   const finishedRef = useRef(false);
-  const notifIdRef = useRef<string | null>(null);
   const recentRr = useRef<number[]>([]);
 
   // The phone must not sleep mid-reading — the timer, BLE stream and breathing
@@ -217,13 +214,6 @@ export function HrvSession({ config, controls, autoStart }: { config: SessionCon
     // since mount (their samples start being collected now).
     if (config.source === 'watch' || config.source === 'camera') setConnected(true);
     timerRef.current = setInterval(() => syncRef.current(), 1000);
-    // Backstop buzz for a backgrounded finish: watch (and camera) sessions are
-    // fully suspended off-screen, so the in-app haptic can't fire at the end.
-    // Scheduled a beat past the duration so an in-app finish cancels it first.
-    scheduleReadingDone(startedAtRef.current + (DURATION + 2) * 1000).then((id) => {
-      notifIdRef.current = id;
-      if (finishedRef.current) cancelReadingDone(id);
-    });
   };
 
   // Watch flow: the prep card's Start button doubles as this card's — the
@@ -237,7 +227,6 @@ export function HrvSession({ config, controls, autoStart }: { config: SessionCon
   useEffect(() => () => {
     if (timerRef.current) clearInterval(timerRef.current);
     if (config.source === 'polar') ble().disconnect().catch(() => {});
-    cancelReadingDone(notifIdRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -248,11 +237,9 @@ export function HrvSession({ config, controls, autoStart }: { config: SessionCon
     // `elapsed` state is stale, and long after the duration if backgrounded).
     const capturedSec = Math.min(DURATION, Math.max(0, Math.round((Date.now() - startedAtRef.current) / 1000)));
     // Stop the breathing guide (and its in/out haptics) immediately, then mark
-    // completion with one strong sustained buzz. The scheduled backstop
-    // notification is only needed when this code can't run (app suspended).
+    // completion with one strong sustained buzz.
     setFinished(true);
     completionBuzz();
-    cancelReadingDone(notifIdRef.current);
     if (timerRef.current) clearInterval(timerRef.current);
     if (config.source === 'polar') await ble().disconnect().catch(() => {});
     if (config.source === 'camera') await ppg().stop().catch(() => {});

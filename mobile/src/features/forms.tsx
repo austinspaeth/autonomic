@@ -4,7 +4,7 @@
  * a picker opens a form on top; Save closes the whole stack and refreshes.
  */
 import React, { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { SheetControls, SheetFooter, useSheets } from '../components/Sheet';
 import { FieldInputs, TextField, TimeField, useFormState } from '../components/Field';
 import { Button, Muted } from '../components/ui';
@@ -19,7 +19,7 @@ import {
 import { typesFor, type TypeKind } from '../lib/typeCatalog';
 import { ManageTypesSheet } from './TypeManager';
 import { computeScores } from '../lib/scoring';
-import { health } from '../lib/health';
+import { health, healthAppName } from '../lib/health';
 import { healthSourceFor, type HealthCandidate, type HealthSource } from '../lib/health/sources';
 import { deleteEntry, getState, upsertEntry, useAppState } from '../store/store';
 import { defaultTimeFor, fmtTime12, uid } from '../lib/dates';
@@ -102,14 +102,14 @@ function ReadingImportSheet({ type, dk, source, onManual, onPick }: {
   return (
     <View>
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 4 }}>{`Add ${def.label}`}</Text>
-      <Text style={{ color: p.textDim, fontSize: 14, marginBottom: 16 }}>Import from Apple Health, or enter manually.</Text>
+      <Text style={{ color: p.textDim, fontSize: 14, marginBottom: 16 }}>{`Import from ${healthAppName()}, or enter manually.`}</Text>
       {loading ? (
         <View style={{ alignItems: 'center', paddingVertical: 30, gap: 12 }}>
           <ActivityIndicator color={p.accent} />
-          <Text style={{ color: p.textDim, fontSize: 14 }}>{`Getting ${lower} from Apple Health…`}</Text>
+          <Text style={{ color: p.textDim, fontSize: 14 }}>{`Getting ${lower} from ${healthAppName()}…`}</Text>
         </View>
       ) : cands.length === 0 ? (
-        <Muted>{`No ${lower} in Apple Health for this day. Enter one manually below.`}</Muted>
+        <Muted>{`No ${lower} in ${healthAppName()} for this day. Enter one manually below.`}</Muted>
       ) : (
         cands.map((c, i) => (
           <Pressable key={c.key} onPress={() => onPick(c)} style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: p.border }, pressed && { opacity: 0.5 }]}>
@@ -167,7 +167,7 @@ function ReadingPicker({ onLive, onPick }: { onLive: () => void; onPick: (type: 
   const manual = ['standTest', 'orthostatic', 'bp', 'restingHr'];
   const readingRow = (t: string) => ({ key: t, title: pickerLabel(t), sub: subFor[t] || '', icon: READING_TYPES[t].icon as string, tint: tintFor(t), onPress: () => onPick(t) });
   const rows: { key: string; title: string; sub: string; icon: string; tint: string; onPress: () => void }[] = [
-    { key: 'hrv', title: 'HRV Reading', sub: 'From a chest strap or Apple Watch', icon: 'heartPulse', tint: p.accent, onPress: onLive },
+    { key: 'hrv', title: 'HRV Reading', sub: Platform.OS === 'ios' ? 'From a chest strap or Apple Watch' : 'From a chest strap or your camera', icon: 'heartPulse', tint: p.accent, onPress: onLive },
     ...manual.map(readingRow),
   ];
   return (
@@ -234,13 +234,13 @@ export function EntryForm({ typeMap, arrKey, dk, type, existing, prefill = null,
     });
     r.scores = computeScores(r, scoreCtx());
     upsertEntry(dk, arrKey, r);
-    // Auto-publish freshly-logged readings to Apple Health (fire-and-forget).
+    // Auto-publish freshly-logged readings to the health store (fire-and-forget).
     // Only new *manual* entries — never re-publish edits or Health-sourced rows.
-    if (arrKey === 'readings' && !existing && !fromHealth && r.note !== 'From Apple Health' && getState().settings.healthEnabled) {
+    if (arrKey === 'readings' && !existing && !fromHealth && r.note !== 'From Apple Health' && r.note !== 'From Health Connect' && getState().settings.healthEnabled) {
       const api = health();
       if (api.available) {
         api.publishReading(r, dk)
-          .then((n) => { if (n > 0) toast('Saved to Apple Health'); })
+          .then((n) => { if (n > 0) toast(`Saved to ${healthAppName()}`); })
           .catch(() => { /* graceful */ });
       }
     }
@@ -385,8 +385,12 @@ export function useEntryForms(dk: string) {
         <OrthostaticIntroSheet
           title={`Add ${pickerLabel(type)}`}
           subtitle={type === 'orthostatic'
-            ? 'Capture live from your watch or a chest strap, or enter an event manually.'
-            : 'Run the guided test from your Apple Watch or with a Bluetooth chest strap.'}
+            ? (Platform.OS === 'ios'
+              ? 'Capture live from your watch or a chest strap, or enter an event manually.'
+              : 'Capture live from a chest strap, or enter an event manually.')
+            : (Platform.OS === 'ios'
+              ? 'Run the guided test from your Apple Watch or with a Bluetooth chest strap.'
+              : 'Run the guided test with a Bluetooth chest strap.')}
           onManual={type === 'orthostatic' ? () => openReadingForm(type, null) : undefined}
           onStrap={() => startPotsLive(type)}
         />

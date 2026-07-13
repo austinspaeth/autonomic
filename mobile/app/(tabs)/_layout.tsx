@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Animated as RNAnimated, Dimensions, Easing, Pressable, Text, View } from 'react-native';
+import { Animated as RNAnimated, Dimensions, Easing, Platform, Pressable, Text, View } from 'react-native';
 import { Tabs } from 'expo-router';
 import { BlurView } from 'expo-blur';
 import Svg, { Path } from 'react-native-svg';
@@ -78,12 +78,8 @@ function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
 
   return (
     <View pointerEvents="box-none" style={{ position: 'absolute', bottom: insets.bottom + 12, left: 0, right: 0, alignItems: 'center' }}>
-      <BlurView
-        intensity={40}
-        tint="dark"
-        style={{ borderRadius: 999, overflow: 'hidden', borderWidth: 1, borderColor: '#34343b', shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 20, shadowOffset: { width: 0, height: 10 }, elevation: 8 }}
-      >
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, padding: PAD, backgroundColor: 'rgba(6,6,9,0.82)' }}>
+      <BarShell>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, padding: PAD, backgroundColor: Platform.OS === 'ios' ? 'rgba(6,6,9,0.82)' : '#0a0a0e' }}>
         <View style={{ paddingLeft: 8, paddingRight: 6, marginRight: 8, justifyContent: 'center' }}>
           <BrandMark size={20} />
         </View>
@@ -124,9 +120,20 @@ function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
           <SolidCog size={22} color={p.textDim} />
         </Pressable>
       </View>
-      </BlurView>
+      </BarShell>
     </View>
   );
+}
+
+/** The floating bar's rounded shell — dark glass (BlurView) on iOS, a solid
+ *  pill on Android where expo-blur renders plain translucency instead of blur. */
+function BarShell({ children }: { children: React.ReactNode }) {
+  const shell = {
+    borderRadius: 999, overflow: 'hidden' as const, borderWidth: 1, borderColor: '#34343b',
+    shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 20, shadowOffset: { width: 0, height: 10 }, elevation: 8,
+  };
+  if (Platform.OS === 'android') return <View style={[shell, { backgroundColor: '#0a0a0e' }]}>{children}</View>;
+  return <BlurView intensity={40} tint="dark" style={shell}>{children}</BlurView>;
 }
 
 export default function TabLayout() {

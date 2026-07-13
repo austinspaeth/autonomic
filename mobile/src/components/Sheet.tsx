@@ -10,9 +10,9 @@
  * absolutely-positioned Views. (iOS can only present one RN Modal at a time, so
  * one-Modal-per-sheet silently fails to stack — the 2nd never appears.)
  */
-import React, { createContext, useContext, useRef, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import {
-  Dimensions, Keyboard, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View,
+  BackHandler, Dimensions, Keyboard, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View,
 } from 'react-native';
 import Animated, {
   Easing, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming,
@@ -58,7 +58,14 @@ let nextId = 1;
 export function SheetProvider({ children }: { children: React.ReactNode }) {
   const [stack, setStack] = useState<SheetEntry[]>([]);
 
+  // Double-tap guard: on a janky frame (slow Androids especially) both taps of
+  // an accidental double-press get queued and each opens the same sheet. Two
+  // deliberate opens are never this close together, so drop the echo.
+  const lastOpenAt = useRef(0);
   const openSheet = (builder: Builder, opts: SheetOptions = {}) => {
+    const now = Date.now();
+    if (now - lastOpenAt.current < 350) return;
+    lastOpenAt.current = now;
     setStack((s) => [...s, { id: nextId++, builder, opts }]);
   };
   // Closing is a two-step dance so the animation stays fluid: flag the sheet
@@ -78,7 +85,7 @@ export function SheetProvider({ children }: { children: React.ReactNode }) {
     <Ctx.Provider value={{ openSheet, closeSheet: closeTop, closeAll, depth: stack.filter((e) => !e.closing).length }}>
       {children}
       {stack.length > 0 && (
-        <Modal transparent visible animationType="none" statusBarTranslucent onRequestClose={closeTop}>
+        <SheetHost onRequestClose={closeTop}>
           {/* Capture-phase touch hook (never claims the responder): any touch in
               the sheet stack blurs chart selections; a touched chart re-selects
               in the same event, so only taps *outside* a chart deselect. */}
@@ -99,9 +106,40 @@ export function SheetProvider({ children }: { children: React.ReactNode }) {
               />
             ))}
           </View>
-        </Modal>
+        </SheetHost>
       )}
     </Ctx.Provider>
+  );
+}
+
+/**
+ * Where the sheet stack lives. iOS: one RN Modal (escapes every stacking
+ * context; iOS keyboards overlay it and the manual footer-lift handles them).
+ * Android: a plain full-screen overlay View in the ACTIVITY window instead —
+ * an RN Modal is its own Android window, and that window pans itself when the
+ * keyboard covers a focused input (windowSoftInputMode doesn't reach Modals),
+ * shoving the whole sheet up on top of the footer-lift. In the activity window
+ * (edge-to-edge) the keyboard simply overlays, matching the iOS model the
+ * sheet's keyboard handling was built for. Back button mirrors onRequestClose.
+ */
+function SheetHost({ children, onRequestClose }: { children: React.ReactNode; onRequestClose: () => void }) {
+  const onRequestCloseRef = useRef(onRequestClose); onRequestCloseRef.current = onRequestClose;
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => { onRequestCloseRef.current(); return true; });
+    return () => sub.remove();
+  }, []);
+  if (Platform.OS === 'android') {
+    return (
+      <View style={[StyleSheet.absoluteFill, { zIndex: 999, elevation: 999 }]}>
+        {children}
+      </View>
+    );
+  }
+  return (
+    <Modal transparent visible animationType="none" statusBarTranslucent onRequestClose={onRequestClose}>
+      {children}
+    </Modal>
   );
 }
 
@@ -306,8 +344,10 @@ function SheetView({ entry, isTop, behind, closing, requestClose, onExited, clos
             gets equal padding all round so the pill is a circle, not an egg. */}
         {((!full && !hideClose) || entry.opts.action) && (
           <View style={[styles.headerPill, !(entry.opts.action && !full && !hideClose) && { paddingHorizontal: 6 }, { borderColor: '#46464e' }]}>
-            <BlurView intensity={45} tint="dark" style={StyleSheet.absoluteFill} />
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(6,6,8,0.78)' }]} />
+            {/* Android gets no real blur (expo-blur renders plain translucency
+                there) — use a solid fill instead of glass. */}
+            {Platform.OS === 'ios' ? <BlurView intensity={45} tint="dark" style={StyleSheet.absoluteFill} /> : null}
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: Platform.OS === 'ios' ? 'rgba(6,6,8,0.78)' : '#0a0a0d' }]} />
             {entry.opts.action && (
               <Pressable onPress={entry.opts.action.onPress} style={[styles.pillBtn, { backgroundColor: p.surface2 }]} hitSlop={8}>
                 <Icon name={entry.opts.action.icon} size={16} color={p.textDim} />

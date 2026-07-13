@@ -5,13 +5,13 @@
  * the phone camera), then Start.
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Platform, Pressable, Text, View } from 'react-native';
 import { SheetControls, useSheets } from '../../components/Sheet';
 import { Button, HelpDot, Segmented } from '../../components/ui';
 import { Icon } from '../../components/Icon';
 import { useToast } from '../../components/Toast';
 import { radius, usePalette } from '../../theme';
-import { getState, useAppState } from '../../store/store';
+import { getState, save, useAppState } from '../../store/store';
 import { getCurrentKey } from '../../store/nav';
 import { health } from '../../lib/health';
 import { defaultPeriod, type Period } from '../../lib/period';
@@ -29,8 +29,9 @@ const HELP = {
     'The numbers are seconds to inhale, hold, and exhale. For most people 4 / 6 matches their resonant frequency, the breathing rate where the baroreflex (your body’s blood pressure regulator) swings in sync with each breath and HRV peaks. That makes it the most effective pattern to train. Box breathing and 4 / 7 / 8 add breath holds, which deepen the calming effect.',
   period:
     'Tagging the time of day keeps like readings comparable. Morning readings taken right after waking are the most consistent baseline; evening readings show how the day wound down.',
-  source:
-    'Where the heartbeat signal comes from. A Bluetooth chest strap is the most accurate. Apple Watch uses a reading you take on your watch during the session, a Mindfulness breathing session or an ECG, which syncs in afterward. Phone camera reads your pulse through your fingertip over the rear camera and flash — no device needed, but it is the least accurate option.',
+  source: Platform.OS === 'ios'
+    ? 'Where the heartbeat signal comes from. A Bluetooth chest strap is the most accurate. Apple Watch uses a reading you take on your watch during the session, a Mindfulness breathing session or an ECG, which syncs in afterward. Phone camera reads your pulse through your fingertip over the rear camera and flash — no device needed, but it is the least accurate option.'
+    : 'Where the heartbeat signal comes from. A Bluetooth chest strap is the most accurate. Phone camera reads your pulse through your fingertip over the rear camera and flash — no device needed, but it is the least accurate option.',
 };
 
 // The sheet's ✕ pill floats top-right; inset the title + subtitle so neither
@@ -38,6 +39,22 @@ const HELP = {
 const CLOSE_CLEARANCE = 58;
 
 type Kind = 'unstructured' | 'breath';
+type Source = 'polar' | 'watch' | 'camera';
+
+/** Default signal source: the user's last deliberate pick when it's still
+ *  usable, else the paired strap, else the camera (always on hand). Bluetooth
+ *  is never defaulted while unpaired — Start would just bounce off "Pair a
+ *  strap first". */
+function defaultSource(): Source {
+  const s = getState().settings;
+  const paired = !!s.lastBleDeviceId;
+  const last = s.lastHrvSource;
+  if (last === 'watch' && Platform.OS === 'ios' && health().available) return 'watch';
+  if (last === 'camera' && ppg().available) return 'camera';
+  if (last === 'polar' && paired) return 'polar';
+  if (paired) return 'polar';
+  return ppg().available ? 'camera' : 'polar';
+}
 
 /** Default time-of-day tag for a reading of this kind (shared rules in
  *  src/lib/period.ts — structured and unstructured each get their own
@@ -50,7 +67,7 @@ export function HrvSetup({ controls }: { controls: SheetControls }) {
   const { openSheet } = useSheets();
   const [kind, setKind] = useState<Kind>('breath');
   const [style, setStyle] = useState('4/6');
-  const [source, setSource] = useState<'polar' | 'watch' | 'camera'>('polar');
+  const [source, setSource] = useState<Source>(defaultSource);
   const [period, setPeriod] = useState<Period>(() => defaultPeriodFor('breath'));
   // Auto-detection follows the selected kind until the user picks a period
   // themselves — then their choice sticks.
@@ -74,14 +91,16 @@ export function HrvSetup({ controls }: { controls: SheetControls }) {
       toast('Pair a strap first in Devices');
       return;
     }
-    if (source === 'watch' && !health().available) {
+    if (source === 'watch' && (Platform.OS !== 'ios' || !health().available)) {
       toast('Apple Watch readings need an iOS build');
       return;
     }
     if (source === 'camera' && !ppg().available) {
-      toast('Camera readings need an iOS device build');
+      toast('Camera readings need a device build');
       return;
     }
+    // Remember the pick so the next capture defaults to it.
+    if (getState().settings.lastHrvSource !== source) { getState().settings.lastHrvSource = source; save(); }
     const config: SessionConfig = { kind, source, period, style: kind === 'breath' ? style : undefined };
     // Watch readings are taken by the Mindfulness app on the wrist, so a prep
     // card walks through getting it ready first; its Start opens the session
@@ -139,7 +158,9 @@ export function HrvSetup({ controls }: { controls: SheetControls }) {
       <Label text="Signal source" help={HELP.source} top />
       <View style={{ gap: 8 }}>
         <SourceOption icon="bluetooth" title="Bluetooth device" badge="Best accuracy" sub={savedName ? `Paired: ${savedName}` : 'Tap to pair a device'} active={source === 'polar'} onPress={pickBluetooth} />
-        <SourceOption icon="watch" title="Apple Watch" badge="High accuracy" sub="Breathe or ECG on the watch, syncs in after" active={source === 'watch'} onPress={() => setSource('watch')} />
+        {Platform.OS === 'ios' ? (
+          <SourceOption icon="watch" title="Apple Watch" badge="High accuracy" sub="Breathe or ECG on the watch, syncs in after" active={source === 'watch'} onPress={() => setSource('watch')} />
+        ) : null}
         <SourceOption icon="camera" title="Phone camera" badge="Lower accuracy" sub="No device needed · fingertip over the rear camera" active={source === 'camera'} onPress={() => setSource('camera')} />
       </View>
 

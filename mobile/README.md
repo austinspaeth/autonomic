@@ -1,6 +1,6 @@
 # Autonomic (native)
 
-A native, iOS-first **Expo / React Native** app for tracking
+A native **Expo / React Native** app (iOS + Android) for tracking
 autonomic-nervous-system recovery. Offline-first, no backend, all data on-device.
 It carries forward the **same data model** as the original web app, so an
 `export.json` from that app imports directly.
@@ -24,7 +24,7 @@ guided full-screen **breathing experience**, and **Apple HealthKit** read/write.
 | HRV pipeline (artifact correction, time- & frequency-domain, coherence) | `src/lib/hrv/` |
 | Analysis / milestones / AI-insights builders | `src/lib/analysis/` |
 | BLE heart-rate manager (0x180D / 0x2A37 RR parsing) | `src/lib/ble/` |
-| Apple HealthKit wrapper (iOS-only, feature-flagged) | `src/lib/health/` |
+| Health wrapper (HealthKit on iOS · Health Connect on Android) | `src/lib/health/` |
 | MMKV store + `save()` (stamps `meta.lastUpdated`) | `src/store/` |
 | Theme (light/dark), component library, charts, sheets | `src/theme/`, `src/components/` |
 | Journal / summaries / forms / live-capture / settings | `src/features/` |
@@ -53,7 +53,7 @@ npx expo run:ios
 # or a signed dev build via EAS:
 #   eas build --profile development --platform ios
 
-# Android (BLE works; HealthKit is iOS-only and auto-disabled)
+# Android (BLE, camera PPG, Health Connect; watch features are iOS-only)
 npx expo run:android
 ```
 
@@ -86,12 +86,14 @@ per packet, reconnection, and weak signal (live artifact hint).
 
 ## Apple Health
 
-Menu (☰) → **Apple Health** → **Connect**, then **Sync today from Health** pulls
-the day's resting HR, HRV (SDNN), blood pressure, SpO₂, weight and sleep into the
-journal (deduped; manual entries are never overwritten). Saving a captured HRV
-reading can optionally write **HRV SDNN + a Mindfulness session** back to Health.
-Everything is user-initiated and gracefully degrades where data/permission is
-missing. On Android these controls are disabled.
+Menu (☰) → **Apple Health** (iOS) / **Health Connect** (Android) → **Connect**,
+then **Sync today from Health** pulls the day's resting HR, blood pressure,
+weight and sleep into the journal (deduped; manual entries are never
+overwritten). Saving a captured HRV reading can optionally write it back to the
+health store — **SDNN + a Mindfulness session** on iOS, **RMSSD** on Android
+(Health Connect's HRV type; it has no beat-to-beat series, so Android HRV
+imports are RMSSD-only). Everything is user-initiated and gracefully degrades
+where data/permission is missing.
 
 ## Live HRV & the breathing experience
 

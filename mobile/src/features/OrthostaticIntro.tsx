@@ -8,7 +8,7 @@
  * src/features/pots/), and manual entry as the fallback where offered.
  */
 import React, { useEffect } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Platform, Pressable, Text, View } from 'react-native';
 import Svg, { Circle, Rect, Text as SvgText } from 'react-native-svg';
 import Animated, {
   Easing, cancelAnimation, useAnimatedProps, useSharedValue, withRepeat, withTiming,
@@ -78,13 +78,17 @@ export function OrthostaticIntroSheet({ title, subtitle, onManual, onStrap }: {
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 4 }}>{title}</Text>
       {/* Right padding keeps the wrapping subtext clear of the floating ✕ pill. */}
       <Text style={{ color: p.textDim, fontSize: 14, marginBottom: 16, paddingRight: 52 }}>{subtitle}</Text>
-      <View style={{ alignItems: 'center', padding: 16, borderRadius: radius.control, borderWidth: 1, borderColor: p.border, backgroundColor: p.surface2 }}>
-        <WatchStandTest />
-        <Text style={{ color: p.text, fontWeight: '700', fontSize: 15, marginTop: 12, textAlign: 'center' }}>Use the Autonomic app on your Apple Watch</Text>
-        <Text style={{ color: p.textDim, fontSize: 13, lineHeight: 19, textAlign: 'center', marginTop: 5 }}>
-          Start a POTS test on the watch. It measures your heart rate lying down and standing, and the result syncs to this device automatically.
-        </Text>
-      </View>
+      {/* The watch pointer is an iOS-only surface — Android leads with the
+          in-app strap capture instead. */}
+      {Platform.OS === 'ios' ? (
+        <View style={{ alignItems: 'center', padding: 16, borderRadius: radius.control, borderWidth: 1, borderColor: p.border, backgroundColor: p.surface2 }}>
+          <WatchStandTest />
+          <Text style={{ color: p.text, fontWeight: '700', fontSize: 15, marginTop: 12, textAlign: 'center' }}>Use the Autonomic app on your Apple Watch</Text>
+          <Text style={{ color: p.textDim, fontSize: 13, lineHeight: 19, textAlign: 'center', marginTop: 5 }}>
+            Start a POTS test on the watch. It measures your heart rate lying down and standing, and the result syncs to this device automatically.
+          </Text>
+        </View>
+      ) : null}
       {onStrap ? (
         <Pressable onPress={onStrap} style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: radius.control, backgroundColor: p.accentSoft, borderWidth: 1, borderColor: p.accent, marginTop: 10 }, pressed && { opacity: 0.7 }]}>
           <Icon name="bluetooth" size={24} color={p.accent} />
