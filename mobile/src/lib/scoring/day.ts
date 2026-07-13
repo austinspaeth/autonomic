@@ -32,7 +32,7 @@ export const OUTLOOK_GUIDE: Record<string, string> = {
   Moderate: 'Reduced reserves. Walking, gentle activity, light core only. Skip cycling and intervals, and lean on hydration and rest.',
   Compromised: 'Significantly reduced reserves. Rest, gentle stretching, basic ADLs. Avoid structured exercise and late dinners. This is a recovery day.',
   Bad: 'System is stressed. Complete rest and gentle breathing only. Look at what’s driving it: sleep, food, illness, or accumulated load.',
-  Crash: 'System in a crash state. Full rest, Liquid IV, magnesium, all meds. Check for illness or stacked triggers; seek care if symptoms warrant.',
+  Crash: 'System in a crash state. Full rest and your protocol. Check for illness or stacked triggers; seek care if symptoms warrant.',
 };
 export const TOMORROW: Record<string, string> = {
   Excellent: 'Tomorrow likely Good to Excellent.',

@@ -34,7 +34,7 @@ private struct IntroView: View {
             ScrollView {
                 VStack(spacing: 0) {
                     VStack(spacing: 10) {
-                        Text("POTS READING")
+                        Text("POTS TEST")
                             .font(.system(size: 11, weight: .bold))
                             .kerning(1)
                             .foregroundStyle(DS.dim)

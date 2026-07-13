@@ -102,7 +102,7 @@ export const READING_TYPES: Record<string, TypeDef> = {
       { type: 'number', key: 'peakHr', label: 'Peak HR' },
       { type: 'number', key: 'peakDelta', label: 'Peak Δ', signed: true },
       { type: 'number', key: 'sustainedDelta', label: 'Sustained Δ', signed: true },
-      { type: 'check', key: 'metThreshold', label: 'POTS threshold met' },
+      { type: 'check', key: 'metThreshold', label: 'Sustained rise ≥30 bpm' },
       { divider: true },
       { type: 'number', key: 'maxHrReached', label: 'Max HR reached' },
       { type: 'time', key: 'time', label: 'Time' },

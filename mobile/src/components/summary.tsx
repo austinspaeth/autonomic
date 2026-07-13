@@ -631,7 +631,7 @@ export function StandTestSummary({ r, days, ctx: _ctx }: SummaryProps) {
     { label: 'Peak Δ', val: peakDelta, unit: 'bpm · rise' },
   ];
   const flags: { label: string; value: string }[] = [];
-  flags.push({ label: 'POTS threshold met', value: r.metThreshold ? 'Yes' : 'No' });
+  flags.push({ label: 'Sustained rise ≥30 bpm', value: r.metThreshold ? 'Yes' : 'No' });
   if (maxReached != null) flags.push({ label: 'Max HR reached', value: String(maxReached) });
   if (r.endedEarly) flags.push({ label: 'Ended early', value: 'Yes' });
   if (r.baselineUnstable) flags.push({ label: 'Short resting phase', value: 'Baseline may be unreliable' });

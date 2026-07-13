@@ -24,8 +24,8 @@ const TERMS_URL = 'https://autonomic.care/terms-of-service/';
 const PRIVACY_URL = 'https://autonomic.care/privacy-policy/';
 
 const VALUE: { icon: IconName; title: string; sub: string }[] = [
-  { icon: 'activity', title: 'Clinical-grade HRV', sub: 'RMSSD, frequency bands, and coherence from your strap or Apple Watch.' },
-  { icon: 'chart', title: 'Every number graded', sub: 'Readings scored against medical thresholds, with trends over time.' },
+  { icon: 'activity', title: 'Lab-quality HRV', sub: 'RMSSD, frequency bands, and coherence from your strap or Apple Watch.' },
+  { icon: 'chart', title: 'Every number graded', sub: 'Readings scored against research-backed thresholds, with trends over time.' },
   { icon: 'ai', title: 'AI-ready insights', sub: 'Turn your logged data into prompts for the AI service of your choice.' },
   { icon: 'heart', title: 'Private & on-device', sub: 'No account, no cloud. Your journal never leaves your phone.' },
 ];

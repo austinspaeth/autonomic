@@ -1,12 +1,12 @@
-# App Store listing — v1.5.0 (Apple Watch update)
+# App Store listing — v1.6.0 (Apple Watch update)
 
 Copy-paste source for App Store Connect. Character counts verified against the
 ASC limits. Promotional text can be updated anytime without review; the
 description, keywords, and screenshots only change with a version submission.
 
-## Promotional text (169/170 chars)
+## Promotional text (166/170 chars)
 
-Clinical grade HRV in your pocket, POTS testing on your wrist. Journal it all, spot your trends, and find what actually helps. Private, on-device. For long covid & POTS.
+Lab-quality HRV in your pocket, POTS testing on your wrist. Journal it all, spot your trends, and find what actually helps. Private, on-device. For long covid & POTS.
 
 ## Keywords (98/100 chars)
 
@@ -20,11 +20,11 @@ chars); added dysautonomia + watch; dropped vagal tone / sdnn / symptom. Remove
 
 Autonomic is now on Apple Watch: a guided lie-and-stand POTS test, one-tap episode capture from a watch face complication, and a live HR monitor with spike alerts. Results sync straight into your journal.
 
-## Description (3,717/4,000 chars)
+## Description (3,693/4,000 chars)
 
 See your nervous system actually recover.
 
-Autonomic turns a heart rate chest strap, your Apple Watch, or even your finger over your camera into a clinical grade HRV lab in your pocket, then grades every reading against the same medical thresholds a specialist would use, so you finally know whether today was a good day or a warning sign.
+Autonomic turns a heart rate chest strap, your Apple Watch, or even your finger over your camera into a full HRV lab in your pocket, then grades every reading against published research thresholds, so you finally know whether today was a good day or a warning sign.
 
 Built for the long haul: long covid and post viral recovery, POTS and dysautonomia, ME/CFS, and anyone rebuilding their autonomic nervous system one day at a time.
 
@@ -32,7 +32,7 @@ Built for the long haul: long covid and post viral recovery, POTS and dysautonom
 POTS TESTING ON YOUR WRIST: THE APPLE WATCH APP
 
 • A guided lie-and-stand test on your watch: rest, stand when it taps you, and watch your live heart rate delta against your resting baseline
-• Haptic alerts the moment your heart rate climbs 30+ bpm over baseline, the same threshold used in clinical stand tests
+• Haptic alerts the moment your heart rate climbs 30+ bpm over baseline, the same threshold used in orthostatic stand tests
 • Caught out by the stairs? One tap on the watch face complication starts a POTS Episode capture: baseline, the climb, and a 60 second recovery
 • A live HR monitor for symptomatic moments, with a rolling average, spike alerts, and always-on display support
 • Every result lands in your phone journal automatically, full heart rate series included, graded like everything else
@@ -46,7 +46,7 @@ LIVE 5-MINUTE HRV, DONE RIGHT
 • Honest signal quality: artifacts are flagged and corrected, and a noisy reading refuses to fake a score instead of lying to you
 
 
-GRADED LIKE A CLINICIAN WOULD
+EVERY NUMBER GRADED, NO BLACK BOX
 
 • Every number is scored great / good / ok / warning / crash against real thresholds, with no mystery "readiness" black box
 • One daily Autonomic Score that rolls up HRV, sleep, symptoms, blood pressure and more
