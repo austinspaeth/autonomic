@@ -26,8 +26,11 @@ const HELP = {
     'A 5 minute read (2 minutes by phone camera) of how your nervous system is balancing stress and recovery. Same time daily shows your trend.',
   kind:
     'Both kinds run 5 minutes (2 with the phone camera). Unstructured captures your current baseline while you rest and breathe naturally. Structured guides you through a paced breathing pattern, which trains your baroreflex and helps build stronger autonomic responses.',
-  breath:
-    'The numbers are seconds to inhale, hold, and exhale. For most people 4 / 6 matches their resonant frequency, the breathing rate where the baroreflex (your body’s blood pressure regulator) swings in sync with each breath and HRV peaks. That makes it the most effective pattern to train. Box breathing and 4 / 7 / 8 add breath holds, which deepen the calming effect.',
+  techniques:
+    'The numbers are the seconds to inhale, hold, and exhale in each cycle.\n\n' +
+    '4 / 6 breathing: in 4s, out 6s. For most people this matches their resonant frequency, the rate where the baroreflex (your body’s blood pressure regulator) swings in sync with each breath and HRV peaks. The longer exhale makes it the most effective pattern to train.\n\n' +
+    'Box breathing: in 4s, hold 4s, out 4s, hold 4s. A steady, even square rhythm that is easy to hold and good for calm focus.\n\n' +
+    '4 / 7 / 8 breathing: in 4s, hold 7s, out 8s. The long exhale leans hard into the vagal brake, making it the most deeply calming of the three.',
   source: Platform.OS === 'ios'
     ? 'Where the heartbeat signal comes from. A Bluetooth chest strap is the most accurate. Apple Watch uses a reading you take on your watch during the session, a Mindfulness breathing session or an ECG, which syncs in afterward. Phone camera reads your pulse through your fingertip over the rear camera and flash — no device needed, but it is the least accurate option.'
     : 'Where the heartbeat signal comes from. A Bluetooth chest strap is the most accurate. Phone camera reads your pulse through your fingertip over the rear camera and flash — no device needed, but it is the least accurate option.',
@@ -115,7 +118,7 @@ export function HrvSetup({ controls }: { controls: SheetControls }) {
 
       {kind === 'breath' ? (
         <>
-          <Label text="Breathing pattern" help={HELP.breath} top />
+          <Label text="Breathing pattern" help={HELP.techniques} top />
           <PatternRow
             pattern={BREATH_STYLES.find((s) => s.val === style) || BREATH_STYLES[0]}
             trailing="chevron"
@@ -183,8 +186,11 @@ function BreathPatternSheet({ value, onPick }: { value: string; onPick: (val: st
   const p = usePalette();
   return (
     <View>
-      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 6, paddingRight: CLOSE_CLEARANCE }}>Breathing pattern</Text>
-      <Text style={{ color: p.textDim, fontSize: 14, lineHeight: 20, marginBottom: 18, paddingRight: CLOSE_CLEARANCE }}>{HELP.breath}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6, paddingRight: CLOSE_CLEARANCE }}>
+        <Text style={{ fontSize: 21, fontWeight: '700', color: p.text }}>Breathing pattern</Text>
+        <HelpDot title="Breathing techniques" text={HELP.techniques} />
+      </View>
+      <Text style={{ color: p.textDim, fontSize: 14, lineHeight: 20, marginBottom: 18, paddingRight: CLOSE_CLEARANCE }}>Choose the breathing pattern (seconds to inhale, hold and exhale) for your structured breathing.</Text>
       <View style={{ gap: 8 }}>
         {BREATH_STYLES.map((s) => (
           <PatternRow key={s.val} pattern={s} active={s.val === value} trailing="check" onPress={() => onPick(s.val)} />
