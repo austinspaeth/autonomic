@@ -28,6 +28,7 @@ import { usePalette, GRADE_COLORS } from '../../theme';
 import { BreathingViz, parsePattern, type BreathPhase } from './BreathingViz';
 import { HrvResults } from './Results';
 import { WatchSyncSheet } from './WatchSync';
+import { startWatchSync } from './watchSyncStore';
 import { ble } from '../../lib/ble/manager';
 import { ppg, type PpgSignal } from '../../lib/ppg/camera';
 import { PpgCameraView } from '../../lib/ppg/CameraView';
@@ -264,9 +265,10 @@ export function HrvSession({ config, controls, autoStart }: { config: SessionCon
     if (config.source === 'watch') {
       const startMs = startedAtRef.current || Date.now();
       const endMs = Math.min(Date.now(), startMs + DURATION * 1000);
-      openSheet((c) => (
-        <WatchSyncSheet windowStartMs={startMs} windowEndMs={endMs} config={config} controls={c} />
-      ), { hideClose: true });
+      // The poller lives outside the sheet (watchSyncStore) so "Continue using
+      // app" can close the card while the sync keeps running.
+      startWatchSync({ windowStartMs: startMs, windowEndMs: endMs, config });
+      openSheet((c) => <WatchSyncSheet controls={c} />, { hideClose: true });
       return;
     }
 

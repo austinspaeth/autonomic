@@ -266,6 +266,36 @@ export function rowScoreCategory(r: Entry, ctx: ScoreContext = {}): ScoreCat | n
   }
 }
 
+/* ---------- POTS episode (orthostatic) max delta ---------- */
+
+/**
+ * The biggest HR excursion from the pre-episode baseline. With a sampled
+ * curve, it's the largest deviation (above or below baseline) from the
+ * transition onward — negative when the dominant move was a drop. Without a
+ * curve it falls back to the manual afterHr − beforeHr.
+ */
+export function orthoMaxDelta(r: Entry, curve?: { t: number; bpm: number }[] | null): number | null {
+  const before = numOr(r.beforeHr);
+  if (before == null) return null;
+  const from = numOr(r.transitionAt);
+  const post = (curve || []).filter((s) => from == null || s.t >= from);
+  if (post.length) {
+    const rise = Math.max(...post.map((s) => s.bpm)) - before;
+    const drop = before - Math.min(...post.map((s) => s.bpm));
+    return Math.round(rise >= drop ? rise : -drop);
+  }
+  const after = numOr(r.afterHr);
+  return after != null ? after - before : null;
+}
+
+/** Grade a max delta: rises take the orthoIncrease bands; a drop of 30 bpm
+ *  or more below baseline flags the blue warning zone instead. */
+export function orthoDeltaCat(d: number | null | undefined): ScoreCat | null {
+  if (d == null) return null;
+  if (d <= -30) return 'warning';
+  return catFromBands(d, BANDS.orthoIncrease);
+}
+
 /* ---------- derived blood-pressure metrics ---------- */
 export const bpMap = (rr: Entry) => { const s = +(rr.sys as number), d = +(rr.dia as number); return !isNaN(s) && !isNaN(d) ? (s + 2 * d) / 3 : null; };
 export const bpPP = (rr: Entry) => { const s = +(rr.sys as number), d = +(rr.dia as number); return !isNaN(s) && !isNaN(d) ? s - d : null; };

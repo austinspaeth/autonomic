@@ -43,6 +43,8 @@ interface SheetCtx {
   openSheet: (builder: Builder, opts?: SheetOptions) => void;
   closeSheet: () => void;
   closeAll: () => void;
+  /** Open (non-closing) sheets — lets overlays outside the stack wait for it to clear. */
+  depth: number;
 }
 const Ctx = createContext<SheetCtx | null>(null);
 export const useSheets = () => {
@@ -73,7 +75,7 @@ export function SheetProvider({ children }: { children: React.ReactNode }) {
   const closeAll = () => setStack((s) => s.map((e) => ({ ...e, closing: true })));
 
   return (
-    <Ctx.Provider value={{ openSheet, closeSheet: closeTop, closeAll }}>
+    <Ctx.Provider value={{ openSheet, closeSheet: closeTop, closeAll, depth: stack.filter((e) => !e.closing).length }}>
       {children}
       {stack.length > 0 && (
         <Modal transparent visible animationType="none" statusBarTranslucent onRequestClose={closeTop}>

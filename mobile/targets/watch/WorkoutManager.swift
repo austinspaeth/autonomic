@@ -11,6 +11,13 @@ import HealthKit
  * `hr` is lightly smoothed (median of the last 5 raw samples). `searching`
  * flips when the sensor loses contact (no fresh sample in 5 s, or a 0 value);
  * consumers suspend delta math + buzzes while it's true.
+ *
+ * Self-heal: watchOS occasionally kills or ends the workout session in the
+ * background (returning to the monitor shows no sensor light and a greyed
+ * value). While streaming is wanted, a watchdog rebuilds the session whenever
+ * it lands in .ended/.stopped, errors out, or goes >15 s without a sample —
+ * rate-limited so a genuinely absent wrist doesn't restart-loop. Held display
+ * values are never cleared by a recovery, only by stop().
  */
 final class WorkoutManager: NSObject, ObservableObject {
     static let shared = WorkoutManager()
@@ -21,6 +28,10 @@ final class WorkoutManager: NSObject, ObservableObject {
     private var recent: [Double] = []
     private var lastSampleAt: Date?
     private var staleTimer: Timer?
+    /// User intent: true between start() and stop(). Recovery only runs while set.
+    private var wantsStreaming = false
+    private var sessionBeganAt: Date?
+    private var lastRecoverAt: Date?
 
     @Published var hr: Double?
     @Published var searching = true
@@ -41,6 +52,19 @@ final class WorkoutManager: NSObject, ObservableObject {
 
     func start() {
         guard session == nil else { return }
+        wantsStreaming = true
+        lastRecoverAt = nil
+        beginSession()
+        DispatchQueue.main.async {
+            self.running = true
+            self.searching = true
+        }
+        staleTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            self?.checkStale()
+        }
+    }
+
+    private func beginSession() {
         let config = HKWorkoutConfiguration()
         config.activityType = .other
         config.locationType = .indoor
@@ -53,15 +77,10 @@ final class WorkoutManager: NSObject, ObservableObject {
             session = s
             builder = b
             let start = Date()
+            sessionBeganAt = start
+            lastSampleAt = nil
             s.startActivity(with: start)
             b.beginCollection(withStart: start) { _, _ in }
-            DispatchQueue.main.async {
-                self.running = true
-                self.searching = true
-            }
-            staleTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-                self?.checkStale()
-            }
         } catch {
             session = nil
             builder = nil
@@ -69,6 +88,7 @@ final class WorkoutManager: NSObject, ObservableObject {
     }
 
     func stop() {
+        wantsStreaming = false
         staleTimer?.invalidate()
         staleTimer = nil
         session?.end()
@@ -87,10 +107,36 @@ final class WorkoutManager: NSObject, ObservableObject {
     }
 
     private func checkStale() {
-        guard let last = lastSampleAt else { return }
-        if Date().timeIntervalSince(last) > 5 {
+        guard wantsStreaming else { return }
+        // Sensor silent past the normal gap → show "searching"; way past it, or
+        // the session died underneath us → rebuild the session (self-heal).
+        let sinceSample = Date().timeIntervalSince(lastSampleAt ?? sessionBeganAt ?? Date())
+        if sinceSample > 5 {
             DispatchQueue.main.async { self.searching = true }
         }
+        let sessionDead = session.map { $0.state == .ended || $0.state == .stopped } ?? true
+        // Longer leash before the first-ever sample: initial sensor lock can be
+        // slow, and restarting mid-lock only delays it further.
+        let leash: TimeInterval = lastSampleAt == nil ? 45 : 15
+        if sessionDead || sinceSample > leash {
+            recover()
+        }
+    }
+
+    /// Tear down whatever is left of the current session and start a fresh one,
+    /// keeping the published (held) values intact. Rate-limited to one attempt
+    /// per 15 s so a removed watch doesn't churn sessions.
+    private func recover() {
+        guard wantsStreaming else { return }
+        if let lastRecoverAt, Date().timeIntervalSince(lastRecoverAt) < 15 { return }
+        lastRecoverAt = Date()
+        let oldSession = session
+        let oldBuilder = builder
+        session = nil
+        builder = nil
+        oldSession?.end()
+        oldBuilder?.endCollection(withEnd: Date()) { _, _ in oldBuilder?.discardWorkout() }
+        beginSession()
     }
 
     private func ingest(_ bpm: Double) {
@@ -112,9 +158,22 @@ final class WorkoutManager: NSObject, ObservableObject {
 }
 
 extension WorkoutManager: HKWorkoutSessionDelegate {
-    func workoutSession(_ workoutSession: HKWorkoutSession, didChangeTo toState: HKWorkoutSessionState, from fromState: HKWorkoutSessionState, date: Date) {}
+    func workoutSession(_ workoutSession: HKWorkoutSession, didChangeTo toState: HKWorkoutSessionState, from fromState: HKWorkoutSessionState, date: Date) {
+        // watchOS ended the session while we still want the stream → self-heal.
+        guard toState == .ended || toState == .stopped else { return }
+        DispatchQueue.main.async {
+            guard workoutSession === self.session else { return }
+            self.searching = true
+            self.recover()
+        }
+    }
+
     func workoutSession(_ workoutSession: HKWorkoutSession, didFailWithError error: Error) {
-        DispatchQueue.main.async { self.searching = true }
+        DispatchQueue.main.async {
+            self.searching = true
+            guard workoutSession === self.session else { return }
+            self.recover()
+        }
     }
 }
 

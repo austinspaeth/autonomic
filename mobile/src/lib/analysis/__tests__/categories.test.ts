@@ -1,8 +1,8 @@
 /**
- * POTS category builders: the stand-test card (per-test trend + curve-overlay
- * refs, latest-test grading) and the orthostatic-events card (transition
- * filter variants). Days are keyed relative to today because acBuckets always
- * windows back from the current date.
+ * POTS category builders: the stand-test card (per-test trend, latest-test
+ * grading) and the orthostatic-events card (transition filter variants).
+ * Days are keyed relative to today because acBuckets always windows back
+ * from the current date.
  */
 import { buildCategories } from '../categories';
 import { resolveProtocol, type DaysMap } from '../../scoring/day';
@@ -43,7 +43,7 @@ describe('POTS stand-test card', () => {
     [dayKey(1)]: day([standTest({ id: 'st3', sustainedDelta: 18, metThreshold: false, standAt: undefined })]),
   };
 
-  it('builds from standTest readings with per-test stats and refs', () => {
+  it('builds from standTest readings with per-test stats', () => {
     const cards = potsCards(days);
     const card = cards.find((c) => c.title === 'POTS Test')!;
     expect(card).toBeTruthy();
@@ -52,9 +52,6 @@ describe('POTS stand-test card', () => {
     expect(card.stats![0].value).toBe(18);            // last sustained rise
     expect(card.stats![1].value).toBe(62);            // avg baseline
     expect(card.stats![2].value).toBe('1 of 3');      // met threshold
-    // Curve overlay refs: only tests carrying standAt + baseline, oldest first.
-    expect(card.standCurves!.map((c) => c.id)).toEqual(['st1', 'st2']);
-    expect(card.standCurves![0]).toMatchObject({ standAt: 300, baseline: 62, date: dayKey(10) });
     // Improvement insight: 34 → 18 across 3 tests.
     expect(card.insights![0].text).toContain('improved 16 bpm across 3 tests');
     expect(card.insights![0].strength).toBe('strong');
@@ -87,6 +84,14 @@ describe('Orthostatic events card', () => {
     expect(f.lay.stats[1].value).toBe(15);   // avg 1-min drop
     expect(f.sit.stats[2].value).toBe(1);
     expect(f.stairs.stats[2].value).toBe(1);
+    // Rise + drop share one chart with a legend.
+    expect(f.all.charts).toHaveLength(1);
+    expect(f.all.charts[0].series.map((s) => s.label)).toEqual(['Rise', '1 min drop']);
+    expect(f.all.charts[0].selectStat).toBe(true);
+    // Per-bucket event counts back the tap-a-point stats: 2 on the double day, 1 on the single.
+    const sum = (vals: (number | null)[]) => vals.reduce((s: number, v) => s + (v || 0), 0);
+    expect(sum(f.all.counts)).toBe(3);
+    expect(sum(f.lay.counts)).toBe(1);
     // ≥30 bpm insight counts only the graded (non-stairs) views.
     expect(f.all.insights[0].text).toContain('2 of 3 events');
     expect(f.lay.insights[0].text).toContain('1 of 1 event');

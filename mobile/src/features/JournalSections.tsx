@@ -15,10 +15,10 @@ import {
   bmLabel, readingLabel, readingRowValue, summarizeFields,
 } from '../lib/registry';
 import { typesFor } from '../lib/typeCatalog';
-import { rowScoreCategory, SCORE_COLORS, GRADE_LABEL } from '../lib/scoring';
+import { orthoDeltaCat, orthoMaxDelta, rowScoreCategory, SCORE_COLORS, GRADE_LABEL } from '../lib/scoring';
 import { sleepGrade, sleepHours, waterGoalL, type DaysMap } from '../lib/scoring/day';
 import type { SleepStages } from '../lib/types';
-import { ensureDay, getState, save, useAppState } from '../store/store';
+import { ensureDay, getState, getWaveform, save, useAppState } from '../store/store';
 import { fmtDateLong, fmtTime12, periodOf } from '../lib/dates';
 import { health } from '../lib/health';
 import { SleepConfirmSheet } from './Health';
@@ -46,7 +46,11 @@ export function JournalSections({ dk }: { dk: string }) {
           {[...(day.readings || [])].sort((a, b) => ((a.time as string) || '').localeCompare((b.time as string) || '')).map((r) => {
             const def = READING_TYPES[r.type];
             if (!def) return null;
-            return <Row key={r.id} icon={def.icon as never} title={readingLabel(r)} right={<View style={{ flexDirection: 'row', alignItems: 'center' }}><RowValue text={readingRowValue(r)} cat={rowScoreCategory(r, ctx)} />{r.time ? <Pill text={fmtTime12(r.time)} /> : null}</View>} onPress={() => forms.openReadingSummary(r)} />;
+            // Episodes grade on the max delta seen across the captured curve
+            // (a ≥30 bpm drop below baseline flags the blue warning zone).
+            const curve = r.type === 'orthostatic' ? getWaveform(String(r.id))?.sampledHr : undefined;
+            const cat = r.type === 'orthostatic' ? orthoDeltaCat(orthoMaxDelta(r, curve)) : rowScoreCategory(r, ctx);
+            return <Row key={r.id} icon={def.icon as never} title={readingLabel(r)} right={<View style={{ flexDirection: 'row', alignItems: 'center' }}><RowValue text={readingRowValue(r, curve)} cat={cat} />{r.time ? <Pill text={fmtTime12(r.time)} /> : null}</View>} onPress={() => forms.openReadingSummary(r)} />;
           })}
           <View style={{ gap: 8, marginTop: 6 }}>
             <Pressable onPress={forms.captureHrv} style={({ pressed }) => [{ flexDirection: 'row', gap: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: p.accent, borderRadius: radius.control, paddingVertical: 13 }, pressed && { opacity: 0.7 }]}>

@@ -16,7 +16,7 @@ import type { Band, Entry, ScoreCat } from '../lib/types';
 import {
   BANDS, GRADE_LABEL, HRV_EXPLAIN, HRV_HELP, SCORE_COLORS, bandsFor,
   bpBce, bpKerdo, bpKvas, bpMap, bpPP, bpRobinson, catFromBands, computeScores,
-  expectedHf, hrvComposite, numOr, restingHrBands,
+  expectedHf, hrvComposite, numOr, orthoDeltaCat, orthoMaxDelta, restingHrBands,
   rowScoreCategory, totalPower, type ScoreContext,
 } from '../lib/scoring';
 import { metricHistory, numEx, type DaysMap } from '../lib/scoring/day';
@@ -512,10 +512,10 @@ export function RestingHrSummary({ r, days, ctx }: SummaryProps) {
 /* ---------- Orthostatic events ---------- */
 
 const ORTHO_HELP: Record<string, string> = {
-  rise: 'The heart-rate increase from resting baseline to standing. A sustained rise of 30 bpm or more (40 in adolescents) within 10 minutes of standing is the adult POTS-range criterion. Trends matter more than any single stand. Repeat under similar conditions to compare.',
-  hr: 'The raw numbers behind this event: heart rate before standing, the standing peak, and where it settled one minute later.',
-  recovery: 'How far your heart rate fell back from its standing peak within the first minute. A larger settle-down reflects a stronger baroreflex and faster vagal recovery.',
-  curve: 'The heart-rate trace from the capture, sampled every second. Purple through the resting phase before the transition, then POTS-graded once you move. Markers show the transition start, its completion, and the one-minute recovery point; the dashed line is the resting baseline.',
+  rise: 'The biggest heart-rate change from your pre-episode baseline. A rise of 30 bpm or more (40 in adolescents) is the adult POTS-range criterion; a drop of 30 bpm or more below baseline is flagged in blue. Trends matter more than any single episode. Repeat under similar conditions to compare.',
+  hr: 'The raw numbers behind this event: heart rate before the episode, during it, and where it settled one minute after.',
+  recovery: 'How far your heart rate fell back within a minute of the episode. A larger settle-down reflects a stronger baroreflex and faster vagal recovery.',
+  curve: 'The heart-rate trace from the capture, sampled every second. Purple through the resting phase before the transition, then POTS-graded once you move. Markers show where the episode begins and where the transition completes; the dashed line is the resting baseline.',
 };
 
 /** Waveforms live in the sidecar keyed by reading id — inline `sampledHr`
@@ -530,44 +530,35 @@ function hrCurveFor(r: Entry): { t: number; bpm: number }[] | null {
 export function OrthostaticSummary({ r, days, ctx: _ctx }: SummaryProps) {
   const p = usePalette();
   const before = numOr(r.beforeHr), after = numOr(r.afterHr), min1 = numOr(r.hr1min);
-  const increase = before != null && after != null ? after - before : null;
+  const hrCurve = hrCurveFor(r);
+  const maxDelta = orthoMaxDelta(r, hrCurve);
   const drop = after != null && min1 != null ? after - min1 : null;
-  const incCat = increase != null ? catFromBands(increase, BANDS.orthoIncrease) : null;
+  const maxCat = orthoDeltaCat(maxDelta);
   const dropCat = drop != null ? catFromBands(drop, BANDS.orthoRecovery) : null;
-  const signed = (v: number) => (v > 0 ? '+' + v : String(v));
   const verdict: Record<string, string> = {
-    great: 'Minimal heart-rate rise on standing - a healthy orthostatic response.',
+    great: 'Minimal heart-rate change - a healthy orthostatic response.',
     good: 'Normal orthostatic rise, within the expected physiologic range.',
     ok: 'Borderline rise at the upper end of normal. Worth keeping an eye on.',
     bad: 'Large rise - at or above the adult ≥30 bpm POTS-range threshold. Note context.',
     concerning: 'Marked rise - at or above the ≥40 bpm threshold. Hydrate, sit or lie down, and log context.',
+    warning: 'HR fell 30 bpm or more below baseline. If you felt lightheaded, log symptoms and context.',
   };
-  const incEx = (rr: Entry) => { const b = numOr(rr.beforeHr), a = numOr(rr.afterHr); return b != null && a != null ? a - b : null; };
+  const maxEx = (rr: Entry) => orthoMaxDelta(rr, hrCurveFor(rr));
   const dropEx = (rr: Entry) => { const a = numOr(rr.afterHr), m = numOr(rr.hr1min); return a != null && m != null ? a - m : null; };
-  const hrCurve = hrCurveFor(r);
   const sourceLabel = sourceLabelFor(r);
   const cols: { label: string; val: number | null; unit: string }[] = [
     { label: 'Before', val: before, unit: 'bpm · baseline' },
-    { label: 'After', val: after, unit: 'bpm · standing' },
-    { label: '1 min', val: min1, unit: 'bpm · settled' },
+    { label: 'During', val: after, unit: 'bpm · episode' },
+    { label: 'After', val: min1, unit: 'bpm · settled' },
   ];
   return (
     <>
       <MetricSection
-        hero label="Standing HR rise" value={increase != null ? signed(increase) : null} suffix="bpm" cat={incCat}
-        days={days} type="orthostatic" ex={incEx} bands={BANDS.orthoIncrease}
-        desc={incCat ? verdict[incCat] : 'Enter Before HR and After HR to rate this event.'}
+        hero label="Max delta after episode" value={maxDelta != null ? String(Math.abs(maxDelta)) : null} suffix="bpm" cat={maxCat}
+        days={days} type="orthostatic" ex={maxEx} bands={BANDS.orthoIncrease}
+        desc={maxCat ? verdict[maxCat] : 'Enter Before HR and After HR to rate this event.'}
         help={ORTHO_HELP.rise}
       />
-      {r.transition || sourceLabel ? (
-        <Section>
-          <SectionHead title="Details" />
-          <View style={{ marginTop: 12 }}>
-            {r.transition ? <MetricRow label="Transition" value={r.transition as string} cat={false} /> : null}
-            {sourceLabel ? <MetricRow label="Source" value={sourceLabel} cat={false} /> : null}
-          </View>
-        </Section>
-      ) : null}
       {hrCurve ? (
         <Section>
           <SectionHead title="Heart rate over time" help={ORTHO_HELP.curve} />
@@ -577,7 +568,7 @@ export function OrthostaticSummary({ r, days, ctx: _ctx }: SummaryProps) {
         </Section>
       ) : null}
       <Section>
-        <SectionHead title="Heart rate" help={ORTHO_HELP.hr} desc="Baseline, standing peak, and one minute after standing." />
+        <SectionHead title="Heart rate" help={ORTHO_HELP.hr} desc="Baseline, during the episode, and one minute after." />
         <View style={{ flexDirection: 'row', marginTop: 12, borderTopWidth: 1, borderTopColor: p.border, paddingTop: 12 }}>
           {cols.map((c) => (
             <View key={c.label} style={{ flex: 1, alignItems: 'center' }}>
@@ -589,12 +580,21 @@ export function OrthostaticSummary({ r, days, ctx: _ctx }: SummaryProps) {
         </View>
       </Section>
       <MetricSection
-        label="HR drop by 1 min" value={drop != null ? String(drop) : null} suffix="bpm" cat={dropCat}
+        label="HR recovery after episode" value={drop != null ? String(drop) : null} suffix="bpm" cat={dropCat}
         days={days} type="orthostatic" ex={dropEx} bands={BANDS.orthoRecovery}
-        desc="How far HR fell from its standing peak after one minute. A larger settle-down means stronger baroreflex and vagal recovery."
+        desc="How far HR fell back within a minute of the episode ending. A larger settle-down means stronger baroreflex and vagal recovery."
         help={ORTHO_HELP.recovery}
       />
       <Notes r={r} />
+      {r.transition || sourceLabel ? (
+        <Section>
+          <SectionHead title="Details" />
+          <View style={{ marginTop: 12 }}>
+            {r.transition ? <MetricRow label="Transition" value={r.transition as string} cat={false} /> : null}
+            {sourceLabel ? <MetricRow label="Source" value={sourceLabel} cat={false} /> : null}
+          </View>
+        </Section>
+      ) : null}
     </>
   );
 }

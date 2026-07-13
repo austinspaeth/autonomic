@@ -43,6 +43,7 @@ final class HrMonitorModel: ObservableObject {
         maxHr = computedMaxHr(age: PhoneRelay.shared.age, sex: PhoneRelay.shared.sex)
         if let maxHr { maxBuzzer = Haptics.makeMaxHrBuzzer(maxHr: maxHr) }
         deltaBuzzers = Haptics.makeDeltaBuzzers()
+        ComplicationStore.hrSessionActive(true)
         ticker = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             self?.tick()
         }
@@ -53,6 +54,7 @@ final class HrMonitorModel: ObservableObject {
         ticker = nil
         WorkoutManager.shared.stop()
         window = []
+        ComplicationStore.hrSessionActive(false)
     }
 
     private func tick() {
@@ -72,6 +74,15 @@ final class HrMonitorModel: ObservableObject {
             // Buzzers run at full sample rate regardless of display cadence.
             deltaBuzzers.forEach { $0.update(d) }
             if maxHr != nil { maxBuzzer?.update(hr) }
+            // Feed the HR complication: last HR, the 2-min low/high range and
+            // the delta (reload throttling lives in ComplicationStore).
+            let hrs = window.map(\.hr)
+            ComplicationStore.hrUpdate(
+                hr: Int(hr.rounded()),
+                low: Int((hrs.min() ?? hr).rounded()),
+                high: Int((hrs.max() ?? hr).rounded()),
+                delta: Int(d.rounded())
+            )
         }
         sinceDisplay += 1
         let cadence = dimmed ? 5 : 1

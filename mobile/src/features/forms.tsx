@@ -23,6 +23,7 @@ import { health } from '../lib/health';
 import { healthSourceFor, type HealthCandidate, type HealthSource } from '../lib/health/sources';
 import { deleteEntry, getState, upsertEntry, useAppState } from '../store/store';
 import { defaultTimeFor, fmtTime12, uid } from '../lib/dates';
+import { defaultPeriod } from '../lib/period';
 import { useToast } from '../components/Toast';
 import { HrvSetup } from './hrv/Setup';
 import { OrthostaticIntroSheet } from './OrthostaticIntro';
@@ -208,6 +209,12 @@ export function EntryForm({ typeMap, arrKey, dk, type, existing, prefill = null,
   const def = typeMap[type];
   const fields = entryFields(def);
   const initial = existing || prefill || { id: uid(), type, time: defaultTimeFor(dk), note: '' };
+  // New entries with a Morning/Evening/Other tag auto-detect it the same way
+  // live HRV capture does, based on the entry's default time.
+  if (!existing && initial.period == null && fields.some((f) => f.type === 'select' && f.key === 'period')) {
+    const h = parseInt(String(initial.time || ''), 10);
+    initial.period = defaultPeriod(type, dk, Number.isFinite(h) ? h : undefined);
+  }
   const [form, set] = useFormState(fields, initial);
 
   const save = () => {

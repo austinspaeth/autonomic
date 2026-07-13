@@ -2,8 +2,22 @@
  * Programmatic entry-type registries — ported from the PWA. Order matters:
  * it is the order shown in the "+ Add" pickers. `icon` keys into the icon set
  * in src/components/Icon.tsx.
+ *
+ * These maps are only the built-in baseline: users can create their own
+ * activity/med/symptom/trigger types and delete unused built-ins, layered on
+ * via src/lib/typeCatalog.ts (state.customTypes / state.hiddenTypes). UI code
+ * should resolve types through typesFor(), not read these maps directly.
  */
 import type { Entry, FieldDef, TypeDef } from './types';
+import { orthoMaxDelta } from './scoring';
+
+/** Blood-pressure auto-advance: a value starting with 1 (or, for systolic, 2)
+ *  is a 3-digit number; anything else is complete at 2 digits. Exact match so
+ *  edits to an already-full field don't re-trigger the jump. */
+const bpDigitsDone = (leads: string[]) => (v: string) => {
+  const d = v.replace(/\D/g, '');
+  return d.length === (leads.includes(d[0]) ? 3 : 2);
+};
 
 export const READING_TYPES: Record<string, TypeDef> = {
   hrv: {
@@ -30,7 +44,7 @@ export const READING_TYPES: Record<string, TypeDef> = {
       { type: 'number', key: 'hfPeak', label: 'HF peak', unit: 'Hz' },
       { divider: true },
       { type: 'time', key: 'time', label: 'Time' },
-      { type: 'select', key: 'period', label: 'Reading type', options: ['Morning', 'Evening', 'Random'] },
+      { type: 'select', key: 'period', label: 'Reading type', options: ['Morning', 'Evening', 'Other'] },
     ],
   },
   breathHrv: {
@@ -58,17 +72,17 @@ export const READING_TYPES: Record<string, TypeDef> = {
       { type: 'number', key: 'hfPeak', label: 'HF peak', unit: 'Hz' },
       { divider: true },
       { type: 'time', key: 'time', label: 'Time' },
-      { type: 'select', key: 'period', label: 'Reading type', options: ['Morning', 'Evening', 'Random'] },
+      { type: 'select', key: 'period', label: 'Reading type', options: ['Morning', 'Evening', 'Other'] },
     ],
   },
   bp: {
     label: 'Blood Pressure',
     icon: 'droplet',
     fields: [
-      { type: 'number', key: 'sys', label: 'Systolic' },
-      { type: 'number', key: 'dia', label: 'Diastolic' },
+      { type: 'number', key: 'sys', label: 'Systolic', autoNext: bpDigitsDone(['1', '2']) },
+      { type: 'number', key: 'dia', label: 'Diastolic', autoNext: bpDigitsDone(['1']) },
       { type: 'number', key: 'pulse', label: 'Pulse' },
-      { type: 'select', key: 'period', label: 'Reading type', options: ['Morning', 'Evening', 'Random'] },
+      { type: 'select', key: 'period', label: 'Reading type', options: ['Morning', 'Evening', 'Other'] },
     ],
   },
   restingHr: {
@@ -427,16 +441,18 @@ export function detailFields(def: TypeDef | undefined, r: Entry): string {
 
 /** Simplified value shown on the right of a reading row (one thing per type). */
 /**
- * Display name for a reading. An unstructured HRV that came from Apple Health /
- * Apple Watch (source 'watch') is shown as "Apple Watch HRV" instead of the
- * generic "Unstructured HRV"; everything else uses its registry label.
+ * Display name for a reading. Only an HRV auto-imported from Apple Health
+ * (welcome-view backfill, `imported`) is shown as "Apple Watch HRV"; an HRV
+ * captured through the readings section keeps its registry label (Structured /
+ * Unstructured HRV) even when the watch was the capture source — the summary
+ * card's Source row is what says it came from the watch.
  */
 export function readingLabel(r: Entry): string {
-  if (r.type === 'hrv' && r.source === 'watch') return 'Apple Watch HRV';
+  if (r.type === 'hrv' && r.source === 'watch' && r.imported) return 'Apple Watch HRV';
   return READING_TYPES[r.type]?.label ?? r.type;
 }
 
-export function readingRowValue(r: Entry): string {
+export function readingRowValue(r: Entry, hrCurve?: { t: number; bpm: number }[] | null): string {
   switch (r.type) {
     case 'hrv':
     case 'breathHrv': return r.sdnn != null && r.sdnn !== '' ? `${r.sdnn} SDNN` : '';
@@ -444,7 +460,11 @@ export function readingRowValue(r: Entry): string {
     case 'restingHr': return r.hr != null && r.hr !== '' ? `${r.hr} hr` : '';
     case 'standTest': {
       const d = r.sustainedDelta ?? r.peakDelta;
-      return d != null && d !== '' ? `+${d} Δ` : '';
+      return d != null && d !== '' ? `${Math.abs(+d)} Δ` : '';
+    }
+    case 'orthostatic': {
+      const d = orthoMaxDelta(r, hrCurve);
+      return d != null ? `${Math.abs(d)} Δ` : '';
     }
     default: return summarizeFields(READING_TYPES[r.type], r);
   }

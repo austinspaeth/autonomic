@@ -83,6 +83,14 @@ function cleanEntries(v: unknown): Entry[] {
     const entry = { ...e, id: typeof e.id === 'string' && e.id ? e.id : uid() } as Entry;
     if (entry.time !== undefined && typeof entry.time !== 'string') delete entry.time;
     if (entry.note !== undefined && typeof entry.note !== 'string') delete entry.note;
+    // The period tag's third option was renamed Random → Other; retag old data.
+    if (entry.period === 'Random') entry.period = 'Other';
+    // Apple Health imports predate the `imported` flag; recognize them by their
+    // stamped note so readingLabel can tell them from watch-captured readings.
+    if (entry.source === 'watch' && entry.imported === undefined &&
+        typeof entry.note === 'string' && entry.note.startsWith('From Apple Health')) {
+      entry.imported = true;
+    }
     out.push(entry);
   }
   return out;

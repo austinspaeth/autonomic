@@ -4,9 +4,9 @@ import { BlurView } from 'expo-blur';
 import { Screen } from '../../src/components/Header';
 import { Icon, IconName } from '../../src/components/Icon';
 import { HelpDot, ScoreDot, Segmented } from '../../src/components/ui';
-import { Bars, BpDumbbell, LineChart, StandOverlay, ZonesToggle } from '../../src/components/charts';
+import { Bars, BpDumbbell, LineChart, ZonesToggle } from '../../src/components/charts';
 import { fonts, radius, usePalette } from '../../src/theme';
-import { getWaveform, useAppState } from '../../src/store/store';
+import { useAppState } from '../../src/store/store';
 import { buildCategories, type AnalysisCard, type BpPeriod, type OrthoTransition } from '../../src/lib/analysis/categories';
 import { resolveProtocol } from '../../src/lib/scoring/day';
 import { avgRound, catFromBands, type Mode } from '../../src/lib/analysis/buckets';
@@ -297,12 +297,9 @@ const CardView = React.memo(function CardView({ card, buckets }: { card: Analysi
   // the range average for that bucket's value with its date in parentheses;
   // tapping anywhere outside the chart blurs (null) back to the average.
   const [sel, setSel] = useState<number | null>(null);
-  const selChart = (card.charts || []).find((c) => c.selectStat);
-  const selSeries = selChart?.series.find((s) => !s.dashed) ?? selChart?.series[0];
   // A selectStat chart hides its own readout/toggle row, so when it has grade
   // zones the card header hosts the "Show zones" link instead.
   const [showZones, setShowZones] = useState(false);
-  const zonesChart = selChart?.zones ? selChart : null;
   // Blood-pressure period filter: swaps the dumbbell + avg stats between all,
   // morning-only and evening-only readings. Inert on non-BP cards.
   const [bpFilt, setBpFilt] = useState<BpPeriod>('all');
@@ -314,20 +311,26 @@ const CardView = React.memo(function CardView({ card, buckets }: { card: Analysi
   const charts = orthoSpan ? orthoSpan.charts : (card.charts || []);
   const insights = orthoSpan ? orthoSpan.insights : (card.insights || []);
   const orthoEmpty = !!orthoSpan && !charts.some((c) => c.series.some((s) => s.values.some((v) => v != null && !isNaN(v))));
-  // Stand-test curve overlay: resolve each referenced test's 1 Hz HR trace
-  // from the waveform sidecar at render time (the card only carries refs).
-  const standTests = useMemo(() => {
-    if (!card.standCurves?.length) return null;
-    const t = card.standCurves
-      .map((c) => {
-        const samples = getWaveform(c.id)?.sampledHr;
-        return samples && samples.length >= 2 ? { samples, standAt: c.standAt, baseline: c.baseline, date: c.date } : null;
-      })
-      .filter((x): x is NonNullable<typeof x> => x != null);
-    return t.length ? t : null;
-  }, [card.standCurves]);
+  // selectStat/zones wiring reads the *active* chart list so the ortho variants
+  // keep their selection + header zones toggle after a transition-filter swap.
+  const selChart = charts.find((c) => c.selectStat);
+  const selSeries = selChart?.series.find((s) => !s.dashed) ?? selChart?.series[0];
+  const zonesChart = selChart?.zones ? selChart : null;
   const stats = useMemo(() => {
-    const st = orthoSpan ? orthoSpan.stats.slice() : card.stats ? card.stats.slice() : [];
+    // Ortho: a selected point swaps the whole row to that bucket — the day's
+    // average rise/drop and how many events it logged; the row tag beside the
+    // stats flips from "avg" to the bucket's date.
+    if (orthoSpan) {
+      const st = orthoSpan.stats.slice();
+      if (selChart && sel != null && sel >= 0) {
+        const at = (si: number) => { const v = selChart.series[si]?.values[sel]; return v != null && !isNaN(v) ? Math.round(v) : null; };
+        st[0] = { ...st[0], value: at(0) };
+        st[1] = { ...st[1], value: at(1) };
+        st[2] = { ...st[2], value: orthoSpan.counts[sel] ?? null };
+      }
+      return st;
+    }
+    const st = card.stats ? card.stats.slice() : [];
     // BP: the two avg tiles follow the selected period's readings.
     if (bpSpan && st.length >= 2) {
       st[0] = { ...st[0], value: avgRound(bpSpan.sys) };
@@ -346,6 +349,9 @@ const CardView = React.memo(function CardView({ card, buckets }: { card: Analysi
     }
     return st;
   }, [card.stats, selChart, selSeries, sel, buckets, bpSpan, orthoSpan]);
+  // The ortho stats row ends with a scope tag: "avg" for the range averages, or
+  // the selected bucket's date once a chart point is tapped.
+  const orthoTag = orthoSpan ? (sel != null && sel >= 0 && buckets[sel] ? buckets[sel].label : 'avg') : null;
   // Grade dot beside the title, like the HRV Progress sections: BP/ortho follow
   // their filter, a dragged selectStat chart re-grades the selected bucket,
   // otherwise the range average's grade from the builder.
@@ -391,6 +397,11 @@ const CardView = React.memo(function CardView({ card, buckets }: { card: Analysi
                 <Text style={{ fontSize: 12, color: p.textDim, marginTop: 2 }}>{s.label}</Text>
               </View>
             ))}
+            {orthoTag ? (
+              <View style={{ flex: 1, alignItems: 'flex-end', justifyContent: 'flex-end', paddingBottom: 1 }}>
+                <Text style={{ fontSize: 12, fontWeight: '600', color: p.textDim }}>{orthoTag}</Text>
+              </View>
+            ) : null}
           </View>
         )
       ) : null}
@@ -404,7 +415,7 @@ const CardView = React.memo(function CardView({ card, buckets }: { card: Analysi
       ) : null}
       {card.orthoFilter ? (
         <View style={{ marginTop: 12 }}>
-          <FilterLinks options={ORTHO_TRANSITIONS} value={orthoFilt} onChange={setOrthoFilt} />
+          <FilterLinks options={ORTHO_TRANSITIONS} value={orthoFilt} onChange={(v) => { setOrthoFilt(v); setSel(null); }} />
         </View>
       ) : null}
       {orthoEmpty ? (
@@ -412,8 +423,10 @@ const CardView = React.memo(function CardView({ card, buckets }: { card: Analysi
           {`No ${(ORTHO_TRANSITIONS.find((o) => o.val === orthoFilt)?.label || '').toLowerCase()} events in this range.`}
         </Text>
       ) : null}
+      {/* Keyed by the transition filter so a variant swap remounts the chart,
+          clearing its internal selection cursor along with the card's. */}
       {(orthoEmpty ? [] : charts).map((ch, i) => (
-        <View key={i} style={{ marginTop: 14 }}>
+        <View key={`${orthoFilt}-${i}`} style={{ marginTop: 14 }}>
           {ch.label ? <Text style={{ fontSize: 12, color: p.text, marginBottom: 6, fontWeight: '600' }}>{ch.label}</Text> : null}
           {ch.dumbbell
             ? (bpSpan && !bpSpan.sys.some((v) => v != null) && !bpSpan.dia.some((v) => v != null)
@@ -432,12 +445,6 @@ const CardView = React.memo(function CardView({ card, buckets }: { card: Analysi
           ) : null}
         </View>
       ))}
-      {standTests ? (
-        <View style={{ marginTop: 14 }}>
-          <Text style={{ fontSize: 12, color: p.text, marginBottom: 6, fontWeight: '600' }}>Response curves · HR above baseline (bpm)</Text>
-          <StandOverlay tests={standTests} />
-        </View>
-      ) : null}
       {(card.bars || []).map((bg, i) => (
         <View key={i} style={{ marginTop: 14 }}>
           {bg.label ? <Text style={{ fontSize: 12, color: p.text, marginBottom: 6, fontWeight: '600' }}>{bg.label}</Text> : null}

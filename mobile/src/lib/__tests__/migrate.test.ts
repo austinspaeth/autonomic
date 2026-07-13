@@ -82,6 +82,17 @@ describe('migrate: logged-entry arrays', () => {
     expect(day([entry]).readings[0]).toEqual(entry);
   });
 
+  it('retags legacy Apple Health imports with the imported flag', () => {
+    const r = day([
+      { id: 'imp', type: 'hrv', source: 'watch', note: 'From Apple Health', sdnn: '48' },
+      { id: 'cap', type: 'hrv', source: 'watch', note: 'Captured via Apple Watch', sdnn: '52' },
+      { id: 'set', type: 'hrv', source: 'watch', note: 'From Apple Health', imported: false },
+    ]).readings;
+    expect(r[0].imported).toBe(true);
+    expect(r[1].imported).toBeUndefined();
+    expect(r[2].imported).toBe(false);
+  });
+
   it('applies the same envelope rules to activities, meds, symptoms and meals', () => {
     const d = migrate({
       days: {

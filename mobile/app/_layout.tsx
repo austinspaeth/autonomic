@@ -12,6 +12,7 @@ import { SheetProvider } from '../src/components/Sheet';
 import { ToastProvider } from '../src/components/Toast';
 import { OnboardingGate } from '../src/features/Onboarding';
 import { WatchArrivalCards } from '../src/features/WatchArrivals';
+import { WatchSyncPill } from '../src/features/hrv/WatchSyncPill';
 import { RestoreGate } from '../src/features/RestoreGate';
 import { SubscriptionGate } from '../src/features/SubscriptionGate';
 import { initIap } from '../src/store/iap';
@@ -74,6 +75,8 @@ export default function RootLayout() {
               <Slot />
               {/* Pops the results card when a watch reading lands mid-session. */}
               <WatchArrivalCards />
+              {/* "Waiting for watch…" pill while the HRV sync card is minimized. */}
+              <WatchSyncPill />
               {/* Paywall — covers the app whenever the user is not Pro (zIndex
                   90). Sits below onboarding so a fresh install sees Welcome
                   first, then the trial offer. */}

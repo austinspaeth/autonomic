@@ -25,11 +25,9 @@ export interface BpSeries { sys: (number | null)[]; dia: (number | null)[]; cat?
 /** Which transition an Orthostatic Events card is filtered to. */
 export type OrthoTransition = 'all' | 'lay' | 'sit' | 'stairs';
 /** One transition-filter variant of the Orthostatic Events card: the view swaps
- *  charts/stats/insights/grade wholesale when the filter changes. */
-export interface OrthoVariant { cat: ScoreCat | null; charts: Chart[]; stats: Stat[]; insights: Insight[] }
-/** A stand test whose HR trace joins the card's curve overlay. The waveform
- *  itself stays in the sidecar; the view resolves it by reading id. */
-export interface StandCurveRef { id: string; date: string; standAt: number; baseline: number }
+ *  charts/stats/insights/grade wholesale when the filter changes. `counts` is
+ *  events per bucket, so a selected chart point can report that day's count. */
+export interface OrthoVariant { cat: ScoreCat | null; charts: Chart[]; stats: Stat[]; insights: Insight[]; counts: (number | null)[] }
 export interface Stat { label: string; value: number | string | null; sub?: string; color?: string }
 export interface Insight { text: string; strength?: 'strong' | 'mod' | null }
 export interface BarGroup { label: string; rows: { name: string; count: number; color?: string }[]; fmt?: (c: number) => string }
@@ -49,8 +47,6 @@ export interface AnalysisCard {
   /** Orthostatic-event transition variants. When set, the card shows an
    *  All/Lay/Sit/Stairs link toggle that swaps charts, stats and the grade. */
   orthoFilter?: Record<OrthoTransition, OrthoVariant>;
-  /** Stand tests (oldest → newest) to draw as an aligned HR-curve overlay. */
-  standCurves?: StandCurveRef[];
   /** Grade dot beside the title, like the HRV Progress sections. Cards with
    *  several graded values (e.g. BP's systolic + diastolic) take the worst. */
   cat?: ScoreCat | null;
@@ -198,15 +194,11 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
         strength: d < 0 ? 'strong' : 'mod',
       });
     }
-    const standCurves: StandCurveRef[] = tests
-      .filter((t) => num(t.r.standAt) != null && num(t.r.baselineHr) != null)
-      .slice(-5)
-      .map((t) => ({ id: String(t.r.id), date: t.dk, standAt: num(t.r.standAt)!, baseline: num(t.r.baselineHr)! }));
     return [{
       title: 'POTS Test', sub: range,
       cat: latestCat,
       desc: 'Your guided lay-to-stand tests. Same protocol every time, so these are directly comparable.',
-      help: 'Each point is one watch stand test. Sustained is the average rise over the final minute of standing versus the supine baseline; a sustained rise of 30 bpm or more (40 in ages 12-19) is the adult POTS-range criterion, and the zones shade it. Peak is the largest single rise. The response curves draw your recent tests aligned at the stand moment, as HR above each test\'s own baseline: watch the standing plateau flatten as recovery progresses. The grade dot follows your latest test.',
+      help: 'Each point is one watch stand test. Sustained is the average rise over the final minute of standing versus the supine baseline; a sustained rise of 30 bpm or more (40 in ages 12-19) is the adult POTS-range criterion, and the zones shade it. Peak is the largest single rise. The grade dot follows your latest test.',
       tiles: true,
       stats: [
         { label: 'Last sustained rise', value: latestSus != null ? Math.round(latestSus) : null, sub: 'bpm', color: latestCat ? SCORE_COLORS[latestCat] : undefined },
@@ -219,7 +211,6 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
         zones: acBandZones('standDelta'), integer: true,
         legend: [['Sustained', '#f97316'], ['Peak', '#a78bfa']],
       }],
-      standCurves,
       insights,
     }];
   };
@@ -240,6 +231,7 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
       const f = TRANSITIONS[filt];
       const inc = acAgg(buckets, (d) => (d.readings || []).filter((r) => r.type === 'orthostatic' && f(r)).map(incOf).filter((v): v is number => v != null));
       const rec = acAgg(buckets, (d) => (d.readings || []).filter((r) => r.type === 'orthostatic' && f(r)).map(recOf).filter((v): v is number => v != null));
+      const counts = acAggSum(buckets, (d) => (d.readings || []).filter((r) => r.type === 'orthostatic' && f(r) && incOf(r) != null).length || null);
       let n = 0, potsN = 0;
       buckets.forEach((b) => b.days.forEach((dk) => (days[dk].readings || []).forEach((r) => {
         if (r.type !== 'orthostatic' || !f(r)) return;
@@ -248,20 +240,27 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
       })));
       const incAvg = acMean(inc), recAvg = acMean(rec);
       // The ≥30 bpm POTS criterion only applies to standing up, so the rise
-      // chart drops its zones and grading on the stairs view.
+      // series drops its zones and grading on the stairs view.
       const graded = filt !== 'stairs';
       return {
         cat: worstCat([
           incAvg != null && graded ? catFromBands(incAvg, BANDS.orthoIncrease) : null,
           recAvg != null ? catFromBands(recAvg, BANDS.orthoRecovery) : null,
         ]),
-        charts: [
-          { label: 'HR rise (bpm)', series: [series(inc, '#f97316', undefined, { pointBands: graded ? BANDS.orthoIncrease : null })], zones: graded ? acBandZones('orthoIncrease') : null, integer: true },
-          { label: 'HR drop by 1 min (bpm)', series: [series(rec, '#38bdf8', undefined, { pointBands: BANDS.orthoRecovery })], zones: acBandZones('orthoRecovery'), integer: true },
-        ],
+        counts,
+        charts: [{
+          label: '',
+          series: [
+            series(inc, '#38bdf8', 'Rise', { pointBands: graded ? BANDS.orthoIncrease : null }),
+            series(rec, '#a78bfa', '1 min drop', { pointBands: BANDS.orthoRecovery }),
+          ],
+          zones: graded ? acBandZones('orthoIncrease') : null, integer: true,
+          legend: [['Rise', '#38bdf8'], ['1 min drop', '#a78bfa']],
+          selectStat: true,
+        }],
         stats: [
-          { label: 'Avg rise', value: avgRound(inc), sub: 'bpm' },
-          { label: 'Avg 1 min drop', value: avgRound(rec), sub: 'bpm' },
+          { label: 'Rise', value: avgRound(inc), sub: 'bpm' },
+          { label: '1 min drop', value: avgRound(rec), sub: 'bpm' },
           { label: 'Events', value: n || null },
         ],
         insights: potsN && graded ? [{ text: `${potsN} of ${n} event${n === 1 ? '' : 's'} reached a ≥30 bpm rise (the adult POTS-range threshold).`, strength: 'mod' }] : [],
@@ -274,7 +273,7 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
       title: 'POTS Episodes', sub: range,
       cat: all.cat,
       desc: 'How your heart rate reacts to everyday position changes, and how fast it settles.',
-      help: 'Each event logs your HR before and after a transition, plus one minute in. The rise chart is the jump on the change; for the stand-up transitions the zones shade the ≥30 bpm adult POTS-range criterion (stairs always spike, so they are not graded). The 1 min drop shows how quickly HR settles back from its peak; a bigger drop means faster vagal recovery, and for everyday events it is often the cleaner progress signal. Use the transition links to compare like with like.',
+      help: 'Each event logs your HR before and after a transition, plus one minute in. Rise is the jump on the change; for the stand-up transitions the zones shade the ≥30 bpm adult POTS-range criterion (stairs always spike, so they are not graded). The 1 min drop shows how quickly HR settles back from its peak; a bigger drop means faster vagal recovery, and for everyday events it is often the cleaner progress signal. Tap a point on the chart to see that day\'s numbers, and use the transition links to compare like with like.',
       charts: all.charts,
       stats: all.stats,
       insights: all.insights,

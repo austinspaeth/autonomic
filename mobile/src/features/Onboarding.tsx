@@ -82,7 +82,7 @@ async function importAppleHealthHistory(): Promise<number> {
       if (r.ownApp) continue;                           // skip our own write-backs
       if (!s.days[r.dayKey]) s.days[r.dayKey] = blankDay();
       const entry: Record<string, unknown> = {
-        id: uid(), type: r.type, time: r.time, note: 'From Apple Health', source: 'watch', ...r.fields,
+        id: uid(), type: r.type, time: r.time, note: 'From Apple Health', source: 'watch', imported: true, ...r.fields,
       };
       // RR series goes to the waveform sidecar, never inline on the entry
       // (rrClean is derived — recomputed on view, not stored).
@@ -401,7 +401,7 @@ function Onboarding({ onDone }: { onDone: () => void }) {
           <Text style={{ fontSize: 46, fontWeight: '800', letterSpacing: -1.4, color: C.text }}>Autonomic</Text>
         </View>
         <Text style={{ fontSize: 18, lineHeight: 28, color: C.dim, textAlign: 'center', maxWidth: 330 }}>
-          Track your autonomic recovery: heart-rate variability, symptoms, sleep, and more, in one private journal.
+          Track your autonomic recovery: heart-rate variability, POTS readings, symptoms, sleep, and more, in one private journal.
         </Text>
       </View>
     );
@@ -563,6 +563,9 @@ function Onboarding({ onDone }: { onDone: () => void }) {
           </Bullet>
           <Bullet icon={<Icon name="plus" size={25} color={ACCENT} />}>
             Tap <Text style={{ fontWeight: '700' }}>+</Text> on any section to log a reading.
+          </Bullet>
+          <Bullet icon={<Icon name="watch" size={25} color={ACCENT} />}>
+            Check your <Text style={{ fontWeight: '700' }}>Apple Watch</Text> to record POTS episodes or monitor your HR.
           </Bullet>
           <Bullet icon={<Glyph size={25} circle={{ r: 9 }} d={['M9.4 9.2a2.6 2.6 0 0 1 5.1.9c0 1.7-2.5 2.3-2.5 2.3', 'M12 16h.01']} />}>
             Tap the <Text style={{ fontWeight: '700' }}>?</Text> icons whenever you need help.

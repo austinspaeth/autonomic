@@ -80,7 +80,7 @@ export function HealthScreen() {
         });
         if (dup) continue;
 
-        const r = { id: uid(), type: imp.type, time: imp.time, note: 'From Apple Health', source: 'watch', ...imp.fields } as Record<string, unknown>;
+        const r = { id: uid(), type: imp.type, time: imp.time, note: 'From Apple Health', source: 'watch', imported: true, ...imp.fields } as Record<string, unknown>;
         // RR series goes to the waveform sidecar, never inline on the entry
         // (rrClean is derived — recomputed on view, not stored).
         if (imp.rr) storeWaveform(r.id as string, { rrRaw: imp.rr });

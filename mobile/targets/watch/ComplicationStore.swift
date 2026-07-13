@@ -41,4 +41,39 @@ enum ComplicationStore {
     private static func reload() {
         WidgetCenter.shared.reloadTimelines(ofKind: "AutonomicComplication")
     }
+
+    // MARK: - HR monitor complication
+
+    private static var lastHrReloadAt: Date?
+    private static var lastHrBand: String?
+
+    /// Live feed from the HR monitor (~1 Hz). Values are written every call;
+    /// the widget timeline reloads immediately when the Δ color band flips
+    /// (that's the POTS-critical signal) and otherwise at most every ~15 s.
+    static func hrUpdate(hr: Int, low: Int, high: Int, delta: Int) {
+        defaults?.set(hr, forKey: "hr.last")
+        defaults?.set(low, forKey: "hr.low")
+        defaults?.set(high, forKey: "hr.high")
+        defaults?.set(delta, forKey: "hr.delta")
+        defaults?.set(true, forKey: "hr.active")
+        defaults?.set(Date().timeIntervalSince1970, forKey: "hr.at")
+        let band = delta >= 30 ? "red" : delta >= 20 ? "orange" : delta <= -30 ? "blue" : "green"
+        let due = lastHrReloadAt.map { Date().timeIntervalSince($0) >= 15 } ?? true
+        guard band != lastHrBand || due else { return }
+        lastHrBand = band
+        reloadHr()
+    }
+
+    /// Session started/ended: flip the live look. Last values stay behind as
+    /// the idle "last recorded HR" glance.
+    static func hrSessionActive(_ active: Bool) {
+        defaults?.set(active, forKey: "hr.active")
+        defaults?.set(Date().timeIntervalSince1970, forKey: "hr.at")
+        reloadHr()
+    }
+
+    private static func reloadHr() {
+        lastHrReloadAt = Date()
+        WidgetCenter.shared.reloadTimelines(ofKind: "AutonomicHrComplication")
+    }
 }

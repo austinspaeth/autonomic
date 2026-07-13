@@ -93,9 +93,9 @@ describe('standTest scoring', () => {
     expect(rowScoreCategory(entry())).toBe('bad');
   });
 
-  it('row headline prefers sustained delta', () => {
-    expect(readingRowValue(entry())).toBe('+38 Δ');
-    expect(readingRowValue(entry({ sustainedDelta: undefined }))).toBe('+44 Δ');
+  it('row headline prefers sustained delta, unsigned', () => {
+    expect(readingRowValue(entry())).toBe('38 Δ');
+    expect(readingRowValue(entry({ sustainedDelta: undefined }))).toBe('44 Δ');
     expect(readingRowValue(entry({ sustainedDelta: undefined, peakDelta: undefined }))).toBe('');
   });
 });

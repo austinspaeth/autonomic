@@ -27,9 +27,11 @@ struct ContentView: View {
         }
         .onAppear { WorkoutManager.shared.requestAuthorization() }
         .onOpenURL { url in
-            // Complication tap: straight into the POTS Episode flow.
+            // Complication taps: episode → POTS Episode flow, hr → HR monitor.
             if url.host == "episode" || url.path.contains("episode") {
                 mode = .orthostatic
+            } else if url.host == "hr" || url.path.contains("hr") {
+                mode = .hr
             }
         }
     }

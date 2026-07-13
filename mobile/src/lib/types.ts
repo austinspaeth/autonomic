@@ -52,6 +52,9 @@ export interface Entry {
 export interface LiveHrvExtras {
   /** Capture source ('polar' = Bluetooth strap, best; 'camera' = phone PPG, lowest quality). */
   source?: 'polar' | 'watch' | 'camera' | 'manual';
+  /** True when the entry was auto-imported from Apple Health (welcome backfill /
+   *  Health sync) rather than captured in-app — drives the "Apple Watch HRV" label. */
+  imported?: boolean;
   /** Bluetooth device name at capture time (source 'polar' only) — shown as the Source detail. */
   sourceName?: string;
   rrRaw?: number[];
@@ -163,6 +166,9 @@ export interface FieldDef {
   placeholder?: string;
   signed?: boolean;
   divider?: boolean;
+  /** Number fields only: when typing makes this true, focus jumps to the next
+   *  number field in the form (e.g. BP systolic → diastolic → pulse). */
+  autoNext?: (v: string) => boolean;
 }
 
 export interface TypeDef {

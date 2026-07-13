@@ -276,5 +276,6 @@ struct AutonomicComplication: Widget {
 struct AutonomicComplicationBundle: WidgetBundle {
     var body: some Widget {
         AutonomicComplication()
+        AutonomicHrComplication()   // HR monitor glance — HrComplication.swift
     }
 }

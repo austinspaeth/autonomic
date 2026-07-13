@@ -708,8 +708,8 @@ let orthoId = 0;
 /**
  * HR-over-time trace for a POTS episode. Purple through the resting "before"
  * phase, then a POTS-graded gradient from the moment the transition begins.
- * Three vertical markers: the transition start, its completion, and the 1-min
- * (60 s after) recovery point. Dashed line is the resting baseline.
+ * Two vertical markers: where the episode begins ("during") and where the
+ * transition completes ("after"). Dashed line is the resting baseline.
  */
 export function OrthoHrChart({ samples, baseline, transitionAt, completedAt, height = 150 }: {
   samples: { t: number; bpm: number }[];
@@ -784,14 +784,13 @@ export function OrthoHrChart({ samples, baseline, transitionAt, completedAt, hei
   const zones = baseline != null && showZones
     ? BANDS.orthoIncrease.filter((b) => isFinite(b.max)).map((b) => ({ v: baseline + b.max, d: b.max, color: GRADE_COLORS[b.cat as ScoreCat] || '#888' })).filter((z) => z.v > min && z.v < max)
     : [];
-  // Vertical phase markers: transition start, completion, and the 1-min point.
-  // Markers may sit on the right edge (the 1-min point is the trace's end), so
-  // they allow t == t1, unlike the purple→gradient split.
+  // Vertical phase markers: where the episode begins (during) and where the
+  // transition completes (after). Completion may sit on the right edge, so it
+  // allows t == t1, unlike the purple→gradient split.
   const markerX = (t?: number | null) => (t != null && t > t0 && t <= t1 ? xAt(t) : null);
   const markers = [
-    { x: splitX, label: 'start', color: STAND_PURPLE, strong: true },
-    { x: markerX(completedAt), label: 'done', color: p.textDim, strong: false },
-    { x: markerX(completedAt != null ? completedAt + 60 : null), label: '1 min', color: p.textDim, strong: false },
+    { x: splitX, label: 'during', color: STAND_PURPLE, strong: true },
+    { x: markerX(completedAt), label: 'after', color: p.textDim, strong: false },
   ].filter((m) => m.x != null) as { x: number; label: string; color: string; strong: boolean }[];
   return (
     <View style={{ backgroundColor: p.bg, borderRadius: radius.control, padding: 8 }}>

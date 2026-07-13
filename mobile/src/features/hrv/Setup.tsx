@@ -14,6 +14,7 @@ import { radius, usePalette } from '../../theme';
 import { getState, useAppState } from '../../store/store';
 import { getCurrentKey } from '../../store/nav';
 import { health } from '../../lib/health';
+import { defaultPeriod, type Period } from '../../lib/period';
 import { ppg } from '../../lib/ppg/camera';
 import { DevicesScreen } from '../Devices';
 import { BREATH_STYLES, HrvSession, type SessionConfig } from './Session';
@@ -36,22 +37,12 @@ const HELP = {
 // runs underneath it (was clipped on narrower screens).
 const CLOSE_CLEARANCE = 58;
 
-type Period = 'Morning' | 'Evening' | 'Other';
 type Kind = 'unstructured' | 'breath';
 
-/** Default time-of-day tag for a reading of this kind: before 11am → Morning,
- *  after 7pm → Evening — unless a reading of the SAME kind already carries that
- *  tag today (structured and unstructured each get their own morning/evening;
- *  extras fall through to Other). */
-function defaultPeriodFor(kind: Kind): Period {
-  const type = kind === 'breath' ? 'breathHrv' : 'hrv';
-  const day = getState().days[getCurrentKey()];
-  const has = (per: Period) => (day?.readings || []).some((r) => r.type === type && r.period === per);
-  const h = new Date().getHours();
-  if (h >= 19) return has('Evening') ? 'Other' : 'Evening';
-  if (h < 11) return has('Morning') ? 'Other' : 'Morning';
-  return 'Other';
-}
+/** Default time-of-day tag for a reading of this kind (shared rules in
+ *  src/lib/period.ts — structured and unstructured each get their own
+ *  morning/evening; extras fall through to Other). */
+const defaultPeriodFor = (kind: Kind) => defaultPeriod(kind === 'breath' ? 'breathHrv' : 'hrv', getCurrentKey());
 
 export function HrvSetup({ controls }: { controls: SheetControls }) {
   const p = usePalette();

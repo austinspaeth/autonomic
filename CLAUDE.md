@@ -20,7 +20,8 @@ See `mobile/README.md` for a fuller map. This file is the quick orientation.
 | Area | Location |
 | --- | --- |
 | Routes (Journal · Analysis · Milestones · Insights + full-screen HRV) | `app/` (expo-router) |
-| Type registry (`READING_TYPES` / `ACTIVITY_TYPES` / `MED_TYPES` / `SYMPTOM_TYPES` / `TRIGGER_TYPES` / `MEAL_TYPES`) + field/summary helpers | `src/lib/registry.ts` |
+| Built-in type registry (`READING_TYPES` / `ACTIVITY_TYPES` / `MED_TYPES` / `SYMPTOM_TYPES` / `TRIGGER_TYPES` / `MEAL_TYPES`) + field/summary helpers | `src/lib/registry.ts` |
+| User-defined types layered over the registry (`typesFor`, `addCustomType`, `deleteType`) | `src/lib/typeCatalog.ts` |
 | Scoring/grading (`computeScores`, `bandsFor`, `rowScoreCategory`, `hrvComposite`) | `src/lib/scoring/` |
 | HRV pipeline (artifact correction, time/frequency domain, coherence) | `src/lib/hrv/` |
 | Analysis / milestones / AI-insights builders | `src/lib/analysis/` |
@@ -42,6 +43,8 @@ old web app so old `export.json` files import directly.
   "version": 1,
   "settings": { "theme": "light" | "dark" },
   "profile": { "sex", "weight", "height" },  // feeds reading scores (e.g. sex-adjusted QTc)
+  "customTypes": { "meds": { "custom-magnesium": { /* pure-JSON TypeDef */ } } },  // user-created types (activities/meds/symptoms/triggers)
+  "hiddenTypes": { "symptoms": ["nausea"] },  // built-in types the user deleted (only allowed while unused)
   "meta": {
     "lastUpdated": "<ISO timestamp>",      // stamped by save(); see rule below
     "lastImport":  { "name": "file.json", "at": "<ISO timestamp>" }
@@ -52,9 +55,10 @@ old web app so old `export.json` files import directly.
                       "stages?": { "deep": 0, "rem": 0, "core": 0, "awake": 0 } },  // minutes, Health-staged nights only
       // readings/activities/meds/symptoms are logged-entry ARRAYS, each item
       // { id, type, time, note, ...templateFields }, where `type` keys into a
-      // registry map (READING_TYPES / ACTIVITY_TYPES / MED_TYPES / SYMPTOM_TYPES).
-      // No user-defined/custom types. Entries use an ordered, typed field schema
-      // (number / select / time / check / text / textarea / {divider:true}).
+      // registry map (READING_TYPES / ACTIVITY_TYPES / MED_TYPES / SYMPTOM_TYPES)
+      // or into state.customTypes for user-created types. Entries use an ordered,
+      // typed field schema (number / select / time / check / text / textarea /
+      // {divider:true}).
       "readings":   [ { "id", "type", "time", "note", ...fields } ],
       "activities": [ { "id", "type", "time", "note", ...fields } ],
       "meds":       [ { "id", "type", "time", "amount", "note" } ],
@@ -81,8 +85,14 @@ old web app so old `export.json` files import directly.
   embedded arrays still import. A dev-build warning fires if an inline array ever
   reaches the persisted journal.
 - **Imports** record `meta.lastImport` (`{ name, at }`) before calling `save()`.
-- **Adding a type**: add it to the relevant `*_TYPES` map in `src/lib/registry.ts`
-  (and an icon in `src/components/Icon.tsx`). There are no user-defined types.
+- **Types come in two layers.** Built-ins live in the `*_TYPES` maps in
+  `src/lib/registry.ts` (add an icon in `src/components/Icon.tsx` when adding one).
+  Users can also create their own activities, meds/supplements, symptoms and
+  triggers at runtime: `src/lib/typeCatalog.ts` layers `state.customTypes` over the
+  registry (`addCustomType` / `deleteType`; deleting a built-in hides it via
+  `state.hiddenTypes`, only while unused — `typeInUse` guards). Custom defs are
+  pure JSON (no summary/detail functions) so they survive export/import. UI code
+  must resolve types through `typesFor(state, kind)`, never the raw registry maps.
 - **All logged sections share one pattern**: a section lists the day's entries;
   "+ Add" opens a `TypePicker` (or the bespoke `ReadingPicker`, which also offers
   Live HRV) of registry types; choosing one stacks its `EntryForm` to capture

@@ -45,14 +45,15 @@ export function FieldLabel({ children }: { children: React.ReactNode }) {
   return <Text style={{ fontSize: 14, fontWeight: '600', color: p.textDim, marginBottom: 6 }}>{children}</Text>;
 }
 
-export function TextField({ label, value, onChange, keyboardType, placeholder, multiline, signed, onToggleSign }: {
+export function TextField({ label, value, onChange, keyboardType, placeholder, multiline, signed, onToggleSign, inputRef }: {
   label: string; value: string; onChange: (v: string) => void;
   keyboardType?: 'default' | 'numeric' | 'decimal-pad'; placeholder?: string; multiline?: boolean;
-  signed?: boolean; onToggleSign?: () => void;
+  signed?: boolean; onToggleSign?: () => void; inputRef?: React.Ref<TextInput>;
 }) {
   const p = usePalette();
   const input = (
     <TextInput
+      ref={inputRef}
       value={value}
       onChangeText={onChange}
       keyboardType={keyboardType || 'default'}
@@ -287,6 +288,14 @@ export function CheckField({ label, value, onChange }: { label: string; value: b
 /** Render the ordered field schema, grouping runs of number fields 2-up. */
 export function FieldInputs({ fields, form, set }: { fields: FieldDef[]; form: FormState; set: (k: string, v: string | boolean) => void }) {
   const p = usePalette();
+  // Auto-advance plumbing: number-field inputs register here by key so a field
+  // whose `autoNext` fires can focus the next number field in the form.
+  const numInputs = useRef<Record<string, TextInput | null>>({});
+  const numKeys = fields.filter(isNumberField).map((f) => f.key!);
+  const advanceFrom = (key: string) => {
+    const next = numKeys[numKeys.indexOf(key) + 1];
+    if (next) numInputs.current[next]?.focus();
+  };
   const out: React.ReactNode[] = [];
   let run: FieldDef[] = [];
   const flush = () => {
@@ -296,11 +305,11 @@ export function FieldInputs({ fields, form, set }: { fields: FieldDef[]; form: F
       const pair = run.slice(i, i + 2);
       if (pair.length === 1) {
         const f = pair[0];
-        out.push(<NumField key={f.key} f={f} form={form} set={set} />);
+        out.push(<NumField key={f.key} f={f} form={form} set={set} numInputs={numInputs} advanceFrom={advanceFrom} />);
       } else {
         out.push(
           <View key={`grid-${pair[0].key}`} style={{ flexDirection: 'row', gap: 10 }}>
-            {pair.map((f) => <NumField key={f.key} f={f} form={form} set={set} />)}
+            {pair.map((f) => <NumField key={f.key} f={f} form={form} set={set} numInputs={numInputs} advanceFrom={advanceFrom} />)}
           </View>,
         );
       }
@@ -321,13 +330,20 @@ export function FieldInputs({ fields, form, set }: { fields: FieldDef[]; form: F
   return <>{out}</>;
 }
 
-function NumField({ f, form, set }: { f: FieldDef; form: FormState; set: (k: string, v: string | boolean) => void }) {
+function NumField({ f, form, set, numInputs, advanceFrom }: {
+  f: FieldDef; form: FormState; set: (k: string, v: string | boolean) => void;
+  numInputs: React.MutableRefObject<Record<string, TextInput | null>>; advanceFrom: (key: string) => void;
+}) {
   const v = form[f.key!] as string;
   return (
     <TextField
       label={fieldLabel(f)}
       value={v}
-      onChange={(nv) => set(f.key!, nv)}
+      inputRef={(el) => { numInputs.current[f.key!] = el; }}
+      onChange={(nv) => {
+        set(f.key!, nv);
+        if (f.autoNext && nv.length > (v || '').length && f.autoNext(nv)) advanceFrom(f.key!);
+      }}
       keyboardType="decimal-pad"
       signed={f.signed}
       onToggleSign={() => {
