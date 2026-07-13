@@ -26,7 +26,7 @@ import {
   purchaseErrorListener, deepLinkToSubscriptions, PurchaseStateAndroid,
   type Subscription, type SubscriptionAndroid, type SubscriptionOfferAndroid,
 } from 'react-native-iap';
-import { isTestFlightBuild } from '../../modules/app-env';
+import { isSideloadedAndroidBuild, isTestFlightBuild } from '../../modules/app-env';
 
 /** Product IDs — identical in App Store Connect and the Play Console. On the
  *  App Store: one subscription group holding both plans (with a 7-day
@@ -87,9 +87,17 @@ const BYPASS_IN_DEV = true;
  *  The real App Store build has a production receipt and stays gated. */
 const BYPASS_IN_TESTFLIGHT = true;
 
+/** Android twin of the TestFlight bypass: builds that Google Play did not
+ *  install (adb / shared APKs — internal test builds) can't purchase through
+ *  Play Billing at all, so gating them would hard-lock testers out. Play
+ *  installs are unaffected — their installer is com.android.vending. */
+const BYPASS_IN_SIDELOAD = true;
+
 /** Whether this build should skip the paywall entirely (treated as Pro). */
 const shouldBypassPaywall = () =>
-  (BYPASS_IN_DEV && __DEV__) || (BYPASS_IN_TESTFLIGHT && isTestFlightBuild());
+  (BYPASS_IN_DEV && __DEV__) ||
+  (BYPASS_IN_TESTFLIGHT && isTestFlightBuild()) ||
+  (BYPASS_IN_SIDELOAD && isSideloadedAndroidBuild());
 
 /** TEMP (dev only): force the paywall to show with fallback prices and no
  *  StoreKit calls, so it can be previewed in a simulator without a native

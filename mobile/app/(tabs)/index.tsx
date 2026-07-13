@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Dimensions, Pressable, ScrollView, Text, View } from 'react-native';
+import { Dimensions, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import Animated, { Easing, runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { Screen } from '../../src/components/Header';
 import { useSheets } from '../../src/components/Sheet';
@@ -65,6 +65,16 @@ export default function JournalScreen() {
 
   // Phase 1 — a date change starts the out-animation.
   useEffect(() => {
+    // Android (often slower hardware): skip the slide choreography entirely
+    // and swap the day in a single commit — the animation frames cost more
+    // than they're worth there. iOS keeps the full sequence.
+    if (Platform.OS === 'android') {
+      if (dk !== shownDk) {
+        setShownDk(dk);
+        scrollRef.current?.scrollTo({ y: 0, animated: false });
+      }
+      return;
+    }
     if (dk === shownDk) {
       // Rapid taps landed back on the day already shown mid-flight: if it's
       // not waiting on a fresh mount, just animate it back into place.

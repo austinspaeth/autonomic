@@ -143,7 +143,13 @@ export default function TabLayout() {
       {/* lazy: false pre-mounts every scene at startup, mirroring the journal's
           day-change rule (render first, then animate): switching tabs slides in
           an already-rendered tree instead of mounting heavy charts mid-transition. */}
-      <Tabs tabBar={(props) => <FloatingTabBar {...props} />} screenOptions={{ headerShown: false, lazy: false, ...TAB_TRANSITION }}>
+      <Tabs
+        tabBar={(props) => <FloatingTabBar {...props} />}
+        // Android (often budget hardware): no scene transition — animating the
+        // full chart trees through the cross-slide is what made tab switches
+        // take seconds there. iOS keeps the directional slide.
+        screenOptions={{ headerShown: false, lazy: false, ...(Platform.OS === 'ios' ? TAB_TRANSITION : { animation: 'none' as const }) }}
+      >
         <Tabs.Screen name="index" />
         <Tabs.Screen name="analysis" />
         <Tabs.Screen name="insights" />
