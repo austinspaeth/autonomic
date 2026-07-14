@@ -14,8 +14,8 @@ import { OnboardingGate } from '../src/features/Onboarding';
 import { WatchArrivalCards } from '../src/features/WatchArrivals';
 import { WatchSyncPill } from '../src/features/hrv/WatchSyncPill';
 import { RestoreGate } from '../src/features/RestoreGate';
-import { SubscriptionGate } from '../src/features/SubscriptionGate';
 import { initIap } from '../src/store/iap';
+import { initTier } from '../src/store/tier';
 import { initWatchReceiver } from '../src/lib/watch/receiver';
 import { runDailyBackup } from '../src/lib/backup';
 import { loadIssue } from '../src/store/store';
@@ -47,6 +47,8 @@ export default function RootLayout() {
   useEffect(() => {
     // Open the store connection and read the current Pro entitlement.
     initIap();
+    // Stamp/derive the freemium tier (7-day local trial window on first launch).
+    initTier();
     // Watch companion (iOS only): drain queued stand-test results + relay
     // entitlement. Safe elsewhere (the bridge no-ops), but don't even try.
     if (Platform.OS === 'ios') initWatchReceiver();
@@ -78,10 +80,8 @@ export default function RootLayout() {
                   "Waiting for watch…" pill while the sync card is minimized. */}
               {Platform.OS === 'ios' ? <WatchArrivalCards /> : null}
               {Platform.OS === 'ios' ? <WatchSyncPill /> : null}
-              {/* Paywall — covers the app whenever the user is not Pro (zIndex
-                  90). Sits below onboarding so a fresh install sees Welcome
-                  first, then the trial offer. */}
-              <SubscriptionGate />
+              {/* Freemium: no blocking paywall. Locked surfaces raise the
+                  PaywallCard sheet on demand (src/features/Paywall.tsx). */}
               {/* First-run welcome wizard — overlays the tabs until completed,
                   then fades to black and reveals the app beneath. Deferred
                   until any launch-time restore offer is resolved. */}

@@ -26,18 +26,23 @@ export const SCORE_CATS: DayCat[] = [
 ];
 export const scoreCat = (s: number): DayCat => SCORE_CATS.find((c) => s >= c.min) || SCORE_CATS[SCORE_CATS.length - 1];
 
+/** Guidance shown on the Autonomic Outlook card. Keep this general: it speaks to
+ *  capacity and pacing, never to a specific training plan. Nothing here should
+ *  tell someone to exercise — on strong days it offers headroom for their own
+ *  protocol and whatever activity they already tolerate, and it always defers to
+ *  their plan over the number. */
 export const OUTLOOK_GUIDE: Record<string, string> = {
-  Excellent: "Strong autonomic baseline. Good for the full protocol, including intervals, core, and strength. Capitalize on the capacity; don't push past the plan.",
-  Good: "Solid baseline. Easy cycling, strength, normal activities. Hold off on intervals unless you've trended up across several days.",
-  Moderate: 'Reduced reserves. Walking, gentle activity, light core only. Skip cycling and intervals, and lean on hydration and rest.',
-  Compromised: 'Significantly reduced reserves. Rest, gentle stretching, basic ADLs. Avoid structured exercise and late dinners. This is a recovery day.',
-  Bad: 'System is stressed. Complete rest and gentle breathing only. Look at what’s driving it: sleep, food, illness, or accumulated load.',
+  Excellent: 'Strong autonomic baseline with reserves to spare. A good day for your full protocol, and for whatever activity you normally tolerate. Work within your plan rather than past it.',
+  Good: 'Solid baseline. Enough reserve for your protocol and a normal day. Keep anything demanding at a level you already know you handle well.',
+  Moderate: 'Reduced reserves. Keep the day easy and stay with the basics of your protocol. Lean on hydration, pacing, and rest, and hold back on anything demanding.',
+  Compromised: 'Significantly reduced reserves. This is a recovery day: rest, hydration, and essentials only. Avoid added load and late meals.',
+  Bad: 'System is stressed. Rest and gentle breathing. Look at what’s driving it: sleep, food, illness, or accumulated load.',
   Crash: 'System in a crash state. Full rest and your protocol. Check for illness or stacked triggers; seek care if symptoms warrant.',
 };
 export const TOMORROW: Record<string, string> = {
   Excellent: 'Tomorrow likely Good to Excellent.',
   Good: 'Tomorrow likely Good.',
-  Moderate: 'Tomorrow likely Moderate, so skip intervals.',
+  Moderate: 'Tomorrow likely Moderate, so plan a lighter day.',
   Compromised: 'Tomorrow likely Compromised to Moderate, so keep it light.',
   Bad: 'Tomorrow likely Bad. Plan a rest day.',
   Crash: 'Tomorrow Bad to Crash. Prepare for full rest.',

@@ -23,6 +23,9 @@ import { health, healthAppName } from '../lib/health';
 import { healthSourceFor, type HealthCandidate, type HealthSource } from '../lib/health/sources';
 import { deleteEntry, getState, upsertEntry, useAppState } from '../store/store';
 import { defaultTimeFor, fmtTime12, todayKey, uid } from '../lib/dates';
+import { getTier } from '../store/tier';
+import { canCaptureHrv, hrvCaptureUsedToday } from '../lib/gating';
+import { usePaywall } from './Paywall';
 import { defaultPeriod } from '../lib/period';
 import { useToast } from '../components/Toast';
 import { HrvSetup } from './hrv/Setup';
@@ -154,7 +157,10 @@ function softTint(hex: string): string {
  *  neutral grey. HRV kinds are live-capture only, so the manual list starts at
  *  Blood Pressure. On a past day the live-only captures (HRV, stand test)
  *  disappear — a live reading can only belong to the day it happens. */
-function ReadingPicker({ isToday, onLive, onPick }: { isToday: boolean; onLive: () => void; onPick: (type: string) => void }) {
+function ReadingPicker({ isToday, hrvLocked, potsLocked, onLocked, onLive, onPick }: {
+  isToday: boolean; hrvLocked?: boolean; potsLocked?: boolean; onLocked?: () => void;
+  onLive: () => void; onPick: (type: string) => void;
+}) {
   const p = usePalette();
   const tintFor = (t: string) => (t === 'standTest' ? POTS_BLUE : t === 'orthostatic' ? POTS_PURPLE : t === 'bp' ? BP_GOLD : p.textDim);
   const subFor: Record<string, string> = {
@@ -166,9 +172,14 @@ function ReadingPicker({ isToday, onLive, onPick }: { isToday: boolean; onLive: 
   // The two POTS captures lead the manual list (the stand test is live-only but
   // stays in, pointing at the watch app); BP and resting HR follow.
   const manual = isToday ? ['standTest', 'orthostatic', 'bp', 'restingHr'] : ['orthostatic', 'bp', 'restingHr'];
-  const readingRow = (t: string) => ({ key: t, title: pickerLabel(t), sub: subFor[t] || '', icon: READING_TYPES[t].icon as string, tint: tintFor(t), onPress: () => onPick(t) });
-  const rows: { key: string; title: string; sub: string; icon: string; tint: string; onPress: () => void }[] = [
-    ...(isToday ? [{ key: 'hrv', title: 'HRV Reading', sub: Platform.OS === 'ios' ? 'From a chest strap, Apple Watch or camera' : 'From a chest strap or your camera', icon: 'heartPulse', tint: p.accent, onPress: onLive }] : []),
+  // Freemium locks: the HRV row once today's free capture is used, and the
+  // live-only stand test on the free tier (the episode row stays — its manual
+  // entry path is free). Locked rows dim, swap the chevron for a lock, and
+  // raise the paywall.
+  const lockFor = (t: string) => (t === 'hrv' ? !!hrvLocked : t === 'standTest' ? !!potsLocked : false);
+  const readingRow = (t: string) => ({ key: t, title: pickerLabel(t), sub: subFor[t] || '', icon: READING_TYPES[t].icon as string, tint: lockFor(t) ? p.textDim : tintFor(t), locked: lockFor(t), onPress: () => (lockFor(t) ? onLocked?.() : onPick(t)) });
+  const rows: { key: string; title: string; sub: string; icon: string; tint: string; locked?: boolean; onPress: () => void }[] = [
+    ...(isToday ? [{ key: 'hrv', title: 'HRV Reading', sub: hrvLocked ? 'Free plan: 1 capture per day used' : Platform.OS === 'ios' ? 'From a chest strap, Apple Watch or camera' : 'From a chest strap or your camera', icon: 'heartPulse', tint: hrvLocked ? p.textDim : p.accent, locked: !!hrvLocked, onPress: onLive }] : []),
     ...manual.map(readingRow),
   ];
   return (
@@ -188,7 +199,7 @@ function ReadingPicker({ isToday, onLive, onPick }: { isToday: boolean; onLive: 
               <Text style={{ color: p.text, fontSize: 16, fontWeight: '700' }}>{r.title}</Text>
               {r.sub ? <Text style={{ color: p.textDim, fontSize: 12.5, marginTop: 1 }}>{r.sub}</Text> : null}
             </View>
-            <Icon name="chevronRight" size={18} color={p.textDim} />
+            <Icon name={r.locked ? 'lock' : 'chevronRight'} size={18} color={p.textDim} />
           </Pressable>
         ))}
       </View>
@@ -337,7 +348,15 @@ export function BikeForm({ dk, existing, controls, onSaved }: { dk: string; exis
 /* ---------- hooks that wire the sheet stack ---------- */
 export function useEntryForms(dk: string) {
   const { openSheet } = useSheets();
+  const openPaywall = usePaywall();
   const refresh = () => { /* store change triggers re-render */ };
+
+  // Freemium: free tier gets one live HRV capture per day; live POTS captures
+  // are Pro. Checked at action time (not render) so the answer is current, and
+  // guarded here — the single choke point — rather than at each button.
+  const hrvCaptureLocked = () =>
+    !canCaptureHrv(getTier(), hrvCaptureUsedToday(getState().days[todayKey()]));
+  const potsCaptureLocked = () => getTier() === 'free';
 
   const openReadingForm = (type: string, existing: Entry | null, prefill: Entry | null = null) =>
     openSheet((c) => (
@@ -356,6 +375,7 @@ export function useEntryForms(dk: string) {
   // treatment as a live HRV session. With no strap saved yet, the pairing
   // sheet opens first; saving a device there flows straight into the session.
   const startPotsLive = (type: string) => {
+    if (potsCaptureLocked()) { openPaywall(); return; }
     const open = () => openSheet(
       (c) => (type === 'standTest' ? <StandTestSession controls={c} /> : <OrthostaticSession controls={c} />),
       { hideClose: true },
@@ -425,10 +445,16 @@ export function useEntryForms(dk: string) {
       { action: { icon: 'edit', onPress: () => openReadingForm(r.type, r) } },
     );
 
-  const captureHrv = () => openSheet((c) => <HrvSetup controls={c} />);
+  const captureHrv = () => {
+    if (hrvCaptureLocked()) { openPaywall(); return; }
+    openSheet((c) => <HrvSetup controls={c} />);
+  };
   const pickReading = () => openSheet(() => (
     <ReadingPicker
       isToday={dk === todayKey()}
+      hrvLocked={hrvCaptureLocked()}
+      potsLocked={potsCaptureLocked()}
+      onLocked={openPaywall}
       onLive={captureHrv}
       onPick={(t) => pickReadingSource(t)}
     />

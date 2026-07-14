@@ -339,6 +339,22 @@ export function replaceState(parsed: unknown, importName?: string) {
   persister.flush();
 }
 
+/** Erase the journal: both MMKV instances (journal + recovery blob + waveform
+ *  sidecar) and the in-memory state, back to a fresh install's defaults. The
+ *  daily backup snapshots are plaintext files, not MMKV — callers must clear
+ *  those too (deleteAllBackups) or the data stays readable in the Files app.
+ *  The blank state is written straight back so the next launch loads it rather
+ *  than seeing an empty store and offering RestoreGate. */
+export function clearAllData() {
+  try { kv().clearAll(); } catch { /* the overwrite below still lands */ }
+  try { wkv().clearAll(); } catch { /* strays pruned on next launch */ }
+  state = defaultState();
+  // save() stamps meta.lastUpdated, which also keeps onboarding from re-firing
+  // on an app the user has merely reset.
+  save();
+  persister.flush();
+}
+
 /* ---------- day accessors ---------- */
 export function getDay(k: string): DayRecord {
   return state.days[k] || blankDay();

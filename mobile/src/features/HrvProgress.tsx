@@ -255,9 +255,13 @@ function Section({ children }: { children: React.ReactNode }) {
 
 /** Section header per the comp: uppercase title + "?" (left), optional action
  *  (right); beneath it the big value with its dim suffix, then a description. */
-function SectionHead({ title, help, value, valueColor, value2, suffix, desc, right, cat }: {
+function SectionHead({ title, help, value, valueColor, value2, pair, suffix, desc, right, cat }: {
   title: string; help: string; value: string | null; valueColor?: string;
   value2?: { text: string; color: string } | null;
+  /** "Both" mode: each series as a legend dot + name on the first row with the
+   *  value below it coloured to match (like the Balance/POTS readouts). When set
+   *  it replaces the plain value/value2 row and the below-chart legend. */
+  pair?: { label: string; color: string; text: string | null }[] | null;
   suffix: string; desc?: string; right?: React.ReactNode; cat?: ScoreCat | null;
 }) {
   const p = usePalette();
@@ -270,7 +274,22 @@ function SectionHead({ title, help, value, valueColor, value2, suffix, desc, rig
         <View style={{ flex: 1 }} />
         {right}
       </View>
-      {value != null ? (
+      {pair ? (
+        <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 10, marginTop: 6 }}>
+          <View style={{ flexDirection: 'row', gap: 28 }}>
+            {pair.map((pp) => (
+              <View key={pp.label}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: pp.color }} />
+                  <Text style={{ fontSize: 12, color: p.textDim, fontWeight: '600' }}>{pp.label}</Text>
+                </View>
+                <Text style={{ fontSize: 27, fontFamily: fonts.numHeavy, color: pp.color, fontVariant: ['tabular-nums'], marginTop: 3 }}>{pp.text ?? '–'}</Text>
+              </View>
+            ))}
+          </View>
+          {suffix ? <Text style={{ fontSize: 13, fontWeight: '600', color: p.textDim, marginBottom: 5 }}>{suffix}</Text> : null}
+        </View>
+      ) : value != null ? (
         <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 6 }}>
           <Text style={{ fontSize: 27, fontFamily: fonts.numHeavy, color: valueColor ?? p.text, fontVariant: ['tabular-nums'] }}>{value}</Text>
           {value2 ? (
@@ -351,6 +370,10 @@ function MetricSection({ m, structured, unstructured, buckets }: {
         value={value}
         valueColor={valueColor}
         value2={value2}
+        pair={both ? [
+          { label: 'Structured', color: STRUCT, text: fmtVal(sRaw) },
+          { label: 'Unstructured', color: UNSTRUCT, text: fmtVal(uRaw) },
+        ] : null}
         suffix={suffix}
         desc={m.desc}
         right={!empty && zones ? <ZonesToggle on={showZones} onPress={() => setShowZones((v) => !v)} /> : undefined}
@@ -373,7 +396,6 @@ function MetricSection({ m, structured, unstructured, buckets }: {
             zonesOn={showZones}
             onSelect={setSel}
           />
-          {kind === 'both' ? <Legend items={[['Structured', STRUCT], ['Unstructured', UNSTRUCT]]} /> : null}
         </>
       )}
     </Section>
@@ -485,20 +507,6 @@ function BandBreakdown({ bands, pct }: {
           </View>
           <Text style={{ fontSize: 17, fontWeight: '800', color: p.text, fontVariant: ['tabular-nums'], marginTop: 3 }}>{b.power == null ? '–' : Math.round(b.power)}</Text>
           <Text style={{ fontSize: 11, color: p.textDim }}>{`ms² · ${pct(b.power)}%`}</Text>
-        </View>
-      ))}
-    </View>
-  );
-}
-
-function Legend({ items }: { items: [string, string][] }) {
-  const p = usePalette();
-  return (
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 14, marginTop: 10 }}>
-      {items.map(([name, color]) => (
-        <View key={name} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: color }} />
-          <Text style={{ fontSize: 12, color: p.textDim, fontWeight: '600' }}>{name}</Text>
         </View>
       ))}
     </View>

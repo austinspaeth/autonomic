@@ -4,15 +4,17 @@ import SwiftUI
  * Mode router + home screen. Deliberately NOT a NavigationStack: once a mode
  * is running there is no back gesture — HR Monitor ends only via the End
  * button on its controls page (one swipe right), the stand test only via its
- * own buttons — so a stray swipe can't abandon a session. The whole watch app
- * is gated by the phone subscription
- * (mirrored over applicationContext); before the first context ever arrives
- * it asks the user to open the iPhone app.
+ * own buttons — so a stray swipe can't abandon a session. Freemium gating is
+ * per-feature: the HR Monitor is always free; the two POTS captures follow
+ * the phone subscription (`pro` mirrored over applicationContext — true while
+ * trialing or subscribed). Locked rows show a lock instead of a chevron and
+ * explain how to unlock on tap.
  */
 struct ContentView: View {
     enum Mode { case home, hr, pots, orthostatic }
 
     @State private var mode: Mode = .home
+    @State private var showLockAlert = false
     @EnvironmentObject private var relay: PhoneRelay
     @EnvironmentObject private var workout: WorkoutManager
 
@@ -29,7 +31,7 @@ struct ContentView: View {
         .onOpenURL { url in
             // Complication taps: episode → POTS Episode flow, hr → HR monitor.
             if url.host == "episode" || url.path.contains("episode") {
-                mode = .orthostatic
+                if potsLocked { mode = .home; showLockAlert = true } else { mode = .orthostatic }
             } else if url.host == "hr" || url.path.contains("hr") {
                 mode = .hr
             }
@@ -51,56 +53,41 @@ struct ContentView: View {
                     Text("Autonomic")
                         .font(.system(size: 15, weight: .heavy))
                 }
-                if gated {
-                    lockCard
-                } else {
-                    modeButton(
-                        title: "HR Monitor", subtitle: "Persistent heart rate",
-                        icon: "heart.fill", tint: DS.accent
-                    ) { mode = .hr }
-                    modeButton(
-                        title: "POTS Test", subtitle: "Lie and stand test",
-                        icon: "figure.stand", tint: DS.blue
-                    ) { mode = .pots }
-                    modeButton(
-                        title: "POTS Episode", subtitle: "Stairs or other events",
-                        icon: "figure.stairs", tint: DS.purple
-                    ) { mode = .orthostatic }
-                }
+                modeButton(
+                    title: "HR Monitor", subtitle: "Persistent heart rate",
+                    icon: "heart.fill", tint: DS.accent
+                ) { mode = .hr }
+                modeButton(
+                    title: "POTS Test", subtitle: "Lie and stand test",
+                    icon: "figure.stand", tint: DS.blue, locked: potsLocked
+                ) { mode = .pots }
+                modeButton(
+                    title: "POTS Episode", subtitle: "Stairs or other events",
+                    icon: "figure.stairs", tint: DS.purple, locked: potsLocked
+                ) { mode = .orthostatic }
             }
         }
-    }
-
-    /// Locked until the phone has ever told us `pro`; then mirrors it live.
-    private var gated: Bool { relay.pro != true }
-
-    private var lockCard: some View {
-        VStack(spacing: 8) {
-            Image(systemName: relay.pro == nil ? "iphone" : "lock.fill")
-                .font(.system(size: 26))
-                .foregroundStyle(DS.dim)
+        .alert("Subscription required", isPresented: $showLockAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
             Text(relay.pro == nil
                  ? "Open Autonomic on your iPhone to set up."
-                 : "Subscribe in the Autonomic app on your iPhone to unlock.")
-                .font(.system(size: 12.5))
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.primary.opacity(0.85))
-                .fixedSize(horizontal: false, vertical: true)
+                 : "Subscribe in the Autonomic app on your iPhone to unlock POTS readings.")
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 18)
-        .padding(.horizontal, 12)
-        .background(DS.card, in: RoundedRectangle(cornerRadius: 20))
     }
 
-    private func modeButton(title: String, subtitle: String, icon: String, tint: Color, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
+    /// POTS captures are Pro (or trial). Locked until the phone has ever told
+    /// us `pro`; then mirrors it live. The HR Monitor is never gated.
+    private var potsLocked: Bool { relay.pro != true }
+
+    private func modeButton(title: String, subtitle: String, icon: String, tint: Color, locked: Bool = false, action: @escaping () -> Void) -> some View {
+        Button(action: { if locked { showLockAlert = true } else { action() } }) {
             HStack(spacing: 11) {
                 Image(systemName: icon)
                     .font(.system(size: 15))
-                    .foregroundStyle(tint)
+                    .foregroundStyle(locked ? DS.dim : tint)
                     .frame(width: 30, height: 30)
-                    .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 9))
+                    .background((locked ? DS.dim : tint).opacity(0.12), in: RoundedRectangle(cornerRadius: 9))
                 VStack(alignment: .leading, spacing: 0) {
                     Text(title).font(.system(size: 15, weight: .bold))
                         .lineLimit(1).minimumScaleFactor(0.8)
@@ -108,7 +95,7 @@ struct ContentView: View {
                         .lineLimit(1).minimumScaleFactor(0.8)
                 }
                 Spacer(minLength: 0)
-                Image(systemName: "chevron.right")
+                Image(systemName: locked ? "lock.fill" : "chevron.right")
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(DS.dim.opacity(0.7))
             }

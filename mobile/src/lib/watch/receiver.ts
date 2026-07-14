@@ -8,13 +8,14 @@
  * order. The write is flushed to disk before the ack, because an acked result
  * is never re-sent by the watch.
  *
- * Outbound: the applicationContext the watch mirrors — `pro` (subscription),
- * plus `age`/`sex` so the watch can compute a max-HR ceiling. Re-pushed on
- * entitlement changes, profile edits, and session activation; deduped so
- * journal churn doesn't spam WCSession.
+ * Outbound: the applicationContext the watch mirrors — `pro` (freemium tier:
+ * true while trialing or subscribed, gating the watch POTS captures), plus
+ * `age`/`sex` so the watch can compute a max-HR ceiling. Re-pushed on tier
+ * changes (entitlement AND local-trial expiry), profile edits, and session
+ * activation; deduped so journal churn doesn't spam WCSession.
  */
 import { watchBridge, type WatchUserInfo } from '../../../modules/watch-bridge';
-import { getIapState, subscribeIap } from '../../store/iap';
+import { getTier, subscribeTier } from '../../store/tier';
 import { flushSave, getState, storeWaveform, subscribeStore, upsertEntry } from '../../store/store';
 import { ageFromBirthday } from '../dates';
 import { SYMPTOM_TYPES } from '../registry';
@@ -41,7 +42,7 @@ function pushContext() {
   if (!bridge) return;
   const profile = getState().profile;
   const age = ageFromBirthday(profile?.birthday);
-  const context: Record<string, unknown> = { pro: getIapState().isPro };
+  const context: Record<string, unknown> = { pro: getTier() !== 'free' };
   if (age != null) context.age = age;
   if (profile?.sex) context.sex = profile.sex;
   // The quick-log symptom list the watch mirrors — id + label in registry order.
@@ -91,7 +92,7 @@ export function initWatchReceiver() {
     lastContext = '';
     pushContext();
   });
-  subscribeIap(pushContext);
+  subscribeTier(pushContext);
   subscribeStore(pushContext);
   // Drain results that arrived before JS attached (background deliveries).
   bridge.pendingUserInfo().then((list) => list.forEach((info) => receive(info))).catch(() => {});

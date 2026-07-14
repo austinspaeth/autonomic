@@ -10,7 +10,7 @@
  * quantization ≈ the whole signal), so each detected peak is refined with
  * parabolic interpolation around the sample max to recover sub-frame timing.
  */
-import { mean, std } from '../hrv';
+import { mean, median, std } from '../hrv';
 
 /** Plausible heart-rate band: 42–200 bpm → RR 300–1428 ms (0.7–3.3 Hz). */
 const RR_MIN_MS = 300;
@@ -82,18 +82,32 @@ export function detectBeats(ts: number[], vs: number[]): BeatDetection {
   const threshold = 0.35 * p90;
 
   const peakTimes: number[] = [];
+  // Trailing accepted intervals drive an adaptive refractory window: once a
+  // rhythm is established, no true beat can arrive within half an RR, so a
+  // secondary bump (the dicrotic notch — PPG's classic false peak) is rejected
+  // even when it clears the amplitude threshold. Before any rhythm exists we
+  // fall back to the fixed 200 bpm floor.
+  const recentRr: number[] = [];
   let lastIdx = -1;
   for (let i = 1; i < n - 1; i++) {
     if (f[i] < threshold || f[i] < f[i - 1] || f[i] <= f[i + 1]) continue;
-    if (lastIdx >= 0 && ts[i] - ts[lastIdx] < MIN_PEAK_GAP_MS) {
+    const refractory = recentRr.length ? Math.max(MIN_PEAK_GAP_MS, 0.5 * median(recentRr)) : MIN_PEAK_GAP_MS;
+    if (lastIdx >= 0 && ts[i] - ts[lastIdx] < refractory) {
       // Within the refractory window: keep whichever candidate is taller.
       if (f[i] > f[lastIdx]) {
-        peakTimes[peakTimes.length - 1] = refinePeak(ts, f, i);
+        const refined = refinePeak(ts, f, i);
+        peakTimes[peakTimes.length - 1] = refined;
+        if (peakTimes.length >= 2) recentRr[recentRr.length - 1] = refined - peakTimes[peakTimes.length - 2];
         lastIdx = i;
       }
       continue;
     }
-    peakTimes.push(refinePeak(ts, f, i));
+    const refined = refinePeak(ts, f, i);
+    if (peakTimes.length) {
+      recentRr.push(refined - peakTimes[peakTimes.length - 1]);
+      if (recentRr.length > 8) recentRr.shift();
+    }
+    peakTimes.push(refined);
     lastIdx = i;
   }
 

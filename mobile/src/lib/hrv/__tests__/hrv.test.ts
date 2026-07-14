@@ -7,7 +7,7 @@
  */
 import {
   computeHrv, correctArtifacts, fft, frequencyDomain,
-  parseHeartRateMeasurement, resampleTachogram, timeDomain,
+  parseHeartRateMeasurement, repairBeats, resampleTachogram, timeDomain,
 } from '../index';
 
 /** Build an RR series (ms) with mean HR, HF and LF sinusoidal modulation. */
@@ -172,6 +172,50 @@ describe('computeHrv end to end', () => {
     const r = computeHrv(noise);
     expect(r.ok).toBe(false);
     expect(r.reason).toBeTruthy();
+  });
+});
+
+describe('repairBeats (camera missed/extra beats)', () => {
+  it('splits a missed beat into two, restoring the beat count', () => {
+    const rr = new Array(40).fill(800);
+    rr[20] = 1600; // detector skipped a pulse → one interval spans two beats
+    const out = repairBeats(rr);
+    expect(out.length).toBe(41); // one beat recovered
+    expect(Math.max(...out)).toBeLessThan(1000); // no double-length interval left
+  });
+  it('merges an extra (false) beat back into one interval', () => {
+    const rr = new Array(40).fill(800);
+    rr[20] = 350; rr[21] = 450; // a spurious peak split one beat into a short pair
+    const out = repairBeats(rr);
+    expect(out.length).toBe(39); // the false beat removed
+    expect(Math.min(...out)).toBeGreaterThan(500); // no implausibly short interval left
+  });
+  it('leaves genuine sinus arrhythmia untouched', () => {
+    const rr = Array.from({ length: 120 }, (_, i) => 900 + 110 * Math.sin((2 * Math.PI * i) / 12));
+    expect(repairBeats(rr)).toEqual(rr);
+  });
+});
+
+describe('computeHrv duration gating', () => {
+  // ~100 s of clean beats: long enough for time-domain, too short for the bands.
+  const shortRr = Array.from({ length: 130 }, (_, i) => 800 + 25 * Math.sin((2 * Math.PI * i) / 12));
+  // ~180 s: LF/HF resolve, VLF (needs ~5 min) still does not.
+  const midRr = Array.from({ length: 225 }, (_, i) => 800 + 30 * Math.sin((2 * Math.PI * i) / 8));
+
+  it('keeps time-domain but omits LF/HF/VLF below ~2 minutes', () => {
+    const r = computeHrv(shortRr, { source: 'camera' });
+    expect(r.ok).toBe(true);
+    expect(r.fields.rmssd).toBeDefined();
+    expect(r.fields.pns).toBeDefined();
+    expect(r.fields.lowPower).toBeUndefined();
+    expect(r.fields.highPower).toBeUndefined();
+    expect(r.fields.vlowPower).toBeUndefined();
+  });
+  it('adds LF/HF at ~3 minutes but still withholds VLF', () => {
+    const r = computeHrv(midRr, { source: 'camera' });
+    expect(r.fields.lowPower).toBeDefined();
+    expect(r.fields.highPower).toBeDefined();
+    expect(r.fields.vlowPower).toBeUndefined();
   });
 });
 

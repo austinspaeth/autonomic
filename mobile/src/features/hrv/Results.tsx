@@ -32,7 +32,10 @@ export function HrvResults({ rr, hrSamples, sdnnSamples, config, durationSec, wa
   const [writeHealth, setWriteHealth] = useState(false);
   const ctx = { sex: getState().profile.sex, height: getState().profile.height };
 
-  const result = useMemo(() => computeHrv(rr, { style: config.style }), [rr, config.style]);
+  const result = useMemo(
+    () => computeHrv(rr, { style: config.style, source: config.source, durationSec }),
+    [rr, config.style, config.source, durationSec],
+  );
 
   // Build the reading with the same keys the manual form uses. A live capture
   // always belongs to the day it physically happened — never the day the

@@ -88,6 +88,46 @@ export function correctArtifacts(rr: number[], threshold = 0.25, window = 7, max
   return { clean, artifactPct, flags };
 }
 
+/**
+ * Camera-PPG beat repair — a pre-pass BEFORE {@link correctArtifacts}, targeting
+ * the two error modes optical peak detection produces that a spike corrector
+ * can't fix by interpolation because they change the *beat count*:
+ *
+ *  - **Missed beat**: the detector skips a pulse, so one RR interval spans two
+ *    real beats (~2× the local median, ~3× for two skips). Left alone it reads
+ *    as a single long beat; interpolating it away loses the beat entirely. We
+ *    split it into equal sub-intervals so the tachogram keeps the right count.
+ *  - **Extra (false) beat**: a dicrotic notch or motion bump is detected as a
+ *    pulse, splitting one real interval into a short pair that sums back to a
+ *    plausible beat. We merge the pair.
+ *
+ * Both are judged against a LOCAL median (robust to the very outlier being
+ * tested), so genuine sinus arrhythmia is untouched. Strap/ECG sources don't
+ * need this and don't run it — their R-peak clock doesn't miss or double beats.
+ */
+export function repairBeats(rr: number[]): number[] {
+  const n = rr.length;
+  if (n < 3) return rr.slice();
+  const localMed = (i: number) => median(rr.slice(Math.max(0, i - 3), Math.min(n, i + 4)));
+  const out: number[] = [];
+  for (let i = 0; i < n; i++) {
+    const m = localMed(i);
+    if (m <= 0) { out.push(rr[i]); continue; }
+    const ratio = rr[i] / m;
+    // One missed beat → split in two; two missed → split in three.
+    if (ratio >= 1.6 && ratio <= 2.4) { out.push(rr[i] / 2, rr[i] / 2); continue; }
+    if (ratio > 2.4 && ratio <= 3.4) { out.push(rr[i] / 3, rr[i] / 3, rr[i] / 3); continue; }
+    // Extra beat → merge the short pair back into one interval.
+    if (ratio < 0.7 && i + 1 < n) {
+      const pair = rr[i] + rr[i + 1];
+      const pr = pair / m;
+      if (pr >= 0.7 && pr <= 1.4) { out.push(pair); i++; continue; }
+    }
+    out.push(rr[i]);
+  }
+  return out;
+}
+
 /* ---------- time-domain ---------- */
 export interface TimeDomain {
   meanRr: number;
@@ -270,14 +310,45 @@ export interface HrvResult {
 const r3 = (v: number) => Number(v.toFixed(3));
 const r0 = (v: number) => Math.round(v);
 
-export function computeHrv(rrRaw: number[], opts: { style?: string; maxArtifactPct?: number } = {}): HrvResult {
-  const { clean, artifactPct } = correctArtifacts(rrRaw);
+/**
+ * Frequency-domain reliability floors. Welch resolution over a short record is
+ * too coarse to separate the low bands: LF needs ~2 min to resolve, VLF ~5 min
+ * (Task Force / Kubios guidance). Below these the corresponding metrics swing
+ * wildly reading-to-reading, so we omit them entirely rather than report noise
+ * as a number — a camera reading finished early, or a 30 s Apple ECG, simply
+ * won't carry LF/HF or VLF. Time-domain metrics (RMSSD, SD1, pNN50) and the
+ * time-domain PNS/SNS composites stay valid at short durations and are kept.
+ */
+const MIN_SEC_LFHF = 120;
+const MIN_SEC_VLF = 300;
+/** A stable reading needs a floor of clean beats behind its statistics. */
+const MIN_CLEAN_BEATS = 30;
+
+export function computeHrv(
+  rrRaw: number[],
+  opts: { style?: string; maxArtifactPct?: number; source?: string; durationSec?: number } = {},
+): HrvResult {
+  // Camera PPG misses and doubles beats optically; repair those before the
+  // spike corrector runs. Strap/watch/ECG sources have a true R-peak clock.
+  const pre = opts.source === 'camera' ? repairBeats(rrRaw) : rrRaw;
+  const { clean, artifactPct } = correctArtifacts(pre);
   const time = timeDomain(clean);
   const freq = frequencyDomain(clean);
-  const maxArt = opts.maxArtifactPct ?? 30;
-  if (!time || !freq) {
+  // Camera is the noisiest source, so hold it to a tighter artifact ceiling.
+  const maxArt = opts.maxArtifactPct ?? (opts.source === 'camera' ? 15 : 30);
+  // Effective analyzed span: the actual cardiac data on hand (RR sum) unless the
+  // caller stamped a wall-clock duration. This is what the band floors gate on,
+  // so every source — live capture, HealthKit series, ECG — is judged uniformly.
+  const spanSec = clean.reduce((s, x) => s + x, 0) / 1000;
+  const durationSec = opts.durationSec ?? spanSec;
+  const noisy = artifactPct > maxArt;
+  const tooFew = clean.length < MIN_CLEAN_BEATS;
+  if (!time || !freq || tooFew) {
+    const reason = tooFew && time
+      ? 'Not enough clean beats to compute HRV. Try a longer, steadier reading.'
+      : 'Not enough clean data to compute HRV.';
     return {
-      ok: false, reason: 'Not enough clean data to compute HRV.', artifactPct,
+      ok: false, reason, artifactPct,
       rrClean: clean, time: time as TimeDomain, freq: freq as FrequencyDomain, fields: {},
     };
   }
@@ -295,15 +366,22 @@ export function computeHrv(rrRaw: number[], opts: { style?: string; maxArtifactP
     stressIndex: r0(time.stressIndex).toString(),
     pns: Number(time.pns.toFixed(1)).toString(),
     sns: Number(time.sns.toFixed(1)).toString(),
-    vlowPower: r0(freq.vlowPower).toString(),
-    lowPower: r0(freq.lowPower).toString(),
-    highPower: r0(freq.highPower).toString(),
-    lfPeak: r3(freq.lfPeak).toString(),
-    hfPeak: r3(freq.hfPeak).toString(),
   };
+  // Frequency-domain metrics only when the record is long enough to resolve them.
+  if (durationSec >= MIN_SEC_LFHF) {
+    fields.lowPower = r0(freq.lowPower).toString();
+    fields.highPower = r0(freq.highPower).toString();
+    fields.lfPeak = r3(freq.lfPeak).toString();
+    fields.hfPeak = r3(freq.hfPeak).toString();
+  }
+  if (durationSec >= MIN_SEC_VLF) {
+    fields.vlowPower = r0(freq.vlowPower).toString();
+  }
   return {
-    ok: artifactPct <= maxArt,
-    reason: artifactPct > maxArt ? `Signal too noisy (${Math.round(artifactPct)}% artifacts). Adjust the strap and try again.` : undefined,
+    ok: !noisy,
+    reason: noisy
+      ? `Signal too noisy (${Math.round(artifactPct)}% artifacts). ${opts.source === 'camera' ? 'Hold your finger still with light pressure and try again.' : 'Adjust the strap and try again.'}`
+      : undefined,
     artifactPct, rrClean: clean, time, freq, fields,
   };
 }

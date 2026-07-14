@@ -12,7 +12,7 @@ export type Mode = 'day' | 'week' | 'month' | 'year';
 export interface Bucket { start: string; end: string; label: string; days: string[] }
 
 export function acRangeLabel(mode: Mode): string {
-  return mode === 'day' ? 'Last 15 days · daily'
+  return mode === 'day' ? 'Last 14 days · daily'
     : mode === 'week' ? 'Last 12 weeks · weekly average'
     : mode === 'month' ? 'Last 12 months · monthly average'
     : 'All time · yearly average';
@@ -23,7 +23,7 @@ export function acBuckets(days: DaysMap, mode: Mode): Bucket[] {
   const mk = (s: Date, e: Date, label: string): Bucket => ({ start: keyOf(s), end: keyOf(e), label, days: [] });
   const buckets: Bucket[] = [];
   if (mode === 'day') {
-    for (let i = 14; i >= 0; i--) { const dt = new Date(today); dt.setDate(today.getDate() - i); buckets.push(mk(dt, dt, `${dt.getMonth() + 1}/${dt.getDate()}`)); }
+    for (let i = 13; i >= 0; i--) { const dt = new Date(today); dt.setDate(today.getDate() - i); buckets.push(mk(dt, dt, `${dt.getMonth() + 1}/${dt.getDate()}`)); }
   } else if (mode === 'week') {
     const dow = (today.getDay() + 6) % 7;
     const thisMon = new Date(today); thisMon.setDate(today.getDate() - dow);

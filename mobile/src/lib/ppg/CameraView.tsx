@@ -1,9 +1,12 @@
 /**
- * Invisible 1×1 camera view that feeds the PPG manager. `Session.tsx` mounts
- * this whenever the camera source is in play; `ppg().start()/stop()` toggles
- * `running`, which drives the camera's active state and torch. The frame
- * processor is deliberately trivial — a strided mean of B/G/R over a center
- * crop — with all detection done in JS (`camera.ts` → `detect.ts`).
+ * Camera view that feeds the PPG manager. The camera-setup card (CameraSetup)
+ * mounts this for the whole camera flow — visibly, as a small circular live
+ * preview (`preview` = diameter; the parent clips it round) — and keeps it
+ * mounted underneath the session card so the stream survives the handoff.
+ * Without `preview` it renders invisibly at 1×1. `ppg().start()/stop()`
+ * toggles `running`, which drives the camera's active state and torch. The
+ * frame processor is deliberately trivial — a strided mean of B/G/R over a
+ * center crop — with all detection done in JS (`camera.ts` → `detect.ts`).
  *
  * Renders null when react-native-vision-camera / worklets aren't in the build
  * (Expo Go / simulator / web), mirroring the manager's graceful stub.
@@ -24,12 +27,12 @@ try {
   worklets = null;
 }
 
-export function PpgCameraView() {
+export function PpgCameraView({ preview }: { preview?: number }) {
   if (!vc || !worklets) return null;
-  return <PpgCameraInner />;
+  return <PpgCameraInner preview={preview} />;
 }
 
-function PpgCameraInner() {
+function PpgCameraInner({ preview }: { preview?: number }) {
   const { Camera, useCameraDevice, useCameraFormat, useFrameProcessor } = vc!;
   const { useRunOnJS } = worklets!;
   const [running, setRunning] = useState(ppgBridge.isRunning());
@@ -111,7 +114,7 @@ function PpgCameraInner() {
   const fps = format ? Math.min(60, format.maxFps) : 30;
   return (
     <Camera
-      style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }}
+      style={preview ? { width: preview, height: preview } : { position: 'absolute', width: 1, height: 1, opacity: 0 }}
       device={device}
       isActive={running}
       torch={running && initialized && !torchBlip && device.hasTorch ? 'on' : 'off'}

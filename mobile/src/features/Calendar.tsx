@@ -28,15 +28,15 @@ function dayHasData(k: string): boolean {
   );
 }
 
-/** The day's autonomic-outlook color, mirroring DaySummary's gating: a scorable
- * day with enough confidence. Returns null otherwise (plain cell). */
+/** The day's autonomic-outlook color, mirroring DaySummary's gating: a day
+ * scored from at least one HRV reading. Returns null otherwise (plain cell). */
 function dayColor(k: string): string | null {
   const state = getState();
   const d = state.days[k];
   if (!d || !d.readings || !d.readings.length) return null;
   const ctx = { sex: state.profile.sex, height: state.profile.height };
   const all = scoreSet(d.readings, d, k, state.days, ctx);
-  if (all.score == null || all.confidence < 40) return null;
+  if (all.score == null || !(all.hasStruct || all.hasUnstruct)) return null;
   return scoreCat(all.score).color;
 }
 

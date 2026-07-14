@@ -7,6 +7,8 @@ import { HelpDot, ScoreDot, Segmented } from '../../src/components/ui';
 import { Bars, BpDumbbell, LineChart, ZonesToggle } from '../../src/components/charts';
 import { fonts, radius, usePalette } from '../../src/theme';
 import { useAppState } from '../../src/store/store';
+import { useTier } from '../../src/store/tier';
+import { usePaywall } from '../../src/features/Paywall';
 import { buildCategories, type AnalysisCard, type BpPeriod, type OrthoTransition } from '../../src/lib/analysis/categories';
 import { resolveProtocol } from '../../src/lib/scoring/day';
 import { avgRound, catFromBands, type Mode } from '../../src/lib/analysis/buckets';
@@ -16,6 +18,12 @@ export default function AnalysisScreen() {
   const p = usePalette();
   const state = useAppState();
   const [mode, setMode] = useState<Mode>('day');
+  // Freemium: free tier keeps the Day view; the longer ranges are Pro. Locked
+  // segments render a lock glyph and raise the paywall instead of switching.
+  const locked = useTier() === 'free';
+  const openPaywall = usePaywall();
+  // Time-based downgrade (trial expires while parked on Week/Month/Year).
+  useEffect(() => { if (locked && mode !== 'day') setMode('day'); }, [locked, mode]);
   // HRV filter lives here (not inside HrvProgress) so the same All/Morning/Evening
   // toggle can appear both inline beside the section title and in the pinned bar.
   const [hrvFilt, setHrvFilt] = useState<Filt>('all');
@@ -98,7 +106,17 @@ export default function AnalysisScreen() {
       onHeaderHeight={setHeaderH}
       header={
         <View style={{ paddingHorizontal: 16 }}>
-          <Segmented options={[{ val: 'day', label: 'Day' }, { val: 'week', label: 'Week' }, { val: 'month', label: 'Month' }, { val: 'year', label: 'Year' }]} value={mode} onChange={setMode} />
+          <Segmented
+            options={[
+              { val: 'day', label: 'Day' },
+              { val: 'week', label: 'Week', locked },
+              { val: 'month', label: 'Month', locked },
+              { val: 'year', label: 'Year', locked },
+            ]}
+            value={mode}
+            onChange={setMode}
+            onLockedPress={openPaywall}
+          />
         </View>
       }
       footer={
@@ -316,6 +334,10 @@ const CardView = React.memo(function CardView({ card, buckets }: { card: Analysi
   const selChart = charts.find((c) => c.selectStat);
   const selSeries = selChart?.series.find((s) => !s.dashed) ?? selChart?.series[0];
   const zonesChart = selChart?.zones ? selChart : null;
+  // Balance-style readout under the description (POTS cards); ortho carries one
+  // per transition variant. When it grades, the "Show zones" link sits top-right.
+  const metricsRow = orthoSpan ? orthoSpan.metricsRow : card.metricsRow;
+  const showZonesLink = !!zonesChart || !!metricsRow?.zones;
   const stats = useMemo(() => {
     // Ortho: a selected point swaps the whole row to that bucket — the day's
     // average rise/drop and how many events it logged; the row tag beside the
@@ -363,7 +385,7 @@ const CardView = React.memo(function CardView({ card, buckets }: { card: Analysi
         {cat ? <View style={{ marginRight: 7 }}><ScoreDot cat={cat} size={10} /></View> : null}
         <Text style={{ flexShrink: 1, fontSize: 15, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, color: p.textDim }}>{card.title}</Text>
         {card.help ? <HelpDot title={card.title} text={card.help} /> : null}
-        {zonesChart ? (
+        {showZonesLink ? (
           <>
             <View style={{ flex: 1 }} />
             <ZonesToggle on={showZones} onPress={() => setShowZones((v) => !v)} />
@@ -413,6 +435,25 @@ const CardView = React.memo(function CardView({ card, buckets }: { card: Analysi
       {!card.tiles && (card.desc || card.sub) ? (
         <Text style={{ color: p.textDim, fontSize: 13, lineHeight: 19, marginTop: 8 }}>{card.desc || card.sub}</Text>
       ) : null}
+      {metricsRow ? (
+        <View style={{ flexDirection: 'row', alignItems: 'flex-end', flexWrap: 'wrap', gap: 10, marginTop: 12 }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 28 }}>
+            {metricsRow.metrics.map((m) => (
+              <View key={m.label}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  {m.color ? <View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: m.color }} /> : null}
+                  <Text style={{ fontSize: 12, color: p.textDim, fontWeight: '600' }}>{m.label}</Text>
+                </View>
+                <Text style={{ fontSize: 25, fontFamily: fonts.numHeavy, color: m.color || p.text, fontVariant: ['tabular-nums'], marginTop: 3 }}>
+                  {m.value == null ? '–' : String(m.value)}
+                  {m.sub ? <Text style={{ fontSize: 13, fontWeight: '600', fontFamily: undefined, color: p.textDim }}>{` ${m.sub}`}</Text> : null}
+                </Text>
+              </View>
+            ))}
+          </View>
+          {metricsRow.suffix ? <Text style={{ fontSize: 13, fontWeight: '600', color: p.textDim, marginBottom: 5 }}>{metricsRow.suffix}</Text> : null}
+        </View>
+      ) : null}
       {card.orthoFilter ? (
         <View style={{ marginTop: 12 }}>
           <FilterLinks options={ORTHO_TRANSITIONS} value={orthoFilt} onChange={(v) => { setOrthoFilt(v); setSel(null); }} />
@@ -432,7 +473,7 @@ const CardView = React.memo(function CardView({ card, buckets }: { card: Analysi
             ? (bpSpan && !bpSpan.sys.some((v) => v != null) && !bpSpan.dia.some((v) => v != null)
               ? <Text style={{ color: p.textDim, fontSize: 13, marginTop: 4 }}>No {bpFilt} readings in this range.</Text>
               : <BpDumbbell buckets={buckets} sys={bpSpan ? bpSpan.sys : ch.dumbbell.sys} dia={bpSpan ? bpSpan.dia : ch.dumbbell.dia} />)
-            : <LineChart buckets={buckets} series={ch.series} zones={ch.zones} integer={ch.integer} target={ch.target} hideHeader={ch.selectStat} zonesOn={ch === zonesChart ? showZones : undefined} onSelect={ch.selectStat ? setSel : undefined} />}
+            : <LineChart buckets={buckets} series={ch.series} zones={ch.zones} integer={ch.integer} target={ch.target} hideHeader={ch.selectStat || !!metricsRow} zonesOn={(ch === zonesChart || metricsRow) ? showZones : undefined} onSelect={ch.selectStat ? setSel : undefined} />}
           {ch.legend ? (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 14, marginTop: 8 }}>
               {ch.legend.map(([name, color]) => (

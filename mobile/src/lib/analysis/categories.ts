@@ -19,6 +19,12 @@ export interface Chart { label: string; series: Series[]; zones?: Zone[] | null;
   /** Hide the chart's own readout and instead drive the card's first stat:
    *  average by default, the dragged bucket's value with its date on select. */
   selectStat?: boolean; }
+/** Balance-style readout rendered just below the card description: each metric
+ *  is a legend dot + name on the first row with the value below it coloured to
+ *  match (a metric without a `color` is dot-less, e.g. an "Events" count).
+ *  `suffix` (a date, or "avg") sits just after the last metric. When `zones`
+ *  is set the card's "Show zones" link appears top-right and shades the chart. */
+export interface MetricsRow { metrics: { label: string; value: number | string | null; sub?: string; color?: string }[]; suffix?: string; zones?: boolean }
 /** Which readings a blood-pressure card is filtered to. */
 export type BpPeriod = 'all' | 'morning' | 'evening';
 export interface BpSeries { sys: (number | null)[]; dia: (number | null)[]; cat?: ScoreCat | null }
@@ -27,7 +33,7 @@ export type OrthoTransition = 'all' | 'lay' | 'sit' | 'stairs';
 /** One transition-filter variant of the Orthostatic Events card: the view swaps
  *  charts/stats/insights/grade wholesale when the filter changes. `counts` is
  *  events per bucket, so a selected chart point can report that day's count. */
-export interface OrthoVariant { cat: ScoreCat | null; charts: Chart[]; stats: Stat[]; insights: Insight[]; counts: (number | null)[] }
+export interface OrthoVariant { cat: ScoreCat | null; charts: Chart[]; stats: Stat[]; insights: Insight[]; counts: (number | null)[]; metricsRow?: MetricsRow }
 export interface Stat { label: string; value: number | string | null; sub?: string; color?: string }
 export interface Insight { text: string; strength?: 'strong' | 'mod' | null }
 export interface BarGroup { label: string; rows: { name: string; count: number; color?: string }[]; fmt?: (c: number) => string }
@@ -39,6 +45,9 @@ export interface AnalysisCard {
   /** Longer copy for the "?" help sheet next to the title. */
   help?: string;
   charts?: Chart[]; stats?: Stat[]; insights?: Insight[]; bars?: BarGroup[];
+  /** Balance-style metric readout under the description (ortho cards carry one
+   *  per transition variant instead, on `OrthoVariant`). */
+  metricsRow?: MetricsRow;
   /** Render stats as darker rounded tiles (squircles) instead of a flat row. */
   tiles?: boolean;
   /** Blood-pressure period variants. When set, the card shows an
@@ -179,9 +188,11 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
     const tests: { dk: string; r: Entry }[] = [];
     buckets.forEach((b) => b.days.forEach((dk) => (days[dk].readings || []).forEach((r) => { if (r.type === 'standTest') tests.push({ dk, r }); })));
     const susSeq = tests.map((t) => num(t.r.sustainedDelta)).filter((v): v is number => v != null);
+    const peakSeq = tests.map((t) => num(t.r.peakDelta)).filter((v): v is number => v != null);
     // Grade dot follows the latest test, not the range average: this is a
     // progress card, and a bad month shouldn't drag on a recovered one.
     const latestSus = susSeq.length ? susSeq[susSeq.length - 1] : null;
+    const latestPeak = peakSeq.length ? peakSeq[peakSeq.length - 1] : null;
     const latestCat = latestSus != null ? catFromBands(latestSus, BANDS.standDelta) : null;
     const met = tests.filter((t) => t.r.metThreshold === true).length;
     const insights: Insight[] = [];
@@ -205,11 +216,18 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
         { label: 'Avg baseline', value: avgRound(base), sub: 'bpm' },
         { label: 'Met POTS threshold', value: tests.length ? `${met} of ${tests.length}` : null },
       ],
+      metricsRow: {
+        metrics: [
+          { label: 'Sustained', value: latestSus != null ? Math.round(latestSus) : null, sub: 'bpm', color: '#60a5fa' },
+          { label: 'Peak', value: latestPeak != null ? Math.round(latestPeak) : null, sub: 'bpm', color: '#a855f7' },
+        ],
+        suffix: tests.length ? `(${+tests[tests.length - 1].dk.slice(5, 7)}/${+tests[tests.length - 1].dk.slice(8, 10)})` : undefined,
+        zones: true,
+      },
       charts: [{
-        label: 'Sustained vs peak rise (bpm)',
-        series: [series(sus, '#f97316', 'Sustained', { pointBands: BANDS.standDelta }), series(peak, '#a78bfa', 'Peak')],
+        label: '',
+        series: [series(sus, '#60a5fa', 'Sustained'), series(peak, '#a855f7', 'Peak')],
         zones: acBandZones('standDelta'), integer: true,
-        legend: [['Sustained', '#f97316'], ['Peak', '#a78bfa']],
       }],
       insights,
     }];
@@ -233,12 +251,18 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
       const rec = acAgg(buckets, (d) => (d.readings || []).filter((r) => r.type === 'orthostatic' && f(r)).map(recOf).filter((v): v is number => v != null));
       const counts = acAggSum(buckets, (d) => (d.readings || []).filter((r) => r.type === 'orthostatic' && f(r) && incOf(r) != null).length || null);
       let n = 0, potsN = 0;
+      // Readout follows the most recent event (like the POTS Test card), not the
+      // range average: buckets/days/readings are chronological, so the last
+      // valid hit wins.
+      let lastRise: number | null = null, lastDrop: number | null = null, lastDk: string | null = null;
       buckets.forEach((b) => b.days.forEach((dk) => (days[dk].readings || []).forEach((r) => {
         if (r.type !== 'orthostatic' || !f(r)) return;
         const v = incOf(r); if (v == null) return;
         n++; if (v >= 30) potsN++;
+        lastRise = v; lastDrop = recOf(r); lastDk = dk;
       })));
       const incAvg = acMean(inc), recAvg = acMean(rec);
+      const lastDate = lastDk ? `(${+(lastDk as string).slice(5, 7)}/${+(lastDk as string).slice(8, 10)})` : undefined;
       // The ≥30 bpm POTS criterion only applies to standing up, so the rise
       // series drops its zones and grading on the stairs view.
       const graded = filt !== 'stairs';
@@ -251,18 +275,21 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
         charts: [{
           label: '',
           series: [
-            series(inc, '#38bdf8', 'Rise', { pointBands: graded ? BANDS.orthoIncrease : null }),
-            series(rec, '#a78bfa', '1 min drop', { pointBands: BANDS.orthoRecovery }),
+            series(inc, '#60a5fa', 'Rise'),
+            series(rec, '#a855f7', '1 min drop'),
           ],
           zones: graded ? acBandZones('orthoIncrease') : null, integer: true,
-          legend: [['Rise', '#38bdf8'], ['1 min drop', '#a78bfa']],
-          selectStat: true,
         }],
-        stats: [
-          { label: 'Rise', value: avgRound(inc), sub: 'bpm' },
-          { label: '1 min drop', value: avgRound(rec), sub: 'bpm' },
-          { label: 'Events', value: n || null },
-        ],
+        metricsRow: {
+          metrics: [
+            { label: 'Rise', value: lastRise != null ? Math.round(lastRise) : null, sub: 'bpm', color: '#60a5fa' },
+            { label: '1 min drop', value: lastDrop != null ? Math.round(lastDrop) : null, sub: 'bpm', color: '#a855f7' },
+            { label: 'Events', value: n || null },
+          ],
+          suffix: lastDate,
+          zones: graded,
+        },
+        stats: [],
         insights: potsN && graded ? [{ text: `${potsN} of ${n} event${n === 1 ? '' : 's'} reached a ≥30 bpm rise (the adult POTS-range threshold).`, strength: 'mod' }] : [],
       };
     };
@@ -273,7 +300,7 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
       title: 'POTS Episodes', sub: range,
       cat: all.cat,
       desc: 'How your heart rate reacts to everyday position changes, and how fast it settles.',
-      help: 'Each event logs your HR before and after a transition, plus one minute in. Rise is the jump on the change; for the stand-up transitions the zones shade the ≥30 bpm adult POTS-range criterion (stairs always spike, so they are not graded). The 1 min drop shows how quickly HR settles back from its peak; a bigger drop means faster vagal recovery, and for everyday events it is often the cleaner progress signal. Tap a point on the chart to see that day\'s numbers, and use the transition links to compare like with like.',
+      help: 'Each event logs your HR before and after a transition, plus one minute in. Rise is the jump on the change; for the stand-up transitions the zones shade the ≥30 bpm adult POTS-range criterion (stairs always spike, so they are not graded). The 1 min drop shows how quickly HR settles back from its peak; a bigger drop means faster vagal recovery, and for everyday events it is often the cleaner progress signal. Use the transition links to compare like with like.',
       charts: all.charts,
       stats: all.stats,
       insights: all.insights,
@@ -298,18 +325,31 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
     const num = (v: string | number | undefined) => { const n = parseFloat(v as string); return isNaN(n) ? null : n; };
     const hrLow = acAgg(buckets, (d) => num(d.sleep?.hrLow));
     const hrHigh = acAgg(buckets, (d) => num(d.sleep?.hrHigh));
-    if (acPresent(hrLow).length || acPresent(hrHigh).length) cards.push({
-      title: 'Sleeping HR', sub: range,
-      desc: 'Your lowest and highest heart rate through the night.',
-      help: 'The low and high heart rate recorded during sleep. The overnight low is one of the cleanest resting-HR readings you get; the high reflects arousals and dreams. A gradually falling overnight low usually tracks improving autonomic recovery.',
-      charts: [
-        { label: '', integer: true, series: [series(hrLow, '#38bdf8', 'Low'), series(hrHigh, '#f97316', 'High')], legend: [['Low', '#38bdf8'], ['High', '#f97316']] },
-      ],
-      stats: [
-        { label: 'Avg low', value: avgRound(hrLow) },
-        { label: 'Avg high', value: avgRound(hrHigh) },
-      ],
-    });
+    if (acPresent(hrLow).length || acPresent(hrHigh).length) {
+      // Readout follows the most recent night with data (like the POTS cards),
+      // not the range average.
+      let lastLow: number | null = null, lastHigh: number | null = null, lastDk: string | null = null;
+      buckets.forEach((b) => b.days.forEach((dk) => {
+        const lo = num(days[dk].sleep?.hrLow), hi = num(days[dk].sleep?.hrHigh);
+        if (lo != null || hi != null) { lastLow = lo; lastHigh = hi; lastDk = dk; }
+      }));
+      const lastDate = lastDk ? `(${+(lastDk as string).slice(5, 7)}/${+(lastDk as string).slice(8, 10)})` : undefined;
+      cards.push({
+        title: 'Sleeping HR', sub: range,
+        desc: 'Your lowest and highest heart rate through the night.',
+        help: 'The low and high heart rate recorded during sleep. The overnight low is one of the cleanest resting-HR readings you get; the high reflects arousals and dreams. A gradually falling overnight low usually tracks improving autonomic recovery.',
+        metricsRow: {
+          metrics: [
+            { label: 'Low', value: lastLow != null ? Math.round(lastLow) : null, sub: 'bpm', color: '#60a5fa' },
+            { label: 'High', value: lastHigh != null ? Math.round(lastHigh) : null, sub: 'bpm', color: '#a855f7' },
+          ],
+          suffix: lastDate,
+        },
+        charts: [
+          { label: '', integer: true, series: [series(hrLow, '#60a5fa', 'Low'), series(hrHigh, '#a855f7', 'High')] },
+        ],
+      });
+    }
     return cards;
   };
 

@@ -94,8 +94,12 @@ export function Muted({ children }: { children: React.ReactNode }) {
 }
 
 /* ---------- Segmented control with an animated pill ---------- */
-export function Segmented<T extends string>({ options, value, onChange, style, compact }: {
-  options: { val: T; label: string }[]; value: T; onChange: (v: T) => void; style?: StyleProp<ViewStyle>; compact?: boolean;
+/** Options may be `locked` (freemium): a locked segment renders a small lock
+ *  glyph beside its label and taps fire `onLockedPress` instead of `onChange`,
+ *  so the pill never moves onto it. */
+export function Segmented<T extends string>({ options, value, onChange, onLockedPress, style, compact }: {
+  options: { val: T; label: string; locked?: boolean }[]; value: T; onChange: (v: T) => void;
+  onLockedPress?: (v: T) => void; style?: StyleProp<ViewStyle>; compact?: boolean;
 }) {
   const p = usePalette();
   const [w, setW] = React.useState(0);
@@ -142,7 +146,7 @@ export function Segmented<T extends string>({ options, value, onChange, style, c
         return (
           <Pressable
             key={o.val}
-            onPress={() => onChange(o.val)}
+            onPress={() => (o.locked ? onLockedPress?.(o.val) : onChange(o.val))}
             onLayout={compact ? (e) => {
               const { x, width } = e.nativeEvent.layout;
               setCells((prev) => {
@@ -154,7 +158,14 @@ export function Segmented<T extends string>({ options, value, onChange, style, c
             } : undefined}
             style={{ paddingVertical: padV, paddingHorizontal: compact ? 13 : 0, alignItems: 'center', zIndex: 1, ...(compact ? null : { flex: 1 }) }}
           >
-            <Text style={{ color: active ? '#fff' : p.textDim, fontSize: font, fontWeight: '600' }}>{o.label}</Text>
+            {o.locked ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Icon name="lock" size={compact ? 10 : 12} color={p.textDim} strokeWidth={2.2} />
+                <Text style={{ color: p.textDim, fontSize: font, fontWeight: '600' }}>{o.label}</Text>
+              </View>
+            ) : (
+              <Text style={{ color: active ? '#fff' : p.textDim, fontSize: font, fontWeight: '600' }}>{o.label}</Text>
+            )}
           </Pressable>
         );
       })}

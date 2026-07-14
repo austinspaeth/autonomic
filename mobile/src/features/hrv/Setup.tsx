@@ -19,6 +19,7 @@ import { defaultPeriod } from '../../lib/period';
 import { ppg } from '../../lib/ppg/camera';
 import { DevicesScreen } from '../Devices';
 import { BREATH_STYLES, HrvSession, type SessionConfig } from './Session';
+import { CameraSetup } from './CameraSetup';
 import { WatchPrep } from './WatchPrep';
 
 const HELP = {
@@ -103,8 +104,17 @@ export function HrvSetup({ controls }: { controls: SheetControls }) {
       openSheet((c) => <WatchPrep config={config} controls={c} />);
       return;
     }
-    // `grow` lets the camera flow's placement squircle bottom-pin above the footer.
-    openSheet((c) => <HrvSession config={config} controls={c} />, { hideClose: true, grow: true });
+    // Camera readings get a setup card first (choose the module shape, mark
+    // the flash, wait for the finger) — it opens the session card itself once
+    // the pulse locks. Like the watch prep, this sheet stays underneath so
+    // its ✕ backs out here.
+    if (source === 'camera') {
+      // `grow` lets the card center the module stage vertically and bottom-pin
+      // the placement squircle above the footer.
+      openSheet((c) => <CameraSetup config={config} controls={c} />, { grow: true });
+      return;
+    }
+    openSheet((c) => <HrvSession config={config} controls={c} />, { hideClose: true });
     controls.close();
   };
 

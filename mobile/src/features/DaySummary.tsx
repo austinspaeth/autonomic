@@ -22,6 +22,9 @@ import {
 import { typesFor } from '../lib/typeCatalog';
 import { todayKey } from '../lib/dates';
 import { getState, mutate, useAppState } from '../store/store';
+import { useTier } from '../store/tier';
+import { MONTHLY_SKU, YEARLY_SKU, priceOf, useIap } from '../store/iap';
+import { usePaywall } from './Paywall';
 
 import type { Band, Protocol, ScoreCat } from '../lib/types';
 
@@ -88,6 +91,7 @@ export function DaySummary({ dk }: { dk: string }) {
   const p = usePalette();
   const { openSheet } = useSheets();
   const state = useAppState();
+  const tier = useTier();
   const { sex, height } = state.profile;
   const ctx = useMemo(() => ({ sex, height }), [sex, height]);
   const today = todayKey();
@@ -99,10 +103,14 @@ export function DaySummary({ dk }: { dk: string }) {
     return { d: day, readings: rs, all: scoreSet(rs, day, dk, state.days, ctx) };
   }, [state.days, dk, ctx]);
 
+  // Any HRV reading (structured or unstructured) unlocks the score right away;
+  // low confidence is flagged inside the hero rather than hiding the number.
+  const scored = all.score != null && (all.hasStruct || all.hasUnstruct);
+
   return (
     <View>
-      <GradientBorderCard color={all.score == null || all.confidence < 40 ? null : scoreCat(all.score).color} trigger={dk} style={{ marginBottom: 12 }}>
-        {all.score == null || all.confidence < 40 ? (
+      <GradientBorderCard color={!scored ? null : scoreCat(all.score!).color} trigger={dk} style={{ marginBottom: 12 }}>
+        {!scored ? (
           <View style={{ padding: 16 }}>
             <Text style={[T.section, { color: p.textDim }]}>Autonomic Outlook</Text>
             {!readings.length ? (
@@ -118,7 +126,7 @@ export function DaySummary({ dk }: { dk: string }) {
               <>
                 <Text style={{ fontSize: 22, fontWeight: '700', color: p.text, marginTop: 6 }}>Insufficient data</Text>
                 <Text style={{ fontSize: 14, color: p.textDim, marginTop: 5, lineHeight: 19 }}>
-                  {(all.score != null ? `Provisional ${all.score} / 100 at ${all.confidence}% confidence. ` : '') + (all.hasStruct ? 'Add more readings to firm up the score.' : all.hasUnstruct ? 'Awaiting a structured reading for higher confidence.' : 'Add a morning HRV reading for higher confidence.')}
+                  {(all.score != null ? `Provisional ${all.score} / 100 at ${all.confidence}% confidence. ` : '') + (all.hasStruct || all.hasUnstruct ? 'Awaiting HRV values to score this day.' : 'Add an HRV reading to unlock today’s score.')}
                 </Text>
               </>
             )}
@@ -127,6 +135,7 @@ export function DaySummary({ dk }: { dk: string }) {
           <ScoredHero dk={dk} readings={readings} d={d} all={all} ctx={ctx} onExplain={() => openSheet((c) => <ScoreExplain all={all} dk={dk} controls={c} />)} />
         )}
       </GradientBorderCard>
+      {tier === 'free' ? <ProUpsellCard /> : null}
       <StreakCard dk={dk} />
       <MilestoneProgressCard dk={dk} />
     </View>
@@ -162,6 +171,7 @@ function ScoredHero({ dk, readings, d, all, ctx, onExplain }: { dk: string; read
     if ((readings.length >= 2 || readings.some((r) => readingPeriod(r) === 'midday')) && delta != null && Math.abs(delta) >= 5)
       guide = (delta < 0 ? 'Trending down from this morning. Watch food and activity through the afternoon. ' : 'Trending up from this morning. ') + guide;
   }
+  if (all.confidence < 40) guide = 'Early read from limited data, so expect it to shift as more readings land. ' + guide;
 
   return (
     <Pressable onPress={onExplain} style={{ padding: 16, backgroundColor: hexA(cat.color, 0.1) }}>
@@ -201,6 +211,89 @@ function Flag({ color, text }: { color: string; text: string }) {
     <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start', marginTop: 11, padding: 10, borderRadius: radius.control, backgroundColor: hexA(color, 0.15) }}>
       <Icon name="alert" size={15} color={color} />
       <Text style={{ flex: 1, fontSize: 13, lineHeight: 17, fontWeight: '600', color }}>{text}</Text>
+    </View>
+  );
+}
+
+/**
+ * Free-tier upsell widget (Claude Design "Subscription Widget" 10b), shown
+ * right after the Autonomic Outlook card. Collapsible exactly like StreakCard
+ * (same rotating chevron + measured-height accordion) but starts expanded.
+ * Design colors map straight onto theme tokens — the mock's red IS the accent.
+ */
+const PRO_BENEFITS = [
+  'Full historical metric analysis',
+  'POTS testing & episode tracking',
+  'AI analysis & doctor report',
+  'Unlimited HRV readings',
+];
+
+function ProUpsellCard() {
+  const p = usePalette();
+  const openPaywall = usePaywall();
+  const { products } = useIap();
+  const [expanded, setExpanded] = useState(true);
+
+  const rot = useSharedValue(1);
+  useEffect(() => { rot.value = withTiming(expanded ? 1 : 0, { duration: 220 }); }, [expanded, rot]);
+  const chevStyle = useAnimatedStyle(() => ({ transform: [{ rotate: `${-90 + rot.value * 90}deg` }] }));
+
+  const [contentH, setContentH] = useState(0);
+  const open = useSharedValue(1);
+  useEffect(() => {
+    open.value = withTiming(
+      expanded ? 1 : 0,
+      expanded ? { duration: 260, easing: Easing.out(Easing.cubic) } : { duration: 220, easing: Easing.inOut(Easing.cubic) },
+    );
+  }, [expanded, open]);
+  const bodyStyle = useAnimatedStyle(() => ({
+    height: open.value * contentH,
+    opacity: interpolate(open.value, [0.35, 1], [0, 1], Extrapolation.CLAMP),
+  }));
+
+  const mPrice = priceOf(products.find((s) => s.productId === MONTHLY_SKU), MONTHLY_SKU);
+  const yPrice = priceOf(products.find((s) => s.productId === YEARLY_SKU), YEARLY_SKU);
+
+  return (
+    <View style={{ borderWidth: 1, borderColor: hexA(p.accent, 0.2), borderRadius: radius.card, backgroundColor: p.surface, marginBottom: 12, overflow: 'hidden' }}>
+      <Pressable onPress={() => setExpanded((v) => !v)} style={{ padding: 15 }}>
+        <View style={{ flexDirection: 'row', gap: 13, alignItems: 'center' }}>
+          <View style={{ width: 42, height: 42, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: p.accentSoft }}>
+            <Icon name="lock" size={21} color={p.accent} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+              <Text style={{ fontSize: 15, fontWeight: '800', color: p.text }}>Autonomic Pro</Text>
+              <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5, backgroundColor: p.accentSoft, borderWidth: 1, borderColor: hexA(p.accent, 0.25) }}>
+                <Text style={{ fontSize: 9.5, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase', color: p.accent }}>Locked</Text>
+              </View>
+            </View>
+            <Text style={{ fontSize: 13, color: p.textDim, marginTop: 2, lineHeight: 17 }}>Unlock everything Autonomic can do</Text>
+          </View>
+          <Animated.View style={chevStyle}>
+            <Icon name="chevron" size={18} color={p.textDim} />
+          </Animated.View>
+        </View>
+        <Animated.View style={[{ overflow: 'hidden' }, bodyStyle]}>
+          <View onLayout={(e) => setContentH(e.nativeEvent.layout.height)} style={{ paddingTop: 14 }}>
+            <View style={{ gap: 9 }}>
+              {PRO_BENEFITS.map((b) => (
+                <View key={b} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <Icon name="check" size={15} color={p.accent} strokeWidth={2.6} />
+                  <Text style={{ flex: 1, fontSize: 13, color: p.text }}>{b}</Text>
+                </View>
+              ))}
+            </View>
+            <Pressable
+              onPress={openPaywall}
+              style={({ pressed }) => [{ height: 46, borderRadius: 12, backgroundColor: p.accent, alignItems: 'center', justifyContent: 'center', marginTop: 16 }, pressed && { opacity: 0.8 }]}
+            >
+              <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>Upgrade to Pro</Text>
+            </Pressable>
+            <Text style={{ fontSize: 11.5, color: p.textDim, textAlign: 'center', marginTop: 9 }}>{`${mPrice}/mo or ${yPrice}/yr · cancel anytime`}</Text>
+          </View>
+        </Animated.View>
+      </Pressable>
     </View>
   );
 }

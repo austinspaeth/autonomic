@@ -230,8 +230,8 @@ export function ReadingSummary({ r, days, ctx }: SummaryProps) {
 /* ---------- HRV (structured + unstructured) ---------- */
 
 const HRV_VERDICT: Record<string, string> = {
-  great: 'Strong parasympathetic reserves today. Fine for your normal protocol or intervals.',
-  good: 'Solid recovery state. Easy to normal activity is reasonable.',
+  great: 'Strong parasympathetic reserves today. Room for your full protocol and a normal day.',
+  good: 'Solid recovery state. Enough reserve for a normal day.',
   ok: 'Moderate reserves. Keep it easy and avoid pushing.',
   bad: 'Low reserves. Favor rest and gentle activity today.',
   crash: 'Very low reserves. Prioritize rest and recovery.',
@@ -561,7 +561,7 @@ export function OrthostaticSummary({ r, days, ctx: _ctx }: SummaryProps) {
   return (
     <>
       <MetricSection
-        hero label="Max delta after episode" value={maxDelta != null ? String(Math.abs(maxDelta)) : null} suffix="bpm" cat={maxCat}
+        hero label="Max delta after" value={maxDelta != null ? String(Math.abs(maxDelta)) : null} suffix="bpm" cat={maxCat}
         days={days} type="orthostatic" ex={maxEx} bands={BANDS.orthoIncrease}
         desc={maxCat ? verdict[maxCat] : 'Enter Before HR and After HR to rate this event.'}
         help={ORTHO_HELP.rise}

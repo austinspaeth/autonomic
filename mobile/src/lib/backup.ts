@@ -51,6 +51,16 @@ export async function runDailyBackup(): Promise<void> {
   }
 }
 
+/** Delete every snapshot (the whole backups directory). Part of "clear all
+ *  data" in Settings: these files are plaintext copies of the journal that the
+ *  user can browse in the Files app, so a wipe that spared them would not be
+ *  one. runDailyBackup() recreates the directory when there's data again. */
+export async function deleteAllBackups(): Promise<void> {
+  const dir = backupDir();
+  if (!dir) return;
+  await FileSystem.deleteAsync(dir, { idempotent: true }).catch(() => {});
+}
+
 /** One restorable snapshot from Documents/backups, newest first. */
 export interface BackupSnapshot {
   name: string;   // autonomic-backup-YYYY-MM-DD.json

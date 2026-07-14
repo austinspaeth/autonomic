@@ -11,35 +11,38 @@
  * camera sessions are suspended) — a backgrounded finish is picked up when the
  * app returns (no notifications; the app deliberately sends none).
  *
- * Camera (PPG) source: the camera + torch start on mount so finger placement
- * can lock BEFORE the reading. There is no Start button for finger readings —
- * only Cancel — the reading begins itself the moment a steady pulse is
- * detected, and runs a shorter 1-minute capture (holding a fingertip still on
- * the lens for longer is unrealistic). Samples stream in the same { hr, rr[] }
- * shape as BLE and flow through the same collection path.
+ * Camera (PPG) source: this card never shows a pre-start state — the
+ * camera-setup card (CameraSetup.tsx) owns the camera view + torch, locks the
+ * pulse, and opens this card with autoStart the moment a finger is detected,
+ * staying mounted underneath so the stream survives the handoff. On mount the
+ * manager's callbacks are retargeted to this card's collector, and a shorter
+ * 3-minute capture runs (a fingertip is harder to hold still than a strap, but
+ * a minute is too short to resolve the low-frequency bands or settle RMSSD).
+ * Samples stream in the same { hr, rr[] } shape as BLE and flow through the
+ * same collection path.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { AppState, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useKeepAwake } from 'expo-keep-awake';
 import Svg, { Circle } from 'react-native-svg';
-import Animated, { Easing, cancelAnimation, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 import { SheetControls, SheetFooter, useSheets } from '../../components/Sheet';
 import { Button } from '../../components/ui';
-import { radius, usePalette, GRADE_COLORS } from '../../theme';
+import { usePalette, GRADE_COLORS } from '../../theme';
 import { BreathingViz, parsePattern, type BreathPhase } from './BreathingViz';
 import { HrvResults } from './Results';
 import { WatchSyncSheet } from './WatchSync';
 import { startWatchSync } from './watchSyncStore';
 import { ble } from '../../lib/ble/manager';
 import { ppg, type PpgSignal } from '../../lib/ppg/camera';
-import { PpgCameraView } from '../../lib/ppg/CameraView';
 import { correctArtifacts, std } from '../../lib/hrv';
 import { getState } from '../../store/store';
 
 // Strap and watch readings — structured or unstructured — run the full
-// 5 minutes. Camera (finger) readings cap at 1 minute on both platforms.
-const durationFor = (config: SessionConfig) => (config.source === 'camera' ? 60 : 300);
+// 5 minutes. Camera (finger) readings run 3 minutes: long enough to resolve the
+// LF band and settle RMSSD/SDNN (a 1-minute optical reading swings too much to
+// compare against a dedicated app), still realistic to hold a fingertip still.
+const durationFor = (config: SessionConfig) => (config.source === 'camera' ? 180 : 300);
 
 /** The three structured breathing patterns. `val` is the stored style string
  *  (in/hold/out/hold seconds — see parsePattern); shared by Setup + Session. */
@@ -78,9 +81,12 @@ export function HrvSession({ config, controls, autoStart }: { config: SessionCon
   const [connected, setConnected] = useState(false);
   const [artifactHint, setArtifactHint] = useState(false);
   const [phase, setPhase] = useState<BreathPhase>('in');
-  // Camera source: finger-placement signal (drives the pre-start lock and the
-  // finger-lifted warning mid-reading).
-  const [signal, setSignal] = useState<PpgSignal>({ locked: false, quality: 'none' });
+  // Camera source: finger-placement signal (drives the finger-lifted warning
+  // mid-reading). The setup card only opens this card once the pulse locked,
+  // so it starts locked.
+  const [signal, setSignal] = useState<PpgSignal>(
+    config.source === 'camera' ? { locked: true, quality: 'good' } : { locked: false, quality: 'none' },
+  );
   const rrRef = useRef<number[]>([]);
   const hrRef = useRef<{ t: number; bpm: number }[]>([]);
   const sdnnRef = useRef<{ t: number; sdnn: number }[]>([]);
@@ -166,23 +172,16 @@ export function HrvSession({ config, controls, autoStart }: { config: SessionCon
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Camera source: start the camera + torch immediately so the finger can be
-  // placed and the pulse locked BEFORE the reading begins. Samples are only
-  // collected once Start is pressed (startedRef gates them).
+  // Camera source: the stream is already running — the camera-setup card
+  // beneath locked the pulse and keeps the camera view mounted. Point the
+  // manager's callbacks at this card's collector; detection state (and the
+  // lock) carries over untouched.
   useEffect(() => {
     if (config.source !== 'camera') return;
-    const mgr = ppg();
-    if (!mgr.available) return;
-    (async () => {
-      try {
-        await mgr.requestPermissions();
-        await mgr.start(
-          (s) => { if (startedRef.current && !finishedRef.current) collect(s); },
-          (sig) => setSignal(sig),
-        );
-      } catch { /* stub or permission denied — the lock text stays on "Place your finger" */ }
-    })();
-    return () => { mgr.stop().catch(() => {}); };
+    ppg().retarget(
+      (s) => { if (startedRef.current && !finishedRef.current) collect(s); },
+      (sig) => setSignal(sig),
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -220,24 +219,18 @@ export function HrvSession({ config, controls, autoStart }: { config: SessionCon
     timerRef.current = setInterval(() => syncRef.current(), 1000);
   };
 
-  // Watch flow: the prep card's Start button doubles as this card's — the
-  // wearer just tapped Breathe on the wrist, so the timer is already running
-  // when this card rises.
+  // Watch and camera flows arrive already started: the wearer just tapped
+  // Breathe on the wrist, or the setup card just detected the finger — either
+  // way the timer is already running when this card rises.
   useEffect(() => {
     if (autoStart) begin();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Camera flow has no Start button: the reading begins itself the moment the
-  // finger signal locks (a steady pulse is detected).
-  useEffect(() => {
-    if (config.source === 'camera' && signal.locked && !startedRef.current && !finishedRef.current) begin();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [signal.locked]);
-
   useEffect(() => () => {
     if (timerRef.current) clearInterval(timerRef.current);
     if (config.source === 'polar') ble().disconnect().catch(() => {});
+    if (config.source === 'camera') ppg().stop().catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -291,12 +284,7 @@ export function HrvSession({ config, controls, autoStart }: { config: SessionCon
   const strapPending = config.source === 'polar' && !started && !connected;
 
   return (
-    // flexGrow + the sheet's `grow` option let the placement squircle below
-    // bottom-pin (marginTop: 'auto') just above the footer divider.
-    <View style={{ alignItems: 'center', paddingTop: 8, flexGrow: 1 }}>
-      {/* Invisible 1×1 camera feeding the PPG manager; mounted for the whole
-          camera session so the pre-start lock and the reading share one stream. */}
-      {config.source === 'camera' ? <PpgCameraView /> : null}
+    <View style={{ alignItems: 'center', paddingTop: 8 }}>
       <Text style={{ color: p.textDim, fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, fontWeight: '700' }}>
         {config.kind === 'breath' ? `Structured HRV · ${styleTitle(config.style)}` : 'Unstructured HRV'}
       </Text>
@@ -347,23 +335,9 @@ export function HrvSession({ config, controls, autoStart }: { config: SessionCon
         ) : null}
       </View>
 
-      {/* Camera pre-start: placement guidance in a full-width squircle that
-          bottom-pins to the card body, just above the footer divider + Cancel. */}
-      {config.source === 'camera' && !started ? (
-        <View style={{ alignSelf: 'stretch', marginTop: 'auto', padding: 16, borderRadius: radius.card, borderCurve: 'continuous', borderWidth: 1, borderColor: p.border, backgroundColor: p.surface2, alignItems: 'center' }}>
-          <Text style={{ color: p.textDim, fontSize: 14, lineHeight: 20, textAlign: 'center' }}>
-            Cover the rear camera and flash with your fingertip. Rest your hand, light pressure.
-          </Text>
-          <PulsingHint text={signal.quality === 'weak' ? 'Hold still, finding your pulse…' : 'Place your finger…'} />
-        </View>
-      ) : null}
-
       <SheetFooter>
         {started ? (
           <Button title="Finish now" variant="primary" onPress={finish} />
-        ) : config.source === 'camera' ? (
-          // Finger readings have no Start button — they begin on pulse lock.
-          <Button title="Cancel" variant="ghost" onPress={() => controls.close()} />
         ) : (
           <>
             <Button title="Cancel" variant="ghost" onPress={() => controls.close()} />
@@ -373,22 +347,6 @@ export function HrvSession({ config, controls, autoStart }: { config: SessionCon
         )}
       </SheetFooter>
     </View>
-  );
-}
-
-/** Bright red, gently pulsing finger-placement prompt shown until the pulse
- *  locks. Deliberately hotter than GRADE_COLORS.crash so it reads as a call to
- *  action, not a score. */
-const HINT_RED = '#ff3b30';
-function PulsingHint({ text }: { text: string }) {
-  const opacity = useSharedValue(1);
-  useEffect(() => {
-    opacity.value = withRepeat(withTiming(0.35, { duration: 700, easing: Easing.inOut(Easing.quad) }), -1, true);
-    return () => cancelAnimation(opacity);
-  }, [opacity]);
-  const style = useAnimatedStyle(() => ({ opacity: opacity.value }));
-  return (
-    <Animated.Text style={[{ color: HINT_RED, fontWeight: '700', marginTop: 8 }, style]}>{text}</Animated.Text>
   );
 }
 

@@ -6,9 +6,9 @@
  *
  * Model: two auto-renewable plans (yearly / monthly) — one subscription group
  * on the App Store, two subscription products with matching IDs on Google
- * Play. Holding *either* is Pro. There is no per-feature gating —
- * `SubscriptionGate` covers the whole app whenever `!isPro`, so "not Pro"
- * simply means "no active plan (trial not started / lapsed)".
+ * Play. Holding *either* is Pro. Freemium gating happens a layer up:
+ * src/store/tier.ts folds `isPro` together with the local 7-day trial window
+ * into a Tier, and locked surfaces raise the PaywallCard sheet on demand.
  *
  * Fails open: any store error leaves `isPro` at its last known value and
  * never throws into the UI, so a store hiccup can't brick the app. It also

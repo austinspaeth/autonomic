@@ -125,6 +125,12 @@ export interface Protocol {
 /** User-defined type defs per kind (state.customTypes shape). */
 export type CustomTypes = Partial<Record<'activities' | 'meds' | 'symptoms' | 'triggers', Record<string, TypeDef>>>;
 
+/** The rear camera-module shape the user picked in the finger-reading setup. */
+export type CameraModuleShape = 'tall' | 'wide' | 'square' | 'single';
+/** Shape + which spot the flash occupies (keys are per-shape: top/middle/
+ *  bottom, left/middle/right, tl/tr/bl/br, or right/below for a single lens). */
+export interface CameraLayout { shape: CameraModuleShape; flash: string }
+
 export interface AppState {
   version: number;
   settings: {
@@ -135,6 +141,10 @@ export interface AppState {
     /** Signal source of the last live HRV capture — seeds the setup sheet's
      *  default so a deliberate choice (camera / watch) sticks across sessions. */
     lastHrvSource?: 'polar' | 'watch' | 'camera';
+    /** Remembered camera-module layout from the finger (PPG) setup card —
+     *  once set, camera readings skip straight to the wait-for-finger step.
+     *  "Start over" on that card clears it. */
+    cameraLayout?: CameraLayout;
     /** Clean-day protocol; undefined falls back to DEFAULT_PROTOCOL. */
     protocol?: Protocol;
   };

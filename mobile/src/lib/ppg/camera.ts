@@ -28,6 +28,13 @@ export interface PpgManagerApi {
     onSample: (s: { hr: number; rr: number[] }) => void,
     onSignal: (s: PpgSignal) => void,
   ): Promise<void>;
+  // Swap the sample/signal consumers of an already-running stream without
+  // resetting detection state — the session card takes over the stream the
+  // camera-setup card locked, keeping the pulse lock and RR buffer intact.
+  retarget(
+    onSample: (s: { hr: number; rr: number[] }) => void,
+    onSignal: (s: PpgSignal) => void,
+  ): void;
   stop(): Promise<void>;
 }
 
@@ -167,6 +174,7 @@ const stub: PpgManagerApi = {
   available: false,
   async requestPermissions() { return false; },
   async start() { throw new Error('The camera is not available in this build.'); },
+  retarget() { /* no-op */ },
   async stop() { /* no-op */ },
 };
 
@@ -197,6 +205,11 @@ export function createPpg(): PpgManagerApi {
       onSignalCb = onSignal;
       running = true;
       runListeners.forEach((fn) => fn(true));
+    },
+    retarget(onSample, onSignal) {
+      onSampleCb = onSample;
+      onSignalCb = onSignal;
+      lastSignalKey = ''; // force a re-emit so the new consumer sees current state
     },
     async stop() {
       running = false;

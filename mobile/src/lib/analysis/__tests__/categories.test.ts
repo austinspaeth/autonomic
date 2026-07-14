@@ -78,17 +78,18 @@ describe('Orthostatic events card', () => {
     const card = potsCards(days).find((c) => c.title === 'POTS Episodes')!;
     expect(card).toBeTruthy();
     const f = card.orthoFilter!;
-    expect(f.all.stats[2].value).toBe(3);
-    expect(f.lay.stats[2].value).toBe(1);
-    expect(f.lay.stats[0].value).toBe(35);   // avg rise
-    expect(f.lay.stats[1].value).toBe(15);   // avg 1-min drop
-    expect(f.sit.stats[2].value).toBe(1);
-    expect(f.stairs.stats[2].value).toBe(1);
-    // Rise + drop share one chart with a legend.
+    // The balance-style readout (Rise / 1 min drop / Events) sits under the description.
+    expect(f.all.metricsRow!.metrics[2].value).toBe(3);   // Events
+    expect(f.lay.metricsRow!.metrics[2].value).toBe(1);
+    expect(f.lay.metricsRow!.metrics[0].value).toBe(35);  // latest rise
+    expect(f.lay.metricsRow!.metrics[1].value).toBe(15);  // latest 1-min drop
+    expect(f.sit.metricsRow!.metrics[2].value).toBe(1);
+    expect(f.stairs.metricsRow!.metrics[2].value).toBe(1);
+    // Rise + drop share one chart, coloured blue / purple.
     expect(f.all.charts).toHaveLength(1);
     expect(f.all.charts[0].series.map((s) => s.label)).toEqual(['Rise', '1 min drop']);
-    expect(f.all.charts[0].selectStat).toBe(true);
-    // Per-bucket event counts back the tap-a-point stats: 2 on the double day, 1 on the single.
+    expect(f.all.charts[0].series.map((s) => s.color)).toEqual(['#60a5fa', '#a855f7']);
+    // Per-bucket event counts: 2 on the double day, 1 on the single.
     const sum = (vals: (number | null)[]) => vals.reduce((s: number, v) => s + (v || 0), 0);
     expect(sum(f.all.counts)).toBe(3);
     expect(sum(f.lay.counts)).toBe(1);
@@ -97,7 +98,7 @@ describe('Orthostatic events card', () => {
     expect(f.lay.insights[0].text).toContain('1 of 1 event');
     expect(f.stairs.insights).toHaveLength(0);
     // The card's default face is the All variant.
-    expect(card.stats).toBe(f.all.stats);
+    expect(card.charts).toBe(f.all.charts);
   });
 
   it('drops POTS zones and rise grading on the stairs view', () => {
@@ -105,7 +106,9 @@ describe('Orthostatic events card', () => {
     const f = card.orthoFilter!;
     expect(f.lay.charts[0].zones).toBeTruthy();
     expect(f.stairs.charts[0].zones).toBeNull();
-    expect(f.stairs.charts[0].series[0].pointBands).toBeNull();
+    // The Show-zones link is offered only on graded transitions.
+    expect(f.lay.metricsRow!.zones).toBe(true);
+    expect(f.stairs.metricsRow!.zones).toBe(false);
     // Stairs still grades on the 1-minute recovery (25 bpm drop → great).
     expect(f.stairs.cat).toBe('great');
   });

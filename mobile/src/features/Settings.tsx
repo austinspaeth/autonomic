@@ -14,10 +14,13 @@ import { DateField, HeightField, TextField, onlyNumeric } from '../components/Fi
 import { BrandMark, Icon, IconName } from '../components/Icon';
 import { useToast } from '../components/Toast';
 import { radius, usePalette } from '../theme';
-import { getState, replaceState, save, serializeState, useAppState } from '../store/store';
+import { clearAllData, getState, replaceState, save, serializeState, useAppState } from '../store/store';
+import { deleteAllBackups } from '../lib/backup';
 import { ageFromBirthday, fmtStamp, keyOf } from '../lib/dates';
 import { DATE_KEY_RE, assertImportVersion, isPlainObject } from '../lib/migrate';
 import { useIap, manageSubscription, restore, priceOf, storeName, MONTHLY_SKU, YEARLY_SKU } from '../store/iap';
+import { getTrialDaysLeft, useTier } from '../store/tier';
+import { usePaywall } from './Paywall';
 import { healthAppName } from '../lib/health';
 import { DevicesScreen } from './Devices';
 import { HealthScreen } from './Health';
@@ -30,19 +33,29 @@ export function MenuSheet({ controls }: { controls: SheetControls }) {
   const p = usePalette();
   const { openSheet } = useSheets();
   const state = useAppState();
+  const tier = useTier();
   const toast = useToast();
-  const item = (icon: IconName, title: string, sub: string, onPress: () => void, connected?: boolean) => (
-    <Pressable onPress={onPress} style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 15, borderTopWidth: 1, borderTopColor: p.border }, pressed && { opacity: 0.5 }]}>
-      <Icon name={icon} size={22} color={p.textDim} />
-      <View style={{ flex: 1 }}><Text style={{ color: p.text, fontSize: 17 }}>{title}</Text><Text style={{ color: p.textDim, fontSize: 13 }}>{sub}</Text></View>
-      {connected ? (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(34,197,94,0.15)', paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999 }}>
-          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#22c55e' }} />
-          <Text style={{ color: '#22c55e', fontSize: 12, fontWeight: '600' }}>Connected</Text>
-        </View>
-      ) : null}
-    </Pressable>
-  );
+  // Row badge: `true` keeps the green "Connected" pill; a {text, color} pair
+  // renders the same pill in any tint (e.g. the accent "Trial" state).
+  const item = (icon: IconName, title: string, sub: string, onPress: () => void, badge?: boolean | { text: string; color: string }) => {
+    const b = badge === true ? { text: 'Connected', color: '#22c55e' } : badge || null;
+    const soft = (hex: string) => {
+      const n = parseInt(hex.slice(1), 16);
+      return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, 0.15)`;
+    };
+    return (
+      <Pressable onPress={onPress} style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 15, borderTopWidth: 1, borderTopColor: p.border }, pressed && { opacity: 0.5 }]}>
+        <Icon name={icon} size={22} color={p.textDim} />
+        <View style={{ flex: 1 }}><Text style={{ color: p.text, fontSize: 17 }}>{title}</Text><Text style={{ color: p.textDim, fontSize: 13 }}>{sub}</Text></View>
+        {b ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: soft(b.color), paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999 }}>
+            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: b.color }} />
+            <Text style={{ color: b.color, fontSize: 12, fontWeight: '600' }}>{b.text}</Text>
+          </View>
+        ) : null}
+      </Pressable>
+    );
+  };
   const m = state.meta || {};
   const appVer = Constants.expoConfig?.version ?? '1.0.0';
   return (
@@ -57,9 +70,11 @@ export function MenuSheet({ controls }: { controls: SheetControls }) {
       {item('user', 'Profile', 'Sex, birthday, height, weight', () => openSheet((c) => <ProfileSheet controls={c} />))}
       {item('bluetooth', 'Devices', 'Heart-rate straps', () => openSheet(() => <DevicesScreen />), !!state.settings.lastBleDeviceId)}
       {item('heart', healthAppName(), 'Read & write health data', () => openSheet(() => <HealthScreen />), !!state.settings.healthEnabled)}
-      {item('star', 'Subscription', 'Manage plan or restore', () => openSheet((c) => <SubscriptionSheet controls={c} />))}
+      {item('star', 'Subscription', 'Manage plan or restore', () => openSheet((c) => <SubscriptionSheet controls={c} />),
+        tier === 'trial' ? { text: 'Trial', color: p.accent } : tier === 'pro' ? { text: 'Pro', color: '#22c55e' } : undefined)}
       {item('download', 'Export data', 'Download everything as JSON', () => exportData(toast))}
       {item('upload', 'Import data', 'Replace everything from a JSON file', () => importData(controls, toast))}
+      {item('trash', 'Clear all data', 'Erase everything on this device', () => openSheet((c) => <ClearDataSheet controls={c} />, { fitContent: true }))}
       {item('sparkles', 'Show welcome screen', 'Replay the first-run guide', () => { controls.closeAll(); showWelcomeAgain(); })}
       {item('info', 'Legal information', 'Disclaimer, privacy & terms', () => openSheet((c) => <LegalSheet controls={c} />))}
       <View style={{ marginTop: 22 }}>
@@ -115,10 +130,13 @@ function SubscriptionSheet({ controls }: { controls: SheetControls }) {
   const p = usePalette();
   const toast = useToast();
   const { isPro, products, activeSku } = useIap();
+  const tier = useTier();
+  const openPaywall = usePaywall();
   const [busy, setBusy] = useState(false);
   const active = products.find((s) => s.productId === activeSku);
   const price = active ? priceOf(active, activeSku ?? YEARLY_SKU) : undefined;
   const period = activeSku === MONTHLY_SKU ? 'month' : 'year';
+  const daysLeft = getTrialDaysLeft();
   const onRestore = async () => {
     if (busy) return;
     setBusy(true);
@@ -126,20 +144,25 @@ function SubscriptionSheet({ controls }: { controls: SheetControls }) {
     setBusy(false);
     toast(ok ? 'Subscription restored' : 'No active subscription found');
   };
+  const status = isPro ? 'Subscription active'
+    : tier === 'trial' ? `Free trial · ${daysLeft} day${daysLeft === 1 ? '' : 's'} left`
+    : 'Free plan';
+  const blurb = isPro
+    ? `${price ? `Your plan renews ${period}ly at ${price}. ` : ''}Change your plan or cancel anytime in ${storeName()}. Cancelling keeps access until the period ends.`
+    : tier === 'trial'
+      ? 'You have full access while your trial lasts. After it ends you keep journaling free forever; Pro unlocks the deep-analysis tools.'
+      : `You're on the free plan — journaling stays free forever. Upgrade for unlimited HRV, your full history, POTS testing and AI reports, or restore a previous purchase from ${storeName()}.`;
   return (
     <View>
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 14 }}>Subscription</Text>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: isPro ? '#22c55e' : p.textDim }} />
-        <Text style={{ color: p.text, fontSize: 15, fontWeight: '600' }}>{isPro ? 'Subscription active' : 'No active subscription'}</Text>
+        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: isPro ? '#22c55e' : tier === 'trial' ? p.accent : p.textDim }} />
+        <Text style={{ color: p.text, fontSize: 15, fontWeight: '600' }}>{status}</Text>
       </View>
-      <Text style={{ color: p.textDim, fontSize: 14, lineHeight: 21, marginBottom: 16 }}>
-        {isPro
-          ? `${price ? `Your plan renews ${period}ly at ${price}. ` : ''}Change your plan or cancel anytime in ${storeName()}. Cancelling keeps access until the period ends.`
-          : `You have no active plan. Restore a previous purchase, or manage plans in ${storeName()}.`}
-      </Text>
+      <Text style={{ color: p.textDim, fontSize: 14, lineHeight: 21, marginBottom: 16 }}>{blurb}</Text>
       <View style={{ gap: 10 }}>
-        <Button title={`Manage in ${storeName()}`} variant="primary" onPress={() => manageSubscription()} />
+        {!isPro ? <Button title="Upgrade to Pro" variant="primary" onPress={() => { controls.close(); openPaywall(); }} /> : null}
+        <Button title={`Manage in ${storeName()}`} variant={isPro ? 'primary' : 'default'} onPress={() => manageSubscription()} />
         <Button title={busy ? 'Restoring…' : 'Restore purchase'} variant="default" disabled={busy} onPress={onRestore} />
       </View>
       <View style={{ height: 20 }} />
@@ -164,6 +187,53 @@ function LegalSheet({ controls }: { controls: SheetControls }) {
       <View style={{ height: 8 }} />
       <Button title="Done" variant="primary" onPress={controls.close} />
       <View style={{ height: 20 }} />
+    </View>
+  );
+}
+
+/* ---------- clear all data ---------- */
+const CLEAR_TAPS = 5;
+
+/** Confirm card for the irreversible wipe. The tap counter lives in this
+ *  component's state, so closing the sheet unmounts it and any partial count
+ *  starts over — a stale "one more tap" can never be waiting on reopen. */
+function ClearDataSheet({ controls }: { controls: SheetControls }) {
+  const p = usePalette();
+  const toast = useToast();
+  const [taps, setTaps] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const left = CLEAR_TAPS - taps;
+  const days = Object.keys(useAppState().days).length;
+
+  const onDelete = async () => {
+    if (busy) return;
+    if (left > 1) { setTaps((t) => t + 1); return; }
+    setBusy(true);
+    clearAllData();
+    // The daily snapshots are plaintext journals in Documents; the wipe isn't
+    // real until they're gone too.
+    await deleteAllBackups();
+    controls.closeAll();
+    toast('All data cleared');
+  };
+
+  return (
+    <View>
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 10, paddingRight: 56 }}>Clear all data?</Text>
+      <Text style={{ color: p.textDim, fontSize: 14.5, lineHeight: 22, marginBottom: 18 }}>
+        {`This erases everything on this device: ${days} logged day${days === 1 ? '' : 's'}, your profile, settings and backup snapshots. It cannot be undone. Export a copy first if you might want it back.`}
+      </Text>
+      <View style={{ flexDirection: 'row', gap: 10, marginBottom: 10 }}>
+        {/* Both neutral: the accent IS red in this theme, so a primary Export
+            button would read as destructive next to the real one. */}
+        <Button title="Cancel" variant="default" onPress={controls.close} />
+        <Button title="Export data first" variant="default" onPress={() => exportData(toast)} />
+      </View>
+      <Button title={busy ? 'Clearing…' : 'Delete everything'} variant="danger" disabled={busy} onPress={onDelete} />
+      <Text style={{ fontSize: 13, textAlign: 'center', marginTop: 10, color: taps ? '#d63b3b' : p.textDim }}>
+        {taps === 0 ? 'Tap 5 times to confirm' : left === 1 ? 'One more tap to erase everything' : `${left} more taps`}
+      </Text>
+      <View style={{ height: 8 }} />
     </View>
   );
 }
