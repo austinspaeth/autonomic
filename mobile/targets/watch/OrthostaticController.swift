@@ -183,9 +183,9 @@ final class OrthostaticController: ObservableObject {
             if let base = baseline, stage == .during || stage == .recovery {
                 delta = hr - base
             }
-        } else if stage == .during || stage == .recovery {
-            delta = nil // sensor gap — never fake a delta
         }
+        // Sensor gap: hold the last delta on screen (the UI greys it via
+        // signalLost) — the series itself keeps the gap, no fake samples.
         // Keep the complication's live Δ fresh: reload the moment its color
         // band flips, otherwise every ~15 s.
         if stage == .during || stage == .recovery {

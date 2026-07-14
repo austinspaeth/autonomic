@@ -14,8 +14,8 @@
  * Camera (PPG) source: the camera + torch start on mount so finger placement
  * can lock BEFORE the reading. There is no Start button for finger readings —
  * only Cancel — the reading begins itself the moment a steady pulse is
- * detected, and runs a shorter 2-minute capture (holding a fingertip still on
- * the lens for 5 is unrealistic). Samples stream in the same { hr, rr[] }
+ * detected, and runs a shorter 1-minute capture (holding a fingertip still on
+ * the lens for longer is unrealistic). Samples stream in the same { hr, rr[] }
  * shape as BLE and flow through the same collection path.
  */
 import React, { useEffect, useRef, useState } from 'react';
@@ -38,8 +38,8 @@ import { correctArtifacts, std } from '../../lib/hrv';
 import { getState } from '../../store/store';
 
 // Strap and watch readings — structured or unstructured — run the full
-// 5 minutes. Camera (finger) readings cap at 2 on both platforms.
-const durationFor = (config: SessionConfig) => (config.source === 'camera' ? 120 : 300);
+// 5 minutes. Camera (finger) readings cap at 1 minute on both platforms.
+const durationFor = (config: SessionConfig) => (config.source === 'camera' ? 60 : 300);
 
 /** The three structured breathing patterns. `val` is the stored style string
  *  (in/hold/out/hold seconds — see parsePattern); shared by Setup + Session. */

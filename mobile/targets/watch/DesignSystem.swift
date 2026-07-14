@@ -103,9 +103,11 @@ struct RingProgress: View {
 
 struct DeltaChip: View {
     let delta: Double?
+    /// Signal lost: keep showing the held delta, but greyed (mirrors HrReadout).
+    var stale: Bool = false
 
     var body: some View {
-        let color = delta.map { DS.deltaColor($0) } ?? DS.dim
+        let color = delta == nil ? DS.dim : stale ? DS.faint : DS.deltaColor(delta!)
         let text = delta.map { "Δ \($0 >= 0 ? "+" : "")\(Int($0.rounded()))" } ?? "Δ 00"
         Text(text)
             .font(DS.number(12.5))

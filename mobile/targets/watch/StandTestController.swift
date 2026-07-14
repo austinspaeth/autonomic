@@ -152,9 +152,9 @@ final class StandTestController: ObservableObject {
                     deltaBuzzers.forEach { $0.update(d) }
                 }
             }
-        } else if stage == .standing || stage == .prompt {
-            delta = nil // sensor gap — never fake a delta
         }
+        // Sensor gap: hold the last delta on screen (the UI greys it via
+        // signalLost) — the series itself keeps the gap, no fake samples.
 
         // Refresh the complication's live delta every 30 s while standing
         // (the countdown self-updates; only the delta snapshot goes stale).

@@ -17,9 +17,8 @@ import { computeHrv } from '../../lib/hrv';
 import { computeScores } from '../../lib/scoring';
 import { getState, storeWaveform, upsertEntry } from '../../store/store';
 import { splitWaveform } from '../../lib/waveforms';
-import { getCurrentKey } from '../../store/nav';
 import { health, healthAppName } from '../../lib/health';
-import { addDays, defaultTimeFor, fmtTime12, nowTime, todayKey, uid } from '../../lib/dates';
+import { nowTime, todayKey, uid } from '../../lib/dates';
 import type { DayRecord, Entry } from '../../lib/types';
 import type { SessionConfig } from './Session';
 
@@ -35,19 +34,16 @@ export function HrvResults({ rr, hrSamples, sdnnSamples, config, durationSec, wa
 
   const result = useMemo(() => computeHrv(rr, { style: config.style }), [rr, config.style]);
 
-  // Build the reading with the same keys the manual form uses.
+  // Build the reading with the same keys the manual form uses. A live capture
+  // always belongs to the day it physically happened — never the day the
+  // journal happens to be showing.
   const reading = useMemo<Entry>(() => {
     const type = config.kind === 'breath' ? 'breathHrv' : 'hrv';
-    const dk = getCurrentKey();
-    // Capturing for yesterday just after midnight: pin the time to 23:59 so
-    // the reading sorts inside that day, and note the real clock time.
-    const afterMidnight = dk !== todayKey() && dk === addDays(todayKey(), -1) && new Date().getHours() < 6;
-    let note = config.source === 'watch' ? 'Captured via Apple Watch'
+    const note = config.source === 'watch' ? 'Captured via Apple Watch'
       : config.source === 'camera' ? 'Captured via device camera (PPG)'
       : `Captured via ${getState().settings.lastBleDeviceName || 'Bluetooth device'}`;
-    if (afterMidnight) note += ` · Taken after midnight (actual time ${fmtTime12(nowTime())})`;
     const base: Entry = {
-      id: uid(), type, time: defaultTimeFor(dk),
+      id: uid(), type, time: nowTime(),
       period: config.period || 'Other',
       note,
       // Capture source is stamped on the reading so camera (PPG) readings stay
@@ -76,7 +72,7 @@ export function HrvResults({ rr, hrSamples, sdnnSamples, config, durationSec, wa
   // reading appended to today's readings.
   const daysWithCurrent = useMemo(() => {
     const days = getState().days;
-    const dk = getCurrentKey();
+    const dk = todayKey();
     const day = days[dk] as DayRecord | undefined;
     return { ...days, [dk]: { ...(day || {}), readings: [...((day && day.readings) || []), reading] } } as typeof days;
   }, [reading]);
@@ -87,7 +83,7 @@ export function HrvResults({ rr, hrSamples, sdnnSamples, config, durationSec, wa
     // written before the entry so the journal never references a missing blob.
     const { entry, waveform } = splitWaveform(reading);
     if (waveform) storeWaveform(entry.id, waveform);
-    upsertEntry(getCurrentKey(), 'readings', entry);
+    upsertEntry(todayKey(), 'readings', entry);
     if (writeHealth && health().available) {
       const sdnn = parseFloat(reading.sdnn as string);
       const rmssd = parseFloat(reading.rmssd as string);
@@ -147,5 +143,3 @@ export function HrvResults({ rr, hrSamples, sdnnSamples, config, durationSec, wa
     </View>
   );
 }
-
-export { todayKey };

@@ -9,7 +9,7 @@ import WatchKit
  * Signal handling: the last good HR is held on screen. Before the first ever
  * reading the value shows a grey "00"; once a reading lands it snaps to its
  * live colour. If contact is later lost the value holds in live colour through
- * a 5 s grace window (WorkoutManager.signalLost) and only then greys out (no
+ * a grace window (WorkoutManager.signalLost) and only then greys out (no
  * "searching" text, no re-render); the 2-min avg + delta freeze until a new
  * reading arrives. Always-on: in luminance-reduced (wrist-down) state the
  * display updates every 5 s instead of every second; the sensor keeps
@@ -33,6 +33,7 @@ final class HrMonitorModel: ObservableObject {
     var dimmed = false
 
     private var window: [(at: Date, hr: Double)] = []
+    private var deltaWindow: [(at: Date, delta: Double)] = []
     private var ticker: Timer?
     private var sinceDisplay = 0
     private var deltaBuzzers = Haptics.makeDeltaBuzzers()
@@ -55,6 +56,7 @@ final class HrMonitorModel: ObservableObject {
         ticker = nil
         WorkoutManager.shared.stop()
         window = []
+        deltaWindow = []
         ComplicationStore.hrSessionActive(false)
     }
 
@@ -75,14 +77,20 @@ final class HrMonitorModel: ObservableObject {
             // Buzzers run at full sample rate regardless of display cadence.
             deltaBuzzers.forEach { $0.update(d) }
             if maxHr != nil { maxBuzzer?.update(hr) }
-            // Feed the HR complication: last HR, the 2-min low/high range and
-            // the delta (reload throttling lives in ComplicationStore).
+            // Feed the HR + HR Delta complications: last HR with its 2-min
+            // low/high range, and the delta with its own 2-min lowest/highest
+            // (reload throttling lives in ComplicationStore).
+            deltaWindow.append((at: now, delta: d))
+            deltaWindow.removeAll { now.timeIntervalSince($0.at) > 120 }
             let hrs = window.map(\.hr)
+            let deltas = deltaWindow.map(\.delta)
             ComplicationStore.hrUpdate(
                 hr: Int(hr.rounded()),
                 low: Int((hrs.min() ?? hr).rounded()),
                 high: Int((hrs.max() ?? hr).rounded()),
-                delta: Int(d.rounded())
+                delta: Int(d.rounded()),
+                deltaLow: Int((deltas.min() ?? d).rounded()),
+                deltaHigh: Int((deltas.max() ?? d).rounded())
             )
         }
         sinceDisplay += 1
@@ -102,7 +110,7 @@ final class HrMonitorModel: ObservableObject {
                 }
             } else {
                 // No live signal: hold the last HR/avg/delta in place. Grey only
-                // once the 5 s grace in WorkoutManager expires (signalLost), so a
+                // once the grace in WorkoutManager expires (signalLost), so a
                 // blip reads as an unbroken connection.
                 self.signalLost = self.everHadReading && wm.signalLost
                 self.nearMax = false

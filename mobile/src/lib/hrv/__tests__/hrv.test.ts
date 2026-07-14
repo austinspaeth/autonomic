@@ -113,6 +113,38 @@ describe('artifact correction', () => {
     const { flags } = correctArtifacts(rr);
     expect(flags[5]).toBe(true);
   });
+
+  it('flags an entire consecutive burst (swallow / camera dropout), not just its edges', () => {
+    // Three adjacent bad beats — a swallow burst. A one-pass median taken over
+    // the burst is dominated by bad beats, so the middle one used to hide; the
+    // iterated peel must catch all three.
+    const rr = new Array(40).fill(900);
+    rr[20] = 1350; rr[21] = 1400; rr[22] = 1300; // +44-56% run
+    const { clean, flags } = correctArtifacts(rr);
+    expect(flags[20]).toBe(true);
+    expect(flags[21]).toBe(true);
+    expect(flags[22]).toBe(true);
+    // Interpolated back onto the ~900 baseline, so SDNN isn't blown up.
+    [20, 21, 22].forEach((i) => expect(clean[i]).toBeCloseTo(900, 0));
+  });
+
+  it('preserves real respiratory sinus arrhythmia (no false positives)', () => {
+    // A smooth ±12% breathing oscillation is the HRV signal itself — every beat
+    // stays close to its neighbors, so nothing should flag.
+    const rr = Array.from({ length: 120 }, (_, i) => 900 + 110 * Math.sin((2 * Math.PI * i) / 12));
+    const { artifactPct } = correctArtifacts(rr);
+    expect(artifactPct).toBe(0);
+  });
+
+  it('cleans a scattered noise cluster without touching the clean run around it', () => {
+    const rr = new Array(60).fill(850);
+    rr[30] = 400; rr[31] = 1300; rr[32] = 450; // erratic camera cluster
+    const { clean, flags } = correctArtifacts(rr);
+    expect(flags[30] && flags[31] && flags[32]).toBe(true);
+    // Beats outside the cluster are untouched.
+    expect(flags.filter(Boolean)).toHaveLength(3);
+    [29, 33].forEach((i) => expect(clean[i]).toBe(850));
+  });
 });
 
 describe('computeHrv end to end', () => {

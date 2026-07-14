@@ -76,8 +76,8 @@ private struct IntroView: View {
 
 /// HR number that never shows "searching": grey "00" before the first reading,
 /// the live value in `liveColor` once found, and — if the signal drops past the
-/// 5 s grace window (`WorkoutManager.signalLost`) — the last value held and
-/// greyed until a new sample arrives. Metric number font.
+/// grace window (`WorkoutManager.signalLost`) — the last value held and greyed
+/// until a new sample arrives. Metric number font.
 struct HrReadout: View {
     let hr: Double?
     let signalLost: Bool
@@ -208,7 +208,7 @@ private struct StandingView: View {
                                         .font(.system(size: 11, weight: .bold))
                                         .foregroundStyle(DS.dim)
                                 }
-                                DeltaChip(delta: test.delta)
+                                DeltaChip(delta: test.delta, stale: workout.signalLost)
                                 Text("\(fmtCountdown(StandTestController.standingDuration - test.stageElapsed)) left")
                                     .font(.system(size: 12, weight: .semibold))
                                     .monospacedDigit()

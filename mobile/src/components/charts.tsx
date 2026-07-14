@@ -87,7 +87,12 @@ export function Sparkline({ points, bands, height = 92, onSelect, showReadout = 
   const [layoutW, setLayoutW] = useState(0);
   const [showZonesState, setShowZonesState] = useState(false);
   const showZones = zonesOn ?? showZonesState;
-  useChartsBlur(useCallback(() => { setSel(points.length - 1); onSelect?.(null); }, [points.length, onSelect]));
+  // Back to the latest point / default readout — shared by tap-away blur and
+  // responder termination (a scroll that started on the chart and got stolen
+  // by the scroll view mid-gesture, which would otherwise strand a stale
+  // historical selection in the card header).
+  const reset = useCallback(() => { setSel(points.length - 1); onSelect?.(null); }, [points.length, onSelect]);
+  useChartsBlur(reset);
   if (!points || points.length < 2) return null;
   const gid = `spk${sparkId++}`;
   const vals = points.map((pt) => pt.v);
@@ -147,6 +152,7 @@ export function Sparkline({ points, bands, height = 92, onSelect, showReadout = 
         onMoveShouldSetResponder={() => true}
         onResponderGrant={(e) => onTouch(e.nativeEvent.locationX)}
         onResponderMove={(e) => onTouch(e.nativeEvent.locationX)}
+        onResponderTerminate={reset}
         style={{ height }}
       >
         <Svg width="100%" height={height} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
@@ -376,7 +382,9 @@ export function LineChart({ buckets, series, zones, integer, height = 140, targe
   const [sel, setSel] = useState<number>(-1);
   const [showZonesInt, setShowZonesInt] = useState(false);
   const showZones = zonesOn ?? showZonesInt;
-  useChartsBlur(useCallback(() => { setSel(-1); onSelect?.(null); }, [onSelect]));
+  // Shared by tap-away blur and responder termination (scroll stole the touch).
+  const reset = useCallback(() => { setSel(-1); onSelect?.(null); }, [onSelect]);
+  useChartsBlur(reset);
   const all: number[] = [];
   series.forEach((s) => s.values.forEach((v) => { if (v != null && !isNaN(v)) all.push(v); }));
   if (!all.length) return null;
@@ -447,6 +455,7 @@ export function LineChart({ buckets, series, zones, integer, height = 140, targe
         onMoveShouldSetResponder={() => true}
         onResponderGrant={(e) => onTouch(e.nativeEvent.locationX)}
         onResponderMove={(e) => onTouch(e.nativeEvent.locationX)}
+        onResponderTerminate={reset}
       >
         <Svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
           {gradientSeries && (
@@ -858,20 +867,22 @@ export function BalanceChart({ pns, sns, height = 168, values, desc, defaultLabe
   sns: { v: number; date: string }[];
   height?: number;
   /** Default PNS/SNS readouts for the header numbers (this reading's value in a
-   *  summary, the range average in Progress). A drag selection overrides them
+   *  summary, the latest point in Progress). A drag selection overrides them
    *  with the touched point's values. */
   values?: { pns?: string | number | null; sns?: string | number | null };
   /** Explainer paragraph, rendered below the PNS/SNS numbers like other cards. */
   desc?: string;
-  /** Label shown after the SNS number when nothing is selected (e.g. "avg" in
-   *  Progress; omitted in the reading summary, which shows this reading). A drag
-   *  selection replaces it with the touched point's date. */
+  /** Label shown after the SNS number when nothing is selected (the latest
+   *  point's date in Progress; omitted in the reading summary, which shows this
+   *  reading). A drag selection replaces it with the touched point's date. */
   defaultLabel?: string;
 }) {
   const p = usePalette();
   const [layoutW, setLayoutW] = useState(0);
   const [sel, setSel] = useState<number>(-1);
-  useChartsBlur(useCallback(() => setSel(-1), []));
+  // Shared by tap-away blur and responder termination (scroll stole the touch).
+  const reset = useCallback(() => setSel(-1), []);
+  useChartsBlur(reset);
   // metricHistory returns pns/sns in the same day/time order, so equal indices
   // align. A reading that logs one index but not the other makes the lengths
   // differ, so pair index-for-index up to the shorter of the two.
@@ -925,6 +936,7 @@ export function BalanceChart({ pns, sns, height = 168, values, desc, defaultLabe
         onMoveShouldSetResponder={() => true}
         onResponderGrant={(e) => onTouch(e.nativeEvent.locationX)}
         onResponderMove={(e) => onTouch(e.nativeEvent.locationX)}
+        onResponderTerminate={reset}
       >
         <Svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
           <Defs>
@@ -970,8 +982,8 @@ export function BalanceChart({ pns, sns, height = 168, values, desc, defaultLabe
   const pnsShown = selIdx >= 0 ? pv[selIdx] : readouts.pns;
   const snsShown = selIdx >= 0 ? sv[selIdx] : readouts.sns;
   // Suffix after the SNS number: the touched point's date in parentheses when
-  // selected (matching other cards), else the caller's default ("avg" in
-  // Progress, nothing in the reading summary).
+  // selected (matching other cards), else the caller's default (the latest
+  // point's date in Progress, nothing in the reading summary).
   const suffixLabel = selIdx >= 0 ? `(${xLabel(pns[selIdx].date)})` : defaultLabel;
   return (
     <View>
@@ -1015,7 +1027,9 @@ export function BpDumbbell({ buckets, sys, dia, height = 180 }: {
   const [layoutW, setLayoutW] = useState(0);
   const [sel, setSel] = useState<number>(-1);
   const [gid] = useState(() => bpId++);
-  useChartsBlur(useCallback(() => setSel(-1), []));
+  // Shared by tap-away blur and responder termination (scroll stole the touch).
+  const reset = useCallback(() => setSel(-1), []);
+  useChartsBlur(reset);
   const all: number[] = [];
   sys.forEach((v) => { if (v != null && !isNaN(v)) all.push(v); });
   dia.forEach((v) => { if (v != null && !isNaN(v)) all.push(v); });
@@ -1040,13 +1054,18 @@ export function BpDumbbell({ buckets, sys, dia, height = 180 }: {
     if (s == null || isNaN(s) || d == null || isNaN(d)) return;
     setSel(i);
   };
-  // Readout mirrors the metric cards: the range average by default, then the
-  // dragged bucket's reading with its date in parentheses.
-  const avgOf = (arr: (number | null)[]) => { const v = arr.filter((x): x is number => x != null && !isNaN(x)); return v.length ? Math.round(v.reduce((s, x) => s + x, 0) / v.length) : null; };
+  // Readout mirrors the metric cards: the latest reading by default (with its
+  // date in parentheses), then the dragged bucket's reading. Tap-away returns
+  // to the latest.
+  const latestIdx = (() => {
+    for (let i = n - 1; i >= 0; i--) { const s = sys[i], d = dia[i]; if (s != null && !isNaN(s) && d != null && !isNaN(d)) return i; }
+    return -1;
+  })();
+  const showIdx = selIdx >= 0 ? selIdx : latestIdx;
   const fmt = (v: number | null | undefined) => (v != null && !isNaN(v) ? Math.round(v) : '–');
-  const rSys = selIdx >= 0 ? sys[selIdx] : avgOf(sys);
-  const rDia = selIdx >= 0 ? dia[selIdx] : avgOf(dia);
-  const suffix = selIdx >= 0 ? `(${buckets[selIdx]?.label ?? ''})` : 'avg';
+  const rSys = showIdx >= 0 ? sys[showIdx] : null;
+  const rDia = showIdx >= 0 ? dia[showIdx] : null;
+  const suffix = showIdx >= 0 ? `(${buckets[showIdx]?.label ?? ''})` : '';
   return (
     <View>
       <RNText style={{ fontSize: 25, fontFamily: fonts.numHeavy, color: p.text, marginBottom: 6, fontVariant: ['tabular-nums'] }}>
@@ -1059,6 +1078,7 @@ export function BpDumbbell({ buckets, sys, dia, height = 180 }: {
         onMoveShouldSetResponder={() => true}
         onResponderGrant={(e) => onTouch(e.nativeEvent.locationX)}
         onResponderMove={(e) => onTouch(e.nativeEvent.locationX)}
+        onResponderTerminate={reset}
       >
         <Svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
           <Defs>
@@ -1117,7 +1137,9 @@ export function StackedBars({ buckets, segments, height = 160, unit, hideHeader,
   const p = usePalette();
   const [layoutW, setLayoutW] = useState(0);
   const [sel, setSel] = useState<number>(-1);
-  useChartsBlur(useCallback(() => { setSel(-1); onSelect?.(null); }, [onSelect]));
+  // Shared by tap-away blur and responder termination (scroll stole the touch).
+  const reset = useCallback(() => { setSel(-1); onSelect?.(null); }, [onSelect]);
+  useChartsBlur(reset);
   const n = buckets.length;
   // Same stale-selection guard as LineChart: `sel` survives a range change
   // that shrinks `buckets`, so an out-of-range index means "no selection".
@@ -1159,6 +1181,7 @@ export function StackedBars({ buckets, segments, height = 160, unit, hideHeader,
         onMoveShouldSetResponder={() => true}
         onResponderGrant={(e) => onTouch(e.nativeEvent.locationX)}
         onResponderMove={(e) => onTouch(e.nativeEvent.locationX)}
+        onResponderTerminate={reset}
       >
         <Svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
           {yticks.map((t, i) => (

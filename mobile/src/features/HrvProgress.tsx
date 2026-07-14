@@ -6,8 +6,9 @@
  * kind toggle (Unstructured / Structured / Both) plus a "Show zones" link.
  * "Both" overlays the two kinds in blue/green comparison colours; a single
  * kind draws one trace tinted by the grade-zone gradient. Power is a stacked
- * VLF/LF/HF bar per bucket. The big value shows the range average by default
- * and mirrors the bucket you drag on the chart.
+ * VLF/LF/HF bar per bucket. The big value shows the latest reading by default,
+ * mirrors the bucket you drag on the chart, and returns to the latest when you
+ * tap away.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Pressable, Text, View } from 'react-native';
@@ -283,17 +284,11 @@ function SectionHead({ title, help, value, valueColor, value2, suffix, desc, rig
   );
 }
 
-/** Mean of the non-null values in a series. */
-const meanOf = (vals: (number | null)[]) => {
-  const xs = vals.filter((v): v is number => v != null && !isNaN(v));
-  return xs.length ? xs.reduce((s, x) => s + x, 0) / xs.length : null;
-};
-
 /**
  * One metric's flat section. "Both" compares structured vs unstructured in the
  * blue/green pair; a single kind hands LineChart exactly one series, which
  * makes it colour the trace with the grade-zone gradient instead. The big
- * value is the range average, or the bucket under your finger while dragging.
+ * value is the latest reading, or the bucket under your finger while dragging.
  */
 function MetricSection({ m, structured, unstructured, buckets }: {
   m: (typeof METRICS)[number];
@@ -317,13 +312,22 @@ function MetricSection({ m, structured, unstructured, buckets }: {
       : [{ values: unstructured, color: UNSTRUCT, label: 'Unstructured' }];
   const empty = !series.some((s) => s.values.some((v) => v != null));
 
-  // Big value: range average, or the drag-selected bucket's value with its
-  // label. In "Both" mode the structured and unstructured values sit side by
-  // side, each tinted its series colour, with the label/avg after the pair.
+  // Big value: the latest reading by default (the newest bucket the shown
+  // kind(s) have data in, its label in parentheses), or the drag-selected
+  // bucket's value. Tapping away from the chart blurs the selection back to
+  // the latest. In "Both" mode the structured and unstructured values sit side
+  // by side, each tinted its series colour, with the label after the pair.
   // A selection can outlive its dataset (Day→Week shrinks `buckets` while this
-  // instance is reused), so an out-of-range index falls back to the average.
+  // instance is reused), so an out-of-range index falls back to the latest.
   const selIdx = sel != null && sel < buckets.length ? sel : null;
-  const pickVal = (vals: (number | null)[]) => (selIdx != null ? vals[selIdx] : meanOf(vals));
+  const latestIdx = (() => {
+    for (let i = buckets.length - 1; i >= 0; i--) {
+      if (series.some((s) => { const v = s.values[i]; return v != null && !isNaN(v); })) return i;
+    }
+    return null;
+  })();
+  const shownIdx = selIdx ?? latestIdx;
+  const pickVal = (vals: (number | null)[]) => (shownIdx != null ? vals[shownIdx] : null);
   const fmtVal = (v: number | null) => (v == null ? null : fmtNum(m.integer ? Math.round(v) : v));
   const sRaw = pickVal(structured);
   const uRaw = pickVal(unstructured);
@@ -332,7 +336,7 @@ function MetricSection({ m, structured, unstructured, buckets }: {
   const value = both ? (fmtVal(sRaw) ?? '–') : fmtVal(raw);
   const valueColor = both ? STRUCT : undefined;
   const value2 = both ? { text: fmtVal(uRaw) ?? '–', color: UNSTRUCT } : null;
-  const suffix = selIdx != null ? `(${buckets[selIdx]?.label ?? ''})` : 'avg';
+  const suffix = shownIdx != null ? `(${buckets[shownIdx]?.label ?? ''})` : '';
   const zones = acBandZones(m.band);
   // Grade dot for the displayed value (range average or dragged bucket), so the
   // Progress cards read their grade at a glance like the reading deep-dive.
@@ -393,16 +397,17 @@ function BalanceSection({ bl, pns, sns }: {
     }
   });
   if (pnsPts.length < 2) return null;
-  const avg = (arr: { v: number }[]) => arr.reduce((sum, x) => sum + x.v, 0) / arr.length;
-  const pnsAvg = avg(pnsPts), snsAvg = avg(snsPts);
+  // Default readout = the latest point; a drag selection overrides it and a
+  // tap-away blur returns here (BalanceChart owns the selection state).
+  const last = pnsPts.length - 1;
   return (
     <Section>
-      <SectionHead title="Balance" help={HRV_HELP.balance} value={null} suffix="" cat={balanceCat(pnsAvg, snsAvg)} />
+      <SectionHead title="Balance" help={HRV_HELP.balance} value={null} suffix="" cat={balanceCat(pnsPts[last].v, snsPts[last].v)} />
       <View style={{ marginTop: 16 }}>
         <BalanceChart
           pns={pnsPts} sns={snsPts}
-          values={{ pns: pnsAvg, sns: snsAvg }}
-          defaultLabel="avg"
+          values={{ pns: pnsPts[last].v, sns: snsPts[last].v }}
+          defaultLabel={`(${pnsPts[last].date})`}
           desc="PNS and SNS index across the range. The fill turns green when you are recovered and red when stress takes over."
         />
       </View>
@@ -410,7 +415,7 @@ function BalanceSection({ bl, pns, sns }: {
   );
 }
 
-/** Power distribution section: big total (range average or selected bucket). */
+/** Power distribution section: big total (latest bucket or selected bucket). */
 function PowerSection({ bl, vlf, lf, hf }: {
   bl: { label: string }[];
   vlf: (number | null)[]; lf: (number | null)[]; hf: (number | null)[];
@@ -420,12 +425,17 @@ function PowerSection({ bl, vlf, lf, hf }: {
     const parts = [vlf[i], lf[i], hf[i]].filter((v): v is number => v != null);
     return parts.length ? parts.reduce((s, x) => s + x, 0) : null;
   });
-  // Same stale-selection fallback as MetricSection — out-of-range → average.
+  // Same stale-selection fallback as MetricSection — out-of-range → latest.
   const selIdx = sel != null && sel < bl.length ? sel : null;
-  const raw = selIdx != null ? totals[selIdx] : meanOf(totals);
-  // Per-band breakdown mirrors the header: range average until a bar is
+  const latestIdx = (() => {
+    for (let i = bl.length - 1; i >= 0; i--) if (totals[i] != null) return i;
+    return null;
+  })();
+  const shownIdx = selIdx ?? latestIdx;
+  const raw = shownIdx != null ? totals[shownIdx] : null;
+  // Per-band breakdown mirrors the header: the latest bucket until a bar is
   // selected, then that bucket's values.
-  const bandVal = (arr: (number | null)[]) => (selIdx != null ? arr[selIdx] : meanOf(arr));
+  const bandVal = (arr: (number | null)[]) => (shownIdx != null ? arr[shownIdx] : null);
   const bands = [
     { label: 'Very low', color: VLF, power: bandVal(vlf) },
     { label: 'Low', color: LF, power: bandVal(lf) },
@@ -439,7 +449,7 @@ function PowerSection({ bl, vlf, lf, hf }: {
         title="Power distribution"
         help={POWER_HELP}
         value={raw == null ? null : String(Math.round(raw))}
-        suffix={selIdx != null ? `ms² · (${bl[selIdx]?.label ?? ''})` : 'ms² · avg'}
+        suffix={shownIdx != null ? `ms² · (${bl[shownIdx]?.label ?? ''})` : 'ms²'}
         desc="Total HRV power split across the VLF, LF and HF frequency bands."
       />
       <StackedBars

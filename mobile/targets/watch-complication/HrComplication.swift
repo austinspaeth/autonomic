@@ -2,21 +2,26 @@ import WidgetKit
 import SwiftUI
 
 /**
- * HR Monitor complication, per the imported redlines (HR Complications.dc.html):
- * the heart rate is the white hero everywhere; the Δ (vs the rolling 2-minute
- * average, same math as the on-watch monitor) rides alongside it, color-coded
- * by the POTS rule — green steady · ≥ +20 orange · ≥ +30 red · ≤ −30 blue.
- * The circular face draws the last-2-min HR range as an arc (end labels are
- * min and max) with a white dot marking where the current HR lands; the arc
- * dims to 45% accent when idle and brightens to full accent while a session
- * records. Tapping any family deep-links straight into the HR monitor.
+ * HR Monitor complication, per the imported redlines (HR & Delta
+ * Complications.dc.html): the current HR is the white hero (Manrope, matching
+ * the phone app's numerals) with no delta anywhere — the 2-minute low and high
+ * sit at the ends of the range gauge, and a dot marks where the current HR
+ * lands. The gauge breaks cleanly on both sides of the dot (nothing touches
+ * it) and the dot's diameter equals the gauge stroke. The gauge dims to 45%
+ * accent when idle and brightens to full accent while a session records.
+ * Tapping any family deep-links straight into the HR monitor.
  */
 
 private let HR_APP_GROUP = "group.com.autonomic.journal"
 private let HR_DEEP_LINK = URL(string: "autonomic://hr")!
-private let HR_ACCENT = Color(red: 0.878, green: 0.192, blue: 0.153)   // #e03127
+let HR_ACCENT = Color(red: 0.878, green: 0.192, blue: 0.153)   // #e03127
 
-/// Δ color rule from the redlines: ≥ +30 red · ≥ +20 orange · ≤ −30 blue · else green.
+/// Metric numerals — system bold (the user preferred SF over the app's
+/// Manrope here after seeing both on-device).
+func hrNumberFont(_ size: CGFloat) -> Font { .system(size: size, weight: .bold) }
+
+/// Δ color rule from the redlines (matches POTS): ≥ +30 red · ≥ +20 orange ·
+/// ≤ −30 blue · else green.
 func hrDeltaColor(_ d: Int) -> Color {
     d >= 30 ? Color(red: 0.937, green: 0.267, blue: 0.267)      // #ef4444
         : d >= 20 ? Color(red: 0.976, green: 0.451, blue: 0.086) // #f97316
@@ -29,6 +34,8 @@ struct HrComplicationState {
     var low: Int?
     var high: Int?
     var delta: Int?
+    var deltaLow: Int?
+    var deltaHigh: Int?
     var active = false
     var at: Date?
 
@@ -39,6 +46,8 @@ struct HrComplicationState {
         if d.object(forKey: "hr.low") != nil { s.low = d.integer(forKey: "hr.low") }
         if d.object(forKey: "hr.high") != nil { s.high = d.integer(forKey: "hr.high") }
         if d.object(forKey: "hr.delta") != nil { s.delta = d.integer(forKey: "hr.delta") }
+        if d.object(forKey: "hr.deltaLow") != nil { s.deltaLow = d.integer(forKey: "hr.deltaLow") }
+        if d.object(forKey: "hr.deltaHigh") != nil { s.deltaHigh = d.integer(forKey: "hr.deltaHigh") }
         s.active = d.bool(forKey: "hr.active")
         let at = d.double(forKey: "hr.at")
         if at > 0 { s.at = Date(timeIntervalSince1970: at) }
@@ -51,7 +60,14 @@ struct HrComplicationState {
         return min(1, max(0, Double(hr - low) / Double(high - low)))
     }
 
-    static let sample = HrComplicationState(hr: 72, low: 64, high: 88, delta: 6)
+    /// 0…1 position of the current Δ within the 2-min lowest…highest Δ range.
+    var deltaPosition: Double {
+        guard let delta, let deltaLow, let deltaHigh, deltaHigh > deltaLow else { return 0.5 }
+        return min(1, max(0, Double(delta - deltaLow) / Double(deltaHigh - deltaLow)))
+    }
+
+    static let sample = HrComplicationState(hr: 72, low: 64, high: 88,
+                                            delta: 22, deltaLow: 8, deltaHigh: 31)
 }
 
 struct HrComplicationEntry: TimelineEntry {
@@ -87,6 +103,87 @@ struct HrComplicationProvider: TimelineProvider {
     }
 }
 
+// MARK: - Range gauges (shared with the HR Delta glance)
+
+/// Circular gauge geometry: a 240° arc over the top, opening at the bottom.
+/// The 120° opening leaves the min/max labels clear of the arc ends
+/// (screen-clockwise degrees from 3 o'clock).
+private let ARC_SWEEP: Double = 240
+private let ARC_START: Double = 90 + (360 - ARC_SWEEP) / 2
+
+/// The 2-min range as an arc, split into two segments that both stop short of
+/// the position dot so nothing touches it. Dot diameter == arc stroke, same
+/// color, per the redlines.
+struct RangeArcGauge: View {
+    var position: Double   // 0…1 along the arc, low → high
+    var color: Color
+    var stroke: CGFloat = 5
+
+    var body: some View {
+        GeometryReader { geo in
+            let side = min(geo.size.width, geo.size.height)
+            let r = (side - stroke) / 2 - 1
+            let center = CGPoint(x: geo.size.width / 2, y: geo.size.height / 2)
+            let dotDeg = ARC_START + ARC_SWEEP * position
+            // Break on each side: round cap radius + dot radius + ~3pt clear,
+            // converted to arc degrees at this radius.
+            let gapDeg = Double(stroke + 3) / Double(r) * 180 / .pi
+            let dotRad = CGFloat(dotDeg * .pi / 180)
+
+            Path { p in
+                addArcSegment(&p, center: center, r: r, from: ARC_START, to: dotDeg - gapDeg)
+                addArcSegment(&p, center: center, r: r, from: dotDeg + gapDeg, to: ARC_START + ARC_SWEEP)
+            }
+            .stroke(color, style: StrokeStyle(lineWidth: stroke, lineCap: .round))
+            Circle()
+                .fill(color)
+                .frame(width: stroke, height: stroke)
+                .position(x: center.x + r * cos(dotRad), y: center.y + r * sin(dotRad))
+        }
+    }
+
+    /// Skips segments the dot has squeezed out at the ends of the range.
+    private func addArcSegment(_ p: inout Path, center: CGPoint, r: CGFloat, from: Double, to: Double) {
+        let a = max(from, ARC_START), b = min(to, ARC_START + ARC_SWEEP)
+        guard b - a > 1 else { return }
+        p.move(to: CGPoint(x: center.x + r * cos(a * .pi / 180), y: center.y + r * sin(a * .pi / 180)))
+        p.addArc(center: center, radius: r, startAngle: .degrees(a), endAngle: .degrees(b), clockwise: false)
+    }
+}
+
+/// The same range gauge flattened for the rectangular family: a horizontal
+/// track breaking around the dot.
+struct RangeTrack: View {
+    var position: Double
+    var color: Color
+    var stroke: CGFloat = 4
+
+    var body: some View {
+        GeometryReader { geo in
+            let y = geo.size.height / 2
+            let inset = stroke / 2
+            let usable = geo.size.width - stroke
+            let x = inset + usable * CGFloat(min(1, max(0, position)))
+            let gap = stroke + 3
+            Path { p in
+                if x - gap > inset + 0.5 {
+                    p.move(to: CGPoint(x: inset, y: y))
+                    p.addLine(to: CGPoint(x: x - gap, y: y))
+                }
+                if x + gap < inset + usable - 0.5 {
+                    p.move(to: CGPoint(x: x + gap, y: y))
+                    p.addLine(to: CGPoint(x: inset + usable, y: y))
+                }
+            }
+            .stroke(color, style: StrokeStyle(lineWidth: stroke, lineCap: .round))
+            Circle()
+                .fill(color)
+                .frame(width: stroke, height: stroke)
+                .position(x: x, y: y)
+        }
+    }
+}
+
 // MARK: - Views
 
 struct HrComplicationView: View {
@@ -106,84 +203,41 @@ struct HrComplicationView: View {
     }
 }
 
-/// Δ with the symbol at ~62% size, per the redlines. Drops render as Δ-34.
-private struct HrDeltaText: View {
-    let value: Int
-    var size: CGFloat
-
-    var body: some View {
-        (Text("Δ").font(.system(size: size * 0.62, weight: .bold))
-            + Text("\(value)").font(.system(size: size, weight: .heavy)))
-            .foregroundStyle(hrDeltaColor(value))
-            .monospacedDigit()
-            .lineLimit(1)
-            .minimumScaleFactor(0.6)
-    }
-}
-
-/// Range arc: ~200° sweep over the top, dot at the current HR's position,
-/// min/max labels in the wide bottom opening.
-private let HR_ARC_SWEEP: Double = 200
-private let HR_ARC_START: Double = 90 + (360 - HR_ARC_SWEEP) / 2
-
+/// Circular: HR hero + BPM caption in the middle, range arc breaking around
+/// the dot, low/high labels in the bottom opening.
 private struct HrCircularView: View {
     let state: HrComplicationState
 
     var body: some View {
         if let hr = state.hr {
+            // Number + labels share the arc's exact tint (incl. the idle dim),
+            // per the redline follow-up.
+            let tint = HR_ACCENT.opacity(state.active ? 1 : 0.45)
             ZStack {
-                GeometryReader { geo in
-                    let stroke: CGFloat = 5
-                    let side = min(geo.size.width, geo.size.height)
-                    let r = (side - stroke) / 2 - 1
-                    let center = CGPoint(x: geo.size.width / 2, y: geo.size.height / 2)
-                    let angle = (HR_ARC_START + HR_ARC_SWEEP * state.position) * .pi / 180
-
-                    Circle()
-                        .trim(from: 0, to: HR_ARC_SWEEP / 360)
-                        .stroke(HR_ACCENT.opacity(state.active ? 1 : 0.45),
-                                style: StrokeStyle(lineWidth: stroke, lineCap: .round))
-                        .rotationEffect(.degrees(HR_ARC_START))
-                        .padding(stroke / 2 + 1)
-                    // Dot slightly larger than the arc's stroke, over a black
-                    // outline ring that cuts a clear gap in the line so the dot
-                    // never merges with it.
-                    ZStack {
-                        Circle().fill(.black).frame(width: stroke + 8, height: stroke + 8)
-                        Circle().fill(.white).frame(width: stroke + 2, height: stroke + 2)
-                    }
-                    .position(x: center.x + r * cos(angle), y: center.y + r * sin(angle))
-                }
-                VStack(spacing: -5) {
-                    Text("\(hr)")
-                        // Drop a couple of points at triple digits so the number
-                        // stays inside the arc instead of relying on scale-down.
-                        .font(.system(size: hr >= 100 ? 17 : 20, weight: .bold))
-                        .monospacedDigit()
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                    if let delta = state.delta { HrDeltaText(value: delta, size: 11) }
-                }
+                RangeArcGauge(position: state.position, color: tint)
+                Text("\(hr)")
+                    // Drop a couple of points at triple digits so the number
+                    // stays inside the arc instead of relying on scale-down.
+                    .font(hrNumberFont(hr >= 100 ? 17 : 19))
+                    .foregroundStyle(tint)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
             .overlay(alignment: .bottom) {
                 if let low = state.low, let high = state.high, high > low {
                     // Spacer(minLength: 0) + lineLimit — the default spacer
-                    // minimum wraps a 3-digit max label onto two lines. The
-                    // ~200° arc leaves a wide bottom opening, so the labels sit
-                    // higher and read larger than the old 270° layout allowed.
+                    // minimum wraps a 3-digit label onto two lines. The labels
+                    // sit under the arc ends, in the bottom opening.
                     HStack {
                         Text("\(low)")
                         Spacer(minLength: 0)
                         Text("\(high)")
                     }
-                    .font(.system(size: 9, weight: .bold))
-                    .monospacedDigit()
+                    .font(hrNumberFont(9))
                     .lineLimit(1)
-                    .foregroundStyle(.secondary)
-                    // Tucked low in the arc's bottom opening — below the Δ line
-                    // (bottom > 4 collides with it) but inside the circular mask.
-                    .padding(.horizontal, 9)
-                    .padding(.bottom, 3)
+                    .foregroundStyle(tint)
+                    .padding(.horizontal, 10)
+                    .padding(.bottom, 2)
                 }
             }
         } else {
@@ -194,37 +248,34 @@ private struct HrCircularView: View {
     }
 }
 
-/// Corner: HR hero + Δ at the corner, bezel gauge = the 2-min range with the
-/// dot at the current HR, tinted by the Δ rule.
+/// Corner: HR hero at the corner, bezel gauge = the 2-min range with the dot
+/// at the current HR and the low/high at the ends.
 private struct HrCornerView: View {
     let state: HrComplicationState
 
     var body: some View {
         if let hr = state.hr {
-            VStack(spacing: -3) {
-                Text("\(hr)")
-                    .font(.system(size: 19, weight: .heavy))
-                    .monospacedDigit()
-                if let delta = state.delta { HrDeltaText(value: delta, size: 10) }
-            }
-            .lineLimit(1)
-            .minimumScaleFactor(0.6)
-            .widgetLabel {
-                if let low = state.low, let high = state.high, high > low {
-                    Gauge(value: Double(hr), in: Double(low)...Double(high)) {
-                        Text("BPM")
-                    } currentValueLabel: {
-                        Text("\(hr)")
-                    } minimumValueLabel: {
-                        Text("\(low)")
-                    } maximumValueLabel: {
-                        Text("\(high)")
+            Text("\(hr)")
+                .font(hrNumberFont(20))
+                .foregroundStyle(HR_ACCENT)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+                .widgetLabel {
+                    if let low = state.low, let high = state.high, high > low {
+                        Gauge(value: Double(hr), in: Double(low)...Double(high)) {
+                            Text("BPM")
+                        } currentValueLabel: {
+                            Text("\(hr)")
+                        } minimumValueLabel: {
+                            Text("\(low)")
+                        } maximumValueLabel: {
+                            Text("\(high)")
+                        }
+                        .tint(HR_ACCENT)
+                    } else {
+                        Text("Heart Rate")
                     }
-                    .tint(state.delta.map { hrDeltaColor($0) } ?? HR_ACCENT)
-                } else {
-                    Text("Heart Rate")
                 }
-            }
         } else {
             Image(systemName: "heart.fill")
                 .font(.system(size: 22))
@@ -234,59 +285,52 @@ private struct HrCornerView: View {
     }
 }
 
-/// Rectangular: leading tile (logo idle · heart while live), title line with the
-/// 2-min range right-aligned, HR hero + BPM + Δ.
+/// Rectangular: HR hero + BPM on the left, the range track breaking around
+/// the dot on the right with low/high beneath its ends.
 private struct HrRectangularView: View {
     let state: HrComplicationState
 
     var body: some View {
-        HStack(spacing: 10) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(HR_ACCENT.opacity(0.15))
-                    .frame(width: 34, height: 34)
-                if state.active {
-                    Image(systemName: "heart.fill")
-                        .font(.system(size: 16))
-                        .foregroundStyle(HR_ACCENT)
-                } else {
-                    Image("logo")
-                        .renderingMode(.template)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 24)
-                        .foregroundStyle(HR_ACCENT)
-                }
-            }
-            VStack(alignment: .leading, spacing: 1) {
-                HStack {
-                    Text(state.active ? "MONITORING" : "HEART RATE")
-                        .font(.system(size: 10, weight: .semibold))
+        if let hr = state.hr {
+            let tint = HR_ACCENT.opacity(state.active ? 1 : 0.45)
+            HStack(spacing: 12) {
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    Text("\(hr)")
+                        .font(hrNumberFont(26))
+                        .foregroundStyle(tint)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                    Text("BPM")
+                        .font(.system(size: 9, weight: .bold))
+                        .kerning(0.6)
                         .foregroundStyle(.secondary)
-                    Spacer()
-                    if let low = state.low, let high = state.high, high > low {
-                        Text("\(low)–\(high)")
-                            .font(.system(size: 10, weight: .bold))
-                            .monospacedDigit()
-                            .foregroundStyle(.secondary)
-                    }
                 }
-                HStack(alignment: .lastTextBaseline, spacing: 6) {
-                    if let hr = state.hr {
-                        Text("\(hr)")
-                            .font(.system(size: 21, weight: .heavy))
-                            .monospacedDigit()
-                        Text("BPM")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(.secondary)
-                        if let delta = state.delta { HrDeltaText(value: delta, size: 14) }
-                    } else {
-                        Text("Tap to monitor")
-                            .font(.system(size: 15, weight: .bold))
+                if let low = state.low, let high = state.high, high > low {
+                    VStack(spacing: 3) {
+                        RangeTrack(position: state.position, color: tint)
+                            .frame(height: 8)
+                        HStack {
+                            Text("\(low)")
+                            Spacer(minLength: 0)
+                            Text("\(high)")
+                        }
+                        .font(hrNumberFont(10))
+                        .lineLimit(1)
+                        .foregroundStyle(tint)
                     }
+                } else {
+                    Spacer(minLength: 0)
                 }
             }
-            Spacer(minLength: 0)
+        } else {
+            HStack(spacing: 10) {
+                Image(systemName: "heart.fill")
+                    .font(.system(size: 18))
+                    .foregroundStyle(HR_ACCENT)
+                Text("Tap to monitor")
+                    .font(.system(size: 15, weight: .bold))
+                Spacer(minLength: 0)
+            }
         }
     }
 }
@@ -299,7 +343,7 @@ struct AutonomicHrComplication: Widget {
             HrComplicationView(entry: entry)
         }
         .configurationDisplayName("Heart Rate")
-        .description("Last HR with its 2-minute range and delta. Tap to open the monitor.")
+        .description("Last HR with its 2-minute range. Tap to open the monitor.")
         .supportedFamilies([.accessoryCircular, .accessoryCorner, .accessoryRectangular])
     }
 }

@@ -19,7 +19,7 @@ import { orthoDeltaCat, orthoMaxDelta, rowScoreCategory, SCORE_COLORS, GRADE_LAB
 import { sleepGrade, sleepHours, waterGoalL, type DaysMap } from '../lib/scoring/day';
 import type { SleepStages } from '../lib/types';
 import { ensureDay, getState, getWaveform, save, useAppState } from '../store/store';
-import { fmtDateLong, fmtTime12, periodOf } from '../lib/dates';
+import { fmtDateLong, fmtTime12, periodOf, todayKey } from '../lib/dates';
 import { health, healthAppName } from '../lib/health';
 import { SleepConfirmSheet } from './Health';
 import { useEntryForms } from './forms';
@@ -53,10 +53,14 @@ export function JournalSections({ dk }: { dk: string }) {
             return <Row key={r.id} icon={def.icon as never} title={readingLabel(r)} right={<View style={{ flexDirection: 'row', alignItems: 'center' }}><RowValue text={readingRowValue(r, curve)} cat={cat} />{r.time ? <Pill text={fmtTime12(r.time)} /> : null}</View>} onPress={() => forms.openReadingSummary(r)} />;
           })}
           <View style={{ gap: 8, marginTop: 6 }}>
-            <Pressable onPress={forms.captureHrv} style={({ pressed }) => [{ flexDirection: 'row', gap: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: p.accent, borderRadius: radius.control, paddingVertical: 13 }, pressed && { opacity: 0.7 }]}>
-              <Icon name="activity" size={18} color="#fff" />
-              <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>Capture HRV reading</Text>
-            </Pressable>
+            {/* Live HRV capture only makes sense on today — a live reading
+                belongs to the day it happens, never a back-dated one. */}
+            {dk === todayKey() ? (
+              <Pressable onPress={forms.captureHrv} style={({ pressed }) => [{ flexDirection: 'row', gap: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: p.accent, borderRadius: radius.control, paddingVertical: 13 }, pressed && { opacity: 0.7 }]}>
+                <Icon name="activity" size={18} color="#fff" />
+                <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>Capture HRV reading</Text>
+              </Pressable>
+            ) : null}
             <AddDashButton onPress={forms.pickReading} label="+ Add reading" />
           </View>
         </View>

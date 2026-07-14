@@ -22,7 +22,7 @@ import { computeScores } from '../lib/scoring';
 import { health, healthAppName } from '../lib/health';
 import { healthSourceFor, type HealthCandidate, type HealthSource } from '../lib/health/sources';
 import { deleteEntry, getState, upsertEntry, useAppState } from '../store/store';
-import { defaultTimeFor, fmtTime12, uid } from '../lib/dates';
+import { defaultTimeFor, fmtTime12, todayKey, uid } from '../lib/dates';
 import { defaultPeriod } from '../lib/period';
 import { useToast } from '../components/Toast';
 import { HrvSetup } from './hrv/Setup';
@@ -152,8 +152,9 @@ function softTint(hex: string): string {
  *  as on the milestone cards). HRV is the live-capture call-to-action; the two
  *  POTS captures carry their watch tints (blue / purple), the plain readings a
  *  neutral grey. HRV kinds are live-capture only, so the manual list starts at
- *  Blood Pressure. */
-function ReadingPicker({ onLive, onPick }: { onLive: () => void; onPick: (type: string) => void }) {
+ *  Blood Pressure. On a past day the live-only captures (HRV, stand test)
+ *  disappear — a live reading can only belong to the day it happens. */
+function ReadingPicker({ isToday, onLive, onPick }: { isToday: boolean; onLive: () => void; onPick: (type: string) => void }) {
   const p = usePalette();
   const tintFor = (t: string) => (t === 'standTest' ? POTS_BLUE : t === 'orthostatic' ? POTS_PURPLE : t === 'bp' ? BP_GOLD : p.textDim);
   const subFor: Record<string, string> = {
@@ -164,10 +165,10 @@ function ReadingPicker({ onLive, onPick }: { onLive: () => void; onPick: (type: 
   };
   // The two POTS captures lead the manual list (the stand test is live-only but
   // stays in, pointing at the watch app); BP and resting HR follow.
-  const manual = ['standTest', 'orthostatic', 'bp', 'restingHr'];
+  const manual = isToday ? ['standTest', 'orthostatic', 'bp', 'restingHr'] : ['orthostatic', 'bp', 'restingHr'];
   const readingRow = (t: string) => ({ key: t, title: pickerLabel(t), sub: subFor[t] || '', icon: READING_TYPES[t].icon as string, tint: tintFor(t), onPress: () => onPick(t) });
   const rows: { key: string; title: string; sub: string; icon: string; tint: string; onPress: () => void }[] = [
-    { key: 'hrv', title: 'HRV Reading', sub: Platform.OS === 'ios' ? 'From a chest strap or Apple Watch' : 'From a chest strap or your camera', icon: 'heartPulse', tint: p.accent, onPress: onLive },
+    ...(isToday ? [{ key: 'hrv', title: 'HRV Reading', sub: Platform.OS === 'ios' ? 'From a chest strap, Apple Watch or camera' : 'From a chest strap or your camera', icon: 'heartPulse', tint: p.accent, onPress: onLive }] : []),
     ...manual.map(readingRow),
   ];
   return (
@@ -377,6 +378,9 @@ export function useEntryForms(dk: string) {
   // watch app's guided stand test (which syncs in by itself) — plus an in-app
   // strap capture — before manual entry.
   const pickReadingSource = (type: string) => {
+    // On a past day the live captures don't apply (a live reading belongs to
+    // the day it happens) — an episode goes straight to the manual form.
+    if (type === 'orthostatic' && dk !== todayKey()) { openReadingForm(type, null); return; }
     // Both POTS types share the watch-pointer card, each with a live strap
     // capture behind it. The episode keeps a manual form too; the stand test
     // is live-only, so no manual fallback.
@@ -424,6 +428,7 @@ export function useEntryForms(dk: string) {
   const captureHrv = () => openSheet((c) => <HrvSetup controls={c} />);
   const pickReading = () => openSheet(() => (
     <ReadingPicker
+      isToday={dk === todayKey()}
       onLive={captureHrv}
       onPick={(t) => pickReadingSource(t)}
     />

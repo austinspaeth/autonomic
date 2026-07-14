@@ -28,21 +28,48 @@ export interface ArtifactResult {
  * Flag RR intervals deviating > `threshold` (fraction) from a local moving
  * median, then correct them by interpolating between the nearest good beats.
  * Ectopic/missed beats, movement and swallowing show up as spikes here.
+ *
+ * Detection runs in two stages, then iterates:
+ *  1. Absolute physiologic guard rails — RR outside 300-2000 ms (30-200 bpm)
+ *     can never be a real sinus beat, so it's flagged up front and excluded
+ *     from every local median below.
+ *  2. Relative deviation from a LOCAL median, recomputed each pass from beats
+ *     NOT yet flagged. A single swallow, an ectopic beat or a camera dropout
+ *     rarely comes alone — it's usually a short burst of consecutive bad beats,
+ *     and a one-pass median taken over that burst is itself corrupted, so the
+ *     interior of the burst escapes detection and its wild swings inflate SDNN.
+ *     Iterating peels the burst from the outside in: its edge beats (which still
+ *     have clean neighbors) flag on the first pass; with those excluded, the
+ *     interior beats compare against clean baselines and flag on the next.
+ *
+ * Because the baseline is always LOCAL (a few beats either side), genuine
+ * respiratory sinus arrhythmia — the smooth beat-to-beat oscillation that IS
+ * the HRV signal — is preserved: a real beat never deviates far from its clean
+ * neighbors, so it never flags no matter how many passes run.
  */
-export function correctArtifacts(rr: number[], threshold = 0.25, window = 5): ArtifactResult {
+export function correctArtifacts(rr: number[], threshold = 0.25, window = 7, maxPasses = 4): ArtifactResult {
   const n = rr.length;
   if (n === 0) return { clean: [], artifactPct: 0, flags: [] };
   const flags = new Array(n).fill(false);
   const half = Math.max(1, Math.floor(window / 2));
-  for (let i = 0; i < n; i++) {
-    const lo = Math.max(0, i - half);
-    const hi = Math.min(n, i + half + 1);
-    const seg = rr.slice(lo, hi).filter((_, j) => lo + j !== i);
-    const med = median(seg.length ? seg : [rr[i]]);
-    // Physiologic guard rails: RR outside 300-2000 ms (30-200 bpm) is an artifact.
-    if (rr[i] < 300 || rr[i] > 2000 || (med > 0 && Math.abs(rr[i] - med) / med > threshold)) {
-      flags[i] = true;
+  // Stage 1: absolute guard rails, so grossly impossible beats never pollute a
+  // neighbor's local median.
+  for (let i = 0; i < n; i++) if (rr[i] < 300 || rr[i] > 2000) flags[i] = true;
+  // Stage 2: relative deviation from a clean local median, iterated to convergence.
+  for (let pass = 0; pass < maxPasses; pass++) {
+    let changed = false;
+    for (let i = 0; i < n; i++) {
+      if (flags[i]) continue;
+      const seg: number[] = [];
+      const lo = Math.max(0, i - half), hi = Math.min(n, i + half + 1);
+      for (let j = lo; j < hi; j++) if (j !== i && !flags[j]) seg.push(rr[j]);
+      const med = median(seg.length ? seg : [rr[i]]);
+      if (med > 0 && Math.abs(rr[i] - med) / med > threshold) {
+        flags[i] = true;
+        changed = true;
+      }
     }
+    if (!changed) break; // clean data settles after one pass — no behaviour change
   }
   // Correct flagged beats by linear interpolation between nearest good neighbors.
   const clean = rr.slice();

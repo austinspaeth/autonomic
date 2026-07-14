@@ -140,7 +140,7 @@ private struct OrthoMeasureView: View {
                         .font(.system(size: 12, weight: .bold))
                         .foregroundStyle(DS.dim)
                 }
-                DeltaChip(delta: ortho.delta)
+                DeltaChip(delta: ortho.delta, stale: workout.signalLost)
             }
             Spacer(minLength: 8)
 
@@ -187,7 +187,7 @@ private struct OrthoRecoveryView: View {
                                         .font(.system(size: 11, weight: .bold))
                                         .foregroundStyle(DS.dim)
                                 }
-                                DeltaChip(delta: ortho.delta)
+                                DeltaChip(delta: ortho.delta, stale: workout.signalLost)
                                 Text("\(fmtCountdown(OrthostaticController.recoveryDuration - ortho.stageElapsed)) left")
                                     .font(.system(size: 12, weight: .semibold))
                                     .monospacedDigit()

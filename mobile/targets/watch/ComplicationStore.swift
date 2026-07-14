@@ -50,11 +50,13 @@ enum ComplicationStore {
     /// Live feed from the HR monitor (~1 Hz). Values are written every call;
     /// the widget timeline reloads immediately when the Δ color band flips
     /// (that's the POTS-critical signal) and otherwise at most every ~15 s.
-    static func hrUpdate(hr: Int, low: Int, high: Int, delta: Int) {
+    static func hrUpdate(hr: Int, low: Int, high: Int, delta: Int, deltaLow: Int, deltaHigh: Int) {
         defaults?.set(hr, forKey: "hr.last")
         defaults?.set(low, forKey: "hr.low")
         defaults?.set(high, forKey: "hr.high")
         defaults?.set(delta, forKey: "hr.delta")
+        defaults?.set(deltaLow, forKey: "hr.deltaLow")
+        defaults?.set(deltaHigh, forKey: "hr.deltaHigh")
         defaults?.set(true, forKey: "hr.active")
         defaults?.set(Date().timeIntervalSince1970, forKey: "hr.at")
         let band = delta >= 30 ? "red" : delta >= 20 ? "orange" : delta <= -30 ? "blue" : "green"
@@ -75,5 +77,6 @@ enum ComplicationStore {
     private static func reloadHr() {
         lastHrReloadAt = Date()
         WidgetCenter.shared.reloadTimelines(ofKind: "AutonomicHrComplication")
+        WidgetCenter.shared.reloadTimelines(ofKind: "AutonomicHrDeltaComplication")
     }
 }

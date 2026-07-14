@@ -13,7 +13,7 @@ import { Icon } from '../../components/Icon';
 import { useToast } from '../../components/Toast';
 import { radius, usePalette } from '../../theme';
 import { getState, save, useAppState } from '../../store/store';
-import { getCurrentKey } from '../../store/nav';
+import { todayKey } from '../../lib/dates';
 import { health } from '../../lib/health';
 import { defaultPeriod } from '../../lib/period';
 import { ppg } from '../../lib/ppg/camera';
@@ -23,9 +23,9 @@ import { WatchPrep } from './WatchPrep';
 
 const HELP = {
   main:
-    'A 5 minute read (2 minutes by phone camera) of how your nervous system is balancing stress and recovery. Same time daily shows your trend.',
+    'A 5 minute read (shorter by phone camera) of how your nervous system is balancing stress and recovery. Same time daily shows your trend.',
   kind:
-    'Both kinds run 5 minutes (2 with the phone camera). Unstructured captures your current baseline while you rest and breathe naturally. Structured guides you through a paced breathing pattern, which trains your baroreflex and helps build stronger autonomic responses.',
+    'Both kinds run 5 minutes (shorter with the phone camera). Unstructured captures your current baseline while you rest and breathe naturally. Structured guides you through a paced breathing pattern, which trains your baroreflex and helps build stronger autonomic responses.',
   techniques:
     'The numbers are the seconds to inhale, hold, and exhale in each cycle.\n\n' +
     '4 / 6 breathing: in 4s, out 6s. For most people this matches their resonant frequency, the rate where the baroreflex (your body’s blood pressure regulator) swings in sync with each breath and HRV peaks. The longer exhale makes it the most effective pattern to train.\n\n' +
@@ -60,7 +60,7 @@ function defaultSource(): Source {
  *  there's no picker in the sheet anymore (shared rules in src/lib/period.ts;
  *  structured and unstructured each get their own morning/evening; extras
  *  fall through to Other). */
-const defaultPeriodFor = (kind: Kind) => defaultPeriod(kind === 'breath' ? 'breathHrv' : 'hrv', getCurrentKey());
+const defaultPeriodFor = (kind: Kind) => defaultPeriod(kind === 'breath' ? 'breathHrv' : 'hrv', todayKey());
 
 export function HrvSetup({ controls }: { controls: SheetControls }) {
   const p = usePalette();
@@ -133,7 +133,7 @@ export function HrvSetup({ controls }: { controls: SheetControls }) {
         {Platform.OS === 'ios' ? (
           <SourceOption icon="watch" title="Apple Watch" badge="High accuracy" sub="Breathe or ECG on the watch, syncs in after" active={source === 'watch'} onPress={() => setSource('watch')} />
         ) : null}
-        <SourceOption icon="camera" title="Phone camera" badge="Lower accuracy" sub="No device needed · 2 minute fingertip reading" active={source === 'camera'} onPress={() => setSource('camera')} />
+        <SourceOption icon="camera" title="Phone camera" badge="Lower accuracy" sub="No device needed · quick fingertip reading" active={source === 'camera'} onPress={() => setSource('camera')} />
       </View>
 
       <View style={{ height: 20 }} />
