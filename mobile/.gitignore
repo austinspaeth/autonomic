@@ -9,6 +9,8 @@ web-build/
 .DS_Store
 expo-env.d.ts
 *.ipa
+*.apk
+*.aab
 
 # Local expo-module native build output
 modules/**/android/build/
