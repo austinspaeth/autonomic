@@ -567,7 +567,7 @@ function ScoreExplain({ all, dk, controls }: { all: ScoreSetResult; dk: string; 
   const helped = comps.filter((c) => c.cat === 'great' || c.cat === 'good').sort(byW);
   const hurt = comps.filter((c) => c.cat === 'bad' || c.cat === 'crash').sort(byW);
   const neutral = comps.filter((c) => c.cat === 'ok').sort(byW);
-  const ceil = (c: ScoreComp) => (c.detail && c.detail.maxCat ? GRADE_PTS[c.detail.maxCat] : 95);
+  const ceil = (c: ScoreComp) => (c.detail && c.detail.maxCat ? GRADE_PTS[c.detail.maxCat] : GRADE_PTS.great);
   const avail = all.confidence || 100;
   const headroom = comps.map((c) => ({ c, gain: (c.w * (ceil(c) - c.p)) / avail })).filter((x) => x.gain > 0.05).sort((a, b) => b.gain - a.gain);
 

@@ -37,6 +37,10 @@ const AWAKE = 2;
  *  vs. the night). Ordinary mid-night wakings are far shorter than this. */
 const SESSION_GAP_MS = 2 * 60 * 60000;
 
+/** A night only counts as interrupted when time spent awake mid-sleep
+ *  exceeds this many minutes; brief stirrings are normal sleep. */
+export const INTERRUPTED_AWAKE_MIN = 10;
+
 interface Interval { start: number; end: number }
 
 /** Merge overlapping/touching intervals into a sorted disjoint union. */
@@ -97,7 +101,7 @@ export function summarizeSleep(rows: readonly SleepSample[]): SleepSummary | nul
     bed: new Date(bedMs),
     wake: new Date(wakeMs),
     minutesAsleep: minutesOf(main),
-    interrupted: awakeIntervals.length >= 2,
+    interrupted: staged.awake > INTERRUPTED_AWAKE_MIN,
     stages: staged.core + staged.deep + staged.rem > 0 ? staged : null,
   };
 }

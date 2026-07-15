@@ -28,7 +28,7 @@ const day = (over: Partial<DayRecord> = {}): DayRecord => ({
 describe('constants pinned to the web app', () => {
   it('CAT_POINTS / GRADE_PTS / SCORE_RANK exact values', () => {
     expect(CAT_POINTS).toEqual({ great: 90, good: 75, ok: 55, bad: 38, crash: 18, concerning: 18, warning: 72 });
-    expect(GRADE_PTS).toEqual({ great: 95, good: 80, ok: 60, warning: 60, bad: 35, crash: 10, concerning: 10 });
+    expect(GRADE_PTS).toEqual({ great: 100, good: 80, ok: 60, warning: 60, bad: 35, crash: 10, concerning: 10 });
     expect(SCORE_RANK).toEqual({ great: 0, good: 1, ok: 2, warning: 2, bad: 3, crash: 4, concerning: 4 });
   });
   it('expectedHf per breathing style', () => {
@@ -252,21 +252,21 @@ describe('day scoring', () => {
     const readings: Entry[] = [{ id: 'x', type: 'breathHrv', rmssd: '35', time: '08:00' }];
     const d = day({ readings });
     const res = scoreSet(readings, d, '2026-07-02', { '2026-07-02': d });
-    // components: HRV (great -> 95). No total power/pnn50/vlf/lfPeak (missing).
+    // components: HRV (great -> 100). No total power/pnn50/vlf/lfPeak (missing).
     // hr missing on the reading, so no resting HR either.
     expect(res.comps.map((c) => c.label)).toEqual(['HRV (RMSSD)']);
-    expect(res.score).toBe(95);
+    expect(res.score).toBe(100);
     expect(res.confidence).toBe(25);
   });
   it('scoreSet: structured + unstructured blends RMSSD 70/30', () => {
     const readings: Entry[] = [
       { id: 'u', type: 'hrv', rmssd: '20', time: '08:00' }, // bad -> 35
-      { id: 's', type: 'breathHrv', rmssd: '35', time: '08:30' }, // great -> 95
+      { id: 's', type: 'breathHrv', rmssd: '35', time: '08:30' }, // great -> 100
     ];
     const d = day({ readings });
     const res = scoreSet(readings, d, '2026-07-02', { '2026-07-02': d });
     const hrv = res.comps.find((c) => c.label === 'HRV (RMSSD)')!;
-    expect(hrv.p).toBeCloseTo(0.7 * 95 + 0.3 * 35);
+    expect(hrv.p).toBeCloseTo(0.7 * 100 + 0.3 * 35);
   });
   it('scoreCat bands', () => {
     expect(scoreCat(90).short).toBe('Excellent');

@@ -86,16 +86,28 @@ describe('summarizeSleep', () => {
     expect(out.bed).toEqual(at('23:00'));
     expect(out.wake).toEqual(at('07:00'));
     expect(out.minutesAsleep).toBe(450);   // 480 minus 30 awake
-    expect(out.interrupted).toBe(true);
+    expect(out.interrupted).toBe(true);    // 30 min awake > 10-min threshold
   });
 
-  it('counts one awakening reported by two sources as one interruption', () => {
+  it('does not flag brief awakenings totaling 10 minutes or less', () => {
+    const out = summarizeSleep([
+      s(ASLEEP, '23:00', '02:00'),
+      s(AWAKE, '02:00', '02:04'),
+      s(ASLEEP, '02:04', '05:00'),
+      s(AWAKE, '05:00', '05:06'),
+      s(ASLEEP, '05:06', '07:00'),
+    ])!;
+    expect(out.interrupted).toBe(false);   // 10 min awake is not > 10
+  });
+
+  it('does not double-count one awakening reported by two sources', () => {
     const out = summarizeSleep([
       s(ASLEEP, '23:00', '03:00'),
-      s(AWAKE, '03:00', '03:15'),    // watch
-      s(AWAKE, '03:01', '03:15'),    // phone, same waking
-      s(ASLEEP, '03:15', '07:00'),
+      s(AWAKE, '03:00', '03:08'),    // watch
+      s(AWAKE, '03:02', '03:09'),    // phone, same waking
+      s(ASLEEP, '03:09', '07:00'),
     ])!;
+    // Union is 9 awake minutes (a raw sum would be 15 and cross the threshold).
     expect(out.interrupted).toBe(false);
     expect(out.stages).toBeNull();
   });

@@ -337,6 +337,26 @@ const CardView = React.memo(function CardView({ card, buckets }: { card: Analysi
   // Balance-style readout under the description (POTS cards); ortho carries one
   // per transition variant. When it grades, the "Show zones" link sits top-right.
   const metricsRow = orthoSpan ? orthoSpan.metricsRow : card.metricsRow;
+  // A metricsRow card's line chart is tappable like a selectStat chart: the
+  // readout metrics map onto the chart series in order, so a selected bucket
+  // swaps each value for that bucket's (and the date suffix for its label);
+  // any extra metric is the ortho event count. Blur restores the latest entry.
+  const metricsChart = metricsRow ? (selChart ?? charts.find((c) => !c.dumbbell)) : null;
+  const shownMetrics = useMemo(() => {
+    if (!metricsRow || !metricsChart || sel == null || sel < 0) return metricsRow;
+    const at = (si: number) => { const v = metricsChart.series[si]?.values[sel]; return v != null && !isNaN(v) ? Math.round(v) : null; };
+    return {
+      ...metricsRow,
+      metrics: metricsRow.metrics.map((m, i) =>
+        i < metricsChart.series.length ? { ...m, value: at(i) }
+          : orthoSpan ? { ...m, value: orthoSpan.counts[sel] ?? null }
+            : m),
+      suffix: `(${buckets[sel]?.label ?? ''})`,
+    };
+  }, [metricsRow, metricsChart, sel, orthoSpan, buckets]);
+  // Range/data changes rebuild the buckets, so any held selection index no
+  // longer points at the same date — drop it.
+  useEffect(() => { setSel(null); }, [buckets]);
   const showZonesLink = !!zonesChart || !!metricsRow?.zones;
   const stats = useMemo(() => {
     // Ortho: a selected point swaps the whole row to that bucket — the day's
@@ -435,10 +455,10 @@ const CardView = React.memo(function CardView({ card, buckets }: { card: Analysi
       {!card.tiles && (card.desc || card.sub) ? (
         <Text style={{ color: p.textDim, fontSize: 13, lineHeight: 19, marginTop: 8 }}>{card.desc || card.sub}</Text>
       ) : null}
-      {metricsRow ? (
+      {shownMetrics ? (
         <View style={{ flexDirection: 'row', alignItems: 'flex-end', flexWrap: 'wrap', gap: 10, marginTop: 12 }}>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 28 }}>
-            {metricsRow.metrics.map((m) => (
+            {shownMetrics.metrics.map((m) => (
               <View key={m.label}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   {m.color ? <View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: m.color }} /> : null}
@@ -451,7 +471,7 @@ const CardView = React.memo(function CardView({ card, buckets }: { card: Analysi
               </View>
             ))}
           </View>
-          {metricsRow.suffix ? <Text style={{ fontSize: 13, fontWeight: '600', color: p.textDim, marginBottom: 5 }}>{metricsRow.suffix}</Text> : null}
+          {shownMetrics.suffix ? <Text style={{ fontSize: 13, fontWeight: '600', color: p.textDim, marginBottom: 5 }}>{shownMetrics.suffix}</Text> : null}
         </View>
       ) : null}
       {card.orthoFilter ? (
@@ -473,7 +493,7 @@ const CardView = React.memo(function CardView({ card, buckets }: { card: Analysi
             ? (bpSpan && !bpSpan.sys.some((v) => v != null) && !bpSpan.dia.some((v) => v != null)
               ? <Text style={{ color: p.textDim, fontSize: 13, marginTop: 4 }}>No {bpFilt} readings in this range.</Text>
               : <BpDumbbell buckets={buckets} sys={bpSpan ? bpSpan.sys : ch.dumbbell.sys} dia={bpSpan ? bpSpan.dia : ch.dumbbell.dia} />)
-            : <LineChart buckets={buckets} series={ch.series} zones={ch.zones} integer={ch.integer} target={ch.target} hideHeader={ch.selectStat || !!metricsRow} zonesOn={(ch === zonesChart || metricsRow) ? showZones : undefined} onSelect={ch.selectStat ? setSel : undefined} />}
+            : <LineChart buckets={buckets} series={ch.series} zones={ch.zones} integer={ch.integer} target={ch.target} hideHeader={ch.selectStat || !!metricsRow} zonesOn={(ch === zonesChart || metricsRow) ? showZones : undefined} onSelect={ch.selectStat || ch === metricsChart ? setSel : undefined} />}
           {ch.legend ? (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 14, marginTop: 8 }}>
               {ch.legend.map(([name, color]) => (

@@ -29,9 +29,10 @@ export const GRADE_LABEL: Record<ScoreCat, string> = {
   great: 'Excellent', good: 'Good', ok: 'Moderate', bad: 'Compromised', crash: 'Bad', concerning: 'Crash', warning: 'Warning',
 };
 
-/** Grade -> 0-100 points (day composite). */
+/** Grade -> 0-100 points (day composite). Great is a full 100 so an
+ *  all-great day scores a perfect 100. */
 export const GRADE_PTS: Record<ScoreCat, number> = {
-  great: 95, good: 80, ok: 60, warning: 60, bad: 35, crash: 10, concerning: 10,
+  great: 100, good: 80, ok: 60, warning: 60, bad: 35, crash: 10, concerning: 10,
 };
 
 /** Grade -> points for the per-reading autonomic composite. */

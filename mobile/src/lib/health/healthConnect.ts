@@ -15,6 +15,7 @@
  */
 import type { Entry, SleepStages } from '../types';
 import { keyOf } from '../dates';
+import { INTERRUPTED_AWAKE_MIN } from './sleepSummary';
 import type {
   HealthApi, HealthDaySamples, HistoryReading, ImportedReading, SleepImport,
 } from './index';
@@ -228,10 +229,9 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
       // it), SLEEPING counts as asleep but carries no stage; a night with only
       // SLEEPING blocks reports stages: null (mirrors iOS asleepUnspecified).
       let deepMin = 0; let remMin = 0; let coreMin = 0; let awakeMin = 0; let unspecMin = 0;
-      let awakeIntervals = 0;
       for (const st of main.stages || []) {
         const mins = (new Date(st.endTime).getTime() - new Date(st.startTime).getTime()) / 60000;
-        if (STAGE_AWAKE.includes(st.stage)) { awakeMin += mins; awakeIntervals++; }
+        if (STAGE_AWAKE.includes(st.stage)) awakeMin += mins;
         else if (st.stage === STAGE_LIGHT) coreMin += mins;
         else if (st.stage === STAGE_DEEP) deepMin += mins;
         else if (st.stage === STAGE_REM) remMin += mins;
@@ -262,7 +262,7 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
         wakeISO: wake.toISOString(),
         hrLow: hrLow != null ? Math.round(hrLow) : null,
         hrHigh: hrHigh != null ? Math.round(hrHigh) : null,
-        interrupted: awakeIntervals >= 2,
+        interrupted: awakeMin > INTERRUPTED_AWAKE_MIN,
         minutesAsleep: Math.round(asleepMin),
         stages,
       } satisfies SleepImport;
