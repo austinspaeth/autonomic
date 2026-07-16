@@ -8,7 +8,7 @@ import { JournalSections } from '../../src/features/JournalSections';
 import { Calendar } from '../../src/features/Calendar';
 import { usePalette } from '../../src/theme';
 import { fmtDateLong, todayKey } from '../../src/lib/dates';
-import { getCurrentKey, setCurrentKey, shiftCurrent, useCurrentKey } from '../../src/store/nav';
+import { getCurrentKey, registerJournalScroller, setCurrentKey, shiftCurrent, useCurrentKey } from '../../src/store/nav';
 
 // Date changes echo the tab-switch motion (TAB_TRANSITION in _layout.tsx) but
 // run it strictly in sequence so the two days never overlap: the current day
@@ -43,6 +43,14 @@ export default function JournalScreen() {
   // True between the swap commit and the new day's first layout; the
   // in-animation waits on it so it never starts while the tree is mounting.
   const pendingIn = useRef(false);
+
+  // Section y-coords are relative to the day content, which sits 16px into the
+  // scroll content below the header inset the header also overlays — so the
+  // section lands just under the header with a small breathing gap.
+  useEffect(() => {
+    registerJournalScroller((y) => scrollRef.current?.scrollTo({ y: y + 4, animated: true }));
+    return () => registerJournalScroller(null);
+  }, []);
 
   // Phase 2 — runs when the out-animation completes: swap the content while
   // it's invisible, pre-positioned on the incoming side.

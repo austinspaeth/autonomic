@@ -46,7 +46,8 @@ old web app so old `export.json` files import directly.
 ```jsonc
 {
   "version": 1,
-  "settings": { "theme": "light" | "dark" },
+  "settings": { "theme": "light" | "dark",
+                "reminder": { "enabled": true, "time": "08:00" } },  // daily morning nudge; source of truth for the OS schedule
   "profile": { "sex", "weight", "height" },  // feeds reading scores (e.g. sex-adjusted QTc)
   "customTypes": { "meds": { "custom-magnesium": { /* pure-JSON TypeDef */ } } },  // user-created types (activities/meds/symptoms/triggers)
   "hiddenTypes": { "symptoms": ["nausea"] },  // built-in types the user deleted (only allowed while unused)
@@ -90,6 +91,26 @@ old web app so old `export.json` files import directly.
   embedded arrays still import. A dev-build warning fires if an inline array ever
   reaches the persisted journal.
 - **Imports** record `meta.lastImport` (`{ name, at }`) before calling `save()`.
+- **Progress + Insights fall back to demo data on an empty journal.** `src/lib/demo.ts`
+  generates a deterministic 30-day sample month (seeded PRNG, keyed off today so it
+  lands in the Analysis buckets and report ranges) that arcs from crash days up into
+  the green. Both views render it behind `<DemoBanner/>` whenever `hasOwnData(days)`
+  is false, and swap to real data on the user's first entry. **Never fake the Journal**
+  — it's where real data goes in, so a demo entry there would be tappable fiction; the
+  demo only ever feeds derived views. `hasOwnData` is deliberately broader than either
+  view's "is there anything to chart" gate (a single logged glass of water counts), so
+  demo data can never sit on top of real data. Insights builds its report prompts from
+  `demoState()` too, resolved at press time. See `src/lib/__tests__/demo.test.ts`, which
+  asserts the arc through the real scoring engine.
+- **The morning reminder is the only notification the app sends.** `src/lib/reminders.ts`
+  owns it; `settings.reminder` is the source of truth and the OS schedule is derived,
+  reconciled by `syncReminder()` on launch (covers reinstall, an imported journal, or
+  permission revoked in system settings). It schedules under one stable id, so
+  re-scheduling replaces rather than stacks. iOS **throws** from
+  `scheduleNotificationAsync` when unauthorized — always request permission first and
+  only persist `enabled: true` once the schedule actually succeeded. UI goes through
+  `useReminderToggle()` (`src/features/Reminders.tsx`), shared by the welcome wizard's
+  last step and the Settings list.
 - **Types come in two layers.** Built-ins live in the `*_TYPES` maps in
   `src/lib/registry.ts` (add an icon in `src/components/Icon.tsx` when adding one).
   Users can also create their own activities, meds/supplements, symptoms and

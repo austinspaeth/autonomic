@@ -15,7 +15,7 @@
     </div>
     <nav class="footer-col" aria-label="Product">
       <h4>Product</h4>
-      <a href="/#how">How it works</a><a href="/#scoring">Scoring</a><a href="/#analysis">Analysis</a><a href="/#ai">AI insights</a>
+      <a href="/#how">How it works</a><a href="/#scoring">Scoring</a><a href="/#analysis">Analysis</a><a href="/#ai">AI insights</a><a href="/#pricing">Pricing</a>
     </nav>
     <nav class="footer-col" aria-label="More">
       <h4>More</h4>

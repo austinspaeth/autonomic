@@ -248,6 +248,31 @@ describe('assertImportVersion', () => {
   });
 });
 
+describe('migrate: reminder', () => {
+  const reminderOf = (v: unknown) => migrate({ settings: { theme: 'dark', reminder: v } }).settings.reminder;
+
+  it('keeps a well-formed reminder', () => {
+    expect(reminderOf({ enabled: true, time: '07:30' })).toEqual({ enabled: true, time: '07:30' });
+    expect(reminderOf({ enabled: false, time: '23:59' })).toEqual({ enabled: false, time: '23:59' });
+  });
+
+  it('coerces enabled to a boolean', () => {
+    expect(reminderOf({ enabled: 1, time: '08:00' })).toEqual({ enabled: true, time: '08:00' });
+    expect(reminderOf({ time: '08:00' })).toEqual({ enabled: false, time: '08:00' });
+  });
+
+  // An armed reminder with an unusable time would throw in the scheduler, so
+  // these must not survive as an "on" reminder.
+  it.each([null, 'garbage', 42, [], { enabled: true }, { enabled: true, time: 99 }, { enabled: true, time: '8:00' }, { enabled: true, time: '24:00' }, { enabled: true, time: '07:60' }])(
+    'drops a malformed reminder %p',
+    (v) => { expect(reminderOf(v)).toBeUndefined(); },
+  );
+
+  it('leaves an absent reminder absent', () => {
+    expect(migrate({ settings: { theme: 'dark' } }).settings.reminder).toBeUndefined();
+  });
+});
+
 describe('migrate: idempotence', () => {
   it('re-migrating produces the identical state', () => {
     const messy = {

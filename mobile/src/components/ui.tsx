@@ -5,7 +5,7 @@
  */
 import React, { useRef } from 'react';
 import {
-  Animated, Pressable, StyleProp, StyleSheet, Text, View, ViewStyle,
+  Animated, Pressable, StyleProp, StyleSheet, Text, View, ViewProps, ViewStyle,
 } from 'react-native';
 import Reanimated, {
   Easing as REasing, useAnimatedStyle, useSharedValue, withTiming,
@@ -15,10 +15,10 @@ import type { ScoreCat } from '../lib/types';
 import { Icon, IconName } from './Icon';
 import { useSheets } from './Sheet';
 
-export function Card({ children, style }: { children: React.ReactNode; style?: StyleProp<ViewStyle> }) {
+export function Card({ children, style, onLayout }: { children: React.ReactNode; style?: StyleProp<ViewStyle>; onLayout?: ViewProps['onLayout'] }) {
   const p = usePalette();
   return (
-    <View style={[styles.card, { backgroundColor: p.surface, borderColor: p.border }, style]}>
+    <View onLayout={onLayout} style={[styles.card, { backgroundColor: p.surface, borderColor: p.border }, style]}>
       {children}
     </View>
   );

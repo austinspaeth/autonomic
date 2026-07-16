@@ -383,6 +383,224 @@ a { color: inherit; text-decoration: none; }
 .ch-x { display: flex; justify-content: space-between; font-size: 11px; color: var(--dim); margin-top: 8px; font-variant-numeric: tabular-nums; }
 
 /* ============================================================
+   APPLE WATCH - interactive companion demo
+   The device face replicates the real watchOS app screen for screen
+   (mobile/targets/watch/*.swift): same stages, copy, glyphs and
+   colours. The --wa-* tokens below mirror DesignSystem.swift and the
+   asset catalog in targets/watch/expo-target.config.js, so the screen
+   stays true to the shipped build; the section chrome around it uses
+   the site's own tokens. Type is scaled up from the Swift point sizes
+   (a true-scale watch face is unreadable on a desktop page) but the
+   hierarchy and layout are kept.
+   ============================================================ */
+.watch {
+  --wa-accent: #e03127;                 /* DS.accent */
+  --wa-blue: #4aa3f0;                   /* DS.blue */
+  --wa-amber: #e0a030;                  /* DS.amber */
+  --wa-green: #3ec46d;                  /* DS.green */
+  --wa-purple: #9d6bf5;                 /* DS.purple */
+  --wa-card: #161618;                   /* DS.card */
+  --wa-tile: #131315;                   /* DS.tile */
+  --wa-dim: #8a8a92;                    /* DS.dim */
+  --wa-faint: rgba(255,255,255,0.3);    /* DS.faint - held-but-stale data */
+  --wa-num: "Manrope", var(--display);  /* DS.number - Manrope ExtraBold */
+  position: relative;
+  overflow: hidden;
+}
+.watch-glow { position: absolute; right: -160px; top: 8%; width: 620px; height: 620px; background: radial-gradient(circle, rgba(224,49,39,0.16), transparent 62%); filter: blur(14px); pointer-events: none; }
+.watch-grid { display: grid; grid-template-columns: 1.02fr 0.98fr; gap: 56px; align-items: center; position: relative; z-index: 2; }
+.watch-copy { max-width: 560px; }
+.watch-pill { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 12px; letter-spacing: 0.06em; color: var(--accent-2); background: var(--accent-soft); border: 1px solid rgba(224,49,39,0.3); border-radius: 999px; padding: 6px 14px; margin-bottom: 20px; }
+.watch-pill i { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 0 rgba(224,49,39,0.6); animation: wa-pulse 2s infinite; }
+@keyframes wa-pulse { 0% { box-shadow: 0 0 0 0 rgba(224,49,39,0.55); } 70% { box-shadow: 0 0 0 8px rgba(224,49,39,0); } 100% { box-shadow: 0 0 0 0 rgba(224,49,39,0); } }
+
+/* Mode selector - mirrors the watch home screen's three rows, same order */
+.wa-modes { display: flex; flex-direction: column; gap: 12px; margin-top: 30px; }
+.wa-mode {
+  display: flex; align-items: center; gap: 16px; width: 100%; text-align: left; cursor: pointer;
+  font-family: var(--body); color: inherit; background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--r); padding: 16px 18px;
+  transition: border-color 0.25s var(--ease), background 0.25s, transform 0.2s var(--bounce);
+}
+.wa-mode:hover { border-color: var(--line-2); transform: translateX(3px); }
+/* Selected: the card takes the mode's own colour, so a blue POTS Test doesn't
+   sit inside a red frame. --wa-tint / --wa-soft are set per card in the markup
+   from DS.accent / DS.blue / DS.purple. */
+.wa-mode.active { border-color: var(--wa-tint, var(--accent)); background: linear-gradient(90deg, var(--wa-soft, var(--accent-soft)), transparent 70%); }
+/* Tinted the way the watch home screen tints its rows: the glyph in the mode's
+   colour on a 12%-alpha wash of it. */
+.wa-mode-ic { flex: none; width: 46px; height: 46px; border-radius: 13px; background: var(--wa-soft, var(--panel-2)); color: var(--wa-tint, var(--dim)); display: grid; place-items: center; transition: color 0.25s, background 0.25s; }
+.wa-mode-ic svg { width: 24px; height: 24px; }
+.wa-mode.active .wa-mode-ic { background: var(--wa-tint, var(--accent)); color: #fff; }
+.wa-mode-txt { flex: 1; min-width: 0; }
+.wa-mode-txt b { display: block; font-family: var(--display); font-weight: 600; font-size: 16.5px; letter-spacing: -0.01em; }
+.wa-mode-txt span { font-size: 13.5px; color: var(--dim); line-height: 1.4; }
+.wa-mode-go { flex: none; color: var(--dim-2); font-size: 20px; transition: color 0.25s, transform 0.25s var(--bounce); }
+.wa-mode.active .wa-mode-go { color: var(--wa-tint, var(--accent-2)); transform: translateX(2px); }
+
+/* Device */
+.watch-stage { display: flex; flex-direction: column; align-items: center; gap: 20px; }
+.wa-device { position: relative; width: 300px; }
+.wa-case {
+  position: relative; border-radius: 76px; padding: 18px;
+  background: linear-gradient(150deg, #3a3a3f, #17171a 46%, #29292d);
+  box-shadow: 0 40px 90px -30px rgba(0,0,0,0.9), inset 0 0 0 1px rgba(255,255,255,0.08);
+}
+.wa-crown, .wa-side { position: absolute; right: -5px; background: linear-gradient(90deg, #46464b, #202024); border-radius: 3px 5px 5px 3px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08); }
+.wa-crown { top: 98px; width: 8px; height: 40px; }
+.wa-crown::after { content: ""; position: absolute; right: -3px; top: 50%; transform: translateY(-50%); width: 5px; height: 26px; border-radius: 4px; background: linear-gradient(90deg, #3a3a3f, #1a1a1d); }
+.wa-side { top: 158px; width: 6px; height: 52px; }
+.wa-screen {
+  position: relative; aspect-ratio: 41 / 50; border-radius: 58px; overflow: hidden;
+  background: #000; box-shadow: inset 0 0 0 2px rgba(0,0,0,0.9); color: #fff;
+}
+/* Each face is a full-screen watchOS view. Scrolling faces mirror the
+   app's ScrollView (Start on the fold, Back/Skip just below it). */
+.wa-face { position: absolute; inset: 0; padding: 16px 14px; display: none; flex-direction: column; }
+.wa-face.on { display: flex; animation: wa-in 0.32s var(--ease); }
+.wa-face.scrolls { overflow-y: auto; overflow-x: hidden; scrollbar-width: none; }
+.wa-face.scrolls::-webkit-scrollbar { display: none; }
+@keyframes wa-in { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: none; } }
+
+/* Shared watch controls (DesignSystem.swift) */
+.wa-lbl { font-size: 10px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: var(--wa-dim); text-align: center; }
+.wa-sub { font-size: 11px; color: var(--wa-dim); text-align: center; }
+.wa-btn { display: block; width: 100%; font-family: var(--body); font-size: 14.5px; font-weight: 700; color: #fff; background: var(--wa-accent); border: 0; border-radius: 15px; padding: 12px; cursor: pointer; text-align: center; }
+/* Skip to standing / Finish now / End early. The app draws these smaller than
+   the primary action (SecondaryButton 13.5pt vs PrimaryButton 16pt), so they
+   stay a step down — just not as small as before. */
+.wa-btn.sec { font-size: 13px; font-weight: 600; color: var(--wa-dim); background: var(--wa-card); border-radius: 14px; padding: 11px; }
+/* The intro Back: Start's dimensions, secondary styling. */
+.wa-btn.back { color: var(--wa-dim); background: var(--wa-card); }
+.wa-num { font-family: var(--wa-num); font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+.wa-chip { display: inline-block; font-family: var(--wa-num); font-weight: 800; font-size: 11px; font-variant-numeric: tabular-nums; padding: 2px 9px; border-radius: 999px; border: 1px solid; }
+.wa-heart { display: inline-block; color: var(--wa-accent); animation: wa-beat 0.83s ease-in-out infinite; transform-origin: center; }
+.wa-heart svg { width: 100%; height: 100%; }
+@keyframes wa-beat { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.18); } }
+
+/* Pushes the face's action button to the fold, the way the app's ScrollView
+   sizes its content to one screenful with Back/Skip scrolling in below. */
+.wa-spring { flex: 1 1 auto; min-height: 4px; }
+
+/* Home face + the episode picker (same row list) */
+.waf-home { gap: 6px; align-items: center; }
+/* Home sits centred on the face rather than riding the top of the scroll
+   view — it's short enough to never need the scroll, so nothing is stranded
+   above the fold by the centring. */
+.waf-root { justify-content: center; }
+.waf-brand { font-size: 12.5px; font-weight: 800; margin-bottom: 2px; }
+.wa-row { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; font-family: var(--body); color: #fff; background: var(--wa-card); border: 0; border-radius: 13px; padding: 11px 9px; cursor: pointer; }
+.wa-row-ic { flex: none; width: 24px; height: 24px; border-radius: 7px; display: grid; place-items: center; }
+.wa-row-ic svg { width: 14px; height: 14px; }
+.wa-row-tx { flex: 1; min-width: 0; }
+.wa-row-tx b { display: block; font-size: 12px; font-weight: 700; line-height: 1.25; }
+.wa-row-tx span { font-size: 9.5px; color: var(--wa-dim); line-height: 1.3; }
+.wa-row-go { flex: none; color: rgba(138,138,146,0.7); font-size: 10px; font-weight: 700; }
+
+/* Episode picker: its rows carry no icon or subtitle, so they get their own
+   height rather than the home screen's. Back is matched to them exactly —
+   same font, padding and line-height, so all four rows measure the same. */
+.waf-pick .wa-row { padding: 14px 12px; }
+.waf-pick .wa-row-tx b { font-size: 14px; line-height: 1.25; }
+.waf-pick .wa-btn.back { font-size: 14px; line-height: 1.25; padding: 14px 12px; border-radius: 13px; }
+
+/* Intro faces (POTS test / episode) - same archetype in the app (IntroView /
+   OrthoIntroView), so they share this styling. Centred and tight rather than
+   the app's "Start on the fold, Back scrolls in below" split, which needs a
+   scroll nobody performs on a picture of a watch. */
+.waf-intro { align-items: center; justify-content: center; text-align: center; gap: 6px; }
+.waf-intro-ic { width: 78px; height: 56px; border-radius: 16px; display: grid; place-items: center; }
+.waf-intro-ic svg { width: 38px; height: 38px; }
+.waf-intro p { margin: 2px 0 5px; font-size: 13px; line-height: 1.35; color: rgba(255,255,255,0.85); }
+/* Start and Back match here, per the app: Back is Start's size with secondary
+   styling (.wa-btn.back), not the smaller SecondaryButton used for
+   Skip/Finish/End early. Both inherit the base .wa-btn size. */
+
+/* Ring faces (resting / standing / recovery) */
+.waf-ringface { align-items: center; gap: 3px; }
+/* The app sizes the ring to the screen and lets Skip/Finish sit below the
+   fold. Nobody scrolls inside a picture of a watch, so the ring gives up a
+   little width here to keep that button on screen. */
+.waf-ring-wrap { position: relative; width: 100%; max-width: 188px; aspect-ratio: 1; margin-top: 4px; }
+/* Direct child only: the -90deg starts the ring's stroke at 12 o'clock, and
+   must not reach the heart glyph nested inside .waf-ring-in. */
+.waf-ring-wrap > svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.waf-ring-in { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 0 22px; }
+.waf-count { font-size: 26px; }
+.waf-hr-line { display: flex; align-items: baseline; gap: 3px; }
+.waf-hr-line .u { font-size: 9.5px; font-weight: 700; color: var(--wa-dim); }
+.waf-left { font-size: 10px; font-weight: 600; color: var(--wa-dim); font-variant-numeric: tabular-nums; }
+
+/* Stand prompt */
+.waf-prompt { align-items: center; justify-content: center; gap: 10px; text-align: center; background: radial-gradient(circle at 50% 38%, rgba(224,49,39,0.18), transparent 62%); }
+.waf-arrow { color: var(--wa-accent); animation: wa-bob 1.1s ease-in-out infinite; }
+.waf-arrow svg { width: 34px; height: 34px; }
+@keyframes wa-bob { 0%, 100% { transform: translateY(3px); } 50% { transform: translateY(-5px); } }
+.waf-prompt b { font-size: 22px; font-weight: 800; letter-spacing: -0.01em; }
+.waf-prompt-sub { font-size: 11.5px; color: rgba(255,255,255,0.8); }
+
+/* Episode measure (before / during) */
+.waf-measure { align-items: center; text-align: center; gap: 6px; }
+.waf-measure-hr { display: flex; align-items: baseline; justify-content: center; gap: 4px; }
+.waf-measure-hr .wa-heart { width: 15px; height: 15px; align-self: center; }
+.waf-measure-hr .n { font-size: 34px; }
+.waf-measure-hr .u { font-size: 10px; font-weight: 700; color: var(--wa-dim); }
+
+/* HR monitor */
+.waf-hr-main { align-items: center; }
+.waf-hr-main .wa-heart { width: 19px; height: 19px; margin: 4px 0 0; }
+.waf-big { font-size: 76px; line-height: 1; margin-top: 7px; }
+.waf-big-u { font-size: 13px; font-weight: 700; color: var(--wa-dim); margin-top: 2px; }
+/* margin-top:auto pins the tiles to the foot of the face; the bottom margin
+   lifts them clear of it. */
+.waf-tiles { display: flex; gap: 6px; width: 100%; margin-top: auto; margin-bottom: 14px; }
+.wa-tile { flex: 1; background: var(--wa-tile); border-radius: 11px; padding: 7px 9px; }
+.wa-tile .k { font-size: 8.5px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--wa-dim); }
+.wa-tile .v { font-size: 19px; margin-top: 2px; }
+.waf-swipe { position: absolute; right: 6px; top: 50%; padding: 6px; border: 0; background: none; cursor: pointer; color: rgba(138,138,146,0.6); animation: wa-swipe 1.4s ease-in-out infinite; }
+.waf-swipe svg { width: 11px; height: 11px; }
+@keyframes wa-swipe { 0%, 100% { transform: translateX(-3px); } 50% { transform: translateX(3px); } }
+.waf-swipe.left { right: auto; left: 6px; animation-direction: reverse; }
+/* The symptom sheet lists the phone's whole registry, so this one genuinely
+   scrolls the way it does on the wrist; the extra bottom padding keeps the
+   last row out of the screen's corner radius. */
+.waf-syms { gap: 6px; padding-bottom: 28px; }
+.waf-syms b { font-size: 12.5px; font-weight: 700; }
+.wa-sym { display: block; width: 100%; text-align: left; font-family: var(--body); font-size: 11.5px; font-weight: 600; color: #fff; background: var(--wa-card); border: 0; border-radius: 12px; padding: 9px 10px; cursor: pointer; }
+.wa-sym.done { background: var(--wa-green); color: #06210f; }
+
+/* Results */
+.waf-res { align-items: center; text-align: center; gap: 3px; }
+.waf-res-ic svg { width: 24px; height: 24px; }
+.waf-res b.t { font-size: 12.5px; font-weight: 800; margin-bottom: 2px; }
+.wa-res-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; background: var(--wa-tile); border-radius: 11px; padding: 5px 10px; }
+.wa-res-row .k { font-size: 10.5px; color: var(--wa-dim); }
+.wa-res-row .v { font-size: 13px; }
+.waf-note { font-size: 9.5px; color: #fff; margin: 2px 0 0; }
+.waf-disc { font-size: 8.5px; line-height: 1.35; color: rgba(138,138,146,0.8); margin: 0; }
+
+/* Under the device: the tap invitation, with a quiet restart beneath it. */
+.wa-under { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.wa-caption { text-align: center; font-size: 13.5px; color: var(--dim); max-width: 34ch; margin: 0; }
+.wa-caption-ic { display: inline-block; width: 15px; height: 15px; margin-right: 6px; vertical-align: -2px; color: var(--accent-2); }
+.wa-caption-ic svg { width: 100%; height: 100%; animation: wa-tap 2.4s var(--ease) infinite; transform-origin: 30% 30%; }
+@keyframes wa-tap { 0%, 70%, 100% { transform: none; } 80%, 90% { transform: translate(1.5px, 1.5px) scale(0.88); } }
+.wa-restart {
+  display: inline-flex; align-items: center; gap: 6px; font-family: var(--body); font-size: 12.5px;
+  color: var(--dim-2); background: none; border: 0; padding: 4px 8px; cursor: pointer;
+  transition: color 0.2s var(--ease);
+}
+.wa-restart:hover { color: var(--text); }
+.wa-restart-ic { display: grid; place-items: center; width: 13px; height: 13px; }
+.wa-restart-ic svg { width: 100%; height: 100%; }
+.wa-restart:hover .wa-restart-ic { color: var(--accent-2); }
+
+@media (prefers-reduced-motion: reduce) {
+  .watch-pill i, .wa-heart, .waf-arrow, .waf-swipe, .wa-caption-ic svg { animation: none !important; }
+  .wa-face.on { animation: none; }
+}
+
+/* ============================================================
    AI MARQUEE
    ============================================================ */
 .ai { overflow: hidden; }
@@ -483,6 +701,140 @@ a { color: inherit; text-decoration: none; }
 .privacy-pills { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 28px; }
 .privacy-pills span { font-size: 13.5px; font-weight: 600; color: var(--dim); padding: 8px 16px; border: 1px solid var(--line); border-radius: 999px; background: rgba(255,255,255,0.02); }
 
+/* ============================================================
+   PRICING - free vs Pro
+   Two plan cards over one comparison grid. The Pro column of the grid is a
+   single continuous rail: an absolutely-positioned element behind the cells,
+   width-matched to the fixed last column, so it can't drift out of alignment
+   the way per-cell borders would.
+   ============================================================ */
+.pricing-sec { position: relative; overflow: hidden; }
+.pr-glow {
+  position: absolute; left: 50%; top: -160px; width: 900px; height: 520px;
+  transform: translateX(-50%);
+  background: radial-gradient(circle, rgba(224,49,39,0.18), transparent 62%);
+  filter: blur(16px); pointer-events: none;
+}
+.pricing-sec .wrap { position: relative; z-index: 1; }
+
+.pr-plans {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px;
+  max-width: 900px; margin: 0 auto;
+}
+.pr-plan {
+  position: relative; display: flex; flex-direction: column; gap: 13px;
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--r-lg); padding: 30px 26px 26px;
+}
+/* Gradient border + lift, the same treatment as .loop-step / .journey-sign. */
+.pr-plan-pro {
+  border: 1px solid transparent;
+  background:
+    linear-gradient(var(--panel), var(--panel)) padding-box,
+    radial-gradient(140% 140% at 0% 0%, var(--accent) 0%, rgba(224,49,39,0.38) 20%, var(--line-2) 55%) border-box;
+  box-shadow: 0 26px 70px -34px rgba(224,49,39,0.85);
+}
+.pr-badge {
+  position: absolute; top: -11px; left: 26px;
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase;
+  color: #fff; background: var(--accent); padding: 4px 11px; border-radius: 999px;
+  box-shadow: 0 8px 24px -8px rgba(224,49,39,0.9);
+}
+.pr-tag {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--dim-2); margin: 0;
+}
+.pr-plan-pro .pr-tag { color: var(--accent-2); }
+.pr-price { display: flex; align-items: baseline; gap: 6px; font-family: var(--display); font-weight: 700; letter-spacing: -0.03em; }
+.pr-amt { font-size: clamp(38px, 4.6vw, 50px); line-height: 1; }
+.pr-per { font-size: 15px; color: var(--dim); font-weight: 500; letter-spacing: 0; }
+.pr-sub { margin: -6px 0 0; font-size: 14px; color: var(--dim); }
+.pr-plan-pro .pr-sub { color: var(--text); }
+.pr-list {
+  list-style: none; margin: 6px 0 0; padding: 18px 0 0; border-top: 1px solid var(--line);
+  display: flex; flex-direction: column; gap: 12px; flex: 1;
+}
+.pr-list li { position: relative; padding-left: 28px; font-size: 14.5px; color: var(--dim); line-height: 1.45; }
+.pr-list li b { color: var(--text); font-weight: 600; }
+.pr-list li::before {
+  content: ""; position: absolute; left: 0; top: 2px; width: 18px; height: 18px; border-radius: 50%;
+  background: rgba(255,255,255,0.05);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239a9aa3' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: center;
+}
+/* background-color, not the `background` shorthand: the shorthand would reset
+   the repeat/position set above and tile the check instead of centring it. */
+.pr-list-pro li::before {
+  background-color: var(--accent-soft);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23ff6a5c' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+}
+.pr-btn { width: 100%; margin-top: 8px; }
+
+.pr-note {
+  max-width: 620px; margin: 26px auto 0; text-align: center;
+  font-size: 14.5px; color: var(--dim); line-height: 1.6; text-wrap: pretty;
+}
+
+/* ---------- the comparison grid ---------- */
+.pr-table {
+  position: relative; display: grid;
+  grid-template-columns: minmax(0, 1fr) 92px 118px;
+  max-width: 760px; margin: 46px auto 0; padding-bottom: 14px;   /* the rail's rounded tail */
+}
+.pr-rail {
+  position: absolute; top: 0; right: 0; bottom: 0; width: 118px; z-index: 0;
+  background: rgba(224,49,39,0.07);
+  border: 1px solid rgba(224,49,39,0.19); border-radius: var(--r);
+  pointer-events: none;
+}
+.pr-cell {
+  position: relative; z-index: 1; display: flex; align-items: center;
+  min-height: 54px; padding: 11px 0; border-top: 1px solid rgba(255,255,255,0.05);
+}
+.pr-feat { padding-right: 14px; font-size: 14px; line-height: 1.4; color: var(--text); }
+.pr-mark { justify-content: center; }
+.pr-corner, .pr-col-head, .pr-first { border-top: none; }
+.pr-col-head {
+  justify-content: center; align-items: flex-end; min-height: 0; padding: 12px 0 13px;
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--dim-2);
+}
+.pr-col-head.pr-col-pro { color: var(--accent-2); }
+.pr-group {
+  grid-column: 1 / 3; margin: 0; align-self: end; padding: 22px 0 7px;
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--dim-2);
+}
+.pr-group-cell { border-top: none; min-height: 0; padding: 0; }
+.pr-ic { width: 18px; height: 18px; flex: none; }
+.pr-mark.dim { color: var(--dim-2); }
+.pr-mark.on { color: var(--accent-2); }
+.pr-mark.on .pr-ic { width: 19px; height: 19px; }
+.pr-val { font-size: 12.5px; font-weight: 600; line-height: 1.3; text-align: center; color: inherit; }
+.pr-mark.on .pr-val { font-weight: 800; }
+.pr-dash { width: 12px; height: 2px; border-radius: 2px; background: var(--dim-2); opacity: 0.5; }
+.pr-sr {
+  position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap;
+}
+
+.pr-foot { max-width: 760px; margin: 20px auto 0; text-align: center; font-size: 13.5px; color: var(--dim-2); }
+
+@media (max-width: 720px) {
+  .pr-plans { grid-template-columns: minmax(0, 1fr); max-width: 440px; }
+  /* Pro leads on mobile: the badge is the hook, and Free is one scroll away. */
+  .pr-plan-pro { order: -1; }
+}
+@media (max-width: 560px) {
+  .pr-plan { padding: 26px 20px 22px; }
+  .pr-table { grid-template-columns: minmax(0, 1fr) 66px 84px; }
+  .pr-rail { width: 84px; }
+  .pr-feat { font-size: 12.75px; padding-right: 10px; }
+  .pr-cell { min-height: 50px; }
+  .pr-val { font-size: 11.5px; }
+  .pr-ic, .pr-mark.on .pr-ic { width: 16px; height: 16px; }
+}
+
 /* Comparison table (Autonomic vs Welltory) */
 .cmp-table {
   display: grid; grid-template-columns: minmax(0,1.5fr) minmax(0,1fr) minmax(0,1fr);
@@ -537,6 +889,8 @@ a { color: inherit; text-decoration: none; }
 
 .cmp-foot { max-width: 840px; margin: 22px auto 0; text-align: center; font-size: 14.5px; color: var(--dim); }
 .cmp-foot { text-wrap: balance; }
+.cmp-foot-link { color: var(--accent-2); font-weight: 600; white-space: nowrap; }
+.cmp-foot-link:hover { text-decoration: underline; }
 
 @media (max-width: 600px) {
   .cmp-table { grid-template-columns: minmax(0,1.35fr) minmax(0,1fr) minmax(0,1fr); }
@@ -618,6 +972,10 @@ a { color: inherit; text-decoration: none; }
   .hero-stage { min-height: 520px; margin-top: 10px; }
   .hero-copy { max-width: 640px; }
   .feature, .ai-grid { grid-template-columns: minmax(0,1fr); gap: 36px; }
+  /* Watch: copy first, device below it (the mode cards drive the screen, so
+     they have to be read before the thing they control). */
+  .watch-grid { grid-template-columns: minmax(0,1fr); gap: 40px; }
+  .watch-copy { max-width: 640px; }
   /* Stacked: cap the prompt height so the body still reads as truncated. */
   .ai-prompt-cell > .ai-prompt { position: static; overflow: hidden; }
   .aip-body { max-height: 210px; }

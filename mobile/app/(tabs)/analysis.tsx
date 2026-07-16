@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, Text, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { Screen } from '../../src/components/Header';
-import { Icon, IconName } from '../../src/components/Icon';
+import { Icon } from '../../src/components/Icon';
 import { HelpDot, ScoreDot, Segmented } from '../../src/components/ui';
 import { Bars, BpDumbbell, LineChart, ZonesToggle } from '../../src/components/charts';
 import { fonts, radius, usePalette } from '../../src/theme';
@@ -13,10 +13,16 @@ import { buildCategories, type AnalysisCard, type BpPeriod, type OrthoTransition
 import { resolveProtocol } from '../../src/lib/scoring/day';
 import { avgRound, catFromBands, type Mode } from '../../src/lib/analysis/buckets';
 import { HrvFilterLinks, HrvProgress, type Filt } from '../../src/features/HrvProgress';
+import { demoDays, hasOwnData } from '../../src/lib/demo';
+import { DemoBanner, DEMO_PROGRESS_TEXT } from '../../src/features/DemoBanner';
 
 export default function AnalysisScreen() {
   const p = usePalette();
   const state = useAppState();
+  // Nothing logged yet: chart the sample month behind a "demo data" banner
+  // rather than an empty view. Swaps to their own data on the first entry.
+  const demo = !hasOwnData(state.days);
+  const days = demo ? demoDays() : state.days;
   const [mode, setMode] = useState<Mode>('day');
   // Freemium: free tier keeps the Day view; the longer ranges are Pro. Locked
   // segments render a lock glyph and raise the paywall instead of switching.
@@ -33,14 +39,15 @@ export default function AnalysisScreen() {
   // Build every category's cards once per (days, mode, profile). Memoized so the
   // scroll-driven "active section" re-render doesn't rebuild all the charts.
   const sections = useMemo(() => {
-    const cats = buildCategories(state.days, mode, { sex, height, protocol: resolveProtocol(state.settings.protocol), customTypes: state.customTypes });
-    return cats.map((c) => ({ id: c.id, icon: c.icon, title: c.title, desc: c.desc, buckets: c.buckets, cards: c.build() }));
-  }, [state.days, mode, sex, height, state.settings.protocol, state.customTypes]);
+    const cats = buildCategories(days, mode, { sex, height, protocol: resolveProtocol(state.settings.protocol), customTypes: state.customTypes });
+    return cats.map((c) => ({ id: c.id, title: c.title, buckets: c.buckets, cards: c.build(), hasOwn: c.hasData?.() ?? false }));
+  }, [days, mode, sex, height, state.settings.protocol, state.customTypes]);
 
   // Outlook always synthesizes a score, so it isn't proof of real data. Treat the
   // whole view as empty unless some *other* category has something logged — that's
-  // when the progress charts are actually meaningful.
-  const hasData = sections.some((s) => s.id !== 'outlook' && s.cards.length > 0);
+  // when the progress charts are actually meaningful. HRV builds no cards (it draws
+  // itself), so it answers through `hasOwn` instead.
+  const hasData = sections.some((s) => s.id !== 'outlook' && (s.cards.length > 0 || s.hasOwn));
 
   const scrollRef = useRef<ScrollView>(null);
   const offsets = useRef<Record<string, number>>({});   // section id -> y in the scroll content
@@ -75,23 +82,15 @@ export default function AnalysisScreen() {
     if (Math.abs(dy) > 0.5) dirRef.current = dy > 0 ? 1 : -1;
     let active: string | null = null;
     for (const s of sections) {
+      // Outlook renders untitled at the very top, so it never pins — the sticky
+      // bar starts with HRV.
+      if (s.id === 'outlook') continue;
       const off = offsets.current[s.id];
       if (off == null) continue;
       if (off - y <= headerH + HANDOFF_LEAD) active = s.id;
       else break;
     }
     if (active !== activeRef.current) { activeRef.current = active; setActiveId(active); }
-  };
-
-  const goTo = (id: string) => {
-    const off = offsets.current[id];
-    if (off == null) return;
-    // `off - headerH` lands the section *title* flush under the top header,
-    // which pins the bar but tucks the first card partly under it (the bar is
-    // taller than the title). Nudge the scroll down so the first card clears the
-    // bar's bottom with a small gap, while staying inside the pin handoff line.
-    const clear = STICKY_BAR_H - SECTION_TITLE_SIZE - 6;   // ≈ 26, < HANDOFF_LEAD
-    scrollRef.current?.scrollTo({ y: Math.max(0, off - headerH - clear), animated: true });
   };
 
   const scrollToTop = () => scrollRef.current?.scrollTo({ y: 0, animated: true });
@@ -136,29 +135,11 @@ export default function AnalysisScreen() {
         </Text>
       ) : (
         <>
-          {/* Jump menu: tap a card to scroll to that category's section below.
-              Explicit rows of three flexing cards rather than percentage widths —
-              31.5% + gaps overflowed by ~1pt on narrow screens (iPhone mini) and
-              wrapped the third column. flex: 1 shrinks to fit any viewport. */}
-          <View style={{ gap: 10 }}>
-            {Array.from({ length: Math.ceil(sections.length / 3) }, (_, ri) => sections.slice(ri * 3, ri * 3 + 3)).map((row, ri) => (
-              <View key={ri} style={{ flexDirection: 'row', gap: 10 }}>
-                {row.map((s) => (
-                  <Pressable key={s.id} onPress={() => goTo(s.id)} style={{ flex: 1, backgroundColor: p.surface, borderColor: activeId === s.id ? p.accent : p.border, borderWidth: 1, borderRadius: radius.card, padding: 12 }}>
-                    <Icon name={s.icon as IconName} size={24} color={p.accent} />
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: p.text, marginTop: 7 }}>{s.title}</Text>
-                    <Text style={{ fontSize: 11, color: p.textDim, marginTop: 2 }}>{s.desc}</Text>
-                  </Pressable>
-                ))}
-                {row.length < 3 ? Array.from({ length: 3 - row.length }, (_, i) => <View key={`sp${i}`} style={{ flex: 1 }} />) : null}
-              </View>
-            ))}
-          </View>
-
+          {demo ? <DemoBanner text={DEMO_PROGRESS_TEXT} /> : null}
           {/* Every category inline as one long document with a titled section. */}
-          {sections.map((s) => (
-            <View key={s.id} onLayout={(e) => { offsets.current[s.id] = e.nativeEvent.layout.y; }} style={{ marginTop: 22 }}>
-              {s.id === 'hrv' ? (
+          {sections.map((s, si) => (
+            <View key={s.id} onLayout={(e) => { offsets.current[s.id] = e.nativeEvent.layout.y; }} style={{ marginTop: si === 0 ? 0 : 22 }}>
+              {s.id === 'outlook' ? null : s.id === 'hrv' ? (
                 // HRV keeps its All/Morning/Evening pills inline with the title —
                 // small and right-aligned so they never overrun the container;
                 // the same toggle also rides in the pinned bar once this section pins.
@@ -172,7 +153,7 @@ export default function AnalysisScreen() {
                 <Text style={{ fontSize: SECTION_TITLE_SIZE, fontWeight: '700', color: p.text, marginBottom: 8 }}>{s.title}</Text>
               )}
               {s.id === 'hrv' ? (
-                <HrvProgress days={state.days} mode={mode} ctx={{ sex, height }} filt={hrvFilt} />
+                <HrvProgress days={days} mode={mode} ctx={{ sex, height }} filt={hrvFilt} />
               ) : s.cards.length === 0 ? (
                 <Text style={{ color: p.textDim }}>No data logged yet for this category.</Text>
               ) : (
@@ -191,8 +172,7 @@ type Active = { id: string; title: string } | null;
 // One size for section titles everywhere — the inline headers in the document
 // and the pinned bar's title must read as the *same* element trading places.
 const SECTION_TITLE_SIZE = 20;
-// Height of the pinned section bar. Shared so `goTo` can land a section's first
-// card just below the bar rather than tucked under it.
+// Height of the pinned section bar.
 const STICKY_BAR_H = 52;
 
 /**

@@ -147,6 +147,13 @@ export interface AppState {
     cameraLayout?: CameraLayout;
     /** Clean-day protocol; undefined falls back to DEFAULT_PROTOCOL. */
     protocol?: Protocol;
+    /** Day key stamped the first time a protocol is saved (never cleared) —
+     *  completes the "Getting started" protocol milestone. */
+    protocolSetOn?: string;
+    /** Daily morning-reading nudge (the app's only notification). Source of
+     *  truth for the OS schedule — see `syncReminder()` in lib/reminders.
+     *  `time` survives disabling so re-enabling can offer it back. */
+    reminder?: { enabled: boolean; time: string };
   };
   profile: Profile;
   /** User-defined types layered on top of the registry maps (pure JSON defs). */

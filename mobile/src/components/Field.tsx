@@ -118,8 +118,9 @@ function AndroidPickerRow({ shown, onPress }: { shown: string; onPress: () => vo
 }
 
 /** Contents of the time-picker sheet: spinner (iOS) / system dialog (Android)
- *  + full-width red Save. */
-export function TimePickerSheet({ label, value, onChange, controls }: { label: string; value: string; onChange: (v: string) => void; controls: SheetControls }) {
+ *  + full-width red Save. `note` adds a line of context under the title (used
+ *  by the morning reminder, where the choice needs explaining). */
+export function TimePickerSheet({ label, note, value, onChange, controls }: { label: string; note?: string; value: string; onChange: (v: string) => void; controls: SheetControls }) {
   const p = usePalette();
   const [h, m] = (value || '00:00').split(':').map(Number);
   const base = new Date();
@@ -140,7 +141,8 @@ export function TimePickerSheet({ label, value, onChange, controls }: { label: s
   return (
     <View>
       {/* Title vertically aligned with the sheet's ✕ (top:12, h:32 → centered on 28px). */}
-      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, lineHeight: 32, marginTop: -12, marginBottom: 12 }}>{label}</Text>
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, lineHeight: 32, marginTop: -12, marginBottom: note ? 8 : 12, paddingRight: 44 }}>{label}</Text>
+      {note ? <Text style={{ fontSize: 14, lineHeight: 21, color: p.textDim, marginBottom: 4 }}>{note}</Text> : null}
       {Platform.OS === 'ios' ? (
         <DateTimePicker
           value={draft}

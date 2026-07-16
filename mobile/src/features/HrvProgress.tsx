@@ -316,7 +316,11 @@ function MetricSection({ m, structured, unstructured, buckets }: {
   buckets: { label: string }[];
 }) {
   const p = usePalette();
-  const [kind, setKind] = useState<Kind>('breath');
+  // Default to structured when the range has any, else unstructured; an explicit
+  // tap on the toggle overrides. Kept derived (not one-shot state) so the default
+  // tracks range/filter changes until the user picks a kind themselves.
+  const [kindChoice, setKindChoice] = useState<Kind | null>(null);
+  const kind: Kind = kindChoice ?? (structured.some((v) => v != null) ? 'breath' : 'hrv');
   const [showZones, setShowZones] = useState(false);
   const [sel, setSel] = useState<number | null>(null);
   useEffect(() => { setSel(null); }, [kind]);
@@ -379,7 +383,7 @@ function MetricSection({ m, structured, unstructured, buckets }: {
         right={!empty && zones ? <ZonesToggle on={showZones} onPress={() => setShowZones((v) => !v)} /> : undefined}
       />
       <View style={{ marginBottom: 12 }}>
-        <KindToggle value={kind} onChange={setKind} />
+        <KindToggle value={kind} onChange={setKindChoice} />
       </View>
       {empty ? (
         <Text style={{ color: p.textDim, fontSize: 13 }}>

@@ -1,14 +1,12 @@
 import React, { useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Clipboard from 'expo-clipboard';
-import * as Sharing from 'expo-sharing';
-import * as FileSystem from 'expo-file-system';
 import { Screen } from '../../src/components/Header';
 import { Icon, IconName } from '../../src/components/Icon';
-import { Button, Segmented } from '../../src/components/ui';
-import { SheetControls, SheetFooter, useSheets } from '../../src/components/Sheet';
+import { Segmented } from '../../src/components/ui';
+import { useSheets } from '../../src/components/Sheet';
 import { useToast } from '../../src/components/Toast';
+import { PromptSheet } from '../../src/features/PromptSheet';
 import { radius, usePalette } from '../../src/theme';
 import { getState, useAppState } from '../../src/store/store';
 import { todayKey } from '../../src/lib/dates';
@@ -16,6 +14,13 @@ import { REPORT_CARDS, ReportRange, buildDataExport, buildPrompt, hasAnyData, re
 import { resolveProtocol } from '../../src/lib/scoring/day';
 import { useTier } from '../../src/store/tier';
 import { usePaywall } from '../../src/features/Paywall';
+import { demoState, hasOwnData } from '../../src/lib/demo';
+import { DemoBanner, DEMO_INSIGHTS_TEXT } from '../../src/features/DemoBanner';
+
+/** The state reports are built from: the user's own, or the sample month while
+ *  they have logged nothing. Resolved at press time off fresh store state so it
+ *  can never disagree with what the view decided to render. */
+const reportState = () => { const s = getState(); return hasOwnData(s.days) ? s : demoState(s); };
 
 // Rendered full-width above the two-up grid, in this order, right under the
 // data-only prompt: the doctor summary, then the all-in-one overall report.
@@ -38,14 +43,16 @@ export default function InsightsScreen() {
   React.useEffect(() => { if (locked && selected.size) setSelected(new Set()); }, [locked, selected.size]);
   React.useEffect(() => { if (locked && range !== 'day') setRange('day'); }, [locked, range]);
 
-  // Nothing to analyze until something real is logged, so hide the report picker
-  // and point people back to the Journal, same gate the Progress view uses.
-  const hasData = useMemo(() => hasAnyData(state.days, Object.keys(state.days)), [state.days]);
+  // Nothing logged yet: run the reports off the sample month behind a "demo
+  // data" banner, so people can see what a report looks like before committing
+  // to a month of logging. Swaps to their own data on the first entry.
+  const demo = !hasOwnData(state.days);
+  const hasData = useMemo(() => demo || hasAnyData(state.days, Object.keys(state.days)), [demo, state.days]);
 
   const toggle = (id: string) => setSelected((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
   const generate = () => {
-    const state = getState();
+    const state = reportState();
     const cards = REPORT_CARDS.filter((c) => selected.has(c.id));
     if (!cards.length) return;
     const { keys: allKeys, rangeText } = reportDateRange(range, todayKey());
@@ -58,7 +65,7 @@ export default function InsightsScreen() {
   };
 
   const dataExport = () => {
-    const state = getState();
+    const state = reportState();
     const { keys: allKeys, rangeText } = reportDateRange(range, todayKey());
     const keys = allKeys.filter((k) => state.days[k]);
     if (!hasAnyData(state.days, keys)) { toast('No data available for this period'); return; }
@@ -116,6 +123,7 @@ export default function InsightsScreen() {
         </Text>
       ) : (
         <>
+          {demo ? <DemoBanner text={DEMO_INSIGHTS_TEXT} /> : null}
           <Text style={{ color: p.textDim, fontSize: 14, marginBottom: 12, lineHeight: 19 }}>
             Pick a report area, tap Generate Report Prompt, then paste it into Claude, ChatGPT, Gemini, or any other provider to discover patterns, spot trends, gauge your progress, and surface what&apos;s worth discussing with your doctor.
           </Text>
@@ -144,57 +152,5 @@ export default function InsightsScreen() {
         </>
       )}
     </Screen>
-  );
-}
-
-function PromptSheet({ title, rangeText, prompt, controls, subtitle }: { title: string; rangeText: string; prompt: string; controls: SheetControls; subtitle?: string }) {
-  const p = usePalette();
-  const toast = useToast();
-  const copy = async () => {
-    await Clipboard.setStringAsync(prompt);
-    controls.close();
-    toast('Copied to clipboard');
-  };
-  const share = async () => {
-    const uri = `${FileSystem.cacheDirectory}autonomic-report.txt`;
-    try {
-      await FileSystem.writeAsStringAsync(uri, prompt);
-      if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(uri, { mimeType: 'text/plain', dialogTitle: title });
-    } catch { toast('Share failed'); }
-    finally {
-      // The report contains the user's health data in plaintext; don't leave it in cache.
-      await FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
-    }
-  };
-  return (
-    <View>
-      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text }}>{title}</Text>
-      <Text style={{ color: p.textDim, fontSize: 14, marginTop: 4 }}>{subtitle || 'Copy this prompt and paste it into Claude, ChatGPT, Gemini, or your AI of choice.'}</Text>
-      <Text style={{ color: p.textDim, fontSize: 12, marginTop: 6, marginBottom: 10, fontVariant: ['tabular-nums'] }}>{`${rangeText} · ${prompt.length.toLocaleString()} characters`}</Text>
-      <View style={{ backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.control, padding: 12 }}>
-        <Text selectable style={{ color: p.text, fontFamily: 'Menlo', fontSize: 11, lineHeight: 16 }}>{prompt}</Text>
-      </View>
-      {/* Extra tail room: the pinned footer (disclaimer + buttons) is taller than
-          the sheet's default footer clearance. */}
-      <View style={{ height: 70 }} />
-      {/* Copy/Share stay pinned in the sheet's fixed footer so they're always in
-          view, with the AI disclaimer riding directly above them. */}
-      <SheetFooter>
-        <View style={{ flex: 1 }}>
-          {!subtitle ? (
-            <View style={{ flexDirection: 'row', gap: 9, alignItems: 'flex-start', backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.control, padding: 10, marginBottom: 10 }}>
-              <View style={{ marginTop: 1 }}><Icon name="info" size={15} color={p.textDim} /></View>
-              <Text style={{ flex: 1, color: p.textDim, fontSize: 11.5, lineHeight: 16 }}>
-                Any analysis or advice comes from the AI service you paste this into. Autonomic only assembles your logged data. Talk to your doctor before acting on its suggestions.
-              </Text>
-            </View>
-          ) : null}
-          <View style={{ flexDirection: 'row', gap: 10 }}>
-            <Button title="Share" variant="ghost" onPress={share} />
-            <Button title={subtitle ? 'Copy data' : 'Copy prompt'} variant="primary" onPress={copy} />
-          </View>
-        </View>
-      </SheetFooter>
-    </View>
   );
 }

@@ -19,6 +19,7 @@ import { orthoDeltaCat, orthoMaxDelta, rowScoreCategory, SCORE_COLORS, GRADE_LAB
 import { sleepGrade, sleepHours, waterGoalL, type DaysMap } from '../lib/scoring/day';
 import type { SleepStages } from '../lib/types';
 import { ensureDay, getState, getWaveform, save, useAppState } from '../store/store';
+import { setJournalSectionY } from '../store/nav';
 import { useTier } from '../store/tier';
 import { canCaptureHrv, hrvCaptureUsedToday } from '../lib/gating';
 import { fmtDateLong, fmtTime12, periodOf, todayKey } from '../lib/dates';
@@ -73,7 +74,7 @@ export function JournalSections({ dk }: { dk: string }) {
         </View>
       </Card>
       {/* Activities */}
-      <Card>
+      <Card onLayout={(e) => setJournalSectionY('activities', e.nativeEvent.layout.y)}>
         <SectionHeader title="Activities" />
         <View style={{ paddingHorizontal: 14, paddingBottom: 12 }}>
           {[...(day.activities || [])].sort((a, b) => ((a.time as string) || '').localeCompare((b.time as string) || '')).map((a) => {

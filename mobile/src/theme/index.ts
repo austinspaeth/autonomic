@@ -26,6 +26,8 @@ export interface Palette {
   bg: string;
   surface: string;
   surface2: string;
+  /** Insets that should recede a step below `surface` (rows nested in a card). */
+  sunk: string;
   text: string;
   textDim: string;
   border: string;
@@ -40,6 +42,7 @@ const dark: Palette = {
   bg: '#000000',
   surface: '#1a1a1c',
   surface2: '#242427',
+  sunk: '#141416',
   text: '#f2f2f5',
   textDim: '#9a9aa0',
   border: '#303034',

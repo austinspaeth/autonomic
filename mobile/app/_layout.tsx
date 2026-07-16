@@ -18,6 +18,7 @@ import { initIap } from '../src/store/iap';
 import { initTier } from '../src/store/tier';
 import { initWatchReceiver } from '../src/lib/watch/receiver';
 import { runDailyBackup } from '../src/lib/backup';
+import { syncReminder } from '../src/lib/reminders';
 import { loadIssue } from '../src/store/store';
 import { usePalette } from '../src/theme';
 
@@ -54,6 +55,9 @@ export default function RootLayout() {
     if (Platform.OS === 'ios') initWatchReceiver();
     // First-launch-of-the-day JSON snapshot (rotating, kept in Documents/backups).
     runDailyBackup();
+    // Reconcile the OS notification schedule with settings.reminder — covers a
+    // reinstall, an imported journal, or permission revoked while we were away.
+    syncReminder();
     // Pull any published EAS update in the background (preview + production
     // builds alike); a downloaded bundle applies on the next launch.
     (async () => {

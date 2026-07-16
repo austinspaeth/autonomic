@@ -10,7 +10,7 @@ import { scoreCat, sleepHours, streakInfo, type DaysMap } from '../scoring/day';
 import { ACTIVITY_TYPES, MED_TYPES, TRIGGER_TYPES } from '../registry';
 import {
   BANDS, Mode, acBandZones, acBandsToZones, acBuckets, acMean, acPresent, acRangeLabel,
-  acReadVals, acScoreZones, acTotalPower, avgRound, catFromBands, isEvening, isMorning, makeAgg,
+  acReadVals, acScoreZones, avgRound, catFromBands, isEvening, isMorning, makeAgg,
   type ScoreContext,
 } from './buckets';
 import type { Series, Zone } from '../../components/charts';
@@ -62,7 +62,12 @@ export interface AnalysisCard {
   /** Bands for re-grading the dot when a `selectStat` chart is dragged. */
   catBands?: Band[] | null;
 }
-export interface Category { id: string; icon: string; title: string; desc: string; buckets: { label: string }[]; build: () => AnalysisCard[] }
+export interface Category {
+  id: string; icon: string; title: string; desc: string; buckets: { label: string }[]; build: () => AnalysisCard[];
+  /** Categories that render their own charts rather than cards report presence here —
+   *  an empty `build()` is not proof the range holds nothing. */
+  hasData?: () => boolean;
+}
 
 export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): Category[] {
   const buckets = acBuckets(days, mode);
@@ -113,24 +118,13 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
     };
   };
 
-  const hrv = (): AnalysisCard[] => {
+  // The HRV section draws itself through <HrvProgress/>, so it builds no cards.
+  // This reports only whether the range holds an HRV reading at all — the signal
+  // the Analysis view needs to tell "no data yet" from "data, drawn elsewhere".
+  const hasHrv = (): boolean => {
     const rmssdS = acAgg(buckets, (d) => acReadVals(d, 'breathHrv', 'rmssd'));
     const rmssdU = acAgg(buckets, (d) => acReadVals(d, 'hrv', 'rmssd'));
-    const tp = acAgg(buckets, (d) => acTotalPower(d));
-    if (!acPresent(rmssdS).length && !acPresent(rmssdU).length) return [];
-    return [{
-      title: 'HRV Readings', sub: range,
-      charts: [
-        { label: 'RMSSD (structured vs unstructured)', series: [series(rmssdS, '#4ade80', 'Structured'), series(rmssdU, '#38bdf8', 'Unstructured')], zones: acBandZones('rmssdS'), legend: [['Structured', '#4ade80'], ['Unstructured', '#38bdf8']] },
-        { label: 'pNN50', series: [series(acAgg(buckets, (d) => acReadVals(d, 'breathHrv', 'pnn50')), '#4ade80')], zones: acBandZones('pnn50') },
-        { label: 'Total power', series: [series(tp, '#a78bfa')], zones: acBandZones('totalPower'), integer: true },
-        { label: 'LF peak frequency', series: [series(acAgg(buckets, (d) => acReadVals(d, 'breathHrv', 'lfPeak')), '#38bdf8')], zones: acBandZones('lfPeak'), target: { from: 0.08, to: 0.1, color: '#16a34a' } },
-      ],
-      stats: [
-        { label: 'Avg RMSSD', value: avgRound(rmssdS) },
-        { label: 'Avg total power', value: avgRound(tp) },
-      ],
-    }];
+    return acPresent(rmssdS).length > 0 || acPresent(rmssdU).length > 0;
   };
 
   const vitals = (): AnalysisCard[] => {
@@ -410,7 +404,7 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
   const bl = buckets.map((b) => ({ label: b.label }));
   return [
     { id: 'outlook', icon: 'gauge', title: 'Outlook', desc: 'Recovery score & trends', buckets: bl, build: () => nonEmpty([...outlook(), heat()]) },
-    { id: 'hrv', icon: 'heartPulse', title: 'HRV', desc: 'Heart-rate variability', buckets: bl, build: () => nonEmpty(hrv()) },
+    { id: 'hrv', icon: 'heartPulse', title: 'HRV', desc: 'Heart-rate variability', buckets: bl, build: () => [], hasData: hasHrv },
     { id: 'vitals', icon: 'heart', title: 'Vitals', desc: 'Blood pressure & heart rate', buckets: bl, build: () => nonEmpty(vitals()) },
     { id: 'pots', icon: 'standing', title: 'POTS', desc: 'Stand tests & events', buckets: bl, build: () => nonEmpty([...standTest(), ...ortho()]) },
     { id: 'sleep', icon: 'moon', title: 'Sleep', desc: 'Duration & timing', buckets: bl, build: () => nonEmpty(sleep()) },

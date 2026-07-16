@@ -1,5 +1,5 @@
 /** Milestone tracker — recovery achievements beyond daily metrics. Now surfaced
- * as a progress card in the journal view (under the clean-day streak) that opens
+ * as a progress card in the journal view (above the clean-day streak) that opens
  * a bottom sheet, rather than living in its own tab. */
 import React from 'react';
 import { Pressable, Text, View } from 'react-native';
@@ -9,35 +9,46 @@ import { useSheets } from '../components/Sheet';
 import { radius, usePalette } from '../theme';
 import { fmtNum, fmtShort, todayKey } from '../lib/dates';
 import { useAppState } from '../store/store';
-import { buildMilestoneDays, buildMilestoneGroups } from '../lib/analysis/milestones';
+import { scrollJournalToSection } from '../store/nav';
+import { STARTERS, buildMilestoneDays, buildMilestoneGroups } from '../lib/analysis/milestones';
 import { resolveProtocol } from '../lib/scoring/day';
+import { useEntryForms } from './forms';
+import { ProtocolEditor } from './ProtocolEditor';
 
 export function useMilestones() {
   const state = useAppState();
   const { days, customTypes } = state;
   const { sex, height } = state.profile;
-  const { protocol } = state.settings;
+  const { protocol, protocolSetOn } = state.settings;
   // Rebuilding every milestone from all days is O(days × milestones) — memoize
   // so unrelated re-renders (theme, sheet state) don't recompute it.
   return React.useMemo(() => {
     const ctx = { sex, height, protocol: resolveProtocol(protocol), customTypes };
     const md = buildMilestoneDays(days, ctx);
-    const groups = md.keys.length ? buildMilestoneGroups(md) : [];
+    const groups = buildMilestoneGroups(md, { protocolSetOn });
     let done = 0, total = 0;
     groups.forEach((g) => g.items.forEach((it) => { total++; if (it.done) done++; }));
     const pct = total ? Math.round((done / total) * 100) : 0;
-    return { groups, done, total, pct };
-  }, [days, sex, height, protocol, customTypes]);
+    const starters = groups.find((g) => g.title === 'Getting started')?.items ?? [];
+    return { groups, done, total, pct, starters };
+  }, [days, sex, height, protocol, protocolSetOn, customTypes]);
 }
 
 /** Compact card for the journal view; taps open the full tracker in a sheet.
- * When milestones were unlocked on `dk`, a divider + checklist of them appears
- * below the progress row. */
+ * Undone "Getting started" milestones render as a tappable "Up first" checklist
+ * (each row jumps straight to the surface that completes it); when milestones
+ * were unlocked on `dk`, a divider + checklist of them appears below. */
 export function MilestoneProgressCard({ dk }: { dk?: string }) {
   const p = usePalette();
   const { openSheet } = useSheets();
-  const { groups, done, total, pct } = useMilestones();
-  if (!total) return null;
+  const { groups, done, total, pct, starters } = useMilestones();
+  const forms = useEntryForms(todayKey());
+  const upFirst = starters.filter((it) => !it.done);
+  const starterAction: Record<string, () => void> = {
+    [STARTERS.hrv]: forms.captureHrv,
+    [STARTERS.fullDay]: () => scrollJournalToSection('activities'),
+    [STARTERS.protocol]: () => openSheet((c) => <ProtocolEditor controls={c} />),
+  };
   const achievedToday = dk ? groups.flatMap((g) => g.items).filter((it) => it.done && it.date === dk) : [];
   return (
     <Pressable
@@ -57,6 +68,30 @@ export function MilestoneProgressCard({ dk }: { dk?: string }) {
         </View>
         <Icon name="chevronRight" size={18} color={p.textDim} />
       </View>
+      {upFirst.length ? (
+        <>
+          <View style={{ height: 1, backgroundColor: p.border, marginTop: 15 }} />
+          <Text style={{ fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, color: p.textDim, marginTop: 13, marginBottom: 10 }}>
+            Up first
+          </Text>
+          <View style={{ gap: 8 }}>
+            {upFirst.map((it) => (
+              <Pressable
+                key={it.label}
+                onPress={starterAction[it.label]}
+                style={({ pressed }) => [
+                  { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: p.sunk, borderRadius: radius.control, paddingVertical: 16, paddingHorizontal: 13 },
+                  pressed && { opacity: 0.6 },
+                ]}
+              >
+                <View style={{ width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: p.border, backgroundColor: p.surface2 }} />
+                <Text numberOfLines={1} style={{ flex: 1, fontSize: 14, color: p.text, fontWeight: '500' }}>{it.label}</Text>
+                <Icon name="chevronRight" size={18} color={p.textDim} />
+              </Pressable>
+            ))}
+          </View>
+        </>
+      ) : null}
       {achievedToday.length ? (
         <>
           <View style={{ height: 1, backgroundColor: p.border, marginTop: 15 }} />

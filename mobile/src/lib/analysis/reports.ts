@@ -3,8 +3,9 @@
  * copyable analysis prompt from the user's data over a range. Pure text, no
  * network. Sections are rendered as the same [stamp]-prefixed lines.
  */
-import { dateFromKey, fmtNum, fmtTime12, keyOf } from '../dates';
+import { addDays, dateFromKey, fmtNum, fmtTime12, keyOf } from '../dates';
 import type { AppState, CustomTypes, DayRecord } from '../types';
+import type { Downturn } from '../scoring/downturn';
 import { blueZone, dayCleanliness, scoreSet, sleepHours, type DaysMap } from '../scoring/day';
 import { ACTIVITY_TYPES, MED_TYPES, SYMPTOM_TYPES, TRIGGER_TYPES, bmLabel, isDivider } from '../registry';
 import { bpBce, bpKerdo, bpKvas, bpMap, bpPP, bpRobinson, type ScoreContext } from '../scoring';
@@ -119,7 +120,7 @@ export function makeSectionRenderer(state: AppState, ctx: ScoreContext) {
 }
 
 export function universalHeader(_state: AppState, rangeText: string): string {
-  return `You are analyzing autonomic and recovery health data logged by a person using a personal health-tracking app. Base every observation on the data provided below. Do not assume a diagnosis, age, sex, or medical history that is not present in the data.
+  return `You are analyzing autonomic and recovery health data logged by a person using Autonomic (autonomic.care), a personal health-tracking app for autonomic recovery. Base every observation on the data provided below. Do not assume a diagnosis, age, sex, or medical history that is not present in the data.
 
 Approach this analysis as an honest friend examining the data carefully - direct and accurate without unnecessary softening or cruelty.
 
@@ -158,7 +159,53 @@ export function buildDataExport(state: AppState, ctx: ScoreContext, range: Repor
   const { keys: allKeys, rangeText } = reportDateRange(range, currentKey);
   const keys = allKeys.filter((k) => state.days[k]).sort();
   const render = makeSectionRenderer(state, ctx);
-  return `DATA EXPORT\nPERIOD: ${rangeText}\n\n${render(keys, ALL_SECTION_KEYS)}`;
+  return `DATA EXPORT\nSOURCE: Autonomic (autonomic.care), a personal health-tracking app for autonomic recovery\nPERIOD: ${rangeText}\n\n${render(keys, ALL_SECTION_KEYS)}`;
+}
+
+/**
+ * Investigation prompt behind the Outlook downturn warning: the last two weeks
+ * of every data section, the detected slide, and a structured ask to rank what
+ * could explain the drop (oncoming sickness, triggers, overexertion, sleep,
+ * protocol, stress) with evidence for and against each.
+ */
+export function buildDownturnPrompt(state: AppState, ctx: ScoreContext, dk: string, w: Downturn): { prompt: string; rangeText: string } {
+  const DAYS = 14;
+  const start = addDays(dk, -(DAYS - 1));
+  const longFmt = (k: string) => dateFromKey(k).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
+  const rangeText = `Past ${DAYS} days (${longFmt(start)} to ${longFmt(dk)})`;
+  const allKeys: string[] = [];
+  for (let i = 0; i < DAYS; i++) allKeys.push(addDays(start, i));
+  const keys = allKeys.filter((k) => state.days[k]);
+  const render = makeSectionRenderer(state, ctx);
+
+  const findings = w.factors.length
+    ? w.factors.map((f) => `- ${f.label} (${f.value}): ${f.detail}`).join('\n')
+    : '- Nothing found: no triggers, protocol breaks, heavy activity, or short sleep were logged in the slide window.';
+
+  return {
+    rangeText,
+    prompt: `You are analyzing autonomic and recovery health data logged by a person using Autonomic (autonomic.care), a personal health-tracking app for autonomic recovery. Base every observation on the data provided below. Do not assume a diagnosis, age, sex, or medical history that is not present in the data.
+
+Approach this analysis as an honest friend examining the data carefully - direct and accurate without unnecessary softening or cruelty.
+
+REQUIREMENTS: Be concise, accurate, honest, specific (use actual numbers), research-grounded, and careful with recommendations (note doctor consultation for medications, therapeutic-dose supplements, or major protocol changes). Do not use em dashes anywhere in your response; use commas, colons, parentheses, or separate sentences instead.
+
+SITUATION: The app's trend detection flagged a downturn ending ${longFmt(dk)}. The daily autonomic score fell about ${w.drop} points below its recent baseline over roughly ${w.spanDays} days (severity: ${w.severity === 'alert' ? 'high' : 'moderate'}). The app scanned the slide window and found:
+${findings}
+
+FOCUS: Work out what is most likely driving this drop. Examine ALL of the data below, not just the flagged window: compare the slide days against the earlier baseline days, and look for patterns the simple scan above cannot see (delayed trigger effects, cumulative load, circadian drift, subtle vital-sign shifts).
+
+ANALYSIS REQUESTED:
+1. THE SLIDE IN NUMBERS: Describe what actually changed across the slide days versus baseline: HRV (RMSSD, power, frequency balance), resting HR, BP, sleep, symptoms. Use the actual values.
+2. CANDIDATE EXPLANATIONS, RANKED: Evaluate each hypothesis with the evidence for and against it from the data: (a) oncoming illness or infection; (b) trigger exposure, including delayed or cumulative effects from before the window; (c) overexertion or post-exertional response; (d) sleep debt or disrupted sleep; (e) protocol lapses; (f) stress or other unlogged load. Name the most likely explanation and say how confident the data lets you be.
+3. SICKNESS CHECK: Autonomic shifts often precede symptoms. State which specific markers in this data do or do not look like a prodromal illness pattern (for example rising resting and sleeping HR, falling HRV with no matching load, worsening despite clean behavior).
+4. WHAT TO WATCH: The 2 or 3 measurements over the next 48 to 72 hours that would best confirm or rule out your leading explanation, with the thresholds that would change the verdict.
+5. WHAT TO DO NOW: Concrete rest-first guidance for the next few days, sized to the severity above. Note explicitly when symptoms or readings would warrant contacting a doctor.
+
+DATA FOR PERIOD (${rangeText}):
+
+${render(keys, ['scores', 'hrv', 'rhr', 'bp', 'sleep', 'activities', 'triggers', 'meds', 'supplements', 'symptoms', 'digestion', 'orthostatic', 'cleanDays', 'notes'])}`,
+  };
 }
 
 export function buildPrompt(state: AppState, ctx: ScoreContext, cards: ReportCard[], range: ReportRange, currentKey: string): string {

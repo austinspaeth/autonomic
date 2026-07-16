@@ -193,7 +193,9 @@ export function Sparkline({ points, bands, height = 92, onSelect, showReadout = 
 }
 
 /* ---------- Score gauge (270° arc) ---------- */
-export function ScoreGauge({ score, color, size = 176, children }: { score: number; color: string; size?: number; children?: React.ReactNode }) {
+// `track` overrides the ring behind the score arc. The default reads as a well
+// on a status-tinted card; the unscored card has no tint, so it passes a grey.
+export function ScoreGauge({ score, color, size = 176, track, children }: { score: number; color: string; size?: number; track?: string; children?: React.ReactNode }) {
   const p = usePalette();
   const cx = size / 2, cy = size / 2, r = 74, sw = 12;
   const START = 135, SWEEP = 270;
@@ -208,9 +210,13 @@ export function ScoreGauge({ score, color, size = 176, children }: { score: numb
   return (
     <View style={{ width: size, height: size }} pointerEvents="none">
       <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-        <Path d={arc(1)} fill="none" stroke={p.gaugeTrack} strokeWidth={sw} strokeLinecap="round" />
-        <Path d={arc(frac)} fill="none" stroke={color} strokeWidth={sw + 7} strokeLinecap="round" opacity={0.16} />
-        <Path d={arc(frac)} fill="none" stroke={color} strokeWidth={sw} strokeLinecap="round" />
+        <Path d={arc(1)} fill="none" stroke={track || p.gaugeTrack} strokeWidth={sw} strokeLinecap="round" />
+        {frac > 0 ? (
+          <>
+            <Path d={arc(frac)} fill="none" stroke={color} strokeWidth={sw + 7} strokeLinecap="round" opacity={0.16} />
+            <Path d={arc(frac)} fill="none" stroke={color} strokeWidth={sw} strokeLinecap="round" />
+          </>
+        ) : null}
       </Svg>
       <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' }}>
         {children}

@@ -9,7 +9,8 @@
  * Apple-Health watch sync card rises over this one. Haptics only play while
  * the JS process is running (BLE keeps it alive in the background; watch and
  * camera sessions are suspended) — a backgrounded finish is picked up when the
- * app returns (no notifications; the app deliberately sends none).
+ * app returns (a finished session never notifies — the daily morning reminder
+ * in lib/reminders is the only notification the app posts).
  *
  * Camera (PPG) source: this card never shows a pre-start state — the
  * camera-setup card (CameraSetup.tsx) owns the camera view + torch, locks the

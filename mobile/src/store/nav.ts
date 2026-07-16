@@ -49,6 +49,19 @@ export function setCurrentKey(k: string) {
 export function shiftCurrent(delta: number) { setCurrentKey(addDays(current, delta)); }
 export function getCurrentKey() { return current; }
 
+/* Journal scroll-to-section: sections report their content y as they lay out
+ * (setJournalSectionY), the Journal screen registers its scroller, and anything
+ * rendered inside the journal (e.g. the milestone "Up first" checklist) can jump
+ * the view to a section. */
+const sectionYs: Record<string, number> = {};
+let journalScroller: ((y: number) => void) | null = null;
+export function setJournalSectionY(section: string, y: number) { sectionYs[section] = y; }
+export function registerJournalScroller(fn: ((y: number) => void) | null) { journalScroller = fn; }
+export function scrollJournalToSection(section: string) {
+  const y = sectionYs[section];
+  if (journalScroller && y != null) journalScroller(y);
+}
+
 export function useCurrentKey(): string {
   return useSyncExternalStore(
     (cb) => { listeners.add(cb); return () => listeners.delete(cb); },

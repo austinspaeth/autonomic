@@ -12,7 +12,7 @@
  * {...}` would silently REPLACE the prototype of the days map instead of
  * adding a day.
  */
-import { addDays, uid } from './dates';
+import { addDays, todayKey, uid } from './dates';
 import { MED_TYPES } from './registry';
 import type {
   AppState,
@@ -29,6 +29,7 @@ import type {
 
 /** Shape of a valid day key (and ISO date generally). */
 export const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
+const HHMM_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 export const SCHEMA_VERSION = 1;
 const TYPE_SECTIONS = ['activities', 'meds', 'symptoms', 'triggers'] as const;
@@ -219,9 +220,25 @@ export function migrate(s: unknown): AppState {
   if (settings.lastBleDeviceName !== undefined && typeof settings.lastBleDeviceName !== 'string') delete settings.lastBleDeviceName;
   if (settings.healthEnabled !== undefined) settings.healthEnabled = !!settings.healthEnabled;
   if (settings.lastHrvSource !== undefined && !['polar', 'watch', 'camera'].includes(settings.lastHrvSource as string)) delete settings.lastHrvSource;
+  // A reminder only ever schedules from a real HH:MM; anything else is dropped
+  // rather than defaulted, so an odd import can't silently arm a notification.
+  const rem = settings.reminder as unknown;
+  if (rem !== undefined) {
+    if (isPlainObject(rem) && typeof rem.time === 'string' && HHMM_RE.test(rem.time)) settings.reminder = { enabled: !!rem.enabled, time: rem.time };
+    else delete settings.reminder;
+  }
 
   const profile: Record<string, unknown> = isPlainObject(src.profile) ? src.profile : {};
   const meta: Record<string, unknown> = isPlainObject(src.meta) ? src.meta : {};
+
+  // Day the protocol was first saved (feeds the "Getting started" milestone).
+  // Keep only a valid day key; journals that saved a protocol before this stamp
+  // existed backfill from their last-updated date so the milestone stays done.
+  if (settings.protocolSetOn !== undefined && (typeof settings.protocolSetOn !== 'string' || !DATE_KEY_RE.test(settings.protocolSetOn))) delete settings.protocolSetOn;
+  if (settings.protocol && !settings.protocolSetOn) {
+    const lu = typeof meta.lastUpdated === 'string' ? meta.lastUpdated.slice(0, 10) : '';
+    settings.protocolSetOn = DATE_KEY_RE.test(lu) ? lu : todayKey();
+  }
 
   const out: AppState = {
     version: SCHEMA_VERSION,

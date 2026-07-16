@@ -24,7 +24,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BrandMark, Icon } from '../components/Icon';
 import { Button } from '../components/ui';
 import { DatePickerSheet, HeightPickerSheet, fmtHeight, onlyNumeric } from '../components/Field';
-import { fmtDateFull, uid } from '../lib/dates';
+import { CheckBox, REMINDER_BLURB, REMINDER_SETUP_TITLE, REMINDER_TITLE, useReminderToggle } from './Reminders';
+import { fmtDateFull, fmtTime12, uid } from '../lib/dates';
 import { SheetControls, useSheets } from '../components/Sheet';
 import { useToast } from '../components/Toast';
 import { ACCENT, radius, usePalette } from '../theme';
@@ -200,6 +201,39 @@ function ConnectRow({ glyph, title, sub, on, busy, onPress }: {
         : on
           ? <Glyph size={20} w={2.2} color={ACCENT} d={['M20 6L9 17l-5-5']} />
           : <Glyph size={20} w={2} color={C.chevron} d={['M9 6l6 6-6 6']} />}
+    </AnimatedPressable>
+  );
+}
+
+/* ---------- morning-reminder opt-in (last step) ---------- */
+
+/** Sits directly above "Start logging" — the one nudge the wizard asks for,
+ *  since a baseline is only meaningful if the readings behind it were taken at
+ *  the same time of day. Checking it opens the time picker; the box only fills
+ *  once a time is saved and the OS grants permission. */
+function ReminderCard() {
+  const { on, time, toggle } = useReminderToggle();
+  const t = useSharedValue(on ? 1 : 0);
+  useEffect(() => { t.value = withTiming(on ? 1 : 0, { duration: 220, easing: Easing.out(Easing.cubic) }); }, [on, t]);
+  const rowStyle = useAnimatedStyle(() => ({
+    backgroundColor: interpolateColor(t.value, [0, 1], ['rgba(224,49,39,0.05)', 'rgba(224,49,39,0.11)']),
+    borderColor: interpolateColor(t.value, [0, 1], ['rgba(224,49,39,0.30)', 'rgba(224,49,39,0.58)']),
+  }));
+  return (
+    <AnimatedPressable
+      onPress={toggle}
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked: on }}
+      style={[{ flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderRadius: 13, paddingVertical: 13, paddingHorizontal: 14, marginTop: 14 }, rowStyle]}
+    >
+      <CheckBox on={on} tone={{ accent: ACCENT, border: 'rgba(255,255,255,0.22)' }} />
+      <View style={{ flex: 1 }}>
+        <Text style={{ fontSize: 14.5, fontWeight: '600', color: C.text }}>{on ? REMINDER_TITLE : REMINDER_SETUP_TITLE}</Text>
+        <Text style={{ fontSize: 12.5, lineHeight: 17, color: C.faint, marginTop: 2 }}>
+          {on ? `Every morning at ${fmtTime12(time)}` : REMINDER_BLURB}
+        </Text>
+      </View>
+      {on ? null : <Glyph size={18} w={2} color={C.chevron} d={['M9 6l6 6-6 6']} />}
     </AnimatedPressable>
   );
 }
@@ -553,40 +587,44 @@ function Onboarding({ onDone }: { onDone: () => void }) {
       </ScrollView>
     );
     return (
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingTop: 24, gap: 22, paddingBottom: 24, flexGrow: 1 }} showsVerticalScrollIndicator={false}>
-        <View style={{ width: 72, height: 72, borderRadius: 20, backgroundColor: 'rgba(224,49,39,0.09)', borderWidth: 1, borderColor: 'rgba(224,49,39,0.25)', alignItems: 'center', justifyContent: 'center' }}>
-          <Glyph size={34} w={2.4} d={['M20 6L9 17l-5-5']} />
-        </View>
-        <View>
-          <Text style={st.h2}>You&apos;re all set</Text>
-          <Text style={st.para}>
-            We hope Autonomic makes your recovery journey a little easier. The more you log, the clearer your
-            patterns become and the better the insights you&apos;ll uncover.
-          </Text>
-        </View>
-        <View style={{ gap: 14 }}>
-          <Bullet icon={<Icon name="clipboard" size={25} color={ACCENT} />}>
-            <Text style={{ fontWeight: '700' }}>Journal</Text> is your day-to-day health log.
-          </Bullet>
-          <Bullet icon={<Icon name="chart" size={25} color={ACCENT} />}>
-            <Text style={{ fontWeight: '700' }}>Progress</Text> charts your trends over time.
-          </Bullet>
-          <Bullet icon={<Icon name="ai" size={25} color={ACCENT} />}>
-            <Text style={{ fontWeight: '700' }}>Insight</Text> turns your data into AI prompts.
-          </Bullet>
-          <Bullet icon={<Icon name="plus" size={25} color={ACCENT} />}>
-            Tap <Text style={{ fontWeight: '700' }}>+</Text> on any section to log a reading.
-          </Bullet>
-          {Platform.OS === 'ios' ? (
-            <Bullet icon={<Icon name="watch" size={25} color={ACCENT} />}>
-              Check your <Text style={{ fontWeight: '700' }}>Apple Watch</Text> to record POTS episodes or monitor your HR.
+      <View style={{ flex: 1 }}>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingTop: 24, gap: 22, paddingBottom: 16, flexGrow: 1 }} showsVerticalScrollIndicator={false}>
+          <View style={{ width: 72, height: 72, borderRadius: 20, backgroundColor: 'rgba(224,49,39,0.09)', borderWidth: 1, borderColor: 'rgba(224,49,39,0.25)', alignItems: 'center', justifyContent: 'center' }}>
+            <Glyph size={34} w={2.4} d={['M20 6L9 17l-5-5']} />
+          </View>
+          <View>
+            <Text style={st.h2}>You&apos;re all set</Text>
+            <Text style={st.para}>
+              We hope Autonomic makes your recovery journey a little easier. The more you log, the clearer your
+              patterns become and the better the insights you&apos;ll uncover.
+            </Text>
+          </View>
+          <View style={{ gap: 14 }}>
+            <Bullet icon={<Icon name="clipboard" size={25} color={ACCENT} />}>
+              <Text style={{ fontWeight: '700' }}>Journal</Text> is your day-to-day health log.
             </Bullet>
-          ) : null}
-          <Bullet icon={<Glyph size={25} circle={{ r: 9 }} d={['M9.4 9.2a2.6 2.6 0 0 1 5.1.9c0 1.7-2.5 2.3-2.5 2.3', 'M12 16h.01']} />}>
-            Tap the <Text style={{ fontWeight: '700' }}>?</Text> icons whenever you need help.
-          </Bullet>
-        </View>
-      </ScrollView>
+            <Bullet icon={<Icon name="chart" size={25} color={ACCENT} />}>
+              <Text style={{ fontWeight: '700' }}>Progress</Text> charts your trends over time.
+            </Bullet>
+            <Bullet icon={<Icon name="ai" size={25} color={ACCENT} />}>
+              <Text style={{ fontWeight: '700' }}>Insight</Text> turns your data into AI prompts.
+            </Bullet>
+            <Bullet icon={<Icon name="plus" size={25} color={ACCENT} />}>
+              Tap <Text style={{ fontWeight: '700' }}>+</Text> on any section to log a reading.
+            </Bullet>
+            {Platform.OS === 'ios' ? (
+              <Bullet icon={<Icon name="watch" size={25} color={ACCENT} />}>
+                Check your <Text style={{ fontWeight: '700' }}>Apple Watch</Text> to record POTS episodes or monitor your HR.
+              </Bullet>
+            ) : null}
+            <Bullet icon={<Glyph size={25} circle={{ r: 9 }} d={['M9.4 9.2a2.6 2.6 0 0 1 5.1.9c0 1.7-2.5 2.3-2.5 2.3', 'M12 16h.01']} />}>
+              Tap the <Text style={{ fontWeight: '700' }}>?</Text> icons whenever you need help.
+            </Bullet>
+          </View>
+        </ScrollView>
+        {/* Pinned below the scroller so it always sits against "Start logging". */}
+        <ReminderCard />
+      </View>
     );
   };
 

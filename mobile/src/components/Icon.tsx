@@ -14,7 +14,7 @@ export type IconName =
   | 'bulb' | 'star' | 'brain' | 'virus' | 'clipboard' | 'smile' | 'ai' | 'chart'
   | 'trendUp' | 'trendDown' | 'triangle' | 'checklist' | 'cell' | 'gut'
   | 'bluetooth' | 'watch' | 'plus' | 'trash' | 'settings' | 'sun' | 'play' | 'stop'
-  | 'camera' | 'lock';
+  | 'camera' | 'lock' | 'bell';
 
 const P: Record<IconName, string[]> = {
   heartPulse: ['M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z', 'M3.22 12H9.5l.6-1.3 1.9 4.6 2-7 1.5 3.7h5.27'],
@@ -79,6 +79,7 @@ const P: Record<IconName, string[]> = {
   stop: [],
   camera: ['M14.5 4h-5L7.5 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3.5z'],
   lock: ['M7 11V7a5 5 0 0 1 10 0v4'],
+  bell: ['M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9', 'M13.7 21a2 2 0 0 1-3.4 0'],
 };
 
 // Icons that need extra <circle>/<rect> elements beyond the path list.

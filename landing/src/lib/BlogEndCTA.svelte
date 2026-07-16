@@ -1,12 +1,14 @@
 <script lang="ts">
   /** Shared end-of-article / hub CTA, styled to the landing's calm-instrument look. */
+  import { pricing, priceLabel } from './site';
 </script>
 
 <div class="article-cta">
   <h3>Track your recovery with Autonomic</h3>
   <p>
     A private, offline journal that scores your daily HRV, BP and orthostatic readings against
-    medical thresholds. $50/year, 7-day free trial.
+    medical thresholds. Free to download, with {priceLabel(pricing.monthly)}/mo Pro when you want
+    the deep-analysis tools.
   </p>
   <a class="btn btn-primary btn-lg btn-appstore" href="#" aria-label="Download Autonomic on the App Store">
     <svg class="btn-apple" viewBox="0 0 384 512" aria-hidden="true">

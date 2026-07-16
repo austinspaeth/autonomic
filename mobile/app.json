@@ -2,7 +2,7 @@
   "expo": {
     "name": "Autonomic",
     "slug": "autonomic",
-    "version": "1.10.0",
+    "version": "1.11.0",
     "scheme": "autonomic",
     "orientation": "portrait",
     "icon": "./assets/autonomic-icon.png",
@@ -126,6 +126,13 @@
         }
       ],
       "@react-native-community/datetimepicker",
+      [
+        "expo-notifications",
+        {
+          "color": "#e03127",
+          "defaultChannel": "reminders"
+        }
+      ],
       "expo-asset",
       "expo-font",
       "react-native-iap",

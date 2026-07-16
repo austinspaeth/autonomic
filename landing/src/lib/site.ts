@@ -4,10 +4,30 @@ export const site = {
   tagline: 'See your nervous system recover.',
   description:
     "Autonomic is a private, offline journal that scores your daily HRV, blood pressure, sleep and orthostatic readings against medical thresholds, so people recovering from POTS, dysautonomia and post-viral illness can see what's helping and what's hurting.",
-  ogImage: 'https://autonomic.care/og.png',
-  price: 50,
-  currency: 'USD'
+  ogImage: 'https://autonomic.care/og.png'
 };
+
+/**
+ * The freemium model, as the app actually ships it: the journal is free
+ * forever, Autonomic Pro is an auto-renewing subscription, and every fresh
+ * install opens with `trialDays` of full Pro access (no card, no account).
+ *
+ * Keep in sync with the app:
+ *  - prices  -> mobile/src/store/iap.ts (FALLBACK_PRICE) + the store products
+ *  - trial   -> mobile/src/lib/tier.ts (TRIAL_DAYS)
+ */
+export const pricing = {
+  currency: 'USD',
+  monthly: 7.99,
+  yearly: 49.99,
+  trialDays: 7
+};
+
+/** `$7.99` — trailing cents kept, so the number reads like the store charge. */
+export const priceLabel = (n: number): string => `$${n.toFixed(2)}`;
+
+/** Yearly vs 12 × monthly, as a whole-percent saving. */
+export const yearlySavePct = Math.round((1 - pricing.yearly / (pricing.monthly * 12)) * 100);
 
 /** The waveform pulse mark, shared by nav / footer / CTA. */
 export const BRAND_POLYLINE =

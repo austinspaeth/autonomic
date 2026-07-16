@@ -7,6 +7,7 @@ import { Alert, Linking, Pressable, Text, View } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import * as Clipboard from 'expo-clipboard';
 import Constants from 'expo-constants';
 import { SheetControls, useSheets } from '../components/Sheet';
 import { Button } from '../components/ui';
@@ -16,7 +17,7 @@ import { useToast } from '../components/Toast';
 import { radius, usePalette } from '../theme';
 import { clearAllData, getState, replaceState, save, serializeState, useAppState } from '../store/store';
 import { deleteAllBackups } from '../lib/backup';
-import { ageFromBirthday, fmtStamp, keyOf } from '../lib/dates';
+import { ageFromBirthday, keyOf } from '../lib/dates';
 import { DATE_KEY_RE, assertImportVersion, isPlainObject } from '../lib/migrate';
 import { useIap, manageSubscription, restore, priceOf, storeName, MONTHLY_SKU, YEARLY_SKU } from '../store/iap';
 import { getTrialDaysLeft, useTier } from '../store/tier';
@@ -24,10 +25,12 @@ import { usePaywall } from './Paywall';
 import { healthAppName } from '../lib/health';
 import { DevicesScreen } from './Devices';
 import { HealthScreen } from './Health';
+import { ReminderRow } from './Reminders';
 import { showWelcomeAgain } from './Onboarding';
 
 const PRIVACY_URL = 'https://autonomic.care/privacy-policy/';
 const TERMS_URL = 'https://autonomic.care/terms-of-service/';
+const SUPPORT_EMAIL = 'austin@discoverymark.com';
 
 export function MenuSheet({ controls }: { controls: SheetControls }) {
   const p = usePalette();
@@ -56,7 +59,6 @@ export function MenuSheet({ controls }: { controls: SheetControls }) {
       </Pressable>
     );
   };
-  const m = state.meta || {};
   const appVer = Constants.expoConfig?.version ?? '1.0.0';
   return (
     <View>
@@ -68,6 +70,7 @@ export function MenuSheet({ controls }: { controls: SheetControls }) {
         <Text style={{ fontSize: 22, fontWeight: '800', color: p.text, letterSpacing: -0.3 }}>Autonomic</Text>
       </View>
       {item('user', 'Profile', 'Sex, birthday, height, weight', () => openSheet((c) => <ProfileSheet controls={c} />))}
+      <ReminderRow />
       {item('bluetooth', 'Devices', 'Heart-rate straps', () => openSheet(() => <DevicesScreen />), !!state.settings.lastBleDeviceId)}
       {item('heart', healthAppName(), 'Read & write health data', () => openSheet(() => <HealthScreen />), !!state.settings.healthEnabled)}
       {item('star', 'Subscription', 'Manage plan or restore', () => openSheet((c) => <SubscriptionSheet controls={c} />),
@@ -77,15 +80,22 @@ export function MenuSheet({ controls }: { controls: SheetControls }) {
       {item('trash', 'Clear all data', 'Erase everything on this device', () => openSheet((c) => <ClearDataSheet controls={c} />, { fitContent: true }))}
       {item('sparkles', 'Show welcome screen', 'Replay the first-run guide', () => { controls.closeAll(); showWelcomeAgain(); })}
       {item('info', 'Legal information', 'Disclaimer, privacy & terms', () => openSheet((c) => <LegalSheet controls={c} />))}
+      {/* Dark card in both themes (like the brand card above), so its text is
+          hardcoded light rather than palette-driven. */}
+      <Pressable
+        onPress={() => emailSupport(toast)}
+        style={({ pressed }) => [{ marginTop: 22, paddingVertical: 18, paddingHorizontal: 16, borderRadius: radius.card, backgroundColor: '#242427' }, pressed && { opacity: 0.6 }]}
+      >
+        <Text style={{ fontSize: 13.5, color: '#c9c9cf', textAlign: 'center' }}>Questions? Concerns? Email us!</Text>
+        <Text style={{ fontSize: 14.5, fontWeight: '600', color: '#f2f2f5', textAlign: 'center', marginTop: 5 }}>{SUPPORT_EMAIL}</Text>
+      </Pressable>
       <View style={{ marginTop: 22 }}>
         <Text style={{ fontSize: 12.5, color: p.textDim, textAlign: 'center', lineHeight: 18 }}>
           We appreciate you for using Autonomic, we hope it genuinely helps you in your journey!
         </Text>
         <Text style={{ fontSize: 12.5, color: p.textDim, textAlign: 'center', marginTop: 4 }}>- Autonomic team</Text>
         <View style={{ height: 1, backgroundColor: p.border, marginVertical: 16 }} />
-        <Text style={{ fontSize: 12, color: p.textDim, textAlign: 'center' }}>{`Data last updated ${fmtStamp(m.lastUpdated)}`}</Text>
-        <Text style={{ fontSize: 12, color: p.textDim, textAlign: 'center', marginTop: 4 }}>{`Autonomic v${appVer}`}</Text>
-        {m.lastImport?.name ? <Text style={{ fontSize: 12, color: p.textDim, textAlign: 'center', marginTop: 4 }}>{`Last import: ${m.lastImport.name} · ${fmtStamp(m.lastImport.at)}`}</Text> : null}
+        <Text style={{ fontSize: 12, color: p.textDim, textAlign: 'center' }}>{`Autonomic v${appVer}`}</Text>
         <Text style={{ fontSize: 11, color: p.textDim, textAlign: 'center', marginTop: 16, lineHeight: 16 }}>
           Autonomic is a personal tracking tool, not a medical device. It does not diagnose or treat any condition. Discuss changes to medication, supplements, or your protocol with a clinician.
         </Text>
@@ -236,6 +246,18 @@ function ClearDataSheet({ controls }: { controls: SheetControls }) {
       <View style={{ height: 8 }} />
     </View>
   );
+}
+
+/** Open the user's mail client at the support address. Devices with no mail
+ *  account (and the iOS Simulator, which has no Mail.app at all) can't handle
+ *  `mailto:` — copy the address instead of failing silently. */
+async function emailSupport(toast: (m: string) => void) {
+  try {
+    await Linking.openURL(`mailto:${SUPPORT_EMAIL}`);
+  } catch {
+    await Clipboard.setStringAsync(SUPPORT_EMAIL);
+    toast(`Email copied: ${SUPPORT_EMAIL}`);
+  }
 }
 
 /* ---------- import / export ---------- */
