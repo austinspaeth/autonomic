@@ -73,7 +73,7 @@
       url: 'https://autonomic.care/',
       logo: {
         '@type': 'ImageObject',
-        url: 'https://autonomic.care/favicon-512.png',
+        url: 'https://autonomic.care/web-app-manifest-512x512.png',
         width: 512,
         height: 512
       }
