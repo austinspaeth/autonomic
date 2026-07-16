@@ -17,7 +17,7 @@ import { Button } from '../components/ui';
 import { radius, type as T, usePalette } from '../theme';
 import { SCORE_COLORS, GRADE_LABEL, GRADE_PTS, catFromBands } from '../lib/scoring';
 import {
-  OUTLOOK_GUIDE, TOMORROW, SCORE_TIPS, blueZone, readingPeriod, resolveProtocol,
+  OUTLOOK_GUIDE, TOMORROW, SCORE_TIPS, blueZone, protocolCriteria, readingPeriod, resolveProtocol,
   scoreCat, scoreSet, streakInfo, streakTier, type ScoreComp, type ScoreSetResult,
 } from '../lib/scoring/day';
 import { detectDownturn, type Downturn } from '../lib/scoring/downturn';
@@ -489,7 +489,14 @@ function StreakCard({ dk }: { dk: string }) {
       if (si.isToday) sub = hardFail ? 'Too late for today. Try again to start fresh tomorrow.' : `Today is day ${si.current + 1}.`;
       else sub = 'Not a clean day.';
     }
-  } else sub = 'No data logged for this day.';
+  } else sub = si.isToday ? `Today is day ${si.current + 1}.` : 'No data logged for this day.';
+
+  // The checklist shows the day's own criteria once anything is logged; on a
+  // still-empty today we synthesize them from the protocol so a new user sees
+  // (and can work toward) their clean-day requirements right away. Past days
+  // with no record stay in the blank "no data" state — all-unmet reads as
+  // failure there, which isn't what a simply-unlogged day means.
+  const criteria = c ? c.criteria : si.isToday ? protocolCriteria(state.days, dk, resolveProtocol(state.settings.protocol), state.customTypes) : [];
 
   const stats = [`Longest ${si.longest}`];
   if (si.rate != null) stats.push(`30-day clean ${si.rate}%`);
@@ -517,9 +524,9 @@ function StreakCard({ dk }: { dk: string }) {
         <Animated.View style={[{ overflow: 'hidden' }, bodyStyle]}>
           <View onLayout={(e) => setContentH(e.nativeEvent.layout.height)} style={{ paddingTop: 12 }}>
             <Text style={{ fontSize: 11, color: p.textDim, fontVariant: ['tabular-nums'] }}>{stats.join(' · ')}</Text>
-            {c ? (
+            {criteria.length ? (
               <View style={{ marginTop: 12, gap: 9 }}>
-                {c.criteria.map((x) => {
+                {criteria.map((x) => {
                   let st: 'pending' | 'met' | 'broken' | 'todo';
                   if (x.pending) st = 'pending';
                   else if (x.pass) st = 'met';
@@ -635,23 +642,46 @@ function CompRow({ c, improveLine }: { c: any; improveLine: (c: any) => string }
   const p = usePalette();
   const [open, setOpen] = useState(false);
   const contrib = c.p >= 80 ? { t: 'Lifting your score', bg: 'rgba(74,222,128,.16)', col: '#4ade80' } : c.p >= 60 ? { t: 'About neutral', bg: 'rgba(234,179,8,.16)', col: '#eab308' } : { t: 'Pulling your score down', bg: 'rgba(249,115,22,.16)', col: '#f97316' };
+
+  // Same accordion convention as StreakCard: rotate the chevron in place
+  // (-90° right when collapsed → 0° down when open) and drive the body's
+  // measured height 0 → contentH with a fade so it eases open like butter.
+  const rot = useSharedValue(0);
+  useEffect(() => { rot.value = withTiming(open ? 1 : 0, { duration: 220 }); }, [open, rot]);
+  const chevStyle = useAnimatedStyle(() => ({ transform: [{ rotate: `${-90 + rot.value * 90}deg` }] }));
+
+  const [contentH, setContentH] = useState(0);
+  const openV = useSharedValue(0);
+  useEffect(() => {
+    openV.value = withTiming(
+      open ? 1 : 0,
+      open ? { duration: 260, easing: Easing.out(Easing.cubic) } : { duration: 220, easing: Easing.inOut(Easing.cubic) },
+    );
+  }, [open, openV]);
+  const bodyStyle = useAnimatedStyle(() => ({
+    height: openV.value * contentH,
+    opacity: interpolate(openV.value, [0.35, 1], [0, 1], Extrapolation.CLAMP),
+  }));
+
   return (
     <View style={{ backgroundColor: p.surface, borderColor: p.border, borderWidth: 1, borderRadius: radius.control, marginBottom: 10, overflow: 'hidden' }}>
       <Pressable onPress={() => setOpen((v) => !v)} style={{ flexDirection: 'row', alignItems: 'center', gap: 9, padding: 13 }}>
         <View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: SCORE_COLORS[c.cat as keyof typeof SCORE_COLORS] || p.border }} />
         <Text style={{ fontWeight: '600', fontSize: 15, color: p.text, flex: 1 }}>{c.label}</Text>
         <Text style={{ fontSize: 14, color: p.textDim, fontVariant: ['tabular-nums'] }}>{c.detail.value || ''}</Text>
-        <Icon name="chevron" size={17} color={p.textDim} />
+        <Animated.View style={chevStyle}>
+          <Icon name="chevron" size={17} color={p.textDim} />
+        </Animated.View>
       </Pressable>
-      {open ? (
-        <View style={{ paddingHorizontal: 14, paddingBottom: 14 }}>
+      <Animated.View style={[{ overflow: 'hidden' }, bodyStyle]}>
+        <View onLayout={(e) => setContentH(e.nativeEvent.layout.height)} style={{ paddingHorizontal: 14, paddingBottom: 14 }}>
           <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 8 }}>
             <View style={{ backgroundColor: contrib.bg, paddingHorizontal: 9, paddingVertical: 3, borderRadius: 999 }}><Text style={{ fontSize: 11, fontWeight: '700', color: contrib.col }}>{contrib.t}</Text></View>
             <Text style={{ fontSize: 12, color: p.textDim }}>{`${GRADE_LABEL[c.cat as keyof typeof GRADE_LABEL]} · weight ${c.w}%`}</Text>
           </View>
           <Text style={{ fontSize: 13, color: p.textDim, lineHeight: 18 }}>{improveLine(c)}</Text>
         </View>
-      ) : null}
+      </Animated.View>
     </View>
   );
 }

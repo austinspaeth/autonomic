@@ -5,6 +5,7 @@
  */
 import React, { useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import * as ExpoLinking from 'expo-linking';
 import { SheetControls, SheetFooter, useSheets } from '../components/Sheet';
 import { FieldInputs, TextField, TimeField, useFormState } from '../components/Field';
 import { Button, Muted } from '../components/ui';
@@ -20,7 +21,7 @@ import { typesFor, type TypeKind } from '../lib/typeCatalog';
 import { ManageTypesSheet } from './TypeManager';
 import { computeScores } from '../lib/scoring';
 import { health, healthAppName } from '../lib/health';
-import { healthSourceFor, type HealthCandidate, type HealthSource } from '../lib/health/sources';
+import { healthSourceFor, workoutCandidates, type HealthCandidate, type HealthSource, type WorkoutCandidate } from '../lib/health/sources';
 import { deleteEntry, getState, upsertEntry, useAppState } from '../store/store';
 import { defaultTimeFor, fmtTime12, todayKey, uid } from '../lib/dates';
 import { getTier } from '../store/tier';
@@ -117,6 +118,53 @@ function ReadingImportSheet({ type, dk, source, onManual, onPick }: {
         cands.map((c, i) => (
           <Pressable key={c.key} onPress={() => onPick(c)} style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: p.border }, pressed && { opacity: 0.5 }]}>
             <Icon name={def.icon as never} size={22} color={p.accent} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: p.text, fontSize: 17, fontWeight: '600' }}>{c.label}</Text>
+              <Text style={{ color: p.textDim, fontSize: 13, marginTop: 1 }}>{c.sub}</Text>
+            </View>
+            <Icon name="chevronRight" size={20} color={p.textDim} />
+          </Pressable>
+        ))
+      )}
+      <SheetFooter>
+        <Button title="Enter manually" variant="default" onPress={onManual} />
+      </SheetFooter>
+    </View>
+  );
+}
+
+/** On-demand workout import card. Lists the selected day's workouts from the
+ *  health store (Apple Workout sessions / Health Connect exercise); tap one to
+ *  review-and-save as an activity, or fall through to the manual type picker. */
+function ActivityImportSheet({ dk, onManual, onPick }: {
+  dk: string; onManual: () => void; onPick: (c: WorkoutCandidate) => void;
+}) {
+  const p = usePalette();
+  const [loading, setLoading] = useState(true);
+  const [cands, setCands] = useState<WorkoutCandidate[]>([]);
+  React.useEffect(() => {
+    let alive = true;
+    workoutCandidates(dk, getState().days[dk]?.activities || [])
+      .then((c) => { if (alive) setCands(c); })
+      .catch(() => { /* graceful — falls through to the empty state */ })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, [dk]);
+  return (
+    <View>
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 4 }}>Add activity</Text>
+      <Text style={{ color: p.textDim, fontSize: 14, marginBottom: 16 }}>{`Import a workout from ${healthAppName()}, or enter one manually.`}</Text>
+      {loading ? (
+        <View style={{ alignItems: 'center', paddingVertical: 30, gap: 12 }}>
+          <ActivityIndicator color={p.accent} />
+          <Text style={{ color: p.textDim, fontSize: 14 }}>{`Getting workouts from ${healthAppName()}…`}</Text>
+        </View>
+      ) : cands.length === 0 ? (
+        <Muted>{`No workouts in ${healthAppName()} for this day. Enter an activity manually below.`}</Muted>
+      ) : (
+        cands.map((c, i) => (
+          <Pressable key={c.key} onPress={() => onPick(c)} style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: p.border }, pressed && { opacity: 0.5 }]}>
+            <Icon name={ACTIVITY_TYPES[c.type].icon as never} size={22} color={p.accent} />
             <View style={{ flex: 1 }}>
               <Text style={{ color: p.text, fontSize: 17, fontWeight: '600' }}>{c.label}</Text>
               <Text style={{ color: p.textDim, fontSize: 13, marginTop: 1 }}>{c.sub}</Text>
@@ -272,10 +320,13 @@ export function EntryForm({ typeMap, arrKey, dk, type, existing, prefill = null,
   );
 }
 
-/** Indoor-bike bespoke form (conditional Resistance vs interval list). */
-export function BikeForm({ dk, existing, controls, onSaved }: { dk: string; existing: Entry | null; controls: SheetControls; onSaved: () => void }) {
+/** Indoor-bike bespoke form (conditional Resistance vs interval list).
+ *  `prefill` seeds a brand-new entry (a workout imported from the health
+ *  store), mirroring EntryForm — reviewed then saved as new, never an edit. */
+export function BikeForm({ dk, existing, prefill = null, controls, onSaved }: { dk: string; existing: Entry | null; prefill?: Entry | null; controls: SheetControls; onSaved: () => void }) {
   const p = usePalette();
-  const init = existing ? (JSON.parse(JSON.stringify(existing)) as Entry) : { id: uid(), type: 'indoorBike', time: defaultTimeFor(dk), note: '', interval: false, intervals: [] as unknown[] };
+  const blank: Entry = { id: uid(), type: 'indoorBike', time: defaultTimeFor(dk), note: '', interval: false, intervals: [] as unknown[] };
+  const init = existing ? (JSON.parse(JSON.stringify(existing)) as Entry) : prefill ? { ...blank, ...prefill } : blank;
   const [time, setTime] = useState((init.time as string) || defaultTimeFor(dk));
   const [num, setNum] = useState<Record<string, string>>({
     duration: (init.duration as string) || '', distance: (init.distance as string) || '', avgHr: (init.avgHr as string) || '',
@@ -346,6 +397,30 @@ export function BikeForm({ dk, existing, controls, onSaved }: { dk: string; exis
 }
 
 /* ---------- hooks that wire the sheet stack ---------- */
+
+/** Home-screen widget deep link (autonomic://?capture=hrv): opens the HRV
+ *  capture setup exactly like the Readings picker's Live HRV action, behind
+ *  the same freemium gate. Listens rather than routes — the URL points at the
+ *  Journal tab so expo-router never sees an unmatched path, and repeated taps
+ *  re-fire because each tap is a fresh openURL event. */
+export function useCaptureDeepLink() {
+  const { openSheet } = useSheets();
+  const openPaywall = usePaywall();
+  React.useEffect(() => {
+    const handle = (url: string | null) => {
+      if (!url) return;
+      const q = ExpoLinking.parse(url).queryParams;
+      if (q?.capture !== 'hrv') return;
+      if (!canCaptureHrv(getTier(), hrvCaptureUsedToday(getState().days[todayKey()]))) { openPaywall(); return; }
+      openSheet((c) => <HrvSetup controls={c} />);
+    };
+    void ExpoLinking.getInitialURL().then(handle);
+    const sub = ExpoLinking.addEventListener('url', (e) => handle(e.url));
+    return () => sub.remove();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+}
+
 export function useEntryForms(dk: string) {
   const { openSheet } = useSheets();
   const openPaywall = usePaywall();
@@ -459,7 +534,20 @@ export function useEntryForms(dk: string) {
       onPick={(t) => pickReadingSource(t)}
     />
   ));
-  const pickActivity = () => openSheet(() => <TypePicker title="Add activity" kind="activities" manageLabel="Add new activity type" onPick={(t) => openActivityForm(t, null)} />);
+  // "+ Add activity": with the health store connected, a workout import card
+  // comes first (the day's Apple Workout / exercise sessions, tap to review);
+  // "Enter manually" stacks the normal type picker. Without it, straight to
+  // the picker.
+  const pickActivityManual = () => openSheet(() => <TypePicker title="Add activity" kind="activities" manageLabel="Add new activity type" onPick={(t) => openActivityForm(t, null)} />);
+  const openWorkoutImport = (c: WorkoutCandidate) => {
+    const prefill = { id: uid(), type: c.type, time: c.time, note: '', source: 'health', imported: true, ...c.entry } as Entry;
+    if (c.type === 'indoorBike') openSheet((sc) => <BikeForm dk={dk} existing={null} prefill={prefill} controls={sc} onSaved={refresh} />);
+    else openSheet((sc) => <EntryForm typeMap={typesFor(getState(), 'activities')} arrKey="activities" dk={dk} type={c.type} existing={null} prefill={prefill} controls={sc} onSaved={refresh} />);
+  };
+  const pickActivity = () => {
+    if (!health().available || !getState().settings.healthEnabled) { pickActivityManual(); return; }
+    openSheet(() => <ActivityImportSheet dk={dk} onManual={pickActivityManual} onPick={openWorkoutImport} />, { fitContent: true });
+  };
   const pickMed = () => openSheet(() => <TypePicker title="Add medication or supplement" kind="meds" manageLabel="Add another medication" onPick={(t) => {
     // A user-defined med with a saved dosage prefills the Amount field.
     const def = typesFor(getState(), 'meds')[t];

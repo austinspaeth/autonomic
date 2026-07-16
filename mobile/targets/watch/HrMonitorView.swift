@@ -62,6 +62,11 @@ final class HrMonitorModel: ObservableObject {
 
     private func tick() {
         let wm = WorkoutManager.shared
+        // Backstop self-heal: while the monitor is on screen the manager must
+        // be streaming. If it isn't (any future start/stop race or a stop from
+        // elsewhere), restart it — WorkoutManager's own watchdog only runs
+        // while it wants to stream, so it can't recover from this state.
+        if !wm.running { wm.start() }
         let now = Date()
         var liveHr: Double?
         var currentAvg: Double?

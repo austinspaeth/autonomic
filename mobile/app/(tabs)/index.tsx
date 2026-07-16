@@ -5,6 +5,7 @@ import { Screen } from '../../src/components/Header';
 import { useSheets } from '../../src/components/Sheet';
 import { DaySummary } from '../../src/features/DaySummary';
 import { JournalSections } from '../../src/features/JournalSections';
+import { useCaptureDeepLink } from '../../src/features/forms';
 import { Calendar } from '../../src/features/Calendar';
 import { usePalette } from '../../src/theme';
 import { fmtDateLong, todayKey } from '../../src/lib/dates';
@@ -34,6 +35,8 @@ export default function JournalScreen() {
   const dk = useCurrentKey();
   const { openSheet } = useSheets();
   const isToday = dk === todayKey();
+  // Home-screen widgets' Start HRV buttons land here (autonomic://?capture=hrv).
+  useCaptureDeepLink();
 
   // Content renders `shownDk`, which trails `dk` by one out-animation.
   const [shownDk, setShownDk] = useState(dk);

@@ -97,6 +97,18 @@ function cleanEntries(v: unknown): Entry[] {
   return out;
 }
 
+/** The upper/lower body split collapsed into one Strength training type; the
+ *  side an old entry recorded moves into its note so nothing is lost. Runs on
+ *  every load/import (idempotent — the legacy keys no longer exist to re-match). */
+const STRENGTH_LEGACY: Record<string, string> = { upperBody: 'Upper body', lowerBody: 'Lower body' };
+function mergeStrength(e: Entry): Entry {
+  const side = STRENGTH_LEGACY[e.type];
+  if (!side) return e;
+  e.type = 'strength';
+  e.note = typeof e.note === 'string' && e.note ? `${side} · ${e.note}` : side;
+  return e;
+}
+
 function cleanMovements(v: unknown): Movement[] {
   if (!Array.isArray(v)) return [];
   const out: Movement[] = [];
@@ -227,6 +239,15 @@ export function migrate(s: unknown): AppState {
     if (isPlainObject(rem) && typeof rem.time === 'string' && HHMM_RE.test(rem.time)) settings.reminder = { enabled: !!rem.enabled, time: rem.time };
     else delete settings.reminder;
   }
+  // crashAlert keeps only the boolean + a valid day key; undefined stays
+  // undefined (it means "never chosen" — see enableReminder's default-on).
+  const ca = settings.crashAlert as unknown;
+  if (ca !== undefined) {
+    if (isPlainObject(ca)) {
+      settings.crashAlert = { enabled: !!ca.enabled };
+      if (typeof ca.lastFired === 'string' && DATE_KEY_RE.test(ca.lastFired)) settings.crashAlert.lastFired = ca.lastFired;
+    } else delete settings.crashAlert;
+  }
 
   const profile: Record<string, unknown> = isPlainObject(src.profile) ? src.profile : {};
   const meta: Record<string, unknown> = isPlainObject(src.meta) ? src.meta : {};
@@ -267,6 +288,22 @@ export function migrate(s: unknown): AppState {
     days: {},
   };
 
+  // Retire catalog references to the removed upper/lower split. Hidden types
+  // are only ever unused (deleteType guards on typeInUse), so a user who had
+  // deleted both halves gets Strength hidden too; same-key built-in overrides
+  // (renames) of the removed types are dropped with them.
+  const hiddenActs = out.hiddenTypes?.activities;
+  if (hiddenActs?.some((t) => STRENGTH_LEGACY[t])) {
+    const both = hiddenActs.includes('upperBody') && hiddenActs.includes('lowerBody');
+    const kept = hiddenActs.filter((t) => !STRENGTH_LEGACY[t]);
+    if (both && !kept.includes('strength')) kept.push('strength');
+    out.hiddenTypes = { ...out.hiddenTypes, activities: kept };
+  }
+  if (out.customTypes?.activities) {
+    delete out.customTypes.activities.upperBody;
+    delete out.customTypes.activities.lowerBody;
+  }
+
   const days = isPlainObject(src.days) ? (src.days as Record<string, unknown>) : {};
   // One-time reframing: historically a day stored the bedtime entered that
   // evening (the night *after* its morning). The app now treats a day's sleep as
@@ -287,7 +324,7 @@ export function migrate(s: unknown): AppState {
     out.days[k] = {
       sleep,
       readings: cleanEntries(d.readings),
-      activities: cleanEntries(d.activities),
+      activities: cleanEntries(d.activities).map(mergeStrength),
       meds: cleanEntries(d.meds),
       symptoms: cleanEntries(d.symptoms),
       food: cleanFood(d.food),

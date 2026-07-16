@@ -16,8 +16,9 @@
 import type { Entry, SleepStages } from '../types';
 import { keyOf } from '../dates';
 import { INTERRUPTED_AWAKE_MIN } from './sleepSummary';
+import { activityTypeFromHc } from './workoutMap';
 import type {
-  HealthApi, HealthDaySamples, HistoryReading, ImportedReading, SleepImport,
+  HealthApi, HealthDaySamples, HistoryReading, ImportedReading, ImportedWorkout, SleepImport,
 } from './index';
 
 /** This app's Android package — used to skip re-importing our own write-backs. */
@@ -35,6 +36,8 @@ type WeightRecord = { time: string; weight: { inKilograms: number }; metadata?: 
 type RespRecord = { time: string; rate: number; metadata?: Metadata };
 type SleepStageRaw = { startTime: string; endTime: string; stage: number };
 type SleepRecord = { startTime: string; endTime: string; stages?: SleepStageRaw[]; metadata?: Metadata };
+type ExerciseRecord = { startTime: string; endTime: string; exerciseType: number; metadata?: Metadata };
+type DistanceRecord = { startTime: string; endTime: string; distance: { inMeters: number }; metadata?: Metadata };
 
 interface HcModule {
   initialize: () => Promise<boolean>;
@@ -50,6 +53,7 @@ interface HcModule {
 const READ_TYPES = [
   'RestingHeartRate', 'HeartRate', 'HeartRateVariabilityRmssd',
   'RespiratoryRate', 'BloodPressure', 'Weight', 'SleepSession',
+  'ExerciseSession', 'Distance',
 ];
 const WRITE_TYPES = [
   'HeartRateVariabilityRmssd', 'HeartRate', 'RestingHeartRate', 'BloodPressure',
@@ -210,6 +214,46 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
     // Apple Watch Breathe/ECG sync flow — no Android equivalent (no heartbeat
     // series record type in Health Connect).
     async readHrvSessions() { return []; },
+
+    async readWorkouts(dk) {
+      const { from, to } = dayBounds(dk);
+      const sessions = await readAll<ExerciseRecord>('ExerciseSession', from, to);
+      const out: ImportedWorkout[] = [];
+      for (const s of sessions) {
+        const start = new Date(s.startTime);
+        const end = new Date(s.endTime);
+        const durationMin = Math.round((end.getTime() - start.getTime()) / 60000);
+        if (durationMin < 1) continue;
+        // Sessions carry no distance or HR of their own — aggregate the raw
+        // Distance and HeartRate records logged while the session ran.
+        const [dist, hrRecords] = await Promise.all([
+          readAll<DistanceRecord>('Distance', start, end),
+          readAll<HrRecord>('HeartRate', start, end),
+        ]);
+        const meters = dist.reduce((sum, r) => sum + (r.distance?.inMeters || 0), 0);
+        let avgHr: number | null = null; let minHr: number | null = null; let maxHr: number | null = null;
+        let hrSum = 0; let hrN = 0;
+        for (const rec of hrRecords) {
+          for (const smp of rec.samples || []) {
+            hrSum += smp.beatsPerMinute; hrN++;
+            if (minHr == null || smp.beatsPerMinute < minHr) minHr = smp.beatsPerMinute;
+            if (maxHr == null || smp.beatsPerMinute > maxHr) maxHr = smp.beatsPerMinute;
+          }
+        }
+        if (hrN) { avgHr = Math.round(hrSum / hrN); minHr = Math.round(minHr!); maxHr = Math.round(maxHr!); }
+        out.push({
+          type: activityTypeFromHc(s.exerciseType),
+          time: hhmm(start),
+          startMs: start.getTime(),
+          durationMin,
+          distanceMi: meters > 0 ? Math.round((meters / 1609.344) * 100) / 100 : null,
+          avgHr, minHr, maxHr,
+          sourceName: s.metadata?.dataOrigin || 'Health Connect',
+          ownApp: isOwnRecord(s.metadata),
+        });
+      }
+      return out.sort((a, b) => a.startMs - b.startMs);
+    },
 
     async readSleep(dk) {
       // Same window strategy as iOS: the night ending on `dk` starts the prior

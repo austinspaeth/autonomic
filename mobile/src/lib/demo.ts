@@ -68,7 +68,7 @@ function rng(seed: number): () => number {
  * These are what keep the month honest: two of them (19 and 25) are heavy
  * enough to land back in the red well after the trend turned.
  */
-const DIPS: Record<number, number> = { 4: 0.05, 8: 0.03, 12: 0.16, 16: 0.15, 19: 0.22, 25: 0.2, 28: 0.04 };
+const DIPS: Record<number, number> = { 4: 0.05, 8: 0.03, 12: 0.16, 16: 0.19, 19: 0.22, 25: 0.2, 28: 0.04 };
 
 /**
  * Wellness for day `i` (0 = a month ago, 29 = today), roughly 0..1.
@@ -92,6 +92,38 @@ const hhmm = (mins: number) => {
 };
 const r1 = (n: number) => Math.round(n * 10) / 10;
 const r2 = (n: number) => Math.round(n * 100) / 100;
+
+/**
+ * The Baevsky histogram metrics (Mode / AMo50 / MxDMn / stress index) and the
+ * Kubios PNS/SNS composites, derived exactly as the live HRV pipeline does
+ * (src/lib/hrv/index.ts) so a demo reading carries every field a real capture
+ * writes. Without these the Progress view's MxDMn, Mode, AMo50, CV, Stress index
+ * and PNS/SNS Balance sections never appear on demo data, and the day score is
+ * blended from fewer HRV metrics than a real day would be. `amo50`/`mxdmn` ride
+ * the recovery arc (a crashed rhythm is rigid and narrow, a recovered one spread
+ * out); the rest fall out of the same formulas the capture uses, so they stay
+ * internally consistent with the sdnn/meanRr/rmssd/hr already generated.
+ */
+function hrvExtra(sdnn: number, meanRr: number, rmssd: number, hr: number, amo50: number, mxdmn: number) {
+  const mode = Math.round(meanRr / 50) * 50; // modal RR, 50 ms-binned like the pipeline
+  const cv = (sdnn / meanRr) * 100;
+  const moSec = mode / 1000;
+  const stressIndex = moSec > 0 && mxdmn > 0 ? amo50 / (2 * moSec * mxdmn) : 0;
+  const sd1 = rmssd / Math.SQRT2;
+  const z = (x: number, m: number, s: number) => (x - m) / s;
+  // NORM constants copied verbatim from the pipeline's healthy-adult references.
+  const pns = (z(meanRr, 900, 110) + z(rmssd, 42, 20) + z(sd1, 30, 14)) / 3;
+  const sns = (z(hr, 67, 10) + z(stressIndex, 90, 45) - z(rmssd, 42, 20)) / 3;
+  return {
+    mode: String(mode),
+    cv: String(Number(cv.toFixed(1))),
+    amo50: String(Math.round(amo50)),
+    mxdmn: String(Number(mxdmn.toFixed(3))),
+    stressIndex: String(Math.round(stressIndex)),
+    pns: String(Number(pns.toFixed(1))),
+    sns: String(Number(sns.toFixed(1))),
+  };
+}
 
 /**
  * One demo day. Values are stored as strings, matching what the forms and a
@@ -131,17 +163,27 @@ function demoDay(i: number, rand: () => number): DayRecord {
     const hf = Math.max(60, Math.round(total) - vlf - lf);
     // Evening readings run a little softer than the morning baseline.
     const bias = slot === 'Evening' ? -0.9 : 0;
+
+    // Structured (paced-breathing) reading. Base metrics are captured as numbers
+    // so the Baevsky/Kubios composites derive off the same values.
+    const sSdnn = Math.round(jit(at(26, 68), 4));
+    const sHr = Math.round(jit(at(80, 58), 3) - bias);
+    const sMeanRr = Math.round(jit(at(760, 1010), 25));
+    const sRmssd = r2(jit(at(13.5, 39) + bias, 2.5));
+    const sAmo50 = jit(at(60, 26), 5); // rigid (~60%) when crashed, spread (~26%) recovered
+    const sMxdmn = Math.max(0.05, jit(at(0.11, 0.46), 0.03)); // narrow → wide RR range, seconds
     readings.push({
       id: id(`breath-${n}`),
       type: 'breathHrv',
       time: hhmm(mins),
       note: '',
       style: '4/6',
-      sdnn: String(Math.round(jit(at(26, 68), 4))),
-      hr: String(Math.round(jit(at(80, 58), 3) - bias)),
-      meanRr: String(Math.round(jit(at(760, 1010), 25))),
-      rmssd: String(r2(jit(at(13.5, 39) + bias, 2.5))),
+      sdnn: String(sSdnn),
+      hr: String(sHr),
+      meanRr: String(sMeanRr),
+      rmssd: String(sRmssd),
       pnn50: String(Math.round(Math.max(0, jit(at(0.8, 17), 3)))),
+      ...hrvExtra(sSdnn, sMeanRr, sRmssd, sHr, sAmo50, sMxdmn),
       vlowPower: String(vlf),
       lowPower: String(lf),
       highPower: String(hf),
@@ -151,16 +193,24 @@ function demoDay(i: number, rand: () => number): DayRecord {
       hfPeak: String(r2(jit(at(0.21, 0.165), 0.02))),
       period: slot,
     });
+
+    const uSdnn = Math.round(jit(at(22, 56), 4));
+    const uHr = Math.round(jit(at(82, 60), 3) - bias);
+    const uMeanRr = Math.round(jit(at(745, 990), 25));
+    const uRmssd = r2(jit(at(11.5, 35.5) + bias, 2.5));
+    const uAmo50 = jit(at(62, 28), 5); // a touch more rigid than the paced reading
+    const uMxdmn = Math.max(0.05, jit(at(0.1, 0.42), 0.03));
     readings.push({
       id: id(`hrv-${n}`),
       type: 'hrv',
       time: hhmm(mins + 6),
       note: '',
-      sdnn: String(Math.round(jit(at(22, 56), 4))),
-      avgHr: String(Math.round(jit(at(82, 60), 3) - bias)),
-      meanRr: String(Math.round(jit(at(745, 990), 25))),
-      rmssd: String(r2(jit(at(11.5, 35.5) + bias, 2.5))),
+      sdnn: String(uSdnn),
+      avgHr: String(uHr),
+      meanRr: String(uMeanRr),
+      rmssd: String(uRmssd),
       pnn50: String(Math.round(Math.max(0, jit(at(0.5, 14), 3)))),
+      ...hrvExtra(uSdnn, uMeanRr, uRmssd, uHr, uAmo50, uMxdmn),
       vlowPower: String(Math.round(vlf * 0.9)),
       lowPower: String(Math.round(lf * 0.28)), // no paced breathing, so no LF resonance peak
       highPower: String(Math.round(hf * 1.1)),

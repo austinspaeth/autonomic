@@ -521,7 +521,7 @@ export function RestingHrSummary({ r, days, ctx }: SummaryProps) {
 const ORTHO_HELP: Record<string, string> = {
   rise: 'The biggest heart-rate change from your pre-episode baseline. A rise of 30 bpm or more (40 in adolescents) is the adult POTS-range criterion; a drop of 30 bpm or more below baseline is flagged in blue. Trends matter more than any single episode. Repeat under similar conditions to compare.',
   hr: 'The raw numbers behind this event: heart rate before the episode, during it, and where it settled one minute after.',
-  recovery: 'How far your heart rate fell back within a minute of the episode. A larger settle-down reflects a stronger baroreflex and faster vagal recovery.',
+  recovery: 'The change in your heart rate one minute after the episode, relative to the during-episode reading. A negative delta means it settled back down (a larger drop reflects a stronger baroreflex and faster vagal recovery); a positive delta means it was still climbing.',
   curve: 'The heart-rate trace from the capture, sampled every second. Purple through the resting phase before the transition, then POTS-graded once you move. Markers show where the episode begins and where the transition completes; the dashed line is the resting baseline.',
 };
 
@@ -539,9 +539,14 @@ export function OrthostaticSummary({ r, days, ctx: _ctx }: SummaryProps) {
   const before = numOr(r.beforeHr), after = numOr(r.afterHr), min1 = numOr(r.hr1min);
   const hrCurve = hrCurveFor(r);
   const maxDelta = orthoMaxDelta(r, hrCurve);
-  const drop = after != null && min1 != null ? after - min1 : null;
+  // Signed change one minute after the episode: negative = HR settled back down,
+  // positive = still climbing. (min1 - after, so a rise reads +.)
+  const delta1 = after != null && min1 != null ? min1 - after : null;
   const maxCat = orthoDeltaCat(maxDelta);
-  const dropCat = drop != null ? catFromBands(drop, BANDS.orthoRecovery) : null;
+  const deltaCat = delta1 != null ? catFromBands(delta1, BANDS.orthoDelta) : null;
+  // "Δ +14" / "Δ -14" for the signed readouts.
+  const withSign = (v: number) => (v > 0 ? '+' + v : String(v));
+  const deltaStr = (v: number) => 'Δ ' + withSign(v);
   const verdict: Record<string, string> = {
     great: 'Minimal heart-rate change - a healthy orthostatic response.',
     good: 'Normal orthostatic rise, within the expected physiologic range.',
@@ -551,7 +556,7 @@ export function OrthostaticSummary({ r, days, ctx: _ctx }: SummaryProps) {
     warning: 'HR fell 30 bpm or more below baseline. If you felt lightheaded, log symptoms and context.',
   };
   const maxEx = (rr: Entry) => orthoMaxDelta(rr, hrCurveFor(rr));
-  const dropEx = (rr: Entry) => { const a = numOr(rr.afterHr), m = numOr(rr.hr1min); return a != null && m != null ? a - m : null; };
+  const deltaEx = (rr: Entry) => { const a = numOr(rr.afterHr), m = numOr(rr.hr1min); return a != null && m != null ? m - a : null; };
   const sourceLabel = sourceLabelFor(r);
   const cols: { label: string; val: number | null; unit: string }[] = [
     { label: 'Before', val: before, unit: 'bpm · baseline' },
@@ -561,7 +566,7 @@ export function OrthostaticSummary({ r, days, ctx: _ctx }: SummaryProps) {
   return (
     <>
       <MetricSection
-        hero label="Max delta after" value={maxDelta != null ? String(Math.abs(maxDelta)) : null} suffix="bpm" cat={maxCat}
+        hero label="Max delta after" value={maxDelta != null ? deltaStr(maxDelta) : null} suffix="bpm" cat={maxCat}
         days={days} type="orthostatic" ex={maxEx} bands={BANDS.orthoIncrease}
         desc={maxCat ? verdict[maxCat] : 'Enter Before HR and After HR to rate this event.'}
         help={ORTHO_HELP.rise}
@@ -587,9 +592,9 @@ export function OrthostaticSummary({ r, days, ctx: _ctx }: SummaryProps) {
         </View>
       </Section>
       <MetricSection
-        label="HR recovery after episode" value={drop != null ? String(drop) : null} suffix="bpm" cat={dropCat}
-        days={days} type="orthostatic" ex={dropEx} bands={BANDS.orthoRecovery}
-        desc="How far HR fell back within a minute of the episode ending. A larger settle-down means stronger baroreflex and vagal recovery."
+        label="HR Delta after 1 minute" value={delta1 != null ? deltaStr(delta1) : null} suffix="bpm" cat={deltaCat}
+        days={days} type="orthostatic" ex={deltaEx} bands={BANDS.orthoDelta}
+        desc="Change in heart rate one minute after the episode. Negative means HR settled back down; positive means it was still climbing."
         help={ORTHO_HELP.recovery}
       />
       <Notes r={r} />

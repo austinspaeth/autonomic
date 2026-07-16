@@ -2,7 +2,7 @@
   "expo": {
     "name": "Autonomic",
     "slug": "autonomic",
-    "version": "1.11.0",
+    "version": "1.12.0",
     "scheme": "autonomic",
     "orientation": "portrait",
     "icon": "./assets/autonomic-icon.png",
@@ -38,7 +38,8 @@
         "ITSAppUsesNonExemptEncryption": false
       },
       "entitlements": {
-        "com.apple.developer.healthkit": true
+        "com.apple.developer.healthkit": true,
+        "com.apple.security.application-groups": ["group.com.autonomic.journal"]
       },
       "privacyManifests": {
         "NSPrivacyTracking": false,
@@ -147,6 +148,56 @@
         }
       ],
       "expo-secure-store",
+      [
+        "react-native-android-widget",
+        {
+          "widgets": [
+            {
+              "name": "Score",
+              "label": "Autonomic Score",
+              "description": "Today's autonomic score and how the day is grading.",
+              "minWidth": "110dp",
+              "minHeight": "110dp",
+              "targetCellWidth": 2,
+              "targetCellHeight": 2,
+              "resizeMode": "horizontal|vertical",
+              "updatePeriodMillis": 1800000
+            },
+            {
+              "name": "ScoreMetrics",
+              "label": "Score & Metrics",
+              "description": "Today's score with graded SDNN, RMSSD and sleep averages.",
+              "minWidth": "250dp",
+              "minHeight": "110dp",
+              "targetCellWidth": 4,
+              "targetCellHeight": 2,
+              "resizeMode": "horizontal|vertical",
+              "updatePeriodMillis": 1800000
+            },
+            {
+              "name": "TodayNumbers",
+              "label": "Today's Numbers",
+              "description": "SDNN, RMSSD, pNN50, resting HR, sleep and water at a glance.",
+              "minWidth": "250dp",
+              "minHeight": "110dp",
+              "targetCellWidth": 4,
+              "targetCellHeight": 2,
+              "resizeMode": "horizontal|vertical",
+              "updatePeriodMillis": 1800000
+            },
+            {
+              "name": "StartHrv",
+              "label": "Start HRV",
+              "description": "Jump straight into an HRV reading.",
+              "minWidth": "110dp",
+              "minHeight": "110dp",
+              "targetCellWidth": 2,
+              "targetCellHeight": 2,
+              "resizeMode": "horizontal|vertical"
+            }
+          ]
+        }
+      ],
       [
         "@bacons/apple-targets",
         {

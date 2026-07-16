@@ -18,7 +18,8 @@ import { initIap } from '../src/store/iap';
 import { initTier } from '../src/store/tier';
 import { initWatchReceiver } from '../src/lib/watch/receiver';
 import { runDailyBackup } from '../src/lib/backup';
-import { syncReminder } from '../src/lib/reminders';
+import { initCrashWatcher, syncReminder } from '../src/lib/reminders';
+import { initWidgetSync } from '../src/lib/widgets';
 import { loadIssue } from '../src/store/store';
 import { usePalette } from '../src/theme';
 
@@ -58,6 +59,12 @@ export default function RootLayout() {
     // Reconcile the OS notification schedule with settings.reminder — covers a
     // reinstall, an imported journal, or permission revoked while we were away.
     syncReminder();
+    // Crash warning: evaluate the trend now and after journal changes, firing
+    // the "rest" notification when a slide is detected (once per day).
+    initCrashWatcher();
+    // Home-screen widgets: push today's payload now, after journal changes,
+    // and on foreground (which also covers the midnight rollover).
+    initWidgetSync();
     // Pull any published EAS update in the background (preview + production
     // builds alike); a downloaded bundle applies on the next launch.
     (async () => {

@@ -115,7 +115,7 @@ export function HealthScreen() {
     <View>
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 6 }}>{healthAppName()}</Text>
       <Text style={{ color: p.textDim, fontSize: 14, marginBottom: 16, lineHeight: 19 }}>
-        {"Grant permission, then import readings one at a time from the reading picker (tap a reading type to choose a sample from Health, or enter it manually). New readings you log are also written back to Health automatically. Existing entries are never overwritten."}
+        {"Grant permission, then import readings one at a time from the reading picker (tap a reading type to choose a sample from Health, or enter it manually). Adding an activity offers the day's workouts the same way. New readings you log are also written back to Health automatically. Existing entries are never overwritten."}
       </Text>
       <Button title={authed ? 'Health connected' : `Connect ${healthAppName()}`} variant="primary" onPress={connect} />
       <View style={{ height: 20 }} />

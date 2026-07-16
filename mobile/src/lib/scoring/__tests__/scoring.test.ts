@@ -244,9 +244,9 @@ describe('day scoring', () => {
     const a = (type: string): Entry => ({ id: 'x', type });
     expect(activityGrade([])).toBeNull();
     expect(activityGrade([a('walk')])).toBe('good');
-    expect(activityGrade([a('upperBody'), a('coreWorkout')])).toBe('ok');
+    expect(activityGrade([a('strength'), a('coreWorkout')])).toBe('ok');
     expect(activityGrade([a('strenuousWork')])).toBe('bad');
-    expect(activityGrade([a('upperBody'), a('coreWorkout'), a('indoorBike')])).toBe('bad');
+    expect(activityGrade([a('strength'), a('coreWorkout'), a('indoorBike')])).toBe('bad');
   });
   it('scoreSet: RMSSD-only reading redistributes weight', () => {
     const readings: Entry[] = [{ id: 'x', type: 'breathHrv', rmssd: '35', time: '08:00' }];

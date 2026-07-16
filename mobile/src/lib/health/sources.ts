@@ -10,9 +10,13 @@
  * manual form).
  *
  * BP + Resting HR reuse `readImports` (already timestamped + provenance-aware).
+ * Activities follow the same model via `workoutCandidates` — the day's
+ * workouts, mapped to app activity types with HR stats, for the add-activity
+ * import card.
  */
 import { fmtTime12 } from '../dates';
-import { health } from './index';
+import { ACTIVITY_TYPES, entryFields } from '../registry';
+import { health, type ImportedWorkout } from './index';
 
 /** One importable Apple Health reading, shaped for the picker + prefill. */
 export interface HealthCandidate {
@@ -30,6 +34,56 @@ export interface HealthSource {
 export function healthSourceFor(type: string): HealthSource | null {
   if (type === 'restingHr' || type === 'bp') return { fetch: (dk) => sampleCandidates(type, dk) };
   return null;
+}
+
+/** One importable workout, shaped for the activity import card + prefill. */
+export interface WorkoutCandidate {
+  key: string;                                 // stable id (type+startMs)
+  type: string;                                // ACTIVITY_TYPES key
+  time: string;                                // HH:MM local start
+  label: string;                               // "Walk · 32 min · 2.1 mi"
+  sub: string;                                 // "10:14 AM · Avg HR 128 · Apple Watch"
+  entry: Record<string, string>;               // prefilled activity fields
+}
+
+/** Prefill fields for a workout, filtered to what the target type's form
+ *  actually shows (an off-schema key would persist invisibly on the entry).
+ *  Indoor bike's bespoke form has no field schema; it takes the full set. */
+function workoutEntry(w: ImportedWorkout): Record<string, string> {
+  const all: Record<string, string | undefined> = {
+    duration: String(w.durationMin),
+    distance: w.distanceMi != null ? String(w.distanceMi) : undefined,
+    avgHr: w.avgHr != null ? String(w.avgHr) : undefined,
+    minHr: w.minHr != null ? String(w.minHr) : undefined,
+    maxHr: w.maxHr != null ? String(w.maxHr) : undefined,
+  };
+  const keys = w.type === 'indoorBike'
+    ? ['duration', 'distance', 'avgHr', 'minHr', 'maxHr']
+    : entryFields(ACTIVITY_TYPES[w.type]).map((f) => f.key).filter((k): k is string => !!k);
+  const entry: Record<string, string> = {};
+  for (const k of keys) { const v = all[k]; if (v !== undefined) entry[k] = v; }
+  return entry;
+}
+
+/** The day's importable workouts: this app's own sessions and workouts already
+ *  logged (same type + start time) drop out. `logged` is the day's activities. */
+export async function workoutCandidates(dk: string, logged: { type?: unknown; time?: unknown }[]): Promise<WorkoutCandidate[]> {
+  const api = health();
+  if (!api.available) return [];
+  // Workouts joined the read set after the first Health builds — re-requesting
+  // prompts existing users once for the new type and is silent once granted.
+  await api.requestAuth();
+  const workouts = await api.readWorkouts(dk);
+  return workouts
+    .filter((w) => !w.ownApp && !logged.some((e) => e.type === w.type && e.time === w.time))
+    .map((w) => {
+      const def = ACTIVITY_TYPES[w.type];
+      const label = [def.label, `${w.durationMin} min`, w.distanceMi != null ? `${w.distanceMi} mi` : null]
+        .filter(Boolean).join(' · ');
+      const sub = [fmtTime12(w.time), w.avgHr != null ? `Avg HR ${w.avgHr}` : null, w.sourceName]
+        .filter(Boolean).join(' · ');
+      return { key: `${w.type}-${w.startMs}`, type: w.type, time: w.time, label, sub, entry: workoutEntry(w) };
+    });
 }
 
 /** Resting HR / BP candidates for a day, from the timestamped import stream. */

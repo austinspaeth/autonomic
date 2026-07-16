@@ -95,14 +95,46 @@ export function addCustomType(kind: TypeKind, name: string, opts?: { dosage?: st
   return key;
 }
 
-/** Delete a type (custom → removed; built-in → hidden). Caller checks typeInUse. */
+/** Rename a type / change its default dose. Works on custom types and on
+ *  built-ins (stored as a same-key override that `typesFor` layers on top).
+ *  The key never changes, so entries already logged against it keep resolving —
+ *  editing is allowed even while the type is in use. Returns false for a blank
+ *  or duplicate name (caller distinguishes via `name.trim()`). */
+export function editType(kind: TypeKind, key: string, name: string, opts?: { dosage?: string }): boolean {
+  const label = name.trim();
+  if (!label) return false;
+  const state = getState();
+  const existing = typesFor(state, kind);
+  const cur = existing[key];
+  if (!cur) return false;
+  if (Object.keys(existing).some((k) => k !== key && existing[k].label.toLowerCase() === label.toLowerCase())) return false;
+  // Strip any registry-only functions so the override stays pure JSON.
+  const { summary, detail, ...json } = cur;
+  void summary; void detail;
+  const next: TypeDef = { ...json, label };
+  if (kind === 'meds') {
+    const dosage = opts?.dosage?.trim();
+    if (dosage) next.dosage = dosage;
+    else delete next.dosage;
+  }
+  state.customTypes = state.customTypes || {};
+  state.customTypes[kind] = { ...(state.customTypes[kind] || {}), [key]: next };
+  save();
+  return true;
+}
+
+/** Delete a type (custom → removed; built-in → hidden). Caller checks typeInUse.
+ *  An edited built-in has both a same-key override and a built-in behind it, so
+ *  drop the override *and* hide the built-in — otherwise the override would keep
+ *  the row visible past the hide. */
 export function deleteType(kind: TypeKind, key: string) {
   const state = getState();
   if (state.customTypes?.[kind]?.[key]) {
     const next = { ...state.customTypes[kind] };
     delete next[key];
     state.customTypes[kind] = next;
-  } else if (BUILTIN[kind][key]) {
+  }
+  if (BUILTIN[kind][key]) {
     state.hiddenTypes = state.hiddenTypes || {};
     const list = state.hiddenTypes[kind] || [];
     if (!list.includes(key)) state.hiddenTypes[kind] = [...list, key];

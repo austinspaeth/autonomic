@@ -102,15 +102,34 @@ old web app so old `export.json` files import directly.
   demo data can never sit on top of real data. Insights builds its report prompts from
   `demoState()` too, resolved at press time. See `src/lib/__tests__/demo.test.ts`, which
   asserts the arc through the real scoring engine.
-- **The morning reminder is the only notification the app sends.** `src/lib/reminders.ts`
-  owns it; `settings.reminder` is the source of truth and the OS schedule is derived,
-  reconciled by `syncReminder()` on launch (covers reinstall, an imported journal, or
-  permission revoked in system settings). It schedules under one stable id, so
-  re-scheduling replaces rather than stacks. iOS **throws** from
+- **The app sends two local notifications, both owned by `src/lib/reminders.ts`.**
+  (1) The morning reminder: `settings.reminder` is the source of truth and the OS
+  schedule is derived, reconciled by `syncReminder()` on launch (covers reinstall, an
+  imported journal, or permission revoked in system settings). It schedules under one
+  stable id, so re-scheduling replaces rather than stacks. iOS **throws** from
   `scheduleNotificationAsync` when unauthorized — always request permission first and
-  only persist `enabled: true` once the schedule actually succeeded. UI goes through
-  `useReminderToggle()` (`src/features/Reminders.tsx`), shared by the welcome wizard's
-  last step and the Settings list.
+  only persist `enabled: true` once the schedule actually succeeded. (2) The crash
+  warning (`settings.crashAlert`): `checkCrashRisk()` runs `detectDownturn` on today —
+  on launch and, debounced, after journal changes via `initCrashWatcher()` (no
+  background execution exists) — and fires an immediate notification reusing the
+  Outlook downturn copy, at most once per day (`crashAlert.lastFired`). Enabling the
+  morning reminder while `crashAlert` is undefined defaults crash warnings on (the
+  welcome wizard's opt-in); an explicit off is never overridden. UI: Settings →
+  `NotificationsRow` opens `NotificationsSheet` (`src/features/Reminders.tsx`); the
+  wizard's last step still uses `useReminderToggle()`.
+- **Home-screen widgets render one shared JSON payload** built by
+  `buildWidgetPayload()` (`src/lib/widgets.ts`, pure — unit-tested) and pushed by
+  `initWidgetSync()` on launch, debounced journal changes, and foreground. iOS:
+  `modules/widget-bridge` writes it to the `group.com.autonomic.journal` app group
+  and reloads WidgetKit; the SwiftUI widgets live in `targets/widget/` (5 widgets,
+  fixed-dark, the Outlook 270° dial). Android: `react-native-android-widget`
+  (pinned 0.17.1 — 0.18+ needs Expo 54); JSX renderers in `src/widgets/android.tsx`,
+  headless handler registered in the custom entry `index.js`, widget list configured
+  in app.json. Widgets show REAL data only — an empty journal renders "Awaiting
+  data", never the demo month. A stale payload (date ≠ today) also renders as
+  awaiting. The Start HRV buttons deep-link `autonomic://?capture=hrv` (query param,
+  not a path, so expo-router never hits an unmatched route), handled by
+  `useCaptureDeepLink()` in `src/features/forms.tsx` behind the freemium gate.
 - **Types come in two layers.** Built-ins live in the `*_TYPES` maps in
   `src/lib/registry.ts` (add an icon in `src/components/Icon.tsx` when adding one).
   Users can also create their own activities, meds/supplements, symptoms and

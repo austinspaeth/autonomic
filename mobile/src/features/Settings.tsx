@@ -25,7 +25,7 @@ import { usePaywall } from './Paywall';
 import { healthAppName } from '../lib/health';
 import { DevicesScreen } from './Devices';
 import { HealthScreen } from './Health';
-import { ReminderRow } from './Reminders';
+import { NotificationsRow } from './Reminders';
 import { showWelcomeAgain } from './Onboarding';
 
 const PRIVACY_URL = 'https://autonomic.care/privacy-policy/';
@@ -70,7 +70,7 @@ export function MenuSheet({ controls }: { controls: SheetControls }) {
         <Text style={{ fontSize: 22, fontWeight: '800', color: p.text, letterSpacing: -0.3 }}>Autonomic</Text>
       </View>
       {item('user', 'Profile', 'Sex, birthday, height, weight', () => openSheet((c) => <ProfileSheet controls={c} />))}
-      <ReminderRow />
+      <NotificationsRow />
       {item('bluetooth', 'Devices', 'Heart-rate straps', () => openSheet(() => <DevicesScreen />), !!state.settings.lastBleDeviceId)}
       {item('heart', healthAppName(), 'Read & write health data', () => openSheet(() => <HealthScreen />), !!state.settings.healthEnabled)}
       {item('star', 'Subscription', 'Manage plan or restore', () => openSheet((c) => <SubscriptionSheet controls={c} />),

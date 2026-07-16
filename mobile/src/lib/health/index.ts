@@ -5,8 +5,9 @@
  *
  * Read: resting/walking HR, HRV (SDNN on iOS, RMSSD on Android), respiratory
  * rate, blood pressure, body mass (profile weight only), sleep (with overnight
- * HR range). Write: HRV, resting/avg HR, a Mindfulness session (iOS), and
- * blood pressure. `publishReading` maps an app journal entry to the right writes.
+ * HR range), and workouts (mapped to app activity types, with per-workout HR
+ * stats). Write: HRV, resting/avg HR, a Mindfulness session (iOS), and blood
+ * pressure. `publishReading` maps an app journal entry to the right writes.
  *
  * IMPORTANT — this targets @kingstinct/react-native-healthkit v8, whose API
  * differs from older majors: `requestAuthorization(read, write)` (read first),
@@ -22,6 +23,7 @@ import type { Entry, SleepStages } from '../types';
 import { computeHrv } from '../hrv';
 import { keyOf } from '../dates';
 import { summarizeSleep } from './sleepSummary';
+import { activityTypeFromHk } from './workoutMap';
 
 /** This app's bundle id — used to skip re-importing our own write-backs. */
 const OWN_BUNDLE = 'com.autonomic.journal';
@@ -36,6 +38,12 @@ export interface HealthApi {
    * each keeps its real clock time and a flag for whether this app authored it.
    */
   readImports(dk: string): Promise<ImportedReading[]>;
+  /**
+   * The day's workouts (Apple Workout app / Health Connect exercise sessions),
+   * already mapped to app activity types, each with HR stats aggregated from
+   * the heart-rate samples recorded during it.
+   */
+  readWorkouts(dk: string): Promise<ImportedWorkout[]>;
   /** Read the night that *ends* on `dk` (spans the prior evening → this morning). */
   readSleep(dk: string): Promise<SleepImport | null>;
   /**
@@ -84,6 +92,20 @@ export interface HistoryReading extends ImportedReading {
   dayKey: string;       // YYYY-MM-DD (local) the sample belongs to
 }
 
+/** A workout from the platform health store, mapped to an app activity type. */
+export interface ImportedWorkout {
+  type: string;              // ACTIVITY_TYPES key (via workoutMap)
+  time: string;              // HH:MM local start
+  startMs: number;           // epoch ms of the workout start, for dedup windows
+  durationMin: number;
+  distanceMi: number | null;
+  avgHr: number | null;
+  minHr: number | null;
+  maxHr: number | null;
+  sourceName: string;        // e.g. "Apple Watch"
+  ownApp: boolean;           // authored by this app (watch sessions) — skip on import
+}
+
 /** A watch heartbeat-series reading pulled for the live-capture sync flow. */
 export interface WatchHrvSample {
   startMs: number;
@@ -118,6 +140,7 @@ const stub: HealthApi = {
   async readImports() { return []; },
   async readHistory() { return []; },
   async readHrvSessions() { return []; },
+  async readWorkouts() { return []; },
   async readSleep() { return null; },
   async writeHrvSession() { /* no-op */ },
   async writeQuantity() { /* no-op */ },
@@ -169,12 +192,23 @@ type CSample = { value: number; startDate: Date; endDate: Date };
 type Heartbeat = { timeSinceSeriesStart: number; precededByGap?: boolean };
 type HeartbeatSeries = { startDate: Date; endDate: Date; heartbeats: readonly Heartbeat[]; uuid?: string; sourceRevision?: SourceRev };
 type SaveSample = { quantityType: string; unit: string; quantity: number; startDate: Date; endDate: Date };
+type HkWorkout = {
+  uuid?: string;
+  workoutActivityType: number;
+  duration: number;                                    // seconds
+  totalDistance?: { unit: string; quantity: number };  // in the requested distanceUnit
+  startDate: Date;
+  endDate: Date;
+  metadata?: { HKIndoorWorkout?: number | boolean } & Record<string, unknown>;
+  sourceRevision?: SourceRev;
+};
 interface HkModule {
   isHealthDataAvailable?: () => Promise<boolean>;
   requestAuthorization?: (read: string[], write: string[]) => Promise<boolean>;
   queryQuantitySamples?: (id: string, opts: Record<string, unknown>) => Promise<readonly QSample[]>;
   queryCategorySamples?: (id: string, opts: Record<string, unknown>) => Promise<readonly CSample[]>;
   queryHeartbeatSeriesSamples?: (opts: Record<string, unknown>) => Promise<readonly HeartbeatSeries[]>;
+  queryWorkoutSamples?: (opts: Record<string, unknown>) => Promise<readonly HkWorkout[]>;
   saveQuantitySample?: (id: string, unit: string, value: number, opts?: Record<string, unknown>) => Promise<boolean>;
   saveCategorySample?: (id: string, value: number, opts?: Record<string, unknown>) => Promise<boolean>;
   saveCorrelationSample?: (id: string, samples: SaveSample[], opts?: Record<string, unknown>) => Promise<boolean>;
@@ -214,10 +248,12 @@ const CID = {
 } as const;
 const CORR = { bloodPressure: 'HKCorrelationTypeIdentifierBloodPressure' } as const;
 const HEARTBEAT_SERIES = 'HKDataTypeIdentifierHeartbeatSeries';
+const WORKOUT_TYPE = 'HKWorkoutTypeIdentifier';
 
 const READ_IDS = [
   QID.restingHr, QID.heartRate, QID.hrvSdnn, QID.respiratoryRate,
   QID.systolic, QID.diastolic, QID.bodyMass, CID.sleep, HEARTBEAT_SERIES,
+  WORKOUT_TYPE,
 ];
 const WRITE_IDS = [
   QID.hrvSdnn, QID.restingHr, QID.heartRate,
@@ -416,6 +452,40 @@ function makeReal(mod: HkModule): HealthApi {
           });
         }
         return out.sort((a, b) => b.startMs - a.startMs);
+      } catch { return []; }
+    },
+
+    async readWorkouts(dk) {
+      const { from, to } = dayBounds(dk);
+      try {
+        const rows = (await mod.queryWorkoutSamples?.({ from, to, distanceUnit: 'mi', limit: 200 })) || [];
+        const out: ImportedWorkout[] = [];
+        for (const w of rows) {
+          const durationMin = Math.round((w.duration || 0) / 60);
+          if (durationMin < 1) continue; // zero-length blips (triathlon transitions etc.)
+          // HR stats from the raw samples recorded during the workout — a watch
+          // workout samples every few seconds, so one query covers avg/min/max.
+          let avgHr: number | null = null; let minHr: number | null = null; let maxHr: number | null = null;
+          let hr: readonly QSample[] = [];
+          try { hr = (await mod.queryQuantitySamples?.(QID.heartRate, { from: w.startDate, to: w.endDate, limit: 5000 })) || []; } catch { /* HR unavailable */ }
+          if (hr.length) {
+            let sum = 0; let min = Infinity; let max = -Infinity;
+            for (const s of hr) { sum += s.quantity; if (s.quantity < min) min = s.quantity; if (s.quantity > max) max = s.quantity; }
+            avgHr = Math.round(sum / hr.length); minHr = Math.round(min); maxHr = Math.round(max);
+          }
+          const dist = w.totalDistance?.quantity;
+          out.push({
+            type: activityTypeFromHk(w.workoutActivityType, !!w.metadata?.HKIndoorWorkout),
+            time: hhmm(w.startDate),
+            startMs: w.startDate.getTime(),
+            durationMin,
+            distanceMi: dist && dist > 0 ? Math.round(dist * 100) / 100 : null,
+            avgHr, minHr, maxHr,
+            sourceName: w.sourceRevision?.source?.name || 'Apple Health',
+            ownApp: isOwnSample(w.sourceRevision),
+          });
+        }
+        return out.sort((a, b) => a.startMs - b.startMs);
       } catch { return []; }
     },
 

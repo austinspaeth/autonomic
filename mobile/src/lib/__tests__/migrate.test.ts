@@ -93,6 +93,37 @@ describe('migrate: logged-entry arrays', () => {
     expect(r[2].imported).toBe(false);
   });
 
+  it('merges legacy upper/lower body activities into strength, keeping the side in the note', () => {
+    const d = migrate({
+      days: {
+        '2026-01-01': {
+          activities: [
+            { id: 'a', type: 'upperBody', time: '10:00', duration: '30' },
+            { id: 'b', type: 'lowerBody', note: 'squats' },
+            { id: 'c', type: 'walk' },
+          ],
+          readings: [{ id: 'r', type: 'upperBody' }], // only activities retype
+        },
+      },
+    }).days['2026-01-01'];
+    expect(d.activities[0]).toMatchObject({ type: 'strength', note: 'Upper body', duration: '30' });
+    expect(d.activities[1]).toMatchObject({ type: 'strength', note: 'Lower body · squats' });
+    expect(d.activities[2].type).toBe('walk');
+    expect(d.readings[0].type).toBe('upperBody');
+  });
+
+  it('retires upper/lower hidden-type refs, hiding strength only when both halves were hidden', () => {
+    const both = migrate({ hiddenTypes: { activities: ['upperBody', 'lowerBody', 'dance'] } }).hiddenTypes;
+    expect(both?.activities).toEqual(['dance', 'strength']);
+    const one = migrate({ hiddenTypes: { activities: ['upperBody'] } }).hiddenTypes;
+    expect(one?.activities).toEqual([]);
+    const overrides = migrate({
+      customTypes: { activities: { upperBody: { label: 'Bench', icon: 'barbell', fields: [] }, 'custom-x': { label: 'X', icon: 'activity', fields: [] } } },
+    }).customTypes;
+    expect(overrides?.activities?.upperBody).toBeUndefined();
+    expect(overrides?.activities?.['custom-x']).toBeDefined();
+  });
+
   it('applies the same envelope rules to activities, meds, symptoms and meals', () => {
     const d = migrate({
       days: {
@@ -270,6 +301,31 @@ describe('migrate: reminder', () => {
 
   it('leaves an absent reminder absent', () => {
     expect(migrate({ settings: { theme: 'dark' } }).settings.reminder).toBeUndefined();
+  });
+});
+
+describe('migrate: crashAlert', () => {
+  const crashOf = (v: unknown) => migrate({ settings: { theme: 'dark', crashAlert: v } }).settings.crashAlert;
+
+  it('keeps a well-formed crashAlert', () => {
+    expect(crashOf({ enabled: true })).toEqual({ enabled: true });
+    expect(crashOf({ enabled: true, lastFired: '2026-07-16' })).toEqual({ enabled: true, lastFired: '2026-07-16' });
+  });
+
+  it('coerces enabled and drops a malformed lastFired', () => {
+    expect(crashOf({ enabled: 1, lastFired: 'yesterday' })).toEqual({ enabled: true });
+    expect(crashOf({ lastFired: '2026-07-16' })).toEqual({ enabled: false, lastFired: '2026-07-16' });
+    expect(crashOf({ enabled: true, lastFired: 42 })).toEqual({ enabled: true });
+  });
+
+  it.each([null, 'garbage', 42, []])('drops a non-object crashAlert %p', (v) => {
+    expect(crashOf(v)).toBeUndefined();
+  });
+
+  // Undefined is meaningful (never chosen → enabling the morning reminder
+  // defaults it on), so migrate must not invent one.
+  it('leaves an absent crashAlert absent', () => {
+    expect(migrate({ settings: { theme: 'dark' } }).settings.crashAlert).toBeUndefined();
   });
 });
 

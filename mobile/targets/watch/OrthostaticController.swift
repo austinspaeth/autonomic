@@ -93,7 +93,9 @@ final class OrthostaticController: ObservableObject {
 
     func begin() {
         guard stage == .intro else { return }
-        WorkoutManager.shared.start()
+        // Capture mode: session runs (not TachyMon-paused) so HR lands at
+        // ~1 Hz — the transition's rise must show within a beat or two.
+        WorkoutManager.shared.start(mode: .capture)
         startTime = Date()
         elapsed = 0
         stageElapsed = 0

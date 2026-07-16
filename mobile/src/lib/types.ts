@@ -150,10 +150,16 @@ export interface AppState {
     /** Day key stamped the first time a protocol is saved (never cleared) —
      *  completes the "Getting started" protocol milestone. */
     protocolSetOn?: string;
-    /** Daily morning-reading nudge (the app's only notification). Source of
-     *  truth for the OS schedule — see `syncReminder()` in lib/reminders.
-     *  `time` survives disabling so re-enabling can offer it back. */
+    /** Daily morning-reading nudge. Source of truth for the OS schedule — see
+     *  `syncReminder()` in lib/reminders. `time` survives disabling so
+     *  re-enabling can offer it back. */
     reminder?: { enabled: boolean; time: string };
+    /** Crash warning: a notification fired when the trailing-week trend flags
+     *  a likely crash (detectDownturn), telling the user to rest. `lastFired`
+     *  is the day key last notified, so one slide alerts once per day.
+     *  Undefined means "never chosen" — first enabling the morning reminder
+     *  defaults it on; an explicit off stays off. */
+    crashAlert?: { enabled: boolean; lastFired?: string };
   };
   profile: Profile;
   /** User-defined types layered on top of the registry maps (pure JSON defs). */

@@ -81,7 +81,7 @@ export function buildMilestoneDays(days: DaysMap, ctx: ScoreContext): { map: Rec
       bikeEasy: acts.some((a) => a.type === 'indoorBike' && !a.interval),
       bikeInterval: acts.some((a) => a.type === 'indoorBike' && a.interval),
       core: acts.some((a) => a.type === 'coreWorkout'),
-      upper: acts.some((a) => a.type === 'upperBody'),
+      upper: acts.some((a) => a.type === 'strength'),
       sessions: acts.length,
       sys: bpAvg('sys'), dia: bpAvg('dia'),
       medsSet: new Set((d.meds || []).map((m) => m.type)),

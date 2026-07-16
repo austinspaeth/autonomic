@@ -120,7 +120,7 @@ export function sleepGrade(days: DaysMap, dk: string): ScoreCat | null {
 /** Behaviour grade from logged activity load (lightly weighted). */
 export function activityGrade(acts?: Entry[]): ScoreCat | null {
   if (!acts || !acts.length) return null;
-  const heavy = acts.filter((a) => ['stressfulWork', 'upperBody', 'coreWorkout', 'indoorBike', 'carWash'].includes(a.type));
+  const heavy = acts.filter((a) => ['stressfulWork', 'strength', 'coreWorkout', 'indoorBike', 'carWash'].includes(a.type));
   if (acts.some((a) => a.type === 'strenuousWork') || heavy.length >= 3) return 'bad';
   if (heavy.length === 2) return 'ok';
   return 'good';
@@ -283,15 +283,20 @@ export function waterGoalL(p?: Partial<Protocol> | null): number {
 const typeLabel = (map: Record<string, { label: string }>, k: string, custom?: Record<string, { label: string }>) => custom?.[k]?.label || map[k]?.label || k;
 const joinLabels = (map: Record<string, { label: string }>, keys: string[], custom?: Record<string, { label: string }>) => keys.map((k) => typeLabel(map, k, custom)).join(', ');
 
-export function dayCleanliness(days: DaysMap, dk: string, protocol: Protocol = DEFAULT_PROTOCOL, custom?: CustomTypes): Cleanliness | null {
+/** Build the clean-day checklist for a day against a protocol. An absent or
+ *  empty day yields the same criteria as a blank one — every requirement simply
+ *  reads as unmet. This is the DISPLAY primitive: it lets the streak widget show
+ *  a new user their protocol before anything is logged. Streak/rate math still
+ *  goes through dayCleanliness, which returns null for days with no record so a
+ *  gap day is excluded rather than counted as a broken day. */
+export function protocolCriteria(days: DaysMap, dk: string, protocol: Protocol = DEFAULT_PROTOCOL, custom?: CustomTypes): Criterion[] {
   const d = days[dk];
-  if (!d) return null;
   const criteria: Criterion[] = [];
 
   // Triggers (hard — logging one can't be undone for the day). Empty selection
   // means "avoid all triggers"; a selection narrows it to those specific ones.
   if (protocol.triggers.enabled) {
-    const triggers = (d.food && d.food.triggers) || {};
+    const triggers = (d && d.food && d.food.triggers) || {};
     const count = (k: string) => (triggers[k] > 0 ? triggers[k] : 0);
     const sel = protocol.triggers.types;
     const logged = (sel.length ? sel : Object.keys(triggers)).reduce((s, k) => s + count(k), 0);
@@ -300,13 +305,13 @@ export function dayCleanliness(days: DaysMap, dk: string, protocol: Protocol = D
   }
 
   if (protocol.water.enabled) {
-    const water = (d.food && d.food.water) || 0;
+    const water = (d && d.food && d.food.water) || 0;
     criteria.push({ key: 'water', label: `Water (${protocol.water.liters} L)`, pass: water >= protocol.water.liters });
   }
 
   // Each required medication/activity is its own criterion (own checkmark).
   if (protocol.meds.enabled) {
-    const meds = d.meds || [];
+    const meds = (d && d.meds) || [];
     protocol.meds.types.forEach((t) => {
       const label = typeLabel(MED_TYPES, t, custom?.meds);
       criteria.push({ key: `meds:${t}`, label, pass: meds.some((m) => m.type === t) });
@@ -314,7 +319,7 @@ export function dayCleanliness(days: DaysMap, dk: string, protocol: Protocol = D
   }
 
   if (protocol.activities.enabled) {
-    const acts = d.activities || [];
+    const acts = (d && d.activities) || [];
     protocol.activities.types.forEach((t) => {
       const label = typeLabel(ACTIVITY_TYPES, t, custom?.activities);
       criteria.push({ key: `activities:${t}`, label, pass: acts.some((a) => a.type === t) });
@@ -327,6 +332,12 @@ export function dayCleanliness(days: DaysMap, dk: string, protocol: Protocol = D
     criteria.push({ key: 'sleep', label: `Sleep ${protocol.sleep.hours}h or more`, pass: sleepLogged && hrs! >= protocol.sleep.hours, hard: true, broken: sleepLogged && hrs! < protocol.sleep.hours });
   }
 
+  return criteria;
+}
+
+export function dayCleanliness(days: DaysMap, dk: string, protocol: Protocol = DEFAULT_PROTOCOL, custom?: CustomTypes): Cleanliness | null {
+  if (!days[dk]) return null;
+  const criteria = protocolCriteria(days, dk, protocol, custom);
   const clean = criteria.length > 0 && criteria.filter((c) => !c.pending).every((c) => c.pass);
   return { clean, criteria };
 }

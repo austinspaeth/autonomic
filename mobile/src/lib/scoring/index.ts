@@ -140,6 +140,10 @@ export const BANDS: Record<string, Band[]> = {
   ecgHrv: [{ max: 15, cat: 'crash' }, { max: 25, cat: 'bad' }, { max: 35, cat: 'ok' }, { max: 50, cat: 'good' }, { max: Infinity, cat: 'great' }],
   orthoIncrease: [{ max: 15, cat: 'great' }, { max: 25, cat: 'good' }, { max: 30, cat: 'ok' }, { max: 40, cat: 'bad' }, { max: Infinity, cat: 'concerning' }],
   orthoRecovery: [{ max: 0, cat: 'concerning' }, { max: 6, cat: 'bad' }, { max: 12, cat: 'ok' }, { max: 20, cat: 'good' }, { max: Infinity, cat: 'great' }],
+  // Signed HR change one minute after the episode (min1 - after): negative means
+  // HR settled back down (good), positive means it was still climbing (bad). The
+  // mirror of orthoRecovery, graded on the signed delta the readout now shows.
+  orthoDelta: [{ max: -20, cat: 'great' }, { max: -12, cat: 'good' }, { max: -6, cat: 'ok' }, { max: 0, cat: 'bad' }, { max: Infinity, cat: 'concerning' }],
   // Watch stand test: HR rise on standing (bpm). ≥30 sustained is the adult
   // POTS threshold, so it sits at the bad boundary.
   standDelta: [{ max: 10, cat: 'great' }, { max: 20, cat: 'good' }, { max: 30, cat: 'ok' }, { max: 40, cat: 'bad' }, { max: Infinity, cat: 'crash' }],

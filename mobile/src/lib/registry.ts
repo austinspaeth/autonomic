@@ -122,7 +122,7 @@ export const READING_TYPES: Record<string, TypeDef> = {
 
 /** Alphabetical by label ("Other exercise" stays last as the catch-all);
  *  pickers render in this insertion order. Covers the Apple Workout app's
- *  default types (strength maps to the upper/lower split). */
+ *  default types (see src/lib/health/workoutMap.ts for the import mapping). */
 export const ACTIVITY_TYPES: Record<string, TypeDef> = {
   breathwork: {
     label: 'Breathwork / meditation', icon: 'wind',
@@ -234,14 +234,6 @@ export const ACTIVITY_TYPES: Record<string, TypeDef> = {
       { key: 'lowHr', label: 'Low HR' },
     ],
   },
-  lowerBody: {
-    label: 'Lower body strength', icon: 'barbell',
-    fields: [
-      { key: 'duration', label: 'Duration', unit: 'min' },
-      { key: 'minHr', label: 'Min HR' },
-      { key: 'maxHr', label: 'Max HR' },
-    ],
-  },
   cycle: {
     label: 'Outdoor bike', icon: 'bike',
     fields: [
@@ -294,6 +286,15 @@ export const ACTIVITY_TYPES: Record<string, TypeDef> = {
       { key: 'maxHr', label: 'Max HR' },
     ],
   },
+  strength: {
+    label: 'Strength training', icon: 'barbell',
+    fields: [
+      { key: 'duration', label: 'Duration', unit: 'min' },
+      { key: 'avgHr', label: 'Avg HR' },
+      { key: 'minHr', label: 'Min HR' },
+      { key: 'maxHr', label: 'Max HR' },
+    ],
+  },
   strenuousWork: {
     label: 'Strenuous work', icon: 'flame',
     fields: [
@@ -320,14 +321,6 @@ export const ACTIVITY_TYPES: Record<string, TypeDef> = {
   },
   taiChi: {
     label: 'Tai chi', icon: 'wind',
-    fields: [
-      { key: 'duration', label: 'Duration', unit: 'min' },
-      { key: 'minHr', label: 'Min HR' },
-      { key: 'maxHr', label: 'Max HR' },
-    ],
-  },
-  upperBody: {
-    label: 'Upper body strength', icon: 'barbell',
     fields: [
       { key: 'duration', label: 'Duration', unit: 'min' },
       { key: 'minHr', label: 'Min HR' },
