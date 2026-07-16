@@ -17,7 +17,7 @@ import { SheetFooter } from '../components/Sheet';
 import { Button } from '../components/ui';
 import { Icon } from '../components/Icon';
 import { radius, usePalette } from '../theme';
-import { useAppState } from '../store/store';
+import { useStore } from '../store/store';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
@@ -72,7 +72,7 @@ export function OrthostaticIntroSheet({ title, subtitle, onManual, onStrap }: {
   const p = usePalette();
   // Reactive so the paired-strap subtitle updates the moment a device is saved
   // from the pairing sheet stacked on top of this one.
-  const savedName = useAppState().settings.lastBleDeviceName;
+  const savedName = useStore((s) => s.state.settings.lastBleDeviceName);
   return (
     <View>
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 4 }}>{title}</Text>

@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Animated as RNAnimated, Easing, Pressable, ScrollView, Text, View } from 'react-native';
+import { runOnJS, useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
 import { Screen } from '../../src/components/Header';
 import { Icon } from '../../src/components/Icon';
@@ -10,7 +11,7 @@ import { useAppState } from '../../src/store/store';
 import { useTier } from '../../src/store/tier';
 import { usePaywall } from '../../src/features/Paywall';
 import { buildCategories, type AnalysisCard, type BpPeriod, type OrthoTransition } from '../../src/lib/analysis/categories';
-import { resolveProtocol } from '../../src/lib/scoring/day';
+import { resolveProtocol, type DaysMap } from '../../src/lib/scoring/day';
 import { avgRound, catFromBands, type Mode } from '../../src/lib/analysis/buckets';
 import { HrvFilterLinks, HrvProgress, type Filt } from '../../src/features/HrvProgress';
 import { demoDays, hasOwnData } from '../../src/lib/demo';
@@ -50,59 +51,76 @@ export default function AnalysisScreen() {
   const hasData = sections.some((s) => s.id !== 'outlook' && (s.cards.length > 0 || s.hasOwn));
 
   const scrollRef = useRef<ScrollView>(null);
-  const offsets = useRef<Record<string, number>>({});   // section id -> y in the scroll content
   const [headerH, setHeaderH] = useState(0);
-  const [activeId, setActiveId] = useState<string | null>(null);
-  const activeRef = useRef<string | null>(null);
-  const lastY = useRef(0);
-  const dirRef = useRef(1);                              // +1 = scrolling down, -1 = up
+
+  // Pinned-section tracking runs as a Reanimated worklet: the per-frame scan
+  // (which section header has scrolled up to the bottom of the top bar) stays
+  // on the UI thread, so scrolling never contends with the chart trees for JS
+  // time. JS only hears runOnJS(setPinned) on an actual handoff — as one title
+  // slides behind the blur the pinned bar adopts it, and the next section takes
+  // over when its title reaches the line.
+  const offsetsSv = useSharedValue<Record<string, number>>({});  // section id -> y in the scroll content
+  const headerSv = useSharedValue(0);
+  const lastYSv = useSharedValue(0);
+  const dirSv = useSharedValue(1);                               // +1 = scrolling down, -1 = up
+  const activeSv = useSharedValue<string | null>(null);
+  const [pinned, setPinnedState] = useState<{ id: string; dir: number } | null>(null);
+  const setPinned = useCallback((id: string | null, dir: number) => setPinnedState(id ? { id, dir } : null), []);
+  // Outlook renders untitled at the very top, so it never pins — the sticky
+  // bar starts with HRV.
+  const pinIds = useMemo(() => sections.filter((s) => s.id !== 'outlook').map((s) => s.id), [sections]);
+  const onScroll = useAnimatedScrollHandler({
+    onScroll: (e) => {
+      const y = e.contentOffset.y;
+      const dy = y - lastYSv.value;
+      lastYSv.value = y;
+      if (Math.abs(dy) > 0.5) dirSv.value = dy > 0 ? 1 : -1;
+      let active: string | null = null;
+      for (const id of pinIds) {
+        const off = offsetsSv.value[id];
+        if (off == null) continue;
+        if (off - y <= headerSv.value + HANDOFF_LEAD) active = id;
+        else break;
+      }
+      if (active !== activeSv.value) {
+        activeSv.value = active;
+        runOnJS(setPinned)(active, dirSv.value);
+      }
+    },
+  }, [pinIds, setPinned]);
+
+  // Sections seed their y-offsets from layout (JS side) into the shared map the
+  // worklet scans; onLayout re-fires whenever mounting sections shift the list.
+  const onSectionLayout = useCallback((id: string, y: number) => {
+    offsetsSv.value = { ...offsetsSv.value, [id]: y };
+  }, [offsetsSv]);
+  const onHeaderHeight = useCallback((h: number) => { setHeaderH(h); headerSv.value = h; }, [headerSv]);
 
   // Reset to the top when the range changes so stale offsets don't mislead. The
   // offsets map is cleared too — the previous range's section heights are wrong
   // for the new one, and each section re-seeds its offset on the next onLayout.
   useEffect(() => {
-    activeRef.current = null;
-    setActiveId(null);
-    offsets.current = {};
-    lastY.current = 0;
+    activeSv.value = null;
+    offsetsSv.value = {};
+    lastYSv.value = 0;
+    setPinnedState(null);
     scrollRef.current?.scrollTo({ y: 0, animated: false });
-  }, [mode]);
+  }, [mode, activeSv, offsetsSv, lastYSv]);
 
-  // The pinned section title = the last section whose header has scrolled up to
-  // (or past) the bottom of the top bar. This is the manual equivalent of the
-  // sticky-header handoff: as one title slides behind the blur, the pinned bar
-  // adopts it; the next section then takes over when its title reaches the line.
-  // HANDOFF_LEAD makes the swap fire as the inline title *touches* the bar
-  // (roughly one title-height early) instead of after it has fully slid under.
-  const HANDOFF_LEAD = 28;
-  const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const y = e.nativeEvent.contentOffset.y;
-    const dy = y - lastY.current;
-    lastY.current = y;
-    if (Math.abs(dy) > 0.5) dirRef.current = dy > 0 ? 1 : -1;
-    let active: string | null = null;
-    for (const s of sections) {
-      // Outlook renders untitled at the very top, so it never pins — the sticky
-      // bar starts with HRV.
-      if (s.id === 'outlook') continue;
-      const off = offsets.current[s.id];
-      if (off == null) continue;
-      if (off - y <= headerH + HANDOFF_LEAD) active = s.id;
-      else break;
-    }
-    if (active !== activeRef.current) { activeRef.current = active; setActiveId(active); }
-  };
+  // Charts are expensive, so sections mount progressively (see the hook below);
+  // until a section's turn comes it renders its real title over skeleton cards.
+  const revealed = useProgressiveReveal(sections);
 
   const scrollToTop = () => scrollRef.current?.scrollTo({ y: 0, animated: true });
 
-  const activeSection = activeId ? sections.find((s) => s.id === activeId) : null;
+  const activeSection = pinned ? sections.find((s) => s.id === pinned.id) : null;
   const active = activeSection ? { id: activeSection.id, title: activeSection.title } : null;
 
   return (
     <Screen
       scrollRef={scrollRef}
       onScroll={onScroll}
-      onHeaderHeight={setHeaderH}
+      onHeaderHeight={onHeaderHeight}
       header={
         <View style={{ paddingHorizontal: 16 }}>
           <Segmented
@@ -122,7 +140,7 @@ export default function AnalysisScreen() {
         <StickyBar
           headerH={headerH}
           active={active}
-          dir={dirRef.current}
+          dir={pinned?.dir ?? 1}
           onUp={scrollToTop}
           hrvFilt={hrvFilt}
           setHrvFilt={setHrvFilt}
@@ -134,36 +152,116 @@ export default function AnalysisScreen() {
           Nothing to show yet. Record readings, sleep, activities and more in your Journal and your progress will start populating here.
         </Text>
       ) : (
-        <>
-          {demo ? <DemoBanner text={DEMO_PROGRESS_TEXT} /> : null}
-          {/* Every category inline as one long document with a titled section. */}
-          {sections.map((s, si) => (
-            <View key={s.id} onLayout={(e) => { offsets.current[s.id] = e.nativeEvent.layout.y; }} style={{ marginTop: si === 0 ? 0 : 22 }}>
-              {s.id === 'outlook' ? null : s.id === 'hrv' ? (
-                // HRV keeps its All/Morning/Evening pills inline with the title —
-                // small and right-aligned so they never overrun the container;
-                // the same toggle also rides in the pinned bar once this section pins.
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, minHeight: 34 }}>
-                  <Text style={{ fontSize: SECTION_TITLE_SIZE, fontWeight: '700', color: p.text }}>{s.title}</Text>
-                  <View style={{ flexShrink: 1, marginLeft: 12, alignItems: 'flex-end' }}>
-                    <HrvFilterLinks value={hrvFilt} onChange={setHrvFilt} />
-                  </View>
-                </View>
-              ) : (
-                <Text style={{ fontSize: SECTION_TITLE_SIZE, fontWeight: '700', color: p.text, marginBottom: 8 }}>{s.title}</Text>
-              )}
-              {s.id === 'hrv' ? (
-                <HrvProgress days={days} mode={mode} ctx={{ sex, height }} filt={hrvFilt} />
-              ) : s.cards.length === 0 ? (
-                <Text style={{ color: p.textDim }}>No data logged yet for this category.</Text>
-              ) : (
-                s.cards.map((card, i) => <CardView key={i} card={card} buckets={s.buckets} />)
-              )}
-            </View>
-          ))}
-        </>
+        <SectionsBody
+          sections={sections}
+          demo={demo}
+          days={days}
+          mode={mode}
+          sex={sex}
+          height={height}
+          hrvFilt={hrvFilt}
+          setHrvFilt={setHrvFilt}
+          revealed={revealed}
+          onSectionLayout={onSectionLayout}
+        />
       )}
     </Screen>
+  );
+}
+
+type Section = { id: string; title: string; buckets: { label: string }[]; cards: AnalysisCard[]; hasOwn: boolean };
+
+/** How many sections mount with real charts on first render — enough to fill
+ *  the viewport (Outlook + HRV). */
+const INITIAL_SECTIONS = 2;
+
+/** Progressive section mount: the chart trees are expensive, so instead of
+ *  mounting all of them in one frame (a visible hitch on tab switch and range
+ *  change), the screen renders INITIAL_SECTIONS for real and then reveals one
+ *  more per frame until every section is live. Sections never unmount. The
+ *  count resets during render whenever `sections` is rebuilt, so the remount
+ *  cost of a range change spreads across frames too — resetting in an effect
+ *  instead would let one full-mount frame slip through first. */
+function useProgressiveReveal(sections: Section[]): number {
+  const [state, setState] = useState({ key: sections as Section[], shown: INITIAL_SECTIONS });
+  if (state.key !== sections) setState({ key: sections, shown: INITIAL_SECTIONS });
+  const shown = state.key === sections ? state.shown : INITIAL_SECTIONS;
+  useEffect(() => {
+    if (shown >= sections.length) return;
+    const id = requestAnimationFrame(() =>
+      setState((s) => (s.key === sections ? { key: s.key, shown: s.shown + 1 } : s)));
+    return () => cancelAnimationFrame(id);
+  }, [shown, sections]);
+  return shown;
+}
+
+/** The whole document of category sections, memoized as one unit so pinned-bar
+ *  handoffs (parent state flipping mid-scroll) never touch the chart trees. */
+const SectionsBody = React.memo(function SectionsBody({ sections, demo, days, mode, sex, height, hrvFilt, setHrvFilt, revealed, onSectionLayout }: {
+  sections: Section[];
+  demo: boolean;
+  days: DaysMap;
+  mode: Mode;
+  sex?: string;
+  height?: string;
+  hrvFilt: Filt;
+  setHrvFilt: (f: Filt) => void;
+  revealed: number;
+  onSectionLayout: (id: string, y: number) => void;
+}) {
+  const p = usePalette();
+  // Stable identity — HrvProgress keys its aggregation memo on `ctx`.
+  const ctx = useMemo(() => ({ sex, height }), [sex, height]);
+  return (
+    <>
+      {demo ? <DemoBanner text={DEMO_PROGRESS_TEXT} /> : null}
+      {/* Every category inline as one long document with a titled section. */}
+      {sections.map((s, si) => (
+        <View key={s.id} onLayout={(e) => onSectionLayout(s.id, e.nativeEvent.layout.y)} style={{ marginTop: si === 0 ? 0 : 22 }}>
+          {s.id === 'outlook' ? null : s.id === 'hrv' ? (
+            // HRV keeps its All/Morning/Evening pills inline with the title —
+            // small and right-aligned so they never overrun the container;
+            // the same toggle also rides in the pinned bar once this section pins.
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, minHeight: 34 }}>
+              <Text style={{ fontSize: SECTION_TITLE_SIZE, fontWeight: '700', color: p.text }}>{s.title}</Text>
+              <View style={{ flexShrink: 1, marginLeft: 12, alignItems: 'flex-end' }}>
+                <HrvFilterLinks value={hrvFilt} onChange={setHrvFilt} />
+              </View>
+            </View>
+          ) : (
+            <Text style={{ fontSize: SECTION_TITLE_SIZE, fontWeight: '700', color: p.text, marginBottom: 8 }}>{s.title}</Text>
+          )}
+          {si >= revealed ? (
+            <SectionSkeleton cards={s.id === 'hrv' ? 2 : Math.max(1, Math.min(s.cards.length, 3))} />
+          ) : s.id === 'hrv' ? (
+            <HrvProgress days={days} mode={mode} ctx={ctx} filt={hrvFilt} />
+          ) : s.cards.length === 0 ? (
+            <Text style={{ color: p.textDim }}>No data logged yet for this category.</Text>
+          ) : (
+            s.cards.map((card, i) => <CardView key={i} card={card} buckets={s.buckets} />)
+          )}
+        </View>
+      ))}
+    </>
+  );
+});
+
+/** Placeholder cards shown for the few frames before a section's charts mount:
+ *  real card chrome (surface, border, ghost blocks), so a hard fling lands on
+ *  skeleton cards rather than blank space. Mounting is top-down, so the swap to
+ *  real content happens below the viewport and never reads as a shift. */
+function SectionSkeleton({ cards }: { cards: number }) {
+  const p = usePalette();
+  return (
+    <>
+      {Array.from({ length: cards }, (_, i) => (
+        <View key={i} style={{ backgroundColor: p.surface, borderColor: p.border, borderWidth: 1, borderRadius: radius.card, padding: 16, height: 280, marginBottom: 12 }}>
+          <View style={{ width: 130, height: 11, borderRadius: 6, backgroundColor: p.surface2 }} />
+          <View style={{ width: 62, height: 22, borderRadius: 6, backgroundColor: p.surface2, marginTop: 18 }} />
+          <View style={{ flex: 1, borderRadius: radius.control, backgroundColor: p.surface2, opacity: 0.55, marginTop: 18 }} />
+        </View>
+      ))}
+    </>
   );
 }
 
@@ -172,6 +270,9 @@ type Active = { id: string; title: string } | null;
 // One size for section titles everywhere — the inline headers in the document
 // and the pinned bar's title must read as the *same* element trading places.
 const SECTION_TITLE_SIZE = 20;
+// The pin handoff fires as the inline title *touches* the bar (roughly one
+// title-height early) instead of after it has fully slid under.
+const HANDOFF_LEAD = 28;
 // Height of the pinned section bar.
 const STICKY_BAR_H = 52;
 
@@ -194,14 +295,14 @@ function StickyBar({ headerH, active, dir, onUp, hrvFilt, setHrvFilt }: {
   const shown = active != null;
 
   // Container fade — presence of any pinned section.
-  const containerOp = useRef(new Animated.Value(shown ? 1 : 0)).current;
+  const containerOp = useRef(new RNAnimated.Value(shown ? 1 : 0)).current;
   useEffect(() => {
-    Animated.timing(containerOp, { toValue: shown ? 1 : 0, duration: 200, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
+    RNAnimated.timing(containerOp, { toValue: shown ? 1 : 0, duration: 200, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
   }, [shown, containerOp]);
 
   // Content swap — two stacked layers driven by one 0→1 phase per transition.
   const [layers, setLayers] = useState<{ out: Active; in: Active }>({ out: null, in: active });
-  const phase = useRef(new Animated.Value(1)).current;
+  const phase = useRef(new RNAnimated.Value(1)).current;
   const slideDir = useRef(1);
   const prevId = useRef<string | null>(active?.id ?? null);
   useEffect(() => {
@@ -211,7 +312,7 @@ function StickyBar({ headerH, active, dir, onUp, hrvFilt, setHrvFilt }: {
     slideDir.current = dir >= 0 ? 1 : -1;
     setLayers((l) => ({ out: l.in, in: active }));
     phase.setValue(0);
-    Animated.timing(phase, { toValue: 1, duration: 260, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+    RNAnimated.timing(phase, { toValue: 1, duration: 260, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
   }, [active, dir, phase]);
 
   const d = slideDir.current;
@@ -225,7 +326,7 @@ function StickyBar({ headerH, active, dir, onUp, hrvFilt, setHrvFilt }: {
   };
 
   const layer = (a: Active, style: object, live: boolean) => (
-    <Animated.View
+    <RNAnimated.View
       pointerEvents={live ? 'box-none' : 'none'}
       style={[{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, style]}
     >
@@ -239,11 +340,11 @@ function StickyBar({ headerH, active, dir, onUp, hrvFilt, setHrvFilt }: {
           ) : null}
         </>
       ) : null}
-    </Animated.View>
+    </RNAnimated.View>
   );
 
   return (
-    <Animated.View pointerEvents={shown ? 'box-none' : 'none'} style={{ position: 'absolute', top: headerH, left: 0, right: 0, opacity: containerOp }}>
+    <RNAnimated.View pointerEvents={shown ? 'box-none' : 'none'} style={{ position: 'absolute', top: headerH, left: 0, right: 0, opacity: containerOp }}>
       <BlurView intensity={50} tint="dark" style={{ flexDirection: 'row', alignItems: 'center', height: BAR_H, paddingHorizontal: 16, backgroundColor: 'rgba(4,4,7,0.97)', borderBottomWidth: 0.5, borderBottomColor: p.border }}>
         <Pressable onPress={onUp} hitSlop={10} style={{ marginLeft: -4, marginRight: 8 }}>
           <Icon name="arrowUp" size={22} color={p.text} />
@@ -253,7 +354,7 @@ function StickyBar({ headerH, active, dir, onUp, hrvFilt, setHrvFilt }: {
           {layer(layers.in, inStyle, true)}
         </View>
       </BlurView>
-    </Animated.View>
+    </RNAnimated.View>
   );
 }
 

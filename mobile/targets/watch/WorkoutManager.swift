@@ -22,11 +22,14 @@ import HealthKit
  * fast rise must show within a beat or two, and the ~5 s paused cadence
  * lagged the critical first seconds of standing. The trade-off is deliberate:
  * a running session accrues real active duration, so the saved workout
- * carries the test's minutes (and its modest Mind & Body calorie estimate).
+ * carries the test's minutes (and a modest calorie estimate).
  *
- * In both modes the live builder is not the delivery path — HR is read from
- * the health store via an HKAnchoredObjectQuery (the only path that works
- * while paused; harmless while running). On stop the workout IS saved rather
+ * HR delivery is per mode. Monitor reads the health store via an
+ * HKAnchoredObjectQuery — the only path that works while paused (a paused
+ * builder collects nothing). Capture ingests from the live builder's
+ * didCollectDataOf: store commits are batched (~5 s or slower even during a
+ * running session), so the anchored query would throw away exactly the
+ * latency a running session is paid for. On stop the workout IS saved rather
  * than discarded, so a system-finalized session after a crash matches what
  * stop() would have left behind.
  *
@@ -127,7 +130,8 @@ final class WorkoutManager: NSObject, ObservableObject {
         recent = []
         lastSampleAt = nil
         beginSession()
-        startHrQuery(from: Date())
+        // Monitor's delivery path; capture gets HR from the builder delegate.
+        if mode == .monitor { startHrQuery(from: Date()) }
         DispatchQueue.main.async {
             self.hr = nil
             self.running = true
@@ -141,13 +145,18 @@ final class WorkoutManager: NSObject, ObservableObject {
 
     private func beginSession() {
         let config = HKWorkoutConfiguration()
-        config.activityType = .mindAndBody
+        // Monitor spends its life paused, so its type barely matters (and
+        // .mindAndBody keeps the TachyMon-shaped Health record). Capture RUNS
+        // through real movement — stairs, standing up — and .other keeps the
+        // sensor's motion-tolerant workout tuning (the pre-paused-model type).
+        config.activityType = mode == .capture ? .other : .mindAndBody
         config.locationType = .indoor
         do {
             let s = try HKWorkoutSession(healthStore: store, configuration: config)
             let b = s.associatedWorkoutBuilder()
             b.dataSource = HKLiveWorkoutDataSource(healthStore: store, workoutConfiguration: config)
             s.delegate = self
+            b.delegate = self
             session = s
             builder = b
             let start = Date()
@@ -250,8 +259,9 @@ final class WorkoutManager: NSObject, ObservableObject {
 
     /// Tear down whatever is left of the current session and start a fresh one,
     /// keeping the published (held) values intact. Rate-limited to one attempt
-    /// per 15 s so a removed watch doesn't churn sessions. The HR query keeps
-    /// running across recoveries — it watches the store, not the session.
+    /// per 15 s so a removed watch doesn't churn sessions. Monitor's HR query
+    /// keeps running across recoveries — it watches the store, not the
+    /// session; capture's builder delegate reattaches with the new session.
     private func recover() {
         guard wantsStreaming else { return }
         if let lastRecoverAt, Date().timeIntervalSince(lastRecoverAt) < 15 { return }
@@ -269,10 +279,10 @@ final class WorkoutManager: NSObject, ObservableObject {
 
     // MARK: - HR intake (anchored query on the health store)
 
-    /// The sensor writes heart-rate samples to the store at workout frequency
-    /// for as long as the session exists — paused included. An anchored query
-    /// with an update handler is the delivery path that keeps working while
-    /// paused (the live builder only collects during .running).
+    /// Monitor-mode delivery: the sensor writes heart-rate samples to the
+    /// store for as long as the session exists — paused included — but the
+    /// commits are batched (~5 s), so this path only serves the mode that can
+    /// live with that cadence. Capture ingests from the builder delegate.
     private func startHrQuery(from start: Date) {
         guard let hrType = HKQuantityType.quantityType(forIdentifier: .heartRate) else { return }
         let predicate = HKQuery.predicateForSamples(withStart: start, end: nil, options: [])
@@ -346,4 +356,24 @@ extension WorkoutManager: HKWorkoutSessionDelegate {
             self.recover()
         }
     }
+}
+
+extension WorkoutManager: HKLiveWorkoutBuilderDelegate {
+    /// Capture-mode delivery: a running builder surfaces each sample the
+    /// moment the sensor produces it (~1 Hz), no waiting on store commits.
+    /// Monitor mode ignores it — a kick's momentary .running can collect a
+    /// sample, and the anchored query already owns that mode's intake.
+    func workoutBuilder(_ workoutBuilder: HKLiveWorkoutBuilder, didCollectDataOf collectedTypes: Set<HKSampleType>) {
+        guard let hrType = HKQuantityType.quantityType(forIdentifier: .heartRate),
+              collectedTypes.contains(hrType) else { return }
+        DispatchQueue.main.async {
+            guard self.mode == .capture, self.wantsStreaming,
+                  workoutBuilder === self.builder,
+                  let stats = workoutBuilder.statistics(for: hrType),
+                  let quantity = stats.mostRecentQuantity() else { return }
+            self.ingest(quantity.doubleValue(for: HKUnit.count().unitDivided(by: .minute())))
+        }
+    }
+
+    func workoutBuilderDidCollectEvent(_ workoutBuilder: HKLiveWorkoutBuilder) {}
 }

@@ -145,7 +145,7 @@ export const REPORT_CARDS: ReportCard[] = [
   { id: 'crash', icon: 'trendDown', title: 'Crash Pattern Analysis', desc: 'What precedes crashes and how to prevent them.', sections: ['scores', 'hrv', 'activities', 'triggers', 'symptoms', 'sleep'], focus: 'Identify what precedes crashes and how to prevent them.', instructions: 'Crash precipitants, warning signs, recovery time, prevention. Cite PEM/pacing research.' },
   { id: 'bestdays', icon: 'star', title: 'Best Days Analysis', desc: 'What made your best days work.', sections: ['scores', 'sleep', 'triggers', 'activities', 'hrv', 'cleanDays'], focus: 'Determine what made the best days possible and how to replicate them.', instructions: 'Common factors, replicable conditions, a best-day formula. Focus on actionable insights.' },
   { id: 'longcovid', icon: 'virus', title: 'Long COVID Recovery Insights', desc: 'Where you are vs research benchmarks.', sections: ['scores', 'hrv', 'symptoms', 'rhr', 'sleep', 'activities'], focus: 'Position within long COVID recovery research and benchmarks.', instructions: 'Position in spectrum, comparison to trajectories, outlook. Heavily cite 2023–2026 research.' },
-  { id: 'doctor', icon: 'clipboard', title: 'Medical Summary For Doctor', desc: 'A structured summary to help you start a conversation with your doctor.', sections: ['hrv', 'bp', 'rhr', 'sleep', 'symptoms', 'digestion', 'orthostatic', 'meds', 'supplements', 'scores'], focus: 'Generate a structured medical summary suitable for sharing with providers.', instructions: 'Summarize recent metrics/trends, persisting symptoms, and notable concerns from the data, plus questions for a physician. Professional tone; do not assert diagnoses not present in the data.' },
+  { id: 'doctor', icon: 'clipboard', title: 'Medical Summary For Doctor', desc: 'A print-ready clinical document (PDF) with your data in tables, ready to share with your doctor.', sections: ['hrv', 'bp', 'rhr', 'sleep', 'symptoms', 'digestion', 'orthostatic', 'meds', 'supplements', 'scores'], focus: 'Generate a structured medical summary suitable for sharing with providers.', instructions: 'Summarize recent metrics/trends, persisting symptoms, and notable concerns from the data, plus questions for a physician. Professional tone; do not assert diagnoses not present in the data.' },
 ];
 
 /** Every data section, in a stable order — used by the "Data export only" item. */
@@ -206,6 +206,52 @@ DATA FOR PERIOD (${rangeText}):
 
 ${render(keys, ['scores', 'hrv', 'rhr', 'bp', 'sleep', 'activities', 'triggers', 'meds', 'supplements', 'symptoms', 'digestion', 'orthostatic', 'cleanDays', 'notes'])}`,
   };
+}
+
+/**
+ * The "Medical Summary For Doctor" report. Unlike the other cards this does not
+ * route through universalHeader's "honest friend" persona: it asks the AI to
+ * build a polished, print-ready clinical document (ideally a PDF artifact) that
+ * a patient can hand to their physician, with the data laid out in scannable
+ * tables. Neutral clinical tone, observations only, no diagnoses.
+ */
+export function buildDoctorPrompt(state: AppState, ctx: ScoreContext, range: ReportRange, currentKey: string): string {
+  const { keys: allKeys, rangeText } = reportDateRange(range, currentKey);
+  const keys = allKeys.filter((k) => state.days[k]).sort();
+  const render = makeSectionRenderer(state, ctx);
+  const sections = ['scores', 'hrv', 'bp', 'rhr', 'orthostatic', 'sleep', 'symptoms', 'digestion', 'meds', 'supplements', 'notes'];
+  const sparse = hasAnyData(state.days, keys) && entryCount(state.days, keys) < 4 ? '\nNOTE: Limited data was logged for this period, so keep the document brief and flag the small sample.\n' : '';
+
+  // Self-entered demographics give the clinician context; age is derived from
+  // the birthday so the document never has to show a raw date of birth.
+  const prof = state.profile || ({} as AppState['profile']);
+  let age = '';
+  if (prof.birthday) { const b = new Date(prof.birthday); if (!isNaN(b.getTime())) { const now = new Date(); let a = now.getFullYear() - b.getFullYear(); if (now.getMonth() < b.getMonth() || (now.getMonth() === b.getMonth() && now.getDate() < b.getDate())) a--; if (a >= 0 && a < 130) age = `${a}`; } }
+  const demographics = [age ? `Age: ${age}` : '', prof.sex ? `Sex: ${prof.sex}` : '', prof.height ? `Height: ${prof.height}` : '', prof.weight ? `Weight: ${prof.weight}` : ''].filter(Boolean).join(' | ') || 'not provided';
+
+  return `You are a clinical health writer preparing a concise, professional medical summary for a physician. The data below was self-tracked by a patient using Autonomic (autonomic.care), a personal app for autonomic recovery (dysautonomia, POTS, long COVID, ME/CFS style presentations), captured with consumer devices: phone-camera or chest-strap PPG for HRV, a home blood-pressure cuff, and wearable sleep tracking. Base every statement strictly on the data provided. Do not invent, assume, or diagnose anything that is not present in the data.
+
+YOUR OUTPUT: Produce a polished, print-ready clinical summary DOCUMENT the patient can hand to or email their doctor. Create it as a downloadable artifact, preferably a PDF; if PDF generation is unavailable, produce a clean, print-styled HTML document sized for US Letter. It must look professional: clear typographic hierarchy, restrained color, generous white space, and DATA PRESENTED IN TABLES wherever possible so a busy clinician can scan it in under two minutes. Right-align numeric columns and keep tables clean with subtle rules, not heavy borders.
+
+TONE & RULES: Neutral, clinical, and objective. Report measured values and observed patterns, not diagnoses or treatment advice. Use standard medical shorthand (HRV, RMSSD, SDNN, pNN50, LF/HF, RHR, SBP/DBP, MAP, bpm). Convert the [YYYY-MM-DD] stamps into readable dates. Where a metric has a widely accepted reference range you may include a clearly labeled reference column, but do NOT characterize the patient's values as normal or abnormal beyond what the data plainly shows. Do not use em dashes; use commas, colons, parentheses, or separate sentences.
+
+DOCUMENT STRUCTURE (each item a titled section; use tables unless noted):
+1. HEADER: Title "Patient Health Tracking Summary", the reporting period (${rangeText}), the date prepared, a "Patient (self-entered): ${demographics}" line, and a one-line note that the data is patient self-tracked with consumer devices.
+2. AT A GLANCE: A short bulleted clinical snapshot (5 to 8 bullets) of the most decision-relevant findings: predominant symptoms, the autonomic/HRV trend, resting HR and BP behavior, orthostatic findings, sleep, and any red flags. This is read first, so lead with what matters most.
+3. VITALS & AUTONOMIC METRICS: A table with columns Metric | Latest | Period Avg | Range (min to max) | Readings (n) | Trend. Include a row for every metric with data: HRV RMSSD, SDNN, pNN50, LF/HF, resting HR (split by position when available), systolic BP, diastolic BP, MAP, pulse pressure, sleeping HR (low/high), and the daily autonomic score. Compute the averages, ranges, and counts from the readings below; show trend as a short arrow or word (rising, stable, falling).
+4. ORTHOSTATIC / POTS ASSESSMENT: A table of every stand test and orthostatic reading: Date | Baseline HR | Peak HR | Peak delta (bpm) | Sustained delta (bpm) | Sustained rise >=30 bpm | Notes. Follow it with one neutral line stating whether the recorded responses meet the common orthostatic tachycardia threshold (sustained HR rise >=30 bpm on standing, >=40 bpm if under 20 years old), without rendering a diagnosis.
+5. SYMPTOM SUMMARY: A table Symptom | Occurrences | Typical severity | Dates / pattern | Notes, most frequent first.
+6. SLEEP SUMMARY: A table of nightly duration, quality, HR range, and stages when present, plus a one-line period average.
+7. MEDICATIONS & SUPPLEMENTS: A table Name | Dose / amount | How often logged | Notes.
+8. TRENDS & TRAJECTORY: A brief objective narrative (3 to 6 sentences) of how the metrics moved across the period, using actual numbers. Observations only, no advice.
+9. QUESTIONS FOR THE VISIT: A short bulleted list of specific, data-grounded questions the patient may want to raise (for example about an orthostatic finding, an HRV trend, or a symptom cluster). Phrase them as the patient's questions, not as clinical recommendations.
+10. METHODOLOGY & LIMITATIONS: A brief closing footnote naming the data source and noting that consumer-device measurements and self-reported symptoms have accuracy limits and are not a substitute for clinical measurement.
+
+Omit any section or table row that has no supporting data rather than showing blanks or speculating. Keep the finished document tight enough to print on two to three pages.
+${sparse}
+PATIENT-TRACKED DATA (${rangeText}):
+
+${render(keys, sections)}`;
 }
 
 export function buildPrompt(state: AppState, ctx: ScoreContext, cards: ReportCard[], range: ReportRange, currentKey: string): string {

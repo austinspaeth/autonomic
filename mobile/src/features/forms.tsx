@@ -25,6 +25,7 @@ import { healthSourceFor, workoutCandidates, type HealthCandidate, type HealthSo
 import { deleteEntry, getState, upsertEntry, useAppState } from '../store/store';
 import { defaultTimeFor, fmtTime12, todayKey, uid } from '../lib/dates';
 import { getTier } from '../store/tier';
+import { requestExpandProtocol, scrollJournalToSection } from '../store/nav';
 import { canCaptureHrv, hrvCaptureUsedToday } from '../lib/gating';
 import { usePaywall } from './Paywall';
 import { defaultPeriod } from '../lib/period';
@@ -398,11 +399,13 @@ export function BikeForm({ dk, existing, prefill = null, controls, onSaved }: { 
 
 /* ---------- hooks that wire the sheet stack ---------- */
 
-/** Home-screen widget deep link (autonomic://?capture=hrv): opens the HRV
- *  capture setup exactly like the Readings picker's Live HRV action, behind
- *  the same freemium gate. Listens rather than routes — the URL points at the
- *  Journal tab so expo-router never sees an unmatched path, and repeated taps
- *  re-fire because each tap is a fresh openURL event. */
+/** Home-screen widget deep links (the URL points at the Journal tab so
+ *  expo-router never sees an unmatched path; repeated taps re-fire because each
+ *  is a fresh openURL event):
+ *   · autonomic://?capture=hrv     — open HRV capture setup (freemium-gated),
+ *     exactly like the Readings picker's Live HRV action.
+ *   · autonomic://?open=protocol   — scroll to the Progress streak card and
+ *     open it expanded (the Protocol widget). */
 export function useCaptureDeepLink() {
   const { openSheet } = useSheets();
   const openPaywall = usePaywall();
@@ -410,6 +413,12 @@ export function useCaptureDeepLink() {
     const handle = (url: string | null) => {
       if (!url) return;
       const q = ExpoLinking.parse(url).queryParams;
+      if (q?.open === 'protocol') {
+        requestExpandProtocol();
+        // Let the card mount/expand before scrolling (cold start lays out late).
+        setTimeout(() => scrollJournalToSection('protocol'), 350);
+        return;
+      }
       if (q?.capture !== 'hrv') return;
       if (!canCaptureHrv(getTier(), hrvCaptureUsedToday(getState().days[todayKey()]))) { openPaywall(); return; }
       openSheet((c) => <HrvSetup controls={c} />);

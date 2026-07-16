@@ -139,7 +139,6 @@ struct TodayNumbersWidgetView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 7) {
-                WaveformLogo().frame(width: 15, height: 10)
                 Text("Today's numbers")
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(WTheme.textDim)
@@ -190,7 +189,6 @@ struct OverviewWidgetView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 8) {
-                WaveformLogo().frame(width: 17, height: 12)
                 Text("Autonomic")
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(Color(hex: "#cfcfd6"))
@@ -256,6 +254,63 @@ struct OverviewWidget: Widget {
     }
 }
 
+// MARK: - Large · score + daily protocol
+
+struct ProtocolWidgetView: View {
+    let entry: TodayEntry
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Score & metrics — the top row.
+            HStack(spacing: 16) {
+                ScoreGauge(payload: entry.payload, size: 104, scoreFont: 30, labelFont: 9.5)
+                MetricRows(rows: entry.payload.rows)
+                    .frame(maxWidth: .infinity)
+            }
+
+            Rectangle().fill(WTheme.divider).frame(height: 1)
+
+            HStack {
+                Text("Daily protocol")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(WTheme.textDim)
+                Spacer()
+                if !entry.payload.`protocol`.isEmpty {
+                    Text("\(entry.payload.protocolDone)/\(entry.payload.`protocol`.count)")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(WTheme.textFaint)
+                        .monospacedDigit()
+                }
+            }
+
+            if entry.payload.`protocol`.isEmpty {
+                Text("No protocol set yet")
+                    .font(.system(size: 13))
+                    .foregroundStyle(WTheme.textFaint)
+            } else {
+                ProtocolChecklist(items: entry.payload.`protocol`)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(18)
+        .containerBackground(WTheme.bg, for: .widget)
+        .widgetURL(PROTOCOL_URL)
+    }
+}
+
+struct ProtocolWidget: Widget {
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: "protocol", provider: TodayProvider()) { entry in
+            ProtocolWidgetView(entry: entry)
+        }
+        .configurationDisplayName("Score & Daily Protocol")
+        .description("Today's score and metrics over the clean-day protocol checklist.")
+        .supportedFamilies([.systemLarge])
+        .contentMarginsDisabled()
+    }
+}
+
 // MARK: - Bundle
 
 @main
@@ -266,6 +321,7 @@ struct AutonomicWidgetsBundle: WidgetBundle {
         OverviewWidget()
         TodayNumbersWidget()
         StartHrvWidget()
+        ProtocolWidget()
     }
 }
 

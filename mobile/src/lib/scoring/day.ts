@@ -5,6 +5,7 @@
  * Pure: operates on a days map + score context, no store imports.
  */
 import { dateFromKey, keyOf, todayKey } from '../dates';
+import { hrvCaptureUsedToday } from '../gating';
 import { ACTIVITY_TYPES, MED_TYPES, TRIGGER_TYPES } from '../registry';
 import type { Band, CustomTypes, DayRecord, Entry, Protocol, ScoreCat } from '../types';
 import {
@@ -255,6 +256,7 @@ export interface Cleanliness { clean: boolean; criteria: Criterion[] }
  *  their own meds in the editor (there are no default drugs any more). */
 export const DEFAULT_PROTOCOL: Protocol = {
   triggers: { enabled: true, types: [] },
+  hrv: { enabled: false },
   water: { enabled: true, liters: 2.5 },
   meds: { enabled: false, types: [] },
   activities: { enabled: false, types: [] },
@@ -266,6 +268,7 @@ export function resolveProtocol(p?: Partial<Protocol> | null): Protocol {
   if (!p) return DEFAULT_PROTOCOL;
   return {
     triggers: { ...DEFAULT_PROTOCOL.triggers, ...p.triggers },
+    hrv: { ...DEFAULT_PROTOCOL.hrv, ...p.hrv },
     water: { ...DEFAULT_PROTOCOL.water, ...p.water },
     meds: { ...DEFAULT_PROTOCOL.meds, ...p.meds },
     activities: { ...DEFAULT_PROTOCOL.activities, ...p.activities },
@@ -302,6 +305,13 @@ export function protocolCriteria(days: DaysMap, dk: string, protocol: Protocol =
     const logged = (sel.length ? sel : Object.keys(triggers)).reduce((s, k) => s + count(k), 0);
     const label = sel.length ? `No ${joinLabels(TRIGGER_TYPES, sel, custom?.triggers)}` : 'No triggers';
     criteria.push({ key: 'triggers', label, pass: logged === 0, hard: true, broken: logged > 0 });
+  }
+
+  // At least one HRV reading captured in-app that day. Health-imported readings
+  // (imported: true) don't count — the requirement is to take a reading, same
+  // definition the freemium allowance uses (hrvCaptureUsedToday).
+  if (protocol.hrv.enabled) {
+    criteria.push({ key: 'hrv', label: 'Take an HRV reading', pass: hrvCaptureUsedToday(d) > 0 });
   }
 
   if (protocol.water.enabled) {

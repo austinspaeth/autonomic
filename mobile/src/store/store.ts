@@ -148,22 +148,49 @@ function wkv(): MMKV {
   return waveKv;
 }
 
+/* Read cache in front of the sidecar: the Journal re-resolves a day's
+ * orthostatic curves on every re-render, and each miss is an encrypted-MMKV
+ * read + JSON.parse. Bounded (LRU) so waveform history still never accumulates
+ * in the JS heap — a day's worth of readings fits with plenty of headroom.
+ * Misses cache as null too; putWaveform refreshes the entry on write. */
+const WAVE_CACHE_MAX = 32;
+const waveCache = new Map<string, WaveformData | null>();
+function waveCachePut(id: string, data: WaveformData | null) {
+  waveCache.delete(id);
+  waveCache.set(id, data);
+  if (waveCache.size > WAVE_CACHE_MAX) waveCache.delete(waveCache.keys().next().value as string);
+}
+
 function putWaveform(id: string, data: WaveformData) {
-  try { wkv().set(id, JSON.stringify(data)); } catch { /* plots degrade, journal unaffected */ }
+  try {
+    wkv().set(id, JSON.stringify(data));
+    waveCachePut(id, data);
+  } catch {
+    // plots degrade, journal unaffected — drop any stale cache entry so a
+    // failed write can't keep serving a value the disk doesn't hold
+    waveCache.delete(id);
+  }
 }
 
 /** Sidecar waveform for a reading, or null (never saved / pruned / unreadable).
  *  Callers fall back to any inline fields — pre-save live previews still carry
  *  them, as do imported-but-not-yet-migrated entries. */
 export function getWaveform(id: string): WaveformData | null {
+  if (waveCache.has(id)) {
+    const hit = waveCache.get(id) ?? null;
+    waveCachePut(id, hit); // refresh recency
+    return hit;
+  }
+  let val: WaveformData | null = null;
   try {
     const raw = wkv().getString(id);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return isPlainObject(parsed) ? (parsed as WaveformData) : null;
+    const parsed = raw ? JSON.parse(raw) : null;
+    val = isPlainObject(parsed) ? (parsed as WaveformData) : null;
   } catch {
-    return null;
+    val = null;
   }
+  waveCachePut(id, val);
+  return val;
 }
 
 /** Persist a reading's waveform arrays. Write this BEFORE upserting the entry
@@ -178,7 +205,7 @@ function pruneWaveforms(s: AppState) {
   try {
     const ids = readingIds(s);
     for (const k of wkv().getAllKeys()) {
-      if (!ids.has(k)) wkv().delete(k);
+      if (!ids.has(k)) { wkv().delete(k); waveCache.delete(k); }
     }
   } catch {
     // best effort — strays cost bytes, not correctness
@@ -267,18 +294,29 @@ function persistNow() {
 // app leaving the foreground is the durability backstop (see flushSave).
 const persister = createDebouncedWriter(persistNow, 400);
 
+/* `state.days` gets a fresh reference only when a day was actually touched, so
+ * the O(history) useMemos keyed on `days` (Analysis sections, milestones,
+ * insights hasData) skip settings-only saves instead of recomputing the whole
+ * journal. Every day-writing path already funnels through ensureDay /
+ * upsertEntry / deleteEntry / mutate / replaceState, each of which marks this —
+ * new code that writes state.days must use one of those, never getState(). */
+let daysTouched = true; // first save after load must re-wrap
+function touchDays() { daysTouched = true; }
+
 /** Centralized persistence — stamps meta.lastUpdated on every call.
  *  Memory + React notification are synchronous; the disk write is debounced.
- *  Re-wraps `state` (and the days map) in fresh objects before emitting:
- *  mutations happen in place, so without new references useSyncExternalStore
- *  consumers and any useMemo keyed on `state.days` would never see a change
- *  (readings used to appear in Progress only after an unrelated re-render). */
+ *  Re-wraps `state` (and, when a day was touched, the days map) in fresh
+ *  objects before emitting: mutations happen in place, so without new
+ *  references useSyncExternalStore consumers and any useMemo keyed on
+ *  `state.days` would never see a change (readings used to appear in Progress
+ *  only after an unrelated re-render). */
 export function save() {
   state = {
     ...state,
-    days: { ...state.days },
+    days: daysTouched ? { ...state.days } : state.days,
     meta: { ...(state.meta || { lastImport: null }), lastUpdated: new Date().toISOString() },
   };
+  daysTouched = false;
   persister.schedule();
   // A save issued while the app isn't foregrounded can't trust the debounce
   // timer — iOS freezes timers on suspend — so it writes through immediately.
@@ -306,8 +344,10 @@ try {
   // no AppState here — flushSave() remains available to callers
 }
 
-/** Apply a mutation to state and persist. */
+/** Apply a mutation to state and persist. Conservatively assumes the mutation
+ *  may have touched days — the generic escape hatch stays safe by default. */
 export function mutate(fn: (s: AppState) => void) {
+  touchDays();
   fn(state);
   save();
 }
@@ -322,9 +362,11 @@ export function getState(): AppState {
 export function replaceState(parsed: unknown, importName?: string) {
   assertImportVersion(parsed);
   state = migrate(parsed);
+  touchDays();
   // Rebuild the waveform sidecar to match the imported journal: old exports
   // embed arrays per entry (stripped out here), new exports carry a top-level
   // `waveforms` map keyed by reading id — both shapes import.
+  waveCache.clear();
   try {
     wkv().clearAll();
     extractWaveforms(state, putWaveform);
@@ -348,7 +390,9 @@ export function replaceState(parsed: unknown, importName?: string) {
 export function clearAllData() {
   try { kv().clearAll(); } catch { /* the overwrite below still lands */ }
   try { wkv().clearAll(); } catch { /* strays pruned on next launch */ }
+  waveCache.clear();
   state = defaultState();
+  touchDays();
   // save() stamps meta.lastUpdated, which also keeps onboarding from re-firing
   // on an app the user has merely reset.
   save();
@@ -361,6 +405,7 @@ export function getDay(k: string): DayRecord {
 }
 /** get-or-create a day record (mutating callers pass create=true) */
 export function ensureDay(k: string): DayRecord {
+  touchDays(); // every caller mutates the returned record before save()
   if (!state.days[k]) state.days[k] = blankDay();
   return state.days[k];
 }
@@ -379,6 +424,7 @@ export function deleteEntry(dk: string, arrKey: 'readings' | 'activities' | 'med
   d[arrKey] = d[arrKey].filter((x) => x.id !== id);
   // Only readings carry sidecar waveforms; drop the blob with its entry.
   if (arrKey === 'readings') {
+    waveCache.delete(id);
     try { wkv().delete(id); } catch { /* stray blob — pruned on next launch */ }
   }
   save();

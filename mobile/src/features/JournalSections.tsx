@@ -9,7 +9,7 @@ import { Icon } from '../components/Icon';
 import { TimeField } from '../components/Field';
 import { useSheets, SheetFooter, type SheetControls } from '../components/Sheet';
 import { useToast } from '../components/Toast';
-import { WATER_BLUE, radius, usePalette } from '../theme';
+import { WATER_BLUE, fonts, radius, usePalette } from '../theme';
 import {
   READING_TYPES,
   bmLabel, readingLabel, readingRowValue, summarizeFields,
@@ -18,7 +18,7 @@ import { typesFor } from '../lib/typeCatalog';
 import { orthoDeltaCat, orthoMaxDelta, rowScoreCategory, SCORE_COLORS, GRADE_LABEL } from '../lib/scoring';
 import { sleepGrade, sleepHours, waterGoalL, type DaysMap } from '../lib/scoring/day';
 import type { SleepStages } from '../lib/types';
-import { ensureDay, getState, getWaveform, save, useAppState } from '../store/store';
+import { ensureDay, getState, getWaveform, save, useAppState, useStore } from '../store/store';
 import { setJournalSectionY } from '../store/nav';
 import { useTier } from '../store/tier';
 import { canCaptureHrv, hrvCaptureUsedToday } from '../lib/gating';
@@ -123,11 +123,11 @@ function HydrationSection({ water, onPress }: { water: number; onPress: () => vo
       <Pressable onPress={onPress} style={({ pressed }) => [{ paddingHorizontal: 14, paddingBottom: 14 }, pressed && { opacity: 0.6 }]}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           <Icon name="cup" size={21} color={p.textDim} />
-          {/* Sized like the other section rows (see Row / med line items): 16pt
-              regular title, 14pt regular value — no bold, no oversized number. */}
+          {/* 16pt regular title; the liters figure is the blue grotesque number
+              (Manrope ExtraBold), the " Liters" unit stays regular in text color. */}
           <Text style={{ color: p.text, fontSize: 16, flex: 1 }}>Water</Text>
           <Text style={{ fontSize: 14, color: WATER_BLUE, fontVariant: ['tabular-nums'] }}>
-            {water}
+            <Text style={{ fontFamily: fonts.numHeavy, fontSize: 20 }}>{water}</Text>
             <Text style={{ color: p.text }}>{` Liter${water === 1 ? '' : 's'}`}</Text>
           </Text>
         </View>
@@ -148,7 +148,8 @@ function HydrationSection({ water, onPress }: { water: number; onPress: () => vo
 function NotesSection({ dk }: { dk: string }) {
   const p = usePalette();
   const { openSheet } = useSheets();
-  const note = useAppState().days[dk]?.notes || '';
+  // Primitive selector: re-renders only when this day's note text changes.
+  const note = useStore((s) => s.state.days[dk]?.notes || '');
   return (
     <Card>
       <SectionHeader title="Notes" />
@@ -342,7 +343,7 @@ function SleepGrade({ dk, sleep }: { dk: string; sleep: { bed: string; wake: str
         ) : null}
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 6 }}>
-        <Text style={{ fontSize: 38, fontWeight: '800', color: p.text, fontVariant: ['tabular-nums'] }}>{hrs != null ? hrs.toFixed(1) : '–'}</Text>
+        <Text style={{ fontSize: 38, fontFamily: fonts.numHeavy, color: p.text, fontVariant: ['tabular-nums'] }}>{hrs != null ? hrs.toFixed(1) : '–'}</Text>
         <Text style={{ fontSize: 16, fontWeight: '700', color: p.textDim, marginLeft: 6 }}>hrs asleep</Text>
       </View>
       <Text style={{ fontSize: 13, color: p.textDim, marginTop: 4 }}>

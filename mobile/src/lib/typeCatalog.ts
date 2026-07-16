@@ -89,8 +89,9 @@ export function addCustomType(kind: TypeKind, name: string, opts?: { dosage?: st
   while (existing[key] || BUILTIN[kind][key]) key += '-2';
   const def: TypeDef = { label, icon: CUSTOM_ICON[kind], fields: CUSTOM_FIELDS[kind].slice(), userDefined: true };
   if (kind === 'meds' && opts?.dosage?.trim()) def.dosage = opts.dosage.trim();
-  state.customTypes = state.customTypes || {};
-  state.customTypes[kind] = { ...(state.customTypes[kind] || {}), [key]: def };
+  // Fresh top-level object (not an in-place write) so useMemos keyed on
+  // state.customTypes see the change — save() only re-wraps state and days.
+  state.customTypes = { ...(state.customTypes || {}), [kind]: { ...(state.customTypes?.[kind] || {}), [key]: def } };
   save();
   return key;
 }
@@ -117,8 +118,8 @@ export function editType(kind: TypeKind, key: string, name: string, opts?: { dos
     if (dosage) next.dosage = dosage;
     else delete next.dosage;
   }
-  state.customTypes = state.customTypes || {};
-  state.customTypes[kind] = { ...(state.customTypes[kind] || {}), [key]: next };
+  // Fresh top-level object — same identity contract as addCustomType.
+  state.customTypes = { ...(state.customTypes || {}), [kind]: { ...(state.customTypes?.[kind] || {}), [key]: next } };
   save();
   return true;
 }
@@ -132,12 +133,12 @@ export function deleteType(kind: TypeKind, key: string) {
   if (state.customTypes?.[kind]?.[key]) {
     const next = { ...state.customTypes[kind] };
     delete next[key];
-    state.customTypes[kind] = next;
+    // Fresh top-level objects — same identity contract as addCustomType.
+    state.customTypes = { ...state.customTypes, [kind]: next };
   }
   if (BUILTIN[kind][key]) {
-    state.hiddenTypes = state.hiddenTypes || {};
-    const list = state.hiddenTypes[kind] || [];
-    if (!list.includes(key)) state.hiddenTypes[kind] = [...list, key];
+    const list = state.hiddenTypes?.[kind] || [];
+    if (!list.includes(key)) state.hiddenTypes = { ...(state.hiddenTypes || {}), [kind]: [...list, key] };
   }
   save();
 }

@@ -83,6 +83,14 @@ old web app so old `export.json` files import directly.
   the store exposes an external store + `useSyncExternalStore` so React re-renders.
   The disk write is **debounced** (`src/lib/persist.ts`) and flushed whenever the
   app leaves the foreground; call `flushSave()` if a write must not wait.
+  `save()` re-wraps `state.days` **only when a day was touched**, so the
+  O(history) `useMemo`s keyed on `days` (Analysis sections, milestones) skip
+  settings-only saves — day writes must go through `ensureDay` / `upsertEntry` /
+  `deleteEntry` / `mutate` (they mark the flag), never via `getState().days`.
+  Nested maps consumed by memo deps (`customTypes`, `hiddenTypes`) are replaced
+  wholesale on edit (`typeCatalog.ts`), not mutated in place, for the same
+  reason. Cheap subscribers should use `useStore(selector)` returning a
+  primitive rather than `useAppState()`.
 - **HRV waveform arrays never live in the journal.** `rrRaw` / `sampledHr` /
   `sampledSdnn` go to a sidecar MMKV instance keyed by reading id — write via
   `storeWaveform()`, read via `getWaveform()` (`src/lib/waveforms.ts` has the pure
@@ -121,15 +129,25 @@ old web app so old `export.json` files import directly.
   `buildWidgetPayload()` (`src/lib/widgets.ts`, pure — unit-tested) and pushed by
   `initWidgetSync()` on launch, debounced journal changes, and foreground. iOS:
   `modules/widget-bridge` writes it to the `group.com.autonomic.journal` app group
-  and reloads WidgetKit; the SwiftUI widgets live in `targets/widget/` (5 widgets,
-  fixed-dark, the Outlook 270° dial). Android: `react-native-android-widget`
+  and reloads WidgetKit; the SwiftUI widgets live in `targets/widget/` (6 widgets,
+  fixed pure-black, the Outlook 270° dial). Android: `react-native-android-widget`
   (pinned 0.17.1 — 0.18+ needs Expo 54); JSX renderers in `src/widgets/android.tsx`,
   headless handler registered in the custom entry `index.js`, widget list configured
-  in app.json. Widgets show REAL data only — an empty journal renders "Awaiting
-  data", never the demo month. A stale payload (date ≠ today) also renders as
-  awaiting. The Start HRV buttons deep-link `autonomic://?capture=hrv` (query param,
-  not a path, so expo-router never hits an unmatched route), handled by
-  `useCaptureDeepLink()` in `src/features/forms.tsx` behind the freemium gate.
+  in app.json. **Android sizing gotcha:** a launcher can hand a widget a taller cell
+  than its content needs; a `height: 'match_parent'` root with centered content then
+  floats mid-cell with padding. Each Android widget therefore wraps its card in a
+  transparent box-filling `Frame` and lets the card be `height: 'wrap_content'`,
+  top-anchored (see `src/widgets/android.tsx`). Widgets show REAL data only — an
+  empty journal renders "Awaiting data", never the demo month. A stale payload
+  (date ≠ today) also renders as awaiting. Metric trend arrows are direction-only
+  (▲/▼, no percentage). The **Protocol** widget (large, both platforms) stacks
+  score & metrics over today's clean-day checklist (`buildWidgetPayload` maps
+  `protocolCriteria` into `payload.protocol`). Deep links point at the Journal tab
+  (query param, not a path, so expo-router never hits an unmatched route), handled by
+  `useCaptureDeepLink()` in `src/features/forms.tsx`: `autonomic://?capture=hrv`
+  opens HRV capture behind the freemium gate; `autonomic://?open=protocol` scrolls to
+  the Progress streak card and opens it expanded (`requestExpandProtocol` /
+  `scrollJournalToSection('protocol')` in `src/store/nav.ts`).
 - **Types come in two layers.** Built-ins live in the `*_TYPES` maps in
   `src/lib/registry.ts` (add an icon in `src/components/Icon.tsx` when adding one).
   Users can also create their own activities, meds/supplements, symptoms and

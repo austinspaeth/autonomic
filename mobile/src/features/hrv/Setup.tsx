@@ -12,7 +12,7 @@ import { Button, HelpDot, Segmented } from '../../components/ui';
 import { Icon } from '../../components/Icon';
 import { useToast } from '../../components/Toast';
 import { radius, usePalette } from '../../theme';
-import { getState, save, useAppState } from '../../store/store';
+import { getState, save, useStore } from '../../store/store';
 import { todayKey } from '../../lib/dates';
 import { health } from '../../lib/health';
 import { defaultPeriod } from '../../lib/period';
@@ -72,7 +72,7 @@ export function HrvSetup({ controls }: { controls: SheetControls }) {
   const [source, setSource] = useState<Source>(defaultSource);
   // Reactive so the "Paired: …" subtitle updates the moment a strap is saved
   // from the pairing sheet stacked on top of this one.
-  const savedName = useAppState().settings.lastBleDeviceName;
+  const savedName = useStore((s) => s.state.settings.lastBleDeviceName);
 
   // With no strap saved yet, choosing Bluetooth opens the pairing sheet right
   // here; saving a device closes it and drops back onto this setup sheet.

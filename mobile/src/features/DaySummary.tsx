@@ -3,8 +3,8 @@
  * flags, and the streak card — ported from renderDaySummary. The "What powers
  * this" button opens the score-explanation sheet (openScoreExplain).
  */
-import React, { useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { type LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Defs, LinearGradient as SvgGradient, Rect, Stop } from 'react-native-svg';
 import Animated, { Easing, Extrapolation, interpolate, useAnimatedProps, useAnimatedStyle, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
 import { ScoreGauge } from '../components/charts';
@@ -14,7 +14,7 @@ import { SumCard, MetricRow } from '../components/summary';
 import { MilestoneProgressCard } from './Milestones';
 import { ProtocolEditor } from './ProtocolEditor';
 import { Button } from '../components/ui';
-import { radius, type as T, usePalette } from '../theme';
+import { fonts, radius, type as T, usePalette } from '../theme';
 import { SCORE_COLORS, GRADE_LABEL, GRADE_PTS, catFromBands } from '../lib/scoring';
 import {
   OUTLOOK_GUIDE, TOMORROW, SCORE_TIPS, blueZone, protocolCriteria, readingPeriod, resolveProtocol,
@@ -25,6 +25,7 @@ import { buildDownturnPrompt } from '../lib/analysis/reports';
 import { PromptSheet } from './PromptSheet';
 import { todayKey } from '../lib/dates';
 import { getState, useAppState } from '../store/store';
+import { setJournalSectionY, useExpandProtocolSignal } from '../store/nav';
 import { useTier } from '../store/tier';
 import { MONTHLY_SKU, YEARLY_SKU, priceOf, useIap } from '../store/iap';
 import { usePaywall } from './Paywall';
@@ -47,6 +48,66 @@ const mixHex = (color: string, base: string, t: number) => {
   const ch = (sh: number) => Math.round(((nc >> sh) & 255) * t + ((nb >> sh) & 255) * (1 - t));
   return `rgb(${ch(16)},${ch(8)},${ch(0)})`;
 };
+
+/**
+ * Shared collapse/expand motion for this view's accordions (streak card, pro
+ * upsell, score-driver rows). Rotates a chevron in place (`chevStyle`) and
+ * reveals a body by animating its measured height with a paired fade
+ * (`bodyStyle`), on a plain timing curve — never a spring, so it can't overshoot.
+ *
+ * The body height is measured off an ABSOLUTELY-POSITIONED copy of the content
+ * (spread `measureStyle` onto the body's inner view): an absolute child is laid
+ * out at its natural height regardless of the parent's animated height, so
+ * `contentH` is correct from the first frame. Measuring inside the clipped,
+ * height-0 container instead reported 0 under the New Architecture until the
+ * first expand, so the row snapped open hard on that first tap (the "bounce").
+ *
+ * Usage:
+ *   const acc = useAccordion(open);
+ *   <Animated.View style={chevStyle-target}/> // acc.chevStyle on the chevron
+ *   <Animated.View style={[{ overflow: 'hidden' }, acc.bodyStyle]}>
+ *     <View style={[acc.measureStyle, { paddingTop: 12 }]}>{body}</View>
+ *   </Animated.View>
+ */
+function useAccordion(open: boolean, startOpen = false) {
+  const rot = useSharedValue(startOpen ? 1 : 0);
+  const openV = useSharedValue(startOpen ? 1 : 0);
+  const [contentH, setContentH] = useState(0);
+  const mounted = useRef(false);
+
+  useEffect(() => {
+    // On the very first render, settle to the initial state instantly (a
+    // start-open card shouldn't animate itself open on mount); animate every
+    // toggle after that.
+    const instant = !mounted.current;
+    mounted.current = true;
+    rot.value = instant ? (open ? 1 : 0) : withTiming(open ? 1 : 0, { duration: 220 });
+    openV.value = instant
+      ? (open ? 1 : 0)
+      : withTiming(
+          open ? 1 : 0,
+          open
+            ? { duration: 260, easing: Easing.out(Easing.cubic) }
+            : { duration: 220, easing: Easing.inOut(Easing.cubic) },
+        );
+  }, [open, rot, openV]);
+
+  const chevStyle = useAnimatedStyle(() => ({ transform: [{ rotate: `${-90 + rot.value * 90}deg` }] }));
+  const bodyStyle = useAnimatedStyle(() => ({
+    height: openV.value * contentH,
+    opacity: interpolate(openV.value, [0.35, 1], [0, 1], Extrapolation.CLAMP),
+  }));
+  const onContentLayout = (e: LayoutChangeEvent) => {
+    const h = e.nativeEvent.layout.height;
+    if (h > 0) setContentH((prev) => (Math.abs(prev - h) > 0.5 ? h : prev));
+  };
+  return { chevStyle, bodyStyle, onContentLayout, measureStyle: MEASURE_STYLE };
+}
+
+/** Absolute inset so the measured body isn't constrained by the clipped, height-
+ *  animated container it sits inside (see useAccordion). Full-width, natural
+ *  height, top-anchored — the reveal clips it from the bottom. */
+const MEASURE_STYLE = { position: 'absolute' as const, left: 0, right: 0, top: 0 };
 
 // Status-color highlight on the top-left border edge, fading down the sides
 // into the normal border — like light shining onto the card. Mirrors the
@@ -217,16 +278,16 @@ function ScoredHero({ dk, readings, d, all, ctx, onExplain }: { dk: string; read
       </View>
       <View style={{ alignItems: 'center', marginVertical: 8 }}>
         <ScoreGauge score={all.score!} color={cat.color}>
-          <Text style={{ fontSize: 57, fontWeight: '800', color: p.text, fontVariant: ['tabular-nums'], letterSpacing: -1 }}>{all.score}</Text>
+          <Text style={{ fontSize: 57, fontFamily: fonts.numHeavy, color: p.text, fontVariant: ['tabular-nums'], letterSpacing: -1 }}>{all.score}</Text>
           <Text style={{ fontSize: 10, fontWeight: '700', letterSpacing: 1, color: p.textDim, marginTop: 4 }}>OUT OF 100</Text>
         </ScoreGauge>
         {delta != null && Math.abs(delta) >= 3 ? (
-          <Text style={{ fontSize: 12, fontWeight: '800', color: delta > 0 ? SCORE_COLORS.good : SCORE_COLORS.bad, fontVariant: ['tabular-nums'] }}>
+          <Text style={{ fontSize: 12, fontWeight: '800', color: delta > 0 ? SCORE_COLORS.good : SCORE_COLORS.bad, fontVariant: ['tabular-nums'], marginTop: -18 }}>
             {(delta > 0 ? '▲ ' : '▼ ') + Math.abs(delta) + ' vs AM'}
           </Text>
         ) : null}
       </View>
-      <View style={{ alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, paddingHorizontal: 11, paddingVertical: 6, borderRadius: 999, marginBottom: 6 }}>
+      <View style={{ alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, paddingHorizontal: 11, paddingVertical: 6, borderRadius: 999, marginBottom: 6, marginTop: delta != null && Math.abs(delta) >= 3 ? 0 : -14 }}>
         <Icon name="info" size={15} color={p.textDim} />
         <Text style={{ color: p.textDim, fontSize: 11, fontWeight: '600' }}>What powers this</Text>
       </View>
@@ -376,23 +437,7 @@ function ProUpsellCard() {
   const openPaywall = usePaywall();
   const { products } = useIap();
   const [expanded, setExpanded] = useState(true);
-
-  const rot = useSharedValue(1);
-  useEffect(() => { rot.value = withTiming(expanded ? 1 : 0, { duration: 220 }); }, [expanded, rot]);
-  const chevStyle = useAnimatedStyle(() => ({ transform: [{ rotate: `${-90 + rot.value * 90}deg` }] }));
-
-  const [contentH, setContentH] = useState(0);
-  const open = useSharedValue(1);
-  useEffect(() => {
-    open.value = withTiming(
-      expanded ? 1 : 0,
-      expanded ? { duration: 260, easing: Easing.out(Easing.cubic) } : { duration: 220, easing: Easing.inOut(Easing.cubic) },
-    );
-  }, [expanded, open]);
-  const bodyStyle = useAnimatedStyle(() => ({
-    height: open.value * contentH,
-    opacity: interpolate(open.value, [0.35, 1], [0, 1], Extrapolation.CLAMP),
-  }));
+  const { chevStyle, bodyStyle, onContentLayout, measureStyle } = useAccordion(expanded, true);
 
   const mPrice = priceOf(products.find((s) => s.productId === MONTHLY_SKU), MONTHLY_SKU);
   const yPrice = priceOf(products.find((s) => s.productId === YEARLY_SKU), YEARLY_SKU);
@@ -418,7 +463,7 @@ function ProUpsellCard() {
           </Animated.View>
         </View>
         <Animated.View style={[{ overflow: 'hidden' }, bodyStyle]}>
-          <View onLayout={(e) => setContentH(e.nativeEvent.layout.height)} style={{ paddingTop: 14 }}>
+          <View onLayout={onContentLayout} style={[measureStyle, { paddingTop: 14 }]}>
             <View style={{ gap: 9 }}>
               {PRO_BENEFITS.map((b) => (
                 <View key={b} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -446,6 +491,16 @@ function StreakCard({ dk }: { dk: string }) {
   const { openSheet } = useSheets();
   const [expanded, setExpanded] = useState(false);
   const state = useAppState();
+
+  // The home-screen Protocol widget deep-links here (autonomic://?open=protocol):
+  // the handler bumps this signal and scrolls to us; open the card when it fires
+  // (skip the initial mount so we don't auto-expand on a normal launch).
+  const expandSignal = useExpandProtocolSignal();
+  const firstSignal = useRef(true);
+  useEffect(() => {
+    if (firstSignal.current) { firstSignal.current = false; return; }
+    setExpanded(true);
+  }, [expandSignal]);
   // streakInfo walks the whole day history; don't redo it for the accordion
   // toggle re-renders below.
   const si = useMemo(
@@ -456,30 +511,9 @@ function StreakCard({ dk }: { dk: string }) {
   const icon = si.current >= 14 ? 'moon' : si.current >= 7 ? 'rocket' : si.current >= 3 ? 'flame' : 'sparkles';
   const c = si.today;
 
-  // Rotate the (down-pointing) chevron in place: -90° = pointing right when
-  // collapsed, easing to 0° = pointing down when expanded. Position never moves.
-  const rot = useSharedValue(0);
-  useEffect(() => { rot.value = withTiming(expanded ? 1 : 0, { duration: 220 }); }, [expanded, rot]);
-  const chevStyle = useAnimatedStyle(() => ({ transform: [{ rotate: `${-90 + rot.value * 90}deg` }] }));
-
-  // Accordion the body open/closed by animating its measured height. The body
-  // stays mounted (clipped to 0 height while collapsed) so onLayout can report
-  // its natural height; `open` drives height 0 → contentH and a fade in step.
-  const [contentH, setContentH] = useState(0);
-  const open = useSharedValue(0);
-  // Open eases out; close uses in-out so the height doesn't crawl sub-pixel
-  // through its last frames (that tail read as jank). Fading the body out over
-  // the top of the close keeps the crawl invisible either way.
-  useEffect(() => {
-    open.value = withTiming(
-      expanded ? 1 : 0,
-      expanded ? { duration: 260, easing: Easing.out(Easing.cubic) } : { duration: 220, easing: Easing.inOut(Easing.cubic) },
-    );
-  }, [expanded, open]);
-  const bodyStyle = useAnimatedStyle(() => ({
-    height: open.value * contentH,
-    opacity: interpolate(open.value, [0.35, 1], [0, 1], Extrapolation.CLAMP),
-  }));
+  // Chevron rotates in place (-90° right when collapsed → 0° down when open) and
+  // the body reveals by animating its measured height with a fade. See useAccordion.
+  const { chevStyle, bodyStyle, onContentLayout, measureStyle } = useAccordion(expanded);
 
   let sub = tier.msg;
   if (c) {
@@ -502,7 +536,10 @@ function StreakCard({ dk }: { dk: string }) {
   if (si.rate != null) stats.push(`30-day clean ${si.rate}%`);
 
   return (
-    <View style={{ borderWidth: 1, borderColor: p.border, borderRadius: radius.card, backgroundColor: p.surface, marginBottom: 12, overflow: 'hidden' }}>
+    <View
+      onLayout={(e: LayoutChangeEvent) => setJournalSectionY('protocol', e.nativeEvent.layout.y)}
+      style={{ borderWidth: 1, borderColor: p.border, borderRadius: radius.card, backgroundColor: p.surface, marginBottom: 12, overflow: 'hidden' }}
+    >
       <Pressable onPress={() => setExpanded((v) => !v)} style={{ padding: 15 }}>
         {/* Header row: always vertically centered, so the chevron never shifts. */}
         <View style={{ flexDirection: 'row', gap: 13, alignItems: 'center' }}>
@@ -522,7 +559,7 @@ function StreakCard({ dk }: { dk: string }) {
           </Animated.View>
         </View>
         <Animated.View style={[{ overflow: 'hidden' }, bodyStyle]}>
-          <View onLayout={(e) => setContentH(e.nativeEvent.layout.height)} style={{ paddingTop: 12 }}>
+          <View onLayout={onContentLayout} style={[measureStyle, { paddingTop: 12 }]}>
             <Text style={{ fontSize: 11, color: p.textDim, fontVariant: ['tabular-nums'] }}>{stats.join(' · ')}</Text>
             {criteria.length ? (
               <View style={{ marginTop: 12, gap: 9 }}>
@@ -617,7 +654,7 @@ function ScoreExplain({ all, dk, controls }: { all: ScoreSetResult; dk: string; 
         </View>
         <View style={{ alignItems: 'center', marginVertical: 8 }}>
           <ScoreGauge score={all.score!} color={cat.color}>
-            <Text style={{ fontSize: 57, fontWeight: '800', color: p.text, fontVariant: ['tabular-nums'], letterSpacing: -1 }}>{all.score}</Text>
+            <Text style={{ fontSize: 57, fontFamily: fonts.numHeavy, color: p.text, fontVariant: ['tabular-nums'], letterSpacing: -1 }}>{all.score}</Text>
             <Text style={{ fontSize: 10, fontWeight: '700', letterSpacing: 1, color: p.textDim, marginTop: 4 }}>OUT OF 100</Text>
           </ScoreGauge>
         </View>
@@ -643,25 +680,9 @@ function CompRow({ c, improveLine }: { c: any; improveLine: (c: any) => string }
   const [open, setOpen] = useState(false);
   const contrib = c.p >= 80 ? { t: 'Lifting your score', bg: 'rgba(74,222,128,.16)', col: '#4ade80' } : c.p >= 60 ? { t: 'About neutral', bg: 'rgba(234,179,8,.16)', col: '#eab308' } : { t: 'Pulling your score down', bg: 'rgba(249,115,22,.16)', col: '#f97316' };
 
-  // Same accordion convention as StreakCard: rotate the chevron in place
-  // (-90° right when collapsed → 0° down when open) and drive the body's
-  // measured height 0 → contentH with a fade so it eases open like butter.
-  const rot = useSharedValue(0);
-  useEffect(() => { rot.value = withTiming(open ? 1 : 0, { duration: 220 }); }, [open, rot]);
-  const chevStyle = useAnimatedStyle(() => ({ transform: [{ rotate: `${-90 + rot.value * 90}deg` }] }));
-
-  const [contentH, setContentH] = useState(0);
-  const openV = useSharedValue(0);
-  useEffect(() => {
-    openV.value = withTiming(
-      open ? 1 : 0,
-      open ? { duration: 260, easing: Easing.out(Easing.cubic) } : { duration: 220, easing: Easing.inOut(Easing.cubic) },
-    );
-  }, [open, openV]);
-  const bodyStyle = useAnimatedStyle(() => ({
-    height: openV.value * contentH,
-    opacity: interpolate(openV.value, [0.35, 1], [0, 1], Extrapolation.CLAMP),
-  }));
+  // Rotate the chevron in place and reveal the body by animating its measured
+  // height with a fade. See useAccordion for why the body is measured absolutely.
+  const { chevStyle, bodyStyle, onContentLayout, measureStyle } = useAccordion(open);
 
   return (
     <View style={{ backgroundColor: p.surface, borderColor: p.border, borderWidth: 1, borderRadius: radius.control, marginBottom: 10, overflow: 'hidden' }}>
@@ -674,7 +695,7 @@ function CompRow({ c, improveLine }: { c: any; improveLine: (c: any) => string }
         </Animated.View>
       </Pressable>
       <Animated.View style={[{ overflow: 'hidden' }, bodyStyle]}>
-        <View onLayout={(e) => setContentH(e.nativeEvent.layout.height)} style={{ paddingHorizontal: 14, paddingBottom: 14 }}>
+        <View onLayout={onContentLayout} style={[measureStyle, { paddingHorizontal: 14, paddingBottom: 14 }]}>
           <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 8 }}>
             <View style={{ backgroundColor: contrib.bg, paddingHorizontal: 9, paddingVertical: 3, borderRadius: 999 }}><Text style={{ fontSize: 11, fontWeight: '700', color: contrib.col }}>{contrib.t}</Text></View>
             <Text style={{ fontSize: 12, color: p.textDim }}>{`${GRADE_LABEL[c.cat as keyof typeof GRADE_LABEL]} · weight ${c.w}%`}</Text>

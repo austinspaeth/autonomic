@@ -15,7 +15,8 @@ import {
   BANDS, SCORE_COLORS, catFromBands, restingHrBands, type ScoreContext,
 } from './scoring';
 import {
-  scoreCat, scoreSet, sleepHours, sleepGrade, type DaysMap,
+  scoreCat, scoreSet, sleepHours, sleepGrade,
+  protocolCriteria, resolveProtocol, type DaysMap,
 } from './scoring/day';
 import type { AppState, DayRecord } from './types';
 
@@ -26,10 +27,17 @@ export interface WidgetMetricRow {
   value: string;       // '–' when the day has no data for it
   unit: string;
   color: string;       // grade dot; dim grey when ungraded
-  trend: string | null;      // '▲8%' vs the trailing week, null when unknowable
+  trend: string | null;      // '▲' / '▼' vs the trailing week, null when unknowable
   trendColor: string | null;
 }
 export interface WidgetGridItem { name: string; value: string; unit: string }
+/** One of today's protocol requirements (the "clean day" checklist). */
+export interface WidgetProtocolItem {
+  key: string;
+  label: string;
+  done: boolean;       // requirement met today
+  broken: boolean;     // hard-failed and can't be undone (e.g. a trigger logged)
+}
 /** The large widget's chart, precomputed to render exactly like the app's
  *  Sparkline card (grade-gradient stroke, graded dots, min/mid/max ticks). */
 export interface WidgetSpark {
@@ -50,6 +58,8 @@ export interface WidgetPayload {
   rows: WidgetMetricRow[];       // SDNN · RMSSD · Sleep (gauge companions)
   grid: WidgetGridItem[];        // Today's numbers (2 × 3)
   spark: WidgetSpark | null;     // RMSSD · 14 days (null under 2 points)
+  protocol: WidgetProtocolItem[];    // today's clean-day checklist
+  protocolDone: number;              // count met (convenience for the widget)
 }
 
 const DIM = '#8a8a92';
@@ -87,14 +97,14 @@ function restingHrDay(d: DayRecord | undefined): { value: number; color: string 
   return { value: fallback, color: cat ? SCORE_COLORS[cat] : DIM };
 }
 
-/** '▲8%' change of today vs the trailing week's mean (higher-is-better). */
+/** '▲' / '▼' direction of today vs the trailing week's mean (higher-is-better). */
 function weekTrend(today: number | null, prior: (number | null)[]): { trend: string | null; trendColor: string | null } {
   const base = mean(prior.filter((v): v is number => v != null));
   if (today == null || base == null || base === 0) return { trend: null, trendColor: null };
   const pct = Math.round(((today - base) / Math.abs(base)) * 100);
   if (pct === 0) return { trend: null, trendColor: null };
   return {
-    trend: `${pct > 0 ? TREND_UP : TREND_DOWN}${Math.abs(pct)}%`,
+    trend: pct > 0 ? TREND_UP : TREND_DOWN,
     trendColor: pct > 0 ? SCORE_COLORS.good : SCORE_COLORS.crash,
   };
 }
@@ -196,6 +206,14 @@ export function buildWidgetPayload(state: AppState, dk = todayKey()): WidgetPayl
     { name: 'Water', value: water != null ? String(round1(water)) : '–', unit: 'L' },
   ];
 
+  // Today's clean-day checklist — the same criteria the Progress streak card
+  // grades, so the widget's checkmarks mirror the in-app card. Pending items
+  // (not yet evaluable) read as still-to-do.
+  const criteria = protocolCriteria(days, dk, resolveProtocol(state.settings?.protocol), state.customTypes);
+  const protocol: WidgetProtocolItem[] = criteria.map((c) => ({
+    key: c.key, label: c.label, done: c.pass, broken: !!c.broken,
+  }));
+
   return {
     date: dk,
     updatedAt: new Date().toISOString(),
@@ -206,6 +224,8 @@ export function buildWidgetPayload(state: AppState, dk = todayKey()): WidgetPayl
     rows,
     grid,
     spark: buildSpark(days, dk),
+    protocol,
+    protocolDone: protocol.filter((p) => p.done).length,
   };
 }
 

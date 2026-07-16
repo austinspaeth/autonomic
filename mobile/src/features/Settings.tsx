@@ -15,7 +15,7 @@ import { DateField, HeightField, TextField, onlyNumeric } from '../components/Fi
 import { BrandMark, Icon, IconName } from '../components/Icon';
 import { useToast } from '../components/Toast';
 import { radius, usePalette } from '../theme';
-import { clearAllData, getState, replaceState, save, serializeState, useAppState } from '../store/store';
+import { clearAllData, getState, replaceState, save, serializeState, useAppState, useStore } from '../store/store';
 import { deleteAllBackups } from '../lib/backup';
 import { ageFromBirthday, keyOf } from '../lib/dates';
 import { DATE_KEY_RE, assertImportVersion, isPlainObject } from '../lib/migrate';
@@ -213,7 +213,7 @@ function ClearDataSheet({ controls }: { controls: SheetControls }) {
   const [taps, setTaps] = useState(0);
   const [busy, setBusy] = useState(false);
   const left = CLEAR_TAPS - taps;
-  const days = Object.keys(useAppState().days).length;
+  const days = useStore((s) => Object.keys(s.state.days).length);
 
   const onDelete = async () => {
     if (busy) return;

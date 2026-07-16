@@ -10,7 +10,7 @@ import { PromptSheet } from '../../src/features/PromptSheet';
 import { radius, usePalette } from '../../src/theme';
 import { getState, useAppState } from '../../src/store/store';
 import { todayKey } from '../../src/lib/dates';
-import { REPORT_CARDS, ReportRange, buildDataExport, buildPrompt, hasAnyData, reportDateRange } from '../../src/lib/analysis/reports';
+import { REPORT_CARDS, ReportRange, buildDataExport, buildDoctorPrompt, buildPrompt, hasAnyData, reportDateRange } from '../../src/lib/analysis/reports';
 import { resolveProtocol } from '../../src/lib/scoring/day';
 import { useTier } from '../../src/store/tier';
 import { usePaywall } from '../../src/features/Paywall';
@@ -24,6 +24,8 @@ const reportState = () => { const s = getState(); return hasOwnData(s.days) ? s 
 
 // Rendered full-width above the two-up grid, in this order, right under the
 // data-only prompt: the doctor summary, then the all-in-one overall report.
+// These are single, self-contained reports: tapping opens the prompt instantly
+// (no multi-select), unlike the stackable focus cards in the grid below.
 const FULL_WIDTH_IDS = ['doctor', 'overall'];
 
 export default function InsightsScreen() {
@@ -64,6 +66,20 @@ export default function InsightsScreen() {
     openSheet((c) => <PromptSheet title={title} rangeText={rangeText} prompt={prompt} controls={c} />);
   };
 
+  // The two full-width cards (doctor, overall) are single reports: one tap
+  // builds their prompt and opens the sheet, no checkmark step. The doctor card
+  // uses its own clinical-document prompt; overall uses the standard builder.
+  const openCard = (card: (typeof REPORT_CARDS)[number]) => {
+    if (locked) { openPaywall(); return; }
+    const state = reportState();
+    const { keys: allKeys, rangeText } = reportDateRange(range, todayKey());
+    const keys = allKeys.filter((k) => state.days[k]);
+    if (!hasAnyData(state.days, keys)) { toast('No data available for this period'); return; }
+    const ctx = { sex: state.profile.sex, height: state.profile.height, protocol: resolveProtocol(state.settings.protocol) };
+    const prompt = card.id === 'doctor' ? buildDoctorPrompt(state, ctx, range, todayKey()) : buildPrompt(state, ctx, [card], range, todayKey());
+    openSheet((c) => <PromptSheet title={card.title} rangeText={rangeText} prompt={prompt} controls={c} />);
+  };
+
   const dataExport = () => {
     const state = reportState();
     const { keys: allKeys, rangeText } = reportDateRange(range, todayKey());
@@ -74,20 +90,18 @@ export default function InsightsScreen() {
     openSheet((c) => <PromptSheet title="Data only prompt" rangeText={rangeText} prompt={text} controls={c} subtitle="Structured data only, no analysis prompt. Paste it into an AI to get specific reports or data back." />);
   };
 
-  const fullWidthCard = (card: (typeof REPORT_CARDS)[number]) => {
-    const sel = !locked && selected.has(card.id);
-    return (
-      <Pressable key={card.id} onPress={() => (locked ? openPaywall() : toggle(card.id))} style={{ marginBottom: 10, width: '100%', borderWidth: 1, borderRadius: radius.card, backgroundColor: sel ? p.accentSoft : p.surface, borderColor: sel ? p.accent : p.border, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-        <Icon name={card.icon as IconName} size={26} color={locked ? p.textDim : p.accent} />
-        <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 15, fontWeight: '700', color: p.text }}>{card.title}</Text>
-          <Text style={{ fontSize: 12, color: p.textDim, marginTop: 4, lineHeight: 15 }}>{card.desc}</Text>
-        </View>
-        {sel ? <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: p.accent, alignItems: 'center', justifyContent: 'center' }}><Icon name="check" size={14} color="#fff" /></View> : null}
-        {locked ? <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: p.surface2, borderWidth: 1, borderColor: p.border, alignItems: 'center', justifyContent: 'center' }}><Icon name="lock" size={12} color={p.textDim} /></View> : null}
-      </Pressable>
-    );
-  };
+  const fullWidthCard = (card: (typeof REPORT_CARDS)[number]) => (
+    <Pressable key={card.id} onPress={() => openCard(card)} style={{ marginBottom: 10, width: '100%', borderWidth: 1, borderRadius: radius.card, backgroundColor: p.surface, borderColor: p.border, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+      <Icon name={card.icon as IconName} size={26} color={locked ? p.textDim : p.accent} />
+      <View style={{ flex: 1 }}>
+        <Text style={{ fontSize: 15, fontWeight: '700', color: p.text }}>{card.title}</Text>
+        <Text style={{ fontSize: 12, color: p.textDim, marginTop: 4, lineHeight: 15 }}>{card.desc}</Text>
+      </View>
+      {locked
+        ? <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: p.surface2, borderWidth: 1, borderColor: p.border, alignItems: 'center', justifyContent: 'center' }}><Icon name="lock" size={12} color={p.textDim} /></View>
+        : <Icon name="chevronRight" size={20} color={p.textDim} />}
+    </Pressable>
+  );
 
   return (
     <Screen

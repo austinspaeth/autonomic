@@ -164,7 +164,7 @@ function AckRow({ on, onPress }: { on: boolean; onPress: () => void }) {
       onPress={onPress}
       accessibilityRole="checkbox"
       accessibilityState={{ checked: on }}
-      style={[{ flexDirection: 'row', alignItems: 'flex-start', gap: 13, borderWidth: 1, borderRadius: 14, padding: 16 }, rowStyle]}
+      style={[{ flexDirection: 'row', alignItems: 'center', gap: 13, borderWidth: 1, borderRadius: 14, padding: 16 }, rowStyle]}
     >
       <Animated.View style={[{ width: 22, height: 22, borderRadius: 7, borderWidth: 1, alignItems: 'center', justifyContent: 'center' }, boxStyle]}>
         <Animated.View style={checkStyle}>

@@ -62,6 +62,24 @@ export function scrollJournalToSection(section: string) {
   if (journalScroller && y != null) journalScroller(y);
 }
 
+/* Progress streak (clean-day protocol) card: the home-screen Protocol widget
+ * deep-links (autonomic://?open=protocol) asking the app to open the card
+ * expanded. The deep-link handler bumps this signal; the StreakCard subscribes
+ * and opens itself, while the handler also scrollJournalToSection('protocol'). */
+let expandProtocolSeq = 0;
+const expandProtocolListeners = new Set<() => void>();
+export function requestExpandProtocol() {
+  expandProtocolSeq++;
+  expandProtocolListeners.forEach((l) => l());
+}
+export function useExpandProtocolSignal(): number {
+  return useSyncExternalStore(
+    (cb) => { expandProtocolListeners.add(cb); return () => expandProtocolListeners.delete(cb); },
+    () => expandProtocolSeq,
+    () => expandProtocolSeq,
+  );
+}
+
 export function useCurrentKey(): string {
   return useSyncExternalStore(
     (cb) => { listeners.add(cb); return () => listeners.delete(cb); },

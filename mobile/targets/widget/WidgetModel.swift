@@ -15,6 +15,8 @@ let DATA_KEY = "widget.today.v1"
 // Query param on the Journal tab (not a path) so expo-router always has a
 // matching route; the app listens for the param (useCaptureDeepLink).
 let CAPTURE_URL = URL(string: "autonomic://?capture=hrv")!
+// Opens the Journal tab scrolled to the expanded Progress streak card.
+let PROTOCOL_URL = URL(string: "autonomic://?open=protocol")!
 
 struct MetricRow: Decodable, Hashable {
     let name: String
@@ -29,6 +31,13 @@ struct GridMetric: Decodable, Hashable {
     let name: String
     let value: String
     let unit: String
+}
+
+struct ProtocolItem: Decodable, Hashable {
+    let key: String
+    let label: String
+    let done: Bool
+    let broken: Bool   // hard-failed today (e.g. a trigger logged) — shows a red ✕
 }
 
 struct SparkStop: Decodable, Hashable {
@@ -57,6 +66,8 @@ struct WidgetPayload: Decodable {
     let rows: [MetricRow]
     let grid: [GridMetric]
     let spark: Spark?
+    let `protocol`: [ProtocolItem]
+    let protocolDone: Int
 }
 
 private func localDayKey(_ date: Date = .now) -> String {
@@ -95,7 +106,9 @@ extension WidgetPayload {
             GridMetric(name: "Sleep", value: "–", unit: "h"),
             GridMetric(name: "Water", value: "–", unit: "L"),
         ],
-        spark: nil
+        spark: nil,
+        protocol: [],
+        protocolDone: 0
     )
 
     /// Gallery preview / placeholder numbers (mirrors the design comp).
@@ -103,9 +116,9 @@ extension WidgetPayload {
         date: "", updatedAt: "", hasScore: true, score: 82,
         label: "Good", color: "#16a34a",
         rows: [
-            MetricRow(name: "SDNN", value: "55", unit: "ms", color: "#16a34a", trend: "▲6%", trendColor: "#16a34a"),
-            MetricRow(name: "RMSSD", value: "42", unit: "ms", color: "#2ee06a", trend: "▲8%", trendColor: "#16a34a"),
-            MetricRow(name: "Sleep", value: "7.2", unit: "h", color: "#16a34a", trend: "▲4%", trendColor: "#16a34a"),
+            MetricRow(name: "SDNN", value: "55", unit: "ms", color: "#16a34a", trend: "▲", trendColor: "#16a34a"),
+            MetricRow(name: "RMSSD", value: "42", unit: "ms", color: "#2ee06a", trend: "▲", trendColor: "#16a34a"),
+            MetricRow(name: "Sleep", value: "7.2", unit: "h", color: "#16a34a", trend: "▲", trendColor: "#16a34a"),
         ],
         grid: [
             GridMetric(name: "SDNN", value: "55", unit: "ms"),
@@ -127,7 +140,15 @@ extension WidgetPayload {
             ],
             ticks: ["21.9", "34.5", "47.2"],
             start: "Jul 3", end: "Jul 16"
-        )
+        ),
+        protocol: [
+            ProtocolItem(key: "hrv", label: "HRV reading", done: true, broken: false),
+            ProtocolItem(key: "water", label: "Water 2.5 L", done: true, broken: false),
+            ProtocolItem(key: "sleep", label: "Sleep 7h", done: true, broken: false),
+            ProtocolItem(key: "triggers", label: "Avoid triggers", done: false, broken: false),
+            ProtocolItem(key: "med:magnesium", label: "Magnesium", done: false, broken: false),
+        ],
+        protocolDone: 3
     )
 }
 

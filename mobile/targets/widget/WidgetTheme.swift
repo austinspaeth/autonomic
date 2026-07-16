@@ -23,7 +23,7 @@ extension Color {
 }
 
 enum WTheme {
-    static let bg = Color(hex: "#0d0d0f")
+    static let bg = Color(hex: "#000000")
     static let cell = Color(hex: "#141416")
     static let track = Color(hex: "#242427")
     static let divider = Color.white.opacity(0.05)
@@ -31,29 +31,6 @@ enum WTheme {
     static let textDim = Color(hex: "#8a8a92")
     static let textFaint = Color(hex: "#6a6a72")
     static let accent = Color(hex: "#e03127")
-}
-
-/// The waveform logo mark (the app icon's polyline).
-struct WaveformLogo: View {
-    var color: Color = WTheme.accent
-
-    var body: some View {
-        // Path from the brand mark: M2 15 h9 l3.5,-11 l6,24 l4.5,-15 l2.5,5 H44 (viewBox 46×30)
-        GeometryReader { geo in
-            let sx = geo.size.width / 46
-            let sy = geo.size.height / 30
-            Path { p in
-                p.move(to: CGPoint(x: 2 * sx, y: 15 * sy))
-                p.addLine(to: CGPoint(x: 11 * sx, y: 15 * sy))
-                p.addLine(to: CGPoint(x: 14.5 * sx, y: 4 * sy))
-                p.addLine(to: CGPoint(x: 20.5 * sx, y: 28 * sy))
-                p.addLine(to: CGPoint(x: 25 * sx, y: 13 * sy))
-                p.addLine(to: CGPoint(x: 27.5 * sx, y: 18 * sy))
-                p.addLine(to: CGPoint(x: 44 * sx, y: 18 * sy))
-            }
-            .stroke(color, style: StrokeStyle(lineWidth: 4 * sx, lineCap: .round, lineJoin: .round))
-        }
-    }
 }
 
 /// One 270° arc of the score dial (fraction 0…1 of the full sweep).
@@ -132,12 +109,61 @@ struct MetricRows: View {
                         .lineLimit(1)
                     if showTrend {
                         Text(m.trend ?? "")
-                            .font(.system(size: 11, weight: .bold))
+                            .font(.system(size: 12, weight: .bold))
                             .foregroundStyle(Color(hex: m.trendColor ?? "#6a6a72"))
-                            .frame(width: 34, alignment: .trailing)
-                            .monospacedDigit()
+                            .frame(width: 14, alignment: .trailing)
                     }
                 }
+            }
+        }
+    }
+}
+
+/// One protocol requirement's status mark: a green tick when done, a red ✕
+/// when hard-broken (a trigger logged / sleep missed), else an empty ring.
+struct ProtocolCheck: View {
+    let item: ProtocolItem
+
+    var body: some View {
+        ZStack {
+            if item.broken {
+                Circle().strokeBorder(WTheme.accent, lineWidth: 2)
+                Image(systemName: "xmark").font(.system(size: 9, weight: .bold)).foregroundStyle(WTheme.accent)
+            } else if item.done {
+                Circle().fill(Color(hex: "#16a34a"))
+                Image(systemName: "checkmark").font(.system(size: 9, weight: .bold)).foregroundStyle(.white)
+            } else {
+                Circle().strokeBorder(Color(hex: "#3a3a40"), lineWidth: 2)
+            }
+        }
+        .frame(width: 18, height: 18)
+    }
+}
+
+/// Today's clean-day checklist: a status mark + label per requirement, capped
+/// with a "+N more" line so a long protocol never overflows the widget.
+struct ProtocolChecklist: View {
+    let items: [ProtocolItem]
+    var limit = 6
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            ForEach(items.prefix(limit), id: \.key) { it in
+                HStack(spacing: 9) {
+                    ProtocolCheck(item: it)
+                    Text(it.label)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(it.done ? WTheme.text : WTheme.textDim)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                    Spacer(minLength: 0)
+                }
+            }
+            if items.count > limit {
+                Text("+\(items.count - limit) more")
+                    .font(.system(size: 12))
+                    .foregroundStyle(WTheme.textFaint)
+                    .padding(.leading, 27)
             }
         }
     }

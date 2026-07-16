@@ -1,19 +1,17 @@
 /** Health settings (Apple Health on iOS, Health Connect on Android):
- *  permission, "Sync today from Health", and a bedtime-confirmation flow that
- *  reads last night's sleep + overnight HR and lets you review/edit it before
- *  it lands in the journal. */
+ *  permission and a bedtime-confirmation flow that reads last night's sleep +
+ *  overnight HR and lets you review/edit it before it lands in the journal. */
 import React, { useState } from 'react';
-import { ActivityIndicator, Platform, Text, View } from 'react-native';
+import { ActivityIndicator, Text, View } from 'react-native';
 import { Button } from '../components/ui';
 import { SheetControls, SheetFooter, useSheets } from '../components/Sheet';
 import { TimeField } from '../components/Field';
 import { useToast } from '../components/Toast';
 import { usePalette } from '../theme';
 import { health, healthAppName, SleepImport } from '../lib/health';
-import { ensureDay, getState, save, storeWaveform } from '../store/store';
+import { ensureDay, getState, save } from '../store/store';
 import { getCurrentKey } from '../store/nav';
-import { computeScores } from '../lib/scoring';
-import { fmtTime12, uid } from '../lib/dates';
+import { fmtTime12 } from '../lib/dates';
 
 export function HealthScreen() {
   const p = usePalette();
@@ -43,60 +41,6 @@ export function HealthScreen() {
     if (ok) { getState().settings.healthEnabled = true; save(); }
   };
 
-  const sync = async () => {
-    setBusy(true);
-    try {
-      const dk = getCurrentKey();
-      const d = ensureDay(dk);
-      const ctx = { sex: getState().profile.sex, height: getState().profile.height };
-      let added = 0;
-
-      // Weight -> profile (aggregate is fine; it's not a timestamped journal entry).
-      const day = await api.readDay(dk);
-      if (day.weightLb != null) { getState().profile.weight = String(day.weightLb); added++; }
-
-      // Timestamped readings, each at its real clock time (no more 9am placeholder).
-      const imports = await api.readImports(dk);
-      const toMin = (t?: string) => { const [h, m] = String(t || '').split(':').map(Number); return isNaN(h) ? null : h * 60 + m; };
-      const valueKey = (type: string, get: (k: string) => unknown) =>
-        type === 'bp' ? `${get('sys')}/${get('dia')}` : type === 'restingHr' ? String(get('hr')) : String(get('sdnn'));
-
-      for (const imp of imports) {
-        // Troubleshooting bulk pull is intentionally "smart": it brings HR, BP and
-        // weight, but NOT the noisy per-sample HRV source — that is imported
-        // one-at-a-time from the reading picker instead.
-        if (imp.type === 'hrv') continue;
-        // Skip anything this app authored (our own write-backs, round-tripped).
-        if (imp.ownApp) continue;
-        // Backstop: skip if an equal reading of the same type already sits within
-        // 5 minutes of this one (covers manual entries that were pushed to Health
-        // and prior syncs of the same sample).
-        const impMin = toMin(imp.time);
-        const impVal = valueKey(imp.type, (k) => imp.fields[k]);
-        const dup = d.readings.some((r) => {
-          if (r.type !== imp.type) return false;
-          if (valueKey(imp.type, (k) => r[k]) !== impVal) return false;
-          const rm = toMin(r.time as string);
-          return rm != null && impMin != null && Math.abs(rm - impMin) <= 5;
-        });
-        if (dup) continue;
-
-        const r = { id: uid(), type: imp.type, time: imp.time, note: `From ${healthAppName()}`, source: Platform.OS === 'android' ? 'health' : 'watch', imported: true, ...imp.fields } as Record<string, unknown>;
-        // RR series goes to the waveform sidecar, never inline on the entry
-        // (rrClean is derived — recomputed on view, not stored).
-        if (imp.rr) storeWaveform(r.id as string, { rrRaw: imp.rr });
-        r.scores = computeScores(r as never, ctx);
-        d.readings.push(r as never);
-        added++;
-      }
-      save();
-      toast(added ? `Synced ${added} item${added === 1 ? '' : 's'}` : 'Nothing new to sync');
-    } catch {
-      toast('Sync failed');
-    }
-    setBusy(false);
-  };
-
   const importSleep = async () => {
     setBusy(true);
     try {
@@ -120,11 +64,6 @@ export function HealthScreen() {
       <Button title={authed ? 'Health connected' : `Connect ${healthAppName()}`} variant="primary" onPress={connect} />
       <View style={{ height: 20 }} />
       <Text style={{ color: p.textDim, fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Troubleshooting</Text>
-      <Text style={{ color: p.textDim, fontSize: 13, marginBottom: 10, lineHeight: 18 }}>
-        {"Bulk-pull the current day's resting HR, blood pressure and weight in one go. Skips HRV (import it individually to avoid noise)."}
-      </Text>
-      <Button title="Sync day from Health" onPress={sync} />
-      <View style={{ height: 12 }} />
       <Button title="Import sleep from Health" onPress={importSleep} />
       {busy ? <View style={{ alignItems: 'center', marginTop: 14 }}><ActivityIndicator color={p.accent} /></View> : null}
       <View style={{ height: 24 }} />

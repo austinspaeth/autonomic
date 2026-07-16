@@ -2,7 +2,7 @@
   "expo": {
     "name": "Autonomic",
     "slug": "autonomic",
-    "version": "1.12.0",
+    "version": "1.13.0",
     "scheme": "autonomic",
     "orientation": "portrait",
     "icon": "./assets/autonomic-icon.png",
@@ -158,9 +158,10 @@
               "description": "Today's autonomic score and how the day is grading.",
               "minWidth": "110dp",
               "minHeight": "110dp",
+              "maxResizeHeight": "160dp",
               "targetCellWidth": 2,
               "targetCellHeight": 2,
-              "resizeMode": "horizontal|vertical",
+              "resizeMode": "none",
               "updatePeriodMillis": 1800000
             },
             {
@@ -169,9 +170,10 @@
               "description": "Today's score with graded SDNN, RMSSD and sleep averages.",
               "minWidth": "250dp",
               "minHeight": "110dp",
+              "maxResizeHeight": "160dp",
               "targetCellWidth": 4,
               "targetCellHeight": 2,
-              "resizeMode": "horizontal|vertical",
+              "resizeMode": "horizontal",
               "updatePeriodMillis": 1800000
             },
             {
@@ -180,9 +182,10 @@
               "description": "SDNN, RMSSD, pNN50, resting HR, sleep and water at a glance.",
               "minWidth": "250dp",
               "minHeight": "110dp",
+              "maxResizeHeight": "160dp",
               "targetCellWidth": 4,
               "targetCellHeight": 2,
-              "resizeMode": "horizontal|vertical",
+              "resizeMode": "horizontal",
               "updatePeriodMillis": 1800000
             },
             {
@@ -191,9 +194,21 @@
               "description": "Jump straight into an HRV reading.",
               "minWidth": "110dp",
               "minHeight": "110dp",
+              "maxResizeHeight": "160dp",
               "targetCellWidth": 2,
               "targetCellHeight": 2,
-              "resizeMode": "horizontal|vertical"
+              "resizeMode": "none"
+            },
+            {
+              "name": "Protocol",
+              "label": "Score & Daily Protocol",
+              "description": "Today's score and metrics over the clean-day protocol checklist.",
+              "minWidth": "250dp",
+              "minHeight": "250dp",
+              "targetCellWidth": 4,
+              "targetCellHeight": 4,
+              "resizeMode": "horizontal|vertical",
+              "updatePeriodMillis": 1800000
             }
           ]
         }

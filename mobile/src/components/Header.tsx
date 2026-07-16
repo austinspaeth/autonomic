@@ -8,7 +8,8 @@
  * black) over the content — z-index below the nav bar, which the Tabs navigator
  * renders in its own layer above every screen. */
 import React, { useCallback, useRef, useState } from 'react';
-import { NativeScrollEvent, NativeSyntheticEvent, Platform, ScrollView, View } from 'react-native';
+import { Platform, ScrollView, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
 import { useFocusEffect } from 'expo-router';
 import Svg, { Defs, LinearGradient as SvgGradient, Rect, Stop } from 'react-native-svg';
@@ -104,7 +105,9 @@ export function Screen({
   contentPadding?: number;
   bottomPad?: number;
   scrollRef?: React.Ref<ScrollView>;
-  onScroll?: (e: NativeSyntheticEvent<NativeScrollEvent>) => void;
+  // Accepts either a plain JS handler or a Reanimated useAnimatedScrollHandler
+  // worklet — the scroll view is Animated.ScrollView, which takes both.
+  onScroll?: React.ComponentProps<typeof Animated.ScrollView>['onScroll'];
   scrollEventThrottle?: number;
   onHeaderHeight?: (h: number) => void;
 }) {
@@ -133,8 +136,10 @@ export function Screen({
       style={{ flex: 1, backgroundColor: p.bg }}
       onStartShouldSetResponderCapture={() => { notifyChartsBlur(); return false; }}
     >
-      <ScrollView
-        ref={setScrollRef}
+      <Animated.ScrollView
+        // Reanimated forwards the ref to the underlying ScrollView instance,
+        // so scrollTo() etc. keep working through the plain ScrollView type.
+        ref={setScrollRef as never}
         onScroll={onScroll}
         scrollEventThrottle={scrollEventThrottle ?? 16}
         contentContainerStyle={{ paddingTop: headerH + contentPadding, paddingHorizontal: contentPadding, paddingBottom: bottomPad }}
@@ -145,7 +150,7 @@ export function Screen({
         keyboardDismissMode="on-drag"
       >
         {children}
-      </ScrollView>
+      </Animated.ScrollView>
       <BottomFade />
       {footer}
       <Header onHeight={(h) => { setHeaderH(h); onHeaderHeight?.(h); }}>{header}</Header>

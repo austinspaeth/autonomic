@@ -5,7 +5,7 @@ import { todayKey } from '../dates';
 import { SCORE_CATS } from '../scoring/day';
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
-const TREND = /^[▲▼]\d+%$/;
+const TREND = /^[▲▼]$/;
 
 describe('widget payload', () => {
   it('renders the awaiting state on an empty journal — never the demo month', () => {
@@ -37,6 +37,17 @@ describe('widget payload', () => {
     });
 
     expect(p.grid.map((g) => g.name)).toEqual(['SDNN', 'RMSSD', 'pNN50', 'Resting HR', 'Sleep', 'Water']);
+
+    // Protocol checklist mirrors the clean-day criteria: labelled items with a
+    // boolean done/broken state and a done-count that never exceeds the total.
+    expect(p.protocol.length).toBeGreaterThan(0);
+    p.protocol.forEach((it) => {
+      expect(typeof it.label).toBe('string');
+      expect(typeof it.done).toBe('boolean');
+      expect(typeof it.broken).toBe('boolean');
+    });
+    expect(p.protocolDone).toBe(p.protocol.filter((it) => it.done).length);
+    expect(p.protocolDone).toBeLessThanOrEqual(p.protocol.length);
 
     // The chart mirrors the app's Sparkline: 14 graded points + gradient stops.
     const s = p.spark!;

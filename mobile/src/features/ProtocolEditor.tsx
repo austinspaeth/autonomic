@@ -88,6 +88,13 @@ export function ProtocolEditor({ controls }: { controls: SheetControls }) {
       />
 
       <ReqSection
+        title="Daily HRV reading"
+        desc="Take at least one HRV reading each day."
+        enabled={proto.hrv.enabled}
+        onToggle={(v) => setProto((x) => ({ ...x, hrv: { ...x.hrv, enabled: v } }))}
+      />
+
+      <ReqSection
         title="Water"
         desc="Hit a minimum daily water intake."
         enabled={proto.water.enabled}

@@ -317,6 +317,7 @@ describe('day scoring', () => {
     // Custom protocol: only require a walk + 1L water, everything else off.
     const proto: Protocol = {
       triggers: { enabled: false, types: [] },
+      hrv: { enabled: false },
       water: { enabled: true, liters: 1 },
       meds: { enabled: false, types: [] },
       activities: { enabled: true, types: ['walk'] },
@@ -348,6 +349,17 @@ describe('day scoring', () => {
     expect(crit.pass).toBe(true);
     // Without the custom map it can only fall back to the raw key.
     expect(dayCleanliness(days, '2026-07-02', proto)!.criteria[0].label).toBe('custom-magnesium');
+  });
+  it('daily HRV requirement passes only for an in-app HRV capture', () => {
+    const proto: Protocol = { ...DEFAULT_PROTOCOL, triggers: { enabled: false, types: [] }, water: { enabled: false, liters: 0 }, sleep: { enabled: false, hours: 0 }, hrv: { enabled: true } };
+    const passOf = (days: Record<string, DayRecord>) => dayCleanliness(days, '2026-07-02', proto)!.criteria.find((x) => x.key === 'hrv')!.pass;
+    expect(passOf({ '2026-07-02': day() })).toBe(false);
+    expect(passOf({ '2026-07-02': day({ readings: [{ id: 'r', type: 'breathHrv' }] as Entry[] }) })).toBe(true);
+    expect(passOf({ '2026-07-02': day({ readings: [{ id: 'r', type: 'hrv' }] as Entry[] }) })).toBe(true);
+    // A health-imported reading does not count — the goal is to take one in-app.
+    expect(passOf({ '2026-07-02': day({ readings: [{ id: 'r', type: 'hrv', imported: true }] as Entry[] }) })).toBe(false);
+    // A non-HRV reading (e.g. blood pressure) does not satisfy it.
+    expect(passOf({ '2026-07-02': day({ readings: [{ id: 'r', type: 'bp' }] as Entry[] }) })).toBe(false);
   });
   it('protocol trigger selection narrows which triggers break the day', () => {
     const days: Record<string, DayRecord> = {

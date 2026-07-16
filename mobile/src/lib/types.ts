@@ -112,6 +112,8 @@ export interface DayRecord {
 export interface Protocol {
   /** Avoid triggers. Empty `types` = avoid ALL triggers; else only these. */
   triggers: { enabled: boolean; types: string[] };
+  /** Take at least one HRV reading (structured or unstructured) that day. */
+  hrv: { enabled: boolean };
   /** Minimum daily water (litres). */
   water: { enabled: boolean; liters: number };
   /** Medications/supplements that must be logged. */
