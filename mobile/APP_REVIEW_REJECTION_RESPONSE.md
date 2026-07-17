@@ -47,22 +47,38 @@ reviewer couldn't complete the review. In App Store Connect:
      AI report card, or Analysis tab → Week/Month/Year."
 3. Repeat for `com.autonomic.journal.monthly`.
 4. Make sure each subscription's **localization** (display name + description)
-   is filled in — missing localization also blocks submission.
-5. On the **app version page**, scroll to the **In-App Purchases and
-   Subscriptions** section and **add both subscriptions to the version** so
-   they ride along with the binary review. (This section only appears before
-   the version is submitted. Both IAPs should show "Waiting for Review" once
-   the version is submitted.)
-6. Upload a new build **from current `main`** (bump the marketing version in
+   is filled in — missing localization also blocks submission — AND the
+   **subscription group's own App Store Localization** (the group display name,
+   e.g. "Autonomic Pro", on the group page). An unlocalized group produces
+   "Your auto-renewable subscription must be submitted with its subscription
+   group" in the draft.
+5. Upload a new build **from current `main`** (bump the marketing version in
    `app.json` past 1.7's if ASC requires it; `eas build --platform ios
    --profile production`) and select it on the version page. Before building,
    run the freemium preview check from `STORE_SETUP.md` Part 2 and confirm
    `FORCE_TIER` is `null` and `PREVIEW_PAYWALL` is `false` in the shipped
    commit.
+6. Build the **review submission** (ASC's draft-submission model — items are
+   added from each item's own page, not from inside the draft panel):
+   - On the yearly subscription's page → **Add for Review** → Create New
+     Submission (iOS).
+   - On the monthly's page → **Add for Review** → same draft.
+   - On the **App Store tab → version page** → **Add for Review** (top right;
+     greyed out means version metadata is incomplete) → same draft.
+   - The subscription group attaches automatically once its localization is
+     complete.
+   - Open the draft (sidebar → **App Review**): it should list the app
+     version, the subscription group, and both subscriptions with no
+     warnings. **Submit for Review** — both subscriptions flip to "Waiting
+     for Review".
 
-The first-ever review of a subscription **must** be submitted with a binary —
-that's why Apple asked for a new one even though the app itself may not have
-changed.
+The first-ever auto-renewable subscription **must** be submitted together
+with an app version — that's why Apple asked for a new binary even though the
+app itself may not have changed. (After this first approval, subscriptions
+can be submitted standalone.) If the original rejected submission is still
+open in App Review, add the items to it and **Resubmit** instead of creating
+a second draft — a platform can only have one submission containing an app
+version.
 
 ## §2 — Guideline 2.3.2: label the paid features in the description
 
