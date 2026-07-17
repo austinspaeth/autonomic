@@ -30,7 +30,7 @@ const VALUE: { icon: IconName; title: string; sub: string }[] = [
       : 'RMSSD, frequency bands, and coherence from your strap or camera.',
   },
   { icon: 'chart', title: 'Your full history', sub: 'Week, month, and year progress views over every number you’ve logged.' },
-  { icon: 'standing', title: 'POTS testing', sub: 'Guided stand tests and episode capture, graded against clinical criteria.' },
+  { icon: 'standing', title: 'POTS tracking', sub: 'Guided stand tests and episode capture, graded against published research thresholds.' },
   { icon: 'ai', title: 'AI-ready reports', sub: 'Turn your logged data into deep-dive prompts and doctor-visit summaries.' },
 ];
 

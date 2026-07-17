@@ -1,0 +1,188 @@
+# App Review rejection — resolution runbook
+
+Rejection of **Autonomic: HRV & POTS Tracker** v1.7 (24), submission
+`49ffd932-0b7a-46fc-b97b-003d6693f572`, reviewed July 17, 2026. Four guidelines
+were cited. Everything here is an **App Store Connect action** except the
+listing copy, which now lives updated in `store-listing.md`, and one paywall
+copy tweak in `src/features/Paywall.tsx`.
+
+The short version: none of the four issues requires a feature change. Two are
+pure ASC housekeeping (2.1(b), 3.1.2(c)), one is fixed by the new description
+(2.3.2), and one (1.4.1) is a misclassification to push back on in the
+Resolution Center — the app connects to consumer fitness heart-rate straps,
+not medical hardware, and the reply below makes that case.
+
+| # | Guideline | What Apple wants | Fix |
+| --- | --- | --- | --- |
+| 1 | 2.1(b) App Completeness | The IAP subscriptions submitted for review with the binary | ASC: attach both subscriptions + review screenshot, resubmit (§1) |
+| 2 | 2.3.2 Accurate Metadata | Paid features clearly labeled in the description | New description in `store-listing.md` marks every Pro feature (§2) |
+| 3 | 1.4.1 Physical Harm | Regulatory docs for "medical hardware" — or show it isn't medical hardware | Resolution Center reply (§3) + wellness statement now in the description |
+| 4 | 3.1.2(c) Subscriptions | Functional Terms of Use (EULA) link in the metadata | Terms link now in the description; verify + screen recording (§4) |
+
+Do §1–§4, then send the combined reply in §5 with the new binary.
+
+---
+
+## §1 — Guideline 2.1(b): submit the In-App Purchases for review
+
+The subscriptions exist but were never attached to a review submission, so the
+reviewer couldn't complete the review. In App Store Connect:
+
+1. **My Apps → Autonomic → Monetization → Subscriptions** → open the group →
+   `com.autonomic.journal.yearly`.
+2. Under **App Review Information**, add:
+   - **Screenshot**: a screenshot of the in-app paywall card (the sheet from
+     `usePaywall()` — Insights tab → any AI report card raises it). It must be
+     a real device/simulator capture at an accepted size (e.g. 6.9" iPhone,
+     1320×2868). This screenshot is only for the reviewer, not the store page.
+   - **Review notes** (optional but helps): "Reachable via Insights tab → any
+     AI report card, or Analysis tab → Week/Month/Year."
+3. Repeat for `com.autonomic.journal.monthly`.
+4. Make sure each subscription's **localization** (display name + description)
+   is filled in — missing localization also blocks submission.
+5. On the **app version page**, scroll to the **In-App Purchases and
+   Subscriptions** section and **add both subscriptions to the version** so
+   they ride along with the binary review. (This section only appears before
+   the version is submitted. Both IAPs should show "Waiting for Review" once
+   the version is submitted.)
+6. Upload a new build (bump the build number; `eas build --platform ios
+   --profile production`) and select it on the version page.
+
+The first-ever review of a subscription **must** be submitted with a binary —
+that's why Apple asked for a new one even though the app itself may not have
+changed.
+
+## §2 — Guideline 2.3.2: label the paid features in the description
+
+The reviewed v1.7 metadata described Pro features (POTS testing, unlimited
+HRV, history, AI reports) without saying they're paid. The rewritten App Store
+description in `store-listing.md`:
+
+- states up front: "Features marked (Pro) below require Autonomic Pro, an
+  optional auto-renewing subscription";
+- tags each paid feature inline — the watch/POTS section header carries
+  "(Pro)", the HRV section says "One capture a day free; unlimited is Pro",
+  the analysis bullets carry "(Pro)";
+- keeps the WHAT'S FREE, WHAT'S PRO section with the exact prices
+  ($7.99/month, $49.99/year, billed to Apple ID, auto-renewing).
+
+Action: paste the new description into the version's **Description** field.
+Nothing else to do — this resolves with the metadata update.
+
+## §3 — Guideline 1.4.1: the "medical hardware" claim
+
+The reviewer concluded the app "connects to external medical hardware to
+provide medical services." That's a misread, and other HRV apps (HRV4Training,
+Elite HRV, Welltory, and every cycling app that pairs a strap) clear this by
+clarifying rather than by producing regulatory documents. The position to
+take, in one paragraph:
+
+> The only external hardware the app can connect to is a **general-purpose
+> consumer Bluetooth heart-rate monitor** (Polar-, Garmin-, Wahoo-style chest
+> straps) via the **standard public Bluetooth SIG Heart Rate profile (GATT
+> service 0x180D / characteristic 0x2A37)** — the same fitness accessories
+> every running and cycling app pairs with. These are marketed and sold as
+> sports equipment, not medical devices, and the app neither requires them
+> (the camera and Apple Watch paths work with no accessory at all — the watch
+> is read through Apple's own HealthKit) nor provides medical services: it is
+> a personal wellness journal that logs and displays the user's own data,
+> makes no diagnosis, and tells users to bring results to their doctor.
+
+Supporting changes already made so the metadata matches that position:
+
+- The description's IMPORTANT footer now says exactly this (wellness journal,
+  no medical services, straps are consumer fitness accessories, no hardware
+  required).
+- The paywall feature row no longer says "graded against clinical criteria"
+  (now "published research thresholds"), and "POTS testing" is now "POTS
+  tracking" on that card. The stand-test result screen already carries a
+  "Wellness screening only … Not a diagnosis" disclaimer, and disclaimers
+  already exist in onboarding and Settings → Legal.
+
+If the reviewer still insists after the reply, the fallback options (in order
+of preference) are: (a) request a call with App Review — this guideline is
+routinely resolved by phone; (b) appeal to the App Review Board; (c) as a last
+resort, the literal compliance path — a jurisdiction statement is already
+effectively covered by the "not medical hardware" footer, so escalation is
+more useful than more copy.
+
+**Do not** attach a strap manufacturer's regulatory filing — that concedes
+the "medical hardware" framing and invites the full 1.4.1 documentation
+burden (test reports, storefront restrictions) for hardware you don't make,
+don't sell, and don't require.
+
+## §4 — Guideline 3.1.2(c): Terms of Use link in the metadata
+
+The in-app paywall was already compliant (title, length, price, functional
+Terms + Privacy links — `src/features/Paywall.tsx`). What was missing is the
+**metadata** side: a Terms of Use link in the App Description or a custom EULA
+in ASC. Fixed by copy:
+
+- The description now ends with functional links:
+  `https://autonomic.care/terms-of-service/` and
+  `https://autonomic.care/privacy-policy/`.
+- The **Privacy Policy field** in ASC should already point at
+  `https://autonomic.care/privacy-policy/` — verify it does.
+- Since the terms are custom (not Apple's standard EULA), the description link
+  satisfies the requirement; optionally also paste the terms into App
+  Information → **License Agreement**, but the description link is sufficient.
+
+Apple asked for **a screen recording** confirming the required info once
+fixed. Record ~30 seconds on a device/simulator: open a locked surface →
+paywall card appears → show plan names, "Billed yearly/monthly", prices →
+scroll to the footer → tap **Terms** (opens the terms page) → back → tap
+**Privacy**. Attach it to the Resolution Center reply.
+
+Also add the standing note Apple requested to **App Review Information →
+Notes** — the "App Review notes (resubmission…)" block in `store-listing.md`
+includes it for this and future submissions.
+
+## §5 — The Resolution Center reply (paste, attach recording, resubmit)
+
+> Hello, and thank you for the detailed review. We've addressed all four
+> items:
+>
+> **2.1(b) — In-App Purchases:** Both auto-renewable subscriptions
+> (com.autonomic.journal.monthly, com.autonomic.journal.yearly) are now
+> submitted for review with this version, each with an App Review screenshot
+> of the paywall. A new binary is uploaded.
+>
+> **2.3.2 — Accurate Metadata:** The App Description now states up front that
+> some features require the Autonomic Pro auto-renewing subscription, marks
+> each paid feature with "(Pro)" inline, and lists exactly what is free
+> forever versus Pro, with prices.
+>
+> **3.1.2(c) — Subscriptions:** The App Description now includes a functional
+> link to our Terms of Use (https://autonomic.care/terms-of-service/)
+> alongside the Privacy Policy. In the app, the paywall already displays the
+> subscription title, length, and price, with functional Terms of Use and
+> Privacy Policy links; the attached screen recording demonstrates this.
+>
+> **1.4.1 — Physical Harm:** Respectfully, the app does not connect to
+> medical hardware and does not provide medical services. The only external
+> hardware it can pair with is a general-purpose consumer Bluetooth
+> heart-rate monitor (e.g. Polar, Garmin, or Wahoo chest straps) using the
+> standard public Bluetooth SIG Heart Rate profile (GATT service 0x180D),
+> the same fitness accessories used by running and cycling apps and sold as
+> sports equipment — not medical devices requiring regulatory clearance. No
+> external hardware is required at all: heart data can come from the iPhone
+> camera or from Apple Watch via HealthKit. Autonomic is a personal wellness
+> journal for self-tracking: it logs and displays the user's own data
+> against published research ranges, makes no diagnosis and offers no
+> treatment, and directs users to discuss results with their doctor
+> (disclaimers appear in onboarding, in Settings → Legal, and on every
+> stand-test result). The App Description now states this explicitly. This
+> is the same model used by established HRV apps on the App Store. Happy to
+> discuss on a call if helpful.
+
+## Resubmission checklist
+
+- [ ] Both subscriptions: localization filled, review screenshot attached
+- [ ] Both subscriptions added to the version page (show "Waiting for Review" after submit)
+- [ ] New build uploaded and selected (bumped build number)
+- [ ] New description pasted (from `store-listing.md`, 3,965/4,000 chars)
+- [ ] Privacy Policy field in ASC = https://autonomic.care/privacy-policy/
+- [ ] App Review notes block pasted into App Review Information → Notes
+- [ ] Screen recording of the paywall (title/length/price/Terms/Privacy) attached to the reply
+- [ ] §5 reply posted in the Resolution Center
+- [ ] Verify https://autonomic.care/terms-of-service/ and /privacy-policy/ load (they must be live at review time)
