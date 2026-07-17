@@ -33,7 +33,7 @@ chars); added dysautonomia + watch; dropped vagal tone / sdnn / symptom. Remove
 `hrv` if it's already in the app name or subtitle — those fields are indexed too.
 Do **not** add "free" — Apple indexes the price separately and it wastes chars.
 
-## What's New
+## What's New (1.13 resubmission — cumulative since 1.7)
 
 Autonomic is now free to use.
 
@@ -41,9 +41,41 @@ Every install starts with 7 days of full access. After that, journaling, your
 daily Autonomic Score, manual readings, the Apple Watch heart-rate monitor, and
 one live HRV capture a day stay free, forever, with no account.
 
+Also new since the last release:
+
+• Home-screen widgets: your score, outlook, HRV trend, and protocol checklist
+• Build your own protocol: define your "clean day" and keep the streak
+• An optional crash warning when today's numbers turn down, plus a daily
+morning reminder
+• Demo data in Progress and Insights so you can explore before you log
+• Analysis and Apple Watch refinements throughout
+
 Pro adds unlimited HRV captures, week/month/year progress, full historical
 analysis, POTS stand testing and episode tracking, and AI insights and doctor
 reports. Existing subscribers: nothing changes, you keep everything.
+
+## Subtitle (30/30 chars)
+
+Private HRV & recovery journal
+
+## Subscription product metadata (ASC → Monetization → Subscriptions)
+
+The live product copy dates from the 1.7 subscription-required era — refresh
+it. Apple limits: display name ≤ 30 chars, description ≤ 45 chars. The
+description shows on the App Store product page and in subscription
+management, so it must describe what Pro unlocks, not claim the app needs it.
+
+| Field | Yearly | Monthly |
+| --- | --- | --- |
+| Product ID | `com.autonomic.journal.yearly` | `com.autonomic.journal.monthly` |
+| Display name | `Autonomic Pro Yearly` | `Autonomic Pro Monthly` |
+| Description | `Unlimited HRV, history, POTS & AI reports` | `Unlimited HRV, history, POTS & AI reports` |
+
+Both need an **App Review screenshot** (the paywall card) and should carry the
+review note: "Reachable via Insights tab → any AI report card, or Analysis tab
+→ Week/Month/Year." Anything in the old product copy reading "required",
+"subscribe to use Autonomic", or trial-first must go — the subscription is
+optional now.
 
 ## Description (3,965/4,000 chars)
 

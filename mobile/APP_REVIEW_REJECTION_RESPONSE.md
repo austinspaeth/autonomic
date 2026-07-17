@@ -189,12 +189,67 @@ includes it for this and future submissions.
 > is the same model used by established HRV apps on the App Store. Happy to
 > discuss on a call if helpful.
 
+## §6 — Refresh the rest of the 1.7-era store data
+
+Everything in the ASC record still reflects the subscription-required 1.7
+app. Sweep all of it in the same pass — stale trial-era copy anywhere is
+another 2.3.2 rejection waiting. Field by field (paste sources in
+`store-listing.md`):
+
+**App Information (rarely-touched fields):**
+
+- **Name** — `Autonomic: HRV & POTS Tracker` stays.
+- **Subtitle** — set to the freemium-era line: `Private HRV & recovery
+  journal` (30/30). If the current subtitle mentions the trial or a
+  subscription, this is mandatory, not optional.
+- **Privacy Policy URL** — must be `https://autonomic.care/privacy-policy/`.
+- **License Agreement (EULA)** — either leave Apple's standard agreement (the
+  description now links our custom terms anyway) or paste the custom terms
+  here. Don't leave a stale 1.7-era custom EULA in place.
+
+**Version page:**
+
+- **Description** — the new 3,965-char freemium description (§2).
+- **Promotional text** — paste the freemium promo line. This field updates
+  without review, so do it immediately, even before resubmitting.
+- **Keywords** — paste the current 98-char set from `store-listing.md`.
+- **What's New** — use the cumulative 1.7 → 1.13 block from
+  `store-listing.md`; reviewers read this, and it must not promise
+  trial-first behavior.
+- **Screenshots** — audit every panel, iPhone and Apple Watch: any caption
+  reading "7-day free trial", "subscription required", or showing pre-1.9 UI
+  gets recaptured. The screenshot plan in `store-listing.md` has the shot
+  list; consider one panel showing the Free vs Pro comparison grid.
+- **App Review Information** — new notes block (§4), contact info current.
+
+**Monetization → Subscriptions (the 1.7-era product copy):**
+
+- **Display names / descriptions** — refresh both products per the
+  subscription-metadata table in `store-listing.md` (`Autonomic Pro Yearly` /
+  `Autonomic Pro Monthly`, description "Unlimited HRV, history, POTS & AI
+  reports", 45-char limit). Any product copy implying the app requires the
+  subscription must go.
+- **Review screenshot + note** on each product (§1).
+- **Introductory offers (7-day trials)** — leave them ACTIVE for this
+  submission. The order in `STORE_SETUP.md` Part 3 still applies: end the
+  offers only after the freemium build is *released*, or everyone still on
+  1.7 hits a trial-less hard paywall. The paywall CTA adjusts itself via
+  `hasTrial()` either way.
+- **Prices** — unchanged ($7.99 / $49.99); confirm they match the
+  description, which now states them.
+
+**Unchanged (verify, don't edit):** privacy nutrition labels (still collects
+nothing), age rating, category, pricing of the app itself (Free).
+
 ## Resubmission checklist
 
-- [ ] Both subscriptions: localization filled, review screenshot attached
+- [ ] Both subscriptions: display name + description refreshed (`Autonomic Pro Yearly` / `Monthly`, no "required" language), review screenshot + note attached
 - [ ] Both subscriptions added to the version page (show "Waiting for Review" after submit)
-- [ ] New build uploaded and selected (bumped build number)
+- [ ] Intro trial offers still ACTIVE (end them only after the freemium build is released — `STORE_SETUP.md` Part 3)
+- [ ] New build from current `main` uploaded and selected; `FORCE_TIER` null, `PREVIEW_PAYWALL` false
 - [ ] New description pasted (from `store-listing.md`, 3,965/4,000 chars)
+- [ ] Subtitle, promotional text, keywords, What's New all pasted from `store-listing.md` — no trial-era copy anywhere
+- [ ] Screenshots audited: nothing shows "free trial" / "subscription required" / pre-1.9 UI
 - [ ] Privacy Policy field in ASC = https://autonomic.care/privacy-policy/
 - [ ] App Review notes block pasted into App Review Information → Notes
 - [ ] Screen recording of the paywall (title/length/price/Terms/Privacy) attached to the reply
