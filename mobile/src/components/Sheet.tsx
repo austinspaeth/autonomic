@@ -12,13 +12,13 @@
  */
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import {
-  BackHandler, Dimensions, Keyboard, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View,
+  BackHandler, Keyboard, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View,
 } from 'react-native';
 import Animated, {
   Easing, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming,
 } from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaFrame, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { radius, usePalette } from '../theme';
 import { notifyChartsBlur } from './charts';
 import { Icon } from './Icon';
@@ -146,7 +146,6 @@ function SheetHost({ children, onRequestClose }: { children: React.ReactNode; on
   );
 }
 
-const SCREEN_H = Dimensions.get('window').height;
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 function SheetView({ entry, isTop, behind, closing, requestClose, onExited, closeAll }: {
@@ -155,6 +154,14 @@ function SheetView({ entry, isTop, behind, closing, requestClose, onExited, clos
 }) {
   const p = usePalette();
   const insets = useSafeAreaInsets();
+  // Size against the ACTUAL container frame, not a module-level Dimensions
+  // snapshot. On Android the sheet host is a full-screen absoluteFill View in
+  // the (edge-to-edge) activity window, but `Dimensions.get('window').height`
+  // is device-inconsistent there — some devices subtract the status/nav bars,
+  // some don't — so a snapshot made the card open to a device-dependent height.
+  // useSafeAreaFrame() reports the frame the provider actually occupies (the
+  // same area the host fills) and is reactive to rotation.
+  const SCREEN_H = useSafeAreaFrame().height;
   const translateY = useSharedValue(SCREEN_H);
   const exiting = useRef(false);
   // 0 = front-most, 1 = pushed back behind a sheet stacked on top. Driven by the
@@ -234,7 +241,7 @@ function SheetView({ entry, isTop, behind, closing, requestClose, onExited, clos
     const s = Keyboard.addListener(ios ? 'keyboardWillShow' : 'keyboardDidShow', onShow);
     const h = Keyboard.addListener(ios ? 'keyboardWillHide' : 'keyboardDidHide', onHide);
     return () => { s.remove(); h.remove(); };
-  }, [kb, kbSpace]);
+  }, [kb, kbSpace, SCREEN_H]);
 
   // Play the exit the moment we're flagged closing. The card beneath is already
   // returning (its `behind` flipped false), so the two animate simultaneously.
@@ -245,7 +252,7 @@ function SheetView({ entry, isTop, behind, closing, requestClose, onExited, clos
         if (fin) runOnJS(onExited)();
       });
     }
-  }, [closing, onExited, translateY]);
+  }, [closing, onExited, translateY, SCREEN_H]);
 
   const dismiss = requestClose;
 

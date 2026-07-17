@@ -88,11 +88,25 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
     const worst = daily.reduce((a, b) => (b.sc < a.sc ? b : a), daily[0]);
     const avg = acMean(vals)!;
     const mdy = (dk: string) => `${+dk.slice(5, 7)}/${+dk.slice(8, 10)}`; // "2026-07-30" → "7/30"
+    // Readout follows the most recent bucket with a score (like the POTS cards):
+    // the score in its grade colour, the rolling average beside it, the date after.
+    let li = -1; vals.forEach((v, i) => { if (v != null) li = i; });
+    const cur = li >= 0 ? vals[li] : null;
+    const curRoll = li >= 0 ? roll[li] : null;
+    const avgLabel = `${win} ${mode === 'day' ? 'day' : mode === 'week' ? 'week' : mode === 'month' ? 'month' : 'year'} avg`;
     const cards: AnalysisCard[] = [{
       title: 'Autonomic Outlook', sub: range,
       desc: 'Your daily autonomic score over the range, with a rolling average to smooth the noise.',
       help: 'Each day is scored 0–100 from everything you logged that day (HRV readings, vitals, symptoms and sleep) using the recovery framework\'s thresholds. The dashed line is a rolling average, which is usually the better trend to watch: single days swing, the rolling line tells the story.',
-      charts: [{ label: 'Daily score', series: [series(vals, SCORE_COLORS.great, 'Score', { pointBands: null }), series(roll, '#9a9aa0', `${win}-pt avg`, { dashed: true })], zones: acScoreZones(), integer: true }],
+      metricsRow: {
+        metrics: [
+          cur != null ? { label: 'Score', value: Math.round(cur), color: scoreCat(cur).color } : null,
+          curRoll != null ? { label: avgLabel, value: Math.round(curRoll), color: '#9a9aa0' } : null,
+        ].filter(Boolean) as MetricsRow['metrics'],
+        suffix: li >= 0 ? `(${buckets[li].label})` : undefined,
+        zones: true,
+      },
+      charts: [{ label: '', series: [series(vals, SCORE_COLORS.great, 'Score', { pointBands: null }), series(roll, '#9a9aa0', avgLabel, { dashed: true })], zones: acScoreZones(), integer: true }],
       tiles: true,
       stats: [
         { label: 'Average', value: Math.round(avg), color: scoreCat(avg).color },

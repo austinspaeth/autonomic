@@ -9,12 +9,11 @@ import Svg, { Defs, LinearGradient as SvgGradient, Rect, Stop } from 'react-nati
 import Animated, { Easing, Extrapolation, interpolate, useAnimatedProps, useAnimatedStyle, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
 import { ScoreGauge } from '../components/charts';
 import { Icon } from '../components/Icon';
-import { SheetControls, useSheets } from '../components/Sheet';
+import { useSheets } from '../components/Sheet';
 import { SumCard, MetricRow } from '../components/summary';
 import { MilestoneProgressCard } from './Milestones';
 import { ProtocolEditor } from './ProtocolEditor';
-import { Button } from '../components/ui';
-import { fonts, radius, type as T, usePalette } from '../theme';
+import { radius, type as T, usePalette } from '../theme';
 import { SCORE_COLORS, GRADE_LABEL, GRADE_PTS, catFromBands } from '../lib/scoring';
 import {
   OUTLOOK_GUIDE, TOMORROW, SCORE_TIPS, blueZone, protocolCriteria, readingPeriod, resolveProtocol,
@@ -186,7 +185,7 @@ export function DaySummary({ dk }: { dk: string }) {
         {!scored ? (
           <UnscoredHero dk={dk} hasReadings={readings.length > 0} />
         ) : (
-          <ScoredHero dk={dk} readings={readings} d={d} all={all} ctx={ctx} onExplain={() => openSheet((c) => <ScoreExplain all={all} dk={dk} controls={c} />)} />
+          <ScoredHero dk={dk} readings={readings} d={d} all={all} ctx={ctx} onExplain={() => openSheet(() => <ScoreExplain all={all} dk={dk} />)} />
         )}
       </GradientBorderCard>
       {tier === 'free' ? <ProUpsellCard /> : null}
@@ -278,8 +277,8 @@ function ScoredHero({ dk, readings, d, all, ctx, onExplain }: { dk: string; read
       </View>
       <View style={{ alignItems: 'center', marginVertical: 8 }}>
         <ScoreGauge score={all.score!} color={cat.color}>
-          <Text style={{ fontSize: 57, fontFamily: fonts.numHeavy, color: p.text, fontVariant: ['tabular-nums'], letterSpacing: -1 }}>{all.score}</Text>
-          <Text style={{ fontSize: 10, fontWeight: '700', letterSpacing: 1, color: p.textDim, marginTop: 4 }}>OUT OF 100</Text>
+          <Text style={{ fontSize: 57, fontWeight: '800', color: p.text, fontVariant: ['tabular-nums'], letterSpacing: -1, lineHeight: 57, marginTop: 8 }}>{all.score}</Text>
+          <Text style={{ fontSize: 10, fontWeight: '700', letterSpacing: 1, color: p.textDim, marginTop: -2 }}>OUT OF 100</Text>
         </ScoreGauge>
         {delta != null && Math.abs(delta) >= 3 ? (
           <Text style={{ fontSize: 12, fontWeight: '800', color: delta > 0 ? SCORE_COLORS.good : SCORE_COLORS.bad, fontVariant: ['tabular-nums'], marginTop: -18 }}>
@@ -620,7 +619,7 @@ function zoneAdvice(raw: number | null, bands: Band[] | null, unit?: string) {
   return { cur, ideal, done: false, dir };
 }
 
-function ScoreExplain({ all, dk, controls }: { all: ScoreSetResult; dk: string; controls: SheetControls }) {
+function ScoreExplain({ all, dk }: { all: ScoreSetResult; dk: string }) {
   const p = usePalette();
   const cat = scoreCat(all.score!);
   const ptsToCat = (pt: number): ScoreCat => (pt >= 88 ? 'great' : pt >= 70 ? 'good' : pt >= 48 ? 'ok' : pt >= 23 ? 'bad' : 'crash');
@@ -642,6 +641,39 @@ function ScoreExplain({ all, dk, controls }: { all: ScoreSetResult; dk: string; 
     return c.detail.note || SCORE_TIPS[c.label] || '';
   };
 
+  // Confidence is the share of the full input set that was available today.
+  // Anything below is a component the score never saw, so it's what we're
+  // unsure of — group the missing inputs by the single action that captures
+  // them and show the confidence each would restore.
+  const CONF_INPUTS: { label: string; w: number; src: string }[] = [
+    { label: 'HRV (RMSSD)', w: 25, src: 'hrv' },
+    { label: 'Total power', w: 15, src: 'guided' },
+    { label: 'pNN50', w: 10, src: 'guided' },
+    { label: 'VLF power', w: 10, src: 'guided' },
+    { label: 'LF peak', w: 10, src: 'guided' },
+    { label: 'Blood pressure', w: 8, src: 'bp' },
+    { label: 'Resting HR', w: 7, src: 'rhr' },
+    { label: 'Sleep', w: 8, src: 'sleep' },
+    { label: 'Activity', w: 2, src: 'activity' },
+  ];
+  const CONF_SOURCES: Record<string, string> = {
+    guided: 'Capture a guided HRV reading',
+    hrv: 'Take an HRV reading',
+    bp: 'Log a blood pressure reading',
+    rhr: 'Log a resting heart rate',
+    sleep: 'Log last night’s sleep',
+    activity: 'Log today’s activity',
+  };
+  const present = new Set(comps.map((c) => c.label));
+  const missing = CONF_INPUTS.filter((f) => !present.has(f.label));
+  const confGaps = Object.keys(CONF_SOURCES)
+    .map((src) => {
+      const items = missing.filter((m) => m.src === src);
+      return { src, action: CONF_SOURCES[src], w: items.reduce((s, m) => s + m.w, 0), labels: items.map((m) => m.label) };
+    })
+    .filter((g) => g.w > 0)
+    .sort((a, b) => b.w - a.w);
+
   return (
     <View>
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 16 }}>How this was calculated</Text>
@@ -654,8 +686,8 @@ function ScoreExplain({ all, dk, controls }: { all: ScoreSetResult; dk: string; 
         </View>
         <View style={{ alignItems: 'center', marginVertical: 8 }}>
           <ScoreGauge score={all.score!} color={cat.color}>
-            <Text style={{ fontSize: 57, fontFamily: fonts.numHeavy, color: p.text, fontVariant: ['tabular-nums'], letterSpacing: -1 }}>{all.score}</Text>
-            <Text style={{ fontSize: 10, fontWeight: '700', letterSpacing: 1, color: p.textDim, marginTop: 4 }}>OUT OF 100</Text>
+            <Text style={{ fontSize: 57, fontWeight: '800', color: p.text, fontVariant: ['tabular-nums'], letterSpacing: -1, lineHeight: 57, marginTop: 8 }}>{all.score}</Text>
+            <Text style={{ fontSize: 10, fontWeight: '700', letterSpacing: 1, color: p.textDim, marginTop: -2 }}>OUT OF 100</Text>
           </ScoreGauge>
         </View>
         <Text style={{ textAlign: 'center', fontSize: 13, color: p.textDim, fontWeight: '600' }}>{`Confidence ${all.confidence}%, the share of the full input set available to score today.`}</Text>
@@ -668,8 +700,19 @@ function ScoreExplain({ all, dk, controls }: { all: ScoreSetResult; dk: string; 
           <MetricRow key={c.label} label={c.label} value={`+${gain.toFixed(1)} pt`} cat={c.cat} explain={improveLine(c)} />
         )) : <MetricRow label="At the ceiling" value="" cat={false} explain="Every scored input is already in its top zone. Keep the inputs consistent to hold it." />}
       </SumCard>
-      <View style={{ height: 8 }} />
-      <Button title="Close" onPress={controls.close} />
+      <SumCard title="What would raise confidence">
+        {confGaps.length ? confGaps.map((g) => (
+          <MetricRow
+            key={g.src}
+            label={g.action}
+            value={`+${g.w}%`}
+            cat={false}
+            explain={`Not captured today, so the score is estimated without ${g.labels.join(', ')}. Adding it would raise confidence by about ${g.w} points.`}
+          />
+        )) : (
+          <MetricRow label="Full input set logged" value="" cat={false} explain="Every scored input was available today, so nothing is missing. This is as confident as the score gets." />
+        )}
+      </SumCard>
       <View style={{ height: 24 }} />
     </View>
   );

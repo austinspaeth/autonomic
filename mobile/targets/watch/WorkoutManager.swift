@@ -6,74 +6,87 @@ import HealthKit
  * workout frequency and keeps the app frontmost — watchOS returns to it on
  * wrist-raise instead of the clock face while a session runs.
  *
- * Two modes, both a `.mindAndBody` workout:
+ * Two modes:
  *
- * `.monitor` (the free HR monitor) is PAUSED the entire time (the TachyMon
- * model): a paused session still streams heart rate and still owns the
- * frontmost slot, but accrues no active duration — so hours of monitoring
- * add no exercise minutes and no workout-rate calorie burn to Apple Health.
- * The session auto-pauses the instant it reaches `.running`, and a
- * zero-length resume→pause "kick" fires at 0:30 and at :00/:30 past every
- * 10 minutes (TachyMon's exact cadence) to keep the sensor armed. The cost
- * of pausing: HealthKit only writes HR samples every ~5 s.
+ * `.monitor` (the free HR monitor) is a `.mindAndBody` workout PAUSED the
+ * entire time (the TachyMon model): a paused session still streams heart
+ * rate and still owns the frontmost slot, but accrues no active duration —
+ * so hours of monitoring add no exercise minutes and no workout-rate calorie
+ * burn to Apple Health. The session auto-pauses the instant it reaches
+ * `.running`, and a zero-length resume→pause "kick" fires at 0:30 and at
+ * :00/:30 past every 10 minutes (TachyMon's exact cadence) to keep the
+ * sensor armed.
  *
- * `.capture` (the POTS stand test + orthostatic episode) leaves the session
- * RUNNING so HR lands at ~1 Hz — these are short, bounded tests where a
- * fast rise must show within a beat or two, and the ~5 s paused cadence
- * lagged the critical first seconds of standing. The trade-off is deliberate:
- * a running session accrues real active duration, so the saved workout
- * carries the test's minutes (and a modest calorie estimate).
+ * `.capture` (the POTS stand test + orthostatic episode) is an `.other`
+ * workout left RUNNING so samples surface with the lowest latency HealthKit
+ * offers — these are short, bounded tests where a fast rise must show the
+ * moment the sensor sees it. The trade-off is deliberate: a running session
+ * accrues real active duration, so the saved workout carries the test's
+ * minutes (and a modest calorie estimate).
  *
- * HR delivery is per mode. Monitor reads the health store via an
- * HKAnchoredObjectQuery — the only path that works while paused (a paused
- * builder collects nothing). Capture ingests from the live builder's
- * didCollectDataOf: store commits are batched (~5 s or slower even during a
- * running session), so the anchored query would throw away exactly the
- * latency a running session is paid for. On stop the workout IS saved rather
- * than discarded, so a system-finalized session after a crash matches what
- * stop() would have left behind.
+ * HR delivery is dual-path. Both modes run an HKAnchoredObjectQuery against
+ * the health store — the only path that works while paused (a paused builder
+ * collects nothing) and the safety net if the builder delegate goes quiet.
+ * Capture ALSO ingests from the live builder's didCollectDataOf, which
+ * surfaces each sample as the sensor commits it — store writes are batched
+ * (~5 s or slower), so the builder path is the latency a running session is
+ * paid for. The two feeds dedupe by sample end date, so no sample is shown
+ * twice and a late store commit can't roll the display back.
  *
- * Smoothing is per mode. Capture (~1 Hz) takes the median of the last 3 raw
- * samples — spike rejection costs only ~1–2 s there and protects the recorded
- * series' peak values. Monitor (~5 s cadence) shows each sample as-is: watch
- * HR samples are already sensor-fused averages, and a median-of-3 at that
- * cadence would trail a real change by an extra ~10 s. Staleness is judged
- * per mode's expected cadence: `searching` flips when no fresh sample lands
- * in 12 s monitoring / 5 s capturing (consumers suspend delta math + buzzes
- * while it's true); `signalLost` is the visual version at 18 s / 10 s — UI
- * code greys on `signalLost`, never on `searching`, so a skipped sample or
- * two never greys the screen. Spurious 0-bpm samples are ignored outright
- * (the stale timer catches a genuine loss).
+ * No smoothing in either mode: watch HR samples are already sensor-fused
+ * averages, and at the ~5 s cadence the optical sensor actually produces
+ * (even in a running session it rarely beats that) any median window trails
+ * a real rise by 10 s+ — exactly the seconds a POTS capture exists to
+ * record. Every fresh sample shows the moment it lands. Staleness is judged
+ * against that ~5 s cadence: `searching` flips when no fresh sample lands in
+ * 10 s capturing / 12 s monitoring, i.e. ~2 missed samples (consumers
+ * suspend delta math + buzzes while it's true); `signalLost` is the visual
+ * version at 15 s / 18 s — UI code greys on `signalLost`, never on
+ * `searching`, so one skipped sample never greys the screen. Spurious 0-bpm
+ * samples are ignored outright (the stale timer catches a genuine loss).
  *
- * Self-heal: watchOS occasionally kills or ends the workout session in the
- * background. While streaming is wanted, a watchdog rebuilds the session
- * whenever it lands in .ended/.stopped, errors out, or goes >30 s without a
- * sample — rate-limited so a genuinely absent wrist doesn't restart-loop.
+ * Self-heal, because a session must never sit on "00" until an app restart:
+ * - watchOS occasionally kills or ends the session in the background: the
+ *   1 Hz watchdog rebuilds the session AND the query whenever the session
+ *   dies, errors out, or goes >30 s without a sample (45 s before the first
+ *   sample — initial sensor lock is slow and restarting mid-lock only
+ *   delays it). Rate-limited so an absent wrist doesn't restart-loop.
+ * - The anchored query can be born dead: executed before the user answered
+ *   the Health permission prompt, it errors once and never fires again.
+ *   That was the old "grey 00 until app restart" state — recoveries only
+ *   rebuilt the session, never the dead query. Now a query error rebuilds
+ *   the query (rate-limited), recover() always rebuilds both halves, and
+ *   authorization completing while a sample-less stream wants data forces an
+ *   immediate recovery instead of waiting out the watchdog leash.
+ * - start() in a mode other than the live session's tears the old session
+ *   down first (saving it) and rebuilds in the new mode, so a POTS capture
+ *   can never silently inherit the monitor's paused session.
  * Held display values are never cleared by a recovery, only by stop().
  *
  * stop()→start() back-to-back is safe: stop() releases the session
  * synchronously (so a new start() is never a silent no-op against a corpse
  * awaiting its HealthKit save callback) and its async display reset is
  * generation-guarded so a stop that raced a fresh start can't clobber the
- * new session's state. This used to be the "grey 00 until app restart" bug —
- * the lost start() left wantsStreaming false, which also disarmed the
- * watchdog that would otherwise have healed it.
+ * new session's state.
  */
 final class WorkoutManager: NSObject, ObservableObject {
     static let shared = WorkoutManager()
 
     enum StreamMode {
-        /// Paused session, ~5 s samples, no active duration (the HR monitor).
+        /// Paused session, no active duration (the HR monitor).
         case monitor
-        /// Running session, ~1 Hz samples, accrues real duration (POTS captures).
+        /// Running session, lowest-latency samples, accrues real duration
+        /// (POTS captures).
         case capture
     }
 
     /// No fresh sample for this long → `searching` (suspend deltas/buzzes).
-    /// Scaled to the mode's cadence: ~2–3 missed samples either way.
-    private var searchingAfter: TimeInterval { mode == .capture ? 5 : 12 }
+    /// Both scale to the sensor's real ~5 s cadence (~2 missed samples);
+    /// capture runs slightly tighter so a test never does delta math on a
+    /// stale reading.
+    private var searchingAfter: TimeInterval { mode == .capture ? 10 : 12 }
     /// No fresh sample for this long → `signalLost` (UI greys the held value).
-    private var signalLostAfter: TimeInterval { mode == .capture ? 10 : 18 }
+    private var signalLostAfter: TimeInterval { mode == .capture ? 15 : 18 }
     /// No fresh sample for this long → rebuild the session (self-heal).
     private static let recoverLeash: TimeInterval = 30
     /// Longer first-sample leash: initial sensor lock can be slow, and
@@ -87,7 +100,12 @@ final class WorkoutManager: NSObject, ObservableObject {
     private var builder: HKLiveWorkoutBuilder?
     private var hrQuery: HKAnchoredObjectQuery?
     private var hrAnchor: HKQueryAnchor?
-    private var recent: [Double] = []
+    /// When start() began this stream — the anchored query's capture window
+    /// (survives session rebuilds; a rebuilt query re-covers the same span).
+    private var streamBeganAt: Date?
+    /// End date of the newest ingested sample — dedupes the two delivery
+    /// paths, which can hand over the same sample.
+    private var lastIngestEnd: Date?
     /// Last real sample, across session rebuilds — staleness/greying key off
     /// this so a recovery never un-greys a genuinely stale value.
     private var lastSampleAt: Date?
@@ -101,6 +119,11 @@ final class WorkoutManager: NSObject, ObservableObject {
     private var generation = 0
     private var sessionBeganAt: Date?
     private var lastRecoverAt: Date?
+    private var lastQueryRestartAt: Date?
+    /// Set when the anchored query errors (it will never fire again). Sticky:
+    /// the 1 Hz tick keeps retrying the rebuild until one takes, so an error
+    /// landing inside the restart rate limit isn't silently dropped.
+    private var hrQueryDead = false
     /// 1 Hz tick count since start() — drives the resume→pause kick schedule.
     private var ticks = 0
 
@@ -115,29 +138,52 @@ final class WorkoutManager: NSObject, ObservableObject {
         guard HKHealthStore.isHealthDataAvailable() else { return }
         let read: Set<HKObjectType> = [HKQuantityType.quantityType(forIdentifier: .heartRate)!]
         let share: Set<HKSampleType> = [HKObjectType.workoutType()]
-        store.requestAuthorization(toShare: share, read: read) { _, _ in }
+        store.requestAuthorization(toShare: share, read: read) { [weak self] _, _ in
+            DispatchQueue.main.async {
+                // If streaming started before the user answered the permission
+                // prompt, the session and/or query were born dead. Rebuild
+                // both now instead of waiting out the watchdog leash.
+                guard let self, self.wantsStreaming, !self.sampleThisSession else { return }
+                self.lastRecoverAt = nil
+                self.recover()
+            }
+        }
     }
 
     func start(mode: StreamMode = .monitor) {
-        guard session == nil else { return }
+        if session != nil {
+            // Already streaming in this mode — nothing to do.
+            guard self.mode != mode else { return }
+            // Mode switch against a live session (e.g. a POTS capture right
+            // behind a still-closing monitor): tear it down properly so the
+            // new mode's session model actually applies — the old silent
+            // no-op left captures on the monitor's paused ~5 s session.
+            stop()
+        }
         self.mode = mode
         generation += 1
         wantsStreaming = true
         lastRecoverAt = nil
+        lastQueryRestartAt = nil
+        hrQueryDead = false
         ticks = 0
         // Fresh session, fresh bookkeeping — a quick restart may have skipped
         // the previous stop()'s reset (generation guard), so clear here too.
-        recent = []
         lastSampleAt = nil
+        lastIngestEnd = nil
         beginSession()
-        // Monitor's delivery path; capture gets HR from the builder delegate.
-        if mode == .monitor { startHrQuery(from: Date()) }
+        // The store query runs in BOTH modes: monitor's only feed, capture's
+        // safety net under the builder delegate.
+        let began = Date()
+        streamBeganAt = began
+        startHrQuery(from: began)
         DispatchQueue.main.async {
             self.hr = nil
             self.running = true
             self.searching = true
             self.signalLost = false
         }
+        staleTimer?.invalidate()
         staleTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             self?.tick()
         }
@@ -164,8 +210,8 @@ final class WorkoutManager: NSObject, ObservableObject {
             sampleThisSession = false
             s.startActivity(with: start)
             b.beginCollection(withStart: start) { _, _ in }
-            // The delegate pauses it the moment it reaches .running — the
-            // workout spends its whole life paused (see the class doc).
+            // Monitor mode: the delegate pauses it the moment it reaches
+            // .running — that workout spends its whole life paused.
         } catch {
             session = nil
             builder = nil
@@ -192,8 +238,8 @@ final class WorkoutManager: NSObject, ObservableObject {
         let reset = { [weak self] in
             DispatchQueue.main.async {
                 guard let self, self.generation == gen else { return }
-                self.recent = []
                 self.lastSampleAt = nil
+                self.lastIngestEnd = nil
                 self.hr = nil
                 self.searching = true
                 self.signalLost = false
@@ -222,6 +268,7 @@ final class WorkoutManager: NSObject, ObservableObject {
         if mode == .monitor, ticks % 600 == 30 || (ticks % 600 == 0 && ticks > 0) {
             kick()
         }
+        if hrQueryDead { restartHrQuery() }
         checkStale()
     }
 
@@ -257,11 +304,11 @@ final class WorkoutManager: NSObject, ObservableObject {
         }
     }
 
-    /// Tear down whatever is left of the current session and start a fresh one,
-    /// keeping the published (held) values intact. Rate-limited to one attempt
-    /// per 15 s so a removed watch doesn't churn sessions. Monitor's HR query
-    /// keeps running across recoveries — it watches the store, not the
-    /// session; capture's builder delegate reattaches with the new session.
+    /// Tear down whatever is left of the current session and start a fresh
+    /// one, keeping the published (held) values intact. Rate-limited to one
+    /// attempt per 15 s so a removed watch doesn't churn sessions. The HR
+    /// query is rebuilt alongside — it can be the dead half (see the class
+    /// doc); the kept anchor means no re-ingest of already-seen samples.
     private func recover() {
         guard wantsStreaming else { return }
         if let lastRecoverAt, Date().timeIntervalSince(lastRecoverAt) < 15 { return }
@@ -275,25 +322,37 @@ final class WorkoutManager: NSObject, ObservableObject {
         // only stop() saves the workout.
         oldBuilder?.endCollection(withEnd: Date()) { _, _ in oldBuilder?.discardWorkout() }
         beginSession()
+        lastQueryRestartAt = nil
+        restartHrQuery()
     }
 
     // MARK: - HR intake (anchored query on the health store)
 
-    /// Monitor-mode delivery: the sensor writes heart-rate samples to the
-    /// store for as long as the session exists — paused included — but the
-    /// commits are batched (~5 s), so this path only serves the mode that can
-    /// live with that cadence. Capture ingests from the builder delegate.
+    /// Store-watcher feed, both modes: the sensor writes heart-rate samples
+    /// to the store for as long as the session exists — paused included —
+    /// but the commits are batched (~5 s or slower). Monitor lives entirely
+    /// on this path; capture uses it as backfill under the builder delegate
+    /// (the end-date dedupe in ingest keeps the two honest).
     private func startHrQuery(from start: Date) {
         guard let hrType = HKQuantityType.quantityType(forIdentifier: .heartRate) else { return }
         let predicate = HKQuery.predicateForSamples(withStart: start, end: nil, options: [])
-        let handler: (HKAnchoredObjectQuery, [HKSample]?, [HKDeletedObject]?, HKQueryAnchor?, Error?) -> Void = { [weak self] _, samples, _, anchor, _ in
+        let handler: (HKAnchoredObjectQuery, [HKSample]?, [HKDeletedObject]?, HKQueryAnchor?, Error?) -> Void = { [weak self] query, samples, _, anchor, error in
             DispatchQueue.main.async {
-                guard let self, self.wantsStreaming else { return }
+                guard let self, self.wantsStreaming, query === self.hrQuery else { return }
+                if error != nil {
+                    // An errored anchored query NEVER fires again (classic
+                    // cause: executed before Health authorization was
+                    // determined). Leaving it dead was the unrecoverable
+                    // "00" state — replace it.
+                    self.hrQueryDead = true
+                    self.restartHrQuery()
+                    return
+                }
                 self.hrAnchor = anchor
                 guard let quantities = samples as? [HKQuantitySample], !quantities.isEmpty else { return }
                 let unit = HKUnit.count().unitDivided(by: .minute())
                 for sample in quantities.sorted(by: { $0.endDate < $1.endDate }) {
-                    self.ingest(sample.quantity.doubleValue(for: unit))
+                    self.ingest(sample.quantity.doubleValue(for: unit), endingAt: sample.endDate)
                 }
             }
         }
@@ -306,25 +365,37 @@ final class WorkoutManager: NSObject, ObservableObject {
         store.execute(query)
     }
 
+    /// Stop and re-execute the anchored query. Rate-limited: a query that
+    /// errors instantly (authorization still undetermined) would otherwise
+    /// rebuild itself in a tight loop.
+    private func restartHrQuery() {
+        guard wantsStreaming else { return }
+        if let lastQueryRestartAt, Date().timeIntervalSince(lastQueryRestartAt) < 5 { return }
+        lastQueryRestartAt = Date()
+        hrQueryDead = false
+        if let q = hrQuery { store.stop(q) }
+        hrQuery = nil
+        startHrQuery(from: streamBeganAt ?? Date())
+    }
+
     /// Main-thread only (the query handler and delegates hop here first).
-    private func ingest(_ bpm: Double) {
+    private func ingest(_ bpm: Double, endingAt end: Date?) {
         // A 0-bpm sample is sensor noise, not proof of loss — drop it and let
         // the stale timer decide.
         guard bpm > 0 else { return }
+        // The two delivery paths can hand over the same sample; its end date
+        // dedupes them and drops store-commit stragglers older than what the
+        // builder already showed.
+        if let end {
+            if let last = lastIngestEnd, end <= last { return }
+            lastIngestEnd = end
+        }
         lastSampleAt = Date()
         sampleThisSession = true
-        if mode == .capture {
-            // ~1 Hz: median of the last 3 rejects a single spurious reading
-            // for ~1–2 s of lag, and keeps a lone spike out of the recorded
-            // series' peak values.
-            recent.append(bpm)
-            if recent.count > 3 { recent.removeFirst(recent.count - 3) }
-            hr = recent.sorted(by: <)[recent.count / 2]
-        } else {
-            // ~5 s cadence: each sample is already a sensor-fused average, and
-            // a median-of-3 here would trail a real change by an extra ~10 s.
-            hr = bpm
-        }
+        // Shown as-is: watch HR samples are already sensor-fused averages,
+        // and any median window at the sensor's real ~5 s cadence would trail
+        // a real rise by 10 s+ (see the class doc).
+        hr = bpm
         searching = false
         signalLost = false
     }
@@ -339,7 +410,8 @@ extension WorkoutManager: HKWorkoutSessionDelegate {
                 // Monitor mode never actually runs: pause immediately on start
                 // and immediately after every kick's resume (zero-length
                 // active interval → no calories, no exercise minutes).
-                // Capture mode stays running — that's what buys ~1 Hz samples.
+                // Capture mode stays running — that's what buys the builder's
+                // low-latency samples.
                 if self.wantsStreaming && self.mode == .monitor { workoutSession.pause() }
             case .ended, .stopped:
                 // watchOS ended the session while we still want the stream.
@@ -359,10 +431,10 @@ extension WorkoutManager: HKWorkoutSessionDelegate {
 }
 
 extension WorkoutManager: HKLiveWorkoutBuilderDelegate {
-    /// Capture-mode delivery: a running builder surfaces each sample the
-    /// moment the sensor produces it (~1 Hz), no waiting on store commits.
-    /// Monitor mode ignores it — a kick's momentary .running can collect a
-    /// sample, and the anchored query already owns that mode's intake.
+    /// Capture-mode delivery: a running builder surfaces each sample as the
+    /// sensor commits it, no waiting on batched store writes. Monitor mode
+    /// ignores it — a kick's momentary .running can collect a sample, and
+    /// the anchored query already owns that mode's intake.
     func workoutBuilder(_ workoutBuilder: HKLiveWorkoutBuilder, didCollectDataOf collectedTypes: Set<HKSampleType>) {
         guard let hrType = HKQuantityType.quantityType(forIdentifier: .heartRate),
               collectedTypes.contains(hrType) else { return }
@@ -371,7 +443,10 @@ extension WorkoutManager: HKLiveWorkoutBuilderDelegate {
                   workoutBuilder === self.builder,
                   let stats = workoutBuilder.statistics(for: hrType),
                   let quantity = stats.mostRecentQuantity() else { return }
-            self.ingest(quantity.doubleValue(for: HKUnit.count().unitDivided(by: .minute())))
+            self.ingest(
+                quantity.doubleValue(for: HKUnit.count().unitDivided(by: .minute())),
+                endingAt: stats.mostRecentQuantityDateInterval()?.end
+            )
         }
     }
 

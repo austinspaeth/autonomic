@@ -7,9 +7,11 @@ import WatchKit
  *
  * picker → intro → baseline (capture resting HR before the move) → during
  * (the transition itself; a tap ends it) → recovery (60 s) → complete. The
- * baseline is the mean HR captured during the baseline stage; `afterHr` is the
- * HR the moment the transition ends; `hr1min` is the HR at the end of the 60 s
- * recovery. Live delta = current HR − baseline, shown from `during` onward.
+ * baseline is the mean HR over the LAST 30 s of the baseline stage — the rate
+ * the user actually transitioned from, not the settling period right after
+ * they started the flow; `afterHr` is the HR the moment the transition ends;
+ * `hr1min` is the HR at the end of the 60 s recovery. Live delta = current
+ * HR − baseline, shown from `during` onward.
  *
  * The result maps onto the app's existing `orthostatic` reading type
  * (transition / beforeHr / afterHr / hr1min).
@@ -93,8 +95,9 @@ final class OrthostaticController: ObservableObject {
 
     func begin() {
         guard stage == .intro else { return }
-        // Capture mode: session runs (not TachyMon-paused) so HR lands at
-        // ~1 Hz — the transition's rise must show within a beat or two.
+        // Capture mode: session runs (not TachyMon-paused) so samples surface
+        // with the lowest latency HealthKit offers — the transition's rise
+        // must show as soon as the sensor sees it.
         WorkoutManager.shared.start(mode: .capture)
         startTime = Date()
         elapsed = 0
@@ -118,7 +121,12 @@ final class OrthostaticController: ObservableObject {
     func startTransition() {
         guard stage == .baseline else { return }
         if !baselineSamples.isEmpty {
-            baseline = baselineSamples.reduce(0, +) / Double(baselineSamples.count)
+            // The delta's reference is the HR the user transitioned FROM: the
+            // last 30 s before the tap (samples are appended ~1/s). Averaging
+            // the whole stage let the early samples — often still elevated
+            // from getting into position — drag the baseline off.
+            let window = baselineSamples.suffix(30)
+            baseline = window.reduce(0, +) / Double(window.count)
         }
         transitionAt = elapsed
         stage = .during

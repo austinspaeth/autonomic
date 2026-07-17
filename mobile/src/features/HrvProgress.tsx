@@ -3,9 +3,10 @@
  * comp: flat sections against the screen background separated by hairline
  * rules (no cards), each with an uppercase title + "?" help dot, a big value
  * line ("37 avg"), a one-line description, and — for metrics — a text-link
- * kind toggle (Unstructured / Structured / Both) plus a "Show zones" link.
- * "Both" overlays the two kinds in blue/green comparison colours; a single
- * kind draws one trace tinted by the grade-zone gradient. Power is a stacked
+ * kind toggle (Both / Structured / Unstructured / Compare) plus a "Show zones"
+ * link. "Both" (the default) averages every reading of either kind into one
+ * trace; "Compare" overlays the two kinds in comparison colours; single-series
+ * views draw one trace tinted by the grade-zone gradient. Power is a stacked
  * VLF/LF/HF bar per bucket. The big value shows the latest reading by default,
  * mirrors the bucket you drag on the chart, and returns to the latest when you
  * tap away.
@@ -177,8 +178,13 @@ export function HrvProgress({ days, mode, ctx, filt }: { days: DaysMap; mode: Mo
     const metricCharts = METRICS.map((m) => {
       const structured = acAgg(buckets, (d) => acReadVals(d, 'breathHrv', m.s, f));
       const unstructured = acAgg(buckets, (d) => acReadVals(d, 'hrv', m.u, f));
+      // "Both": every reading of either kind pooled per bucket, so the average
+      // weights each reading equally (not an average of the two kind-averages).
+      const combined = acAgg(buckets, (d) => [
+        ...acReadVals(d, 'breathHrv', m.s, f), ...acReadVals(d, 'hrv', m.u, f),
+      ]);
       const has = structured.some((v) => v != null) || unstructured.some((v) => v != null);
-      return { m, structured, unstructured, has };
+      return { m, structured, unstructured, combined, has };
     }).filter((x) => x.has);
 
     // Power: average VLF/LF/HF per bucket over both HRV kinds → stacked bar.
@@ -208,12 +214,12 @@ export function HrvProgress({ days, mode, ctx, filt }: { days: DaysMap; mode: Mo
             <PowerSection bl={view.bl} vlf={view.vlf} lf={view.lf} hf={view.hf} />
           ) : null}
 
-          {view.metricCharts.map(({ m, structured, unstructured }) => (
+          {view.metricCharts.map(({ m, structured, unstructured, combined }) => (
             <React.Fragment key={m.label}>
               {m.s === 'stressIndex' && view.hasBalance ? (
                 <BalanceSection bl={view.bl} pns={view.pnsB} sns={view.snsB} />
               ) : null}
-              <MetricSection m={m} structured={structured} unstructured={unstructured} buckets={view.bl} />
+              <MetricSection m={m} structured={structured} unstructured={unstructured} combined={combined} buckets={view.bl} />
             </React.Fragment>
           ))}
         </>
@@ -222,10 +228,12 @@ export function HrvProgress({ days, mode, ctx, filt }: { days: DaysMap; mode: Mo
   );
 }
 
-/** Which HRV kind a metric section is showing. */
-type Kind = 'hrv' | 'breath' | 'both';
+/** Which HRV kind a metric section is showing. "both" averages every reading of
+ *  either kind into one line; "compare" overlays the two kinds. */
+type Kind = 'both' | 'breath' | 'hrv' | 'compare';
 const KIND_OPTS: { val: Kind; label: string }[] = [
-  { val: 'breath', label: 'Structured' }, { val: 'hrv', label: 'Unstructured' }, { val: 'both', label: 'Both' },
+  { val: 'both', label: 'Both' }, { val: 'breath', label: 'Structured' },
+  { val: 'hrv', label: 'Unstructured' }, { val: 'compare', label: 'Compare' },
 ];
 
 /** Text-link kind toggle (per the design comp) — active option in bright white
@@ -233,7 +241,7 @@ const KIND_OPTS: { val: Kind; label: string }[] = [
 function KindToggle({ value, onChange }: { value: Kind; onChange: (v: Kind) => void }) {
   const p = usePalette();
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', columnGap: 14, rowGap: 8 }}>
       {KIND_OPTS.map((o) => {
         const on = o.val === value;
         return (
@@ -304,42 +312,42 @@ function SectionHead({ title, help, value, valueColor, value2, pair, suffix, des
 }
 
 /**
- * One metric's flat section. "Both" compares structured vs unstructured in the
- * blue/green pair; a single kind hands LineChart exactly one series, which
- * makes it colour the trace with the grade-zone gradient instead. The big
- * value is the latest reading, or the bucket under your finger while dragging.
+ * One metric's flat section. "Compare" overlays structured vs unstructured in
+ * the blue/purple pair; every other kind (including the default "Both"
+ * average) hands LineChart exactly one series, which makes it colour the trace
+ * with the grade-zone gradient instead. The big value is the latest reading,
+ * or the bucket under your finger while dragging.
  */
-function MetricSection({ m, structured, unstructured, buckets }: {
+function MetricSection({ m, structured, unstructured, combined, buckets }: {
   m: (typeof METRICS)[number];
   structured: (number | null)[];
   unstructured: (number | null)[];
+  combined: (number | null)[];
   buckets: { label: string }[];
 }) {
   const p = usePalette();
-  // Default to structured when the range has any, else unstructured; an explicit
-  // tap on the toggle overrides. Kept derived (not one-shot state) so the default
-  // tracks range/filter changes until the user picks a kind themselves.
-  const [kindChoice, setKindChoice] = useState<Kind | null>(null);
-  const kind: Kind = kindChoice ?? (structured.some((v) => v != null) ? 'breath' : 'hrv');
+  const [kind, setKind] = useState<Kind>('both');
   const [showZones, setShowZones] = useState(false);
   const [sel, setSel] = useState<number | null>(null);
   useEffect(() => { setSel(null); }, [kind]);
 
-  const series = kind === 'both'
+  const series = kind === 'compare'
     ? [
       { values: structured, color: STRUCT, label: 'Structured' },
       { values: unstructured, color: UNSTRUCT, label: 'Unstructured' },
     ]
     : kind === 'breath'
       ? [{ values: structured, color: STRUCT, label: 'Structured' }]
-      : [{ values: unstructured, color: UNSTRUCT, label: 'Unstructured' }];
+      : kind === 'hrv'
+        ? [{ values: unstructured, color: UNSTRUCT, label: 'Unstructured' }]
+        : [{ values: combined, color: STRUCT, label: 'Both' }];
   const empty = !series.some((s) => s.values.some((v) => v != null));
 
   // Big value: the latest reading by default (the newest bucket the shown
   // kind(s) have data in, its label in parentheses), or the drag-selected
   // bucket's value. Tapping away from the chart blurs the selection back to
-  // the latest. In "Both" mode the structured and unstructured values sit side
-  // by side, each tinted its series colour, with the label after the pair.
+  // the latest. In "Compare" mode the structured and unstructured values sit
+  // side by side, each tinted its series colour, with the label after the pair.
   // A selection can outlive its dataset (Day→Week shrinks `buckets` while this
   // instance is reused), so an out-of-range index falls back to the latest.
   const selIdx = sel != null && sel < buckets.length ? sel : null;
@@ -354,11 +362,11 @@ function MetricSection({ m, structured, unstructured, buckets }: {
   const fmtVal = (v: number | null) => (v == null ? null : fmtNum(m.integer ? Math.round(v) : v));
   const sRaw = pickVal(structured);
   const uRaw = pickVal(unstructured);
-  const both = kind === 'both' && (sRaw != null || uRaw != null);
-  const raw = kind === 'both' ? (sRaw ?? uRaw) : kind === 'breath' ? sRaw : uRaw;
-  const value = both ? (fmtVal(sRaw) ?? '–') : fmtVal(raw);
-  const valueColor = both ? STRUCT : undefined;
-  const value2 = both ? { text: fmtVal(uRaw) ?? '–', color: UNSTRUCT } : null;
+  const compare = kind === 'compare' && (sRaw != null || uRaw != null);
+  const raw = kind === 'compare' ? (sRaw ?? uRaw) : kind === 'breath' ? sRaw : kind === 'hrv' ? uRaw : pickVal(combined);
+  const value = compare ? (fmtVal(sRaw) ?? '–') : fmtVal(raw);
+  const valueColor = compare ? STRUCT : undefined;
+  const value2 = compare ? { text: fmtVal(uRaw) ?? '–', color: UNSTRUCT } : null;
   const suffix = shownIdx != null ? `(${buckets[shownIdx]?.label ?? ''})` : '';
   const zones = acBandZones(m.band);
   // Grade dot for the displayed value (range average or dragged bucket), so the
@@ -374,7 +382,7 @@ function MetricSection({ m, structured, unstructured, buckets }: {
         value={value}
         valueColor={valueColor}
         value2={value2}
-        pair={both ? [
+        pair={compare ? [
           { label: 'Structured', color: STRUCT, text: fmtVal(sRaw) },
           { label: 'Unstructured', color: UNSTRUCT, text: fmtVal(uRaw) },
         ] : null}
@@ -383,11 +391,11 @@ function MetricSection({ m, structured, unstructured, buckets }: {
         right={!empty && zones ? <ZonesToggle on={showZones} onPress={() => setShowZones((v) => !v)} /> : undefined}
       />
       <View style={{ marginBottom: 12 }}>
-        <KindToggle value={kind} onChange={setKindChoice} />
+        <KindToggle value={kind} onChange={setKind} />
       </View>
       {empty ? (
         <Text style={{ color: p.textDim, fontSize: 13 }}>
-          No {kind === 'breath' ? 'structured' : 'unstructured'} readings in this range.
+          No {kind === 'breath' ? 'structured' : kind === 'hrv' ? 'unstructured' : 'HRV'} readings in this range.
         </Text>
       ) : (
         <>
