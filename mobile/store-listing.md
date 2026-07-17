@@ -77,7 +77,7 @@ review note: "Reachable via Insights tab → any AI report card, or Analysis tab
 "subscribe to use Autonomic", or trial-first must go — the subscription is
 optional now.
 
-## Description (3,965/4,000 chars)
+## Description (3,999/4,000 chars)
 
 See your nervous system actually recover.
 
@@ -91,7 +91,7 @@ Free to use, with no account, no ads or tracking. The core journal is free forev
 LIVE 5-MINUTE HRV, DONE RIGHT
 
 • Capture beat-to-beat RR intervals live from a Bluetooth chest strap, Apple Watch, or with your iPhone's camera using your finger — no hardware required
-• A guided session with a 5:00 ring, live heart rate, and a paced breathing visualizer
+• A guided session with live heart rate and a paced breathing visualizer
 • Every metric computed on-device: SDNN, RMSSD, pNN50, mean RR, PNS & SNS index, stress index, VLF/LF/HF power, coherence, and more
 • One capture a day free; unlimited is Pro
 
@@ -141,12 +141,12 @@ WHAT'S FREE, WHAT'S PRO
 
 Free forever: journaling, manual readings (blood pressure, resting heart rate, episodes), your daily Autonomic Score and outlook, the Apple Watch heart-rate monitor, one live HRV capture a day, 14 days of charts, and full export.
 
-Autonomic Pro (auto-renewing subscription) adds: unlimited live HRV captures, week / month / year progress views, full historical analysis, POTS stand testing and episode tracking, and AI insights and doctor reports. $7.99/month or $49.99/year, billed to your Apple ID and renewing automatically until cancelled. Manage or cancel anytime in your App Store settings.
+Autonomic Pro (auto-renewing subscription) adds: unlimited live HRV captures, week / month / year progress views, full historical analysis, POTS stand testing and episode tracking, and AI insights and doctor reports. $7.99/month or $49.99/year, billed to your Apple ID and renewing automatically until cancelled. Cancel anytime in your App Store settings.
 
 Terms of Use: https://autonomic.care/terms-of-service/
 Privacy Policy: https://autonomic.care/privacy-policy/
 
-IMPORTANT: Autonomic is a personal wellness journal and education tool, not a medical device, and it provides no medical services: it does not diagnose, treat, or prevent any disease. No external hardware is required; compatible chest straps are general-purpose consumer fitness accessories using the standard Bluetooth heart-rate profile, not medical hardware. Always discuss protocol or medication changes with your doctor.
+IMPORTANT: Autonomic is a personal wellness journal and education tool, not a medical device, and it provides no medical services: it does not diagnose, treat, or prevent any disease. No external hardware is required; compatible chest straps are general-purpose consumer fitness accessories using the standard Bluetooth heart-rate profile, not medical devices, and require no regulatory clearance for use in any region. Always discuss protocol or medication changes with your doctor.
 
 ## App Review notes (resubmission after the July 2026 rejection)
 

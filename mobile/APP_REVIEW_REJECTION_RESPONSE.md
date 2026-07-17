@@ -139,6 +139,77 @@ the "medical hardware" framing and invites the full 1.4.1 documentation
 burden (test reports, storefront restrictions) for hardware you don't make,
 don't sell, and don't require.
 
+### Round 2 (submission f57bdf07-0416-4061-b66a-fcfc410aab66, July 2026)
+
+The resubmission cleared 2.1(b), 2.3.2 and 3.1.2(c); only 1.4.1 came back,
+with the identical boilerplate — i.e. the classification argument alone
+didn't land. Round-2 strategy is two-track: satisfy every literal bullet of
+the rejection AND get a human conversation.
+
+**Track 1 — book the conversation immediately.** The rejection itself offers
+an **App Review Appointment** ("Meet with Apple", Tuesdays/Thursdays, local
+business hours, subject to availability) — request one the moment the
+rejection lands; slots go fast. This guideline is routinely resolved by
+phone. Keep the appointment even if you also reply in writing.
+
+**Track 2 — literal compliance with all three bullets, without conceding:**
+
+1. *"Documentation … demonstrating the hardware works as described"* — Apple
+   explicitly accepts a peer-reviewed study PDF. Attach these to the reply:
+   - Gilgen-Ammann, Schweizer & Wyss, *Eur J Appl Physiol* 119:1525–1532
+     (2019): Polar H10 RR-interval signal quality 99.6% vs. an ECG Holter's
+     94.6%, r = 0.997 — the consumer strap outperformed the reference
+     medical device. https://link.springer.com/article/10.1007/s00421-019-04142-5
+   - Schaffarczyk et al., *Sensors* 22(17):6536 (2022): Polar H10 validity
+     for HRV analysis at rest and during exercise.
+     https://www.mdpi.com/1424-8220/22/17/6536
+2. *"Regulatory clearance documentation"* — state plainly that none exists
+   because the hardware is not a medical device in any jurisdiction; there
+   is no clearance to obtain. (This is the truthful answer, not a dodge —
+   and it's why bullet 3's "or" clause exists.)
+3. *"Restrict storefronts OR include a jurisdiction statement in the
+   description"* — taken literally: the description's IMPORTANT footer now
+   carries the jurisdiction statement ("…not medical devices, and require no
+   regulatory clearance for use in any region"). Description is at
+   3,999/4,000 chars — any future edit must stay under.
+
+**Round-2 reply (paste into the submission's Messages, attach both PDFs):**
+
+> Thank you for the follow-up review — we're glad the subscription and
+> metadata issues are resolved. On 1.4.1, we'd like to address each
+> requirement directly:
+>
+> 1. Hardware classification: the app does not connect to medical hardware.
+> The only external hardware it can pair with is a general-purpose consumer
+> Bluetooth heart-rate monitor (chest straps such as Polar H10 or Garmin
+> HRM) via the standard public Bluetooth SIG Heart Rate profile (GATT
+> 0x180D) — the same category of fitness accessory used by running and
+> cycling apps across the App Store, marketed and sold as sports equipment.
+> These are not blood pressure monitors, glucose monitors, or comparable
+> regulated devices, and no external hardware is required to use the app at
+> all: heart data can also come from the iPhone camera or from Apple Watch
+> via HealthKit.
+>
+> 2. Documentation that the hardware works as described: attached are two
+> peer-reviewed studies validating consumer chest-strap RR-interval/HRV
+> accuracy — Gilgen-Ammann et al., European Journal of Applied Physiology
+> (2019), which found 99.6% RR signal quality versus an ECG Holter
+> (r = 0.997), and Schaffarczyk et al., Sensors (2022), validating HRV
+> analysis at rest and during exercise.
+>
+> 3. Regulatory clearance and jurisdiction: no regulatory clearance
+> documentation exists for these products because they are not medical
+> devices in any jurisdiction. Per the option in your message, the App
+> Description now includes a jurisdiction statement: compatible chest straps
+> are general-purpose consumer fitness accessories, not medical devices,
+> and require no regulatory clearance for use in any region.
+>
+> The app itself provides no medical services — it is a personal wellness
+> journal that logs and displays the user's own data, makes no diagnosis,
+> and directs users to their doctor. Could you let us know which specific
+> hardware the review identified as medical hardware? We have also requested
+> an App Review appointment and would welcome the discussion.
+
 ## §4 — Guideline 3.1.2(c): Terms of Use link in the metadata
 
 The in-app paywall was already compliant (title, length, price, functional
