@@ -33,7 +33,7 @@ chars); added dysautonomia + watch; dropped vagal tone / sdnn / symptom. Remove
 `hrv` if it's already in the app name or subtitle — those fields are indexed too.
 Do **not** add "free" — Apple indexes the price separately and it wastes chars.
 
-## What's New
+## What's New (1.13 resubmission — cumulative since 1.7)
 
 Autonomic is now free to use.
 
@@ -41,11 +41,43 @@ Every install starts with 7 days of full access. After that, journaling, your
 daily Autonomic Score, manual readings, the Apple Watch heart-rate monitor, and
 one live HRV capture a day stay free, forever, with no account.
 
+Also new since the last release:
+
+• Home-screen widgets: your score, outlook, HRV trend, and protocol checklist
+• Build your own protocol: define your "clean day" and keep the streak
+• An optional crash warning when today's numbers turn down, plus a daily
+morning reminder
+• Demo data in Progress and Insights so you can explore before you log
+• Analysis and Apple Watch refinements throughout
+
 Pro adds unlimited HRV captures, week/month/year progress, full historical
 analysis, POTS stand testing and episode tracking, and AI insights and doctor
 reports. Existing subscribers: nothing changes, you keep everything.
 
-## Description (3,982/4,000 chars)
+## Subtitle (30/30 chars)
+
+Private HRV & recovery journal
+
+## Subscription product metadata (ASC → Monetization → Subscriptions)
+
+The live product copy dates from the 1.7 subscription-required era — refresh
+it. Apple limits: display name ≤ 30 chars, description ≤ 45 chars. The
+description shows on the App Store product page and in subscription
+management, so it must describe what Pro unlocks, not claim the app needs it.
+
+| Field | Yearly | Monthly |
+| --- | --- | --- |
+| Product ID | `com.autonomic.journal.yearly` | `com.autonomic.journal.monthly` |
+| Display name | `Autonomic Pro Yearly` | `Autonomic Pro Monthly` |
+| Description | `Unlimited HRV, history, POTS & AI reports` | `Unlimited HRV, history, POTS & AI reports` |
+
+Both need an **App Review screenshot** (the paywall card) and should carry the
+review note: "Reachable via Insights tab → any AI report card, or Analysis tab
+→ Week/Month/Year." Anything in the old product copy reading "required",
+"subscribe to use Autonomic", or trial-first must go — the subscription is
+optional now.
+
+## Description (3,999/4,000 chars)
 
 See your nervous system actually recover.
 
@@ -53,50 +85,49 @@ Autonomic turns a heart rate chest strap, your Apple Watch, or even your finger 
 
 Built for the long haul: long covid and post viral recovery, POTS and dysautonomia, ME/CFS, and anyone rebuilding their autonomic nervous system one day at a time.
 
-Free to use, with no account, no ads or tracking. Every install starts with 7 days of full access, then keeps the core free forever.
+Free to use, with no account, no ads or tracking. The core journal is free forever. Features marked (Pro) below require Autonomic Pro, an optional auto-renewing subscription.
 
 
 LIVE 5-MINUTE HRV, DONE RIGHT
 
-• Capture beat-to-beat RR intervals live from a Bluetooth chest strap, Apple Watch, or with your iPhone's camera using your finger
-• A full screen guided session with a 5:00 ring, live heart rate, and a paced breathing visualizer (4/6 resonance breathing)
-• Every metric computed on-device: SDNN, RMSSD, pNN50, mean RR, PNS & SNS index, Baevsky stress index, VLF/LF/HF power, LF/HF, coherence, and more
-• Honest signal quality: artifacts are flagged and corrected, and a noisy reading refuses to fake a score
+• Capture beat-to-beat RR intervals live from a Bluetooth chest strap, Apple Watch, or with your iPhone's camera using your finger — no hardware required
+• A guided session with live heart rate and a paced breathing visualizer
+• Every metric computed on-device: SDNN, RMSSD, pNN50, mean RR, PNS & SNS index, stress index, VLF/LF/HF power, coherence, and more
+• One capture a day free; unlimited is Pro
 
 
 EVERY NUMBER GRADED, NO BLACK BOX
 
 • Every number is scored great / good / ok / warning / crash against real thresholds
 • One daily Autonomic Score that rolls up HRV, sleep, symptoms, blood pressure and more
-• A plain-language outlook for the day: what your body is ready for, from a full workout to a rest day
+• A plain-language outlook for the day: what your body is ready for
 
 
-POTS TESTING ON YOUR WRIST: THE APPLE WATCH APP
+POTS TRACKING ON YOUR WRIST: THE APPLE WATCH APP (Pro)
 
-• A guided lie-and-stand test on your watch: rest, stand when it taps you, and watch your live heart rate delta against your resting baseline
-• Haptic alerts the moment your heart rate climbs 30+ bpm over baseline, the orthostatic stand test threshold
-• One tap on the watch face complication starts a POTS Episode capture: baseline, the climb, and a 60 second recovery
-• A live HR monitor for symptomatic moments, with a rolling average and spike alerts
+• A guided lie-and-stand test on your watch, with your live heart rate delta against your resting baseline
+• Haptic alerts when your heart rate climbs 30+ bpm over baseline
+• One tap starts an episode capture: baseline, the climb, and a 60 second recovery
+• A live HR monitor for symptomatic moments
 • Every result lands in your phone journal automatically, graded like everything else
 
 
 BUILD YOUR PROTOCOL, KEEP YOUR STREAK
 
-• Define your own "clean day": a hydration target, sleep hours, the meds and supplements to take, the triggers to avoid
+• Define your own "clean day": hydration, sleep, meds and supplements, triggers to avoid
 • Clean days build a streak, with your longest run and a 30 day consistency rate
 
 
 TRACK EVERYTHING THAT MOVES THE NEEDLE
 
-• Water, meals and food triggers, meds and supplements, symptoms, activities, sleep, blood pressure, orthostatic stand tests, and digestion
+• Water, meals and food triggers, meds and supplements, symptoms, activities, sleep, blood pressure, stand tests, and digestion
 • Add your own meds, supplements, activities, symptoms and triggers as custom types
 
 
 FIND WHAT HELPS OR HURTS
 
-• Analysis across days, weeks and months: spot the salt, sleep, pacing or medication changes that move your numbers
-• On-device trigger and symptom trends over time
-• Bring your own AI for a deeper read of your data, or a report for your doctor
+• Analysis across days, weeks and months (full history is Pro): spot the salt, sleep, pacing or medication changes that move your numbers
+• AI insights and doctor-visit reports, built from your own data (Pro)
 
 
 YOUR DATA NEVER LEAVES YOUR PHONE
@@ -108,30 +139,49 @@ YOUR DATA NEVER LEAVES YOUR PHONE
 
 WHAT'S FREE, WHAT'S PRO
 
-Free forever: journaling (sleep, meds, symptoms, triggers, hydration, meals), manual readings (blood pressure, resting heart rate, episodes), your daily Autonomic Score and outlook, the Apple Watch heart-rate monitor, one live HRV capture a day, 14 days of charts, and full export.
+Free forever: journaling, manual readings (blood pressure, resting heart rate, episodes), your daily Autonomic Score and outlook, the Apple Watch heart-rate monitor, one live HRV capture a day, 14 days of charts, and full export.
 
-Autonomic Pro adds: unlimited live HRV captures, week / month / year progress views, full historical metric analysis, POTS stand testing and episode tracking, and AI insights and doctor reports.
+Autonomic Pro (auto-renewing subscription) adds: unlimited live HRV captures, week / month / year progress views, full historical analysis, POTS stand testing and episode tracking, and AI insights and doctor reports. $7.99/month or $49.99/year, billed to your Apple ID and renewing automatically until cancelled. Cancel anytime in your App Store settings.
 
-Pro is $7.99/month or $49.99/year, billed to your Apple ID and renewing automatically until cancelled. Manage or cancel anytime in your App Store settings.
+Terms of Use: https://autonomic.care/terms-of-service/
+Privacy Policy: https://autonomic.care/privacy-policy/
 
+IMPORTANT: Autonomic is a personal wellness journal and education tool, not a medical device, and it provides no medical services: it does not diagnose, treat, or prevent any disease. No external hardware is required; compatible chest straps are general-purpose consumer fitness accessories using the standard Bluetooth heart-rate profile, not medical devices, and require no regulatory clearance for use in any region. Always discuss protocol or medication changes with your doctor.
 
-IMPORTANT: Autonomic is a personal journal and education tool, not a medical device. It does not diagnose, treat, or prevent any disease. Always discuss protocol or medication changes with your doctor.
+## App Review notes (resubmission after the July 2026 rejection)
 
-## App Review notes (freemium submission)
+Paste into App Review Information → Notes. Addresses guidelines 2.1(b), 2.3.2,
+1.4.1 and 3.1.2(c) from submission 49ffd932-0b7a-46fc-b97b-003d6693f572; the
+full resolution runbook (including the reply to post in Resolution Center) is
+in `APP_REVIEW_REJECTION_RESPONSE.md`.
 
-> This version removes the hard paywall — the app is now fully usable without a
-> purchase. On first launch it grants a 7-day local full-access window (no
-> account, no store call), after which the core (journaling, daily score, manual
-> readings, watch HR monitor, one live HRV capture per day, 14 days of charts,
-> export) remains free indefinitely.
+> The app is fully usable without a purchase. On first launch it grants a 7-day
+> local full-access window (no account, no store call), after which the core
+> (journaling, daily score, manual readings, watch HR monitor, one live HRV
+> capture per day, 14 days of charts, export) remains free indefinitely.
 >
-> Autonomic Pro (com.autonomic.journal.monthly / .yearly, one subscription
-> group) unlocks unlimited HRV captures, full progress history, POTS testing,
-> and AI reports. To reach the paywall: Insights tab → any AI report card, or
-> Analysis tab → Week/Month/Year. "Restore purchase" is on the paywall card.
+> SUBSCRIPTIONS (3.1.2): Autonomic Pro (com.autonomic.journal.monthly $7.99/mo /
+> com.autonomic.journal.yearly $49.99/yr, one subscription group) unlocks
+> unlimited HRV captures, full progress history, POTS testing, and AI reports.
+> To reach the paywall: Insights tab → any AI report card, or Analysis tab →
+> Week/Month/Year. The paywall card shows the subscription title, length, and
+> price, plus functional Terms of Use and Privacy Policy links; "Restore
+> purchase" is on the same card. The Terms of Use (EULA) link is also in the
+> App Description: https://autonomic.care/terms-of-service/
 >
-> No demo account is needed. HRV capture works without hardware via the camera
-> (finger over the rear lens); a chest strap or Apple Watch is optional.
+> HARDWARE (1.4.1): Autonomic does not connect to or require any medical
+> hardware, and it provides no medical services. HRV capture works with no
+> hardware at all via the iPhone camera (finger over the rear lens). Optionally
+> it can read heart-rate data from the user's Apple Watch (via HealthKit) or
+> from a general-purpose consumer Bluetooth heart-rate strap (e.g. Polar,
+> Garmin) using the standard public Bluetooth SIG Heart Rate profile (GATT
+> service 0x180D) — the same fitness accessories used by running and cycling
+> apps, marketed and sold as sports equipment, not medical devices. The app is
+> a personal wellness journal: it displays and logs the user's own data, makes
+> no diagnosis, and directs users to their doctor (disclaimers on the welcome
+> screen, in Settings → Legal, and on every stand-test result).
+>
+> No demo account is needed. No account exists; all data is on-device.
 
 ## Screenshot plan
 
@@ -173,7 +223,7 @@ Autonomic Journal: HRV & POTS
 
 Free HRV, POTS & symptom journal for long covid recovery. Private and on-device.
 
-## Full description (3,808/4,000 chars)
+## Full description (3,989/4,000 chars)
 
 See your nervous system actually recover.
 
@@ -187,14 +237,14 @@ Free to use, with no account, no ads and no tracking. Every install starts with 
 LIVE 5-MINUTE HRV, DONE RIGHT
 
 • Capture beat-to-beat RR intervals live from a Bluetooth chest strap, or with your phone's camera using your finger
-• A full screen guided session with a 5:00 ring, live heart rate, and a paced breathing visualizer (4/6 resonance breathing and more)
+• A full screen guided session with a 5:00 ring, live heart rate, and a paced breathing visualizer
 • Every metric computed on-device: SDNN, RMSSD, pNN50, mean RR, PNS & SNS index, Baevsky stress index, VLF/LF/HF power, LF/HF, coherence, and more
-• Honest signal quality: artifacts are flagged and corrected, and a noisy reading refuses to fake a score instead of lying to you
+• Honest signal quality: artifacts are flagged and corrected, and a noisy reading refuses to fake a score
 
 
 EVERY NUMBER GRADED, NO BLACK BOX
 
-• Every number is scored great / good / ok / warning / crash against real thresholds, with no mystery "readiness" black box
+• Every number is scored great / good / ok / warning / crash against real thresholds
 • One daily Autonomic Score that rolls up HRV, sleep, symptoms, blood pressure and more
 • A plain-language outlook for the day: what your body is ready for, from a full workout to a rest day
 
@@ -203,7 +253,7 @@ BUILD YOUR PROTOCOL, KEEP YOUR STREAK
 
 • Define your own "clean day": a hydration target, sleep hours, the meds and supplements to take, the triggers to avoid
 • Every day is matched against your protocol automatically, so you see at a glance whether you stayed on plan
-• Clean days build a streak, with your longest run and a 30 day consistency rate: the discipline that actually drives recovery
+• Clean days build a streak, with your longest run and a 30 day consistency rate
 
 
 TRACK EVERYTHING THAT MOVES THE NEEDLE
@@ -218,7 +268,7 @@ FIND WHAT HELPS OR HURTS
 • Analysis across days, weeks and months: spot the salt, sleep, pacing or medication changes that move your numbers
 • On-device trigger and symptom trends over time
 • Milestones so recovery actually adds up
-• Optional: bring your own AI for a deeper written read of your data, or to create a report to share with your doctor
+• Optional: bring your own AI for a deeper written read of your data, or to create a report for your doctor
 
 
 YOUR DATA NEVER LEAVES YOUR PHONE
@@ -237,7 +287,10 @@ Autonomic Pro adds: unlimited live HRV captures, week / month / year progress vi
 Pro is $7.99 per month or $49.99 per year, billed through Google Play. Subscriptions renew automatically until cancelled; manage or cancel anytime in Google Play → Subscriptions.
 
 
-IMPORTANT: Autonomic is a personal journal and education tool, not a medical device. It does not diagnose, treat, or prevent any disease. Always discuss protocol, medication, or supplement changes with your doctor.
+Terms of Use: https://autonomic.care/terms-of-service/
+Privacy Policy: https://autonomic.care/privacy-policy/
+
+IMPORTANT: Autonomic is a personal wellness journal and education tool, not a medical device, and it provides no medical services: it does not diagnose, treat, or prevent any disease. No external hardware is required; compatible chest straps are general-purpose consumer fitness accessories using the standard Bluetooth heart-rate profile, not medical hardware. Always discuss protocol, medication, or supplement changes with your doctor.
 
 ## Play graphics checklist
 
