@@ -12,6 +12,14 @@ pure ASC housekeeping (2.1(b), 3.1.2(c)), one is fixed by the new description
 Resolution Center — the app connects to consumer fitness heart-rate straps,
 not medical hardware, and the reply below makes that case.
 
+> **The new binary must be built from current `main` (1.13.0), not the 1.7
+> code.** The reviewed 1.7 build predates the freemium cutover (1.9.0): it was
+> the subscription-required model, which is what actually triggered 2.3.2. The
+> review notes and the §5 reply describe freemium behavior ("fully usable
+> without a purchase", the 7-day local full-access window) — statements that
+> are only true of 1.9.0+. Resubmitting the 1.7 binary with those notes would
+> misrepresent the app to the reviewer and invite a repeat rejection.
+
 | # | Guideline | What Apple wants | Fix |
 | --- | --- | --- | --- |
 | 1 | 2.1(b) App Completeness | The IAP subscriptions submitted for review with the binary | ASC: attach both subscriptions + review screenshot, resubmit (§1) |
@@ -45,8 +53,12 @@ reviewer couldn't complete the review. In App Store Connect:
    they ride along with the binary review. (This section only appears before
    the version is submitted. Both IAPs should show "Waiting for Review" once
    the version is submitted.)
-6. Upload a new build (bump the build number; `eas build --platform ios
-   --profile production`) and select it on the version page.
+6. Upload a new build **from current `main`** (bump the marketing version in
+   `app.json` past 1.7's if ASC requires it; `eas build --platform ios
+   --profile production`) and select it on the version page. Before building,
+   run the freemium preview check from `STORE_SETUP.md` Part 2 and confirm
+   `FORCE_TIER` is `null` and `PREVIEW_PAYWALL` is `false` in the shipped
+   commit.
 
 The first-ever review of a subscription **must** be submitted with a binary —
 that's why Apple asked for a new one even though the app itself may not have
@@ -150,7 +162,9 @@ includes it for this and future submissions.
 > **2.3.2 — Accurate Metadata:** The App Description now states up front that
 > some features require the Autonomic Pro auto-renewing subscription, marks
 > each paid feature with "(Pro)" inline, and lists exactly what is free
-> forever versus Pro, with prices.
+> forever versus Pro, with prices. Note the new binary also changes the model
+> the reviewed version had: the app no longer requires a subscription — the
+> core app is free, and the subscription is optional.
 >
 > **3.1.2(c) — Subscriptions:** The App Description now includes a functional
 > link to our Terms of Use (https://autonomic.care/terms-of-service/)
