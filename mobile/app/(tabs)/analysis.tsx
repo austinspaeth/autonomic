@@ -428,10 +428,13 @@ const CardView = React.memo(function CardView({ card, buckets }: { card: Analysi
     const at = (si: number) => { const v = metricsChart.series[si]?.values[sel]; return v != null && !isNaN(v) ? Math.round(v) : null; };
     return {
       ...metricsRow,
-      metrics: metricsRow.metrics.map((m, i) =>
-        i < metricsChart.series.length ? { ...m, value: at(i) }
-          : orthoSpan ? { ...m, value: orthoSpan.counts[sel] ?? null }
-            : m),
+      metrics: metricsRow.metrics.map((m, i) => {
+        if (i < metricsChart.series.length) {
+          const v = at(i);
+          return { ...m, value: v, color: v != null && m.regrade ? m.regrade(v) : m.color };
+        }
+        return orthoSpan ? { ...m, value: orthoSpan.counts[sel] ?? null } : m;
+      }),
       suffix: `(${buckets[sel]?.label ?? ''})`,
     };
   }, [metricsRow, metricsChart, sel, orthoSpan, buckets]);

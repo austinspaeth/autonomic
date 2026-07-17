@@ -22,9 +22,11 @@ export interface Chart { label: string; series: Series[]; zones?: Zone[] | null;
 /** Balance-style readout rendered just below the card description: each metric
  *  is a legend dot + name on the first row with the value below it coloured to
  *  match (a metric without a `color` is dot-less, e.g. an "Events" count).
- *  `suffix` (a date, or "avg") sits just after the last metric. When `zones`
- *  is set the card's "Show zones" link appears top-right and shades the chart. */
-export interface MetricsRow { metrics: { label: string; value: number | string | null; sub?: string; color?: string }[]; suffix?: string; zones?: boolean }
+ *  `regrade` re-derives that colour from the selected bucket's value when a
+ *  chart point is tapped (so the dot/value track that day's grade, not the
+ *  latest one). `suffix` (a date, or "avg") sits just after the last metric.
+ *  When `zones` is set the card's "Show zones" link appears top-right. */
+export interface MetricsRow { metrics: { label: string; value: number | string | null; sub?: string; color?: string; regrade?: (v: number) => string }[]; suffix?: string; zones?: boolean }
 /** Which readings a blood-pressure card is filtered to. */
 export type BpPeriod = 'all' | 'morning' | 'evening';
 export interface BpSeries { sys: (number | null)[]; dia: (number | null)[]; cat?: ScoreCat | null }
@@ -100,7 +102,7 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
       help: 'Each day is scored 0–100 from everything you logged that day (HRV readings, vitals, symptoms and sleep) using the recovery framework\'s thresholds. The dashed line is a rolling average, which is usually the better trend to watch: single days swing, the rolling line tells the story.',
       metricsRow: {
         metrics: [
-          cur != null ? { label: 'Score', value: Math.round(cur), color: scoreCat(cur).color } : null,
+          cur != null ? { label: 'Score', value: Math.round(cur), color: scoreCat(cur).color, regrade: (v: number) => scoreCat(v).color } : null,
           curRoll != null ? { label: avgLabel, value: Math.round(curRoll), color: '#9a9aa0' } : null,
         ].filter(Boolean) as MetricsRow['metrics'],
         suffix: li >= 0 ? `(${buckets[li].label})` : undefined,
