@@ -6,7 +6,10 @@ module.exports = {
   // Dot prefix → appended to the phone app's bundle id: com.autonomic.journal.watchkitapp
   bundleIdentifier: '.watchkitapp',
   deploymentTarget: '10.0',
-  icon: '../../assets/autonomic-icon.png',
+  // Watch-specific icon (dark-red base under the squiggle). NOTE: prebuild
+  // REGENERATES the AppIcon.appiconset from this file — editing the generated
+  // PNG under Assets.xcassets does nothing for EAS builds.
+  icon: '../../assets/watch-icon.png',
   entitlements: {
     'com.apple.developer.healthkit': true,
     // Shared with the complication widget (last result + live session state).
