@@ -134,6 +134,31 @@ final class WorkoutManager: NSObject, ObservableObject {
     @Published var signalLost = false
     @Published var running = false
 
+    /// Claim and end a workout session orphaned by a dead previous process.
+    /// An unclaimed orphan wedges the whole app: watchOS keeps relaunching it
+    /// for recovery and dismisses the UI on every icon tap until the user
+    /// force-quits. We never resume the orphan as a live stream — no UI mode
+    /// owns it anymore — we just end it so the system lets go. Safe to call
+    /// when there is nothing to recover (the completion hands back nil).
+    func recoverOrphanedSession() {
+        guard HKHealthStore.isHealthDataAvailable() else { return }
+        store.recoverActiveWorkoutSession { recovered, _ in
+            guard let recovered else { return }
+            DispatchQueue.main.async {
+                // If start() already owns a session, the orphan is from an
+                // older incarnation either way — ending it never touches ours.
+                guard recovered !== self.session else { return }
+                let builder = recovered.associatedWorkoutBuilder()
+                recovered.end()
+                // Best-effort save, matching stop(); a builder that never
+                // collected in this process just errors these into no-ops.
+                builder.endCollection(withEnd: Date()) { _, _ in
+                    builder.finishWorkout { _, _ in }
+                }
+            }
+        }
+    }
+
     func requestAuthorization() {
         guard HKHealthStore.isHealthDataAvailable() else { return }
         let read: Set<HKObjectType> = [HKQuantityType.quantityType(forIdentifier: .heartRate)!]

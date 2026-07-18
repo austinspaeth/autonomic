@@ -65,6 +65,10 @@ struct ContentView: View {
                     title: "POTS Episode", subtitle: "Stairs or other events",
                     icon: "figure.stairs", tint: DS.purple, locked: potsLocked
                 ) { mode = .orthostatic }
+                Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0")")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(DS.faint)
+                    .padding(.top, 2)
             }
         }
         .alert("Subscription required", isPresented: $showLockAlert) {
@@ -85,9 +89,9 @@ struct ContentView: View {
             HStack(spacing: 11) {
                 Image(systemName: icon)
                     .font(.system(size: 15))
-                    .foregroundStyle(locked ? DS.dim : tint)
+                    .foregroundStyle(tint)
                     .frame(width: 30, height: 30)
-                    .background((locked ? DS.dim : tint).opacity(0.12), in: RoundedRectangle(cornerRadius: 9))
+                    .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 9))
                 VStack(alignment: .leading, spacing: 0) {
                     Text(title).font(.system(size: 15, weight: .bold))
                         .lineLimit(1).minimumScaleFactor(0.8)

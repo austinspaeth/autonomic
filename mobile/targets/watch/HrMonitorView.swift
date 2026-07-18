@@ -15,9 +15,10 @@ import WatchKit
  * display updates every 5 s instead of every second; the sensor keeps
  * streaming underneath so buzzes stay timely.
  *
- * The screen is a two-page pager: the HR readout, and a controls panel one
- * swipe to the right (End session + Log symptom). A stray swipe can't abandon
- * the session — ending still takes a deliberate tap on the second page.
+ * The screen is a three-page pager centered on the HR readout: a 5-minute
+ * history chart one swipe to the left, and a controls panel one swipe to the
+ * right (End session + Log symptom). A stray swipe can't abandon the
+ * session — ending still takes a deliberate tap on the controls page.
  */
 final class HrMonitorModel: ObservableObject {
     /// Last known HR — held through signal loss; nil only before the first reading.
@@ -29,9 +30,14 @@ final class HrMonitorModel: ObservableObject {
     @Published var signalLost = false
     @Published var atMax = false
     @Published var nearMax = false
+    /// Rolling 5-minute HR history for the chart page. Sensor dropouts stay
+    /// as real holes (no fake samples) — the chart breaks its line across
+    /// them. Refreshed at display cadence, like every other published value.
+    @Published var chartSeries: [(at: Date, hr: Double)] = []
 
     var dimmed = false
 
+    private var history: [(at: Date, hr: Double)] = []
     private var window: [(at: Date, hr: Double)] = []
     private var deltaWindow: [(at: Date, delta: Double)] = []
     private var ticker: Timer?
@@ -57,6 +63,7 @@ final class HrMonitorModel: ObservableObject {
         WorkoutManager.shared.stop()
         window = []
         deltaWindow = []
+        history = []
         ComplicationStore.hrSessionActive(false)
     }
 
@@ -73,6 +80,8 @@ final class HrMonitorModel: ObservableObject {
         var currentDelta: Double?
         if !wm.searching, let hr = wm.hr {
             liveHr = hr
+            history.append((at: now, hr: hr))
+            history.removeAll { now.timeIntervalSince($0.at) > HrHistoryChart.window }
             window.append((at: now, hr: hr))
             window.removeAll { now.timeIntervalSince($0.at) > 120 }
             let avg = window.map(\.hr).reduce(0, +) / Double(window.count)
@@ -102,7 +111,11 @@ final class HrMonitorModel: ObservableObject {
         let cadence = dimmed ? 5 : 1
         guard sinceDisplay >= cadence else { return }
         sinceDisplay = 0
+        let historySnapshot = history
         DispatchQueue.main.async {
+            // Refresh even without a live sample so the chart keeps sliding
+            // (its x-axis is anchored to "now").
+            self.chartSeries = historySnapshot
             if let liveHr {
                 self.displayHr = liveHr
                 self.everHadReading = true
@@ -132,11 +145,15 @@ struct HrMonitorView: View {
     @Environment(\.isLuminanceReduced) private var isLuminanceReduced
     @State private var pulse = false
     @State private var showSymptoms = false
+    /// Pager position — boots on the HR readout, chart to its left,
+    /// controls to its right.
+    @State private var page = 1
 
     var body: some View {
-        TabView {
-            hrPage.tag(0)
-            controlsPage.tag(1)
+        TabView(selection: $page) {
+            chartPage.tag(0)
+            hrPage.tag(1)
+            controlsPage.tag(2)
         }
         .tabViewStyle(.page(indexDisplayMode: .never))
         .onAppear { model.start() }
@@ -187,6 +204,29 @@ struct HrMonitorView: View {
         }
         .overlay(alignment: .trailing) {
             if !isLuminanceReduced { SwipeChevron().padding(.trailing, 6) }
+        }
+        .overlay(alignment: .leading) {
+            if !isLuminanceReduced { SwipeChevron(pointsLeft: true).padding(.leading, 6) }
+        }
+    }
+
+    // MARK: - Chart page (last 5 min)
+
+    private var chartPage: some View {
+        VStack(spacing: 4) {
+            Text("LAST 5 MIN")
+                .font(.system(size: 11, weight: .bold))
+                .kerning(1)
+                .foregroundStyle(DS.dim)
+            if model.chartSeries.count >= 2 {
+                HrHistoryChart(series: model.chartSeries, live: !model.signalLost)
+            } else {
+                Spacer()
+                Text("Collecting data…")
+                    .font(.system(size: 12.5))
+                    .foregroundStyle(DS.dim)
+                Spacer()
+            }
         }
     }
 
@@ -248,18 +288,94 @@ struct HrMonitorView: View {
     }
 }
 
-/// A small right-pointing chevron that drifts back and forth — hints that the
-/// controls page is one swipe away.
+/// A small chevron that drifts back and forth — hints that another page is
+/// one swipe away (controls to the right, the history chart to the left).
 private struct SwipeChevron: View {
+    var pointsLeft = false
     @State private var shift = false
     var body: some View {
-        Image(systemName: "chevron.right")
+        Image(systemName: pointsLeft ? "chevron.left" : "chevron.right")
             .font(.system(size: 12, weight: .bold))
             .foregroundStyle(DS.dim.opacity(0.6))
             .offset(x: shift ? 3 : -3)
             .onAppear {
                 withAnimation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true)) { shift = true }
             }
+    }
+}
+
+/**
+ * Rolling 5-minute HR line: time maps to x (right edge = now), HR to y over
+ * a padded min/max domain rounded to 5s. Sensor dropouts >10 s break the
+ * line — real gaps stay visible as holes, same no-fake-samples rule as the
+ * logged series. A dot marks the newest sample while the signal is live.
+ */
+struct HrHistoryChart: View {
+    let series: [(at: Date, hr: Double)]
+    var live = true
+
+    static let window: TimeInterval = 300
+    private static let gapBreak: TimeInterval = 10
+
+    var body: some View {
+        let hrs = series.map(\.hr)
+        let rawLo = hrs.min() ?? 0, rawHi = hrs.max() ?? 0
+        let lo = ((rawLo - 4) / 5).rounded(.down) * 5
+        let hi = max(((rawHi + 4) / 5).rounded(.up) * 5, lo + 20)
+        VStack(spacing: 2) {
+            GeometryReader { geo in
+                let now = Date()
+                let pt = { (s: (at: Date, hr: Double)) -> CGPoint in
+                    CGPoint(
+                        x: geo.size.width * (1 - now.timeIntervalSince(s.at) / Self.window),
+                        y: geo.size.height * (1 - (s.hr - lo) / (hi - lo))
+                    )
+                }
+                ZStack(alignment: .leading) {
+                    // Domain gridlines with their bpm labels tucked above.
+                    ForEach([lo, (lo + hi) / 2, hi], id: \.self) { level in
+                        let y = geo.size.height * (1 - (level - lo) / (hi - lo))
+                        Path { p in
+                            p.move(to: CGPoint(x: 0, y: y))
+                            p.addLine(to: CGPoint(x: geo.size.width, y: y))
+                        }
+                        .stroke(Color.white.opacity(0.08), style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                        Text(String(Int(level)))
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(DS.dim.opacity(0.8))
+                            .position(x: 9, y: max(6, y - 7))
+                    }
+                    Path { p in
+                        var lastAt: Date?
+                        for s in series {
+                            let point = pt(s)
+                            if let lastAt, s.at.timeIntervalSince(lastAt) <= Self.gapBreak {
+                                p.addLine(to: point)
+                            } else {
+                                p.move(to: point)
+                            }
+                            lastAt = s.at
+                        }
+                    }
+                    .stroke(DS.accent, style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+                    if live, let last = series.last,
+                       now.timeIntervalSince(last.at) < Self.gapBreak {
+                        Circle()
+                            .fill(DS.accent)
+                            .frame(width: 5, height: 5)
+                            .position(pt(last))
+                    }
+                }
+                .clipped()
+            }
+            HStack {
+                Text("5 MIN AGO")
+                Spacer()
+                Text("NOW")
+            }
+            .font(.system(size: 9, weight: .semibold))
+            .foregroundStyle(DS.dim.opacity(0.8))
+        }
     }
 }
 
