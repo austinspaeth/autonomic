@@ -9,8 +9,9 @@
  * Apple-Health watch sync card rises over this one. Haptics only play while
  * the JS process is running (BLE keeps it alive in the background; watch and
  * camera sessions are suspended) — a backgrounded finish is picked up when the
- * app returns (a finished session never notifies — the daily morning reminder
- * in lib/reminders is the only notification the app posts).
+ * app returns. iOS suppresses the completion buzz while backgrounded, so a
+ * finish that lands with the app away also posts a local notification
+ * (notifyHrvComplete in lib/reminders) so completion is still felt.
  *
  * Camera (PPG) source: this card never shows a pre-start state — the
  * camera-setup card (CameraSetup.tsx) owns the camera view + torch, locks the
@@ -37,6 +38,7 @@ import { startWatchSync } from './watchSyncStore';
 import { ble } from '../../lib/ble/manager';
 import { ppg, type PpgSignal } from '../../lib/ppg/camera';
 import { correctArtifacts, std } from '../../lib/hrv';
+import { notifyHrvComplete } from '../../lib/reminders';
 import { getState } from '../../store/store';
 
 // Strap and watch readings — structured or unstructured — run the full
@@ -245,6 +247,10 @@ export function HrvSession({ config, controls, autoStart }: { config: SessionCon
     // completion with one strong sustained buzz.
     setFinished(true);
     completionBuzz();
+    // Backgrounded (a BLE reading keeps running while the phone is set aside),
+    // iOS never plays the buzz above — post a notification so the completion is
+    // still felt/heard. Foreground readings feel the buzz, so skip it there.
+    if (AppState.currentState !== 'active') void notifyHrvComplete();
     if (timerRef.current) clearInterval(timerRef.current);
     if (config.source === 'polar') await ble().disconnect().catch(() => {});
     if (config.source === 'camera') await ppg().stop().catch(() => {});

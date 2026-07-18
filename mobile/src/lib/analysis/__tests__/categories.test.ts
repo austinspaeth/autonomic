@@ -68,8 +68,8 @@ describe('POTS stand-test card', () => {
 describe('Orthostatic events card', () => {
   const days: DaysMap = {
     [dayKey(4)]: day([
-      ortho({ beforeHr: 60, afterHr: 95, hr1min: 80 }),                                     // lay: +35 rise, 15 drop
-      ortho({ transition: 'Climbing stairs', beforeHr: 70, afterHr: 120, hr1min: 95 }),     // stairs: +50 rise
+      ortho({ beforeHr: 60, afterHr: 95, hr1min: 80 }),                                     // lay: +35 rise, -15 delta
+      ortho({ transition: 'Climbing stairs', beforeHr: 70, afterHr: 120, hr1min: 95 }),     // stairs: +50 rise, -25 delta
     ]),
     [dayKey(2)]: day([ortho({ transition: 'Sitting to standing', beforeHr: 65, afterHr: 85, hr1min: 78 })]), // sit: +20 rise
   };
@@ -78,16 +78,16 @@ describe('Orthostatic events card', () => {
     const card = potsCards(days).find((c) => c.title === 'POTS Episodes')!;
     expect(card).toBeTruthy();
     const f = card.orthoFilter!;
-    // The balance-style readout (Rise / 1 min drop / Events) sits under the description.
+    // The balance-style readout (Rise / 1 min delta / Events) sits under the description.
     expect(f.all.metricsRow!.metrics[2].value).toBe(3);   // Events
     expect(f.lay.metricsRow!.metrics[2].value).toBe(1);
     expect(f.lay.metricsRow!.metrics[0].value).toBe(35);  // latest rise
-    expect(f.lay.metricsRow!.metrics[1].value).toBe(15);  // latest 1-min drop
+    expect(f.lay.metricsRow!.metrics[1].value).toBe(-15); // latest 1-min delta (hr1min - afterHr)
     expect(f.sit.metricsRow!.metrics[2].value).toBe(1);
     expect(f.stairs.metricsRow!.metrics[2].value).toBe(1);
-    // Rise + drop share one chart, coloured blue / purple.
+    // Rise + delta share one chart, coloured blue / purple.
     expect(f.all.charts).toHaveLength(1);
-    expect(f.all.charts[0].series.map((s) => s.label)).toEqual(['Rise', '1 min drop']);
+    expect(f.all.charts[0].series.map((s) => s.label)).toEqual(['Rise', '1 min delta']);
     expect(f.all.charts[0].series.map((s) => s.color)).toEqual(['#60a5fa', '#a855f7']);
     // Per-bucket event counts: 2 on the double day, 1 on the single.
     const sum = (vals: (number | null)[]) => vals.reduce((s: number, v) => s + (v || 0), 0);
@@ -109,7 +109,7 @@ describe('Orthostatic events card', () => {
     // The Show-zones link is offered only on graded transitions.
     expect(f.lay.metricsRow!.zones).toBe(true);
     expect(f.stairs.metricsRow!.zones).toBe(false);
-    // Stairs still grades on the 1-minute recovery (25 bpm drop → great).
+    // Stairs still grades on the 1-minute delta (-25 bpm → great).
     expect(f.stairs.cat).toBe('great');
   });
 });

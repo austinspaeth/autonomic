@@ -248,7 +248,10 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
    *  stairs always spike, and a trend only means something like for like. */
   const ortho = (): AnalysisCard[] => {
     const incOf = (r: Entry) => { const a = parseFloat(r.afterHr as string), b = parseFloat(r.beforeHr as string); return !isNaN(a) && !isNaN(b) ? a - b : null; };
-    const recOf = (r: Entry) => { const a = parseFloat(r.afterHr as string), m = parseFloat(r.hr1min as string); return !isNaN(a) && !isNaN(m) ? a - m : null; };
+    // Signed change one minute after the episode, matching the journal summary
+    // card's "HR Delta after 1 minute" (hr1min - afterHr): negative = HR settled
+    // back down, positive = still climbing. Graded on BANDS.orthoDelta.
+    const recOf = (r: Entry) => { const a = parseFloat(r.afterHr as string), m = parseFloat(r.hr1min as string); return !isNaN(a) && !isNaN(m) ? m - a : null; };
     const TRANSITIONS: Record<OrthoTransition, (r: Entry) => boolean> = {
       all: () => true,
       lay: (r) => r.transition === 'Laying to standing',
@@ -264,12 +267,12 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
       // Readout follows the most recent event (like the POTS Test card), not the
       // range average: buckets/days/readings are chronological, so the last
       // valid hit wins.
-      let lastRise: number | null = null, lastDrop: number | null = null, lastDk: string | null = null;
+      let lastRise: number | null = null, lastDelta: number | null = null, lastDk: string | null = null;
       buckets.forEach((b) => b.days.forEach((dk) => (days[dk].readings || []).forEach((r) => {
         if (r.type !== 'orthostatic' || !f(r)) return;
         const v = incOf(r); if (v == null) return;
         n++; if (v >= 30) potsN++;
-        lastRise = v; lastDrop = recOf(r); lastDk = dk;
+        lastRise = v; lastDelta = recOf(r); lastDk = dk;
       })));
       const incAvg = acMean(inc), recAvg = acMean(rec);
       const lastDate = lastDk ? `(${+(lastDk as string).slice(5, 7)}/${+(lastDk as string).slice(8, 10)})` : undefined;
@@ -279,21 +282,21 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
       return {
         cat: worstCat([
           incAvg != null && graded ? catFromBands(incAvg, BANDS.orthoIncrease) : null,
-          recAvg != null ? catFromBands(recAvg, BANDS.orthoRecovery) : null,
+          recAvg != null ? catFromBands(recAvg, BANDS.orthoDelta) : null,
         ]),
         counts,
         charts: [{
           label: '',
           series: [
             series(inc, '#60a5fa', 'Rise'),
-            series(rec, '#a855f7', '1 min drop'),
+            series(rec, '#a855f7', '1 min delta'),
           ],
           zones: graded ? acBandZones('orthoIncrease') : null, integer: true,
         }],
         metricsRow: {
           metrics: [
             { label: 'Rise', value: lastRise != null ? Math.round(lastRise) : null, sub: 'bpm', color: '#60a5fa' },
-            { label: '1 min drop', value: lastDrop != null ? Math.round(lastDrop) : null, sub: 'bpm', color: '#a855f7' },
+            { label: '1 min delta', value: lastDelta != null ? Math.round(lastDelta) : null, sub: 'bpm', color: '#a855f7' },
             { label: 'Events', value: n || null },
           ],
           suffix: lastDate,
@@ -310,7 +313,7 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
       title: 'POTS Episodes', sub: range,
       cat: all.cat,
       desc: 'How your heart rate reacts to everyday position changes, and how fast it settles.',
-      help: 'Each event logs your HR before and after a transition, plus one minute in. Rise is the jump on the change; for the stand-up transitions the zones shade the ≥30 bpm adult POTS-range criterion (stairs always spike, so they are not graded). The 1 min drop shows how quickly HR settles back from its peak; a bigger drop means faster vagal recovery, and for everyday events it is often the cleaner progress signal. Use the transition links to compare like with like.',
+      help: 'Each event logs your HR before and after a transition, plus one minute in. Rise is the jump on the change; for the stand-up transitions the zones shade the ≥30 bpm adult POTS-range criterion (stairs always spike, so they are not graded). The 1 min delta is the change one minute after the peak, the same signed number the episode card shows: negative means HR settled back down (a bigger drop reflects faster vagal recovery), positive means it was still climbing. For everyday events it is often the cleaner progress signal. Use the transition links to compare like with like.',
       charts: all.charts,
       stats: all.stats,
       insights: all.insights,

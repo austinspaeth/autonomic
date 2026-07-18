@@ -26,6 +26,7 @@ import { getState, save, subscribeStore } from '../store/store';
 const ID = 'morning-reminder';
 const CHANNEL = 'reminders';
 const CRASH_CHANNEL = 'crash-warnings';
+const HRV_CHANNEL = 'hrv-complete';
 
 /** 8:00 AM — late enough to be awake, early enough to be pre-coffee. */
 export const DEFAULT_REMINDER_TIME = '08:00';
@@ -71,6 +72,46 @@ async function ensureCrashChannel() {
     vibrationPattern: [0, 250, 250, 250],
     lockscreenVisibility: Notifications.AndroidNotificationVisibility.PRIVATE,
   });
+}
+
+/** Reading-complete rides its own channel — a "your reading is done" buzz
+ *  should break through like the crash warning, not sit on the quiet daily
+ *  channel. */
+async function ensureHrvChannel() {
+  if (Platform.OS !== 'android') return;
+  await Notifications.setNotificationChannelAsync(HRV_CHANNEL, {
+    name: 'Reading complete',
+    importance: Notifications.AndroidImportance.HIGH,
+    sound: 'default',
+    vibrationPattern: [0, 400],
+    lockscreenVisibility: Notifications.AndroidNotificationVisibility.PRIVATE,
+  });
+}
+
+/**
+ * A backgrounded HRV reading finishes with no felt haptic — iOS suppresses
+ * haptics entirely while the app isn't in the foreground, and an unstructured
+ * reading is usually taken with the phone set aside. Post an immediate local
+ * notification (sound + vibration) so completion is still felt, the same signal
+ * the completion buzz gives a foreground reading. Best-effort: silently no-ops
+ * without notification permission, mirroring the crash warning — never prompt
+ * mid-reading.
+ */
+export async function notifyHrvComplete(): Promise<void> {
+  try {
+    if (!(await Notifications.getPermissionsAsync()).granted) return;
+    await ensureHrvChannel();
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'Reading complete',
+        body: 'Your HRV reading is done. Open Autonomic to save it.',
+        sound: 'default',
+      },
+      trigger: Platform.OS === 'android' ? { channelId: HRV_CHANNEL } : null,
+    });
+  } catch {
+    // Best-effort — never let the cue break the reading.
+  }
 }
 
 /**
