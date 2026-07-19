@@ -4,11 +4,11 @@
  * network. Sections are rendered as the same [stamp]-prefixed lines.
  */
 import { addDays, dateFromKey, fmtNum, fmtTime12, keyOf } from '../dates';
-import type { AppState, CustomTypes, DayRecord } from '../types';
+import type { AppState, CustomTypes, DayRecord, Entry } from '../types';
 import type { Downturn } from '../scoring/downturn';
 import { blueZone, dayCleanliness, scoreSet, sleepHours, type DaysMap } from '../scoring/day';
 import { ACTIVITY_TYPES, MED_TYPES, SYMPTOM_TYPES, TRIGGER_TYPES, bmLabel, isDivider } from '../registry';
-import { bpBce, bpKerdo, bpKvas, bpMap, bpPP, bpRobinson, type ScoreContext } from '../scoring';
+import { bpBce, bpKerdo, bpKvas, bpMap, bpPP, bpRobinson, numOr, orthoMaxDelta, type ScoreContext } from '../scoring';
 
 export type ReportRange = 'day' | 'week' | 'month' | 'year';
 
@@ -208,6 +208,120 @@ ${render(keys, ['scores', 'hrv', 'rhr', 'bp', 'sleep', 'activities', 'triggers',
   };
 }
 
+/** Age in whole years from the profile birthday (never the raw date), or null. */
+function profileAge(profile: AppState['profile']): number | null {
+  if (!profile || !profile.birthday) return null;
+  const b = new Date(profile.birthday);
+  if (isNaN(b.getTime())) return null;
+  const now = new Date();
+  let a = now.getFullYear() - b.getFullYear();
+  if (now.getMonth() < b.getMonth() || (now.getMonth() === b.getMonth() && now.getDate() < b.getDate())) a--;
+  return a >= 0 && a < 130 ? a : null;
+}
+
+/**
+ * Single-event insight prompt behind "Get AI Insights" on the POTS deep dives
+ * (orthostatic episode + guided stand test): every recorded field of the one
+ * event, the HR trace when captured (downsampled), and the recent orthostatic
+ * history for trend context, with a structured ask to judge the event against
+ * the POTS-range criteria and explain what the response pattern suggests.
+ */
+export function buildEventInsightPrompt(
+  days: DaysMap, profile: AppState['profile'], r: Entry, dk: string,
+  hrCurve?: { t: number; bpm: number }[] | null,
+): { prompt: string; rangeText: string } {
+  const isTest = r.type === 'standTest';
+  const longFmt = (k: string) => dateFromKey(k).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
+  const rangeText = `${longFmt(dk)}${r.time ? ' · ' + fmtTime12(r.time as string) : ''}`;
+  const signed = (v: number) => (v > 0 ? `+${v}` : String(v));
+  const line = (label: string, v: unknown, unit = '') => (v == null || v === '' ? null : `${label}: ${v}${unit}`);
+
+  const SOURCE: Record<string, string> = { polar: 'Bluetooth heart-rate strap', watch: 'Apple Watch', camera: 'Phone-camera PPG', manual: 'Manual entry', health: 'Imported from the platform health store' };
+  const source = (r.sourceName as string) || (r.source ? SOURCE[r.source as string] : null);
+
+  let lines: (string | null)[];
+  if (isTest) {
+    const peakDelta = numOr(r.peakDelta), sustained = numOr(r.sustainedDelta);
+    lines = [
+      line('Supine baseline HR (last two minutes lying down)', numOr(r.baselineHr), ' bpm'),
+      line('Peak standing HR', numOr(r.peakHr), ' bpm'),
+      line('Largest single rise above baseline (peak delta)', peakDelta != null ? signed(peakDelta) : null, ' bpm'),
+      line('Sustained rise (final-minute standing average vs baseline)', sustained != null ? signed(sustained) : null, ' bpm'),
+      `App flag - sustained rise of 30 bpm or more: ${r.metThreshold ? 'Yes' : 'No'}`,
+      line('Max HR reached during the test', numOr(r.maxHrReached), ' bpm'),
+      r.endedEarly ? 'The test was ended early' : null,
+      r.baselineUnstable ? 'Short resting phase: the baseline may be unreliable' : null,
+      line('Capture source', source),
+      line('User note', r.note),
+    ];
+  } else {
+    const before = numOr(r.beforeHr), after = numOr(r.afterHr), min1 = numOr(r.hr1min);
+    const maxDelta = orthoMaxDelta(r, hrCurve && hrCurve.length >= 2 ? hrCurve : null);
+    const rec = after != null && min1 != null ? min1 - after : null;
+    lines = [
+      line('Transition', (rv(r, 'transition') as string) ?? 'Position change'),
+      line('HR before (pre-episode baseline)', before, ' bpm'),
+      line('HR during the episode', after, ' bpm'),
+      line('HR one minute after', min1, ' bpm'),
+      line('Max change from baseline', maxDelta != null ? signed(maxDelta) : null, ' bpm'),
+      line('Recovery delta (HR at one minute vs during; negative means it settled back down)', rec != null ? signed(rec) : null, ' bpm'),
+      line('Capture source', source),
+      line('User note', r.note),
+    ];
+  }
+
+  // The per-second HR trace, thinned to ~150 points so the prompt stays small.
+  let curveBlock = '';
+  if (hrCurve && hrCurve.length >= 2) {
+    const step = Math.max(1, Math.ceil(hrCurve.length / 150));
+    const pts = hrCurve.filter((_, i) => i % step === 0).map((s) => `${Math.round(s.t)}s:${s.bpm}`).join(', ');
+    const markers = (isTest
+      ? [line('Stood up at', numOr(r.standAt), 's')]
+      : [line('Episode began at', numOr(r.transitionAt), 's'), line('Transition completed at', numOr(r.completedAt), 's')]
+    ).filter(Boolean).join(' | ');
+    curveBlock = `\n\nHEART-RATE TRACE (seconds from start : bpm${step > 1 ? `, showing 1 of every ${step} samples` : ''}; total length ${Math.round(hrCurve[hrCurve.length - 1].t)}s):\n${markers ? markers + '\n' : ''}${pts}`;
+  }
+
+  // Same-kind results from the surrounding month, so one event is never read
+  // in isolation (trends matter more than any single episode).
+  const HIST_DAYS = 30;
+  const histKeys: string[] = [];
+  for (let i = 0; i < HIST_DAYS; i++) histKeys.push(addDays(dk, -(HIST_DAYS - 1) + i));
+  const hist = secOrthostatic(days, histKeys.filter((k) => days[k]));
+
+  const age = profileAge(profile);
+  const who = [age != null ? `Age: ${age}` : '', profile && profile.sex ? `Sex: ${profile.sex}` : ''].filter(Boolean).join(' | ');
+  const eventName = isTest
+    ? 'guided POTS stand test (a timed lie-then-stand heart-rate test)'
+    : 'orthostatic episode (a logged heart-rate event around a position change)';
+
+  return {
+    rangeText,
+    prompt: `You are analyzing a single ${eventName} recorded on ${rangeText} by a person using Autonomic (autonomic.care), a personal health-tracking app for autonomic recovery. Base every observation on the data provided below. Do not assume a diagnosis or medical history that is not present in the data.
+
+Approach this as an honest friend examining the data carefully - direct and accurate without unnecessary softening or cruelty.
+
+REQUIREMENTS: Be concise, accurate, honest, specific (use actual numbers), research-grounded, and careful with recommendations (note doctor consultation for medications, therapeutic-dose supplements, or major protocol changes). Do not use em dashes anywhere in your response; use commas, colons, parentheses, or separate sentences instead.
+
+REFERENCE CRITERIA: The common adult POTS-range criterion is a sustained heart-rate rise of 30 bpm or more (40 or more for ages 12 to 19) within 10 minutes of standing, without the blood-pressure drop that defines orthostatic hypotension. This capture is heart-rate only: it contains no blood-pressure data, so orthostatic hypotension can be neither confirmed nor ruled out here. A single event is a data point, not a diagnosis; trends across repeated events under similar conditions matter most.
+${who ? `\nPROFILE (self-entered): ${who}\n` : ''}
+EVENT DATA:
+${lines.filter(Boolean).join('\n')}${curveBlock}
+
+RECENT ORTHOSTATIC HISTORY (past 30 days, includes this event):
+${hist}
+
+ANALYSIS REQUESTED:
+1. THE EVENT IN NUMBERS: Walk through what was recorded: baseline, the rise, the peak, and how the heart rate settled. Use the actual values.
+2. CRITERIA CHECK: State clearly whether this ${isTest ? 'test' : 'episode'} meets, approaches, or stays below the POTS-range criterion above, and exactly what a single heart-rate-only result can and cannot establish.
+3. RESPONSE PATTERN: What the shape of the response suggests (speed of the rise, peak timing, whether and how quickly it settled, and the trace shape if provided). Also weigh benign or situational explanations worth considering, such as deconditioning, dehydration, heat, a recent meal, anxiety, illness, or medication effects.
+4. TREND: Compare this event against the recent history above. Is the response better, worse, or consistent, and what does the pattern across events suggest?
+5. WHAT TO DO NEXT: How to repeat the measurement under similar conditions for a fair comparison, what context is worth logging alongside it, and which specific findings here would be worth bringing to a doctor.
+
+End your response by reminding the user that this is not a medical diagnosis, and that they should talk with their doctor if they are concerned or if symptoms persist or worsen.`,
+  };
+}
+
 /**
  * The "Medical Summary For Doctor" report. Unlike the other cards this does not
  * route through universalHeader's "honest friend" persona: it asks the AI to
@@ -225,9 +339,8 @@ export function buildDoctorPrompt(state: AppState, ctx: ScoreContext, range: Rep
   // Self-entered demographics give the clinician context; age is derived from
   // the birthday so the document never has to show a raw date of birth.
   const prof = state.profile || ({} as AppState['profile']);
-  let age = '';
-  if (prof.birthday) { const b = new Date(prof.birthday); if (!isNaN(b.getTime())) { const now = new Date(); let a = now.getFullYear() - b.getFullYear(); if (now.getMonth() < b.getMonth() || (now.getMonth() === b.getMonth() && now.getDate() < b.getDate())) a--; if (a >= 0 && a < 130) age = `${a}`; } }
-  const demographics = [age ? `Age: ${age}` : '', prof.sex ? `Sex: ${prof.sex}` : '', prof.height ? `Height: ${prof.height}` : '', prof.weight ? `Weight: ${prof.weight}` : ''].filter(Boolean).join(' | ') || 'not provided';
+  const a = profileAge(prof);
+  const demographics = [a != null ? `Age: ${a}` : '', prof.sex ? `Sex: ${prof.sex}` : '', prof.height ? `Height: ${prof.height}` : '', prof.weight ? `Weight: ${prof.weight}` : ''].filter(Boolean).join(' | ') || 'not provided';
 
   return `You are a clinical health writer preparing a concise, professional medical summary for a physician. The data below was self-tracked by a patient using Autonomic (autonomic.care), a personal app for autonomic recovery (dysautonomia, POTS, long COVID, ME/CFS style presentations), captured with consumer devices: phone-camera or chest-strap PPG for HRV, a home blood-pressure cuff, and wearable sleep tracking. Base every statement strictly on the data provided. Do not invent, assume, or diagnose anything that is not present in the data.
 

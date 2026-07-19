@@ -9,7 +9,7 @@ import { SCORE_COLORS, restingHrBands, sBP, worstCat } from '../scoring';
 import { scoreCat, sleepHours, streakInfo, type DaysMap } from '../scoring/day';
 import { ACTIVITY_TYPES, MED_TYPES, TRIGGER_TYPES } from '../registry';
 import {
-  BANDS, Mode, acBandZones, acBandsToZones, acBuckets, acMean, acPresent, acRangeLabel,
+  BANDS, Mode, acBandZones, acBandsToZones, acBuckets, acLatestIdx, acMean, acPresent, acRangeLabel,
   acReadVals, acScoreZones, avgRound, catFromBands, isEvening, isMorning, makeAgg,
   type ScoreContext,
 } from './buckets';
@@ -29,7 +29,9 @@ export interface Chart { label: string; series: Series[]; zones?: Zone[] | null;
 export interface MetricsRow { metrics: { label: string; value: number | string | null; sub?: string; color?: string; regrade?: (v: number) => string }[]; suffix?: string; zones?: boolean }
 /** Which readings a blood-pressure card is filtered to. */
 export type BpPeriod = 'all' | 'morning' | 'evening';
-export interface BpSeries { sys: (number | null)[]; dia: (number | null)[]; cat?: ScoreCat | null }
+/** `curSys`/`curDia`/`curLabel` are the latest bucket with a reading (the
+ *  current week/month/year when it has data) — the card's default readout. */
+export interface BpSeries { sys: (number | null)[]; dia: (number | null)[]; cat?: ScoreCat | null; curSys: number | null; curDia: number | null; curLabel?: string }
 /** Which transition an Orthostatic Events card is filtered to. */
 export type OrthoTransition = 'all' | 'lay' | 'sit' | 'stairs';
 /** One transition-filter variant of the Orthostatic Events card: the view swaps
@@ -38,7 +40,11 @@ export type OrthoTransition = 'all' | 'lay' | 'sit' | 'stairs';
 export interface OrthoVariant { cat: ScoreCat | null; charts: Chart[]; stats: Stat[]; insights: Insight[]; counts: (number | null)[]; metricsRow?: MetricsRow }
 export interface Stat { label: string; value: number | string | null; sub?: string; color?: string }
 export interface Insight { text: string; strength?: 'strong' | 'mod' | null }
-export interface BarGroup { label: string; rows: { name: string; count: number; color?: string }[]; fmt?: (c: number) => string }
+export interface BarGroup { label: string; rows: { name: string; count: number; color?: string; key?: string }[]; fmt?: (c: number) => string }
+/** Per-bucket counts behind a bars card: `totals` draws a bucket chart above
+ *  the horizontal bars, and tapping a row (matched by its `key`) narrows the
+ *  chart to that row's own counts until a tap elsewhere resets it. */
+export interface BarBuckets { totals: (number | null)[]; byKey: Record<string, (number | null)[]> }
 export interface AnalysisCard {
   title: string;
   sub?: string;
@@ -47,6 +53,8 @@ export interface AnalysisCard {
   /** Longer copy for the "?" help sheet next to the title. */
   help?: string;
   charts?: Chart[]; stats?: Stat[]; insights?: Insight[]; bars?: BarGroup[];
+  /** Per-bucket counts charted above the first bars group (see BarBuckets). */
+  barBuckets?: BarBuckets;
   /** Balance-style metric readout under the description (ortho cards carry one
    *  per transition variant instead, on `OrthoVariant`). */
   metricsRow?: MetricsRow;
@@ -149,8 +157,12 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
     const bpSpan = (f?: (r: Entry) => boolean): BpSeries => {
       const sys = acAgg(buckets, (d) => acReadVals(d, 'bp', 'sys', f));
       const dia = acAgg(buckets, (d) => acReadVals(d, 'bp', 'dia', f));
-      // Grade dot for the period: the worse of the systolic/diastolic averages.
-      return { sys, dia, cat: sBP(avgRound(sys), avgRound(dia)) };
+      // Readout + grade dot follow the latest bucket with a reading (the current
+      // week/month/year when it has data), not the range average.
+      const li = acLatestIdx(sys, dia);
+      const curSys = li >= 0 && sys[li] != null ? Math.round(sys[li]!) : null;
+      const curDia = li >= 0 && dia[li] != null ? Math.round(dia[li]!) : null;
+      return { sys, dia, cat: sBP(curSys, curDia), curSys, curDia, curLabel: li >= 0 ? buckets[li].label : undefined };
     };
     const bpFilter: Record<BpPeriod, BpSeries> = { all: bpSpan(), morning: bpSpan(isMorning), evening: bpSpan(isEvening) };
     const { sys, dia } = bpFilter.all;
@@ -167,20 +179,23 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
         { label: '', series: [], dumbbell: { sys, dia } },
       ],
       stats: [
-        { label: 'Avg systolic', value: avgRound(sys) },
-        { label: 'Avg diastolic', value: avgRound(dia) },
+        { label: 'Systolic', value: bpFilter.all.curSys, sub: bpFilter.all.curLabel ? `(${bpFilter.all.curLabel})` : undefined },
+        { label: 'Diastolic', value: bpFilter.all.curDia, sub: bpFilter.all.curLabel ? `(${bpFilter.all.curLabel})` : undefined },
       ],
       bpFilter,
     });
-    const layingAvg = acMean(laying);
+    // Readout + grade follow the latest bucket with a reading; dragging the
+    // chart swaps in other buckets and a blur returns here.
+    const layingLi = acLatestIdx(laying);
+    const layingCur = layingLi >= 0 ? laying[layingLi] : null;
     if (acPresent(laying).length) cards.push({
       title: 'Resting Heart Rate', sub: range,
-      cat: layingAvg != null ? catFromBands(layingAvg, restingHrBands('Laying')) : null,
+      cat: layingCur != null ? catFromBands(layingCur, restingHrBands('Laying')) : null,
       catBands: restingHrBands('Laying'),
       desc: 'Laying heart rate over the range.',
       help: 'Heart rate measured while laying down, the cleanest resting baseline. A gradually falling laying HR usually accompanies improving autonomic recovery; a sustained unexplained rise is worth noting alongside symptoms and sleep.',
       charts: [{ label: '', series: [series(laying, SCORE_COLORS.bad)], zones: acBandsToZones(restingHrBands('Laying')), integer: true, selectStat: true }],
-      stats: [{ label: 'Avg laying HR', value: avgRound(laying) }],
+      stats: [{ label: 'Laying HR', value: layingCur != null ? Math.round(layingCur) : null, sub: layingLi >= 0 ? `(${buckets[layingLi].label})` : undefined }],
     });
     return cards;
   };
@@ -325,15 +340,26 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
     const dur = acAgg(buckets, (d, dk) => sleepHours(days, dk));
     if (!acPresent(dur).length) return [];
     const durAvg = acMean(dur);
+    // Readout follows the most recent bucket with a night logged (like the
+    // Outlook/POTS cards); tapping the chart swaps it for that bucket.
+    let li = -1; dur.forEach((v, i) => { if (v != null) li = i; });
+    const cur = li >= 0 ? dur[li] : null;
+    const durColor = (v: number) => { const c = catFromBands(v, BANDS.sleepDur); return c ? SCORE_COLORS[c] : '#38bdf8'; };
     const cards: AnalysisCard[] = [{
       title: 'Duration', sub: range,
       cat: durAvg != null ? catFromBands(durAvg, BANDS.sleepDur) : null,
       desc: 'How long you slept and when, night by night.',
       help: 'Duration is the night that ended that morning, coloured by grade the same way each night is scored: 8h+ reads as great, 7h good, 6h ok, and it falls off below that. Tap "Show zones" for the grade thresholds. Consistency of timing often moves HRV as much as raw duration does.',
+      metricsRow: {
+        metrics: cur != null
+          ? [{ label: 'Duration', value: Math.round(cur * 10) / 10, sub: 'h', color: durColor(cur), regrade: durColor }]
+          : [],
+        suffix: li >= 0 ? `(${buckets[li].label})` : undefined,
+        zones: true,
+      },
       charts: [
         { label: '', series: [series(dur, '#38bdf8')], zones: acBandZones('sleepDur') },
       ],
-      stats: [{ label: 'Avg sleep', value: avgRound(dur, 1), sub: 'h' }],
     }];
     const num = (v: string | number | undefined) => { const n = parseFloat(v as string); return isNaN(n) ? null : n; };
     const hrLow = acAgg(buckets, (d) => num(d.sleep?.hrLow));
@@ -386,23 +412,35 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
   const triggers = (): AnalysisCard[] => {
     const water = acAgg(buckets, (d) => (d.food && +d.food.water > 0 ? +d.food.water : null));
     const trig: Record<string, number> = {};
+    // Per-bucket counts per trigger, for the chart above the bars: totals by
+    // default, one trigger's own counts while its row is selected.
+    const byKey: Record<string, (number | null)[]> = {};
     const trigLabel = (k: string) => ctx.customTypes?.triggers?.[k]?.label || TRIGGER_TYPES[k]?.label;
-    buckets.forEach((b) => b.days.forEach((dk) => { const f = days[dk].food; if (!f) return; Object.keys(f.triggers || {}).forEach((k) => { if (f.triggers[k] > 0 && trigLabel(k)) trig[k] = (trig[k] || 0) + f.triggers[k]; }); }));
-    const trigRows = Object.entries(trig).map(([k, c]) => ({ name: trigLabel(k)!, count: c })).sort((a, b) => b.count - a.count);
+    buckets.forEach((b, bi) => b.days.forEach((dk) => { const f = days[dk].food; if (!f) return; Object.keys(f.triggers || {}).forEach((k) => {
+      if (!(f.triggers[k] > 0) || !trigLabel(k)) return;
+      trig[k] = (trig[k] || 0) + f.triggers[k];
+      if (!byKey[k]) byKey[k] = buckets.map(() => 0);
+      byKey[k][bi] = (byKey[k][bi] || 0) + f.triggers[k];
+    }); }));
+    const trigRows = Object.entries(trig).map(([k, c]) => ({ key: k, name: trigLabel(k)!, count: c })).sort((a, b) => b.count - a.count);
     if (!acPresent(water).length && !trigRows.length) return [];
     const cards: AnalysisCard[] = [];
     if (trigRows.length) cards.push({
       title: 'Triggers',
       desc: 'How often each trigger showed up in this range.',
-      help: 'Counts of every logged trigger (histamine foods, caffeine, alcohol and the rest). Pair this with the Outlook correlations: if a trigger keeps landing before bad days, that\'s a pattern worth testing with an elimination window.',
+      help: 'Counts of every logged trigger (histamine foods, caffeine, alcohol and the rest). The chart totals them per day/week/month; tap a trigger below to see just its own pattern, and tap anywhere else to reset. Pair this with the Outlook correlations: if a trigger keeps landing before bad days, that\'s a pattern worth testing with an elimination window.',
       bars: [{ label: 'All triggers', rows: trigRows }],
+      barBuckets: { totals: buckets.map((_, bi) => trigRows.reduce((s, r) => s + (byKey[r.key][bi] || 0), 0)), byKey },
     });
+    // Readout follows the latest bucket with water logged, like the other cards.
+    const waterLi = acLatestIdx(water);
+    const waterCur = waterLi >= 0 && water[waterLi] != null ? Math.round(water[waterLi]! * 10) / 10 : null;
     if (acPresent(water).length) cards.push({
       title: 'Hydration', sub: range,
       desc: 'Daily water intake against the target band.',
       help: 'Litres of water per day; the dashed band marks the 2.5–3.5 L range commonly recommended alongside electrolytes for orthostatic conditions. Fluid only holds where salt allows. If you chase volume, discuss electrolyte targets with your doctor.',
       charts: [{ label: 'Water (L/day)', series: [series(water, '#38bdf8')], target: { from: 2.5, to: 3.5, color: '#16a34a' } }],
-      stats: [{ label: 'Avg water', value: avgRound(water, 1), sub: 'L' }],
+      stats: [{ label: 'Water', value: waterCur, sub: waterLi >= 0 ? `L (${buckets[waterLi].label})` : 'L' }],
     });
     return cards;
   };

@@ -25,9 +25,10 @@ export function acBuckets(days: DaysMap, mode: Mode): Bucket[] {
   if (mode === 'day') {
     for (let i = 13; i >= 0; i--) { const dt = new Date(today); dt.setDate(today.getDate() - i); buckets.push(mk(dt, dt, `${dt.getMonth() + 1}/${dt.getDate()}`)); }
   } else if (mode === 'week') {
-    const dow = (today.getDay() + 6) % 7;
-    const thisMon = new Date(today); thisMon.setDate(today.getDate() - dow);
-    for (let i = 11; i >= 0; i--) { const s = new Date(thisMon); s.setDate(thisMon.getDate() - i * 7); const e = new Date(s); e.setDate(s.getDate() + 6); buckets.push(mk(s, e, `${s.getMonth() + 1}/${s.getDate()}`)); }
+    // Weeks run Sunday → Saturday (matching the Calendar grid), so the last
+    // bucket is the in-progress week starting on the most recent Sunday.
+    const thisSun = new Date(today); thisSun.setDate(today.getDate() - today.getDay());
+    for (let i = 11; i >= 0; i--) { const s = new Date(thisSun); s.setDate(thisSun.getDate() - i * 7); const e = new Date(s); e.setDate(s.getDate() + 6); buckets.push(mk(s, e, `${s.getMonth() + 1}/${s.getDate()}`)); }
   } else if (mode === 'month') {
     for (let i = 11; i >= 0; i--) { const s = new Date(today.getFullYear(), today.getMonth() - i, 1); const e = new Date(today.getFullYear(), today.getMonth() - i + 1, 0); buckets.push(mk(s, e, s.toLocaleDateString(undefined, { month: 'short' }))); }
   } else {
@@ -70,6 +71,15 @@ export function makeAgg(days: DaysMap, ctx: ScoreContext) {
 }
 
 export const acPresent = (vals: (number | null)[]) => vals.filter((v): v is number => v != null && !isNaN(v));
+/** Index of the newest bucket where any of the given series resolved, or -1.
+ *  Card readouts default to this bucket (the current week/month/year when it
+ *  has data), mirroring what a chart tap on the last point would show. */
+export const acLatestIdx = (...seriesArr: (number | null)[][]): number => {
+  for (let i = Math.max(0, ...seriesArr.map((a) => a.length)) - 1; i >= 0; i--) {
+    if (seriesArr.some((a) => a[i] != null && !isNaN(a[i] as number))) return i;
+  }
+  return -1;
+};
 export const acMean = (vals: (number | null)[]) => { const p = acPresent(vals); return p.length ? p.reduce((s, x) => s + x, 0) / p.length : null; };
 export const avgRound = (vals: (number | null)[], dp = 0) => { const m = acMean(vals); if (m == null) return null; const f = Math.pow(10, dp); return Math.round(m * f) / f; };
 

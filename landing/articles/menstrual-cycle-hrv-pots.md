@@ -8,7 +8,7 @@ keywords: "menstrual cycle and HRV, HRV luteal phase, HRV follicular phase, POTS
 date: 2026-07-19
 updated: 2026-07-19
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1506126613408-eca07ce68773?q=80&w=1760&auto=format&fit=crop"
+photoLocation: "https://images.unsplash.com/photo-1783916812204-1e975731de9d?q=80&w=1287&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
 photoAttribution: "Jared Rice / Unsplash"
 tldr: "Across a typical cycle, estrogen dominates the first (follicular) half and tends to lift HRV and lower resting heart rate, while progesterone dominates the second (luteal) half and does the reverse: HRV drifts down and resting heart rate rises a few beats. That means a lower HRV in the week before your period is usually expected physiology, not a red flag. It also helps explain why POTS and dysautonomia symptoms so often worsen premenstrually and during bleeding, when hormones withdraw and blood volume can dip. The practical move is to know your cycle phase when you read your numbers, compare like phase to like phase, and follow the multi-cycle trend rather than reacting to a single luteal-phase dip."
 categories:

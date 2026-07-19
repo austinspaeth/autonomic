@@ -5,14 +5,14 @@ import { BlurView } from 'expo-blur';
 import { Screen } from '../../src/components/Header';
 import { Icon } from '../../src/components/Icon';
 import { HelpDot, ScoreDot, Segmented } from '../../src/components/ui';
-import { Bars, BpDumbbell, LineChart, ZonesToggle } from '../../src/components/charts';
+import { Bars, BpDumbbell, LineChart, StackedBars, ZonesToggle, useChartsBlur } from '../../src/components/charts';
 import { fonts, radius, usePalette } from '../../src/theme';
 import { useAppState } from '../../src/store/store';
 import { useTier } from '../../src/store/tier';
 import { usePaywall } from '../../src/features/Paywall';
 import { buildCategories, type AnalysisCard, type BpPeriod, type OrthoTransition } from '../../src/lib/analysis/categories';
 import { resolveProtocol, type DaysMap } from '../../src/lib/scoring/day';
-import { avgRound, catFromBands, type Mode } from '../../src/lib/analysis/buckets';
+import { catFromBands, type Mode } from '../../src/lib/analysis/buckets';
 import { HrvFilterLinks, HrvProgress, type Filt } from '../../src/features/HrvProgress';
 import { demoDays, hasOwnData } from '../../src/lib/demo';
 import { DemoBanner, DEMO_PROGRESS_TEXT } from '../../src/features/DemoBanner';
@@ -407,6 +407,11 @@ const CardView = React.memo(function CardView({ card, buckets }: { card: Analysi
   // insights and grade, so the view swaps them wholesale. Inert elsewhere.
   const [orthoFilt, setOrthoFilt] = useState<OrthoTransition>('all');
   const orthoSpan = card.orthoFilter ? card.orthoFilter[orthoFilt] : null;
+  // Bar-row selection (Triggers card): tapping a horizontal bar narrows the
+  // bucket chart above the bars to that trigger; any tap elsewhere fires the
+  // shared charts-blur and resets it back to the totals.
+  const [selBar, setSelBar] = useState<string | null>(null);
+  useChartsBlur(useCallback(() => setSelBar(null), []));
   const charts = orthoSpan ? orthoSpan.charts : (card.charts || []);
   const insights = orthoSpan ? orthoSpan.insights : (card.insights || []);
   const orthoEmpty = !!orthoSpan && !charts.some((c) => c.series.some((s) => s.values.some((v) => v != null && !isNaN(v))));
@@ -425,7 +430,7 @@ const CardView = React.memo(function CardView({ card, buckets }: { card: Analysi
   const metricsChart = metricsRow ? (selChart ?? charts.find((c) => !c.dumbbell)) : null;
   const shownMetrics = useMemo(() => {
     if (!metricsRow || !metricsChart || sel == null || sel < 0) return metricsRow;
-    const at = (si: number) => { const v = metricsChart.series[si]?.values[sel]; return v != null && !isNaN(v) ? Math.round(v) : null; };
+    const at = (si: number) => { const v = metricsChart.series[si]?.values[sel]; return v != null && !isNaN(v) ? (metricsChart.integer ? Math.round(v) : Math.round(v * 10) / 10) : null; };
     return {
       ...metricsRow,
       metrics: metricsRow.metrics.map((m, i) => {
@@ -440,7 +445,7 @@ const CardView = React.memo(function CardView({ card, buckets }: { card: Analysi
   }, [metricsRow, metricsChart, sel, orthoSpan, buckets]);
   // Range/data changes rebuild the buckets, so any held selection index no
   // longer points at the same date — drop it.
-  useEffect(() => { setSel(null); }, [buckets]);
+  useEffect(() => { setSel(null); setSelBar(null); }, [buckets]);
   const showZonesLink = !!zonesChart || !!metricsRow?.zones;
   const stats = useMemo(() => {
     // Ortho: a selected point swaps the whole row to that bucket — the day's
@@ -457,10 +462,11 @@ const CardView = React.memo(function CardView({ card, buckets }: { card: Analysi
       return st;
     }
     const st = card.stats ? card.stats.slice() : [];
-    // BP: the two avg tiles follow the selected period's readings.
+    // BP: the two tiles follow the selected period's latest bucket.
     if (bpSpan && st.length >= 2) {
-      st[0] = { ...st[0], value: avgRound(bpSpan.sys) };
-      st[1] = { ...st[1], value: avgRound(bpSpan.dia) };
+      const sub = bpSpan.curLabel ? `(${bpSpan.curLabel})` : undefined;
+      st[0] = { ...st[0], value: bpSpan.curSys, sub };
+      st[1] = { ...st[1], value: bpSpan.curDia, sub };
     }
     if (selChart && selSeries && sel != null && sel >= 0 && st.length) {
       const v = selSeries.values[sel];
@@ -590,12 +596,27 @@ const CardView = React.memo(function CardView({ card, buckets }: { card: Analysi
           ) : null}
         </View>
       ))}
-      {(card.bars || []).map((bg, i) => (
-        <View key={i} style={{ marginTop: 14 }}>
-          {bg.label ? <Text style={{ fontSize: 12, color: p.text, marginBottom: 6, fontWeight: '600' }}>{bg.label}</Text> : null}
-          <Bars rows={bg.rows} fmt={bg.fmt} />
-        </View>
-      ))}
+      {(card.bars || []).map((bg, i) => {
+        // `barBuckets` rides with the first bars group: a per-bucket totals
+        // chart above the rows, narrowed to one row's counts while selected.
+        const bb = i === 0 ? card.barBuckets : undefined;
+        const selRow = bb && selBar ? bg.rows.find((r) => r.key === selBar) : null;
+        return (
+          <View key={i} style={{ marginTop: 14 }}>
+            {bg.label ? <Text style={{ fontSize: 12, color: p.text, marginBottom: 6, fontWeight: '600' }}>{selRow ? selRow.name : bg.label}</Text> : null}
+            {bb ? (
+              <View style={{ marginBottom: 4 }}>
+                <StackedBars
+                  buckets={buckets}
+                  height={124}
+                  segments={[{ label: selRow ? selRow.name : bg.label, color: p.accent, values: selRow ? (bb.byKey[selRow.key!] ?? bb.totals) : bb.totals }]}
+                />
+              </View>
+            ) : null}
+            <Bars rows={bg.rows} fmt={bg.fmt} selected={bb ? selBar : undefined} onRowPress={bb ? setSelBar : undefined} />
+          </View>
+        );
+      })}
       {insights.map((ins, i) => (
         <View key={i} style={{ flexDirection: 'row', gap: 10, backgroundColor: p.surface2, borderRadius: radius.control, padding: 12, marginTop: 10 }}>
           <View style={{ width: 3, borderRadius: 2, backgroundColor: ins.strength === 'strong' ? '#16a34a' : ins.strength === 'mod' ? '#eab308' : p.accent }} />

@@ -46,7 +46,7 @@ let sparkId = 0;
  * effect is that tapping anywhere *outside* a chart blurs its selection. */
 const chartBlurListeners = new Set<() => void>();
 export function notifyChartsBlur() { chartBlurListeners.forEach((fn) => fn()); }
-function useChartsBlur(onBlur: () => void) {
+export function useChartsBlur(onBlur: () => void) {
   useEffect(() => {
     chartBlurListeners.add(onBlur);
     return () => { chartBlurListeners.delete(onBlur); };
@@ -1172,8 +1172,9 @@ export function StackedBars({ buckets, segments, height = 160, unit, hideHeader,
     onSelect?.(i);
   };
   const readoutIdx = selIdx >= 0 ? selIdx : (() => { for (let i = n - 1; i >= 0; i--) if (totals[i] > 0) return i; return -1; })();
+  // A single segment's breakdown would just repeat the total, so it is omitted.
   const readout = readoutIdx >= 0
-    ? `${buckets[readoutIdx]?.label ?? ''}: ${Math.round(totals[readoutIdx])}${unit ? ' ' + unit : ''} · ${segments.map((s) => `${s.label} ${Math.round(s.values[readoutIdx] || 0)}`).join(' · ')}`
+    ? `${buckets[readoutIdx]?.label ?? ''}: ${Math.round(totals[readoutIdx])}${unit ? ' ' + unit : ''}${segments.length > 1 ? ` · ${segments.map((s) => `${s.label} ${Math.round(s.values[readoutIdx] || 0)}`).join(' · ')}` : ''}`
     : '';
   const yticks = [0, max / 2, max];
   return (
@@ -1224,21 +1225,33 @@ export function StackedBars({ buckets, segments, height = 160, unit, hideHeader,
 }
 
 /* ---------- Horizontal bars (analysis) ---------- */
-export function Bars({ rows, fmt }: { rows: { name: string; count: number; color?: string }[]; fmt?: (c: number) => string }) {
+export function Bars({ rows, fmt, selected, onRowPress }: {
+  rows: { name: string; count: number; color?: string; key?: string }[]; fmt?: (c: number) => string;
+  /** Selected row key — the other rows dim while one is selected. */
+  selected?: string | null;
+  /** Makes keyed rows tappable; selection state is owned by the host. */
+  onRowPress?: (key: string) => void;
+}) {
   const p = usePalette();
   if (!rows.length) return null;
   const max = Math.max(...rows.map((r) => r.count)) || 1;
   return (
     <View>
-      {rows.map((r, i) => (
-        <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 }}>
-          <RNText style={{ width: '38%', fontSize: 15, color: p.text }}>{r.name}</RNText>
-          <View style={{ flex: 1, height: 8, backgroundColor: p.surface2, borderRadius: 999, overflow: 'hidden' }}>
-            <View style={{ height: '100%', width: `${(r.count / max) * 100}%`, backgroundColor: r.color || p.accent, borderRadius: 999 }} />
+      {rows.map((r, i) => {
+        const dim = selected != null && r.key !== selected;
+        const row = (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, opacity: dim ? 0.4 : 1 }}>
+            <RNText style={{ width: '38%', fontSize: 15, color: p.text }}>{r.name}</RNText>
+            <View style={{ flex: 1, height: 8, backgroundColor: p.surface2, borderRadius: 999, overflow: 'hidden' }}>
+              <View style={{ height: '100%', width: `${(r.count / max) * 100}%`, backgroundColor: r.color || p.accent, borderRadius: 999 }} />
+            </View>
+            <RNText style={{ width: 40, textAlign: 'right', fontVariant: ['tabular-nums'], fontWeight: '600', fontSize: 15, color: p.text }}>{fmt ? fmt(r.count) : String(r.count)}</RNText>
           </View>
-          <RNText style={{ width: 40, textAlign: 'right', fontVariant: ['tabular-nums'], fontWeight: '600', fontSize: 15, color: p.text }}>{fmt ? fmt(r.count) : String(r.count)}</RNText>
-        </View>
-      ))}
+        );
+        return onRowPress && r.key != null
+          ? <Pressable key={r.key} onPress={() => onRowPress(r.key!)}>{row}</Pressable>
+          : <View key={i}>{row}</View>;
+      })}
     </View>
   );
 }

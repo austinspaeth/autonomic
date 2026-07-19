@@ -10,7 +10,7 @@
  * kept for the day-score breakdown (DaySummary).
  */
 import React, { useMemo, useState } from 'react';
-import { Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { fonts, radius, usePalette } from '../theme';
 import type { Band, Entry, ScoreCat } from '../lib/types';
 import {
@@ -22,10 +22,16 @@ import {
 import { metricHistory, numEx, type DaysMap } from '../lib/scoring/day';
 import { entryFields, isDivider, READING_TYPES } from '../lib/registry';
 import { healthAppName } from '../lib/health';
-import { fmtNum, fmtShort } from '../lib/dates';
+import { fmtNum, fmtShort, todayKey } from '../lib/dates';
 import { correctArtifacts } from '../lib/hrv';
-import { getWaveform } from '../store/store';
+import { buildEventInsightPrompt } from '../lib/analysis/reports';
+import { getState, getWaveform } from '../store/store';
+import { useTier } from '../store/tier';
+import { usePaywall } from '../features/Paywall';
+import { PromptSheet } from '../features/PromptSheet';
 import { BalanceChart, OrthoHrChart, PowerSpectrum, Sparkline, StandHrChart, Tachogram, ZonesToggle, balanceCat } from './charts';
+import { Icon } from './Icon';
+import { useSheets } from './Sheet';
 import { HelpDot, ScoreDot } from './ui';
 
 const hexA = (hex: string, a: number) => {
@@ -534,6 +540,42 @@ function hrCurveFor(r: Entry): { t: number; bpm: number }[] | null {
   return Array.isArray(inline) && inline.length >= 2 ? inline : null;
 }
 
+/**
+ * "Get AI Insights on this episode/test" footer button on the POTS deep dives.
+ * Builds a single-event analysis prompt (all recorded fields + HR trace +
+ * recent orthostatic history) and stacks the shared PromptSheet, wearing the
+ * Insights tab's icon to tie the two together. Pro-gated like the Insights
+ * reports and the downturn investigation.
+ */
+function EventInsightButton({ r, days, hrCurve, noun, title }: {
+  r: Entry; days: DaysMap; hrCurve: { t: number; bpm: number }[] | null; noun: string; title: string;
+}) {
+  const p = usePalette();
+  const { openSheet } = useSheets();
+  const tier = useTier();
+  const openPaywall = usePaywall();
+  const open = () => {
+    if (tier === 'free') { openPaywall(); return; }
+    // The entry's day key comes from the days map itself (unsaved live previews
+    // are injected into today's readings, so they resolve too).
+    const dk = Object.keys(days).find((k) => ((days[k] && days[k].readings) || []).some((x) => x.id === r.id)) || todayKey();
+    const { prompt, rangeText } = buildEventInsightPrompt(days, getState().profile, r, dk, hrCurve);
+    openSheet((c) => <PromptSheet title={title} rangeText={rangeText} prompt={prompt} controls={c} />);
+  };
+  return (
+    <Pressable
+      onPress={open}
+      style={({ pressed }) => [
+        { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, borderWidth: 1, borderRadius: radius.control, backgroundColor: p.surface2, borderColor: p.border, paddingVertical: 13, marginBottom: 12 },
+        pressed && { opacity: 0.7 },
+      ]}
+    >
+      <Icon name="ai" size={19} color={p.accent} />
+      <Text style={{ color: p.text, fontSize: 16, fontWeight: '600' }}>{`Get AI Insights on this ${noun}`}</Text>
+    </Pressable>
+  );
+}
+
 export function OrthostaticSummary({ r, days, ctx: _ctx }: SummaryProps) {
   const p = usePalette();
   const before = numOr(r.beforeHr), after = numOr(r.afterHr), min1 = numOr(r.hr1min);
@@ -607,6 +649,7 @@ export function OrthostaticSummary({ r, days, ctx: _ctx }: SummaryProps) {
           </View>
         </Section>
       ) : null}
+      <EventInsightButton r={r} days={days} hrCurve={hrCurve} noun="episode" title="Episode Insights" />
     </>
   );
 }
@@ -684,6 +727,7 @@ export function StandTestSummary({ r, days, ctx: _ctx }: SummaryProps) {
         </View>
       </Section>
       <Notes r={r} />
+      <EventInsightButton r={r} days={days} hrCurve={hrCurve} noun="test" title="Stand Test Insights" />
       <Text style={{ fontSize: 12, color: p.textDim, lineHeight: 17, marginBottom: 16, paddingHorizontal: 4 }}>{STAND_DISCLAIMER}</Text>
     </>
   );

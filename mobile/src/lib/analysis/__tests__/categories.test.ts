@@ -113,3 +113,29 @@ describe('Orthostatic events card', () => {
     expect(f.stairs.cat).toBe('great');
   });
 });
+
+describe('Triggers card bucket chart', () => {
+  const trigDay = (triggers: Record<string, number>) => ({ ...blankDay(), food: { water: 0, calories: 0, meals: [], triggers } });
+  const days: DaysMap = {
+    [dayKey(3)]: trigDay({ caffeine: 2, alcohol: 1 }),
+    [dayKey(1)]: trigDay({ caffeine: 1 }),
+  };
+
+  it('keys rows and carries per-bucket totals + per-trigger counts', () => {
+    const cat = buildCategories(days, 'day', ctx).find((c) => c.id === 'triggers')!;
+    const card = cat.build().find((c) => c.title === 'Triggers')!;
+    // Rows carry their registry key (the row-tap → chart-filter handle),
+    // sorted by count like before.
+    expect(card.bars![0].rows.map((r) => r.key)).toEqual(['caffeine', 'alcohol']);
+    const bb = card.barBuckets!;
+    // Day mode = 14 daily buckets, newest last.
+    expect(bb.totals).toHaveLength(14);
+    expect(bb.totals[13 - 3]).toBe(3);
+    expect(bb.totals[13 - 1]).toBe(1);
+    expect(bb.totals[13]).toBe(0);
+    expect(bb.byKey.caffeine[13 - 3]).toBe(2);
+    expect(bb.byKey.caffeine[13 - 1]).toBe(1);
+    expect(bb.byKey.alcohol[13 - 3]).toBe(1);
+    expect(bb.byKey.alcohol[13 - 1]).toBe(0);
+  });
+});
