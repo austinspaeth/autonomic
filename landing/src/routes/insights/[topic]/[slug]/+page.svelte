@@ -3,6 +3,7 @@
   import ArticleCover from '$lib/ArticleCover.svelte';
   import ArticleCard from '$lib/ArticleCard.svelte';
   import BlogEndCTA from '$lib/BlogEndCTA.svelte';
+  import SocialShareWidget from '$lib/SocialShareWidget.svelte';
   import InsightsShell from '$lib/InsightsShell.svelte';
   import { formatDate, isoDate, articleHref } from '$lib/site';
   import { topicLabel } from '$lib/topics';
@@ -22,6 +23,7 @@
     photoLocation?: string;
     photoAttribution?: string;
     faq?: { q: string; a: string }[];
+    social?: { linkedin?: string; reddit?: string; x?: string; facebook?: string };
   };
   export let data: { content: any; meta: Meta; articles?: Article[] };
 
@@ -143,6 +145,7 @@
 </svelte:head>
 
 <InsightsShell>
+  <SocialShareWidget social={meta.social} />
   <article class="article-card">
     <figure class="ac-figure">
       <ArticleCover
