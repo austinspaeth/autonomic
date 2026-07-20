@@ -141,6 +141,7 @@ final class HrMonitorModel: ObservableObject {
 struct HrMonitorView: View {
     let onEnd: () -> Void
     @EnvironmentObject private var relay: PhoneRelay
+    @EnvironmentObject private var workout: WorkoutManager
     @StateObject private var model = HrMonitorModel()
     @Environment(\.isLuminanceReduced) private var isLuminanceReduced
     @State private var pulse = false
@@ -170,7 +171,29 @@ struct HrMonitorView: View {
 
     // MARK: - HR page
 
-    private var hrPage: some View {
+    /// Sharing denied replaces the readout: a grey 00 there would read as a
+    /// sensor failure, when the fix lives in Health settings.
+    @ViewBuilder private var hrPage: some View {
+        if workout.sharingDenied { deniedNotice } else { hrReadout }
+    }
+
+    private var deniedNotice: some View {
+        VStack(spacing: 6) {
+            Image(systemName: "heart.slash.fill")
+                .font(.system(size: 22))
+                .foregroundStyle(DS.accent)
+            Text("Health access needed")
+                .font(.system(size: 14, weight: .bold))
+            Text("Allow workouts for Autonomic in Health sharing settings, then come back.")
+                .font(.system(size: 11.5))
+                .foregroundStyle(DS.dim)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, 6)
+    }
+
+    private var hrReadout: some View {
         VStack(spacing: 0) {
             Text("HEART RATE")
                 .font(.system(size: 11, weight: .bold))

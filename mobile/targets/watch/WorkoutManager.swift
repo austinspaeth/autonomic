@@ -63,6 +63,17 @@ import HealthKit
  *   can never silently inherit the monitor's paused session.
  * Held display values are never cleared by a recovery, only by stop().
  *
+ * Authorization gates the whole pipeline. start() only builds a session once
+ * workout sharing is granted: undetermined → request first and begin from
+ * the completion (starting anyway not only fails, it can keep watchOS from
+ * ever presenting the permission sheet — the post-upgrade wedge where every
+ * complication tap sat on a grey 00 for a minute, bounced back to the clock
+ * face, and stayed broken until a reboot). Denied → `sharingDenied`
+ * publishes so the monitor explains itself instead of imitating a sensor
+ * failure. recover() honors the same gate, and refreshAuthorization()
+ * (called on every app activation) retries a sheet that never presented and
+ * picks up access granted in Settings while the app sat denied.
+ *
  * stop()→start() back-to-back is safe: stop() releases the session
  * synchronously (so a new start() is never a silent no-op against a corpse
  * awaiting its HealthKit save callback) and its async display reset is
@@ -133,6 +144,13 @@ final class WorkoutManager: NSObject, ObservableObject {
     /// UI greys on this so a short dropout looks like an unbroken connection.
     @Published var signalLost = false
     @Published var running = false
+    /// Workout sharing is denied in Health settings — no session can run.
+    /// The monitor UI shows how to fix it instead of a grey 00.
+    @Published var sharingDenied = false
+
+    private var workoutShareStatus: HKAuthorizationStatus {
+        store.authorizationStatus(for: HKObjectType.workoutType())
+    }
 
     /// Claim and end a workout session orphaned by a dead previous process.
     /// An unclaimed orphan wedges the whole app: watchOS keeps relaunching it
@@ -165,12 +183,31 @@ final class WorkoutManager: NSObject, ObservableObject {
         let share: Set<HKSampleType> = [HKObjectType.workoutType()]
         store.requestAuthorization(toShare: share, read: read) { [weak self] _, _ in
             DispatchQueue.main.async {
-                // If streaming started before the user answered the permission
-                // prompt, the session and/or query were born dead. Rebuild
-                // both now instead of waiting out the watchdog leash.
-                guard let self, self.wantsStreaming, !self.sampleThisSession else { return }
-                self.lastRecoverAt = nil
-                self.recover()
+                guard let self else { return }
+                self.sharingDenied = self.workoutShareStatus == .sharingDenied
+                // A stream started before authorization resolved was deferred
+                // by start()'s gate — begin it now that the user has answered.
+                guard self.wantsStreaming, self.session == nil,
+                      self.workoutShareStatus == .sharingAuthorized else { return }
+                self.beginStream()
+            }
+        }
+    }
+
+    /// Re-evaluate Health authorization whenever the app becomes active:
+    /// retries a permission sheet that never presented (the stuck
+    /// post-upgrade state) and picks up access granted in Settings while a
+    /// wanted stream sat gated. Safe to call when nothing is streaming.
+    func refreshAuthorization() {
+        guard HKHealthStore.isHealthDataAvailable() else { return }
+        let status = workoutShareStatus
+        DispatchQueue.main.async {
+            self.sharingDenied = status == .sharingDenied
+            guard self.wantsStreaming, self.session == nil else { return }
+            switch status {
+            case .sharingAuthorized: self.beginStream()
+            case .notDetermined: self.requestAuthorization()
+            default: break
             }
         }
     }
@@ -196,12 +233,18 @@ final class WorkoutManager: NSObject, ObservableObject {
         // the previous stop()'s reset (generation guard), so clear here too.
         lastSampleAt = nil
         lastIngestEnd = nil
-        beginSession()
-        // The store query runs in BOTH modes: monitor's only feed, capture's
-        // safety net under the builder delegate.
-        let began = Date()
-        streamBeganAt = began
-        startHrQuery(from: began)
+        // Authorization gate: a session started while workout sharing is
+        // undetermined fails outright AND can block watchOS from presenting
+        // the permission sheet at all (see the class doc). Ask first and
+        // begin from the completion; denied surfaces in the UI instead.
+        switch workoutShareStatus {
+        case .sharingAuthorized:
+            beginStream()
+        case .notDetermined:
+            requestAuthorization()
+        default:
+            DispatchQueue.main.async { self.sharingDenied = true }
+        }
         DispatchQueue.main.async {
             self.hr = nil
             self.running = true
@@ -212,6 +255,19 @@ final class WorkoutManager: NSObject, ObservableObject {
         staleTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             self?.tick()
         }
+    }
+
+    /// Build the session + store query. Only ever called with workout
+    /// sharing authorized (start()'s gate, the auth completion, or an
+    /// activation refresh) and with no session live.
+    private func beginStream() {
+        DispatchQueue.main.async { self.sharingDenied = false }
+        beginSession()
+        // The store query runs in BOTH modes: monitor's only feed, capture's
+        // safety net under the builder delegate.
+        let began = Date()
+        streamBeganAt = began
+        startHrQuery(from: began)
     }
 
     private func beginSession() {
@@ -336,6 +392,10 @@ final class WorkoutManager: NSObject, ObservableObject {
     /// doc); the kept anchor means no re-ingest of already-seen samples.
     private func recover() {
         guard wantsStreaming else { return }
+        // Same gate as start(): never rebuild into an unauthorized session —
+        // while the permission sheet is up the watchdog sees "no session"
+        // every second, and each of these must stay a no-op.
+        guard workoutShareStatus == .sharingAuthorized else { return }
         if let lastRecoverAt, Date().timeIntervalSince(lastRecoverAt) < 15 { return }
         lastRecoverAt = Date()
         let oldSession = session

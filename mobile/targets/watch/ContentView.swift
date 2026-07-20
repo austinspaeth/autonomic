@@ -17,6 +17,7 @@ struct ContentView: View {
     @State private var showLockAlert = false
     @EnvironmentObject private var relay: PhoneRelay
     @EnvironmentObject private var workout: WorkoutManager
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         Group {
@@ -28,6 +29,12 @@ struct ContentView: View {
             }
         }
         .onAppear { WorkoutManager.shared.requestAuthorization() }
+        .onChange(of: scenePhase) { _, phase in
+            // Every activation, not just first appear: a permission sheet
+            // that failed to present gets retried instead of wedging the
+            // monitor until a watch reboot (see WorkoutManager's class doc).
+            if phase == .active { WorkoutManager.shared.refreshAuthorization() }
+        }
         .onOpenURL { url in
             // Complication taps: episode → POTS Episode flow, hr → HR monitor.
             if url.host == "episode" || url.path.contains("episode") {
