@@ -8,7 +8,7 @@ keywords: "heat intolerance POTS, does heat make POTS worse, POTS hot weather, h
 date: 2026-07-21
 updated: 2026-07-21
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1623266631647-6fba4a497be6?q=80&w=1760&auto=format&fit=crop"
+photoLocation: "https://images.unsplash.com/photo-1526801505392-f7e63693233d?q=80&w=774&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
 photoAttribution: "Giorgio Trovato / Unsplash"
 tldr: "Heat is a top trigger in POTS and dysautonomia because thermoregulation is an autonomic job. To shed heat your skin vessels widen and you sweat, which pools blood in the periphery and drains fluid and salt from an already low blood volume. Less blood returns to the heart, so heart rate climbs, HRV falls, and standing gets harder. On a hot day your resting heart rate runs higher, your morning HRV runs lower, and your stand test looks worse, none of which means you are backsliding. The useful moves are to cool actively (cold drinks, cooling vest, shade, cool showers), lift fluids and salt with your clinician's guidance, wear compression, avoid midday heat, and log heat as a trigger so you can see the pattern instead of guessing."
 categories:

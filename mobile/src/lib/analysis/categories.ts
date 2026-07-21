@@ -395,17 +395,17 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
   const activity = (): AnalysisCard[] => {
     const mins = acAggSum(buckets, (d) => (d.activities || []).reduce((s, a) => s + (parseFloat(a.duration as string) || 0), 0) || null);
     const typeCounts: Record<string, number> = {};
-    let activeDays = 0, restDays = 0;
-    buckets.forEach((b) => b.days.forEach((dk) => { const acts = days[dk].activities || []; if (acts.length) { activeDays++; acts.forEach((a) => { typeCounts[a.type] = (typeCounts[a.type] || 0) + 1; }); } else restDays++; }));
+    let sessions = 0, totalMins = 0;
+    buckets.forEach((b) => b.days.forEach((dk) => { const acts = days[dk].activities || []; acts.forEach((a) => { sessions++; totalMins += parseFloat(a.duration as string) || 0; typeCounts[a.type] = (typeCounts[a.type] || 0) + 1; }); }));
     const rows = Object.entries(typeCounts).map(([t, c]) => ({ name: ctx.customTypes?.activities?.[t]?.label || ACTIVITY_TYPES[t]?.label || t, count: c })).sort((a, b) => b.count - a.count);
     if (!rows.length) return [];
     return [{
       title: 'Activity', sub: range,
-      desc: 'Exercise minutes over the range and what kinds of sessions they were.',
-      help: 'Total logged exercise minutes per bucket, plus a breakdown of session types and the balance of active versus rest days. In autonomic recovery, consistency at a tolerable dose beats intensity. Watch how your score and symptoms respond in the day or two after harder sessions.',
+      desc: 'Exercise sessions and minutes over the range, and what kinds they were.',
+      help: 'How many sessions you logged, the total exercise minutes per bucket, and a breakdown of session types. In autonomic recovery, consistency at a tolerable dose beats intensity. Watch how your score and symptoms respond in the day or two after harder sessions.',
       charts: [{ label: 'Total exercise minutes', series: [series(mins, SCORE_COLORS.bad)], integer: true }],
       bars: [{ label: 'Activity types', rows }],
-      stats: [{ label: 'Active days', value: activeDays || null }, { label: 'Rest days', value: restDays || null }],
+      stats: [{ label: 'Sessions', value: sessions || null, sub: 'times' }, { label: 'Total', value: totalMins ? Math.round(totalMins) : null, sub: 'mins' }],
     }];
   };
 
@@ -437,9 +437,9 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
     const waterCur = waterLi >= 0 && water[waterLi] != null ? Math.round(water[waterLi]! * 10) / 10 : null;
     if (acPresent(water).length) cards.push({
       title: 'Hydration', sub: range,
-      desc: 'Daily water intake against the target band.',
-      help: 'Litres of water per day; the dashed band marks the 2.5–3.5 L range commonly recommended alongside electrolytes for orthostatic conditions. Fluid only holds where salt allows. If you chase volume, discuss electrolyte targets with your doctor.',
-      charts: [{ label: 'Water (L/day)', series: [series(water, '#38bdf8')], target: { from: 2.5, to: 3.5, color: '#16a34a' } }],
+      desc: 'Daily water intake over the range.',
+      help: 'Litres of water per day. 2.5–3.5 L is commonly recommended alongside electrolytes for orthostatic conditions. Fluid only holds where salt allows. If you chase volume, discuss electrolyte targets with your doctor.',
+      charts: [{ label: '', series: [series(water, '#38bdf8')], selectStat: true }],
       stats: [{ label: 'Water', value: waterCur, sub: waterLi >= 0 ? `L (${buckets[waterLi].label})` : 'L' }],
     });
     return cards;

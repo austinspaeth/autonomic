@@ -25,6 +25,11 @@ export default function AnalysisScreen() {
   const demo = !hasOwnData(state.days);
   const days = demo ? demoDays() : state.days;
   const [mode, setMode] = useState<Mode>('day');
+  // The segmented pill + label colors commit on `mode` immediately; the heavy
+  // sections rebuild (buildCategories + every card build) trails on the
+  // deferred value in a low-priority render, so a range tap never freezes the
+  // pill animation behind an O(history) recompute.
+  const chartMode = React.useDeferredValue(mode);
   // Freemium: free tier keeps the Day view; the longer ranges are Pro. Locked
   // segments render a lock glyph and raise the paywall instead of switching.
   const locked = useTier() === 'free';
@@ -40,9 +45,9 @@ export default function AnalysisScreen() {
   // Build every category's cards once per (days, mode, profile). Memoized so the
   // scroll-driven "active section" re-render doesn't rebuild all the charts.
   const sections = useMemo(() => {
-    const cats = buildCategories(days, mode, { sex, height, protocol: resolveProtocol(state.settings.protocol), customTypes: state.customTypes });
+    const cats = buildCategories(days, chartMode, { sex, height, protocol: resolveProtocol(state.settings.protocol), customTypes: state.customTypes });
     return cats.map((c) => ({ id: c.id, title: c.title, buckets: c.buckets, cards: c.build(), hasOwn: c.hasData?.() ?? false }));
-  }, [days, mode, sex, height, state.settings.protocol, state.customTypes]);
+  }, [days, chartMode, sex, height, state.settings.protocol, state.customTypes]);
 
   // Outlook always synthesizes a score, so it isn't proof of real data. Treat the
   // whole view as empty unless some *other* category has something logged — that's
@@ -105,7 +110,7 @@ export default function AnalysisScreen() {
     lastYSv.value = 0;
     setPinnedState(null);
     scrollRef.current?.scrollTo({ y: 0, animated: false });
-  }, [mode, activeSv, offsetsSv, lastYSv]);
+  }, [chartMode, activeSv, offsetsSv, lastYSv]);
 
   // Charts are expensive, so sections mount progressively (see the hook below);
   // until a section's turn comes it renders its real title over skeleton cards.
@@ -156,7 +161,7 @@ export default function AnalysisScreen() {
           sections={sections}
           demo={demo}
           days={days}
-          mode={mode}
+          mode={chartMode}
           sex={sex}
           height={height}
           hrvFilt={hrvFilt}

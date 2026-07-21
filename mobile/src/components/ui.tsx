@@ -109,9 +109,18 @@ export function Segmented<T extends string>({ options, value, onChange, onLocked
   const n = options.length;
   const idx = Math.max(0, options.findIndex((o) => o.val === value));
   const anim = useRef(new Animated.Value(idx)).current;
+  // The pill starts moving in the press handler, not the value-change effect:
+  // a range switch can trigger an expensive re-render upstream, and an effect-
+  // started spring would sit frozen until that render commits. Started on press,
+  // the native-driver spring runs on the UI thread no matter how busy JS is.
+  const target = useRef(idx);
+  const springTo = React.useCallback((i: number) => {
+    target.current = i;
+    Animated.spring(anim, { toValue: i, useNativeDriver: !compact, speed: 16, bounciness: 8 }).start();
+  }, [anim, compact]);
   React.useEffect(() => {
-    Animated.spring(anim, { toValue: idx, useNativeDriver: !compact, speed: 16, bounciness: 8 }).start();
-  }, [idx, anim, compact]);
+    if (target.current !== idx) springTo(idx);
+  }, [idx, springTo]);
   // Compact variant (used inline beside a section title): tighter padding + type,
   // small enough to sit right-aligned next to a 20pt title without overflowing.
   const pad = compact ? 2 : 4;
@@ -146,7 +155,11 @@ export function Segmented<T extends string>({ options, value, onChange, onLocked
         return (
           <Pressable
             key={o.val}
-            onPress={() => (o.locked ? onLockedPress?.(o.val) : onChange(o.val))}
+            onPress={() => {
+              if (o.locked) { onLockedPress?.(o.val); return; }
+              springTo(i);
+              onChange(o.val);
+            }}
             onLayout={compact ? (e) => {
               const { x, width } = e.nativeEvent.layout;
               setCells((prev) => {
