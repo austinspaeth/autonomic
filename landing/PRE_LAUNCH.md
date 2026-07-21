@@ -8,18 +8,13 @@ are open. Verified against source on 2026-07-10.
 
 ## 🔴 Blockers — the site is not launch-ready without these
 
-- [ ] **Real App Store link + reconcile launch status.** The "Download on the
-      App Store" badge in `src/routes/+page.svelte` (~line 461) still links to
-      `href="#"`, and there is no `apps.apple.com` URL anywhere in `src/`. Yet the
-      copy says "available now on the Apple App Store," "Download for iOS now,"
-      and "live on iPhone" — while the hero + CTA also say "Join the waitlist."
-      Decide which is true:
-  - If **iOS is live**: point the badge at the real App Store URL and add
-        `"downloadUrl"`/`"installUrl"` to the `SoftwareApplication` JSON-LD.
-        (The waitlist is already Android-only.)
-  - If **not live yet**: soften the "available now / live on iPhone" copy back to
-        waitlist framing (and note Google can flag a `SoftwareApplication` whose
-        `offers` price isn't actually purchasable).
+- [x] **Real App Store link + reconcile launch status.** iOS is live. Every
+      "Download on the App Store" CTA (hero, nav, pricing plans, waitlist badge,
+      blog end-CTA, insights sidebar) now points at the real store URL via the
+      shared `appStoreUrl` constant in `src/lib/site.ts`
+      (`https://apps.apple.com/app/id6789786971`), and the `SoftwareApplication`
+      JSON-LD carries `downloadUrl`/`installUrl`. (The waitlist stays
+      Android-only, matching the "available now on iOS" copy.)
 - [ ] **Deploy target + DNS.** Confirm `autonomic.care` DNS points at the host,
       HTTPS/cert is valid, and the static `build/` output is what's served. Every
       canonical URL, the sitemap, and all structured data hard-code

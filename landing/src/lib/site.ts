@@ -8,6 +8,12 @@ export const site = {
 };
 
 /**
+ * Canonical Apple App Store URL. Every iOS "Download on the App Store" CTA
+ * across the site points here (one download, the plan is chosen in-app).
+ */
+export const appStoreUrl = 'https://apps.apple.com/app/id6789786971';
+
+/**
  * The freemium model, as the app actually ships it: the journal is free
  * forever, Autonomic Pro is an auto-renewing subscription, and every fresh
  * install opens with `trialDays` of full Pro access (no card, no account).
