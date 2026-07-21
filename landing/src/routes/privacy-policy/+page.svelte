@@ -103,17 +103,13 @@
         loads again on future visits, we don't track you at all. Your choice is saved in your
         browser, and you can change your mind by clearing this site's data. You can also block
         analytics with a content or cookie blocker or your browser's tracking controls. This applies
-        only to your visits to the website, never to anything you do inside the app, and Google
-        Analytics never sees what you type into the waitlist form.
+        only to your visits to the website, never to anything you do inside the app.
       </p>
       <p>
-        The website also has an <strong>Android waitlist form</strong>. If you join it, we collect
-        your email address and, optionally, your first name. We ask nothing about your health or
-        medical conditions. The submission is delivered to our email by
-        <a href="https://flowform.to" rel="noopener" target="_blank">FlowForm</a>, a third-party
-        form-forwarding service that transmits it under its own privacy practices. We use your
-        submission only to send your early-access invite and launch updates, we never sell or share
-        it, and you can ask us to delete it at any time using the contact below.
+        The website does <strong>not</strong> collect any personal information from you: there is no
+        sign-up, no account, and no contact or waitlist form. The download buttons simply link out to
+        the Apple App Store and Google Play, where any install is governed by Apple's and Google's own
+        privacy practices.
       </p>
 
       <h2>Children</h2>

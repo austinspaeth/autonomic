@@ -8,10 +8,15 @@ export const site = {
 };
 
 /**
- * Canonical Apple App Store URL. Every iOS "Download on the App Store" CTA
- * across the site points here (one download, the plan is chosen in-app).
+ * Canonical store URLs. Every "Download" CTA across the site points at one of
+ * these (one download per platform, the plan is chosen in-app). The site-wide
+ * script in `app.html` sniffs the platform and either deep-links a phone
+ * straight to its store or opens the dual-download modal (iOS + Android + QR)
+ * on desktop / unknown platforms.
  */
 export const appStoreUrl = 'https://apps.apple.com/app/id6789786971';
+export const playStoreUrl =
+  'https://play.google.com/store/apps/details?id=com.autonomic.journal&hl=en';
 
 /**
  * The freemium model, as the app actually ships it: the journal is free

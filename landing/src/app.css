@@ -102,6 +102,72 @@ a { color: inherit; text-decoration: none; }
 .btn-ghost { background: rgba(255,255,255,0.04); color: var(--text); border-color: var(--line-2); }
 .btn-ghost:hover { background: rgba(255,255,255,0.08); transform: translateY(-2px); }
 
+/* Platform-aware download button. The glyph slot is empty (and hidden) until
+   the site-wide script sniffs a phone and injects the Apple / Android icon;
+   on desktop it stays iconless and opens the dual-download modal. */
+.btn-download { gap: 8px; }
+.btn-dl-ic { display: none; }
+.btn-download.has-ic .btn-dl-ic { display: inline-flex; }
+.btn-dl-ic svg { width: 17px; height: 17px; margin-top: -2px; flex: none; }
+
+/* ---------- Download modal ---------- */
+.dlm {
+  position: fixed; inset: 0; z-index: 300;
+  display: grid; place-items: center; padding: 20px;
+}
+.dlm[hidden] { display: none; }
+.dlm-backdrop {
+  position: absolute; inset: 0;
+  background: rgba(2,2,4,0.72);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  animation: dlm-fade 0.2s var(--ease);
+}
+.dlm-panel {
+  position: relative; z-index: 1;
+  width: 100%; max-width: 480px;
+  background: var(--panel); border: 1px solid var(--line-2);
+  border-radius: var(--r-lg); padding: 30px 28px 28px;
+  box-shadow: 0 40px 90px -30px rgba(0,0,0,0.9);
+  animation: dlm-pop 0.24s var(--bounce);
+  text-align: center;
+}
+.dlm-x {
+  position: absolute; top: 14px; right: 14px;
+  width: 34px; height: 34px; border-radius: 50%;
+  background: var(--panel-2); border: 1px solid var(--line);
+  color: var(--dim); display: grid; place-items: center; cursor: pointer;
+  transition: color 0.2s, background 0.2s;
+}
+.dlm-x:hover { color: var(--text); background: rgba(255,255,255,0.09); }
+.dlm-x svg { width: 17px; height: 17px; }
+.dlm-eyebrow {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--accent-2); margin: 0 0 8px;
+}
+.dlm-title { font-family: var(--display); font-weight: 600; font-size: 26px; letter-spacing: -0.02em; margin: 0 0 8px; }
+.dlm-sub { font-size: 14.5px; color: var(--dim); margin: 0 auto 24px; max-width: 34ch; line-height: 1.5; }
+.dlm-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.dlm-col {
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+  background: var(--panel-2); border: 1px solid var(--line);
+  border-radius: var(--r); padding: 18px 14px;
+}
+.dlm-badge { display: block; transition: transform 0.18s var(--bounce); }
+.dlm-badge:hover { transform: translateY(-2px); }
+.dlm-badge svg { width: 138px; height: 46px; }
+.dlm-qr {
+  background: #fff; border-radius: 12px; padding: 9px; line-height: 0;
+  box-shadow: 0 4px 14px -6px rgba(0,0,0,0.5);
+}
+.dlm-qr img { width: 116px; height: 116px; }
+.dlm-scan { font-family: var(--mono); font-size: 11px; letter-spacing: 0.05em; color: var(--dim); }
+@keyframes dlm-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes dlm-pop { from { opacity: 0; transform: translateY(14px) scale(0.97); } to { opacity: 1; transform: none; } }
+@media (max-width: 460px) {
+  .dlm-cols { grid-template-columns: 1fr; }
+  .dlm-panel { padding: 26px 20px 22px; }
+}
+
 /* ============================================================
    NAV
    ============================================================ */
@@ -1042,17 +1108,13 @@ a { color: inherit; text-decoration: none; }
 .hero-microcopy { font-size: 13.5px; color: var(--dim-2); margin: 14px 0 0; }
 .hero-microcopy b { color: var(--dim); font-weight: 600; }
 
-/* Hero dual CTA — iOS available now | Android coming soon */
+/* Hero CTA — available now on iPhone & Android */
 .hero-cta {
-  display: flex; align-items: stretch; max-width: 500px;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 14px;
+  max-width: 500px; padding: 20px 22px;
   background: var(--panel); border: 1px solid var(--line-2);
-  border-radius: var(--r-lg); overflow: hidden;
+  border-radius: var(--r-lg);
 }
-.hero-cta-col {
-  flex: 1; display: flex; flex-direction: column; align-items: flex-start;
-  justify-content: space-between; gap: 12px; padding: 18px 20px;
-}
-.hero-cta-ios { border-right: 1px solid var(--line-2); }
 .hero-cta-eyebrow {
   display: inline-flex; align-items: center; gap: 8px;
   font-size: 12.5px; font-weight: 600; color: var(--dim);
@@ -1061,24 +1123,14 @@ a { color: inherit; text-decoration: none; }
   width: 7px; height: 7px; border-radius: 50%; background: var(--green);
   box-shadow: 0 0 0 3px rgba(22,163,74,0.18); flex: none;
 }
-.hero-android-ic { height: 22px; width: auto; flex: none; }
+.hero-badges { display: flex; flex-wrap: wrap; gap: 12px; }
 .hero-appstore { display: inline-flex; transition: transform 0.2s; }
 .hero-appstore:hover { transform: translateY(-1px); }
-.hero-appstore svg { height: 68px; width: auto; display: block; }
-.hero-android-link {
-  display: inline-flex; align-items: center; gap: 6px;
-  font-family: var(--display); font-size: 16px; font-weight: 600;
-  color: var(--text); text-decoration: none; padding: 11px 0;
-  transition: color 0.2s;
-}
-.hero-android-link span { transition: transform 0.2s; }
-.hero-android-link:hover { color: var(--accent); }
-.hero-android-link:hover span { transform: translateX(3px); }
+.hero-appstore svg { height: 54px; width: auto; display: block; }
 .hero-cta-note { margin: 0; font-size: 13px; color: var(--dim-2); }
 .hero-cta-note b { color: var(--dim); font-weight: 600; }
 @media (max-width: 560px) {
-  .hero-cta { flex-direction: column; max-width: 340px; }
-  .hero-cta-ios { border-right: none; border-bottom: 1px solid var(--line-2); }
+  .hero-cta { max-width: 360px; }
 }
 
 .dl-ios {
@@ -1091,6 +1143,26 @@ a { color: inherit; text-decoration: none; }
 .dl-ios-badge { display: inline-flex; flex: none; transition: transform 0.2s; }
 .dl-ios-badge:hover { transform: translateY(-1px); }
 .dl-ios-badge svg { height: 48px; width: auto; display: block; }
+
+/* Download section — pricing card on top, dual store cards (badge + QR) below */
+.dl-layout {
+  display: flex; flex-direction: column; gap: 20px;
+  max-width: 620px; margin: 0 auto; text-align: left;
+}
+.dl-layout .pricing { text-align: left; }
+.dl-stores { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.dl-store {
+  display: flex; flex-direction: column; align-items: center; gap: 13px;
+  background: var(--panel); border: 1px solid var(--line-2);
+  border-radius: var(--r-lg); padding: 22px 16px;
+}
+.dl-store-badge { display: block; transition: transform 0.18s var(--bounce); }
+.dl-store-badge:hover { transform: translateY(-2px); }
+.dl-store-badge svg { width: 150px; height: 50px; }
+.dl-store-qr { background: #fff; border-radius: 12px; padding: 9px; line-height: 0; box-shadow: 0 4px 14px -6px rgba(0,0,0,0.5); }
+.dl-store-qr img { width: 104px; height: 104px; }
+.dl-store-scan { font-family: var(--mono); font-size: 11px; letter-spacing: 0.05em; color: var(--dim); }
+@media (max-width: 460px) { .dl-stores { grid-template-columns: 1fr; } }
 
 .waitlist-grid { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 32px; align-items: start; text-align: left; }
 .wl-form { background: var(--panel); border: 1px solid var(--line-2); border-radius: var(--r-lg); padding: 28px; }
@@ -1623,8 +1695,9 @@ a.gc { display: block; }
   margin: 4px 0 6px;
 }
 .side-get-p { margin: 0 auto 16px; max-width: 30ch; font-size: 13px; line-height: 1.5; color: var(--dim); }
-.side-get .dl-ios-badge { justify-content: center; }
+.side-get .dl-ios-badge { display: flex; justify-content: center; }
 .side-get .dl-ios-badge svg { height: 44px; }
+.side-get .dl-ios-badge + .dl-ios-badge { margin-top: 10px; }
 
 /* Mini phone illustration + hovering chips */
 .side-phone-stage { position: relative; width: 178px; margin: 8px auto 20px; }

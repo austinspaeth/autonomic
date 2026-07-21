@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { BRAND_POLYLINE, pricing, priceLabel, yearlySavePct, appStoreUrl } from '$lib/site';
+  import { BRAND_POLYLINE, pricing, priceLabel, yearlySavePct, appStoreUrl, playStoreUrl } from '$lib/site';
   import BrandMark from '$lib/BrandMark.svelte';
   import { demoReports as reports } from '$lib/demoPrompts';
 
@@ -25,47 +25,6 @@
   ];
   const CHECK =
     '<svg class="pr-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>';
-
-  // The site is prerendered with csr disabled, so no Svelte runtime hydrates.
-  // The Android waitlist form therefore ships as plain HTML with a native
-  // FlowForm POST fallback, progressively enhanced by the inline script below
-  // (emitted via {@html waitlistScript} at the end of the page). The script is
-  // embedded in the prerendered HTML and runs with no framework JS on the client.
-  //  - fetch(no-cors) posts to FlowForm without leaving the page
-  //  - on success it swaps the form for the in-place confirmation
-  //  - it fires a GA `waitlist_signup` event (location: android)
-  // The form collects email + optional first name ONLY — no health/condition
-  // questions; the privacy policy's "The website" section documents exactly this
-  // and must be kept in sync if fields change.
-  const waitlistScript = `<script>
-(function () {
-  var ENDPOINT = 'https://flowform.to/austin@discoverymark.com';
-  function track(location) {
-    if (typeof window.gtag === 'function') {
-      window.gtag('event', 'waitlist_signup', { location: location });
-    }
-  }
-  function wire(form, location, onDone) {
-    if (!form) return;
-    form.addEventListener('submit', function (e) {
-      e.preventDefault();
-      var button = form.querySelector('button[type="submit"]');
-      var label = button ? button.textContent : '';
-      if (button) { button.disabled = true; button.textContent = 'Joining…'; }
-      fetch(ENDPOINT, { method: 'POST', mode: 'no-cors', body: new FormData(form) })
-        .then(function () { form.reset(); track(location); onDone(); })
-        .catch(function () {
-          if (button) { button.disabled = false; button.textContent = label; }
-          alert('Sorry, something went wrong. Please try again or email austin@discoverymark.com.');
-        });
-    });
-  }
-  wire(document.getElementById('wlForm'), 'android', function () {
-    var s = document.getElementById('wlSuccess');
-    if (s) s.classList.add('show');
-  });
-})();
-<\/script>`;
 
   // ── Apple Watch section ────────────────────────────────────────────────
   // The device face replicates the real watchOS app (mobile/targets/watch):
@@ -150,8 +109,8 @@
     'Brain fog', 'Chest pain / tightness', 'Chills', 'Coat hanger pain', 'Cold hands / feet'
   ];
 
-  // The watch demo's behaviour. Like the waitlist form above, the site ships
-  // with no framework runtime, so this rides along as a plain inline script in
+  // The watch demo's behaviour. The site ships with no framework runtime, so
+  // this rides along as a plain inline script in
   // the prerendered HTML (emitted via {@html watchScript} at the foot of the
   // page). It runs the same state machines the watch does — StandTestController
   // (intro → resting → prompt → standing → complete) and OrthostaticController
@@ -434,9 +393,9 @@
     '@type': 'SoftwareApplication',
     name: 'Autonomic',
     applicationCategory: 'HealthApplication',
-    operatingSystem: 'iOS',
-    downloadUrl: appStoreUrl,
-    installUrl: appStoreUrl,
+    operatingSystem: 'iOS, Android',
+    downloadUrl: [appStoreUrl, playStoreUrl],
+    installUrl: [appStoreUrl, playStoreUrl],
     description:
       'A private, offline journal that scores daily autonomic readings, HRV, blood pressure, SpO2, resting heart rate and orthostatic tests, against medical thresholds to track recovery from POTS, dysautonomia and post-illness conditions.',
     offers: {
@@ -519,9 +478,9 @@
       <h1 class="hero-h1">See your nervous&nbsp;system recover.</h1>
       <p class="hero-lead">Autonomic turns your daily <strong>HRV, blood pressure, sleep and orthostatic</strong> readings into clear, medically-scored signals, so anyone recovering from <strong>POTS, dysautonomia</strong> or post-viral illness can finally see what helps and what hurts.</p>
       <div class="hero-cta">
-        <div class="hero-cta-col hero-cta-ios">
-          <span class="hero-cta-eyebrow"><i class="hero-cta-dot"></i>Available now on iOS</span>
-          <a class="hero-appstore" href={appStoreUrl} aria-label="Download Autonomic on the App Store">
+        <span class="hero-cta-eyebrow"><i class="hero-cta-dot"></i>Available now on iPhone &amp; Android</span>
+        <div class="hero-badges">
+          <a class="hero-appstore" href={appStoreUrl} data-dl-store="ios" aria-label="Download Autonomic on the App Store">
             <svg viewBox="0 0 120 40" role="img" aria-label="Download on the App Store" xmlns="http://www.w3.org/2000/svg">
               <rect x="0.5" y="0.5" width="119" height="39" rx="6.5" fill="#000" stroke="rgba(255,255,255,0.4)" />
               <path transform="translate(10,7.5) scale(0.05)" fill="#fff" d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5c0 26.2 4.8 53.3 14.4 81.2 12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 20-27.8 44.7-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z" />
@@ -529,21 +488,19 @@
               <text x="34" y="31" fill="#fff" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="16" font-weight="600" letter-spacing="-0.3">App Store</text>
             </svg>
           </a>
-          <p class="hero-cta-note"><b>Free to download.</b> Pro from {monthly}/mo.</p>
+          <a class="hero-appstore" href={playStoreUrl} data-dl-store="android" aria-label="Get Autonomic on Google Play">
+            <svg viewBox="0 0 120 40" role="img" aria-label="Get it on Google Play" xmlns="http://www.w3.org/2000/svg">
+              <rect x="0.5" y="0.5" width="119" height="39" rx="6.5" fill="#000" stroke="rgba(255,255,255,0.4)" />
+              <path fill="#00C3FF" d="M10 8 21 19.5 10 19.5Z" />
+              <path fill="#FF3A44" d="M10 8 27 19.5 21 19.5Z" />
+              <path fill="#00D66F" d="M10 19.5 21 19.5 10 31Z" />
+              <path fill="#FFCE00" d="M21 19.5 27 19.5 10 31Z" />
+              <text x="35" y="16" fill="#fff" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="7">GET IT ON</text>
+              <text x="34" y="31" fill="#fff" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="15" font-weight="600" letter-spacing="-0.2">Google Play</text>
+            </svg>
+          </a>
         </div>
-
-        <div class="hero-cta-col hero-cta-android">
-          <span class="hero-cta-eyebrow">Coming soon on Android</span>
-          <a class="hero-android-link" href="#waitlist">
-            <svg class="hero-android-ic" viewBox="5.5 3.8 13 8" aria-hidden="true">
-              <path fill="#3DDC84" d="M6 11a6 6 0 0 1 12 0H6z" />
-              <line x1="8" y1="4.4" x2="9.4" y2="6.5" stroke="#3DDC84" stroke-width="1.1" stroke-linecap="round" />
-              <line x1="16" y1="4.4" x2="14.6" y2="6.5" stroke="#3DDC84" stroke-width="1.1" stroke-linecap="round" />
-              <circle cx="9.6" cy="8.6" r="0.85" fill="#fff" />
-              <circle cx="14.4" cy="8.6" r="0.85" fill="#fff" />
-            </svg>Join the waitlist <span aria-hidden="true">→</span></a>
-          <p class="hero-cta-note">Be first when it lands.</p>
-        </div>
+        <p class="hero-cta-note"><b>Free to download.</b> Pro from {monthly}/mo.</p>
       </div>
       <ul class="hero-trust">
         <li>Free to download</li>
@@ -1096,7 +1053,7 @@
           <li><b>One HRV reading</b> a day, with 14 days of charts</li>
           <li><b>Backups and one-tap export</b>, because it's your data</li>
         </ul>
-        <a class="btn btn-ghost btn-lg pr-btn" href={appStoreUrl}>Download free</a>
+        <a class="btn btn-ghost btn-lg pr-btn btn-download" data-dl-cta href="/#download"><span class="btn-dl-ic" aria-hidden="true"></span><span class="btn-dl-label">Download free</span></a>
       </article>
 
       <article class="pr-plan pr-plan-pro">
@@ -1218,7 +1175,7 @@
       <details><summary>What’s free, and what needs Pro?<span class="fq-i">+</span></summary><p>Free covers the daily journal, your manual readings, your daily Autonomic Outlook, the Apple Watch heart-rate monitor, backups and export, plus one live HRV capture a day and 14 days of charts. Pro adds unlimited HRV capture, your full history, POTS testing and episode tracking, and AI insight and doctor reports. There’s a full breakdown in <a href="#pricing">the pricing table</a>, and the same table lives inside the app.</p></details>
       <details><summary>Does it really work offline?<span class="fq-i">+</span></summary><p>Completely. It’s a fully offline iOS app. Scoring, trends and reports are computed locally, so it works anywhere, no signal required.</p></details>
       <details><summary>Which conditions is it built for?<span class="fq-i">+</span></summary><p>POTS, dysautonomia, long COVID and post-viral or post-illness recovery, anywhere daily HRV, heart-rate and orthostatic patterns matter.</p></details>
-      <details><summary>Is Autonomic available on Android?<span class="fq-i">+</span></summary><p>Not yet. Autonomic is iOS-only for now. An Android version is coming soon, join the waitlist and we’ll let you know the moment it lands.</p></details>
+      <details><summary>Is Autonomic available on Android?<span class="fq-i">+</span></summary><p>Yes. Autonomic is available now on both iPhone (App Store) and Android (Google Play). It’s the same app, the same price, and the same private, offline design on either platform.</p></details>
       <details><summary>Do I need a wearable or special hardware?<span class="fq-i">+</span></summary><p>No, you don’t. You can type readings in by hand from any source. That said, tools like a Polar H10 chest strap, an Apple Watch or a blood pressure cuff make Autonomic far more powerful, the more data you feed it, the better you understand how your body is doing.</p></details>
       <details><summary>How do the AI insights work?<span class="fq-i">+</span></summary><p>Autonomic builds a structured analysis prompt from your data over a date range. You copy it into Claude, Gemini or ChatGPT, the text is generated on-device, nothing is sent automatically.</p></details>
       <details><summary>Is this medical advice?<span class="fq-i">+</span></summary><p>No. Autonomic is a personal tracking and reflection tool. It helps you organize data and conversations, but it doesn’t diagnose or treat. Always work with your clinician.</p></details>
@@ -1226,64 +1183,18 @@
   </div>
 </section>
 
-<!-- ============ WAITLIST + PRICING ============ -->
-<section class="cta" id="waitlist">
+<!-- ============ DOWNLOAD + PRICING ============ -->
+<section class="cta" id="download">
   <div class="cta-glow" aria-hidden="true"></div>
   <div class="wrap">
     <div class="section-head center" style="margin-bottom: 38px;">
       <BrandMark size={40} class="cta-mark" />
-      <p class="eyebrow">Join the waitlist</p>
-      <h2 class="cta-h">Be first to read your recovery clearly.</h2>
-      <p class="cta-sub">Autonomic is available now on the Apple App Store, with Android coming soon. Join the waitlist to be first to get the Android release.</p>
+      <p class="eyebrow">Free to download</p>
+      <h2 class="cta-h">Read your recovery clearly.</h2>
+      <p class="cta-sub">Autonomic is available now on iPhone and Android, free to download, with {pricing.trialDays} days of Pro to start. Scan a code or tap a badge.</p>
     </div>
 
-    <div class="dl-ios">
-      <div class="dl-ios-copy">
-        <h3 class="dl-ios-h">Download for iOS now</h3>
-        <p class="dl-ios-p">Autonomic is live on iPhone, free to download, with {pricing.trialDays} days of Pro to start.</p>
-      </div>
-      <a class="dl-ios-badge" href={appStoreUrl} aria-label="Download on the App Store">
-        <svg viewBox="0 0 120 40" role="img" aria-label="Download on the App Store" xmlns="http://www.w3.org/2000/svg">
-          <rect x="0.5" y="0.5" width="119" height="39" rx="6.5" fill="#000" stroke="rgba(255,255,255,0.4)" />
-          <path transform="translate(10,7.5) scale(0.05)" fill="#fff" d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5c0 26.2 4.8 53.3 14.4 81.2 12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 20-27.8 44.7-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z" />
-          <text x="35" y="16" fill="#fff" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="7.5">Download on the</text>
-          <text x="34" y="31" fill="#fff" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="16" font-weight="600" letter-spacing="-0.3">App Store</text>
-        </svg>
-      </a>
-    </div>
-
-    <div class="waitlist-grid">
-      <div class="wl-form">
-        <div class="wl-head">
-          <svg class="wl-android" viewBox="5.5 3.8 13 8" aria-hidden="true">
-            <path fill="#3DDC84" d="M6 11a6 6 0 0 1 12 0H6z" />
-            <line x1="8" y1="4.4" x2="9.4" y2="6.5" stroke="#3DDC84" stroke-width="1.1" stroke-linecap="round" />
-            <line x1="16" y1="4.4" x2="14.6" y2="6.5" stroke="#3DDC84" stroke-width="1.1" stroke-linecap="round" />
-            <circle cx="9.6" cy="8.6" r="0.85" fill="#fff" />
-            <circle cx="14.4" cy="8.6" r="0.85" fill="#fff" />
-          </svg>
-          <span>Android Waitlist</span>
-        </div>
-        <div class="wl-success" id="wlSuccess">
-          <div class="wl-check" aria-hidden="true">✓</div>
-          <h3 style="font-family: var(--display); font-size: 22px; margin: 0 0 8px;">You're on the list.</h3>
-          <p style="color: var(--dim); margin: 0; font-size: 15px;">We'll email your early access invite and lock in your price for life. Welcome aboard.</p>
-        </div>
-        <form id="wlForm" class="wl-fields" action="https://flowform.to/austin@discoverymark.com" method="POST">
-          <input type="hidden" name="_subject" value="Autonomic Waitlist Signup" />
-          <div class="wl-field">
-            <label for="wl-email">Email</label>
-            <input id="wl-email" type="email" name="email" required placeholder="you@email.com" />
-          </div>
-          <div class="wl-field">
-            <label for="wl-name">Name <span style="color:var(--dim-2)">(optional)</span></label>
-            <input id="wl-name" type="text" name="name" placeholder="First name" />
-          </div>
-          <button class="btn btn-primary btn-lg" type="submit">Join the Android waitlist</button>
-          <p class="wl-note">No charge today · Free to download at launch · Unsubscribe anytime</p>
-        </form>
-      </div>
-
+    <div class="dl-layout">
       <aside class="pricing">
         <p class="pricing-tag">Free to download</p>
         <div class="pricing-price"><span class="amt">$0</span><span class="per">/ forever</span></div>
@@ -1293,9 +1204,39 @@
           <li>Pro adds unlimited HRV, full history, POTS testing &amp; AI reports</li>
           <li>Pro is {monthly}/month or {yearly}/year, cancel anytime</li>
           <li>Private &amp; offline forever, no ads, no data sale</li>
-          <li>Waitlist members lock in the launch Pro price for life</li>
+          <li>The same app, same price, on iPhone and Android</li>
         </ul>
       </aside>
+
+      <div class="dl-stores">
+        <div class="dl-store">
+          <a class="dl-store-badge" href={appStoreUrl} data-dl-store="ios" aria-label="Download on the App Store">
+            <svg viewBox="0 0 120 40" role="img" aria-label="Download on the App Store" xmlns="http://www.w3.org/2000/svg">
+              <rect x="0.5" y="0.5" width="119" height="39" rx="6.5" fill="#000" stroke="rgba(255,255,255,0.4)" />
+              <path transform="translate(10,7.5) scale(0.05)" fill="#fff" d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5c0 26.2 4.8 53.3 14.4 81.2 12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 20-27.8 44.7-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z" />
+              <text x="35" y="16" fill="#fff" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="7.5">Download on the</text>
+              <text x="34" y="31" fill="#fff" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="16" font-weight="600" letter-spacing="-0.3">App Store</text>
+            </svg>
+          </a>
+          <div class="dl-store-qr"><img src="/qr-ios.svg" width="120" height="120" alt="QR code to download Autonomic on the App Store" /></div>
+          <span class="dl-store-scan">Scan for iPhone</span>
+        </div>
+        <div class="dl-store">
+          <a class="dl-store-badge" href={playStoreUrl} data-dl-store="android" aria-label="Get it on Google Play">
+            <svg viewBox="0 0 120 40" role="img" aria-label="Get it on Google Play" xmlns="http://www.w3.org/2000/svg">
+              <rect x="0.5" y="0.5" width="119" height="39" rx="6.5" fill="#000" stroke="rgba(255,255,255,0.4)" />
+              <path fill="#00C3FF" d="M10 8 21 19.5 10 19.5Z" />
+              <path fill="#FF3A44" d="M10 8 27 19.5 21 19.5Z" />
+              <path fill="#00D66F" d="M10 19.5 21 19.5 10 31Z" />
+              <path fill="#FFCE00" d="M21 19.5 27 19.5 10 31Z" />
+              <text x="35" y="16" fill="#fff" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="7">GET IT ON</text>
+              <text x="34" y="31" fill="#fff" font-family="-apple-system, Helvetica, Arial, sans-serif" font-size="15" font-weight="600" letter-spacing="-0.2">Google Play</text>
+            </svg>
+          </a>
+          <div class="dl-store-qr"><img src="/qr-android.svg" width="120" height="120" alt="QR code to download Autonomic on Google Play" /></div>
+          <span class="dl-store-scan">Scan for Android</span>
+        </div>
+      </div>
     </div>
   </div>
 </section>
@@ -1333,5 +1274,4 @@
   </div>
 </section>
 
-{@html waitlistScript}
 {@html watchScript}
