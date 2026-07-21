@@ -69,15 +69,17 @@ this is no longer a "fix it before it locks" emergency. It becomes a **queued
 change for the very next point release** (§6). Do not skip it: it is the lever
 that moves you up the search results, and it costs one submission.
 
-### 1.3 autonomic.care now contradicts itself the *other* way 🔴
+### 1.3 autonomic.care Android contradiction — ✅ fixed Tue 21 Jul
 
 The old blocker (a dead iOS download button under an "available now" headline)
-is fixed — the App Store badge points at the real store URL. But the site was
-built iOS-only: the hero still says **"Coming soon on Android,"** the FAQ says
-Autonomic is **"iOS-only for now,"** and the page carries a full **Android
-waitlist** section. **Android is live as of this morning.** Every Android visitor
-now gets told to join a waitlist for an app they can already download. This is
-the top site fix of the week — details in §2.
+was fixed first; then the site was still built iOS-only — hero "Coming soon on
+Android," FAQ "iOS-only for now," and a full **Android waitlist** — while Android
+went live this morning. **Resolved same day** (main `6c8b6a4`): a `playStoreUrl`
+constant, a Google Play badge in the hero, the FAQ flipped to "available now on
+both iPhone and Android," the waitlist replaced with a platform-aware download
+section carrying **QR codes for both stores**, and the Android `downloadUrl`
+added to the `SoftwareApplication` JSON-LD. No "coming soon / waitlist" Android
+copy remains. Nothing outstanding here.
 
 ### 1.4 The App Store search-ranking question (read this before you panic)
 
@@ -133,31 +135,19 @@ is a day off the October window.
 - [ ] **DM the mods** of those four subs: *"patient-founder, built this, may I
       share when ready?"* Relationship-building, not outreach. Do it before you
       have anything to ask for.
-- [ ] **Submit the Apple featuring nomination** (App Store Connect → Featuring
-      Nominations). Pitch: patient-founder story + HealthKit/BLE/watchOS +
-      privacy-as-architecture + accessibility (an explicit featuring criterion).
-      Aim it at **October** — it's ~10 weeks out, so this genuinely cannot slip a
-      day. Re-nominate every release.
-- [ ] **Fix the site's Android contradiction (§1.3).** Now that Android is live,
-      `landing/src/routes/+page.svelte` needs, in one pass:
-  - Hero: `Coming soon on Android` → a real **"Get it on Google Play"** badge
-    linking to `https://play.google.com/store/apps/details?id=com.autonomic.journal`
-    (package confirmed in `mobile/app.json`), alongside the existing App Store
-    badge.
-  - FAQ: the "Is Autonomic available on Android?" answer ("Not yet… iOS-only for
-    now") → "Yes — available now on Google Play," and drop the waitlist pitch.
-  - The `#waitlist` section: retire it (or repoint it to the Play badge). The
-    "available now on iOS, Android coming soon" CTA copy becomes "available now on
-    iOS **and** Android."
-  - `SoftwareApplication` JSON-LD: it currently advertises one `downloadUrl`
-    (App Store). Either leave it iOS-anchored or add the Play URL — but the
-    human-visible copy is what actually misleads a visitor, so fix that first.
-  - Keep the waitlist GA plumbing (`waitlist_signup`) harmless if you leave the
-    script in; just make sure no *visible* "coming soon / join the waitlist"
-    Android copy survives the pass.
+- [x] **Submit the Apple featuring nomination** (App Store Connect → Featuring
+      Nominations). ✅ **Submitted Tue 21 Jul.** Pitch: patient-founder story +
+      HealthKit/BLE/watchOS + privacy-as-architecture + accessibility (an
+      explicit featuring criterion), aimed at **October**. Re-nominate every
+      release.
+- [x] **Fix the site's Android contradiction (§1.3).** ✅ **Done Tue 21 Jul**
+      (main `6c8b6a4`): Google Play badge in the hero, FAQ flipped to "on both
+      iPhone and Android," waitlist replaced with a two-store QR download section,
+      Play `downloadUrl` in the JSON-LD. Verified no "coming soon / waitlist"
+      Android copy remains.
 
-> Everything else waits; these four do not. The site fix is here (not Friday)
-> because it's the one change actively costing you installs every hour it's live.
+> The site fix landed here (not Friday) because it was the one change actively
+> costing installs every hour it was live — that reasoning held; it's fixed.
 
 ---
 
@@ -271,8 +261,8 @@ fifth planning day.
 ## 9. Done looks like (by Fri 24, tail on Mon 27)
 
 - [ ] Reddit residency clock started **Tuesday**, mods contacted (→ launch post mid-Sep)
-- [ ] Featuring nomination submitted Tuesday, aimed at October
-- [ ] Site tells the truth on Android: Play badge live, waitlist retired, FAQ updated
+- [x] Featuring nomination submitted Tuesday, aimed at October ✅
+- [x] Site tells the truth on Android: Play badge live, waitlist retired, FAQ updated ✅
 - [ ] Small Business Program applied (21% revenue raise); Play fee tier confirmed
 - [ ] Search Console + Bing indexed
 - [ ] Trial offers ended **only after** confirming the freemium build is the live one
