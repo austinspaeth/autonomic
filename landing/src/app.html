@@ -120,6 +120,9 @@
             try { localStorage.setItem('aj-cookie-consent', value); } catch (e) {}
             banner.style.display = 'none';
             if (value === 'blocked') window['ga-disable-G-3R3E75CLGQ'] = true;
+            // Track accepts only — a "blocked" event would break the promise
+            // that blocking means no tracking at all.
+            else if (typeof gtag === 'function') gtag('event', 'cookie_accept', { location: window.location.pathname });
           }
           document.getElementById('aj-cookie-accept').addEventListener('click', function () { choose('accepted'); });
           document.getElementById('aj-cookie-block').addEventListener('click', function () { choose('blocked'); });
@@ -135,6 +138,16 @@
         'use strict';
 
         function init() {
+          // Shared GA event helper: every custom event carries the page path so
+          // reports can split the same event by where it happened. gtag() is
+          // always defined (head loader) and no-ops when analytics is blocked.
+          function ajEvent(name, params) {
+            if (typeof gtag !== 'function') return;
+            var p = params || {};
+            p.location = window.location.pathname;
+            gtag('event', name, p);
+          }
+
           var yr = document.getElementById('yr');
           if (yr) yr.textContent = String(new Date().getFullYear());
 
@@ -183,9 +196,7 @@
             }
 
             function track(platform) {
-              if (typeof gtag !== 'function') return;
-              var ev = platform === 'android' ? 'play_store_click' : 'app_store_click';
-              gtag('event', ev, { location: window.location.pathname });
+              ajEvent(platform === 'android' ? 'play_store_click' : 'app_store_click');
             }
 
             var platform = detectPlatform();
@@ -195,6 +206,7 @@
             var lastFocus = null;
             function openModal() {
               if (!modal) return;
+              ajEvent('download_modal_open');
               lastFocus = document.activeElement;
               modal.hidden = false;
               document.body.style.overflow = 'hidden';
@@ -264,12 +276,76 @@
           // insights sidebar, modal); the platform-aware nav CTA tracks itself.
           document.querySelectorAll('[data-dl-store]').forEach(function (el) {
             el.addEventListener('click', function () {
-              if (typeof gtag === 'function') {
-                var p = el.getAttribute('data-dl-store');
-                gtag('event', p === 'android' ? 'play_store_click' : 'app_store_click', { location: window.location.pathname });
-              }
+              var p = el.getAttribute('data-dl-store');
+              ajEvent(p === 'android' ? 'play_store_click' : 'app_store_click');
             });
           });
+
+          // ---- Engagement tracking -------------------------------------
+          // One delegated listener maps every remaining interactive element
+          // to a GA event (store badges/CTAs are wired individually above,
+          // so they're excluded here to avoid double-counting).
+          document.addEventListener('click', function (ev) {
+            var t = ev.target;
+            if (!t || !t.closest) return;
+            var el;
+            if ((el = t.closest('[data-wa-go],[data-wa-act],[data-wa-log]'))) {
+              // Watch interactive (#watch): which face/button was tapped.
+              var action = el.getAttribute('data-wa-log') ? 'log:' + el.getAttribute('data-wa-log')
+                : el.getAttribute('data-wa-act') || 'go:' + el.getAttribute('data-wa-go');
+              ajEvent('watch_interact', { action: action });
+            } else if ((el = t.closest('.ai-chip[data-prompt]'))) {
+              // AI interactive: report chip selected.
+              ajEvent('ai_report_select', { report: el.getAttribute('data-report') || el.getAttribute('data-title') || '' });
+            } else if ((el = t.closest('.aip-copy'))) {
+              // AI interactive: prompt copied (which report was showing).
+              var sel = document.querySelector('.ai-chip.selected[data-report]');
+              ajEvent('ai_prompt_copy', { report: sel ? sel.getAttribute('data-report') : '' });
+            } else if (t.closest('#burger')) {
+              ajEvent('nav_click', { target: 'menu' });
+            } else if ((el = t.closest('#nav a'))) {
+              if (el.hasAttribute('data-dl-cta') || el.hasAttribute('data-dl-store')) return;
+              ajEvent('nav_click', { target: el.getAttribute('href') || '' });
+            } else if ((el = t.closest('a[href^="#"], a[href^="/#"]'))) {
+              // Any other in-page link (trustbar "Read my story", pricing
+              // cross-links, footer section links, …).
+              if (el.hasAttribute('data-dl-cta') || el.hasAttribute('data-dl-store')) return;
+              ajEvent('link_click', { target: el.getAttribute('href') || '' });
+            }
+          });
+
+          // FAQ (and any other <details>) opens. Toggle doesn't bubble, so
+          // listen in the capture phase. Strip the "+" indicator glyph.
+          document.addEventListener('toggle', function (ev) {
+            var d = ev.target;
+            if (d && d.tagName === 'DETAILS' && d.open) {
+              var s = d.querySelector('summary');
+              ajEvent('faq_open', { question: s ? s.textContent.replace(/\+\s*$/, '').trim().slice(0, 100) : '' });
+            }
+          }, true);
+
+          // Section views: fire once per page load when a section crosses the
+          // middle band of the viewport (works for sections taller than the
+          // screen, where a visible-fraction threshold would never trip).
+          // Sections are keyed by id, falling back to a slug of aria-label.
+          if (window.IntersectionObserver) {
+            var seenSections = {};
+            var sectionObs = new IntersectionObserver(function (entries) {
+              entries.forEach(function (en) {
+                if (!en.isIntersecting) return;
+                var sec = en.target;
+                var key = sec.id || (sec.getAttribute('aria-label') || '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+                if (!key || seenSections[key]) return;
+                seenSections[key] = true;
+                sectionObs.unobserve(sec);
+                ajEvent('section_view', { section: key });
+              });
+            }, { rootMargin: '-40% 0px -40% 0px', threshold: 0 });
+            document.querySelectorAll('section').forEach(function (s) {
+              if (s.id || s.getAttribute('aria-label')) sectionObs.observe(s);
+            });
+          }
+          // --------------------------------------------------------------
 
           var copyBtn = document.querySelector('.aip-copy');
           if (copyBtn) {
