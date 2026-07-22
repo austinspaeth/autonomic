@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 580" width="920" height="580" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" role="img" aria-label="Data-flow diagram: heart-rate sources feed into your phone, where data is captured, processed and stored on-device. Nothing is sent to any server or cloud; data leaves only when you choose to export it.">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#475569"/>
+    </marker>
+    <marker id="arrowGreen" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#059669"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="920" height="580" fill="#ffffff"/>
+
+  <!-- Title -->
+  <text x="40" y="46" font-size="24" font-weight="700" fill="#0F172A">Where your data goes — and where it stops</text>
+  <text x="40" y="72" font-size="15" fill="#64748B">Autonomic has no backend. Nothing is transmitted automatically.</text>
+
+  <!-- ===== Left: capture sources ===== -->
+  <text x="40" y="120" font-size="13" font-weight="700" fill="#94A3B8" letter-spacing="0.06em">CAPTURE SOURCES</text>
+
+  <!-- source boxes -->
+  <g font-size="14" fill="#0F172A">
+    <rect x="40" y="134" width="196" height="50" rx="10" fill="#F8FAFC" stroke="#E2E8F0"/>
+    <text x="60" y="164">Bluetooth chest strap</text>
+
+    <rect x="40" y="196" width="196" height="50" rx="10" fill="#F8FAFC" stroke="#E2E8F0"/>
+    <text x="60" y="226">Apple Watch</text>
+
+    <rect x="40" y="258" width="196" height="50" rx="10" fill="#F8FAFC" stroke="#E2E8F0"/>
+    <text x="60" y="288">Phone camera (finger PPG)</text>
+
+    <rect x="40" y="320" width="196" height="50" rx="10" fill="#F8FAFC" stroke="#E2E8F0"/>
+    <text x="60" y="344">Apple Health / Health</text>
+    <text x="60" y="362" font-size="14">Connect</text>
+  </g>
+
+  <!-- arrows converging into phone -->
+  <g stroke="#475569" stroke-width="2" fill="none" marker-end="url(#arrow)">
+    <path d="M236,159 C300,175 320,250 372,286"/>
+    <path d="M236,221 C300,235 330,262 372,290"/>
+    <path d="M236,283 L372,294"/>
+    <path d="M236,345 C300,330 330,308 372,300"/>
+  </g>
+
+  <!-- ===== Center: the phone ===== -->
+  <rect x="372" y="96" width="212" height="404" rx="30" fill="#ffffff" stroke="#0F172A" stroke-width="2.5"/>
+  <rect x="446" y="110" width="64" height="12" rx="6" fill="#0F172A"/>
+  <text x="478" y="486" font-size="14" font-weight="700" fill="#0F172A" text-anchor="middle">Your phone</text>
+
+  <!-- three on-device stages -->
+  <g>
+    <rect x="392" y="140" width="172" height="96" rx="12" fill="#ECFDF5" stroke="#A7F3D0"/>
+    <text x="404" y="168" font-size="13" font-weight="700" fill="#065F46">1 · Capture</text>
+    <text x="404" y="190" font-size="12.5" fill="#047857">Beat-to-beat</text>
+    <text x="404" y="208" font-size="12.5" fill="#047857">RR intervals</text>
+
+    <rect x="392" y="248" width="172" height="96" rx="12" fill="#ECFDF5" stroke="#A7F3D0"/>
+    <text x="404" y="276" font-size="13" font-weight="700" fill="#065F46">2 · Process</text>
+    <text x="404" y="298" font-size="12.5" fill="#047857">Artifact correction,</text>
+    <text x="404" y="316" font-size="12.5" fill="#047857">HRV, scoring</text>
+
+    <rect x="392" y="356" width="172" height="96" rx="12" fill="#ECFDF5" stroke="#A7F3D0"/>
+    <text x="404" y="384" font-size="13" font-weight="700" fill="#065F46">3 · Store</text>
+    <text x="404" y="406" font-size="12.5" fill="#047857">On device, encrypted</text>
+    <text x="404" y="424" font-size="12.5" fill="#047857">No account</text>
+  </g>
+
+  <!-- vertical flow arrows inside phone -->
+  <g stroke="#059669" stroke-width="2" fill="none" marker-end="url(#arrowGreen)">
+    <path d="M478,236 L478,246"/>
+    <path d="M478,344 L478,354"/>
+  </g>
+
+  <!-- ===== Top right: blocked cloud ===== -->
+  <g>
+    <!-- cloud -->
+    <path d="M690,150 a34,34 0 0,1 66,-10 a30,30 0 0,1 40,28 a26,26 0 0,1 -6,51 h-92 a30,30 0 0,1 -8,-69 z" fill="#FEF2F2" stroke="#FCA5A5" stroke-width="2"/>
+    <!-- no-symbol over cloud -->
+    <circle cx="742" cy="158" r="40" fill="none" stroke="#EF4444" stroke-width="4"/>
+    <line x1="714" y1="130" x2="770" y2="186" stroke="#EF4444" stroke-width="4"/>
+    <text x="742" y="238" font-size="13" font-weight="700" fill="#B91C1C" text-anchor="middle">No server · No cloud</text>
+    <text x="742" y="257" font-size="13" font-weight="700" fill="#B91C1C" text-anchor="middle">No account · No tracking</text>
+  </g>
+
+  <!-- blocked arrow from phone toward cloud -->
+  <g>
+    <path d="M584,180 L648,168" stroke="#EF4444" stroke-width="2" fill="none" stroke-dasharray="5 5"/>
+    <circle cx="616" cy="174" r="13" fill="#ffffff" stroke="#EF4444" stroke-width="2.5"/>
+    <line x1="607" y1="165" x2="625" y2="183" stroke="#EF4444" stroke-width="2.5"/>
+  </g>
+
+  <!-- ===== Bottom right: user-initiated export (the only egress) ===== -->
+  <g>
+    <rect x="672" y="360" width="150" height="86" rx="12" fill="#F8FAFC" stroke="#E2E8F0"/>
+    <text x="747" y="392" font-size="13.5" font-weight="700" fill="#0F172A" text-anchor="middle">Export /</text>
+    <text x="747" y="412" font-size="13.5" font-weight="700" fill="#0F172A" text-anchor="middle">doctor report</text>
+    <text x="747" y="432" font-size="11.5" fill="#64748B" text-anchor="middle">only when you tap Share</text>
+  </g>
+  <path d="M584,420 L666,410" stroke="#059669" stroke-width="2" fill="none" marker-end="url(#arrowGreen)"/>
+  <text x="600" y="450" font-size="11.5" fill="#059669">you choose</text>
+
+  <!-- footer -->
+  <line x1="40" y1="524" x2="880" y2="524" stroke="#E2E8F0"/>
+  <text x="40" y="552" font-size="13.5" fill="#475569">The only way data leaves your phone is an export <tspan font-weight="700" fill="#0F172A">you</tspan> initiate. The developer never has access — there is no backend to hold it.</text>
+</svg>
+</content>
