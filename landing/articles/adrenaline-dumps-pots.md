@@ -8,7 +8,7 @@ keywords: "adrenaline dumps POTS, adrenaline surges POTS, hyperadrenergic POTS, 
 date: 2026-07-22
 updated: 2026-07-22
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1522075782449-e45a34f1ddfb?q=80&w=1760&auto=format&fit=crop"
+photoLocation: "https://images.unsplash.com/photo-1590642916589-592bca10dfbf?q=80&w=763&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
 photoAttribution: "Sage Friedman / Unsplash"
 tldr: "An adrenaline dump is a surge of the stress hormones adrenaline and noradrenaline (norepinephrine) that hits fast: pounding heart, tremor, chills, nausea, a wave of dread, and often a rush to urinate afterward. In POTS the nervous system leans on these hormones to compensate for blood pooling and low blood volume, so surges are common, especially overnight and after standing or big meals. They feel identical to panic, but in POTS the racing usually comes first and the fear follows, and the trigger is physical (posture, sleep, temperature, food) rather than a frightening thought. They pass. The useful moves are to lie down and use gentle vagal and breathing tricks in the moment, defend your fluids and salt, and log the surge with your heart rate and HRV so the pattern becomes visible instead of terrifying. Discuss recurrent surges with a clinician."
 categories:
