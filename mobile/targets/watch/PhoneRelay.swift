@@ -25,6 +25,11 @@ final class PhoneRelay: NSObject, ObservableObject, WCSessionDelegate {
 
     private let outboxKey = "relay.outbox"
     private let defaults = UserDefaults.standard
+    /// All outbox read-modify-writes hop here: send() comes from the main
+    /// thread while acks arrive on WCSession's background queue, and two
+    /// interleaved read-modify-writes of the array can drop a result or
+    /// resurrect an acked one.
+    private let outboxQueue = DispatchQueue(label: "relay.outbox")
 
     /// nil until the first context ever arrives (fresh install, phone app
     /// never opened) — the UI shows "set up on iPhone" in that state.
@@ -71,31 +76,37 @@ final class PhoneRelay: NSObject, ObservableObject, WCSessionDelegate {
 
     func send(result: [String: Any]) {
         guard result["id"] is String else { return }
-        var box = outbox()
-        box.append(result)
-        saveOutbox(box)
-        if WCSession.default.activationState == .activated {
-            WCSession.default.transferUserInfo(result)
+        outboxQueue.async {
+            var box = self.outbox()
+            box.append(result)
+            self.saveOutbox(box)
+            if WCSession.default.activationState == .activated {
+                WCSession.default.transferUserInfo(result)
+            }
         }
     }
 
     /// Re-queue outbox items with no outstanding transfer (e.g. after a
     /// relaunch where the system dropped the queue, or a failed transfer).
     private func flushOutbox() {
-        let session = WCSession.default
-        guard session.activationState == .activated else { return }
-        let inFlight = Set(session.outstandingUserInfoTransfers.compactMap { $0.userInfo["id"] as? String })
-        for item in outbox() {
-            guard let id = item["id"] as? String, !inFlight.contains(id) else { continue }
-            session.transferUserInfo(item)
+        outboxQueue.async {
+            let session = WCSession.default
+            guard session.activationState == .activated else { return }
+            let inFlight = Set(session.outstandingUserInfoTransfers.compactMap { $0.userInfo["id"] as? String })
+            for item in self.outbox() {
+                guard let id = item["id"] as? String, !inFlight.contains(id) else { continue }
+                session.transferUserInfo(item)
+            }
         }
     }
 
     private func handleAck(_ id: String) {
-        saveOutbox(outbox().filter { ($0["id"] as? String) != id })
-        for transfer in WCSession.default.outstandingUserInfoTransfers
-        where (transfer.userInfo["id"] as? String) == id {
-            transfer.cancel()
+        outboxQueue.async {
+            self.saveOutbox(self.outbox().filter { ($0["id"] as? String) != id })
+            for transfer in WCSession.default.outstandingUserInfoTransfers
+            where (transfer.userInfo["id"] as? String) == id {
+                transfer.cancel()
+            }
         }
     }
 

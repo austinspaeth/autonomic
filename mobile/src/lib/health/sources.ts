@@ -44,6 +44,8 @@ export interface WorkoutCandidate {
   label: string;                               // "Walk · 32 min · 2.1 mi"
   sub: string;                                 // "10:14 AM · Avg HR 128 · Apple Watch"
   entry: Record<string, string>;               // prefilled activity fields
+  /** Full HR trace over the workout, destined for the waveform sidecar. */
+  hrSeries: { t: number; bpm: number }[] | null;
 }
 
 /** Prefill fields for a workout, filtered to what the target type's form
@@ -82,7 +84,7 @@ export async function workoutCandidates(dk: string, logged: { type?: unknown; ti
         .filter(Boolean).join(' · ');
       const sub = [fmtTime12(w.time), w.avgHr != null ? `Avg HR ${w.avgHr}` : null, w.sourceName]
         .filter(Boolean).join(' · ');
-      return { key: `${w.type}-${w.startMs}`, type: w.type, time: w.time, label, sub, entry: workoutEntry(w) };
+      return { key: `${w.type}-${w.startMs}`, type: w.type, time: w.time, label, sub, entry: workoutEntry(w), hrSeries: w.hrSeries };
     });
 }
 

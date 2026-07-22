@@ -83,6 +83,12 @@ import HealthKit
 final class WorkoutManager: NSObject, ObservableObject {
     static let shared = WorkoutManager()
 
+    /// Launch permission gate. The UI shows a dedicated request screen before
+    /// anything else while `.needed`: asking up front, from a fully-active
+    /// app, is the reliable presentation path — the old ask-on-first-use flow
+    /// could try to present mid-session-spinup and wedge (see the class doc).
+    enum AuthGate { case checking, needed, resolved }
+
     enum StreamMode {
         /// Paused session, no active duration (the HR monitor).
         case monitor
@@ -147,9 +153,42 @@ final class WorkoutManager: NSObject, ObservableObject {
     /// Workout sharing is denied in Health settings — no session can run.
     /// The monitor UI shows how to fix it instead of a grey 00.
     @Published var sharingDenied = false
+    /// Whether the launch permission screen must show before the app's UI.
+    @Published var authGate: AuthGate = .checking
 
     private var workoutShareStatus: HKAuthorizationStatus {
         store.authorizationStatus(for: HKObjectType.workoutType())
+    }
+
+    /// The full permission set the app ever asks for. The gate check and the
+    /// request must stay in lockstep — a type asked for later would present
+    /// its sheet mid-session again, the exact flow the gate exists to avoid.
+    private var readTypes: Set<HKObjectType> {
+        [HKQuantityType.quantityType(forIdentifier: .heartRate)!]
+    }
+    private var shareTypes: Set<HKSampleType> {
+        [HKObjectType.workoutType()]
+    }
+
+    /// Decide whether the launch permission screen is needed.
+    /// `getRequestStatusForAuthorization` covers READ types too (plain
+    /// `authorizationStatus` never reveals read state), so this is the only
+    /// check that knows whether the sheet still has anything to present.
+    func evaluateAuthGate() {
+        guard HKHealthStore.isHealthDataAvailable() else {
+            DispatchQueue.main.async { self.authGate = .resolved }
+            return
+        }
+        store.getRequestStatusForAuthorization(toShare: shareTypes, read: readTypes) { [weak self] status, _ in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.sharingDenied = self.workoutShareStatus == .sharingDenied
+                // .unknown (transient error) resolves rather than trapping the
+                // user at the gate — start()'s own auth gate still protects
+                // the session path.
+                self.authGate = status == .shouldRequest ? .needed : .resolved
+            }
+        }
     }
 
     /// Claim and end a workout session orphaned by a dead previous process.
@@ -179,12 +218,13 @@ final class WorkoutManager: NSObject, ObservableObject {
 
     func requestAuthorization() {
         guard HKHealthStore.isHealthDataAvailable() else { return }
-        let read: Set<HKObjectType> = [HKQuantityType.quantityType(forIdentifier: .heartRate)!]
-        let share: Set<HKSampleType> = [HKObjectType.workoutType()]
-        store.requestAuthorization(toShare: share, read: read) { [weak self] _, _ in
+        store.requestAuthorization(toShare: shareTypes, read: readTypes) { [weak self] _, _ in
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.sharingDenied = self.workoutShareStatus == .sharingDenied
+                // The user answered (or the sheet failed) — re-check whether
+                // the launch gate can come down.
+                self.evaluateAuthGate()
                 // A stream started before authorization resolved was deferred
                 // by start()'s gate — begin it now that the user has answered.
                 guard self.wantsStreaming, self.session == nil,

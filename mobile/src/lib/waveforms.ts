@@ -5,9 +5,10 @@
  * per-second HR/SDNN samples — tens of KB per session). Persisted inline they
  * dominated the journal blob, which save() re-stringifies on every mutation,
  * so write cost grew monotonically with history. The arrays now live in a
- * separate MMKV instance keyed by reading id (wired in src/store/store.ts);
+ * separate MMKV instance keyed by entry id (wired in src/store/store.ts);
  * the journal keeps only the computed metrics, so it stays small no matter
- * how many sessions accumulate.
+ * how many sessions accumulate. Activities carry waveforms too — a workout
+ * imported from the health store keeps its full HR trace as `sampledHr`.
  *
  * These helpers do the moving: splitting an entry into journal + waveform
  * halves, migrating legacy embedded arrays on load, and round-tripping
@@ -51,9 +52,12 @@ export function splitWaveform(entry: Entry): { entry: Entry; waveform: WaveformD
   return stripped ? { entry: stripped, waveform } : { entry, waveform: null };
 }
 
+/** The day arrays whose entries may own a sidecar waveform. */
+const WAVEFORM_ARRAYS = ['readings', 'activities'] as const;
+
 /**
- * Move embedded arrays off every reading into the sidecar via `put`. The
- * sidecar write happens BEFORE the stripped journal is persisted by the
+ * Move embedded arrays off every reading/activity into the sidecar via `put`.
+ * The sidecar write happens BEFORE the stripped journal is persisted by the
  * caller, so a crash between the two writes just re-runs the (idempotent)
  * move on the next launch. Mutates `state`. Returns how many entries changed.
  */
@@ -64,26 +68,34 @@ export function extractWaveforms(
   let moved = 0;
   for (const dk of Object.keys(state.days)) {
     const day = state.days[dk];
-    if (!day || !Array.isArray(day.readings)) continue;
-    day.readings = day.readings.map((r) => {
-      const { entry, waveform } = splitWaveform(r);
-      if (entry === r) return r;
-      if (waveform) put(entry.id, waveform);
-      moved++;
-      return entry;
-    });
+    if (!day) continue;
+    for (const arr of WAVEFORM_ARRAYS) {
+      if (!Array.isArray(day[arr])) continue;
+      day[arr] = day[arr].map((r) => {
+        const { entry, waveform } = splitWaveform(r);
+        if (entry === r) return r;
+        if (waveform) put(entry.id, waveform);
+        moved++;
+        return entry;
+      });
+    }
   }
   return moved;
 }
 
-/** Every reading id in the journal — the set of sidecar keys allowed to
- *  exist (export filters to these; the store prunes strays on launch). */
-export function readingIds(state: AppState): Set<string> {
+/** Every reading + activity id in the journal — the set of sidecar keys
+ *  allowed to exist (export filters to these; the store prunes strays on
+ *  launch). */
+export function waveformIds(state: AppState): Set<string> {
   const ids = new Set<string>();
   for (const dk of Object.keys(state.days)) {
-    const rs = state.days[dk] && state.days[dk].readings;
-    if (!Array.isArray(rs)) continue;
-    for (const r of rs) if (typeof r.id === 'string' && r.id) ids.add(r.id);
+    const day = state.days[dk];
+    if (!day) continue;
+    for (const arr of WAVEFORM_ARRAYS) {
+      const rs = day[arr];
+      if (!Array.isArray(rs)) continue;
+      for (const r of rs) if (typeof r.id === 'string' && r.id) ids.add(r.id);
+    }
   }
   return ids;
 }
@@ -91,7 +103,7 @@ export function readingIds(state: AppState): Set<string> {
 /**
  * Validate the top-level `waveforms` map of a new-format export. Imports are
  * user-picked files, so only well-shaped array fields survive, only for ids
- * that exist as readings — and "__proto__" is skipped (JSON.parse creates it
+ * that exist as entries — and "__proto__" is skipped (JSON.parse creates it
  * as an own key; using it as a map key would poison the output's prototype).
  */
 export function collectImportWaveforms(
@@ -122,12 +134,16 @@ export function collectImportWaveforms(
  *  path must route arrays through the sidecar; this catches a missed one. */
 export function findEmbeddedWaveform(state: AppState): string | null {
   for (const dk of Object.keys(state.days)) {
-    const rs = state.days[dk] && state.days[dk].readings;
-    if (!Array.isArray(rs)) continue;
-    for (const r of rs) {
-      for (const f of WAVEFORM_FIELDS) {
-        const v = r[f];
-        if (Array.isArray(v) && v.length) return `${dk}/${String(r.type)}:${f}`;
+    const day = state.days[dk];
+    if (!day) continue;
+    for (const arr of WAVEFORM_ARRAYS) {
+      const rs = day[arr];
+      if (!Array.isArray(rs)) continue;
+      for (const r of rs) {
+        for (const f of WAVEFORM_FIELDS) {
+          const v = r[f];
+          if (Array.isArray(v) && v.length) return `${dk}/${String(r.type)}:${f}`;
+        }
       }
     }
   }

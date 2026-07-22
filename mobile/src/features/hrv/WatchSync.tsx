@@ -7,7 +7,11 @@
  * watchSyncStore.ts, which watches HealthKit for any RR-backed reading near
  * the session window — heartbeat series and ECGs — and hands the RR intervals
  * to the normal results card. If more than one reading lands in the window it
- * asks which one to use. Cancel closes the whole capture stack.
+ * asks which one to use. While waiting, any other RR-backed reading found in
+ * today's Health data is listed as a manual pick — the escape hatch when the
+ * reading landed outside the sync window (watch clock drift, Breathe started
+ * at the wrong moment, or a reading taken earlier). Cancel closes the whole
+ * capture stack.
  *
  * "Continue using app" minimizes the card: the sheet stack closes but the
  * poller keeps running, and the floating WatchSyncPill takes over until the
@@ -19,13 +23,12 @@ import { SheetControls, SheetFooter } from '../../components/Sheet';
 import { Button } from '../../components/ui';
 import { Icon } from '../../components/Icon';
 import { usePalette } from '../../theme';
-import { fmtTime12 } from '../../lib/dates';
+import { fmtTime12, pad } from '../../lib/dates';
 import { HrvResults } from './Results';
 import {
   getWatchSyncState, minimizeWatchSync, stopWatchSync, subscribeWatchSync, type WatchCandidate,
 } from './watchSyncStore';
 
-const pad = (n: number) => String(n).padStart(2, '0');
 const timeOf = (ms: number) => {
   const d = new Date(ms);
   return fmtTime12(`${pad(d.getHours())}:${pad(d.getMinutes())}`);
@@ -34,6 +37,25 @@ const durLabel = (c: WatchCandidate) => {
   const sec = Math.max(1, Math.round((c.endMs - c.startMs) / 1000));
   return sec >= 90 ? `${Math.round(sec / 60)} min` : `${sec}s`;
 };
+
+/** One tappable RR-backed reading, shared by the which-one picker and the
+ *  waiting card's found-in-Health list. */
+export function CandidateRow({ c, onPress }: { c: WatchCandidate; onPress: () => void }) {
+  const p = usePalette();
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => ({ backgroundColor: p.surface2, borderRadius: 14, padding: 16, marginBottom: 10, opacity: pressed ? 0.7 : 1 })}
+    >
+      <Text style={{ color: p.text, fontWeight: '700', fontSize: 16 }}>
+        {c.kind === 'hrv' ? 'HRV reading' : 'ECG'} · {timeOf(c.startMs)}
+      </Text>
+      <Text style={{ color: p.textDim, fontSize: 13, marginTop: 3 }}>
+        {durLabel(c)} · {c.rr.length} beats · {c.sourceName}
+      </Text>
+    </Pressable>
+  );
+}
 
 export function WatchSyncSheet({ controls }: { controls: SheetControls }) {
   const p = usePalette();
@@ -58,6 +80,7 @@ export function WatchSyncSheet({ controls }: { controls: SheetControls }) {
         hrSamples={[]}
         config={st.config}
         durationSec={durationSec}
+        startedAtMs={chosen.startMs}
         watchFallback={chosen.avgHr != null ? { hr: chosen.avgHr } : null}
         controls={controls}
       />
@@ -73,18 +96,7 @@ export function WatchSyncSheet({ controls }: { controls: SheetControls }) {
           More than one watch reading landed near this session. Pick the one to use.
         </Text>
         {st.candidates.map((c) => (
-          <Pressable
-            key={c.key}
-            onPress={() => setPicked(c)}
-            style={({ pressed }) => ({ backgroundColor: p.surface2, borderRadius: 14, padding: 16, marginBottom: 10, opacity: pressed ? 0.7 : 1 })}
-          >
-            <Text style={{ color: p.text, fontWeight: '700', fontSize: 16 }}>
-              {c.kind === 'hrv' ? 'HRV reading' : 'ECG'} · {timeOf(c.startMs)}
-            </Text>
-            <Text style={{ color: p.textDim, fontSize: 13, marginTop: 3 }}>
-              {durLabel(c)} · {c.rr.length} beats
-            </Text>
-          </Pressable>
+          <CandidateRow key={c.key} c={c} onPress={() => setPicked(c)} />
         ))}
         <SheetFooter>
           <Button title="Cancel" variant="ghost" onPress={cancel} />
@@ -111,6 +123,22 @@ export function WatchSyncSheet({ controls }: { controls: SheetControls }) {
             <Text style={{ color: p.textDim, fontSize: 13, lineHeight: 18, textAlign: 'center', paddingHorizontal: 28, marginTop: 12 }}>
               Not seeing it yet. Keep your watch near your phone. Opening the Health app once can nudge the sync.
             </Text>
+          ) : null}
+          {st.waitedSec >= 120 ? (
+            <Text style={{ color: p.textDim, fontSize: 13, lineHeight: 18, textAlign: 'center', paddingHorizontal: 28, marginTop: 12 }}>
+              Still nothing? Check that Autonomic can read your heart data: in the Health app tap your picture, then Privacy, then Apps, then Autonomic, and turn everything on, including Beat-to-Beat Measurements.
+            </Text>
+          ) : null}
+          {st.nearby.length ? (
+            <View style={{ alignSelf: 'stretch', marginTop: 26 }}>
+              <Text style={{ color: p.text, fontWeight: '700', fontSize: 15, marginBottom: 4 }}>Found in Apple Health today</Text>
+              <Text style={{ color: p.textDim, fontSize: 13, lineHeight: 18, marginBottom: 12 }}>
+                These readings are outside the sync window. If one of them is yours, tap it to use it.
+              </Text>
+              {st.nearby.map((c) => (
+                <CandidateRow key={c.key} c={c} onPress={() => setPicked(c)} />
+              ))}
+            </View>
           ) : null}
         </>
       ) : (

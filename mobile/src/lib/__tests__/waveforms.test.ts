@@ -8,7 +8,7 @@
 import { migrate } from '../migrate';
 import type { AppState, Entry } from '../types';
 import {
-  collectImportWaveforms, extractWaveforms, findEmbeddedWaveform, readingIds,
+  collectImportWaveforms, extractWaveforms, findEmbeddedWaveform, waveformIds,
   splitWaveform, type WaveformData,
 } from '../waveforms';
 
@@ -79,23 +79,43 @@ describe('extractWaveforms', () => {
     extractWaveforms(s, () => {});
     expect(extractWaveforms(s, () => { throw new Error('should not put'); })).toBe(0);
   });
+
+  it('moves an imported workout HR trace off an activity too', () => {
+    const put: Record<string, WaveformData> = {};
+    const s = migrate({
+      meta: { sleepReframed: true },
+      days: { '2026-01-01': { activities: [{ id: 'w1', type: 'run', duration: '32', sampledHr: [...HR_SAMPLES] }] } },
+    });
+    expect(extractWaveforms(s, (id, data) => { put[id] = data; })).toBe(1);
+    expect(put.w1).toEqual({ sampledHr: HR_SAMPLES });
+    expect(findEmbeddedWaveform(s)).toBeNull();
+    expect(s.days['2026-01-01'].activities[0].duration).toBe('32');
+  });
 });
 
-describe('readingIds / findEmbeddedWaveform', () => {
-  it('collects every reading id across days', () => {
+describe('waveformIds / findEmbeddedWaveform', () => {
+  it('collects reading and activity ids across days', () => {
     const s = migrate({
       meta: { sleepReframed: true },
       days: {
-        '2026-01-01': { readings: [{ id: 'a', type: 'hrv' }] },
+        '2026-01-01': { readings: [{ id: 'a', type: 'hrv' }], activities: [{ id: 'w', type: 'run' }] },
         '2026-01-02': { readings: [{ id: 'b', type: 'bp' }] },
       },
     });
-    expect([...readingIds(s)].sort()).toEqual(['a', 'b']);
+    expect([...waveformIds(s)].sort()).toEqual(['a', 'b', 'w']);
   });
 
   it('findEmbeddedWaveform names the first offender', () => {
     const s = stateWith([hrvEntry()]);
     expect(findEmbeddedWaveform(s)).toBe('2026-01-01/hrv:rrRaw');
+  });
+
+  it('findEmbeddedWaveform catches an inline trace on an activity', () => {
+    const s = migrate({
+      meta: { sleepReframed: true },
+      days: { '2026-01-01': { activities: [{ id: 'w1', type: 'run', sampledHr: [...HR_SAMPLES] }] } },
+    });
+    expect(findEmbeddedWaveform(s)).toBe('2026-01-01/run:sampledHr');
   });
 });
 
@@ -148,7 +168,7 @@ describe('round trip: legacy export → sidecar → new export → import', () =
 
     // Import path: state from migrate(), waveforms from the top-level map.
     const reimported = migrate(exported);
-    const collected = collectImportWaveforms(exported, readingIds(reimported));
+    const collected = collectImportWaveforms(exported, waveformIds(reimported));
     expect(findEmbeddedWaveform(reimported)).toBeNull();
     expect(collected.r1.rrRaw).toEqual(RR);
     expect(collected.r1.sampledHr).toEqual(HR_SAMPLES);

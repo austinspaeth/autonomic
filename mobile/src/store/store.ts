@@ -21,7 +21,7 @@ import { createDebouncedWriter } from '../lib/persist';
 import { migrateLegacyJournal } from '../lib/storeMigration';
 import type { AppState, DayRecord, Entry } from '../lib/types';
 import {
-  collectImportWaveforms, extractWaveforms, findEmbeddedWaveform, readingIds,
+  collectImportWaveforms, extractWaveforms, findEmbeddedWaveform, waveformIds,
   type WaveformData,
 } from '../lib/waveforms';
 
@@ -199,11 +199,11 @@ export function storeWaveform(id: string, data: WaveformData) {
   putWaveform(id, data);
 }
 
-/** Drop sidecar blobs whose reading no longer exists (deleted while the
+/** Drop sidecar blobs whose entry no longer exists (deleted while the
  *  journal write raced a crash, or left behind by an older build). */
 function pruneWaveforms(s: AppState) {
   try {
-    const ids = readingIds(s);
+    const ids = waveformIds(s);
     for (const k of wkv().getAllKeys()) {
       if (!ids.has(k)) { wkv().delete(k); waveCache.delete(k); }
     }
@@ -370,7 +370,7 @@ export function replaceState(parsed: unknown, importName?: string) {
   try {
     wkv().clearAll();
     extractWaveforms(state, putWaveform);
-    const imported = collectImportWaveforms(parsed, readingIds(state));
+    const imported = collectImportWaveforms(parsed, waveformIds(state));
     for (const id of Object.keys(imported)) putWaveform(id, imported[id]);
   } catch {
     // waveforms are best-effort — the journal itself is intact without them
@@ -452,13 +452,13 @@ export function useAppState(): AppState {
 }
 
 /** Full journal as export JSON. Exports stay one self-contained file: sidecar
- *  waveforms ride along under a top-level `waveforms` map keyed by reading id
+ *  waveforms ride along under a top-level `waveforms` map keyed by entry id
  *  (filtered to ids that exist, so a stray blob can't bloat exports forever).
  *  replaceState() accepts this shape and the old embedded-arrays shape alike. */
 export function serializeState(): string {
   const out: Record<string, unknown> = { ...state };
   try {
-    const ids = readingIds(state);
+    const ids = waveformIds(state);
     const waveforms: Record<string, WaveformData> = {};
     for (const id of wkv().getAllKeys()) {
       if (!ids.has(id)) continue;

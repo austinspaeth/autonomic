@@ -18,13 +18,16 @@ import { computeScores } from '../../lib/scoring';
 import { getState, storeWaveform, upsertEntry } from '../../store/store';
 import { splitWaveform } from '../../lib/waveforms';
 import { health, healthAppName } from '../../lib/health';
-import { nowTime, todayKey, uid } from '../../lib/dates';
+import { keyOf, nowTime, pad, todayKey, uid } from '../../lib/dates';
 import type { DayRecord, Entry } from '../../lib/types';
 import type { SessionConfig } from './Session';
 
-export function HrvResults({ rr, hrSamples, sdnnSamples, config, durationSec, watchFallback, controls }: {
+export function HrvResults({ rr, hrSamples, sdnnSamples, config, durationSec, startedAtMs, watchFallback, controls }: {
   rr: number[]; hrSamples: { t: number; bpm: number }[]; sdnnSamples?: { t: number; sdnn: number }[];
   config: SessionConfig; durationSec: number;
+  /** When the reading actually began (watch-synced / imported readings) — the
+   *  entry is stamped with this time and day, not the moment Save is pressed. */
+  startedAtMs?: number | null;
   watchFallback: { sdnn?: number; hr?: number } | null; controls: SheetControls;
 }) {
   const p = usePalette();
@@ -37,16 +40,20 @@ export function HrvResults({ rr, hrSamples, sdnnSamples, config, durationSec, wa
     [rr, config.style, config.source, durationSec],
   );
 
-  // Build the reading with the same keys the manual form uses. A live capture
-  // always belongs to the day it physically happened — never the day the
-  // journal happens to be showing.
+  // The day + time the reading physically happened — never the day the journal
+  // happens to be showing, and for watch-synced/imported readings the moment
+  // the watch recorded it, not the moment Save is pressed.
+  const startedAt = startedAtMs ? new Date(startedAtMs) : null;
+  const dk = startedAt ? keyOf(startedAt) : todayKey();
+
+  // Build the reading with the same keys the manual form uses.
   const reading = useMemo<Entry>(() => {
     const type = config.kind === 'breath' ? 'breathHrv' : 'hrv';
     const note = config.source === 'watch' ? 'Captured via Apple Watch'
       : config.source === 'camera' ? 'Captured via device camera (PPG)'
       : `Captured via ${getState().settings.lastBleDeviceName || 'Bluetooth device'}`;
     const base: Entry = {
-      id: uid(), type, time: nowTime(),
+      id: uid(), type, time: startedAt ? `${pad(startedAt.getHours())}:${pad(startedAt.getMinutes())}` : nowTime(),
       period: config.period || 'Other',
       note,
       // Capture source is stamped on the reading so camera (PPG) readings stay
@@ -75,9 +82,9 @@ export function HrvResults({ rr, hrSamples, sdnnSamples, config, durationSec, wa
   // reading appended to today's readings.
   const daysWithCurrent = useMemo(() => {
     const days = getState().days;
-    const dk = todayKey();
     const day = days[dk] as DayRecord | undefined;
     return { ...days, [dk]: { ...(day || {}), readings: [...((day && day.readings) || []), reading] } } as typeof days;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reading]);
 
   const save = async () => {
@@ -86,7 +93,7 @@ export function HrvResults({ rr, hrSamples, sdnnSamples, config, durationSec, wa
     // written before the entry so the journal never references a missing blob.
     const { entry, waveform } = splitWaveform(reading);
     if (waveform) storeWaveform(entry.id, waveform);
-    upsertEntry(todayKey(), 'readings', entry);
+    upsertEntry(dk, 'readings', entry);
     if (writeHealth && health().available) {
       const sdnn = parseFloat(reading.sdnn as string);
       const rmssd = parseFloat(reading.rmssd as string);
@@ -99,7 +106,7 @@ export function HrvResults({ rr, hrSamples, sdnnSamples, config, durationSec, wa
             sdnnMs: isNaN(sdnn) ? undefined : sdnn,
             rmssdMs: isNaN(rmssd) ? undefined : rmssd,
             avgHr: isNaN(hr) ? undefined : hr,
-            startISO: new Date(Date.now() - durationSec * 1000).toISOString(),
+            startISO: new Date(startedAtMs || (Date.now() - durationSec * 1000)).toISOString(),
             durationSec,
           });
         } catch { /* graceful */ }

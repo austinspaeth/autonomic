@@ -23,7 +23,7 @@ import type { Entry, SleepStages } from '../types';
 import { computeHrv } from '../hrv';
 import { keyOf } from '../dates';
 import { summarizeSleep } from './sleepSummary';
-import { activityTypeFromHk } from './workoutMap';
+import { activityTypeFromHk, workoutHrSeries } from './workoutMap';
 
 /** This app's bundle id — used to skip re-importing our own write-backs. */
 const OWN_BUNDLE = 'com.autonomic.journal';
@@ -102,6 +102,9 @@ export interface ImportedWorkout {
   avgHr: number | null;
   minHr: number | null;
   maxHr: number | null;
+  /** Full HR trace over the workout ({ t: seconds from start, bpm }), for the
+   *  post-import report; null when the source recorded no HR. */
+  hrSeries: { t: number; bpm: number }[] | null;
   sourceName: string;        // e.g. "Apple Watch"
   ownApp: boolean;           // authored by this app (watch sessions) — skip on import
 }
@@ -481,6 +484,7 @@ function makeReal(mod: HkModule): HealthApi {
             durationMin,
             distanceMi: dist && dist > 0 ? Math.round(dist * 100) / 100 : null,
             avgHr, minHr, maxHr,
+            hrSeries: workoutHrSeries(hr.map((s) => ({ ms: s.startDate.getTime(), bpm: s.quantity })), w.startDate.getTime()),
             sourceName: w.sourceRevision?.source?.name || 'Apple Health',
             ownApp: isOwnSample(w.sourceRevision),
           });

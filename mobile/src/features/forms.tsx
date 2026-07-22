@@ -10,7 +10,7 @@ import { SheetControls, SheetFooter, useSheets } from '../components/Sheet';
 import { FieldInputs, TextField, TimeField, useFormState } from '../components/Field';
 import { Button, Muted } from '../components/ui';
 import { Icon } from '../components/Icon';
-import { ReadingSummary } from '../components/summary';
+import { ReadingSummary, WorkoutSummary, workoutCurveFor } from '../components/summary';
 import { radius, usePalette } from '../theme';
 import type { Entry, TypeDef } from '../lib/types';
 import {
@@ -22,7 +22,8 @@ import { ManageTypesSheet } from './TypeManager';
 import { computeScores } from '../lib/scoring';
 import { health, healthAppName } from '../lib/health';
 import { healthSourceFor, workoutCandidates, type HealthCandidate, type HealthSource, type WorkoutCandidate } from '../lib/health/sources';
-import { deleteEntry, getState, upsertEntry, useAppState } from '../store/store';
+import { deleteEntry, getState, storeWaveform, upsertEntry, useAppState } from '../store/store';
+import { splitWaveform } from '../lib/waveforms';
 import { defaultTimeFor, fmtTime12, todayKey, uid } from '../lib/dates';
 import { getTier } from '../store/tier';
 import { requestExpandProtocol, scrollJournalToSection } from '../store/nav';
@@ -287,13 +288,18 @@ export function EntryForm({ typeMap, arrKey, dk, type, existing, prefill = null,
     } else if (numFields.length && !anyNum && !anyCheck) {
       return toast('Enter a value');
     }
-    const r: Entry = { ...initial };
+    let r: Entry = { ...initial };
     fields.forEach((f) => {
       if (isDivider(f) || !f.key) return;
       if (f.type === 'check') r[f.key] = !!form[f.key];
       else r[f.key] = String(form[f.key] ?? '').trim();
     });
     r.scores = computeScores(r, scoreCtx());
+    // A prefill may carry inline waveform arrays (an imported workout's HR
+    // trace) — those go to the sidecar, never into the journal blob.
+    const { entry: stripped, waveform } = splitWaveform(r);
+    if (waveform) storeWaveform(stripped.id, waveform);
+    r = stripped;
     upsertEntry(dk, arrKey, r);
     // Auto-publish freshly-logged readings to the health store (fire-and-forget).
     // Only new *manual* entries — never re-publish edits or Health-sourced rows.
@@ -324,7 +330,7 @@ export function EntryForm({ typeMap, arrKey, dk, type, existing, prefill = null,
 /** Indoor-bike bespoke form (conditional Resistance vs interval list).
  *  `prefill` seeds a brand-new entry (a workout imported from the health
  *  store), mirroring EntryForm — reviewed then saved as new, never an edit. */
-export function BikeForm({ dk, existing, prefill = null, controls, onSaved }: { dk: string; existing: Entry | null; prefill?: Entry | null; controls: SheetControls; onSaved: () => void }) {
+export function BikeForm({ dk, existing, prefill = null, controls, onSaved }: { dk: string; existing: Entry | null; prefill?: Entry | null; controls: SheetControls; onSaved: (saved?: Entry) => void }) {
   const p = usePalette();
   const blank: Entry = { id: uid(), type: 'indoorBike', time: defaultTimeFor(dk), note: '', interval: false, intervals: [] as unknown[] };
   const init = existing ? (JSON.parse(JSON.stringify(existing)) as Entry) : prefill ? { ...blank, ...prefill } : blank;
@@ -346,9 +352,12 @@ export function BikeForm({ dk, existing, prefill = null, controls, onSaved }: { 
     else { r.resistance = num.resistance.trim(); r.intervals = []; }
     r.hr60 = num.hr60.trim();
     r.note = note.trim();
-    upsertEntry(dk, 'activities', r);
+    // An imported ride's prefill carries the inline HR trace — sidecar it.
+    const { entry: stripped, waveform } = splitWaveform(r);
+    if (waveform) storeWaveform(stripped.id, waveform);
+    upsertEntry(dk, 'activities', stripped);
     controls.closeAll();
-    onSaved();
+    onSaved(stripped);
   };
 
   return (
@@ -529,6 +538,18 @@ export function useEntryForms(dk: string) {
       { action: { icon: 'edit', onPress: () => openReadingForm(r.type, r) } },
     );
 
+  // The workout report (HR-over-time with zones + stats), for activities that
+  // carry an HR trace. The pencil stacks the normal edit form on top.
+  const openActivitySummary = (r: Entry) =>
+    openSheet(
+      () => <WorkoutSummarySheet r={r} dk={dk} />,
+      { action: { icon: 'edit', onPress: () => openActivityForm(r.type, r) } },
+    );
+
+  // Tapping a journal activity row: imported workouts with an HR trace open
+  // as the report; everything else opens the edit form directly, as before.
+  const openActivity = (r: Entry) => (workoutCurveFor(r) ? openActivitySummary(r) : openActivityForm(r.type, r));
+
   const captureHrv = () => {
     if (hrvCaptureLocked()) { openPaywall(); return; }
     openSheet((c) => <HrvSetup controls={c} />);
@@ -549,9 +570,12 @@ export function useEntryForms(dk: string) {
   // the picker.
   const pickActivityManual = () => openSheet(() => <TypePicker title="Add activity" kind="activities" manageLabel="Add new activity type" onPick={(t) => openActivityForm(t, null)} />);
   const openWorkoutImport = (c: WorkoutCandidate) => {
-    const prefill = { id: uid(), type: c.type, time: c.time, note: '', source: 'health', imported: true, ...c.entry } as Entry;
-    if (c.type === 'indoorBike') openSheet((sc) => <BikeForm dk={dk} existing={null} prefill={prefill} controls={sc} onSaved={refresh} />);
-    else openSheet((sc) => <EntryForm typeMap={typesFor(getState(), 'activities')} arrKey="activities" dk={dk} type={c.type} existing={null} prefill={prefill} controls={sc} onSaved={refresh} />);
+    // The HR trace rides inline on the prefill; the form's save splits it into
+    // the waveform sidecar. Saving then pops the workout report.
+    const prefill = { id: uid(), type: c.type, time: c.time, note: '', source: 'health', imported: true, ...c.entry, ...(c.hrSeries?.length ? { sampledHr: c.hrSeries } : {}) } as Entry;
+    const afterImport = (saved?: Entry) => { refresh(); if (saved && workoutCurveFor(saved)) openActivitySummary(saved); };
+    if (c.type === 'indoorBike') openSheet((sc) => <BikeForm dk={dk} existing={null} prefill={prefill} controls={sc} onSaved={afterImport} />);
+    else openSheet((sc) => <EntryForm typeMap={typesFor(getState(), 'activities')} arrKey="activities" dk={dk} type={c.type} existing={null} prefill={prefill} controls={sc} onSaved={afterImport} />);
   };
   const pickActivity = () => {
     if (!health().available || !getState().settings.healthEnabled) { pickActivityManual(); return; }
@@ -568,7 +592,7 @@ export function useEntryForms(dk: string) {
   const openMed = (r: Entry) => openSheet((c) => <EntryForm typeMap={typesFor(getState(), 'meds')} arrKey="meds" dk={dk} type={r.type} existing={r} controls={c} onSaved={refresh} />);
   const openSymptom = (r: Entry) => openSheet((c) => <EntryForm typeMap={typesFor(getState(), 'symptoms')} arrKey="symptoms" dk={dk} type={r.type} existing={r} controls={c} onSaved={refresh} />);
 
-  return { openReadingForm, openActivityForm, openReadingSummary, captureHrv, pickReading, pickActivity, pickMed, pickSymptom, openMed, openSymptom };
+  return { openReadingForm, openActivityForm, openActivity, openReadingSummary, captureHrv, pickReading, pickActivity, pickMed, pickSymptom, openMed, openSymptom };
 }
 
 export function ReadingSummarySheet({ r, dk }: { r: Entry; dk: string }) {
@@ -583,6 +607,27 @@ export function ReadingSummarySheet({ r, dk }: { r: Entry; dk: string }) {
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, paddingRight: 100 }}>{readingLabel(live)}</Text>
       <Text style={{ color: p.textDim, fontSize: 14, marginTop: 2, marginBottom: 14, paddingRight: 100 }}>{live.time ? fmtTime12(live.time as string) : ''}</Text>
       <ReadingSummary r={live} days={state.days} ctx={ctx} />
+      <View style={{ height: 24 }} />
+    </ScrollView>
+  );
+}
+
+/** The imported-workout report: the activity's HR trace with exercise zones,
+ *  HR stats, time in zones, and the workout's own details (mirror of
+ *  ReadingSummarySheet, over the day's activities). */
+export function WorkoutSummarySheet({ r, dk }: { r: Entry; dk: string }) {
+  const p = usePalette();
+  useAppState(); // re-render on edits
+  const state = getState();
+  const live = (state.days[dk]?.activities || []).find((x) => x.id === r.id) || r;
+  const def = typesFor(state, 'activities')[live.type];
+  const ctx = { sex: state.profile.sex, height: state.profile.height };
+  return (
+    <ScrollView showsVerticalScrollIndicator={false}>
+      {/* The edit + close pill floats top-right — keep the header text clear of it. */}
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, paddingRight: 100 }}>{def?.label || 'Workout'}</Text>
+      <Text style={{ color: p.textDim, fontSize: 14, marginTop: 2, marginBottom: 14, paddingRight: 100 }}>{live.time ? fmtTime12(live.time as string) : ''}</Text>
+      <WorkoutSummary r={live} days={state.days} ctx={ctx} />
       <View style={{ height: 24 }} />
     </ScrollView>
   );

@@ -16,7 +16,7 @@
 import type { Entry, SleepStages } from '../types';
 import { keyOf } from '../dates';
 import { INTERRUPTED_AWAKE_MIN } from './sleepSummary';
-import { activityTypeFromHc } from './workoutMap';
+import { activityTypeFromHc, workoutHrSeries } from './workoutMap';
 import type {
   HealthApi, HealthDaySamples, HistoryReading, ImportedReading, ImportedWorkout, SleepImport,
 } from './index';
@@ -233,11 +233,13 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
         const meters = dist.reduce((sum, r) => sum + (r.distance?.inMeters || 0), 0);
         let avgHr: number | null = null; let minHr: number | null = null; let maxHr: number | null = null;
         let hrSum = 0; let hrN = 0;
+        const hrPoints: { ms: number; bpm: number }[] = [];
         for (const rec of hrRecords) {
           for (const smp of rec.samples || []) {
             hrSum += smp.beatsPerMinute; hrN++;
             if (minHr == null || smp.beatsPerMinute < minHr) minHr = smp.beatsPerMinute;
             if (maxHr == null || smp.beatsPerMinute > maxHr) maxHr = smp.beatsPerMinute;
+            hrPoints.push({ ms: new Date(smp.time).getTime(), bpm: smp.beatsPerMinute });
           }
         }
         if (hrN) { avgHr = Math.round(hrSum / hrN); minHr = Math.round(minHr!); maxHr = Math.round(maxHr!); }
@@ -248,6 +250,7 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
           durationMin,
           distanceMi: meters > 0 ? Math.round((meters / 1609.344) * 100) / 100 : null,
           avgHr, minHr, maxHr,
+          hrSeries: workoutHrSeries(hrPoints, start.getTime()),
           sourceName: s.metadata?.dataOrigin || 'Health Connect',
           ownApp: isOwnRecord(s.metadata),
         });

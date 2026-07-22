@@ -30,6 +30,7 @@ import { SheetControls, useSheets } from '../components/Sheet';
 import { useToast } from '../components/Toast';
 import { ACCENT, radius, usePalette } from '../theme';
 import { health, healthAppName } from '../lib/health';
+import { requestEcgAuth } from '../lib/health/ecg';
 import { computeScores } from '../lib/scoring';
 import { blankDay, getState, mutate, save, storeWaveform, useAppState } from '../store/store';
 import { DevicesScreen } from './Devices';
@@ -400,6 +401,10 @@ function Onboarding({ onDone }: { onDone: () => void }) {
     if (!api.available) { toast(`${healthAppName()} needs a full app build`); return; }
     setHealthBusy(true);
     const ok = await api.requestAuth();
+    // The ECG permission lives outside the HealthKit set (a local native
+    // module) — ask here too, so the watch-sync flow never has to prompt after
+    // a finished reading. Sequential: its sheet must not race the one above.
+    if (ok) await requestEcgAuth();
     setHealthBusy(false);
     if (!ok) { toast('Permission denied'); return; }
     getState().settings.healthEnabled = true; save(); toast('Health connected');

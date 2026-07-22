@@ -43,6 +43,12 @@ final class StandTestController: ObservableObject {
 
     private(set) var lastResult: [String: Any]?
 
+    deinit {
+        // The timer only holds `self` weakly, so without this a controller
+        // discarded mid-test leaves a no-op timer firing forever.
+        ticker?.invalidate()
+    }
+
     // MARK: - Stage transitions
 
     func begin() {

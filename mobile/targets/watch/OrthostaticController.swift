@@ -80,6 +80,12 @@ final class OrthostaticController: ObservableObject {
     private var lastComplicationBand: String?
     private(set) var lastResult: [String: Any]?
 
+    deinit {
+        // The timer only holds `self` weakly, so without this a controller
+        // discarded mid-event leaves a no-op timer firing forever.
+        ticker?.invalidate()
+    }
+
     // MARK: - Transitions
 
     func pick(_ type: EventType) {

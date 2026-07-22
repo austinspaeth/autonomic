@@ -46,6 +46,12 @@ final class HrMonitorModel: ObservableObject {
     private var maxBuzzer: ThresholdBuzzer?
     private var maxHr: Double?
 
+    deinit {
+        // The timer only holds `self` weakly, so without this a model
+        // discarded mid-session leaves a no-op timer firing forever.
+        ticker?.invalidate()
+    }
+
     func start() {
         WorkoutManager.shared.start()
         maxHr = computedMaxHr(age: PhoneRelay.shared.age, sex: PhoneRelay.shared.sex)

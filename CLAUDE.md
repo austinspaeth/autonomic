@@ -91,10 +91,14 @@ old web app so old `export.json` files import directly.
   wholesale on edit (`typeCatalog.ts`), not mutated in place, for the same
   reason. Cheap subscribers should use `useStore(selector)` returning a
   primitive rather than `useAppState()`.
-- **HRV waveform arrays never live in the journal.** `rrRaw` / `sampledHr` /
-  `sampledSdnn` go to a sidecar MMKV instance keyed by reading id — write via
+- **Waveform arrays never live in the journal.** `rrRaw` / `sampledHr` /
+  `sampledSdnn` go to a sidecar MMKV instance keyed by entry id — write via
   `storeWaveform()`, read via `getWaveform()` (`src/lib/waveforms.ts` has the pure
-  split/extract/import helpers). `rrClean` isn't stored at all (re-derived via
+  split/extract/import helpers). Readings AND activities: a workout imported from
+  the health store keeps its full HR trace as `sampledHr`, which powers the
+  workout report (`WorkoutSummary` + `WorkoutHrChart`, zones in
+  `src/lib/workoutZones.ts`); tapping such an activity row opens the report
+  instead of the edit form. `rrClean` isn't stored at all (re-derived via
   `correctArtifacts`). Exports carry a top-level `waveforms` map; old exports with
   embedded arrays still import. A dev-build warning fires if an inline array ever
   reaches the persisted journal.

@@ -13,6 +13,7 @@ import { GRADE_COLORS, fonts, radius, usePalette } from '../theme';
 import type { Band, ScoreCat } from '../lib/types';
 import { BANDS, catFromBands } from '../lib/scoring';
 import { psdCurve } from '../lib/hrv';
+import { zoneFor, type HrZone } from '../lib/workoutZones';
 
 /* HRV frequency bands (Hz) — kept local to the chart so it has no lib/hrv dep. */
 const SPECTRUM_BANDS = [
@@ -833,6 +834,109 @@ export function OrthoHrChart({ samples, baseline, transitionAt, completedAt, hei
         ))}
         {pre.length ? <Path d={pathOf(pre)} fill="none" stroke={STAND_PURPLE} strokeWidth={1.8} strokeLinejoin="round" strokeLinecap="round" /> : null}
         {post.length ? <Path d={pathOf(post)} fill="none" stroke={`url(#${gid})`} strokeWidth={1.8} strokeLinejoin="round" strokeLinecap="round" /> : null}
+      </Svg>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+        <RNText style={{ fontSize: 10, color: p.textDim }}>0:00</RNText>
+        <RNText style={{ fontSize: 10, color: p.textDim }}>{fmtT(t1 - t0)}</RNText>
+      </View>
+    </View>
+  );
+}
+
+/* ---------- Imported-workout HR curve (samples vs elapsed time, zone-graded) ---------- */
+/**
+ * The HR trace of a workout imported from the health store, presented like the
+ * POTS captures' curves: strided, smoothed runs (dropout gaps break the path)
+ * with a vertical gradient — here coloured by exercise zone (%-of-max bands
+ * from lib/workoutZones) instead of POTS grades. "Show zones" marks the zone
+ * floors. Without an age-estimated max HR there are no zones, so the trace
+ * draws in the accent colour and the toggle disappears.
+ */
+let workoutId = 0;
+export function WorkoutHrChart({ samples, zones, height = 150 }: {
+  samples: { t: number; bpm: number }[];
+  zones: HrZone[] | null;
+  height?: number;
+}) {
+  const p = usePalette();
+  const [showZones, setShowZones] = useState(false);
+  const [gid] = useState(() => `wh${workoutId++}`);
+  if (!samples || samples.length < 2) return null;
+  const stride = Math.max(1, Math.ceil(samples.length / 300));
+  const kept = samples.filter((_, i) => i % stride === 0 || i === samples.length - 1);
+  // Sample cadence varies by source (watch ~5 s, straps ~1 s) — size the
+  // dropout threshold from the median gap rather than assuming 1 Hz.
+  const gaps = kept.slice(1).map((s, i) => s.t - kept[i].t).sort((a, b) => a - b);
+  const medGap = gaps[Math.floor(gaps.length / 2)] || 1;
+  const runs: { t: number; bpm: number }[][] = [];
+  kept.forEach((s, i) => {
+    if (i === 0 || s.t - kept[i - 1].t > 4 * medGap) runs.push([]);
+    runs[runs.length - 1].push({ t: s.t, bpm: s.bpm });
+  });
+  runs.forEach((run) => {
+    for (let pass = 0; pass < 2; pass++) {
+      const src = run.map((q) => q.bpm);
+      for (let i = 1; i < run.length - 1; i++) run[i].bpm = 0.25 * src[i - 1] + 0.5 * src[i] + 0.25 * src[i + 1];
+    }
+  });
+  const bpms = runs.flat().map((q) => q.bpm);
+  if (bpms.length < 2) return null;
+  const dMin = Math.min(...bpms), dMax = Math.max(...bpms);
+  const span = dMax - dMin || 1;
+  const min = dMin - span * 0.08, max = dMax + span * 0.08;
+  const range = max - min || 1;
+  const t0 = kept[0].t, t1 = kept[kept.length - 1].t;
+  const tSpan = t1 - t0 || 1;
+  const W = 320, H = height, padL = 34, padR = 8, padT = 12, padB = 20;
+  const innerW = W - padL - padR;
+  const xAt = (t: number) => padL + ((t - t0) / tSpan) * innerW;
+  const yAt = (v: number) => padT + (1 - (v - min) / range) * (H - padT - padB);
+  const ticks = [min, (min + max) / 2, max];
+  const fmtT = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, '0')}`;
+  const pathOf = (segs: { t: number; bpm: number }[][]) =>
+    segs.map((run) => smoothPath(run.map((q) => [xAt(q.t), yAt(q.bpm)] as [number, number]))).join(' ');
+  // Vertical gradient banded at the zone floors, same trick as the POTS charts.
+  const colAt = (v: number) => (zones ? zoneFor(v, zones).color : p.accent);
+  const offAt = (v: number) => Math.max(0, Math.min(1, 1 - (v - min) / range));
+  const stops: { o: number; c: string }[] = [];
+  if (zones) {
+    stops.push({ o: 0, c: colAt(max - 1e-9) });
+    zones.map((z) => z.from).filter((v) => v > min && v < max).sort((a, b) => b - a).forEach((v) => {
+      stops.push({ o: offAt(v), c: colAt(v + 1e-9) });
+      stops.push({ o: offAt(v), c: colAt(v - 1e-9) });
+    });
+    stops.push({ o: 1, c: colAt(min + 1e-9) });
+  }
+  const zoneLines = zones && showZones
+    ? zones.filter((z) => z.z > 1 && z.from > min && z.from < max)
+    : [];
+  return (
+    <View style={{ backgroundColor: p.bg, borderRadius: radius.control, padding: 8 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+        <RNText style={{ fontSize: 11, color: p.textDim }}>{`Heart rate (bpm) · ${fmtT(tSpan)} workout`}</RNText>
+        {zones ? <ZonesToggle on={showZones} onPress={() => setShowZones((v) => !v)} /> : null}
+      </View>
+      <Svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+        {zones ? (
+          <Defs>
+            <LinearGradient id={gid} x1="0" y1={padT} x2="0" y2={H - padB} gradientUnits="userSpaceOnUse">
+              {stops.map((s, i) => <Stop key={i} offset={s.o} stopColor={s.c} />)}
+            </LinearGradient>
+          </Defs>
+        ) : null}
+        {ticks.map((t, i) => (
+          <React.Fragment key={i}>
+            <Line x1={padL} x2={W - padR} y1={yAt(t)} y2={yAt(t)} stroke={p.border} strokeWidth={1} opacity={0.4} />
+            <SvgText x={padL - 4} y={yAt(t) + 3} textAnchor="end" fontSize={9} fill={p.textDim}>{Math.round(t)}</SvgText>
+          </React.Fragment>
+        ))}
+        {zoneLines.map((z) => (
+          <React.Fragment key={`z${z.z}`}>
+            <Line x1={padL} x2={W - padR} y1={yAt(z.from)} y2={yAt(z.from)} stroke={z.color} strokeWidth={1.2} strokeDasharray="4 3" opacity={0.85} />
+            <SvgText x={W - padR} y={yAt(z.from) - 2} textAnchor="end" fontSize={8} fontWeight="700" fill={z.color}>{`Z${z.z}`}</SvgText>
+          </React.Fragment>
+        ))}
+        <Path d={pathOf(runs)} fill="none" stroke={zones ? `url(#${gid})` : p.accent} strokeWidth={1.8} strokeLinejoin="round" strokeLinecap="round" />
       </Svg>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
         <RNText style={{ fontSize: 10, color: p.textDim }}>0:00</RNText>

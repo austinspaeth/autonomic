@@ -22,14 +22,15 @@ import {
 import { metricHistory, numEx, type DaysMap } from '../lib/scoring/day';
 import { entryFields, isDivider, READING_TYPES } from '../lib/registry';
 import { healthAppName } from '../lib/health';
-import { fmtNum, fmtShort, todayKey } from '../lib/dates';
+import { ageFromBirthday, fmtNum, fmtShort, todayKey } from '../lib/dates';
+import { estimatedHrMax, hrZones, timeInZones } from '../lib/workoutZones';
 import { correctArtifacts } from '../lib/hrv';
 import { buildEventInsightPrompt } from '../lib/analysis/reports';
 import { getState, getWaveform } from '../store/store';
 import { useTier } from '../store/tier';
 import { usePaywall } from '../features/Paywall';
 import { PromptSheet } from '../features/PromptSheet';
-import { BalanceChart, OrthoHrChart, PowerSpectrum, Sparkline, StandHrChart, Tachogram, ZonesToggle, balanceCat } from './charts';
+import { BalanceChart, OrthoHrChart, PowerSpectrum, Sparkline, StandHrChart, Tachogram, WorkoutHrChart, ZonesToggle, balanceCat } from './charts';
 import { Icon } from './Icon';
 import { useSheets } from './Sheet';
 import { HelpDot, ScoreDot } from './ui';
@@ -729,6 +730,119 @@ export function StandTestSummary({ r, days, ctx: _ctx }: SummaryProps) {
       <Notes r={r} />
       <EventInsightButton r={r} days={days} hrCurve={hrCurve} noun="test" title="Stand Test Insights" />
       <Text style={{ fontSize: 12, color: p.textDim, lineHeight: 17, marginBottom: 16, paddingHorizontal: 4 }}>{STAND_DISCLAIMER}</Text>
+    </>
+  );
+}
+
+/* ---------- Imported workout (health-store activity with an HR trace) ---------- */
+
+const WORKOUT_HELP: Record<string, string> = {
+  curve: 'Your heart rate across the whole workout, from the samples the source recorded (a watch logs one every few seconds). The trace is coloured by exercise zone; gaps mean the sensor dropped out.',
+  zones: 'Exercise zones as a percentage of your estimated max heart rate (208 minus 0.7 times your age): Z1 under 60%, Z2 60-70%, Z3 70-80%, Z4 80-90%, Z5 90% and up. The estimate comes from your birthday in Settings, so treat the boundaries as approximate.',
+  hr: 'Average, lowest and highest heart rate recorded during the workout.',
+};
+
+const fmtDur = (sec: number) => {
+  const m = Math.floor(sec / 60);
+  return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}:${String(Math.round(sec % 60)).padStart(2, '0')}`;
+};
+
+/** "10:24 /mi" from duration (min) and distance (mi). */
+function paceStr(durationMin: number, distanceMi: number): string | null {
+  if (!(durationMin > 0) || !(distanceMi > 0)) return null;
+  const secPerMi = (durationMin * 60) / distanceMi;
+  if (secPerMi < 120 || secPerMi > 3600) return null; // implausible — bad field entry
+  return `${Math.floor(secPerMi / 60)}:${String(Math.round(secPerMi % 60)).padStart(2, '0')} /mi`;
+}
+
+/** Whether this activity opens as a workout report (it has a stored HR trace). */
+export function workoutCurveFor(r: Entry): { t: number; bpm: number }[] | null {
+  return hrCurveFor(r);
+}
+
+export function WorkoutSummary({ r, days: _days, ctx: _ctx }: SummaryProps) {
+  const p = usePalette();
+  const curve = hrCurveFor(r);
+  const hrMax = estimatedHrMax(ageFromBirthday(getState().profile.birthday));
+  const zones = hrMax != null ? hrZones(hrMax) : null;
+  // HR stats prefer the imported fields; a trace with missing fields fills in.
+  const fromCurve = (f: (b: number[]) => number) => (curve ? Math.round(f(curve.map((q) => q.bpm))) : null);
+  const avg = numOr(r.avgHr) ?? fromCurve((b) => b.reduce((s, v) => s + v, 0) / b.length);
+  const lo = numOr(r.minHr) ?? fromCurve((b) => Math.min(...b));
+  const hi = numOr(r.maxHr) ?? fromCurve((b) => Math.max(...b));
+  const inZones = curve && zones ? timeInZones(curve, zones) : null;
+  const zoneTotal = inZones ? inZones.reduce((s, v) => s + v, 0) : 0;
+  const duration = numOr(r.duration);
+  const distance = numOr(r.distance);
+  const pace = duration != null && distance != null ? paceStr(duration, distance) : null;
+  const cols = [
+    { label: 'Avg', val: avg, unit: 'bpm' },
+    { label: 'Min', val: lo, unit: 'bpm' },
+    { label: 'Max', val: hi, unit: 'bpm' },
+  ];
+  const details: { label: string; value: string }[] = [];
+  if (duration != null) details.push({ label: 'Duration', value: `${fmtNum(duration)} min` });
+  if (distance != null) details.push({ label: 'Distance', value: `${fmtNum(distance)} mi` });
+  if (pace) details.push({ label: 'Pace', value: pace });
+  const sourceLabel = sourceLabelFor(r);
+  if (sourceLabel) details.push({ label: 'Source', value: sourceLabel });
+  return (
+    <>
+      {curve ? (
+        <Section>
+          <SectionHead title="Heart rate over time" help={WORKOUT_HELP.curve} />
+          <View style={{ marginTop: 12 }}>
+            <WorkoutHrChart samples={curve} zones={zones} />
+          </View>
+        </Section>
+      ) : null}
+      <Section>
+        <SectionHead title="Heart rate" help={WORKOUT_HELP.hr} desc="Average, lowest and highest over the workout." />
+        <View style={{ flexDirection: 'row', marginTop: 12, borderTopWidth: 1, borderTopColor: p.border, paddingTop: 12 }}>
+          {cols.map((c) => (
+            <View key={c.label} style={{ flex: 1, alignItems: 'center' }}>
+              <Text style={{ fontSize: 12, color: p.textDim, fontWeight: '600' }}>{c.label}</Text>
+              <Text style={{ fontSize: 20, fontFamily: fonts.numHeavy, color: p.text, fontVariant: ['tabular-nums'], marginTop: 3 }}>{c.val != null ? String(c.val) : '–'}</Text>
+              <Text style={{ fontSize: 11, color: p.textDim }}>{c.unit}</Text>
+            </View>
+          ))}
+        </View>
+      </Section>
+      {inZones && zones && zoneTotal > 0 ? (
+        <Section>
+          <SectionHead title="Time in zones" help={WORKOUT_HELP.zones} desc={hrMax != null ? `Zones from an estimated max HR of ${hrMax} bpm.` : undefined} />
+          <View style={{ marginTop: 12, gap: 10 }}>
+            {zones.map((z, i) => {
+              const sec = inZones[i];
+              const frac = sec / zoneTotal;
+              const range = isFinite(z.to) ? `${z.from}–${z.to}` : `${z.from}+`;
+              return (
+                <View key={z.z}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: z.color }} />
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: p.text }}>{`Z${z.z} · ${z.label}`}</Text>
+                    <Text style={{ fontSize: 11, color: p.textDim }}>{`${range} bpm`}</Text>
+                    <View style={{ flex: 1 }} />
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: sec > 0 ? p.text : p.textDim, fontVariant: ['tabular-nums'] }}>{sec > 0 ? fmtDur(sec) : '–'}</Text>
+                  </View>
+                  <View style={{ height: 4, borderRadius: 2, backgroundColor: p.surface, marginTop: 5, overflow: 'hidden' }}>
+                    <View style={{ width: `${Math.max(frac * 100, sec > 0 ? 1.5 : 0)}%`, height: 4, borderRadius: 2, backgroundColor: z.color }} />
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        </Section>
+      ) : null}
+      {details.length ? (
+        <Section>
+          <SectionHead title="Details" />
+          <View style={{ marginTop: 12 }}>
+            {details.map((d) => <MetricRow key={d.label} label={d.label} value={d.value} cat={false} />)}
+          </View>
+        </Section>
+      ) : null}
+      <Notes r={r} />
     </>
   );
 }

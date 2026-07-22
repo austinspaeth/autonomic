@@ -81,7 +81,7 @@ export function JournalSections({ dk }: { dk: string }) {
             const def = typesFor(state, 'activities')[a.type];
             if (!def) return null;
             const headline = def.summary ? def.summary(a) : summarizeFields(def, a);
-            return <Row key={a.id} icon={def.icon as never} title={def.label} right={<View style={{ flexDirection: 'row', alignItems: 'center' }}>{headline ? <Text style={{ color: p.text, fontWeight: '600' }}>{headline}</Text> : null}{a.time ? <Pill text={fmtTime12(a.time)} /> : null}</View>} onPress={() => forms.openActivityForm(a.type, a)} />;
+            return <Row key={a.id} icon={def.icon as never} title={def.label} right={<View style={{ flexDirection: 'row', alignItems: 'center' }}>{headline ? <Text style={{ color: p.text, fontWeight: '600' }}>{headline}</Text> : null}{a.time ? <Pill text={fmtTime12(a.time)} /> : null}</View>} onPress={() => forms.openActivity(a)} />;
           })}
           <View style={{ marginTop: 6 }}><AddDashButton onPress={forms.pickActivity} label="+ Add activity" /></View>
         </View>

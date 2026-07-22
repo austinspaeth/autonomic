@@ -26,16 +26,27 @@ export default function AnalysisScreen() {
   const days = demo ? demoDays() : state.days;
   const [mode, setMode] = useState<Mode>('day');
   // The segmented pill + label colors commit on `mode` immediately; the heavy
-  // sections rebuild (buildCategories + every card build) trails on the
-  // deferred value in a low-priority render, so a range tap never freezes the
-  // pill animation behind an O(history) recompute.
-  const chartMode = React.useDeferredValue(mode);
+  // sections don't swap until the pill spring has visibly settled. Deferring the
+  // render alone isn't enough — the commit that mounts the new chart trees lands
+  // mid-animation and stutters even a native-driver spring — so `settledMode`
+  // trails `mode` by the spring's settle time (the timer resets on rapid taps,
+  // so day→week→month rebuilds once). The old sections stay on screen until
+  // then, and useDeferredValue keeps the eventual rebuild interruptible.
+  const [settledMode, setSettledMode] = useState<Mode>('day');
+  const swapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const changeMode = useCallback((m: Mode) => {
+    setMode(m);
+    if (swapTimer.current) clearTimeout(swapTimer.current);
+    swapTimer.current = setTimeout(() => setSettledMode(m), PILL_SETTLE_MS);
+  }, []);
+  useEffect(() => () => { if (swapTimer.current) clearTimeout(swapTimer.current); }, []);
+  const chartMode = React.useDeferredValue(settledMode);
   // Freemium: free tier keeps the Day view; the longer ranges are Pro. Locked
   // segments render a lock glyph and raise the paywall instead of switching.
   const locked = useTier() === 'free';
   const openPaywall = usePaywall();
   // Time-based downgrade (trial expires while parked on Week/Month/Year).
-  useEffect(() => { if (locked && mode !== 'day') setMode('day'); }, [locked, mode]);
+  useEffect(() => { if (locked && mode !== 'day') changeMode('day'); }, [locked, mode, changeMode]);
   // HRV filter lives here (not inside HrvProgress) so the same All/Morning/Evening
   // toggle can appear both inline beside the section title and in the pinned bar.
   const [hrvFilt, setHrvFilt] = useState<Filt>('all');
@@ -136,7 +147,7 @@ export default function AnalysisScreen() {
               { val: 'year', label: 'Year', locked },
             ]}
             value={mode}
-            onChange={setMode}
+            onChange={changeMode}
             onLockedPress={openPaywall}
           />
         </View>
@@ -173,6 +184,11 @@ export default function AnalysisScreen() {
     </Screen>
   );
 }
+
+/** How long after a range tap before the sections swap: the Segmented pill
+ *  spring (speed 16, bounciness 8) has visually settled by then, so the chart
+ *  remount can't drop its frames. */
+const PILL_SETTLE_MS = 300;
 
 type Section = { id: string; title: string; buckets: { label: string }[]; cards: AnalysisCard[]; hasOwn: boolean };
 

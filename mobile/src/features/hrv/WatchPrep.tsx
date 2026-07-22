@@ -7,12 +7,14 @@
  * closes and HrvSession rises already running, so the watch and the in-app
  * timer stay in step. The ✕ drops back to the setup sheet underneath.
  */
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Text, View } from 'react-native';
 import Svg, { Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { SheetControls, SheetFooter, useSheets } from '../../components/Sheet';
 import { Button } from '../../components/ui';
 import { radius, usePalette } from '../../theme';
+import { health } from '../../lib/health';
+import { requestEcgAuth } from '../../lib/health/ecg';
 import { HrvSession, type SessionConfig } from './Session';
 
 /** The watchOS Mindfulness app icon, near enough to recognize on the wrist:
@@ -65,6 +67,16 @@ const STEPS: { title: string; sub: string }[] = [
 export function WatchPrep({ config, controls }: { config: SessionConfig; controls: SheetControls }) {
   const p = usePalette();
   const { openSheet } = useSheets();
+
+  // Any Health permission sheet must appear NOW, while the wearer reads the
+  // prep steps — never over the waiting card after a finished 5-minute
+  // reading. Sequential (two sheets must not race); silent once determined.
+  useEffect(() => {
+    void (async () => {
+      await health().requestAuth();
+      await requestEcgAuth();
+    })();
+  }, []);
 
   // Start here = start on the watch: open the session card already running and
   // let this card fall away beneath it.

@@ -21,6 +21,7 @@ import { DevicesScreen } from '../Devices';
 import { BREATH_STYLES, HrvSession, type SessionConfig } from './Session';
 import { CameraSetup } from './CameraSetup';
 import { WatchPrep } from './WatchPrep';
+import { HealthRrImportSheet } from './HealthImport';
 
 const HELP = {
   main:
@@ -148,6 +149,19 @@ export function HrvSetup({ controls }: { controls: SheetControls }) {
 
       <View style={{ height: 20 }} />
       <Button title="Start reading" variant="primary" onPress={start} />
+      {/* Recovery path: a watch reading already sitting in Apple Health (taken
+          without a live session, or one that never synced in) can be imported
+          and evaluated after the fact. */}
+      {Platform.OS === 'ios' && health().available ? (
+        <>
+          <View style={{ height: 10 }} />
+          <Button
+            title="Import a watch reading from Apple Health"
+            variant="ghost"
+            onPress={() => openSheet((c) => <HealthRrImportSheet kind={kind} style={style} controls={c} />)}
+          />
+        </>
+      ) : null}
       <View style={{ height: 20 }} />
     </View>
   );

@@ -78,6 +78,27 @@ const HC_ACTIVITY: Record<number, string> = {
   83: 'yoga',
 };
 
+/**
+ * The workout's HR trace for the waveform sidecar: raw timestamped samples →
+ * `{ t, bpm }` seconds-from-start, sorted, sanity-filtered, and decimated to
+ * at most `cap` points (a long ride at one sample per ~5 s can run to
+ * thousands; the report chart strides to ~300 anyway). Returns null when the
+ * trace is too short to chart.
+ */
+export function workoutHrSeries(
+  points: { ms: number; bpm: number }[],
+  startMs: number,
+  cap = 900,
+): { t: number; bpm: number }[] | null {
+  const clean = points
+    .filter((s) => Number.isFinite(s.ms) && Number.isFinite(s.bpm) && s.bpm >= 25 && s.bpm <= 250)
+    .sort((a, b) => a.ms - b.ms)
+    .map((s) => ({ t: Math.max(0, Math.round((s.ms - startMs) / 1000)), bpm: Math.round(s.bpm) }));
+  if (clean.length < 10) return null;
+  const stride = Math.max(1, Math.ceil(clean.length / cap));
+  return clean.filter((_, i) => i % stride === 0 || i === clean.length - 1);
+}
+
 /** App activity type for a HealthKit workout. */
 export function activityTypeFromHk(hkType: number, indoor: boolean): string {
   if (hkType === HK_CYCLING) return indoor ? 'indoorBike' : 'cycle';

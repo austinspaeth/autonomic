@@ -4,7 +4,7 @@
  * registry would make the import card render a blank row and save an
  * unrenderable entry.
  */
-import { activityTypeFromHc, activityTypeFromHk } from '../workoutMap';
+import { activityTypeFromHc, activityTypeFromHk, workoutHrSeries } from '../workoutMap';
 import { ACTIVITY_TYPES } from '../../registry';
 
 describe('activityTypeFromHk', () => {
@@ -54,5 +54,37 @@ describe('mapping targets', () => {
     for (let t = 0; t <= 83; t++) {
       expect(ACTIVITY_TYPES[activityTypeFromHc(t)]).toBeDefined();
     }
+  });
+});
+
+describe('workoutHrSeries', () => {
+  const start = 1_000_000;
+  const pts = (n: number, stepSec = 5) =>
+    Array.from({ length: n }, (_, i) => ({ ms: start + i * stepSec * 1000, bpm: 100 + (i % 40) }));
+
+  it('converts timestamps to seconds-from-start, sorted', () => {
+    const shuffled = [...pts(20)].reverse();
+    const out = workoutHrSeries(shuffled, start)!;
+    expect(out[0]).toEqual({ t: 0, bpm: 100 });
+    expect(out[1].t).toBe(5);
+    expect(out.every((s, i) => i === 0 || s.t > out[i - 1].t)).toBe(true);
+  });
+
+  it('drops non-physiologic and non-finite samples', () => {
+    const junk = [...pts(20), { ms: start + 1000, bpm: 10 }, { ms: start + 2000, bpm: 400 }, { ms: NaN, bpm: 120 }];
+    const out = workoutHrSeries(junk, start)!;
+    expect(out.every((s) => s.bpm >= 25 && s.bpm <= 250)).toBe(true);
+  });
+
+  it('returns null for traces too short to chart', () => {
+    expect(workoutHrSeries(pts(5), start)).toBeNull();
+    expect(workoutHrSeries([], start)).toBeNull();
+  });
+
+  it('decimates long traces to the cap, keeping the last sample', () => {
+    const long = pts(3000);
+    const out = workoutHrSeries(long, start)!;
+    expect(out.length).toBeLessThanOrEqual(901);
+    expect(out[out.length - 1].t).toBe(2999 * 5);
   });
 });
