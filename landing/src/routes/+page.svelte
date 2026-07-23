@@ -414,14 +414,14 @@
     mainEntity: [
       { '@type': 'Question', name: 'How much does Autonomic cost?', acceptedAnswer: { '@type': 'Answer', text: `Autonomic is free to download and the journal is free forever, with no account and no ads. Autonomic Pro is ${monthly} per month or ${yearly} per year and unlocks unlimited HRV captures, your full history, POTS testing and AI reports. Every install opens with ${pricing.trialDays} days of Pro so you can try it before paying. Your data stays private on your device and is never sold.` } },
       { '@type': 'Question', name: 'What is free and what needs Pro?', acceptedAnswer: { '@type': 'Answer', text: 'Free covers the daily journal (sleep, meds, symptoms, triggers, hydration), manual readings like blood pressure and resting heart rate, your daily autonomic score and outlook, the Apple Watch heart-rate monitor, backups and export, plus one live HRV capture a day and 14 days of progress charts. Pro adds unlimited live HRV capture, all progress views, full historical metric analysis, POTS testing and episode tracking, and AI insight and doctor reports.' } },
-      { '@type': 'Question', name: 'Does it work offline?', acceptedAnswer: { '@type': 'Answer', text: 'Completely. Autonomic is a fully offline iOS app. All scoring, trends and reports are computed locally, so it works on a plane, in a clinic basement, or anywhere without signal.' } },
+      { '@type': 'Question', name: 'Does it work offline?', acceptedAnswer: { '@type': 'Answer', text: 'Completely. Autonomic is a fully offline app for iOS and Android. All scoring, trends and reports are computed locally, so it works on a plane, in a clinic basement, or anywhere without signal.' } },
       { '@type': 'Question', name: 'Which conditions is it for?', acceptedAnswer: { '@type': 'Answer', text: 'It is built for people managing POTS, dysautonomia, long COVID and post-viral or post-illness autonomic recovery, where day-to-day HRV, heart rate and orthostatic patterns matter.' } },
       { '@type': 'Question', name: 'Do I need a wearable?', acceptedAnswer: { '@type': 'Answer', text: 'No. You can type readings from any source, a chest strap, a ring, a blood-pressure cuff, or a fingertip pulse oximeter. Autonomic scores whatever you log.' } },
       { '@type': 'Question', name: 'How do the AI insights work?', acceptedAnswer: { '@type': 'Answer', text: 'Autonomic assembles your logged data over a date range into a structured analysis prompt that you copy into Claude, Gemini or ChatGPT. The text is generated locally; nothing is sent automatically.' } }
     ]
   };
 
-  // The AI-report picker. Each report is the REAL prompt the Autonomic iOS app
+  // The AI-report picker. Each report is the REAL prompt the Autonomic app
   // builds, run over a fabricated week of sample data (see src/lib/demoPrompts.ts).
   // The prompt rides on the chip as a data-prompt attribute (Svelte escapes it);
   // the site script in app.html swaps it into the mock on click.
@@ -439,7 +439,7 @@
 </script>
 
 <svelte:head>
-  <title>Autonomic for iOS | Private HRV, POTS &amp; Dysautonomia Recovery App</title>
+  <title>Autonomic for iOS &amp; Android | Private HRV, POTS &amp; Dysautonomia Recovery App</title>
   <meta
     name="description"
     content="Autonomic is a private, offline journal that scores your daily HRV, blood pressure, sleep and orthostatic readings against medical thresholds, so people recovering from POTS, dysautonomia and post-viral illness can see what's helping and what's hurting."
@@ -448,7 +448,7 @@
 
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://autonomic.care/" />
-  <meta property="og:title" content="Autonomic for iOS | See your nervous system recover" />
+  <meta property="og:title" content="Autonomic for iOS &amp; Android | See your nervous system recover" />
   <meta property="og:description" content="Medically-scored daily readings, trend analysis, and AI-ready insight reports for autonomic recovery. Private, offline, on-device." />
   <meta property="og:image" content="https://autonomic.care/og.png" />
   <meta property="og:image:width" content="1200" />
@@ -456,7 +456,7 @@
   <meta property="og:image:type" content="image/png" />
   <meta property="og:image:alt" content="Autonomic: see your nervous system recover. A private journal that scores your daily HRV, blood pressure, sleep and orthostatic readings." />
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Autonomic for iOS | Private autonomic recovery app" />
+  <meta name="twitter:title" content="Autonomic for iOS &amp; Android | Private autonomic recovery app" />
   <meta name="twitter:description" content="Score your HRV, BP, sleep & orthostatic data. Spot trends. Generate doctor-ready and AI-ready reports. Offline and private." />
   <meta name="twitter:image" content="https://autonomic.care/og.png" />
   <meta name="twitter:image:alt" content="Autonomic: private, offline autonomic recovery journal for POTS, dysautonomia and long COVID." />
@@ -1173,7 +1173,7 @@
     <div class="faq">
       <details><summary>How much does it cost, and is my data private?<span class="fq-i">+</span></summary><p>The app is free to download and your journal is free forever, with no account and no ads. Autonomic Pro is {monthly}/month or {yearly}/year and unlocks the deep-analysis tools. Every install opens with {pricing.trialDays} days of Pro, no card, so you can try all of it first. Your data is always private: stored on your device, never sold, never sent to a server.</p></details>
       <details><summary>What’s free, and what needs Pro?<span class="fq-i">+</span></summary><p>Free covers the daily journal, your manual readings, your daily Autonomic Outlook, the Apple Watch heart-rate monitor, backups and export, plus one live HRV capture a day and 14 days of charts. Pro adds unlimited HRV capture, your full history, POTS testing and episode tracking, and AI insight and doctor reports. There’s a full breakdown in <a href="#pricing">the pricing table</a>, and the same table lives inside the app.</p></details>
-      <details><summary>Does it really work offline?<span class="fq-i">+</span></summary><p>Completely. It’s a fully offline iOS app. Scoring, trends and reports are computed locally, so it works anywhere, no signal required.</p></details>
+      <details><summary>Does it really work offline?<span class="fq-i">+</span></summary><p>Completely. It’s a fully offline app on both iOS and Android. Scoring, trends and reports are computed locally, so it works anywhere, no signal required.</p></details>
       <details><summary>Which conditions is it built for?<span class="fq-i">+</span></summary><p>POTS, dysautonomia, long COVID and post-viral or post-illness recovery, anywhere daily HRV, heart-rate and orthostatic patterns matter.</p></details>
       <details><summary>Is Autonomic available on Android?<span class="fq-i">+</span></summary><p>Yes. Autonomic is available now on both iPhone (App Store) and Android (Google Play). It’s the same app, the same price, and the same private, offline design on either platform.</p></details>
       <details><summary>Do I need a wearable or special hardware?<span class="fq-i">+</span></summary><p>No, you don’t. You can type readings in by hand from any source. That said, tools like a Polar H10 chest strap, an Apple Watch or a blood pressure cuff make Autonomic far more powerful, the more data you feed it, the better you understand how your body is doing.</p></details>

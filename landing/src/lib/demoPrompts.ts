@@ -1,5 +1,5 @@
 // AUTO-GENERATED demo prompts for the "Bring your own AI" section.
-// These are the REAL prompts the Autonomic iOS app builds (via buildPrompt in
+// These are the REAL prompts the Autonomic app builds (via buildPrompt in
 // mobile/src/lib/analysis/reports.ts), run over a fabricated week of sample
 // data: recovering from a crash, steady improvement to a strong day, then a
 // trigger (party: alcohol, pizza, aged cheese, a late night and an overlong
