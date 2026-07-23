@@ -138,6 +138,7 @@
       ],
       "expo-asset",
       "expo-font",
+      "./plugins/withKotlinStdlibPin",
       "./plugins/withFmtConstevalFix",
       "./plugins/withHealthConnect",
       [
