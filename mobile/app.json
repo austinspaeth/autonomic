@@ -39,7 +39,9 @@
       },
       "entitlements": {
         "com.apple.developer.healthkit": true,
-        "com.apple.security.application-groups": ["group.com.autonomic.journal"]
+        "com.apple.security.application-groups": [
+          "group.com.autonomic.journal"
+        ]
       },
       "privacyManifests": {
         "NSPrivacyTracking": false,
@@ -136,7 +138,6 @@
       ],
       "expo-asset",
       "expo-font",
-      "react-native-iap",
       "./plugins/withFmtConstevalFix",
       "./plugins/withHealthConnect",
       [
@@ -222,7 +223,8 @@
           "appleTeamId": "L3YCKS64HC"
         }
       ],
-      "./plugins/withWatchBuildVersion"
+      "./plugins/withWatchBuildVersion",
+      "expo-iap"
     ],
     "experiments": {
       "typedRoutes": false
