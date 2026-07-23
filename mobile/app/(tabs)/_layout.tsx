@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Animated as RNAnimated, Dimensions, Easing, Platform, Pressable, Text, View } from 'react-native';
 import { Tabs } from 'expo-router';
+import { useIsFocused } from '@react-navigation/native';
 import { BlurView } from 'expo-blur';
 import Svg, { Path } from 'react-native-svg';
-import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import Animated, { Easing as REasing, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { BrandMark, Icon, IconName } from '../../src/components/Icon';
@@ -43,6 +44,64 @@ const TAB_TRANSITION = {
   }),
 };
 
+// ---- Android staged tab transition ----
+// iOS runs TAB_TRANSITION above natively: both scenes cross-slide at once. On
+// Android (often budget hardware) animating two full chart trees concurrently
+// is what made tab switches take seconds, so the navigator keeps
+// `animation: 'none'` (the scene swap is one instant commit) and the same
+// motion is staged around it in strict sequence: the outgoing scene fades and
+// slides off toward the tab you left, the scenes swap while nothing is
+// visible, then the incoming scene (already rendered — lazy: false) slides in
+// from the opposite side. Only one tree animates at a time, and the swap
+// commit can never stutter a visible frame.
+const SCENE_TIMING = { duration: 160, easing: REasing.out(REasing.cubic) };
+// Every mounted scene's fx listener; the tab bar broadcasts a signed direction
+// (+1 = moving to a tab on the right), or 0 to cancel back into place.
+const sceneFx = new Set<(dir: number) => void>();
+// True between the out-animation and the incoming scene gaining focus.
+let scenePendingIn = false;
+let sceneNavTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Per-scene wrapper, installed Android-only via the navigator's
+ *  `screenLayout`. Focused scene: animates out on a broadcast (or back in on a
+ *  cancel). Hidden scenes: snap to the incoming-side pose so the swap can't
+ *  flash, then slide in on gaining focus. */
+function AndroidSceneFx({ children }: { children: React.ReactNode }) {
+  const focused = useIsFocused();
+  const focusedRef = useRef(focused);
+  focusedRef.current = focused;
+  const tx = useSharedValue(0);
+  const fade = useSharedValue(1);
+  useEffect(() => {
+    const onFx = (dir: number) => {
+      if (focusedRef.current) {
+        tx.value = withTiming(dir === 0 ? 0 : -dir * SHIFT, SCENE_TIMING);
+        fade.value = withTiming(dir === 0 ? 1 : 0, SCENE_TIMING);
+      } else if (dir !== 0) {
+        tx.value = dir * SHIFT;
+        fade.value = 0;
+      }
+    };
+    sceneFx.add(onFx);
+    return () => { sceneFx.delete(onFx); };
+  }, [tx, fade]);
+  // Gaining focus: slide in if the tab bar staged this switch; snap into place
+  // otherwise (hardware back navigates tabs without going through the bar).
+  useEffect(() => {
+    if (!focused) return;
+    if (scenePendingIn) {
+      scenePendingIn = false;
+      tx.value = withTiming(0, SCENE_TIMING);
+      fade.value = withTiming(1, SCENE_TIMING);
+    } else {
+      tx.value = 0;
+      fade.value = 1;
+    }
+  }, [focused, tx, fade]);
+  const style = useAnimatedStyle(() => ({ opacity: fade.value, transform: [{ translateX: tx.value }] }));
+  return <Animated.View style={[{ flex: 1 }, style]}>{children}</Animated.View>;
+}
+
 // Solid (filled) cog — hollow center via even-odd fill. Opens the menu sheet.
 function SolidCog({ size = 22, color = '#000' }: { size?: number; color?: string }) {
   return (
@@ -64,16 +123,45 @@ function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
   const tabRoutes = state.routes.filter((r) => TABS.some((t) => t.name === r.name));
   const activeIndex = Math.max(0, tabRoutes.findIndex((r) => state.routes.indexOf(r) === state.index));
 
+  // Android staging: the pill (and icon tint) moves the moment a tab is
+  // pressed, while navigation state only advances after the out-animation —
+  // so the highlight follows an optimistic index until the two agree.
+  const [optimistic, setOptimistic] = useState<number | null>(null);
+  const shownIndex = Platform.OS === 'android' && optimistic != null ? optimistic : activeIndex;
+  useEffect(() => {
+    if (optimistic != null && optimistic === activeIndex) setOptimistic(null);
+  }, [optimistic, activeIndex]);
+
+  const pressTab = (name: string, i: number) => {
+    if (Platform.OS !== 'android') { navigation.navigate(name); return; }
+    if (i === shownIndex) return;            // already there (or already heading there)
+    const dir = i > shownIndex ? 1 : -1;
+    setOptimistic(i);
+    if (sceneNavTimer) { clearTimeout(sceneNavTimer); sceneNavTimer = null; }
+    if (i === activeIndex) {
+      // Mid-flight return to the scene still on screen: cancel the pending
+      // switch and slide it back into place.
+      scenePendingIn = false;
+      sceneFx.forEach((l) => l(0));
+      return;
+    }
+    scenePendingIn = true;
+    sceneFx.forEach((l) => l(dir));
+    // Navigate once the outgoing scene is fully off; the incoming scene's
+    // focus effect (AndroidSceneFx) runs the slide-in.
+    sceneNavTimer = setTimeout(() => { sceneNavTimer = null; navigation.navigate(name); }, SCENE_TIMING.duration + 20);
+  };
+
   // Measured per-tab geometry drives the sliding highlight pill.
   const [layouts, setLayouts] = useState<{ x: number; w: number }[]>([]);
   const pillX = useSharedValue(0);
   const pillW = useSharedValue(0);
   useEffect(() => {
-    const l = layouts[activeIndex];
+    const l = layouts[shownIndex];
     if (!l) return;
     if (pillW.value === 0) { pillX.value = l.x; pillW.value = l.w; } // first measure: snap
     else { pillX.value = withSpring(l.x, SPRING); pillW.value = withSpring(l.w, SPRING); }
-  }, [activeIndex, layouts]);
+  }, [shownIndex, layouts]);
   const pillStyle = useAnimatedStyle(() => ({ transform: [{ translateX: pillX.value }], width: pillW.value }));
 
   return (
@@ -89,12 +177,12 @@ function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
           style={[{ position: 'absolute', top: PAD, bottom: PAD, left: 0, borderRadius: 999, backgroundColor: p.dark ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.07)' }, pillStyle]}
         />
         {tabRoutes.map((route, i) => {
-          const focused = i === activeIndex;
+          const focused = i === shownIndex;
           const tab = TABS.find((t) => t.name === route.name)!;
           return (
             <Pressable
               key={route.key}
-              onPress={() => navigation.navigate(route.name)}
+              onPress={() => pressTab(route.name, i)}
               onLayout={(e) => {
                 const { x, width } = e.nativeEvent.layout;
                 setLayouts((prev) => {
@@ -138,6 +226,7 @@ function BarShell({ children }: { children: React.ReactNode }) {
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
+  const p = usePalette();
   return (
     <View style={{ flex: 1 }}>
       {/* lazy: false pre-mounts every scene at startup, mirroring the journal's
@@ -145,10 +234,18 @@ export default function TabLayout() {
           an already-rendered tree instead of mounting heavy charts mid-transition. */}
       <Tabs
         tabBar={(props) => <FloatingTabBar {...props} />}
-        // Android (often budget hardware): no scene transition — animating the
-        // full chart trees through the cross-slide is what made tab switches
-        // take seconds there. iOS keeps the directional slide.
-        screenOptions={{ headerShown: false, lazy: false, ...(Platform.OS === 'ios' ? TAB_TRANSITION : { animation: 'none' as const }) }}
+        // Android: the navigator itself never animates (the concurrent
+        // cross-slide is what made tab switches take seconds on budget
+        // hardware) — AndroidSceneFx stages the same motion around the
+        // instant swap instead. iOS keeps the native directional slide.
+        // sceneStyle: the scene container behind the fading views defaults to
+        // react-navigation's light-theme white — the staged Android switch
+        // holds nothing but that background on screen between out and in, so
+        // it must be the app background or the gap flashes white.
+        screenOptions={{ headerShown: false, lazy: false, sceneStyle: { backgroundColor: p.bg }, ...(Platform.OS === 'ios' ? TAB_TRANSITION : { animation: 'none' as const }) }}
+        {...(Platform.OS === 'android'
+          ? { screenLayout: ({ children }: { children: React.ReactElement }) => <AndroidSceneFx>{children}</AndroidSceneFx> }
+          : null)}
       >
         <Tabs.Screen name="index" />
         <Tabs.Screen name="analysis" />

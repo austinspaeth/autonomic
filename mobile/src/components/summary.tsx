@@ -25,7 +25,7 @@ import { healthAppName } from '../lib/health';
 import { ageFromBirthday, fmtNum, fmtShort, todayKey } from '../lib/dates';
 import { estimatedHrMax, hrZones, timeInZones } from '../lib/workoutZones';
 import { correctArtifacts } from '../lib/hrv';
-import { buildEventInsightPrompt } from '../lib/analysis/reports';
+import { buildEventInsightPrompt, buildReadingInsightPrompt, buildWorkoutInsightPrompt } from '../lib/analysis/reports';
 import { getState, getWaveform } from '../store/store';
 import { useTier } from '../store/tier';
 import { usePaywall } from '../features/Paywall';
@@ -223,15 +223,22 @@ export interface SummaryProps { r: Entry; days: DaysMap; ctx: ScoreContext }
 
 /* ---------- dispatcher ---------- */
 export function ReadingSummary({ r, days, ctx }: SummaryProps) {
+  // The POTS deep dives carry their own bespoke insight buttons.
   switch (r.type) {
-    case 'breathHrv': return <BreathingSummary r={r} days={days} ctx={ctx} />;
-    case 'hrv': return <UnstructuredSummary r={r} days={days} ctx={ctx} />;
-    case 'bp': return <BpSummary r={r} days={days} ctx={ctx} />;
-    case 'restingHr': return <RestingHrSummary r={r} days={days} ctx={ctx} />;
     case 'orthostatic': return <OrthostaticSummary r={r} days={days} ctx={ctx} />;
     case 'standTest': return <StandTestSummary r={r} days={days} ctx={ctx} />;
-    default: return <GenericSummary r={r} days={days} ctx={ctx} />;
   }
+  const Body = r.type === 'breathHrv' ? BreathingSummary
+    : r.type === 'hrv' ? UnstructuredSummary
+    : r.type === 'bp' ? BpSummary
+    : r.type === 'restingHr' ? RestingHrSummary
+    : GenericSummary;
+  return (
+    <>
+      <Body r={r} days={days} ctx={ctx} />
+      <ReadingInsightButton r={r} days={days} ctx={ctx} />
+    </>
+  );
 }
 
 /* ---------- HRV (structured + unstructured) ---------- */
@@ -244,6 +251,18 @@ const HRV_VERDICT: Record<string, string> = {
   crash: 'Very low reserves. Prioritize rest and recovery.',
 };
 
+/** Cleaned RR series for an HRV reading. Waveforms live in the sidecar store
+ *  keyed by reading id — inline fields exist only on pre-save live previews
+ *  (and old imports mid-migration). The cleaned series isn't stored at all;
+ *  it's re-derived from rrRaw on demand. */
+function rrCleanFor(r: Entry): number[] | null {
+  const w = getWaveform(String(r.id));
+  const clean = (w && w.rrClean) || (r.rrClean as number[] | undefined);
+  if (clean && clean.length) return clean;
+  const raw = (w && w.rrRaw) || (r.rrRaw as number[] | undefined);
+  return raw && raw.length ? correctArtifacts(raw).clean : null;
+}
+
 /**
  * Both HRV kinds render the identical stack of metric cards — the only
  * difference is the breathing-style detail (structured only) and which
@@ -252,16 +271,7 @@ const HRV_VERDICT: Record<string, string> = {
 function HrvSummaryBody({ r, days, ctx, type }: SummaryProps & { type: 'breathHrv' | 'hrv' }) {
   const s = computeScores(r, ctx);
   const { score, overall } = hrvComposite(r, ctx);
-  // Waveforms live in the sidecar store keyed by reading id — inline fields
-  // exist only on pre-save live previews (and old imports mid-migration). The
-  // cleaned series isn't stored at all; it's re-derived from rrRaw on demand.
-  const rr = useMemo(() => {
-    const w = getWaveform(String(r.id));
-    const clean = (w && w.rrClean) || (r.rrClean as number[] | undefined);
-    if (clean && clean.length) return clean;
-    const raw = (w && w.rrRaw) || (r.rrRaw as number[] | undefined);
-    return raw && raw.length ? correctArtifacts(raw).clean : null;
-  }, [r]);
+  const rr = useMemo(() => rrCleanFor(r), [r]);
   const rmssdBand = type === 'breathHrv' ? BANDS.rmssdS : BANDS.rmssdU;
   const hrKey = type === 'breathHrv' ? 'hr' : 'avgHr';
   const n = (k: string) => { const x = parseFloat(r[k] as string); return isNaN(x) ? null : x; };
@@ -541,15 +551,19 @@ function hrCurveFor(r: Entry): { t: number; bpm: number }[] | null {
   return Array.isArray(inline) && inline.length >= 2 ? inline : null;
 }
 
+/** The entry's day key comes from the days map itself (unsaved live previews
+ *  are injected into today's entries, so they resolve too). */
+const dayKeyOf = (days: DaysMap, r: Entry, section: 'readings' | 'activities' = 'readings') =>
+  Object.keys(days).find((k) => ((days[k] && days[k][section]) || []).some((x) => x.id === r.id)) || todayKey();
+
 /**
- * "Get AI Insights on this episode/test" footer button on the POTS deep dives.
- * Builds a single-event analysis prompt (all recorded fields + HR trace +
- * recent orthostatic history) and stacks the shared PromptSheet, wearing the
- * Insights tab's icon to tie the two together. Pro-gated like the Insights
- * reports and the downturn investigation.
+ * "Get AI Insights on this ..." footer button on the reading summaries.
+ * Builds a single-entry analysis prompt at press time and stacks the shared
+ * PromptSheet, wearing the Insights tab's icon to tie the two together.
+ * Pro-gated like the Insights reports and the downturn investigation.
  */
-function EventInsightButton({ r, days, hrCurve, noun, title }: {
-  r: Entry; days: DaysMap; hrCurve: { t: number; bpm: number }[] | null; noun: string; title: string;
+function InsightButton({ noun, title, build }: {
+  noun: string; title: string; build: () => { prompt: string; rangeText: string };
 }) {
   const p = usePalette();
   const { openSheet } = useSheets();
@@ -557,10 +571,7 @@ function EventInsightButton({ r, days, hrCurve, noun, title }: {
   const openPaywall = usePaywall();
   const open = () => {
     if (tier === 'free') { openPaywall(); return; }
-    // The entry's day key comes from the days map itself (unsaved live previews
-    // are injected into today's readings, so they resolve too).
-    const dk = Object.keys(days).find((k) => ((days[k] && days[k].readings) || []).some((x) => x.id === r.id)) || todayKey();
-    const { prompt, rangeText } = buildEventInsightPrompt(days, getState().profile, r, dk, hrCurve);
+    const { prompt, rangeText } = build();
     openSheet((c) => <PromptSheet title={title} rangeText={rangeText} prompt={prompt} controls={c} />);
   };
   return (
@@ -574,6 +585,42 @@ function EventInsightButton({ r, days, hrCurve, noun, title }: {
       <Icon name="ai" size={19} color={p.accent} />
       <Text style={{ color: p.text, fontSize: 16, fontWeight: '600' }}>{`Get AI Insights on this ${noun}`}</Text>
     </Pressable>
+  );
+}
+
+/** POTS deep dives (orthostatic episode + guided stand test): all recorded
+ *  fields + the HR trace + recent orthostatic history. */
+function EventInsightButton({ r, days, hrCurve, noun, title }: {
+  r: Entry; days: DaysMap; hrCurve: { t: number; bpm: number }[] | null; noun: string; title: string;
+}) {
+  return (
+    <InsightButton
+      noun={noun} title={title}
+      build={() => buildEventInsightPrompt(days, getState().profile, r, dayKeyOf(days, r), hrCurve)}
+    />
+  );
+}
+
+/** Every other reading type: all recorded fields + app-derived values, the
+ *  cleaned RR series for HRV readings, and the recent same-type history. */
+function ReadingInsightButton({ r, days, ctx }: SummaryProps) {
+  const isHrv = r.type === 'hrv' || r.type === 'breathHrv';
+  return (
+    <InsightButton
+      noun="reading" title="Reading Insights"
+      build={() => buildReadingInsightPrompt(days, getState().profile, ctx, r, dayKeyOf(days, r), isHrv ? rrCleanFor(r) : null)}
+    />
+  );
+}
+
+/** Imported workouts: all recorded fields + derived pace, time in zones, the
+ *  full HR trace, and the recent activity history for load context. */
+function WorkoutInsightButton({ r, days, hrCurve }: { r: Entry; days: DaysMap; hrCurve: { t: number; bpm: number }[] | null }) {
+  return (
+    <InsightButton
+      noun="workout" title="Workout Insights"
+      build={() => buildWorkoutInsightPrompt(days, getState().profile, getState().customTypes, r, dayKeyOf(days, r, 'activities'), hrCurve)}
+    />
   );
 }
 
@@ -760,7 +807,7 @@ export function workoutCurveFor(r: Entry): { t: number; bpm: number }[] | null {
   return hrCurveFor(r);
 }
 
-export function WorkoutSummary({ r, days: _days, ctx: _ctx }: SummaryProps) {
+export function WorkoutSummary({ r, days, ctx: _ctx }: SummaryProps) {
   const p = usePalette();
   const curve = hrCurveFor(r);
   const hrMax = estimatedHrMax(ageFromBirthday(getState().profile.birthday));
@@ -843,6 +890,7 @@ export function WorkoutSummary({ r, days: _days, ctx: _ctx }: SummaryProps) {
         </Section>
       ) : null}
       <Notes r={r} />
+      <WorkoutInsightButton r={r} days={days} hrCurve={curve} />
     </>
   );
 }

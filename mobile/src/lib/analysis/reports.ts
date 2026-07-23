@@ -7,8 +7,9 @@ import { addDays, dateFromKey, fmtNum, fmtTime12, keyOf } from '../dates';
 import type { AppState, CustomTypes, DayRecord, Entry } from '../types';
 import type { Downturn } from '../scoring/downturn';
 import { blueZone, dayCleanliness, scoreSet, sleepHours, type DaysMap } from '../scoring/day';
-import { ACTIVITY_TYPES, MED_TYPES, SYMPTOM_TYPES, TRIGGER_TYPES, bmLabel, isDivider } from '../registry';
-import { bpBce, bpKerdo, bpKvas, bpMap, bpPP, bpRobinson, numOr, orthoMaxDelta, type ScoreContext } from '../scoring';
+import { ACTIVITY_TYPES, MED_TYPES, READING_TYPES, SYMPTOM_TYPES, TRIGGER_TYPES, bmLabel, entryFields, isDivider } from '../registry';
+import { bpBce, bpKerdo, bpKvas, bpMap, bpPP, bpRobinson, hrvComposite, numOr, orthoMaxDelta, type ScoreContext } from '../scoring';
+import { estimatedHrMax, hrZones, timeInZones } from '../workoutZones';
 
 export type ReportRange = 'day' | 'week' | 'month' | 'year';
 
@@ -219,6 +220,10 @@ function profileAge(profile: AppState['profile']): number | null {
   return a >= 0 && a < 130 ? a : null;
 }
 
+/** Human label for an entry's capture source (device name wins when stamped). */
+const CAPTURE_SOURCE: Record<string, string> = { polar: 'Bluetooth heart-rate strap', watch: 'Apple Watch', camera: 'Phone-camera PPG', manual: 'Manual entry', health: 'Imported from the platform health store' };
+const sourceLine = (r: Entry): string | null => (r.sourceName as string) || (r.source ? CAPTURE_SOURCE[r.source as string] : null);
+
 /**
  * Single-event insight prompt behind "Get AI Insights" on the POTS deep dives
  * (orthostatic episode + guided stand test): every recorded field of the one
@@ -235,9 +240,7 @@ export function buildEventInsightPrompt(
   const rangeText = `${longFmt(dk)}${r.time ? ' · ' + fmtTime12(r.time as string) : ''}`;
   const signed = (v: number) => (v > 0 ? `+${v}` : String(v));
   const line = (label: string, v: unknown, unit = '') => (v == null || v === '' ? null : `${label}: ${v}${unit}`);
-
-  const SOURCE: Record<string, string> = { polar: 'Bluetooth heart-rate strap', watch: 'Apple Watch', camera: 'Phone-camera PPG', manual: 'Manual entry', health: 'Imported from the platform health store' };
-  const source = (r.sourceName as string) || (r.source ? SOURCE[r.source as string] : null);
+  const source = sourceLine(r);
 
   let lines: (string | null)[];
   if (isTest) {
@@ -317,6 +320,274 @@ ANALYSIS REQUESTED:
 3. RESPONSE PATTERN: What the shape of the response suggests (speed of the rise, peak timing, whether and how quickly it settled, and the trace shape if provided). Also weigh benign or situational explanations worth considering, such as deconditioning, dehydration, heat, a recent meal, anxiety, illness, or medication effects.
 4. TREND: Compare this event against the recent history above. Is the response better, worse, or consistent, and what does the pattern across events suggest?
 5. WHAT TO DO NEXT: How to repeat the measurement under similar conditions for a fair comparison, what context is worth logging alongside it, and which specific findings here would be worth bringing to a doctor.
+
+End your response by reminding the user that this is not a medical diagnosis, and that they should talk with their doctor if they are concerned or if symptoms persist or worsen.`,
+  };
+}
+
+/** "Label: value" parts for any reading, straight from its registry field
+ *  schema — shared by the generic single-reading prompt and its history. */
+function genericReadingParts(r: Entry): string[] {
+  const parts: string[] = [];
+  entryFields(READING_TYPES[r.type]).forEach((f) => {
+    if (isDivider(f) || f.type === 'time' || f.key === 'note') return;
+    if (f.type === 'check') { if (r[f.key!]) parts.push(f.label!); return; }
+    const v = rv(r, f.key!);
+    if (v != null) parts.push(`${f.label}: ${v}${f.unit ? ' ' + f.unit : ''}`);
+  });
+  return parts;
+}
+
+/** Per-type framing for the single-reading prompt below. */
+const READING_INSIGHT: Record<string, { kind: string; histTitle: string; reference?: string }> = {
+  hrv: {
+    kind: 'unstructured HRV (heart-rate variability) reading',
+    histTitle: 'HRV',
+    reference: 'REFERENCE NOTES: RMSSD and pNN50 reflect vagal (parasympathetic) tone; SDNN reflects overall variability. The LF (baroreflex) peak is typically targeted around 0.08 to 0.10 Hz. Paced breathing concentrates power in the LF band by design, so structured (paced) readings read differently from unstructured ones. HRV is highly individual: comparison against this person\'s own recent readings matters more than population norms.',
+  },
+  bp: {
+    kind: 'blood-pressure reading',
+    histTitle: 'BLOOD PRESSURE',
+    reference: 'REFERENCE NOTES: The derived indexes are computed by the app from this reading: MAP (diastolic plus a third of pulse pressure), pulse pressure (systolic minus diastolic), Kerdo vegetative index (positive suggests sympathetic dominance, negative parasympathetic), Robinson index (systolic x pulse / 100, a proxy for myocardial oxygen demand), BCE (pulse pressure x pulse, a circulation-strain marker), and the Kvas endurance coefficient (pulse x 10 / pulse pressure; around 16 is typical).',
+  },
+  restingHr: {
+    kind: 'resting-heart-rate reading',
+    histTitle: 'RESTING HEART RATE',
+    reference: 'REFERENCE NOTES: Resting heart rate depends on position (laying reads lower than sitting), so weigh the recorded position. A gradually falling resting HR usually accompanies improving autonomic recovery; a sustained unexplained rise alongside symptoms deserves attention.',
+  },
+};
+READING_INSIGHT.breathHrv = { ...READING_INSIGHT.hrv, kind: 'structured (paced-breathing) HRV reading' };
+
+/**
+ * Single-reading insight prompt behind "Get AI Insights on this reading" on
+ * the reading summaries (HRV, blood pressure, resting HR, and any other
+ * reading type; the POTS deep dives use buildEventInsightPrompt instead):
+ * every recorded field plus the app-derived values, the artifact-corrected RR
+ * trace when one was captured (thinned), and the recent same-type history so
+ * one reading is never read in isolation.
+ */
+export function buildReadingInsightPrompt(
+  days: DaysMap, profile: AppState['profile'], ctx: ScoreContext, r: Entry, dk: string,
+  rr?: number[] | null,
+): { prompt: string; rangeText: string } {
+  const longFmt = (k: string) => dateFromKey(k).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
+  const rangeText = `${longFmt(dk)}${r.time ? ' · ' + fmtTime12(r.time as string) : ''}`;
+  const line = (label: string, v: unknown, unit = '') => (v == null || v === '' ? null : `${label}: ${v}${unit}`);
+  const meta = READING_INSIGHT[r.type] || { kind: `${READING_TYPES[r.type]?.label ?? r.type} reading`, histTitle: (READING_TYPES[r.type]?.label ?? r.type).toUpperCase() };
+  const isHrv = r.type === 'hrv' || r.type === 'breathHrv';
+
+  let lines: (string | null)[];
+  if (isHrv) {
+    const { score } = hrvComposite(r, ctx);
+    const vlf = numOr(r.vlowPower), lf = numOr(r.lowPower), hf = numOr(r.highPower);
+    const total = [vlf, lf, hf].some((v) => v != null) ? [vlf, lf, hf].reduce((a, b) => a! + (b || 0), 0) : null;
+    const lfhf = lf != null && hf != null && hf !== 0 ? (lf / hf).toFixed(2) : null;
+    lines = [
+      r.type === 'breathHrv' ? line('Breathing style', r.style) : null,
+      line('Reading type', r.period),
+      line('Capture source', sourceLine(r)),
+      line('HR', numOr(r.type === 'breathHrv' ? r.hr : r.avgHr), ' bpm'),
+      line('App composite autonomic score', score, '/100'),
+      line('SDNN', numOr(r.sdnn), ' ms'),
+      line('RMSSD', numOr(r.rmssd), ' ms'),
+      line('pNN50', numOr(r.pnn50), '%'),
+      line('Mean RR', numOr(r.meanRr), ' ms'),
+      line('MxDMn', numOr(r.mxdmn), ' s'),
+      line('Mode', numOr(r.mode), ' ms'),
+      line('AMo50', numOr(r.amo50), '%'),
+      line('CV', numOr(r.cv), '%'),
+      line('PNS index', numOr(r.pns)),
+      line('SNS index', numOr(r.sns)),
+      line('Stress index', numOr(r.stressIndex)),
+      line('Total power', total != null ? Math.round(total) : null, ' ms²'),
+      line('VLF power', vlf, ' ms²'),
+      line('LF power', lf, ' ms²'),
+      line('HF power', hf, ' ms²'),
+      line('LF/HF ratio', lfhf),
+      line('LF peak', numOr(r.lfPeak), ' Hz'),
+      line('HF peak', numOr(r.hfPeak), ' Hz'),
+      line('User note', r.note),
+    ];
+  } else if (r.type === 'bp') {
+    const sys = numOr(r.sys), dia = numOr(r.dia), pulse = numOr(r.pulse);
+    lines = [
+      line('Blood pressure', sys != null || dia != null ? `${sys ?? '-'}/${dia ?? '-'}` : null, ' mmHg'),
+      line('Pulse', pulse, ' bpm'),
+      line('Reading type', r.period),
+      sys != null && dia != null ? line('MAP (mean arterial pressure)', fmtNum(bpMap(r)), ' mmHg') : null,
+      sys != null && dia != null ? line('Pulse pressure', fmtNum(bpPP(r)), ' mmHg') : null,
+      dia != null && pulse != null ? line('Kerdo index', fmtNum(bpKerdo(r))) : null,
+      sys != null && pulse != null ? line('Robinson index', fmtNum(bpRobinson(r))) : null,
+      sys != null && dia != null && pulse != null ? line('BCE index', fmtNum(bpBce(r))) : null,
+      sys != null && dia != null && pulse != null ? line('Kvas coefficient', fmtNum(bpKvas(r))) : null,
+      line('User note', r.note),
+    ];
+  } else if (r.type === 'restingHr') {
+    lines = [
+      line('Resting HR', numOr(r.hr), ' bpm'),
+      line('Position', (r.position as string) || 'Laying'),
+      line('User note', r.note),
+    ];
+  } else {
+    lines = [...genericReadingParts(r), line('User note', r.note)];
+  }
+
+  // The cleaned beat-to-beat series, thinned to ~200 values so the prompt
+  // stays small while keeping the shape of the tachogram.
+  let rrBlock = '';
+  if (isHrv && rr && rr.length >= 8) {
+    const step = Math.max(1, Math.ceil(rr.length / 200));
+    const pts = rr.filter((_, i) => i % step === 0).map((v) => Math.round(v)).join(', ');
+    rrBlock = `\n\nBEAT-TO-BEAT (RR) INTERVALS (artifact-corrected, in ms, in order${step > 1 ? `; showing 1 of every ${step} of ${rr.length} intervals` : ''}):\n${pts}`;
+  }
+
+  // Same-type readings from the surrounding month, so one reading is never
+  // read in isolation (trends matter more than any single reading).
+  const HIST_DAYS = 30;
+  const histKeys: string[] = [];
+  for (let i = 0; i < HIST_DAYS; i++) histKeys.push(addDays(dk, -(HIST_DAYS - 1) + i));
+  const keys = histKeys.filter((k) => days[k]);
+  const hist = isHrv ? secHRV(days, keys)
+    : r.type === 'bp' ? secBP(days, keys)
+    : r.type === 'restingHr' ? secRHR(days, keys)
+    : orNone(eachEntry(days, keys, (d, k) => (d.readings || []).filter((x) => x.type === r.type).map((x) => { const parts = genericReadingParts(x); return `${stamp(k, x.time as string)} ${READING_TYPES[x.type]?.label ?? x.type}${parts.length ? ' | ' + parts.join(' | ') : ''}${noteSuffix(x)}`; })));
+
+  const age = profileAge(profile);
+  const who = [age != null ? `Age: ${age}` : '', profile && profile.sex ? `Sex: ${profile.sex}` : ''].filter(Boolean).join(' | ');
+
+  return {
+    rangeText,
+    prompt: `You are analyzing a single ${meta.kind} recorded on ${rangeText} by a person using Autonomic (autonomic.care), a personal health-tracking app for autonomic recovery. Base every observation on the data provided below. Do not assume a diagnosis or medical history that is not present in the data.
+
+Approach this as an honest friend examining the data carefully - direct and accurate without unnecessary softening or cruelty.
+
+REQUIREMENTS: Be concise, accurate, honest, specific (use actual numbers), research-grounded, and careful with recommendations (note doctor consultation for medications, therapeutic-dose supplements, or major protocol changes). Do not use em dashes anywhere in your response; use commas, colons, parentheses, or separate sentences instead.
+${meta.reference ? `\n${meta.reference}\n` : ''}
+A single reading is a data point, not a diagnosis; trends across readings taken under similar conditions matter most.
+${who ? `\nPROFILE (self-entered): ${who}\n` : ''}
+READING DATA:
+${lines.filter(Boolean).join('\n')}${rrBlock}
+
+RECENT ${meta.histTitle} HISTORY (past 30 days, includes this reading):
+${hist}
+
+ANALYSIS REQUESTED:
+1. THE READING IN NUMBERS: Walk through what was recorded and what stands out. Use the actual values.
+2. INTERPRETATION: What this reading suggests about the current autonomic and cardiovascular state, and how confident a single reading lets you be.
+3. CONTEXT AND CONFOUNDERS: Benign or situational explanations worth considering, such as time of day, measurement conditions, hydration, a recent meal, caffeine, stress, poor sleep, illness, or medication effects.
+4. TREND: Compare this reading against the recent history above. Is it better, worse, or consistent, and what does the pattern suggest?
+5. WHAT TO DO NEXT: How to take comparable readings for a fair trend, what context is worth logging alongside them, and which specific findings here, if any, would be worth bringing to a doctor.
+
+End your response by reminding the user that this is not a medical diagnosis, and that they should talk with their doctor if they are concerned or if symptoms persist or worsen.`,
+  };
+}
+
+/**
+ * Single-workout insight prompt behind "Get AI Insights on this workout" on
+ * the imported-workout report: the workout's fields plus derived pace and
+ * curve-filled HR stats, time in the estimated exercise zones, the full HR
+ * trace (thinned), and the recent activity history for training-load context.
+ */
+export function buildWorkoutInsightPrompt(
+  days: DaysMap, profile: AppState['profile'], custom: CustomTypes | undefined, r: Entry, dk: string,
+  hrCurve?: { t: number; bpm: number }[] | null,
+): { prompt: string; rangeText: string } {
+  const longFmt = (k: string) => dateFromKey(k).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
+  const rangeText = `${longFmt(dk)}${r.time ? ' · ' + fmtTime12(r.time as string) : ''}`;
+  const line = (label: string, v: unknown, unit = '') => (v == null || v === '' ? null : `${label}: ${v}${unit}`);
+  const def = custom?.activities?.[r.type] || ACTIVITY_TYPES[r.type];
+  const label = def?.label || r.type;
+  const curve = hrCurve && hrCurve.length >= 2 ? hrCurve : null;
+
+  // HR stats prefer the imported fields; a trace with missing fields fills in
+  // (same rule as the workout report itself).
+  const bpms = curve ? curve.map((s) => s.bpm) : null;
+  const avg = numOr(r.avgHr) ?? (bpms ? Math.round(bpms.reduce((s, v) => s + v, 0) / bpms.length) : null);
+  const lo = numOr(r.minHr) ?? (bpms ? Math.min(...bpms) : null);
+  const hi = numOr(r.maxHr) ?? (bpms ? Math.max(...bpms) : null);
+  const duration = numOr(r.duration), distance = numOr(r.distance);
+  // "10:24 /mi", with the same plausibility guard as the report.
+  let pace: string | null = null;
+  if (duration != null && duration > 0 && distance != null && distance > 0) {
+    const secPerMi = (duration * 60) / distance;
+    if (secPerMi >= 120 && secPerMi <= 3600) pace = `${Math.floor(secPerMi / 60)}:${String(Math.round(secPerMi % 60)).padStart(2, '0')} /mi`;
+  }
+
+  // Any other filled fields the type defines (resistance, intervals notes, …),
+  // beyond the ones already rendered above.
+  const covered = new Set(['duration', 'distance', 'avgHr', 'minHr', 'maxHr', 'note']);
+  const extras: string[] = [];
+  entryFields(def).forEach((f) => {
+    if (isDivider(f) || f.type === 'time' || !f.key || covered.has(f.key)) return;
+    if (f.type === 'check') { if (r[f.key]) extras.push(f.label!); return; }
+    const v = rv(r, f.key);
+    if (v != null) extras.push(`${f.label}: ${v}${f.unit ? ' ' + f.unit : ''}`);
+  });
+
+  const lines = [
+    line('Workout type', label),
+    line('Capture source', sourceLine(r)),
+    line('Duration', duration, ' min'),
+    line('Distance', distance, ' mi'),
+    line('Pace', pace),
+    line('Avg HR', avg, ' bpm'),
+    line('Min HR', lo, ' bpm'),
+    line('Max HR', hi, ' bpm'),
+    ...extras,
+    line('User note', r.note),
+  ];
+
+  // Time in the five %-of-max zones, when an age gives us a max to anchor on.
+  const age = profileAge(profile);
+  const hrMax = estimatedHrMax(age);
+  let zoneBlock = '';
+  if (curve && hrMax != null) {
+    const zones = hrZones(hrMax);
+    const secs = timeInZones(curve, zones);
+    const fmtSec = (s: number) => (s >= 60 ? `${Math.floor(s / 60)}m ${Math.round(s % 60)}s` : `${Math.round(s)}s`);
+    const rows = zones.map((z, i) => `Z${z.z} ${z.label} (${isFinite(z.to) ? `${z.from}–${z.to}` : `${z.from}+`} bpm): ${secs[i] > 0 ? fmtSec(secs[i]) : '-'}`);
+    zoneBlock = `\n\nTIME IN EXERCISE ZONES (zones from an age-estimated max HR of ${hrMax} bpm, Tanaka 208 - 0.7 x age; boundaries are approximate):\n${rows.join('\n')}`;
+  }
+
+  // The HR trace, thinned to ~150 points so the prompt stays small.
+  let curveBlock = '';
+  if (curve) {
+    const step = Math.max(1, Math.ceil(curve.length / 150));
+    const pts = curve.filter((_, i) => i % step === 0).map((s) => `${Math.round(s.t)}s:${s.bpm}`).join(', ');
+    curveBlock = `\n\nHEART-RATE TRACE (seconds from start : bpm${step > 1 ? `, showing 1 of every ${step} samples` : ''}; total length ${Math.round(curve[curve.length - 1].t)}s; gaps mean sensor dropout):\n${pts}`;
+  }
+
+  // The surrounding month of activities, so effort is judged against the
+  // recent training load rather than in isolation.
+  const HIST_DAYS = 30;
+  const histKeys: string[] = [];
+  for (let i = 0; i < HIST_DAYS; i++) histKeys.push(addDays(dk, -(HIST_DAYS - 1) + i));
+  const hist = secActivities(days, histKeys.filter((k) => days[k]), custom);
+
+  const who = [age != null ? `Age: ${age}` : '', profile && profile.sex ? `Sex: ${profile.sex}` : ''].filter(Boolean).join(' | ');
+
+  return {
+    rangeText,
+    prompt: `You are analyzing a single recorded workout (${label}) from ${rangeText}, imported from a health platform by a person using Autonomic (autonomic.care), a personal health-tracking app for autonomic recovery (dysautonomia, POTS, long COVID, ME/CFS style presentations). Base every observation on the data provided below. Do not assume a diagnosis, fitness level, or medical history that is not present in the data.
+
+Approach this as an honest friend examining the data carefully - direct and accurate without unnecessary softening or cruelty.
+
+REQUIREMENTS: Be concise, accurate, honest, specific (use actual numbers), research-grounded, and careful with recommendations (note doctor consultation for medications, therapeutic-dose supplements, or major protocol changes). Do not use em dashes anywhere in your response; use commas, colons, parentheses, or separate sentences instead.
+
+CONTEXT: For people tracking autonomic recovery, exercise is a double-edged tool: appropriately dosed activity supports recovery, while overexertion can trigger post-exertional symptom flares (PEM) or crashes that show up hours to days later. Judge this workout with that lens, not a pure performance lens. A single workout is a data point; the pattern across sessions matters most.
+${who ? `\nPROFILE (self-entered): ${who}\n` : ''}
+WORKOUT DATA:
+${lines.filter(Boolean).join('\n')}${zoneBlock}${curveBlock}
+
+RECENT ACTIVITY HISTORY (past 30 days, includes this workout):
+${hist}
+
+ANALYSIS REQUESTED:
+1. THE WORKOUT IN NUMBERS: Walk through what was recorded: duration, distance and pace if present, and how the heart rate behaved (where it sat, peaks, drift over the session, recovery between efforts if the trace shows any). Use the actual values.
+2. EFFORT ASSESSMENT: Where the effort actually sat (zones if provided), whether the intensity looks light, moderate, or hard for this person's data, and any signs of cardiovascular strain such as upward HR drift at steady effort or a HR that looks high for the apparent workload.
+3. AUTONOMIC LENS: What this session could mean for autonomic recovery: was the dose likely restorative or risky for post-exertional flare, and what confounders could color the numbers (heat, hydration, caffeine, stress, illness, terrain, or sensor dropout).
+4. TREND: Compare this workout against the recent activity history above: frequency, intensity, and load progression. Is the pattern building sensibly, flat, or spiking?
+5. WHAT TO DO NEXT: What to watch in the day or two after this workout (for example next-morning HRV, resting HR, and symptoms), what context is worth logging alongside workouts, and which findings here, if any, would be worth discussing with a doctor.
 
 End your response by reminding the user that this is not a medical diagnosis, and that they should talk with their doctor if they are concerned or if symptoms persist or worsen.`,
   };

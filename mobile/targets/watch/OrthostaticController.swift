@@ -101,9 +101,9 @@ final class OrthostaticController: ObservableObject {
 
     func begin() {
         guard stage == .intro else { return }
-        // Capture mode: session runs (not TachyMon-paused) so samples surface
-        // with the lowest latency HealthKit offers — the transition's rise
-        // must show as soon as the sensor sees it.
+        // Capture mode: the HR monitor's exact pipeline, with tighter
+        // staleness thresholds — the transition's rise must show as soon as
+        // the sensor sees it, never off a stale reading.
         WorkoutManager.shared.start(mode: .capture)
         startTime = Date()
         elapsed = 0

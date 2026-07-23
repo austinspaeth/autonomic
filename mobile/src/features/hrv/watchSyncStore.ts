@@ -18,7 +18,7 @@
 import { health } from '../../lib/health';
 import { requestEcgAuth } from '../../lib/health/ecg';
 import { ecgNative } from '../../../modules/ecg-health';
-import { dayStartMs, partitionCandidates, type RrCandidate } from '../../lib/health/rrCandidates';
+import { dayStartMs, isPickable, partitionCandidates, type RrCandidate } from '../../lib/health/rrCandidates';
 import { findRrCandidates } from '../../lib/health/rrSearch';
 import type { SessionConfig } from './Session';
 
@@ -109,12 +109,15 @@ export function startWatchSync({ windowStartMs, windowEndMs, config }: {
       const all = await findRrCandidates({ fromMs: dayStartMs(windowStartMs), toMs: Date.now() });
       if (!live() || state.status !== 'syncing') return;
       const { inWindow, outside } = partitionCandidates(all, fromMs, toMs);
+      // The manual-pick list only offers readings worth evaluating: real
+      // beat-to-beat data, at least 2 minutes long.
+      const nearby = outside.filter(isPickable);
       if (inWindow.length) {
         if (timer) { clearInterval(timer); timer = null; }
-        set({ status: 'found', candidates: inWindow, nearby: outside });
+        set({ status: 'found', candidates: inWindow, nearby });
         return;
       }
-      if (keysOf(outside) !== keysOf(state.nearby)) set({ nearby: outside });
+      if (keysOf(nearby) !== keysOf(state.nearby)) set({ nearby });
     };
     await tick();
     if (live() && state.status === 'syncing') timer = setInterval(tick, POLL_MS);

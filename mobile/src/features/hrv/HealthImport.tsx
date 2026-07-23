@@ -9,8 +9,8 @@
  */
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
-import { SheetControls, SheetFooter, useSheets } from '../../components/Sheet';
-import { Button, Muted } from '../../components/ui';
+import { useSheets } from '../../components/Sheet';
+import { Muted } from '../../components/ui';
 import { usePalette } from '../../theme';
 import { health, healthAppName } from '../../lib/health';
 import { requestEcgAuth } from '../../lib/health/ecg';
@@ -23,8 +23,8 @@ import { CandidateRow } from './WatchSync';
 import { HrvResults } from './Results';
 import type { SessionConfig } from './Session';
 
-export function HealthRrImportSheet({ kind, style, controls }: {
-  kind: 'breath' | 'unstructured'; style?: string; controls: SheetControls;
+export function HealthRrImportSheet({ kind, style }: {
+  kind: 'breath' | 'unstructured'; style?: string;
 }) {
   const p = usePalette();
   const { openSheet } = useSheets();
@@ -96,9 +96,6 @@ export function HealthRrImportSheet({ kind, style, controls }: {
       ) : (
         cands.map((c) => <CandidateRow key={c.key} c={c} onPress={() => pick(c)} />)
       )}
-      <SheetFooter>
-        <Button title="Close" variant="ghost" onPress={() => controls.close()} />
-      </SheetFooter>
     </View>
   );
 }

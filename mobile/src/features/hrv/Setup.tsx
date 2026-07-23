@@ -25,9 +25,9 @@ import { HealthRrImportSheet } from './HealthImport';
 
 const HELP = {
   main:
-    'A 5 minute read (shorter by phone camera) of how your nervous system is balancing stress and recovery. Same time daily shows your trend.',
+    'A 5 minute read of how your nervous system is balancing stress and recovery. Same time daily shows your trend.',
   kind:
-    'Both kinds run 5 minutes (shorter with the phone camera). Unstructured captures your current baseline while you rest and breathe naturally. Structured guides you through a paced breathing pattern, which trains your baroreflex and helps build stronger autonomic responses.',
+    'Both kinds run 5 minutes. Unstructured captures your current baseline while you rest and breathe naturally. Structured guides you through a paced breathing pattern, which trains your baroreflex and helps build stronger autonomic responses.',
   techniques:
     'The numbers are the seconds to inhale, hold, and exhale in each cycle.\n\n' +
     '4 / 6 breathing: in 4s, out 6s. For most people this matches their resonant frequency, the rate where the baroreflex (your body’s blood pressure regulator) swings in sync with each breath and HRV peaks. The longer exhale makes it the most effective pattern to train.\n\n' +
@@ -156,9 +156,9 @@ export function HrvSetup({ controls }: { controls: SheetControls }) {
         <>
           <View style={{ height: 10 }} />
           <Button
-            title="Import a watch reading from Apple Health"
+            title="Import watch reading from Apple Health"
             variant="ghost"
-            onPress={() => openSheet((c) => <HealthRrImportSheet kind={kind} style={style} controls={c} />)}
+            onPress={() => openSheet(() => <HealthRrImportSheet kind={kind} style={style} />)}
           />
         </>
       ) : null}

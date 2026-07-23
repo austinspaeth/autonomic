@@ -3,7 +3,7 @@
  * session window auto-sync; everything else found in the day becomes a manual
  * pick on the waiting card.
  */
-import { dayStartMs, partitionCandidates } from '../rrCandidates';
+import { dayStartMs, isPickable, partitionCandidates } from '../rrCandidates';
 
 const MIN = 60000;
 const c = (startMs: number, endMs: number) => ({ startMs, endMs });
@@ -41,6 +41,23 @@ describe('partitionCandidates', () => {
     const startsAtTo = c(to, 120 * MIN);
     const { inWindow } = partitionCandidates([endsAtFrom, startsAtTo], from, to);
     expect(inWindow).toEqual([endsAtFrom, startsAtTo]);
+  });
+});
+
+describe('isPickable', () => {
+  const rr = Array(100).fill(800);
+
+  it('accepts a reading with RR data at least 2 minutes long', () => {
+    expect(isPickable({ rr, startMs: 0, endMs: 3 * MIN })).toBe(true);
+    expect(isPickable({ rr, startMs: 0, endMs: 2 * MIN })).toBe(true); // edge inclusive
+  });
+
+  it('rejects a reading shorter than 2 minutes', () => {
+    expect(isPickable({ rr, startMs: 0, endMs: MIN })).toBe(false);
+  });
+
+  it('rejects a reading with no beat-to-beat data', () => {
+    expect(isPickable({ rr: [], startMs: 0, endMs: 5 * MIN })).toBe(false);
   });
 });
 

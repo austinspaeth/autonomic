@@ -53,9 +53,9 @@ final class StandTestController: ObservableObject {
 
     func begin() {
         guard stage == .intro else { return }
-        // Capture mode: session runs (not TachyMon-paused) so samples surface
-        // with the lowest latency HealthKit offers — the stand-up rise must
-        // show as soon as the sensor sees it.
+        // Capture mode: the HR monitor's exact pipeline, with tighter
+        // staleness thresholds — the stand-up rise must show as soon as the
+        // sensor sees it, never off a stale reading.
         WorkoutManager.shared.start(mode: .capture)
         testStart = Date()
         testElapsed = 0

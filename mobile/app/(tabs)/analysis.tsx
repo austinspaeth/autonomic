@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated as RNAnimated, Easing, Pressable, ScrollView, Text, View } from 'react-native';
-import { runOnJS, useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
+import { Animated as RNAnimated, Dimensions, Easing, Pressable, ScrollView, Text, View } from 'react-native';
+import Animated, { Easing as REasing, runOnJS, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
 import { Screen } from '../../src/components/Header';
 import { Icon } from '../../src/components/Icon';
@@ -25,22 +25,55 @@ export default function AnalysisScreen() {
   const demo = !hasOwnData(state.days);
   const days = demo ? demoDays() : state.days;
   const [mode, setMode] = useState<Mode>('day');
-  // The segmented pill + label colors commit on `mode` immediately; the heavy
-  // sections don't swap until the pill spring has visibly settled. Deferring the
-  // render alone isn't enough — the commit that mounts the new chart trees lands
-  // mid-animation and stutters even a native-driver spring — so `settledMode`
-  // trails `mode` by the spring's settle time (the timer resets on rapid taps,
-  // so day→week→month rebuilds once). The old sections stay on screen until
-  // then, and useDeferredValue keeps the eventual rebuild interruptible.
+  // A range change echoes the tab-switch motion (TAB_TRANSITION in _layout.tsx)
+  // in strict sequence with the Segmented pill: the pill springs and, at the
+  // same time, the current sections fade while sliding off toward the direction
+  // of travel (a later range = leftward, like moving to a tab on the right).
+  // Only once the pill has settled — the out-slide is long gone by then — does
+  // `settledMode` swap the data, so the commit that mounts the new chart trees
+  // lands while nothing is visible and can't stutter the animation. The new
+  // sections then slide in from the opposite side only after their first
+  // layout, so the slide-in never fights a heavy render. useDeferredValue
+  // keeps the rebuild interruptible on rapid taps.
   const [settledMode, setSettledMode] = useState<Mode>('day');
-  const swapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const changeMode = useCallback((m: Mode) => {
-    setMode(m);
-    if (swapTimer.current) clearTimeout(swapTimer.current);
-    swapTimer.current = setTimeout(() => setSettledMode(m), PILL_SETTLE_MS);
-  }, []);
-  useEffect(() => () => { if (swapTimer.current) clearTimeout(swapTimer.current); }, []);
+  const tx = useSharedValue(0);
+  const fade = useSharedValue(1);
+  // True between the swap commit and the new range's first layout; the
+  // in-animation waits on it so it never starts while the tree is mounting.
+  const pendingIn = useRef(false);
+  const changeMode = useCallback((m: Mode) => setMode(m), []);
+  useEffect(() => {
+    if (mode === settledMode) {
+      // Rapid taps landed back on the range already shown mid-flight: if it's
+      // not waiting on a fresh mount, just animate it back into place.
+      if (!pendingIn.current) {
+        tx.value = withTiming(0, RANGE_TIMING);
+        fade.value = withTiming(1, RANGE_TIMING);
+      }
+      return;
+    }
+    const dir = MODE_ORDER.indexOf(mode) > MODE_ORDER.indexOf(settledMode) ? 1 : -1;
+    tx.value = withTiming(-dir * SHIFT, RANGE_TIMING);
+    fade.value = withTiming(0, RANGE_TIMING);
+    // Swap only after the pill spring has settled; the timeout resets on rapid
+    // taps, so day→week→month rebuilds once.
+    const t = setTimeout(() => {
+      tx.value = dir * SHIFT;   // pre-position on the incoming side, still invisible
+      pendingIn.current = true;
+      setSettledMode(mode);
+    }, PILL_SETTLE_MS);
+    return () => clearTimeout(t);
+  }, [mode, settledMode, tx, fade]);
   const chartMode = React.useDeferredValue(settledMode);
+  // The swapped-in range's first layout (keyed by chartMode, so it always
+  // remounts): the new tree is rendered and sized, slide it in now.
+  const onIncomingLayout = useCallback(() => {
+    if (!pendingIn.current) return;
+    pendingIn.current = false;
+    tx.value = withTiming(0, RANGE_TIMING);
+    fade.value = withTiming(1, RANGE_TIMING);
+  }, [tx, fade]);
+  const slideStyle = useAnimatedStyle(() => ({ opacity: fade.value, transform: [{ translateX: tx.value }] }));
   // Freemium: free tier keeps the Day view; the longer ranges are Pro. Locked
   // segments render a lock glyph and raise the paywall instead of switching.
   const locked = useTier() === 'free';
@@ -163,32 +196,41 @@ export default function AnalysisScreen() {
         />
       }
     >
-      {!hasData ? (
-        <Text style={{ color: p.textDim, textAlign: 'center', marginTop: 48, paddingHorizontal: 24, fontSize: 15, lineHeight: 22 }}>
-          Nothing to show yet. Record readings, sleep, activities and more in your Journal and your progress will start populating here.
-        </Text>
-      ) : (
-        <SectionsBody
-          sections={sections}
-          demo={demo}
-          days={days}
-          mode={chartMode}
-          sex={sex}
-          height={height}
-          hrvFilt={hrvFilt}
-          setHrvFilt={setHrvFilt}
-          revealed={revealed}
-          onSectionLayout={onSectionLayout}
-        />
-      )}
+      <Animated.View key={chartMode} onLayout={onIncomingLayout} style={slideStyle}>
+        {!hasData ? (
+          <Text style={{ color: p.textDim, textAlign: 'center', marginTop: 48, paddingHorizontal: 24, fontSize: 15, lineHeight: 22 }}>
+            Nothing to show yet. Record readings, sleep, activities and more in your Journal and your progress will start populating here.
+          </Text>
+        ) : (
+          <SectionsBody
+            sections={sections}
+            demo={demo}
+            days={days}
+            mode={chartMode}
+            sex={sex}
+            height={height}
+            hrvFilt={hrvFilt}
+            setHrvFilt={setHrvFilt}
+            revealed={revealed}
+            onSectionLayout={onSectionLayout}
+          />
+        )}
+      </Animated.View>
     </Screen>
   );
 }
 
 /** How long after a range tap before the sections swap: the Segmented pill
- *  spring (speed 16, bounciness 8) has visually settled by then, so the chart
- *  remount can't drop its frames. */
+ *  spring (speed 16, bounciness 8) has visually settled by then — and the
+ *  out-slide (RANGE_TIMING) finished even earlier — so the chart remount
+ *  happens fully off screen and can't drop visible frames. */
 const PILL_SETTLE_MS = 300;
+// Segment order, for the slide direction: moving to a later range slides the
+// content off leftward (like moving to a tab on the right), earlier rightward.
+const MODE_ORDER: Mode[] = ['day', 'week', 'month', 'year'];
+// Same travel + timing as the tab switches and the Journal's day changes.
+const SHIFT = Math.round(Dimensions.get('window').width * 0.32);
+const RANGE_TIMING = { duration: 190, easing: REasing.out(REasing.cubic) };
 
 type Section = { id: string; title: string; buckets: { label: string }[]; cards: AnalysisCard[]; hasOwn: boolean };
 

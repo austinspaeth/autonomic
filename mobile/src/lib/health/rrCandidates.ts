@@ -15,6 +15,15 @@ export interface RrCandidate {
   sourceName: string;   // e.g. "Apple Watch"
 }
 
+/** Minimum length for a manual-pick offer — shorter readings (a quick 1-minute
+ *  Breathe, a truncated ECG) aren't worth evaluating. */
+const MIN_PICK_MS = 2 * 60000;
+
+/** Whether a reading is worth offering as a manual pick: it actually carries
+ *  beat-to-beat data and ran at least 2 minutes. */
+export const isPickable = (c: Pick<RrCandidate, 'rr' | 'startMs' | 'endMs'>) =>
+  c.rr.length > 0 && c.endMs - c.startMs >= MIN_PICK_MS;
+
 /** Split candidates into ones overlapping [windowFromMs, windowToMs] (the
  *  session window, auto-synced) and the rest (elsewhere in the scan range,
  *  offered as a manual pick). Preserves order within each group. */
