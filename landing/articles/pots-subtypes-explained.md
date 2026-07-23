@@ -8,7 +8,7 @@ keywords: "POTS subtypes, hyperadrenergic POTS, neuropathic POTS, hypovolemic PO
 date: 2026-07-23
 updated: 2026-07-23
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1522075782449-e45a34f1ddfb?q=80&w=1760&auto=format&fit=crop"
+photoLocation: "https://images.unsplash.com/photo-1709316010534-23646d72ed2e?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
 photoAttribution: "Unsplash"
 tldr: "POTS is not a single mechanism. Clinicians often describe three overlapping patterns: neuropathic POTS (partial nerve damage lets blood pool in the legs and belly on standing), hyperadrenergic POTS (an oversized sympathetic surge, with tremor, palpitations and blood pressure that often rises on standing), and hypovolemic POTS (low blood and plasma volume). These are not tidy boxes: most people show features of more than one, and the labels guide treatment rather than deliver a diagnosis. Your at-home stand test, especially with blood pressure, can hint at which pattern dominates, but confirming a subtype needs a clinician."
 categories:
