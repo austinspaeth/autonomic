@@ -1621,6 +1621,8 @@ a.gc { display: block; }
   .insights-cols { grid-template-columns: 1fr; gap: 40px; padding-top: 32px; }
   .insights-main { grid-column: 1; grid-row: 1; }
   .insights-side { grid-column: 1; grid-row: 2; }
+  /* Single-article view only (marked by .article-card) — no top gap above the hero image. */
+  .insights-cols:has(.article-card) { padding-top: 0; }
 }
 
 /* ── Sidebar cards ─────────────────────────────────────────── */
