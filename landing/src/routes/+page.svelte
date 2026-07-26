@@ -606,7 +606,7 @@
       <h2 class="h2">Everything that moves the needle, in one place.</h2>
       <p class="lead">A guided log built around real autonomic data, not a generic habit tracker. Add a reading and Autonomic knows exactly which fields and thresholds apply.</p>
       <ul class="ticks">
-        <li><b>HRV, both ways</b>, quick unstructured reads and full breathing sessions with LF/HF power, RMSSD, pNN50 and baroreflex peak.</li>
+        <li><b>HRV, both ways</b>, quick baseline reads and paced training sessions with LF/HF power, RMSSD, pNN50 and baroreflex peak.</li>
         <li><b>Cardio &amp; vitals</b>, blood pressure spread and resting heart rate.</li>
         <li><b>Orthostatic tests</b>, lying-to-standing heart-rate jumps and one-minute recovery, scored for POTS patterns.</li>
         <li><b>Context that explains it</b>, sleep, activity, meds &amp; supplements, food, hydration, symptoms and digestion.</li>
@@ -616,7 +616,7 @@
       <div class="card-mock">
         <div class="cm-head"><span>Add reading</span><span class="cm-x">✕</span></div>
         <div class="cm-list">
-          <div class="cm-item"><span class="cm-ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" /><path d="M3.22 12H9.5l.6-1.3 1.9 4.6 2-7 1.5 3.7h5.27" /></svg></span><div><b>Unstructured HRV</b><small>Quick read · RMSSD · pNN50</small></div></div>
+          <div class="cm-item"><span class="cm-ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" /><path d="M3.22 12H9.5l.6-1.3 1.9 4.6 2-7 1.5 3.7h5.27" /></svg></span><div><b>Baseline HRV</b><small>Quick read · RMSSD · pNN50</small></div></div>
           <div class="cm-item"><span class="cm-ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.8 19.6A2 2 0 1 0 14 16H2" /><path d="M17.5 8a2.5 2.5 0 1 1 2 4H2" /><path d="M9.8 4.4A2 2 0 1 1 11 8H2" /></svg></span><div><b>Breathing HRV</b><small>Coherence, power spectrum, RMSSD</small></div></div>
           <div class="cm-item"><span class="cm-ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z" /></svg></span><div><b>Blood Pressure</b><small>Systolic / diastolic / pulse</small></div></div>
           <div class="cm-item"><span class="cm-ic"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" /></svg></span><div><b>Resting Heart Rate</b><small>Resting HR · trend</small></div></div>
