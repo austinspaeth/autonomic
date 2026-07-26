@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated as RNAnimated, Dimensions, Easing, Pressable, ScrollView, Text, View } from 'react-native';
-import Animated, { Easing as REasing, runOnJS, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import { Animated as RNAnimated, Easing, Pressable, ScrollView, Text, View } from 'react-native';
+import Animated, { Easing as REasing, runOnJS, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, withTiming, type SharedValue } from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
-import { Screen } from '../../src/components/Header';
+import { BottomFade, Screen } from '../../src/components/Header';
 import { Icon } from '../../src/components/Icon';
 import { HelpDot, ScoreDot, Segmented } from '../../src/components/ui';
 import { Bars, BpDumbbell, LineChart, StackedBars, ZonesToggle, useChartsBlur } from '../../src/components/charts';
@@ -24,80 +24,15 @@ export default function AnalysisScreen() {
   // rather than an empty view. Swaps to their own data on the first entry.
   const demo = !hasOwnData(state.days);
   const days = demo ? demoDays() : state.days;
-  const [mode, setMode] = useState<Mode>('day');
-  // A range change echoes the tab-switch motion (TAB_TRANSITION in _layout.tsx)
-  // in strict sequence with the Segmented pill: the pill springs and, at the
-  // same time, the current sections fade while sliding off toward the direction
-  // of travel (a later range = leftward, like moving to a tab on the right).
-  // Only once the pill has settled — the out-slide is long gone by then — does
-  // `settledMode` swap the data, so the commit that mounts the new chart trees
-  // lands while nothing is visible and can't stutter the animation. The new
-  // sections then slide in from the opposite side only after their first
-  // layout, so the slide-in never fights a heavy render. useDeferredValue
-  // keeps the rebuild interruptible on rapid taps.
-  const [settledMode, setSettledMode] = useState<Mode>('day');
-  const tx = useSharedValue(0);
-  const fade = useSharedValue(1);
-  // True between the swap commit and the new range's first layout; the
-  // in-animation waits on it so it never starts while the tree is mounting.
-  const pendingIn = useRef(false);
-  const changeMode = useCallback((m: Mode) => setMode(m), []);
-  useEffect(() => {
-    if (mode === settledMode) {
-      // Rapid taps landed back on the range already shown mid-flight: if it's
-      // not waiting on a fresh mount, just animate it back into place.
-      if (!pendingIn.current) {
-        tx.value = withTiming(0, RANGE_TIMING);
-        fade.value = withTiming(1, RANGE_TIMING);
-      }
-      return;
-    }
-    const dir = MODE_ORDER.indexOf(mode) > MODE_ORDER.indexOf(settledMode) ? 1 : -1;
-    tx.value = withTiming(-dir * SHIFT, RANGE_TIMING);
-    fade.value = withTiming(0, RANGE_TIMING);
-    // Swap only after the pill spring has settled; the timeout resets on rapid
-    // taps, so day→week→month rebuilds once.
-    const t = setTimeout(() => {
-      tx.value = dir * SHIFT;   // pre-position on the incoming side, still invisible
-      pendingIn.current = true;
-      setSettledMode(mode);
-    }, PILL_SETTLE_MS);
-    return () => clearTimeout(t);
-  }, [mode, settledMode, tx, fade]);
-  const chartMode = React.useDeferredValue(settledMode);
-  // The swapped-in range's first layout (keyed by chartMode, so it always
-  // remounts): the new tree is rendered and sized, slide it in now.
-  const onIncomingLayout = useCallback(() => {
-    if (!pendingIn.current) return;
-    pendingIn.current = false;
-    tx.value = withTiming(0, RANGE_TIMING);
-    fade.value = withTiming(1, RANGE_TIMING);
-  }, [tx, fade]);
-  const slideStyle = useAnimatedStyle(() => ({ opacity: fade.value, transform: [{ translateX: tx.value }] }));
   // Freemium: free tier keeps the Day view; the longer ranges are Pro. Locked
   // segments render a lock glyph and raise the paywall instead of switching.
   const locked = useTier() === 'free';
   const openPaywall = usePaywall();
-  // Time-based downgrade (trial expires while parked on Week/Month/Year).
-  useEffect(() => { if (locked && mode !== 'day') changeMode('day'); }, [locked, mode, changeMode]);
   // HRV filter lives here (not inside HrvProgress) so the same All/Morning/Evening
   // toggle can appear both inline beside the section title and in the pinned bar.
   const [hrvFilt, setHrvFilt] = useState<Filt>('all');
   const sex = state.profile.sex;
   const height = state.profile.height;
-
-  // Build every category's cards once per (days, mode, profile). Memoized so the
-  // scroll-driven "active section" re-render doesn't rebuild all the charts.
-  const sections = useMemo(() => {
-    const cats = buildCategories(days, chartMode, { sex, height, protocol: resolveProtocol(state.settings.protocol), customTypes: state.customTypes });
-    return cats.map((c) => ({ id: c.id, title: c.title, buckets: c.buckets, cards: c.build(), hasOwn: c.hasData?.() ?? false }));
-  }, [days, chartMode, sex, height, state.settings.protocol, state.customTypes]);
-
-  // Outlook always synthesizes a score, so it isn't proof of real data. Treat the
-  // whole view as empty unless some *other* category has something logged — that's
-  // when the progress charts are actually meaningful. HRV builds no cards (it draws
-  // itself), so it answers through `hasOwn` instead.
-  const hasData = sections.some((s) => s.id !== 'outlook' && (s.cards.length > 0 || s.hasOwn));
 
   const scrollRef = useRef<ScrollView>(null);
   const [headerH, setHeaderH] = useState(0);
@@ -114,7 +49,206 @@ export default function AnalysisScreen() {
   const dirSv = useSharedValue(1);                               // +1 = scrolling down, -1 = up
   const activeSv = useSharedValue<string | null>(null);
   const [pinned, setPinnedState] = useState<{ id: string; dir: number } | null>(null);
-  const setPinned = useCallback((id: string | null, dir: number) => setPinnedState(id ? { id, dir } : null), []);
+  const pinnedRef = useRef<string | null>(null);
+  const setPinned = useCallback((id: string | null, dir: number) => {
+    pinnedRef.current = id;
+    setPinnedState(id ? { id, dir } : null);
+  }, []);
+
+  /* ── Range switching ──────────────────────────────────────────────────────
+   * `mode` is what the control shows and flips the instant a segment is
+   * tapped; `chartMode` is what's actually rendered. They have to be separate
+   * because committing a range rebuilds every category and mounts a screenful
+   * of charts — work that blocks the JS *and* UI threads, so an animation
+   * running through it stalls whichever driver it's on. Earlier attempts here
+   * (defer the swap by a fixed delay; slide the old content out first) all had
+   * the pill and the commit sharing a window, or left the viewport empty while
+   * they didn't.
+   *
+   * So instead: the pill moves on the UI thread the moment it's pressed (see
+   * `Segmented`, which owes nothing to React), a skeleton veil fades over the
+   * document in ~110ms, and the commit happens only once that veil is opaque —
+   * where a dropped frame costs nothing. The veil carries the *same section
+   * titles*, so it reads as the page recalculating rather than a new screen
+   * loading, and it hides the scroll reposition that used to dump you back at
+   * the top. It lifts as soon as the new tree has laid out, with a floor so a
+   * cheap switch can't blink and a ceiling so a slow one can't strand you. */
+  const [mode, setMode] = useState<Mode>('day');
+  const [chartMode, setChartMode] = useState<Mode>('day');
+  const modeRef = useRef<Mode>('day');
+  const chartModeRef = useRef<Mode>('day');
+  // The veil's contents are snapshotted at tap time (`items`) and start at the
+  // section we'll restore the scroll to, so what it shows lines up with what's
+  // underneath when it lifts.
+  const [veil, setVeil] = useState<{ from: number; items: VeilItem[] } | null>(null);
+  const veilOp = useSharedValue(0);
+  const stage = useRef<'idle' | 'in' | 'opaque' | 'out'>('idle');
+  const fadeStarted = useRef(false);
+  const pending = useRef<Mode | null>(null);
+  const anchor = useRef<{ id: string; index: number } | null>(null);
+  const awaitingBody = useRef(false);
+  const floorAt = useRef(0);
+  const timers = useRef<{ ceiling?: ReturnType<typeof setTimeout>; lift?: ReturnType<typeof setTimeout> }>({});
+  const sectionsRef = useRef<Section[]>([]);
+  useEffect(() => () => {
+    if (timers.current.ceiling) clearTimeout(timers.current.ceiling);
+    if (timers.current.lift) clearTimeout(timers.current.lift);
+  }, []);
+
+  // Put the scroll where the new range should open — the section the user was
+  // reading, or the top. Always runs while the veil is opaque, so it's unseen.
+  const restore = useCallback(() => {
+    if (!awaitingBody.current) return;
+    awaitingBody.current = false;
+    const a = anchor.current;
+    const off = a ? offsetsSv.value[a.id] : null;
+    const y = off != null ? Math.max(0, off - headerSv.value - CONTENT_PAD) : 0;
+    scrollRef.current?.scrollTo({ y, animated: false });
+    lastYSv.value = y;
+    // That landing spot is inside the handoff zone, so the anchored section is
+    // pinned on arrival — say so now rather than waiting for the scroll event,
+    // so the pinned bar's fade-in also happens under the veil.
+    if (a && off != null) { activeSv.value = a.id; setPinned(a.id, 1); }
+  }, [offsetsSv, headerSv, lastYSv, activeSv, setPinned]);
+
+  const clearVeil = useCallback(() => {
+    if (stage.current !== 'out') return;   // a new tap caught it on the way down
+    stage.current = 'idle';
+    fadeStarted.current = false;
+    anchor.current = null;
+    setVeil(null);
+  }, []);
+
+  const lift = useCallback(() => {
+    if (timers.current.ceiling) { clearTimeout(timers.current.ceiling); timers.current.ceiling = undefined; }
+    if (timers.current.lift) { clearTimeout(timers.current.lift); timers.current.lift = undefined; }
+    if (stage.current !== 'opaque') return;
+    restore();                             // no-op unless the ceiling beat the layout
+    stage.current = 'out';
+    veilOp.value = withTiming(0, VEIL_OUT, (fin) => { if (fin) runOnJS(clearVeil)(); });
+  }, [restore, veilOp, clearVeil]);
+
+  const raiseCeiling = useCallback(() => {
+    if (timers.current.ceiling) clearTimeout(timers.current.ceiling);
+    timers.current.ceiling = setTimeout(lift, VEIL_CEILING_MS);
+  }, [lift]);
+
+  const scheduleLift = useCallback(() => {
+    if (timers.current.lift) clearTimeout(timers.current.lift);
+    timers.current.lift = setTimeout(lift, Math.max(0, floorAt.current - Date.now()));
+  }, [lift]);
+
+  // The actual swap. Only ever called with the veil opaque.
+  const commitPending = useCallback(() => {
+    const to = pending.current;
+    if (to == null) return;
+    pending.current = null;
+    if (to === chartModeRef.current) {
+      // Rapid taps landed back on the range already rendered — nothing to
+      // rebuild (and no re-render to wait on), so just take the veil down.
+      scheduleLift();
+      return;
+    }
+    chartModeRef.current = to;
+    // The old range's section offsets mean nothing for the new one. Cleared
+    // here rather than in an effect keyed on chartMode, so a late reset can't
+    // wipe the offsets the incoming tree seeds during its first layout pass.
+    activeSv.value = null;
+    offsetsSv.value = {};
+    setPinned(null, 1);
+    awaitingBody.current = true;
+    raiseCeiling();
+    setChartMode(to);
+  }, [activeSv, offsetsSv, setPinned, raiseCeiling, scheduleLift]);
+
+  const onVeilOpaque = useCallback(() => {
+    if (stage.current !== 'in') return;
+    stage.current = 'opaque';
+    floorAt.current = Date.now() + VEIL_HOLD_MS;
+    commitPending();
+  }, [commitPending]);
+
+  const fadeUp = useCallback(() => {
+    fadeStarted.current = true;
+    veilOp.value = withTiming(1, VEIL_IN, (fin) => { if (fin) runOnJS(onVeilOpaque)(); });
+  }, [veilOp, onVeilOpaque]);
+
+  // Start the fade only once the veil is mounted and measured: a timing kicked
+  // off in the same commit that mounts it would play against a view that isn't
+  // on screen yet, and the veil would appear already half-way up.
+  const onVeilLayout = useCallback(() => {
+    if (stage.current === 'in' && !fadeStarted.current) fadeUp();
+  }, [fadeUp]);
+
+  const changeMode = useCallback((m: Mode) => {
+    if (m === modeRef.current) return;
+    modeRef.current = m;
+    setMode(m);            // the pill has already moved itself; this is bookkeeping
+    pending.current = m;
+    if (stage.current === 'idle') {
+      // Where to reopen: whatever section the user was reading. Flipping
+      // Day→Week to see the same metric at a coarser resolution shouldn't
+      // throw you back to the top of the page.
+      const id = pinnedRef.current;
+      const i = id ? sectionsRef.current.findIndex((s) => s.id === id) : -1;
+      anchor.current = id && i > 0 ? { id, index: i } : null;
+      stage.current = 'in';
+      fadeStarted.current = false;
+      const from = anchor.current ? anchor.current.index : 0;
+      setVeil({ from, items: veilItems(sectionsRef.current, from) });
+    } else if (stage.current === 'opaque') {
+      commitPending();       // already hidden — swap straight through
+    } else if (stage.current === 'out') {
+      stage.current = 'in';  // caught the veil on the way down; back up it goes
+      fadeUp();
+    }
+    // stage === 'in': the fade is already running and will pick up `pending`.
+  }, [commitPending, fadeUp]);
+
+  // Time-based downgrade (trial expires while parked on Week/Month/Year).
+  useEffect(() => { if (locked && mode !== 'day') changeMode('day'); }, [locked, mode, changeMode]);
+
+  // First layout of the freshly committed range. Children lay out before their
+  // parent, so every mounted section has already reported its offset by now.
+  const onBodyLayout = useCallback(() => {
+    if (!awaitingBody.current) return;
+    restore();
+    scheduleLift();
+  }, [restore, scheduleLift]);
+
+  // Building a range walks the whole journal, so keep the last build per range:
+  // switching back to one you've already seen then costs nothing and the veil
+  // is pure courtesy. Demand-only on purpose — there is nowhere off-thread to
+  // pre-warm the unseen ranges (a Reanimated worklet runtime can't take this
+  // work: the built cards carry live functions — `regrade`, `fmt`, the ortho
+  // predicates — which don't cross a runtime boundary), so speculating would
+  // just be an unbounded JS-thread stall on a long journal in exchange for
+  // shortening a window the veil already hides. The cache is dropped wholesale
+  // whenever any build input changes.
+  const buildArgs = useMemo(
+    () => ({ days, sex, height, protocol: resolveProtocol(state.settings.protocol), customTypes: state.customTypes }),
+    [days, sex, height, state.settings.protocol, state.customTypes],
+  );
+  const cache = useRef<{ args: typeof buildArgs; byMode: Map<Mode, Section[]> }>({ args: buildArgs, byMode: new Map() });
+  if (cache.current.args !== buildArgs) cache.current = { args: buildArgs, byMode: new Map() };
+  const build = useCallback((m: Mode): Section[] => {
+    const hit = cache.current.byMode.get(m);
+    if (hit) return hit;
+    const { days: d, ...ctx } = buildArgs;
+    const cats = buildCategories(d, m, ctx);
+    const built = cats.map((c) => ({ id: c.id, title: c.title, buckets: c.buckets, cards: c.build(), hasOwn: c.hasData?.() ?? false }));
+    cache.current.byMode.set(m, built);
+    return built;
+  }, [buildArgs]);
+  const sections = useMemo(() => build(chartMode), [build, chartMode]);
+  sectionsRef.current = sections;
+
+  // Outlook always synthesizes a score, so it isn't proof of real data. Treat the
+  // whole view as empty unless some *other* category has something logged — that's
+  // when the progress charts are actually meaningful. HRV builds no cards (it draws
+  // itself), so it answers through `hasOwn` instead.
+  const hasData = sections.some((s) => s.id !== 'outlook' && (s.cards.length > 0 || s.hasOwn));
+
   // Outlook renders untitled at the very top, so it never pins — the sticky
   // bar starts with HRV.
   const pinIds = useMemo(() => sections.filter((s) => s.id !== 'outlook').map((s) => s.id), [sections]);
@@ -145,20 +279,12 @@ export default function AnalysisScreen() {
   }, [offsetsSv]);
   const onHeaderHeight = useCallback((h: number) => { setHeaderH(h); headerSv.value = h; }, [headerSv]);
 
-  // Reset to the top when the range changes so stale offsets don't mislead. The
-  // offsets map is cleared too — the previous range's section heights are wrong
-  // for the new one, and each section re-seeds its offset on the next onLayout.
-  useEffect(() => {
-    activeSv.value = null;
-    offsetsSv.value = {};
-    lastYSv.value = 0;
-    setPinnedState(null);
-    scrollRef.current?.scrollTo({ y: 0, animated: false });
-  }, [chartMode, activeSv, offsetsSv, lastYSv]);
-
   // Charts are expensive, so sections mount progressively (see the hook below);
   // until a section's turn comes it renders its real title over skeleton cards.
-  const revealed = useProgressiveReveal(sections);
+  // While the veil is up we mount straight through to the anchored section
+  // instead, so its offset is real before we scroll to it — one bigger commit,
+  // entirely hidden, beats waiting several reveal frames with the veil held up.
+  const revealed = useProgressiveReveal(sections, veil ? veil.from + INITIAL_SECTIONS : INITIAL_SECTIONS);
 
   const scrollToTop = () => scrollRef.current?.scrollTo({ y: 0, animated: true });
 
@@ -186,17 +312,24 @@ export default function AnalysisScreen() {
         </View>
       }
       footer={
-        <StickyBar
-          headerH={headerH}
-          active={active}
-          dir={pinned?.dir ?? 1}
-          onUp={scrollToTop}
-          hrvFilt={hrvFilt}
-          setHrvFilt={setHrvFilt}
-        />
+        <>
+          <StickyBar
+            headerH={headerH}
+            active={active}
+            dir={pinned?.dir ?? 1}
+            onUp={scrollToTop}
+            hrvFilt={hrvFilt}
+            setHrvFilt={setHrvFilt}
+          />
+          {/* Last in the overlay layer, so it covers the pinned bar too — the
+              pinned section is one of the things a range change invalidates. */}
+          {veil ? (
+            <RangeVeil top={headerH} op={veilOp} items={veil.items} banner={demo && veil.from === 0} onLayout={onVeilLayout} />
+          ) : null}
+        </>
       }
     >
-      <Animated.View key={chartMode} onLayout={onIncomingLayout} style={slideStyle}>
+      <View key={chartMode} onLayout={onBodyLayout}>
         {!hasData ? (
           <Text style={{ color: p.textDim, textAlign: 'center', marginTop: 48, paddingHorizontal: 24, fontSize: 15, lineHeight: 22 }}>
             Nothing to show yet. Record readings, sleep, activities and more in your Journal and your progress will start populating here.
@@ -215,22 +348,22 @@ export default function AnalysisScreen() {
             onSectionLayout={onSectionLayout}
           />
         )}
-      </Animated.View>
+      </View>
     </Screen>
   );
 }
 
-/** How long after a range tap before the sections swap: the Segmented pill
- *  spring (speed 16, bounciness 8) has visually settled by then — and the
- *  out-slide (RANGE_TIMING) finished even earlier — so the chart remount
- *  happens fully off screen and can't drop visible frames. */
-const PILL_SETTLE_MS = 300;
-// Segment order, for the slide direction: moving to a later range slides the
-// content off leftward (like moving to a tab on the right), earlier rightward.
-const MODE_ORDER: Mode[] = ['day', 'week', 'month', 'year'];
-// Same travel + timing as the tab switches and the Journal's day changes.
-const SHIFT = Math.round(Dimensions.get('window').width * 0.32);
-const RANGE_TIMING = { duration: 190, easing: REasing.out(REasing.cubic) };
+// `Screen`'s default contentPadding — the gap an anchored section should keep
+// below the header when the veil lifts, matching the veil's own top padding.
+const CONTENT_PAD = 16;
+/** Veil timings. The fade-in is short enough that the tap still reads as
+ *  instantaneous; the hold guarantees a cheap switch can't blink; the ceiling
+ *  caps a pathological one (a Year rebuild over a long journal) so the veil can
+ *  never be the thing you're waiting on. */
+const VEIL_IN = { duration: 110, easing: REasing.out(REasing.quad) };
+const VEIL_OUT = { duration: 170, easing: REasing.out(REasing.cubic) };
+const VEIL_HOLD_MS = 140;
+const VEIL_CEILING_MS = 700;
 
 type Section = { id: string; title: string; buckets: { label: string }[]; cards: AnalysisCard[]; hasOwn: boolean };
 
@@ -240,15 +373,17 @@ const INITIAL_SECTIONS = 2;
 
 /** Progressive section mount: the chart trees are expensive, so instead of
  *  mounting all of them in one frame (a visible hitch on tab switch and range
- *  change), the screen renders INITIAL_SECTIONS for real and then reveals one
+ *  change), the screen renders `initial` sections for real and then reveals one
  *  more per frame until every section is live. Sections never unmount. The
  *  count resets during render whenever `sections` is rebuilt, so the remount
  *  cost of a range change spreads across frames too — resetting in an effect
- *  instead would let one full-mount frame slip through first. */
-function useProgressiveReveal(sections: Section[]): number {
-  const [state, setState] = useState({ key: sections as Section[], shown: INITIAL_SECTIONS });
-  if (state.key !== sections) setState({ key: sections, shown: INITIAL_SECTIONS });
-  const shown = state.key === sections ? state.shown : INITIAL_SECTIONS;
+ *  instead would let one full-mount frame slip through first. A range change
+ *  raises `initial` to cover the section it will scroll to (see the caller);
+ *  that whole commit happens under the veil, where its cost is invisible. */
+function useProgressiveReveal(sections: Section[], initial: number): number {
+  const [state, setState] = useState({ key: sections as Section[], shown: initial });
+  if (state.key !== sections) setState({ key: sections, shown: initial });
+  const shown = state.key === sections ? state.shown : initial;
   useEffect(() => {
     if (shown >= sections.length) return;
     const id = requestAnimationFrame(() =>
@@ -256,6 +391,52 @@ function useProgressiveReveal(sections: Section[]): number {
     return () => cancelAnimationFrame(id);
   }, [shown, sections]);
   return shown;
+}
+
+type VeilItem = { title: string; cards: number };
+
+/** Snapshot of the on-screen document's shape, from `from` down — section
+ *  titles are identical across ranges, so the veil can keep them. */
+function veilItems(sections: Section[], from: number): VeilItem[] {
+  return sections.slice(from).map((s) => ({
+    // Outlook renders untitled at the very top.
+    title: s.id === 'outlook' ? '' : s.title,
+    cards: s.id === 'hrv' ? 2 : Math.max(1, Math.min(s.cards.length, 3)),
+  }));
+}
+
+/** The skeleton veil raised over the document while a new range commits: the
+ *  same headings over ghost cards, so the page reads as recalculating rather
+ *  than as a new screen loading. Opaque by the time anything happens beneath
+ *  it, which is what lets the rebuild — and the scroll reposition that goes
+ *  with it — be free. Touches are swallowed while it's up; the header (and so
+ *  the range control) sits in a layer above it and stays live. */
+function RangeVeil({ top, op, items, banner, onLayout }: {
+  top: number; op: SharedValue<number>; items: VeilItem[]; banner: boolean; onLayout: () => void;
+}) {
+  const p = usePalette();
+  const style = useAnimatedStyle(() => ({ opacity: op.value }));
+  return (
+    <Animated.View
+      onLayout={onLayout}
+      style={[{
+        position: 'absolute', top, left: 0, right: 0, bottom: 0,
+        backgroundColor: p.bg, paddingHorizontal: CONTENT_PAD, paddingTop: CONTENT_PAD, overflow: 'hidden',
+      }, style]}
+    >
+      {/* Only when the document below starts at the top, where the banner is. */}
+      {banner ? <DemoBanner text={DEMO_PROGRESS_TEXT} /> : null}
+      {items.map((it, i) => (
+        <View key={i} style={{ marginTop: i === 0 ? 0 : 22 }}>
+          {it.title ? (
+            <Text style={{ fontSize: SECTION_TITLE_SIZE, fontWeight: '700', color: p.text, marginBottom: 8 }}>{it.title}</Text>
+          ) : null}
+          <SectionSkeleton cards={it.cards} />
+        </View>
+      ))}
+      <BottomFade />
+    </Animated.View>
+  );
 }
 
 /** The whole document of category sections, memoized as one unit so pinned-bar

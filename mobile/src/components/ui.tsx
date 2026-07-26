@@ -3,12 +3,13 @@
  * MetricRow, one Segmented, one Stepper, one Button, reused everywhere.
  * Everything themed via usePalette(); light + dark both intentional.
  */
-import React, { useRef } from 'react';
+import React from 'react';
 import {
-  Animated, Pressable, StyleProp, StyleSheet, Text, View, ViewProps, ViewStyle,
+  Pressable, StyleProp, StyleSheet, Text, View, ViewProps, ViewStyle,
 } from 'react-native';
 import Reanimated, {
-  Easing as REasing, useAnimatedStyle, useSharedValue, withTiming,
+  Easing as REasing, interpolate, interpolateColor, useAnimatedStyle, useSharedValue,
+  withSpring, withTiming, type SharedValue,
 } from 'react-native-reanimated';
 import { GRADE_COLORS, radius, space, type as T, usePalette } from '../theme';
 import type { ScoreCat } from '../lib/types';
@@ -94,9 +95,25 @@ export function Muted({ children }: { children: React.ReactNode }) {
 }
 
 /* ---------- Segmented control with an animated pill ---------- */
-/** Options may be `locked` (freemium): a locked segment renders a small lock
- *  glyph beside its label and taps fire `onLockedPress` instead of `onChange`,
- *  so the pill never moves onto it. */
+/**
+ * Options may be `locked` (freemium): a locked segment renders a small lock
+ * glyph beside its label and taps fire `onLockedPress` instead of `onChange`,
+ * so the pill never moves onto it.
+ *
+ * The pill *and* the label colours are driven by one Reanimated shared value
+ * written straight from the press handler, so the whole selection animates on
+ * the UI thread and never waits on React. That matters on Progress, where
+ * picking a range commits an expensive re-render: a shared-value write reaches
+ * the UI thread immediately, whereas anything derived from the `value` prop
+ * (the old `active ? '#fff' : dim` label colour) couldn't repaint until that
+ * commit landed, so the control looked frozen mid-tap. The effect below only
+ * catches selection changes driven from *outside* the control (e.g. the tier
+ * downgrade that forces Progress back to Day).
+ */
+// Reanimated equivalent of the previous RN `Animated.spring` at speed 16 /
+// bounciness 8 — same feel, converted through Origami tension/friction.
+const PILL_SPRING = { stiffness: 427, damping: 27.6, mass: 1 };
+
 export function Segmented<T extends string>({ options, value, onChange, onLockedPress, style, compact }: {
   options: { val: T; label: string; locked?: boolean }[]; value: T; onChange: (v: T) => void;
   onLockedPress?: (v: T) => void; style?: StyleProp<ViewStyle>; compact?: boolean;
@@ -104,20 +121,16 @@ export function Segmented<T extends string>({ options, value, onChange, onLocked
   const p = usePalette();
   const [w, setW] = React.useState(0);
   // Compact cells hug their labels, so the pill has to chase measured rects
-  // (a width animation — JS driver) instead of sliding across uniform cells.
+  // (an animated width) instead of sliding across uniform cells.
   const [cells, setCells] = React.useState<{ x: number; w: number }[]>([]);
   const n = options.length;
   const idx = Math.max(0, options.findIndex((o) => o.val === value));
-  const anim = useRef(new Animated.Value(idx)).current;
-  // The pill starts moving in the press handler, not the value-change effect:
-  // a range switch can trigger an expensive re-render upstream, and an effect-
-  // started spring would sit frozen until that render commits. Started on press,
-  // the native-driver spring runs on the UI thread no matter how busy JS is.
-  const target = useRef(idx);
+  const sel = useSharedValue(idx);
+  const target = React.useRef(idx);
   const springTo = React.useCallback((i: number) => {
     target.current = i;
-    Animated.spring(anim, { toValue: i, useNativeDriver: !compact, speed: 16, bounciness: 8 }).start();
-  }, [anim, compact]);
+    sel.value = withSpring(i, PILL_SPRING);
+  }, [sel]);
   React.useEffect(() => {
     if (target.current !== idx) springTo(idx);
   }, [idx, springTo]);
@@ -128,6 +141,18 @@ export function Segmented<T extends string>({ options, value, onChange, onLocked
   const font = compact ? 12 : 15;
   const cell = w > 0 ? (w - pad * 2) / n : 0;
   const measured = compact && n > 1 && cells.filter(Boolean).length === n;
+  // Interpolation inputs for the compact pill. Padded to the stop list (and to
+  // at least two stops) so the worklet stays valid before the cells are
+  // measured, and in the even variant where they're never measured at all —
+  // the pill itself only renders once `measured`, but the worklet always runs.
+  const stops = React.useMemo(() => (n > 1 ? options.map((_, i) => i) : [0, 1]), [options, n]);
+  const xs = React.useMemo(() => stops.map((_, i) => cells[i]?.x ?? 0), [stops, cells]);
+  const ws = React.useMemo(() => stops.map((_, i) => cells[i]?.w ?? 0), [stops, cells]);
+  const compactPill = useAnimatedStyle(() => ({
+    width: interpolate(sel.value, stops, ws),
+    transform: [{ translateX: interpolate(sel.value, stops, xs) }],
+  }));
+  const evenPill = useAnimatedStyle(() => ({ transform: [{ translateX: sel.value * cell }] }));
   return (
     <View
       onLayout={(e) => setW(e.nativeEvent.layout.width)}
@@ -135,55 +160,59 @@ export function Segmented<T extends string>({ options, value, onChange, onLocked
     >
       {compact ? (
         measured && (
-          <Animated.View
-            style={{
-              position: 'absolute', top: pad, bottom: pad, left: 0, borderRadius: radius.pill, backgroundColor: p.accent,
-              width: anim.interpolate({ inputRange: options.map((_, i) => i), outputRange: cells.map((c) => c.w) }),
-              transform: [{ translateX: anim.interpolate({ inputRange: options.map((_, i) => i), outputRange: cells.map((c) => c.x) }) }],
-            }}
+          <Reanimated.View
+            style={[{ position: 'absolute', top: pad, bottom: pad, left: 0, borderRadius: radius.pill, backgroundColor: p.accent }, compactPill]}
           />
         )
       ) : (
         cell > 0 && (
-          <Animated.View
-            style={{ position: 'absolute', top: pad, bottom: pad, left: pad, width: cell, borderRadius: radius.pill, backgroundColor: p.accent, transform: [{ translateX: Animated.multiply(anim, cell) }] }}
+          <Reanimated.View
+            style={[{ position: 'absolute', top: pad, bottom: pad, left: pad, width: cell, borderRadius: radius.pill, backgroundColor: p.accent }, evenPill]}
           />
         )
       )}
-      {options.map((o, i) => {
-        const active = o.val === value;
-        return (
-          <Pressable
-            key={o.val}
-            onPress={() => {
-              if (o.locked) { onLockedPress?.(o.val); return; }
-              springTo(i);
-              onChange(o.val);
-            }}
-            onLayout={compact ? (e) => {
-              const { x, width } = e.nativeEvent.layout;
-              setCells((prev) => {
-                if (prev[i] && prev[i].x === x && prev[i].w === width) return prev;
-                const next = prev.slice();
-                next[i] = { x, w: width };
-                return next;
-              });
-            } : undefined}
-            style={{ paddingVertical: padV, paddingHorizontal: compact ? 13 : 0, alignItems: 'center', zIndex: 1, ...(compact ? null : { flex: 1 }) }}
-          >
-            {o.locked ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                <Icon name="lock" size={compact ? 10 : 12} color={p.textDim} strokeWidth={2.2} />
-                <Text style={{ color: p.textDim, fontSize: font, fontWeight: '600' }}>{o.label}</Text>
-              </View>
-            ) : (
-              <Text style={{ color: active ? '#fff' : p.textDim, fontSize: font, fontWeight: '600' }}>{o.label}</Text>
-            )}
-          </Pressable>
-        );
-      })}
+      {options.map((o, i) => (
+        <Pressable
+          key={o.val}
+          onPress={() => {
+            if (o.locked) { onLockedPress?.(o.val); return; }
+            springTo(i);
+            onChange(o.val);
+          }}
+          onLayout={compact ? (e) => {
+            const { x, width } = e.nativeEvent.layout;
+            setCells((prev) => {
+              if (prev[i] && prev[i].x === x && prev[i].w === width) return prev;
+              const next = prev.slice();
+              next[i] = { x, w: width };
+              return next;
+            });
+          } : undefined}
+          style={{ paddingVertical: padV, paddingHorizontal: compact ? 13 : 0, alignItems: 'center', zIndex: 1, ...(compact ? null : { flex: 1 }) }}
+        >
+          {o.locked ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Icon name="lock" size={compact ? 10 : 12} color={p.textDim} strokeWidth={2.2} />
+              <Text style={{ color: p.textDim, fontSize: font, fontWeight: '600' }}>{o.label}</Text>
+            </View>
+          ) : (
+            <SegLabel label={o.label} index={i} sel={sel} font={font} dim={p.textDim} />
+          )}
+        </Pressable>
+      ))}
     </View>
   );
+}
+
+/** One segment's label, cross-fading between dim and white as the pill passes
+ *  under it — on the UI thread, so it tracks the pill exactly. */
+function SegLabel({ label, index, sel, font, dim }: {
+  label: string; index: number; sel: SharedValue<number>; font: number; dim: string;
+}) {
+  const style = useAnimatedStyle(() => ({
+    color: interpolateColor(sel.value, [index - 1, index, index + 1], [dim, '#fff', dim]),
+  }));
+  return <Reanimated.Text style={[{ fontSize: font, fontWeight: '600' }, style]}>{label}</Reanimated.Text>;
 }
 
 /* ---------- Progress bar ---------- */
