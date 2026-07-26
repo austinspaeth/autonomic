@@ -165,15 +165,24 @@ export function HrvSetup({ controls }: { controls: SheetControls }) {
 /** One purpose card: icon tile, title (+ "Daily" tag on the recommended one),
  *  and a plain-language description of what the reading is for.
  *
- *  Selection eases in rather than snapping: the accent tint is an overlay whose
+ *  The selected card RECEDES rather than lighting up red: a translucent black
+ *  overlay sinks it below the sheet surface and the accent moves to the border,
+ *  icon, title and check. A red wash over the whole card (accentSoft) muddied
+ *  the body copy — the description read as tinted rather than the card as
+ *  chosen.
+ *
+ *  Selection eases in rather than snapping: the darkening is an overlay whose
  *  opacity animates, and the border color interpolates between two opaque greys/
- *  accent. Do NOT interpolate the card's own backgroundColor between `surface2`
- *  and `accentSoft` — one is opaque and the other is 12% alpha, so the midpoint
- *  is a saturated half-transparent red that reads as a flash on every tap.
- *  Everything else (icon, title, radio) switches instantly; animating those too
- *  made the whole card shimmer. Reanimated because color can't use the native
- *  driver. */
+ *  accent. Do NOT interpolate the card's own backgroundColor against a
+ *  translucent color — one is opaque and the other has alpha, so the midpoint
+ *  reads as a flash on every tap. Everything else (icon, title, radio) switches
+ *  instantly; animating those too made the whole card shimmer. Reanimated
+ *  because color can't use the native driver. */
 const MODE_ANIM = { duration: 180, easing: Easing.out(Easing.quad) };
+/** Sinks `surface2` (#242427) to roughly #1e0705 — near-black with the accent
+ *  hue still in it. Not a tint of the bright accent (that washed the card) and
+ *  not neutral grey. */
+const MODE_SELECTED_SHADE = 'rgba(30,6,4,0.94)';
 
 function ModeCard({ mode, active, onPress }: { mode: (typeof MODES)[number]; active: boolean; onPress: () => void }) {
   const p = usePalette();
@@ -190,7 +199,7 @@ function ModeCard({ mode, active, onPress }: { mode: (typeof MODES)[number]; act
       <Animated.View
         style={[{ flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: 14, borderRadius: radius.control, borderWidth: 1, backgroundColor: p.surface2, overflow: 'hidden' }, borderStyle]}
       >
-        <Animated.View pointerEvents="none" style={[{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: p.accentSoft }, tintStyle]} />
+        <Animated.View pointerEvents="none" style={[{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: MODE_SELECTED_SHADE }, tintStyle]} />
         <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: active ? p.accentSoft : p.sunk, alignItems: 'center', justifyContent: 'center' }}>
           <Icon name={mode.icon} size={21} color={active ? p.accent : p.textDim} />
         </View>

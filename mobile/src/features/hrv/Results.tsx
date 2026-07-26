@@ -10,7 +10,7 @@ import React, { useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 import { SheetControls, SheetFooter } from '../../components/Sheet';
 import { Button } from '../../components/ui';
-import { ReadingSummary } from '../../components/summary';
+import { NoteDraftCard, ReadingSummary } from '../../components/summary';
 import { useToast } from '../../components/Toast';
 import { usePalette } from '../../theme';
 import { computeHrv } from '../../lib/hrv';
@@ -54,16 +54,14 @@ export function HrvResults({ rr, segmentStarts, hrSamples, sdnnSamples, config, 
   const startedAt = startedAtMs ? new Date(startedAtMs) : null;
   const dk = startedAt ? keyOf(startedAt) : todayKey();
 
-  // Build the reading with the same keys the manual form uses.
+  // Build the reading with the same keys the manual form uses. The capture
+  // source is stamped on the entry (and shown in the summary's Details card),
+  // so the note stays empty and free for whatever the user wants to write.
   const reading = useMemo<Entry>(() => {
     const type = config.kind === 'breath' ? 'breathHrv' : 'hrv';
-    const note = config.source === 'watch' ? 'Captured via Apple Watch'
-      : config.source === 'camera' ? 'Captured via device camera (PPG)'
-      : `Captured via ${getState().settings.lastBleDeviceName || 'Bluetooth device'}`;
     const base: Entry = {
       id: uid(), type, time: startedAt ? `${pad(startedAt.getHours())}:${pad(startedAt.getMinutes())}` : nowTime(),
       period: config.period || 'Other',
-      note,
       // Capture source is stamped on the reading so camera (PPG) readings stay
       // distinguishable downstream (filtering / de-weighting in Analysis later).
       source: config.source, durationSec,
@@ -96,11 +94,16 @@ export function HrvResults({ rr, segmentStarts, hrSamples, sdnnSamples, config, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reading]);
 
+  // Notes can be written on the results card before the reading is saved; the
+  // entry only exists in memory until Save, so hold the text here.
+  const [note, setNote] = useState('');
+  const shown = useMemo(() => (note ? { ...reading, note } : reading), [reading, note]);
+
   const save = async () => {
     // The preview `reading` carries its arrays inline (ReadingSummary renders
     // from them pre-save); persisting splits them into the waveform sidecar,
     // written before the entry so the journal never references a missing blob.
-    const { entry, waveform } = splitWaveform(reading);
+    const { entry, waveform } = splitWaveform(shown);
     if (waveform) storeWaveform(entry.id, waveform);
     upsertEntry(dk, 'readings', entry);
     if (writeHealth && health().available) {
@@ -152,7 +155,10 @@ export function HrvResults({ rr, segmentStarts, hrSamples, sdnnSamples, config, 
         </View>
       ) : null}
 
-      <ReadingSummary r={reading} days={daysWithCurrent} ctx={ctx} />
+      <ReadingSummary r={shown} days={daysWithCurrent} ctx={ctx} />
+      {/* Notes belong to the keep-or-discard decision, so the field lives here
+          rather than in the (read-only) summary. */}
+      <NoteDraftCard note={note} onChange={setNote} />
 
       {/* The whole action cluster rides the fixed footer — no scrolling to
           the bottom to find Save. */}

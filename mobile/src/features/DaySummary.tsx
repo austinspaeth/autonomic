@@ -179,6 +179,13 @@ export function DaySummary({ dk }: { dk: string }) {
   // rather than hiding the number behind an HRV requirement.
   const scored = all.score != null;
 
+  // Trailing-week trend check. Lives out here rather than inside the hero: the
+  // warning is its own card below the Outlook, sized like Milestones/Protocol.
+  const downturn = useMemo(
+    () => detectDownturn(state.days, dk, ctx, resolveProtocol(state.settings.protocol), state.customTypes),
+    [state.days, dk, ctx, state.settings.protocol, state.customTypes],
+  );
+
   return (
     <View>
       <GradientBorderCard color={!scored ? null : scoreCat(all.score!).color} trigger={dk} style={{ marginBottom: 12 }}>
@@ -188,6 +195,7 @@ export function DaySummary({ dk }: { dk: string }) {
           <ScoredHero dk={dk} readings={readings} d={d} all={all} ctx={ctx} onExplain={() => openSheet(() => <ScoreExplain all={all} dk={dk} />)} />
         )}
       </GradientBorderCard>
+      {downturn ? <DownturnWarning w={downturn} dk={dk} /> : null}
       {tier === 'free' ? <ProUpsellCard /> : null}
       <MilestoneProgressCard dk={dk} />
       <StreakCard dk={dk} />
@@ -242,16 +250,6 @@ function ScoredHero({ dk, readings, d, all, ctx, onExplain }: { dk: string; read
   );
   const delta = mornScore != null ? all.score! - mornScore : null;
   const mode = hasEvening ? (dk < today ? 'Day Complete' : 'Reflectance') : 'Autonomic Outlook';
-  // Trailing-week trend check; `readings`/`d` get fresh identities whenever the
-  // days map changes, so they cache this exactly like mornScore above.
-  const downturn = useMemo(
-    () => {
-      const s = getState();
-      return detectDownturn(s.days, dk, ctx, resolveProtocol(s.settings.protocol), s.customTypes);
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [readings, d, dk, ctx],
-  );
 
   let guide: string;
   if (hasEvening) {
@@ -296,13 +294,14 @@ function ScoredHero({ dk, readings, d, all, ctx, onExplain }: { dk: string; read
         <Flag color={SCORE_COLORS.warning} text="Blue-zone risk. High readiness may mask fragility, so do less today, not more." />
       ) : null}
       {cat.short === 'Crash' ? <Flag color={SCORE_COLORS.crash} text="Mandatory recovery day. Full rest, hydration, and protocol." /> : null}
-      {downturn ? <DownturnWarning w={downturn} dk={dk} /> : null}
     </Pressable>
   );
 }
 
-/** Trend warning shown at the bottom of the Outlook card when the trailing
- *  week is clearly worsening: compact icon + title + drop stat row. Tapping
+/** Trend warning card, sitting between the Outlook and Milestones when the
+ *  trailing week is clearly worsening. Same silhouette as the Milestones and
+ *  streak cards (42pt icon tile, title + subtitle, chevron), but tinted in the
+ *  severity color: colored border, darkened-color fill, colored text. Tapping
  *  opens the explanation sheet with the journal findings behind it. */
 function DownturnWarning({ w, dk }: { w: Downturn; dk: string }) {
   const p = usePalette();
@@ -312,21 +311,21 @@ function DownturnWarning({ w, dk }: { w: Downturn; dk: string }) {
     <Pressable
       onPress={() => openSheet(() => <DownturnExplain w={w} dk={dk} />)}
       style={({ pressed }) => [
-        { marginTop: 12, padding: 12, borderRadius: radius.control, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: mixHex(color, p.surface, 0.14), borderWidth: 1, borderColor: hexA(color, 0.55) },
+        { borderWidth: 1, borderColor: hexA(color, 0.55), borderRadius: radius.card, backgroundColor: mixHex(color, p.surface, 0.14), marginBottom: 12, padding: 15 },
         pressed && { opacity: 0.75 },
       ]}
     >
-      <View style={{ width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: mixHex(color, p.surface, 0.3) }}>
-        <Icon name="trendDown" size={17} color={color} />
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={{ fontSize: 14, fontWeight: '800', color }}>{w.title}</Text>
-        <Text style={{ fontSize: 11.5, fontWeight: '700', color: hexA(color, 0.8), fontVariant: ['tabular-nums'], marginTop: 1 }}>
-          {`Down ${w.drop} points over the last ${w.spanDays} days`}
-        </Text>
-      </View>
-      <View style={{ transform: [{ rotate: '-90deg' }] }}>
-        <Icon name="chevron" size={17} color={hexA(color, 0.55)} />
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 13 }}>
+        <View style={{ width: 42, height: 42, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: mixHex(color, p.surface, 0.3) }}>
+          <Icon name="trendDown" size={21} color={color} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 15, fontWeight: '700', color }}>{w.title}</Text>
+          <Text style={{ fontSize: 13, fontWeight: '600', color: hexA(color, 0.8), fontVariant: ['tabular-nums'], marginTop: 2 }}>
+            {`Down ${w.drop} points over the last ${w.spanDays} days`}
+          </Text>
+        </View>
+        <Icon name="chevronRight" size={18} color={hexA(color, 0.55)} />
       </View>
     </Pressable>
   );

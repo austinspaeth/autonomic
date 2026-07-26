@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated as RNAnimated, Easing, Pressable, ScrollView, Text, View } from 'react-native';
+import { Animated as RNAnimated, Easing, InteractionManager, Pressable, ScrollView, Text, View } from 'react-native';
 import Animated, { Easing as REasing, runOnJS, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, withTiming, type SharedValue } from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
+import { useIsFocused } from '@react-navigation/native';
 import { BottomFade, Screen } from '../../src/components/Header';
 import { Icon } from '../../src/components/Icon';
-import { HelpDot, ScoreDot, Segmented } from '../../src/components/ui';
+import { Ghost, HelpDot, ScoreDot, Segmented } from '../../src/components/ui';
 import { Bars, BpDumbbell, LineChart, StackedBars, ZonesToggle, useChartsBlur } from '../../src/components/charts';
 import { fonts, radius, usePalette } from '../../src/theme';
 import { useAppState } from '../../src/store/store';
@@ -68,8 +69,9 @@ export default function AnalysisScreen() {
    *
    * So instead: the pill moves on the UI thread the moment it's pressed (see
    * `Segmented`, which owes nothing to React), a skeleton veil fades over the
-   * document in ~110ms, and the commit happens only once that veil is opaque —
-   * where a dropped frame costs nothing. The veil carries the *same section
+   * document in ~110ms, and the commit happens only once that veil is opaque
+   * *and* the pill's spring has settled — so neither animation ever has the
+   * heavy commit landing in the middle of it. The veil carries the *same section
    * titles*, so it reads as the page recalculating rather than a new screen
    * loading, and it hides the scroll reposition that used to dump you back at
    * the top. It lifts as soon as the new tree has laid out, with a floor so a
@@ -86,6 +88,13 @@ export default function AnalysisScreen() {
   const stage = useRef<'idle' | 'in' | 'opaque' | 'out'>('idle');
   const fadeStarted = useRef(false);
   const pending = useRef<Mode | null>(null);
+  // A veil pre-raised while the tab was unfocused (stale data, or first
+  // launch): it must not lift until the deferred rebuild has committed.
+  const dirtyVeil = useRef(false);
+  // The range pill's spring is still travelling: the commit waits for it, so
+  // the heavy re-render can't land a dropped frame mid-animation.
+  const pillMoving = useRef(false);
+  const pillTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const anchor = useRef<{ id: string; index: number } | null>(null);
   const awaitingBody = useRef(false);
   const floorAt = useRef(0);
@@ -94,6 +103,7 @@ export default function AnalysisScreen() {
   useEffect(() => () => {
     if (timers.current.ceiling) clearTimeout(timers.current.ceiling);
     if (timers.current.lift) clearTimeout(timers.current.lift);
+    if (pillTimer.current) clearTimeout(pillTimer.current);
   }, []);
 
   // Put the scroll where the new range should open — the section the user was
@@ -116,14 +126,19 @@ export default function AnalysisScreen() {
     if (stage.current !== 'out') return;   // a new tap caught it on the way down
     stage.current = 'idle';
     fadeStarted.current = false;
+    dirtyVeil.current = false;
     anchor.current = null;
     setVeil(null);
   }, []);
 
   const lift = useCallback(() => {
+    if (stage.current !== 'opaque') return;
+    // A commit is still on its way — a re-tapped range waiting on the pill, or
+    // a stale document waiting on the tab transition. Whoever lands it will
+    // re-schedule the lift; the ceiling timer stays armed as the backstop.
+    if (pending.current != null || dirtyVeil.current) return;
     if (timers.current.ceiling) { clearTimeout(timers.current.ceiling); timers.current.ceiling = undefined; }
     if (timers.current.lift) { clearTimeout(timers.current.lift); timers.current.lift = undefined; }
-    if (stage.current !== 'opaque') return;
     restore();                             // no-op unless the ceiling beat the layout
     stage.current = 'out';
     veilOp.value = withTiming(0, VEIL_OUT, (fin) => { if (fin) runOnJS(clearVeil)(); });
@@ -162,12 +177,26 @@ export default function AnalysisScreen() {
     setChartMode(to);
   }, [activeSv, offsetsSv, setPinned, raiseCeiling, scheduleLift]);
 
+  // The commit is gated on *two* things: the veil being opaque (so the frame
+  // cost is invisible) and the range pill's spring having settled (so the
+  // pill's travel is never interrupted by it). Whichever finishes last fires
+  // the commit.
+  const tryCommit = useCallback(() => {
+    if (stage.current === 'opaque' && !pillMoving.current) commitPending();
+  }, [commitPending]);
+
+  const onPillSettled = useCallback(() => {
+    if (pillTimer.current) { clearTimeout(pillTimer.current); pillTimer.current = null; }
+    pillMoving.current = false;
+    tryCommit();
+  }, [tryCommit]);
+
   const onVeilOpaque = useCallback(() => {
     if (stage.current !== 'in') return;
     stage.current = 'opaque';
     floorAt.current = Date.now() + VEIL_HOLD_MS;
-    commitPending();
-  }, [commitPending]);
+    tryCommit();
+  }, [tryCommit]);
 
   const fadeUp = useCallback(() => {
     fadeStarted.current = true;
@@ -186,6 +215,12 @@ export default function AnalysisScreen() {
     modeRef.current = m;
     setMode(m);            // the pill has already moved itself; this is bookkeeping
     pending.current = m;
+    // Hold the commit until the pill's spring settles (Segmented reports via
+    // onSettled). The timer is the safety net in case the report never comes —
+    // e.g. a mode change forced from outside while the control is off-screen.
+    pillMoving.current = true;
+    if (pillTimer.current) clearTimeout(pillTimer.current);
+    pillTimer.current = setTimeout(onPillSettled, PILL_SETTLE_MAX_MS);
     if (stage.current === 'idle') {
       // Where to reopen: whatever section the user was reading. Flipping
       // Day→Week to see the same metric at a coarser resolution shouldn't
@@ -198,13 +233,13 @@ export default function AnalysisScreen() {
       const from = anchor.current ? anchor.current.index : 0;
       setVeil({ from, items: veilItems(sectionsRef.current, from) });
     } else if (stage.current === 'opaque') {
-      commitPending();       // already hidden — swap straight through
+      tryCommit();           // already hidden — swap as soon as the pill rests
     } else if (stage.current === 'out') {
       stage.current = 'in';  // caught the veil on the way down; back up it goes
       fadeUp();
     }
     // stage === 'in': the fade is already running and will pick up `pending`.
-  }, [commitPending, fadeUp]);
+  }, [tryCommit, fadeUp, onPillSettled]);
 
   // Time-based downgrade (trial expires while parked on Week/Month/Year).
   useEffect(() => { if (locked && mode !== 'day') changeMode('day'); }, [locked, mode, changeMode]);
@@ -230,19 +265,89 @@ export default function AnalysisScreen() {
     () => ({ days, sex, height, protocol: resolveProtocol(state.settings.protocol), customTypes: state.customTypes }),
     [days, sex, height, state.settings.protocol, state.customTypes],
   );
-  const cache = useRef<{ args: typeof buildArgs; byMode: Map<Mode, Section[]> }>({ args: buildArgs, byMode: new Map() });
-  if (cache.current.args !== buildArgs) cache.current = { args: buildArgs, byMode: new Map() };
-  const build = useCallback((m: Mode): Section[] => {
+  // What the document is *actually* built from. Frozen while the tab is
+  // unfocused: a journal edit made elsewhere doesn't rebuild this pre-mounted
+  // scene in the background — it just leaves `renderArgs` behind `buildArgs`
+  // (dirty), and the effect below handles the catch-up on the next focus.
+  // Null until the first focus ever, so startup mounts ghosts, not charts.
+  const [renderArgs, setRenderArgs] = useState<typeof buildArgs | null>(null);
+  // Bumped by each veiled catch-up commit so the body remounts and its
+  // onLayout re-fires even though `chartMode` didn't change.
+  const [renderSeq, setRenderSeq] = useState(0);
+  const dirty = renderArgs !== buildArgs;
+  const focused = useIsFocused();
+  const buildArgsRef = useRef(buildArgs);
+  buildArgsRef.current = buildArgs;
+  const renderArgsRef = useRef(renderArgs);
+  renderArgsRef.current = renderArgs;
+  // The cache holds builds for exactly one args identity — the launch pre-warm
+  // fills it with `buildArgs` before the first commit adopts that same object
+  // as `renderArgs`, which is why the reset lives here and not at render time.
+  const cache = useRef<{ args: typeof renderArgs; byMode: Map<Mode, Section[]> }>({ args: null, byMode: new Map() });
+  const buildWith = useCallback((args: NonNullable<typeof renderArgs>, m: Mode): Section[] => {
+    if (cache.current.args !== args) cache.current = { args, byMode: new Map() };
     const hit = cache.current.byMode.get(m);
     if (hit) return hit;
-    const { days: d, ...ctx } = buildArgs;
+    const { days: d, ...ctx } = args;
     const cats = buildCategories(d, m, ctx);
     const built = cats.map((c) => ({ id: c.id, title: c.title, buckets: c.buckets, cards: c.build(), hasOwn: c.hasData?.() ?? false }));
     cache.current.byMode.set(m, built);
     return built;
-  }, [buildArgs]);
-  const sections = useMemo(() => build(chartMode), [build, chartMode]);
+  }, []);
+  const sections = useMemo(() => (renderArgs ? buildWith(renderArgs, chartMode) : []), [buildWith, renderArgs, chartMode]);
   sectionsRef.current = sections;
+
+  // Launch pre-warm. The scene pre-mounts unbuilt so startup stays cheap, but
+  // the entry veil must show the *same* skeletons a range change does — and
+  // those are shaped from real built cards. So once launch interactions
+  // settle (the user is still on the Journal), build the initial range in the
+  // background and re-dress the still-cold veil with it. The first-focus
+  // commit then finds this build already in the cache, so the only work left
+  // under the veil is mounting the chart tree.
+  useEffect(() => {
+    if (renderArgsRef.current != null) return;
+    const task = InteractionManager.runAfterInteractions(() => {
+      if (renderArgsRef.current != null) return;   // beaten by a fast tab-in
+      const built = buildWith(buildArgsRef.current, chartModeRef.current);
+      setVeil((v) => (v && v.items.length === 0 ? { from: 0, items: veilItems(built, 0) } : v));
+    });
+    return () => task.cancel();
+  }, [buildWith]);
+
+  // Tab-entry skeleton. New data while unfocused (or first launch) raises the
+  // veil immediately — opaque, no fade; nothing is watching — so switching to
+  // this tab slides a *skeleton* in, and the rebuild commits only once the
+  // tab transition and nav pill have settled, keeping the switch fluid. A
+  // change that lands while the tab is focused (a health import, a settings
+  // edit) still commits in place with no veil, exactly as before the freeze.
+  useEffect(() => {
+    if (!dirty) return;
+    if (!focused) {
+      if (stage.current !== 'idle') return;    // a range swap is mid-flight; catch up on focus
+      const id = pinnedRef.current;
+      const i = id ? sectionsRef.current.findIndex((s) => s.id === id) : -1;
+      anchor.current = id && i > 0 ? { id, index: i } : null;
+      stage.current = 'opaque';
+      fadeStarted.current = true;
+      dirtyVeil.current = true;
+      veilOp.value = 1;
+      const from = anchor.current ? anchor.current.index : 0;
+      setVeil({ from, items: veilItems(sectionsRef.current, from) });
+      return;
+    }
+    if (dirtyVeil.current) {
+      const t = setTimeout(() => {
+        dirtyVeil.current = false;
+        awaitingBody.current = true;
+        floorAt.current = Date.now() + VEIL_HOLD_MS;
+        raiseCeiling();
+        setRenderArgs(buildArgs);
+        setRenderSeq((s) => s + 1);
+      }, TAB_SETTLE_MS);
+      return () => clearTimeout(t);
+    }
+    setRenderArgs(buildArgs);
+  }, [dirty, focused, buildArgs, veilOp, raiseCeiling]);
 
   // Outlook always synthesizes a score, so it isn't proof of real data. Treat the
   // whole view as empty unless some *other* category has something logged — that's
@@ -309,6 +414,7 @@ export default function AnalysisScreen() {
             value={mode}
             onChange={changeMode}
             onLockedPress={openPaywall}
+            onSettled={onPillSettled}
           />
         </View>
       }
@@ -330,7 +436,7 @@ export default function AnalysisScreen() {
         </>
       }
     >
-      <View key={chartMode} onLayout={onBodyLayout}>
+      <View key={`${chartMode}:${renderSeq}`} onLayout={onBodyLayout}>
         {!hasData ? (
           <Text style={{ color: p.textDim, textAlign: 'center', marginTop: 48, paddingHorizontal: 24, fontSize: 15, lineHeight: 22 }}>
             Nothing to show yet. Record readings, sleep, activities and more in your Journal and your progress will start populating here.
@@ -339,7 +445,7 @@ export default function AnalysisScreen() {
           <SectionsBody
             sections={sections}
             demo={demo}
-            days={days}
+            days={renderArgs ? renderArgs.days : days}
             mode={chartMode}
             sex={sex}
             height={height}
@@ -367,6 +473,14 @@ const VEIL_HOLD_MS = 140;
 // The veil's copies of live controls are inert — nothing under it can be reached.
 const NOOP = () => {};
 const VEIL_CEILING_MS = 700;
+/** Backstop for the pill-settle gate: if `Segmented` never reports the spring
+ *  finishing (forced mode change while the control is off-screen), commit
+ *  anyway. Just past the spring's real settle time (~290ms). */
+const PILL_SETTLE_MAX_MS = 500;
+/** Focus → catch-up commit delay: long enough for the tab scene transition
+ *  (190ms iOS / staged 160ms Android) and the tab bar's highlight spring to
+ *  visibly finish, so the rebuild never drops a frame of either. */
+const TAB_SETTLE_MS = 350;
 
 type Section = { id: string; title: string; buckets: { label: string }[]; cards: AnalysisCard[]; hasOwn: boolean };
 
@@ -432,6 +546,7 @@ function RangeVeil({ top, op, items, banner, hrvFilt, onLayout }: {
     >
       {/* Only when the document below starts at the top, where the banner is. */}
       {banner ? <DemoBanner text={DEMO_PROGRESS_TEXT} /> : null}
+      {items.length === 0 ? <ColdSkeleton /> : null}
       {items.map((it, i) => (
         <View key={i} style={{ marginTop: i === 0 ? 0 : 22 }}>
           {it.id === 'hrv' ? (
@@ -451,6 +566,28 @@ function RangeVeil({ top, op, items, banner, hrvFilt, onLayout }: {
       ))}
       <BottomFade />
     </Animated.View>
+  );
+}
+
+/** Last-resort veil filling for the moments at launch before the pre-warm has
+ *  produced real cards to shape skeletons from — reachable only by tabbing to
+ *  Progress faster than the background build. A generic first viewport: a
+ *  ghost where Outlook lands, the HRV section, a ghost card under the next
+ *  title. */
+function ColdSkeleton() {
+  const p = usePalette();
+  return (
+    <>
+      <Ghost h={170} r={radius.card} />
+      <View style={{ marginTop: 22 }}>
+        <Text style={{ fontSize: SECTION_TITLE_SIZE, fontWeight: '700', color: p.text, marginBottom: 8 }}>HRV</Text>
+        <HrvProgressSkeleton />
+      </View>
+      <View style={{ marginTop: 22 }}>
+        <Text style={{ fontSize: SECTION_TITLE_SIZE, fontWeight: '700', color: p.text, marginBottom: 8 }}>Vitals</Text>
+        <Ghost h={280} r={radius.card} />
+      </View>
+    </>
   );
 }
 

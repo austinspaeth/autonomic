@@ -6,7 +6,10 @@
  * The check runs on launch, at most hourly on foreground, and on demand from
  * the Journal's pull-to-refresh (`requestHealthUpdateCheck` — ignored while
  * the pill or its card is already up). Nothing is shown for an empty result —
- * the pill just fades away. Tapping a "found" pill opens the grouped sheet
+ * the pill just fades away. Checking and found are the SAME pill: one fixed-height
+ * container whose two content layers cross-fade while its width tweens from the
+ * checking content's (intrinsic) width out to the found content's, measured
+ * off-screen. Tapping a "found" pill opens the grouped sheet
  * (Sleep / Readings / Exercise / Medications), where items can be imported
  * all at once or hand-picked.
  *
@@ -17,7 +20,7 @@
  * showing everything not already in the journal.
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, AppState, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Animated, AppState, Easing, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SheetControls, useSheets } from '../components/Sheet';
@@ -80,6 +83,13 @@ export async function runHealthUpdateCheck(
 
 type PillPhase = 'hidden' | 'checking' | 'found';
 
+/** Fixed pill height — every state renders at this height so the morph only
+ *  ever moves width. */
+const PILL_H = 46;
+/** Pill border width — the measured content width has to grow by it, since RN
+ *  widths are border-box. */
+const BORDER = 1;
+
 export function HealthUpdatePill() {
   const p = usePalette();
   const { openSheet } = useSheets();
@@ -87,7 +97,20 @@ export function HealthUpdatePill() {
   const insets = useSafeAreaInsets();
   const [phase, setPhase] = useState<PillPhase>('hidden');
   const [found, setFound] = useState<HealthUpdateSet | null>(null);
+  // Natural width of the "found" content, measured off-screen (below) so the
+  // pill can tween out to it instead of snapping. The checking state needs no
+  // measurement — its content sits in flow and gives the pill its width.
+  const [foundW, setFoundW] = useState(0);
+  // Only true once we're driving width ourselves; until then the pill is
+  // intrinsically sized, so it can never render at zero width.
+  const [morphing, setMorphing] = useState(false);
   const opacity = useRef(new Animated.Value(0)).current;
+  const pillW = useRef(new Animated.Value(0)).current;
+  const checkOp = useRef(new Animated.Value(1)).current;
+  const foundOp = useRef(new Animated.Value(0)).current;
+  // The pill's own laid-out width while it's intrinsically sized = where the
+  // tween starts from.
+  const restW = useRef(0);
   const running = useRef(false);
   const phaseRef = useRef<PillPhase>('hidden');
   phaseRef.current = phase;
@@ -95,7 +118,25 @@ export function HealthUpdatePill() {
   const fadeTo = (to: number, done?: () => void) =>
     Animated.timing(opacity, { toValue: to, duration: to ? 220 : 280, useNativeDriver: true }).start(({ finished }) => { if (finished) done?.(); });
 
-  const hide = () => fadeTo(0, () => { setPhase('hidden'); setFound(null); });
+  const hide = () => fadeTo(0, () => {
+    setPhase('hidden'); setFound(null); setFoundW(0); setMorphing(false); restW.current = 0;
+  });
+
+  // Morph into "found": fade the checking content out, tween the width out to
+  // the measured new content, fade that in as the width settles.
+  useEffect(() => {
+    if (phase !== 'found' || !foundW || !restW.current) return;
+    pillW.setValue(restW.current);
+    setMorphing(true);
+    Animated.sequence([
+      Animated.timing(checkOp, { toValue: 0, duration: 140, useNativeDriver: true }),
+      Animated.parallel([
+        Animated.timing(pillW, { toValue: foundW + BORDER * 2, duration: 300, easing: Easing.out(Easing.cubic), useNativeDriver: false }),
+        Animated.timing(foundOp, { toValue: 1, duration: 200, delay: 90, useNativeDriver: true }),
+      ]),
+    ]).start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, foundW]);
 
   const runCheck = async () => {
     if (running.current || importSheetOpen || phaseRef.current !== 'hidden') return;
@@ -103,6 +144,8 @@ export function HealthUpdatePill() {
     if (!health().available || !s.settings.healthEnabled) return;
     running.current = true;
     markAutoChecked();
+    checkOp.setValue(1);
+    foundOp.setValue(0);
     setPhase('checking');
     fadeTo(1);
     const startedAt = Date.now();
@@ -159,39 +202,77 @@ export function HealthUpdatePill() {
   };
   const dismiss = () => { if (found) markSeenKeys(allItemKeys(found)); hide(); };
 
+  // Both states' contents, rendered twice: once stacked inside the pill (so
+  // they can cross-fade in place) and once in the off-screen measure layer.
+  const checkingContent = (
+    <>
+      <ActivityIndicator size="small" color="#fff" />
+      <Text numberOfLines={1} style={styles.label}>{`Checking ${healthAppName()}…`}</Text>
+    </>
+  );
+  const foundContent = (interactive: boolean) => (
+    <>
+      <Icon name="download" size={17} color={p.accent} />
+      <Text numberOfLines={1} style={styles.label}>Items available to import</Text>
+      <View style={[styles.badge, { backgroundColor: p.accent }]}>
+        <Text style={styles.badgeText}>{count}</Text>
+      </View>
+      <Pressable
+        onPress={interactive ? dismiss : undefined}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel="Dismiss"
+        style={styles.dismiss}
+      >
+        <Icon name="x" size={13} color="#9a9aa0" />
+      </Pressable>
+    </>
+  );
+
+  // The checking row stays in flow — it's what gives the pill its width before
+  // (and its starting width for) the morph. The found row overlays it.
   const inner = (
-    <View style={[styles.row, Platform.OS === 'android' && { backgroundColor: '#0a0a0e' }]}>
-      {phase === 'checking' ? (
-        <>
-          <ActivityIndicator size="small" color="#fff" />
-          <Text style={styles.label}>{`Checking ${healthAppName()}…`}</Text>
-        </>
-      ) : (
-        <>
-          <Icon name="download" size={17} color={p.accent} />
-          <Text style={styles.label}>Items available to import</Text>
-          <View style={[styles.badge, { backgroundColor: p.accent }]}>
-            <Text style={styles.badgeText}>{count}</Text>
-          </View>
-          <Pressable onPress={dismiss} hitSlop={8} accessibilityRole="button" accessibilityLabel="Dismiss" style={styles.dismiss}>
-            <Icon name="x" size={13} color="#9a9aa0" />
-          </Pressable>
-        </>
-      )}
-    </View>
+    <>
+      <Animated.View pointerEvents="none" style={[styles.row, { opacity: checkOp }]}>
+        {checkingContent}
+      </Animated.View>
+      {found ? (
+        <Animated.View pointerEvents={phase === 'found' ? 'auto' : 'none'} style={[styles.row, styles.layer, { opacity: foundOp }]}>
+          {foundContent(true)}
+        </Animated.View>
+      ) : null}
+    </>
   );
 
   return (
     <Animated.View pointerEvents="box-none" style={[styles.wrap, { bottom: insets.bottom + 88, opacity }]}>
-      <Pressable
-        onPress={phase === 'found' ? openImport : undefined}
-        accessibilityRole="button"
-        accessibilityLabel={phase === 'found' ? `${count} health items available to import` : `Checking ${healthAppName()}`}
+      <Animated.View
+        style={[styles.pill, morphing && { width: pillW }]}
+        onLayout={(e) => { if (!morphing) restW.current = e.nativeEvent.layout.width; }}
       >
-        {Platform.OS === 'android'
-          ? <View style={styles.pill}>{inner}</View>
-          : <BlurView intensity={40} tint="dark" style={styles.pill}>{inner}</BlurView>}
-      </Pressable>
+        <Pressable
+          onPress={phase === 'found' ? openImport : undefined}
+          accessibilityRole="button"
+          accessibilityLabel={phase === 'found' ? `${count} health items available to import` : `Checking ${healthAppName()}`}
+        >
+          {Platform.OS === 'android'
+            ? <View style={[styles.stack, { backgroundColor: '#0a0a0e' }]}>{inner}</View>
+            : <BlurView intensity={40} tint="dark" style={styles.stack}>{inner}</BlurView>}
+        </Pressable>
+      </Animated.View>
+
+      {/* Off-screen sizing pass: the found state's natural width, so the pill
+          knows what to tween out to. */}
+      {found ? (
+        <View pointerEvents="none" style={styles.measure} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+          <View
+            style={styles.row}
+            onLayout={(e) => { const w = e.nativeEvent.layout.width; setFoundW((prev) => (Math.abs(prev - w) < 0.5 ? prev : w)); }}
+          >
+            {foundContent(false)}
+          </View>
+        </View>
+      ) : null}
     </Animated.View>
   );
 }
@@ -200,10 +281,16 @@ export function HealthUpdatePill() {
 const styles = StyleSheet.create({
   wrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
   pill: {
-    borderRadius: 999, overflow: 'hidden', borderWidth: 1, borderColor: '#34343b',
+    height: PILL_H, borderRadius: 999, overflow: 'hidden', borderWidth: BORDER, borderColor: '#34343b',
     shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 20, shadowOffset: { width: 0, height: 10 }, elevation: 8,
   },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 11, paddingHorizontal: 16, backgroundColor: 'rgba(6,6,9,0.82)' },
+  // No percentage sizes anywhere in the pill: widths are intrinsic (or the
+  // animated width on the pill itself, which the children stretch to).
+  stack: { backgroundColor: 'rgba(6,6,9,0.82)' },
+  // Contents are centered inside the animated width so they stay put mid-tween.
+  layer: { ...StyleSheet.absoluteFillObject, justifyContent: 'center' },
+  measure: { position: 'absolute', bottom: 0, left: 0, opacity: 0 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 9, height: PILL_H - BORDER * 2, paddingHorizontal: 16, justifyContent: 'center' },
   label: { color: '#fff', fontSize: 14, fontWeight: '600' },
   badge: { minWidth: 21, height: 21, borderRadius: 999, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center' },
   badgeText: { color: '#fff', fontSize: 12, fontWeight: '800' },

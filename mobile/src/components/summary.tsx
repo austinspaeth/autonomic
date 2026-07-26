@@ -10,7 +10,7 @@
  * kept for the day-score breakdown (DaySummary).
  */
 import React, { useMemo, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, Text, TextInput, View } from 'react-native';
 import { fonts, radius, usePalette } from '../theme';
 import type { Band, Entry, ScoreCat } from '../lib/types';
 import {
@@ -33,7 +33,7 @@ import { usePaywall } from '../features/Paywall';
 import { PromptSheet } from '../features/PromptSheet';
 import { BalanceChart, OrthoHrChart, PowerSpectrum, Sparkline, StandHrChart, Tachogram, WorkoutHrChart, ZonesToggle, balanceCat } from './charts';
 import { Icon } from './Icon';
-import { useSheets } from './Sheet';
+import { SheetFooter, useSheets, type SheetControls } from './Sheet';
 import { HelpDot, ScoreDot } from './ui';
 
 const hexA = (hex: string, a: number) => {
@@ -218,6 +218,8 @@ function MetricSection({ label, value, suffix, cat, desc, help, days, type, ex, 
   );
 }
 
+/** The entry's free-text note, read-only. Editing lives in the entry's edit
+ *  form (and, pre-save, in `NoteDraftCard` on the results step). */
 function Notes({ r }: { r: Entry }) {
   const p = usePalette();
   if (!r.note) return null;
@@ -226,6 +228,65 @@ function Notes({ r }: { r: Entry }) {
       <SectionHead title="Notes" />
       <Text style={{ fontSize: 14, color: p.text, lineHeight: 20, marginTop: 10 }}>{r.note as string}</Text>
     </Section>
+  );
+}
+
+/**
+ * Note field for the keep-or-discard results step, where the reading only
+ * exists in memory: shows the draft note and opens the editor sheet on tap.
+ * Once saved, notes are edited through the entry's edit form instead.
+ */
+export function NoteDraftCard({ note, onChange }: { note: string; onChange: (next: string) => void }) {
+  const p = usePalette();
+  const { openSheet } = useSheets();
+  return (
+    <Section>
+      <SectionHead
+        title="Notes"
+        right={<Text style={{ fontSize: 13, fontWeight: '700', color: p.accent }}>{note ? 'Edit' : 'Add'}</Text>}
+      />
+      <Pressable
+        onPress={() => openSheet((c) => <NoteSheet initial={note} onSave={onChange} controls={c} />)}
+        style={({ pressed }) => [pressed && { opacity: 0.6 }]}
+        hitSlop={8}
+      >
+        <Text style={{ fontSize: 14, color: note ? p.text : p.textDim, lineHeight: 20, marginTop: 10 }}>
+          {note || 'Add a note about this reading.'}
+        </Text>
+      </Pressable>
+    </Section>
+  );
+}
+
+/** Card-modal note editor, matching the journal's day-notes sheet. */
+function NoteSheet({ initial, onSave, controls }: {
+  initial: string; onSave: (next: string) => void; controls: SheetControls;
+}) {
+  const p = usePalette();
+  const [text, setText] = useState(initial);
+  const commit = () => {
+    if (text !== initial) onSave(text);
+    controls.close();
+  };
+  return (
+    <View>
+      <Text style={{ fontSize: 20, fontWeight: '700', color: p.text, marginBottom: 16 }}>Notes</Text>
+      <TextInput
+        value={text}
+        onChangeText={setText}
+        multiline
+        autoFocus
+        keyboardAppearance="dark"
+        placeholder="Add a note about this reading."
+        placeholderTextColor={p.textDim}
+        style={{ backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.control, padding: 12, fontSize: 15, lineHeight: 21, color: p.text, minHeight: 180, textAlignVertical: 'top' }}
+      />
+      <SheetFooter>
+        <Pressable onPress={commit} style={({ pressed }) => [{ flex: 1, borderRadius: radius.control, backgroundColor: p.accent, paddingVertical: 13, alignItems: 'center' }, pressed && { opacity: 0.7 }]}>
+          <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>Save</Text>
+        </Pressable>
+      </SheetFooter>
+    </View>
   );
 }
 

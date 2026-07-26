@@ -8,6 +8,7 @@
  * (40→100, 30→80, 25→60, 20→35, 15→10).
  */
 import type { DayRecord, Entry } from '../../types';
+import { addDays, todayKey } from '../../dates';
 import { detectDownturn } from '../downturn';
 import { DEFAULT_PROTOCOL } from '../day';
 
@@ -160,5 +161,23 @@ describe('detectDownturn — factors for the detail sheet', () => {
     const f = detectDownturn(days, DK, {}, DEFAULT_PROTOCOL)!.factors;
     expect(f.some((x) => x.label === 'Heavy activity' && x.value === '1 day')).toBe(true);
     expect(f.some((x) => /Water/.test(x.label) && x.value === '2 days')).toBe(true);
+  });
+
+  // The current day is still being lived: its water, sleep and meds simply
+  // aren't entered yet, so nothing logged (or missing) today may be blamed.
+  it('ignores the current day entirely when the anchor day is today', () => {
+    const T = todayKey();
+    const days: Record<string, DayRecord> = {};
+    for (let i = 7; i >= 3; i--) days[addDays(T, -i)] = hrvDay(40); // 100
+    days[addDays(T, -2)] = hrvDay(30); // 80
+    days[addDays(T, -1)] = hrvDay(25); // 60
+    days[T] = hrvDay(20, { // 35 — today, with a trigger and heavy activity logged
+      activities: [{ id: 'a', type: 'strenuousWork', time: '10:00' }],
+      food: { water: 1, calories: 0, meals: [], triggers: { alcohol: 2 } },
+    });
+    const w = detectDownturn(days, T, {}, DEFAULT_PROTOCOL)!;
+    expect(w).not.toBeNull();
+    expect(w.factors).toEqual([]);
+    expect(w.cause).toBe('unexplained');
   });
 });

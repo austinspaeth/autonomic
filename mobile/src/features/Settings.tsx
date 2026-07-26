@@ -264,7 +264,7 @@ async function emailSupport(toast: (m: string) => void) {
 async function exportData(toast: (m: string) => void) {
   const uri = `${FileSystem.cacheDirectory}autonomic-journal-${keyOf(new Date())}.json`;
   try {
-    const json = serializeState();
+    const json = serializeState(true);
     await FileSystem.writeAsStringAsync(uri, json);
     if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(uri, { mimeType: 'application/json', dialogTitle: 'Export Autonomic data' });
     else toast('Sharing unavailable');

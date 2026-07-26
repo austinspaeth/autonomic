@@ -116,6 +116,15 @@ old web app so old `export.json` files import directly.
   Apple Health → "Check for updates" ignores that memory and sweeps the last 24h
   (`checkHealthUpdatesLast24h`). Imports write through the normal store paths
   (scores + waveform sidecar).
+- **One-time historical backfill.** Connecting Health in the welcome wizard offers
+  a one-shot import of the last year (`HealthApi.readHistory`, `HISTORY_DAYS` in
+  `src/features/Onboarding.tsx`): readings (HRV only with real RR ≥ 4 min on iOS),
+  nights of sleep with overnight HR + stages, workouts with their HR trace, and
+  meds (same platform stub). Guarded by `meta.healthHistoryImported` and written
+  in a single `mutate()`. Sleep uses one range query bucketed by `groupNights`
+  (`src/lib/health/sleepSummary.ts`, pure + tested) instead of 365 per-day reads;
+  per-night HR and per-workout HR are the only per-item queries, pooled a few at
+  a time, with `onProgress` driving the sheet's status line.
 - **Progress + Insights fall back to demo data on an empty journal.** `src/lib/demo.ts`
   generates a deterministic 30-day sample month (seeded PRNG, keyed off today so it
   lands in the Analysis buckets and report ranges) that arcs from crash days up into
@@ -201,3 +210,19 @@ npm run lint     # eslint
 
 Device builds ship via EAS — see `mobile/EAS_UPDATE.md` and the workflows in
 `.github/workflows/` (`eas-build.yml`, `eas-update.yml`).
+
+**Android release builds are minified.** `enableProguardInReleaseBuilds` +
+`enableShrinkResourcesInReleaseBuilds` are on in `expo-build-properties`, so R8
+shrinks and obfuscates every release (dex 42 MB → 13 MB, 5 dex files → 2).
+Consequences worth remembering: keep rules for anything reached by reflection or
+from C++ live in the same `extraProguardRules` block in `app.json` (libraries
+that ship their own `consumerProguardFiles` need no entry — expo,
+expo-modules-core, expo-updates, reanimated, svg, health-connect,
+openiap-google); `plugins/withR8Memory.js` raises the Gradle heap because R8
+OOMs at the template's 2 GB; release stack traces are obfuscated, but AGP embeds
+the mapping in the AAB itself
+(`BUNDLE-METADATA/com.android.tools.build.obfuscation/proguard.map`), so Play
+deobfuscates crashes with no upload step. **A green build proves nothing here** —
+a missing keep rule fails at
+runtime, so launch the minified APK and exercise BLE / camera / Health Connect /
+IAP / widgets before shipping.

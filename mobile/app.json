@@ -2,7 +2,7 @@
   "expo": {
     "name": "Autonomic",
     "slug": "autonomic",
-    "version": "1.17.0",
+    "version": "1.18.0",
     "scheme": "autonomic",
     "orientation": "portrait",
     "icon": "./assets/autonomic-icon.png",
@@ -139,6 +139,7 @@
       "expo-asset",
       "expo-font",
       "./plugins/withKotlinStdlibPin",
+      "./plugins/withR8Memory",
       "./plugins/withFmtConstevalFix",
       "./plugins/withHealthConnect",
       [
@@ -148,7 +149,10 @@
             "minSdkVersion": 26,
             "compileSdkVersion": 36,
             "targetSdkVersion": 36,
-            "buildToolsVersion": "36.0.0"
+            "buildToolsVersion": "36.0.0",
+            "enableProguardInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true,
+            "extraProguardRules": "# --- Autonomic R8 keeps (see plugins/withR8Memory.js for the heap bump) ---\n# Only libraries WITHOUT consumer rules of their own need entries here.\n# Shipping their own already: expo, expo-modules-core, expo-updates,\n# react-native-reanimated, react-native-svg, react-native-health-connect,\n# openiap-google (dev.hyo.openiap.models.**).\n\n# Gson 2.10.1 (pulled in by openiap-google) ships no rules of its own and\n# reflects over field names + generic signatures.\n-keepattributes Signature\n-keepattributes *Annotation*\n-keep class com.google.gson.reflect.TypeToken { *; }\n-keep class * extends com.google.gson.reflect.TypeToken\n-keepclassmembers,allowobfuscation class * { @com.google.gson.annotations.SerializedName <fields>; }\n\n# react-native-android-widget: the AppWidgetProvider subclasses are reached\n# only from AndroidManifest.xml and the headless task registry (index.js).\n-keep class com.reactnativeandroidwidget.** { *; }\n\n# JSI/TurboModule installers are called from C++, so nothing in Java\n# references them and R8 would happily strip them.\n-keep class com.mrousavy.mmkv.** { *; }\n-keep class com.mrousavy.camera.** { *; }\n-keep class com.worklets.** { *; }\n-keep class com.bleplx.** { *; }\n\n# expo-notifications has no consumer rules; its receivers/services are\n# manifest-referenced but the serialized trigger/content classes are not.\n-keep class expo.modules.notifications.** { *; }\n-keep class expo.modules.iap.** { *; }\n"
           }
         }
       ],

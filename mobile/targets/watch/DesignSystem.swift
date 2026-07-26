@@ -16,6 +16,14 @@ enum DS {
     static let dim = Color("textDim")            // #8a8a92
     /// Dark grey for held-but-stale data: shown while no HR signal / signal dropped.
     static let faint = Color.white.opacity(0.3)
+    /// Night-mode palette (HR monitor): values render dark grey, labels /
+    /// icons / heart a step darker still, tiles near-black, so the whole
+    /// readout stays sleep-friendly.
+    static let night = Color(white: 0.34)
+    static let nightDim = Color(white: 0.20)
+    static let nightTile = Color(white: 0.035)
+    /// Low-power bolt icon when night mode is off.
+    static let gold = Color(red: 0.95, green: 0.78, blue: 0.25)
 
     /// Shared delta color rule: <20 green · 20–29 amber · ≥30 red.
     static func deltaColor(_ delta: Double) -> Color {
@@ -65,13 +73,15 @@ struct StatTile: View {
     let label: String
     let value: String
     var valueColor: Color = .primary
+    var labelColor: Color = DS.dim
+    var bg: Color = DS.tile
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label.uppercased())
                 .font(.system(size: 10, weight: .bold))
                 .kerning(0.5)
-                .foregroundStyle(DS.dim)
+                .foregroundStyle(labelColor)
             Text(value)
                 .font(DS.number(20))
                 .foregroundStyle(valueColor)
@@ -80,7 +90,7 @@ struct StatTile: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, 9)
         .padding(.horizontal, 11)
-        .background(DS.tile, in: RoundedRectangle(cornerRadius: 13))
+        .background(bg, in: RoundedRectangle(cornerRadius: 13))
     }
 }
 
@@ -126,6 +136,7 @@ struct BeatingHeart: View {
     /// nil falls back to a gentle idle pulse.
     var bpm: Double? = nil
     var beating = true
+    var color: Color = DS.accent
     @State private var beat = false
 
     /// Bucket BPM to the nearest 5 so the repeating animation only restarts on a
@@ -139,17 +150,27 @@ struct BeatingHeart: View {
         return max(0.16, min(0.9, 30.0 / bpm))
     }
 
+    /// The branches are separate view identities: flipping `beating` tears
+    /// the animated heart down outright — a repeatForever animation can
+    /// survive a mere parameter change (see SwipeChevron).
     var body: some View {
+        if beating {
+            heart
+                .scaleEffect(beat ? 1.18 : 1.0)
+                .onAppear { restart() }
+                .onChange(of: bucket) { _, _ in restart() }
+        } else {
+            heart
+        }
+    }
+
+    private var heart: some View {
         Image(systemName: "heart.fill")
             .font(.system(size: size))
-            .foregroundStyle(DS.accent)
-            .scaleEffect(beat ? 1.18 : 1.0)
-            .onAppear { restart() }
-            .onChange(of: bucket) { _, _ in restart() }
+            .foregroundStyle(color)
     }
 
     private func restart() {
-        guard beating else { return }
         beat = false
         withAnimation(.easeInOut(duration: halfCycle).repeatForever(autoreverses: true)) { beat = true }
     }

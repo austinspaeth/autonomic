@@ -12,7 +12,7 @@ import * as Haptics from 'expo-haptics';
 import Svg, { Circle } from 'react-native-svg';
 import { SheetControls, SheetFooter } from '../../components/Sheet';
 import { Button } from '../../components/ui';
-import { ReadingSummary } from '../../components/summary';
+import { NoteDraftCard, ReadingSummary } from '../../components/summary';
 import { useToast } from '../../components/Toast';
 import { usePalette, GRADE_COLORS } from '../../theme';
 import { BANDS, catFromBands } from '../../lib/scoring';
@@ -163,8 +163,13 @@ export function PotsResultsSheet({ entry, dayKey, title, sub, controls }: {
     return { ...days, [dayKey]: { ...(day || {}), readings: [...((day && day.readings) || []), entry] } } as typeof days;
   }, [entry, dayKey]);
 
+  // Notes can be written before the reading is saved; the entry only exists in
+  // memory until Save, so hold the text here.
+  const [note, setNote] = useState('');
+  const shown = useMemo(() => (note ? { ...entry, note } : entry), [entry, note]);
+
   const save = () => {
-    const { entry: stripped, waveform } = splitWaveform(entry);
+    const { entry: stripped, waveform } = splitWaveform(shown);
     if (waveform) storeWaveform(stripped.id, waveform);
     upsertEntry(dayKey, 'readings', stripped);
     toast('Reading saved');
@@ -175,7 +180,8 @@ export function PotsResultsSheet({ entry, dayKey, title, sub, controls }: {
     <View>
       <Text style={{ fontSize: 25, fontWeight: '800', color: p.text, marginBottom: 4 }}>{title}</Text>
       <Text style={{ color: p.textDim, fontSize: 14, marginBottom: 16 }}>{sub}</Text>
-      <ReadingSummary r={entry} days={daysWithCurrent} ctx={ctx} />
+      <ReadingSummary r={shown} days={daysWithCurrent} ctx={ctx} />
+      <NoteDraftCard note={note} onChange={setNote} />
       <SheetFooter>
         <View style={{ flex: 1, flexDirection: 'row', gap: 12 }}>
           <Button title="Discard" variant="danger" onPress={() => controls.closeAll()} />

@@ -2,6 +2,16 @@
 
 App versions for **Autonomic Journal** (`mobile/`). Newest first.
 
+## 1.18.0
+
+- One-time historical Health backfill (onboarding "Connect data") now pulls a full year of sleep nights (with overnight HR + stages), workouts (with HR trace), and medications, alongside HRV/blood pressure/resting HR — both platforms. The import sheet shows live progress ("Sleep · 140/312") instead of a bare spinner.
+- Live HRV and orthostatic/POTS test results can have a note added right on the keep-or-discard screen, not just afterward via edit.
+- Progress (Analysis) tab: range switching (Day/Week/Month/Year) holds the heavy chart rebuild until the pill's slide animation finishes, and shows a brief skeleton instead of a stale render when data changed elsewhere.
+- The Outlook downturn warning is now its own card below Outlook (matching Milestones/Streak styling) instead of embedded inside it, and no longer factors in today's still-in-progress water/sleep/meds.
+- Apple Watch HR monitor: Night mode (dims the readout, stops animation, keeps only the red high-HR alert) and Low Power mode (drops refresh rate, unmounts the chart page), both per-session from the controls page.
+- Health-store "new data available" pill morphs smoothly between checking and found states.
+- Android: release builds are now minified (R8/Proguard + resource shrinking), meaningfully shrinking install size.
+
 ## 1.17.0
 
 - Periodic health-store import check: a floating pill quietly offers today's Apple Health / Health Connect data that the journal doesn't already have, grouped into Sleep / Readings / Exercise / Medications.

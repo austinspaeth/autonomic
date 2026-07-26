@@ -15,10 +15,11 @@
  */
 import type { Entry, SleepStages } from '../types';
 import { keyOf } from '../dates';
-import { INTERRUPTED_AWAKE_MIN } from './sleepSummary';
+import { INTERRUPTED_AWAKE_MIN, NIGHT_END_HOUR, NIGHT_START_HOUR, nightKeyOf } from './sleepSummary';
 import { activityTypeFromHc, workoutHrSeries } from './workoutMap';
+import { HISTORY_SLEEP_MIN_MIN, emptyHistory } from './index';
 import type {
-  HealthApi, HealthDaySamples, HistoryReading, ImportedReading, ImportedWorkout, SleepImport,
+  HealthApi, HealthDaySamples, ImportedReading, ImportedWorkout, SleepImport,
 } from './index';
 
 /** This app's Android package — used to skip re-importing our own write-backs. */
@@ -83,6 +84,9 @@ function dateAt(dk: string, time?: string): Date {
 
 const isOwnRecord = (meta?: Metadata): boolean => meta?.dataOrigin === OWN_PACKAGE;
 
+const durMs = (s: SleepRecord): number =>
+  new Date(s.endTime).getTime() - new Date(s.startTime).getTime();
+
 export function makeHealthConnect(mod: HcModule): HealthApi {
   let initialized = false;
   const ensureInit = async (): Promise<boolean> => {
@@ -124,6 +128,100 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
     if (!records.length || !(await ensureInit())) return false;
     try { await mod.insertRecords(records); return true; } catch { return false; }
   };
+
+  /** Longest session wins — the night, not a nap that shared the window. */
+  const mainSession = (sessions: SleepRecord[]): SleepRecord =>
+    sessions.reduce((a, b) => (durMs(b) > durMs(a) ? b : a));
+
+  /**
+   * One Health Connect sleep session → the app's night shape, including the
+   * overnight HR range read across it. Stages: light→core (Apple's name for
+   * it); SLEEPING counts as asleep but carries no stage, so a night of only
+   * SLEEPING blocks reports stages: null (mirrors iOS asleepUnspecified).
+   */
+  async function nightOf(main: SleepRecord): Promise<SleepImport> {
+    const bed = new Date(main.startTime);
+    const wake = new Date(main.endTime);
+
+    let deepMin = 0; let remMin = 0; let coreMin = 0; let awakeMin = 0; let unspecMin = 0;
+    for (const st of main.stages || []) {
+      const mins = (new Date(st.endTime).getTime() - new Date(st.startTime).getTime()) / 60000;
+      if (STAGE_AWAKE.includes(st.stage)) awakeMin += mins;
+      else if (st.stage === STAGE_LIGHT) coreMin += mins;
+      else if (st.stage === STAGE_DEEP) deepMin += mins;
+      else if (st.stage === STAGE_REM) remMin += mins;
+      else if (st.stage === STAGE_UNSPECIFIED) unspecMin += mins;
+    }
+    const staged = deepMin + remMin + coreMin > 0;
+    const asleepMin = staged || unspecMin > 0
+      ? deepMin + remMin + coreMin + unspecMin
+      : durMs(main) / 60000;
+    const stages: SleepStages | null = staged
+      ? { deep: Math.round(deepMin), rem: Math.round(remMin), core: Math.round(coreMin), awake: Math.round(awakeMin) }
+      : null;
+
+    // Overnight HR range from raw HeartRate samples across the night.
+    let hrLow: number | null = null; let hrHigh: number | null = null;
+    const hrRecords = await readAll<HrRecord>('HeartRate', bed, wake);
+    for (const rec of hrRecords) {
+      for (const s of rec.samples || []) {
+        if (hrLow == null || s.beatsPerMinute < hrLow) hrLow = s.beatsPerMinute;
+        if (hrHigh == null || s.beatsPerMinute > hrHigh) hrHigh = s.beatsPerMinute;
+      }
+    }
+
+    return {
+      bed: hhmm(bed),
+      wake: hhmm(wake),
+      bedISO: bed.toISOString(),
+      wakeISO: wake.toISOString(),
+      hrLow: hrLow != null ? Math.round(hrLow) : null,
+      hrHigh: hrHigh != null ? Math.round(hrHigh) : null,
+      interrupted: awakeMin > INTERRUPTED_AWAKE_MIN,
+      minutesAsleep: Math.round(asleepMin),
+      stages,
+    } satisfies SleepImport;
+  }
+
+  /**
+   * One exercise session → an ImportedWorkout. Sessions carry no distance or HR
+   * of their own, so the Distance and HeartRate records logged while the
+   * session ran are aggregated here. Returns null for zero-length blips.
+   */
+  async function workoutOf(s: ExerciseRecord): Promise<ImportedWorkout | null> {
+    const start = new Date(s.startTime);
+    const end = new Date(s.endTime);
+    const durationMin = Math.round((end.getTime() - start.getTime()) / 60000);
+    if (durationMin < 1) return null;
+    const [dist, hrRecords] = await Promise.all([
+      readAll<DistanceRecord>('Distance', start, end),
+      readAll<HrRecord>('HeartRate', start, end),
+    ]);
+    const meters = dist.reduce((sum, r) => sum + (r.distance?.inMeters || 0), 0);
+    let avgHr: number | null = null; let minHr: number | null = null; let maxHr: number | null = null;
+    let hrSum = 0; let hrN = 0;
+    const hrPoints: { ms: number; bpm: number }[] = [];
+    for (const rec of hrRecords) {
+      for (const smp of rec.samples || []) {
+        hrSum += smp.beatsPerMinute; hrN++;
+        if (minHr == null || smp.beatsPerMinute < minHr) minHr = smp.beatsPerMinute;
+        if (maxHr == null || smp.beatsPerMinute > maxHr) maxHr = smp.beatsPerMinute;
+        hrPoints.push({ ms: new Date(smp.time).getTime(), bpm: smp.beatsPerMinute });
+      }
+    }
+    if (hrN) { avgHr = Math.round(hrSum / hrN); minHr = Math.round(minHr!); maxHr = Math.round(maxHr!); }
+    return {
+      type: activityTypeFromHc(s.exerciseType),
+      time: hhmm(start),
+      startMs: start.getTime(),
+      durationMin,
+      distanceMi: meters > 0 ? Math.round((meters / 1609.344) * 100) / 100 : null,
+      avgHr, minHr, maxHr,
+      hrSeries: workoutHrSeries(hrPoints, start.getTime()),
+      sourceName: s.metadata?.dataOrigin || 'Health Connect',
+      ownApp: isOwnRecord(s.metadata),
+    };
+  }
 
   return {
     available: true,
@@ -202,10 +300,14 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
       return out;
     },
 
-    async readHistory({ fromISO, toISO }) {
+    async readHistory({ fromISO, toISO, onProgress }) {
       const from = new Date(fromISO);
       const to = new Date(toISO);
-      const out: HistoryReading[] = [];
+      const out = emptyHistory();
+      const step = (label: string, done = 0, total = 0) => {
+        try { onProgress?.({ label, done, total }); } catch { /* progress is advisory */ }
+      };
+      step('Readings');
       const [rhr, bp, rmssd] = await Promise.all([
         readAll<RestingHrRecord>('RestingHeartRate', from, to),
         readAll<BpRecord>('BloodPressure', from, to),
@@ -215,14 +317,54 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
         const d = new Date(iso);
         return { time: hhmm(d), startMs: d.getTime(), ownApp: isOwnRecord(meta), dayKey: keyOf(d) };
       };
-      rhr.forEach((r) => out.push({ type: 'restingHr', ...ts(r.time, r.metadata), fields: { hr: String(Math.round(r.beatsPerMinute)), position: 'Laying' } }));
-      bp.forEach((r) => out.push({
+      rhr.forEach((r) => out.readings.push({ type: 'restingHr', ...ts(r.time, r.metadata), fields: { hr: String(Math.round(r.beatsPerMinute)), position: 'Laying' } }));
+      bp.forEach((r) => out.readings.push({
         type: 'bp', ...ts(r.time, r.metadata),
         fields: { sys: String(Math.round(r.systolic.inMillimetersOfMercury)), dia: String(Math.round(r.diastolic.inMillimetersOfMercury)) },
       }));
       // No beat-to-beat series exists on Android, so unlike iOS (which imports
-      // only RR-backed HRV) the history sweep takes the RMSSD records as-is.
-      rmssd.forEach((r) => out.push({ type: 'hrv', ...ts(r.time, r.metadata), fields: { rmssd: String(Math.round(r.heartRateVariabilityMillis)) } }));
+      // only RR-backed HRV of at least four minutes) the history sweep takes the
+      // RMSSD records as-is — they are Health Connect's only HRV, already
+      // reduced to a number, with no RR or duration to qualify them by.
+      rmssd.forEach((r) => out.readings.push({ type: 'hrv', ...ts(r.time, r.metadata), fields: { rmssd: String(Math.round(r.heartRateVariabilityMillis)) } }));
+
+      // Sleep — one range query bucketed into nights (see groupNights), each
+      // summarized exactly as its own day's read would have. Every night costs
+      // an extra HR query, so they run a few at a time.
+      step('Sleep');
+      const sessions = await readAll<SleepRecord>('SleepSession', from, to);
+      const byNight = new Map<string, SleepRecord[]>();
+      for (const s of sessions) {
+        const dk = nightKeyOf(new Date(s.endTime));
+        if (!dk) continue;                                  // an afternoon nap
+        const bucket = byNight.get(dk);
+        if (bucket) bucket.push(s); else byNight.set(dk, [s]);
+      }
+      const nights = [...byNight.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+      let doneNights = 0;
+      for (const [dayKey, group] of nights) {
+        const night = await nightOf(mainSession(group));
+        doneNights++;
+        step('Sleep', doneNights, nights.length);
+        if (night.minutesAsleep >= HISTORY_SLEEP_MIN_MIN) out.sleep.push({ ...night, dayKey });
+      }
+
+      // Workouts — every exercise session in the range, each with its HR trace.
+      step('Workouts');
+      const exercises = await readAll<ExerciseRecord>('ExerciseSession', from, to);
+      let doneWorkouts = 0;
+      for (const s of exercises) {
+        const w = await workoutOf(s);
+        doneWorkouts++;
+        step('Workouts', doneWorkouts, exercises.length);
+        if (w) out.workouts.push({ ...w, dayKey: keyOf(new Date(s.startTime)) });
+      }
+      out.workouts.sort((a, b) => a.startMs - b.startMs);
+
+      // Medications — Health Connect's dose record is still experimental and
+      // unexposed (see readMedications), so history has nothing to sweep.
+      step('Medications');
+
       return out;
     },
 
@@ -239,40 +381,8 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
       const sessions = await readAll<ExerciseRecord>('ExerciseSession', from, to);
       const out: ImportedWorkout[] = [];
       for (const s of sessions) {
-        const start = new Date(s.startTime);
-        const end = new Date(s.endTime);
-        const durationMin = Math.round((end.getTime() - start.getTime()) / 60000);
-        if (durationMin < 1) continue;
-        // Sessions carry no distance or HR of their own — aggregate the raw
-        // Distance and HeartRate records logged while the session ran.
-        const [dist, hrRecords] = await Promise.all([
-          readAll<DistanceRecord>('Distance', start, end),
-          readAll<HrRecord>('HeartRate', start, end),
-        ]);
-        const meters = dist.reduce((sum, r) => sum + (r.distance?.inMeters || 0), 0);
-        let avgHr: number | null = null; let minHr: number | null = null; let maxHr: number | null = null;
-        let hrSum = 0; let hrN = 0;
-        const hrPoints: { ms: number; bpm: number }[] = [];
-        for (const rec of hrRecords) {
-          for (const smp of rec.samples || []) {
-            hrSum += smp.beatsPerMinute; hrN++;
-            if (minHr == null || smp.beatsPerMinute < minHr) minHr = smp.beatsPerMinute;
-            if (maxHr == null || smp.beatsPerMinute > maxHr) maxHr = smp.beatsPerMinute;
-            hrPoints.push({ ms: new Date(smp.time).getTime(), bpm: smp.beatsPerMinute });
-          }
-        }
-        if (hrN) { avgHr = Math.round(hrSum / hrN); minHr = Math.round(minHr!); maxHr = Math.round(maxHr!); }
-        out.push({
-          type: activityTypeFromHc(s.exerciseType),
-          time: hhmm(start),
-          startMs: start.getTime(),
-          durationMin,
-          distanceMi: meters > 0 ? Math.round((meters / 1609.344) * 100) / 100 : null,
-          avgHr, minHr, maxHr,
-          hrSeries: workoutHrSeries(hrPoints, start.getTime()),
-          sourceName: s.metadata?.dataOrigin || 'Health Connect',
-          ownApp: isOwnRecord(s.metadata),
-        });
+        const w = await workoutOf(s);
+        if (w) out.push(w);
       }
       return out.sort((a, b) => a.startMs - b.startMs);
     },
@@ -282,56 +392,11 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
       // evening; query prev-day 18:00 → this-day 14:00 and take the longest
       // session (so a nap doesn't win).
       const [y, m, d] = dk.split('-').map(Number);
-      const from = new Date(y, m - 1, d - 1, 18, 0, 0);
-      const to = new Date(y, m - 1, d, 14, 0, 0);
+      const from = new Date(y, m - 1, d - 1, NIGHT_START_HOUR, 0, 0);
+      const to = new Date(y, m - 1, d, NIGHT_END_HOUR, 0, 0);
       const sessions = await readAll<SleepRecord>('SleepSession', from, to);
       if (!sessions.length) return null;
-      const durMs = (s: SleepRecord) => new Date(s.endTime).getTime() - new Date(s.startTime).getTime();
-      const main = sessions.reduce((a, b) => (durMs(b) > durMs(a) ? b : a));
-      const bed = new Date(main.startTime);
-      const wake = new Date(main.endTime);
-
-      // Per-stage minutes. Health Connect stages: light→core (Apple's name for
-      // it), SLEEPING counts as asleep but carries no stage; a night with only
-      // SLEEPING blocks reports stages: null (mirrors iOS asleepUnspecified).
-      let deepMin = 0; let remMin = 0; let coreMin = 0; let awakeMin = 0; let unspecMin = 0;
-      for (const st of main.stages || []) {
-        const mins = (new Date(st.endTime).getTime() - new Date(st.startTime).getTime()) / 60000;
-        if (STAGE_AWAKE.includes(st.stage)) awakeMin += mins;
-        else if (st.stage === STAGE_LIGHT) coreMin += mins;
-        else if (st.stage === STAGE_DEEP) deepMin += mins;
-        else if (st.stage === STAGE_REM) remMin += mins;
-        else if (st.stage === STAGE_UNSPECIFIED) unspecMin += mins;
-      }
-      const staged = deepMin + remMin + coreMin > 0;
-      const asleepMin = staged || unspecMin > 0
-        ? deepMin + remMin + coreMin + unspecMin
-        : durMs(main) / 60000;
-      const stages: SleepStages | null = staged
-        ? { deep: Math.round(deepMin), rem: Math.round(remMin), core: Math.round(coreMin), awake: Math.round(awakeMin) }
-        : null;
-
-      // Overnight HR range from raw HeartRate samples across the night.
-      let hrLow: number | null = null; let hrHigh: number | null = null;
-      const hrRecords = await readAll<HrRecord>('HeartRate', bed, wake);
-      for (const rec of hrRecords) {
-        for (const s of rec.samples || []) {
-          if (hrLow == null || s.beatsPerMinute < hrLow) hrLow = s.beatsPerMinute;
-          if (hrHigh == null || s.beatsPerMinute > hrHigh) hrHigh = s.beatsPerMinute;
-        }
-      }
-
-      return {
-        bed: hhmm(bed),
-        wake: hhmm(wake),
-        bedISO: bed.toISOString(),
-        wakeISO: wake.toISOString(),
-        hrLow: hrLow != null ? Math.round(hrLow) : null,
-        hrHigh: hrHigh != null ? Math.round(hrHigh) : null,
-        interrupted: awakeMin > INTERRUPTED_AWAKE_MIN,
-        minutesAsleep: Math.round(asleepMin),
-        stages,
-      } satisfies SleepImport;
+      return nightOf(mainSession(sessions));
     },
 
     async writeHrvSession({ rmssdMs, avgHr, startISO, durationSec }) {

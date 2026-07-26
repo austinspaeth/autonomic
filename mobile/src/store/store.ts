@@ -193,6 +193,20 @@ export function getWaveform(id: string): WaveformData | null {
   return val;
 }
 
+/** Same read, but without touching the LRU. Bulk walks over the whole sidecar
+ *  (export, daily backup) would otherwise evict every hot entry and leave the
+ *  Journal re-parsing today's curves on its next render. */
+function readWaveformUncached(id: string): WaveformData | null {
+  try {
+    if (waveCache.has(id)) return waveCache.get(id) ?? null;
+    const raw = wkv().getString(id);
+    const parsed = raw ? JSON.parse(raw) : null;
+    return isPlainObject(parsed) ? (parsed as WaveformData) : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Persist a reading's waveform arrays. Write this BEFORE upserting the entry
  *  so the journal never references a waveform that isn't on disk yet. */
 export function storeWaveform(id: string, data: WaveformData) {
@@ -454,22 +468,27 @@ export function useAppState(): AppState {
 /** Full journal as export JSON. Exports stay one self-contained file: sidecar
  *  waveforms ride along under a top-level `waveforms` map keyed by entry id
  *  (filtered to ids that exist, so a stray blob can't bloat exports forever).
- *  replaceState() accepts this shape and the old embedded-arrays shape alike. */
-export function serializeState(): string {
+ *  replaceState() accepts this shape and the old embedded-arrays shape alike.
+ *
+ *  `pretty` is for the human-facing export in Settings only. It is NOT free:
+ *  indentation puts every RR interval and HR sample on its own line, so a year
+ *  of waveforms inflates several-fold in both stringify time and bytes written.
+ *  Machine-read callers (the daily backup) leave it off. */
+export function serializeState(pretty = false): string {
   const out: Record<string, unknown> = { ...state };
   try {
     const ids = waveformIds(state);
     const waveforms: Record<string, WaveformData> = {};
     for (const id of wkv().getAllKeys()) {
       if (!ids.has(id)) continue;
-      const w = getWaveform(id);
+      const w = readWaveformUncached(id);
       if (w) waveforms[id] = w;
     }
     if (Object.keys(waveforms).length) out.waveforms = waveforms;
   } catch {
     // export without waveforms rather than fail the export
   }
-  return JSON.stringify(out, null, 2);
+  return pretty ? JSON.stringify(out, null, 2) : JSON.stringify(out);
 }
 
 export { STORAGE_KEY, keyOf };

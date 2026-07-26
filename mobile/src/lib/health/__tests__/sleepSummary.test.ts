@@ -4,7 +4,7 @@
  * (union, not sum) and naps inside the evening→afternoon query window
  * (main session, not earliest→latest).
  */
-import { summarizeSleep, SleepSample } from '../sleepSummary';
+import { groupNights, nightKeyOf, summarizeSleep, SleepSample } from '../sleepSummary';
 
 // HKCategoryValueSleepAnalysis values.
 const IN_BED = 0;
@@ -121,5 +121,60 @@ describe('summarizeSleep', () => {
     expect(out.bed).toEqual(at('23:00'));
     expect(out.stages).toEqual({ core: 360, deep: 0, rem: 120, awake: 0 });
     expect(out.minutesAsleep).toBe(480);
+  });
+});
+
+describe('groupNights', () => {
+  /** Sample on an explicit calendar day (the fixed-night helper can't span months). */
+  const on = (day: number, hhmm: string): Date => {
+    const [h, m] = hhmm.split(':').map(Number);
+    return new Date(2026, 0, day, h, m, 0);
+  };
+  const sd = (value: number, [d1, t1]: [number, string], [d2, t2]: [number, string]): SleepSample =>
+    ({ value, startDate: on(d1, t1), endDate: on(d2, t2) });
+
+  it('files a night under the day it ends on', () => {
+    const out = groupNights([
+      sd(ASLEEP, [10, '23:00'], [11, '07:00']),
+      sd(ASLEEP, [11, '22:30'], [12, '06:30']),
+    ]);
+    expect(out.map((n) => n.dayKey)).toEqual(['2026-01-11', '2026-01-12']);
+    expect(out[0].rows).toHaveLength(1);
+  });
+
+  it('keeps an evening block with the night it leads into', () => {
+    // A pre-midnight block ends on the 10th but belongs to the 11th's night.
+    const out = groupNights([
+      sd(ASLEEP, [10, '22:00'], [10, '23:30']),
+      sd(ASLEEP, [10, '23:30'], [11, '06:00']),
+    ]);
+    expect(out).toHaveLength(1);
+    expect(out[0].dayKey).toBe('2026-01-11');
+    expect(summarizeSleep(out[0].rows)!.minutesAsleep).toBe(480);
+  });
+
+  it('drops an afternoon nap no night window would have caught', () => {
+    expect(groupNights([sd(ASLEEP, [10, '14:30'], [10, '15:30'])])).toEqual([]);
+  });
+
+  it('returns nights oldest first across a month boundary', () => {
+    const out = groupNights([
+      sd(ASLEEP, [11, '23:00'], [12, '07:00']),
+      sd(ASLEEP, [9, '23:00'], [10, '07:00']),
+      sd(ASLEEP, [10, '23:00'], [11, '07:00']),
+    ]);
+    expect(out.map((n) => n.dayKey)).toEqual(['2026-01-10', '2026-01-11', '2026-01-12']);
+  });
+});
+
+describe('nightKeyOf', () => {
+  it('maps by end time, evening forward and morning back', () => {
+    expect(nightKeyOf(new Date(2026, 0, 10, 19, 0))).toBe('2026-01-11');
+    expect(nightKeyOf(new Date(2026, 0, 11, 6, 0))).toBe('2026-01-11');
+    expect(nightKeyOf(new Date(2026, 0, 11, 16, 0))).toBeNull();
+  });
+
+  it('rolls an evening end into the next month', () => {
+    expect(nightKeyOf(new Date(2026, 0, 31, 23, 30))).toBe('2026-02-01');
   });
 });

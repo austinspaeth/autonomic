@@ -67,9 +67,15 @@ function PpgCameraInner({ preview }: { preview?: number }) {
 
   const device = useCameraDevice('back');
   // Lowest usable resolution + highest frame rate: we only need one averaged
-  // brightness value per frame, and more frames = finer RR timing.
+  // brightness value per frame, and more frames = finer RR timing. 320x240 is
+  // deliberately tiny — toArrayBuffer() copies the frame GPU→CPU, so this is
+  // the one knob that actually costs anything per frame (307 KB instead of
+  // 640x480's 1.2 MB, ~18 MB/s instead of ~74 MB/s at 60 fps). It does not
+  // cost signal: the frame processor scales its stride to average the same
+  // pixel count either way (see below), and a smaller sensor mode gathers more
+  // light per pixel, not less.
   const format = useCameraFormat(device, [
-    { videoResolution: { width: 640, height: 480 } },
+    { videoResolution: { width: 320, height: 240 } },
     { fps: 60 },
   ]);
 
@@ -94,12 +100,23 @@ function PpgCameraInner({ preview }: { preview?: number }) {
     const declared = frame.bytesPerRow;
     const fromBuf = Math.floor(data.length / h);
     const bpr = declared && declared >= w * 4 && declared <= fromBuf ? declared : fromBuf;
+    // Average a fixed ~1200 pixels no matter what resolution the device
+    // actually handed back. The per-frame mean's noise floor is set by how many
+    // pixels go into it, not by the frame size, and useCameraFormat only
+    // promises the *closest* available format to the one requested — so a fixed
+    // stride would silently give a device that only offers 1280x720 a very
+    // different signal from one that offers 320x240. Deriving it keeps every
+    // device on the same noise floor. At 640x480 this evaluates to exactly 8,
+    // the stride this loop used when the requested format was fixed, so the
+    // signal on any device that reports that format is unchanged.
+    const TARGET_SAMPLES = 1200;
+    const stride = Math.max(1, Math.round(Math.sqrt((w * h) / (4 * TARGET_SAMPLES))));
     let r = 0, g = 0, b = 0, count = 0;
     const x0 = w >> 2, x1 = (3 * w) >> 2;
     const y0 = h >> 2, y1 = (3 * h) >> 2;
-    for (let y = y0; y < y1; y += 8) {
+    for (let y = y0; y < y1; y += stride) {
       const row = y * bpr;
-      for (let x = x0; x < x1; x += 8) {
+      for (let x = x0; x < x1; x += stride) {
         const i = row + x * 4;
         b += data[i + bOff];
         g += data[i + 1];

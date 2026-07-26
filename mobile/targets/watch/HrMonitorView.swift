@@ -17,8 +17,16 @@ import WatchKit
  *
  * The screen is a three-page pager centered on the HR readout: a 5-minute
  * history chart one swipe to the left, and a controls panel one swipe to the
- * right (End session + Log symptom). A stray swipe can't abandon the
- * session — ending still takes a deliberate tap on the controls page.
+ * right (End session + Log symptom + the Night / Low-power mode toggles).
+ * A stray swipe can't abandon the session — ending still takes a deliberate
+ * tap on the controls page.
+ *
+ * Night mode darkens the whole readout to sleep-friendly greys (delta only
+ * turns red at Δ ≥ 30); low power drops the awake display refresh to the
+ * dimmed 5 s cadence and freezes animations. Neither can shorten the system
+ * wake duration or slow the sensor (watchOS owns both); buzzers stay at full
+ * sample rate. Both are per-session and show an outline icon (bat / bolt)
+ * beside the HEART RATE label while active.
  */
 final class HrMonitorModel: ObservableObject {
     /// Last known HR — held through signal loss; nil only before the first reading.
@@ -36,6 +44,14 @@ final class HrMonitorModel: ObservableObject {
     /// the chart breaks its line across them. Refreshed at display cadence,
     /// like every other published value.
     @Published var chartSeries: [(at: Date, hr: Double, delta: Double)] = []
+    /// Session-scoped display modes (reset with the model — a new session
+    /// always starts with both off). Night darkens the readout for sleep;
+    /// low power drops the awake display refresh to the dimmed 5 s cadence
+    /// and freezes animations. Neither touches the sensor: its ~5 s cadence
+    /// is fixed by HealthKit while the session runs, and the safety buzzers
+    /// stay at full sample rate in both modes.
+    @Published var nightMode = false
+    @Published var lowPowerMode = false
 
     var dimmed = false
 
@@ -116,14 +132,17 @@ final class HrMonitorModel: ObservableObject {
             )
         }
         sinceDisplay += 1
-        let cadence = dimmed ? 5 : 1
+        let cadence = (dimmed || lowPowerMode) ? 5 : 1
         guard sinceDisplay >= cadence else { return }
         sinceDisplay = 0
         let historySnapshot = history
         DispatchQueue.main.async {
             // Refresh even without a live sample so the chart keeps sliding
-            // (its x-axis is anchored to "now").
-            self.chartSeries = historySnapshot
+            // (its x-axis is anchored to "now"). Low power skips the publish
+            // entirely — the chart page is unmounted, so every update would
+            // just be wasted layout/path work; `history` keeps accumulating,
+            // so toggling back on repopulates the chart on the next tick.
+            if !self.lowPowerMode { self.chartSeries = historySnapshot }
             if let liveHr {
                 self.displayHr = liveHr
                 self.everHadReading = true
@@ -160,7 +179,10 @@ struct HrMonitorView: View {
 
     var body: some View {
         TabView(selection: $page) {
-            chartPage.tag(0)
+            // Low power unmounts the chart page: offscreen TabView pages still
+            // re-run their body (domain math + path building) on every model
+            // publish, so not mounting it at all is a real saving.
+            if !model.lowPowerMode { chartPage.tag(0) }
             hrPage.tag(1)
             controlsPage.tag(2)
         }
@@ -168,13 +190,21 @@ struct HrMonitorView: View {
         .onAppear { model.start() }
         .onDisappear { model.stop() }
         .onChange(of: isLuminanceReduced) { _, dimmed in model.dimmed = dimmed }
-        .onChange(of: model.atMax) { _, at in
-            guard at else { pulse = false; return }
-            withAnimation(.easeInOut(duration: 0.55).repeatForever(autoreverses: true)) { pulse = true }
-        }
+        .onChange(of: model.atMax) { _, _ in syncPulse() }
+        .onChange(of: model.nightMode) { _, _ in syncPulse() }
         .sheet(isPresented: $showSymptoms) {
             SymptomPicker(symptoms: relay.symptomTypes, hr: model.displayHr) { showSymptoms = false }
         }
+    }
+
+    /// At-max attention pulse — suppressed in night mode (no animated
+    /// movements on a sleep screen; the number still turns red).
+    private func syncPulse() {
+        guard model.atMax, !model.nightMode else {
+            withAnimation(.easeOut(duration: 0.2)) { pulse = false }
+            return
+        }
+        withAnimation(.easeInOut(duration: 0.55).repeatForever(autoreverses: true)) { pulse = true }
     }
 
     // MARK: - HR page
@@ -201,19 +231,39 @@ struct HrMonitorView: View {
         .padding(.horizontal, 6)
     }
 
+    /// Label colour steps down in night mode along with the values.
+    private var labelColor: Color { model.nightMode ? DS.nightDim : DS.dim }
+
     private var hrReadout: some View {
         VStack(spacing: 0) {
-            Text("HEART RATE")
-                .font(.system(size: 11, weight: .bold))
-                .kerning(1)
-                .foregroundStyle(DS.dim)
+            HStack(spacing: 5) {
+                Text("HEART RATE")
+                    .font(.system(size: 11, weight: .bold))
+                    .kerning(1)
+                    .foregroundStyle(labelColor)
+                if model.nightMode {
+                    BatIcon()
+                        .stroke(DS.nightDim, style: StrokeStyle(lineWidth: 1, lineJoin: .round))
+                        .frame(width: 13, height: 10)
+                }
+                if model.lowPowerMode {
+                    Image(systemName: "bolt")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(model.nightMode ? DS.nightDim : DS.gold)
+                }
+            }
 
             Spacer(minLength: 2)
 
             VStack(spacing: 4) {
                 if !isLuminanceReduced {
-                    BeatingHeart(size: 22, bpm: model.signalLost ? nil : model.displayHr)
-                        .padding(.top, 8)   // breathing room under HEART RATE
+                    BeatingHeart(
+                        size: 22,
+                        bpm: model.signalLost ? nil : model.displayHr,
+                        beating: !model.lowPowerMode && !model.nightMode,
+                        color: model.nightMode ? DS.nightDim : DS.accent
+                    )
+                    .padding(.top, 8)   // breathing room under HEART RATE
                 }
                 hrValue
             }
@@ -224,20 +274,35 @@ struct HrMonitorView: View {
                 StatTile(
                     label: "2 min avg",
                     value: model.avg2min.map { String(Int($0.rounded())) } ?? "00",
-                    valueColor: model.avg2min == nil ? DS.faint : .primary
+                    valueColor: model.avg2min == nil ? DS.faint : model.nightMode ? DS.night : .primary,
+                    labelColor: labelColor,
+                    bg: model.nightMode ? DS.nightTile : DS.tile
                 )
                 StatTile(
                     label: "Delta",
                     value: model.delta.map { "Δ \($0 >= 0 ? "+" : "")\(Int($0.rounded()))" } ?? "Δ 00",
-                    valueColor: model.delta.map { DS.deltaColor($0) } ?? DS.faint
+                    valueColor: model.delta.map { deltaValueColor($0) } ?? DS.faint,
+                    labelColor: labelColor,
+                    bg: model.nightMode ? DS.nightTile : DS.tile
                 )
             }
         }
         .overlay(alignment: .trailing) {
-            if !isLuminanceReduced { SwipeChevron().padding(.trailing, 6) }
+            if !isLuminanceReduced {
+                SwipeChevron(color: model.nightMode ? DS.nightDim : DS.dim.opacity(0.6),
+                             animated: !model.nightMode && !model.lowPowerMode)
+                    .padding(.trailing, 6)
+            }
         }
         .overlay(alignment: .leading) {
-            if !isLuminanceReduced { SwipeChevron(pointsLeft: true).padding(.leading, 6) }
+            // No left chevron in low power — the chart page it points at is
+            // unmounted.
+            if !isLuminanceReduced && !model.lowPowerMode {
+                SwipeChevron(pointsLeft: true,
+                             color: model.nightMode ? DS.nightDim : DS.dim.opacity(0.6),
+                             animated: !model.nightMode)
+                    .padding(.leading, 6)
+            }
         }
     }
 
@@ -248,9 +313,9 @@ struct HrMonitorView: View {
             Text("LAST 5 MIN")
                 .font(.system(size: 11, weight: .bold))
                 .kerning(1)
-                .foregroundStyle(DS.dim)
+                .foregroundStyle(labelColor)
             if model.chartSeries.count >= 2 {
-                HrHistoryChart(series: model.chartSeries, live: !model.signalLost)
+                HrHistoryChart(series: model.chartSeries, live: !model.signalLost, night: model.nightMode)
             } else {
                 Spacer()
                 Text("Collecting data…")
@@ -261,23 +326,32 @@ struct HrMonitorView: View {
         }
     }
 
+    /// Night mode flattens the delta to the same dark grey as everything
+    /// else — only a Δ ≥ 30 warning still turns red (matches the buzzer).
+    private func deltaValueColor(_ delta: Double) -> Color {
+        model.nightMode ? (delta >= 30 ? DS.accent : DS.night) : DS.deltaColor(delta)
+    }
+
     /// HR readout state machine: grey "00" before the first reading, live colour
     /// once contact is made, greyed last value while the signal is lost.
+    /// Night mode swaps the live colour for dark grey; the near-max/at-max red
+    /// is a safety signal and deliberately overrides night mode.
     private var hrValue: some View {
         let hasReading = model.displayHr != nil
         let text = hasReading ? String(Int(model.displayHr!.rounded())) : "00"
         let color: Color = !hasReading || model.signalLost
             ? DS.faint
-            : (model.nearMax || model.atMax ? DS.accent : .primary)
+            : model.nearMax || model.atMax ? DS.accent
+            : model.nightMode ? DS.night : .primary
         return VStack(spacing: -8) {
             Text(text)
                 .font(DS.number(54))
                 .monospacedDigit()
                 .foregroundStyle(color)
-                .opacity(model.atMax && pulse ? 0.45 : 1)
+                .opacity(model.atMax && !model.nightMode && pulse ? 0.45 : 1)
             Text("BPM")
                 .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(DS.dim)
+                .foregroundStyle(labelColor)
         }
         .padding(.bottom, 8)   // BPM hugs the number, sits farther from the tiles
     }
@@ -313,9 +387,89 @@ struct HrMonitorView: View {
                         .background(DS.card, in: RoundedRectangle(cornerRadius: 16))
                 }
                 .buttonStyle(.plain)
+
+                Rectangle()
+                    .fill(Color.white.opacity(0.1))
+                    .frame(height: 1)
+                    .padding(.vertical, 3)
+
+                // Session-scoped modes — both reset to off on the next session.
+                ModeToggleRow(title: "Night mode", isOn: model.nightMode) {
+                    model.nightMode.toggle()
+                }
+                ModeToggleRow(title: "Low power", isOn: model.lowPowerMode) {
+                    model.lowPowerMode.toggle()
+                    // Turning it on returns to the HR readout — the point of
+                    // the mode is to sit on that screen doing minimal work.
+                    if model.lowPowerMode {
+                        withAnimation { page = 1 }
+                    }
+                }
             }
             .padding(.horizontal, 2)
         }
+    }
+}
+
+/// Controls-page toggle: plain label with an On/Off state on the trailing
+/// edge; the card border tints the shared night grey while active.
+private struct ModeToggleRow: View {
+    let title: String
+    let isOn: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack {
+                Text(title)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.primary)
+                Spacer(minLength: 4)
+                Text(isOn ? "ON" : "OFF")
+                    .font(.system(size: 10, weight: .bold))
+                    .kerning(0.5)
+                    .foregroundStyle(isOn ? DS.night : DS.dim.opacity(0.7))
+            }
+            .padding(.vertical, 11)
+            .padding(.horizontal, 12)
+            .background(DS.card, in: RoundedRectangle(cornerRadius: 16))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(isOn ? DS.night.opacity(0.5) : .clear, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// Small line-art bat (no SF Symbol exists): scalloped wings, eared head,
+/// stroked as an outline. Draw at ~13 pt tall next to an 11 pt label.
+struct BatIcon: Shape {
+    func path(in rect: CGRect) -> Path {
+        let w = rect.width, h = rect.height
+        func pt(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+            CGPoint(x: rect.minX + x * w, y: rect.minY + y * h)
+        }
+        var p = Path()
+        // Left wing tip, along the top edge over the ears to the right tip…
+        p.move(to: pt(0.02, 0.22))
+        p.addQuadCurve(to: pt(0.36, 0.26), control: pt(0.20, 0.30))
+        p.addLine(to: pt(0.42, 0.08))          // left ear
+        p.addLine(to: pt(0.47, 0.24))
+        p.addQuadCurve(to: pt(0.53, 0.24), control: pt(0.50, 0.20))
+        p.addLine(to: pt(0.58, 0.08))          // right ear
+        p.addLine(to: pt(0.64, 0.26))
+        p.addQuadCurve(to: pt(0.98, 0.22), control: pt(0.80, 0.30))
+        // …then back along the scalloped bottom edge to the tail.
+        p.addQuadCurve(to: pt(0.86, 0.56), control: pt(0.90, 0.40))
+        p.addQuadCurve(to: pt(0.66, 0.62), control: pt(0.72, 0.50))
+        p.addQuadCurve(to: pt(0.55, 0.74), control: pt(0.58, 0.58))
+        p.addQuadCurve(to: pt(0.45, 0.74), control: pt(0.50, 0.90))  // tail dip
+        p.addQuadCurve(to: pt(0.34, 0.62), control: pt(0.42, 0.58))
+        p.addQuadCurve(to: pt(0.14, 0.56), control: pt(0.28, 0.50))
+        p.addQuadCurve(to: pt(0.02, 0.22), control: pt(0.10, 0.40))
+        p.closeSubpath()
+        return p
     }
 }
 
@@ -323,15 +477,31 @@ struct HrMonitorView: View {
 /// one swipe away (controls to the right, the history chart to the left).
 private struct SwipeChevron: View {
     var pointsLeft = false
+    var color: Color = DS.dim.opacity(0.6)
+    /// Night mode holds the chevron still — no motion on a sleep screen.
+    /// The branches are separate view identities, so flipping this tears the
+    /// animated chevron down outright (a repeatForever can survive a mere
+    /// parameter change).
+    var animated = true
     @State private var shift = false
+
     var body: some View {
+        if animated {
+            chevron
+                .offset(x: shift ? 3 : -3)
+                .onAppear {
+                    shift = false
+                    withAnimation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true)) { shift = true }
+                }
+        } else {
+            chevron
+        }
+    }
+
+    private var chevron: some View {
         Image(systemName: pointsLeft ? "chevron.left" : "chevron.right")
             .font(.system(size: 12, weight: .bold))
-            .foregroundStyle(DS.dim.opacity(0.6))
-            .offset(x: shift ? 3 : -3)
-            .onAppear {
-                withAnimation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true)) { shift = true }
-            }
+            .foregroundStyle(color)
     }
 }
 
@@ -348,13 +518,16 @@ private struct SwipeChevron: View {
 struct HrHistoryChart: View {
     let series: [(at: Date, hr: Double, delta: Double)]
     var live = true
+    /// Night mode: the in-range (green) band renders the dark value grey
+    /// instead; the ≥20 amber and ≥30 red warnings keep their colors.
+    var night = false
 
     static let window: TimeInterval = 300
     private static let gapBreak: TimeInterval = 10
 
-    /// One stroke path per delta band, index-aligned with `bandColors`
+    /// One stroke path per delta band, index-aligned with `bandPaths`
     /// (mirrors `DS.deltaColor`).
-    private static let bandColors: [Color] = [DS.green, DS.amber, DS.accent]
+    private var bandColors: [Color] { [night ? DS.night : DS.green, DS.amber, DS.accent] }
     private static func band(_ delta: Double) -> Int {
         delta >= 30 ? 2 : delta >= 20 ? 1 : 0
     }
@@ -390,14 +563,14 @@ struct HrHistoryChart: View {
                     let paths = bandPaths(pt: pt)
                     ForEach(paths.indices, id: \.self) { i in
                         paths[i].stroke(
-                            Self.bandColors[i],
+                            bandColors[i],
                             style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round)
                         )
                     }
                     if live, let last = series.last,
                        now.timeIntervalSince(last.at) < Self.gapBreak {
                         Circle()
-                            .fill(DS.deltaColor(last.delta))
+                            .fill(bandColors[Self.band(last.delta)])
                             .frame(width: 5, height: 5)
                             .position(pt(last))
                     }
@@ -417,7 +590,7 @@ struct HrHistoryChart: View {
     /// Splits the line into one path per delta band. Each segment is colored by
     /// its newer sample's delta; gaps >10 s break the line in every band.
     private func bandPaths(pt: ((at: Date, hr: Double, delta: Double)) -> CGPoint) -> [Path] {
-        var paths = Array(repeating: Path(), count: Self.bandColors.count)
+        var paths = Array(repeating: Path(), count: bandColors.count)
         var prev: (at: Date, hr: Double, delta: Double)?
         for s in series {
             if let prev, s.at.timeIntervalSince(prev.at) <= Self.gapBreak {

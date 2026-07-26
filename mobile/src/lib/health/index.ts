@@ -22,7 +22,7 @@ import { Linking, Platform } from 'react-native';
 import type { Entry, SleepStages } from '../types';
 import { computeHrv } from '../hrv';
 import { keyOf } from '../dates';
-import { summarizeSleep } from './sleepSummary';
+import { groupNights, summarizeSleep } from './sleepSummary';
 import { activityTypeFromHk, workoutHrSeries } from './workoutMap';
 
 /** This app's bundle id — used to skip re-importing our own write-backs. */
@@ -66,11 +66,16 @@ export interface HealthApi {
   readSleep(dk: string): Promise<SleepImport | null>;
   /**
    * One-shot historical import across a date range (used once, from onboarding):
-   * RR-based HRV, blood pressure, and resting heart rate, each tagged with the
-   * local day it belongs to. HRV comes only from heartbeat series (real
-   * beat-to-beat RR); plain SDNN-only samples are intentionally excluded.
+   * readings (RR-based HRV, blood pressure, resting heart rate), nights of
+   * sleep with their overnight HR, workouts with their HR traces, and
+   * medication doses — each tagged with the local day it belongs to. HRV comes
+   * only from heartbeat series covering at least {@link HISTORY_HRV_MIN_MS}
+   * (real beat-to-beat RR); plain SDNN-only samples are excluded. A year of
+   * data takes a while to walk, so `onProgress` reports each phase.
    */
-  readHistory(opts: { fromISO: string; toISO: string }): Promise<HistoryReading[]>;
+  readHistory(opts: {
+    fromISO: string; toISO: string; onProgress?: (p: HistoryProgress) => void;
+  }): Promise<HistoryBundle>;
   /**
    * Heartbeat-series readings (real beat-to-beat RR) overlapping a time window,
    * newest first — what an Apple Watch Mindfulness/Breathe session produces.
@@ -117,6 +122,62 @@ export interface ImportedReading {
 /** An {@link ImportedReading} from the historical sweep, tagged with its day. */
 export interface HistoryReading extends ImportedReading {
   dayKey: string;       // YYYY-MM-DD (local) the sample belongs to
+}
+
+/** An {@link ImportedWorkout} from the historical sweep, tagged with its day. */
+export interface HistoryWorkout extends ImportedWorkout { dayKey: string }
+
+/** An {@link ImportedMed} from the historical sweep, tagged with its day. */
+export interface HistoryMed extends ImportedMed { dayKey: string }
+
+/** A night from the historical sweep, tagged with the day it *ends* on —
+ *  the day whose `sleep` record it belongs to. */
+export interface HistorySleep extends SleepImport { dayKey: string }
+
+/** Everything one historical sweep found, ready to be written into the journal. */
+export interface HistoryBundle {
+  readings: HistoryReading[];
+  sleep: HistorySleep[];
+  workouts: HistoryWorkout[];
+  meds: HistoryMed[];
+}
+
+/** Progress from a historical sweep: a phase label plus its own item counts
+ *  (0/0 while the phase is still fetching its index). */
+export interface HistoryProgress { label: string; done: number; total: number }
+
+/** Minimum RR coverage for an importable historical HRV reading — the same bar
+ *  the periodic update check applies (see ./updateSet). */
+export const HISTORY_HRV_MIN_MS = 4 * 60 * 1000;
+
+/** A night this short in the historical sweep is a nap or a stray sample, not
+ *  a night worth writing into the journal's sleep record. */
+export const HISTORY_SLEEP_MIN_MIN = 120;
+
+/** Empty bundle — the stub's answer, and a safe base for partial sweeps. */
+export const emptyHistory = (): HistoryBundle => ({ readings: [], sleep: [], workouts: [], meds: [] });
+
+/**
+ * Run `work` over `items` a few at a time, reporting progress as each lands.
+ * Historical sweeps need one extra query per night/workout; unbounded
+ * Promise.all over a year of them would swamp the bridge.
+ */
+async function mapPooled<T, R>(
+  items: readonly T[],
+  size: number,
+  work: (item: T) => Promise<R | null>,
+  onEach?: (done: number, total: number) => void,
+): Promise<R[]> {
+  const out: R[] = [];
+  let done = 0;
+  for (let i = 0; i < items.length; i += size) {
+    const slice = items.slice(i, i + size);
+    const res = await Promise.all(slice.map((it) => work(it).catch(() => null)));
+    for (const r of res) if (r) out.push(r);
+    done += slice.length;
+    onEach?.(done, items.length);
+  }
+  return out;
 }
 
 /** A workout from the platform health store, mapped to an app activity type. */
@@ -178,7 +239,7 @@ const stub: HealthApi = {
   async readAuthStatus() { return 'unknown'; },
   async readDay() { return emptyDay; },
   async readImports() { return []; },
-  async readHistory() { return []; },
+  async readHistory() { return emptyHistory(); },
   async readHrvSessions() { return []; },
   async readMedications() { return []; },
   async readWorkouts() { return []; },
@@ -476,18 +537,22 @@ function makeReal(mod: HkModule): HealthApi {
       return out;
     },
 
-    async readHistory({ fromISO, toISO }) {
+    async readHistory({ fromISO, toISO, onProgress }) {
       const from = new Date(fromISO);
       const to = new Date(toISO);
-      const out: HistoryReading[] = [];
+      const out = emptyHistory();
+      const step = (label: string, done = 0, total = 0) => {
+        try { onProgress?.({ label, done, total }); } catch { /* progress is advisory */ }
+      };
       // Generous cap: resting HR is ~1/day, so this comfortably spans years.
       const LIMIT = 50000;
 
       // Resting HR — one reading each, at its real timestamp.
+      step('Resting heart rate');
       try {
         const rows = (await mod.queryQuantitySamples?.(QID.restingHr, { from, to, limit: LIMIT })) || [];
         for (const s of rows) {
-          out.push({
+          out.readings.push({
             type: 'restingHr', time: hhmm(s.startDate), startMs: s.startDate.getTime(),
             ownApp: isOwnSample(s.sourceRevision), dayKey: keyOf(s.startDate),
             fields: { hr: String(Math.round(s.quantity)), position: 'Laying' },
@@ -496,6 +561,7 @@ function makeReal(mod: HkModule): HealthApi {
       } catch { /* resting HR unavailable */ }
 
       // Blood pressure — pair systolic + diastolic saved at (near-)identical times.
+      step('Blood pressure');
       try {
         const [sys, dia] = await Promise.all([
           mod.queryQuantitySamples?.(QID.systolic, { from, to, limit: LIMIT }),
@@ -504,7 +570,7 @@ function makeReal(mod: HkModule): HealthApi {
         for (const s of sys || []) {
           const m = (dia || []).find((d) => Math.abs(d.startDate.getTime() - s.startDate.getTime()) < 2000);
           if (!m) continue;
-          out.push({
+          out.readings.push({
             type: 'bp', time: hhmm(s.startDate), startMs: s.startDate.getTime(),
             ownApp: isOwnSample(s.sourceRevision), dayKey: keyOf(s.startDate),
             fields: { sys: String(Math.round(s.quantity)), dia: String(Math.round(m.quantity)) },
@@ -512,21 +578,86 @@ function makeReal(mod: HkModule): HealthApi {
         }
       } catch { /* blood pressure unavailable */ }
 
-      // HRV — heartbeat series only, so every reading carries real RR intervals.
+      // HRV — heartbeat series only, so every reading carries real RR intervals,
+      // and only sessions long enough to trust (same bar as the daily check).
+      step('HRV sessions');
       try {
         const series = (await mod.queryHeartbeatSeriesSamples?.({ from, to, limit: LIMIT })) || [];
         for (const hb of series) {
           const rr = rrFromSeries(hb);
           if (rr.length < 20) continue;
+          if (rr.reduce((s, v) => s + v, 0) < HISTORY_HRV_MIN_MS) continue;
           const res = computeHrv(rr);
           if (!res.time || !Object.keys(res.fields).length) continue;
-          out.push({
+          out.readings.push({
             type: 'hrv', time: hhmm(hb.startDate), startMs: hb.startDate.getTime(),
             ownApp: isOwnSample(hb.sourceRevision), dayKey: keyOf(hb.startDate),
             fields: res.fields, rr, rrClean: res.rrClean,
           });
         }
       } catch { /* heartbeat series unavailable */ }
+
+      // Sleep — one range query bucketed into nights (see groupNights), then
+      // each night's overnight HR range. Per-night HR is a separate query, so
+      // they run pooled rather than 365-at-once.
+      step('Sleep');
+      try {
+        const rows = (await mod.queryCategorySamples?.(CID.sleep, { from, to, limit: 100000 })) || [];
+        const nights = groupNights(rows);
+        out.sleep = await mapPooled(nights, 6, async ({ dayKey, rows: night }) => {
+          const sum = summarizeSleep(night);
+          if (!sum || sum.minutesAsleep < HISTORY_SLEEP_MIN_MIN) return null;
+          const hr = await rangeQ(QID.heartRate, sum.bed, sum.wake);
+          return {
+            dayKey,
+            bed: hhmm(sum.bed),
+            wake: hhmm(sum.wake),
+            bedISO: sum.bed.toISOString(),
+            wakeISO: sum.wake.toISOString(),
+            hrLow: hr ? Math.round(hr.min) : null,
+            hrHigh: hr ? Math.round(hr.max) : null,
+            interrupted: sum.interrupted,
+            minutesAsleep: sum.minutesAsleep,
+            stages: sum.stages,
+          } satisfies HistorySleep;
+        }, (done, total) => step('Sleep', done, total));
+      } catch { /* sleep unavailable */ }
+
+      // Workouts — one range query, then each session's HR samples for its
+      // stats and the trace the workout report draws.
+      step('Workouts');
+      try {
+        const rows = (await mod.queryWorkoutSamples?.({ from, to, distanceUnit: 'mi', limit: 5000 })) || [];
+        const usable = rows.filter((w) => Math.round((w.duration || 0) / 60) >= 1);
+        out.workouts = await mapPooled(usable, 4, async (w) => {
+          let avgHr: number | null = null; let minHr: number | null = null; let maxHr: number | null = null;
+          let hr: readonly QSample[] = [];
+          try { hr = (await mod.queryQuantitySamples?.(QID.heartRate, { from: w.startDate, to: w.endDate, limit: 5000 })) || []; } catch { /* HR unavailable */ }
+          if (hr.length) {
+            let sum = 0; let min = Infinity; let max = -Infinity;
+            for (const s of hr) { sum += s.quantity; if (s.quantity < min) min = s.quantity; if (s.quantity > max) max = s.quantity; }
+            avgHr = Math.round(sum / hr.length); minHr = Math.round(min); maxHr = Math.round(max);
+          }
+          const dist = w.totalDistance?.quantity;
+          return {
+            type: activityTypeFromHk(w.workoutActivityType, !!w.metadata?.HKIndoorWorkout),
+            time: hhmm(w.startDate),
+            startMs: w.startDate.getTime(),
+            dayKey: keyOf(w.startDate),
+            durationMin: Math.round((w.duration || 0) / 60),
+            distanceMi: dist && dist > 0 ? Math.round(dist * 100) / 100 : null,
+            avgHr, minHr, maxHr,
+            hrSeries: workoutHrSeries(hr.map((s) => ({ ms: s.startDate.getTime(), bpm: s.quantity })), w.startDate.getTime()),
+            sourceName: w.sourceRevision?.source?.name || 'Apple Health',
+            ownApp: isOwnSample(w.sourceRevision),
+          } satisfies HistoryWorkout;
+        }, (done, total) => step('Workouts', done, total));
+        out.workouts.sort((a, b) => a.startMs - b.startMs);
+      } catch { /* workouts unavailable */ }
+
+      // Medications — no HealthKit dose query exists yet (see readMedications),
+      // so history has nothing to sweep; wired through for when it lands.
+      step('Medications');
 
       return out;
     },

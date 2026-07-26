@@ -7,7 +7,8 @@
  * `showWelcomeAgain()`.
  *
  * Connecting Apple Health in the Connect-data step pops a one-time confirmation
- * card offering to backfill history (RR-based HRV, blood pressure, resting HR).
+ * card offering to backfill the last year of history (RR-based HRV, blood
+ * pressure, resting HR, sleep with overnight HR, workouts, medications).
  * That import is guarded by `meta.healthHistoryImported` so it runs at most once.
  *
  * The wizard renders as an absolute-fill overlay above the tab UI (mounted in
@@ -29,8 +30,10 @@ import { fmtDateFull, fmtTime12, uid } from '../lib/dates';
 import { SheetControls, SheetPill, SheetPillButton, useSheets } from '../components/Sheet';
 import { useToast } from '../components/Toast';
 import { ACCENT, radius, usePalette } from '../theme';
-import { health, healthAppName } from '../lib/health';
+import { health, healthAppName, type HistoryProgress } from '../lib/health';
 import { requestEcgAuth } from '../lib/health/ecg';
+import { workoutCandidateOf } from '../lib/health/workoutCandidate';
+import { typesFor } from '../lib/typeCatalog';
 import { computeScores } from '../lib/scoring';
 import { blankDay, getState, mutate, save, storeWaveform, useAppState } from '../store/store';
 import { DevicesScreen } from './Devices';
@@ -61,40 +64,94 @@ const STEP_DUR = 280;
 /** Steps that show the top-right Skip (About you + Connect data). */
 const SKIPPABLE = new Set([3, 4]);
 
-/** Historical import floor — early enough to cover any HealthKit-era data. */
-const HISTORY_SINCE = new Date(2014, 0, 1);
+/** How far back the one-time historical import reaches. */
+const HISTORY_DAYS = 365;
 
 /**
- * One-time backfill of Apple Health history into the journal: RR-based HRV,
- * blood pressure, and resting heart rate, each written into the day it was
- * recorded and scored like a live capture. Assumes read permission is already
- * granted. Idempotent — stamps (and is guarded by) meta.healthHistoryImported,
- * so it can never double-import. Returns how many readings were added.
+ * One-time backfill of Apple Health / Health Connect history into the journal —
+ * the last year of readings (RR-based HRV, blood pressure, resting heart rate),
+ * nights of sleep with their overnight HR and stages, workouts with their HR
+ * traces, and medication doses — each written into the day it was recorded and
+ * scored like a live capture. Assumes read permission is already granted.
+ * Idempotent — stamps (and is guarded by) meta.healthHistoryImported, so it can
+ * never double-import. Returns how many items were added.
  */
-async function importAppleHealthHistory(): Promise<number> {
+async function importHealthHistory(onProgress?: (p: HistoryProgress) => void): Promise<number> {
   const api = health();
   if (!api.available) return 0;
-  const readings = await api.readHistory({
-    fromISO: HISTORY_SINCE.toISOString(),
-    toISO: new Date().toISOString(),
+  const to = new Date();
+  const from = new Date(to.getFullYear(), to.getMonth(), to.getDate() - HISTORY_DAYS);
+  const bundle = await api.readHistory({
+    fromISO: from.toISOString(),
+    toISO: to.toISOString(),
+    onProgress,
   });
-  const ctx = { sex: getState().profile.sex, height: getState().profile.height };
+  const st = getState();
+  const ctx = { sex: st.profile.sex, height: st.profile.height };
+  const note = `From ${healthAppName()}`;
+  const source = Platform.OS === 'android' ? 'health' : 'watch';
+  // Doses come back under the health app's own name; only those matching a med
+  // type we know how to file get imported (same rule as the daily check).
+  const medTypes = typesFor(st, 'meds');
+  const medKeyByLabel = new Map(Object.keys(medTypes).map((k) => [medTypes[k].label.toLowerCase(), k]));
   let added = 0;
   mutate((s) => {
     if (s.meta.healthHistoryImported) return;          // already ran — no-op
-    for (const r of readings) {
+    const day = (dk: string) => {
+      if (!s.days[dk]) s.days[dk] = blankDay();
+      return s.days[dk];
+    };
+
+    for (const r of bundle.readings) {
       if (r.ownApp) continue;                           // skip our own write-backs
-      if (!s.days[r.dayKey]) s.days[r.dayKey] = blankDay();
       const entry: Record<string, unknown> = {
-        id: uid(), type: r.type, time: r.time, note: `From ${healthAppName()}`, source: Platform.OS === 'android' ? 'health' : 'watch', imported: true, ...r.fields,
+        id: uid(), type: r.type, time: r.time, note, source, imported: true, ...r.fields,
       };
       // RR series goes to the waveform sidecar, never inline on the entry
       // (rrClean is derived — recomputed on view, not stored).
       if (r.rr) storeWaveform(entry.id as string, { rrRaw: r.rr });
       entry.scores = computeScores(entry as never, ctx);
-      s.days[r.dayKey].readings.push(entry as never);
+      day(r.dayKey).readings.push(entry as never);
       added++;
     }
+
+    for (const w of bundle.workouts) {
+      if (w.ownApp) continue;                           // our own watch sessions
+      const cand = workoutCandidateOf(w);
+      const entry: Record<string, unknown> = {
+        id: uid(), type: cand.type, time: cand.time, note: '', source: 'health', imported: true, ...cand.entry,
+      };
+      // The full HR trace powers the workout report; sidecar, never inline.
+      if (cand.hrSeries?.length) storeWaveform(entry.id as string, { sampledHr: cand.hrSeries });
+      entry.scores = computeScores(entry as never, ctx);
+      day(w.dayKey).activities.push(entry as never);
+      added++;
+    }
+
+    for (const m of bundle.meds) {
+      if (m.ownApp) continue;
+      const type = medKeyByLabel.get(m.name.trim().toLowerCase());
+      if (!type) continue;                              // nothing sane to file it under
+      const amount = m.amount ? (m.amount.match(/[\d.]+/)?.[0] ?? '') : '';
+      day(m.dayKey).meds.push({ id: uid(), type, time: m.time, note, amount } as never);
+      added++;
+    }
+
+    for (const n of bundle.sleep) {
+      const d = day(n.dayKey);
+      if (d.sleep?.bed && d.sleep?.wake) continue;      // never overwrite a logged night
+      d.sleep = {
+        ...d.sleep,
+        bed: n.bed,
+        wake: n.wake,
+        quality: n.interrupted ? 'interrupted' : (d.sleep?.quality || 'good'),
+        ...(n.hrLow != null ? { hrLow: n.hrLow } : {}),
+        ...(n.hrHigh != null ? { hrHigh: n.hrHigh } : {}),
+        ...(n.stages ? { stages: n.stages } : {}),
+      };
+      added++;
+    }
+
     s.meta.healthHistoryImported = new Date().toISOString();
   });
   return added;
@@ -261,12 +318,20 @@ function HistoryImportSheet({ controls, onImported }: {
 }) {
   const p = usePalette();
   const [busy, setBusy] = useState(false);
+  // A year of history takes a while to walk, so the sheet narrates the sweep
+  // ("Sleep · 140/312") instead of sitting on a bare spinner.
+  const [status, setStatus] = useState('');
   // App-themed sheet (rendered above the dark wizard), so it uses the palette.
   const run = async () => {
     if (busy) return;
     setBusy(true);
+    setStatus('Reading your history');
     let n: number | null;
-    try { n = await importAppleHealthHistory(); } catch { n = null; }
+    try {
+      n = await importHealthHistory((pr) => {
+        setStatus(pr.total > 1 ? `${pr.label} · ${pr.done}/${pr.total}` : pr.label);
+      });
+    } catch { n = null; }
     setBusy(false);
     onImported(n);
     controls.close();
@@ -279,13 +344,16 @@ function HistoryImportSheet({ controls, onImported }: {
       <View style={{ gap: 8 }}>
         <Text style={{ fontSize: 21, fontWeight: '700', letterSpacing: -0.3, color: p.text }}>Import your history?</Text>
         <Text style={{ fontSize: 14.5, lineHeight: 22, color: p.textDim }}>
-          {`Bring your past HRV, blood pressure, and resting heart rate from ${healthAppName()} into your journal so your trends start full. This is a one-time import — new readings sync automatically as you go.`}
+          {`Bring the past year from ${healthAppName()} into your journal so your trends start full: sleep, workouts, blood pressure, resting heart rate and HRV. This is a one-time import, and new readings sync automatically as you go.`}
         </Text>
         <Text style={{ fontSize: 12.5, lineHeight: 18, color: p.textDim, opacity: 0.85 }}>
           {Platform.OS === 'ios'
-            ? 'Only HRV recordings with beat-to-beat detail come in, so the full variability panel is available.'
-            : 'HRV history comes in as RMSSD values from Health Connect.'}
+            ? 'Only HRV recordings with beat-to-beat detail of at least four minutes come in, so the full variability panel is available. It can take a minute.'
+            : 'HRV history comes in as RMSSD values from Health Connect. It can take a minute.'}
         </Text>
+        {busy && !!status && (
+          <Text style={{ fontSize: 12.5, lineHeight: 18, color: p.accent }}>{status}</Text>
+        )}
       </View>
       <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
         <Button title="Not now" onPress={() => { if (!busy) controls.close(); }} />
@@ -418,7 +486,7 @@ function Onboarding({ onDone }: { onDone: () => void }) {
             controls={c}
             onImported={(n) => {
               if (n == null) toast('Import failed');
-              else toast(n ? `Imported ${n} reading${n === 1 ? '' : 's'}` : `No history found in ${healthAppName()}`);
+              else toast(n ? `Imported ${n} item${n === 1 ? '' : 's'}` : `No history found in ${healthAppName()}`);
             }}
           />
         ),

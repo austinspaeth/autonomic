@@ -7,7 +7,7 @@
  * warns the drop may be stress or oncoming sickness — the autonomic system
  * often shifts before symptoms do. Pure: days map in, verdict out.
  */
-import { addDays, dateFromKey } from '../dates';
+import { addDays, dateFromKey, todayKey } from '../dates';
 import { TRIGGER_TYPES } from '../registry';
 import type { CustomTypes, Protocol } from '../types';
 import type { ScoreContext } from './index';
@@ -84,10 +84,16 @@ export function detectDownturn(
   // user actually engaged with that criterion (water logged but short, sleep
   // logged but short, a required med/activity missed) so a day simply not
   // tracked doesn't read as a broken protocol.
+  //
+  // The CURRENT day is never scanned: it's still in progress, so its water,
+  // sleep and meds are simply not entered yet, and counting them would blame
+  // the slide on "missed" protocol items the user hasn't reached yet. A past
+  // day being viewed is complete, so it stays in the window.
+  const scanEnd = dk === todayKey() ? addDays(dk, -1) : dk;
   let trigN = 0, slipDays = 0, shortNights = 0, heavy = 0, heavyDays = 0, windowLen = 0;
   const trigCounts: Record<string, number> = {};
   const misses: Record<string, { label: string; key: string; days: number }> = {};
-  for (let k = scored[startIdx].k; k <= dk; k = addDays(k, 1)) {
+  for (let k = scored[startIdx].k; k <= scanEnd; k = addDays(k, 1)) {
     const d = days[k];
     if (!d) continue;
     windowLen++;

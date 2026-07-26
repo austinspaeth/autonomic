@@ -8,7 +8,7 @@ import {
   Pressable, StyleProp, StyleSheet, Text, TextStyle, View, ViewProps, ViewStyle,
 } from 'react-native';
 import Reanimated, {
-  Easing as REasing, interpolate, interpolateColor, useAnimatedStyle, useSharedValue,
+  Easing as REasing, interpolate, interpolateColor, runOnJS, useAnimatedStyle, useSharedValue,
   withSpring, withTiming, type SharedValue,
 } from 'react-native-reanimated';
 import { GRADE_COLORS, radius, space, type as T, usePalette } from '../theme';
@@ -114,9 +114,9 @@ export function Muted({ children }: { children: React.ReactNode }) {
 // bounciness 8 — same feel, converted through Origami tension/friction.
 const PILL_SPRING = { stiffness: 427, damping: 27.6, mass: 1 };
 
-export function Segmented<T extends string>({ options, value, onChange, onLockedPress, style, compact }: {
+export function Segmented<T extends string>({ options, value, onChange, onLockedPress, onSettled, style, compact }: {
   options: { val: T; label: string; locked?: boolean }[]; value: T; onChange: (v: T) => void;
-  onLockedPress?: (v: T) => void; style?: StyleProp<ViewStyle>; compact?: boolean;
+  onLockedPress?: (v: T) => void; onSettled?: () => void; style?: StyleProp<ViewStyle>; compact?: boolean;
 }) {
   const p = usePalette();
   const [w, setW] = React.useState(0);
@@ -127,10 +127,17 @@ export function Segmented<T extends string>({ options, value, onChange, onLocked
   const idx = Math.max(0, options.findIndex((o) => o.val === value));
   const sel = useSharedValue(idx);
   const target = React.useRef(idx);
+  // `onSettled` fires when the pill spring actually comes to rest (an
+  // interrupted spring never reports — only the final one does). Progress uses
+  // it to hold the expensive range commit until the pill has finished moving,
+  // so the animation never has a heavy commit landing in the middle of it.
+  const settledRef = React.useRef(onSettled);
+  settledRef.current = onSettled;
+  const notifySettled = React.useCallback(() => { settledRef.current?.(); }, []);
   const springTo = React.useCallback((i: number) => {
     target.current = i;
-    sel.value = withSpring(i, PILL_SPRING);
-  }, [sel]);
+    sel.value = withSpring(i, PILL_SPRING, (fin) => { if (fin) runOnJS(notifySettled)(); });
+  }, [sel, notifySettled]);
   React.useEffect(() => {
     if (target.current !== idx) springTo(idx);
   }, [idx, springTo]);

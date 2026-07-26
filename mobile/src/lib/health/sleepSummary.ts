@@ -11,12 +11,23 @@
  *    a morning nap. The night is the *longest* cluster of sleep, not simply
  *    earliest-start → latest-end across the whole window.
  *
+ * `groupNights` extends the same rules to a long span: the one-time historical
+ * import reads months of sleep in a single query and buckets it into nights
+ * here, rather than issuing one windowed query per day.
+ *
  * Kept free of native imports so jest can exercise it directly.
  */
 import type { SleepStages } from '../types';
+import { keyOf } from '../dates';
 
 /** The slice of an HKCategorySample this module needs. */
 export interface SleepSample { value: number; startDate: Date; endDate: Date }
+
+/** The night ending on day X is queried from X-1 18:00 → X 14:00. Both the
+ *  per-day reads and the historical sweep use these bounds so a night lands on
+ *  the same day key either way. */
+export const NIGHT_START_HOUR = 18;
+export const NIGHT_END_HOUR = 14;
 
 export interface SleepSummary {
   bed: Date;
@@ -104,4 +115,37 @@ export function summarizeSleep(rows: readonly SleepSample[]): SleepSummary | nul
     interrupted: staged.awake > INTERRUPTED_AWAKE_MIN,
     stages: staged.core + staged.deep + staged.rem > 0 ? staged : null,
   };
+}
+
+/**
+ * The day key whose night a sleep sample belongs to, judged by when it *ends*:
+ * an evening sample (≥ 18:00) belongs to the next morning's night, an early
+ * sample (< 14:00) to that same morning. Anything ending mid-afternoon is an
+ * afternoon nap that no night's window would have caught either — null.
+ */
+export function nightKeyOf(end: Date): string | null {
+  const h = end.getHours();
+  if (h >= NIGHT_START_HOUR) return keyOf(new Date(end.getFullYear(), end.getMonth(), end.getDate() + 1));
+  if (h < NIGHT_END_HOUR) return keyOf(end);
+  return null;
+}
+
+/**
+ * Bucket a long span of sleep samples into nights, so one range query can
+ * stand in for a per-day read across months of history. Each bucket is what
+ * {@link summarizeSleep} would have received from that day's own window;
+ * buckets come back oldest first.
+ */
+export function groupNights(rows: readonly SleepSample[]): { dayKey: string; rows: SleepSample[] }[] {
+  const byDay = new Map<string, SleepSample[]>();
+  for (const r of rows) {
+    const dk = nightKeyOf(r.endDate);
+    if (!dk) continue;
+    const bucket = byDay.get(dk);
+    if (bucket) bucket.push(r);
+    else byDay.set(dk, [r]);
+  }
+  return [...byDay.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([dayKey, list]) => ({ dayKey, rows: list }));
 }

@@ -3,7 +3,7 @@
  * Triggers, Hydration, Digestion — each a Card with a header + "+ Add".
  */
 import React, { useState } from 'react';
-import { ActivityIndicator, LayoutAnimation, Platform, Pressable, Text, TextInput, UIManager, View } from 'react-native';
+import { ActivityIndicator, LayoutAnimation, Pressable, Text, TextInput, View } from 'react-native';
 import { AddDashButton, Card, Pill, ProgressBar, Row, RowValue, SectionHeader, Segmented } from '../components/ui';
 import { Icon } from '../components/Icon';
 import { TimeField } from '../components/Field';
@@ -28,9 +28,9 @@ import { SleepConfirmSheet } from './Health';
 import { useEntryForms } from './forms';
 import { useDrawers } from './drawers';
 
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
+// (No setLayoutAnimationEnabledExperimental opt-in here: under the New
+// Architecture it is a documented no-op that warns on every dev launch —
+// Fabric drives LayoutAnimation on Android without the Paper-era toggle.)
 export function JournalSections({ dk }: { dk: string }) {
   const p = usePalette();
   const state = useAppState();

@@ -3,7 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Slot } from 'expo-router';
-import { Platform, View } from 'react-native';
+import { InteractionManager, Platform, View } from 'react-native';
 import * as Updates from 'expo-updates';
 import { useFonts } from 'expo-font';
 import { Manrope_600SemiBold, Manrope_700Bold, Manrope_800ExtraBold } from '@expo-google-fonts/manrope';
@@ -56,7 +56,11 @@ export default function RootLayout() {
     // entitlement. Safe elsewhere (the bridge no-ops), but don't even try.
     if (Platform.OS === 'ios') initWatchReceiver();
     // First-launch-of-the-day JSON snapshot (rotating, kept in Documents/backups).
-    runDailyBackup();
+    // Deferred: serializing a year of waveforms is a single long synchronous
+    // stringify, and running it while the first screen is still mounting shows
+    // up as a launch hitch (most visibly on mid-range Android). Nothing waits
+    // on the snapshot, so let the UI settle first.
+    const backup = InteractionManager.runAfterInteractions(() => { void runDailyBackup(); });
     // Reconcile the OS notification schedule with settings.reminder — covers a
     // reinstall, an imported journal, or permission revoked while we were away.
     syncReminder();
@@ -77,6 +81,7 @@ export default function RootLayout() {
         // updates are best-effort
       }
     })();
+    return () => backup.cancel();
   }, []);
   // Hold the (black) splash a beat until the custom faces are registered, so the
   // numeric readouts never flash in a fallback font first.
