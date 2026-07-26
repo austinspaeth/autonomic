@@ -12,9 +12,8 @@ import { Icon } from '../components/Icon';
 import { GRADE_COLORS, WATER_BLUE, WATER_BLUE_SOFT, fonts, radius, usePalette } from '../theme';
 import { waterGoalL } from '../lib/scoring/day';
 import { BM_KINDS, BM_VOLUMES, bmLabel } from '../lib/registry';
-import { typesFor } from '../lib/typeCatalog';
-import { ManageTypesSheet } from './TypeManager';
-import { ensureDay, getState, save, useAppState } from '../store/store';
+import { LogPickerSheet } from './LogPicker';
+import { ensureDay, getState, save } from '../store/store';
 import { defaultTimeFor, uid } from '../lib/dates';
 import type { Movement } from '../lib/types';
 
@@ -22,7 +21,7 @@ export function useDrawers(dk: string) {
   const { openSheet } = useSheets();
   return {
     water: () => openSheet((c) => <WaterDrawer dk={dk} controls={c} />),
-    triggers: () => openSheet(() => <TriggerPicker dk={dk} />),
+    triggers: () => openSheet((c) => <LogPickerSheet kind="triggers" dk={dk} controls={c} />),
     bowel: (existing: Movement | null) => openSheet((c) => <BowelForm dk={dk} existing={existing} controls={c} />),
   };
 }
@@ -100,32 +99,6 @@ function WaterDrawer({ dk, controls }: { dk: string; controls: SheetControls }) 
       <Text style={{ color: p.textDim, fontSize: 13, marginTop: 10 }}>1 cup ≈ 250 ml. Steps adjust by one cup.</Text>
       <SheetFooter>
         <Button title="Save" variant="primary" onPress={() => { ensureDay(dk).food.water = roundL(liters); save(); controls.closeAll(); }} />
-      </SheetFooter>
-    </View>
-  );
-}
-
-function TriggerPicker({ dk }: { dk: string }) {
-  const p = usePalette();
-  const { closeSheet, openSheet } = useSheets();
-  const state = useAppState();
-  const [q, setQ] = useState('');
-  const trigTypes = typesFor(state, 'triggers');
-  const types = Object.keys(trigTypes).filter((t) => trigTypes[t].label.toLowerCase().includes(q.trim().toLowerCase()));
-  return (
-    <View>
-      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 16 }}>Add trigger</Text>
-      <TextInput value={q} onChangeText={setQ} placeholder="Filter…" placeholderTextColor={p.textDim} style={{ backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.control, padding: 12, fontSize: 17, color: p.text, marginBottom: 8 }} />
-      {types.map((t) => (
-        <Pressable key={t} onPress={() => { ensureDay(dk).food.triggers[t] = 1; save(); closeSheet(); }} style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 15, borderTopWidth: 1, borderTopColor: p.border }, pressed && { opacity: 0.5 }]}>
-          <Icon name="alert" size={22} color={p.textDim} />
-          <Text style={{ color: p.text, fontSize: 17 }}>{trigTypes[t].label}</Text>
-        </Pressable>
-      ))}
-      <SheetFooter>
-        <View style={{ flex: 1 }}>
-          <Button title="Add another trigger" variant="default" onPress={() => openSheet(() => <ManageTypesSheet kind="triggers" />)} />
-        </View>
       </SheetFooter>
     </View>
   );

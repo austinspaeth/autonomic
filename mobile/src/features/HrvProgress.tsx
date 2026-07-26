@@ -14,7 +14,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Pressable, Text, View } from 'react-native';
 import { BalanceChart, LineChart, StackedBars, ZonesToggle, balanceCat } from '../components/charts';
-import { HelpDot, ScoreDot } from '../components/ui';
+import { Ghost, HelpDot, ScoreDot, TextGhost } from '../components/ui';
 import { fonts, radius, usePalette } from '../theme';
 import { fmtNum } from '../lib/dates';
 import type { DayRecord, Entry, ScoreCat } from '../lib/types';
@@ -152,6 +152,8 @@ const METRICS: { label: string; s: string; u: string; band: string; integer?: bo
 
 const POWER_HELP = 'Total spectral power of the reading, split into very-low (VLF), low (LF) and high (HF) frequency bands. Bar height is the total in ms², and a higher total is generally better: it means the heart rhythm is varying freely, which is the sign of an adaptable, well-regulated autonomic system. But the mix matters as much as the total; a healthy reading spreads power across the bands rather than piling it into one.\n\nHF (0.15–0.4 Hz) is the fast, breath-linked band. It rides almost purely on parasympathetic (vagal) tone, the "rest and digest" branch, so strong HF means good recovery and calm. LF (0.04–0.15 Hz) is the slower baroreflex band around blood-pressure regulation; it carries a mix of both branches but leans sympathetic (the "fight or flight" side) when you are stressed or standing. Note that slow paced breathing deliberately pumps LF up, so a big LF share during a breathing exercise is expected, not a warning.\n\nVLF (below 0.04 Hz) reflects slow regulatory waves tied to thermoregulation, hormones and vascular tone. A VLF share that dominates the reading (with little HF) can point to poor vagal engagement, physical or emotional stress, poor sleep, inflammation, or simply a reading that was too short or too noisy to resolve the faster bands cleanly. Occasional high VLF is normal; a persistent pattern of high VLF with suppressed HF is worth watching. Growing total power with a balanced spread over weeks is a common recovery pattern.';
 
+const POWER_DESC = 'Total HRV power split across the VLF, LF and HF frequency bands.';
+
 const filterFor = (f: Filt) => (f === 'morning' ? isMorning : f === 'evening' ? isEvening : undefined);
 
 /** Read a numeric key from readings of BOTH HRV kinds (for power). */
@@ -228,6 +230,63 @@ export function HrvProgress({ days, mode, ctx, filt }: { days: DaysMap; mode: Mo
   );
 }
 
+/**
+ * Placeholder for the HRV section, shown while it waits its turn to mount and
+ * under the range-change veil. HRV builds no cards, so its skeleton is written
+ * out here instead: the same metric sections the range will open with (their
+ * real titles, "?" copy, description and kind toggle — none of which depend on
+ * the data) with a placeholder in place of the big value and the chart.
+ */
+export function HrvProgressSkeleton() {
+  const p = usePalette();
+  return (
+    <View>
+      {/* Power leads the real section whenever the range holds any HRV reading
+          (every capture resolves the bands), so it leads the skeleton too. */}
+      <Section>
+        <SectionHead title="Power distribution" help={POWER_HELP} value={null} ghost suffix="" desc={POWER_DESC} />
+        <Ghost h={160} r={radius.control} style={{ opacity: 0.55 }} />
+        <View style={{ flexDirection: 'row', marginTop: 12, borderTopWidth: 1, borderTopColor: p.border, paddingTop: 12 }}>
+          {[['Very low', VLF], ['Low', LF], ['High', HF]].map(([label, color]) => (
+            <View key={label} style={{ flex: 1, alignItems: 'center' }}>
+              {/* Band names and colours are fixed chrome — only the numbers go. */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: color }} />
+                <Text style={{ fontSize: 12, color: p.textDim, fontWeight: '600' }}>{label}</Text>
+              </View>
+              <View style={{ marginTop: 3 }}>
+                <TextGhost style={{ fontSize: 17, fontWeight: '800', fontVariant: ['tabular-nums'] }} sample="888" w={38} inset={2} r={4} />
+              </View>
+              <TextGhost style={{ fontSize: 11 }} sample="ms² · 00%" w={52} inset={2} r={4} />
+            </View>
+          ))}
+        </View>
+      </Section>
+      {SKELETON_METRICS.map((m) => (
+        <Section key={m.label}>
+          <SectionHead
+            title={m.label}
+            help={m.help}
+            value={null}
+            ghost
+            suffix=""
+            desc={m.desc}
+            right={<Text style={{ fontSize: 12, fontWeight: '700', color: p.accent }}>Show zones</Text>}
+          />
+          <View style={{ marginBottom: 12 }}>
+            <KindToggle value="both" onChange={NOOP} />
+          </View>
+          <Ghost h={140} r={radius.control} style={{ opacity: 0.55 }} />
+        </Section>
+      ))}
+    </View>
+  );
+}
+// Power + the first metric is what the real section opens with, and enough to
+// fill the viewport below the Outlook section.
+const SKELETON_METRICS = METRICS.filter((m) => m.s === 'sdnn');
+const NOOP = () => {};
+
 /** Which HRV kind a metric section is showing. "both" averages every reading of
  *  either kind into one line; "compare" overlays the two kinds. */
 type Kind = 'both' | 'breath' | 'hrv' | 'compare';
@@ -263,9 +322,11 @@ function Section({ children }: { children: React.ReactNode }) {
 
 /** Section header per the comp: uppercase title + "?" (left), optional action
  *  (right); beneath it the big value with its dim suffix, then a description. */
-function SectionHead({ title, help, value, valueColor, value2, pair, suffix, desc, right, cat }: {
+function SectionHead({ title, help, value, valueColor, value2, pair, suffix, desc, right, cat, ghost }: {
   title: string; help: string; value: string | null; valueColor?: string;
   value2?: { text: string; color: string } | null;
+  /** Skeleton mode: the big value is a placeholder block of the same height. */
+  ghost?: boolean;
   /** "Both" mode: each series as a legend dot + name on the first row with the
    *  value below it coloured to match (like the Balance/POTS readouts). When set
    *  it replaces the plain value/value2 row and the below-chart legend. */
@@ -296,6 +357,12 @@ function SectionHead({ title, help, value, valueColor, value2, pair, suffix, des
             ))}
           </View>
           {suffix ? <Text style={{ fontSize: 13, fontWeight: '600', color: p.textDim, marginBottom: 5 }}>{suffix}</Text> : null}
+        </View>
+      ) : ghost ? (
+        // Invisible copy of the real value line, so the placeholder is exactly
+        // as tall as the number it stands in for.
+        <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 6 }}>
+          <TextGhost style={{ fontSize: 27, fontFamily: fonts.numHeavy, fontVariant: ['tabular-nums'] }} sample="888" w={64} />
         </View>
       ) : value != null ? (
         <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 6 }}>
@@ -484,7 +551,7 @@ function PowerSection({ bl, vlf, lf, hf }: {
         help={POWER_HELP}
         value={raw == null ? null : String(Math.round(raw))}
         suffix={shownIdx != null ? `ms² · (${bl[shownIdx]?.label ?? ''})` : 'ms²'}
-        desc="Total HRV power split across the VLF, LF and HF frequency bands."
+        desc={POWER_DESC}
       />
       <StackedBars
         buckets={bl}

@@ -2,23 +2,25 @@
  *  permission and a bedtime-confirmation flow that reads last night's sleep +
  *  overnight HR and lets you review/edit it before it lands in the journal. */
 import React, { useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Platform, Text, View } from 'react-native';
 import { Button } from '../components/ui';
 import { SheetControls, SheetFooter, useSheets } from '../components/Sheet';
 import { TimeField } from '../components/Field';
 import { useToast } from '../components/Toast';
 import { usePalette } from '../theme';
-import { health, healthAppName, SleepImport } from '../lib/health';
+import { health, healthAppName, healthPermissionPath, revokeHealthAuth, SleepImport } from '../lib/health';
 import { requestEcgAuth } from '../lib/health/ecg';
-import { ensureDay, getState, save } from '../store/store';
-import { getCurrentKey } from '../store/nav';
+import { ensureDay, getState, save, useStore } from '../store/store';
 import { fmtTime12 } from '../lib/dates';
+import { runHealthUpdateCheck } from './HealthUpdates';
 
 export function HealthScreen() {
   const p = usePalette();
   const toast = useToast();
   const { openSheet } = useSheets();
-  const [authed, setAuthed] = useState<boolean | null>(null);
+  // `settings.healthEnabled` is the source of truth, so reopening this screen
+  // still shows the connected state (local state alone reset to "Connect …").
+  const connected = useStore((s) => !!s.state.settings.healthEnabled);
   const [busy, setBusy] = useState(false);
   const api = health();
 
@@ -39,23 +41,44 @@ export function HealthScreen() {
     // ECG lives outside the HealthKit permission set (local native module) —
     // request it in the same connect step, sequentially so sheets don't race.
     if (ok) await requestEcgAuth();
-    setAuthed(ok);
     setBusy(false);
     toast(ok ? 'Health connected' : 'Permission denied');
     if (ok) { getState().settings.healthEnabled = true; save(); }
   };
 
-  const importSleep = async () => {
+  // Neither platform lets an app silently drop its own grants: Health Connect
+  // revokes for us (applied on the next app start), HealthKit can only send the
+  // user to the Health app. Either way we stop reading/writing immediately.
+  const disconnect = () => {
+    const name = healthAppName();
+    Alert.alert(
+      `Disconnect ${name}?`,
+      Platform.OS === 'android'
+        ? `Autonomic will stop reading and writing health data. ${name} finishes removing the permissions the next time the app starts.`
+        : `Autonomic will stop reading and writing health data. To remove the permissions too, turn Autonomic's toggles off in ${healthPermissionPath()}.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: Platform.OS === 'android' ? 'Disconnect' : 'Disconnect & open Health',
+          style: 'destructive',
+          onPress: async () => {
+            getState().settings.healthEnabled = false; save();
+            const revoked = await revokeHealthAuth();
+            toast(revoked ? `${name} disconnected` : `${name} disconnected on this device`);
+          },
+        },
+      ],
+    );
+  };
+
+  const checkForUpdates = async () => {
     setBusy(true);
     try {
-      const dk = getCurrentKey();
-      const s = await api.readSleep(dk);
-      setBusy(false);
-      if (!s) { toast('No sleep found for last night'); return; }
-      openSheet((c) => <SleepConfirmSheet dk={dk} data={s} controls={c} onDone={() => toast('Sleep saved')} />);
+      await runHealthUpdateCheck(openSheet, toast);
     } catch {
+      toast(`Could not read from ${healthAppName()}`);
+    } finally {
       setBusy(false);
-      toast('Could not read sleep');
     }
   };
 
@@ -65,10 +88,12 @@ export function HealthScreen() {
       <Text style={{ color: p.textDim, fontSize: 14, marginBottom: 16, lineHeight: 19 }}>
         {"Grant permission, then import readings one at a time from the reading picker (tap a reading type to choose a sample from Health, or enter it manually). Adding an activity offers the day's workouts the same way. New readings you log are also written back to Health automatically. Existing entries are never overwritten."}
       </Text>
-      <Button title={authed ? 'Health connected' : `Connect ${healthAppName()}`} variant="primary" onPress={connect} />
+      {connected
+        ? <Button title={`Disconnect ${healthAppName()}`} variant="danger" onPress={disconnect} />
+        : <Button title={`Connect ${healthAppName()}`} variant="primary" onPress={connect} />}
       <View style={{ height: 20 }} />
       <Text style={{ color: p.textDim, fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Troubleshooting</Text>
-      <Button title="Import sleep from Health" onPress={importSleep} />
+      <Button title={`Check ${healthAppName()} for updates`} onPress={checkForUpdates} disabled={busy} />
       {busy ? <View style={{ alignItems: 'center', marginTop: 14 }}><ActivityIndicator color={p.accent} /></View> : null}
       <View style={{ height: 24 }} />
     </View>

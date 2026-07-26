@@ -5,7 +5,7 @@
  */
 import React from 'react';
 import {
-  Pressable, StyleProp, StyleSheet, Text, View, ViewProps, ViewStyle,
+  Pressable, StyleProp, StyleSheet, Text, TextStyle, View, ViewProps, ViewStyle,
 } from 'react-native';
 import Reanimated, {
   Easing as REasing, interpolate, interpolateColor, useAnimatedStyle, useSharedValue,
@@ -295,6 +295,38 @@ function HelpSheet({ title, text }: { title: string; text: string }) {
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 10 }}>{title}</Text>
       <Text style={{ color: p.textDim, fontSize: 14.5, lineHeight: 22 }}>{text}</Text>
       <View style={{ height: 10 }} />
+    </View>
+  );
+}
+
+/* ---------- Skeleton block ---------- */
+/** A dim rounded rect standing in for a piece of content that hasn't been built
+ *  yet. Skeletons keep the chrome around it real (titles, help dots, labels)
+ *  and swap only the data for these, so a placeholder lays out at the height of
+ *  the thing it becomes — see `src/features/ProgressSkeleton.tsx`. */
+export function Ghost({ w, h, r = 6, style }: {
+  w?: number | `${number}%`; h: number; r?: number; style?: StyleProp<ViewStyle>;
+}) {
+  const p = usePalette();
+  return <View style={[{ width: w ?? '100%', height: h, borderRadius: r, backgroundColor: p.surface2 }, style]} />;
+}
+
+/** Ghost of a *text* run. Guessing a height for text never matches (font
+ *  metrics, line height, wrapping), so this lays the block over an invisible
+ *  copy of the real Text — same style, same sample string — and lets that set
+ *  the height. Give it the exact style the real value/label uses and the
+ *  skeleton row is exactly as tall as the row it becomes. */
+export function TextGhost({ style, sample, w, inset = 3, r = 6 }: {
+  style?: StyleProp<TextStyle>; sample: string; w?: number | `${number}%`; inset?: number; r?: number;
+}) {
+  const p = usePalette();
+  return (
+    <View>
+      <Text style={[style, { opacity: 0 }]}>{sample}</Text>
+      <View
+        pointerEvents="none"
+        style={{ position: 'absolute', left: 0, top: inset, bottom: inset, width: w ?? '100%', borderRadius: r, backgroundColor: p.surface2 }}
+      />
     </View>
   );
 }

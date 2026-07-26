@@ -13,7 +13,8 @@ import { usePaywall } from '../../src/features/Paywall';
 import { buildCategories, type AnalysisCard, type BpPeriod, type OrthoTransition } from '../../src/lib/analysis/categories';
 import { resolveProtocol, type DaysMap } from '../../src/lib/scoring/day';
 import { catFromBands, type Mode } from '../../src/lib/analysis/buckets';
-import { HrvFilterLinks, HrvProgress, type Filt } from '../../src/features/HrvProgress';
+import { HrvFilterLinks, HrvProgress, HrvProgressSkeleton, type Filt } from '../../src/features/HrvProgress';
+import { SectionSkeleton } from '../../src/features/ProgressSkeleton';
 import { demoDays, hasOwnData } from '../../src/lib/demo';
 import { DemoBanner, DEMO_PROGRESS_TEXT } from '../../src/features/DemoBanner';
 
@@ -324,7 +325,7 @@ export default function AnalysisScreen() {
           {/* Last in the overlay layer, so it covers the pinned bar too — the
               pinned section is one of the things a range change invalidates. */}
           {veil ? (
-            <RangeVeil top={headerH} op={veilOp} items={veil.items} banner={demo && veil.from === 0} onLayout={onVeilLayout} />
+            <RangeVeil top={headerH} op={veilOp} items={veil.items} banner={demo && veil.from === 0} hrvFilt={hrvFilt} onLayout={onVeilLayout} />
           ) : null}
         </>
       }
@@ -363,6 +364,8 @@ const CONTENT_PAD = 16;
 const VEIL_IN = { duration: 110, easing: REasing.out(REasing.quad) };
 const VEIL_OUT = { duration: 170, easing: REasing.out(REasing.cubic) };
 const VEIL_HOLD_MS = 140;
+// The veil's copies of live controls are inert — nothing under it can be reached.
+const NOOP = () => {};
 const VEIL_CEILING_MS = 700;
 
 type Section = { id: string; title: string; buckets: { label: string }[]; cards: AnalysisCard[]; hasOwn: boolean };
@@ -393,15 +396,18 @@ function useProgressiveReveal(sections: Section[], initial: number): number {
   return shown;
 }
 
-type VeilItem = { title: string; cards: number };
+type VeilItem = { id: string; title: string; cards: AnalysisCard[] };
 
-/** Snapshot of the on-screen document's shape, from `from` down — section
- *  titles are identical across ranges, so the veil can keep them. */
+/** Snapshot of the on-screen document's shape, from `from` down. Section titles
+ *  — and the card chrome the skeleton keeps (titles, help copy, descriptions,
+ *  chart labels) — are the same whichever range is charted, so the outgoing
+ *  range's cards describe the incoming one's layout well enough to stand in. */
 function veilItems(sections: Section[], from: number): VeilItem[] {
   return sections.slice(from).map((s) => ({
+    id: s.id,
     // Outlook renders untitled at the very top.
     title: s.id === 'outlook' ? '' : s.title,
-    cards: s.id === 'hrv' ? 2 : Math.max(1, Math.min(s.cards.length, 3)),
+    cards: s.cards,
   }));
 }
 
@@ -411,8 +417,8 @@ function veilItems(sections: Section[], from: number): VeilItem[] {
  *  it, which is what lets the rebuild — and the scroll reposition that goes
  *  with it — be free. Touches are swallowed while it's up; the header (and so
  *  the range control) sits in a layer above it and stays live. */
-function RangeVeil({ top, op, items, banner, onLayout }: {
-  top: number; op: SharedValue<number>; items: VeilItem[]; banner: boolean; onLayout: () => void;
+function RangeVeil({ top, op, items, banner, hrvFilt, onLayout }: {
+  top: number; op: SharedValue<number>; items: VeilItem[]; banner: boolean; hrvFilt: Filt; onLayout: () => void;
 }) {
   const p = usePalette();
   const style = useAnimatedStyle(() => ({ opacity: op.value }));
@@ -428,10 +434,19 @@ function RangeVeil({ top, op, items, banner, onLayout }: {
       {banner ? <DemoBanner text={DEMO_PROGRESS_TEXT} /> : null}
       {items.map((it, i) => (
         <View key={i} style={{ marginTop: i === 0 ? 0 : 22 }}>
-          {it.title ? (
+          {it.id === 'hrv' ? (
+            // Same title row as the document's, filter pills and all — they're
+            // live under there and unaffected by the range change.
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, minHeight: 34 }}>
+              <Text style={{ fontSize: SECTION_TITLE_SIZE, fontWeight: '700', color: p.text }}>{it.title}</Text>
+              <View style={{ flexShrink: 1, marginLeft: 12, alignItems: 'flex-end' }}>
+                <HrvFilterLinks value={hrvFilt} onChange={NOOP} />
+              </View>
+            </View>
+          ) : it.title ? (
             <Text style={{ fontSize: SECTION_TITLE_SIZE, fontWeight: '700', color: p.text, marginBottom: 8 }}>{it.title}</Text>
           ) : null}
-          <SectionSkeleton cards={it.cards} />
+          {it.id === 'hrv' ? <HrvProgressSkeleton /> : <SectionSkeleton cards={it.cards} />}
         </View>
       ))}
       <BottomFade />
@@ -476,7 +491,7 @@ const SectionsBody = React.memo(function SectionsBody({ sections, demo, days, mo
             <Text style={{ fontSize: SECTION_TITLE_SIZE, fontWeight: '700', color: p.text, marginBottom: 8 }}>{s.title}</Text>
           )}
           {si >= revealed ? (
-            <SectionSkeleton cards={s.id === 'hrv' ? 2 : Math.max(1, Math.min(s.cards.length, 3))} />
+            s.id === 'hrv' ? <HrvProgressSkeleton /> : <SectionSkeleton cards={s.cards} />
           ) : s.id === 'hrv' ? (
             <HrvProgress days={days} mode={mode} ctx={ctx} filt={hrvFilt} />
           ) : s.cards.length === 0 ? (
@@ -489,25 +504,6 @@ const SectionsBody = React.memo(function SectionsBody({ sections, demo, days, mo
     </>
   );
 });
-
-/** Placeholder cards shown for the few frames before a section's charts mount:
- *  real card chrome (surface, border, ghost blocks), so a hard fling lands on
- *  skeleton cards rather than blank space. Mounting is top-down, so the swap to
- *  real content happens below the viewport and never reads as a shift. */
-function SectionSkeleton({ cards }: { cards: number }) {
-  const p = usePalette();
-  return (
-    <>
-      {Array.from({ length: cards }, (_, i) => (
-        <View key={i} style={{ backgroundColor: p.surface, borderColor: p.border, borderWidth: 1, borderRadius: radius.card, padding: 16, height: 280, marginBottom: 12 }}>
-          <View style={{ width: 130, height: 11, borderRadius: 6, backgroundColor: p.surface2 }} />
-          <View style={{ width: 62, height: 22, borderRadius: 6, backgroundColor: p.surface2, marginTop: 18 }} />
-          <View style={{ flex: 1, borderRadius: radius.control, backgroundColor: p.surface2, opacity: 0.55, marginTop: 18 }} />
-        </View>
-      ))}
-    </>
-  );
-}
 
 type Active = { id: string; title: string } | null;
 

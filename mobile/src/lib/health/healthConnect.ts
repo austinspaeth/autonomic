@@ -43,6 +43,7 @@ interface HcModule {
   initialize: () => Promise<boolean>;
   getSdkStatus: () => Promise<number>;
   requestPermission: (perms: { accessType: 'read' | 'write'; recordType: string }[]) => Promise<unknown[]>;
+  getGrantedPermissions: () => Promise<{ accessType?: string; recordType?: string }[]>;
   readRecords: (recordType: string, opts: {
     timeRangeFilter: TimeRangeFilter; pageSize?: number; pageToken?: string; ascendingOrder?: boolean;
   }) => Promise<{ records: unknown[]; pageToken?: string }>;
@@ -138,6 +139,20 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
       } catch { return false; }
     },
 
+    async readAuthStatus(scope) {
+      // Health Connect, unlike HealthKit, reports its grants — so an empty
+      // workout list here can be blamed accurately instead of guessed at.
+      try {
+        if (!(await ensureInit())) return 'unknown';
+        const granted = await mod.getGrantedPermissions();
+        const has = (recordType: string) => granted.some(
+          (g) => g.recordType === recordType && g.accessType === 'read',
+        );
+        const need = scope === 'workouts' ? ['ExerciseSession', 'HeartRate'] : READ_TYPES;
+        return need.every(has) ? 'granted' : 'denied';
+      } catch { return 'unknown'; }
+    },
+
     async readDay(dk) {
       const { from, to } = dayBounds(dk);
       const [rhr, resp, bp, weight] = await Promise.all([
@@ -214,6 +229,10 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
     // Apple Watch Breathe/ECG sync flow — no Android equivalent (no heartbeat
     // series record type in Health Connect).
     async readHrvSessions() { return []; },
+
+    // Health Connect's medication record type is still experimental and not
+    // exposed by react-native-health-connect — wire it here when it ships.
+    async readMedications() { return []; },
 
     async readWorkouts(dk) {
       const { from, to } = dayBounds(dk);

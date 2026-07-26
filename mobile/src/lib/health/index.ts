@@ -18,7 +18,7 @@
  * Guarded so importing on Android or without the native module returns a stub
  * with `available: false`. The module is loaded lazily.
  */
-import { Platform } from 'react-native';
+import { Linking, Platform } from 'react-native';
 import type { Entry, SleepStages } from '../types';
 import { computeHrv } from '../hrv';
 import { keyOf } from '../dates';
@@ -28,9 +28,27 @@ import { activityTypeFromHk, workoutHrSeries } from './workoutMap';
 /** This app's bundle id — used to skip re-importing our own write-backs. */
 const OWN_BUNDLE = 'com.autonomic.journal';
 
+/** Which slice of the read set a permission question is about. */
+export type HealthScope = 'all' | 'workouts';
+/**
+ * What we can honestly say about read access.
+ *  - `shouldRequest` — the OS still has questions to ask; requesting shows UI.
+ *  - `granted` / `denied` — provable (Health Connect reports grants).
+ *  - `unknown` — we asked and the platform won't say. HealthKit *never* reveals
+ *    read grants, so iOS lands here for every already-requested type.
+ */
+export type HealthAuthStatus = 'shouldRequest' | 'granted' | 'denied' | 'unknown';
+
 export interface HealthApi {
   available: boolean;
   requestAuth(): Promise<boolean>;
+  /**
+   * Whether a read scope has been asked about yet, and (where the platform
+   * says) whether it was granted. Lets callers tell "nothing recorded that day"
+   * apart from "we may have been denied" instead of showing one empty state for
+   * both — see `HEALTH_PERMISSION_HINT`.
+   */
+  readAuthStatus(scope: HealthScope): Promise<HealthAuthStatus>;
   /** Pull the day's relevant samples for a YYYY-MM-DD key. */
   readDay(dk: string): Promise<HealthDaySamples>;
   /**
@@ -59,6 +77,15 @@ export interface HealthApi {
    * Excludes samples this app authored and series with too few beats.
    */
   readHrvSessions(opts: { fromMs: number; toMs: number }): Promise<WatchHrvSample[]>;
+  /**
+   * The day's medication doses logged in the platform health app. Neither
+   * bridge library exposes medication reads yet (HealthKit gained a meds API
+   * in iOS 26 but @kingstinct/react-native-healthkit doesn't surface it, and
+   * Health Connect's medication record is still experimental), so both
+   * implementations currently return [] — this seam exists so the periodic
+   * import check grows a Medications group the moment a library ships it.
+   */
+  readMedications(dk: string): Promise<ImportedMed[]>;
   /** iOS writes SDNN (HealthKit's HRV type); Android writes RMSSD (Health
    *  Connect's). Callers pass both when they have them. */
   writeHrvSession(opts: { sdnnMs?: number; rmssdMs?: number; avgHr?: number; startISO: string; durationSec: number }): Promise<void>;
@@ -109,6 +136,15 @@ export interface ImportedWorkout {
   ownApp: boolean;           // authored by this app (watch sessions) — skip on import
 }
 
+/** A medication dose from the platform health store (see readMedications). */
+export interface ImportedMed {
+  name: string;              // as recorded by the health app, e.g. "Magnesium Glycinate"
+  time: string;              // HH:MM local
+  startMs: number;           // epoch ms of the dose, for dedup windows
+  amount: string | null;     // display amount, e.g. "400 mg", when recorded
+  ownApp: boolean;           // authored by this app — skip on import
+}
+
 /** A watch heartbeat-series reading pulled for the live-capture sync flow. */
 export interface WatchHrvSample {
   startMs: number;
@@ -139,10 +175,12 @@ const emptyDay: HealthDaySamples = {
 const stub: HealthApi = {
   available: false,
   async requestAuth() { return false; },
+  async readAuthStatus() { return 'unknown'; },
   async readDay() { return emptyDay; },
   async readImports() { return []; },
   async readHistory() { return []; },
   async readHrvSessions() { return []; },
+  async readMedications() { return []; },
   async readWorkouts() { return []; },
   async readSleep() { return null; },
   async writeHrvSession() { /* no-op */ },
@@ -186,6 +224,48 @@ export function healthAppName(): string {
 }
 
 /**
+ * Where a user fixes a read permission we can't fix from here. HealthKit has no
+ * deep link into an app's Data Access page, so iOS opens the Health app itself
+ * and the copy carries the rest of the path.
+ */
+export function healthPermissionPath(): string {
+  return Platform.OS === 'android'
+    ? 'Health Connect → App permissions → Autonomic'
+    : 'Apple Health → your profile → Apps';
+}
+
+/** Open the platform health app so the user can review this app's access. */
+export function openHealthApp(): void {
+  if (Platform.OS === 'android') {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require('react-native-health-connect').openHealthConnectSettings();
+    } catch { /* Health Connect missing — nothing to open */ }
+    return;
+  }
+  Linking.openURL('x-apple-health://').catch(() => { /* Health app unavailable */ });
+}
+
+/**
+ * Hand the user the platform's own permission UI to cut access.
+ * Health Connect can actually revoke from here (Android 14+ applies it on the
+ * next app start); HealthKit has no revoke API at all, so iOS falls back to
+ * opening the Health app where the user flips the toggles themselves.
+ * Returns true when the platform revoked it for us.
+ */
+export async function revokeHealthAuth(): Promise<boolean> {
+  if (Platform.OS === 'android') {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      await require('react-native-health-connect').revokeAllPermissions();
+      return true;
+    } catch { return false; }
+  }
+  openHealthApp();
+  return false;
+}
+
+/**
  * Loosely-typed surface over the healthkit module (v8). Queries/saves take Date
  * objects; requestAuthorization is (read, write).
  */
@@ -208,6 +288,8 @@ type HkWorkout = {
 interface HkModule {
   isHealthDataAvailable?: () => Promise<boolean>;
   requestAuthorization?: (read: string[], write: string[]) => Promise<boolean>;
+  /** HKAuthorizationRequestStatus: 0 unknown · 1 shouldRequest · 2 unnecessary. */
+  getRequestStatusForAuthorization?: (read: string[], write?: string[]) => Promise<number>;
   queryQuantitySamples?: (id: string, opts: Record<string, unknown>) => Promise<readonly QSample[]>;
   queryCategorySamples?: (id: string, opts: Record<string, unknown>) => Promise<readonly CSample[]>;
   queryHeartbeatSeriesSamples?: (opts: Record<string, unknown>) => Promise<readonly HeartbeatSeries[]>;
@@ -314,6 +396,18 @@ function makeReal(mod: HkModule): HealthApi {
         // v8 order: (read, write).
         return (await mod.requestAuthorization?.(READ_IDS, WRITE_IDS)) ?? false;
       } catch { return false; }
+    },
+
+    async readAuthStatus(scope) {
+      // HealthKit answers only "would a request show UI?" — a determined type
+      // reads back as `unnecessary` whether the user granted it or denied it,
+      // so an already-asked scope can never resolve better than 'unknown'.
+      try {
+        const read = scope === 'workouts' ? [WORKOUT_TYPE, QID.heartRate] : READ_IDS;
+        const write = scope === 'workouts' ? [] : WRITE_IDS;
+        const st = await mod.getRequestStatusForAuthorization?.(read, write);
+        return st === 1 ? 'shouldRequest' : 'unknown';
+      } catch { return 'unknown'; }
     },
 
     async readDay(dk) {
@@ -456,6 +550,12 @@ function makeReal(mod: HkModule): HealthApi {
         }
         return out.sort((a, b) => b.startMs - a.startMs);
       } catch { return []; }
+    },
+
+    async readMedications() {
+      // @kingstinct/react-native-healthkit has no medication-dose query yet
+      // (the HKMedication APIs are iOS 26+); wire it here when it lands.
+      return [];
     },
 
     async readWorkouts(dk) {

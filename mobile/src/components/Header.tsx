@@ -98,6 +98,7 @@ export function Screen({
   onScroll,
   scrollEventThrottle,
   onHeaderHeight,
+  refreshControl,
 }: {
   header?: React.ReactNode;
   footer?: React.ReactNode;
@@ -110,6 +111,9 @@ export function Screen({
   onScroll?: React.ComponentProps<typeof Animated.ScrollView>['onScroll'];
   scrollEventThrottle?: number;
   onHeaderHeight?: (h: number) => void;
+  /** Native pull-to-refresh control (Android — iOS screens draw their own
+   *  overscroll graphic off `onScroll` instead). */
+  refreshControl?: React.ComponentProps<typeof Animated.ScrollView>['refreshControl'];
 }) {
   const p = usePalette();
   const insets = useSafeAreaInsets();
@@ -142,6 +146,7 @@ export function Screen({
         ref={setScrollRef as never}
         onScroll={onScroll}
         scrollEventThrottle={scrollEventThrottle ?? 16}
+        refreshControl={refreshControl}
         contentContainerStyle={{ paddingTop: headerH + contentPadding, paddingHorizontal: contentPadding, paddingBottom: bottomPad }}
         showsVerticalScrollIndicator={false}
         // No keyboard-inset handling here on purpose: nothing inline needs it

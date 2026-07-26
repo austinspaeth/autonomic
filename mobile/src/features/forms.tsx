@@ -19,8 +19,9 @@ import {
 } from '../lib/registry';
 import { typesFor, type TypeKind } from '../lib/typeCatalog';
 import { ManageTypesSheet } from './TypeManager';
+import { LogPickerSheet } from './LogPicker';
 import { computeScores } from '../lib/scoring';
-import { health, healthAppName } from '../lib/health';
+import { health, healthAppName, healthPermissionPath, openHealthApp } from '../lib/health';
 import { healthSourceFor, workoutCandidates, type HealthCandidate, type HealthSource, type WorkoutCandidate } from '../lib/health/sources';
 import { deleteEntry, getState, storeWaveform, upsertEntry, useAppState } from '../store/store';
 import { splitWaveform } from '../lib/waveforms';
@@ -144,10 +145,11 @@ function ActivityImportSheet({ dk, onManual, onPick }: {
   const p = usePalette();
   const [loading, setLoading] = useState(true);
   const [cands, setCands] = useState<WorkoutCandidate[]>([]);
+  const [mayBeDenied, setMayBeDenied] = useState(false);
   React.useEffect(() => {
     let alive = true;
     workoutCandidates(dk, getState().days[dk]?.activities || [])
-      .then((c) => { if (alive) setCands(c); })
+      .then((r) => { if (alive) { setCands(r.workouts); setMayBeDenied(r.mayBeDenied); } })
       .catch(() => { /* graceful — falls through to the empty state */ })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
@@ -162,7 +164,19 @@ function ActivityImportSheet({ dk, onManual, onPick }: {
           <Text style={{ color: p.textDim, fontSize: 14 }}>{`Getting workouts from ${healthAppName()}…`}</Text>
         </View>
       ) : cands.length === 0 ? (
-        <Muted>{`No workouts in ${healthAppName()} for this day. Enter an activity manually below.`}</Muted>
+        <View style={{ gap: 10 }}>
+          <Muted>{`No workouts in ${healthAppName()} for this day. Enter an activity manually below.`}</Muted>
+          {mayBeDenied && (
+            // Read permission can be off without the app ever being told (iOS
+            // never reports read grants, and the permission sheet's toggles
+            // default to off), so an empty day gets a way out.
+            <Text style={{ color: p.textDim, fontSize: 13, lineHeight: 18 }}>
+              {'Expecting one? Check that workouts are shared with Autonomic in '}
+              <Text style={{ color: p.accent, fontWeight: '600' }} onPress={openHealthApp}>{healthPermissionPath()}</Text>
+              {'.'}
+            </Text>
+          )}
+        </View>
       ) : (
         cands.map((c, i) => (
           <Pressable key={c.key} onPress={() => onPick(c)} style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: p.border }, pressed && { opacity: 0.5 }]}>
@@ -581,13 +595,9 @@ export function useEntryForms(dk: string) {
     if (!health().available || !getState().settings.healthEnabled) { pickActivityManual(); return; }
     openSheet(() => <ActivityImportSheet dk={dk} onManual={pickActivityManual} onPick={openWorkoutImport} />, { fitContent: true });
   };
-  const pickMed = () => openSheet(() => <TypePicker title="Add medication or supplement" kind="meds" manageLabel="Add another medication" onPick={(t) => {
-    // A user-defined med with a saved dosage prefills the Amount field.
-    const def = typesFor(getState(), 'meds')[t];
-    const prefill = def?.dosage ? ({ id: uid(), type: t, time: defaultTimeFor(dk), note: '', amount: def.dosage } as Entry) : null;
-    openSheet((c) => <EntryForm typeMap={typesFor(getState(), 'meds')} arrKey="meds" dk={dk} type={t} existing={null} prefill={prefill} controls={c} onSaved={refresh} />);
-  }} />);
-  const pickSymptom = () => openSheet(() => <TypePicker title="Add symptom" kind="symptoms" manageLabel="Add another symptom" onPick={(t) => openSheet((c) => <EntryForm typeMap={typesFor(getState(), 'symptoms')} arrKey="symptoms" dk={dk} type={t} existing={null} controls={c} onSaved={refresh} />)} />);
+  // Multi-select med logging sheet (search, checkboxes, edit-list mode).
+  const pickMed = () => openSheet((c) => <LogPickerSheet kind="meds" dk={dk} controls={c} />);
+  const pickSymptom = () => openSheet((c) => <LogPickerSheet kind="symptoms" dk={dk} controls={c} />);
 
   const openMed = (r: Entry) => openSheet((c) => <EntryForm typeMap={typesFor(getState(), 'meds')} arrKey="meds" dk={dk} type={r.type} existing={r} controls={c} onSaved={refresh} />);
   const openSymptom = (r: Entry) => openSheet((c) => <EntryForm typeMap={typesFor(getState(), 'symptoms')} arrKey="symptoms" dk={dk} type={r.type} existing={r} controls={c} onSaved={refresh} />);

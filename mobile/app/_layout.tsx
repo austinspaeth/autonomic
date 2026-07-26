@@ -13,6 +13,7 @@ import { ToastProvider } from '../src/components/Toast';
 import { OnboardingGate } from '../src/features/Onboarding';
 import { WatchArrivalCards } from '../src/features/WatchArrivals';
 import { WatchSyncPill } from '../src/features/hrv/WatchSyncPill';
+import { HealthUpdatePill } from '../src/features/HealthUpdates';
 import { RestoreGate } from '../src/features/RestoreGate';
 import { initIap } from '../src/store/iap';
 import { initTier } from '../src/store/tier';
@@ -91,6 +92,9 @@ export default function RootLayout() {
                   "Waiting for watch…" pill while the sync card is minimized. */}
               {Platform.OS === 'ios' ? <WatchArrivalCards /> : null}
               {Platform.OS === 'ios' ? <WatchSyncPill /> : null}
+              {/* Hourly "anything new in the health store?" pill (both
+                  platforms — it no-ops until Health is connected). */}
+              <HealthUpdatePill />
               {/* Freemium: no blocking paywall. Locked surfaces raise the
                   PaywallCard sheet on demand (src/features/Paywall.tsx). */}
               {/* First-run welcome wizard — overlays the tabs until completed,

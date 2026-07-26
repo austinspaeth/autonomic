@@ -30,14 +30,16 @@ final class HrMonitorModel: ObservableObject {
     @Published var signalLost = false
     @Published var atMax = false
     @Published var nearMax = false
-    /// Rolling 5-minute HR history for the chart page. Sensor dropouts stay
-    /// as real holes (no fake samples) — the chart breaks its line across
-    /// them. Refreshed at display cadence, like every other published value.
-    @Published var chartSeries: [(at: Date, hr: Double)] = []
+    /// Rolling 5-minute HR history for the chart page, each sample carrying
+    /// the delta-vs-2-min-average it had when it landed (drives the POTS
+    /// color bands). Sensor dropouts stay as real holes (no fake samples) —
+    /// the chart breaks its line across them. Refreshed at display cadence,
+    /// like every other published value.
+    @Published var chartSeries: [(at: Date, hr: Double, delta: Double)] = []
 
     var dimmed = false
 
-    private var history: [(at: Date, hr: Double)] = []
+    private var history: [(at: Date, hr: Double, delta: Double)] = []
     private var window: [(at: Date, hr: Double)] = []
     private var deltaWindow: [(at: Date, delta: Double)] = []
     private var ticker: Timer?
@@ -86,14 +88,14 @@ final class HrMonitorModel: ObservableObject {
         var currentDelta: Double?
         if !wm.searching, let hr = wm.hr {
             liveHr = hr
-            history.append((at: now, hr: hr))
-            history.removeAll { now.timeIntervalSince($0.at) > HrHistoryChart.window }
             window.append((at: now, hr: hr))
             window.removeAll { now.timeIntervalSince($0.at) > 120 }
             let avg = window.map(\.hr).reduce(0, +) / Double(window.count)
             currentAvg = avg
             let d = hr - avg
             currentDelta = d
+            history.append((at: now, hr: hr, delta: d))
+            history.removeAll { now.timeIntervalSince($0.at) > HrHistoryChart.window }
             // Buzzers run at full sample rate regardless of display cadence.
             deltaBuzzers.forEach { $0.update(d) }
             if maxHr != nil { maxBuzzer?.update(hr) }
@@ -338,13 +340,24 @@ private struct SwipeChevron: View {
  * a padded min/max domain rounded to 5s. Sensor dropouts >10 s break the
  * line — real gaps stay visible as holes, same no-fake-samples rule as the
  * logged series. A dot marks the newest sample while the signal is live.
+ *
+ * The line is delta-banded: each segment takes `DS.deltaColor` of the delta
+ * its newer sample had against the rolling 2-min average when it was recorded
+ * (green <20 · amber ≥20 · red ≥30 — same rule as the Delta tile and buzzers).
  */
 struct HrHistoryChart: View {
-    let series: [(at: Date, hr: Double)]
+    let series: [(at: Date, hr: Double, delta: Double)]
     var live = true
 
     static let window: TimeInterval = 300
     private static let gapBreak: TimeInterval = 10
+
+    /// One stroke path per delta band, index-aligned with `bandColors`
+    /// (mirrors `DS.deltaColor`).
+    private static let bandColors: [Color] = [DS.green, DS.amber, DS.accent]
+    private static func band(_ delta: Double) -> Int {
+        delta >= 30 ? 2 : delta >= 20 ? 1 : 0
+    }
 
     var body: some View {
         let hrs = series.map(\.hr)
@@ -354,7 +367,7 @@ struct HrHistoryChart: View {
         VStack(spacing: 2) {
             GeometryReader { geo in
                 let now = Date()
-                let pt = { (s: (at: Date, hr: Double)) -> CGPoint in
+                let pt = { (s: (at: Date, hr: Double, delta: Double)) -> CGPoint in
                     CGPoint(
                         x: geo.size.width * (1 - now.timeIntervalSince(s.at) / Self.window),
                         y: geo.size.height * (1 - (s.hr - lo) / (hi - lo))
@@ -374,23 +387,17 @@ struct HrHistoryChart: View {
                             .foregroundStyle(DS.dim.opacity(0.8))
                             .position(x: 9, y: max(6, y - 7))
                     }
-                    Path { p in
-                        var lastAt: Date?
-                        for s in series {
-                            let point = pt(s)
-                            if let lastAt, s.at.timeIntervalSince(lastAt) <= Self.gapBreak {
-                                p.addLine(to: point)
-                            } else {
-                                p.move(to: point)
-                            }
-                            lastAt = s.at
-                        }
+                    let paths = bandPaths(pt: pt)
+                    ForEach(paths.indices, id: \.self) { i in
+                        paths[i].stroke(
+                            Self.bandColors[i],
+                            style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round)
+                        )
                     }
-                    .stroke(DS.accent, style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
                     if live, let last = series.last,
                        now.timeIntervalSince(last.at) < Self.gapBreak {
                         Circle()
-                            .fill(DS.accent)
+                            .fill(DS.deltaColor(last.delta))
                             .frame(width: 5, height: 5)
                             .position(pt(last))
                     }
@@ -405,6 +412,22 @@ struct HrHistoryChart: View {
             .font(.system(size: 9, weight: .semibold))
             .foregroundStyle(DS.dim.opacity(0.8))
         }
+    }
+
+    /// Splits the line into one path per delta band. Each segment is colored by
+    /// its newer sample's delta; gaps >10 s break the line in every band.
+    private func bandPaths(pt: ((at: Date, hr: Double, delta: Double)) -> CGPoint) -> [Path] {
+        var paths = Array(repeating: Path(), count: Self.bandColors.count)
+        var prev: (at: Date, hr: Double, delta: Double)?
+        for s in series {
+            if let prev, s.at.timeIntervalSince(prev.at) <= Self.gapBreak {
+                let i = Self.band(s.delta)
+                paths[i].move(to: pt(prev))
+                paths[i].addLine(to: pt(s))
+            }
+            prev = s
+        }
+        return paths
     }
 }
 

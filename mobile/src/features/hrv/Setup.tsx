@@ -13,7 +13,7 @@ import React, { useState } from 'react';
 import { Platform, Pressable, Text, View } from 'react-native';
 import Animated, { Easing, interpolateColor, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { SheetControls, useSheets } from '../../components/Sheet';
-import { Button, HelpDot } from '../../components/ui';
+import { Button } from '../../components/ui';
 import { Icon, type IconName } from '../../components/Icon';
 import { useToast } from '../../components/Toast';
 import { radius, usePalette } from '../../theme';
@@ -27,18 +27,6 @@ import { CameraSetup } from './CameraSetup';
 import { WatchPrep } from './WatchPrep';
 import { HealthRrImportSheet } from './HealthImport';
 import { SOURCE_META, SourcePicker, sourceSub, type Source } from './SourcePicker';
-
-const HELP = {
-  main:
-    'A 5 minute read of how your nervous system is balancing stress and recovery. Same time daily shows your trend.',
-  kind:
-    'Both kinds run 5 minutes.\n\n' +
-    'Training HRV paces your breath at 4 seconds in, 6 seconds out. For most people that is their resonant frequency, the rate where the baroreflex (your blood pressure regulator) swings in sync with each breath and HRV peaks. It is the most sensitive and most repeatable daily measure, and the pacing itself trains the baroreflex.\n\n' +
-    'Baseline HRV lets you breathe however you normally do. It captures where your nervous system actually sits right now, with nothing imposed on it.',
-  source: Platform.OS === 'ios'
-    ? 'Where the heartbeat signal comes from. A Bluetooth chest strap is the most accurate. Apple Watch uses a reading you take on your watch during the session, a Mindfulness breathing session or an ECG, which syncs in afterward. Phone camera reads your pulse through your fingertip over the rear camera and flash, no device needed, but it is the least accurate option.'
-    : 'Where the heartbeat signal comes from. A Bluetooth chest strap is the most accurate. Phone camera reads your pulse through your fingertip over the rear camera and flash, no device needed, but it is the least accurate option.',
-};
 
 // The sheet's ✕ pill floats top-right; inset the title + subtitle so neither
 // runs underneath it (was clipped on narrower screens).
@@ -131,10 +119,7 @@ export function HrvSetup({ controls }: { controls: SheetControls }) {
   return (
     <View>
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 6, paddingRight: CLOSE_CLEARANCE }}>Capture an HRV reading</Text>
-      <View style={{ flexDirection: 'row', alignItems: 'flex-start', paddingRight: CLOSE_CLEARANCE, marginBottom: 18 }}>
-        <Text style={{ flex: 1, color: p.textDim, fontSize: 14, lineHeight: 20 }}>Five minutes, same time each day. Choose what this reading is for.</Text>
-        <HelpDot title="HRV readings" text={`${HELP.main}\n\n${HELP.kind}`} />
-      </View>
+      <Text style={{ color: p.textDim, fontSize: 14, lineHeight: 20, paddingRight: CLOSE_CLEARANCE, marginBottom: 18 }}>Five minutes, same time each day. Choose what this reading is for.</Text>
 
       <View style={{ gap: 10 }}>
         {MODES.map((m) => (
@@ -142,10 +127,7 @@ export function HrvSetup({ controls }: { controls: SheetControls }) {
         ))}
       </View>
 
-      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 22, marginBottom: 10 }}>
-        <Text style={{ fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.6, color: p.textDim, fontWeight: '700' }}>Measuring with</Text>
-        <HelpDot title="Measuring with" text={HELP.source} />
-      </View>
+      <Text style={{ fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.6, color: p.textDim, fontWeight: '700', marginTop: 22, marginBottom: 10 }}>Measuring with</Text>
       <Pressable
         onPress={changeSource}
         style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: radius.control, borderWidth: 1, borderColor: p.border, backgroundColor: p.surface2 }}

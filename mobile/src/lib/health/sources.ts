@@ -15,8 +15,12 @@
  * import card.
  */
 import { fmtTime12 } from '../dates';
-import { ACTIVITY_TYPES, entryFields } from '../registry';
-import { health, type ImportedWorkout } from './index';
+import { health } from './index';
+import { workoutCandidateOf, type WorkoutCandidate } from './workoutCandidate';
+
+// The candidate shape + mapper live in ./workoutCandidate (pure module, shared
+// with the periodic update check); existing consumers keep importing them here.
+export { workoutCandidateOf, type WorkoutCandidate } from './workoutCandidate';
 
 /** One importable Apple Health reading, shaped for the picker + prefill. */
 export interface HealthCandidate {
@@ -36,56 +40,31 @@ export function healthSourceFor(type: string): HealthSource | null {
   return null;
 }
 
-/** One importable workout, shaped for the activity import card + prefill. */
-export interface WorkoutCandidate {
-  key: string;                                 // stable id (type+startMs)
-  type: string;                                // ACTIVITY_TYPES key
-  time: string;                                // HH:MM local start
-  label: string;                               // "Walk · 32 min · 2.1 mi"
-  sub: string;                                 // "10:14 AM · Avg HR 128 · Apple Watch"
-  entry: Record<string, string>;               // prefilled activity fields
-  /** Full HR trace over the workout, destined for the waveform sidecar. */
-  hrSeries: { t: number; bpm: number }[] | null;
-}
-
-/** Prefill fields for a workout, filtered to what the target type's form
- *  actually shows (an off-schema key would persist invisibly on the entry).
- *  Indoor bike's bespoke form has no field schema; it takes the full set. */
-function workoutEntry(w: ImportedWorkout): Record<string, string> {
-  const all: Record<string, string | undefined> = {
-    duration: String(w.durationMin),
-    distance: w.distanceMi != null ? String(w.distanceMi) : undefined,
-    avgHr: w.avgHr != null ? String(w.avgHr) : undefined,
-    minHr: w.minHr != null ? String(w.minHr) : undefined,
-    maxHr: w.maxHr != null ? String(w.maxHr) : undefined,
-  };
-  const keys = w.type === 'indoorBike'
-    ? ['duration', 'distance', 'avgHr', 'minHr', 'maxHr']
-    : entryFields(ACTIVITY_TYPES[w.type]).map((f) => f.key).filter((k): k is string => !!k);
-  const entry: Record<string, string> = {};
-  for (const k of keys) { const v = all[k]; if (v !== undefined) entry[k] = v; }
-  return entry;
+/** The day's workouts, plus whether an empty result might be a denied read. */
+export interface WorkoutImport {
+  workouts: WorkoutCandidate[];
+  /**
+   * True when we cannot prove we're allowed to read workouts, so an empty list
+   * may mean "denied" rather than "rest day". Always true on iOS (HealthKit
+   * never reports read grants); on Android only when the grant is really
+   * missing. Drives the permission hint in the empty state.
+   */
+  mayBeDenied: boolean;
 }
 
 /** The day's importable workouts: this app's own sessions and workouts already
  *  logged (same type + start time) drop out. `logged` is the day's activities. */
-export async function workoutCandidates(dk: string, logged: { type?: unknown; time?: unknown }[]): Promise<WorkoutCandidate[]> {
+export async function workoutCandidates(dk: string, logged: { type?: unknown; time?: unknown }[]): Promise<WorkoutImport> {
   const api = health();
-  if (!api.available) return [];
+  if (!api.available) return { workouts: [], mayBeDenied: false };
   // Workouts joined the read set after the first Health builds — re-requesting
   // prompts existing users once for the new type and is silent once granted.
   await api.requestAuth();
-  const workouts = await api.readWorkouts(dk);
-  return workouts
+  const [raw, status] = await Promise.all([api.readWorkouts(dk), api.readAuthStatus('workouts')]);
+  const workouts = raw
     .filter((w) => !w.ownApp && !logged.some((e) => e.type === w.type && e.time === w.time))
-    .map((w) => {
-      const def = ACTIVITY_TYPES[w.type];
-      const label = [def.label, `${w.durationMin} min`, w.distanceMi != null ? `${w.distanceMi} mi` : null]
-        .filter(Boolean).join(' · ');
-      const sub = [fmtTime12(w.time), w.avgHr != null ? `Avg HR ${w.avgHr}` : null, w.sourceName]
-        .filter(Boolean).join(' · ');
-      return { key: `${w.type}-${w.startMs}`, type: w.type, time: w.time, label, sub, entry: workoutEntry(w), hrSeries: w.hrSeries };
-    });
+    .map(workoutCandidateOf);
+  return { workouts, mayBeDenied: status !== 'granted' };
 }
 
 /** Resting HR / BP candidates for a day, from the timestamped import stream. */

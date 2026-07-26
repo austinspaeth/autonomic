@@ -1,12 +1,14 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Dimensions, Platform, Pressable, ScrollView, Text, View } from 'react-native';
-import Animated, { Easing, runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import { Dimensions, Platform, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import Animated, { Easing, Extrapolation, interpolate, runOnJS, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { Screen } from '../../src/components/Header';
+import { BrandMark, brandMarkWidth } from '../../src/components/Icon';
 import { useSheets } from '../../src/components/Sheet';
 import { DaySummary } from '../../src/features/DaySummary';
 import { JournalSections } from '../../src/features/JournalSections';
 import { useCaptureDeepLink } from '../../src/features/forms';
 import { Calendar } from '../../src/features/Calendar';
+import { requestHealthUpdateCheck } from '../../src/features/HealthUpdates';
 import { usePalette } from '../../src/theme';
 import { fmtDateLong, todayKey } from '../../src/lib/dates';
 import { getCurrentKey, registerJournalScroller, setCurrentKey, shiftCurrent, useCurrentKey } from '../../src/store/nav';
@@ -20,6 +22,17 @@ import { getCurrentKey, registerJournalScroller, setCurrentKey, shiftCurrent, us
 // fighting a heavy render).
 const SHIFT = Math.round(Dimensions.get('window').width * 0.32);
 const TIMING = { duration: 190, easing: Easing.out(Easing.cubic) };
+
+// Pull-to-check: dragging this far past the top asks the health-update pill
+// to run a check (it ignores the request while it or its card is showing).
+const PULL_TRIGGER = 90;
+// The pull graphic — the brand heartbeat squiggle, whose red fill sweeps
+// left → right with the pull and completes exactly when the check arms.
+const MARK_H = 26;
+const MARK_W = brandMarkWidth(MARK_H);
+// Content top padding inside Screen (its `contentPadding` default) — the pull
+// gap at drag distance d spans from the header bottom to `PULL_PAD + d` below.
+const PULL_PAD = 16;
 
 const DayContent = React.memo(function DayContent({ dk }: { dk: string }) {
   return (
@@ -41,6 +54,48 @@ export default function JournalScreen() {
   // Content renders `shownDk`, which trails `dk` by one out-animation.
   const [shownDk, setShownDk] = useState(dk);
   const scrollRef = useRef<ScrollView>(null);
+
+  // ---- pull-to-check (health updates) ----
+  // iOS: ride the native bounce — the brand mark fades/scales in under the
+  // header as you pull, and releasing past the threshold fires the check.
+  // Android: no negative overscroll, so a plain RefreshControl (accent-tinted)
+  // does the gesture; the pill takes over as the real progress UI.
+  const [headerH, setHeaderH] = useState(0);
+  const pullY = useSharedValue(0);
+  const pullScroll = useAnimatedScrollHandler({
+    onScroll: (e) => { pullY.value = e.contentOffset.y; },
+    onEndDrag: (e) => {
+      if (e.contentOffset.y <= -PULL_TRIGGER) runOnJS(requestHealthUpdateCheck)();
+    },
+  });
+  // The graphic is anchored at the header's bottom edge and counter-translated
+  // so it stays vertically centered in the gap the pull opens — always BELOW
+  // the fixed header, never hidden behind it.
+  const pullWrapStyle = useAnimatedStyle(() => {
+    const d = Math.max(0, -pullY.value);
+    const inGap = Math.max(2, (PULL_PAD + d - MARK_H) / 2);
+    return {
+      opacity: interpolate(d, [8, 44], [0, 1], Extrapolation.CLAMP),
+      transform: [
+        { translateY: inGap - d },
+        // A small pop the moment the pull is far enough to arm the check.
+        { scale: interpolate(d, [PULL_TRIGGER - 1, PULL_TRIGGER + 24], [1, 1.12], Extrapolation.CLAMP) },
+      ],
+    };
+  });
+  // Red fill sweeping across the squiggle: a clipped copy of the mark whose
+  // width tracks the pull, reaching the squiggle's end exactly at the trigger.
+  const pullFillStyle = useAnimatedStyle(() => {
+    const d = Math.max(0, -pullY.value);
+    return { width: interpolate(d, [8, PULL_TRIGGER], [0, MARK_W], Extrapolation.CLAMP) };
+  });
+  const [refreshing, setRefreshing] = useState(false);
+  const androidRefresh = () => {
+    setRefreshing(true);
+    requestHealthUpdateCheck();
+    // The spinner only acknowledges the gesture — the pill shows real progress.
+    setTimeout(() => setRefreshing(false), 700);
+  };
   const tx = useSharedValue(0);
   const fade = useSharedValue(1);
   // True between the swap commit and the new day's first layout; the
@@ -119,6 +174,11 @@ export default function JournalScreen() {
   return (
     <Screen
       scrollRef={scrollRef}
+      onScroll={Platform.OS === 'ios' ? pullScroll : undefined}
+      onHeaderHeight={setHeaderH}
+      refreshControl={Platform.OS === 'android'
+        ? <RefreshControl refreshing={refreshing} onRefresh={androidRefresh} colors={[p.accent]} progressBackgroundColor={p.surface} progressViewOffset={headerH} />
+        : undefined}
       header={
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 16 }}>
           <Pressable onPress={() => shiftCurrent(-1)} hitSlop={8} style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}>
@@ -135,6 +195,19 @@ export default function JournalScreen() {
         </View>
       }
     >
+      {Platform.OS === 'ios' ? (
+        // The pull graphic: a dim brand squiggle that the accent red fills
+        // left → right as you pull (an overflow-hidden copy on top whose
+        // width rides the drag); fully red = far enough to trigger the check.
+        <Animated.View pointerEvents="none" style={[{ position: 'absolute', top: headerH, left: 0, right: 0, alignItems: 'center' }, pullWrapStyle]}>
+          <View style={{ width: MARK_W, height: MARK_H }}>
+            <BrandMark size={MARK_H} color={p.border} />
+            <Animated.View style={[{ position: 'absolute', top: 0, left: 0, bottom: 0, overflow: 'hidden' }, pullFillStyle]}>
+              <BrandMark size={MARK_H} color={p.accent} />
+            </Animated.View>
+          </View>
+        </Animated.View>
+      ) : null}
       <Animated.View key={shownDk} onLayout={onIncomingLayout} style={slideStyle}>
         <DayContent dk={shownDk} />
       </Animated.View>

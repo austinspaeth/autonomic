@@ -103,6 +103,19 @@ old web app so old `export.json` files import directly.
   embedded arrays still import. A dev-build warning fires if an inline array ever
   reaches the persisted journal.
 - **Imports** record `meta.lastImport` (`{ name, at }`) before calling `save()`.
+- **Periodic health-store import pill.** With Health connected, the app quietly
+  checks today's Apple Health / Health Connect data on launch, at most hourly on
+  foreground, and on the Journal's pull-to-refresh (iOS: custom overscroll brand
+  mark; Android: RefreshControl) — `<HealthUpdatePill/>` in the root layout +
+  `src/features/HealthUpdates.tsx`. It offers only non-duplicates not authored by
+  this app (dedup rules are pure + tested in `src/lib/health/updateSet.ts`; HRV
+  needs real RR ≥ 4 min). Tapping opens a grouped import sheet (Sleep / Readings /
+  Exercise / Medications — meds read is a stub, see `HealthApi.readMedications`).
+  Viewing the card or dismissing the pill marks those item keys "seen" (plaintext
+  `autonomic.flags` MMKV, 48h TTL) so the pill never re-offers them; Settings →
+  Apple Health → "Check for updates" ignores that memory and sweeps the last 24h
+  (`checkHealthUpdatesLast24h`). Imports write through the normal store paths
+  (scores + waveform sidecar).
 - **Progress + Insights fall back to demo data on an empty journal.** `src/lib/demo.ts`
   generates a deterministic 30-day sample month (seeded PRNG, keyed off today so it
   lands in the Analysis buckets and report ranges) that arcs from crash days up into
