@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated as RNAnimated, Easing, InteractionManager, Pressable, ScrollView, Text, View } from 'react-native';
+import { Animated as RNAnimated, Easing, Pressable, ScrollView, Text, View } from 'react-native';
 import Animated, { Easing as REasing, runOnJS, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, withTiming, type SharedValue } from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
 import { BottomFade, Screen } from '../../src/components/Header';
@@ -216,10 +216,15 @@ export default function AnalysisScreen() {
     scheduleLift();
   }, [restore, scheduleLift]);
 
-  // Building a range walks the whole journal, so keep the last build per range
-  // and pre-warm the rest while the screen is idle. Switching back to a range
-  // you've already seen then costs nothing and the veil is pure courtesy. The
-  // cache is dropped wholesale whenever any build input changes.
+  // Building a range walks the whole journal, so keep the last build per range:
+  // switching back to one you've already seen then costs nothing and the veil
+  // is pure courtesy. Demand-only on purpose — there is nowhere off-thread to
+  // pre-warm the unseen ranges (a Reanimated worklet runtime can't take this
+  // work: the built cards carry live functions — `regrade`, `fmt`, the ortho
+  // predicates — which don't cross a runtime boundary), so speculating would
+  // just be an unbounded JS-thread stall on a long journal in exchange for
+  // shortening a window the veil already hides. The cache is dropped wholesale
+  // whenever any build input changes.
   const buildArgs = useMemo(
     () => ({ days, sex, height, protocol: resolveProtocol(state.settings.protocol), customTypes: state.customTypes }),
     [days, sex, height, state.settings.protocol, state.customTypes],
@@ -237,23 +242,6 @@ export default function AnalysisScreen() {
   }, [buildArgs]);
   const sections = useMemo(() => build(chartMode), [build, chartMode]);
   sectionsRef.current = sections;
-
-  // One range per idle tick, so the warm-up never lands in the middle of a
-  // gesture. Skipped on the free tier, where the other ranges aren't reachable.
-  useEffect(() => {
-    if (locked) return;
-    let cancelled = false;
-    const todo = MODE_ORDER.filter((m) => m !== chartMode);
-    const task = InteractionManager.runAfterInteractions(() => {
-      const step = (i: number) => {
-        if (cancelled || i >= todo.length) return;
-        build(todo[i]);
-        requestAnimationFrame(() => step(i + 1));
-      };
-      step(0);
-    });
-    return () => { cancelled = true; task.cancel(); };
-  }, [build, chartMode, locked]);
 
   // Outlook always synthesizes a score, so it isn't proof of real data. Treat the
   // whole view as empty unless some *other* category has something logged — that's
@@ -365,7 +353,6 @@ export default function AnalysisScreen() {
   );
 }
 
-const MODE_ORDER: Mode[] = ['day', 'week', 'month', 'year'];
 // `Screen`'s default contentPadding — the gap an anchored section should keep
 // below the header when the veil lifts, matching the veil's own top padding.
 const CONTENT_PAD = 16;
