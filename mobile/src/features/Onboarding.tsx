@@ -26,7 +26,7 @@ import { Button } from '../components/ui';
 import { DatePickerSheet, HeightPickerSheet, fmtHeight, onlyNumeric } from '../components/Field';
 import { CheckBox, REMINDER_BLURB, REMINDER_SETUP_TITLE, REMINDER_TITLE, useReminderToggle } from './Reminders';
 import { fmtDateFull, fmtTime12, uid } from '../lib/dates';
-import { SheetControls, useSheets } from '../components/Sheet';
+import { SheetControls, SheetPill, SheetPillButton, useSheets } from '../components/Sheet';
 import { useToast } from '../components/Toast';
 import { ACCENT, radius, usePalette } from '../theme';
 import { health, healthAppName } from '../lib/health';
@@ -53,6 +53,8 @@ const C = {
 };
 
 const STEPS = 6;
+/** Opacity of the back arrow where there's nothing to go back to. */
+const BACK_GHOST = 0.22;
 const PRIMARY_LABELS = ['Get started', 'Continue', 'I understand', 'Continue', 'Continue', 'Start logging'];
 const STEP_DUR = 280;
 
@@ -427,10 +429,12 @@ function Onboarding({ onDone }: { onDone: () => void }) {
   const connectStrap = () => openSheet((c) => <DevicesScreen controls={c} />);
 
   /* ---------- animated chrome ---------- */
-  const backO = useSharedValue(0);
+  // Back stays on screen at step 0, just ghosted (and non-interactive), so the
+  // bar doesn't reflow the moment you leave the first step.
+  const backO = useSharedValue(BACK_GHOST);
   const skipO = useSharedValue(0);
   const primO = useSharedValue(1);
-  useEffect(() => { backO.value = withTiming(step > 0 ? 1 : 0, { duration: 200 }); }, [step, backO]);
+  useEffect(() => { backO.value = withTiming(step > 0 ? 1 : BACK_GHOST, { duration: 200 }); }, [step, backO]);
   useEffect(() => { skipO.value = withTiming(SKIPPABLE.has(step) ? 1 : 0, { duration: 200 }); }, [step, skipO]);
   useEffect(() => { primO.value = withTiming(gated ? 0.4 : 1, { duration: 200 }); }, [gated, primO]);
   const backStyle = useAnimatedStyle(() => ({ opacity: backO.value }));
@@ -638,20 +642,32 @@ function Onboarding({ onDone }: { onDone: () => void }) {
   return (
     <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: C.bg, zIndex: 100, elevation: 100 }, rootStyle]}>
       {/* Top bar: back · progress dots · skip */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 22, paddingTop: insets.top + 10, paddingBottom: 8 }}>
-        <Animated.View style={backStyle} pointerEvents={step > 0 ? 'auto' : 'none'}>
-          <Pressable onPress={back} hitSlop={8} accessibilityRole="button" accessibilityLabel="Back" style={st.backBtn}>
-            <Glyph size={16} w={2.2} color={C.text} d={['M15 18l-6-6 6-6']} />
-          </Pressable>
-        </Animated.View>
-        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 7 }}>
-          {Array.from({ length: STEPS }, (_, i) => <Dot key={i} i={i} step={step} />)}
+      {/* Padding lives on the outer box so the row itself has none: the dots'
+          absolute layer then fills exactly the row, with no ambiguity about
+          whether insets are measured inside or outside the padding. */}
+      <View style={{ paddingHorizontal: 22, paddingTop: insets.top + 10, paddingBottom: 8 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          {/* Dots ride an absolute layer across the row so they center on the
+              screen, not in the gap left over between Back and a Skip that comes
+              and goes. The row's height is the back pill's, so centering in it
+              puts the dots on the pill's centerline. */}
+          <View pointerEvents="none" style={[StyleSheet.absoluteFill, { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 }]}>
+            {Array.from({ length: STEPS }, (_, i) => <Dot key={i} i={i} step={step} />)}
+          </View>
+          {/* Same tinted-glass pill the sheets' ✕ rides in, so every back arrow
+              in the app reads the same. Its height sets the row's. */}
+          <Animated.View style={backStyle} pointerEvents={step > 0 ? 'auto' : 'none'}>
+            <SheetPill lone>
+              <SheetPillButton icon="chevronLeft" size={18} onPress={back} label="Back" />
+            </SheetPill>
+          </Animated.View>
+          <View style={{ flex: 1 }} />
+          <Animated.View style={skipStyle} pointerEvents={SKIPPABLE.has(step) ? 'auto' : 'none'}>
+            <Pressable onPress={skip} hitSlop={8}>
+              <Text style={{ color: C.faint, fontSize: 14, fontWeight: '600', paddingVertical: 6 }}>Skip</Text>
+            </Pressable>
+          </Animated.View>
         </View>
-        <Animated.View style={skipStyle} pointerEvents={SKIPPABLE.has(step) ? 'auto' : 'none'}>
-          <Pressable onPress={skip} hitSlop={8}>
-            <Text style={{ color: C.faint, fontSize: 14, fontWeight: '600', paddingVertical: 6 }}>Skip</Text>
-          </Pressable>
-        </Animated.View>
       </View>
 
       {/* Step content — directional cross-fade/slide between steps */}
@@ -709,5 +725,4 @@ const st = StyleSheet.create({
   fieldLabel: { fontSize: 12, letterSpacing: 0.6, textTransform: 'uppercase', color: C.faint, fontWeight: '700', marginBottom: 7 },
   input: { backgroundColor: C.row, borderWidth: 1, borderColor: C.rowBorder, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15, color: C.text },
   note: { flexDirection: 'row', gap: 11, backgroundColor: C.accentWash, borderWidth: 1, borderColor: 'rgba(224,49,39,0.19)', borderRadius: 12, padding: 14 },
-  backBtn: { width: 34, height: 34, borderRadius: 999, borderWidth: 1, borderColor: C.tileBorder, backgroundColor: C.row, alignItems: 'center', justifyContent: 'center' },
 });

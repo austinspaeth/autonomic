@@ -24,7 +24,8 @@ import { entryFields, isDivider, READING_TYPES } from '../lib/registry';
 import { healthAppName } from '../lib/health';
 import { ageFromBirthday, fmtNum, fmtShort, todayKey } from '../lib/dates';
 import { estimatedHrMax, hrZones, timeInZones } from '../lib/workoutZones';
-import { correctArtifacts } from '../lib/hrv';
+import { correctArtifacts, splitSegments } from '../lib/hrv';
+import { BREATH_STYLE, styleTitle } from '../lib/breathStyle';
 import { buildEventInsightPrompt, buildReadingInsightPrompt, buildWorkoutInsightPrompt } from '../lib/analysis/reports';
 import { getState, getWaveform } from '../store/store';
 import { useTier } from '../store/tier';
@@ -172,6 +173,14 @@ function SectionHead({ title, help, cat, value, suffix, desc, right }: {
  * (value + date, dot re-graded for that point). Hidden entirely when there is
  * neither a value nor any history to chart.
  */
+/**
+ * Id of the reading whose summary is on screen. Every metric card's history
+ * stops there, so opening an older reading charts the run of readings that led
+ * up to it instead of the whole journal (null for unsaved live previews).
+ */
+const ViewedReadingCtx = React.createContext<string | null>(null);
+const useViewedReading = () => React.useContext(ViewedReadingCtx);
+
 function MetricSection({ label, value, suffix, cat, desc, help, days, type, ex, bands, hero }: {
   label: string; value?: string | number | null; suffix?: string; cat?: ScoreCat | null;
   desc?: string; help?: string; days: DaysMap; type: string;
@@ -181,7 +190,8 @@ function MetricSection({ label, value, suffix, cat, desc, help, days, type, ex, 
 }) {
   const [showZones, setShowZones] = useState(false);
   const [sel, setSel] = useState<{ v: number; date: string } | null>(null);
-  const hist = metricHistory(days, type, ex, 15);
+  const upto = useViewedReading();
+  const hist = metricHistory(days, type, ex, 15, upto);
   const hasSpark = hist.length >= 2;
   const hasValue = value != null && value !== '';
   if (!hasValue && !hasSpark) return null;
@@ -224,24 +234,23 @@ export interface SummaryProps { r: Entry; days: DaysMap; ctx: ScoreContext }
 /* ---------- dispatcher ---------- */
 export function ReadingSummary({ r, days, ctx }: SummaryProps) {
   // The POTS deep dives carry their own bespoke insight buttons.
-  switch (r.type) {
-    case 'orthostatic': return <OrthostaticSummary r={r} days={days} ctx={ctx} />;
-    case 'standTest': return <StandTestSummary r={r} days={days} ctx={ctx} />;
-  }
-  const Body = r.type === 'breathHrv' ? BreathingSummary
-    : r.type === 'hrv' ? UnstructuredSummary
+  const Body = r.type === 'orthostatic' ? OrthostaticSummary
+    : r.type === 'standTest' ? StandTestSummary
+    : r.type === 'breathHrv' ? BreathingSummary
+    : r.type === 'hrv' ? BaselineSummary
     : r.type === 'bp' ? BpSummary
     : r.type === 'restingHr' ? RestingHrSummary
     : GenericSummary;
+  const bespoke = r.type === 'orthostatic' || r.type === 'standTest';
   return (
-    <>
+    <ViewedReadingCtx.Provider value={String(r.id)}>
       <Body r={r} days={days} ctx={ctx} />
-      <ReadingInsightButton r={r} days={days} ctx={ctx} />
-    </>
+      {bespoke ? null : <ReadingInsightButton r={r} days={days} ctx={ctx} />}
+    </ViewedReadingCtx.Provider>
   );
 }
 
-/* ---------- HRV (structured + unstructured) ---------- */
+/* ---------- HRV (training + baseline) ---------- */
 
 const HRV_VERDICT: Record<string, string> = {
   great: 'Strong parasympathetic reserves today. Room for your full protocol and a normal day.',
@@ -260,13 +269,17 @@ function rrCleanFor(r: Entry): number[] | null {
   const clean = (w && w.rrClean) || (r.rrClean as number[] | undefined);
   if (clean && clean.length) return clean;
   const raw = (w && w.rrRaw) || (r.rrRaw as number[] | undefined);
-  return raw && raw.length ? correctArtifacts(raw).clean : null;
+  if (!raw || !raw.length) return null;
+  // A camera reading is stitched from separate stretches of tracked pulse;
+  // correct each on its own so a seam isn't judged against the wrong baseline.
+  const segs = (w && w.rrSegments) || (r.rrSegments as number[] | undefined);
+  return splitSegments(raw, segs).flatMap((s) => correctArtifacts(s).clean);
 }
 
 /**
  * Both HRV kinds render the identical stack of metric cards — the only
- * difference is the breathing-style detail (structured only) and which
- * RMSSD/HR grade band applies.
+ * difference is which RMSSD/HR grade band applies, plus a breathing-style row
+ * on the handful of legacy training readings taken on a retired pattern.
  */
 function HrvSummaryBody({ r, days, ctx, type }: SummaryProps & { type: 'breathHrv' | 'hrv' }) {
   const s = computeScores(r, ctx);
@@ -282,14 +295,18 @@ function HrvSummaryBody({ r, days, ctx, type }: SummaryProps & { type: 'breathHr
   const e = expectedHf(r.style);
   // Each metricHistory scans (and per-day sorts) the whole journal; cache while
   // the sheet re-renders without a data change.
+  const upto = useViewedReading();
   const [pnsHist, snsHist] = useMemo(
-    () => [metricHistory(days, type, numEx('pns')), metricHistory(days, type, numEx('sns'))],
-    [days, type],
+    () => [metricHistory(days, type, numEx('pns'), 15, upto), metricHistory(days, type, numEx('sns'), 15, upto)],
+    [days, type, upto],
   );
   const pnsNum = n('pns'), snsNum = n('sns');
   const balCat = pnsNum != null && snsNum != null ? balanceCat(pnsNum, snsNum) : undefined;
   const sourceLabel = sourceLabelFor(r);
-  const hasDetails = !!sourceLabel || type === 'breathHrv' || !!r.period;
+  // Training readings are all 4/6 now, so the style row would just restate the
+  // type. It only earns its place on legacy readings taken on a retired pattern.
+  const legacyStyle = type === 'breathHrv' && r.style && r.style !== BREATH_STYLE ? styleTitle(r.style as string) : null;
+  const hasDetails = !!sourceLabel || !!legacyStyle || !!r.period;
   return (
     <>
       <Section cat={overall}>
@@ -305,7 +322,7 @@ function HrvSummaryBody({ r, days, ctx, type }: SummaryProps & { type: 'breathHr
           <SectionHead title="Details" />
           <View style={{ marginTop: 12 }}>
             {sourceLabel ? <MetricRow label="Source" value={sourceLabel} cat={false} /> : null}
-            {type === 'breathHrv' ? <MetricRow label="Breathing style" value={(r.style as string) || '—'} cat={false} /> : null}
+            {legacyStyle ? <MetricRow label="Breathing style" value={legacyStyle} cat={false} /> : null}
             {r.period ? <MetricRow label="Reading type" value={r.period as string} cat={false} /> : null}
           </View>
         </Section>
@@ -426,7 +443,7 @@ export function BreathingSummary(props: SummaryProps) {
   return <HrvSummaryBody {...props} type="breathHrv" />;
 }
 
-export function UnstructuredSummary(props: SummaryProps) {
+export function BaselineSummary(props: SummaryProps) {
   return <HrvSummaryBody {...props} type="hrv" />;
 }
 

@@ -12,7 +12,8 @@
  */
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import {
-  BackHandler, Keyboard, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View,
+  BackHandler, Keyboard, Modal, Platform, Pressable, ScrollView, StyleProp, StyleSheet, TextInput,
+  View, ViewStyle,
 } from 'react-native';
 import Animated, {
   Easing, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming,
@@ -349,26 +350,14 @@ function SheetView({ entry, isTop, behind, closing, requestClose, onExited, clos
           )}
         </SheetContentContext.Provider>
 
-        {/* Close (and optional edit) live together in one tinted-glass pill:
-            blurred background, near-black tint, dark grey border. A lone button
-            gets equal padding all round so the pill is a circle, not an egg. */}
+        {/* Close (and optional edit) live together in one tinted-glass pill. */}
         {((!full && !hideClose) || entry.opts.action) && (
-          <View style={[styles.headerPill, !(entry.opts.action && !full && !hideClose) && { paddingHorizontal: 6 }, { borderColor: '#46464e' }]}>
-            {/* Android gets no real blur (expo-blur renders plain translucency
-                there) — use a solid fill instead of glass. */}
-            {Platform.OS === 'ios' ? <BlurView intensity={45} tint="dark" style={StyleSheet.absoluteFill} /> : null}
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: Platform.OS === 'ios' ? 'rgba(6,6,8,0.78)' : '#0a0a0d' }]} />
+          <SheetPill lone={!(entry.opts.action && !full && !hideClose)} style={styles.headerPill}>
             {entry.opts.action && (
-              <Pressable onPress={entry.opts.action.onPress} style={[styles.pillBtn, { backgroundColor: p.surface2 }]} hitSlop={8}>
-                <Icon name={entry.opts.action.icon} size={16} color={p.textDim} />
-              </Pressable>
+              <SheetPillButton icon={entry.opts.action.icon} size={16} onPress={entry.opts.action.onPress} label="Edit" />
             )}
-            {!full && !hideClose && (
-              <Pressable onPress={dismiss} style={[styles.pillBtn, { backgroundColor: p.surface2 }]} hitSlop={8}>
-                <Icon name="x" size={18} color={p.textDim} />
-              </Pressable>
-            )}
-          </View>
+            {!full && !hideClose && <SheetPillButton icon="x" size={18} onPress={dismiss} label="Close" />}
+          </SheetPill>
         )}
         {footer && (
           <Animated.View onLayout={(e) => { setFooterH(e.nativeEvent.layout.height); footerHRef.current = e.nativeEvent.layout.height; }} style={[styles.footer, { backgroundColor: p.surface, borderTopColor: p.border }, footerStyle]}>
@@ -382,6 +371,46 @@ function SheetView({ entry, isTop, behind, closing, requestClose, onExited, clos
         )}
       </Animated.View>
     </>
+  );
+}
+
+/**
+ * The floating tinted-glass pill the sheet's ✕ rides in: blurred background,
+ * near-black tint, dark grey border. Exported so sheet *content* can put its own
+ * control (the camera wizard's back arrow) in matching chrome — position it and
+ * the two read as one row. `lone` gives a single button equal padding all round
+ * so the pill is a circle, not an egg.
+ */
+export function SheetPill({ children, lone, style }: {
+  children: React.ReactNode; lone?: boolean; style?: StyleProp<ViewStyle>;
+}) {
+  return (
+    <View style={[styles.pill, lone && { paddingHorizontal: 6 }, style]}>
+      {/* Android gets no real blur (expo-blur renders plain translucency
+          there) — use a solid fill instead of glass. */}
+      {Platform.OS === 'ios' ? <BlurView intensity={45} tint="dark" style={StyleSheet.absoluteFill} /> : null}
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: Platform.OS === 'ios' ? 'rgba(6,6,8,0.78)' : '#0a0a0d' }]} />
+      {children}
+    </View>
+  );
+}
+
+/** One grey circular icon button inside a `SheetPill`. */
+export function SheetPillButton({ icon, size = 18, onPress, label, disabled }: {
+  icon: React.ComponentProps<typeof Icon>['name']; size?: number; onPress: () => void; label: string; disabled?: boolean;
+}) {
+  const p = usePalette();
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      hitSlop={8}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={[styles.pillBtn, { backgroundColor: p.surface2 }]}
+    >
+      <Icon name={icon} size={size} color={p.textDim} />
+    </Pressable>
   );
 }
 
@@ -399,7 +428,10 @@ export function SheetFooter({ children }: { children: React.ReactNode }) {
 const styles = StyleSheet.create({
   backdrop: { ...StyleSheet.absoluteFillObject },
   sheet: { position: 'absolute', left: 0, right: 0, bottom: 0, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
-  headerPill: { position: 'absolute', top: 10, right: 14, flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 999, borderWidth: 1, overflow: 'hidden' },
+  // Pill chrome (shared with SheetPill) and its fixed top-right placement, kept
+  // apart so content can reuse the chrome without the positioning.
+  pill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 999, borderWidth: 1, borderColor: '#46464e', overflow: 'hidden' },
+  headerPill: { position: 'absolute', top: 10, right: 14 },
   pillBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   footer: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 18, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: 10 },
   kbDismiss: { width: 46, borderRadius: radius.control, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },

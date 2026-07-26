@@ -10,8 +10,8 @@ import {
   restingHrBands, rowScoreCategory, sHfPeak, sLfPeak, sSys, totalPower, worstCat,
 } from '../index';
 import {
-  DEFAULT_PROTOCOL, activityGrade, blueZone, dayCleanliness, resolveProtocol, scoreCat,
-  scoreSet, sleepGrade, sleepHours, streakInfo, streakTier,
+  DEFAULT_PROTOCOL, activityGrade, blueZone, dayCleanliness, metricHistory, numEx,
+  resolveProtocol, scoreCat, scoreSet, sleepGrade, sleepHours, streakInfo, streakTier,
 } from '../day';
 
 const day = (over: Partial<DayRecord> = {}): DayRecord => ({
@@ -384,6 +384,22 @@ describe('day scoring', () => {
     expect(streakTier(10).tier).toBe('Excellent');
     expect(streakTier(20).tier).toBe('Outstanding');
     expect(streakTier(45).tier).toBe('Elite');
+  });
+  it('metricHistory stops at the viewed reading', () => {
+    const rd = (id: string, time: string, rmssd: number): Entry => ({ id, type: 'hrv', time, rmssd: String(rmssd) });
+    const days: Record<string, DayRecord> = {
+      '2026-07-01': day({ readings: [rd('a', '08:00', 30)] }),
+      // Out of time order on disk: metricHistory sorts within the day.
+      '2026-07-02': day({ readings: [rd('c', '18:00', 50), rd('b', '07:00', 40)] }),
+      '2026-07-03': day({ readings: [rd('d', '09:00', 60)] }),
+    };
+    const vals = (upto?: string) => metricHistory(days, 'hrv', numEx('rmssd'), 15, upto).map((p) => p.v);
+    expect(vals()).toEqual([30, 40, 50, 60]);
+    expect(vals('b')).toEqual([30, 40]);       // earlier reading, same day as a later one
+    expect(vals('c')).toEqual([30, 40, 50]);
+    expect(vals('d')).toEqual([30, 40, 50, 60]);
+    // An unsaved live preview isn't in the journal: keep the full history.
+    expect(vals('unsaved')).toEqual([30, 40, 50, 60]);
   });
   it('streakInfo counts consecutive clean days', () => {
     const clean = () =>

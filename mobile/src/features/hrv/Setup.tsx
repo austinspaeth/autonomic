@@ -1,15 +1,20 @@
 /**
- * HRV setup sheet — the entry point for a live 5-minute capture. Choose kind
- * (Unstructured vs Structured), a breathing pattern (4/6 default; the row
- * opens a stacked picker sheet with box breathing and 4/7/8), and a signal
- * source (Bluetooth strap, Apple Watch, or the phone camera), then Start.
- * The time-of-day tag is stamped automatically at Start.
+ * HRV setup sheet — the entry point for a live 5-minute capture. Purpose-first:
+ * pick what the reading is FOR (Training, which paces your breath at resonance,
+ * or Baseline, which reads where you sit right now), confirm the signal source
+ * on one line, and Start. The time-of-day tag is stamped automatically at Start.
+ *
+ * There is no breathing-pattern picker: training readings are always 4/6
+ * (resonant-frequency) pacing. Offering box breathing or 4/7/8 invited choices
+ * that flatten RSA and broke day-to-day comparability, which is the whole point
+ * of a daily measure. Legacy readings keep whatever style they were saved with.
  */
 import React, { useState } from 'react';
 import { Platform, Pressable, Text, View } from 'react-native';
+import Animated, { Easing, interpolateColor, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { SheetControls, useSheets } from '../../components/Sheet';
-import { Button, HelpDot, Segmented } from '../../components/ui';
-import { Icon } from '../../components/Icon';
+import { Button, HelpDot } from '../../components/ui';
+import { Icon, type IconName } from '../../components/Icon';
 import { useToast } from '../../components/Toast';
 import { radius, usePalette } from '../../theme';
 import { getState, save, useStore } from '../../store/store';
@@ -17,25 +22,22 @@ import { todayKey } from '../../lib/dates';
 import { health } from '../../lib/health';
 import { defaultPeriod } from '../../lib/period';
 import { ppg } from '../../lib/ppg/camera';
-import { DevicesScreen } from '../Devices';
-import { BREATH_STYLES, HrvSession, type SessionConfig } from './Session';
+import { BREATH_STYLE, HrvSession, type SessionConfig } from './Session';
 import { CameraSetup } from './CameraSetup';
 import { WatchPrep } from './WatchPrep';
 import { HealthRrImportSheet } from './HealthImport';
+import { SOURCE_META, SourcePicker, sourceSub, type Source } from './SourcePicker';
 
 const HELP = {
   main:
     'A 5 minute read of how your nervous system is balancing stress and recovery. Same time daily shows your trend.',
   kind:
-    'Both kinds run 5 minutes. Unstructured captures your current baseline while you rest and breathe naturally. Structured guides you through a paced breathing pattern, which trains your baroreflex and helps build stronger autonomic responses.',
-  techniques:
-    'The numbers are the seconds to inhale, hold, and exhale in each cycle.\n\n' +
-    '4 / 6 breathing: in 4s, out 6s. For most people this matches their resonant frequency, the rate where the baroreflex (your body’s blood pressure regulator) swings in sync with each breath and HRV peaks. The longer exhale makes it the most effective pattern to train.\n\n' +
-    'Box breathing: in 4s, hold 4s, out 4s, hold 4s. A steady, even square rhythm that is easy to hold and good for calm focus.\n\n' +
-    '4 / 7 / 8 breathing: in 4s, hold 7s, out 8s. The long exhale leans hard into the vagal brake, making it the most deeply calming of the three.',
+    'Both kinds run 5 minutes.\n\n' +
+    'Training HRV paces your breath at 4 seconds in, 6 seconds out. For most people that is their resonant frequency, the rate where the baroreflex (your blood pressure regulator) swings in sync with each breath and HRV peaks. It is the most sensitive and most repeatable daily measure, and the pacing itself trains the baroreflex.\n\n' +
+    'Baseline HRV lets you breathe however you normally do. It captures where your nervous system actually sits right now, with nothing imposed on it.',
   source: Platform.OS === 'ios'
-    ? 'Where the heartbeat signal comes from. A Bluetooth chest strap is the most accurate. Apple Watch uses a reading you take on your watch during the session, a Mindfulness breathing session or an ECG, which syncs in afterward. Phone camera reads your pulse through your fingertip over the rear camera and flash — no device needed, but it is the least accurate option.'
-    : 'Where the heartbeat signal comes from. A Bluetooth chest strap is the most accurate. Phone camera reads your pulse through your fingertip over the rear camera and flash — no device needed, but it is the least accurate option.',
+    ? 'Where the heartbeat signal comes from. A Bluetooth chest strap is the most accurate. Apple Watch uses a reading you take on your watch during the session, a Mindfulness breathing session or an ECG, which syncs in afterward. Phone camera reads your pulse through your fingertip over the rear camera and flash, no device needed, but it is the least accurate option.'
+    : 'Where the heartbeat signal comes from. A Bluetooth chest strap is the most accurate. Phone camera reads your pulse through your fingertip over the rear camera and flash, no device needed, but it is the least accurate option.',
 };
 
 // The sheet's ✕ pill floats top-right; inset the title + subtitle so neither
@@ -43,12 +45,23 @@ const HELP = {
 const CLOSE_CLEARANCE = 58;
 
 type Kind = 'unstructured' | 'breath';
-type Source = 'polar' | 'watch' | 'camera';
+
+/** The two things a reading can be for. `breath` is the daily default. */
+const MODES: { val: Kind; icon: IconName; title: string; desc: string; daily?: boolean }[] = [
+  {
+    val: 'breath', icon: 'wind', title: 'Training HRV', daily: true,
+    desc: 'We pace your breath so heart rate and breathing sync. The most sensitive, most repeatable daily measure, and the pacing itself helps train your autonomic system.',
+  },
+  {
+    val: 'unstructured', icon: 'heartPulse', title: 'Baseline HRV',
+    desc: 'Breathe however you normally do. Best for capturing where your nervous system actually sits right now.',
+  },
+];
 
 /** Default signal source: the paired strap when there is one (it's the most
  *  accurate option), else the user's last deliberate pick when it's still
  *  usable, else the camera (always on hand). Bluetooth is never defaulted
- *  while unpaired — Start would just bounce off "Pair a strap first". */
+ *  while unpaired — Start would just bounce off the pairing sheet. */
 function defaultSource(): Source {
   const s = getState().settings;
   if (s.lastBleDeviceId) return 'polar';
@@ -60,7 +73,7 @@ function defaultSource(): Source {
 
 /** Time-of-day tag for a reading of this kind, stamped silently at Start —
  *  there's no picker in the sheet anymore (shared rules in src/lib/period.ts;
- *  structured and unstructured each get their own morning/evening; extras
+ *  training and baseline each get their own morning/evening; extras
  *  fall through to Other). */
 const defaultPeriodFor = (kind: Kind) => defaultPeriod(kind === 'breath' ? 'breathHrv' : 'hrv', todayKey());
 
@@ -69,22 +82,16 @@ export function HrvSetup({ controls }: { controls: SheetControls }) {
   const toast = useToast();
   const { openSheet } = useSheets();
   const [kind, setKind] = useState<Kind>('breath');
-  const [style, setStyle] = useState('4/6');
   const [source, setSource] = useState<Source>(defaultSource);
-  // Reactive so the "Paired: …" subtitle updates the moment a strap is saved
-  // from the pairing sheet stacked on top of this one.
+  // Reactive so the summary row updates the moment a strap is saved from the
+  // source picker stacked on top of this one.
   const savedName = useStore((s) => s.state.settings.lastBleDeviceName);
 
-  // With no strap saved yet, choosing Bluetooth opens the pairing sheet right
-  // here; saving a device closes it and drops back onto this setup sheet.
-  const pickBluetooth = () => {
-    setSource('polar');
-    if (!getState().settings.lastBleDeviceId) openSheet((c) => <DevicesScreen controls={c} />);
-  };
+  const changeSource = () => openSheet((c) => <SourcePicker value={source} onPick={setSource} controls={c} />);
 
   const start = () => {
     if (source === 'polar' && !getState().settings.lastBleDeviceId) {
-      toast('Pair a strap first in Devices');
+      changeSource();
       return;
     }
     if (source === 'watch' && (Platform.OS !== 'ios' || !health().available)) {
@@ -97,7 +104,7 @@ export function HrvSetup({ controls }: { controls: SheetControls }) {
     }
     // Remember the pick so the next capture defaults to it.
     if (getState().settings.lastHrvSource !== source) { getState().settings.lastHrvSource = source; save(); }
-    const config: SessionConfig = { kind, source, period: defaultPeriodFor(kind), style: kind === 'breath' ? style : undefined };
+    const config: SessionConfig = { kind, source, period: defaultPeriodFor(kind), style: kind === 'breath' ? BREATH_STYLE : undefined };
     // Watch readings are taken by the Mindfulness app on the wrist, so a prep
     // card walks through getting it ready first; its Start opens the session
     // already running. This sheet stays underneath so ✕ backs out to it.
@@ -119,33 +126,39 @@ export function HrvSetup({ controls }: { controls: SheetControls }) {
     controls.close();
   };
 
+  const srcMeta = SOURCE_META[source];
+
   return (
     <View>
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 6, paddingRight: CLOSE_CLEARANCE }}>Capture an HRV reading</Text>
-      <Text style={{ color: p.textDim, fontSize: 14, lineHeight: 20, marginBottom: 18, paddingRight: CLOSE_CLEARANCE }}>{HELP.main}</Text>
-
-      <Label text="Breathing type" help={HELP.kind} />
-      <Segmented options={[{ val: 'unstructured', label: 'Unstructured' }, { val: 'breath', label: 'Structured' }]} value={kind} onChange={setKind} />
-
-      {kind === 'breath' ? (
-        <>
-          <Label text="Breathing pattern" help={HELP.techniques} top />
-          <PatternRow
-            pattern={BREATH_STYLES.find((s) => s.val === style) || BREATH_STYLES[0]}
-            trailing="chevron"
-            onPress={() => openSheet((c) => <BreathPatternSheet value={style} onPick={(v) => { setStyle(v); c.close(); }} />)}
-          />
-        </>
-      ) : null}
-
-      <Label text="Signal source" help={HELP.source} top />
-      <View style={{ gap: 8 }}>
-        <SourceOption icon="bluetooth" title="Bluetooth device" badge="Best accuracy" sub={savedName ? `Paired: ${savedName}` : 'Tap to pair a device'} active={source === 'polar'} onPress={pickBluetooth} />
-        {Platform.OS === 'ios' ? (
-          <SourceOption icon="watch" title="Apple Watch" badge="High accuracy" sub="Breathe or ECG on the watch, syncs in after" active={source === 'watch'} onPress={() => setSource('watch')} />
-        ) : null}
-        <SourceOption icon="camera" title="Phone camera" badge="Lower accuracy" sub="No device needed · quick fingertip reading" active={source === 'camera'} onPress={() => setSource('camera')} />
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start', paddingRight: CLOSE_CLEARANCE, marginBottom: 18 }}>
+        <Text style={{ flex: 1, color: p.textDim, fontSize: 14, lineHeight: 20 }}>Five minutes, same time each day. Choose what this reading is for.</Text>
+        <HelpDot title="HRV readings" text={`${HELP.main}\n\n${HELP.kind}`} />
       </View>
+
+      <View style={{ gap: 10 }}>
+        {MODES.map((m) => (
+          <ModeCard key={m.val} mode={m} active={kind === m.val} onPress={() => setKind(m.val)} />
+        ))}
+      </View>
+
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 22, marginBottom: 10 }}>
+        <Text style={{ fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.6, color: p.textDim, fontWeight: '700' }}>Measuring with</Text>
+        <HelpDot title="Measuring with" text={HELP.source} />
+      </View>
+      <Pressable
+        onPress={changeSource}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: radius.control, borderWidth: 1, borderColor: p.border, backgroundColor: p.surface2 }}
+      >
+        <View style={{ width: 34, height: 34, borderRadius: 10, backgroundColor: p.accentSoft, alignItems: 'center', justifyContent: 'center' }}>
+          <Icon name={srcMeta.icon} size={19} color={p.accent} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: p.text, fontWeight: '700' }}>{srcMeta.title}</Text>
+          <Text style={{ color: p.textDim, fontSize: 12, marginTop: 3 }}>{sourceSub(source, savedName)}</Text>
+        </View>
+        <Text style={{ color: p.accent, fontSize: 13, fontWeight: '700' }}>Change</Text>
+      </Pressable>
 
       <View style={{ height: 20 }} />
       <Button title="Start reading" variant="primary" onPress={start} />
@@ -156,9 +169,9 @@ export function HrvSetup({ controls }: { controls: SheetControls }) {
         <>
           <View style={{ height: 10 }} />
           <Button
-            title="Import watch reading from Apple Health"
+            title="Import reading from Apple Health"
             variant="ghost"
-            onPress={() => openSheet(() => <HealthRrImportSheet kind={kind} style={style} />)}
+            onPress={() => openSheet(() => <HealthRrImportSheet kind={kind} />)}
           />
         </>
       ) : null}
@@ -167,81 +180,59 @@ export function HrvSetup({ controls }: { controls: SheetControls }) {
   );
 }
 
-function Label({ text, help, top }: { text: string; help?: string; top?: boolean }) {
-  const p = usePalette();
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: top ? 22 : 0, marginBottom: 12 }}>
-      <Text style={{ fontSize: 15, textTransform: 'uppercase', letterSpacing: 0.6, color: p.textDim, fontWeight: '700' }}>{text}</Text>
-      {help ? <HelpDot title={text} text={help} /> : null}
-    </View>
-  );
-}
+/** One purpose card: icon tile, title (+ "Daily" tag on the recommended one),
+ *  and a plain-language description of what the reading is for.
+ *
+ *  Selection eases in rather than snapping: the accent tint is an overlay whose
+ *  opacity animates, and the border color interpolates between two opaque greys/
+ *  accent. Do NOT interpolate the card's own backgroundColor between `surface2`
+ *  and `accentSoft` — one is opaque and the other is 12% alpha, so the midpoint
+ *  is a saturated half-transparent red that reads as a flash on every tap.
+ *  Everything else (icon, title, radio) switches instantly; animating those too
+ *  made the whole card shimmer. Reanimated because color can't use the native
+ *  driver. */
+const MODE_ANIM = { duration: 180, easing: Easing.out(Easing.quad) };
 
-/** One breathing-pattern card. On the setup sheet it's the collapsed picker
- *  button (trailing chevron); inside BreathPatternSheet it's a selectable
- *  option (accent tint + check when active). */
-function PatternRow({ pattern, active, trailing, onPress }: { pattern: (typeof BREATH_STYLES)[number]; active?: boolean; trailing: 'chevron' | 'check'; onPress: () => void }) {
+function ModeCard({ mode, active, onPress }: { mode: (typeof MODES)[number]; active: boolean; onPress: () => void }) {
   const p = usePalette();
+  const t = useSharedValue(active ? 1 : 0);
+  React.useEffect(() => { t.value = withTiming(active ? 1 : 0, MODE_ANIM); }, [active, t]);
+
+  const borderStyle = useAnimatedStyle(() => ({
+    borderColor: interpolateColor(t.value, [0, 1], [p.border, p.accent]),
+  }));
+  const tintStyle = useAnimatedStyle(() => ({ opacity: t.value }));
+
   return (
-    <Pressable onPress={onPress} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: radius.control, borderWidth: 1, borderColor: active ? p.accent : p.border, backgroundColor: active ? p.accentSoft : p.surface2 }}>
-      <View style={{ flex: 1 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Text style={{ color: active ? p.accent : p.text, fontWeight: '700' }}>{pattern.title}</Text>
-          {pattern.badge ? (
-            <View style={{ paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999, borderWidth: 1, borderColor: active ? p.accent : '#47474e' }}>
-              <Text style={{ color: active ? p.accent : p.textDim, fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 }}>{pattern.badge}</Text>
-            </View>
-          ) : null}
+    <Pressable onPress={onPress}>
+      <Animated.View
+        style={[{ flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: 14, borderRadius: radius.control, borderWidth: 1, backgroundColor: p.surface2, overflow: 'hidden' }, borderStyle]}
+      >
+        <Animated.View pointerEvents="none" style={[{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: p.accentSoft }, tintStyle]} />
+        <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: active ? p.accentSoft : p.sunk, alignItems: 'center', justifyContent: 'center' }}>
+          <Icon name={mode.icon} size={21} color={active ? p.accent : p.textDim} />
         </View>
-        <Text style={{ color: p.textDim, fontSize: 12, lineHeight: 17, marginTop: 5 }}>{pattern.sub}</Text>
-      </View>
-      {trailing === 'chevron' ? (
-        <Icon name="chevronRight" size={18} color={p.textDim} />
-      ) : active ? (
-        <Icon name="check" size={18} color={p.accent} />
-      ) : null}
-    </Pressable>
-  );
-}
-
-/** Stacked sheet listing every paced-breathing pattern; picking one reports
- *  back to the setup sheet and closes. */
-function BreathPatternSheet({ value, onPick }: { value: string; onPick: (val: string) => void }) {
-  const p = usePalette();
-  return (
-    <View>
-      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6, paddingRight: CLOSE_CLEARANCE }}>
-        <Text style={{ fontSize: 21, fontWeight: '700', color: p.text }}>Breathing pattern</Text>
-        <HelpDot title="Breathing techniques" text={HELP.techniques} />
-      </View>
-      <Text style={{ color: p.textDim, fontSize: 14, lineHeight: 20, marginBottom: 18, paddingRight: CLOSE_CLEARANCE }}>Choose the breathing pattern (seconds to inhale, hold and exhale) for your structured breathing.</Text>
-      <View style={{ gap: 8 }}>
-        {BREATH_STYLES.map((s) => (
-          <PatternRow key={s.val} pattern={s} active={s.val === value} trailing="check" onPress={() => onPick(s.val)} />
-        ))}
-      </View>
-      <View style={{ height: 8 }} />
-    </View>
-  );
-}
-
-function SourceOption({ icon, title, badge, sub, active, onPress }: { icon: 'bluetooth' | 'watch' | 'camera'; title: string; badge: string; sub: string; active: boolean; onPress: () => void }) {
-  const p = usePalette();
-  return (
-    <Pressable onPress={onPress} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: radius.control, borderWidth: 1, borderColor: active ? p.accent : p.border, backgroundColor: active ? p.accentSoft : p.surface2 }}>
-      <Icon name={icon} size={22} color={active ? p.accent : p.textDim} />
-      <View style={{ flex: 1 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Text style={{ color: active ? p.accent : p.text, fontWeight: '700' }}>{title}</Text>
-          {/* Unselected rows wear a slightly lighter grey pill border so the
-              accuracy tag stays legible without competing with the selection. */}
-          <View style={{ paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999, borderWidth: 1, borderColor: active ? p.accent : '#47474e' }}>
-            <Text style={{ color: active ? p.accent : p.textDim, fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 }}>{badge}</Text>
+        <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Text style={{ color: active ? p.accent : p.text, fontWeight: '700', fontSize: 15 }}>{mode.title}</Text>
+            {mode.daily ? (
+              <View style={{ paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999, borderWidth: 1, borderColor: active ? p.accent : '#47474e' }}>
+                <Text style={{ color: active ? p.accent : p.textDim, fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 }}>Daily</Text>
+              </View>
+            ) : null}
           </View>
+          <Text style={{ color: p.textDim, fontSize: 12.5, lineHeight: 17, marginTop: 5 }}>{mode.desc}</Text>
         </View>
-        <Text style={{ color: p.textDim, fontSize: 12, lineHeight: 17, marginTop: 5 }}>{sub}</Text>
-      </View>
-      {active ? <Icon name="check" size={18} color={p.accent} /> : null}
+        <View style={{ marginTop: 2 }}>
+          {active ? (
+            <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: p.accent, alignItems: 'center', justifyContent: 'center' }}>
+              <Icon name="check" size={13} color="#fff" strokeWidth={3.2} />
+            </View>
+          ) : (
+            <View style={{ width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: '#4a4a52' }} />
+          )}
+        </View>
+      </Animated.View>
     </Pressable>
   );
 }

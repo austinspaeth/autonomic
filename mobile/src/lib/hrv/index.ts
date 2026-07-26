@@ -18,6 +18,17 @@ export const HRV_BANDS = {
 } as const;
 
 /* ---------- artifact detection & correction ---------- */
+
+/**
+ * Wide moving-median window (beats) and the deviation from it beyond which a
+ * beat cannot be the same person's rhythm. 61 beats ≈ 45 s at rest: wide enough
+ * that a multi-second dropout can't dominate it, narrow enough to track real HR
+ * drift over a reading. 0.38 sits well clear of the ±12-15% swing that deep
+ * respiratory sinus arrhythmia produces, so the actual HRV signal is untouched.
+ */
+const WIDE_WINDOW = 61;
+const WIDE_DEV = 0.38;
+
 export interface ArtifactResult {
   clean: number[];
   artifactPct: number;
@@ -29,23 +40,30 @@ export interface ArtifactResult {
  * median, then correct them by interpolating between the nearest good beats.
  * Ectopic/missed beats, movement and swallowing show up as spikes here.
  *
- * Detection runs in two stages, then iterates:
+ * Detection runs in three stages, then iterates:
  *  1. Absolute physiologic guard rails — RR outside 300-2000 ms (30-200 bpm)
  *     can never be a real sinus beat, so it's flagged up front and excluded
- *     from every local median below.
- *  2. Relative deviation from a LOCAL median, recomputed each pass from beats
- *     NOT yet flagged. A single swallow, an ectopic beat or a camera dropout
- *     rarely comes alone — it's usually a short burst of consecutive bad beats,
- *     and a one-pass median taken over that burst is itself corrupted, so the
- *     interior of the burst escapes detection and its wild swings inflate SDNN.
- *     Iterating peels the burst from the outside in: its edge beats (which still
- *     have clean neighbors) flag on the first pass; with those excluded, the
- *     interior beats compare against clean baselines and flag on the next.
+ *     from every median below.
+ *  2. Deviation from a WIDE (~61-beat) moving median. The local test in stage 3
+ *     is structurally blind to a long burst: when a dozen consecutive beats are
+ *     junk, the ±3-beat window at the burst's center contains only junk, so its
+ *     baseline is corrupted and the interior never flags no matter how many
+ *     passes run. That is exactly the shape a camera dropout-and-reacquire
+ *     makes, and it was the dominant source of inflated SDNN/RMSSD on camera
+ *     readings. A 61-beat window centered on such a burst is still dominated by
+ *     good beats, so the burst flags wholesale. The window moves, so genuine
+ *     slow HR drift across a reading is tracked rather than flagged.
+ *  3. Relative deviation from a LOCAL median, recomputed each pass from beats
+ *     NOT yet flagged. This catches the short stuff — a single swallow, an
+ *     ectopic beat — and iterating peels a short burst from the outside in: its
+ *     edge beats (which still have clean neighbors) flag on the first pass; with
+ *     those excluded, the interior beats compare against clean baselines and
+ *     flag on the next.
  *
- * Because the baseline is always LOCAL (a few beats either side), genuine
- * respiratory sinus arrhythmia — the smooth beat-to-beat oscillation that IS
- * the HRV signal — is preserved: a real beat never deviates far from its clean
- * neighbors, so it never flags no matter how many passes run.
+ * Because both baselines are medians over windows far wider than a breath,
+ * genuine respiratory sinus arrhythmia — the smooth beat-to-beat oscillation
+ * that IS the HRV signal — is preserved: a real beat never deviates far from
+ * its neighbors, so it never flags no matter how many passes run.
  */
 export function correctArtifacts(rr: number[], threshold = 0.25, window = 7, maxPasses = 4): ArtifactResult {
   const n = rr.length;
@@ -53,9 +71,20 @@ export function correctArtifacts(rr: number[], threshold = 0.25, window = 7, max
   const flags = new Array(n).fill(false);
   const half = Math.max(1, Math.floor(window / 2));
   // Stage 1: absolute guard rails, so grossly impossible beats never pollute a
-  // neighbor's local median.
+  // neighbor's median.
   for (let i = 0; i < n; i++) if (rr[i] < 300 || rr[i] > 2000) flags[i] = true;
-  // Stage 2: relative deviation from a clean local median, iterated to convergence.
+  // Stage 2: wide moving median — the long-burst catcher.
+  const wideHalf = Math.floor(WIDE_WINDOW / 2);
+  for (let i = 0; i < n; i++) {
+    if (flags[i]) continue;
+    const seg: number[] = [];
+    const lo = Math.max(0, i - wideHalf), hi = Math.min(n, i + wideHalf + 1);
+    for (let j = lo; j < hi; j++) if (rr[j] >= 300 && rr[j] <= 2000) seg.push(rr[j]);
+    if (seg.length < 8) continue; // too little context to judge — leave to stage 3
+    const med = median(seg);
+    if (med > 0 && Math.abs(rr[i] - med) / med > WIDE_DEV) flags[i] = true;
+  }
+  // Stage 3: relative deviation from a clean local median, iterated to convergence.
   for (let pass = 0; pass < maxPasses; pass++) {
     let changed = false;
     for (let i = 0; i < n; i++) {
@@ -106,8 +135,21 @@ export function correctArtifacts(rr: number[], threshold = 0.25, window = 7, max
  * need this and don't run it — their R-peak clock doesn't miss or double beats.
  */
 export function repairBeats(rr: number[]): number[] {
+  return repairBeatsCounted(rr).rr;
+}
+
+/**
+ * {@link repairBeats} plus a count of how many intervals it rewrote. The count
+ * matters for honesty: repair MANUFACTURES plausible beats (a junk 1400 ms
+ * interval becomes two tidy 700 ms ones), which means it can launder noise into
+ * data that the artifact detector then scores as clean. Surfacing the repair
+ * rate alongside the artifact rate keeps a heavily-reconstructed reading from
+ * presenting itself as pristine.
+ */
+export function repairBeatsCounted(rr: number[]): { rr: number[]; repaired: number } {
   const n = rr.length;
-  if (n < 3) return rr.slice();
+  if (n < 3) return { rr: rr.slice(), repaired: 0 };
+  let repaired = 0;
   const localMed = (i: number) => median(rr.slice(Math.max(0, i - 3), Math.min(n, i + 4)));
   const out: number[] = [];
   for (let i = 0; i < n; i++) {
@@ -115,17 +157,73 @@ export function repairBeats(rr: number[]): number[] {
     if (m <= 0) { out.push(rr[i]); continue; }
     const ratio = rr[i] / m;
     // One missed beat → split in two; two missed → split in three.
-    if (ratio >= 1.6 && ratio <= 2.4) { out.push(rr[i] / 2, rr[i] / 2); continue; }
-    if (ratio > 2.4 && ratio <= 3.4) { out.push(rr[i] / 3, rr[i] / 3, rr[i] / 3); continue; }
+    if (ratio >= 1.6 && ratio <= 2.4) { out.push(rr[i] / 2, rr[i] / 2); repaired++; continue; }
+    if (ratio > 2.4 && ratio <= 3.4) { out.push(rr[i] / 3, rr[i] / 3, rr[i] / 3); repaired++; continue; }
     // Extra beat → merge the short pair back into one interval.
     if (ratio < 0.7 && i + 1 < n) {
       const pair = rr[i] + rr[i + 1];
       const pr = pair / m;
-      if (pr >= 0.7 && pr <= 1.4) { out.push(pair); i++; continue; }
+      if (pr >= 0.7 && pr <= 1.4) { out.push(pair); i++; repaired++; continue; }
     }
     out.push(rr[i]);
   }
-  return out;
+  return { rr: out, repaired };
+}
+
+/* ---------- segmentation ---------- */
+
+/**
+ * A reading is captured as one or more segments of continuously-tracked pulse.
+ * `starts` are indices into `rr` at which a NEW segment begins (index 0 is
+ * implicit). An empty/absent `starts` means the whole reading is continuous,
+ * which is the strap/ECG case.
+ */
+export function splitSegments(rr: number[], starts?: number[]): number[][] {
+  if (!starts || !starts.length) return [rr];
+  const bounds = Array.from(new Set([0, ...starts.filter((i) => i > 0 && i < rr.length)])).sort((a, b) => a - b);
+  return bounds.map((s, k) => rr.slice(s, k + 1 < bounds.length ? bounds[k + 1] : rr.length)).filter((s) => s.length > 0);
+}
+
+/**
+ * Segment triage. A stitched reading is only as good as the pieces it's made
+ * of, and interpolating a hopeless stretch back onto the baseline still leaves
+ * fabricated beats in the statistics. Better to throw the piece away and say so.
+ *
+ * A segment is discarded when it is too short to carry a stable statistic, when
+ * too much of it had to be corrected, or when its own median heart rate sits
+ * far off the rest of the reading — the "that clearly wasn't their pulse" case,
+ * typically the detector locking onto the dicrotic notch (half the true rate)
+ * or onto motion after a reacquire.
+ */
+const MIN_SEGMENT_BEATS = 20;
+const SEGMENT_MAX_ARTIFACT = 30;
+const SEGMENT_MEDIAN_DEV = 0.2;
+
+export interface SegmentTriage {
+  kept: number[][];
+  keptStarts: number[];
+  dropped: number;
+  droppedBeats: number;
+}
+
+export function triageSegments(cleaned: { clean: number[]; artifactPct: number }[]): SegmentTriage {
+  const recordMed = median(cleaned.flatMap((c) => c.clean));
+  const kept: number[][] = [];
+  const keptStarts: number[] = [];
+  let dropped = 0, droppedBeats = 0, cursor = 0;
+  for (const c of cleaned) {
+    const segMed = median(c.clean);
+    const offBaseline = recordMed > 0 && Math.abs(segMed - recordMed) / recordMed > SEGMENT_MEDIAN_DEV;
+    if (c.clean.length < MIN_SEGMENT_BEATS || c.artifactPct > SEGMENT_MAX_ARTIFACT || offBaseline) {
+      dropped++;
+      droppedBeats += c.clean.length;
+      continue;
+    }
+    keptStarts.push(cursor);
+    cursor += c.clean.length;
+    kept.push(c.clean);
+  }
+  return { kept, keptStarts, dropped, droppedBeats };
 }
 
 /* ---------- time-domain ---------- */
@@ -163,19 +261,62 @@ const NORM = {
 const z = (x: number, ref: { m: number; s: number }) => (x - ref.m) / ref.s;
 
 export function timeDomain(rr: number[]): TimeDomain | null {
+  return timeDomainSegments([rr]);
+}
+
+/**
+ * Time-domain metrics over a reading captured as one or more DISCONTINUOUS
+ * segments (camera PPG drops signal and reacquires; each stretch of locked
+ * pulse is a segment). Passing a single segment reproduces the classic
+ * whole-array formulas exactly, so strap/ECG readings are unaffected.
+ *
+ * Two things must not cross a segment boundary:
+ *
+ *  - **Successive-difference metrics** (RMSSD, pNN50, and SD1 which derives
+ *    from RMSSD). The "difference" between the last beat before a dropout and
+ *    the first beat after it spans however many seconds of missing data — it is
+ *    not a beat-to-beat difference at all, and feeding it in inflates RMSSD.
+ *    Differences are summed within segments and pooled by degrees of freedom.
+ *  - **SDNN's mean.** A reacquired segment often sits at a slightly different
+ *    heart rate (the user shifted, or simply relaxed further). Taking one grand
+ *    mean charges that offset to variability, which is how clean data alone can
+ *    report SDNN in the 60s. Deviations are taken from each segment's OWN mean
+ *    and pooled — the within-segment variance the user actually produced.
+ *
+ * The tradeoff is honest and worth stating: pooled SDNN excludes drift BETWEEN
+ * segments, some of which is real slow variability. It under-reports slightly
+ * rather than over-reporting wildly, which is the right direction to err.
+ */
+export function timeDomainSegments(segments: number[][]): TimeDomain | null {
+  const segs = segments.filter((s) => s.length >= 2);
+  const rr = segs.flat();
   const n = rr.length;
   if (n < 2) return null;
   const meanRr = mean(rr);
   const hr = 60000 / meanRr;
-  const sdnn = std(rr);
-  let sq = 0, over50 = 0;
-  for (let i = 1; i < n; i++) {
-    const diff = rr[i] - rr[i - 1];
-    sq += diff * diff;
-    if (Math.abs(diff) > 50) over50++;
+
+  // Pooled within-segment SD: deviations from each segment's own mean, with one
+  // degree of freedom spent per segment mean.
+  let ss = 0, sdDof = 0;
+  for (const s of segs) {
+    const m = mean(s);
+    for (const v of s) ss += (v - m) * (v - m);
+    sdDof += s.length - 1;
   }
-  const rmssd = Math.sqrt(sq / (n - 1));
-  const pnn50 = (over50 / (n - 1)) * 100;
+  const sdnn = Math.sqrt(ss / (sdDof || 1));
+
+  // Successive differences, never across a seam.
+  let sq = 0, over50 = 0, diffs = 0;
+  for (const s of segs) {
+    for (let i = 1; i < s.length; i++) {
+      const diff = s[i] - s[i - 1];
+      sq += diff * diff;
+      if (Math.abs(diff) > 50) over50++;
+      diffs++;
+    }
+  }
+  const rmssd = Math.sqrt(sq / (diffs || 1));
+  const pnn50 = (over50 / (diffs || 1)) * 100;
   const cv = (sdnn / meanRr) * 100;
 
   // Baevsky: histogram in 50 ms bins. Mode = center of the most-populated bin;
@@ -305,6 +446,17 @@ export interface HrvResult {
   freq: FrequencyDomain;
   /** Fields ready to merge onto a reading (string values, PWA-compatible). */
   fields: Record<string, string>;
+  /** Seconds of usable cardiac data actually behind the numbers. */
+  coverageSec: number;
+  /** Longest unbroken stretch — what the frequency bands are gated on. */
+  longestCleanSec: number;
+  /** Segment boundaries within `rrClean` (indices where a new segment begins). */
+  cleanSegmentStarts: number[];
+  segmentsUsed: number;
+  segmentsDropped: number;
+  /** % of beats reconstructed by {@link repairBeats} before correction. */
+  repairPct: number;
+  confidence: 'high' | 'fair' | 'low';
 }
 
 const r3 = (v: number) => Number(v.toFixed(3));
@@ -323,26 +475,58 @@ const MIN_SEC_LFHF = 120;
 const MIN_SEC_VLF = 300;
 /** A stable reading needs a floor of clean beats behind its statistics. */
 const MIN_CLEAN_BEATS = 30;
+/** Fraction of the attempted reading that must survive cleaning to be trusted. */
+const MIN_COVERAGE_RATIO = 0.5;
 
 export function computeHrv(
   rrRaw: number[],
-  opts: { style?: string; maxArtifactPct?: number; source?: string; durationSec?: number } = {},
+  opts: {
+    style?: string; maxArtifactPct?: number; source?: string; durationSec?: number;
+    /** Indices into `rrRaw` where tracking resumed after a dropout. */
+    segmentStarts?: number[];
+  } = {},
 ): HrvResult {
+  const segmented = !!(opts.segmentStarts && opts.segmentStarts.length);
+  const rawSegments = splitSegments(rrRaw, opts.segmentStarts);
+
   // Camera PPG misses and doubles beats optically; repair those before the
   // spike corrector runs. Strap/watch/ECG sources have a true R-peak clock.
-  const pre = opts.source === 'camera' ? repairBeats(rrRaw) : rrRaw;
-  const { clean, artifactPct } = correctArtifacts(pre);
-  const time = timeDomain(clean);
-  const freq = frequencyDomain(clean);
+  // Repair and correction both run PER SEGMENT so neither one reasons across a
+  // seam it can't see.
+  let repaired = 0;
+  const cleaned = rawSegments.map((seg) => {
+    const pre = opts.source === 'camera' ? repairBeatsCounted(seg) : { rr: seg, repaired: 0 };
+    repaired += pre.repaired;
+    return correctArtifacts(pre.rr);
+  });
+  const repairPct = rrRaw.length ? (repaired / rrRaw.length) * 100 : 0;
+
+  const { kept, keptStarts, dropped, droppedBeats } = triageSegments(cleaned);
+  const clean = kept.flat();
+
+  // Artifact rate is charged over everything we started with — beats thrown out
+  // with a discarded segment count against the reading, they don't vanish.
+  const analyzedBeats = clean.length + droppedBeats;
+  const flaggedBeats = cleaned.reduce((s, c) => s + (c.artifactPct / 100) * c.clean.length, 0);
+  const artifactPct = analyzedBeats ? ((flaggedBeats + droppedBeats) / analyzedBeats) * 100 : 0;
+
+  const time = timeDomainSegments(kept);
+  // The bands need an unbroken stretch: Welch over a tachogram stitched across
+  // dropouts reads the seams as spectral content. Use the longest segment.
+  const longest = kept.reduce((best, s) => (s.length > best.length ? s : best), [] as number[]);
+  const freq = frequencyDomain(longest);
+  const secOf = (s: number[]) => s.reduce((a, x) => a + x, 0) / 1000;
+  const coverageSec = secOf(clean);
+  const longestCleanSec = secOf(longest);
+
   // Camera is the noisiest source, so hold it to a tighter artifact ceiling.
   const maxArt = opts.maxArtifactPct ?? (opts.source === 'camera' ? 15 : 30);
-  // Effective analyzed span: the actual cardiac data on hand (RR sum) unless the
-  // caller stamped a wall-clock duration. This is what the band floors gate on,
-  // so every source — live capture, HealthKit series, ECG — is judged uniformly.
-  const spanSec = clean.reduce((s, x) => s + x, 0) / 1000;
-  const durationSec = opts.durationSec ?? spanSec;
+  const durationSec = opts.durationSec ?? coverageSec;
   const noisy = artifactPct > maxArt;
   const tooFew = clean.length < MIN_CLEAN_BEATS;
+  // Only a segmented (live camera) capture knows its own wall-clock gaps, so
+  // only it can be judged on coverage. An imported series has no such notion.
+  const thin = segmented && durationSec > 0 && coverageSec / durationSec < MIN_COVERAGE_RATIO;
   if (!time || !freq || tooFew) {
     const reason = tooFew && time
       ? 'Not enough clean beats to compute HRV. Try a longer, steadier reading.'
@@ -350,6 +534,8 @@ export function computeHrv(
     return {
       ok: false, reason, artifactPct,
       rrClean: clean, time: time as TimeDomain, freq: freq as FrequencyDomain, fields: {},
+      coverageSec, longestCleanSec, cleanSegmentStarts: keptStarts,
+      segmentsUsed: kept.length, segmentsDropped: dropped, repairPct, confidence: 'low',
     };
   }
   const fields: Record<string, string> = {
@@ -367,22 +553,36 @@ export function computeHrv(
     pns: Number(time.pns.toFixed(1)).toString(),
     sns: Number(time.sns.toFixed(1)).toString(),
   };
-  // Frequency-domain metrics only when the record is long enough to resolve them.
-  if (durationSec >= MIN_SEC_LFHF) {
+  // Frequency-domain metrics only when an UNBROKEN stretch is long enough to
+  // resolve them — 120 s of coverage in four fragments resolves nothing.
+  if (longestCleanSec >= MIN_SEC_LFHF) {
     fields.lowPower = r0(freq.lowPower).toString();
     fields.highPower = r0(freq.highPower).toString();
     fields.lfPeak = r3(freq.lfPeak).toString();
     fields.hfPeak = r3(freq.hfPeak).toString();
   }
-  if (durationSec >= MIN_SEC_VLF) {
+  if (longestCleanSec >= MIN_SEC_VLF) {
     fields.vlowPower = r0(freq.vlowPower).toString();
   }
+
+  const coverageRatio = durationSec > 0 ? Math.min(1, coverageSec / durationSec) : 1;
+  const confidence: HrvResult['confidence'] =
+    artifactPct <= 5 && repairPct <= 5 && dropped === 0 && coverageRatio >= 0.9 ? 'high'
+      : !noisy && !thin && artifactPct <= 10 && coverageRatio >= 0.7 ? 'fair'
+        : 'low';
+
+  const reason = noisy
+    ? `Signal too noisy (${Math.round(artifactPct)}% artifacts). ${opts.source === 'camera' ? 'Hold your finger still with light pressure and try again.' : 'Adjust the strap and try again.'}`
+    : thin
+      ? `Only ${Math.round(coverageSec)}s of usable pulse out of ${Math.round(durationSec)}s. Keep your finger still and fully covering the lens, then try again.`
+      : undefined;
+
   return {
-    ok: !noisy,
-    reason: noisy
-      ? `Signal too noisy (${Math.round(artifactPct)}% artifacts). ${opts.source === 'camera' ? 'Hold your finger still with light pressure and try again.' : 'Adjust the strap and try again.'}`
-      : undefined,
+    ok: !noisy && !thin,
+    reason,
     artifactPct, rrClean: clean, time, freq, fields,
+    coverageSec, longestCleanSec, cleanSegmentStarts: keptStarts,
+    segmentsUsed: kept.length, segmentsDropped: dropped, repairPct, confidence,
   };
 }
 

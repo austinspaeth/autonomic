@@ -168,8 +168,8 @@ export function scoreSet(readings: Entry[], d: DayRecord, dk: string, days: Days
   const nv = (x: unknown): number | null => { const v = parseFloat(x as string); return isNaN(v) ? null : v; };
   const rmS = bs ? nv(bs.rmssd) : null, rmU = bu ? nv(bu.rmssd) : null;
   const hrvMetrics: CompDetailMetric[] = [];
-  if (rmS != null) hrvMetrics.push({ label: 'RMSSD (structured)', raw: rmS, bands: BANDS.rmssdS, unit: 'ms' });
-  if (rmU != null) hrvMetrics.push({ label: 'RMSSD (unstructured)', raw: rmU, bands: BANDS.rmssdU, unit: 'ms' });
+  if (rmS != null) hrvMetrics.push({ label: 'RMSSD (training)', raw: rmS, bands: BANDS.rmssdS, unit: 'ms' });
+  if (rmU != null) hrvMetrics.push({ label: 'RMSSD (baseline)', raw: rmU, bands: BANDS.rmssdU, unit: 'ms' });
   const hrvDetail: CompDetail = {
     value: rmS != null && rmU != null ? `${rmS}/${rmU} ms` : rmS != null ? `${rmS} ms` : rmU != null ? `${rmU} ms` : '',
     metrics: hrvMetrics,
@@ -198,7 +198,7 @@ export function scoreSet(readings: Entry[], d: DayRecord, dk: string, days: Days
   if (rhr) {
     rhrV = nv(rhr.hr); rhrBands = restingHrBands(rhr.position);
     if (rhr.position) rhrLabel = `Resting HR (${rhr.position})`;
-  } else if (bs) { rhrV = nv(bs.hr); rhrBands = BANDS.hrBreath; rhrLabel = 'HR (from structured HRV)'; }
+  } else if (bs) { rhrV = nv(bs.hr); rhrBands = BANDS.hrBreath; rhrLabel = 'HR (from training HRV)'; }
   else if (bu) { rhrV = nv(bu.avgHr); rhrBands = BANDS.hrBreath; rhrLabel = 'Avg HR (from HRV)'; }
   const rhrDetail: CompDetail = { value: rhrV != null ? `${rhrV} bpm` : '', metrics: rhrV != null ? [{ label: rhrLabel, raw: rhrV, bands: rhrBands, unit: 'bpm', lowerBetter: true }] : [] };
 
@@ -235,7 +235,7 @@ export function scoreSet(readings: Entry[], d: DayRecord, dk: string, days: Days
   return { score: Math.round(sum / avail), confidence: Math.round(avail), hasStruct: !!sStruct, hasUnstruct: !!unstructured.length, comps };
 }
 
-/** Blue-zone flag: high unstructured readiness masking a fragile structured RMSSD. */
+/** Blue-zone flag: high baseline readiness masking a fragile training RMSSD. */
 export function blueZone(readings: Entry[], ctx: ScoreContext = {}): boolean {
   const u = readings.find((r) => r.type === 'hrv' && numOr(r.readiness) != null);
   const s = readings.find((r) => r.type === 'breathHrv');
@@ -399,18 +399,29 @@ export function streakInfo(days: DaysMap, dk: string, protocol: Protocol = DEFAU
 /**
  * Chronological history for one metric across all days (last `limit`):
  * returns [{ v, date }] oldest -> newest.
+ *
+ * `upto` is a reading id: history stops at that reading (inclusive), so a
+ * summary opened on an older reading charts what was known *then* rather than
+ * trailing off into readings taken after it. An id that isn't in `days` (an
+ * unsaved live preview) leaves the full history intact.
  */
-export function metricHistory(days: DaysMap, type: string, extractor: (r: Entry) => number | null, limit = 15): { v: number; date: string }[] {
+export function metricHistory(
+  days: DaysMap, type: string, extractor: (r: Entry) => number | null, limit = 15, upto?: string | null,
+): { v: number; date: string }[] {
   const out: { v: number; date: string }[] = [];
+  let cut = -1;
   Object.keys(days).sort().forEach((dk) => {
     const list = (days[dk].readings || []).filter((r) => r.type === type);
     list.sort((a, b) => ((a.time as string) || '').localeCompare((b.time as string) || ''));
     list.forEach((r) => {
       const v = extractor(r);
-      if (v != null && !isNaN(v)) out.push({ v, date: dk });
+      if (v != null && !isNaN(v)) {
+        out.push({ v, date: dk });
+        if (upto && String(r.id) === upto) cut = out.length;
+      }
     });
   });
-  return out.slice(-limit);
+  return (cut >= 0 ? out.slice(0, cut) : out).slice(-limit);
 }
 
 export const numEx = (key: string) => (rr: Entry): number | null => {

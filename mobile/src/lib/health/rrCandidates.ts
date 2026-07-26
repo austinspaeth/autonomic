@@ -16,11 +16,13 @@ export interface RrCandidate {
 }
 
 /** Minimum length for a manual-pick offer — shorter readings (a quick 1-minute
- *  Breathe, a truncated ECG) aren't worth evaluating. */
-const MIN_PICK_MS = 2 * 60000;
+ *  Breathe, a truncated ECG) don't carry enough beats for a trustworthy score.
+ *  The setup copy asks for a 5-minute session, so 4 minutes is the floor that
+ *  still admits a slightly-short one. */
+const MIN_PICK_MS = 4 * 60000;
 
 /** Whether a reading is worth offering as a manual pick: it actually carries
- *  beat-to-beat data and ran at least 2 minutes. */
+ *  beat-to-beat data and ran at least 4 minutes. */
 export const isPickable = (c: Pick<RrCandidate, 'rr' | 'startMs' | 'endMs'>) =>
   c.rr.length > 0 && c.endMs - c.startMs >= MIN_PICK_MS;
 

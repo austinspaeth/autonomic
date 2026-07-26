@@ -1,6 +1,6 @@
 /**
  * Apple Watch prep card — stacked over the setup sheet when the watch source
- * is chosen (structured or unstructured). Walks the wearer through getting the
+ * is chosen (training or baseline). Walks the wearer through getting the
  * Mindfulness app ready on the watch: open it, make sure Breathe is set to
  * 5 minutes, then tap Breathe on the watch and the red Start button here in
  * the same moment. That Start doubles as the session card's start — this card

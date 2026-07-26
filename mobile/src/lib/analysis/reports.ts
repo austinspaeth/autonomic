@@ -59,8 +59,8 @@ function secHRV(days: DaysMap, keys: string[]) {
       const lfn = Number(lf), hfn = Number(hf);
       const lfhf = lf != null && hf != null && !isNaN(lfn) && !isNaN(hfn) && hfn !== 0 ? (lfn / hfn).toFixed(2) : null;
       const head = r.type === 'breathHrv'
-        ? `Type: Structured (${rv(r, 'style') ?? '?'}) | HR: ${rv(r, 'hr') ?? '-'}`
-        : `Type: ${r.source === 'watch' ? 'Apple Watch' : r.source === 'health' ? 'Imported' : 'Unstructured'} | HR: ${rv(r, 'avgHr') ?? '-'}`;
+        ? `Type: Training, paced ${rv(r, 'style') ?? '4/6'} | HR: ${rv(r, 'hr') ?? '-'}`
+        : `Type: ${r.source === 'watch' ? 'Apple Watch' : r.source === 'health' ? 'Imported' : 'Baseline'} | HR: ${rv(r, 'avgHr') ?? '-'}`;
       out.push(`${stamp(k, r.time as string)} ${head} | RMSSD: ${rv(r, 'rmssd') ?? '-'} | pNN50: ${rv(r, 'pnn50') ?? '-'}% | SDNN: ${rv(r, 'sdnn') ?? '-'} | PNS: ${rv(r, 'pns') ?? '-'} | SNS: ${rv(r, 'sns') ?? '-'} | Stress: ${rv(r, 'stressIndex') ?? '-'} | Power: ${total || '-'} | VLF: ${vlf ?? '-'} | LF: ${lf ?? '-'} | HF: ${hf ?? '-'} | LF/HF: ${lfhf ?? '-'} | LF Peak: ${rv(r, 'lfPeak') ?? '-'} Hz | HF Peak: ${rv(r, 'hfPeak') ?? '-'} Hz${hrvExtras(r)}${noteSuffix(r)}`);
     });
     return out;
@@ -102,7 +102,7 @@ export function makeSectionRenderer(state: AppState, ctx: ScoreContext) {
   const secScores = (keys: string[]) => { const lines: string[] = []; keys.forEach((k) => { const d = days[k]; if (!d) return; const ss = scoreSet(d.readings || [], d, k, days, ctx); if (ss.score == null) return; lines.push(`[${k}] Autonomic Score: ${ss.score}/100 (confidence ${ss.confidence}%)${blueZone(d.readings || [], ctx) ? ' [BLUE ZONE]' : ''}`); }); return orNone(lines); };
   const secCleanDays = (keys: string[]) => { const lines: string[] = []; keys.forEach((k) => { const c = dayCleanliness(days, k, ctx.protocol, custom); if (!c) return; const missed = c.criteria.filter((x: { pending?: boolean; pass: boolean }) => !x.pending && !x.pass).map((x: { label: string }) => x.label); lines.push(`[${k}] Clean day: ${c.clean ? 'YES' : 'NO'}${missed.length ? ` (missed: ${missed.join(', ')})` : ''}`); }); return orNone(lines); };
   const DEFS: Record<string, [string, (keys: string[]) => string]> = {
-    hrv: ['HRV READINGS (structured + unstructured)', (k) => secHRV(days, k)],
+    hrv: ['HRV READINGS (training + baseline)', (k) => secHRV(days, k)],
     bp: ['BLOOD PRESSURE READINGS', (k) => secBP(days, k)],
     rhr: ['RESTING HEART RATE', (k) => secRHR(days, k)],
     sleep: ['SLEEP DATA', (k) => secSleep(days, k)],
@@ -341,9 +341,9 @@ function genericReadingParts(r: Entry): string[] {
 /** Per-type framing for the single-reading prompt below. */
 const READING_INSIGHT: Record<string, { kind: string; histTitle: string; reference?: string }> = {
   hrv: {
-    kind: 'unstructured HRV (heart-rate variability) reading',
+    kind: 'baseline HRV (heart-rate variability) reading, taken breathing naturally',
     histTitle: 'HRV',
-    reference: 'REFERENCE NOTES: RMSSD and pNN50 reflect vagal (parasympathetic) tone; SDNN reflects overall variability. The LF (baroreflex) peak is typically targeted around 0.08 to 0.10 Hz. Paced breathing concentrates power in the LF band by design, so structured (paced) readings read differently from unstructured ones. HRV is highly individual: comparison against this person\'s own recent readings matters more than population norms.',
+    reference: 'REFERENCE NOTES: RMSSD and pNN50 reflect vagal (parasympathetic) tone; SDNN reflects overall variability. The LF (baroreflex) peak is typically targeted around 0.08 to 0.10 Hz. Paced breathing concentrates power in the LF band by design, so training (paced 4/6) readings read differently from baseline ones. HRV is highly individual: comparison against this person\'s own recent readings matters more than population norms.',
   },
   bp: {
     kind: 'blood-pressure reading',
@@ -356,7 +356,7 @@ const READING_INSIGHT: Record<string, { kind: string; histTitle: string; referen
     reference: 'REFERENCE NOTES: Resting heart rate depends on position (laying reads lower than sitting), so weigh the recorded position. A gradually falling resting HR usually accompanies improving autonomic recovery; a sustained unexplained rise alongside symptoms deserves attention.',
   },
 };
-READING_INSIGHT.breathHrv = { ...READING_INSIGHT.hrv, kind: 'structured (paced-breathing) HRV reading' };
+READING_INSIGHT.breathHrv = { ...READING_INSIGHT.hrv, kind: 'training HRV reading, taken at paced 4/6 (resonance) breathing' };
 
 /**
  * Single-reading insight prompt behind "Get AI Insights on this reading" on

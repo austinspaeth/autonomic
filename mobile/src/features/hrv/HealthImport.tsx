@@ -5,7 +5,8 @@
  * readings (heartbeat series from Mindfulness/Breathe sessions, plus ECGs);
  * tapping one runs the normal HRV pipeline and opens the standard results card,
  * stamped with the time the watch recorded it. Opened from the HRV setup sheet,
- * so the kind/style chosen there carries through to the saved reading.
+ * so the kind chosen there (training or baseline) carries through to the saved
+ * reading.
  */
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
@@ -14,18 +15,16 @@ import { Muted } from '../../components/ui';
 import { usePalette } from '../../theme';
 import { health, healthAppName } from '../../lib/health';
 import { requestEcgAuth } from '../../lib/health/ecg';
-import { dayStartMs, type RrCandidate } from '../../lib/health/rrCandidates';
+import { dayStartMs, isPickable, type RrCandidate } from '../../lib/health/rrCandidates';
 import { findRrCandidates } from '../../lib/health/rrSearch';
 import { getState } from '../../store/store';
 import { keyOf, pad, todayKey } from '../../lib/dates';
 import { defaultPeriod } from '../../lib/period';
 import { CandidateRow } from './WatchSync';
 import { HrvResults } from './Results';
-import type { SessionConfig } from './Session';
+import { BREATH_STYLE, type SessionConfig } from './Session';
 
-export function HealthRrImportSheet({ kind, style }: {
-  kind: 'breath' | 'unstructured'; style?: string;
-}) {
+export function HealthRrImportSheet({ kind }: { kind: 'breath' | 'unstructured' }) {
   const p = usePalette();
   const { openSheet } = useSheets();
   const [loading, setLoading] = useState(true);
@@ -47,7 +46,9 @@ export function HealthRrImportSheet({ kind, style }: {
           .filter((r) => r.type === 'hrv' || r.type === 'breathHrv')
           .map((r) => r.time as string),
       );
-      const fresh = found.filter((c) => {
+      // Too-short readings never make the list: the setup copy asks for a
+      // 5-minute session, and anything under four can't be scored honestly.
+      const fresh = found.filter(isPickable).filter((c) => {
         const d = new Date(c.startMs);
         return !logged.has(`${pad(d.getHours())}:${pad(d.getMinutes())}`);
       });
@@ -61,7 +62,7 @@ export function HealthRrImportSheet({ kind, style }: {
     const config: SessionConfig = {
       kind,
       source: 'watch',
-      style: kind === 'breath' ? style : undefined,
+      style: kind === 'breath' ? BREATH_STYLE : undefined,
       period: defaultPeriod(kind === 'breath' ? 'breathHrv' : 'hrv', dk, new Date(c.startMs).getHours()),
     };
     const durationSec = Math.max(1, Math.round((c.endMs - c.startMs) / 1000));
@@ -82,7 +83,7 @@ export function HealthRrImportSheet({ kind, style }: {
     <View>
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 4 }}>{`Import from ${healthAppName()}`}</Text>
       <Text style={{ color: p.textDim, fontSize: 14, lineHeight: 19, marginBottom: 16 }}>
-        {"Today's readings with beat-to-beat data, from a Mindfulness breathing session or an ECG on your watch. Tap one to evaluate and save it."}
+        {"Today's readings with beat-to-beat data, from a Mindfulness breathing session or an ECG on your watch. Sessions under 4 minutes are left out, they're too short to score. Tap one to evaluate and save it."}
       </Text>
       {loading ? (
         <View style={{ alignItems: 'center', paddingVertical: 30, gap: 12 }}>
@@ -91,7 +92,7 @@ export function HealthRrImportSheet({ kind, style }: {
         </View>
       ) : cands.length === 0 ? (
         <Muted>
-          {'No beat-to-beat readings found today. Take one with the Mindfulness (Breathe) or ECG app on your watch, give it a minute or two to sync, then check that Autonomic can read your heart data: in the Health app tap your picture, then Privacy, then Apps, then Autonomic, and turn everything on, including Beat-to-Beat Measurements.'}
+          {'No beat-to-beat readings of 4 minutes or longer found today. Take a 5-minute one with the Mindfulness (Breathe) or ECG app on your watch, give it a minute or two to sync, then check that Autonomic can read your heart data: in the Health app tap your picture, then Privacy, then Apps, then Autonomic, and turn everything on, including Beat-to-Beat Measurements.'}
         </Muted>
       ) : (
         cands.map((c) => <CandidateRow key={c.key} c={c} onPress={() => pick(c)} />)

@@ -3,7 +3,7 @@
  * comp: flat sections against the screen background separated by hairline
  * rules (no cards), each with an uppercase title + "?" help dot, a big value
  * line ("37 avg"), a one-line description, and — for metrics — a text-link
- * kind toggle (Both / Structured / Unstructured / Compare) plus a "Show zones"
+ * kind toggle (Both / Training / Baseline / Compare) plus a "Show zones"
  * link. "Both" (the default) averages every reading of either kind into one
  * trace; "Compare" overlays the two kinds in comparison colours; single-series
  * views draw one trace tinted by the grade-zone gradient. Power is a stacked
@@ -30,8 +30,8 @@ export type Filt = 'all' | 'morning' | 'evening';
 export const HRV_FILTERS: { val: Filt; label: string }[] = [
   { val: 'all', label: 'All' }, { val: 'morning', label: 'Morning' }, { val: 'evening', label: 'Evening' },
 ];
-const STRUCT = '#60a5fa';   // structured — blue
-const UNSTRUCT = '#a855f7'; // unstructured — purple
+const STRUCT = '#60a5fa';   // training — blue
+const UNSTRUCT = '#a855f7'; // baseline — purple
 const VLF = '#f59e0b', LF = '#6366f1', HF = '#22c55e';
 
 /** Pill filter: the selected option sits in a dark-grey pill that animates its
@@ -83,7 +83,7 @@ export function HrvFilterLinks({ value, onChange }: { value: Filt; onChange: (f:
   );
 }
 
-// Structured (breathHrv) key, unstructured (hrv) key, grade band, integer?,
+// Training (breathHrv) key, baseline (hrv) key, grade band, integer?,
 // short inline description + longer "?" help copy.
 const METRICS: { label: string; s: string; u: string; band: string; integer?: boolean; desc: string; help: string }[] = [
   {
@@ -232,8 +232,8 @@ export function HrvProgress({ days, mode, ctx, filt }: { days: DaysMap; mode: Mo
  *  either kind into one line; "compare" overlays the two kinds. */
 type Kind = 'both' | 'breath' | 'hrv' | 'compare';
 const KIND_OPTS: { val: Kind; label: string }[] = [
-  { val: 'both', label: 'Both' }, { val: 'breath', label: 'Structured' },
-  { val: 'hrv', label: 'Unstructured' }, { val: 'compare', label: 'Compare' },
+  { val: 'both', label: 'Both' }, { val: 'breath', label: 'Training' },
+  { val: 'hrv', label: 'Baseline' }, { val: 'compare', label: 'Compare' },
 ];
 
 /** Text-link kind toggle (per the design comp) — active option in bright white
@@ -312,7 +312,7 @@ function SectionHead({ title, help, value, valueColor, value2, pair, suffix, des
 }
 
 /**
- * One metric's flat section. "Compare" overlays structured vs unstructured in
+ * One metric's flat section. "Compare" overlays training vs baseline in
  * the blue/purple pair; every other kind (including the default "Both"
  * average) hands LineChart exactly one series, which makes it colour the trace
  * with the grade-zone gradient instead. The big value is the latest reading,
@@ -333,20 +333,20 @@ function MetricSection({ m, structured, unstructured, combined, buckets }: {
 
   const series = kind === 'compare'
     ? [
-      { values: structured, color: STRUCT, label: 'Structured' },
-      { values: unstructured, color: UNSTRUCT, label: 'Unstructured' },
+      { values: structured, color: STRUCT, label: 'Training' },
+      { values: unstructured, color: UNSTRUCT, label: 'Baseline' },
     ]
     : kind === 'breath'
-      ? [{ values: structured, color: STRUCT, label: 'Structured' }]
+      ? [{ values: structured, color: STRUCT, label: 'Training' }]
       : kind === 'hrv'
-        ? [{ values: unstructured, color: UNSTRUCT, label: 'Unstructured' }]
+        ? [{ values: unstructured, color: UNSTRUCT, label: 'Baseline' }]
         : [{ values: combined, color: STRUCT, label: 'Both' }];
   const empty = !series.some((s) => s.values.some((v) => v != null));
 
   // Big value: the latest reading by default (the newest bucket the shown
   // kind(s) have data in, its label in parentheses), or the drag-selected
   // bucket's value. Tapping away from the chart blurs the selection back to
-  // the latest. In "Compare" mode the structured and unstructured values sit
+  // the latest. In "Compare" mode the training and baseline values sit
   // side by side, each tinted its series colour, with the label after the pair.
   // A selection can outlive its dataset (Day→Week shrinks `buckets` while this
   // instance is reused), so an out-of-range index falls back to the latest.
@@ -383,8 +383,8 @@ function MetricSection({ m, structured, unstructured, combined, buckets }: {
         valueColor={valueColor}
         value2={value2}
         pair={compare ? [
-          { label: 'Structured', color: STRUCT, text: fmtVal(sRaw) },
-          { label: 'Unstructured', color: UNSTRUCT, text: fmtVal(uRaw) },
+          { label: 'Training', color: STRUCT, text: fmtVal(sRaw) },
+          { label: 'Baseline', color: UNSTRUCT, text: fmtVal(uRaw) },
         ] : null}
         suffix={suffix}
         desc={m.desc}
@@ -395,7 +395,7 @@ function MetricSection({ m, structured, unstructured, combined, buckets }: {
       </View>
       {empty ? (
         <Text style={{ color: p.textDim, fontSize: 13 }}>
-          No {kind === 'breath' ? 'structured' : kind === 'hrv' ? 'unstructured' : 'HRV'} readings in this range.
+          No {kind === 'breath' ? 'training' : kind === 'hrv' ? 'baseline' : 'HRV'} readings in this range.
         </Text>
       ) : (
         <>

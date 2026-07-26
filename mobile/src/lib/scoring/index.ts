@@ -113,7 +113,7 @@ export const BANDS: Record<string, Band[]> = {
   // Respiratory (HF) peak: a peak inside the HF band (0.15–0.40 Hz) reflects
   // normal respiratory sinus arrhythmia; ~0.20–0.30 Hz (12–18 breaths/min) is
   // the relaxed-breathing sweet spot. Used to give HF peak grade zones even for
-  // unstructured readings, where there's no target pace to compare against.
+  // baseline readings, where there's no target pace to compare against.
   hfPeak: [{ max: 0.12, cat: 'bad' }, { max: 0.15, cat: 'ok' }, { max: 0.20, cat: 'good' }, { max: 0.32, cat: 'great' }, { max: 0.40, cat: 'good' }, { max: Infinity, cat: 'ok' }],
   lfhf: [{ max: 1.5, cat: 'great' }, { max: 3, cat: 'good' }, { max: 5, cat: 'ok' }, { max: 10, cat: 'bad' }, { max: Infinity, cat: 'concerning' }],
   readiness: [{ max: 35, cat: 'crash' }, { max: 50, cat: 'bad' }, { max: 60, cat: 'ok' }, { max: 70, cat: 'good' }, { max: 86, cat: 'great' }, { max: Infinity, cat: 'warning' }],
@@ -338,7 +338,7 @@ export const HRV_HELP: Record<string, string> = {
   vlf: 'Very-low-frequency power (below 0.04 Hz) reflects slow regulatory waves tied to thermoregulation, hormones and vascular tone. Occasional high VLF is normal; a persistent pattern of high VLF with suppressed HF can point to stress, poor sleep, or inflammation, or simply a reading that was too short or noisy to resolve the faster bands.',
   lf: 'Low-frequency power (0.04–0.15 Hz) is the baroreflex band around blood-pressure regulation. It carries a mix of both branches but leans sympathetic when you are stressed or standing. Slow paced breathing deliberately pumps LF up, so a big LF share during a breathing exercise is expected, not a warning.',
   hf: 'High-frequency power (0.15–0.4 Hz) is the fast, breath-linked band. It rides almost purely on parasympathetic (vagal) tone, the "rest and digest" branch, so strong HF generally means good recovery and calm.',
-  lfhf: 'The ratio of low-frequency to high-frequency power, a rough sympathetic-versus-vagal balance marker. Slow paced breathing deliberately inflates LF, so judge this mainly on unstructured readings, and on trends rather than single values.',
+  lfhf: 'The ratio of low-frequency to high-frequency power, a rough sympathetic-versus-vagal balance marker. Slow paced breathing deliberately inflates LF, so judge this mainly on baseline readings, and on trends rather than single values.',
   sdnn: 'Standard deviation of all RR intervals in the reading. SDNN captures every rhythm influence (breathing, blood-pressure waves, slower autonomic swings), so it summarizes total variability rather than just vagal activity. In short readings it runs lower than 24-hour figures you may see quoted elsewhere.',
   rmssd: 'Root mean square of successive RR-interval differences. RMSSD is the workhorse HRV metric: it reflects parasympathetic (vagal) activity, and higher values generally mean better recovery capacity. Compare readings taken at the same time of day and in the same position. A consistent morning reading is the most reliable trend line.',
   pnn50: 'The percentage of successive heartbeat intervals that differ by more than 50 ms. Like RMSSD it tracks vagal tone, but it saturates at the extremes, so expect it to move together with RMSSD, and treat sustained changes as more meaningful than single readings.',

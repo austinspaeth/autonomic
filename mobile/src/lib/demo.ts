@@ -155,7 +155,7 @@ function demoDay(i: number, rand: () => number): DayRecord {
   const readings: Entry[] = [];
   const id = (kind: string, n = 0) => `demo-${i}-${kind}${n ? `-${n}` : ''}`;
 
-  /* --- HRV: a structured (paced-breathing) reading plus a plain one --- */
+  /* --- HRV: a training (paced-breathing) reading plus a baseline one --- */
   const hrvPair = (slot: 'Morning' | 'Evening', mins: number, n: number) => {
     const total = jit(at(560, 4300), 260);
     const vlf = Math.round(total * at(0.6, 0.06));
@@ -164,7 +164,7 @@ function demoDay(i: number, rand: () => number): DayRecord {
     // Evening readings run a little softer than the morning baseline.
     const bias = slot === 'Evening' ? -0.9 : 0;
 
-    // Structured (paced-breathing) reading. Base metrics are captured as numbers
+    // Training (paced-breathing) reading. Base metrics are captured as numbers
     // so the Baevsky/Kubios composites derive off the same values.
     const sSdnn = Math.round(jit(at(26, 68), 4));
     const sHr = Math.round(jit(at(80, 58), 3) - bias);

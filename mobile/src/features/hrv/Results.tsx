@@ -22,8 +22,16 @@ import { keyOf, nowTime, pad, todayKey, uid } from '../../lib/dates';
 import type { DayRecord, Entry } from '../../lib/types';
 import type { SessionConfig } from './Session';
 
-export function HrvResults({ rr, hrSamples, sdnnSamples, config, durationSec, startedAtMs, watchFallback, controls }: {
+const CONFIDENCE_LABEL: Record<'high' | 'fair' | 'low', string> = {
+  high: 'High confidence',
+  fair: 'Fair confidence',
+  low: 'Low confidence',
+};
+
+export function HrvResults({ rr, segmentStarts, hrSamples, sdnnSamples, config, durationSec, startedAtMs, watchFallback, controls }: {
   rr: number[]; hrSamples: { t: number; bpm: number }[]; sdnnSamples?: { t: number; sdnn: number }[];
+  /** Indices into `rr` where camera tracking resumed after a dropout. */
+  segmentStarts?: number[];
   config: SessionConfig; durationSec: number;
   /** When the reading actually began (watch-synced / imported readings) — the
    *  entry is stamped with this time and day, not the moment Save is pressed. */
@@ -36,8 +44,8 @@ export function HrvResults({ rr, hrSamples, sdnnSamples, config, durationSec, st
   const ctx = { sex: getState().profile.sex, height: getState().profile.height };
 
   const result = useMemo(
-    () => computeHrv(rr, { style: config.style, source: config.source, durationSec }),
-    [rr, config.style, config.source, durationSec],
+    () => computeHrv(rr, { style: config.style, source: config.source, durationSec, segmentStarts }),
+    [rr, segmentStarts, config.style, config.source, durationSec],
   );
 
   // The day + time the reading physically happened — never the day the journal
@@ -61,6 +69,7 @@ export function HrvResults({ rr, hrSamples, sdnnSamples, config, durationSec, st
       source: config.source, durationSec,
       rrRaw: rr, rrClean: result.rrClean, sampledHr: hrSamples,
     };
+    if (segmentStarts && segmentStarts.length) base.rrSegments = segmentStarts;
     if (config.source === 'polar' && getState().settings.lastBleDeviceName) {
       base.sourceName = getState().settings.lastBleDeviceName;
     }
@@ -124,6 +133,17 @@ export function HrvResults({ rr, hrSamples, sdnnSamples, config, durationSec, st
       <Text style={{ color: p.textDim, fontSize: 14, marginBottom: 16 }}>
         {`${Math.floor(durationSec / 60)}:${String(durationSec % 60).padStart(2, '0')} captured · ${rr.length} beats · ${Math.round(result.artifactPct)}% artifacts${config.source === 'camera' ? ' · Camera (PPG)' : ''}`}
       </Text>
+
+      {/* Camera readings are stitched from however much clean pulse we got, so
+          say how much that was. A number built from 90 s of a 3 min attempt is
+          a different claim than one built from all of it. */}
+      {config.source === 'camera' && enoughData ? (
+        <Text style={{ color: p.textDim, fontSize: 13, marginTop: -10, marginBottom: 16 }}>
+          {`${CONFIDENCE_LABEL[result.confidence]} · ${Math.round(result.coverageSec)}s of usable pulse`
+            + (result.segmentsDropped ? ` · ${result.segmentsDropped} unusable stretch${result.segmentsDropped > 1 ? 'es' : ''} discarded` : '')
+            + (result.segmentsUsed > 1 ? ` · stitched from ${result.segmentsUsed} segments` : '')}
+        </Text>
+      ) : null}
 
       {!enoughData ? (
         <View style={{ backgroundColor: p.surface2, borderRadius: 12, padding: 16, marginBottom: 16 }}>

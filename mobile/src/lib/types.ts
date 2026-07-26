@@ -61,6 +61,10 @@ export interface LiveHrvExtras {
   sourceName?: string;
   rrRaw?: number[];
   rrClean?: number[];
+  /** Indices into rrRaw where camera tracking resumed after losing the pulse.
+   *  Beat-to-beat metrics must not step across these. Absent on strap/watch/ECG
+   *  readings, which are one continuous take. */
+  rrSegments?: number[];
   durationSec?: number;
   sampledHr?: { t: number; bpm: number }[];
   /** Rolling SDNN (trailing ~60 s window) sampled through the session. */
@@ -112,7 +116,7 @@ export interface DayRecord {
 export interface Protocol {
   /** Avoid triggers. Empty `types` = avoid ALL triggers; else only these. */
   triggers: { enabled: boolean; types: string[] };
-  /** Take at least one HRV reading (structured or unstructured) that day. */
+  /** Take at least one HRV reading (training or baseline) that day. */
   hrv: { enabled: boolean };
   /** Minimum daily water (litres). */
   water: { enabled: boolean; liters: number };

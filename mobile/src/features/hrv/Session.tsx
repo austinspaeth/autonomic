@@ -32,6 +32,7 @@ import { SheetControls, SheetFooter, useSheets } from '../../components/Sheet';
 import { Button } from '../../components/ui';
 import { usePalette, GRADE_COLORS } from '../../theme';
 import { BreathingViz, parsePattern, type BreathPhase } from './BreathingViz';
+import { BREATH_STYLE, styleTitle } from '../../lib/breathStyle';
 import { HrvResults } from './Results';
 import { WatchSyncSheet } from './WatchSync';
 import { startWatchSync } from './watchSyncStore';
@@ -41,20 +42,16 @@ import { correctArtifacts, std } from '../../lib/hrv';
 import { notifyHrvComplete } from '../../lib/reminders';
 import { getState } from '../../store/store';
 
-// Strap and watch readings — structured or unstructured — run the full
+// Strap and watch readings — training or baseline — run the full
 // 5 minutes. Camera (finger) readings run 3 minutes: long enough to resolve the
 // LF band and settle RMSSD/SDNN (a 1-minute optical reading swings too much to
 // compare against a dedicated app), still realistic to hold a fingertip still.
 const durationFor = (config: SessionConfig) => (config.source === 'camera' ? 180 : 300);
 
-/** The three structured breathing patterns. `val` is the stored style string
- *  (in/hold/out/hold seconds — see parsePattern); shared by Setup + Session. */
-export const BREATH_STYLES: { val: string; title: string; sub: string; badge?: string }[] = [
-  { val: '4/6', title: '4 / 6 breathing', badge: 'Recommended', sub: 'In 4s · out 6s. Resonant-frequency pacing that trains the baroreflex.' },
-  { val: '4/4/4/4', title: 'Box breathing', sub: 'In 4s · hold 4s · out 4s · hold 4s. A steady square rhythm for calm focus.' },
-  { val: '4/7/8', title: '4 / 7 / 8 breathing', sub: 'In 4s · hold 7s · out 8s. A long exhale that leans into the vagal brake.' },
-];
-export const styleTitle = (val?: string) => BREATH_STYLES.find((s) => s.val === val)?.title || (val || '');
+// The single paced pattern training readings use (4s in, 6s out) and the
+// display titles for it plus the retired ones live in lib/breathStyle; re-export
+// so the HRV feature files have one import site.
+export { BREATH_STYLE, styleTitle };
 
 /** ~1 s strong buzz: expo-haptics has no long-duration vibration on iOS, so a
  *  dense train of heavy impacts reads as one sustained buzz. */
@@ -91,6 +88,9 @@ export function HrvSession({ config, controls, autoStart }: { config: SessionCon
     config.source === 'camera' ? { locked: true, quality: 'good' } : { locked: false, quality: 'none' },
   );
   const rrRef = useRef<number[]>([]);
+  // Indices into rrRef where tracking resumed after a dropout. Everything
+  // downstream needs these to avoid treating a seam as a beat-to-beat interval.
+  const segmentsRef = useRef<number[]>([]);
   const hrRef = useRef<{ t: number; bpm: number }[]>([]);
   const sdnnRef = useRef<{ t: number; sdnn: number }[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -108,10 +108,17 @@ export function HrvSession({ config, controls, autoStart }: { config: SessionCon
 
   // Shared RR/HR/SDNN collection — both the BLE strap and the camera PPG
   // stream emit the same { hr, rr[] } sample shape into this.
-  const collect = (s: { hr: number; rr: number[] }) => {
+  const collect = (s: { hr: number; rr: number[]; gap?: boolean }) => {
     if (s.hr) { setHr(s.hr); }
     const now = Date.now();
     if (s.hr) hrRef.current.push({ t: now, bpm: s.hr });
+    // Tracking resumed after a lapse: mark a boundary before these beats land,
+    // and start the live artifact window over — its first "successive
+    // difference" would otherwise straddle the gap.
+    if (s.gap && rrRef.current.length) {
+      segmentsRef.current.push(rrRef.current.length);
+      recentRr.current = [];
+    }
     s.rr.forEach((v) => rrRef.current.push(v));
     // live artifact hint over the last ~10 beats
     recentRr.current = [...recentRr.current, ...s.rr].slice(-12);
@@ -272,11 +279,12 @@ export function HrvSession({ config, controls, autoStart }: { config: SessionCon
 
     // Strap and camera both finish with the RR array in hand — same Results path.
     const rr = rrRef.current.slice();
+    const segmentStarts = segmentsRef.current.slice();
     // Open Results as a card stacked ON TOP of this one: this session card recedes
     // (scales back + lifts) while Results rises over it. Save/Discard in Results
     // calls closeAll(), so both cards animate out together. Leave this card mounted.
     openSheet((c) => (
-      <HrvResults rr={rr} hrSamples={hrRef.current} sdnnSamples={sdnnRef.current} config={config} durationSec={capturedSec} watchFallback={null} controls={c} />
+      <HrvResults rr={rr} segmentStarts={segmentStarts} hrSamples={hrRef.current} sdnnSamples={sdnnRef.current} config={config} durationSec={capturedSec} watchFallback={null} controls={c} />
     ), { hideClose: true });
   };
 
@@ -293,7 +301,7 @@ export function HrvSession({ config, controls, autoStart }: { config: SessionCon
   return (
     <View style={{ alignItems: 'center', paddingTop: 8 }}>
       <Text style={{ color: p.textDim, fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, fontWeight: '700' }}>
-        {config.kind === 'breath' ? `Structured HRV · ${styleTitle(config.style)}` : 'Unstructured HRV'}
+        {config.kind === 'breath' ? `Training HRV · ${styleTitle(config.style)}` : 'Baseline HRV'}
       </Text>
 
       <View style={{ width: ringSize, height: ringSize, marginTop: 18, alignItems: 'center', justifyContent: 'center' }}>

@@ -21,7 +21,7 @@ const bpDigitsDone = (leads: string[]) => (v: string) => {
 
 export const READING_TYPES: Record<string, TypeDef> = {
   hrv: {
-    label: 'Unstructured HRV',
+    label: 'Baseline HRV',
     icon: 'heartPulse',
     fields: [
       { key: 'pns', label: 'PNS index', signed: true },
@@ -48,10 +48,12 @@ export const READING_TYPES: Record<string, TypeDef> = {
     ],
   },
   breathHrv: {
-    label: 'Structured HRV',
+    label: 'Training HRV',
     icon: 'wind',
+    // No breathing-style field: training readings are always 4/6 pacing now
+    // (see BREATH_STYLE in features/hrv/Session.tsx). Older readings saved with
+    // box breathing or 4/7/8 still carry and display their stored style.
     fields: [
-      { type: 'select', key: 'style', label: 'Breathing style', options: ['4/6', '4/4/4/4', '4/7/8'] },
       { key: 'pns', label: 'PNS index', signed: true },
       { key: 'sns', label: 'SNS index', signed: true },
       { key: 'stressIndex', label: 'Stress index' },
@@ -548,8 +550,8 @@ export function summarizeFields(def: TypeDef | undefined, r: Entry): string {
 /**
  * Display name for a reading. Only an HRV auto-imported from Apple Health
  * (welcome-view backfill, `imported`) is shown as "Apple Watch HRV"; an HRV
- * captured through the readings section keeps its registry label (Structured /
- * Unstructured HRV) even when the watch was the capture source — the summary
+ * captured through the readings section keeps its registry label (Training /
+ * Baseline HRV) even when the watch was the capture source — the summary
  * card's Source row is what says it came from the watch.
  */
 export function readingLabel(r: Entry): string {

@@ -82,7 +82,7 @@ function hrvDayAvg(d: DayRecord | undefined, key: string, unstructuredKey = key)
 }
 
 /** Day-average resting HR, mirroring the day score's source preference:
- *  dedicated resting-HR readings, else structured HR, else unstructured avg. */
+ *  dedicated resting-HR readings, else training HR, else baseline avg. */
 function restingHrDay(d: DayRecord | undefined): { value: number; color: string } | null {
   if (!d) return null;
   const dedicated = (d.readings || []).filter((r) => r.type === 'restingHr');
@@ -117,7 +117,7 @@ const SPARK_DAYS = 14;
 
 /** RMSSD day averages over the trailing two weeks, packaged with the exact
  *  scale + grade-gradient stops the app's Sparkline computes (charts.tsx), so
- *  the widget chart is the Progress card's chart. Graded on the structured
+ *  the widget chart is the Progress card's chart. Graded on the training
  *  bands, matching the Progress RMSSD card. */
 function buildSpark(days: DaysMap, dk: string): WidgetSpark | null {
   const keys = Array.from({ length: SPARK_DAYS }, (_, i) => dayBefore(dk, SPARK_DAYS - 1 - i));
@@ -164,7 +164,7 @@ export function buildWidgetPayload(state: AppState, dk = todayKey()): WidgetPayl
   const cat = hasScore ? scoreCat(all.score!) : null;
 
   // SDNN / RMSSD day averages + grade colors. RMSSD grades against the
-  // structured bands when a structured reading exists (same split day.ts uses).
+  // training bands when a training reading exists (same split day.ts uses).
   const sdnn = hrvDayAvg(d, 'sdnn');
   const rmssd = hrvDayAvg(d, 'rmssd');
   const rmssdBands = d && acReadVals(d, 'breathHrv', 'rmssd').length ? BANDS.rmssdS : BANDS.rmssdU;

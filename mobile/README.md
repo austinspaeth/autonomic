@@ -99,11 +99,17 @@ where data/permission is missing.
 
 Readings → **+ Add** → **Live HRV reading**:
 
-- **Kind**: Unstructured (quiet, no pacing) or Breathing.
-- **Breathing pattern**: 4/4, 4/5, **4/6 (recommended)**, 5/5 — the inhale/exhale
-  seconds drive the pacing and the HF-peak grading (`expectedHf`).
-- **Source**: Bluetooth strap, or Apple Watch (run a Breathe/Mindfulness session;
-  beat-to-beat / SDNN is read from Health at the end).
+- **Kind**: **Training HRV** (paced breathing) or **Baseline HRV** (quiet, no
+  pacing). The old "structured/unstructured" wording is gone.
+- **Breathing pattern**: always **4/6** (4s in, 6s out) for training readings, the
+  resonant-frequency pace; the inhale/exhale seconds drive the pacing and the
+  HF-peak grading (`expectedHf`). Box breathing and 4/7/8 were retired because
+  they flatten RSA and break day-to-day comparability; old readings keep the
+  style they were saved with (`src/lib/breathStyle.ts`).
+- **Source**: picked in the "Measuring with" sheet (`features/hrv/SourcePicker.tsx`),
+  which also scans for nearby BLE straps inline so pairing never needs a detour
+  into Settings. Bluetooth strap, Apple Watch (run a Breathe/Mindfulness session;
+  beat-to-beat / SDNN is read from Health at the end), or phone camera.
 
 The full-screen session shows a 5:00 progress ring, live HR, a signal-quality
 hint, and — for breathing — a vertical glowing "volume-bar" visualizer paced on
@@ -126,12 +132,12 @@ fill-in-the-blank field on both HRV forms. The PNS/SNS composites are
 Kubios-style approximations; they track vagal/sympathetic balance but may not
 match a specific device's proprietary calibration to the decimal.
 
-**Unstructured and structured HRV report the identical measurements.** Both
+**Baseline and training HRV report the identical measurements.** Both
 capture and compute the same metric set (including the PNS/SNS/stress balance
 indices and coherence) and grade them against the same bands; the only
-difference is the breathing-style row (structured only) and the RMSSD/HR grade
+difference is the RMSSD/HR grade
 band that applies per kind. The per-reading *composite score* still uses the two
-documented weightings (structured weights the HF peak, unstructured weights
+documented weightings (training weights the HF peak, baseline weights
 SDNN), since a paced reading has a defined respiratory peak and an unpaced one
 does not. There is no "physiological age" field — it was a device-proprietary
 estimate not derivable from an RR series, so it's been removed.

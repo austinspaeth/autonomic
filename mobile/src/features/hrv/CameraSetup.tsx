@@ -1,47 +1,69 @@
 /**
  * Camera-reading setup card — stacked over the HRV setup sheet when the phone
  * camera source is chosen (the session card is never shown until the reading
- * is actually running). Three steps:
+ * is actually running). Four steps, wizard-style: a back arrow and the welcome
+ * wizard's progress pills (`StepDots`, active dot stretches to a pill) sit at
+ * the top of the card throughout.
  *
- *   1. Choose your camera setup — a 2×2 grid of rear camera-module shapes
+ *   1. Heads-up — the camera is the least accurate source. Sets expectations
+ *      before anyone invests time in setup, and points at the strap article on
+ *      the website rather than recommending hardware in-app.
+ *   2. Choose your camera setup — a 2×2 grid of rear camera-module shapes
  *      (tall, wide, square, single lens). Picking one fades the others out and
  *      the chosen shape glides to the center of the card, larger.
- *   2. Where is the flash? — glowing tappable dots mark the candidate flash
+ *   3. Where is the flash? — glowing tappable dots mark the candidate flash
  *      spots for that shape (top/middle/bottom, left/middle/right, the four
  *      corners, or beside/below a single lens).
- *   3. Wait for the finger — the live camera feed appears in a lens circle
+ *   4. Wait for the finger — the live camera feed appears in a lens circle
  *      placed away from the flash, a finger outline slides in along the
  *      flash↔lens axis to show the coverage, and the reading starts itself
  *      the moment a steady pulse is detected: the session card rises over
  *      this one already running (this card stays mounted underneath so the
  *      camera view survives the handoff).
  *
- * The shape + flash choice is remembered (settings.cameraLayout), so later
- * camera readings open straight at step 3; "Start over" clears it. Camera
+ * The shape + flash choice is remembered (settings.cameraLayout), so once a
+ * camera reading has been set up the card opens straight at step 4 (the
+ * heads-up is a first-time-only screen); "Start over" clears it. Camera
  * permission is requested when the card opens. The ✕ backs out to the setup
  * sheet.
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Linking, Pressable, Text, View } from 'react-native';
 import { useKeepAwake } from 'expo-keep-awake';
 import Animated, {
-  Easing, FadeIn, cancelAnimation,
+  Easing, FadeIn, cancelAnimation, interpolateColor,
   useAnimatedStyle, useSharedValue, withDelay, withRepeat, withTiming,
 } from 'react-native-reanimated';
-import { SheetControls, SheetFooter, useSheets } from '../../components/Sheet';
+import { SheetControls, SheetFooter, SheetPill, SheetPillButton, useSheets } from '../../components/Sheet';
+import { Icon } from '../../components/Icon';
 import { Button } from '../../components/ui';
-import { radius, usePalette } from '../../theme';
+import { ACCENT, radius, usePalette } from '../../theme';
 import { getState, save } from '../../store/store';
 import { ppg, type PpgSignal } from '../../lib/ppg/camera';
 import { PpgCameraView } from '../../lib/ppg/CameraView';
 import type { CameraModuleShape } from '../../lib/types';
 import { HrvSession, type SessionConfig } from './Session';
 
-// Matches the setup sheet — keep the title clear of the floating ✕ pill.
-const CLOSE_CLEARANCE = 58;
+/** Sheet content is inset 18/24 (padding/topPad); its floating ✕ pill sits at
+ *  14/10 on the sheet itself. These pull the back pill out to the same spot so
+ *  the two pills share a centerline. Keep in sync with Sheet.tsx's headerPill. */
+const BAR_INSET = 18 - 14;
+const BAR_LIFT = 24 - 10;
+/** Pill height: 36px button + 6px padding + 1px border, both sides. */
+const BAR_H = 36 + (6 + 1) * 2;
+/** Opacity of the back arrow on step 1, where there's nothing to go back to. */
+const BACK_GHOST = 0.22;
+
+/** Strap explainer on the website. Deliberately not an in-app product list:
+ *  no stock, no prices and no hardware endorsement to maintain here. */
+const STRAP_ARTICLE_URL =
+  'https://autonomic.care/insights/hrv/best-hrv-chest-strap-polar-h10-coospo-h808s/';
 
 type Pt = { x: number; y: number };
-type Step = 'shape' | 'flash' | 'wait';
+type Step = 'warn' | 'shape' | 'flash' | 'wait';
+
+/** Wizard order — drives the back arrow and the progress pills. */
+const ORDER: Step[] = ['warn', 'shape', 'flash', 'wait'];
 
 /** Full-size module dimensions (steps 2–3); the grid shows them at SMALL. */
 const MODULE: Record<CameraModuleShape, { w: number; h: number }> = {
@@ -166,7 +188,9 @@ export function CameraSetup({ config, controls: _controls }: { config: SessionCo
   const saved = getState().settings.cameraLayout;
   const [shape, setShape] = useState<CameraModuleShape | null>(saved?.shape ?? null);
   const [flash, setFlash] = useState<string | null>(saved?.flash ?? null);
-  const [step, setStep] = useState<Step>(saved ? 'wait' : 'shape');
+  // A remembered layout means they've done this before: skip the heads-up and
+  // the pickers and open straight on "place your finger".
+  const [step, setStep] = useState<Step>(saved ? 'wait' : 'warn');
   const [signal, setSignal] = useState<PpgSignal>({ locked: false, quality: 'none' });
   const handedOff = useRef(false);
 
@@ -227,6 +251,23 @@ export function CameraSetup({ config, controls: _controls }: { config: SessionCo
     if (getState().settings.cameraLayout) { delete getState().settings.cameraLayout; save(); }
   };
 
+  const idx = ORDER.indexOf(step);
+  // Back walks the wizard one step at a time. Landing on the shape grid arms
+  // the same rise-in the stage uses on the way out, so the two directions read
+  // as one motion rather than a pop.
+  const back = () => {
+    if (idx <= 0) return;
+    const prev = ORDER[idx - 1];
+    if (prev === 'shape') returning.current = true;
+    // Stepping back off the finger guide means the layout is up for revision
+    // again; the pick is re-committed (and re-saved) on the way forward.
+    if (step === 'wait') setSignal({ locked: false, quality: 'none' });
+    setStep(prev);
+  };
+
+  const title = step === 'warn' ? 'The camera is less reliable'
+    : step === 'shape' ? 'Choose your camera layout'
+      : step === 'flash' ? 'Where is your flash?' : 'Place your finger';
   const subtext = step === 'shape' ? 'Which of these best matches the camera on the back of your phone?'
     : step === 'flash' ? 'Tap the glowing spot where your flash sits.'
       : 'The camera circle shows a live view of the lens.';
@@ -237,15 +278,40 @@ export function CameraSetup({ config, controls: _controls }: { config: SessionCo
     // flexGrow + the sheet's `grow` option: the stage area soaks up the free
     // height so the module centers vertically and the wait-step squircle
     // bottom-pins above the footer.
-    <View style={{ paddingTop: 8, flexGrow: 1 }}>
-      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 6, paddingRight: CLOSE_CLEARANCE }}>Set up your camera</Text>
-      <Text style={{ color: p.textDim, fontSize: 14, lineHeight: 20, textAlign: 'center', marginTop: 18, marginBottom: 14, paddingHorizontal: 16 }}>{subtext}</Text>
+    <View style={{ flexGrow: 1 }}>
+      {/* Wizard bar: back arrow + the welcome wizard's progress pills. The back
+          arrow wears the same tinted-glass pill as the sheet's floating ✕ — the
+          negative margins pull the bar out of the content box onto the sheet's
+          own 14/10 inset so the two circles sit on one line. The bar therefore
+          spans pill-to-pill, and the dots ride an absolute layer across its full
+          width so they center on the card, not in the gap left over between the
+          two buttons. */}
+      <View style={{ height: BAR_H, marginTop: -BAR_LIFT, marginHorizontal: -BAR_INSET, marginBottom: 12, justifyContent: 'center' }}>
+        <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 7 }}>
+          {ORDER.map((_, i) => <StepDot key={i} i={i} step={idx} />)}
+        </View>
+        {/* Ghosted rather than hidden on step 1 — nothing to go back to, but the
+            bar keeps its shape. */}
+        <SheetPill lone style={{ alignSelf: 'flex-start', opacity: idx <= 0 ? BACK_GHOST : 1 }}>
+          <SheetPillButton icon="chevronLeft" size={18} onPress={back} label="Back" disabled={idx <= 0} />
+        </SheetPill>
+      </View>
+
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 6 }}>{title}</Text>
+
+      {/* Step 1 is a plain read-and-continue screen; it owns the rest of the
+          card and hands off to the shape grid. */}
+      {step === 'warn' ? (
+        <HeadsUp />
+      ) : (
+        <Text style={{ color: p.textDim, fontSize: 14, lineHeight: 20, marginBottom: 14 }}>{subtext}</Text>
+      )}
 
       {/* The 2×2 grid sits toward the top of the card. Picking a shape swaps
           it for a statically-centered full-size stage — the grid fades out
           sinking down, the stage fades in rising up into place (no layout
           transitions; the stage's centered position is plain flexbox). */}
-      {chosen ? (
+      {step === 'warn' ? null : chosen ? (
         <View style={{ flexGrow: 1, alignItems: 'center', justifyContent: 'center' }}>
           <Animated.View entering={riseIn} exiting={sinkOut} style={{ width: MODULE[chosen].w + PAD * 2, height: MODULE[chosen].h + PAD * 2, alignItems: 'center', justifyContent: 'center' }}>
             <ShapeView shape={chosen} big />
@@ -271,15 +337,75 @@ export function CameraSetup({ config, controls: _controls }: { config: SessionCo
           above the footer's Start over. Mounted (invisibly) from the flash
           step so revealing it doesn't reflow the centered stage — the module
           stays put; only the camera circle and finger animate in on top. */}
-      {step !== 'shape' ? (
-        <PlacementCard visible={step === 'wait'} hint={signal.quality === 'weak' ? 'Hold still, finding your pulse…' : 'Place your finger…'} />
+      {step === 'flash' || step === 'wait' ? (
+        <PlacementCard visible={step === 'wait'} hint={signal.quality === 'weak' ? 'Hold still, finding your pulse…' : 'Waiting for a steady pulse…'} />
       ) : null}
 
-      {step !== 'shape' ? (
+      {step === 'warn' ? (
+        <SheetFooter>
+          <Button title="I understand, continue" variant="primary" onPress={() => setStep('shape')} />
+        </SheetFooter>
+      ) : step === 'flash' || step === 'wait' ? (
         <SheetFooter>
           <Button title="Start over" variant="ghost" onPress={startOver} />
         </SheetFooter>
       ) : null}
+    </View>
+  );
+}
+
+/** Progress pill, same treatment as the welcome wizard's: the active step
+ *  stretches from a dot into a pill, completed steps stay dots tinted red. */
+function StepDot({ i, step }: { i: number; step: number }) {
+  const target = i === step ? 1 : i < step ? 0.5 : 0;
+  const t = useSharedValue(target);
+  useEffect(() => { t.value = withTiming(target, { duration: 300, easing: Easing.out(Easing.cubic) }); }, [target, t]);
+  const style = useAnimatedStyle(() => ({
+    width: 6 + 28 * Math.max(0, t.value - 0.5),
+    backgroundColor: interpolateColor(t.value, [0, 0.5, 1], ['rgba(255,255,255,0.12)', 'rgba(224,49,39,0.40)', ACCENT]),
+  }));
+  return <Animated.View style={[{ height: 6, borderRadius: 999 }, style]} />;
+}
+
+/** Step 1 — what a camera reading can and can't do, before any setup effort is
+ *  spent on it. The strap recommendation links out to the website article
+ *  rather than listing hardware in-app. */
+function HeadsUp() {
+  const p = usePalette();
+  return (
+    <View style={{ flexGrow: 1, gap: 14 }}>
+      <Text style={{ color: p.textDim, fontSize: 14, lineHeight: 20 }}>
+        Movement, finger pressure and stray light all affect the signal, so quality varies from reading to reading.
+        If a number looks off, take the reading again.
+      </Text>
+
+      <View style={{ flexDirection: 'row', gap: 12, padding: 15, borderRadius: radius.card, borderCurve: 'continuous', borderWidth: 1, borderColor: p.border, backgroundColor: p.sunk }}>
+        <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(74,157,224,0.12)', alignItems: 'center', justifyContent: 'center' }}>
+          <Icon name="check" size={16} color="#4a9de0" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: p.text, fontSize: 14, fontWeight: '700', marginBottom: 3 }}>Every reading gets cleaned up</Text>
+          <Text style={{ color: p.textDim, fontSize: 13, lineHeight: 18 }}>Obvious deviations and dropped signal are removed automatically when you finish.</Text>
+        </View>
+      </View>
+
+      <View style={{ padding: 16, borderRadius: radius.card, borderCurve: 'continuous', borderWidth: 1, borderColor: 'rgba(224,49,39,0.28)', backgroundColor: p.accentSoft }}>
+        <Text style={{ color: p.text, fontSize: 16, fontWeight: '700', marginBottom: 6 }}>Chest straps are more accurate</Text>
+        <Text style={{ color: p.textDim, fontSize: 13, lineHeight: 19, marginBottom: 14 }}>
+          Straps read your heartbeat electrically, so the timing stays clean. We highly recommend one for anyone
+          who wants to monitor their HRV. Good ones start around $30.
+        </Text>
+        <Pressable
+          onPress={() => Linking.openURL(STRAP_ARTICLE_URL).catch(() => {})}
+          style={({ pressed }) => [
+            { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 46, borderRadius: radius.control, borderWidth: 1, borderColor: 'rgba(224,49,39,0.45)' },
+            pressed && { opacity: 0.7 },
+          ]}
+        >
+          <Text style={{ color: p.accent, fontSize: 14, fontWeight: '700' }}>Which strap to buy</Text>
+          <Icon name="chevronRight" size={15} color={p.accent} />
+        </Pressable>
+      </View>
     </View>
   );
 }

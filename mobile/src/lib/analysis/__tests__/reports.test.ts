@@ -86,7 +86,7 @@ describe('buildReadingInsightPrompt', () => {
   it('builds an HRV prompt with the metrics, derived values, and doctor reminder', () => {
     const { prompt, rangeText } = buildReadingInsightPrompt(readingDays, profile, {}, hrvReading, '2026-07-19');
     expect(rangeText).toContain('July 19, 2026');
-    expect(prompt).toContain('structured (paced-breathing) HRV reading');
+    expect(prompt).toContain('training HRV reading');
     expect(prompt).toContain('Breathing style: 4/6');
     expect(prompt).toContain('Capture source: Polar H10');
     expect(prompt).toContain('RMSSD: 42 ms');

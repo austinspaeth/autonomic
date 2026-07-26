@@ -21,11 +21,15 @@ import type { AppState, Entry } from './types';
 export interface WaveformData {
   rrRaw?: number[];
   rrClean?: number[];
+  /** Indices into rrRaw where camera tracking resumed after a dropout — the
+   *  reading is discontinuous there, so it rides with rrRaw rather than in the
+   *  journal blob (it's meaningless without it). Absent = one continuous take. */
+  rrSegments?: number[];
   sampledHr?: { t: number; bpm: number }[];
   sampledSdnn?: { t: number; sdnn: number }[];
 }
 
-export const WAVEFORM_FIELDS = ['rrRaw', 'rrClean', 'sampledHr', 'sampledSdnn'] as const;
+export const WAVEFORM_FIELDS = ['rrRaw', 'rrClean', 'rrSegments', 'sampledHr', 'sampledSdnn'] as const;
 
 /**
  * Split an entry into its journal half (waveform fields removed) and its

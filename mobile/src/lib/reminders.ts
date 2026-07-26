@@ -90,7 +90,7 @@ async function ensureHrvChannel() {
 
 /**
  * A backgrounded HRV reading finishes with no felt haptic — iOS suppresses
- * haptics entirely while the app isn't in the foreground, and an unstructured
+ * haptics entirely while the app isn't in the foreground, and a baseline
  * reading is usually taken with the phone set aside. Post an immediate local
  * notification (sound + vibration) so completion is still felt, the same signal
  * the completion buzz gives a foreground reading. Best-effort: silently no-ops
