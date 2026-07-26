@@ -8,7 +8,7 @@ keywords: "how to stimulate the vagus nerve, vagus nerve stimulation, vagal tone
 date: 2026-07-26
 updated: 2026-07-26
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1506126613408-eca07ce68773?q=80&w=1760&auto=format&fit=crop"
+photoLocation: "https://images.unsplash.com/photo-1650056201297-4a6d7ec6ca6c?q=80&w=1546&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
 photoAttribution: "Jared Rice / Unsplash"
 tldr: "The single most reliable way to stimulate your vagus nerve is slow breathing with a long exhale, around five to six breaths a minute, which acutely raises vagal tone and HRV within minutes. Over the longer term, regular exercise within your limits and consistent sleep do the most. Cold water on the face triggers a real vagal reflex, humming and gargling are low-risk but weakly evidenced, and ear-clip 'taVNS' devices are promising but still investigational. Chasing a bigger HRV number is not the goal; steadier regulation is. None of this diagnoses or treats a condition, and if you have POTS or dysautonomia, check big changes with your clinician."
 categories:
