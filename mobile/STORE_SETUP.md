@@ -376,6 +376,58 @@ on Expo's servers, drop the `.p8` beside `eas.json` and add to
 commit the key**; it is a full-privilege App Store Connect credential. For CI,
 prefer an EAS secret over a checked-in file.
 
+### The key resolves but the upload is rejected
+
+A *later* failure, and a different problem — the submission gets as far as
+fastlane pilot and then:
+
+```
+Creating authorization token for App Store Connect API
+Ready to upload new build to TestFlight (App: 6789786971)...
+[altool] *** Error: Unable to upload archive. Failed to authenticate for session:
+[altool]   ITunesConnectionAuthenticationErrorDomain Code=2006
+[altool]   "Error authenticating iTunesConnect user." (-1011)
+```
+
+Read the sequence: the key was found, and the JWT was minted from it
+successfully. So the `.p8`, key ID and issuer ID are all internally consistent —
+Apple is rejecting the **account behind the key**, not the key's signature.
+Ranked by how often it's the answer:
+
+1. **The key is the wrong role.** It must be **App Manager**, Admin or Account
+   Holder. A **Developer**-role key mints a perfectly valid token and then fails
+   exactly here, because Developer cannot upload builds. Apple won't let you
+   change a key's role after creation — revoke it and issue a new one.
+2. **It's an Individual Key, not a Team Key.** App Store Connect → Users and
+   Access → Integrations → App Store Connect API has separate **Team Keys** and
+   **Individual Keys** tabs. Individual keys are scoped to your own access and
+   don't carry upload rights; the key must come from the Team Keys tab.
+3. **An unaccepted agreement.** App Store Connect → **Business** → Agreements,
+   Tax, and Banking, plus the banner on developer.apple.com's account home. When
+   Apple revises the Program License Agreement, uploads fail with this generic
+   auth error until the **Account Holder** accepts — nobody else can.
+4. **The key is minutes old.** New keys take a little while to propagate; if you
+   just created it, wait ~15 minutes and retry before changing anything.
+5. **Apple is down.** Check https://developer.apple.com/system-status/ for App
+   Store Connect / TestFlight before chasing your own config.
+
+**Bisect it with an app-specific password.** This bypasses the API key path
+entirely, so it isolates cause 1–2 from cause 3:
+
+```bash
+# appleid.apple.com → Sign-In and Security → App-Specific Passwords
+export EXPO_APPLE_APP_SPECIFIC_PASSWORD='xxxx-xxxx-xxxx-xxxx'
+eas submit --platform ios --profile production --latest \
+  --apple-id you@example.com
+```
+
+Uploads fine this way → the key is the problem (role or key type). Fails the
+same way → it's account-level, i.e. an agreement to accept.
+
+After fixing a bad key, replace it on the project too — `eas credentials
+--platform ios` → remove the old App Store Connect API Key and add the new one.
+EAS keeps using the stored one until you do.
+
 ---
 
 ## Verification checklist
