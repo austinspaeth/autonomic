@@ -9,8 +9,10 @@ earns more. Every version opens by saying what the app *is*. Message discipline 
 `MARKETING_PLAN.md` §2 still holds: no recovery/cure promises, no second-person diagnosis
 ("Do you have POTS?"), data over lifestyle.
 
-**The hook, reused across all three:** most health apps give you a wellness score;
-Autonomic gives you a number a cardiologist will read.
+**The hook, reused across all three:** good days and bad days, and no way to tell them
+apart — which days are helping, and which ones are costing you. It opens on the reader's
+own problem rather than on the category or a competitor, and it promises something the app
+actually does, with no claim about what a clinician will or won't do with the output.
 
 ---
 
@@ -18,37 +20,36 @@ Autonomic gives you a number a cardiologist will read.
 
 ### Facebook
 
-> Most health apps give you a wellness score. **Autonomic** gives you a number a
-> cardiologist will read.
+> Good days and bad days, and no way to tell them apart.
 >
-> Measure your HRV with a chest strap or just your phone camera. Log blood pressure,
-> orthostatic (lying-to-standing) tests, sleep. Every reading is scored against published
-> medical thresholds — so you can finally see which days are helping and which ones cost
-> you.
+> **Autonomic** scores your HRV, blood pressure, orthostatic (lying-to-standing) tests and
+> sleep against published medical thresholds — so you can see which days are helping and
+> which ones are costing you.
 >
-> Built for POTS, dysautonomia and long COVID recovery. Nothing ever leaves your phone —
-> no account, no cloud.
+> Measure HRV with a chest strap or just your phone camera. Built for POTS, dysautonomia
+> and long COVID recovery.
 >
-> Free journal. Every install opens with 7 days of full Pro, no card.
+> Nothing ever leaves your phone — no account, no cloud. The journal is free, and every
+> install opens with 7 days of full Pro, no card.
 >
 > iPhone → {IOS_FACEBOOK}
 > Android → {ANDROID_FACEBOOK}
 
 ### LinkedIn
 
-> Most health apps give you a wellness score. **Autonomic** gives you a number a
-> cardiologist will read.
+> The hardest part of recovering from POTS, dysautonomia or long COVID isn't the symptoms.
+> It's that fifty things change in a week and nothing tells you which one mattered.
 >
-> Chest-strap RR intervals (or camera PPG), artifact-corrected, run through real time- and
-> frequency-domain HRV — the same math as lab software. Blood pressure, orthostatic
-> response and sleep, each scored against published clinical thresholds, each transparent
-> about *why* it scored that way. Then a report built for the 15 minutes you get with a
-> specialist.
+> **Autonomic** is built to answer that. Chest-strap RR intervals (or camera PPG),
+> artifact-corrected, run through real time- and frequency-domain HRV — the same math as
+> lab software. Blood pressure, orthostatic response and sleep, each scored against
+> published clinical thresholds, each transparent about *why* it scored that way. Then a
+> report built for the 15 minutes you get with a specialist.
 >
 > And there is no backend. No account, no cloud, no telemetry — everything on-device, and
 > your export is a JSON file you own outright.
 >
-> Built for POTS, dysautonomia and long COVID recovery. iOS and Android, out now.
+> iOS and Android, out now.
 >
 > iOS → {IOS_LINKEDIN}
 > Android → {ANDROID_LINKEDIN}
@@ -58,18 +59,18 @@ links moved to your own first comment (same tracked URLs — attribution is unaf
 
 ### X
 
-> Most health apps give you a wellness score.
+> Good days and bad days, no way to tell them apart.
 >
-> Autonomic gives you a number your cardiologist will read — HRV, BP, orthostatic tests and
-> sleep, scored against medical thresholds.
+> Autonomic scores your HRV, BP, orthostatic tests and sleep against medical thresholds —
+> which days help, which ones cost you.
 >
-> Nothing ever leaves your phone.
+> Nothing leaves your phone.
 >
 > iOS {IOS_X}
 > Android {ANDROID_X}
 
-*270/280 characters (X counts every URL as 23 regardless of length). If you add anything,
-move the Android link to a reply.*
+*266/280 characters (X counts every URL as 23 regardless of length). ~14 to spare; if you
+add more than that, move the Android link to a reply.*
 
 ---
 
