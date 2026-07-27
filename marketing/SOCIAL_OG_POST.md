@@ -4,9 +4,13 @@
 **Channels:** Facebook · LinkedIn · X
 **Campaign:** `social-og` (July 2026)
 
-Copy follows the message discipline in `MARKETING_PLAN.md` §2: first-person founder
-testimony, no recovery/cure promises, no second-person diagnosis ("Do you have POTS?"),
-data over lifestyle.
+Product-led copy — the founder story is held back for the Reddit/press launch, where it
+earns more. Every version opens by saying what the app *is*. Message discipline from
+`MARKETING_PLAN.md` §2 still holds: no recovery/cure promises, no second-person diagnosis
+("Do you have POTS?"), data over lifestyle.
+
+**The hook, reused across all three:** most health apps give you a wellness score;
+Autonomic gives you a number a cardiologist will read.
 
 ---
 
@@ -14,47 +18,37 @@ data over lifestyle.
 
 ### Facebook
 
-> I spent a long stretch of my recovery unable to answer one question: what is actually
-> helping? Good days and bad days looked random. I was guessing.
+> Most health apps give you a wellness score. **Autonomic** gives you a number a
+> cardiologist will read.
 >
-> So I built the tool I needed.
+> Measure your HRV with a chest strap or just your phone camera. Log blood pressure,
+> orthostatic (lying-to-standing) tests, sleep. Every reading is scored against published
+> medical thresholds — so you can finally see which days are helping and which ones cost
+> you.
 >
-> **Autonomic** measures real physiology — HRV from a chest strap or your phone camera,
-> blood pressure, orthostatic (lying-to-standing) tests, sleep and its stages — and scores
-> every reading against published medical thresholds. Not a wellness vibe. A number with
-> the trend behind it, and a report you can hand your cardiologist.
+> Built for POTS, dysautonomia and long COVID recovery. Nothing ever leaves your phone —
+> no account, no cloud.
 >
-> And none of it leaves your phone. No account, no cloud, no sign-up. I don't have your
-> health data, because I never collect it — that's the architecture, not a privacy policy.
->
-> Built by one person, for POTS, dysautonomia, long COVID and post-viral recovery. The
-> journal is free; every install opens with 7 days of full Pro, no card required.
+> Free journal. Every install opens with 7 days of full Pro, no card.
 >
 > iPhone → {IOS_FACEBOOK}
 > Android → {ANDROID_FACEBOOK}
 
 ### LinkedIn
 
-> For people recovering from POTS, dysautonomia or long COVID, the hardest part isn't the
-> symptoms — it's that you cannot tell which of the fifty things you changed this week did
-> anything. The signal is buried in noise, and most apps answer with a mood ring.
+> Most health apps give you a wellness score. **Autonomic** gives you a number a
+> cardiologist will read.
 >
-> So I built **Autonomic**.
+> Chest-strap RR intervals (or camera PPG), artifact-corrected, run through real time- and
+> frequency-domain HRV — the same math as lab software. Blood pressure, orthostatic
+> response and sleep, each scored against published clinical thresholds, each transparent
+> about *why* it scored that way. Then a report built for the 15 minutes you get with a
+> specialist.
 >
-> It captures chest-strap RR intervals (or camera PPG), corrects artifacts, and runs real
-> time- and frequency-domain HRV — the same math as lab software — then scores HRV, blood
-> pressure, orthostatic response and sleep against published clinical thresholds. Every
-> score is transparent about why it's that score. It generates a report built for the
-> 15 minutes you get with a cardiologist.
+> And there is no backend. No account, no cloud, no telemetry — everything on-device, and
+> your export is a JSON file you own outright.
 >
-> The part I'm most proud of is what it doesn't do: there is no backend. No account, no
-> cloud, no telemetry on your health data. Everything is on-device, and the export is a
-> plain JSON file you own. For an audience carrying real disability-insurance and
-> employment anxiety, "we can't lose or sell your data because we never have it" should be
-> table stakes. It isn't.
->
-> iOS and Android, out now. The journal is free; every install starts with 7 days of full
-> Pro, no card.
+> Built for POTS, dysautonomia and long COVID recovery. iOS and Android, out now.
 >
 > iOS → {IOS_LINKEDIN}
 > Android → {ANDROID_LINKEDIN}
@@ -64,15 +58,17 @@ links moved to your own first comment (same tracked URLs — attribution is unaf
 
 ### X
 
-> I couldn't tell what was helping my recovery. So I built the tool.
+> Most health apps give you a wellness score.
 >
-> Autonomic scores your HRV, BP, orthostatic tests and sleep against medical thresholds —
-> and none of it ever leaves your phone. No account, no cloud.
+> Autonomic gives you a number your cardiologist will read — HRV, BP, orthostatic tests and
+> sleep, scored against medical thresholds.
+>
+> Nothing ever leaves your phone.
 >
 > iOS {IOS_X}
 > Android {ANDROID_X}
 
-*277/280 characters (X counts every URL as 23 regardless of length). If you add anything,
+*270/280 characters (X counts every URL as 23 regardless of length). If you add anything,
 move the Android link to a reply.*
 
 ---
