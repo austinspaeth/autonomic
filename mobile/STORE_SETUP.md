@@ -306,6 +306,78 @@ the paywall works when you never actually tested it.
 
 ---
 
+## Part 6 — iOS submission credentials (`eas submit`)
+
+If a submission dies with:
+
+```
+eas-cli failed to resolve submission config. Add EXPO_DEBUG: "1" to the job env
+to see the error.
+… /steps/prepare_asc_api_key/scripts/….sh exited with non-zero code: 1
+```
+
+that is **not** a problem with the build, the binary, or the listing.
+`prepare_asc_api_key` is the step where the submission worker materialises the
+**App Store Connect API key** (a `.p8` file plus its key ID and issuer ID) that
+it authenticates to Apple with. `submit.production.ios` in `eas.json` names only
+`ascAppId`, which is correct — the key is deliberately *not* in this repo, so
+EAS looks it up from the project's credentials stored on Expo's servers. If no
+key is stored there (or the stored one was revoked/expired in App Store
+Connect), there is nothing to prepare, and a cloud job cannot stop and prompt
+for one. It fails at that step, and the underlying Apple error is swallowed
+unless `EXPO_DEBUG` is set.
+
+Work it in this order:
+
+1. **Get the real error.** Re-run the submission from your machine, where
+   eas-cli can both print the cause and prompt to fix it:
+
+   ```bash
+   cd mobile
+   EXPO_DEBUG=1 eas submit --platform ios --profile production --latest
+   ```
+
+   (`--latest` submits the most recent finished iOS build, so you don't have to
+   rebuild.) If it's an EAS Workflow job instead, add `EXPO_DEBUG: "1"` to that
+   job's `env:` block and re-run it.
+
+2. **Check what's actually stored:** `eas credentials --platform ios` →
+   `production` → **App Store Connect API Key**. An empty list here is the
+   whole bug.
+
+3. **Register a key** if it's missing — either let Expo create one through your
+   Apple login, or create it yourself at App Store Connect → **Users and
+   Access** → **Integrations** → **App Store Connect API** → **Team Keys**, and
+   upload it. The key needs the **App Manager** role; *Developer* cannot upload
+   builds and produces a 403 at the Apple call rather than a clean error. Apple
+   lets you download the `.p8` exactly once — if it's lost, revoke it and make a
+   new one.
+
+4. **Verify `ascAppId`.** `6789786971` must be the Apple ID of this app (App
+   Store Connect → app → **General** → **App Information** → *Apple ID*) under
+   the same team the API key belongs to. A key from a different team resolves,
+   then fails against that app ID.
+
+Once a key is registered on the project, cloud submissions and
+`eas build --auto-submit` both stop failing — the credential is per-project, not
+per-run.
+
+**Fully headless alternative.** To keep the key in the repo checkout instead of
+on Expo's servers, drop the `.p8` beside `eas.json` and add to
+`submit.production.ios`:
+
+```jsonc
+"ascApiKeyPath": "./AuthKey_XXXXXXXXXX.p8",
+"ascApiKeyId": "XXXXXXXXXX",
+"ascApiKeyIssuerId": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+```
+
+`.p8`, `.p12`, `.mobileprovision` and `credentials.json` are gitignored — **never
+commit the key**; it is a full-privilege App Store Connect credential. For CI,
+prefer an EAS secret over a checked-in file.
+
+---
+
 ## Verification checklist
 
 Before you call it done:
