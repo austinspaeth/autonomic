@@ -414,11 +414,13 @@ Ranked by how often it's the answer:
 **Bisect it with an app-specific password.** This bypasses the API key path
 entirely, so it isolates cause 1–2 from cause 3:
 
+Temporarily add `appleId` to `submit.production.ios` in `eas.json` alongside
+`ascAppId`, then:
+
 ```bash
 # appleid.apple.com → Sign-In and Security → App-Specific Passwords
 export EXPO_APPLE_APP_SPECIFIC_PASSWORD='xxxx-xxxx-xxxx-xxxx'
-eas submit --platform ios --profile production --latest \
-  --apple-id you@example.com
+eas submit --platform ios --profile production --latest
 ```
 
 Uploads fine this way → the key is the problem (role or key type). Fails the
