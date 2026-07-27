@@ -306,6 +306,132 @@ the paywall works when you never actually tested it.
 
 ---
 
+## Part 6 — iOS submission credentials (`eas submit`)
+
+If a submission dies with:
+
+```
+eas-cli failed to resolve submission config. Add EXPO_DEBUG: "1" to the job env
+to see the error.
+… /steps/prepare_asc_api_key/scripts/….sh exited with non-zero code: 1
+```
+
+that is **not** a problem with the build, the binary, or the listing.
+`prepare_asc_api_key` is the step where the submission worker materialises the
+**App Store Connect API key** (a `.p8` file plus its key ID and issuer ID) that
+it authenticates to Apple with. `submit.production.ios` in `eas.json` names only
+`ascAppId`, which is correct — the key is deliberately *not* in this repo, so
+EAS looks it up from the project's credentials stored on Expo's servers. If no
+key is stored there (or the stored one was revoked/expired in App Store
+Connect), there is nothing to prepare, and a cloud job cannot stop and prompt
+for one. It fails at that step, and the underlying Apple error is swallowed
+unless `EXPO_DEBUG` is set.
+
+Work it in this order:
+
+1. **Get the real error.** Re-run the submission from your machine, where
+   eas-cli can both print the cause and prompt to fix it:
+
+   ```bash
+   cd mobile
+   EXPO_DEBUG=1 eas submit --platform ios --profile production --latest
+   ```
+
+   (`--latest` submits the most recent finished iOS build, so you don't have to
+   rebuild.) If it's an EAS Workflow job instead, add `EXPO_DEBUG: "1"` to that
+   job's `env:` block and re-run it.
+
+2. **Check what's actually stored:** `eas credentials --platform ios` →
+   `production` → **App Store Connect API Key**. An empty list here is the
+   whole bug.
+
+3. **Register a key** if it's missing — either let Expo create one through your
+   Apple login, or create it yourself at App Store Connect → **Users and
+   Access** → **Integrations** → **App Store Connect API** → **Team Keys**, and
+   upload it. The key needs the **App Manager** role; *Developer* cannot upload
+   builds and produces a 403 at the Apple call rather than a clean error. Apple
+   lets you download the `.p8` exactly once — if it's lost, revoke it and make a
+   new one.
+
+4. **Verify `ascAppId`.** `6789786971` must be the Apple ID of this app (App
+   Store Connect → app → **General** → **App Information** → *Apple ID*) under
+   the same team the API key belongs to. A key from a different team resolves,
+   then fails against that app ID.
+
+Once a key is registered on the project, cloud submissions and
+`eas build --auto-submit` both stop failing — the credential is per-project, not
+per-run.
+
+**Fully headless alternative.** To keep the key in the repo checkout instead of
+on Expo's servers, drop the `.p8` beside `eas.json` and add to
+`submit.production.ios`:
+
+```jsonc
+"ascApiKeyPath": "./AuthKey_XXXXXXXXXX.p8",
+"ascApiKeyId": "XXXXXXXXXX",
+"ascApiKeyIssuerId": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+```
+
+`.p8`, `.p12`, `.mobileprovision` and `credentials.json` are gitignored — **never
+commit the key**; it is a full-privilege App Store Connect credential. For CI,
+prefer an EAS secret over a checked-in file.
+
+### The key resolves but the upload is rejected
+
+A *later* failure, and a different problem — the submission gets as far as
+fastlane pilot and then:
+
+```
+Creating authorization token for App Store Connect API
+Ready to upload new build to TestFlight (App: 6789786971)...
+[altool] *** Error: Unable to upload archive. Failed to authenticate for session:
+[altool]   ITunesConnectionAuthenticationErrorDomain Code=2006
+[altool]   "Error authenticating iTunesConnect user." (-1011)
+```
+
+Read the sequence: the key was found, and the JWT was minted from it
+successfully. So the `.p8`, key ID and issuer ID are all internally consistent —
+Apple is rejecting the **account behind the key**, not the key's signature.
+Ranked by how often it's the answer:
+
+1. **The key is the wrong role.** It must be **App Manager**, Admin or Account
+   Holder. A **Developer**-role key mints a perfectly valid token and then fails
+   exactly here, because Developer cannot upload builds. Apple won't let you
+   change a key's role after creation — revoke it and issue a new one.
+2. **It's an Individual Key, not a Team Key.** App Store Connect → Users and
+   Access → Integrations → App Store Connect API has separate **Team Keys** and
+   **Individual Keys** tabs. Individual keys are scoped to your own access and
+   don't carry upload rights; the key must come from the Team Keys tab.
+3. **An unaccepted agreement.** App Store Connect → **Business** → Agreements,
+   Tax, and Banking, plus the banner on developer.apple.com's account home. When
+   Apple revises the Program License Agreement, uploads fail with this generic
+   auth error until the **Account Holder** accepts — nobody else can.
+4. **The key is minutes old.** New keys take a little while to propagate; if you
+   just created it, wait ~15 minutes and retry before changing anything.
+5. **Apple is down.** Check https://developer.apple.com/system-status/ for App
+   Store Connect / TestFlight before chasing your own config.
+
+**Bisect it with an app-specific password.** This bypasses the API key path
+entirely, so it isolates cause 1–2 from cause 3:
+
+Temporarily add `appleId` to `submit.production.ios` in `eas.json` alongside
+`ascAppId`, then:
+
+```bash
+# appleid.apple.com → Sign-In and Security → App-Specific Passwords
+export EXPO_APPLE_APP_SPECIFIC_PASSWORD='xxxx-xxxx-xxxx-xxxx'
+eas submit --platform ios --profile production --latest
+```
+
+Uploads fine this way → the key is the problem (role or key type). Fails the
+same way → it's account-level, i.e. an agreement to accept.
+
+After fixing a bad key, replace it on the project too — `eas credentials
+--platform ios` → remove the old App Store Connect API Key and add the new one.
+EAS keeps using the stored one until you do.
+
+---
+
 ## Verification checklist
 
 Before you call it done:

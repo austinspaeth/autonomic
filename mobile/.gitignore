@@ -12,5 +12,13 @@ expo-env.d.ts
 *.apk
 *.aab
 
+# Signing / store credentials — never commit these
+credentials.json
+*.p8
+*.p12
+*.mobileprovision
+*.keystore
+*.jks
+
 # Local expo-module native build output
 modules/**/android/build/
