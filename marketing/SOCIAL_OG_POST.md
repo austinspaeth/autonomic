@@ -9,10 +9,22 @@ earns more. Every version opens by saying what the app *is*. Message discipline 
 `MARKETING_PLAN.md` §2 still holds: no recovery/cure promises, no second-person diagnosis
 ("Do you have POTS?"), data over lifestyle.
 
-**The hook, reused across all three:** good days and bad days, and no way to tell them
-apart — which days are helping, and which ones are costing you. It opens on the reader's
-own problem rather than on the category or a competitor, and it promises something the app
-actually does, with no claim about what a clinician will or won't do with the output.
+**The hook, reused across all three:** you can feel the bad days — you can't feel what
+caused them.
+
+This is the correction that matters. Nobody in this audience needs an app to tell them
+today was bad; they felt it at 6am. The unmet need is *attribution* (what drove it) and
+*trajectory* (is any of this working), and those are the two things a body cannot self-report.
+The copy is built on features that already ship:
+
+- **Attribution** — `scoring/downturn.ts` flags a sustained slide and names the cause from
+  the journal: triggers logged, heavy exertion, short sleep, a slipped protocol. When the
+  logs are clean it says so rather than inventing a reason.
+- **Ahead of symptoms** — the same module fires the crash warning, on the premise that the
+  autonomic system shifts before symptoms do. Phrase this as "often," never as a guarantee.
+- **Trajectory** — milestones, Analysis buckets and the AI reports cover recovery
+  trajectory, trigger/setback patterns, sleep→next-day impact, and "best days and what made
+  them work."
 
 ---
 
@@ -20,31 +32,36 @@ actually does, with no claim about what a clinician will or won't do with the ou
 
 ### Facebook
 
-> Good days and bad days, and no way to tell them apart.
+> You can feel the bad days. What you can't feel is what caused them — the trigger three
+> days ago, the short night, the workout that took more than it gave.
 >
-> **Autonomic** scores your HRV, blood pressure, orthostatic (lying-to-standing) tests and
-> sleep against published medical thresholds — so you can see which days are helping and
-> which ones are costing you.
+> **Autonomic** tracks what goes in (food, triggers, meds, activity, sleep) against what
+> your body actually does: HRV, blood pressure and orthostatic response, each scored
+> against published medical thresholds. When your numbers start sliding, it names what in
+> your journal is driving it — often before the symptoms arrive.
 >
-> Measure HRV with a chest strap or just your phone camera. Built for POTS, dysautonomia
-> and long COVID recovery.
+> Then it shows you the part that's hardest to see from the inside: whether you're
+> genuinely improving, week over week and month over month.
 >
-> Nothing ever leaves your phone — no account, no cloud. The journal is free, and every
-> install opens with 7 days of full Pro, no card.
+> Built for POTS, dysautonomia and long COVID recovery. Measure HRV with a chest strap or
+> just your phone camera. Nothing ever leaves your phone — no account, no cloud. The
+> journal is free, and every install opens with 7 days of full Pro, no card.
 >
 > iPhone → {IOS_FACEBOOK}
 > Android → {ANDROID_FACEBOOK}
 
 ### LinkedIn
 
-> The hardest part of recovering from POTS, dysautonomia or long COVID isn't the symptoms.
-> It's that fifty things change in a week and nothing tells you which one mattered.
+> Nobody recovering from POTS, dysautonomia or long COVID needs an app to tell them it was
+> a bad day. They felt it at 6am. What they can't feel is *why* — or whether any of it is
+> trending the right way.
 >
-> **Autonomic** is built to answer that. Chest-strap RR intervals (or camera PPG),
+> **Autonomic** is built for those two questions. Chest-strap RR intervals (or camera PPG),
 > artifact-corrected, run through real time- and frequency-domain HRV — the same math as
 > lab software. Blood pressure, orthostatic response and sleep, each scored against
-> published clinical thresholds, each transparent about *why* it scored that way. Then a
-> report built for the 15 minutes you get with a specialist.
+> published clinical thresholds. When the trend turns, it reads back the journal and names
+> the likely driver — triggers, exertion, short sleep, a slipped protocol — and when the
+> logs are clean, it says that instead of inventing a reason.
 >
 > And there is no backend. No account, no cloud, no telemetry — everything on-device, and
 > your export is a JSON file you own outright.
@@ -59,18 +76,18 @@ links moved to your own first comment (same tracked URLs — attribution is unaf
 
 ### X
 
-> Good days and bad days, no way to tell them apart.
+> You can feel the bad days. You can't feel what caused them.
 >
-> Autonomic scores your HRV, BP, orthostatic tests and sleep against medical thresholds —
-> which days help, which ones cost you.
->
-> Nothing leaves your phone.
+> Autonomic tracks what you log against what your body does — HRV, BP, orthostatic
+> response, sleep — and names what's driving a slide before symptoms show.
 >
 > iOS {IOS_X}
 > Android {ANDROID_X}
 
-*266/280 characters (X counts every URL as 23 regardless of length). ~14 to spare; if you
-add more than that, move the Android link to a reply.*
+*275/280 characters (X counts every URL as 23 regardless of length). The privacy line had
+to go to fit — the OG image says PRIVATE · OFFLINE across the top, so the post still
+carries it visually. Put "No account, no cloud. Everything stays on your phone." in a reply
+if you want it in text.*
 
 ---
 
