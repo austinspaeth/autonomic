@@ -33,21 +33,38 @@ chars); added dysautonomia + watch; dropped vagal tone / sdnn / symptom. Remove
 `hrv` if it's already in the app name or subtitle — those fields are indexed too.
 Do **not** add "free" — Apple indexes the price separately and it wastes chars.
 
-## What's New
+## What's New (1.19.1, iOS)
 
-Connecting Apple Health can now backfill a full year of history in one shot:
-sleep (with time in each stage), workouts (with your heart-rate trace) and
-medications, alongside HRV and vitals, with live progress as it imports.
+Your HRV numbers just got more honest. Short HRV samples from Apple Health, like
+the watch's passing background reading, are no longer averaged in with a real
+seated capture, so your trends reflect the readings you actually took. Nothing
+is deleted, and past entries are cleaned up automatically.
 
-Other improvements:
-• Add a note right on the HRV or stand-test results screen, before you save
-• Smoother Progress tab: switching Day/Week/Month/Year no longer stutters
-• The "trending down" warning is now its own card, and only looks at days
-  you've fully logged
-• Apple Watch: Night mode and Low Power mode for the heart-rate monitor
-• A new one-tap sheet for logging meds, symptoms and triggers
-• "Check for updates" now tells you if Health permissions were denied
-• Various performance and stability improvements
+Also in this release:
+• Delete an imported entry and Health will not offer it back again
+• Fix your bed and wake times and the hours asleep update with them
+• POTS episodes now grade on the biggest heart-rate rise in the whole capture
+• More reliable HRV frequency bands on 5 minute captures
+• Health imports no longer come up empty over a permission we never asked for
+• The "new health data" pill can no longer get stuck checking
+• Progress readouts show their units, with the date alongside ("56 bpm on 7/27")
+• Blood pressure tiles report the range average instead of repeating the latest reading
+• Medication doses accept units again ("400mg", "1 scoop")
+• Fixes for keyboards covering sheets and Progress jumping to the wrong section
+
+### Play Store variant (1.19.1, Android, 493/500 chars)
+
+Your HRV numbers just got more honest. Short HRV samples from Health Connect are
+no longer averaged in with a real seated capture, so your trends reflect the
+readings you took.
+
+Also:
+• Delete an imported entry and it stays gone
+• Fix bed and wake times and hours asleep update too
+• POTS episodes grade on the biggest heart-rate rise
+• Health imports no longer come up empty over a missing permission
+• Medication doses accept units again
+• Keyboard and Progress scrolling fixes
 
 ## Description (3,982/4,000 chars)
 

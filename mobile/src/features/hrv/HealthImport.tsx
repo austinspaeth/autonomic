@@ -14,7 +14,6 @@ import { useSheets } from '../../components/Sheet';
 import { Muted } from '../../components/ui';
 import { usePalette } from '../../theme';
 import { health, healthAppName } from '../../lib/health';
-import { requestEcgAuth } from '../../lib/health/ecg';
 import { dayStartMs, isPickable, type RrCandidate } from '../../lib/health/rrCandidates';
 import { findRrCandidates } from '../../lib/health/rrSearch';
 import { getState } from '../../store/store';
@@ -33,10 +32,10 @@ export function HealthRrImportSheet({ kind }: { kind: 'breath' | 'unstructured' 
   useEffect(() => {
     let alive = true;
     (async () => {
-      // Sequential: each call can present a permission sheet (silent once
-      // determined), and two sheets must not race.
-      await health().requestAuth();
-      await requestEcgAuth();
+      // One call covers the whole set, ECG included; silent once determined.
+      // `force` because the user opened this import card — a sheet here is
+      // expected, so the quiet checks' once-per-launch pacing shouldn't apply.
+      await health().requestAuth({ force: true });
       const now = Date.now();
       const found = await findRrCandidates({ fromMs: dayStartMs(now), toMs: now });
       // A reading already saved to today's journal (watch-synced or previously

@@ -57,10 +57,10 @@ export interface WorkoutImport {
 export async function workoutCandidates(dk: string, logged: { type?: unknown; time?: unknown }[]): Promise<WorkoutImport> {
   const api = health();
   if (!api.available) return { workouts: [], mayBeDenied: false };
-  // Self-gating (see HealthApi.requestAuth): prompts at most once if the set
-  // has genuinely never been presented (fresh install, or a new type joined
-  // the set in an update), and never shows UI again after that.
-  await api.requestAuth();
+  // The user opened an import card, so a permission sheet here is expected —
+  // `force` skips the once-per-launch pacing meant for the quiet checks. Still
+  // silent whenever the platform has nothing left to ask (see requestAuth).
+  await api.requestAuth({ force: true });
   const [raw, status] = await Promise.all([api.readWorkouts(dk), api.readAuthStatus('workouts')]);
   const workouts = raw
     .filter((w) => !w.ownApp && !logged.some((e) => e.type === w.type && e.time === w.time))

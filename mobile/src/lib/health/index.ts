@@ -22,7 +22,10 @@ import { Linking, Platform } from 'react-native';
 import type { Entry, SleepStages } from '../types';
 import { computeHrv } from '../hrv';
 import { keyOf } from '../dates';
-import { hasAskedAuth, markAskedAuth } from './askedAuth';
+import {
+  hasAskedAuth, markAskedAuth, markPromptedThisLaunch, promptedThisLaunch, shareAuthRequest,
+} from './askedAuth';
+import { requestEcgAuth } from './ecg';
 import { groupNights, summarizeSleep } from './sleepSummary';
 import { activityTypeFromHk, workoutHrSeries } from './workoutMap';
 
@@ -410,6 +413,9 @@ const READ_IDS = [
   QID.restingHr, QID.heartRate, QID.hrvSdnn, QID.respiratoryRate,
   QID.systolic, QID.diastolic, QID.bodyMass, CID.sleep, HEARTBEAT_SERIES,
   WORKOUT_TYPE,
+  // We write Mindfulness sessions; reading them back is what lets an import
+  // check tell our own session apart from one logged elsewhere.
+  CID.mindful,
 ];
 const WRITE_IDS = [
   QID.hrvSdnn, QID.restingHr, QID.heartRate,
@@ -437,6 +443,40 @@ function dateAt(dk: string, time?: string): Date {
   const [y, m, d] = dk.split('-').map(Number);
   const [hh, mm] = (time && /^\d{1,2}:\d{2}$/.test(time) ? time : '12:00').split(':').map(Number);
   return new Date(y, m - 1, d, hh, mm, 0);
+}
+
+/**
+ * ECG authorization, folded into the main request.
+ *
+ * ECG lives outside the kingstinct permission set (a local native module, see
+ * ./ecg), so HealthKit's request-status query says nothing about it — we just
+ * make the call alongside the main one. It is silent once determined; the
+ * per-launch latch bounds the one case where it isn't (a swiped-away sheet).
+ */
+let ecgAsked = false;
+async function ecgAuth(force: boolean): Promise<void> {
+  if (!force && ecgAsked) return;
+  ecgAsked = true;
+  try { await step('ecg', () => requestEcgAuth()); } catch { /* ECG is optional */ }
+}
+
+/**
+ * Dev-only timing around each native leg of the authorization dance. Every one
+ * of them is a promise the platform may simply never settle (an OS sheet that
+ * didn't present has no callback), so when a check hangs, the packager log
+ * names which leg to blame instead of leaving it to guesswork.
+ */
+async function step<T>(name: string, run: () => Promise<T> | undefined): Promise<T | undefined> {
+  if (!__DEV__) return run();
+  const t0 = Date.now();
+  try {
+    const v = await run();
+    console.log(`[health auth] ${name} → ${String(v)} in ${Date.now() - t0}ms`);
+    return v;
+  } catch (e) {
+    console.log(`[health auth] ${name} threw after ${Date.now() - t0}ms`, e);
+    throw e;
+  }
 }
 
 function makeReal(mod: HkModule): HealthApi {
@@ -470,22 +510,33 @@ function makeReal(mod: HkModule): HealthApi {
   return {
     available: true,
 
-    async requestAuth(opts) {
-      try {
-        if (mod.isHealthDataAvailable && !(await mod.isHealthDataAvailable())) return false;
-        // Fully determined (status 2 = unnecessary): a request would present
-        // nothing — skip the native round-trip entirely.
-        let st = 0;
-        try { st = (await mod.getRequestStatusForAuthorization?.(READ_IDS, WRITE_IDS)) ?? 0; } catch { st = 0; }
-        if (st === 2) return true;
-        // The OS wants to present, but we've already shown this exact set once.
-        // Entry paths stop here; only an explicit Connect press re-presents.
-        if (!opts?.force && st === 1 && hasAskedAuth(HK_SET_KEY)) return true;
-        // v8 order: (read, write).
-        const ok = (await mod.requestAuthorization?.(READ_IDS, WRITE_IDS)) ?? false;
-        if (ok) markAskedAuth(HK_SET_KEY);
-        return ok;
-      } catch { return false; }
+    requestAuth(opts) {
+      const force = !!opts?.force;
+      return shareAuthRequest(async () => {
+        try {
+          if (mod.isHealthDataAvailable && !(await step('available', () => mod.isHealthDataAvailable!()))) return false;
+          // Fully determined (status 2 = unnecessary): a request would present
+          // nothing — skip the native round-trip entirely.
+          let st = 0;
+          try { st = (await step('status', () => mod.getRequestStatusForAuthorization?.(READ_IDS, WRITE_IDS))) ?? 0; } catch { st = 0; }
+          const settled = st === 2;
+          if (settled && hasAskedAuth(HK_SET_KEY) && !force) { await ecgAuth(force); return true; }
+          // The OS still has something to ask about: a fresh install, a type
+          // added by an app update (the phone's workout read / the watch's
+          // workout share both arrived this way), or a sheet the user swiped
+          // away. Entry paths DO ask — a missing grant is exactly why a check
+          // comes back empty — but only once per launch, so nothing nags.
+          if (!force && !settled && promptedThisLaunch()) return true;
+          if (!settled) markPromptedThisLaunch();
+          // v8 order: (read, write).
+          const ok = (await step('request', () => mod.requestAuthorization?.(READ_IDS, WRITE_IDS))) ?? false;
+          if (ok) markAskedAuth(HK_SET_KEY);
+          // ECG sits outside the kingstinct set (local native module) — same
+          // step, sequential so the two sheets can't race.
+          await ecgAuth(force);
+          return ok;
+        } catch { return false; }
+      });
     },
 
     async readAuthStatus(scope) {

@@ -9,7 +9,7 @@ import Svg, {
   Circle, Defs, G, Line, LinearGradient, Path, Rect, Stop, Text as SvgText,
 } from 'react-native-svg';
 import { fmtNum, fmtShort } from '../lib/dates';
-import { GRADE_COLORS, fonts, radius, usePalette } from '../theme';
+import { GRADE_COLORS, TAIL_STYLE, fonts, radius, readoutTail, usePalette } from '../theme';
 import type { Band, ScoreCat } from '../lib/types';
 import { BANDS, catFromBands } from '../lib/scoring';
 import { psdCurve } from '../lib/hrv';
@@ -1095,26 +1095,29 @@ export function BalanceChart({ pns, sns, height = 168, values, desc, defaultLabe
   // The numbers reflect the selected point when dragging, else the defaults.
   const pnsShown = selIdx >= 0 ? pv[selIdx] : readouts.pns;
   const snsShown = selIdx >= 0 ? sv[selIdx] : readouts.sns;
-  // Suffix after the SNS number: the touched point's date in parentheses when
-  // selected (matching other cards), else the caller's default (the latest
-  // point's date in Progress, nothing in the reading summary).
-  const suffixLabel = selIdx >= 0 ? `(${xLabel(pns[selIdx].date)})` : defaultLabel;
+  // Trails the SNS number: the touched point's date when selected (matching the
+  // other cards), else the caller's default (the latest point's date in
+  // Progress, nothing in the reading summary). PNS/SNS are unitless indices.
+  const suffixLabel = readoutTail(null, selIdx >= 0 ? xLabel(pns[selIdx].date) : defaultLabel);
   return (
     <View>
-      {/* PNS/SNS legend + big numbers (main-metric size), then the date/label. */}
+      {/* PNS/SNS legend + big numbers (main-metric size); the date trails the
+          second number, as on the other Progress readouts. */}
       <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 10 }}>
         <View style={{ flexDirection: 'row', gap: 28 }}>
-          {([['PNS', PNS_LINE, pnsShown], ['SNS', SNS_LINE, snsShown]] as const).map(([label, color, val]) => (
+          {([['PNS', PNS_LINE, pnsShown], ['SNS', SNS_LINE, snsShown]] as const).map(([label, color, val], i) => (
             <View key={label}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                 <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color }} />
                 <RNText style={{ fontSize: 12, color: p.textDim, fontWeight: '700', letterSpacing: 0.5 }}>{label}</RNText>
               </View>
-              <RNText style={{ fontSize: 27, fontFamily: fonts.numHeavy, color, fontVariant: ['tabular-nums'], marginTop: 4 }}>{fmtV(val)}</RNText>
+              <RNText style={{ fontSize: 27, fontFamily: fonts.numHeavy, color, fontVariant: ['tabular-nums'], marginTop: 4 }}>
+                {fmtV(val)}
+                {suffixLabel && i === 1 ? <RNText style={TAIL_STYLE(p)}>{suffixLabel}</RNText> : null}
+              </RNText>
             </View>
           ))}
         </View>
-        {suffixLabel ? <RNText style={{ fontSize: 13, fontWeight: '600', color: p.textDim, marginBottom: 5 }}>{suffixLabel}</RNText> : null}
       </View>
       {/* Explainer below the numbers, like other cards. */}
       {desc ? <RNText style={{ color: p.textDim, fontSize: 13, lineHeight: 19, marginTop: 8 }}>{desc}</RNText> : null}
@@ -1179,12 +1182,12 @@ export function BpDumbbell({ buckets, sys, dia, height = 180 }: {
   const fmt = (v: number | null | undefined) => (v != null && !isNaN(v) ? Math.round(v) : '–');
   const rSys = showIdx >= 0 ? sys[showIdx] : null;
   const rDia = showIdx >= 0 ? dia[showIdx] : null;
-  const suffix = showIdx >= 0 ? `(${buckets[showIdx]?.label ?? ''})` : '';
+  const suffix = readoutTail('mmHg', showIdx >= 0 ? buckets[showIdx]?.label : null);
   return (
     <View>
       <RNText style={{ fontSize: 25, fontFamily: fonts.numHeavy, color: p.text, marginBottom: 6, fontVariant: ['tabular-nums'] }}>
         {`${fmt(rSys)}/${fmt(rDia)}`}
-        <RNText style={{ fontSize: 13, fontWeight: '600', fontFamily: undefined, color: p.textDim }}>{`  ${suffix}`}</RNText>
+        <RNText style={TAIL_STYLE(p)}>{suffix}</RNText>
       </RNText>
       <View
         onLayout={(e) => setLayoutW(e.nativeEvent.layout.width)}

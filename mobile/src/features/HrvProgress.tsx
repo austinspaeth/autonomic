@@ -15,7 +15,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Pressable, Text, View } from 'react-native';
 import { BalanceChart, LineChart, StackedBars, ZonesToggle, balanceCat } from '../components/charts';
 import { Ghost, HelpDot, ScoreDot, TextGhost } from '../components/ui';
-import { fonts, radius, usePalette } from '../theme';
+import { TAIL_STYLE, fonts, radius, readoutTail, usePalette } from '../theme';
 import { fmtNum } from '../lib/dates';
 import type { DayRecord, Entry, ScoreCat } from '../lib/types';
 import { BANDS, catFromBands, HRV_HELP, type ScoreContext } from '../lib/scoring';
@@ -86,59 +86,61 @@ export function HrvFilterLinks({ value, onChange }: { value: Filt; onChange: (f:
 
 // Training (breathHrv) key, baseline (hrv) key, grade band, integer?,
 // short inline description + longer "?" help copy.
-const METRICS: { label: string; s: string; u: string; band: string; integer?: boolean; desc: string; help: string }[] = [
+// (`unit` trails the big value, with the shown bucket's date after it; the
+// stress index is a unitless composite, so it has none.)
+const METRICS: { label: string; s: string; u: string; unit?: string; band: string; integer?: boolean; desc: string; help: string }[] = [
   {
-    label: 'SDNN', s: 'sdnn', u: 'sdnn', band: 'sdnn', integer: true,
+    label: 'SDNN', s: 'sdnn', u: 'sdnn', unit: 'ms', band: 'sdnn', integer: true,
     desc: 'Overall variability across the whole reading, the broadest HRV summary.',
     help: 'Standard deviation of all RR intervals in the reading. SDNN captures every rhythm influence (breathing, blood-pressure waves, slower autonomic swings), so it summarizes total variability rather than just vagal activity. In short readings it runs lower than 24-hour figures you may see quoted elsewhere.',
   },
   {
-    label: 'RMSSD', s: 'rmssd', u: 'rmssd', band: 'rmssdS', integer: true,
+    label: 'RMSSD', s: 'rmssd', u: 'rmssd', unit: 'ms', band: 'rmssdS', integer: true,
     desc: 'Beat-to-beat variation in your heart rate, a quick read on recovery and rest-state balance.',
     help: 'Root mean square of successive RR-interval differences. RMSSD is the workhorse HRV metric: it reflects parasympathetic (vagal) activity, and higher values generally mean better recovery capacity. Compare readings taken at the same time of day and in the same position. A consistent morning reading is the most reliable trend line.',
   },
   {
-    label: 'pNN50', s: 'pnn50', u: 'pnn50', band: 'pnn50', integer: true,
+    label: 'pNN50', s: 'pnn50', u: 'pnn50', unit: '%', band: 'pnn50', integer: true,
     desc: 'Share of beats that differ from the previous one by more than 50 ms.',
     help: 'The percentage of successive heartbeat intervals that differ by more than 50 ms. Like RMSSD it tracks vagal tone, but it saturates at the extremes. Expect it to move together with RMSSD, and treat sustained changes as more meaningful than single readings.',
   },
   {
-    label: 'Avg HR', s: 'hr', u: 'avgHr', band: 'hrBreath', integer: true,
+    label: 'Avg HR', s: 'hr', u: 'avgHr', unit: 'bpm', band: 'hrBreath', integer: true,
     desc: 'Average heart rate across the reading.',
     help: 'Mean heart rate during the capture. A drifting resting rate is one of the simplest autonomic signals: a falling trend usually accompanies improving recovery, while an unexplained sustained rise is worth noting alongside symptoms.',
   },
   {
-    label: 'Mean RR', s: 'meanRr', u: 'meanRr', band: 'rrMode', integer: true,
+    label: 'Mean RR', s: 'meanRr', u: 'meanRr', unit: 'ms', band: 'rrMode', integer: true,
     desc: 'Average time between beats, in milliseconds, the inverse of heart rate.',
     help: 'The mean interval between successive beats. It is the same information as average heart rate seen from the other side (60,000 ÷ HR), but HRV work is done in RR space, so it is shown in milliseconds here.',
   },
   {
-    label: 'MxDMn', s: 'mxdmn', u: 'mxdmn', band: 'mxdmn',
+    label: 'MxDMn', s: 'mxdmn', u: 'mxdmn', unit: 'ms', band: 'mxdmn',
     desc: 'Spread between your longest and shortest beat intervals.',
     help: 'The difference between the maximum and minimum RR interval in the reading. A wide spread generally reflects healthy variability; a narrow one a rigid rhythm. It is sensitive to stray artifacts, so a single odd value matters less than the trend.',
   },
   {
-    label: 'Mode', s: 'mode', u: 'mode', band: 'rrMode', integer: true,
+    label: 'Mode', s: 'mode', u: 'mode', unit: 'ms', band: 'rrMode', integer: true,
     desc: 'Your most common beat interval, where the rhythm settles.',
     help: 'The most frequently occurring RR interval. Together with AMo50 it describes the shape of your beat-interval distribution: the mode is its centre, and shifts in the mode track shifts in your underlying resting rate.',
   },
   {
-    label: 'AMo50', s: 'amo50', u: 'amo50', band: 'amo50', integer: true,
+    label: 'AMo50', s: 'amo50', u: 'amo50', unit: '%', band: 'amo50', integer: true,
     desc: 'How concentrated beats are around the mode; higher means a more rigid rhythm.',
     help: 'The share of beats falling in the modal 50 ms bin. When the autonomic system is under strain the rhythm concentrates around one interval and AMo50 climbs; relaxed states spread the distribution out and it falls.',
   },
   {
-    label: 'CV', s: 'cv', u: 'cv', band: 'cv',
+    label: 'CV', s: 'cv', u: 'cv', unit: '%', band: 'cv',
     desc: 'Variability relative to your average beat length.',
     help: 'Coefficient of variation: SDNN divided by the mean RR, as a percentage. Because it is normalized by heart rate it makes readings taken at different rates more comparable than raw SDNN.',
   },
   {
-    label: 'LF peak', s: 'lfPeak', u: 'lfPeak', band: 'lfPeak',
+    label: 'LF peak', s: 'lfPeak', u: 'lfPeak', unit: 'Hz', band: 'lfPeak',
     desc: 'Dominant frequency in the low band; with slow breathing it should track your breath pace.',
     help: 'The frequency with the most power between 0.04 and 0.15 Hz. During paced breathing the LF peak generally mirrors your breathing pace, so it lands close to your breathing frequency. A 4/6 pattern (four seconds in, six out) is one breath every ten seconds, or 0.1 Hz, which is near the resonance frequency for most people. A clean session concentrates power at that peak, so an LF peak near your pacing frequency is a sign of good coherence.',
   },
   {
-    label: 'HF peak', s: 'hfPeak', u: 'hfPeak', band: 'hfPeak',
+    label: 'HF peak', s: 'hfPeak', u: 'hfPeak', unit: 'Hz', band: 'hfPeak',
     desc: 'Dominant frequency in the high band, usually your natural breathing rate.',
     help: 'The frequency with the most power between 0.15 and 0.4 Hz. At rest this band is driven by respiration (each breath speeds and slows the heart slightly), so the HF peak usually sits at your breathing rate.',
   },
@@ -348,17 +350,20 @@ function SectionHead({ title, help, value, valueColor, value2, pair, suffix, des
       {pair ? (
         <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 10, marginTop: 6 }}>
           <View style={{ flexDirection: 'row', gap: 28 }}>
-            {pair.map((pp) => (
+            {pair.map((pp, i) => (
               <View key={pp.label}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: pp.color }} />
                   <Text style={{ fontSize: 12, color: p.textDim, fontWeight: '600' }}>{pp.label}</Text>
                 </View>
-                <Text style={{ fontSize: 27, fontFamily: fonts.numHeavy, color: pp.color, fontVariant: ['tabular-nums'], marginTop: 3 }}>{pp.text ?? '–'}</Text>
+                <Text style={{ fontSize: 27, fontFamily: fonts.numHeavy, color: pp.color, fontVariant: ['tabular-nums'], marginTop: 3 }}>
+                  {pp.text ?? '–'}
+                  {/* Unit + date ride on the last value, as on the other cards. */}
+                  {suffix && i === pair.length - 1 ? <Text style={TAIL_STYLE(p)}>{suffix}</Text> : null}
+                </Text>
               </View>
             ))}
           </View>
-          {suffix ? <Text style={{ fontSize: 13, fontWeight: '600', color: p.textDim, marginBottom: 5 }}>{suffix}</Text> : null}
         </View>
       ) : ghost ? (
         // Invisible copy of the real value line, so the placeholder is exactly
@@ -372,7 +377,7 @@ function SectionHead({ title, help, value, valueColor, value2, pair, suffix, des
           {value2 ? (
             <Text style={{ fontSize: 27, fontFamily: fonts.numHeavy, color: value2.color, fontVariant: ['tabular-nums'], marginLeft: 14 }}>{value2.text}</Text>
           ) : null}
-          <Text style={{ fontSize: 13, fontWeight: '600', color: p.textDim, marginLeft: 7 }}>{suffix}</Text>
+          <Text style={TAIL_STYLE(p)}>{suffix}</Text>
         </View>
       ) : null}
       {desc ? <Text style={{ color: p.textDim, fontSize: 13, lineHeight: 19, marginTop: 8 }}>{desc}</Text> : null}
@@ -436,7 +441,7 @@ function MetricSection({ m, structured, unstructured, combined, buckets }: {
   const value = compare ? (fmtVal(sRaw) ?? '–') : fmtVal(raw);
   const valueColor = compare ? STRUCT : undefined;
   const value2 = compare ? { text: fmtVal(uRaw) ?? '–', color: UNSTRUCT } : null;
-  const suffix = shownIdx != null ? `(${buckets[shownIdx]?.label ?? ''})` : '';
+  const suffix = readoutTail(m.unit, shownIdx != null ? buckets[shownIdx]?.label : null);
   const zones = acBandZones(m.band);
   // Grade dot for the displayed value (range average or dragged bucket), so the
   // Progress cards read their grade at a glance like the reading deep-dive.
@@ -510,7 +515,7 @@ function BalanceSection({ bl, pns, sns }: {
         <BalanceChart
           pns={pnsPts} sns={snsPts}
           values={{ pns: pnsPts[last].v, sns: snsPts[last].v }}
-          defaultLabel={`(${pnsPts[last].date})`}
+          defaultLabel={pnsPts[last].date}
           desc="PNS and SNS index across the range. The fill turns green when you are recovered and red when stress takes over."
         />
       </View>
@@ -552,7 +557,7 @@ function PowerSection({ bl, vlf, lf, hf }: {
         title="Power distribution"
         help={POWER_HELP}
         value={raw == null ? null : String(Math.round(raw))}
-        suffix={shownIdx != null ? `ms² · (${bl[shownIdx]?.label ?? ''})` : 'ms²'}
+        suffix={readoutTail('ms²', shownIdx != null ? bl[shownIdx]?.label : null)}
         desc={POWER_DESC}
       />
       <StackedBars

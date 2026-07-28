@@ -14,7 +14,6 @@ import { SheetControls, SheetFooter, useSheets } from '../../components/Sheet';
 import { Button } from '../../components/ui';
 import { radius, usePalette } from '../../theme';
 import { health } from '../../lib/health';
-import { requestEcgAuth } from '../../lib/health/ecg';
 import { HrvSession, type SessionConfig } from './Session';
 
 /** The watchOS Mindfulness app icon, near enough to recognize on the wrist:
@@ -70,12 +69,10 @@ export function WatchPrep({ config, controls }: { config: SessionConfig; control
 
   // Any Health permission sheet must appear NOW, while the wearer reads the
   // prep steps — never over the waiting card after a finished 5-minute
-  // reading. Sequential (two sheets must not race); silent once determined.
+  // reading. One call covers the whole set, ECG included; silent once
+  // determined, so `force` makes sure it isn't skipped by the launch pacing.
   useEffect(() => {
-    void (async () => {
-      await health().requestAuth();
-      await requestEcgAuth();
-    })();
+    void health().requestAuth({ force: true });
   }, []);
 
   // Start here = start on the watch: open the session card already running and

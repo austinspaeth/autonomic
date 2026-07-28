@@ -22,6 +22,7 @@ import {
   type HealthUpdateSet, type UpdateMed, type UpdateReading,
 } from './updateSet';
 import { getDeclinedKeys } from './declined';
+import { withAuthTimeout } from './askedAuth';
 
 export { allItemKeys, filterDeclined, filterSeen, updateCount, updateSignature };
 export { getDeclinedKeys, markDeclinedKeys } from './declined';
@@ -29,17 +30,26 @@ export type { HealthUpdateSet, UpdateMed, UpdateReading };
 
 /**
  * Read a day's health-store data and reduce it to the importable set. Returns
- * null when Health isn't connected. Quiet by default — pass `interactive` from
- * a user-pressed button so a missing permission can raise the OS sheet.
+ * null when Health isn't connected.
+ *
+ * Every check requests authorization first. It is self-gating (see
+ * HealthApi.requestAuth): silent when the platform has nothing left to ask,
+ * and at most one prompt per launch otherwise — but it must run, because a
+ * permission we were never granted (a type added in an app update, a sheet the
+ * user swiped away) otherwise reads back as "nothing new to import" forever.
+ * It is also on a deadline: an unanswered (or never-presented) OS sheet leaves
+ * that promise pending, and the check has to go on reading regardless — the
+ * pill hanging on "Checking…" is worse than a check that ran unauthorized.
+ *
  * `sinceMs` drops samples older than that instant (the Settings check's
  * 24-hour window); `includeSleep: false` skips the night read (used for the
  * yesterday half of that window — the night belongs to the day it ends on).
  */
-export async function checkHealthUpdates(dk: string, opts: { interactive?: boolean; sinceMs?: number; includeSleep?: boolean } = {}): Promise<HealthUpdateSet | null> {
+export async function checkHealthUpdates(dk: string, opts: { sinceMs?: number; includeSleep?: boolean } = {}): Promise<HealthUpdateSet | null> {
   const api = health();
   const s = getState();
   if (!api.available || !s.settings.healthEnabled) return null;
-  if (opts.interactive) await api.requestAuth();
+  await withAuthTimeout(api.requestAuth());
   const [imports, workouts, sleep, meds] = await Promise.all([
     api.readImports(dk).catch(() => [] as ImportedReading[]),
     api.readWorkouts(dk).catch(() => [] as ImportedWorkout[]),
@@ -64,7 +74,7 @@ export async function checkHealthUpdatesLast24h(): Promise<HealthUpdateSet[]> {
   const today = todayKey();
   const [yesterday, current] = await Promise.all([
     checkHealthUpdates(addDays(today, -1), { sinceMs, includeSleep: false }),
-    checkHealthUpdates(today, { interactive: true, sinceMs }),
+    checkHealthUpdates(today, { sinceMs }),
   ]);
   return [yesterday, current].filter((s): s is HealthUpdateSet => !!s && updateCount(s) > 0);
 }

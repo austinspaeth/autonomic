@@ -87,6 +87,19 @@ export async function runHealthUpdateCheck(
 
 type PillPhase = 'hidden' | 'checking' | 'found';
 
+/** Longest the pill will wait on the health store before giving up quietly. */
+const CHECK_TIMEOUT_MS = 30_000;
+/** Reject once `ms` passes, so a pending native call can't wedge the pill. */
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error('health check timed out')), ms);
+    void p.then(
+      (v) => { clearTimeout(t); resolve(v); },
+      (e) => { clearTimeout(t); reject(e); },
+    );
+  });
+}
+
 /** Fixed pill height — every state renders at this height so the morph only
  *  ever moves width. */
 const PILL_H = 46;
@@ -160,7 +173,11 @@ export function HealthUpdatePill() {
       setTimeout(() => { apply(); running.current = false; }, wait);
     };
     try {
-      const set = await checkHealthUpdates(todayKey());
+      // Hard ceiling on the whole check. Everything inside it is a native
+      // round-trip (health-store reads, and a permission request that only
+      // resolves once the user answers the OS sheet), so any one of them
+      // pending would otherwise leave "Checking…" on screen forever.
+      const set = await withTimeout(checkHealthUpdates(todayKey()), CHECK_TIMEOUT_MS);
       // Items the user was already offered (viewed or dismissed) don't count,
       // and neither does anything they imported and then deleted.
       const fresh = set ? filterDeclined(filterSeen(set, getSeenKeys()), getDeclinedKeys()) : null;

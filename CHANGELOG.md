@@ -2,6 +2,25 @@
 
 App versions for **Autonomic Journal** (`mobile/`). Newest first.
 
+## 1.19.1
+
+- Health imports no longer come back empty because of a permission the app never got around to asking for. Every check asks first (silently when there is nothing left to ask), capped at one prompt per launch, and two checks firing at once can no longer stack two permission sheets. ECG is asked for in the same step instead of a second sheet behind the first.
+- The "new health data" pill can't hang on "Checking…" any more: an unanswered permission sheet or a stalled health-store read now gives up quietly instead of leaving the pill spinning.
+- Progress readouts carry their units, and the date rides along with them ("56 bpm on 7/27") instead of sitting in a column of its own. POTS episode readouts read as a rise off baseline ("Δ16 bpm").
+- Blood pressure tiles now report the range averages, so they stop repeating the latest reading already shown above them.
+
+## 1.19.0
+
+- Imported HRV only counts when it carries 4+ minutes of real beat-to-beat RR. The watch's passive one-minute background samples, truncated Breathe sessions and other apps' RMSSD records are no longer treated as comparable to a seated capture, so they're kept out of the Journal list, scoring, Analysis, Progress, widgets, milestones and Insights. Nothing is deleted; older journals are repaired on load from stored waveforms.
+- Deleting an imported entry is now permanent: the health sample behind it is remembered and the update pill never offers it again.
+- Sleep hours follow the times you enter. Correcting bed/wake on a night the watch only half-recorded now updates the hours asleep (and drops the stale stage breakdown) instead of holding the imported stage total.
+- POTS episodes chart the biggest excursion from the pre-episode baseline across the whole capture, matching how the journal row and episode summary grade it, and the stairs view is shaded and graded on the same zones.
+- HRV frequency bands: the VLF floor moved to 240 s so a real 5-minute strap or watch capture reliably resolves every band, and a band the engine withheld now reads "–" over a dimmed fill instead of a confident 0.
+- Health permissions are requested once rather than on tap paths.
+- Medication dose fields get the normal keyboard, so a unit ("400mg", "1 scoop") can actually be typed.
+- Fixed compact sheets sliding under the keyboard, and Progress section pinning landing on the wrong section.
+- Android: Health Connect imports no historical HRV (the platform exposes no beat-to-beat series).
+
 ## 1.18.0
 
 - One-time historical Health backfill (onboarding "Connect data") now pulls a full year of sleep nights (with overnight HR + stages), workouts (with HR trace), and medications, alongside HRV/blood pressure/resting HR — both platforms. The import sheet shows live progress ("Sleep · 140/312") instead of a bare spinner.

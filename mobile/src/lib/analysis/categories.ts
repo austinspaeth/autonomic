@@ -24,21 +24,27 @@ export interface Chart { label: string; series: Series[]; zones?: Zone[] | null;
  *  match (a metric without a `color` is dot-less, e.g. an "Events" count).
  *  `regrade` re-derives that colour from the selected bucket's value when a
  *  chart point is tapped (so the dot/value track that day's grade, not the
- *  latest one). `suffix` (a date, or "avg") sits just after the last metric.
+ *  latest one). `sub` is the metric's unit; `prefix` sits immediately before the
+ *  number (e.g. "Δ"). `date` is the bucket/day the readout belongs to, rendered
+ *  as "on 7/27" right after the last metric's unit.
  *  When `zones` is set the card's "Show zones" link appears top-right. */
-export interface MetricsRow { metrics: { label: string; value: number | string | null; sub?: string; color?: string; regrade?: (v: number) => string }[]; suffix?: string; zones?: boolean }
+export interface MetricsRow { metrics: { label: string; value: number | string | null; prefix?: string; sub?: string; color?: string; regrade?: (v: number) => string }[]; date?: string; zones?: boolean }
 /** Which readings a blood-pressure card is filtered to. */
 export type BpPeriod = 'all' | 'morning' | 'evening';
 /** `curSys`/`curDia`/`curLabel` are the latest bucket with a reading (the
  *  current week/month/year when it has data) — the card's default readout. */
-export interface BpSeries { sys: (number | null)[]; dia: (number | null)[]; cat?: ScoreCat | null; curSys: number | null; curDia: number | null; curLabel?: string }
+export interface BpSeries { sys: (number | null)[]; dia: (number | null)[]; cat?: ScoreCat | null; curSys: number | null; curDia: number | null; curLabel?: string;
+  /** Range averages — what the card's two tiles report. */
+  avgSys: number | null; avgDia: number | null }
 /** Which transition an Orthostatic Events card is filtered to. */
 export type OrthoTransition = 'all' | 'lay' | 'sit' | 'stairs';
 /** One transition-filter variant of the Orthostatic Events card: the view swaps
  *  charts/stats/insights/grade wholesale when the filter changes. `counts` is
  *  events per bucket, so a selected chart point can report that day's count. */
 export interface OrthoVariant { cat: ScoreCat | null; charts: Chart[]; stats: Stat[]; insights: Insight[]; counts: (number | null)[]; metricsRow?: MetricsRow }
-export interface Stat { label: string; value: number | string | null; sub?: string; color?: string }
+/** `sub` is the unit shown after the value; `date` (when set) follows it as
+ *  "on 7/27", so a tile reads "56 bpm on 7/27". */
+export interface Stat { label: string; value: number | string | null; sub?: string; date?: string; color?: string }
 export interface Insight { text: string; strength?: 'strong' | 'mod' | null }
 export interface BarGroup { label: string; rows: { name: string; count: number; color?: string; key?: string }[]; fmt?: (c: number) => string }
 /** Per-bucket counts behind a bars card: `totals` draws a bucket chart above
@@ -113,7 +119,7 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
           cur != null ? { label: 'Score', value: Math.round(cur), color: scoreCat(cur).color, regrade: (v: number) => scoreCat(v).color } : null,
           curRoll != null ? { label: avgLabel, value: Math.round(curRoll), color: '#9a9aa0' } : null,
         ].filter(Boolean) as MetricsRow['metrics'],
-        suffix: li >= 0 ? `(${buckets[li].label})` : undefined,
+        date: li >= 0 ? buckets[li].label : undefined,
         zones: true,
       },
       charts: [{ label: '', series: [series(vals, SCORE_COLORS.great, 'Score', { pointBands: null }), series(roll, '#9a9aa0', avgLabel, { dashed: true })], zones: acScoreZones(), integer: true }],
@@ -162,7 +168,7 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
       const li = acLatestIdx(sys, dia);
       const curSys = li >= 0 && sys[li] != null ? Math.round(sys[li]!) : null;
       const curDia = li >= 0 && dia[li] != null ? Math.round(dia[li]!) : null;
-      return { sys, dia, cat: sBP(curSys, curDia), curSys, curDia, curLabel: li >= 0 ? buckets[li].label : undefined };
+      return { sys, dia, cat: sBP(curSys, curDia), curSys, curDia, curLabel: li >= 0 ? buckets[li].label : undefined, avgSys: avgRound(sys), avgDia: avgRound(dia) };
     };
     const bpFilter: Record<BpPeriod, BpSeries> = { all: bpSpan(), morning: bpSpan(isMorning), evening: bpSpan(isEvening) };
     const { sys, dia } = bpFilter.all;
@@ -179,8 +185,10 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
         { label: '', series: [], dumbbell: { sys, dia } },
       ],
       stats: [
-        { label: 'Systolic', value: bpFilter.all.curSys, sub: bpFilter.all.curLabel ? `(${bpFilter.all.curLabel})` : undefined },
-        { label: 'Diastolic', value: bpFilter.all.curDia, sub: bpFilter.all.curLabel ? `(${bpFilter.all.curLabel})` : undefined },
+        // Tiles are the range averages; the dumbbell readout above them is
+        // where the latest (or dragged) reading with its date lives.
+        { label: 'Avg systolic', value: bpFilter.all.avgSys, sub: 'mmHg' },
+        { label: 'Avg diastolic', value: bpFilter.all.avgDia, sub: 'mmHg' },
       ],
       bpFilter,
     });
@@ -195,7 +203,7 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
       desc: 'Laying heart rate over the range.',
       help: 'Heart rate measured while laying down, the cleanest resting baseline. A gradually falling laying HR usually accompanies improving autonomic recovery; a sustained unexplained rise is worth noting alongside symptoms and sleep.',
       charts: [{ label: '', series: [series(laying, SCORE_COLORS.bad)], zones: acBandsToZones(restingHrBands('Laying')), integer: true, selectStat: true }],
-      stats: [{ label: 'Laying HR', value: layingCur != null ? Math.round(layingCur) : null, sub: layingLi >= 0 ? `(${buckets[layingLi].label})` : undefined }],
+      stats: [{ label: 'Laying HR', value: layingCur != null ? Math.round(layingCur) : null, sub: 'bpm', date: layingLi >= 0 ? buckets[layingLi].label : undefined }],
     });
     return cards;
   };
@@ -246,7 +254,7 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
           { label: 'Sustained', value: latestSus != null ? Math.round(latestSus) : null, sub: 'bpm', color: '#60a5fa' },
           { label: 'Peak', value: latestPeak != null ? Math.round(latestPeak) : null, sub: 'bpm', color: '#a855f7' },
         ],
-        suffix: tests.length ? `(${+tests[tests.length - 1].dk.slice(5, 7)}/${+tests[tests.length - 1].dk.slice(8, 10)})` : undefined,
+        date: tests.length ? `${+tests[tests.length - 1].dk.slice(5, 7)}/${+tests[tests.length - 1].dk.slice(8, 10)}` : undefined,
         zones: true,
       },
       charts: [{
@@ -294,7 +302,7 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
         lastMax = v; lastDk = dk;
       })));
       const maxAvg = acMean(max);
-      const lastDate = lastDk ? `(${+(lastDk as string).slice(5, 7)}/${+(lastDk as string).slice(8, 10)})` : undefined;
+      const lastDate = lastDk ? `${+(lastDk as string).slice(5, 7)}/${+(lastDk as string).slice(8, 10)}` : undefined;
       // Every transition (stairs included) shades and colours on the same
       // zones, so the line never reads as a plain blue trace. The ≥30 bpm POTS
       // *criterion* is about standing up, so only that claim is withheld from
@@ -311,12 +319,14 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
         metricsRow: {
           metrics: [
             {
-              label: 'Max delta', value: lastMax != null ? Math.round(lastMax) : null, sub: 'bpm',
+              // The number is a rise off the pre-episode baseline, so it reads
+              // as a delta ("Δ16 bpm"), like the episode summary's own readout.
+              label: 'Max delta', value: lastMax != null ? Math.round(lastMax) : null, prefix: 'Δ', sub: 'bpm',
               color: lastMax != null ? gradeColor(lastMax) : '#60a5fa',
               regrade: gradeColor,
             },
           ],
-          suffix: lastDate,
+          date: lastDate,
           zones: true,
         },
         stats: [],
@@ -354,9 +364,9 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
       help: 'Duration is the night that ended that morning, coloured by grade the same way each night is scored: 8h+ reads as great, 7h good, 6h ok, and it falls off below that. Tap "Show zones" for the grade thresholds. Consistency of timing often moves HRV as much as raw duration does.',
       metricsRow: {
         metrics: cur != null
-          ? [{ label: 'Duration', value: Math.round(cur * 10) / 10, sub: 'h', color: durColor(cur), regrade: durColor }]
+          ? [{ label: 'Duration', value: Math.round(cur * 10) / 10, sub: 'hours', color: durColor(cur), regrade: durColor }]
           : [],
-        suffix: li >= 0 ? `(${buckets[li].label})` : undefined,
+        date: li >= 0 ? buckets[li].label : undefined,
         zones: true,
       },
       charts: [
@@ -374,7 +384,7 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
         const lo = num(days[dk].sleep?.hrLow), hi = num(days[dk].sleep?.hrHigh);
         if (lo != null || hi != null) { lastLow = lo; lastHigh = hi; lastDk = dk; }
       }));
-      const lastDate = lastDk ? `(${+(lastDk as string).slice(5, 7)}/${+(lastDk as string).slice(8, 10)})` : undefined;
+      const lastDate = lastDk ? `${+(lastDk as string).slice(5, 7)}/${+(lastDk as string).slice(8, 10)}` : undefined;
       cards.push({
         title: 'Sleeping HR', sub: range,
         desc: 'Your lowest and highest heart rate through the night.',
@@ -384,7 +394,7 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
             { label: 'Low', value: lastLow != null ? Math.round(lastLow) : null, sub: 'bpm', color: '#60a5fa' },
             { label: 'High', value: lastHigh != null ? Math.round(lastHigh) : null, sub: 'bpm', color: '#a855f7' },
           ],
-          suffix: lastDate,
+          date: lastDate,
         },
         charts: [
           { label: '', integer: true, series: [series(hrLow, '#60a5fa', 'Low'), series(hrHigh, '#a855f7', 'High')] },
@@ -431,7 +441,7 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
       title: 'Triggers',
       desc: 'How often each trigger showed up in this range.',
       help: 'Counts of every logged trigger (histamine foods, caffeine, alcohol and the rest). The chart totals them per day/week/month; tap a trigger below to see just its own pattern, and tap anywhere else to reset. Pair this with the Outlook correlations: if a trigger keeps landing before bad days, that\'s a pattern worth testing with an elimination window.',
-      bars: [{ label: 'All triggers', rows: trigRows }],
+      bars: [{ label: '', rows: trigRows }],
       barBuckets: { totals: buckets.map((_, bi) => trigRows.reduce((s, r) => s + (byKey[r.key][bi] || 0), 0)), byKey },
     });
     // Readout follows the latest bucket with water logged, like the other cards.
@@ -442,7 +452,7 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
       desc: 'Daily water intake over the range.',
       help: 'Litres of water per day. 2.5–3.5 L is commonly recommended alongside electrolytes for orthostatic conditions. Fluid only holds where salt allows. If you chase volume, discuss electrolyte targets with your doctor.',
       charts: [{ label: '', series: [series(water, '#38bdf8')], selectStat: true }],
-      stats: [{ label: 'Water', value: waterCur, sub: waterLi >= 0 ? `L (${buckets[waterLi].label})` : 'L' }],
+      stats: [{ label: 'Water', value: waterCur, sub: 'litres', date: waterLi >= 0 ? buckets[waterLi].label : undefined }],
     });
     return cards;
   };

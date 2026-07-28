@@ -7,7 +7,7 @@ import { BottomFade, Screen } from '../../src/components/Header';
 import { Icon } from '../../src/components/Icon';
 import { Ghost, HelpDot, ScoreDot, Segmented } from '../../src/components/ui';
 import { Bars, BpDumbbell, LineChart, StackedBars, ZonesToggle, useChartsBlur } from '../../src/components/charts';
-import { fonts, radius, usePalette } from '../../src/theme';
+import { TAIL_STYLE, fonts, radius, readoutTail, usePalette } from '../../src/theme';
 import { getWaveform, useAppState } from '../../src/store/store';
 import { useTier } from '../../src/store/tier';
 import { usePaywall } from '../../src/features/Paywall';
@@ -846,7 +846,7 @@ const CardView = React.memo(function CardView({ card, buckets }: { card: Analysi
         }
         return orthoSpan ? { ...m, value: orthoSpan.counts[sel] ?? null } : m;
       }),
-      suffix: `(${buckets[sel]?.label ?? ''})`,
+      date: buckets[sel]?.label ?? '',
     };
   }, [metricsRow, metricsChart, sel, orthoSpan, buckets]);
   // Range/data changes rebuild the buckets, so any held selection index no
@@ -868,11 +868,10 @@ const CardView = React.memo(function CardView({ card, buckets }: { card: Analysi
       return st;
     }
     const st = card.stats ? card.stats.slice() : [];
-    // BP: the two tiles follow the selected period's latest bucket.
+    // BP: the two tiles are the selected period's range averages.
     if (bpSpan && st.length >= 2) {
-      const sub = bpSpan.curLabel ? `(${bpSpan.curLabel})` : undefined;
-      st[0] = { ...st[0], value: bpSpan.curSys, sub };
-      st[1] = { ...st[1], value: bpSpan.curDia, sub };
+      st[0] = { ...st[0], value: bpSpan.avgSys };
+      st[1] = { ...st[1], value: bpSpan.avgDia };
     }
     if (selChart && selSeries && sel != null && sel >= 0 && st.length) {
       const v = selSeries.values[sel];
@@ -881,7 +880,7 @@ const CardView = React.memo(function CardView({ card, buckets }: { card: Analysi
           ...st[0],
           label: st[0].label.replace(/^avg\s+/i, ''),
           value: selChart.integer ? Math.round(v) : Math.round(v * 10) / 10,
-          sub: `(${buckets[sel]?.label ?? ''})`,
+          date: buckets[sel]?.label ?? '',
         };
       }
     }
@@ -918,7 +917,7 @@ const CardView = React.memo(function CardView({ card, buckets }: { card: Analysi
               <View key={i} style={{ flex: 1, minWidth: 96, backgroundColor: p.bg, borderColor: p.border, borderWidth: 1, borderRadius: radius.card, paddingVertical: 12, paddingHorizontal: 14 }}>
                 <Text style={{ fontSize: 25, fontFamily: fonts.numHeavy, color: s.color || p.text, fontVariant: ['tabular-nums'] }}>
                   {s.value == null ? '–' : String(s.value)}
-                  {s.sub ? <Text style={{ fontSize: 13, fontWeight: '600', fontFamily: undefined, color: p.textDim }}>{` ${s.sub}`}</Text> : null}
+                  {readoutTail(s.sub, s.date) ? <Text style={TAIL_STYLE(p)}>{readoutTail(s.sub, s.date)}</Text> : null}
                 </Text>
                 <Text style={{ fontSize: 12, color: p.textDim, marginTop: 2 }}>{s.label}</Text>
               </View>
@@ -930,7 +929,7 @@ const CardView = React.memo(function CardView({ card, buckets }: { card: Analysi
               <View key={i}>
                 <Text style={{ fontSize: 25, fontFamily: fonts.numHeavy, color: s.color || p.text, fontVariant: ['tabular-nums'] }}>
                   {s.value == null ? '–' : String(s.value)}
-                  {s.sub ? <Text style={{ fontSize: 13, fontWeight: '600', fontFamily: undefined, color: p.textDim }}>{` ${s.sub}`}</Text> : null}
+                  {readoutTail(s.sub, s.date) ? <Text style={TAIL_STYLE(p)}>{readoutTail(s.sub, s.date)}</Text> : null}
                 </Text>
                 <Text style={{ fontSize: 12, color: p.textDim, marginTop: 2 }}>{s.label}</Text>
               </View>
@@ -954,20 +953,24 @@ const CardView = React.memo(function CardView({ card, buckets }: { card: Analysi
       {shownMetrics ? (
         <View style={{ flexDirection: 'row', alignItems: 'flex-end', flexWrap: 'wrap', gap: 10, marginTop: 12 }}>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 28 }}>
-            {shownMetrics.metrics.map((m) => (
-              <View key={m.label}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  {m.color ? <View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: m.color }} /> : null}
-                  <Text style={{ fontSize: 12, color: p.textDim, fontWeight: '600' }}>{m.label}</Text>
+            {shownMetrics.metrics.map((m, i) => {
+              // The date rides on the last metric's unit ("64 bpm on 7/28")
+              // rather than standing in a column of its own.
+              const t = readoutTail(m.sub, i === shownMetrics.metrics.length - 1 ? shownMetrics.date : undefined);
+              return (
+                <View key={m.label}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    {m.color ? <View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: m.color }} /> : null}
+                    <Text style={{ fontSize: 12, color: p.textDim, fontWeight: '600' }}>{m.label}</Text>
+                  </View>
+                  <Text style={{ fontSize: 25, fontFamily: fonts.numHeavy, color: m.color || p.text, fontVariant: ['tabular-nums'], marginTop: 3 }}>
+                    {m.value == null ? '–' : `${m.prefix || ''}${m.value}`}
+                    {t ? <Text style={TAIL_STYLE(p)}>{t}</Text> : null}
+                  </Text>
                 </View>
-                <Text style={{ fontSize: 25, fontFamily: fonts.numHeavy, color: m.color || p.text, fontVariant: ['tabular-nums'], marginTop: 3 }}>
-                  {m.value == null ? '–' : String(m.value)}
-                  {m.sub ? <Text style={{ fontSize: 13, fontWeight: '600', fontFamily: undefined, color: p.textDim }}>{` ${m.sub}`}</Text> : null}
-                </Text>
-              </View>
-            ))}
+              );
+            })}
           </View>
-          {shownMetrics.suffix ? <Text style={{ fontSize: 13, fontWeight: '600', color: p.textDim, marginBottom: 5 }}>{shownMetrics.suffix}</Text> : null}
         </View>
       ) : null}
       {card.orthoFilter ? (
@@ -1015,6 +1018,7 @@ const CardView = React.memo(function CardView({ card, buckets }: { card: Analysi
                 <StackedBars
                   buckets={buckets}
                   height={124}
+                  hideHeader
                   segments={[{ label: selRow ? selRow.name : bg.label, color: p.accent, values: selRow ? (bb.byKey[selRow.key!] ?? bb.totals) : bb.totals }]}
                 />
               </View>

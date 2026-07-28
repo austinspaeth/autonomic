@@ -70,6 +70,32 @@ export const fonts = {
   mono: 'IBMPlexMono_400Regular',
 } as const;
 
+/**
+ * The dim text that trails a big Progress readout: the unit, then the day the
+ * value belongs to ("bpm on 7/27"). Cards that show a value with a date fold the
+ * date in here rather than parking it in a column of its own, so the whole line
+ * reads as one phrase. Either half may be missing (a unitless index still gets
+ * its date; a card without a date shows just the unit).
+ *
+ * A symbol unit hugs the number on a narrow space, so it reads as part of the
+ * value ("56 bpm"). A unit that is a word of its own takes a full space, as does
+ * a tail that opens on "on" because its card has no unit ("82 on 7/27"). The
+ * string carries its own leading space, so callers render it straight after the
+ * value and add no spacing of their own.
+ */
+const WORD_UNITS = new Set(['days', 'hours', 'mins', 'times', 'litres', 'reps', 'nights']);
+const NARROW_SPACE = '\u2005';
+export const readoutTail = (unit?: string | null, date?: string | null) => {
+  const t = [unit || '', date ? `on ${date}` : ''].filter(Boolean).join(' ');
+  if (!t) return '';
+  return (!unit || WORD_UNITS.has(unit) ? ' ' : NARROW_SPACE) + t;
+};
+
+/** Sized between the metric label and the big value it follows. */
+export const TAIL_STYLE = (p: { textDim: string }) => ({
+  fontSize: 16, fontWeight: '600' as const, fontFamily: undefined, color: p.textDim,
+});
+
 /** Type scale: hero number, card title, row label, caption. */
 export const type = {
   hero: { fontSize: 57, fontWeight: '800' as const, letterSpacing: -1 },

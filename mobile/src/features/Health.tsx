@@ -9,7 +9,6 @@ import { TimeField } from '../components/Field';
 import { useToast } from '../components/Toast';
 import { usePalette } from '../theme';
 import { health, healthAppName, healthPermissionPath, revokeHealthAuth, SleepImport } from '../lib/health';
-import { requestEcgAuth } from '../lib/health/ecg';
 import { ensureDay, getState, save, useStore } from '../store/store';
 import { fmtTime12 } from '../lib/dates';
 import { runHealthUpdateCheck } from './HealthUpdates';
@@ -37,10 +36,9 @@ export function HealthScreen() {
 
   const connect = async () => {
     setBusy(true);
+    // Asks for the whole set, ECG included (requestAuth folds in the local
+    // native module's sheet); `force` skips the once-per-launch pacing.
     const ok = await api.requestAuth({ force: true });
-    // ECG lives outside the HealthKit permission set (local native module) —
-    // request it in the same connect step, sequentially so sheets don't race.
-    if (ok) await requestEcgAuth();
     setBusy(false);
     toast(ok ? 'Health connected' : 'Permission denied');
     if (ok) { getState().settings.healthEnabled = true; save(); }

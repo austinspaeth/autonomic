@@ -15,7 +15,9 @@
  */
 import type { Entry, SleepStages } from '../types';
 import { keyOf } from '../dates';
-import { hasAskedAuth, markAskedAuth } from './askedAuth';
+import {
+  markAskedAuth, markPromptedThisLaunch, promptedThisLaunch, shareAuthRequest,
+} from './askedAuth';
 import { INTERRUPTED_AWAKE_MIN, NIGHT_END_HOUR, NIGHT_START_HOUR, nightKeyOf } from './sleepSummary';
 import { activityTypeFromHc, workoutHrSeries } from './workoutMap';
 import { HISTORY_SLEEP_MIN_MIN, emptyHistory } from './index';
@@ -227,29 +229,33 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
   return {
     available: true,
 
-    async requestAuth(opts) {
-      try {
-        if (!(await ensureInit())) return false;
-        const wanted = [
-          ...READ_TYPES.map((recordType) => ({ accessType: 'read' as const, recordType })),
-          ...WRITE_TYPES.map((recordType) => ({ accessType: 'write' as const, recordType })),
-        ];
-        // Everything already granted: never touch the permission activity.
-        let have: { accessType?: string; recordType?: string }[] = [];
-        try { have = await mod.getGrantedPermissions(); } catch { /* treat as none */ }
-        const has = (w: { accessType: string; recordType: string }) =>
-          have.some((g) => g.recordType === w.recordType && g.accessType === w.accessType);
-        if (wanted.every(has)) return true;
-        // Something is missing but we already asked for this exact set once —
-        // don't nag from entry paths, and don't burn Android's deny counter
-        // (two dismissals permanently block the request UI). Connect buttons
-        // pass `force` to re-open the permission activity deliberately.
-        const setKey = `hc1:${READ_TYPES.join(',')}|${WRITE_TYPES.join(',')}`;
-        if (!opts?.force && hasAskedAuth(setKey)) return have.length > 0;
-        const granted = await mod.requestPermission(wanted);
-        markAskedAuth(setKey);
-        return granted.length > 0;
-      } catch { return false; }
+    requestAuth(opts) {
+      const force = !!opts?.force;
+      return shareAuthRequest(async () => {
+        try {
+          if (!(await ensureInit())) return false;
+          const wanted = [
+            ...READ_TYPES.map((recordType) => ({ accessType: 'read' as const, recordType })),
+            ...WRITE_TYPES.map((recordType) => ({ accessType: 'write' as const, recordType })),
+          ];
+          // Everything already granted: never touch the permission activity.
+          let have: { accessType?: string; recordType?: string }[] = [];
+          try { have = await mod.getGrantedPermissions(); } catch { /* treat as none */ }
+          const has = (w: { accessType: string; recordType: string }) =>
+            have.some((g) => g.recordType === w.recordType && g.accessType === w.accessType);
+          const setKey = `hc1:${READ_TYPES.join(',')}|${WRITE_TYPES.join(',')}`;
+          if (wanted.every(has)) { markAskedAuth(setKey); return true; }
+          // A grant is provably missing (Health Connect, unlike HealthKit, says
+          // so), so entry paths ask rather than reading a permission-shaped
+          // hole as "nothing recorded". Bounded to one prompt per launch: two
+          // dismissals of the permission activity permanently block it.
+          if (!force && promptedThisLaunch()) return have.length > 0;
+          markPromptedThisLaunch();
+          const granted = await mod.requestPermission(wanted);
+          markAskedAuth(setKey);
+          return granted.length > 0;
+        } catch { return false; }
+      });
     },
 
     async readAuthStatus(scope) {

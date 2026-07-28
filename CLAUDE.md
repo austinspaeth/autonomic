@@ -107,7 +107,15 @@ old web app so old `export.json` files import directly.
   checks today's Apple Health / Health Connect data on launch, at most hourly on
   foreground, and on the Journal's pull-to-refresh (iOS: custom overscroll brand
   mark; Android: RefreshControl) — `<HealthUpdatePill/>` in the root layout +
-  `src/features/HealthUpdates.tsx`. It offers only non-duplicates not authored by
+  `src/features/HealthUpdates.tsx`. Every check calls `HealthApi.requestAuth()`
+  first — a permission we never asked for otherwise reads back as "nothing new"
+  forever. That request is self-gating (`src/lib/health/askedAuth.ts`): silent
+  when the platform has nothing left to ask, at most one prompt per app launch
+  otherwise, concurrent callers coalesced into one sheet, and only the Connect
+  buttons pass `force`. It covers the whole set both devices need (the watch's
+  workout SHARE included) plus ECG, which rides on the local
+  `modules/ecg-health` module because the kingstinct library can't express it.
+  It offers only non-duplicates not authored by
   this app (dedup rules are pure + tested in `src/lib/health/updateSet.ts`; HRV
   needs real RR ≥ 4 min). Tapping opens a grouped import sheet (Sleep / Readings /
   Exercise / Medications — meds read is a stub, see `HealthApi.readMedications`).
