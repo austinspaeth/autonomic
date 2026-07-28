@@ -20,6 +20,7 @@ import {
   scoreCat, scoreSet, streakInfo, streakTier, type ScoreComp, type ScoreSetResult,
 } from '../lib/scoring/day';
 import { detectDownturn, type Downturn } from '../lib/scoring/downturn';
+import { trustedReadings } from '../lib/hrvQuality';
 import { buildDownturnPrompt } from '../lib/analysis/reports';
 import { PromptSheet } from './PromptSheet';
 import { todayKey } from '../lib/dates';
@@ -47,6 +48,11 @@ const mixHex = (color: string, base: string, t: number) => {
   const ch = (sh: number) => Math.round(((nc >> sh) & 255) * t + ((nb >> sh) & 255) * (1 - t));
   return `rgb(${ch(16)},${ch(8)},${ch(0)})`;
 };
+
+// Warning/crash containers blend their severity color into this near-black
+// instead of `p.surface`, so the fill reads as a dark tinted panel rather than
+// a washed-out surface. Same mix ratios as elsewhere, darker base.
+const WARN_BASE = '#0d0d0f';
 
 /**
  * Shared collapse/expand motion for this view's accordions (streak card, pro
@@ -170,7 +176,8 @@ export function DaySummary({ dk }: { dk: string }) {
   // not caused by a data change (sheets, animations) don't re-score.
   const { d, readings, all } = useMemo(() => {
     const day = state.days[dk] || ({ readings: [], activities: [] } as never);
-    const rs = (day.readings || []).slice().sort((a, b) => ((a.time as string) || '').localeCompare((b.time as string) || ''));
+    // Imported HRV without enough real RR is not shown or scored anywhere.
+    const rs = trustedReadings(day.readings).slice().sort((a, b) => ((a.time as string) || '').localeCompare((b.time as string) || ''));
     return { d: day, readings: rs, all: scoreSet(rs, day, dk, state.days, ctx) };
   }, [state.days, dk, ctx]);
 
@@ -311,12 +318,12 @@ function DownturnWarning({ w, dk }: { w: Downturn; dk: string }) {
     <Pressable
       onPress={() => openSheet(() => <DownturnExplain w={w} dk={dk} />)}
       style={({ pressed }) => [
-        { borderWidth: 1, borderColor: hexA(color, 0.55), borderRadius: radius.card, backgroundColor: mixHex(color, p.surface, 0.14), marginBottom: 12, padding: 15 },
+        { borderWidth: 1, borderColor: hexA(color, 0.55), borderRadius: radius.card, backgroundColor: mixHex(color, WARN_BASE, 0.14), marginBottom: 12, padding: 15 },
         pressed && { opacity: 0.75 },
       ]}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 13 }}>
-        <View style={{ width: 42, height: 42, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: mixHex(color, p.surface, 0.3) }}>
+        <View style={{ width: 42, height: 42, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: mixHex(color, WARN_BASE, 0.3) }}>
           <Icon name="trendDown" size={21} color={color} />
         </View>
         <View style={{ flex: 1 }}>
@@ -350,9 +357,9 @@ function DownturnExplain({ w, dk }: { w: Downturn; dk: string }) {
   return (
     <View>
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 16 }}>Something&apos;s off</Text>
-      <View style={{ borderRadius: radius.card, padding: 14, marginBottom: 16, backgroundColor: mixHex(color, p.surface, 0.14), borderWidth: 1, borderColor: hexA(color, 0.55) }}>
+      <View style={{ borderRadius: radius.card, padding: 14, marginBottom: 16, backgroundColor: mixHex(color, WARN_BASE, 0.14), borderWidth: 1, borderColor: hexA(color, 0.55) }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <View style={{ width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: mixHex(color, p.surface, 0.3) }}>
+          <View style={{ width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: mixHex(color, WARN_BASE, 0.3) }}>
             <Icon name="trendDown" size={17} color={color} />
           </View>
           <View style={{ flex: 1 }}>
@@ -410,7 +417,7 @@ function PossibilityRow({ label, explain }: { label: string; explain: string }) 
 function Flag({ color, text }: { color: string; text: string }) {
   const p = usePalette();
   return (
-    <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start', marginTop: 11, padding: 10, borderRadius: radius.control, backgroundColor: mixHex(color, p.surface, 0.14), borderWidth: 1, borderColor: hexA(color, 0.55) }}>
+    <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start', marginTop: 11, padding: 10, borderRadius: radius.control, backgroundColor: mixHex(color, WARN_BASE, 0.14), borderWidth: 1, borderColor: hexA(color, 0.55) }}>
       <Icon name="alert" size={15} color={color} />
       <Text style={{ flex: 1, fontSize: 13, lineHeight: 17, fontWeight: '600', color }}>{text}</Text>
     </View>

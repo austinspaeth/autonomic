@@ -174,6 +174,9 @@ function SheetView({ entry, isTop, behind, closing, requestClose, onExited, clos
   // Same height but applied to the tail spacer INSTANTLY on show — the auto-scroll
   // below needs the extra scroll room to exist before scrollTo, or iOS clamps it.
   const kbSpace = useSharedValue(0);
+  // Measured height of the card itself — a fitContent sheet rides up bodily on
+  // the keyboard, and this is what caps the lift so its top can't leave the screen.
+  const cardH = useSharedValue(0);
   const [kbOpen, setKbOpen] = useState(false);
   const isTopRef = useRef(isTop); isTopRef.current = isTop;
   const [footer, setFooter] = useState<React.ReactNode>(null);
@@ -275,9 +278,14 @@ function SheetView({ entry, isTop, behind, closing, requestClose, onExited, clos
     // — the iOS "stacked cards" look.
     const peek = 22 * recede.value;
     const lift = recede.value * 0.04 * sheetH + peek;
+    // A fitContent card has no scroll view to scroll a focused field clear of the
+    // keyboard, so the whole card rides up on it instead. Capped at the slack
+    // above the card so its top (and title) can never leave the screen.
+    const slack = Math.max(0, SCREEN_H - cardH.value - insets.top - 8);
+    const kbShift = fit ? Math.min(kb.value, slack) : 0;
     return {
       transform: [
-        { translateY: translateY.value - lift },
+        { translateY: translateY.value - lift - kbShift },
         { scale },
       ],
     };
@@ -285,8 +293,9 @@ function SheetView({ entry, isTop, behind, closing, requestClose, onExited, clos
 
   // Lift the footer by the keyboard height and shed the home-indicator inset as it
   // rises (the keyboard already covers that safe area).
+  // (A fitContent card lifts bodily in sheetStyle, so its footer must not lift again.)
   const footerStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: -kb.value }],
+    transform: [{ translateY: fit ? 0 : -kb.value }],
     paddingBottom: 14 + insets.bottom * (1 - Math.min(1, kb.value / 24)),
   }));
   // Spacer at the tail of the scroll content so a focused field can scroll clear
@@ -319,6 +328,7 @@ function SheetView({ entry, isTop, behind, closing, requestClose, onExited, clos
       )}
       <Animated.View
         pointerEvents={isTop ? 'auto' : 'none'}
+        onLayout={(e) => { cardH.value = e.nativeEvent.layout.height; }}
         style={[
           styles.sheet,
           fit ? { maxHeight: sheetH } : { height: sheetH },

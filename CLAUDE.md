@@ -112,19 +112,39 @@ old web app so old `export.json` files import directly.
   needs real RR ≥ 4 min). Tapping opens a grouped import sheet (Sleep / Readings /
   Exercise / Medications — meds read is a stub, see `HealthApi.readMedications`).
   Viewing the card or dismissing the pill marks those item keys "seen" (plaintext
-  `autonomic.flags` MMKV, 48h TTL) so the pill never re-offers them; Settings →
+  `autonomic.flags` MMKV, 48h TTL) so the pill never re-offers them. Deleting an
+  imported entry is stronger: `deleteEntry` records its `healthKey` (stamped at
+  import) plus a day/kind/type/time fingerprint in a permanent declined list
+  (`src/lib/health/declined.ts`), and `filterDeclined` keeps the pill from ever
+  suggesting that sample again. Settings →
   Apple Health → "Check for updates" ignores that memory and sweeps the last 24h
   (`checkHealthUpdatesLast24h`). Imports write through the normal store paths
   (scores + waveform sidecar).
 - **One-time historical backfill.** Connecting Health in the welcome wizard offers
   a one-shot import of the last year (`HealthApi.readHistory`, `HISTORY_DAYS` in
-  `src/features/Onboarding.tsx`): readings (HRV only with real RR ≥ 4 min on iOS),
+  `src/features/Onboarding.tsx`): readings (HRV only with real RR ≥ 4 min; Android
+  imports no historical HRV at all — Health Connect has no beat-to-beat series),
   nights of sleep with overnight HR + stages, workouts with their HR trace, and
   meds (same platform stub). Guarded by `meta.healthHistoryImported` and written
   in a single `mutate()`. Sleep uses one range query bucketed by `groupNights`
   (`src/lib/health/sleepSummary.ts`, pure + tested) instead of 365 per-day reads;
   per-night HR and per-workout HR are the only per-item queries, pooled a few at
   a time, with `onProgress` driving the sheet's status line.
+- **An imported HRV reading only counts if it carries ≥ 4 min of real RR.**
+  Health stores are full of short HRV samples (the watch's passive ~1-minute
+  background measurement, a truncated Breathe session, another app's RMSSD
+  record); they aren't comparable to a seated 5-minute reading and a year of them
+  wrecks every average. The import paths refuse them (`health/updateSet`,
+  `readHistory`), and `src/lib/hrvQuality.ts` is the second line of defence:
+  `isTrustedReading` / `trustedReadings` drop `imported` HRV entries whose
+  `durationSec` (stamped with real RR coverage at import) is under
+  `IMPORTED_HRV_MIN_SEC`, in the Journal list, `scoreSet` / `blueZone` /
+  `metricHistory`, `acReadVals` / `acTotalPower` (so all of Analysis, Progress and
+  the widgets), milestones and the Insights prompts. Readings captured in-app are
+  never filtered, however short. Journals imported by older builds are repaired on
+  load by `stampImportedHrvCoverage` (store `loadState`), which stamps coverage
+  from the waveform sidecar — no RR ⇒ 0 ⇒ permanently excluded. Nothing is
+  deleted: the entries stay in the journal and in exports, they just don't count.
 - **Progress + Insights fall back to demo data on an empty journal.** `src/lib/demo.ts`
   generates a deterministic 30-day sample month (seeded PRNG, keyed off today so it
   lands in the Analysis buckets and report ranges) that arcs from crash days up into

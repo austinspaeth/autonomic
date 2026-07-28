@@ -218,6 +218,22 @@ describe('computeHrv duration gating', () => {
     expect(r.fields.highPower).toBeDefined();
     expect(r.fields.vlowPower).toBeUndefined();
   });
+  // The VLF floor is 240 s, not 300 s: a nominal 5-minute strap capture always
+  // sums a few seconds short of its own timer, so a 300 s floor would pass or
+  // fail identical readings at random. These two pin the floor where it is.
+  it('withholds VLF just under the 4-minute floor', () => {
+    const rr = Array.from({ length: 290 }, (_, i) => 800 + 30 * Math.sin((2 * Math.PI * i) / 8)); // ~232 s
+    const r = computeHrv(rr);
+    expect(r.longestCleanSec).toBeLessThan(240);
+    expect(r.fields.vlowPower).toBeUndefined();
+  });
+  it('reports VLF for a 5-minute capture that lands a little short of 300 s', () => {
+    const rr = Array.from({ length: 370 }, (_, i) => 800 + 30 * Math.sin((2 * Math.PI * i) / 8)); // ~296 s
+    const r = computeHrv(rr);
+    expect(r.longestCleanSec).toBeGreaterThan(240);
+    expect(r.longestCleanSec).toBeLessThan(300);
+    expect(r.fields.vlowPower).toBeDefined();
+  });
 });
 
 

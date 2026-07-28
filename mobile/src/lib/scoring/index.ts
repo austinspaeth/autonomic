@@ -183,6 +183,10 @@ export interface ScoreContext {
   protocol?: Protocol;
   /** state.customTypes, so labels resolve for user-created types too. */
   customTypes?: CustomTypes;
+  /** Resolves an entry's sampled HR curve from the waveform sidecar, injected
+   *  so the pure scoring/analysis libs never import the store. Used by the POTS
+   *  Episodes card to grade each event on its max delta. */
+  hrCurve?: (id: string) => { t: number; bpm: number }[] | null;
 }
 
 export function computeScores(r: Entry, ctx: ScoreContext = {}): Record<string, ScoreCat> {

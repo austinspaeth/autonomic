@@ -272,6 +272,10 @@ export function PowerSpectrum({ rr, vlf, lf, hf }: { rr?: number[] | null; vlf: 
   const total = vals.vlf + vals.lf + vals.hf;
   if (!total && !curve) return null;
   const pct = (x: number) => (total ? Math.round((x / total) * 100) : 0);
+  // A band whose power the HRV engine withheld (record too short to resolve it)
+  // still has real energy in the drawn PSD, so the curve shows it. Dim that
+  // band's fill and read out "–" rather than a confident 0 next to a visible hump.
+  const held = { vlf: vlf == null, lf: lf == null, hf: hf == null };
 
   const W = 320, H = 150, padL = 8, padR = 6, padT = 10, padB = 26;
   const fMax = 0.5;
@@ -324,28 +328,28 @@ export function PowerSpectrum({ rr, vlf, lf, hf }: { rr?: number[] | null; vlf: 
 
   // One filled sub-path per band; a soft curve along the top edge keeps the
   // peaks defined but rounds their tips.
-  const segs: { color: string; d: string }[] = [];
+  const segs: { color: string; d: string; dim: boolean }[] = [];
   SPECTRUM_BANDS.forEach((b, bi) => {
     const seg = bandPts[bi];
     if (seg.length < 2) return;
     const xy: [number, number][] = seg.map((q) => [xAt(q.f), Math.min(baseY, yAt(q.d))]);
     const top = smoothPath(xy); // "Mx y Cx1 y1 …"
     const area = `M${xy[0][0].toFixed(2)} ${baseY} L${top.slice(1)} L${xy[xy.length - 1][0].toFixed(2)} ${baseY} Z`;
-    segs.push({ color: b.color, d: area });
+    segs.push({ color: b.color, d: area, dim: held[b.key as keyof typeof held] });
   });
 
   const ticks = [0, 0.1, 0.2, 0.3, 0.4, 0.5];
-  const legend: { label: string; color: string; power: number }[] = [
-    { label: 'Very low', color: SPECTRUM_BANDS[0].color, power: vals.vlf },
-    { label: 'Low', color: SPECTRUM_BANDS[1].color, power: vals.lf },
-    { label: 'High', color: SPECTRUM_BANDS[2].color, power: vals.hf },
+  const legend: { label: string; color: string; power: number | null }[] = [
+    { label: 'Very low', color: SPECTRUM_BANDS[0].color, power: vlf },
+    { label: 'Low', color: SPECTRUM_BANDS[1].color, power: lf },
+    { label: 'High', color: SPECTRUM_BANDS[2].color, power: hf },
   ];
 
   return (
     <View>
       <Svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
         <Line x1={padL} x2={W - padR} y1={baseY} y2={baseY} stroke={p.border} strokeWidth={1} />
-        {segs.map((s, i) => <Path key={i} d={s.d} fill={s.color} opacity={0.9} />)}
+        {segs.map((s, i) => <Path key={i} d={s.d} fill={s.color} opacity={s.dim ? 0.28 : 0.9} />)}
         {ticks.map((t, i) => (
           <SvgText key={i} x={xAt(t)} y={baseY + 14} textAnchor={i === 0 ? 'start' : i === ticks.length - 1 ? 'end' : 'middle'} fontSize={9} fill={p.textDim}>{t.toFixed(1)}</SvgText>
         ))}
@@ -358,8 +362,8 @@ export function PowerSpectrum({ rr, vlf, lf, hf }: { rr?: number[] | null; vlf: 
               <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: l.color }} />
               <RNText style={{ fontSize: 12, color: p.textDim, fontWeight: '600' }}>{l.label}</RNText>
             </View>
-            <RNText style={{ fontSize: 17, fontWeight: '800', color: p.text, fontVariant: ['tabular-nums'], marginTop: 3 }}>{Math.round(l.power)}</RNText>
-            <RNText style={{ fontSize: 11, color: p.textDim }}>{`ms² · ${pct(l.power)}%`}</RNText>
+            <RNText style={{ fontSize: 17, fontWeight: '800', color: l.power == null ? p.textDim : p.text, fontVariant: ['tabular-nums'], marginTop: 3 }}>{l.power == null ? '–' : Math.round(l.power)}</RNText>
+            <RNText style={{ fontSize: 11, color: p.textDim }}>{l.power == null ? 'reading too short' : `ms² · ${pct(l.power)}%`}</RNText>
           </View>
         ))}
       </View>

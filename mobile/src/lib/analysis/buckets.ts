@@ -7,6 +7,7 @@ import { keyOf } from '../dates';
 import type { Band, DayRecord, Entry } from '../types';
 import { BANDS, SCORE_COLORS, catFromBands, type ScoreContext } from '../scoring';
 import { SCORE_CATS, scoreSet, blueZone, type DaysMap } from '../scoring/day';
+import { isTrustedReading } from '../hrvQuality';
 
 export type Mode = 'day' | 'week' | 'month' | 'year';
 export interface Bucket { start: string; end: string; label: string; days: string[] }
@@ -47,11 +48,14 @@ export const isEvening = (r: Entry) => { const mo = acMinOf(r.time as string); i
 
 export function acReadVals(d: DayRecord, type: string, key: string, filt?: (r: Entry) => boolean): number[] {
   const out: number[] = [];
-  (d.readings || []).forEach((r) => { if (r.type !== type) return; if (filt && !filt(r)) return; const v = parseFloat(r[key] as string); if (!isNaN(v)) out.push(v); });
+  // Imported HRV without enough real RR never reaches an aggregate — see
+  // src/lib/hrvQuality.ts. Every Analysis/Progress/widget series funnels
+  // through here, so this one guard covers them all.
+  (d.readings || []).forEach((r) => { if (r.type !== type) return; if (!isTrustedReading(r)) return; if (filt && !filt(r)) return; const v = parseFloat(r[key] as string); if (!isNaN(v)) out.push(v); });
   return out;
 }
 export function acTotalPower(d: DayRecord, filt?: (r: Entry) => boolean): number[] {
-  return (d.readings || []).filter((r) => r.type === 'breathHrv' && (!filt || filt(r))).map((r) => {
+  return (d.readings || []).filter((r) => r.type === 'breathHrv' && isTrustedReading(r) && (!filt || filt(r))).map((r) => {
     const p = ['vlowPower', 'lowPower', 'highPower'].map((k) => parseFloat(r[k] as string));
     return p.every((x) => !isNaN(x)) ? p[0] + p[1] + p[2] : null;
   }).filter((v): v is number => v != null);

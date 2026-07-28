@@ -14,14 +14,17 @@ import type { Entry } from '../types';
 import { computeScores } from '../scoring';
 import { addDays, todayKey, uid } from '../dates';
 import { typesFor } from '../typeCatalog';
+import { rrCoverageSec } from '../hrvQuality';
 import { ensureDay, getState, save, storeWaveform, upsertEntry } from '../../store/store';
 import { health, healthAppName, type ImportedMed, type ImportedReading, type ImportedWorkout } from './index';
 import {
-  allItemKeys, buildUpdateSet, filterSeen, updateCount, updateSignature,
+  allItemKeys, buildUpdateSet, filterDeclined, filterSeen, updateCount, updateSignature,
   type HealthUpdateSet, type UpdateMed, type UpdateReading,
 } from './updateSet';
+import { getDeclinedKeys } from './declined';
 
-export { allItemKeys, filterSeen, updateCount, updateSignature };
+export { allItemKeys, filterDeclined, filterSeen, updateCount, updateSignature };
+export { getDeclinedKeys, markDeclinedKeys } from './declined';
 export type { HealthUpdateSet, UpdateMed, UpdateReading };
 
 /**
@@ -66,12 +69,16 @@ export async function checkHealthUpdatesLast24h(): Promise<HealthUpdateSet[]> {
   return [yesterday, current].filter((s): s is HealthUpdateSet => !!s && updateCount(s) > 0);
 }
 
+/** What one import wrote: the item count, plus the workout entries themselves
+ *  so a single imported workout can be shown as its report (features/HealthUpdates). */
+export interface ImportResult { added: number; workouts: Entry[] }
+
 /**
  * Write the chosen items into the journal through the normal entry paths.
  * `selected` holds item keys (plus 'sleep' for the sleep row); null imports
- * everything in the set. Returns how many items were written.
+ * everything in the set. Returns what was written.
  */
-export function importUpdates(set: HealthUpdateSet, selected: Set<string> | null): number {
+export function importUpdates(set: HealthUpdateSet, selected: Set<string> | null): ImportResult {
   const take = (key: string) => selected == null || selected.has(key);
   const s = getState();
   const ctx = { sex: s.profile.sex, height: s.profile.height };
@@ -80,10 +87,16 @@ export function importUpdates(set: HealthUpdateSet, selected: Set<string> | null
   const source = Platform.OS === 'android' ? 'health' : 'watch';
   const note = `From ${healthAppName()}`;
   let added = 0;
+  const workouts: Entry[] = [];
 
   for (const r of set.readings) {
     if (!take(r.key)) continue;
-    const entry: Entry = { id: uid(), type: r.type, time: r.time, note, source, imported: true, ...r.fields };
+    // healthKey rides on the entry so that deleting it can permanently decline
+    // this exact sample (see ./declined + deleteEntry in store).
+    const entry: Entry = { id: uid(), type: r.type, time: r.time, note, source, imported: true, healthKey: r.key, ...r.fields };
+    // RR coverage rides on the entry: it's what decides, forever after, whether
+    // this imported reading is long enough to trust (src/lib/hrvQuality.ts).
+    if (r.type === 'hrv') entry.durationSec = rrCoverageSec(r.rr);
     if (r.rr) storeWaveform(entry.id, { rrRaw: r.rr });
     entry.scores = computeScores(entry, ctx);
     upsertEntry(set.dk, 'readings', entry);
@@ -92,17 +105,18 @@ export function importUpdates(set: HealthUpdateSet, selected: Set<string> | null
 
   for (const w of set.workouts) {
     if (!take(w.key)) continue;
-    const entry: Entry = { id: uid(), type: w.type, time: w.time, note: '', source: 'health', imported: true, ...w.entry };
+    const entry: Entry = { id: uid(), type: w.type, time: w.time, note: '', source: 'health', imported: true, healthKey: w.key, ...w.entry };
     if (w.hrSeries?.length) storeWaveform(entry.id, { sampledHr: w.hrSeries });
     entry.scores = computeScores(entry, ctx);
     upsertEntry(set.dk, 'activities', entry);
+    workouts.push(entry);
     added++;
   }
 
   for (const m of set.meds) {
     if (!take(m.key)) continue;
     const amount = m.amount ? (m.amount.match(/[\d.]+/)?.[0] ?? '') : '';
-    const entry: Entry = { id: uid(), type: m.type, time: m.time, note, amount };
+    const entry: Entry = { id: uid(), type: m.type, time: m.time, note, amount, imported: true, healthKey: m.key };
     upsertEntry(set.dk, 'meds', entry);
     added++;
   }
@@ -124,7 +138,7 @@ export function importUpdates(set: HealthUpdateSet, selected: Set<string> | null
     added++;
   }
 
-  return added;
+  return { added, workouts };
 }
 
 /* ---------- "already shown" memory ---------- */

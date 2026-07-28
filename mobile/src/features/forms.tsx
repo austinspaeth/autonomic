@@ -453,6 +453,24 @@ export function useCaptureDeepLink() {
   }, []);
 }
 
+type OpenSheet = ReturnType<typeof useSheets>['openSheet'];
+
+/**
+ * Open the imported-workout report (HR-over-time with zones + stats) for an
+ * activity, with the pencil stacking that activity's normal edit form.
+ * Shared by the journal's activity rows, the add-activity import card and the
+ * health-update import sheet (features/HealthUpdates) — importing a single
+ * workout from any of them lands on its report.
+ */
+export function openWorkoutReport(openSheet: OpenSheet, r: Entry, dk: string): void {
+  const openEdit = () => {
+    const noop = () => { /* store change triggers re-render */ };
+    if (ACTIVITY_TYPES[r.type]?.custom === 'bike') openSheet((c) => <BikeForm dk={dk} existing={r} controls={c} onSaved={noop} />);
+    else openSheet((c) => <EntryForm typeMap={typesFor(getState(), 'activities')} arrKey="activities" dk={dk} type={r.type} existing={r} controls={c} onSaved={noop} />);
+  };
+  openSheet(() => <WorkoutSummarySheet r={r} dk={dk} />, { action: { icon: 'edit', onPress: openEdit } });
+}
+
 export function useEntryForms(dk: string) {
   const { openSheet } = useSheets();
   const openPaywall = usePaywall();
@@ -554,11 +572,7 @@ export function useEntryForms(dk: string) {
 
   // The workout report (HR-over-time with zones + stats), for activities that
   // carry an HR trace. The pencil stacks the normal edit form on top.
-  const openActivitySummary = (r: Entry) =>
-    openSheet(
-      () => <WorkoutSummarySheet r={r} dk={dk} />,
-      { action: { icon: 'edit', onPress: () => openActivityForm(r.type, r) } },
-    );
+  const openActivitySummary = (r: Entry) => openWorkoutReport(openSheet, r, dk);
 
   // Tapping a journal activity row: imported workouts with an HR trace open
   // as the report; everything else opens the edit form directly, as before.

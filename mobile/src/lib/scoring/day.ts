@@ -6,8 +6,9 @@
  */
 import { dateFromKey, keyOf, todayKey } from '../dates';
 import { hrvCaptureUsedToday } from '../gating';
+import { isTrustedReading } from '../hrvQuality';
 import { ACTIVITY_TYPES, MED_TYPES, TRIGGER_TYPES } from '../registry';
-import type { Band, CustomTypes, DayRecord, Entry, Protocol, ScoreCat } from '../types';
+import type { Band, CustomTypes, DayRecord, Entry, Protocol, ScoreCat, SleepRecord, SleepStages } from '../types';
 import {
   BANDS, GRADE_PTS, computeScores, numOr, restingHrBands, totalPower,
   type ScoreContext,
@@ -89,6 +90,31 @@ export function sleepHours(days: DaysMap, dk: string): number | null {
   return mins / 60;
 }
 
+/** Minutes covered by a stage breakdown (asleep stages + awake-in-bed). */
+const stageTotal = (s: SleepStages) => s.deep + s.rem + s.core + s.awake;
+
+/** How far the stage breakdown may sit from the bed→wake window and still be
+ *  taken as describing that night. Health sources round and drop a few minutes
+ *  at the edges; a watch that came off mid-night misses hours. */
+const STAGE_WINDOW_TOLERANCE_MIN = 30;
+
+/**
+ * The stage breakdown for a night, but only when it still matches the recorded
+ * window. Stages come from the health store; the user can afterwards correct
+ * bed/wake by hand (a watch charged mid-night records half the night, so Health
+ * reports half). Once the window is edited the old stage minutes no longer
+ * describe it, and treating them as the night's duration is what made the hours
+ * shown disagree with the times the user just entered. Returns null in that
+ * case, so duration falls back to bed→wake and the stage bar is hidden.
+ */
+export function stagesForWindow(sleep: SleepRecord | undefined | null): SleepStages | null {
+  if (!sleep || !sleep.stages) return null;
+  const days: DaysMap = { d: { sleep } as DayRecord };
+  const hrs = sleepHours(days, 'd');
+  if (hrs == null) return sleep.stages;
+  return Math.abs(hrs * 60 - stageTotal(sleep.stages)) <= STAGE_WINDOW_TOLERANCE_MIN ? sleep.stages : null;
+}
+
 /** Sleep recovery grade for the night before `dk`. Duration + quality set the
  *  base grade; an elevated overnight heart rate then caps it — a long night
  *  spent at a high rate is not restorative sleep. The sleeping low is the
@@ -145,8 +171,9 @@ export interface ScoreSetResult {
 export function scoreSet(readings: Entry[], d: DayRecord, dk: string, days: DaysMap, ctx: ScoreContext = {}): ScoreSetResult {
   const last = <T,>(a: T[]): T | undefined => a[a.length - 1];
   const pts = (cat: ScoreCat | null | undefined): number | null => (cat ? GRADE_PTS[cat] : null);
-  const structured = readings.filter((r) => r.type === 'breathHrv');
-  const unstructured = readings.filter((r) => r.type === 'hrv');
+  // Imported HRV that carries too little real RR never scores (hrvQuality.ts).
+  const structured = readings.filter((r) => r.type === 'breathHrv' && isTrustedReading(r));
+  const unstructured = readings.filter((r) => r.type === 'hrv' && isTrustedReading(r));
   const sStruct = structured.length ? computeScores(last(structured)!, ctx) : null;
   const sUn = unstructured.length ? computeScores(last(unstructured)!, ctx) : null;
 
@@ -237,8 +264,8 @@ export function scoreSet(readings: Entry[], d: DayRecord, dk: string, days: Days
 
 /** Blue-zone flag: high baseline readiness masking a fragile training RMSSD. */
 export function blueZone(readings: Entry[], ctx: ScoreContext = {}): boolean {
-  const u = readings.find((r) => r.type === 'hrv' && numOr(r.readiness) != null);
-  const s = readings.find((r) => r.type === 'breathHrv');
+  const u = readings.find((r) => r.type === 'hrv' && isTrustedReading(r) && numOr(r.readiness) != null);
+  const s = readings.find((r) => r.type === 'breathHrv' && isTrustedReading(r));
   if (!u || !s) return false;
   const rmssd = computeScores(s, ctx).rmssd;
   return numOr(u.readiness)! >= 90 && (['ok', 'bad', 'crash'] as ScoreCat[]).includes(rmssd);
@@ -411,7 +438,7 @@ export function metricHistory(
   const out: { v: number; date: string }[] = [];
   let cut = -1;
   Object.keys(days).sort().forEach((dk) => {
-    const list = (days[dk].readings || []).filter((r) => r.type === type);
+    const list = (days[dk].readings || []).filter((r) => r.type === type && isTrustedReading(r));
     list.sort((a, b) => ((a.time as string) || '').localeCompare((b.time as string) || ''));
     list.forEach((r) => {
       const v = extractor(r);

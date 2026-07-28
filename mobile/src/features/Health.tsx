@@ -37,7 +37,7 @@ export function HealthScreen() {
 
   const connect = async () => {
     setBusy(true);
-    const ok = await api.requestAuth();
+    const ok = await api.requestAuth({ force: true });
     // ECG lives outside the HealthKit permission set (local native module) —
     // request it in the same connect step, sequentially so sheets don't race.
     if (ok) await requestEcgAuth();
@@ -101,7 +101,7 @@ export function HealthScreen() {
 }
 
 /** Review/edit the night Health reported before writing it into the day.
- *  Also used by the Journal sleep widget's "Check for updates" flow. */
+ *  Also used by the Journal sleep section's "Add sleep" import card. */
 export function SleepConfirmSheet({ dk, data, controls, onDone }: {
   dk: string; data: SleepImport; controls: SheetControls; onDone: () => void;
 }) {

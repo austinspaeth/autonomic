@@ -5,6 +5,7 @@
  * from the current date.
  */
 import { buildCategories } from '../categories';
+import { SCORE_COLORS } from '../../scoring';
 import { resolveProtocol, type DaysMap } from '../../scoring/day';
 import { keyOf } from '../../dates';
 import { blankDay } from '../../migrate';
@@ -78,22 +79,26 @@ describe('Orthostatic events card', () => {
     const card = potsCards(days).find((c) => c.title === 'POTS Episodes')!;
     expect(card).toBeTruthy();
     const f = card.orthoFilter!;
-    // The balance-style readout (Rise / 1 min delta / Events) sits under the description.
-    expect(f.all.metricsRow!.metrics[2].value).toBe(3);   // Events
-    expect(f.lay.metricsRow!.metrics[2].value).toBe(1);
-    expect(f.lay.metricsRow!.metrics[0].value).toBe(35);  // latest rise
-    expect(f.lay.metricsRow!.metrics[1].value).toBe(-15); // latest 1-min delta (hr1min - afterHr)
-    expect(f.sit.metricsRow!.metrics[2].value).toBe(1);
-    expect(f.stairs.metricsRow!.metrics[2].value).toBe(1);
-    // Rise + delta share one chart, coloured blue / purple.
+    // The readout under the description is a single metric: the latest event's
+    // max delta (no curve stored here, so it falls back to afterHr - beforeHr).
+    expect(f.all.metricsRow!.metrics).toHaveLength(1);
+    expect(f.all.metricsRow!.metrics[0].label).toBe('Max delta');
+    expect(f.all.metricsRow!.metrics[0].value).toBe(20);   // latest event (sit)
+    expect(f.lay.metricsRow!.metrics[0].value).toBe(35);
+    expect(f.stairs.metricsRow!.metrics[0].value).toBe(50);
+    // Under 20 green, 20-30 amber, 30+ red.
+    expect(f.sit.metricsRow!.metrics[0].color).toBe(SCORE_COLORS.ok);
+    expect(f.lay.metricsRow!.metrics[0].color).toBe(SCORE_COLORS.crash);
+    expect(f.lay.cat).toBe('crash');
+    expect(f.sit.cat).toBe('ok');
+    // One line per chart now.
     expect(f.all.charts).toHaveLength(1);
-    expect(f.all.charts[0].series.map((s) => s.label)).toEqual(['Rise', '1 min delta']);
-    expect(f.all.charts[0].series.map((s) => s.color)).toEqual(['#60a5fa', '#a855f7']);
+    expect(f.all.charts[0].series.map((s) => s.label)).toEqual(['Max delta']);
     // Per-bucket event counts: 2 on the double day, 1 on the single.
     const sum = (vals: (number | null)[]) => vals.reduce((s: number, v) => s + (v || 0), 0);
     expect(sum(f.all.counts)).toBe(3);
     expect(sum(f.lay.counts)).toBe(1);
-    // ≥30 bpm insight counts only the graded (non-stairs) views.
+    // >=30 bpm insight counts only the graded (non-stairs) views.
     expect(f.all.insights[0].text).toContain('2 of 3 events');
     expect(f.lay.insights[0].text).toContain('1 of 1 event');
     expect(f.stairs.insights).toHaveLength(0);
@@ -101,16 +106,29 @@ describe('Orthostatic events card', () => {
     expect(card.charts).toBe(f.all.charts);
   });
 
-  it('drops POTS zones and rise grading on the stairs view', () => {
+  it('takes the peak of the captured curve when one is stored', () => {
+    const curved: DaysMap = {
+      [dayKey(3)]: day([ortho({ id: 'oe-curve', beforeHr: 60, afterHr: 90, hr1min: 78, transitionAt: 10 })]),
+    };
+    // Peak of 118 bpm mid-transition, well above the +30 the endpoints show.
+    const hrCurve = (id: string) => (id === 'oe-curve'
+      ? [{ t: 0, bpm: 60 }, { t: 12, bpm: 118 }, { t: 40, bpm: 90 }]
+      : null);
+    const card = buildCategories(curved, 'day', { ...ctx, hrCurve }).find((c) => c.id === 'pots')!
+      .build().find((c) => c.title === 'POTS Episodes')!;
+    expect(card.orthoFilter!.lay.metricsRow!.metrics[0].value).toBe(58);
+  });
+
+  it('shades every transition, but withholds the POTS claim on stairs', () => {
     const card = potsCards(days).find((c) => c.title === 'POTS Episodes')!;
     const f = card.orthoFilter!;
     expect(f.lay.charts[0].zones).toBeTruthy();
-    expect(f.stairs.charts[0].zones).toBeNull();
-    // The Show-zones link is offered only on graded transitions.
-    expect(f.lay.metricsRow!.zones).toBe(true);
-    expect(f.stairs.metricsRow!.zones).toBe(false);
-    // Stairs still grades on the 1-minute delta (-25 bpm → great).
-    expect(f.stairs.cat).toBe('great');
+    expect(f.stairs.charts[0].zones).toBeTruthy();
+    expect(f.stairs.metricsRow!.zones).toBe(true);
+    expect(f.stairs.metricsRow!.metrics[0].color).toBe(SCORE_COLORS.crash);  // +50
+    expect(f.stairs.cat).toBe('crash');
+    // Climbing a flight is expected to clear 30, so the criterion insight is off.
+    expect(f.stairs.insights).toHaveLength(0);
   });
 });
 

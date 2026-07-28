@@ -19,6 +19,9 @@ import { keyOf } from '../lib/dates';
 import { SCHEMA_VERSION, assertImportVersion, blankDay, defaultState, isPlainObject, migrate } from '../lib/migrate';
 import { createDebouncedWriter } from '../lib/persist';
 import { migrateLegacyJournal } from '../lib/storeMigration';
+import { stampImportedHrvCoverage } from '../lib/hrvQuality';
+import { markDeclinedKeys } from '../lib/health/declined';
+import { importFingerprint } from '../lib/health/updateSet';
 import type { AppState, DayRecord, Entry } from '../lib/types';
 import {
   collectImportWaveforms, extractWaveforms, findEmbeddedWaveform, waveformIds,
@@ -259,9 +262,16 @@ function loadState(): AppState {
     // blobs whose reading is gone.
     const movedWaveforms = extractWaveforms(migrated, putWaveform);
     pruneWaveforms(migrated);
-    // If a one-time migration (sleep reframing, waveform extraction) ran,
-    // persist immediately so it can't re-run and double-apply on the next launch.
-    if (movedWaveforms || !(parsed && parsed.meta && parsed.meta.sleepReframed)) {
+    // Older builds imported HRV without recording how much RR it covered, so
+    // journals can hold short Apple/Health Connect samples that skew every
+    // average. Stamp their real coverage from the sidecar — readings that never
+    // had a beat series get 0 and stay excluded (see src/lib/hrvQuality.ts).
+    // Uncached read: this walks the sidecar once and must not evict the entries
+    // the Journal is about to render.
+    const stampedHrv = stampImportedHrvCoverage(migrated, (id) => readWaveformUncached(id)?.rrRaw);
+    // If a one-time migration (sleep reframing, waveform extraction, HRV
+    // coverage) ran, persist immediately so it can't re-run next launch.
+    if (movedWaveforms || stampedHrv || !(parsed && parsed.meta && parsed.meta.sleepReframed)) {
       try { kv().set(STORAGE_KEY, JSON.stringify(migrated)); } catch { /* keep in memory */ }
     }
     return migrated;
@@ -433,8 +443,21 @@ export function upsertEntry(dk: string, arrKey: 'readings' | 'activities' | 'med
   save();
 }
 
+/** Deleting a health-imported entry is a permanent "no thanks" — record it so
+ *  the import pill never offers that sample back (src/lib/health/declined.ts).
+ *  Settings → Apple Health's manual check still shows it. */
+function noteDeclinedImport(dk: string, arrKey: 'readings' | 'activities' | 'meds' | 'symptoms', entry: Entry | undefined) {
+  if (!entry?.imported) return;
+  const kind = arrKey === 'readings' ? 'reading' : arrKey === 'activities' ? 'workout' : arrKey === 'meds' ? 'med' : null;
+  if (!kind) return;
+  const keys = [importFingerprint(dk, kind, entry.type, String(entry.time || ''))];
+  if (typeof entry.healthKey === 'string') keys.push(entry.healthKey);
+  markDeclinedKeys(keys);
+}
+
 export function deleteEntry(dk: string, arrKey: 'readings' | 'activities' | 'meds' | 'symptoms', id: string) {
   const d = ensureDay(dk);
+  noteDeclinedImport(dk, arrKey, d[arrKey].find((x) => x.id === id));
   d[arrKey] = d[arrKey].filter((x) => x.id !== id);
   // Only readings carry sidecar waveforms; drop the blob with its entry.
   if (arrKey === 'readings') {

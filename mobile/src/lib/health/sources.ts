@@ -57,8 +57,9 @@ export interface WorkoutImport {
 export async function workoutCandidates(dk: string, logged: { type?: unknown; time?: unknown }[]): Promise<WorkoutImport> {
   const api = health();
   if (!api.available) return { workouts: [], mayBeDenied: false };
-  // Workouts joined the read set after the first Health builds — re-requesting
-  // prompts existing users once for the new type and is silent once granted.
+  // Self-gating (see HealthApi.requestAuth): prompts at most once if the set
+  // has genuinely never been presented (fresh install, or a new type joined
+  // the set in an update), and never shows UI again after that.
   await api.requestAuth();
   const [raw, status] = await Promise.all([api.readWorkouts(dk), api.readAuthStatus('workouts')]);
   const workouts = raw

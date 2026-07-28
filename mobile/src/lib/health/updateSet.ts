@@ -82,6 +82,35 @@ export function filterSeen(set: HealthUpdateSet, seen: ReadonlySet<string>): Hea
   };
 }
 
+/**
+ * Identity of an imported item that survives on the journal entry itself.
+ *
+ * The item key (`hrv-<startMs>`) is stamped onto entries as `healthKey` at
+ * import, but entries written by older builds don't carry one — and a deleted
+ * entry is all we have to work from. This day/kind/type/time fingerprint is the
+ * fallback match: the import writes the sample's local HH:MM verbatim, so a
+ * re-read of the same sample lands on the same fingerprint.
+ */
+export type ItemKind = 'reading' | 'workout' | 'med';
+export function importFingerprint(dk: string, kind: ItemKind, type: string, time: string): string {
+  return `fp:${dk}:${kind}:${type}:${time}`;
+}
+
+/** Drop items the user imported and then DELETED (./declined) — matched by
+ *  item key or by fingerprint, so pre-`healthKey` entries count too. The pill
+ *  never re-offers these; the Settings check skips this filter. */
+export function filterDeclined(set: HealthUpdateSet, declined: ReadonlySet<string>): HealthUpdateSet {
+  const gone = (key: string, kind: ItemKind, type: string, time: string) =>
+    declined.has(key) || declined.has(importFingerprint(set.dk, kind, type, time));
+  return {
+    dk: set.dk,
+    sleep: set.sleep,
+    readings: set.readings.filter((r) => !gone(r.key, 'reading', r.type, r.time)),
+    workouts: set.workouts.filter((w) => !gone(w.key, 'workout', w.type, w.time)),
+    meds: set.meds.filter((m) => !gone(m.key, 'med', m.type, m.time)),
+  };
+}
+
 /** Stable id of a result set — lets the pill remember "already dismissed this
  *  exact batch" without suppressing genuinely new items on the next check. */
 export function updateSignature(set: HealthUpdateSet): string {

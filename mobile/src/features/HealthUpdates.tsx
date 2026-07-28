@@ -15,9 +15,10 @@
  *
  * Viewing the card (or dismissing the pill) marks every offered item as seen
  * (lib/health/updates markSeenKeys) so the pill never nags about the same
- * items again. Settings → Apple Health's "Check for updates" is the escape
- * hatch: it sweeps the last 24 hours and deliberately ignores that memory,
- * showing everything not already in the journal.
+ * items again, and deleting an imported entry declines that sample for good
+ * (lib/health/declined). Settings → Apple Health's "Check for updates" is the
+ * escape hatch: it sweeps the last 24 hours and deliberately ignores both
+ * memories, showing everything not already in the journal.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, AppState, Easing, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -31,9 +32,12 @@ import { radius, usePalette } from '../theme';
 import { health, healthAppName } from '../lib/health';
 import {
   allItemKeys, checkHealthUpdates, checkHealthUpdatesLast24h, dueForAutoCheck,
-  filterSeen, getSeenKeys, importUpdates, markAutoChecked, markSeenKeys,
-  updateCount, type HealthUpdateSet,
+  filterDeclined, filterSeen, getDeclinedKeys, getSeenKeys, importUpdates,
+  markAutoChecked, markSeenKeys, updateCount, type HealthUpdateSet,
 } from '../lib/health/updates';
+import type { Entry } from '../lib/types';
+import { workoutCurveFor } from '../components/summary';
+import { openWorkoutReport } from './forms';
 import { ACTIVITY_TYPES } from '../lib/registry';
 import { getState } from '../store/store';
 import { fmtTime12, todayKey } from '../lib/dates';
@@ -157,8 +161,9 @@ export function HealthUpdatePill() {
     };
     try {
       const set = await checkHealthUpdates(todayKey());
-      // Items the user was already offered (viewed or dismissed) don't count.
-      const fresh = set ? filterSeen(set, getSeenKeys()) : null;
+      // Items the user was already offered (viewed or dismissed) don't count,
+      // and neither does anything they imported and then deleted.
+      const fresh = set ? filterDeclined(filterSeen(set, getSeenKeys()), getDeclinedKeys()) : null;
       if (fresh && updateCount(fresh) > 0) {
         settle(() => { setFound(fresh); setPhase('found'); });
       } else {
@@ -340,6 +345,7 @@ export function HealthUpdatesSheet({ sets, controls, onImported }: {
   sets: HealthUpdateSet[]; controls: SheetControls; onImported: (n: number) => void;
 }) {
   const p = usePalette();
+  const { openSheet } = useSheets();
   const [sel, setSel] = useState<Record<string, boolean>>({});
   const groups = groupsOf(sets);
   const total = sets.reduce((n, s) => n + updateCount(s), 0);
@@ -359,9 +365,21 @@ export function HealthUpdatesSheet({ sets, controls, onImported }: {
     setSel((prev) => { const next = { ...prev }; g.items.forEach((it) => { next[it.key] = on; }); return next; });
 
   const finish = (selected: Set<string> | null) => {
-    const n = sets.reduce((sum, s) => sum + importUpdates(s, selected), 0);
+    let n = 0;
+    const workouts: { entry: Entry; dk: string }[] = [];
+    for (const s of sets) {
+      const res = importUpdates(s, selected);
+      n += res.added;
+      res.workouts.forEach((entry) => workouts.push({ entry, dk: s.dk }));
+    }
     controls.closeAll();
     onImported(n);
+    // Importing exactly ONE workout lands on its report, the same as picking a
+    // workout from the add-activity import card. More than one and there's no
+    // single report to show, so the journal list is the right landing place.
+    if (workouts.length === 1 && workoutCurveFor(workouts[0].entry)) {
+      openWorkoutReport(openSheet, workouts[0].entry, workouts[0].dk);
+    }
   };
 
   return (

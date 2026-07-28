@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated as RNAnimated, Easing, InteractionManager, Pressable, ScrollView, Text, View } from 'react-native';
+import { Animated as RNAnimated, Easing, InteractionManager, type LayoutChangeEvent, Pressable, ScrollView, Text, View } from 'react-native';
 import Animated, { Easing as REasing, runOnJS, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, withTiming, type SharedValue } from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
 import { useIsFocused } from '@react-navigation/native';
@@ -8,7 +8,7 @@ import { Icon } from '../../src/components/Icon';
 import { Ghost, HelpDot, ScoreDot, Segmented } from '../../src/components/ui';
 import { Bars, BpDumbbell, LineChart, StackedBars, ZonesToggle, useChartsBlur } from '../../src/components/charts';
 import { fonts, radius, usePalette } from '../../src/theme';
-import { useAppState } from '../../src/store/store';
+import { getWaveform, useAppState } from '../../src/store/store';
 import { useTier } from '../../src/store/tier';
 import { usePaywall } from '../../src/features/Paywall';
 import { buildCategories, type AnalysisCard, type BpPeriod, type OrthoTransition } from '../../src/lib/analysis/categories';
@@ -18,6 +18,11 @@ import { HrvFilterLinks, HrvProgress, HrvProgressSkeleton, type Filt } from '../
 import { SectionSkeleton } from '../../src/features/ProgressSkeleton';
 import { demoDays, hasOwnData } from '../../src/lib/demo';
 import { DemoBanner, DEMO_PROGRESS_TEXT } from '../../src/features/DemoBanner';
+
+/** Sidecar lookup handed to the category builders (POTS Episodes grades each
+ *  event on the max delta across its captured curve). Module-level so the
+ *  build-args memo keeps a stable identity. */
+const hrCurve = (id: string) => getWaveform(id)?.sampledHr ?? null;
 
 export default function AnalysisScreen() {
   const p = usePalette();
@@ -38,6 +43,7 @@ export default function AnalysisScreen() {
 
   const scrollRef = useRef<ScrollView>(null);
   const [headerH, setHeaderH] = useState(0);
+  const headerRef = useRef(0);   // same value, readable synchronously off the UI runtime
 
   // Pinned-section tracking runs as a Reanimated worklet: the per-frame scan
   // (which section header has scrolled up to the bottom of the top bar) stays
@@ -45,7 +51,18 @@ export default function AnalysisScreen() {
   // time. JS only hears runOnJS(setPinned) on an actual handoff — as one title
   // slides behind the blur the pinned bar adopts it, and the next section takes
   // over when its title reaches the line.
-  const offsetsSv = useSharedValue<Record<string, number>>({});  // section id -> y in the scroll content
+  // Section id -> y in the scroll content. The map is *owned* by `offsetsRef` on
+  // the JS side and mirrored into the shared value for the worklet to scan:
+  // writing `sv.value` from JS is asynchronous (Reanimated schedules it onto the
+  // UI runtime) and reading it back returns the UI thread's current value, so
+  // `sv.value = { ...sv.value, [id]: y }` across the several onLayouts that land
+  // in one frame would have every section merge into the same stale map and the
+  // last write would win — leaving only one section pinnable.
+  const offsetsRef = useRef<Record<string, number>>({});
+  const offsetsSv = useSharedValue<Record<string, number>>({});
+  // y of the document wrapper itself — the offsets above are relative to it.
+  const bodyRef = useRef(0);
+  const bodySv = useSharedValue(0);
   const headerSv = useSharedValue(0);
   const lastYSv = useSharedValue(0);
   const dirSv = useSharedValue(1);                               // +1 = scrolling down, -1 = up
@@ -112,15 +129,17 @@ export default function AnalysisScreen() {
     if (!awaitingBody.current) return;
     awaitingBody.current = false;
     const a = anchor.current;
-    const off = a ? offsetsSv.value[a.id] : null;
-    const y = off != null ? Math.max(0, off - headerSv.value - CONTENT_PAD) : 0;
+    // Read the JS-side map, not the shared value: the offsets this very layout
+    // pass just seeded haven't crossed to the UI runtime yet.
+    const off = a ? offsetsRef.current[a.id] : null;
+    const y = off != null ? Math.max(0, off + bodyRef.current - headerRef.current - CONTENT_PAD) : 0;
     scrollRef.current?.scrollTo({ y, animated: false });
     lastYSv.value = y;
     // That landing spot is inside the handoff zone, so the anchored section is
     // pinned on arrival — say so now rather than waiting for the scroll event,
     // so the pinned bar's fade-in also happens under the veil.
     if (a && off != null) { activeSv.value = a.id; setPinned(a.id, 1); }
-  }, [offsetsSv, headerSv, lastYSv, activeSv, setPinned]);
+  }, [lastYSv, activeSv, setPinned]);
 
   const clearVeil = useCallback(() => {
     if (stage.current !== 'out') return;   // a new tap caught it on the way down
@@ -170,7 +189,8 @@ export default function AnalysisScreen() {
     // here rather than in an effect keyed on chartMode, so a late reset can't
     // wipe the offsets the incoming tree seeds during its first layout pass.
     activeSv.value = null;
-    offsetsSv.value = {};
+    offsetsRef.current = {};
+    offsetsSv.value = offsetsRef.current;
     setPinned(null, 1);
     awaitingBody.current = true;
     raiseCeiling();
@@ -246,11 +266,17 @@ export default function AnalysisScreen() {
 
   // First layout of the freshly committed range. Children lay out before their
   // parent, so every mounted section has already reported its offset by now.
-  const onBodyLayout = useCallback(() => {
+  const onBodyLayout = useCallback((e: LayoutChangeEvent) => {
+    // Sections report y relative to *this* wrapper, but the scan compares
+    // against the scroll offset — so the wrapper's own y (the scroll view's top
+    // inset: header height + content padding) has to be added back in. Recorded
+    // here rather than assumed, since the header measures itself at runtime.
+    bodyRef.current = e.nativeEvent.layout.y;
+    bodySv.value = e.nativeEvent.layout.y;
     if (!awaitingBody.current) return;
     restore();
     scheduleLift();
-  }, [restore, scheduleLift]);
+  }, [bodySv, restore, scheduleLift]);
 
   // Building a range walks the whole journal, so keep the last build per range:
   // switching back to one you've already seen then costs nothing and the veil
@@ -262,7 +288,7 @@ export default function AnalysisScreen() {
   // shortening a window the veil already hides. The cache is dropped wholesale
   // whenever any build input changes.
   const buildArgs = useMemo(
-    () => ({ days, sex, height, protocol: resolveProtocol(state.settings.protocol), customTypes: state.customTypes }),
+    () => ({ days, sex, height, protocol: resolveProtocol(state.settings.protocol), customTypes: state.customTypes, hrCurve }),
     [days, sex, height, state.settings.protocol, state.customTypes],
   );
   // What the document is *actually* built from. Frozen while the tab is
@@ -368,7 +394,8 @@ export default function AnalysisScreen() {
       for (const id of pinIds) {
         const off = offsetsSv.value[id];
         if (off == null) continue;
-        if (off - y <= headerSv.value + HANDOFF_LEAD) active = id;
+        // Section top in scroll coordinates vs the bottom of the header bar.
+        if (off + bodySv.value - y <= headerSv.value + HANDOFF_LEAD) active = id;
         else break;
       }
       if (active !== activeSv.value) {
@@ -381,9 +408,11 @@ export default function AnalysisScreen() {
   // Sections seed their y-offsets from layout (JS side) into the shared map the
   // worklet scans; onLayout re-fires whenever mounting sections shift the list.
   const onSectionLayout = useCallback((id: string, y: number) => {
-    offsetsSv.value = { ...offsetsSv.value, [id]: y };
+    if (offsetsRef.current[id] === y) return;
+    offsetsRef.current = { ...offsetsRef.current, [id]: y };
+    offsetsSv.value = offsetsRef.current;
   }, [offsetsSv]);
-  const onHeaderHeight = useCallback((h: number) => { setHeaderH(h); headerSv.value = h; }, [headerSv]);
+  const onHeaderHeight = useCallback((h: number) => { setHeaderH(h); headerRef.current = h; headerSv.value = h; }, [headerSv]);
 
   // Charts are expensive, so sections mount progressively (see the hook below);
   // until a section's turn comes it renders its real title over skeleton cards.

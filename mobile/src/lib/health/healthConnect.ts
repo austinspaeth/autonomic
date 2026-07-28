@@ -15,6 +15,7 @@
  */
 import type { Entry, SleepStages } from '../types';
 import { keyOf } from '../dates';
+import { hasAskedAuth, markAskedAuth } from './askedAuth';
 import { INTERRUPTED_AWAKE_MIN, NIGHT_END_HOUR, NIGHT_START_HOUR, nightKeyOf } from './sleepSummary';
 import { activityTypeFromHc, workoutHrSeries } from './workoutMap';
 import { HISTORY_SLEEP_MIN_MIN, emptyHistory } from './index';
@@ -226,13 +227,27 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
   return {
     available: true,
 
-    async requestAuth() {
+    async requestAuth(opts) {
       try {
         if (!(await ensureInit())) return false;
-        const granted = await mod.requestPermission([
+        const wanted = [
           ...READ_TYPES.map((recordType) => ({ accessType: 'read' as const, recordType })),
           ...WRITE_TYPES.map((recordType) => ({ accessType: 'write' as const, recordType })),
-        ]);
+        ];
+        // Everything already granted: never touch the permission activity.
+        let have: { accessType?: string; recordType?: string }[] = [];
+        try { have = await mod.getGrantedPermissions(); } catch { /* treat as none */ }
+        const has = (w: { accessType: string; recordType: string }) =>
+          have.some((g) => g.recordType === w.recordType && g.accessType === w.accessType);
+        if (wanted.every(has)) return true;
+        // Something is missing but we already asked for this exact set once —
+        // don't nag from entry paths, and don't burn Android's deny counter
+        // (two dismissals permanently block the request UI). Connect buttons
+        // pass `force` to re-open the permission activity deliberately.
+        const setKey = `hc1:${READ_TYPES.join(',')}|${WRITE_TYPES.join(',')}`;
+        if (!opts?.force && hasAskedAuth(setKey)) return have.length > 0;
+        const granted = await mod.requestPermission(wanted);
+        markAskedAuth(setKey);
         return granted.length > 0;
       } catch { return false; }
     },
@@ -308,10 +323,9 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
         try { onProgress?.({ label, done, total }); } catch { /* progress is advisory */ }
       };
       step('Readings');
-      const [rhr, bp, rmssd] = await Promise.all([
+      const [rhr, bp] = await Promise.all([
         readAll<RestingHrRecord>('RestingHeartRate', from, to),
         readAll<BpRecord>('BloodPressure', from, to),
-        readAll<RmssdRecord>('HeartRateVariabilityRmssd', from, to),
       ]);
       const ts = (iso: string, meta?: Metadata) => {
         const d = new Date(iso);
@@ -322,11 +336,14 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
         type: 'bp', ...ts(r.time, r.metadata),
         fields: { sys: String(Math.round(r.systolic.inMillimetersOfMercury)), dia: String(Math.round(r.diastolic.inMillimetersOfMercury)) },
       }));
-      // No beat-to-beat series exists on Android, so unlike iOS (which imports
-      // only RR-backed HRV of at least four minutes) the history sweep takes the
-      // RMSSD records as-is — they are Health Connect's only HRV, already
-      // reduced to a number, with no RR or duration to qualify them by.
-      rmssd.forEach((r) => out.readings.push({ type: 'hrv', ...ts(r.time, r.metadata), fields: { rmssd: String(Math.round(r.heartRateVariabilityMillis)) } }));
+      // HRV is deliberately NOT swept. Health Connect exposes no beat-to-beat
+      // series, so its RMSSD records are bare numbers — typically a wearable's
+      // short passive samples, minutes long at most, which are not comparable to
+      // a real seated reading and drag every average when a year of them lands
+      // at once. An HRV reading with no qualifying RR behind it is excluded
+      // everywhere in the app (src/lib/hrvQuality.ts), so importing these would
+      // only write rows that are never shown. Same rule the daily import check
+      // has always applied (health/updateSet).
 
       // Sleep — one range query bucketed into nights (see groupNights), each
       // summarized exactly as its own day's read would have. Every night costs

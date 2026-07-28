@@ -5,7 +5,7 @@
  */
 import type { Band, Entry, ScoreCat } from '../types';
 import { todayKey } from '../dates';
-import { SCORE_COLORS, restingHrBands, sBP, worstCat } from '../scoring';
+import { SCORE_COLORS, orthoMaxDelta, restingHrBands, sBP } from '../scoring';
 import { scoreCat, sleepHours, streakInfo, type DaysMap } from '../scoring/day';
 import { ACTIVITY_TYPES, MED_TYPES, TRIGGER_TYPES } from '../registry';
 import {
@@ -258,15 +258,20 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
     }];
   };
 
+  /** Three zones for the episode max delta, coarser than BANDS.orthoIncrease:
+   *  the card carries a single line, so it reads as one traffic light against
+   *  the ≥30 bpm POTS-range criterion with an amber warning lane below it. */
+  const EPISODE_BANDS: Band[] = [{ max: 20, cat: 'good' }, { max: 30, cat: 'ok' }, { max: Infinity, cat: 'crash' }];
+
   /** Everyday orthostatic events (stairs, sit to stand, lay to stand). These
    *  are noisy, context-dependent samples, so the card filters by transition:
    *  stairs always spike, and a trend only means something like for like. */
   const ortho = (): AnalysisCard[] => {
-    const incOf = (r: Entry) => { const a = parseFloat(r.afterHr as string), b = parseFloat(r.beforeHr as string); return !isNaN(a) && !isNaN(b) ? a - b : null; };
-    // Signed change one minute after the episode, matching the journal summary
-    // card's "HR Delta after 1 minute" (hr1min - afterHr): negative = HR settled
-    // back down, positive = still climbing. Graded on BANDS.orthoDelta.
-    const recOf = (r: Entry) => { const a = parseFloat(r.afterHr as string), m = parseFloat(r.hr1min as string); return !isNaN(a) && !isNaN(m) ? m - a : null; };
+    // The card charts one number per event: the biggest excursion from the
+    // pre-episode baseline across the whole capture (same `orthoMaxDelta` the
+    // journal row and the episode summary grade on), not the endpoint rise.
+    // Without a stored curve it falls back to afterHr − beforeHr.
+    const maxOf = (r: Entry) => orthoMaxDelta(r, ctx.hrCurve ? ctx.hrCurve(String(r.id)) : null);
     const TRANSITIONS: Record<OrthoTransition, (r: Entry) => boolean> = {
       all: () => true,
       lay: (r) => r.transition === 'Laying to standing',
@@ -275,50 +280,47 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
     };
     const variant = (filt: OrthoTransition): OrthoVariant => {
       const f = TRANSITIONS[filt];
-      const inc = acAgg(buckets, (d) => (d.readings || []).filter((r) => r.type === 'orthostatic' && f(r)).map(incOf).filter((v): v is number => v != null));
-      const rec = acAgg(buckets, (d) => (d.readings || []).filter((r) => r.type === 'orthostatic' && f(r)).map(recOf).filter((v): v is number => v != null));
-      const counts = acAggSum(buckets, (d) => (d.readings || []).filter((r) => r.type === 'orthostatic' && f(r) && incOf(r) != null).length || null);
+      const max = acAgg(buckets, (d) => (d.readings || []).filter((r) => r.type === 'orthostatic' && f(r)).map(maxOf).filter((v): v is number => v != null));
+      const counts = acAggSum(buckets, (d) => (d.readings || []).filter((r) => r.type === 'orthostatic' && f(r) && maxOf(r) != null).length || null);
       let n = 0, potsN = 0;
       // Readout follows the most recent event (like the POTS Test card), not the
       // range average: buckets/days/readings are chronological, so the last
       // valid hit wins.
-      let lastRise: number | null = null, lastDelta: number | null = null, lastDk: string | null = null;
+      let lastMax: number | null = null, lastDk: string | null = null;
       buckets.forEach((b) => b.days.forEach((dk) => (days[dk].readings || []).forEach((r) => {
         if (r.type !== 'orthostatic' || !f(r)) return;
-        const v = incOf(r); if (v == null) return;
+        const v = maxOf(r); if (v == null) return;
         n++; if (v >= 30) potsN++;
-        lastRise = v; lastDelta = recOf(r); lastDk = dk;
+        lastMax = v; lastDk = dk;
       })));
-      const incAvg = acMean(inc), recAvg = acMean(rec);
+      const maxAvg = acMean(max);
       const lastDate = lastDk ? `(${+(lastDk as string).slice(5, 7)}/${+(lastDk as string).slice(8, 10)})` : undefined;
-      // The ≥30 bpm POTS criterion only applies to standing up, so the rise
-      // series drops its zones and grading on the stairs view.
-      const graded = filt !== 'stairs';
+      // Every transition (stairs included) shades and colours on the same
+      // zones, so the line never reads as a plain blue trace. The ≥30 bpm POTS
+      // *criterion* is about standing up, so only that claim is withheld from
+      // the stairs view — climbing a flight is expected to clear 30.
+      const gradeColor = (v: number) => { const c = catFromBands(v, EPISODE_BANDS); return c ? SCORE_COLORS[c] : '#60a5fa'; };
       return {
-        cat: worstCat([
-          incAvg != null && graded ? catFromBands(incAvg, BANDS.orthoIncrease) : null,
-          recAvg != null ? catFromBands(recAvg, BANDS.orthoDelta) : null,
-        ]),
+        cat: maxAvg != null ? catFromBands(maxAvg, EPISODE_BANDS) : null,
         counts,
         charts: [{
           label: '',
-          series: [
-            series(inc, '#60a5fa', 'Rise'),
-            series(rec, '#a855f7', '1 min delta'),
-          ],
-          zones: graded ? acBandZones('orthoIncrease') : null, integer: true,
+          series: [series(max, '#60a5fa', 'Max delta')],
+          zones: acBandsToZones(EPISODE_BANDS), integer: true,
         }],
         metricsRow: {
           metrics: [
-            { label: 'Rise', value: lastRise != null ? Math.round(lastRise) : null, sub: 'bpm', color: '#60a5fa' },
-            { label: '1 min delta', value: lastDelta != null ? Math.round(lastDelta) : null, sub: 'bpm', color: '#a855f7' },
-            { label: 'Events', value: n || null },
+            {
+              label: 'Max delta', value: lastMax != null ? Math.round(lastMax) : null, sub: 'bpm',
+              color: lastMax != null ? gradeColor(lastMax) : '#60a5fa',
+              regrade: gradeColor,
+            },
           ],
           suffix: lastDate,
-          zones: graded,
+          zones: true,
         },
         stats: [],
-        insights: potsN && graded ? [{ text: `${potsN} of ${n} event${n === 1 ? '' : 's'} reached a ≥30 bpm rise (the adult POTS-range threshold).`, strength: 'mod' }] : [],
+        insights: potsN && filt !== 'stairs' ? [{ text: `${potsN} of ${n} event${n === 1 ? '' : 's'} reached a ≥30 bpm rise (the adult POTS-range threshold).`, strength: 'mod' }] : [],
       };
     };
     const orthoFilter: Record<OrthoTransition, OrthoVariant> = { all: variant('all'), lay: variant('lay'), sit: variant('sit'), stairs: variant('stairs') };
@@ -327,8 +329,8 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
     return [{
       title: 'POTS Episodes', sub: range,
       cat: all.cat,
-      desc: 'How your heart rate reacts to everyday position changes, and how fast it settles.',
-      help: 'Each event logs your HR before and after a transition, plus one minute in. Rise is the jump on the change; for the stand-up transitions the zones shade the ≥30 bpm adult POTS-range criterion (stairs always spike, so they are not graded). The 1 min delta is the change one minute after the peak, the same signed number the episode card shows: negative means HR settled back down (a bigger drop reflects faster vagal recovery), positive means it was still climbing. For everyday events it is often the cleaner progress signal. Use the transition links to compare like with like.',
+      desc: 'How far your heart rate climbs above its resting baseline on everyday position changes.',
+      help: 'Max delta is the biggest change from your pre-episode baseline across the whole capture, so it catches the peak rather than wherever the heart rate happened to sit when the transition ended. The zones shade it: under 20 bpm green, 20 to 30 amber, 30 and above red, the ≥30 mark being the adult POTS-range criterion for standing up. Stairs are shaded the same way for readability, but a flight of stairs is expected to clear 30, so read that view as a trend rather than against the criterion. Use the transition links to compare like with like.',
       charts: all.charts,
       stats: all.stats,
       insights: all.insights,

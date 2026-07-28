@@ -386,6 +386,11 @@ function NumField({ f, form, set, numInputs, advanceFrom }: {
   numInputs: React.MutableRefObject<Record<string, TextInput | null>>; advanceFrom: (key: string) => void;
 }) {
   const v = form[f.key!] as string;
+  // A med/supplement dose is a number PLUS its unit ("400mg", "1 scoop"), so it
+  // gets the normal keyboard — decimal-pad has no letters to type the unit with.
+  // Keyed off `amount` (the only dose field, built-in or custom) rather than the
+  // field type, which still drives the row headline and the save validation.
+  const dose = f.key === 'amount';
   return (
     <TextField
       label={fieldLabel(f)}
@@ -395,7 +400,7 @@ function NumField({ f, form, set, numInputs, advanceFrom }: {
         set(f.key!, nv);
         if (f.autoNext && nv.length > (v || '').length && f.autoNext(nv)) advanceFrom(f.key!);
       }}
-      keyboardType="decimal-pad"
+      keyboardType={dose ? 'default' : 'decimal-pad'}
       signed={f.signed}
       onToggleSign={() => {
         const cur = (v || '').trim();

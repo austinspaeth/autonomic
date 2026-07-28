@@ -22,6 +22,7 @@ import { Linking, Platform } from 'react-native';
 import type { Entry, SleepStages } from '../types';
 import { computeHrv } from '../hrv';
 import { keyOf } from '../dates';
+import { hasAskedAuth, markAskedAuth } from './askedAuth';
 import { groupNights, summarizeSleep } from './sleepSummary';
 import { activityTypeFromHk, workoutHrSeries } from './workoutMap';
 
@@ -41,7 +42,16 @@ export type HealthAuthStatus = 'shouldRequest' | 'granted' | 'denied' | 'unknown
 
 export interface HealthApi {
   available: boolean;
-  requestAuth(): Promise<boolean>;
+  /**
+   * Ask for the app's WHOLE health permission set — once. Self-gating: when the
+   * platform reports nothing left to present (or this exact set was already
+   * asked, see ./askedAuth), it resolves without any UI, so entry paths (the
+   * add-activity import card, update checks, watch sync) can call it freely
+   * without ever re-nagging. Only the explicit Connect buttons pass `force`,
+   * which skips the asked-before latch (the OS still won't re-present types it
+   * considers determined).
+   */
+  requestAuth(opts?: { force?: boolean }): Promise<boolean>;
   /**
    * Whether a read scope has been asked about yet, and (where the platform
    * says) whether it was granted. Lets callers tell "nothing recorded that day"
@@ -404,7 +414,16 @@ const READ_IDS = [
 const WRITE_IDS = [
   QID.hrvSdnn, QID.restingHr, QID.heartRate,
   QID.systolic, QID.diastolic, CID.mindful,
+  // Workout SHARE is what the watch app needs (its sessions are HKWorkouts).
+  // HealthKit syncs authorization to the paired watch, so asking here — in the
+  // one connect-time sheet — means the watch never has to present its own
+  // sheet. Before this, phone (workout read) and watch (workout share) each
+  // requested a different set and kept re-prompting in turn.
+  WORKOUT_TYPE,
 ];
+
+/** Identity of the current permission set, for the once-only ask latch. */
+const HK_SET_KEY = `hk1:${READ_IDS.join(',')}|${WRITE_IDS.join(',')}`;
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const hhmm = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
@@ -451,11 +470,21 @@ function makeReal(mod: HkModule): HealthApi {
   return {
     available: true,
 
-    async requestAuth() {
+    async requestAuth(opts) {
       try {
         if (mod.isHealthDataAvailable && !(await mod.isHealthDataAvailable())) return false;
+        // Fully determined (status 2 = unnecessary): a request would present
+        // nothing — skip the native round-trip entirely.
+        let st = 0;
+        try { st = (await mod.getRequestStatusForAuthorization?.(READ_IDS, WRITE_IDS)) ?? 0; } catch { st = 0; }
+        if (st === 2) return true;
+        // The OS wants to present, but we've already shown this exact set once.
+        // Entry paths stop here; only an explicit Connect press re-presents.
+        if (!opts?.force && st === 1 && hasAskedAuth(HK_SET_KEY)) return true;
         // v8 order: (read, write).
-        return (await mod.requestAuthorization?.(READ_IDS, WRITE_IDS)) ?? false;
+        const ok = (await mod.requestAuthorization?.(READ_IDS, WRITE_IDS)) ?? false;
+        if (ok) markAskedAuth(HK_SET_KEY);
+        return ok;
       } catch { return false; }
     },
 

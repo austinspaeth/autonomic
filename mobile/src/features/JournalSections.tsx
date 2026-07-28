@@ -3,8 +3,8 @@
  * Triggers, Hydration, Digestion — each a Card with a header + "+ Add".
  */
 import React, { useState } from 'react';
-import { ActivityIndicator, LayoutAnimation, Pressable, Text, TextInput, View } from 'react-native';
-import { AddDashButton, Card, Pill, ProgressBar, Row, RowValue, SectionHeader, Segmented } from '../components/ui';
+import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
+import { AddDashButton, Button, Card, Muted, Pill, ProgressBar, Row, RowValue, SectionHeader, Segmented } from '../components/ui';
 import { Icon } from '../components/Icon';
 import { TimeField } from '../components/Field';
 import { useSheets, SheetFooter, type SheetControls } from '../components/Sheet';
@@ -16,21 +16,19 @@ import {
 } from '../lib/registry';
 import { typesFor } from '../lib/typeCatalog';
 import { orthoDeltaCat, orthoMaxDelta, rowScoreCategory, SCORE_COLORS, GRADE_LABEL } from '../lib/scoring';
-import { sleepGrade, sleepHours, waterGoalL, type DaysMap } from '../lib/scoring/day';
-import type { SleepStages } from '../lib/types';
+import { sleepGrade, sleepHours, stagesForWindow, waterGoalL, type DaysMap } from '../lib/scoring/day';
+import type { SleepRecord, SleepStages } from '../lib/types';
 import { ensureDay, getState, getWaveform, save, useAppState, useStore } from '../store/store';
 import { setJournalSectionY } from '../store/nav';
 import { useTier } from '../store/tier';
 import { canCaptureHrv, hrvCaptureUsedToday } from '../lib/gating';
+import { trustedReadings } from '../lib/hrvQuality';
 import { fmtDateLong, fmtTime12, periodOf, todayKey } from '../lib/dates';
-import { health, healthAppName } from '../lib/health';
+import { health, healthAppName, type SleepImport } from '../lib/health';
 import { SleepConfirmSheet } from './Health';
 import { useEntryForms } from './forms';
 import { useDrawers } from './drawers';
 
-// (No setLayoutAnimationEnabledExperimental opt-in here: under the New
-// Architecture it is a documented no-op that warns on every dev launch —
-// Fabric drives LayoutAnimation on Android without the Paper-era toggle.)
 export function JournalSections({ dk }: { dk: string }) {
   const p = usePalette();
   const state = useAppState();
@@ -51,7 +49,9 @@ export function JournalSections({ dk }: { dk: string }) {
       <Card>
         <SectionHeader title="Readings" />
         <View style={{ paddingHorizontal: 14, paddingBottom: 12 }}>
-          {[...(day.readings || [])].sort((a, b) => ((a.time as string) || '').localeCompare((b.time as string) || '')).map((r) => {
+          {/* Imported HRV samples too short to trust are never listed — they'd
+              be tappable fiction and they'd skew every average (hrvQuality.ts). */}
+          {[...trustedReadings(day.readings)].sort((a, b) => ((a.time as string) || '').localeCompare((b.time as string) || '')).map((r) => {
             const def = READING_TYPES[r.type];
             if (!def) return null;
             // Episodes grade on the max delta seen across the captured curve
@@ -204,76 +204,112 @@ function NotesSheet({ dk, controls }: { dk: string; controls: SheetControls }) {
 function SleepSection({ dk }: { dk: string }) {
   const p = usePalette();
   const state = useAppState();
-  const toast = useToast();
   const { openSheet } = useSheets();
   const sleep = state.days[dk]?.sleep || { bed: '', wake: '' };
   const hasData = !!(sleep.bed && sleep.wake);
-  const api = health();
-  const canHealth = api.available;
+  const canHealth = health().available;
 
-  const [manual, setManual] = useState(false);
-  const [syncing, setSyncing] = useState(false);
-
-  const toggleManual = () => { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); setManual((v) => !v); };
-
-  const checkHealth = async () => {
-    setSyncing(true);
-    try {
-      const s = await api.readSleep(dk);
-      setSyncing(false);
-      if (!s) { toast(`No sleep data from ${healthAppName()} yet`); return; }
-      // Even when found, still confirm the asleep window before writing it.
-      openSheet((c) => <SleepConfirmSheet dk={dk} data={s} controls={c} onDone={() => toast('Sleep saved')} />);
-    } catch {
-      setSyncing(false);
-      toast('Could not read sleep');
-    }
-  };
+  // Empty night: the whole row is the add affordance (chevron on the right),
+  // opening a mini card that looks the night up in the health store and always
+  // offers manual entry — the same shape as "+ Add activity"'s import card.
+  // Without a health store there's nothing to look up, so it opens the editor.
+  const openAdd = () => (canHealth
+    ? openSheet(() => <SleepImportSheet dk={dk} />, { fitContent: true })
+    : openSheet((c) => <SleepEditSheet dk={dk} controls={c} add />, { fitContent: true }));
 
   return (
     <Card>
       <SectionHeader title="Sleep" />
       <View style={{ paddingHorizontal: 14, paddingBottom: 14 }}>
-        {hasData ? <SleepGrade dk={dk} sleep={sleep} /> : (
-          <View style={{ marginBottom: 4 }}>
-            {canHealth ? (
-              <>
-                <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: p.surface2, borderRadius: radius.control, padding: 12, marginBottom: 12 }}>
-                  <Icon name="moon" size={18} color={p.textDim} />
-                  <Text style={{ flex: 1, color: p.textDim, fontSize: 13, lineHeight: 18 }}>
-                    {`Waiting for last night’s sleep from ${healthAppName()}. It can take a while after you wake for the data to be ready. Check back, or enter it yourself.`}
-                  </Text>
-                </View>
-                <View style={{ flexDirection: 'row', gap: 10 }}>
-                  <Pressable onPress={checkHealth} disabled={syncing} style={({ pressed }) => [{ flex: 1, flexDirection: 'row', gap: 8, justifyContent: 'center', alignItems: 'center', borderRadius: radius.control, borderWidth: 1, borderColor: p.border, backgroundColor: p.surface2, paddingVertical: 12 }, pressed && { opacity: 0.6 }]}>
-                    {syncing ? <ActivityIndicator size="small" color={p.textDim} /> : <Icon name="download" size={16} color={p.text} />}
-                    <Text style={{ color: p.text, fontWeight: '600' }}>{syncing ? 'Checking…' : 'Check for updates'}</Text>
-                  </Pressable>
-                  <Pressable onPress={toggleManual} style={({ pressed }) => [{ justifyContent: 'center', alignItems: 'center', borderRadius: radius.control, borderWidth: 1, borderColor: manual ? p.accent : p.border, backgroundColor: manual ? p.accentSoft : p.surface2, paddingVertical: 12, paddingHorizontal: 16 }, pressed && { opacity: 0.6 }]}>
-                    <Text style={{ color: manual ? p.accent : p.text, fontWeight: '600' }}>{manual ? 'Close' : 'Enter manually'}</Text>
-                  </Pressable>
-                </View>
-              </>
-            ) : (
-              <Pressable onPress={toggleManual} style={({ pressed }) => [{ flexDirection: 'row', gap: 8, justifyContent: 'center', alignItems: 'center', borderRadius: radius.control, borderWidth: 1, borderColor: manual ? p.accent : p.border, backgroundColor: manual ? p.accentSoft : p.surface2, paddingVertical: 12 }, pressed && { opacity: 0.6 }]}>
-                <Icon name="edit" size={16} color={manual ? p.accent : p.text} />
-                <Text style={{ color: manual ? p.accent : p.text, fontWeight: '600' }}>{manual ? 'Close' : 'Enter sleep details'}</Text>
-              </Pressable>
-            )}
-          </View>
-        )}
         {hasData ? (
+          <>
+            <SleepGrade dk={dk} sleep={sleep} />
+            <Pressable
+              onPress={() => openSheet((c) => <SleepEditSheet dk={dk} controls={c} />, { fitContent: true })}
+              style={({ pressed }) => [{ marginTop: 12, alignItems: 'center', justifyContent: 'center', borderRadius: radius.control, borderWidth: 1, borderColor: p.border, backgroundColor: p.surface2, paddingVertical: 12 }, pressed && { opacity: 0.6 }]}
+            >
+              <Text style={{ color: p.text, fontWeight: '600' }}>Edit sleep details</Text>
+            </Pressable>
+          </>
+        ) : (
           <Pressable
-            onPress={() => openSheet((c) => <SleepEditSheet dk={dk} controls={c} />, { fitContent: true })}
-            style={({ pressed }) => [{ marginTop: 12, alignItems: 'center', justifyContent: 'center', borderRadius: radius.control, borderWidth: 1, borderColor: p.border, backgroundColor: p.surface2, paddingVertical: 12 }, pressed && { opacity: 0.6 }]}
+            onPress={openAdd}
+            style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 8 }, pressed && { opacity: 0.6 }]}
           >
-            <Text style={{ color: p.text, fontWeight: '600' }}>Edit sleep details</Text>
+            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: p.surface2, borderRadius: radius.control, padding: 12 }}>
+              <Text style={{ flex: 1, color: p.textDim, fontSize: 13, lineHeight: 18 }}>
+                {dk !== todayKey()
+                  // A past night is never still "on its way" from the health
+                  // store, so don't tell them to check back — it just wasn't
+                  // recorded. Adding/editing stays open either way.
+                  ? 'No sleep was recorded for this day. Add it here.'
+                  : canHealth
+                    ? `Waiting for last night’s sleep from ${healthAppName()}. It can take a while after you wake for the data to be ready. Check back, or enter it yourself.`
+                    : 'Enter last night’s sleep details.'}
+              </Text>
+            </View>
+            <Icon name="chevronRight" size={18} color={p.textDim} />
           </Pressable>
-        ) : manual ? (
-          <SleepFields dk={dk} sleep={sleep} onDone={toggleManual} />
-        ) : null}
+        )}
       </View>
     </Card>
+  );
+}
+
+/** Mini "add sleep" card: looks last night up in the health store (tap the
+ *  result to confirm the window before it's written) and always leaves a manual
+ *  path in the footer. Same pattern as the reading / workout import cards. */
+function SleepImportSheet({ dk }: { dk: string }) {
+  const p = usePalette();
+  const toast = useToast();
+  const { openSheet } = useSheets();
+  const [loading, setLoading] = useState(true);
+  const [found, setFound] = useState<SleepImport | null>(null);
+  React.useEffect(() => {
+    let alive = true;
+    health().readSleep(dk)
+      .then((s) => { if (alive) setFound(s); })
+      .catch(() => { /* graceful — falls through to the empty state */ })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, [dk]);
+  const openManual = () => openSheet((c) => <SleepEditSheet dk={dk} controls={c} add />, { fitContent: true });
+  // A past night is settled: the health store either has it or never will, so
+  // the copy drops the "still on its way, check back" framing.
+  const past = dk !== todayKey();
+  return (
+    <View>
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 4 }}>Add sleep</Text>
+      <Text style={{ color: p.textDim, fontSize: 14, marginBottom: 16 }}>{`Import ${past ? 'this night' : 'last night'} from ${healthAppName()}, or enter it manually.`}</Text>
+      {loading ? (
+        <View style={{ alignItems: 'center', paddingVertical: 30, gap: 12 }}>
+          <ActivityIndicator color={p.accent} />
+          <Text style={{ color: p.textDim, fontSize: 14 }}>{`Getting sleep from ${healthAppName()}…`}</Text>
+        </View>
+      ) : !found ? (
+        <Muted>{past
+          ? `No sleep was recorded in ${healthAppName()} for this night. Enter it manually below.`
+          : `No sleep in ${healthAppName()} for this night yet. It can take a while after you wake for the data to be ready. Check back, or enter it manually below.`}</Muted>
+      ) : (
+        <Pressable
+          // Even when found, the window is confirmed before it's written.
+          onPress={() => openSheet((c) => <SleepConfirmSheet dk={dk} data={found} controls={c} onDone={() => toast('Sleep saved')} />)}
+          style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14 }, pressed && { opacity: 0.5 }]}
+        >
+          <Icon name="moon" size={22} color={p.accent} />
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: p.text, fontSize: 17, fontWeight: '600' }}>{`${fmtTime12(found.bed)} – ${fmtTime12(found.wake)}`}</Text>
+            <Text style={{ color: p.textDim, fontSize: 13, marginTop: 1 }}>
+              {found.minutesAsleep > 0 ? `${fmtMin(found.minutesAsleep)} asleep${found.interrupted ? ', interrupted' : ''}` : healthAppName()}
+            </Text>
+          </View>
+          <Icon name="chevronRight" size={20} color={p.textDim} />
+        </Pressable>
+      )}
+      <SheetFooter>
+        <Button title="Enter manually" variant="default" onPress={openManual} />
+      </SheetFooter>
+    </View>
   );
 }
 
@@ -322,7 +358,9 @@ function SleepGrade({ dk, sleep }: { dk: string; sleep: { bed: string; wake: str
   const p = usePalette();
   const state = useAppState();
   const grade = sleepGrade(state.days, dk);
-  const stages = sleep.stages;
+  // Stages only count when they still describe the recorded window — after a
+  // hand-corrected bed/wake they don't, and duration comes from the times.
+  const stages = stagesForWindow(sleep as SleepRecord);
   const asleepMin = stages ? stages.deep + stages.rem + stages.core : null;
   const hrs = asleepMin != null ? asleepMin / 60 : sleepHours(state.days, dk);
   const color = grade ? SCORE_COLORS[grade] : p.textDim;
@@ -394,7 +432,15 @@ type SleepShape = { bed: string; wake: string; quality?: string; hrLow?: string 
 /** Bed/wake/quality/HR inputs — shared by the inline manual editor and the edit sheet. */
 function SleepEditFields({ dk, sleep }: { dk: string; sleep: SleepShape }) {
   const p = usePalette();
-  const setField = (field: string, v: string) => { (ensureDay(dk).sleep as never as Record<string, string>)[field] = v; save(); };
+  const setField = (field: string, v: string) => {
+    const s = ensureDay(dk).sleep;
+    (s as never as Record<string, string>)[field] = v;
+    // Correcting the window invalidates an imported stage breakdown that no
+    // longer spans it (watch off half the night). Drop it rather than keep
+    // reporting stage minutes that contradict the times just entered.
+    if ((field === 'bed' || field === 'wake') && s.stages && !stagesForWindow(s)) delete s.stages;
+    save();
+  };
   return (
     <>
       <View style={{ flexDirection: 'row', gap: 14 }}>
@@ -416,30 +462,21 @@ function SleepEditFields({ dk, sleep }: { dk: string; sleep: SleepShape }) {
   );
 }
 
-/** Inline editor shown when entering a night manually (no Apple Health data yet). */
-function SleepFields({ dk, sleep, onDone }: { dk: string; sleep: SleepShape; onDone: () => void }) {
-  const p = usePalette();
-  return (
-    <View style={{ marginTop: 12 }}>
-      <SleepEditFields dk={dk} sleep={sleep} />
-      <Pressable onPress={onDone} style={({ pressed }) => [{ marginTop: 14, borderRadius: radius.control, backgroundColor: p.accent, paddingVertical: 13, alignItems: 'center' }, pressed && { opacity: 0.7 }]}>
-        <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>Save sleep</Text>
-      </Pressable>
-    </View>
-  );
-}
-
-/** Card-modal editor for a night that already has data — opened from "Edit sleep details". */
-function SleepEditSheet({ dk, controls }: { dk: string; controls: SheetControls }) {
+/** Card-modal editor for a night — opened from "Edit sleep details", and with
+ *  `add` from the import card's "Enter manually". Fields write straight through
+ *  on change, so Done only dismisses. */
+function SleepEditSheet({ dk, controls, add }: { dk: string; controls: SheetControls; add?: boolean }) {
   const p = usePalette();
   const state = useAppState();
   const sleep = state.days[dk]?.sleep || { bed: '', wake: '' };
   return (
     <View>
-      <Text style={{ fontSize: 20, fontWeight: '700', color: p.text, marginBottom: 16 }}>Edit sleep details</Text>
+      <Text style={{ fontSize: 20, fontWeight: '700', color: p.text, marginBottom: 16 }}>{add ? 'Enter sleep details' : 'Edit sleep details'}</Text>
       <SleepEditFields dk={dk} sleep={sleep} />
       <SheetFooter>
-        <Pressable onPress={controls.close} style={({ pressed }) => [{ flex: 1, borderRadius: radius.control, backgroundColor: p.accent, paddingVertical: 13, alignItems: 'center' }, pressed && { opacity: 0.7 }]}>
+        {/* Stacked on the import card, Done dismisses both — the night is
+            already saved, so there's nothing to come back to underneath. */}
+        <Pressable onPress={add ? controls.closeAll : controls.close} style={({ pressed }) => [{ flex: 1, borderRadius: radius.control, backgroundColor: p.accent, paddingVertical: 13, alignItems: 'center' }, pressed && { opacity: 0.7 }]}>
           <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>Done</Text>
         </Pressable>
       </SheetFooter>

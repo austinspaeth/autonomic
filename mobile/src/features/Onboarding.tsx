@@ -35,6 +35,7 @@ import { requestEcgAuth } from '../lib/health/ecg';
 import { workoutCandidateOf } from '../lib/health/workoutCandidate';
 import { typesFor } from '../lib/typeCatalog';
 import { computeScores } from '../lib/scoring';
+import { rrCoverageSec } from '../lib/hrvQuality';
 import { blankDay, getState, mutate, save, storeWaveform, useAppState } from '../store/store';
 import { DevicesScreen } from './Devices';
 
@@ -107,6 +108,9 @@ async function importHealthHistory(onProgress?: (p: HistoryProgress) => void): P
       const entry: Record<string, unknown> = {
         id: uid(), type: r.type, time: r.time, note, source, imported: true, ...r.fields,
       };
+      // How much real RR the sample covered — the trust gate downstream reads
+      // this, so a short one can never re-enter the averages (hrvQuality.ts).
+      if (r.type === 'hrv') entry.durationSec = rrCoverageSec(r.rr);
       // RR series goes to the waveform sidecar, never inline on the entry
       // (rrClean is derived — recomputed on view, not stored).
       if (r.rr) storeWaveform(entry.id as string, { rrRaw: r.rr });
@@ -470,7 +474,7 @@ function Onboarding({ onDone }: { onDone: () => void }) {
     const api = health();
     if (!api.available) { toast(`${healthAppName()} needs a full app build`); return; }
     setHealthBusy(true);
-    const ok = await api.requestAuth();
+    const ok = await api.requestAuth({ force: true });
     // The ECG permission lives outside the HealthKit set (a local native
     // module) — ask here too, so the watch-sync flow never has to prompt after
     // a finished reading. Sequential: its sheet must not race the one above.

@@ -2,7 +2,10 @@
  * Dedup rules for the periodic health-store update check: only items that
  * aren't ours and wouldn't duplicate a journal entry may be offered.
  */
-import { allItemKeys, buildUpdateSet, filterSeen, sleepItemKey, updateCount, updateSignature, type RawHealthDay } from '../updateSet';
+import {
+  allItemKeys, buildUpdateSet, filterDeclined, filterSeen, importFingerprint,
+  sleepItemKey, updateCount, updateSignature, type RawHealthDay,
+} from '../updateSet';
 import type { ImportedReading, ImportedWorkout, SleepImport } from '../index';
 import { MED_TYPES } from '../../registry';
 import type { DayRecord, Entry } from '../../types';
@@ -127,6 +130,27 @@ describe('buildUpdateSet', () => {
     expect(updateCount(fresh)).toBe(1);
     // Nothing seen → untouched.
     expect(updateCount(filterSeen(set, new Set()))).toBe(3);
+  });
+
+  it('filterDeclined drops a deleted import by its item key', () => {
+    const set = buildUpdateSet(DK, day(), raw({ imports: [hrvImport()], workouts: [workout()] }), MED_TYPES);
+    const fresh = filterDeclined(set, new Set([set.readings[0].key]));
+    expect(fresh.readings).toHaveLength(0);
+    expect(fresh.workouts).toHaveLength(1);
+  });
+
+  it('filterDeclined matches pre-healthKey entries by day/kind/type/time', () => {
+    const set = buildUpdateSet(DK, day(), raw({ imports: [hrvImport()], workouts: [workout()] }), MED_TYPES);
+    const byFingerprint = new Set([
+      importFingerprint(DK, 'reading', 'hrv', '06:52'),
+      importFingerprint(DK, 'workout', 'walk', '07:15'),
+    ]);
+    expect(updateCount(filterDeclined(set, byFingerprint))).toBe(0);
+    // A different day's identical sample is a different item.
+    expect(updateCount(filterDeclined(set, new Set([importFingerprint('2000-01-01', 'reading', 'hrv', '06:52')])))).toBe(2);
+    // Sleep is day-level, not an entry the user can delete — never declined.
+    const withSleep = buildUpdateSet(DK, day(), raw({ sleep: night }), MED_TYPES);
+    expect(filterDeclined(withSleep, new Set()).sleep).not.toBeNull();
   });
 
   it('signature changes when the found set changes', () => {

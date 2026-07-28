@@ -10,6 +10,7 @@ import { blueZone, dayCleanliness, scoreSet, sleepHours, type DaysMap } from '..
 import { ACTIVITY_TYPES, MED_TYPES, READING_TYPES, SYMPTOM_TYPES, TRIGGER_TYPES, bmLabel, entryFields, isDivider } from '../registry';
 import { bpBce, bpKerdo, bpKvas, bpMap, bpPP, bpRobinson, hrvComposite, numOr, orthoMaxDelta, type ScoreContext } from '../scoring';
 import { estimatedHrMax, hrZones, timeInZones } from '../workoutZones';
+import { isTrustedReading } from '../hrvQuality';
 
 export type ReportRange = 'day' | 'week' | 'month' | 'year';
 
@@ -54,6 +55,7 @@ function secHRV(days: DaysMap, keys: string[]) {
     const out: string[] = [];
     (d.readings || []).forEach((r) => {
       if (r.type !== 'hrv' && r.type !== 'breathHrv') return;
+      if (!isTrustedReading(r)) return; // short imported samples never reach a report
       const vlf = rv(r, 'vlowPower'), lf = rv(r, 'lowPower'), hf = rv(r, 'highPower');
       const total = [vlf, lf, hf].map(Number).filter((n) => !isNaN(n)).reduce((s, n) => s + n, 0);
       const lfn = Number(lf), hfn = Number(hf);

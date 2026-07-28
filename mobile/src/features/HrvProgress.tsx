@@ -20,6 +20,7 @@ import { fmtNum } from '../lib/dates';
 import type { DayRecord, Entry, ScoreCat } from '../lib/types';
 import { BANDS, catFromBands, HRV_HELP, type ScoreContext } from '../lib/scoring';
 import { type DaysMap } from '../lib/scoring/day';
+import { isTrustedReading } from '../lib/hrvQuality';
 import {
   acBandZones, acBuckets, acReadVals, isEvening, isMorning, makeAgg, type Mode,
 } from '../lib/analysis/buckets';
@@ -161,6 +162,7 @@ function readAnyHrv(d: DayRecord, key: string, filt?: (r: Entry) => boolean): nu
   const out: number[] = [];
   (d.readings || []).forEach((r) => {
     if (r.type !== 'hrv' && r.type !== 'breathHrv') return;
+    if (!isTrustedReading(r)) return;
     if (filt && !filt(r)) return;
     const v = parseFloat(r[key] as string);
     if (!isNaN(v)) out.push(v);

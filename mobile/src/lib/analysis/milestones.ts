@@ -7,6 +7,7 @@ import { addDays, dateFromKey, keyOf, todayKey } from '../dates';
 import type { DayRecord, Entry } from '../types';
 import { type ScoreContext } from '../scoring';
 import { dayCleanliness, scoreSet, sleepHours, type DaysMap } from '../scoring/day';
+import { isTrustedReading, trustedReadings } from '../hrvQuality';
 
 
 export interface MDay {
@@ -36,13 +37,16 @@ export function buildMilestoneDays(days: DaysMap, ctx: ScoreContext): { map: Rec
   const map: Record<string, MDay> = {};
   const readVals = (d: DayRecord, type: string, key: string, filt?: (r: Entry) => boolean) => {
     const out: number[] = [];
-    (d.readings || []).forEach((r) => { if (r.type !== type) return; if (filt && !filt(r)) return; const v = parseFloat(r[key] as string); if (!isNaN(v)) out.push(v); });
+    (d.readings || []).forEach((r) => { if (r.type !== type) return; if (!isTrustedReading(r)) return; if (filt && !filt(r)) return; const v = parseFloat(r[key] as string); if (!isNaN(v)) out.push(v); });
     return out;
   };
   const isMorning = (r: Entry) => { const m = /^(\d{1,2}):(\d{2})/.exec((r.time as string) || ''); const mo = m ? +m[1] * 60 + +m[2] : null; if (mo != null) return mo < 720; return (r.period || '') === 'Morning'; };
   keys.forEach((dk) => {
     const d = days[dk];
-    const rd = d.readings || [], acts = d.activities || [], syms = d.symptoms || [];
+    // Untrusted imported HRV is dropped up front, so no milestone (first HF
+    // dominance, "has HRV", the day score) can be unlocked by a 1-minute
+    // Apple sample — see src/lib/hrvQuality.ts.
+    const rd = trustedReadings(d.readings), acts = d.activities || [], syms = d.symptoms || [];
     const maxOf = (t: string, k: string, f?: (r: Entry) => boolean) => { const v = readVals(d, t, k, f); return v.length ? Math.max(...v) : null; };
     const minOf = (t: string, k: string, f?: (r: Entry) => boolean) => { const v = readVals(d, t, k, f); return v.length ? Math.min(...v) : null; };
     const rmCand = [maxOf('breathHrv', 'rmssd'), maxOf('hrv', 'rmssd')].filter((v): v is number => v != null);

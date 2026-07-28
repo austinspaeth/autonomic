@@ -35,15 +35,19 @@ Do **not** add "free" — Apple indexes the price separately and it wastes chars
 
 ## What's New
 
-Autonomic is now free to use.
+Connecting Apple Health can now backfill a full year of history in one shot:
+sleep (with time in each stage), workouts (with your heart-rate trace) and
+medications, alongside HRV and vitals, with live progress as it imports.
 
-Every install starts with 7 days of full access. After that, journaling, your
-daily Autonomic Score, manual readings, the Apple Watch heart-rate monitor, and
-one live HRV capture a day stay free, forever, with no account.
-
-Pro adds unlimited HRV captures, week/month/year progress, full historical
-analysis, POTS stand testing and episode tracking, and AI insights and doctor
-reports. Existing subscribers: nothing changes, you keep everything.
+Other improvements:
+• Add a note right on the HRV or stand-test results screen, before you save
+• Smoother Progress tab: switching Day/Week/Month/Year no longer stutters
+• The "trending down" warning is now its own card, and only looks at days
+  you've fully logged
+• Apple Watch: Night mode and Low Power mode for the heart-rate monitor
+• A new one-tap sheet for logging meds, symptoms and triggers
+• "Check for updates" now tells you if Health permissions were denied
+• Various performance and stability improvements
 
 ## Description (3,982/4,000 chars)
 

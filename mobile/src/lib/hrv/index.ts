@@ -470,9 +470,21 @@ const r0 = (v: number) => Math.round(v);
  * as a number — a camera reading finished early, or a 30 s Apple ECG, simply
  * won't carry LF/HF or VLF. Time-domain metrics (RMSSD, SD1, pNN50) and the
  * time-domain PNS/SNS composites stay valid at short durations and are kept.
+ *
+ * VLF sits at 240 s rather than the textbook 300 s deliberately. These floors
+ * are charged against `longestCleanSec` — the summed RR of the longest unbroken
+ * kept segment — which for a nominal 300 s strap/watch capture always lands a
+ * few seconds short: collection starts on the first notification, the session
+ * stops mid-beat, and a single dropout splits the record. At a 300 s floor a
+ * clean 5-minute reading passes or fails on a coin flip. 240 s gives it real
+ * headroom while still excluding the 180 s camera capture and 30 s Apple ECG.
+ * The cost is bounded: `frequencyDomain` caps its Welch window at 256 samples
+ * (64 s at FS=4), so band RESOLUTION is identical either way — a shorter record
+ * only averages fewer segments (8 at 300 s vs 6 at 240 s), so VLF is slightly
+ * noisier, not coarser.
  */
 const MIN_SEC_LFHF = 120;
-const MIN_SEC_VLF = 300;
+const MIN_SEC_VLF = 240;
 /** A stable reading needs a floor of clean beats behind its statistics. */
 const MIN_CLEAN_BEATS = 30;
 /** Fraction of the attempted reading that must survive cleaning to be trusted. */
