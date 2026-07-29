@@ -8,8 +8,8 @@ keywords: "blood pooling POTS, venous pooling POTS, why do my feet turn purple P
 date: 2026-07-29
 updated: 2026-07-29
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1723406230636-aa8c4ac1e6c5?q=80&w=1760&auto=format&fit=crop"
-photoAttribution: "Jaspinder Singh / Unsplash"
+photoLocation: "https://images.unsplash.com/photo-1536685965216-c5f4478ec2cf?q=80&w=1760&auto=format&fit=crop"
+photoAttribution: "Unsplash"
 tldr: "Every time you stand, gravity shifts roughly 300 to 800 mL of blood downward into your leg and abdominal veins. Normally your vessels clamp down within seconds to push it back up, but in POTS that reflex is weak or slow, so blood lingers in the lower body, less returns to the heart, and your heart rate climbs to keep output up. That is the pooling behind the racing heart, the heavy legs, and the dusky or purple feet many people notice after standing. It is a recognized feature of POTS, not usually dangerous, and it responds well to movement, compression, salt and fluids, leg elevation and gradual reconditioning. Track how your standing heart rate and symptoms respond, and discuss bigger changes with your clinician."
 categories:
   - pots
