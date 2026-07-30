@@ -3,7 +3,7 @@
  * comp: flat sections against the screen background separated by hairline
  * rules (no cards), each with an uppercase title + "?" help dot, a big value
  * line ("37 avg"), a one-line description, and — for metrics — a text-link
- * kind toggle (Both / Training / Baseline / Compare) plus a "Show zones"
+ * kind toggle (Both / Baseline / Training / Compare) plus a "Show zones"
  * link. "Both" (the default) averages every reading of either kind into one
  * trace; "Compare" overlays the two kinds in comparison colours; single-series
  * views draw one trace tinted by the grade-zone gradient. Power is a stacked
@@ -22,7 +22,8 @@ import { BANDS, catFromBands, HRV_HELP, type ScoreContext } from '../lib/scoring
 import { type DaysMap } from '../lib/scoring/day';
 import { isTrustedReading } from '../lib/hrvQuality';
 import {
-  acBandZones, acBuckets, acReadVals, isEvening, isMorning, makeAgg, type Mode,
+  acBandZones, acBuckets, acReadVals, bucketViews, isEvening, isMorning, makeAgg,
+  type BucketView, type Mode,
 } from '../lib/analysis/buckets';
 
 export type Filt = 'all' | 'morning' | 'evening';
@@ -177,7 +178,7 @@ export function HrvProgress({ days, mode, ctx, filt }: { days: DaysMap; mode: Mo
 
   const view = useMemo(() => {
     const buckets = acBuckets(days, mode);
-    const bl = buckets.map((b) => ({ label: b.label }));
+    const bl = bucketViews(buckets, mode);
     const { acAgg } = makeAgg(days, ctx);
     const f = filterFor(filt);
 
@@ -295,8 +296,8 @@ const NOOP = () => {};
  *  either kind into one line; "compare" overlays the two kinds. */
 type Kind = 'both' | 'breath' | 'hrv' | 'compare';
 const KIND_OPTS: { val: Kind; label: string }[] = [
-  { val: 'both', label: 'Both' }, { val: 'breath', label: 'Training' },
-  { val: 'hrv', label: 'Baseline' }, { val: 'compare', label: 'Compare' },
+  { val: 'both', label: 'Both' }, { val: 'hrv', label: 'Baseline' },
+  { val: 'breath', label: 'Training' }, { val: 'compare', label: 'Compare' },
 ];
 
 /** Text-link kind toggle (per the design comp) — active option in bright white
@@ -397,7 +398,7 @@ function MetricSection({ m, structured, unstructured, combined, buckets }: {
   structured: (number | null)[];
   unstructured: (number | null)[];
   combined: (number | null)[];
-  buckets: { label: string }[];
+  buckets: BucketView[];
 }) {
   const p = usePalette();
   const [kind, setKind] = useState<Kind>('both');
@@ -441,7 +442,7 @@ function MetricSection({ m, structured, unstructured, combined, buckets }: {
   const value = compare ? (fmtVal(sRaw) ?? '–') : fmtVal(raw);
   const valueColor = compare ? STRUCT : undefined;
   const value2 = compare ? { text: fmtVal(uRaw) ?? '–', color: UNSTRUCT } : null;
-  const suffix = readoutTail(m.unit, shownIdx != null ? buckets[shownIdx]?.label : null);
+  const suffix = readoutTail(m.unit, shownIdx != null ? buckets[shownIdx]?.when : null);
   const zones = acBandZones(m.band);
   // Grade dot for the displayed value (range average or dragged bucket), so the
   // Progress cards read their grade at a glance like the reading deep-dive.
@@ -492,16 +493,16 @@ function MetricSection({ m, structured, unstructured, combined, buckets }: {
  *  band fill. Only buckets where both indices resolved are plotted, so the band
  *  stays continuous. */
 function BalanceSection({ bl, pns, sns }: {
-  bl: { label: string }[];
+  bl: BucketView[];
   pns: (number | null)[]; sns: (number | null)[];
 }) {
-  const pnsPts: { v: number; date: string }[] = [];
-  const snsPts: { v: number; date: string }[] = [];
+  const pnsPts: { v: number; date: string; when: string | null }[] = [];
+  const snsPts: { v: number; date: string; when: string | null }[] = [];
   bl.forEach((b, i) => {
     const pv = pns[i], sv = sns[i];
     if (pv != null && sv != null) {
-      pnsPts.push({ v: pv, date: b.label });
-      snsPts.push({ v: sv, date: b.label });
+      pnsPts.push({ v: pv, date: b.label, when: b.when });
+      snsPts.push({ v: sv, date: b.label, when: b.when });
     }
   });
   if (pnsPts.length < 2) return null;
@@ -515,7 +516,7 @@ function BalanceSection({ bl, pns, sns }: {
         <BalanceChart
           pns={pnsPts} sns={snsPts}
           values={{ pns: pnsPts[last].v, sns: snsPts[last].v }}
-          defaultLabel={pnsPts[last].date}
+          defaultWhen={pnsPts[last].when}
           desc="PNS and SNS index across the range. The fill turns green when you are recovered and red when stress takes over."
         />
       </View>
@@ -525,7 +526,7 @@ function BalanceSection({ bl, pns, sns }: {
 
 /** Power distribution section: big total (latest bucket or selected bucket). */
 function PowerSection({ bl, vlf, lf, hf }: {
-  bl: { label: string }[];
+  bl: BucketView[];
   vlf: (number | null)[]; lf: (number | null)[]; hf: (number | null)[];
 }) {
   const [sel, setSel] = useState<number | null>(null);
@@ -557,7 +558,7 @@ function PowerSection({ bl, vlf, lf, hf }: {
         title="Power distribution"
         help={POWER_HELP}
         value={raw == null ? null : String(Math.round(raw))}
-        suffix={readoutTail('ms²', shownIdx != null ? bl[shownIdx]?.label : null)}
+        suffix={readoutTail('ms²', shownIdx != null ? bl[shownIdx]?.when : null)}
         desc={POWER_DESC}
       />
       <StackedBars

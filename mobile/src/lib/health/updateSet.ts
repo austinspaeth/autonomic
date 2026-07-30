@@ -2,8 +2,15 @@
  * Pure core of the periodic health-store update check: given a day's raw
  * platform reads and the journal day they'd land in, decide what is actually
  * importable — never our own write-backs, never anything that would duplicate
- * an existing entry. Kept free of react-native/store imports so the dedup
- * rules run in jest; the fetching/writing shell lives in ./updates.
+ * an existing entry, and never two offers for the same sample. Kept free of
+ * react-native/store imports so the dedup rules run in jest; the fetching/
+ * writing shell lives in ./updates.
+ *
+ * Health stores hand back genuine duplicates: a resting HR that both the phone
+ * and the watch wrote, a workout a third-party app mirrored. Every candidate is
+ * therefore checked against the ones already accepted here as well as against
+ * the journal — same rule either way. (Two rows for one sample also shared an
+ * item key, which is what made ticking one tick the other.)
  *
  * What qualifies:
  *  - Sleep: last night's session, only while the day has no bed/wake yet.
@@ -166,6 +173,7 @@ export function buildUpdateSet(
       // (SDNN-only samples carry no series and are excluded outright).
       if (!im.rr || rrTotalMs(im.rr) < HRV_MIN_MS) continue;
       if (readings.some((e) => (e.type === 'hrv' || e.type === 'breathHrv') && near(e.time, im.time, NEAR_MIN))) continue;
+      if (out.readings.some((r) => r.type === 'hrv' && near(r.time, im.time, NEAR_MIN))) continue;
       const ms = im.fields.sdnn ?? im.fields.rmssd;
       out.readings.push({
         key: `hrv-${im.startMs}`, type: 'hrv', time: im.time,
@@ -177,6 +185,7 @@ export function buildUpdateSet(
       // Apple's resting HR is ~one derived sample a day; a same-value or
       // same-moment entry already in the journal makes it a dupe.
       if (readings.some((e) => e.type === 'restingHr' && (String(e.hr) === im.fields.hr || near(e.time, im.time, NEAR_MIN)))) continue;
+      if (out.readings.some((r) => r.type === 'restingHr' && (r.fields.hr === im.fields.hr || near(r.time, im.time, NEAR_MIN)))) continue;
       out.readings.push({
         key: `restingHr-${im.startMs}`, type: 'restingHr', time: im.time,
         title: `Resting HR ${im.fields.hr} bpm`, sub: fmtTime12(im.time),
@@ -185,6 +194,8 @@ export function buildUpdateSet(
     } else if (im.type === 'bp') {
       if (readings.some((e) => e.type === 'bp'
         && ((String(e.sys) === im.fields.sys && String(e.dia) === im.fields.dia) || near(e.time, im.time, NEAR_MIN)))) continue;
+      if (out.readings.some((r) => r.type === 'bp'
+        && ((r.fields.sys === im.fields.sys && r.fields.dia === im.fields.dia) || near(r.time, im.time, NEAR_MIN)))) continue;
       out.readings.push({
         key: `bp-${im.startMs}`, type: 'bp', time: im.time,
         title: `${im.fields.sys}/${im.fields.dia}`, sub: fmtTime12(im.time),
@@ -199,6 +210,7 @@ export function buildUpdateSet(
     // captures) or a workout already logged at the same time.
     if (w.ownApp) continue;
     if (activities.some((e) => e.type === w.type && near(e.time, w.time, NEAR_MIN))) continue;
+    if (out.workouts.some((c) => c.type === w.type && near(c.time, w.time, NEAR_MIN))) continue;
     out.workouts.push(workoutCandidateOf(w));
   }
 
@@ -208,6 +220,7 @@ export function buildUpdateSet(
     const key = medLabelToKey.get(m.name.trim().toLowerCase());
     if (!key) continue; // no matching med type — nothing sane to file it under
     if (meds.some((e) => e.type === key && near(e.time, m.time, MED_NEAR_MIN))) continue;
+    if (out.meds.some((c) => c.type === key && near(c.time, m.time, MED_NEAR_MIN))) continue;
     out.meds.push({
       key: `med-${key}-${m.startMs}`, type: key, time: m.time,
       title: medTypes[key].label,

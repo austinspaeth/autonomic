@@ -19,6 +19,32 @@ export function acRangeLabel(mode: Mode): string {
     : 'All time · yearly average';
 }
 
+/**
+ * The phrase a card readout trails its value with when it is showing one
+ * bucket's figure. The wording follows the range, so the readout stays a
+ * sentence at every zoom level: "on 7/27", "for the week of 7/27", "in July",
+ * "in 2027". Months spell out in full (the chart axis keeps the short label).
+ */
+export function bucketWhen(mode: Mode, b?: { start: string; label: string } | null): string | null {
+  if (!b) return null;
+  if (mode === 'week') return `for the week of ${b.label}`;
+  if (mode === 'month') {
+    const d = new Date(+b.start.slice(0, 4), +b.start.slice(5, 7) - 1, 1);
+    return `in ${d.toLocaleDateString(undefined, { month: 'long' })}`;
+  }
+  if (mode === 'year') return `in ${b.label}`;
+  return `on ${b.label}`;
+}
+
+/** Same phrase for a plain calendar date (an event's own day, not a bucket). */
+export const onDay = (label?: string | null): string | null => (label ? `on ${label}` : null);
+
+/** What the chart/readout components need from a bucket: its axis label and the
+ *  phrase a readout for it reads with. */
+export interface BucketView { label: string; when: string | null }
+export const bucketViews = (buckets: Bucket[], mode: Mode): BucketView[] =>
+  buckets.map((b) => ({ label: b.label, when: bucketWhen(mode, b) }));
+
 export function acBuckets(days: DaysMap, mode: Mode): Bucket[] {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const mk = (s: Date, e: Date, label: string): Bucket => ({ start: keyOf(s), end: keyOf(e), label, days: [] });

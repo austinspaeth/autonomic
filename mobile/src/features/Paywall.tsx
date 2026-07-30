@@ -14,6 +14,7 @@ import { BrandMark, Icon, IconName } from '../components/Icon';
 import { SheetControls, SheetFooter, useSheets } from '../components/Sheet';
 import { Button } from '../components/ui';
 import { radius, usePalette } from '../theme';
+import { notePaywallSeen } from '../lib/review';
 import {
   useIap, subscribe, restore, refreshEntitlement,
   YEARLY_SKU, MONTHLY_SKU, priceOf, hasTrial,
@@ -102,6 +103,9 @@ export function PaywallCard({ controls }: { controls: SheetControls }) {
   // Entitlement may have changed outside the purchase listener (e.g. returning
   // from the App Store subscribe sheet) — re-check whenever the card opens.
   useEffect(() => { refreshEntitlement(); }, []);
+  // Someone who just met a subscription wall doesn't get asked for a review in
+  // the same sitting (src/lib/review).
+  useEffect(() => { notePaywallSeen(); }, []);
   // Purchase / restore landed — the card has done its job.
   useEffect(() => { if (isPro) controls.close(); }, [isPro, controls]);
 

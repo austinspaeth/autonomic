@@ -2,7 +2,7 @@
  * Range bucketing: week view buckets calendar weeks starting Sunday, so the
  * newest bucket is the in-progress week (a single day when today is Sunday).
  */
-import { acBuckets, acLatestIdx } from '../buckets';
+import { acBuckets, acLatestIdx, bucketViews, bucketWhen, onDay } from '../buckets';
 
 afterEach(() => jest.useRealTimers());
 
@@ -24,6 +24,29 @@ describe('acBuckets week mode', () => {
     expect(b[11].start).toBe('2026-07-19');
     expect(b[11].days).toEqual(['2026-07-19']);                // Saturday belongs to last week
     expect(b[10].days).toEqual(['2026-07-18']);
+  });
+});
+
+describe('bucketWhen', () => {
+  it('words the readout phrase for the active range', () => {
+    jest.useFakeTimers().setSystemTime(new Date(2026, 6, 22)); // Wed Jul 22 2026
+    const at = (mode: 'day' | 'week' | 'month' | 'year') => {
+      const b = acBuckets({ '2026-07-22': {} } as never, mode);
+      return bucketWhen(mode, b[b.length - 1]);
+    };
+    expect(at('day')).toBe('on 7/22');
+    expect(at('week')).toBe('for the week of 7/19');   // Sunday-start week
+    expect(at('month')).toBe('in July');               // spelled out, unlike the axis label
+    expect(at('year')).toBe('in 2026');
+  });
+
+  it('has no phrase without a bucket, and pairs labels with phrases', () => {
+    jest.useFakeTimers().setSystemTime(new Date(2026, 6, 22));
+    expect(bucketWhen('day', null)).toBeNull();
+    expect(bucketWhen('day', undefined)).toBeNull();   // e.g. buckets[-1], no bucket had data
+    expect(onDay(null)).toBeNull();
+    const v = bucketViews(acBuckets({} as never, 'month'), 'month');
+    expect(v[11]).toEqual({ label: 'Jul', when: 'in July' });
   });
 });
 

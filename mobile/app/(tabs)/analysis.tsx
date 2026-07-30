@@ -13,7 +13,7 @@ import { useTier } from '../../src/store/tier';
 import { usePaywall } from '../../src/features/Paywall';
 import { buildCategories, type AnalysisCard, type BpPeriod, type OrthoTransition } from '../../src/lib/analysis/categories';
 import { resolveProtocol, type DaysMap } from '../../src/lib/scoring/day';
-import { catFromBands, type Mode } from '../../src/lib/analysis/buckets';
+import { catFromBands, type BucketView, type Mode } from '../../src/lib/analysis/buckets';
 import { HrvFilterLinks, HrvProgress, HrvProgressSkeleton, type Filt } from '../../src/features/HrvProgress';
 import { SectionSkeleton } from '../../src/features/ProgressSkeleton';
 import { demoDays, hasOwnData } from '../../src/lib/demo';
@@ -511,7 +511,7 @@ const PILL_SETTLE_MAX_MS = 500;
  *  visibly finish, so the rebuild never drops a frame of either. */
 const TAB_SETTLE_MS = 350;
 
-type Section = { id: string; title: string; buckets: { label: string }[]; cards: AnalysisCard[]; hasOwn: boolean };
+type Section = { id: string; title: string; buckets: BucketView[]; cards: AnalysisCard[]; hasOwn: boolean };
 
 /** How many sections mount with real charts on first render — enough to fill
  *  the viewport (Outlook + HRV). */
@@ -796,11 +796,11 @@ function FilterLinks<T extends string>({ options, value, onChange }: { options: 
   );
 }
 
-const CardView = React.memo(function CardView({ card, buckets }: { card: AnalysisCard; buckets: { label: string }[] }) {
+const CardView = React.memo(function CardView({ card, buckets }: { card: AnalysisCard; buckets: BucketView[] }) {
   const p = usePalette();
   // A `selectStat` chart drives the card's first stat: dragging the chart swaps
-  // the range average for that bucket's value with its date in parentheses;
-  // tapping anywhere outside the chart blurs (null) back to the average.
+  // the range average for that bucket's value, trailed by the phrase for that
+  // bucket ("on 7/27", "in July"); tapping outside the chart blurs back.
   const [sel, setSel] = useState<number | null>(null);
   // A selectStat chart hides its own readout/toggle row, so when it has grade
   // zones the card header hosts the "Show zones" link instead.
@@ -831,7 +831,7 @@ const CardView = React.memo(function CardView({ card, buckets }: { card: Analysi
   const metricsRow = orthoSpan ? orthoSpan.metricsRow : card.metricsRow;
   // A metricsRow card's line chart is tappable like a selectStat chart: the
   // readout metrics map onto the chart series in order, so a selected bucket
-  // swaps each value for that bucket's (and the date suffix for its label);
+  // swaps each value for that bucket's (and the tail for that bucket's phrase);
   // any extra metric is the ortho event count. Blur restores the latest entry.
   const metricsChart = metricsRow ? (selChart ?? charts.find((c) => !c.dumbbell)) : null;
   const shownMetrics = useMemo(() => {
@@ -846,7 +846,7 @@ const CardView = React.memo(function CardView({ card, buckets }: { card: Analysi
         }
         return orthoSpan ? { ...m, value: orthoSpan.counts[sel] ?? null } : m;
       }),
-      date: buckets[sel]?.label ?? '',
+      when: buckets[sel]?.when ?? null,
     };
   }, [metricsRow, metricsChart, sel, orthoSpan, buckets]);
   // Range/data changes rebuild the buckets, so any held selection index no
@@ -880,7 +880,7 @@ const CardView = React.memo(function CardView({ card, buckets }: { card: Analysi
           ...st[0],
           label: st[0].label.replace(/^avg\s+/i, ''),
           value: selChart.integer ? Math.round(v) : Math.round(v * 10) / 10,
-          date: buckets[sel]?.label ?? '',
+          when: buckets[sel]?.when ?? null,
         };
       }
     }
@@ -917,7 +917,7 @@ const CardView = React.memo(function CardView({ card, buckets }: { card: Analysi
               <View key={i} style={{ flex: 1, minWidth: 96, backgroundColor: p.bg, borderColor: p.border, borderWidth: 1, borderRadius: radius.card, paddingVertical: 12, paddingHorizontal: 14 }}>
                 <Text style={{ fontSize: 25, fontFamily: fonts.numHeavy, color: s.color || p.text, fontVariant: ['tabular-nums'] }}>
                   {s.value == null ? '–' : String(s.value)}
-                  {readoutTail(s.sub, s.date) ? <Text style={TAIL_STYLE(p)}>{readoutTail(s.sub, s.date)}</Text> : null}
+                  {readoutTail(s.sub, s.when) ? <Text style={TAIL_STYLE(p)}>{readoutTail(s.sub, s.when)}</Text> : null}
                 </Text>
                 <Text style={{ fontSize: 12, color: p.textDim, marginTop: 2 }}>{s.label}</Text>
               </View>
@@ -929,7 +929,7 @@ const CardView = React.memo(function CardView({ card, buckets }: { card: Analysi
               <View key={i}>
                 <Text style={{ fontSize: 25, fontFamily: fonts.numHeavy, color: s.color || p.text, fontVariant: ['tabular-nums'] }}>
                   {s.value == null ? '–' : String(s.value)}
-                  {readoutTail(s.sub, s.date) ? <Text style={TAIL_STYLE(p)}>{readoutTail(s.sub, s.date)}</Text> : null}
+                  {readoutTail(s.sub, s.when) ? <Text style={TAIL_STYLE(p)}>{readoutTail(s.sub, s.when)}</Text> : null}
                 </Text>
                 <Text style={{ fontSize: 12, color: p.textDim, marginTop: 2 }}>{s.label}</Text>
               </View>
@@ -954,9 +954,9 @@ const CardView = React.memo(function CardView({ card, buckets }: { card: Analysi
         <View style={{ flexDirection: 'row', alignItems: 'flex-end', flexWrap: 'wrap', gap: 10, marginTop: 12 }}>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 28 }}>
             {shownMetrics.metrics.map((m, i) => {
-              // The date rides on the last metric's unit ("64 bpm on 7/28")
+              // The period rides on the last metric's unit ("64 bpm on 7/28")
               // rather than standing in a column of its own.
-              const t = readoutTail(m.sub, i === shownMetrics.metrics.length - 1 ? shownMetrics.date : undefined);
+              const t = readoutTail(m.sub, i === shownMetrics.metrics.length - 1 ? shownMetrics.when : undefined);
               return (
                 <View key={m.label}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>

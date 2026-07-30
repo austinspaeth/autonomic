@@ -179,6 +179,20 @@ old web app so old `export.json` files import directly.
   welcome wizard's opt-in); an explicit off is never overridden. UI: Settings →
   `NotificationsRow` opens `NotificationsSheet` (`src/features/Reminders.tsx`); the
   wizard's last step still uses `useReminderToggle()`.
+- **The store review ask is earned, never scheduled.** `src/lib/review/` decides
+  it: `eligibility.ts` is pure (four days holding the user's OWN entries —
+  imported Health rows don't count — plus `detectUpturn`, the mirror of
+  `detectDownturn` in `src/lib/scoring/upturn.ts`), and `index.ts` is the shell
+  (memory in the plaintext `autonomic.flags` MMKV, `expo-store-review`). It asks
+  on a day trending clearly above the user's own recent baseline, NOT on a green
+  day — plenty of people never reach one — but never below a Bad-day floor, never
+  during a downturn, never on the day the crash warning fired, and never in a
+  session where the paywall came up (`notePaywallSeen()`). Our memory is stricter
+  than the OS quota (once per app version, ~120 days apart) because iOS allows
+  only 3 prompts a year and silently swallows the rest; the ask is therefore
+  stamped BEFORE it's requested, since nothing tells us whether the sheet
+  appeared. `<ReviewPrompt/>` (root layout) owns the "calm moment" half: sheet
+  stack empty, app foreground, 25s after launch, 4s after a journal change.
 - **Home-screen widgets render one shared JSON payload** built by
   `buildWidgetPayload()` (`src/lib/widgets.ts`, pure — unit-tested) and pushed by
   `initWidgetSync()` on launch, debounced journal changes, and foreground. iOS:

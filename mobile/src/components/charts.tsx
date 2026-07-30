@@ -12,6 +12,7 @@ import { fmtNum, fmtShort } from '../lib/dates';
 import { GRADE_COLORS, TAIL_STYLE, fonts, radius, readoutTail, usePalette } from '../theme';
 import type { Band, ScoreCat } from '../lib/types';
 import { BANDS, catFromBands } from '../lib/scoring';
+import { onDay, type BucketView } from '../lib/analysis/buckets';
 import { psdCurve } from '../lib/hrv';
 import { zoneFor, type HrZone } from '../lib/workoutZones';
 
@@ -976,8 +977,10 @@ const SNS_LINE = '#a855f7'; // purple — sympathetic
 export const balanceCat = (pns: number, sns: number): ScoreCat | null =>
   catFromBands(pns - sns, BALANCE_BANDS) as ScoreCat | null;
 let balId = 0;
-export function BalanceChart({ pns, sns, height = 168, values, desc, defaultLabel }: {
-  pns: { v: number; date: string }[];  // aligned index-for-index with sns
+export function BalanceChart({ pns, sns, height = 168, values, desc, defaultWhen }: {
+  /** `date` is the x-axis label; `when` (Progress) is the readout phrase for
+   *  that bucket ("in July"). Without one the point reads as a plain day. */
+  pns: { v: number; date: string; when?: string | null }[];  // aligned index-for-index with sns
   sns: { v: number; date: string }[];
   height?: number;
   /** Default PNS/SNS readouts for the header numbers (this reading's value in a
@@ -986,10 +989,10 @@ export function BalanceChart({ pns, sns, height = 168, values, desc, defaultLabe
   values?: { pns?: string | number | null; sns?: string | number | null };
   /** Explainer paragraph, rendered below the PNS/SNS numbers like other cards. */
   desc?: string;
-  /** Label shown after the SNS number when nothing is selected (the latest
-   *  point's date in Progress; omitted in the reading summary, which shows this
-   *  reading). A drag selection replaces it with the touched point's date. */
-  defaultLabel?: string;
+  /** Phrase shown after the SNS number when nothing is selected (the latest
+   *  bucket's in Progress; omitted in the reading summary, which shows this
+   *  reading). A drag selection replaces it with the touched point's. */
+  defaultWhen?: string | null;
 }) {
   const p = usePalette();
   const [layoutW, setLayoutW] = useState(0);
@@ -1095,10 +1098,12 @@ export function BalanceChart({ pns, sns, height = 168, values, desc, defaultLabe
   // The numbers reflect the selected point when dragging, else the defaults.
   const pnsShown = selIdx >= 0 ? pv[selIdx] : readouts.pns;
   const snsShown = selIdx >= 0 ? sv[selIdx] : readouts.sns;
-  // Trails the SNS number: the touched point's date when selected (matching the
-  // other cards), else the caller's default (the latest point's date in
-  // Progress, nothing in the reading summary). PNS/SNS are unitless indices.
-  const suffixLabel = readoutTail(null, selIdx >= 0 ? xLabel(pns[selIdx].date) : defaultLabel);
+  // Trails the SNS number: the touched point's period when selected (matching
+  // the other cards), else the caller's default (the latest bucket in Progress,
+  // nothing in the reading summary). PNS/SNS are unitless indices.
+  const suffixLabel = readoutTail(null, selIdx >= 0
+    ? (pns[selIdx].when ?? onDay(xLabel(pns[selIdx].date)))
+    : defaultWhen);
   return (
     <View>
       {/* PNS/SNS legend + big numbers (main-metric size); the date trails the
@@ -1138,7 +1143,7 @@ export function BalanceChart({ pns, sns, height = 168, values, desc, defaultLabe
  */
 let bpId = 0;
 export function BpDumbbell({ buckets, sys, dia, height = 180 }: {
-  buckets: { label: string }[]; sys: (number | null)[]; dia: (number | null)[]; height?: number;
+  buckets: BucketView[]; sys: (number | null)[]; dia: (number | null)[]; height?: number;
 }) {
   const p = usePalette();
   const [layoutW, setLayoutW] = useState(0);
@@ -1182,7 +1187,7 @@ export function BpDumbbell({ buckets, sys, dia, height = 180 }: {
   const fmt = (v: number | null | undefined) => (v != null && !isNaN(v) ? Math.round(v) : '–');
   const rSys = showIdx >= 0 ? sys[showIdx] : null;
   const rDia = showIdx >= 0 ? dia[showIdx] : null;
-  const suffix = readoutTail('mmHg', showIdx >= 0 ? buckets[showIdx]?.label : null);
+  const suffix = readoutTail('mmHg', showIdx >= 0 ? buckets[showIdx]?.when : null);
   return (
     <View>
       <RNText style={{ fontSize: 25, fontFamily: fonts.numHeavy, color: p.text, marginBottom: 6, fontVariant: ['tabular-nums'] }}>

@@ -1,17 +1,18 @@
 /**
  * Reading-summary building blocks and the per-type summary screens, styled
  * after the Progress view's metric cards: each stat is a surface card with a
- * grade dot + uppercase title + "?" help dot, a big value with a dim unit
- * suffix, a one-line description, then the recent-readings sparkline with a
- * "Show zones" link. Dragging a sparkline mirrors that reading in the big
- * value (value + date) and its grade dot, like the Progress charts.
+ * grade dot + uppercase title + "?" help dot, a big value with the same dim
+ * unit tail the Progress cards use ("55 ms"), a one-line description, then the
+ * recent-readings sparkline with a "Show zones" link. Dragging a sparkline
+ * mirrors that reading in the big value, date and all ("55 ms on 7/27"), and
+ * re-grades its dot, like the Progress charts.
  *
  * HeroCard / SumCard / MetricRow further down are the older row primitives,
  * kept for the day-score breakdown (DaySummary).
  */
 import React, { useMemo, useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
-import { fonts, radius, usePalette } from '../theme';
+import { TAIL_STYLE, fonts, radius, readoutTail, usePalette } from '../theme';
 import type { Band, Entry, ScoreCat } from '../lib/types';
 import {
   BANDS, GRADE_LABEL, HRV_EXPLAIN, HRV_HELP, SCORE_COLORS, bandsFor,
@@ -20,6 +21,7 @@ import {
   rowScoreCategory, totalPower, type ScoreContext,
 } from '../lib/scoring';
 import { metricHistory, numEx, type DaysMap } from '../lib/scoring/day';
+import { onDay } from '../lib/analysis/buckets';
 import { entryFields, isDivider, READING_TYPES } from '../lib/registry';
 import { healthAppName } from '../lib/health';
 import { ageFromBirthday, fmtNum, fmtShort, todayKey } from '../lib/dates';
@@ -140,12 +142,16 @@ function Section({ children, cat }: { children: React.ReactNode; cat?: ScoreCat 
 
 /** Section header per the Progress comp: grade dot + uppercase title + "?"
  *  help dot (left), optional action (right); beneath it the big value with its
- *  dim suffix, then a one-line description. */
-function SectionHead({ title, help, cat, value, suffix, desc, right }: {
+ *  dim tail (unit, then the shown reading's date), then a one-line description.
+ *  The tail is built and styled exactly as on the Progress cards, so the two
+ *  views read identically ("55 ms", "55 ms on 7/27"). */
+function SectionHead({ title, help, cat, value, unit, when, desc, right }: {
   title: string; help?: string; cat?: ScoreCat | null;
-  value?: string | null; suffix?: string; desc?: string; right?: React.ReactNode;
+  value?: string | null; unit?: string; when?: string | null;
+  desc?: string; right?: React.ReactNode;
 }) {
   const p = usePalette();
+  const tail = readoutTail(unit, when);
   return (
     <View>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -156,9 +162,11 @@ function SectionHead({ title, help, cat, value, suffix, desc, right }: {
         {right}
       </View>
       {value != null ? (
-        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 7, marginTop: 6 }}>
-          <Text style={{ fontSize: 27, fontFamily: fonts.numHeavy, color: p.text, fontVariant: ['tabular-nums'] }}>{value}</Text>
-          {suffix ? <Text style={{ fontSize: 13, fontWeight: '600', color: p.textDim }}>{suffix}</Text> : null}
+        <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 6 }}>
+          <Text style={{ fontSize: 27, fontFamily: fonts.numHeavy, color: p.text, fontVariant: ['tabular-nums'] }}>
+            {value}
+            {tail ? <Text style={TAIL_STYLE(p)}>{tail}</Text> : null}
+          </Text>
         </View>
       ) : null}
       {desc ? <Text style={{ color: p.textDim, fontSize: 13, lineHeight: 19, marginTop: 8 }}>{desc}</Text> : null}
@@ -181,12 +189,16 @@ function SectionHead({ title, help, cat, value, suffix, desc, right }: {
 const ViewedReadingCtx = React.createContext<string | null>(null);
 const useViewedReading = () => React.useContext(ViewedReadingCtx);
 
-function MetricSection({ label, value, suffix, cat, desc, help, days, type, ex, bands, hero }: {
-  label: string; value?: string | number | null; suffix?: string; cat?: ScoreCat | null;
+function MetricSection({ label, value, unit, cat, desc, help, days, type, ex, bands, hero, fmt }: {
+  label: string; value?: string | number | null; unit?: string; cat?: ScoreCat | null;
   desc?: string; help?: string; days: DaysMap; type: string;
   ex: (r: Entry) => number | null; bands?: Band[] | null;
   /** Hero treatment: grade-tinted container + corner tag instead of the dot. */
   hero?: boolean;
+  /** How to render a sparkline-selected value. Cards whose headline number
+   *  carries a prefix or sign ("Δ +14") must pass the same formatter, or
+   *  scrubbing to another date silently drops it. Defaults to `fmtNum`. */
+  fmt?: (v: number) => string;
 }) {
   const [showZones, setShowZones] = useState(false);
   const [sel, setSel] = useState<{ v: number; date: string } | null>(null);
@@ -195,14 +207,13 @@ function MetricSection({ label, value, suffix, cat, desc, help, days, type, ex, 
   const hasSpark = hist.length >= 2;
   const hasValue = value != null && value !== '';
   if (!hasValue && !hasSpark) return null;
-  const shown = sel ? fmtNum(sel.v) : hasValue ? String(value) : '–';
+  const shown = sel ? (fmt ? fmt(sel.v) : fmtNum(sel.v)) : hasValue ? String(value) : '–';
   const shownCat = sel ? (bands ? catFromBands(sel.v, bands) : null) : cat ?? null;
-  const shownSuffix = sel ? [suffix, `(${fmtShort(sel.date)})`].filter(Boolean).join(' · ') : suffix;
   return (
     <Section cat={hero ? cat : undefined}>
       <SectionHead
         title={label} help={help} cat={hero ? undefined : shownCat}
-        value={shown} suffix={shownSuffix} desc={desc}
+        value={shown} unit={unit} when={onDay(sel ? fmtShort(sel.date) : null)} desc={desc}
         right={!hero && hasSpark && bands ? <ZonesToggle on={showZones} onPress={() => setShowZones((v) => !v)} /> : undefined}
       />
       {/* Hero cards wear the grade tag in the header's corner, so the zones
@@ -373,7 +384,7 @@ function HrvSummaryBody({ r, days, ctx, type }: SummaryProps & { type: 'breathHr
       <Section cat={overall}>
         <SectionHead
           title="Autonomic score" help={HRV_HELP.score}
-          value={score != null ? String(score) : '–'} suffix="/100"
+          value={score != null ? String(score) : '–'} unit="/100"
           desc={overall ? HRV_VERDICT[overall] : 'Composite of vagal tone, power, and baroreflex position.'}
         />
       </Section>
@@ -400,40 +411,40 @@ function HrvSummaryBody({ r, days, ctx, type }: SummaryProps & { type: 'breathHr
       ) : null}
 
       <MetricSection
-        label="SDNN" value={r.sdnn as string} suffix="ms" cat={s.sdnn} days={days} type={type} ex={numEx('sdnn')} bands={BANDS.sdnn}
+        label="SDNN" value={r.sdnn as string} unit="ms" cat={s.sdnn} days={days} type={type} ex={numEx('sdnn')} bands={BANDS.sdnn}
         desc={HRV_EXPLAIN.sdnn} help={HRV_HELP.sdnn}
       />
       <MetricSection
-        label="RMSSD" value={r.rmssd as string} suffix="ms" cat={s.rmssd} days={days} type={type} ex={numEx('rmssd')} bands={rmssdBand}
+        label="RMSSD" value={r.rmssd as string} unit="ms" cat={s.rmssd} days={days} type={type} ex={numEx('rmssd')} bands={rmssdBand}
         desc={HRV_EXPLAIN.rmssd} help={HRV_HELP.rmssd}
       />
       <MetricSection
-        label="pNN50" value={r.pnn50 as string} suffix="%" cat={s.pnn50} days={days} type={type} ex={numEx('pnn50')} bands={BANDS.pnn50}
+        label="pNN50" value={r.pnn50 as string} unit="%" cat={s.pnn50} days={days} type={type} ex={numEx('pnn50')} bands={BANDS.pnn50}
         desc={HRV_EXPLAIN.pnn50} help={HRV_HELP.pnn50}
       />
       <MetricSection
-        label={type === 'breathHrv' ? 'HR' : 'Avg HR'} value={r[hrKey] as string} suffix="bpm" cat={type === 'breathHrv' ? s.hr : s.avgHr}
+        label={type === 'breathHrv' ? 'HR' : 'Avg HR'} value={r[hrKey] as string} unit="bpm" cat={type === 'breathHrv' ? s.hr : s.avgHr}
         days={days} type={type} ex={numEx(hrKey)} bands={BANDS.hrBreath}
         desc={HRV_EXPLAIN.hr} help={HRV_HELP.hr}
       />
       <MetricSection
-        label="Mean RR" value={r.meanRr as string} suffix="ms" cat={s.meanRr} days={days} type={type} ex={numEx('meanRr')} bands={BANDS.rrMode}
+        label="Mean RR" value={r.meanRr as string} unit="ms" cat={s.meanRr} days={days} type={type} ex={numEx('meanRr')} bands={BANDS.rrMode}
         desc={HRV_EXPLAIN.meanRr} help={HRV_HELP.meanRr}
       />
       <MetricSection
-        label="MxDMn" value={r.mxdmn as string} suffix="ms" cat={s.mxdmn} days={days} type={type} ex={numEx('mxdmn')} bands={BANDS.mxdmn}
+        label="MxDMn" value={r.mxdmn as string} unit="ms" cat={s.mxdmn} days={days} type={type} ex={numEx('mxdmn')} bands={BANDS.mxdmn}
         desc={HRV_EXPLAIN.mxdmn} help={HRV_HELP.mxdmn}
       />
       <MetricSection
-        label="Mode" value={r.mode as string} suffix="ms" cat={s.mode} days={days} type={type} ex={numEx('mode')} bands={BANDS.rrMode}
+        label="Mode" value={r.mode as string} unit="ms" cat={s.mode} days={days} type={type} ex={numEx('mode')} bands={BANDS.rrMode}
         desc={HRV_EXPLAIN.mode} help={HRV_HELP.mode}
       />
       <MetricSection
-        label="AMo50" value={r.amo50 as string} suffix="%" cat={s.amo50} days={days} type={type} ex={numEx('amo50')} bands={BANDS.amo50}
+        label="AMo50" value={r.amo50 as string} unit="%" cat={s.amo50} days={days} type={type} ex={numEx('amo50')} bands={BANDS.amo50}
         desc={HRV_EXPLAIN.amo50} help={HRV_HELP.amo50}
       />
       <MetricSection
-        label="CV" value={r.cv as string} suffix="%" cat={s.cv} days={days} type={type} ex={numEx('cv')} bands={BANDS.cv}
+        label="CV" value={r.cv as string} unit="%" cat={s.cv} days={days} type={type} ex={numEx('cv')} bands={BANDS.cv}
         desc={HRV_EXPLAIN.cv} help={HRV_HELP.cv}
       />
 
@@ -448,7 +459,7 @@ function HrvSummaryBody({ r, days, ctx, type }: SummaryProps & { type: 'breathHr
       ) : null}
 
       <MetricSection
-        label="Total power" value={total != null ? String(Math.round(total)) : null} suffix="ms²" cat={s.totalPower}
+        label="Total power" value={total != null ? String(Math.round(total)) : null} unit="ms²" cat={s.totalPower}
         days={days} type={type} ex={totalPower} bands={BANDS.totalPower}
         desc="Total autonomic engagement across all frequencies." help={HRV_HELP.power}
       />
@@ -457,23 +468,23 @@ function HrvSummaryBody({ r, days, ctx, type }: SummaryProps & { type: 'breathHr
         desc="Sympathetic vs vagal balance. Balanced or low favors flexibility." help={HRV_HELP.lfhf}
       />
       <MetricSection
-        label="VLF power" value={r.vlowPower as string} suffix="ms²" cat={s.vlf} days={days} type={type} ex={numEx('vlowPower')} bands={BANDS.vlf}
+        label="VLF power" value={r.vlowPower as string} unit="ms²" cat={s.vlf} days={days} type={type} ex={numEx('vlowPower')} bands={BANDS.vlf}
         desc="Slow regulatory waves (below 0.04 Hz) tied to thermoregulation, hormones and vascular tone. Elevated means system stress." help={HRV_HELP.vlf}
       />
       <MetricSection
-        label="LF power" value={r.lowPower as string} suffix="ms²" days={days} type={type} ex={numEx('lowPower')} bands={null}
+        label="LF power" value={r.lowPower as string} unit="ms²" days={days} type={type} ex={numEx('lowPower')} bands={null}
         desc="Baroreflex band (0.04–0.15 Hz) around blood-pressure regulation. Leans sympathetic; paced breathing inflates it." help={HRV_HELP.lf}
       />
       <MetricSection
-        label="HF power" value={r.highPower as string} suffix="ms²" days={days} type={type} ex={numEx('highPower')} bands={null}
+        label="HF power" value={r.highPower as string} unit="ms²" days={days} type={type} ex={numEx('highPower')} bands={null}
         desc="Breath-linked band (0.15–0.4 Hz) driven by vagal tone. Higher means a better recovery state." help={HRV_HELP.hf}
       />
       <MetricSection
-        label="LF peak" value={r.lfPeak as string} suffix="Hz" cat={s.lfPeak} days={days} type={type} ex={numEx('lfPeak')} bands={BANDS.lfPeak}
+        label="LF peak" value={r.lfPeak as string} unit="Hz" cat={s.lfPeak} days={days} type={type} ex={numEx('lfPeak')} bands={BANDS.lfPeak}
         desc="Baroreflex frequency, your training target, 0.08 to 0.10 Hz." help={HRV_HELP.lfPeak}
       />
       <MetricSection
-        label="HF peak" value={r.hfPeak as string} suffix="Hz" cat={s.hfPeak} days={days} type={type} ex={numEx('hfPeak')} bands={BANDS.hfPeak}
+        label="HF peak" value={r.hfPeak as string} unit="Hz" cat={s.hfPeak} days={days} type={type} ex={numEx('hfPeak')} bands={BANDS.hfPeak}
         desc={e ? `Expected about ${e[0]} to ${e[1]} Hz for ${r.style} breathing; large deviation means the pace drifted.` : 'Respiratory peak, usually sits at your natural breathing rate.'}
         help={HRV_HELP.hfPeak}
       />
@@ -545,7 +556,7 @@ export function BpSummary({ r, days, ctx }: SummaryProps) {
       <Section cat={cat}>
         <SectionHead
           title="Blood pressure" help={BP_HELP.bp}
-          value={r.sys || r.dia ? `${r.sys || '–'}/${r.dia || '–'}` : '–'} suffix="mmHg"
+          value={r.sys || r.dia ? `${r.sys || '–'}/${r.dia || '–'}` : '–'} unit="mmHg"
           desc={cat ? verdict[cat] : 'Systolic over diastolic pressure.'}
         />
       </Section>
@@ -558,15 +569,15 @@ export function BpSummary({ r, days, ctx }: SummaryProps) {
         </Section>
       ) : null}
       <MetricSection
-        label="Systolic" value={r.sys as string} suffix="mmHg" cat={s.sys} days={days} type="bp" ex={numEx('sys')} bands={BANDS.sys}
+        label="Systolic" value={r.sys as string} unit="mmHg" cat={s.sys} days={days} type="bp" ex={numEx('sys')} bands={BANDS.sys}
         desc="Peak arterial pressure during a heartbeat." help={BP_HELP.sys}
       />
       <MetricSection
-        label="Diastolic" value={r.dia as string} suffix="mmHg" cat={s.dia} days={days} type="bp" ex={numEx('dia')} bands={BANDS.dia}
+        label="Diastolic" value={r.dia as string} unit="mmHg" cat={s.dia} days={days} type="bp" ex={numEx('dia')} bands={BANDS.dia}
         desc="Arterial pressure between beats." help={BP_HELP.dia}
       />
       <MetricSection
-        label="Pulse" value={r.pulse as string} suffix="bpm" days={days} type="bp" ex={numEx('pulse')}
+        label="Pulse" value={r.pulse as string} unit="bpm" days={days} type="bp" ex={numEx('pulse')}
         desc="Heart rate at the time of the reading." help={BP_HELP.pulse}
       />
       {derived('Arterial pressure', bpMap, BANDS.map, 'Average pressure perfusing your organs and brain. Low MAP drives lightheadedness in dysautonomia.', BP_HELP.map)}
@@ -595,7 +606,7 @@ export function RestingHrSummary({ r, days, ctx }: SummaryProps) {
   return (
     <>
       <MetricSection
-        hero label="Resting heart rate" value={r.hr as string} suffix="bpm" cat={hrCat}
+        hero label="Resting heart rate" value={r.hr as string} unit="bpm" cat={hrCat}
         days={days} type="restingHr" ex={numEx('hr')} bands={band}
         desc={hrCat ? `${verdict[hrCat]} ${posLine}` : posLine}
         help={RESTING_HELP}
@@ -713,7 +724,7 @@ export function OrthostaticSummary({ r, days, ctx: _ctx }: SummaryProps) {
   const maxCat = orthoDeltaCat(maxDelta);
   const deltaCat = delta1 != null ? catFromBands(delta1, BANDS.orthoDelta) : null;
   // "Δ +14" / "Δ -14" for the signed readouts.
-  const withSign = (v: number) => (v > 0 ? '+' + v : String(v));
+  const withSign = (v: number) => (v > 0 ? '+' + fmtNum(v) : fmtNum(v));
   const deltaStr = (v: number) => 'Δ ' + withSign(v);
   const verdict: Record<string, string> = {
     great: 'Minimal heart-rate change - a healthy orthostatic response.',
@@ -734,8 +745,8 @@ export function OrthostaticSummary({ r, days, ctx: _ctx }: SummaryProps) {
   return (
     <>
       <MetricSection
-        hero label="Max delta after" value={maxDelta != null ? deltaStr(maxDelta) : null} suffix="bpm" cat={maxCat}
-        days={days} type="orthostatic" ex={maxEx} bands={BANDS.orthoIncrease}
+        hero label="Max delta after" value={maxDelta != null ? deltaStr(maxDelta) : null} unit="bpm" cat={maxCat}
+        days={days} type="orthostatic" ex={maxEx} bands={BANDS.orthoIncrease} fmt={deltaStr}
         desc={maxCat ? verdict[maxCat] : 'Enter Before HR and After HR to rate this event.'}
         help={ORTHO_HELP.rise}
       />
@@ -760,8 +771,8 @@ export function OrthostaticSummary({ r, days, ctx: _ctx }: SummaryProps) {
         </View>
       </Section>
       <MetricSection
-        label="HR Delta after 1 minute" value={delta1 != null ? deltaStr(delta1) : null} suffix="bpm" cat={deltaCat}
-        days={days} type="orthostatic" ex={deltaEx} bands={BANDS.orthoDelta}
+        label="Delta after 1 minute" value={delta1 != null ? deltaStr(delta1) : null} unit="bpm" cat={deltaCat}
+        days={days} type="orthostatic" ex={deltaEx} bands={BANDS.orthoDelta} fmt={deltaStr}
         desc="Change in heart rate one minute after the episode. Negative means HR settled back down; positive means it was still climbing."
         help={ORTHO_HELP.recovery}
       />
@@ -796,7 +807,7 @@ export function StandTestSummary({ r, days, ctx: _ctx }: SummaryProps) {
   const peakDelta = numOr(r.peakDelta), sustained = numOr(r.sustainedDelta);
   const susCat = sustained != null ? catFromBands(sustained, BANDS.standDelta) : null;
   const maxReached = numOr(r.maxHrReached);
-  const signed = (v: number) => (v > 0 ? '+' + v : String(v));
+  const signed = (v: number) => (v > 0 ? '+' + fmtNum(v) : fmtNum(v));
   const verdict: Record<string, string> = {
     great: 'Minimal sustained rise on standing - a healthy orthostatic response.',
     good: 'Normal sustained rise, within the expected physiologic range.',
@@ -819,8 +830,8 @@ export function StandTestSummary({ r, days, ctx: _ctx }: SummaryProps) {
   return (
     <>
       <MetricSection
-        hero label="Sustained HR rise" value={sustained != null ? signed(sustained) : null} suffix="bpm" cat={susCat}
-        days={days} type="standTest" ex={susEx} bands={BANDS.standDelta}
+        hero label="Sustained HR rise" value={sustained != null ? signed(sustained) : null} unit="bpm" cat={susCat}
+        days={days} type="standTest" ex={susEx} bands={BANDS.standDelta} fmt={signed}
         desc={susCat ? verdict[susCat] : 'No sustained figure was captured for this test.'}
         help={STAND_HELP.rise}
       />
@@ -997,7 +1008,7 @@ export function GenericSummary({ r, days, ctx }: SummaryProps) {
         if (v == null || v === '') return null;
         return (
           <MetricSection
-            key={f.key} label={f.label!} value={String(v)} suffix={f.unit} cat={s[f.key!]}
+            key={f.key} label={f.label!} value={String(v)} unit={f.unit} cat={s[f.key!]}
             days={days} type={r.type} ex={numEx(f.key!)} bands={bandsFor(r.type, f.key!)}
           />
         );

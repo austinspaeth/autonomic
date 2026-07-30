@@ -15,6 +15,7 @@ import { WatchArrivalCards } from '../src/features/WatchArrivals';
 import { WatchSyncPill } from '../src/features/hrv/WatchSyncPill';
 import { HealthUpdatePill } from '../src/features/HealthUpdates';
 import { RestoreGate } from '../src/features/RestoreGate';
+import { ReviewPrompt } from '../src/features/ReviewPrompt';
 import { initIap } from '../src/store/iap';
 import { initTier } from '../src/store/tier';
 import { initWatchReceiver } from '../src/lib/watch/receiver';
@@ -100,6 +101,9 @@ export default function RootLayout() {
               {/* Hourly "anything new in the health store?" pill (both
                   platforms — it no-ops until Health is connected). */}
               <HealthUpdatePill />
+              {/* Store review ask — renders nothing; waits for a day that's
+                  trending up and a calm moment (src/lib/review). */}
+              <ReviewPrompt />
               {/* Freemium: no blocking paywall. Locked surfaces raise the
                   PaywallCard sheet on demand (src/features/Paywall.tsx). */}
               {/* First-run welcome wizard — overlays the tabs until completed,

@@ -399,7 +399,7 @@ export function SheetPill({ children, lone, style }: {
       {/* Android gets no real blur (expo-blur renders plain translucency
           there) — use a solid fill instead of glass. */}
       {Platform.OS === 'ios' ? <BlurView intensity={45} tint="dark" style={StyleSheet.absoluteFill} /> : null}
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: Platform.OS === 'ios' ? 'rgba(6,6,8,0.78)' : '#0a0a0d' }]} />
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: Platform.OS === 'ios' ? 'rgba(6,6,8,0.67)' : '#0a0a0d' }]} />
       {children}
     </View>
   );

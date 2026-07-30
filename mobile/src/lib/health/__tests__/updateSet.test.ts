@@ -104,6 +104,33 @@ describe('buildUpdateSet', () => {
     expect(set.readings).toHaveLength(0);
   });
 
+  it('offers one row per sample when the health store returns duplicates', () => {
+    // Phone and watch both write the day's resting HR; a mirroring app repeats
+    // a workout and a dose. Same sample twice must never become two rows (they
+    // shared an item key, so ticking one ticked the other).
+    const set = buildUpdateSet(DK, day(), raw({
+      imports: [
+        { type: 'restingHr', time: '00:00', startMs: 2, ownApp: false, fields: { hr: '58', position: 'Laying' } },
+        { type: 'restingHr', time: '00:00', startMs: 2, ownApp: false, fields: { hr: '58', position: 'Laying' } },
+        { type: 'restingHr', time: '14:20', startMs: 5, ownApp: false, fields: { hr: '58', position: 'Laying' } },  // same value, later
+        { type: 'bp', time: '08:12', startMs: 3, ownApp: false, fields: { sys: '118', dia: '76' } },
+        { type: 'bp', time: '08:12', startMs: 3, ownApp: false, fields: { sys: '118', dia: '76' } },
+        hrvImport(),
+        hrvImport({ startMs: 1001, time: '06:54' }),  // same session, a shade later
+      ],
+      workouts: [workout(), workout({ startMs: 2500, time: '07:16' })],
+      meds: [
+        { name: 'Magnesium Glycinate', time: '21:02', startMs: 4, amount: '400 mg', ownApp: false },
+        { name: 'Magnesium Glycinate', time: '21:02', startMs: 4, amount: '400 mg', ownApp: false },
+      ],
+    }), MED_TYPES);
+    expect(set.readings.map((r) => r.type)).toEqual(['restingHr', 'hrv', 'bp']);
+    expect(set.workouts).toHaveLength(1);
+    expect(set.meds).toHaveLength(1);
+    const keys = allItemKeys(set);
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
   it('drops workouts already logged at the same time, keeps others', () => {
     const d = day({ activities: [entry({ type: 'walk', time: '07:18' })] });
     const set = buildUpdateSet(DK, d, raw({

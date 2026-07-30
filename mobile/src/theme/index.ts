@@ -71,22 +71,26 @@ export const fonts = {
 } as const;
 
 /**
- * The dim text that trails a big Progress readout: the unit, then the day the
- * value belongs to ("bpm on 7/27"). Cards that show a value with a date fold the
- * date in here rather than parking it in a column of its own, so the whole line
- * reads as one phrase. Either half may be missing (a unitless index still gets
- * its date; a card without a date shows just the unit).
+ * The dim text that trails a big Progress readout: the unit, then the period the
+ * value belongs to ("bpm on 7/27", "ms in July"). Cards that show a value for a
+ * period fold that phrase in here rather than parking it in a column of its own,
+ * so the whole line reads as one sentence. Either half may be missing (a unitless
+ * index still gets its period; a card without one shows just the unit).
+ *
+ * `when` is the complete phrase, preposition included \u2014 the range decides the
+ * wording, so it is built by `bucketWhen` (day/week/month/year) or `onDay` for a
+ * plain calendar date, never assembled here.
  *
  * A symbol unit hugs the number on a narrow space, so it reads as part of the
  * value ("56 bpm"). A unit that is a word of its own takes a full space, as does
- * a tail that opens on "on" because its card has no unit ("82 on 7/27"). The
- * string carries its own leading space, so callers render it straight after the
- * value and add no spacing of their own.
+ * a tail that opens on the phrase because its card has no unit ("82 on 7/27").
+ * The string carries its own leading space, so callers render it straight after
+ * the value and add no spacing of their own.
  */
 const WORD_UNITS = new Set(['days', 'hours', 'mins', 'times', 'litres', 'reps', 'nights']);
 const NARROW_SPACE = '\u2005';
-export const readoutTail = (unit?: string | null, date?: string | null) => {
-  const t = [unit || '', date ? `on ${date}` : ''].filter(Boolean).join(' ');
+export const readoutTail = (unit?: string | null, when?: string | null) => {
+  const t = [unit || '', when || ''].filter(Boolean).join(' ');
   if (!t) return '';
   return (!unit || WORD_UNITS.has(unit) ? ' ' : NARROW_SPACE) + t;
 };
