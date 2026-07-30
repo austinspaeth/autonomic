@@ -50,6 +50,15 @@ function base64ToBytes(b64: string): Uint8Array {
   return bytes;
 }
 
+/** Android API level. `Platform.Version` is already a number on Android, but it
+ *  arrives as a string on some OEM builds — parse defensively and assume modern
+ *  (31+) if it is unreadable, since that is the permission set nearly every live
+ *  device wants and the legacy branch is the narrower guess. */
+function androidApiLevel(): number {
+  const v = typeof Platform.Version === 'number' ? Platform.Version : parseInt(String(Platform.Version), 10);
+  return Number.isFinite(v) ? v : 31;
+}
+
 const stub: BleManagerApi = {
   available: false,
   async requestPermissions() { return false; },
@@ -100,12 +109,17 @@ export function createBle(): BleManagerApi {
       if (Platform.OS === 'android') {
         // eslint-disable-next-line @typescript-eslint/no-require-imports
         const { PermissionsAndroid } = require('react-native');
-        const perms = [
-          PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
-          PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
-          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-        ].filter(Boolean);
-        const res = await PermissionsAndroid.requestMultiple(perms);
+        // Ask for exactly what this OS version has, and no more. Asking for all
+        // three unconditionally could never succeed: below API 31 the BLUETOOTH_*
+        // runtime permissions don't exist and always report denied, while from
+        // API 31 up we declare BLUETOOTH_SCAN as `neverForLocation` so
+        // ACCESS_FINE_LOCATION is capped at maxSdkVersion=30 and reports denied
+        // too. Either way the old every()-granted gate blocked the scan outright.
+        const res = await PermissionsAndroid.requestMultiple(
+          androidApiLevel() >= 31
+            ? [PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN, PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT]
+            : [PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION],
+        );
         return Object.values(res).every((v) => v === 'granted');
       }
       await waitReady();

@@ -26,6 +26,11 @@ export function DevicesScreen({ controls }: { controls?: SheetControls } = {}) {
   const savedName = state.settings.lastBleDeviceName;
 
   useEffect(() => () => { mgr.stopScan(); }, [mgr]);
+  // Ask on arrival rather than on the first Scan tap. The permission sheet is
+  // the one thing that must not land *during* a scan: on Android the scan runs
+  // regardless and quietly returns nothing, so the user reads "no straps found"
+  // when the real answer is "never allowed to look".
+  useEffect(() => { if (mgr.available) mgr.requestPermissions().catch(() => {}); }, [mgr]);
   useEffect(() => {
     if (savedId) mgr.readBattery(savedId).then(setBattery).catch(() => {});
   }, [savedId, mgr]);

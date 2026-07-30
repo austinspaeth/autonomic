@@ -90,7 +90,6 @@
       "permissions": [
         "android.permission.BLUETOOTH_SCAN",
         "android.permission.BLUETOOTH_CONNECT",
-        "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.BLUETOOTH",
         "android.permission.BLUETOOTH_ADMIN",
         "android.permission.health.READ_HEART_RATE",
@@ -115,6 +114,7 @@
         "react-native-ble-plx",
         {
           "isBackgroundEnabled": true,
+          "neverForLocation": true,
           "modes": [
             "central"
           ],
