@@ -153,7 +153,9 @@ Order matters. Nothing below is speculative; each item is a checklist.
    forget), submit sitemap.
 2. **ASO overhaul** (biggest free win available):
    - Title: `Autonomic: POTS & HRV Tracker` — Subtitle: `Dysautonomia & Long COVID log`
-   - Keyword field: `long,covid,pacing,pem,cfs,orthostatic,tachycardia,dizzy,syncope,vagus,heart,rate,variability,mcas,eds`
+   - Keyword field: `heart,rate,variability,orthostatic,tachycardia,cfs,pem,pacing,fatigue,chronic,illness,symptom,diary`
+     (no word repeated from the title/subtitle — those are indexed too; see
+     `mobile/store-listing.md`, the source of truth for all store copy)
    - Screenshots as a story: standing-HR graph → scored reading → doctor report → "no
      account, no cloud" card. First two screenshots decide the install.
 3. Apply to Small Business Program; set up RevenueCat (or equivalent) so every channel is

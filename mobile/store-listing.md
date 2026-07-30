@@ -18,20 +18,80 @@ updated anytime (they go through a short content review, no binary needed).
 
 # App Store (iOS + watchOS)
 
+## App name (29/30 chars)
+
+Autonomic: POTS & HRV Tracker
+
+## Subtitle (29/30 chars)
+
+Dysautonomia & Long COVID Log
+
+Name and subtitle are the **highest-weighted indexed fields** and change only
+with a version submission — set them on the next build. Together they index
+`autonomic` `pots` `hrv` `tracker` `dysautonomia` `long` `covid` `log`, so none
+of those words may appear in the keyword field below.
+
 ## Promotional text (168/170 chars)
 
 Free to use, no account, no ads. Journal your recovery, score every day, and
 capture a lab-quality HRV reading daily. Go Pro for unlimited HRV, POTS testing
 & analysis.
 
-## Keywords (98/100 chars)
+## Keywords (99/100 chars) — pairs with the name + subtitle above
 
-long,covid,hrv,heart,rate,variability,pots,dysautonomia,orthostatic,watch,rmssd,pacing,chest,strap
+heart,rate,variability,orthostatic,tachycardia,cfs,pem,pacing,fatigue,chronic,illness,symptom,diary
 
-Notes: single words instead of phrases (ASC recombines them, spaces waste
-chars); added dysautonomia + watch; dropped vagal tone / sdnn / symptom. Remove
-`hrv` if it's already in the app name or subtitle — those fields are indexed too.
-Do **not** add "free" — Apple indexes the price separately and it wastes chars.
+### Fallback if the name stays `Autonomic` with no subtitle (100/100 chars)
+
+pots,dysautonomia,hrv,heart,rate,variability,orthostatic,tachycardia,long,covid,cfs,pem,pacing,diary
+
+Use this **only** until a submission can fix the name/subtitle. Spending a
+quarter of the field on `pots,dysautonomia,hrv` is pure waste once those words
+sit in the two fields Apple weights hardest.
+
+### Spanish (Mexico) — a second free keyword field (100/100 chars)
+
+hrv,pots,disautonomia,taquicardia,ortostatica,fatiga,cronica,variabilidad,frecuencia,cardiaca,diario
+
+The US storefront indexes English (U.S.) **and** Spanish (Mexico). Adding an
+es-MX localization buys another 100 indexed characters that also rank for
+English searches; the listing body can stay English if there's no translation
+budget, though a translated one converts better.
+
+### Rules the field obeys
+
+- **Single words, no spaces, no phrases.** ASC recombines tokens across the
+  name, subtitle and keyword field, so `heart` + `rate` + `variability` covers
+  "heart rate variability", and `symptom` + `diary` + `tracker` (from the name)
+  covers "symptom diary" and "symptom tracker".
+- **Never repeat a word** that appears in the app name, subtitle, or an IAP
+  display name — all are indexed. Duplicates add nothing and cost characters.
+- **No `free`, no `app`, no stop words** (`the`, `for`, `and`, `with`). Apple
+  indexes price separately and drops stop words.
+- **No competitor brand names** (`welltory`, `visible`, `bearable`). Trademark
+  terms in the keyword field invite rejection — bid on them in Apple Search Ads
+  instead, where they're allowed and measurable.
+- The **description is not indexed on iOS** (unlike Play). Writing keywords into
+  it does nothing for search; write it for conversion.
+
+### Deliberately cut, and why
+
+| Cut | Reason |
+| --- | --- |
+| `rmssd` `sdnn` | Near-zero search volume; the users who know them already search `hrv` |
+| `watch` `chest` `strap` | Hardware modifiers; almost no one searches them to find a journal |
+| `syncope` `dizzy` `fainting` | Symptom searches skew to WebMD-style answers, not app installs |
+| `eds` `mcas` `hypermobility` | Comorbidity terms — real audience, but the app doesn't serve them yet; revisit if EDS/MCAS features ship |
+| `vagus` | Weak without `nerve`, and `nerve` costs 6 more chars for a poorly-qualified audience |
+| `postural` | `pots` (in the name) already wins the query; the spelled-out phrase is rare |
+
+### Rotation bench
+
+Keyword changes are free and only need a version submission, so treat the field
+as a test, not a decision. Track rank for `pots tracker`, `dysautonomia`,
+`hrv journal`, `long covid tracker` (Appfigures/Astro, ~$10–30/mo), and rotate
+one term per release from: `postviral` `intolerance` `syndrome` `recovery`
+`hydration` `readiness` `dizziness` `eds` `mcas`.
 
 ## What's New (1.19.1, iOS)
 
@@ -192,7 +252,20 @@ Autonomic Journal: HRV & POTS
 
 ## Short description (80/80 chars)
 
-Free HRV, POTS & symptom journal for long covid recovery. Private and on-device.
+HRV, POTS & dysautonomia journal for long covid recovery. Private and on-device.
+
+Previous line, for reference: `Free HRV, POTS & symptom journal for long covid
+recovery. Private and on-device.` The swap trades `free` and `symptom` for
+`dysautonomia` — Play has **no keyword field**, so ranking comes from the app
+name, the short description, and the full description, which *is* indexed.
+`free` is redundant (Play shows the price) and `symptom` already appears several
+times in the full description, while `dysautonomia` appeared nowhere in either
+of Play's two highest-weighted fields.
+
+Play weighting differs from iOS in one more way worth remembering: repetition in
+the full description counts, but only to a point — 3–5 natural uses of each core
+term (`HRV`, `POTS`, `dysautonomia`, `long covid`, `ME/CFS`, `pacing`) is the
+useful range, and keyword stuffing is a policy violation.
 
 ## Full description (3,808/4,000 chars)
 
