@@ -5,11 +5,11 @@ published: true
 summary: "That window between 10pm and 1am where the symptoms lift and you finally feel like yourself is real physiology, not avoidance. Here is what actually produces it, why the relief is borrowed rather than earned, and how to keep the good part without paying for it three days later."
 description: "Why MCAS symptoms feel better at night: the evening adrenaline that stabilizes mast cells, the wake maintenance zone, and why late nights raise inflammatory and autonomic load anyway."
 keywords: "MCAS symptoms better at night, why do I feel better at night MCAS, mast cell activation night, MCAS staying up late, histamine dump 3am, MCAS insomnia, night owl chronic illness, MCAS circadian rhythm, why do I feel worse in the morning MCAS, mast cell circadian clock, delayed sleep phase chronic illness"
-date: 2026-07-30
-updated: 2026-07-30
+date: 2026-05-21
+updated: 2026-05-21
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1654145268052-6b68f1d94519?q=80&w=1760&auto=format&fit=crop"
-photoAttribution: "Ahya Agawis / Unsplash"
+photoLocation: "https://images.unsplash.com/photo-1734009027745-a3ae6804c6e3?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb&dl=romain-water-iwQudHOR3Go-unsplash.jpg"
+photoAttribution: "Romain Water / Unsplash"
 tldr: "The late-night window where MCAS symptoms lift is genuine. By evening your trigger exposures have stopped, you have been off your feet for hours, and your circadian alerting signal peaks in the three or four hours before your usual bedtime. On top of that, the adrenaline that keeps you awake past your bedtime binds beta-2 receptors on your mast cells, raises intracellular cAMP and physically suppresses degranulation, which is a weak version of what an epinephrine injector does in anaphylaxis. So you really do feel better. The problem is that this is a borrowed brake, not a repair. Mast cells run on a circadian clock that is gated by your cortisol rhythm, and pushing your sleep later degrades that gating, raises inflammatory signaling, and drops next-morning HRV. The relief is real and the bill is real, and they arrive on different days. Educational field notes, not medical advice."
 categories:
   - recovery
