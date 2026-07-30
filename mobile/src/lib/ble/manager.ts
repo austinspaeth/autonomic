@@ -10,13 +10,14 @@
  */
 import { Platform } from 'react-native';
 import { parseHeartRateMeasurement } from '../hrv';
+import type { BleDevice } from './devices';
 
 const HR_SERVICE = '0000180d-0000-1000-8000-00805f9b34fb';
 const HR_MEASUREMENT = '00002a37-0000-1000-8000-00805f9b34fb';
 const BATTERY_SERVICE = '0000180f-0000-1000-8000-00805f9b34fb';
 const BATTERY_LEVEL = '00002a19-0000-1000-8000-00805f9b34fb';
 
-export interface BleDevice { id: string; name: string; rssi: number }
+export type { BleDevice } from './devices';
 export interface HrSample { hr: number; rr: number[] }
 
 export interface BleManagerApi {
@@ -113,12 +114,26 @@ export function createBle(): BleManagerApi {
     async scan(onFound) {
       await waitReady();
       const seen = new Set<string>();
+      const emit = (d: BleDevice) => {
+        if (seen.has(d.id)) return;
+        seen.add(d.id);
+        onFound(d);
+      };
       manager.startDeviceScan([HR_SERVICE], { allowDuplicates: false }, (error, device) => {
         if (error || !device) return;
-        if (seen.has(device.id)) return;
-        seen.add(device.id);
-        onFound({ id: device.id, name: device.name || device.localName || 'Unknown strap', rssi: device.rssi || -100 });
+        emit({ id: device.id, name: device.name || device.localName || 'Unknown strap', rssi: device.rssi || -100 });
       });
+      // A strap the OS is already linked to has stopped advertising, so the scan
+      // above can never see it — the single most common way a new user ends up
+      // staring at an empty list is having "helpfully" paired the strap in system
+      // Bluetooth settings first. Ask the OS for heart-rate peripherals it
+      // already holds. Best-effort: Android only reports these once services
+      // have been discovered, so it often returns nothing there.
+      try {
+        for (const device of await manager.connectedDevices([HR_SERVICE])) {
+          emit({ id: device.id, name: device.name || device.localName || 'Connected strap', rssi: device.rssi || 0, connected: true });
+        }
+      } catch { /* ignore — the advertising scan is still running */ }
     },
     stopScan() { try { manager.stopDeviceScan(); } catch { /* ignore */ } },
     async connect(id, onSample, onDisconnect) {

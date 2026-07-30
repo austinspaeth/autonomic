@@ -6,7 +6,9 @@ import { Icon } from '../components/Icon';
 import type { SheetControls } from '../components/Sheet';
 import { useToast } from '../components/Toast';
 import { radius, usePalette } from '../theme';
-import { ble, type BleDevice } from '../lib/ble/manager';
+import { ble } from '../lib/ble/manager';
+import { sortDevices, type BleDevice } from '../lib/ble/devices';
+import { NO_STRAPS_HINT } from './hrv/SourcePicker';
 import { getState, save, useAppState } from '../store/store';
 
 /** When opened mid-flow (HRV setup, onboarding), pass the sheet's `controls`
@@ -18,6 +20,7 @@ export function DevicesScreen({ controls }: { controls?: SheetControls } = {}) {
   const [scanning, setScanning] = useState(false);
   const [found, setFound] = useState<BleDevice[]>([]);
   const [battery, setBattery] = useState<number | null>(null);
+  const [scanned, setScanned] = useState(false);
   const mgr = useRef(ble()).current;
   const savedId = state.settings.lastBleDeviceId;
   const savedName = state.settings.lastBleDeviceName;
@@ -33,7 +36,8 @@ export function DevicesScreen({ controls }: { controls?: SheetControls } = {}) {
     if (!ok) { toast('Bluetooth permission denied'); return; }
     setFound([]);
     setScanning(true);
-    await mgr.scan((d) => setFound((prev) => (prev.some((x) => x.id === d.id) ? prev : [...prev, d].sort((a, b) => b.rssi - a.rssi))));
+    setScanned(true);
+    await mgr.scan((d) => setFound((prev) => (prev.some((x) => x.id === d.id) ? prev : sortDevices([...prev, d]))));
     setTimeout(() => { mgr.stopScan(); setScanning(false); }, 12000);
   };
 
@@ -79,10 +83,13 @@ export function DevicesScreen({ controls }: { controls?: SheetControls } = {}) {
           <Pressable key={d.id} onPress={() => remember(d)} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderTopWidth: 1, borderTopColor: p.border }}>
             <Icon name="bluetooth" size={18} color={p.textDim} />
             <Text style={{ flex: 1, color: p.text }}>{d.name}</Text>
-            <Text style={{ color: p.textDim, fontSize: 12 }}>{d.rssi} dBm</Text>
+            <Text style={{ color: p.textDim, fontSize: 12 }}>{d.connected ? 'Connected' : `${d.rssi} dBm`}</Text>
             {d.id === savedId ? <Icon name="check" size={16} color={p.accent} /> : null}
           </Pressable>
         ))}
+        {scanned && !scanning && !found.length ? (
+          <Text style={{ color: p.textDim, fontSize: 13, lineHeight: 19 }}>{NO_STRAPS_HINT}</Text>
+        ) : null}
       </View>
       <View style={{ height: 24 }} />
     </View>
