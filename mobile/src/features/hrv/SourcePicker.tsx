@@ -14,7 +14,8 @@ import type { SheetControls } from '../../components/Sheet';
 import { useToast } from '../../components/Toast';
 import { Icon } from '../../components/Icon';
 import { radius, usePalette } from '../../theme';
-import { ble, type BleDevice } from '../../lib/ble/manager';
+import { ble } from '../../lib/ble/manager';
+import { sortDevices, type BleDevice } from '../../lib/ble/devices';
 import { health } from '../../lib/health';
 import { getState, save, useStore } from '../../store/store';
 
@@ -22,6 +23,16 @@ export type Source = 'polar' | 'watch' | 'camera';
 
 const CLOSE_CLEARANCE = 58;
 const SCAN_MS = 12000;
+
+/** Shown when a scan finishes empty — also used by Settings → Devices. Straps
+ *  are found by their advertisement, so the three ways to be invisible are: not
+ *  broadcasting (dry/not worn), already held by the OS or another app, or out
+ *  of battery. Naming them beats "no straps found", which reads as "unsupported". */
+export const NO_STRAPS_HINT =
+  'No straps found. Three things make a strap invisible:\n\n'
+  + '·  It is not broadcasting — wet the electrodes and put the strap on, then scan again.\n'
+  + '·  Something else is holding it — unpair it in system Bluetooth settings and quit other heart-rate apps.\n'
+  + '·  Its battery is flat.';
 
 /** One source's static copy. `sub` is resolved at render (the strap's line
  *  depends on whether a device is remembered). */
@@ -58,7 +69,7 @@ export function SourcePicker({ value, onPick, controls }: {
     setFound([]);
     setScanning(true);
     setScanned(true);
-    await mgr.scan((d) => setFound((prev) => (prev.some((x) => x.id === d.id) ? prev : [...prev, d].sort((a, b) => b.rssi - a.rssi))));
+    await mgr.scan((d) => setFound((prev) => (prev.some((x) => x.id === d.id) ? prev : sortDevices([...prev, d]))));
     stopTimer.current = setTimeout(() => { mgr.stopScan(); setScanning(false); }, SCAN_MS);
   };
 
@@ -128,7 +139,7 @@ export function SourcePicker({ value, onPick, controls }: {
               <Icon name="bluetooth" size={20} color={p.textDim} />
               <View style={{ flex: 1 }}>
                 <Text style={{ color: p.text, fontWeight: '700' }}>{d.name}</Text>
-                <Text style={{ color: p.textDim, fontSize: 12, marginTop: 3 }}>{`Signal ${d.rssi} dBm`}</Text>
+                <Text style={{ color: p.textDim, fontSize: 12, marginTop: 3 }}>{d.connected ? 'Already connected to this phone' : `Signal ${d.rssi} dBm`}</Text>
               </View>
               <Text style={{ color: p.accent, fontSize: 13, fontWeight: '700' }}>Use</Text>
             </Pressable>
@@ -138,9 +149,13 @@ export function SourcePicker({ value, onPick, controls }: {
         <Text style={{ color: p.textDim, fontSize: 13, lineHeight: 19 }}>
           {scanning
             ? 'Looking for heart-rate straps. Put yours on and make sure it is not connected to another app.'
-            : scanned
-              ? 'No new straps found. Wet the electrodes, put the strap on, then scan again.'
-              : 'Tap Scan to look for heart-rate straps nearby.'}
+            : !scanned
+              ? 'Tap Scan to look for heart-rate straps nearby.'
+              // `nearby` hides the remembered strap, so an empty list here still
+              // means success when the scan did find it — don't cry wolf.
+              : found.length
+                ? 'Your saved strap is listed above. No other straps nearby.'
+                : NO_STRAPS_HINT}
         </Text>
       )}
       <View style={{ height: 16 }} />

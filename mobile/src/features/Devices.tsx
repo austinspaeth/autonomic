@@ -1,13 +1,22 @@
 /** Devices settings: scan, connect, remember, battery, forget. */
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { Button, Muted } from '../components/ui';
 import { Icon } from '../components/Icon';
-import type { SheetControls } from '../components/Sheet';
+import { useSheets, type SheetControls } from '../components/Sheet';
 import { useToast } from '../components/Toast';
 import { radius, usePalette } from '../theme';
-import { ble, type BleDevice } from '../lib/ble/manager';
+import { ble } from '../lib/ble/manager';
+import { formatDiagnostics, sortDevices, type BleDevice } from '../lib/ble/devices';
+import { NO_STRAPS_HINT } from './hrv/SourcePicker';
+import { PromptSheet } from './PromptSheet';
 import { getState, save, useAppState } from '../store/store';
+
+/** Hold "Scan for straps" this long to collect a Bluetooth diagnostics dump.
+ *  Deliberately far past any accidental press — it is a support tool, not a
+ *  feature, and nobody should find it by fumbling. */
+const DIAGNOSTICS_HOLD_MS = 10000;
 
 /** When opened mid-flow (HRV setup, onboarding), pass the sheet's `controls`
  *  so pairing a strap closes this sheet and drops you back where you were. */
@@ -18,11 +27,19 @@ export function DevicesScreen({ controls }: { controls?: SheetControls } = {}) {
   const [scanning, setScanning] = useState(false);
   const [found, setFound] = useState<BleDevice[]>([]);
   const [battery, setBattery] = useState<number | null>(null);
+  const [scanned, setScanned] = useState(false);
+  const [diagnosing, setDiagnosing] = useState(false);
+  const { openSheet } = useSheets();
   const mgr = useRef(ble()).current;
   const savedId = state.settings.lastBleDeviceId;
   const savedName = state.settings.lastBleDeviceName;
 
   useEffect(() => () => { mgr.stopScan(); }, [mgr]);
+  // Ask on arrival rather than on the first Scan tap. The permission sheet is
+  // the one thing that must not land *during* a scan: on Android the scan runs
+  // regardless and quietly returns nothing, so the user reads "no straps found"
+  // when the real answer is "never allowed to look".
+  useEffect(() => { if (mgr.available) mgr.requestPermissions().catch(() => {}); }, [mgr]);
   useEffect(() => {
     if (savedId) mgr.readBattery(savedId).then(setBattery).catch(() => {});
   }, [savedId, mgr]);
@@ -33,8 +50,37 @@ export function DevicesScreen({ controls }: { controls?: SheetControls } = {}) {
     if (!ok) { toast('Bluetooth permission denied'); return; }
     setFound([]);
     setScanning(true);
-    await mgr.scan((d) => setFound((prev) => (prev.some((x) => x.id === d.id) ? prev : [...prev, d].sort((a, b) => b.rssi - a.rssi))));
+    setScanned(true);
+    await mgr.scan((d) => setFound((prev) => (prev.some((x) => x.id === d.id) ? prev : sortDevices([...prev, d]))));
     setTimeout(() => { mgr.stopScan(); setScanning(false); }, 12000);
+  };
+
+  // Held the Scan button for 10s: collect a dump the user can paste into a
+  // support email. Runs its own unfiltered scan, so stop the visible one first
+  // and take the saved-device fields along — a mismatch between what's
+  // remembered and what's nearby is itself a common cause.
+  const diagnose = async () => {
+    if (diagnosing) return;
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    mgr.stopScan();
+    setScanning(false);
+    setDiagnosing(true);
+    try {
+      const report = await mgr.diagnose({ id: savedId, name: savedName });
+      openSheet((c) => (
+        <PromptSheet
+          controls={c}
+          title="Bluetooth diagnostics"
+          rangeText="Bluetooth diagnostics"
+          subtitle="A snapshot of this phone's Bluetooth state and everything it can currently see. Send this to support — it contains no health data, and nearby devices that aren't heart-rate straps are listed without their names."
+          prompt={formatDiagnostics(report)}
+        />
+      ));
+    } catch {
+      toast('Could not collect diagnostics');
+    } finally {
+      setDiagnosing(false);
+    }
   };
 
   const remember = (d: BleDevice) => {
@@ -71,18 +117,28 @@ export function DevicesScreen({ controls }: { controls?: SheetControls } = {}) {
         </View>
       ) : <Muted>No saved device.</Muted>}
 
-      <Button title={scanning ? 'Scanning…' : 'Scan for straps'} variant="primary" onPress={startScan} />
-      {scanning ? <View style={{ alignItems: 'center', marginTop: 14 }}><ActivityIndicator color={p.accent} /></View> : null}
+      <Button
+        title={diagnosing ? 'Collecting diagnostics…' : scanning ? 'Scanning…' : 'Scan for straps'}
+        variant="primary"
+        onPress={startScan}
+        onLongPress={diagnose}
+        delayLongPress={DIAGNOSTICS_HOLD_MS}
+        disabled={diagnosing}
+      />
+      {scanning || diagnosing ? <View style={{ alignItems: 'center', marginTop: 14 }}><ActivityIndicator color={p.accent} /></View> : null}
 
       <View style={{ marginTop: 16 }}>
         {found.map((d) => (
           <Pressable key={d.id} onPress={() => remember(d)} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderTopWidth: 1, borderTopColor: p.border }}>
             <Icon name="bluetooth" size={18} color={p.textDim} />
             <Text style={{ flex: 1, color: p.text }}>{d.name}</Text>
-            <Text style={{ color: p.textDim, fontSize: 12 }}>{d.rssi} dBm</Text>
+            <Text style={{ color: p.textDim, fontSize: 12 }}>{d.connected ? 'Connected' : `${d.rssi} dBm`}</Text>
             {d.id === savedId ? <Icon name="check" size={16} color={p.accent} /> : null}
           </Pressable>
         ))}
+        {scanned && !scanning && !found.length ? (
+          <Text style={{ color: p.textDim, fontSize: 13, lineHeight: 19 }}>{NO_STRAPS_HINT}</Text>
+        ) : null}
       </View>
       <View style={{ height: 24 }} />
     </View>
