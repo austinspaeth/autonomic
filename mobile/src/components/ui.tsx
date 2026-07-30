@@ -260,8 +260,10 @@ export function Stepper({ value, step, onChange, format }: { value: number; step
 }
 
 /* ---------- Buttons ---------- */
-export function Button({ title, onPress, variant = 'default', style, disabled }: {
+export function Button({ title, onPress, variant = 'default', style, disabled, onLongPress, delayLongPress }: {
   title: string; onPress: () => void; variant?: 'default' | 'primary' | 'ghost' | 'danger' | 'dashed'; style?: StyleProp<ViewStyle>; disabled?: boolean;
+  /** Optional hidden affordance (e.g. hold to open diagnostics). */
+  onLongPress?: () => void; delayLongPress?: number;
 }) {
   const p = usePalette();
   const bg = variant === 'primary' ? p.accent : variant === 'danger' ? '#d63b3b' : variant === 'ghost' || variant === 'dashed' ? 'transparent' : p.surface2;
@@ -270,6 +272,8 @@ export function Button({ title, onPress, variant = 'default', style, disabled }:
   return (
     <Pressable
       onPress={onPress}
+      onLongPress={onLongPress}
+      delayLongPress={delayLongPress}
       disabled={disabled}
       style={({ pressed }) => [
         { flex: 1, borderRadius: radius.control, borderWidth: variant === 'dashed' ? 1.5 : 1, borderStyle: variant === 'dashed' ? 'dashed' : 'solid', backgroundColor: bg, borderColor: border, paddingVertical: 13, alignItems: 'center' },

@@ -10,15 +10,19 @@
  */
 import { Platform } from 'react-native';
 import { parseHeartRateMeasurement } from '../hrv';
-import type { BleDevice } from './devices';
+import { looksLikeStrap, type BleDevice, type BleDiagnostics, type BleScanRecord } from './devices';
 
 const HR_SERVICE = '0000180d-0000-1000-8000-00805f9b34fb';
 const HR_MEASUREMENT = '00002a37-0000-1000-8000-00805f9b34fb';
 const BATTERY_SERVICE = '0000180f-0000-1000-8000-00805f9b34fb';
 const BATTERY_LEVEL = '00002a19-0000-1000-8000-00805f9b34fb';
 
-export type { BleDevice } from './devices';
+export type { BleDevice, BleDiagnostics } from './devices';
 export interface HrSample { hr: number; rr: number[] }
+
+/** Long enough to catch a strap advertising on a slow interval, short enough
+ *  that someone holding the phone waits it out. */
+const DIAGNOSTIC_SCAN_MS = 8000;
 
 export interface BleManagerApi {
   available: boolean;
@@ -29,6 +33,10 @@ export interface BleManagerApi {
   readBattery(id: string): Promise<number | null>;
   disconnect(): Promise<void>;
   destroy(): void;
+  /** Collect everything needed to diagnose "it won't find my strap" from a
+   *  user's phone. Never throws and never short-circuits: a denied permission
+   *  or a powered-off adapter is the answer, not a reason to stop. */
+  diagnose(saved?: { id?: string; name?: string }): Promise<BleDiagnostics>;
 }
 
 function base64ToBytes(b64: string): Uint8Array {
@@ -59,6 +67,81 @@ function androidApiLevel(): number {
   return Number.isFinite(v) ? v : 31;
 }
 
+/** Build/runtime facts. Everything is optional and guarded — a diagnostics dump
+ *  that throws while collecting is worse than one with gaps. */
+function appInfo(): Record<string, string | number | boolean | null> {
+  const out: Record<string, string | number | boolean | null> = {};
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const C = require('expo-constants').default;
+    out['app version'] = C?.expoConfig?.version ?? null;
+    out['native version'] = C?.nativeAppVersion ?? null;
+    out['native build'] = C?.nativeBuildVersion ?? null;
+    out['environment'] = C?.executionEnvironment ?? null;
+  } catch { /* ignore */ }
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const U = require('expo-updates');
+    out['runtime version'] = U?.runtimeVersion ?? null;
+    out['update id'] = U?.updateId ?? null;
+    out['update channel'] = U?.channel ?? null;
+    out['embedded launch'] = U?.isEmbeddedLaunch ?? null;
+  } catch { /* ignore */ }
+  return out;
+}
+
+function platformInfo(): Record<string, string | number | boolean | null> {
+  const c = Platform.constants as unknown as Record<string, unknown> | undefined;
+  const pick = (...keys: string[]) => {
+    for (const k of keys) if (c?.[k] != null) return String(c[k]);
+    return null;
+  };
+  return {
+    os: Platform.OS,
+    'os version': pick('Release', 'osVersion', 'systemVersion') ?? String(Platform.Version),
+    'api level': Platform.OS === 'android' ? androidApiLevel() : null,
+    manufacturer: pick('Manufacturer'),
+    brand: pick('Brand'),
+    model: pick('Model', 'model'),
+    'dev build': __DEV__,
+  };
+}
+
+const HR_SHORT = '180d';
+function advertisesHeartRate(uuids: string[] | null | undefined): boolean {
+  return !!uuids?.some((u) => {
+    const s = u.toLowerCase();
+    return s === HR_SHORT || s.startsWith(`0000${HR_SHORT}`);
+  });
+}
+
+/** ble-plx `Device` → report row. Keeps the real id/name; `formatDiagnostics`
+ *  is the single place that decides what a shared dump may reveal. */
+function toRecord(d: {
+  id: string; name?: string | null; localName?: string | null; rssi?: number | null;
+  txPowerLevel?: number | null; isConnectable?: boolean | null; serviceUUIDs?: string[] | null;
+}): BleScanRecord {
+  const heartRate = advertisesHeartRate(d.serviceUUIDs);
+  return {
+    id: d.id,
+    name: d.name ?? null,
+    localName: d.localName ?? null,
+    rssi: d.rssi ?? null,
+    txPower: d.txPowerLevel ?? null,
+    isConnectable: d.isConnectable ?? null,
+    serviceUUIDs: d.serviceUUIDs ?? null,
+    heartRate,
+    identified: heartRate || looksLikeStrap(d.name ?? d.localName),
+  };
+}
+
+function describeError(e: unknown): string {
+  const err = e as { errorCode?: number; reason?: string; message?: string } | null;
+  if (!err) return 'unknown';
+  return [err.errorCode != null ? `code ${err.errorCode}` : '', err.reason || err.message || String(e)]
+    .filter(Boolean).join(': ');
+}
+
 const stub: BleManagerApi = {
   available: false,
   async requestPermissions() { return false; },
@@ -68,6 +151,21 @@ const stub: BleManagerApi = {
   async readBattery() { return null; },
   async disconnect() { /* no-op */ },
   destroy() { /* no-op */ },
+  async diagnose(saved) {
+    return {
+      at: new Date().toISOString(),
+      app: appInfo(),
+      platform: platformInfo(),
+      adapter: { available: false, state: 'NativeModuleMissing' },
+      permissions: {},
+      requires: [],
+      scan: { ms: 0, error: 'Bluetooth is not available in this build.', started: false, devices: [] },
+      connectedError: null,
+      connected: [],
+      saved: { id: saved?.id ?? null, name: saved?.name ?? null },
+      notes: ['The native Bluetooth module is missing — this is Expo Go or a build without react-native-ble-plx.'],
+    };
+  },
 };
 
 export function createBle(): BleManagerApi {
@@ -203,6 +301,90 @@ export function createBle(): BleManagerApi {
       connectEpoch++;
       teardown();
       try { manager.destroy(); } catch { /* ignore */ }
+    },
+    async diagnose(saved) {
+      const notes: string[] = [];
+
+      // Read the adapter rather than waiting for it: waitReady() never resolves
+      // while Bluetooth is off, and "off" is a diagnosis we want to report.
+      let state = 'Unknown';
+      try { state = String(await manager.state()); } catch (e) { state = `unreadable (${describeError(e)})`; }
+
+      // check(), not request() — a dump must observe the current grant, not
+      // change it. A prompt here would also rewrite the very state we're reporting.
+      const permissions: Record<string, string> = {};
+      let requires: string[] = [];
+      if (Platform.OS === 'android') {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { PermissionsAndroid } = require('react-native');
+        const api = androidApiLevel();
+        requires = api >= 31
+          ? [PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN, PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT]
+          : [PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION];
+        const all = [
+          PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
+          PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+          PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION,
+        ];
+        for (const perm of all) {
+          try { permissions[perm] = (await PermissionsAndroid.check(perm)) ? 'granted' : 'denied'; }
+          catch (e) { permissions[perm] = `unreadable (${describeError(e)})`; }
+        }
+        if (api < 31) {
+          notes.push('Android 11 or below: BLE scanning is treated as location access, so the system Location toggle must be ON or the OS returns zero results with no error.');
+        }
+        for (const need of requires) {
+          if (permissions[need] !== 'granted') notes.push(`${need} is not granted — scans cannot return results.`);
+        }
+      }
+
+      // Unfiltered: the whole point is to separate "we see nothing at all"
+      // (phone-side) from "we see plenty, just not a strap" (strap-side).
+      // The normal scan filters on 0x180D and so cannot tell those apart.
+      const seen = new Map<string, BleScanRecord>();
+      let scanError: string | null = null;
+      let started = false;
+      try { manager.stopDeviceScan(); } catch { /* ignore */ }
+      try {
+        manager.startDeviceScan(null, { allowDuplicates: false }, (error, device) => {
+          if (error) { scanError = scanError ?? describeError(error); return; }
+          if (device && !seen.has(device.id)) seen.set(device.id, toRecord(device));
+        });
+        started = true;
+      } catch (e) {
+        scanError = describeError(e);
+      }
+      if (started) await new Promise((r) => setTimeout(r, DIAGNOSTIC_SCAN_MS));
+      try { manager.stopDeviceScan(); } catch { /* ignore */ }
+
+      let connectedError: string | null = null;
+      let connected: BleScanRecord[] = [];
+      try { connected = (await manager.connectedDevices([HR_SERVICE])).map(toRecord); }
+      catch (e) { connectedError = describeError(e); }
+
+      const devices = [...seen.values()].sort((a, b) => Number(b.heartRate) - Number(a.heartRate) || (b.rssi ?? -127) - (a.rssi ?? -127));
+      if (state !== 'PoweredOn') notes.push(`Adapter state is ${state}. Scans only return results while PoweredOn.`);
+      if (started && !devices.length && !scanError) {
+        notes.push('Zero advertisements of any kind. In a normal room this is close to impossible, so suspect the phone (permissions, Location toggle) rather than the strap.');
+      }
+      if (devices.length && !devices.some((d) => d.heartRate)) {
+        notes.push('Scanning works, but nothing nearby advertises the 0x180D heart-rate service. A strap that is off, dry, unworn, or already connected to another phone will not advertise.');
+      }
+
+      return {
+        at: new Date().toISOString(),
+        app: appInfo(),
+        platform: platformInfo(),
+        adapter: { available: true, state },
+        permissions,
+        requires,
+        scan: { ms: DIAGNOSTIC_SCAN_MS, error: scanError, started, devices },
+        connectedError,
+        connected,
+        saved: { id: saved?.id ?? null, name: saved?.name ?? null },
+        notes,
+      };
     },
   };
 }
