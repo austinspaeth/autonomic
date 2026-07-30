@@ -8,8 +8,8 @@ keywords: "quercetin mast cells, quercetin MCAS, quercetin mast cell stabilizer,
 date: 2026-07-30
 updated: 2026-07-30
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1734009027745-a3ae6804c6e3?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb&dl=romain-water-iwQudHOR3Go-unsplash.jpg"
-photoAttribution: "Romain Water / Unsplash"
+photoLocation: "https://images.unsplash.com/photo-1656331797721-b593b8f00297?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb&dl=d-koi-5nI9N2wNcBU-unsplash.jpg"
+photoAttribution: "D koi / Unsplash"
 tldr: "Quercetin is a plant flavonol that, in the laboratory, is a real mast cell stabilizer: it blocks histamine, prostaglandin D2, leukotrienes and inflammatory cytokines, and in one head-to-head study outperformed cromolyn on cytokine release while also working prophylactically. The catch is dose. Those experiments used around 100 micromolar, while a generous dietary intake produces peak plasma levels near 0.3 micromolar, and free quercetin has never actually been detected in human plasma (it circulates as glucuronide and sulfate conjugates). There is no randomized controlled trial of quercetin in MCAS. The best human evidence is a small randomized trial of a high-bioavailability form that improved eye symptoms in seasonal allergy. Safety at 500 to 1000 mg daily for up to 12 weeks looks good, but quercetin inhibits CYP3A4, CYP2C9 and P-glycoprotein, which matters a great deal if you take other medications. This is educational information, not medical advice: talk to your doctor or pharmacist before starting anything new."
 categories:
   - food
