@@ -222,11 +222,21 @@ export function CameraSetup({ config, controls: _controls }: { config: SessionCo
   // Torch is lit and the user is watching the back of the phone — don't sleep.
   useKeepAwake();
 
-  // One trace per visit to this card, so a dump describes THIS attempt. Probe
-  // the native modules straight away: the camera view only mounts on the last
-  // step, and a run that stalls before then must not look like a build missing
-  // its camera libraries.
-  useEffect(() => { ppgTrace.reset(); probePpgModules(); }, []);
+  // One trace per visit to this card, so a dump describes THIS attempt. Done
+  // during the first render, NOT in an effect: React runs child effects before
+  // the parent's, so a reset in an effect wiped everything the camera view had
+  // already recorded on mount — which on the saved-layout path (this card opens
+  // straight on the wait step) is the permission status and the device. Those
+  // are recorded once and never again, so the dump reported them as never
+  // reached. Probe the modules here too: the view only mounts on the last step,
+  // and a run that stalls earlier must not look like a build missing its
+  // camera libraries.
+  const traceStarted = useRef(false);
+  if (!traceStarted.current) {
+    traceStarted.current = true;
+    ppgTrace.reset();
+    probePpgModules();
+  }
 
   // Ask for camera permission the moment the card opens, while the user is
   // still reading — not mid-flow when the feed is about to appear.

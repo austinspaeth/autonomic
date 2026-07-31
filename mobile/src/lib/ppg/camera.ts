@@ -16,6 +16,7 @@
  */
 import { assessPulse, detectBeats, fingerPresent, type PulseQuality } from './detect';
 import { ppgTrace } from './diagnostics';
+import { createPermissionGate } from './permission';
 import { mean } from '../hrv';
 
 export interface PpgSignal { locked: boolean; quality: PulseQuality }
@@ -225,19 +226,21 @@ export function createPpg(): PpgManagerApi {
   const { Camera } = CameraModule;
   if (!Camera) return stub;
 
+  // Self-gating: never prompt for a permission we already hold, and never let
+  // two callers prompt at once — Android drops the second request and leaves
+  // both promises unsettled. See permission.ts for the full story.
+  const ensurePermission = createPermissionGate({
+    status: () => String(Camera.getCameraPermissionStatus()),
+    request: () => Camera.requestCameraPermission().then(String),
+    onResult: (status, prompted) => {
+      ppgTrace.set({ permissionRequested: status }, 'permission-request', prompted ? status : `${status} (already held, not prompted)`);
+      if (status === 'granted') ppgTrace.mark('permission-granted');
+    },
+  });
+
   return {
     available: true,
-    async requestPermissions() {
-      try {
-        const status = String(await Camera.requestCameraPermission());
-        ppgTrace.set({ permissionRequested: status }, 'permission-request', status);
-        if (status === 'granted') ppgTrace.mark('permission-granted');
-        return status === 'granted';
-      } catch (e) {
-        ppgTrace.set({ permissionRequested: `threw: ${String(e)}` }, 'permission-request', 'threw');
-        return false;
-      }
-    },
+    requestPermissions: ensurePermission,
     async start(onSample, onSignal) {
       resetSignalState();
       ppgTrace.set({ stopped: false }, 'start');
