@@ -11,6 +11,7 @@
 import { Platform } from 'react-native';
 import { parseHeartRateMeasurement } from '../hrv';
 import { bluetoothMessage, looksLikeStrap, type BleDevice, type BleDiagnostics, type BleReadiness, type BleScanRecord } from './devices';
+import { androidApiLevel, appInfo, describeError, platformInfo } from '../diagnostics/env';
 
 const HR_SERVICE = '0000180d-0000-1000-8000-00805f9b34fb';
 const HR_MEASUREMENT = '00002a37-0000-1000-8000-00805f9b34fb';
@@ -67,55 +68,6 @@ function base64ToBytes(b64: string): Uint8Array {
   return bytes;
 }
 
-/** Android API level. `Platform.Version` is already a number on Android, but it
- *  arrives as a string on some OEM builds — parse defensively and assume modern
- *  (31+) if it is unreadable, since that is the permission set nearly every live
- *  device wants and the legacy branch is the narrower guess. */
-function androidApiLevel(): number {
-  const v = typeof Platform.Version === 'number' ? Platform.Version : parseInt(String(Platform.Version), 10);
-  return Number.isFinite(v) ? v : 31;
-}
-
-/** Build/runtime facts. Everything is optional and guarded — a diagnostics dump
- *  that throws while collecting is worse than one with gaps. */
-function appInfo(): Record<string, string | number | boolean | null> {
-  const out: Record<string, string | number | boolean | null> = {};
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const C = require('expo-constants').default;
-    out['app version'] = C?.expoConfig?.version ?? null;
-    out['native version'] = C?.nativeAppVersion ?? null;
-    out['native build'] = C?.nativeBuildVersion ?? null;
-    out['environment'] = C?.executionEnvironment ?? null;
-  } catch { /* ignore */ }
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const U = require('expo-updates');
-    out['runtime version'] = U?.runtimeVersion ?? null;
-    out['update id'] = U?.updateId ?? null;
-    out['update channel'] = U?.channel ?? null;
-    out['embedded launch'] = U?.isEmbeddedLaunch ?? null;
-  } catch { /* ignore */ }
-  return out;
-}
-
-function platformInfo(): Record<string, string | number | boolean | null> {
-  const c = Platform.constants as unknown as Record<string, unknown> | undefined;
-  const pick = (...keys: string[]) => {
-    for (const k of keys) if (c?.[k] != null) return String(c[k]);
-    return null;
-  };
-  return {
-    os: Platform.OS,
-    'os version': pick('Release', 'osVersion', 'systemVersion') ?? String(Platform.Version),
-    'api level': Platform.OS === 'android' ? androidApiLevel() : null,
-    manufacturer: pick('Manufacturer'),
-    brand: pick('Brand'),
-    model: pick('Model', 'model'),
-    'dev build': __DEV__,
-  };
-}
-
 const HR_SHORT = '180d';
 function advertisesHeartRate(uuids: string[] | null | undefined): boolean {
   return !!uuids?.some((u) => {
@@ -142,13 +94,6 @@ function toRecord(d: {
     heartRate,
     identified: heartRate || looksLikeStrap(d.name ?? d.localName),
   };
-}
-
-function describeError(e: unknown): string {
-  const err = e as { errorCode?: number; reason?: string; message?: string } | null;
-  if (!err) return 'unknown';
-  return [err.errorCode != null ? `code ${err.errorCode}` : '', err.reason || err.message || String(e)]
-    .filter(Boolean).join(': ');
 }
 
 const stub: BleManagerApi = {

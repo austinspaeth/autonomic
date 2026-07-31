@@ -216,6 +216,25 @@ old web app so old `export.json` files import directly.
   opens HRV capture behind the freemium gate; `autonomic://?open=protocol` scrolls to
   the Progress streak card and opens it expanded (`requestExpandProtocol` /
   `scrollJournalToSection('protocol')` in `src/store/nav.ts`).
+- **Capture failures are diagnosable from the user's own phone.** Bluetooth and
+  the camera both fail in several ways that look identical from the outside, so
+  each hides a support dump behind an 8-second hold on the button that would
+  normally retry: "Scan for straps" (`src/lib/ble/devices.ts` `formatDiagnostics`)
+  and the camera setup card's "Start over" (`src/lib/ppg/diagnostics.ts`). Both
+  render into the shared `<PromptSheet/>` (copy + share), carry no health data,
+  and share the APP/PLATFORM blocks from `src/lib/diagnostics/`. Collection only
+  ever *reads* — never request a permission while reporting on it. The camera
+  report is built around ordered milestones (`PPG_MILESTONES`, card opened →
+  modules → permission → device → format → view mounted → session initialized →
+  torch → frames → finger → lock): the first unreached one is the diagnosis, so
+  the verdict distinguishes a refused permission from a session CameraX would not
+  bind. Feeding it, `ppgTrace` is written from the camera view's *render* path,
+  which is why its notifications are deferred and a no-op patch emits nothing.
+  The camera also degrades rather than dying: `PPG_ATTEMPTS` walks 320×240@60 →
+  320×240@device fps → device default, dropping a rung on an error OR on a
+  watchdog (no `onInitialized` in 5s, no frames in 4s), since the failures that
+  strand a user are the silent ones. A rung that binds at 30 fps coarsens RR
+  timing but still produces a reading.
 - **Types come in two layers.** Built-ins live in the `*_TYPES` maps in
   `src/lib/registry.ts` (add an icon in `src/components/Icon.tsx` when adding one).
   Users can also create their own activities, meds/supplements, symptoms and

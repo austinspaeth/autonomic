@@ -10,10 +10,20 @@
  *
  * Renders null when react-native-vision-camera / worklets aren't in the build
  * (Expo Go / simulator / web), mirroring the manager's graceful stub.
+ *
+ * Every branch that can end in "no preview and no torch" reports itself to
+ * `ppgTrace` (`diagnostics.ts`), because from the outside those branches are
+ * indistinguishable: a refused permission, a missing device, a format CameraX
+ * won't bind and a session that binds but streams nothing all look like a black
+ * circle. The trace is what the 8-second hold on "Start over" prints.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 import { ppgBridge } from './camera';
+import {
+  ATTEMPT_FRAME_TIMEOUT_MS, ATTEMPT_INIT_TIMEOUT_MS, PPG_ATTEMPTS, ppgTrace,
+} from './diagnostics';
+import { describeError } from '../diagnostics/env';
 
 let vc: typeof import('react-native-vision-camera') | null = null;
 let worklets: typeof import('react-native-worklets-core') | null = null;
@@ -27,8 +37,28 @@ try {
   worklets = null;
 }
 
+/**
+ * Record whether the two native modules made it into this build, and return it.
+ * Called from the setup card on open as well as from the view: the view only
+ * renders on the last wizard step, and a run that stalls before then would
+ * otherwise report the modules as missing when they are simply unexamined.
+ */
+export function probePpgModules(): boolean {
+  const ok = !!vc && !!worklets;
+  ppgTrace.set(
+    { moduleLoaded: !!vc, workletsLoaded: !!worklets },
+    'modules',
+    `vision-camera ${vc ? 'ok' : 'missing'}, worklets ${worklets ? 'ok' : 'missing'}`,
+  );
+  if (ok) ppgTrace.mark('module-loaded');
+  return ok;
+}
+
 export function PpgCameraView({ preview }: { preview?: number }) {
-  if (!vc || !worklets) return null;
+  if (!probePpgModules()) {
+    ppgTrace.set({ renderBlocked: 'react-native-vision-camera or react-native-worklets-core is missing from this build' });
+    return null;
+  }
   return <PpgCameraInner preview={preview} />;
 }
 
@@ -43,13 +73,115 @@ function PpgCameraInner({ preview }: { preview?: number }) {
   // surfaced as a red LogBox bar while the permission dialog was still up).
   // The session flow requests permission before start(); re-check on each
   // running flip so the grant is picked up.
-  const [hasPermission, setHasPermission] = useState(() => Camera.getCameraPermissionStatus() === 'granted');
-  useEffect(() => { setHasPermission(Camera.getCameraPermissionStatus() === 'granted'); }, [Camera, running]);
+  const [permission, setPermission] = useState(() => String(Camera.getCameraPermissionStatus()));
+  useEffect(() => {
+    const status = String(Camera.getCameraPermissionStatus());
+    setPermission(status);
+    ppgTrace.set({ permissionStatus: status }, 'permission-status', status);
+    if (status === 'granted') ppgTrace.mark('permission-granted');
+  }, [Camera, running]);
+  const hasPermission = permission === 'granted';
 
   // Torch is only applied once the camera session is actually initialized —
   // flipping it in the same commit that activates the camera races the
   // Android session bind and can leave the flash off.
   const [initialized, setInitialized] = useState(false);
+
+  // Which rung of PPG_ATTEMPTS we're on. A device that refuses our preferred
+  // format (or accepts it and then streams nothing) drops to the next one
+  // rather than leaving the user staring at a black circle forever.
+  const [attempt, setAttempt] = useState(0);
+  const spec = PPG_ATTEMPTS[attempt];
+
+  const device = useCameraDevice('back');
+  useEffect(() => {
+    if (device) {
+      ppgTrace.set({ device: `${device.name || device.id} (torch ${device.hasTorch ? 'yes' : 'no'})`, hasTorch: device.hasTorch });
+      ppgTrace.mark('device-found', device.id);
+    } else {
+      ppgTrace.set({ renderBlocked: 'no back-facing camera device was returned by the OS' }, 'device-missing');
+    }
+  }, [device]);
+
+  // Lowest usable resolution + highest frame rate: we only need one averaged
+  // brightness value per frame, and more frames = finer RR timing. 320x240 is
+  // deliberately tiny — toArrayBuffer() copies the frame GPU→CPU, so this is
+  // the one knob that actually costs anything per frame (307 KB instead of
+  // 640x480's 1.2 MB, ~18 MB/s instead of ~74 MB/s at 60 fps). It does not
+  // cost signal: the frame processor scales its stride to average the same
+  // pixel count either way (see below), and a smaller sensor mode gathers more
+  // light per pixel, not less.
+  //
+  // useCameraFormat is memoized on JSON.stringify(filters), so building the
+  // array inline is free. The last rung passes no filters and its result is
+  // discarded — we hand <Camera> no format at all and let the platform choose.
+  const picked = useCameraFormat(device, [
+    ...(spec.width && spec.height ? [{ videoResolution: { width: spec.width, height: spec.height } }] : []),
+    ...(spec.fps ? [{ fps: spec.fps }] : []),
+  ]);
+  const format = spec.width ? picked : undefined;
+  // Clamp into the format's own range: CameraX asserts fps against it before
+  // binding and throws InvalidFpsError otherwise — which is one of the ways a
+  // session dies silently.
+  const fps = spec.fps && format ? Math.max(format.minFps, Math.min(spec.fps, format.maxFps)) : undefined;
+
+  // Register each rung as it starts, so the report lists every configuration
+  // this device was actually asked for and what it said.
+  const registered = useRef(-1);
+  useEffect(() => {
+    if (!running || !device || registered.current === attempt) return;
+    registered.current = attempt;
+    setInitialized(false);
+    ppgTrace.set({ fps: fps ?? null });
+    ppgTrace.beginAttempt({
+      n: attempt,
+      label: spec.label,
+      requested: { resolution: spec.width ? `${spec.width}×${spec.height}` : null, fps: spec.fps },
+      resolved: picked ? `${picked.videoWidth}×${picked.videoHeight} @ ${picked.minFps}–${picked.maxFps} fps` : null,
+      appliedFps: fps ?? null,
+      initialized: false,
+      frames: 0,
+      error: null,
+    });
+    if (picked) ppgTrace.mark('format-chosen', `${picked.videoWidth}×${picked.videoHeight}`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [running, device, attempt]);
+
+  /** Drop to the next rung, or give up and leave the error standing. */
+  const fallback = useCallback((why: string) => {
+    ppgTrace.patchAttempt({ error: why });
+    ppgTrace.set({ lastError: why }, 'attempt-failed', why);
+    setAttempt((a) => {
+      if (a + 1 >= PPG_ATTEMPTS.length) {
+        ppgTrace.note('no-fallback-left', 'every camera configuration failed');
+        return a;
+      }
+      return a + 1;
+    });
+  }, []);
+
+  // Watchdogs. The dangerous failures here are the silent ones — CameraX binds
+  // and never calls back, or binds and streams zero frames — because nothing
+  // throws and the user just waits. Both are treated as a failed attempt.
+  useEffect(() => {
+    if (!running || !device || !hasPermission) return;
+    if (initialized) return;
+    const timer = setTimeout(
+      () => fallback(`session never initialized within ${ATTEMPT_INIT_TIMEOUT_MS} ms`),
+      ATTEMPT_INIT_TIMEOUT_MS,
+    );
+    return () => clearTimeout(timer);
+  }, [running, device, hasPermission, initialized, attempt, fallback]);
+
+  useEffect(() => {
+    if (!running || !initialized) return;
+    const framesAtStart = ppgTrace.frameCount();
+    const timer = setTimeout(() => {
+      if (ppgTrace.frameCount() > framesAtStart) return;
+      fallback(`session initialized but delivered no frames within ${ATTEMPT_FRAME_TIMEOUT_MS} ms`);
+    }, ATTEMPT_FRAME_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [running, initialized, attempt, fallback]);
 
   // Android: CameraX silently drops an enableTorch() that lands before the
   // capture session is streaming (LEGACY-HAL devices especially; the failed
@@ -64,20 +196,6 @@ function PpgCameraInner({ preview }: { preview?: number }) {
     const on = setTimeout(() => setTorchBlip(false), 1000);
     return () => { clearTimeout(off); clearTimeout(on); setTorchBlip(false); };
   }, [running, initialized]);
-
-  const device = useCameraDevice('back');
-  // Lowest usable resolution + highest frame rate: we only need one averaged
-  // brightness value per frame, and more frames = finer RR timing. 320x240 is
-  // deliberately tiny — toArrayBuffer() copies the frame GPU→CPU, so this is
-  // the one knob that actually costs anything per frame (307 KB instead of
-  // 640x480's 1.2 MB, ~18 MB/s instead of ~74 MB/s at 60 fps). It does not
-  // cost signal: the frame processor scales its stride to average the same
-  // pixel count either way (see below), and a smaller sensor mode gathers more
-  // light per pixel, not less.
-  const format = useCameraFormat(device, [
-    { videoResolution: { width: 320, height: 240 } },
-    { fps: 60 },
-  ]);
 
   const push = useRunOnJS((t: number, r: number, g: number, b: number) => {
     ppgBridge.pushFrame(t, r, g, b);
@@ -127,21 +245,42 @@ function PpgCameraInner({ preview }: { preview?: number }) {
     if (count > 0) push(frame.timestamp, r / count, g / count, b / count);
   }, [push, rOff, bOff]);
 
-  if (!device || !hasPermission) return null;
-  const fps = format ? Math.min(60, format.maxFps) : 30;
+  if (!device || !hasPermission) {
+    ppgTrace.set({
+      renderBlocked: !device
+        ? 'no back-facing camera device'
+        : `camera permission is "${permission}", not granted`,
+    });
+    return null;
+  }
+  const torch = running && initialized && !torchBlip && device.hasTorch ? 'on' : 'off';
+  ppgTrace.mark('view-mounted');
+  ppgTrace.set({ renderBlocked: null, torch });
+  if (torch === 'on') ppgTrace.mark('torch-on');
   return (
     <Camera
+      // Remount cleanly between rungs: reconfiguring a session that failed to
+      // bind in place is how you get a camera that never recovers.
+      key={attempt}
       style={preview ? { width: preview, height: preview } : { position: 'absolute', width: 1, height: 1, opacity: 0 }}
       device={device}
       isActive={running}
-      torch={running && initialized && !torchBlip && device.hasTorch ? 'on' : 'off'}
+      torch={torch}
       format={format}
       fps={fps}
       pixelFormat="rgb"
       frameProcessor={running ? frameProcessor : undefined}
       audio={false}
-      onInitialized={() => setInitialized(true)}
-      onError={(e: unknown) => { console.warn('PPG camera error', e); }}
+      onInitialized={() => {
+        setInitialized(true);
+        ppgTrace.patchAttempt({ initialized: true });
+        ppgTrace.mark('session-initialized', PPG_ATTEMPTS[attempt].label);
+      }}
+      onError={(e: unknown) => {
+        const why = describeError(e);
+        console.warn('PPG camera error', e);
+        fallback(why);
+      }}
     />
   );
 }

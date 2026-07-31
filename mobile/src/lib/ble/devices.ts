@@ -3,6 +3,7 @@
  * dump. Split from `manager.ts` so they can be unit-tested — the manager
  * imports `react-native` at module scope and cannot be loaded under jest.
  */
+import { line, yn } from '../diagnostics/format';
 
 /** `connected` marks a strap the OS already holds a link to (paired in system
  *  Bluetooth settings, or open in another app) rather than one we saw
@@ -77,12 +78,6 @@ export interface BleDiagnostics {
   connected: BleScanRecord[];
   saved: { id: string | null; name: string | null };
   notes: string[];
-}
-
-const yn = (v: boolean | null | undefined) => (v == null ? '?' : v ? 'yes' : 'no');
-
-function line(label: string, value: unknown): string {
-  return `  ${label.padEnd(22)}${value == null || value === '' ? '—' : String(value)}`;
 }
 
 function recordLines(d: BleScanRecord, i: number): string[] {

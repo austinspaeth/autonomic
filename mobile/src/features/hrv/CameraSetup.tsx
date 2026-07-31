@@ -26,9 +26,18 @@
  * heads-up is a first-time-only screen); "Start over" clears it. Camera
  * permission is requested when the card opens. The ✕ backs out to the setup
  * sheet.
+ *
+ * Step 4 can fail in ways the user cannot see — a refused permission, or a
+ * camera the OS will not start — and it used to render every one of them as the
+ * same "Waiting for a steady pulse…" over a black circle, forever. It now
+ * watches for both and swaps in a `<FaultCard/>` that names the problem and
+ * offers system Settings. Holding "Start over" for 8 seconds dumps the whole
+ * camera trace into the shared PromptSheet, the same gesture the Bluetooth scan
+ * button uses (`src/lib/ppg/diagnostics.ts`).
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { Linking, Pressable, Text, View } from 'react-native';
+import { Linking, Platform, Pressable, Text, View } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { useKeepAwake } from 'expo-keep-awake';
 import Animated, {
   Easing, FadeIn, cancelAnimation, interpolateColor,
@@ -36,12 +45,16 @@ import Animated, {
 } from 'react-native-reanimated';
 import { SheetControls, SheetFooter, SheetPill, SheetPillButton, useSheets } from '../../components/Sheet';
 import { Icon } from '../../components/Icon';
+import { useToast } from '../../components/Toast';
 import { Button } from '../../components/ui';
 import { ACCENT, radius, usePalette } from '../../theme';
 import { getState, save } from '../../store/store';
 import { ppg, type PpgSignal } from '../../lib/ppg/camera';
-import { PpgCameraView } from '../../lib/ppg/CameraView';
+import { PpgCameraView, probePpgModules } from '../../lib/ppg/CameraView';
+import { PPG_ATTEMPTS, formatCameraDiagnostics, ppgTrace } from '../../lib/ppg/diagnostics';
+import { collectCameraDiagnostics } from '../../lib/ppg/collect';
 import type { CameraModuleShape } from '../../lib/types';
+import { PromptSheet } from '../PromptSheet';
 import { HrvSession, type SessionConfig } from './Session';
 
 /** Sheet content is inset 18/24 (padding/topPad); its floating ✕ pill sits at
@@ -53,6 +66,14 @@ const BAR_LIFT = 24 - 10;
 const BAR_H = 36 + (6 + 1) * 2;
 /** Opacity of the back arrow on step 1, where there's nothing to go back to. */
 const BACK_GHOST = 0.22;
+
+/** Hold "Start over" this long to collect a camera diagnostics dump. Matches
+ *  the Bluetooth scan button's hold, so there is one gesture to remember. */
+const DIAGNOSTICS_HOLD_MS = 8000;
+
+/** Why the camera can't run. Each one used to render as the same eternal
+ *  "Waiting for a steady pulse…" over a black circle. */
+type CameraFault = 'permission' | 'camera' | 'unavailable';
 
 /** Strap explainer on the website. Deliberately not an in-app product list:
  *  no stock, no prices and no hardware endorsement to maintain here. */
@@ -185,6 +206,7 @@ function fingerLayout(a: Pt, b: Pt) {
 export function CameraSetup({ config, controls: _controls }: { config: SessionConfig; controls: SheetControls }) {
   const p = usePalette();
   const { openSheet } = useSheets();
+  const toast = useToast();
   const saved = getState().settings.cameraLayout;
   const [shape, setShape] = useState<CameraModuleShape | null>(saved?.shape ?? null);
   const [flash, setFlash] = useState<string | null>(saved?.flash ?? null);
@@ -193,28 +215,61 @@ export function CameraSetup({ config, controls: _controls }: { config: SessionCo
   const [step, setStep] = useState<Step>(saved ? 'wait' : 'warn');
   const [signal, setSignal] = useState<PpgSignal>({ locked: false, quality: 'none' });
   const handedOff = useRef(false);
+  /** Why the camera can't run, in the user's words. Null while it's fine. */
+  const [fault, setFault] = useState<CameraFault | null>(null);
+  const [diagnosing, setDiagnosing] = useState(false);
 
   // Torch is lit and the user is watching the back of the phone — don't sleep.
   useKeepAwake();
 
+  // One trace per visit to this card, so a dump describes THIS attempt. Probe
+  // the native modules straight away: the camera view only mounts on the last
+  // step, and a run that stalls before then must not look like a build missing
+  // its camera libraries.
+  useEffect(() => { ppgTrace.reset(); probePpgModules(); }, []);
+
   // Ask for camera permission the moment the card opens, while the user is
   // still reading — not mid-flow when the feed is about to appear.
-  useEffect(() => { ppg().requestPermissions().catch(() => {}); }, []);
+  useEffect(() => {
+    ppg().requestPermissions().then((ok) => { if (!ok) setFault('permission'); }).catch(() => {});
+  }, []);
 
   // Camera + torch run only during the wait step. Collection is a no-op here —
   // the session card retargets the stream to its own collector after handoff.
   useEffect(() => {
     if (step !== 'wait') return;
     const mgr = ppg();
-    if (!mgr.available) return;
+    if (!mgr.available) { setFault('unavailable'); return; }
     let alive = true;
     (async () => {
+      // The result matters: a refused permission means the camera view will
+      // never mount, so waiting for a pulse is waiting for nothing. Saying so
+      // is the difference between a fixable problem and a broken app.
+      const granted = await mgr.requestPermissions().catch(() => false);
+      if (!alive) return;
+      if (!granted) { setFault('permission'); return; }
+      setFault(null);
       try {
-        await mgr.requestPermissions();
         await mgr.start(() => {}, (sig) => { if (alive) setSignal(sig); });
-      } catch { /* permission denied — the waiting text just stays up */ }
+      } catch { if (alive) setFault('unavailable'); }
     })();
     return () => { alive = false; if (!handedOff.current) mgr.stop().catch(() => {}); };
+  }, [step]);
+
+  // Watch the trace for the failures that happen below the UI: every camera
+  // configuration refused, or a live session that never delivers a frame. Both
+  // otherwise read as "still waiting", forever.
+  useEffect(() => {
+    if (step !== 'wait') return;
+    return ppgTrace.subscribe((t) => {
+      if (t.lastError && t.attempts.length >= PPG_ATTEMPTS.length && t.attempts.every((a) => a.error)) {
+        setFault('camera');
+      } else if (t.reached['frames-arriving'] != null) {
+        // Frames are flowing — whatever went wrong on an earlier rung is now
+        // history, and the fallback did its job.
+        setFault((f) => (f === 'camera' ? null : f));
+      }
+    });
   }, [step]);
 
   // Pulse locked → the reading is on. The session card rises over this one
@@ -249,6 +304,32 @@ export function CameraSetup({ config, controls: _controls }: { config: SessionCo
     setFlash(null);
     setSignal({ locked: false, quality: 'none' });
     if (getState().settings.cameraLayout) { delete getState().settings.cameraLayout; save(); }
+  };
+
+  // Held "Start over" for 8s: dump everything the camera path recorded into the
+  // same copy/share box the AI prompts use. Deliberately far past an accidental
+  // press — it is a support tool, not a feature. Collection only reads state,
+  // so it is safe to run mid-reading and never disturbs what it reports.
+  const diagnose = async () => {
+    if (diagnosing) return;
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    setDiagnosing(true);
+    try {
+      const report = await collectCameraDiagnostics(getState().settings.cameraLayout);
+      openSheet((c) => (
+        <PromptSheet
+          controls={c}
+          title="Camera diagnostics"
+          rangeText="Camera diagnostics"
+          subtitle="A snapshot of how far the camera reading got on this phone, and where it stopped. Send this to support — it contains no health data and no images."
+          prompt={formatCameraDiagnostics(report)}
+        />
+      ));
+    } catch {
+      toast('Could not collect diagnostics');
+    } finally {
+      setDiagnosing(false);
+    }
   };
 
   const idx = ORDER.indexOf(step);
@@ -337,7 +418,9 @@ export function CameraSetup({ config, controls: _controls }: { config: SessionCo
           above the footer's Start over. Mounted (invisibly) from the flash
           step so revealing it doesn't reflow the centered stage — the module
           stays put; only the camera circle and finger animate in on top. */}
-      {step === 'flash' || step === 'wait' ? (
+      {step === 'wait' && fault ? (
+        <FaultCard fault={fault} />
+      ) : step === 'flash' || step === 'wait' ? (
         <PlacementCard visible={step === 'wait'} hint={signal.quality === 'weak' ? 'Hold still, finding your pulse…' : 'Waiting for a steady pulse…'} />
       ) : null}
 
@@ -347,7 +430,14 @@ export function CameraSetup({ config, controls: _controls }: { config: SessionCo
         </SheetFooter>
       ) : step === 'flash' || step === 'wait' ? (
         <SheetFooter>
-          <Button title="Start over" variant="ghost" onPress={startOver} />
+          <Button
+            title={diagnosing ? 'Collecting diagnostics…' : 'Start over'}
+            variant="ghost"
+            onPress={startOver}
+            onLongPress={diagnose}
+            delayLongPress={DIAGNOSTICS_HOLD_MS}
+            disabled={diagnosing}
+          />
         </SheetFooter>
       ) : null}
     </View>
@@ -424,6 +514,51 @@ function PlacementCard({ visible, hint }: { visible: boolean; hint: string }) {
         Cover the rear camera and flash with your fingertip. Rest your hand, light pressure.
       </Text>
       <PulsingHint text={hint} />
+    </Animated.View>
+  );
+}
+
+/** Replaces the placement card when the camera cannot run at all. Says what
+ *  went wrong, and offers the one action that can fix it — a permission the app
+ *  can no longer ask for itself has to be granted in system Settings. */
+function FaultCard({ fault }: { fault: CameraFault }) {
+  const p = usePalette();
+  const settingsName = Platform.OS === 'ios' ? 'Settings → Autonomic → Camera' : 'Settings → Apps → Autonomic → Permissions → Camera';
+  const copy: Record<CameraFault, { title: string; body: string; action?: string }> = {
+    permission: {
+      title: 'Camera access is off',
+      body: `Autonomic needs the camera to read your pulse through your fingertip. Turn it on in ${settingsName}, then come back to this screen.`,
+      action: 'Open Settings',
+    },
+    camera: {
+      title: 'The camera would not start',
+      body: 'Every camera mode this phone offers was refused. Close any other app using the camera, check that camera access is not blocked in your Quick Settings, then try again. Hold "Start over" for 8 seconds to collect a report for support.',
+    },
+    unavailable: {
+      title: 'No camera in this build',
+      body: 'This build has no camera support, so a fingertip reading cannot run. A Bluetooth chest strap still works.',
+    },
+  };
+  const c = copy[fault];
+  return (
+    <Animated.View
+      entering={FadeIn.duration(250)}
+      style={{ alignSelf: 'stretch', padding: 16, borderRadius: radius.card, borderCurve: 'continuous', borderWidth: 1, borderColor: 'rgba(224,49,39,0.28)', backgroundColor: p.accentSoft }}
+    >
+      <Text style={{ color: p.text, fontSize: 16, fontWeight: '700', marginBottom: 6 }}>{c.title}</Text>
+      <Text style={{ color: p.textDim, fontSize: 13, lineHeight: 19 }}>{c.body}</Text>
+      {c.action ? (
+        <Pressable
+          onPress={() => Linking.openSettings().catch(() => {})}
+          style={({ pressed }) => [
+            { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 46, marginTop: 14, borderRadius: radius.control, borderWidth: 1, borderColor: 'rgba(224,49,39,0.45)' },
+            pressed && { opacity: 0.7 },
+          ]}
+        >
+          <Text style={{ color: p.accent, fontSize: 14, fontWeight: '700' }}>{c.action}</Text>
+          <Icon name="chevronRight" size={15} color={p.accent} />
+        </Pressable>
+      ) : null}
     </Animated.View>
   );
 }

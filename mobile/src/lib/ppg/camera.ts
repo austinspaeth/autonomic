@@ -15,6 +15,7 @@
  * stub that reports unavailable.
  */
 import { assessPulse, detectBeats, fingerPresent, type PulseQuality } from './detect';
+import { ppgTrace } from './diagnostics';
 import { mean } from '../hrv';
 
 export interface PpgSignal { locked: boolean; quality: PulseQuality }
@@ -93,6 +94,8 @@ function emitSignal(s: PpgSignal) {
   const key = `${s.locked}:${s.quality}`;
   if (key === lastSignalKey) return;
   lastSignalKey = key;
+  ppgTrace.set({ quality: s.quality, locked: s.locked }, 'signal', key);
+  if (s.locked) ppgTrace.mark('pulse-locked');
   onSignalCb?.(s);
 }
 
@@ -106,6 +109,7 @@ function normalizeT(rawT: number): number | null {
     for (const scale of [1, 1e-3, 1e-6, 1e3]) {
       if (dt * scale >= 4 && dt * scale <= 200) { tScale = scale; break; }
     }
+    if (tScale != null) ppgTrace.set({ tScale }, 'timestamp-scale', `x${tScale} (raw delta ${Math.round(dt)})`);
     if (tScale == null) return null; // duplicate/garbage timestamp — wait
   }
   return rawT * tScale;
@@ -174,6 +178,7 @@ export const ppgBridge = {
   },
   pushFrame(rawT: number, red: number, green: number, blue: number) {
     if (!running) return;
+    ppgTrace.countFrame();
     const t = normalizeT(rawT);
     if (t == null) return;
 
@@ -184,6 +189,8 @@ export const ppgBridge = {
     if (fingerStreak >= FINGER_FLIP_FRAMES) {
       fingerOn = present;
       fingerStreak = 0;
+      ppgTrace.set({ fingerOn }, 'finger', fingerOn ? 'covered' : 'uncovered');
+      if (fingerOn) ppgTrace.mark('finger-detected');
       if (!fingerOn) { tBuf = []; vBuf = []; recentRr = []; pendingGap = true; }
     }
     if (!fingerOn) { analyze(t); return; }
@@ -222,25 +229,31 @@ export function createPpg(): PpgManagerApi {
     available: true,
     async requestPermissions() {
       try {
-        const status = await Camera.requestCameraPermission();
+        const status = String(await Camera.requestCameraPermission());
+        ppgTrace.set({ permissionRequested: status }, 'permission-request', status);
+        if (status === 'granted') ppgTrace.mark('permission-granted');
         return status === 'granted';
-      } catch {
+      } catch (e) {
+        ppgTrace.set({ permissionRequested: `threw: ${String(e)}` }, 'permission-request', 'threw');
         return false;
       }
     },
     async start(onSample, onSignal) {
       resetSignalState();
+      ppgTrace.set({ stopped: false }, 'start');
       onSampleCb = onSample;
       onSignalCb = onSignal;
       running = true;
       runListeners.forEach((fn) => fn(true));
     },
     retarget(onSample, onSignal) {
+      ppgTrace.note('retarget', 'session card took over the stream');
       onSampleCb = onSample;
       onSignalCb = onSignal;
       lastSignalKey = ''; // force a re-emit so the new consumer sees current state
     },
     async stop() {
+      ppgTrace.set({ stopped: true }, 'stop');
       running = false;
       onSampleCb = null;
       onSignalCb = null;
