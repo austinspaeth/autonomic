@@ -14,6 +14,23 @@ export function sortDevices(list: BleDevice[]): BleDevice[] {
   return [...list].sort((a, b) => Number(!!b.connected) - Number(!!a.connected) || b.rssi - a.rssi);
 }
 
+/** What the adapter reported, and what a scan is allowed to do about it. */
+export interface BleReadiness { ok: boolean; state: string; message: string | null }
+
+/** Plain-language reason a scan cannot run, or null when it can. The adapter
+ *  being off, unauthorized or absent is an ANSWER the user can act on, not a
+ *  condition to wait out — waiting silently is what made "Scan" look dead. */
+export function bluetoothMessage(state: string): string | null {
+  switch (state) {
+    case 'PoweredOn': return null;
+    case 'PoweredOff': return 'Bluetooth is off. Turn it on, then scan again.';
+    case 'Unauthorized': return 'Autonomic is not allowed to use Bluetooth. Turn it on for Autonomic in system Settings.';
+    case 'Unsupported': return 'This device has no Bluetooth radio, so straps cannot be found. The simulator is the usual reason you see this.';
+    case 'Resetting': return 'Bluetooth is restarting. Try again in a moment.';
+    default: return 'Bluetooth is not responding. Try again in a moment.';
+  }
+}
+
 /* ---------- diagnostics ---------- */
 
 /** Names worth showing in full in a dump the user emails to support. Anything

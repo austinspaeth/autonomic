@@ -16,7 +16,7 @@ import { getState, save, useAppState } from '../store/store';
 /** Hold "Scan for straps" this long to collect a Bluetooth diagnostics dump.
  *  Deliberately far past any accidental press — it is a support tool, not a
  *  feature, and nobody should find it by fumbling. */
-const DIAGNOSTICS_HOLD_MS = 10000;
+const DIAGNOSTICS_HOLD_MS = 8000;
 
 /** When opened mid-flow (HRV setup, onboarding), pass the sheet's `controls`
  *  so pairing a strap closes this sheet and drops you back where you were. */
@@ -29,6 +29,8 @@ export function DevicesScreen({ controls }: { controls?: SheetControls } = {}) {
   const [battery, setBattery] = useState<number | null>(null);
   const [scanned, setScanned] = useState(false);
   const [diagnosing, setDiagnosing] = useState(false);
+  /** Why the last scan could not run (adapter off, permission denied). */
+  const [blocked, setBlocked] = useState<string | null>(null);
   const { openSheet } = useSheets();
   const mgr = useRef(ble()).current;
   const savedId = state.settings.lastBleDeviceId;
@@ -46,16 +48,21 @@ export function DevicesScreen({ controls }: { controls?: SheetControls } = {}) {
 
   const startScan = async () => {
     if (!mgr.available) { toast('Bluetooth needs a development build'); return; }
-    const ok = await mgr.requestPermissions();
-    if (!ok) { toast('Bluetooth permission denied'); return; }
+    // Mark the attempt BEFORE any await: everything below can bail, and a scan
+    // that explains itself is the whole point of this screen.
     setFound([]);
-    setScanning(true);
+    setBlocked(null);
     setScanned(true);
+    const state = await mgr.ready();
+    if (!state.ok) { setBlocked(state.message); return; }
+    const ok = await mgr.requestPermissions();
+    if (!ok) { setBlocked('Bluetooth permission denied. Allow it for Autonomic in system Settings, then scan again.'); return; }
+    setScanning(true);
     await mgr.scan((d) => setFound((prev) => (prev.some((x) => x.id === d.id) ? prev : sortDevices([...prev, d]))));
     setTimeout(() => { mgr.stopScan(); setScanning(false); }, 12000);
   };
 
-  // Held the Scan button for 10s: collect a dump the user can paste into a
+  // Held the Scan button for 8s: collect a dump the user can paste into a
   // support email. Runs its own unfiltered scan, so stop the visible one first
   // and take the saved-device fields along — a mismatch between what's
   // remembered and what's nearby is itself a common cause.
@@ -137,7 +144,7 @@ export function DevicesScreen({ controls }: { controls?: SheetControls } = {}) {
           </Pressable>
         ))}
         {scanned && !scanning && !found.length ? (
-          <Text style={{ color: p.textDim, fontSize: 13, lineHeight: 19 }}>{NO_STRAPS_HINT}</Text>
+          <Text style={{ color: p.textDim, fontSize: 13, lineHeight: 19 }}>{blocked ?? NO_STRAPS_HINT}</Text>
         ) : null}
       </View>
       <View style={{ height: 24 }} />

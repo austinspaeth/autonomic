@@ -10,22 +10,31 @@
  */
 import { Platform } from 'react-native';
 import { parseHeartRateMeasurement } from '../hrv';
-import { looksLikeStrap, type BleDevice, type BleDiagnostics, type BleScanRecord } from './devices';
+import { bluetoothMessage, looksLikeStrap, type BleDevice, type BleDiagnostics, type BleReadiness, type BleScanRecord } from './devices';
 
 const HR_SERVICE = '0000180d-0000-1000-8000-00805f9b34fb';
 const HR_MEASUREMENT = '00002a37-0000-1000-8000-00805f9b34fb';
 const BATTERY_SERVICE = '0000180f-0000-1000-8000-00805f9b34fb';
 const BATTERY_LEVEL = '00002a19-0000-1000-8000-00805f9b34fb';
 
-export type { BleDevice, BleDiagnostics } from './devices';
+export type { BleDevice, BleDiagnostics, BleReadiness } from './devices';
 export interface HrSample { hr: number; rr: number[] }
 
 /** Long enough to catch a strap advertising on a slow interval, short enough
  *  that someone holding the phone waits it out. */
 const DIAGNOSTIC_SCAN_MS = 8000;
 
+/** How long to let a `Unknown`/`Resetting` adapter settle before reporting it.
+ *  Long enough for a cold CoreBluetooth/Android stack, short enough that a tap
+ *  on Scan still feels like it did something. */
+const READY_TIMEOUT_MS = 4000;
+
 export interface BleManagerApi {
   available: boolean;
+  /** Can this phone scan right now, and if not, what should the user be told?
+   *  Always settles — call it before scanning so a dead adapter produces copy
+   *  on screen instead of a button that does nothing. */
+  ready(): Promise<BleReadiness>;
   requestPermissions(): Promise<boolean>;
   scan(onFound: (d: BleDevice) => void): Promise<void>;
   stopScan(): void;
@@ -144,6 +153,9 @@ function describeError(e: unknown): string {
 
 const stub: BleManagerApi = {
   available: false,
+  async ready() {
+    return { ok: false, state: 'NativeModuleMissing', message: 'This build has no Bluetooth support, so straps cannot be found.' };
+  },
   async requestPermissions() { return false; },
   async scan() { /* no-op */ },
   stopScan() { /* no-op */ },
@@ -197,12 +209,42 @@ export function createBle(): BleManagerApi {
     disconnectSub = null;
   };
 
-  const waitReady = () => new Promise<void>((resolve) => {
-    const sub = manager.onStateChange((s) => { if (s === State.PoweredOn) { sub.remove(); resolve(); } }, true);
+  // Resolve with whatever the adapter settles on, and ALWAYS resolve. Waiting
+  // only for PoweredOn hangs forever on a phone with Bluetooth switched off, a
+  // denied permission, or a simulator — and every caller awaits this before
+  // touching UI state, so the whole screen went dead with nothing to read.
+  // `Unknown`/`Resetting` are the only states worth waiting through; they are
+  // transient, so they get the timeout rather than an immediate verdict.
+  const waitReady = () => new Promise<string>((resolve) => {
+    let sub: { remove: () => void } | null = null;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let done = false;
+    const finish = (state: string) => {
+      if (done) return;
+      done = true;
+      if (timer) clearTimeout(timer);
+      // Deferred: onStateChange(_, true) may emit before `sub` is assigned.
+      setTimeout(() => { try { sub?.remove(); } catch { /* ignore */ } }, 0);
+      resolve(state);
+    };
+    timer = setTimeout(() => finish(String(State.Unknown)), READY_TIMEOUT_MS);
+    try {
+      sub = manager.onStateChange((s) => {
+        const state = String(s);
+        if (state !== String(State.Unknown) && state !== String(State.Resetting)) finish(state);
+      }, true);
+    } catch (e) {
+      finish(`unreadable (${describeError(e)})`);
+    }
+    if (done) { try { sub?.remove(); } catch { /* ignore */ } }
   });
 
   return {
     available: true,
+    async ready() {
+      const state = await waitReady();
+      return { ok: state === String(State.PoweredOn), state, message: bluetoothMessage(state) };
+    },
     async requestPermissions() {
       if (Platform.OS === 'android') {
         // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -220,11 +262,12 @@ export function createBle(): BleManagerApi {
         );
         return Object.values(res).every((v) => v === 'granted');
       }
-      await waitReady();
-      return true;
+      return (await waitReady()) === String(State.PoweredOn);
     },
     async scan(onFound) {
-      await waitReady();
+      // A scan started against an adapter that isn't on returns nothing and
+      // reports no error, which reads as "no straps here" — refuse instead.
+      if ((await waitReady()) !== String(State.PoweredOn)) return;
       const seen = new Set<string>();
       const emit = (d: BleDevice) => {
         if (seen.has(d.id)) return;

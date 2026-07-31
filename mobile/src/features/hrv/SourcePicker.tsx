@@ -58,17 +58,24 @@ export function SourcePicker({ value, onPick, controls }: {
   const savedId = useStore((s) => s.state.settings.lastBleDeviceId);
   const [scanning, setScanning] = useState(false);
   const [scanned, setScanned] = useState(false);
+  /** Why the last scan could not run (adapter off, permission denied). */
+  const [blocked, setBlocked] = useState<string | null>(null);
   const [found, setFound] = useState<BleDevice[]>([]);
   const mgr = useRef(ble()).current;
   const stopTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const startScan = async () => {
     if (!mgr.available) { toast('Bluetooth needs a development build'); return; }
-    const ok = await mgr.requestPermissions();
-    if (!ok) { setScanned(true); toast('Bluetooth permission denied'); return; }
+    // Before any await: this sheet scans on open, so a bail-out that left
+    // `scanned` false rendered an empty panel with no explanation at all.
     setFound([]);
-    setScanning(true);
+    setBlocked(null);
     setScanned(true);
+    const state = await mgr.ready();
+    if (!state.ok) { setBlocked(state.message); return; }
+    const ok = await mgr.requestPermissions();
+    if (!ok) { setBlocked('Bluetooth permission denied. Allow it for Autonomic in system Settings, then scan again.'); return; }
+    setScanning(true);
     await mgr.scan((d) => setFound((prev) => (prev.some((x) => x.id === d.id) ? prev : sortDevices([...prev, d]))));
     stopTimer.current = setTimeout(() => { mgr.stopScan(); setScanning(false); }, SCAN_MS);
   };
@@ -155,7 +162,7 @@ export function SourcePicker({ value, onPick, controls }: {
               // means success when the scan did find it — don't cry wolf.
               : found.length
                 ? 'Your saved strap is listed above. No other straps nearby.'
-                : NO_STRAPS_HINT}
+                : blocked ?? NO_STRAPS_HINT}
         </Text>
       )}
       <View style={{ height: 16 }} />
