@@ -8,7 +8,7 @@ keywords: "POTS or anxiety, POTS vs anxiety, is it POTS or a panic attack, POTS 
 date: 2026-08-02
 updated: 2026-08-02
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1522075782449-e45a34f1ddfb?q=80&w=1760&auto=format&fit=crop"
+photoLocation: "https://images.unsplash.com/photo-1527236438218-d82077ae1f85?q=80&w=687&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
 photoAttribution: "Sage Friedman / Unsplash"
 tldr: "Both POTS and anxiety can race your heart, make you dizzy and short of breath, and leave you feeling wired. The reliable difference is the trigger: POTS tachycardia is driven by posture (a sustained rise of at least 30 bpm within ten minutes of standing, which settles when you lie down), while anxiety tachycardia is driven by fear, thoughts or situations and does not track with standing and lying. An at-home stand test measures the orthostatic rise; a clinician confirms it. And the two often coexist, so it is frequently 'and,' not 'or.'"
 categories:
