@@ -1,7 +1,7 @@
-# Founder Quotes — ready for attribution
+# Founder Quotes: ready for attribution
 
 > Drafted from Austin's own founder story (autonomic.care). Read them once and
-> tweak anything that doesn't sound like you — a journalist may quote them
+> tweak anything that doesn't sound like you, because a journalist may quote them
 > verbatim. None of them promise recovery.
 
 Attribute as: **Austin Spaeth, founder of Autonomic** (or just "Austin, founder

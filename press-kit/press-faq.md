@@ -13,7 +13,7 @@ from POTS, dysautonomia and long COVID.
 
 **Who is it for?**
 People living with or recovering from POTS, dysautonomia, long COVID, ME/CFS and
-other post-viral or autonomic conditions — and anyone trying to see whether their
+other post-viral or autonomic conditions, and anyone trying to see whether their
 recovery is actually trending the right way.
 
 **How is it private, exactly?**
@@ -37,7 +37,7 @@ readings are flagged and won't produce a fake score.
 **What makes it different from Welltory, Visible, or a smartwatch?**
 Three things: it measures real beat-to-beat data instead of guessing from the
 wrist; it grades every number against published thresholds instead of a
-proprietary black-box score; and it has no cloud or hardware subscription — it
+proprietary black-box score; and it has no cloud or hardware subscription, so it
 works with a strap you buy once and own.
 
 **What does it cost?**
@@ -47,7 +47,7 @@ anyone who can't afford it: email austin@autonomic.care and Austin will send a
 free code, no questions asked.
 
 **Who built it?**
-One person — Austin, a patient-founder who has lived with long COVID for four-plus
+One person: Austin, a patient-founder who has lived with long COVID for four-plus
 years and built the app during his own recovery, after specialists left him
 without answers. He's a solo developer and a dad of six in South Carolina.
 
@@ -56,11 +56,11 @@ iOS (with an Apple Watch app) and Android (via Health Connect). Both launched in
 July 2026.
 
 **Do you have user data / outcomes to share?**
-By design, no — the app collects nothing, so there is no user dataset. [If you
+By design, no. The app collects nothing, so there is no user dataset. [If you
 ever publish aggregate insights, it will be from opt-in, anonymized shares or
-surveys — note that here when relevant.] The absence of a dataset is itself the
+surveys, note that here when relevant.] The absence of a dataset is itself the
 story.
 
 **Can I get a review copy / walkthrough?**
-Yes — the app is free to download on both stores, and Austin is happy to give a
+Yes. The app is free to download on both stores, and Austin is happy to give a
 live walkthrough or answer questions. Contact: austin@autonomic.care.
