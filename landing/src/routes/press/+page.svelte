@@ -11,7 +11,7 @@
    * JSON-LD). Everything still works with JS off except the copy buttons,
    * which degrade to plain selectable text.
    */
-  import { site, appStoreUrl, playStoreUrl, pricing, priceLabel } from '$lib/site';
+  import { site, appStoreLink, playStoreLink, pricing, priceLabel } from '$lib/site';
 
   const canonical = `${site.url}/press/`;
   const email = 'austin@autonomic.care';
@@ -148,8 +148,8 @@
         <dt>Links</dt>
         <dd>
           <a href={site.url}>autonomic.care</a> ·
-          <a href={appStoreUrl}>App Store</a> ·
-          <a href={playStoreUrl}>Google Play</a>
+          <a href={appStoreLink}>App Store</a> ·
+          <a href={playStoreLink}>Google Play</a>
         </dd>
       </div>
     </dl>

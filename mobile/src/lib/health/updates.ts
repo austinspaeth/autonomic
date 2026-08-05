@@ -15,6 +15,7 @@ import { computeScores } from '../scoring';
 import { addDays, todayKey, uid } from '../dates';
 import { typesFor } from '../typeCatalog';
 import { rrCoverageSec } from '../hrvQuality';
+import { logError } from '../diagnostics/errorLog';
 import { ensureDay, getState, save, storeWaveform, upsertEntry } from '../../store/store';
 import { health, healthAppName, type ImportedMed, type ImportedReading, type ImportedWorkout } from './index';
 import {
@@ -50,11 +51,15 @@ export async function checkHealthUpdates(dk: string, opts: { sinceMs?: number; i
   const s = getState();
   if (!api.available || !s.settings.healthEnabled) return null;
   await withAuthTimeout(api.requestAuth());
+  // A failed read degrades to "nothing new", which is indistinguishable from a
+  // quiet day — so each failure goes to the error log on its way to being
+  // swallowed. This is the top suspect whenever health data never appears.
+  const failed = (where: string) => (e: unknown) => { logError(`health.${where}`, e); };
   const [imports, workouts, sleep, meds] = await Promise.all([
-    api.readImports(dk).catch(() => [] as ImportedReading[]),
-    api.readWorkouts(dk).catch(() => [] as ImportedWorkout[]),
-    opts.includeSleep === false ? Promise.resolve(null) : api.readSleep(dk).catch(() => null),
-    api.readMedications(dk).catch(() => [] as ImportedMed[]),
+    api.readImports(dk).catch((e) => { failed('readImports')(e); return [] as ImportedReading[]; }),
+    api.readWorkouts(dk).catch((e) => { failed('readWorkouts')(e); return [] as ImportedWorkout[]; }),
+    opts.includeSleep === false ? Promise.resolve(null) : api.readSleep(dk).catch((e) => { failed('readSleep')(e); return null; }),
+    api.readMedications(dk).catch((e) => { failed('readMedications')(e); return [] as ImportedMed[]; }),
   ]);
   const after = <T extends { startMs: number }>(rows: T[]): T[] =>
     opts.sinceMs != null ? rows.filter((r) => r.startMs >= opts.sinceMs!) : rows;

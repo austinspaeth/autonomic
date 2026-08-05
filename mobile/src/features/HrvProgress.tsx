@@ -421,7 +421,7 @@ function MetricSection({ m, structured, unstructured, combined, buckets }: {
   // Big value: the latest reading by default (the newest bucket the shown
   // kind(s) have data in, its label in parentheses), or the drag-selected
   // bucket's value. Tapping away from the chart blurs the selection back to
-  // the latest. In "Compare" mode the training and baseline values sit
+  // the latest. In "Compare" mode the baseline and training values sit
   // side by side, each tinted its series colour, with the label after the pair.
   // A selection can outlive its dataset (Day→Week shrinks `buckets` while this
   // instance is reused), so an out-of-range index falls back to the latest.
@@ -458,8 +458,8 @@ function MetricSection({ m, structured, unstructured, combined, buckets }: {
         valueColor={valueColor}
         value2={value2}
         pair={compare ? [
-          { label: 'Training', color: STRUCT, text: fmtVal(sRaw) },
           { label: 'Baseline', color: UNSTRUCT, text: fmtVal(uRaw) },
+          { label: 'Training', color: STRUCT, text: fmtVal(sRaw) },
         ] : null}
         suffix={suffix}
         desc={m.desc}

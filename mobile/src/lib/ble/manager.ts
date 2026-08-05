@@ -383,3 +383,12 @@ export function ble(): BleManagerApi {
   if (!singleton) singleton = createBle();
   return singleton;
 }
+
+/** The manager ONLY if something already started it this session, never
+ *  creating one. Constructing a BleManager builds a CBCentralManager, which is
+ *  what raises the iOS Bluetooth permission alert — fine when the user just
+ *  tapped "Devices", wrong for an observer. The app diagnostics dump reports on
+ *  Bluetooth and must not turn its own report into a permission prompt. */
+export function bleIfStarted(): BleManagerApi | null {
+  return singleton;
+}

@@ -9,6 +9,7 @@ import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import * as Clipboard from 'expo-clipboard';
 import Constants from 'expo-constants';
+import * as Haptics from 'expo-haptics';
 import { SheetControls, useSheets } from '../components/Sheet';
 import { Button } from '../components/ui';
 import { DateField, HeightField, TextField, onlyNumeric } from '../components/Field';
@@ -27,10 +28,43 @@ import { DevicesScreen } from './Devices';
 import { HealthScreen } from './Health';
 import { NotificationsRow } from './Reminders';
 import { showWelcomeAgain } from './Onboarding';
+import { PromptSheet } from './PromptSheet';
+import { collectAppDiagnostics } from '../lib/diagnostics/collectApp';
+import { formatAppDiagnostics } from '../lib/diagnostics/appReport';
 
 const PRIVACY_URL = 'https://autonomic.care/privacy-policy/';
 const TERMS_URL = 'https://autonomic.care/terms-of-service/';
 const SUPPORT_EMAIL = 'austin@discoverymark.com';
+
+/** Hold the brand card this long to collect the whole-app support dump. Same
+ *  duration as the Bluetooth and camera dumps: far past any accidental press,
+ *  because it is a support tool rather than a feature. */
+const DIAGNOSTICS_HOLD_MS = 8000;
+
+/** Collect and present the support dump. Collection touches native modules
+ *  (camera, Bluetooth, health, watch) and takes a moment, so the haptic and
+ *  toast confirm the hold landed rather than leaving a dead-feeling card. */
+async function runAppDiagnostics(
+  openSheet: (b: (c: SheetControls) => React.ReactNode) => void,
+  toast: (m: string) => void,
+) {
+  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+  toast('Collecting diagnostics…');
+  try {
+    const report = await collectAppDiagnostics();
+    openSheet((c) => (
+      <PromptSheet
+        controls={c}
+        title="App diagnostics"
+        rangeText="App diagnostics"
+        subtitle="A snapshot of this app's current state: version, permissions, connected services, subscription, storage and recent errors. Send it to support. It contains no health data and nothing that identifies you."
+        prompt={formatAppDiagnostics(report)}
+      />
+    ));
+  } catch {
+    toast('Could not collect diagnostics');
+  }
+}
 
 export function MenuSheet({ controls }: { controls: SheetControls }) {
   const p = usePalette();
@@ -64,11 +98,17 @@ export function MenuSheet({ controls }: { controls: SheetControls }) {
     <View>
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 16 }}>Settings</Text>
       {/* Near-black brand card, inset to match content: 18px left/right (content
-          padding). */}
-      <View style={{ marginBottom: 16, paddingVertical: 24, borderRadius: radius.card, backgroundColor: '#131315', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 }}>
+          padding). Holding it for 8s opens the whole-app support dump — the
+          same hidden gesture as the Bluetooth and camera reports, deliberately
+          unlabelled so it's reached by being told about it, not by accident. */}
+      <Pressable
+        onLongPress={() => runAppDiagnostics(openSheet, toast)}
+        delayLongPress={DIAGNOSTICS_HOLD_MS}
+        style={{ marginBottom: 16, paddingVertical: 24, borderRadius: radius.card, backgroundColor: '#131315', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 }}
+      >
         <BrandMark size={26} />
         <Text style={{ fontSize: 22, fontWeight: '800', color: p.text, letterSpacing: -0.3 }}>Autonomic</Text>
-      </View>
+      </Pressable>
       {item('user', 'Profile', 'Sex, birthday, height, weight', () => openSheet((c) => <ProfileSheet controls={c} />))}
       <NotificationsRow />
       {item('bluetooth', 'Devices', 'Heart-rate straps', () => openSheet(() => <DevicesScreen />), !!state.settings.lastBleDeviceId)}

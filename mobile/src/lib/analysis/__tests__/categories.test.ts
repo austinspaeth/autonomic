@@ -66,6 +66,42 @@ describe('POTS stand-test card', () => {
   });
 });
 
+describe('Week/month/year readouts open on the bucket, not the last entry', () => {
+  // Days pinned inside the current calendar month, so both land in the final
+  // month bucket whatever today's date is.
+  const inThisMonth = (dom: number) => { const d = new Date(); d.setDate(dom); return keyOf(d); };
+  const monthName = new Date().toLocaleDateString(undefined, { month: 'long' });
+  const days: DaysMap = {
+    [inThisMonth(1)]: day([ortho({ beforeHr: 60, afterHr: 95 }), standTest({ sustainedDelta: 30, peakDelta: 40 })]),
+    [inThisMonth(2)]: day([ortho({ beforeHr: 60, afterHr: 75 }), standTest({ sustainedDelta: 20, peakDelta: 30 })]),
+  };
+  const cards = buildCategories(days, 'month', ctx).find((c) => c.id === 'pots')!.build();
+
+  it('POTS Episodes reports the month average, not the latest event', () => {
+    const card = cards.find((c) => c.title === 'POTS Episodes')!;
+    const row = card.orthoFilter!.all.metricsRow!;
+    expect(row.metrics[0].value).toBe(25);            // (35 + 15) / 2, not 15
+    expect(row.when).toBe(`in ${monthName}`);
+  });
+
+  it('POTS Test reports the month average, not the latest test', () => {
+    const card = cards.find((c) => c.title === 'POTS Test')!;
+    expect(card.metricsRow!.metrics[0].value).toBe(25);  // sustained (30 + 20) / 2
+    expect(card.metricsRow!.metrics[1].value).toBe(35);  // peak (40 + 30) / 2
+    expect(card.metricsRow!.when).toBe(`in ${monthName}`);
+  });
+
+  it('Sleeping HR reports the month average, not the latest night', () => {
+    const night = (lo: number, hi: number) => ({ ...blankDay(), sleep: { bed: '22:00', wake: '06:00', quality: 'good' as const, hrLow: lo, hrHigh: hi } });
+    const sleepDays: DaysMap = { [inThisMonth(1)]: night(52, 80), [inThisMonth(2)]: night(58, 90) };
+    const card = buildCategories(sleepDays, 'month', ctx).find((c) => c.id === 'sleep')!
+      .build().find((c) => c.title === 'Sleeping HR')!;
+    expect(card.metricsRow!.metrics[0].value).toBe(55);   // low (52 + 58) / 2
+    expect(card.metricsRow!.metrics[1].value).toBe(85);   // high (80 + 90) / 2
+    expect(card.metricsRow!.when).toBe(`in ${monthName}`);
+  });
+});
+
 describe('Orthostatic events card', () => {
   const days: DaysMap = {
     [dayKey(4)]: day([

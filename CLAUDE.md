@@ -235,6 +235,31 @@ old web app so old `export.json` files import directly.
   watchdog (no `onInitialized` in 5s, no frames in 4s), since the failures that
   strand a user are the silent ones. A rung that binds at 30 fps coarsens RR
   timing but still produces a reading.
+- **The app's whole state is diagnosable too.** An 8-second hold on the brand
+  card at the top of Settings collects the general support dump
+  (`src/lib/diagnostics/collectApp.ts` → `formatAppDiagnostics`), rendered into
+  the same `<PromptSheet/>`: build/OS, permissions, native-module presence,
+  entitlement + tier, Health/watch/Bluetooth state, storage sizes, journal
+  **counts**, settings, and the recent error log — led by a NOTES block naming
+  the likely problem. Two rules bind it. It **reads, never requests**: every
+  permission is a status read, and `bleIfStarted()` exists so collecting a
+  Bluetooth report can't itself raise the iOS Bluetooth prompt (constructing a
+  `BleManager` builds a `CBCentralManager`). And it carries **no health data and
+  nothing identifying** — journal contents become counts, timestamps become ages
+  in days, the profile reports which fields are filled rather than their values,
+  an import reports that it happened and not its file name (asserted in
+  `src/lib/diagnostics/__tests__/collectApp.test.ts`).
+- **Errors are recorded, because everything else swallows them.** The app
+  degrades quietly by design, so by the time a user writes in there is no
+  evidence left. `src/lib/diagnostics/errorLog.ts` keeps the last 40 failures
+  (plaintext `autonomic.flags` MMKV, outside the journal: never rides
+  export/import, survives "Clear all data"), consecutive repeats collapsed into
+  a count so a retry loop can't flush the window (`errorBuffer.ts`, pure +
+  tested). `installErrorLogging()` in the root layout also routes uncaught
+  errors there on their way to the default handler — it observes, it never
+  swallows. Call `logError('area.thing', e)` from a catch that would otherwise
+  be silent (already wired: store persist/load, IAP, health reads, reminders,
+  backups, widgets), and prefer an existing tag over a new phrasing of one.
 - **Types come in two layers.** Built-ins live in the `*_TYPES` maps in
   `src/lib/registry.ts` (add an icon in `src/components/Icon.tsx` when adding one).
   Users can also create their own activities, meds/supplements, symptoms and

@@ -461,14 +461,19 @@ type OpenSheet = ReturnType<typeof useSheets>['openSheet'];
  * Shared by the journal's activity rows, the add-activity import card and the
  * health-update import sheet (features/HealthUpdates) — importing a single
  * workout from any of them lands on its report.
+ *
+ * `justImported` marks that first post-import open: the report then carries the
+ * inline recovery card (see WorkoutQuickEdit), since HR @60s can only be
+ * measured in the minute after the workout. Every later open is read-only and
+ * sends the user through the pencil to the edit form.
  */
-export function openWorkoutReport(openSheet: OpenSheet, r: Entry, dk: string): void {
+export function openWorkoutReport(openSheet: OpenSheet, r: Entry, dk: string, justImported = false): void {
   const openEdit = () => {
     const noop = () => { /* store change triggers re-render */ };
     if (ACTIVITY_TYPES[r.type]?.custom === 'bike') openSheet((c) => <BikeForm dk={dk} existing={r} controls={c} onSaved={noop} />);
     else openSheet((c) => <EntryForm typeMap={typesFor(getState(), 'activities')} arrKey="activities" dk={dk} type={r.type} existing={r} controls={c} onSaved={noop} />);
   };
-  openSheet(() => <WorkoutSummarySheet r={r} dk={dk} />, { action: { icon: 'edit', onPress: openEdit } });
+  openSheet(() => <WorkoutSummarySheet r={r} dk={dk} justImported={justImported} />, { action: { icon: 'edit', onPress: openEdit } });
 }
 
 export function useEntryForms(dk: string) {
@@ -572,7 +577,7 @@ export function useEntryForms(dk: string) {
 
   // The workout report (HR-over-time with zones + stats), for activities that
   // carry an HR trace. The pencil stacks the normal edit form on top.
-  const openActivitySummary = (r: Entry) => openWorkoutReport(openSheet, r, dk);
+  const openActivitySummary = (r: Entry, justImported = false) => openWorkoutReport(openSheet, r, dk, justImported);
 
   // Tapping a journal activity row: imported workouts with an HR trace open
   // as the report; everything else opens the edit form directly, as before.
@@ -601,7 +606,7 @@ export function useEntryForms(dk: string) {
     // The HR trace rides inline on the prefill; the form's save splits it into
     // the waveform sidecar. Saving then pops the workout report.
     const prefill = { id: uid(), type: c.type, time: c.time, note: '', source: 'health', imported: true, ...c.entry, ...(c.hrSeries?.length ? { sampledHr: c.hrSeries } : {}) } as Entry;
-    const afterImport = (saved?: Entry) => { refresh(); if (saved && workoutCurveFor(saved)) openActivitySummary(saved); };
+    const afterImport = (saved?: Entry) => { refresh(); if (saved && workoutCurveFor(saved)) openActivitySummary(saved, true); };
     if (c.type === 'indoorBike') openSheet((sc) => <BikeForm dk={dk} existing={null} prefill={prefill} controls={sc} onSaved={afterImport} />);
     else openSheet((sc) => <EntryForm typeMap={typesFor(getState(), 'activities')} arrKey="activities" dk={dk} type={c.type} existing={null} prefill={prefill} controls={sc} onSaved={afterImport} />);
   };
@@ -639,7 +644,7 @@ export function ReadingSummarySheet({ r, dk }: { r: Entry; dk: string }) {
 /** The imported-workout report: the activity's HR trace with exercise zones,
  *  HR stats, time in zones, and the workout's own details (mirror of
  *  ReadingSummarySheet, over the day's activities). */
-export function WorkoutSummarySheet({ r, dk }: { r: Entry; dk: string }) {
+export function WorkoutSummarySheet({ r, dk, justImported }: { r: Entry; dk: string; justImported?: boolean }) {
   const p = usePalette();
   useAppState(); // re-render on edits
   const state = getState();
@@ -651,8 +656,78 @@ export function WorkoutSummarySheet({ r, dk }: { r: Entry; dk: string }) {
       {/* The edit + close pill floats top-right — keep the header text clear of it. */}
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, paddingRight: 100 }}>{def?.label || 'Workout'}</Text>
       <Text style={{ color: p.textDim, fontSize: 14, marginTop: 2, marginBottom: 14, paddingRight: 100 }}>{live.time ? fmtTime12(live.time as string) : ''}</Text>
+      {justImported ? <WorkoutQuickEdit r={live} dk={dk} def={def} /> : null}
       <WorkoutSummary r={live} days={state.days} ctx={ctx} />
       <View style={{ height: 24 }} />
     </ScrollView>
+  );
+}
+
+/** Which of the quick-edit fields this activity type actually stores. Only
+ *  fields the type declares are offered, so nothing typed here becomes orphan
+ *  data the edit form can't show later. */
+const QUICK_KEYS = ['hr60', 'maxHr', 'minHr'] as const;
+
+/**
+ * The recovery card shown once, on the report that pops right after an import.
+ * HR @60s (and a missed min/max) can only be filled in while the user is still
+ * sitting there catching their breath, and by then the import form is long
+ * closed — so the report offers those inputs inline that first time. Later
+ * opens are read-only: the pencil is the way in, same as any other entry.
+ *
+ * Edits write straight through `upsertEntry` on blur (and on unmount, so
+ * closing the sheet mid-typing still saves).
+ */
+function WorkoutQuickEdit({ r, dk, def }: { r: Entry; dk: string; def?: TypeDef }) {
+  const p = usePalette();
+  // Fixed at mount: hr60 (never imported) plus any declared min/max the import
+  // left blank — so filling one in doesn't make its field vanish mid-typing.
+  const [keys] = useState<string[]>(() => {
+    // The bike form is bespoke (registry `fields` is empty) but stores all three.
+    const declared = def?.custom === 'bike'
+      ? new Set<string | undefined>(QUICK_KEYS)
+      : new Set(entryFields(def).filter((f) => !isDivider(f)).map((f) => f.key));
+    return QUICK_KEYS.filter((k) => declared.has(k) && (k === 'hr60' || !r[k]));
+  });
+  const [vals, setVals] = useState<Record<string, string>>(() =>
+    Object.fromEntries(QUICK_KEYS.map((k) => [k, (r[k] as string) || ''])));
+  // Commit reads the entry fresh: the report re-renders on every store change,
+  // so the copy captured at mount can be stale by the time a field blurs.
+  const valsRef = React.useRef(vals);
+  valsRef.current = vals;
+  const commit = () => {
+    const cur = (getState().days[dk]?.activities || []).find((x) => x.id === r.id);
+    if (!cur) return;
+    const patch = Object.fromEntries(keys.map((k) => [k, valsRef.current[k].trim()]));
+    if (keys.every((k) => ((cur[k] as string) || '') === patch[k])) return;
+    upsertEntry(dk, 'activities', { ...cur, ...patch });
+  };
+  const commitRef = React.useRef(commit);
+  commitRef.current = commit;
+  React.useEffect(() => () => commitRef.current(), []);
+
+  if (!keys.length) return null;
+  return (
+    <View style={{ backgroundColor: p.surface2, borderColor: p.accent, borderWidth: 1, borderRadius: radius.card, padding: 16, marginBottom: 12 }}>
+      <Text style={{ fontSize: 15, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, color: p.accent }}>Log now</Text>
+      <Text style={{ fontSize: 13, color: p.textDim, marginTop: 6, marginBottom: 12, lineHeight: 18 }}>
+        {keys.includes('hr60')
+          ? 'Your heart rate 60 seconds after stopping. Add it now while you can still measure it, or later from the edit form.'
+          : 'Anything the import missed. You can also add it later from the edit form.'}
+      </Text>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+        {keys.map((k) => (
+          <View key={k} style={{ width: keys.length === 1 ? '100%' : '47%' }}>
+            <TextField
+              label={k === 'hr60' ? 'HR after 60 seconds' : k === 'maxHr' ? 'Max HR' : 'Min HR'}
+              value={vals[k]}
+              onChange={(v) => setVals((prev) => ({ ...prev, [k]: v }))}
+              onBlur={commit}
+              keyboardType="decimal-pad"
+            />
+          </View>
+        ))}
+      </View>
+    </View>
   );
 }

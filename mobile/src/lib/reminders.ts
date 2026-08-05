@@ -18,6 +18,7 @@
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { todayKey } from './dates';
+import { logError } from './diagnostics/errorLog';
 import { resolveProtocol } from './scoring/day';
 import { detectDownturn } from './scoring/downturn';
 import { getState, save, subscribeStore } from '../store/store';
@@ -172,7 +173,8 @@ export async function enableReminder(hhmm: string): Promise<boolean> {
   if (!(await requestReminderPermission())) return false;
   try {
     await scheduleMorningReminder(hhmm);
-  } catch {
+  } catch (e) {
+    logError('reminder.schedule', e);
     return false;
   }
   const s = getState();
@@ -279,7 +281,10 @@ export async function syncReminder(): Promise<void> {
       return;
     }
     await scheduleMorningReminder(r.time || DEFAULT_REMINDER_TIME);
-  } catch {
-    // Reminders are a nicety — never let them break launch.
+  } catch (e) {
+    // Reminders are a nicety — never let them break launch. Logged because a
+    // reminder that silently never re-armed is invisible from the UI, which
+    // keeps showing it as on.
+    logError('reminder.sync', e);
   }
 }

@@ -23,6 +23,7 @@ import { runDailyBackup } from '../src/lib/backup';
 import { initCrashWatcher, syncReminder } from '../src/lib/reminders';
 import { initWidgetSync } from '../src/lib/widgets';
 import { loadIssue } from '../src/store/store';
+import { installErrorLogging, logError } from '../src/lib/diagnostics/errorLog';
 import { usePalette } from '../src/theme';
 
 function Themed({ children }: { children: React.ReactNode }) {
@@ -49,6 +50,11 @@ export default function RootLayout() {
     IBMPlexMono_400Regular,
   });
   useEffect(() => {
+    // Record uncaught errors to the on-device log first, so a crash during the
+    // rest of this startup sequence still shows up in a support dump. Observes
+    // only — the default handler still runs.
+    installErrorLogging();
+    if (loadIssue?.kind === 'corrupt') logError('store.load', 'journal on disk was unreadable at launch');
     // Open the store connection and read the current Pro entitlement.
     initIap();
     // Stamp/derive the freemium tier (7-day local trial window on first launch).

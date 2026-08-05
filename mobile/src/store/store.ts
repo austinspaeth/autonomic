@@ -18,6 +18,7 @@ import { MMKV } from 'react-native-mmkv';
 import { keyOf } from '../lib/dates';
 import { SCHEMA_VERSION, assertImportVersion, blankDay, defaultState, isPlainObject, migrate } from '../lib/migrate';
 import { createDebouncedWriter } from '../lib/persist';
+import { logError } from '../lib/diagnostics/errorLog';
 import { migrateLegacyJournal } from '../lib/storeMigration';
 import { stampImportedHrvCoverage } from '../lib/hrvQuality';
 import { markDeclinedKeys } from '../lib/health/declined';
@@ -309,8 +310,11 @@ function persistNow() {
   }
   try {
     kv().set(STORAGE_KEY, JSON.stringify(state));
-  } catch {
-    // storage error — state stays in memory
+  } catch (e) {
+    // storage error — state stays in memory. Worth recording: a journal that
+    // silently stops persisting looks exactly like one that lost a day's
+    // entries on the next launch, and nothing on screen says so.
+    logError('store.persist', e);
   }
 }
 
@@ -512,6 +516,37 @@ export function serializeState(pretty = false): string {
     // export without waveforms rather than fail the export
   }
   return pretty ? JSON.stringify(out, null, 2) : JSON.stringify(out);
+}
+
+/** Storage facts for the support dump (src/lib/diagnostics/collectApp.ts):
+ *  how big the journal blob is, how many waveform blobs sit beside it, and
+ *  whether either instance ended up encrypted. Nothing here reads a value —
+ *  sizes and key counts only, so it stays cheap and carries no health data.
+ *  `encrypted: false` means the Keychain was unavailable and both stores fell
+ *  back to plaintext, which is worth knowing when a journal reads as empty
+ *  after a restore. */
+export function storageStats(): {
+  journalBytes: number | null; waveformCount: number | null; waveformBytes: number | null;
+  encrypted: boolean; orphanWaveforms: number | null;
+} {
+  const out = {
+    journalBytes: null as number | null,
+    waveformCount: null as number | null,
+    waveformBytes: null as number | null,
+    encrypted: !!encryptionKey(),
+    orphanWaveforms: null as number | null,
+  };
+  try { out.journalBytes = kv().getString(STORAGE_KEY)?.length ?? 0; } catch { /* unreadable */ }
+  try {
+    const ids = waveformIds(state);
+    const keys = wkv().getAllKeys();
+    out.waveformCount = keys.length;
+    out.orphanWaveforms = keys.filter((k) => !ids.has(k)).length;
+    out.waveformBytes = keys.reduce((n, k) => {
+      try { return n + (wkv().getString(k)?.length ?? 0); } catch { return n; }
+    }, 0);
+  } catch { /* unreadable */ }
+  return out;
 }
 
 export { STORAGE_KEY, keyOf };

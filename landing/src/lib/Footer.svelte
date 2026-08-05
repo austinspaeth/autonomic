@@ -1,13 +1,13 @@
 <script lang="ts">
-  import { BRAND_POLYLINE } from './site';
+  import { APP_MARK_PATH } from './site';
 </script>
 
 <footer class="footer">
   <div class="wrap footer-grid">
     <div class="footer-brand">
       <a class="brand" href="/">
-        <svg class="brand-mark" viewBox="0 0 512 512" aria-hidden="true">
-          <polyline points={BRAND_POLYLINE} fill="none" stroke="currentColor" stroke-width="40" stroke-linejoin="round" stroke-linecap="round" />
+        <svg class="brand-mark brand-mark-app" viewBox="0 0 651.59 348.34" aria-hidden="true">
+          <path d={APP_MARK_PATH} fill="currentColor" />
         </svg>
         <span>Autonomic</span>
       </a>

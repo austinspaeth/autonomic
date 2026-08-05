@@ -251,8 +251,12 @@ async function pushWidgetData(): Promise<void> {
       const { updateAndroidWidgets } = require('../widgets/android') as typeof import('../widgets/android');
       await updateAndroidWidgets(payload);
     }
-  } catch {
-    // Widget refresh is best-effort — never let it break logging.
+  } catch (e) {
+    // Widget refresh is best-effort — never let it break logging. Required
+    // lazily so this module stays loadable under jest (buildWidgetPayload is
+    // unit-tested and must not drag MMKV in).
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    try { (require('./diagnostics/errorLog') as typeof import('./diagnostics/errorLog')).logError('widgets.push', e); } catch { /* ignore */ }
   }
 }
 

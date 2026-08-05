@@ -19,6 +19,7 @@
 import * as FileSystem from 'expo-file-system';
 import { getState, replaceState, serializeState } from '../store/store';
 import { todayKey } from './dates';
+import { logError } from './diagnostics/errorLog';
 
 const KEEP = 5;
 const NAME_RE = /^autonomic-backup-\d{4}-\d{2}-\d{2}\.json$/;
@@ -46,8 +47,11 @@ export async function runDailyBackup(): Promise<void> {
       const oldest = all.shift()!;
       await FileSystem.deleteAsync(`${dir}/${oldest}`, { idempotent: true }).catch(() => {});
     }
-  } catch {
+  } catch (e) {
     // Backups are best-effort — never let them interfere with app startup.
+    // Logged because the snapshots are the recovery path for a corrupt
+    // journal, so one that stopped being written matters before it's needed.
+    logError('backup.daily', e);
   }
 }
 

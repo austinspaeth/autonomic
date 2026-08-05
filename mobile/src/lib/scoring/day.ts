@@ -304,10 +304,12 @@ export function resolveProtocol(p?: Partial<Protocol> | null): Protocol {
 }
 
 /** Daily water goal (liters): the clean-day protocol amount when one is set,
- *  otherwise the 2.5 L default. */
+ *  otherwise the 2.5 L default. The protocol holds the ONE goal number, whether
+ *  or not water is an enabled requirement — `enabled` only decides whether the
+ *  goal counts toward the clean-day streak, not what the goal is. */
 export function waterGoalL(p?: Partial<Protocol> | null): number {
   const w = resolveProtocol(p).water;
-  return w.enabled && w.liters > 0 ? w.liters : DEFAULT_PROTOCOL.water.liters;
+  return w.liters > 0 ? w.liters : DEFAULT_PROTOCOL.water.liters;
 }
 
 const typeLabel = (map: Record<string, { label: string }>, k: string, custom?: Record<string, { label: string }>) => custom?.[k]?.label || map[k]?.label || k;

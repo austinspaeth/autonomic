@@ -138,14 +138,57 @@
         'use strict';
 
         function init() {
-          // Shared GA event helper: every custom event carries the page path so
-          // reports can split the same event by where it happened. gtag() is
-          // always defined (head loader) and no-ops when analytics is blocked.
+          // Page context, resolved once from the DOM (not the path, which the
+          // blog serves under two shapes): an article page is anything that
+          // rendered .article-prose, and its slug comes from the canonical link.
+          var proseEl = document.querySelector('.article-prose');
+          var canonicalEl = document.querySelector('link[rel="canonical"]');
+          var pagePath = window.location.pathname;
+          var articleSlug = '';
+          if (proseEl) {
+            var canon = canonicalEl ? canonicalEl.getAttribute('href') || '' : '';
+            articleSlug = (canon || pagePath).replace(/[?#].*$/, '').replace(/\/$/, '').split('/').pop() || '';
+          }
+          var pageType = proseEl
+            ? 'blog_article'
+            : pagePath === '/' ? 'home'
+            : /^\/(insights|blog)\b/.test(pagePath) ? 'blog_hub'
+            : pagePath.replace(/^\/|\/$/g, '').replace(/\//g, '_') || 'other';
+
+          // Shared GA event helper: every custom event carries the page path,
+          // the kind of page, and (on an article) which article, so any event
+          // can be split by where it happened without parsing URLs in GA.
+          // gtag() is always defined (head loader) and no-ops when blocked.
           function ajEvent(name, params) {
             if (typeof gtag !== 'function') return;
             var p = params || {};
-            p.location = window.location.pathname;
+            p.location = pagePath;
+            p.page_type = pageType;
+            if (articleSlug) p.article = articleSlug;
             gtag('event', name, p);
+          }
+
+          // Where on the page an element sits, for the `placement` param.
+          // Ordered most-specific first; falls back to the enclosing section.
+          function placementOf(el) {
+            if (!el || !el.closest) return 'unknown';
+            if (el.closest('#dlModal')) return 'download_modal';
+            if (el.closest('#nav')) return 'nav';
+            if (el.closest('.article-cta')) return 'blog_end_cta';
+            if (el.closest('.side-get')) return 'blog_sidebar';
+            if (el.closest('.insights-side')) return 'blog_sidebar';
+            if (el.closest('.article-prose')) return 'article_body';
+            if (el.closest('.article-related')) return 'article_related';
+            if (el.closest('footer')) return 'footer';
+            if (el.closest('.hero')) return 'hero';
+            var sec = el.closest('section[id], section[aria-label]');
+            if (sec) return sec.id || (sec.getAttribute('aria-label') || '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+            return 'page';
+          }
+
+          // Slug of an article an anchor points at (for card / list clicks).
+          function slugOf(href) {
+            return String(href || '').replace(/[?#].*$/, '').replace(/\/$/, '').split('/').pop() || '';
           }
 
           var yr = document.getElementById('yr');
@@ -175,11 +218,13 @@
           }
 
           // Platform-aware download CTA + dual-download modal.
-          // Store URLs are canonical/fixed — keep in sync with src/lib/site.ts.
+          // Store URLs carry the site's attribution tags (Apple pt+ct, Play
+          // referrer) — keep in sync with storeUrl() in src/lib/site.ts.
           (function () {
             var STORE = {
-              ios: 'https://apps.apple.com/app/id6789786971',
-              android: 'https://play.google.com/store/apps/details?id=com.autonomic.journal&hl=en'
+              ios: 'https://apps.apple.com/app/apple-store/id6789786971?pt=126963570&ct=Landing&mt=8',
+              android:
+                'https://play.google.com/store/apps/details?id=com.autonomic.journal&referrer=utm_source%3Dautonomic.care%26utm_medium%3Dreferral%26utm_campaign%3Dlanding'
             };
             var GLYPH = {
               ios: '<svg viewBox="0 0 384 512" fill="currentColor" aria-hidden="true"><path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5c0 26.2 4.8 53.3 14.4 81.2 12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zM262.1 104.5c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 20-27.8 44.7-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/></svg>',
@@ -195,18 +240,26 @@
               return null;
             }
 
-            function track(platform) {
-              ajEvent(platform === 'android' ? 'play_store_click' : 'app_store_click');
+            // Every download click fires TWO events: the store-specific one
+            // (unchanged, so existing reports keep working) and a single
+            // `download_click` carrying platform + placement, so total download
+            // intent can be read off one event and split by where it came from
+            // (blog end CTA, blog sidebar, nav, hero, modal, …).
+            function trackDownload(platform, el, placement) {
+              var place = placement || placementOf(el);
+              ajEvent(platform === 'android' ? 'play_store_click' : 'app_store_click', { placement: place });
+              ajEvent('download_click', { platform: platform, placement: place });
             }
+            window.ajTrackDownload = trackDownload;
 
             var platform = detectPlatform();
 
             // Modal open/close (desktop / unknown platform).
             var modal = document.getElementById('dlModal');
             var lastFocus = null;
-            function openModal() {
+            function openModal(trigger) {
               if (!modal) return;
-              ajEvent('download_modal_open');
+              ajEvent('download_modal_open', { placement: placementOf(trigger) });
               lastFocus = document.activeElement;
               modal.hidden = false;
               document.body.style.overflow = 'hidden';
@@ -235,11 +288,11 @@
                 el.setAttribute('href', STORE[platform]);
                 var slot = el.querySelector('.btn-dl-ic');
                 if (slot) { slot.innerHTML = GLYPH[platform]; el.classList.add('has-ic'); }
-                el.addEventListener('click', function () { track(platform); });
+                el.addEventListener('click', function () { trackDownload(platform, el); });
               } else {
                 el.addEventListener('click', function (e) {
                   e.preventDefault();
-                  openModal();
+                  openModal(el);
                 });
               }
             });
@@ -277,7 +330,7 @@
           document.querySelectorAll('[data-dl-store]').forEach(function (el) {
             el.addEventListener('click', function () {
               var p = el.getAttribute('data-dl-store');
-              ajEvent(p === 'android' ? 'play_store_click' : 'app_store_click');
+              if (typeof window.ajTrackDownload === 'function') window.ajTrackDownload(p === 'android' ? 'android' : 'ios', el);
             });
           });
 
@@ -288,6 +341,9 @@
           document.addEventListener('click', function (ev) {
             var t = ev.target;
             if (!t || !t.closest) return;
+            // Store CTAs/badges are wired individually above (they resolve the
+            // platform first); skip them here so nothing double-counts.
+            if (t.closest('[data-dl-cta],[data-dl-store]')) return;
             var el;
             if ((el = t.closest('[data-wa-go],[data-wa-act],[data-wa-log]'))) {
               // Watch interactive (#watch): which face/button was tapped.
@@ -301,6 +357,32 @@
               // AI interactive: prompt copied (which report was showing).
               var sel = document.querySelector('.ai-chip.selected[data-report]');
               ajEvent('ai_prompt_copy', { report: sel ? sel.getAttribute('data-report') : '' });
+            } else if ((el = t.closest('.article-prose a'))) {
+              // Any link inside the article body: cross-links between articles,
+              // citations out to studies, in-page jumps.
+              var ph = el.getAttribute('href') || '';
+              ajEvent('article_link_click', {
+                target: ph,
+                link_type: /^https?:/i.test(ph) && ph.indexOf('autonomic.care') < 0 ? 'external'
+                  : ph.charAt(0) === '#' ? 'anchor' : 'internal',
+                text: (el.textContent || '').trim().slice(0, 100)
+              });
+            } else if ((el = t.closest('.ash-btn'))) {
+              ajEvent('article_share', { network: (el.textContent || '').trim() });
+            } else if ((el = t.closest('.blog-card, .recent-card, .article-line, .side-recent-link, .side-pillars a'))) {
+              // Every route into an article, tagged with the surface it came
+              // from: related block, a hub/list page, or the blog sidebar.
+              ajEvent('article_click', {
+                article_target: slugOf(el.getAttribute('href')),
+                placement: el.closest('.side-pillars') ? 'sidebar_start_here'
+                  : el.closest('.insights-side') ? 'sidebar_recent'
+                  : el.closest('.article-related') ? 'related'
+                  : 'list'
+              });
+            } else if ((el = t.closest('.ac-author, .author-name a, .writer-link'))) {
+              ajEvent('author_click', { author: (el.textContent || '').trim().slice(0, 60) });
+            } else if ((el = t.closest('.ac-tag, .article-chips a, .side-all, .topic-card'))) {
+              ajEvent('topic_click', { target: el.getAttribute('href') || '', text: (el.textContent || '').trim().slice(0, 60) });
             } else if (t.closest('#burger')) {
               ajEvent('nav_click', { target: 'menu' });
             } else if ((el = t.closest('#nav a'))) {
@@ -320,9 +402,66 @@
             var d = ev.target;
             if (d && d.tagName === 'DETAILS' && d.open) {
               var s = d.querySelector('summary');
-              ajEvent('faq_open', { question: s ? s.textContent.replace(/\+\s*$/, '').trim().slice(0, 100) : '' });
+              var label = s ? s.textContent.replace(/\+\s*$/, '').trim().slice(0, 100) : '';
+              // A <details> inside the article body is expandable content, not
+              // an FAQ answer; keep the two apart in reporting.
+              if (d.closest('.article-prose')) ajEvent('article_details_open', { label: label });
+              else ajEvent('faq_open', { question: label });
             }
           }, true);
+
+          // ---- Blog content interaction ---------------------------------
+          // In-article calculators (.metric-calc, written into the markdown):
+          // one `calc_use` the first time a widget is touched, plus a
+          // `calc_change` per committed field so we can see which inputs the
+          // reader actually explores.
+          document.querySelectorAll('.metric-calc').forEach(function (calc, i) {
+            var head = calc.querySelector('.mc-head');
+            var name = (head ? head.textContent : '').trim().slice(0, 60) || 'calculator-' + (i + 1);
+            var used = false;
+            calc.addEventListener('change', function (ev) {
+              var f = ev.target;
+              if (!f || !f.tagName || !/^(INPUT|SELECT|TEXTAREA)$/.test(f.tagName)) return;
+              if (!used) { used = true; ajEvent('calc_use', { calc: name }); }
+              var lab = f.closest('.mc-field');
+              var labEl = lab ? lab.querySelector('.mc-label') : null;
+              ajEvent('calc_change', {
+                calc: name,
+                field: (labEl ? labEl.textContent : f.name || f.type || '').trim().slice(0, 60)
+              });
+            });
+          });
+
+          if (proseEl) {
+            // Reading depth through the article body: 25/50/75/100% of the
+            // prose scrolled past the bottom of the viewport, once each.
+            var depthHit = {};
+            var onDepth = function () {
+              var box = proseEl.getBoundingClientRect();
+              var total = box.height;
+              if (total <= 0) return;
+              var read = Math.min(total, Math.max(0, window.innerHeight - box.top));
+              var pct = Math.floor((read / total) * 100);
+              [25, 50, 75, 100].forEach(function (m) {
+                if (pct >= m && !depthHit[m]) {
+                  depthHit[m] = true;
+                  ajEvent('article_scroll', { percent: m });
+                }
+              });
+              if (depthHit[100]) window.removeEventListener('scroll', onDepth);
+            };
+            window.addEventListener('scroll', onDepth, { passive: true });
+            onDepth();
+
+            // Copying out of an article is a strong "this was useful" signal.
+            var copiedOnce = false;
+            proseEl.addEventListener('copy', function () {
+              if (copiedOnce) return;
+              copiedOnce = true;
+              ajEvent('article_copy');
+            });
+          }
+          // --------------------------------------------------------------
 
           // Section views: fire once per page load when a section crosses the
           // middle band of the viewport (works for sections taller than the

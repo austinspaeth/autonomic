@@ -28,6 +28,7 @@ import {
   type ProductSubscription, type ProductSubscriptionAndroidOfferDetails,
 } from 'expo-iap';
 import { isSideloadedAndroidBuild, isTestFlightBuild } from '../../modules/app-env';
+import { logError } from '../lib/diagnostics/errorLog';
 
 /** Product IDs — identical in App Store Connect and the Play Console. On the
  *  App Store: one subscription group holding both plans (with a 7-day
@@ -176,8 +177,10 @@ export async function initIap() {
       .sort((a, b) => PRO_SKUS.indexOf(a.productId) - PRO_SKUS.indexOf(b.productId));
     set({ products });
     await refreshEntitlement();
-  } catch {
-    // swallow; treated as not-Pro (paywall shows, app is not bricked)
+  } catch (e) {
+    // swallow; treated as not-Pro (paywall shows, app is not bricked). Logged
+    // because "it says I'm not subscribed" arrives with no other evidence.
+    logError('iap.init', e);
   } finally {
     set({ ready: true });
   }
@@ -195,7 +198,7 @@ export async function refreshEntitlement(): Promise<boolean> {
     );
     const hit = (active || []).find((p) => isProSku(p.productId) && p.purchaseState !== 'pending');
     set({ isPro: !!hit, activeSku: hit?.productId });
-  } catch { /* keep last known entitlement */ }
+  } catch (e) { logError('iap.entitlement', e); /* keep last known entitlement */ }
   return state.isPro;
 }
 

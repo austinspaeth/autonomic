@@ -45,8 +45,8 @@ export function FieldLabel({ children }: { children: React.ReactNode }) {
   return <Text style={{ fontSize: 14, fontWeight: '600', color: p.textDim, marginBottom: 6 }}>{children}</Text>;
 }
 
-export function TextField({ label, value, onChange, keyboardType, placeholder, multiline, signed, onToggleSign, inputRef }: {
-  label: string; value: string; onChange: (v: string) => void;
+export function TextField({ label, value, onChange, onBlur, keyboardType, placeholder, multiline, signed, onToggleSign, inputRef }: {
+  label: string; value: string; onChange: (v: string) => void; onBlur?: () => void;
   keyboardType?: 'default' | 'numeric' | 'decimal-pad'; placeholder?: string; multiline?: boolean;
   signed?: boolean; onToggleSign?: () => void; inputRef?: React.Ref<TextInput>;
 }) {
@@ -56,6 +56,7 @@ export function TextField({ label, value, onChange, keyboardType, placeholder, m
       ref={inputRef}
       value={value}
       onChangeText={onChange}
+      onBlur={onBlur}
       keyboardType={keyboardType || 'default'}
       keyboardAppearance="dark"
       placeholder={placeholder || '-'}

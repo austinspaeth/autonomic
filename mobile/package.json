@@ -1,6 +1,6 @@
 {
   "name": "autonomic",
-  "version": "1.21.2",
+  "version": "1.22.0",
   "main": "index.js",
   "private": true,
   "scripts": {

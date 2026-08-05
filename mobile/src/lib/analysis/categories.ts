@@ -11,7 +11,7 @@ import { ACTIVITY_TYPES, MED_TYPES, TRIGGER_TYPES } from '../registry';
 import {
   BANDS, Mode, acBandZones, acBandsToZones, acBuckets, acLatestIdx, acMean, acPresent, acRangeLabel,
   acReadVals, acScoreZones, avgRound, bucketViews, bucketWhen, catFromBands, isEvening, isMorning,
-  makeAgg, onDay, type BucketView, type ScoreContext,
+  makeAgg, type BucketView, type ScoreContext,
 } from './buckets';
 import type { Series, Zone } from '../../components/charts';
 
@@ -221,11 +221,14 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
     const tests: { dk: string; r: Entry }[] = [];
     buckets.forEach((b) => b.days.forEach((dk) => (days[dk].readings || []).forEach((r) => { if (r.type === 'standTest') tests.push({ dk, r }); })));
     const susSeq = tests.map((t) => num(t.r.sustainedDelta)).filter((v): v is number => v != null);
-    const peakSeq = tests.map((t) => num(t.r.peakDelta)).filter((v): v is number => v != null);
-    // Grade dot follows the latest test, not the range average: this is a
-    // progress card, and a bad month shouldn't drag on a recovered one.
-    const latestSus = susSeq.length ? susSeq[susSeq.length - 1] : null;
-    const latestPeak = peakSeq.length ? peakSeq[peakSeq.length - 1] : null;
+    // Readout + grade follow the newest bucket with a test (the current
+    // week/month/year when it has one), so the card opens on the same figure a
+    // tap on the chart's last point shows — an average in week/month/year mode,
+    // the day's own test in day mode. Not the range average: this is a progress
+    // card, and a bad month shouldn't drag on a recovered one.
+    const li = acLatestIdx(sus, peak);
+    const latestSus = li >= 0 ? sus[li] : null;
+    const latestPeak = li >= 0 ? peak[li] : null;
     const latestCat = latestSus != null ? catFromBands(latestSus, BANDS.standDelta) : null;
     const met = tests.filter((t) => t.r.metThreshold === true).length;
     const insights: Insight[] = [];
@@ -242,10 +245,10 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
       title: 'POTS Test', sub: range,
       cat: latestCat,
       desc: 'Your guided lay-to-stand tests. Same protocol every time, so these are directly comparable.',
-      help: 'Each point is one watch stand test. Sustained is the average rise over the final minute of standing versus the supine baseline; a sustained rise of 30 bpm or more (40 in ages 12-19) is the adult POTS-range criterion, and the zones shade it. Peak is the largest single rise. The grade dot follows your latest test.',
+      help: 'Each point is one watch stand test. Sustained is the average rise over the final minute of standing versus the supine baseline; a sustained rise of 30 bpm or more (40 in ages 12-19) is the adult POTS-range criterion, and the zones shade it. Peak is the largest single rise. The readout and grade dot follow your most recent point on the chart, so in week/month/year view they report that period\'s average.',
       tiles: true,
       stats: [
-        { label: 'Last sustained rise', value: latestSus != null ? Math.round(latestSus) : null, sub: 'bpm', color: latestCat ? SCORE_COLORS[latestCat] : undefined },
+        { label: mode === 'day' ? 'Last sustained rise' : 'Latest sustained rise', value: latestSus != null ? Math.round(latestSus) : null, sub: 'bpm', color: latestCat ? SCORE_COLORS[latestCat] : undefined },
         { label: 'Avg baseline', value: avgRound(base), sub: 'bpm' },
         { label: 'Met POTS threshold', value: tests.length ? `${met} of ${tests.length}` : null },
       ],
@@ -254,7 +257,7 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
           { label: 'Sustained', value: latestSus != null ? Math.round(latestSus) : null, sub: 'bpm', color: '#60a5fa' },
           { label: 'Peak', value: latestPeak != null ? Math.round(latestPeak) : null, sub: 'bpm', color: '#a855f7' },
         ],
-        when: onDay(tests.length ? `${+tests[tests.length - 1].dk.slice(5, 7)}/${+tests[tests.length - 1].dk.slice(8, 10)}` : null),
+        when: bucketWhen(mode, buckets[li]),
         zones: true,
       },
       charts: [{
@@ -291,18 +294,17 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
       const max = acAgg(buckets, (d) => (d.readings || []).filter((r) => r.type === 'orthostatic' && f(r)).map(maxOf).filter((v): v is number => v != null));
       const counts = acAggSum(buckets, (d) => (d.readings || []).filter((r) => r.type === 'orthostatic' && f(r) && maxOf(r) != null).length || null);
       let n = 0, potsN = 0;
-      // Readout follows the most recent event (like the POTS Test card), not the
-      // range average: buckets/days/readings are chronological, so the last
-      // valid hit wins.
-      let lastMax: number | null = null, lastDk: string | null = null;
       buckets.forEach((b) => b.days.forEach((dk) => (days[dk].readings || []).forEach((r) => {
         if (r.type !== 'orthostatic' || !f(r)) return;
         const v = maxOf(r); if (v == null) return;
         n++; if (v >= 30) potsN++;
-        lastMax = v; lastDk = dk;
       })));
       const maxAvg = acMean(max);
-      const lastDate = lastDk ? `${+(lastDk as string).slice(5, 7)}/${+(lastDk as string).slice(8, 10)}` : undefined;
+      // Readout follows the newest bucket with an event (like the POTS Test
+      // card), so it opens on the same figure a tap on the chart's last point
+      // gives: that week/month/year's average, or the day's own in day mode.
+      const li = acLatestIdx(max);
+      const lastMax = li >= 0 ? max[li] : null;
       // Every transition (stairs included) shades and colours on the same
       // zones, so the line never reads as a plain blue trace. The ≥30 bpm POTS
       // *criterion* is about standing up, so only that claim is withheld from
@@ -326,7 +328,7 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
               regrade: gradeColor,
             },
           ],
-          when: onDay(lastDate),
+          when: bucketWhen(mode, buckets[li]),
           zones: true,
         },
         stats: [],
@@ -377,14 +379,12 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
     const hrLow = acAgg(buckets, (d) => num(d.sleep?.hrLow));
     const hrHigh = acAgg(buckets, (d) => num(d.sleep?.hrHigh));
     if (acPresent(hrLow).length || acPresent(hrHigh).length) {
-      // Readout follows the most recent night with data (like the POTS cards),
-      // not the range average.
-      let lastLow: number | null = null, lastHigh: number | null = null, lastDk: string | null = null;
-      buckets.forEach((b) => b.days.forEach((dk) => {
-        const lo = num(days[dk].sleep?.hrLow), hi = num(days[dk].sleep?.hrHigh);
-        if (lo != null || hi != null) { lastLow = lo; lastHigh = hi; lastDk = dk; }
-      }));
-      const lastDate = lastDk ? `${+(lastDk as string).slice(5, 7)}/${+(lastDk as string).slice(8, 10)}` : undefined;
+      // Readout follows the newest bucket with a night logged (like the POTS
+      // cards), so it opens on the same figure a tap on the chart's last point
+      // gives: that week/month/year's average, or the night itself in day mode.
+      const li = acLatestIdx(hrLow, hrHigh);
+      const lastLow = li >= 0 ? hrLow[li] : null;
+      const lastHigh = li >= 0 ? hrHigh[li] : null;
       cards.push({
         title: 'Sleeping HR', sub: range,
         desc: 'Your lowest and highest heart rate through the night.',
@@ -394,7 +394,7 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
             { label: 'Low', value: lastLow != null ? Math.round(lastLow) : null, sub: 'bpm', color: '#60a5fa' },
             { label: 'High', value: lastHigh != null ? Math.round(lastHigh) : null, sub: 'bpm', color: '#a855f7' },
           ],
-          when: onDay(lastDate),
+          when: bucketWhen(mode, buckets[li]),
         },
         charts: [
           { label: '', integer: true, series: [series(hrLow, '#60a5fa', 'Low'), series(hrHigh, '#a855f7', 'High')] },

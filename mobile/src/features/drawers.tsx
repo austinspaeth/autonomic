@@ -10,10 +10,10 @@ import { FieldLabel, TimeField, onlyNumeric } from '../components/Field';
 import { Button, ProgressBar, Segmented } from '../components/ui';
 import { Icon } from '../components/Icon';
 import { GRADE_COLORS, WATER_BLUE, WATER_BLUE_SOFT, fonts, radius, usePalette } from '../theme';
-import { waterGoalL } from '../lib/scoring/day';
+import { resolveProtocol, waterGoalL } from '../lib/scoring/day';
 import { BM_KINDS, BM_VOLUMES, bmLabel } from '../lib/registry';
 import { LogPickerSheet } from './LogPicker';
-import { ensureDay, getState, save } from '../store/store';
+import { ensureDay, getState, save, useStore } from '../store/store';
 import { defaultTimeFor, uid } from '../lib/dates';
 import type { Movement } from '../lib/types';
 
@@ -32,7 +32,10 @@ const roundL = (n: number) => Math.round(n * 100) / 100;
 
 function WaterDrawer({ dk, controls }: { dk: string; controls: SheetControls }) {
   const p = usePalette();
-  const goal = waterGoalL(getState().settings.protocol);
+  const { openSheet } = useSheets();
+  // Subscribed, not read once — the goal card stacks on top of this drawer and
+  // the progress bar has to follow the new goal the moment it saves.
+  const goal = useStore((s) => waterGoalL(s.state.settings.protocol));
   const [text, setText] = useState(String(+((getState().days[dk]?.food.water) || 0)));
   const liters = Math.max(0, parseFloat(text) || 0);
   const cups = Math.round(liters / CUP_L);
@@ -97,8 +100,74 @@ function WaterDrawer({ dk, controls }: { dk: string; controls: SheetControls }) 
         </Pressable>
       </View>
       <Text style={{ color: p.textDim, fontSize: 13, marginTop: 10 }}>1 cup ≈ 250 ml. Steps adjust by one cup.</Text>
+      <Button
+        title="Change water goal"
+        style={{ marginTop: 20 }}
+        onPress={() => openSheet((c) => <WaterGoalCard controls={c} />, { fitContent: true })}
+      />
       <SheetFooter>
         <Button title="Save" variant="primary" onPress={() => { ensureDay(dk).food.water = roundL(liters); save(); controls.closeAll(); }} />
+      </SheetFooter>
+    </View>
+  );
+}
+
+/**
+ * Daily water goal, edited from the water drawer. A `fitContent` card so the
+ * whole thing rides up on the keyboard (see Sheet.tsx) instead of the input
+ * disappearing behind it. Saving writes the clean-day protocol's water amount,
+ * which is the one place the goal lives (`waterGoalL`) — so changing it here
+ * changes the protocol requirement too. Whether water is an enabled requirement
+ * is left exactly as the user set it in the protocol editor.
+ */
+function WaterGoalCard({ controls }: { controls: SheetControls }) {
+  const p = usePalette();
+  const inProtocol = useStore((s) => resolveProtocol(s.state.settings.protocol).water.enabled);
+  const [text, setText] = useState(() => String(waterGoalL(getState().settings.protocol)));
+  const liters = Math.max(0, parseFloat(text) || 0);
+  const step = (dir: 1 | -1) => setText(String(roundL(Math.max(0, liters + dir * CUP_L))));
+  const onSave = () => {
+    const s = getState();
+    const proto = resolveProtocol(s.settings.protocol);
+    // Settings-only write: no ensureDay/mutate, so the O(history) memos keyed on
+    // `days` don't recompute for a goal change.
+    s.settings.protocol = { ...proto, water: { ...proto.water, liters: roundL(liters) } };
+    save();
+    controls.close();
+  };
+  return (
+    <View>
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 6, paddingRight: 56 }}>Water goal</Text>
+      <Text style={{ color: p.textDim, fontSize: 14, lineHeight: 20, marginBottom: 18 }}>
+        {inProtocol
+          ? 'How much water you aim to drink each day. Water is part of your clean-day protocol, so this is the amount a clean day needs too.'
+          : 'How much water you aim to drink each day. It also sets the amount your clean-day protocol would use if you turn its water requirement on.'}
+      </Text>
+      <FieldLabel>LITERS PER DAY</FieldLabel>
+      <View style={{ flexDirection: 'row', gap: 8 }}>
+        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.control, paddingHorizontal: 12 }}>
+          <TextInput
+            value={text}
+            onChangeText={(t) => setText(onlyNumeric(t))}
+            keyboardType="decimal-pad"
+            keyboardAppearance="dark"
+            placeholder="2.5"
+            placeholderTextColor={p.textDim}
+            selectTextOnFocus
+            style={{ flex: 1, paddingVertical: 12, fontSize: 18, fontWeight: '700', color: p.text }}
+          />
+          <Text style={{ color: p.textDim, fontSize: 15, fontWeight: '600' }}>L</Text>
+        </View>
+        <Pressable onPress={() => step(-1)} style={({ pressed }) => [{ width: 52, borderWidth: 1, borderColor: p.border, backgroundColor: p.surface2, borderRadius: radius.control, alignItems: 'center', justifyContent: 'center' }, pressed && { opacity: 0.6 }]}>
+          <Text style={{ color: p.text, fontSize: 22, fontWeight: '600', lineHeight: 26 }}>−</Text>
+        </Pressable>
+        <Pressable onPress={() => step(1)} style={({ pressed }) => [{ width: 52, borderWidth: 1, borderColor: WATER_BLUE, backgroundColor: WATER_BLUE_SOFT, borderRadius: radius.control, alignItems: 'center', justifyContent: 'center' }, pressed && { opacity: 0.6 }]}>
+          <Text style={{ color: WATER_BLUE, fontSize: 22, fontWeight: '600', lineHeight: 26 }}>+</Text>
+        </Pressable>
+      </View>
+      <Text style={{ color: p.textDim, fontSize: 13, marginTop: 10 }}>Steps adjust by 0.25 L (one cup).</Text>
+      <SheetFooter>
+        <Button title="Save goal" variant="primary" onPress={onSave} disabled={liters <= 0} />
       </SheetFooter>
     </View>
   );

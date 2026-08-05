@@ -395,7 +395,7 @@ export function HealthUpdatesSheet({ sets, controls, onImported }: {
     // workout from the add-activity import card. More than one and there's no
     // single report to show, so the journal list is the right landing place.
     if (workouts.length === 1 && workoutCurveFor(workouts[0].entry)) {
-      openWorkoutReport(openSheet, workouts[0].entry, workouts[0].dk);
+      openWorkoutReport(openSheet, workouts[0].entry, workouts[0].dk, true);
     }
   };
 
