@@ -44,6 +44,5 @@ of Autonomic" to match how you sign everywhere else).
 
 > "It's one person and a subscription, no investor, no data to sell. That's
 > exactly why the app has no reason to touch your data. It's free to use, and
-> there's a hardship path for anyone who needs it." *(only if you do offer a
-> hardship path; drop the last line if not)*
+> there's a hardship path for anyone who needs it."
 </content>
