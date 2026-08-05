@@ -8,7 +8,7 @@ keywords: "compression garments POTS, compression for POTS, abdominal compressio
 date: 2026-08-05
 updated: 2026-08-05
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1536685965216-c5f4478ec2cf?q=80&w=1760&auto=format&fit=crop"
+photoLocation: "https://images.unsplash.com/photo-1759476534021-163836fddc50?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Unsplash"
 tldr: "Compression works for POTS by pushing pooled blood back up out of your legs and, more importantly, your abdomen so your heart has something to pump when you stand. The evidence is strongest for abdominal or waist-high garments at roughly 20 to 40 mmHg; knee-high socks alone help far less because most pooling happens in the belly, not the calves. Put it on before you get up, and use your stand test to check whether it is actually lowering your standing heart rate."
 categories:
