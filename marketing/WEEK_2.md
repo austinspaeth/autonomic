@@ -152,5 +152,3 @@ this week, ship as they're ready:
 **The shift from Week 1:** Week 1 produced nothing visible on purpose. Week 2
 produces the compounding assets — identity, content, cadence — that don't spike
 but quietly build the traction (and the search rank) everything later stands on.
-</content>
-</invoke>

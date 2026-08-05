@@ -62,4 +62,3 @@ shipping app. Items in [brackets] need Austin to confirm before external use.*
 Autonomic is a personal journal and education tool, **not a medical device.** It
 does not diagnose, treat, or prevent any disease. Users are told to discuss any
 protocol or medication changes with their doctor.
-</content>

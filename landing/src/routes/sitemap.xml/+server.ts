@@ -25,6 +25,7 @@ export async function GET() {
     { loc: `${BASE}/`, priority: '1.0' },
     { loc: `${BASE}/insights/`, priority: '0.8' },
     { loc: `${BASE}/insights/articles/`, priority: '0.6' },
+    { loc: `${BASE}/press/`, priority: '0.5' },
     { loc: `${BASE}/privacy-policy/`, priority: '0.3' },
     { loc: `${BASE}/terms-of-service/`, priority: '0.3' },
     ...allTopics().map((t) => ({ loc: `${BASE}/insights/${t.slug}/`, priority: '0.6' })),

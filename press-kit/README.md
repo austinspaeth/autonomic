@@ -39,4 +39,3 @@ files so the whole kit is a single shareable link for Thursday's outreach.
 - **The privacy claim is literally true** — no account, no cloud, no backend,
   developer can't access user data. Say it plainly.
 - Autonomic is a journal/education tool, **not a medical device.**
-</content>

@@ -62,4 +62,3 @@ link it from the press page so a writer can grab everything at once.
 - [ ] `app-icon.png` copied from repo `favicon.png`
 - [ ] `logo.svg` copied from repo root
 - [ ] (optional) `autonomic-press-assets.zip`
-</content>

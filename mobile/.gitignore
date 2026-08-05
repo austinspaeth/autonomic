@@ -14,3 +14,6 @@ expo-env.d.ts
 
 # Local expo-module native build output
 modules/**/android/build/
+
+# Local build output (EAS/xcode logs, .ipa/.aab, generated fixtures)
+build-out/

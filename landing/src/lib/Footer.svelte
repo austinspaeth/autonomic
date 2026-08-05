@@ -19,7 +19,7 @@
     </nav>
     <nav class="footer-col" aria-label="More">
       <h4>More</h4>
-      <a href="/#milestones">Milestones</a><a href="/#privacy">Privacy</a><a href="/insights/">Blog</a><a href="/#faq">FAQ</a><a href="/privacy-policy/">Privacy Policy</a><a href="/terms-of-service/">Terms of Service</a>
+      <a href="/#milestones">Milestones</a><a href="/#privacy">Privacy</a><a href="/insights/">Blog</a><a href="/press/">Press</a><a href="/#faq">FAQ</a><a href="/privacy-policy/">Privacy Policy</a><a href="/terms-of-service/">Terms of Service</a>
     </nav>
   </div>
   <div class="wrap footer-base">

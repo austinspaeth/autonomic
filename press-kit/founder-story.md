@@ -59,4 +59,3 @@ information, that isn't a privacy *policy*; it's the architecture.
 - **The app is a journal and education tool, not a medical device.**
 - The privacy claim is literally true and load-bearing — no account, no cloud, no
   backend, developer can't access user data.
-</content>

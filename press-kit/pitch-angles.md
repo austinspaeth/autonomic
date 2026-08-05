@@ -87,4 +87,3 @@ cannot* leak your data.
 - **No recovery claims. No competitor trash-talk.** Receipts, not attacks.
 - **Track who got which angle and when** so you don't double-pitch or forget a
   follow-up.
-</content>

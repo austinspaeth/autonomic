@@ -276,5 +276,3 @@ fifth planning day.
 July. Week 1 buys September and October. The search-rank burial you're seeing
 today (§1.4) is the *absence* of this week's work showing up — it lifts as the
 work lands, not before.
-</content>
-</invoke>

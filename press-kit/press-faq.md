@@ -64,4 +64,3 @@ story.
 **Can I get a review copy / walkthrough?**
 Yes — the app is free to download on both stores, and Austin is happy to give a
 live walkthrough or answer questions. Contact: austin@autonomic.care.
-</content>

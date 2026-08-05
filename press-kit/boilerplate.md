@@ -48,4 +48,3 @@ space. All are factually confirmed against the shipping app.*
 > Everything runs on the device: there is no account, no cloud, and no backend, so
 > the data can't be lost or sold. Built solo by a patient-founder. Free to use;
 > Autonomic Pro is $49.99/year. autonomic.care
-</content>
