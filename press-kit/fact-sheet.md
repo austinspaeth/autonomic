@@ -14,8 +14,8 @@ shipping app. Items in [brackets] need Austin to confirm before external use.*
 | **Website** | https://autonomic.care |
 | **App Store** | https://apps.apple.com/app/id6789786971 |
 | **Google Play** | https://play.google.com/store/apps/details?id=com.autonomic.journal |
-| **Founder** | Austin Spaeth — solo, patient-founder |
-| **Press contact** | [set a press email — e.g. press@autonomic.care] |
+| **Founder** | Austin Spaeth — solo, patient-founder (long hauler of 4+ years, dad of six, South Carolina) |
+| **Press contact** | austin@autonomic.care |
 | **Launched** | July 2026 |
 
 ## What it does

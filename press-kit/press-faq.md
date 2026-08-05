@@ -46,8 +46,9 @@ every install starts with 7 days of full access. [There is a hardship path —
 describe how someone requests it.]
 
 **Who built it?**
-One person — Austin Spaeth, a patient-founder who built it during his own
-recovery. [Confirm.]
+One person — Austin, a patient-founder who has lived with long COVID for four-plus
+years and built the app during his own recovery, after specialists left him
+without answers. He's a solo developer and a dad of six in South Carolina.
 
 **What platforms and when did it launch?**
 iOS (with an Apple Watch app) and Android (via Health Connect). Both launched in
@@ -60,6 +61,6 @@ surveys — note that here when relevant.] The absence of a dataset is itself th
 story.
 
 **Can I get a review copy / walkthrough?**
-Yes — [the app is free to download on both stores, and I'm happy to give a live
-walkthrough or answer questions. Contact: ___.]
+Yes — the app is free to download on both stores, and Austin is happy to give a
+live walkthrough or answer questions. Contact: austin@autonomic.care.
 </content>

@@ -1,48 +1,49 @@
 # Founder Quotes — ready for attribution
 
-> **⚠️ These are drafts in your voice, for you to approve or rewrite.** A journalist
-> may quote these verbatim, so read each one and make sure it's something *you*
-> would actually say and can stand behind. Anything with `[brackets]` needs your
-> personal detail. Never ship a quote that implies a recovery promise.
+> Drafted from Austin's own founder story (autonomic.care). Read them once and
+> tweak anything that doesn't sound like you — a journalist may quote them
+> verbatim. None of them promise recovery.
 
-Attribute as: **Austin Spaeth, founder of Autonomic.**
+Attribute as: **Austin Spaeth, founder of Autonomic** (or just "Austin, founder
+of Autonomic" to match how you sign everywhere else).
 
 ---
 
-### On why it exists (patient angle)
+### On why it exists
 
-> "Every app I tried answered a different question than the one I had. I didn't
-> want a score to trust — I wanted to know whether what I was doing was working. So
-> I built something that measures instead of guesses."
+> "I saw specialist after specialist — cardiology, neurology — and kept leaving
+> with no real answers. So I started tracking everything myself: HRV, blood
+> pressure, sleep, the days I crashed. Slowly the patterns showed up. Autonomic is
+> the tool I built to make sense of my own recovery."
 
 ### On the privacy architecture (the reporter's favorite)
 
-> "Other health apps promise not to sell your data. Autonomic can't sell it,
-> because it never has it. There's no account and no server — the numbers never
-> leave your phone. That's not a policy I could change later; it's how the app is
-> built."
+> "Other health apps promise not to sell your data. Autonomic can't — there's no
+> account and no server, so the numbers never leave your phone. For people already
+> anxious about who sees their health data, that's the whole point."
+
+### On honesty / no false hope
+
+> "I'm not healed, and I won't pretend otherwise. The app doesn't promise
+> recovery — it shows you honestly what's helping and what's hurting. That's what
+> I needed, so that's what I built."
 
 ### On the measurement rigor (vs. the black box)
 
-> "A noisy reading should tell you it's noisy, not invent a number to keep you
-> happy. Every metric is graded against published thresholds, out in the open — so
-> a good day and a warning sign don't look the same."
+> "A noisy reading should tell you it's noisy, not invent a number. Every metric
+> is graded against published thresholds, out in the open — so a good day and a
+> warning sign don't look the same."
+
+### On who it's for (patient-founder)
+
+> "I'm not a doctor or an expert. I'm someone on this road — four years of long
+> COVID, six kids, figuring out my recovery one reading at a time. I built the app
+> I wished I'd had when I was getting no answers."
 
 ### On the business model (pre-empts the "selling to the sick" fight)
 
-> "It's one person and a subscription. There's no data to monetize and no investor
-> to answer to, which is exactly why the app has no reason to touch your data. It's
-> free to use, and there's a hardship path for anyone who needs it."
-
-### On who it's for
-
-> "This is for the person staring at their standing heart rate wondering if
-> they're actually getting better or just having a good week. I built it because I
-> was that person." [confirm this matches your story]
-
-### Personal / recovery framing (optional — only if true and comfortable)
-
-> "[Your one honest sentence about what living with this taught you, or what you
-> hope the app does for someone else. Keep it 'see what's helping,' never a cure
-> claim.]"
+> "It's one person and a subscription — no investor, no data to sell. That's
+> exactly why the app has no reason to touch your data. It's free to use, and
+> there's a hardship path for anyone who needs it." *(only if you do offer a
+> hardship path — drop the last line if not)*
 </content>
