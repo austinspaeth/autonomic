@@ -8,7 +8,7 @@ keywords: "iron deficiency POTS, ferritin POTS, low ferritin symptoms, iron defi
 date: 2026-08-06
 updated: 2026-08-06
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?q=80&w=1760&auto=format&fit=crop"
+photoLocation: "https://images.unsplash.com/photo-1508061461508-cb18c242f556?q=80&w=1469&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
 photoAttribution: "Anna Pelzer / Unsplash"
 tldr: "Iron does two jobs that matter for POTS: it carries oxygen in your blood and it helps build the catecholamines that run your autonomic nervous system. Ferritin, your iron-storage marker, can sit low enough to cause fatigue, faster heart rate and lightheadedness while a routine complete blood count still looks normal, because stores empty before anemia shows up. Many clinicians treat symptomatic iron deficiency below a ferritin of roughly 50 ng/mL, well above the lab's lower cutoff. Ask for ferritin and transferrin saturation, not just hemoglobin, and never self-supplement iron without labs, because iron overload is real."
 categories:
