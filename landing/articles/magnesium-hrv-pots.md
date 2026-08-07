@@ -8,7 +8,7 @@ keywords: "magnesium and HRV, magnesium for POTS, does magnesium improve HRV, ma
 date: 2026-08-07
 updated: 2026-08-07
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?q=80&w=1760&auto=format&fit=crop"
+photoLocation: "https://images.unsplash.com/photo-1693996045463-6ea86d10a2e7?q=80&w=1470&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
 photoAttribution: "Brooke Lark / Unsplash"
 tldr: "Magnesium is an essential mineral your nerves, muscles and heart cannot run without, and it helps quiet the excitatory side of your nervous system. The direct evidence that a supplement raises HRV is modest and strongest in people who are actually deficient, but the indirect route is solid: magnesium can improve sleep quality, and better sleep reliably lifts the next morning's reading. Serum magnesium is a poor test because less than 1 percent of your body's magnesium is in the blood. Forms matter mostly for absorption and side effects, not magic: glycinate is gentle and calming, citrate is well absorbed but loosens stools, oxide is cheap and poorly absorbed. In POTS there is a real caution, because magnesium can relax blood vessels and nudge blood pressure down, so start low and watch your standing symptoms. Because the response is individual, the useful move is to hold your dose and timing steady and track your HRV, resting heart rate and stand test against your own baseline."
 categories:
