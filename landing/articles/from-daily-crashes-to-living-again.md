@@ -1,14 +1,14 @@
 ---
 title: "From Daily Crashes to Living Again: What I Tracked, What I Changed, and What the Data Showed"
 slug: from-daily-crashes-to-living-again
-published: false
+published: true
 summary: "A patient-founder's honest account of four years with long COVID and dysautonomia: the daily crashes and labile blood pressure, why I started measuring, the routine I built piece by piece, and what my own HRV and blood pressure data actually showed."
 description: "One long hauler's real recovery story, with the data behind it. Crashing HRV, labile blood pressure, and how tracking HRV, blood pressure and orthostatic patterns helped me see what was actually helping. Not a cure, a way to see. Personal experience, not medical advice."
 keywords: "long covid recovery story, dysautonomia recovery, POTS recovery, tracking HRV long covid, labile blood pressure long covid, low HRV recovery, quercetin long covid, antihistamines POTS histamine, MCAS long covid, patient founder, see what is helping"
-date: 2026-08-06
-updated: 2026-08-06
+date: 2026-08-07
+updated: 2026-08-07
 author: "Austin Spaeth"
-photoLocation: "/journey-family.jpg"
+photoLocation: "/articles/from-daily-crashes-to-living-again/austin-and-daughter-carousel.jpg"
 photoAttribution: "Austin Spaeth"
 tldr: "Four years into long COVID I was crashing daily, with labile blood pressure and HRV in the teens, and no doctor could tell me whether anything I tried was working. So I started measuring: HRV, blood pressure, orthostatic response, sleep, food, and the supplements and medications I was trying. Slowly the patterns surfaced. Over two years I built a routine and watched the numbers after every change (antihistamines, and later quercetin, were the big ones for me), and I went from daily crashes to occasional ones. I am not healed, but I can see and manage it now. The app did not fix me. It let me see, and seeing was what I needed. This is my own experience, not medical advice."
 categories:
@@ -50,7 +50,10 @@ I started logging everything: my HRV, my blood pressure, standing episodes, slee
 
 I want to be clear about one thing, because it matters: the app didn't fix me. It never could. What it did was let me see. For the first time I could tell a good day from a warning sign, and I could start connecting what I did to how I felt two hours, or two days, later.
 
-> 📷 **[ 1-daily-reading.png ]** — *A morning reading in Autonomic: the daily score, graded so a good day and a warning sign actually look different.*
+<figure>
+  <img src="/articles/from-daily-crashes-to-living-again/1-daily-reading.png" width="1600" height="696" loading="lazy" alt="A completed day in the Autonomic app scored 91 out of 100 and graded Excellent, next to seven-day SDNN and RMSSD trend charts reading 53 and 35 milliseconds." />
+  <figcaption>A day in the app: the score with its grade, and the SDNN and RMSSD trends underneath it. Graded, so a good day and a warning sign do not look the same.</figcaption>
+</figure>
 
 ## What I changed, and what the data actually showed
 
@@ -62,7 +65,10 @@ Then I started working on my diet, doing my best to keep it clean and cut histam
 
 Everything I did moved the needle a little, but nothing felt life changing. Until a few months ago, when I added quercetin. I'd seen in my own data how much mast cells and histamine seemed to drive my bad days, and for me quercetin was a night and day change. My RMSSD went from a regular floor of 15 to 20 up to a new floor of 32 to 36, with good days hitting the 40s. My SDNN climbed too. I'm still not 100 percent, but I could do so much more than before. And beyond the numbers, I could feel it, which in the end is what matters most.
 
-> 📷 **[ 2-rmmsd-jump.png ]** — *My RMSSD trend around the change: a floor of 15 to 20 stepping up to 32 to 36. The clearest before-and-after in my data.*
+<figure class="prose-shot">
+  <img src="/articles/from-daily-crashes-to-living-again/2-rmssd-jump.png" width="559" height="621" loading="lazy" alt="The Autonomic Outlook chart showing a daily autonomic score across a year, averaging 75, with a worst day of 37 in January and a best of 99 in June, and a rolling three month average climbing through the spring." />
+  <figcaption>My daily autonomic score across the year, with the three month rolling average behind it. The worst day sits at 37 in January; by June the best is 99.</figcaption>
+</figure>
 
 ### The patterns that changed how I live
 
@@ -82,7 +88,10 @@ If I had to pick the most telling number, it was my morning SDNN and RMSSD. A st
 
 The number I'm proudest of is my blood pressure. Two years ago I averaged around 130 over 85 with those terrifying spikes above 180 over 100. Today I'm steady, around 110 over 75, and I've gone four months without a single spike. The scariest part of my condition is, for now, gone. I still get big heart rate jumps when I stand sometimes, 50 beats a minute on a bad day, but even those happen less often and settle faster than they used to. A bad HRV day for me now is around 40 SDNN and 28 RMSSD, which used to be a number I could only dream of.
 
-> 📷 **[ 3-blood-pressure.png ]** — *My blood pressure over time: from labile, with spikes above 180 over 100, to steady around 110 over 75.*
+<figure class="prose-shot">
+  <img src="/articles/from-daily-crashes-to-living-again/3-blood-pressure.png" width="513" height="639" loading="lazy" alt="Blood pressure in the Autonomic app shown as quarterly systolic-to-diastolic spans from late 2024 to 2026, the bars falling and narrowing from orange in 2024 to green at 112 over 72 in 2026." />
+  <figcaption>My blood pressure by quarter, each bar spanning diastolic up to systolic. It starts high and wide on the left and settles to 112 over 72 by 2026.</figcaption>
+</figure>
 
 ## Where I am now
 
@@ -92,7 +101,10 @@ Today I can do all of it. I still have rough days, but I'm not canceling my life
 
 Two years ago I was in a daily tailspin, heart rate episodes, blood pressure episodes, feeling almost disabled, unable to be the dad I wanted to be. Now a crash might happen once or twice every couple of weeks. And when one does, I can usually tell you exactly why, because I've tracked long enough to understand my own patterns. They're less frequent, I recover faster, and I have a framework that keeps me out of trouble most of the time.
 
-> 📷 **[ 4-recovery-arc.png ]** — *The long view: my HRV climbing from the crash-era lows up to where I am now. The whole story in one line.*
+<figure>
+  <img src="/articles/from-daily-crashes-to-living-again/4-recovery-arc.png" width="1600" height="579" loading="lazy" alt="Three charts covering 2024 to 2026, each climbing: SDNN from 25 to 51 milliseconds, RMSSD from 9 to 29 milliseconds, and pNN50 from near zero to 9 percent, the lines shading from red through orange to green." />
+  <figcaption>The long view, 2024 to 2026. SDNN, RMSSD and pNN50 all climbing out of the crash-era lows. Red to green is the whole story.</figcaption>
+</figure>
 
 ## What I'd say to you
 
@@ -105,4 +117,3 @@ If you're where I was, please work with a doctor who takes long COVID and dysaut
 ---
 
 *Autonomic is a personal journal and education tool, not a medical device. It does not diagnose, treat, or prevent any disease. This article describes my own experience only and is not medical advice. Always talk to your doctor before starting or stopping any medication, supplement, or treatment.*
-</content>

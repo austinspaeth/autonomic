@@ -1539,6 +1539,9 @@ a { color: inherit; text-decoration: none; }
 .article-prose figure { margin: 28px 0; }
 .article-prose figure svg { width: 100%; height: auto; display: block; }
 .article-prose figure img { width: 100%; height: auto; display: block; border-radius: var(--r); border: 1px solid var(--line); }
+/* App screenshots. A portrait capture is narrower than the prose column, so it
+   centres at its own width instead of upscaling to full bleed and going soft. */
+.article-prose figure.prose-shot img { width: auto; max-width: min(100%, 420px); margin-inline: auto; }
 .article-prose figcaption {
   margin-top: 10px; font-size: 13.5px; color: var(--dim-2);
   font-family: var(--mono); letter-spacing: 0.01em; text-align: center;
