@@ -1067,7 +1067,7 @@
     <div class="feature-art">
       <div class="card-mock ms-mock">
         <div class="ms-track"><b>Milestone tracker</b><span>32 of 88 achieved</span><div class="ms-bar"><i style="width:36%"></i></div></div>
-        <div class="ms-row done"><span class="ms-check">✓</span>First RMSSD 30+ (baseline recovery)<em>May 30</em></div>
+        <div class="ms-row done"><span class="ms-check">✓</span>First RMSSD 30+<em>May 30</em></div>
         <div class="ms-row done"><span class="ms-check">✓</span>3 consecutive days RMSSD 30+<em>Jun 2</em></div>
         <div class="ms-row"><span class="ms-check off">○</span>First RMSSD 35+ (pre-illness)<em></em></div>
         <div class="ms-row"><span class="ms-check off">○</span>7-day clean streak<em></em></div>

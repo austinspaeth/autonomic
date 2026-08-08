@@ -822,6 +822,12 @@ a { color: inherit; text-decoration: none; }
   100% { box-shadow: 0 0 0 0 rgba(224,49,39,0); }
 }
 @media (prefers-reduced-motion: reduce) { .aip-copy { animation: none; } }
+/* Phones: the button gets its own full-width line under the caption. */
+@media (max-width: 720px) {
+  .aip-foot { flex-direction: column; align-items: stretch; gap: 12px; }
+  .aip-foot span { text-align: center; }
+  .aip-copy { width: 100%; }
+}
 .ai-try {
   max-width: 60ch; margin: 26px auto 0; text-align: center;
   font-size: 14.5px; line-height: 1.6; color: var(--dim);
@@ -835,7 +841,9 @@ a { color: inherit; text-decoration: none; }
 .ms-bar i { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
 .ms-row { display: flex; align-items: center; gap: 11px; padding: 11px 2px; border-top: 1px solid var(--line); font-size: 14px; }
 .ms-row:first-of-type { border-top: none; }
-.ms-row em { margin-left: auto; font-style: normal; font-size: 12px; color: var(--green); font-weight: 600; }
+/* The date holds its own line: the label beside it is a bare text node (an
+   anonymous flex item), which will happily shrink the date into a wrap. */
+.ms-row em { margin-left: auto; flex: none; white-space: nowrap; font-style: normal; font-size: 12px; color: var(--green); font-weight: 600; }
 .ms-check { width: 20px; height: 20px; border-radius: 50%; background: var(--green); color: #04210f; display: grid; place-items: center; font-size: 12px; font-weight: 800; flex: none; }
 .ms-check.off { background: transparent; border: 1.5px solid var(--line-2); color: var(--dim-2); }
 .ms-row:not(.done) { color: var(--dim-2); }
@@ -1052,6 +1060,12 @@ a { color: inherit; text-decoration: none; }
   .cmp-cell { padding: 13px 11px; font-size: 12.5px; }
   .cmp-head { padding: 20px 8px 15px; }
   .cmp-brand { font-size: 14px; gap: 5px; }
+  /* The wordmark is wider than the column and spills into the row below. The
+     mark alone identifies the column here; kept for screen readers. */
+  .cmp-us .cmp-brand b {
+    position: absolute; width: 1px; height: 1px; margin: -1px;
+    overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+  }
   .cmp-logo-them { width: 18px; height: 18px; }
   .cmp-amt { font-size: 23px; }
   .cmp-them .cmp-amt { font-size: 20px; }
@@ -1261,7 +1275,19 @@ a { color: inherit; text-decoration: none; }
 .dl-store-qr { background: #fff; border-radius: 12px; padding: 9px; line-height: 0; box-shadow: 0 4px 14px -6px rgba(0,0,0,0.5); }
 .dl-store-qr img { width: 132px; height: 132px; }
 .dl-store-scan { font-family: var(--mono); font-size: 11px; letter-spacing: 0.05em; color: var(--dim); }
-@media (max-width: 460px) { .dl-stores { grid-template-columns: 1fr; } }
+/* Phones: no QR (you can't scan a code with the device showing it), and the
+   two badges share one card side by side instead of stacking into two. */
+@media (max-width: 720px) {
+  .dl-store-qr, .dl-store-scan { display: none; }
+  .dl-stores {
+    grid-template-columns: 1fr 1fr; gap: 10px; align-items: center;
+    background: var(--panel); border: 1px solid var(--line-2);
+    border-radius: var(--r-lg); padding: 14px;
+  }
+  .dl-store { background: none; border: 0; border-radius: 0; padding: 0; gap: 0; }
+  .dl-store-badge { width: 100%; }
+  .dl-store-badge svg { width: 100%; height: auto; }
+}
 
 .waitlist-grid { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 32px; align-items: start; text-align: left; }
 .wl-form { background: var(--panel); border: 1px solid var(--line-2); border-radius: var(--r-lg); padding: 28px; }
@@ -1929,3 +1955,182 @@ a.gc { display: block; }
 .article-prose .metric-scale { display: flex; margin: 22px 0 10px; border-radius: 9px; overflow: hidden; border: 1px solid var(--line); }
 .metric-scale .ms-seg { flex: 1; padding: 8px 5px; text-align: center; font-family: var(--mono); font-size: 10.5px; font-weight: 700; color: #08080a; line-height: 1.25; }
 .metric-scale .ms-seg small { display: block; font-size: 9.5px; font-weight: 700; opacity: 0.8; }
+
+/* ============================================================
+   Bottom dock — cookie notice + sticky blog CTA
+   Everything that hovers over the bottom of the viewport stacks
+   in here (markup lives in app.html, outside the Svelte app).
+   Desktop keeps the old free-floating layout via display:contents;
+   mobile turns the dock into a real bottom-anchored column.
+   ============================================================ */
+
+.aj-dock { display: contents; }
+
+/* --- Cookie notice ------------------------------------------------ */
+.aj-cb {
+  position: fixed; left: 16px; right: 16px; bottom: 16px; z-index: 9999;
+  max-width: 360px; margin-left: auto;
+  font-family: var(--body);
+  color: var(--text);
+}
+.aj-cb[hidden] { display: none; }
+.aj-cb-pill { display: none; }
+.aj-cb-card {
+  background: var(--panel); border: 1px solid var(--line-2); border-radius: var(--r);
+  padding: 16px 18px; box-shadow: 0 12px 32px rgba(0,0,0,0.45);
+}
+.aj-cb-copy { margin: 0 0 12px; font-size: 14px; line-height: 1.5; color: var(--dim); }
+.aj-cb-copy a { color: var(--accent-2); text-decoration: underline; }
+.aj-cb-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.aj-cb-btn {
+  background: transparent; color: var(--dim);
+  border: 1px solid var(--line-2); border-radius: 10px;
+  padding: 8px 14px; font-size: 13px; font-family: inherit; cursor: pointer;
+}
+.aj-cb-btn--go { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+
+@media (max-width: 720px) {
+  .aj-dock {
+    display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 9999;
+    padding: 0 14px calc(7px + env(safe-area-inset-bottom));
+    pointer-events: none;
+  }
+  /* Only the visible surfaces take taps — the dock and the notice's own box
+     span the full width and would otherwise swallow them. The expanded card
+     re-enables its own below, so the collapsed (invisible) one can never sit
+     on top of the pill. */
+  .aj-dock .aj-cb-pill, .aj-dock .aj-scta { pointer-events: auto; }
+
+  /* In flow inside the dock. The sticky CTA docks underneath it (out of
+     flow, see below), so the notice lifts by the CTA's height instead of
+     being pushed — a transform tweens, a reflow doesn't. */
+  .aj-cb {
+    position: relative; left: auto; right: auto; bottom: auto;
+    width: 100%; max-width: 420px; margin: 0;
+    transition: transform 0.45s var(--ease);
+  }
+  .aj-dock.has-scta .aj-cb { transform: translateY(calc(-1 * var(--aj-scta-h, 66px))); }
+
+  /* Collapsed: a compact glass pill. Expanded (.is-open): the same card as
+     desktop, centered. Both are always in the DOM and cross-fade, the
+     collapsed one anchored bottom-center so the card grows out of it. */
+  .aj-cb-pill {
+    display: flex; align-items: center; gap: 2px;
+    width: max-content; max-width: 100%; margin: 0 auto;
+    background: rgba(8,8,10,0.62);
+    -webkit-backdrop-filter: blur(18px) saturate(150%); backdrop-filter: blur(18px) saturate(150%);
+    border: 1px solid var(--line-2); border-radius: 999px;
+    padding: 4px 5px 4px 4px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    transition: opacity 0.22s var(--ease), transform 0.3s var(--bounce);
+  }
+  .aj-cb-open {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: none; border: 0; cursor: pointer;
+    font-family: inherit; font-size: 13px; line-height: 1; color: var(--text);
+    padding: 8px 6px 8px 10px;
+  }
+  .aj-cb-ic { width: 16px; height: 16px; flex: none; color: var(--dim); }
+  .aj-cb-x {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 28px; height: 28px; flex: none;
+    background: none; border: 0; border-radius: 999px; cursor: pointer; color: var(--dim);
+  }
+  .aj-cb-x svg { width: 14px; height: 14px; }
+
+  .aj-cb-card {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    opacity: 0; transform: translateY(6px) scale(0.94); transform-origin: 50% 100%;
+    pointer-events: none;
+    transition: opacity 0.24s var(--ease), transform 0.32s var(--bounce);
+  }
+  .aj-cb.is-open .aj-cb-pill {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    opacity: 0; transform: scale(0.86); pointer-events: none;
+  }
+  .aj-cb.is-open .aj-cb-card {
+    position: relative; opacity: 1; transform: none; pointer-events: auto;
+  }
+}
+
+/* --- Sticky blog CTA (mobile only) -------------------------------- */
+.aj-scta { display: none; }
+@media (max-width: 720px) {
+  .aj-scta {
+    /* Out of the dock's flow: it always sits on the floor, and the cookie
+       notice lifts above it. */
+    position: absolute; left: 12px; right: 12px; bottom: calc(7px + env(safe-area-inset-bottom));
+    display: flex; align-items: center; gap: 12px;
+    padding: 7px 7px 7px 18px;
+    background: rgba(8,8,10,0.66);
+    -webkit-backdrop-filter: blur(18px) saturate(150%); backdrop-filter: blur(18px) saturate(150%);
+    border: 1px solid var(--line-2); border-radius: 999px;
+    /* Lifts it off whatever it's floating over — without a shadow it reads as
+       part of the article. Tight contact layer + a wide soft ambient one. */
+    box-shadow: 0 4px 14px rgba(0,0,0,0.5), 0 18px 44px rgba(0,0,0,0.62);
+    opacity: 0; transform: translateY(120%);
+    transition: opacity 0.35s var(--ease), transform 0.5s var(--ease);
+  }
+  .aj-scta[hidden] { display: none; }
+  .aj-dock.has-scta .aj-scta { opacity: 1; transform: none; }
+  /* Travelling light along the border. Same "red light from the top left"
+     gradient the journey photo uses, but the source point is animated, so it
+     drifts to the middle-right and back. Drawn as a masked 1px ring on a
+     pseudo-element rather than a border-box gradient: the bar is translucent
+     glass, so a border-box layer would bleed red through the whole pill. */
+  .aj-scta::before {
+    content: ''; position: absolute; inset: -1px; border-radius: inherit;
+    padding: 1px; pointer-events: none;
+    /* Both radii are animated, not just the position: the light starts as a
+       small spot that only reaches the top edge, then swells at the end so it
+       spans the full height and wraps the button. */
+    background: radial-gradient(
+      var(--aj-glow-rx) var(--aj-glow-ry) at var(--aj-glow-x) var(--aj-glow-y),
+      var(--accent) 0%, rgba(224,49,39,0.6) 22%, rgba(224,49,39,0) 55%
+    );
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask-composite: exclude;
+  }
+  .aj-scta-text {
+    flex: 1; min-width: 0;
+    font-size: 14.5px; font-weight: 500; line-height: 1.34; color: var(--text);
+  }
+  .aj-scta-btn {
+    flex: none; display: inline-flex; align-items: center; gap: 8px;
+    background: var(--accent); color: #fff;
+    border-radius: 999px; padding: 13px 20px;
+    font-size: 15px; font-weight: 700; letter-spacing: 0.01em; line-height: 1;
+    box-shadow: 0 4px 16px rgba(224,49,39,0.4);
+  }
+  .aj-scta.has-ic .btn-dl-ic { display: inline-flex; }
+  .aj-scta .btn-dl-ic svg { width: 16px; height: 16px; margin-top: 0; }
+
+  /* Plays once when the bar arrives and holds. `both` so the corner is
+     already lit through the start delay that lets the slide-up finish. */
+  @media (prefers-reduced-motion: no-preference) {
+    .aj-dock.has-scta .aj-scta::before { animation: aj-scta-glow 2s var(--ease) 0.4s both; }
+  }
+}
+
+/* Registered so the coordinates and radii interpolate — an unregistered
+   custom property is a plain token swap and would jump between keyframes.
+   Where @property is unsupported the light simply parks at the top-left. */
+@property --aj-glow-x { syntax: '<percentage>'; initial-value: 50%; inherits: false; }
+@property --aj-glow-y { syntax: '<percentage>'; initial-value: 0%; inherits: false; }
+@property --aj-glow-rx { syntax: '<percentage>'; initial-value: 68%; inherits: false; }
+@property --aj-glow-ry { syntax: '<percentage>'; initial-value: 80%; inherits: false; }
+/* Opens as a wide band across roughly three quarters of the top border,
+   centered (the colour fades out at 55% of the radius, so rx 68% lights about
+   75% of the width), then slides right and swells to wrap the button. */
+@keyframes aj-scta-glow {
+  0%   { --aj-glow-x: 50%; --aj-glow-y: 0%;  --aj-glow-rx: 68%; --aj-glow-ry: 80%; }
+  55%  { --aj-glow-x: 64%; --aj-glow-y: 0%;  --aj-glow-rx: 56%; --aj-glow-ry: 90%; }
+  100% { --aj-glow-x: 97%; --aj-glow-y: 50%; --aj-glow-rx: 42%; --aj-glow-ry: 700%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aj-cb, .aj-cb-pill, .aj-cb-card, .aj-scta { transition: none; }
+}

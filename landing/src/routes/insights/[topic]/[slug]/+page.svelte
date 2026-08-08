@@ -117,6 +117,9 @@
   {#if meta.keywords}<meta name="keywords" content={meta.keywords} />{/if}
   <meta name="author" content={meta.author} />
   <link rel="canonical" href={canonical} />
+  <!-- Marks the page as eligible for the mobile sticky download CTA and picks
+       its copy (see the sticky-CTA block in src/app.html). -->
+  <meta name="aj-cta-topic" content={primaryCat ?? 'basics'} />
 
   <meta property="og:type" content="article" />
   <meta property="og:title" content={meta.title} />
