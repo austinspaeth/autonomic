@@ -173,7 +173,7 @@ input[type="number"] { -moz-appearance: textfield; }
   top: calc(100% + 6px);
   right: 0;
   z-index: 60;
-  width: 250px;
+  width: min(250px, calc(100vw - 24px));
   background: var(--surface-2);
   border: 1px solid var(--border-strong);
   border-radius: 10px;
@@ -198,8 +198,8 @@ input[type="number"] { -moz-appearance: textfield; }
 /* ---------- cards ---------- */
 
 .grid { display: grid; gap: 14px; align-items: start; }
-.cards { grid-template-columns: repeat(auto-fit, minmax(215px, 1fr)); margin-bottom: 16px; }
-.two-col { grid-template-columns: repeat(auto-fit, minmax(430px, 1fr)); }
+.cards { grid-template-columns: repeat(auto-fit, minmax(min(215px, 100%), 1fr)); margin-bottom: 16px; }
+.two-col { grid-template-columns: repeat(auto-fit, minmax(min(430px, 100%), 1fr)); }
 
 .card {
   background: var(--surface-1);
@@ -309,6 +309,13 @@ kbd {
   border: 1px solid var(--border-strong); border-radius: 5px;
   background: var(--surface-2); color: var(--text-secondary);
 }
+
+/* Long comma-joined column lists have nowhere to break on a phone. */
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: .92em; color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
 #bulkGrid .table-scroll { max-height: 540px; }
 #bulkGrid table { font-size: 12.5px; }
 #bulkGrid td { padding: 2px 3px; }
@@ -348,7 +355,7 @@ kbd {
 
 .ctrl-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
   gap: 16px 22px;
 }
 .ctrl-head { display: flex; align-items: baseline; gap: 8px; }
@@ -405,7 +412,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { outline: 2px solid var
 
 /* ---------- forms ---------- */
 
-.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(160px, 100%), 1fr)); gap: 12px; }
 .field { display: flex; flex-direction: column; gap: 5px; }
 .field label { color: var(--text-secondary); font-size: 12.5px; }
 .field small { color: var(--text-muted); font-size: 11px; }
@@ -417,6 +424,7 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { outline: 2px solid var
   background: var(--surface-2); border: 1px solid var(--border-strong);
   color: var(--text-primary); padding: 10px 16px; border-radius: 10px;
   box-shadow: 0 10px 30px rgba(0,0,0,.6); z-index: 100;
+  max-width: calc(100vw - 24px);
   opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s;
 }
 .toast.on { opacity: 1; transform: translateX(-50%) translateY(-4px); }
@@ -428,15 +436,10 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { outline: 2px solid var
 .hidden { display: none !important; }
 .note { color: var(--text-muted); font-size: 12px; line-height: 1.55; }
 
-@media (max-width: 700px) {
-  .app { padding: 14px 12px 48px; }
-  .funnel-step { grid-template-columns: 120px 1fr 96px; }
-  .funnel-gap { padding-left: 132px; }
-}
-
 /* ---------- sign-in gate ---------- */
-/* Dark only, like the rest of the dashboard. The white squiggle is the whole
-   brand statement here — nothing else on the card competes with it. */
+/* No card, no panel: the mark, the name and one field, centred on the page.
+   The white squiggle is the whole brand statement here, and a container around
+   it would only be a second thing to look at. */
 
 body.gated { overflow: hidden; }
 body.gated .app,
@@ -453,18 +456,12 @@ body.gated .toast { display: none; }
 
 .gate-card {
   position: relative;
-  width: 100%; max-width: 380px;
-  padding: 34px 30px 30px;
-  background: var(--surface-1);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, .55);
+  width: 100%; max-width: 340px;
   text-align: center;
 }
 
 .gate-logo { width: 86px; height: auto; display: block; margin: 0 auto 16px; }
-.gate-title { margin: 0; font-size: 21px; letter-spacing: -0.015em; font-weight: 600; }
-.gate-sub { margin: 4px 0 24px; color: var(--text-muted); font-size: 12.5px; letter-spacing: .04em; text-transform: uppercase; }
+.gate-title { margin: 0 0 26px; font-size: 21px; letter-spacing: -0.015em; font-weight: 600; }
 
 .gate-error {
   display: none;
@@ -533,14 +530,18 @@ body.gated .toast { display: none; }
 .gate-link:hover:not(:disabled) { color: var(--text-primary); }
 .gate-link:disabled { color: var(--text-muted); cursor: default; text-decoration: none; }
 
-/* Covers the card while Cognito is working, so a slow round trip can't be
-   double-submitted. */
+/* Locks the form out while Cognito is working, so a slow round trip can't be
+   double-submitted. With no card to cover, the fields fade back and the spinner
+   takes the foreground. */
 .gate-spinner { display: none; }
+.gate.busy .gate-card > *:not(.gate-spinner) {
+  opacity: .28;
+  pointer-events: none;
+  transition: opacity .15s;
+}
 .gate.busy .gate-spinner {
   display: block;
   position: absolute; inset: 0;
-  border-radius: 16px;
-  background: rgba(26, 26, 25, .6);
 }
 .gate.busy .gate-spinner::after {
   content: ''; position: absolute; top: 50%; left: 50%;
@@ -568,7 +569,96 @@ body.gated .toast { display: none; }
 
 .whoami { color: var(--text-muted); font-size: 12px; align-self: center; }
 
+/* ---------- responsive ---------- */
+/* One place for every breakpoint, so a rule and its override are read
+   together. Desktop is the base; these narrow it. */
+
+@media (max-width: 900px) {
+  .app { padding: 18px 16px 56px; }
+  .funnel-step { grid-template-columns: 150px 1fr 112px; }
+  .funnel-gap { padding-left: 162px; }
+}
+
 @media (max-width: 700px) {
+  .app { padding: 14px 12px 48px; }
+
+  /* Title and sync state on one line, the controls on the next: the spacer
+     becomes a full-width flex break instead of an elastic gap. */
+  .topbar { align-items: center; gap: 8px; padding-bottom: 12px; }
+  .topbar h1 { font-size: 17px; }
+  .topbar .spacer { flex: 0 0 100%; height: 0; }
+  .topbar .btn { padding: 6px 11px; font-size: 13.5px; }
   .whoami { display: none; }
-  .gate-code input { width: 48px; height: 56px; font-size: 21px; }
+  /* Export sits at the right of the header on a desktop and at the left of the
+     controls row on a phone, so its popover has to hang the other way — anchored
+     right it runs off the left edge of the screen. */
+  .popover { left: 0; right: auto; }
+
+  /* Wrap the tabs rather than scroll them: six of them do not fit, and a
+     clipped scroller hides that Explore and Forecast are even there. */
+  .tabs { flex-wrap: wrap; overflow-x: visible; margin-bottom: 12px; }
+  .tab { padding: 8px 11px; }
+
+  /* Each filter becomes its own full-width row: label above, control across.
+     Side by side they overflow — Platform alone is four segments wide. */
+  .filterbar { flex-direction: column; align-items: stretch; gap: 12px; padding: 12px; }
+  .filtergroup { flex-wrap: wrap; gap: 6px 10px; }
+  .filtergroup > label { flex: 0 0 100%; }
+  .filterbar select { flex: 1; min-width: 0; }
+  .filterbar .segmented { flex: 1; display: flex; }
+  .filterbar .segmented button { flex: 1; padding: 6px 8px; }
+  #customRange { flex: 1 0 100%; }
+  #customRange input { flex: 1; min-width: 0; }
+
+  .card { padding: 13px 13px 15px; }
+  .card .hint { margin-bottom: 10px; }
+  /* A five-option metric switcher will not sit beside a title on a phone, and
+     a segmented control is the one thing here that never shrinks on its own.
+     Let it wrap its options over two lines instead, so the card's Table button
+     keeps its place at the end of the row rather than being pushed below. */
+  .card > header { gap: 8px; }
+  .card > header .segmented { flex: 1 1 auto; min-width: 0; flex-wrap: wrap; }
+  .card > header .segmented button { flex: 1 0 auto; }
+  .grid { gap: 12px; }
+  .tile .value { font-size: 27px; }
+  .tile .value.small { font-size: 22px; }
+
+  .gate { padding: 20px; }
+  .gate-code { gap: 8px; }
+
+  .btn.sm, .segmented button { font-size: 13.5px; }
+  .gate-code input { width: 52px; height: 60px; font-size: 22px; }
+}
+
+/* iOS Safari zooms the whole page when a control it focuses is under 16px,
+   which leaves the layout scrolled sideways and the field half off-screen. The
+   trigger is the device, not the width — an iPhone in landscape is over 900px
+   and still zooms — so this keys off a coarse pointer as well as a narrow
+   viewport. Every text-entry control is listed explicitly: several carry a size
+   from a more specific selector than a bare `input` could override. */
+@media (max-width: 700px), (hover: none) and (pointer: coarse) {
+  input, select, textarea,
+  td input, #bulkGrid td input, #bulkGrid td input.note-cell,
+  .stepper input, .ctrl-head input.ctrl-val, .gate-input {
+    font-size: 16px;
+  }
+  /* Wider, because the same box now holds 16px digits. */
+  td input { width: 104px; }
+  #bulkGrid td input { width: 100px; }
+  #bulkGrid td input.note-cell { width: 140px; }
+  .ctrl-head input.ctrl-val { width: 96px; }
+  .gate-code input { font-size: 22px; }
+}
+
+@media (max-width: 460px) {
+  /* The funnel's three columns cannot all hold their width; the bar drops to
+     its own row under the name and value rather than being squeezed to a stub. */
+  .funnel-step { grid-template-columns: 1fr auto; gap: 2px 10px; padding: 5px 0; }
+  .funnel-step .fname { grid-row: 1; grid-column: 1; }
+  .funnel-step .fval { grid-row: 1; grid-column: 2; }
+  .funnel-bar { grid-row: 2; grid-column: 1 / -1; height: 16px; }
+  .funnel-gap { padding-left: 0; }
+
+  .row-actions .btn { flex: 1 0 auto; }
+  .gate-code input { width: 100%; max-width: 60px; }
 }

@@ -21,7 +21,6 @@
   <div class="gate-card">
     <svg class="gate-logo" viewBox="0 0 651.59 348.34" aria-hidden="true"><use href="#masterLogo"/></svg>
     <h1 class="gate-title">Autonomic</h1>
-    <p class="gate-sub">Master dashboard</p>
 
     <div class="gate-error" id="gateError" role="alert"></div>
 
@@ -88,7 +87,7 @@
 
     <button class="btn" id="btnEditData">Edit data</button>
     <span class="whoami" id="whoami"></span>
-    <button class="btn" id="btnSignOut" title="Sign out of the master dashboard">Sign out</button>
+    <button class="btn" id="btnSignOut">Sign out</button>
   </header>
 
   <nav class="tabs" role="tablist">
@@ -435,7 +434,7 @@
 
     <div class="card" style="margin-bottom:14px">
       <header><h2>Trial &amp; wall lengths</h2></header>
-      <p class="hint">These describe how your app behaves, so they live here rather than in the filter bar — changing one re-derives every cohort metric in the dashboard. Both limits are inclusive: with 7 and 14, a user is still in the trial on day 7 and still has full charts on day 14, leaving the trial on day 8 and hitting the wall on day 15.</p>
+      <p class="hint">These describe how your app behaves, so they live here rather than in the filter bar — changing one re-derives every cohort metric here. Both limits are inclusive: with 7 and 14, a user is still in the trial on day 7 and still has full charts on day 14, leaving the trial on day 8 and hitting the wall on day 15.</p>
       <div class="form-grid" style="max-width:560px">
         <div class="field"><label for="fTrial">Free trial length (days)</label>
           <input type="number" id="fTrial" min="1" max="60" step="1" value="7"></div>

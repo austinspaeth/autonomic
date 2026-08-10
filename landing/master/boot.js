@@ -55,7 +55,7 @@
       if (err.status === 403) {
         // Signed in fine, just not on the allowlist. Signing them out would
         // only send them round the same loop, so say so and stop.
-        fatal('That account is not authorized for the master dashboard.');
+        fatal('That account is not authorized.');
         return;
       }
       if (err.status === 401) {
