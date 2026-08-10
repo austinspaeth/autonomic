@@ -2098,6 +2098,183 @@
     renderAll();
   }
 
+  /* ------------------------------------------------ store-export import */
+
+  /* The consoles' own CSVs, read by storeimport.js and staged here until the
+     user has looked at the mapping. Nothing touches `db` before Merge: a column
+     match is a guess against header names Apple and Google both rename without
+     notice, and a wrong guess silently overwrites a month of hand-entered days.
+     Each staged file keeps its decoded text so re-pointing a column can be
+     re-derived without asking for the file again. */
+  var siStaged = [];
+
+  var SI_LABEL = {
+    downloads: 'First-time downloads', impressions: 'Impressions',
+    pageViews: 'Product page views', updates: 'Updates',
+    sales: 'Sales (count)', revenue: 'Sales amount'
+  };
+
+  function siEsc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+    });
+  }
+
+  function siRead(fileList) {
+    var list = Array.prototype.slice.call(fileList || []);
+    if (!list.length) return;
+    var pending = list.length;
+    var failed = function (name, why) {
+      return { name: name, columns: [], days: {}, dates: [], rowsRead: 0, rowsSkipped: 0,
+               warnings: [why], platform: null };
+    };
+    var done = function () { if (!--pending) siRender(); };
+    list.forEach(function (f) {
+      var reader = new FileReader();
+      reader.onload = function () {
+        var stub = { name: f.name, text: '', overrides: { columns: {} } };
+        try {
+          stub.text = StoreImport.decode(reader.result);
+          stub.read = StoreImport.readFile(f.name, stub.text);
+        } catch (err) {
+          stub.read = failed(f.name, 'Could not read this file: ' + err.message);
+        }
+        siStaged.push(stub);
+        done();
+      };
+      reader.onerror = function () {
+        siStaged.push({ name: f.name, text: '', overrides: { columns: {} },
+          read: failed(f.name, 'The browser could not read this file.') });
+        done();
+      };
+      reader.readAsArrayBuffer(f);
+    });
+  }
+
+  function siPlan() {
+    return StoreImport.plan(siStaged.map(function (s) { return s.read; }));
+  }
+
+  function siColumnCell(fileIdx, col) {
+    if (col.kind === 'date') return '<span class="si-fixed">date</span>';
+    if (col.kind === 'platform') return '<span class="si-fixed">platform</span>';
+    if (col.kind === 'dimension') return '<span class="si-fixed">split by</span>';
+    if (col.kind === 'metricname') return '<span class="si-fixed">metric names</span>';
+    var opts = ['<option value="">— ignore —</option>'];
+    StoreImport.FIELDS.forEach(function (f) {
+      opts.push('<option value="' + f + '"' + (col.field === f ? ' selected' : '') + '>' + siEsc(SI_LABEL[f]) + '</option>');
+    });
+    return '<select data-file="' + fileIdx + '" data-col="' + col.index + '">' + opts.join('') + '</select>';
+  }
+
+  function siRender() {
+    var host = document.getElementById('siPreview');
+    if (!host) return;
+    if (!siStaged.length) { host.innerHTML = ''; return; }
+
+    var html = siStaged.map(function (s, i) {
+      var r = s.read;
+      var span = r.dates.length ? r.dates[0] + ' → ' + r.dates[r.dates.length - 1] : 'no dated rows';
+      var mapped = r.columns.filter(function (c) { return c.kind === 'metric' && c.field; });
+      var plat = r.byPlatform ? 'from the file' : (r.platform || '');
+      var head = '<div class="si-head"><b>' + siEsc(s.name) + '</b>' +
+        '<span class="note">' + fmtInt(r.rowsRead || 0) + ' rows · ' + siEsc(span) +
+        (r.rowsSkipped ? ' · ' + fmtInt(r.rowsSkipped) + ' skipped' : '') + '</span>' +
+        '<span class="spacer"></span>' +
+        (r.byPlatform
+          ? '<span class="note">Platform read per row</span>'
+          : '<label class="si-plat">Platform <select data-file="' + i + '" data-plat="1">' +
+            '<option value=""' + (plat ? '' : ' selected') + '>— choose —</option>' +
+            '<option value="ios"' + (plat === 'ios' ? ' selected' : '') + '>iOS</option>' +
+            '<option value="android"' + (plat === 'android' ? ' selected' : '') + '>Android</option>' +
+            '</select></label>') +
+        '<button class="btn sm" data-file="' + i + '" data-drop="1">Remove</button></div>';
+
+      var cols = r.columns.length
+        ? '<div class="si-cols">' + r.columns.map(function (c) {
+            return '<div class="si-col' + (c.kind === 'unknown' && !c.field ? ' unknown' : '') + '">' +
+              '<span title="' + siEsc(c.header) + '">' + siEsc(c.header || '(column ' + (c.index + 1) + ')') + '</span>' +
+              siColumnCell(i, c) + '</div>';
+          }).join('') + '</div>'
+        : '';
+
+      var notes = [];
+      (r.warnings || []).forEach(function (w) { notes.push(siEsc(w)); });
+      if (!mapped.length && r.columns.length) notes.push('No metric columns recognised — point at least one column at a field above.');
+      var superseded = r.columns.filter(function (c) { return c.kind === 'superseded'; });
+      if (superseded.length) {
+        notes.push('Ignoring ' + superseded.map(function (c) { return '"' + siEsc(c.header) + '"' ; }).join(', ') +
+          ' — another column already covers that field. Re-point it if that is the one you want.');
+      }
+      return '<div class="si-file">' + head + cols +
+        (notes.length ? '<p class="note">' + notes.join('<br>') + '</p>' : '') + '</div>';
+    }).join('');
+
+    var p = siPlan();
+    var body = p.rows.slice(0, 40).map(function (row) {
+      var exists = !!findEntry(row.date, row.platform);
+      return '<tr><td>' + row.date + '</td><td>' + (row.platform === 'ios' ? 'iOS' : 'Android') + '</td>' +
+        StoreImport.FIELDS.map(function (f) {
+          if (row.fields[f] === undefined) return '<td class="si-blank">·</td>';
+          return '<td>' + (f === 'revenue' ? fmtMoney(row.fields[f]) : fmtInt(row.fields[f])) + '</td>';
+        }).join('') +
+        '<td>' + (exists ? 'update' : 'new') + '</td></tr>';
+    }).join('');
+
+    var summary;
+    if (!p.rows.length) {
+      summary = '<p class="note">Nothing to merge yet' +
+        (p.missingPlatform.length ? ' — set the platform for ' + siEsc(p.missingPlatform.join(', ')) + '.' : '.') + '</p>';
+    } else {
+      var untouched = StoreImport.FIELDS.filter(function (f) { return p.fields.indexOf(f) === -1; });
+      summary =
+        '<p class="note"><b>' + fmtInt(p.rows.length) + ' day-rows</b>, ' + p.from + ' → ' + p.to + '. Writing ' +
+        p.fields.map(function (f) { return SI_LABEL[f].toLowerCase(); }).join(', ') + '.' +
+        (untouched.length ? ' Leaving ' + untouched.map(function (f) { return SI_LABEL[f].toLowerCase(); }).join(', ') +
+          ' as they are — a column no file carried is never overwritten.' : '') +
+        (p.missingPlatform.length ? ' <b>Skipping ' + siEsc(p.missingPlatform.join(', ')) +
+          '</b> until a platform is chosen.' : '') +
+        (p.conflicts.length ? ' ' + fmtInt(p.conflicts.length) + ' value' + (p.conflicts.length === 1 ? '' : 's') +
+          ' given twice by different files — the later file wins.' : '') + '</p>' +
+        '<div class="table-scroll"><table><thead><tr><th>Date</th><th>Platform</th>' +
+        StoreImport.FIELDS.map(function (f) { return '<th>' + siEsc(SI_LABEL[f]) + '</th>'; }).join('') +
+        '<th>Effect</th></tr></thead><tbody>' + body + '</tbody></table></div>' +
+        (p.rows.length > 40 ? '<p class="note">Showing the first 40 of ' + fmtInt(p.rows.length) + '.</p>' : '');
+    }
+
+    host.innerHTML = html + '<div class="si-plan">' + summary + '<div class="row-actions">' +
+      '<button class="btn primary" id="siMerge"' + (p.rows.length ? '' : ' disabled') + '>Merge ' +
+      fmtInt(p.rows.length) + ' day-row' + (p.rows.length === 1 ? '' : 's') + '</button>' +
+      '<button class="btn" id="siDiscard">Discard</button></div></div>';
+  }
+
+  function siCommit() {
+    var p = siPlan();
+    if (!p.rows.length) { toast('Nothing to merge.'); return; }
+    var added = 0, updated = 0;
+    p.rows.forEach(function (row) {
+      var e = findEntry(row.date, row.platform);
+      if (!e) {
+        e = { date: row.date, platform: row.platform, downloads: 0, impressions: 0,
+              pageViews: 0, updates: 0, sales: 0, revenue: 0, notes: '' };
+        db.entries.push(e);
+        added++;
+      } else updated++;
+      // Only the fields the files actually carried — see storeimport.js.
+      Object.keys(row.fields).forEach(function (f) { e[f] = row.fields[f]; });
+      bulkDirty = true;
+    });
+    finishBulk();
+    siStaged = [];
+    siRender();
+    var msg = 'Merged ' + fmtInt(p.rows.length) + ' day-rows — ' + fmtInt(added) + ' new, ' + fmtInt(updated) + ' updated.';
+    var status = document.getElementById('siStatus');
+    if (status) status.textContent = msg;
+    toast(msg);
+    refreshBulk();
+    renderAll();
+  }
+
   /* -------------------------------------------------------------- toast */
 
   var toastTimer;
@@ -2295,6 +2472,53 @@
       setView('data');
       document.getElementById('eDate').value = asOf();
       document.getElementById('eDate').dispatchEvent(new Event('change'));
+    });
+
+    /* --- store-export import --- */
+    document.getElementById('siPick').addEventListener('click', function () {
+      document.getElementById('siFile').click();
+    });
+    document.getElementById('siFile').addEventListener('change', function () {
+      siRead(this.files);
+      this.value = '';
+    });
+
+    var siCard = document.getElementById('siCard');
+    ['dragenter', 'dragover'].forEach(function (t) {
+      siCard.addEventListener(t, function (e) { e.preventDefault(); siCard.classList.add('dropping'); });
+    });
+    ['dragleave', 'dragend'].forEach(function (t) {
+      siCard.addEventListener(t, function (e) {
+        // dragleave fires for every child too; only the real exit counts.
+        if (t === 'dragleave' && siCard.contains(e.relatedTarget)) return;
+        siCard.classList.remove('dropping');
+      });
+    });
+    siCard.addEventListener('drop', function (e) {
+      e.preventDefault();
+      siCard.classList.remove('dropping');
+      siRead(e.dataTransfer && e.dataTransfer.files);
+    });
+
+    document.getElementById('siPreview').addEventListener('change', function (e) {
+      var sel = e.target;
+      if (sel.tagName !== 'SELECT') return;
+      var stub = siStaged[+sel.getAttribute('data-file')];
+      if (!stub) return;
+      if (sel.hasAttribute('data-plat')) stub.overrides.platform = sel.value;
+      else stub.overrides.columns[+sel.getAttribute('data-col')] = sel.value;
+      stub.read = StoreImport.applyOverrides(stub.name, stub.text, stub.overrides);
+      siRender();
+    });
+    document.getElementById('siPreview').addEventListener('click', function (e) {
+      var btn = e.target.closest ? e.target.closest('button') : null;
+      if (!btn) return;
+      if (btn.id === 'siMerge') return siCommit();
+      if (btn.id === 'siDiscard') { siStaged = []; siRender(); return; }
+      if (btn.hasAttribute('data-drop')) {
+        siStaged.splice(+btn.getAttribute('data-file'), 1);
+        siRender();
+      }
     });
 
     /* --- import / export --- */

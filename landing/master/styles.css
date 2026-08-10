@@ -330,6 +330,34 @@ code {
 }
 .dot-existing { color: var(--series-1); }
 
+/* store-export import */
+#siCard.dropping { border-color: var(--series-1); }
+#siCard.dropping::after {
+  content: 'Drop to read'; position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: color-mix(in srgb, var(--surface-1) 82%, transparent);
+  color: var(--series-1); font-size: 13px; border-radius: inherit; pointer-events: none;
+}
+#siCard { position: relative; }
+.si-file { border: 1px solid var(--border); border-radius: 10px; padding: 11px 12px; margin-top: 12px; }
+.si-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13px; }
+.si-head .spacer { flex: 1; }
+.si-plat { display: inline-flex; align-items: center; gap: 6px; color: var(--text-secondary); font-size: 12.5px; }
+.si-cols { display: flex; flex-wrap: wrap; gap: 8px 12px; margin-top: 10px; }
+.si-col { display: flex; flex-direction: column; gap: 4px; min-width: 150px; }
+.si-col > span {
+  color: var(--text-secondary); font-size: 11.5px;
+  max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.si-col.unknown > span { color: var(--text-muted); }
+.si-fixed {
+  color: var(--text-muted); font-size: 11.5px; padding: 5px 0;
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+.si-plan { margin-top: 14px; }
+.si-plan .table-scroll { max-height: 320px; }
+td.si-blank { color: var(--text-muted); }
+
 .pill {
   display: inline-block; padding: 2px 8px; border-radius: 999px;
   font-size: 11.5px; border: 1px solid var(--border-strong); color: var(--text-secondary);

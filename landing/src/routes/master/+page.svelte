@@ -2,7 +2,7 @@
   /* /master — the private store-analytics dashboard.
    *
    * The dashboard itself is framework-free: plain HTML, one stylesheet and
-   * seven scripts under `landing/master/`, which is where they are edited. This
+   * eight scripts under `landing/master/`, which is where they are edited. This
    * route is only a shell that inlines all of it into a single prerendered
    * document, so the page has nothing to resolve at runtime — no sibling
    * stylesheet, no script src, no image. It used to ship as
@@ -21,13 +21,14 @@
   import api from '../../../master/api.js?raw';
   import sync from '../../../master/sync.js?raw';
   import charts from '../../../master/charts.js?raw';
+  import storeimport from '../../../master/storeimport.js?raw';
   import app from '../../../master/app.js?raw';
   import boot from '../../../master/boot.js?raw';
 
   /* Load order matters — see boot.js. Each file is an IIFE hanging one global
-     off `window`, so concatenating them is the same as the seven <script src>
+     off `window`, so concatenating them is the same as the eight <script src>
      tags the standalone page used. */
-  const dashboard = [config, auth, api, sync, charts, app, boot].join('\n');
+  const dashboard = [config, auth, api, sync, charts, storeimport, app, boot].join('\n');
 
   /* Tags are assembled rather than written out, because a literal <script> or
      <style> in this file — even inside a string or a comment — is what Svelte's
