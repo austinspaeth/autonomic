@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Article } from '../../api/articles/types';
+  import type { Article } from '../../../api/articles/types';
   import ArticleLine from '$lib/ArticleLine.svelte';
   import InsightsShell from '$lib/InsightsShell.svelte';
   import { articleHref } from '$lib/site';

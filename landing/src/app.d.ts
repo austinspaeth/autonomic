@@ -11,4 +11,11 @@ declare global {
   }
 }
 
+/* Vite's `?raw` imports. /master inlines its stylesheet, markup and scripts
+   into one prerendered document this way. */
+declare module '*?raw' {
+  const contents: string;
+  export default contents;
+}
+
 export {};

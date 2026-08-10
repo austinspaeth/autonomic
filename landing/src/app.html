@@ -22,6 +22,9 @@
       window.dataLayer = window.dataLayer || [];
       function _ajBlocked() {
         if (window.location.hostname === 'localhost') return true;
+        // /master is the private analytics dashboard, not a page of the site:
+        // noindex, one signed-in visitor, nothing to measure.
+        if (/^\/master(\/|$)/.test(window.location.pathname)) return true;
         try { return localStorage.getItem('aj-cookie-consent') === 'blocked'; } catch (e) { return true; }
       }
       function gtag(){ if (!_ajBlocked()) dataLayer.push(arguments); }
@@ -166,7 +169,9 @@
     <script>
       (function () {
         try {
-          if (window.location.hostname === 'localhost') return;
+          // Nowhere that sets no cookies asks about them — this covers
+          // localhost and /master as well as an existing "blocked" choice.
+          if (_ajBlocked()) return;
           if (localStorage.getItem('aj-cookie-consent')) return;
           var banner = document.getElementById('aj-cookie-banner');
           if (!banner) return;

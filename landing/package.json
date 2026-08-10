@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "prepare": "svelte-kit sync || echo ''",
     "qr": "node scripts/gen-qr.mjs",
-    "test:master": "node tests/master-gate.test.mjs",
+    "test:master": "vite build && node tests/master-gate.test.mjs",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json"
   },
   "devDependencies": {

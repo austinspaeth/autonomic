@@ -1,18 +1,21 @@
 /* End-to-end smoke test of the /master client: sign-in challenge, token
-   persistence, boot pull, hydrate, and the first sync push. */
-import { JSDOM, ResourceLoader } from 'jsdom';
-import fs from 'node:fs';
-import path from 'node:path';
+   persistence, boot pull, hydrate, and the first sync push.
 
-/* Serve the sibling scripts/styles off disk; jsdom's default loader won't. */
-class LocalFiles extends ResourceLoader {
-  fetch(url) {
-    const file = path.join(DIR, new URL(url).pathname.replace(/^\//, ''));
-    try { return Promise.resolve(Buffer.from(fs.readFileSync(file))); } catch { return null; }
-  }
+   It runs against the BUILT page (build/master/index.html), not the sources in
+   landing/master/, because half of what can break now lives in the route that
+   assembles them: the stylesheet and the seven scripts are inlined by
+   src/routes/master/+page.svelte, and only the built document proves they
+   landed, in order, with nothing left to fetch. `npm run test:master` builds
+   first. */
+import { JSDOM } from 'jsdom';
+import fs from 'node:fs';
+
+const PAGE = new URL('../build/master/index.html', import.meta.url).pathname;
+if (!fs.existsSync(PAGE)) {
+  console.error(`No built page at ${PAGE} — run \`npm run build\` first (or \`npm run test:master\`).`);
+  process.exit(1);
 }
 
-const DIR = new URL('../static/master/', import.meta.url).pathname;
 const b64u = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
 const idToken = [
   b64u({ alg: 'RS256' }),
@@ -24,11 +27,15 @@ const calls = [];
 const results = [];
 const check = (name, ok, detail) => { results.push({ name, ok, detail }); };
 
-const dom = new JSDOM(fs.readFileSync(path.join(DIR, 'index.html'), 'utf8'), {
-  url: 'http://localhost:8080/',
+/* The real origin, not localhost: the site shell short-circuits analytics and
+   the cookie banner on localhost anyway, and the point of the two checks below
+   is the /master path rule that has to hold in production. No `resources`
+   loader is configured, so anything the page still tried to fetch would simply
+   not arrive — which is the assertion. */
+const dom = new JSDOM(fs.readFileSync(PAGE, 'utf8'), {
+  url: 'https://autonomic.care/master/',
   runScripts: 'dangerously',
   pretendToBeVisual: true,
-  resources: new LocalFiles(),
 });
 const { window } = dom;
 
@@ -67,6 +74,26 @@ await new Promise((r) => setTimeout(r, 300));
 
 const $ = (id) => window.document.getElementById(id);
 
+// --- the shipped document ---------------------------------------------------
+// The bug this route replaced: relative asset URLs. A request for /master
+// without the trailing slash resolved every one of them against /, so the page
+// arrived with no stylesheet and no scripts — unstyled, gate inert, dashboard
+// on display. Nothing the page references may be relative.
+const html = fs.readFileSync(PAGE, 'utf8').replace(/<!--[\s\S]*?-->/g, '');
+const relative = [...html.matchAll(/(?:src|href)="(?!https?:|\/\/|\/|#|data:|mailto:)([^"]*)"/g)].map((m) => m[1]);
+check('no relative asset references', relative.length === 0, relative.join(', '));
+check('stylesheet is inlined', html.includes('Autonomic Dashboard — dark theme tokens'));
+check('every dashboard script is inlined and ran',
+  ['AUTONOMIC_CONFIG', 'Auth', 'Api', 'Sync', 'Chart', 'Dashboard'].every((g) => window[g]),
+  ['AUTONOMIC_CONFIG', 'Auth', 'Api', 'Sync', 'Chart', 'Dashboard'].filter((g) => !window[g]).join(', '));
+
+// The dashboard is a private page on a public site's shell; neither of the
+// shell's visitor-facing behaviours belongs on it.
+check('the site shell loads no analytics here',
+  !window.document.querySelector('script[src*="googletagmanager"]'));
+check('the site shell shows no cookie banner here', $('aj-cookie-banner').hidden);
+
+// --- the gate ---------------------------------------------------------------
 check('gate is visible on arrival', !$('gate').classList.contains('hidden'));
 check('body is gated (dashboard hidden)', window.document.body.classList.contains('gated'));
 check('email step shown, code step hidden',
