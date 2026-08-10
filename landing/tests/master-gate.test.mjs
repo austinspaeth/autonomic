@@ -3,7 +3,7 @@
 
    It runs against the BUILT page (build/master/index.html), not the sources in
    landing/master/, because half of what can break now lives in the route that
-   assembles them: the stylesheet and the seven scripts are inlined by
+   assembles them: the stylesheet and the eight scripts are inlined by
    src/routes/master/+page.svelte, and only the built document proves they
    landed, in order, with nothing left to fetch. `npm run test:master` builds
    first. */
@@ -84,8 +84,8 @@ const relative = [...html.matchAll(/(?:src|href)="(?!https?:|\/\/|\/|#|data:|mai
 check('no relative asset references', relative.length === 0, relative.join(', '));
 check('stylesheet is inlined', html.includes('Autonomic Dashboard — dark theme tokens'));
 check('every dashboard script is inlined and ran',
-  ['AUTONOMIC_CONFIG', 'Auth', 'Api', 'Sync', 'Chart', 'Dashboard'].every((g) => window[g]),
-  ['AUTONOMIC_CONFIG', 'Auth', 'Api', 'Sync', 'Chart', 'Dashboard'].filter((g) => !window[g]).join(', '));
+  ['AUTONOMIC_CONFIG', 'Auth', 'Api', 'Sync', 'Chart', 'StoreImport', 'Dashboard'].every((g) => window[g]),
+  ['AUTONOMIC_CONFIG', 'Auth', 'Api', 'Sync', 'Chart', 'StoreImport', 'Dashboard'].filter((g) => !window[g]).join(', '));
 
 // The dashboard is a private page on a public site's shell; neither of the
 // shell's visitor-facing behaviours belongs on it.

@@ -13,7 +13,7 @@ format are documented in the dashboard's own README in the source repo
 ## How it is served
 
 `/master/` is a **prerendered SvelteKit route**. The dashboard itself is still
-framework-free — plain HTML, one stylesheet and seven scripts, edited in
+framework-free — plain HTML, one stylesheet and eight scripts, edited in
 `landing/master/` — and `src/routes/master/+page.svelte` is a shell that
 `?raw`-imports all of it and inlines it into a single self-contained document.
 Nothing is bundled, minified or scoped, so what runs in the browser is
@@ -94,9 +94,49 @@ Everything below is in `landing/master/`, except the route that assembles them.
 | `api.js` | The single authenticated POST to `api.autonomic.care` |
 | `sync.js` | Diff-and-push mirror of the store into DynamoDB |
 | `boot.js` | Boot order and sync-status/sign-out wiring |
+| `storeimport.js` | Reader for App Store Connect / Play Console CSV exports — pure, unit-tested |
 | `app.js` | Store, cohort derivation, all views, import/export |
 | `charts.js` | Dependency-free SVG chart engine |
 | `styles.css` | Dark theme tokens, layout, gate |
+
+## Getting data in
+
+Three ways, in the Data view. The single-day form and the bulk grid are typing.
+The third is **Import a store export**, which reads the CSVs the consoles hand
+you — App Store Connect → Analytics, Play Console → Statistics / Download
+reports — so the daily numbers no longer have to be copied by hand.
+
+`storeimport.js` is the reader and is pure: text in, a plan out. `app.js` owns
+the card and is the only thing that writes to the store. Four things about it
+are load-bearing:
+
+- **A file states only the metrics it contains.** App Store Connect exports one
+  file per chart, so impressions and downloads for the same day arrive
+  separately. A parsed value is therefore `null` when the cell is empty and `0`
+  only when the file really says zero, the plan carries fields rather than whole
+  rows, and the commit assigns just those fields. Importing a page-views file
+  cannot blank out that day's downloads. The dashboard's own `importCSV` still
+  follows the opposite rule — missing column means zero — which is right for its
+  own wide CSV and wrong for these, and is why this is a separate path.
+- **Nothing commits before the mapping is shown.** Columns are matched against
+  header names that Apple and Google both rename without notice, so the card
+  lists every column it saw — mapped, ignored as a breakdown, or unrecognised —
+  and each one can be re-pointed at a field before merging. A guess that is
+  wrong is then visibly wrong rather than silently destructive.
+- **The platform is never guessed from nothing.** It comes from the filename,
+  the header vocabulary, or a platform column in the file; failing all three the
+  file is held back until the user picks, because filing a month under the wrong
+  store is not something the dashboard can undo.
+- **Apple's `Sales` is money, not a count.** It is customer spend, the sibling of
+  `Proceeds`, so it maps to the dashboard's `revenue` and loses to `Proceeds`
+  when both appear. Mapping it to `sales`, which counts conversions, would file
+  dollars as purchases.
+
+Smaller things the exports actually do: Play's statistics CSVs are UTF-16 (read
+as UTF-8 the header matches nothing), consoles put a title and a date range
+above the header row, a territory- or device-split export repeats a date and has
+to be summed, and some exports run dates across the top instead of down the
+side. All four are handled and all four are tested.
 
 ## Backend
 
@@ -122,12 +162,20 @@ npm run build && (cd build && python3 -m http.server 8080)
 ## Testing
 
 ```bash
-npm run test:master
+npm run test:master     # build + all three suites
+npm run test:import     # just the import suites, against the last build
 ```
 
-Builds the site, then drives `build/master/index.html` in jsdom through the
-whole path: the sign-in challenge (wrong code, then right), token persistence,
+`master-gate.test.mjs` builds the site, then drives `build/master/index.html` in
+jsdom through the whole path: the sign-in challenge (wrong code, then right), token persistence,
 the boot `LOAD`, hydrate, and the first diffed `SYNC` push. It runs against the
 **built** page rather than the sources, because the route that assembles them
 is now part of what can break — the test asserts that the stylesheet and all
-seven scripts are inlined and that the document references nothing relative.
+eight scripts are inlined and that the document references nothing relative.
+
+`store-import.test.mjs` exercises the export reader directly — date and value
+parsing, column matching, UTF-16, pivoted and split files, the plan and its
+conflicts. `store-import-ui.test.mjs` drives the card in the built page from
+dropped file to stored entry, and holds the line the feature rests on: a
+single-metric import must leave the other five metrics of an existing day
+untouched.

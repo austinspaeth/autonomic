@@ -386,7 +386,6 @@
 
   <!-- ================= DATA ================= -->
   <section id="view-data" class="view hidden">
-  <section id="view-data" class="view hidden">
     <div class="card" style="margin-bottom:14px">
       <header><h2 id="entryTitle">Add / update a single day</h2></header>
       <p class="hint">Entries are keyed by date + platform, so re-entering a day overwrites it. Store reporting lags, so the date defaults to the latest day that can have data — never the current day. Everything is stored in this browser's local storage — nothing leaves your machine.</p>
@@ -407,6 +406,18 @@
         <button class="btn" id="eClear">Clear form</button>
         <span class="note" id="eStatus"></span>
       </div>
+    </div>
+
+    <div class="card" id="siCard" style="margin-bottom:14px">
+      <header><h2>Import a store export</h2><span class="spacer"></span>
+        <span class="note" id="siStatus"></span></header>
+      <p class="hint">Drop the CSVs the consoles give you — <b>App Store Connect → Analytics</b> (its charts export one file per metric, so bring them all at once) or <b>Play Console → Statistics → Export report</b> / <b>Download reports</b>. Columns are matched by name and merged by date + platform, and <b>only the metrics a file actually contains are written</b>: importing an impressions file will not blank out that day's downloads. Rows split by country or device are summed per day. Nothing is uploaded — the files are read in this browser. Check the mapping before merging; the consoles rename their columns from time to time, and anything unrecognised can be pointed at the right field by hand.</p>
+      <div class="row-actions">
+        <button class="btn primary" id="siPick">Choose export files…</button>
+        <input type="file" id="siFile" accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values" multiple class="hidden">
+        <span class="note">…or drag them onto this card.</span>
+      </div>
+      <div id="siPreview"></div>
     </div>
 
     <div class="card" style="margin-bottom:14px">
