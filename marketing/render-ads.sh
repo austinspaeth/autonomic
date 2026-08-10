@@ -8,6 +8,7 @@
 # Outputs are 2x the CSS size — downscale as needed per network.
 #   ad-square-1x1  1080x1080 css -> 2160x2160 png   (feed / square placements)
 #   ad-4x3-thumb   1200x900  css -> 2400x1800 png   (thumbnail / 4:3 placements)
+#   ad-tests-are-normal-body-isnt  1600x900 css -> 3200x1800 png  (16:9 banner)
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -23,3 +24,4 @@ render() { # name width height
 
 render ad-square-1x1 1080 1080
 render ad-4x3-thumb  1200 900
+render ad-tests-are-normal-body-isnt 1600 900

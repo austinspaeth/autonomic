@@ -117,7 +117,11 @@
 
     var W = Math.max(280, wrap.clientWidth || container.clientWidth || 640);
     var H = cfg.height;
-    var pad = { l: 56, r: 16, t: 12, b: 30 };
+    /* Annotated charts get a gutter above the plot for their flags, so a tag
+       never lands on a bar it might be the same colour as. The rule then dashes
+       down from the tag into the data. */
+    var markGutter = (cfg.marks && cfg.marks.length) ? 14 : 0;
+    var pad = { l: 56, r: 16, t: 12 + markGutter, b: 30 };
     var iw = W - pad.l - pad.r;
     var ih = H - pad.t - pad.b;
     var n = cfg.x.length;
@@ -189,6 +193,77 @@
       tx.textContent = cfg.x[i].label;
       svg.appendChild(tx);
     }
+
+    /* ---- guides + annotations ----
+       Two kinds of vertical rule. `cfg.guides` are drawn here, under the data:
+       they mark a boundary on an axis (day 8, day 15) rather than an event, and
+       the charts carrying them are line or area charts that show through.
+       `cfg.marks` are recorded events and are painted at the very END of this
+       function, over everything — see the block near the crosshair setup for
+       why. `cfg.guides` are fixed reference lines the chart itself means (the
+       trial and history-wall boundaries on a retention curve). `cfg.marks` are
+       recorded events, supplied by the caller from one central store — no chart
+       decides for itself what happened on a given day. Both are positioned by
+       x-index, so a chart only has to say which column it belongs on. */
+    (cfg.guides || []).forEach(function (g) {
+      if (g.index < 0 || g.index >= n) return;
+      var gx = pad.l + band * (g.index + (g.atBandStart ? 0 : 0.5));
+      svg.appendChild(el('line', {
+        x1: gx, x2: gx, y1: pad.t, y2: pad.t + ih,
+        stroke: g.color || '#898781', 'stroke-width': 1,
+        'stroke-dasharray': '3 4', opacity: 0.75
+      }));
+      if (!g.label) return;
+      var gl = el('text', {
+        x: gx + 4, y: pad.t + 11, fill: g.color || '#898781',
+        'font-size': 10, 'font-family': 'system-ui, sans-serif'
+      });
+      gl.textContent = g.label;
+      svg.appendChild(gl);
+    });
+
+    var markNodes = [];
+    (cfg.marks || []).forEach(function (m) {
+      if (m.index < 0 || m.index >= n) return;
+      var mx = xCenter(m.index);
+      /* Full-height rule, styled by what kind of thing it is: releases dashed,
+         marketing dotted, everything else solid. The pattern carries the
+         category at a glance, so a chart full of flags is still readable
+         without hovering every one. */
+      var rule = el('line', {
+        // starts at the tag sitting in the gutter and runs to the baseline
+        x1: mx, x2: mx, y1: pad.t - markGutter + 8, y2: pad.t + ih,
+        // Neutral on purpose. The rule crosses the data, and this chart's
+        // series colour changes with the selected metric, so any category
+        // colour here eventually lands on top of bars of the same colour and
+        // disappears. The flag at the top carries the category's colour, where
+        // nothing is drawn behind it.
+        stroke: m.ruleColor || '#cfcdc4', 'stroke-width': 1,
+        'stroke-dasharray': m.dash || null,
+        'stroke-linecap': m.dash === '1 5' ? 'round' : null,
+        opacity: 0.75
+      });
+      /* The flag and its hit target are NOT appended here. The crosshair layer
+         is a transparent rect over the whole plot, added further down, and in
+         SVG the last element painted takes the pointer — so anything appended
+         now would be deaf to hover. They are collected and appended after it
+         instead. The rule itself stays back here, under the data, where it
+         belongs visually. */
+      markNodes.push({
+        rule: rule,
+        // the tag itself, in the gutter above the plot
+        flag: el('rect', {
+          x: mx - 4, y: pad.t - markGutter, width: 8, height: 8, rx: 2,
+          fill: m.color || '#898781', opacity: 0.95, style: 'cursor:pointer'
+        }),
+        // one hit target covering tag and rule together
+        hitLine: el('line', {
+          x1: mx, x2: mx, y1: pad.t - markGutter, y2: pad.t + ih,
+          stroke: 'transparent', 'stroke-width': 12, style: 'cursor:pointer'
+        }),
+        mark: m
+      });
+    });
 
     // ---- marks ----
     // areas first (they stack bottom-up), then bars, then lines on top — so the
@@ -291,6 +366,22 @@
 
     var hit = el('rect', { x: pad.l, y: pad.t, width: iw, height: ih, fill: 'transparent', style: 'cursor:crosshair' });
     svg.appendChild(hit);
+
+    /* Event annotations are painted LAST, over both the data and the crosshair
+       layer. Under the data they were invisible: a full-height bar covers all
+       but the sliver of rule above its top, which is most of the chart on a
+       busy day. A 1px dashed hairline over a bar hides nothing worth seeing,
+       and being last is also what lets the rule receive a hover — the crosshair
+       is a transparent rect across the whole plot, and in SVG the last element
+       painted takes the pointer. */
+    var markHits = [];
+    markNodes.forEach(function (mn) {
+      svg.appendChild(mn.rule);
+      svg.appendChild(mn.hitLine);
+      svg.appendChild(mn.flag);
+      markHits.push({ node: mn.hitLine, mark: mn.mark });
+      markHits.push({ node: mn.flag, mark: mn.mark });
+    });
     wrap.appendChild(svg);
 
     var tip = document.createElement('div');
@@ -358,6 +449,30 @@
     hit.addEventListener('touchmove', function (ev) {
       if (ev.touches[0]) show(indexFromEvent(ev.touches[0]));
     }, { passive: true });
+
+    /* Event flags own their own hover: the crosshair tooltip answers "what were
+       the numbers here", the flag answers "what did we do here", and stacking
+       them into one popup makes both harder to read. */
+    markHits.forEach(function (h) {
+      h.node.addEventListener('mouseenter', function () {
+        var m = h.mark;
+        tip.innerHTML = '<div class="tt-title">' + escapeHTML(m.title || 'Event') + '</div>' +
+          '<div class="tt-row"><span class="swatch" style="background:' + (m.color || '#898781') + '"></span>' +
+          escapeHTML(m.categoryLabel || '') + '<span class="n">' + escapeHTML(m.dateLabel || '') + '</span></div>' +
+          (m.note ? '<div class="tt-note">' + escapeHTML(m.note) + '</div>' : '');
+        tip.classList.add('on');
+        var wrapBox = wrap.getBoundingClientRect();
+        var px = (xCenter(m.index) / W) * wrapBox.width;
+        var tw = tip.offsetWidth;
+        tip.style.left = Math.max(4, Math.min(px + 12, wrapBox.width - tw - 4)) + 'px';
+        tip.style.top = '4px';
+      });
+      h.node.addEventListener('mouseleave', hide);
+      h.node.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        if (cfg.onMarkClick) cfg.onMarkClick(h.mark);
+      });
+    });
 
     // keyboard access mirrors hover
     svg.setAttribute('tabindex', '0');

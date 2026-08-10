@@ -399,7 +399,7 @@
             // reduced motion (and any throw) simply keeps what's rendered.
             function countUp() {
               var el = cta.querySelector('.aj-scta-num');
-              if (!el || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+              if (!el || still()) return;
               var end = parseInt(el.textContent, 10);
               if (!end) return;
               var t0 = 0;
@@ -413,6 +413,225 @@
               };
               el.textContent = '0';
               requestAnimationFrame(step);
+            }
+
+            // ---- Topic variants -------------------------------------------
+            // The default bar sells the Autonomic score, which is the right
+            // pitch almost everywhere. Five topics don't want a score, they
+            // want a demonstration: the reader of an HRV piece should watch an
+            // RR trace, the reader of a POTS piece should watch a stand-test
+            // delta climb into the red. Each variant therefore replaces the
+            // badge (never the bar) and renames the button to the action its
+            // instrument just argued for.
+            //
+            // Colour is one channel, not three: `--aj-scta-green` is the pill's
+            // signal token, so setting it recolours the button, its glow and the
+            // travelling border light together, and a variant that turns gold
+            // mid-run drags all of them with it. `--aj-scta-fg` flips the button
+            // text dark where the signal is too bright to carry white.
+            // The red is the site's own accent, not a softer signal red: these
+            // bars sit on brand pages and a lighter red reads as a different
+            // product.
+            var GREEN = '#6ee06e', GOLD = '#f5c451', RED = '#e03127';
+            // The dial's FULL 270° sweep. The default badge bakes its value into
+            // a shortened arc; the variants need to move theirs afterwards, so
+            // they draw the whole sweep and use the dash offset as the value.
+            var ARC = 'M35.67 140.33 A74 74 0 1 1 140.33 140.33';
+
+            function still() {
+              return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            }
+            function signal(color, darkText) {
+              cta.style.setProperty('--aj-scta-green', color);
+              cta.style.setProperty('--aj-scta-fg', darkText ? '#08080a' : '#fff');
+            }
+            // Every timer is held so a dismissal mid-run can't animate a bar
+            // that is already gone.
+            var timers = [];
+            function at(ms, fn) { timers.push(setTimeout(fn, ms)); }
+            function stopTimers() { timers.forEach(clearTimeout); timers = []; }
+            // Walks a number through a list of stops, `gap` apart, handing each
+            // to `apply` — the shape every variant's read-out shares.
+            function stepThrough(stops, gap, apply, delay) {
+              stops.forEach(function (v, i) { at((delay || 0) + i * gap, function () { apply(v, i); }); });
+            }
+
+            function gaugeHtml(extra) {
+              return '<span class="aj-scta-gauge">' +
+                  '<svg viewBox="0 0 176 176" aria-hidden="true">' +
+                    '<path d="' + ARC + '" fill="none" stroke="rgba(255,255,255,0.10)" stroke-width="15" stroke-linecap="round" />' +
+                    '<path class="aj-vgauge-arc" pathLength="100" d="' + ARC + '" fill="none" stroke="' + GREEN + '" stroke-width="15" stroke-linecap="round" stroke-dasharray="100" stroke-dashoffset="8" />' +
+                  '</svg>' +
+                  '<span class="aj-scta-num">92</span>' + (extra || '') +
+                '</span>';
+            }
+            // A score of `v` is an arc with `100 - v` of its dash still hidden.
+            function setGauge(v, color) {
+              var arc = cta.querySelector('.aj-vgauge-arc');
+              var num = cta.querySelector('.aj-scta-num');
+              if (arc) { arc.style.strokeDashoffset = String(100 - v); arc.style.stroke = color; }
+              if (num) { num.textContent = String(v); num.style.color = color; }
+            }
+
+            var VARIANTS = {
+              // HRV — a live RR trace redrawing left to right (two beats to a
+              // pass), with the SDNN beside it lifting the way a good week's
+              // does. Red: this is the brand's own signal, and the trace is the
+              // app's headline instrument.
+              hrv: {
+                cta: 'Measure your HRV',
+                aria: 'Measure your HRV, free',
+                color: RED,
+                badge:
+                  '<span class="aj-scta-wave">' +
+                    '<svg viewBox="0 0 100 44" fill="none" aria-hidden="true">' +
+                      '<path class="aj-wave-line" pathLength="100" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" ' +
+                        'd="M0 26 L4 26 L8 21 L12 26 L14 26 L16 30 L19 4 L22 38 L25 26 L31 19 L37 26 L46 26 ' +
+                        'L50 26 L54 21 L58 26 L60 26 L62 30 L65 4 L68 38 L71 26 L77 19 L83 26 L100 26" />' +
+                    '</svg>' +
+                  '</span>' +
+                  '<span class="aj-scta-stat"><span class="aj-scta-val">38</span><span class="aj-scta-unit">SDNN</span></span>',
+                run: function (val) {
+                  var el = cta.querySelector('.aj-scta-val');
+                  if (!el) return;
+                  if (still()) { el.textContent = '42'; return; }
+                  // Held back a beat so the first pass of the trace is what the
+                  // eye catches, and the number is the thing it lands on.
+                  stepThrough([38, 39, 40, 41, 42], 240, function (v) {
+                    el.textContent = String(v);
+                  }, 900);
+                }
+              },
+
+              // POTS — the stand test itself: heart rate climbing off the
+              // baseline into the diagnostic bands. 20+ is gold, 30+ is the
+              // adult POTS threshold and goes red, and the button goes with it,
+              // so the colour IS the finding.
+              pots: {
+                cta: 'Run a stand test',
+                aria: 'Run a stand test, free',
+                color: GREEN,
+                badge:
+                  '<span class="aj-scta-delta">' +
+                    '<span class="aj-pots-sym">&#916;</span>' +
+                    '<span class="aj-pots-num">2</span>' +
+                    '<span class="aj-pots-unit">bpm</span>' +
+                  '</span>',
+                run: function () {
+                  var num = cta.querySelector('.aj-pots-num');
+                  var sym = cta.querySelector('.aj-pots-sym');
+                  if (!num || !sym) return;
+                  var paint = function (v) {
+                    var c = v >= 30 ? RED : v >= 20 ? GOLD : GREEN;
+                    num.textContent = String(v);
+                    num.style.color = c;
+                    sym.style.color = c;
+                    signal(c, c === GOLD);
+                  };
+                  if (still()) { paint(38); return; }
+                  // Deliberately uneven: a real stand test lurches, and an
+                  // evenly-spaced count reads as a progress bar.
+                  stepThrough([2, 4, 7, 12, 18, 23, 27, 31, 35, 37, 38], 250, paint);
+                }
+              },
+
+              // Food — the score is already good, then a trigger lands on it.
+              // The dial doesn't sweep in (the point isn't the score, it's the
+              // drop), and the pizza stays where the number was as the arc
+              // falls into the gold band.
+              food: {
+                cta: 'Find your triggers',
+                aria: 'Find your food triggers, free',
+                color: GREEN,
+                badge:
+                  gaugeHtml('<span class="aj-scta-emoji">&#127829;</span>') +
+                  '<span class="aj-scta-lbl"><span>Autonomic</span><span>Score</span></span>',
+                run: function () {
+                  var g = cta.querySelector('.aj-scta-gauge');
+                  var drop = function () {
+                    if (g) g.classList.add('has-emoji');
+                    setGauge(72, GOLD);
+                    signal(GOLD, true);
+                  };
+                  setGauge(92, GREEN);
+                  if (still()) { drop(); return; }
+                  at(900, function () { if (g) g.classList.add('has-emoji'); });
+                  at(1500, drop);
+                }
+              },
+
+              // Long COVID — the crash, seen coming. No score label: the words
+              // beside the dial are the read-out, and they change with it.
+              postviral: {
+                cta: 'See it coming',
+                aria: 'See a crash coming, free',
+                color: GREEN,
+                badge: gaugeHtml() + '<span class="aj-scta-tag"></span>',
+                run: function () {
+                  var tag = cta.querySelector('.aj-scta-tag');
+                  var stage = function (v, color, text) {
+                    setGauge(v, color);
+                    signal(color, color === GOLD);
+                    if (tag) { tag.textContent = text; tag.style.color = color; }
+                  };
+                  setGauge(92, GREEN);
+                  if (still()) { stage(58, RED, 'Crash!'); return; }
+                  at(900, function () { stage(78, GOLD, 'Crash coming'); });
+                  at(2200, function () { stage(58, RED, 'Crash!'); });
+                }
+              },
+
+              // Recovery — the long view. One line climbing out of the red
+              // through its own gradient, so each stage reveals the colour it
+              // earned rather than repainting what came before.
+              recovery: {
+                cta: 'See your trend',
+                aria: 'See your recovery trend, free',
+                color: RED,
+                badge:
+                  '<span class="aj-scta-spark">' +
+                    '<svg viewBox="0 0 96 48" fill="none" aria-hidden="true">' +
+                      '<defs><linearGradient id="ajSparkGrad" gradientUnits="userSpaceOnUse" x1="3" y1="43" x2="93" y2="5">' +
+                        '<stop offset="0" stop-color="' + RED + '" />' +
+                        '<stop offset="0.5" stop-color="' + GOLD + '" />' +
+                        '<stop offset="1" stop-color="' + GREEN + '" />' +
+                      '</linearGradient></defs>' +
+                      '<path class="aj-spark-line" pathLength="100" stroke="url(#ajSparkGrad)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" ' +
+                        'd="M3 43 L17 39 L30 41 L44 31 L57 27 L71 17 L93 5" />' +
+                    '</svg>' +
+                  '</span>' +
+                  '<span class="aj-scta-stat"><span class="aj-scta-val">15</span><span class="aj-scta-unit">RMSSD</span></span>',
+                run: function () {
+                  var line = cta.querySelector('.aj-spark-line');
+                  var val = cta.querySelector('.aj-scta-val');
+                  var stage = function (drawn, v, color) {
+                    if (line) line.style.strokeDashoffset = String(100 - drawn);
+                    if (val) { val.textContent = String(v); val.style.color = color; }
+                    signal(color, color === GOLD);
+                  };
+                  if (still()) { stage(100, 32, GREEN); return; }
+                  at(120, function () { stage(34, 15, RED); });
+                  at(1000, function () { stage(67, 26, GOLD); });
+                  at(1900, function () { stage(100, 32, GREEN); });
+                }
+              }
+            };
+
+            // Swapped in at setup, not at reveal: the dismiss handlers below
+            // bind to whatever `[data-dl-cta]` nodes exist, and the bar can be
+            // revealed synchronously on a page that already starts scrolled.
+            var variant = VARIANTS[topic];
+            if (variant) {
+              var badge = cta.querySelector('.aj-scta-badge');
+              var btn = cta.querySelector('.aj-scta-btn');
+              if (badge && btn) {
+                badge.innerHTML = variant.badge;
+                btn.textContent = variant.cta;
+                btn.setAttribute('aria-label', variant.aria);
+                signal(variant.color, variant.color === GOLD);
+              } else {
+                variant = null;
+              }
             }
 
             function onScroll() {
@@ -430,7 +649,7 @@
                 if (dock) dock.style.setProperty('--aj-scta-h', cta.offsetHeight + 12 + 'px');
                 requestAnimationFrame(function () {
                   if (dock) dock.classList.add('has-scta');
-                  countUp();
+                  if (variant) variant.run(); else countUp();
                 });
               });
               ajEvent('sticky_cta_view', { topic: topic || 'none' });
@@ -445,6 +664,7 @@
             // tick so hiding the link's own container can't race its
             // navigation.
             function dismiss(reason) {
+              stopTimers();
               cta.hidden = true;
               if (dock) { dock.classList.remove('has-scta'); dock.style.removeProperty('--aj-scta-h'); }
               try { sessionStorage.setItem('aj-scta-off', '1'); } catch (e) {}

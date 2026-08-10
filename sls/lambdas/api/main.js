@@ -87,6 +87,34 @@ const cleanEntry = (raw) => {
   return entry;
 };
 
+/* A recorded event — a release, a campaign, a store change. These are the
+   annotations every calendar chart draws, so they live with the dashboard's own
+   data (one partition per user, synced like entries) rather than anywhere near
+   the anonymous ping counters. */
+const EVENT_CATEGORIES = ['RELEASE', 'MARKETING', 'STORE', 'EXTERNAL'];
+
+const cleanEvent = (raw) => {
+  if (!raw || typeof raw !== 'object') return null;
+  if (!isIsoDate(raw.date)) return null;
+  const id = String(raw.id || '').slice(0, 64);
+  if (!id) return null;
+  const out = {
+    id,
+    date: raw.date,
+    category: EVENT_CATEGORIES.includes(raw.category) ? raw.category : 'EXTERNAL',
+    title: String(raw.title || '').slice(0, 200),
+  };
+  if (raw.time && /^\d{2}:\d{2}$/.test(raw.time)) out.time = raw.time;
+  if (raw.type) out.type = String(raw.type).slice(0, 80);
+  if (raw.note) out.note = String(raw.note).slice(0, 2000);
+  if (raw.url) out.url = String(raw.url).slice(0, 500);
+  const amount = Number(raw.amount);
+  if (raw.amount !== undefined && raw.amount !== null && raw.amount !== '' && Number.isFinite(amount)) {
+    out.amount = amount;
+  }
+  return out.title ? out : null;
+};
+
 const cleanSettings = (raw) => {
   if (!raw || typeof raw !== 'object') return null;
   const trialDays = Number(raw.trialDays);
@@ -141,6 +169,7 @@ const writeBatches = async (requests) => {
 const load = async (pk) => {
   const items = await readAll(pk);
   const entries = [];
+  const events = [];
   let settings = { ...DEFAULT_SETTINGS };
   let ui = null;
 
@@ -152,14 +181,19 @@ const load = async (pk) => {
     } else if (typeof item.SK === 'string' && item.SK.startsWith('ENTRY#')) {
       const entry = cleanEntry(item.entry || item);
       if (entry) entries.push(entry);
+    } else if (typeof item.SK === 'string' && item.SK.startsWith('EVENT#')) {
+      const event = cleanEvent(item.event || item);
+      if (event) events.push(event);
     }
   });
+
+  events.sort((a, b) => (a.date === b.date ? a.id.localeCompare(b.id) : a.date.localeCompare(b.date)));
 
   entries.sort((a, b) => (a.date === b.date
     ? a.platform.localeCompare(b.platform)
     : a.date.localeCompare(b.date)));
 
-  return { entries, settings, ui };
+  return { entries, events, settings, ui };
 };
 
 const sync = async (pk, payload) => {
@@ -181,6 +215,22 @@ const sync = async (pk, payload) => {
         },
       },
     });
+  });
+
+  const eventUpserts = Array.isArray(payload.eventUpserts) ? payload.eventUpserts : [];
+  eventUpserts.forEach((raw) => {
+    const event = cleanEvent(raw);
+    if (!event) return;
+    requests.push({
+      PutRequest: {
+        Item: { PK: pk, SK: `EVENT#${event.id}`, entityType: 'DASH_EVENT', event, updatedAt: now },
+      },
+    });
+  });
+
+  const eventDeletes = Array.isArray(payload.eventDeletes) ? payload.eventDeletes : [];
+  eventDeletes.forEach((id) => {
+    if (typeof id === 'string' && id) requests.push({ DeleteRequest: { Key: { PK: pk, SK: `EVENT#${id}` } } });
   });
 
   const deletes = Array.isArray(payload.deletes) ? payload.deletes : [];
@@ -219,7 +269,10 @@ const sync = async (pk, payload) => {
     }));
   }
 
-  return { upserted: upserts.length, deleted: deletes.length };
+  return {
+    upserted: upserts.length, deleted: deletes.length,
+    eventsUpserted: eventUpserts.length, eventsDeleted: eventDeletes.length,
+  };
 };
 
 /** Wipe every entry and write the supplied set. Backs a JSON-backup restore. */

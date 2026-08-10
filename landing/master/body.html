@@ -92,6 +92,8 @@
 
   <nav class="tabs" role="tablist">
     <button class="tab" role="tab" data-view="overview" aria-selected="true">Overview</button>
+    <button class="tab" role="tab" data-view="ping" aria-selected="false">App usage</button>
+    <button class="tab" role="tab" data-view="timeline" aria-selected="false">Timeline</button>
     <button class="tab" role="tab" data-view="trial" aria-selected="false">Trial &amp; conversion</button>
     <button class="tab" role="tab" data-view="cohorts" aria-selected="false">Cohorts</button>
     <button class="tab" role="tab" data-view="platforms" aria-selected="false">iOS vs Android</button>
@@ -274,6 +276,148 @@
       <div id="cohChart"></div>
       <div id="cohChart-table" class="hidden" style="margin-top:12px"></div>
     </div>
+  </section>
+
+  <!-- ================= APP USAGE (cohort pings) =================
+       The only view fed by the app itself rather than by store CSVs. Its data
+       is fetched separately (action PINGS) and is read-only: nothing here is
+       editable and nothing here is pushed back by sync.js.
+
+       Every number on this screen comes from analytics.js. No arithmetic lives
+       in the render code, because the rules about what these counters may and
+       may not claim (see that file's header) have to hold everywhere at once. -->
+  <section id="view-ping" class="view hidden">
+    <div id="pgStatus"></div>
+
+    <!-- ---------- 1. the 30-second read ---------- -->
+    <div class="section-head">
+      <h2 class="section-title">Overview</h2>
+      <span class="section-note" id="pgAsOf"></span>
+    </div>
+    <div class="grid cards" id="pgTiles"></div>
+    <div class="grid cards" id="pgTilesB"></div>
+
+    <!-- ---------- 2. growth vs. actual usage ---------- -->
+    <div class="card" style="margin-bottom:14px">
+      <header><h2>Growth &amp; usage</h2><span class="spacer"></span>
+        <div class="segmented" id="pgTlMode">
+          <button data-v="usage" aria-pressed="true">Usage</button>
+          <button data-v="acquisition" aria-pressed="false">Acquisition</button>
+          <button data-v="both" aria-pressed="false">Both</button>
+        </div>
+        <button class="btn sm" data-table-toggle="pgTimeline">Table</button></header>
+      <p class="hint">The question this answers is <b>question 9</b>: are we acquiring more people without building a larger returning userbase? <b>Returning</b> is the line to watch — first runs rise and fall with the store, but only returning activity means the product is holding anyone. Recorded events appear as flags along the top; hover one for what it was.</p>
+      <div id="pgTimeline"></div>
+      <div id="pgTimeline-table" class="hidden" style="margin-top:12px"></div>
+    </div>
+
+    <!-- ---------- 3. retention ---------- -->
+    <div class="grid two-col" style="margin-bottom:14px">
+      <div class="card">
+        <header><h2>Retention curve</h2><span class="spacer"></span>
+          <div class="segmented" id="pgCurveMode">
+            <button data-v="all" aria-pressed="true">All</button>
+            <button data-v="split" aria-pressed="false">Recent vs earlier</button>
+          </div>
+          <button class="btn sm" data-table-toggle="pgCurve">Table</button></header>
+        <p class="hint">Share of each cohort still opening the app N days after installing, pooled over every cohort old enough to have reached that day. The two dashed rules are the product's boundaries: the trial ends after <b>D7</b>, and the history wall starts at <b>D15</b>. A cohort too young for a day is left out of it entirely rather than counted as churned.</p>
+        <div id="pgCurve"></div>
+        <div id="pgCurve-table" class="hidden" style="margin-top:12px"></div>
+      </div>
+      <div class="card">
+        <header><h2>Crossing the boundaries</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="pgSurvival">Table</button></header>
+        <p class="hint">The lifecycle as a funnel, and the two transitions that straddle a product decision. Both sides of each transition are measured over the <em>same</em> installs — only cohorts old enough for the later day — so a change cannot be an artefact of a shifting denominator.</p>
+        <div id="pgSurvival"></div>
+        <div id="pgSurvival-table" class="hidden" style="margin-top:12px"></div>
+        <div id="pgTransitions"></div>
+      </div>
+    </div>
+
+    <!-- ---------- 4. cohort heatmap ---------- -->
+    <div class="card" style="margin-bottom:14px">
+      <header><h2>Cohort retention</h2><span class="spacer"></span>
+        <div class="segmented" id="pgHeatGrain">
+          <button data-v="week" aria-pressed="true">By week</button>
+          <button data-v="day" aria-pressed="false">By day</button>
+        </div>
+        <button class="btn sm" id="pgHeatExport">Export CSV</button></header>
+      <p class="hint">Rows are install cohorts, columns are milestones either side of each boundary. Colour is retention strength. A <span class="heat-key-immature">hatched</span> cell means that cohort has not lived that long yet — which is <em>not</em> the same as 0%, and is never averaged in. Cohorts under <b>10 installs</b> are flagged, because a percentage over six people is mostly noise. Click a row to inspect it below.</p>
+      <div id="pgHeat"></div>
+      <div id="pgCohortDetail"></div>
+    </div>
+
+    <!-- ---------- 5. who is actually here ---------- -->
+    <div class="grid two-col" style="margin-bottom:14px">
+      <div class="card">
+        <header><h2>Who is using it today</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="pgActiveCohort">Table</button></header>
+        <p class="hint">Today's active installs by how old they are. If this is dominated by the youngest bars, activity is being propped up by acquisition; a long tail means older installs are still showing up. Installs older than the counter are charted here too — their age came in with the ping, only their cohort size is unknown.</p>
+        <div id="pgActiveCohort"></div>
+        <div id="pgActiveCohort-table" class="hidden" style="margin-top:12px"></div>
+        <div id="pgOlderInstalls"></div>
+      </div>
+      <div class="card">
+        <header><h2>Purchase timing</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="pgPurchaseAge">Table</button></header>
+        <p class="hint">How old an install was when it subscribed. <b>D15</b> has its own column deliberately: if the history wall is what converts people, this is where it shows up.</p>
+        <div id="pgPurchaseAge"></div>
+        <div id="pgPurchaseAge-table" class="hidden" style="margin-top:12px"></div>
+        <div id="pgConversion"></div>
+      </div>
+    </div>
+
+    <!-- ---------- 6. weekday shape ---------- -->
+    <div class="card" style="margin-bottom:14px">
+      <header><h2>Weekday pattern</h2><span class="spacer"></span>
+        <button class="btn sm" data-table-toggle="pgWeekday">Table</button></header>
+      <p class="hint">Whether the midweek acquisition peak is real, and whether it is worth anything. Each weekday carries three bars — downloads, first runs and returning activity — as averages per weekday, so a day with five Mondays in range is not flattered by having more of them. The table below asks the harder question: do installs born midweek actually <em>retain</em> better, or are they just more numerous?</p>
+      <div id="pgWeekday"></div>
+      <div id="pgWeekday-table" class="hidden" style="margin-top:12px"></div>
+      <div id="pgWeekdayRetention"></div>
+    </div>
+
+  </section>
+
+  <!-- ================= TIMELINE =================
+       What we changed, and what happened around it. Events live here; every
+       other calendar chart in the dashboard draws them as annotations from the
+       same store. Releases are not entered by hand — they are read from the
+       app's own release log (see landing/scripts/gen-releases.mjs). -->
+  <section id="view-timeline" class="view hidden">
+    <div class="card" style="margin-bottom:14px">
+      <header><h2>What happened</h2><span class="spacer"></span>
+        <div class="segmented" id="tlMetric">
+          <button data-v="active" aria-pressed="true">Active</button>
+          <button data-v="returning" aria-pressed="false">Returning</button>
+          <button data-v="fresh" aria-pressed="false">First runs</button>
+          <button data-v="downloads" aria-pressed="false">Downloads</button>
+          <button data-v="pageViews" aria-pressed="false">Page views</button>
+          <button data-v="purchases" aria-pressed="false">Purchases</button>
+          <button data-v="revenue" aria-pressed="false">Revenue</button>
+        </div>
+        <button class="btn sm" data-table-toggle="tlChart">Table</button></header>
+      <p class="hint">One metric against the record of what changed. Each vertical rule is something that happened, and its <b>pattern</b> says what kind: <b>dashed</b> is a release <span class="mark-key release"></span> (version and notes, read from the app's release log), <b>dotted</b> is marketing <span class="mark-key marketing"></span>, <b>dash-dot</b> is an App Store change <span class="mark-key store"></span>, <b>solid</b> is external <span class="mark-key external"></span>. The rules are deliberately neutral so they never blend into the bars; the colour sits in the flag at the top of each one. Hover anywhere along a rule for what it was, click it to compare the fortnight either side.</p>
+      <div id="tlChart"></div>
+      <div id="tlChart-table" class="hidden" style="margin-top:12px"></div>
+    </div>
+
+    <div class="card" style="margin-bottom:14px">
+      <header><h2>Events</h2><span class="spacer"></span>
+        <button class="btn primary sm" id="pgEventAdd">+ Add event</button></header>
+      <p class="hint">Campaigns, store changes, press, anything else that might move the numbers. Recorded once here and drawn on every calendar chart in the dashboard, so a spike six months from now still says what you did that week.</p>
+      <div id="pgEventForm" class="hidden"></div>
+      <div id="pgEventList"></div>
+    </div>
+
+    <div class="card" style="margin-bottom:14px">
+      <header><h2>Releases</h2><span class="spacer"></span>
+        <span class="note">from the app's release log</span></header>
+      <p class="hint">Read from <code>mobile/src/lib/whatsNew.ts</code>, which the app itself shows on its "What's new" card, so the versions and dates cannot drift from what actually shipped. They are not editable here. Select one to compare the windows either side of it.</p>
+      <div id="tlReleases"></div>
+    </div>
+
+    <div id="pgEventAnalysis"></div>
   </section>
 
   <!-- ================= PLATFORMS ================= -->

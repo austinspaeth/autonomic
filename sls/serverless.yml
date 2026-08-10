@@ -30,6 +30,10 @@ provider:
         - https://www.autonomic.care
         - http://localhost:5173
         - http://localhost:8080
+        # A third local port, because the other two are routinely taken by other
+        # projects on the same machine. Origins only get you as far as the
+        # Cognito token and the email allowlist behind it.
+        - http://localhost:8099
       allowedMethods:
         - GET
         - POST

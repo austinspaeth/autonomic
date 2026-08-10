@@ -2,7 +2,7 @@
 
 One DynamoDB table and two Lambdas behind an HTTP API, deployed by the
 Serverless Framework. It stores the analytics dashboard at
-`landing/static/master/` (see `../MASTER_DASHBOARD.md`) and counts the mobile
+`landing/master/` (see `../MASTER_DASHBOARD.md`) and counts the mobile
 app's cohort pings. The app still keeps every byte of health data on-device;
 the ping is a bare counter with no identifier attached (see below).
 
@@ -101,6 +101,31 @@ four of these stay true:
 Point 4 is also why the client, not the server, enforces one ping per day: with
 nothing to de-duplicate on, the server *cannot* do it, and that is the
 property, not a limitation.
+
+### Never delete a day row
+
+`PING#OPEN / <day>` is **everyone's** counts for that day, in one item. Deleting
+it to undo your own test ping destroys every real ping that landed in it, and
+the client will not re-send: an install stamps "pinged today" on success and
+stays quiet until the next UTC day. This has happened once already, and was only
+recoverable because the table has point-in-time recovery on.
+
+So: do not write test pings to production. If you must, pick a cohort date you
+can recognise and undo it by decrementing that one map key, never by deleting
+the item:
+
+```bash
+aws dynamodb update-item --region us-west-2 --table-name Autonomic-prod \
+  --key '{"PK":{"S":"PING#OPEN"},"SK":{"S":"2026-08-10"}}' \
+  --update-expression "SET cohorts.#c = cohorts.#c - :one, #t = #t - :one" \
+  --expression-attribute-names '{"#c":"081026","#t":"total"}' \
+  --expression-attribute-values '{":one":{"N":"1"}}'
+```
+
+If a row does get destroyed, PITR can restore the table to a moment before it
+(`restore-table-to-point-in-time` into a **new** table name, read the row, write
+it back to the live table with `--condition-expression "attribute_not_exists(PK)"`
+so a newer row cannot be clobbered, then delete the temporary table).
 
 ### Reading it back
 

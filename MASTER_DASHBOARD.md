@@ -98,11 +98,43 @@ Everything below is in `landing/master/`, except the route that assembles them.
 | `charts.js` | Dependency-free SVG chart engine |
 | `styles.css` | Dark theme tokens, layout, gate |
 
+## The App usage view
+
+Every other view is fed by store CSVs you paste in. This one is fed by the app
+itself, through the `PINGS` action (`sls/lambdas/ping/`): each install asks a
+counter to add one, at most once per UTC day, carrying nothing but the day that
+install first ran. The data is fetched once per session, cached on `pings`, and
+is **read-only** — it lives outside `db`, so `sync.js` never sees it and there
+is nothing here to edit.
+
+One rule governs all the arithmetic, and every metric in the view is shaped by
+it: **counts can be compared across days but never summed into one.** With no
+identifier there is no way to tell one install from another, so adding up seven
+daily numbers counts the same person seven times. Consequences you will see in
+the UI, each of them deliberate:
+
+- The grain filter is hidden. There is no weekly or monthly active count, only
+  daily ones, and pretending otherwise would be the easiest lie to tell here.
+- "Active in the last 7 days" takes each cohort's **busiest single day**, never
+  a sum, and is labelled as a floor rather than a figure.
+- Cohort size is exact, because a cohort's day 0 count is one day. Retention is
+  therefore exact too: day N's count over day 0's.
+- Cohorts born before the counter shipped have no day 0, so they are counted as
+  active but carry no percentage. The view says how many days that affects
+  rather than quietly averaging them in.
+
+Joining the two sources is where it gets useful: **activation** is first runs
+against that day's store downloads (how many people who downloaded ever opened
+the app), and the purchases chart puts subscribe pings beside store sales as a
+cross-check. They count different moments — the app only notices a subscription
+on its next launch — so they should track, not match.
+
 ## Backend
 
-`sls/` at the repo root — one DynamoDB table and one Lambda behind an HTTP API
-with a Cognito JWT authorizer. It deploys from the same CodePipeline as the
-landing site on push to `main`.
+`sls/` at the repo root — one DynamoDB table and two Lambdas behind an HTTP API,
+the dashboard's own behind a Cognito JWT authorizer and the app's ping counter
+public. It deploys from the same CodePipeline as the landing site on push to
+`main`.
 
 ## Running locally
 
@@ -131,3 +163,11 @@ the boot `LOAD`, hydrate, and the first diffed `SYNC` push. It runs against the
 **built** page rather than the sources, because the route that assembles them
 is now part of what can break — the test asserts that the stylesheet and all
 seven scripts are inlined and that the document references nothing relative.
+
+A second file, `tests/master-ping.test.mjs`, renders the App usage view against
+a three-cohort fixture built relative to today, and checks the numbers on screen
+against ones worked out by hand in its header: retention at day 1 and day 7,
+activation against store downloads, the unlived cells of the grid staying blank
+rather than reading 0%, and the tiles refusing to answer where the data is too
+young. If you change how a metric is derived, that fixture is where you find out
+whether you meant to.

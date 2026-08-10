@@ -55,13 +55,46 @@ window.Sync = (function () {
     }, {}));
   }
 
+  /* Mirrors cleanEvent() in the Lambda, same rule as normalize(): if the two
+     shapes disagree, every diff reports every event as changed forever. */
+  var EVENT_CATEGORIES = ['RELEASE', 'MARKETING', 'STORE', 'EXTERNAL'];
+
+  function normalizeEvent(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(raw.date || ''))) return null;
+    var id = String(raw.id || '').slice(0, 64);
+    var title = String(raw.title || '').slice(0, 200);
+    if (!id || !title) return null;
+    var out = {
+      id: id, date: raw.date, title: title,
+      category: EVENT_CATEGORIES.indexOf(raw.category) >= 0 ? raw.category : 'EXTERNAL'
+    };
+    if (raw.time && /^\d{2}:\d{2}$/.test(raw.time)) out.time = raw.time;
+    if (raw.type) out.type = String(raw.type).slice(0, 80);
+    if (raw.note) out.note = String(raw.note).slice(0, 2000);
+    if (raw.url) out.url = String(raw.url).slice(0, 500);
+    var amount = Number(raw.amount);
+    if (raw.amount !== undefined && raw.amount !== null && raw.amount !== '' && isFinite(amount)) {
+      out.amount = amount;
+    }
+    return out;
+  }
+
   function snapshotOf(db, state) {
     var entries = new Map();
     (db.entries || []).forEach(function (e) {
       var n = normalize(e);
       if (n) entries.set(keyOf(n), stable(n));
     });
-    return { entries: entries, settings: stable(db.settings || {}), ui: stable(state || {}) };
+    var events = new Map();
+    (db.events || []).forEach(function (e) {
+      var n = normalizeEvent(e);
+      if (n) events.set(n.id, stable(n));
+    });
+    return {
+      entries: entries, events: events,
+      settings: stable(db.settings || {}), ui: stable(state || {})
+    };
   }
 
   function setStatus(next, detail) {
@@ -102,9 +135,22 @@ window.Sync = (function () {
       });
     }
 
+    var eventUpserts = [];
+    var eventDeletes = [];
+    now.events.forEach(function (json, id) {
+      if (!baseline || !baseline.events || baseline.events.get(id) !== json) eventUpserts.push(JSON.parse(json));
+    });
+    if (baseline && baseline.events) {
+      baseline.events.forEach(function (_json, id) {
+        if (!now.events.has(id)) eventDeletes.push(id);
+      });
+    }
+
     var payload = {};
     if (upserts.length) payload.upserts = upserts;
     if (deletes.length) payload.deletes = deletes;
+    if (eventUpserts.length) payload.eventUpserts = eventUpserts;
+    if (eventDeletes.length) payload.eventDeletes = eventDeletes;
     if (!baseline || baseline.settings !== now.settings) payload.settings = db.settings;
     if (!baseline || baseline.ui !== now.ui) payload.ui = state;
     return { payload: payload, snapshot: now, empty: Object.keys(payload).length === 0 };

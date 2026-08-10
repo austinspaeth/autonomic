@@ -224,8 +224,10 @@ old web app so old `export.json` files import directly.
   a list would lose concurrent pings. Read it back with `GET /ping/report?key=`
   (shared key, `PING_REPORT_KEY`, injected by CodeBuild from SSM) or the `PINGS`
   action on the authenticated `/master` API; both return
-  `{ day, total, cohorts: [{ cohortDate, count }] }` rows. Details in
-  `sls/README.md`.
+  `{ day, total, cohorts: [{ cohortDate, cohort, count }] }` rows. The `/master`
+  dashboard renders them in its **App usage** view (`landing/master/`, tested by
+  `landing/tests/master-ping.test.mjs`). Details in `sls/README.md` and
+  `MASTER_DASHBOARD.md`.
 - **Home-screen widgets render one shared JSON payload** built by
   `buildWidgetPayload()` (`src/lib/widgets.ts`, pure — unit-tested) and pushed by
   `initWidgetSync()` on launch, debounced journal changes, and foreground. iOS:

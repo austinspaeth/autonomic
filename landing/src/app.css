@@ -2164,11 +2164,84 @@ a.gc { display: block; }
      that still reads as a button. */
   .aj-scta-btn {
     flex: none; display: inline-flex; align-items: center;
-    background: var(--aj-scta-green); color: #fff;
+    background: var(--aj-scta-green); color: var(--aj-scta-fg, #fff);
     border-radius: 999px; padding: 18px 22px; white-space: nowrap;
     font-size: 15.5px; font-weight: 700; letter-spacing: 0.01em; line-height: 1;
-    box-shadow: 0 4px 16px rgba(110,224,110,0.4);
+    /* Derived from the signal colour rather than hard-coded, so a topic
+       variant that turns gold or red carries its glow with it. */
+    box-shadow: 0 4px 16px color-mix(in srgb, var(--aj-scta-green) 40%, transparent);
+    transition: background-color 0.45s var(--ease), color 0.45s var(--ease), box-shadow 0.45s var(--ease);
   }
+
+  /* --- Topic variants ---------------------------------------------
+     Five topics swap the badge for an instrument that demonstrates what
+     that topic's article is about (markup + timing in app.html). They all
+     drive the same two tokens the default bar already keys off —
+     `--aj-scta-green` (the signal colour: button, glow, border light) and
+     `--aj-scta-fg` (its text) — so a variant that turns gold or red mid
+     animation drags the whole pill with it. Everything here is a
+     transition, never a keyframe, because the JS is what decides when a
+     stage lands. */
+
+  /* HRV: an RR trace drawn in left to right, two beats, once. It's a CTA and
+     not a monitor — a looping trace turns into wallpaper the eye stops
+     reading, and the number beside it is what should hold attention. */
+  .aj-scta-wave { flex: none; width: 88px; height: 40px; color: var(--aj-scta-green); }
+  .aj-scta-wave svg { width: 100%; height: 100%; overflow: visible; }
+  .aj-wave-line { stroke-dasharray: 100; stroke-dashoffset: 0; }
+  @media (prefers-reduced-motion: no-preference) {
+    .aj-dock.has-scta .aj-wave-line { animation: aj-wave-draw 2s linear both; }
+  }
+
+  /* Shared stat block: big number over a unit caption (HRV, Recovery). */
+  .aj-scta-stat { display: flex; flex-direction: column; align-items: flex-start; line-height: 1; }
+  .aj-scta-val {
+    font-family: var(--display); font-size: 22px; font-weight: 800;
+    letter-spacing: -0.02em; color: var(--aj-scta-green);
+    font-variant-numeric: tabular-nums; transition: color 0.4s var(--ease);
+  }
+  .aj-scta-unit {
+    margin-top: 5px; font-size: 9.5px; font-weight: 800;
+    text-transform: uppercase; letter-spacing: 0.09em; color: rgba(255,255,255,0.72);
+  }
+
+  /* POTS: the stand-test delta, counting up into its danger bands. */
+  .aj-scta-delta {
+    display: inline-flex; align-items: baseline; gap: 4px;
+    font-family: var(--display); font-weight: 800; letter-spacing: -0.02em;
+  }
+  .aj-pots-sym { font-size: 25px; color: var(--aj-scta-green); transition: color 0.25s var(--ease); }
+  /* Reserves two digits so the bar's lanes don't shuffle as it climbs. */
+  .aj-pots-num {
+    font-size: 34px; min-width: 48px; color: var(--aj-scta-green);
+    font-variant-numeric: tabular-nums; transition: color 0.25s var(--ease);
+  }
+  .aj-pots-unit { font-size: 12.5px; font-weight: 700; color: rgba(255,255,255,0.8); }
+
+  /* Gauge variants (Food, Long COVID): same 270° dial as the default, but
+     the arc is the FULL sweep and the value is the dash offset, so it can
+     be moved after it lands. */
+  .aj-vgauge-arc { transition: stroke-dashoffset 0.9s var(--ease), stroke 0.5s var(--ease); }
+  .aj-scta-gauge .aj-scta-num { transition: opacity 0.4s var(--ease), color 0.45s var(--ease); }
+  /* Food swaps the score out for the trigger that moved it. */
+  .aj-scta-emoji {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 25px; line-height: 1; opacity: 0; transition: opacity 0.45s var(--ease);
+  }
+  .aj-scta-gauge.has-emoji .aj-scta-num { opacity: 0; }
+  .aj-scta-gauge.has-emoji .aj-scta-emoji { opacity: 1; }
+  /* Long COVID's verdict, beside the dial in place of the score label. */
+  .aj-scta-tag {
+    font-family: var(--display); font-size: 14px; font-weight: 800;
+    line-height: 1.1; letter-spacing: -0.01em; white-space: nowrap;
+    color: var(--aj-scta-green); transition: color 0.4s var(--ease);
+  }
+
+  /* Recovery: a trend line drawn in through its own red → gold → green
+     gradient, so each stage reveals the colour it earned. */
+  .aj-scta-spark { flex: none; width: 74px; height: 44px; }
+  .aj-scta-spark svg { width: 100%; height: 100%; overflow: visible; }
+  .aj-spark-line { stroke-dasharray: 100; stroke-dashoffset: 100; transition: stroke-dashoffset 0.85s var(--ease); }
 
   /* Mini phones: every millimetre the controls and the bar's own inset give
      up goes to the phone, which is the first thing to become unreadable when
@@ -2180,6 +2253,13 @@ a.gc { display: block; }
     .aj-scta-num { font-size: 18px; }
     .aj-scta-lbl { font-size: 9px; }
     .aj-scta-btn { font-size: 14px; padding: 16px 17px; }
+    .aj-scta-wave { width: 74px; height: 34px; }
+    .aj-scta-spark { width: 62px; height: 40px; }
+    .aj-scta-val { font-size: 20px; }
+    .aj-pots-sym { font-size: 22px; }
+    .aj-pots-num { font-size: 30px; min-width: 42px; }
+    .aj-scta-tag { font-size: 12.5px; }
+    .aj-scta-emoji { font-size: 22px; }
   }
 
   /* Plays once when the bar arrives and holds. `both` so the corner is
@@ -2206,6 +2286,11 @@ a.gc { display: block; }
   from { stroke-dashoffset: 100; }
   to   { stroke-dashoffset: 0; }
 }
+/* One pass of the HRV trace, left to right, then it stays drawn. */
+@keyframes aj-wave-draw {
+  from { stroke-dashoffset: 100; }
+  to   { stroke-dashoffset: 0; }
+}
 @keyframes aj-scta-glow {
   0%   { --aj-glow-x: 18%; --aj-glow-y: 100%; --aj-glow-rx: 52%; --aj-glow-ry: 90%;   opacity: 1; }
   47%  { --aj-glow-x: 97%; --aj-glow-y: 100%; --aj-glow-rx: 52%; --aj-glow-ry: 90%; }
@@ -2219,4 +2304,10 @@ a.gc { display: block; }
   /* No sweep and no roll-up (app.html skips the count): the score is simply
      already there. */
   .aj-scta-arc, .aj-dock.has-scta .aj-scta-arc { animation: none; stroke-dashoffset: 0; }
+  /* Topic variants: the JS jumps straight to each one's final reading, so
+     nothing here may tween it there. */
+  .aj-wave-line, .aj-dock.has-scta .aj-wave-line { animation: none; stroke-dashoffset: 0; }
+  .aj-vgauge-arc, .aj-spark-line, .aj-scta-emoji, .aj-scta-tag,
+  .aj-scta-val, .aj-pots-sym, .aj-pots-num, .aj-scta-btn,
+  .aj-scta-gauge .aj-scta-num { transition: none; }
 }

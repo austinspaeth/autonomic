@@ -1,0 +1,332 @@
+/* The App usage view, rendered against a fixture whose answers are worked out
+   by hand below. Runs against the BUILT page, because the view only exists once
+   the route has inlined body.html, the stylesheet and the scripts in order.
+
+   analytics.test.mjs already pins the arithmetic. This file's job is the other
+   half: that the view puts those numbers on screen, keeps "unavailable" looking
+   different from zero, and that events save, annotate and analyse.
+
+   The fixture is relative to today, since the view anchors its range to the
+   newest ping day rather than the store's lagging reporting day:
+
+     Z  born T-10, 8 installs   old enough for D7 (nobody came back: a real 0%)
+     A  born T-4,  10 installs  mid-life
+     B  born T-3,  4 installs   young; D7 and beyond are unavailable for it   */
+import { JSDOM } from 'jsdom';
+import fs from 'node:fs';
+
+const PAGE = new URL('../build/master/index.html', import.meta.url).pathname;
+if (!fs.existsSync(PAGE)) {
+  console.error(`No built page at ${PAGE} — run \`npm run build\` first.`);
+  process.exit(1);
+}
+
+const results = [];
+const check = (name, ok, detail) => results.push({ name, ok, detail });
+
+const pad = (n) => (n < 10 ? '0' + n : '' + n);
+const iso = (d) => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+const T = (back) => { const d = new Date(); d.setDate(d.getDate() - back); return iso(d); };
+
+const OPEN = {
+  [T(10)]: { [T(10)]: 8 },
+  [T(9)]: { [T(10)]: 4 },
+  [T(4)]: { [T(4)]: 10 },
+  [T(3)]: { [T(4)]: 5, [T(3)]: 4 },
+  [T(2)]: { [T(4)]: 3, [T(3)]: 2 },
+  [T(1)]: { [T(10)]: 1, [T(4)]: 2, [T(3)]: 2 },
+  [T(0)]: { [T(10)]: 1, [T(4)]: 2, [T(3)]: 1 },
+};
+const SUB = {
+  [T(2)]: { [T(4)]: 1 },     // bought on its D2, inside the trial
+  [T(0)]: { [T(10)]: 1 },    // bought on its D10, past the trial
+};
+
+const shape = (map) => Object.keys(map).sort().map((day) => ({
+  day,
+  total: Object.values(map[day]).reduce((a, b) => a + b, 0),
+  cohorts: Object.keys(map[day]).sort().map((cohort) => ({
+    cohort,
+    cohortDate: cohort.slice(5, 7) + cohort.slice(8, 10) + cohort.slice(2, 4),
+    count: map[day][cohort],
+  })),
+}));
+
+const b64u = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
+const idToken = [b64u({ alg: 'RS256' }), b64u({ email: 'austinspaeth@msn.com', exp: Math.floor(Date.now() / 1000) + 3600 }), 'sig'].join('.');
+
+const dom = new JSDOM(fs.readFileSync(PAGE, 'utf8'), {
+  url: 'https://autonomic.care/master/',
+  runScripts: 'dangerously',
+  pretendToBeVisual: true,
+});
+const { window } = dom;
+window.scrollTo = () => {};           // jsdom has no layout; setView calls it
+window.Element.prototype.scrollIntoView = () => {};
+
+const calls = [];
+window.fetch = (url, opts) => {
+  const body = JSON.parse(opts.body);
+  const target = (opts.headers['X-Amz-Target'] || '').split('.').pop();
+  calls.push({ target, action: body.action, payload: body.payload });
+  const reply = (obj) => Promise.resolve({ ok: true, status: 200, text: () => Promise.resolve(JSON.stringify(obj)) });
+
+  if (target === 'InitiateAuth') return reply({ Session: 's1', ChallengeName: 'CUSTOM_CHALLENGE', ChallengeParameters: { USERNAME: 'austinspaeth@msn.com' } });
+  if (target === 'RespondToAuthChallenge') return reply({ AuthenticationResult: { IdToken: idToken, AccessToken: 'at', RefreshToken: 'rt' } });
+  if (body.action === 'LOAD') {
+    return reply({
+      entries: [{ date: T(4), platform: 'ios', downloads: 20, impressions: 1000, pageViews: 100, sales: 1 }],
+      events: [],
+      settings: { trialDays: 7, wallDays: 14, currency: '$' },
+      // Boot straight into the Timeline tab on purpose: it is the case where
+      // the ping fetch resolves AFTER the view first renders, which is how the
+      // chart once came up empty.
+      ui: { view: 'timeline' },
+    });
+  }
+  if (body.action === 'PINGS') return reply({ since: body.payload.since, open: shape(OPEN), sub: shape(SUB) });
+  return reply({ ok: true });
+};
+
+const errors = [];
+window.addEventListener('error', (e) => errors.push(String(e.error || e.message)));
+
+await new Promise((r) => window.addEventListener('load', r));
+await new Promise((r) => setTimeout(r, 200));
+const $ = (id) => window.document.getElementById(id);
+
+$('gateEmail').value = 'austinspaeth@msn.com';
+$('gateSubmit').click();
+await new Promise((r) => setTimeout(r, 150));
+[...$('gateCodeRow').querySelectorAll('input')].forEach((el, i) => {
+  el.value = '1234'[i];
+  el.dispatchEvent(new window.Event('input', { bubbles: true }));
+});
+await new Promise((r) => setTimeout(r, 250));
+
+/* The view the session restored into must draw the ping data once it lands,
+   not just the view that happened to request it. */
+check('timeline booted straight in', !$('view-timeline').classList.contains('hidden'));
+check('the timeline drew data that arrived after its first render',
+  $('tlChart').querySelectorAll('path[fill]:not([fill="none"]), rect[rx="3"]').length > 0 ||
+  [...$('tlChart').querySelectorAll('rect')].some((n) => Number(n.getAttribute('height')) > 1 && n.getAttribute('rx') !== '2'),
+  String($('tlChart').querySelectorAll('rect').length) + ' rects');
+
+window.document.querySelector('.tab[data-view="ping"]').click();
+await new Promise((r) => setTimeout(r, 300));
+
+check('view is showing', !$('view-ping').classList.contains('hidden'));
+check('asked the API for pings', calls.some((c) => c.action === 'PINGS'));
+
+/* ------------------------------------------------------------------ tiles */
+
+const tiles = {};
+['pgTiles', 'pgTilesB'].forEach((id) => {
+  $(id).querySelectorAll('.tile').forEach((t) => {
+    tiles[t.querySelector('.label').textContent.trim()] = {
+      value: t.querySelector('.value').textContent.trim(),
+      meta: (t.querySelector('.meta') || {}).textContent || '',
+    };
+  });
+});
+check('twelve KPI tiles', Object.keys(tiles).length === 12, Object.keys(tiles).join(' | '));
+
+// D1 pools all three cohorts: (4 + 5 + 2) / 22 = 50%
+check('D1 retention is 50%', tiles['D1 retention'].value === '50.0%', tiles['D1 retention'].value);
+check('D1 shows its denominator', /11 of 22/.test(tiles['D1 retention'].meta), tiles['D1 retention'].meta);
+
+// only Z is old enough for D7, and none of its 8 returned that day: a real 0%
+check('D7 is a real 0%, not a dash', tiles['D7 retention'].value === '0.00%', tiles['D7 retention'].value);
+check('D7 names the trial boundary', /last day of the trial/.test(tiles['D7 retention'].meta), tiles['D7 retention'].meta);
+check('D7 says how many cohorts were too young',
+  /2 cohorts too young to count/.test(tiles['D7 retention'].meta), tiles['D7 retention'].meta);
+
+// nobody is 14 or 30 days old: unavailable, and it must not read 0%
+check('D14 is unavailable, not zero', tiles['D14 retention'].value === '–', tiles['D14 retention'].value);
+check('D30 is unavailable, not zero', tiles['D30 retention'].value === '–', tiles['D30 retention'].value);
+
+/* Lifecycle tiles are usage-based: what pinged on the latest day, bucketed by
+   install age. On T that is Z(age 10, 1 active), A(age 4, 2), B(age 3, 1).
+   So 3 are inside the trial and 1 is past it — and none of that depends on a
+   cohort size, which is what lets installs older than the counter appear. */
+check('active-in-trial counts today\'s actives aged 0-7',
+  tiles['Active in trial'].value === '3', tiles['Active in trial'].value);
+check('active-past-trial counts today\'s actives aged 8-14',
+  tiles['Active past the trial'].value === '1', tiles['Active past the trial'].value);
+check('active-past-wall is 0 because nobody active is 15 days old',
+  tiles['Active past the wall'].value === '0', tiles['Active past the wall'].value);
+check('the trial tile still quotes how many started one',
+  /started a trial in that window/.test(tiles['Active in trial'].meta), tiles['Active in trial'].meta);
+
+// today: Z 1 + A 2 + B 1 = 4 active, of which 4 are returning (nobody born today)
+check('active today is 4', tiles[Object.keys(tiles).find((k) => k.startsWith('Active on'))].value.startsWith('4'));
+
+check('purchases counted', tiles['Purchases in range'].value === '2', tiles['Purchases in range'].value);
+// conversion by D7 is measurable only for Z: 1 of its 8 bought within 7 days? no — it
+// bought on D10, so within-7 is 0 of 8.
+check('D7 conversion is 0% over the one eligible cohort',
+  tiles['Conversion by D7'].value === '0.00%', tiles['Conversion by D7'].value);
+check('D30 conversion is unavailable', tiles['Conversion by D30'].value === '–', tiles['Conversion by D30'].value);
+
+/* ----------------------------------------------------------- boundaries */
+
+const transitions = $('pgTransitions').querySelectorAll('.transition');
+check('two boundary transitions shown', transitions.length === 2, String(transitions.length));
+check('the trial transition is named D7 → D8', /D7 → D8/.test(transitions[0].textContent), transitions[0].textContent.slice(0, 40));
+check('the wall transition reports unavailable rather than guessing',
+  /Not yet measurable/.test(transitions[1].textContent), transitions[1].textContent.slice(0, 60));
+
+/* -------------------------------------------------------------- heatmap */
+
+check('heatmap has rows', $('pgHeat').querySelectorAll('tbody tr').length > 0);
+check('immature cells are hatched, not shaded',
+  $('pgHeat').querySelectorAll('td.heat.immature').length > 0);
+check('immature cells are empty, never 0%',
+  [...$('pgHeat').querySelectorAll('td.heat.immature')].every((td) => td.textContent.trim() === ''));
+check('D8 and D15 columns are marked as boundaries',
+  $('pgHeat').querySelectorAll('th.boundary').length === 2,
+  String($('pgHeat').querySelectorAll('th.boundary').length));
+
+// switch to daily cohorts and select one
+$('pgHeatGrain').querySelector('[data-v="day"]').click();
+await new Promise((r) => setTimeout(r, 60));
+const dayRows = $('pgHeat').querySelectorAll('tbody tr');
+check('three daily cohorts', dayRows.length === 3, String(dayRows.length));
+check('small cohorts are flagged', $('pgHeat').querySelectorAll('.warn-small').length > 0);
+dayRows[0].click();
+await new Promise((r) => setTimeout(r, 60));
+check('clicking a cohort opens its detail', !!$('pgCohortDetail').querySelector('.cohort-detail'));
+
+/* --------------------------------------------------------------- charts */
+
+['pgTimeline', 'pgCurve', 'pgSurvival', 'pgActiveCohort', 'pgPurchaseAge', 'pgWeekday'].forEach((id) => {
+  check(id + ' rendered', !!$(id).querySelector('svg'));
+});
+// The oldest cohort is 10 days old, so the curve's axis ends at D10: the trial
+// boundary is drawable, the D15 wall is not, and drawing it anyway would put a
+// rule on an axis that does not reach it.
+check('the curve draws the boundaries its axis actually reaches',
+  $('pgCurve').querySelectorAll('line[stroke-dasharray="3 4"]').length === 1,
+  String($('pgCurve').querySelectorAll('line[stroke-dasharray="3 4"]').length));
+check('and labels it as the trial boundary',
+  /trial ends/.test($('pgCurve').textContent), $('pgCurve').textContent.slice(0, 80));
+
+/* ------------------------------------------------------ timeline tab */
+
+window.document.querySelector('.tab[data-view="timeline"]').click();
+await new Promise((r) => setTimeout(r, 200));
+check('timeline tab opens', !$('view-timeline').classList.contains('hidden'));
+check('the metric chart renders', !!$('tlChart').querySelector('svg'));
+
+// releases are derived from the app's own log, not entered here
+const releaseRows = $('tlReleases').querySelectorAll('.event-row');
+check('releases are listed from the app release log', releaseRows.length > 0, String(releaseRows.length));
+check('a release is titled by version', /^v\d+\.\d+$/.test(
+  releaseRows[0].querySelector('.event-title').textContent.trim()),
+  releaseRows[0] && releaseRows[0].querySelector('.event-title').textContent);
+check('releases carry no edit control', !$('tlReleases').querySelector('[data-edit]'));
+
+// releases draw as full-height dashed rules, hoverable along their whole length
+const relLines = [...$('tlChart').querySelectorAll('line[stroke-dasharray="6 4"]')];
+check('releases are full-height dashed rules', relLines.length > 0, String(relLines.length));
+check('...spanning the plot, not a stub',
+  relLines.every((l) => Number(l.getAttribute('y2')) - Number(l.getAttribute('y1')) > 100),
+  relLines[0] && (relLines[0].getAttribute('y1') + '->' + relLines[0].getAttribute('y2')));
+check('every rule has a full-height hit target',
+  $('tlChart').querySelectorAll('line[stroke="transparent"]').length >= relLines.length,
+  String($('tlChart').querySelectorAll('line[stroke="transparent"]').length));
+
+/* Hovering the rule must actually reach it. The crosshair layer is a
+   transparent rect over the whole plot, and in SVG the last element painted
+   takes the pointer — so the flags have to be appended after it. Asserting the
+   elements exist proves nothing about that; dispatching the event does. */
+const hitLines = [...$('tlChart').querySelectorAll('line[stroke="transparent"]')];
+const crosshairRect = $('tlChart').querySelector('rect[fill="transparent"]');
+/* The rule must be painted after the bars, or a full-height bar hides all of
+   it but the sliver above its top — which is most of the chart on a busy day. */
+const lastBar = [...$('tlChart').querySelectorAll('path[fill]')].pop();
+check('rules are painted over the data, not under it',
+  lastBar && (lastBar.compareDocumentPosition(relLines[0]) & window.Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+  'a bar must come before the rule in document order');
+
+check('mark hit targets are painted above the crosshair layer',
+  crosshairRect && hitLines.length > 0 &&
+  (crosshairRect.compareDocumentPosition(hitLines[0]) & window.Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+  'crosshair must come first in document order');
+hitLines[0].dispatchEvent(new window.MouseEvent('mouseenter', { bubbles: false }));
+const tip = $('tlChart').querySelector('.tt-title');
+check('hovering a rule names the release', tip && /^v\d+\.\d+$/.test(tip.textContent.trim()),
+  tip && tip.textContent);
+
+// purchases on this chart come from store sales, not subscribe pings: the
+// fixture has 1 store sale and 2 subscribe pings, so the two are separable
+$('tlMetric').querySelector('[data-v="purchases"]').click();
+await new Promise((r) => setTimeout(r, 80));
+$('tlChart').parentElement.querySelector('[data-table-toggle="tlChart"]').click();
+const purchaseTotal = [...$('tlChart-table').querySelectorAll('tbody tr')]
+  .reduce((a, tr) => a + (Number(tr.lastElementChild.textContent.replace(/[^0-9.]/g, '')) || 0), 0);
+check('timeline purchases follow store sales, not pings',
+  purchaseTotal === 1, purchaseTotal + ' (store sales 1, subscribe pings 2)');
+
+// switching the metric redraws
+$('tlMetric').querySelector('[data-v="downloads"]').click();
+await new Promise((r) => setTimeout(r, 80));
+check('metric switch redraws the chart', !!$('tlChart').querySelector('svg'));
+
+/* --------------------------------------------------------------- events */
+
+check('empty state invites the first event', /No events recorded yet/.test($('pgEventList').textContent));
+
+$('pgEventAdd').click();
+await new Promise((r) => setTimeout(r, 60));
+check('the add form opens', !$('pgEventForm').classList.contains('hidden'));
+check('category types populate', $('evType').options.length > 0);
+
+$('evDate').value = T(5);
+$('evTitle').value = 'v1.24 paywall copy';
+$('evCategory').value = 'RELEASE';
+$('evCategory').dispatchEvent(new window.Event('change', { bubbles: true }));
+$('evAmount').value = '250';
+$('evSave').click();
+await new Promise((r) => setTimeout(r, 60));
+
+check('event saved into the list', /v1\.24 paywall copy/.test($('pgEventList').textContent));
+check('the form closed after saving', $('pgEventForm').classList.contains('hidden'));
+check('the event is annotated onto the timeline chart',
+  $('tlChart').querySelectorAll('rect[rx="2"]').length >= 1,
+  String($('tlChart').querySelectorAll('rect[rx="2"]').length));
+// the App usage charts draw the same annotations from the same store
+window.document.querySelector('.tab[data-view="ping"]').click();
+await new Promise((r) => setTimeout(r, 150));
+check('the same event annotates the App usage charts too',
+  $('pgTimeline').querySelectorAll('rect[rx="2"]').length >= 1,
+  String($('pgTimeline').querySelectorAll('rect[rx="2"]').length));
+window.document.querySelector('.tab[data-view="timeline"]').click();
+await new Promise((r) => setTimeout(r, 150));
+
+// selecting it opens the before/after comparison
+$('pgEventList').querySelector('.event-row').click();
+await new Promise((r) => setTimeout(r, 60));
+const analysis = $('pgEventAnalysis');
+check('before/after analysis opens', !!analysis.querySelector('table'));
+check('it is labelled observational, not causal',
+  /not evidence that the event caused anything/.test(analysis.textContent));
+check('retention rows that cannot be compared say so',
+  /not enough mature data on both sides/.test(analysis.textContent), analysis.textContent.slice(0, 200));
+
+// and it syncs like any other dashboard data
+await new Promise((r) => setTimeout(r, 1200));
+const push = calls.filter((c) => c.action === 'SYNC').pop();
+check('the event pushed to the server', !!push && !!push.payload.eventUpserts, JSON.stringify(push && push.payload));
+check('the pushed event carries its fields',
+  push && push.payload.eventUpserts[0].title === 'v1.24 paywall copy' && push.payload.eventUpserts[0].amount === 250,
+  JSON.stringify(push && push.payload.eventUpserts));
+
+let failed = 0;
+results.forEach((r) => {
+  if (!r.ok) failed += 1;
+  console.log((r.ok ? '  ok  ' : '  FAIL') + '  ' + r.name + (r.ok || !r.detail ? '' : '   <- ' + r.detail));
+});
+if (errors.length) console.log('\nPage errors:\n' + errors.slice(0, 5).join('\n'));
+console.log(`\n${results.length - failed}/${results.length} passed`);
+process.exit(failed ? 1 : 0);

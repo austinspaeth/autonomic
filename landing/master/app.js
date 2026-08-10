@@ -39,12 +39,13 @@
   var db = load();
 
   function load() {
-    var d = { entries: [], settings: { trialDays: 7, wallDays: 14, currency: '$' } };
+    var d = { entries: [], events: [], settings: { trialDays: 7, wallDays: 14, currency: '$' } };
     try {
       var raw = localStorage.getItem(KEY);
       if (raw) {
         var p = JSON.parse(raw);
         if (p && Array.isArray(p.entries)) d.entries = p.entries;
+        if (p && Array.isArray(p.events)) d.events = p.events;
         // conversion rate used to be an entered field; it is derived now, so drop
         // any stale values rather than carrying them into exports and backups
         d.entries.forEach(function (e) { if (e) delete e.conversionRate; });
@@ -876,6 +877,970 @@
       ],
       stacked: true, height: 300, format: fmtInt, xLabel: 'Cohort',
       tooltipNote: function (i) { return rows[i] ? 'Age ' + diffDays(rows[i].start, now) + ' days' : ''; }
+    });
+  }
+
+  /* ---------------------------------------------------- view: app usage */
+
+  /* The one view fed by the app rather than by store CSVs.
+   *
+   * All of the arithmetic lives in analytics.js — see its header for the three
+   * rules it exists to enforce (never sum actives across days, immature is not
+   * churned, a rate carries its denominator). This file is presentation: it
+   * decides what to draw and how to say what a number does not know.
+   *
+   * The data is read-only and lives outside `db`, so sync.js never sees it.
+   * Events, by contrast, ARE part of `db` and do sync — they are the one thing
+   * on this screen a human enters. */
+
+  var A = window.Analytics;
+
+  var PING_DAYS = 400;                 // history pulled in one call, then cached
+  var pings = { status: 'idle', report: null, at: null, error: '' };
+  var pingUI = { tlMode: 'usage', tlMetric: 'active', curveMode: 'all', heatGrain: 'week', cohort: null, event: null, editing: null };
+
+  var PC = {
+    fresh: COLOR.green,        // first run — an install the counter had not seen
+    back: COLOR.s1,            // returning
+    active: COLOR.s1,
+    downloads: COLOR.s2,       // store-sourced, deliberately not the blue above
+    pageViews: COLOR.s5,
+    subs: ENTITY.sales,        // violet, as "paid" is everywhere else
+    trial: COLOR.green,
+    postTrial: COLOR.gold,
+    wall: COLOR.red
+  };
+
+  /* Both ping-fed views repaint when the fetch lands. Naming only one of them
+     here is how the Timeline tab ended up rendering an empty chart: the data
+     arrived, and nothing asked the view to draw it again. */
+  function repaintPingViews() {
+    if (state.view === 'ping') renderPing();
+    else if (state.view === 'timeline') renderTimelineView();
+  }
+
+  function pingLoad(force) {
+    if (pings.status === 'loading') return;
+    if (pings.status === 'ready' && !force) return;
+    pings.status = 'loading';
+    pings.error = '';
+    repaintPingViews();
+    window.Api.call('PINGS', { since: addDays(today(), -PING_DAYS) }).then(function (res) {
+      pings.report = res || { open: [], sub: [] };
+      pings.at = new Date();
+      pings.status = 'ready';
+      repaintPingViews();
+    }).catch(function (err) {
+      pings.status = 'error';
+      pings.error = (err && err.message) || 'Could not reach the counter.';
+      repaintPingViews();
+    });
+  }
+
+  /* --------------------------------------------------------------- events */
+
+  function events() { return db.events || (db.events = []); }
+
+  /**
+   * Releases, as annotations the dashboard derives rather than stores.
+   *
+   * The app's own release log (mobile/src/lib/whatsNew.ts, generated into
+   * releases.js) already knows every version and the day it was cut, so a
+   * hand-entered copy would only drift from what actually shipped. They behave
+   * like events everywhere it matters — flags on charts, before/after analysis
+   * — but they are read-only, and `derived` is what stops the editor offering
+   * to change something this dashboard does not own.
+   */
+  function releaseEvents() {
+    return (window.RELEASES || []).map(function (r) {
+      return {
+        id: 'rel-' + r.version,
+        date: r.date,
+        category: 'RELEASE',
+        type: 'New version',
+        title: 'v' + r.version,
+        note: (r.notes || []).join(' '),
+        derived: true
+      };
+    });
+  }
+
+  /** Everything that can be annotated or analysed: recorded plus derived. */
+  function timelineItems() {
+    return events().concat(releaseEvents());
+  }
+
+  function eventById(id) {
+    return timelineItems().filter(function (e) { return e.id === id; })[0] || null;
+  }
+  function newEventId() {
+    return 'ev-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7);
+  }
+  function putEvent(ev) {
+    var list = events();
+    var at = -1;
+    list.forEach(function (e, i) { if (e.id === ev.id) at = i; });
+    if (at >= 0) list[at] = ev; else list.push(ev);
+    list.sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
+    save();
+  }
+  function removeEvent(id) {
+    db.events = events().filter(function (e) { return e.id !== id; });
+    if (pingUI.event === id) pingUI.event = null;
+    save();
+  }
+
+  /* How each kind of annotation draws its rule. The pattern is the category,
+     so a chart can be read without hovering: releases dashed, marketing dotted,
+     store changes dash-dot, everything else solid. */
+  var MARK_DASH = {
+    RELEASE: '6 4',
+    MARKETING: '1 5',
+    STORE: '6 3 2 3',
+    EXTERNAL: null
+  };
+
+  /**
+   * Chart annotations for a day-indexed x axis.
+   *
+   * Built centrally and handed to whichever chart wants them, so no chart ever
+   * decides for itself what happened on a date — that was the whole point of
+   * recording events in one place.
+   */
+  function marksFor(days) {
+    var idx = {};
+    days.forEach(function (d, i) { idx[d] = i; });
+    return A.eventsBetween(timelineItems(), days[0], days[days.length - 1]).map(function (ev) {
+      var cat = A.EVENT_CATEGORIES[ev.category] || {};
+      return {
+        id: ev.id,
+        index: idx[ev.date],
+        color: A.eventColor(ev),
+        title: ev.title,
+        categoryLabel: (cat.label || 'Event') + (ev.type ? ' · ' + ev.type : ''),
+        dateLabel: labelDay(ev.date),
+        note: ev.note || '',
+        dash: MARK_DASH[ev.category] || null
+      };
+    }).filter(function (m) { return m.index !== undefined; });
+  }
+
+  /* Clicking a flag anywhere in the dashboard opens its before/after, which
+     lives on the Timeline tab — so a click from another view switches to it
+     rather than rendering the analysis somewhere it does not belong. */
+  function onMarkClick(mark) {
+    pingUI.event = mark.id;
+    if (state.view !== 'timeline') { setView('timeline'); return; }
+    renderTimelineView();
+    var node = document.getElementById('pgEventAnalysis');
+    if (node) node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  /* ------------------------------------------------------------ formatting */
+
+  /** A rate, with "not yet knowable" kept distinct from zero. */
+  function fmtRate(r) {
+    if (!r || !r.available) return '<span class="na" title="No cohort has reached this milestone yet">–</span>';
+    return fmtPct(r.pct);
+  }
+  function rateMeta(r, noun) {
+    if (!r || !r.available) {
+      var waiting = r && r.immature ? r.immature + ' cohort' + (r.immature === 1 ? '' : 's') + ' still too young' : 'not enough history yet';
+      return waiting;
+    }
+    return fmtInt(r.kept) + ' of ' + fmtInt(r.of) + ' ' + (noun || 'installs') +
+      (r.immature ? ' · ' + r.immature + ' cohort' + (r.immature === 1 ? '' : 's') + ' too young to count' : '') +
+      (r.small ? ' · <span class="warn-small">small sample</span>' : '');
+  }
+
+  /* ---------------------------------------------------------------- render */
+
+  function pingStatusHTML() {
+    if (pings.status === 'loading') return '<div class="card" style="margin-bottom:14px"><div class="empty">Reading the counter…</div></div>';
+    if (pings.status === 'error') {
+      return '<div class="card" style="margin-bottom:14px"><div class="empty">' + esc(pings.error) +
+        ' <button class="btn sm" id="pgRetry" style="margin-left:8px">Try again</button></div></div>';
+    }
+    return '';
+  }
+
+  function renderPing() {
+    document.getElementById('pgStatus').innerHTML = pingStatusHTML();
+    var retry = document.getElementById('pgRetry');
+    if (retry) retry.addEventListener('click', function () { pingLoad(true); });
+
+    var ix = A.index(pings.report);
+    var ready = pings.status === 'ready';
+    var blank = !ix.days.length;
+
+    var hosts = ['pgTiles', 'pgTilesB', 'pgHeat', 'pgCohortDetail', 'pgTransitions', 'pgConversion', 'pgWeekdayRetention'];
+    if (!ready || blank) hosts.forEach(function (id) {
+      var n = document.getElementById(id);
+      if (n) n.innerHTML = '';
+    });
+    if (!ready) return;
+
+    document.getElementById('pgAsOf').textContent = blank ? '' :
+      'counter data through ' + labelFull(ix.last) + (ix.last === today() ? ' · today still running' : '');
+
+    if (blank) {
+      document.getElementById('pgHeat').innerHTML =
+        '<div class="empty">No pings yet. The counter starts filling the first time a build carrying it is opened.</div>';
+      ['pgTimeline', 'pgCurve', 'pgSurvival', 'pgActiveCohort', 'pgPurchaseAge', 'pgWeekday'].forEach(function (id) {
+        drawChart(id, { x: [], series: [], emptyText: 'Waiting for the first ping.' });
+      });
+      return;
+    }
+
+    var r = pingRange(ix);
+    var days = A.range(r.from, r.to);
+    var marks = marksFor(days);
+
+    renderPingTiles(ix, r, days);
+    renderTimeline(ix, days, marks);
+    renderCurve(ix);
+    renderSurvival(ix);
+    renderHeat(ix);
+    renderActiveByCohort(ix);
+    renderPurchases(ix, r);
+    renderWeekday(ix, days);
+  }
+
+  /* The filter bar's range, anchored to the pings rather than to the store:
+     store reporting lags a day, a ping lands the moment the app opens. */
+  function pingRange(ix) {
+    var sel = activeRange();
+    var to = (ix.last && ix.last > sel.to) ? ix.last : sel.to;
+    var from = sel.from;
+    if (state.range !== 'custom' && state.range !== 'all') {
+      from = addDays(to, -((parseInt(state.range, 10) || 30) - 1));
+    }
+    if (state.range === 'all' && ix.first) from = ix.first;
+    if (ix.first && from < ix.first) from = ix.first;
+    return { from: from, to: to };
+  }
+
+  /* ------------------------------------------------------------- 1. tiles */
+
+  function renderPingTiles(ix, r, days) {
+    var latest = ix.last;
+    var activeToday = A.activeOn(ix, latest);
+    var returningToday = A.returningOn(ix, latest);
+
+    var avg = 0, avgRet = 0;
+    days.forEach(function (d) { avg += A.activeOn(ix, d); avgRet += A.returningOn(ix, d); });
+    avg = days.length ? avg / days.length : 0;
+    avgRet = days.length ? avgRet / days.length : 0;
+
+    // previous window of equal length, only when the counter covered all of it
+    var prevTo = addDays(r.from, -1), prevFrom = addDays(prevTo, -(days.length - 1));
+    var covered = ix.first && prevFrom >= ix.first;
+    var prevAvg = 0, prevAvgRet = 0;
+    if (covered) {
+      A.range(prevFrom, prevTo).forEach(function (d) { prevAvg += A.activeOn(ix, d); prevAvgRet += A.returningOn(ix, d); });
+      prevAvg /= days.length; prevAvgRet /= days.length;
+    }
+    var dActive = covered && prevAvg ? ((avg - prevAvg) / prevAvg) * 100 : null;
+    var dRet = covered && prevAvgRet ? ((avgRet - prevAvgRet) / prevAvgRet) * 100 : null;
+
+    var d1 = A.retentionAt(ix, ix.cohorts, 1);
+    var d7 = A.retentionAt(ix, ix.cohorts, 7);
+    var d14 = A.retentionAt(ix, ix.cohorts, 14);
+    var d30 = A.retentionAt(ix, ix.cohorts, 30);
+    // Usage-based, so installs older than the counter are included: their age
+    // is exact even though their cohort size was never observed.
+    var live = A.lifecycleActive(ix, ix.last);
+    var started = A.lifecycleNow(ix, ix.cohorts);
+
+    var subsRange = 0;
+    days.forEach(function (d) { subsRange += A.purchasesOn(ix, d); });
+    var conv7 = A.conversion(ix, ix.cohorts, 7);
+    var conv30 = A.conversion(ix, ix.cohorts, 30);
+
+    document.getElementById('pgTiles').innerHTML = [
+      tile({
+        label: 'Active on ' + labelDay(ix.last), color: PC.active, value: fmtInt(activeToday),
+        delta: dActive,
+        meta: fmtInt(Math.round(avg)) + '/day across this range',
+        split: [{ name: 'returning', color: PC.back, value: fmtInt(returningToday) },
+                { name: 'first run', color: PC.fresh, value: fmtInt(A.newOn(ix, ix.last)) }]
+      }),
+      tile({
+        label: 'Returning / day', color: PC.back, value: fmtInt(Math.round(avgRet)), delta: dRet,
+        meta: 'the number that says the product is holding people'
+      }),
+      tile({ label: 'D1 retention', color: PC.fresh, smallValue: true, value: fmtRate(d1), meta: rateMeta(d1) }),
+      tile({ label: 'D7 retention', color: PC.trial, smallValue: true, value: fmtRate(d7),
+             meta: 'last day of the trial · ' + rateMeta(d7) }),
+      tile({ label: 'D14 retention', color: PC.postTrial, smallValue: true, value: fmtRate(d14),
+             meta: 'last day of full history · ' + rateMeta(d14) }),
+      tile({ label: 'D30 retention', color: PC.wall, smallValue: true, value: fmtRate(d30), meta: rateMeta(d30) })
+    ].join('');
+
+    document.getElementById('pgTilesB').innerHTML = [
+      tile({
+        label: 'Active in trial', color: PC.trial, value: fmtInt(live.inTrial),
+        meta: 'day 0–7 · ' + fmtInt(started.inTrial) + ' started a trial in that window'
+      }),
+      tile({
+        label: 'Active past the trial', color: PC.postTrial, value: fmtInt(live.postTrial),
+        meta: 'day 8–14: free, full history still open'
+      }),
+      tile({
+        label: 'Active past the wall', color: PC.wall, value: fmtInt(live.pastWall),
+        meta: 'day 15+: older history needs Pro'
+      }),
+      tile({
+        label: 'Purchases in range', color: PC.subs, value: fmtInt(subsRange),
+        meta: 'subscribe pings, not store receipts'
+      }),
+      tile({
+        label: 'Conversion by D7', color: PC.subs, smallValue: true, value: fmtRate(conv7),
+        meta: rateMeta(conv7)
+      }),
+      tile({
+        label: 'Conversion by D30', color: PC.subs, smallValue: true, value: fmtRate(conv30),
+        meta: rateMeta(conv30)
+      })
+    ].join('');
+  }
+
+  /* ---------------------------------------------------------- 2. timeline */
+
+  function renderTimeline(ix, days, marks) {
+    var x = days.map(function (d) { return bucketLabel(d, 'day'); });
+    var mode = pingUI.tlMode;
+    var series = [];
+    var fresh = [], back = [], dls = [], pv = [], subs = [];
+    days.forEach(function (d) {
+      fresh.push(A.newOn(ix, d));
+      back.push(A.returningOn(ix, d));
+      dls.push(dayRec('all', d).downloads);
+      pv.push(dayRec('all', d).pageViews);
+      subs.push(A.purchasesOn(ix, d));
+    });
+
+    if (mode !== 'acquisition') {
+      series.push({ key: 'back', name: 'Returning', color: PC.back, type: 'bar', values: back });
+      series.push({ key: 'fresh', name: 'First run', color: PC.fresh, type: 'bar', values: fresh });
+    }
+    if (mode !== 'usage') {
+      series.push({ key: 'dl', name: 'Store downloads', color: PC.downloads, type: 'line', dashed: true, values: dls });
+      if (mode === 'acquisition') {
+        series.push({ key: 'pv', name: 'Product page views', color: PC.pageViews, type: 'line', dashed: true, values: pv });
+      }
+    }
+    /* Purchases are two or three a day against hundreds of actives, so on this
+       axis they are a flat line on the floor. They get their own section; here
+       they ride the tooltip instead of pretending to be a series. */
+
+    drawChart('pgTimeline', {
+      x: x, series: series, stacked: mode !== 'acquisition', height: 330, format: fmtInt, xLabel: 'Day',
+      marks: marks, onMarkClick: onMarkClick,
+      tooltipNote: function (i) {
+        var d = days[i];
+        var bits = [];
+        if (A.activeOn(ix, d)) bits.push(fmtInt(A.activeOn(ix, d)) + ' active installs');
+        if (subs[i]) bits.push(fmtInt(subs[i]) + ' purchase' + (subs[i] === 1 ? '' : 's'));
+        // Store reporting lags a day, so the newest columns are genuinely
+        // incomplete on the acquisition side rather than a drop.
+        if (d > asOf()) bits.push('store reporting has not landed yet');
+        return bits.join(' · ') || 'no pings';
+      }
+    });
+  }
+
+  /* ------------------------------------------------------------- 3. curve */
+
+  function renderCurve(ix) {
+    var B = A.BOUNDARIES;
+    var maxN = 60;
+    var series = [];
+    var len = 0;
+
+    function toValues(curve) { return curve.map(function (p) { return p.pct; }); }
+
+    if (pingUI.curveMode === 'split' && ix.cohorts.length >= 4) {
+      // Split at the median cohort so "is retention improving?" has an answer
+      // that does not depend on an arbitrary date.
+      var half = Math.ceil(ix.cohorts.length / 2);
+      var earlier = ix.cohorts.slice(0, half), recent = ix.cohorts.slice(half);
+      var cE = A.curve(ix, earlier, maxN), cR = A.curve(ix, recent, maxN);
+      len = Math.max(cE.length, cR.length);
+      series.push({ key: 'earlier', name: 'Earlier cohorts', color: COLOR.muted, type: 'line', dashed: true, values: toValues(cE) });
+      series.push({ key: 'recent', name: 'Recent cohorts', color: PC.fresh, type: 'line', values: toValues(cR) });
+    } else {
+      var c = A.curve(ix, ix.cohorts, maxN);
+      len = c.length;
+      series.push({ key: 'all', name: 'All mature cohorts', color: PC.fresh, type: 'area', values: toValues(c) });
+    }
+
+    var x = [];
+    for (var i = 0; i < len; i++) x.push({ label: 'D' + i, full: 'Day ' + i });
+
+    drawChart('pgCurve', {
+      x: x, series: series, height: 300, format: fmtPct, xLabel: 'Days since install',
+      emptyText: 'No cohort has reached its second day yet.',
+      guides: [
+        { index: B.trialLastDay, label: 'trial ends', color: PC.trial },
+        { index: B.firstWallDay, label: 'history wall', color: PC.wall }
+      ],
+      tooltipNote: function (i) {
+        var p = A.retentionAt(ix, ix.cohorts, i);
+        var note = p.available ? 'over ' + p.cohorts + ' cohort' + (p.cohorts === 1 ? '' : 's') +
+          ' · ' + fmtInt(p.kept) + ' of ' + fmtInt(p.of) : 'not yet available';
+        if (i === B.firstPostTrial) note += ' · first day outside the trial';
+        if (i === B.firstWallDay) note += ' · first day the history wall applies';
+        return note;
+      }
+    });
+  }
+
+  /* ---------------------------------------------------------- 3b. survival */
+
+  function renderSurvival(ix) {
+    var s = A.survival(ix, ix.cohorts);
+    var labels = { 0: 'Install', 1: 'D1', 7: 'D7 (last trial day)', 8: 'D8 (post-trial)', 14: 'D14 (history open)', 15: 'D15 (wall)', 30: 'D30' };
+    var steps = s.steps.filter(function (p) { return p.available; });
+
+    drawChart('pgSurvival', {
+      x: steps.map(function (p) { return { label: 'D' + p.day, full: labels[p.day] || ('Day ' + p.day) }; }),
+      series: [{ key: 'ret', name: 'Still active', color: PC.trial, type: 'bar', values: steps.map(function (p) { return p.pct; }) }],
+      height: 220, format: fmtPct, legend: false,
+      emptyText: 'No cohort has reached day 1 yet.',
+      tooltipNote: function (i) {
+        var p = steps[i];
+        return fmtInt(p.kept) + ' of ' + fmtInt(p.of) + ' · ' + p.cohorts + ' cohort' + (p.cohorts === 1 ? '' : 's');
+      }
+    });
+
+    function transitionHTML(t, title, why) {
+      if (!t) {
+        return '<div class="transition"><div class="t-title">' + esc(title) + '</div>' +
+          '<div class="t-value na">Not yet measurable</div>' +
+          '<div class="t-note">No cohort has reached the later day.</div></div>';
+      }
+      var cls = t.points < -1 ? 'down' : t.points > 1 ? 'up' : 'flat';
+      var sign = t.points > 0 ? '+' : '';
+      return '<div class="transition"><div class="t-title">' + esc(title) + '</div>' +
+        '<div class="t-value ' + cls + '">' + sign + t.points.toFixed(1) + ' pts</div>' +
+        '<div class="t-note">' + fmtPct(t.before.pct) + ' → ' + fmtPct(t.after.pct) +
+        ' over ' + t.cohorts + ' cohort' + (t.cohorts === 1 ? '' : 's') + ' (' + fmtInt(t.after.of) + ' installs). ' +
+        esc(why) + '</div></div>';
+    }
+
+    document.getElementById('pgTransitions').innerHTML =
+      '<div class="transitions">' +
+      transitionHTML(s.trialEnd, 'Trial ends: D7 → D8', 'How many keep opening the app the day their trial runs out.') +
+      transitionHTML(s.historyWall, 'History wall: D14 → D15', 'How many keep opening it the day older history closes.') +
+      '</div>';
+  }
+
+  /* ------------------------------------------------------------- 4. heatmap */
+
+  function renderHeat(ix) {
+    var byWeek = pingUI.heatGrain === 'week';
+    var rows;
+    if (byWeek) {
+      rows = A.weeklyCohorts(ix, ix.cohorts).map(function (w) {
+        return { key: w.key, label: 'Week of ' + labelDay(w.key), size: w.size, days: w.days,
+                 cells: A.weekMilestones(ix, w, A.MILESTONES) };
+      });
+    } else {
+      rows = ix.cohorts.map(function (c) {
+        return { key: c, label: labelDay(c), size: A.cohortSize(ix, c), days: [c],
+                 cells: A.milestoneRow(ix, c, A.MILESTONES) };
+      });
+    }
+    rows.reverse();
+
+    if (!rows.length) {
+      document.getElementById('pgHeat').innerHTML = '<div class="empty">No cohort has a measurable day 0 yet.</div>';
+      return;
+    }
+
+    var head = '<tr><th>Cohort</th><th>Installs</th>' + A.MILESTONES.map(function (n) {
+      var cls = n === A.BOUNDARIES.firstPostTrial || n === A.BOUNDARIES.firstWallDay ? ' class="boundary"' : '';
+      return '<th' + cls + '>D' + n + '</th>';
+    }).join('') + '</tr>';
+
+    var body = rows.map(function (row) {
+      var small = row.size < A.SMALL_COHORT;
+      var cells = row.cells.map(function (cell) {
+        if (!cell.available) {
+          return '<td class="heat immature" title="This cohort has not lived ' + cell.day + ' days yet — not zero, unknown"></td>';
+        }
+        var a = Math.min(1, Math.sqrt(Math.max(0, cell.pct) / 100)) * 0.85;
+        var boundary = cell.day === A.BOUNDARIES.firstPostTrial || cell.day === A.BOUNDARIES.firstWallDay;
+        return '<td class="heat' + (boundary ? ' boundary' : '') + '" style="background:rgba(0,160,143,' + a.toFixed(3) + ')"' +
+          ' title="' + fmtInt(cell.kept) + ' of ' + fmtInt(cell.of) + ' still active on day ' + cell.day +
+          (cell.partial ? ' — some days of this week are still too young' : '') + '">' +
+          (cell.pct >= 0.5 ? Math.round(cell.pct) + '%' : '·') + '</td>';
+      }).join('');
+      return '<tr data-cohort="' + esc(row.key) + '" class="heat-row' + (pingUI.cohort === row.key ? ' selected' : '') + '">' +
+        '<td>' + esc(row.label) + '</td>' +
+        '<td>' + fmtInt(row.size) + (small ? ' <span class="warn-small" title="Percentages over a handful of installs are noise">small</span>' : '') + '</td>' +
+        cells + '</tr>';
+    }).join('');
+
+    document.getElementById('pgHeat').innerHTML =
+      '<div class="table-scroll"><table class="grid-heat"><thead>' + head + '</thead><tbody>' + body + '</tbody></table></div>';
+
+    document.getElementById('pgHeat').querySelectorAll('.heat-row').forEach(function (tr) {
+      tr.addEventListener('click', function () {
+        pingUI.cohort = pingUI.cohort === tr.dataset.cohort ? null : tr.dataset.cohort;
+        renderHeat(ix);
+        renderCohortDetail(ix, rows);
+      });
+    });
+    renderCohortDetail(ix, rows);
+  }
+
+  function renderCohortDetail(ix, rows) {
+    var host = document.getElementById('pgCohortDetail');
+    if (!pingUI.cohort) { host.innerHTML = ''; return; }
+    var row = rows.filter(function (r) { return r.key === pingUI.cohort; })[0];
+    if (!row) { host.innerHTML = ''; return; }
+
+    var conv = A.conversion(ix, row.days, undefined);
+    var d7 = A.retentionAt(ix, row.days, 7);
+    var d15 = A.retentionAt(ix, row.days, 15);
+    var age = A.maturity(ix, row.days[row.days.length - 1]);
+
+    host.innerHTML = '<div class="cohort-detail">' +
+      '<div class="cd-head"><b>' + esc(row.label) + '</b>' +
+      '<span class="note">' + fmtInt(row.size) + ' installs · oldest member is ' + age + ' days old</span></div>' +
+      '<div class="cd-grid">' +
+      '<div><span class="cd-label">D7 retention</span><span class="cd-value">' + fmtRate(d7) + '</span><span class="cd-note">' + rateMeta(d7) + '</span></div>' +
+      '<div><span class="cd-label">D15 retention</span><span class="cd-value">' + fmtRate(d15) + '</span><span class="cd-note">' + rateMeta(d15) + '</span></div>' +
+      '<div><span class="cd-label">Purchases</span><span class="cd-value">' + fmtInt(conv.kept) + '</span><span class="cd-note">' + fmtRate(conv) + ' of this cohort, all time</span></div>' +
+      '</div></div>';
+  }
+
+  /* -------------------------------------------------- 5. active by cohort */
+
+  function renderActiveByCohort(ix) {
+    var abc = A.activeByCohort(ix, ix.last);
+    var rows = abc.rows.slice(0, 24);
+    var B = A.BOUNDARIES;
+
+    /* The boundary rules sit at an AGE, and a row is a cohort that happened to
+       be active — with gaps, row index is not age. Find the first row at or
+       past each boundary instead of assuming the two line up. */
+    function guideAt(age, label, color) {
+      for (var i = 0; i < rows.length; i++) {
+        if (rows[i].age >= age) return { index: i, label: label, color: color, atBandStart: true };
+      }
+      return null;
+    }
+
+    drawChart('pgActiveCohort', {
+      x: rows.map(function (r) {
+        return { label: 'D' + r.age, full: labelFull(r.cohort) + ' · ' + r.age + ' days old' };
+      }),
+      series: [{
+        key: 'n', name: 'Active today', type: 'bar',
+        color: PC.back,
+        values: rows.map(function (r) { return r.count; })
+      }],
+      height: 240, format: fmtInt, legend: false, xLabel: 'Install age',
+      emptyText: 'Nobody has pinged on the latest day yet.',
+      guides: [guideAt(B.firstPostTrial, 'post-trial', PC.trial),
+               guideAt(B.firstWallDay, 'wall', PC.wall)].filter(Boolean),
+      tooltipNote: function (i) {
+        var r = rows[i];
+        return fmtInt(r.count) + ' of today\'s ' + fmtInt(abc.total) + ' active installs' +
+          (r.measurable ? '' : ' · installed before the counter, so no retention rate for it');
+      }
+    });
+
+    renderOlderInstalls(ix);
+  }
+
+  /**
+   * Installs older than the counter get their own list rather than a footnote.
+   *
+   * They are the most-established users the app has, and on a counter that is
+   * days old they are most of what there is to look at. Everything here is
+   * genuinely known — the install date rode in on the ping — so the only thing
+   * withheld is the retention percentage, which has no denominator and never
+   * will: nobody counted how many installed that day.
+   */
+  function renderOlderInstalls(ix) {
+    var host = document.getElementById('pgOlderInstalls');
+    if (!host) return;
+    var rows = A.preTrackingCohorts(ix);
+    if (!rows.length) { host.innerHTML = ''; return; }
+
+    var B = A.BOUNDARIES;
+    host.innerHTML =
+      '<p class="hint" style="margin:12px 0 6px"><b>Installed before the counter existed.</b> ' +
+      'Their install date arrived with the ping, so their age is exact. Their cohort size was never ' +
+      'observed, so they carry no retention percentage and are left out of every rate above.</p>' +
+      '<div class="table-scroll"><table><thead><tr><th>Installed</th><th>Age</th><th>Stage</th>' +
+      '<th>Active on ' + esc(labelDay(ix.last)) + '</th><th>Days seen</th><th>Last seen</th></tr></thead><tbody>' +
+      rows.map(function (r) {
+        var stage = r.age <= B.trialLastDay ? '<span class="pill trial">In trial</span>'
+          : r.age < B.firstWallDay ? '<span class="pill past7">Past trial</span>'
+          : '<span class="pill past14">Past the wall</span>';
+        return '<tr><td>' + esc(labelFull(r.cohort)) + '</td>' +
+          '<td>D' + r.age + '</td>' +
+          '<td style="text-align:left">' + stage + '</td>' +
+          '<td>' + fmtInt(r.activeLatest) + '</td>' +
+          '<td>' + fmtInt(r.days) + '</td>' +
+          '<td>' + (r.lastSeen ? esc(labelDay(r.lastSeen)) : '–') + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+  }
+
+  /* ----------------------------------------------------- 6. purchase timing */
+
+  function renderPurchases(ix, r) {
+    var ages = A.purchaseAges(ix);
+    drawChart('pgPurchaseAge', {
+      x: ages.buckets.map(function (b) { return { label: b.label, full: b.label + (b.note ? ' — ' + b.note : '') }; }),
+      series: [{
+        key: 'n', name: 'Purchases', color: PC.subs, type: 'bar',
+        values: ages.buckets.map(function (b) { return b.count; })
+      }],
+      height: 220, format: fmtInt, legend: false, xLabel: 'Install age at purchase',
+      emptyText: 'No purchases have been recorded yet.',
+      guides: [{ index: 2, label: 'wall', color: PC.wall }],
+      tooltipNote: function (i) {
+        var b = ages.buckets[i];
+        return ages.total ? pctOf(b.count, ages.total) + ' of all purchases' : '';
+      }
+    });
+
+    var conv7 = A.conversion(ix, ix.cohorts, 7);
+    var conv30 = A.conversion(ix, ix.cohorts, 30);
+    document.getElementById('pgConversion').innerHTML =
+      '<div class="mini-rows">' +
+      '<div><span>Bought by D7</span><b>' + fmtRate(conv7) + '</b><span class="note">' + rateMeta(conv7) + '</span></div>' +
+      '<div><span>Bought by D30</span><b>' + fmtRate(conv30) + '</b><span class="note">' + rateMeta(conv30) + '</span></div>' +
+      '</div>';
+  }
+
+  /* --------------------------------------------------------- 7. weekday */
+
+  function renderWeekday(ix, days) {
+    var dl = A.byWeekday(days, function (d) { return dayRec('all', d).downloads; });
+    var fresh = A.byWeekday(days, function (d) { return A.newOn(ix, d); });
+    var ret = A.byWeekday(days, function (d) { return A.returningOn(ix, d); });
+
+    drawChart('pgWeekday', {
+      x: WD.map(function (w) { return { label: w, full: WD_LONG[WD.indexOf(w)] }; }),
+      /* Three grouped bars per weekday, not two bars and a line. On a 7-point
+         axis a line degenerates into disconnected dots that are trivial to
+         miss, and the comparison here is between three counts of people — the
+         same kind of quantity, so they should carry the same kind of mark. */
+      series: [
+        { key: 'dl', name: 'Store downloads', color: PC.downloads, type: 'bar', values: dl.map(function (s) { return s.avg; }) },
+        { key: 'fresh', name: 'First runs', color: PC.fresh, type: 'bar', values: fresh.map(function (s) { return s.avg; }) },
+        { key: 'ret', name: 'Returning', color: PC.back, type: 'bar', values: ret.map(function (s) { return s.avg; }) }
+      ],
+      height: 240, format: function (v) { return v === null ? '–' : v.toFixed(1); }, xLabel: 'Weekday',
+      tooltipNote: function (i) { return 'average per ' + WD_LONG[i] + ' over ' + dl[i].days + ' of them'; }
+    });
+
+    // The harder question: are midweek installs actually better?
+    var d7 = A.retentionByInstallWeekday(ix, ix.cohorts, 7);
+    var any = d7.some(function (s) { return s.available; });
+    document.getElementById('pgWeekdayRetention').innerHTML = !any
+      ? '<p class="hint" style="margin:10px 0 0">No cohort has reached D7 yet, so there is nothing to say about whether install weekday predicts retention.</p>'
+      : '<div class="table-scroll" style="margin-top:12px"><table><thead><tr><th>Install weekday</th><th>Installs</th><th>D7 retention</th><th>Cohorts</th></tr></thead><tbody>' +
+        d7.map(function (s) {
+          return '<tr><td>' + WD_LONG[s.weekday] + '</td><td>' + fmtInt(s.installs) + '</td>' +
+            '<td>' + fmtRate(s) + (s.small ? ' <span class="warn-small">small</span>' : '') + '</td>' +
+            '<td>' + s.cohorts + (s.immature ? ' <span class="note">(' + s.immature + ' too young)</span>' : '') + '</td></tr>';
+        }).join('') + '</tbody></table></div>';
+  }
+
+  /* ---------------------------------------------------------- 8. events */
+
+  function renderEvents(ix) {
+    var list = events().slice().reverse();
+    var host = document.getElementById('pgEventList');
+    host.innerHTML = list.length
+      ? '<div class="event-list">' + list.map(function (ev) {
+          var cat = A.EVENT_CATEGORIES[ev.category] || {};
+          return '<div class="event-row' + (pingUI.event === ev.id ? ' selected' : '') + '" data-id="' + esc(ev.id) + '">' +
+            '<span class="event-dot" style="background:' + A.eventColor(ev) + '"></span>' +
+            '<span class="event-date">' + esc(labelFull(ev.date)) + '</span>' +
+            '<span class="event-title">' + esc(ev.title) + '</span>' +
+            '<span class="event-type">' + esc((cat.label || '') + (ev.type ? ' · ' + ev.type : '')) + '</span>' +
+            '<span class="event-amount">' + (ev.amount !== undefined ? fmtMoney(ev.amount) : '') + '</span>' +
+            '<button class="btn sm" data-edit="' + esc(ev.id) + '">Edit</button>' +
+            '</div>';
+        }).join('') + '</div>'
+      : '<div class="empty">No events recorded yet. Add the last release or campaign and it will appear on every chart above.</div>';
+
+    host.querySelectorAll('.event-row').forEach(function (row) {
+      row.addEventListener('click', function (e) {
+        if (e.target.dataset.edit) return;
+        pingUI.event = pingUI.event === row.dataset.id ? null : row.dataset.id;
+        renderTimelineView();
+      });
+    });
+    host.querySelectorAll('[data-edit]').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        openEventForm(btn.dataset.edit);
+      });
+    });
+
+    renderEventAnalysis(ix);
+  }
+
+  function openEventForm(id) {
+    var ev = id ? eventById(id) : null;
+    // Releases come from the app's own log; this dashboard does not own them.
+    if (ev && ev.derived) { toast('Releases come from the app\'s release log and are not edited here.'); return; }
+    pingUI.editing = id || 'new';
+    var host = document.getElementById('pgEventForm');
+    host.classList.remove('hidden');
+
+    var catOptions = Object.keys(A.EVENT_CATEGORIES).map(function (k) {
+      return '<option value="' + k + '"' + (ev && ev.category === k ? ' selected' : '') + '>' +
+        esc(A.EVENT_CATEGORIES[k].label) + '</option>';
+    }).join('');
+
+    host.innerHTML =
+      '<div class="event-form">' +
+      '<div class="field"><label for="evDate">Date</label><input type="date" id="evDate" value="' + esc(ev ? ev.date : asOf()) + '"></div>' +
+      '<div class="field"><label for="evCategory">Category</label><select id="evCategory">' + catOptions + '</select></div>' +
+      '<div class="field"><label for="evType">Type</label><select id="evType"></select></div>' +
+      '<div class="field grow"><label for="evTitle">Title</label><input type="text" id="evTitle" maxlength="200" placeholder="v1.24 — new paywall copy" value="' + esc(ev ? ev.title : '') + '"></div>' +
+      '<div class="field"><label for="evAmount">Spend (optional)</label><input type="number" id="evAmount" step="0.01" min="0" value="' + (ev && ev.amount !== undefined ? ev.amount : '') + '"></div>' +
+      '<div class="field grow"><label for="evUrl">Link (optional)</label><input type="text" id="evUrl" placeholder="https://" value="' + esc(ev && ev.url ? ev.url : '') + '"></div>' +
+      '<div class="field full"><label for="evNote">Notes</label><textarea id="evNote" rows="2" maxlength="2000">' + esc(ev && ev.note ? ev.note : '') + '</textarea></div>' +
+      '<div class="event-form-actions">' +
+      '<button class="btn primary" id="evSave">' + (ev ? 'Save event' : 'Add event') + '</button>' +
+      '<button class="btn" id="evCancel">Cancel</button>' +
+      (ev ? '<span class="spacer"></span><button class="btn danger" id="evDelete">Delete</button>' : '') +
+      '</div></div>';
+
+    function fillTypes() {
+      var cat = A.EVENT_CATEGORIES[document.getElementById('evCategory').value];
+      var sel = document.getElementById('evType');
+      sel.innerHTML = (cat ? cat.types : []).map(function (t) {
+        return '<option value="' + esc(t) + '"' + (ev && ev.type === t ? ' selected' : '') + '>' + esc(t) + '</option>';
+      }).join('');
+    }
+    fillTypes();
+    document.getElementById('evCategory').addEventListener('change', fillTypes);
+
+    document.getElementById('evCancel').addEventListener('click', closeEventForm);
+    if (ev) {
+      document.getElementById('evDelete').addEventListener('click', function () {
+        removeEvent(ev.id);
+        closeEventForm();
+        renderTimelineView();
+      });
+    }
+    document.getElementById('evSave').addEventListener('click', function () {
+      var title = document.getElementById('evTitle').value.trim();
+      var date = document.getElementById('evDate').value;
+      if (!date) { toast('An event needs a date.'); return; }
+      if (!title) { toast('An event needs a title.'); return; }
+      var amount = document.getElementById('evAmount').value;
+      putEvent({
+        id: ev ? ev.id : newEventId(),
+        date: date,
+        category: document.getElementById('evCategory').value,
+        type: document.getElementById('evType').value,
+        title: title,
+        note: document.getElementById('evNote').value.trim(),
+        url: document.getElementById('evUrl').value.trim(),
+        amount: amount === '' ? undefined : Number(amount)
+      });
+      closeEventForm();
+      renderTimelineView();
+    });
+    document.getElementById('evTitle').focus();
+  }
+
+  function closeEventForm() {
+    pingUI.editing = null;
+    var host = document.getElementById('pgEventForm');
+    host.classList.add('hidden');
+    host.innerHTML = '';
+  }
+
+  /* ------------------------------------------------- 9. before / after */
+
+  function renderEventAnalysis(ix) {
+    var host = document.getElementById('pgEventAnalysis');
+    if (!pingUI.event) { host.innerHTML = ''; return; }
+    var ev = eventById(pingUI.event);
+    if (!ev) { host.innerHTML = ''; return; }
+
+    var ba = A.beforeAfter(ix, db.entries, ev, 14);
+    var rows = ba.metrics.map(function (m) {
+      if (!m.available) {
+        return '<tr><td>' + esc(m.label) + '</td><td class="na">–</td><td class="na">–</td>' +
+          '<td class="na" colspan="2">not enough mature data on both sides</td></tr>';
+      }
+      var fmt = m.kind === 'pct' ? fmtPct : function (v) { return fmtInt(Math.round(v * 10) / 10); };
+      var cls = m.delta > 0 ? 'up' : m.delta < 0 ? 'down' : 'flat';
+      var deltaTxt = m.kind === 'pct'
+        ? (m.delta > 0 ? '+' : '') + m.delta.toFixed(1) + ' pts'
+        : (m.delta > 0 ? '+' : '') + fmtInt(Math.round(m.delta * 10) / 10);
+      return '<tr><td>' + esc(m.label) + '</td>' +
+        '<td>' + fmt(m.before) + '</td><td>' + fmt(m.after) + '</td>' +
+        '<td class="delta ' + cls + '">' + deltaTxt + '</td>' +
+        '<td class="' + cls + '">' + (m.relative === null ? '–' : (m.relative > 0 ? '+' : '') + m.relative.toFixed(0) + '%') + '</td></tr>';
+    }).join('');
+
+    host.innerHTML =
+      '<div class="event-analysis">' +
+      '<div class="ea-head"><b>' + esc(ev.title) + '</b> <span class="note">' + esc(labelFull(ev.date)) +
+      ' · 14 days either side</span>' +
+      '<span class="spacer"></span><button class="btn sm" id="eaClose">Close</button></div>' +
+      (ev.note ? '<p class="hint">' + esc(ev.note) + '</p>' : '') +
+      '<div class="table-scroll"><table><thead><tr><th>Metric</th><th>Before</th><th>After</th><th>Change</th><th>Relative</th></tr></thead><tbody>' +
+      rows + '</tbody></table></div>' +
+      '<p class="hint warn-observational">This is a comparison of two windows, not evidence that the event caused anything. ' +
+      'Other things moved in the same fortnight. Retention rows only count cohorts old enough for the milestone on both sides, ' +
+      'so a recent event will honestly report D14 as unavailable rather than guess.</p>' +
+      '</div>';
+
+    document.getElementById('eaClose').addEventListener('click', function () {
+      pingUI.event = null;
+      renderTimelineView();
+    });
+  }
+
+  /* ---------------------------------------------------------------- wiring */
+
+  function wirePingView() {
+    function segment(id, key, after) {
+      var host = document.getElementById(id);
+      if (!host) return;
+      host.querySelectorAll('button').forEach(function (b) {
+        b.addEventListener('click', function () {
+          pingUI[key] = b.dataset.v;
+          host.querySelectorAll('button').forEach(function (o) {
+            o.setAttribute('aria-pressed', o === b ? 'true' : 'false');
+          });
+          if (after) after();
+        });
+      });
+    }
+    segment('pgTlMode', 'tlMode', renderPing);
+    segment('pgCurveMode', 'curveMode', renderPing);
+    segment('pgHeatGrain', 'heatGrain', function () { pingUI.cohort = null; renderPing(); });
+    segment('tlMetric', 'tlMetric', renderTimelineView);
+
+    document.getElementById('pgEventAdd').addEventListener('click', function () {
+      if (pingUI.editing) closeEventForm(); else openEventForm(null);
+    });
+
+    document.getElementById('pgHeatExport').addEventListener('click', function () {
+      var ix = A.index(pings.report);
+      if (!ix.cohorts.length) { toast('Nothing to export yet.'); return; }
+      var out = ['cohort,installs,' + A.MILESTONES.map(function (n) { return 'D' + n; }).join(',')];
+      var rows = pingUI.heatGrain === 'week'
+        ? A.weeklyCohorts(ix, ix.cohorts).map(function (w) { return { key: w.key, size: w.size, cells: A.weekMilestones(ix, w, A.MILESTONES) }; })
+        : ix.cohorts.map(function (c) { return { key: c, size: A.cohortSize(ix, c), cells: A.milestoneRow(ix, c, A.MILESTONES) }; });
+      rows.forEach(function (row) {
+        out.push([row.key, row.size].concat(row.cells.map(function (c) {
+          // an immature cell exports as empty, never as 0 — the distinction has
+          // to survive leaving the dashboard
+          return c.available ? c.pct.toFixed(1) : '';
+        })).join(','));
+      });
+      download('autonomic-cohort-retention.csv', out.join('\n'), 'text/csv');
+    });
+  }
+  /* ----------------------------------------------------- view: timeline */
+
+  /* What we changed, against what happened.
+   *
+   * Events are recorded here and annotated everywhere; releases are read from
+   * the app's own log rather than entered. The metric on the chart is one at a
+   * time on purpose — the point is to read a single line against the flags
+   * underneath it, not to build a comparison surface. */
+
+  var TL_METRICS = {
+    active: { label: 'Daily active', color: PC.active, type: 'bar', fmt: fmtInt,
+              of: function (ix, d) { return A.activeOn(ix, d); } },
+    returning: { label: 'Returning', color: PC.back, type: 'bar', fmt: fmtInt,
+                 of: function (ix, d) { return A.returningOn(ix, d); } },
+    fresh: { label: 'First runs', color: PC.fresh, type: 'bar', fmt: fmtInt,
+             of: function (ix, d) { return A.newOn(ix, d); } },
+    downloads: { label: 'Store downloads', color: PC.downloads, type: 'bar', fmt: fmtInt, store: true,
+                 of: function (ix, d) { return dayRec('all', d).downloads; } },
+    pageViews: { label: 'Product page views', color: PC.pageViews, type: 'bar', fmt: fmtInt, store: true,
+                 of: function (ix, d) { return dayRec('all', d).pageViews; } },
+    /* Store sales, not subscribe pings. The ping fires when the app next
+       notices an entitlement, which can be a launch or two after the purchase;
+       the store's number is the transaction itself, and it is the one to read
+       against a campaign or a release. The ping-derived view lives on App usage,
+       where it is being used for a different question (purchase age by cohort). */
+    purchases: { label: 'Purchases', color: PC.subs, type: 'bar', fmt: fmtInt, store: true,
+                 of: function (ix, d) { return dayRec('all', d).sales; } },
+    revenue: { label: 'Revenue', color: ENTITY.revenue, type: 'bar', fmt: fmtMoney, store: true,
+               of: function (ix, d) { return dayRec('all', d).revenue; } }
+  };
+
+  function renderTimelineView() {
+    var ix = A.index(pings.report);
+    var m = TL_METRICS[pingUI.tlMetric] || TL_METRICS.active;
+
+    /* The counter and the store cover different spans, so the axis is the union
+       of the selected range and whatever data exists, clamped to the store's
+       start when the metric is a store one. */
+    var sel = activeRange();
+    var to = sel.to;
+    if (ix.last && ix.last > to) to = ix.last;
+    var from = sel.from;
+    if (state.range !== 'custom' && state.range !== 'all') {
+      from = addDays(to, -((parseInt(state.range, 10) || 30) - 1));
+    }
+    var days = A.range(from, to);
+    var marks = marksFor(days);
+
+    drawChart('tlChart', {
+      x: days.map(function (d) { return bucketLabel(d, 'day'); }),
+      series: [{ key: 'v', name: m.label, color: m.color, type: m.type,
+                 values: days.map(function (d) { return m.of(ix, d); }) }],
+      height: 340, format: m.fmt, legend: false, xLabel: 'Day',
+      marks: marks, onMarkClick: onMarkClick,
+      emptyText: 'Nothing recorded in this range yet.',
+      tooltipNote: function (i) {
+        var d = days[i];
+        // Store reporting lands a day late, so the newest columns of a
+        // store-sourced metric are incomplete rather than a collapse.
+        if (m.store && d > asOf()) return 'store reporting has not landed for this day yet';
+        var here = A.eventsBetween(timelineItems(), d, d);
+        return here.length ? here.map(function (e) { return e.title; }).join(' · ') : '';
+      }
+    });
+
+    renderEvents(ix);
+    renderReleases();
+  }
+
+  function renderReleases() {
+    var list = releaseEvents().slice().reverse();
+    var host = document.getElementById('tlReleases');
+    if (!host) return;
+    host.innerHTML = list.length
+      ? '<div class="event-list">' + list.map(function (r) {
+          return '<div class="event-row' + (pingUI.event === r.id ? ' selected' : '') + '" data-id="' + esc(r.id) + '">' +
+            '<span class="event-dot" style="background:' + A.eventColor(r) + '"></span>' +
+            '<span class="event-date">' + esc(labelFull(r.date)) + '</span>' +
+            '<span class="event-title">' + esc(r.title) + '</span>' +
+            '<span class="event-type">' + esc((r.note || '').slice(0, 110)) + '</span>' +
+            '</div>';
+        }).join('') + '</div>'
+      : '<div class="empty">No releases found. Run <code>npm run releases</code> in landing/ to read them from the app\'s release log.</div>';
+
+    host.querySelectorAll('.event-row').forEach(function (row) {
+      row.addEventListener('click', function () {
+        pingUI.event = pingUI.event === row.dataset.id ? null : row.dataset.id;
+        renderTimelineView();
+      });
     });
   }
 
@@ -1900,7 +2865,7 @@
   /* ------------------------------------------------------------- render */
 
   var VIEW_TITLES = {
-    overview: 'Overview', trial: 'Trial & conversion', cohorts: 'Cohorts',
+    overview: 'Overview', ping: 'App usage', timeline: 'Timeline', trial: 'Trial & conversion', cohorts: 'Cohorts',
     platforms: 'iOS vs Android', explore: 'Explore', forecast: 'Forecast', data: 'Edit data'
   };
 
@@ -1918,6 +2883,11 @@
       var g = document.getElementById(id);
       if (g) g.classList.toggle('hidden', state.view === 'forecast');
     });
+    // App usage is per-day by nature: daily actives can't be added into a week
+    // without knowing who is who, which is exactly what the ping refuses to
+    // carry. Hiding the grain is more honest than silently ignoring it.
+    var grainGroup = document.getElementById('fgGrain');
+    if (grainGroup && (state.view === 'ping' || state.view === 'timeline')) grainGroup.classList.add('hidden');
     document.getElementById('reportDayValue').textContent = labelFull(asOf());
     document.getElementById('btnEditData').textContent =
       state.view === 'data' ? '← Back' : 'Edit data';
@@ -1931,7 +2901,10 @@
       t.setAttribute('aria-selected', t.dataset.view === state.view ? 'true' : 'false');
     });
 
-    var empty = !db.entries.length && state.view !== 'data';
+    // App usage and Timeline have their own data sources, so both stand up with
+    // no store CSVs at all.
+    var empty = !db.entries.length && state.view !== 'data' &&
+      state.view !== 'ping' && state.view !== 'timeline';
     document.getElementById('emptyState').classList.toggle('hidden', !empty);
     if (empty) {
       document.getElementById('view-' + state.view).classList.add('hidden');
@@ -1940,6 +2913,8 @@
     }
 
     if (state.view === 'overview') renderOverview();
+    else if (state.view === 'ping') { pingLoad(); renderPing(); }
+    else if (state.view === 'timeline') { pingLoad(); renderTimelineView(); }
     else if (state.view === 'trial') renderTrial();
     else if (state.view === 'cohorts') renderCohorts();
     else if (state.view === 'platforms') renderPlatforms();
@@ -2240,6 +3215,8 @@
       download('autonomic-cohorts.csv', out.join('\n'), 'text/csv');
     });
 
+    wirePingView();
+
     /* --- data entry --- */
     wireBulk();
     wireExport();
@@ -2373,6 +3350,7 @@
     hydrate: function (remote) {
       if (!remote) return;
       if (Array.isArray(remote.entries)) db.entries = remote.entries;
+      if (Array.isArray(remote.events)) db.events = remote.events;
       if (remote.settings) Object.assign(db.settings, remote.settings);
       if (remote.ui) Object.assign(state, remote.ui);
       try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) {}

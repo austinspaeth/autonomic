@@ -150,9 +150,16 @@ const readDays = async (kind, since) => {
       rows.push({
         day: item.SK,
         total: Number(item.total) || 0,
+        // Both spellings of the cohort: the MMDDYY key as stored, and the ISO
+        // date, so a consumer can do date arithmetic (day N of a cohort)
+        // without re-implementing the decode.
         cohorts: Object.keys(cohorts)
-          .sort()
-          .map((cohortDate) => ({ cohortDate, count: Number(cohorts[cohortDate]) || 0 })),
+          .map((cohortDate) => ({
+            cohortDate,
+            cohort: `20${cohortDate.slice(4, 6)}-${cohortDate.slice(0, 2)}-${cohortDate.slice(2, 4)}`,
+            count: Number(cohorts[cohortDate]) || 0,
+          }))
+          .sort((a, b) => a.cohort.localeCompare(b.cohort)),
       });
     });
     ExclusiveStartKey = res.LastEvaluatedKey;

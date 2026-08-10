@@ -295,6 +295,137 @@ th {
 }
 th:first-child, td:first-child { text-align: left; }
 tbody tr:hover { background: var(--surface-2); }
+
+/* ---------------------------------------------------------- App usage view */
+
+/* Section rules, so the page reads as a hierarchy rather than a wall of
+   equally-weighted cards. */
+.section-head {
+  display: flex; align-items: baseline; gap: 12px;
+  margin: 4px 0 10px;
+}
+.section-title { font-size: 13px; font-weight: 600; margin: 0; letter-spacing: 0.02em; }
+.section-note { color: var(--text-muted); font-size: 12px; }
+
+/* "Not knowable yet" is a first-class state and must never look like zero. */
+.na { color: var(--text-muted); }
+.warn-small {
+  color: var(--warn, #c98500);
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;
+}
+.warn-observational { border-left: 2px solid var(--border); padding-left: 10px; margin-top: 12px; }
+
+/* Boundary crossings: two numbers that carry most of the monetization story. */
+.transitions { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 12px; }
+.transition { background: var(--surface-2); border-radius: 8px; padding: 10px 12px; }
+.transition .t-title { color: var(--text-secondary); font-size: 12px; }
+.transition .t-value { font-size: 22px; margin: 4px 0 3px; font-variant-numeric: tabular-nums; }
+.transition .t-value.up { color: var(--good); }
+.transition .t-value.down { color: var(--critical); }
+.transition .t-value.flat, .transition .t-value.na { color: var(--text-muted); }
+.transition .t-note { color: var(--text-muted); font-size: 11.5px; line-height: 1.45; }
+
+.cohort-detail { margin-top: 12px; background: var(--surface-2); border-radius: 8px; padding: 12px; }
+.cohort-detail .cd-head { display: flex; gap: 10px; align-items: baseline; margin-bottom: 10px; }
+.cd-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.cd-grid > div { display: flex; flex-direction: column; gap: 2px; }
+.cd-label { color: var(--text-secondary); font-size: 12px; }
+.cd-value { font-size: 20px; font-variant-numeric: tabular-nums; }
+.cd-note { color: var(--text-muted); font-size: 11.5px; }
+
+.mini-rows { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+.mini-rows > div { display: flex; align-items: baseline; gap: 8px; font-size: 12.5px; }
+.mini-rows b { font-variant-numeric: tabular-nums; }
+.mini-rows .note { color: var(--text-muted); font-size: 11.5px; }
+
+/* Events */
+.event-list { display: flex; flex-direction: column; }
+/* The release log runs to every version ever shipped; it scrolls rather than
+   pushing the rest of the page off the screen. */
+#tlReleases .event-list { max-height: 340px; overflow-y: auto; }
+.event-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 6px; border-bottom: 1px solid var(--border);
+  cursor: pointer; font-size: 12.5px;
+}
+.event-row:hover { background: var(--surface-2); }
+.event-row.selected { background: var(--surface-2); box-shadow: inset 2px 0 0 var(--series-1); }
+.event-dot { width: 9px; height: 9px; border-radius: 3px; flex: none; }
+.event-date { color: var(--text-muted); width: 120px; flex: none; }
+.event-title { font-weight: 500; }
+.event-type { color: var(--text-muted); }
+.event-amount { margin-left: auto; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.event-row .btn { flex: none; }
+
+.event-form {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px; padding: 12px; background: var(--surface-2); border-radius: 8px; margin-bottom: 12px;
+}
+.event-form .field { display: flex; flex-direction: column; gap: 4px; }
+.event-form .field.grow { grid-column: span 2; }
+.event-form .field.full { grid-column: 1 / -1; }
+.event-form label { color: var(--text-muted); font-size: 11.5px; }
+.event-form input, .event-form select, .event-form textarea {
+  background: var(--surface-1); border: 1px solid var(--border); color: var(--text-primary);
+  border-radius: 6px; padding: 6px 8px; font: inherit; font-size: 12.5px;
+}
+.event-form-actions { grid-column: 1 / -1; display: flex; gap: 8px; align-items: center; }
+.event-form-actions .spacer { flex: 1; }
+
+.mark-key {
+  display: inline-block; width: 8px; height: 8px; border-radius: 2px;
+  vertical-align: middle; margin: 0 2px;
+}
+.mark-key.release { background: var(--series-1); }
+.mark-key.marketing { background: var(--series-2); }
+.mark-key.store { background: var(--warn, #c98500); }
+.mark-key.external { background: var(--series-7, #9085e9); }
+
+.event-analysis { margin-top: 14px; }
+.event-analysis .ea-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+.event-analysis .ea-head .spacer { flex: 1; }
+
+/* Retention grid (App usage). Cells carry their own background, so the row
+   hover is suppressed — it would wash the heat out — and the first two columns
+   stay put while the triangle scrolls sideways. */
+.grid-heat td.heat {
+  text-align: center;
+  padding: 6px 8px;
+  min-width: 42px;
+  color: var(--text-primary);
+  border-bottom-color: transparent;
+}
+.grid-heat tbody tr:hover { background: none; }
+.grid-heat tbody tr:hover td:first-child, .grid-heat tbody tr:hover td:nth-child(2) { background: var(--surface-2); }
+.grid-heat th:first-child, .grid-heat td:first-child,
+.grid-heat th:nth-child(2), .grid-heat td:nth-child(2) {
+  position: sticky; z-index: 1;
+  background: var(--surface-1);
+}
+.grid-heat th:first-child, .grid-heat td:first-child { left: 0; }
+.grid-heat th:nth-child(2), .grid-heat td:nth-child(2) { left: 96px; text-align: right; }
+.grid-heat th:first-child, .grid-heat th:nth-child(2) { z-index: 3; }
+
+/* An immature cell is hatched, never shaded: "this cohort has not lived that
+   long" has to be unmistakable against "nobody came back", which is a real 0%
+   and gets the palest green. */
+.grid-heat td.heat.immature {
+  background: repeating-linear-gradient(
+    -45deg, transparent, transparent 3px, var(--border) 3px, var(--border) 4px
+  );
+  opacity: 0.5;
+}
+.heat-key-immature {
+  display: inline-block; padding: 0 6px; border-radius: 3px;
+  background: repeating-linear-gradient(
+    -45deg, transparent, transparent 3px, var(--border) 3px, var(--border) 4px
+  );
+}
+/* The two columns that sit on a product boundary get a rule, so the eye lands
+   on D8 and D15 without needing the legend. */
+.grid-heat th.boundary, .grid-heat td.heat.boundary { box-shadow: inset 1px 0 0 var(--text-muted); }
+.grid-heat tbody tr.heat-row { cursor: pointer; }
+.grid-heat tbody tr.heat-row.selected td:first-child { box-shadow: inset 2px 0 0 var(--series-1); }
 td.num-edit { padding: 2px 4px; }
 td input {
   width: 92px; text-align: right; padding: 4px 6px;
