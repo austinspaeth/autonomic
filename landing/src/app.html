@@ -373,11 +373,12 @@
 
           // Sticky blog CTA (mobile only). Topic hubs and articles render an
           // `aj-cta-topic` meta; its presence is what makes the page eligible.
-          // The bar rises into the bottom dock at 15% of PAGE scroll (not the
+          // The bar rises into the bottom dock at 5% of PAGE scroll (not the
           // prose-relative depth behind the `article_scroll` events — the page
           // includes the header, cover and footer, so this lands later in the
-          // reading than the number reads) and stays for the rest of the
-          // visit, unless dismissed. The CSS owns the mobile breakpoint —
+          // reading than the number reads, which is why the number is this
+          // small) and stays for the rest of the visit, unless dismissed. The
+          // CSS owns the mobile breakpoint —
           // mirrored here so nothing is revealed on desktop.
           (function () {
             var cta = document.getElementById('aj-sticky-cta');
@@ -637,7 +638,7 @@
             function onScroll() {
               if (shown || !mq.matches) return;
               var scrollable = document.documentElement.scrollHeight - window.innerHeight;
-              if (scrollable <= 0 || window.scrollY / scrollable < 0.15) return;
+              if (scrollable <= 0 || window.scrollY / scrollable < 0.05) return;
               shown = true;
               window.removeEventListener('scroll', onScroll);
               cta.hidden = false;
