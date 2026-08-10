@@ -40,7 +40,7 @@
 </script>
 
 <svelte:head>
-  <title>Autonomic — App Analytics Dashboard</title>
+  <title>Autonomic</title>
   <meta name="robots" content="noindex, nofollow" />
   {@html tag('style', styles)}
 </svelte:head>
