@@ -389,17 +389,6 @@ function HrvSummaryBody({ r, days, ctx, type }: SummaryProps & { type: 'breathHr
         />
       </Section>
 
-      {hasDetails ? (
-        <Section>
-          <SectionHead title="Details" />
-          <View style={{ marginTop: 12 }}>
-            {sourceLabel ? <MetricRow label="Source" value={sourceLabel} cat={false} /> : null}
-            {legacyStyle ? <MetricRow label="Breathing style" value={legacyStyle} cat={false} /> : null}
-            {r.period ? <MetricRow label="Reading type" value={r.period as string} cat={false} /> : null}
-          </View>
-        </Section>
-      ) : null}
-
       {rr && rr.length > 2 ? (
         <Section>
           <SectionHead
@@ -507,6 +496,16 @@ function HrvSummaryBody({ r, days, ctx, type }: SummaryProps & { type: 'breathHr
         desc={HRV_EXPLAIN.stressIndex} help={HRV_HELP.stressIndex}
       />
       <Notes r={r} />
+      {hasDetails ? (
+        <Section>
+          <SectionHead title="Details" />
+          <View style={{ marginTop: 12 }}>
+            {sourceLabel ? <MetricRow label="Source" value={sourceLabel} cat={false} /> : null}
+            {legacyStyle ? <MetricRow label="Breathing style" value={legacyStyle} cat={false} /> : null}
+            {r.period ? <MetricRow label="Reading type" value={r.period as string} cat={false} /> : null}
+          </View>
+        </Section>
+      ) : null}
     </>
   );
 }
@@ -560,14 +559,6 @@ export function BpSummary({ r, days, ctx }: SummaryProps) {
           desc={cat ? verdict[cat] : 'Systolic over diastolic pressure.'}
         />
       </Section>
-      {r.period ? (
-        <Section>
-          <SectionHead title="Details" />
-          <View style={{ marginTop: 12 }}>
-            <MetricRow label="Reading type" value={r.period as string} cat={false} />
-          </View>
-        </Section>
-      ) : null}
       <MetricSection
         label="Systolic" value={r.sys as string} unit="mmHg" cat={s.sys} days={days} type="bp" ex={numEx('sys')} bands={BANDS.sys}
         desc="Peak arterial pressure during a heartbeat." help={BP_HELP.sys}
@@ -587,6 +578,14 @@ export function BpSummary({ r, days, ctx }: SummaryProps) {
       {derived('BCE index', bpBce, BANDS.bce, 'Blood-circulation economy (pulse pressure x pulse). Higher means a more strained circulation.', BP_HELP.bce)}
       {derived('Kvas coefficient', bpKvas, BANDS.kvas, 'Coefficient of endurance. Around 16 is typical; higher suggests cardiovascular fatigue.', BP_HELP.kvas)}
       <Notes r={r} />
+      {r.period ? (
+        <Section>
+          <SectionHead title="Details" />
+          <View style={{ marginTop: 12 }}>
+            <MetricRow label="Reading type" value={r.period as string} cat={false} />
+          </View>
+        </Section>
+      ) : null}
     </>
   );
 }
@@ -611,13 +610,13 @@ export function RestingHrSummary({ r, days, ctx }: SummaryProps) {
         desc={hrCat ? `${verdict[hrCat]} ${posLine}` : posLine}
         help={RESTING_HELP}
       />
+      <Notes r={r} />
       <Section>
         <SectionHead title="Details" />
         <View style={{ marginTop: 12 }}>
           <MetricRow label="Position" value={(r.position as string) || 'Laying'} cat={false} />
         </View>
       </Section>
-      <Notes r={r} />
     </>
   );
 }
@@ -855,6 +854,7 @@ export function StandTestSummary({ r, days, ctx: _ctx }: SummaryProps) {
           ))}
         </View>
       </Section>
+      <Notes r={r} />
       <Section>
         <SectionHead title="Details" />
         <View style={{ marginTop: 12 }}>
@@ -863,7 +863,6 @@ export function StandTestSummary({ r, days, ctx: _ctx }: SummaryProps) {
           <MetricRow label="Source" value={sourceLabelFor(r) || 'Apple Watch'} cat={false} />
         </View>
       </Section>
-      <Notes r={r} />
       <EventInsightButton r={r} days={days} hrCurve={hrCurve} noun="test" title="Stand Test Insights" />
       <Text style={{ fontSize: 12, color: p.textDim, lineHeight: 17, marginBottom: 16, paddingHorizontal: 4 }}>{STAND_DISCLAIMER}</Text>
     </>
@@ -970,6 +969,7 @@ export function WorkoutSummary({ r, days, ctx: _ctx }: SummaryProps) {
           </View>
         </Section>
       ) : null}
+      <Notes r={r} />
       {details.length ? (
         <Section>
           <SectionHead title="Details" />
@@ -978,7 +978,6 @@ export function WorkoutSummary({ r, days, ctx: _ctx }: SummaryProps) {
           </View>
         </Section>
       ) : null}
-      <Notes r={r} />
       <WorkoutInsightButton r={r} days={days} hrCurve={curve} />
     </>
   );
@@ -1013,6 +1012,7 @@ export function GenericSummary({ r, days, ctx }: SummaryProps) {
           />
         );
       })}
+      <Notes r={r} />
       {checks.length ? (
         <Section>
           <SectionHead title="Details" />
@@ -1021,7 +1021,6 @@ export function GenericSummary({ r, days, ctx }: SummaryProps) {
           </View>
         </Section>
       ) : null}
-      <Notes r={r} />
     </>
   );
 }

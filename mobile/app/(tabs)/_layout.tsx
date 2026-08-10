@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated as RNAnimated, Dimensions, Easing, Platform, Pressable, Text, View } from 'react-native';
+import { Animated as RNAnimated, Dimensions, Easing, Platform, Pressable, Text, useWindowDimensions, View } from 'react-native';
 import { Tabs } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
 import { BlurView } from 'expo-blur';
@@ -20,6 +20,8 @@ const TABS: { name: string; label: string; icon: IconName }[] = [
 ];
 
 const PAD = 5; // bar inner padding; the highlight pill is inset by this top/bottom
+// Minimum breathing room between the floating bar and the screen edges.
+const BAR_GUTTER = 12;
 // Slight elastic bounce (damping ratio ~0.7) — a soft overshoot, not springy.
 const SPRING = { damping: 19, stiffness: 210, mass: 1 };
 
@@ -121,6 +123,28 @@ function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
   const { openSheet } = useSheets();
   const tabRoutes = state.routes.filter((r) => TABS.some((t) => t.name === r.name));
+  const { width: winW, fontScale } = useWindowDimensions();
+
+  // The bar sizes to its content, so a narrow phone — or an OS text size large
+  // enough to widen the tab labels — can push it past the screen. `maxWidth`
+  // below pins it to the available width, at which point the row's children
+  // (none of them shrinkable) overflow and the shell clips the cog off the
+  // edge. The brand mark is the only thing in the bar that does nothing, so
+  // it's what gives way, keeping every control reachable.
+  //
+  // Overflow is read directly rather than compared against the screen: the cog
+  // is the last child, so content wider than the row means its right edge lands
+  // past the row's own width. Latched — hiding the mark can only shrink the
+  // content, so the decision can't oscillate — and reset when the inputs that
+  // drive it change (rotation, or the user changing text size in Settings).
+  const avail = winW - BAR_GUTTER * 2;
+  const [markFits, setMarkFits] = useState(true);
+  const [rowW, setRowW] = useState(0);
+  const [cogEnd, setCogEnd] = useState(0);
+  useEffect(() => { setMarkFits(true); }, [winW, fontScale]);
+  useEffect(() => {
+    if (rowW > 0 && cogEnd > 0 && cogEnd + PAD > rowW + 0.5) setMarkFits(false);
+  }, [rowW, cogEnd]);
   const activeIndex = Math.max(0, tabRoutes.findIndex((r) => state.routes.indexOf(r) === state.index));
 
   // Android staging: the pill (and icon tint) moves the moment a tab is
@@ -166,11 +190,16 @@ function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
 
   return (
     <View pointerEvents="box-none" style={{ position: 'absolute', bottom: insets.bottom + 12, left: 0, right: 0, alignItems: 'center' }}>
-      <BarShell>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, padding: PAD, backgroundColor: Platform.OS === 'ios' ? 'rgba(6,6,9,0.82)' : '#0a0a0e' }}>
-        <View style={{ paddingLeft: 8, paddingRight: 6, marginRight: 8, justifyContent: 'center' }}>
-          <BrandMark size={20} />
-        </View>
+      <BarShell maxWidth={avail}>
+      <View
+        onLayout={(e) => setRowW(e.nativeEvent.layout.width)}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: 2, padding: PAD, backgroundColor: Platform.OS === 'ios' ? 'rgba(6,6,9,0.82)' : '#0a0a0e' }}
+      >
+        {markFits ? (
+          <View style={{ paddingLeft: 8, paddingRight: 6, marginRight: 8, justifyContent: 'center' }}>
+            <BrandMark size={20} />
+          </View>
+        ) : null}
         {/* Sliding highlight pill sits behind the tabs. */}
         <Animated.View
           pointerEvents="none"
@@ -203,6 +232,10 @@ function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
           accessibilityRole="button"
           accessibilityLabel="Settings"
           onPress={() => openSheet((c) => <MenuSheet controls={c} />)}
+          onLayout={(e) => {
+            const { x, width } = e.nativeEvent.layout;
+            setCogEnd(x + width);
+          }}
           style={{ paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999, alignItems: 'center', justifyContent: 'center', alignSelf: 'stretch' }}
         >
           <SolidCog size={22} color={p.textDim} />
@@ -215,8 +248,9 @@ function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
 
 /** The floating bar's rounded shell — dark glass (BlurView) on iOS, a solid
  *  pill on Android where expo-blur renders plain translucency instead of blur. */
-function BarShell({ children }: { children: React.ReactNode }) {
+function BarShell({ children, maxWidth }: { children: React.ReactNode; maxWidth: number }) {
   const shell = {
+    maxWidth,
     borderRadius: 999, overflow: 'hidden' as const, borderWidth: 1, borderColor: '#34343b',
     shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 20, shadowOffset: { width: 0, height: 10 }, elevation: 8,
   };

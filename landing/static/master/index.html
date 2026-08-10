@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Autonomic — App Analytics Dashboard</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="stylesheet" href="styles.css">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+</head>
+<body class="gated">
+
+<!-- Sign-in gate. Rendered on top of everything until Cognito hands back a
+     session; `body.gated` hides the dashboard behind it so no numbers can be
+     read from a screenshot of the login screen. -->
+<div class="gate" id="gate">
+  <div class="gate-card">
+    <img src="logo.svg" alt="" class="gate-logo">
+    <h1 class="gate-title">Autonomic</h1>
+    <p class="gate-sub">Master dashboard</p>
+
+    <div class="gate-error" id="gateError" role="alert"></div>
+
+    <div id="gateEmailStep">
+      <label class="gate-label" for="gateEmail">Email address</label>
+      <input class="gate-input" id="gateEmail" type="email" inputmode="email"
+             autocomplete="email" spellcheck="false" placeholder="you@example.com">
+      <button class="gate-btn" id="gateSubmit">Continue</button>
+      <p class="gate-note">We'll email you a four-digit sign-in code.</p>
+    </div>
+
+    <div id="gateCodeStep" class="hidden">
+      <p class="gate-sent">Code sent to <strong id="gateSentTo"></strong></p>
+      <div class="gate-code" id="gateCodeRow">
+        <input type="text" inputmode="numeric" maxlength="1" autocomplete="one-time-code" aria-label="Digit 1">
+        <input type="text" inputmode="numeric" maxlength="1" aria-label="Digit 2">
+        <input type="text" inputmode="numeric" maxlength="1" aria-label="Digit 3">
+        <input type="text" inputmode="numeric" maxlength="1" aria-label="Digit 4">
+      </div>
+      <!-- The email is sent by DiscoveryMark's Cognito trigger, so it carries
+           DiscoveryMark branding and a magic link that will not sign you in
+           here. Say so plainly rather than let the link look broken. -->
+      <p class="gate-note">
+        The email comes from DiscoveryMark and includes a sign-in link —
+        ignore the link and enter the code above.
+      </p>
+      <div class="gate-links">
+        <button class="gate-link" id="gateResend">Resend code</button>
+        <button class="gate-link" id="gateBack">Use a different email</button>
+      </div>
+    </div>
+
+    <div class="gate-spinner" aria-hidden="true"></div>
+  </div>
+</div>
+
+<div class="app">
+
+  <header class="topbar">
+    <h1><img src="logo.svg" alt="" class="logomark">Autonomic</h1>
+    <span class="syncdot" id="syncStatus" title="Saved to your account">Saved</span>
+    <span class="spacer"></span>
+
+    <div class="split-btn" id="exportBtn">
+      <button class="btn" id="exportMain" title="Copy a data prompt to the clipboard">Export data</button>
+      <button class="btn split-caret" id="exportToggle" aria-expanded="false" aria-haspopup="true"
+              title="Choose how much to export"><span id="exportScopeLabel">1 day</span><span class="caret"></span></button>
+      <div class="popover hidden" id="exportPop">
+        <div class="pop-label">How much to export</div>
+        <div class="stepper">
+          <button class="btn sm" data-step="-1" aria-label="Fewer">−</button>
+          <input type="number" id="exportN" min="1" max="999" step="1" value="1" aria-label="Amount">
+          <button class="btn sm" data-step="1" aria-label="More">+</button>
+        </div>
+        <div class="segmented" id="exportUnit">
+          <button data-v="days" aria-pressed="true">Days</button>
+          <button data-v="weeks" aria-pressed="false">Weeks</button>
+          <button data-v="months" aria-pressed="false">Months</button>
+          <button data-v="years" aria-pressed="false">Years</button>
+        </div>
+        <p class="note" id="exportRange"></p>
+      </div>
+    </div>
+
+    <button class="btn" id="btnEditData">Edit data</button>
+    <span class="whoami" id="whoami"></span>
+    <button class="btn" id="btnSignOut" title="Sign out of the master dashboard">Sign out</button>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab" role="tab" data-view="overview" aria-selected="true">Overview</button>
+    <button class="tab" role="tab" data-view="trial" aria-selected="false">Trial &amp; conversion</button>
+    <button class="tab" role="tab" data-view="cohorts" aria-selected="false">Cohorts</button>
+    <button class="tab" role="tab" data-view="platforms" aria-selected="false">iOS vs Android</button>
+    <button class="tab" role="tab" data-view="explore" aria-selected="false">Explore</button>
+    <button class="tab" role="tab" data-view="forecast" aria-selected="false">Forecast</button>
+  </nav>
+
+  <!-- one filter row above everything it scopes -->
+  <div class="filterbar" id="filterbar">
+    <div class="filtergroup" id="fgRange">
+      <label for="fRange">Range</label>
+      <select id="fRange">
+        <option value="7">Last 7 days</option>
+        <option value="14">Last 14 days</option>
+        <option value="30" selected>Last 30 days</option>
+        <option value="90">Last 90 days</option>
+        <option value="180">Last 180 days</option>
+        <option value="365">Last 365 days</option>
+        <option value="all">All time</option>
+        <option value="custom">Custom…</option>
+      </select>
+      <span id="customRange" class="hidden filtergroup">
+        <input type="date" id="fFrom"> <span class="note">to</span> <input type="date" id="fTo">
+      </span>
+    </div>
+
+    <div class="filtergroup">
+      <label>Platform</label>
+      <div class="segmented" id="fPlatform">
+        <button data-v="combined" aria-pressed="true">Combined</button>
+        <button data-v="ios" aria-pressed="false">iOS</button>
+        <button data-v="android" aria-pressed="false">Android</button>
+        <button data-v="compare" aria-pressed="false">Compare</button>
+      </div>
+    </div>
+
+    <div class="filtergroup" id="fgThrough">
+      <label>Data through</label>
+      <span class="note" id="reportDayValue"></span>
+    </div>
+
+    <div class="filtergroup" id="fgGrain">
+      <label>Grain</label>
+      <div class="segmented" id="fGrain">
+        <button data-v="day" aria-pressed="true">Day</button>
+        <button data-v="week" aria-pressed="false">Week</button>
+        <button data-v="month" aria-pressed="false">Month</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="emptyState" class="empty hidden">
+    Nothing to chart yet.<br><br>
+    <button class="btn primary" id="goData">Add your first day</button>
+    <button class="btn" id="goDemo">Load demo data</button>
+  </div>
+
+  <!-- ================= OVERVIEW ================= -->
+  <section id="view-overview" class="view">
+    <div class="grid cards" id="ovTiles"></div>
+
+    <div class="card" style="margin-bottom:14px">
+      <header>
+        <h2 id="ovChartTitle">Downloads over time</h2>
+        <span class="spacer"></span>
+        <div class="segmented" id="ovMode">
+          <button data-v="daily" aria-pressed="true">Per period</button>
+          <button data-v="cumulative" aria-pressed="false">Cumulative</button>
+        </div>
+        <button class="btn sm" data-table-toggle="ovChart">Table</button>
+      </header>
+      <p class="hint" id="ovChartHint"></p>
+      <div id="ovChart"></div>
+      <div id="ovChart-table" class="hidden" style="margin-top:12px"></div>
+    </div>
+
+    <div class="card" style="margin-bottom:14px">
+      <header><h2>By day of week</h2><span class="spacer"></span>
+        <div class="segmented" id="dowMetric">
+          <button data-v="downloads" aria-pressed="true">Downloads</button>
+          <button data-v="sales" aria-pressed="false">Paid</button>
+          <button data-v="pageViews" aria-pressed="false">Page views</button>
+          <button data-v="impressions" aria-pressed="false">Impressions</button>
+          <button data-v="revenue" aria-pressed="false">Revenue</button>
+        </div>
+        <button class="btn sm" data-table-toggle="ovDow">Table</button>
+      </header>
+      <p class="hint">Average per weekday across the selected range, with a tick marking the most recent occurrence of that day — so you can see at a glance whether last Monday beat a normal Monday.</p>
+      <div id="ovDow"></div>
+      <div id="ovDow-table" class="hidden" style="margin-top:12px"></div>
+    </div>
+
+    <div class="grid two-col">
+      <div class="card">
+        <header><h2>Lifecycle mix</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="ovStack">Table</button></header>
+        <p class="hint">Everyone who has ever installed, split by where they are in the lifecycle at the end of each period. Green is still inside the free trial, gold is past it, red has hit the wall and lost historical charts.</p>
+        <div id="ovStack"></div>
+        <div id="ovStack-table" class="hidden" style="margin-top:12px"></div>
+      </div>
+      <div class="card">
+        <header><h2>Store reach</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="ovReach">Table</button></header>
+        <p class="hint">How many people saw the listing. Page views sit on the next card beside the installs they produced, and the impression → page view rate is a tile above.</p>
+        <div id="ovReach"></div>
+        <div id="ovReach-table" class="hidden" style="margin-top:12px"></div>
+      </div>
+      <div class="card">
+        <header><h2>Page views → installs</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="ovStore">Table</button></header>
+        <p class="hint">The last step of the store funnel. Impressions are on their own chart because they are an order of magnitude larger — two scales never share an axis here.</p>
+        <div id="ovStore"></div>
+        <div id="ovStore-table" class="hidden" style="margin-top:12px"></div>
+      </div>
+      <div class="card">
+        <header><h2>Paid conversions</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="ovSales">Table</button></header>
+        <p class="hint">Sales recorded per period. Hover a bar for the revenue that came with it — money and counts never share an axis.</p>
+        <div id="ovSales"></div>
+        <div id="ovSales-table" class="hidden" style="margin-top:12px"></div>
+      </div>
+      <div class="card">
+        <header><h2>Conversion rates</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="ovConv">Table</button></header>
+        <p class="hint">Both steps of the store funnel, derived per period: downloads ÷ product page views, and downloads ÷ impressions. Both are percentages, so they share one axis.</p>
+        <div id="ovConv"></div>
+        <div id="ovConv-table" class="hidden" style="margin-top:12px"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= TRIAL & CONVERSION ================= -->
+  <section id="view-trial" class="view hidden">
+    <div class="grid cards" id="trTiles"></div>
+
+    <div class="card" style="margin-bottom:14px">
+      <header><h2>Install → paid funnel</h2><span class="spacer"></span>
+        <span class="note" id="trFunnelScope"></span></header>
+      <p class="hint">A nested funnel: the last two cohort steps are the <em>same installs</em> from the downloads step, aged forward to the latest reporting day — so each step is a subset of the one above it and the drop-off is purely how much time has passed. Day 7 and day 14 are inclusive, so a cohort leaves the trial on day 8 and hits the wall on day 15.</p>
+      <div id="trFunnel"></div>
+    </div>
+
+    <div class="grid two-col">
+      <div class="card">
+        <header><h2>Pressure points passed per period</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="trPressure">Table</button></header>
+        <p class="hint">How many users passed each threshold in each period, against paid conversions recorded in the same period.</p>
+        <div id="trPressure"></div>
+        <div id="trPressure-table" class="hidden" style="margin-top:12px"></div>
+      </div>
+      <div class="card">
+        <header><h2>Conversion rate over time</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="trRate">Table</button></header>
+        <p class="hint">Cumulative paid conversions as a share of everyone who has passed each threshold, evaluated at the end of every period.</p>
+        <div id="trRate"></div>
+        <div id="trRate-table" class="hidden" style="margin-top:12px"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= COHORTS ================= -->
+  <section id="view-cohorts" class="view hidden">
+    <div class="grid cards" id="cohTiles"></div>
+    <div class="card" style="margin-bottom:14px">
+      <header><h2>Install cohorts</h2><span class="spacer"></span>
+        <div class="segmented" id="cohGrain">
+          <button data-v="day" aria-pressed="true">By day</button>
+          <button data-v="week" aria-pressed="false">By week</button>
+          <button data-v="month" aria-pressed="false">By month</button>
+        </div>
+        <button class="btn sm" id="cohExport">Export CSV</button>
+      </header>
+      <p class="hint">Each row is a group of installs. Age is measured from the cohort's start to the latest reporting day. Day 7 still counts as in-trial and day 14 still counts as inside the chart window — each cohort moves on the day after.</p>
+      <div id="cohTable"></div>
+    </div>
+    <div class="card">
+      <header><h2>Cohort maturity</h2><span class="spacer"></span>
+        <button class="btn sm" data-table-toggle="cohChart">Table</button></header>
+      <p class="hint">Cohort size by install period, shaded by the furthest threshold that cohort has reached as of the latest reporting day.</p>
+      <div id="cohChart"></div>
+      <div id="cohChart-table" class="hidden" style="margin-top:12px"></div>
+    </div>
+  </section>
+
+  <!-- ================= PLATFORMS ================= -->
+  <section id="view-platforms" class="view hidden">
+    <div class="card" style="margin-bottom:14px">
+      <header><h2>iOS vs Android</h2><span class="spacer"></span>
+        <span class="note">This view always compares platforms — the platform filter above does not apply here.</span></header>
+      <div class="table-scroll full" id="pfTable"></div>
+    </div>
+    <div class="grid two-col" id="pfCharts"></div>
+  </section>
+
+  <!-- ================= EXPLORE ================= -->
+  <section id="view-explore" class="view hidden">
+    <div class="card" style="margin-bottom:14px">
+      <header><h2>Metric explorer</h2><span class="spacer"></span>
+        <div class="segmented" id="exType">
+          <button data-v="line" aria-pressed="true">Line</button>
+          <button data-v="bar" aria-pressed="false">Bar</button>
+          <button data-v="stacked" aria-pressed="false">Stacked</button>
+        </div>
+        <button class="btn sm" data-table-toggle="exChart">Table</button>
+        <button class="btn sm" id="exExport">Export CSV</button>
+      </header>
+      <p class="hint">Pick any combination of metrics. Rate metrics have their own scale, so they are charted separately below rather than sharing an axis with counts.</p>
+      <div class="checks" id="exMetrics" style="margin-bottom:14px"></div>
+      <div id="exChart"></div>
+      <div id="exChart-table" class="hidden" style="margin-top:12px"></div>
+    </div>
+    <div class="card hidden" id="exRateCard">
+      <header><h2>Rates &amp; ratios</h2><span class="spacer"></span>
+        <button class="btn sm" data-table-toggle="exRate">Table</button></header>
+      <p class="hint">Percentages and per-user averages, on their own axis.</p>
+      <div id="exRate"></div>
+      <div id="exRate-table" class="hidden" style="margin-top:12px"></div>
+    </div>
+  </section>
+
+  <!-- ================= FORECAST ================= -->
+  <section id="view-forecast" class="view hidden">
+    <div class="card" style="margin-bottom:14px">
+      <header><h2>Assumptions</h2><span class="spacer"></span>
+        <div class="segmented" id="fcHorizon">
+          <button data-v="6" aria-pressed="false">6 mo</button>
+          <button data-v="12" aria-pressed="true">12 mo</button>
+          <button data-v="24" aria-pressed="false">24 mo</button>
+          <button data-v="36" aria-pressed="false">36 mo</button>
+        </div>
+        <div class="segmented" id="fcModel">
+          <button data-v="monthly" aria-pressed="true">Monthly sub</button>
+          <button data-v="annual" aria-pressed="false">Annual sub</button>
+          <button data-v="onetime" aria-pressed="false">One-time</button>
+        </div>
+        <button class="btn sm" id="fcReset">Reset to actuals</button>
+      </header>
+      <p class="hint">Every slider starts at the value derived from your own data — drag one and every number below re-computes live. The first <span id="fcLagNote">14</span> days of the forecast convert from installs you have <em>already</em> recorded, so the near term is grounded rather than projected.</p>
+      <div class="ctrl-grid" id="fcControls"></div>
+    </div>
+
+    <div class="grid cards" id="fcTiles"></div>
+
+    <div class="card" style="margin-bottom:14px">
+      <header><h2 id="fcMainTitle">Cumulative revenue</h2><span class="spacer"></span>
+        <span class="note" id="fcScope"></span>
+        <button class="btn sm" data-table-toggle="fcRevenue">Table</button></header>
+      <p class="hint">The shaded band is the bear-to-optimistic range; the line is the expected case. Scenarios scale conversion, install volume, churn and growth by the spread you set.</p>
+      <div id="fcRevenue"></div>
+      <div id="fcRevenue-table" class="hidden" style="margin-top:12px"></div>
+    </div>
+
+    <div class="grid two-col">
+      <div class="card">
+        <header><h2 id="fcMrrTitle">MRR</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="fcMrr">Table</button></header>
+        <p class="hint" id="fcMrrHint"></p>
+        <div id="fcMrr"></div>
+        <div id="fcMrr-table" class="hidden" style="margin-top:12px"></div>
+      </div>
+      <div class="card">
+        <header><h2>Paying users</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="fcPayers">Table</button></header>
+        <p class="hint" id="fcPayersHint">Everyone paying at the end of each month, after churn.</p>
+        <div id="fcPayers"></div>
+        <div id="fcPayers-table" class="hidden" style="margin-top:12px"></div>
+      </div>
+      <div class="card">
+        <header><h2>New installs per month</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="fcInstalls">Table</button></header>
+        <p class="hint">Expected case. The first and last months are partial.</p>
+        <div id="fcInstalls"></div>
+        <div id="fcInstalls-table" class="hidden" style="margin-top:12px"></div>
+      </div>
+      <div class="card">
+        <header><h2>New paying users per month</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="fcConv">Table</button></header>
+        <p class="hint">Conversions from users hitting the wall that month, expected case.</p>
+        <div id="fcConv"></div>
+        <div id="fcConv-table" class="hidden" style="margin-top:12px"></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <header><h2>Month by month</h2><span class="spacer"></span>
+        <button class="btn sm" id="fcExport">Copy forecast</button></header>
+      <p class="hint">Expected case, with the bear-to-optimistic range on revenue.</p>
+      <div id="fcTable"></div>
+    </div>
+  </section>
+
+  <!-- ================= DATA ================= -->
+  <section id="view-data" class="view hidden">
+  <section id="view-data" class="view hidden">
+    <div class="card" style="margin-bottom:14px">
+      <header><h2 id="entryTitle">Add / update a single day</h2></header>
+      <p class="hint">Entries are keyed by date + platform, so re-entering a day overwrites it. Store reporting lags, so the date defaults to the latest day that can have data — never the current day. Everything is stored in this browser's local storage — nothing leaves your machine.</p>
+      <div class="form-grid">
+        <div class="field"><label for="eDate">Date</label><input type="date" id="eDate"></div>
+        <div class="field"><label for="ePlatform">Platform</label>
+          <select id="ePlatform"><option value="ios">iOS</option><option value="android">Android</option></select></div>
+        <div class="field"><label for="eDownloads">First-time downloads</label><input type="number" id="eDownloads" min="0" step="1" placeholder="0"></div>
+        <div class="field"><label for="eImpressions">Impressions</label><input type="number" id="eImpressions" min="0" step="1" placeholder="0"></div>
+        <div class="field"><label for="ePageViews">Product page views</label><input type="number" id="ePageViews" min="0" step="1" placeholder="0"></div>
+        <div class="field"><label for="eUpdates">Updates</label><input type="number" id="eUpdates" min="0" step="1" placeholder="0"></div>
+        <div class="field"><label for="eSales">Sales (count)</label><input type="number" id="eSales" min="0" step="1" placeholder="0"></div>
+        <div class="field"><label for="eRevenue">Sales amount</label><input type="number" id="eRevenue" min="0" step="0.01" placeholder="0.00"></div>
+        <div class="field"><label for="eNotes">Note</label><input type="text" id="eNotes" placeholder="optional"></div>
+      </div>
+      <div class="row-actions">
+        <button class="btn primary" id="eSave">Save entry</button>
+        <button class="btn" id="eClear">Clear form</button>
+        <span class="note" id="eStatus"></span>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:14px">
+      <header><h2>Bulk add / edit days</h2><span class="spacer"></span>
+        <span class="note" id="bulkCount"></span></header>
+      <p class="hint">Build a grid for a stretch of days and fill it in one pass. Days you have already entered come back pre-filled, so this doubles as bulk editing. <b>Paste straight from a spreadsheet</b> — click the top-left cell you want to land on and paste; tab- or comma-separated blocks spill across and down. <kbd>Enter</kbd> / <kbd>↑</kbd> <kbd>↓</kbd> move down and up a column, <kbd>Tab</kbd> moves across. Rows that already hold data are marked <span class="dot-existing">•</span> and can be deleted outright with the button at the end of the row.</p>
+      <div class="form-grid" style="max-width:820px">
+        <div class="field"><label for="bFrom">From</label><input type="date" id="bFrom"></div>
+        <div class="field"><label for="bTo">To</label><input type="date" id="bTo"></div>
+        <div class="field"><label for="bPlatform">Platforms</label>
+          <select id="bPlatform">
+            <option value="both">Both — a row each</option>
+            <option value="ios">iOS only</option>
+            <option value="android">Android only</option>
+          </select></div>
+        <div class="field"><label>&nbsp;</label><button class="btn" id="bBuild">Build grid</button></div>
+      </div>
+      <div id="bulkGrid" style="margin-top:14px"></div>
+      <div class="row-actions">
+        <button class="btn primary" id="bSave">Save all rows</button>
+        <button class="btn" id="bFillDown">Fill down</button>
+        <button class="btn" id="bClearVals">Clear values</button>
+        <span class="note" id="bStatus"></span>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:14px">
+      <header><h2>Trial &amp; wall lengths</h2></header>
+      <p class="hint">These describe how your app behaves, so they live here rather than in the filter bar — changing one re-derives every cohort metric in the dashboard. Both limits are inclusive: with 7 and 14, a user is still in the trial on day 7 and still has full charts on day 14, leaving the trial on day 8 and hitting the wall on day 15.</p>
+      <div class="form-grid" style="max-width:560px">
+        <div class="field"><label for="fTrial">Free trial length (days)</label>
+          <input type="number" id="fTrial" min="1" max="60" step="1" value="7"></div>
+        <div class="field"><label for="fWall">Chart window (days)</label>
+          <input type="number" id="fWall" min="1" max="120" step="1" value="14"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <header><h2>Backup, import &amp; reset</h2></header>
+      <p class="hint">CSV columns: <code>date,platform,downloads,impressions,pageViews,updates,sales,revenue,notes</code>. Importing merges by date + platform, overwriting matches. A conversion-rate column is ignored — it is always derived from downloads ÷ impressions.</p>
+      <div class="row-actions">
+        <button class="btn" id="ioExportCsv">Export CSV</button>
+        <button class="btn" id="ioExportJson">Export JSON backup</button>
+        <button class="btn" id="ioImport">Import CSV / JSON…</button>
+        <input type="file" id="ioFile" accept=".csv,.json,text/csv,application/json" class="hidden">
+        <button class="btn" id="ioDemo">Load demo data</button>
+        <button class="btn danger" id="ioReset">Delete all data</button>
+      </div>
+      <p class="note" id="ioStatus" style="margin-top:10px"></p>
+    </div>
+  </section>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="config.js"></script>
+<script src="auth.js"></script>
+<script src="api.js"></script>
+<script src="sync.js"></script>
+<script src="charts.js"></script>
+<script src="app.js"></script>
+<script src="boot.js"></script>
+</body>
+</html>

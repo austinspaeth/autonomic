@@ -27,6 +27,19 @@ Parameters:
     Default: E17FMCFPDR3P3D
     Description: Existing CloudFront distribution serving autonomic.care / www.autonomic.care
 
+  ServerlessAccessKeyParameter:
+    Type: String
+    Default: /autonomic/serverless-access-key
+    Description: >-
+      SSM SecureString parameter holding the Serverless Framework access key.
+      Kept in Parameter Store rather than this template so the key never lands
+      in the repo.
+
+  SlsStackName:
+    Type: String
+    Default: autonomic-prod
+    Description: CloudFormation stack the serverless backend deploys into
+
 Resources:
 
   # ============================================================
@@ -75,13 +88,148 @@ Resources:
                   - cloudfront:GetInvalidation
                 Resource: !Sub 'arn:aws:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistributionId}'
 
+              # ----------------------------------------------------------
+              # `sls deploy` for the /master dashboard backend (sls/).
+              # Serverless drives everything through CloudFormation, so the
+              # verbs below are what CFN needs on its behalf. Resource names
+              # inside the stack are generated, hence the wildcards — the
+              # stack itself is pinned by name.
+              # ----------------------------------------------------------
+              - Effect: Allow
+                Action:
+                  - cloudformation:CreateStack
+                  - cloudformation:UpdateStack
+                  - cloudformation:DeleteStack
+                  - cloudformation:DescribeStacks
+                  - cloudformation:DescribeStackEvents
+                  - cloudformation:DescribeStackResource
+                  - cloudformation:DescribeStackResources
+                  - cloudformation:ListStackResources
+                  - cloudformation:GetTemplate
+                  - cloudformation:ValidateTemplate
+                  - cloudformation:CreateChangeSet
+                  - cloudformation:DescribeChangeSet
+                  - cloudformation:ExecuteChangeSet
+                  - cloudformation:DeleteChangeSet
+                  - cloudformation:ListChangeSets
+                Resource:
+                  - !Sub 'arn:aws:cloudformation:*:${AWS::AccountId}:stack/${SlsStackName}/*'
+              - Effect: Allow
+                Action:
+                  - cloudformation:ValidateTemplate
+                  - cloudformation:ListStacks
+                Resource: '*'
+              # Serverless' own deployment bucket, created inside the stack.
+              - Effect: Allow
+                Action:
+                  - s3:CreateBucket
+                  - s3:ListBucket
+                  - s3:GetBucketLocation
+                  - s3:GetBucketPolicy
+                  - s3:PutBucketPolicy
+                  - s3:DeleteBucketPolicy
+                  - s3:PutEncryptionConfiguration
+                  - s3:GetEncryptionConfiguration
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:DeleteObject
+                  - s3:ListBucketVersions
+                Resource:
+                  - !Sub 'arn:aws:s3:::${SlsStackName}-serverlessdeploymentbuck*'
+                  - !Sub 'arn:aws:s3:::${SlsStackName}-serverlessdeploymentbuck*/*'
+              - Effect: Allow
+                Action:
+                  - lambda:*
+                Resource:
+                  - !Sub 'arn:aws:lambda:*:${AWS::AccountId}:function:${SlsStackName}-*'
+              - Effect: Allow
+                Action:
+                  - lambda:GetFunction
+                  - lambda:ListFunctions
+                  - lambda:GetAccountSettings
+                Resource: '*'
+              # The execution role serverless creates for the Lambda.
+              - Effect: Allow
+                Action:
+                  - iam:CreateRole
+                  - iam:DeleteRole
+                  - iam:GetRole
+                  - iam:PassRole
+                  - iam:PutRolePolicy
+                  - iam:DeleteRolePolicy
+                  - iam:GetRolePolicy
+                  - iam:AttachRolePolicy
+                  - iam:DetachRolePolicy
+                  - iam:TagRole
+                  - iam:UntagRole
+                Resource:
+                  - !Sub 'arn:aws:iam::${AWS::AccountId}:role/${SlsStackName}-*'
+              - Effect: Allow
+                Action:
+                  - apigateway:*
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - dynamodb:CreateTable
+                  - dynamodb:DescribeTable
+                  - dynamodb:UpdateTable
+                  - dynamodb:DescribeTimeToLive
+                  - dynamodb:UpdateTimeToLive
+                  - dynamodb:DescribeContinuousBackups
+                  - dynamodb:UpdateContinuousBackups
+                  - dynamodb:ListTagsOfResource
+                  - dynamodb:TagResource
+                Resource:
+                  - !Sub 'arn:aws:dynamodb:*:${AWS::AccountId}:table/Autonomic-*'
+              # HTTPS for api.autonomic.care: ACM issues the certificate and
+              # validates it by writing records into the hosted zone.
+              - Effect: Allow
+                Action:
+                  - acm:RequestCertificate
+                  - acm:DescribeCertificate
+                  - acm:DeleteCertificate
+                  - acm:ListCertificates
+                  - acm:AddTagsToCertificate
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - route53:ChangeResourceRecordSets
+                  - route53:GetHostedZone
+                  - route53:ListResourceRecordSets
+                Resource: 'arn:aws:route53:::hostedzone/Z101404626QO1OFJN008E'
+              - Effect: Allow
+                Action:
+                  - route53:GetChange
+                  - route53:ListHostedZones
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - logs:DescribeLogGroups
+                  - logs:DeleteLogGroup
+                  - logs:PutRetentionPolicy
+                  - logs:TagResource
+                Resource: '*'
+              # The Serverless Framework licence key.
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                Resource: !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${ServerlessAccessKeyParameter}'
+              # The parameter is a SecureString under the AWS-managed SSM key.
+              - Effect: Allow
+                Action: kms:Decrypt
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    kms:ViaService: !Sub 'ssm.${AWS::Region}.amazonaws.com'
+
   CodeBuildProject:
     Type: AWS::CodeBuild::Project
     Properties:
       Name: autonomic-build
-      Description: Build and deploy the Autonomic landing site
+      Description: Build and deploy the Autonomic landing site + /master backend
       ServiceRole: !GetAtt CodeBuildRole.Arn
-      TimeoutInMinutes: 15
+      TimeoutInMinutes: 25
       Source:
         Type: CODEPIPELINE
         BuildSpec: buildspec.yml
@@ -96,6 +244,9 @@ Resources:
             Value: !Ref SiteBucket
           - Name: CLOUDFRONT_DISTRIBUTION_ID
             Value: !Ref CloudFrontDistributionId
+          - Name: SERVERLESS_ACCESS_KEY
+            Type: PARAMETER_STORE
+            Value: !Ref ServerlessAccessKeyParameter
 
   # ============================================================
   # CodePipeline

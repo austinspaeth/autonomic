@@ -108,7 +108,10 @@ a { color: inherit; text-decoration: none; }
 .btn-download { gap: 8px; }
 .btn-dl-ic { display: none; }
 .btn-download.has-ic .btn-dl-ic { display: inline-flex; }
-.btn-dl-ic svg { width: 17px; height: 17px; margin-top: -2px; flex: none; }
+/* flex:none + a matching min-width on both the slot and the svg: inside a
+   shrinking flex row a bare svg squashes instead of holding its box. */
+.btn-dl-ic { flex: none; }
+.btn-dl-ic svg { width: 17px; height: 17px; min-width: 17px; margin-top: -2px; flex: none; }
 
 /* ---------- Download modal ---------- */
 .dlm {
@@ -2025,19 +2028,27 @@ a.gc { display: block; }
     box-shadow: 0 8px 24px rgba(0,0,0,0.4);
     transition: opacity 0.22s var(--ease), transform 0.3s var(--bounce);
   }
+  /* The label is the only part allowed to give way when the pill runs out of
+     room — min-width:0 lets it shrink and truncate instead of squeezing the
+     dismiss button, which every narrow phone needs at full size. */
   .aj-cb-open {
     display: inline-flex; align-items: center; gap: 8px;
+    min-width: 0; flex: 0 1 auto;
     background: none; border: 0; cursor: pointer;
     font-family: inherit; font-size: 13px; line-height: 1; color: var(--text);
     padding: 8px 6px 8px 10px;
   }
-  .aj-cb-ic { width: 16px; height: 16px; flex: none; color: var(--dim); }
+  .aj-cb-open span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .aj-cb-ic { width: 16px; height: 16px; min-width: 16px; flex: none; color: var(--dim); }
   .aj-cb-x {
     display: inline-flex; align-items: center; justify-content: center;
-    width: 28px; height: 28px; flex: none;
+    width: 32px; min-width: 32px; height: 32px; flex: none;
     background: none; border: 0; border-radius: 999px; cursor: pointer; color: var(--dim);
+    /* -webkit-tap-highlight aside, the hit box is what matters: a bare 28px
+       square with a 14px glyph reads (and taps) as too small on a mini phone. */
+    padding: 0;
   }
-  .aj-cb-x svg { width: 14px; height: 14px; }
+  .aj-cb-x svg { width: 16px; height: 16px; min-width: 16px; flex: none; }
 
   .aj-cb-card {
     position: absolute; left: 0; right: 0; bottom: 0;
@@ -2060,9 +2071,12 @@ a.gc { display: block; }
   .aj-scta {
     /* Out of the dock's flow: it always sits on the floor, and the cookie
        notice lifts above it. */
-    position: absolute; left: 12px; right: 12px; bottom: calc(7px + env(safe-area-inset-bottom));
-    display: flex; align-items: center; gap: 12px;
-    padding: 7px 7px 7px 18px;
+    --aj-inset: 12px;
+    position: absolute; left: var(--aj-inset); right: var(--aj-inset); bottom: calc(7px + env(safe-area-inset-bottom));
+    /* Score on the left, both controls right-aligned. The bar's height is
+       whatever the dial needs — half again as tall as the old one-row pill. */
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 8px 8px 8px 14px;
     background: rgba(8,8,10,0.66);
     -webkit-backdrop-filter: blur(18px) saturate(150%); backdrop-filter: blur(18px) saturate(150%);
     border: 1px solid var(--line-2); border-radius: 999px;
@@ -2074,17 +2088,23 @@ a.gc { display: block; }
   }
   .aj-scta[hidden] { display: none; }
   .aj-dock.has-scta .aj-scta { opacity: 1; transform: none; }
+  /* The dial sweeps up to today's score as the bar lands, in step with the
+     number rolling up beside it (app.html). `pathLength` lets the dash maths
+     be a plain 0-100 regardless of the arc's real length. */
+  .aj-scta-arc { stroke-dasharray: 100; stroke-dashoffset: 100; }
+  .aj-dock.has-scta .aj-scta-arc { animation: aj-scta-fill 2s var(--ease) both; }
   /* Travelling light along the border. Same "red light from the top left"
      gradient the journey photo uses, but the source point is animated, so it
      drifts to the middle-right and back. Drawn as a masked 1px ring on a
      pseudo-element rather than a border-box gradient: the bar is translucent
      glass, so a border-box layer would bleed red through the whole pill. */
   .aj-scta::before {
-    content: ''; position: absolute; inset: -1px; border-radius: inherit;
+    content: ''; position: absolute; inset: -1px; z-index: 3; border-radius: inherit;
     padding: 1px; pointer-events: none;
     /* Both radii are animated, not just the position: the light starts as a
-       small spot that only reaches the top edge, then swells at the end so it
-       spans the full height and wraps the button. */
+       small spot that only reaches the bottom edge, then swells at the end so
+       it spans the full height and wraps the button. It runs along the bottom
+       because the score badge now overhangs the top. */
     background: radial-gradient(
       var(--aj-glow-rx) var(--aj-glow-ry) at var(--aj-glow-x) var(--aj-glow-y),
       var(--accent) 0%, rgba(224,49,39,0.6) 22%, rgba(224,49,39,0) 55%
@@ -2094,24 +2114,57 @@ a.gc { display: block; }
     mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
     mask-composite: exclude;
   }
-  .aj-scta-text {
-    flex: 1; min-width: 0;
-    font-size: 14.5px; font-weight: 500; line-height: 1.34; color: var(--text);
+
+  /* --- The score, inside the pill on the left -----------------------
+     In the bar's flow, so the dial is what sets the pill's height — and it
+     arrives with the bar rather than animating on its own. */
+  .aj-scta-badge {
+    flex: none; display: inline-flex; align-items: center; gap: 10px;
   }
+
+  /* The app's own 270° dial, at a size where the number still reads. */
+  .aj-scta-gauge { position: relative; flex: none; width: 62px; height: 62px; }
+  .aj-scta-gauge svg { display: block; width: 100%; height: 100%; }
+  .aj-scta-num {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-family: var(--display); font-size: 20px; font-weight: 800; line-height: 1;
+    letter-spacing: -0.02em; color: #fff;
+  }
+  /* Two stacked words, beside the dial. */
+  .aj-scta-lbl {
+    display: flex; flex-direction: column; align-items: flex-start;
+    font-size: 9.5px; font-weight: 800; line-height: 1.18;
+    text-transform: uppercase; letter-spacing: 0.09em;
+    color: rgba(255,255,255,0.88); white-space: nowrap;
+  }
+
+  /* Kept tight on purpose: every pixel of button width comes out of the
+     badge's room between the two controls, so the padding is the smallest
+     that still reads as a button. */
   .aj-scta-btn {
-    flex: none; display: inline-flex; align-items: center; gap: 8px;
+    flex: none; display: inline-flex; align-items: center;
     background: var(--accent); color: #fff;
-    border-radius: 999px; padding: 13px 20px;
-    font-size: 15px; font-weight: 700; letter-spacing: 0.01em; line-height: 1;
+    border-radius: 999px; padding: 18px 22px; white-space: nowrap;
+    font-size: 15.5px; font-weight: 700; letter-spacing: 0.01em; line-height: 1;
     box-shadow: 0 4px 16px rgba(224,49,39,0.4);
   }
-  .aj-scta.has-ic .btn-dl-ic { display: inline-flex; }
-  .aj-scta .btn-dl-ic svg { width: 16px; height: 16px; margin-top: 0; }
+
+  /* Mini phones: every millimetre the controls and the bar's own inset give
+     up goes to the phone, which is the first thing to become unreadable when
+     the lanes eat the middle. */
+  @media (max-width: 380px) {
+    .aj-scta { --aj-inset: 8px; gap: 8px; padding-left: 11px; }
+    .aj-scta-badge { gap: 8px; }
+    .aj-scta-gauge { width: 56px; height: 56px; }
+    .aj-scta-num { font-size: 18px; }
+    .aj-scta-lbl { font-size: 9px; }
+    .aj-scta-btn { font-size: 14px; padding: 16px 17px; }
+  }
 
   /* Plays once when the bar arrives and holds. `both` so the corner is
      already lit through the start delay that lets the slide-up finish. */
   @media (prefers-reduced-motion: no-preference) {
-    .aj-dock.has-scta .aj-scta::before { animation: aj-scta-glow 2s var(--ease) 0.4s both; }
+    .aj-dock.has-scta .aj-scta::before { animation: aj-scta-glow 3.2s linear 0.4s both; }
   }
 }
 
@@ -2119,18 +2172,30 @@ a.gc { display: block; }
    custom property is a plain token swap and would jump between keyframes.
    Where @property is unsupported the light simply parks at the top-left. */
 @property --aj-glow-x { syntax: '<percentage>'; initial-value: 50%; inherits: false; }
-@property --aj-glow-y { syntax: '<percentage>'; initial-value: 0%; inherits: false; }
+@property --aj-glow-y { syntax: '<percentage>'; initial-value: 100%; inherits: false; }
 @property --aj-glow-rx { syntax: '<percentage>'; initial-value: 68%; inherits: false; }
 @property --aj-glow-ry { syntax: '<percentage>'; initial-value: 80%; inherits: false; }
-/* Opens as a wide band across roughly three quarters of the top border,
-   centered (the colour fades out at 55% of the radius, so rx 68% lights about
-   75% of the width), then slides right and swells to wrap the button. */
+/* Three phases on a linear clock, so the light reads as one continuous move
+   rather than an eased lurch: it travels along the BOTTOM border from left to
+   right at a constant size, then — parked at the right — grows up and out
+   until it wraps the button, holds a beat, and fades out to leave the pill's
+   own grey border. Only the second phase changes y and ry, which is what
+   keeps the travel flat. `both` holds that faded-out end state. */
+@keyframes aj-scta-fill {
+  from { stroke-dashoffset: 100; }
+  to   { stroke-dashoffset: 0; }
+}
 @keyframes aj-scta-glow {
-  0%   { --aj-glow-x: 50%; --aj-glow-y: 0%;  --aj-glow-rx: 68%; --aj-glow-ry: 80%; }
-  55%  { --aj-glow-x: 64%; --aj-glow-y: 0%;  --aj-glow-rx: 56%; --aj-glow-ry: 90%; }
-  100% { --aj-glow-x: 97%; --aj-glow-y: 50%; --aj-glow-rx: 42%; --aj-glow-ry: 700%; }
+  0%   { --aj-glow-x: 18%; --aj-glow-y: 100%; --aj-glow-rx: 52%; --aj-glow-ry: 90%;   opacity: 1; }
+  47%  { --aj-glow-x: 97%; --aj-glow-y: 100%; --aj-glow-rx: 52%; --aj-glow-ry: 90%; }
+  72%  { --aj-glow-x: 97%; --aj-glow-y: 50%;  --aj-glow-rx: 42%; --aj-glow-ry: 700%; }
+  80%  { --aj-glow-x: 97%; --aj-glow-y: 50%;  --aj-glow-rx: 42%; --aj-glow-ry: 700%; opacity: 1; }
+  100% { --aj-glow-x: 97%; --aj-glow-y: 50%;  --aj-glow-rx: 42%; --aj-glow-ry: 700%; opacity: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .aj-cb, .aj-cb-pill, .aj-cb-card, .aj-scta { transition: none; }
+  /* No sweep and no roll-up (app.html skips the count): the score is simply
+     already there. */
+  .aj-scta-arc, .aj-dock.has-scta .aj-scta-arc { animation: none; stroke-dashoffset: 0; }
 }

@@ -3,6 +3,9 @@
 User-agent: *
 Allow: /
 
+# The master dashboard is a private, signed-in app — nothing to index.
+Disallow: /master
+
 # Named AI/answer-engine crawlers (explicitly welcomed so the content can be
 # cited and surfaced in AI answers).
 User-agent: GPTBot

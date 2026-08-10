@@ -135,15 +135,33 @@
         </div>
       </div>
 
-      <!-- Sticky download CTA, mobile only, on topic hubs and articles: rises
-           into the dock partway down the page with a line of copy matched to
-           the topic (set by the script below from the page's `aj-cta-topic`
-           meta). data-dl-cta wires it into the shared platform-aware download
-           handler (store URL, glyph, tracking). -->
-      <a class="aj-scta" id="aj-sticky-cta" data-dl-cta href="/#download" hidden>
-        <span class="aj-scta-text" id="aj-scta-text">See what's helping</span>
-        <span class="aj-scta-btn"><span class="btn-dl-ic" aria-hidden="true"></span>Free</span>
-      </a>
+      <!-- Sticky download CTA, mobile only, on topic hubs and articles (the
+           `aj-cta-topic` meta is what makes a page eligible): rises into the
+           dock partway down the page: the app's Outlook gauge on the left,
+           its dial sweeping up to the score as the bar lands, and the CTA on
+           the right.
+           data-dl-cta wires both the score and the button into the shared
+           platform-aware download handler (store URL, glyph, tracking), and
+           either tap retires the bar for the session. -->
+      <div class="aj-scta" id="aj-sticky-cta" hidden>
+        <!-- The score is a second, decorative handle on the same download
+             link (hidden from assistive tech so the bar reads as one CTA).
+             The gauge is the app's own 270° dial, same geometry as the
+             homepage mock's. -->
+        <a class="aj-scta-badge" data-dl-cta href="/#download" aria-hidden="true" tabindex="-1">
+          <span class="aj-scta-gauge">
+            <svg viewBox="0 0 176 176" aria-hidden="true">
+              <path d="M35.67 140.33 A74 74 0 1 1 140.33 140.33" fill="none" stroke="#2b3a2c" stroke-width="15" stroke-linecap="round" />
+              <path class="aj-scta-arc" pathLength="100" d="M35.67 140.33 A74 74 0 1 1 152.6 118.3" fill="none" stroke="#6ee06e" stroke-width="15" stroke-linecap="round" />
+            </svg>
+            <span class="aj-scta-num">92</span>
+          </span>
+          <span class="aj-scta-lbl"><span>Autonomic</span><span>Score</span></span>
+        </a>
+        <!-- No store glyph here: the gauge does the selling, and the button
+             just answers the question it plants ("92 out of 100... mine?"). -->
+        <a class="aj-scta-btn" data-dl-cta href="/#download" aria-label="Get your Autonomic score, free">Get your score</a>
+      </div>
     </div>
     <script>
       (function () {
@@ -275,7 +293,10 @@
             };
             var GLYPH = {
               ios: '<svg viewBox="0 0 384 512" fill="currentColor" aria-hidden="true"><path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5c0 26.2 4.8 53.3 14.4 81.2 12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zM262.1 104.5c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 20-27.8 44.7-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/></svg>',
-              android: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M15.6 5.2 16.8 3a.4.4 0 0 0-.7-.4l-1.24 2.14a6.5 6.5 0 0 0-5.72 0L7.9 2.6a.4.4 0 0 0-.7.4l1.2 2.2A6 6 0 0 0 5.3 10.4h13.4a6 6 0 0 0-3.1-5.2zM9.5 8.6a.8.8 0 1 1 0-1.6.8.8 0 0 1 0 1.6zm5 0a.8.8 0 1 1 0-1.6.8.8 0 0 1 0 1.6z"/></svg>'
+              // The Play Store mark, not the Android robot: the button opens
+              // Play, and the robot head only fills the top third of a 24-box,
+              // so it rendered as a flat sliver next to the label.
+              android: '<svg viewBox="0 0 512 512" fill="currentColor" aria-hidden="true"><path d="M325.3 234.3 104.6 13l280.8 161.2-60.1 60.1zM47 0C34 6.8 25.3 19.2 25.3 35.3v441.3c0 16.1 8.7 28.5 21.7 35.3l256.6-256L47 0zm425.2 225.6-58.9-34.1-65.7 64.5 65.7 64.5 60.1-34.1c18-14.3 18-46.5-1.2-60.8zM104.6 499l280.8-161.2-60.1-60.1L104.6 499z"/></svg>'
             };
 
             function detectPlatform() {
@@ -346,31 +367,49 @@
           })();
 
           // Sticky blog CTA (mobile only). Topic hubs and articles render an
-          // `aj-cta-topic` meta; its presence is what makes the page eligible,
-          // and its value picks the line of copy. The bar rises into the bottom
-          // dock at 15% of PAGE scroll (not the prose-relative depth behind the
-          // `article_scroll` events — the page includes the header, cover and
-          // footer, so this lands later in the reading than the number reads)
-          // and stays for the rest of the visit. The CSS owns the mobile
-          // breakpoint — mirrored here so nothing is revealed on desktop.
+          // `aj-cta-topic` meta; its presence is what makes the page eligible.
+          // The bar rises into the bottom dock at 15% of PAGE scroll (not the
+          // prose-relative depth behind the `article_scroll` events — the page
+          // includes the header, cover and footer, so this lands later in the
+          // reading than the number reads) and stays for the rest of the
+          // visit, unless dismissed. The CSS owns the mobile breakpoint —
+          // mirrored here so nothing is revealed on desktop.
           (function () {
             var cta = document.getElementById('aj-sticky-cta');
             var meta = document.querySelector('meta[name="aj-cta-topic"]');
             if (!cta || !meta) return;
-            var COPY = {
-              hrv: 'Measure your own HRV in five minutes',
-              pots: 'Run a stand test at home and see your own numbers',
-              postviral: 'Find what sets off your crashes',
-              food: "Log meals, see tomorrow's HRV",
-              recovery: "See if it's actually working"
-            };
             var topic = (meta.getAttribute('content') || '').trim();
-            var textEl = document.getElementById('aj-scta-text');
-            if (textEl) textEl.textContent = COPY[topic] || "See what's helping";
+            // Dismissed once, gone for the rest of the session (a reader who
+            // said no shouldn't be asked again on the next article).
+            try { if (sessionStorage.getItem('aj-scta-off')) return; } catch (e) {}
 
             var dock = document.getElementById('aj-dock');
             var mq = window.matchMedia('(max-width: 720px)');
             var shown = false;
+
+            // The score rolls up to its value as the bar lands, over the same
+            // 2s the dial takes to sweep (see .aj-scta-arc in app.css) — it
+            // skips numbers, the point is the growth, not the tally. The markup
+            // carries the final value, so nothing here can leave it wrong:
+            // reduced motion (and any throw) simply keeps what's rendered.
+            function countUp() {
+              var el = cta.querySelector('.aj-scta-num');
+              if (!el || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+              var end = parseInt(el.textContent, 10);
+              if (!end) return;
+              var t0 = 0;
+              var step = function (now) {
+                if (!t0) t0 = now;
+                var p = Math.min(1, (now - t0) / 2000);
+                var eased = 1 - Math.pow(1 - p, 3);
+                el.textContent = String(Math.round(end * eased));
+                if (p < 1) requestAnimationFrame(step);
+                else el.textContent = String(end);
+              };
+              el.textContent = '0';
+              requestAnimationFrame(step);
+            }
+
             function onScroll() {
               if (shown || !mq.matches) return;
               var scrollable = document.documentElement.scrollHeight - window.innerHeight;
@@ -380,18 +419,35 @@
               cta.hidden = false;
               // Two frames: the element has to be laid out in its hidden
               // state before the class that transitions it into view lands.
-              // Measure it first — the copy wraps to one or two lines, and
-              // the cookie notice lifts by exactly this much.
+              // Measure it first — the cookie notice lifts by exactly this
+              // much.
               requestAnimationFrame(function () {
                 if (dock) dock.style.setProperty('--aj-scta-h', cta.offsetHeight + 12 + 'px');
                 requestAnimationFrame(function () {
                   if (dock) dock.classList.add('has-scta');
+                  countUp();
                 });
               });
               ajEvent('sticky_cta_view', { topic: topic || 'none' });
             }
             window.addEventListener('scroll', onScroll, { passive: true });
             onScroll();
+
+            // Tapping the CTA retires the bar: once the tap has landed (a
+            // store deep-link, or the modal on a device we can't place) it has
+            // done its job and would only sit on top of what it opened. It
+            // also drops the cookie notice back onto the floor. Deferred a
+            // tick so hiding the link's own container can't race its
+            // navigation.
+            function dismiss(reason) {
+              cta.hidden = true;
+              if (dock) { dock.classList.remove('has-scta'); dock.style.removeProperty('--aj-scta-h'); }
+              try { sessionStorage.setItem('aj-scta-off', '1'); } catch (e) {}
+              ajEvent('sticky_cta_dismiss', { topic: topic || 'none', reason: reason });
+            }
+            cta.querySelectorAll('[data-dl-cta]').forEach(function (el) {
+              el.addEventListener('click', function () { setTimeout(function () { dismiss('download'); }, 0); });
+            });
           })();
 
           // AI report picker: clicking a chip swaps the mocked prompt (title +

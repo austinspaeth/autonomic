@@ -2,7 +2,9 @@
 
 **Autonomic Journal** is a private, offline-first app for tracking autonomic
 recovery. The app is a native **Expo / React Native (iOS + Android)** build that
-lives in **`mobile/`**. There is **no backend** — all state is on-device. (A
+lives in **`mobile/`**. **The app has no backend** — all state is on-device. The
+one backend in this repo (`sls/`) belongs to the private store-analytics
+dashboard at `/master`, not to the product. (A
 previous pure-static-HTML PWA under `docs/` has been removed; the mobile app is
 the app.) Platform split: the Apple Watch companion, HealthKit and ECG are
 iOS-only; Android uses **Health Connect** (`src/lib/health/healthConnect.ts`,
@@ -18,7 +20,13 @@ See `mobile/README.md` for a fuller map. This file is the quick orientation.
 | --- | --- |
 | `mobile/` | The app — Expo / React Native |
 | `landing/` | Marketing landing page (separate from the app) |
+| `landing/static/master/` | Private store-analytics dashboard served at `/master` — static assets, no build step, signed in via Cognito. See `MASTER_DASHBOARD.md` |
+| `sls/` | The `/master` dashboard's API + DynamoDB table. **Nothing the mobile app uses** |
+| `infrastructure/` | CodePipeline / CodeBuild stack; `buildspec.yml` at the root drives it |
 | `FABLE_BUILD_PROMPT.md` | Historical build spec used to bootstrap the native app |
+
+Pushing to `main` builds the landing site, syncs it to S3, invalidates
+CloudFront and runs `sls deploy` — one pipeline for all three.
 
 ## Inside `mobile/`
 

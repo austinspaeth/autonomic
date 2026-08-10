@@ -34,7 +34,7 @@ export default function InsightsScreen() {
   const toast = useToast();
   const { openSheet } = useSheets();
   const state = useAppState();
-  const [range, setRange] = useState<ReportRange>('week');
+  const [range, setRange] = useState<ReportRange>('day');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   // Freemium: all report cards are Pro. Locked cards show a lock badge and
   // raise the paywall; the data-only prompt stays free (the data is theirs).
