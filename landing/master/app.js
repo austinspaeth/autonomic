@@ -1906,7 +1906,7 @@
 
   function renderAll() {
     invalidate();
-    document.title = (VIEW_TITLES[state.view] || 'Overview') + ' | Autonomic Dashboard';
+    document.title = (VIEW_TITLES[state.view] || 'Overview') + ' | Autonomic';
     // don't clobber a field the user is currently typing into
     [['fTrial', trialDays()], ['fWall', wallDays()]].forEach(function (pair) {
       var el = document.getElementById(pair[0]);
@@ -1920,7 +1920,7 @@
     });
     document.getElementById('reportDayValue').textContent = labelFull(asOf());
     document.getElementById('btnEditData').textContent =
-      state.view === 'data' ? '← Back to dashboard' : 'Edit data';
+      state.view === 'data' ? '← Back' : 'Edit data';
     syncExportUI();
     syncSegments();
 
