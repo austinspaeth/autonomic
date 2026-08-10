@@ -8,7 +8,7 @@ export const prerender = true;
 export async function load({ params }) {
   let topic = 'basics';
   try {
-    const post = await import(`../../../../articles/${params.slug}.md`);
+    const post = await import(`../../../../../articles/${params.slug}.md`);
     topic = post.metadata?.categories?.[0] ?? 'basics';
   } catch (e) {
     throw error(404, `Could not find ${params.slug}`);
@@ -17,7 +17,7 @@ export async function load({ params }) {
 }
 
 export function entries() {
-  const paths = import.meta.glob('../../../../articles/*.md');
+  const paths = import.meta.glob('../../../../../articles/*.md');
   return Object.keys(paths).map((path) => ({
     slug: path.split('/').at(-1)!.replace('.md', '')
   }));

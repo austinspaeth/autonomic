@@ -20,7 +20,7 @@ See `mobile/README.md` for a fuller map. This file is the quick orientation.
 | --- | --- |
 | `mobile/` | The app — Expo / React Native |
 | `landing/` | Marketing landing page (separate from the app) |
-| `landing/static/master/` | Private store-analytics dashboard served at `/master` — static assets, no build step, signed in via Cognito. See `MASTER_DASHBOARD.md` |
+| `landing/master/` | Private store-analytics dashboard served at `/master/` — framework-free HTML/CSS/JS, inlined into one prerendered page by `landing/src/routes/master/`, signed in via Cognito. See `MASTER_DASHBOARD.md` |
 | `sls/` | The `/master` dashboard's API + DynamoDB table. **Nothing the mobile app uses** |
 | `infrastructure/` | CodePipeline / CodeBuild stack; `buildspec.yml` at the root drives it |
 | `FABLE_BUILD_PROMPT.md` | Historical build spec used to bootstrap the native app |

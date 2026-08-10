@@ -1,6 +1,6 @@
 <script lang="ts">
   import { page } from '$app/stores';
-  import type { Article } from '../../../api/articles/types';
+  import type { Article } from '../../../../api/articles/types';
   import ArticleLine from '$lib/ArticleLine.svelte';
   import InsightsShell from '$lib/InsightsShell.svelte';
   import { getWriter, writerName } from '$lib/writers';

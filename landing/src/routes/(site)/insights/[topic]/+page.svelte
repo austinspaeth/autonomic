@@ -1,6 +1,6 @@
 <script lang="ts">
   import { page } from '$app/stores';
-  import type { Article } from '../../api/articles/types';
+  import type { Article } from '../../../api/articles/types';
   import ArticleCover from '$lib/ArticleCover.svelte';
   import ArticleCard from '$lib/ArticleCard.svelte';
   import BlogEndCTA from '$lib/BlogEndCTA.svelte';
