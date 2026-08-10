@@ -34,7 +34,7 @@ Digestion is metabolically expensive. After a meal, your body sends a large volu
 The result is a familiar cluster: your heart rate climbs, you feel lightheaded and foggy, and you crash on the couch an hour after lunch. This is sometimes called *postprandial* (after-eating) symptom flare, and the bigger the meal, the bigger the effect.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 220" role="img" aria-label="Diagram comparing a small meal and a large meal, showing how a large meal diverts more blood to the gut and raises heart rate more.">
+  <svg class="fig-d" viewBox="0 0 720 220" role="img" aria-label="Diagram comparing a small meal and a large meal, showing how a large meal diverts more blood to the gut and raises heart rate more.">
     <text x="12" y="26" font-family="Space Grotesk, sans-serif" font-size="15" fill="var(--dim-2)">Blood diverted to digestion after eating</text>
     <!-- small meal -->
     <text x="70" y="70" font-family="Space Grotesk, sans-serif" font-size="14" fill="var(--dim-2)" text-anchor="middle">Small meal</text>
@@ -52,6 +52,22 @@ The result is a familiar cluster: your heart rate climbs, you feel lightheaded a
     <text x="420" y="112" font-family="Space Grotesk, sans-serif" font-size="14" fill="var(--dim-2)">More blood to the gut</text>
     <text x="420" y="136" font-family="Space Grotesk, sans-serif" font-size="14" fill="var(--dim-2)">= less return to the heart</text>
     <text x="420" y="160" font-family="Space Grotesk, sans-serif" font-size="14" fill="var(--dim-2)">= bigger heart-rate spike</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 290" role="img" aria-label="Diagram comparing a small meal and a large meal, showing how a large meal diverts more blood to the gut and raises heart rate more.">
+    <text x="20" y="18" font-family="Space Grotesk, sans-serif" font-size="13" fill="var(--dim-2)">Blood diverted to digestion after eating</text>
+    <text x="90" y="46" font-family="Space Grotesk, sans-serif" font-size="13.5" fill="var(--dim-2)" text-anchor="middle">Small meal</text>
+    <rect x="50" y="58" width="80" height="90" rx="6" fill="none" stroke="var(--line)"/>
+    <rect x="50" y="108" width="80" height="40" rx="6" fill="#54d98a" opacity="0.75"/>
+    <text x="90" y="172" font-family="Space Mono, monospace" font-size="12.5" fill="#54d98a" text-anchor="middle">HR +small</text>
+    <text x="250" y="46" font-family="Space Grotesk, sans-serif" font-size="13.5" fill="var(--dim-2)" text-anchor="middle">Large meal</text>
+    <rect x="210" y="58" width="80" height="90" rx="6" fill="none" stroke="var(--line)"/>
+    <rect x="210" y="78" width="80" height="70" rx="6" fill="#e03127" opacity="0.7"/>
+    <text x="250" y="172" font-family="Space Mono, monospace" font-size="12.5" fill="#e03127" text-anchor="middle">HR +large</text>
+    <line x1="180" y1="186" x2="180" y2="206" stroke="var(--line)" stroke-width="2" marker-end="url(#ah-m)"/>
+    <defs><marker id="ah-m" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 Z" fill="var(--line)"/></marker></defs>
+    <text x="20" y="232" font-family="Space Grotesk, sans-serif" font-size="13" fill="var(--dim-2)">More blood to the gut</text>
+    <text x="20" y="254" font-family="Space Grotesk, sans-serif" font-size="13" fill="var(--dim-2)">= less return to the heart</text>
+    <text x="20" y="276" font-family="Space Grotesk, sans-serif" font-size="13" fill="var(--dim-2)">= bigger heart-rate spike</text>
   </svg>
   <figcaption>Smaller meals divert less blood to digestion, which usually means a gentler post-meal heart-rate response.</figcaption>
 </figure>

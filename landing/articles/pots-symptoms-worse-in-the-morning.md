@@ -127,7 +127,7 @@ Cortisol is not just a "stress hormone." It follows a daily rhythm, and its sing
 The third factor is the trigger that fires all of this off. Lying down, blood is spread fairly evenly through your body and your heart has an easy job. The instant you stand, gravity pulls roughly half a liter of blood downward into your legs and abdomen. In a well-regulated system, blood vessels clamp down and the heart rate ticks up modestly to keep pressure steady. In POTS, that vessel-tightening response is blunted, so the heart compensates the only way it can, by beating much faster. On a morning when your blood volume is already at its lowest, that compensation has to work even harder, which is why the standing heart-rate spike often feels most dramatic first thing.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 240" role="img" aria-label="A line chart of circulating blood volume across a night, starting high at bedtime and drifting steadily downward through overnight urine losses to reach its lowest point at wake-up, just before standing">
+  <svg class="fig-d" viewBox="0 0 720 240" role="img" aria-label="A line chart of circulating blood volume across a night, starting high at bedtime and drifting steadily downward through overnight urine losses to reach its lowest point at wake-up, just before standing">
     <line x1="60" y1="30" x2="60" y2="190" stroke="var(--dim-2)" stroke-width="1"/>
     <line x1="60" y1="190" x2="690" y2="190" stroke="var(--dim-2)" stroke-width="1"/>
     <text x="60" y="215" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="12" text-anchor="middle">Bedtime</text>
@@ -139,6 +139,19 @@ The third factor is the trigger that fires all of this off. Lying down, blood is
     <polyline fill="none" stroke="#54d98a" stroke-width="2.5" points="60,55 180,70 300,95 420,120 500,140 600,158 650,170"/>
     <circle cx="650" cy="170" r="5" fill="#e03127"/>
     <text x="640" y="160" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13" text-anchor="end">Volume lowest, then you stand</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 222" role="img" aria-label="A line chart of circulating blood volume across a night, starting high at bedtime and drifting steadily downward through overnight urine losses to reach its lowest point at wake-up, just before standing">
+    <line x1="44" y1="34" x2="44" y2="176" stroke="var(--dim-2)" stroke-width="1"/>
+    <line x1="44" y1="176" x2="344" y2="176" stroke="var(--dim-2)" stroke-width="1"/>
+    <text x="44" y="196" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5">Bedtime</text>
+    <text x="158" y="196" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5" text-anchor="middle">2am</text>
+    <text x="254" y="196" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5" text-anchor="middle">5am</text>
+    <text x="344" y="196" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5" text-anchor="end">Wake</text>
+    <text x="16" y="42" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5">High</text>
+    <text x="18" y="174" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5">Low</text>
+    <polyline fill="none" stroke="#54d98a" stroke-width="2.5" points="44,56 101,70 158,92 215,114 254,132 301,148 325,158"/>
+    <circle cx="325" cy="158" r="5" fill="#e03127"/>
+    <text x="344" y="218" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="12" text-anchor="end">Volume lowest, then you stand ↑</text>
   </svg>
   <figcaption>Circulating blood volume tends to drift down across the night as overnight urine production offloads fluid, reaching its daily low just as you get up and take on gravity.</figcaption>
 </figure>
@@ -164,7 +177,7 @@ You do not have to guess at how big your morning jolt is. A simple home version 
 The method is the same one covered in the [orthostatic stand test guide](/insights/pots/the-orthostatic-stand-test-at-home/): lie still for a few minutes and note your resting heart rate, then stand and note your heart rate over the next several minutes, watching for the sustained rise. As a reminder of the framework, the defining feature of POTS is a **sustained heart-rate increase of at least 30 beats per minute** within ten minutes of standing (**40 bpm** for adolescents), without a large drop in blood pressure, alongside symptoms. A brief spike that quickly settles is normal for everyone.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 250" role="img" aria-label="Two heart-rate traces over a stand test: a typical response rising modestly from supine and settling near baseline, and a POTS-range response rising sharply on standing and staying elevated">
+  <svg class="fig-d" viewBox="0 0 720 250" role="img" aria-label="Two heart-rate traces over a stand test: a typical response rising modestly from supine and settling near baseline, and a POTS-range response rising sharply on standing and staying elevated">
     <line x1="60" y1="30" x2="60" y2="200" stroke="var(--dim-2)" stroke-width="1"/>
     <line x1="60" y1="200" x2="690" y2="200" stroke="var(--dim-2)" stroke-width="1"/>
     <line x1="250" y1="30" x2="250" y2="200" stroke="var(--dim-2)" stroke-width="1" stroke-dasharray="4 4"/>
@@ -175,6 +188,17 @@ The method is the same one covered in the [orthostatic stand test guide](/insigh
     <polyline fill="none" stroke="#54d98a" stroke-width="2.5" points="70,152 250,152 275,128 330,134 420,140 520,142 620,144 680,145"/>
     <text x="680" y="66" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13" text-anchor="end">POTS-range: +35 bpm, stays high</text>
     <text x="680" y="163" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13" text-anchor="end">Typical: small rise, settles</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 236" role="img" aria-label="Two heart-rate traces over a stand test: a typical response rising modestly from supine and settling near baseline, and a POTS-range response rising sharply on standing and staying elevated">
+    <line x1="44" y1="34" x2="44" y2="186" stroke="var(--dim-2)" stroke-width="1"/>
+    <line x1="44" y1="186" x2="344" y2="186" stroke="var(--dim-2)" stroke-width="1"/>
+    <line x1="134" y1="34" x2="134" y2="186" stroke="var(--dim-2)" stroke-width="1" stroke-dasharray="4 4"/>
+    <text x="87" y="204" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5" text-anchor="middle">Lying</text>
+    <text x="140" y="204" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5">Standing (minutes)</text>
+    <polyline fill="none" stroke="#e03127" stroke-width="2.5" points="49,141 134,141 144,79 168,72 206,77 254,73 301,79 339,75"/>
+    <polyline fill="none" stroke="#54d98a" stroke-width="2.5" points="49,143 134,143 146,122 173,127 215,132 263,134 311,136 339,137"/>
+    <text x="344" y="60" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="12" text-anchor="end">POTS-range: +35 bpm, stays high</text>
+    <text x="344" y="164" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="12" text-anchor="end">Typical: small rise, settles</text>
   </svg>
   <figcaption>Both traces start from the same supine heart rate. On standing, a typical response rises modestly and settles; a POTS-range response jumps 30 bpm or more and stays elevated.</figcaption>
 </figure>

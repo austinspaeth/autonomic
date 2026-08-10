@@ -48,7 +48,7 @@ Finger-worn rings do impressively well too. A [large validation of consumer wear
 Wrist watches are where it gets messier. A [validation study of the Apple Watch's serial HRV and resting heart rate](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC11478500/) found that it systematically underestimated HRV, on the order of 8 milliseconds, with a wide error band on individual readings. It is still useful for watching your own trend, but any single number carries real uncertainty.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 220" role="img" aria-label="A scale showing chest straps as most accurate for HRV, rings close behind, watches underestimating, and phone-camera apps most variable">
+  <svg class="fig-d" viewBox="0 0 720 220" role="img" aria-label="A scale showing chest straps as most accurate for HRV, rings close behind, watches underestimating, and phone-camera apps most variable">
     <line x1="60" y1="170" x2="680" y2="170" stroke="var(--line)" stroke-width="2"/>
     <text x="60" y="200" font-family="Space Grotesk, sans-serif" font-size="13" fill="var(--dim-2)">less accurate</text>
     <text x="590" y="200" font-family="Space Grotesk, sans-serif" font-size="13" fill="var(--dim-2)">near-ECG</text>
@@ -72,6 +72,23 @@ Wrist watches are where it gets messier. A [validation study of the Apple Watch'
     <line x1="650" y1="163" x2="650" y2="120" stroke="var(--line)" stroke-width="1.5" stroke-dasharray="3 3"/>
     <text x="650" y="110" font-family="Space Grotesk, sans-serif" font-size="14" fill="var(--dim-2)" text-anchor="middle">Chest strap</text>
     <text x="650" y="92" font-family="Space Mono, monospace" font-size="12" fill="var(--dim-2)" text-anchor="middle">~0.99</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 250" role="img" aria-label="A scale showing chest straps as most accurate for HRV, rings close behind, watches underestimating, and phone-camera apps most variable">
+    <text x="20" y="20" font-family="Space Grotesk, sans-serif" font-size="12.5" fill="var(--dim-2)">↑ near-ECG</text>
+    <line x1="44" y1="34" x2="44" y2="222" stroke="var(--line)" stroke-width="2"/>
+    <circle cx="44" cy="52" r="7" fill="#54d98a"/>
+    <text x="64" y="49" font-family="Space Grotesk, sans-serif" font-size="14.5" fill="var(--dim-2)">Chest strap</text>
+    <text x="64" y="66" font-family="Space Mono, monospace" font-size="11.5" fill="var(--dim-2)">~0.99</text>
+    <circle cx="44" cy="104" r="7" fill="#54d98a"/>
+    <text x="64" y="101" font-family="Space Grotesk, sans-serif" font-size="14.5" fill="var(--dim-2)">Finger ring</text>
+    <text x="64" y="118" font-family="Space Mono, monospace" font-size="11.5" fill="var(--dim-2)">high</text>
+    <circle cx="44" cy="156" r="7" fill="#f5a524"/>
+    <text x="64" y="153" font-family="Space Grotesk, sans-serif" font-size="14.5" fill="var(--dim-2)">Wrist watch</text>
+    <text x="64" y="170" font-family="Space Mono, monospace" font-size="11.5" fill="var(--dim-2)">~8 ms low</text>
+    <circle cx="44" cy="208" r="7" fill="#f5a524"/>
+    <text x="64" y="205" font-family="Space Grotesk, sans-serif" font-size="14.5" fill="var(--dim-2)">Phone camera</text>
+    <text x="64" y="222" font-family="Space Mono, monospace" font-size="11.5" fill="var(--dim-2)">variable</text>
+    <text x="20" y="244" font-family="Space Grotesk, sans-serif" font-size="12.5" fill="var(--dim-2)">↓ less accurate</text>
   </svg>
   <figcaption>Roughly where each device class lands against a clinical ECG for HRV.</figcaption>
 </figure>

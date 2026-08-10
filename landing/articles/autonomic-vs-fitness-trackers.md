@@ -67,7 +67,7 @@ For recovery, that context is the whole point. A number only becomes useful when
 | **What "good" means** | Ready to train hard today | Trending toward your medically relevant range |
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 220" role="img" aria-label="Two views of the same HRV reading: a fitness tracker grades it against a healthy population and marks it poor, while a recovery tool grades it against your own rising baseline and marks it progress.">
+  <svg class="fig-d" viewBox="0 0 720 220" role="img" aria-label="Two views of the same HRV reading: a fitness tracker grades it against a healthy population and marks it poor, while a recovery tool grades it against your own rising baseline and marks it progress.">
     <text x="20" y="34" font-family="Space Grotesk, sans-serif" font-size="15" fill="var(--dim-2)">Same HRV reading, two verdicts</text>
     <line x1="20" y1="52" x2="700" y2="52" stroke="var(--line)" stroke-width="1"/>
 
@@ -84,6 +84,24 @@ For recovery, that context is the whole point. A number only becomes useful when
     <text x="96" y="205" font-family="Space Mono, monospace" font-size="11" fill="var(--dim-2)">last week</text>
     <circle cx="170" cy="176" r="9" fill="#54d98a" stroke="var(--dim-2)" stroke-width="1.5"/>
     <text x="514" y="180" font-family="Space Mono, monospace" font-size="13" fill="#54d98a">"Up"</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 200" role="img" aria-label="Two views of the same HRV reading: a fitness tracker grades it against a healthy population and marks it poor, while a recovery tool grades it against your own rising baseline and marks it progress.">
+    <text x="20" y="22" font-family="Space Grotesk, sans-serif" font-size="14" fill="var(--dim-2)">Same HRV reading, two verdicts</text>
+    <line x1="20" y1="38" x2="340" y2="38" stroke="var(--line)" stroke-width="1"/>
+
+    <text x="20" y="66" font-family="Space Grotesk, sans-serif" font-size="12.5" fill="var(--dim-2)">Fitness tracker vs. healthy norm</text>
+    <rect x="20" y="76" width="250" height="16" rx="8" fill="var(--line)"/>
+    <rect x="20" y="76" width="78" height="16" rx="8" fill="#e03127"/>
+    <circle cx="98" cy="84" r="9" fill="#e03127" stroke="var(--dim-2)" stroke-width="1.5"/>
+    <text x="284" y="89" font-family="Space Mono, monospace" font-size="13" fill="#e03127">"Poor"</text>
+
+    <text x="20" y="136" font-family="Space Grotesk, sans-serif" font-size="12.5" fill="var(--dim-2)">Autonomic vs. your own baseline</text>
+    <rect x="20" y="146" width="250" height="16" rx="8" fill="var(--line)"/>
+    <rect x="20" y="146" width="62" height="16" rx="8" fill="var(--dim-2)" opacity="0.4"/>
+    <line x1="82" y1="140" x2="82" y2="168" stroke="var(--dim-2)" stroke-width="1.5" stroke-dasharray="3 3"/>
+    <text x="58" y="184" font-family="Space Mono, monospace" font-size="11" fill="var(--dim-2)">last week</text>
+    <circle cx="109" cy="154" r="9" fill="#54d98a" stroke="var(--dim-2)" stroke-width="1.5"/>
+    <text x="284" y="159" font-family="Space Mono, monospace" font-size="13" fill="#54d98a">"Up"</text>
   </svg>
   <figcaption>One reading, two lenses: a healthy-population grade calls it a failure; your own trend calls it progress.</figcaption>
 </figure>

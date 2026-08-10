@@ -168,7 +168,7 @@ Two details from that study matter more than the headline:
 - **It acts upstream of antihistamines.** This is the single most useful thing to understand about quercetin's proposed role. An H1 antihistamine blocks the receptor that histamine binds after it has already been released. A mast cell stabilizer aims to reduce the release itself, along with the other mediators that antihistamines do nothing about: prostaglandins, leukotrienes, and inflammatory cytokines like TNF and IL-8.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 260" role="img" aria-label="Diagram showing a trigger activating a mast cell, which releases histamine, prostaglandins, leukotrienes and cytokines that then act on receptors to produce symptoms. Quercetin is shown acting upstream on the release step, while antihistamines act downstream at the H1 receptor.">
+  <svg class="fig-d" viewBox="0 0 720 260" role="img" aria-label="Diagram showing a trigger activating a mast cell, which releases histamine, prostaglandins, leukotrienes and cytokines that then act on receptors to produce symptoms. Quercetin is shown acting upstream on the release step, while antihistamines act downstream at the H1 receptor.">
     <text x="20" y="26" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="15">Two different places to intervene</text>
     <rect x="24" y="98" width="96" height="52" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/>
     <text x="72" y="129" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="13" text-anchor="middle">trigger</text>
@@ -199,6 +199,34 @@ Two details from that study matter more than the headline:
     <text x="566" y="216" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="13" text-anchor="middle">antihistamines</text>
     <text x="566" y="234" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10" text-anchor="middle">block one receptor</text>
   </svg>
+  <svg class="fig-m" viewBox="0 0 360 396" role="img" aria-label="Diagram showing a trigger activating a mast cell, which releases histamine, prostaglandins, leukotrienes and cytokines that then act on receptors to produce symptoms. Quercetin is shown acting upstream on the release step, while antihistamines act downstream at the H1 receptor.">
+    <text x="20" y="20" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13.5">Two different places to intervene</text>
+    <rect x="118" y="36" width="124" height="40" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/>
+    <text x="180" y="61" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="13" text-anchor="middle">trigger</text>
+    <line x1="180" y1="76" x2="180" y2="94" stroke="var(--dim-2)" stroke-width="2"/>
+    <polygon points="175,94 185,94 180,104" fill="var(--dim-2)"/>
+    <circle cx="180" cy="162" r="56" fill="none" stroke="var(--line)" stroke-width="2"/>
+    <text x="180" y="158" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11" text-anchor="middle">mast cell</text>
+    <circle cx="160" cy="180" r="7" fill="#e03127" opacity="0.45"/>
+    <circle cx="184" cy="186" r="7" fill="#e03127" opacity="0.45"/>
+    <circle cx="204" cy="176" r="7" fill="#e03127" opacity="0.45"/>
+    <text x="20" y="122" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-size="12">quercetin</text>
+    <text x="20" y="136" fill="#54d98a" font-family="Space Mono, monospace" font-size="9.5">(proposed):</text>
+    <text x="20" y="148" fill="#54d98a" font-family="Space Mono, monospace" font-size="9.5">reduce the release</text>
+    <line x1="20" y1="164" x2="108" y2="164" stroke="#54d98a" stroke-width="2"/>
+    <polygon points="108,159 108,169 118,164" fill="#54d98a"/>
+    <line x1="180" y1="218" x2="180" y2="236" stroke="var(--dim-2)" stroke-width="2"/>
+    <polygon points="175,236 185,236 180,246" fill="var(--dim-2)"/>
+    <text x="196" y="234" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">release</text>
+    <text x="180" y="268" fill="#e03127" font-family="Space Mono, monospace" font-size="11.5" text-anchor="middle">histamine · prostaglandins</text>
+    <text x="180" y="286" fill="#e03127" font-family="Space Mono, monospace" font-size="11.5" text-anchor="middle">leukotrienes · cytokines</text>
+    <line x1="180" y1="298" x2="180" y2="316" stroke="var(--dim-2)" stroke-width="2"/>
+    <polygon points="175,316 185,316 180,326" fill="var(--dim-2)"/>
+    <text x="196" y="314" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="9.5">antihistamines block</text>
+    <text x="196" y="326" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="9.5">one receptor here</text>
+    <rect x="118" y="336" width="124" height="40" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/>
+    <text x="180" y="361" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="13" text-anchor="middle">symptoms</text>
+  </svg>
   <figcaption>Antihistamines block a receptor after histamine has been released, and do nothing about prostaglandins, leukotrienes or cytokines. A mast cell stabilizer aims at the release step itself. This is why quercetin is usually proposed alongside an antihistamine rather than instead of one.</figcaption>
 </figure>
 
@@ -211,7 +239,7 @@ The mast cell experiments above used quercetin at around **100 micromolar**. Wha
 That is a gap of a couple of hundred fold between the concentration that worked in the dish and the concentration a generous dietary dose produces in a person.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 250" role="img" aria-label="Logarithmic bar chart comparing quercetin concentrations. The concentration used in mast cell laboratory studies is about 100 micromolar, while peak human plasma concentration after onion powder is about 0.3 micromolar, a difference of roughly 300 fold.">
+  <svg class="fig-d" viewBox="0 0 720 250" role="img" aria-label="Logarithmic bar chart comparing quercetin concentrations. The concentration used in mast cell laboratory studies is about 100 micromolar, while peak human plasma concentration after onion powder is about 0.3 micromolar, a difference of roughly 300 fold.">
     <text x="20" y="26" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="15">Dish versus bloodstream (log scale)</text>
     <line x1="180" y1="58" x2="180" y2="206" stroke="var(--line)" stroke-width="1.5"/>
     <text x="172" y="200" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10" text-anchor="end">0.1</text>
@@ -228,6 +256,26 @@ That is a gap of a couple of hundred fold between the concentration that worked 
     <text x="540" y="163" fill="#54d98a" font-family="Space Mono, monospace" font-size="12" text-anchor="middle">~0.3 uM</text>
     <text x="540" y="220" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="12" text-anchor="middle">peak plasma, onion powder</text>
     <text x="540" y="238" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10" text-anchor="middle">and it is not free quercetin</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 274" role="img" aria-label="Logarithmic bar chart comparing quercetin concentrations. The concentration used in mast cell laboratory studies is about 100 micromolar, while peak human plasma concentration after onion powder is about 0.3 micromolar, a difference of roughly 300 fold.">
+    <text x="20" y="18" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13">Dish versus bloodstream (log scale)</text>
+    <line x1="66" y1="58" x2="66" y2="206" stroke="var(--line)" stroke-width="1.5"/>
+    <text x="58" y="200" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10" text-anchor="end">0.1</text>
+    <text x="58" y="152" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10" text-anchor="end">1</text>
+    <text x="58" y="104" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10" text-anchor="end">10</text>
+    <text x="58" y="66" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10" text-anchor="end">100</text>
+    <line x1="66" y1="196" x2="344" y2="196" stroke="var(--line)" stroke-width="1"/>
+    <rect x="86" y="62" width="110" height="134" rx="4" fill="#e03127" opacity="0.28"/>
+    <rect x="86" y="62" width="110" height="4" fill="#e03127"/>
+    <text x="141" y="52" fill="#e03127" font-family="Space Mono, monospace" font-size="11.5" text-anchor="middle">100 uM</text>
+    <text x="141" y="216" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="11" text-anchor="middle">used in mast</text>
+    <text x="141" y="232" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="11" text-anchor="middle">cell studies</text>
+    <rect x="226" y="171" width="110" height="25" rx="4" fill="#54d98a" opacity="0.28"/>
+    <rect x="226" y="171" width="110" height="4" fill="#54d98a"/>
+    <text x="281" y="163" fill="#54d98a" font-family="Space Mono, monospace" font-size="11.5" text-anchor="middle">~0.3 uM</text>
+    <text x="281" y="216" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="11" text-anchor="middle">peak plasma,</text>
+    <text x="281" y="232" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="11" text-anchor="middle">onion powder</text>
+    <text x="180" y="262" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10" text-anchor="middle">and it is not free quercetin</text>
   </svg>
   <figcaption>Each gridline is a tenfold step. The concentration that stabilized mast cells in vitro is roughly 300 times what a generous dietary dose puts in plasma. Supplement doses do better than onion powder, but not by anything close to 300 fold.</figcaption>
 </figure>
@@ -273,7 +321,7 @@ What exists:
 - **COVID-era trials**, mostly small, mostly of quercetin phytosome, mostly in acute infection rather than long COVID, and generally of modest methodological quality. They do not establish a long COVID indication.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 240" role="img" aria-label="An evidence ladder with five rungs. From strongest at the bottom to weakest coverage at the top: laboratory mast cell studies are strong, animal studies are supportive, one small randomized trial exists in seasonal allergy, open-label pilots exist in skin conditions, and there are no randomized controlled trials in MCAS or long COVID.">
+  <svg class="fig-d" viewBox="0 0 720 240" role="img" aria-label="An evidence ladder with five rungs. From strongest at the bottom to weakest coverage at the top: laboratory mast cell studies are strong, animal studies are supportive, one small randomized trial exists in seasonal allergy, open-label pilots exist in skin conditions, and there are no randomized controlled trials in MCAS or long COVID.">
     <text x="20" y="26" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="15">Where the evidence actually sits</text>
     <rect x="30" y="188" width="530" height="34" rx="6" fill="#54d98a" opacity="0.22"/>
     <text x="44" y="210" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-size="13">In vitro human mast cells: strong, consistent, replicated</text>
@@ -289,6 +337,25 @@ What exists:
     <text x="600" y="84" fill="#f97316" font-family="Space Mono, monospace" font-size="11">uncontrolled</text>
     <rect x="30" y="38" width="96" height="18" rx="4" fill="#e03127" opacity="0.22"/>
     <text x="136" y="52" fill="#e03127" font-family="Space Grotesk, sans-serif" font-size="13">RCTs in MCAS: none</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 302" role="img" aria-label="An evidence ladder with five rungs. From strongest at the bottom to weakest coverage at the top: laboratory mast cell studies are strong, animal studies are supportive, one small randomized trial exists in seasonal allergy, open-label pilots exist in skin conditions, and there are no randomized controlled trials in MCAS or long COVID.">
+    <text x="20" y="18" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13">Where the evidence actually sits</text>
+    <rect x="20" y="36" width="120" height="20" rx="4" fill="#e03127" opacity="0.22"/>
+    <text x="148" y="51" fill="#e03127" font-family="Space Grotesk, sans-serif" font-size="12">RCTs in MCAS: none</text>
+    <rect x="20" y="76" width="180" height="34" rx="6" fill="#f97316" opacity="0.22"/>
+    <text x="32" y="92" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="12">Open-label pilots</text>
+    <text x="32" y="106" fill="#f97316" font-family="Space Mono, monospace" font-size="10">uncontrolled</text>
+    <rect x="20" y="126" width="240" height="34" rx="6" fill="#eab308" opacity="0.22"/>
+    <text x="32" y="142" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="12">One 20-person RCT, allergy</text>
+    <text x="32" y="156" fill="#eab308" font-family="Space Mono, monospace" font-size="10">thin</text>
+    <rect x="20" y="176" width="290" height="34" rx="6" fill="#54d98a" opacity="0.16"/>
+    <text x="32" y="192" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="12">Animal models</text>
+    <text x="32" y="206" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">supportive</text>
+    <rect x="20" y="226" width="320" height="46" rx="6" fill="#54d98a" opacity="0.22"/>
+    <text x="32" y="244" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-size="12">In vitro human mast cells:</text>
+    <text x="32" y="258" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-size="12">strong, consistent, replicated</text>
+    <text x="32" y="270" fill="#54d98a" font-family="Space Mono, monospace" font-size="10">solid</text>
+    <text x="20" y="294" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">bar width = how much weight it carries</text>
   </svg>
   <figcaption>The width of each bar reflects how much weight it can carry. Strong mechanism plus widespread anecdote is a reason to investigate, not a substitute for trial evidence.</figcaption>
 </figure>

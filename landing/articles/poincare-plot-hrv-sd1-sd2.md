@@ -111,7 +111,7 @@ Most heart rate variability numbers are single figures: [RMSSD](/insights/basics
 Here is the whole trick. Line up your heartbeat intervals in order. Take the first two, and plot a single dot: the first interval sets the horizontal position, the second sets the vertical position. Then slide over by one beat and plot the next pair, the second interval against the third. Keep going. Every dot is one pair of consecutive beats, so a five-minute reading becomes a cloud of a few hundred dots. If your rhythm barely changes, each interval is almost the same as the next, so the dots pile up in a tight little ball on the diagonal. If your rhythm is lively, the dots spread out into a long, comet-shaped cloud. The eye reads recovery before you even look at a number.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 340" role="img" aria-label="A Poincaré plot: each heartbeat interval plotted against the next forms an elongated cloud of dots along the diagonal line of identity, wrapped by an ellipse whose short width is labelled SD1 and long length is labelled SD2">
+  <svg class="fig-d" viewBox="0 0 720 340" role="img" aria-label="A Poincaré plot: each heartbeat interval plotted against the next forms an elongated cloud of dots along the diagonal line of identity, wrapped by an ellipse whose short width is labelled SD1 and long length is labelled SD2">
     <line x1="90" y1="300" x2="640" y2="300" stroke="var(--line)" stroke-width="1.5" />
     <line x1="90" y1="300" x2="90" y2="30" stroke="var(--line)" stroke-width="1.5" />
     <text x="365" y="330" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="13" text-anchor="middle">RR interval n (ms)</text>
@@ -132,6 +132,30 @@ Here is the whole trick. Line up your heartbeat intervals in order. Take the fir
     <text x="500" y="118" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="15">SD2 (length)</text>
     <line x1="365" y1="175" x2="386" y2="216" stroke="#e03127" stroke-width="3" />
     <text x="392" y="228" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="15">SD1 (width)</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 292" role="img" aria-label="A Poincaré plot: each heartbeat interval plotted against the next forms an elongated cloud of dots along the diagonal line of identity, wrapped by an ellipse whose short width is labelled SD1 and long length is labelled SD2">
+    <line x1="44" y1="252" x2="300" y2="252" stroke="var(--line)" stroke-width="1.5" />
+    <line x1="44" y1="252" x2="44" y2="40" stroke="var(--line)" stroke-width="1.5" />
+    <text x="172" y="278" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="12" text-anchor="middle">RR interval n (ms)</text>
+    <text x="16" y="146" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="12" text-anchor="middle" transform="rotate(-90 16 146)">RR interval n+1 (ms)</text>
+    <line x1="62" y1="224" x2="286" y2="67" stroke="var(--dim-2)" stroke-width="1.5" stroke-dasharray="5 5" />
+    <text x="296" y="242" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11" text-anchor="end">dashed = line of identity</text>
+    <ellipse cx="168" cy="150" rx="86" ry="28" fill="rgba(84,217,138,0.10)" stroke="#54d98a" stroke-width="2" transform="rotate(-35 168 150)" />
+    <g fill="#54d98a">
+      <circle cx="114" cy="195" r="4"/><circle cx="118" cy="180" r="4"/><circle cx="135" cy="183" r="4"/>
+      <circle cx="133" cy="167" r="4"/><circle cx="147" cy="169" r="4"/><circle cx="149" cy="154" r="4"/>
+      <circle cx="164" cy="159" r="4"/><circle cx="168" cy="146" r="4"/><circle cx="182" cy="149" r="4"/>
+      <circle cx="183" cy="133" r="4"/><circle cx="197" cy="135" r="4"/><circle cx="198" cy="120" r="4"/>
+      <circle cx="212" cy="122" r="4"/><circle cx="216" cy="111" r="4"/><circle cx="124" cy="178" r="4"/>
+      <circle cx="144" cy="174" r="4"/><circle cx="153" cy="152" r="4"/><circle cx="178" cy="154" r="4"/>
+      <circle cx="186" cy="130" r="4"/><circle cx="207" cy="126" r="4"/>
+    </g>
+    <line x1="168" y1="150" x2="238" y2="101" stroke="#54d98a" stroke-width="3" />
+    <text x="246" y="116" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13">SD2</text>
+    <text x="246" y="131" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-size="11">(length)</text>
+    <line x1="168" y1="150" x2="184" y2="173" stroke="#e03127" stroke-width="3" />
+    <text x="190" y="180" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13">SD1</text>
+    <text x="190" y="195" fill="#e03127" font-family="Space Grotesk, sans-serif" font-size="11">(width)</text>
   </svg>
   <figcaption>Each dot is one pair of consecutive beat intervals. SD1 is the width of the cloud across the diagonal (fast, vagal change); SD2 is its length along the diagonal (overall variability).</figcaption>
 </figure>
@@ -155,7 +179,7 @@ SD2 is the **length** of the cloud, measured along the diagonal. It grows with y
 The relationship is again a clean formula, built from the two numbers you already know: SD2 is derived from SDNN and SD1 together, as `SD2 = √(2·SDNN² − SD1²)`. In plain terms, once you know your total variability (SDNN) and your fast beat-to-beat width (SD1), the long axis of the cloud is fixed. So the Poincaré plot is not new information so much as a new *view* of RMSSD and SDNN, one that happens to be very good at showing shape and at flagging odd beats.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 260" role="img" aria-label="Two Poincaré plots side by side: on the left a recovered rhythm forms a long wide green comet, on the right an under-recovered rhythm forms a small tight red cluster">
+  <svg class="fig-d" viewBox="0 0 720 260" role="img" aria-label="Two Poincaré plots side by side: on the left a recovered rhythm forms a long wide green comet, on the right an under-recovered rhythm forms a small tight red cluster">
     <text x="180" y="28" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="15" text-anchor="middle">Recovered: long, wide comet</text>
     <line x1="60" y1="230" x2="300" y2="230" stroke="var(--line)" stroke-width="1.2" />
     <line x1="60" y1="230" x2="60" y2="50" stroke="var(--line)" stroke-width="1.2" />
@@ -178,6 +202,31 @@ The relationship is again a clean formula, built from the two numbers you alread
       <circle cx="550" cy="140" r="3.5"/><circle cx="538" cy="153" r="3.5"/><circle cx="548" cy="138" r="3.5"/>
       <circle cx="543" cy="149" r="3.5"/><circle cx="553" cy="136" r="3.5"/><circle cx="536" cy="145" r="3.5"/>
       <circle cx="551" cy="146" r="3.5"/><circle cx="541" cy="142" r="3.5"/><circle cx="547" cy="151" r="3.5"/>
+    </g>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 400" role="img" aria-label="Two Poincaré plots, one above the other: a recovered rhythm forms a long wide green comet, an under-recovered rhythm forms a small tight red cluster">
+    <text x="20" y="20" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="14">Recovered: long, wide comet</text>
+    <line x1="40" y1="180" x2="330" y2="180" stroke="var(--line)" stroke-width="1.2" />
+    <line x1="40" y1="180" x2="40" y2="40" stroke="var(--line)" stroke-width="1.2" />
+    <line x1="58" y1="170" x2="300" y2="54" stroke="var(--dim-2)" stroke-width="1" stroke-dasharray="4 4" />
+    <ellipse cx="168" cy="120" rx="88" ry="30" fill="rgba(84,217,138,0.10)" stroke="#54d98a" stroke-width="1.8" transform="rotate(-34 168 120)" />
+    <g fill="#54d98a">
+      <circle cx="114" cy="162" r="3.6"/><circle cx="119" cy="147" r="3.6"/><circle cx="135" cy="150" r="3.6"/>
+      <circle cx="138" cy="136" r="3.6"/><circle cx="150" cy="136" r="3.6"/><circle cx="154" cy="121" r="3.6"/>
+      <circle cx="170" cy="123" r="3.6"/><circle cx="176" cy="111" r="3.6"/><circle cx="191" cy="112" r="3.6"/>
+      <circle cx="193" cy="96" r="3.6"/><circle cx="206" cy="98" r="3.6"/><circle cx="212" cy="85" r="3.6"/>
+      <circle cx="225" cy="84" r="3.6"/><circle cx="139" cy="148" r="3.6"/><circle cx="180" cy="102" r="3.6"/>
+    </g>
+    <text x="20" y="238" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="14">Under-recovered: tight cluster</text>
+    <line x1="40" y1="398" x2="330" y2="398" stroke="var(--line)" stroke-width="1.2" />
+    <line x1="40" y1="398" x2="40" y2="258" stroke="var(--line)" stroke-width="1.2" />
+    <line x1="58" y1="388" x2="300" y2="272" stroke="var(--dim-2)" stroke-width="1" stroke-dasharray="4 4" />
+    <ellipse cx="168" cy="338" rx="28" ry="11" fill="rgba(224,49,39,0.10)" stroke="#e03127" stroke-width="1.8" transform="rotate(-34 168 338)" />
+    <g fill="#e03127">
+      <circle cx="159" cy="348" r="3.6"/><circle cx="160" cy="340" r="3.6"/><circle cx="167" cy="344" r="3.6"/>
+      <circle cx="168" cy="338" r="3.6"/><circle cx="169" cy="332" r="3.6"/><circle cx="176" cy="336" r="3.6"/>
+      <circle cx="177" cy="330" r="3.6"/><circle cx="162" cy="340" r="3.6"/><circle cx="172" cy="340" r="3.6"/>
+      <circle cx="171" cy="332" r="3.6"/><circle cx="160" cy="344" r="3.6"/><circle cx="177" cy="334" r="3.6"/>
     </g>
   </svg>
   <figcaption>Same idea, two very different rhythms. Recovery widens the cloud (SD1 up) and lengthens it (SD2 up); strain collapses it toward a point.</figcaption>

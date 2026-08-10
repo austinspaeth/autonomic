@@ -89,7 +89,7 @@ When you stand, gravity pulls a large volume of blood down into your legs and be
 In a typical system this correction is quiet and quick. In POTS the correction has to be much larger to make up for the pooling and low volume, so the same standing challenge triggers a bigger catecholamine release. When that release overshoots, or stacks on top of another stressor, you feel it as a surge. The racing heart of POTS and the adrenaline dump are two faces of the same compensatory effort.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 300" role="img" aria-label="Flow diagram: a physical trigger such as standing, a meal, heat or waking leads to blood pooling and low venous return, which the baroreflex answers with a large surge of adrenaline and noradrenaline, producing a racing heart, tremor, chills, nausea and dread">
+  <svg class="fig-d" viewBox="0 0 720 300" role="img" aria-label="Flow diagram: a physical trigger such as standing, a meal, heat or waking leads to blood pooling and low venous return, which the baroreflex answers with a large surge of adrenaline and noradrenaline, producing a racing heart, tremor, chills, nausea and dread">
     <rect x="250" y="16" width="220" height="48" rx="10" fill="none" stroke="#e03127" stroke-width="2"/>
     <text x="360" y="38" text-anchor="middle" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="15">Physical trigger</text>
     <text x="360" y="55" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11">stand up / meal / heat / waking</text>
@@ -105,6 +105,26 @@ In a typical system this correction is quiet and quick. In POTS the correction h
     <rect x="180" y="238" width="360" height="46" rx="10" fill="none" stroke="var(--dim-2)" stroke-width="1.5"/>
     <text x="360" y="260" text-anchor="middle" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="14">Racing heart, tremor, chills, nausea, dread</text>
     <text x="360" y="278" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11">then a rush to urinate and fatigue</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 326" role="img" aria-label="Flow diagram: a physical trigger such as standing, a meal, heat or waking leads to blood pooling and low venous return, which the baroreflex answers with a large surge of adrenaline and noradrenaline, producing a racing heart, tremor, chills, nausea and dread">
+    <rect x="20" y="10" width="320" height="48" rx="10" fill="none" stroke="#e03127" stroke-width="2"/>
+    <text x="180" y="32" text-anchor="middle" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="15">Physical trigger</text>
+    <text x="180" y="49" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11">stand up / meal / heat / waking</text>
+    <line x1="180" y1="58" x2="180" y2="80" stroke="var(--line)" stroke-width="2"/>
+    <rect x="20" y="82" width="320" height="62" rx="10" fill="none" stroke="var(--line)" stroke-width="1.5"/>
+    <text x="180" y="103" text-anchor="middle" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="14">Blood pools, less returns</text>
+    <text x="180" y="120" text-anchor="middle" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="14">to the heart</text>
+    <text x="180" y="136" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11">low venous return, low volume</text>
+    <line x1="180" y1="144" x2="180" y2="166" stroke="var(--line)" stroke-width="2"/>
+    <rect x="20" y="168" width="320" height="62" rx="10" fill="none" stroke="#e03127" stroke-width="2"/>
+    <text x="180" y="189" text-anchor="middle" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="14">Large adrenaline /</text>
+    <text x="180" y="206" text-anchor="middle" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="14">noradrenaline surge</text>
+    <text x="180" y="222" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11">baroreflex overcompensates</text>
+    <line x1="180" y1="230" x2="180" y2="252" stroke="var(--line)" stroke-width="2"/>
+    <rect x="20" y="254" width="320" height="62" rx="10" fill="none" stroke="var(--dim-2)" stroke-width="1.5"/>
+    <text x="180" y="275" text-anchor="middle" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="14">Racing heart, tremor, chills,</text>
+    <text x="180" y="292" text-anchor="middle" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="14">nausea, dread</text>
+    <text x="180" y="308" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11">then a rush to urinate and fatigue</text>
   </svg>
   <figcaption>The surge cascade: a physical trigger drops the blood returning to your heart, and an over-sized catecholamine response to rescue blood pressure is what you feel as an adrenaline dump.</figcaption>
 </figure>
@@ -146,7 +166,7 @@ Because a surge is a burst of sympathetic activity, it leaves fingerprints in ex
 - **Frequency-domain shift:** relatively more low-frequency (LF) power and less high-frequency (HF) power, the signature of a sympathetically biased rhythm covered in the [frequency-domain HRV explainer](/insights/basics/hrv-frequency-domain-vlf-lf-hf-power/).
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 300" role="img" aria-label="Overnight heart rate and HRV over eight hours of sleep. Heart rate stays low until a sharp spike around 3am, where HRV simultaneously collapses, then both slowly recover toward morning">
+  <svg class="fig-d" viewBox="0 0 720 300" role="img" aria-label="Overnight heart rate and HRV over eight hours of sleep. Heart rate stays low until a sharp spike around 3am, where HRV simultaneously collapses, then both slowly recover toward morning">
     <line x1="60" y1="30" x2="60" y2="250" stroke="var(--line)" stroke-width="1.5"/>
     <line x1="60" y1="250" x2="690" y2="250" stroke="var(--line)" stroke-width="1.5"/>
     <text x="30" y="120" text-anchor="middle" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="11" transform="rotate(-90 30 150)">overnight trace</text>
@@ -162,6 +182,21 @@ Because a surge is a burst of sympathetic activity, it leaves fingerprints in ex
     <text x="470" y="112" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13">HRV</text>
     <text x="120" y="278" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11">asleep</text>
     <text x="640" y="278" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11">waking</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 274" role="img" aria-label="Overnight heart rate and HRV over eight hours of sleep. Heart rate stays low until a sharp spike around 3am, where HRV simultaneously collapses, then both slowly recover toward morning">
+    <line x1="50" y1="34" x2="50" y2="232" stroke="var(--line)" stroke-width="1.5"/>
+    <line x1="50" y1="232" x2="344" y2="232" stroke="var(--line)" stroke-width="1.5"/>
+    <text x="18" y="133" text-anchor="middle" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="11" transform="rotate(-90 18 133)">overnight trace</text>
+    <polyline fill="none" stroke="#e03127" stroke-width="2.5" points="50,192 91,196 128,194 160,192 174,115 183,70 194,84 207,142 239,174 280,183 335,187"/>
+    <polyline fill="none" stroke="#54d98a" stroke-width="2.5" points="50,92 91,86 128,90 160,93 177,169 186,200 196,192 211,151 239,115 280,104 335,97"/>
+    <line x1="181" y1="34" x2="181" y2="232" stroke="var(--dim-2)" stroke-width="1" stroke-dasharray="4 4"/>
+    <text x="181" y="26" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11">~3am surge</text>
+    <circle cx="183" cy="70" r="4" fill="#e03127"/>
+    <circle cx="186" cy="200" r="4" fill="#54d98a"/>
+    <text x="234" y="210" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13">Heart rate</text>
+    <text x="248" y="104" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13">HRV</text>
+    <text x="50" y="254" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11">asleep</text>
+    <text x="344" y="254" text-anchor="end" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11">waking</text>
   </svg>
   <figcaption>A nocturnal surge on an overnight trace: heart rate spikes as HRV collapses at the same moment, then both recover slowly toward morning. The mirror image of the two lines is the sympathetic signature.</figcaption>
 </figure>

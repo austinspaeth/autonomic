@@ -169,7 +169,7 @@ That alerting signal does not fade in the evening. It **peaks** in the three to 
 So the "second wind" is not a metaphor and not a failure of self-control. It is your circadian system producing maximum arousal at precisely the hour you were hoping to wind down.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 280" role="img" aria-label="Chart showing sleep pressure rising steadily through the day while the circadian alerting signal dips in the afternoon and peaks in the late evening. The peak is highlighted as the wake maintenance zone, where symptoms often feel best.">
+  <svg class="fig-d" viewBox="0 0 720 280" role="img" aria-label="Chart showing sleep pressure rising steadily through the day while the circadian alerting signal dips in the afternoon and peaks in the late evening. The peak is highlighted as the wake maintenance zone, where symptoms often feel best.">
     <rect x="452" y="46" width="94" height="176" fill="#54d98a" opacity="0.13"/>
     <text x="499" y="40" fill="#54d98a" font-family="Space Mono, monospace" font-size="11" text-anchor="middle">wake maintenance zone</text>
     <line x1="60" y1="222" x2="690" y2="222" stroke="var(--line)" stroke-width="1.5"/>
@@ -186,6 +186,26 @@ So the "second wind" is not a metaphor and not a failure of self-control. It is 
     <circle cx="240" cy="162" r="4" fill="#e03127"/>
     <text x="240" y="184" fill="#e03127" font-family="Space Mono, monospace" font-size="11" text-anchor="middle">afternoon dip</text>
   </svg>
+  <svg class="fig-m" viewBox="0 0 360 250" role="img" aria-label="Chart showing sleep pressure rising steadily through the day while the circadian alerting signal dips in the afternoon and peaks in the late evening. The peak is highlighted as the wake maintenance zone, where symptoms often feel best.">
+    <rect x="229" y="46" width="46" height="150" fill="#54d98a" opacity="0.13"/>
+    <text x="344" y="18" fill="#54d98a" font-family="Space Mono, monospace" font-size="10.5" text-anchor="end">wake maintenance zone</text>
+    <line x1="252" y1="24" x2="252" y2="44" stroke="#54d98a" stroke-width="1" stroke-dasharray="3 3"/>
+    <line x1="40" y1="196" x2="344" y2="196" stroke="var(--line)" stroke-width="1.5"/>
+    <line x1="40" y1="46" x2="40" y2="196" stroke="var(--line)" stroke-width="1.5"/>
+    <text x="40" y="214" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10" text-anchor="middle">8am</text>
+    <text x="115" y="214" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10" text-anchor="middle">1pm</text>
+    <text x="190" y="214" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10" text-anchor="middle">6pm</text>
+    <text x="252" y="214" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10" text-anchor="middle">10pm</text>
+    <text x="310" y="214" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10" text-anchor="middle">2am</text>
+    <path d="M 40,182 C 103,158 165,133 228,109 C 267,95 305,85 344,80" fill="none" stroke="var(--dim-2)" stroke-width="2.5" stroke-dasharray="6 4"/>
+    <path d="M 40,119 C 74,111 95,141 127,145 C 165,149 199,109 229,82 C 242,70 248,63 258,65 C 281,70 305,135 344,177" fill="none" stroke="#54d98a" stroke-width="3"/>
+    <circle cx="127" cy="145" r="4" fill="#e03127"/>
+    <text x="112" y="180" fill="#e03127" font-family="Space Mono, monospace" font-size="10" text-anchor="middle">afternoon dip</text>
+    <line x1="20" y1="234" x2="46" y2="234" stroke="var(--dim-2)" stroke-width="2.5" stroke-dasharray="6 4"/>
+    <text x="52" y="238" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="10.5">sleep pressure</text>
+    <line x1="160" y1="234" x2="186" y2="234" stroke="#54d98a" stroke-width="3"/>
+    <text x="192" y="238" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-size="10.5">circadian alerting</text>
+  </svg>
   <figcaption>The circadian alerting signal peaks in the hours just before habitual bedtime, opposing the sleep pressure that has been building all day. This is the window most people describe as their best.</figcaption>
 </figure>
 
@@ -200,7 +220,7 @@ The **beta-2 adrenergic receptor is the principal receptor transmitting inhibito
 Your endogenous evening adrenaline is a whisper compared to an auto-injector. But it works on the same receptor through the same second messenger. When you notice that the flushing and the itching quiet down in the same hours that you feel wired and productive, those are not two coincidental facts. They are one event.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 250" role="img" aria-label="Diagram of a mast cell showing adrenaline binding the beta-2 adrenergic receptor, activating adenylate cyclase, raising cyclic AMP and activating PKA, which blocks degranulation and holds back histamine, tryptase and prostaglandins.">
+  <svg class="fig-d" viewBox="0 0 720 250" role="img" aria-label="Diagram of a mast cell showing adrenaline binding the beta-2 adrenergic receptor, activating adenylate cyclase, raising cyclic AMP and activating PKA, which blocks degranulation and holds back histamine, tryptase and prostaglandins.">
     <text x="20" y="26" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="15">The evening brake, step by step</text>
     <rect x="24" y="52" width="120" height="52" rx="10" fill="none" stroke="#54d98a" stroke-width="2"/>
     <text x="84" y="76" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-size="13" text-anchor="middle">adrenaline</text>
@@ -231,6 +251,33 @@ Your endogenous evening adrenaline is a whisper compared to an auto-injector. Bu
     <text x="656" y="150" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11" text-anchor="middle">tryptase</text>
     <text x="656" y="168" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11" text-anchor="middle">prostaglandins</text>
   </svg>
+  <svg class="fig-m" viewBox="0 0 360 380" role="img" aria-label="Diagram of a mast cell showing adrenaline binding the beta-2 adrenergic receptor, activating adenylate cyclase, raising cyclic AMP and activating PKA, which blocks degranulation and holds back histamine, tryptase and prostaglandins.">
+    <text x="20" y="18" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13.5">The evening brake, step by step</text>
+    <rect x="110" y="30" width="140" height="48" rx="10" fill="none" stroke="#54d98a" stroke-width="2"/>
+    <text x="180" y="52" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-size="13" text-anchor="middle">adrenaline</text>
+    <text x="180" y="69" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10" text-anchor="middle">(staying up late)</text>
+    <line x1="180" y1="78" x2="180" y2="94" stroke="var(--dim-2)" stroke-width="2"/>
+    <polygon points="175,94 185,94 180,104" fill="var(--dim-2)"/>
+    <ellipse cx="180" cy="212" rx="152" ry="102" fill="none" stroke="var(--line)" stroke-width="2"/>
+    <text x="180" y="126" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5" text-anchor="middle">mast cell</text>
+    <rect x="133" y="136" width="94" height="32" rx="8" fill="none" stroke="#54d98a" stroke-width="2"/>
+    <text x="180" y="157" fill="#54d98a" font-family="Space Mono, monospace" font-size="12" text-anchor="middle">beta-2 R</text>
+    <line x1="180" y1="168" x2="180" y2="182" stroke="var(--dim-2)" stroke-width="2"/>
+    <polygon points="175,182 185,182 180,192" fill="var(--dim-2)"/>
+    <text x="180" y="208" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="12" text-anchor="middle">cAMP up → PKA</text>
+    <line x1="180" y1="216" x2="180" y2="230" stroke="var(--dim-2)" stroke-width="2"/>
+    <polygon points="175,230 185,230 180,240" fill="var(--dim-2)"/>
+    <rect x="118" y="242" width="124" height="46" rx="10" fill="none" stroke="#e03127" stroke-width="2"/>
+    <text x="180" y="262" fill="#e03127" font-family="Space Grotesk, sans-serif" font-size="13" text-anchor="middle">degranulation</text>
+    <text x="180" y="279" fill="#e03127" font-family="Space Mono, monospace" font-size="11" text-anchor="middle">suppressed</text>
+    <circle cx="98" cy="264" r="9" fill="#e03127" opacity="0.5"/>
+    <circle cx="80" cy="288" r="9" fill="#e03127" opacity="0.5"/>
+    <circle cx="262" cy="264" r="9" fill="#e03127" opacity="0.5"/>
+    <text x="180" y="306" fill="#e03127" font-family="Space Mono, monospace" font-size="10" text-anchor="middle">granules held</text>
+    <line x1="180" y1="316" x2="180" y2="330" stroke="var(--line)" stroke-width="2"/>
+    <text x="180" y="348" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11" text-anchor="middle">less histamine, tryptase,</text>
+    <text x="180" y="366" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11" text-anchor="middle">prostaglandins released</text>
+  </svg>
   <figcaption>Adrenaline binds the beta-2 adrenergic receptor, raising cAMP and activating PKA, which suppresses mast cell degranulation. An epinephrine auto-injector uses the same pathway at vastly higher dose.</figcaption>
 </figure>
 
@@ -259,7 +306,7 @@ Cortisol, your main endogenous anti-inflammatory, reaches its **nadir between ro
 Then add the histamine point from above. When mediators surge in that window, they do not let you sleep through it. They wake you. The 2 to 4am itching, flushing, racing heart and sudden anxious alertness that so many people with MCAS report fits this timing well.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 290" role="img" aria-label="A 24-hour timeline comparing cortisol and inflammatory mediator burden. Cortisol peaks in the morning and reaches its lowest point between midnight and 4am, while mediator burden rises through the night, with a green best-feeling window in the late evening and a red flare window at 2 to 4am.">
+  <svg class="fig-d" viewBox="0 0 720 290" role="img" aria-label="A 24-hour timeline comparing cortisol and inflammatory mediator burden. Cortisol peaks in the morning and reaches its lowest point between midnight and 4am, while mediator burden rises through the night, with a green best-feeling window in the late evening and a red flare window at 2 to 4am.">
     <rect x="404" y="42" width="96" height="188" fill="#54d98a" opacity="0.13"/>
     <text x="452" y="36" fill="#54d98a" font-family="Space Mono, monospace" font-size="11" text-anchor="middle">feels best</text>
     <rect x="524" y="42" width="72" height="188" fill="#e03127" opacity="0.13"/>
@@ -276,6 +323,27 @@ Then add the histamine point from above. When mediators surge in that window, th
     <text x="540" y="234" fill="#54d98a" font-family="Space Mono, monospace" font-size="10" text-anchor="middle">nadir</text>
     <path d="M60 196 C 130 176, 200 152, 280 140 C 340 132, 380 138, 420 152 C 450 163, 480 158, 510 132 C 536 110, 552 82, 572 74 C 610 60, 650 130, 690 190" fill="none" stroke="#e03127" stroke-width="3" stroke-dasharray="7 4"/>
     <text x="196" y="132" fill="#e03127" font-family="Space Grotesk, sans-serif" font-size="12">mediator burden</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 260" role="img" aria-label="A 24-hour timeline comparing cortisol and inflammatory mediator burden. Cortisol peaks in the morning and reaches its lowest point between midnight and 4am, while mediator burden rises through the night, with a green best-feeling window in the late evening and a red flare window at 2 to 4am.">
+    <rect x="206" y="42" width="46" height="158" fill="#54d98a" opacity="0.13"/>
+    <text x="206" y="18" fill="#54d98a" font-family="Space Mono, monospace" font-size="10" text-anchor="middle">feels best</text>
+    <line x1="229" y1="24" x2="229" y2="40" stroke="#54d98a" stroke-width="1" stroke-dasharray="3 3"/>
+    <rect x="264" y="42" width="35" height="158" fill="#e03127" opacity="0.13"/>
+    <text x="316" y="18" fill="#e03127" font-family="Space Mono, monospace" font-size="10" text-anchor="middle">flare window</text>
+    <line x1="282" y1="24" x2="282" y2="40" stroke="#e03127" stroke-width="1" stroke-dasharray="3 3"/>
+    <line x1="40" y1="200" x2="344" y2="200" stroke="var(--line)" stroke-width="1.5"/>
+    <text x="40" y="218" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10" text-anchor="middle">8am</text>
+    <text x="122" y="218" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10" text-anchor="middle">2pm</text>
+    <text x="206" y="218" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10" text-anchor="middle">8pm</text>
+    <text x="264" y="232" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10" text-anchor="middle">midnight</text>
+    <text x="299" y="218" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10" text-anchor="middle">4am</text>
+    <text x="344" y="218" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10" text-anchor="middle">8am</text>
+    <path d="M 40,62 C 64,76 88,114 122,134 C 156,155 185,166 219,175 C 243,182 257,187 272,188 C 284,189 291,182 301,155 C 315,114 330,82 344,62" fill="none" stroke="#54d98a" stroke-width="3"/>
+    <path d="M 40,171 C 74,155 108,134 146,124 C 175,118 194,123 214,134 C 228,144 243,139 257,118 C 270,99 277,76 287,69 C 305,57 325,116 344,166" fill="none" stroke="#e03127" stroke-width="3" stroke-dasharray="7 4"/>
+    <line x1="20" y1="250" x2="46" y2="250" stroke="#54d98a" stroke-width="3"/>
+    <text x="52" y="254" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-size="10.5">cortisol</text>
+    <line x1="140" y1="250" x2="166" y2="250" stroke="#e03127" stroke-width="3" stroke-dasharray="7 4"/>
+    <text x="172" y="254" fill="#e03127" font-family="Space Grotesk, sans-serif" font-size="10.5">mediator burden</text>
   </svg>
   <figcaption>Cortisol bottoms out between roughly midnight and 4am, and glucocorticoid receptor sensitivity is reduced at 4am as well. The evening window that feels best sits directly upstream of the hours with the least anti-inflammatory restraint.</figcaption>
 </figure>
@@ -313,7 +381,7 @@ This is the most trackable cost. Sleep deprivation reliably lowers **RMSSD** and
 The loop is the real problem. A late night produces a worse morning, both because you slept less and because [POTS and dysautonomia symptoms are already at their worst in the first hour after waking](/insights/pots/pots-symptoms-worse-in-the-morning/). The worse morning makes the daytime less usable. The less usable the daytime, the more the evening looks like the only window where life happens. And because sleep onset is being pushed later, your circadian phase actually delays, moving the wake maintenance zone later too, so tomorrow's good window arrives even later than tonight's.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 250" role="img" aria-label="A circular diagram with four stages: the evening window feels good, so you stay up later; short and misaligned sleep follows; the next day brings lower HRV and higher symptom load; the daytime becomes unusable so the evening is the only good window, returning to the start.">
+  <svg class="fig-d" viewBox="0 0 720 250" role="img" aria-label="A circular diagram with four stages: the evening window feels good, so you stay up later; short and misaligned sleep follows; the next day brings lower HRV and higher symptom load; the daytime becomes unusable so the evening is the only good window, returning to the start.">
     <rect x="24" y="42" width="150" height="70" rx="12" fill="none" stroke="#54d98a" stroke-width="2"/>
     <text x="99" y="72" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-size="13" text-anchor="middle">evening window</text>
     <text x="99" y="92" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-size="13" text-anchor="middle">feels good</text>
@@ -339,6 +407,30 @@ The loop is the real problem. A late night produces a worse morning, both becaus
     <text x="265" y="204" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="13" text-anchor="middle">is the only good window</text>
     <path d="M150 189 C 90 189, 70 160, 78 118" fill="none" stroke="var(--dim-2)" stroke-width="2"/>
     <polygon points="73,122 83,122 78,110" fill="var(--dim-2)"/>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 372" role="img" aria-label="A circular diagram with four stages: the evening window feels good, so you stay up later; short and misaligned sleep follows; the next day brings lower HRV and higher symptom load; the daytime becomes unusable so the evening is the only good window, returning to the start.">
+    <rect x="50" y="8" width="270" height="60" rx="12" fill="none" stroke="#54d98a" stroke-width="2"/>
+    <text x="185" y="34" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-size="13" text-anchor="middle">evening window</text>
+    <text x="185" y="54" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-size="13" text-anchor="middle">feels good</text>
+    <line x1="185" y1="68" x2="185" y2="84" stroke="var(--dim-2)" stroke-width="2"/>
+    <polygon points="180,84 190,84 185,94" fill="var(--dim-2)"/>
+    <rect x="50" y="96" width="270" height="60" rx="12" fill="none" stroke="var(--line)" stroke-width="2"/>
+    <text x="185" y="122" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="13" text-anchor="middle">you stay up</text>
+    <text x="185" y="142" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="13" text-anchor="middle">two hours later</text>
+    <line x1="185" y1="156" x2="185" y2="172" stroke="var(--dim-2)" stroke-width="2"/>
+    <polygon points="180,172 190,172 185,182" fill="var(--dim-2)"/>
+    <rect x="50" y="184" width="270" height="60" rx="12" fill="none" stroke="#e03127" stroke-width="2"/>
+    <text x="185" y="210" fill="#e03127" font-family="Space Grotesk, sans-serif" font-size="13" text-anchor="middle">short, misaligned sleep</text>
+    <text x="185" y="230" fill="#e03127" font-family="Space Grotesk, sans-serif" font-size="13" text-anchor="middle">+ phase delay</text>
+    <line x1="185" y1="244" x2="185" y2="260" stroke="var(--dim-2)" stroke-width="2"/>
+    <polygon points="180,260 190,260 185,270" fill="var(--dim-2)"/>
+    <rect x="50" y="272" width="270" height="60" rx="12" fill="none" stroke="#e03127" stroke-width="2"/>
+    <text x="185" y="298" fill="#e03127" font-family="Space Grotesk, sans-serif" font-size="13" text-anchor="middle">lower HRV, higher</text>
+    <text x="185" y="318" fill="#e03127" font-family="Space Grotesk, sans-serif" font-size="13" text-anchor="middle">symptom load next day</text>
+    <path d="M50 302 L26 302 L26 26 L44 26" fill="none" stroke="var(--dim-2)" stroke-width="2"/>
+    <polygon points="44,21 44,31 54,26" fill="var(--dim-2)"/>
+    <text x="180" y="358" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5" text-anchor="middle">daytime unusable, so the evening is</text>
+    <text x="180" y="370" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5" text-anchor="middle">the only good window — and round again</text>
   </svg>
   <figcaption>The reinforcing loop. Each pass through it delays your circadian phase a little further, so tomorrow's good window arrives later than tonight's.</figcaption>
 </figure>

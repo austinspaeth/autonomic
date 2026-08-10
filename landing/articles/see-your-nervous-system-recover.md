@@ -48,7 +48,7 @@ That's the problem Autonomic was built to solve. Not another place to dump numbe
 Any single reading is a dot: today's HRV, this morning's resting heart rate, one stand test. Dots bounce. Sleep, stress, salt, hormones and yesterday's walk all push them around, which is why judging yourself by this morning's number is a recipe for despair.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 300" role="img" aria-label="A scatter of noisy daily readings around a smooth rising baseline. One low outlier is labeled 'a rough day'; the rising curve is labeled 'your baseline'.">
+  <svg class="fig-d" viewBox="0 0 720 300" role="img" aria-label="A scatter of noisy daily readings around a smooth rising baseline. One low outlier is labeled 'a rough day'; the rising curve is labeled 'your baseline'.">
     <g fill="#58c4f2" opacity="0.55">
       <circle cx="60" cy="238" r="5" /><circle cx="96" cy="206" r="5" /><circle cx="132" cy="242" r="5" />
       <circle cx="168" cy="212" r="5" /><circle cx="204" cy="188" r="5" /><circle cx="240" cy="224" r="5" />
@@ -65,6 +65,24 @@ Any single reading is a dot: today's HRV, this morning's resting heart rate, one
       <text x="600" y="221" text-anchor="middle" fill="var(--dim)">(just a dot)</text>
       <text x="360" y="130" text-anchor="middle" fill="#54d98a" font-weight="600">your baseline</text>
       <text x="360" y="147" text-anchor="middle" fill="var(--dim)">(the actual story)</text>
+    </g>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 250" role="img" aria-label="A scatter of noisy daily readings around a smooth rising baseline. One low outlier is labeled 'a rough day'; the rising curve is labeled 'your baseline'.">
+    <g fill="#58c4f2" opacity="0.55">
+      <circle cx="30" cy="198" r="5" /><circle cx="48" cy="164" r="5" /><circle cx="66" cy="202" r="5" />
+      <circle cx="84" cy="171" r="5" /><circle cx="102" cy="146" r="5" /><circle cx="120" cy="183" r="5" />
+      <circle cx="138" cy="133" r="5" /><circle cx="156" cy="160" r="5" /><circle cx="174" cy="113" r="5" />
+      <circle cx="191" cy="144" r="5" /><circle cx="209" cy="98" r="5" /><circle cx="227" cy="125" r="5" />
+      <circle cx="245" cy="77" r="5" /><circle cx="263" cy="106" r="5" /><circle cx="281" cy="61" r="5" />
+      <circle cx="317" cy="50" r="5" /><circle cx="335" cy="67" r="5" />
+    </g>
+    <circle cx="299" cy="133" r="7" fill="#e03127" />
+    <path d="M 20,185 C 80,175 115,160 155,140 C 194,119 224,104 259,81 C 289,63 322,48 344,40" fill="none" stroke="#54d98a" stroke-width="3.5" stroke-linecap="round" />
+    <g font-family="-apple-system, sans-serif" font-size="12">
+      <text x="344" y="162" text-anchor="end" fill="#e03127">a rough day</text>
+      <text x="344" y="178" text-anchor="end" fill="var(--dim)">(just a dot)</text>
+      <text x="20" y="222" fill="#54d98a" font-weight="600">your baseline</text>
+      <text x="20" y="240" fill="var(--dim)">(the actual story)</text>
     </g>
   </svg>
   <figcaption>Daily readings bounce. The baseline underneath is what recovery actually looks like, and it's what Autonomic keeps in front of you.</figcaption>

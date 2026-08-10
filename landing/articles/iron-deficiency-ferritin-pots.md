@@ -129,7 +129,7 @@ Think of your iron like a household budget. **Ferritin is your savings account**
 That in-between stage, when ferritin is low but hemoglobin is still normal, has a name: **iron deficiency without anemia**. You can be genuinely iron-deficient, symptomatic, and have a CBC that reads perfectly normal. If nobody orders a ferritin, the whole thing is invisible.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 240" role="img" aria-label="Two-stage timeline showing that ferritin, the iron-storage marker, falls well before hemoglobin drops, so a normal complete blood count can miss early iron deficiency">
+  <svg class="fig-d" viewBox="0 0 720 240" role="img" aria-label="Two-stage timeline showing that ferritin, the iron-storage marker, falls well before hemoglobin drops, so a normal complete blood count can miss early iron deficiency">
     <text x="20" y="28" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="12">As iron intake falls short over time  &#8594;</text>
     <!-- ferritin line: starts high, drops early -->
     <polyline fill="none" stroke="#e03127" stroke-width="3" points="60,70 200,72 320,120 440,175 620,196 700,198" />
@@ -142,6 +142,18 @@ That in-between stage, when ferritin is low but hemoglobin is still normal, has 
     <text x="418" y="52" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11">symptoms can start here,</text>
     <text x="418" y="68" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11">while the CBC still reads normal</text>
     <line x1="60" y1="210" x2="700" y2="210" stroke="var(--line)" stroke-width="1" />
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 200" role="img" aria-label="Two-stage timeline showing that ferritin, the iron-storage marker, falls well before hemoglobin drops, so a normal complete blood count can miss early iron deficiency">
+    <text x="20" y="16" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11">As iron intake falls short over time &#8594;</text>
+    <text x="20" y="40" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13">Ferritin (stored iron) falls first</text>
+    <polyline fill="none" stroke="#e03127" stroke-width="3" points="44,66 110,67 166,109 222,156 306,174 344,176" />
+    <text x="20" y="86" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="12.5">Hemoglobin holds, then drops late</text>
+    <polyline fill="none" stroke="#54d98a" stroke-width="3" points="44,100 166,100 232,102 278,117 325,156 344,169" />
+    <line x1="208" y1="40" x2="208" y2="186" stroke="var(--dim-2)" stroke-width="1" stroke-dasharray="4 4" opacity="0.7" />
+    <line x1="44" y1="186" x2="344" y2="186" stroke="var(--line)" stroke-width="1" />
+    <text x="232" y="56" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="9.5">symptoms can start</text>
+    <text x="232" y="70" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="9.5">here, while the CBC</text>
+    <text x="232" y="84" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="9.5">still reads normal</text>
   </svg>
   <figcaption>Ferritin is the early-warning marker. A complete blood count can stay normal well into a deficiency, which is why "your CBC is fine" does not rule out low iron.</figcaption>
 </figure>
@@ -185,7 +197,7 @@ Use the small tool below to see roughly where a given ferritin sits on that prac
 {@html ferritinScript}
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 150" role="img" aria-label="A ferritin scale from 0 to 150 nanograms per milliliter, showing the lab flag near 15, a depleted zone up to 30, a low-normal zone to 50, and an adequate zone above 50">
+  <svg class="fig-d" viewBox="0 0 720 150" role="img" aria-label="A ferritin scale from 0 to 150 nanograms per milliliter, showing the lab flag near 15, a depleted zone up to 30, a low-normal zone to 50, and an adequate zone above 50">
     <line x1="40" y1="90" x2="700" y2="90" stroke="var(--line)" stroke-width="2" />
     <!-- zones -->
     <rect x="40" y="80" width="88" height="20" fill="#ef4444" opacity="0.85" />
@@ -206,6 +218,30 @@ Use the small tool below to see roughly where a given ferritin sits on that prac
     <text x="282" y="66" fill="#eab308" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="12" text-anchor="middle">low-normal</text>
     <text x="500" y="66" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="12" text-anchor="middle">adequate for most</text>
     <text x="128" y="20" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">&#8593; where most labs stop flagging</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 196" role="img" aria-label="A ferritin scale from 0 to 150 nanograms per milliliter, showing the lab flag near 15, a depleted zone up to 30, a low-normal zone to 50, and an adequate zone above 50">
+    <text x="20" y="16" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11">Ferritin (ng/mL)</text>
+    <line x1="63" y1="26" x2="63" y2="40" stroke="var(--dim-2)" stroke-width="1"/>
+    <text x="72" y="34" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="9.5">where most labs stop flagging</text>
+    <rect x="20" y="44" width="43" height="20" fill="#ef4444" opacity="0.85" />
+    <rect x="63" y="44" width="43" height="20" fill="#f97316" opacity="0.85" />
+    <rect x="106" y="44" width="64" height="20" fill="#eab308" opacity="0.85" />
+    <rect x="170" y="44" width="170" height="20" fill="#54d98a" opacity="0.85" />
+    <g font-family="Space Mono, monospace" font-size="10.5" fill="var(--dim-2)" text-anchor="middle">
+      <text x="20" y="80">0</text>
+      <text x="63" y="80">15</text>
+      <text x="106" y="80">30</text>
+      <text x="170" y="80">50</text>
+      <text x="336" y="80">150</text>
+    </g>
+    <rect x="20" y="102" width="26" height="12" fill="#ef4444" opacity="0.85"/>
+    <text x="54" y="112" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="12.5">under 15 · clearly low</text>
+    <rect x="20" y="126" width="26" height="12" fill="#f97316" opacity="0.85"/>
+    <text x="54" y="136" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="12.5">15 to 30 · depleted</text>
+    <rect x="20" y="150" width="26" height="12" fill="#eab308" opacity="0.85"/>
+    <text x="54" y="160" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="12.5">30 to 50 · low-normal</text>
+    <rect x="20" y="174" width="26" height="12" fill="#54d98a" opacity="0.85"/>
+    <text x="54" y="184" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="12.5">above 50 · adequate for most</text>
   </svg>
   <figcaption>The gap between "the lab flags it" (about 15) and "many people feel better above it" (roughly 50) is where iron deficiency hides in plain sight. Ranges vary by lab and person.</figcaption>
 </figure>
@@ -257,7 +293,7 @@ This is firmly a clinician-led area, so the goal here is to know what to expect,
 The single most important expectation to set: **this is slow**. Blood markers can move within a couple of weeks, but refilling ferritin stores typically takes **three to six months**, and how you feel tends to lag the labs. That gap is precisely why watching a trend beats judging by any single day.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 240" role="img" aria-label="An illustrative multi-month chart showing resting heart rate drifting down and HRV drifting up as iron stores are rebuilt, with symptom improvement lagging behind">
+  <svg class="fig-d" viewBox="0 0 720 240" role="img" aria-label="An illustrative multi-month chart showing resting heart rate drifting down and HRV drifting up as iron stores are rebuilt, with symptom improvement lagging behind">
     <line x1="60" y1="200" x2="700" y2="200" stroke="var(--line)" stroke-width="1" />
     <text x="60" y="228" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11">start</text>
     <text x="360" y="228" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11" text-anchor="middle">~3 months</text>
@@ -268,6 +304,16 @@ The single most important expectation to set: **this is slow**. Blood markers ca
     <!-- HRV trending up -->
     <polyline fill="none" stroke="#54d98a" stroke-width="2.5" points="60,178 180,172 300,158 420,140 540,126 700,110" />
     <text x="360" y="196" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13" text-anchor="middle">HRV, trending up</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 212" role="img" aria-label="An illustrative multi-month chart showing resting heart rate drifting down and HRV drifting up as iron stores are rebuilt, with symptom improvement lagging behind">
+    <text x="20" y="42" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="12.5">Resting heart rate, trending down</text>
+    <polyline fill="none" stroke="#e03127" stroke-width="2.5" points="44,66 100,69 156,79 213,93 269,105 344,115" />
+    <polyline fill="none" stroke="#54d98a" stroke-width="2.5" points="44,157 100,152 156,140 213,125 269,113 344,100" />
+    <text x="20" y="182" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="12.5">HRV, trending up</text>
+    <line x1="44" y1="190" x2="344" y2="190" stroke="var(--line)" stroke-width="1" />
+    <text x="44" y="206" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5">start</text>
+    <text x="194" y="206" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5" text-anchor="middle">~3 months</text>
+    <text x="344" y="206" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5" text-anchor="end">~6 months</text>
   </svg>
   <figcaption>An illustrative repletion arc. As iron stores rebuild, resting heart rate often eases down and HRV drifts up. The point is the direction over months, not any single reading.</figcaption>
 </figure>

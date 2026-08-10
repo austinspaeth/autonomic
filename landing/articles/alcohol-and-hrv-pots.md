@@ -125,7 +125,7 @@ This is the big one. Alcohol is sedating, so it often helps people fall asleep f
 Alcohol suppresses vasopressin, the hormone that tells your kidneys to hold onto water, so you urinate out more fluid than you take in. Lower blood volume means the heart has to work a little harder to maintain pressure, nudging heart rate up and HRV down. Alcohol also disturbs overnight blood sugar regulation, and the small hormonal corrections your body makes can add another layer of sympathetic arousal in the early hours. None of these is dramatic alone, but stacked on top of the first two, they explain why the morning after can feel so flat.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 260" role="img" aria-label="Overnight HRV across a night of sleep. A sober night rises steadily to a high plateau in the first half, while a night after drinking stays suppressed early and only partly recovers before waking.">
+  <svg class="fig-d" viewBox="0 0 720 260" role="img" aria-label="Overnight HRV across a night of sleep. A sober night rises steadily to a high plateau in the first half, while a night after drinking stays suppressed early and only partly recovers before waking.">
     <line x1="60" y1="210" x2="700" y2="210" stroke="var(--line)" stroke-width="1.5"/>
     <line x1="60" y1="30" x2="60" y2="210" stroke="var(--line)" stroke-width="1.5"/>
     <text x="26" y="44" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11">HRV</text>
@@ -137,6 +137,18 @@ Alcohol suppresses vasopressin, the hormone that tells your kidneys to hold onto
     <text x="380" y="230" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11">3am</text>
     <text x="700" y="230" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11">7am</text>
   </svg>
+  <svg class="fig-m" viewBox="0 0 360 216" role="img" aria-label="Overnight HRV across a night of sleep. A sober night rises steadily to a high plateau in the first half, while a night after drinking stays suppressed early and only partly recovers before waking.">
+    <line x1="46" y1="190" x2="344" y2="190" stroke="var(--line)" stroke-width="1.5"/>
+    <line x1="46" y1="30" x2="46" y2="190" stroke="var(--line)" stroke-width="1.5"/>
+    <text x="14" y="110" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11" transform="rotate(-90 14 110)">HRV</text>
+    <polyline fill="none" stroke="#54d98a" stroke-width="2.5" points="46,163 83,137 120,103 156,76 193,66 230,64 266,69 303,80 340,90"/>
+    <polyline fill="none" stroke="#e03127" stroke-width="2.5" points="46,178 83,174 120,170 156,163 193,153 230,138 266,124 303,112 340,101"/>
+    <text x="150" y="58" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="14">Sober night</text>
+    <text x="95" y="150" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="14">After drinking</text>
+    <text x="46" y="210" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11">11pm</text>
+    <text x="193" y="210" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11">3am</text>
+    <text x="344" y="210" text-anchor="end" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11">7am</text>
+  </svg>
   <figcaption>On a normal night HRV climbs early as you drop into deep sleep, then eases toward morning. After alcohol it stays flat and low while your body works through it, and only starts recovering in the second half, so a morning reading catches the suppressed part.</figcaption>
 </figure>
 
@@ -145,7 +157,7 @@ Alcohol suppresses vasopressin, the hormone that tells your kidneys to hold onto
 The honest answer is that it depends on the dose, your size, your sex, your tolerance, and how late you drank, so treat any specific number as your own to discover. What is dependable is the *shape*: the more you drink in the evening, the further overnight HRV falls and the longer it takes to bounce back.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 240" role="img" aria-label="Bar chart showing overnight HRV falling further as evening alcohol increases: highest with no drinks, lower with one, lower still with two to three, and lowest with four or more.">
+  <svg class="fig-d" viewBox="0 0 720 240" role="img" aria-label="Bar chart showing overnight HRV falling further as evening alcohol increases: highest with no drinks, lower with one, lower still with two to three, and lowest with four or more.">
     <line x1="60" y1="190" x2="700" y2="190" stroke="var(--line)" stroke-width="1.5"/>
     <rect x="110" y="58" width="90" height="132" fill="#54d98a"/>
     <rect x="270" y="94" width="90" height="96" fill="#22c55e"/>
@@ -156,6 +168,18 @@ The honest answer is that it depends on the dose, your size, your sex, your tole
     <text x="475" y="212" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="12">2-3</text>
     <text x="635" y="212" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="12">4+</text>
     <text x="60" y="48" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11">Overnight HRV</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 232" role="img" aria-label="Bar chart showing overnight HRV falling further as evening alcohol increases: highest with no drinks, lower with one, lower still with two to three, and lowest with four or more.">
+    <line x1="20" y1="190" x2="344" y2="190" stroke="var(--line)" stroke-width="1.5"/>
+    <rect x="30" y="58" width="62" height="132" fill="#54d98a"/>
+    <rect x="112" y="94" width="62" height="96" fill="#22c55e"/>
+    <rect x="194" y="130" width="62" height="60" fill="#f97316"/>
+    <rect x="276" y="158" width="62" height="32" fill="#e03127"/>
+    <text x="61" y="212" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="12">None</text>
+    <text x="143" y="212" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="12">1 drink</text>
+    <text x="225" y="212" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="12">2-3</text>
+    <text x="307" y="212" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="12">4+</text>
+    <text x="20" y="40" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="12">Overnight HRV</text>
   </svg>
   <figcaption>The effect is dose dependent: more evening alcohol means a deeper drop and a slower recovery. Illustrative shape, not your exact numbers, which is the point of measuring your own.</figcaption>
 </figure>

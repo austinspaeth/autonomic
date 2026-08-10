@@ -40,6 +40,7 @@ import { workoutCurveFor } from '../components/summary';
 import { openWorkoutReport } from './forms';
 import { ACTIVITY_TYPES } from '../lib/registry';
 import { getState } from '../store/store';
+import { setPillSlotClaim } from '../store/pillSlot';
 import { fmtTime12, todayKey } from '../lib/dates';
 
 /** Group tints, shared with the watch/design palette (see forms.tsx). */
@@ -132,12 +133,26 @@ export function HealthUpdatePill() {
   const phaseRef = useRef<PillPhase>('hidden');
   phaseRef.current = phase;
 
+  // Own the floating slot while visible, so the low-priority "What's new" pill
+  // recedes behind this one instead of overlapping it (src/store/pillSlot).
+  // Release on unmount only: a cleanup keyed on `phase` would drop the claim and
+  // retake it on every transition, bouncing the pill behind it mid-spring.
+  useEffect(() => { setPillSlotClaim('health', phase !== 'hidden'); }, [phase]);
+  useEffect(() => () => setPillSlotClaim('health', false), []);
+
   const fadeTo = (to: number, done?: () => void) =>
     Animated.timing(opacity, { toValue: to, duration: to ? 220 : 280, useNativeDriver: true }).start(({ finished }) => { if (finished) done?.(); });
 
-  const hide = () => fadeTo(0, () => {
-    setPhase('hidden'); setFound(null); setFoundW(0); setMorphing(false); restW.current = 0;
-  });
+  const hide = () => {
+    // Hand the slot back as the fade STARTS, not when it finishes. `phase` only
+    // reaches 'hidden' after the 280ms fade, so releasing from the effect below
+    // would leave the pill behind sitting shrunk for the whole dissolve; the two
+    // should move together.
+    setPillSlotClaim('health', false);
+    fadeTo(0, () => {
+      setPhase('hidden'); setFound(null); setFoundW(0); setMorphing(false); restW.current = 0;
+    });
+  };
 
   // Morph into "found": fade the checking content out, tween the width out to
   // the measured new content, fade that in as the width settles.
@@ -301,7 +316,9 @@ export function HealthUpdatePill() {
 
 // Styled to match the floating tab bar + WatchSyncPill (same blur, tint, border).
 const styles = StyleSheet.create({
-  wrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
+  // zIndex 2: this pill always sits in front of the "What's new" pill, which
+  // recedes to the layer behind it while this one holds the slot.
+  wrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center', zIndex: 2 },
   pill: {
     height: PILL_H, borderRadius: 999, overflow: 'hidden', borderWidth: BORDER, borderColor: '#34343b',
     shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 20, shadowOffset: { width: 0, height: 10 }, elevation: 8,

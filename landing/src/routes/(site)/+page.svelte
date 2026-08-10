@@ -1084,7 +1084,7 @@
     </div>
     <p class="eyebrow">Privacy by architecture</p>
     <h2 class="h2">Your most sensitive data never leaves your phone.</h2>
-    <p class="lead">No account. No cloud. No analytics. Autonomic stores everything in local storage on your device, computes every score and report offline, and gives you a one-tap JSON export you fully control. It can even back up automatically to your own iCloud, so your data stays with you, not us. Privacy isn’t a setting here, it’s how the app is built.</p>
+    <p class="lead">No account. No cloud. No tracking. Autonomic stores everything in local storage on your device, computes every score and report offline, and gives you a one-tap JSON export you fully control. It can even back up automatically to your own iCloud, so your data stays with you, not us. Privacy isn’t a setting here, it’s how the app is built.</p>
     <div class="privacy-pills">
       <span>100% on-device</span><span>No sign-up</span><span>No tracking</span><span>iCloud backup</span><span>Export anytime</span>
     </div>

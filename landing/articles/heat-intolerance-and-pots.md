@@ -74,7 +74,7 @@ Your body has two main tools for shedding heat, and both work directly against t
 Put those together and you get the heat cascade: widened vessels and a shrinking fluid volume both reduce venous return, the heart rate climbs to compensate, vagal tone falls, and standing becomes markedly harder. Humidity makes it worse still, because sweat cannot evaporate efficiently in damp air, so you lose the fluid without getting the full cooling benefit.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 300" role="img" aria-label="Flow diagram showing how a heat load triggers skin vessel widening and sweating, both of which reduce blood returning to the heart, which raises heart rate and lowers HRV and worsens standing">
+  <svg class="fig-d" viewBox="0 0 720 300" role="img" aria-label="Flow diagram showing how a heat load triggers skin vessel widening and sweating, both of which reduce blood returning to the heart, which raises heart rate and lowers HRV and worsens standing">
     <rect x="280" y="18" width="160" height="46" rx="10" fill="none" stroke="#e03127" stroke-width="2"/>
     <text x="360" y="40" text-anchor="middle" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="16">Heat load</text>
     <text x="360" y="57" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11">hot / humid day</text>
@@ -94,6 +94,29 @@ Put those together and you get the heat cascade: widened vessels and a shrinking
     <line x1="360" y1="236" x2="360" y2="262" stroke="var(--line)" stroke-width="2"/>
     <rect x="210" y="262" width="300" height="30" rx="8" fill="none" stroke="#e03127" stroke-width="2"/>
     <text x="360" y="282" text-anchor="middle" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13">Heart rate up, HRV down, standing harder</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 300" role="img" aria-label="Flow diagram showing how a heat load triggers skin vessel widening and sweating, both of which reduce blood returning to the heart, which raises heart rate and lowers HRV and worsens standing">
+    <rect x="100" y="8" width="160" height="46" rx="10" fill="none" stroke="#e03127" stroke-width="2"/>
+    <text x="180" y="30" text-anchor="middle" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="15">Heat load</text>
+    <text x="180" y="47" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11">hot / humid day</text>
+    <line x1="150" y1="54" x2="93" y2="72" stroke="var(--line)" stroke-width="2"/>
+    <line x1="210" y1="54" x2="267" y2="72" stroke="var(--line)" stroke-width="2"/>
+    <rect x="8" y="76" width="170" height="76" rx="10" fill="none" stroke="var(--line)" stroke-width="1.5"/>
+    <text x="93" y="100" text-anchor="middle" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13">Skin vessels widen</text>
+    <text x="93" y="122" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">blood pools in</text>
+    <text x="93" y="138" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">arms and legs</text>
+    <rect x="182" y="76" width="170" height="76" rx="10" fill="none" stroke="var(--line)" stroke-width="1.5"/>
+    <text x="267" y="100" text-anchor="middle" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13">Sweating</text>
+    <text x="267" y="122" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">fluid and salt</text>
+    <text x="267" y="138" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">lost</text>
+    <line x1="93" y1="152" x2="150" y2="176" stroke="var(--line)" stroke-width="2"/>
+    <line x1="267" y1="152" x2="210" y2="176" stroke="var(--line)" stroke-width="2"/>
+    <rect x="10" y="178" width="340" height="52" rx="10" fill="none" stroke="var(--dim-2)" stroke-width="1.5"/>
+    <text x="180" y="200" text-anchor="middle" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13">Less blood returns to the heart</text>
+    <text x="180" y="219" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5">lower venous return, lower volume</text>
+    <line x1="180" y1="230" x2="180" y2="250" stroke="var(--line)" stroke-width="2"/>
+    <rect x="10" y="252" width="340" height="40" rx="8" fill="none" stroke="#e03127" stroke-width="2"/>
+    <text x="180" y="277" text-anchor="middle" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="12">Heart rate up, HRV down, standing harder</text>
   </svg>
   <figcaption>The heat cascade: two normal cooling responses both cut the blood returning to your heart, and your heart rate climbs to make up the difference.</figcaption>
 </figure>
@@ -115,7 +138,7 @@ Because heat shifts your autonomic balance toward the sympathetic side, it shows
 The single most useful habit here is to **compare like with like**. Your summer numbers belong next to your other summer numbers, not against a reading from a cool morning in March. A resting heart rate five to ten beats above your winter baseline, and a morning [HRV](/insights/hrv/hrv-complete-guide/) that runs a little lower, can be a completely stable hot-season pattern. What matters is the trend within the season and whether a genuinely bad day lines up with a genuinely hot one.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 280" role="img" aria-label="A stand test heart rate over ten minutes on a cool day versus a hot day. On the cool day heart rate rises modestly after standing. On the hot day it rises much higher and stays elevated.">
+  <svg class="fig-d" viewBox="0 0 720 280" role="img" aria-label="A stand test heart rate over ten minutes on a cool day versus a hot day. On the cool day heart rate rises modestly after standing. On the hot day it rises much higher and stays elevated.">
     <line x1="60" y1="40" x2="60" y2="210" stroke="var(--line)" stroke-width="1.5"/>
     <line x1="60" y1="210" x2="690" y2="210" stroke="var(--line)" stroke-width="1.5"/>
     <text x="30" y="204" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11">60</text>
@@ -131,6 +154,23 @@ The single most useful habit here is to **compare like with like**. Your summer 
     <text x="606" y="118" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13">Cool day</text>
     <text x="606" y="50" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13">Hot day</text>
     <text x="375" y="252" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11">minutes standing  0 to 10</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 232" role="img" aria-label="A stand test heart rate over ten minutes on a cool day versus a hot day. On the cool day heart rate rises modestly after standing. On the hot day it rises much higher and stays elevated.">
+    <line x1="44" y1="40" x2="44" y2="186" stroke="var(--line)" stroke-width="1.5"/>
+    <line x1="44" y1="186" x2="340" y2="186" stroke="var(--line)" stroke-width="1.5"/>
+    <text x="38" y="185" text-anchor="end" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5">60</text>
+    <text x="38" y="116" text-anchor="end" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5">100</text>
+    <text x="38" y="47" text-anchor="end" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5">140</text>
+    <text x="14" y="113" text-anchor="middle" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="11" transform="rotate(-90 14 113)">Heart rate (bpm)</text>
+    <line x1="102" y1="40" x2="102" y2="186" stroke="var(--line)" stroke-width="1" stroke-dasharray="4 4"/>
+    <text x="102" y="202" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5">stand up</text>
+    <polyline fill="none" stroke="#54d98a" stroke-width="2.5" points="44,157 102,153 117,122 131,112 161,109 219,110 277,109 335,112"/>
+    <polyline fill="none" stroke="#e03127" stroke-width="2.5" points="44,143 102,140 117,92 131,67 161,54 219,57 277,52 335,55"/>
+    <circle cx="335" cy="112" r="4" fill="#54d98a"/>
+    <circle cx="335" cy="55" r="4" fill="#e03127"/>
+    <text x="330" y="134" text-anchor="end" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="12.5">Cool day</text>
+    <text x="330" y="42" text-anchor="end" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="12.5">Hot day</text>
+    <text x="192" y="224" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5">minutes standing  0 to 10</text>
   </svg>
   <figcaption>The same person, the same stand test, two temperatures. Heat inflates the standing heart-rate rise, which is why a hot-day stand test reads worse without anything changing about your underlying recovery.</figcaption>
 </figure>

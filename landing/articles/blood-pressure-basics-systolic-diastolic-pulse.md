@@ -120,7 +120,7 @@ Between beats, your heart relaxes and refills, but your arteries do not empty. T
 A low diastolic can mean your arteries are relaxed and elastic, which is often healthy, but a *very* low diastolic can leave the heart's own blood supply short, since the heart muscle is fed mostly during diastole. A high diastolic points to vessels that stay tense between beats.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 280" role="img" aria-label="One arterial pressure waveform showing the systolic peak as the heart contracts and the diastolic trough as it rests between beats">
+  <svg class="fig-d" viewBox="0 0 720 280" role="img" aria-label="One arterial pressure waveform showing the systolic peak as the heart contracts and the diastolic trough as it rests between beats">
     <line x1="60" y1="40" x2="60" y2="240" stroke="var(--line-2)" stroke-width="1" />
     <line x1="60" y1="240" x2="700" y2="240" stroke="var(--line-2)" stroke-width="1" />
     <line x1="60" y1="72" x2="700" y2="72" stroke="#e03127" stroke-width="1" stroke-dasharray="4 4" opacity="0.55" />
@@ -135,6 +135,22 @@ A low diastolic can mean your arteries are relaxed and elastic, which is often h
     <text x="230" y="262" fill="var(--dim)" font-family="Space Mono, monospace" font-size="11">one beat</text>
     <line x1="138" y1="250" x2="478" y2="250" stroke="var(--dim)" stroke-width="1" />
     <text x="308" y="248" text-anchor="middle" fill="var(--dim)" font-family="Space Mono, monospace" font-size="10">pulse = beats per minute</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 254" role="img" aria-label="One arterial pressure waveform showing the systolic peak as the heart contracts and the diastolic trough as it rests between beats">
+    <line x1="40" y1="40" x2="40" y2="210" stroke="var(--line-2)" stroke-width="1" />
+    <line x1="40" y1="210" x2="344" y2="210" stroke="var(--line-2)" stroke-width="1" />
+    <line x1="40" y1="67" x2="344" y2="67" stroke="#e03127" stroke-width="1" stroke-dasharray="4 4" opacity="0.55" />
+    <line x1="40" y1="173" x2="344" y2="173" stroke="#58c4f2" stroke-width="1" stroke-dasharray="4 4" opacity="0.65" />
+    <path d="M 40 173 C 57 173 61 69 77 67 C 90 66 93 116 102 125 C 106 130 111 118 118 125 C 136 144 173 173 202 173 C 218 173 223 69 239 67 C 251 66 255 116 263 125 C 268 130 273 118 279 125 C 297 144 325 173 344 173" fill="none" stroke="var(--text)" stroke-width="2.5" />
+    <circle cx="77" cy="67" r="5" fill="#e03127" />
+    <circle cx="202" cy="173" r="5" fill="#58c4f2" />
+    <text x="88" y="52" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="12.5">Systolic, heart contracts</text>
+    <text x="120" y="196" fill="#58c4f2" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="12.5">Diastolic, between beats</text>
+    <text x="344" y="62" text-anchor="end" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5">peak</text>
+    <text x="344" y="192" text-anchor="end" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5">trough</text>
+    <line x1="77" y1="222" x2="239" y2="222" stroke="var(--dim)" stroke-width="1" />
+    <text x="158" y="216" text-anchor="middle" fill="var(--dim)" font-family="Space Mono, monospace" font-size="10.5">one beat</text>
+    <text x="180" y="244" text-anchor="middle" fill="var(--dim)" font-family="Space Mono, monospace" font-size="11">pulse = beats per minute</text>
   </svg>
   <figcaption>One cardiac cycle. The curve climbs to the systolic peak as the heart contracts, then falls to the diastolic trough as it refills. How often this repeats is your pulse.</figcaption>
 </figure>

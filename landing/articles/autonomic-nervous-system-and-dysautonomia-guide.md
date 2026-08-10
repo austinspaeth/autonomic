@@ -36,7 +36,7 @@ That entire automatic control layer is the **autonomic nervous system (ANS)**. I
 The autonomic nervous system has two main branches that pull in opposite directions. Health is not one side winning; it's the two staying in flexible balance and handing off to each other as the moment demands.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 300" role="img" aria-label="Diagram of the autonomic nervous system splitting into sympathetic and parasympathetic branches">
+  <svg class="fig-d" viewBox="0 0 720 300" role="img" aria-label="Diagram of the autonomic nervous system splitting into sympathetic and parasympathetic branches">
     <text x="360" y="30" text-anchor="middle" fill="var(--text)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="19">Autonomic Nervous System</text>
     <line x1="360" y1="42" x2="180" y2="92" stroke="var(--line-2)" stroke-width="2" />
     <line x1="360" y1="42" x2="540" y2="92" stroke="var(--line-2)" stroke-width="2" />
@@ -52,6 +52,24 @@ The autonomic nervous system has two main branches that pull in opposite directi
     <text x="540" y="180" text-anchor="middle" fill="var(--dim)" font-family="-apple-system, sans-serif" font-size="13">Slows the heart</text>
     <text x="540" y="204" text-anchor="middle" fill="var(--dim)" font-family="-apple-system, sans-serif" font-size="13">Aids digestion</text>
     <text x="540" y="228" text-anchor="middle" fill="var(--dim)" font-family="-apple-system, sans-serif" font-size="13">Raises HRV</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 268" role="img" aria-label="Diagram of the autonomic nervous system splitting into sympathetic and parasympathetic branches">
+    <text x="180" y="26" text-anchor="middle" fill="var(--text)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="16">Autonomic Nervous System</text>
+    <line x1="180" y1="38" x2="91" y2="72" stroke="var(--line-2)" stroke-width="2" />
+    <line x1="180" y1="38" x2="269" y2="72" stroke="var(--line-2)" stroke-width="2" />
+    <rect x="8" y="76" width="166" height="180" rx="14" fill="none" stroke="#f97316" stroke-width="2" />
+    <rect x="186" y="76" width="166" height="180" rx="14" fill="none" stroke="#58c4f2" stroke-width="2" />
+    <text x="91" y="106" text-anchor="middle" fill="#f97316" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="15">Sympathetic</text>
+    <text x="91" y="128" text-anchor="middle" fill="var(--dim)" font-family="Space Mono, monospace" font-size="11">"fight or flight"</text>
+    <text x="91" y="162" text-anchor="middle" fill="var(--dim)" font-family="-apple-system, sans-serif" font-size="12.5">Speeds the heart</text>
+    <text x="91" y="190" text-anchor="middle" fill="var(--dim)" font-family="-apple-system, sans-serif" font-size="12.5">Raises blood</text>
+    <text x="91" y="207" text-anchor="middle" fill="var(--dim)" font-family="-apple-system, sans-serif" font-size="12.5">pressure</text>
+    <text x="91" y="235" text-anchor="middle" fill="var(--dim)" font-family="-apple-system, sans-serif" font-size="12.5">Lowers HRV</text>
+    <text x="269" y="106" text-anchor="middle" fill="#58c4f2" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="15">Parasympathetic</text>
+    <text x="269" y="128" text-anchor="middle" fill="var(--dim)" font-family="Space Mono, monospace" font-size="11">"rest and digest"</text>
+    <text x="269" y="162" text-anchor="middle" fill="var(--dim)" font-family="-apple-system, sans-serif" font-size="12.5">Slows the heart</text>
+    <text x="269" y="190" text-anchor="middle" fill="var(--dim)" font-family="-apple-system, sans-serif" font-size="12.5">Aids digestion</text>
+    <text x="269" y="235" text-anchor="middle" fill="var(--dim)" font-family="-apple-system, sans-serif" font-size="12.5">Raises HRV</text>
   </svg>
   <figcaption>The two branches of the autonomic nervous system and the signals each one moves.</figcaption>
 </figure>
@@ -101,7 +119,7 @@ None of these are the disease itself. They are its *fingerprints*, and fingerpri
 Here's the reframe that changes everything. You can't feel your autonomic regulation directly. You can't sense your vagal tone or watch your baroreflex work. But you *can* measure the signals those systems leave behind, and you can do it at home, without a lab.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 150" role="img" aria-label="Three measurable autonomic signals: HRV, resting heart rate, and the orthostatic stand test">
+  <svg class="fig-d" viewBox="0 0 720 150" role="img" aria-label="Three measurable autonomic signals: HRV, resting heart rate, and the orthostatic stand test">
     <g>
       <rect x="30" y="30" width="200" height="90" rx="12" fill="none" stroke="#54d98a" stroke-width="2" />
       <text x="130" y="68" text-anchor="middle" fill="var(--text)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="16">HRV</text>
@@ -116,6 +134,23 @@ Here's the reframe that changes everything. You can't feel your autonomic regula
       <rect x="490" y="30" width="200" height="90" rx="12" fill="none" stroke="#58c4f2" stroke-width="2" />
       <text x="590" y="68" text-anchor="middle" fill="var(--text)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="16">Stand test</text>
       <text x="590" y="92" text-anchor="middle" fill="var(--dim)" font-family="-apple-system, sans-serif" font-size="12">orthostatic response</text>
+    </g>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 232" role="img" aria-label="Three measurable autonomic signals: HRV, resting heart rate, and the orthostatic stand test">
+    <g>
+      <rect x="20" y="10" width="320" height="64" rx="12" fill="none" stroke="#54d98a" stroke-width="2" />
+      <text x="180" y="38" text-anchor="middle" fill="var(--text)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="16">HRV</text>
+      <text x="180" y="60" text-anchor="middle" fill="var(--dim)" font-family="-apple-system, sans-serif" font-size="12.5">parasympathetic tone</text>
+    </g>
+    <g>
+      <rect x="20" y="84" width="320" height="64" rx="12" fill="none" stroke="#e03127" stroke-width="2" />
+      <text x="180" y="112" text-anchor="middle" fill="var(--text)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="16">Resting heart rate</text>
+      <text x="180" y="134" text-anchor="middle" fill="var(--dim)" font-family="-apple-system, sans-serif" font-size="12.5">sympathetic load</text>
+    </g>
+    <g>
+      <rect x="20" y="158" width="320" height="64" rx="12" fill="none" stroke="#58c4f2" stroke-width="2" />
+      <text x="180" y="186" text-anchor="middle" fill="var(--text)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="16">Stand test</text>
+      <text x="180" y="208" text-anchor="middle" fill="var(--dim)" font-family="-apple-system, sans-serif" font-size="12.5">orthostatic response</text>
     </g>
   </svg>
   <figcaption>Three at-home windows into autonomic function, no lab required.</figcaption>

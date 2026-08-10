@@ -130,7 +130,7 @@ There is a second, quieter reason. POTS disproportionately affects young women, 
 This is the difference that matters, drawn out. In POTS, standing is the trigger. Heart rate climbs within a few minutes of getting upright, stays elevated the whole time you are standing, and drops back down when you lie flat. It is repeatable: it happens on calm mornings and stressful ones alike, because it is mechanical, not emotional. In anxiety, the trigger is a thought or a situation. The heart can spike while you are sitting on the sofa, lying in bed, or standing, and it does not follow the lie-down and stand-up rhythm.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 260" role="img" aria-label="Two heart-rate timelines over a stand test. The POTS line stays flat while lying, jumps sharply on standing, stays elevated, then drops when lying again. The anxiety line stays lower and flatter across posture but spikes at an unrelated stressful moment while seated.">
+  <svg class="fig-d" viewBox="0 0 720 260" role="img" aria-label="Two heart-rate timelines over a stand test. The POTS line stays flat while lying, jumps sharply on standing, stays elevated, then drops when lying again. The anxiety line stays lower and flatter across posture but spikes at an unrelated stressful moment while seated.">
     <line x1="60" y1="30" x2="60" y2="210" stroke="var(--line)" stroke-width="1.5"/>
     <line x1="60" y1="210" x2="700" y2="210" stroke="var(--line)" stroke-width="1.5"/>
     <text x="16" y="60" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11">130</text>
@@ -146,6 +146,26 @@ This is the difference that matters, drawn out. In POTS, standing is the trigger
     <polyline fill="none" stroke="#38bdf8" stroke-width="2.5" stroke-dasharray="1 0" points="70,178 130,176 150,120 175,176 235,178 320,177 400,179 500,177 590,178 690,177"/>
     <text x="70" y="110" fill="#38bdf8" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="14">Anxiety: spikes with a trigger, not posture</text>
   </svg>
+  <svg class="fig-m" viewBox="0 0 360 246" role="img" aria-label="Two heart-rate timelines over a stand test. The POTS line stays flat while lying, jumps sharply on standing, stays elevated, then drops when lying again. The anxiety line stays lower and flatter across posture but spikes at an unrelated stressful moment while seated.">
+    <text x="20" y="16" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="12">POTS: rises on standing, settles lying</text>
+    <text x="20" y="32" fill="#38bdf8" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="12">Anxiety: spikes with a trigger, not posture</text>
+    <line x1="44" y1="46" x2="44" y2="186" stroke="var(--line)" stroke-width="1.5"/>
+    <line x1="44" y1="186" x2="344" y2="186" stroke="var(--line)" stroke-width="1.5"/>
+    <text x="38" y="62" text-anchor="end" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5">130</text>
+    <text x="38" y="121" text-anchor="end" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5">95</text>
+    <text x="38" y="182" text-anchor="end" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5">60</text>
+    <line x1="128" y1="46" x2="128" y2="186" stroke="var(--line)" stroke-width="1" stroke-dasharray="4 4"/>
+    <line x1="260" y1="46" x2="260" y2="186" stroke="var(--line)" stroke-width="1" stroke-dasharray="4 4"/>
+    <text x="86" y="204" text-anchor="middle" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="11.5">Lying</text>
+    <text x="194" y="204" text-anchor="middle" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="11.5">Standing</text>
+    <text x="302" y="204" text-anchor="middle" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="11.5">Lying again</text>
+    <polyline fill="none" stroke="#e03127" stroke-width="2.5" points="49,151 86,149 126,150 133,90 166,81 203,85 250,83 260,135 297,144 339,145"/>
+    <polyline fill="none" stroke="#38bdf8" stroke-width="2.5" points="49,159 77,157 86,110 98,157 126,159 166,158 203,160 250,158 292,159 339,158"/>
+    <line x1="20" y1="228" x2="42" y2="228" stroke="#e03127" stroke-width="2.5"/>
+    <text x="48" y="232" fill="#e03127" font-family="Space Mono, monospace" font-size="10.5">POTS</text>
+    <line x1="130" y1="228" x2="152" y2="228" stroke="#38bdf8" stroke-width="2.5"/>
+    <text x="158" y="232" fill="#38bdf8" font-family="Space Mono, monospace" font-size="10.5">anxiety</text>
+  </svg>
   <figcaption>The POTS line is locked to posture: flat lying, up on standing, down again lying. The anxiety line ignores posture and spikes at an unrelated stressful moment. Watching the trigger, not the sensation, is what separates them.</figcaption>
 </figure>
 
@@ -154,7 +174,7 @@ The formal threshold makes this concrete. POTS is defined by a **sustained heart
 ## POTS versus anxiety, side by side
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 210" role="img" aria-label="Two overlapping circles. The large shared overlap in the middle lists symptoms common to both POTS and anxiety. The left side lists the POTS-specific trigger, posture. The right lists the anxiety-specific trigger, fear and thoughts.">
+  <svg class="fig-d" viewBox="0 0 720 210" role="img" aria-label="Two overlapping circles. The large shared overlap in the middle lists symptoms common to both POTS and anxiety. The left side lists the POTS-specific trigger, posture. The right lists the anxiety-specific trigger, fear and thoughts.">
     <ellipse cx="270" cy="105" rx="215" ry="88" fill="none" stroke="#e03127" stroke-width="2.5"/>
     <ellipse cx="450" cy="105" rx="215" ry="88" fill="none" stroke="#38bdf8" stroke-width="2.5"/>
     <text x="150" y="45" text-anchor="middle" fill="#e03127" font-family="Space Grotesk, sans-serif" font-size="16" font-weight="600">POTS trigger</text>
@@ -168,6 +188,21 @@ The formal threshold makes this concrete. POTS is defined by a **sustained heart
     <text x="570" y="45" text-anchor="middle" fill="#38bdf8" font-family="Space Grotesk, sans-serif" font-size="16" font-weight="600">Anxiety trigger</text>
     <text x="570" y="105" text-anchor="middle" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="12.5">Fear, thoughts</text>
     <text x="570" y="127" text-anchor="middle" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="12.5">Situations</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 386" role="img" aria-label="Two overlapping circles. The large shared overlap in the middle lists symptoms common to both POTS and anxiety. The top lists the POTS-specific trigger, posture. The bottom lists the anxiety-specific trigger, fear and thoughts.">
+    <ellipse cx="180" cy="118" rx="150" ry="112" fill="none" stroke="#e03127" stroke-width="2.5"/>
+    <ellipse cx="180" cy="262" rx="150" ry="112" fill="none" stroke="#38bdf8" stroke-width="2.5"/>
+    <text x="180" y="42" text-anchor="middle" fill="#e03127" font-family="Space Grotesk, sans-serif" font-size="15" font-weight="600">POTS trigger</text>
+    <text x="180" y="76" text-anchor="middle" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="12.5">Standing up</text>
+    <text x="180" y="98" text-anchor="middle" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="12.5">Heat, meals</text>
+    <text x="180" y="164" text-anchor="middle" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="12" font-weight="600">Shared</text>
+    <text x="180" y="186" text-anchor="middle" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="11.5">Racing heart</text>
+    <text x="180" y="204" text-anchor="middle" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="11.5">Dizziness</text>
+    <text x="180" y="222" text-anchor="middle" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="11.5">Breathlessness</text>
+    <text x="180" y="240" text-anchor="middle" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="11.5">Shakiness</text>
+    <text x="180" y="284" text-anchor="middle" fill="#38bdf8" font-family="Space Grotesk, sans-serif" font-size="15" font-weight="600">Anxiety trigger</text>
+    <text x="180" y="316" text-anchor="middle" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="12.5">Fear, thoughts</text>
+    <text x="180" y="338" text-anchor="middle" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="12.5">Situations</text>
   </svg>
   <figcaption>The symptoms overlap almost entirely. The triggers do not. That is where the answer lives.</figcaption>
 </figure>

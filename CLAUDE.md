@@ -2,8 +2,10 @@
 
 **Autonomic Journal** is a private, offline-first app for tracking autonomic
 recovery. The app is a native **Expo / React Native (iOS + Android)** build that
-lives in **`mobile/`**. **The app has no backend** — all state is on-device. The
-one backend in this repo (`sls/`) belongs to the private store-analytics
+lives in **`mobile/`**. **All state is on-device** — no accounts, no sync, no
+health data ever leaves the phone. The app makes exactly one network call of
+its own, the anonymous cohort ping in `src/store/ping.ts` (one date, no
+identifier); everything else in `sls/` belongs to the private store-analytics
 dashboard at `/master`, not to the product. (A
 previous pure-static-HTML PWA under `docs/` has been removed; the mobile app is
 the app.) Platform split: the Apple Watch companion, HealthKit and ECG are
@@ -201,6 +203,29 @@ old web app so old `export.json` files import directly.
   stamped BEFORE it's requested, since nothing tells us whether the sheet
   appeared. `<ReviewPrompt/>` (root layout) owns the "calm moment" half: sheet
   stack empty, app foreground, 25s after launch, 4s after a journal change.
+- **The only thing the app sends anywhere is an anonymous cohort ping.**
+  `src/store/ping.ts` (shell) over `src/lib/ping.ts` (pure + tested) GETs
+  `api.autonomic.care/ping/open/D{MMDDYY}` on launch and on foreground, and
+  `/ping/sub/D{MMDDYY}` once the store reports an entitlement. The path segment
+  is the day this install FIRST ran (read from `trialStartedAt`, then frozen in
+  its own flag); the server stamps the arrival day, so a row is (cohort day,
+  arrival day) → count, which is retention. There is no device id, no install
+  id, no body, no health data — which is exactly why the server can't
+  de-duplicate and the CLIENT must: one open ping per install per **UTC** day
+  (the server's bucket), one subscribe ping per install ever, flags written
+  only on a successful send so an offline launch retries. Dev builds send
+  nothing; the subscribe ping also skips any build made Pro by the
+  dev/TestFlight/sideload bypass (`paywallBypassed()` in `src/store/iap.ts`),
+  since nobody paid there. Failures are silent and NOT sent to `logError` —
+  being offline is a phone's normal state, and it would flush the 40-entry
+  support log. Storage is **one DynamoDB row per day** holding a map of
+  cohort → count (`PK PING#OPEN`, `SK 2026-08-21`, `cohorts: { '082126': 12 }`)
+  — a map, not a list, because `ADD cohorts.<key> :1` is atomic and appending to
+  a list would lose concurrent pings. Read it back with `GET /ping/report?key=`
+  (shared key, `PING_REPORT_KEY`, injected by CodeBuild from SSM) or the `PINGS`
+  action on the authenticated `/master` API; both return
+  `{ day, total, cohorts: [{ cohortDate, count }] }` rows. Details in
+  `sls/README.md`.
 - **Home-screen widgets render one shared JSON payload** built by
   `buildWidgetPayload()` (`src/lib/widgets.ts`, pure — unit-tested) and pushed by
   `initWidgetSync()` on launch, debounced journal changes, and foreground. iOS:
@@ -224,6 +249,26 @@ old web app so old `export.json` files import directly.
   opens HRV capture behind the freemium gate; `autonomic://?open=protocol` scrolls to
   the Progress streak card and opens it expanded (`requestExpandProtocol` /
   `scrollJournalToSection('protocol')` in `src/store/nav.ts`).
+- **"What's new" is announced once per `x.x` release, and never wins the pill
+  slot.** The customer-facing release log lives in `src/lib/whatsNew.ts` (product
+  copy, deliberately not `CHANGELOG.md`, which stays the engineering record);
+  bump it whenever `version` in `app.json` crosses to a new minor, or the card
+  ships with nothing to say (a unit test enforces this).
+  **What goes in is opt-in**: Austin names the changes worth announcing when a
+  version is cut, and nothing else is added, however much of the release it was.
+  Plumbing a user can't see (support dumps, error logs, build config, refactors)
+  stays out by default. Never generate it from `CHANGELOG.md`.
+  `<WhatsNewPill/>` offers it when the running build's minor differs from the last one shown
+  (`src/lib/whatsNewSeen.ts`, plaintext `autonomic.flags` MMKV — so it can't ride
+  an import, and erasing the journal isn't a request to be told again); a fresh
+  install is stamped silently rather than shown. A patch release (1.22.0 → 1.22.1)
+  is never announced. Three overlays now share the floating slot above the tab bar
+  (watch sync, health import, what's new); `src/store/pillSlot.ts` arbitrates. The
+  first two claim it while visible because they're transient; the What's new pill
+  yields, receding to the sheet stack's stacked-card treatment at pill scale
+  (0.9 scale, 13px lift, same spring) and springing back when the slot frees. It
+  is therefore mounted FIRST of the three in the root layout, since siblings paint
+  in order.
 - **Capture failures are diagnosable from the user's own phone.** Bluetooth and
   the camera both fail in several ways that look identical from the outside, so
   each hides a support dump behind an 8-second hold on the button that would

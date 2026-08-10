@@ -1,7 +1,9 @@
 # Autonomic (native)
 
 A native **Expo / React Native** app (iOS + Android) for tracking
-autonomic-nervous-system recovery. Offline-first, no backend, all data on-device.
+autonomic-nervous-system recovery. Offline-first, no accounts, all data
+on-device — the app's only network call is an anonymous cohort ping carrying a
+single date and no identifier (`src/store/ping.ts`).
 It carries forward the **same data model** as the original web app, so an
 `export.json` from that app imports directly.
 

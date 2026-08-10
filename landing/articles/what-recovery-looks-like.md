@@ -48,7 +48,7 @@ The reframe that helps most: **track trends, not days.** One data point is weath
 Picture the shape honestly and it stops being demoralizing. Recovery is a jagged, zig-zag line that trends upward over months, punctuated by bad weeks that dip below where you were. The dips are part of the curve, not a departure from it.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 240" role="img" aria-label="A jagged line representing weekly wellbeing zig-zags up and down but trends upward over six months, with a smooth trend line drawn through the noise and two labeled bad-week dips.">
+  <svg class="fig-d" viewBox="0 0 720 240" role="img" aria-label="A jagged line representing weekly wellbeing zig-zags up and down but trends upward over six months, with a smooth trend line drawn through the noise and two labeled bad-week dips.">
     <!-- axes -->
     <line x1="60" y1="20" x2="60" y2="200" stroke="var(--line)" stroke-width="1.5"/>
     <line x1="60" y1="200" x2="690" y2="200" stroke="var(--line)" stroke-width="1.5"/>
@@ -76,6 +76,28 @@ Picture the shape honestly and it stops being demoralizing. Recovery is a jagged
     <text x="506" y="34" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="11">trend (the truth)</text>
     <line x1="470" y1="48" x2="500" y2="48" stroke="var(--dim-2)" stroke-width="1.6"/>
     <text x="506" y="52" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="11">day-to-day (the noise)</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 252" role="img" aria-label="A jagged line representing weekly wellbeing zig-zags up and down but trends upward over six months, with a smooth trend line drawn through the noise and two labeled bad-week dips.">
+    <line x1="44" y1="34" x2="44" y2="180" stroke="var(--line)" stroke-width="1.5"/>
+    <line x1="44" y1="180" x2="344" y2="180" stroke="var(--line)" stroke-width="1.5"/>
+    <text x="14" y="110" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="11" transform="rotate(-90 14 110)">Wellbeing</text>
+    <g fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10" text-anchor="middle">
+      <text x="68" y="196">1</text><text x="115" y="196">2</text><text x="163" y="196">3</text>
+      <text x="211" y="196">4</text><text x="258" y="196">5</text><text x="306" y="196">6</text>
+    </g>
+    <text x="192" y="214" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="11" text-anchor="middle">Time (months)</text>
+    <path d="M 49,162 Q 158,139 215,113 T 339,65" fill="none" stroke="#54d98a" stroke-width="3" stroke-linecap="round" opacity="0.9"/>
+    <polyline points="49,164 63,154 77,169 92,146 106,157 120,172 134,139 149,151 163,131 177,154 192,125 206,138 220,107 234,130 249,139 263,101 277,115 292,96 306,109 320,81 334,70"
+      fill="none" stroke="var(--dim-2)" stroke-width="1.6" opacity="0.85"/>
+    <circle cx="120" cy="172" r="4" fill="#e03127"/>
+    <text x="120" y="60" fill="#e03127" font-family="Space Grotesk, sans-serif" font-size="10" text-anchor="middle">bad week</text>
+    <line x1="120" y1="66" x2="120" y2="166" stroke="#e03127" stroke-width="1" stroke-dasharray="3 3"/>
+    <circle cx="249" cy="139" r="4" fill="#e03127"/>
+    <text x="249" y="160" fill="#e03127" font-family="Space Grotesk, sans-serif" font-size="10" text-anchor="middle">setback</text>
+    <line x1="20" y1="232" x2="46" y2="232" stroke="#54d98a" stroke-width="3"/>
+    <text x="52" y="236" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="10.5">trend (the truth)</text>
+    <line x1="180" y1="232" x2="206" y2="232" stroke="var(--dim-2)" stroke-width="1.6"/>
+    <text x="212" y="236" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="10.5">day-to-day (noise)</text>
   </svg>
   <figcaption>The jagged line is what you feel. The smooth line is what is actually happening. Both are true, but only one of them is the story.</figcaption>
 </figure>

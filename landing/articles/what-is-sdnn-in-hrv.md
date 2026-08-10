@@ -70,7 +70,7 @@ If you could keep only a single heart rate variability figure, **SDNN** would be
 A healthy heart is not a metronome. The gap between beats is constantly stretching and shrinking, and that restlessness is a good sign: it means your [autonomic nervous system](/insights/basics/autonomic-nervous-system-and-dysautonomia-guide/) is flexible enough to adjust the heart moment to moment. SDNN puts a single number on the size of that restlessness. When the spread is wide, SDNN is high. When the rhythm goes rigid and metronomic, SDNN collapses.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 250" role="img" aria-label="Two readings compared: a high-SDNN reading with beat intervals scattered widely around the mean, and a low-SDNN reading with intervals clustered tightly around the mean">
+  <svg class="fig-d" viewBox="0 0 720 250" role="img" aria-label="Two readings compared: a high-SDNN reading with beat intervals scattered widely around the mean, and a low-SDNN reading with intervals clustered tightly around the mean">
     <text x="20" y="26" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="15">High SDNN, wide spread</text>
     <line x1="20" y1="70" x2="700" y2="70" stroke="var(--line-2)" stroke-width="1" stroke-dasharray="4 4" />
     <text x="705" y="66" text-anchor="end" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">mean</text>
@@ -79,6 +79,16 @@ A healthy heart is not a metronome. The gap between beats is constantly stretchi
     <line x1="20" y1="195" x2="700" y2="195" stroke="var(--line-2)" stroke-width="1" stroke-dasharray="4 4" />
     <text x="705" y="191" text-anchor="end" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">mean</text>
     <g fill="#ef4444"><circle cx="70" cy="190" r="4"/><circle cx="130" cy="200" r="4"/><circle cx="190" cy="189" r="4"/><circle cx="250" cy="201" r="4"/><circle cx="310" cy="191" r="4"/><circle cx="370" cy="199" r="4"/><circle cx="430" cy="188" r="4"/><circle cx="490" cy="202" r="4"/><circle cx="550" cy="190" r="4"/><circle cx="610" cy="200" r="4"/><circle cx="670" cy="192" r="4"/></g>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 240" role="img" aria-label="Two readings compared: a high-SDNN reading with beat intervals scattered widely around the mean, and a low-SDNN reading with intervals clustered tightly around the mean">
+    <text x="20" y="20" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13.5">High SDNN, wide spread</text>
+    <line x1="20" y1="70" x2="344" y2="70" stroke="var(--line-2)" stroke-width="1" stroke-dasharray="4 4" />
+    <text x="344" y="64" text-anchor="end" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">mean</text>
+    <g fill="#54d98a"><circle cx="44" cy="44" r="4"/><circle cx="72" cy="92" r="4"/><circle cx="101" cy="52" r="4"/><circle cx="130" cy="96" r="4"/><circle cx="158" cy="40" r="4"/><circle cx="187" cy="84" r="4"/><circle cx="215" cy="56" r="4"/><circle cx="244" cy="98" r="4"/><circle cx="273" cy="48" r="4"/><circle cx="301" cy="88" r="4"/><circle cx="330" cy="60" r="4"/></g>
+    <text x="20" y="150" fill="#ef4444" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13.5">Low SDNN, rigid rhythm</text>
+    <line x1="20" y1="196" x2="344" y2="196" stroke="var(--line-2)" stroke-width="1" stroke-dasharray="4 4" />
+    <text x="344" y="190" text-anchor="end" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">mean</text>
+    <g fill="#ef4444"><circle cx="44" cy="191" r="4"/><circle cx="72" cy="201" r="4"/><circle cx="101" cy="190" r="4"/><circle cx="130" cy="202" r="4"/><circle cx="158" cy="192" r="4"/><circle cx="187" cy="200" r="4"/><circle cx="215" cy="189" r="4"/><circle cx="244" cy="203" r="4"/><circle cx="273" cy="191" r="4"/><circle cx="301" cy="201" r="4"/><circle cx="330" cy="193" r="4"/></g>
   </svg>
   <figcaption>Each dot is one beat-to-beat interval. SDNN measures how far the dots stray from the average: wide scatter is high SDNN, a tight line is low.</figcaption>
 </figure>

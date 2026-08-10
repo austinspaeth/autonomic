@@ -86,7 +86,7 @@ After COVID, that reflex is often sluggish or incomplete. Blood pools low, less 
 This is the same machinery behind [POTS and orthostatic intolerance](/insights/pots/how-pots-is-diagnosed/), which is one of the most common autonomic presentations of long COVID. If your fog is clearly better lying down and worse after time upright, this mechanism is very likely part of your picture.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 260" role="img" aria-label="Two body diagrams comparing brain blood flow while lying down versus standing, showing blood pooling in the legs and reduced cerebral flow when upright">
+  <svg class="fig-d" viewBox="0 0 720 260" role="img" aria-label="Two body diagrams comparing brain blood flow while lying down versus standing, showing blood pooling in the legs and reduced cerebral flow when upright">
     <text x="20" y="26" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="15">Lying down: brain well supplied</text>
     <text x="700" y="26" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="15" text-anchor="end">Upright: flow dips, fog rises</text>
     <line x1="360" y1="40" x2="360" y2="250" stroke="var(--line)" stroke-width="1" />
@@ -106,6 +106,28 @@ This is the same machinery behind [POTS and orthostatic intolerance](/insights/p
     <polygon points="600,120 595,132 605,132" fill="#e03127" opacity="0.6" />
     <ellipse cx="600" cy="210" rx="30" ry="20" fill="#e03127" opacity="0.28" />
     <text x="600" y="252" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10" text-anchor="middle">blood pools in legs</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 288" role="img" aria-label="Two body diagrams comparing brain blood flow while lying down versus standing, showing blood pooling in the legs and reduced cerebral flow when upright">
+    <text x="90" y="18" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="12" text-anchor="middle">Lying down:</text>
+    <text x="90" y="34" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="12" text-anchor="middle">brain well supplied</text>
+    <text x="270" y="18" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="12" text-anchor="middle">Upright:</text>
+    <text x="270" y="34" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="12" text-anchor="middle">flow dips, fog rises</text>
+    <line x1="180" y1="48" x2="180" y2="280" stroke="var(--line)" stroke-width="1" />
+    <circle cx="90" cy="86" r="26" fill="none" stroke="#54d98a" stroke-width="2.5" />
+    <text x="90" y="91" fill="#54d98a" font-family="Space Mono, monospace" font-size="11" text-anchor="middle">brain</text>
+    <line x1="90" y1="112" x2="90" y2="216" stroke="var(--dim-2)" stroke-width="10" stroke-linecap="round" opacity="0.35" />
+    <path d="M90 126 L90 204" stroke="#54d98a" stroke-width="4" fill="none" />
+    <polygon points="90,212 84,198 96,198" fill="#54d98a" />
+    <polygon points="90,120 84,134 96,134" fill="#54d98a" />
+    <text x="90" y="248" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10" text-anchor="middle">even circulation</text>
+    <circle cx="270" cy="80" r="26" fill="none" stroke="#e03127" stroke-width="2.5" stroke-dasharray="4 4" />
+    <text x="270" y="85" fill="#e03127" font-family="Space Mono, monospace" font-size="11" text-anchor="middle">brain</text>
+    <line x1="270" y1="106" x2="270" y2="230" stroke="var(--dim-2)" stroke-width="10" stroke-linecap="round" opacity="0.35" />
+    <path d="M270 118 L270 148" stroke="#e03127" stroke-width="3" fill="none" />
+    <polygon points="270,120 265,132 275,132" fill="#e03127" opacity="0.6" />
+    <ellipse cx="270" cy="212" rx="30" ry="20" fill="#e03127" opacity="0.28" />
+    <text x="270" y="262" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10" text-anchor="middle">blood pools</text>
+    <text x="270" y="276" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10" text-anchor="middle">in legs</text>
   </svg>
   <figcaption>Upright, blood pools low and less returns to the heart. When the autonomic reflex is sluggish, cerebral blood flow can dip and cognition is one of the first things to feel it.</figcaption>
 </figure>
@@ -133,7 +155,7 @@ The single most useful thing you can do is stop logging that you were foggy and 
 A [simple orthostatic stand test at home](/insights/pots/the-orthostatic-stand-test-at-home/) is the most direct check for the upright mechanism. Measure your heart rate lying down, then again after standing for a few minutes. A repeatable, sustained jump in heart rate on standing is a strong hint that orthostatic intolerance is feeding your fog, and it is something you can capture in a few minutes.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 240" role="img" aria-label="A line chart of brain fog severity across a day, staying low while reclined and rising during long upright periods, easing again when lying down">
+  <svg class="fig-d" viewBox="0 0 720 240" role="img" aria-label="A line chart of brain fog severity across a day, staying low while reclined and rising during long upright periods, easing again when lying down">
     <line x1="50" y1="30" x2="50" y2="195" stroke="var(--line)" stroke-width="1" />
     <line x1="50" y1="195" x2="695" y2="195" stroke="var(--line)" stroke-width="1" />
     <text x="16" y="50" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">foggy</text>
@@ -147,6 +169,18 @@ A [simple orthostatic stand test at home](/insights/pots/the-orthostatic-stand-t
     <text x="300" y="220" fill="#e03127" font-family="Space Mono, monospace" font-size="10" text-anchor="middle">upright, working</text>
     <text x="430" y="220" fill="#54d98a" font-family="Space Mono, monospace" font-size="10" text-anchor="middle">rest lying down</text>
     <text x="600" y="220" fill="#e03127" font-family="Space Mono, monospace" font-size="10" text-anchor="middle">upright, errands</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 232" role="img" aria-label="A line chart of brain fog severity across a day, staying low while reclined and rising during long upright periods, easing again when lying down">
+    <line x1="40" y1="34" x2="40" y2="180" stroke="var(--line)" stroke-width="1" />
+    <line x1="40" y1="180" x2="344" y2="180" stroke="var(--line)" stroke-width="1" />
+    <text x="14" y="48" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">foggy</text>
+    <text x="14" y="176" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">clear</text>
+    <rect x="40" y="153" width="304" height="27" fill="#54d98a" opacity="0.12" />
+    <path d="M 40 162 L 73 160 L 101 140 L 130 92 L 158 69 L 177 85 L 196 140 L 219 156 L 252 140 L 280 92 L 309 71 L 337 92" fill="none" stroke="#e03127" stroke-width="3" />
+    <text x="61" y="198" fill="#54d98a" font-family="Space Mono, monospace" font-size="10" text-anchor="middle">in bed</text>
+    <text x="219" y="198" fill="#54d98a" font-family="Space Mono, monospace" font-size="10" text-anchor="middle">rest lying down</text>
+    <text x="158" y="216" fill="#e03127" font-family="Space Mono, monospace" font-size="10" text-anchor="middle">upright, working</text>
+    <text x="295" y="216" fill="#e03127" font-family="Space Mono, monospace" font-size="10" text-anchor="middle">upright, errands</text>
   </svg>
   <figcaption>A common orthostatic fog pattern: clear when reclined, worse the longer you stay upright, better again when you lie back down. Your curve may look different, which is the point of tracking it.</figcaption>
 </figure>

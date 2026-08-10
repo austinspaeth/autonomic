@@ -1533,7 +1533,7 @@ a { color: inherit; text-decoration: none; }
 .article-figure { margin: 0 0 36px; border-radius: var(--r-lg); overflow: hidden; border: 1px solid var(--line); }
 .article-figure img { width: 100%; height: auto; }
 .article-figure figcaption { font-size: 12px; color: var(--dim-2); padding: 8px 12px; background: var(--bg-1); }
-.article-prose { font-size: 17px; line-height: 1.7; color: #828282; }
+.article-prose { font-size: 17px; line-height: 1.7; color: #bbbbbe; }
 .article-prose > :first-child { margin-top: 0; }
 .article-prose h2 { font-family: var(--display); font-weight: 600; letter-spacing: -0.01em; font-size: 27px; color: var(--text); margin: 44px 0 14px; }
 .article-prose h3 { font-family: var(--display); font-weight: 600; font-size: 21px; color: var(--text); margin: 32px 0 12px; }
@@ -1579,6 +1579,22 @@ a { color: inherit; text-decoration: none; }
   border: 1px solid var(--line); border-radius: var(--r-lg);
   background: linear-gradient(180deg, var(--panel), var(--bg-1));
   padding: 22px 20px;
+}
+
+/* Diagrams ship in two cuts. The wide one (`fig-d`, a 720-unit canvas) is
+   drawn for the full prose column; on a phone that column is ~320px, so the
+   whole drawing scales to ~0.45 and its 13px labels land at 6px — legible
+   nowhere. The mobile cut (`fig-m`) redraws the SAME content on a 360-unit
+   portrait canvas — panels stacked instead of side by side, series labelled
+   in place instead of in a legend — so it renders at roughly 1:1 and the type
+   stays at its authored size. Only one is ever in the layout, so nothing is
+   painted twice. */
+.article-prose figure svg.fig-m { display: none; }
+@media (max-width: 640px) {
+  .article-prose figure svg.fig-d { display: none; }
+  .article-prose figure svg.fig-m { display: block; }
+  /* Every millimetre the frame gives back is a millimetre of canvas. */
+  .prose-figure { padding: 14px 10px; }
 }
 
 /* Callout boxes: <div class="callout callout-tip|note|warn">…</div> */
@@ -2072,6 +2088,9 @@ a.gc { display: block; }
     /* Out of the dock's flow: it always sits on the floor, and the cookie
        notice lifts above it. */
     --aj-inset: 12px;
+    /* The dial's arc colour (see .aj-scta-arc's stroke in app.html) — the
+       button and the travelling border light both key off it. */
+    --aj-scta-green: #6ee06e;
     position: absolute; left: var(--aj-inset); right: var(--aj-inset); bottom: calc(7px + env(safe-area-inset-bottom));
     /* Score on the left, both controls right-aligned. The bar's height is
        whatever the dial needs — half again as tall as the old one-row pill. */
@@ -2101,13 +2120,15 @@ a.gc { display: block; }
   .aj-scta::before {
     content: ''; position: absolute; inset: -1px; z-index: 3; border-radius: inherit;
     padding: 1px; pointer-events: none;
+    /* Green, not the site accent: the light has to read as the same signal as
+       the dial it wraps (`--aj-scta-green`, the arc's stroke). */
     /* Both radii are animated, not just the position: the light starts as a
        small spot that only reaches the bottom edge, then swells at the end so
        it spans the full height and wraps the button. It runs along the bottom
        because the score badge now overhangs the top. */
     background: radial-gradient(
       var(--aj-glow-rx) var(--aj-glow-ry) at var(--aj-glow-x) var(--aj-glow-y),
-      var(--accent) 0%, rgba(224,49,39,0.6) 22%, rgba(224,49,39,0) 55%
+      var(--aj-scta-green) 0%, rgba(110,224,110,0.6) 22%, rgba(110,224,110,0) 55%
     );
     -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
     -webkit-mask-composite: xor;
@@ -2143,10 +2164,10 @@ a.gc { display: block; }
      that still reads as a button. */
   .aj-scta-btn {
     flex: none; display: inline-flex; align-items: center;
-    background: var(--accent); color: #fff;
+    background: var(--aj-scta-green); color: #fff;
     border-radius: 999px; padding: 18px 22px; white-space: nowrap;
     font-size: 15.5px; font-weight: 700; letter-spacing: 0.01em; line-height: 1;
-    box-shadow: 0 4px 16px rgba(224,49,39,0.4);
+    box-shadow: 0 4px 16px rgba(110,224,110,0.4);
   }
 
   /* Mini phones: every millimetre the controls and the bar's own inset give

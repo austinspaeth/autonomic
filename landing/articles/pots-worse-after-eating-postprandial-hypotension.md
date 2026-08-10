@@ -125,7 +125,7 @@ In a body with a brisk autonomic system, that redirection is seamless. The momen
 In POTS and dysautonomia, that compensation is exactly what runs short. Vessels do not constrict hard enough, so blood settles into the gut and legs, **venous return** (the blood flowing back to your heart) falls, and your circulation is briefly short-changed. Your body's fallback is a large reflex jump in heart rate to try to maintain output. The result is the familiar post-meal cocktail: a racing pulse, lightheadedness, fatigue, brain fog, sometimes nausea or the urge to lie flat.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 260" role="img" aria-label="A two-hour timeline after a meal. Blood pressure dips below baseline and heart rate rises above baseline within the first 30 to 60 minutes, then both drift back toward baseline by 120 minutes.">
+  <svg class="fig-d" viewBox="0 0 720 260" role="img" aria-label="A two-hour timeline after a meal. Blood pressure dips below baseline and heart rate rises above baseline within the first 30 to 60 minutes, then both drift back toward baseline by 120 minutes.">
     <line x1="60" y1="30" x2="60" y2="210" stroke="var(--line)" stroke-width="1.5"/>
     <line x1="60" y1="120" x2="700" y2="120" stroke="var(--line)" stroke-width="1" stroke-dasharray="4 5"/>
     <text x="66" y="114" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11">baseline</text>
@@ -137,6 +137,19 @@ In POTS and dysautonomia, that compensation is exactly what runs short. Vessels 
     <text x="470" y="185" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="14">Blood pressure dips</text>
     <polyline fill="none" stroke="#54d98a" stroke-width="2.5" points="60,120 140,92 220,74 300,78 380,90 540,110 700,118"/>
     <text x="470" y="62" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="14">Heart rate spikes</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 224" role="img" aria-label="A two-hour timeline after a meal. Blood pressure dips below baseline and heart rate rises above baseline within the first 30 to 60 minutes, then both drift back toward baseline by 120 minutes.">
+    <line x1="44" y1="34" x2="44" y2="186" stroke="var(--line)" stroke-width="1.5"/>
+    <line x1="44" y1="110" x2="344" y2="110" stroke="var(--line)" stroke-width="1" stroke-dasharray="4 5"/>
+    <text x="48" y="105" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5">baseline</text>
+    <polyline fill="none" stroke="#e03127" stroke-width="2.5" points="44,110 82,135 119,151 156,149 194,137 269,120 344,113"/>
+    <text x="344" y="176" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="12.5" text-anchor="end">Blood pressure dips</text>
+    <polyline fill="none" stroke="#54d98a" stroke-width="2.5" points="44,110 82,86 119,71 156,75 194,85 269,102 344,108"/>
+    <text x="344" y="52" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="12.5" text-anchor="end">Heart rate spikes</text>
+    <text x="44" y="206" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5">meal</text>
+    <text x="119" y="206" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5" text-anchor="middle">30 min</text>
+    <text x="194" y="206" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5" text-anchor="middle">60 min</text>
+    <text x="344" y="206" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5" text-anchor="end">120 min</text>
   </svg>
   <figcaption>The typical post-meal pattern in an under-compensating autonomic system: blood pressure sags and heart rate climbs within the first hour, then both settle by around two hours. Meal size and carbohydrate load stretch or shrink this curve.</figcaption>
 </figure>
@@ -186,7 +199,7 @@ Not all meals are equal. Three features of a meal decide how much blood your gut
 - **How quickly it empties.** Liquids and simple carbs leave the stomach fast and flood the intestine, which drives a quicker, steeper response. Protein, fat, and fiber slow gastric emptying, spreading the blood demand over a longer, gentler window.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 220" role="img" aria-label="Two bars comparing post-meal symptom load. A large high-carb meal produces a tall red bar; a small balanced meal with protein, fat and fiber produces a short green bar.">
+  <svg class="fig-d" viewBox="0 0 720 220" role="img" aria-label="Two bars comparing post-meal symptom load. A large high-carb meal produces a tall red bar; a small balanced meal with protein, fat and fiber produces a short green bar.">
     <text x="60" y="34" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="13">Relative post-meal blood demand and symptom load</text>
     <rect x="90" y="60" width="220" height="120" rx="6" fill="#e03127" opacity="0.18"/>
     <rect x="90" y="60" width="220" height="120" rx="6" fill="none" stroke="#e03127" stroke-width="2"/>
@@ -196,6 +209,22 @@ Not all meals are equal. Three features of a meal decide how much blood your gut
     <rect x="410" y="140" width="220" height="40" rx="6" fill="none" stroke="#54d98a" stroke-width="2"/>
     <text x="520" y="165" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="15" text-anchor="middle">Small, balanced</text>
     <line x1="60" y1="180" x2="680" y2="180" stroke="var(--line)" stroke-width="1.5"/>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 236" role="img" aria-label="Two bars comparing post-meal symptom load. A large high-carb meal produces a tall red bar; a small balanced meal with protein, fat and fiber produces a short green bar.">
+    <text x="20" y="18" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="12.5">Relative post-meal blood demand</text>
+    <text x="20" y="34" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="12.5">and symptom load</text>
+    <rect x="30" y="60" width="140" height="130" rx="6" fill="#e03127" opacity="0.18"/>
+    <rect x="30" y="60" width="140" height="130" rx="6" fill="none" stroke="#e03127" stroke-width="2"/>
+    <text x="100" y="116" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13.5" text-anchor="middle">Large,</text>
+    <text x="100" y="134" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13.5" text-anchor="middle">high-carb</text>
+    <text x="100" y="156" fill="#e03127" font-family="Space Mono, monospace" font-size="11" text-anchor="middle">big blood surge</text>
+    <rect x="190" y="146" width="140" height="44" rx="6" fill="#54d98a" opacity="0.20"/>
+    <rect x="190" y="146" width="140" height="44" rx="6" fill="none" stroke="#54d98a" stroke-width="2"/>
+    <text x="260" y="164" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13.5" text-anchor="middle">Small,</text>
+    <text x="260" y="182" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13.5" text-anchor="middle">balanced</text>
+    <line x1="20" y1="190" x2="344" y2="190" stroke="var(--line)" stroke-width="1.5"/>
+    <text x="180" y="216" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5" text-anchor="middle">protein, fat and fiber flatten</text>
+    <text x="180" y="230" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5" text-anchor="middle">the response</text>
   </svg>
   <figcaption>Meal size and fast-carb content drive how much blood your gut pulls at once. A smaller plate weighted toward protein, fat, and fiber flattens the response.</figcaption>
 </figure>

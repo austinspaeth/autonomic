@@ -164,7 +164,7 @@ Try a stress-index number against the same bands the app uses:
 The cleanest way to picture the trio is a **balance beam**. On the up-side is the parasympathetic PNS index, on the down-side the sympathetic SNS index, and the stress index is the load pressing down on the whole thing.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 320" role="img" aria-label="A see-saw balance diagram: the parasympathetic PNS side is raised and the sympathetic SNS side is lowered in a recovered state, with a stress-index load gauge reading low">
+  <svg class="fig-d" viewBox="0 0 720 320" role="img" aria-label="A see-saw balance diagram: the parasympathetic PNS side is raised and the sympathetic SNS side is lowered in a recovered state, with a stress-index load gauge reading low">
     <text x="360" y="28" text-anchor="middle" fill="var(--text)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="17">Recovered pattern</text>
     <!-- beam, tilted: PNS side (left) up, SNS side (right) down -->
     <line x1="120" y1="120" x2="600" y2="200" stroke="var(--line-2)" stroke-width="6" stroke-linecap="round" />
@@ -184,6 +184,22 @@ The cleanest way to picture the trio is a **balance beam**. On the up-side is th
     <rect x="270" y="278" width="180" height="26" rx="13" fill="none" stroke="var(--line-2)" stroke-width="1.5" />
     <rect x="273" y="281" width="54" height="20" rx="10" fill="#54d98a" />
     <text x="360" y="296" text-anchor="middle" fill="var(--dim)" font-family="Space Mono, monospace" font-size="11">stress index: low</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 300" role="img" aria-label="A see-saw balance diagram: the parasympathetic PNS side is raised and the sympathetic SNS side is lowered in a recovered state, with a stress-index load gauge reading low">
+    <text x="180" y="24" text-anchor="middle" fill="var(--text)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="16">Recovered pattern</text>
+    <text x="62" y="72" text-anchor="middle" fill="#58c4f2" font-family="-apple-system, sans-serif" font-size="11.5">rest &amp; recover</text>
+    <line x1="62" y1="120" x2="298" y2="196" stroke="var(--line-2)" stroke-width="6" stroke-linecap="round" />
+    <polygon points="180,158 152,238 208,238" fill="var(--line-2)" />
+    <circle cx="62" cy="120" r="30" fill="#58c4f2" />
+    <text x="62" y="116" text-anchor="middle" fill="#0b1220" font-family="Space Grotesk, sans-serif" font-weight="700" font-size="14">PNS</text>
+    <text x="62" y="133" text-anchor="middle" fill="#0b1220" font-family="Space Mono, monospace" font-size="10">+ up</text>
+    <circle cx="298" cy="196" r="30" fill="#f97316" />
+    <text x="298" y="192" text-anchor="middle" fill="#0b1220" font-family="Space Grotesk, sans-serif" font-weight="700" font-size="14">SNS</text>
+    <text x="298" y="209" text-anchor="middle" fill="#0b1220" font-family="Space Mono, monospace" font-size="10">− down</text>
+    <text x="298" y="246" text-anchor="middle" fill="#f97316" font-family="-apple-system, sans-serif" font-size="11.5">fight or flight</text>
+    <rect x="90" y="262" width="180" height="26" rx="13" fill="none" stroke="var(--line-2)" stroke-width="1.5" />
+    <rect x="93" y="265" width="54" height="20" rx="10" fill="#54d98a" />
+    <text x="210" y="280" text-anchor="middle" fill="var(--dim)" font-family="Space Mono, monospace" font-size="11">stress index: low</text>
   </svg>
   <figcaption>Recovered: the parasympathetic side is up (PNS positive), the sympathetic side is down (SNS negative), and the stress-index load runs low. Under strain the beam tips the other way and the load gauge fills.</figcaption>
 </figure>

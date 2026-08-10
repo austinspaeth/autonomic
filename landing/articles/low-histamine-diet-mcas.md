@@ -47,7 +47,7 @@ Fresh-cooked chicken eaten right away is low. That same chicken left in the frid
 - Freeze extra portions **immediately** after cooking rather than parking them in the fridge, since freezing largely halts histamine buildup while fridge storage does not.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 210" role="img" aria-label="A rising line showing histamine increasing in stored cooked protein over time, staying low if frozen">
+  <svg class="fig-d" viewBox="0 0 720 210" role="img" aria-label="A rising line showing histamine increasing in stored cooked protein over time, staying low if frozen">
     <line x1="70" y1="30" x2="70" y2="170" stroke="var(--line)" stroke-width="1.5"/>
     <line x1="70" y1="170" x2="680" y2="170" stroke="var(--line)" stroke-width="1.5"/>
     <text x="20" y="40" font-family="Space Grotesk, sans-serif" font-size="13" fill="var(--dim-2)">high</text>
@@ -59,6 +59,19 @@ Fresh-cooked chicken eaten right away is low. That same chicken left in the frid
     <text x="500" y="70" font-family="Space Grotesk, sans-serif" font-size="12" fill="#e03127">fridged leftovers</text>
     <path d="M70 160 L 680 156" fill="none" stroke="#54d98a" stroke-width="3" stroke-dasharray="6 5"/>
     <text x="500" y="145" font-family="Space Grotesk, sans-serif" font-size="12" fill="#54d98a">frozen right away</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 224" role="img" aria-label="A rising line showing histamine increasing in stored cooked protein over time, staying low if frozen">
+    <line x1="46" y1="30" x2="46" y2="170" stroke="var(--line)" stroke-width="1.5"/>
+    <line x1="46" y1="170" x2="344" y2="170" stroke="var(--line)" stroke-width="1.5"/>
+    <text x="18" y="36" font-family="Space Grotesk, sans-serif" font-size="12" fill="var(--dim-2)">high</text>
+    <text x="20" y="168" font-family="Space Grotesk, sans-serif" font-size="12" fill="var(--dim-2)">low</text>
+    <path d="M46 160 C 134 150, 198 120, 344 45" fill="none" stroke="#e03127" stroke-width="3"/>
+    <text x="196" y="76" font-family="Space Grotesk, sans-serif" font-size="12" fill="#e03127">fridged leftovers</text>
+    <path d="M46 160 L 344 156" fill="none" stroke="#54d98a" stroke-width="3" stroke-dasharray="6 5"/>
+    <text x="196" y="145" font-family="Space Grotesk, sans-serif" font-size="12" fill="#54d98a">frozen right away</text>
+    <text x="46" y="190" font-family="Space Grotesk, sans-serif" font-size="11" fill="var(--dim-2)">cooked fresh</text>
+    <text x="344" y="190" text-anchor="end" font-family="Space Grotesk, sans-serif" font-size="11" fill="var(--dim-2)">3 days in fridge</text>
+    <text x="196" y="212" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="11" fill="var(--dim-2)">(1 day in fridge, midway)</text>
   </svg>
   <figcaption>Histamine climbs in stored cooked protein. Freezing leftovers immediately keeps them near the fresh baseline.</figcaption>
 </figure>

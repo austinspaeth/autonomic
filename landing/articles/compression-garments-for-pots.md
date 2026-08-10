@@ -80,7 +80,7 @@ Here is the part that changes how you should compress. People picture the poolin
 Compression works by physically shrinking those reservoirs. Squeeze the veins from the outside and there is less room for blood to sit, so more of it returns to the heart, filling improves, and the heart does not need to race as hard to keep pressure up. Which means the single most useful place to compress is the abdomen, exactly the spot a pair of socks does nothing for.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 260" role="img" aria-label="Diagram comparing where blood pools on standing: a large reservoir in the abdomen and a smaller one in the legs, with compression shrinking both">
+  <svg class="fig-d" viewBox="0 0 720 260" role="img" aria-label="Diagram comparing where blood pools on standing: a large reservoir in the abdomen and a smaller one in the legs, with compression shrinking both">
     <text x="20" y="28" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="15">Where blood pools when you stand</text>
     <!-- No compression column -->
     <text x="150" y="60" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="12" text-anchor="middle">No compression</text>
@@ -98,6 +98,23 @@ Compression works by physically shrinking those reservoirs. Squeeze the veins fr
     <text x="560" y="113" fill="#06301a" font-family="Space Grotesk, sans-serif" font-size="12" text-anchor="middle" font-weight="600">Abdomen</text>
     <rect x="535" y="160" width="50" height="60" rx="8" fill="#54d98a" opacity="0.55" />
     <text x="560" y="196" fill="#06301a" font-family="Space Grotesk, sans-serif" font-size="12" text-anchor="middle" font-weight="600">Legs</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 206" role="img" aria-label="Diagram comparing where blood pools on standing: a large reservoir in the abdomen and a smaller one in the legs, with compression shrinking both">
+    <text x="20" y="20" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13.5">Where blood pools when you stand</text>
+    <text x="76" y="46" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11" text-anchor="middle">No compression</text>
+    <rect x="36" y="56" width="80" height="56" rx="8" fill="#e03127" opacity="0.85" />
+    <text x="76" y="90" fill="#fff" font-family="Space Grotesk, sans-serif" font-size="12" text-anchor="middle" font-weight="600">Abdomen</text>
+    <rect x="54" y="122" width="44" height="64" rx="8" fill="#e03127" opacity="0.5" />
+    <text x="76" y="160" fill="#fff" font-family="Space Grotesk, sans-serif" font-size="12" text-anchor="middle" font-weight="600">Legs</text>
+    <line x1="148" y1="122" x2="196" y2="122" stroke="var(--line)" stroke-width="2" />
+    <polygon points="196,122 184,116 184,128" fill="var(--line)" />
+    <text x="172" y="112" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5" text-anchor="middle">compress</text>
+    <text x="276" y="40" fill="#54d98a" font-family="Space Mono, monospace" font-size="11" text-anchor="middle">Waist-high</text>
+    <text x="276" y="54" fill="#54d98a" font-family="Space Mono, monospace" font-size="11" text-anchor="middle">compression</text>
+    <rect x="246" y="68" width="60" height="34" rx="8" fill="#54d98a" opacity="0.85" />
+    <text x="276" y="90" fill="#06301a" font-family="Space Grotesk, sans-serif" font-size="12" text-anchor="middle" font-weight="600">Abdomen</text>
+    <rect x="254" y="130" width="44" height="48" rx="8" fill="#54d98a" opacity="0.55" />
+    <text x="276" y="160" fill="#06301a" font-family="Space Grotesk, sans-serif" font-size="12" text-anchor="middle" font-weight="600">Legs</text>
   </svg>
   <figcaption>The abdomen is the larger, stretchier reservoir. Compression that includes it shrinks the pool that matters most, which is why waist-high beats socks alone.</figcaption>
 </figure>
@@ -158,7 +175,7 @@ Run it as a simple before-and-after:
 A smaller rise, a quicker recovery, or noticeably fewer symptoms upright is your evidence that compression is doing real work for your body. Because any single morning is noisy, repeat it a few times over a couple of weeks rather than deciding on one comparison.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 240" role="img" aria-label="Line chart of heart rate after standing: without compression the heart rate rises about 40 bpm and stays high, with compression it rises about 20 bpm and settles">
+  <svg class="fig-d" viewBox="0 0 720 240" role="img" aria-label="Line chart of heart rate after standing: without compression the heart rate rises about 40 bpm and stays high, with compression it rises about 20 bpm and settles">
     <line x1="60" y1="30" x2="60" y2="200" stroke="var(--line)" stroke-width="1.5" />
     <line x1="60" y1="200" x2="700" y2="200" stroke="var(--line)" stroke-width="1.5" />
     <text x="30" y="55" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11" text-anchor="middle">HR</text>
@@ -174,6 +191,20 @@ A smaller rise, a quicker recovery, or noticeably fewer symptoms upright is your
     <!-- with compression -->
     <polyline fill="none" stroke="#54d98a" stroke-width="2.5" points="60,175 110,120 200,124 320,130 460,132 620,136 700,138" />
     <text x="360" y="155" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13">With compression (~20 bpm rise)</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 212" role="img" aria-label="Line chart of heart rate after standing: without compression the heart rate rises about 40 bpm and stays high, with compression it rises about 20 bpm and settles">
+    <line x1="44" y1="34" x2="44" y2="180" stroke="var(--line)" stroke-width="1.5" />
+    <line x1="44" y1="180" x2="344" y2="180" stroke="var(--line)" stroke-width="1.5" />
+    <text x="18" y="48" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11" text-anchor="middle">HR</text>
+    <text x="46" y="198" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11">stand</text>
+    <text x="194" y="198" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11" text-anchor="middle">3 min</text>
+    <text x="344" y="198" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11" text-anchor="end">10 min</text>
+    <line x1="44" y1="159" x2="344" y2="159" stroke="var(--dim-2)" stroke-width="1" stroke-dasharray="4 4" opacity="0.5" />
+    <text x="344" y="174" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5" text-anchor="end">resting baseline</text>
+    <polyline fill="none" stroke="#e03127" stroke-width="2.5" points="44,159 67,68 110,60 166,65 232,61 306,67 344,63" />
+    <text x="52" y="46" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="12">Without compression (~40 bpm)</text>
+    <polyline fill="none" stroke="#54d98a" stroke-width="2.5" points="44,159 67,111 110,115 166,120 232,122 306,125 344,127" />
+    <text x="100" y="145" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="12">With compression (~20 bpm)</text>
   </svg>
   <figcaption>An illustrative stand test with and without abdominal compression. The garment does not flatten the rise entirely, but a meaningfully smaller, steadier climb is exactly what you are looking for.</figcaption>
 </figure>

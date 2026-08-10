@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSheets } from '../../components/Sheet';
 import { WatchSyncSheet } from './WatchSync';
 import { getWatchSyncState, restoreWatchSync, subscribeWatchSync } from './watchSyncStore';
+import { setPillSlotClaim } from '../../store/pillSlot';
 
 export function WatchSyncPill() {
   const { openSheet, depth } = useSheets();
@@ -34,6 +35,13 @@ export function WatchSyncPill() {
   // A fresh minimize arms the pill for one reopen (tap or auto).
   useEffect(() => { if (st.minimized) reopening.current = false; }, [st.minimized]);
 
+  // Own the floating slot while visible, so the low-priority "What's new" pill
+  // recedes behind this one instead of overlapping it (src/store/pillSlot).
+  // Release on unmount only: a cleanup keyed on `shown` would drop the claim and
+  // retake it on every transition, bouncing the pill behind it mid-spring.
+  useEffect(() => { setPillSlotClaim('watchSync', shown); }, [shown]);
+  useEffect(() => () => setPillSlotClaim('watchSync', false), []);
+
   useEffect(() => {
     if (st.minimized && st.status === 'syncing') {
       setShown(true);
@@ -42,6 +50,9 @@ export function WatchSyncPill() {
       // The reading landed (or auth resolved against us) while minimized:
       // fade the pill away, then bring the card up showing the result.
       if (depth > 0) return; // hold until the user's open sheets close
+      // Release as the fade starts, so the pill behind slides forward with this
+      // one rather than 280ms after it (see HealthUpdates' hide()).
+      setPillSlotClaim('watchSync', false);
       Animated.timing(opacity, { toValue: 0, duration: 280, useNativeDriver: true }).start(({ finished }) => {
         if (finished) { setShown(false); reopen(); }
       });
@@ -71,7 +82,9 @@ export function WatchSyncPill() {
 
 // Styled to match the floating tab bar pill (same blur, tint, border).
 const styles = StyleSheet.create({
-  wrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
+  // zIndex 2, same layer as the health-import pill: both sit in front of the
+  // "What's new" pill, which recedes behind whichever holds the slot.
+  wrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center', zIndex: 2 },
   pill: {
     borderRadius: 999, overflow: 'hidden', borderWidth: 1, borderColor: '#34343b',
     shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 20, shadowOffset: { width: 0, height: 10 }, elevation: 8,

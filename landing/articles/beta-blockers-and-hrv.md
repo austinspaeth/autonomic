@@ -91,7 +91,7 @@ Two separate mechanisms push the numbers in the same direction, and it is worth 
 That second point is the one almost nobody accounts for. A big chunk of the HRV jump you see when you start a beta blocker is simply the consequence of a lower heart rate stretching out the ruler. It does not mean the improvement is fake, but it does mean the size of the jump oversells how much your nervous system actually changed.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 250" role="img" aria-label="Before-and-after comparison of resting heart rate and RMSSD when starting a beta blocker: resting heart rate falls from 78 to 62 beats per minute while RMSSD rises from 24 to 38 milliseconds, with a note that part of the RMSSD rise comes from the slower heart rate">
+  <svg class="fig-d" viewBox="0 0 720 250" role="img" aria-label="Before-and-after comparison of resting heart rate and RMSSD when starting a beta blocker: resting heart rate falls from 78 to 62 beats per minute while RMSSD rises from 24 to 38 milliseconds, with a note that part of the RMSSD rise comes from the slower heart rate">
     <text x="150" y="34" text-anchor="middle" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="15">Before beta blocker</text>
     <text x="560" y="34" text-anchor="middle" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="15">On beta blocker (new baseline)</text>
     <line x1="360" y1="52" x2="360" y2="220" stroke="var(--line)" stroke-width="1" stroke-dasharray="4 4" />
@@ -105,6 +105,23 @@ That second point is the one almost nobody accounts for. A big chunk of the HRV 
     <text x="150" y="200" text-anchor="middle" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="700" font-size="22" dy="16">24 ms</text>
     <text x="560" y="188" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="13">RMSSD</text>
     <text x="560" y="200" text-anchor="middle" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="700" font-size="22" dy="16">38 ms &#9650;</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 234" role="img" aria-label="Before-and-after comparison of resting heart rate and RMSSD when starting a beta blocker: resting heart rate falls from 78 to 62 beats per minute while RMSSD rises from 24 to 38 milliseconds, with a note that part of the RMSSD rise comes from the slower heart rate">
+    <text x="90" y="22" text-anchor="middle" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13.5">Before</text>
+    <text x="90" y="40" text-anchor="middle" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13.5">beta blocker</text>
+    <text x="270" y="22" text-anchor="middle" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13.5">On beta blocker</text>
+    <text x="270" y="40" text-anchor="middle" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13.5">(new baseline)</text>
+    <line x1="180" y1="56" x2="180" y2="220" stroke="var(--line)" stroke-width="1" stroke-dasharray="4 4" />
+    <text x="90" y="88" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="12.5">Resting HR</text>
+    <text x="90" y="126" text-anchor="middle" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="700" font-size="30">78</text>
+    <text x="90" y="146" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="12">bpm</text>
+    <text x="270" y="88" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="12.5">Resting HR</text>
+    <text x="270" y="126" text-anchor="middle" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="700" font-size="30">62 &#9660;</text>
+    <text x="270" y="146" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="12">bpm</text>
+    <text x="90" y="182" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="12.5">RMSSD</text>
+    <text x="90" y="212" text-anchor="middle" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="700" font-size="22">24 ms</text>
+    <text x="270" y="182" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="12.5">RMSSD</text>
+    <text x="270" y="212" text-anchor="middle" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="700" font-size="22">38 ms &#9650;</text>
   </svg>
   <figcaption>Starting a beta blocker typically drops resting heart rate and lifts RMSSD. Some of the RMSSD rise is a real parasympathetic shift, but part is the slower heart rate stretching out the beat-to-beat intervals. Treat the values after the dose change as a fresh baseline.</figcaption>
 </figure>
@@ -131,7 +148,7 @@ Ivabradine is worth a mention because people group it with beta blockers, and it
 If you use the [orthostatic stand test](/insights/pots/the-orthostatic-stand-test-at-home/) to track POTS, a beta blocker will visibly change it, and that change is usually the point. The test measures how far your heart rate climbs when you go from lying to standing. In POTS that jump is exaggerated (a sustained rise of 30 beats per minute or more in adults is part of the diagnostic picture). A beta blocker blunts exactly that climb.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 280" role="img" aria-label="Two stand-test heart-rate curves over time. Off medication, heart rate is flat while lying then jumps about 40 beats per minute on standing. On a beta blocker, the resting heart rate is lower and the jump on standing is much smaller, about 18 beats per minute.">
+  <svg class="fig-d" viewBox="0 0 720 280" role="img" aria-label="Two stand-test heart-rate curves over time. Off medication, heart rate is flat while lying then jumps about 40 beats per minute on standing. On a beta blocker, the resting heart rate is lower and the jump on standing is much smaller, about 18 beats per minute.">
     <line x1="60" y1="40" x2="60" y2="240" stroke="var(--line)" stroke-width="1" />
     <line x1="60" y1="240" x2="700" y2="240" stroke="var(--line)" stroke-width="1" />
     <text x="20" y="140" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="12" transform="rotate(-90 20 140)" text-anchor="middle">Heart rate (bpm)</text>
@@ -142,6 +159,18 @@ If you use the [orthostatic stand test](/insights/pots/the-orthostatic-stand-tes
     <polyline fill="none" stroke="#54d98a" stroke-width="2.6" points="60,213 180,213 300,213 330,175 420,170 560,176 700,178" />
     <text x="705" y="99" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13" text-anchor="end" dx="-8" dy="-8">Off medication: +40 bpm</text>
     <text x="705" y="178" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13" text-anchor="end" dx="-8" dy="20">On beta blocker: +18 bpm</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 250" role="img" aria-label="Two stand-test heart-rate curves over time. Off medication, heart rate is flat while lying then jumps about 40 beats per minute on standing. On a beta blocker, the resting heart rate is lower and the jump on standing is much smaller, about 18 beats per minute.">
+    <line x1="44" y1="40" x2="44" y2="200" stroke="var(--line)" stroke-width="1" />
+    <line x1="44" y1="200" x2="344" y2="200" stroke="var(--line)" stroke-width="1" />
+    <text x="16" y="120" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11.5" transform="rotate(-90 16 120)" text-anchor="middle">Heart rate (bpm)</text>
+    <text x="194" y="224" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11.5" text-anchor="middle">Lying, then standing (minutes)</text>
+    <line x1="156" y1="40" x2="156" y2="200" stroke="var(--line)" stroke-width="1" stroke-dasharray="4 4" />
+    <text x="156" y="34" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="12.5" text-anchor="middle">Stand up</text>
+    <polyline fill="none" stroke="#e03127" stroke-width="2.6" points="44,166 100,166 156,166 171,84 213,79 278,85 344,87" />
+    <polyline fill="none" stroke="#54d98a" stroke-width="2.6" points="44,178 100,178 156,178 171,148 213,144 278,149 344,150" />
+    <text x="344" y="66" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="12.5" text-anchor="end">Off medication: +40 bpm</text>
+    <text x="344" y="132" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="12.5" text-anchor="end">On beta blocker: +18 bpm</text>
   </svg>
   <figcaption>A beta blocker lowers the resting heart rate and shrinks the jump on standing. A smaller delta usually means better symptom control, not that the underlying orthostatic problem has resolved.</figcaption>
 </figure>

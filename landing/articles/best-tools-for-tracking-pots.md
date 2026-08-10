@@ -70,7 +70,7 @@ If you want *one* accurate signal, a chest strap is the value champion. It reads
 Rings and watches win on *consistency without effort*. They log resting heart rate, overnight HRV and sleep automatically, night after night, which is exactly the kind of long baseline that reveals whether you are trending better or worse. The trade-off is fidelity: optical wrist and finger sensors are noisier, and research shows the [Apple Watch tends to underestimate HRV](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC11478500/) relative to a chest strap. That is fine for trends. Just don't compare a watch number to a strap number and expect them to match. Our deeper look at [how accurate HRV wearables really are](/insights/research/how-accurate-are-hrv-wearables/) unpacks this further.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 210" role="img" aria-label="A trade-off scale showing chest straps highest in accuracy and rings and watches highest in convenience">
+  <svg class="fig-d" viewBox="0 0 720 210" role="img" aria-label="A trade-off scale showing chest straps highest in accuracy and rings and watches highest in convenience">
     <line x1="60" y1="150" x2="660" y2="150" stroke="var(--line)" stroke-width="2"/>
     <text x="60" y="180" font-family="Space Grotesk, sans-serif" font-size="14" fill="var(--dim-2)">More convenient →</text>
     <text x="660" y="180" font-family="Space Grotesk, sans-serif" font-size="14" fill="var(--dim-2)" text-anchor="end">← More accurate</text>
@@ -80,6 +80,17 @@ Rings and watches win on *consistency without effort*. They log resting heart ra
     <text x="400" y="125" font-family="Space Grotesk, sans-serif" font-size="14" fill="var(--dim-2)" text-anchor="middle">Pulse oximeter</text>
     <circle cx="600" cy="150" r="8" fill="#54d98a"/>
     <text x="600" y="125" font-family="Space Grotesk, sans-serif" font-size="14" fill="var(--dim-2)" text-anchor="middle">Chest strap</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 250" role="img" aria-label="A trade-off scale showing chest straps highest in accuracy and rings and watches highest in convenience">
+    <text x="40" y="22" font-family="Space Grotesk, sans-serif" font-size="14" fill="var(--dim-2)">↑ More accurate</text>
+    <line x1="44" y1="40" x2="44" y2="200" stroke="var(--line)" stroke-width="2"/>
+    <circle cx="44" cy="62" r="8" fill="#54d98a"/>
+    <text x="64" y="67" font-family="Space Grotesk, sans-serif" font-size="15" fill="var(--dim-2)">Chest strap</text>
+    <circle cx="44" cy="122" r="8" fill="#f5a524"/>
+    <text x="64" y="127" font-family="Space Grotesk, sans-serif" font-size="15" fill="var(--dim-2)">Pulse oximeter</text>
+    <circle cx="44" cy="182" r="8" fill="#38bdf8"/>
+    <text x="64" y="187" font-family="Space Grotesk, sans-serif" font-size="15" fill="var(--dim-2)">Ring / watch</text>
+    <text x="40" y="228" font-family="Space Grotesk, sans-serif" font-size="14" fill="var(--dim-2)">↓ More convenient</text>
   </svg>
   <figcaption>No single device wins on everything: pair an always-on wearable for trends with a chest strap for high-fidelity checks.</figcaption>
 </figure>

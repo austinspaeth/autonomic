@@ -2,6 +2,18 @@
 
 App versions for **Autonomic Journal** (`mobile/`). Newest first.
 
+This file is the engineering record. The **customer-facing** release notes shown
+in the app's "What's new" card are a separate, deliberately plainer log in
+`mobile/src/lib/whatsNew.ts` — update it whenever `version` in `mobile/app.json`
+crosses to a new `x.x` (a unit test fails if the shipping minor has no entry).
+
+## 1.23.0
+
+- "What's new" card: a pill offers the release notes once per `x.x` release (never for a patch), and Settings keeps a permanent entry to it. The pill yields the floating slot to the health-import and watch-sync pills, receding to the stacked-card treatment behind whichever holds it and springing back the moment that pill starts to fade.
+- Customer-facing release notes live in `mobile/src/lib/whatsNew.ts`, curated opt-in: only changes explicitly called out for announcement go in, never a filtered view of this file. A unit test fails if the shipping minor has no entry.
+- Seen-memory lives in the plaintext flags MMKV, so it can't ride an export/import and erasing the journal doesn't re-announce the release. Fresh installs are stamped silently.
+- Reading card UI refinements.
+
 ## 1.19.1
 
 - Health imports no longer come back empty because of a permission the app never got around to asking for. Every check asks first (silently when there is nothing left to ask), capped at one prompt per launch, and two checks firing at once can no longer stack two permission sheets. ECG is asked for in the same step instead of a second sheet behind the first.

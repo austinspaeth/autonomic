@@ -74,7 +74,7 @@ The methodology researchers make the same point: in their <a href="https://www.f
 Three things must stay fixed for your readings to line up. Change any one and you've changed the measurement.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 260" role="img" aria-label="Two morning readings taken the same way, both lying down at the same time for the same length, marked comparable in green; versus one lying and one seated reading marked not comparable in orange">
+  <svg class="fig-d" viewBox="0 0 720 260" role="img" aria-label="Two morning readings taken the same way, both lying down at the same time for the same length, marked comparable in green; versus one lying and one seated reading marked not comparable in orange">
     <text x="20" y="26" fill="#22c55e" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="15">Comparable: same conditions</text>
     <g font-family="-apple-system, sans-serif" font-size="11" fill="var(--dim)">
       <rect x="52" y="44" width="180" height="58" rx="8" fill="none" stroke="#22c55e" stroke-width="2" />
@@ -94,6 +94,28 @@ Three things must stay fixed for your readings to line up. Change any one and yo
       <text x="362" y="202" text-anchor="middle" fill="var(--text)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13">Tue 9:30pm</text>
       <text x="362" y="220" text-anchor="middle">seated · 1 min</text>
       <text x="500" y="213" fill="#f97316" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13">→ cannot compare</text>
+    </g>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 240" role="img" aria-label="Two morning readings taken the same way, both lying down at the same time for the same length, marked comparable in green; versus one lying and one seated reading marked not comparable in orange">
+    <text x="20" y="20" fill="#22c55e" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13.5">Comparable: same conditions</text>
+    <g font-family="-apple-system, sans-serif" font-size="11" fill="var(--dim)">
+      <rect x="20" y="32" width="150" height="54" rx="8" fill="none" stroke="#22c55e" stroke-width="2" />
+      <text x="95" y="55" text-anchor="middle" fill="var(--text)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13">Mon 7:00am</text>
+      <text x="95" y="73" text-anchor="middle">lying · 3 min</text>
+      <rect x="190" y="32" width="150" height="54" rx="8" fill="none" stroke="#22c55e" stroke-width="2" />
+      <text x="265" y="55" text-anchor="middle" fill="var(--text)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13">Tue 7:00am</text>
+      <text x="265" y="73" text-anchor="middle">lying · 3 min</text>
+      <text x="180" y="106" text-anchor="middle" fill="#22c55e" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13">→ they line up</text>
+    </g>
+    <text x="20" y="144" fill="#f97316" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13.5">Not comparable: conditions changed</text>
+    <g font-family="-apple-system, sans-serif" font-size="11" fill="var(--dim)">
+      <rect x="20" y="156" width="150" height="54" rx="8" fill="none" stroke="#f97316" stroke-width="2" />
+      <text x="95" y="179" text-anchor="middle" fill="var(--text)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13">Mon 7:00am</text>
+      <text x="95" y="197" text-anchor="middle">lying · 3 min</text>
+      <rect x="190" y="156" width="150" height="54" rx="8" fill="none" stroke="#f97316" stroke-width="2" />
+      <text x="265" y="179" text-anchor="middle" fill="var(--text)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13">Tue 9:30pm</text>
+      <text x="265" y="197" text-anchor="middle">seated · 1 min</text>
+      <text x="180" y="230" text-anchor="middle" fill="#f97316" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13">→ cannot compare</text>
     </g>
   </svg>
   <figcaption>Two readings taken the same way track each other honestly. Change the time, posture or length and the difference you see is measurement noise, not your nervous system.</figcaption>

@@ -75,7 +75,7 @@ There are three common ways a clinician confirms the standing response.
 **The NASA 10-minute lean test** is a middle ground: you rest, then lean against a wall with your shoulders touching and heels slightly out for 10 minutes while readings are taken. It requires no expensive equipment, which is why some clinics (and the wider dysautonomia community) favor it. [Dysautonomia International](https://www.dysautonomiainternational.org/pdf/POTSTreatmentEssentials.pdf) publishes patient-facing material on these protocols.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 220" role="img" aria-label="Bar chart comparing heart-rate rise on standing for a normal response, borderline, and POTS against the 30 bpm threshold line">
+  <svg class="fig-d" viewBox="0 0 720 220" role="img" aria-label="Bar chart comparing heart-rate rise on standing for a normal response, borderline, and POTS against the 30 bpm threshold line">
     <line x1="70" y1="20" x2="70" y2="180" stroke="var(--line)" stroke-width="1.5"/>
     <line x1="70" y1="180" x2="690" y2="180" stroke="var(--line)" stroke-width="1.5"/>
     <line x1="70" y1="95" x2="690" y2="95" stroke="#f5a524" stroke-width="1.5" stroke-dasharray="6 5"/>
@@ -90,6 +90,22 @@ There are three common ways a clinician confirms the standing response.
     <text x="545" y="203" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="13" fill="var(--dim-2)">POTS range</text>
     <text x="545" y="47" text-anchor="middle" font-family="Space Mono, monospace" font-size="13" fill="var(--dim-2)">+45</text>
     <text x="40" y="185" text-anchor="middle" font-family="Space Mono, monospace" font-size="12" fill="var(--dim-2)">0</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 214" role="img" aria-label="Bar chart comparing heart-rate rise on standing for a normal response, borderline, and POTS against the 30 bpm threshold line">
+    <line x1="50" y1="30" x2="50" y2="180" stroke="var(--line)" stroke-width="1.5"/>
+    <line x1="50" y1="180" x2="344" y2="180" stroke="var(--line)" stroke-width="1.5"/>
+    <line x1="50" y1="97" x2="344" y2="97" stroke="#f5a524" stroke-width="1.5" stroke-dasharray="6 5"/>
+    <text x="54" y="90" font-family="Space Mono, monospace" font-size="11.5" fill="#f5a524">30 bpm threshold</text>
+    <rect x="74" y="140" width="62" height="40" rx="4" fill="#54d98a"/>
+    <text x="105" y="200" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="12" fill="var(--dim-2)">Normal</text>
+    <text x="105" y="132" text-anchor="middle" font-family="Space Mono, monospace" font-size="12" fill="var(--dim-2)">+15</text>
+    <rect x="154" y="104" width="62" height="76" rx="4" fill="#f5a524"/>
+    <text x="185" y="200" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="12" fill="var(--dim-2)">Borderline</text>
+    <text x="185" y="118" text-anchor="middle" font-family="Space Mono, monospace" font-size="12" fill="#3a2a06">+27</text>
+    <rect x="234" y="57" width="62" height="123" rx="4" fill="#e03127"/>
+    <text x="265" y="200" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="12" fill="var(--dim-2)">POTS range</text>
+    <text x="265" y="49" text-anchor="middle" font-family="Space Mono, monospace" font-size="12" fill="var(--dim-2)">+45</text>
+    <text x="40" y="185" text-anchor="end" font-family="Space Mono, monospace" font-size="11.5" fill="var(--dim-2)">0</text>
   </svg>
   <figcaption>It is the sustained rise above baseline that counts: crossing and holding above the 30 bpm line, with stable blood pressure, is the POTS signature.</figcaption>
 </figure>

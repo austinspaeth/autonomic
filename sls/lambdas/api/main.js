@@ -10,6 +10,7 @@
  *   LOAD         -> { entries, settings, ui }
  *   SYNC         { upserts, deletes, settings, ui } -> applies a client diff
  *   REPLACE_ALL  { entries, settings } -> wipes and rewrites every entry
+ *   PINGS        { since } -> the mobile app's cohort-ping counters
  */
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
 const {
@@ -18,6 +19,9 @@ const {
   BatchWriteCommand,
   PutCommand,
 } = require('@aws-sdk/lib-dynamodb');
+
+/* One implementation of the ping read, shared with the public keyed route. */
+const { report: pingReport } = require('../ping/main');
 
 const TABLE = process.env.DYNAMO_TABLE_NAME;
 const ALLOWED = String(process.env.ALLOWED_EMAILS || '')
@@ -272,6 +276,13 @@ const handler = async (event) => {
         return json(200, await sync(pk, payload));
       case 'REPLACE_ALL':
         return json(200, await replaceAll(pk, payload));
+      // The mobile app's cohort counters. They live under their own partitions
+      // (PING#OPEN / PING#SUB), not any dashboard user's, but they are read
+      // through this handler so the allowlist above guards them too — the
+      // dashboard already holds a token, and shouldn't also hold the ping
+      // lambda's shared key.
+      case 'PINGS':
+        return json(200, await pingReport(payload.since));
       default:
         return json(400, { error: `Unknown action: ${action}` });
     }

@@ -71,7 +71,7 @@ The pattern is consistent: the cloud model concentrates your data where others c
 It can help to picture the data flow. In a cloud app, every entry makes a trip to a server and back. In Autonomic, the loop closes on your phone.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 220" role="img" aria-label="Diagram contrasting a cloud app that sends data to a remote server with Autonomic, where data stays entirely on the phone">
+  <svg class="fig-d" viewBox="0 0 720 220" role="img" aria-label="Diagram contrasting a cloud app that sends data to a remote server with Autonomic, where data stays entirely on the phone">
     <text x="180" y="28" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="15" fill="var(--dim-2)">Typical cloud app</text>
     <rect x="120" y="50" width="120" height="120" rx="14" fill="none" stroke="var(--line)" stroke-width="2"/>
     <text x="180" y="115" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="13" fill="var(--dim-2)">your phone</text>
@@ -88,6 +88,26 @@ It can help to picture the data flow. In a cloud app, every entry makes a trip t
     <text x="565" y="128" text-anchor="middle" font-family="Space Mono, monospace" font-size="12" fill="#54d98a">stays here</text>
     <path d="M 648 90 a 34 34 0 1 1 0 40" fill="none" stroke="#54d98a" stroke-width="2"/>
     <polygon points="648,130 656,124 640,122" fill="#54d98a"/>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 400" role="img" aria-label="Diagram contrasting a cloud app that sends data to a remote server with Autonomic, where data stays entirely on the phone">
+    <text x="20" y="20" font-family="Space Grotesk, sans-serif" font-size="14" fill="var(--dim-2)">Typical cloud app</text>
+    <rect x="30" y="34" width="110" height="120" rx="14" fill="none" stroke="var(--line)" stroke-width="2"/>
+    <text x="85" y="99" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="12.5" fill="var(--dim-2)">your phone</text>
+    <line x1="146" y1="70" x2="230" y2="70" stroke="#e03127" stroke-width="2" stroke-dasharray="6 5"/>
+    <polygon points="230,70 220,65 220,75" fill="#e03127"/>
+    <line x1="230" y1="118" x2="146" y2="118" stroke="#e03127" stroke-width="2" stroke-dasharray="6 5"/>
+    <polygon points="146,118 156,113 156,123" fill="#e03127"/>
+    <rect x="236" y="54" width="34" height="80" rx="4" fill="none" stroke="#e03127" stroke-width="2"/>
+    <text x="253" y="152" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="11.5" fill="#e03127">their server</text>
+    <line x1="20" y1="188" x2="340" y2="188" stroke="var(--line)" stroke-width="1.5" stroke-dasharray="3 4"/>
+    <text x="20" y="222" font-family="Space Grotesk, sans-serif" font-size="14" fill="var(--dim-2)">Autonomic</text>
+    <rect x="30" y="236" width="110" height="120" rx="14" fill="none" stroke="#54d98a" stroke-width="2"/>
+    <text x="85" y="290" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="12.5" fill="var(--dim-2)">your phone</text>
+    <text x="85" y="312" text-anchor="middle" font-family="Space Mono, monospace" font-size="11.5" fill="#54d98a">stays here</text>
+    <path d="M 162 276 a 34 34 0 1 1 0 40" fill="none" stroke="#54d98a" stroke-width="2"/>
+    <polygon points="162,316 170,310 154,308" fill="#54d98a"/>
+    <text x="244" y="292" font-family="Space Mono, monospace" font-size="11" fill="#54d98a">the loop closes</text>
+    <text x="244" y="308" font-family="Space Mono, monospace" font-size="11" fill="#54d98a">on your device</text>
   </svg>
   <figcaption>In a cloud app, every entry travels to a server and back. In Autonomic, the loop closes on your device: nothing leaves unless you export it.</figcaption>
 </figure>

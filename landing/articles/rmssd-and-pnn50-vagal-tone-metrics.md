@@ -70,13 +70,23 @@ Of all the heart rate variability figures you can capture, two stand slightly ap
 The vagus nerve acts fast. It can slow your heart within a single beat and release it just as quickly, which shows up as rapid, short-lived changes in the spacing between beats. RMSSD and pNN50 are both built specifically to catch those quick changes and ignore the slower drifts, which is exactly why they're the metrics most people watch every morning.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 250" role="img" aria-label="Two tachograms compared: a high-RMSSD reading where each beat interval jumps sharply from the last, and a low-RMSSD reading where intervals change only slightly beat to beat">
+  <svg class="fig-d" viewBox="0 0 720 250" role="img" aria-label="Two tachograms compared: a high-RMSSD reading where each beat interval jumps sharply from the last, and a low-RMSSD reading where intervals change only slightly beat to beat">
     <text x="20" y="26" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="15">High RMSSD, big beat-to-beat jumps</text>
     <polyline fill="none" stroke="#54d98a" stroke-width="2.5" points="40,70 100,40 160,95 220,45 280,90 340,50 400,98 460,42 520,88 580,52 640,92 700,48" />
     <g fill="#54d98a"><circle cx="40" cy="70" r="4"/><circle cx="100" cy="40" r="4"/><circle cx="160" cy="95" r="4"/><circle cx="220" cy="45" r="4"/><circle cx="280" cy="90" r="4"/><circle cx="340" cy="50" r="4"/><circle cx="400" cy="98" r="4"/><circle cx="460" cy="42" r="4"/><circle cx="520" cy="88" r="4"/><circle cx="580" cy="52" r="4"/><circle cx="640" cy="92" r="4"/><circle cx="700" cy="48" r="4"/></g>
     <text x="20" y="150" fill="#ef4444" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="15">Low RMSSD, small beat-to-beat changes</text>
     <polyline fill="none" stroke="#ef4444" stroke-width="2.5" points="40,192 100,188 160,195 220,190 280,193 340,189 400,194 460,188 520,192 580,190 640,193 700,189" />
     <g fill="#ef4444"><circle cx="40" cy="192" r="4"/><circle cx="100" cy="188" r="4"/><circle cx="160" cy="195" r="4"/><circle cx="220" cy="190" r="4"/><circle cx="280" cy="193" r="4"/><circle cx="340" cy="189" r="4"/><circle cx="400" cy="194" r="4"/><circle cx="460" cy="188" r="4"/><circle cx="520" cy="192" r="4"/><circle cx="580" cy="190" r="4"/><circle cx="640" cy="193" r="4"/><circle cx="700" cy="189" r="4"/></g>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 244" role="img" aria-label="Two tachograms compared: a high-RMSSD reading where each beat interval jumps sharply from the last, and a low-RMSSD reading where intervals change only slightly beat to beat">
+    <text x="20" y="18" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13">High RMSSD, big</text>
+    <text x="20" y="34" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13">beat-to-beat jumps</text>
+    <polyline fill="none" stroke="#54d98a" stroke-width="2.5" points="24,70 53,40 82,95 111,45 140,90 169,50 199,98 228,42 257,88 286,52 315,92 344,48" />
+    <g fill="#54d98a"><circle cx="24" cy="70" r="4"/><circle cx="53" cy="40" r="4"/><circle cx="82" cy="95" r="4"/><circle cx="111" cy="45" r="4"/><circle cx="140" cy="90" r="4"/><circle cx="169" cy="50" r="4"/><circle cx="199" cy="98" r="4"/><circle cx="228" cy="42" r="4"/><circle cx="257" cy="88" r="4"/><circle cx="286" cy="52" r="4"/><circle cx="315" cy="92" r="4"/><circle cx="344" cy="48" r="4"/></g>
+    <text x="20" y="146" fill="#ef4444" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13">Low RMSSD, small</text>
+    <text x="20" y="162" fill="#ef4444" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13">beat-to-beat changes</text>
+    <polyline fill="none" stroke="#ef4444" stroke-width="2.5" points="24,204 53,200 82,207 111,202 140,205 169,201 199,206 228,200 257,204 286,202 315,205 344,201" />
+    <g fill="#ef4444"><circle cx="24" cy="204" r="4"/><circle cx="53" cy="200" r="4"/><circle cx="82" cy="207" r="4"/><circle cx="111" cy="202" r="4"/><circle cx="140" cy="205" r="4"/><circle cx="169" cy="201" r="4"/><circle cx="199" cy="206" r="4"/><circle cx="228" cy="200" r="4"/><circle cx="257" cy="204" r="4"/><circle cx="286" cy="202" r="4"/><circle cx="315" cy="205" r="4"/><circle cx="344" cy="201" r="4"/></g>
   </svg>
   <figcaption>RMSSD measures the size of the jump from each beat interval to the next, not the spread around an average. Big zig-zags mean high RMSSD; a nearly flat line means low.</figcaption>
 </figure>

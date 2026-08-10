@@ -135,7 +135,7 @@ There is no universal number that means "low," and chasing one causes a lot of n
 The distinction between those two is the single most useful idea in reading HRV, so the figure below is worth a look before the causes.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 250" role="img" aria-label="Two HRV trend lines over two weeks. The first bounces up and down around a steady baseline with one sharp single-day dip that recovers immediately. The second starts at the same baseline then steps down and stays low, showing a sustained suppression.">
+  <svg class="fig-d" viewBox="0 0 720 250" role="img" aria-label="Two HRV trend lines over two weeks. The first bounces up and down around a steady baseline with one sharp single-day dip that recovers immediately. The second starts at the same baseline then steps down and stays low, showing a sustained suppression.">
     <line x1="50" y1="210" x2="700" y2="210" stroke="var(--line)" stroke-width="1.5" />
     <line x1="50" y1="20" x2="50" y2="210" stroke="var(--line)" stroke-width="1.5" />
     <text x="16" y="30" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11">HRV</text>
@@ -146,6 +146,19 @@ The distinction between those two is the single most useful idea in reading HRV,
     <text x="150" y="178" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-size="12" font-weight="600">one-day dip, recovers</text>
     <polyline fill="none" stroke="#e03127" stroke-width="2.5" points="60,74 105,66 150,78 195,120 240,150 285,158 330,150 375,162 420,152 465,158 510,150 555,160 600,152 645,158" />
     <text x="470" y="185" fill="#e03127" font-family="Space Grotesk, sans-serif" font-size="12" font-weight="600">sustained suppression</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 226" role="img" aria-label="Two HRV trend lines over two weeks. The first bounces up and down around a steady baseline with one sharp single-day dip that recovers immediately. The second starts at the same baseline then steps down and stays low, showing a sustained suppression.">
+    <line x1="44" y1="186" x2="344" y2="186" stroke="var(--line)" stroke-width="1.5" />
+    <line x1="44" y1="30" x2="44" y2="186" stroke="var(--line)" stroke-width="1.5" />
+    <text x="16" y="38" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5">HRV</text>
+    <line x1="44" y1="71" x2="344" y2="71" stroke="var(--line)" stroke-width="1" stroke-dasharray="4 4" />
+    <text x="344" y="92" text-anchor="end" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">your baseline</text>
+    <polyline fill="none" stroke="#54d98a" stroke-width="2.5" points="49,73 69,63 90,79 111,137 132,69 152,61 173,78 194,66 215,81 236,68 256,74 277,63 298,78 319,68" />
+    <circle cx="111" cy="137" r="5" fill="#54d98a" />
+    <text x="44" y="162" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-size="11.5" font-weight="600">one-day dip, recovers</text>
+    <polyline fill="none" stroke="#e03127" stroke-width="2.5" points="49,74 69,68 90,78 111,112 132,137 152,143 173,137 194,147 215,138 236,143 256,137 277,145 298,138 319,143" />
+    <text x="344" y="178" text-anchor="end" fill="#e03127" font-family="Space Grotesk, sans-serif" font-size="11.5" font-weight="600">sustained suppression</text>
+    <text x="44" y="212" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">two weeks of morning readings →</text>
   </svg>
   <figcaption>Same starting baseline, two very different stories. A single sharp dip that bounces back is normal. A step down that holds for days is the pattern worth reading.</figcaption>
 </figure>
@@ -183,7 +196,7 @@ A tough workout is a stressor by design, and HRV typically dips for 12 to 48 hou
 A late large meal keeps digestion and sympathetic tone active into the night. Caffeine too close to your reading, nicotine, and even a very warm room can each shave a bit off the number. None of these are alarming; they are simply inputs your nervous system was responding to.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 260" role="img" aria-label="Horizontal bar chart showing the rough size and duration of common HRV suppressors. Poor sleep and alcohol show the largest and longest bars, followed by illness onset, stress, hard exercise, dehydration and a late meal.">
+  <svg class="fig-d" viewBox="0 0 720 260" role="img" aria-label="Horizontal bar chart showing the rough size and duration of common HRV suppressors. Poor sleep and alcohol show the largest and longest bars, followed by illness onset, stress, hard exercise, dehydration and a late meal.">
     <line x1="170" y1="20" x2="170" y2="235" stroke="var(--line)" stroke-width="1.5" />
     <g font-family="Space Grotesk, sans-serif" font-size="12" fill="var(--dim-2)" text-anchor="end">
       <text x="160" y="42">Poor sleep</text>
@@ -204,6 +217,24 @@ A late large meal keeps digestion and sympathetic tone active into the night. Ca
       <rect x="170" y="222" width="180" height="16" rx="4" fill="#54d98a" fill-opacity="0.7" />
     </g>
     <text x="180" y="252" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">rough relative impact on a morning reading (illustrative, not measured)</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 320" role="img" aria-label="Horizontal bar chart showing the rough size and duration of common HRV suppressors. Poor sleep and alcohol show the largest and longest bars, followed by illness onset, stress, hard exercise, dehydration and a late meal.">
+    <g font-family="Space Grotesk, sans-serif" font-size="12" fill="var(--dim-2)">
+      <text x="20" y="20">Poor sleep</text>
+      <rect x="20" y="26" width="320" height="14" rx="4" fill="#e03127" fill-opacity="0.75" />
+      <text x="20" y="66">Alcohol</text>
+      <rect x="20" y="72" width="293" height="14" rx="4" fill="#e03127" fill-opacity="0.65" />
+      <text x="20" y="112">Illness onset</text>
+      <rect x="20" y="118" width="245" height="14" rx="4" fill="#f97316" fill-opacity="0.8" />
+      <text x="20" y="158">Stress load</text>
+      <rect x="20" y="164" width="225" height="14" rx="4" fill="#f97316" fill-opacity="0.7" />
+      <text x="20" y="204">Hard exercise</text>
+      <rect x="20" y="210" width="204" height="14" rx="4" fill="#eab308" fill-opacity="0.85" />
+      <text x="20" y="250">Dehydration</text>
+      <rect x="20" y="256" width="157" height="14" rx="4" fill="#eab308" fill-opacity="0.7" />
+      <text x="20" y="290">Late heavy meal</text>
+      <rect x="20" y="296" width="123" height="14" rx="4" fill="#54d98a" fill-opacity="0.7" />
+    </g>
   </svg>
   <figcaption>A rough, illustrative sense of which everyday loads tend to move HRV most. Individual response varies widely, so treat it as a map of where to look, not a formula.</figcaption>
 </figure>

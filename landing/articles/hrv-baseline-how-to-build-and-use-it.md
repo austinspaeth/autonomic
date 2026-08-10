@@ -110,7 +110,7 @@ Your HRV baseline is two things at once: your own rolling average, and the norma
 This matters even more in POTS, long COVID and post-viral dysautonomia, where absolute HRV numbers often run low and comparing yourself to a healthy 25-year-old's chart is both discouraging and useless. Your baseline sidesteps that entirely: it only ever compares you to you.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 260" role="img" aria-label="A scatter of daily HRV readings around a horizontal baseline average line, with a shaded normal-range band. Most dots fall inside the band; one dot sits well below it, marked as a meaningful dip.">
+  <svg class="fig-d" viewBox="0 0 720 260" role="img" aria-label="A scatter of daily HRV readings around a horizontal baseline average line, with a shaded normal-range band. Most dots fall inside the band; one dot sits well below it, marked as a meaningful dip.">
     <rect x="55" y="96" width="620" height="70" fill="#54d98a" opacity="0.12" />
     <line x1="55" y1="131" x2="675" y2="131" stroke="#54d98a" stroke-width="2" stroke-dasharray="6 5" />
     <text x="60" y="88" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-size="13" font-weight="600">Your normal range (baseline ± typical swing)</text>
@@ -126,6 +126,24 @@ This matters even more in POTS, long COVID and post-viral dysautonomia, where ab
     <text x="500" y="234" fill="#e03127" font-family="Space Grotesk, sans-serif" font-size="12" font-weight="600" text-anchor="middle">outside the band: worth a look</text>
     <line x1="55" y1="185" x2="675" y2="185" stroke="var(--line)" stroke-width="1"/>
     <text x="55" y="205" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11">morning readings, one per day →</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 268" role="img" aria-label="A scatter of daily HRV readings around a horizontal baseline average line, with a shaded normal-range band. Most dots fall inside the band; one dot sits well below it, marked as a meaningful dip.">
+    <text x="20" y="20" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-size="12.5" font-weight="600">Your normal range</text>
+    <text x="20" y="36" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-size="12.5" font-weight="600">(baseline ± typical swing)</text>
+    <rect x="20" y="52" width="320" height="70" fill="#54d98a" opacity="0.12" />
+    <line x1="20" y1="87" x2="340" y2="87" stroke="#54d98a" stroke-width="2" stroke-dasharray="6 5" />
+    <text x="24" y="114" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11.5">baseline average</text>
+    <g fill="var(--dim-2)">
+      <circle cx="42" cy="76" r="5"/><circle cx="66" cy="101" r="5"/><circle cx="90" cy="68" r="5"/>
+      <circle cx="114" cy="94" r="5"/><circle cx="138" cy="61" r="5"/><circle cx="162" cy="106" r="5"/>
+      <circle cx="186" cy="74" r="5"/><circle cx="210" cy="89" r="5"/><circle cx="234" cy="66" r="5"/>
+      <circle cx="282" cy="82" r="5"/><circle cx="306" cy="104" r="5"/><circle cx="330" cy="71" r="5"/>
+    </g>
+    <circle cx="258" cy="176" r="6" fill="#e03127"/>
+    <line x1="258" y1="122" x2="258" y2="170" stroke="#e03127" stroke-width="1.5" stroke-dasharray="3 3"/>
+    <text x="340" y="200" fill="#e03127" font-family="Space Grotesk, sans-serif" font-size="12" font-weight="600" text-anchor="end">outside the band: worth a look</text>
+    <line x1="20" y1="228" x2="340" y2="228" stroke="var(--line)" stroke-width="1"/>
+    <text x="20" y="248" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11">morning readings, one per day →</text>
   </svg>
   <figcaption>A reading only becomes meaningful against your own band. Most mornings scatter inside your normal range; the ones that leave it are the ones worth reading.</figcaption>
 </figure>
@@ -157,13 +175,22 @@ Because HRV is so variable, you need enough readings to capture your normal spre
 The takeaway: give it about **two weeks** before you read much into any single day, and about **four to eight weeks** before you fully trust the band. After that, most tracking tools hold the baseline on a **rolling window** so it keeps moving as you do, rather than freezing your first month forever.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 240" role="img" aria-label="A line chart showing noisy daily HRV readings over several weeks, with a smoother rolling-baseline line that starts uncertain and settles, then gradually climbs upward during a recovery phase.">
+  <svg class="fig-d" viewBox="0 0 720 240" role="img" aria-label="A line chart showing noisy daily HRV readings over several weeks, with a smoother rolling-baseline line that starts uncertain and settles, then gradually climbs upward during a recovery phase.">
     <polyline fill="none" stroke="var(--line-2)" stroke-width="1.5" opacity="0.7" points="50,150 82,120 114,175 146,130 178,165 210,125 242,155 274,115 306,150 338,110 370,140 402,100 434,132 466,92 498,120 530,86 562,110 594,78 626,102 658,72 690,95" />
     <polyline fill="none" stroke="#54d98a" stroke-width="3" points="50,150 82,145 114,148 146,143 178,145 210,140 242,142 274,135 306,136 338,128 370,128 402,120 434,120 466,112 498,110 530,102 562,100 594,92 626,90 658,82 690,80" />
     <line x1="178" y1="40" x2="178" y2="200" stroke="var(--line)" stroke-width="1" stroke-dasharray="4 4"/>
     <text x="184" y="55" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="12">~2 weeks: rough baseline</text>
     <text x="50" y="222" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-size="12" font-weight="600">rolling baseline (bold) settles, then climbs as recovery takes hold</text>
     <text x="500" y="60" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11">daily readings (faint)</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 232" role="img" aria-label="A line chart showing noisy daily HRV readings over several weeks, with a smoother rolling-baseline line that starts uncertain and settles, then gradually climbs upward during a recovery phase.">
+    <polyline fill="none" stroke="var(--line-2)" stroke-width="1.5" opacity="0.7" points="20,130 36,103 52,153 69,112 85,144 101,108 117,135 133,98 150,130 166,94 182,121 198,85 214,114 231,77 247,103 263,72 279,94 295,65 312,87 328,59 344,80" />
+    <polyline fill="none" stroke="#54d98a" stroke-width="3" points="20,130 36,126 52,129 69,124 85,126 101,121 117,123 133,117 150,118 166,110 182,110 198,103 214,103 231,96 247,94 263,87 279,85 295,77 312,76 328,68 344,66" />
+    <line x1="85" y1="30" x2="85" y2="176" stroke="var(--line)" stroke-width="1" stroke-dasharray="4 4"/>
+    <text x="91" y="42" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="11.5">~2 weeks: rough baseline</text>
+    <text x="344" y="172" text-anchor="end" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5">daily readings (faint)</text>
+    <text x="20" y="204" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-size="11.5" font-weight="600">rolling baseline (bold) settles, then</text>
+    <text x="20" y="220" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-size="11.5" font-weight="600">climbs as recovery takes hold</text>
   </svg>
   <figcaption>Daily HRV is noisy (faint line). The rolling baseline (bold) filters that noise, and its slow upward drift is itself a recovery signal.</figcaption>
 </figure>

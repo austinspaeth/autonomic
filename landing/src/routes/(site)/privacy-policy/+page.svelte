@@ -7,13 +7,13 @@
   <title>Privacy Policy | Autonomic</title>
   <meta
     name="description"
-    content="Autonomic's privacy policy: the app collects nothing and your data stays on your device. No accounts, no servers, no in-app tracking. Our marketing website uses basic analytics."
+    content="Autonomic's privacy policy: the app collects nothing and your data stays on your device. No accounts, no cloud, no in-app tracking, just an anonymous daily counter that carries no identifier. Our marketing website uses basic analytics."
   />
   <link rel="canonical" href={canonical} />
   <meta property="og:type" content="website" />
   <meta property="og:url" content={canonical} />
   <meta property="og:title" content="Privacy Policy | Autonomic" />
-  <meta property="og:description" content="The app collects nothing and your data stays on your device. No accounts, no servers, no in-app tracking. Our marketing website uses basic analytics." />
+  <meta property="og:description" content="The app collects nothing and your data stays on your device. No accounts, no cloud, no in-app tracking, just an anonymous daily counter that carries no identifier. Our marketing website uses basic analytics." />
   <meta property="og:image" content="https://autonomic.care/og.png" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:image" content="https://autonomic.care/og.png" />
@@ -23,23 +23,51 @@
   <div class="wrap legal-wrap">
     <p class="eyebrow">Legal</p>
     <h1 class="h2">Privacy Policy</h1>
-    <p class="legal-updated">Last updated: July 12, 2026</p>
+    <p class="legal-updated">Last updated: August 10, 2026</p>
 
     <div class="article-prose">
       <p>
         Autonomic is a private, offline journal for logging autonomic-nervous-system recovery. This
         policy is short because the honest answer to "what does the app do with my data?" is:
-        <strong>nothing, we never receive it.</strong> The one exception is this marketing website,
-        which uses basic analytics, described under <a href="#website">The website</a> below.
+        <strong>nothing, we never receive it.</strong> There are two exceptions, and both are
+        described in full below: a daily counter that tells us how many people use the app and
+        nothing about who they are (<a href="#counter">The one thing the app tells us</a>), and this
+        marketing website, which uses basic analytics (<a href="#website">The website</a>).
       </p>
 
       <h2>What the app collects</h2>
       <p>
-        <strong>Nothing.</strong> The Autonomic app has no user accounts, no sign-in, no servers, and
-        no backend. We do not collect, receive, store, sell, or share any personal information or
-        health data from the app. The app itself contains no analytics, no advertising, no crash
-        reporters, and no third-party tracking of any kind. Everything below about your health data
-        applies to the app; the separate website is covered at the end.
+        <strong>Nothing.</strong> The Autonomic app has no user accounts, no sign-in, and no cloud.
+        We do not collect, store, sell, or share any personal information or health data from the
+        app. The app itself contains no analytics, no advertising, no crash reporters, and no
+        third-party tracking of any kind. Everything below about your health data applies to the
+        app; the separate website is covered at the end.
+      </p>
+
+      <h2 id="counter">The one thing the app tells us</h2>
+      <p>
+        Once a day, the app asks a counter on our server to add one. It tells that counter a single
+        thing: the date this copy of the app was first opened, a date shared by everyone who
+        installed it the same day. There is no account, no device or install identifier, no request
+        body, and nothing about you, your journal, or your health. It sends the same thing again if
+        you subscribe, so we can tell how many people found the app worth paying for.
+      </p>
+      <p>
+        <strong>We do not keep the request. We keep the count.</strong> The date is added to a
+        running total and discarded; we never log the IP address it arrived from, and nothing stored
+        on our side can say whether any particular copy of the app checked in. What it leaves us
+        with is a number, like "412 people who installed the app in March were still using it in
+        September". That is how a small, independent app finds out whether it is actually helping
+        anyone.
+      </p>
+      <p>
+        Two other connections leave the app, and neither of them reaches us. If you subscribe, the
+        purchase is handled entirely by <strong>Apple</strong> or <strong>Google</strong> under
+        their own privacy policies: we never see your name, email, or payment details, and the app
+        only ever learns from them whether this device holds an active subscription. Separately, the
+        app checks for software updates, the same kind of check the App Store and Google Play make,
+        which reaches our update host (<strong>Expo</strong>) and tells it only which version of the
+        app is running. Neither carries anything you have logged.
       </p>
 
       <h2>Where your data lives</h2>

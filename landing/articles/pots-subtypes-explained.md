@@ -66,7 +66,7 @@ The definition of POTS itself is deliberately simple. It is a sustained heart-ra
 The most important thing to hold onto: **these categories overlap heavily**, and most people have features of more than one. Treat them as a vocabulary for your symptoms and your data, not as a box you belong in.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 240" role="img" aria-label="Three POTS subtypes shown as overlapping circles: neuropathic, hyperadrenergic and hypovolemic, with deconditioning as a band beneath all three, illustrating that most patients have features of more than one">
+  <svg class="fig-d" viewBox="0 0 720 240" role="img" aria-label="Three POTS subtypes shown as overlapping circles: neuropathic, hyperadrenergic and hypovolemic, with deconditioning as a band beneath all three, illustrating that most patients have features of more than one">
     <circle cx="270" cy="110" r="88" fill="#54d98a" fill-opacity="0.16" stroke="#54d98a" stroke-width="2"/>
     <circle cx="450" cy="110" r="88" fill="#e03127" fill-opacity="0.14" stroke="#e03127" stroke-width="2"/>
     <circle cx="360" cy="150" r="88" fill="#eab308" fill-opacity="0.16" stroke="#eab308" stroke-width="2"/>
@@ -74,6 +74,15 @@ The most important thing to hold onto: **these categories overlap heavily**, and
     <text x="430" y="80" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="15">Hyperadrenergic</text>
     <text x="322" y="205" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="15">Hypovolemic</text>
     <text x="360" y="128" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="12" text-anchor="middle">overlap</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 272" role="img" aria-label="Three POTS subtypes shown as overlapping circles: neuropathic, hyperadrenergic and hypovolemic, illustrating that most patients have features of more than one">
+    <circle cx="120" cy="110" r="76" fill="#54d98a" fill-opacity="0.16" stroke="#54d98a" stroke-width="2"/>
+    <circle cx="240" cy="110" r="76" fill="#e03127" fill-opacity="0.14" stroke="#e03127" stroke-width="2"/>
+    <circle cx="180" cy="180" r="76" fill="#eab308" fill-opacity="0.16" stroke="#eab308" stroke-width="2"/>
+    <text x="82" y="72" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13" text-anchor="middle">Neuropathic</text>
+    <text x="274" y="72" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13" text-anchor="middle">Hyperadrenergic</text>
+    <text x="180" y="242" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13" text-anchor="middle">Hypovolemic</text>
+    <text x="180" y="134" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11.5" text-anchor="middle">overlap</text>
   </svg>
   <figcaption>The three subtypes are overlapping mechanisms, not exclusive categories. Deconditioning and low blood volume can ride along with any of them.</figcaption>
 </figure>
@@ -131,7 +140,7 @@ You cannot measure your standing norepinephrine or your blood volume at home. Bu
 - If everything is clearly **worse on low-fluid days** and salt and water noticeably steady you, a **hypovolemic** component is likely in the mix.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 260" role="img" aria-label="Three panels comparing standing blood pressure and heart rate. Neuropathic: heart rate rises sharply, systolic blood pressure stays flat. Hyperadrenergic: heart rate rises and systolic blood pressure also rises. Hypovolemic: heart rate rises with a narrow gap between systolic and diastolic pressure.">
+  <svg class="fig-d" viewBox="0 0 720 260" role="img" aria-label="Three panels comparing standing blood pressure and heart rate. Neuropathic: heart rate rises sharply, systolic blood pressure stays flat. Hyperadrenergic: heart rate rises and systolic blood pressure also rises. Hypovolemic: heart rate rises with a narrow gap between systolic and diastolic pressure.">
     <!-- Panel 1: Neuropathic -->
     <text x="30" y="30" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="14">Neuropathic</text>
     <line x1="30" y1="210" x2="200" y2="210" stroke="var(--line)" stroke-width="1"/>
@@ -160,6 +169,33 @@ You cannot measure your standing norepinephrine or your blood volume at home. Bu
     <polyline fill="none" stroke="#54d98a" stroke-width="1.5" stroke-dasharray="4 4" points="535,138 590,138 600,132 675,132"/>
     <text x="680" y="80" fill="#e03127" font-family="Space Mono, monospace" font-size="10">HR</text>
     <text x="680" y="124" fill="#54d98a" font-family="Space Mono, monospace" font-size="10">BP</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 340" role="img" aria-label="Three panels comparing standing blood pressure and heart rate. Neuropathic: heart rate rises sharply, systolic blood pressure stays flat. Hyperadrenergic: heart rate rises and systolic blood pressure also rises. Hypovolemic: heart rate rises with a narrow gap between systolic and diastolic pressure.">
+    <text x="20" y="14" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13">Neuropathic</text>
+    <line x1="30" y1="90" x2="300" y2="90" stroke="var(--line)" stroke-width="1"/>
+    <text x="40" y="104" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">lie</text>
+    <text x="160" y="104" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">stand</text>
+    <polyline fill="none" stroke="#e03127" stroke-width="2.5" points="70,77 157,77 173,29 292,28"/>
+    <polyline fill="none" stroke="#54d98a" stroke-width="2.5" points="70,56 157,56 173,59 292,60"/>
+    <text x="306" y="32" fill="#e03127" font-family="Space Mono, monospace" font-size="10">HR</text>
+    <text x="306" y="64" fill="#54d98a" font-family="Space Mono, monospace" font-size="10">BP</text>
+    <text x="20" y="124" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13">Hyperadrenergic</text>
+    <line x1="30" y1="200" x2="300" y2="200" stroke="var(--line)" stroke-width="1"/>
+    <text x="40" y="214" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">lie</text>
+    <text x="160" y="214" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">stand</text>
+    <polyline fill="none" stroke="#e03127" stroke-width="2.5" points="70,187 157,187 173,135 292,133"/>
+    <polyline fill="none" stroke="#54d98a" stroke-width="2.5" points="70,170 157,170 173,149 292,147"/>
+    <text x="306" y="137" fill="#e03127" font-family="Space Mono, monospace" font-size="10">HR</text>
+    <text x="306" y="151" fill="#54d98a" font-family="Space Mono, monospace" font-size="10">BP</text>
+    <text x="20" y="234" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13">Hypovolemic</text>
+    <line x1="30" y1="310" x2="300" y2="310" stroke="var(--line)" stroke-width="1"/>
+    <text x="40" y="324" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">lie</text>
+    <text x="160" y="324" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">stand</text>
+    <polyline fill="none" stroke="#e03127" stroke-width="2.5" points="70,297 157,297 173,250 292,249"/>
+    <polyline fill="none" stroke="#54d98a" stroke-width="2.5" points="70,275 157,275 173,274 292,274"/>
+    <polyline fill="none" stroke="#54d98a" stroke-width="1.5" stroke-dasharray="4 4" points="70,289 157,289 173,285 292,285"/>
+    <text x="306" y="253" fill="#e03127" font-family="Space Mono, monospace" font-size="10">HR</text>
+    <text x="306" y="282" fill="#54d98a" font-family="Space Mono, monospace" font-size="10">BP</text>
   </svg>
   <figcaption>Stylized standing responses. Heart rate (red) rises in all three. The difference is blood pressure (green): flat in neuropathic, rising in hyperadrenergic, and a narrow gap between systolic and diastolic (the dashed line) in hypovolemic. Illustrative, not diagnostic.</figcaption>
 </figure>

@@ -34,7 +34,7 @@ Heart rate variability reflects how flexibly your autonomic nervous system can s
 That framing matters because it tells you what to expect. The levers below work by reducing load on your nervous system and giving it room to recover. They are powerful, but they are enablers, not switches. Here is roughly how they stack up.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 260" role="img" aria-label="Horizontal bar chart ranking HRV levers by relative impact, from sleep at the top to daily rhythm at the bottom.">
+  <svg class="fig-d" viewBox="0 0 720 260" role="img" aria-label="Horizontal bar chart ranking HRV levers by relative impact, from sleep at the top to daily rhythm at the bottom.">
     <text x="12" y="24" font-family="Space Grotesk, sans-serif" font-size="15" fill="var(--dim-2)">Levers on HRV, ranked by typical impact</text>
     <g font-family="Space Grotesk, sans-serif" font-size="13" fill="var(--dim-2)">
       <text x="12" y="58">Sleep</text>
@@ -51,6 +51,25 @@ That framing matters because it tells you what to expect. The levers below work 
       <rect x="150" y="186" width="250" height="16" rx="4" fill="#f5a524"></rect>
       <text x="12" y="226">Daily rhythm</text>
       <rect x="150" y="214" width="210" height="16" rx="4" fill="#f5a524"></rect>
+    </g>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 300" role="img" aria-label="Horizontal bar chart ranking HRV levers by relative impact, from sleep at the top to daily rhythm at the bottom.">
+    <text x="20" y="20" font-family="Space Grotesk, sans-serif" font-size="13" fill="var(--dim-2)">Levers on HRV, ranked by typical impact</text>
+    <g font-family="Space Grotesk, sans-serif" font-size="12.5" fill="var(--dim-2)">
+      <text x="20" y="48">Sleep</text>
+      <rect x="20" y="54" width="320" height="13" rx="4" fill="#54d98a"></rect>
+      <text x="20" y="84">Pacing (avoid PEM)</text>
+      <rect x="20" y="90" width="284" height="13" rx="4" fill="#54d98a"></rect>
+      <text x="20" y="120">Slow breathing</text>
+      <rect x="20" y="126" width="225" height="13" rx="4" fill="#38bdf8"></rect>
+      <text x="20" y="156">Hydration + electrolytes</text>
+      <rect x="20" y="162" width="196" height="13" rx="4" fill="#38bdf8"></rect>
+      <text x="20" y="192">Less alcohol</text>
+      <rect x="20" y="198" width="178" height="13" rx="4" fill="#38bdf8"></rect>
+      <text x="20" y="228">Gentle movement</text>
+      <rect x="20" y="234" width="148" height="13" rx="4" fill="#f5a524"></rect>
+      <text x="20" y="264">Daily rhythm</text>
+      <rect x="20" y="270" width="124" height="13" rx="4" fill="#f5a524"></rect>
     </g>
   </svg>
   <figcaption>Approximate, not absolute. Your own bottleneck may differ, which is exactly why you track.</figcaption>

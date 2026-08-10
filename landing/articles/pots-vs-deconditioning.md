@@ -74,7 +74,7 @@ Both share a mechanical root: gravity. When you stand, roughly half a litre of b
 Because the visible symptom is the same, a fast heart rate on standing, it is genuinely hard to tell them apart from a single moment. The difference shows up in **how big the rise is and how it behaves over weeks.**
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 300" role="img" aria-label="Line chart of heart rate over ten minutes of standing. A deconditioning line rises about fifteen to twenty beats and partly settles, staying below the thirty-beat threshold band. A POTS line rises more than thirty beats and stays elevated across the full ten minutes.">
+  <svg class="fig-d" viewBox="0 0 720 300" role="img" aria-label="Line chart of heart rate over ten minutes of standing. A deconditioning line rises about fifteen to twenty beats and partly settles, staying below the thirty-beat threshold band. A POTS line rises more than thirty beats and stays elevated across the full ten minutes.">
     <line x1="70" y1="40" x2="70" y2="250" stroke="var(--line)" stroke-width="1.5"/>
     <line x1="70" y1="250" x2="690" y2="250" stroke="var(--line)" stroke-width="1.5"/>
     <text x="70" y="272" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="12">stand</text>
@@ -88,6 +88,21 @@ Because the visible symptom is the same, a fast heart rate on standing, it is ge
     <polyline fill="none" stroke="#54d98a" stroke-width="2.6" points="70,220 130,168 210,150 300,156 400,150 500,158 600,152 690,156"/>
     <text x="300" y="130" fill="#e03127" font-family="Space Grotesk, sans-serif" font-size="13" font-weight="600">POTS: sustained 30+ rise</text>
     <text x="300" y="182" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-size="13" font-weight="600">Deconditioning: modest, partly settles</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 250" role="img" aria-label="Line chart of heart rate over ten minutes of standing. A deconditioning line rises about fifteen to twenty beats and partly settles, staying below the thirty-beat threshold band. A POTS line rises more than thirty beats and stays elevated across the full ten minutes.">
+    <line x1="44" y1="34" x2="44" y2="210" stroke="var(--line)" stroke-width="1.5"/>
+    <line x1="44" y1="210" x2="344" y2="210" stroke="var(--line)" stroke-width="1.5"/>
+    <text x="44" y="228" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5">stand</text>
+    <text x="194" y="228" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5" text-anchor="middle">5 min</text>
+    <text x="344" y="228" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5" text-anchor="end">10 min</text>
+    <text x="16" y="44" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5">bpm</text>
+    <rect x="44" y="64" width="300" height="28" fill="#e03127" opacity="0.09"/>
+    <line x1="44" y1="92" x2="344" y2="92" stroke="#e03127" stroke-width="1.3" stroke-dasharray="5 5"/>
+    <text x="344" y="60" fill="#e03127" font-family="Space Grotesk, sans-serif" font-size="11.5" text-anchor="end" font-weight="600">+30 bpm threshold</text>
+    <polyline fill="none" stroke="#e03127" stroke-width="2.6" points="44,186 73,105 112,85 155,77 204,80 252,76 300,79 344,77"/>
+    <polyline fill="none" stroke="#54d98a" stroke-width="2.6" points="44,186 73,144 112,129 155,134 204,129 252,136 300,131 344,134"/>
+    <text x="344" y="114" fill="#e03127" font-family="Space Grotesk, sans-serif" font-size="11.5" font-weight="600" text-anchor="end">POTS: sustained 30+ rise</text>
+    <text x="344" y="166" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-size="11.5" font-weight="600" text-anchor="end">Deconditioning: partly settles</text>
   </svg>
   <figcaption>Both rise when you stand. POTS holds a rise of at least 30 bpm across the full ten minutes; a deconditioned rise tends to be smaller and to ease as you stay upright and, over weeks, as fitness returns. Illustrative, not a diagnostic cutoff.</figcaption>
 </figure>
@@ -137,7 +152,7 @@ Your metrics beyond heart rate help fill in the picture. A suppressed [resting h
 Because both conditions respond, at least partly, to careful reconditioning, the clearest home evidence comes from watching your numbers over a couple of months of consistent, gentle work.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 280" role="img" aria-label="Line chart of the standing heart-rate rise over eight weeks of gentle reconditioning. The deconditioning line falls steadily from about twenty-five beats toward ten. The POTS line starts near thirty-five beats and declines only slightly, staying near or above the thirty-beat line.">
+  <svg class="fig-d" viewBox="0 0 720 280" role="img" aria-label="Line chart of the standing heart-rate rise over eight weeks of gentle reconditioning. The deconditioning line falls steadily from about twenty-five beats toward ten. The POTS line starts near thirty-five beats and declines only slightly, staying near or above the thirty-beat line.">
     <line x1="70" y1="30" x2="70" y2="230" stroke="var(--line)" stroke-width="1.5"/>
     <line x1="70" y1="230" x2="690" y2="230" stroke="var(--line)" stroke-width="1.5"/>
     <text x="70" y="252" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="12">week 0</text>
@@ -149,6 +164,19 @@ Because both conditions respond, at least partly, to careful reconditioning, the
     <polyline fill="none" stroke="#e03127" stroke-width="2.6" points="70,95 160,98 250,102 340,104 430,108 520,110 610,113 690,116"/>
     <text x="250" y="140" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-size="13" font-weight="600">Deconditioning: bends down</text>
     <text x="250" y="86" fill="#e03127" font-family="Space Grotesk, sans-serif" font-size="13" font-weight="600">POTS: barely moves</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 232" role="img" aria-label="Line chart of the standing heart-rate rise over eight weeks of gentle reconditioning. The deconditioning line falls steadily from about twenty-five beats toward ten. The POTS line starts near thirty-five beats and declines only slightly, staying near or above the thirty-beat line.">
+    <line x1="44" y1="34" x2="44" y2="190" stroke="var(--line)" stroke-width="1.5"/>
+    <line x1="44" y1="190" x2="344" y2="190" stroke="var(--line)" stroke-width="1.5"/>
+    <text x="44" y="208" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5">week 0</text>
+    <text x="344" y="208" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5" text-anchor="end">week 8</text>
+    <text x="16" y="44" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5">rise</text>
+    <line x1="44" y1="104" x2="344" y2="104" stroke="#e03127" stroke-width="1.2" stroke-dasharray="5 5"/>
+    <text x="344" y="99" fill="#e03127" font-family="Space Grotesk, sans-serif" font-size="11.5" text-anchor="end" font-weight="600">+30 bpm</text>
+    <polyline fill="none" stroke="#54d98a" stroke-width="2.6" points="44,120 88,128 131,135 175,145 218,153 262,160 305,167 344,171"/>
+    <polyline fill="none" stroke="#e03127" stroke-width="2.6" points="44,85 88,87 131,90 175,92 218,95 262,96 305,99 344,101"/>
+    <text x="20" y="70" fill="#e03127" font-family="Space Grotesk, sans-serif" font-size="12" font-weight="600">POTS: barely moves</text>
+    <text x="344" y="140" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-size="12" font-weight="600" text-anchor="end">Deconditioning: bends down</text>
   </svg>
   <figcaption>Over weeks of consistent, paced reconditioning, a deconditioning-driven standing rise tends to fall steadily, while a POTS-driven rise is stubborn. Watching the slope over time is more informative than any single stand test. Illustrative pattern only.</figcaption>
 </figure>

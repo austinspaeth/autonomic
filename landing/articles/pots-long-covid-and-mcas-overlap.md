@@ -42,7 +42,7 @@ That single event radiates outward:
 - Wrap it in a **post-COVID timeline** and the whole thing gets the label long COVID.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 320" role="img" aria-label="Overlapping circles showing POTS, ME/CFS and MCAS all sharing a dysautonomia core, inside a long COVID umbrella">
+  <svg class="fig-d" viewBox="0 0 720 320" role="img" aria-label="Overlapping circles showing POTS, ME/CFS and MCAS all sharing a dysautonomia core, inside a long COVID umbrella">
     <rect x="20" y="20" width="680" height="280" rx="18" fill="none" stroke="var(--line-2)" stroke-width="1.5" stroke-dasharray="6 6" />
     <text x="40" y="46" fill="var(--dim)" font-family="Space Mono, monospace" font-size="12">LONG COVID / POST-VIRAL UMBRELLA</text>
     <circle cx="290" cy="175" r="105" fill="#e0312722" stroke="#e03127" stroke-width="2" />
@@ -55,6 +55,21 @@ That single event radiates outward:
     <text x="360" y="285" text-anchor="middle" fill="var(--text)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="16">MCAS</text>
     <text x="360" y="305" text-anchor="middle" fill="var(--dim)" font-family="-apple-system, sans-serif" font-size="11">mast-cell symptoms</text>
     <text x="360" y="188" text-anchor="middle" fill="var(--text)" font-family="Space Grotesk, sans-serif" font-weight="700" font-size="13">Dysautonomia</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 332" role="img" aria-label="Overlapping circles showing POTS, ME/CFS and MCAS all sharing a dysautonomia core, inside a long COVID umbrella">
+    <rect x="8" y="8" width="344" height="316" rx="18" fill="none" stroke="var(--line-2)" stroke-width="1.5" stroke-dasharray="6 6" />
+    <text x="20" y="30" fill="var(--dim)" font-family="Space Mono, monospace" font-size="10.5">LONG COVID / POST-VIRAL UMBRELLA</text>
+    <circle cx="124" cy="140" r="88" fill="#e0312722" stroke="#e03127" stroke-width="2" />
+    <circle cx="236" cy="140" r="88" fill="#58c4f222" stroke="#58c4f2" stroke-width="2" />
+    <circle cx="180" cy="228" r="78" fill="#f9731622" stroke="#f97316" stroke-width="2" />
+    <text x="90" y="116" text-anchor="middle" fill="var(--text)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="15">POTS</text>
+    <text x="90" y="134" text-anchor="middle" fill="var(--dim)" font-family="-apple-system, sans-serif" font-size="10">standing HR rise</text>
+    <text x="270" y="116" text-anchor="middle" fill="var(--text)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="15">ME/CFS</text>
+    <text x="270" y="134" text-anchor="middle" fill="var(--dim)" font-family="-apple-system, sans-serif" font-size="10">post-exertional</text>
+    <text x="270" y="148" text-anchor="middle" fill="var(--dim)" font-family="-apple-system, sans-serif" font-size="10">malaise</text>
+    <text x="180" y="172" text-anchor="middle" fill="var(--text)" font-family="Space Grotesk, sans-serif" font-weight="700" font-size="12.5">Dysautonomia</text>
+    <text x="180" y="266" text-anchor="middle" fill="var(--text)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="15">MCAS</text>
+    <text x="180" y="284" text-anchor="middle" fill="var(--dim)" font-family="-apple-system, sans-serif" font-size="10">mast-cell symptoms</text>
   </svg>
   <figcaption>Different defining symptoms, one shared autonomic core, which is why so many people meet criteria for more than one.</figcaption>
 </figure>

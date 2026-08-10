@@ -129,7 +129,7 @@ So the direct story is muddy. The **indirect** story is not, and it is the one t
 Caffeine has a half-life of roughly **five hours**, meaning that five hours after your last cup, about half of it is still in your bloodstream, and ten hours later a quarter remains. That long tail is why an innocent 3pm coffee can still be working at 11pm, keeping your nervous system a notch more alert than it should be while you are trying to sleep.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 260" role="img" aria-label="Two caffeine decay curves across a day. A morning coffee curve falls to near zero by bedtime, while an afternoon coffee curve is still one third elevated at the bedtime marker.">
+  <svg class="fig-d" viewBox="0 0 720 260" role="img" aria-label="Two caffeine decay curves across a day. A morning coffee curve falls to near zero by bedtime, while an afternoon coffee curve is still one third elevated at the bedtime marker.">
     <line x1="60" y1="200" x2="700" y2="200" stroke="var(--line)" stroke-width="1.5"/>
     <line x1="60" y1="40" x2="60" y2="200" stroke="var(--line)" stroke-width="1.5"/>
     <line x1="660" y1="40" x2="660" y2="200" stroke="var(--line)" stroke-width="1.5" stroke-dasharray="4 5"/>
@@ -142,6 +142,20 @@ Caffeine has a half-life of roughly **five hours**, meaning that five hours afte
     <text x="260" y="220" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="12">1pm</text>
     <text x="460" y="220" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="12">6pm</text>
     <text x="660" y="220" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="12">11pm</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 226" role="img" aria-label="Two caffeine decay curves across a day. A morning coffee curve falls to near zero by bedtime, while an afternoon coffee curve is still one third elevated at the bedtime marker.">
+    <line x1="44" y1="176" x2="344" y2="176" stroke="var(--line)" stroke-width="1.5"/>
+    <line x1="44" y1="40" x2="44" y2="176" stroke="var(--line)" stroke-width="1.5"/>
+    <line x1="325" y1="40" x2="325" y2="176" stroke="var(--line)" stroke-width="1.5" stroke-dasharray="4 5"/>
+    <text x="321" y="32" text-anchor="end" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11.5">Bedtime</text>
+    <polyline fill="none" stroke="#54d98a" stroke-width="2.5" points="44,48 63,66 82,81 100,94 119,105 138,114 156,123 175,130 194,136 213,141 232,145 250,149 269,152 288,155 306,157 325,160"/>
+    <polyline fill="none" stroke="#e03127" stroke-width="2.5" points="175,53 194,70 213,84 232,97 250,106 269,115 288,122 306,128 325,134"/>
+    <text x="60" y="66" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13">Morning coffee</text>
+    <text x="190" y="46" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13">Afternoon coffee</text>
+    <text x="44" y="198" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11.5">8am</text>
+    <text x="138" y="198" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11.5">1pm</text>
+    <text x="232" y="198" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11.5">6pm</text>
+    <text x="325" y="198" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11.5">11pm</text>
   </svg>
   <figcaption>Same size cup, different timing. A morning dose has mostly cleared by bed, while an afternoon one is still a third of its peak when you lie down. The residual is what fragments sleep and shows up as a lower HRV the next morning.</figcaption>
 </figure>
@@ -181,7 +195,7 @@ For many people with POTS, the HRV question is almost beside the point. The felt
 But there is a genuine other side, and it is worth stating fairly. Caffeine's mild vasoconstriction and small blood-pressure bump are the same directions you are trying to push when you use salt, fluids, and compression. A subset of people, particularly those whose POTS overlaps with low blood pressure or blood pooling, find that a small, consistent morning dose actually **steadies** their standing symptoms rather than worsening them. This is not a recommendation, it is an acknowledgment that the response is real and it goes both ways.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 300" role="img" aria-label="Horizontal bar chart of approximate caffeine content in milligrams for common drinks, from cold brew at about 200 down to green tea at about 28.">
+  <svg class="fig-d" viewBox="0 0 720 300" role="img" aria-label="Horizontal bar chart of approximate caffeine content in milligrams for common drinks, from cold brew at about 200 down to green tea at about 28.">
     <g font-family="Manrope, sans-serif" font-size="13" fill="var(--dim-2)">
       <text x="20" y="52">Cold brew (16 oz)</text>
       <text x="20" y="86">Brewed coffee (8 oz)</text>
@@ -208,6 +222,35 @@ But there is a genuine other side, and it is worth stating fairly. Caffeine's mi
       <text x="331" y="189">~47 mg</text>
       <text x="300" y="223">~34 mg</text>
       <text x="285" y="257">~28 mg</text>
+    </g>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 290" role="img" aria-label="Horizontal bar chart of approximate caffeine content in milligrams for common drinks, from cold brew at about 200 down to green tea at about 28.">
+    <g font-family="Manrope, sans-serif" font-size="12.5" fill="var(--dim-2)">
+      <text x="20" y="22">Cold brew (16 oz)</text>
+      <text x="20" y="62">Brewed coffee (8 oz)</text>
+      <text x="20" y="102">Energy drink (8 oz)</text>
+      <text x="20" y="142">Espresso (1 shot)</text>
+      <text x="20" y="182">Black tea (8 oz)</text>
+      <text x="20" y="222">Cola (12 oz)</text>
+      <text x="20" y="262">Green tea (8 oz)</text>
+    </g>
+    <g fill="#e03127">
+      <rect x="20" y="28" width="260" height="14" rx="3"/>
+      <rect x="20" y="68" width="124" height="14" rx="3"/>
+      <rect x="20" y="108" width="104" height="14" rx="3"/>
+      <rect x="20" y="148" width="82" height="14" rx="3"/>
+      <rect x="20" y="188" width="61" height="14" rx="3"/>
+      <rect x="20" y="228" width="44" height="14" rx="3"/>
+      <rect x="20" y="268" width="36" height="14" rx="3"/>
+    </g>
+    <g font-family="Space Mono, monospace" font-size="11.5" fill="var(--dim-2)">
+      <text x="288" y="40">~200 mg</text>
+      <text x="152" y="80">~95 mg</text>
+      <text x="132" y="120">~80 mg</text>
+      <text x="110" y="160">~63 mg</text>
+      <text x="89" y="200">~47 mg</text>
+      <text x="72" y="240">~34 mg</text>
+      <text x="64" y="280">~28 mg</text>
     </g>
   </svg>
   <figcaption>Approximate caffeine per serving. Real values swing widely with brew, bean, and cup size, a large cold brew can carry more than two strong coffees.</figcaption>
@@ -243,7 +286,7 @@ Because the population data is mixed and the individual variation is large, the 
 4. **Compare the trend, not the day.** Look at your rolling baseline across each week rather than reacting to any single reading. If nothing moves, caffeine is probably not your lever. If your morning numbers and standing symptoms clearly improve, you have your answer, in your own data.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 220" role="img" aria-label="Two week-long baselines compared. Week one with late caffeine sits lower; week two with a morning-only cutoff sits higher, illustrating a self-test.">
+  <svg class="fig-d" viewBox="0 0 720 220" role="img" aria-label="Two week-long baselines compared. Week one with late caffeine sits lower; week two with a morning-only cutoff sits higher, illustrating a self-test.">
     <line x1="60" y1="180" x2="700" y2="180" stroke="var(--line)" stroke-width="1.5"/>
     <text x="150" y="40" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="14">Week 1: caffeine after 3pm</text>
     <polyline fill="none" stroke="#e03127" stroke-width="2.5" points="80,150 155,138 230,158 305,144 360,150"/>
@@ -251,6 +294,15 @@ Because the population data is mixed and the individual variation is large, the 
     <text x="420" y="40" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="14">Week 2: morning-only cutoff</text>
     <polyline fill="none" stroke="#54d98a" stroke-width="2.5" points="400,120 475,108 550,98 625,90 690,84"/>
     <text x="80" y="205" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="12">morning HRV, same reading each day</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 206" role="img" aria-label="Two week-long baselines compared. Week one with late caffeine sits lower; week two with a morning-only cutoff sits higher, illustrating a self-test.">
+    <line x1="40" y1="176" x2="344" y2="176" stroke="var(--line)" stroke-width="1.5"/>
+    <text x="20" y="26" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="11.5">Week 1: caffeine after 3pm</text>
+    <polyline fill="none" stroke="#e03127" stroke-width="2.5" points="50,133 85,123 121,140 156,128 182,133"/>
+    <line x1="182" y1="46" x2="182" y2="176" stroke="var(--line)" stroke-width="1.5" stroke-dasharray="4 5"/>
+    <text x="344" y="26" text-anchor="end" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="11.5">Week 2: morning-only cutoff</text>
+    <polyline fill="none" stroke="#54d98a" stroke-width="2.5" points="202,107 237,97 273,88 308,82 339,76"/>
+    <text x="40" y="198" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11">morning HRV, same reading each day</text>
   </svg>
   <figcaption>A simple self-test: hold everything steady, change one caffeine variable, and read the weekly baseline. This is illustrative, your own result is the one that counts.</figcaption>
 </figure>

@@ -14,10 +14,12 @@ import { OnboardingGate } from '../src/features/Onboarding';
 import { WatchArrivalCards } from '../src/features/WatchArrivals';
 import { WatchSyncPill } from '../src/features/hrv/WatchSyncPill';
 import { HealthUpdatePill } from '../src/features/HealthUpdates';
+import { WhatsNewPill } from '../src/features/WhatsNew';
 import { RestoreGate } from '../src/features/RestoreGate';
 import { ReviewPrompt } from '../src/features/ReviewPrompt';
 import { initIap } from '../src/store/iap';
 import { initTier } from '../src/store/tier';
+import { initPing } from '../src/store/ping';
 import { initWatchReceiver } from '../src/lib/watch/receiver';
 import { runDailyBackup } from '../src/lib/backup';
 import { initCrashWatcher, syncReminder } from '../src/lib/reminders';
@@ -59,6 +61,10 @@ export default function RootLayout() {
     initIap();
     // Stamp/derive the freemium tier (7-day local trial window on first launch).
     initTier();
+    // The one network call the app makes: an anonymous daily cohort ping
+    // (install's birthday, nothing else). Must follow initTier — it reads the
+    // stamp that lands there. See src/store/ping.ts.
+    initPing();
     // Watch companion (iOS only): drain queued stand-test results + relay
     // entitlement. Safe elsewhere (the bridge no-ops), but don't even try.
     if (Platform.OS === 'ios') initWatchReceiver();
@@ -100,6 +106,11 @@ export default function RootLayout() {
           <ToastProvider>
             <SheetProvider>
               <Slot />
+              {/* "See what's new in x.x" — mounted FIRST of the pills on
+                  purpose: siblings paint in order, so it sits behind the two
+                  below and can recede into the stacked-card look when either
+                  of them takes the slot. */}
+              <WhatsNewPill />
               {/* Watch companion overlays (iOS only): results card on arrival +
                   "Waiting for watch…" pill while the sync card is minimized. */}
               {Platform.OS === 'ios' ? <WatchArrivalCards /> : null}

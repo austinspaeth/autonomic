@@ -88,7 +88,7 @@ Those tiny beat-to-beat changes are exactly what HRV metrics capture. **RMSSD** 
 Two honest caveats before we go further. First, HRV is a **proxy**, not a direct meter of the nerve: it reflects vagal influence on the heart, filtered through your breathing, hydration, posture and more. Second, "more vagal tone" is not a universal good. In healthy people, higher resting HRV generally tracks with better stress regulation, but in dysautonomia the story is messier, and the aim is steadier balance rather than a maxed-out number.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 260" role="img" aria-label="Two breathing patterns and their effect on heart rate. Fast shallow breathing produces small heart-rate swings and low HRV. Slow breathing with a long exhale produces large heart-rate swings that dip on each out-breath, the signature of strong vagal braking and higher HRV.">
+  <svg class="fig-d" viewBox="0 0 720 260" role="img" aria-label="Two breathing patterns and their effect on heart rate. Fast shallow breathing produces small heart-rate swings and low HRV. Slow breathing with a long exhale produces large heart-rate swings that dip on each out-breath, the signature of strong vagal braking and higher HRV.">
     <line x1="60" y1="30" x2="60" y2="210" stroke="var(--line)" stroke-width="1.5"/>
     <line x1="60" y1="120" x2="690" y2="120" stroke="var(--line)" stroke-width="1" stroke-dasharray="3 5"/>
     <text x="34" y="120" text-anchor="middle" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="11" transform="rotate(-90 34 120)">heart rate</text>
@@ -104,6 +104,21 @@ Two honest caveats before we go further. First, HRV is a **proxy**, not a direct
     <text x="465" y="230" text-anchor="middle" fill="#54d98a" font-family="Space Mono, monospace" font-size="10">out (brake)</text>
     <path d="M450,190 L450,178" stroke="#54d98a" stroke-width="1.5"/>
     <path d="M390,190 L390,80" stroke="var(--line)" stroke-width="0"/>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 268" role="img" aria-label="Two breathing patterns and their effect on heart rate. Fast shallow breathing produces small heart-rate swings and low HRV. Slow breathing with a long exhale produces large heart-rate swings that dip on each out-breath, the signature of strong vagal braking and higher HRV.">
+    <line x1="30" y1="20" x2="30" y2="244" stroke="var(--line)" stroke-width="1.5"/>
+    <text x="14" y="132" text-anchor="middle" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="11" transform="rotate(-90 14 132)">heart rate</text>
+    <text x="190" y="26" text-anchor="middle" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13">Fast, shallow</text>
+    <text x="190" y="43" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5">small swings, low HRV</text>
+    <line x1="40" y1="76" x2="344" y2="76" stroke="var(--line)" stroke-width="1" stroke-dasharray="3 5"/>
+    <polyline fill="none" stroke="var(--dim-2)" stroke-width="2" points="40,76 77,70 115,82 152,71 190,83 227,72 265,82 302,73 340,81"/>
+    <text x="190" y="120" text-anchor="middle" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13">Slow, long exhale</text>
+    <text x="190" y="137" text-anchor="middle" fill="#54d98a" font-family="Space Mono, monospace" font-size="10.5">large swings, high HRV</text>
+    <line x1="40" y1="190" x2="344" y2="190" stroke="var(--line)" stroke-width="1" stroke-dasharray="3 5"/>
+    <polyline fill="none" stroke="#54d98a" stroke-width="2.5" points="40,165 67,150 95,211 122,230 149,165 176,150 204,211 231,230 258,165 285,150 313,211 340,230"/>
+    <path d="M122,248 L122,236" stroke="#54d98a" stroke-width="1.5"/>
+    <text x="72" y="262" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5">in</text>
+    <text x="150" y="262" text-anchor="middle" fill="#54d98a" font-family="Space Mono, monospace" font-size="10.5">out (brake)</text>
   </svg>
   <figcaption>The vagal brake at work: on each exhale the vagus slows the heart. Slow breathing with a long out-breath deepens those swings, which is what shows up as higher HRV.</figcaption>
 </figure>
@@ -141,7 +156,7 @@ Regular mindfulness and gentle yoga show moderate associations with better HRV, 
 Transcutaneous auricular vagus nerve stimulation (**taVNS**) uses a small clip to deliver a gentle pulse to a vagal branch at the outer ear. It is being actively studied for inflammation, long COVID, headache and mood, and some related nerve-stimulation devices are cleared for specific medical uses. For now, treat it as promising and investigational rather than a proven home cure, and something to explore with a clinician rather than freelance.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 300" role="img" aria-label="Evidence-strength scale for vagus nerve methods. Slow breathing, regular exercise and consistent sleep rate strong. Face cooling and meditation rate moderate. Humming and gargling, and taVNS devices, rate weaker or investigational.">
+  <svg class="fig-d" viewBox="0 0 720 300" role="img" aria-label="Evidence-strength scale for vagus nerve methods. Slow breathing, regular exercise and consistent sleep rate strong. Face cooling and meditation rate moderate. Humming and gargling, and taVNS devices, rate weaker or investigational.">
     <text x="20" y="24" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13">Evidence strength</text>
     <line x1="250" y1="34" x2="250" y2="286" stroke="var(--line)" stroke-width="1"/>
     <text x="300" y="30" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="9">weak</text>
@@ -164,6 +179,27 @@ Transcutaneous auricular vagus nerve stimulation (**taVNS**) uses a small clip t
     <text x="256" y="242" fill="var(--bg, #000)" font-family="Space Mono, monospace" font-size="9"> </text>
     <text x="410" y="239" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="9">investigational</text>
     <text x="20" y="278" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">Bars are a plain-language read of current evidence, not a formal meta-analysis.</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 320" role="img" aria-label="Evidence-strength scale for vagus nerve methods. Slow breathing, regular exercise and consistent sleep rate strong. Face cooling and meditation rate moderate. Humming and gargling, and taVNS devices, rate weaker or investigational.">
+    <text x="20" y="18" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13">Evidence strength</text>
+    <text x="340" y="18" text-anchor="end" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">weak → strong</text>
+    <text x="20" y="46" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="12">Slow breathing (long exhale)</text>
+    <rect x="20" y="52" width="320" height="13" rx="6.5" fill="#54d98a"/>
+    <text x="20" y="82" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="12">Exercise within limits</text>
+    <rect x="20" y="88" width="297" height="13" rx="6.5" fill="#54d98a"/>
+    <text x="20" y="118" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="12">Consistent sleep</text>
+    <rect x="20" y="124" width="290" height="13" rx="6.5" fill="#54d98a"/>
+    <text x="20" y="154" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="12">Cold on the face</text>
+    <rect x="20" y="160" width="190" height="13" rx="6.5" fill="#7bc47f"/>
+    <text x="20" y="190" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="12">Meditation / yoga</text>
+    <rect x="20" y="196" width="183" height="13" rx="6.5" fill="#7bc47f"/>
+    <text x="20" y="226" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="12">Humming / gargling</text>
+    <rect x="20" y="232" width="99" height="13" rx="6.5" fill="var(--dim-2)"/>
+    <text x="20" y="262" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="12">taVNS ear devices</text>
+    <rect x="20" y="268" width="114" height="13" rx="6.5" fill="var(--dim-2)"/>
+    <text x="142" y="279" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="9.5">investigational</text>
+    <text x="20" y="302" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="9.5">Bars are a plain-language read of current</text>
+    <text x="20" y="314" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="9.5">evidence, not a formal meta-analysis.</text>
   </svg>
   <figcaption>A rough map of how strong the evidence is for each method. The unglamorous top three do most of the work.</figcaption>
 </figure>

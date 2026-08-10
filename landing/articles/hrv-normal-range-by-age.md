@@ -137,7 +137,7 @@ The age effect is real and well documented. As we get older, the parasympathetic
 That means a 25-year-old and a 65-year-old with identical health can have very different HRV, and neither is doing anything wrong. If [HRV is the tug-of-war between your sympathetic and parasympathetic branches](/insights/hrv/what-is-hrv-and-why-it-matters-for-pots-recovery/), age gradually turns down the volume on the parasympathetic side for everyone.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 260" role="img" aria-label="A chart of HRV against age from 20 to 80. A shaded band declines gently from left to right, and a median line falls within it, showing HRV drops with age while the band stays wide at every age.">
+  <svg class="fig-d" viewBox="0 0 720 260" role="img" aria-label="A chart of HRV against age from 20 to 80. A shaded band declines gently from left to right, and a median line falls within it, showing HRV drops with age while the band stays wide at every age.">
     <line x1="60" y1="220" x2="700" y2="220" stroke="var(--line)" stroke-width="1.5" />
     <line x1="60" y1="30" x2="60" y2="220" stroke="var(--line)" stroke-width="1.5" />
     <text x="20" y="40" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11">HRV</text>
@@ -149,6 +149,19 @@ That means a 25-year-old and a 65-year-old with identical health can have very d
     <path d="M60 100 C 220 120, 420 148, 700 195" fill="none" stroke="#54d98a" stroke-width="3" />
     <text x="150" y="60" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="12">Wide band at every age</text>
     <text x="470" y="140" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13">median trend</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 236" role="img" aria-label="A chart of HRV against age from 20 to 80. A shaded band declines gently from left to right, and a median line falls within it, showing HRV drops with age while the band stays wide at every age.">
+    <line x1="44" y1="200" x2="344" y2="200" stroke="var(--line)" stroke-width="1.5" />
+    <line x1="44" y1="34" x2="44" y2="200" stroke="var(--line)" stroke-width="1.5" />
+    <text x="16" y="44" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11">HRV</text>
+    <text x="35" y="216" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11">20</text>
+    <text x="185" y="216" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11">50</text>
+    <text x="333" y="216" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11">80</text>
+    <text x="180" y="232" text-anchor="middle" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="12">Age</text>
+    <path d="M 44 69 C 119 91 213 139 344 169 L 344 187 C 213 163 119 134 44 121 Z" fill="#54d98a" fill-opacity="0.16" stroke="none" />
+    <path d="M 44 95 C 119 113 213 137 344 178" fill="none" stroke="#54d98a" stroke-width="3" />
+    <text x="60" y="52" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="11.5">Wide band at every age</text>
+    <text x="200" y="126" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="12.5">median trend</text>
   </svg>
   <figcaption>HRV drifts down with age, but the healthy band stays wide the whole way. Two people the same age can sit far apart and both be fine.</figcaption>
 </figure>
@@ -195,7 +208,7 @@ As the table shows, healthy people in the same decade can differ two-fold or mor
 In POTS, dysautonomia and long COVID, the nervous system is often biased toward sympathetic "fight or flight" activation, which suppresses the vagal tone that drives HRV. A lower-than-chart reading is expected and does not mean you are failing at recovery. The encouraging part, which we follow in [recovery from post-viral dysautonomia](/insights/recovery/recovery-from-post-viral-dysautonomia/), is that this baseline is trackable and often climbs over months of pacing, sometimes moving before you feel better.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 250" role="img" aria-label="Two overlapping distribution curves, one for people in their thirties centered higher and one for people in their sixties centered lower. A large shaded overlap region in the middle shows that many sixty-year-olds have higher HRV than many thirty-year-olds.">
+  <svg class="fig-d" viewBox="0 0 720 250" role="img" aria-label="Two overlapping distribution curves, one for people in their thirties centered higher and one for people in their sixties centered lower. A large shaded overlap region in the middle shows that many sixty-year-olds have higher HRV than many thirty-year-olds.">
     <line x1="40" y1="200" x2="700" y2="200" stroke="var(--line)" stroke-width="1.5" />
     <text x="330" y="228" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="12">HRV (low to high)</text>
     <path d="M60 200 C 200 200, 230 60, 330 60 C 430 60, 460 200, 600 200" fill="#54d98a" fill-opacity="0.12" stroke="#54d98a" stroke-width="2.5" />
@@ -204,6 +217,16 @@ In POTS, dysautonomia and long COVID, the nervous system is often biased toward 
     <text x="205" y="86" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13">60s</text>
     <text x="300" y="185" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11" text-anchor="middle">large overlap</text>
     <line x1="360" y1="200" x2="360" y2="150" stroke="var(--dim-2)" stroke-width="1" stroke-dasharray="3 3" />
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 224" role="img" aria-label="Two overlapping distribution curves, one for people in their thirties centered higher and one for people in their sixties centered lower. A large shaded overlap region in the middle shows that many sixty-year-olds have higher HRV than many thirty-year-olds.">
+    <line x1="20" y1="190" x2="344" y2="190" stroke="var(--line)" stroke-width="1.5" />
+    <text x="180" y="216" text-anchor="middle" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="12">HRV (low to high)</text>
+    <path d="M 30 190 C 99 190 113 50 162 50 C 211 50 226 190 295 190" fill="#54d98a" fill-opacity="0.12" stroke="#54d98a" stroke-width="2.5" />
+    <path d="M 20 190 C 74 190 86 85 123 85 C 160 85 172 190 236 190" fill="#e03127" fill-opacity="0.10" stroke="#e03127" stroke-width="2.5" />
+    <text x="186" y="42" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13">30s</text>
+    <text x="98" y="76" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13">60s</text>
+    <text x="148" y="176" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11" text-anchor="middle">large overlap</text>
+    <line x1="177" y1="190" x2="177" y2="140" stroke="var(--dim-2)" stroke-width="1" stroke-dasharray="3 3" />
   </svg>
   <figcaption>Age shifts the whole distribution down, but the curves overlap heavily. Plenty of people in their sixties sit above plenty of people in their thirties.</figcaption>
 </figure>

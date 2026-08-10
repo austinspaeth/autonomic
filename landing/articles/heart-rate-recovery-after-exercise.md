@@ -113,7 +113,7 @@ During exercise, two things push your heart rate up together. The vagal brake le
 The moment you stop, the sequence reverses, but not all at once. The **first 30 to 60 seconds of recovery are dominated by vagal reactivation**: the parasympathetic brake re-engages almost instantly and yanks the heart rate down. Only after that does the slower part take over, as circulating adrenaline clears and sympathetic drive winds down over the following minutes. This two-phase pattern is why the one-minute number is such a good read on vagal tone specifically: it lands squarely inside the window the vagus nerve controls. Researchers have leaned on this for decades; the landmark study by <a href="https://www.nejm.org/doi/full/10.1056/NEJM199910283411804" target="_blank" rel="noopener">Cole and colleagues (1999)</a> found that a blunted one-minute recovery was a meaningful marker of autonomic health in a large group followed over years.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 260" role="img" aria-label="Two heart rate recovery curves after the same peak: a fast drop showing strong vagal reactivation and a shallow drop showing blunted recovery">
+  <svg class="fig-d" viewBox="0 0 720 260" role="img" aria-label="Two heart rate recovery curves after the same peak: a fast drop showing strong vagal reactivation and a shallow drop showing blunted recovery">
     <line x1="60" y1="210" x2="700" y2="210" stroke="var(--line-2)" stroke-width="1.5" />
     <line x1="60" y1="210" x2="60" y2="24" stroke="var(--line-2)" stroke-width="1.5" />
     <text x="46" y="52" text-anchor="end" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">150</text>
@@ -127,6 +127,21 @@ The moment you stop, the sequence reverses, but not all at once. The **first 30 
     <polyline fill="none" stroke="#e03127" stroke-width="2.5" points="60,48 130,60 200,72 270,82 340,90 380,96 480,110 580,122 700,132" />
     <text x="480" y="160" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13">fast drop, strong vagal brake</text>
     <text x="480" y="104" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13">shallow drop, blunted recovery</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 240" role="img" aria-label="Two heart rate recovery curves after the same peak: a fast drop showing strong vagal reactivation and a shallow drop showing blunted recovery">
+    <line x1="44" y1="186" x2="344" y2="186" stroke="var(--line-2)" stroke-width="1.5" />
+    <line x1="44" y1="186" x2="44" y2="34" stroke="var(--line-2)" stroke-width="1.5" />
+    <text x="38" y="58" text-anchor="end" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5">150</text>
+    <text x="38" y="138" text-anchor="end" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5">100</text>
+    <text x="38" y="190" text-anchor="end" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5">70</text>
+    <text x="44" y="206" fill="var(--dim)" font-family="Space Mono, monospace" font-size="10.5">stop</text>
+    <text x="194" y="206" text-anchor="middle" fill="var(--dim)" font-family="Space Mono, monospace" font-size="10.5">1 min</text>
+    <text x="344" y="206" text-anchor="end" fill="var(--dim)" font-family="Space Mono, monospace" font-size="10.5">3 min</text>
+    <line x1="194" y1="186" x2="194" y2="47" stroke="var(--line)" stroke-width="1" stroke-dasharray="4 4" />
+    <polyline fill="none" stroke="#54d98a" stroke-width="2.5" points="44,54 77,85 110,111 142,127 175,137 194,142 241,152 288,158 344,163" />
+    <polyline fill="none" stroke="#e03127" stroke-width="2.5" points="44,54 77,63 110,73 142,81 175,88 194,93 241,104 288,114 344,122" />
+    <text x="344" y="180" text-anchor="end" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="12">fast drop, strong vagal brake</text>
+    <text x="344" y="76" text-anchor="end" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="12">shallow drop, blunted recovery</text>
   </svg>
   <figcaption>Same peak heart rate, two very different first minutes. The green curve falls far in the vagal window; the red one barely moves.</figcaption>
 </figure>
@@ -194,7 +209,7 @@ Keep the effort, the posture and the timing consistent from session to session. 
 It helps to picture recovery as two overlapping stages. Reading them separately explains why the timing of your measurement matters so much.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 220" role="img" aria-label="A timeline of heart rate recovery showing a fast vagal reactivation phase in the first minute and a slower sympathetic withdrawal phase over the following minutes">
+  <svg class="fig-d" viewBox="0 0 720 220" role="img" aria-label="A timeline of heart rate recovery showing a fast vagal reactivation phase in the first minute and a slower sympathetic withdrawal phase over the following minutes">
     <line x1="40" y1="150" x2="700" y2="150" stroke="var(--line-2)" stroke-width="1.5" />
     <rect x="40" y="60" width="300" height="90" fill="#54d98a" opacity="0.14" />
     <rect x="340" y="60" width="360" height="90" fill="#e03127" opacity="0.10" />
@@ -208,6 +223,18 @@ It helps to picture recovery as two overlapping stages. Reading them separately 
     <text x="40" y="172" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">stop</text>
     <text x="340" y="172" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">1 min</text>
     <text x="700" y="172" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">3+ min</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 260" role="img" aria-label="A timeline of heart rate recovery showing a fast vagal reactivation phase in the first minute and a slower sympathetic withdrawal phase over the following minutes">
+    <text x="180" y="26" text-anchor="middle" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13.5">Phase 1: vagal reactivation</text>
+    <rect x="20" y="36" width="320" height="90" rx="10" fill="#54d98a" opacity="0.14" />
+    <text x="180" y="70" text-anchor="middle" fill="var(--dim)" font-family="-apple-system, sans-serif" font-size="12.5">first ~60 seconds</text>
+    <text x="180" y="92" text-anchor="middle" fill="var(--dim)" font-family="-apple-system, sans-serif" font-size="12.5">the parasympathetic brake</text>
+    <text x="180" y="116" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5">stop → 1 min</text>
+    <text x="180" y="156" text-anchor="middle" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13.5">Phase 2: sympathetic withdrawal</text>
+    <rect x="20" y="166" width="320" height="90" rx="10" fill="#e03127" opacity="0.10" />
+    <text x="180" y="200" text-anchor="middle" fill="var(--dim)" font-family="-apple-system, sans-serif" font-size="12.5">the following minutes</text>
+    <text x="180" y="222" text-anchor="middle" fill="var(--dim)" font-family="-apple-system, sans-serif" font-size="12.5">adrenaline clears, accelerator eases</text>
+    <text x="180" y="246" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5">1 min → 3+ min</text>
   </svg>
   <figcaption>The one-minute reading lands inside the vagal window, which is why it reads parasympathetic tone so directly.</figcaption>
 </figure>

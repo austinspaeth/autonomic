@@ -78,7 +78,7 @@ Most HRV numbers are statistics on a list of intervals. The geometric family wor
 This lineage traces back to the Russian physiologist R.M. Baevsky, whose work on the geometry of the [RR-interval](/insights/basics/rr-intervals-and-the-tachogram-explained/) distribution gave us the stress index still used today. The appeal is intuition: instead of an abstract standard deviation, you get the center, the height, and the width of a picture you can actually imagine.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 280" role="img" aria-label="An RR-interval histogram with bars forming a hump, labeling the Mode as the center peak, AMo50 as the peak height, and MxDMn as the full width from the shortest to longest interval">
+  <svg class="fig-d" viewBox="0 0 720 280" role="img" aria-label="An RR-interval histogram with bars forming a hump, labeling the Mode as the center peak, AMo50 as the peak height, and MxDMn as the full width from the shortest to longest interval">
     <line x1="60" y1="230" x2="700" y2="230" stroke="var(--line-2)" stroke-width="1.5" />
     <line x1="60" y1="40" x2="60" y2="230" stroke="var(--line-2)" stroke-width="1.5" />
     <g fill="#58c4f2" opacity="0.85">
@@ -99,6 +99,28 @@ This lineage traces back to the Russian physiologist R.M. Baevsky, whose work on
     <line x1="150" y1="248" x2="450" y2="248" stroke="var(--dim-2)" stroke-width="1"/>
     <text x="300" y="266" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">MxDMn = full width (max − min)</text>
     <text x="380" y="223" fill="var(--text)" font-family="Space Grotesk, sans-serif" font-size="12">RR interval length →</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 262" role="img" aria-label="An RR-interval histogram with bars forming a hump, labeling the Mode as the center peak, AMo50 as the peak height, and MxDMn as the full width from the shortest to longest interval">
+    <line x1="44" y1="214" x2="344" y2="214" stroke="var(--line-2)" stroke-width="1.5" />
+    <line x1="44" y1="40" x2="44" y2="214" stroke="var(--line-2)" stroke-width="1.5" />
+    <g fill="#58c4f2" opacity="0.85">
+      <rect x="70" y="187" width="28" height="27"/>
+      <rect x="102" y="159" width="28" height="55"/>
+      <rect x="134" y="113" width="28" height="101"/>
+      <rect x="166" y="67" width="28" height="147"/>
+      <rect x="198" y="113" width="28" height="101"/>
+      <rect x="230" y="141" width="28" height="73"/>
+      <rect x="262" y="173" width="28" height="41"/>
+      <rect x="294" y="191" width="28" height="23"/>
+    </g>
+    <line x1="180" y1="57" x2="180" y2="214" stroke="#e03127" stroke-width="2" stroke-dasharray="4 4"/>
+    <text x="180" y="24" text-anchor="middle" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13">Mode</text>
+    <text x="180" y="38" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="9.5">center</text>
+    <line x1="194" y1="67" x2="344" y2="67" stroke="var(--dim-2)" stroke-width="1" stroke-dasharray="3 3"/>
+    <text x="344" y="60" text-anchor="end" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">AMo50 = peak height</text>
+    <line x1="70" y1="226" x2="322" y2="226" stroke="var(--dim-2)" stroke-width="1"/>
+    <text x="196" y="242" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">MxDMn = full width (max − min)</text>
+    <text x="196" y="260" text-anchor="middle" fill="var(--text)" font-family="Space Grotesk, sans-serif" font-size="11">RR interval length →</text>
   </svg>
   <figcaption>The same reading as a histogram. Mode is where the peak sits, AMo50 is how tall that peak is, and MxDMn is how wide the whole distribution spreads.</figcaption>
 </figure>

@@ -129,6 +129,12 @@ const shouldBypassPaywall = () =>
   (BYPASS_IN_TESTFLIGHT && isTestFlightBuild()) ||
   (BYPASS_IN_SIDELOAD && isSideloadedAndroidBuild());
 
+/** Is this build's Pro status granted by a bypass above rather than by the
+ *  store? The cohort ping asks, because a dev/TestFlight/sideload build is
+ *  `isPro` without anyone having paid, and counting those as conversions
+ *  would make the number meaningless. */
+export const paywallBypassed = () => shouldBypassPaywall();
+
 /** TEMP (dev only): force the paywall to show with fallback prices and no
  *  store calls, so it can be previewed in a simulator without a native
  *  rebuild. Leave false in committed code. */

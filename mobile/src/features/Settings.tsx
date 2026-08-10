@@ -29,6 +29,7 @@ import { HealthScreen } from './Health';
 import { NotificationsRow } from './Reminders';
 import { showWelcomeAgain } from './Onboarding';
 import { PromptSheet } from './PromptSheet';
+import { openWhatsNew } from './WhatsNew';
 import { collectAppDiagnostics } from '../lib/diagnostics/collectApp';
 import { formatAppDiagnostics } from '../lib/diagnostics/appReport';
 
@@ -120,6 +121,7 @@ export function MenuSheet({ controls }: { controls: SheetControls }) {
       {item('trash', 'Clear all data', 'Erase everything on this device', () => openSheet((c) => <ClearDataSheet controls={c} />, { fitContent: true }))}
       {item('sparkles', 'Show welcome screen', 'Replay the first-run guide', () => { controls.closeAll(); showWelcomeAgain(); })}
       {item('info', 'Legal information', 'Disclaimer, privacy & terms', () => openSheet((c) => <LegalSheet controls={c} />))}
+      {item('rocket', "What's new", `Release notes for v${appVer}`, () => openWhatsNew(openSheet))}
       {/* Dark card in both themes (like the brand card above), so its text is
           hardcoded light rather than palette-driven. */}
       <Pressable

@@ -34,7 +34,7 @@ Long COVID (post-acute sequelae of SARS-CoV-2, or PASC) is best understood as an
 A broad review of the evidence describes long COVID as arising from [several interacting mechanisms rather than one root cause](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC10103775/), including persistent inflammation, vascular changes, and autonomic dysfunction. Keep that framing in mind as you read: these are overlapping hypotheses, not a settled diagnosis, and most people probably have more than one at play.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 740 260" role="img" aria-label="Diagram showing a SARS-CoV-2 trigger leading to four overlapping mechanisms (immune dysregulation, microclots, small-fiber neuropathy and autonomic injury) which converge on symptoms like fatigue, brain fog, racing heart and dizziness.">
+  <svg class="fig-d" viewBox="0 0 740 260" role="img" aria-label="Diagram showing a SARS-CoV-2 trigger leading to four overlapping mechanisms (immune dysregulation, microclots, small-fiber neuropathy and autonomic injury) which converge on symptoms like fatigue, brain fog, racing heart and dizziness.">
     <rect x="20" y="105" width="130" height="50" rx="8" fill="none" stroke="var(--accent)" stroke-width="2"/>
     <text x="85" y="127" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="13" fill="var(--dim-1)">SARS-CoV-2</text>
     <text x="85" y="144" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="13" fill="var(--dim-1)">infection</text>
@@ -62,6 +62,26 @@ A broad review of the evidence describes long COVID as arising from [several int
     <text x="642" y="118" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="12" fill="var(--dim-1)">Fatigue · brain fog</text>
     <text x="642" y="136" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="12" fill="var(--dim-1)">racing heart</text>
     <text x="642" y="154" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="12" fill="var(--dim-1)">dizziness · PEM</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 372" role="img" aria-label="Diagram showing a SARS-CoV-2 trigger leading to four overlapping mechanisms (immune dysregulation, microclots, small-fiber neuropathy and autonomic injury) which converge on symptoms like fatigue, brain fog, racing heart and dizziness.">
+    <rect x="100" y="8" width="160" height="44" rx="8" fill="none" stroke="var(--accent)" stroke-width="2"/>
+    <text x="180" y="28" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="13" fill="var(--dim-2)">SARS-CoV-2</text>
+    <text x="180" y="44" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="13" fill="var(--dim-2)">infection</text>
+    <line x1="180" y1="52" x2="180" y2="66" stroke="var(--line)" stroke-width="1.5"/>
+    <rect x="20" y="68" width="320" height="38" rx="8" fill="none" stroke="#f5a524" stroke-width="1.5"/>
+    <text x="180" y="92" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="13" fill="var(--dim-2)">Immune dysregulation</text>
+    <rect x="20" y="114" width="320" height="38" rx="8" fill="none" stroke="#e03127" stroke-width="1.5"/>
+    <text x="180" y="138" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="13" fill="var(--dim-2)">Microclots &amp; NETs</text>
+    <rect x="20" y="160" width="320" height="38" rx="8" fill="none" stroke="#38bdf8" stroke-width="1.5"/>
+    <text x="180" y="184" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="13" fill="var(--dim-2)">Small-fiber neuropathy</text>
+    <rect x="20" y="206" width="320" height="38" rx="8" fill="none" stroke="#54d98a" stroke-width="1.5"/>
+    <text x="180" y="230" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="13" fill="var(--dim-2)">Autonomic injury</text>
+    <line x1="180" y1="244" x2="180" y2="262" stroke="var(--line)" stroke-width="1.5"/>
+    <polygon points="180,268 174,256 186,256" fill="var(--line)"/>
+    <rect x="40" y="270" width="280" height="84" rx="8" fill="none" stroke="var(--dim-2)" stroke-width="2"/>
+    <text x="180" y="296" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="12.5" fill="var(--dim-2)">Fatigue · brain fog</text>
+    <text x="180" y="318" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="12.5" fill="var(--dim-2)">racing heart</text>
+    <text x="180" y="340" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="12.5" fill="var(--dim-2)">dizziness · PEM</text>
   </svg>
   <figcaption>One trigger, several overlapping injuries, converging symptoms, which is why long COVID rarely shows up as a single complaint.</figcaption>
 </figure>

@@ -128,7 +128,7 @@ A textbook cycle is often described as 28 days, though anywhere from about 21 to
 Those two hormones do not just manage fertility. They also act on your heart, blood vessels and autonomic nervous system, which is why your HRV and resting heart rate follow the calendar.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 280" role="img" aria-label="A chart across one menstrual cycle showing HRV in green running higher in the follicular phase and lower in the luteal phase, and resting heart rate in red running lower in the follicular phase and higher in the luteal phase, with phase labels along the bottom">
+  <svg class="fig-d" viewBox="0 0 720 280" role="img" aria-label="A chart across one menstrual cycle showing HRV in green running higher in the follicular phase and lower in the luteal phase, and resting heart rate in red running lower in the follicular phase and higher in the luteal phase, with phase labels along the bottom">
     <line x1="40" y1="250" x2="700" y2="250" stroke="var(--line)" stroke-width="1" />
     <line x1="180" y1="30" x2="180" y2="250" stroke="var(--line)" stroke-width="1" stroke-dasharray="3 4" />
     <line x1="357" y1="30" x2="357" y2="250" stroke="var(--line)" stroke-width="1" stroke-dasharray="3 4" />
@@ -146,6 +146,24 @@ Those two hormones do not just manage fertility. They also act on your heart, bl
     <text x="612" y="270" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11">Premenstrual</text>
     <text x="34" y="26" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11">Day 1</text>
     <text x="690" y="26" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11" text-anchor="end">Day 28</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 262" role="img" aria-label="A chart across one menstrual cycle showing HRV in green running higher in the follicular phase and lower in the luteal phase, and resting heart rate in red running lower in the follicular phase and higher in the luteal phase, with phase labels along the bottom">
+    <text x="20" y="18" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="12.5">HRV (green)</text>
+    <text x="344" y="18" text-anchor="end" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="12.5">Resting HR (red)</text>
+    <line x1="22" y1="210" x2="344" y2="210" stroke="var(--line)" stroke-width="1" />
+    <line x1="90" y1="34" x2="90" y2="210" stroke="var(--line)" stroke-width="1" stroke-dasharray="3 4" />
+    <line x1="177" y1="34" x2="177" y2="210" stroke="var(--line)" stroke-width="1" stroke-dasharray="3 4" />
+    <line x1="296" y1="34" x2="296" y2="210" stroke="var(--line)" stroke-width="1" stroke-dasharray="3 4" />
+    <polyline fill="none" stroke="#54d98a" stroke-width="2.5" points="22,130 69,120 129,90 177,74 201,84 260,116 308,136 344,143" />
+    <g fill="#54d98a"><circle cx="22" cy="130" r="4"/><circle cx="129" cy="90" r="4"/><circle cx="177" cy="74" r="4"/><circle cx="260" cy="116" r="4"/><circle cx="344" cy="143" r="4"/></g>
+    <polyline fill="none" stroke="#e03127" stroke-width="2.5" points="22,175 69,178 129,186 177,181 260,167 308,156 344,152" />
+    <g fill="#e03127"><circle cx="22" cy="175" r="4"/><circle cx="129" cy="186" r="4"/><circle cx="260" cy="167" r="4"/><circle cx="344" cy="152" r="4"/></g>
+    <text x="22" y="34" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5">Day 1</text>
+    <text x="344" y="34" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5" text-anchor="end">Day 28</text>
+    <text x="22" y="230" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">Menstrual</text>
+    <text x="120" y="230" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">Follicular</text>
+    <text x="230" y="230" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">Luteal</text>
+    <text x="180" y="250" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10" text-anchor="middle">Ovulation mid-cycle · Premenstrual at the end</text>
   </svg>
   <figcaption>The general pattern across a cycle: HRV rises through the follicular phase toward ovulation, then declines through the luteal phase to a low just before bleeding, while resting heart rate does the opposite. The size of the swing is individual.</figcaption>
 </figure>
@@ -192,7 +210,7 @@ If you live with POTS, long COVID or another form of dysautonomia, you may have 
 Put together, that is a physiological explanation for the perimenstrual flare of dizziness, palpitations, brain fog and fatigue that so many patients describe. It does not mean your condition is worsening; it means the calendar briefly stacked the odds against you.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 220" role="img" aria-label="A jagged HRV line across two menstrual cycles showing repeated dips before each period, with a smoother dashed baseline line that stays flat to gently rising, illustrating that cyclical dips do not signal a downward trend">
+  <svg class="fig-d" viewBox="0 0 720 220" role="img" aria-label="A jagged HRV line across two menstrual cycles showing repeated dips before each period, with a smoother dashed baseline line that stays flat to gently rising, illustrating that cyclical dips do not signal a downward trend">
     <line x1="40" y1="180" x2="700" y2="180" stroke="var(--line)" stroke-width="1" />
     <polyline fill="none" stroke="#54d98a" stroke-width="2.5" points="40,120 96,108 152,102 208,132 264,150 320,118 376,104 432,100 488,128 544,146 600,112 656,100 700,96" />
     <polyline fill="none" stroke="var(--dim-2)" stroke-width="2" stroke-dasharray="6 5" points="40,122 700,110" />
@@ -202,6 +220,17 @@ Put together, that is a physiological explanation for the perimenstrual flare of
     <text x="510" y="200" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11" text-anchor="middle">period</text>
     <line x1="232" y1="150" x2="232" y2="180" stroke="var(--dim-2)" stroke-width="1" stroke-dasharray="2 3" />
     <line x1="512" y1="150" x2="512" y2="180" stroke="var(--dim-2)" stroke-width="1" stroke-dasharray="2 3" />
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 216" role="img" aria-label="A jagged HRV line across two menstrual cycles showing repeated dips before each period, with a smoother dashed baseline line that stays flat to gently rising, illustrating that cyclical dips do not signal a downward trend">
+    <text x="20" y="18" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="12.5">Daily HRV</text>
+    <text x="344" y="18" text-anchor="end" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="12.5">Rolling baseline</text>
+    <line x1="20" y1="176" x2="344" y2="176" stroke="var(--line)" stroke-width="1" />
+    <polyline fill="none" stroke="#54d98a" stroke-width="2.5" points="20,119 47,108 75,102 102,131 130,148 157,117 185,104 212,100 240,127 267,144 295,112 322,100 344,96" />
+    <polyline fill="none" stroke="var(--dim-2)" stroke-width="2" stroke-dasharray="6 5" points="20,121 344,110" />
+    <line x1="114" y1="148" x2="114" y2="176" stroke="var(--dim-2)" stroke-width="1" stroke-dasharray="2 3" />
+    <line x1="252" y1="148" x2="252" y2="176" stroke="var(--dim-2)" stroke-width="1" stroke-dasharray="2 3" />
+    <text x="114" y="196" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5" text-anchor="middle">period</text>
+    <text x="252" y="196" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5" text-anchor="middle">period</text>
   </svg>
   <figcaption>Cyclical premenstrual dips repeat every month, but a rolling baseline that averages across recent readings stays flat to gently rising. The dip is rhythm; the baseline is the signal.</figcaption>
 </figure>

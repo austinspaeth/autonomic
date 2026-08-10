@@ -35,6 +35,14 @@ Parameters:
       Kept in Parameter Store rather than this template so the key never lands
       in the repo.
 
+  PingReportKeyParameter:
+    Type: String
+    Default: /autonomic/ping-report-key
+    Description: >-
+      SSM SecureString parameter holding the shared key for GET /ping/report.
+      Must exist before this stack is updated — CodeBuild resolves it at build
+      start, so a missing parameter fails the build rather than the deploy.
+
   SlsStackName:
     Type: String
     Default: autonomic-prod
@@ -209,12 +217,15 @@ Resources:
                   - logs:PutRetentionPolicy
                   - logs:TagResource
                 Resource: '*'
-              # The Serverless Framework licence key.
+              # The Serverless Framework licence key, plus the cohort-ping
+              # report key — both under /autonomic/, neither in the repo.
               - Effect: Allow
                 Action:
                   - ssm:GetParameter
                   - ssm:GetParameters
-                Resource: !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${ServerlessAccessKeyParameter}'
+                Resource:
+                  - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${ServerlessAccessKeyParameter}'
+                  - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${PingReportKeyParameter}'
               # The parameter is a SecureString under the AWS-managed SSM key.
               - Effect: Allow
                 Action: kms:Decrypt
@@ -247,6 +258,12 @@ Resources:
           - Name: SERVERLESS_ACCESS_KEY
             Type: PARAMETER_STORE
             Value: !Ref ServerlessAccessKeyParameter
+          # Injected as an env var rather than resolved by ${ssm:...} inside
+          # serverless.yml: CodeBuild fetches it with this role's permission,
+          # and the deploy then needs none of its own.
+          - Name: AUTONOMIC_PING_REPORT_KEY
+            Type: PARAMETER_STORE
+            Value: !Ref PingReportKeyParameter
 
   # ============================================================
   # CodePipeline

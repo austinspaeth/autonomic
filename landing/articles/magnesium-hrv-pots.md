@@ -128,7 +128,7 @@ First, magnesium sits in the doorway of the **NMDA receptor**, a channel that dr
 Second, magnesium is a natural **calcium counterweight** in muscle and blood vessels. Calcium drives contraction; magnesium eases it. In the heart that helps stabilize rhythm, which is why magnesium is used clinically for certain arrhythmias, and in blood vessel walls it promotes relaxation, which is why it lowers blood pressure a little. Hold onto that last point, because it becomes the POTS caution later.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 210" role="img" aria-label="A bar showing that less than one percent of the body's magnesium is in the blood, while more than ninety-nine percent is stored inside cells and bone, illustrating why a serum test can read normal while stores are low">
+  <svg class="fig-d" viewBox="0 0 720 210" role="img" aria-label="A bar showing that less than one percent of the body's magnesium is in the blood, while more than ninety-nine percent is stored inside cells and bone, illustrating why a serum test can read normal while stores are low">
     <text x="20" y="30" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="15">Where your body's magnesium lives</text>
     <rect x="20" y="52" width="676" height="46" rx="6" fill="#54d98a" />
     <rect x="690" y="52" width="6" height="46" rx="3" fill="#e03127" />
@@ -136,6 +136,20 @@ Second, magnesium is a natural **calcium counterweight** in muscle and blood ves
     <text x="20" y="140" fill="#e03127" font-family="Space Mono, monospace" font-size="13">Blood (serum): under 1%, the only part a standard lab measures</text>
     <line x1="693" y1="102" x2="640" y2="128" stroke="var(--line)" stroke-width="1.2" />
     <text x="20" y="176" fill="var(--dim-2)" font-family="Manrope, sans-serif" font-size="13">Your body defends the blood level tightly, so serum magnesium can read normal while tissue stores quietly run down.</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 240" role="img" aria-label="A bar showing that less than one percent of the body's magnesium is in the blood, while more than ninety-nine percent is stored inside cells and bone, illustrating why a serum test can read normal while stores are low">
+    <text x="20" y="22" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13.5">Where your body's magnesium lives</text>
+    <rect x="20" y="40" width="316" height="44" rx="6" fill="#54d98a" />
+    <rect x="332" y="40" width="8" height="44" rx="3" fill="#e03127" />
+    <text x="32" y="60" fill="#0b1f14" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="12.5">Inside cells and bone:</text>
+    <text x="32" y="76" fill="#0b1f14" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="12.5">over 99%</text>
+    <line x1="336" y1="88" x2="300" y2="104" stroke="var(--line)" stroke-width="1.2" />
+    <text x="20" y="118" fill="#e03127" font-family="Space Mono, monospace" font-size="11">Blood (serum): under 1%, the only</text>
+    <text x="20" y="132" fill="#e03127" font-family="Space Mono, monospace" font-size="11">part a standard lab measures</text>
+    <text x="20" y="168" fill="var(--dim-2)" font-family="Manrope, sans-serif" font-size="12.5">Your body defends the blood level</text>
+    <text x="20" y="186" fill="var(--dim-2)" font-family="Manrope, sans-serif" font-size="12.5">tightly, so serum magnesium can read</text>
+    <text x="20" y="204" fill="var(--dim-2)" font-family="Manrope, sans-serif" font-size="12.5">normal while tissue stores quietly</text>
+    <text x="20" y="222" fill="var(--dim-2)" font-family="Manrope, sans-serif" font-size="12.5">run down.</text>
   </svg>
   <figcaption>Less than 1% of body magnesium is in the blood, which is why a "normal" serum result does not rule out a real deficiency.</figcaption>
 </figure>
@@ -151,7 +165,7 @@ In people who are **not deficient**, the direct evidence that extra magnesium ra
 Where the ground is firmer is **sleep**. Magnesium's role in calming NMDA-driven excitation and supporting GABA signaling gives it a plausible mechanism for better sleep, and several trials, especially in older adults with insomnia, report modest improvements in sleep quality. This matters for you because sleep is one of the strongest overnight drivers of HRV. If magnesium helps you sleep more deeply, your morning [RMSSD](/insights/basics/rmssd-and-pnn50-vagal-tone-metrics/) can rise as a downstream effect, even if magnesium never touched your heart directly. For how the two connect, see [sleep and autonomic recovery](/insights/recovery/sleep-and-autonomic-recovery/).
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 200" role="img" aria-label="A flow diagram showing magnesium leading to two paths, a weak direct path to higher HRV and a stronger indirect path through calmer excitation and better sleep to higher next-morning HRV">
+  <svg class="fig-d" viewBox="0 0 720 200" role="img" aria-label="A flow diagram showing magnesium leading to two paths, a weak direct path to higher HRV and a stronger indirect path through calmer excitation and better sleep to higher next-morning HRV">
     <rect x="20" y="80" width="150" height="46" rx="8" fill="none" stroke="var(--line)" stroke-width="1.5" />
     <text x="95" y="108" text-anchor="middle" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="15">Magnesium</text>
     <line x1="170" y1="95" x2="250" y2="55" stroke="var(--line)" stroke-width="1.5" stroke-dasharray="4 4" />
@@ -166,6 +180,24 @@ Where the ground is firmer is **sleep**. Magnesium's role in calming NMDA-driven
     <line x1="432" y1="142" x2="512" y2="120" stroke="#54d98a" stroke-width="2.5" />
     <rect x="514" y="96" width="182" height="48" rx="8" fill="#54d98a" />
     <text x="605" y="125" text-anchor="middle" fill="#0b1f14" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="14">Higher morning HRV</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 264" role="img" aria-label="A flow diagram showing magnesium leading to two paths, a weak direct path to higher HRV and a stronger indirect path through calmer excitation and better sleep to higher next-morning HRV">
+    <rect x="105" y="8" width="150" height="42" rx="8" fill="none" stroke="var(--line)" stroke-width="1.5" />
+    <text x="180" y="34" text-anchor="middle" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="15">Magnesium</text>
+    <line x1="120" y1="50" x2="80" y2="80" stroke="var(--line)" stroke-width="1.5" stroke-dasharray="4 4" />
+    <text x="14" y="72" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5">weak, direct</text>
+    <line x1="240" y1="50" x2="272" y2="80" stroke="#54d98a" stroke-width="2.5" />
+    <text x="284" y="64" fill="#54d98a" font-family="Space Mono, monospace" font-size="10.5">stronger,</text>
+    <text x="284" y="78" fill="#54d98a" font-family="Space Mono, monospace" font-size="10.5">indirect</text>
+    <rect x="14" y="96" width="150" height="44" rx="8" fill="none" stroke="var(--line)" stroke-width="1.5" />
+    <text x="89" y="123" text-anchor="middle" fill="var(--dim-2)" font-family="Manrope, sans-serif" font-size="12.5">Small HRV change</text>
+    <rect x="180" y="96" width="166" height="60" rx="8" fill="none" stroke="#54d98a" stroke-width="1.8" />
+    <text x="263" y="122" text-anchor="middle" fill="var(--dim-2)" font-family="Manrope, sans-serif" font-size="12.5">Calmer excitation,</text>
+    <text x="263" y="140" text-anchor="middle" fill="var(--dim-2)" font-family="Manrope, sans-serif" font-size="12.5">better sleep</text>
+    <line x1="263" y1="156" x2="263" y2="196" stroke="#54d98a" stroke-width="2.5" />
+    <polygon points="263,202 257,190 269,190" fill="#54d98a" />
+    <rect x="89" y="206" width="230" height="48" rx="8" fill="#54d98a" />
+    <text x="204" y="235" text-anchor="middle" fill="#0b1f14" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="14">Higher morning HRV</text>
   </svg>
   <figcaption>The dependable path to a better HRV reading runs through sleep, not straight from the mineral to the heart.</figcaption>
 </figure>

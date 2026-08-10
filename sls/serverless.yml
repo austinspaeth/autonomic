@@ -79,6 +79,34 @@ functions:
           authorizer:
             name: cognitoAuthorizer
 
+  # The mobile app's cohort ping. Public by design — the app has no accounts
+  # and no credentials to present, and the request carries nothing worth
+  # protecting: one date, no identifier, no body. See lambdas/ping/main.js.
+  ping:
+    handler: lambdas/ping/main.handler
+    description: Anonymous cohort ping from the mobile app (open + subscribe)
+    memorySize: 256
+    timeout: 5
+    events:
+      - httpApi:
+          method: GET
+          path: /ping/open/{cohort}
+      - httpApi:
+          method: GET
+          path: /ping/sub/{cohort}
+      # Reading the counters back. Not public — guarded by PING_REPORT_KEY,
+      # which is unset by default, and an unset key refuses everyone.
+      - httpApi:
+          method: GET
+          path: /ping/report
+    environment:
+      # CodeBuild injects this from SSM (/autonomic/ping-report-key) — see
+      # infrastructure/pipeline.yml. Deliberately NOT a ${ssm:...} lookup here:
+      # that resolves with whatever credentials the deploy runs under, and a
+      # missing permission would fail the whole deploy, landing site included.
+      # Empty is safe — the read route refuses everyone without a key.
+      PING_REPORT_KEY: ${env:AUTONOMIC_PING_REPORT_KEY, ''}
+
 resources:
   Resources:
 
@@ -158,3 +186,12 @@ resources:
     TableName:
       Description: DynamoDB table backing the dashboard
       Value: ${param:tableName}
+    OpenPingEndpoint:
+      Description: Mobile app daily open ping (cohort is D{MMDDYY})
+      Value: !Sub https://${param:apiDomain}/ping/open/{cohort}
+    SubPingEndpoint:
+      Description: Mobile app subscribe ping (cohort is D{MMDDYY})
+      Value: !Sub https://${param:apiDomain}/ping/sub/{cohort}
+    PingReportEndpoint:
+      Description: Read the ping counters (needs ?key= — see sls/README.md)
+      Value: !Sub https://${param:apiDomain}/ping/report

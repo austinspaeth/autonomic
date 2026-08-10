@@ -82,7 +82,7 @@ It turns out your heartbeat rhythm is not one wave but several layered on top of
 The <a href="https://www.ahajournals.org/doi/10.1161/01.CIR.93.5.1043" target="_blank" rel="noopener">1996 Task Force standards</a> defined the band boundaries that are still used today, and the review by <a href="https://www.frontiersin.org/articles/10.3389/fpubh.2017.00258/full" target="_blank" rel="noopener">Shaffer and Ginsberg (2017)</a> is a clear modern summary of what each one means.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 300" role="img" aria-label="An HRV power spectrum from 0 to 0.4 Hz, with the VLF band shaded purple on the left, the LF band shaded orange with a peak near 0.1 Hz, and the HF band shaded blue with a peak near 0.25 Hz">
+  <svg class="fig-d" viewBox="0 0 720 300" role="img" aria-label="An HRV power spectrum from 0 to 0.4 Hz, with the VLF band shaded purple on the left, the LF band shaded orange with a peak near 0.1 Hz, and the HF band shaded blue with a peak near 0.25 Hz">
     <!-- band shading -->
     <rect x="60" y="60" width="60" height="180" fill="#a78bfa" fill-opacity="0.12" />
     <rect x="120" y="60" width="165" height="180" fill="#f97316" fill-opacity="0.12" />
@@ -102,6 +102,22 @@ The <a href="https://www.ahajournals.org/doi/10.1161/01.CIR.93.5.1043" target="_
     <text x="660" y="262" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">0.4</text>
     <text x="360" y="286" text-anchor="middle" fill="var(--dim)" font-family="-apple-system, sans-serif" font-size="12">frequency (Hz)</text>
     <text x="30" y="150" text-anchor="middle" fill="var(--dim)" font-family="-apple-system, sans-serif" font-size="12" transform="rotate(-90 30 150)">power</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 268" role="img" aria-label="An HRV power spectrum from 0 to 0.4 Hz, with the VLF band shaded purple on the left, the LF band shaded orange with a peak near 0.1 Hz, and the HF band shaded blue with a peak near 0.25 Hz">
+    <rect x="40" y="66" width="30" height="148" fill="#a78bfa" fill-opacity="0.12" />
+    <rect x="70" y="66" width="84" height="148" fill="#f97316" fill-opacity="0.12" />
+    <rect x="154" y="66" width="190" height="148" fill="#58c4f2" fill-opacity="0.12" />
+    <path d="M40,214 L55,184 L70,195 L91,138 L116,91 L141,144 L154,168 L182,138 L230,112 L273,160 L314,192 L344,212 L344,214 L40,214 Z" fill="var(--accent, #e03127)" fill-opacity="0.18" stroke="var(--accent, #e03127)" stroke-width="2" stroke-linejoin="round" />
+    <line x1="40" y1="214" x2="344" y2="214" stroke="var(--line-2)" stroke-width="1.5" />
+    <text x="55" y="58" text-anchor="middle" fill="#a78bfa" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13">VLF</text>
+    <text x="112" y="58" text-anchor="middle" fill="#f97316" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13">LF</text>
+    <text x="249" y="58" text-anchor="middle" fill="#58c4f2" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13">HF</text>
+    <text x="40" y="232" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">0</text>
+    <text x="70" y="232" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">0.04</text>
+    <text x="154" y="232" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">0.15</text>
+    <text x="344" y="232" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">0.4</text>
+    <text x="192" y="256" text-anchor="middle" fill="var(--dim)" font-family="-apple-system, sans-serif" font-size="12">frequency (Hz)</text>
+    <text x="16" y="140" text-anchor="middle" fill="var(--dim)" font-family="-apple-system, sans-serif" font-size="12" transform="rotate(-90 16 140)">power</text>
   </svg>
   <figcaption>A short-reading power spectrum. The area under each shaded region is that band's power; a healthy rhythm spreads power across the bands rather than piling it into one.</figcaption>
 </figure>

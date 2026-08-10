@@ -57,7 +57,7 @@ Here is the reason so many people conclude their symptoms are "random." Triggers
 Single-day thinking will mislead you here. If you only compare today's symptoms to today's inputs, the real cause is often already off-screen. The Saturday hike doesn't show up until the Monday crash.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 220" role="img" aria-label="A timeline showing a trigger on Saturday leading to a symptom crash on Monday, with two quiet days in between.">
+  <svg class="fig-d" viewBox="0 0 720 220" role="img" aria-label="A timeline showing a trigger on Saturday leading to a symptom crash on Monday, with two quiet days in between.">
     <line x1="40" y1="150" x2="680" y2="150" stroke="var(--line)" stroke-width="2"/>
     <g font-family="Space Grotesk, sans-serif" font-size="13" fill="var(--dim-2)" text-anchor="middle">
       <text x="110" y="180">Sat</text>
@@ -75,6 +75,25 @@ Single-day thinking will mislead you here. If you only compare today's symptoms 
     <circle cx="590" cy="150" r="6" fill="var(--dim-2)"/>
     <path d="M 122 143 Q 270 90 418 143" fill="none" stroke="var(--dim-2)" stroke-width="1.5" stroke-dasharray="4 4"/>
     <text x="270" y="72" font-family="Space Mono, monospace" font-size="12" fill="var(--dim-2)" text-anchor="middle">~48h lag</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 190" role="img" aria-label="A timeline showing a trigger on Saturday leading to a symptom crash on Monday, with two quiet days in between.">
+    <line x1="24" y1="140" x2="336" y2="140" stroke="var(--line)" stroke-width="2"/>
+    <g font-family="Space Grotesk, sans-serif" font-size="12.5" fill="var(--dim-2)" text-anchor="middle">
+      <text x="63" y="168">Sat</text>
+      <text x="138" y="168">Sun</text>
+      <text x="213" y="168">Mon</text>
+      <text x="288" y="168">Tue</text>
+    </g>
+    <circle cx="63" cy="140" r="9" fill="#f5a524"/>
+    <text x="63" y="118" font-family="Space Grotesk, sans-serif" font-size="12.5" fill="#f5a524" text-anchor="middle">trigger</text>
+    <text x="63" y="103" font-family="Space Grotesk, sans-serif" font-size="11" fill="var(--dim-2)" text-anchor="middle">(long hike)</text>
+    <circle cx="138" cy="140" r="6" fill="var(--dim-2)"/>
+    <circle cx="213" cy="140" r="11" fill="#e03127"/>
+    <text x="213" y="118" font-family="Space Grotesk, sans-serif" font-size="12.5" fill="#e03127" text-anchor="middle">crash</text>
+    <text x="213" y="103" font-family="Space Grotesk, sans-serif" font-size="11" fill="var(--dim-2)" text-anchor="middle">(fatigue, dizziness)</text>
+    <circle cx="288" cy="140" r="6" fill="var(--dim-2)"/>
+    <path d="M 74 133 Q 138 86 203 133" fill="none" stroke="var(--dim-2)" stroke-width="1.5" stroke-dasharray="4 4"/>
+    <text x="138" y="74" font-family="Space Mono, monospace" font-size="11.5" fill="var(--dim-2)" text-anchor="middle">~48h lag</text>
   </svg>
   <figcaption>The cause and the symptom can sit two days apart, which is exactly why a same-day view makes triggers look random.</figcaption>
 </figure>

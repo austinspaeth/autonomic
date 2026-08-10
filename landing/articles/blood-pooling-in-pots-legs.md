@@ -77,7 +77,7 @@ In a body with brisk autonomic reflexes, this barely registers. Sensors in your 
 In POTS, that clamp-down is weak, delayed, or incomplete. The blood that gravity pulled downward lingers there instead of being pushed back up. Less blood returns to the heart, and the whole downstream cascade follows from that one fact.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 300" role="img" aria-label="Two body diagrams. On the left, lying down, blood is distributed evenly and heart rate is normal. On the right, standing, blood pools in the legs and abdomen, less returns to the heart, and the heart rate is elevated.">
+  <svg class="fig-d" viewBox="0 0 720 300" role="img" aria-label="Two body diagrams. On the left, lying down, blood is distributed evenly and heart rate is normal. On the right, standing, blood pools in the legs and abdomen, less returns to the heart, and the heart rate is elevated.">
     <text x="20" y="26" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="15">Lying down: even distribution</text>
     <text x="400" y="26" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="15">Standing (POTS): blood pools low</text>
     <!-- left body outline -->
@@ -95,6 +95,23 @@ In POTS, that clamp-down is weak, delayed, or incomplete. The blood that gravity
     <line x1="660" y1="90" x2="660" y2="240" stroke="var(--dim-2)" stroke-width="1.5" stroke-dasharray="4 4"/>
     <polygon points="656,235 664,235 660,246" fill="var(--dim-2)"/>
     <text x="672" y="170" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11" transform="rotate(90 672 170)">gravity</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 244" role="img" aria-label="Two body diagrams. On the left, lying down, blood is distributed evenly and heart rate is normal. On the right, standing, blood pools in the legs and abdomen, less returns to the heart, and the heart rate is elevated.">
+    <text x="77" y="18" text-anchor="middle" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="12.5">Lying down:</text>
+    <text x="77" y="34" text-anchor="middle" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="12.5">even distribution</text>
+    <text x="233" y="18" text-anchor="middle" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="12.5">Standing (POTS):</text>
+    <text x="233" y="34" text-anchor="middle" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="12.5">blood pools low</text>
+    <rect x="14" y="48" width="126" height="150" rx="24" fill="none" stroke="var(--line)" stroke-width="2"/>
+    <circle cx="77" cy="70" r="5" fill="#54d98a"/><circle cx="49" cy="93" r="5" fill="#54d98a"/><circle cx="105" cy="93" r="5" fill="#54d98a"/><circle cx="63" cy="123" r="5" fill="#54d98a"/><circle cx="94" cy="123" r="5" fill="#54d98a"/><circle cx="49" cy="153" r="5" fill="#54d98a"/><circle cx="105" cy="153" r="5" fill="#54d98a"/><circle cx="77" cy="176" r="5" fill="#54d98a"/>
+    <text x="77" y="222" fill="#54d98a" font-family="Space Mono, monospace" font-size="12.5" text-anchor="middle">HR steady</text>
+    <rect x="170" y="48" width="126" height="150" rx="24" fill="none" stroke="var(--line)" stroke-width="2"/>
+    <circle cx="233" cy="70" r="5" fill="var(--line)"/>
+    <text x="233" y="90" fill="#e03127" font-family="Space Mono, monospace" font-size="11" text-anchor="middle">less return</text>
+    <circle cx="205" cy="153" r="6" fill="#e03127"/><circle cx="219" cy="164" r="6" fill="#e03127"/><circle cx="236" cy="157" r="6" fill="#e03127"/><circle cx="250" cy="168" r="6" fill="#e03127"/><circle cx="212" cy="179" r="6" fill="#e03127"/><circle cx="233" cy="183" r="6" fill="#e03127"/><circle cx="258" cy="183" r="6" fill="#e03127"/><circle cx="198" cy="168" r="6" fill="#e03127"/>
+    <text x="233" y="222" fill="#e03127" font-family="Space Mono, monospace" font-size="12.5" text-anchor="middle">HR +30 to +40</text>
+    <line x1="316" y1="70" x2="316" y2="180" stroke="var(--dim-2)" stroke-width="1.5" stroke-dasharray="4 4"/>
+    <polygon points="312,175 320,175 316,186" fill="var(--dim-2)"/>
+    <text x="332" y="100" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="11" transform="rotate(90 332 100)">gravity</text>
   </svg>
   <figcaption>Standing shifts a large volume of blood into the lower body. When the vessels are slow to push it back up, less returns to the heart and the heart rate climbs to compensate.</figcaption>
 </figure>
@@ -133,7 +150,7 @@ A subset of people have what is sometimes called **neuropathic POTS**, where the
 The single most useful thing to understand is the **skeletal muscle pump**. Your deep leg veins run through your calf and thigh muscles, and those veins have one-way valves. Every time the muscle contracts, it squeezes the veins and pushes blood upward; the valves stop it falling back. Contract, release, contract, release, and your legs become a second heart moving blood toward your chest. Stand perfectly still and the pump switches off, so blood settles downward. This is why soldiers standing at rigid attention faint, and why fidgeting is protective.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 240" role="img" aria-label="Two calf diagrams. On the left, a still, relaxed calf lets blood settle downward. On the right, a contracting calf muscle squeezes the deep vein and one-way valves push blood upward toward the heart.">
+  <svg class="fig-d" viewBox="0 0 720 240" role="img" aria-label="Two calf diagrams. On the left, a still, relaxed calf lets blood settle downward. On the right, a contracting calf muscle squeezes the deep vein and one-way valves push blood upward toward the heart.">
     <text x="30" y="26" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="15">Still: pump off, blood settles</text>
     <text x="400" y="26" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="15">Moving: pump on, blood rises</text>
     <!-- left: relaxed calf -->
@@ -154,6 +171,26 @@ The single most useful thing to understand is the **skeletal muscle pump**. Your
     <polygon points="510,90 503,102 517,102" fill="#54d98a"/>
     <polygon points="510,120 503,132 517,132" fill="#54d98a"/>
     <text x="510" y="220" fill="#54d98a" font-family="Space Mono, monospace" font-size="12" text-anchor="middle">toward heart</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 226" role="img" aria-label="Two calf diagrams. On the left, a still, relaxed calf lets blood settle downward. On the right, a contracting calf muscle squeezes the deep vein and one-way valves push blood upward toward the heart.">
+    <text x="88" y="18" text-anchor="middle" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="12.5">Still: pump off,</text>
+    <text x="88" y="34" text-anchor="middle" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="12.5">blood settles</text>
+    <text x="266" y="18" text-anchor="middle" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="12.5">Moving: pump on,</text>
+    <text x="266" y="34" text-anchor="middle" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="12.5">blood rises</text>
+    <path d="M66 56 q-28 46 0 116" fill="none" stroke="var(--line)" stroke-width="2"/>
+    <path d="M110 56 q28 46 0 116" fill="none" stroke="var(--line)" stroke-width="2"/>
+    <rect x="80" y="60" width="16" height="108" rx="8" fill="#e0312722" stroke="#e03127" stroke-width="1.5"/>
+    <polygon points="88,156 82,146 94,146" fill="#e03127"/>
+    <polygon points="88,130 82,120 94,120" fill="#e03127"/>
+    <text x="88" y="200" fill="#e03127" font-family="Space Mono, monospace" font-size="12" text-anchor="middle">downward</text>
+    <path d="M238 56 q-38 46 0 116" fill="none" stroke="var(--line)" stroke-width="2"/>
+    <path d="M294 56 q38 46 0 116" fill="none" stroke="var(--line)" stroke-width="2"/>
+    <rect x="258" y="60" width="16" height="108" rx="8" fill="#54d98a22" stroke="#54d98a" stroke-width="1.5"/>
+    <line x1="234" y1="114" x2="256" y2="114" stroke="#54d98a" stroke-width="2"/><polygon points="258,114 248,109 248,119" fill="#54d98a"/>
+    <line x1="298" y1="114" x2="276" y2="114" stroke="#54d98a" stroke-width="2"/><polygon points="274,114 284,109 284,119" fill="#54d98a"/>
+    <polygon points="266,84 260,95 272,95" fill="#54d98a"/>
+    <polygon points="266,110 260,121 272,121" fill="#54d98a"/>
+    <text x="266" y="200" fill="#54d98a" font-family="Space Mono, monospace" font-size="12" text-anchor="middle">toward heart</text>
   </svg>
   <figcaption>Leg muscles squeeze the deep veins; one-way valves keep blood moving upward. Movement runs the pump, standing still shuts it off.</figcaption>
 </figure>

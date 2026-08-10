@@ -79,7 +79,7 @@ An infection is exactly that kind of threat, and it moves several levers at once
 Put together, the picture is consistent: resting heart rate up, breathing rate up, and HRV (RMSSD and HF power especially) down. It is the autonomic fingerprint of a body that has quietly gone to work.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 260" role="img" aria-label="A timeline chart over about ten days. HRV, the green line, sits in a normal band, then drops sharply a day or two before a marked symptom-onset point, stays low through the illness, and climbs back toward baseline during recovery. Resting heart rate, the red line, mirrors it in reverse, rising as HRV falls.">
+  <svg class="fig-d" viewBox="0 0 720 260" role="img" aria-label="A timeline chart over about ten days. HRV, the green line, sits in a normal band, then drops sharply a day or two before a marked symptom-onset point, stays low through the illness, and climbs back toward baseline during recovery. Resting heart rate, the red line, mirrors it in reverse, rising as HRV falls.">
     <text x="20" y="24" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="15">HRV dips before symptoms, then recovers</text>
     <!-- baseline band for HRV -->
     <rect x="60" y="70" width="620" height="34" fill="#54d98a14"/>
@@ -102,6 +102,24 @@ Put together, the picture is consistent: resting heart rate up, breathing rate u
     <text x="497" y="246" fill="#54d98a" font-family="Space Mono, monospace" font-size="11">HRV</text>
     <line x1="560" y1="242" x2="582" y2="242" stroke="#e03127" stroke-width="2" stroke-dasharray="5 4"/>
     <text x="587" y="246" fill="#e03127" font-family="Space Mono, monospace" font-size="11">resting HR</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 250" role="img" aria-label="A timeline chart over about ten days. HRV, the green line, sits in a normal band, then drops sharply a day or two before a marked symptom-onset point, stays low through the illness, and climbs back toward baseline during recovery. Resting heart rate, the red line, mirrors it in reverse, rising as HRV falls.">
+    <text x="20" y="18" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13">HRV dips before symptoms,</text>
+    <text x="20" y="34" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13">then recovers</text>
+    <rect x="40" y="60" width="300" height="30" fill="#54d98a14"/>
+    <text x="44" y="56" fill="#54d98a" font-family="Space Mono, monospace" font-size="10.5">your HRV baseline range</text>
+    <line x1="40" y1="176" x2="340" y2="176" stroke="var(--line)" stroke-width="1.5"/>
+    <polyline points="40,75 74,72 103,79 122,126 156,160 185,164 219,158 253,126 287,98 321,82 340,77" fill="none" stroke="#54d98a" stroke-width="2.5"/>
+    <polyline points="40,150 74,151 103,148 122,118 156,94 185,89 219,94 253,118 287,138 321,148 340,151" fill="none" stroke="#e03127" stroke-width="2" stroke-dasharray="5 4"/>
+    <line x1="156" y1="44" x2="156" y2="176" stroke="var(--dim-2)" stroke-width="1.5" stroke-dasharray="3 3"/>
+    <text x="162" y="44" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5">symptoms start</text>
+    <line x1="117" y1="191" x2="153" y2="191" stroke="var(--dim-2)" stroke-width="1"/>
+    <polygon points="117,191 125,187 125,195" fill="var(--dim-2)"/>
+    <text x="137" y="207" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">dip leads by 1–2 days</text>
+    <line x1="40" y1="226" x2="62" y2="226" stroke="#54d98a" stroke-width="2.5"/>
+    <text x="68" y="230" fill="#54d98a" font-family="Space Mono, monospace" font-size="11">HRV</text>
+    <line x1="150" y1="226" x2="172" y2="226" stroke="#e03127" stroke-width="2" stroke-dasharray="5 4"/>
+    <text x="178" y="230" fill="#e03127" font-family="Space Mono, monospace" font-size="11">resting HR</text>
   </svg>
   <figcaption>The classic shape: HRV steps down a day or two before symptoms appear, resting heart rate mirrors it upward, and both drift back toward baseline as you recover.</figcaption>
 </figure>
