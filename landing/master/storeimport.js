@@ -126,7 +126,10 @@
     'territory', 'country', 'countryregion', 'region', 'market',
     'device', 'devicetype', 'platformversion', 'osversion', 'appversion', 'version',
     'source', 'sourcetype', 'sourceinfo', 'campaign', 'pagetype', 'pagetitle',
-    'utmsource', 'utmcampaign', 'trafficsource', 'acquisitionchannel',
+    'utmsource', 'utmcampaign', 'utmmedium', 'utmcontent', 'utmterm',
+    'trafficsource', 'acquisitionchannel',
+    // Play's acquisition report splits by these before it gets to a number.
+    'searchterm', 'searchterms', 'customstorelisting', 'storelisting', 'listingid',
     'currency', 'currencycode', 'carrier', 'language', 'subscriptionname',
     'conversionrate', 'convrate', 'taprate', 'tapthrough', 'tapthroughrate', 'proceedsreason',
     'notes', 'note'

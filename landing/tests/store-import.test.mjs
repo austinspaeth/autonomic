@@ -63,6 +63,16 @@ eq('buyers are a count', field('Buyers'), 'sales');
 eq('territory is a breakdown, not a metric', field('Territory'), 'dimension');
 eq('conversion rate is ignored — it is derived', field('Conversion Rate'), 'dimension');
 eq('the date column is the date column', field('Date'), 'date');
+/* Play's acquisition report — the source of store-listing views — splits by
+   search term and traffic source before it gets to a number. */
+eq('search term is a breakdown', field('Search Term'), 'dimension');
+eq('traffic source is a breakdown', field('Traffic Source'), 'dimension');
+check('a search-term split still finds the metrics', (() => {
+  const r = SI.readFile('store_performance_search_term.csv',
+    'Date,Search Term,Store Listing Visitors,Store Listing Acquisitions\n' +
+    '2026-07-01,pots tracker,40,6\n2026-07-01,hrv journal,22,3\n');
+  return JSON.stringify(r.days['2026-07-01']) === JSON.stringify({ pageViews: 62, downloads: 9 });
+})());
 
 /* --------------------------------------------------------------- one file */
 
