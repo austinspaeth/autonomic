@@ -592,14 +592,51 @@ always expanded, on every day summary, with a **"LOCKED"** badge. Three problems
 permanent (so it trains blindness), it's generic (says nothing about *them*), and the badge
 frames the app as broken.
 
-Rewrite it as a **rotating, data-personalized single line**:
+Rewrite it as a **single personalized line**. But one rule governs the whole idea:
 
-> "31 days logged — your month view is ready." →
-> "6 crash days this month. See what they had in common." →
-> "Your HRV is trending up. See how far." →
+> **Every line must resolve to a view that exists today.**
 
-Collapse it by default after the first week. Drop the LOCKED badge. One personalized line
-outperforms four generic bullets, and it stops feeling like a permanent ad in their journal.
+A line like *"6 crash days this month — see what they had in common"* points at flare forensics
+(§1.1 C), which isn't built. Landing a user on a paywall for a view that doesn't exist is worse
+than the generic bullets — that's how you earn refunds. Only three destinations are reachable
+right now (Analysis Week/Month/Year, the Insights reports, unlimited HRV capture), so only
+claims that land there may be made. POTS testing is reachable *only with a strap* — never point
+a phone-only user at it.
+
+That leaves three honest triggers, all computable today:
+
+1. **History horizon** → Analysis Month. `engagedDayCount(days) > 14`.
+   *"You have 31 days logged. Your Day view shows 14."*
+2. **Report ready** → Insights month report. `entryCount(days, last30Keys)` over a threshold.
+   *"240 entries this month. Turn them into a doctor-visit summary."*
+3. **Trend visible** → Analysis Month. A qualifying 30-vs-30 improvement.
+   *"Your resting HR is down 6 bpm since last month."*
+
+The third is the strongest, because it's a **reward rather than a nag** — and it leads to the
+bigger realization below.
+
+Drop the LOCKED badge. With one line there's nothing to expand, so the accordion goes too.
+
+**The Trend card should render for every tier, not just free users.** A card that only appears
+when you haven't paid is an advertisement, and people learn to ignore advertisements. The same
+card shown to everyone is a *feature*: free and Pro see the identical headline, and the tier
+changes only where the tap lands (free → the locked Month view and its faded data; Pro → the
+same view, unlocked). **The fact is never rationed; only the ask is** — which means the card
+itself doesn't pass through the upsell gate, only its optional upgrade sub-line does.
+
+Two rules keep it honest: it reports **improvements only** — decline is `DownturnWarning`'s job
+and telling a chronically ill user their HRV fell is an actual crash trigger — and it stays
+silent during a downturn even when some metric improved. Full spec in
+**`TREND_CARD_PROMPT.md`** at the repo root.
+
+**And when no trigger matches, show nothing.** No generic fallback. The card only renders for
+`tier === 'free'` today, so it never appears during the trial; it first becomes possible on day
+8, when the user has ≤7 days of data and trigger 1 can't fire. That leaves roughly days 8–14
+quiet — which is correct, not a gap. Day 8 is when the app just got *worse* for them, the exact
+uninstall risk §2.6 is about. Staying silent until there's something true and specific to say is
+the better trade. Net effect: today a brand-new free user carries a permanent LOCKED ad in their
+journal before the app has demonstrated anything; after this, the first thing they ever see is a
+true statement about their own data.
 
 ## 2.8 Frequency discipline — the actual mechanism of "non-intrusive"
 
