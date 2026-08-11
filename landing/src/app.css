@@ -571,6 +571,14 @@ a { color: inherit; text-decoration: none; }
 .watch-pill { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 12px; letter-spacing: 0.06em; color: var(--accent-2); background: var(--accent-soft); border: 1px solid rgba(224,49,39,0.3); border-radius: 999px; padding: 6px 14px; margin-bottom: 20px; }
 .watch-pill i { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 0 rgba(224,49,39,0.6); animation: wa-pulse 2s infinite; }
 @keyframes wa-pulse { 0% { box-shadow: 0 0 0 0 rgba(224,49,39,0.55); } 70% { box-shadow: 0 0 0 8px rgba(224,49,39,0); } 100% { box-shadow: 0 0 0 0 rgba(224,49,39,0); } }
+/* Platform caveat. Deliberately plain: an Android reader should meet this
+   before they've spent two minutes playing with a watch they can't buy for. */
+.watch-note {
+  margin: 16px 0 0; padding: 12px 15px; max-width: 54ch;
+  font-size: 13.5px; line-height: 1.55; color: var(--dim-2);
+  background: rgba(255,255,255,0.03); border: 1px solid var(--line); border-radius: 12px;
+}
+.watch-note b { color: var(--dim); font-weight: 600; }
 
 /* Mode selector - mirrors the watch home screen's three rows, same order */
 .wa-modes { display: flex; flex-direction: column; gap: 12px; margin-top: 30px; }
@@ -935,6 +943,28 @@ a { color: inherit; text-decoration: none; }
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23ff6a5c' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
 }
 .pr-btn { width: 100%; margin-top: 8px; }
+/* Risk reversal sits UNDER the button, where the hesitation is, not three
+   paragraphs below the cards where it used to live. */
+.pr-reassure { margin: 10px 0 0; text-align: center; font-size: 12.5px; color: var(--dim-2); }
+
+/* Platform caveat on a shared-plan row (e.g. the watch app, iPhone only). */
+.pr-only {
+  display: inline-block;
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--dim-2); border: 1px solid var(--line-2); border-radius: 999px; padding: 2px 6px;
+  white-space: nowrap;
+}
+
+/* Rating + platform line under the plan cards. */
+.pr-proof {
+  display: flex; align-items: center; justify-content: center; flex-wrap: wrap;
+  gap: 10px 14px; margin: 22px auto 0; text-align: center;
+}
+.pr-proof-sep { width: 1px; height: 15px; background: var(--line-2); }
+.pr-proof-note { font-size: 13.5px; color: var(--dim-2); }
+@media (max-width: 480px) {
+  .pr-proof-sep { display: none; }
+}
 
 .pr-note {
   max-width: 620px; margin: 26px auto 0; text-align: center;
@@ -957,7 +987,9 @@ a { color: inherit; text-decoration: none; }
   position: relative; z-index: 1; display: flex; align-items: center;
   min-height: 54px; padding: 11px 0; border-top: 1px solid rgba(255,255,255,0.05);
 }
-.pr-feat { padding-right: 14px; font-size: 14px; line-height: 1.4; color: var(--text); }
+/* Wraps, so a row carrying a platform chip drops the chip onto its own line on
+   a narrow phone instead of squeezing the label into one word per line. */
+.pr-feat { flex-wrap: wrap; column-gap: 7px; row-gap: 5px; padding-right: 14px; font-size: 14px; line-height: 1.4; color: var(--text); }
 .pr-mark { justify-content: center; }
 .pr-corner, .pr-col-head, .pr-first { border-top: none; }
 .pr-col-head {
@@ -1055,8 +1087,6 @@ a { color: inherit; text-decoration: none; }
 
 .cmp-foot { max-width: 840px; margin: 22px auto 0; text-align: center; font-size: 14.5px; color: var(--dim); }
 .cmp-foot { text-wrap: balance; }
-.cmp-foot-link { color: var(--accent-2); font-weight: 600; white-space: nowrap; }
-.cmp-foot-link:hover { text-decoration: underline; }
 
 @media (max-width: 600px) {
   .cmp-table { grid-template-columns: minmax(0,1.35fr) minmax(0,1fr) minmax(0,1fr); }
@@ -1117,6 +1147,32 @@ a { color: inherit; text-decoration: none; }
 .cta-mark { color: var(--accent); margin: 0 auto 26px; }
 .cta-h { font-family: var(--display); font-weight: 600; font-size: clamp(32px, 5.5vw, 58px); letter-spacing: -0.03em; line-height: 1.04; margin: 0 0 18px; text-wrap: balance; }
 .cta-sub { font-size: clamp(16px, 1.8vw, 19px); color: var(--dim); margin: 0 0 32px; }
+
+.cta-proof { display: flex; justify-content: center; margin-top: 22px; }
+
+/* ------------------------------------------------------------
+   Mid-page CTA blocks
+
+   The page runs long, and used to hold exactly two CTAs: the hero
+   badges and the pricing cards, ~60% of the page apart. These are
+   the in-between ones — after the AI demo, after the price
+   comparison, and after the founder story — each a centred button
+   over one line of reassurance. One shared shape so they read as
+   the same offer repeated, not three different asks.
+   ------------------------------------------------------------ */
+.mid-act, .cmp-act, .journey-act {
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+  text-align: center;
+}
+.mid-act { margin: 40px auto 0; }
+.cmp-act { margin: 26px auto 0; }
+.journey-act { margin: 38px auto 0; padding-top: 30px; border-top: 1px solid var(--line); }
+.mid-act-note, .cmp-act-note, .journey-act-note {
+  font-size: 13.5px; color: var(--dim-2); max-width: 46ch; line-height: 1.55; text-wrap: pretty;
+}
+@media (max-width: 560px) {
+  .mid-act .btn, .cmp-act .btn, .journey-act .btn { width: 100%; max-width: 360px; }
+}
 
 /* ============================================================
    FOOTER
@@ -1235,6 +1291,9 @@ a { color: inherit; text-decoration: none; }
 .hero-appstore svg { height: 54px; width: auto; display: block; }
 .hero-cta-note { margin: 0; font-size: 13px; color: var(--dim-2); }
 .hero-cta-note b { color: var(--dim); font-weight: 600; }
+/* Rating between the CTA card and the trust bullets — the first thing after
+   the buttons, which is where a stranger decides whether to believe them. */
+.hero-proof { display: flex; margin: 18px 0 0; }
 @media (max-width: 560px) {
   .h1-keep { white-space: normal; }
   /* Phone: the CTA card runs full width and the two badges share the row,
@@ -1315,7 +1374,10 @@ a { color: inherit; text-decoration: none; }
 .pricing { background: linear-gradient(180deg, var(--panel), var(--bg-1)); border: 1px solid var(--line-2); border-radius: var(--r-lg); padding: 28px; }
 .pricing-tag { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--accent-2); }
 .pricing-price { font-family: var(--display); font-weight: 700; letter-spacing: -0.02em; margin: 14px 0 2px; display: flex; align-items: baseline; gap: 4px; }
-.pricing-price .amt { font-size: 54px; line-height: 1; }
+/* Sized for a word ("7 days"), not just a glyph-and-digit ("$0") — the headline
+   here is the trial length, which is several characters wider than a price. */
+.pricing-price { flex-wrap: wrap; }
+.pricing-price .amt { font-size: clamp(34px, 4.4vw, 46px); line-height: 1.05; }
 .pricing-price .per { font-size: 17px; color: var(--dim); font-weight: 500; }
 .pricing-trial { font-size: 15px; color: var(--text); font-weight: 600; margin: 0 0 18px; }
 .pricing-trial b { color: var(--accent-2); }

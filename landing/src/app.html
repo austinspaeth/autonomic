@@ -318,10 +318,14 @@
             // `download_click` carrying platform + placement, so total download
             // intent can be read off one event and split by where it came from
             // (blog end CTA, blog sidebar, nav, hero, modal, …).
+            // `plan` splits free-framed CTAs from Pro-framed ones — without it
+            // every button on the site reads as the same undifferentiated
+            // "download" and paid intent can't be measured at all.
             function trackDownload(platform, el, placement) {
               var place = placement || placementOf(el);
-              ajEvent(platform === 'android' ? 'play_store_click' : 'app_store_click', { placement: place });
-              ajEvent('download_click', { platform: platform, placement: place });
+              var plan = (el && el.getAttribute && el.getAttribute('data-dl-plan')) || 'unspecified';
+              ajEvent(platform === 'android' ? 'play_store_click' : 'app_store_click', { placement: place, plan: plan });
+              ajEvent('download_click', { platform: platform, placement: place, plan: plan });
             }
             window.ajTrackDownload = trackDownload;
 
@@ -391,7 +395,23 @@
 
             var dock = document.getElementById('aj-dock');
             var mq = window.matchMedia('(max-width: 720px)');
-            var shown = false;
+            var shown = false, parked = false, ran = false;
+
+            // One place decides whether the bar is on screen, because two
+            // things now move it: the reveal (scrolled far enough) and parking
+            // (a real CTA section is on screen, see below). Both use the same
+            // class, so the slide-in transition is reused for both.
+            function applyDock() {
+              if (!dock) return;
+              var on = shown && !parked && !cta.hidden;
+              dock.classList.toggle('has-scta', on);
+              // The intro animation waits for the bar to actually be visible —
+              // running it behind a parked bar would spend it on nobody.
+              if (on && !ran) {
+                ran = true;
+                if (variant) variant.run(); else countUp();
+              }
+            }
 
             // The score rolls up to its value as the bar lands, over the same
             // 2s the dial takes to sweep (see .aj-scta-arc in app.css) — it
@@ -442,9 +462,24 @@
             function still() {
               return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
             }
-            function signal(color, darkText) {
+            // Relative luminance (WCAG), for picking the button's text colour.
+            function lum(hex) {
+              var n = parseInt(hex.slice(1), 16);
+              var c = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(function (v) {
+                v /= 255;
+                return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+              });
+              return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+            }
+            // The signal colour drives the button's background, so the label has
+            // to be chosen from it rather than from a list of colour names — a
+            // new variant colour would otherwise silently inherit white. The
+            // green and gold sit around L 0.58 and read at ~1.6:1 against white;
+            // the brand red is at 0.18 and clears 4.5:1, so it keeps white and
+            // stays consistent with every other red button on the site.
+            function signal(color) {
               cta.style.setProperty('--aj-scta-green', color);
-              cta.style.setProperty('--aj-scta-fg', darkText ? '#08080a' : '#fff');
+              cta.style.setProperty('--aj-scta-fg', lum(color) > 0.4 ? '#08080a' : '#fff');
             }
             // Every timer is held so a dismissal mid-run can't animate a bar
             // that is already gone.
@@ -475,6 +510,30 @@
             }
 
             var VARIANTS = {
+              // Home — the app's own Outlook dial sweeping up to a strong day,
+              // which is the thing the whole homepage argues you can get back
+              // to. The button sells the trial rather than the free download:
+              // it's the same tap (every install opens with Pro) and a better
+              // offer, and it's the only persistent Pro-framed CTA on mobile.
+              home: {
+                cta: 'Try Pro free',
+                aria: 'Download Autonomic and try Pro free',
+                color: GREEN,
+                plan: 'pro',
+                badge: gaugeHtml() + '<span class="aj-scta-lbl"><span>Autonomic</span><span>Score</span></span>',
+                run: function () {
+                  setGauge(0, GREEN);
+                  if (still()) { setGauge(92, GREEN); return; }
+                  // Eased over ~1.9s, matching countUp()'s cubic ease-out on the
+                  // default bar so the two read as the same instrument.
+                  var stops = [];
+                  for (var i = 1; i <= 24; i++) {
+                    stops.push(Math.round(92 * (1 - Math.pow(1 - i / 24, 3))));
+                  }
+                  stepThrough(stops, 80, function (v) { setGauge(v, GREEN); });
+                }
+              },
+
               // HRV — a live RR trace redrawing left to right (two beats to a
               // pass), with the SDNN beside it lifting the way a good week's
               // does. Red: this is the brand's own signal, and the trace is the
@@ -527,7 +586,7 @@
                     num.textContent = String(v);
                     num.style.color = c;
                     sym.style.color = c;
-                    signal(c, c === GOLD);
+                    signal(c);
                   };
                   if (still()) { paint(38); return; }
                   // Deliberately uneven: a real stand test lurches, and an
@@ -552,7 +611,7 @@
                   var drop = function () {
                     if (g) g.classList.add('has-emoji');
                     setGauge(72, GOLD);
-                    signal(GOLD, true);
+                    signal(GOLD);
                   };
                   setGauge(92, GREEN);
                   if (still()) { drop(); return; }
@@ -572,7 +631,7 @@
                   var tag = cta.querySelector('.aj-scta-tag');
                   var stage = function (v, color, text) {
                     setGauge(v, color);
-                    signal(color, color === GOLD);
+                    signal(color);
                     if (tag) { tag.textContent = text; tag.style.color = color; }
                   };
                   setGauge(92, GREEN);
@@ -608,7 +667,7 @@
                   var stage = function (drawn, v, color) {
                     if (line) line.style.strokeDashoffset = String(100 - drawn);
                     if (val) { val.textContent = String(v); val.style.color = color; }
-                    signal(color, color === GOLD);
+                    signal(color);
                   };
                   if (still()) { stage(100, 32, GREEN); return; }
                   at(120, function () { stage(34, 15, RED); });
@@ -629,7 +688,15 @@
                 badge.innerHTML = variant.badge;
                 btn.textContent = variant.cta;
                 btn.setAttribute('aria-label', variant.aria);
-                signal(variant.color, variant.color === GOLD);
+                signal(variant.color);
+                // A variant that promises Pro says so in its tracking. The
+                // feature-framed blog variants leave `plan` unset, which reads
+                // as "unspecified" rather than pretending to be one or other.
+                if (variant.plan) {
+                  cta.querySelectorAll('[data-dl-cta]').forEach(function (el) {
+                    el.setAttribute('data-dl-plan', variant.plan);
+                  });
+                }
               } else {
                 variant = null;
               }
@@ -648,15 +715,32 @@
               // much.
               requestAnimationFrame(function () {
                 if (dock) dock.style.setProperty('--aj-scta-h', cta.offsetHeight + 12 + 'px');
-                requestAnimationFrame(function () {
-                  if (dock) dock.classList.add('has-scta');
-                  if (variant) variant.run(); else countUp();
-                });
+                requestAnimationFrame(applyDock);
               });
               ajEvent('sticky_cta_view', { topic: topic || 'none' });
             }
             window.addEventListener('scroll', onScroll, { passive: true });
             onScroll();
+
+            // Park the bar over the page's real CTAs. On a long page (the
+            // homepage runs ~13 phone screens between the hero and the first
+            // price) the bar has to persist, but it must not float on top of
+            // the pricing cards or the store badges it exists to drive people
+            // to. Parking slides it away without dismissing it, so it comes
+            // back when those sections scroll off.
+            if (window.IntersectionObserver) {
+              var anchors = document.querySelectorAll('#pricing, #download');
+              if (anchors.length) {
+                var covering = 0;
+                var parkObs = new IntersectionObserver(function (entries) {
+                  entries.forEach(function (en) { covering += en.isIntersecting ? 1 : -1; });
+                  covering = Math.max(0, covering);
+                  parked = covering > 0;
+                  applyDock();
+                }, { threshold: 0 });
+                anchors.forEach(function (a) { parkObs.observe(a); });
+              }
+            }
 
             // Tapping the CTA retires the bar: once the tap has landed (a
             // store deep-link, or the modal on a device we can't place) it has
@@ -667,7 +751,8 @@
             function dismiss(reason) {
               stopTimers();
               cta.hidden = true;
-              if (dock) { dock.classList.remove('has-scta'); dock.style.removeProperty('--aj-scta-h'); }
+              applyDock();
+              if (dock) dock.style.removeProperty('--aj-scta-h');
               try { sessionStorage.setItem('aj-scta-off', '1'); } catch (e) {}
               ajEvent('sticky_cta_dismiss', { topic: topic || 'none', reason: reason });
             }

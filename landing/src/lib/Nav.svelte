@@ -24,7 +24,7 @@
            app.html either deep-links a phone straight to its store (adding the
            Apple / Android glyph) or opens the dual-download modal below on
            desktop / unknown platforms. -->
-      <a class="btn btn-primary btn-download" id="navDownload" data-dl-cta href="/#download" aria-label="Download Autonomic">
+      <a class="btn btn-primary btn-download" id="navDownload" data-dl-cta data-dl-plan="free" href="/#download" aria-label="Download Autonomic">
         <span class="btn-dl-ic" aria-hidden="true"></span>
         <span class="btn-dl-label">Download free</span>
       </a>
