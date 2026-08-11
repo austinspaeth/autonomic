@@ -36,6 +36,16 @@ adding to it.
 **Trial:** local 7-day full-access window stamped at first launch (`src/lib/tier.ts`),
 independent of the store-side 7-day intro offer.
 
+> ⚠️ **A phone-only subscriber cannot use POTS testing at all.** `StandTestSession.tsx:232`
+> and `OrthostaticSession.tsx:209` are both `disabled={!strap.connected}` — the POTS sessions
+> are Bluetooth-chest-strap-only. HRV capture has a proper `SourcePicker` (strap / watch /
+> camera); the POTS sessions never got one. So a user with no watch and no strap pays for a
+> headline paywall benefit and hits *"Connecting to strap…"* forever. **Giving the stand test
+> the camera source it's missing is the highest-priority fix in this document** — the PPG
+> pipeline (`src/lib/ppg/`), the grading (`src/lib/pots/live.ts`) and the session UI all
+> already exist. A hardware-free orthostatic test graded against the ≥30 bpm criterion is also
+> something nobody else ships.
+
 **The single most important number in this doc:** the free Analysis view shows the
 **last 14 days**. Which means *the day a free user crosses day 15, the app starts hiding
 data they created themselves.* That is the moment. Everything in §3 is built around it.
@@ -52,6 +62,31 @@ in rough order of willingness-to-pay:
 
 Free journaling serves none of these on its own. It just collects the raw material.
 That gap *is* the Pro pitch.
+
+## 1.0 What separates a killer feature from a good one
+
+Four tests. A killer feature passes all four:
+
+1. **Used daily** (or near enough to build a habit)
+2. **Pays off on day 1**, not day 30
+3. **Unavailable anywhere else**
+4. **Changes what you do**, not just what you know
+
+Running the candidates through it is clarifying, and it demotes some obvious favourites:
+
+| | Verdict |
+|---|---|
+| Doctor report (§1.2) | Used ~3× a year. Highest willingness-to-pay here, but it's a **purchase reason**, not a killer feature. Both are worth having — don't confuse them. |
+| Trigger discovery (§1.3) | Fails test 2. Brilliant at day 60, invisible at day 2. |
+| Ewing battery (§1.5) | Fails 1 and 4. A credibility feature for the report, not a wedge. |
+| Passive watch monitoring (§1.1 G) | Fails 3 by construction — most users have no watch. |
+| **Episode capture (§1.1 E)** | **Passes all four.** |
+| **Pacing budget (§1.1 B)** | **Passes all four.** |
+
+The recurring trap: nearly every analysis feature has a **cold-start problem** — it needs 30
+days of logging before it says anything, which is well past the trial window where the buying
+decision happens. Only two things on this list dodge it: episode capture (immediate, from the
+first tap) and "your year before the app" (§1.4 Q).
 
 ---
 
@@ -95,11 +130,53 @@ Turns the worst days into the most valuable data. Nothing on the market does thi
 schedule from their own best-day pattern) and a predicted state. Very concrete life value,
 very hard to get anywhere else.
 
-### E. Passive orthostatic detection (Apple Watch)
+### E. Episode capture — the 60-second camera reading taken *during* symptoms ⭐⭐
 
-Watch HR spikes on standing are detectable passively. "6 orthostatic events detected today,
-avg +34 bpm." Novel, watch-only, and it feeds the doctor report. Uses the HR pipeline you
-already have.
+**The strongest killer-feature candidate on this list, and it needs no hardware.**
+
+Someone feels an episode starting: widget button or lock screen → finger on the rear camera →
+60 seconds → timestamped HR, rise from baseline, posture and symptoms in two taps.
+
+What that delivers is the thing this population is most starved of: **objective evidence of a
+subjective experience.** "HR 128 standing, +42 over baseline, 2:14pm" is instantly validating
+in a way no chart is. It's phone-only. It's frequent — symptomatic people have several a day.
+And it accumulates into *"47 documented episodes over 3 months, mean rise +38 bpm"*, which is
+simultaneously the episode counter, the recovery trend, and the strongest page in the doctor
+report.
+
+Run it against the four tests in §1.7a and it passes all of them, which almost nothing else here does.
+
+*Engineering caveat, honestly:* peripheral vasoconstriction during presyncope is the worst case
+for camera PPG — the finger goes pale exactly when the signal is needed. Design it to capture
+**rate reliably and treat HRV as best-effort**. For documenting an episode, rate is what
+matters, and rate is the easy part.
+
+### F. Time-to-symptom-onset ⭐
+
+Two taps: "upright" → "symptoms started." That's the whole feature.
+
+Trended, it *is* the recovery curve, and it moves visibly weeks before HRV does. *"Three weeks
+ago you lasted 4 minutes. Yesterday: 19."* Costs almost nothing to build, works for every user
+with no hardware at all, and it's the number both doctors and disability assessors actually ask
+for. This is the "am I getting better" answer for someone with only a phone.
+
+### G. Passive orthostatic detection (Apple Watch) — an accelerant, not the feature
+
+Watch HR spikes on standing are detectable passively: "6 orthostatic events detected today,
+avg +34 bpm."
+
+**The metric is right; the mechanism can't be the wedge.** Episode burden per day is genuinely
+one of the best things to track — it's how patients describe their own lives ("I had five
+today"), it's what doctors ask, and its trend over months is a clearer recovery signal than HRV
+will ever be. But passive detection has two problems. False positives — stairs, heat, caffeine,
+a startle — and if the app says 14 when the user felt 3, trust is gone, which in this community
+is the whole product. Fixing that needs a confirmation prompt, which turns passive magic into a
+notification chore. And it's watch-gated.
+
+**The principle worth generalizing: make the metric universal, make the sensor an accelerant.**
+Episode burden should be first-class and one-tap for everyone (§1.1 E), with watch owners
+getting help filling it in. Then the trend chart, the report line and the correlations work for
+100% of users instead of the minority with hardware.
 
 ---
 
@@ -178,9 +255,33 @@ patients and doctors are both bad at answering.
 
 ### M. Cycle-phase overlay
 
-Enormous for POTS — symptoms track the luteal phase for a large share of patients. Cycle ×
-symptom × HRV heat map, plus "your bad days cluster days 24–28." 100% on-device, and almost
-nobody in the dysautonomia space does it properly.
+Cycle position as a layer under every other metric: cycle day on the day summary, a phase band
+behind the Analysis charts, a "symptoms by cycle day" view.
+
+**Why it matters here.** Estrogen and progesterone act directly on the things already broken in
+POTS — vascular tone, plasma volume, heart rate. Plasma volume falls in the late luteal phase;
+progesterone is a vasodilator and raises core temperature. The wearable literature is consistent
+that resting HR rises a few bpm and RMSSD drops in the luteal phase in *healthy* women. In a
+population whose baseline is already marginal, that shift is the difference between a functional
+week and a bedbound one, and perimenstrual flares are among the most commonly reported patterns
+in POTS communities.
+
+**But lead with the stronger argument:** cycle phase is a **confounder in everything else you
+show**. If HRV reliably drops 15% every luteal phase, week-over-week trends carry a monthly
+sawtooth that reads as "I'm getting worse" — and the trigger-discovery engine (§1.3 J) will
+silently attribute that sawtooth to whatever the user happened to eat or do that week. This
+isn't a nice extra layer; **it's noise removal that makes every other Pro analysis more correct.**
+
+**What it takes.** Nothing exists today — the `period` field in the registry is morning/evening,
+unrelated. Needs a small cycle model (period start dates → derived cycle day), a one-tap "period
+started" entry, and optionally a Health read (HealthKit menstrual flow, Health Connect
+`MenstruationPeriod`) so users already logging in Apple Health get it free.
+
+**The catch.** Irregular cycles are extremely common here — illness disrupts them and the
+hEDS/PCOS overlap is significant. So don't predict phase from a calendar: label by **cycle day
+since last period**, which is backward-looking and therefore always accurate. And a large share
+of users are on hormonal contraception, post-menopausal, or male — this must be an opt-in
+overlay that is completely invisible if unused.
 
 ### N. Weather / barometric overlay
 
@@ -215,10 +316,30 @@ the line.)
 
 ### Q. "Your year before the app"
 
-Watch/Health Connect users already get the one-year backfill. Turn that into an instant
-Pro report on day 1: "Here's what your last year looked like." Converts during the trial,
-before they've logged anything themselves. Highest-leverage trial-window feature on this
-list.
+When someone connects Health you already sweep 365 days (`readHistory`, `HISTORY_DAYS`,
+`HistoryBundle`). Right now that lands silently in the journal. Turn it into a generated report
+they see immediately: twelve months of resting HR, sleep, workout load and HRV, with downturn
+periods marked.
+
+**Why it matters strategically.** This is the only feature in this document that delivers full
+Pro value **on day 1 with zero user effort**. Everything else in Part 1 has the cold-start
+problem from §1.0 — 30 days of logging before it says anything, which is well past the trial.
+This one is instantly rich at the exact moment the buying decision happens. That property is
+rare enough to be worth a lot on its own.
+
+The emotional payload is unusually high too. Someone sick for two years with no record of it
+gets handed one; long COVID users can frequently see the precise week they were infected
+sitting in their resting HR. That's a screenshot that ends up in a Facebook group.
+
+**What it takes.** The pipeline exists. The work is the narrative/report layer and its placement
+in the trial flow.
+
+**Two honest catches.** **Android gets substantially less** — Health Connect has no
+beat-to-beat series, so the backfill imports zero historical HRV there; the Android report is
+sleep, RHR and workouts only, and the copy has to be scoped per-platform rather than promising
+the same thing. And it only fires for people who *have* a year of history, so a new iPhone user
+with an empty Health app gets an empty report. Needs a graceful "not enough history yet" path
+or it becomes a bad first impression instead of a great one.
 
 ---
 
@@ -238,17 +359,64 @@ dysregulation. It's daily, it's sticky, it's habit-forming, and you already have
 the HRV pipeline and breath styling in `src/lib/breathStyle.ts`. Of everything on this list,
 this is the one most likely to make someone say "I use this every morning."
 
-### S. The Ewing autonomic battery
+### S. The Ewing battery — build two of three, drop Valsalva
 
-Guided **deep-breathing E/I ratio**, **Valsalva ratio**, and **30:15 ratio** tests alongside
-the existing stand test. These are the actual clinical autonomic function tests. Your RR
-pipeline can already compute them. Nothing consumer does this, and it feeds §1.2 directly.
+The standard bedside autonomic assessment (Ewing & Clarke, 1985), still used in autonomic labs:
 
-### T. Nocturnal autonomic recovery
+- **E/I ratio (deep breathing)** — breathe at 6/min for a minute; mean longest RR on expiration
+  over mean shortest on inspiration. Measures vagal integrity. Roughly >1.21 in young adults.
+- **30:15 ratio (standing)** — longest RR around beat 30 after standing over shortest around
+  beat 15. Captures reflex tachycardia and vagal rebound. Roughly >1.04.
+- **Valsalva ratio** — forced expiration against 40 mmHg for 15s; longest RR after release over
+  shortest during strain.
 
-You already pull sleep stages + overnight HR. Compute **nocturnal HR dip %** (non-dipping is
-a real dysautonomia signal nobody surfaces), deep-sleep-vs-next-day-score correlation, and a
-nightly recovery score.
+**Why it's clinically interesting.** It separates *"my heart rate goes up when I stand"* from
+*"my autonomic reflexes are impaired."* Normal E/I in a POTS patient means intact vagal function
+— the hyperadrenergic or hypovolemic phenotype. Reduced E/I points to a neuropathic phenotype.
+That distinction changes treatment, which is more than almost any consumer metric can claim.
+
+**Correction to an earlier note in this doc:** the HRV pipeline produces the clean RR series
+these need (`correctArtifacts`, `parseHeartRateMeasurement`), but the ratio math is *not*
+implemented. That part is small. The real problems are elsewhere:
+
+- **30:15 is nearly free if the camera stand test gets built** — same session, one extra
+  beat-indexed computation. A second clinical number from a session the user already performed.
+- **E/I is nearly free too** — paced breathing at 6/min is exactly what the `breathHrv` session
+  already does. The raw data may already be collected and the ratio thrown away.
+- **Drop Valsalva.** It needs a calibrated 40 mmHg expiratory pressure; without a manometer the
+  ratio isn't imprecise, it's uninterpretable. And Valsalva can provoke syncope — shipping
+  "blow as hard as you can for 15 seconds" to a population defined by fainting is a real safety
+  and liability question, not a nitpick.
+
+So: two-thirds is a free byproduct of sessions already planned; the remaining third is the part
+that's genuinely problematic. Report credibility, not a wedge — see §1.0.
+
+### T. Nocturnal HR dip — the best value-to-effort item in this document
+
+**What it is.** Healthy autonomic function drops HR and BP 10–20% below daytime values
+overnight as control shifts to parasympathetic dominance. Under ~10% is "non-dipping" — a
+recognized marker of autonomic dysfunction and an independent cardiovascular risk predictor in
+the BP literature.
+
+**Why it matters here.** "I sleep nine hours and wake up exhausted" is among the most universal
+complaints in this population and the most routinely dismissed. Non-dipping HR is a
+*mechanistic explanation*: the nervous system never entered recovery mode. Handing someone a
+number for unrefreshing sleep is precisely the "prove it's real" wedge — and it applies to
+sleep, which is every night, for every user.
+
+It's also **predictive**: a rising overnight HR floor typically precedes illness and crashes by
+a day or two (the basis of Whoop's and Oura's illness detection), so it feeds the crash
+forecast in §1.1 A directly.
+
+**What it takes — the good news.** `sleep.hrLow` / `sleep.hrHigh` are already persisted per
+night, and resting HR already arrives via `readImports`. A first-pass dip percentage is
+computable **today, from data already on disk** — no new permissions, no native work, no new
+capture flow. A refined version uses the overnight HR series `readSleep` already returns.
+
+**The catch.** `hrLow` is a single minimum, so one artifact drags it — prefer the sleeping mean
+or trough hour once using the series. It needs a stable daytime resting-HR baseline as the
+denominator, so users with no resting HR readings get nothing. Health Connect coverage varies
+by device.
 
 ### U. Research-grade export
 
@@ -264,9 +432,31 @@ Keep basic widgets free (they drive retention — gating them would backfire). M
 **Protocol / energy-envelope** widget Pro, since it depends on a Pro computation. Same for
 a watch complication.
 
-### W. Multi-profile / caregiver mode
-Parents tracking a teen with POTS are a real, underserved segment. One subscription,
-multiple profiles, and a per-profile report. Also justifies a higher-priced "Family" tier.
+### W. Multi-profile / caregiver mode — right demand, wrong time
+
+**Why the demand is real.** Adolescent POTS is a large, underserved segment and the *parent* is
+the one who logs, researches, buys and posts in the support groups. Severe ME/CFS patients often
+can't use a phone at all, so the caregiver *is* the user. High willingness to pay, no good tool.
+It would also justify a Family tier at ~$79–99/yr, raising the ARPU ceiling and making $49.99
+look modest.
+
+**Why I'd still say no for now.** The architecture assumes one subject in more places than is
+obvious: `STORAGE_KEY = 'autonomic.journal.v1'` (one MMKV key), `state.profile` (singular), the
+waveform sidecar (one instance keyed by entry id), widgets (one payload), reminders (one stable
+id), plus the crash watcher, review eligibility, Health-import dedup and the permanent declined
+list — all single-subject. Every "one stable id" invariant in `CLAUDE.md` becomes "one per
+profile." That's weeks of work touching nearly every stateful module, and a permanent tax on
+everything built afterward.
+
+There's also a hard constraint that namespacing can't fix: **a parent's phone holds the
+parent's HealthKit data.** A child's profile can't import from it at all, so the highest-value
+half of the app doesn't work for the second profile regardless.
+
+**The 80% version is free.** What a family actually lacks is (a) one subscription covering two
+installs and (b) eventually a combined view. Solve (a) **today** by enabling **Family Sharing**
+for the subscription in App Store Connect and the Play Console — a settings toggle, zero code.
+That captures most of the willingness-to-pay with none of the architecture. Build real
+multi-profile later, if the support emails demand it.
 
 ### X. Data longevity as a promise
 Automatic encrypted backups to *their own* iCloud/Drive, version history, restore-from-any-day.
@@ -429,6 +619,28 @@ Codify these as rules in the eligibility module:
 Rules 1 and 5 alone will make the app feel meaningfully calmer while *increasing* the
 conversion rate of the prompts that do fire.
 
+**The distinction that makes this work — and the one that's easy to get wrong.** There are two
+kinds of upsell surface needing opposite treatment:
+
+- **Reactive** — the user tapped a locked thing. Week/Month/Year segments, the Insights cards,
+  the second HRV capture, the Settings row. These must **never** be rate-limited or suppressed.
+  The user asked. Gating them breaks the app: someone taps "Month" and nothing happens. Every
+  existing `usePaywall()` call site is already correct and stays exactly as it is.
+- **Proactive** — the app raises an offer unprompted. Today there is exactly **one**:
+  `ProUpsellCard` (`DaySummary.tsx:206`). This is the only category the gate governs.
+
+Passive state — a dimmed segment, a faded chart — is neither: honest UI, always visible, never
+counted.
+
+The review prompt is 100% proactive, so it has no equivalent split; this is the one place the
+mirror isn't symmetric, and it's the part to get right. Note also that `'improvement'` (pitching
+Pro on a good day) competes with `detectUpturn` for *the same day* — the two systems want the
+same scarce resource, the user's goodwill when they feel better. **The review ask should win**
+(OS-quota-limited, far rarer). Today they can't see each other, so a free user on a good day can
+get both — fix by adding `noteReviewAsked()` as the reverse of the existing `notePaywallSeen()`.
+
+A full implementation spec lives in **`UPSELL_ELIGIBILITY_PROMPT.md`** at the repo root.
+
 ## 2.9 Value-first notifications
 
 A monthly **"Your month in review"** notification (free, real content) that opens a genuinely
@@ -508,6 +720,9 @@ Minimum viable, without compromising the privacy position:
 
 Ranked by (impact × confidence) ÷ effort:
 
+0. **Give the POTS stand test a camera source** (§0). Not on the original list because it isn't
+   a new feature — it's a headline Pro benefit that phone-only subscribers currently cannot use
+   at all. Fix before adding anything.
 1. **§2.1 — Replace locks with faded real data.** Small change, biggest single lever, and it
    lands exactly at the day-15 moment you asked about. Do this first.
 2. **§2.7 + §2.8 — Personalize the upsell card, add the eligibility engine.** Makes the app
