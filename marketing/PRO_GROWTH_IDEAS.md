@@ -626,8 +626,15 @@ itself doesn't pass through the upsell gate, only its optional upgrade sub-line 
 
 Two rules keep it honest: it reports **improvements only** — decline is `DownturnWarning`'s job
 and telling a chronically ill user their HRV fell is an actual crash trigger — and it stays
-silent during a downturn even when some metric improved. Full spec in
-**`TREND_CARD_PROMPT.md`** at the repo root.
+silent during a downturn even when some metric improved.
+
+Building it also forces a cleanup worth doing on its own: **three places already answer "is this
+metric moving?" and they disagree.** `weekTrend` (`widgets.ts:101`) fires on any non-zero
+percent change against a trailing-week *mean*, while `detectDownturn` / `detectUpturn` require
+4 scored days of 8 plus a real magnitude — so a widget can show ▲ on noise while the app shows a
+downturn warning for the same day. And `downturn.ts` / `upturn.ts` duplicate each other outright
+(both `WINDOW = 8`, `MIN_SCORED = 4`). Full spec, including the consolidated `src/lib/trends/`
+registry, in **`TRENDS_MODULE_PROMPT.md`** at the repo root.
 
 **And when no trigger matches, show nothing.** No generic fallback. The card only renders for
 `tier === 'free'` today, so it never appears during the trial; it first becomes possible on day
