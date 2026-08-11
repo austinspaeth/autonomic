@@ -88,7 +88,7 @@ so they can ship second):
    below 71 bpm, which cost two steps"). This is the report's reason to exist for
    a user who only ever reads the top.
 
-2. **Overnight heart rate.** The hero. The full night's HR curve, with the
+2. **Overnight heart rate.** The full night's HR curve, with the
    overnight low and high marked, and the user's own typical-low line for
    reference. Call out **time to settle** — how long after bed the rate reached
    its low — and distinguish a night that settled early and stayed down from one
