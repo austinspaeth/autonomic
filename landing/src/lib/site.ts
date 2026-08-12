@@ -76,6 +76,36 @@ export const priceLabel = (n: number): string => `$${n.toFixed(2)}`;
 /** Yearly vs 12 × monthly, as a whole-percent saving. */
 export const yearlySavePct = Math.round((1 - pricing.yearly / (pricing.monthly * 12)) * 100);
 
+/**
+ * The App Store rating, shown as social proof beside the CTAs. `reviews` is the
+ * public review COUNT — leave it null until there are enough of them to help
+ * (a "5.0 from 2 ratings" reads worse than no number at all); once set, every
+ * surface that renders the stars picks it up.
+ *
+ * Only ever state what the App Store page actually shows. Google Play has its
+ * own, separate rating, so this is deliberately labelled as Apple's.
+ */
+export const rating: { stars: number; label: string; store: string; reviews: number | null } = {
+  stars: 5,
+  label: '5.0',
+  store: 'App Store',
+  reviews: null
+};
+
+/**
+ * The competitor in the #compare table. Prices are THEIRS, checked by hand —
+ * re-check them before a release, and keep the savings derived rather than
+ * typed so a change to our own pricing can't leave a stale number on the page.
+ */
+export const competitor = {
+  name: 'Welltory',
+  monthly: 19.99,
+  yearly: 119.99
+};
+
+/** Whole dollars saved per year against the competitor's yearly plan. */
+export const yearlySaveVsCompetitor = Math.round(competitor.yearly - pricing.yearly);
+
 /** The waveform pulse mark, shared by nav / footer / CTA. */
 /** The app's real brand mark (mobile `logo.svg`, same path as `BrandMark` in the
  *  app's Icon.tsx). Used where a mock has to show the app itself, e.g. the
