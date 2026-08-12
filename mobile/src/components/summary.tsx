@@ -93,10 +93,18 @@ export function SumCard({ title, children }: { title?: string; children: React.R
   );
 }
 
-export function MetricRow({ label, value, cat, explain, spark, bare }: {
+export function MetricRow({ label, value, cat, explain, spark, bare, valueColor, valueNum }: {
   label: string; value?: string | number | null; cat?: ScoreCat | null | false; explain?: string; spark?: React.ReactNode;
   /** Drop the dark card chrome so the row sits directly on the parent surface. */
   bare?: boolean;
+  /** Tint the value. For rows whose value carries a direction (a signed
+   *  contribution, a gain or a loss) rather than just a reading. */
+  valueColor?: string;
+  /** Render the value in the app's numeral face, as the Progress stat tiles do.
+   *  Opt-in rather than the default: most callers' values are short readings where
+   *  the body face already lines up, and switching them all would be a change to
+   *  every sheet that uses this row. */
+  valueNum?: boolean;
 }) {
   const p = usePalette();
   return (
@@ -106,7 +114,18 @@ export function MetricRow({ label, value, cat, explain, spark, bare }: {
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
         {cat === false ? null : <ScoreDot cat={cat || null} />}
         <Text style={{ flex: 1, fontSize: 16, fontWeight: '700', color: p.text }}>{label}</Text>
-        <Text numberOfLines={1} ellipsizeMode="tail" style={{ fontSize: 16, fontWeight: '700', color: p.text, fontVariant: ['tabular-nums'], maxWidth: '70%' }}>{value == null || value === '' ? '-' : String(value)}</Text>
+        <Text
+          numberOfLines={1}
+          ellipsizeMode="tail"
+          style={{
+            fontSize: 16,
+            fontWeight: '700',
+            color: valueColor || p.text,
+            fontFamily: valueNum ? fonts.numHeavy : undefined,
+            fontVariant: ['tabular-nums'],
+            maxWidth: '70%',
+          }}
+        >{value == null || value === '' ? '-' : String(value)}</Text>
       </View>
       {explain ? <Text style={{ fontSize: 13, color: p.textDim, marginTop: 6, lineHeight: 17 }}>{explain}</Text> : null}
       {spark}

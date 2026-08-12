@@ -51,11 +51,10 @@ export const RELEASES: Release[] = [
     version: '1.24',
     date: '2026-08-11',
     notes: [
-      'Insights is now a real analysis of your own log rather than a set of AI prompts. It looks for what changed and what is linked to what across everything you track, from supplements and triggers to sleep, bowel movements and the notes you write, then leads with the biggest change of the month. Each finding carries a confidence rating, and anything it is not sure about is left out. It all runs on your device, and the AI reports are still there in the Ask AI button.',
-      'Your Journal now points out real improvements as they happen, like a lower resting heart rate or a month of steadier sleep, and takes you straight to the chart behind it. It only speaks up when the change is big enough to mean something, and it never reports bad news.',
-      'Tapping last night on your Journal now opens a full sleep report. It explains exactly why the night graded the way it did, shows how far your heart rate settled below your own daytime resting rate, and puts your stages, bedtime and hours against your recent nights.',
-      'Every metric now explains itself properly. Tap the "?" beside any card for what it is in plain terms, then what it means for you, your symptoms and your scores.',
-      'Those explanations end with a link to a full article on the subject, so you can read the whole story whenever a number leaves you wanting more.',
+      'NEW FEATURE: Insights. A real analysis of your own log rather than a set of AI prompts. It finds what changed and what is linked to what across everything you track, rates its confidence in each finding, and leaves out anything it is unsure of. It all runs on your device, and the AI reports are still there under Ask AI.',
+      'NEW FEATURE: Sleep reports. Tapping the sleep card opens the whole night: why it graded the way it did, your heart rate and breathing through the night, when each stage happened, and how your schedule and hours compare with your recent nights.',
+      'Your Journal now points out real improvements as they happen, like a lower resting heart rate or steadier sleep, and takes you straight to the chart behind it.',
+      'Every metric explains itself. Tap the "?" on any card for what it is in plain terms and what it means for you.',
     ],
   },
   {

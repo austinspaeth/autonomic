@@ -45,12 +45,26 @@ export interface BiggestChange {
   headline: string;
   /** "In the 24 days since, SDNN averaged 12 ms higher than the 24 days before." */
   body: string;
+  /**
+   * The three stat tiles, split into numeral and unit.
+   *
+   * Progress's tile draws the number in Manrope at 25pt with the unit trailing in
+   * 12pt, so the two have to arrive separately — a pre-joined "41 ms" would render
+   * the unit at numeral size and break the row's rhythm.
+   */
+  beforeValue: string;
+  afterValue: string;
+  /** Shared by before and after, e.g. "ms". */
+  unit: string;
+  /** Relative change where that is meaningful ("+29"), else the absolute delta. */
+  changeValue: string;
+  changeUnit: string;
   beforeLabel: string;
   afterLabel: string;
-  /** Formatted for display, e.g. "41 ms". */
+  /** Formatted for display, e.g. "41 ms". Still used by the AI prompt. */
   beforeText: string;
   afterText: string;
-  /** Raw, for sizing the two bars against each other. */
+  /** Raw, for anything that needs to compare them. */
   before: number;
   after: number;
   good: boolean;
@@ -245,11 +259,26 @@ export function findBiggestChange(matrix: DayMatrix): BiggestChange | null {
     ? `In the ${c.spanDays} days since, ${said} ran ${magnitude} ${def.unit} ${up ? 'higher' : 'lower'} than the ${c.spanDays} days before. This is an association in your own log, not proof of a cause.`
     : `Across the last ${c.spanDays} days, ${said} ran ${magnitude} ${def.unit} ${up ? 'higher' : 'lower'} than the ${c.spanDays} days before.`;
 
+  // A percentage only where a ratio actually means something, which the registry
+  // already knows: `deltaKind === 'relative'` is exactly the metrics whose own
+  // threshold is a fraction of the baseline (the HRV family). Everywhere else it
+  // would mislead — the daily score is a 0-100 index, so 28 to 61 is "+33 pts", not
+  // the "+118%" an unguarded ratio produces; counts and banded metrics are worse
+  // still, since "+8%" on a systolic reading implies more is better.
+  const relative = def.deltaKind === 'relative' && Math.abs(c.before) > 0.0001;
+  const rel = Math.round(((c.after - c.before) / Math.abs(c.before)) * 100);
+  const absDelta = c.after - c.before;
+
   return {
     id: c.id,
     kind: c.kind,
     headline,
     body,
+    beforeValue: def.fmt(c.before),
+    afterValue: def.fmt(c.after),
+    unit: def.unit,
+    changeValue: relative ? `${rel > 0 ? '+' : ''}${rel}` : `${absDelta > 0 ? '+' : ''}${def.fmt(absDelta)}`,
+    changeUnit: relative ? '%' : def.unit,
     beforeLabel: 'Before',
     afterLabel: 'After',
     beforeText: `${def.fmt(c.before)} ${def.unit}`,
@@ -274,12 +303,17 @@ export const WELCOME_CHANGE: BiggestChange = {
   kind: 'welcome',
   headline: 'You downloaded this app',
   body: 'Easily the biggest change this month. Log a few days and this card starts reporting the real ones: what you changed, what moved, and how sure we are about it.',
+  beforeValue: '0',
+  afterValue: '1',
+  unit: 'app',
+  changeValue: '+100',
+  changeUnit: '%',
   beforeLabel: 'Before',
   afterLabel: 'After',
   beforeText: 'Guessing',
   afterText: 'Measuring',
-  before: 1,
-  after: 3,
+  before: 0,
+  after: 1,
   good: true,
   pips: 5,
   confidence: 'Very strong',

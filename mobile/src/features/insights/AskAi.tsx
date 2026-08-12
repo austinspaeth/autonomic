@@ -20,7 +20,10 @@ import { useAccordion } from '../../components/ui';
 import { Icon } from '../../components/Icon';
 import { useSheets, type SheetControls } from '../../components/Sheet';
 import { ACCENT, radius, usePalette } from '../../theme';
-import { pillSlotTaken, subscribePillSlot } from '../../store/pillSlot';
+import {
+  RECEDE_FADE_STEP, RECEDE_LIFT_STEP, RECEDE_MAX_DEPTH, RECEDE_SCALE_STEP, RECEDE_SPRING,
+  pillDepth, setPillSlotClaim, subscribePillSlot,
+} from '../../store/pillSlot';
 import { getState } from '../../store/store';
 import { todayKey } from '../../lib/dates';
 import { resolveProtocol } from '../../lib/scoring/day';
@@ -35,9 +38,6 @@ import { PromptSheet } from '../PromptSheet';
 
 const PILL_H = 54;
 const BORDER = 1;
-const RECEDE_SCALE = 0.9;
-const RECEDE_LIFT = 13;
-const RECEDE_SPRING = { damping: 21, stiffness: 210, mass: 0.9 } as const;
 
 export const ASK_AI_LABEL = 'Get AI Insights & Reports';
 /** The sheet's own title. Shorter than the button's, which has to say "Get". */
@@ -47,40 +47,55 @@ export function AskAiPill() {
   const insets = useSafeAreaInsets();
   const { openSheet } = useSheets();
 
-  // Yields to the priority pills (health import, watch sync) exactly the way the
-  // What's new pill does, rather than competing for the slot.
-  const taken = useSyncExternalStore(subscribePillSlot, pillSlotTaken, pillSlotTaken);
-  const recede = useSharedValue(pillSlotTaken() ? 1 : 0);
-  useEffect(() => { recede.value = withSpring(taken ? 1 : 0, RECEDE_SPRING); }, [taken, recede]);
+  /**
+   * The bottom layer of the pill stack.
+   *
+   * This is permanent furniture on its own tab, where the health-import, watch-sync
+   * and what's-new pills are all transient and time-sensitive, so it ranks last in
+   * `PILL_RANK` and recedes one step per pill above it — the same stacked-card
+   * treatment, from the same shared constants, so the three never disagree about how
+   * far back a layer sits.
+   */
+  const depth = useSyncExternalStore(subscribePillSlot, () => pillDepth('ai'), () => pillDepth('ai'));
+  const recede = useSharedValue(pillDepth('ai'));
+  useEffect(() => { recede.value = withSpring(depth, RECEDE_SPRING); }, [depth, recede]);
+  // Claims its own rank while mounted; released on unmount only, so a transition
+  // can't drop and retake it and bounce the pills above.
+  useEffect(() => { setPillSlotClaim('ai', true); return () => setPillSlotClaim('ai', false); }, []);
   const style = useAnimatedStyle(() => {
-    const scale = 1 - (1 - RECEDE_SCALE) * recede.value;
+    const d = Math.min(RECEDE_MAX_DEPTH, recede.value);
     return {
-      opacity: 1 - 0.2 * recede.value,
-      transform: [{ translateY: -RECEDE_LIFT * recede.value }, { scale }],
+      opacity: 1 - RECEDE_FADE_STEP * d,
+      transform: [{ translateY: -RECEDE_LIFT_STEP * d }, { scale: 1 - RECEDE_SCALE_STEP * d }],
     };
   });
+  // While receded this is decoration behind whichever pill owns the slot; tapping
+  // the sliver is a mis-tap, not an intent.
+  const buried = depth > 0;
 
   return (
     <Animated.View pointerEvents="box-none" style={[styles.wrap, { bottom: insets.bottom + 88 }, style]}>
-      <View style={styles.pill}>
-        <Pressable
-          // While receded the pill is decoration behind the one that owns the
-          // slot; tapping the sliver would be a mis-tap, not an intent.
-          onPress={taken ? undefined : () => openSheet((c) => <AiReportsSheet controls={c} />, { fitContent: true })}
-          accessibilityRole="button"
-          accessibilityLabel={ASK_AI_LABEL}
-        >
-          <Blurred>
-            <View style={styles.row}>
-              {/* Accent glyph on a neutral pill: the red marks this as the one AI
-                  affordance on the screen, while the grey hairline keeps the pill
-                  itself from reading as an alert. */}
-              <Icon name="ai" size={20} color={ACCENT} strokeWidth={2} />
-              <Text numberOfLines={1} style={styles.label}>{ASK_AI_LABEL}</Text>
-              <Icon name="chevronRight" size={18} color="#9a9aa0" strokeWidth={2.2} />
-            </View>
-          </Blurred>
-        </Pressable>
+      {/* Shadow OUTSIDE, clipping inside. A shadow and `overflow: hidden` on the same
+          view cancel out on iOS — the clip takes the shadow with it — which is why the
+          pill looked flat against the content behind it despite having a shadow
+          declared. Two layers: the outer one casts, the inner one clips the blur to
+          the pill's radius. */}
+      <View style={styles.shadow}>
+        <View style={styles.pill}>
+          <Pressable
+            onPress={buried ? undefined : () => openSheet((c) => <AiReportsSheet controls={c} />, { fitContent: true })}
+            accessibilityRole="button"
+            accessibilityLabel={ASK_AI_LABEL}
+          >
+            <Blurred>
+              <View style={styles.row}>
+                <Icon name="ai" size={20} color={ACCENT} strokeWidth={2} />
+                <Text numberOfLines={1} style={styles.label}>{ASK_AI_LABEL}</Text>
+                <Icon name="chevronRight" size={18} color="#9a9aa0" strokeWidth={2.2} />
+              </View>
+            </Blurred>
+          </Pressable>
+        </View>
       </View>
     </Animated.View>
   );
@@ -105,11 +120,15 @@ const styles = StyleSheet.create({
   // Mount order alone would do it on iOS, but Android resolves overlap by
   // elevation first and every pill shares elevation 8, so say it explicitly.
   wrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center', zIndex: 1 },
+  /** Casts only. No `overflow`, or iOS clips the shadow away with the content. */
+  shadow: {
+    borderRadius: 999,
+    shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 8,
+  },
   pill: {
     // Neutral grey hairline, matched to the health-import and what's-new pills.
     // An accent-red outline made a persistent affordance look like an alert.
     height: PILL_H, borderRadius: 999, overflow: 'hidden', borderWidth: BORDER, borderColor: '#34343b',
-    shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 20, shadowOffset: { width: 0, height: 10 }, elevation: 8,
   },
   stack: { backgroundColor: 'rgba(6,6,9,0.82)' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, height: PILL_H - BORDER * 2, paddingLeft: 20, paddingRight: 16, justifyContent: 'center' },
@@ -213,7 +232,7 @@ export function AiReportsSheet(_props: { controls?: SheetControls }) {
   return (
     <View>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9, marginBottom: 6 }}>
-        <Icon name="ai" size={18} color={p.accent} strokeWidth={2} />
+        <Icon name="ai" size={18} color={ACCENT} strokeWidth={2} />
         <Text style={{ color: p.text, fontSize: 19, fontWeight: '800', letterSpacing: -0.3 }}>{AI_SHEET_TITLE}</Text>
       </View>
       {/* Held short of the sheet's own close button, which sits in the top-right
@@ -308,7 +327,7 @@ function ReportRow({ icon, title, sub, onPress, chevStyle, bare }: {
       ]}
     >
       <View style={{ width: 32, height: 32, borderRadius: 11, backgroundColor: p.accentSoft, alignItems: 'center', justifyContent: 'center' }}>
-        <Icon name={icon} size={15} color={p.accent} strokeWidth={2.1} />
+        <Icon name={icon} size={15} color={ACCENT} strokeWidth={2.1} />
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text style={{ color: p.text, fontSize: 14.5, fontWeight: '700' }}>{title}</Text>

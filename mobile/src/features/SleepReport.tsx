@@ -30,10 +30,10 @@ import { resolveProtocol, scoreCat } from '../lib/scoring/day';
 import { addDays, fmtDateLong, fmtShort, fmtTime12 } from '../lib/dates';
 import { acBandsToZones, onDay } from '../lib/analysis/buckets';
 import {
-  DIP_BANDS, OVERNIGHT_HR_BANDS, STAGE_COLORS, STAGE_LABEL, STAGE_ORDER,
+  DIP_BANDS, DIP_TREND_NIGHTS, OVERNIGHT_HR_BANDS, STAGE_COLORS, STAGE_LABEL, STAGE_ORDER,
   WAKE_MINUTES_BANDS, buildSleepReport, clockFromNoon, dipBandFor, fmtMin,
-  WAKEUP_MIN_SEC, nightMinutes, respMedian, timeToFloor, wakeCat,
-  type DipResult, type GradeReason, type SleepReport, type StageKey,
+  WAKEUP_MIN_SEC, nightMinutes, overnightMean, respMedian, timeToFloor, wakeCat,
+  type DipResult, type GradeReason, type HrPoint, type SleepReport, type StageKey,
 } from '../lib/sleep';
 import { getSleepSeries, getState, useAppState } from '../store/store';
 import { useEntryForms } from './forms';
@@ -75,8 +75,8 @@ const SLEEP_HELP: Record<string, HelpContent> = {
     learnMore: '/insights/recovery/sleep-and-autonomic-recovery/',
   },
   resp: {
-    what: 'Your breathing rate through the night, in breaths per minute, taken from the same window as the heart-rate curve. Most adults sit somewhere between 12 and 20 at rest, and your own usual number matters far more than the range.',
-    why: 'Overnight breathing rate is steady from night to night, which is exactly what makes a change in it worth noticing: it often moves before you feel anything. Read it across a run of nights rather than one, and take a single unusual night as noise.',
+    what: 'Your breathing rate through the night in breaths per minute, with heart rate drawn over it on its own scale. Most adults sit somewhere between 12 and 20 breaths at rest, and your own usual number matters far more than the range.',
+    why: 'Overnight breathing rate is steady night to night, which is exactly what makes a change worth noticing: it often moves before you feel anything. Seeing it against heart rate matters too, since a night where both climb together reads differently from one where only the heart rate does. Read a run of nights rather than one.',
     learnMore: '/insights/recovery/sleep-and-autonomic-recovery/',
   },
   balance: {
@@ -97,8 +97,16 @@ export function SleepReportSheet({ dk }: { dk: string }) {
     // The night's series lives in the waveform sidecar, never the journal, so
     // it is read here and handed to the (store-free) builder.
     const w = getSleepSeries(dk);
+    // The dip trend's other nights need their curves too, or the bars would be
+    // measured off stored single minimums while the headline used the settled
+    // stretch — and the number would jump when you touched the last bar.
+    const hrByDay: Record<string, HrPoint[] | undefined> = {};
+    for (let i = 0; i < DIP_TREND_NIGHTS; i++) {
+      const key = addDays(dk, -i);
+      hrByDay[key] = key === dk ? w?.sampledHr : getSleepSeries(key)?.sampledHr;
+    }
     return buildSleepReport(state.days, dk, addDays, ctx, state.settings.protocol, {
-      hr: w?.sampledHr, resp: w?.sampledResp, spans: w?.stageSpans,
+      hr: w?.sampledHr, resp: w?.sampledResp, spans: w?.stageSpans, hrByDay,
     });
   }, [state.days, dk, state.settings.protocol, state.profile.sex, state.profile.height]);
 
@@ -692,7 +700,6 @@ function Balance({ report }: { report: SleepReport }) {
         <SleepBalanceChart
           hours={bal.nights.map((n) => nightMinutes(n) / 60)}
           target={bal.targetHours}
-          cumulative={bal.cumulative}
         />
       </View>
       <Text style={{ fontSize: 12.5, lineHeight: 18, color: p.textDim, marginTop: 10 }}>
@@ -706,36 +713,57 @@ function Balance({ report }: { report: SleepReport }) {
 
 /* ---------- respiratory rate ---------- */
 
+/** The two overnight lines. Blue reads as breath, red as heart, and they are
+ *  the only thing saying which axis is which — so they must not drift. */
+const RESP_LINE = '#60a5fa';
+const HR_LINE = '#ef4444';
+
 /**
- * Breathing rate across the night, against the user's own recent nights.
+ * Breathing rate across the night, with heart rate over it on its own axis.
  *
- * Deliberately quiet, and near the bottom: overnight respiratory rate is a
- * genuinely useful early signal (it moves with illness before much else does)
- * and also one of the easiest numbers in the app to alarm someone with. So it
- * reports the night and its own baseline, and says nothing about what a change
- * might mean.
+ * The pair is the point. Breaths and beats rarely move for the same reason,
+ * so a night where they rise together reads differently from one where only
+ * the heart rate climbs — and neither is legible from two separate cards you
+ * have to hold in your head. They cannot share a y-axis (15 br/min against 60
+ * bpm would flatten the breathing line into a straight one), so each keeps its
+ * own scale and its axis labels take its colour.
+ *
+ * The readout defaults to the night's averages rather than a date, because the
+ * whole card is one night. Touch it and both values become that moment's, with
+ * the time where the date would sit on the other cards.
  */
 function Respiratory({ report }: { report: SleepReport }) {
-  const p = usePalette();
+  const [sel, setSel] = useState<{ t: number; v: number; rv: number | null } | null>(null);
   const resp = report.resp;
   if (!resp) return null;
   const median = respMedian(resp);
   if (median == null) return null;
+  const hrMean = report.hr ? overnightMean(report.hr) : null;
+
+  const brShown = sel ? sel.v : median;
+  const hrShown = sel ? sel.rv : hrMean;
   return (
     <Section>
       <SectionHead
-        title="Respiratory rate"
+        title="Breathing and heart rate"
         help={SLEEP_HELP.resp}
-        value={median.toFixed(1)}
-        unit="br/min"
-        when={onDay(fmtShort(report.dk))}
-        desc="Your breathing rate across the night, from the same window as the curve above."
+        pair={[
+          { label: 'Br/min', color: RESP_LINE, text: brShown != null ? brShown.toFixed(1) : null },
+          ...(hrMean != null || sel ? [{ label: 'HR', color: HR_LINE, text: hrShown != null ? String(Math.round(hrShown)) : '–' }] : []),
+        ]}
+        when={sel ? `at ${fmtTime12(clockFromNoon(report.night.bedAt + sel.t / 60))}` : null}
+        tailBelow
+        desc={sel
+          ? 'Both lines at the moment you are touching.'
+          : 'Averages across the night. Touch the chart to read any moment.'}
       />
       <View style={{ marginTop: 12 }}>
         <NightSeriesChart
           points={resp.map((q) => ({ t: q.t, v: q.br }))}
           bedAt={report.night.bedAt}
-          color={p.accent}
+          color={RESP_LINE}
+          right={report.hr ? { points: report.hr.map((q) => ({ t: q.t, v: q.bpm })), color: HR_LINE } : null}
+          onSelect={setSel}
         />
       </View>
     </Section>

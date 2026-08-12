@@ -66,6 +66,22 @@ export const fmtDateLong = (k: string) => {
 export const fmtShort = (dk: string) =>
   dateFromKey(dk).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 
+/** "1st", "2nd", "11th", "23rd". The teens are the exception every naive version
+ *  gets wrong (11th, not 11st). */
+const ordinal = (n: number) => {
+  const teens = n % 100;
+  if (teens >= 11 && teens <= 13) return 'th';
+  return ['th', 'st', 'nd', 'rd'][n % 10] || 'th';
+};
+
+/** "2026-07-01" -> "July 1st". For dates inside SENTENCES: a bare ISO key reads as
+ *  a database field, and the year is noise when the copy is about the recent past. */
+export const fmtMonthDay = (k: string) => {
+  const d = dateFromKey(k);
+  if (isNaN(d.getTime())) return k;
+  return `${d.toLocaleDateString(undefined, { month: 'long' })} ${d.getDate()}${ordinal(d.getDate())}`;
+};
+
 /** "1990-01-31" -> "January 31, 1990" for display (stored value stays ISO). */
 export const fmtDateFull = (k: string) => {
   const d = dateFromKey(k);

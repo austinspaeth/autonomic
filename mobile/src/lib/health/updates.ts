@@ -22,7 +22,6 @@ import {
   allItemKeys, buildUpdateSet, filterDeclined, filterSeen, updateCount, updateSignature,
   type HealthUpdateSet, type UpdateMed, type UpdateReading,
 } from './updateSet';
-import { getDeclinedKeys } from './declined';
 import { withAuthTimeout } from './askedAuth';
 
 export { allItemKeys, filterDeclined, filterSeen, updateCount, updateSignature };

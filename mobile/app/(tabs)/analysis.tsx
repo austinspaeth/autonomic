@@ -20,6 +20,7 @@ import { catFromBands, type BucketView, type Mode } from '../../src/lib/analysis
 import { HrvFilterLinks, HrvProgress, HrvProgressSkeleton, type Filt } from '../../src/features/HrvProgress';
 import { SectionSkeleton } from '../../src/features/ProgressSkeleton';
 import { demoDays, hasOwnData } from '../../src/lib/demo';
+import { logError } from '../../src/lib/diagnostics/errorLog';
 import { DemoBanner, DEMO_PROGRESS_TEXT } from '../../src/features/DemoBanner';
 
 /** Sidecar lookup handed to the category builders (POTS Episodes grades each
@@ -419,7 +420,17 @@ export default function AnalysisScreen() {
     if (renderArgsRef.current != null) return;
     const task = InteractionManager.runAfterInteractions(() => {
       if (renderArgsRef.current != null) return;   // beaten by a fast tab-in
-      const built = buildWith(buildArgsRef.current, chartModeRef.current);
+      // Wrapped because this queue is SHARED. A task that throws stops it, and the
+      // symptom lands on whichever screen defers next rather than on the one that
+      // failed — this screen sitting on its skeletons at every range was in fact
+      // Insights throwing. Failing here costs an undressed veil, nothing more.
+      let built: Section[];
+      try {
+        built = buildWith(buildArgsRef.current, chartModeRef.current);
+      } catch (e) {
+        logError('progress.prewarm', e);
+        return;
+      }
       // A cold veil raised by an incoming range request already carries its
       // anchor id but no index, since nothing was built when it went up. Now
       // that there is a document, resolve it — so the skeleton is dressed from

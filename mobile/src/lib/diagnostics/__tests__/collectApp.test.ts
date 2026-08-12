@@ -71,6 +71,10 @@ jest.mock('../../../store/store', () => ({
   }),
 }));
 
+/* eslint-disable import/first -- these must be read AFTER the jest.mock calls above.
+   Both modules capture native and store handles at import time, so hoisting them to
+   the top of the file would bind the real ones and this test would collect a real
+   device's diagnostics instead of the planted fixture it asserts against. */
 import { collectAppDiagnostics } from '../collectApp';
 import { formatAppDiagnostics } from '../appReport';
 

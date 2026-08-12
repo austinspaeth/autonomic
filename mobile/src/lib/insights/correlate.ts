@@ -99,8 +99,18 @@ export interface Correlation {
   lag: number;
   /** Spearman's rho or the rank-biserial correlation, both in [-1, 1]. */
   r: number;
-  /** "+0.68" */
+  /** "+0.68" — the coefficient itself. Kept for the AI prompt and for tests; NOT
+   *  shown in the UI, because a rank correlation is not a quantity anybody can act
+   *  on and readers reasonably assume a signed decimal is a percentage. */
   rText: string;
+  /**
+   * The difference the reader can actually picture: the gap between the two medians,
+   * signed and in the metric's own unit ("+12 ms").
+   *
+   * This is what the row shows. The strength of the evidence is the bar and the
+   * confidence word; the SIZE of the association belongs in units, not in rho.
+   */
+  deltaText: string;
   /** Does the association point the healthy way for this metric? */
   good: boolean;
   q: number;
@@ -227,6 +237,13 @@ function test(matrix: DayMatrix, factor: FactorDef, def: TrendMetricDef, lag: nu
   };
 }
 
+/** "+12 ms" / "−0.4" — a signed median gap in the metric's own unit. The minus is a
+ *  true minus sign, matching every other signed readout in the app. */
+function deltaText(def: TrendMetricDef, delta: number): string {
+  const sign = delta > 0 ? '+' : delta < 0 ? '\u2212' : '';
+  return `${sign}${def.fmt(Math.abs(delta))}${def.unit ? ` ${def.unit}` : ''}`;
+}
+
 function describe(c: Candidate, q: number): Correlation {
   const { factor, def, lag } = c;
   const metric = shortMetric(def);
@@ -258,6 +275,7 @@ function describe(c: Candidate, q: number): Correlation {
     lag,
     r: c.r,
     rText: signed(c.r),
+    deltaText: deltaText(def, c.high - c.low),
     good,
     q,
     pips,

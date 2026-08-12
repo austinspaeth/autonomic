@@ -30,9 +30,13 @@ import Constants from 'expo-constants';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SheetControls, useSheets } from '../components/Sheet';
 import { Icon } from '../components/Icon';
+import { useAccordion } from '../components/ui';
 import { radius, usePalette } from '../theme';
 import { useStore } from '../store/store';
-import { pillSlotTaken, subscribePillSlot } from '../store/pillSlot';
+import {
+  RECEDE_FADE_STEP, RECEDE_LIFT_STEP, RECEDE_MAX_DEPTH, RECEDE_SCALE_STEP, RECEDE_SPRING,
+  pillDepth, setPillSlotClaim, subscribePillSlot,
+} from '../store/pillSlot';
 import { RELEASES, fmtReleaseDate, minorOf, releaseFor, shouldOfferWhatsNew } from '../lib/whatsNew';
 import { getWhatsNewSeen, markWhatsNewSeen } from '../lib/whatsNewSeen';
 
@@ -48,9 +52,6 @@ const APPEAR_DELAY_MS = 1600;
 /** The receded state, mirroring the sheet stack's card treatment at pill scale:
  *  shrink, then lift by enough to clear the front pill's top edge and show a
  *  sliver of this one behind it. */
-const RECEDE_SCALE = 0.9;
-const RECEDE_LIFT = 13;
-const RECEDE_SPRING = { damping: 21, stiffness: 210, mass: 0.9 } as const;
 
 export const appVersion = (): string => Constants.expoConfig?.version ?? '1.0.0';
 
@@ -67,13 +68,17 @@ export function WhatsNewPill() {
   // The wizard stamps meta.onboarded; journals from before that field existed
   // are recognised by having been written at all (same test Onboarding uses).
   const onboarded = useStore((s) => !!(s.state.meta.onboarded || s.state.meta.lastUpdated));
-  const taken = useSyncExternalStore(subscribePillSlot, pillSlotTaken, pillSlotTaken);
+  // Claims its own rank so the pills below it (the Insights button) know to recede,
+  // and reads its OWN depth rather than "is anything up" — with three layers, "taken"
+  // was true of itself the moment it started claiming.
+  const depth = useSyncExternalStore(subscribePillSlot, () => pillDepth('whatsNew'), () => pillDepth('whatsNew'));
+  const taken = depth > 0;
   const version = appVersion();
   const minor = minorOf(version);
   const [offer, setOffer] = useState(() => shouldOfferWhatsNew(version, getWhatsNewSeen(), onboarded));
   const [mounted, setMounted] = useState(false);
   const opacity = useSharedValue(0);
-  const recede = useSharedValue(pillSlotTaken() ? 1 : 0);
+  const recede = useSharedValue(pillDepth('whatsNew'));
 
   // A first-run install is stamped silently, so the very first launch after the
   // wizard doesn't open with a "what's new" the user has no baseline for.
@@ -93,8 +98,13 @@ export function WhatsNewPill() {
   }, [mounted, opacity]);
 
   useEffect(() => {
-    recede.value = withSpring(taken ? 1 : 0, RECEDE_SPRING);
-  }, [taken, recede]);
+    recede.value = withSpring(depth, RECEDE_SPRING);
+  }, [depth, recede]);
+
+  // Claim while visible; release on unmount only. A cleanup keyed on `mounted`
+  // would drop and retake the claim on every transition, bouncing the pill behind.
+  useEffect(() => { setPillSlotClaim('whatsNew', offer && mounted); }, [offer, mounted]);
+  useEffect(() => () => setPillSlotClaim('whatsNew', false), []);
 
   const dismiss = () => {
     markWhatsNewSeen(minor);
@@ -102,11 +112,12 @@ export function WhatsNewPill() {
     setTimeout(() => { setOffer(false); setMounted(false); }, 240);
   };
 
+  // One shared treatment for every pill in the stack: see recedeStyle.
   const style = useAnimatedStyle(() => {
-    const scale = 1 - (1 - RECEDE_SCALE) * recede.value;
+    const d = Math.min(RECEDE_MAX_DEPTH, recede.value);
     return {
-      opacity: opacity.value * (1 - 0.2 * recede.value),
-      transform: [{ translateY: -RECEDE_LIFT * recede.value }, { scale }],
+      opacity: opacity.value * (1 - RECEDE_FADE_STEP * d),
+      transform: [{ translateY: -RECEDE_LIFT_STEP * d }, { scale: 1 - RECEDE_SCALE_STEP * d }],
     };
   });
 
@@ -229,46 +240,105 @@ const styles = StyleSheet.create({
 
 /* ---------- the release-notes card ---------- */
 
+/** The bullets for one release, in the sheet's card treatment. `sunk`, not
+ *  `surface`: the sheet itself is already surface, so a surface card would read
+ *  as flat text with mysterious indents. */
+function ReleaseNotes({ notes }: { notes: readonly string[] }) {
+  const p = usePalette();
+  return (
+    <View style={{ backgroundColor: p.sunk, borderRadius: radius.card, borderWidth: 1, borderColor: p.border, padding: 14, gap: 10 }}>
+      {notes.map((n, i) => (
+        <View key={i} style={{ flexDirection: 'row', gap: 9 }}>
+          <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: p.textDim, marginTop: 7 }} />
+          <Text style={{ flex: 1, fontSize: 14, lineHeight: 21, color: p.text }}>{n}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+/** Version + date, shared by the open headline release and the collapsed ones. */
+function ReleaseHeading({ version, date, badge }: { version: string; date: string; badge?: boolean }) {
+  const p = usePalette();
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+      <Text style={{ fontSize: 17, fontWeight: '700', color: p.text }}>{version}</Text>
+      <Text style={{ fontSize: 13, color: p.textDim }}>{fmtReleaseDate(date)}</Text>
+      {badge ? (
+        <View style={{ backgroundColor: p.accentSoft, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 }}>
+          <Text style={{ fontSize: 11, fontWeight: '700', color: p.accent }}>This version</Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+/** An older release: heading only until tapped. Uses the app's shared accordion
+ *  motion, so it opens the way every other collapsible card does. */
+function PastRelease({ release }: { release: (typeof RELEASES)[number] }) {
+  const p = usePalette();
+  const [open, setOpen] = useState(false);
+  const { chevStyle, bodyStyle, onContentLayout, measureStyle } = useAccordion(open);
+  return (
+    <View style={{ marginBottom: 14 }}>
+      <Pressable
+        onPress={() => setOpen((v) => !v)}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        accessibilityLabel={`Version ${release.version} release notes`}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6 }}
+      >
+        <ReleaseHeading version={release.version} date={release.date} />
+        <Animated.View style={chevStyle}>
+          <Icon name="chevron" size={18} color={p.textDim} />
+        </Animated.View>
+      </Pressable>
+      <Animated.View style={[{ overflow: 'hidden' }, bodyStyle]}>
+        <View style={[measureStyle, { paddingTop: 8 }]} onLayout={onContentLayout}>
+          <ReleaseNotes notes={release.notes} />
+        </View>
+      </Animated.View>
+    </View>
+  );
+}
+
 /**
- * Every release, newest first. The sheet supplies the scrolling, so this is a
+ * Every release, newest first. The one the user is running is open — it is what
+ * they came for and what the pill promised — and everything before it collapses
+ * behind its own heading, so the history stays reachable without burying the
+ * current notes under a scroll. The sheet supplies the scrolling, so this is a
  * plain View (house style, see LogPicker).
  */
 export function WhatsNewSheet(_props: { controls?: SheetControls }) {
   const p = usePalette();
   const version = appVersion();
+  // The running build's release when we have notes for it; otherwise the newest
+  // we know about, so the sheet is never all-collapsed with nothing to read.
   const current = releaseFor(version);
+  const headline = current ?? RELEASES[0] ?? null;
+  const past = RELEASES.filter((r) => r.version !== headline?.version);
   return (
     <View>
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text }}>What&apos;s new</Text>
       <Text style={{ fontSize: 13.5, color: p.textDim, marginTop: 4, marginBottom: 18 }}>
         {`You’re on Autonomic ${version}`}
       </Text>
-      {RELEASES.map((r) => {
-        const isCurrent = !!current && r.version === current.version;
-        return (
-          <View key={r.version} style={{ marginBottom: 22 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-              <Text style={{ fontSize: 17, fontWeight: '700', color: p.text }}>{r.version}</Text>
-              <Text style={{ fontSize: 13, color: p.textDim }}>{fmtReleaseDate(r.date)}</Text>
-              {isCurrent ? (
-                <View style={{ backgroundColor: p.accentSoft, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 }}>
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: p.accent }}>This version</Text>
-                </View>
-              ) : null}
-            </View>
-            {/* `sunk`, not `surface`: the sheet itself is already surface, so a
-                surface card would read as flat text with mysterious indents. */}
-            <View style={{ backgroundColor: p.sunk, borderRadius: radius.card, borderWidth: 1, borderColor: p.border, padding: 14, gap: 10 }}>
-              {r.notes.map((n, i) => (
-                <View key={i} style={{ flexDirection: 'row', gap: 9 }}>
-                  <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: p.textDim, marginTop: 7 }} />
-                  <Text style={{ flex: 1, fontSize: 14, lineHeight: 21, color: p.text }}>{n}</Text>
-                </View>
-              ))}
-            </View>
+      {headline ? (
+        <View style={{ marginBottom: 22 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+            <ReleaseHeading version={headline.version} date={headline.date} badge={!!current} />
           </View>
-        );
-      })}
+          <ReleaseNotes notes={headline.notes} />
+        </View>
+      ) : null}
+      {past.length ? (
+        <>
+          <Text style={{ fontSize: 12, fontWeight: '700', color: p.textDim, letterSpacing: 0.4, textTransform: 'uppercase', marginBottom: 6 }}>
+            Earlier releases
+          </Text>
+          {past.map((r) => <PastRelease key={r.version} release={r} />)}
+        </>
+      ) : null}
     </View>
   );
 }

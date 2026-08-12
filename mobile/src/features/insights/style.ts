@@ -8,117 +8,130 @@
  * relies on somebody reading the comment. These two files live in the same folder,
  * so they can share the constants outright and the drift becomes impossible.
  *
- * The rule that follows from that: every padding, margin, font size and line
- * height that affects layout belongs HERE, not inline in either file. Colour and
- * anything else purely visual can stay at the call site.
+ * EVERYTHING HERE IS PROGRESS'S GRAMMAR, not a second design language. The card
+ * chrome, the 15px uppercase tracked title, the 13/19 description, the stat tiles
+ * and the hairline row dividers are all lifted from `CardView` in
+ * app/(tabs)/analysis.tsx so Insights reads as the same app. Where the Claude
+ * Design comp differs (22px radii, borderless cards, 14px gutters) the app wins:
+ * the comp's own notes ask for the app's card grammar, and this is what that
+ * grammar actually is.
  */
 import type { TextStyle, ViewStyle } from 'react-native';
+import { radius } from '../../theme';
 import { VISIBLE_CORRELATIONS } from '../../lib/insights';
 
 /** Green for "this is working". Accent red is the palette's, for "this isn't". */
 export const GOOD = '#3ec46d';
+/** The middle tone: noticed, neither good nor bad. */
+export const NEUTRAL = '#9a9aa0';
 
 /* ---------- containers ---------- */
 
-/** The headline card. Softer than the app's `radius.card` per the design comp. */
-export const PANEL: ViewStyle = { borderWidth: 1, borderRadius: 20, padding: 15 };
+/** A card. Verbatim from `CardView`: 16pt padding, `radius.card`, 12pt gutter. */
+export const CARD: ViewStyle = { borderWidth: 1, borderRadius: radius.card, padding: 16, marginBottom: 12 };
 
-/** Every list row: correlations, observations, trend watch. */
-export const ROW: ViewStyle = { borderWidth: 1, borderRadius: 16, padding: 13, marginBottom: 9 };
+/** The title band inside a card. */
+export const CARD_HEAD: ViewStyle = { flexDirection: 'row', alignItems: 'center' };
 
-/** Trend watch rows are shorter and wider than the others. */
-export const WATCH_ROW: ViewStyle = { borderWidth: 1, borderRadius: 16, paddingVertical: 12, paddingHorizontal: 14, marginBottom: 9 };
+/** A stat tile in the three-up row. Verbatim from `CardView`'s `card.tiles`. */
+export const TILE: ViewStyle = { flex: 1, minWidth: 96, borderWidth: 1, borderRadius: radius.card, paddingVertical: 12, paddingHorizontal: 14 };
+export const TILE_ROW: ViewStyle = { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 12, marginBottom: 6 };
 
-/** The uppercase section heading band. */
-export const SECTION_BAND: ViewStyle = { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 20, marginBottom: 10 };
+/**
+ * A row inside a card: a bubble, not a divided line.
+ *
+ * It reads as a button because it is one — every row here goes somewhere. Hairline
+ * dividers said "list" and left the first row butted against the description with
+ * a stray line above it; an inset bubble on the card's own background is the same
+ * treatment the stat tiles wear, so the card holds one kind of object throughout.
+ */
+export const ROW: ViewStyle = { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderRadius: radius.card, paddingVertical: 12, paddingHorizontal: 13, marginTop: 8 };
+export const ROW_TALL: ViewStyle = { flexDirection: 'row', alignItems: 'flex-start', gap: 12, borderWidth: 1, borderRadius: radius.card, paddingVertical: 13, paddingHorizontal: 13, marginTop: 8 };
 
-/** "Show all N". */
-export const SHOW_ALL: ViewStyle = { alignItems: 'center', paddingVertical: 12, borderRadius: 999, borderWidth: 1, marginTop: 1 };
+/** The full-width action that closes a card, e.g. "Show all 24 correlations". */
+export const CARD_BUTTON: ViewStyle = { alignItems: 'center', borderWidth: 1, borderRadius: radius.control, paddingVertical: 13, marginTop: 10 };
+export const CARD_BUTTON_TEXT: TextStyle = { fontSize: 14.5, fontWeight: '600' };
 
-/* ---------- type ---------- */
+/** The first bubble sits a little clear of the title or description above it. */
+export const ROWS_TOP = 4;
 
-export const SECTION_LABEL: TextStyle = { fontSize: 12, fontWeight: '700', letterSpacing: 1.4 };
-export const SECTION_RIGHT: TextStyle = { fontSize: 12 };
+/* ---------- type, all of it Progress's ---------- */
 
-export const EYEBROW: TextStyle = { fontSize: 11, fontWeight: '700', letterSpacing: 1.5 };
-export const HEADLINE: TextStyle = { fontSize: 18.5, fontWeight: '700', letterSpacing: -0.3 };
-export const BODY: TextStyle = { fontSize: 13, lineHeight: 19.5 };
-export const BAR_LABEL: TextStyle = { fontSize: 11 };
-export const BAR_VALUE: TextStyle = { fontSize: 18, fontWeight: '700' };
-export const CONF_LABEL: TextStyle = { fontSize: 12 };
-export const CONF_WORD: TextStyle = { fontSize: 12.5, fontWeight: '700' };
+/** `CardView`'s title: 15/700 uppercase, tracked out, dim. */
+export const CARD_TITLE: TextStyle = { flexShrink: 1, fontSize: 15, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 };
+/** `CardView`'s description under the title. */
+export const CARD_DESC: TextStyle = { fontSize: 13, lineHeight: 19, marginTop: 8 };
+/** The red text action on the right of a card title ("Show all"). */
+export const CARD_ACTION: TextStyle = { fontSize: 13, fontWeight: '700' };
 
-export const PAIR_TEXT: TextStyle = { fontSize: 14, fontWeight: '700' };
-export const R_VALUE: TextStyle = { fontSize: 16.5, fontWeight: '700' };
+/** The stat tile's numeral. Manrope, tabular, exactly as Progress renders it. */
+export const TILE_VALUE: TextStyle = { fontSize: 25 };
+export const TILE_LABEL: TextStyle = { fontSize: 12, marginTop: 2 };
+
+export const HEADLINE: TextStyle = { fontSize: 17, fontWeight: '700', letterSpacing: -0.2, marginTop: 10 };
+export const BODY: TextStyle = { fontSize: 13, lineHeight: 19, marginTop: 6 };
+
+export const PAIR_DRIVER: TextStyle = { fontSize: 14.5, fontWeight: '700' };
+export const PAIR_METRIC: TextStyle = { fontSize: 14.5, fontWeight: '600' };
 export const ROW_NOTE: TextStyle = { fontSize: 12 };
+export const R_VALUE: TextStyle = { fontSize: 18, fontWeight: '700' };
 
-export const OBS_TITLE: TextStyle = { fontSize: 13.5, fontWeight: '700' };
-export const OBS_BODY: TextStyle = { fontSize: 12.5, lineHeight: 18 };
+export const ROW_TITLE: TextStyle = { fontSize: 14, fontWeight: '700' };
+export const ROW_SUB: TextStyle = { fontSize: 12.5, lineHeight: 18 };
+export const WATCH_SUB: TextStyle = { fontSize: 12.5 };
+export const WATCH_VALUE: TextStyle = { fontSize: 15, fontWeight: '700' };
 
-export const WATCH_TITLE: TextStyle = { fontSize: 13.5, fontWeight: '700' };
-export const WATCH_SUB: TextStyle = { fontSize: 12 };
-export const WATCH_VALUE: TextStyle = { fontSize: 13.5, fontWeight: '700' };
-
+export const CONF_LABEL: TextStyle = { fontSize: 12.5 };
 export const FOOTER_TEXT: TextStyle = { fontSize: 11.5, lineHeight: 17 };
-export const SHOW_ALL_TEXT: TextStyle = { fontSize: 13.5, fontWeight: '600' };
 
 /* ---------- fixed sizes ---------- */
 
-/** The before/after bars in the headline card. */
-export const BAR_H = 9;
+/**
+ * The confidence bar under the headline card, and the strength bar on a
+ * correlation row: a solid fill on a dark track, the same shape as the milestone
+ * progress bar. Segmented pips were a chart type nothing else in the app used.
+ */
+export const CONF_BAR_H = 6;
+export const STRENGTH_BAR_W = 58;
+export const STRENGTH_BAR_H = 5;
+/** The tone tile on a "worth a look" row. */
+export const TONE_BOX = 34;
 /** Trend watch sparkline. */
 export const SPARK_W = 64;
 export const SPARK_H = 26;
-/** How many correlation rows are visible before "Show all". Re-exported from the
- *  engine rather than copied, so the skeleton and the list cannot disagree about
- *  how many rows to draw. */
-export const VISIBLE_ROWS = VISIBLE_CORRELATIONS;
-
-/** Confidence pips. */
-export const PIP_H = 5;
-export const PIP_W = 13;
-export const PIP_W_WIDE = 14;
+/** The "new" dot at the start of a card title. */
+export const NEW_DOT = 8;
 
 /* ---------- gaps the skeleton has to reproduce ---------- */
 
-export const EYEBROW_GAP = 11;      // eyebrow row -> headline
-export const HEADLINE_GAP = 6;      // headline -> body
-export const BODY_GAP = 15;         // body -> bars
-export const BARS_GAP = 14;         // bars -> confidence footer
-export const BAR_LABEL_GAP = 6;     // "Before" -> bar
-export const BAR_VALUE_GAP = 7;     // bar -> value
-export const CONF_PAD = 12;         // confidence footer's top padding
-export const PAIR_GAP = 9;          // correlation pair row -> pips row
-export const OBS_TITLE_GAP = 3;     // observation title -> body
-export const WATCH_TITLE_GAP = 2;   // watch title -> sub
-export const FOOTER_TOP = 18;
+export const CONF_TOP = 13;      // hairline above the confidence block
+export const CONF_GAP = 8;       // "Confidence" row -> bar
+export const PAIR_GAP = 5;       // driver->metric line -> strength line
+export const ROW_TITLE_GAP = 3;  // observation title -> body
+export const WATCH_TITLE_GAP = 2;
+export const FOOTER_TOP = 4;
 export const FOOTER_BOTTOM = 4;
+
+/** How many correlation rows show before "Show all". Re-exported from the engine
+ *  rather than copied, so the skeleton and the list cannot disagree. */
+export const VISIBLE_ROWS = VISIBLE_CORRELATIONS;
 
 /**
  * Text the skeleton measures against.
  *
- * These are real strings the engine produces, at representative length, because
- * `TextGhost` sizes itself from an invisible copy of the sample in the real style.
- * A short sample under-reserves and the content jumps; that is the entire class of
- * bug this file prevents. Wrapping does the work, so length matters more than
- * wording.
+ * These are used ONLY by the skeleton's once-per-install fallback, the path taken
+ * before any card has been measured. After that, heights come from
+ * `shape.heights`/`shape.rows` and none of this is consulted.
+ *
+ * They work by measurement rather than by a number: an invisible copy of the sample in
+ * the real style reserves exactly the space that string would take, so a sample
+ * shorter than reality under-reserves and the first open jumps.
+ * `../../lib/insights/__tests__/skeleton.test.ts` fails if any of them falls short of
+ * what the demo month really produces.
  */
 export const SAMPLE = {
-  // The multi-line ones, where length genuinely decides the reserved height.
-  headline: 'Diastolic pressure is up since you started magnesium glycinate',
   body: 'In the 26 days since, diastolic pressure ran 38.5 mmHg higher than the 26 days before. This is an association in your own log, not proof of a cause.',
-  obsTitle: 'Headache and postural lightheadedness travel together',
   obsBody: 'RMSSD before noon averages 3.6 ms above the other half of the day, across 194 readings. Taking readings at a consistent hour makes every trend here sharper.',
   rowNote: 'Next day · 47.9 vs 28.4 ms · 34 days with it, 26 without',
-  // Single-line ones. Their height comes from font metrics rather than wrapping,
-  // so these only set the ghost's WIDTH, and they are sized to the longest real
-  // value so the block never looks narrower than the number it replaces.
-  barValue: '2797 ms²',
-  confWord: 'Very strong',
-  driver: 'Magnesium Glycinate',
-  metric: 'SDNN',
-  rValue: '+0.68',
-  watchTitle: 'Bedtime consistency',
   watchSub: 'Steadier by 40 min vs last month',
-  watchValue: '2797 ms²',
 } as const;

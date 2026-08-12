@@ -197,11 +197,19 @@ export function dipHistory(
   dk: string,
   count: number,
   addDays: (k: string, n: number) => string,
+  /**
+   * A better low for a night than the stored single minimum, when that night's
+   * overnight curve is available. Every night in the window must go through
+   * the SAME basis or the card contradicts itself: the headline was showing a
+   * settled-stretch dip while the bars showed single-minimum ones, so the
+   * number jumped the moment you touched the bar it was already on.
+   */
+  lowFor?: (dk: string) => { low: number; basis: DipBasis } | null,
 ): DipNight[] {
   const out: DipNight[] = [];
   for (let i = count - 1; i >= 0; i--) {
     const key = addDays(dk, -i);
-    out.push({ dk: key, dip: nocturnalDip(days, key) });
+    out.push({ dk: key, dip: nocturnalDip(days, key, (lowFor && lowFor(key)) || {}) });
   }
   return out;
 }

@@ -262,6 +262,30 @@ describe('overnight series', () => {
     expect(lowestRollingMean(curve(pts))).toBeCloseTo(48, 0);
   });
 
+  it('measures every night in the dip trend the same way as the headline', () => {
+    // A flat 70 bpm night whose stored hrLow is a 40 bpm artifact. Given the
+    // curve, both the bar and the headline must read the settled stretch — the
+    // bug was the headline using it and the bar not, so the number jumped the
+    // moment you touched the bar it was already showing.
+    const flat = [];
+    for (let i = 0; i <= 120; i++) flat.push({ t: i * 60, bpm: i === 30 ? 40 : 70 });
+    const days: Days = {
+      [dkSeries]: {
+        ...night('23:00', '07:00', { hrLow: 40 }),
+        readings: [resting(80), resting(80, 1), resting(80, 2)],
+      } as DayRecord,
+    };
+    const rep = buildSleepReport(days, dkSeries, addDays, {}, null, {
+      hr: flat, hrByDay: { [dkSeries]: flat },
+    })!;
+    const lastBar = rep.dipTrend[rep.dipTrend.length - 1].dip!;
+    expect(rep.dip!.pct).toBe(lastBar.pct);
+    expect(rep.dip!.basis).toBe('rolling-low');
+    // A ten-minute mean dilutes the artifact instead of being defined by it:
+    // the single minimum is 40, the settled floor is up near the real rate.
+    expect(rep.dip!.low).toBeGreaterThan(65);
+  });
+
   it('has no floor without a full window of samples', () => {
     expect(lowestRollingMean(curve([[0, 60], [120, 58]]))).toBeNull();
     expect(lowestRollingMean([])).toBeNull();

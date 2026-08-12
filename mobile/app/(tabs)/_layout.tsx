@@ -185,6 +185,9 @@ function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
     if (!l) return;
     if (pillW.value === 0) { pillX.value = l.x; pillW.value = l.w; } // first measure: snap
     else { pillX.value = withSpring(l.x, SPRING); pillW.value = withSpring(l.w, SPRING); }
+    // Shared values are stable refs whose `.value` is deliberately mutated here;
+    // listing them would only re-run this on a geometry change it just caused.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shownIndex, layouts]);
   const pillStyle = useAnimatedStyle(() => ({ transform: [{ translateX: pillX.value }], width: pillW.value }));
 

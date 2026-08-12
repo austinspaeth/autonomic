@@ -15,7 +15,7 @@ import { CORRELATION_OUTCOMES, findCorrelations } from '../correlate';
 import { buildFactors } from '../factors';
 import { buildDayMatrix } from '../matrix';
 import { PROBES_BY_ID, findObservations } from '../observations';
-import { findWatchItems, overallDirection } from '../watch';
+import { changeSinceStart, findWatchItems, overallDirection } from '../watch';
 import { buildInsights } from '../index';
 import { computeInsights, getCachedInsights, resetInsightsCache } from '../cache';
 import { INSIGHT_OUTCOMES, TREND_METRICS, keyRange } from '../../trends';
@@ -161,6 +161,23 @@ describe('a planted association', () => {
   it('states the group sizes it compared, in the copy', () => {
     expect(found[0].note).toMatch(/\d+ days with it, \d+ without/);
     expect(found[0].detail).toMatch(/\d/);
+  });
+
+  /**
+   * The row's readout has to be a quantity, not a coefficient. "+0.74" is a rank
+   * correlation, which reads as a percentage to anyone who has not met one and is
+   * not actionable even when read correctly, so what the row shows is the gap
+   * between the two groups' medians in the metric's own units.
+   */
+  it('quantifies each finding in the metric own units, signed', () => {
+    found.forEach((c) => {
+      expect(c.deltaText).toMatch(/^[+\u2212]?\d/);
+      // Signed the same way the medians are ordered, and never the bare coefficient.
+      if (c.high > c.low) expect(c.deltaText.startsWith('+')).toBe(true);
+      if (c.high < c.low) expect(c.deltaText.startsWith('\u2212')).toBe(true);
+      expect(c.deltaText).not.toBe(c.rText);
+      if (c.unit) expect(c.deltaText.endsWith(c.unit)).toBe(true);
+    });
   });
 
   it('collapses the HRV family to one row instead of five', () => {
@@ -633,13 +650,13 @@ describe('buildInsights', () => {
     expect(rep.confidence.pct).toBeGreaterThan(0);
     expect(rep.daysLogged).toBe(120);
     expect(typeof rep.ms).toBe('number');
-    expect(rep.fingerprint).toContain('med:magGlycinate');
+    expect(rep.correlations[0].factorId).toBe('med:magGlycinate');
   });
 
-  it('fingerprints only the headline and the visible four', () => {
-    const rep = buildInsights(state, DK);
-    // change id plus at most four correlation ids.
-    expect(rep.fingerprint.split(',').length).toBeLessThanOrEqual(5);
+  it('reports the real window, not the engine limit', () => {
+    // 120 days of journal, so the header must not promise 180 days of analysis.
+    expect(buildInsights(state, DK).windowDays).toBe(120);
+    expect(buildInsights(journal(1, () => null), DK).windowDays).toBe(0);
   });
 
   it('shows the welcome card, and only it, in demo mode', () => {
@@ -786,5 +803,145 @@ describe('the header verdict', () => {
     const rep = buildInsights(falling, DK);
     expect(rep.overall.direction).toBe('down');
     if (rep.downturn) expect(rep.watch).toEqual([]);
+  });
+});
+
+describe('the header claim, against day one', () => {
+  /** 60 logged days: a bad first fortnight, a good last one. */
+  const risen = journal(60, (i) => { const d = blank(); d.readings = [hrv(i < 30 ? 22 : 44)]; return d; });
+  const fallen = journal(60, (i) => { const d = blank(); d.readings = [hrv(i < 30 ? 44 : 22)]; return d; });
+
+  it('reports the gain as a percentage of day one, in two halves', () => {
+    const s = changeSinceStart(risen.days, DK)!;
+    expect(s).toBeTruthy();
+    expect(s.better).toBe(true);
+    expect(s.pct).toBeGreaterThan(0);
+    expect(s.value).toMatch(/^\d+% better$/);
+    expect(s.tail).toBe(' than day one');
+    expect(s.detail).toMatch(/then, .* now/);
+  });
+
+  it('reports a decline just as plainly', () => {
+    const s = changeSinceStart(fallen.days, DK)!;
+    expect(s.better).toBe(false);
+    expect(s.pct).toBeLessThan(0);
+    expect(s.value).toMatch(/^\d+% worse$/);
+  });
+
+  it('says "about the same" rather than dressing a flat run as a gain', () => {
+    const level = journal(60, () => { const d = blank(); d.readings = [hrv(34)]; return d; });
+    const s = changeSinceStart(level.days, DK)!;
+    expect(s.pct).toBe(0);
+    expect(s.value).toBe('About the same');
+    expect(s.tail).toBe(' as day one');
+  });
+
+  it('refuses to answer under a month of logged days', () => {
+    const thin = journal(20, () => { const d = blank(); d.readings = [hrv(34)]; return d; });
+    expect(changeSinceStart(thin.days, DK)).toBeNull();
+  });
+
+  it('refuses to answer when neither end can be scored', () => {
+    // Water only: nothing `scoreSet` can grade, so there is no score to compare.
+    const noScore = journal(60, () => { const d = blank(); d.food.water = 2; return d; });
+    expect(changeSinceStart(noScore.days, DK)).toBeNull();
+  });
+
+  it('measures from the real day one, not from the analysis window', () => {
+    // 300 logged days, so day one sits well outside the 180-day matrix. The claim
+    // must still be against the earliest fortnight.
+    const long = journal(300, (i) => { const d = blank(); d.readings = [hrv(i < 20 ? 20 : 44)]; return d; });
+    const s = changeSinceStart(long.days, DK)!;
+    expect(s.better).toBe(true);
+    // Day one scored 20 rmssd (35 pts); a window starting at day 120 would already
+    // be at 44 and report about the same.
+    expect(s.pct).toBeGreaterThan(20);
+  });
+
+  it('states percentage POINTS on the 0-100 score, never a ratio', () => {
+    // 22 rmssd grades 'ok' (60 pts) and 44 grades 'great' (100), so this is a
+    // 40-point rise on a 100-point index: "40% better". A ratio would call the same
+    // move "67% better" here and can run past 200% on a worse starting point, which
+    // is arithmetically true, unbounded, and hype rather than information.
+    const s = changeSinceStart(risen.days, DK)!;
+    expect(s.pct).toBe(40);
+    expect(s.pct).toBeLessThanOrEqual(100);
+  });
+
+  it('breaks the change down into components that add up', () => {
+    // The score is a weighted blend, so the claim is the sum of its parts and the
+    // sheet has to be able to show that. A reader who distrusts the headline should
+    // be able to total the column.
+    const s = changeSinceStart(risen.days, DK)!;
+    expect(s.parts.length).toBeGreaterThan(0);
+    // Tight, because "the parts add up" is the claim the breakdown sheet makes. The
+    // slack is only for medians not summing exactly linearly.
+    const total = s.parts.reduce((a, x) => a + x.delta, 0);
+    expect(Math.abs(total - s.pct)).toBeLessThan(3);
+    s.parts.forEach((x) => {
+      expect(x.weight).toBeGreaterThan(0);
+      expect(x.then).toBeGreaterThanOrEqual(0);
+      expect(x.now).toBeGreaterThanOrEqual(0);
+    });
+    // Sorted by how much each one accounts for.
+    for (let i = 1; i < s.parts.length; i++) {
+      expect(Math.abs(s.parts[i - 1].delta)).toBeGreaterThanOrEqual(Math.abs(s.parts[i].delta));
+    }
+  });
+
+  it('lists only components present at BOTH ends', () => {
+    // Blood pressure starts halfway through. It has no "then" to be measured
+    // against, and counting it from zero would credit its whole weight to a change
+    // that is really just the user starting to log it.
+    const late = journal(60, (i) => {
+      const d = blank();
+      d.readings = [hrv(30)];
+      if (i >= 30) d.readings.push({ id: nextId(), type: 'bp', time: '08:05', sys: '118', dia: '76', pulse: '64' });
+      return d;
+    });
+    const s = changeSinceStart(late.days, DK)!;
+    expect(s.parts.some((x) => /pressure/i.test(x.label))).toBe(false);
+  });
+
+  it('names the days it compared, for the breakdown header', () => {
+    const s = changeSinceStart(risen.days, DK)!;
+    expect(s.fromKey).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(s.toKey).toBe(DK);
+    expect(s.thenN).toBeGreaterThanOrEqual(5);
+    expect(s.nowN).toBeGreaterThanOrEqual(5);
+  });
+
+  it('measures from a chosen day one when one is set', () => {
+    // Three plateaus: 22 rmssd, then 30, then 44. Moving day one forward should shrink
+    // the claim, because more of the recovery is already behind the new baseline.
+    const stepped = journal(90, (i) => {
+      const d = blank();
+      d.readings = [hrv(i < 30 ? 22 : i < 60 ? 30 : 44)];
+      return d;
+    });
+    const keys = keyRange(DK, 90, addDays);
+    const dflt = changeSinceStart(stepped.days, DK)!;
+    const mid = changeSinceStart(stepped.days, DK, {}, keys[30])!;
+    const late = changeSinceStart(stepped.days, DK, {}, keys[60])!;
+    expect(dflt.pct).toBeGreaterThan(mid.pct);
+    expect(mid.pct).toBeGreaterThan(late.pct);
+    expect(mid.fromKey).toBe(keys[30]);
+    // Starting after the recovery finished, there is nothing left to claim.
+    expect(late.value).toBe('About the same');
+  });
+
+  it('ignores an anchor with too little behind it rather than losing the claim', () => {
+    // An anchor three days from the end leaves no window. Silently falling back to the
+    // default is better than emptying the header because of a mis-tap on a calendar.
+    const stepped = journal(90, (i) => { const d = blank(); d.readings = [hrv(i < 45 ? 22 : 44)]; return d; });
+    const keys = keyRange(DK, 90, addDays);
+    const s = changeSinceStart(stepped.days, DK, {}, keys[87]);
+    expect(s).toBeTruthy();
+    expect(s!.fromKey).toBe(keys[0]);
+  });
+
+  it('rides on the report', () => {
+    expect(buildInsights(risen, DK).since!.better).toBe(true);
+    expect(buildInsights(journal(5, () => null), DK).since).toBeNull();
   });
 });

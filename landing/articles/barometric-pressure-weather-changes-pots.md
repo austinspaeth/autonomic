@@ -8,8 +8,8 @@ keywords: "weather and POTS, barometric pressure POTS, does weather affect POTS,
 date: 2026-08-12
 updated: 2026-08-12
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1519643381401-22c77e60520e?q=80&w=1760&auto=format&fit=crop"
-photoAttribution: "Kinga Howard / Unsplash"
+photoLocation: "https://images.unsplash.com/photo-1513866717996-6c19fd870937?q=80&w=1632&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+photoAttribution: "Unsplash"
 tldr: "Weather changes really can move POTS and dysautonomia symptoms, mostly through the autonomic nervous system's job of thermoregulation and blood pressure control. Heat and humidity widen skin vessels and drain fluid, so blood pools and standing heart rate climbs. High humidity blocks sweat from evaporating, making a moderate day feel worse than the thermometer says. Falling barometric pressure ahead of a storm is a weaker and more individual trigger, but many people feel it, likely because a passing front bundles pressure, temperature, and humidity swings together. Cold helps some people (vessels tighten, blood volume centralizes) and hurts others (Raynaud's, stiffness, extra cardiovascular load). None of this means you are backsliding. Log the weather alongside your readings for a few weeks and you can see whether the sky is genuinely your trigger or a coincidence, then plan the hard days instead of dreading them."
 categories:
   - pots

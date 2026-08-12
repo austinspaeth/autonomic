@@ -31,7 +31,7 @@
  *
  * Pure: no store, no MMKV, no expo, no React.
  */
-import { addDays } from '../dates';
+import { addDays, dateFromKey } from '../dates';
 import type { ScoreContext } from '../scoring';
 import { detectDownturn } from '../scoring/downturn';
 import { resolveProtocol } from '../scoring/day';
@@ -43,12 +43,12 @@ import { findCorrelations, type Correlation } from './correlate';
 import { buildFactors } from './factors';
 import { buildDayMatrix } from './matrix';
 import { findObservations, type Observation } from './observations';
-import { findWatchItems, overallDirection, type Overall, type WatchItem } from './watch';
+import { changeSinceStart, findWatchItems, overallDirection, type Overall, type SinceStart, type WatchItem } from './watch';
 
 export type { BiggestChange } from './change';
 export type { Correlation } from './correlate';
 export type { Observation } from './observations';
-export type { WatchItem, Overall, OverallDirection } from './watch';
+export type { WatchItem, Overall, OverallDirection, SinceStart } from './watch';
 export type { ConfidencePart, DataConfidence } from './confidence';
 export type { FactorDef, FactorGroup, FactorKind } from './factors';
 export type { ConfidenceLabel } from './stats';
@@ -57,6 +57,7 @@ export { CONFIDENCE_LABELS, confidenceLabel } from './stats';
 export { MAX_OBSERVATIONS } from './observations';
 export { MAX_WATCH_ITEMS } from './watch';
 export { MAX_CORRELATIONS, shortMetric } from './correlate';
+export { INSIGHTS_HELP } from './help';
 
 /**
  * How far back the engine looks.
@@ -72,6 +73,7 @@ export const ANALYSIS_DAYS = 180;
 /** Correlations visible before the user asks for the rest. */
 export const VISIBLE_CORRELATIONS = 4;
 
+
 export interface InsightReport {
   /** The day the report was computed for. */
   dk: string;
@@ -86,12 +88,33 @@ export interface InsightReport {
   daysLogged: number;
   /** True while a downturn is active, which is why `watch` may be empty. */
   downturn: boolean;
-  /** Where the whole journal is heading, for the header. */
+  /** Where the whole journal is heading. */
   overall: Overall;
+  /**
+   * The header's claim: the daily score now against the daily score at the very
+   * start of the journal. Null when there isn't enough to compare, in which case
+   * the header states its window instead.
+   */
+  since: SinceStart | null;
+  /**
+   * How many days the findings were actually computed from: the span of the
+   * user's own history, capped at ANALYSIS_DAYS. This is what the header states,
+   * because "what window is this?" is the question every claim below depends on.
+   */
+  windowDays: number;
   /** Wall-clock cost of the build, for the perf check. */
   ms: number;
-  /** Stable fingerprint of the headline findings, for the NEW badge. See ./seen. */
-  fingerprint: string;
+  /**
+   * This report is the one `emptyReport` hands back after a build THREW, not a
+   * genuine "nothing found".
+   *
+   * The two look identical in the data and are completely different facts, so the
+   * view has to be able to tell them apart: "there isn't enough here yet" invites
+   * the user to keep logging, and saying that after a crash would be a lie about
+   * their own journal. Never set by `buildInsights`, which either returns a real
+   * report or throws.
+   */
+  failed?: boolean;
 }
 
 /**
@@ -101,7 +124,7 @@ export interface InsightReport {
  * already decided whether to hand us the user's state or the sample month and the
  * two must not disagree about what the banner says.
  */
-export function buildInsights(state: AppState, dk: string, opts: { demo?: boolean; ctx?: ScoreContext } = {}): InsightReport {
+export function buildInsights(state: AppState, dk: string, opts: { demo?: boolean; ctx?: ScoreContext; anchor?: string | null } = {}): InsightReport {
   const started = Date.now();
   const ctx: ScoreContext = opts.ctx || {
     sex: state.profile.sex,
@@ -130,7 +153,18 @@ export function buildInsights(state: AppState, dk: string, opts: { demo?: boolea
   // for exactly that situation, and suppressing it would leave the screen mute at
   // the moment it has the most to say.
   const overall = overallDirection(matrix);
+  // Reads the two ENDS of the whole journal rather than the analysis window, so
+  // "day one" is genuinely day one. Cheap: 28 scored days regardless of length.
+  const since = changeSinceStart(state.days, dk, ctx, opts.anchor);
   const confidence = dataConfidence(state.days, dk);
+
+  // The window a claim could have been computed from: the user's own span, capped.
+  // Reported rather than assumed, so the header cannot promise 180 days of analysis
+  // to somebody who has logged three weeks.
+  const logged = Object.keys(state.days).sort();
+  const spanDays = logged.length
+    ? Math.min(ANALYSIS_DAYS, Math.round((dateFromKey(dk).getTime() - dateFromKey(logged[0]).getTime()) / 86400000) + 1)
+    : 0;
 
   return {
     dk,
@@ -140,33 +174,30 @@ export function buildInsights(state: AppState, dk: string, opts: { demo?: boolea
     observations,
     watch,
     overall,
+    since,
     confidence,
     daysLogged: confidence.daysLogged,
     downturn,
+    windowDays: Math.max(0, spanDays),
     ms: Date.now() - started,
-    fingerprint: fingerprintOf(change, correlations),
   };
 }
 
 /**
- * What "new findings" means.
+ * An empty report, for the first render before the real one is built — and for the
+ * screen's catch, which must hand back a report rather than nothing.
  *
- * The headline change plus the ids of the correlations that would be visible
- * without tapping "show all" — the things a user would actually notice had
- * changed. Deliberately NOT the whole list: a twenty-fourth correlation shuffling
- * position is not news, and a badge that lights up every single day teaches people
- * to ignore it.
+ * A null there left the view on its skeleton permanently: the placeholder is shown
+ * whenever there is no report, so a failed build promised content that was never
+ * coming. An empty report at least renders a finished screen, and `failed` lets it
+ * say which kind of empty it is.
  */
-export function fingerprintOf(change: BiggestChange | null, correlations: Correlation[]): string {
-  return [change ? change.id : '-', ...correlations.slice(0, VISIBLE_CORRELATIONS).map((c) => c.id)].join(',');
-}
-
-/** An empty report, for the first render before the real one is built. */
-export function emptyReport(dk: string): InsightReport {
+export function emptyReport(dk: string, failed = false): InsightReport {
   return {
     dk, demo: false, change: null, correlations: [], observations: [], watch: [],
     overall: { direction: 'unknown', label: null, detail: 'not enough to compare yet' },
+    since: null,
     confidence: { pct: 0, parts: [], topFix: null, daysLogged: 0 },
-    daysLogged: 0, downturn: false, ms: 0, fingerprint: '',
+    daysLogged: 0, downturn: false, windowDays: 0, ms: 0, failed,
   };
 }

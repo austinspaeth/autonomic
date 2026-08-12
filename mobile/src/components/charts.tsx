@@ -202,7 +202,24 @@ export function Sparkline({ points, bands, height = 92, onSelect, showReadout = 
 /* ---------- Score gauge (270° arc) ---------- */
 // `track` overrides the ring behind the score arc. The default reads as a well
 // on a status-tinted card; the unscored card has no tint, so it passes a grey.
-export function ScoreGauge({ score, color, size = 176, track, children }: { score: number; color: string; size?: number; track?: string; children?: React.ReactNode }) {
+export function ScoreGauge({ score, color, size = 176, track, marker, children }: {
+  score: number;
+  color: string;
+  size?: number;
+  track?: string;
+  /**
+   * A tick across the ring at `score`. Used by the Insights day-one explainer to show
+   * where the comparison started, so the arc carries both numbers instead of the sheet
+   * needing a second chart.
+   *
+   * Tick only, deliberately: a label anchored outside the ring needs the label's own
+   * width of clear space beyond `r + sw/2`, which no sensible `size` leaves, so it
+   * clipped against the viewBox. The figure it stood for belongs in the gauge's
+   * children, where there is room for it.
+   */
+  marker?: { score: number };
+  children?: React.ReactNode;
+}) {
   const p = usePalette();
   const cx = size / 2, cy = size / 2, r = 74, sw = 12;
   const START = 135, SWEEP = 270;
@@ -214,6 +231,12 @@ export function ScoreGauge({ score, color, size = 176, track, children }: { scor
     return `M ${x0} ${y0} A ${r} ${r} 0 ${large} 1 ${x1} ${y1}`;
   };
   const frac = Math.max(0, Math.min(1, (score || 0) / 100));
+  // The marker's tick spans the ring's width plus a little either side.
+  const mFrac = marker ? Math.max(0, Math.min(1, (marker.score || 0) / 100)) : 0;
+  const mDeg = START + SWEEP * mFrac;
+  const mAt = (rad: number): [number, number] => { const a = (mDeg * Math.PI) / 180; return [cx + rad * Math.cos(a), cy + rad * Math.sin(a)]; };
+  const [mx0, my0] = mAt(r - sw / 2 - 3);
+  const [mx1, my1] = mAt(r + sw / 2 + 3);
   return (
     <View style={{ width: size, height: size }} pointerEvents="none">
       <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
@@ -223,6 +246,9 @@ export function ScoreGauge({ score, color, size = 176, track, children }: { scor
             <Path d={arc(frac)} fill="none" stroke={color} strokeWidth={sw + 7} strokeLinecap="round" opacity={0.16} />
             <Path d={arc(frac)} fill="none" stroke={color} strokeWidth={sw} strokeLinecap="round" />
           </>
+        ) : null}
+        {marker ? (
+          <Line x1={mx0} y1={my0} x2={mx1} y2={my1} stroke={p.text} strokeWidth={3} strokeLinecap="round" />
         ) : null}
       </Svg>
       <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' }}>
@@ -1497,15 +1523,24 @@ function shortClock(m: number): string {
   return `${h}${h24 >= 12 ? 'p' : 'a'}`;
 }
 
+/** Nights under target — the same purple the Progress charts use for their
+ *  second series (SNS_LINE below, baseline HRV in HrvProgress). Deliberately
+ *  OUTSIDE the grade scale: amber there means "moderate", and these bars are
+ *  not graded — a night under your own target is a fact about the night, not a
+ *  mark against it. */
+const SHORT_NIGHT = '#a855f7';
+
 /**
- * Nightly sleep against the user's own target, with the running total over it.
- * Nights under target take the warning colour; the dashed line is the
- * cumulative balance, which is a line to steer by rather than a debt to clear.
+ * Nightly sleep against the user's own target.
+ *
+ * Just the bars and the target line. A cumulative running-total line used to
+ * sit over them on its own hidden scale, which read as a second metric nobody
+ * asked for — and "sleep debt" is exactly the framing this card is supposed to
+ * avoid. The total is still in the header, as a number.
  */
-export function SleepBalanceChart({ hours, target, cumulative, height = 120 }: {
-  hours: number[]; target: number; cumulative: number[]; height?: number;
+export function SleepBalanceChart({ hours, target, height = 120 }: {
+  hours: number[]; target: number; height?: number;
 }) {
-  const p = usePalette();
   if (hours.length < 2) return null;
   const W = 320, H = height, padL = 20, padR = 6, padT = 12, padB = 16;
   const lo = Math.min(4, Math.floor(Math.min(...hours) - 0.5));
@@ -1513,9 +1548,6 @@ export function SleepBalanceChart({ hours, target, cumulative, height = 120 }: {
   const y = (v: number) => padT + (1 - (v - lo) / (hi - lo)) * (H - padT - padB);
   const slot = (W - padL - padR) / hours.length;
   const bw = Math.max(2, slot - 4);
-  const cLo = Math.min(...cumulative, 0), cHi = Math.max(...cumulative, 0);
-  const cy = (v: number) => padT + (1 - (v - cLo) / Math.max(0.1, cHi - cLo)) * (H - padT - padB);
-  const cx = (i: number) => padL + i * slot + 2 + bw / 2;
   return (
     <Svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
       <Line x1={padL} x2={W - padR} y1={y(target)} y2={y(target)} stroke={GRADE_COLORS.good} strokeWidth={1.4} strokeDasharray="5 4" />
@@ -1523,13 +1555,9 @@ export function SleepBalanceChart({ hours, target, cumulative, height = 120 }: {
       {hours.map((h, i) => (
         <Rect
           key={i} x={padL + i * slot + 2} y={y(h)} width={bw} height={Math.max(2, y(lo) - y(h))} rx={2.5}
-          fill={h < target ? GRADE_COLORS.ok : SLEEP_BLUE} opacity={i === hours.length - 1 ? 1 : 0.7}
+          fill={h < target ? SHORT_NIGHT : SLEEP_BLUE} opacity={i === hours.length - 1 ? 1 : 0.7}
         />
       ))}
-      <Path
-        d={cumulative.map((v, i) => `${i ? 'L' : 'M'}${cx(i).toFixed(1)} ${cy(v).toFixed(1)}`).join(' ')}
-        fill="none" stroke={p.textDim} strokeWidth={1.6} strokeDasharray="3 3"
-      />
     </Svg>
   );
 }
@@ -1630,7 +1658,7 @@ let nightId = 0;
  * The x-axis is real clock time, because "when did that happen" is the only
  * question this chart exists to answer.
  */
-export function NightSeriesChart({ points, bedAt, color, bands, scatter, refLine, height = 150, onSelect }: {
+export function NightSeriesChart({ points, bedAt, color, bands, scatter, refLine, right, height = 150, onSelect }: {
   points: { t: number; v: number }[];
   /** Bedtime in minutes past noon, for the clock labels. */
   bedAt: number;
@@ -1640,8 +1668,16 @@ export function NightSeriesChart({ points, bedAt, color, bands, scatter, refLine
   scatter?: boolean;
   /** A dashed reference line with its own label, e.g. the user's typical low. */
   refLine?: { v: number; label: string; color: string } | null;
+  /**
+   * A second series on its OWN right-hand axis. Two overnight measures rarely
+   * share a range (breaths per minute against beats per minute is 15 vs 60),
+   * so a shared axis would flatten one of them into a straight line. Each gets
+   * its own scale and its axis labels take its colour, which is the only thing
+   * saying which number belongs to which line.
+   */
+  right?: { points: { t: number; v: number }[]; color: string } | null;
   height?: number;
-  onSelect?: (pt: { t: number; v: number } | null) => void;
+  onSelect?: (sel: { t: number; v: number; rv: number | null } | null) => void;
 }) {
   const p = usePalette();
   const [layoutW, setLayoutW] = useState(0);
@@ -1651,17 +1687,24 @@ export function NightSeriesChart({ points, bedAt, color, bands, scatter, refLine
   useChartsBlur(reset);
   if (!points || points.length < 3) return null;
 
-  const vals = points.map((q) => q.v);
-  let min = Math.min(...vals), max = Math.max(...vals);
-  if (refLine) { min = Math.min(min, refLine.v); max = Math.max(max, refLine.v); }
-  const span = max - min || 1;
-  min -= span * 0.12; max += span * 0.12;
+  const scaleOf = (vals: number[], extra?: number | null) => {
+    let lo = Math.min(...vals), hi = Math.max(...vals);
+    if (extra != null) { lo = Math.min(lo, extra); hi = Math.max(hi, extra); }
+    const span = hi - lo || 1;
+    return { lo: lo - span * 0.12, hi: hi + span * 0.12 };
+  };
+  const L = scaleOf(points.map((q) => q.v), refLine ? refLine.v : null);
+  const R = right && right.points.length >= 2 ? scaleOf(right.points.map((q) => q.v)) : null;
+
   const t0 = points[0].t, t1 = points[points.length - 1].t;
   const tSpan = t1 - t0 || 1;
-  const W = 320, H = height, padL = 28, padR = 10, padT = 12, padB = 20;
+  const W = 320, H = height, padL = 28, padR = R ? 28 : 10, padT = 12, padB = 20;
   const innerW = W - padL - padR;
   const xAt = (t: number) => padL + ((t - t0) / tSpan) * innerW;
-  const yAt = (v: number) => padT + (1 - (v - min) / (max - min)) * (H - padT - padB);
+  const plotY = (v: number, s: { lo: number; hi: number }) =>
+    padT + (1 - (v - s.lo) / (s.hi - s.lo)) * (H - padT - padB);
+  const yAt = (v: number) => plotY(v, L);
+  const yR = (v: number) => plotY(v, R!);
   const colAt = (v: number) => {
     if (!bands) return color;
     const c = catFromBands(v, bands);
@@ -1669,15 +1712,27 @@ export function NightSeriesChart({ points, bedAt, color, bands, scatter, refLine
   };
   const selIdx = sel >= 0 && sel < points.length ? sel : -1;
 
-  // A smoothed line through the scatter: the trend the eye is trying to draw
-  // for itself, done for it. Window is in samples — cadence varies by source.
+  const nearest = (rows: { t: number; v: number }[], t: number) => {
+    let best = 0;
+    for (let i = 1; i < rows.length; i++) if (Math.abs(rows[i].t - t) < Math.abs(rows[best].t - t)) best = i;
+    return rows[best];
+  };
+
+  /**
+   * The scatter's trend line is a moving average — the line the eye is trying
+   * to draw for itself. A plain line chart draws the SAMPLES, smoothed only by
+   * the usual spline: a moving-averaged path with the readout dot placed on
+   * the raw value puts the dot visibly off the line it is supposed to sit on.
+   */
   const win = Math.max(2, Math.round(points.length / 24));
-  const smooth = points.map((q, i) => {
-    const from = Math.max(0, i - win), to = Math.min(points.length - 1, i + win);
-    let sum = 0;
-    for (let j = from; j <= to; j++) sum += points[j].v;
-    return [xAt(q.t), yAt(sum / (to - from + 1))] as [number, number];
-  });
+  const linePts: [number, number][] = scatter
+    ? points.map((q, i) => {
+      const from = Math.max(0, i - win), to = Math.min(points.length - 1, i + win);
+      let sum = 0;
+      for (let j = from; j <= to; j++) sum += points[j].v;
+      return [xAt(q.t), yAt(sum / (to - from + 1))];
+    })
+    : points.map((q) => [xAt(q.t), yAt(q.v)]);
 
   const onTouch = (x: number) => {
     if (layoutW <= 0) return;
@@ -1688,12 +1743,15 @@ export function NightSeriesChart({ points, bedAt, color, bands, scatter, refLine
       if (Math.abs(points[i].t - t) < Math.abs(points[best].t - t)) best = i;
     }
     setSel(best);
-    onSelect?.(points[best]);
+    const rv = right && right.points.length ? nearest(right.points, points[best].t).v : null;
+    onSelect?.({ t: points[best].t, v: points[best].v, rv });
   };
 
   // Three clock ticks: start, middle, end of the night.
   const ticks = [t0, t0 + tSpan / 2, t1];
-  const yTicks = [min + (max - min) * 0.12, (min + max) / 2, max - (max - min) * 0.12];
+  const axisVals = (s: { lo: number; hi: number }) =>
+    [s.lo + (s.hi - s.lo) * 0.12, (s.lo + s.hi) / 2, s.hi - (s.hi - s.lo) * 0.12];
+  const selR = selIdx >= 0 && right && right.points.length ? nearest(right.points, points[selIdx].t) : null;
 
   return (
     <View
@@ -1707,35 +1765,45 @@ export function NightSeriesChart({ points, bedAt, color, bands, scatter, refLine
       <Svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
         <Defs>
           <LinearGradient id={gid} x1="0" y1={padT} x2="0" y2={H - padB} gradientUnits="userSpaceOnUse">
-            <Stop offset={0} stopColor={colAt(max)} />
-            <Stop offset={1} stopColor={colAt(min)} />
+            <Stop offset={0} stopColor={colAt(L.hi)} />
+            <Stop offset={1} stopColor={colAt(L.lo)} />
           </LinearGradient>
         </Defs>
-        {yTicks.map((v, i) => (
+        {axisVals(L).map((v, i) => (
           <React.Fragment key={i}>
             <Line x1={padL} x2={W - padR} y1={yAt(v)} y2={yAt(v)} stroke={p.border} strokeWidth={1} opacity={0.45} />
-            <SvgText x={padL - 4} y={yAt(v) + 3} textAnchor="end" fontSize={9} fontFamily={fonts.mono} fill={p.textDim}>{Math.round(v)}</SvgText>
+            <SvgText x={padL - 4} y={yAt(v) + 3} textAnchor="end" fontSize={9} fontFamily={fonts.mono} fill={R ? color : p.textDim}>{Math.round(v)}</SvgText>
           </React.Fragment>
         ))}
-        {refLine && refLine.v > min && refLine.v < max ? (
+        {R ? axisVals(R).map((v, i) => (
+          <SvgText key={`r${i}`} x={W - padR + 4} y={yR(v) + 3} fontSize={9} fontFamily={fonts.mono} fill={right!.color}>{Math.round(v)}</SvgText>
+        )) : null}
+        {refLine && refLine.v > L.lo && refLine.v < L.hi ? (
           <>
             <Line x1={padL} x2={W - padR} y1={yAt(refLine.v)} y2={yAt(refLine.v)} stroke={refLine.color} strokeWidth={1.2} strokeDasharray="5 4" opacity={0.85} />
             <SvgText x={W - padR} y={yAt(refLine.v) - 4} textAnchor="end" fontSize={9} fontWeight="700" fill={refLine.color}>{refLine.label}</SvgText>
           </>
         ) : null}
+        {R ? (
+          <Path
+            d={smoothPath(right!.points.map((q) => [xAt(q.t), yR(q.v)] as [number, number]))}
+            fill="none" stroke={right!.color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" opacity={0.9}
+          />
+        ) : null}
         {scatter
           ? points.map((q, i) => <Circle key={i} cx={xAt(q.t)} cy={yAt(q.v)} r={1.7} fill={colAt(q.v)} opacity={0.9} />)
           : null}
         <Path
-          d={smoothPath(smooth)} fill="none"
-          stroke={scatter ? (p.dark ? '#c9c9d0' : '#52525b') : `url(#${gid})`}
-          strokeWidth={scatter ? 1.8 : 2.4} strokeLinecap="round" strokeLinejoin="round"
+          d={smoothPath(linePts)} fill="none"
+          stroke={scatter ? (p.dark ? '#c9c9d0' : '#52525b') : (bands ? `url(#${gid})` : color)}
+          strokeWidth={scatter ? 1.8 : 2.2} strokeLinecap="round" strokeLinejoin="round"
           opacity={scatter ? 0.85 : 1}
         />
         {selIdx >= 0 ? (
           <G>
             <Line x1={xAt(points[selIdx].t)} x2={xAt(points[selIdx].t)} y1={padT} y2={H - padB} stroke={p.text} strokeWidth={1} opacity={0.35} />
-            <Circle cx={xAt(points[selIdx].t)} cy={yAt(points[selIdx].v)} r={4} fill={colAt(points[selIdx].v)} stroke={p.surface2} strokeWidth={1.5} />
+            {selR ? <Circle cx={xAt(points[selIdx].t)} cy={yR(selR.v)} r={4} fill={right!.color} stroke={p.surface2} strokeWidth={1.5} /> : null}
+            <Circle cx={xAt(points[selIdx].t)} cy={yAt(points[selIdx].v)} r={4} fill={bands ? colAt(points[selIdx].v) : color} stroke={p.surface2} strokeWidth={1.5} />
           </G>
         ) : null}
         {ticks.map((t, i) => (

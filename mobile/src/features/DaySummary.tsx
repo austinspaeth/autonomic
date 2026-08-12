@@ -362,7 +362,6 @@ function PossibilityRow({ label, explain }: { label: string; explain: string }) 
 }
 
 function Flag({ color, text }: { color: string; text: string }) {
-  const p = usePalette();
   return (
     <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start', marginTop: 11, padding: 10, borderRadius: radius.control, backgroundColor: mixHex(color, WARN_BASE, 0.14), borderWidth: 1, borderColor: hexA(color, 0.55) }}>
       <Icon name="alert" size={15} color={color} />

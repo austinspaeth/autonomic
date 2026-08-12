@@ -463,9 +463,11 @@ type OpenSheet = ReturnType<typeof useSheets>['openSheet'];
  * workout from any of them lands on its report.
  *
  * `justImported` marks that first post-import open: the report then carries the
- * inline recovery card (see WorkoutQuickEdit), since HR @60s can only be
- * measured in the minute after the workout. Every later open is read-only and
- * sends the user through the pencil to the edit form.
+ * "Add more details" card (see WorkoutDetailsPrompt), because the fields a
+ * health store can't supply — distance on an indoor machine, HR @60s — are only
+ * worth asking for while the user is still standing there. It is a signpost to
+ * the edit form, not a second place to type: everything is entered in the one
+ * form, so nothing can be offered here that the form can't show later.
  */
 export function openWorkoutReport(openSheet: OpenSheet, r: Entry, dk: string, justImported = false): void {
   const openEdit = () => {
@@ -473,7 +475,7 @@ export function openWorkoutReport(openSheet: OpenSheet, r: Entry, dk: string, ju
     if (ACTIVITY_TYPES[r.type]?.custom === 'bike') openSheet((c) => <BikeForm dk={dk} existing={r} controls={c} onSaved={noop} />);
     else openSheet((c) => <EntryForm typeMap={typesFor(getState(), 'activities')} arrKey="activities" dk={dk} type={r.type} existing={r} controls={c} onSaved={noop} />);
   };
-  openSheet(() => <WorkoutSummarySheet r={r} dk={dk} justImported={justImported} />, { action: { icon: 'edit', onPress: openEdit } });
+  openSheet(() => <WorkoutSummarySheet r={r} dk={dk} justImported={justImported} onEdit={openEdit} />, { action: { icon: 'edit', onPress: openEdit } });
 }
 
 export function useEntryForms(dk: string) {
@@ -644,7 +646,7 @@ export function ReadingSummarySheet({ r, dk }: { r: Entry; dk: string }) {
 /** The imported-workout report: the activity's HR trace with exercise zones,
  *  HR stats, time in zones, and the workout's own details (mirror of
  *  ReadingSummarySheet, over the day's activities). */
-export function WorkoutSummarySheet({ r, dk, justImported }: { r: Entry; dk: string; justImported?: boolean }) {
+export function WorkoutSummarySheet({ r, dk, justImported, onEdit }: { r: Entry; dk: string; justImported?: boolean; onEdit?: () => void }) {
   const p = usePalette();
   useAppState(); // re-render on edits
   const state = getState();
@@ -656,78 +658,72 @@ export function WorkoutSummarySheet({ r, dk, justImported }: { r: Entry; dk: str
       {/* The edit + close pill floats top-right — keep the header text clear of it. */}
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, paddingRight: 100 }}>{def?.label || 'Workout'}</Text>
       <Text style={{ color: p.textDim, fontSize: 14, marginTop: 2, marginBottom: 14, paddingRight: 100 }}>{live.time ? fmtTime12(live.time as string) : ''}</Text>
-      {justImported ? <WorkoutQuickEdit r={live} dk={dk} def={def} /> : null}
+      {justImported && onEdit ? <WorkoutDetailsPrompt r={live} def={def} onPress={onEdit} /> : null}
       <WorkoutSummary r={live} days={state.days} ctx={ctx} />
       <View style={{ height: 24 }} />
     </ScrollView>
   );
 }
 
-/** Which of the quick-edit fields this activity type actually stores. Only
- *  fields the type declares are offered, so nothing typed here becomes orphan
- *  data the edit form can't show later. */
-const QUICK_KEYS = ['hr60', 'maxHr', 'minHr'] as const;
+/** The bike form is bespoke (its registry `fields` is empty) but stores these,
+ *  so the prompt below can still name what's missing on an indoor ride. */
+const BIKE_DETAIL_FIELDS: { key: string; label: string }[] = [
+  { key: 'distance', label: 'Distance' },
+  { key: 'resistance', label: 'Resistance' },
+  { key: 'minHr', label: 'Min HR' },
+  { key: 'maxHr', label: 'Max HR' },
+  { key: 'hr60', label: 'HR @60s rest' },
+];
+
+/** The numeric details this activity type declares that the import left blank —
+ *  what the prompt names, so it asks for things this entry can actually hold. */
+function missingDetailLabels(r: Entry, def?: TypeDef): string[] {
+  const fields = def?.custom === 'bike'
+    ? BIKE_DETAIL_FIELDS
+    : entryFields(def)
+      .filter((f) => !isDivider(f) && isNumberField(f) && f.key !== 'duration')
+      .map((f) => ({ key: f.key as string, label: f.label || (f.key as string) }));
+  return fields.filter((f) => !r[f.key]).map((f) => f.label);
+}
 
 /**
- * The recovery card shown once, on the report that pops right after an import.
- * HR @60s (and a missed min/max) can only be filled in while the user is still
- * sitting there catching their breath, and by then the import form is long
- * closed — so the report offers those inputs inline that first time. Later
- * opens are read-only: the pencil is the way in, same as any other entry.
+ * The card shown once, on the report that pops right after an import: a
+ * signpost into the edit form for the details a health store can't supply
+ * (distance on an indoor machine, HR @60s), named so the user knows what's
+ * worth adding while they're still standing there.
  *
- * Edits write straight through `upsertEntry` on blur (and on unmount, so
- * closing the sheet mid-typing still saves).
+ * It used to be an inline set of inputs in an accent-outlined box, which read
+ * as an error and as a second, competing place to enter data. There is one
+ * form; this only opens it. Later opens of the report have the pencil, the
+ * same way in as any other entry.
  */
-function WorkoutQuickEdit({ r, dk, def }: { r: Entry; dk: string; def?: TypeDef }) {
+function WorkoutDetailsPrompt({ r, def, onPress }: { r: Entry; def?: TypeDef; onPress: () => void }) {
   const p = usePalette();
-  // Fixed at mount: hr60 (never imported) plus any declared min/max the import
-  // left blank — so filling one in doesn't make its field vanish mid-typing.
-  const [keys] = useState<string[]>(() => {
-    // The bike form is bespoke (registry `fields` is empty) but stores all three.
-    const declared = def?.custom === 'bike'
-      ? new Set<string | undefined>(QUICK_KEYS)
-      : new Set(entryFields(def).filter((f) => !isDivider(f)).map((f) => f.key));
-    return QUICK_KEYS.filter((k) => declared.has(k) && (k === 'hr60' || !r[k]));
-  });
-  const [vals, setVals] = useState<Record<string, string>>(() =>
-    Object.fromEntries(QUICK_KEYS.map((k) => [k, (r[k] as string) || ''])));
-  // Commit reads the entry fresh: the report re-renders on every store change,
-  // so the copy captured at mount can be stale by the time a field blurs.
-  const valsRef = React.useRef(vals);
-  valsRef.current = vals;
-  const commit = () => {
-    const cur = (getState().days[dk]?.activities || []).find((x) => x.id === r.id);
-    if (!cur) return;
-    const patch = Object.fromEntries(keys.map((k) => [k, valsRef.current[k].trim()]));
-    if (keys.every((k) => ((cur[k] as string) || '') === patch[k])) return;
-    upsertEntry(dk, 'activities', { ...cur, ...patch });
-  };
-  const commitRef = React.useRef(commit);
-  commitRef.current = commit;
-  React.useEffect(() => () => commitRef.current(), []);
-
-  if (!keys.length) return null;
+  // Fixed at mount: typing a value in shouldn't make the sub-line rewrite
+  // itself under the user when they come back from the form.
+  const [missing] = useState<string[]>(() => missingDetailLabels(r, def));
   return (
-    <View style={{ backgroundColor: p.surface2, borderColor: p.accent, borderWidth: 1, borderRadius: radius.card, padding: 16, marginBottom: 12 }}>
-      <Text style={{ fontSize: 15, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, color: p.accent }}>Log now</Text>
-      <Text style={{ fontSize: 13, color: p.textDim, marginTop: 6, marginBottom: 12, lineHeight: 18 }}>
-        {keys.includes('hr60')
-          ? 'Your heart rate 60 seconds after stopping. Add it now while you can still measure it, or later from the edit form.'
-          : 'Anything the import missed. You can also add it later from the edit form.'}
-      </Text>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-        {keys.map((k) => (
-          <View key={k} style={{ width: keys.length === 1 ? '100%' : '47%' }}>
-            <TextField
-              label={k === 'hr60' ? 'HR after 60 seconds' : k === 'maxHr' ? 'Max HR' : 'Min HR'}
-              value={vals[k]}
-              onChange={(v) => setVals((prev) => ({ ...prev, [k]: v }))}
-              onBlur={commit}
-              keyboardType="decimal-pad"
-            />
-          </View>
-        ))}
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        {
+          borderWidth: 1, borderColor: p.border, borderRadius: radius.card,
+          backgroundColor: p.surface, marginBottom: 14, padding: 15,
+          flexDirection: 'row', alignItems: 'center', gap: 13,
+        },
+        pressed && { opacity: 0.75 },
+      ]}
+    >
+      <View style={{ width: 42, height: 42, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: p.sunk, borderWidth: 1, borderColor: p.border }}>
+        <Icon name="edit" size={19} color={p.textDim} />
       </View>
-    </View>
+      <View style={{ flex: 1 }}>
+        <Text style={{ fontSize: 15, fontWeight: '700', color: p.text }}>Add more details</Text>
+        <Text style={{ fontSize: 13, color: p.textDim, marginTop: 3, lineHeight: 17 }} numberOfLines={2}>
+          {missing.length ? missing.join(' · ') : 'Anything the import missed'}
+        </Text>
+      </View>
+      <Icon name="chevronRight" size={20} color={p.textDim} />
+    </Pressable>
   );
 }

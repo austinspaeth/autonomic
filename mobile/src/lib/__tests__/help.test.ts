@@ -23,6 +23,7 @@ const SOURCES = [
   'src/lib/analysis/categories.ts',
   'src/components/summary.tsx',
   'src/features/HrvProgress.tsx',
+  'src/lib/insights/help.ts',
 ];
 
 const learnMorePaths = () => {

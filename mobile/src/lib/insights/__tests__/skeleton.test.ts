@@ -1,16 +1,19 @@
 /**
  * The skeleton's measuring samples, against what the engine really produces.
  *
- * `TextGhost` reserves height by laying its block over an invisible copy of a
- * SAMPLE string in the real style, so the sample's wrapped length is what decides
- * whether the page jumps when the content lands. A sample that is too short
- * under-reserves and the content pushes everything down; too long over-reserves and
- * the page settles up by a few pixels, which is far less visible.
+ * These cover the skeleton's ONCE-PER-INSTALL fallback, the path taken before any card
+ * has been measured. After that the placeholder uses the heights it remembered from
+ * `onLayout` and none of these samples is consulted.
  *
- * So these assert the samples are at least as long as the real strings, using the
- * demo month, which is exactly what a first-time user's skeleton is measured
- * against. They cannot cover every possible journal (somebody's custom supplement
- * name may be longer than any sample), which is why the samples err long.
+ * On that first open it reserves space by laying an invisible copy of a SAMPLE string
+ * in the real style behind each block, so the sample's wrapped length is what decides
+ * whether the page jumps. Too short under-reserves and the content pushes everything
+ * down; too long over-reserves and the page settles up by a few pixels, which is far
+ * less visible.
+ *
+ * The demo month is the fixture, since that is exactly what a first-time user's
+ * skeleton is measured against. It cannot cover every journal — somebody's custom
+ * supplement name may be longer than any sample — which is why the samples err long.
  */
 import { todayKey } from '../../dates';
 import { demoState } from '../../demo';
@@ -27,59 +30,31 @@ const atLeast = (sample: string, real: string) => {
   expect(sample.length).toBeGreaterThanOrEqual(real.length);
 };
 
-describe('skeleton samples cover the headline card', () => {
-  it('reserves the headline and its body', () => {
-    const c = report.change!;
-    atLeast(SAMPLE.headline, c.headline);
-    atLeast(SAMPLE.body, c.body);
+describe('skeleton samples cover the paragraphs they reserve', () => {
+  it('reserves the headline card body', () => {
+    atLeast(SAMPLE.body, report.change!.body);
   });
 
-  it('reserves the before/after values and the confidence word', () => {
-    const c = report.change!;
-    atLeast(SAMPLE.barValue, c.beforeText);
-    atLeast(SAMPLE.barValue, c.afterText);
-    atLeast(SAMPLE.confWord, c.confidence);
-  });
-});
-
-describe('skeleton samples cover the visible correlation rows', () => {
-  const visible = report.correlations.slice(0, VISIBLE_CORRELATIONS);
-
-  it('has rows to check', () => {
-    expect(visible.length).toBeGreaterThan(0);
-  });
-
-  it('reserves the r value and the detail line', () => {
-    visible.forEach((c) => {
-      atLeast(SAMPLE.rValue, c.rText);
-      atLeast(SAMPLE.rowNote, `${c.detail} · ${c.note}`);
-    });
-  });
-
-  it('shows the same number of rows the list does', () => {
-    expect(VISIBLE_ROWS).toBe(VISIBLE_CORRELATIONS);
-  });
-});
-
-describe('skeleton samples cover the observation rows', () => {
-  it('reserves the tallest body the probes can produce', () => {
-    // The body is the tall part: three wrapped lines at 12.5/18. Every probe's copy
-    // has to fit, not just the one that happened to win.
+  it('reserves the tallest observation body any probe can produce', () => {
+    // Every probe's copy has to fit, not just the one that happened to win.
     expect(report.observations.length).toBeGreaterThan(0);
-    report.observations.forEach((o) => {
-      atLeast(SAMPLE.obsTitle, o.title);
-      atLeast(SAMPLE.obsBody, o.body);
-    });
+    report.observations.forEach((o) => atLeast(SAMPLE.obsBody, o.body));
+  });
+
+  it('reserves a correlation row and a trend-watch row', () => {
+    report.correlations.slice(0, VISIBLE_CORRELATIONS).forEach((c) => atLeast(SAMPLE.rowNote, c.note));
+    report.watch.forEach((t) => atLeast(SAMPLE.watchSub, t.sub));
+  });
+
+  it('carries no samples it no longer measures with', () => {
+    // Dead samples are worse than none: they look like a guarantee and give one.
+    expect(Object.keys(SAMPLE).sort()).toEqual(['body', 'obsBody', 'rowNote', 'watchSub']);
   });
 });
 
-describe('skeleton samples cover the trend watch rows', () => {
-  it('reserves the title, subtitle and value', () => {
-    expect(report.watch.length).toBeGreaterThan(0);
-    report.watch.forEach((t) => {
-      atLeast(SAMPLE.watchTitle, t.title);
-      atLeast(SAMPLE.watchSub, t.sub);
-      atLeast(SAMPLE.watchValue, t.value);
-    });
+describe('the skeleton draws as many rows as the list does', () => {
+  it('shows the same number of correlation rows', () => {
+    expect(VISIBLE_ROWS).toBe(VISIBLE_CORRELATIONS);
+    expect(report.correlations.length).toBeGreaterThan(0);
   });
 });

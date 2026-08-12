@@ -314,15 +314,76 @@ old web app so old `export.json` files import directly.
   supplement-free; **onset analysis needs `onsetNoun`**, since starting magnesium
   is a decision with a date and the first night you slept 7h is not; **dispersion
   metrics can't be correlation outcomes** (one night's bedtime is a bedtime, not a
-  consistency); **copy is associational, never causal**; and **an empty report is
+  consistency); **copy is associational, never causal**; **a row's readout is the gap
+  between the two groups' medians in the metric's own unit** (`deltaText`, "+12 ms"),
+  never the coefficient — a signed decimal with no unit reads as a percentage, and a
+  rho is a statement about ordering nobody can act on, so `rText` now survives only in
+  the AI prompt; and **an empty report is
   a correct answer**. `watch.ts` is the ONE place the app volunteers bad news —
   Insights is a view the user deliberately opened — but it stays silent during a
   downturn, and `findTrend`'s improvements-only rule is untouched. Results are
   cached in `cache.ts` keyed `todayKey()|meta.lastUpdated|demo`; the screen's
   render path only ever calls `getCachedInsights`, and builds run in
-  `InteractionManager.runAfterInteractions` behind a skeleton. The demo month's
-  correlations all read ~1.00 for a structural reason documented in `demo.ts`, not
-  a bug.
+  `InteractionManager.runAfterInteractions` behind a skeleton. **Anything queued on
+  that queue must not throw**: a task that throws stops the queue, and every deferred
+  build in the app shares it, so one Insights failure left Progress sitting on its
+  skeletons at every range with no visible connection to Insights at all. The build
+  and the shape write in `app/(tabs)/insights.tsx` are therefore wrapped and reported
+  through `logError` ("finding nothing" is a state this view already renders). The
+  app's own error log is how that was diagnosed — `errorLog` in the plaintext
+  `autonomic.flags` MMKV, readable straight out of a simulator's container. The demo
+  month's correlations all read ~1.00 for a structural reason documented in `demo.ts`,
+  not a bug.
+- **Insights wears Progress's card grammar, not its own.** Each section is ONE
+  card (`InsightCard` in `src/features/insights/Sections.tsx`) holding its title,
+  a `HelpDot`, an optional plain-language sentence, and then its rows as inset
+  BUBBLES (`ROW` in `style.ts`) rather than hairline-divided lines: every row goes
+  somewhere, so it reads as a button, and the treatment matches the stat tiles so a
+  card holds one kind of object throughout. A card that has more to show ends with a
+  full-width `CardButton` ("Show all 24 correlations") rather than a link in its
+  title, and the claim's chevron opens `SinceExplain` — the same "How this was
+  calculated" shape the Outlook's "What powers this" opens, wearing the Journal's own
+  `ScoreGauge` (extended with a `marker` tick for where the comparison began), with
+  the component breakdown normalised by the score's `confidence` so the parts genuinely
+  SUM to the headline (dividing by 100 instead understated them fourfold). Day one is
+  user-changeable via the Journal's `Calendar` sheet, stored in
+  `insights/anchorMemory.ts` and part of the cache key. Every
+  measurement lives in `src/features/insights/style.ts`, which lifts them from
+  `CardView` and is imported by BOTH the content and the skeleton, so the two
+  cannot drift; `ProgressSkeleton` copies its constants with a warning comment
+  instead, which is the weaker version of the same idea. The skeleton's other two
+  rules: chrome whose text never depends on data is rendered FOR REAL (titles,
+  help dots, descriptions, tile labels, "Confidence", the footer), and **the skeleton
+  does not rebuild a card's interior, it reproduces the card's HEIGHT**. Rebuilding
+  can never be exact (a headline wraps to one line or two, a body to three or four),
+  so `insights/shape.ts` (pure, tested) + `shapeMemory.ts` (flags MMKV, the
+  `annual.ts`/`annualMemory.ts` split) remember both the row counts AND each card's
+  measured height from `onLayout`, and the placeholder pins each card to it with
+  `overflow: hidden`. Inside that height it draws the real title and `HelpDot` plus
+  ONE ghost bar, nothing more. The measured-sample fallback runs once per install,
+  guarded by `insights/__tests__/skeleton.test.ts`. Note the trap it fixed: text the
+  real row clamps with `numberOfLines={1}` must be measured from a ONE-CHARACTER
+  sample, because a full sample wraps inside the placeholder and makes it a line
+  taller than the row it becomes. Two more traps it fixed: `onLayout` on a WRAPPER
+  reports the child's margin too, so measuring a wrapper and pinning the card made
+  every skeleton card 12pt tall (48pt down the page) — measure the card itself; and row
+  heights are stored PER ROW, because observation rows genuinely differ and one figure
+  put later bubbles where no row would be.
+- **Four overlays share the floating pill slot, as a STACK.** `src/lib/pillStack.ts`
+  (pure, tested) owns `PILL_RANK` — watch sync, health import, what's new, then the
+  Insights AI button — and the recede geometry; `src/store/pillSlot.ts` keeps the live
+  claims. Each pill claims its own rank and reads `pillDepth(key)`, receding one step
+  per pill ABOVE it. The old binary "is anything claimed" counted a pill against
+  itself, which only showed up once a third layer existed. Note the iOS trap in
+  `AskAi.tsx`: a shadow and `overflow: hidden` on the same view cancel out, so the
+  shadow lives on an outer layer and the clip on an inner one. The "new" dot is PER CARD (`insights/seen.ts` stores
+  The header is the claim `changeSinceStart` makes — "64% better than day one", bold and coloured,
+  with the reference in grey — beside a bare confidence ring. That percentage is
+  PERCENTAGE POINTS on the score's own 0-100 index, never a ratio: a ratio called
+  the same move "251% better", which is unbounded and hype. It scores only the
+  earliest and latest fortnight of LOGGED days, so "day one" is genuinely day one
+  rather than the start of the 180-day analysis window, and it falls back to stating
+  the window when there is too little to compare.
 - **The sleep report is the workout report's twin, and all its math is
   `src/lib/sleep/`.** Tapping the Journal's "Last night" card opens
   `<SleepReportSheet/>` (`src/features/SleepReport.tsx`) with the edit pencil in

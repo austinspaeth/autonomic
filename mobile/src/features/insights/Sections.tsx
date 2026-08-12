@@ -1,23 +1,32 @@
 /**
- * The Insights view's content, one component per section of the design.
+ * The Insights view's content: four cards, in Progress's card grammar.
  *
- * These are all presentational: every number, label and sentence arrives from
- * src/lib/insights already computed and already worded. That split is the point —
- * the copy for a health claim belongs next to the statistics that justify it, not
- * in a component that could quietly start rounding differently.
+ * WHAT CHANGED AND WHY, because the previous build read as a different app: every
+ * section used to be a floating uppercase label over a stack of separate
+ * mini-cards, which nothing else here does. Each section is now ONE card holding
+ * its own title, a "?" help dot, an optional red text action, one plain-language
+ * sentence, and then hairline-divided rows — the same object `CardView` renders on
+ * Progress, and the same rows the Journal lists entries with. Card chrome, title
+ * size, description size and the stat tiles all come from ./style, which lifts
+ * them from `CardView` directly.
  *
- * Shared visual language, taken from the Claude Design comp:
- *   · section headings are small, uppercase, tracked-out and dim
- *   · confidence is always five pips, filled to the finding's strength
- *   · a finding that points the healthy way is green, one that doesn't is accent
- *     red — never both on the same row
+ * Two deliberate departures from the Claude Design comp:
+ *   · Its borderless 22pt cards on 14pt gutters are replaced by the app's bordered
+ *     `radius.card` on 16pt. The comp's own notes ask for the app's grammar, and
+ *     this is what that grammar is.
+ *
+ * These components are presentational. Every number, label and sentence arrives
+ * from src/lib/insights already computed and already worded: the copy for a health
+ * claim belongs next to the statistics that justify it, not in a component that
+ * could quietly start rounding differently.
  */
 import React, { useMemo } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, Text, View, type LayoutChangeEvent } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
-import { Icon } from '../../components/Icon';
+import { Icon, type IconName } from '../../components/Icon';
+import { HelpDot } from '../../components/ui';
 import { useSheets, type SheetControls } from '../../components/Sheet';
-import { radius, usePalette } from '../../theme';
+import { fonts, radius, usePalette } from '../../theme';
 import { getState } from '../../store/store';
 import { useTier } from '../../store/tier';
 import { usePaywall } from '../Paywall';
@@ -25,55 +34,154 @@ import { PromptSheet } from '../PromptSheet';
 import { demoState, hasOwnData } from '../../lib/demo';
 import { resolveProtocol } from '../../lib/scoring/day';
 import { buildCorrelationsPrompt } from '../../lib/insights/prompt';
+import { INSIGHTS_HELP, VISIBLE_CORRELATIONS } from '../../lib/insights';
 import type { BiggestChange, ConfidencePart, Correlation, DataConfidence, Observation, WatchItem } from '../../lib/insights';
-import { VISIBLE_CORRELATIONS } from '../../lib/insights';
 import * as S from './style';
 
 const GOOD = S.GOOD;
 
-/* ---------- shared bits ---------- */
+/** Card descriptions, exported so ./InsightsSkeleton renders the SAME strings and
+ *  the copy cannot move when the report lands. */
+export const OBS_DESC = 'Smaller patterns and gaps the app noticed while you were logging.';
+export const WATCH_DESC = 'Metrics that have genuinely moved over the last month, against the month before it.';
+
+/* ---------- the card shell ---------- */
 
 /**
- * The uppercase section heading. Pure chrome, so the skeleton renders the REAL
- * one rather than a ghost of it: the text never depends on the data, and a
- * placeholder for a fixed string is a placeholder that can be wrong.
+ * One Insights card: the shell every section wears.
+ *
+ * Deliberately the same header shape as `CardView`: title, help dot, right-hand
+ * action.
  */
-export function SectionLabel({ text, right }: { text: string; right?: string }) {
+export function InsightCard({ title, help, desc, action, onAction, onLayout, children }: {
+  title: string;
+  help: keyof typeof INSIGHTS_HELP;
+  /**
+   * Measures the CARD, not a wrapper around it.
+   *
+   * This distinction was a real 12pt-per-card bug: `S.CARD` carries
+   * `marginBottom: 12`, and a wrapper's frame includes a child's margin while the
+   * child's own frame does not. Measuring the wrapper and then applying that height
+   * to the card made every skeleton card 12pt too tall — 48pt of shift down the page.
+   */
+  onLayout?: (e: LayoutChangeEvent) => void;
+  /** The card's plain-language sentence. Omitted by the Biggest change card, which
+   *  leads with the finding itself rather than a standing description. */
+  desc?: string;
+  /** Red text action on the right of the title, e.g. "Show all". */
+  action?: string;
+  onAction?: () => void;
+  children?: React.ReactNode;
+}) {
   const p = usePalette();
   return (
-    <View style={S.SECTION_BAND}>
-      <Text style={[S.SECTION_LABEL, { color: p.textDim }]}>{text.toUpperCase()}</Text>
-      {right ? <Text style={[S.SECTION_RIGHT, { color: p.textDim }]}>{right}</Text> : null}
+    <View onLayout={onLayout} style={[S.CARD, { backgroundColor: p.surface, borderColor: p.border }]}>
+      <View style={S.CARD_HEAD}>
+        <Text style={[S.CARD_TITLE, { color: p.textDim }]}>{title}</Text>
+        <HelpDot title={title} text={INSIGHTS_HELP[help]} />
+        {action ? (
+          <>
+            <View style={{ flex: 1 }} />
+            <Pressable onPress={onAction} hitSlop={8} accessibilityRole="button">
+              <Text style={[S.CARD_ACTION, { color: p.accent }]}>{action}</Text>
+            </Pressable>
+          </>
+        ) : null}
+      </View>
+      {desc ? <Text style={[S.CARD_DESC, { color: p.textDim }]}>{desc}</Text> : null}
+      {children}
     </View>
   );
 }
 
-/** Five pips, `filled` of them lit. The app's one confidence notation. */
-export function Pips({ filled, color, width = S.PIP_W }: { filled: number; color: string; width?: number }) {
+/** A bubble row. Tappable only when it has somewhere to go — a chevron on a row
+ *  that does nothing is a promise the app doesn't keep. */
+function CardRow({ onPress, tall, onLayout, children }: {
+  onPress?: () => void;
+  tall?: boolean;
+  /** Reports this row's height, so the skeleton's bubble can sit exactly where it
+   *  will. Every row, not just the first: observation rows genuinely differ in height. */
+  onLayout?: (e: LayoutChangeEvent) => void;
+  children: React.ReactNode;
+}) {
+  const p = usePalette();
+  const base = [tall ? S.ROW_TALL : S.ROW, { backgroundColor: p.bg, borderColor: p.border }];
+  if (!onPress) return <View onLayout={onLayout} style={base}>{children}</View>;
+  return (
+    <Pressable onPress={onPress} onLayout={onLayout} accessibilityRole="button" style={({ pressed }) => [...base, pressed && { opacity: 0.6 }]}>
+      {children}
+    </Pressable>
+  );
+}
+
+/** The full-width action a card can end with. */
+function CardButton({ label, onPress }: { label: string; onPress: () => void }) {
   const p = usePalette();
   return (
-    <View style={{ flexDirection: 'row', gap: 3 }}>
-      {[0, 1, 2, 3, 4].map((i) => (
-        <View key={i} style={{ width, height: S.PIP_H, borderRadius: 999, backgroundColor: i < filled ? color : p.surface2 }} />
-      ))}
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      style={({ pressed }) => [S.CARD_BUTTON, { borderColor: p.border, backgroundColor: p.surface2 }, pressed && { opacity: 0.7 }]}
+    >
+      <Text style={[S.CARD_BUTTON_TEXT, { color: p.text }]}>{label}</Text>
+    </Pressable>
+  );
+}
+
+/** A solid fill on a dark track: the app's one strength notation, matching the
+ *  milestone progress bar. Segmented pips were a chart type nothing else used. */
+function Bar({ pct, color, width, height = S.CONF_BAR_H }: { pct: number; color: string; width?: number; height?: number }) {
+  const p = usePalette();
+  return (
+    <View style={{ width, height, borderRadius: 999, backgroundColor: p.bg, overflow: 'hidden' }}>
+      <View style={{ width: `${Math.max(4, Math.min(100, pct))}%`, height: '100%', borderRadius: 999, backgroundColor: color }} />
     </View>
   );
 }
 
-/** The headline card's chrome. Shared with the skeleton via ./style. */
-export function Panel({ children, style }: { children: React.ReactNode; style?: object }) {
+/** A stat tile, exactly as Progress draws one. */
+function Tile({ value, unit, label, color }: { value: string; unit?: string; label: string; color?: string }) {
   const p = usePalette();
-  return <View style={[S.PANEL, { backgroundColor: p.sunk, borderColor: p.border }, style]}>{children}</View>;
+  return (
+    <View style={[S.TILE, { backgroundColor: p.bg, borderColor: p.border }]}>
+      <Text style={[S.TILE_VALUE, { fontFamily: fonts.numHeavy, color: color || p.text, fontVariant: ['tabular-nums'] }]}>
+        {value}
+        {unit ? <Text style={{ fontSize: 12, fontWeight: '600', color: p.textDim }}>{` ${unit}`}</Text> : null}
+      </Text>
+      <Text style={[S.TILE_LABEL, { color: p.textDim }]}>{label}</Text>
+    </View>
+  );
 }
 
-/** A list row's chrome: correlations, observations. Shared with the skeleton. */
-export function Row({ children, style }: { children: React.ReactNode; style?: object }) {
+/* ---------- biggest change ---------- */
+
+export function BiggestChangeCard({ change, onLayout }: { change: BiggestChange; onLayout?: (e: LayoutChangeEvent) => void }) {
   const p = usePalette();
-  return <View style={[S.ROW, { backgroundColor: p.sunk, borderColor: p.border }, style]}>{children}</View>;
+  const color = change.good ? GOOD : p.accent;
+  return (
+    <InsightCard title="Biggest change" help="change" onLayout={onLayout}>
+      {/* The finding leads, then its explanation. This card has no standing
+          description: the headline IS the sentence, and a fixed line above it would
+          push the one thing worth reading down the card. */}
+      <Text style={[S.HEADLINE, { color: p.text }]}>{change.headline}</Text>
+      <Text style={[S.BODY, { color: p.textDim }]}>{change.body}</Text>
+      <View style={S.TILE_ROW}>
+        <Tile value={change.beforeValue} unit={change.unit} label="Before" />
+        <Tile value={change.afterValue} unit={change.unit} label="After" color={color} />
+        <Tile value={change.changeValue} unit={change.changeUnit} label="Change" color={color} />
+      </View>
+      <View style={{ borderTopWidth: 1, borderTopColor: p.border, paddingTop: S.CONF_TOP }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: S.CONF_GAP }}>
+          <Text style={[S.CONF_LABEL, { color: p.textDim }]}>Confidence</Text>
+          <Text style={[S.CONF_LABEL, { color, fontWeight: '700' }]}>{change.confidence}</Text>
+        </View>
+        <Bar pct={(change.pips / 5) * 100} color={color} />
+      </View>
+    </InsightCard>
+  );
 }
 
-/** The headline card's eyebrow. Fixed text, so the skeleton renders it for real. */
-export const CHANGE_EYEBROW = 'BIGGEST CHANGE THIS MONTH';
+/* ---------- correlations ---------- */
 
 /** The `driver -> metric` glyph. Chrome, so the skeleton keeps it. */
 export function PairArrow() {
@@ -85,115 +193,91 @@ export function PairArrow() {
   );
 }
 
-/** A tiny pulsing-free "new" dot. Static: the header owns the animated one, and
- *  two pulsing dots on one screen is a fairground. */
-function NewDot() {
-  const p = usePalette();
-  return <View style={{ width: 7, height: 7, borderRadius: 999, backgroundColor: p.accent }} />;
-}
-
-/* ---------- biggest change ---------- */
-
-export function BiggestChangeCard({ change, isNew }: { change: BiggestChange; isNew: boolean }) {
-  const p = usePalette();
-  const color = change.good ? GOOD : p.accent;
-  // The two bars are sized against each other so the shorter one still reads as a
-  // bar rather than a hairline — this is a comparison, not a measurement.
-  const max = Math.max(Math.abs(change.before), Math.abs(change.after)) || 1;
-  const beforeW = Math.max(18, (Math.abs(change.before) / max) * 100);
-  const afterW = Math.max(18, (Math.abs(change.after) / max) * 100);
-
-  return (
-    <Panel>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: S.EYEBROW_GAP }}>
-        <Text style={[S.EYEBROW, { color: p.textDim }]}>{CHANGE_EYEBROW}</Text>
-        {isNew ? <NewDot /> : null}
-      </View>
-      <Text style={[S.HEADLINE, { color: p.text, marginBottom: S.HEADLINE_GAP }]}>{change.headline}</Text>
-      <Text style={[S.BODY, { color: p.textDim, marginBottom: S.BODY_GAP }]}>{change.body}</Text>
-
-      <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 14, marginBottom: S.BARS_GAP }}>
-        <View style={{ flex: 1 }}>
-          <Text style={[S.BAR_LABEL, { color: p.textDim, marginBottom: S.BAR_LABEL_GAP }]}>{change.beforeLabel}</Text>
-          <View style={{ height: S.BAR_H, borderRadius: 999, backgroundColor: p.surface2, width: `${beforeW}%` }} />
-          <Text style={[S.BAR_VALUE, { color: p.textDim, marginTop: S.BAR_VALUE_GAP }]}>{change.beforeText}</Text>
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={[S.BAR_LABEL, { color: p.textDim, marginBottom: S.BAR_LABEL_GAP }]}>{change.afterLabel}</Text>
-          <View style={{ height: S.BAR_H, borderRadius: 999, backgroundColor: color, width: `${afterW}%` }} />
-          <Text style={[S.BAR_VALUE, { color, marginTop: S.BAR_VALUE_GAP }]}>{change.afterText}</Text>
-        </View>
-      </View>
-
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: p.border, paddingTop: S.CONF_PAD }}>
-        <Text style={[S.CONF_LABEL, { color: p.textDim }]}>Confidence</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Pips filled={change.pips} color={color} width={S.PIP_W_WIDE} />
-          <Text style={[S.CONF_WORD, { color: p.text }]}>{change.confidence}</Text>
-        </View>
-      </View>
-    </Panel>
-  );
-}
-
-/* ---------- correlations ---------- */
-
-function CorrelationRow({ c }: { c: Correlation }) {
+/**
+ * ONE correlation, wherever it appears.
+ *
+ * Shared by the card and by the full list in the sheet, rather than each drawing its
+ * own: they are the same object, so a reader who opens "Show all" should recognise the
+ * rows they were just looking at, and two hand-built versions of a row drift the
+ * moment either is touched. The sheet adds the associational sentence via `sub` — the
+ * one thing it has room for that the card does not.
+ *
+ * THE READOUT IS THE DIFFERENCE, NOT THE COEFFICIENT. This row used to end in the
+ * correlation itself ("+0.74"), which is not a quantity: a signed decimal with no unit
+ * reads as a percentage, and even read correctly a rho is a statement about ordering
+ * that nobody can act on. So the number is now the gap between the two groups' medians
+ * in the metric's own unit ("+12 ms"), the bar and its word carry how good the
+ * evidence is, and the coefficient survives only in the AI prompt.
+ *
+ * Not a button. There is no per-correlation screen to go to, and pointing the row at
+ * the nearest Progress chart answered a different question than the row asked.
+ */
+function CorrelationRow({ c, onLayout, sub }: {
+  c: Correlation;
+  onLayout?: (e: LayoutChangeEvent) => void;
+  /** An extra line under the strength bar, in the row's own note style. */
+  sub?: string;
+}) {
   const p = usePalette();
   const color = c.good ? GOOD : p.accent;
   return (
-    <Row>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: S.PAIR_GAP }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, flex: 1, minWidth: 0 }}>
-          <Text numberOfLines={1} style={[S.PAIR_TEXT, { color: p.text, flexShrink: 1 }]}>{c.driver}</Text>
+    <CardRow onLayout={onLayout}>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: S.PAIR_GAP }}>
+          <Text numberOfLines={1} style={[S.PAIR_DRIVER, { color: p.text, flexShrink: 1 }]}>{c.driver}</Text>
           <PairArrow />
-          <Text numberOfLines={1} style={[S.PAIR_TEXT, { color: p.textDim }]}>{c.metric}</Text>
+          <Text numberOfLines={1} style={[S.PAIR_METRIC, { color: p.textDim }]}>{c.metric}</Text>
         </View>
-        <Text style={[S.R_VALUE, { color }]}>{c.rText}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
+          <Bar pct={(c.pips / 5) * 100} color={color} width={S.STRENGTH_BAR_W} height={S.STRENGTH_BAR_H} />
+          <Text numberOfLines={1} style={[S.ROW_NOTE, { color: p.textDim, flex: 1 }]}>{c.note}</Text>
+        </View>
+        {sub ? <Text style={[S.ROW_NOTE, { color: p.textDim, marginTop: S.PAIR_GAP }]}>{sub}</Text> : null}
       </View>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-        <Pips filled={c.pips} color={color} />
-        <Text numberOfLines={1} style={[S.ROW_NOTE, { color: p.textDim, flex: 1 }]}>{c.detail} · {c.note}</Text>
-      </View>
-    </Row>
+      <Text numberOfLines={1} style={[S.R_VALUE, { color, fontFamily: fonts.numHeavy, fontVariant: ['tabular-nums'] }]}>{c.deltaText}</Text>
+    </CardRow>
   );
 }
 
-export function Correlations({ list, change }: { list: Correlation[]; change: BiggestChange | null }) {
-  const p = usePalette();
+export function Correlations({ list, change, onRowLayout, onLayout }: {
+  list: Correlation[];
+  change: BiggestChange | null;
+  /** Fires per row, with its index. Feeds the skeleton's remembered row heights. */
+  onRowLayout?: (i: number, e: LayoutChangeEvent) => void;
+  onLayout?: (e: LayoutChangeEvent) => void;
+}) {
   const { openSheet } = useSheets();
   if (!list.length) return null;
   const visible = list.slice(0, VISIBLE_CORRELATIONS);
-  const rest = list.length - visible.length;
+  const more = list.length > visible.length;
   return (
-    <View>
-      <SectionLabel text="Other correlations" right="Computed on device" />
-      {visible.map((c) => <CorrelationRow key={c.id} c={c} />)}
-      {rest > 0 ? (
-        <Pressable
+    // No description: the rows say what they are, and the sentence only pushed the
+    // findings down the card. No "Show all" link in the title either — the count is
+    // worth stating, and a full-width button at the end reads as the end of the list
+    // rather than as a header control.
+    <InsightCard title="Correlations" help="correlations" onLayout={onLayout}>
+      {visible.map((c, i) => (
+        <CorrelationRow key={c.id} c={c} onLayout={onRowLayout ? (e) => onRowLayout(i, e) : undefined} />
+      ))}
+      {more ? (
+        <CardButton
+          label={`Show all ${list.length} correlations`}
           onPress={() => openSheet(() => <AllCorrelationsSheet list={list} change={change} />)}
-          accessibilityRole="button"
-          style={[S.SHOW_ALL, { borderColor: p.border }]}
-        >
-          <Text style={[S.SHOW_ALL_TEXT, { color: p.text }]}>{`Show all ${list.length}`}</Text>
-        </Pressable>
+        />
       ) : null}
-    </View>
+    </InsightCard>
   );
 }
 
 /**
  * The full ranked list.
  *
- * Uses each finding's `headline` rather than the compact `driver → metric` row,
- * because this is the view somebody opens when they want to actually read them,
- * and it carries the standing disclaimer, since a wall of twenty associations is
- * exactly where somebody might start reading causes into them.
- *
- * It ends with the AI hand-off rather than a close button. The sheet already has
- * its own dismiss, and a second opinion is the genuinely useful next step from a
- * list this long: the device can rank associations but it cannot tell the user
- * which four of them are the same underlying trend wearing different clothes.
+ * The SAME rows as the card, in the same bubbles at the same type scale, because this
+ * is the same list continued rather than a second presentation of it. Each row carries
+ * the finding's `headline` underneath as well: the sheet is where somebody has gone to
+ * actually read them, and there is room here for the sentence the card has to leave
+ * out. It ends with the AI hand-off, since the device can rank associations but cannot
+ * tell the user which four of them are one underlying trend wearing different clothes.
  */
 function AllCorrelationsSheet({ list, change }: { list: Correlation[]; change: BiggestChange | null }) {
   const p = usePalette();
@@ -203,23 +287,11 @@ function AllCorrelationsSheet({ list, change }: { list: Correlation[]; change: B
       {/* Held clear of the sheet's own close button, which sits over the
           top-right corner of this block. */}
       <Text style={{ color: p.textDim, fontSize: 13, lineHeight: 19, marginTop: 5, marginBottom: 16, maxWidth: '82%' }}>
-        {`${list.length} associations found in your own log, strongest first. These are patterns, not causes.`}
+        {`${list.length} associations found in your own log, most trusted first. Each number is the typical difference between the two groups in that metric's own units. These are patterns, not causes.`}
       </Text>
-      {list.map((c) => {
-        const color = c.good ? GOOD : p.accent;
-        return (
-          <View key={c.id} style={{ borderTopWidth: 1, borderTopColor: p.border, paddingVertical: 13 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-              <Text style={{ color: p.text, fontSize: 14, fontWeight: '700', flex: 1 }}>{c.headline}</Text>
-              <Text style={{ color, fontSize: 15, fontWeight: '700' }}>{c.rText}</Text>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9, marginTop: 7 }}>
-              <Pips filled={c.pips} color={color} width={12} />
-              <Text style={{ color: p.textDim, fontSize: 12, flex: 1 }}>{c.confidence} · {c.detail} · {c.note}</Text>
-            </View>
-          </View>
-        );
-      })}
+      {list.map((c) => (
+        <CorrelationRow key={c.id} c={c} sub={c.headline} />
+      ))}
       <View style={{ height: 16 }} />
       <CorrelationsAiButton list={list} change={change} />
     </View>
@@ -271,27 +343,58 @@ function CorrelationsAiButton({ list, change }: { list: Correlation[]; change: B
 /* ---------- worth a look ---------- */
 
 /**
- * No glyphs, and no tone colour either.
+ * Three fixed glyphs, one per tone: a check, an info circle, a warning triangle.
  *
- * Each probe used to carry its own icon, but they were eight different metaphors
- * for "we noticed something", which is not a distinction worth a column of tiles.
- * Colouring the title by tone instead was worse: an amber or red heading turns
- * "No POTS test in 42 days" into something that reads like an error, when it is
- * a note about the analysis. The titles are plain and the copy carries the weight.
+ * An earlier build gave every probe its own icon, which was eight different
+ * metaphors for "we noticed something" and so carried no information; the build
+ * after that dropped icons entirely. This is the comp's answer and the better one —
+ * three fixed categories, so whether a row is good news, a note, or something to
+ * attend to is readable before the words are.
  */
-export function WorthALook({ list }: { list: Observation[] }) {
+export const TONE: Record<Observation['tone'], { icon: IconName; color: (p: { accent: string }) => string }> = {
+  good: { icon: 'check', color: () => GOOD },
+  watch: { icon: 'info', color: () => S.NEUTRAL },
+  alert: { icon: 'alert', color: (p) => p.accent },
+};
+
+/**
+ * The heuristic observations.
+ *
+ * Rows are NOT buttons. Each one is already a complete statement — "your morning
+ * readings run higher than your evening ones" — so there is nothing behind it to go
+ * and see; the chevron promised a destination that was really just the nearest
+ * Progress chart, which answers a different question than the row asked.
+ */
+export function WorthALook({ list, onRowLayout, onLayout }: {
+  list: Observation[];
+  onRowLayout?: (i: number, e: LayoutChangeEvent) => void;
+  onLayout?: (e: LayoutChangeEvent) => void;
+}) {
   const p = usePalette();
   if (!list.length) return null;
   return (
-    <View>
-      <SectionLabel text="Worth a look" />
-      {list.map((o) => (
-        <Row key={o.id}>
-          <Text style={[S.OBS_TITLE, { color: p.text, marginBottom: S.OBS_TITLE_GAP }]}>{o.title}</Text>
-          <Text style={[S.OBS_BODY, { color: p.textDim }]}>{o.body}</Text>
-        </Row>
-      ))}
-    </View>
+    <InsightCard
+      title="Worth a look"
+      help="observations"
+      onLayout={onLayout}
+      desc={OBS_DESC}
+    >
+      {list.map((o, i) => {
+        const tone = TONE[o.tone];
+        const color = tone.color(p);
+        return (
+          <CardRow key={o.id} tall onLayout={onRowLayout ? (e) => onRowLayout(i, e) : undefined}>
+            <View style={{ width: S.TONE_BOX, height: S.TONE_BOX, borderRadius: 12, backgroundColor: p.bg, alignItems: 'center', justifyContent: 'center' }}>
+              <Icon name={tone.icon} size={16} color={color} strokeWidth={2.3} />
+            </View>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={[S.ROW_TITLE, { color: p.text, marginBottom: S.ROW_TITLE_GAP }]}>{o.title}</Text>
+              <Text style={[S.ROW_SUB, { color: p.textDim }]}>{o.body}</Text>
+            </View>
+          </CardRow>
+        );
+      })}
+    </InsightCard>
   );
 }
 
@@ -318,31 +421,35 @@ function Spark({ series, color }: { series: (number | null)[]; color: string }) 
   );
 }
 
-export function TrendWatch({ list, onPress }: { list: WatchItem[]; onPress?: (item: WatchItem) => void }) {
+export function TrendWatch({ list, onPress, onRowLayout, onLayout }: {
+  list: WatchItem[];
+  onPress: (item: WatchItem) => void;
+  onRowLayout?: (i: number, e: LayoutChangeEvent) => void;
+  onLayout?: (e: LayoutChangeEvent) => void;
+}) {
   const p = usePalette();
   if (!list.length) return null;
   return (
-    <View>
-      <SectionLabel text="Trend watch" right="Last 30 days" />
-      {list.map((t) => {
+    <InsightCard
+      title="Trend watch"
+      help="watch"
+      onLayout={onLayout}
+      desc={WATCH_DESC}
+    >
+      {list.map((t, i) => {
         const color = t.good ? GOOD : p.accent;
         return (
-          <Pressable
-            key={t.metric}
-            onPress={onPress ? () => onPress(t) : undefined}
-            accessibilityRole={onPress ? 'button' : undefined}
-            style={[S.WATCH_ROW, { flexDirection: 'row', alignItems: 'center', gap: 13, backgroundColor: p.sunk, borderColor: p.border }]}
-          >
+          <CardRow key={t.metric} onPress={() => onPress(t)} onLayout={onRowLayout ? (e) => onRowLayout(i, e) : undefined}>
             <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={[S.WATCH_TITLE, { color: p.text }]}>{t.title}</Text>
+              <Text style={[S.ROW_TITLE, { color: p.text }]}>{t.title}</Text>
               <Text numberOfLines={1} style={[S.WATCH_SUB, { color: p.textDim, marginTop: S.WATCH_TITLE_GAP }]}>{t.sub}</Text>
             </View>
             <Spark series={t.series} color={color} />
-            <Text style={[S.WATCH_VALUE, { color }]}>{t.value}</Text>
-          </Pressable>
+            <Text style={[S.WATCH_VALUE, { color, fontFamily: fonts.numHeavy, fontVariant: ['tabular-nums'] }]}>{t.value}</Text>
+          </CardRow>
         );
       })}
-    </View>
+    </InsightCard>
   );
 }
 
@@ -390,8 +497,8 @@ export function ConfidenceSheet({ confidence }: { confidence: DataConfidence; co
             <Text style={{ color: p.text, fontSize: 14, fontWeight: '700' }}>{part.label}</Text>
             <Text style={{ color: p.textDim, fontSize: 12.5, fontWeight: '600' }}>{`${Math.round(part.ratio * 100)}% of ${Math.round(part.weight * 100)}`}</Text>
           </View>
-          <View style={{ height: 5, borderRadius: 999, backgroundColor: p.surface2, marginTop: 8, overflow: 'hidden' }}>
-            <View style={{ height: 5, borderRadius: 999, backgroundColor: part.ratio >= 0.85 ? GOOD : p.accent, width: `${Math.round(part.ratio * 100)}%` }} />
+          <View style={{ marginTop: 8 }}>
+            <Bar pct={part.ratio * 100} color={part.ratio >= 0.85 ? GOOD : p.accent} height={5} />
           </View>
           <Text style={{ color: p.textDim, fontSize: 12, marginTop: 6 }}>{part.detail}</Text>
         </View>
@@ -409,19 +516,17 @@ export function ConfidenceSheet({ confidence }: { confidence: DataConfidence; co
 
 /* ---------- the standing disclaimer ---------- */
 
+export const FOOTER_COPY = 'Everything here is computed on your device from your own log. These are patterns that happen together, which is not the same as one causing the other, and none of it is medical advice.';
+
 /**
  * Rendered once, at the foot of the view.
  *
- * Every headline above it is already worded as an association, but this is a
- * screen whose whole job is to point at things that move together, and the step
- * from "these move together" to "this caused that" is one a reader takes for
- * free. Saying so once, plainly, at the bottom is the honest cost of the feature.
+ * Every headline above it is already worded as an association, but this is a screen
+ * whose whole job is to point at things that move together, and the step from
+ * "these move together" to "this caused that" is one a reader takes for free.
+ * Saying so once, plainly, at the bottom is the honest cost of the feature.
  */
-export const FOOTER_COPY = 'Everything here is computed on your device from your own log. These are patterns that happen together, which is not the same as one causing the other, and none of it is medical advice.';
-
 export function InsightsFooter() {
   const p = usePalette();
-  return (
-    <Text style={[S.FOOTER_TEXT, { color: p.textDim, marginTop: S.FOOTER_TOP, marginBottom: S.FOOTER_BOTTOM }]}>{FOOTER_COPY}</Text>
-  );
+  return <Text style={[S.FOOTER_TEXT, { color: p.textDim, marginTop: S.FOOTER_TOP, marginBottom: S.FOOTER_BOTTOM }]}>{FOOTER_COPY}</Text>;
 }

@@ -71,15 +71,23 @@ export interface FactorDef {
    */
   subject?: string;
   /**
-   * The factor as something a person STARTED doing: "magnesium glycinate",
-   * "yoga". Present only where a first occurrence is genuinely an onset.
+   * The factor as something a person STARTED taking: "magnesium glycinate".
+   * Present only where a first occurrence is genuinely an onset.
    *
-   * This gates ./change's before/after analysis, and the distinction is
-   * substantive rather than cosmetic. Starting a supplement is a decision with a
-   * date. The first night somebody happened to sleep seven hours is not — it is
-   * a threshold crossing inside a trend, and treating it as an intervention
-   * reported "SDNN is up since you started sleeping 7 hours or more", which
-   * mistakes a symptom of recovery for its cause.
+   * This gates ./change's before/after analysis, and the distinction is substantive
+   * rather than cosmetic. Starting a supplement is a decision with a date. The first
+   * night somebody happened to sleep seven hours is not — it is a threshold crossing
+   * inside a trend, and treating it as an intervention reported "SDNN is up since
+   * you started sleeping 7 hours or more", which mistakes a symptom of recovery for
+   * its cause.
+   *
+   * MEDS AND SUPPLEMENTS ONLY, which is narrower than it first looks like it should
+   * be. Starting an exercise programme is a real intervention too, but the type
+   * labels are bare verbs ("Walk", "Run", "Swim") and the onset sentence came out as
+   * "since you started walk". That the grammar breaks is a fair signal: a walk
+   * appearing in the log once is much weaker evidence of a decision than a
+   * supplement appearing every day is. Activities still show up in ./correlate,
+   * where "Walk days show higher SDNN" reads correctly.
    */
   onsetNoun?: string;
   group: FactorGroup;
@@ -260,7 +268,6 @@ export function buildFactors(state: AppState, keys: string[]): FactorDef[] {
       id: `activity:${type}`,
       label,
       driver: label,
-      onsetNoun: label.toLowerCase(),
       group: 'activity',
       kind: 'binary',
       lags: [0, 1],

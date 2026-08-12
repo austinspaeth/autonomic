@@ -20,7 +20,7 @@
  * Pure: no store, no MMKV, no expo, no React.
  */
 import { isEvening, isMorning } from '../analysis/buckets';
-import { dateFromKey } from '../dates';
+import { dateFromKey, fmtMonthDay } from '../dates';
 import { trustedReadings } from '../hrvQuality';
 import { resolveProtocol, streakInfo } from '../scoring/day';
 import { READING_TYPES } from '../registry';
@@ -38,8 +38,19 @@ export interface Observation {
   /** Drives the glyph colour: something working, something to keep an eye on,
    *  something that needs attention. */
   tone: 'good' | 'watch' | 'alert';
-  /** An `IconName` from src/components/Icon. */
+  /** An `IconName` from src/components/Icon. Unused by the current UI, which draws
+   *  one fixed glyph per tone, but kept because the probe knows its own subject and
+   *  a future surface may want it. */
   icon: string;
+  /**
+   * Where tapping this row should land: a Progress category id, or absent when the
+   * probe has nowhere useful to send anybody.
+   *
+   * Absent is a real answer and the UI respects it by drawing no chevron and not
+   * making the row pressable. A chevron on a row that does nothing is a promise the
+   * app doesn't keep.
+   */
+  section?: string;
   /** Higher wins the three slots. Set by hand per probe, because these are not
    *  comparable statistics and pretending otherwise would rank them wrongly. */
   importance: number;
@@ -77,6 +88,11 @@ function hrvReadings(input: ProbeInput): { r: Entry; dk: string }[] {
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
+/** Which Progress chart a stale reading type belongs to. */
+const STALE_SECTION: Record<string, string | undefined> = {
+  hrv: 'hrv', breathHrv: 'hrv', bp: 'vitals', restingHr: 'vitals', standTest: 'pots', orthostatic: 'pots',
+};
+
 /* ---------- probes ---------- */
 
 /**
@@ -103,6 +119,7 @@ const timeOfDay: ObservationProbe = (input) => {
   const higher = diff > 0;
   return {
     id: 'timeOfDay',
+    section: 'hrv',
     title: higher ? 'Your morning readings run higher' : 'Your later readings run higher',
     body: `RMSSD ${higher ? 'before noon' : 'after noon'} averages ${round1(Math.abs(diff))} ms above the other half of the day, across ${morning.length + later.length} readings. Taking readings at a consistent hour makes every trend here sharper.`,
     tone: 'good',
@@ -134,6 +151,7 @@ const weekday: ObservationProbe = (input) => {
   if (best.i === worst.i || best.m - worst.m < 10) return null;
   return {
     id: 'weekday',
+    section: 'outlook',
     title: `${WEEKDAYS[worst.i]}s are your hardest day`,
     body: `Your score averages ${Math.round(worst.m)} on ${WEEKDAYS[worst.i]}s against ${Math.round(best.m)} on ${WEEKDAYS[best.i]}s. Worth asking what is different about the day before.`,
     tone: 'watch',
@@ -172,8 +190,9 @@ const stale: ObservationProbe = (input) => {
   const label = READING_TYPES[type].label;
   return {
     id: `stale:${type}`,
+    section: STALE_SECTION[type],
     title: `No ${label.toLowerCase()} in ${age} days`,
-    body: `You have logged ${label} before, but not since ${(counts.get(type) as { last: string }).last}. A fresh one sharpens every finding that depends on it.`,
+    body: `You have logged ${label} before, but not since ${fmtMonthDay((counts.get(type) as { last: string }).last)}. A fresh one sharpens every finding that depends on it.`,
     tone: age >= 30 ? 'alert' : 'watch',
     icon: 'clipboard',
     importance: 62,
@@ -218,6 +237,7 @@ const bestDays: ObservationProbe = (input) => {
   const b = best as { label: string; hi: number; lo: number };
   return {
     id: 'bestDays',
+    section: 'outlook',
     title: `${b.label} shows up on your best days`,
     body: `It appears on ${b.hi}% of your highest-scoring days and ${b.lo}% of your lowest. Not proof of anything on its own, but the clearest lead in your log.`,
     tone: 'good',
@@ -236,6 +256,7 @@ const sleepDebt: ObservationProbe = (input) => {
   if (short < 4) return null;
   return {
     id: 'sleepDebt',
+    section: 'sleep',
     title: `${short} short nights in the last two weeks`,
     body: `You slept under six hours on ${short} of the ${recent.length} nights recorded. Sleep is the factor most often sitting underneath everything else on this screen.`,
     tone: short >= 7 ? 'alert' : 'watch',
@@ -272,6 +293,7 @@ const symptomPair: ObservationProbe = (input) => {
   const b = best as { a: string; b: string; both: number };
   return {
     id: 'symptomPair',
+    section: 'triggers',
     title: `${b.a} and ${b.b} travel together`,
     body: `They were logged on the same day ${b.both} times, more often than either one's frequency would predict. They may share a trigger.`,
     tone: 'watch',
@@ -286,6 +308,7 @@ const streak: ObservationProbe = (input) => {
   if (!info || info.current < 4) return null;
   return {
     id: 'streak',
+    section: 'outlook',
     title: `${info.current} clean days in a row`,
     body: info.longest > info.current
       ? `Your longest run is ${info.longest}. Everything on this screen gets easier to read while a streak holds, because the days are comparable.`

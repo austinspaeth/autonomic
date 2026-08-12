@@ -321,6 +321,11 @@ export interface NightSeries {
   hr?: HrPoint[] | null;
   resp?: RespPoint[] | null;
   spans?: StageSpan[] | null;
+  /**
+   * Overnight curves for the other nights in the dip trend, keyed by day, so
+   * every bar is measured the same way as the headline above it.
+   */
+  hrByDay?: Record<string, HrPoint[] | null | undefined>;
 }
 
 /**
@@ -342,17 +347,20 @@ export function buildSleepReport(
   const nights = recentNights(days, dk, REPORT_WINDOW_NIGHTS, addDays);
   const target = resolveProtocol(protocol).sleep.hours;
 
-  // With the curve in hand the dip is measured from the lowest settled stretch
-  // rather than the single lowest beat, and it says which it used — one stray
-  // sample can move a single-minimum dip by several percent.
+  // With a curve in hand the dip is measured from the lowest settled stretch
+  // rather than the single lowest beat — one stray sample moves a
+  // single-minimum dip by several percent — and it reports which it used.
   const hr = series.hr && series.hr.length ? series.hr : null;
-  const settled = hr ? lowestRollingMean(hr) : null;
-  const dip = settled != null
-    ? nocturnalDip(days, dk, { low: settled, basis: 'rolling-low' })
-    : nocturnalDip(days, dk);
+  const lowFor = (key: string) => {
+    const curve = key === dk ? hr : series.hrByDay?.[key];
+    const settled = curve && curve.length ? lowestRollingMean(curve) : null;
+    return settled != null ? { low: settled, basis: 'rolling-low' as const } : null;
+  };
   const low = overnightLow(days, dk);
   const baseline = restingHrBaseline(days, dk);
-  const dipTrend = dipHistory(days, dk, DIP_TREND_NIGHTS, addDays);
+  const dipTrend = dipHistory(days, dk, DIP_TREND_NIGHTS, addDays, lowFor);
+  // The headline IS the last bar, by construction rather than by coincidence.
+  const dip = dipTrend[dipTrend.length - 1]?.dip ?? null;
 
   return {
     dk,

@@ -32,13 +32,15 @@ let slot: Slot | null = null;
 /** The revision this state would produce a report for. `demo` is part of the key
  *  because the sample month and the user's own data are two different reports
  *  that can share a `lastUpdated` — the first entry someone logs flips the mode. */
-export function cacheKey(state: AppState, dk: string, demo?: boolean): string {
-  return `${dk}|${state.meta.lastUpdated || '-'}|${demo ? 'demo' : 'own'}`;
+export function cacheKey(state: AppState, dk: string, demo?: boolean, anchor?: string | null): string {
+  // The anchor is part of the key because it changes which days the header's claim is
+  // computed from: picking a new day one has to rebuild, not serve the old number.
+  return `${dk}|${state.meta.lastUpdated || '-'}|${demo ? 'demo' : 'own'}|${anchor || '-'}`;
 }
 
 /** A cached report for this exact revision, or null. Never recomputes. */
-export function getCachedInsights(state: AppState, dk: string, demo?: boolean): InsightReport | null {
-  const key = cacheKey(state, dk, demo);
+export function getCachedInsights(state: AppState, dk: string, demo?: boolean, anchor?: string | null): InsightReport | null {
+  const key = cacheKey(state, dk, demo, anchor);
   return slot && slot.key === key ? slot.report : null;
 }
 
@@ -49,8 +51,8 @@ export function getCachedInsights(state: AppState, dk: string, demo?: boolean): 
  * `InteractionManager.runAfterInteractions`, behind a skeleton on first build and
  * behind the previous report on later ones.
  */
-export function computeInsights(state: AppState, dk: string, opts: { demo?: boolean; ctx?: ScoreContext } = {}): InsightReport {
-  const key = cacheKey(state, dk, opts.demo);
+export function computeInsights(state: AppState, dk: string, opts: { demo?: boolean; ctx?: ScoreContext; anchor?: string | null } = {}): InsightReport {
+  const key = cacheKey(state, dk, opts.demo, opts.anchor);
   const hit = slot && slot.key === key ? slot.report : null;
   if (hit) return hit;
   const report = buildInsights(state, dk, opts);

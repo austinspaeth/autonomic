@@ -32,10 +32,13 @@ import { PromptSheet } from './PromptSheet';
 import { openWhatsNew } from './WhatsNew';
 import { collectAppDiagnostics } from '../lib/diagnostics/collectApp';
 import { formatAppDiagnostics } from '../lib/diagnostics/appReport';
+// One address for every route into support: this card and the Insights failure
+// state. A second copy is a second thing to forget when it changes, and the one
+// the user is told to write to must be the one that is watched.
+import { SUPPORT_EMAIL } from '../lib/diagnostics/supportEmail';
 
 const PRIVACY_URL = 'https://autonomic.care/privacy-policy/';
 const TERMS_URL = 'https://autonomic.care/terms-of-service/';
-const SUPPORT_EMAIL = 'austin@discoverymark.com';
 
 /** Hold the brand card this long to collect the whole-app support dump. Same
  *  duration as the Bluetooth and camera dumps: far past any accidental press,

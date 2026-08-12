@@ -36,9 +36,9 @@
  * inside a locked view is a dead end, not an upsell.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { InteractionManager, Pressable, Text, View } from 'react-native';
-import Animated, { Easing as REasing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
+import { InteractionManager, Pressable, Text, View, type LayoutChangeEvent } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
+import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Screen, headerHeight } from '../../src/components/Header';
 import { Icon } from '../../src/components/Icon';
@@ -53,17 +53,21 @@ import { DemoBanner, DEMO_INSIGHTS_TEXT } from '../../src/features/DemoBanner';
 import { METRIC_SECTION } from '../../src/features/TrendCard';
 import { AskAiPill } from '../../src/features/insights/AskAi';
 import { InsightsEmpty, InsightsSkeleton } from '../../src/features/insights/InsightsSkeleton';
+import { InsightsFailed } from '../../src/features/insights/BuildFailed';
 import {
   BiggestChangeCard, ConfidenceRing, ConfidenceSheet, Correlations, InsightsFooter, TrendWatch, WorthALook,
 } from '../../src/features/insights/Sections';
+import { SinceExplain } from '../../src/features/insights/SinceExplain';
 import { todayKey } from '../../src/lib/dates';
 import { demoDays, hasOwnData } from '../../src/lib/demo';
 import { resolveProtocol } from '../../src/lib/scoring/day';
 import type { AppState } from '../../src/lib/types';
-import type { InsightReport } from '../../src/lib/insights';
+import { emptyReport, type InsightReport } from '../../src/lib/insights';
 import { computeInsights } from '../../src/lib/insights/cache';
-import { EMPTY_SHAPE, insightsShape, noteInsightsShape } from '../../src/lib/insights/shape';
-import { insightsAreNew, markInsightsSeen } from '../../src/lib/insights/seen';
+import { logError } from '../../src/lib/diagnostics/errorLog';
+import { EMPTY_SHAPE, type CardHeights, type RowHeights, type RowKey } from '../../src/lib/insights/shape';
+import { insightsShape, noteInsightsShape } from '../../src/lib/insights/shapeMemory';
+import { insightsAnchor } from '../../src/lib/insights/anchorMemory';
 
 /**
  * How long after interactions finish before the real content mounts.
@@ -75,12 +79,11 @@ import { insightsAreNew, markInsightsSeen } from '../../src/lib/insights/seen';
  */
 const TAB_SETTLE_MS = 350;
 
-/** How long the findings stay marked new after the screen is opened. Long enough
- *  to be noticed, short enough that leaving and returning doesn't re-flag them. */
-const SEEN_AFTER_MS = 1200;
+/** How long to let the cards finish laying out before their heights are written.
+ *  `onLayout` fires per card, and images/fonts can settle a frame or two later. */
+const SHAPE_SETTLE_MS = 600;
 
 export default function InsightsScreen() {
-  const p = usePalette();
   const { openSheet } = useSheets();
   const state = useAppState();
   const focused = useIsFocused();
@@ -96,6 +99,13 @@ export default function InsightsScreen() {
    * builds a new state object: without this, every render produced a new `source`,
    * re-ran the effect, and called back into the engine on a loop.
    */
+  // Bumped when the user picks a new day one, so the anchor re-enters `buildArgs` and
+  // the report rebuilds through the normal catch-up path rather than a special case.
+  const [anchorSeq, setAnchorSeq] = useState(0);
+
+  /** Bumped by "Try again" on the failed state, to re-enter the build effect. */
+  const [retrySeq, setRetrySeq] = useState(0);
+
   const buildArgs = useMemo(() => {
     const demo = !hasOwnData(state.days);
     // `demoDays()` is itself cached per day key, so this stays referentially
@@ -104,6 +114,7 @@ export default function InsightsScreen() {
     return {
       demo,
       source,
+      anchor: insightsAnchor(),
       ctx: {
         sex: source.profile.sex,
         height: source.profile.height,
@@ -111,7 +122,8 @@ export default function InsightsScreen() {
         customTypes: source.customTypes,
       },
     };
-  }, [state]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state, anchorSeq]);
 
   // Seeded to the header's exact height (see Screen) so overlays anchored to it
   // aren't positioned at the top of the window on the first paint.
@@ -133,6 +145,30 @@ export default function InsightsScreen() {
   const builtFor = useRef<typeof buildArgs | null>(null);
 
   /**
+   * The one place the report is built.
+   *
+   * Wrapped, because this runs inside `InteractionManager.runAfterInteractions` and a
+   * throw in a queued task takes the QUEUE down with it, not just this screen: every
+   * deferred build in the app goes through it, so an Insights failure was showing up
+   * as Progress stuck on its skeletons at every range. A screen that finds nothing is
+   * a state this view already renders; a poisoned queue is not.
+   *
+   * It returns an EMPTY REPORT on failure rather than null, and that distinction is
+   * the whole point: the skeleton is what renders whenever there is no report, so a
+   * null here left the view placeholding forever for content that was never coming.
+   * `failed` carries the difference through to the copy, and the callers clear
+   * `builtFor` so the next focus tries again instead of pinning the failure.
+   */
+  const build = useCallback((args: typeof buildArgs): InsightReport => {
+    try {
+      return computeInsights(args.source, dk, { demo: args.demo, ctx: args.ctx, anchor: args.anchor });
+    } catch (e) {
+      logError('insights.build', e);
+      return emptyReport(dk, true);
+    }
+  }, [dk]);
+
+  /**
    * Launch pre-warm: build in the background while the user is still elsewhere.
    *
    * Runs once per mount regardless of focus. By the time the Insights tab is
@@ -145,10 +181,13 @@ export default function InsightsScreen() {
       const args = argsRef.current;
       if (builtFor.current === args) return;
       builtFor.current = args;
-      setReport(computeInsights(args.source, dk, { demo: args.demo, ctx: args.ctx }));
+      const built = build(args);
+      setReport(built);
+      // A failure is not a result: leave nothing pinned, so the next focus rebuilds.
+      if (built.failed) builtFor.current = null;
     });
     return () => task.cancel();
-  }, [dk]);
+  }, [build, dk]);
 
   /**
    * Catch-up: the journal changed, or the day rolled over.
@@ -162,10 +201,31 @@ export default function InsightsScreen() {
     const task = InteractionManager.runAfterInteractions(() => {
       if (cancelled) return;
       builtFor.current = buildArgs;
-      setReport(computeInsights(buildArgs.source, dk, { demo: buildArgs.demo, ctx: buildArgs.ctx }));
+      const built = build(buildArgs);
+      setReport(built);
+      if (built.failed) builtFor.current = null;
     });
     return () => { cancelled = true; task.cancel(); };
-  }, [focused, buildArgs, dk]);
+    // `retrySeq` is not read in the body: it is here so "Try again" re-enters this
+    // effect after clearing `builtFor`, which is a ref and cannot trigger one.
+  }, [build, focused, buildArgs, dk, retrySeq]);
+
+  /**
+   * "Try again", from the failed state.
+   *
+   * Drops everything the screen is holding — the report, the copy kept back to
+   * survive a rebuild, and the args it was built from — so the effect above sees
+   * genuinely nothing built and runs. Clearing `shown` is what puts the skeleton
+   * back up while it works: without it the failure stays on screen and a retry
+   * that succeeds looks like a retry that did nothing, and one that fails again
+   * looks like the button is dead.
+   */
+  const retry = useCallback(() => {
+    builtFor.current = null;
+    shown.current = null;
+    setReport(null);
+    setRetrySeq((n) => n + 1);
+  }, []);
 
   /**
    * Has the tab transition finished? Latches true and stays there.
@@ -183,16 +243,6 @@ export default function InsightsScreen() {
     return () => { task.cancel(); if (timer) clearTimeout(timer); };
   }, [focused, settled]);
 
-  // The NEW badge, resolved once per report rather than on render so it can't
-  // flicker, and cleared a beat after the user has actually had it on screen.
-  const [isNew, setIsNew] = useState(false);
-  useEffect(() => {
-    if (!report || !focused || !settled) return;
-    setIsNew(insightsAreNew(report.fingerprint));
-    const t = setTimeout(() => markInsightsSeen(report.fingerprint), SEEN_AFTER_MS);
-    return () => clearTimeout(t);
-  }, [report, focused, settled]);
-
   /**
    * The skeleton's shape, read ONCE per mount.
    *
@@ -203,16 +253,77 @@ export default function InsightsScreen() {
    */
   const [shape] = useState(insightsShape);
 
-  // Remember what actually rendered, for the next cold launch's skeleton.
+  /**
+   * Each card's measured height, collected as it lays out.
+   *
+   * A ref rather than state: these arrive one `onLayout` at a time and nothing on
+   * screen depends on them, so storing them in state would re-render the whole
+   * document four times for a value only the NEXT cold launch reads.
+   */
+  const heights = useRef<CardHeights>({ change: 0, correlations: 0, observations: 0, watch: 0 });
+  const rows = useRef<RowHeights>({ correlations: [], observations: [], watch: [] });
+  const measure = useCallback((key: keyof CardHeights) => (e: LayoutChangeEvent) => {
+    heights.current[key] = e.nativeEvent.layout.height;
+  }, []);
+  /** Every row of a list card, by index, so each skeleton bubble can sit exactly where
+   *  its row will. Per row because observation rows differ in height. */
+  const measureRow = useCallback((key: RowKey) => (i: number, e: LayoutChangeEvent) => {
+    // Defensive about the list: an older build of this screen stored ONE height per
+    // card rather than one per row, and under Fast Refresh this ref survives from the
+    // component version that seeded it — so it can be a number, and assigning an index
+    // on a number is a fatal. A fatal here is expensive out of all proportion: it
+    // poisons the InteractionManager queue every deferred screen builds through,
+    // which showed up as Progress sitting on its skeletons forever.
+    if (!Array.isArray(rows.current[key])) rows.current[key] = [];
+    rows.current[key][i] = e.nativeEvent.layout.height;
+  }, []);
+
+  // Remember what actually rendered, for the next cold launch's skeleton. Heights
+  // are read at this point rather than as they arrive, so one write covers all four.
   useEffect(() => {
-    if (!report || !settled) return;
-    noteInsightsShape({
-      change: !!report.change,
-      correlations: report.correlations.length,
-      observations: report.observations.length,
-      watch: report.watch.length,
-    });
+    // A failed build rendered no cards, so its shape is not a shape — writing it
+    // would teach the next cold launch to draw an empty skeleton for a journal that
+    // has plenty to show.
+    if (!report || report.failed || !settled) return;
+    const copy = (k: RowKey) => (Array.isArray(rows.current[k]) ? rows.current[k].slice() : []);
+    const t = setTimeout(() => {
+      try {
+        noteInsightsShape({
+          change: !!report.change,
+          correlations: report.correlations.length,
+          observations: report.observations.length,
+          watch: report.watch.length,
+          heights: { ...heights.current },
+          rows: { correlations: copy('correlations'), observations: copy('observations'), watch: copy('watch') },
+        });
+      } catch (e) {
+        // A mis-sized skeleton next launch is the whole cost of failing here.
+        logError('insights.shape', e);
+      }
+    }, SHAPE_SETTLE_MS);
+    return () => clearTimeout(t);
   }, [report, settled]);
+
+  /**
+   * Hand off to the Progress chart a claim was computed from.
+   *
+   * Same target the Journal's Trend card uses, so a finding here and a
+   * congratulation there both land on the same evidence. A row with no section is
+   * not pressable, so the guard is belt and braces.
+   */
+  const openProgress = useCallback((section?: string) => {
+    if (!section) return;
+    requestProgressRange('month', section);
+    router.navigate('/(tabs)/analysis');
+  }, []);
+
+  /** The claim's own breakdown, in the same shape the Outlook's "What powers this"
+   *  opens: the two windows, then what moved between them. */
+  const openSince = useCallback(() => {
+    const r = shown.current;
+    if (!r || !r.since) return;
+    openSheet(() => <SinceExplain since={r.since!} onAnchorChange={() => setAnchorSeq((n) => n + 1)} />);
+  }, [openSheet]);
 
   const openConfidence = useCallback(() => {
     const r = shown.current;
@@ -237,20 +348,19 @@ export default function InsightsScreen() {
       onHeaderHeight={setHeaderH}
       header={
         <View style={{ paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9, flex: 1, minWidth: 0 }}>
-            {isNew ? <PulsingDot /> : null}
-            {isNew ? <Text style={{ color: p.accent, fontSize: 12, fontWeight: '800', letterSpacing: 1.2 }}>NEW</Text> : null}
-            <Trend head={head} />
-          </View>
+          <HeaderClaim head={head} onExplain={openSince} />
+          {/* The ring alone. It is a status light, not a labelled control: the word
+              "Confidence" beside it explained the glyph at the cost of competing
+              with the claim on the left, and tapping it opens a card that explains
+              it properly. */}
           <Pressable
             onPress={openConfidence}
             disabled={!head}
+            hitSlop={12}
             accessibilityRole="button"
             accessibilityLabel={head ? `Data confidence ${head.confidence.pct} percent` : 'Data confidence'}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: p.sunk, borderWidth: 1, borderColor: p.border, borderRadius: 999, paddingVertical: 6, paddingLeft: 8, paddingRight: 12 }}
           >
-            <ConfidenceRing pct={head ? head.confidence.pct : 0} />
-            <Text style={{ color: p.text, fontSize: 12.5, fontWeight: '700' }}>Data confidence</Text>
+            <ConfidenceRing pct={head ? head.confidence.pct : 0} size={26} />
           </Pressable>
         </View>
       }
@@ -278,16 +388,32 @@ export default function InsightsScreen() {
         <InsightsSkeleton shape={locked ? EMPTY_SHAPE : shape} />
       ) : (
         <>
-          {view.change ? <BiggestChangeCard change={view.change} isNew={isNew} /> : null}
-          <Correlations list={view.correlations} change={view.change} />
-          <WorthALook list={view.observations} />
+          {/* Each card measures ITSELF, not a wrapper: a wrapper's frame includes the
+              card's 12pt bottom margin and the card's own frame does not, so
+              measuring the wrapper made every skeleton card 12pt too tall. */}
+          {view.change ? <BiggestChangeCard change={view.change} onLayout={measure('change')} /> : null}
+          <Correlations
+            list={view.correlations}
+            change={view.change}
+            // Every row lands on the Progress chart its OUTCOME was computed from,
+            // the same hand-off the Journal's Trend card makes.
+            onLayout={measure('correlations')}
+            onRowLayout={measureRow('correlations')}
+          />
+          <WorthALook
+            list={view.observations}
+            onLayout={measure('observations')}
+            onRowLayout={measureRow('observations')}
+          />
           <TrendWatch
             list={view.watch}
-            // Lands on the Progress chart the claim was computed from, the same
-            // hand-off the Journal's Trend card makes.
-            onPress={(item) => requestProgressRange('month', METRIC_SECTION[item.metric])}
+            onPress={(item) => openProgress(METRIC_SECTION[item.metric])}
+            onLayout={measure('watch')}
+            onRowLayout={measureRow('watch')}
           />
-          {hasFindings ? <InsightsFooter /> : <InsightsEmpty daysLogged={view.daysLogged} />}
+          {hasFindings ? <InsightsFooter />
+            : view.failed ? <InsightsFailed onRetry={retry} />
+              : <InsightsEmpty daysLogged={view.daysLogged} />}
         </>
       )}
     </Screen>
@@ -295,70 +421,71 @@ export default function InsightsScreen() {
 }
 
 /**
- * Where the journal is heading, in the header.
+ * The header's left side: how far the user has come, and a way into the working.
  *
- * Falls back to the days-logged count rather than inventing a direction. `overall`
- * returns a null label when coverage is too thin to compare two months, and
- * "Trending up" on four days of data would be a claim the data cannot support —
- * whereas "12 days logged" is always true and is itself the reason the verdict is
- * missing.
+ * "3% worse than day one", in two halves — the claim bold and in the metric's
+ * colour, the reference in grey — because the number is the thing being read and
+ * "than day one" only says what it is measured against. The chevron opens the same
+ * kind of breakdown the Outlook's "What powers this" does, since a claim this
+ * prominent has to be checkable.
  *
- * Green up, accent-red down, and neutral for steady. Reporting a decline here is
- * the same deliberate choice Trend Watch makes: this is a screen somebody opened
- * to find out.
+ * Falls back to stating the analysis window when there is nothing to compare.
+ * `changeSinceStart` returns null under a month of logged days or with too few
+ * scored days at either end, and "0% better" on three days of data would be a claim
+ * the data cannot make, whereas "Last 21 days" is always true and is itself the
+ * reason the claim is missing.
  */
-function Trend({ head }: { head: InsightReport | null }) {
+function HeaderClaim({ head, onExplain }: { head: InsightReport | null; onExplain: () => void }) {
   const p = usePalette();
-  const dir = head ? head.overall.direction : 'unknown';
-  const label = head ? head.overall.label : null;
+  if (!head) return <Text numberOfLines={1} style={[CLAIM, { color: p.text }]}>Insights</Text>;
 
-  if (!head) return <Text numberOfLines={1} style={[HEAD_TEXT, { color: p.text }]}>Insights</Text>;
-  if (!label) {
+  const since = head.since;
+  if (!since) {
     return (
-      <Text numberOfLines={1} style={[HEAD_TEXT, { color: p.text, flexShrink: 1 }]}>
-        {`${head.daysLogged} ${head.daysLogged === 1 ? 'day' : 'days'} logged`}
+      <Text numberOfLines={1} style={[CLAIM, { color: p.text, fontWeight: '600', flexShrink: 1 }]}>
+        {windowLabel(head.windowDays)}
       </Text>
     );
   }
-  const color = dir === 'up' ? TREND_UP : dir === 'down' ? p.accent : p.text;
+  // "About the same" is neither good nor bad, so it takes the neutral colour rather
+  // than being congratulated in green.
+  const flat = since.pct === 0;
+  const color = flat ? p.text : since.better ? TREND_UP : p.accent;
   return (
-    <View
-      style={{ flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1 }}
-      accessibilityLabel={`${label}, ${head.overall.detail}`}
+    <Pressable
+      onPress={onExplain}
+      hitSlop={8}
+      accessibilityRole="button"
+      accessibilityLabel={`${since.value}${since.tail}, ${since.detail}. How this was calculated.`}
+      style={{ flexDirection: 'row', alignItems: 'center', flexShrink: 1, minWidth: 0 }}
     >
-      {dir === 'flat' ? null : <Icon name={dir === 'up' ? 'trendUp' : 'trendDown'} size={16} color={color} strokeWidth={2.4} />}
-      <Text numberOfLines={1} style={[HEAD_TEXT, { color, flexShrink: 1 }]}>{label}</Text>
-    </View>
+      <Text numberOfLines={1} style={{ flexShrink: 1 }}>
+        <Text style={[CLAIM, { color, fontWeight: '800' }]}>{since.value}</Text>
+        <Text style={[CLAIM, { color: p.textDim, fontWeight: '500' }]}>{since.tail}</Text>
+      </Text>
+      <Icon name="chevronRight" size={17} color={p.textDim} strokeWidth={2.2} />
+    </Pressable>
   );
 }
 
-/** Matches the confidence chip's label beside it. */
-const HEAD_TEXT = { fontSize: 14.5, fontWeight: '700' } as const;
+/** The screen's one headline sentence, and the only text in the header now that the
+ *  ring has lost its label. Sized up accordingly. */
+const CLAIM = { fontSize: 17.5 } as const;
 /** Same green the findings use for "this is working". */
 const TREND_UP = '#3ec46d';
 
 /**
- * The header's "new findings" dot: a solid core with a halo pulsing out of it.
+ * The analysis window, for when there is no claim to make.
  *
- * Reanimated rather than a looping timer, so it runs on the UI thread and costs
- * nothing while the JS thread is busy building the report, which is exactly when
- * it is on screen.
+ * States the REAL scope: `windowDays` is the user's own span capped at the engine's
+ * limit, so somebody three weeks in is told three weeks rather than promised the
+ * full six months of analysis they haven't got yet. In days, not rounded to weeks
+ * or months, because a reader cannot tell whether "2 months" is 45 days or 89.
  */
-function PulsingDot() {
-  const p = usePalette();
-  const t = useSharedValue(0);
-  useEffect(() => {
-    t.value = withRepeat(withTiming(1, { duration: 2000, easing: REasing.inOut(REasing.quad) }), -1, false);
-  }, [t]);
-  const halo = useAnimatedStyle(() => ({
-    // 0.8 -> 1.35 while fading out, matching the comp's ivPulse keyframes.
-    opacity: 0.7 * (1 - t.value),
-    transform: [{ scale: 0.8 + 0.55 * t.value }],
-  }));
-  return (
-    <View style={{ width: 8, height: 8 }}>
-      <Animated.View style={[{ position: 'absolute', top: -4, left: -4, right: -4, bottom: -4, borderRadius: 999, backgroundColor: p.accent }, halo]} />
-      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 999, backgroundColor: p.accent }} />
-    </View>
-  );
+function windowLabel(days: number): string {
+  // Zero days is not a window, it is the absence of one — an empty journal, or a
+  // build that failed. "Today" there would state a scope the screen doesn't have.
+  if (days <= 0) return 'Insights';
+  if (days === 1) return 'Today';
+  return `Last ${days} days`;
 }

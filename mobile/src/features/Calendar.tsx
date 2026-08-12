@@ -50,6 +50,13 @@ export function Calendar({ current, onPick, controls }: { current: string; onPic
   const startPad = first.getDay();
   const daysInMonth = new Date(view.getFullYear(), view.getMonth() + 1, 0).getDate();
   const cells: (number | null)[] = [...Array(startPad).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
+  // Pad to whole weeks and split into rows of 7. Percentage widths (100/7 =
+  // 14.2857%) round to device pixels independently, so seven of them can add up
+  // to more than the container and wrap the last day onto its own line — a
+  // fixed 7-cell row of flex:1 cells can't.
+  while (cells.length % 7) cells.push(null);
+  const weeks: (number | null)[][] = [];
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
 
   // Each scored cell runs a full scoreSet; cache the month's cell states so
   // month-nav / theme re-renders don't re-score ~31 days. `days` (fresh identity
@@ -76,33 +83,39 @@ export function Calendar({ current, onPick, controls }: { current: string; onPic
         <Text style={{ fontSize: 17, fontWeight: '700', color: p.text }}>{view.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</Text>
         <Pressable disabled={atCurMonth} onPress={() => setView(new Date(view.getFullYear(), view.getMonth() + 1, 1))} hitSlop={8} style={{ opacity: atCurMonth ? 0.3 : 1 }}><Icon name="chevronRight" size={22} color={p.text} /></Pressable>
       </View>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', width: '100%' }}>
-        {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => <View key={i} style={{ width: `${100 / 7}%`, alignItems: 'center', paddingVertical: 4 }}><Text style={{ fontSize: 11, color: p.textDim, fontWeight: '700' }}>{d}</Text></View>)}
-        {cells.map((dn, i) => {
-          if (dn == null) return <View key={`e${i}`} style={{ width: `${100 / 7}%`, aspectRatio: 1 }} />;
-          const dk = keyOf(new Date(view.getFullYear(), view.getMonth(), dn));
-          const isSel = dk === current, isFuture = dk > tk;
-          const { has, color } = cellInfo[dk];
-          return (
-            <View key={dk} style={{ width: `${100 / 7}%`, aspectRatio: 1, padding: 2 }}>
-              {/* Squircle cell: tinted with the day's autonomic-outlook color when
-                  scored. Selected day fills the solid outlook color. */}
-              <Pressable
-                disabled={isFuture}
-                onPress={() => { onPick(dk); controls.close(); }}
-                style={{
-                  flex: 1, borderRadius: 13, alignItems: 'center', justifyContent: 'center', opacity: isFuture ? 0.3 : 1,
-                  backgroundColor: isSel ? (color || p.accent) : color ? hexA(color, 0.16) : 'transparent',
-                  borderWidth: color && !isSel ? 1 : 0,
-                  borderColor: color ? hexA(color, 0.45) : 'transparent',
-                }}
-              >
-                <Text style={{ color: isSel ? '#fff' : color ? color : p.text, fontWeight: isSel || color ? '700' : '400', fontSize: 15 }}>{dn}</Text>
-                {has && !isSel && !color ? <View style={{ position: 'absolute', bottom: 6, width: 5, height: 5, borderRadius: 3, backgroundColor: p.accent }} /> : null}
-              </Pressable>
-            </View>
-          );
-        })}
+      <View style={{ width: '100%' }}>
+        <View style={{ flexDirection: 'row', width: '100%' }}>
+          {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => <View key={i} style={{ flex: 1, alignItems: 'center', paddingVertical: 4 }}><Text style={{ fontSize: 11, color: p.textDim, fontWeight: '700' }}>{d}</Text></View>)}
+        </View>
+        {weeks.map((week, wi) => (
+          <View key={wi} style={{ flexDirection: 'row', width: '100%' }}>
+            {week.map((dn, i) => {
+              if (dn == null) return <View key={`e${i}`} style={{ flex: 1, aspectRatio: 1 }} />;
+              const dk = keyOf(new Date(view.getFullYear(), view.getMonth(), dn));
+              const isSel = dk === current, isFuture = dk > tk;
+              const { has, color } = cellInfo[dk];
+              return (
+                <View key={dk} style={{ flex: 1, aspectRatio: 1, padding: 2 }}>
+                  {/* Squircle cell: tinted with the day's autonomic-outlook color when
+                      scored. Selected day fills the solid outlook color. */}
+                  <Pressable
+                    disabled={isFuture}
+                    onPress={() => { onPick(dk); controls.close(); }}
+                    style={{
+                      flex: 1, borderRadius: 13, alignItems: 'center', justifyContent: 'center', opacity: isFuture ? 0.3 : 1,
+                      backgroundColor: isSel ? (color || p.accent) : color ? hexA(color, 0.16) : 'transparent',
+                      borderWidth: color && !isSel ? 1 : 0,
+                      borderColor: color ? hexA(color, 0.45) : 'transparent',
+                    }}
+                  >
+                    <Text style={{ color: isSel ? '#fff' : color ? color : p.text, fontWeight: isSel || color ? '700' : '400', fontSize: 15 }}>{dn}</Text>
+                    {has && !isSel && !color ? <View style={{ position: 'absolute', bottom: 6, width: 5, height: 5, borderRadius: 3, backgroundColor: p.accent }} /> : null}
+                  </Pressable>
+                </View>
+              );
+            })}
+          </View>
+        ))}
       </View>
       <View style={{ height: 12 }} />
       <Button title="Jump to Today" onPress={() => { onPick(tk); controls.close(); }} />
