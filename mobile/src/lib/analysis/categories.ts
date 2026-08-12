@@ -4,6 +4,7 @@
  * the PWA: a few good charts + stat tiles per category, grade-zone shaded.
  */
 import type { Band, Entry, ScoreCat } from '../types';
+import type { HelpContent } from '../help';
 import { todayKey } from '../dates';
 import { SCORE_COLORS, orthoMaxDelta, restingHrBands, sBP } from '../scoring';
 import { scoreCat, sleepHours, streakInfo, type DaysMap } from '../scoring/day';
@@ -56,8 +57,8 @@ export interface AnalysisCard {
   sub?: string;
   /** One-line description shown under the section header (design-comp style). */
   desc?: string;
-  /** Longer copy for the "?" help sheet next to the title. */
-  help?: string;
+  /** Copy for the "?" help sheet next to the title (see `src/lib/help.ts`). */
+  help?: HelpContent;
   charts?: Chart[]; stats?: Stat[]; insights?: Insight[]; bars?: BarGroup[];
   /** Per-bucket counts charted above the first bars group (see BarBuckets). */
   barBuckets?: BarBuckets;
@@ -113,7 +114,11 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
     const cards: AnalysisCard[] = [{
       title: 'Autonomic Outlook', sub: range,
       desc: 'Your daily autonomic score over the range, with a rolling average to smooth the noise.',
-      help: 'Each day is scored 0–100 from everything you logged that day (HRV readings, vitals, symptoms and sleep) using the recovery framework\'s thresholds. The dashed line is a rolling average, which is usually the better trend to watch: single days swing, the rolling line tells the story.',
+      help: {
+        what: 'Each day is scored 0–100 from everything you logged that day: HRV readings, vitals, symptoms and sleep, graded against the recovery framework thresholds. The dashed line is a rolling average of the last few buckets.',
+        why: 'Single days swing on sleep, stress and timing, so read the dashed line for the trend and the points for the story behind it. Tap "Show zones" to see which grade band you are sitting in, and compare a dip against what you logged around it.',
+        learnMore: '/insights/basics/the-autonomic-score-and-grade-bands/',
+      },
       metricsRow: {
         metrics: [
           cur != null ? { label: 'Score', value: Math.round(cur), color: scoreCat(cur).color, regrade: (v: number) => scoreCat(v).color } : null,
@@ -138,7 +143,11 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
     return {
       title: 'Clean Days',
       desc: 'Days in a row without breaking your protocol.',
-      help: 'A "clean" day is one that meets your protocol. The streak counts consecutive clean days ending today; the 30-day rate shows what share of the last month stayed clean. Streaks build tolerance slowly; a broken streak is data, not failure.',
+      help: {
+        what: 'A clean day is one that met every item in your protocol. The streak counts consecutive clean days ending today, Longest is your best run so far, and the 30-day rate is the share of the last month that stayed clean.',
+        why: 'Tolerance is built by repetition, so the 30-day rate matters more than the streak. A broken streak is data, not failure; look at what changed that day. If the rate stays low for weeks, the protocol may be asking more than this stage of recovery allows.',
+        learnMore: '/insights/recovery/clean-days-and-protocol-streaks/',
+      },
       tiles: true,
       stats: [
         { label: 'Current streak', value: streak.current, sub: 'days', color: SCORE_COLORS.great },
@@ -178,7 +187,11 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
       title: 'Blood Pressure', sub: range,
       cat: bpFilter.all.cat,
       desc: 'Each reading as a systolic-to-diastolic span, coloured by grade at each end.',
-      help: 'Every bar connects a reading\'s diastolic (bottom) to its systolic (top), tinted by how each value grades against the framework thresholds. Watch for the spread as well as the level; a narrowing pulse pressure on standing is a common dysautonomia pattern worth showing your doctor. The All/Morning/Evening toggle limits the chart to readings from that time of day.',
+      help: {
+        what: 'Every bar connects one reading\'s diastolic (bottom) to its systolic (top), each end tinted by how that value grades. The tiles below are the range averages, and the gap between the two ends is your pulse pressure.',
+        why: 'Watch the spread as well as the level: a narrowing pulse pressure on standing is a common dysautonomia pattern and is worth showing your doctor. Use the All/Morning/Evening toggle to see whether your pressure is time-of-day driven, which changes when medication and fluids land best.',
+        learnMore: '/insights/basics/blood-pressure-basics-systolic-diastolic-pulse/',
+      },
       tiles: true,
       charts: [
         // One connected systolic↕diastolic segment per reading, grade-gradient coloured.
@@ -201,7 +214,11 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
       cat: layingCur != null ? catFromBands(layingCur, restingHrBands('Laying')) : null,
       catBands: restingHrBands('Laying'),
       desc: 'Laying heart rate over the range.',
-      help: 'Heart rate measured while laying down, the cleanest resting baseline. A gradually falling laying HR usually accompanies improving autonomic recovery; a sustained unexplained rise is worth noting alongside symptoms and sleep.',
+      help: {
+        what: 'Heart rate from readings you logged while laying down, which is the cleanest resting baseline you can take. The shaded zones are the grade bands; the readout follows the most recent point, or whichever point you tap.',
+        why: 'A gradually falling laying HR usually tracks improving autonomic recovery, and it moves earlier than how you feel does. A sustained rise you cannot explain by illness, heat or a hard week is worth noting alongside your symptoms and sleep.',
+        learnMore: '/insights/basics/resting-heart-rate-and-mean-rr/',
+      },
       charts: [{ label: '', series: [series(laying, SCORE_COLORS.bad)], zones: acBandsToZones(restingHrBands('Laying')), integer: true, selectStat: true }],
       stats: [{ label: 'Laying HR', value: layingCur != null ? Math.round(layingCur) : null, sub: 'bpm', when: bucketWhen(mode, buckets[layingLi]) }],
     });
@@ -245,7 +262,11 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
       title: 'POTS Test', sub: range,
       cat: latestCat,
       desc: 'Your guided lay-to-stand tests. Same protocol every time, so these are directly comparable.',
-      help: 'Each point is one watch stand test. Sustained is the average rise over the final minute of standing versus the supine baseline; a sustained rise of 30 bpm or more (40 in ages 12-19) is the adult POTS-range criterion, and the zones shade it. Peak is the largest single rise. The readout and grade dot follow your most recent point on the chart, so in week/month/year view they report that period\'s average.',
+      help: {
+        what: 'Each point is one guided stand test. Sustained is the average rise over the final minute of standing versus your supine baseline; 30 bpm or more (40 in ages 12–19) is the POTS-range criterion, and the zones shade it. Peak is the largest single rise.',
+        why: 'Because the protocol is identical every time, this is the fairest answer to whether your physiology is changing, not whether today was easy. The readout follows the latest point, so week, month and year views report that period\'s average; tap any point to read its own test.',
+        learnMore: '/insights/pots/the-orthostatic-stand-test-at-home/',
+      },
       tiles: true,
       stats: [
         { label: mode === 'day' ? 'Last sustained rise' : 'Latest sustained rise', value: latestSus != null ? Math.round(latestSus) : null, sub: 'bpm', color: latestCat ? SCORE_COLORS[latestCat] : undefined },
@@ -342,7 +363,11 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
       title: 'POTS Episodes', sub: range,
       cat: all.cat,
       desc: 'How far your heart rate climbs above its resting baseline on everyday position changes.',
-      help: 'Max delta is the biggest change from your pre-episode baseline across the whole capture, so it catches the peak rather than wherever the heart rate happened to sit when the transition ended. The zones shade it: under 20 bpm green, 20 to 30 amber, 30 and above red, the ≥30 mark being the adult POTS-range criterion for standing up. Stairs are shaded the same way for readability, but a flight of stairs is expected to clear 30, so read that view as a trend rather than against the criterion. Use the transition links to compare like with like.',
+      help: {
+        what: 'Max delta is the biggest rise above your pre-episode baseline across the whole capture, not wherever your heart rate landed when the transition ended. Zones shade it: under 20 bpm green, 20–30 amber, 30 and above red, the 30 mark being the adult POTS-range criterion for standing.',
+        why: 'These are everyday position changes, so they answer whether daily life is getting easier. Use the All/Lay/Sit/Stairs links to compare like with like; stairs are expected to clear 30, so read that view as a trend rather than against the criterion.',
+        learnMore: '/insights/pots/how-pots-is-diagnosed/',
+      },
       charts: all.charts,
       stats: all.stats,
       insights: all.insights,
@@ -363,7 +388,11 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
       title: 'Duration', sub: range,
       cat: durAvg != null ? catFromBands(durAvg, BANDS.sleepDur) : null,
       desc: 'How long you slept and when, night by night.',
-      help: 'Duration is the night that ended that morning, coloured by grade the same way each night is scored: 8h+ reads as great, 7h good, 6h ok, and it falls off below that. Tap "Show zones" for the grade thresholds. Consistency of timing often moves HRV as much as raw duration does.',
+      help: {
+        what: 'Each point is the night that ended that morning, coloured by the same grade every night is scored on: 8h or more reads as great, 7h good, 6h ok, and it falls off below that. Tap "Show zones" to see the thresholds on the chart.',
+        why: 'Sleep is where most autonomic repair happens, so short nights show up in the next day\'s HRV and score. Consistency of bed and wake times often moves HRV as much as raw hours do, so look for a steady band rather than chasing one long night after a short one.',
+        learnMore: '/insights/recovery/sleep-and-autonomic-recovery/',
+      },
       metricsRow: {
         metrics: cur != null
           ? [{ label: 'Duration', value: Math.round(cur * 10) / 10, sub: 'hours', color: durColor(cur), regrade: durColor }]
@@ -388,7 +417,11 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
       cards.push({
         title: 'Sleeping HR', sub: range,
         desc: 'Your lowest and highest heart rate through the night.',
-        help: 'The low and high heart rate recorded during sleep. The overnight low is one of the cleanest resting-HR readings you get; the high reflects arousals and dreams. A gradually falling overnight low usually tracks improving autonomic recovery.',
+        help: {
+          what: 'The lowest and highest heart rate recorded across the night. The low is the floor your body reached while fully at rest; the high reflects arousals, dreams and anything that pulled you toward waking.',
+          why: 'The overnight low is one of the cleanest resting readings you get, and a gradual fall in it usually tracks improving autonomic recovery. A low that creeps up over a week, or a wide low-to-high gap, often shows up before you notice the symptoms.',
+          learnMore: '/insights/basics/overnight-heart-rate-while-you-sleep/',
+        },
         metricsRow: {
           metrics: [
             { label: 'Low', value: lastLow != null ? Math.round(lastLow) : null, sub: 'bpm', color: '#60a5fa' },
@@ -414,7 +447,11 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
     return [{
       title: 'Activity', sub: range,
       desc: 'Exercise sessions and minutes over the range, and what kinds they were.',
-      help: 'How many sessions you logged, the total exercise minutes per bucket, and a breakdown of session types. In autonomic recovery, consistency at a tolerable dose beats intensity. Watch how your score and symptoms respond in the day or two after harder sessions.',
+      help: {
+        what: 'Sessions you logged and their total exercise minutes per day, week or month, with a breakdown of which kinds of session made up the total.',
+        why: 'In autonomic recovery, consistency at a tolerable dose beats intensity, and recumbent work is often tolerated long before upright work is. Watch how your score and symptoms respond in the day or two after a harder session; that lag is what tells you the dose was too much.',
+        learnMore: '/insights/pots/exercise-for-pots-levine-protocol/',
+      },
       charts: [{ label: 'Total exercise minutes', series: [series(mins, SCORE_COLORS.bad)], integer: true }],
       bars: [{ label: 'Activity types', rows }],
       stats: [{ label: 'Sessions', value: sessions || null, sub: 'times' }, { label: 'Total', value: totalMins ? Math.round(totalMins) : null, sub: 'mins' }],
@@ -440,7 +477,11 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
     if (trigRows.length) cards.push({
       title: 'Triggers',
       desc: 'How often each trigger showed up in this range.',
-      help: 'Counts of every logged trigger (histamine foods, caffeine, alcohol and the rest). The chart totals them per day/week/month; tap a trigger below to see just its own pattern, and tap anywhere else to reset. Pair this with the Outlook correlations: if a trigger keeps landing before bad days, that\'s a pattern worth testing with an elimination window.',
+      help: {
+        what: 'Counts of every trigger you logged: histamine foods, caffeine, alcohol and the rest. The chart totals them per day, week or month; tap a trigger row to narrow the chart to that one, and tap elsewhere to reset.',
+        why: 'Triggers rarely announce themselves on the day, so counts over weeks read better than memory does. Pair this with the Outlook trend: if one keeps landing the day before your bad days, that is the pattern worth testing with a short elimination window.',
+        learnMore: '/insights/recovery/find-your-triggers-symptom-journal/',
+      },
       bars: [{ label: '', rows: trigRows }],
       barBuckets: { totals: buckets.map((_, bi) => trigRows.reduce((s, r) => s + (byKey[r.key][bi] || 0), 0)), byKey },
     });
@@ -450,7 +491,11 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
     if (acPresent(water).length) cards.push({
       title: 'Hydration', sub: range,
       desc: 'Daily water intake over the range.',
-      help: 'Litres of water per day. 2.5–3.5 L is commonly recommended alongside electrolytes for orthostatic conditions. Fluid only holds where salt allows. If you chase volume, discuss electrolyte targets with your doctor.',
+      help: {
+        what: 'Litres of water logged per day across the range. For orthostatic conditions, 2.5–3.5 L a day alongside electrolytes is the range commonly recommended. Tap any point to read that day.',
+        why: 'Blood volume is one of the few things you can change the same morning, and low days here often sit under a poor score. Fluid only holds where salt allows, so volume alone can dilute you; discuss electrolyte targets with your doctor rather than raising water on its own.',
+        learnMore: '/insights/research/science-of-salt-and-fluids-for-pots/',
+      },
       charts: [{ label: '', series: [series(water, '#38bdf8')], selectStat: true }],
       stats: [{ label: 'Water', value: waterCur, sub: 'litres', when: bucketWhen(mode, buckets[waterLi]) }],
     });
@@ -465,7 +510,11 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
     return [{
       title: 'Medications & Supplements',
       desc: 'How many days each was taken in this range.',
-      help: 'Days-taken counts for every medication and supplement you logged. Consistent daily bars make it easy to spot missed stretches, and to line adherence up against score changes when you and your doctor adjust the protocol.',
+      help: {
+        what: 'How many days in this range each medication or supplement was logged at least once. A daily item should sit close to the number of days in the range; anything well below that is a gap.',
+        why: 'Most of these only work when they are taken steadily, so a missed stretch here often explains a dip in the Outlook before anything else does. It is also the record to bring to an appointment when you and your doctor are judging whether a change actually helped.',
+        learnMore: '/insights/pots/pots-treatment-salt-fluids-compression-medication/',
+      },
       bars: [{ label: '', rows, fmt: (c) => `${c} d` }],
     }];
   };

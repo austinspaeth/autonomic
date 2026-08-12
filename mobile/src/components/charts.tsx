@@ -15,8 +15,13 @@ import { BANDS, catFromBands } from '../lib/scoring';
 import { onDay, type BucketView } from '../lib/analysis/buckets';
 import { psdCurve } from '../lib/hrv';
 import { zoneFor, type HrZone } from '../lib/workoutZones';
+import { STAGE_COLORS } from '../lib/sleep/stages';
 
 /* HRV frequency bands (Hz) — kept local to the chart so it has no lib/hrv dep. */
+/* Sleep bars share the stage palette's core blue, so a night reads the same
+ * colour everywhere it appears. */
+const SLEEP_BLUE = STAGE_COLORS.core;
+
 const SPECTRUM_BANDS = [
   { key: 'vlf', label: 'VLF', lo: 0.0033, hi: 0.04, color: '#f59e0b' },
   { key: 'lf', label: 'LF', lo: 0.04, hi: 0.15, color: '#6366f1' },
@@ -373,7 +378,13 @@ export function PowerSpectrum({ rr, vlf, lf, hf }: { rr?: number[] | null; vlf: 
 }
 
 /* ---------- Line chart (analysis) with grade-zone gradient + drag readout ---------- */
-export interface Series { values: (number | null)[]; color: string; label?: string; dashed?: boolean; pointBands?: Band[] | null }
+export interface Series {
+  values: (number | null)[];
+  color: string;
+  label?: string;
+  dashed?: boolean;
+  pointBands?: Band[] | null;
+}
 export interface Zone { from: number; to: number; color: string }
 
 let lcId = 0;
@@ -1369,5 +1380,418 @@ export function Bars({ rows, fmt, selected, onRowPress }: {
           : <View key={i}>{row}</View>;
       })}
     </View>
+  );
+}
+
+/* ---------- sleep report ---------- */
+
+/**
+ * One vertical bar per night, running from bedtime at the top to wake at the
+ * bottom, over the rolling week the user was keeping at the time.
+ *
+ * Time runs DOWNWARD — earlier at the top — because that is the direction a
+ * night runs, and it puts bedtime and wake where the eye expects them. Each
+ * bar is graded on how long the night was, which is also its length, so the
+ * colour and the picture say the same thing instead of two different ones.
+ *
+ * Drift is left to read off the bars themselves. `avgBedAt` / `avgWakeAt` are
+ * still carried on each night for whatever wants them, but nothing is drawn
+ * behind the bars: a shaded band competed with the dumbbells for the eye and
+ * made the chart busier without answering a question the bars did not.
+ */
+export function SleepScheduleChart({ nights, height = 200, onSelect }: {
+  nights: {
+    dk: string;
+    bedAt: number | null; wakeAt: number | null;
+    cat: ScoreCat | null;
+  }[];
+  height?: number;
+  onSelect?: (idx: number | null) => void;
+}) {
+  const p = usePalette();
+  const [layoutW, setLayoutW] = useState(0);
+  const [sel, setSel] = useState<number>(-1);
+  const reset = useCallback(() => { setSel(-1); onSelect?.(null); }, [onSelect]);
+  useChartsBlur(reset);
+
+  const all: number[] = [];
+  nights.forEach((n) => { if (n.bedAt != null) all.push(n.bedAt); if (n.wakeAt != null) all.push(n.wakeAt); });
+  if (all.length < 4) return null;
+  let min = Math.min(...all), max = Math.max(...all);
+  const padv = (max - min) * 0.1 + 15; min -= padv; max += padv;
+  const W = 320, H = height, padL = 26, padR = 8, padT = 10, padB = 20;
+  const innerW = W - padL - padR, n = nights.length;
+  const selIdx = sel < n ? sel : -1;
+  const xAt = (i: number) => padL + (n <= 1 ? innerW / 2 : (i / (n - 1)) * innerW);
+  // Earlier at the top: time flows down the chart, the way a night does.
+  const yAt = (v: number) => padT + ((v - min) / (max - min)) * (H - padT - padB);
+  const col = (c: ScoreCat | null) => (c && GRADE_COLORS[c]) || p.text;
+  const slot = innerW / Math.max(1, n - 1);
+  // Dumbbell proportions: the ends keep the bar's full width (they are the two
+  // times you actually read off the chart) while the body between them is
+  // narrower, so a run of nights reads as a row of endpoints rather than a
+  // picket fence. Same shape as the blood-pressure chart.
+  const capW = Math.max(4, Math.min(13, slot * 0.5));
+  const bodyW = Math.max(2, capW * 0.42);
+
+  // Hour gridlines, at whatever spacing keeps them to a handful.
+  const hourStep = (max - min) > 480 ? 180 : (max - min) > 240 ? 120 : 60;
+  const ticks: number[] = [];
+  for (let t = Math.ceil(min / hourStep) * hourStep; t <= max; t += hourStep) ticks.push(t);
+
+  const step = Math.max(1, Math.ceil(n / 6));
+  const onTouch = (x: number) => {
+    if (layoutW <= 0) return;
+    const px = (x / layoutW) * W;
+    const i = Math.max(0, Math.min(n - 1, Math.round(((px - padL) / innerW) * (n - 1))));
+    if (nights[i]?.bedAt == null) return;   // nothing drawn there to select
+    setSel(i);
+    onSelect?.(i);
+  };
+
+  return (
+    <View
+      onLayout={(e: LayoutChangeEvent) => setLayoutW(e.nativeEvent.layout.width)}
+      onStartShouldSetResponder={() => true}
+      onMoveShouldSetResponder={() => true}
+      onResponderGrant={(e) => onTouch(e.nativeEvent.locationX)}
+      onResponderMove={(e) => onTouch(e.nativeEvent.locationX)}
+      onResponderTerminate={reset}
+    >
+      <Svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+        {ticks.map((t) => (
+          <React.Fragment key={t}>
+            <Line x1={padL} x2={W - padR} y1={yAt(t)} y2={yAt(t)} stroke={p.border} strokeWidth={1} opacity={0.45} />
+            <SvgText x={padL - 4} y={yAt(t) + 3} textAnchor="end" fontSize={9} fontFamily={fonts.mono} fill={p.textDim}>{shortClock(t)}</SvgText>
+          </React.Fragment>
+        ))}
+        {nights.map((q, i) => (i % step === 0 || i === n - 1)
+          ? <SvgText key={`x${i}`} x={xAt(i)} y={H - 5} textAnchor="middle" fontSize={9} fontFamily={fonts.mono} fill={p.textDim}>{fmtShort(q.dk)}</SvgText>
+          : null)}
+        {nights.map((q, i) => {
+          if (q.bedAt == null || q.wakeAt == null) return null;
+          const on = i === selIdx;
+          const c = col(q.cat);
+          const x = xAt(i), r = (on ? capW + 2 : capW) / 2;
+          return (
+            <G key={q.dk} opacity={selIdx >= 0 && !on ? 0.5 : 1}>
+              <Line
+                x1={x} x2={x} y1={yAt(q.bedAt)} y2={yAt(q.wakeAt)}
+                stroke={c} strokeWidth={on ? bodyW + 1.5 : bodyW} strokeLinecap="round"
+              />
+              <Circle cx={x} cy={yAt(q.bedAt)} r={r} fill={c} />
+              <Circle cx={x} cy={yAt(q.wakeAt)} r={r} fill={c} />
+            </G>
+          );
+        })}
+      </Svg>
+    </View>
+  );
+}
+
+/** "9p" / "12a" / "6a" for a minutes-past-noon value on the schedule axis. */
+function shortClock(m: number): string {
+  const mins = ((Math.round(m) + 720) % 1440 + 1440) % 1440;
+  const h24 = Math.floor(mins / 60);
+  const h = h24 % 12 || 12;
+  return `${h}${h24 >= 12 ? 'p' : 'a'}`;
+}
+
+/**
+ * Nightly sleep against the user's own target, with the running total over it.
+ * Nights under target take the warning colour; the dashed line is the
+ * cumulative balance, which is a line to steer by rather than a debt to clear.
+ */
+export function SleepBalanceChart({ hours, target, cumulative, height = 120 }: {
+  hours: number[]; target: number; cumulative: number[]; height?: number;
+}) {
+  const p = usePalette();
+  if (hours.length < 2) return null;
+  const W = 320, H = height, padL = 20, padR = 6, padT = 12, padB = 16;
+  const lo = Math.min(4, Math.floor(Math.min(...hours) - 0.5));
+  const hi = Math.max(9, Math.ceil(Math.max(...hours, target) + 0.5));
+  const y = (v: number) => padT + (1 - (v - lo) / (hi - lo)) * (H - padT - padB);
+  const slot = (W - padL - padR) / hours.length;
+  const bw = Math.max(2, slot - 4);
+  const cLo = Math.min(...cumulative, 0), cHi = Math.max(...cumulative, 0);
+  const cy = (v: number) => padT + (1 - (v - cLo) / Math.max(0.1, cHi - cLo)) * (H - padT - padB);
+  const cx = (i: number) => padL + i * slot + 2 + bw / 2;
+  return (
+    <Svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+      <Line x1={padL} x2={W - padR} y1={y(target)} y2={y(target)} stroke={GRADE_COLORS.good} strokeWidth={1.4} strokeDasharray="5 4" />
+      <SvgText x={0} y={y(target) + 3.5} fontSize={9} fontWeight="700" fill={GRADE_COLORS.good}>{`${fmtNum(target)}h`}</SvgText>
+      {hours.map((h, i) => (
+        <Rect
+          key={i} x={padL + i * slot + 2} y={y(h)} width={bw} height={Math.max(2, y(lo) - y(h))} rx={2.5}
+          fill={h < target ? GRADE_COLORS.ok : SLEEP_BLUE} opacity={i === hours.length - 1 ? 1 : 0.7}
+        />
+      ))}
+      <Path
+        d={cumulative.map((v, i) => `${i ? 'L' : 'M'}${cx(i).toFixed(1)} ${cy(v).toFixed(1)}`).join(' ')}
+        fill="none" stroke={p.textDim} strokeWidth={1.6} strokeDasharray="3 3"
+      />
+    </Svg>
+  );
+}
+
+/**
+ * The last N nights' nocturnal dip as bars above and below zero, with the
+ * normal-dip guide across them. Nights with no dip leave a gap rather than
+ * closing up, so the run reads as nights and not as samples.
+ *
+ * Tapping or dragging a bar selects that night, the same gesture the Progress
+ * sparklines use, and reports it so the card's headline can read that night's
+ * value and date. A touch anywhere else blurs back to the latest night
+ * (`useChartsBlur`), so a selection is never left stranded.
+ */
+export function DipTrendChart({ points, colorFor, onSelect, height = 96 }: {
+  points: { dk: string; pct: number | null }[];
+  colorFor: (pct: number) => string;
+  /** Reports the selected night (null when a tap elsewhere blurs it). */
+  onSelect?: (pt: { dk: string; pct: number } | null) => void;
+  height?: number;
+}) {
+  const p = usePalette();
+  const lastWithValue = (() => {
+    for (let i = points.length - 1; i >= 0; i--) if (points[i].pct != null) return i;
+    return -1;
+  })();
+  const [sel, setSel] = useState(lastWithValue);
+  const [layoutW, setLayoutW] = useState(0);
+  const reset = useCallback(() => { setSel(lastWithValue); onSelect?.(null); }, [lastWithValue, onSelect]);
+  useChartsBlur(reset);
+  const vals = points.map((q) => q.pct).filter((v): v is number => v != null);
+  const W = 320, H = height, padL = 4, padR = 4, padT = 10, padB = 16;
+  const slot = (W - padL - padR) / (points.length || 1);
+  const bw = Math.max(2, slot - 5);
+  const onTouch = (x: number) => {
+    if (layoutW <= 0) return;
+    const px = (x / layoutW) * W;
+    const i = Math.max(0, Math.min(points.length - 1, Math.floor((px - padL) / slot)));
+    // A night with no overnight low has nothing to select; hold the last one.
+    if (points[i]?.pct == null) return;
+    setSel(i);
+    onSelect?.({ dk: points[i].dk, pct: points[i].pct as number });
+  };
+  if (vals.length < 2) return null;
+  const hi = Math.max(...vals, 5);
+  const lo = Math.min(0, ...vals);
+  const y = (v: number) => padT + (1 - (v - lo) / (hi - lo || 1)) * (H - padT - padB);
+  return (
+    <View
+      onLayout={(e: LayoutChangeEvent) => setLayoutW(e.nativeEvent.layout.width)}
+      onStartShouldSetResponder={() => true}
+      onMoveShouldSetResponder={() => true}
+      onResponderGrant={(e) => onTouch(e.nativeEvent.locationX)}
+      onResponderMove={(e) => onTouch(e.nativeEvent.locationX)}
+      onResponderTerminate={reset}
+      style={{ height: H }}
+    >
+      <Svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+        <Line x1={padL} x2={W - padR} y1={y(0)} y2={y(0)} stroke={p.border} strokeWidth={1} />
+        {points.map((q, i) => {
+          if (q.pct == null) return null;
+          const top = q.pct >= 0 ? y(q.pct) : y(0);
+          return (
+            <Rect
+              key={q.dk} x={padL + i * slot + 2.5} y={top} width={bw} height={Math.max(2, Math.abs(y(q.pct) - y(0)))} rx={2}
+              fill={colorFor(q.pct)} opacity={i === sel ? 1 : 0.45}
+            />
+          );
+        })}
+        <SvgText x={padL} y={H - 3} fontSize={9} fill={p.textDim}>{`${points.length} nights ago`}</SvgText>
+        <SvgText x={W - padR} y={H - 3} textAnchor="end" fontSize={9} fontWeight="700" fill={p.text}>last night</SvgText>
+      </Svg>
+    </View>
+  );
+}
+
+/* ---------- within-night series ---------- */
+
+/** Clock label for `sec` seconds after a bedtime given in minutes past noon. */
+function nightClock(bedAt: number, sec: number): string {
+  const mins = ((Math.round(bedAt + sec / 60) + 720) % 1440 + 1440) % 1440;
+  const h24 = Math.floor(mins / 60), m = mins % 60;
+  const h = h24 % 12 || 12;
+  return m ? `${h}:${String(m).padStart(2, '0')}${h24 >= 12 ? 'p' : 'a'}` : `${h}${h24 >= 12 ? 'p' : 'a'}`;
+}
+
+let nightId = 0;
+
+/**
+ * One night's curve on a clock axis — the overnight heart rate, or the
+ * respiratory rate over the same window.
+ *
+ * `scatter` draws one dot per sample graded through `bands`, with a smoothed
+ * line through them: an overnight trace is noisy enough that a single line
+ * hides the spikes, and the spikes are the whole reason someone opens this.
+ * Without it the series is drawn as a plain line in `color`.
+ *
+ * The x-axis is real clock time, because "when did that happen" is the only
+ * question this chart exists to answer.
+ */
+export function NightSeriesChart({ points, bedAt, color, bands, scatter, refLine, height = 150, onSelect }: {
+  points: { t: number; v: number }[];
+  /** Bedtime in minutes past noon, for the clock labels. */
+  bedAt: number;
+  color: string;
+  /** Grades each sample's colour (scatter mode). */
+  bands?: Band[] | null;
+  scatter?: boolean;
+  /** A dashed reference line with its own label, e.g. the user's typical low. */
+  refLine?: { v: number; label: string; color: string } | null;
+  height?: number;
+  onSelect?: (pt: { t: number; v: number } | null) => void;
+}) {
+  const p = usePalette();
+  const [layoutW, setLayoutW] = useState(0);
+  const [sel, setSel] = useState<number>(-1);
+  const [gid] = useState(() => `ns${nightId++}`);
+  const reset = useCallback(() => { setSel(-1); onSelect?.(null); }, [onSelect]);
+  useChartsBlur(reset);
+  if (!points || points.length < 3) return null;
+
+  const vals = points.map((q) => q.v);
+  let min = Math.min(...vals), max = Math.max(...vals);
+  if (refLine) { min = Math.min(min, refLine.v); max = Math.max(max, refLine.v); }
+  const span = max - min || 1;
+  min -= span * 0.12; max += span * 0.12;
+  const t0 = points[0].t, t1 = points[points.length - 1].t;
+  const tSpan = t1 - t0 || 1;
+  const W = 320, H = height, padL = 28, padR = 10, padT = 12, padB = 20;
+  const innerW = W - padL - padR;
+  const xAt = (t: number) => padL + ((t - t0) / tSpan) * innerW;
+  const yAt = (v: number) => padT + (1 - (v - min) / (max - min)) * (H - padT - padB);
+  const colAt = (v: number) => {
+    if (!bands) return color;
+    const c = catFromBands(v, bands);
+    return (c && GRADE_COLORS[c]) || color;
+  };
+  const selIdx = sel >= 0 && sel < points.length ? sel : -1;
+
+  // A smoothed line through the scatter: the trend the eye is trying to draw
+  // for itself, done for it. Window is in samples — cadence varies by source.
+  const win = Math.max(2, Math.round(points.length / 24));
+  const smooth = points.map((q, i) => {
+    const from = Math.max(0, i - win), to = Math.min(points.length - 1, i + win);
+    let sum = 0;
+    for (let j = from; j <= to; j++) sum += points[j].v;
+    return [xAt(q.t), yAt(sum / (to - from + 1))] as [number, number];
+  });
+
+  const onTouch = (x: number) => {
+    if (layoutW <= 0) return;
+    const px = (x / layoutW) * W;
+    const t = t0 + ((px - padL) / innerW) * tSpan;
+    let best = 0;
+    for (let i = 1; i < points.length; i++) {
+      if (Math.abs(points[i].t - t) < Math.abs(points[best].t - t)) best = i;
+    }
+    setSel(best);
+    onSelect?.(points[best]);
+  };
+
+  // Three clock ticks: start, middle, end of the night.
+  const ticks = [t0, t0 + tSpan / 2, t1];
+  const yTicks = [min + (max - min) * 0.12, (min + max) / 2, max - (max - min) * 0.12];
+
+  return (
+    <View
+      onLayout={(e: LayoutChangeEvent) => setLayoutW(e.nativeEvent.layout.width)}
+      onStartShouldSetResponder={() => true}
+      onMoveShouldSetResponder={() => true}
+      onResponderGrant={(e) => onTouch(e.nativeEvent.locationX)}
+      onResponderMove={(e) => onTouch(e.nativeEvent.locationX)}
+      onResponderTerminate={reset}
+    >
+      <Svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+        <Defs>
+          <LinearGradient id={gid} x1="0" y1={padT} x2="0" y2={H - padB} gradientUnits="userSpaceOnUse">
+            <Stop offset={0} stopColor={colAt(max)} />
+            <Stop offset={1} stopColor={colAt(min)} />
+          </LinearGradient>
+        </Defs>
+        {yTicks.map((v, i) => (
+          <React.Fragment key={i}>
+            <Line x1={padL} x2={W - padR} y1={yAt(v)} y2={yAt(v)} stroke={p.border} strokeWidth={1} opacity={0.45} />
+            <SvgText x={padL - 4} y={yAt(v) + 3} textAnchor="end" fontSize={9} fontFamily={fonts.mono} fill={p.textDim}>{Math.round(v)}</SvgText>
+          </React.Fragment>
+        ))}
+        {refLine && refLine.v > min && refLine.v < max ? (
+          <>
+            <Line x1={padL} x2={W - padR} y1={yAt(refLine.v)} y2={yAt(refLine.v)} stroke={refLine.color} strokeWidth={1.2} strokeDasharray="5 4" opacity={0.85} />
+            <SvgText x={W - padR} y={yAt(refLine.v) - 4} textAnchor="end" fontSize={9} fontWeight="700" fill={refLine.color}>{refLine.label}</SvgText>
+          </>
+        ) : null}
+        {scatter
+          ? points.map((q, i) => <Circle key={i} cx={xAt(q.t)} cy={yAt(q.v)} r={1.7} fill={colAt(q.v)} opacity={0.9} />)
+          : null}
+        <Path
+          d={smoothPath(smooth)} fill="none"
+          stroke={scatter ? (p.dark ? '#c9c9d0' : '#52525b') : `url(#${gid})`}
+          strokeWidth={scatter ? 1.8 : 2.4} strokeLinecap="round" strokeLinejoin="round"
+          opacity={scatter ? 0.85 : 1}
+        />
+        {selIdx >= 0 ? (
+          <G>
+            <Line x1={xAt(points[selIdx].t)} x2={xAt(points[selIdx].t)} y1={padT} y2={H - padB} stroke={p.text} strokeWidth={1} opacity={0.35} />
+            <Circle cx={xAt(points[selIdx].t)} cy={yAt(points[selIdx].v)} r={4} fill={colAt(points[selIdx].v)} stroke={p.surface2} strokeWidth={1.5} />
+          </G>
+        ) : null}
+        {ticks.map((t, i) => (
+          <SvgText
+            key={i} x={xAt(t)} y={H - 5} fontSize={9} fontFamily={fonts.mono} fill={p.textDim}
+            textAnchor={i === 0 ? 'start' : i === ticks.length - 1 ? 'end' : 'middle'}
+          >{nightClock(bedAt, t)}</SvgText>
+        ))}
+      </Svg>
+    </View>
+  );
+}
+
+/**
+ * The hypnogram: one row per stage, one block per span, across the night.
+ *
+ * This is the picture the report could not draw before — stage TOTALS cannot
+ * say whether the deep sleep came in one early block or in scraps all night,
+ * and they cannot put an awake block next to the moment the heart rate rose.
+ */
+export function Hypnogram({ spans, bedAt, colors, labels, rows, height = 118 }: {
+  spans: { s: number; d: number; v: string }[];
+  bedAt: number;
+  colors: Record<string, string>;
+  labels: Record<string, string>;
+  /** Row order, top to bottom. */
+  rows: string[];
+  height?: number;
+}) {
+  const p = usePalette();
+  if (!spans.length) return null;
+  const total = spans.reduce((m, q) => Math.max(m, q.s + q.d), 0) || 1;
+  const W = 320, H = height, padL = 34, padR = 6, padT = 6, padB = 14;
+  const rowH = (H - padT - padB) / rows.length;
+  const xAt = (sec: number) => padL + (sec / total) * (W - padL - padR);
+  return (
+    <Svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+      {rows.map((r, i) => (
+        <React.Fragment key={r}>
+          <SvgText x={0} y={padT + i * rowH + rowH / 2 + 3} fontSize={9.5} fontWeight="600" fill={p.textDim}>{labels[r]}</SvgText>
+          <Line x1={padL} x2={W - padR} y1={padT + i * rowH + rowH / 2 + 1} y2={padT + i * rowH + rowH / 2 + 1} stroke={p.border} strokeWidth={1} opacity={0.4} />
+        </React.Fragment>
+      ))}
+      {spans.map((q, i) => {
+        const row = rows.indexOf(q.v);
+        if (row < 0) return null;
+        const w = Math.max(1.5, xAt(q.s + q.d) - xAt(q.s));
+        return (
+          <Rect
+            key={i} x={xAt(q.s)} y={padT + row * rowH + rowH / 2 - 5.5}
+            width={w} height={11} rx={2.5} fill={colors[q.v]}
+          />
+        );
+      })}
+      <SvgText x={padL} y={H - 3} fontSize={9} fontFamily={fonts.mono} fill={p.textDim}>{nightClock(bedAt, 0)}</SvgText>
+      <SvgText x={W - padR} y={H - 3} textAnchor="end" fontSize={9} fontFamily={fonts.mono} fill={p.textDim}>{nightClock(bedAt, total)}</SvgText>
+    </Svg>
   );
 }

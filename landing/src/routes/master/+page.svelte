@@ -2,7 +2,7 @@
   /* /master — the private store-analytics dashboard.
    *
    * The dashboard itself is framework-free: plain HTML, one stylesheet and
-   * seven scripts under `landing/master/`, which is where they are edited. This
+   * scripts under `landing/master/`, which is where they are edited. This
    * route is only a shell that inlines all of it into a single prerendered
    * document, so the page has nothing to resolve at runtime — no sibling
    * stylesheet, no script src, no image. It used to ship as
@@ -22,14 +22,15 @@
   import sync from '../../../master/sync.js?raw';
   import charts from '../../../master/charts.js?raw';
   import analytics from '../../../master/analytics.js?raw';
+  import costs from '../../../master/costs.js?raw';
   import releases from '../../../master/releases.js?raw';
   import app from '../../../master/app.js?raw';
   import boot from '../../../master/boot.js?raw';
 
   /* Load order matters — see boot.js. Each file is an IIFE hanging one global
-     off `window`, so concatenating them is the same as the seven <script src>
+     off `window`, so concatenating them is the same as the <script src>
      tags the standalone page used. */
-  const dashboard = [config, auth, api, sync, charts, analytics, releases, app, boot].join('\n');
+  const dashboard = [config, auth, api, sync, charts, analytics, costs, releases, app, boot].join('\n');
 
   /* Tags are assembled rather than written out, because a literal <script> or
      <style> in this file — even inside a string or a comment — is what Svelte's
@@ -51,8 +52,19 @@
      scripts at the bottom of the page have run, or the numbers flash on screen
      first. The standalone page did this with `<body class="gated">`; app.html
      is shared by the whole site, so the class is set here instead — still
-     before the markup below is parsed. -->
-{@html inlineScript("document.body.classList.add('gated')")}
+     before the markup below is parsed.
+
+     The same script pins the viewport. This is a dense grid of numbers with its
+     own horizontal scrollers, and pinch-zoom on a phone fights every one of
+     them — a sideways drag on a wide table zooms the page instead of scrolling
+     the table. The meta tag is REWRITTEN rather than added: app.html ships one
+     for the whole site and two viewport tags is undefined behaviour, so this
+     route edits the site's rather than competing with it. -->
+{@html inlineScript(
+  "document.body.classList.add('gated');" +
+  "var vp=document.querySelector('meta[name=viewport]');" +
+  "if(vp)vp.setAttribute('content','width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no');"
+)}
 
 {@html body}
 

@@ -191,10 +191,10 @@ resources:
       Description: DynamoDB table backing the dashboard
       Value: ${param:tableName}
     OpenPingEndpoint:
-      Description: Mobile app daily open ping (cohort is D{MMDDYY})
+      Description: Mobile app daily open ping (cohort is D{MMDDYY}{platform})
       Value: !Sub https://${param:apiDomain}/ping/open/{cohort}
     SubPingEndpoint:
-      Description: Mobile app subscribe ping (cohort is D{MMDDYY})
+      Description: Mobile app subscribe ping (cohort is D{MMDDYY}{platform})
       Value: !Sub https://${param:apiDomain}/ping/sub/{cohort}
     PingReportEndpoint:
       Description: Read the ping counters (needs ?key= — see sls/README.md)

@@ -25,8 +25,8 @@ import { markDeclinedKeys } from '../lib/health/declined';
 import { importFingerprint } from '../lib/health/updateSet';
 import type { AppState, DayRecord, Entry } from '../lib/types';
 import {
-  collectImportWaveforms, extractWaveforms, findEmbeddedWaveform, waveformIds,
-  type WaveformData,
+  collectImportWaveforms, extractWaveforms, findEmbeddedWaveform, sleepWaveformId,
+  waveformIds, type WaveformData,
 } from '../lib/waveforms';
 
 const STORAGE_KEY = 'autonomic.journal.v1';
@@ -216,6 +216,33 @@ function readWaveformUncached(id: string): WaveformData | null {
 export function storeWaveform(id: string, data: WaveformData) {
   putWaveform(id, data);
 }
+
+/**
+ * A night's series (overnight HR curve, respiratory rate, hypnogram spans)
+ * into the sidecar under its own namespaced key — never into the journal,
+ * where a year of nights would be re-stringified on every mutation.
+ *
+ * Passing nothing CLEARS the night's blob, which is the important half: an
+ * unstaged re-import, or a hand-corrected bed/wake, must not leave yesterday's
+ * curve behind describing a window it no longer covers.
+ */
+export function storeSleepSeries(dk: string, s: {
+  hrSeries?: WaveformData['sampledHr'] | null;
+  respSeries?: WaveformData['sampledResp'] | null;
+  spans?: WaveformData['stageSpans'] | null;
+} = {}) {
+  const data: WaveformData = {};
+  if (s.hrSeries && s.hrSeries.length) data.sampledHr = s.hrSeries;
+  if (s.respSeries && s.respSeries.length) data.sampledResp = s.respSeries;
+  if (s.spans && s.spans.length) data.stageSpans = s.spans;
+  const id = sleepWaveformId(dk);
+  if (Object.keys(data).length) { putWaveform(id, data); return; }
+  waveCache.delete(id);
+  try { wkv().delete(id); } catch { /* stray blob — pruned on next launch */ }
+}
+
+/** A night's stored series, or null when it was logged by hand. */
+export const getSleepSeries = (dk: string): WaveformData | null => getWaveform(sleepWaveformId(dk));
 
 /** Drop sidecar blobs whose entry no longer exists (deleted while the
  *  journal write raced a crash, or left behind by an older build). */

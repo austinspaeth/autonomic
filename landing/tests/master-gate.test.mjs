@@ -145,7 +145,12 @@ check('server entry hydrated into the store',
   JSON.stringify(store.db.entries));
 check('cache written from server data',
   JSON.parse(window.localStorage.getItem('autonomic.dashboard.v1')).entries.length === 1);
-check('sync status reads Saved', $('syncStatus').textContent === 'Saved');
+/* There is no status pill any more: "Saved" was on screen essentially always,
+   which made it furniture. Silence is the success state, and only a failure
+   speaks — so both halves of that contract get asserted. */
+check('no status pill in the header', !$('syncStatus'));
+check('a healthy save says nothing', !$('toast').classList.contains('on'),
+  $('toast').textContent);
 
 // --- a local edit pushes a diff, not the whole store ------------------------
 const before = calls.length;
@@ -168,6 +173,32 @@ const push2 = calls.slice(before2).find((c) => c.action === 'SYNC');
 check('removal produced a delete', push2 && push2.body.payload.deletes
   && push2.body.payload.deletes[0].date === '2026-08-01',
   push2 && JSON.stringify(push2.body.payload));
+
+/* --- no two top-level functions share a name -------------------------------
+   app.js is one long IIFE of hoisted function declarations, so a duplicate name
+   is not an error: the later one silently wins and the earlier caller renders
+   nothing. That is exactly how the Overview's "By day of week" chart went blank
+   when the App usage view added its own renderWeekday. */
+const appJs = fs.readFileSync(new URL('../master/app.js', import.meta.url), 'utf8');
+const names = [...appJs.matchAll(/^  function ([A-Za-z0-9_$]+)\s*\(/gm)].map((m) => m[1]);
+const dupes = [...new Set(names.filter((n, i) => names.indexOf(n) !== i))];
+check('no duplicate top-level function names in app.js', dupes.length === 0, dupes.join(', '));
+
+// --- a save that fails is not silent ---------------------------------------
+/* The pill used to be the only place a failed push showed up. With it gone, a
+   real failure has to interrupt, or "silence means saved" becomes a lie. */
+const goodFetch = window.fetch;
+window.fetch = (url, opts) => {
+  const b = JSON.parse(opts.body || '{}');
+  if (b.action === 'SYNC') return Promise.reject(Object.assign(new Error('network down'), { status: 0 }));
+  return goodFetch(url, opts);
+};
+store.db.entries.push({ date: '2026-08-03', platform: 'ios', downloads: 3 });
+window.Sync.schedule();
+await new Promise((r) => setTimeout(r, 1500));
+check('a failed save interrupts', $('toast').classList.contains('on') &&
+  /Could not save/.test($('toast').textContent), $('toast').textContent);
+window.fetch = goodFetch;
 
 let failed = 0;
 results.forEach((r) => {

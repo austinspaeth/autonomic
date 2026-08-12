@@ -14,11 +14,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Pressable, Text, View } from 'react-native';
 import { BalanceChart, LineChart, StackedBars, ZonesToggle, balanceCat } from '../components/charts';
-import { Ghost, HelpDot, ScoreDot, TextGhost } from '../components/ui';
+import { Ghost, HelpDot, LinkToggle, ScoreDot, TextGhost } from '../components/ui';
 import { TAIL_STYLE, fonts, radius, readoutTail, usePalette } from '../theme';
 import { fmtNum } from '../lib/dates';
 import type { DayRecord, Entry, ScoreCat } from '../lib/types';
 import { BANDS, catFromBands, HRV_HELP, type ScoreContext } from '../lib/scoring';
+import type { HelpContent } from '../lib/help';
 import { type DaysMap } from '../lib/scoring/day';
 import { isTrustedReading } from '../lib/hrvQuality';
 import {
@@ -89,72 +90,72 @@ export function HrvFilterLinks({ value, onChange }: { value: Filt; onChange: (f:
 // short inline description + longer "?" help copy.
 // (`unit` trails the big value, with the shown bucket's date after it; the
 // stress index is a unitless composite, so it has none.)
-const METRICS: { label: string; s: string; u: string; unit?: string; band: string; integer?: boolean; desc: string; help: string }[] = [
+const METRICS: { label: string; s: string; u: string; unit?: string; band: string; integer?: boolean; desc: string; help: HelpContent }[] = [
   {
     label: 'SDNN', s: 'sdnn', u: 'sdnn', unit: 'ms', band: 'sdnn', integer: true,
     desc: 'Overall variability across the whole reading, the broadest HRV summary.',
-    help: 'Standard deviation of all RR intervals in the reading. SDNN captures every rhythm influence (breathing, blood-pressure waves, slower autonomic swings), so it summarizes total variability rather than just vagal activity. In short readings it runs lower than 24-hour figures you may see quoted elsewhere.',
+    help: HRV_HELP.sdnn,
   },
   {
     label: 'RMSSD', s: 'rmssd', u: 'rmssd', unit: 'ms', band: 'rmssdS', integer: true,
     desc: 'Beat-to-beat variation in your heart rate, a quick read on recovery and rest-state balance.',
-    help: 'Root mean square of successive RR-interval differences. RMSSD is the workhorse HRV metric: it reflects parasympathetic (vagal) activity, and higher values generally mean better recovery capacity. Compare readings taken at the same time of day and in the same position. A consistent morning reading is the most reliable trend line.',
+    help: HRV_HELP.rmssd,
   },
   {
     label: 'pNN50', s: 'pnn50', u: 'pnn50', unit: '%', band: 'pnn50', integer: true,
     desc: 'Share of beats that differ from the previous one by more than 50 ms.',
-    help: 'The percentage of successive heartbeat intervals that differ by more than 50 ms. Like RMSSD it tracks vagal tone, but it saturates at the extremes. Expect it to move together with RMSSD, and treat sustained changes as more meaningful than single readings.',
+    help: HRV_HELP.pnn50,
   },
   {
     label: 'Avg HR', s: 'hr', u: 'avgHr', unit: 'bpm', band: 'hrBreath', integer: true,
     desc: 'Average heart rate across the reading.',
-    help: 'Mean heart rate during the capture. A drifting resting rate is one of the simplest autonomic signals: a falling trend usually accompanies improving recovery, while an unexplained sustained rise is worth noting alongside symptoms.',
+    help: HRV_HELP.hr,
   },
   {
     label: 'Mean RR', s: 'meanRr', u: 'meanRr', unit: 'ms', band: 'rrMode', integer: true,
     desc: 'Average time between beats, in milliseconds, the inverse of heart rate.',
-    help: 'The mean interval between successive beats. It is the same information as average heart rate seen from the other side (60,000 ÷ HR), but HRV work is done in RR space, so it is shown in milliseconds here.',
+    help: HRV_HELP.meanRr,
   },
   {
     label: 'MxDMn', s: 'mxdmn', u: 'mxdmn', unit: 'ms', band: 'mxdmn',
     desc: 'Spread between your longest and shortest beat intervals.',
-    help: 'The difference between the maximum and minimum RR interval in the reading. A wide spread generally reflects healthy variability; a narrow one a rigid rhythm. It is sensitive to stray artifacts, so a single odd value matters less than the trend.',
+    help: HRV_HELP.mxdmn,
   },
   {
     label: 'Mode', s: 'mode', u: 'mode', unit: 'ms', band: 'rrMode', integer: true,
     desc: 'Your most common beat interval, where the rhythm settles.',
-    help: 'The most frequently occurring RR interval. Together with AMo50 it describes the shape of your beat-interval distribution: the mode is its centre, and shifts in the mode track shifts in your underlying resting rate.',
+    help: HRV_HELP.mode,
   },
   {
     label: 'AMo50', s: 'amo50', u: 'amo50', unit: '%', band: 'amo50', integer: true,
     desc: 'How concentrated beats are around the mode; higher means a more rigid rhythm.',
-    help: 'The share of beats falling in the modal 50 ms bin. When the autonomic system is under strain the rhythm concentrates around one interval and AMo50 climbs; relaxed states spread the distribution out and it falls.',
+    help: HRV_HELP.amo50,
   },
   {
     label: 'CV', s: 'cv', u: 'cv', unit: '%', band: 'cv',
     desc: 'Variability relative to your average beat length.',
-    help: 'Coefficient of variation: SDNN divided by the mean RR, as a percentage. Because it is normalized by heart rate it makes readings taken at different rates more comparable than raw SDNN.',
+    help: HRV_HELP.cv,
   },
   {
     label: 'LF peak', s: 'lfPeak', u: 'lfPeak', unit: 'Hz', band: 'lfPeak',
     desc: 'Dominant frequency in the low band; with slow breathing it should track your breath pace.',
-    help: 'The frequency with the most power between 0.04 and 0.15 Hz. During paced breathing the LF peak generally mirrors your breathing pace, so it lands close to your breathing frequency. A 4/6 pattern (four seconds in, six out) is one breath every ten seconds, or 0.1 Hz, which is near the resonance frequency for most people. A clean session concentrates power at that peak, so an LF peak near your pacing frequency is a sign of good coherence.',
+    help: HRV_HELP.lfPeak,
   },
   {
     label: 'HF peak', s: 'hfPeak', u: 'hfPeak', unit: 'Hz', band: 'hfPeak',
     desc: 'Dominant frequency in the high band, usually your natural breathing rate.',
-    help: 'The frequency with the most power between 0.15 and 0.4 Hz. At rest this band is driven by respiration (each breath speeds and slows the heart slightly), so the HF peak usually sits at your breathing rate.',
+    help: HRV_HELP.hfPeak,
   },
   // Kept last so the Balance chart (rendered just before it) closes out the deep
   // dives; see the `m.s === 'stressIndex'` branch in HrvProgress.
   {
     label: 'Stress index', s: 'stressIndex', u: 'stressIndex', band: 'stressIndex', integer: true,
     desc: 'Baevsky strain index that climbs when the rhythm turns rigid under sympathetic load.',
-    help: 'A composite of AMo50, mode, and MxDMn that rises steeply as the rhythm becomes rigid. Low and stable is the goal; spikes typically accompany stress, illness, or overreaching, and often lead symptoms by a day or two.',
+    help: HRV_HELP.stressIndex,
   },
 ];
 
-const POWER_HELP = 'Total spectral power of the reading, split into very-low (VLF), low (LF) and high (HF) frequency bands. Bar height is the total in ms², and a higher total is generally better: it means the heart rhythm is varying freely, which is the sign of an adaptable, well-regulated autonomic system. But the mix matters as much as the total; a healthy reading spreads power across the bands rather than piling it into one.\n\nHF (0.15–0.4 Hz) is the fast, breath-linked band. It rides almost purely on parasympathetic (vagal) tone, the "rest and digest" branch, so strong HF means good recovery and calm. LF (0.04–0.15 Hz) is the slower baroreflex band around blood-pressure regulation; it carries a mix of both branches but leans sympathetic (the "fight or flight" side) when you are stressed or standing. Note that slow paced breathing deliberately pumps LF up, so a big LF share during a breathing exercise is expected, not a warning.\n\nVLF (below 0.04 Hz) reflects slow regulatory waves tied to thermoregulation, hormones and vascular tone. A VLF share that dominates the reading (with little HF) can point to poor vagal engagement, physical or emotional stress, poor sleep, inflammation, or simply a reading that was too short or too noisy to resolve the faster bands cleanly. Occasional high VLF is normal; a persistent pattern of high VLF with suppressed HF is worth watching. Growing total power with a balanced spread over weeks is a common recovery pattern.';
+const POWER_HELP = HRV_HELP.power;
 
 const POWER_DESC = 'Total HRV power split across the VLF, LF and HF frequency bands.';
 
@@ -279,7 +280,7 @@ export function HrvProgressSkeleton() {
             right={<Text style={{ fontSize: 12, fontWeight: '700', color: p.accent }}>Show zones</Text>}
           />
           <View style={{ marginBottom: 12 }}>
-            <KindToggle value="both" onChange={NOOP} />
+            <LinkToggle options={KIND_OPTS} value="both" onChange={NOOP} />
           </View>
           <Ghost h={140} r={radius.control} style={{ opacity: 0.55 }} />
         </Section>
@@ -300,25 +301,6 @@ const KIND_OPTS: { val: Kind; label: string }[] = [
   { val: 'breath', label: 'Training' }, { val: 'compare', label: 'Compare' },
 ];
 
-/** Text-link kind toggle (per the design comp) — active option in bright white
- *  with a short underline beneath it. */
-function KindToggle({ value, onChange }: { value: Kind; onChange: (v: Kind) => void }) {
-  const p = usePalette();
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', columnGap: 14, rowGap: 8 }}>
-      {KIND_OPTS.map((o) => {
-        const on = o.val === value;
-        return (
-          <Pressable key={o.val} onPress={() => onChange(o.val)} hitSlop={6} style={{ alignItems: 'center' }}>
-            <Text style={{ fontSize: 13, fontWeight: '600', color: on ? '#fff' : p.textDim }}>{o.label}</Text>
-            <View style={{ height: 2, borderRadius: 1, alignSelf: 'stretch', marginTop: 3, backgroundColor: on ? '#fff' : 'transparent' }} />
-          </Pressable>
-        );
-      })}
-    </View>
-  );
-}
-
 /** Card container — the flat section design sits inside a surface card. */
 function Section({ children }: { children: React.ReactNode }) {
   const p = usePalette();
@@ -328,7 +310,7 @@ function Section({ children }: { children: React.ReactNode }) {
 /** Section header per the comp: uppercase title + "?" (left), optional action
  *  (right); beneath it the big value with its dim suffix, then a description. */
 function SectionHead({ title, help, value, valueColor, value2, pair, suffix, desc, right, cat, ghost }: {
-  title: string; help: string; value: string | null; valueColor?: string;
+  title: string; help: HelpContent; value: string | null; valueColor?: string;
   value2?: { text: string; color: string } | null;
   /** Skeleton mode: the big value is a placeholder block of the same height. */
   ghost?: boolean;
@@ -466,7 +448,7 @@ function MetricSection({ m, structured, unstructured, combined, buckets }: {
         right={!empty && zones ? <ZonesToggle on={showZones} onPress={() => setShowZones((v) => !v)} /> : undefined}
       />
       <View style={{ marginBottom: 12 }}>
-        <KindToggle value={kind} onChange={setKind} />
+        <LinkToggle options={KIND_OPTS} value={kind} onChange={setKind} />
       </View>
       {empty ? (
         <Text style={{ color: p.textDim, fontSize: 13 }}>

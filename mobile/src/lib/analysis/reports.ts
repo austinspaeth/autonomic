@@ -11,8 +11,21 @@ import { ACTIVITY_TYPES, MED_TYPES, READING_TYPES, SYMPTOM_TYPES, TRIGGER_TYPES,
 import { bpBce, bpKerdo, bpKvas, bpMap, bpPP, bpRobinson, hrvComposite, numOr, orthoMaxDelta, type ScoreContext } from '../scoring';
 import { estimatedHrMax, hrZones, timeInZones } from '../workoutZones';
 import { isTrustedReading } from '../hrvQuality';
+import { TREND_METRICS, median as trendMedian, metricSeries, type TrendMetricId } from '../trends';
 
-export type ReportRange = 'day' | 'week' | 'month' | 'year';
+export type ReportRange = 'day' | 'week' | 'month' | 'year' | 'all';
+
+/**
+ * How much of an all-time report keeps per-day detail.
+ *
+ * Everything older is rolled up to one line per month by `buildMonthlyRollup`.
+ * Without that, a three-year journal produces a prompt of several hundred
+ * kilobytes: past the context window of most AI tools, painful to paste, and
+ * mostly repetition. A monthly median carries the shape of an old year at about
+ * a thousandth of the size, and the header says where the rollup starts so
+ * nothing is silently dropped.
+ */
+export const ALL_TIME_DETAIL_DAYS = 365;
 
 const MED_KEYS = new Set(['allegra', 'pepsidAc', 'gaviscon', 'melatonin']);
 const rv = (o: unknown, k: string): unknown => { if (!o || typeof o !== 'object') return null; const x = (o as Record<string, unknown>)[k]; return x === undefined || x === null || x === '' ? null : x; };
@@ -22,10 +35,19 @@ const noteSuffix = (r: { note?: unknown }) => (r && r.note ? ` | Note: ${r.note}
 const kv = (o: unknown, label: string, k: string, unit = '') => { const v = rv(o, k); return v == null ? '' : ` | ${label}: ${v}${unit}`; };
 const orNone = (lines: string[]) => (lines.length ? lines.join('\n') : '(none recorded)');
 
-export function reportDateRange(range: ReportRange, currentKey: string): { keys: string[]; rangeText: string } {
+export function reportDateRange(range: ReportRange, currentKey: string, days?: DaysMap): { keys: string[]; rangeText: string } {
   const tk = keyOf(new Date());
   const longFmt = (k: string) => dateFromKey(k).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
   if (range === 'day') return { keys: [currentKey], rangeText: (currentKey === tk ? 'Today, ' : '') + longFmt(currentKey) };
+  // All time: from the first logged day to today. `days` is optional so the
+  // signature stays backwards compatible; without it, 'all' means the last year.
+  if (range === 'all') {
+    const logged = days ? Object.keys(days).sort() : [];
+    const first = logged.length ? logged[0] : addDays(tk, -364);
+    const keys: string[] = [];
+    for (let k = first; k <= tk; k = addDays(k, 1)) keys.push(k);
+    return { keys, rangeText: keys.length > 1 ? `All time (${longFmt(keys[0])} to ${longFmt(tk)}, ${keys.length} days)` : longFmt(tk) };
+  }
   const span = range === 'week' ? 7 : range === 'month' ? 30 : 365;
   const start = new Date(); start.setDate(start.getDate() - (span - 1));
   const keys: string[] = [];
@@ -154,15 +176,95 @@ export const REPORT_CARDS: ReportCard[] = [
 /** Every data section, in a stable order — used by the "Data export only" item. */
 const ALL_SECTION_KEYS = ['scores', 'hrv', 'bp', 'rhr', 'sleep', 'orthostatic', 'activities', 'triggers', 'meds', 'supplements', 'symptoms', 'digestion', 'cleanDays', 'notes'];
 
+/* ---------- all-time rollup ---------- */
+
+/** Metrics summarised per month, in the order they appear on the line. */
+const ROLLUP_METRICS: TrendMetricId[] = [
+  'score', 'rmssd', 'sdnn', 'restingHr', 'sys', 'dia', 'sleepDuration', 'sleepingHr', 'waterIntake',
+];
+/** Metrics whose month value is a TOTAL rather than a median. */
+const ROLLUP_TOTALS: TrendMetricId[] = ['symptomLoad', 'cleanDays'];
+
+/**
+ * Split an all-time key range into the recent stretch that keeps per-day detail
+ * and the older stretch that gets rolled up.
+ */
+export function splitAllTime(keys: string[]): { older: string[]; recent: string[] } {
+  if (keys.length <= ALL_TIME_DETAIL_DAYS) return { older: [], recent: keys };
+  const cut = keys.length - ALL_TIME_DETAIL_DAYS;
+  return { older: keys.slice(0, cut), recent: keys.slice(cut) };
+}
+
+/**
+ * One line per calendar month: how much was logged and where the numbers sat.
+ *
+ * Medians rather than means, and computed through `metricSeries` and the trend
+ * registry rather than by hand, so a month in this summary is aggregated exactly
+ * the way the same month would be anywhere else in the app. A summary that
+ * disagreed with the charts would be worse than no summary.
+ */
+export function buildMonthlyRollup(state: AppState, ctx: ScoreContext, keys: string[]): string {
+  if (!keys.length) return '';
+  const months: string[] = [];
+  const byMonth = new Map<string, string[]>();
+  keys.forEach((k) => {
+    const m = k.slice(0, 7);
+    if (!byMonth.has(m)) { byMonth.set(m, []); months.push(m); }
+    (byMonth.get(m) as string[]).push(k);
+  });
+
+  const lines = months.map((m) => {
+    const mk = byMonth.get(m) as string[];
+    const logged = mk.filter((k) => state.days[k] && entryCount(state.days, [k]) > 0).length;
+    if (!logged) return '';
+    const series = metricSeries(state.days, mk, [...ROLLUP_METRICS, ...ROLLUP_TOTALS], ctx);
+    const parts: string[] = [`days logged: ${logged}`];
+    ROLLUP_METRICS.forEach((id) => {
+      const vals = (series[id] || []).filter((v): v is number => v != null);
+      if (!vals.length) return;
+      const def = TREND_METRICS[id];
+      parts.push(`${def.label} ${def.fmt(trendMedian(vals))} ${def.unit} (n=${vals.length})`);
+    });
+    ROLLUP_TOTALS.forEach((id) => {
+      const vals = (series[id] || []).filter((v): v is number => v != null);
+      if (!vals.length) return;
+      const def = TREND_METRICS[id];
+      parts.push(`${def.label} ${Math.round(vals.reduce((s, v) => s + v, 0))} total`);
+    });
+    return `[${m}] ${parts.join(' | ')}`;
+  }).filter(Boolean);
+
+  if (!lines.length) return '';
+  const first = months[0], last = months[months.length - 1];
+  return `MONTHLY SUMMARY (${first} to ${last} — older data, condensed to one line per month; medians unless marked total):\n${lines.join('\n')}`;
+}
+
+/**
+ * The data body for a report: the rollup for anything beyond
+ * ALL_TIME_DETAIL_DAYS, then the per-day sections for the rest.
+ *
+ * Every builder goes through this so the three of them cannot disagree about
+ * where the detail stops.
+ */
+function renderBody(state: AppState, ctx: ScoreContext, keys: string[], sections: string[], range: ReportRange): string {
+  const render = makeSectionRenderer(state, ctx);
+  if (range !== 'all') return render(keys, sections);
+  const { older, recent } = splitAllTime(keys);
+  const rollup = buildMonthlyRollup(state, ctx, older);
+  const detail = render(recent, sections);
+  if (!rollup) return detail;
+  const from = recent.length ? recent[0] : keys[keys.length - 1];
+  return `${rollup}\n\nDAY-BY-DAY DETAIL (from ${from} onward):\n\n${detail}`;
+}
+
 /**
  * Raw data export: just the rendered data sections for the period, with no
  * prompt framing (no persona, focus, or instructions) — the numbers only.
  */
 export function buildDataExport(state: AppState, ctx: ScoreContext, range: ReportRange, currentKey: string): string {
-  const { keys: allKeys, rangeText } = reportDateRange(range, currentKey);
+  const { keys: allKeys, rangeText } = reportDateRange(range, currentKey, state.days);
   const keys = allKeys.filter((k) => state.days[k]).sort();
-  const render = makeSectionRenderer(state, ctx);
-  return `DATA EXPORT\nSOURCE: Autonomic (autonomic.care), a personal health-tracking app for autonomic recovery\nPERIOD: ${rangeText}\n\n${render(keys, ALL_SECTION_KEYS)}`;
+  return `DATA EXPORT\nSOURCE: Autonomic (autonomic.care), a personal health-tracking app for autonomic recovery\nPERIOD: ${rangeText}\n\n${renderBody(state, ctx, keys, ALL_SECTION_KEYS, range)}`;
 }
 
 /**
@@ -603,9 +705,8 @@ End your response by reminding the user that this is not a medical diagnosis, an
  * tables. Neutral clinical tone, observations only, no diagnoses.
  */
 export function buildDoctorPrompt(state: AppState, ctx: ScoreContext, range: ReportRange, currentKey: string): string {
-  const { keys: allKeys, rangeText } = reportDateRange(range, currentKey);
+  const { keys: allKeys, rangeText } = reportDateRange(range, currentKey, state.days);
   const keys = allKeys.filter((k) => state.days[k]).sort();
-  const render = makeSectionRenderer(state, ctx);
   const sections = ['scores', 'hrv', 'bp', 'rhr', 'orthostatic', 'sleep', 'symptoms', 'digestion', 'meds', 'supplements', 'notes'];
   const sparse = hasAnyData(state.days, keys) && entryCount(state.days, keys) < 4 ? '\nNOTE: Limited data was logged for this period, so keep the document brief and flag the small sample.\n' : '';
 
@@ -637,20 +738,19 @@ Omit any section or table row that has no supporting data rather than showing bl
 ${sparse}
 PATIENT-TRACKED DATA (${rangeText}):
 
-${render(keys, sections)}`;
+${renderBody(state, ctx, keys, sections, range)}`;
 }
 
 export function buildPrompt(state: AppState, ctx: ScoreContext, cards: ReportCard[], range: ReportRange, currentKey: string): string {
-  const { keys: allKeys, rangeText } = reportDateRange(range, currentKey);
+  const { keys: allKeys, rangeText } = reportDateRange(range, currentKey, state.days);
   const keys = allKeys.filter((k) => state.days[k]).sort();
-  const render = makeSectionRenderer(state, ctx);
   const header = universalHeader(state, rangeText);
   const sparse = hasAnyData(state.days, keys) && entryCount(state.days, keys) < 4 ? '\n\nNOTE: Limited data available for this period, analysis may be less comprehensive.\n' : '';
   if (cards.length === 1) {
     const card = cards[0];
     let body = `FOCUS: ${card.focus}`;
     if (card.context) body += `\n\n${card.context}`;
-    body += `\n\nDATA FOR PERIOD:\n\n${render(keys, [...card.sections, 'notes'])}`;
+    body += `\n\nDATA FOR PERIOD:\n\n${renderBody(state, ctx, keys, [...card.sections, 'notes'], range)}`;
     if (card.instructions) body += `\n\n${card.instructions}`;
     return `${header}${sparse}\n\n${body}`;
   }
@@ -659,7 +759,7 @@ export function buildPrompt(state: AppState, ctx: ScoreContext, cards: ReportCar
   sectionKeys.push('notes');
   const titles = cards.map((c) => c.title);
   const intro = `This is a CUSTOM, MULTI-PART report covering ${cards.length} focus areas:\n${titles.map((t, i) => `${i + 1}. ${t}`).join('\n')}\n\nAddress each as its own labeled section, in order. The shared data below covers all areas. End with an integrated summary.`;
-  const data = `SHARED DATA FOR PERIOD:\n\n${render(keys, sectionKeys)}`;
+  const data = `SHARED DATA FOR PERIOD:\n\n${renderBody(state, ctx, keys, sectionKeys, range)}`;
   const focusBlocks = cards.map((c, i) => { let b = `=== ${i + 1}. ${c.title.toUpperCase()} ===\nFOCUS: ${c.focus}`; if (c.context) b += `\n\n${c.context}`; if (c.instructions) b += `\n\nANALYSIS REQUESTED:\n${c.instructions}`; return b; }).join('\n\n');
   return `${header}${sparse}\n\n${intro}\n\n${data}\n\nFOCUS AREAS:\n\n${focusBlocks}`;
 }

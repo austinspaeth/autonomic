@@ -29,6 +29,9 @@ export interface SleepSample { value: number; startDate: Date; endDate: Date }
 export const NIGHT_START_HOUR = 18;
 export const NIGHT_END_HOUR = 14;
 
+/** One block of the night: `s` seconds after bed, `d` seconds long. */
+export interface StageSpan { s: number; d: number; v: 'deep' | 'rem' | 'core' | 'awake' }
+
 export interface SleepSummary {
   bed: Date;
   wake: Date;
@@ -37,6 +40,17 @@ export interface SleepSummary {
   /** Per-stage minutes when the source staged the night; null when every
    *  sample is plain asleepUnspecified (manual logs, older sources). */
   stages: SleepStages | null;
+  /**
+   * The same stages as a timeline rather than four totals — every block in the
+   * order it happened, awake blocks included, sorted by start.
+   *
+   * This is the half that used to be summed away. Totals cannot answer "was I
+   * awake at 3am, and did my heart rate do anything then", which is the
+   * question a person actually has about a bad night, so the spans are kept
+   * and stored in the waveform sidecar (never in the journal — see
+   * `sleepWaveformId`). Empty on an unstaged night with no awake samples.
+   */
+  spans: StageSpan[];
 }
 
 // HKCategoryValueSleepAnalysis: 0 inBed, 1 asleepUnspecified, 2 awake,
@@ -97,16 +111,27 @@ export function summarizeSleep(rows: readonly SleepSample[]): SleepSummary | nul
   const inMain = (r: SleepSample) =>
     r.startDate.getTime() < wakeMs && r.endDate.getTime() > bedMs;
 
-  const stageMinutes = (value: number) =>
-    minutesOf(unionIntervals(asleep.filter((r) => r.value === value && inMain(r))));
+  const stageIv = (value: number) => unionIntervals(asleep.filter((r) => r.value === value && inMain(r)));
+  const coreIv = stageIv(3), deepIv = stageIv(4), remIv = stageIv(5);
   const awakeIntervals = unionIntervals(rows.filter((r) => r.value === AWAKE && inMain(r)));
 
   const staged: SleepStages = {
-    core: stageMinutes(3),
-    deep: stageMinutes(4),
-    rem: stageMinutes(5),
+    core: minutesOf(coreIv),
+    deep: minutesOf(deepIv),
+    rem: minutesOf(remIv),
     awake: minutesOf(awakeIntervals),
   };
+
+  // Same intervals, kept as a timeline. Offsets from bed in whole seconds, so
+  // the series survives a journal that only knows the night's clock times.
+  const toSpans = (iv: readonly Interval[], v: StageSpan['v']): StageSpan[] =>
+    iv.map((i) => ({ s: Math.round((i.start - bedMs) / 1000), d: Math.round((i.end - i.start) / 1000), v }));
+  const spans = [
+    ...toSpans(deepIv, 'deep'),
+    ...toSpans(remIv, 'rem'),
+    ...toSpans(coreIv, 'core'),
+    ...toSpans(awakeIntervals, 'awake'),
+  ].sort((a, b) => a.s - b.s);
 
   return {
     bed: new Date(bedMs),
@@ -114,6 +139,7 @@ export function summarizeSleep(rows: readonly SleepSample[]): SleepSummary | nul
     minutesAsleep: minutesOf(main),
     interrupted: staged.awake > INTERRUPTED_AWAKE_MIN,
     stages: staged.core + staged.deep + staged.rem > 0 ? staged : null,
+    spans,
   };
 }
 

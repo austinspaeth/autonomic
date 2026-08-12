@@ -18,9 +18,10 @@ import { keyOf } from '../dates';
 import {
   markAskedAuth, markPromptedThisLaunch, promptedThisLaunch, shareAuthRequest,
 } from './askedAuth';
-import { INTERRUPTED_AWAKE_MIN, NIGHT_END_HOUR, NIGHT_START_HOUR, nightKeyOf } from './sleepSummary';
+import { INTERRUPTED_AWAKE_MIN, NIGHT_END_HOUR, NIGHT_START_HOUR, nightKeyOf, type StageSpan } from './sleepSummary';
+import { thinSeries, type HrPoint, type RespPoint } from '../sleep/night';
 import { activityTypeFromHc, workoutHrSeries } from './workoutMap';
-import { HISTORY_SLEEP_MIN_MIN, emptyHistory } from './index';
+import { HISTORY_SLEEP_MIN_MIN, NIGHT_SERIES_MAX, emptyHistory } from './index';
 import type {
   HealthApi, HealthDaySamples, ImportedReading, ImportedWorkout, SleepImport,
 } from './index';
@@ -146,15 +147,24 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
     const bed = new Date(main.startTime);
     const wake = new Date(main.endTime);
 
+    const bedMs = bed.getTime();
     let deepMin = 0; let remMin = 0; let coreMin = 0; let awakeMin = 0; let unspecMin = 0;
+    // The same blocks, kept as a timeline as well as summed — the hypnogram is
+    // what lets the report say WHEN a stage happened rather than only how much.
+    const spans: StageSpan[] = [];
     for (const st of main.stages || []) {
-      const mins = (new Date(st.endTime).getTime() - new Date(st.startTime).getTime()) / 60000;
-      if (STAGE_AWAKE.includes(st.stage)) awakeMin += mins;
-      else if (st.stage === STAGE_LIGHT) coreMin += mins;
-      else if (st.stage === STAGE_DEEP) deepMin += mins;
-      else if (st.stage === STAGE_REM) remMin += mins;
+      const startMs = new Date(st.startTime).getTime();
+      const mins = (new Date(st.endTime).getTime() - startMs) / 60000;
+      const span = (v: StageSpan['v']) => spans.push({
+        s: Math.round((startMs - bedMs) / 1000), d: Math.round(mins * 60), v,
+      });
+      if (STAGE_AWAKE.includes(st.stage)) { awakeMin += mins; span('awake'); }
+      else if (st.stage === STAGE_LIGHT) { coreMin += mins; span('core'); }
+      else if (st.stage === STAGE_DEEP) { deepMin += mins; span('deep'); }
+      else if (st.stage === STAGE_REM) { remMin += mins; span('rem'); }
       else if (st.stage === STAGE_UNSPECIFIED) unspecMin += mins;
     }
+    spans.sort((a, b) => a.s - b.s);
     const staged = deepMin + remMin + coreMin > 0;
     const asleepMin = staged || unspecMin > 0
       ? deepMin + remMin + coreMin + unspecMin
@@ -163,26 +173,42 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
       ? { deep: Math.round(deepMin), rem: Math.round(remMin), core: Math.round(coreMin), awake: Math.round(awakeMin) }
       : null;
 
-    // Overnight HR range from raw HeartRate samples across the night.
-    let hrLow: number | null = null; let hrHigh: number | null = null;
+    // The overnight heart-rate curve, kept rather than reduced to min/max on
+    // the way past — the iOS side keeps it too, and the report reads the same
+    // sidecar on both platforms.
     const hrRecords = await readAll<HrRecord>('HeartRate', bed, wake);
+    const hrPts: HrPoint[] = [];
     for (const rec of hrRecords) {
-      for (const s of rec.samples || []) {
-        if (hrLow == null || s.beatsPerMinute < hrLow) hrLow = s.beatsPerMinute;
-        if (hrHigh == null || s.beatsPerMinute > hrHigh) hrHigh = s.beatsPerMinute;
+      for (const smp of rec.samples || []) {
+        const bpm = smp.beatsPerMinute;
+        if (!Number.isFinite(bpm) || bpm <= 0) continue;
+        hrPts.push({ t: Math.round((new Date(smp.time).getTime() - bedMs) / 1000), bpm });
       }
     }
+    hrPts.sort((a, b) => a.t - b.t);
+    const hrSeries = thinSeries(hrPts, NIGHT_SERIES_MAX);
+    const bpms = hrSeries.map((q) => q.bpm);
+
+    // Respiratory rate across the same window.
+    const respRecords = await readAll<RespRecord>('RespiratoryRate', bed, wake);
+    const respPts: RespPoint[] = respRecords
+      .map((r) => ({ t: Math.round((new Date(r.time).getTime() - bedMs) / 1000), br: r.rate }))
+      .filter((q) => Number.isFinite(q.br) && q.br > 0)
+      .sort((a, b) => a.t - b.t);
 
     return {
       bed: hhmm(bed),
       wake: hhmm(wake),
       bedISO: bed.toISOString(),
       wakeISO: wake.toISOString(),
-      hrLow: hrLow != null ? Math.round(hrLow) : null,
-      hrHigh: hrHigh != null ? Math.round(hrHigh) : null,
+      hrLow: bpms.length ? Math.round(Math.min(...bpms)) : null,
+      hrHigh: bpms.length ? Math.round(Math.max(...bpms)) : null,
       interrupted: awakeMin > INTERRUPTED_AWAKE_MIN,
       minutesAsleep: Math.round(asleepMin),
       stages,
+      hrSeries: hrSeries.length ? hrSeries : null,
+      respSeries: respPts.length ? thinSeries(respPts, NIGHT_SERIES_MAX) : null,
+      spans,
     } satisfies SleepImport;
   }
 

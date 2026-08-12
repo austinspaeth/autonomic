@@ -9,7 +9,7 @@ import { TimeField } from '../components/Field';
 import { useToast } from '../components/Toast';
 import { usePalette } from '../theme';
 import { health, healthAppName, healthPermissionPath, revokeHealthAuth, SleepImport } from '../lib/health';
-import { ensureDay, getState, save, useStore } from '../store/store';
+import { ensureDay, getState, save, storeSleepSeries, useStore } from '../store/store';
 import { fmtTime12 } from '../lib/dates';
 import { runHealthUpdateCheck } from './HealthUpdates';
 
@@ -125,6 +125,10 @@ export function SleepConfirmSheet({ dk, data, controls, onDone }: {
     // rather than mixing them with the new times.
     if (data.stages) d.sleep.stages = data.stages;
     else delete d.sleep.stages;
+    // The night's series goes to the sidecar, never the journal. Called even
+    // when the import carried none, so a re-import clears an older night's
+    // curve rather than leaving it describing a window it no longer covers.
+    storeSleepSeries(dk, data);
     save();
     controls.closeAll();
     onDone();

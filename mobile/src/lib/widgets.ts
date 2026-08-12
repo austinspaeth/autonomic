@@ -18,6 +18,7 @@ import {
   scoreCat, scoreSet, sleepHours, sleepGrade,
   protocolCriteria, resolveProtocol, type DaysMap,
 } from './scoring/day';
+import { WIDGET_WINDOW_DAYS, trendDirection, type TrendMetricId } from './trends';
 import type { AppState, DayRecord } from './types';
 
 /* ---------- payload shape (decoded verbatim by the Swift widgets) ---------- */
@@ -97,16 +98,25 @@ function restingHrDay(d: DayRecord | undefined): { value: number; color: string 
   return { value: fallback, color: cat ? SCORE_COLORS[cat] : DIM };
 }
 
-/** '▲' / '▼' direction of today vs the trailing week's mean (higher-is-better). */
-function weekTrend(today: number | null, prior: (number | null)[]): { trend: string | null; trendColor: string | null } {
-  const base = mean(prior.filter((v): v is number => v != null));
-  if (today == null || base == null || base === 0) return { trend: null, trendColor: null };
-  const pct = Math.round(((today - base) / Math.abs(base)) * 100);
-  if (pct === 0) return { trend: null, trendColor: null };
-  return {
-    trend: pct > 0 ? TREND_UP : TREND_DOWN,
-    trendColor: pct > 0 ? SCORE_COLORS.good : SCORE_COLORS.crash,
-  };
+/**
+ * '▲' / '▼' for a registry metric, from the shared trend engine (src/lib/trends).
+ *
+ * This replaced a local week-trend helper that compared today against the trailing
+ * week's MEAN and fired on any non-zero percentage change with no coverage
+ * requirement — so the widget could show a rising arrow on the same day the app
+ * showed a downturn warning, and a single artifact reading could set the
+ * direction. `trendDirection` uses medians, demands the metric's own minimum
+ * coverage in BOTH windows, and only speaks when the move clears a threshold
+ * chosen to be worth telling someone about.
+ *
+ * The visible consequence is intended: rows that used to show an arrow almost
+ * always now show none unless something really moved.
+ */
+function metricArrow(days: DaysMap, dk: string, id: TrendMetricId, ctx: ScoreContext): { trend: string | null; trendColor: string | null } {
+  const dirn = trendDirection(days, dk, id, WIDGET_WINDOW_DAYS, ctx);
+  if (dirn === 'improving') return { trend: TREND_UP, trendColor: SCORE_COLORS.good };
+  if (dirn === 'declining') return { trend: TREND_DOWN, trendColor: SCORE_COLORS.crash };
+  return { trend: null, trendColor: null };   // 'flat' and 'unknown' both stay quiet
 }
 
 function fmt(v: number | null, dp = 0): string {
@@ -178,22 +188,23 @@ export function buildWidgetPayload(state: AppState, dk = todayKey()): WidgetPayl
     const c = v != null ? catFromBands(v, bands) : null;
     return c ? SCORE_COLORS[c] : DIM;
   };
-  const prior = (fn: (day: string) => number | null) =>
-    [1, 2, 3, 4, 5, 6, 7].map((n) => fn(dayBefore(dk, n)));
-
   const rows: WidgetMetricRow[] = [
     {
+      // SDNN carries no arrow: it has no entry in the trend registry, and a
+      // metric without declared thresholds and coverage rules has no business
+      // asserting a direction. Adding one is a single row in
+      // src/lib/trends/metrics.ts, never a comparison written here.
       name: 'SDNN', value: fmt(sdnn), unit: 'ms', color: gradeColor(sdnn, BANDS.sdnn),
-      ...weekTrend(sdnn, prior((k) => hrvDayAvg(days[k], 'sdnn'))),
+      trend: null, trendColor: null,
     },
     {
       name: 'RMSSD', value: fmt(rmssd), unit: 'ms', color: gradeColor(rmssd, rmssdBands),
-      ...weekTrend(rmssd, prior((k) => hrvDayAvg(days[k], 'rmssd'))),
+      ...metricArrow(days, dk, 'rmssd', ctx),
     },
     {
       name: 'Sleep', value: fmt(sleep, 1), unit: 'h',
       color: sleepCat ? SCORE_COLORS[sleepCat] : DIM,
-      ...weekTrend(sleep, prior((k) => sleepHours(days, k))),
+      ...metricArrow(days, dk, 'sleepDuration', ctx),
     },
   ];
 

@@ -36,7 +36,7 @@ const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}), {
 /* DynamoDB caps a BatchWriteItem at 25 requests. */
 const BATCH_SIZE = 25;
 
-const DEFAULT_SETTINGS = { trialDays: 7, wallDays: 14, currency: '$' };
+const DEFAULT_SETTINGS = { trialDays: 7, wallDays: 14, currency: '$', storeCutPct: 15 };
 
 /* The numeric columns a dashboard entry carries. Anything else the client
    sends is dropped — the table is not a scratch pad. */
@@ -115,14 +115,72 @@ const cleanEvent = (raw) => {
   return out.title ? out : null;
 };
 
+/* An advertising campaign, and a dated cost that may or may not belong to one.
+   Same partition and the same diff-driven sync as entries and events: the money
+   the dashboard spends is dashboard data, not app data, and nothing here ever
+   goes near the anonymous ping counters. */
+const AD_PLATFORMS = ['all', 'ios', 'android'];
+
+const cleanAd = (raw) => {
+  if (!raw || typeof raw !== 'object') return null;
+  const id = String(raw.id || '').slice(0, 64);
+  const name = String(raw.name || '').slice(0, 120);
+  if (!id || !name || !isIsoDate(raw.start)) return null;
+  const out = {
+    id,
+    name,
+    start: raw.start,
+    platform: AD_PLATFORMS.includes(raw.platform) ? raw.platform : 'all',
+  };
+  if (raw.channel) out.channel = String(raw.channel).slice(0, 80);
+  if (isIsoDate(raw.end)) out.end = raw.end;
+  if (raw.url) out.url = String(raw.url).slice(0, 500);
+  if (raw.note) out.note = String(raw.note).slice(0, 2000);
+  return out;
+};
+
+const COST_CATEGORIES = ['ADS', 'CREATIVE', 'INFRA', 'TOOLS', 'FEES', 'SERVICES', 'HARDWARE', 'OTHER'];
+const RECURRENCES = ['weekly', 'monthly', 'quarterly', 'yearly'];
+const COST_NUMBERS = ['impressions', 'clicks', 'installs'];
+
+const cleanCost = (raw) => {
+  if (!raw || typeof raw !== 'object') return null;
+  const id = String(raw.id || '').slice(0, 64);
+  if (!id || !isIsoDate(raw.date)) return null;
+  const amount = Number(raw.amount);
+  // A cost with no readable amount is not a cost. Dropping it is better than
+  // storing a NaN that every chart downstream has to defend against.
+  if (!Number.isFinite(amount)) return null;
+
+  const out = {
+    id,
+    date: raw.date,
+    amount,
+    category: COST_CATEGORIES.includes(raw.category) ? raw.category : 'OTHER',
+  };
+  if (raw.label) out.label = String(raw.label).slice(0, 200);
+  if (raw.note) out.note = String(raw.note).slice(0, 2000);
+  if (raw.adId) out.adId = String(raw.adId).slice(0, 64);
+  if (RECURRENCES.includes(raw.recurrence)) out.recurrence = raw.recurrence;
+  if (out.recurrence && isIsoDate(raw.until)) out.until = raw.until;
+  COST_NUMBERS.forEach((k) => {
+    const n = Number(raw[k]);
+    if (raw[k] !== undefined && raw[k] !== null && raw[k] !== '' && Number.isFinite(n)) out[k] = n;
+  });
+  return out;
+};
+
 const cleanSettings = (raw) => {
   if (!raw || typeof raw !== 'object') return null;
   const trialDays = Number(raw.trialDays);
   const wallDays = Number(raw.wallDays);
+  const storeCutPct = Number(raw.storeCutPct);
   return {
     trialDays: Number.isFinite(trialDays) && trialDays > 0 ? Math.round(trialDays) : DEFAULT_SETTINGS.trialDays,
     wallDays: Number.isFinite(wallDays) && wallDays > 0 ? Math.round(wallDays) : DEFAULT_SETTINGS.wallDays,
     currency: typeof raw.currency === 'string' && raw.currency.length <= 4 ? raw.currency : DEFAULT_SETTINGS.currency,
+    storeCutPct: Number.isFinite(storeCutPct) && storeCutPct >= 0 && storeCutPct <= 100
+      ? storeCutPct : DEFAULT_SETTINGS.storeCutPct,
   };
 };
 
@@ -170,6 +228,8 @@ const load = async (pk) => {
   const items = await readAll(pk);
   const entries = [];
   const events = [];
+  const ads = [];
+  const costs = [];
   let settings = { ...DEFAULT_SETTINGS };
   let ui = null;
 
@@ -184,16 +244,26 @@ const load = async (pk) => {
     } else if (typeof item.SK === 'string' && item.SK.startsWith('EVENT#')) {
       const event = cleanEvent(item.event || item);
       if (event) events.push(event);
+    } else if (typeof item.SK === 'string' && item.SK.startsWith('AD#')) {
+      const ad = cleanAd(item.ad || item);
+      if (ad) ads.push(ad);
+    } else if (typeof item.SK === 'string' && item.SK.startsWith('COST#')) {
+      const cost = cleanCost(item.cost || item);
+      if (cost) costs.push(cost);
     }
   });
 
   events.sort((a, b) => (a.date === b.date ? a.id.localeCompare(b.id) : a.date.localeCompare(b.date)));
+  // Newest first for both: the dashboard lists them that way, and sorting here
+  // means a fresh load and a locally-edited list are in the same order.
+  ads.sort((a, b) => (a.start === b.start ? a.id.localeCompare(b.id) : b.start.localeCompare(a.start)));
+  costs.sort((a, b) => (a.date === b.date ? a.id.localeCompare(b.id) : b.date.localeCompare(a.date)));
 
   entries.sort((a, b) => (a.date === b.date
     ? a.platform.localeCompare(b.platform)
     : a.date.localeCompare(b.date)));
 
-  return { entries, events, settings, ui };
+  return { entries, events, ads, costs, settings, ui };
 };
 
 const sync = async (pk, payload) => {
@@ -231,6 +301,34 @@ const sync = async (pk, payload) => {
   const eventDeletes = Array.isArray(payload.eventDeletes) ? payload.eventDeletes : [];
   eventDeletes.forEach((id) => {
     if (typeof id === 'string' && id) requests.push({ DeleteRequest: { Key: { PK: pk, SK: `EVENT#${id}` } } });
+  });
+
+  /* Ads and costs, keyed by id under their own SK prefixes. One shape of loop
+     for both, because they differ only in prefix, cleaner and entity type. */
+  const idKeyed = [
+    { prefix: 'AD', entityType: 'DASH_AD', field: 'ad', clean: cleanAd, ups: payload.adUpserts, dels: payload.adDeletes },
+    { prefix: 'COST', entityType: 'DASH_COST', field: 'cost', clean: cleanCost, ups: payload.costUpserts, dels: payload.costDeletes },
+  ];
+  const idKeptCounts = {};
+  idKeyed.forEach((kind) => {
+    const ups = Array.isArray(kind.ups) ? kind.ups : [];
+    ups.forEach((raw) => {
+      const item = kind.clean(raw);
+      if (!item) return;
+      requests.push({
+        PutRequest: {
+          Item: {
+            PK: pk, SK: `${kind.prefix}#${item.id}`, entityType: kind.entityType,
+            [kind.field]: item, updatedAt: now,
+          },
+        },
+      });
+    });
+    const dels = Array.isArray(kind.dels) ? kind.dels : [];
+    dels.forEach((id) => {
+      if (typeof id === 'string' && id) requests.push({ DeleteRequest: { Key: { PK: pk, SK: `${kind.prefix}#${id}` } } });
+    });
+    idKeptCounts[kind.prefix] = { upserted: ups.length, deleted: dels.length };
   });
 
   const deletes = Array.isArray(payload.deletes) ? payload.deletes : [];
@@ -272,6 +370,8 @@ const sync = async (pk, payload) => {
   return {
     upserted: upserts.length, deleted: deletes.length,
     eventsUpserted: eventUpserts.length, eventsDeleted: eventDeletes.length,
+    adsUpserted: idKeptCounts.AD.upserted, adsDeleted: idKeptCounts.AD.deleted,
+    costsUpserted: idKeptCounts.COST.upserted, costsDeleted: idKeptCounts.COST.deleted,
   };
 };
 

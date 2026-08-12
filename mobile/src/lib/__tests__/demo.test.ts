@@ -3,12 +3,13 @@ import { scoreSet, streakInfo, resolveProtocol, sleepHours, type DaysMap } from 
 import { todayKey } from '../dates';
 import { REPORT_CARDS, buildDataExport, buildPrompt, hasAnyData, reportDateRange } from '../analysis/reports';
 import type { AppState } from '../types';
+import { buildInsights } from '../insights';
 
 const scores = (days: DaysMap) =>
   Object.keys(days).sort().map((k) => scoreSet(days[k].readings, days[k], k, days, {}).score!);
 
 describe('demo journal', () => {
-  it('is deterministic and a month long, ending today', () => {
+  it('is deterministic and DEMO_DAYS long, ending today', () => {
     const a = demoDays();
     expect(Object.keys(a)).toHaveLength(DEMO_DAYS);
     expect(Object.keys(a).sort().pop()).toBe(todayKey());
@@ -75,6 +76,51 @@ describe('demo journal', () => {
       expect(prompt.length).toBeGreaterThan(1200);
     });
     expect(buildDataExport(st, {}, 'month', todayKey())).toContain('Autonomic Score');
+  });
+
+  /**
+   * The reason DEMO_DAYS is 60 rather than 30. Someone with an empty journal sees
+   * this month behind a demo banner, and a demo of a discovery engine that
+   * discovers nothing is worse than no demo at all. These assert the sample data
+   * genuinely exercises the engine — through the real statistics, with the real
+   * FDR correction, no fixtures.
+   */
+  it('fills the Insights view with findings the real engine agrees with', () => {
+    const blank = { version: 1, settings: {}, profile: {}, meta: {}, days: {} } as unknown as AppState;
+    const st = demoState(blank);
+    const rep = buildInsights(st, todayKey());
+    expect(rep.correlations.length).toBeGreaterThanOrEqual(3);
+    expect(rep.observations.length).toBeGreaterThanOrEqual(1);
+    expect(rep.watch.length).toBeGreaterThanOrEqual(2);
+    expect(rep.confidence.pct).toBeGreaterThan(60);
+  });
+
+  it('makes the magnesium onset discoverable', () => {
+    // DEMO_MAG_START sits mid-month precisely so ../insights/change has a month
+    // either side to compare, and other supplements run the whole span so the meds
+    // category's active window covers everything and this is a real contrast.
+    //
+    // It is not asserted to WIN the headline slot: the sample arc also has sleep
+    // lengthening, and that onset legitimately scores higher. What matters is that
+    // the supplement trial is found at all.
+    const blank = { version: 1, settings: {}, profile: {}, meta: {}, days: {} } as unknown as AppState;
+    const rep = buildInsights(demoState(blank), todayKey());
+    expect(rep.correlations.some((c) => c.factorId === 'med:magGlycinate')).toBe(true);
+  });
+
+  it('leads with a good-news onset, since the sample arc is a recovery', () => {
+    const blank = { version: 1, settings: {}, profile: {}, meta: {}, days: {} } as unknown as AppState;
+    const change = buildInsights(demoState(blank), todayKey()).change;
+    expect(change).toBeTruthy();
+    expect(change!.kind).toBe('onset');
+    expect(change!.good).toBe(true);
+    expect(change!.headline).toMatch(/since you started/i);
+  });
+
+  it('still shows the welcome card in demo mode, whatever it found', () => {
+    const blank = { version: 1, settings: {}, profile: {}, meta: {}, days: {} } as unknown as AppState;
+    const rep = buildInsights(demoState(blank), todayKey(), { demo: true });
+    expect(rep.change!.headline).toBe('You downloaded this app');
   });
 
   it('reads as the user own data to hasOwnData', () => {

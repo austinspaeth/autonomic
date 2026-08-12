@@ -11,7 +11,8 @@ code — the app already ships freemium (`src/lib/tier.ts`, `src/lib/gating.ts`,
 | Bundle ID / package | `com.autonomic.journal` |
 | Yearly SKU | `com.autonomic.journal.yearly` — $49.99 |
 | Monthly SKU | `com.autonomic.journal.monthly` — $7.99 |
-| Subscription group (Apple) | one group, both plans |
+| Promo yearly SKU | `com.autonomic.journal.yearly.promo` — $24.99 (see Part 6) |
+| Subscription group (Apple) | one group, all three plans |
 | App version | 1.9.0 (freemium) |
 | Terms | https://autonomic.care/terms-of-service/ |
 | Privacy | https://autonomic.care/privacy-policy/ |
@@ -306,6 +307,66 @@ the paywall works when you never actually tested it.
 
 ---
 
+## Part 6 — The half-off annual offer (`com.autonomic.journal.yearly.promo`)
+
+The annual offer card (`src/features/AnnualOffer.tsx`) surfaces a year of Pro at
+half price to free users at 30 / 90 / 180 / 365 days since install, and unlocks
+Pro for 24 hours alongside it. The unlock is entirely app-side
+(`src/lib/upsell/annual.ts` + `src/store/tier.ts`) and needs **no** store
+configuration. The discounted plan does.
+
+**Create the product in both consoles BEFORE the build that references it
+ships.** A missing product means `fetchProducts` returns nothing for it, the
+card renders the `$24.99` fallback string, and the purchase fails outright.
+
+### Why a separate SKU and not a discount
+
+Apple can only target a price cut on an existing product through **promotional
+offers**, which require every purchase to carry a payload signed with a
+subscription key — i.e. a signing endpoint the app does not have. A separate
+product needs no server and behaves identically on both stores.
+
+The cost of that choice: this plan **renews at $24.99 forever**. It is "half
+off, locked in", not "half off the first year". Moving those subscribers to
+$49.99 later is a price increase, which on iOS needs per-subscriber consent and
+on Play a notification period. If first-year-only pricing ever matters more,
+that is the promotional-offer project, and it starts with a `sls/` endpoint.
+
+### App Store Connect
+
+1. **Monetization → Subscriptions** → open the **existing subscription group**
+   (the one holding yearly + monthly). Same group is required: it is what makes
+   the plans mutually exclusive instead of letting someone hold two.
+2. **Create** → Product ID `com.autonomic.journal.yearly.promo`
+   (**permanent, cannot be changed**) → Reference Name "Pro Yearly (Half Off)".
+3. Duration **1 Year**, price **$24.99** USD. Review the auto-generated
+   territory matrix before saving.
+4. **Subscription level**: same level as `...yearly`. Nobody is ever offered
+   both, so a crossgrade is the correct and simplest relationship.
+5. Add a **localization** (display name + description) — required for review.
+6. **Review information**: attach a screenshot of the offer card and note
+   "targeted 50%-off annual plan surfaced in-app after 30 days of use".
+   Reviewers reject subscriptions they cannot find in the UI, and this one is
+   invisible until day 30, so the note is load-bearing.
+7. **Do NOT add an introductory offer.** A free trial on the promo plan would
+   stack with the app's own 24-hour unlock and make the pricing incoherent.
+8. A new subscription product is **reviewed with the next binary**, so it ships
+   alongside the build rather than ahead of it.
+
+### Google Play Console
+
+1. **Monetize → Products → Subscriptions → Create subscription**.
+2. Product ID `com.autonomic.journal.yearly.promo` (**permanent**), name
+   "Pro Yearly (Half Off)".
+3. **Add base plan** → ID `yearly-promo` (**permanent**), **Auto-renewing**,
+   billing period **1 year**, price **$24.99** + the regional matrix.
+4. **No free-trial offer** on this base plan.
+5. **Activate the base plan.** An inactive base plan makes the whole product
+   return nothing — the usual cause of the fallback-price symptom.
+6. Confirm availability in the same countries as the other two products.
+
+---
+
 ## Verification checklist
 
 Before you call it done:
@@ -315,5 +376,6 @@ Before you call it done:
 - [ ] Paywall shows **real** localized prices, not $49.99/$7.99 fallbacks — fallbacks mean `getSubscriptions` returned nothing, i.e. a product ID typo or an inactive base plan
 - [ ] Both plans purchasable; purchase flips the app to Pro
 - [ ] "Restore purchase" works on a second device
-- [ ] `FORCE_TIER` is `null` and `PREVIEW_PAYWALL` is `false` in the shipped commit
+- [ ] Annual offer card shows a **real localized $24.99**, not the fallback, and "Claim half off" completes a purchase on both stores
+- [ ] `FORCE_TIER` is `null`, `FORCE_ANNUAL_OFFER` is `null`, and `PREVIEW_PAYWALL` is `false` in the shipped commit
 - [ ] Fresh install → 7 days full access with no store call and no account

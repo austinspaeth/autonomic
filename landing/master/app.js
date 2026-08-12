@@ -15,7 +15,6 @@
     green: '#00a08f', gold: '#c98500', red: '#c9403f',
     muted: '#898781', text: '#c3c2b7'
   };
-  var SLOTS = [COLOR.s1, COLOR.s2, COLOR.s3, COLOR.s4, COLOR.s5, COLOR.s6, COLOR.s7, COLOR.s8];
 
   /* Entity colours — fixed, never assigned by rank.
      Downloads own slot 1, the 7-day threshold slot 2, the 14-day wall slot 3. */
@@ -39,13 +38,18 @@
   var db = load();
 
   function load() {
-    var d = { entries: [], events: [], settings: { trialDays: 7, wallDays: 14, currency: '$' } };
+    var d = {
+      entries: [], events: [], ads: [], costs: [],
+      settings: { trialDays: 7, wallDays: 14, currency: '$', storeCutPct: 15 }
+    };
     try {
       var raw = localStorage.getItem(KEY);
       if (raw) {
         var p = JSON.parse(raw);
         if (p && Array.isArray(p.entries)) d.entries = p.entries;
         if (p && Array.isArray(p.events)) d.events = p.events;
+        if (p && Array.isArray(p.ads)) d.ads = p.ads;
+        if (p && Array.isArray(p.costs)) d.costs = p.costs;
         // conversion rate used to be an entered field; it is derived now, so drop
         // any stale values rather than carrying them into exports and backups
         d.entries.forEach(function (e) { if (e) delete e.conversionRate; });
@@ -71,8 +75,6 @@
     grain: 'day',
     ovMode: 'daily',
     cohGrain: 'day',
-    exType: 'line',
-    exMetrics: ['downloads', 'trialEnd', 'wallHit'],
     dowMetric: 'downloads',
     exportN: 1,
     exportUnit: 'days',
@@ -161,6 +163,20 @@
       });
       if (!min || e.date < min) min = e.date;
       if (!max || e.date > max) max = e.date;
+    });
+
+    /* The spine has to reach back to the first cost as well as the first store
+       entry: the developer programme is usually paid for months before there is
+       anything to download, and "All time" that starts at the first install
+       would silently drop it. Store days stay the only source of store numbers
+       — these dates only widen the axis. */
+    (db.costs || []).forEach(function (c) {
+      if (!c || !/^\d{4}-\d{2}-\d{2}$/.test(String(c.date || ''))) return;
+      if (!min || c.date < min) min = c.date;
+    });
+    (db.ads || []).forEach(function (a) {
+      if (!a || !/^\d{4}-\d{2}-\d{2}$/.test(String(a.start || ''))) return;
+      if (!min || a.start < min) min = a.start;
     });
 
     var end = reportDay();
@@ -473,6 +489,24 @@
         split: splitOf(function (x) { return fmtPct(x.tapThrough); })
       })
     ];
+
+    /* Two lines from the Costs view, because revenue on its own is not a
+       result. They are combined-platform whatever the filter says — costs are
+       not per-store — so they are added only when there is spend to report,
+       rather than sitting at a permanent zero beside eight per-store tiles. */
+    var money = costSummary(r);
+    if (money.spend) {
+      tiles.push(tile({
+        label: 'Net profit in range', color: money.profit >= 0 ? COLOR.s3 : COLOR.red,
+        value: fmtMoney(money.profit), smallValue: true,
+        meta: fmtMoney(money.spend) + ' spent · both stores, whatever the filter says'
+      }));
+      tiles.push(tile({
+        label: 'Cost per install', value: fmtMoney(money.costPerInstall), smallValue: true,
+        meta: 'blended · ' + fmtMoney(money.costPerPaid) + ' per paid conversion'
+      }));
+    }
+
     document.getElementById('ovTiles').innerHTML = tiles.join('');
 
     /* main chart — downloads with the two thresholds shaded underneath */
@@ -894,6 +928,7 @@
    * on this screen a human enters. */
 
   var A = window.Analytics;
+  var CS = window.Costs;
 
   var PING_DAYS = 400;                 // history pulled in one call, then cached
   var pings = { status: 'idle', report: null, at: null, error: '' };
@@ -919,13 +954,24 @@
     else if (state.view === 'timeline') renderTimelineView();
   }
 
+  /* The filter bar's platform, as the ping index speaks it. `compare` has no
+     meaning here — a retention matrix is one population, not two side by side —
+     so it reads as "all", and the platform tile carries the split instead. */
+  function pingPlatform() {
+    return (state.platform === 'ios' || state.platform === 'android') ? state.platform : 'all';
+  }
+
   function pingLoad(force) {
-    if (pings.status === 'loading') return;
-    if (pings.status === 'ready' && !force) return;
+    if (pings.status === 'loading') return Promise.resolve();
+    if (pings.status === 'ready' && !force) return Promise.resolve();
     pings.status = 'loading';
     pings.error = '';
-    repaintPingViews();
-    window.Api.call('PINGS', { since: addDays(today(), -PING_DAYS) }).then(function (res) {
+    /* Only repaint into the loading state when there is nothing on screen to
+       keep. A refetch holds the numbers it already has and swaps them when the
+       new ones land — tearing the view down and rebuilding it is the whole
+       reason the page used to blink on every refresh. */
+    if (!pings.report) repaintPingViews();
+    return window.Api.call('PINGS', { since: addDays(today(), -PING_DAYS) }).then(function (res) {
       pings.report = res || { open: [], sub: [] };
       pings.at = new Date();
       pings.status = 'ready';
@@ -965,9 +1011,30 @@
     });
   }
 
+  /**
+   * Campaigns, as annotations. Same argument as releases: the Costs view
+   * already knows the day each one started and stopped, so a hand-entered
+   * MARKETING event beside it would be a second copy free to drift. They are
+   * derived and therefore not editable from the event form — the campaign
+   * itself is edited on the Costs tab.
+   */
+  function adEvents() {
+    return CS.adMarks(ads()).map(function (m) {
+      return {
+        id: m.id,
+        date: m.date,
+        category: 'MARKETING',
+        type: m.ad.channel || 'Campaign',
+        title: m.ad.name + (m.edge === 'end' ? ' ended' : ' started'),
+        note: m.ad.note || '',
+        derived: true
+      };
+    });
+  }
+
   /** Everything that can be annotated or analysed: recorded plus derived. */
   function timelineItems() {
-    return events().concat(releaseEvents());
+    return events().concat(releaseEvents()).concat(adEvents());
   }
 
   function eventById(id) {
@@ -1007,14 +1074,19 @@
    * decides for itself what happened on a date — that was the whole point of
    * recording events in one place.
    */
-  function marksFor(days) {
+  function marksFor(days, indexOf) {
     var idx = {};
     days.forEach(function (d, i) { idx[d] = i; });
+    /* `days` is the axis when a chart is per-day, and every day the axis covers
+       when it is per-week or per-month. `indexOf` is how the second kind says
+       which column a date belongs in; without it a Wednesday release would be
+       dropped from a weekly chart for not being a bucket's first day. */
+    var at = indexOf || function (d) { return idx[d]; };
     return A.eventsBetween(timelineItems(), days[0], days[days.length - 1]).map(function (ev) {
       var cat = A.EVENT_CATEGORIES[ev.category] || {};
       return {
         id: ev.id,
-        index: idx[ev.date],
+        index: at(ev.date),
         color: A.eventColor(ev),
         title: ev.title,
         categoryLabel: (cat.label || 'Event') + (ev.type ? ' · ' + ev.type : ''),
@@ -1056,7 +1128,13 @@
   /* ---------------------------------------------------------------- render */
 
   function pingStatusHTML() {
-    if (pings.status === 'loading') return '<div class="card" style="margin-bottom:14px"><div class="empty">Reading the counter…</div></div>';
+    // A refetch over data we already hold says nothing: the header's refresh is
+    // already spinning, and a banner appearing above the charts would move
+    // every one of them down a line and back.
+    if (pings.status === 'loading') {
+      return pings.report ? '' :
+        '<div class="card" style="margin-bottom:14px"><div class="empty">Reading the counter…</div></div>';
+    }
     if (pings.status === 'error') {
       return '<div class="card" style="margin-bottom:14px"><div class="empty">' + esc(pings.error) +
         ' <button class="btn sm" id="pgRetry" style="margin-left:8px">Try again</button></div></div>';
@@ -1069,8 +1147,11 @@
     var retry = document.getElementById('pgRetry');
     if (retry) retry.addEventListener('click', function () { pingLoad(true); });
 
-    var ix = A.index(pings.report);
-    var ready = pings.status === 'ready';
+    var ix = A.index(pings.report, pingPlatform());
+    /* Anything we hold is worth drawing, whatever the fetch is doing now: a
+       failed refresh should leave the last good read on screen under its error,
+       not replace a working page with an empty one. */
+    var ready = pings.status === 'ready' || !!pings.report;
     var blank = !ix.days.length;
 
     var hosts = ['pgTiles', 'pgTilesB', 'pgHeat', 'pgCohortDetail', 'pgTransitions', 'pgConversion', 'pgWeekdayRetention'];
@@ -1103,7 +1184,7 @@
     renderHeat(ix);
     renderActiveByCohort(ix);
     renderPurchases(ix, r);
-    renderWeekday(ix, days);
+    renderPingWeekday(ix, days);
   }
 
   /* The filter bar's range, anchored to the pings rather than to the store:
@@ -1201,8 +1282,33 @@
       tile({
         label: 'Conversion by D30', color: PC.subs, smallValue: true, value: fmtRate(conv30),
         meta: rateMeta(conv30)
-      })
+      }),
+      platformTile(ix)
     ].join('');
+  }
+
+  /* Which store the day's pings came from.
+   *
+   * Deliberately unfiltered even when the filter bar is on one platform: this
+   * tile is what the rest of the view is a slice OF. `unknown` is the honest
+   * bucket for builds that shipped before the ping carried a platform marker,
+   * so it is shown when it is non-zero rather than folded into either store. */
+  function platformTile(ix) {
+    var split = A.platformsOn(ix, ix.last);
+    var ios = split.I || 0, android = split.A || 0, unknown = split.U || 0;
+    var known = ios + android;
+    var parts = [
+      { name: 'iOS', color: ENTITY.ios, value: fmtInt(ios) },
+      { name: 'Android', color: ENTITY.android, value: fmtInt(android) }
+    ];
+    if (unknown) parts.push({ name: 'pre-marker', color: COLOR.muted, value: fmtInt(unknown) });
+    return tile({
+      label: 'Platform on ' + labelDay(ix.last), color: ENTITY.ios,
+      value: known ? Math.round((ios / known) * 100) + '% iOS' : '--',
+      smallValue: true,
+      meta: 'of everything that pinged that day',
+      split: parts
+    });
   }
 
   /* ---------------------------------------------------------- 2. timeline */
@@ -1522,7 +1628,7 @@
 
   /* --------------------------------------------------------- 7. weekday */
 
-  function renderWeekday(ix, days) {
+  function renderPingWeekday(ix, days) {
     var dl = A.byWeekday(days, function (d) { return dayRec('all', d).downloads; });
     var fresh = A.byWeekday(days, function (d) { return A.newOn(ix, d); });
     var ret = A.byWeekday(days, function (d) { return A.returningOn(ix, d); });
@@ -1736,7 +1842,7 @@
     });
 
     document.getElementById('pgHeatExport').addEventListener('click', function () {
-      var ix = A.index(pings.report);
+      var ix = A.index(pings.report, pingPlatform());
       if (!ix.cohorts.length) { toast('Nothing to export yet.'); return; }
       var out = ['cohort,installs,' + A.MILESTONES.map(function (n) { return 'D' + n; }).join(',')];
       var rows = pingUI.heatGrain === 'week'
@@ -1780,11 +1886,26 @@
     purchases: { label: 'Purchases', color: PC.subs, type: 'bar', fmt: fmtInt, store: true,
                  of: function (ix, d) { return dayRec('all', d).sales; } },
     revenue: { label: 'Revenue', color: ENTITY.revenue, type: 'bar', fmt: fmtMoney, store: true,
-               of: function (ix, d) { return dayRec('all', d).revenue; } }
+               of: function (ix, d) { return dayRec('all', d).revenue; } },
+    /* Not a store metric: spend is entered by hand on the Costs tab, so it is
+       complete for today in a way downloads never are. */
+    spend: { label: 'Spend', color: CS.CATEGORIES.ADS.color, type: 'bar', fmt: fmtMoney,
+             of: function (ix, d) { return spendOnDay(d); } }
   };
 
+  /* One expansion of every recurring cost per render, cached on the day set the
+     chart asked for — recomputing it inside `of()` would re-expand the whole
+     cost list 400 times for one chart. */
+  var spendDayCache = { key: '', byDay: {} };
+  function primeSpendDays(from, to) {
+    var key = from + '|' + to + '|' + costList().length;
+    if (spendDayCache.key === key) return;
+    spendDayCache = { key: key, byDay: CS.daily(costList(), from, to).byDay };
+  }
+  function spendOnDay(d) { return spendDayCache.byDay[d] || 0; }
+
   function renderTimelineView() {
-    var ix = A.index(pings.report);
+    var ix = A.index(pings.report, pingPlatform());
     var m = TL_METRICS[pingUI.tlMetric] || TL_METRICS.active;
 
     /* The counter and the store cover different spans, so the axis is the union
@@ -1798,6 +1919,7 @@
       from = addDays(to, -((parseInt(state.range, 10) || 30) - 1));
     }
     var days = A.range(from, to);
+    primeSpendDays(from, to);
     var marks = marksFor(days);
 
     drawChart('tlChart', {
@@ -1912,100 +2034,880 @@
     });
   }
 
-  /* ------------------------------------------------------ view: explore */
+  /* -------------------------------------------------------- view: costs
 
-  var METRICS = [
-    { key: 'downloads', label: 'First-time downloads', group: 'count' },
-    { key: 'impressions', label: 'Impressions', group: 'count' },
-    { key: 'pageViews', label: 'Product page views', group: 'count' },
-    { key: 'updates', label: 'Updates', group: 'count' },
-    { key: 'sales', label: 'Sales (count)', group: 'count' },
-    { key: 'revenue', label: 'Revenue', group: 'count', fmt: fmtMoney },
-    { key: 'trialEnd', label: 'Left the trial', group: 'count', dyn: 'trial' },
-    { key: 'wallHit', label: 'Hit the wall', group: 'count', dyn: 'wall' },
-    { key: 'cumDownloads', label: 'Cumulative installs', group: 'count' },
-    { key: 'cumSales', label: 'Cumulative paid', group: 'count' },
-    { key: 'cumRevenue', label: 'Cumulative revenue', group: 'count', fmt: fmtMoney },
-    { key: 'inTrial', label: 'Currently in trial', group: 'count' },
-    { key: 'pastTrial', label: 'Past trial, charts open', group: 'count' },
-    { key: 'pastWall', label: 'Past the wall', group: 'count' },
-    { key: 'convRate', label: 'Store conversion rate', group: 'rate', fmt: fmtPct },
-    { key: 'ppvConv', label: 'Page view → install', group: 'rate', fmt: fmtPct },
-    { key: 'tapThrough', label: 'Impression → page view', group: 'rate', fmt: fmtPct },
-    { key: 'paidOfTrial', label: 'Paid % of past-trial', group: 'rate', fmt: fmtPct },
-    { key: 'paidOfWall', label: 'Paid % of wall-hitters', group: 'rate', fmt: fmtPct },
-    { key: 'paidOfInstalls', label: 'Paid % of installs', group: 'rate', fmt: fmtPct },
-    { key: 'arppu', label: 'Revenue per paying user', group: 'rate', fmt: fmtMoney },
-    { key: 'rpi', label: 'Revenue per install', group: 'rate', fmt: fmtMoney }
-  ];
-  function metricDef(k) { return METRICS.filter(function (m) { return m.key === k; })[0]; }
-  function metricLabel(m) {
-    if (m.dyn === 'trial') return 'Left the trial (past day ' + trialDays() + ')';
-    if (m.dyn === 'wall') return 'Hit the wall (past day ' + wallDays() + ')';
-    return m.label;
+     What the app costs to run, against what it earns.
+
+     Every number here is arithmetic from costs.js, which is pure and tested;
+     this half is entry and rendering. Two things about it are worth knowing
+     before reading on.
+
+     The platform filter does NOT apply. A hosting bill is not iOS or Android,
+     and splitting acquisition cost by store would need per-store spend that no
+     network reports the same way. The view always reads both stores combined,
+     and says so in the filter bar.
+
+     Ad spend is stored as ordinary cost rows — one per campaign per day, with
+     category ADS and an `adId`. The grid and the spread box are two ways of
+     writing the same rows, which is why either can correct the other. */
+
+  function ads() { return db.ads || (db.ads = []); }
+  function costList() { return db.costs || (db.costs = []); }
+  function adById(id) {
+    return ads().filter(function (a) { return a.id === id; })[0] || null;
+  }
+  function storeCut() {
+    var v = Number(db.settings.storeCutPct);
+    return (isFinite(v) && v >= 0 && v <= 100) ? v : 15;
+  }
+  function newId(prefix) {
+    return prefix + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7);
   }
 
-  /* colour follows the entity: a metric keeps its slot while it is on screen */
-  var slotMap = {};
-  function assignSlots() {
-    Object.keys(slotMap).forEach(function (k) {
-      if (state.exMetrics.indexOf(k) === -1) delete slotMap[k];
+  function putAd(ad) {
+    var list = ads(), at = -1;
+    list.forEach(function (a, i) { if (a.id === ad.id) at = i; });
+    if (at >= 0) list[at] = ad; else list.push(ad);
+    list.sort(function (a, b) { return (a.start || '') < (b.start || '') ? 1 : -1; });
+    save(); invalidate();
+  }
+
+  /* Deleting a campaign keeps its money. The spend happened whether or not the
+     campaign is still on the books, so its rows are detached rather than
+     removed — they carry on as unattributed advertising and the totals do not
+     move. Silently deleting a few thousand of spend to tidy a list would be the
+     worst kind of helpful. */
+  function removeAd(id) {
+    var detached = 0;
+    costList().forEach(function (c) {
+      if (c.adId === id) { delete c.adId; detached++; }
     });
-    state.exMetrics.forEach(function (k) {
-      if (slotMap[k] !== undefined) return;
-      for (var i = 0; i < SLOTS.length; i++) {
-        var taken = Object.keys(slotMap).some(function (o) { return slotMap[o] === i; });
-        if (!taken) { slotMap[k] = i; return; }
+    db.ads = ads().filter(function (a) { return a.id !== id; });
+    save(); invalidate();
+    return detached;
+  }
+
+  function putCost(c) {
+    var list = costList(), at = -1;
+    list.forEach(function (x, i) { if (x.id === c.id) at = i; });
+    if (at >= 0) list[at] = c; else list.push(c);
+    list.sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; });
+    /* A cost can predate every store entry, and base() folds cost dates into
+       the date spine — so the derived cache has to go, exactly as it does on
+       an entry write. Without this the first cost on a fresh account is filed
+       outside the range that was computed before it existed, and vanishes. */
+    save(); invalidate();
+  }
+  function removeCost(id) {
+    db.costs = costList().filter(function (c) { return c.id !== id; });
+    save(); invalidate();
+  }
+
+  /** The one-off ad row for a campaign on a day, if it exists. */
+  function adCostOn(adId, date) {
+    var found = null;
+    costList().forEach(function (c) {
+      if (c.category !== 'ADS' || c.adId !== adId || c.date !== date) return;
+      if (c.recurrence && c.recurrence !== 'none') return;   // the grid never edits a recurring row
+      found = c;
+    });
+    return found;
+  }
+
+  /* ----------------------------------------------------------- buckets */
+
+  /* Costs can exist before any store data does — the developer programme is
+     usually the first thing anyone pays for. buildBuckets returns nothing
+     without store entries, so the spine is built here when it has to be. */
+  function bareBuckets(from, to, grain) {
+    var order = [], map = {};
+    for (var d = from; d <= to; d = addDays(d, 1)) {
+      var k = grain === 'week' ? weekStart(d) : grain === 'month' ? monthStart(d) : d;
+      var row = map[k];
+      if (!row) {
+        row = map[k] = { key: k, start: d, end: d, downloads: 0, sales: 0, revenue: 0 };
+        order.push(row);
       }
-      slotMap[k] = 0;
+      row.end = d;
+    }
+    return order;
+  }
+
+  /** Per-bucket money: store side from buildBuckets, cost side folded in. */
+  function costRows(from, to, grain) {
+    grain = grain || state.grain;
+    var rows = buildBuckets('all', from, to, grain);
+    if (!rows.length) rows = bareBuckets(from, to, grain);
+    var d = CS.daily(costList(), from, to);
+    var cut = storeCut();
+
+    rows.forEach(function (row) {
+      row.spend = 0; row.marketing = 0; row.byCategory = {};
+      for (var day = row.start; day <= row.end; day = addDays(day, 1)) {
+        row.spend += d.byDay[day] || 0;
+        row.marketing += d.marketingByDay[day] || 0;
+        CS.CATEGORY_KEYS.forEach(function (k) {
+          var v = d.byCategory[k][day];
+          if (v) row.byCategory[k] = (row.byCategory[k] || 0) + v;
+        });
+      }
+      row.netRevenue = CS.netRevenue(row.revenue, cut);
+      row.profit = row.netRevenue - row.spend;
+      row.cpi = row.downloads ? row.marketing / row.downloads : null;
+      row.cpa = row.sales ? row.marketing / row.sales : null;
+      row.loadedCpa = row.sales ? row.spend / row.sales : null;
+    });
+    return rows;
+  }
+
+  /** Range economics, shared by the Costs tiles and the Overview strip. */
+  function costSummary(r) {
+    var s = summarize('all', r.from, r.to);
+    return CS.summary({
+      costs: costList(), from: r.from, to: r.to, storeCutPct: storeCut(),
+      store: { revenue: s.revenue, downloads: s.downloads, sales: s.sales }
     });
   }
 
-  function renderExplore() {
+  /* ------------------------------------------------------------ render */
+
+  function renderCosts() {
     var r = activeRange();
-    var box = document.getElementById('exMetrics');
-    box.innerHTML = METRICS.map(function (m) {
-      var on = state.exMetrics.indexOf(m.key) !== -1;
-      return '<label><input type="checkbox" data-metric="' + m.key + '"' + (on ? ' checked' : '') + '> ' +
-        esc(metricLabel(m)) + '</label>';
+    var sum = costSummary(r);
+    var rows = costRows(r.from, r.to);
+    var cut = storeCut();
+
+    /* ---- tiles ---- */
+    var profitTile = tile({
+      label: 'Net profit in range', color: sum.profit >= 0 ? COLOR.s3 : COLOR.red,
+      value: fmtMoney(sum.profit), smallValue: true,
+      meta: fmtMoney(sum.netRevenue) + ' net revenue − ' + fmtMoney(sum.spend) + ' spend · ' +
+        fmtMoney(sum.grossRevenue) + ' gross before the ' + cut + '% store cut'
+    });
+    document.getElementById('csTiles').innerHTML = [
+      tile({
+        label: 'Total spend', color: COLOR.s2, value: fmtMoney(sum.spend), smallValue: true,
+        meta: fmtMoney(sum.marketing) + ' marketing · ' + fmtMoney(sum.other) + ' everything else',
+        spark: Chart.sparkline(rows.map(function (x) { return x.spend; }), COLOR.s2)
+      }),
+      profitTile,
+      tile({
+        label: 'Cost per install', value: fmtMoney(sum.costPerInstall), smallValue: true,
+        meta: 'blended — marketing spend ÷ every store download in range'
+      }),
+      tile({
+        label: 'Cost per paid conversion', value: fmtMoney(sum.costPerPaid), smallValue: true,
+        meta: sum.loadedCostPerPaid === null ? 'no paid conversions in range'
+          : 'marketing only · ' + fmtMoney(sum.loadedCostPerPaid) + ' with every cost loaded in'
+      }),
+      tile({
+        label: 'Return on ad spend', value: sum.roas === null ? '–' : sum.roas.toFixed(2) + '×',
+        smallValue: true,
+        meta: sum.roas === null ? 'no marketing spend in range'
+          : 'net revenue ÷ marketing spend · ' + fmtMoney(sum.revenuePerInstall) + ' net per install'
+      }),
+      tile({
+        label: 'Margin', value: fmtPct(sum.margin), smallValue: true,
+        meta: 'of net revenue, after every cost in range'
+      })
+    ].join('') + allTimeTiles();
+
+    /* ---- spend against revenue ---- */
+    var x = rows.map(function (row) { return bucketLabel(row.key); });
+    var marks = marksForRows(rows);
+    var used = CS.CATEGORY_KEYS.filter(function (k) {
+      return rows.some(function (row) { return row.byCategory[k]; });
+    });
+    var series = used.map(function (k) {
+      return {
+        key: k, name: CS.CATEGORIES[k].label, color: CS.CATEGORIES[k].color, type: 'bar',
+        format: fmtMoney, values: rows.map(function (row) { return row.byCategory[k] || 0; })
+      };
+    });
+    series.push({
+      key: 'net', name: 'Net revenue', color: ENTITY.revenue, type: 'line', format: fmtMoney,
+      values: rows.map(function (row) { return row.netRevenue; })
+    });
+    drawChart('csChart', {
+      x: x, series: series, height: 320, stacked: true, format: fmtMoney,
+      yTickFormat: moneyTick, marks: marks, onMarkClick: onMarkClick,
+      emptyText: 'No costs recorded in this range yet.',
+      tooltipNote: function (i) {
+        var row = rows[i];
+        if (!row) return '';
+        return 'Profit ' + fmtMoney(row.profit);
+      }
+    });
+
+    renderBreakeven();
+
+    /* ---- cost per acquisition ---- */
+    drawChart('csCpa', {
+      x: x, height: 280, format: fmtMoney, yTickFormat: moneyTick,
+      series: [
+        { key: 'cpi', name: 'Per install (blended)', color: ENTITY.downloads, type: 'line',
+          format: fmtMoney, values: rows.map(function (row) { return row.cpi; }) },
+        { key: 'cpa', name: 'Per paid conversion (blended)', color: ENTITY.sales, type: 'line',
+          format: fmtMoney, values: rows.map(function (row) { return row.cpa; }) },
+        { key: 'loaded', name: 'Per paid conversion, all costs', color: COLOR.muted, type: 'line',
+          format: fmtMoney, dashed: true, values: rows.map(function (row) { return row.loadedCpa; }) }
+      ],
+      emptyText: 'Nothing to divide yet.'
+    });
+
+    renderCostTables(r, sum);
+    renderAdTable('csAdPerf', r, false);
+  }
+
+  /* The entry half, which lives under Edit data. Split from renderCosts so the
+     analysis tab never rebuilds a grid the reader is typing into, and the entry
+     tab never recomputes four charts nobody is looking at. */
+  function renderCostEntry() {
+    renderAdTable('csAdTable', allTimeRange(), true);
+    renderCostList();
+    syncSpreadAds();
+    if (!document.getElementById('csGrid').innerHTML) buildAdGrid();
+  }
+
+  /* Flags land on the bucket that CONTAINS the event, not on a bucket whose
+     first day happens to equal the event's date. At week or month grain the
+     latter drops every event that did not fall on a Monday. */
+  function marksForRows(rows) {
+    var idx = {}, all = [];
+    rows.forEach(function (row, i) {
+      for (var d = row.start; d <= row.end; d = addDays(d, 1)) { idx[d] = i; all.push(d); }
+    });
+    return marksFor(all, function (d) { return idx[d]; });
+  }
+
+  function moneyTick(v) { return (db.settings.currency || '$') + Chart.fmtCompact(v); }
+
+  /* All-time is a different question from the selected range, and the one that
+     decides whether this was worth doing. It ignores the filter bar on purpose. */
+  function allTimeTiles() {
+    var b = base();
+    var from = b.dates.length ? b.start : asOf();
+    var to = asOf();
+    var s = summarize('all', from, to);
+    var spend = CS.spend(costList(), from, to);
+    var net = CS.netRevenue(s.revenue, storeCut());
+    var be = breakevenSeries();
+    return [
+      tile({
+        label: 'All-time net', value: fmtMoney(net - spend), smallValue: true,
+        color: net - spend >= 0 ? COLOR.s3 : COLOR.red,
+        meta: fmtMoney(net) + ' net revenue − ' + fmtMoney(spend) + ' spent, since ' + labelFull(from)
+      }),
+      tile({
+        label: 'Breakeven', value: be.at ? labelDay(be.at) : '–', smallValue: true,
+        meta: be.at
+          ? 'the day cumulative net revenue first passed cumulative spend'
+          : (be.spend - be.revenue > 0
+            ? fmtMoney(be.spend - be.revenue) + ' still to make back'
+            : 'nothing spent yet')
+      })
+    ].join('');
+  }
+
+  function breakevenSeries() {
+    var b = base();
+    var from = b.dates.length ? b.start : asOf();
+    var to = asOf();
+    var cut = storeCut();
+    var netByDay = {};
+    CS.days(from, to).forEach(function (d) {
+      netByDay[d] = CS.netRevenue(dayRec('all', d).revenue, cut);
+    });
+    var out = CS.breakeven(costList(), netByDay, from, to);
+    out.from = from; out.to = to;
+    return out;
+  }
+
+  function renderBreakeven() {
+    var be = breakevenSeries();
+    var days = be.series.map(function (p) { return p.date; });
+    document.getElementById('csCumHint').innerHTML = be.at
+      ? 'Cumulative net revenue passed cumulative spend on <b>' + esc(labelFull(be.at)) +
+        '</b>, and the gap since is profit. Runs over all of history rather than the selected range — breakeven happens once, and a rolling window would announce it every month.'
+      : 'Cumulative spend against cumulative net revenue, over all of history rather than the selected range. They have not crossed yet: ' +
+        '<b>' + esc(fmtMoney(be.spend - be.revenue)) + '</b> still to make back.';
+
+    drawChart('csCum', {
+      x: days.map(function (d) { return bucketLabel(d, 'day'); }),
+      height: 300, format: fmtMoney, yTickFormat: moneyTick, xLabel: 'Day',
+      series: [
+        { key: 'spend', name: 'Cumulative spend', color: COLOR.s2, type: 'line', format: fmtMoney,
+          values: be.series.map(function (p) { return p.spend; }) },
+        { key: 'rev', name: 'Cumulative net revenue', color: ENTITY.revenue, type: 'line', format: fmtMoney,
+          values: be.series.map(function (p) { return p.revenue; }) }
+      ],
+      guides: be.at ? [{ index: days.indexOf(be.at), label: 'breakeven', color: COLOR.s3 }] : [],
+      marks: marksFor(days), onMarkClick: onMarkClick,
+      emptyText: 'Nothing recorded yet.',
+      tooltipNote: function (i) {
+        var p = be.series[i];
+        return p ? (p.profit >= 0 ? 'Ahead by ' : 'Behind by ') + fmtMoney(Math.abs(p.profit)) : '';
+      }
+    });
+  }
+
+  function renderCostTables(r, sum) {
+    var downloads = summarize('all', r.from, r.to).downloads;
+    var rowsHtml = CS.CATEGORY_KEYS.filter(function (k) { return sum.byCategory[k]; })
+      .sort(function (a, b) { return sum.byCategory[b] - sum.byCategory[a]; })
+      .map(function (k) {
+        var v = sum.byCategory[k];
+        var perInstall = downloads ? v / downloads : null;
+        return '<tr><td><span class="cat-dot" style="background:' + CS.CATEGORIES[k].color + '"></span>' +
+          esc(CS.CATEGORIES[k].label) + (CS.CATEGORIES[k].marketing ? ' <span class="note">marketing</span>' : '') + '</td>' +
+          '<td class="money">' + fmtMoney(v) + '</td>' +
+          '<td class="money">' + (sum.spend ? ((v / sum.spend) * 100).toFixed(1) + '%' : '–') + '</td>' +
+          '<td class="money">' + fmtMoney(perInstall) + '</td></tr>';
+      }).join('');
+    document.getElementById('csCategoryTable').innerHTML = rowsHtml
+      ? '<table><thead><tr><th>Category</th><th class="money">Spend</th><th class="money">Share</th>' +
+        '<th class="money">Per install</th></tr></thead><tbody>' + rowsHtml +
+        '<tr><td><b>Total</b></td><td class="money"><b>' + fmtMoney(sum.spend) + '</b></td>' +
+        '<td class="money">100%</td><td class="money"><b>' +
+        fmtMoney(downloads ? sum.spend / downloads : null) + '</b></td></tr>' +
+        '</tbody></table>'
+      : '<div class="empty">No costs in this range.</div>';
+
+    var chans = CS.perChannel(ads(), costList(), r.from, r.to);
+    document.getElementById('csChannelTable').innerHTML = chans.length
+      ? '<table><thead><tr><th>Channel</th><th class="money">Campaigns</th><th class="money">Spend</th>' +
+        '<th class="money">Reported installs</th><th class="money">Reported CPI</th></tr></thead><tbody>' +
+        chans.map(function (c) {
+          return '<tr><td>' + esc(c.channel) + '</td><td class="money">' + fmtInt(c.ads) + '</td>' +
+            '<td class="money">' + fmtMoney(c.spend) + '</td>' +
+            '<td class="money">' + (c.installs ? fmtInt(c.installs) : '<span class="na">–</span>') + '</td>' +
+            '<td class="money">' + fmtMoney(c.cpi) + '</td></tr>';
+        }).join('') + '</tbody></table>'
+      : '<div class="empty">No advertising spend in this range.</div>';
+  }
+
+  /**
+   * The campaign table, drawn twice from one function.
+   *
+   * On Edit data it is the management list: editable, and all-time, because
+   * that view has no filter bar and "spend on this campaign" is a lifetime
+   * question when you are deciding whether to keep running it. On the Costs tab
+   * it is read-only and scoped to the selected range, which is the reading
+   * question. Same numbers, two jobs, one place they are computed.
+   */
+  function renderAdTable(hostId, r, editable) {
+    var per = CS.perAd(ads(), costList(), r.from, r.to);
+    var day = asOf();
+    var host = document.getElementById(hostId);
+    if (!host) return;
+    if (!ads().length && !per.rows.length) {
+      host.innerHTML = '<div class="empty">' + (editable
+        ? 'No campaigns yet. Add one and its daily spend can be entered in the grid below.'
+        : 'No campaigns yet. Add one under Edit data.') + '</div>';
+      return;
+    }
+    host.innerHTML = '<table><thead><tr><th>Campaign</th><th>Channel</th><th>Status</th>' +
+      '<th class="money">Spend</th><th class="money">Share</th><th class="money">Reported clicks</th>' +
+      '<th class="money">Reported installs</th><th class="money">Reported CPI</th>' +
+      (editable ? '<th></th>' : '') + '</tr></thead><tbody>' +
+      per.rows.map(function (row) {
+        var st = row.ad ? CS.adStatus(row.ad, day) : null;
+        return '<tr><td>' + esc(row.name) +
+          (row.ad && row.ad.platform && row.ad.platform !== 'all'
+            ? ' <span class="note">' + esc(PLATFORMS[row.ad.platform] || row.ad.platform) + '</span>' : '') +
+          '</td>' +
+          '<td>' + esc(row.channel || '–') + '</td>' +
+          '<td>' + (st ? '<span class="pill ' + st + '">' + st + '</span>' : '<span class="note">detached</span>') + '</td>' +
+          '<td class="money">' + fmtMoney(row.spend) + '</td>' +
+          '<td class="money">' + (row.share === null ? '–' : row.share.toFixed(1) + '%') + '</td>' +
+          '<td class="money">' + (row.clicks ? fmtInt(row.clicks) : '<span class="na">–</span>') + '</td>' +
+          '<td class="money">' + (row.installs ? fmtInt(row.installs) : '<span class="na">–</span>') + '</td>' +
+          '<td class="money">' + fmtMoney(row.cpi) + '</td>' +
+          (editable
+            ? '<td>' + (row.id ? '<button class="btn sm" data-ad-edit="' + esc(row.id) + '">Edit</button>' : '') + '</td>'
+            : '') +
+          '</tr>';
+      }).join('') +
+      '<tr><td><b>Total</b></td><td></td><td></td><td class="money"><b>' + fmtMoney(per.total) + '</b></td>' +
+      '<td colspan="' + (editable ? 5 : 4) + '"></td></tr></tbody></table>';
+
+    if (!editable) return;
+    host.querySelectorAll('[data-ad-edit]').forEach(function (b) {
+      b.addEventListener('click', function () { openAdForm(b.dataset.adEdit); });
+    });
+  }
+
+  /** Everything ever recorded — the window the management tables read. */
+  function allTimeRange() {
+    var b = base();
+    return { from: b.dates.length ? b.start : asOf(), to: asOf() };
+  }
+
+  function openAdForm(id) {
+    var ad = id ? adById(id) : null;
+    var host = document.getElementById('csAdForm');
+    host.classList.remove('hidden');
+    var channels = CS.CHANNELS.map(function (c) {
+      return '<option value="' + esc(c) + '"' + (ad && ad.channel === c ? ' selected' : '') + '>' + esc(c) + '</option>';
+    }).join('');
+    var plats = [['all', 'Both stores'], ['ios', 'iOS'], ['android', 'Android']].map(function (p) {
+      return '<option value="' + p[0] + '"' + (ad && ad.platform === p[0] ? ' selected' : '') + '>' + p[1] + '</option>';
     }).join('');
 
-    assignSlots();
-    var keys = platKeys();
-    var rowsByPlat = {};
-    keys.forEach(function (p) { rowsByPlat[p] = buildBuckets(p, r.from, r.to); });
-    var x = xAxis(rowsByPlat[keys[0]]);
+    host.innerHTML = '<div class="event-form">' +
+      '<div class="field grow"><label for="adName">Campaign name</label>' +
+      '<input type="text" id="adName" maxlength="120" placeholder="Search Ads — POTS keywords" value="' + esc(ad ? ad.name : '') + '"></div>' +
+      '<div class="field"><label for="adChannel">Channel</label><select id="adChannel">' + channels + '</select></div>' +
+      '<div class="field"><label for="adPlatform">Store</label><select id="adPlatform">' + plats + '</select></div>' +
+      '<div class="field"><label for="adStart">Started</label><input type="date" id="adStart" value="' + esc(ad ? ad.start : asOf()) + '"></div>' +
+      '<div class="field"><label for="adEnd">Ended (blank = running)</label><input type="date" id="adEnd" value="' + esc(ad && ad.end ? ad.end : '') + '"></div>' +
+      '<div class="field grow"><label for="adUrl">Link (optional)</label><input type="text" id="adUrl" placeholder="https://" value="' + esc(ad && ad.url ? ad.url : '') + '"></div>' +
+      '<div class="field full"><label for="adNote">Notes</label><textarea id="adNote" rows="2" maxlength="2000">' + esc(ad && ad.note ? ad.note : '') + '</textarea></div>' +
+      '<div class="event-form-actions">' +
+      '<button class="btn primary" id="adSave">' + (ad ? 'Save campaign' : 'Add campaign') + '</button>' +
+      '<button class="btn" id="adCancel">Cancel</button>' +
+      (ad ? '<span class="spacer"></span><button class="btn danger" id="adDelete">Delete</button>' : '') +
+      '</div></div>';
 
-    var counts = [], rates = [];
-    state.exMetrics.forEach(function (k) {
-      var m = metricDef(k);
-      if (!m) return;
-      keys.forEach(function (p, pi) {
-        var color = SLOTS[slotMap[k]];
-        // in compare mode the second platform is drawn dashed so the pair stays distinguishable
-        var s = mk(rowsByPlat[p], p, k, metricLabel(m) + (keys.length > 1 ? ' · ' + platName(p) : ''),
-          color, state.exType === 'line' ? 'line' : 'bar', pi === 1);
-        s.format = m.fmt || fmtInt;
-        (m.group === 'rate' ? rates : counts).push(s);
-      });
-    });
-
-    var type = state.exType;
-    if (type !== 'line') counts.forEach(function (s) { s.type = 'bar'; });
-    drawChart('exChart', {
-      x: x, series: counts, height: 340, stacked: type === 'stacked',
-      format: fmtInt, emptyText: 'Pick one or more count metrics above.'
-    });
-
-    var rateCard = document.getElementById('exRateCard');
-    rateCard.classList.toggle('hidden', rates.length === 0);
-    if (rates.length) {
-      rates.forEach(function (s) { s.type = type === 'line' ? 'line' : 'bar'; });
-      drawChart('exRate', {
-        x: x, series: rates, height: 300, format: fmtPct,
-        yTickFormat: function (v) { return v.toFixed(v < 10 ? 1 : 0) + '%'; }
+    document.getElementById('adCancel').addEventListener('click', closeAdForm);
+    if (ad) {
+      document.getElementById('adDelete').addEventListener('click', function () {
+        var spent = CS.spend(costList(), '0000-01-01', '9999-12-31', function (c) { return c.adId === ad.id; });
+        if (!confirm('Delete "' + ad.name + '"? Its ' + fmtMoney(spent) +
+          ' of recorded spend is kept and reported as unattributed advertising.')) return;
+        var n = removeAd(ad.id);
+        closeAdForm();
+        renderAll();
+        toast(n ? 'Campaign deleted — ' + n + ' cost row' + (n === 1 ? '' : 's') + ' kept as unattributed.' : 'Campaign deleted.');
       });
     }
+    document.getElementById('adSave').addEventListener('click', function () {
+      var name = document.getElementById('adName').value.trim();
+      var start = document.getElementById('adStart').value;
+      var end = document.getElementById('adEnd').value;
+      if (!name) { toast('A campaign needs a name.'); return; }
+      if (!start) { toast('A campaign needs a start date.'); return; }
+      if (end && end < start) { toast('The end date is before the start date.'); return; }
+      putAd({
+        id: ad ? ad.id : newId('ad'),
+        name: name,
+        channel: document.getElementById('adChannel').value,
+        platform: document.getElementById('adPlatform').value,
+        start: start,
+        end: end || undefined,
+        url: document.getElementById('adUrl').value.trim() || undefined,
+        note: document.getElementById('adNote').value.trim() || undefined
+      });
+      closeAdForm();
+      buildAdGrid();
+      renderAll();
+      toast(ad ? 'Campaign saved.' : 'Campaign added.');
+    });
+    document.getElementById('adName').focus();
+  }
+
+  function closeAdForm() {
+    var host = document.getElementById('csAdForm');
+    host.classList.add('hidden');
+    host.innerHTML = '';
+  }
+
+  /* ------------------------------------------------------- the cost list */
+
+  /* The ledger. Every row, newest first, unscoped — this is the list you check
+     a charge against, and a cost filtered out by a range selected on another
+     tab is a cost you would swear you had entered. */
+  function renderCostList() {
+    var list = costList();
+    var host = document.getElementById('csCostTable');
+    if (!host) return;
+    if (!list.length) {
+      host.innerHTML = '<div class="empty">No costs recorded yet.</div>';
+      return;
+    }
+    var r = allTimeRange();
+
+    host.innerHTML = '<table><thead><tr><th>Date</th><th>Category</th><th>What</th>' +
+      '<th class="money">Amount</th><th class="money">Charged so far</th><th></th></tr></thead><tbody>' +
+      list.map(function (c) {
+        var cat = CS.CATEGORIES[c.category] || CS.CATEGORIES.OTHER;
+        var hits = CS.occurrences(c, r.from, r.to).length;
+        var rec = c.recurrence && c.recurrence !== 'none' ? CS.RECURRENCES[c.recurrence] : null;
+        var ad = c.adId ? adById(c.adId) : null;
+        return '<tr><td>' + esc(labelFull(c.date)) +
+          (rec ? '<br><span class="repeats">' + esc(rec.label.toLowerCase()) +
+            (c.until ? ' until ' + esc(labelDay(c.until)) : '') + '</span>' : '') + '</td>' +
+          '<td><span class="cat-dot" style="background:' + cat.color + '"></span>' + esc(cat.label) + '</td>' +
+          '<td>' + esc(c.label || (ad ? ad.name : '') || '–') +
+          (ad ? ' <span class="note">' + esc(ad.channel || 'campaign') + '</span>' : '') +
+          (c.note ? '<br><span class="note">' + esc(c.note) + '</span>' : '') + '</td>' +
+          '<td class="money">' + fmtMoney(c.amount) + '</td>' +
+          '<td class="money">' + (hits ? fmtMoney(num(c.amount) * hits) + (hits > 1 ? ' <span class="note">×' + hits + '</span>' : '') : '<span class="na">–</span>') + '</td>' +
+          '<td><button class="btn sm" data-cost-edit="' + esc(c.id) + '">Edit</button></td></tr>';
+      }).join('') + '</tbody></table>';
+
+    host.querySelectorAll('[data-cost-edit]').forEach(function (b) {
+      b.addEventListener('click', function () { openCostForm(b.dataset.costEdit); });
+    });
+  }
+
+  function openCostForm(id) {
+    var c = id ? costList().filter(function (x) { return x.id === id; })[0] : null;
+    var host = document.getElementById('csCostForm');
+    host.classList.remove('hidden');
+
+    var cats = CS.CATEGORY_KEYS.map(function (k) {
+      return '<option value="' + k + '"' + (c && c.category === k ? ' selected' : (!c && k === 'INFRA' ? ' selected' : '')) + '>' +
+        esc(CS.CATEGORIES[k].label) + '</option>';
+    }).join('');
+    var recs = Object.keys(CS.RECURRENCES).map(function (k) {
+      return '<option value="' + k + '"' + (c && c.recurrence === k ? ' selected' : '') + '>' +
+        esc(CS.RECURRENCES[k].label) + '</option>';
+    }).join('');
+    var adOpts = '<option value="">Not a campaign</option>' + ads().map(function (a) {
+      return '<option value="' + esc(a.id) + '"' + (c && c.adId === a.id ? ' selected' : '') + '>' + esc(a.name) + '</option>';
+    }).join('');
+
+    host.innerHTML = '<div class="event-form">' +
+      '<div class="field"><label for="coDate">Date charged</label><input type="date" id="coDate" value="' + esc(c ? c.date : asOf()) + '"></div>' +
+      '<div class="field"><label for="coCategory">Category</label><select id="coCategory">' + cats + '</select></div>' +
+      '<div class="field grow"><label for="coLabel">What it was</label>' +
+      '<input type="text" id="coLabel" maxlength="200" placeholder="Apple Developer Program" value="' + esc(c && c.label ? c.label : '') + '"></div>' +
+      '<div class="field"><label for="coAmount">Amount</label><input type="number" id="coAmount" step="0.01" value="' + (c && c.amount !== undefined ? c.amount : '') + '"></div>' +
+      '<div class="field"><label for="coRecurrence">Repeats</label><select id="coRecurrence">' + recs + '</select></div>' +
+      '<div class="field"><label for="coUntil">Repeat until (blank = still paying)</label><input type="date" id="coUntil" value="' + esc(c && c.until ? c.until : '') + '"></div>' +
+      '<div class="field"><label for="coAd">Campaign</label><select id="coAd">' + adOpts + '</select></div>' +
+      '<div class="field full"><label for="coNote">Notes</label><textarea id="coNote" rows="2" maxlength="2000">' + esc(c && c.note ? c.note : '') + '</textarea></div>' +
+      '<div class="event-form-actions">' +
+      '<button class="btn primary" id="coSave">' + (c ? 'Save cost' : 'Add cost') + '</button>' +
+      '<button class="btn" id="coCancel">Cancel</button>' +
+      (c ? '<span class="spacer"></span><button class="btn danger" id="coDelete">Delete</button>' : '') +
+      '</div></div>';
+
+    document.getElementById('coCancel').addEventListener('click', closeCostForm);
+    if (c) {
+      document.getElementById('coDelete').addEventListener('click', function () {
+        if (!confirm('Delete this ' + fmtMoney(c.amount) + ' cost?')) return;
+        removeCost(c.id);
+        closeCostForm();
+        renderAll();
+        toast('Cost deleted.');
+      });
+    }
+    document.getElementById('coSave').addEventListener('click', function () {
+      var date = document.getElementById('coDate').value;
+      var amount = document.getElementById('coAmount').value;
+      if (!date) { toast('A cost needs the date it was charged.'); return; }
+      if (amount === '') { toast('A cost needs an amount.'); return; }
+      var until = document.getElementById('coUntil').value;
+      if (until && until < date) { toast('The repeat-until date is before the first charge.'); return; }
+      var rec = document.getElementById('coRecurrence').value;
+      var adId = document.getElementById('coAd').value;
+      putCost({
+        id: c ? c.id : newId('co'),
+        date: date,
+        category: document.getElementById('coCategory').value,
+        label: document.getElementById('coLabel').value.trim() || undefined,
+        amount: Number(amount),
+        recurrence: rec === 'none' ? undefined : rec,
+        until: rec === 'none' || !until ? undefined : until,
+        adId: adId || undefined,
+        note: document.getElementById('coNote').value.trim() || undefined,
+        // network-reported counts survive an edit through this form
+        impressions: c ? c.impressions : undefined,
+        clicks: c ? c.clicks : undefined,
+        installs: c ? c.installs : undefined
+      });
+      closeCostForm();
+      buildAdGrid();
+      renderAll();
+      toast(c ? 'Cost saved.' : 'Cost added.');
+    });
+    document.getElementById('coLabel').focus();
+  }
+
+  function closeCostForm() {
+    var host = document.getElementById('csCostForm');
+    host.classList.add('hidden');
+    host.innerHTML = '';
+  }
+
+  /* --------------------------------------------------------- spend grid */
+
+  var gridDays = [];      // rows: ISO dates
+  var gridAds = [];       // columns: campaigns
+  var gridFields = ['amount'];
+
+  var GRID_FIELDS = {
+    amount: { label: 'Spend', step: '0.01' },
+    impressions: { label: 'Impressions', step: '1' },
+    clicks: { label: 'Clicks', step: '1' },
+    installs: { label: 'Installs', step: '1' }
+  };
+
+  /* Columns are the campaigns that could plausibly have spent money in the
+     window: anything running in it, plus anything that already has a row there.
+     A campaign that ended last year is not offered a column it would only be
+     scrolled past. */
+  function gridCampaigns(from, to) {
+    return ads().filter(function (a) {
+      if (!a.start || a.start > to) return false;
+      if (a.end && a.end < from) {
+        return costList().some(function (c) {
+          return c.adId === a.id && c.date >= from && c.date <= to;
+        });
+      }
+      return true;
+    });
+  }
+
+  function buildAdGrid() {
+    var fromEl = document.getElementById('csGridFrom');
+    var toEl = document.getElementById('csGridTo');
+    if (!fromEl.value) fromEl.value = addDays(asOf(), -13);
+    if (!toEl.value) toEl.value = asOf();
+    var from = fromEl.value, to = toEl.value;
+    if (from > to) { var t = from; from = to; to = t; }
+
+    gridFields = document.getElementById('csGridExtra').value === 'all'
+      ? ['amount', 'impressions', 'clicks', 'installs'] : ['amount'];
+    gridDays = CS.days(from, to).reverse();     // newest first, like every other list here
+    gridAds = gridCampaigns(from, to);
+
+    var host = document.getElementById('csGrid');
+    var count = document.getElementById('csGridCount');
+    if (!gridAds.length) {
+      host.innerHTML = '<div class="empty">No campaigns ran in this window. Add one above, or widen the dates.</div>';
+      count.textContent = '';
+      return;
+    }
+    if (!gridDays.length) { host.innerHTML = '<div class="empty">Pick a date range.</div>'; return; }
+
+    var head = '<tr><th class="day-col" rowspan="' + (gridFields.length > 1 ? 2 : 1) + '">Day</th>' +
+      gridAds.map(function (a) {
+        return '<th class="ad-head" colspan="' + gridFields.length + '">' + esc(a.name) +
+          '<span class="sub">' + esc(a.channel || '') + '</span></th>';
+      }).join('') + '</tr>';
+    if (gridFields.length > 1) {
+      head += '<tr>' + gridAds.map(function () {
+        return gridFields.map(function (f) { return '<th class="ad-head">' + GRID_FIELDS[f].label + '</th>'; }).join('');
+      }).join('') + '</tr>';
+    }
+
+    var body = gridDays.map(function (day, ri) {
+      var wd = dow(day);
+      var cells = '';
+      gridAds.forEach(function (a, ai) {
+        var existing = adCostOn(a.id, day);
+        gridFields.forEach(function (f, fi) {
+          var c = ai * gridFields.length + fi;
+          var v = existing ? existing[f] : undefined;
+          cells += '<td class="num-edit"><input type="number" step="' + GRID_FIELDS[f].step + '" min="0" ' +
+            'data-r="' + ri + '" data-c="' + c + '" data-day="' + day + '" data-ad="' + esc(a.id) + '" ' +
+            'data-field="' + f + '" value="' + (v === undefined || v === null ? '' : v) + '"></td>';
+        });
+      });
+      return '<tr' + (wd >= 5 ? ' class="weekend"' : '') + '><td class="day-col">' +
+        WD[wd] + ' ' + esc(labelDay(day)) + '</td>' + cells + '</tr>';
+    }).join('');
+
+    host.innerHTML = '<div class="table-scroll full"><table><thead>' + head + '</thead><tbody>' + body + '</tbody></table></div>';
+    count.textContent = gridDays.length + ' days × ' + gridAds.length + ' campaign' + (gridAds.length === 1 ? '' : 's');
+  }
+
+  function gridCell(r, c) {
+    return document.querySelector('#csGrid input[data-r="' + r + '"][data-c="' + c + '"]');
+  }
+
+  function saveAdGrid() {
+    var inputs = document.querySelectorAll('#csGrid input[data-day]');
+    var touched = {};
+    inputs.forEach(function (el) {
+      var key = el.dataset.ad + '|' + el.dataset.day;
+      var rec = touched[key] || (touched[key] = { adId: el.dataset.ad, day: el.dataset.day, fields: {} });
+      rec.fields[el.dataset.field] = el.value === '' ? null : cleanNum(el.value);
+    });
+
+    var written = 0, removed = 0;
+    Object.keys(touched).forEach(function (key) {
+      var rec = touched[key];
+      var existing = adCostOn(rec.adId, rec.day);
+      var amount = rec.fields.amount;
+      var hasExtras = ['impressions', 'clicks', 'installs'].some(function (f) {
+        return rec.fields[f] !== undefined && rec.fields[f] !== null && rec.fields[f] !== 0;
+      });
+
+      /* A blanked spend cell means "this day cost nothing", which is a deletion
+         rather than a zero — a wall of zero rows would make the cost list
+         unreadable and change none of the totals. Reported counts on their own
+         are not enough to keep a row: they describe spend that is not there. */
+      if ((amount === null || amount === 0) && !hasExtras) {
+        if (existing) { removeCost(existing.id); removed++; }
+        return;
+      }
+      var next = existing ? Object.assign({}, existing) : {
+        id: newId('co'), date: rec.day, category: 'ADS', adId: rec.adId
+      };
+      next.amount = amount === null ? 0 : amount;
+      ['impressions', 'clicks', 'installs'].forEach(function (f) {
+        if (rec.fields[f] === undefined) return;
+        if (rec.fields[f] === null || rec.fields[f] === 0) delete next[f];
+        else next[f] = rec.fields[f];
+      });
+      var before = existing ? JSON.stringify(existing) : null;
+      if (before !== JSON.stringify(next)) { putCost(next); written++; }
+    });
+
+    document.getElementById('csGridStatus').textContent =
+      written || removed
+        ? 'Saved ' + written + ' day' + (written === 1 ? '' : 's') +
+          (removed ? ', cleared ' + removed : '') + '.'
+        : 'Nothing changed.';
+    if (written || removed) toast('Ad spend saved.');
+    buildAdGrid();
+    renderAll();
+  }
+
+  function gridPaste(ev) {
+    var input = ev.target.closest('#csGrid input[data-r]');
+    if (!input) return;
+    var text = (ev.clipboardData || window.clipboardData).getData('text');
+    if (!text) return;
+    if (!/[\t\n\r]/.test(text) && text.indexOf(',') === -1) return;
+    ev.preventDefault();
+
+    var lines = text.replace(/\r\n?/g, '\n').replace(/\n$/, '').split('\n');
+    var sep = text.indexOf('\t') !== -1 ? '\t' : ',';
+    var r0 = +input.dataset.r, c0 = +input.dataset.c, filled = 0;
+    lines.forEach(function (line, dr) {
+      line.split(sep).forEach(function (cell, dc) {
+        var el = gridCell(r0 + dr, c0 + dc);
+        if (!el) return;
+        // currency symbols and thousands separators come along with a paste from
+        // any ad network's export; strip them rather than reject the row
+        var val = cell.trim().replace(/^"|"$/g, '').replace(/[^0-9.\-]/g, '');
+        el.value = val === '' ? '' : String(cleanNum(val));
+        filled++;
+      });
+    });
+    document.getElementById('csGridStatus').textContent = 'Pasted ' + filled + ' cells — not saved yet.';
+  }
+
+  /* ----------------------------------------------------- spread a total */
+
+  function syncSpreadAds() {
+    var sel = document.getElementById('csSpreadAd');
+    var keep = sel.value;
+    sel.innerHTML = ads().length
+      ? ads().map(function (a) { return '<option value="' + esc(a.id) + '">' + esc(a.name) + '</option>'; }).join('')
+      : '<option value="">No campaigns yet</option>';
+    if (keep) sel.value = keep;
+  }
+
+  function spreadTotal() {
+    var adId = document.getElementById('csSpreadAd').value;
+    var from = document.getElementById('csSpreadFrom').value;
+    var to = document.getElementById('csSpreadTo').value;
+    var total = document.getElementById('csSpreadTotal').value;
+    var installs = document.getElementById('csSpreadInstalls').value;
+    var status = document.getElementById('csSpreadStatus');
+
+    if (!adId) { toast('Add a campaign first.'); return; }
+    if (!from || !to) { toast('Pick both dates.'); return; }
+    if (from > to) { var t = from; from = to; to = t; }
+    if (total === '') { toast('Enter the total spent.'); return; }
+
+    var days = CS.days(from, to);
+    var cents = Math.round(cleanNum(total) * 100);
+    var per = Math.floor(cents / days.length);
+    var remainder = cents - per * days.length;
+    var inst = installs === '' ? null : Math.round(cleanNum(installs));
+    var perInst = inst === null ? null : Math.floor(inst / days.length);
+    var instRemainder = inst === null ? 0 : inst - perInst * days.length;
+
+    days.forEach(function (day, i) {
+      var last = i === days.length - 1;
+      var existing = adCostOn(adId, day);
+      var next = existing ? Object.assign({}, existing) : { id: newId('co'), date: day, category: 'ADS', adId: adId };
+      next.amount = (per + (last ? remainder : 0)) / 100;
+      if (inst !== null) {
+        var v = perInst + (last ? instRemainder : 0);
+        if (v) next.installs = v; else delete next.installs;
+      }
+      putCost(next);
+    });
+
+    status.textContent = 'Wrote ' + days.length + ' daily rows totalling ' +
+      fmtMoney(cents / 100) + ' — the grid above can correct any of them.';
+    toast('Spread ' + fmtMoney(cents / 100) + ' over ' + days.length + ' days.');
+    buildAdGrid();
+    renderAll();
+  }
+
+  /* --------------------------------------------------------------- csv */
+
+  function costsCSV() {
+    var cols = ['date', 'category', 'label', 'amount', 'recurrence', 'until', 'campaign', 'channel',
+      'impressions', 'clicks', 'installs', 'note'];
+    var lines = [cols.join(',')];
+    costList().slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; }).forEach(function (c) {
+      var ad = c.adId ? adById(c.adId) : null;
+      var row = {
+        date: c.date, category: c.category, label: c.label || '', amount: num(c.amount),
+        recurrence: c.recurrence || 'none', until: c.until || '',
+        campaign: ad ? ad.name : '', channel: ad ? (ad.channel || '') : '',
+        impressions: c.impressions || '', clicks: c.clicks || '', installs: c.installs || '',
+        note: c.note || ''
+      };
+      lines.push(cols.map(function (k) {
+        var v = String(row[k] === undefined || row[k] === null ? '' : row[k]);
+        return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+      }).join(','));
+    });
+    return lines.join('\n');
+  }
+
+  /* ------------------------------------------------------------ wiring */
+
+  function wireCosts() {
+    document.getElementById('csGoEdit').addEventListener('click', function () {
+      setView('data');
+      var head = document.getElementById('csAdTable');
+      if (head) setTimeout(function () { head.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 60);
+    });
+    document.getElementById('csAdAdd').addEventListener('click', function () {
+      if (document.getElementById('csAdForm').innerHTML) closeAdForm(); else openAdForm(null);
+    });
+    document.getElementById('csCostAdd').addEventListener('click', function () {
+      if (document.getElementById('csCostForm').innerHTML) closeCostForm(); else openCostForm(null);
+    });
+    document.getElementById('csExport').addEventListener('click', function () {
+      download('autonomic-costs-' + today() + '.csv', costsCSV(), 'text/csv');
+    });
+
+    document.getElementById('csGridBuild').addEventListener('click', buildAdGrid);
+    document.getElementById('csGridExtra').addEventListener('change', buildAdGrid);
+    ['csGridFrom', 'csGridTo'].forEach(function (id) {
+      document.getElementById(id).addEventListener('change', buildAdGrid);
+    });
+    document.getElementById('csGridSave').addEventListener('click', saveAdGrid);
+
+    var grid = document.getElementById('csGrid');
+    grid.addEventListener('paste', gridPaste);
+    grid.addEventListener('keydown', function (ev) {
+      var i = ev.target.closest('input[data-r]');
+      if (!i) return;
+      var r = +i.dataset.r, c = +i.dataset.c, next = null;
+      if (ev.key === 'Enter' || ev.key === 'ArrowDown') next = gridCell(r + 1, c);
+      else if (ev.key === 'ArrowUp') next = gridCell(r - 1, c);
+      else return;
+      ev.preventDefault();
+      if (next) { next.focus(); next.select(); }
+    });
+
+    document.getElementById('csSpreadGo').addEventListener('click', spreadTotal);
+    document.getElementById('csSpreadTo').value = asOf();
+    document.getElementById('csSpreadFrom').value = addDays(asOf(), -6);
   }
 
   /* --------------------------------------------------------- view: data */
@@ -2028,7 +2930,10 @@
   /* The Data view is the bulk grid plus the single-day form — the grid is built
      once by wireBulk() and only rebuilt when the store changes underneath it,
      so switching tabs never discards half-typed rows. */
-  function renderData() { if (!bulkRows.length) buildBulkGrid(); }
+  function renderData() {
+    if (!bulkRows.length) buildBulkGrid();
+    renderCostEntry();
+  }
 
   /* ------------------------------------------------------ view: forecast */
 
@@ -2862,24 +3767,79 @@
     syncExportUI();
   }
 
+  /* ------------------------------------------------------------- refresh
+
+     The header's refresh, which exists so reading a new number never costs a
+     page reload (and with it the sign-in round trip and every open card).
+
+     It does three things in order. Push first: pulling the server's copy over
+     the top of unsaved local edits would lose them, and `Sync.flush` resolves
+     once there is nothing outstanding. Then pull and hydrate, keeping the
+     current view rather than adopting whatever another device last looked at.
+     Then re-fetch the view's own source — the ping counter is a separate call
+     with its own cache, and a refresh that left it stale would be a lie on the
+     two views that read it.
+
+     The spin runs for at least MIN_SPIN_MS even when the network answers in
+     40ms: a control that flashes reads as broken rather than fast. */
+
+  var MIN_SPIN_MS = 480;
+  var refreshing = false;
+
+  function refreshView() {
+    if (refreshing) return;
+    var btn = document.getElementById('btnRefresh');
+    refreshing = true;
+    if (btn) btn.dataset.busy = 'true';
+    var startedAt = Date.now();
+
+    var work = Promise.resolve(window.Sync ? window.Sync.flush() : null)
+      .then(function () { return window.Sync ? window.Sync.pull() : null; })
+      .then(function (remote) {
+        hydrate(remote, true);
+        var store = { db: db, state: state };
+        if (window.Sync) window.Sync.adopt(store.db, store.state);
+      });
+
+    // The counter is only worth a round trip on the views that show it.
+    if (state.view === 'ping' || state.view === 'timeline') {
+      work = work.then(function () { return pingLoad(true); });
+    }
+
+    work.then(function () {
+      renderAll();
+      toast('Refreshed.');
+    }).catch(function (err) {
+      toast('Could not refresh: ' + ((err && err.message) || 'no answer from the server') + '.');
+    }).then(function () {
+      var wait = Math.max(0, MIN_SPIN_MS - (Date.now() - startedAt));
+      setTimeout(function () {
+        refreshing = false;
+        if (btn) btn.dataset.busy = 'false';
+      }, wait);
+    });
+  }
+
   /* ------------------------------------------------------------- render */
 
   var VIEW_TITLES = {
     overview: 'Overview', ping: 'App usage', timeline: 'Timeline', trial: 'Trial & conversion', cohorts: 'Cohorts',
-    platforms: 'iOS vs Android', explore: 'Explore', forecast: 'Forecast', data: 'Edit data'
+    platforms: 'iOS vs Android', costs: 'Costs', forecast: 'Forecast', data: 'Edit data'
   };
 
   function renderAll() {
     invalidate();
+    if (!VIEW_TITLES[state.view]) state.view = 'overview';
     document.title = (VIEW_TITLES[state.view] || 'Overview') + ' | Autonomic';
     // don't clobber a field the user is currently typing into
-    [['fTrial', trialDays()], ['fWall', wallDays()]].forEach(function (pair) {
+    [['fTrial', trialDays()], ['fWall', wallDays()],
+      ['fStoreCut', storeCut()], ['fCurrency', db.settings.currency || '$']].forEach(function (pair) {
       var el = document.getElementById(pair[0]);
       if (el && el !== document.activeElement) el.value = pair[1];
     });
     document.getElementById('filterbar').classList.toggle('hidden', state.view === 'data');
     // the forecast is driven by its own assumptions — only the platform filter applies
-    ['fgRange', 'fgGrain', 'fgThrough'].forEach(function (id) {
+    ['fgRange', 'fgGrain'].forEach(function (id) {
       var g = document.getElementById(id);
       if (g) g.classList.toggle('hidden', state.view === 'forecast');
     });
@@ -2888,7 +3848,11 @@
     // carry. Hiding the grain is more honest than silently ignoring it.
     var grainGroup = document.getElementById('fgGrain');
     if (grainGroup && (state.view === 'ping' || state.view === 'timeline')) grainGroup.classList.add('hidden');
-    document.getElementById('reportDayValue').textContent = labelFull(asOf());
+    /* Costs are not per-store — a hosting bill belongs to neither, and no ad
+       network reports spend split the way the stores report downloads. The view
+       always reads both combined, so the filter is hidden rather than ignored. */
+    var platGroup = document.getElementById('fgPlatform');
+    if (platGroup) platGroup.classList.toggle('hidden', state.view === 'costs');
     document.getElementById('btnEditData').textContent =
       state.view === 'data' ? '← Back' : 'Edit data';
     syncExportUI();
@@ -2904,7 +3868,7 @@
     // App usage and Timeline have their own data sources, so both stand up with
     // no store CSVs at all.
     var empty = !db.entries.length && state.view !== 'data' &&
-      state.view !== 'ping' && state.view !== 'timeline';
+      state.view !== 'ping' && state.view !== 'timeline' && state.view !== 'costs';
     document.getElementById('emptyState').classList.toggle('hidden', !empty);
     if (empty) {
       document.getElementById('view-' + state.view).classList.add('hidden');
@@ -2918,7 +3882,7 @@
     else if (state.view === 'trial') renderTrial();
     else if (state.view === 'cohorts') renderCohorts();
     else if (state.view === 'platforms') renderPlatforms();
-    else if (state.view === 'explore') renderExplore();
+    else if (state.view === 'costs') renderCosts();
     else if (state.view === 'forecast') renderForecast();
     else if (state.view === 'data') renderData();
   }
@@ -3089,7 +4053,7 @@
   /* segmented controls live inside re-rendered cards, so clicks are delegated */
   var SEGMENTS = {
     fPlatform: 'platform', fGrain: 'grain', ovMode: 'ovMode',
-    cohGrain: 'cohGrain', exType: 'exType', dowMetric: 'dowMetric'
+    cohGrain: 'cohGrain', dowMetric: 'dowMetric'
   };
 
   function syncSegments() {
@@ -3150,6 +4114,20 @@
     document.getElementById('goData').addEventListener('click', function () { setView('data'); });
     document.getElementById('goDemo').addEventListener('click', loadDemo);
 
+    document.getElementById('fStoreCut').addEventListener('change', function () {
+      var v = Number(this.value);
+      if (!isFinite(v) || v < 0 || v > 100) { this.value = storeCut(); toast('Commission has to be between 0 and 100%.'); return; }
+      db.settings.storeCutPct = v;
+      save(); renderAll();
+      toast('Store commission set to ' + v + '% — every profit figure now nets revenue down by it.');
+    });
+    document.getElementById('fCurrency').addEventListener('change', function () {
+      var v = this.value.trim().slice(0, 4) || '$';
+      db.settings.currency = v;
+      this.value = v;
+      save(); renderAll();
+    });
+
     ['fTrial', 'fWall'].forEach(function (id) {
       document.getElementById(id).addEventListener('change', function () {
         var v = Math.max(1, Math.round(+this.value || 1));
@@ -3173,35 +4151,6 @@
       if (!showing && chartCfgs[id]) t.innerHTML = Chart.tableHTML(chartCfgs[id]);
     });
 
-    /* explore metric checkboxes */
-    document.getElementById('exMetrics').addEventListener('change', function (ev) {
-      var cb = ev.target.closest('input[data-metric]');
-      if (!cb) return;
-      var k = cb.dataset.metric;
-      if (cb.checked) {
-        if (state.exMetrics.length >= 8) {
-          cb.checked = false;
-          toast('Eight metrics is the limit — colours stay distinguishable up to eight.');
-          return;
-        }
-        state.exMetrics.push(k);
-      } else {
-        state.exMetrics = state.exMetrics.filter(function (m) { return m !== k; });
-      }
-      saveUI(); renderExplore();
-    });
-    document.getElementById('exExport').addEventListener('click', function () {
-      var cfg = chartCfgs.exChart;
-      if (!cfg) return;
-      var lines = ['period,' + cfg.series.map(function (s) { return '"' + s.name.replace(/"/g, '""') + '"'; }).join(',')];
-      cfg.x.forEach(function (x, i) {
-        lines.push('"' + (x.full || x.label) + '",' + cfg.series.map(function (s) {
-          var v = s.values[i]; return (v === null || v === undefined || isNaN(v)) ? '' : v;
-        }).join(','));
-      });
-      download('autonomic-explore.csv', lines.join('\n'), 'text/csv');
-    });
-
     document.getElementById('cohExport').addEventListener('click', function () {
       var r = activeRange();
       var main = isCompare() ? 'all' : platKeys()[0];
@@ -3216,6 +4165,9 @@
     });
 
     wirePingView();
+    wireCosts();
+
+    document.getElementById('btnRefresh').addEventListener('click', refreshView);
 
     /* --- data entry --- */
     wireBulk();
@@ -3303,6 +4255,20 @@
               upsertQuiet(e);
             });
             if (parsed.settings) Object.assign(db.settings, parsed.settings);
+            // A JSON backup is the whole store, so a restore has to bring the
+            // campaigns and costs back too — not just the store days. Merged by
+            // id, like every other collection, so restoring an old backup over
+            // a newer ledger adds to it rather than truncating it.
+            [['ads', 'ads'], ['costs', 'costs']].forEach(function (pair) {
+              if (!Array.isArray(parsed[pair[0]])) return;
+              var into = db[pair[1]] || (db[pair[1]] = []);
+              parsed[pair[0]].forEach(function (row) {
+                if (!row || !row.id) return;
+                var at = -1;
+                into.forEach(function (x, i) { if (x.id === row.id) at = i; });
+                if (at >= 0) into[at] = row; else into.push(row);
+              });
+            });
             finishBulk();
             n = list.length;
           } else {
@@ -3345,18 +4311,31 @@
   /* The dashboard no longer boots itself: index.html resolves sign-in and pulls
      the server's copy first, then hands it here. Painting the localStorage
      cache before the pull would flash stale numbers on a second device. */
+  /**
+   * Swap in the server's copy.
+   *
+   * `keepUi` is set by the header's refresh: a mid-session refetch must not
+   * yank the reader back to whichever view another device last looked at.
+   */
+  function hydrate(remote, keepUi) {
+    if (!remote) return;
+    if (Array.isArray(remote.entries)) db.entries = remote.entries;
+    if (Array.isArray(remote.events)) db.events = remote.events;
+    if (Array.isArray(remote.ads)) db.ads = remote.ads;
+    if (Array.isArray(remote.costs)) db.costs = remote.costs;
+    if (remote.settings) Object.assign(db.settings, remote.settings);
+    if (remote.ui && !keepUi) Object.assign(state, remote.ui);
+    // A session saved before Explore was replaced still names it. An unknown
+    // view hides every section and leaves a blank page with no way back.
+    if (!VIEW_TITLES[state.view]) state.view = 'overview';
+    if (!VIEW_TITLES[state.lastView]) state.lastView = 'overview';
+    try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) {}
+    try { localStorage.setItem(KEY + '.ui', JSON.stringify(state)); } catch (e) {}
+    invalidate();
+  }
+
   window.Dashboard = {
-    /** Swap in the server's state ahead of the first render. */
-    hydrate: function (remote) {
-      if (!remote) return;
-      if (Array.isArray(remote.entries)) db.entries = remote.entries;
-      if (Array.isArray(remote.events)) db.events = remote.events;
-      if (remote.settings) Object.assign(db.settings, remote.settings);
-      if (remote.ui) Object.assign(state, remote.ui);
-      try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) {}
-      try { localStorage.setItem(KEY + '.ui', JSON.stringify(state)); } catch (e) {}
-      invalidate();
-    },
+    hydrate: hydrate,
     /** What sync.js diffs against. */
     store: function () { return { db: db, state: state }; },
     start: init

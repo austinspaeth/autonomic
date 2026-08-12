@@ -115,12 +115,38 @@ export function stagesForWindow(sleep: SleepRecord | undefined | null): SleepSta
   return Math.abs(hrs * 60 - stageTotal(sleep.stages)) <= STAGE_WINDOW_TOLERANCE_MIN ? sleep.stages : null;
 }
 
-/** Sleep recovery grade for the night before `dk`. Duration + quality set the
- *  base grade; an elevated overnight heart rate then caps it — a long night
- *  spent at a high rate is not restorative sleep. The sleeping low is the
- *  strongest signal (a low that never dropped under ~65 bpm means the system
- *  never settled); a very high overnight peak also costs a step. */
-export function sleepGrade(days: DaysMap, dk: string): ScoreCat | null {
+/** Overnight-HR thresholds that demote the sleep grade. Exported so the sleep
+ *  report can quote the exact numbers it graded against instead of restating
+ *  them in copy that then drifts. */
+export const SLEEP_HR_LOW_1 = 65;   // sleeping low at/above this costs one step
+export const SLEEP_HR_LOW_2 = 75;   // ...and two steps at/above this
+export const SLEEP_HR_HIGH = 110;   // an overnight peak at/above this costs one
+
+/** The grade order demotion walks down. */
+const SLEEP_GRADE_ORDER: ScoreCat[] = ['great', 'good', 'ok', 'bad', 'crash'];
+
+export interface SleepGradeParts {
+  /** Hours between bed and wake (the window, not staged sleep). */
+  hours: number;
+  interrupted: boolean;
+  /** Grade from duration + quality alone, before any HR demotion. */
+  base: ScoreCat;
+  hrLow: number | null;
+  hrHigh: number | null;
+  /** Steps the sleeping low cost, and the steps the peak cost. */
+  demoteLow: number;
+  demoteHigh: number;
+  /** Steps actually applied (the larger of the two, not their sum). */
+  demote: number;
+  cat: ScoreCat;
+}
+
+/**
+ * Every input the sleep grade used, and what each one did to it. `sleepGrade`
+ * is this function's `cat` — the report explains the grade from the same
+ * computation rather than a second copy of the thresholds.
+ */
+export function sleepGradeParts(days: DaysMap, dk: string): SleepGradeParts | null {
   const dur = sleepHours(days, dk);
   if (dur == null) return null;
   const d = days[dk];
@@ -131,17 +157,27 @@ export function sleepGrade(days: DaysMap, dk: string): ScoreCat | null {
   else if (dur >= 6) cat = good ? 'ok' : 'bad';
   else if (dur >= 5) cat = 'bad';
   else cat = 'crash';
+  const base = cat;
   const num = (x: unknown) => { const v = parseFloat(String(x)); return isNaN(v) ? null : v; };
   const lo = d && d.sleep ? num(d.sleep.hrLow) : null;
   const hi = d && d.sleep ? num(d.sleep.hrHigh) : null;
-  let demote = 0;
-  if (lo != null) demote = lo >= 75 ? 2 : lo >= 65 ? 1 : 0;
-  if (hi != null && hi >= 110) demote = Math.max(demote, 1);
+  const demoteLow = lo != null ? (lo >= SLEEP_HR_LOW_2 ? 2 : lo >= SLEEP_HR_LOW_1 ? 1 : 0) : 0;
+  const demoteHigh = hi != null && hi >= SLEEP_HR_HIGH ? 1 : 0;
+  const demote = Math.max(demoteLow, demoteHigh);
   if (demote) {
-    const order: ScoreCat[] = ['great', 'good', 'ok', 'bad', 'crash'];
-    cat = order[Math.min(order.length - 1, order.indexOf(cat) + demote)];
+    cat = SLEEP_GRADE_ORDER[Math.min(SLEEP_GRADE_ORDER.length - 1, SLEEP_GRADE_ORDER.indexOf(cat) + demote)];
   }
-  return cat;
+  return { hours: dur, interrupted: !good, base, hrLow: lo, hrHigh: hi, demoteLow, demoteHigh, demote, cat };
+}
+
+/** Sleep recovery grade for the night before `dk`. Duration + quality set the
+ *  base grade; an elevated overnight heart rate then caps it — a long night
+ *  spent at a high rate is not restorative sleep. The sleeping low is the
+ *  strongest signal (a low that never dropped under ~65 bpm means the system
+ *  never settled); a very high overnight peak also costs a step. */
+export function sleepGrade(days: DaysMap, dk: string): ScoreCat | null {
+  const parts = sleepGradeParts(days, dk);
+  return parts ? parts.cat : null;
 }
 
 /** Behaviour grade from logged activity load (lightly weighted). */

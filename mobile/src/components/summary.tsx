@@ -14,6 +14,7 @@ import React, { useMemo, useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 import { TAIL_STYLE, fonts, radius, readoutTail, usePalette } from '../theme';
 import type { Band, Entry, ScoreCat } from '../lib/types';
+import type { HelpContent } from '../lib/help';
 import {
   BANDS, GRADE_LABEL, HRV_EXPLAIN, HRV_HELP, SCORE_COLORS, bandsFor,
   bpBce, bpKerdo, bpKvas, bpMap, bpPP, bpRobinson, catFromBands, computeScores,
@@ -117,9 +118,11 @@ export function MetricRow({ label, value, cat, explain, spark, bare }: {
 
 /** Card container matching the Progress view's metric cards. It sits on the
  *  sheet's `surface` backdrop, so the card is one step lighter (surface2).
+ *  Exported because the sleep report (`features/SleepReport.tsx`) is built from
+ *  the same blocks — two divergent section headers is the failure mode here.
  *  With `cat` it becomes the hero treatment: tinted with the grade colour and
  *  wearing the grade tag in the top-right corner (like the old HeroCard). */
-function Section({ children, cat }: { children: React.ReactNode; cat?: ScoreCat | null }) {
+export function Section({ children, cat }: { children: React.ReactNode; cat?: ScoreCat | null }) {
   const p = usePalette();
   const color = cat && SCORE_COLORS[cat] ? SCORE_COLORS[cat] : null;
   return (
@@ -145,10 +148,22 @@ function Section({ children, cat }: { children: React.ReactNode; cat?: ScoreCat 
  *  dim tail (unit, then the shown reading's date), then a one-line description.
  *  The tail is built and styled exactly as on the Progress cards, so the two
  *  views read identically ("55 ms", "55 ms on 7/27"). */
-function SectionHead({ title, help, cat, value, unit, when, desc, right }: {
-  title: string; help?: string; cat?: ScoreCat | null;
+export function SectionHead({ title, help, cat, value, unit, when, desc, right, pair, tailBelow }: {
+  title: string; help?: HelpContent; cat?: ScoreCat | null;
   value?: string | null; unit?: string; when?: string | null;
   desc?: string; right?: React.ReactNode;
+  /** Multi-series readout: each entry becomes a name with its value below it,
+   *  and the unit/date tail rides the last one. Replaces `value` when set.
+   *  Same treatment as the Balance and POTS readouts and the Progress cards'
+   *  "Compare" mode — it wraps, so four series fall to a second row rather
+   *  than off the edge. `color` tints the value and puts a dot beside its
+   *  label; omit it when the entries are not colour-coded series (two ends of
+   *  one night, say), and the value reads plain with no dot to decode. */
+  pair?: { label: string; color?: string; text: string | null }[] | null;
+  /** Move the unit/date tail off the last value and onto its own line beneath
+   *  the readout. A pair of two fits the tail inline; four values do not, and
+   *  a date wedged after the fourth number reads as part of it. */
+  tailBelow?: boolean;
 }) {
   const p = usePalette();
   const tail = readoutTail(unit, when);
@@ -161,7 +176,25 @@ function SectionHead({ title, help, cat, value, unit, when, desc, right }: {
         <View style={{ flex: 1 }} />
         {right}
       </View>
-      {value != null ? (
+      {pair ? (
+        <View style={{ marginTop: 12 }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-end', columnGap: 28, rowGap: 10 }}>
+            {pair.map((pp, i) => (
+              <View key={pp.label}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  {pp.color ? <View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: pp.color }} /> : null}
+                  <Text style={{ fontSize: 12, color: p.textDim, fontWeight: '600' }}>{pp.label}</Text>
+                </View>
+                <Text style={{ fontSize: 27, fontFamily: fonts.numHeavy, color: pp.color ?? p.text, fontVariant: ['tabular-nums'], marginTop: 3 }}>
+                  {pp.text ?? '–'}
+                  {tail && !tailBelow && i === pair.length - 1 ? <Text style={TAIL_STYLE(p)}>{tail}</Text> : null}
+                </Text>
+              </View>
+            ))}
+          </View>
+          {tail && tailBelow ? <Text style={[TAIL_STYLE(p), { marginTop: 8 }]}>{tail.trim()}</Text> : null}
+        </View>
+      ) : value != null ? (
         <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 6 }}>
           <Text style={{ fontSize: 27, fontFamily: fonts.numHeavy, color: p.text, fontVariant: ['tabular-nums'] }}>
             {value}
@@ -191,7 +224,7 @@ const useViewedReading = () => React.useContext(ViewedReadingCtx);
 
 function MetricSection({ label, value, unit, cat, desc, help, days, type, ex, bands, hero, fmt }: {
   label: string; value?: string | number | null; unit?: string; cat?: ScoreCat | null;
-  desc?: string; help?: string; days: DaysMap; type: string;
+  desc?: string; help?: HelpContent; days: DaysMap; type: string;
   ex: (r: Entry) => number | null; bands?: Band[] | null;
   /** Hero treatment: grade-tinted container + corner tag instead of the dot. */
   hero?: boolean;
@@ -520,17 +553,57 @@ export function BaselineSummary(props: SummaryProps) {
 
 /* ---------- Blood pressure ---------- */
 
-const BP_HELP: Record<string, string> = {
-  bp: 'Systolic (peak) over diastolic (between-beats) arterial pressure, graded against the framework thresholds. In dysautonomia the pattern across positions and times of day often says more than any single reading. Log context and watch the trend.',
-  sys: 'The peak arterial pressure each heartbeat produces. Persistent changes matter more than one-off readings; pair unusual values with context like salt, fluids, meds, or stress.',
-  dia: 'The arterial pressure between beats, while the heart refills. Together with systolic it sets the mean arterial pressure and pulse pressure below.',
-  pulse: 'The heart rate your monitor recorded with this reading. It feeds the circulation indexes below (Kerdo, Robinson, BCE, Kvas).',
-  map: 'Mean arterial pressure, diastolic plus a third of the pulse pressure, approximates the average pressure actually perfusing your organs and brain. Low MAP is a common driver of lightheadedness in dysautonomia.',
-  pp: 'Pulse pressure = systolic − diastolic. Under about 30 mmHg suggests low stroke volume or dehydration; a narrowing pulse pressure on standing is a classic dysautonomia pattern worth showing your doctor.',
-  kerdo: 'Kerdo vegetative index, computed from pulse and diastolic pressure. Positive values suggest sympathetic dominance, negative parasympathetic; near zero is balanced.',
-  robinson: 'Robinson index (double product): systolic × pulse ÷ 100, a proxy for the heart\'s oxygen demand at rest. Lower generally means a more efficient circulation.',
-  bce: 'Blood-circulation economy: pulse pressure × pulse. Higher values mean the circulation is working harder to move the same blood, a strain marker.',
-  kvas: 'Coefficient of endurance: pulse × 10 ÷ pulse pressure. Around 16 is typical; sustained higher values suggest cardiovascular fatigue.',
+const BP_HELP: Record<string, HelpContent> = {
+  bp: {
+    what: 'Systolic (the peak pressure of each heartbeat) over diastolic (the pressure between beats), in mmHg, graded against the framework thresholds for a resting reading.',
+    why: 'In dysautonomia the pattern across positions and times of day usually says more than any single reading. Log the context around it, salt, fluids, meds and stress, and read the trend rather than reacting to one number.',
+    learnMore: '/insights/basics/blood-pressure-basics-systolic-diastolic-pulse/',
+  },
+  sys: {
+    what: 'The top number: the peak arterial pressure each heartbeat produces as the heart empties. Graded against the framework thresholds for a resting reading.',
+    why: 'Persistent changes matter more than one-off readings. A drifting systolic often tracks fluid and salt intake, deconditioning or a medication change, so pair an unusual value with what was going on around it.',
+    learnMore: '/insights/basics/blood-pressure-basics-systolic-diastolic-pulse/',
+  },
+  dia: {
+    what: 'The bottom number: arterial pressure between beats, while the heart refills. With systolic it sets the mean arterial pressure and pulse pressure shown below.',
+    why: 'Diastolic reflects how much tone your vessels are holding. Low readings on days you feel lightheaded point at poor constriction; a pattern either way is worth showing your doctor rather than acting on alone.',
+    learnMore: '/insights/basics/blood-pressure-basics-systolic-diastolic-pulse/',
+  },
+  pulse: {
+    what: 'The heart rate your monitor recorded with this reading, in beats per minute. It feeds the circulation indexes below (Kerdo, Robinson, BCE and Kvas).',
+    why: 'Pressure and pulse read together. A normal pressure held up by a fast heart rate is a different state from the same pressure at rest, and a creeping pulse often shows up before you notice symptoms.',
+    learnMore: '/insights/basics/blood-pressure-basics-systolic-diastolic-pulse/',
+  },
+  map: {
+    what: 'Mean arterial pressure: diastolic plus a third of the pulse pressure. It approximates the average pressure actually perfusing your organs and brain across the whole cardiac cycle.',
+    why: 'Low MAP is a common driver of lightheadedness, greying vision and brain fog in dysautonomia. If yours sits low on your worst days, that pairing is concrete evidence to bring to your doctor.',
+    learnMore: '/insights/basics/mean-arterial-pressure-and-pulse-pressure/',
+  },
+  pp: {
+    what: 'Pulse pressure = systolic − diastolic, the size of the gap between the two numbers. Under about 30 mmHg suggests low stroke volume or dehydration.',
+    why: 'A narrow gap often accompanies the flat, faint feeling of low circulating volume, and a narrowing on standing is a classic dysautonomia pattern worth showing your doctor. Compare readings taken in the same position.',
+    learnMore: '/insights/basics/mean-arterial-pressure-and-pulse-pressure/',
+  },
+  kerdo: {
+    what: 'The Kerdo vegetative index, computed from pulse and diastolic pressure. Positive values suggest sympathetic dominance, negative parasympathetic, near zero balanced.',
+    why: 'It is a rough one-number read on which branch is driving your circulation right now. Persistently positive fits the wired, tachycardic end of dysautonomia; watch it move as pacing, sleep and recovery change.',
+    learnMore: '/insights/basics/autonomic-blood-pressure-indices-kerdo-robinson-kvas/',
+  },
+  robinson: {
+    what: 'The Robinson index, or double product: systolic × pulse ÷ 100. It stands in for how much oxygen your heart muscle demands at rest, so lower generally means a more efficient circulation.',
+    why: 'A falling index over months means rest is costing your heart less, which is what reconditioning looks like from the outside. A sustained rise usually follows poor sleep, illness or a heavier symptom period.',
+    learnMore: '/insights/basics/autonomic-blood-pressure-indices-kerdo-robinson-kvas/',
+  },
+  bce: {
+    what: 'Blood-circulation economy: pulse pressure × pulse. Higher values mean your circulation is moving the same blood at a greater cost.',
+    why: 'It tends to climb on days when standing, heat or effort feel harder than they should. Treat a rising run of values as a cue to pace and rehydrate rather than push, and note it next to your symptoms.',
+    learnMore: '/insights/basics/autonomic-blood-pressure-indices-kerdo-robinson-kvas/',
+  },
+  kvas: {
+    what: 'The Kvas coefficient of endurance: pulse × 10 ÷ pulse pressure. Around 16 is typical; sustained higher values suggest cardiovascular fatigue.',
+    why: 'A high value usually means your heart rate is covering for a small pulse pressure, the combination behind poor standing and exercise tolerance. If it stays high across calm readings, discuss it with your doctor.',
+    learnMore: '/insights/basics/autonomic-blood-pressure-indices-kerdo-robinson-kvas/',
+  },
 };
 
 export function BpSummary({ r, days, ctx }: SummaryProps) {
@@ -541,7 +614,7 @@ export function BpSummary({ r, days, ctx }: SummaryProps) {
     ok: 'Slightly outside your ideal range; keep an eye on it.', bad: 'Out of range; note context like salt, fluids, meds, or stress.',
     concerning: 'Well outside range; consider rechecking and noting context.',
   };
-  const derived = (label: string, ex: (rr: Entry) => number | null, bands: Band[], desc: string, help: string) => {
+  const derived = (label: string, ex: (rr: Entry) => number | null, bands: Band[], desc: string, help: HelpContent) => {
     const v = ex(r);
     return (
       <MetricSection
@@ -592,7 +665,11 @@ export function BpSummary({ r, days, ctx }: SummaryProps) {
 
 /* ---------- Resting heart rate ---------- */
 
-const RESTING_HELP = 'Heart rate at rest, graded with position-specific thresholds (laying reads lower than sitting). A gradually falling resting HR usually accompanies improving autonomic recovery; a sustained unexplained rise is worth noting alongside symptoms and sleep. Drag the chart to revisit past readings.';
+const RESTING_HELP: HelpContent = {
+  what: 'Your heart rate at rest, in beats per minute, graded with position-specific thresholds because laying reads lower than sitting. Taken calmly, not after movement, caffeine or a meal.',
+  why: 'A gradually falling resting rate usually accompanies improving autonomic recovery; a sustained unexplained rise is worth noting alongside symptoms, sleep and illness. Drag the chart to revisit past readings and see the trend.',
+  learnMore: '/insights/basics/resting-heart-rate-and-mean-rr/',
+};
 
 export function RestingHrSummary({ r, days, ctx }: SummaryProps) {
   const verdict: Record<string, string> = {
@@ -623,11 +700,27 @@ export function RestingHrSummary({ r, days, ctx }: SummaryProps) {
 
 /* ---------- Orthostatic events ---------- */
 
-const ORTHO_HELP: Record<string, string> = {
-  rise: 'The biggest heart-rate change from your pre-episode baseline. A rise of 30 bpm or more (40 in adolescents) is the adult POTS-range criterion; a drop of 30 bpm or more below baseline is flagged in blue. Trends matter more than any single episode. Repeat under similar conditions to compare.',
-  hr: 'The raw numbers behind this event: heart rate before the episode, during it, and where it settled one minute after.',
-  recovery: 'The change in your heart rate one minute after the episode, relative to the during-episode reading. A negative delta means it settled back down (a larger drop reflects a stronger baroreflex and faster vagal recovery); a positive delta means it was still climbing.',
-  curve: 'The heart-rate trace from the capture, sampled every second. Purple through the resting phase before the transition, then POTS-graded once you move. Markers show where the episode begins and where the transition completes; the dashed line is the resting baseline.',
+const ORTHO_HELP: Record<string, HelpContent> = {
+  rise: {
+    what: 'The biggest heart-rate change from your pre-episode baseline. A rise of 30 bpm or more (40 in adolescents) is the adult POTS-range criterion; a drop of 30 bpm or more below baseline is flagged in blue.',
+    why: 'This is the number that ties what you felt to what your heart did. One episode is a data point, not a diagnosis, so repeat under similar conditions and let the trend across episodes guide what you raise with your doctor.',
+    learnMore: '/insights/pots/the-orthostatic-stand-test-at-home/',
+  },
+  hr: {
+    what: 'The raw numbers behind this event: your heart rate before the episode, during it, and where it settled one minute after.',
+    why: 'Seeing all three together separates a large spike that recovered quickly from a smaller one that did not. That difference usually decides how much of the rest of your day the episode costs you.',
+    learnMore: '/insights/basics/resting-heart-rate-and-mean-rr/',
+  },
+  recovery: {
+    what: 'The change in heart rate one minute after the episode, relative to the during-episode reading. A negative delta means it settled back down; a positive delta means it was still climbing.',
+    why: 'A larger drop reflects a stronger baroreflex and faster vagal recovery, the thing that improves as you recondition. Recoveries that keep shrinking over weeks are a reason to rest sooner after standing episodes.',
+    learnMore: '/insights/basics/baroreflex-sensitivity-orthostatic-intolerance/',
+  },
+  curve: {
+    what: 'The heart-rate trace from the capture, sampled every second. Purple through the resting phase, then POTS-graded once you move. Markers show where the episode begins and where the transition completes; the dashed line is the resting baseline.',
+    why: 'The shape matters as much as the peak: a spike that plateaus and settles reads differently from one that keeps climbing. Comparing curves from episodes captured the same way shows whether your tolerance is shifting.',
+    learnMore: '/insights/pots/the-orthostatic-stand-test-at-home/',
+  },
 };
 
 /** Waveforms live in the sidecar keyed by reading id — inline `sampledHr`
@@ -792,10 +885,22 @@ export function OrthostaticSummary({ r, days, ctx: _ctx }: SummaryProps) {
 
 /* ---------- Watch stand test (POTS) ---------- */
 
-const STAND_HELP: Record<string, string> = {
-  rise: 'The sustained heart-rate rise: the average increase over the final minute of standing, compared against the resting (supine) baseline. A sustained rise of 30 bpm or more (40 in ages 12-19) within 10 minutes of standing is the adult POTS-range criterion. One test is a data point, not a diagnosis; trends across tests under similar conditions matter most.',
-  hr: 'The numbers behind this test: the supine baseline (last two minutes of lying down), the standing peak, and the largest single rise above baseline.',
-  curve: 'The full heart-rate trace from the test, sampled every second: resting phase, the stand moment (marked), and the standing response. The dashed line is the supine baseline.',
+const STAND_HELP: Record<string, HelpContent> = {
+  rise: {
+    what: 'The sustained rise: your average heart rate over the final minute of standing, compared with the resting supine baseline. A sustained rise of 30 bpm or more (40 at ages 12-19) within 10 minutes of standing is the POTS-range criterion.',
+    why: 'The sustained value, not the momentary spike, is what clinicians look at, so it is the fairest measure of how standing is treating you. One test is a data point, not a diagnosis; trends across tests run the same way are what to bring to your doctor.',
+    learnMore: '/insights/pots/the-orthostatic-stand-test-at-home/',
+  },
+  hr: {
+    what: 'The numbers behind this test: the supine baseline (the last two minutes of lying down), the standing peak, and the largest single rise above that baseline.',
+    why: 'The peak shows your worst moment, the baseline shows what you started from. A high peak that mostly reflects a high baseline is a different picture from a genuine surge on standing, and the two call for different conversations.',
+    learnMore: '/insights/pots/how-pots-is-diagnosed/',
+  },
+  curve: {
+    what: 'The full heart-rate trace from the test, sampled every second: the resting phase, the stand moment (marked), and the standing response. The dashed line is the supine baseline.',
+    why: 'The shape tells you whether your rate surged then settled or kept climbing, which is the part symptoms tend to follow. Running the test the same way each time is what makes these curves comparable.',
+    learnMore: '/insights/pots/the-orthostatic-stand-test-at-home/',
+  },
 };
 
 const STAND_DISCLAIMER = 'Wellness screening only. This test is HR-based; it does not measure blood pressure, and a POTS assessment also requires ruling out orthostatic hypotension (a BP drop), which this test cannot detect. Not a diagnosis. Discuss results with your doctor.';
@@ -871,10 +976,22 @@ export function StandTestSummary({ r, days, ctx: _ctx }: SummaryProps) {
 
 /* ---------- Imported workout (health-store activity with an HR trace) ---------- */
 
-const WORKOUT_HELP: Record<string, string> = {
-  curve: 'Your heart rate across the whole workout, from the samples the source recorded (a watch logs one every few seconds). The trace is coloured by exercise zone; gaps mean the sensor dropped out.',
-  zones: 'Exercise zones as a percentage of your estimated max heart rate (208 minus 0.7 times your age): Z1 under 60%, Z2 60-70%, Z3 70-80%, Z4 80-90%, Z5 90% and up. The estimate comes from your birthday in Settings, so treat the boundaries as approximate.',
-  hr: 'Average, lowest and highest heart rate recorded during the workout.',
+const WORKOUT_HELP: Record<string, HelpContent> = {
+  curve: {
+    what: 'Your heart rate across the whole workout, from the samples the source recorded (a watch logs one every few seconds). The trace is coloured by exercise zone; gaps mean the sensor dropped out.',
+    why: 'How fast your rate rose, how steadily it held and how quickly it came down say more about your tolerance than the workout itself. A trace that drifts upward at an easy effort usually means the session cost more than it felt like.',
+    learnMore: '/insights/basics/heart-rate-recovery-after-exercise/',
+  },
+  zones: {
+    what: 'Exercise zones as a percentage of your estimated max heart rate (208 minus 0.7 times your age): Z1 under 60%, Z2 60-70%, Z3 70-80%, Z4 80-90%, Z5 90% and up.',
+    why: 'With dysautonomia most of the useful work sits in Z1 and Z2; time spent in Z4 and Z5 is what tends to buy a crash the next day. The max is estimated from your birthday in Settings, so treat the boundaries as approximate.',
+    learnMore: '/insights/recovery/heart-rate-zones-explained/',
+  },
+  hr: {
+    what: 'The average, lowest and highest heart rate recorded during the workout, taken from the same samples that draw the trace above.',
+    why: 'The average shows the intensity you actually held rather than the one you intended, and the highest shows where the session peaked. Both are worth comparing against how you felt the following day.',
+    learnMore: '/insights/basics/heart-rate-recovery-after-exercise/',
+  },
 };
 
 const fmtDur = (sec: number) => {

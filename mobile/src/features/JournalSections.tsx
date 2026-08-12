@@ -18,14 +18,17 @@ import { typesFor } from '../lib/typeCatalog';
 import { orthoDeltaCat, orthoMaxDelta, rowScoreCategory, SCORE_COLORS, GRADE_LABEL } from '../lib/scoring';
 import { sleepGrade, sleepHours, stagesForWindow, waterGoalL, type DaysMap } from '../lib/scoring/day';
 import type { SleepRecord, SleepStages } from '../lib/types';
-import { ensureDay, getState, getWaveform, save, useAppState, useStore } from '../store/store';
+import { ensureDay, getState, getWaveform, save, storeSleepSeries, useAppState, useStore } from '../store/store';
 import { setJournalSectionY } from '../store/nav';
 import { useTier } from '../store/tier';
 import { canCaptureHrv, hrvCaptureUsedToday } from '../lib/gating';
 import { trustedReadings } from '../lib/hrvQuality';
 import { fmtDateLong, fmtTime12, periodOf, todayKey } from '../lib/dates';
 import { health, healthAppName, type SleepImport } from '../lib/health';
+import { STAGE_COLORS, STAGE_LABEL, STAGE_ORDER, fmtMin } from '../lib/sleep/stages';
+import { typicalOvernightLow } from '../lib/sleep/night';
 import { SleepConfirmSheet } from './Health';
+import { SleepReportSheet } from './SleepReport';
 import { useEntryForms } from './forms';
 import { useDrawers } from './drawers';
 
@@ -313,38 +316,13 @@ function SleepImportSheet({ dk }: { dk: string }) {
   );
 }
 
-/** Sleep-stage colors (Apple-Health-like: deep violet → REM light blue → core
- *  blue, awake neutral). Validated for CVD separation + contrast on the dark
- *  surface; identity is also carried by the labeled legend, never color alone. */
-const STAGE_COLORS = { deep: '#8b5cf6', rem: '#3d93ee', core: '#2f66d0', awake: '#71717a' } as const;
-const STAGE_ORDER = ['deep', 'rem', 'core', 'awake'] as const;
-const STAGE_LABEL = { deep: 'Deep', rem: 'REM', core: 'Core', awake: 'Awake' } as const;
-
-const fmtMin = (min: number) => {
-  const h = Math.floor(min / 60), m = min % 60;
-  return h ? (m ? `${h}h ${m}m` : `${h}h`) : `${m}m`;
-};
-
-/** Typical overnight low HR: median of prior nights' hrLow (needs 3+ nights). */
-function typicalHrLow(days: DaysMap, dk: string): number | null {
-  const vals = Object.keys(days)
-    .filter((k) => k < dk)
-    .sort()
-    .slice(-30)
-    .map((k) => parseFloat(String(days[k]?.sleep?.hrLow ?? '')))
-    .filter((v) => Number.isFinite(v) && v > 0);
-  if (vals.length < 3) return null;
-  const s = [...vals].sort((a, b) => a - b);
-  return s[Math.floor(s.length / 2)];
-}
-
 /** Why the night graded the way it did — shown under the divider when there's
  *  something worth flagging (short/interrupted night, elevated overnight HR). */
 function sleepNote(days: DaysMap, dk: string, hrs: number | null, interrupted: boolean, hrLow: number | null): string | null {
   const reasons: string[] = [];
   if (hrs != null && hrs < 7) reasons.push(hrs < 5 ? 'very short duration' : 'short duration');
   if (interrupted) reasons.push('interrupted sleep');
-  const typical = typicalHrLow(days, dk);
+  const typical = typicalOvernightLow(days, dk);
   if (hrLow != null && typical != null && hrLow >= typical + 5) {
     reasons.push(`elevated overnight HR (${hrLow} bpm vs ${Math.round(typical)} typical)`);
   }
@@ -353,10 +331,16 @@ function sleepNote(days: DaysMap, dk: string, hrs: number | null, interrupted: b
   return joined.charAt(0).toUpperCase() + joined.slice(1) + '.';
 }
 
-/** Graded summary of a night with data: grade chip, hours asleep, stage bar. */
+/** Graded summary of a night with data: grade chip, hours asleep, stage bar.
+ *  Tapping it opens the full sleep report (`SleepReport.tsx`) — the card itself
+ *  is unchanged apart from the chevron that says so. The report's floating
+ *  pencil reaches the same editor as the button below the card. */
 function SleepGrade({ dk, sleep }: { dk: string; sleep: { bed: string; wake: string; quality?: string; hrLow?: string | number; hrHigh?: string | number; stages?: SleepStages } }) {
   const p = usePalette();
   const state = useAppState();
+  const { openSheet } = useSheets();
+  const openEdit = () => openSheet((c) => <SleepEditSheet dk={dk} controls={c} />, { fitContent: true });
+  const openReport = () => openSheet(() => <SleepReportSheet dk={dk} />, { action: { icon: 'edit', onPress: openEdit } });
   const grade = sleepGrade(state.days, dk);
   // Stages only count when they still describe the recorded window — after a
   // hand-corrected bed/wake they don't, and duration comes from the times.
@@ -371,14 +355,18 @@ function SleepGrade({ dk, sleep }: { dk: string; sleep: { bed: string; wake: str
     ? `${sleep.hrLow}–${sleep.hrHigh} bpm`
     : sleep.hrLow != null && sleep.hrLow !== '' ? `${sleep.hrLow} bpm low` : null;
   return (
-    <View style={{ borderWidth: 1, borderRadius: radius.card, padding: 14, marginBottom: 2, backgroundColor: p.surface2, borderColor: p.border }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Text style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.6, color: p.textDim, fontWeight: '700' }}>Last night</Text>
+    <Pressable
+      onPress={openReport}
+      style={({ pressed }) => [{ borderWidth: 1, borderRadius: radius.card, padding: 14, marginBottom: 2, backgroundColor: p.surface2, borderColor: p.border }, pressed && { opacity: 0.6 }]}
+    >
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <Text style={{ flex: 1, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.6, color: p.textDim, fontWeight: '700' }}>Last night</Text>
         {grade ? (
           <View style={{ backgroundColor: color, paddingHorizontal: 11, paddingVertical: 4, borderRadius: 999 }}>
             <Text style={{ color: '#fff', fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.4 }}>{GRADE_LABEL[grade]}</Text>
           </View>
         ) : null}
+        <Icon name="chevronRight" size={18} color={p.textDim} />
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 6 }}>
         <Text style={{ fontSize: 38, fontFamily: fonts.numHeavy, color: p.text, fontVariant: ['tabular-nums'] }}>{hrs != null ? hrs.toFixed(1) : '–'}</Text>
@@ -399,7 +387,7 @@ function SleepGrade({ dk, sleep }: { dk: string; sleep: { bed: string; wake: str
           </View>
         </>
       ) : null}
-    </View>
+    </Pressable>
   );
 }
 
@@ -438,7 +426,12 @@ function SleepEditFields({ dk, sleep }: { dk: string; sleep: SleepShape }) {
     // Correcting the window invalidates an imported stage breakdown that no
     // longer spans it (watch off half the night). Drop it rather than keep
     // reporting stage minutes that contradict the times just entered.
-    if ((field === 'bed' || field === 'wake') && s.stages && !stagesForWindow(s)) delete s.stages;
+    // ...and the overnight series with them: a curve keyed to the old bedtime
+    // describes a window the user has just told us was wrong.
+    if (field === 'bed' || field === 'wake') {
+      if (s.stages && !stagesForWindow(s)) delete s.stages;
+      storeSleepSeries(dk);
+    }
     save();
   };
   return (

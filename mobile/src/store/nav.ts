@@ -80,6 +80,38 @@ export function useExpandProtocolSignal(): number {
   );
 }
 
+/* Progress range request: the Journal's Trend card ("your resting HR is down 6
+ * bpm since last month") navigates to Progress and asks it to open on Month, so
+ * the user lands on the view the claim was computed from. A free user lands on
+ * the same view with its Pro mask over it — meeting their own faded data sells
+ * far better than jumping them to a price list, which is why this carries a
+ * range and not a paywall call. */
+export interface ProgressRequest { mode: string; section?: string }
+let requestedRange: ProgressRequest | null = null;
+let rangeSeq = 0;
+const rangeListeners = new Set<() => void>();
+/** `section` is an analysis category id ('hrv', 'vitals', 'sleep', …) — the
+ *  screen scrolls there once the range has committed, so the user arrives at
+ *  the chart the claim was made about rather than the top of the page. */
+export function requestProgressRange(mode: string, section?: string) {
+  requestedRange = { mode, section };
+  rangeSeq++;
+  rangeListeners.forEach((l) => l());
+}
+/** Consume the pending request (returns null when there isn't one). */
+export function takeProgressRange(): ProgressRequest | null {
+  const r = requestedRange;
+  requestedRange = null;
+  return r;
+}
+export function useProgressRangeSignal(): number {
+  return useSyncExternalStore(
+    (cb) => { rangeListeners.add(cb); return () => rangeListeners.delete(cb); },
+    () => rangeSeq,
+    () => rangeSeq,
+  );
+}
+
 export function useCurrentKey(): string {
   return useSyncExternalStore(
     (cb) => { listeners.add(cb); return () => listeners.delete(cb); },

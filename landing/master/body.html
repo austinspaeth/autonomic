@@ -61,7 +61,6 @@
 
   <header class="topbar">
     <h1><svg class="logomark" viewBox="0 0 651.59 348.34" aria-hidden="true"><use href="#masterLogo"/></svg>Autonomic</h1>
-    <span class="syncdot" id="syncStatus" title="Saved to your account">Saved</span>
     <span class="spacer"></span>
 
     <div class="split-btn" id="exportBtn">
@@ -85,19 +84,28 @@
       </div>
     </div>
 
-    <button class="btn" id="btnEditData">Edit data</button>
-    <span class="whoami" id="whoami"></span>
-    <button class="btn" id="btnSignOut">Sign out</button>
+    <!-- Every view has a data source that can go stale behind it — the store
+         entries, the ping counter, the release log — and the only way to see
+         the new numbers used to be a page reload, which also throws away the
+         sign-in round trip. This refetches whatever the current view reads. -->
+    <button class="btn icon-btn" id="btnRefresh" title="Refetch this view's data">
+      <svg class="refresh-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none"
+           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/>
+      </svg><span class="icon-btn-label">Refresh</span>
+    </button>
+
+    <button class="btn primary" id="btnEditData">Edit data</button>
   </header>
 
   <nav class="tabs" role="tablist">
     <button class="tab" role="tab" data-view="overview" aria-selected="true">Overview</button>
     <button class="tab" role="tab" data-view="ping" aria-selected="false">App usage</button>
     <button class="tab" role="tab" data-view="timeline" aria-selected="false">Timeline</button>
+    <button class="tab" role="tab" data-view="costs" aria-selected="false">Costs</button>
     <button class="tab" role="tab" data-view="trial" aria-selected="false">Trial &amp; conversion</button>
     <button class="tab" role="tab" data-view="cohorts" aria-selected="false">Cohorts</button>
     <button class="tab" role="tab" data-view="platforms" aria-selected="false">iOS vs Android</button>
-    <button class="tab" role="tab" data-view="explore" aria-selected="false">Explore</button>
     <button class="tab" role="tab" data-view="forecast" aria-selected="false">Forecast</button>
   </nav>
 
@@ -120,7 +128,7 @@
       </span>
     </div>
 
-    <div class="filtergroup">
+    <div class="filtergroup" id="fgPlatform">
       <label>Platform</label>
       <div class="segmented" id="fPlatform">
         <button data-v="combined" aria-pressed="true">Combined</button>
@@ -128,11 +136,6 @@
         <button data-v="android" aria-pressed="false">Android</button>
         <button data-v="compare" aria-pressed="false">Compare</button>
       </div>
-    </div>
-
-    <div class="filtergroup" id="fgThrough">
-      <label>Data through</label>
-      <span class="note" id="reportDayValue"></span>
     </div>
 
     <div class="filtergroup" id="fgGrain">
@@ -395,9 +398,10 @@
           <button data-v="pageViews" aria-pressed="false">Page views</button>
           <button data-v="purchases" aria-pressed="false">Purchases</button>
           <button data-v="revenue" aria-pressed="false">Revenue</button>
+          <button data-v="spend" aria-pressed="false">Spend</button>
         </div>
         <button class="btn sm" data-table-toggle="tlChart">Table</button></header>
-      <p class="hint">One metric against the record of what changed. Each vertical rule is something that happened, and its <b>pattern</b> says what kind: <b>dashed</b> is a release <span class="mark-key release"></span> (version and notes, read from the app's release log), <b>dotted</b> is marketing <span class="mark-key marketing"></span>, <b>dash-dot</b> is an App Store change <span class="mark-key store"></span>, <b>solid</b> is external <span class="mark-key external"></span>. The rules are deliberately neutral so they never blend into the bars; the colour sits in the flag at the top of each one. Hover anywhere along a rule for what it was, click it to compare the fortnight either side.</p>
+      <p class="hint">One metric against the record of what changed. Each vertical rule is something that happened, and its <b>pattern</b> says what kind: <b>dashed</b> is a release <span class="mark-key release"></span> (version and notes, read from the app's release log), <b>dotted</b> is marketing <span class="mark-key marketing"></span> (campaigns flag themselves from the Costs tab, at both ends), <b>dash-dot</b> is an App Store change <span class="mark-key store"></span>, <b>solid</b> is external <span class="mark-key external"></span>. The rules are deliberately neutral so they never blend into the bars; the colour sits in the flag at the top of each one. Hover anywhere along a rule for what it was, click it to compare the fortnight either side.</p>
       <div id="tlChart"></div>
       <div id="tlChart-table" class="hidden" style="margin-top:12px"></div>
     </div>
@@ -430,29 +434,58 @@
     <div class="grid two-col" id="pfCharts"></div>
   </section>
 
-  <!-- ================= EXPLORE ================= -->
-  <section id="view-explore" class="view hidden">
-    <div class="card" style="margin-bottom:14px">
-      <header><h2>Metric explorer</h2><span class="spacer"></span>
-        <div class="segmented" id="exType">
-          <button data-v="line" aria-pressed="true">Line</button>
-          <button data-v="bar" aria-pressed="false">Bar</button>
-          <button data-v="stacked" aria-pressed="false">Stacked</button>
-        </div>
-        <button class="btn sm" data-table-toggle="exChart">Table</button>
-        <button class="btn sm" id="exExport">Export CSV</button>
-      </header>
-      <p class="hint">Pick any combination of metrics. Rate metrics have their own scale, so they are charted separately below rather than sharing an axis with counts.</p>
-      <div class="checks" id="exMetrics" style="margin-bottom:14px"></div>
-      <div id="exChart"></div>
-      <div id="exChart-table" class="hidden" style="margin-top:12px"></div>
+  <!-- ================= COSTS ================= -->
+  <section id="view-costs" class="view hidden">
+
+    <!-- ---------- 1. the money ---------- -->
+    <div class="grid cards" id="csTiles"></div>
+
+    <!-- ---------- 2. spend against what it bought ---------- -->
+    <div class="card" style="margin:14px 0">
+      <header><h2>Spend against revenue</h2><span class="spacer"></span>
+        <button class="btn sm" data-table-toggle="csChart">Table</button></header>
+      <p class="hint">Every cost stacked by category, with net revenue — after the store's commission — as the line over the top. A cost lands on the day it is charged, so a yearly fee is one tall column rather than a smear; the range totals above are what to read for a period.</p>
+      <div id="csChart"></div>
+      <div id="csChart-table" class="hidden" style="margin-top:12px"></div>
     </div>
-    <div class="card hidden" id="exRateCard">
-      <header><h2>Rates &amp; ratios</h2><span class="spacer"></span>
-        <button class="btn sm" data-table-toggle="exRate">Table</button></header>
-      <p class="hint">Percentages and per-user averages, on their own axis.</p>
-      <div id="exRate"></div>
-      <div id="exRate-table" class="hidden" style="margin-top:12px"></div>
+
+    <!-- ---------- 3. breakeven ---------- -->
+    <div class="card" style="margin-bottom:14px">
+      <header><h2>Cumulative: are we ahead yet?</h2><span class="spacer"></span>
+        <button class="btn sm" data-table-toggle="csCum">Table</button></header>
+      <p class="hint" id="csCumHint"></p>
+      <div id="csCum"></div>
+      <div id="csCum-table" class="hidden" style="margin-top:12px"></div>
+    </div>
+
+    <!-- ---------- 4. cost per acquisition ---------- -->
+    <div class="card" style="margin-bottom:14px">
+      <header><h2>Cost per acquisition</h2><span class="spacer"></span>
+        <button class="btn sm" data-table-toggle="csCpa">Table</button></header>
+      <p class="hint">Blended: marketing spend divided by everything the store reported, organic installs included. It is the honest ceiling on what acquisition costs — the per-campaign numbers further down use each network's own claimed installs, which are always kinder.</p>
+      <div id="csCpa"></div>
+      <div id="csCpa-table" class="hidden" style="margin-top:12px"></div>
+    </div>
+
+    <!-- ---------- 5. where it went ---------- -->
+    <div class="grid two-col" style="margin-bottom:14px">
+      <div class="card">
+        <header><h2>By category</h2></header>
+        <div class="table-scroll" id="csCategoryTable"></div>
+      </div>
+      <div class="card">
+        <header><h2>By channel</h2></header>
+        <p class="hint">Advertising only, rolled up across campaigns on the same network.</p>
+        <div class="table-scroll" id="csChannelTable"></div>
+      </div>
+    </div>
+
+    <!-- ---------- 6. per campaign ---------- -->
+    <div class="card">
+      <header><h2>By campaign</h2><span class="spacer"></span>
+        <button class="btn sm" id="csGoEdit">Manage campaigns &amp; costs</button></header>
+      <p class="hint">Read-only, and scoped to the range above. Reported clicks and installs are whatever the ad network claims; they never match store downloads, and both are shown so the gap is visible. Campaigns, daily spend and every other cost are entered under <b>Edit data</b>.</p>
+      <div class="table-scroll" id="csAdPerf"></div>
     </div>
   </section>
 
@@ -529,7 +562,11 @@
 
   <!-- ================= DATA ================= -->
   <section id="view-data" class="view hidden">
-  <section id="view-data" class="view hidden">
+
+    <div class="section-head">
+      <h2 class="section-title">Store data</h2>
+      <span class="section-note">Downloads, impressions and sales, as the stores report them</span>
+    </div>
     <div class="card" style="margin-bottom:14px">
       <header><h2 id="entryTitle">Add / update a single day</h2></header>
       <p class="hint">Entries are keyed by date + platform, so re-entering a day overwrites it. Store reporting lags, so the date defaults to the latest day that can have data — never the current day. Everything is stored in this browser's local storage — nothing leaves your machine.</p>
@@ -576,6 +613,69 @@
       </div>
     </div>
 
+    <div class="section-head" style="margin-top:22px">
+      <h2 class="section-title">Spending</h2>
+      <span class="section-note">Campaigns, ad spend and every other cost of running the app</span>
+    </div>
+
+    <div class="card" style="margin-bottom:14px">
+      <header><h2>Campaigns</h2><span class="spacer"></span>
+        <button class="btn sm" id="csAdAdd">New campaign</button></header>
+      <p class="hint">A campaign is a name, a channel and the days it ran. Its start and end appear as flags on the Timeline, so a spike can be read against what was running. Spend here is <b>all time</b>, not the dashboard's selected range — this is the list you manage campaigns from; the Costs tab is where you read them against a period.</p>
+      <div id="csAdForm" class="hidden" style="margin-bottom:12px"></div>
+      <div class="table-scroll" id="csAdTable"></div>
+    </div>
+
+    <div class="card" style="margin-bottom:14px">
+      <header><h2>Daily ad spend</h2><span class="spacer"></span>
+        <span class="note" id="csGridCount"></span></header>
+      <p class="hint">A row per day, a column per campaign. <b>Paste straight from the network's export</b> — click the top-left cell you want to land on and paste; tab- or comma-separated blocks spill across and down. Blank a cell to remove that day's cost. If the network only gave you a total, use the spread box below instead.</p>
+      <div class="form-grid" style="max-width:820px">
+        <div class="field"><label for="csGridFrom">From</label><input type="date" id="csGridFrom"></div>
+        <div class="field"><label for="csGridTo">To</label><input type="date" id="csGridTo"></div>
+        <div class="field"><label for="csGridExtra">Columns</label>
+          <select id="csGridExtra">
+            <option value="spend">Spend only</option>
+            <option value="all">Spend + reported impressions / clicks / installs</option>
+          </select></div>
+        <div class="field"><label>&nbsp;</label><button class="btn" id="csGridBuild">Build grid</button></div>
+      </div>
+      <div id="csGrid" style="margin-top:14px"></div>
+      <div class="row-actions">
+        <button class="btn primary" id="csGridSave">Save grid</button>
+        <span class="note" id="csGridStatus"></span>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:14px">
+      <header><h2>Spread a total across dates</h2></header>
+      <p class="hint">For when the network reports a campaign total rather than a daily breakdown. The amount is split evenly over the days, to the cent, with any rounding remainder landing on the last day so the days still add up to exactly what you spent. It writes ordinary daily rows, so the grid above can correct any of them afterwards.</p>
+      <div class="form-grid" style="max-width:900px">
+        <div class="field"><label for="csSpreadAd">Campaign</label><select id="csSpreadAd"></select></div>
+        <div class="field"><label for="csSpreadFrom">From</label><input type="date" id="csSpreadFrom"></div>
+        <div class="field"><label for="csSpreadTo">To</label><input type="date" id="csSpreadTo"></div>
+        <div class="field"><label for="csSpreadTotal">Total spend</label><input type="number" id="csSpreadTotal" min="0" step="0.01" placeholder="0.00"></div>
+        <div class="field"><label for="csSpreadInstalls">Reported installs (optional)</label><input type="number" id="csSpreadInstalls" min="0" step="1" placeholder="0"></div>
+        <div class="field"><label>&nbsp;</label><button class="btn" id="csSpreadGo">Spread it</button></div>
+      </div>
+      <p class="note" id="csSpreadStatus" style="margin-top:8px"></p>
+    </div>
+
+    <div class="card">
+      <header><h2>All costs</h2><span class="spacer"></span>
+        <button class="btn sm" id="csCostAdd">Add a cost</button>
+        <button class="btn sm" id="csExport">Export CSV</button>
+      </header>
+      <p class="hint">Every cost on the books, newest first — the developer programmes, hosting, tools, contract work, and the daily ad rows the grid above writes. A recurring cost is entered once and charged on every occurrence, so a monthly bill needs one row rather than twelve.</p>
+      <div id="csCostForm" class="hidden" style="margin-bottom:12px"></div>
+      <div class="table-scroll" id="csCostTable"></div>
+    </div>
+
+    <div class="section-head" style="margin-top:22px">
+      <h2 class="section-title">Settings</h2>
+      <span class="section-note">How the app behaves, and what the stores keep</span>
+    </div>
+
     <div class="card" style="margin-bottom:14px">
       <header><h2>Trial &amp; wall lengths</h2></header>
       <p class="hint">These describe how your app behaves, so they live here rather than in the filter bar — changing one re-derives every cohort metric here. Both limits are inclusive: with 7 and 14, a user is still in the trial on day 7 and still has full charts on day 14, leaving the trial on day 8 and hitting the wall on day 15.</p>
@@ -585,6 +685,22 @@
         <div class="field"><label for="fWall">Chart window (days)</label>
           <input type="number" id="fWall" min="1" max="120" step="1" value="14"></div>
       </div>
+    </div>
+
+    <div class="card" style="margin-bottom:14px">
+      <header><h2>Store commission</h2></header>
+      <p class="hint">Sales amounts are entered at the customer-facing price, which is not what reaches the bank. This is the cut Apple and Google keep — 15% on the small-business programmes, 30% once you leave them. It is used everywhere profit is: the Costs view nets revenue down by it before subtracting spend, and always shows the gross figure beside the net one.</p>
+      <div class="form-grid" style="max-width:560px">
+        <div class="field"><label for="fStoreCut">Commission (%)</label>
+          <input type="number" id="fStoreCut" min="0" max="100" step="0.5" value="15"></div>
+        <div class="field"><label for="fCurrency">Currency symbol</label>
+          <input type="text" id="fCurrency" maxlength="4" value="$"></div>
+      </div>
+    </div>
+
+    <div class="section-head" style="margin-top:22px">
+      <h2 class="section-title">Backup &amp; account</h2>
+      <span class="section-note">Everything here leaves or ends the session</span>
     </div>
 
     <div class="card">
@@ -599,6 +715,17 @@
         <button class="btn danger" id="ioReset">Delete all data</button>
       </div>
       <p class="note" id="ioStatus" style="margin-top:10px"></p>
+    </div>
+
+    <!-- Signing out lives here rather than in the header: the header is a row
+         of things you press many times a day, and this is one you press twice a
+         year. -->
+    <div class="card" style="margin-top:14px">
+      <header><h2>Account</h2></header>
+      <p class="hint">Signed in as <b id="whoami"></b>. Signing out clears this browser's session; the data stays on your account.</p>
+      <div class="row-actions">
+        <button class="btn" id="btnSignOut">Sign out</button>
+      </div>
     </div>
   </section>
 

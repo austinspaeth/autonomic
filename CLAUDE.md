@@ -4,9 +4,9 @@
 recovery. The app is a native **Expo / React Native (iOS + Android)** build that
 lives in **`mobile/`**. **All state is on-device** — no accounts, no sync, no
 health data ever leaves the phone. The app makes exactly one network call of
-its own, the anonymous cohort ping in `src/store/ping.ts` (one date, no
-identifier); everything else in `sls/` belongs to the private store-analytics
-dashboard at `/master`, not to the product. (A
+its own, the anonymous cohort ping in `src/store/ping.ts` (one date, one
+platform letter, no identifier); everything else in `sls/` belongs to the
+private store-analytics dashboard at `/master`, not to the product. (A
 previous pure-static-HTML PWA under `docs/` has been removed; the mobile app is
 the app.) Platform split: the Apple Watch companion, HealthKit and ECG are
 iOS-only; Android uses **Health Connect** (`src/lib/health/healthConnect.ts`,
@@ -164,16 +164,25 @@ old web app so old `export.json` files import directly.
   from the waveform sidecar — no RR ⇒ 0 ⇒ permanently excluded. Nothing is
   deleted: the entries stay in the journal and in exports, they just don't count.
 - **Progress + Insights fall back to demo data on an empty journal.** `src/lib/demo.ts`
-  generates a deterministic 30-day sample month (seeded PRNG, keyed off today so it
-  lands in the Analysis buckets and report ranges) that arcs from crash days up into
-  the green. Both views render it behind `<DemoBanner/>` whenever `hasOwnData(days)`
-  is false, and swap to real data on the user's first entry. **Never fake the Journal**
+  generates a deterministic **60-day** sample history (`DEMO_DAYS`; seeded PRNG, keyed
+  off today so it lands in the Analysis buckets and report ranges) that arcs from crash
+  days up into the green. Two months, not one, because every windowed comparison in the
+  app is a month against the month before — a 30-day sample gave the Insights view only
+  one window and almost nothing to show. Each domain (sleep, BP, symptoms, gut, HRV)
+  draws its own reading of the day around the shared arc rather than being one function
+  of it, and `DEMO_MAG_START` puts a supplement onset mid-history so the before/after
+  card has something real to find. Both views render it behind `<DemoBanner/>` whenever
+  `hasOwnData(days)` is false, and swap to real data on the user's first entry.
+  **Never fake the Journal**
   — it's where real data goes in, so a demo entry there would be tappable fiction; the
   demo only ever feeds derived views. `hasOwnData` is deliberately broader than either
   view's "is there anything to chart" gate (a single logged glass of water counts), so
   demo data can never sit on top of real data. Insights builds its report prompts from
-  `demoState()` too, resolved at press time. See `src/lib/__tests__/demo.test.ts`, which
-  asserts the arc through the real scoring engine.
+  `demoState()` too, resolved at press time, and overrides its headline card with
+  `WELCOME_CHANGE` ("You downloaded this app") — the only fabricated finding anywhere in
+  the engine, and it sits directly under the demo banner. See
+  `src/lib/__tests__/demo.test.ts`, which asserts the arc through the real scoring engine
+  and the findings through the real insights engine.
 - **The app sends two local notifications, both owned by `src/lib/reminders.ts`.**
   (1) The morning reminder: `settings.reminder` is the source of truth and the OS
   schedule is derived, reconciled by `syncReminder()` on launch (covers reinstall, an
@@ -203,29 +212,233 @@ old web app so old `export.json` files import directly.
   stamped BEFORE it's requested, since nothing tells us whether the sheet
   appeared. `<ReviewPrompt/>` (root layout) owns the "calm moment" half: sheet
   stack empty, app foreground, 25s after launch, 4s after a journal change.
+- **Every offer the app raises on its OWN initiative goes through
+  `src/lib/upsell/`.** Same split as the review module: `eligibility.ts` is pure
+  (`nextUpsell`, unit-tested), `index.ts` is the shell over the plaintext
+  `autonomic.flags` MMKV. It returns a winning **surface** plus the `trigger`
+  phrase that picked it ("31 days logged"), so exactly one proactive offer can be
+  live and the card's copy can't drift from the condition that fired it.
+  Suppressed for pro/trial, an open sheet, a crash-alert day, an active
+  downturn, a session where the review ask already went out
+  (`noteReviewAsked()`), and for 10 days after any offer; two dismissals or three
+  ignored sessions retire a surface for 30 days (`noteUpsellShown` /
+  `noteUpsellDismissed` / `noteUpsellTapped`). The one consumer today is
+  the annual offer below (`ProUpsellCard`, the old generic card, is gone —
+  replaced in the Journal by `<TrendCard/>`, which is a feature and not an
+  offer). **Reactive paywalls are not
+  upsells**: a user who taps a locked thing gets `usePaywall()` instantly and is
+  never gated, delayed or counted. Greyed-out UI is neither, and never counted.
+- **"Has this metric moved?" is answered in exactly one place: `src/lib/trends/`.**
+  `metrics.ts` is a REGISTRY (the way `registry.ts` is for entry types): each
+  metric declares its extractor, direction, aggregate, thresholds and copy, and
+  `series.ts` / `compare.ts` are generic machinery over that table. Adding a
+  metric is a row there, never a comparison at a call site. The statistics are
+  the product: **medians, not means** (one 130 bpm artifact is normal here and
+  drags a mean into a false claim), `minPoints` enforced in **each** window
+  independently, `minDelta` set at "worth telling someone about", and
+  `'unknown'` a first-class result that is never reported as `'flat'`. **A
+  dispersion metric's headline carries NO number** — the one exception in the
+  registry, enforced by the coverage test. `sleepConsistency` is a stdev, so its
+  delta is a change in night-to-night scatter, a second-order quantity nobody
+  can picture; "steadier by 89 min" and "swings 1h 29m less" both shipped and
+  both read as nonsense, because there is no question "89 minutes" answers. It
+  says "much more consistent" instead, with the magnitude word banded so a
+  just-past-threshold change doesn't get the superlative, and a `tail` of "than
+  last month" because a comparative needs it. The `fmt` readout column stays
+  numeric — there the ± spread IS interpretable. Durations elsewhere in copy go
+  through `hm()` ("1h 29m"), never bare minutes or decimal hours. HRV
+  extraction goes through `isTrustedReading`, sleep duration is banded (`[7,9]`
+  — 11h is not better than 8h), bedtime consistency is a stdev of minutes past
+  noon so midnight doesn't wrap. **`findTrend` returns improvements ONLY** and
+  returns null during a downturn even when something improved — telling someone
+  with a chronic illness their HRV fell is a crash trigger, and decline is
+  `detectDownturn`'s job. The lower-level `compareWindows` / `trendDirection`
+  are neutral, which is what the widget arrows use. Consumers: `<TrendCard/>`
+  in the Journal (**every tier** — free and Pro see the same headline; only the
+  tap destination differs, landing a free user on their own masked Month) and
+  `src/lib/widgets.ts` (which lost its local today-vs-week-mean helper, so
+  arrows no longer flip on 1% noise; SDNN has no registry entry and so carries
+  no arrow). `downturn.ts` / `upturn.ts` consume `metricSeries` for scored-day
+  extraction but keep their own thresholds — both are safety-adjacent (a crash
+  notification and the review ask), and their tests pass unchanged.
+  `TREND_PRIORITY` is the curated 6 the Journal card walks; `INSIGHT_OUTCOMES` is
+  every row (what `src/lib/insights/` may correlate), `WATCH_PRIORITY` the subset
+  Trend Watch may display, `OUTCOME_FAMILY` which rows say the same thing. A
+  metric that should never be shown a trend for (MxDMn, AMo50, stress index) is
+  kept out simply by never being a row.
+- **A congratulation that arrives daily isn't one, so the Trend card is PACED.**
+  On an improving journal `findTrend` has an answer every single day, and the
+  card shipped restating it with a slightly worse number each morning ("steadier
+  by 130 min", then 125, then 120), which reads as noise. `src/lib/trends/pacing.ts`
+  (pure + tested) + `memory.ts` (the ONE stateful file in `trends/`, flags MMKV,
+  never exported from `index.ts` so the engine stays pure) make a finding
+  **claimed** rather than recomputed: the headline is **pinned** to the journal
+  day it was computed for and cannot drift under the reader, the card then goes
+  quiet for **7 days**, and the SUBJECT is retired for **30 days**. Retirement is
+  by `OUTCOME_FAMILY`, not by metric — muting `sleepConsistency` alone would just
+  hand the slot to `sleepDuration` and say the same thing in different units — and
+  it is enforced by `findTrend`'s `exclude` argument, so the next thing the card
+  says is about something else or it says nothing. The headline ends in an
+  exclamation mark: this is the only place the app congratulates anyone, and the
+  pacing is what keeps that earned. **Bump `TREND_COPY_VERSION` whenever a
+  headline's wording changes** — a claim pins the finished SENTENCE, so a copy
+  fix cannot otherwise reach phones already holding one, and an OTA update would
+  leave the old wording on the Journal for a day and its subject retired for a
+  month. A bump discards the stored memory wholesale.
+- **The downturn card and the Trend card are the same object.** `DownturnWarning`
+  (`src/features/DaySummary.tsx`) was tinted in the severity colour with a
+  title over a "Down 8 points over the last 3 days" readout — the loudest thing
+  on a screen someone opens while already feeling bad, and a different kind of
+  notice from the good news directly below it. Both are now a neutral surface
+  card: sunk tile, ONE sentence, chevron. Severity rides the emoji (⚠️ watch,
+  🛑 alert) and the sentence carries its own numbers — `Downturn.headline`
+  ("Autonomic score trending down 8 points over the last 3 days"), which is a
+  separate field from `title` because `title` still feeds the crash notification
+  in `src/lib/reminders.ts`. The explain SHEET keeps the colour; that is where
+  the user went looking for it.
+- **"What is linked to what?" is `src/lib/insights/`, and every guard in it is
+  load-bearing.** One entry point, `buildInsights(state, dk)`, returns the whole
+  Insights view: the headline change, ranked correlations, heuristic observations,
+  trend watch and a data-confidence score. Outcomes are rows in
+  `trends/metrics.ts` (never a second registry); **factors are generated** from
+  whatever this user logs, custom types included (`factors.ts`), and everything
+  reads one `buildDayMatrix` pass. The rules, all of which exist because the
+  alternative is confidently telling someone something false about their body:
+  **rank statistics only** (Spearman / Mann–Whitney, tie-corrected — a 130 bpm
+  artifact must not invent a relationship); **one Benjamini–Hochberg family per
+  sweep at `FDR_Q = 0.05`**, measured against 30 noise journals, and the clinical
+  filters (`MIN_EFFECT`, "both medians inside a target band is not a finding") run
+  **after** the correction, never before, because shrinking the family raises
+  every BH threshold; **factors have active windows** (`presence`), so the months
+  before someone started logging supplements are unknown rather than
+  supplement-free; **onset analysis needs `onsetNoun`**, since starting magnesium
+  is a decision with a date and the first night you slept 7h is not; **dispersion
+  metrics can't be correlation outcomes** (one night's bedtime is a bedtime, not a
+  consistency); **copy is associational, never causal**; and **an empty report is
+  a correct answer**. `watch.ts` is the ONE place the app volunteers bad news —
+  Insights is a view the user deliberately opened — but it stays silent during a
+  downturn, and `findTrend`'s improvements-only rule is untouched. Results are
+  cached in `cache.ts` keyed `todayKey()|meta.lastUpdated|demo`; the screen's
+  render path only ever calls `getCachedInsights`, and builds run in
+  `InteractionManager.runAfterInteractions` behind a skeleton. The demo month's
+  correlations all read ~1.00 for a structural reason documented in `demo.ts`, not
+  a bug.
+- **The sleep report is the workout report's twin, and all its math is
+  `src/lib/sleep/`.** Tapping the Journal's "Last night" card opens
+  `<SleepReportSheet/>` (`src/features/SleepReport.tsx`) with the edit pencil in
+  the sheet's action pill, exactly as an imported workout opens
+  `WorkoutSummarySheet` — same `<Section>` / `<SectionHead>` blocks, now exported
+  from `components/summary.tsx` rather than copied. `buildSleepReport` is pure
+  (no store, no native; `addDays` is passed in) and returns one nullable field
+  per section, because **absent, not empty** is the rule: a night with only bed,
+  wake and quality must still read as a complete report, so a section with no
+  data renders nothing rather than a dashed grid. The grade explanation comes
+  from `sleepGradeParts` in `scoring/day.ts` — `sleepGrade` is now that
+  function's `cat`, so the "why this grade" lines cannot drift from the
+  thresholds that produced it. **Nocturnal dip** is the one piece of new math:
+  the overnight low against the MEDIAN of the user's own recent `restingHr`
+  readings (both registry positions count; there is no Standing option to
+  exclude, and if one is ever added it must be), null below
+  `DIP_MIN_BASELINE` readings so a two-reading baseline never becomes a
+  percentage, banded by named constants in `sleep/dip.ts`, and it reports the
+  `basis` it used ('single-minimum' today; the sleeping mean once the overnight
+  series ships). Copy describes a pattern in the user's own log and never
+  diagnoses. **Nothing in the report picks a colour**: the dip bands carry a
+  grade `cat` and the UI resolves it through `SCORE_COLORS`, so a normal dip is
+  the same green as an Excellent day. It renders as a Progress metric card —
+  grade dot, the shared readout size, a dim `unit`/`when` tail, a one-line
+  description — and selecting a night in the 10-night trend moves the headline,
+  the band strip and the low/baseline block onto that night, the same gesture
+  the Progress sparklines use. Any delta the report shows **names its window** —
+  "vs month", never a vague "vs usual", which is a number the reader cannot
+  use. Sleep stages are one always-overlaid chart (deep/REM/core, no
+  picker: they trade against each other and the overlay IS the reading), which
+  is why the numeric month deltas that preceded it are gone rather than sitting
+  unused. **Awake time is not a stage** — it is the leftover and gets
+  its own card, graded in MINUTES on the wake-after-sleep-onset ladder
+  (`WAKE_MINUTES_BANDS`). Minutes, not a share of the night, because the scale
+  has to be the number on the y-axis or the chart cannot grade itself the way
+  every other chart does: zone lines, the grade-zone gradient on the trace and
+  "Show zones" all need fixed boundaries, and a share-based grade's boundaries
+  move with each night's length. Absolute bands are defensible there and not
+  for bedtime, since how much of the night you were awake does not depend on
+  WHEN you slept. **No hour of the night is ever graded** — the sleep
+  schedule chart draws a rounded vertical bar per night (bed at the top, wake
+  at the bottom, time running DOWNWARD) over the TRAILING rolling week as a
+  soft band, and each bar is coloured by how LONG the night was
+  (`SLEEP_DURATION_BANDS`, the duration ladder out of `sleepGradeParts` — move
+  them together), so the colour and the bar's own length say the same thing.
+  Drift stays legible as bars hanging outside the band, never as a grade:
+  telling a night-shift nurse that 2am is a bad bedtime would be both wrong and
+  useless. The rolling average excludes the night it sits behind, or a night
+  grades against an average it is inside of. Clock times
+  inside the module are **minutes past noon** so a bedtime past midnight reads
+  as later rather than wrapping. Awake is charted on its own card, never as a
+  fourth option in the stage picker: it is not a stage, it is the leftover.
+  **The night is also kept as a SERIES, not just as totals.** `readSleep` /
+  `readHistory` (and the Health Connect twin) used to fetch every overnight
+  heart-rate sample and keep only min/max, and `summarizeSleep` built the stage
+  and awake intervals then summed them away; both now keep what they read. The
+  series — overnight HR, respiratory rate, and the hypnogram spans — goes to
+  the **waveform sidecar** under `sleepWaveformId(dk)` (`sleep:<dk>`), NEVER
+  into the journal, and that key must stay listed in `waveformIds` or
+  `pruneWaveforms` deletes every curve on the next launch. It is thinned to
+  `NIGHT_SERIES_MAX` at WRITE time, which is the only place a year-long
+  backfill can be bounded. `storeSleepSeries(dk)` with no series CLEARS the
+  night, which is how a hand-corrected bed/wake drops a curve that no longer
+  describes its window (the same rule `stagesForWindow` applies to stages).
+  Everything derived from the series is pure and tested in `sleep/night.ts`.
+  Two consequences worth remembering: the dip's basis upgrades itself to
+  `'rolling-low'` (the lowest settled ten minutes) whenever a curve exists,
+  because a single-beat minimum moves several percent on one artifact; and the
+  curve is coloured by `OVERNIGHT_HR_BANDS`, which are deliberately the same
+  numbers `sleepGradeParts` demotes on, so the picture and the grade cannot
+  tell different stories. **Nights imported before this shipped have no
+  series** and fall back to the min/max tiles.
+- **The half-off annual offer is the one offer that isn't a rotating surface.**
+  `src/lib/upsell/annual.ts` (pure + tested) + `annualMemory.ts` (flags MMKV):
+  at 30 / 90 / 180 / 365 **calendar days since install** — not engaged days, the
+  deliberate difference from the surfaces above — a free user gets one 24-hour
+  window offering a year of Pro at half price (`PROMO_YEARLY_SKU`, a SEPARATE
+  product because Apple can only target a price cut through server-signed
+  promotional offers; it therefore RENEWS at the discount, see `STORE_SETUP.md`
+  Part 6). The same window unlocks Pro: `src/store/tier.ts` layers it over
+  `deriveTier` and reports `'trial'`, never `'pro'` — nobody paid, and it ends.
+  A window is spent when it OPENS (`startOffer` consumes every milestone at or
+  below it), so a user returning on day 200 gets one offer, not four. It is not
+  opened on a crash-alert day or during a downturn: the milestone stays due and
+  fires on a calmer open rather than being wasted. `<AnnualOfferCard/>` renders
+  it under the Journal's Outlook, accordion-collapsible with no ✕ (it expires on
+  its own), and stamps the shared pacing clock via `noteAnnualOfferPacing()`.
 - **The only thing the app sends anywhere is an anonymous cohort ping.**
   `src/store/ping.ts` (shell) over `src/lib/ping.ts` (pure + tested) GETs
-  `api.autonomic.care/ping/open/D{MMDDYY}` on launch and on foreground, and
-  `/ping/sub/D{MMDDYY}` once the store reports an entitlement. The path segment
-  is the day this install FIRST ran (read from `trialStartedAt`, then frozen in
-  its own flag); the server stamps the arrival day, so a row is (cohort day,
-  arrival day) → count, which is retention. There is no device id, no install
-  id, no body, no health data — which is exactly why the server can't
-  de-duplicate and the CLIENT must: one open ping per install per **UTC** day
-  (the server's bucket), one subscribe ping per install ever, flags written
+  `api.autonomic.care/ping/open/D{MMDDYY}{P}` on launch and on foreground, and
+  `/ping/sub/D{MMDDYY}{P}` once the store reports an entitlement. The path
+  segment is the day this install FIRST ran (read from `trialStartedAt`, then
+  frozen in its own flag) plus ONE letter for the platform (`I` iOS / `A`
+  Android / `U` unknown, which is also how the server reads the missing letter
+  older builds send); the server stamps the arrival day, so a row is
+  (cohort day, platform, arrival day) → count, which is retention per store.
+  There is no device id, no install id, no body, no health data — which is
+  exactly why the server can't
+  de-duplicate and the CLIENT must: one open ping per install per **US Eastern**
+  day (the server's bucket — `easternDay` is duplicated verbatim on both sides
+  and DST-aware; move one and you must move the other, or one install lands
+  twice in a row), one subscribe ping per install ever, flags written
   only on a successful send so an offline launch retries. Dev builds send
   nothing; the subscribe ping also skips any build made Pro by the
   dev/TestFlight/sideload bypass (`paywallBypassed()` in `src/store/iap.ts`),
   since nobody paid there. Failures are silent and NOT sent to `logError` —
   being offline is a phone's normal state, and it would flush the 40-entry
   support log. Storage is **one DynamoDB row per day** holding a map of
-  cohort → count (`PK PING#OPEN`, `SK 2026-08-21`, `cohorts: { '082126': 12 }`)
-  — a map, not a list, because `ADD cohorts.<key> :1` is atomic and appending to
-  a list would lose concurrent pings. Read it back with `GET /ping/report?key=`
+  cohort+platform → count (`PK PING#OPEN`, `SK 2026-08-21`,
+  `cohorts: { '082126I': 12 }`) — a map, not a list, because the nested bump is
+  atomic and appending to a list would lose concurrent pings.
+  Read it back with `GET /ping/report?key=`
   (shared key, `PING_REPORT_KEY`, injected by CodeBuild from SSM) or the `PINGS`
   action on the authenticated `/master` API; both return
-  `{ day, total, cohorts: [{ cohortDate, cohort, count }] }` rows. The `/master`
-  dashboard renders them in its **App usage** view (`landing/master/`, tested by
+  `{ day, total, cohorts: [{ key, cohortDate, cohort, platform, count }] }`
+  rows. The `/master` dashboard renders them in its **App usage** view (`landing/master/`, tested by
   `landing/tests/master-ping.test.mjs`). Details in `sls/README.md` and
   `MASTER_DASHBOARD.md`.
 - **Home-screen widgets render one shared JSON payload** built by
@@ -328,7 +541,12 @@ old web app so old `export.json` files import directly.
   Live HRV) of registry types; choosing one stacks its `EntryForm` to capture
   fields. See `src/features/forms.tsx` and `src/features/JournalSections.tsx`.
 - **Sheets are bottom sheets that stack iOS-style** via `useSheets` /
-  `src/components/Sheet.tsx` (`openSheet`, `closeSheet`, `closeAll`).
+  `src/components/Sheet.tsx` (`openSheet`, `closeSheet`, `closeAll`). The stack is
+  one RN **Modal**, which paints above every sibling of `SheetProvider` — including
+  `ToastProvider`, which wraps it. So **`toast()` is invisible from inside a
+  sheet**: a failure path that only calls it looks to the user like the tap did
+  nothing at all. Report failure inside the sheet's own content, or better, make
+  the impossible option unavailable rather than tappable-then-refused.
 - **Reading scoring**: on render, `computeScores(r, ctx)` categorizes each scorable
   metric (great/good/ok/bad/crash|concerning, plus a `warning` blue zone) per the
   framework thresholds; rows tint their value via the score category and sparklines

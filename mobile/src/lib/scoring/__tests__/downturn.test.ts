@@ -80,6 +80,22 @@ describe('detectDownturn — when it fires', () => {
     expect(w.severity).toBe('watch');
   });
 
+  it('states the whole warning in one sentence carrying its own numbers', () => {
+    // The Journal card renders `headline` alone — no title/subtext pair — so it
+    // has to be self-contained, and short enough for two lines at 15pt.
+    const w = detectDownturn(steepDecline(), DK)!;
+    expect(w.headline).toContain(`down ${w.drop} points over the last ${w.spanDays} days`);
+    expect(w.headline.length).toBeLessThan(80);
+
+    const mild = {
+      [K(5)]: hrvDay(30), [K(6)]: hrvDay(30),
+      [K(7)]: hrvDay(25), [K(8)]: hrvDay(25),
+    };
+    const m = detectDownturn(mild, DK)!;
+    expect(m.headline).toMatch(/^Something looks off, score down \d+ points over the last \d+ days$/);
+    expect(m.headline.length).toBeLessThan(80);
+  });
+
   it('handles gaps: unlogged days between scored days still trend', () => {
     const days = {
       [K(1)]: hrvDay(40), [K(3)]: hrvDay(40),

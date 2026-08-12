@@ -73,6 +73,15 @@ export function reviewMemory(): ReviewMemory {
 let paywallSeen = false;
 export function notePaywallSeen(): void { paywallSeen = true; }
 
+/** The reverse of the above, read by src/lib/upsell: once we've spent the
+ *  review ask this session, the app doesn't also try to sell them something.
+ *  The two compete for the same day — detectUpturn is the review prompt's
+ *  precondition and the upsell 'improvement' surface's trigger — and the review
+ *  ask wins, because it's the one with an OS quota behind it. */
+let reviewAsked = false;
+export function noteReviewAsked(): void { reviewAsked = true; }
+export function reviewAskedThisSession(): boolean { return reviewAsked; }
+
 /** The eligibility verdict for right now — exported so a dev build can log why
  *  the prompt is (not) showing without duplicating the wiring. */
 export function reviewVerdict(): ReviewVerdict {
@@ -111,6 +120,7 @@ export async function maybeAskForReview(): Promise<boolean> {
       writeFlag(KEY_LAST_ASKED, String(Date.now()));
       writeFlag(KEY_ASKED_VERSION, appVersion());
     }
+    reviewAsked = true;   // the upsell gate reads this for the rest of the session
     await StoreReview.requestReview();
     return true;
   } catch {

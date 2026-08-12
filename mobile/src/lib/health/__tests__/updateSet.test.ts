@@ -41,6 +41,7 @@ const workout = (over: Partial<ImportedWorkout> = {}): ImportedWorkout => ({
 const night: SleepImport = {
   bed: '23:04', wake: '06:41', bedISO: '', wakeISO: '',
   hrLow: 52, hrHigh: 74, interrupted: false, minutesAsleep: 432, stages: null,
+  hrSeries: null, respSeries: null, spans: [],
 };
 
 const DK = '2026-07-25';

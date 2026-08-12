@@ -13,7 +13,8 @@
  */
 import { addDays, dateFromKey } from '../dates';
 import type { ScoreContext } from './index';
-import { scoreSet, type DaysMap } from './day';
+import { type DaysMap } from './day';
+import { keyRange, metricSeries } from '../trends/series';
 
 export interface Upturn {
   /** Today's score. */
@@ -34,15 +35,13 @@ export const MIN_TODAY = 40;
 const mean = (xs: number[]) => xs.reduce((s, x) => s + x, 0) / xs.length;
 
 export function detectUpturn(days: DaysMap, dk: string, ctx: ScoreContext = {}): Upturn | null {
+  // Shared scored-day extraction (../trends), same as ./downturn. The
+  // thresholds stay local: this gates the App Store review ask, and changing
+  // when it fires spends an OS-quota-limited asset.
+  const keys = keyRange(dk, WINDOW, addDays);
+  const series = metricSeries(days, keys, ['score'], ctx).score;
   const scored: { k: string; s: number }[] = [];
-  for (let i = WINDOW - 1; i >= 0; i--) {
-    const k = addDays(dk, -i);
-    const d = days[k];
-    if (!d) continue;
-    const rs = (d.readings || []).slice().sort((a, b) => ((a.time as string) || '').localeCompare((b.time as string) || ''));
-    const { score } = scoreSet(rs, d, k, days, ctx);
-    if (score != null) scored.push({ k, s: score });
-  }
+  keys.forEach((k, i) => { const s = series[i]; if (s != null) scored.push({ k, s }); });
   const n = scored.length;
   if (n < MIN_SCORED || scored[n - 1].k !== dk) return null;
 

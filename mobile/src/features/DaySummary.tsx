@@ -6,11 +6,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { type LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Defs, LinearGradient as SvgGradient, Rect, Stop } from 'react-native-svg';
-import Animated, { Easing, Extrapolation, interpolate, useAnimatedProps, useAnimatedStyle, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
+import Animated, { Easing, useAnimatedProps, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
 import { ScoreGauge } from '../components/charts';
 import { Icon } from '../components/Icon';
 import { useSheets } from '../components/Sheet';
 import { SumCard, MetricRow } from '../components/summary';
+import { useAccordion } from '../components/ui';
+import { AnnualOfferCard } from './AnnualOffer';
+import { TrendCard } from './TrendCard';
 import { MilestoneProgressCard } from './Milestones';
 import { ProtocolEditor } from './ProtocolEditor';
 import { radius, type as T, usePalette } from '../theme';
@@ -27,7 +30,6 @@ import { todayKey } from '../lib/dates';
 import { getState, useAppState } from '../store/store';
 import { setJournalSectionY, useExpandProtocolSignal } from '../store/nav';
 import { useTier } from '../store/tier';
-import { MONTHLY_SKU, YEARLY_SKU, priceOf, useIap } from '../store/iap';
 import { usePaywall } from './Paywall';
 
 import type { Band, ScoreCat } from '../lib/types';
@@ -54,65 +56,6 @@ const mixHex = (color: string, base: string, t: number) => {
 // a washed-out surface. Same mix ratios as elsewhere, darker base.
 const WARN_BASE = '#0d0d0f';
 
-/**
- * Shared collapse/expand motion for this view's accordions (streak card, pro
- * upsell, score-driver rows). Rotates a chevron in place (`chevStyle`) and
- * reveals a body by animating its measured height with a paired fade
- * (`bodyStyle`), on a plain timing curve — never a spring, so it can't overshoot.
- *
- * The body height is measured off an ABSOLUTELY-POSITIONED copy of the content
- * (spread `measureStyle` onto the body's inner view): an absolute child is laid
- * out at its natural height regardless of the parent's animated height, so
- * `contentH` is correct from the first frame. Measuring inside the clipped,
- * height-0 container instead reported 0 under the New Architecture until the
- * first expand, so the row snapped open hard on that first tap (the "bounce").
- *
- * Usage:
- *   const acc = useAccordion(open);
- *   <Animated.View style={chevStyle-target}/> // acc.chevStyle on the chevron
- *   <Animated.View style={[{ overflow: 'hidden' }, acc.bodyStyle]}>
- *     <View style={[acc.measureStyle, { paddingTop: 12 }]}>{body}</View>
- *   </Animated.View>
- */
-function useAccordion(open: boolean, startOpen = false) {
-  const rot = useSharedValue(startOpen ? 1 : 0);
-  const openV = useSharedValue(startOpen ? 1 : 0);
-  const [contentH, setContentH] = useState(0);
-  const mounted = useRef(false);
-
-  useEffect(() => {
-    // On the very first render, settle to the initial state instantly (a
-    // start-open card shouldn't animate itself open on mount); animate every
-    // toggle after that.
-    const instant = !mounted.current;
-    mounted.current = true;
-    rot.value = instant ? (open ? 1 : 0) : withTiming(open ? 1 : 0, { duration: 220 });
-    openV.value = instant
-      ? (open ? 1 : 0)
-      : withTiming(
-          open ? 1 : 0,
-          open
-            ? { duration: 260, easing: Easing.out(Easing.cubic) }
-            : { duration: 220, easing: Easing.inOut(Easing.cubic) },
-        );
-  }, [open, rot, openV]);
-
-  const chevStyle = useAnimatedStyle(() => ({ transform: [{ rotate: `${-90 + rot.value * 90}deg` }] }));
-  const bodyStyle = useAnimatedStyle(() => ({
-    height: openV.value * contentH,
-    opacity: interpolate(openV.value, [0.35, 1], [0, 1], Extrapolation.CLAMP),
-  }));
-  const onContentLayout = (e: LayoutChangeEvent) => {
-    const h = e.nativeEvent.layout.height;
-    if (h > 0) setContentH((prev) => (Math.abs(prev - h) > 0.5 ? h : prev));
-  };
-  return { chevStyle, bodyStyle, onContentLayout, measureStyle: MEASURE_STYLE };
-}
-
-/** Absolute inset so the measured body isn't constrained by the clipped, height-
- *  animated container it sits inside (see useAccordion). Full-width, natural
- *  height, top-anchored — the reveal clips it from the bottom. */
-const MEASURE_STYLE = { position: 'absolute' as const, left: 0, right: 0, top: 0 };
 
 // Status-color highlight on the top-left border edge, fading down the sides
 // into the normal border — like light shining onto the card. Mirrors the
@@ -169,7 +112,6 @@ function GradientBorderCard({ color, trigger, style, children }: { color: string
 export function DaySummary({ dk }: { dk: string }) {
   const { openSheet } = useSheets();
   const state = useAppState();
-  const tier = useTier();
   const { sex, height } = state.profile;
   const ctx = useMemo(() => ({ sex, height }), [sex, height]);
   // scoreSet makes several passes over the day's readings; memoize so renders
@@ -202,8 +144,12 @@ export function DaySummary({ dk }: { dk: string }) {
           <ScoredHero dk={dk} readings={readings} d={d} all={all} ctx={ctx} onExplain={() => openSheet(() => <ScoreExplain all={all} dk={dk} />)} />
         )}
       </GradientBorderCard>
+      {/* Directly under the Outlook: the half-off year is time-boxed to 24h and
+          outranks the generic upsell, which suppresses itself while the offer's
+          unlock has the tier reading 'trial'. */}
+      <AnnualOfferCard />
       {downturn ? <DownturnWarning w={downturn} dk={dk} /> : null}
-      {tier === 'free' ? <ProUpsellCard /> : null}
+      <TrendCard dk={dk} />
       <MilestoneProgressCard dk={dk} />
       <StreakCard dk={dk} />
     </View>
@@ -305,35 +251,36 @@ function ScoredHero({ dk, readings, d, all, ctx, onExplain }: { dk: string; read
   );
 }
 
-/** Trend warning card, sitting between the Outlook and Milestones when the
- *  trailing week is clearly worsening. Same silhouette as the Milestones and
- *  streak cards (42pt icon tile, title + subtitle, chevron), but tinted in the
- *  severity color: colored border, darkened-color fill, colored text. Tapping
- *  opens the explanation sheet with the journal findings behind it. */
+/** Trend warning card, sitting between the Outlook and the Trend card when the
+ *  trailing week is clearly worsening. Deliberately the SAME object as
+ *  `<TrendCard/>` below it — neutral surface, sunk tile, one sentence, chevron
+ *  — with the emoji carrying the severity (⚠️ watch, 🛑 alert) instead of a
+ *  wash of red across the card.
+ *
+ *  It used to be tinted in the severity color, which made it the loudest thing
+ *  on a screen someone opens while already feeling bad, and made good news and
+ *  bad news look like two unrelated kinds of notice. The sheet behind it still
+ *  carries the color — that's where the user went looking for it. */
 function DownturnWarning({ w, dk }: { w: Downturn; dk: string }) {
   const p = usePalette();
   const { openSheet } = useSheets();
-  const color = w.severity === 'alert' ? SCORE_COLORS.crash : SCORE_COLORS.bad;
   return (
     <Pressable
       onPress={() => openSheet(() => <DownturnExplain w={w} dk={dk} />)}
       style={({ pressed }) => [
-        { borderWidth: 1, borderColor: hexA(color, 0.55), borderRadius: radius.card, backgroundColor: mixHex(color, WARN_BASE, 0.14), marginBottom: 12, padding: 15 },
+        {
+          borderWidth: 1, borderColor: p.border, borderRadius: radius.card,
+          backgroundColor: p.surface, marginBottom: 12, padding: 15,
+          flexDirection: 'row', alignItems: 'center', gap: 13,
+        },
         pressed && { opacity: 0.75 },
       ]}
     >
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 13 }}>
-        <View style={{ width: 42, height: 42, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: mixHex(color, WARN_BASE, 0.3) }}>
-          <Icon name="trendDown" size={21} color={color} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 15, fontWeight: '700', color }}>{w.title}</Text>
-          <Text style={{ fontSize: 13, fontWeight: '600', color: hexA(color, 0.8), fontVariant: ['tabular-nums'], marginTop: 2 }}>
-            {`Down ${w.drop} points over the last ${w.spanDays} days`}
-          </Text>
-        </View>
-        <Icon name="chevronRight" size={18} color={hexA(color, 0.55)} />
+      <View style={{ width: 42, height: 42, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: p.sunk, borderWidth: 1, borderColor: p.border }}>
+        <Text style={{ fontSize: 21 }}>{w.severity === 'alert' ? '🛑' : '⚠️'}</Text>
       </View>
+      <Text style={{ flex: 1, fontSize: 15, fontWeight: '700', color: p.text, lineHeight: 20 }}>{w.headline}</Text>
+      <Icon name="chevronRight" size={20} color={p.textDim} />
     </Pressable>
   );
 }
@@ -420,73 +367,6 @@ function Flag({ color, text }: { color: string; text: string }) {
     <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start', marginTop: 11, padding: 10, borderRadius: radius.control, backgroundColor: mixHex(color, WARN_BASE, 0.14), borderWidth: 1, borderColor: hexA(color, 0.55) }}>
       <Icon name="alert" size={15} color={color} />
       <Text style={{ flex: 1, fontSize: 13, lineHeight: 17, fontWeight: '600', color }}>{text}</Text>
-    </View>
-  );
-}
-
-/**
- * Free-tier upsell widget (Claude Design "Subscription Widget" 10b), shown
- * right after the Autonomic Outlook card. Collapsible exactly like StreakCard
- * (same rotating chevron + measured-height accordion) but starts expanded.
- * Design colors map straight onto theme tokens — the mock's red IS the accent.
- */
-const PRO_BENEFITS = [
-  'Full historical metric analysis',
-  'POTS testing & episode tracking',
-  'AI analysis & doctor report',
-  'Unlimited HRV readings',
-];
-
-function ProUpsellCard() {
-  const p = usePalette();
-  const openPaywall = usePaywall();
-  const { products } = useIap();
-  const [expanded, setExpanded] = useState(true);
-  const { chevStyle, bodyStyle, onContentLayout, measureStyle } = useAccordion(expanded, true);
-
-  const mPrice = priceOf(products.find((s) => s.productId === MONTHLY_SKU), MONTHLY_SKU);
-  const yPrice = priceOf(products.find((s) => s.productId === YEARLY_SKU), YEARLY_SKU);
-
-  return (
-    <View style={{ borderWidth: 1, borderColor: hexA(p.accent, 0.2), borderRadius: radius.card, backgroundColor: p.surface, marginBottom: 12, overflow: 'hidden' }}>
-      <Pressable onPress={() => setExpanded((v) => !v)} style={{ padding: 15 }}>
-        <View style={{ flexDirection: 'row', gap: 13, alignItems: 'center' }}>
-          <View style={{ width: 42, height: 42, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: p.accentSoft }}>
-            <Icon name="lock" size={21} color={p.accent} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
-              <Text style={{ fontSize: 15, fontWeight: '800', color: p.text }}>Autonomic Pro</Text>
-              <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5, backgroundColor: p.accentSoft, borderWidth: 1, borderColor: hexA(p.accent, 0.25) }}>
-                <Text style={{ fontSize: 9.5, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase', color: p.accent }}>Locked</Text>
-              </View>
-            </View>
-            <Text style={{ fontSize: 13, color: p.textDim, marginTop: 2, lineHeight: 17 }}>Unlock everything Autonomic can do</Text>
-          </View>
-          <Animated.View style={chevStyle}>
-            <Icon name="chevron" size={18} color={p.textDim} />
-          </Animated.View>
-        </View>
-        <Animated.View style={[{ overflow: 'hidden' }, bodyStyle]}>
-          <View onLayout={onContentLayout} style={[measureStyle, { paddingTop: 14 }]}>
-            <View style={{ gap: 9 }}>
-              {PRO_BENEFITS.map((b) => (
-                <View key={b} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                  <Icon name="check" size={15} color={p.accent} strokeWidth={2.6} />
-                  <Text style={{ flex: 1, fontSize: 13, color: p.text }}>{b}</Text>
-                </View>
-              ))}
-            </View>
-            <Pressable
-              onPress={openPaywall}
-              style={({ pressed }) => [{ height: 46, borderRadius: 12, backgroundColor: p.accent, alignItems: 'center', justifyContent: 'center', marginTop: 16 }, pressed && { opacity: 0.8 }]}
-            >
-              <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>Upgrade to Pro</Text>
-            </Pressable>
-            <Text style={{ fontSize: 11.5, color: p.textDim, textAlign: 'center', marginTop: 9 }}>{`${mPrice}/mo or ${yPrice}/yr · cancel anytime`}</Text>
-          </View>
-        </Animated.View>
-      </Pressable>
     </View>
   );
 }

@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Dimensions, Platform, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import Animated, { Easing, Extrapolation, interpolate, runOnJS, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
-import { Screen } from '../../src/components/Header';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Screen, headerHeight } from '../../src/components/Header';
 import { BrandMark, brandMarkWidth } from '../../src/components/Icon';
 import { useSheets } from '../../src/components/Sheet';
 import { DaySummary } from '../../src/features/DaySummary';
@@ -60,7 +61,11 @@ export default function JournalScreen() {
   // header as you pull, and releasing past the threshold fires the check.
   // Android: no negative overscroll, so a plain RefreshControl (accent-tinted)
   // does the gesture; the pill takes over as the real progress UI.
-  const [headerH, setHeaderH] = useState(0);
+  // Seeded to the header's exact height rather than 0: the pull graphic is
+  // anchored to it and Android's RefreshControl offsets by it, both of which
+  // would sit under the header on the first gesture after launch.
+  const insets = useSafeAreaInsets();
+  const [headerH, setHeaderH] = useState(() => headerHeight(insets.top));
   const pullY = useSharedValue(0);
   const pullScroll = useAnimatedScrollHandler({
     onScroll: (e) => { pullY.value = e.contentOffset.y; },

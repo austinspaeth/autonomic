@@ -7,15 +7,21 @@
  * ---------------------------------------------------------------------------
  * What the data is
  * ---------------------------------------------------------------------------
- * Installs ping a counter at most once per UTC day, carrying one fact: the day
- * that install first ran. The server aggregates on arrival and keeps counters,
- * never events (see sls/lambdas/ping/main.js). So what we hold is:
+ * Installs ping a counter at most once per Eastern day, carrying two facts: the
+ * day that install first ran, and which store the build came from. The server
+ * aggregates on arrival and keeps counters, never events (see
+ * sls/lambdas/ping/main.js). So what we hold is:
  *
  *     open[day].cohorts[cohort] = how many installs born on `cohort`
  *                                 opened the app on `day`
  *     sub[day].cohorts[cohort]  = ...and how many first showed a subscription
  *
  * `ageDays` is therefore derived, not transmitted: day − cohort.
+ *
+ * A stored cohort is really cohort+platform (`082126I`), so the report can hand
+ * back two rows for one cohort day. `index` pools them, and takes a platform
+ * filter for the times the split is the question — see `index` and
+ * `platformSplit`.
  *
  * ---------------------------------------------------------------------------
  * The three rules this module enforces so the UI cannot break them
@@ -90,17 +96,53 @@ window.Analytics = (function () {
 
   var EMPTY = { total: 0, cohorts: {} };
 
-  function rowsToMap(list) {
+  /* The report's platform letters, and the names the filter bar speaks. */
+  var PLATFORM_LETTER = { ios: 'I', android: 'A', unknown: 'U', I: 'I', A: 'A', U: 'U' };
+  var PLATFORM_NAME = { I: 'ios', A: 'android', U: 'unknown' };
+
+  /** Normalize a filter into a letter, or null for "every platform". */
+  function platformFilter(p) {
+    if (!p || p === 'all' || p === 'compare') return null;
+    return PLATFORM_LETTER[p] || null;
+  }
+
+  /**
+   * Rows to `{ day: { total, cohorts, platforms } }`.
+   *
+   * Two cohort entries can now share a cohort DAY (one per platform), so the
+   * counts are pooled rather than assigned — an `=` here would silently drop
+   * whichever platform sorted first. `platforms` is the day's split, always
+   * counted before the filter is applied, so a filtered view can still say what
+   * it is a slice of. Rows written before the platform marker existed carry no
+   * `platform` and pool under U.
+   */
+  function rowsToMap(list, letter) {
     var by = {};
     (list || []).forEach(function (r) {
       if (!r || !r.day) return;
-      var c = {};
+      var c = {}, plat = {}, kept = 0;
       (r.cohorts || []).forEach(function (x) {
-        if (x && x.cohort) c[x.cohort] = Number(x.count) || 0;
+        if (!x || !x.cohort) return;
+        var p = PLATFORM_NAME[x.platform] ? x.platform : 'U';
+        var n = Number(x.count) || 0;
+        plat[p] = (plat[p] || 0) + n;
+        if (letter && p !== letter) return;
+        c[x.cohort] = (c[x.cohort] || 0) + n;
+        kept += n;
       });
-      by[r.day] = { total: Number(r.total) || 0, cohorts: c };
+      by[r.day] = { total: letter ? kept : (Number(r.total) || 0), cohorts: c, platforms: plat };
     });
     return by;
+  }
+
+  /** Totals per platform over a whole map, as `{ I: n, A: n, U: n }`. */
+  function splitOf(map) {
+    var out = {};
+    Object.keys(map).forEach(function (d) {
+      var p = map[d].platforms || {};
+      Object.keys(p).forEach(function (k) { out[k] = (out[k] || 0) + p[k]; });
+    });
+    return out;
   }
 
   /**
@@ -111,9 +153,10 @@ window.Analytics = (function () {
    * installs are real and active, but they are not a measurable cohort, and
    * every function below skips them rather than dividing by a size of zero.
    */
-  function index(report) {
-    var open = rowsToMap(report && report.open);
-    var sub = rowsToMap(report && report.sub);
+  function index(report, platform) {
+    var letter = platformFilter(platform);
+    var open = rowsToMap(report && report.open, letter);
+    var sub = rowsToMap(report && report.sub, letter);
     var seen = {};
     Object.keys(open).forEach(function (d) { seen[d] = true; });
     Object.keys(sub).forEach(function (d) { seen[d] = true; });
@@ -141,7 +184,11 @@ window.Analytics = (function () {
       open: open, sub: sub, days: days, first: first, last: last,
       cohorts: cohorts,
       preTracking: Object.keys(older).sort(),
-      platforms: (report && report.platforms) || null,
+      /* What this index is a slice of: the filter in force, and the platform
+         totals BEFORE it was applied, so a view can show the split without a
+         second pass over the report. */
+      platform: letter ? PLATFORM_NAME[letter] : 'all',
+      platformSplit: { open: splitOf(open), sub: splitOf(sub) },
       versions: (report && report.versions) || null
     };
   }
@@ -154,6 +201,9 @@ window.Analytics = (function () {
   function countOn(ix, day, cohort) { return openOn(ix, day).cohorts[cohort] || 0; }
   function subCountOn(ix, day, cohort) { return subOn(ix, day).cohorts[cohort] || 0; }
   function purchasesOn(ix, day) { return subOn(ix, day).total; }
+
+  /** One day's platform split, `{ I: n, A: n, U: n }`, ALWAYS unfiltered. */
+  function platformsOn(ix, day) { return (ix.open[day] || EMPTY).platforms || {}; }
 
   /** A cohort's size: how many installs opened the app on their own first day. */
   function cohortSize(ix, cohort) { return countOn(ix, cohort, cohort); }
@@ -669,8 +719,8 @@ window.Analytics = (function () {
     addDays: addDays, ageDays: ageDays, weekStart: weekStart, weekday: weekday, range: range,
 
     // index + accessors
-    index: index,
-    activeOn: activeOn, newOn: newOn, returningOn: returningOn,
+    index: index, platformName: function (letter) { return PLATFORM_NAME[letter] || 'unknown'; },
+    activeOn: activeOn, newOn: newOn, returningOn: returningOn, platformsOn: platformsOn,
     countOn: countOn, purchasesOn: purchasesOn, cohortSize: cohortSize,
     maturity: maturity, isMature: isMature,
 

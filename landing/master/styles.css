@@ -51,6 +51,11 @@
 html, body {
   margin: 0;
   padding: 0;
+  /* Pinch-zoom is pinned off for this page (see src/routes/master/+page.svelte),
+     and this is the other half of it: `manipulation` drops the double-tap-to-zoom
+     gesture, which iOS keeps even when the viewport says it may not scale. It
+     also removes the 300ms click delay that gesture costs every tap. */
+  touch-action: manipulation;
   background: var(--page);
   color: var(--text-primary);
   font-family: var(--font);
@@ -146,6 +151,20 @@ input[type="number"] { -moz-appearance: textfield; }
 .btn.primary:hover { filter: brightness(1.1); }
 .btn.danger:hover { border-color: var(--critical); color: var(--critical); }
 .btn.sm { padding: 4px 9px; font-size: 12.5px; }
+
+/* A button whose icon is the point, and whose label is a courtesy the phone
+   layout drops. */
+.icon-btn { display: inline-flex; align-items: center; gap: 7px; }
+.refresh-icon { width: 15px; height: 15px; flex: none; display: block; }
+.icon-btn[data-busy="true"] { color: var(--text-secondary); pointer-events: none; }
+.icon-btn[data-busy="true"] .refresh-icon { animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  /* Still say "working", just without the wheel: the pulse carries the same
+     information to someone who asked the OS for less movement. */
+  .icon-btn[data-busy="true"] .refresh-icon { animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .35; } }
+}
 
 /* ---------- split button + popover ---------- */
 
@@ -686,19 +705,54 @@ body.gated .toast { display: none; }
 
 /* ---------- header: sync state + account ---------- */
 
-.syncdot {
-  font-size: 11.5px; color: var(--text-muted);
-  padding: 2px 8px 3px; border-radius: 999px;
-  border: 1px solid var(--border);
-  align-self: center;
-}
-.syncdot[data-state="saving"],
-.syncdot[data-state="pending"],
-.syncdot[data-state="loading"] { color: var(--text-secondary); }
-.syncdot[data-state="error"] { color: var(--warning); border-color: rgba(250, 178, 25, .4); }
-.syncdot[data-state="offline"] { color: var(--serious); border-color: rgba(236, 131, 90, .4); }
 
-.whoami { color: var(--text-muted); font-size: 12px; align-self: center; }
+/* ---------- costs ---------- */
+
+/* A campaign's state is one word, and it is the first thing you look for in a
+   list of thirty: colour carries it, the word confirms it. */
+.pill {
+  display: inline-block; padding: 1px 8px; border-radius: 20px;
+  font-size: 11.5px; border: 1px solid var(--border-strong); color: var(--text-secondary);
+  white-space: nowrap;
+}
+.pill.running { color: var(--good); border-color: rgba(12, 163, 12, .45); }
+.pill.scheduled { color: var(--warning); border-color: rgba(250, 178, 25, .4); }
+.pill.ended, .pill.draft { color: var(--text-muted); }
+
+/* Money is read down a column, so every figure is tabular and right-aligned.
+   Losses are coloured, gains are not: a profit line that is green everywhere
+   stops meaning anything, while a red one should catch the eye. */
+.money { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.money.neg { color: var(--critical); }
+th.money, td.money { text-align: right; }
+
+/* The recurrence marker on a cost row — small, and next to the date it repeats
+   from rather than in a column of its own. */
+.repeats { color: var(--text-muted); font-size: 11.5px; white-space: nowrap; }
+
+/* The daily spend grid reuses the bulk-entry grid's cell behaviour, with a
+   sticky date column so a wide set of campaigns can scroll under it. */
+/* Auto width, unlike every other table here. With two campaigns a full-width
+   grid strands the day label and its two inputs at opposite ends of the card;
+   sized to its content the row reads as a row. It still scrolls when there are
+   enough campaigns to need it. */
+#csGrid table { width: auto; min-width: 0; }
+#csGrid th, #csGrid td { padding-right: 18px; }
+#csGrid th.day-col, #csGrid td.day-col {
+  position: sticky; left: 0; z-index: 1;
+  background: var(--surface-1); white-space: nowrap;
+}
+#csGrid th.day-col { z-index: 3; }
+#csGrid td input { width: 92px; }
+#csGrid th.ad-head { text-align: right; }
+#csGrid th.ad-head .sub { display: block; color: var(--text-muted); font-weight: 400; font-size: 11px; }
+#csGrid tbody tr.weekend td.day-col { color: var(--text-muted); }
+
+/* The category swatch column in the cost list and the category table. */
+td .cat-dot, .cat-dot {
+  width: 9px; height: 9px; border-radius: 3px; flex: none;
+  display: inline-block; margin-right: 7px; vertical-align: middle;
+}
 
 /* ---------- responsive ---------- */
 /* One place for every breakpoint, so a rule and its override are read
@@ -719,16 +773,32 @@ body.gated .toast { display: none; }
   .topbar h1 { font-size: 17px; }
   .topbar .spacer { flex: 0 0 100%; height: 0; }
   .topbar .btn { padding: 6px 11px; font-size: 13.5px; }
-  .whoami { display: none; }
+  /* Export anchors the left of the controls row; refresh and Edit data are
+     pushed to the right edge, so the row reads as a pair of groups rather than
+     three buttons drifting left with a gap after them. */
+  #btnRefresh { margin-left: auto; }
+  /* The refresh button drops its label and becomes a round icon: on a phone the
+     header is already carrying Export, its scope caret and Edit data. */
+  .icon-btn { padding: 0; width: 34px; height: 34px; border-radius: 50%; justify-content: center; }
+  .icon-btn .icon-btn-label { display: none; }
   /* Export sits at the right of the header on a desktop and at the left of the
      controls row on a phone, so its popover has to hang the other way — anchored
      right it runs off the left edge of the screen. */
   .popover { left: 0; right: auto; }
 
-  /* Wrap the tabs rather than scroll them: six of them do not fit, and a
-     clipped scroller hides that Explore and Forecast are even there. */
-  .tabs { flex-wrap: wrap; overflow-x: visible; margin-bottom: 12px; }
-  .tab { padding: 8px 11px; }
+  /* Scroll the tabs rather than wrap them. Wrapped, eight of them take three
+     lines and push the whole dashboard down the screen on every view; scrolled,
+     the nav stays one line and the row is swipeable. The fade on the right edge
+     is what says there is more — a clipped scroller with a hard edge reads as a
+     list that simply ends. */
+  .tabs {
+    flex-wrap: nowrap; overflow-x: auto; margin-bottom: 12px;
+    scrollbar-width: none; -webkit-overflow-scrolling: touch;
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab { padding: 8px 11px; flex: 0 0 auto; }
 
   /* Each filter becomes its own full-width row: label above, control across.
      Side by side they overflow — Platform alone is four segments wide. */

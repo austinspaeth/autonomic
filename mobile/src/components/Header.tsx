@@ -99,6 +99,7 @@ export function Screen({
   scrollEventThrottle,
   onHeaderHeight,
   refreshControl,
+  scrollEnabled,
 }: {
   header?: React.ReactNode;
   footer?: React.ReactNode;
@@ -114,12 +115,23 @@ export function Screen({
   /** Native pull-to-refresh control (Android — iOS screens draw their own
    *  overscroll graphic off `onScroll` instead). */
   refreshControl?: React.ComponentProps<typeof Animated.ScrollView>['refreshControl'];
+  /**
+   * Lock scrolling. For screens showing a skeleton: a placeholder is a promise
+   * about a layout that doesn't exist yet, so letting someone scroll it means
+   * scrolling to a position the real content may not have, and being thrown when
+   * it arrives. Defaults to enabled.
+   */
+  scrollEnabled?: boolean;
 }) {
   const p = usePalette();
   const insets = useSafeAreaInsets();
-  // Seed the top inset with an estimate so content doesn't flash under the
-  // header on first paint; the measured height takes over immediately after.
-  const [headerH, setHeaderH] = useState(insets.top + 6);
+  // Seed the top inset from `headerHeight`, which is the header's EXACT height
+  // (its paddingTop plus the fixed band) rather than an estimate — the seed used
+  // to omit the band, so every screen's first paint sat HEADER_CONTENT_HEIGHT
+  // too high and then dropped by that much when the header's onLayout landed.
+  // Held as measured-or-null so the seed keeps tracking a late inset change.
+  const [measuredH, setMeasuredH] = useState<number | null>(null);
+  const headerH = measuredH ?? headerHeight(insets.top);
   // Tab scenes stay mounted, so keep our own handle on the scroll view (merged
   // with any caller-provided ref) and snap back to the top whenever the screen
   // regains focus — switching tabs always starts you at the top.
@@ -141,6 +153,7 @@ export function Screen({
       onStartShouldSetResponderCapture={() => { notifyChartsBlur(); return false; }}
     >
       <Animated.ScrollView
+        scrollEnabled={scrollEnabled !== false}
         // Reanimated forwards the ref to the underlying ScrollView instance,
         // so scrollTo() etc. keep working through the plain ScrollView type.
         ref={setScrollRef as never}
@@ -158,7 +171,7 @@ export function Screen({
       </Animated.ScrollView>
       <BottomFade />
       {footer}
-      <Header onHeight={(h) => { setHeaderH(h); onHeaderHeight?.(h); }}>{header}</Header>
+      <Header onHeight={(h) => { setMeasuredH(h); onHeaderHeight?.(h); }}>{header}</Header>
     </View>
   );
 }

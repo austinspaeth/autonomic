@@ -16,7 +16,7 @@ import { addDays, todayKey, uid } from '../dates';
 import { typesFor } from '../typeCatalog';
 import { rrCoverageSec } from '../hrvQuality';
 import { logError } from '../diagnostics/errorLog';
-import { ensureDay, getState, save, storeWaveform, upsertEntry } from '../../store/store';
+import { ensureDay, getState, save, storeSleepSeries, storeWaveform, upsertEntry } from '../../store/store';
 import { health, healthAppName, type ImportedMed, type ImportedReading, type ImportedWorkout } from './index';
 import {
   allItemKeys, buildUpdateSet, filterDeclined, filterSeen, updateCount, updateSignature,
@@ -149,6 +149,7 @@ export function importUpdates(set: HealthUpdateSet, selected: Set<string> | null
     // Stages describe the imported night; drop any from a previous import.
     if (set.sleep.stages) d.sleep.stages = set.sleep.stages;
     else delete d.sleep.stages;
+    storeSleepSeries(set.dk, set.sleep);
     save();
     added++;
   }

@@ -26,7 +26,8 @@ import {
   hasAskedAuth, markAskedAuth, markPromptedThisLaunch, promptedThisLaunch, shareAuthRequest,
 } from './askedAuth';
 import { requestEcgAuth } from './ecg';
-import { groupNights, summarizeSleep } from './sleepSummary';
+import { groupNights, summarizeSleep, type StageSpan } from './sleepSummary';
+import { thinSeries, type HrPoint, type RespPoint } from '../sleep/night';
 import { activityTypeFromHk, workoutHrSeries } from './workoutMap';
 
 /** This app's bundle id — used to skip re-importing our own write-backs. */
@@ -227,6 +228,11 @@ export interface WatchHrvSample {
   sourceName: string;   // e.g. "Apple Watch"
 }
 
+/** Points kept per night after thinning. A night is 320 pixels wide on the
+ *  chart; four hundred points is already more resolution than can be drawn,
+ *  and it bounds what a year-long backfill can put on disk. */
+export const NIGHT_SERIES_MAX = 400;
+
 export interface SleepImport {
   bed: string;        // HH:MM local
   wake: string;       // HH:MM local
@@ -239,6 +245,19 @@ export interface SleepImport {
   /** Per-stage minutes when the source recorded stages; null when every
    *  sample is plain asleepUnspecified (manual logs, older sources). */
   stages: SleepStages | null;
+  /**
+   * The night as a series rather than as totals: the overnight heart-rate
+   * curve, respiratory rate and the hypnogram, all as seconds from bed.
+   *
+   * These NEVER go into the journal — the caller writes them to the waveform
+   * sidecar under `sleepWaveformId(dk)` and keeps only the summary numbers in
+   * `day.sleep`. An inline array in persisted state trips the store's
+   * tripwire, and rightly: a year of nights inline would be re-stringified on
+   * every mutation.
+   */
+  hrSeries: HrPoint[] | null;
+  respSeries: RespPoint[] | null;
+  spans: StageSpan[];
 }
 
 const emptyDay: HealthDaySamples = {
@@ -489,19 +508,27 @@ function makeReal(mod: HkModule): HealthApi {
       return rows.reduce((s, r) => s + r.quantity, 0) / rows.length;
     } catch { return null; }
   };
+  /**
+   * A quantity as a series of {seconds-from-`base`, value} points, thinned to
+   * NIGHT_SERIES_MAX. This is the read that used to be `rangeQ` — every
+   * overnight heart-rate sample was fetched and all but min/max thrown away,
+   * which is why the report could say "49-92" but never when the 92 happened.
+   */
+  const seriesQ = async (id: string, from: Date, to: Date, base: Date): Promise<{ t: number; v: number }[]> => {
+    try {
+      const rows = (await mod.queryQuantitySamples?.(id, { from, to, limit: 5000 })) || [];
+      const baseMs = base.getTime();
+      const pts = rows
+        .map((r) => ({ t: Math.round((r.startDate.getTime() - baseMs) / 1000), v: r.quantity }))
+        .filter((q) => Number.isFinite(q.v) && q.v > 0)
+        .sort((a, b) => a.t - b.t);
+      return thinSeries(pts, NIGHT_SERIES_MAX);
+    } catch { return []; }
+  };
   /** Raw per-sample rows (kept: timestamp + provenance), for timestamped imports. */
   const samplesQ = async (id: string, from: Date, to: Date): Promise<readonly QSample[]> => {
     try { return (await mod.queryQuantitySamples?.(id, { from, to, limit: 500 })) || []; }
     catch { return []; }
-  };
-  const rangeQ = async (id: string, from: Date, to: Date): Promise<{ min: number; max: number } | null> => {
-    try {
-      const rows = (await mod.queryQuantitySamples?.(id, { from, to, limit: 2000 })) || [];
-      if (!rows.length) return null;
-      let min = Infinity; let max = -Infinity;
-      for (const r of rows) { if (r.quantity < min) min = r.quantity; if (r.quantity > max) max = r.quantity; }
-      return { min, max };
-    } catch { return null; }
   };
   const saveQ = async (id: string, unit: string, value: number, start: Date, end: Date) => {
     try { await mod.saveQuantitySample?.(id, unit, value, { start, end }); return true; } catch { return false; }
@@ -687,18 +714,26 @@ function makeReal(mod: HkModule): HealthApi {
         out.sleep = await mapPooled(nights, 6, async ({ dayKey, rows: night }) => {
           const sum = summarizeSleep(night);
           if (!sum || sum.minutesAsleep < HISTORY_SLEEP_MIN_MIN) return null;
-          const hr = await rangeQ(QID.heartRate, sum.bed, sum.wake);
+          const [hrPts, respPts] = await Promise.all([
+            seriesQ(QID.heartRate, sum.bed, sum.wake, sum.bed),
+            seriesQ(QID.respiratoryRate, sum.bed, sum.wake, sum.bed),
+          ]);
+          const hrSeries = hrPts.map((q) => ({ t: q.t, bpm: q.v }));
+          const bpms = hrSeries.map((q) => q.bpm);
           return {
             dayKey,
             bed: hhmm(sum.bed),
             wake: hhmm(sum.wake),
             bedISO: sum.bed.toISOString(),
             wakeISO: sum.wake.toISOString(),
-            hrLow: hr ? Math.round(hr.min) : null,
-            hrHigh: hr ? Math.round(hr.max) : null,
+            hrLow: bpms.length ? Math.round(Math.min(...bpms)) : null,
+            hrHigh: bpms.length ? Math.round(Math.max(...bpms)) : null,
             interrupted: sum.interrupted,
             minutesAsleep: sum.minutesAsleep,
             stages: sum.stages,
+            hrSeries: hrSeries.length ? hrSeries : null,
+            respSeries: respPts.length ? respPts.map((q) => ({ t: q.t, br: q.v })) : null,
+            spans: sum.spans,
           } satisfies HistorySleep;
         }, (done, total) => step('Sleep', done, total));
       } catch { /* sleep unavailable */ }
@@ -817,17 +852,26 @@ function makeReal(mod: HkModule): HealthApi {
         const rows = (await mod.queryCategorySamples?.(CID.sleep, { from, to, limit: 400 })) || [];
         const night = summarizeSleep(rows);
         if (!night) return null;
-        const hr = await rangeQ(QID.heartRate, night.bed, night.wake);
+        const [hrPts, respPts] = await Promise.all([
+          seriesQ(QID.heartRate, night.bed, night.wake, night.bed),
+          seriesQ(QID.respiratoryRate, night.bed, night.wake, night.bed),
+        ]);
+        const hrSeries = hrPts.map((q) => ({ t: q.t, bpm: q.v }));
+        const bpms = hrSeries.map((q) => q.bpm);
         return {
           bed: hhmm(night.bed),
           wake: hhmm(night.wake),
           bedISO: night.bed.toISOString(),
           wakeISO: night.wake.toISOString(),
-          hrLow: hr ? Math.round(hr.min) : null,
-          hrHigh: hr ? Math.round(hr.max) : null,
+          // min/max come off the same series now — one query, not two.
+          hrLow: bpms.length ? Math.round(Math.min(...bpms)) : null,
+          hrHigh: bpms.length ? Math.round(Math.max(...bpms)) : null,
           interrupted: night.interrupted,
           minutesAsleep: night.minutesAsleep,
           stages: night.stages,
+          hrSeries: hrSeries.length ? hrSeries : null,
+          respSeries: respPts.length ? respPts.map((q) => ({ t: q.t, br: q.v })) : null,
+          spans: night.spans,
         };
       } catch { return null; }
     },

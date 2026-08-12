@@ -11,8 +11,8 @@ POST https://api.autonomic.care/api/master
 Authorization: Bearer <Cognito id token>
 { "action": "LOAD" | "SYNC" | "REPLACE_ALL" | "PINGS", "payload": { ... } }
 
-GET  https://api.autonomic.care/ping/open/D082126     (public, no auth)
-GET  https://api.autonomic.care/ping/sub/D082126
+GET  https://api.autonomic.care/ping/open/D082126I    (public, no auth)
+GET  https://api.autonomic.care/ping/sub/D082126I
 GET  https://api.autonomic.care/ping/report?key=...&since=2026-08-01
 ```
 
@@ -35,14 +35,22 @@ per user, which would eventually meet DynamoDB's 400KB item ceiling.
 | PK | SK | Holds |
 |---|---|---|
 | `DASH#<email>` | `ENTRY#<date>#<platform>` | one day of store metrics |
-| `DASH#<email>` | `SETTINGS` | trial/wall lengths, currency |
+| `DASH#<email>` | `EVENT#<id>` | a recorded release / campaign / store change |
+| `DASH#<email>` | `AD#<id>` | an advertising campaign (name, channel, dates) |
+| `DASH#<email>` | `COST#<id>` | a dated cost, optionally attributed to an ad |
+| `DASH#<email>` | `SETTINGS` | trial/wall lengths, currency, store commission |
 | `DASH#<email>` | `UI` | view and filter preferences |
 | `PING#OPEN` | `<day>` | that day's opens, counted per cohort |
 | `PING#SUB` | `<day>` | that day's new subscribers, counted per cohort |
 
-`LOAD` queries the whole partition. `SYNC` applies the client's diff
-(`upserts` / `deletes` / `settings` / `ui`). `REPLACE_ALL` wipes the entries and
-rewrites them, which is what "Delete all data" uses — a wipe is worth stating
+`LOAD` queries the whole partition. `SYNC` applies the client's diff — entries
+as `upserts` / `deletes`, and the three id-keyed collections as
+`eventUpserts` / `eventDeletes`, `adUpserts` / `adDeletes`,
+`costUpserts` / `costDeletes` — plus `settings` and `ui`. Each cleaner in the
+Lambda has a twin in `landing/master/sync.js`; **if the two shapes disagree,
+every diff reports every row as changed forever.** `REPLACE_ALL` wipes the ENTRIES and
+rewrites them — it does not touch events, ads or costs, matching a button that
+says "delete every entry" — and is what "Delete all data" uses — a wipe is worth stating
 outright rather than trusting a diff to enumerate every deletion.
 
 The table is `DeletionPolicy: Retain` with point-in-time recovery on. A
@@ -51,24 +59,35 @@ The table is `DeletionPolicy: Retain` with point-in-time recovery on. A
 ## The cohort ping
 
 `lambdas/ping/main.js` — two public write routes, no auth, no body, `204` to
-everything. The path segment is the calling install's **cohort**: the day it
-first ran the app, as `D{MMDDYY}`. The server stamps the arrival day itself.
+everything. The path segment is the calling install's **cohort** — the day it
+first ran the app, as `D{MMDDYY}` — followed by **one letter for the platform**:
+`I` for iOS, `A` for Android, `U` for unknown. A missing letter also reads as
+`U`, which is what builds that shipped before the marker send. The server stamps
+the arrival day itself.
 
-**One row per day**, holding that day's count for every cohort:
+**Days here are US Eastern days**, not UTC ones, so the counters line up with
+the calendar the numbers are read against; DST is handled (`easternDay`). The
+client dedupes against the same boundary, which is what keeps one install to one
+count per row — change one side and you must change the other.
+
+**One row per day**, holding that day's count for every cohort+platform:
 
 ```jsonc
 { "PK": "PING#OPEN", "SK": "2026-08-21",
   "day": "2026-08-21",
   "total": 137,
-  "cohorts": { "082126": 12, "080126": 4, "071526": 2 } }
+  "cohorts": { "082126I": 12, "082126A": 3, "080126I": 4, "071526": 2 } }
 ```
 
 Read as a grid, that is a retention matrix: how many installs born on cohort C
-opened the app on day D. It is a DynamoDB **map** rather than a list because a
-list has no addressable slot — appending would need a read-modify-write, and
-two phones pinging in the same millisecond would lose a count. A map key is
+opened the app on day D. Platform lives in the key rather than in a counter of
+its own so that every question the matrix answers — retention, conversion, day N
+— can also be asked per store. It is a DynamoDB **map** rather than a list
+because a list has no addressable slot — appending would need a read-modify-write,
+and two phones pinging in the same millisecond would lose a count. A map key is
 addressable, so one atomic `UpdateItem` does the whole bump. It reads back as an
-array of `{ cohortDate, count }`, which is the shape a chart wants.
+array of `{ key, cohortDate, cohort, platform, count }`, which is the shape a
+chart wants.
 
 Two details that are easy to get wrong when editing `bump()`: the increment is
 `SET x = if_not_exists(x, 0) + 1`, not `ADD x 1`, because **`ADD` only works on
@@ -107,7 +126,7 @@ property, not a limitation.
 `PING#OPEN / <day>` is **everyone's** counts for that day, in one item. Deleting
 it to undo your own test ping destroys every real ping that landed in it, and
 the client will not re-send: an install stamps "pinged today" on success and
-stays quiet until the next UTC day. This has happened once already, and was only
+stays quiet until the next Eastern day. This has happened once already, and was only
 recoverable because the table has point-in-time recovery on.
 
 So: do not write test pings to production. If you must, pick a cohort date you
@@ -118,7 +137,7 @@ the item:
 aws dynamodb update-item --region us-west-2 --table-name Autonomic-prod \
   --key '{"PK":{"S":"PING#OPEN"},"SK":{"S":"2026-08-10"}}' \
   --update-expression "SET cohorts.#c = cohorts.#c - :one, #t = #t - :one" \
-  --expression-attribute-names '{"#c":"081026","#t":"total"}' \
+  --expression-attribute-names '{"#c":"081026I","#t":"total"}' \
   --expression-attribute-values '{":one":{"N":"1"}}'
 ```
 
@@ -140,7 +159,8 @@ Two doors onto the same function, because they have different callers:
   the shared key. The email allowlist guards it like everything else there.
 
 Both answer `{ since, open: [...], sub: [...] }`, each row
-`{ day, total, cohorts: [{ cohortDate, count }] }`.
+`{ day, total, cohorts: [{ key, cohortDate, cohort, platform, count }] }`. Rows
+stored before the platform marker existed report `platform: "U"`.
 
 Set the key once before the first deploy (any random string):
 
@@ -155,7 +175,7 @@ did. A cohort date is shared by every install born that day, so it names a day,
 not a person. Two consequences follow and neither is a bug:
 
 - **The server cannot de-duplicate**, so the client does: at most one open ping
-  per install per UTC day, exactly one subscribe ping per install
+  per install per Eastern day, exactly one subscribe ping per install
   (`mobile/src/store/ping.ts`). One ping == one active install that day.
 - **Counts are trusted, not verified.** Anyone can curl the URL and inflate a
   number. The alternative is an identifier, which is the thing being refused.

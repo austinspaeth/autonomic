@@ -1,7 +1,7 @@
 import { buildWidgetPayload } from '../widgets';
 import { demoDays } from '../demo';
 import { defaultState } from '../migrate';
-import { todayKey } from '../dates';
+import { addDays, todayKey } from '../dates';
 import { SCORE_CATS } from '../scoring/day';
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
@@ -84,5 +84,50 @@ describe('widget payload', () => {
     expect(a.score).toBe(b.score);
     expect(a.rows).toEqual(b.rows);
     expect(a.date).toBe(mid);
+  });
+});
+
+/**
+ * Arrows come from the shared trend engine (src/lib/trends) rather than a local
+ * today-vs-week-mean comparison. The behaviour change is the point: an arrow now
+ * requires median movement past the metric's own threshold with enough coverage
+ * in BOTH windows, so noise no longer flips it.
+ */
+describe('widget trend arrows', () => {
+  const day = (rmssd: number) => ({
+    sleep: { bed: '', wake: '' },
+    readings: [{ id: `r${rmssd}${Math.random()}`, type: 'hrv', time: '08:00', rmssd: String(rmssd) }],
+    activities: [], meds: [], symptoms: [],
+    food: { water: 0, calories: 0, triggers: {}, meals: [] },
+    digestion: { movements: [] },
+  });
+  /** 14 days ending today: the older 7 at `prior`, the newer 7 at `recent`. */
+  const fortnight = (prior: number, recent: number) => {
+    const days: Record<string, ReturnType<typeof day>> = {};
+    for (let i = 13; i >= 0; i--) days[addDays(todayKey(), -i)] = day(i >= 7 ? prior : recent);
+    return days;
+  };
+
+  it('shows no arrow for a 1% move', () => {
+    const state = { ...defaultState(), days: fortnight(50, 50.5) };
+    const rmssd = buildWidgetPayload(state).rows.find((r) => r.name === 'RMSSD')!;
+    expect(rmssd.trend).toBeNull();
+  });
+
+  it('shows an up arrow once the move clears the metric threshold', () => {
+    const state = { ...defaultState(), days: fortnight(40, 60) };
+    const rmssd = buildWidgetPayload(state).rows.find((r) => r.name === 'RMSSD')!;
+    expect(rmssd.trend).toBe('▲');
+  });
+
+  it('shows a down arrow when the metric really fell', () => {
+    const state = { ...defaultState(), days: fortnight(60, 40) };
+    const rmssd = buildWidgetPayload(state).rows.find((r) => r.name === 'RMSSD')!;
+    expect(rmssd.trend).toBe('▼');
+  });
+
+  it('never puts an arrow on SDNN — it has no trend-registry entry', () => {
+    const state = { ...defaultState(), days: fortnight(40, 60) };
+    expect(buildWidgetPayload(state).rows.find((r) => r.name === 'SDNN')!.trend).toBeNull();
   });
 });

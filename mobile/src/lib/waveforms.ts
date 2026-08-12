@@ -25,11 +25,30 @@ export interface WaveformData {
    *  reading is discontinuous there, so it rides with rrRaw rather than in the
    *  journal blob (it's meaningless without it). Absent = one continuous take. */
   rrSegments?: number[];
+  /** Seconds from the start of the reading/workout/night, and the rate then.
+   *  A night's overnight heart-rate curve rides here too (keyed by
+   *  {@link sleepWaveformId}), which is why this is `t`-relative rather than
+   *  absolute: the journal already knows when the night began. */
   sampledHr?: { t: number; bpm: number }[];
   sampledSdnn?: { t: number; sdnn: number }[];
+  /** Overnight respiratory rate, breaths per minute, same time base. */
+  sampledResp?: { t: number; br: number }[];
+  /** The night's hypnogram: one span per stage block, `s` seconds from bed and
+   *  `d` seconds long. Stage minutes in the journal are the sums of these; the
+   *  spans are what say WHEN each stage happened, which is the whole reason a
+   *  night can be read rather than just totalled. */
+  stageSpans?: { s: number; d: number; v: 'deep' | 'rem' | 'core' | 'awake' }[];
 }
 
-export const WAVEFORM_FIELDS = ['rrRaw', 'rrClean', 'rrSegments', 'sampledHr', 'sampledSdnn'] as const;
+export const WAVEFORM_FIELDS = ['rrRaw', 'rrClean', 'rrSegments', 'sampledHr', 'sampledSdnn', 'sampledResp', 'stageSpans'] as const;
+
+/**
+ * Sidecar key for a night's series (overnight HR, respiratory rate, stage
+ * spans). Nights are not entries — they live at `day.sleep` and have no id —
+ * so they get a namespaced key instead. Entry ids are `uid()`s and never
+ * contain a colon, so the two can't collide.
+ */
+export const sleepWaveformId = (dk: string) => `sleep:${dk}`;
 
 /**
  * Split an entry into its journal half (waveform fields removed) and its
@@ -100,6 +119,10 @@ export function waveformIds(state: AppState): Set<string> {
       if (!Array.isArray(rs)) continue;
       for (const r of rs) if (typeof r.id === 'string' && r.id) ids.add(r.id);
     }
+    // Nights own a sidecar too. They must be listed here or `pruneWaveforms`
+    // would delete every overnight curve on the next launch (it drops any key
+    // this set does not name), and exports would leave them behind.
+    if (day.sleep && day.sleep.bed && day.sleep.wake) ids.add(sleepWaveformId(dk));
   }
   return ids;
 }

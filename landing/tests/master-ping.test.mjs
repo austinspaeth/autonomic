@@ -42,14 +42,22 @@ const SUB = {
   [T(0)]: { [T(10)]: 1 },    // bought on its D10, past the trial
 };
 
+/* Each cohort day arrives as it does from the counter: one row per platform,
+   iOS taking the odd half. The totals are unchanged by the split, which is the
+   point — every hand-worked number below still has to come out the same. */
+const split = (n) => [['I', Math.ceil(n / 2)], ['A', n - Math.ceil(n / 2)]].filter((p) => p[1] > 0);
+
 const shape = (map) => Object.keys(map).sort().map((day) => ({
   day,
   total: Object.values(map[day]).reduce((a, b) => a + b, 0),
-  cohorts: Object.keys(map[day]).sort().map((cohort) => ({
-    cohort,
-    cohortDate: cohort.slice(5, 7) + cohort.slice(8, 10) + cohort.slice(2, 4),
-    count: map[day][cohort],
-  })),
+  cohorts: Object.keys(map[day]).sort().reduce((rows, cohort) => rows.concat(
+    split(map[day][cohort]).map(([platform, count]) => ({
+      cohort,
+      cohortDate: cohort.slice(5, 7) + cohort.slice(8, 10) + cohort.slice(2, 4),
+      platform,
+      count,
+    })),
+  ), []),
 }));
 
 const b64u = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
@@ -129,7 +137,21 @@ const tiles = {};
     };
   });
 });
-check('twelve KPI tiles', Object.keys(tiles).length === 12, Object.keys(tiles).join(' | '));
+check('thirteen KPI tiles', Object.keys(tiles).length === 13, Object.keys(tiles).join(' | '));
+
+/* T(0) is 1 + 2 + 1 pings, which the fixture splits 3 iOS / 1 Android. The
+   tile is what tells Austin which store phoned home; the numbers above it are
+   the proof the split pooled back into the same totals. */
+const platTile = [].slice.call($('pgTilesB').querySelectorAll('.tile'))
+  .filter((t) => /^Platform on/.test(t.querySelector('.label').textContent))[0];
+check('a platform tile names the day\'s split', !!platTile);
+check('and reads it as a share of iOS',
+  platTile && /75% iOS/.test(platTile.querySelector('.value').textContent),
+  platTile && platTile.querySelector('.value').textContent);
+check('with both stores counted out',
+  platTile && /iOS 3/.test(platTile.querySelector('.split').textContent.replace(/\s+/g, ' '))
+           && /Android 1/.test(platTile.querySelector('.split').textContent.replace(/\s+/g, ' ')),
+  platTile && platTile.querySelector('.split').textContent.replace(/\s+/g, ' '));
 
 // D1 pools all three cohorts: (4 + 5 + 2) / 22 = 50%
 check('D1 retention is 50%', tiles['D1 retention'].value === '50.0%', tiles['D1 retention'].value);
@@ -321,6 +343,42 @@ check('the event pushed to the server', !!push && !!push.payload.eventUpserts, J
 check('the pushed event carries its fields',
   push && push.payload.eventUpserts[0].title === 'v1.24 paywall copy' && push.payload.eventUpserts[0].amount === 250,
   JSON.stringify(push && push.payload.eventUpserts));
+
+/* --- refreshing must not blank the page ------------------------------------
+   The view used to repaint into its "Reading the counter…" state the moment a
+   refetch started, which tore down every chart and rebuilt it a beat later.
+   A refresh now holds what it has and swaps when the new numbers land. */
+window.document.querySelector('.tab[data-view="ping"]').click();
+await new Promise((r) => setTimeout(r, 300));
+const heatBefore = $('pgHeat').innerHTML;
+check('there is something on screen to keep', heatBefore.length > 0);
+
+let releasePings;
+const held = new Promise((r) => { releasePings = r; });
+const beforeFetch = window.fetch;
+window.fetch = (url, opts) => {
+  const b = JSON.parse(opts.body || '{}');
+  if (b.action === 'PINGS') {
+    return held.then(() => ({
+      ok: true, status: 200,
+      text: () => Promise.resolve(JSON.stringify({ since: b.payload.since, open: shape(OPEN), sub: shape(SUB) })),
+    }));
+  }
+  return beforeFetch(url, opts);
+};
+
+$('btnRefresh').click();
+await new Promise((r) => setTimeout(r, 300));
+check('the grid is still there mid-refresh', $('pgHeat').innerHTML.length > 0,
+  String($('pgHeat').innerHTML.length));
+check('no "reading the counter" banner over data we already have',
+  !/Reading the counter/.test($('pgStatus').textContent), $('pgStatus').textContent);
+check('the tiles survived the refresh too', $('pgTiles').querySelectorAll('.tile').length > 0);
+
+releasePings();
+await new Promise((r) => setTimeout(r, 700));
+check('the refreshed data rendered', $('pgHeat').innerHTML.length > 0);
+window.fetch = beforeFetch;
 
 let failed = 0;
 results.forEach((r) => {

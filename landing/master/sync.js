@@ -80,6 +80,55 @@ window.Sync = (function () {
     return out;
   }
 
+  /* Mirrors cleanAd() / cleanCost() in the Lambda — same rule again: if the two
+     shapes disagree, every diff reports every row as changed forever. */
+  var COST_CATEGORIES = ['ADS', 'CREATIVE', 'INFRA', 'TOOLS', 'FEES', 'SERVICES', 'HARDWARE', 'OTHER'];
+  var RECURRENCES = ['weekly', 'monthly', 'quarterly', 'yearly'];
+  var AD_PLATFORMS = ['all', 'ios', 'android'];
+
+  function normalizeAd(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    var id = String(raw.id || '').slice(0, 64);
+    var name = String(raw.name || '').slice(0, 120);
+    if (!id || !name) return null;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(raw.start || ''))) return null;
+    var out = {
+      id: id, name: name, start: raw.start,
+      platform: AD_PLATFORMS.indexOf(raw.platform) >= 0 ? raw.platform : 'all'
+    };
+    if (raw.channel) out.channel = String(raw.channel).slice(0, 80);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(String(raw.end || ''))) out.end = raw.end;
+    if (raw.url) out.url = String(raw.url).slice(0, 500);
+    if (raw.note) out.note = String(raw.note).slice(0, 2000);
+    return out;
+  }
+
+  var COST_NUMBERS = ['impressions', 'clicks', 'installs'];
+
+  function normalizeCost(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    var id = String(raw.id || '').slice(0, 64);
+    if (!id) return null;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(raw.date || ''))) return null;
+    var amount = Number(raw.amount);
+    if (!isFinite(amount)) return null;
+    var out = {
+      id: id, date: raw.date, amount: amount,
+      category: COST_CATEGORIES.indexOf(raw.category) >= 0 ? raw.category : 'OTHER'
+    };
+    if (raw.label) out.label = String(raw.label).slice(0, 200);
+    if (raw.note) out.note = String(raw.note).slice(0, 2000);
+    if (raw.adId) out.adId = String(raw.adId).slice(0, 64);
+    if (RECURRENCES.indexOf(raw.recurrence) >= 0) out.recurrence = raw.recurrence;
+    if (out.recurrence && /^\d{4}-\d{2}-\d{2}$/.test(String(raw.until || ''))) out.until = raw.until;
+    COST_NUMBERS.forEach(function (k) {
+      var n = Number(raw[k]);
+      if (raw[k] === undefined || raw[k] === null || raw[k] === '' || !isFinite(n)) return;
+      out[k] = n;
+    });
+    return out;
+  }
+
   function snapshotOf(db, state) {
     var entries = new Map();
     (db.entries || []).forEach(function (e) {
@@ -91,8 +140,18 @@ window.Sync = (function () {
       var n = normalizeEvent(e);
       if (n) events.set(n.id, stable(n));
     });
+    var adsMap = new Map();
+    (db.ads || []).forEach(function (a) {
+      var n = normalizeAd(a);
+      if (n) adsMap.set(n.id, stable(n));
+    });
+    var costsMap = new Map();
+    (db.costs || []).forEach(function (c) {
+      var n = normalizeCost(c);
+      if (n) costsMap.set(n.id, stable(n));
+    });
     return {
-      entries: entries, events: events,
+      entries: entries, events: events, ads: adsMap, costs: costsMap,
       settings: stable(db.settings || {}), ui: stable(state || {})
     };
   }
@@ -146,7 +205,30 @@ window.Sync = (function () {
       });
     }
 
+    /* Ads and costs diff exactly like events: keyed by id, upserts for anything
+       whose JSON moved, deletes for anything the baseline had and we no longer
+       do. Factored because there are now three id-keyed collections and a
+       fourth copy of this loop would be where they start to disagree. */
+    function diffById(name) {
+      var ups = [], dels = [];
+      now[name].forEach(function (json, id) {
+        if (!baseline || !baseline[name] || baseline[name].get(id) !== json) ups.push(JSON.parse(json));
+      });
+      if (baseline && baseline[name]) {
+        baseline[name].forEach(function (_json, id) {
+          if (!now[name].has(id)) dels.push(id);
+        });
+      }
+      return { ups: ups, dels: dels };
+    }
+    var adDiff = diffById('ads');
+    var costDiff = diffById('costs');
+
     var payload = {};
+    if (adDiff.ups.length) payload.adUpserts = adDiff.ups;
+    if (adDiff.dels.length) payload.adDeletes = adDiff.dels;
+    if (costDiff.ups.length) payload.costUpserts = costDiff.ups;
+    if (costDiff.dels.length) payload.costDeletes = costDiff.dels;
     if (upserts.length) payload.upserts = upserts;
     if (deletes.length) payload.deletes = deletes;
     if (eventUpserts.length) payload.eventUpserts = eventUpserts;
@@ -156,21 +238,26 @@ window.Sync = (function () {
     return { payload: payload, snapshot: now, empty: Object.keys(payload).length === 0 };
   }
 
+  /* Returns a promise so a caller that must not race the push — the header's
+     refresh, which pulls the server's copy over the top of ours — can wait for
+     it. Fire-and-forget callers ignore it, as they always have. */
   function flush() {
-    if (inFlight || !getStore) return;
+    if (inFlight || !getStore) return Promise.resolve();
     var store = getStore();
     var d = diff(store.db, store.state);
-    if (d.empty) { setStatus('synced'); return; }
+    if (d.empty) { setStatus('synced'); return Promise.resolve(); }
 
     inFlight = true;
     setStatus('saving');
-    window.Api.call('SYNC', d.payload).then(function () {
+    return window.Api.call('SYNC', d.payload).then(function () {
       inFlight = false;
       // Commit the snapshot only on success, so a failed push retries the same
       // work instead of quietly losing it.
       baseline = d.snapshot;
       retryDelay = RETRY_BASE_MS;
-      if (pending) { pending = false; flush(); } else setStatus('synced');
+      if (pending) { pending = false; return flush(); }
+      setStatus('synced');
+      return null;
     }).catch(function (err) {
       inFlight = false;
       pending = false;
@@ -244,11 +331,14 @@ window.Sync = (function () {
 
   return {
     pull: pull,
+    flush: flush,
     bind: bind,
     adopt: adopt,
     schedule: schedule,
     replaceAll: replaceAll,
     onStatus: onStatus,
-    normalize: normalize
+    normalize: normalize,
+    normalizeAd: normalizeAd,
+    normalizeCost: normalizeCost
   };
 })();

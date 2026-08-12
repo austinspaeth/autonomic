@@ -3,13 +3,16 @@ import { Animated as RNAnimated, Easing, InteractionManager, type LayoutChangeEv
 import Animated, { Easing as REasing, runOnJS, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, withTiming, type SharedValue } from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
 import { useIsFocused } from '@react-navigation/native';
-import { BottomFade, Screen } from '../../src/components/Header';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BottomFade, Screen, headerHeight } from '../../src/components/Header';
 import { Icon } from '../../src/components/Icon';
 import { Ghost, HelpDot, ScoreDot, Segmented } from '../../src/components/ui';
 import { Bars, BpDumbbell, LineChart, StackedBars, ZonesToggle, useChartsBlur } from '../../src/components/charts';
 import { TAIL_STYLE, fonts, radius, readoutTail, usePalette } from '../../src/theme';
 import { getWaveform, useAppState } from '../../src/store/store';
 import { useTier } from '../../src/store/tier';
+import { takeProgressRange, useProgressRangeSignal } from '../../src/store/nav';
+import { LockedOverlay } from '../../src/features/LockedOverlay';
 import { usePaywall } from '../../src/features/Paywall';
 import { buildCategories, type AnalysisCard, type BpPeriod, type OrthoTransition } from '../../src/lib/analysis/categories';
 import { resolveProtocol, type DaysMap } from '../../src/lib/scoring/day';
@@ -31,8 +34,11 @@ export default function AnalysisScreen() {
   // rather than an empty view. Swaps to their own data on the first entry.
   const demo = !hasOwnData(state.days);
   const days = demo ? demoDays() : state.days;
-  // Freemium: free tier keeps the Day view; the longer ranges are Pro. Locked
-  // segments render a lock glyph and raise the paywall instead of switching.
+  // Freemium: free tier keeps the Day view; the longer ranges are Pro. The
+  // range control stays fully live either way — no lock glyphs, no paywall on
+  // tap. Picking a Pro range builds and lays out the real document, then
+  // `<LockedOverlay/>` masks it and docks a small upgrade card over the top
+  // (Claude Design "Locked Progress"). Switching back to Day clears it.
   const locked = useTier() === 'free';
   const openPaywall = usePaywall();
   // HRV filter lives here (not inside HrvProgress) so the same All/Morning/Evening
@@ -42,8 +48,11 @@ export default function AnalysisScreen() {
   const height = state.profile.height;
 
   const scrollRef = useRef<ScrollView>(null);
-  const [headerH, setHeaderH] = useState(0);
-  const headerRef = useRef(0);   // same value, readable synchronously off the UI runtime
+  // Seeded to the header's exact height (see Screen) so the sticky bar and the
+  // range veil aren't pinned to the top of the window before it measures.
+  const insets = useSafeAreaInsets();
+  const [headerH, setHeaderH] = useState(() => headerHeight(insets.top));
+  const headerRef = useRef(headerHeight(insets.top));   // same value, readable synchronously off the UI runtime
 
   // Pinned-section tracking runs as a Reanimated worklet: the per-frame scan
   // (which section header has scrolled up to the bottom of the top bar) stays
@@ -63,7 +72,7 @@ export default function AnalysisScreen() {
   // y of the document wrapper itself — the offsets above are relative to it.
   const bodyRef = useRef(0);
   const bodySv = useSharedValue(0);
-  const headerSv = useSharedValue(0);
+  const headerSv = useSharedValue(headerHeight(insets.top));
   const lastYSv = useSharedValue(0);
   const dirSv = useSharedValue(1);                               // +1 = scrolling down, -1 = up
   const activeSv = useSharedValue<string | null>(null);
@@ -100,7 +109,12 @@ export default function AnalysisScreen() {
   // The veil's contents are snapshotted at tap time (`items`) and start at the
   // section we'll restore the scroll to, so what it shows lines up with what's
   // underneath when it lifts.
-  const [veil, setVeil] = useState<{ from: number; items: VeilItem[] } | null>(null);
+  // `anchorId` is carried separately from `from` because the index can be stale
+  // or unknowable: when the Journal navigates straight here, the veil is raised
+  // before `sections` exists, so there is no index yet — but the id is enough to
+  // resolve one once the body builds, and the progressive reveal below has to
+  // mount that far or the section we mean to land on has no offset to land on.
+  const [veil, setVeil] = useState<{ from: number; items: VeilItem[]; anchorId?: string } | null>(null);
   const veilOp = useSharedValue(0);
   const stage = useRef<'idle' | 'in' | 'opaque' | 'out'>('idle');
   const fadeStarted = useRef(false);
@@ -125,13 +139,21 @@ export default function AnalysisScreen() {
 
   // Put the scroll where the new range should open — the section the user was
   // reading, or the top. Always runs while the veil is opaque, so it's unseen.
-  const restore = useCallback(() => {
-    if (!awaitingBody.current) return;
-    awaitingBody.current = false;
+  const restore = useCallback((force = false) => {
+    if (!awaitingBody.current) return true;
     const a = anchor.current;
     // Read the JS-side map, not the shared value: the offsets this very layout
     // pass just seeded haven't crossed to the UI runtime yet.
     const off = a ? offsetsRef.current[a.id] : null;
+    // An anchored section with no offset means this layout pass was NOT the
+    // document — on a cold tab the veil goes opaque and commits before the
+    // first build lands, so the body lays out as the empty-state text. Staying
+    // armed lets the next layout pass (the real one) do the scroll; consuming
+    // the flag here landed the user at the top and never looked again, which is
+    // exactly what tapping the Trend card into a cold Progress tab did.
+    // `force` is the ceiling timer giving up, and takes the top.
+    if (a && off == null && !force) return false;
+    awaitingBody.current = false;
     const y = off != null ? Math.max(0, off + bodyRef.current - headerRef.current - CONTENT_PAD) : 0;
     scrollRef.current?.scrollTo({ y, animated: false });
     lastYSv.value = y;
@@ -139,6 +161,7 @@ export default function AnalysisScreen() {
     // pinned on arrival — say so now rather than waiting for the scroll event,
     // so the pinned bar's fade-in also happens under the veil.
     if (a && off != null) { activeSv.value = a.id; setPinned(a.id, 1); }
+    return true;
   }, [lastYSv, activeSv, setPinned]);
 
   const clearVeil = useCallback(() => {
@@ -158,7 +181,7 @@ export default function AnalysisScreen() {
     if (pending.current != null || dirtyVeil.current) return;
     if (timers.current.ceiling) { clearTimeout(timers.current.ceiling); timers.current.ceiling = undefined; }
     if (timers.current.lift) { clearTimeout(timers.current.lift); timers.current.lift = undefined; }
-    restore();                             // no-op unless the ceiling beat the layout
+    restore(true);                         // no-op unless the ceiling beat the layout
     stage.current = 'out';
     veilOp.value = withTiming(0, VEIL_OUT, (fin) => { if (fin) runOnJS(clearVeil)(); });
   }, [restore, veilOp, clearVeil]);
@@ -230,7 +253,10 @@ export default function AnalysisScreen() {
     if (stage.current === 'in' && !fadeStarted.current) fadeUp();
   }, [fadeUp]);
 
-  const changeMode = useCallback((m: Mode) => {
+  /** `anchorId` overrides where the new range opens — the Journal's Trend card
+   *  passes the section its claim came from, so the user lands on that chart
+   *  instead of the top. Omitted, the anchor stays "wherever you were reading". */
+  const changeMode = useCallback((m: Mode, anchorId?: string) => {
     if (m === modeRef.current) return;
     modeRef.current = m;
     setMode(m);            // the pill has already moved itself; this is bookkeeping
@@ -245,13 +271,21 @@ export default function AnalysisScreen() {
       // Where to reopen: whatever section the user was reading. Flipping
       // Day→Week to see the same metric at a coarser resolution shouldn't
       // throw you back to the top of the page.
-      const id = pinnedRef.current;
+      const id = anchorId ?? pinnedRef.current;
       const i = id ? sectionsRef.current.findIndex((s) => s.id === id) : -1;
-      anchor.current = id && i > 0 ? { id, index: i } : null;
+      // `i < 0` with nothing built yet is the Journal navigating straight here
+      // before this tab has ever been focused (`renderArgs` is null, so
+      // `sections` is empty). That used to drop the requested anchor and land
+      // the user at the top of the page — the exact case the Trend card hits on
+      // first use. The index only dresses the veil; restore() resolves the id
+      // against the offsets the incoming layout seeds, so keep the id and let
+      // the veil start from the top.
+      const cold = i < 0 && sectionsRef.current.length === 0;
+      anchor.current = id && (i > 0 || cold) ? { id, index: Math.max(0, i) } : null;
       stage.current = 'in';
       fadeStarted.current = false;
       const from = anchor.current ? anchor.current.index : 0;
-      setVeil({ from, items: veilItems(sectionsRef.current, from) });
+      setVeil({ from, items: veilItems(sectionsRef.current, from), anchorId: anchor.current?.id });
     } else if (stage.current === 'opaque') {
       tryCommit();           // already hidden — swap as soon as the pill rests
     } else if (stage.current === 'out') {
@@ -261,8 +295,57 @@ export default function AnalysisScreen() {
     // stage === 'in': the fade is already running and will pick up `pending`.
   }, [tryCommit, fadeUp, onPillSettled]);
 
-  // Time-based downgrade (trial expires while parked on Week/Month/Year).
-  useEffect(() => { if (locked && mode !== 'day') changeMode('day'); }, [locked, mode, changeMode]);
+  // A trial expiring while parked on Week/Month/Year needs no forced downgrade:
+  // the range stays selected and the mask simply arrives over it.
+
+  // The Journal's Trend card navigates here asking for a specific range, so the
+  // user lands on the view its claim was computed from. A free user lands on the
+  // same view with the Pro mask over it — meeting their own faded month sells
+  // better than being dropped on a price list.
+  const rangeSignal = useProgressRangeSignal();
+  const scrollToSection = useCallback((id: string) => {
+    const off = offsetsRef.current[id];
+    if (off == null) return false;
+    const y = Math.max(0, off + bodyRef.current - headerRef.current - CONTENT_PAD);
+    // Not animated: arriving from another tab, a visible scroll from the top
+    // down to the section reads as the page moving on its own. The section
+    // should simply be what the page opened on.
+    scrollRef.current?.scrollTo({ y, animated: false });
+    lastYSv.value = y;
+    activeSv.value = id;
+    setPinned(id, 1);
+    return true;
+  }, [lastYSv, activeSv, setPinned]);
+  useEffect(() => {
+    const want = takeProgressRange();
+    if (!want) return;
+    // Build the document NOW if this tab has never been focused. The normal
+    // path waits for `focused` to flip, which happens after the tab transition
+    // — well after the veil has faded up, committed, and laid out an empty
+    // body. The user is being navigated here deliberately and the veil is
+    // already up to hide the cost, so there is nothing to defer for.
+    if (renderArgsRef.current == null) setRenderArgs(buildArgsRef.current);
+    if (want.mode !== modeRef.current) {
+      // The range is changing anyway: hand the section to the veil's anchor and
+      // the existing restore() lands there while the page is still hidden.
+      changeMode(want.mode as Mode, want.section);
+      return;
+    }
+    if (!want.section) return;
+    // Already on the requested range, so the veil's anchor never runs — jump
+    // there directly. Deferred past the tab transition (Screen scrolls itself
+    // to the top on focus, and the section offsets may not have been reported
+    // yet), then retried: on a cold tab the body has to build and lay out
+    // first, which the 350ms settle alone does not cover.
+    anchor.current = { id: want.section, index: 0 };   // in case a veiled rebuild lands first
+    let tries = 0;
+    const tick = () => {
+      if (scrollToSection(want.section!) || ++tries > 20) return;
+      timer = setTimeout(tick, 60);
+    };
+    let timer = setTimeout(tick, TAB_SETTLE_MS);
+    return () => clearTimeout(timer);
+  }, [rangeSignal, changeMode, scrollToSection]);
 
   // First layout of the freshly committed range. Children lay out before their
   // parent, so every mounted section has already reported its offset by now.
@@ -274,8 +357,10 @@ export default function AnalysisScreen() {
     bodyRef.current = e.nativeEvent.layout.y;
     bodySv.value = e.nativeEvent.layout.y;
     if (!awaitingBody.current) return;
-    restore();
-    scheduleLift();
+    // Only hand the page back once the anchored section was actually reached.
+    // A deferred restore stays armed for the next layout pass, and the ceiling
+    // timer is the backstop if that pass never comes.
+    if (restore()) scheduleLift();
   }, [bodySv, restore, scheduleLift]);
 
   // Building a range walks the whole journal, so keep the last build per range:
@@ -335,7 +420,16 @@ export default function AnalysisScreen() {
     const task = InteractionManager.runAfterInteractions(() => {
       if (renderArgsRef.current != null) return;   // beaten by a fast tab-in
       const built = buildWith(buildArgsRef.current, chartModeRef.current);
-      setVeil((v) => (v && v.items.length === 0 ? { from: 0, items: veilItems(built, 0) } : v));
+      // A cold veil raised by an incoming range request already carries its
+      // anchor id but no index, since nothing was built when it went up. Now
+      // that there is a document, resolve it — so the skeleton is dressed from
+      // the section the user is actually being taken to.
+      setVeil((v) => {
+        if (!v || v.items.length !== 0) return v;
+        const i = v.anchorId ? built.findIndex((s) => s.id === v.anchorId) : -1;
+        const from = i > 0 ? i : 0;
+        return { ...v, from, items: veilItems(built, from) };
+      });
     });
     return () => task.cancel();
   }, [buildWith]);
@@ -358,7 +452,7 @@ export default function AnalysisScreen() {
       dirtyVeil.current = true;
       veilOp.value = 1;
       const from = anchor.current ? anchor.current.index : 0;
-      setVeil({ from, items: veilItems(sectionsRef.current, from) });
+      setVeil({ from, items: veilItems(sectionsRef.current, from), anchorId: anchor.current?.id });
       return;
     }
     if (dirtyVeil.current) {
@@ -419,7 +513,17 @@ export default function AnalysisScreen() {
   // While the veil is up we mount straight through to the anchored section
   // instead, so its offset is real before we scroll to it — one bigger commit,
   // entirely hidden, beats waiting several reveal frames with the veil held up.
-  const revealed = useProgressiveReveal(sections, veil ? veil.from + INITIAL_SECTIONS : INITIAL_SECTIONS);
+  //
+  // The reveal target is resolved from the anchor's ID against the sections
+  // actually on hand, not from `veil.from`. `from` is snapshotted when the veil
+  // goes up, which for a request arriving from the Journal is BEFORE the
+  // document exists — it was 0, so only the first two sections mounted, the
+  // anchored one never reported an offset, and restore() fell back to y=0. That
+  // is the "tapping the Trend card leaves me at the Autonomic score" bug: the
+  // anchor was right, there was simply nothing mounted at the other end of it.
+  const anchorIdx = veil?.anchorId ? sections.findIndex((s) => s.id === veil.anchorId) : -1;
+  const revealFrom = Math.max(veil ? veil.from : 0, anchorIdx);
+  const revealed = useProgressiveReveal(sections, revealFrom + INITIAL_SECTIONS);
 
   const scrollToTop = () => scrollRef.current?.scrollTo({ y: 0, animated: true });
 
@@ -436,13 +540,12 @@ export default function AnalysisScreen() {
           <Segmented
             options={[
               { val: 'day', label: 'Day' },
-              { val: 'week', label: 'Week', locked },
-              { val: 'month', label: 'Month', locked },
-              { val: 'year', label: 'Year', locked },
+              { val: 'week', label: 'Week' },
+              { val: 'month', label: 'Month' },
+              { val: 'year', label: 'Year' },
             ]}
             value={mode}
             onChange={changeMode}
-            onLockedPress={openPaywall}
             onSettled={onPillSettled}
           />
         </View>
@@ -462,6 +565,17 @@ export default function AnalysisScreen() {
           {veil ? (
             <RangeVeil top={headerH} op={veilOp} items={veil.items} banner={demo && veil.from === 0} hrvFilt={hrvFilt} onLayout={onVeilLayout} />
           ) : null}
+          {/* Above the veil: the mask belongs to the range that was picked, not
+              to the rebuild, so it must not blink off while the veil is up. */}
+          {locked ? (
+        <LockedOverlay
+          visible={mode !== 'day'}
+          top={headerH}
+          title={`${MODE_LABEL[mode]} trends are locked`}
+          body="Free keeps the last 14 days on the Day view. Pro opens every range over your full history."
+          onUpgrade={openPaywall}
+        />
+      ) : null}
         </>
       }
     >
@@ -597,6 +711,8 @@ function RangeVeil({ top, op, items, banner, hrvFilt, onLayout }: {
     </Animated.View>
   );
 }
+
+const MODE_LABEL: Record<Mode, string> = { day: 'Day', week: 'Week', month: 'Month', year: 'Year' };
 
 /** Last-resort veil filling for the moments at launch before the pre-warm has
  *  produced real cards to shape skeletons from — reachable only by tabbing to

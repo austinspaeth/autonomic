@@ -87,7 +87,7 @@ export const fonts = {
  * The string carries its own leading space, so callers render it straight after
  * the value and add no spacing of their own.
  */
-const WORD_UNITS = new Set(['days', 'hours', 'mins', 'times', 'litres', 'reps', 'nights']);
+const WORD_UNITS = new Set(['days', 'hours', 'mins', 'times', 'litres', 'reps', 'nights', 'asleep', 'in bed', 'dip', 'minutes']);
 const NARROW_SPACE = '\u2005';
 export const readoutTail = (unit?: string | null, when?: string | null) => {
   const t = [unit || '', when || ''].filter(Boolean).join(' ');

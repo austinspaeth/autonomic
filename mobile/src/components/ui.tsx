@@ -5,14 +5,15 @@
  */
 import React from 'react';
 import {
-  Pressable, StyleProp, StyleSheet, Text, TextStyle, View, ViewProps, ViewStyle,
+  type LayoutChangeEvent, Linking, Platform, Pressable, StyleProp, StyleSheet, Text, TextStyle, View, ViewProps, ViewStyle,
 } from 'react-native';
 import Reanimated, {
-  Easing as REasing, interpolate, interpolateColor, runOnJS, useAnimatedStyle, useSharedValue,
-  withSpring, withTiming, type SharedValue,
+  Easing as REasing, Extrapolation, interpolate, interpolateColor, runOnJS, useAnimatedStyle,
+  useSharedValue, withSpring, withTiming, type SharedValue,
 } from 'react-native-reanimated';
 import { GRADE_COLORS, radius, space, type as T, usePalette } from '../theme';
 import type { ScoreCat } from '../lib/types';
+import { helpUrl, type HelpContent } from '../lib/help';
 import { Icon, IconName } from './Icon';
 import { useSheets } from './Sheet';
 
@@ -289,7 +290,7 @@ export function Button({ title, onPress, variant = 'default', style, disabled, o
 
 /* ---------- Help dot ---------- */
 /** Circled "?" beside a section title; opens a small sheet with an explanation. */
-export function HelpDot({ title, text }: { title: string; text: string }) {
+export function HelpDot({ title, text }: { title: string; text: HelpContent }) {
   const p = usePalette();
   const { openSheet } = useSheets();
   const open = () => openSheet(() => <HelpSheet title={title} text={text} />, { fitContent: true });
@@ -299,13 +300,48 @@ export function HelpDot({ title, text }: { title: string; text: string }) {
     </Pressable>
   );
 }
-function HelpSheet({ title, text }: { title: string; text: string }) {
+
+/**
+ * The info card itself, and the same three parts every time: title, "What it
+ * is", "Why it matters to me", then a Learn more button onto the article on
+ * autonomic.care. Copy lives beside the metric it explains (`HRV_HELP`,
+ * `BP_HELP`, `AnalysisCard.help`, ...), typed as `HelpContent` so a card cannot
+ * ship as one undifferentiated paragraph.
+ *
+ * The sheet's ✕ floats over the top-right corner (`Sheet.tsx`), so the title
+ * reserves room for it rather than running underneath.
+ */
+function HelpSheet({ title, text }: { title: string; text: HelpContent }) {
   const p = usePalette();
+  const { closeSheet } = useSheets();
+  const url = helpUrl(text, title, Platform.OS);
+  // Sits between the title and the body: brighter than the paragraph it heads,
+  // dimmer than the sheet title. The rule hugs the text (`alignSelf`) rather
+  // than spanning the sheet, so it reads as an underline, not a divider, and
+  // takes the label's own colour — the shared `opacity` dims both together.
+  const label = (s: string) => (
+    <Text style={{
+      alignSelf: 'flex-start', fontSize: 11.5, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1.1,
+      color: p.text, opacity: 0.7, borderBottomWidth: 2, borderBottomColor: p.text, paddingBottom: 5, marginBottom: 9,
+    }}>{s}</Text>
+  );
+  const para = (s: string) => <Text style={{ color: p.textDim, fontSize: 14.5, lineHeight: 22 }}>{s}</Text>;
   return (
     <View>
-      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 10 }}>{title}</Text>
-      <Text style={{ color: p.textDim, fontSize: 14.5, lineHeight: 22 }}>{text}</Text>
-      <View style={{ height: 10 }} />
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 16, paddingRight: 46 }}>{title}</Text>
+      {label('What it is')}
+      {para(text.what)}
+      <View style={{ height: 16 }} />
+      {label('Why it matters to me')}
+      {para(text.why)}
+      {url ? (
+        <View style={{ flexDirection: 'row', marginTop: 20 }}>
+          <Button
+            title="Learn more"
+            onPress={() => { closeSheet(); Linking.openURL(url).catch(() => { /* no browser */ }); }}
+          />
+        </View>
+      ) : <View style={{ height: 10 }} />}
     </View>
   );
 }
@@ -342,6 +378,39 @@ export function TextGhost({ style, sample, w, inset = 3, r = 6 }: {
   );
 }
 
+/* ---------- Link toggle ---------- */
+/**
+ * The series picker the chart cards wear: plain text links with a short
+ * underline under the active one, no container (unlike `Segmented`, which is a
+ * control the user is answering with — this only changes what a chart is
+ * showing). Wraps rather than scrolls, so a fifth option drops to a second row
+ * instead of hiding off the edge.
+ *
+ * Shared so the Progress metric cards (Both / Baseline / Training / Compare)
+ * and the sleep report's stage chart (Deep / REM / Core / Awake / Compare) are
+ * the same control and not two that merely resemble each other.
+ */
+export function LinkToggle<T extends string>({ options, value, onChange }: {
+  options: { val: T; label: string }[];
+  value: T;
+  onChange: (v: T) => void;
+}) {
+  const p = usePalette();
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', columnGap: 14, rowGap: 8 }}>
+      {options.map((o) => {
+        const on = o.val === value;
+        return (
+          <Pressable key={o.val} onPress={() => onChange(o.val)} hitSlop={6} style={{ alignItems: 'center' }}>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: on ? '#fff' : p.textDim }}>{o.label}</Text>
+            <View style={{ height: 2, borderRadius: 1, alignSelf: 'stretch', marginTop: 3, backgroundColor: on ? '#fff' : 'transparent' }} />
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
 /* ---------- Chip ---------- */
 export function Chip({ text, color }: { text: string; color: string }) {
   return (
@@ -360,3 +429,75 @@ const styles = StyleSheet.create({
 });
 
 export { space, radius, T, GRADE_COLORS };
+
+/* ---------- Accordion motion ---------- */
+/**
+ * Shared collapse/expand motion for the app's accordion cards (Journal streak
+ * card, the pro upsell, the annual offer, score-driver rows). Rotates a chevron
+ * in place (`chevStyle`) and reveals a body by animating its measured height
+ * with a paired fade (`bodyStyle`), on a plain timing curve — never a spring, so
+ * it can't overshoot.
+ *
+ * The body height is measured off an ABSOLUTELY-POSITIONED copy of the content
+ * (spread `measureStyle` onto the body's inner view): an absolute child is laid
+ * out at its natural height regardless of the parent's animated height, so
+ * `contentH` is correct from the first frame. Measuring inside the clipped,
+ * height-0 container instead reported 0 under the New Architecture until the
+ * first expand, so the row snapped open hard on that first tap (the "bounce").
+ *
+ * Lives here rather than beside its first caller because two feature files now
+ * use it, and a features/ → features/ import between them would be a cycle.
+ *
+ * Usage:
+ *   const acc = useAccordion(open);
+ *   <Animated.View style={acc.chevStyle}/>       // on the chevron
+ *   <Animated.View style={[{ overflow: 'hidden' }, acc.bodyStyle]}>
+ *     <View style={[acc.measureStyle, { paddingTop: 12 }]}>{body}</View>
+ *   </Animated.View>
+ *
+ * `chevron` overrides the rotation the arrow travels through, in degrees. The
+ * default (-90 → 0) is the app's row convention: a `chevron` icon points right
+ * while collapsed and down while open. A card that reads as "there is more
+ * below, tap to open" instead passes { from: 0, to: 180 } for down → up.
+ */
+export function useAccordion(open: boolean, startOpen = false, chevron: { from?: number; to?: number } = {}) {
+  const chevFrom = chevron.from ?? -90;
+  const chevTo = chevron.to ?? 0;
+  const rot = useSharedValue(startOpen ? 1 : 0);
+  const openV = useSharedValue(startOpen ? 1 : 0);
+  const [contentH, setContentH] = React.useState(0);
+  const mounted = React.useRef(false);
+
+  React.useEffect(() => {
+    // On the very first render, settle to the initial state instantly (a
+    // start-open card shouldn't animate itself open on mount); animate every
+    // toggle after that.
+    const instant = !mounted.current;
+    mounted.current = true;
+    rot.value = instant ? (open ? 1 : 0) : withTiming(open ? 1 : 0, { duration: 220 });
+    openV.value = instant
+      ? (open ? 1 : 0)
+      : withTiming(
+          open ? 1 : 0,
+          open
+            ? { duration: 260, easing: REasing.out(REasing.cubic) }
+            : { duration: 220, easing: REasing.inOut(REasing.cubic) },
+        );
+  }, [open, rot, openV]);
+
+  const chevStyle = useAnimatedStyle(() => ({ transform: [{ rotate: `${chevFrom + rot.value * (chevTo - chevFrom)}deg` }] }));
+  const bodyStyle = useAnimatedStyle(() => ({
+    height: openV.value * contentH,
+    opacity: interpolate(openV.value, [0.35, 1], [0, 1], Extrapolation.CLAMP),
+  }));
+  const onContentLayout = (e: LayoutChangeEvent) => {
+    const h = e.nativeEvent.layout.height;
+    if (h > 0) setContentH((prev) => (Math.abs(prev - h) > 0.5 ? h : prev));
+  };
+  return { chevStyle, bodyStyle, onContentLayout, measureStyle: MEASURE_STYLE };
+}
+
+/** Absolute inset so the measured body isn't constrained by the clipped, height-
+ *  animated container it sits inside (see useAccordion). Full-width, natural
+ *  height, top-anchored — the reveal clips it from the bottom. */
+const MEASURE_STYLE = { position: 'absolute' as const, left: 0, right: 0, top: 0 };

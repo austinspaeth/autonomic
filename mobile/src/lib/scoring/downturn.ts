@@ -12,9 +12,10 @@ import { TRIGGER_TYPES } from '../registry';
 import type { CustomTypes, Protocol } from '../types';
 import type { ScoreContext } from './index';
 import {
-  DEFAULT_PROTOCOL, activityGrade, dayCleanliness, scoreSet, sleepHours,
+  DEFAULT_PROTOCOL, activityGrade, dayCleanliness, sleepHours,
   type DaysMap,
 } from './day';
+import { keyRange, metricSeries } from '../trends/series';
 
 export type DownturnCause = 'triggers' | 'exertion' | 'sleep' | 'protocol' | 'unexplained';
 
@@ -28,7 +29,14 @@ export interface Downturn {
   /** Calendar days the slide covers (for "over the last N days" copy). */
   spanDays: number;
   cause: DownturnCause;
+  /** Short label for the crash notification (../reminders) and the sheet. */
   title: string;
+  /** The whole warning as ONE sentence carrying its own numbers, for the
+   *  Journal card. The card used to render `title` over a separate "Down 8
+   *  points over the last 3 days" readout; two lines of chrome to deliver one
+   *  fact, and it read as a different kind of object from the Trend card
+   *  directly below it. Both are now a single sentence with an emoji. */
+  headline: string;
   body: string;
   /** Everything found in the slide window, most likely driver first. */
   factors: DownturnFactor[];
@@ -47,15 +55,15 @@ export function detectDownturn(
   protocol: Protocol = DEFAULT_PROTOCOL,
   custom?: CustomTypes,
 ): Downturn | null {
+  // Scored-day extraction comes from the shared trend engine (../trends), so
+  // "what is this day's score" is answered in exactly one place. The thresholds
+  // and the verdict below are deliberately NOT shared: this function fires a
+  // crash notification (../reminders), so when it fires is user-visible and
+  // safety-adjacent, and it keeps its own tuning.
+  const keys = keyRange(dk, WINDOW, addDays);
+  const series = metricSeries(days, keys, ['score'], ctx).score;
   const scored: { k: string; s: number }[] = [];
-  for (let i = WINDOW - 1; i >= 0; i--) {
-    const k = addDays(dk, -i);
-    const d = days[k];
-    if (!d) continue;
-    const rs = (d.readings || []).slice().sort((a, b) => ((a.time as string) || '').localeCompare((b.time as string) || ''));
-    const { score } = scoreSet(rs, d, k, days, ctx);
-    if (score != null) scored.push({ k, s: score });
-  }
+  keys.forEach((k, i) => { const s = series[i]; if (s != null) scored.push({ k, s }); });
   const n = scored.length;
   if (n < MIN_SCORED || scored[n - 1].k !== dk) return null;
 
@@ -142,6 +150,13 @@ export function detectDownturn(
     ? (severity === 'alert' ? 'You may be crashing or getting sick' : 'Something looks off')
     : (severity === 'alert' ? 'Heading toward a crash' : 'Trending down');
 
+  // Kept to two lines on the card at 15pt, so the lead clause has to be short:
+  // the number and the window are the part the reader can act on.
+  const span = `${drop} points over the last ${spanDays} days`;
+  const headline = cause === 'unexplained'
+    ? (severity === 'alert' ? `You may be crashing or getting sick, down ${span}` : `Something looks off, score down ${span}`)
+    : (severity === 'alert' ? `Heading toward a crash, down ${span}` : `Autonomic score trending down ${span}`);
+
   // Everything found in the window, ordered by how likely it is the driver
   // (mirrors the cause priority above). Empty when the journal is clean.
   const factors: DownturnFactor[] = [];
@@ -169,5 +184,5 @@ export function detectDownturn(
     });
   });
 
-  return { severity, drop, spanDays, cause, title, body: BODY[cause], factors };
+  return { severity, drop, spanDays, cause, title, headline, body: BODY[cause], factors };
 }

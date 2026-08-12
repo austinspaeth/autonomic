@@ -35,7 +35,7 @@ import { workoutCandidateOf } from '../lib/health/workoutCandidate';
 import { typesFor } from '../lib/typeCatalog';
 import { computeScores } from '../lib/scoring';
 import { rrCoverageSec } from '../lib/hrvQuality';
-import { blankDay, getState, mutate, save, storeWaveform, useAppState } from '../store/store';
+import { blankDay, getState, mutate, save, storeSleepSeries, storeWaveform, useAppState } from '../store/store';
 import { DevicesScreen } from './Devices';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -152,6 +152,8 @@ async function importHealthHistory(onProgress?: (p: HistoryProgress) => void): P
         ...(n.hrHigh != null ? { hrHigh: n.hrHigh } : {}),
         ...(n.stages ? { stages: n.stages } : {}),
       };
+      // Series to the sidecar, summary numbers to the journal.
+      storeSleepSeries(n.dayKey, n);
       added++;
     }
 

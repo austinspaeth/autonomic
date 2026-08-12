@@ -7,8 +7,12 @@
  * this install first ran, because the server stamps the day the request
  * arrives. Two routes, no body, no response worth reading:
  *
- *   GET /ping/open/D082126   opened today by an install from that cohort
- *   GET /ping/sub/D082126    an install from that cohort became a subscriber
+ *   GET /ping/open/D082126I   opened today by an install from that cohort
+ *   GET /ping/sub/D082126I    an install from that cohort became a subscriber
+ *
+ * The trailing letter is the platform: I for iOS, A for Android. It is a
+ * property of the build, not of the person holding it, and it is what makes
+ * "how is Android doing" answerable without a second data source.
  *
  * What is deliberately absent: no device id, no install id, no session id, no
  * request body, no health data, no journal data, nothing about what the user
@@ -16,8 +20,9 @@
  * by every install born that day, so it names a day, not a person.
  *
  * Because there is no identifier, the server cannot de-duplicate, so THIS side
- * has to: at most one open ping per install per UTC day, and exactly one
- * subscribe ping per install, ever.
+ * has to: at most one open ping per install per Eastern day (the server's own
+ * bucket — see easternDay in ../lib/ping), and exactly one subscribe ping per
+ * install, ever.
  *
  * Bookkeeping lives in the plaintext `autonomic.flags` MMKV, the same instance
  * as the trial stamp and the review-prompt memory. That placement is the point:
@@ -31,14 +36,14 @@
  * phone, not an error worth a slot in the 40-entry support log — a lost ping
  * costs one count and retries on the next foreground.
  */
-import { AppState as RNAppState } from 'react-native';
+import { AppState as RNAppState, Platform } from 'react-native';
 import { MMKV } from 'react-native-mmkv';
-import { pingUrl, resolveCohort, shouldPingOpen, utcDay } from '../lib/ping';
+import { easternDay, pingUrl, platformCode, resolveCohort, shouldPingOpen } from '../lib/ping';
 import { getIapState, paywallBypassed, subscribeIap } from './iap';
 
 const FLAGS_ID = 'autonomic.flags';
 const KEY_COHORT = 'pingCohort';        // ISO date — this install's cohort, frozen once
-const KEY_LAST_OPEN = 'pingLastOpen';   // ISO date (UTC) of the last open ping sent
+const KEY_LAST_OPEN = 'pingLastOpen';   // ISO date (Eastern) of the last open ping sent
 const KEY_SUB_SENT = 'pingSubSent';     // '1' once the subscribe ping landed
 /** Written by ./tier.ts on first launch: this install's birthday. */
 const KEY_TRIAL_STARTED = 'trialStartedAt';
@@ -74,8 +79,9 @@ function cohortDate(nowMs: number): string {
 async function send(kind: 'open' | 'sub', cohort: string): Promise<boolean> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const url = pingUrl(kind, cohort, platformCode(Platform.OS));
   try {
-    const res = await fetch(pingUrl(kind, cohort), { method: 'GET', signal: controller.signal });
+    const res = await fetch(url, { method: 'GET', signal: controller.signal });
     return res.ok;
   } catch {
     return false;   // offline, DNS, timeout — all the same to us
@@ -102,7 +108,7 @@ async function pingOpen(): Promise<void> {
   if (!shouldPingOpen(read(KEY_LAST_OPEN), now)) return;
   inFlight = true;
   try {
-    if (await send('open', cohortDate(now))) write(KEY_LAST_OPEN, utcDay(now));
+    if (await send('open', cohortDate(now))) write(KEY_LAST_OPEN, easternDay(now));
   } finally {
     inFlight = false;
   }

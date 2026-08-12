@@ -37,11 +37,24 @@ import { logError } from '../lib/diagnostics/errorLog';
  *  wanted). The two must be listed together in fetchProducts. */
 export const YEARLY_SKU = 'com.autonomic.journal.yearly';
 export const MONTHLY_SKU = 'com.autonomic.journal.monthly';
-export const PRO_SKUS = [YEARLY_SKU, MONTHLY_SKU];
+/**
+ * The half-off year behind the annual offer card (src/lib/upsell/annual). A
+ * SEPARATE product rather than a discount on YEARLY_SKU: Apple can only target
+ * a price cut on an existing product through server-signed promotional offers,
+ * and the app has no signing endpoint. The consequence to remember is that this
+ * plan RENEWS at its own price — it is "half off, locked in", not "half off the
+ * first year". Same Apple subscription group as the other two, so a user can
+ * only ever hold one; its own Play subscription with a `yearly-promo` base plan.
+ * Never listed on the paywall — the offer card is its only door.
+ */
+export const PROMO_YEARLY_SKU = 'com.autonomic.journal.yearly.promo';
+export const PRO_SKUS = [YEARLY_SKU, MONTHLY_SKU, PROMO_YEARLY_SKU];
 const isProSku = (id?: string) => !!id && PRO_SKUS.includes(id);
 
 /** Fallback prices shown before the store returns the localized ones. */
-export const FALLBACK_PRICE: Record<string, string> = { [YEARLY_SKU]: '$49.99', [MONTHLY_SKU]: '$7.99' };
+export const FALLBACK_PRICE: Record<string, string> = {
+  [YEARLY_SKU]: '$49.99', [MONTHLY_SKU]: '$7.99', [PROMO_YEARLY_SKU]: '$24.99',
+};
 
 /** User-facing store name for UI copy. */
 export const storeName = () => (Platform.OS === 'android' ? 'Google Play' : 'App Store');

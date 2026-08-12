@@ -8,22 +8,25 @@
 (function () {
   'use strict';
 
+  /* There is no longer a status pill in the header: "Saved" was on screen
+     essentially always, which made it furniture rather than information.
+     Silence now means saved. Only the two states worth interrupting for say
+     anything, and they say it once per transition rather than on every tick of
+     a retry loop — otherwise a long offline stretch would toast forever. */
+  var lastNoisyStatus = null;
+
   function statusLabel(status, detail) {
-    var node = document.getElementById('syncStatus');
-    if (!node) return;
-    var map = {
-      idle: ['Saved', 'Saved to your account'],
-      loading: ['Loading…', 'Fetching your data'],
-      pending: ['Saving…', 'Changes queued'],
-      saving: ['Saving…', 'Writing to your account'],
-      synced: ['Saved', 'Saved to your account'],
-      offline: ['Offline', 'Working from this browser\'s cache — changes will sync when the connection returns'],
-      error: ['Retrying…', (detail && detail.message) || 'Could not save — retrying']
-    };
-    var entry = map[status] || map.idle;
-    node.textContent = entry[0];
-    node.title = entry[1];
-    node.dataset.state = status;
+    var noisy = status === 'error' || status === 'offline';
+    if (!noisy) { lastNoisyStatus = null; return; }
+    if (lastNoisyStatus === status) return;
+    lastNoisyStatus = status;
+    var toast = document.getElementById('toast');
+    if (!toast) return;
+    toast.textContent = status === 'offline'
+      ? 'Working from this browser\'s cache — changes will sync when the connection returns.'
+      : 'Could not save: ' + ((detail && detail.message) || 'no answer from the server') + '. Retrying.';
+    toast.classList.add('on');
+    setTimeout(function () { toast.classList.remove('on'); }, 6000);
   }
 
   function fatal(message) {
