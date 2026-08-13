@@ -8,7 +8,7 @@ keywords: "heart rate zones, Z1 Z2 Z3 Z4 Z5, maximum heart rate formula, 208 min
 date: 2026-08-11
 updated: 2026-08-11
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1536331568701-0b15cbb1a918?q=80&w=1760&auto=format&fit=crop"
+photoLocation: "https://images.unsplash.com/photo-1758520705189-a6b56a7ae832?q=80&w=3132&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
 photoAttribution: "Briana Tozour / Unsplash"
 tldr: "Heart rate zones divide effort into five bands as a percentage of your estimated maximum heart rate: Z1 under 60 percent, Z2 60 to 70, Z3 70 to 80, Z4 80 to 90, Z5 above 90. Autonomic estimates your maximum from your age using 208 minus 0.7 times age, which is a population average with a wide spread around it, and which reads badly if you take a beta blocker or if your heart rate is driven by orthostatic stress rather than effort. Zone 2 is where aerobic and autonomic base is rebuilt. In dysautonomia, work recumbent first, treat Z4 and Z5 minutes as a risk you accepted rather than a win, and read your zone chart beside your post-exertional malaise log rather than on its own."
 categories:
