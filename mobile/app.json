@@ -2,7 +2,7 @@
   "expo": {
     "name": "Autonomic",
     "slug": "autonomic",
-    "version": "1.24.1",
+    "version": "1.24.2",
     "scheme": "autonomic",
     "orientation": "portrait",
     "icon": "./assets/autonomic-icon.png",
@@ -99,6 +99,8 @@
         "android.permission.health.READ_BLOOD_PRESSURE",
         "android.permission.health.READ_WEIGHT",
         "android.permission.health.READ_SLEEP",
+        "android.permission.health.READ_EXERCISE",
+        "android.permission.health.READ_DISTANCE",
         "android.permission.health.WRITE_HEART_RATE",
         "android.permission.health.WRITE_RESTING_HEART_RATE",
         "android.permission.health.WRITE_HEART_RATE_VARIABILITY",

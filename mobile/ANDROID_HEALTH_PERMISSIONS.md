@@ -1,6 +1,8 @@
-# Pending: Health Connect workout permissions (needs a native build)
+# Health Connect workout permissions
 
-**Status: open.** The JS side ships; this part cannot go over the air.
+**Status: declared in app.json as of 1.24.2** (the two entries below are in
+`expo.android.permissions`). What remains is the Play Console step — see "Still
+to do" at the bottom. Everything above it is kept as the record of why.
 
 ## What's wrong
 
@@ -25,7 +27,14 @@ Consequences while it stands:
   `src/lib/health/askedAuth.ts`, which stops asking for anything still missing
   after the user has answered — but the underlying capability is still absent.
 
-## The fix
+## Still to do
+
+- [x] Declare both permissions in `app.json` (done in 1.24.2).
+- [ ] **Play Console: add Exercise and Distance to the Health Connect data-type
+      declaration form.** Without it the release is rejected.
+- [ ] Verify on a device after installing 1.24.2 (step 4 below).
+
+## The fix (for reference)
 
 1. Add both permissions to `app.json`:
 
