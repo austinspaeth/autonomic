@@ -16,7 +16,8 @@
 import type { Entry, SleepStages } from '../types';
 import { keyOf } from '../dates';
 import {
-  hasAskedAuth, markAskedAuth, markPromptedThisLaunch, promptedThisLaunch, shareAuthRequest,
+  hasAskedAuth, markAskedAuth, markPromptedThisLaunch, markUngrantable, promptedThisLaunch,
+  shareAuthRequest, ungrantable, ungrantableScope,
 } from './askedAuth';
 import { INTERRUPTED_AWAKE_MIN, NIGHT_END_HOUR, NIGHT_START_HOUR, nightKeyOf, type StageSpan } from './sleepSummary';
 import { thinSeries, type HrPoint, type RespPoint } from '../sleep/night';
@@ -270,7 +271,15 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
           const has = (w: { accessType: string; recordType: string }) =>
             have.some((g) => g.recordType === w.recordType && g.accessType === w.accessType);
           const setKey = `hc1:${READ_TYPES.join(',')}|${WRITE_TYPES.join(',')}`;
-          if (wanted.every(has)) { markAskedAuth(setKey); return true; }
+          // Permissions this build has already proven it cannot obtain (not
+          // declared in the manifest, or refused) don't count as "left to ask".
+          // Without this, one undeclared type re-opens the sheet forever, no
+          // matter how many times the user grants everything on offer.
+          const scope = ungrantableScope(setKey);
+          const blocked = ungrantable(scope);
+          const id = (w: { accessType: string; recordType: string }) => `${w.accessType}:${w.recordType}`;
+          const askable = wanted.filter((w) => !blocked.has(id(w)));
+          if (askable.every(has)) { markAskedAuth(setKey); return true; }
           // A grant is provably missing (Health Connect, unlike HealthKit, says
           // so), so entry paths ask rather than reading a permission-shaped
           // hole as "nothing recorded".
@@ -292,6 +301,16 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
           markPromptedThisLaunch();
           const granted = await mod.requestPermission(wanted);
           markAskedAuth(setKey);
+          // The user has now answered. Anything still missing is not obtainable
+          // on this build — remember it, so the next check doesn't reopen the
+          // sheet over a permission that can never come back granted.
+          try {
+            const after = await mod.getGrantedPermissions();
+            const stillMissing = wanted
+              .filter((w) => !after.some((g) => g.recordType === w.recordType && g.accessType === w.accessType))
+              .map(id);
+            markUngrantable(scope, stillMissing);
+          } catch { /* leave the memory alone; the per-launch cap still holds */ }
           return granted.length > 0;
         } catch { return false; }
       });

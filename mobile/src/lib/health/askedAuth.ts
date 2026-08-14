@@ -54,6 +54,51 @@ export function markAskedAuth(setKey: string): void {
   try { store()?.set(KEY, setKey); } catch { /* in-memory only */ }
 }
 
+/* ---------- permissions this build cannot actually obtain ---------- */
+
+/**
+ * A permission the app REQUESTS but does not DECLARE in its manifest can never
+ * be granted: Health Connect happily lists it in the sheet, the user taps
+ * Allow, and `getGrantedPermissions()` still comes back without it. Every later
+ * check then sees a missing grant, asks again, and the user answers the same
+ * question forever. (Shipped exactly that way: `ExerciseSession` + `Distance`
+ * were in READ_TYPES but `health.READ_EXERCISE` / `health.READ_DISTANCE` were
+ * missing from app.json's android.permissions.)
+ *
+ * A refusal has the same shape and deserves the same treatment, so rather than
+ * hard-coding which types are broken, we observe: whatever is still missing
+ * AFTER the user has answered the sheet is not obtainable right now, and asking
+ * for it again is nagging. Keyed by permission set + app version, so a build
+ * that adds the missing manifest entries (or a user who changes their mind in
+ * an app update) gets exactly one fresh attempt.
+ */
+const UNGRANTABLE_KEY = 'healthUngrantable';
+
+function appVersion(): string {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    return String(require('expo-constants').default?.expoConfig?.version ?? '?');
+  } catch { return '?'; }
+}
+
+/** Scope key for the memory below: this permission set, on this app version. */
+export const ungrantableScope = (setKey: string) => `${setKey}@${appVersion()}`;
+
+/** Permission ids (`read:HeartRate`) known to be unobtainable in this scope. */
+export function ungrantable(scope: string): Set<string> {
+  try {
+    const raw = store()?.getString(UNGRANTABLE_KEY);
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw) as { scope?: string; ids?: string[] };
+    return parsed?.scope === scope ? new Set(parsed.ids ?? []) : new Set();
+  } catch { return new Set(); }
+}
+
+/** Record what the user's answer left ungranted. Replaces any older scope. */
+export function markUngrantable(scope: string, ids: string[]): void {
+  try { store()?.set(UNGRANTABLE_KEY, JSON.stringify({ scope, ids })); } catch { /* in-memory only */ }
+}
+
 /* ---------- per-launch pacing ---------- */
 
 // Module-scoped on purpose: the cap is one prompt per app launch, so a user who
