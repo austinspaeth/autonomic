@@ -16,7 +16,7 @@ import { Button } from '../components/ui';
 import { radius, usePalette } from '../theme';
 import { notePaywallSeen } from '../lib/review';
 import {
-  useIap, subscribe, restore, refreshEntitlement,
+  useIap, subscribe, restore, refreshEntitlement, ensureIapReady, clearIapError,
   YEARLY_SKU, MONTHLY_SKU, priceOf, hasTrial,
 } from '../store/iap';
 
@@ -36,6 +36,19 @@ const VALUE: { icon: IconName; title: string; sub: string }[] = [
 ];
 
 const numeric = (s: string) => parseFloat(s.replace(/[^0-9.]/g, '')) || 0;
+
+/** A store failure has to be reported INSIDE the sheet: the sheet stack is one
+ *  RN Modal painted above the ToastProvider, so a toast here is invisible and
+ *  the tap reads as a dead button (see CLAUDE.md). */
+function StoreError({ text }: { text: string }) {
+  const p = usePalette();
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 9, padding: 12, borderRadius: radius.control, borderWidth: 1, borderColor: 'rgba(214,59,59,0.45)', backgroundColor: 'rgba(214,59,59,0.10)' }}>
+      <Icon name="alert" size={16} color="#d63b3b" />
+      <Text style={{ flex: 1, color: p.text, fontSize: 13, lineHeight: 19 }}>{text}</Text>
+    </View>
+  );
+}
 
 function ValueRow({ icon, title, sub }: { icon: IconName; title: string; sub: string }) {
   const p = usePalette();
@@ -96,13 +109,18 @@ export function usePaywall(): () => void {
 
 export function PaywallCard({ controls }: { controls: SheetControls }) {
   const p = usePalette();
-  const { isPro, products, purchasing } = useIap();
+  const { isPro, products, purchasing, error } = useIap();
   const { openSheet } = useSheets();
   const [sku, setSku] = useState(YEARLY_SKU);
 
   // Entitlement may have changed outside the purchase listener (e.g. returning
   // from the App Store subscribe sheet) — re-check whenever the card opens.
   useEffect(() => { refreshEntitlement(); }, []);
+  // A store connection that failed at launch (Play Billing routinely isn't up
+  // yet on a cold start: "Billing client not ready") left this card with no
+  // products for the whole session, which made every tap on Upgrade a silent
+  // no-op. Retry on open, and clear any failure from a previous visit.
+  useEffect(() => { clearIapError(); ensureIapReady(); }, []);
   // Someone who just met a subscription wall doesn't get asked for a review in
   // the same sitting (src/lib/review).
   useEffect(() => { notePaywallSeen(); }, []);
@@ -178,6 +196,7 @@ export function PaywallCard({ controls }: { controls: SheetControls }) {
       </View>
 
       <View style={{ gap: 12 }}>
+        {error ? <StoreError text={error} /> : null}
         <Button
           title={purchasing ? 'Starting…' : trial ? 'Start 7-day free trial' : 'Upgrade to Pro'}
           variant="primary"
@@ -235,7 +254,7 @@ const PRO_W = 88;
 
 export function FreeVsProCard({ controls }: { controls: SheetControls }) {
   const p = usePalette();
-  const { isPro, products, purchasing } = useIap();
+  const { isPro, products, purchasing, error } = useIap();
   // Purchase landed (from the CTA below, or restored) — close up.
   useEffect(() => { if (isPro) controls.close(); }, [isPro, controls]);
   const mPrice = priceOf(products.find((s) => s.productId === MONTHLY_SKU), MONTHLY_SKU);
@@ -314,6 +333,7 @@ export function FreeVsProCard({ controls }: { controls: SheetControls }) {
           (paddingBottom = footerH + 20), so no extra tail spacer here. */}
       <SheetFooter>
         <View style={{ flex: 1 }}>
+          {error ? <View style={{ marginBottom: 10 }}><StoreError text={error} /></View> : null}
           <Pressable
             onPress={() => subscribe(MONTHLY_SKU)}
             disabled={purchasing}

@@ -20,12 +20,13 @@
  * install (the runtime fingerprint changes; this can't ship as an OTA update).
  */
 import { useSyncExternalStore } from 'react';
-import { Platform } from 'react-native';
+import { AppState as RNAppState, Platform } from 'react-native';
 import {
   initConnection, endConnection, fetchProducts, getAvailablePurchases,
   requestPurchase, finishTransaction, deepLinkToSubscriptions,
   purchaseUpdatedListener, purchaseErrorListener,
   type ProductSubscription, type ProductSubscriptionAndroidOfferDetails,
+  type ExpoPurchaseError,
 } from 'expo-iap';
 import { isSideloadedAndroidBuild, isTestFlightBuild } from '../../modules/app-env';
 import { logError } from '../lib/diagnostics/errorLog';
@@ -159,6 +160,9 @@ type IapState = {
   products: IapProduct[];   // yearly + monthly, in that order
   activeSku?: string;       // which plan is currently entitled (if any)
   purchasing: boolean;
+  /** Last purchase failure, in the user's words. Cleared when a purchase
+   *  starts. Never set for a user cancellation — that isn't a failure. */
+  error?: string;
 };
 let state: IapState = { ready: false, isPro: false, products: [], purchasing: false };
 const listeners = new Set<() => void>();
@@ -168,6 +172,94 @@ const set = (p: Partial<IapState>) => { state = { ...state, ...p }; emit(); };
 let purchaseSub: { remove: () => void } | undefined;
 let errorSub: { remove: () => void } | undefined;
 let started = false;
+/** True only after a successful `initConnection()`. Kept separate from
+ *  `started` so a connection that failed at launch (Play services not ready on
+ *  a cold boot, no network) can be retried when the user actually taps buy —
+ *  otherwise the app spends the whole session with no products, and every tap
+ *  on Upgrade is a silent no-op. */
+let connected = false;
+
+const storeUnavailable = () =>
+  (Platform.OS !== 'ios' && Platform.OS !== 'android') || shouldBypassPaywall() || (__DEV__ && PREVIEW_PAYWALL);
+
+/** Play's billing service is a BOUND SERVICE, and the binding does not survive
+ *  the Play Store updating itself, the process being backgrounded for a while,
+ *  or a transient failure at cold start. Once it drops, every call fails with
+ *  "Billing client not ready" (`service-error` / `service-disconnected`) until
+ *  something calls initConnection again — which nothing did. That is how a
+ *  reachable, correctly-configured store still produced a paywall whose button
+ *  did nothing for a whole session. Anything below that talks to the store goes
+ *  through `withBilling`, which reconnects once and retries. */
+const NOT_READY = new Set(['service-error', 'service-disconnected', 'connection-closed', 'not-prepared', 'init-connection']);
+const isDisconnected = (e: unknown) =>
+  NOT_READY.has(codeOf(e)) || /not ready|disconnect/i.test(String((e as Error)?.message ?? ''));
+
+/** Re-establish the billing connection for real.
+ *
+ *  Calling `initConnection()` again is NOT enough on Android: expo-iap's native
+ *  module short-circuits it on a cached `connectionReady` flag (ExpoIapModule.kt)
+ *  that a service disconnect never clears — only `endConnection()` (or the
+ *  module being destroyed) does. So a plain retry resolves `true` against a dead
+ *  binding and the next call fails "Billing client not ready" all over again,
+ *  which is precisely why this never self-healed. Tear down, then connect. */
+async function reconnect() {
+  connected = false;
+  try { await endConnection(); } catch { /* nothing to tear down */ }
+  await connect();
+}
+
+/** Run a store call, re-establishing a dropped connection once and retrying. */
+async function withBilling<T>(fn: () => Promise<T>): Promise<T> {
+  await connect();
+  try {
+    return await fn();
+  } catch (e) {
+    if (!isDisconnected(e)) throw e;
+    await reconnect();
+    return fn();
+  }
+}
+
+/** Connect once, register the purchase listeners once. Throws on failure so
+ *  callers can report it; leaves `connected` false so the next call retries. */
+async function connect() {
+  if (connected) return;
+  await initConnection();   // expo-iap is StoreKit 2 on iOS by default
+  connected = true;
+  if (!purchaseSub) {
+    purchaseSub = purchaseUpdatedListener(async (purchase) => {
+      // Fires on a new purchase, a trial start, and each renewal.
+      // Android can deliver PENDING purchases (e.g. cash top-up pending);
+      // don't grant Pro or acknowledge until it completes.
+      if (purchase.purchaseState === 'pending') return;
+      try { await finishTransaction({ purchase, isConsumable: false }); } catch { /* already finished */ }
+      set({ isPro: true, activeSku: purchase.productId, purchasing: false, error: undefined });
+    });
+  }
+  if (!errorSub) {
+    errorSub = purchaseErrorListener((e) => {
+      // The store's own failure path (Play's dialog closing on an error, a
+      // declined card). A cancel is not a failure and says nothing.
+      if (isCancel(e)) { set({ purchasing: false }); return; }
+      logError('iap.purchaseError', e);
+      set({ purchasing: false, error: purchaseMessage(e) });
+    });
+  }
+}
+
+/** Fetch the subscription products, if we don't already hold them. Throws. */
+async function loadProducts(): Promise<IapProduct[]> {
+  if (state.products.length) return state.products;
+  const fetched = (await withBilling(
+    () => fetchProducts({ skus: PRO_SKUS, type: 'subs' }),
+  )) as ProductSubscription[] | null;
+  const products = (fetched || [])
+    .map(normalize)
+    // Keep a stable order: yearly first, then monthly.
+    .sort((a, b) => PRO_SKUS.indexOf(a.productId) - PRO_SKUS.indexOf(b.productId));
+  set({ products });
+  return products;
+}
 
 /** Call once at app start. Dev/TestFlight builds resolve straight to Pro. */
 export async function initIap() {
@@ -178,31 +270,47 @@ export async function initIap() {
     set({ ready: true, isPro: true });
     return;
   }
-  try {
-    await initConnection();   // expo-iap is StoreKit 2 on iOS by default
-    purchaseSub = purchaseUpdatedListener(async (purchase) => {
-      // Fires on a new purchase, a trial start, and each renewal.
-      // Android can deliver PENDING purchases (e.g. cash top-up pending);
-      // don't grant Pro or acknowledge until it completes.
-      if (purchase.purchaseState === 'pending') return;
-      try { await finishTransaction({ purchase, isConsumable: false }); } catch { /* already finished */ }
-      set({ isPro: true, activeSku: purchase.productId, purchasing: false });
-    });
-    errorSub = purchaseErrorListener(() => set({ purchasing: false }));
-    const fetched = (await fetchProducts({ skus: PRO_SKUS, type: 'subs' })) as ProductSubscription[] | null;
-    const products = (fetched || [])
-      .map(normalize)
-      // Keep a stable order: yearly first, then monthly.
-      .sort((a, b) => PRO_SKUS.indexOf(a.productId) - PRO_SKUS.indexOf(b.productId));
-    set({ products });
-    await refreshEntitlement();
-  } catch (e) {
-    // swallow; treated as not-Pro (paywall shows, app is not bricked). Logged
-    // because "it says I'm not subscribed" arrives with no other evidence.
-    logError('iap.init', e);
-  } finally {
-    set({ ready: true });
+  // Play Billing is frequently not up yet at cold start ("Billing client not
+  // ready"), so a single attempt at launch is a coin flip — and losing it used
+  // to cost the whole session. Back off and try again; the user isn't waiting
+  // on this (`ready` is set after the first attempt so the UI never blocks).
+  for (let attempt = 0; attempt < INIT_ATTEMPTS; attempt += 1) {
+    try {
+      await loadProducts();
+      await refreshEntitlement();
+      break;
+    } catch (e) {
+      // Not fatal: treated as not-Pro (the paywall shows, the app is not
+      // bricked). Logged because "it says I'm not subscribed" arrives with no
+      // other evidence. Only the last attempt is logged, so a cold-start
+      // hiccup that heals on retry doesn't flush the 40-entry support log.
+      if (attempt === INIT_ATTEMPTS - 1) logError('iap.init', e);
+      else await delay(INIT_BACKOFF_MS[attempt]);
+    } finally {
+      set({ ready: true });
+    }
   }
+  // The billing connection also dies while the app is backgrounded. Re-heal on
+  // the way back in, rather than at the moment the user taps buy.
+  try {
+    RNAppState.addEventListener('change', (s) => {
+      if (s !== 'active') return;
+      void ensureIapReady();
+      void refreshEntitlement();
+    });
+  } catch { /* no AppState here (jest / bare node) */ }
+}
+
+const INIT_ATTEMPTS = 3;
+const INIT_BACKOFF_MS = [1_500, 5_000];
+const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Re-attempt the store connection + product fetch. Called when the paywall
+ *  opens, so a card raised after a failed launch still has real prices and a
+ *  working button. Silent: the card shows fallback prices either way. */
+export async function ensureIapReady() {
+  if (storeUnavailable() || state.products.length) return;
+  try { await loadProducts(); } catch (e) { logError('iap.retryProducts', e); }
 }
 
 /** Active entitlements only — StoreKit 2 currentEntitlements on iOS, the
@@ -212,41 +320,136 @@ export async function refreshEntitlement(): Promise<boolean> {
   if (__DEV__ && PREVIEW_PAYWALL) return false;   // preview: never call the store
   if ((Platform.OS !== 'ios' && Platform.OS !== 'android') || shouldBypassPaywall()) return state.isPro;
   try {
-    const active = await getAvailablePurchases(
+    const active = await withBilling(() => getAvailablePurchases(
       Platform.OS === 'ios' ? { onlyIncludeActiveItemsIOS: true } : undefined,
-    );
+    ));
     const hit = (active || []).find((p) => isProSku(p.productId) && p.purchaseState !== 'pending');
     set({ isPro: !!hit, activeSku: hit?.productId });
   } catch (e) { logError('iap.entitlement', e); /* keep last known entitlement */ }
   return state.isPro;
 }
 
-/** Start the subscribe/free-trial flow for a specific plan. Success arrives via
- *  the listener. Defaults to yearly. */
-export async function subscribe(sku: string = YEARLY_SKU) {
-  if (state.purchasing) return;
-  set({ purchasing: true });
-  try {
-    if (Platform.OS === 'android') {
-      // Play Billing needs the chosen offer's token alongside the sku.
-      const product = state.products.find((s) => s.productId === sku)?.raw;
-      const offer = bestAndroidOffer(product);
-      if (!offer) throw new Error('No subscription offer available');
-      await requestPurchase({
-        type: 'subs',
-        request: { google: { skus: [sku], subscriptionOffers: [{ sku, offerToken: offer.offerToken }] } },
-      });
-    } else {
-      await requestPurchase({ type: 'subs', request: { apple: { sku } } });
+/* ---------- failure reporting ----------
+ * A purchase that fails silently is indistinguishable from a dead button, and
+ * that is exactly how this reached a user's phone: `subscribe()` swallowed
+ * every error, so an empty product list (a store connection that never came
+ * up, a plan not live in the console) made "Upgrade to Pro" do nothing at all,
+ * with nothing in the support dump either. Every failure below now lands in
+ * `state.error` AND in the error log. */
+
+const codeOf = (e: unknown): string =>
+  String((e as ExpoPurchaseError | undefined)?.code ?? '');
+
+/** Backing out of the store's own sheet. Not a failure, and says nothing. */
+const isCancel = (e: unknown) => {
+  const c = codeOf(e).toLowerCase();
+  return c.includes('cancel') || /cancell?ed/i.test(String((e as Error)?.message ?? ''));
+};
+
+/** What to tell the user. Deliberately plain, and always ending somewhere they
+ *  can act — the store's name, or "try again". */
+function purchaseMessage(e: unknown): string {
+  const store = storeName();
+  switch (codeOf(e)) {
+    case 'network-error':
+    case 'service-timeout':
+      return `Couldn’t reach ${store}. Check your connection and try again.`;
+    case 'billing-unavailable':
+    case 'iap-not-available':
+    case 'service-disconnected':
+    case 'service-error':
+      return `${store} isn’t available on this device right now. Make sure you’re signed in to ${store}, then try again.`;
+    case 'item-unavailable':
+    case 'sku-not-found':
+    case 'query-product':
+      return `This plan isn’t available on your ${store} account yet. Try again shortly.`;
+    case 'already-owned':
+    case 'duplicate-purchase':
+      return 'You already have a subscription. Tap Restore purchase.';
+    case 'deferred-payment':
+    case 'pending':
+      return `${store} is still processing this purchase. Pro unlocks as soon as it clears.`;
+    case 'developer-error':
+      return `${store} rejected the request for this plan. Please contact support.`;
+    default: {
+      const m = String((e as Error)?.message ?? '').trim();
+      return m ? `Purchase couldn’t start: ${m}` : 'Purchase couldn’t start. Please try again.';
     }
-  } catch {
-    set({ purchasing: false });   // user cancelled or a store error
   }
 }
 
-/** Apple requires a visible "Restore purchases" control (harmless on Play). */
+/** Clear a stale failure (e.g. when the paywall re-opens). */
+export const clearIapError = () => { if (state.error) set({ error: undefined }); };
+
+/** Start the subscribe/free-trial flow for a specific plan. Success arrives via
+ *  the listener. Defaults to yearly. Resolves true when the store flow was
+ *  handed off; false when it couldn't start (and `state.error` says why). */
+export async function subscribe(sku: string = YEARLY_SKU): Promise<boolean> {
+  if (state.purchasing) return false;
+  set({ purchasing: true, error: undefined });
+  try {
+    if (storeUnavailable()) throw new Error(`${storeName()} purchases aren’t available in this build.`);
+    // Retry the connection/fetch here rather than trusting launch: on Android
+    // the Play Billing connection often isn't up yet at cold start. A plan the
+    // launch fetch missed is also re-fetched here, so a session that started
+    // with no products can still buy.
+    let products = await loadProducts();
+    // Play offer tokens belong to the ProductDetails they came from, and the
+    // ones we cached are stale after a reconnect (or simply old, in a session
+    // left open for days). If the plan is missing a usable offer, re-query
+    // before deciding it can't be bought.
+    if (Platform.OS === 'android' && !bestAndroidOffer(products.find((s) => s.productId === sku)?.raw)) {
+      set({ products: [] });
+      products = await loadProducts();
+    }
+    if (Platform.OS === 'android') {
+      // Play Billing needs the chosen offer's token alongside the sku.
+      const product = products.find((s) => s.productId === sku)?.raw;
+      const offer = bestAndroidOffer(product);
+      if (!offer) {
+        throw Object.assign(
+          new Error(product ? `No purchasable offer on ${sku}` : `${sku} not returned by Google Play`),
+          { code: product ? 'sku-offer-mismatch' : 'sku-not-found' },
+        );
+      }
+      await withBilling(() => requestPurchase({
+        type: 'subs',
+        request: { google: { skus: [sku], subscriptionOffers: [{ sku, offerToken: offer.offerToken }] } },
+      }));
+    } else {
+      await withBilling(() => requestPurchase({ type: 'subs', request: { apple: { sku } } }));
+    }
+    // The store sheet is up. purchasing clears on the purchase or error
+    // listener; the watchdog below covers a flow that ends with neither
+    // (backing out of Play's sheet doesn't always emit an error), which would
+    // otherwise leave the button stuck on "Starting…" for the whole session.
+    armPurchaseWatchdog();
+    return true;
+  } catch (e) {
+    if (isCancel(e)) { set({ purchasing: false }); return false; }
+    logError('iap.purchase', e);
+    set({ purchasing: false, error: purchaseMessage(e) });
+    return false;
+  }
+}
+
+let watchdog: ReturnType<typeof setTimeout> | undefined;
+function armPurchaseWatchdog() {
+  if (watchdog) clearTimeout(watchdog);
+  watchdog = setTimeout(() => {
+    watchdog = undefined;
+    if (state.purchasing) set({ purchasing: false });
+  }, 120_000);
+}
+
+/** Apple requires a visible "Restore purchases" control (harmless on Play).
+ *  Reports its own outcome: a restore that finds nothing has to SAY so, or it
+ *  is another button that looks broken. */
 export async function restore(): Promise<boolean> {
-  return refreshEntitlement();
+  set({ error: undefined });
+  const pro = await refreshEntitlement();
+  if (!pro) set({ error: `No active subscription found on this ${storeName()} account.` });
+  return pro;
 }
 
 /** Deep-link to the store's Manage-Subscriptions screen (cancel / change plan). */
@@ -259,8 +462,10 @@ export async function manageSubscription() {
 export function teardownIap() {
   purchaseSub?.remove();
   errorSub?.remove();
+  purchaseSub = errorSub = undefined;
   endConnection().catch(() => {});
   started = false;
+  connected = false;
 }
 
 export function useIap(): IapState {

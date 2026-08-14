@@ -80,7 +80,7 @@ const TICK_MS = 30_000;
 
 export function AnnualOfferCard() {
   const p = usePalette();
-  const { products, purchasing } = useIap();
+  const { products, purchasing, error } = useIap();
   const { depth } = useSheets();
   const state = useAppState();
   const tier = useTier();
@@ -225,6 +225,12 @@ export function AnnualOfferCard() {
             >
               <Text style={{ color: '#fff', fontSize: 15.5, fontWeight: '700' }}>{purchasing ? 'Starting…' : 'Claim half off'}</Text>
             </Pressable>
+
+            {/* A store failure has to be said out loud here too, or the button
+                just flashes "Starting…" and reverts (see src/store/iap.ts). */}
+            {error ? (
+              <Text style={{ color: '#d63b3b', fontSize: 12, lineHeight: 17, textAlign: 'center', marginTop: 9 }}>{error}</Text>
+            ) : null}
 
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, marginTop: 11 }}>
               <Animated.View style={[{ width: 5, height: 5, borderRadius: 3, backgroundColor: p.accent }, dotStyle]} />
