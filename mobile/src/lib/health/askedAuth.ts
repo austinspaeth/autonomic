@@ -8,6 +8,11 @@
  * sync) all request, so a missing grant can never leave a surface quietly
  * empty. What keeps that from nagging:
  *   - nothing left to ask ⇒ no request at all (the platform is consulted first);
+ *   - this exact set already asked ⇒ no request either (`hasAskedAuth`). This
+ *     one matters most on Android: Health Connect lets the user grant a SUBSET,
+ *     so "something is still missing" is the permanent steady state and is not
+ *     a reason to ask again. Both platforms consult it now; the Android path
+ *     once didn't, and re-raised the whole sheet on every cold start;
  *   - otherwise at most ONE prompt per app launch (`promptedThisLaunch`);
  *   - concurrent callers share one request (`shareAuthRequest`), so two checks
  *     firing at once can't stack two sheets.

@@ -16,7 +16,7 @@
 import type { Entry, SleepStages } from '../types';
 import { keyOf } from '../dates';
 import {
-  markAskedAuth, markPromptedThisLaunch, promptedThisLaunch, shareAuthRequest,
+  hasAskedAuth, markAskedAuth, markPromptedThisLaunch, promptedThisLaunch, shareAuthRequest,
 } from './askedAuth';
 import { INTERRUPTED_AWAKE_MIN, NIGHT_END_HOUR, NIGHT_START_HOUR, nightKeyOf, type StageSpan } from './sleepSummary';
 import { thinSeries, type HrPoint, type RespPoint } from '../sleep/night';
@@ -273,8 +273,21 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
           if (wanted.every(has)) { markAskedAuth(setKey); return true; }
           // A grant is provably missing (Health Connect, unlike HealthKit, says
           // so), so entry paths ask rather than reading a permission-shaped
-          // hole as "nothing recorded". Bounded to one prompt per launch: two
-          // dismissals of the permission activity permanently block it.
+          // hole as "nothing recorded".
+          //
+          // But "missing" is the NORMAL steady state: Health Connect lets the
+          // user grant a subset, and the ones they left off (Distance and
+          // Exercise, in practice) are missing on every launch forever. This
+          // path only paced itself per launch and never consulted the asked-set
+          // memory that the iOS path uses (src/lib/health/index.ts), so the
+          // whole set was re-requested on EVERY cold start — the user answers,
+          // and is asked the same question again next time they open the app.
+          // Once we have asked for this exact set, the answer stands: only an
+          // explicit Connect press (`force`) or a set that changed because the
+          // app shipped a new record type (the key carries the set) asks again.
+          if (!force && hasAskedAuth(setKey)) return have.length > 0;
+          // Bounded to one prompt per launch besides: two dismissals of the
+          // permission activity permanently block it.
           if (!force && promptedThisLaunch()) return have.length > 0;
           markPromptedThisLaunch();
           const granted = await mod.requestPermission(wanted);
