@@ -129,6 +129,38 @@ window.Sync = (function () {
     return out;
   }
 
+  var SALE_PLANS = ['monthly', 'annual', 'lifetime', 'unknown'];
+
+  /* Mirrors cleanSale() in the Lambda, field for field and guard for guard. A
+     row the server would silently reshape (a cohort on a qty>1 aggregate, a
+     cancellation before the purchase) has to be reshaped identically here, or
+     the diff reports it as changed on every single push forever. */
+  function normalizeSale(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    var id = String(raw.id || '').slice(0, 64);
+    if (!id) return null;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(raw.date || ''))) return null;
+    var price = Number(raw.price);
+    if (!isFinite(price)) return null;
+    var qty = Number(raw.qty);
+    var out = {
+      id: id, date: raw.date,
+      platform: raw.platform === 'android' ? 'android' : 'ios',
+      plan: SALE_PLANS.indexOf(raw.plan) >= 0 ? raw.plan : 'unknown',
+      price: price,
+      qty: isFinite(qty) && qty >= 1 ? Math.round(qty) : 1
+    };
+    if (out.qty === 1 && /^\d{4}-\d{2}-\d{2}$/.test(String(raw.cohort || '')) && raw.cohort <= out.date) {
+      out.cohort = raw.cohort;
+    }
+    if (/^\d{4}-\d{2}-\d{2}$/.test(String(raw.cancelled || '')) && raw.cancelled >= out.date) {
+      out.cancelled = raw.cancelled;
+    }
+    if (raw.refunded) out.refunded = true;
+    if (raw.note) out.note = String(raw.note).slice(0, 2000);
+    return out;
+  }
+
   function snapshotOf(db, state) {
     var entries = new Map();
     (db.entries || []).forEach(function (e) {
@@ -150,8 +182,13 @@ window.Sync = (function () {
       var n = normalizeCost(c);
       if (n) costsMap.set(n.id, stable(n));
     });
+    var salesMap = new Map();
+    (db.sales || []).forEach(function (r) {
+      var n = normalizeSale(r);
+      if (n) salesMap.set(n.id, stable(n));
+    });
     return {
-      entries: entries, events: events, ads: adsMap, costs: costsMap,
+      entries: entries, events: events, ads: adsMap, costs: costsMap, sales: salesMap,
       settings: stable(db.settings || {}), ui: stable(state || {})
     };
   }
@@ -207,8 +244,8 @@ window.Sync = (function () {
 
     /* Ads and costs diff exactly like events: keyed by id, upserts for anything
        whose JSON moved, deletes for anything the baseline had and we no longer
-       do. Factored because there are now three id-keyed collections and a
-       fourth copy of this loop would be where they start to disagree. */
+       do. Factored because there are now four id-keyed collections and a
+       fifth copy of this loop would be where they start to disagree. */
     function diffById(name) {
       var ups = [], dels = [];
       now[name].forEach(function (json, id) {
@@ -223,12 +260,15 @@ window.Sync = (function () {
     }
     var adDiff = diffById('ads');
     var costDiff = diffById('costs');
+    var saleDiff = diffById('sales');
 
     var payload = {};
     if (adDiff.ups.length) payload.adUpserts = adDiff.ups;
     if (adDiff.dels.length) payload.adDeletes = adDiff.dels;
     if (costDiff.ups.length) payload.costUpserts = costDiff.ups;
     if (costDiff.dels.length) payload.costDeletes = costDiff.dels;
+    if (saleDiff.ups.length) payload.saleUpserts = saleDiff.ups;
+    if (saleDiff.dels.length) payload.saleDeletes = saleDiff.dels;
     if (upserts.length) payload.upserts = upserts;
     if (deletes.length) payload.deletes = deletes;
     if (eventUpserts.length) payload.eventUpserts = eventUpserts;
@@ -277,9 +317,9 @@ window.Sync = (function () {
   }
 
   /**
-   * Replace the server's entries wholesale. Used by "Delete all data" and by a
-   * JSON-backup restore, where a diff would be the wrong shape (the client's
-   * idea of what existed is exactly what's being thrown away).
+   * Replace the server's entries and sales wholesale. Used by "Delete all data"
+   * and by a JSON-backup restore, where a diff would be the wrong shape (the
+   * client's idea of what existed is exactly what's being thrown away).
    */
   function replaceAll() {
     if (!getStore) return Promise.resolve();
@@ -290,6 +330,10 @@ window.Sync = (function () {
     setStatus('saving');
     return window.Api.call('REPLACE_ALL', {
       entries: (store.db.entries || []).map(normalize).filter(Boolean),
+      /* Sent alongside the entries, because this call adopts its own snapshot
+         as the baseline and cancels any pending push — a sale delete produced
+         by the ordinary diff a moment earlier would be thrown away unsent. */
+      sales: (store.db.sales || []).map(normalizeSale).filter(Boolean),
       settings: store.db.settings
     }).then(function () {
       inFlight = false;

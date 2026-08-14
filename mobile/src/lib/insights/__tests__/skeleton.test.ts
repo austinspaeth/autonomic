@@ -31,24 +31,25 @@ const atLeast = (sample: string, real: string) => {
 };
 
 describe('skeleton samples cover the paragraphs they reserve', () => {
-  it('reserves the headline card body', () => {
-    atLeast(SAMPLE.body, report.change!.body);
+  it('reserves the headline card headline', () => {
+    atLeast(SAMPLE.headline, report.change!.headline);
   });
 
-  it('reserves the tallest observation body any probe can produce', () => {
-    // Every probe's copy has to fit, not just the one that happened to win.
+  it('reserves the longest observation TITLE any probe can produce', () => {
+    // The rows show titles only now, and every probe's has to fit — not just the
+    // one that happened to win.
     expect(report.observations.length).toBeGreaterThan(0);
-    report.observations.forEach((o) => atLeast(SAMPLE.obsBody, o.body));
+    report.observations.forEach((o) => atLeast(SAMPLE.obsTitle, o.title));
   });
 
   it('reserves a correlation row and a trend-watch row', () => {
-    report.correlations.slice(0, VISIBLE_CORRELATIONS).forEach((c) => atLeast(SAMPLE.rowNote, c.note));
-    report.watch.forEach((t) => atLeast(SAMPLE.watchSub, t.sub));
+    report.correlations.slice(0, VISIBLE_CORRELATIONS).forEach((c) => atLeast(SAMPLE.pair, `${c.driver} → ${c.metric}`));
+    report.watch.forEach((t) => atLeast(SAMPLE.watchTitle, t.title));
   });
 
   it('carries no samples it no longer measures with', () => {
     // Dead samples are worse than none: they look like a guarantee and give one.
-    expect(Object.keys(SAMPLE).sort()).toEqual(['body', 'obsBody', 'rowNote', 'watchSub']);
+    expect(Object.keys(SAMPLE).sort()).toEqual(['headline', 'obsTitle', 'pair', 'watchTitle']);
   });
 });
 

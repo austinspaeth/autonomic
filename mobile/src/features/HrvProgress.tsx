@@ -174,7 +174,13 @@ function readAnyHrv(d: DayRecord, key: string, filt?: (r: Entry) => boolean): nu
   return out;
 }
 
-export function HrvProgress({ days, mode, ctx, filt }: { days: DaysMap; mode: Mode; ctx: ScoreContext; filt: Filt }) {
+export function HrvProgress({ days, mode, ctx, filt, onCardLayout }: {
+  days: DaysMap; mode: Mode; ctx: ScoreContext; filt: Filt;
+  /** Reports where each metric block sits inside the HRV section, keyed by its
+   *  own label ('RMSSD', 'Power distribution'), so Progress can be navigated to a
+   *  metric rather than to the top of a section several charts long. */
+  onCardLayout?: (card: string, y: number) => void;
+}) {
   const p = usePalette();
 
   const view = useMemo(() => {
@@ -219,15 +225,21 @@ export function HrvProgress({ days, mode, ctx, filt }: { days: DaysMap; mode: Mo
       ) : (
         <>
           {view.hasPower ? (
-            <PowerSection bl={view.bl} vlf={view.vlf} lf={view.lf} hf={view.hf} />
+            <View onLayout={(e) => onCardLayout?.('Power distribution', e.nativeEvent.layout.y)}>
+              <PowerSection bl={view.bl} vlf={view.vlf} lf={view.lf} hf={view.hf} />
+            </View>
           ) : null}
 
           {view.metricCharts.map(({ m, structured, unstructured, combined }) => (
             <React.Fragment key={m.label}>
               {m.s === 'stressIndex' && view.hasBalance ? (
-                <BalanceSection bl={view.bl} pns={view.pnsB} sns={view.snsB} />
+                <View onLayout={(e) => onCardLayout?.('Balance', e.nativeEvent.layout.y)}>
+                  <BalanceSection bl={view.bl} pns={view.pnsB} sns={view.snsB} />
+                </View>
               ) : null}
-              <MetricSection m={m} structured={structured} unstructured={unstructured} combined={combined} buckets={view.bl} />
+              <View onLayout={(e) => onCardLayout?.(m.label, e.nativeEvent.layout.y)}>
+                <MetricSection m={m} structured={structured} unstructured={unstructured} combined={combined} buckets={view.bl} />
+              </View>
             </React.Fragment>
           ))}
         </>

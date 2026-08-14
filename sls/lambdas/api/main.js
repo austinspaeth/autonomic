@@ -7,9 +7,9 @@
  * the email allowlist below is the actual access control. Never remove it.
  *
  * Actions:
- *   LOAD         -> { entries, settings, ui }
+ *   LOAD         -> { entries, events, ads, costs, sales, settings, ui }
  *   SYNC         { upserts, deletes, settings, ui } -> applies a client diff
- *   REPLACE_ALL  { entries, settings } -> wipes and rewrites every entry
+ *   REPLACE_ALL  { entries, sales, settings } -> wipes and rewrites both
  *   PINGS        { since } -> the mobile app's cohort-ping counters
  */
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
@@ -139,6 +139,40 @@ const cleanAd = (raw) => {
   return out;
 };
 
+/* A single PURCHASE. Sales used to be two numeric columns on a store entry, a
+   count and an amount summed per day; they are a collection of their own now
+   because the two things the dashboard needs to know about a sale — the plan's
+   term and the buyer's install date — are properties of the purchase and are
+   averaged away by a daily total. `plan: 'unknown'` is what the migrated daily
+   columns become, and it is a real value rather than a missing one: those rows
+   are money of an unknown term and must never be counted into MRR. */
+const SALE_PLANS = ['monthly', 'annual', 'lifetime', 'unknown'];
+
+const cleanSale = (raw) => {
+  if (!raw || typeof raw !== 'object') return null;
+  const id = String(raw.id || '').slice(0, 64);
+  if (!id || !isIsoDate(raw.date)) return null;
+  const price = Number(raw.price);
+  if (!Number.isFinite(price)) return null;
+  const qty = Number(raw.qty);
+  const out = {
+    id,
+    date: raw.date,
+    platform: PLATFORMS.includes(raw.platform) ? raw.platform : 'ios',
+    plan: SALE_PLANS.includes(raw.plan) ? raw.plan : 'unknown',
+    price,
+    qty: Number.isFinite(qty) && qty >= 1 ? Math.round(qty) : 1,
+  };
+  // An install date only makes sense on a single purchase, and only if it is
+  // not after the purchase itself. A qty>1 row is an aggregate of buyers who do
+  // not share one, so it never carries a cohort — see sales.js rule FOUR.
+  if (out.qty === 1 && isIsoDate(raw.cohort) && raw.cohort <= out.date) out.cohort = raw.cohort;
+  if (isIsoDate(raw.cancelled) && raw.cancelled >= out.date) out.cancelled = raw.cancelled;
+  if (raw.refunded) out.refunded = true;
+  if (raw.note) out.note = String(raw.note).slice(0, 2000);
+  return out;
+};
+
 const COST_CATEGORIES = ['ADS', 'CREATIVE', 'INFRA', 'TOOLS', 'FEES', 'SERVICES', 'HARDWARE', 'OTHER'];
 const RECURRENCES = ['weekly', 'monthly', 'quarterly', 'yearly'];
 const COST_NUMBERS = ['impressions', 'clicks', 'installs'];
@@ -230,6 +264,7 @@ const load = async (pk) => {
   const events = [];
   const ads = [];
   const costs = [];
+  const sales = [];
   let settings = { ...DEFAULT_SETTINGS };
   let ui = null;
 
@@ -250,6 +285,9 @@ const load = async (pk) => {
     } else if (typeof item.SK === 'string' && item.SK.startsWith('COST#')) {
       const cost = cleanCost(item.cost || item);
       if (cost) costs.push(cost);
+    } else if (typeof item.SK === 'string' && item.SK.startsWith('SALE#')) {
+      const sale = cleanSale(item.sale || item);
+      if (sale) sales.push(sale);
     }
   });
 
@@ -258,12 +296,15 @@ const load = async (pk) => {
   // means a fresh load and a locally-edited list are in the same order.
   ads.sort((a, b) => (a.start === b.start ? a.id.localeCompare(b.id) : b.start.localeCompare(a.start)));
   costs.sort((a, b) => (a.date === b.date ? a.id.localeCompare(b.id) : b.date.localeCompare(a.date)));
+  // Sales ascend, unlike ads and costs: the ledger is a history read forwards
+  // and every series built from it walks it in order.
+  sales.sort((a, b) => (a.date === b.date ? a.id.localeCompare(b.id) : a.date.localeCompare(b.date)));
 
   entries.sort((a, b) => (a.date === b.date
     ? a.platform.localeCompare(b.platform)
     : a.date.localeCompare(b.date)));
 
-  return { entries, events, ads, costs, settings, ui };
+  return { entries, events, ads, costs, sales, settings, ui };
 };
 
 const sync = async (pk, payload) => {
@@ -308,6 +349,7 @@ const sync = async (pk, payload) => {
   const idKeyed = [
     { prefix: 'AD', entityType: 'DASH_AD', field: 'ad', clean: cleanAd, ups: payload.adUpserts, dels: payload.adDeletes },
     { prefix: 'COST', entityType: 'DASH_COST', field: 'cost', clean: cleanCost, ups: payload.costUpserts, dels: payload.costDeletes },
+    { prefix: 'SALE', entityType: 'DASH_SALE', field: 'sale', clean: cleanSale, ups: payload.saleUpserts, dels: payload.saleDeletes },
   ];
   const idKeptCounts = {};
   idKeyed.forEach((kind) => {
@@ -372,29 +414,49 @@ const sync = async (pk, payload) => {
     eventsUpserted: eventUpserts.length, eventsDeleted: eventDeletes.length,
     adsUpserted: idKeptCounts.AD.upserted, adsDeleted: idKeptCounts.AD.deleted,
     costsUpserted: idKeptCounts.COST.upserted, costsDeleted: idKeptCounts.COST.deleted,
+    salesUpserted: idKeptCounts.SALE.upserted, salesDeleted: idKeptCounts.SALE.deleted,
   };
 };
 
-/** Wipe every entry and write the supplied set. Backs a JSON-backup restore. */
+/**
+ * Wipe every entry AND every sale, then write the supplied sets. Backs a
+ * JSON-backup restore and the "Delete all data" button.
+ *
+ * Sales are in here rather than left to the ordinary diff for a timing reason
+ * worth remembering: `Sync.replaceAll` adopts its own snapshot as the new
+ * baseline and cancels any pending push, so a diff produced moments earlier
+ * (the sale deletes, say) is discarded before it ever leaves the browser. A
+ * wipe has to be stated outright, which is the same reason entries are here.
+ *
+ * Ads, costs and events deliberately survive. The money was spent and the
+ * releases happened whichever store rows you throw away — the same rule that
+ * keeps a deleted campaign's spend on the books.
+ */
 const replaceAll = async (pk, payload) => {
   const existing = await readAll(pk);
-  const staleKeys = existing
-    .filter((i) => typeof i.SK === 'string' && i.SK.startsWith('ENTRY#'))
-    .map((i) => i.SK);
 
   const incoming = (Array.isArray(payload.entries) ? payload.entries : [])
     .map(cleanEntry)
     .filter(Boolean);
+  const incomingSales = (Array.isArray(payload.sales) ? payload.sales : [])
+    .map(cleanSale)
+    .filter(Boolean);
 
   // Keys we're about to rewrite don't need deleting first.
-  const keeping = new Set(incoming.map((e) => entrySk(e.date, e.platform)));
-  const toDelete = staleKeys.filter((sk) => !keeping.has(sk));
+  const keeping = new Set([
+    ...incoming.map((e) => entrySk(e.date, e.platform)),
+    ...incomingSales.map((s) => `SALE#${s.id}`),
+  ]);
+  const toDelete = existing
+    .filter((i) => typeof i.SK === 'string' && (i.SK.startsWith('ENTRY#') || i.SK.startsWith('SALE#')))
+    .map((i) => i.SK)
+    .filter((sk) => !keeping.has(sk));
 
   if (toDelete.length) {
     await writeBatches(toDelete.map((SK) => ({ DeleteRequest: { Key: { PK: pk, SK } } })));
   }
 
-  return sync(pk, { upserts: incoming, settings: payload.settings });
+  return sync(pk, { upserts: incoming, saleUpserts: incomingSales, settings: payload.settings });
 };
 
 /* --------------------------------------------------------------- handler */

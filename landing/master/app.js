@@ -39,7 +39,7 @@
 
   function load() {
     var d = {
-      entries: [], events: [], ads: [], costs: [],
+      entries: [], events: [], ads: [], costs: [], sales: [],
       settings: { trialDays: 7, wallDays: 14, currency: '$', storeCutPct: 15 }
     };
     try {
@@ -50,6 +50,7 @@
         if (p && Array.isArray(p.events)) d.events = p.events;
         if (p && Array.isArray(p.ads)) d.ads = p.ads;
         if (p && Array.isArray(p.costs)) d.costs = p.costs;
+        if (p && Array.isArray(p.sales)) d.sales = p.sales;
         // conversion rate used to be an entered field; it is derived now, so drop
         // any stale values rather than carrying them into exports and backups
         d.entries.forEach(function (e) { if (e) delete e.conversionRate; });
@@ -79,7 +80,7 @@
     exportN: 1,
     exportUnit: 'days',
     lastView: 'overview',
-    fc: { horizon: 12, model: 'monthly' }
+    fc: { horizon: 12, model: 'mix' }
   };
   try {
     var st = JSON.parse(localStorage.getItem(KEY + '.ui') || 'null');
@@ -97,12 +98,43 @@
   function parseISO(s) { var p = String(s).split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
   function addDays(s, n) { var d = parseISO(s); d.setDate(d.getDate() + n); return toISO(d); }
   function diffDays(a, b) { return Math.round((parseISO(b) - parseISO(a)) / 86400000); }
-  function today() { return toISO(new Date()); }
+  /* Day-of-month of the `n`th Sunday of a month (1-based n, 0-based month). */
+  function nthSunday(year, month, n) {
+    var firstDow = new Date(Date.UTC(year, month, 1)).getUTCDay();
+    return 1 + ((7 - firstDow) % 7) + (n - 1) * 7;
+  }
+  /* Is this instant inside US Eastern daylight time? Second Sunday of March at
+     02:00 standard (07:00 UTC) through the first Sunday of November at 02:00
+     daylight (06:00 UTC). */
+  function isEasternDst(ms) {
+    var year = new Date(ms).getUTCFullYear();
+    return ms >= Date.UTC(year, 2, nthSunday(year, 2, 2), 7)
+        && ms < Date.UTC(year, 10, nthSunday(year, 10, 1), 6);
+  }
+
+  /**
+   * The dashboard's own calendar day, in US EASTERN — not the browser's.
+   *
+   * This is a copy of `easternDay` in sls/lambdas/ping/main.js, which is a copy
+   * of the one in mobile/src/lib/ping.ts, and the three must stay identical:
+   * the ping counter buckets every arrival on the Eastern day, so a dashboard
+   * reading the browser's local day disagrees with its own data for part of
+   * every day. Opened from a laptop on UTC, the page started calling tomorrow
+   * "today" at 8pm Eastern and showed a fresh, nearly empty day hours before
+   * one existed. Anchoring here rather than shifting the data means the page
+   * reads the same wherever it is opened, which is the point: these are the
+   * business's numbers, read against the business's calendar.
+   */
+  function easternDay(ms) {
+    var t = (ms === undefined ? Date.now() : ms);
+    return new Date(t - (isEasternDst(t) ? 4 : 5) * 3600000).toISOString().slice(0, 10);
+  }
+  function today() { return easternDay(); }
   /* Store reporting always lags, so the current calendar day never has data.
      `reportDay` is the newest day the dashboard treats as real; `asOf` is the
      same thing but extended if entries somehow run later, so a manually entered
      day is never silently hidden. */
-  function reportDay() { return addDays(toISO(new Date()), -1); }
+  function reportDay() { return addDays(today(), -1); }
   function asOf() { var b = base(); return b.dates.length ? b.end : reportDay(); }
   function weekStart(s) { var d = parseISO(s); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return toISO(d); }
   function monthStart(s) { return s.slice(0, 7) + '-01'; }
@@ -139,6 +171,19 @@
 
   function num(v) { return (v === null || v === undefined || v === '' || isNaN(v)) ? 0 : +v; }
 
+  /* Every numeric field a day carries. The first four come from the store CSVs
+     you paste in; `sales` / `revenue` and the three after them are folded in
+     from the sales ledger (see base()). Listed once so the running totals, the
+     cumulative record and an empty day can never drift out of step — they used
+     to be three hand-written copies of the same six names. */
+  var FIELDS = ['downloads', 'impressions', 'pageViews', 'updates',
+    'sales', 'revenue', 'mrr', 'annualSales', 'monthlySales'];
+  function blank() {
+    var o = {};
+    FIELDS.forEach(function (f) { o[f] = 0; });
+    return o;
+  }
+
   /* daily[platform][date] = summed record; built once per render pass */
   var cache = null;
   function invalidate() { cache = null; }
@@ -151,18 +196,38 @@
     db.entries.forEach(function (e) {
       if (!e || !e.date || !PLATFORMS[e.platform]) return;
       [e.platform, 'all'].forEach(function (p) {
-        var r = byPlat[p][e.date] || (byPlat[p][e.date] = {
-          downloads: 0, impressions: 0, pageViews: 0, updates: 0, sales: 0, revenue: 0
-        });
+        var r = byPlat[p][e.date] || (byPlat[p][e.date] = blank());
         r.downloads += num(e.downloads);
         r.impressions += num(e.impressions);
         r.pageViews += num(e.pageViews);
         r.updates += num(e.updates);
-        r.sales += num(e.sales);
-        r.revenue += num(e.revenue);
       });
       if (!min || e.date < min) min = e.date;
       if (!max || e.date > max) max = e.date;
+    });
+
+    /* Sales come from the LEDGER, never from the store entry any more.
+       `sales` and `revenue` still mean exactly what they meant when they were
+       two columns on an entry — a unit count and gross bookings at the
+       customer-facing price — so every consumer downstream (Overview, Costs,
+       Trial & conversion, the weekday chart) reads one source of truth without
+       knowing the shape underneath it changed. `mrr` and the plan counts are
+       new and only the Sales view asks for them. */
+    var salesByDay = Sales.dailyTotals(db.sales);
+    ['ios', 'android', 'all'].forEach(function (p) {
+      Object.keys(salesByDay[p]).forEach(function (d) {
+        var s = salesByDay[p][d];
+        var r = byPlat[p][d] || (byPlat[p][d] = blank());
+        r.sales += s.sales; r.revenue += s.revenue; r.mrr += s.mrr;
+        r.annualSales += s.annual; r.monthlySales += s.monthly;
+      });
+    });
+    /* A sale widens the spine the way a cost does: the first purchase can
+       predate the first store CSV you happened to paste in, and an "All time"
+       that started at the first download would drop it off the left edge. */
+    Object.keys(salesByDay.all).forEach(function (d) {
+      if (!min || d < min) min = d;
+      if (!max || d > max) max = d;
     });
 
     /* The spine has to reach back to the first cost as well as the first store
@@ -190,26 +255,19 @@
       dates.push(d);
       ['ios', 'android', 'all'].forEach(function (p) {
         var r = byPlat[p][d];
-        if (r) {
-          run[p].downloads += r.downloads; run[p].impressions += r.impressions;
-          run[p].pageViews += r.pageViews; run[p].updates += r.updates;
-          run[p].sales += r.sales; run[p].revenue += r.revenue;
-        }
-        cum[p][d] = {
-          downloads: run[p].downloads, impressions: run[p].impressions, pageViews: run[p].pageViews,
-          updates: run[p].updates, sales: run[p].sales, revenue: run[p].revenue
-        };
+        if (r) FIELDS.forEach(function (f) { run[p][f] += r[f]; });
+        var c = {};
+        FIELDS.forEach(function (f) { c[f] = run[p][f]; });
+        cum[p][d] = c;
       });
     }
-    function blank() { return { downloads: 0, impressions: 0, pageViews: 0, updates: 0, sales: 0, revenue: 0 }; }
 
     cache = { byPlat: byPlat, cum: cum, dates: dates, start: start, end: end, min: min, max: max };
     return cache;
   }
 
   function dayRec(p, d) {
-    var r = base().byPlat[p][d];
-    return r || { downloads: 0, impressions: 0, pageViews: 0, updates: 0, sales: 0, revenue: 0 };
+    return base().byPlat[p][d] || blank();
   }
   /* cumulative value at a date, clamped to the data spine (0 before it starts) */
   function cumAt(p, d, field) {
@@ -1154,7 +1212,8 @@
     var ready = pings.status === 'ready' || !!pings.report;
     var blank = !ix.days.length;
 
-    var hosts = ['pgTiles', 'pgTilesB', 'pgHeat', 'pgCohortDetail', 'pgTransitions', 'pgConversion', 'pgWeekdayRetention'];
+    var hosts = ['pgTiles', 'pgTilesB', 'pgHeat', 'pgCohortDetail', 'pgTransitions', 'pgConversion',
+      'pgWeekdayRetention', 'pgPlatformNote'];
     if (!ready || blank) hosts.forEach(function (id) {
       var n = document.getElementById(id);
       if (n) n.innerHTML = '';
@@ -1167,7 +1226,7 @@
     if (blank) {
       document.getElementById('pgHeat').innerHTML =
         '<div class="empty">No pings yet. The counter starts filling the first time a build carrying it is opened.</div>';
-      ['pgTimeline', 'pgCurve', 'pgSurvival', 'pgActiveCohort', 'pgPurchaseAge', 'pgWeekday'].forEach(function (id) {
+      ['pgTimeline', 'pgCurve', 'pgSurvival', 'pgActiveCohort', 'pgPurchaseAge', 'pgPlatforms', 'pgWeekday'].forEach(function (id) {
         drawChart(id, { x: [], series: [], emptyText: 'Waiting for the first ping.' });
       });
       return;
@@ -1184,6 +1243,7 @@
     renderHeat(ix);
     renderActiveByCohort(ix);
     renderPurchases(ix, r);
+    renderPingPlatforms(ix, days);
     renderPingWeekday(ix, days);
   }
 
@@ -1292,7 +1352,15 @@
    * Deliberately unfiltered even when the filter bar is on one platform: this
    * tile is what the rest of the view is a slice OF. `unknown` is the honest
    * bucket for builds that shipped before the ping carried a platform marker,
-   * so it is shown when it is non-zero rather than folded into either store. */
+   * so it is shown when it is non-zero rather than folded into either store.
+   *
+   * The iOS share is of the KNOWN pings only, which is why the meta line has to
+   * say so the moment there are unknown ones: "62% iOS" computed over a day
+   * that is half pre-marker is a claim about a fraction of the day, and reads
+   * as a claim about all of it. With a platform filter in force those same
+   * pings are also counted INTO the filtered view (see rowsToMap), so the line
+   * says that too — otherwise the tile and the numbers beside it disagree with
+   * no visible reason. */
   function platformTile(ix) {
     var split = A.platformsOn(ix, ix.last);
     var ios = split.I || 0, android = split.A || 0, unknown = split.U || 0;
@@ -1301,12 +1369,20 @@
       { name: 'iOS', color: ENTITY.ios, value: fmtInt(ios) },
       { name: 'Android', color: ENTITY.android, value: fmtInt(android) }
     ];
-    if (unknown) parts.push({ name: 'pre-marker', color: COLOR.muted, value: fmtInt(unknown) });
+    if (unknown) parts.push({ name: 'no store', color: COLOR.muted, value: fmtInt(unknown) });
+
+    var meta = 'of everything that pinged that day';
+    if (unknown) {
+      meta = 'of the ' + fmtInt(known) + ' that named a store · ' + fmtInt(unknown) +
+        (ix.platform === 'all'
+          ? ' pre-marker, store unknown'
+          : ' pre-marker, counted into every platform view');
+    }
     return tile({
       label: 'Platform on ' + labelDay(ix.last), color: ENTITY.ios,
       value: known ? Math.round((ios / known) * 100) + '% iOS' : '--',
       smallValue: true,
-      meta: 'of everything that pinged that day',
+      meta: meta,
       split: parts
     });
   }
@@ -1626,25 +1702,119 @@
       '</div>';
   }
 
+  /* ------------------------------------------------------ 6b. platforms
+
+     The split the filter bar can only ever show you one side of.
+
+     Deliberately drawn from the UNFILTERED split (`platformsOn`, which counts
+     before the filter is applied), because this chart is what the rest of the
+     view is a slice of: filtering it would leave one band and nothing to
+     compare it against.
+
+     The third band is the one worth understanding. Builds that shipped before
+     the ping carried a platform marker send a bare cohort with no letter, and
+     they read back as U. Those are real installs whose STORE we failed to
+     record — not installs on some third platform — so they are shown as their
+     own band here, counted into BOTH platform views everywhere else, and never
+     folded into either store. Excluding them instead is what made a dashboard
+     whose history predates the marker read as "no pings at all" the moment a
+     platform filter was switched on. */
+  function renderPingPlatforms(ix, days) {
+    var split = days.map(function (d) { return A.platformsOn(ix, d); });
+    var totals = { I: 0, A: 0, U: 0 };
+    split.forEach(function (p) {
+      totals.I += p.I || 0; totals.A += p.A || 0; totals.U += p.U || 0;
+    });
+
+    var series = [
+      { key: 'I', name: 'iOS', color: ENTITY.ios, type: 'area', values: split.map(function (p) { return p.I || 0; }) },
+      { key: 'A', name: 'Android', color: ENTITY.android, type: 'area', values: split.map(function (p) { return p.A || 0; }) }
+    ];
+    if (totals.U) {
+      series.push({ key: 'U', name: 'No store recorded', color: COLOR.muted, type: 'area',
+        values: split.map(function (p) { return p.U || 0; }) });
+    }
+
+    drawChart('pgPlatforms', {
+      x: days.map(labelDay), stacked: true, height: 260, format: fmtInt, xLabel: 'Day',
+      series: series,
+      emptyText: 'No pings in this range.'
+    });
+
+    var known = totals.I + totals.A;
+    var all = known + totals.U;
+
+    /* How much of the picture can be split at all.
+    *
+    * This is the number that answers "why is there no Android?", and it has to
+    * be stated outright rather than left to be inferred from a grey band. The
+    * platform letter arrived in a specific release, so an install that has not
+    * updated yet keeps sending pings with no store on them — which means a
+    * newly-shipped marker reads exactly like an empty Android userbase, and the
+    * two are indistinguishable from the chart alone. Coverage climbing over the
+    * following weeks is what tells them apart. */
+    var coverage = all ? (known / all) * 100 : null;
+    var verdict = coverage === null
+      ? 'No pings in this range.'
+      : coverage >= 99
+        ? 'Effectively every ping in this range names its store, so the split above is the whole picture.'
+        : '<b>' + fmtPct(coverage) + ' of pings in this range name a store.</b> The rest come from builds ' +
+          'that shipped before the platform marker existed, and they will keep arriving until those installs ' +
+          'update. Until this figure climbs, a quiet store here means "not measured yet" rather than ' +
+          '"nobody is there" — the two look identical from the chart alone, and only coverage tells them apart.';
+
+    document.getElementById('pgPlatformNote').innerHTML =
+      '<div class="mini-rows" style="margin-top:12px">' +
+      '<div><span>iOS</span><b>' + fmtInt(totals.I) + '</b><span class="note">' +
+        (known ? fmtPct((totals.I / known) * 100) + ' of the pings that named a store' : 'nothing named a store yet') + '</span></div>' +
+      '<div><span>Android</span><b>' + fmtInt(totals.A) + '</b><span class="note">' +
+        (known ? fmtPct((totals.A / known) * 100) + ' of the pings that named a store' : '') + '</span></div>' +
+      (totals.U
+        ? '<div><span>No store</span><b>' + fmtInt(totals.U) + '</b><span class="note">pre-marker builds' +
+          (ix.platform === 'all' ? ' — store unknown' : ' — counted into this filtered view as well as the other one') +
+          '</span></div>'
+        : '') +
+      '<div><span>Coverage</span><b>' + (coverage === null ? '–' : fmtPct(coverage)) +
+        '</b><span class="note">of pings can be attributed to a store</span></div>' +
+      '</div>' +
+      '<p class="hint" style="margin:10px 0 0">' + verdict + '</p>';
+  }
+
   /* --------------------------------------------------------- 7. weekday */
 
   function renderPingWeekday(ix, days) {
+    var plat = pingPlatform();
     var dl = A.byWeekday(days, function (d) { return dayRec('all', d).downloads; });
     var fresh = A.byWeekday(days, function (d) { return A.newOn(ix, d); });
     var ret = A.byWeekday(days, function (d) { return A.returningOn(ix, d); });
+    /* The two purchase measures, side by side on purpose. `buys` is the sales
+       ledger — what actually happened, as recorded from the store report — and
+       `subs` is the app's own subscribe ping, which fires on the launch AFTER
+       the subscription starts. They count the same event at different moments,
+       so they should track and never match; charting only one of them is how a
+       weekday pattern in the LAG gets read as a weekday pattern in buying.
+       The ledger is sliced by the same platform filter the ping index is, or
+       the two bars would be answering about different populations. */
+    var salesDaily = Sales.dailyTotals(salesList());
+    var buys = A.byWeekday(days, function (d) {
+      var rec = salesDaily[plat === 'all' ? 'all' : plat][d];
+      return rec ? rec.sales : 0;
+    });
+    var subs = A.byWeekday(days, function (d) { return A.purchasesOn(ix, d); });
 
     drawChart('pgWeekday', {
       x: WD.map(function (w) { return { label: w, full: WD_LONG[WD.indexOf(w)] }; }),
-      /* Three grouped bars per weekday, not two bars and a line. On a 7-point
-         axis a line degenerates into disconnected dots that are trivial to
-         miss, and the comparison here is between three counts of people — the
-         same kind of quantity, so they should carry the same kind of mark. */
+      /* Grouped bars, never a line. On a 7-point axis a line degenerates into
+         disconnected dots that are trivial to miss, and every quantity here is
+         a count of people — the same kind of thing, so the same kind of mark. */
       series: [
         { key: 'dl', name: 'Store downloads', color: PC.downloads, type: 'bar', values: dl.map(function (s) { return s.avg; }) },
         { key: 'fresh', name: 'First runs', color: PC.fresh, type: 'bar', values: fresh.map(function (s) { return s.avg; }) },
-        { key: 'ret', name: 'Returning', color: PC.back, type: 'bar', values: ret.map(function (s) { return s.avg; }) }
+        { key: 'ret', name: 'Returning', color: PC.back, type: 'bar', values: ret.map(function (s) { return s.avg; }) },
+        { key: 'buys', name: 'Purchases (ledger)', color: PC.subs, type: 'bar', values: buys.map(function (s) { return s.avg; }) },
+        { key: 'subs', name: 'Subscribe pings', color: COLOR.s4, type: 'bar', values: subs.map(function (s) { return s.avg; }) }
       ],
-      height: 240, format: function (v) { return v === null ? '–' : v.toFixed(1); }, xLabel: 'Weekday',
+      height: 260, format: function (v) { return v === null ? '–' : v.toFixed(1); }, xLabel: 'Weekday',
       tooltipNote: function (i) { return 'average per ' + WD_LONG[i] + ' over ' + dl[i].days + ' of them'; }
     });
 
@@ -2031,6 +2201,627 @@
         x: x, series: series, height: 240, format: sp.fmt,
         yTickFormat: sp.fmt === fmtPct ? function (v) { return v.toFixed(v < 10 ? 1 : 0) + '%'; } : undefined
       });
+    });
+  }
+
+  /* ======================================================== sales ledger
+
+     The purchase ledger and the Sales view over it.
+
+     Every number here is arithmetic from sales.js, which is pure and tested;
+     this half is entry and rendering. Three things are worth knowing before
+     reading on.
+
+     ONE. This view answers a question the rest of the dashboard cannot. Sales
+     used to be two columns on a store entry — a count and an amount, summed per
+     day — and both of the facts that matter about a subscription are invisible
+     in that shape: the PLAN, because an annual sale at 29.99 and a monthly one
+     at 4.99 are wildly different recurring revenue, and the BUYER'S INSTALL
+     DATE, because "how long after installing did they pay?" is a property of a
+     person and a daily total has averaged the people away.
+
+     TWO. Cash and MRR are shown side by side and never blended. `Bookings` is
+     money that arrived. `MRR` is the rate the book runs at. A month with one
+     annual sale is a record on one and an ordinary month on the other, and both
+     readings are true — a single "revenue" number that silently picked one is
+     the thing this view exists to stop.
+
+     THREE. What the ledger does not know, it says. Rows migrated from the old
+     daily columns carry `plan: 'unknown'`: real money of an unknown term, so
+     they sit in bookings and out of MRR, and every tile that is affected
+     discloses it rather than quietly shrinking. Same for the days-to-purchase
+     histogram, which is drawn only from purchases carrying an install date and
+     reports what share of purchases that is. */
+
+  function salesList() { return db.sales || (db.sales = []); }
+  function saleById(id) {
+    var l = salesList();
+    for (var i = 0; i < l.length; i++) if (l[i].id === id) return l[i];
+    return null;
+  }
+  function putSale(rec) {
+    var l = salesList(), ex = saleById(rec.id);
+    if (ex) Object.assign(ex, rec); else l.push(rec);
+    sortSales();
+    save(); invalidate();
+  }
+  function removeSale(id) {
+    db.sales = salesList().filter(function (s) { return s.id !== id; });
+    save(); invalidate();
+  }
+  /* Newest first, which is the order the management table reads in and the
+     order every other id-keyed collection here is kept in. sales.js re-sorts
+     ascending for its own series, so this is presentation only. */
+  function sortSales() {
+    salesList().sort(function (a, b) {
+      return a.date === b.date ? String(b.id).localeCompare(String(a.id)) : (a.date < b.date ? 1 : -1);
+    });
+  }
+
+  /* The ledger, sliced by the filter bar. `compare` has no single answer, so it
+     reads as combined and the plan/platform tables carry the split instead. */
+  function salesPlatform() {
+    return (state.platform === 'ios' || state.platform === 'android') ? state.platform : 'all';
+  }
+  function salesIndex() { return Sales.index(salesList(), salesPlatform()); }
+
+  /**
+   * The one-shot migration out of the old daily columns.
+   *
+   * Guarded by `settings.salesMigrated`, and it must stay guarded: running it
+   * twice would double every historical sale, and the entries it reads from are
+   * rewritten in the same pass so a second run would find nothing to migrate
+   * only by luck. It runs after load AND after a hydrate, because the server's
+   * copy is what a second browser sees first and it may still be carrying the
+   * old shape.
+   *
+   * Nothing is invented. Each (date, platform) with a count or an amount
+   * becomes one row of `plan: 'unknown'` holding the count as `qty` and the
+   * average price — which is the whole of what the old shape knew. The plan and
+   * the buyer's install date were never recorded, so they are absent rather
+   * than guessed, and the view says how much of its history that leaves
+   * unclassified.
+   */
+  function migrateSales() {
+    if (db.settings.salesMigrated) return 0;
+    var rows = Sales.migrateEntries(db.entries, function (date, platform) {
+      return 'sale-legacy-' + date + '-' + (platform || 'ios');
+    });
+    /* An id already in the ledger means a previous attempt got as far as
+       writing rows but not as far as stamping the flag. Skip those rather than
+       adding a second copy. */
+    var have = {};
+    salesList().forEach(function (s) { have[s.id] = true; });
+    rows = rows.filter(function (r) { return !have[r.id]; });
+    rows.forEach(function (r) { salesList().push(r); });
+
+    db.entries.forEach(function (e) {
+      if (!e) return;
+      delete e.sales;
+      delete e.revenue;
+    });
+    db.settings.salesMigrated = true;
+    sortSales();
+    save(); invalidate();
+    return rows.length;
+  }
+
+  /* ---------------------------------------------------------- view: sales */
+
+  /* Plan colours come from sales.js so the legend, the mix table and the stacked
+     areas cannot disagree about which green is annual. */
+  function planColor(k) { return (Sales.PLANS[k] || {}).color || COLOR.muted; }
+  function planLabel(k) { return (Sales.PLANS[k] || {}).label || k; }
+
+  function renderSales() {
+    var ix = salesIndex();
+    var r = activeRange();
+    var prevTo = addDays(r.from, -1);
+    var prevFrom = addDays(prevTo, -diffDays(r.from, r.to));
+    /* The same rule the Overview sets, restated here because the flag is shared
+       and defaults to true: a delta against a window that predates the first
+       purchase is not a comparison, it is division by whatever happened to be
+       there. Landing straight on this tab without visiting the Overview first
+       would otherwise show one. */
+    deltaOK = ix.first !== null && prevFrom >= ix.first;
+    var s = Sales.summarize(ix, r.from, r.to);
+    var prev = Sales.summarize(ix, prevFrom, prevTo);
+
+    document.getElementById('slScope').textContent =
+      labelFull(r.from) + ' → ' + labelFull(r.to) +
+      (ix.platform === 'all' ? '' : ' · ' + PLATFORMS[ix.platform]);
+
+    renderSalesTiles(ix, s, prev, r);
+    renderMrrChart(ix, r);
+    renderNewSubs(ix, r);
+    renderBookingsChart(ix, r);
+    renderPurchaseAges(ix, r);
+    renderInstallCohorts(ix);
+    renderPlanMix(s);
+  }
+
+  function renderSalesTiles(ix, s, prev, r) {
+    var unknownNote = s.activeByPlan.unknown.count
+      ? ' · ' + fmtInt(s.activeByPlan.unknown.count) + ' unclassified sales carry no term and are not in it'
+      : '';
+    var churnNote = s.churnedMrr
+      ? fmtMoney(s.churnedMrr) + ' cancelled in range'
+      : 'nothing marked cancelled — MRR assumes every subscription still runs';
+
+    document.getElementById('slTiles').innerHTML = [
+      tile({
+        label: 'MRR on ' + labelDay(r.to), color: ENTITY.revenue, value: fmtMoney(s.mrr),
+        meta: churnNote + unknownNote,
+        split: [
+          { name: 'Monthly', color: planColor('monthly'), value: fmtMoney(s.activeByPlan.monthly.mrr) },
+          { name: 'Annual', color: planColor('annual'), value: fmtMoney(s.activeByPlan.annual.mrr) }
+        ]
+      }),
+      tile({
+        /* Full size, matching MRR. `smallValue` marks a SECONDARY figure — a
+           rate, a per-unit derivation, texture rather than headline — and ARR
+           is neither: it is MRR annualised, the same quantity on a different
+           clock. Rendering it one step smaller than the number it is twelve
+           times made it read as the lesser of the two, which is the opposite of
+           true and the first thing anyone noticed about this strip. The rule
+           for the rest of the tiles below: the five that say how big the book
+           is are full size, the three that describe its texture are small. */
+        label: 'ARR', color: ENTITY.revenue, value: fmtMoney(s.arr),
+        meta: 'MRR × 12, at the rate the book runs at today'
+      }),
+      tile({
+        label: 'Bookings in range', color: ENTITY.sales, value: fmtMoney(s.bookings),
+        delta: pctDelta(s.bookings, prev.bookings),
+        meta: 'cash that arrived · ' + fmtMoney(s.bookings * (1 - storeCut() / 100)) + ' after the ' + storeCut() + '% store cut'
+      }),
+      tile({
+        label: 'New MRR in range', color: planColor('monthly'), value: fmtMoney(s.newMrr),
+        delta: pctDelta(s.newMrr, prev.newMrr),
+        meta: s.annualMrrShare === null ? 'nothing recurring sold in range'
+          : fmtPct(s.annualMrrShare) + ' of it from annual plans'
+      }),
+      tile({
+        label: 'Active subscriptions', color: ENTITY.trialEnd, value: fmtInt(s.active),
+        meta: 'recurring plans live on ' + labelDay(r.to) + ' · ' + fmtInt(s.units) + ' sold in range' +
+          (s.activeOther ? ' · ' + fmtInt(s.activeOther) + ' lifetime or unclassified purchases are not subscriptions and sit outside this' : ''),
+        split: Sales.PLAN_KEYS.filter(function (k) { return s.activeByPlan[k].count; }).map(function (k) {
+          return { name: planLabel(k), color: planColor(k), value: fmtInt(s.activeByPlan[k].count) };
+        })
+      }),
+      tile({
+        label: 'Average price', value: s.arpu === null ? '–' : fmtMoney(s.arpu), smallValue: true,
+        meta: 'per purchase in range, across every plan'
+      }),
+      tile({
+        label: 'Annual share', color: planColor('annual'),
+        value: s.annualUnitShare === null ? '–' : fmtPct(s.annualUnitShare), smallValue: true,
+        meta: 'of the recurring plans sold in range, by count'
+      }),
+      tile({
+        label: 'Refunds in range', color: ENTITY.wallHit,
+        value: s.refundedCount ? fmtMoney(s.refunds) : '–', smallValue: true,
+        meta: s.refundedCount ? fmtInt(s.refundedCount) + ' refunded, removed from every figure here'
+          : 'nothing marked refunded'
+      })
+    ].join('');
+  }
+
+  /* MRR over time, stacked by plan. Stacked rather than grouped because the
+     parts genuinely sum to the whole — that is what MRR is — and the reader's
+     question is how much of the total is the annual base. */
+  function renderMrrChart(ix, r) {
+    var rows = Sales.mrrSeries(ix, r.from, r.to);
+    drawChart('slMrr', {
+      x: rows.map(function (m) { return labelDay(m.date); }),
+      stacked: true, height: 300, format: fmtMoney, xLabel: 'Day',
+      yTickFormat: moneyTick,
+      series: [
+        { key: 'monthly', name: 'Monthly plans', color: planColor('monthly'), type: 'area',
+          values: rows.map(function (m) { return m.monthly; }) },
+        { key: 'annual', name: 'Annual plans', color: planColor('annual'), type: 'area',
+          values: rows.map(function (m) { return m.annual; }) }
+      ],
+      emptyText: 'No subscriptions on the books in this range yet.'
+    });
+  }
+
+  /* New purchases per bucket, GROUPED by plan rather than stacked: the question
+     here is which plan people are choosing, which is a comparison between the
+     bars and not a total. */
+  function renderNewSubs(ix, r) {
+    var grain = state.grain === 'day' ? 'day' : state.grain;
+    var buckets = bareBuckets(r.from, r.to, grain);
+    var counts = buckets.map(function (b) {
+      var acc = { monthly: 0, annual: 0, lifetime: 0, unknown: 0 };
+      ix.rows.forEach(function (row) {
+        if (row.date >= b.start && row.date <= b.end && !row.refunded) acc[row.plan] += row.qty;
+      });
+      return acc;
+    });
+    var live = Sales.PLAN_KEYS.filter(function (k) {
+      return counts.some(function (c) { return c[k] > 0; });
+    });
+    drawChart('slNew', {
+      x: xAxis(buckets, grain), height: 260, format: fmtInt, xLabel: 'Purchases',
+      series: (live.length ? live : ['monthly', 'annual']).map(function (k) {
+        return { key: k, name: planLabel(k), color: planColor(k), type: 'bar',
+          values: counts.map(function (c) { return c[k]; }) };
+      }),
+      emptyText: 'No purchases in this range.'
+    });
+  }
+
+  /**
+   * Bookings against recognised revenue, per month.
+   *
+   * The gap between the two lines IS the annual book: cash lands the day the
+   * plan is bought and the revenue it represents belongs to the twelve months
+   * after. Reading either one alone is how an annual-heavy month gets called a
+   * record or a collapse depending on which number happened to be on screen.
+   */
+  function renderBookingsChart(ix, r) {
+    var rows = Sales.monthlyRevenue(ix, r.from, r.to);
+    drawChart('slBookings', {
+      x: rows.map(function (m) { return bucketLabel(m.key, 'month'); }),
+      height: 280, format: fmtMoney, xLabel: 'Month', yTickFormat: moneyTick,
+      series: [
+        { key: 'bookings', name: 'Bookings (cash in)', color: ENTITY.sales, type: 'bar',
+          values: rows.map(function (m) { return m.bookings; }) },
+        { key: 'recognised', name: 'Recognised revenue', color: ENTITY.downloads, type: 'line',
+          values: rows.map(function (m) { return m.recognised; }) }
+      ],
+      emptyText: 'No purchases in this range.'
+    });
+  }
+
+  /**
+   * Days from install to purchase.
+   *
+   * Drawn only from purchases that carry an install date — see rule FOUR in
+   * sales.js — so the hint under it says what share of purchases that is. A
+   * histogram over a third of the sales is a real answer about a third of the
+   * sales, and the one thing it must not do is look like an answer about all of
+   * them.
+   */
+  function renderPurchaseAges(ix, r) {
+    var ages = Sales.purchaseAges(ix, r.from, r.to);
+    var live = Sales.PLAN_KEYS.filter(function (k) {
+      return ages.buckets.some(function (b) { return b[k] > 0; });
+    });
+    drawChart('slAges', {
+      x: ages.buckets.map(function (b) { return { label: b.label, full: b.label + ' after installing' }; }),
+      stacked: true, height: 260, format: fmtInt, xLabel: 'Days from install to purchase',
+      series: (live.length ? live : ['monthly', 'annual']).map(function (k) {
+        return { key: k, name: planLabel(k), color: planColor(k), type: 'bar',
+          values: ages.buckets.map(function (b) { return b[k]; }) };
+      }),
+      emptyText: 'No purchase yet carries the buyer’s install date.',
+      guides: [{ index: 3, label: 'wall', color: COLOR.red }],
+      tooltipNote: function (i) {
+        var b = ages.buckets[i];
+        return ages.total ? pctOf(b.count, ages.total) + ' of the purchases this is drawn from' : '';
+      }
+    });
+
+    var byPlan = Sales.ageByPlan(ix, r.from, r.to).filter(function (p) { return p.n; });
+    document.getElementById('slAgeMeta').innerHTML = !ages.total
+      ? '<p class="hint" style="margin:10px 0 0">Add the buyer’s install date to a purchase and it appears here. Nothing else in the dashboard can supply it — a ping carries a cohort but no identity, so it can never be matched to a sale.</p>'
+      : '<div class="mini-rows">' +
+        '<div><span>Median</span><b>' + ages.median + ' days</b><span class="note">the typical buyer’s decision</span></div>' +
+        byPlan.map(function (p) {
+          return '<div><span>' + esc(p.label) + '</span><b>' + p.median + ' days</b>' +
+            '<span class="note">from ' + fmtInt(p.n) + ' purchase' + (p.n === 1 ? '' : 's') + '</span></div>';
+        }).join('') +
+        '<div><span>Coverage</span><b>' + fmtPct(ages.coverage) + '</b><span class="note">' +
+          fmtInt(ages.total) + ' of ' + fmtInt(ages.total + ages.withoutCohort) +
+          ' purchases carry an install date</span></div>' +
+        '</div>';
+  }
+
+  /**
+   * Which intake actually paid — purchases grouped by the buyer's INSTALL
+   * month, not the month the money landed.
+   *
+   * A young cohort has not finished buying, so its row is not comparable to a
+   * mature one and the table says how old each is rather than leaving the
+   * reader to work out that last month's zero is not a failure yet.
+   */
+  function renderInstallCohorts(ix) {
+    var rows = Sales.byInstallMonth(ix, asOf());
+    var host = document.getElementById('slCohorts');
+    if (!rows.length) {
+      host.innerHTML = '<div class="empty">No purchase yet carries the buyer’s install date, so there is nothing to group by intake.</div>';
+      drawChart('slCohortChart', { x: [], series: [], emptyText: 'Waiting for a purchase with an install date.' });
+      return;
+    }
+    drawChart('slCohortChart', {
+      x: rows.map(function (m) { return bucketLabel(m.key, 'month'); }),
+      stacked: true, height: 240, format: fmtInt, xLabel: 'Install month',
+      series: ['monthly', 'annual', 'lifetime', 'unknown'].filter(function (k) {
+        return rows.some(function (m) { return m[k] > 0; });
+      }).map(function (k) {
+        return { key: k, name: planLabel(k), color: planColor(k), type: 'bar',
+          values: rows.map(function (m) { return m[k]; }) };
+      })
+    });
+    host.innerHTML = '<div class="table-scroll"><table><thead><tr>' +
+      '<th>Install month</th><th>Purchases</th><th>Bookings</th><th>MRR</th><th>Maturity</th>' +
+      '</tr></thead><tbody>' +
+      rows.slice().reverse().map(function (m) {
+        var young = m.maturityDays !== null && m.maturityDays < 60;
+        return '<tr><td>' + bucketLabel(m.key, 'month').full + '</td>' +
+          '<td>' + fmtInt(m.count) + '</td>' +
+          '<td>' + fmtMoney(m.bookings) + '</td>' +
+          '<td>' + fmtMoney(m.mrr) + '</td>' +
+          '<td>' + (m.maturityDays === null ? '–' : fmtInt(m.maturityDays) + ' days' +
+            (young ? ' <span class="warn-small">still buying</span>' : '')) + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+  }
+
+  function renderPlanMix(s) {
+    var total = s.bookings || 0;
+    document.getElementById('slMix').innerHTML =
+      '<div class="table-scroll"><table><thead><tr>' +
+      '<th>Plan</th><th>Purchases</th><th>Bookings</th><th>Share of bookings</th><th>New MRR</th><th>Live now</th>' +
+      '</tr></thead><tbody>' +
+      Sales.PLAN_KEYS.filter(function (k) { return s.byPlan[k].units || s.activeByPlan[k].count; })
+        .map(function (k) {
+          var p = s.byPlan[k];
+          return '<tr><td><span class="swatch" style="background:' + planColor(k) + '"></span> ' + esc(planLabel(k)) + '</td>' +
+            '<td>' + fmtInt(p.units) + '</td>' +
+            '<td>' + fmtMoney(p.bookings) + '</td>' +
+            '<td>' + (total ? fmtPct((p.bookings / total) * 100) : '–') + '</td>' +
+            '<td>' + (Sales.isRecurring(k) ? fmtMoney(p.mrr) : '<span class="note">no term</span>') + '</td>' +
+            '<td>' + fmtInt(s.activeByPlan[k].count) + '</td></tr>';
+        }).join('') +
+      '</tbody></table></div>' +
+      (s.unknownCount
+        ? '<p class="hint" style="margin:10px 0 0">' + fmtInt(s.unknownCount) + ' unclassified purchase' +
+          (s.unknownCount === 1 ? '' : 's') + ' worth ' + fmtMoney(s.unknownBookings) +
+          ' came from the old daily sales columns, which recorded no plan. They count as revenue and as conversions everywhere, and they are left out of MRR because nothing recorded the term — set a plan on them under Edit data and they join it.</p>'
+        : '');
+  }
+
+  /* ------------------------------------------------- sales entry (Edit data)
+
+     The form stays open with the last purchase's plan, price and platform
+     pre-filled rather than resetting to blank. Entering sales is a batch job —
+     you sit down with the store report and type six of them — and a form that
+     clears its plan and price between rows makes you re-choose the same two
+     answers every time. */
+
+  var lastSale = null;
+
+  function renderSaleEntry() {
+    renderSaleForm(null);
+    renderSaleTable();
+  }
+
+  function saleFormDefaults() {
+    return lastSale || { platform: 'ios', plan: 'monthly', price: '' };
+  }
+
+  function renderSaleForm(id) {
+    var host = document.getElementById('slSaleForm');
+    if (!host) return;
+    var sale = id ? saleById(id) : null;
+    var d = sale || saleFormDefaults();
+    var plans = Sales.PLAN_KEYS.map(function (k) {
+      return '<option value="' + k + '"' + (d.plan === k ? ' selected' : '') + '>' + esc(planLabel(k)) + '</option>';
+    }).join('');
+    var plats = [['ios', 'iOS'], ['android', 'Android']].map(function (p) {
+      return '<option value="' + p[0] + '"' + (d.platform === p[0] ? ' selected' : '') + '>' + p[1] + '</option>';
+    }).join('');
+
+    host.innerHTML = '<div class="event-form">' +
+      '<div class="field"><label for="slDate">Purchase date</label>' +
+        '<input type="date" id="slDate" value="' + esc(sale ? sale.date : today()) + '"></div>' +
+      '<div class="field"><label for="slPlatform">Store</label><select id="slPlatform">' + plats + '</select></div>' +
+      '<div class="field"><label for="slPlan">Plan</label><select id="slPlan">' + plans + '</select></div>' +
+      '<div class="field"><label for="slPrice">Price paid</label>' +
+        '<input type="number" id="slPrice" min="0" step="0.01" placeholder="0.00" value="' +
+        esc(sale ? sale.price : (d.price === '' ? '' : d.price)) + '"></div>' +
+      '<div class="field"><label for="slQty">Count</label>' +
+        '<input type="number" id="slQty" min="1" step="1" value="' + esc(sale ? sale.qty : 1) + '"></div>' +
+      '<div class="field"><label for="slCohort">Install date (optional)</label>' +
+        '<input type="date" id="slCohort" value="' + esc(sale && sale.cohort ? sale.cohort : '') + '"></div>' +
+      '<div class="field"><label for="slCancelled">Cancelled on (optional)</label>' +
+        '<input type="date" id="slCancelled" value="' + esc(sale && sale.cancelled ? sale.cancelled : '') + '"></div>' +
+      '<div class="field"><label for="slRefunded">Refunded</label>' +
+        '<select id="slRefunded"><option value="">No</option><option value="1"' +
+        (sale && sale.refunded ? ' selected' : '') + '>Yes — remove from every money figure</option></select></div>' +
+      '<div class="field grow"><label for="slNote">Note</label>' +
+        '<input type="text" id="slNote" maxlength="200" value="' + esc(sale && sale.note ? sale.note : '') + '"></div>' +
+      '<div class="event-form-actions">' +
+      '<button class="btn primary" id="slSave">' + (sale ? 'Save purchase' : 'Add purchase') + '</button>' +
+      (sale ? '<button class="btn" id="slCancelEdit">Cancel</button>' +
+        '<span class="spacer"></span><button class="btn danger" id="slDelete">Delete</button>' : '') +
+      '</div>' +
+      '<p class="note" id="slFormHint" style="margin:0"></p>' +
+      '</div>';
+
+    /* The count field is the migration's shape, not a shape you should be
+       entering new sales in: a row of four buyers cannot carry one install
+       date, so the cohort input disables itself the moment the count leaves 1
+       rather than accepting a value the ledger would then drop. */
+    var qty = document.getElementById('slQty');
+    var cohort = document.getElementById('slCohort');
+    function syncQty() {
+      var many = (+qty.value || 1) > 1;
+      cohort.disabled = many;
+      if (many) cohort.value = '';
+      document.getElementById('slFormHint').textContent = many
+        ? 'A row of more than one purchase has no single buyer, so it carries no install date and stays out of the days-to-purchase chart.'
+        : '';
+    }
+    qty.addEventListener('input', syncQty);
+    syncQty();
+
+    if (sale) {
+      document.getElementById('slCancelEdit').addEventListener('click', function () { renderSaleForm(null); });
+      document.getElementById('slDelete').addEventListener('click', function () {
+        if (!confirm('Delete the ' + fmtMoney(sale.price) + ' purchase on ' + labelFull(sale.date) + '?')) return;
+        removeSale(sale.id);
+        renderSaleEntry();
+        renderAll();
+        toast('Purchase deleted.');
+      });
+    }
+
+    document.getElementById('slSave').addEventListener('click', function () {
+      var date = document.getElementById('slDate').value;
+      var price = document.getElementById('slPrice').value;
+      if (!date) { toast('A purchase needs a date.'); return; }
+      if (price === '' || !isFinite(+price)) { toast('A purchase needs a price — enter 0 for a free conversion.'); return; }
+      var n = Math.max(1, Math.round(+document.getElementById('slQty').value || 1));
+      var cohortVal = document.getElementById('slCohort').value;
+      var cancelledVal = document.getElementById('slCancelled').value;
+      if (cohortVal && cohortVal > date) { toast('The install date is after the purchase date.'); return; }
+      if (cancelledVal && cancelledVal < date) { toast('The cancellation is before the purchase.'); return; }
+
+      var rec = {
+        id: sale ? sale.id : newId('sale'),
+        date: date,
+        platform: document.getElementById('slPlatform').value,
+        plan: document.getElementById('slPlan').value,
+        price: +price,
+        qty: n,
+        cohort: (n === 1 && cohortVal) ? cohortVal : undefined,
+        cancelled: cancelledVal || undefined,
+        refunded: !!document.getElementById('slRefunded').value,
+        note: document.getElementById('slNote').value.trim() || undefined
+      };
+      putSale(rec);
+      lastSale = { platform: rec.platform, plan: rec.plan, price: rec.price };
+      renderSaleEntry();
+      renderAll();
+      toast(sale ? 'Purchase saved.' : 'Purchase added.');
+    });
+  }
+
+  function renderSaleTable() {
+    var list = salesList();
+    var host = document.getElementById('slSaleTable');
+    if (!host) return;
+    document.getElementById('slSaleCount').textContent = list.length
+      ? list.length + ' purchase' + (list.length === 1 ? '' : 's') + ' on record' : '';
+    if (!list.length) {
+      host.innerHTML = '<div class="empty">No purchases recorded yet. Add one above, or paste a batch.</div>';
+      return;
+    }
+    host.innerHTML = '<table><thead><tr><th>Date</th><th>Store</th><th>Plan</th>' +
+      '<th class="money">Price</th><th class="money">Count</th><th class="money">MRR</th>' +
+      '<th>Installed</th><th>Age</th><th>Status</th><th></th></tr></thead><tbody>' +
+      list.map(function (raw) {
+        var s = Sales.normalize(raw);
+        if (!s) return '';
+        var age = Sales.cohortDayOf(s);
+        var status = s.refunded ? '<span class="pill red">refunded</span>'
+          : s.cancelled ? '<span class="note">cancelled ' + esc(labelDay(s.cancelled)) + '</span>'
+          : Sales.isRecurring(s.plan) ? '<span class="pill green">live</span>' : '';
+        return '<tr><td>' + esc(labelFull(s.date)) + '</td>' +
+          '<td><span class="pill ' + s.platform + '">' + PLATFORMS[s.platform] + '</span></td>' +
+          '<td><span class="swatch" style="background:' + planColor(s.plan) + '"></span> ' + esc(planLabel(s.plan)) + '</td>' +
+          '<td class="money">' + fmtMoney(s.price) + '</td>' +
+          '<td class="money">' + fmtInt(s.qty) + '</td>' +
+          '<td class="money">' + (Sales.isRecurring(s.plan) ? fmtMoney(Sales.mrrOf(s)) : '<span class="na">–</span>') + '</td>' +
+          '<td>' + (s.cohort ? esc(labelDay(s.cohort)) : '<span class="na">–</span>') + '</td>' +
+          '<td>' + (age === null ? '<span class="na">–</span>' : age + 'd') + '</td>' +
+          '<td>' + status + '</td>' +
+          '<td><button class="btn sm" data-sale-edit="' + esc(s.id) + '">Edit</button></td></tr>';
+      }).join('') + '</tbody></table>';
+
+    host.querySelectorAll('[data-sale-edit]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        renderSaleForm(b.dataset.saleEdit);
+        document.getElementById('slSaleForm').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+    });
+  }
+
+  /**
+   * Parse the paste box.
+   *
+   * Returns rows AND the lines it could not read, because a silent drop is the
+   * worst outcome here: you paste thirty purchases, twenty-eight land, and the
+   * two that did not are indistinguishable from two you never made until the
+   * numbers stop matching the store report months later.
+   */
+  function parseSalePaste(text) {
+    var rows = [], bad = [];
+    String(text || '').replace(/\r\n?/g, '\n').split('\n').forEach(function (line, i) {
+      if (!line.trim()) return;
+      var sep = line.indexOf('\t') !== -1 ? '\t' : ',';
+      var c = line.split(sep).map(function (x) { return x.trim().replace(/^"|"$/g, ''); });
+      var date = normalizeDate(c[0] || '');
+      if (!date) { bad.push({ line: i + 1, text: line, why: 'no readable date in the first column' }); return; }
+      var plat = /and|goog|play/i.test(c[1] || '') ? 'android' : 'ios';
+      var planRaw = (c[2] || '').toLowerCase();
+      var plan = /ann|year|yr/.test(planRaw) ? 'annual'
+        : /life|perm|forever/.test(planRaw) ? 'lifetime'
+        : /month|mo\b/.test(planRaw) ? 'monthly'
+        : planRaw ? 'monthly' : 'unknown';
+      var price = cleanNum(c[3]);
+      if (c[3] !== undefined && c[3] !== '' && !isFinite(price)) {
+        bad.push({ line: i + 1, text: line, why: 'the price did not read as a number' });
+        return;
+      }
+      var cohort = normalizeDate(c[4] || '');
+      var cancelled = normalizeDate(c[5] || '');
+      rows.push({
+        date: date, platform: plat, plan: plan, price: price, qty: 1,
+        cohort: (cohort && cohort <= date) ? cohort : undefined,
+        cancelled: (cancelled && cancelled >= date) ? cancelled : undefined,
+        note: c[6] ? String(c[6]).slice(0, 200) : undefined
+      });
+    });
+    return { rows: rows, bad: bad };
+  }
+
+  function salesCSV() {
+    var cols = ['date', 'platform', 'plan', 'price', 'qty', 'cohort', 'cancelled', 'refunded', 'note'];
+    var lines = [cols.join(',')];
+    salesList().slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; }).forEach(function (raw) {
+      var s = Sales.normalize(raw);
+      if (!s) return;
+      lines.push(cols.map(function (c) {
+        var v = s[c];
+        if (c === 'refunded') v = s.refunded ? 'yes' : '';
+        if (v === null || v === undefined) v = '';
+        v = String(v);
+        return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+      }).join(','));
+    });
+    return lines.join('\n');
+  }
+
+  function wireSales() {
+    document.getElementById('slPasteClear').addEventListener('click', function () {
+      document.getElementById('slPaste').value = '';
+      document.getElementById('slPasteStatus').textContent = '';
+    });
+    document.getElementById('slPasteGo').addEventListener('click', function () {
+      var box = document.getElementById('slPaste');
+      var out = parseSalePaste(box.value);
+      if (!out.rows.length && !out.bad.length) { toast('Nothing to add — paste some rows first.'); return; }
+      out.rows.forEach(function (r) {
+        r.id = newId('sale');
+        salesList().push(r);
+      });
+      if (out.rows.length) { sortSales(); save(); invalidate(); }
+      /* The unreadable lines are left in the box rather than cleared, so the
+         fix is a correction in place instead of a hunt through the source. */
+      box.value = out.bad.map(function (b) { return b.text; }).join('\n');
+      document.getElementById('slPasteStatus').textContent =
+        'Added ' + out.rows.length + ' purchase' + (out.rows.length === 1 ? '' : 's') +
+        (out.bad.length ? ' · ' + out.bad.length + ' line' + (out.bad.length === 1 ? '' : 's') +
+          ' left in the box: ' + out.bad[0].why : '');
+      renderSaleEntry();
+      renderAll();
+      toast('Added ' + out.rows.length + ' purchases.');
+    });
+    document.getElementById('slExport').addEventListener('click', function () {
+      download('autonomic-sales.csv', salesCSV(), 'text/csv');
     });
   }
 
@@ -2932,18 +3723,33 @@
      so switching tabs never discards half-typed rows. */
   function renderData() {
     if (!bulkRows.length) buildBulkGrid();
+    renderSaleEntry();
     renderCostEntry();
   }
 
   /* ------------------------------------------------------ view: forecast */
 
-  function fcModel() { return (state.fc && state.fc.model) || 'monthly'; }
+  /**
+   * 'monthly' used to be the default, so every saved UI carries it whether or
+   * not anyone chose it — and leaving those on a single-price model is exactly
+   * the thing the ledger was added to fix. A model the user never pressed a
+   * button for is upgraded to the mix once; `modelChosen` is stamped the moment
+   * they do press one, so a deliberate "all monthly" is never overridden.
+   */
+  function fcModel() {
+    var fc = state.fc || (state.fc = {});
+    if (!fc.modelChosen && fc.model === 'monthly') fc.model = 'mix';
+    return fc.model || 'mix';
+  }
   function fcIsSub() { return fcModel() !== 'onetime'; }
 
   function renderForecastControls(a) {
     var host = document.getElementById('fcControls');
+    var model = fcModel();
     host.innerHTML = FC_CONTROLS.filter(function (c) {
-      return !(c.subsOnly && !fcIsSub());
+      if (c.subsOnly && !fcIsSub()) return false;
+      if (c.only && c.only.indexOf(model) === -1) return false;
+      return true;
     }).map(function (c) {
       var v = fcValue(c.key, a), act = fcActualFor(c.key, a);
       var min = c.min(a), max = c.max(a);
@@ -2958,8 +3764,9 @@
           '" step="' + c.step + '" value="' + v + '">' +
         '<div class="ctrl-foot">' +
           (c.note ? esc(c.note)
-            : (c.needsSales && !a.hasSales ? 'no sales on record yet — assumption'
-              : 'from your data: ' + c.fmt(act))) +
+            : (c.derived && c.derived(a) ? esc(c.derived(a))
+              : (c.needsSales && !a.hasSales ? 'no sales on record yet — assumption'
+                : 'from your data: ' + c.fmt(act)))) +
           (fcIsOverridden(c.key) ? ' <button class="linkbtn" data-fc-reset="' + c.key + '">reset</button>' : '') +
         '</div></div>';
     }).join('');
@@ -2989,8 +3796,10 @@
     document.getElementById('fcMrrHint').textContent = model === 'onetime'
       ? 'One-time purchases do not recur, so this is the revenue earned in each month rather than a recurring base.'
       : model === 'annual'
-        ? 'Annual plans are shown as monthly recurring revenue — the yearly price spread across twelve months.'
-        : 'Recurring revenue at the end of each month, after churn.';
+        ? 'Annual plans are shown as monthly recurring revenue — the yearly price spread across twelve months. Cash arrives a year at a time; the cumulative chart above shows both.'
+        : model === 'mix'
+          ? 'Recurring revenue at the end of each month, from both plans: an annual buyer contributes a twelfth of the yearly price each month, exactly like the Sales view. Monthly plans churn continuously; annual ones are only tested at their renewal, because someone who has paid for a year cannot leave in month three.'
+          : 'Recurring revenue at the end of each month, after churn.';
 
     /* ---- tiles ---- */
     var rangeMeta = function (lo, hi, f) { return 'range ' + f(lo) + ' – ' + f(hi); };
@@ -3005,19 +3814,25 @@
         meta: rangeMeta(bear.endMrr * 12, bull.endMrr * 12, fmtMoney)
       }),
       tile({
-        label: 'Revenue through ' + fcEndLabel(), color: ENTITY.sales, value: fmtMoney(exp.totalRevenue),
-        meta: rangeMeta(bear.totalRevenue, bull.totalRevenue, fmtMoney)
+        label: 'Cash through ' + fcEndLabel(), color: ENTITY.sales, value: fmtMoney(exp.totalBookings),
+        meta: rangeMeta(bear.totalBookings, bull.totalBookings, fmtMoney) +
+          (model === 'onetime' ? '' : ' · ' + fmtMoney(exp.totalRevenue) + ' of it recognised in the window')
       }),
       tile({
-        label: 'Revenue, next 30 days', value: fmtMoney(exp.revenueNext30), smallValue: true,
-        meta: rangeMeta(bear.revenueNext30, bull.revenueNext30, fmtMoney)
+        label: 'Cash, next 30 days', value: fmtMoney(exp.bookingsNext30), smallValue: true,
+        meta: rangeMeta(bear.bookingsNext30, bull.bookingsNext30, fmtMoney)
       }),
       tile({
         label: (model === 'onetime' ? 'Buyers in ' : 'Paying users in ') + fcEndLabel(),
         color: ENTITY.trialEnd, value: fmtInt(model === 'onetime' ? a.payers + exp.totalConv : exp.endPayers),
         meta: model === 'onetime'
           ? 'starting from ' + fmtInt(a.payers) + ' today'
-          : rangeMeta(bear.endPayers, bull.endPayers, fmtInt) + ' · from ' + fmtInt(a.payers) + ' today'
+          : rangeMeta(bear.endPayers, bull.endPayers, fmtInt) + ' · from ' +
+            fmtInt(a.startMonthly + a.startAnnual) + ' on the books today',
+        split: model === 'mix' ? [
+          { name: 'Monthly', color: planColor('monthly'), value: fmtInt(exp.endMonthly) },
+          { name: 'Annual', color: planColor('annual'), value: fmtInt(exp.endAnnual) }
+        ] : null
       }),
       tile({
         label: 'New installs through ' + fcEndLabel(), color: ENTITY.downloads, value: fmtInt(exp.totalInstalls),
@@ -3051,6 +3866,17 @@
       });
     }
     bandChart('fcRevenue', 'cumRevenue', fmtMoney, moneyTick);
+    /* Cash rides on the revenue chart rather than getting a card of its own:
+       the two are the same quantity counted at different moments, and the gap
+       between them only means anything when you can see both at once. */
+    if (model !== 'onetime') {
+      var cfg = chartCfgs.fcRevenue;
+      cfg.series.push({
+        key: 'cash', name: 'Cash collected', color: ENTITY.sales, type: 'line', dashed: true,
+        values: pick(exp, 'cumBookings'), format: fmtMoney
+      });
+      drawChart('fcRevenue', cfg);
+    }
     bandChart('fcMrr', 'mrr', fmtMoney, moneyTick);
     bandChart('fcPayers', 'payers', fmtInt);
 
@@ -3064,17 +3890,20 @@
     });
 
     /* ---- month table ---- */
-    var head = '<tr><th>Month</th><th>New installs</th><th>New paying</th><th>' +
-      (fcIsSub() ? 'Paying users' : 'Buyers') + '</th><th>' + esc(mrrLabel) + '</th><th>Revenue</th>' +
-      '<th>Cumulative</th><th>Range (cumulative)</th></tr>';
+    var head = '<tr><th>Month</th><th>New installs</th><th>New paying</th>' +
+      (model === 'mix' ? '<th>New monthly</th><th>New annual</th>' : '') +
+      '<th>' + (fcIsSub() ? 'Paying users' : 'Buyers') + '</th><th>' + esc(mrrLabel) + '</th>' +
+      '<th>Recognised</th><th>Cash in</th><th>Cumulative cash</th><th>Range (cumulative)</th></tr>';
     var body = exp.months.map(function (m, i) {
       return '<tr><td>' + bucketLabel(m.key, 'month').full + '</td>' +
         '<td>' + fmtInt(m.installs) + '</td>' +
         '<td>' + fmtInt(m.conv) + '</td>' +
+        (model === 'mix' ? '<td>' + fmtInt(m.newMonthly) + '</td><td>' + fmtInt(m.newAnnual) + '</td>' : '') +
         '<td>' + fmtInt(m.payers) + '</td>' +
         '<td>' + fmtMoney(m.mrr) + '</td>' +
         '<td>' + fmtMoney(m.revenue) + '</td>' +
-        '<td>' + fmtMoney(m.cumRevenue) + '</td>' +
+        '<td>' + fmtMoney(m.bookings) + '</td>' +
+        '<td>' + fmtMoney(m.cumBookings) + '</td>' +
         '<td>' + fmtMoney(bear.months[i] ? bear.months[i].cumRevenue : 0) + ' – ' +
           fmtMoney(bull.months[i] ? bull.months[i].cumRevenue : 0) + '</td></tr>';
     }).join('');
@@ -3090,34 +3919,46 @@
     var L = [];
     L.push('# Autonomic — forecast');
     L.push('Base date: ' + labelFull(asOf()) + ' · through ' + fcEndLabel() + ' · ' +
-      (model === 'onetime' ? 'one-time purchase' : model === 'annual' ? 'annual subscription' : 'monthly subscription'));
+      (model === 'onetime' ? 'one-time purchase'
+        : model === 'annual' ? 'annual subscription only'
+        : model === 'monthly' ? 'monthly subscription only'
+        : 'plan mix — monthly and annual'));
     L.push('Platform: ' + (o.platform === 'all' ? 'combined' : platName(o.platform)));
     L.push('');
     L.push('## Assumptions (expected case)');
     L.push('New installs/day        ' + fmtInt(o.installs));
     L.push('Install growth/month    ' + (o.growth * 100).toFixed(1) + '%');
     L.push('Convert rate at wall    ' + (o.conv * 100).toFixed(2) + '%');
-    L.push('Price per paying user   ' + fmtMoney(o.price));
-    if (model !== 'onetime') L.push('Monthly churn           ' + (o.churn * 100).toFixed(2) + '%');
-    L.push('Starting paying users   ' + fmtInt(o.startPayers));
+    if (model === 'onetime') {
+      L.push('Price per buyer         ' + fmtMoney(o.price));
+    } else {
+      if (model !== 'annual') L.push('Monthly plan price      ' + fmtMoney(o.monthlyPrice));
+      if (model !== 'monthly') L.push('Annual plan price       ' + fmtMoney(o.annualPrice));
+      if (model === 'mix') L.push('Choose annual           ' + (o.annualShare * 100).toFixed(0) + '%');
+      L.push('Monthly churn           ' + (o.churn * 100).toFixed(2) + '%');
+      L.push('Starting monthly subs   ' + fmtInt(o.startMonthly));
+      L.push('Starting annual subs    ' + fmtInt(o.startAnnual));
+    }
     L.push('Scenario spread         ±' + fcValue('spread', sc.actuals) + '%');
     L.push('');
     L.push('## Outcome by ' + fcEndLabel() + ' (bear / expected / optimistic)');
     L.push((model === 'onetime' ? 'Monthly revenue  ' : 'MRR              ') +
       fmtMoney(bear.endMrr) + ' / ' + fmtMoney(exp.endMrr) + ' / ' + fmtMoney(bull.endMrr));
     L.push('ARR              ' + fmtMoney(bear.endMrr * 12) + ' / ' + fmtMoney(exp.endMrr * 12) + ' / ' + fmtMoney(bull.endMrr * 12));
-    L.push('Total revenue    ' + fmtMoney(bear.totalRevenue) + ' / ' + fmtMoney(exp.totalRevenue) + ' / ' + fmtMoney(bull.totalRevenue));
+    L.push('Cash collected   ' + fmtMoney(bear.totalBookings) + ' / ' + fmtMoney(exp.totalBookings) + ' / ' + fmtMoney(bull.totalBookings));
+    L.push('Recognised rev   ' + fmtMoney(bear.totalRevenue) + ' / ' + fmtMoney(exp.totalRevenue) + ' / ' + fmtMoney(bull.totalRevenue));
     L.push('Paying users     ' + fmtInt(bear.endPayers) + ' / ' + fmtInt(exp.endPayers) + ' / ' + fmtInt(bull.endPayers));
     L.push('New installs     ' + fmtInt(bear.totalInstalls) + ' / ' + fmtInt(exp.totalInstalls) + ' / ' + fmtInt(bull.totalInstalls));
     L.push('New conversions  ' + fmtInt(bear.totalConv) + ' / ' + fmtInt(exp.totalConv) + ' / ' + fmtInt(bull.totalConv));
     L.push('');
     L.push('## Month by month (expected)');
     L.push(pad2('month', 12) + padL('installs', 10) + padL('new paying', 12) +
-      padL('paying', 9) + padL('mrr', 12) + padL('revenue', 12) + padL('cumulative', 13));
+      padL('paying', 9) + padL('mrr', 12) + padL('recognised', 12) + padL('cash in', 12) +
+      padL('cum cash', 13));
     exp.months.forEach(function (m) {
       L.push(pad2(m.key.slice(0, 7), 12) + padL(fmtInt(m.installs), 10) + padL(fmtInt(m.conv), 12) +
         padL(fmtInt(m.payers), 9) + padL(fmtMoney(m.mrr), 12) + padL(fmtMoney(m.revenue), 12) +
-        padL(fmtMoney(m.cumRevenue), 13));
+        padL(fmtMoney(m.bookings), 12) + padL(fmtMoney(m.cumBookings), 13));
     });
     return L.join('\n');
   }
@@ -3164,6 +4005,7 @@
       state.fc = state.fc || {};
       state.fc[b.parentElement.id === 'fcHorizon' ? 'horizon' : 'model'] =
         b.parentElement.id === 'fcHorizon' ? +b.dataset.v : b.dataset.v;
+      if (b.parentElement.id === 'fcModel') state.fc.modelChosen = true;
       saveUI();
       renderForecast();
     });
@@ -3189,8 +4031,6 @@
     { f: 'impressions', label: 'Impressions' },
     { f: 'pageViews', label: 'Page views' },
     { f: 'updates', label: 'Updates' },
-    { f: 'sales', label: 'Sales' },
-    { f: 'revenue', label: 'Amount' },
     { f: 'notes', label: 'Note', text: true }
   ];
   var MAX_BULK_ROWS = 400;
@@ -3431,13 +4271,36 @@
       growth = Math.max(-0.5, Math.min(1, growth));
     }
     var hasSales = all.totalSales > 0;
+
+    /* Plan-level defaults come from the LEDGER, not from `all.arppu`: an
+       average across a monthly and an annual sale is a price nobody paid, and
+       feeding it to a model that then divides by twelve is how an annual-heavy
+       book forecasts a twelfth of its real MRR. `basis` returns null for
+       anything it has not seen enough of, and null is what makes the slider
+       say "assumption" instead of "from your data". */
+    var six = Sales.forecastBasis(salesIndex(), addDays(end, -179), end);
+    var live = Sales.summarize(salesIndex(), addDays(end, -(FC_WINDOW - 1)), end);
+
     return {
       installs: recent.downloads / covered,
       growth: growth * 100,
       conv: hasSales && all.convOfWall ? all.convOfWall : 3,
+      /* Kept for the one-time model and for anything still reading a single
+         price. The mix model never uses it. */
       price: hasSales && all.arppu ? all.arppu : 4.99,
+      monthlyPrice: six.monthlyPrice === null ? 4.99 : six.monthlyPrice,
+      annualPrice: six.annualPrice === null ? 39.99 : six.annualPrice,
+      annualShare: six.annualShare === null ? 25 : six.annualShare,
+      churn: six.churnPct,
       payers: all.totalSales,
+      /* The book the forecast starts from, split by plan, so month one opens
+         at the MRR you actually have rather than at payers × one price. */
+      startMonthly: live.activeByPlan.monthly.count,
+      startAnnual: live.activeByPlan.annual.count,
+      startMrr: live.mrr,
       hasSales: hasSales,
+      hasPlans: six.units > 0,
+      unknownSales: six.unknownCount,
       platform: p
     };
   }
@@ -3452,31 +4315,76 @@
       min: function () { return 0; },
       max: function (a) { return Math.max(40, Math.ceil(a.conv * 3)); } },
     { key: 'price', needsSales: true, label: 'Price per paying user', step: 0.5, fmt: fmtMoney,
+      only: ['onetime'],
       min: function () { return 0; },
       max: function (a) { return Math.max(100, Math.ceil(a.price * 4)); } },
+    { key: 'monthlyPrice', label: 'Monthly plan price', step: 0.5, fmt: fmtMoney,
+      only: ['mix', 'monthly'],
+      min: function () { return 0; },
+      max: function (a) { return Math.max(50, Math.ceil(a.monthlyPrice * 4)); },
+      derived: function (a) { return a.hasPlans ? null : 'no monthly plan sold yet — assumption'; } },
+    { key: 'annualPrice', label: 'Annual plan price', step: 1, fmt: fmtMoney,
+      only: ['mix', 'annual'],
+      min: function () { return 0; },
+      max: function (a) { return Math.max(200, Math.ceil(a.annualPrice * 4)); },
+      derived: function (a) { return a.hasPlans ? null : 'no annual plan sold yet — assumption'; } },
+    /* The lever that makes this forecast different from the old one. An annual
+       buyer is worth twelve months of cash today and the same MRR as a monthly
+       buyer, so moving this changes the cash curve steeply and the MRR curve
+       not at all — which is exactly the trade the number is there to show. */
+    { key: 'annualShare', label: 'Share who choose annual', step: 1,
+      fmt: function (v) { return v.toFixed(0) + '%'; },
+      only: ['mix'],
+      min: function () { return 0; }, max: function () { return 100; },
+      derived: function (a) { return a.hasPlans ? null : 'nothing recurring sold yet — assumption'; } },
     { key: 'churn', label: 'Monthly churn', step: 0.25, fmt: function (v) { return v.toFixed(2) + '%'; },
       min: function () { return 0; }, max: function () { return 40; }, subsOnly: true,
-      note: 'no churn data yet — assumption' },
+      derived: function (a) {
+        return a.churn === null ? 'nothing marked cancelled yet — assumption' : null;
+      } },
     { key: 'spread', label: 'Scenario spread', step: 5, fmt: function (v) { return '±' + v.toFixed(0) + '%'; },
       min: function () { return 5; }, max: function () { return 80; },
       note: 'width of the bear / optimistic band' }
   ];
-  var FC_FALLBACK = { churn: 5, spread: 35 };
+  /* What a control falls back to when the data cannot answer it. `churn` is
+     here rather than on the actuals because a measured 0% and an unmeasurable
+     one are different claims, and only the second may be replaced by 5. */
+  var FC_FALLBACK = { spread: 35 };
+  var FC_ASSUMED = { churn: 5 };
 
   /* a control's live value: the user's override if set, else the derived actual */
   function fcValue(key, a) {
     var v = state.fc && state.fc[key];
     if (v !== null && v !== undefined && !isNaN(v)) return +v;
     if (key in FC_FALLBACK) return FC_FALLBACK[key];
-    return a[key];
+    var actual = a[key];
+    if (actual === null || actual === undefined || isNaN(actual)) return FC_ASSUMED[key] || 0;
+    return actual;
   }
   function fcIsOverridden(key) {
     var v = state.fc && state.fc[key];
     return v !== null && v !== undefined && !isNaN(v);
   }
-  function fcActualFor(key, a) { return key in FC_FALLBACK ? FC_FALLBACK[key] : a[key]; }
+  function fcActualFor(key, a) {
+    if (key in FC_FALLBACK) return FC_FALLBACK[key];
+    var v = a[key];
+    return (v === null || v === undefined || isNaN(v)) ? (FC_ASSUMED[key] || 0) : v;
+  }
 
-  /* One scenario run. Returns per-calendar-month rollups plus end-state totals. */
+  /**
+   * One scenario run. Returns per-calendar-month rollups plus end-state totals.
+   *
+   * The two pools are the point. A monthly buyer and an annual buyer are the
+   * same MRR at the same price per month and completely different CASH: the
+   * annual one pays twelve months up front and then nothing until the plan
+   * renews. Running them as one pool with one average price — which is what
+   * this model did while sales were a daily total — gets both curves wrong in
+   * opposite directions the moment the mix is not what the average assumed.
+   *
+   * `revenue` is recognised revenue, the month's share of what was sold.
+   * `bookings` is cash. They differ by the annual book, and both are reported
+   * rather than one of them being called "revenue" and left to be misread.
+   */
   function fcRun(o) {
     var days = o.days;
     var gDaily = Math.pow(1 + o.growth, 1 / DPM) - 1;
@@ -3484,12 +4392,29 @@
     var lag = wallExit();
     var start = asOf();
 
+    /* Annual plans churn on the renewal, not continuously — someone who has
+       paid for a year cannot leave in month three however unhappy they are, and
+       applying a monthly churn to them understates MRR for eleven months out of
+       twelve. They are held whole and tested once a year instead. */
+    var annualRenewal = Math.pow(1 - o.churn, 12);
+
     var installs = new Array(days + 1);
     for (var t = 1; t <= days; t++) installs[t] = o.installs * Math.pow(1 + gDaily, t);
 
-    var payers = o.model === 'onetime' ? 0 : o.startPayers;
+    var share = o.model === 'mix' ? o.annualShare
+      : o.model === 'annual' ? 1
+      : 0;                                    // monthly and one-time buy no annual plans
+    var monthlyPrice = o.monthlyPrice;
+    var annualPrice = o.annualPrice;
+
+    var moPayers = o.model === 'onetime' ? 0 : o.startMonthly;
+    var anPayers = o.model === 'onetime' ? 0 : o.startAnnual;
+    /* Annual cohorts, by the day they were bought, so each can renew (or not)
+       exactly a year later instead of decaying every day. */
+    var anCohorts = [];
+
     var months = {}, order = [];
-    var cumRev = 0, totInstalls = 0, totConv = 0, rev30 = 0;
+    var cumRev = 0, cumBook = 0, totInstalls = 0, totConv = 0, rev30 = 0, book30 = 0;
 
     for (var t2 = 1; t2 <= days; t2++) {
       var date = addDays(start, t2);
@@ -3497,49 +4422,69 @@
       // before the lag is up, the cohort hitting the wall is one we already recorded
       var wall = srcT >= 1 ? installs[srcT] : dayRec(o.platform, addDays(start, srcT)).downloads;
       var conv = wall * o.conv;
-      payers = payers * (1 - churnDaily) + conv;
+      var newAnnual = conv * share;
+      var newMonthly = conv - newAnnual;
 
-      var rev = o.model === 'onetime' ? conv * o.price
-        : o.model === 'annual' ? (payers * o.price) / 365.25
-        : (payers * o.price) / DPM;
+      var bookings = 0;
+      if (o.model === 'onetime') {
+        bookings = conv * o.price;
+      } else {
+        moPayers = moPayers * (1 - churnDaily) + newMonthly;
+        anPayers += newAnnual;
+        anCohorts.push({ day: t2, n: newAnnual });
+        bookings = newMonthly * monthlyPrice + newAnnual * annualPrice;
+        /* A year on, an annual cohort renews at whatever survives the annual
+           churn, and the renewal is cash again. */
+        for (var ci = 0; ci < anCohorts.length; ci++) {
+          var c = anCohorts[ci];
+          if (t2 - c.day === 365) {
+            var kept = c.n * annualRenewal;
+            anPayers -= (c.n - kept);
+            bookings += kept * annualPrice;
+            c.n = kept;
+            c.day = t2;
+          }
+        }
+      }
 
-      cumRev += rev; totInstalls += installs[t2]; totConv += conv;
-      if (t2 > days - 30) rev30 += rev;
+      var mrr = o.model === 'onetime' ? 0
+        : moPayers * monthlyPrice + anPayers * (annualPrice / 12);
+      /* Recognised revenue for the day: a twelfth of a month of MRR-worth. */
+      var rev = o.model === 'onetime' ? conv * o.price : mrr / DPM;
+
+      cumRev += rev; cumBook += bookings;
+      totInstalls += installs[t2]; totConv += conv;
+      if (t2 <= 30) { rev30 += rev; book30 += bookings; }
 
       var key = monthStart(date);
       var m = months[key];
-      if (!m) { m = months[key] = { key: key, installs: 0, conv: 0, revenue: 0 }; order.push(m); }
+      if (!m) { m = months[key] = { key: key, installs: 0, conv: 0, revenue: 0, bookings: 0, newAnnual: 0, newMonthly: 0 }; order.push(m); }
       m.installs += installs[t2];
       m.conv += conv;
       m.revenue += rev;
-      m.payers = payers;
+      m.bookings += bookings;
+      m.newAnnual += newAnnual;
+      m.newMonthly += newMonthly;
+      m.payers = moPayers + anPayers;
+      m.monthlyPayers = moPayers;
+      m.annualPayers = anPayers;
       m.cumRevenue = cumRev;
-      m.mrr = o.model === 'monthly' ? payers * o.price
-        : o.model === 'annual' ? (payers * o.price) / 12
-        : m.revenue;   // one-time has no recurring revenue — show the month's take
+      m.cumBookings = cumBook;
+      m.mrr = o.model === 'onetime' ? m.revenue : mrr;
     }
 
     return {
       months: order,
-      endPayers: payers,
+      endPayers: moPayers + anPayers,
+      endMonthly: moPayers,
+      endAnnual: anPayers,
       endMrr: order.length ? order[order.length - 1].mrr : 0,
       totalRevenue: cumRev,
+      totalBookings: cumBook,
       totalInstalls: totInstalls,
       totalConv: totConv,
-      revenueNext30: (function () {
-        var r = 0;
-        // recompute the FIRST 30 days rather than the last
-        var pv = o.model === 'onetime' ? 0 : o.startPayers, cd = churnDaily;
-        for (var t3 = 1; t3 <= Math.min(30, days); t3++) {
-          var st = t3 - lag;
-          var w = st >= 1 ? installs[st] : dayRec(o.platform, addDays(start, st)).downloads;
-          var c = w * o.conv;
-          pv = pv * (1 - cd) + c;
-          r += o.model === 'onetime' ? c * o.price
-            : o.model === 'annual' ? (pv * o.price) / 365.25 : (pv * o.price) / DPM;
-        }
-        return r;
-      })()
+      revenueNext30: rev30,
+      bookingsNext30: book30
     };
   }
 
@@ -3547,15 +4492,19 @@
   function fcScenarios() {
     var a = fcActuals();
     var f = fcValue('spread', a) / 100;
-    var model = (state.fc && state.fc.model) || 'monthly';
+    var model = fcModel();
     var months = (state.fc && +state.fc.horizon) || 12;
     var o = {
       months: months, days: diffDays(asOf(), fcEndDate()), model: model,
-      platform: a.platform, startPayers: a.payers,
+      platform: a.platform,
+      startPayers: a.payers, startMonthly: a.startMonthly, startAnnual: a.startAnnual,
       installs: fcValue('installs', a),
       growth: fcValue('growth', a) / 100,
       conv: fcValue('conv', a) / 100,
       price: fcValue('price', a),
+      monthlyPrice: fcValue('monthlyPrice', a),
+      annualPrice: fcValue('annualPrice', a),
+      annualShare: fcValue('annualShare', a) / 100,
       churn: fcValue('churn', a) / 100
     };
     function variant(dir) {   // dir = -1 bear, +1 optimistic
@@ -3565,11 +4514,18 @@
          too wide to be worth reading. */
       return {
         months: o.months, days: o.days, model: o.model, platform: o.platform,
-        startPayers: o.startPayers,
+        startPayers: o.startPayers, startMonthly: o.startMonthly, startAnnual: o.startAnnual,
         installs: Math.max(0, o.installs * (1 + dir * f / 3)),
         growth: o.growth + dir * f / 8,
         conv: Math.max(0, o.conv * (1 + dir * f)),
         price: o.price,
+        monthlyPrice: o.monthlyPrice,
+        annualPrice: o.annualPrice,
+        /* Price and mix are NOT scenario levers. They are decisions, not
+           outcomes: you know what you charge and roughly who picks what, and
+           swinging them alongside conversion would widen the band with
+           uncertainty that is not actually there. */
+        annualShare: o.annualShare,
         churn: Math.max(0, o.churn * (1 - dir * f / 2))
       };
     }
@@ -3799,6 +4755,8 @@
         hydrate(remote, true);
         var store = { db: db, state: state };
         if (window.Sync) window.Sync.adopt(store.db, store.state);
+        // After the adopt, never before — see the note in hydrate().
+        migrateSales();
       });
 
     // The counter is only worth a round trip on the views that show it.
@@ -3824,7 +4782,7 @@
 
   var VIEW_TITLES = {
     overview: 'Overview', ping: 'App usage', timeline: 'Timeline', trial: 'Trial & conversion', cohorts: 'Cohorts',
-    platforms: 'iOS vs Android', costs: 'Costs', forecast: 'Forecast', data: 'Edit data'
+    platforms: 'iOS vs Android', sales: 'Sales', costs: 'Costs', forecast: 'Forecast', data: 'Edit data'
   };
 
   function renderAll() {
@@ -3867,8 +4825,12 @@
 
     // App usage and Timeline have their own data sources, so both stand up with
     // no store CSVs at all.
-    var empty = !db.entries.length && state.view !== 'data' &&
-      state.view !== 'ping' && state.view !== 'timeline' && state.view !== 'costs';
+    /* Sales stands up with no store CSVs for the same reason Costs does: the
+       ledger is entered here, not pasted from a store report, so a dashboard
+       with purchases and no downloads has plenty to show. */
+    var empty = !db.entries.length && !salesList().length && state.view !== 'data' &&
+      state.view !== 'ping' && state.view !== 'timeline' && state.view !== 'costs' &&
+      state.view !== 'sales';
     document.getElementById('emptyState').classList.toggle('hidden', !empty);
     if (empty) {
       document.getElementById('view-' + state.view).classList.add('hidden');
@@ -3882,6 +4844,7 @@
     else if (state.view === 'trial') renderTrial();
     else if (state.view === 'cohorts') renderCohorts();
     else if (state.view === 'platforms') renderPlatforms();
+    else if (state.view === 'sales') renderSales();
     else if (state.view === 'costs') renderCosts();
     else if (state.view === 'forecast') renderForecast();
     else if (state.view === 'data') renderData();
@@ -3897,7 +4860,7 @@
   /* ---------------------------------------------------------------- I/O */
 
   function toCSV() {
-    var cols = ['date', 'platform', 'downloads', 'impressions', 'pageViews', 'updates', 'sales', 'revenue', 'notes'];
+    var cols = ['date', 'platform', 'downloads', 'impressions', 'pageViews', 'updates', 'notes'];
     var lines = [cols.join(',')];
     db.entries.slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; }).forEach(function (e) {
       lines.push(cols.map(function (c) {
@@ -3949,19 +4912,43 @@
       notes: idx(['notes', 'note'])
     };
     if (map.date === -1) throw new Error('CSV needs a "date" column.');
-    var count = 0;
+    var count = 0, legacySales = [];
     rows.slice(1).forEach(function (r) {
       var date = normalizeDate((r[map.date] || '').trim());
       if (!date) return;
       var rawP = ((map.platform !== -1 ? r[map.platform] : '') || '').trim().toLowerCase();
       var plat = /and|goog|play/.test(rawP) ? 'android' : 'ios';
       var rec = { date: date, platform: plat, notes: map.notes !== -1 ? (r[map.notes] || '') : '' };
-      ['downloads', 'impressions', 'pageViews', 'updates', 'sales'].forEach(function (f) {
+      ['downloads', 'impressions', 'pageViews', 'updates'].forEach(function (f) {
         rec[f] = map[f] !== -1 ? cleanNum(r[map[f]]) : 0;
       });
-      rec.revenue = map.revenue !== -1 ? cleanNum(r[map.revenue]) : 0;
       upsertQuiet(rec); count++;
+      /* A store export still carries sales columns, and dropping them on the
+         floor because the dashboard's own shape moved would lose real money
+         without saying so. They land in the ledger as unclassified purchases —
+         the same thing the migration made of the old daily columns — so they
+         count everywhere except MRR, and the Sales view says how many there
+         are and how to classify them. */
+      var n = Math.round(map.sales !== -1 ? cleanNum(r[map.sales]) : 0);
+      var amount = map.revenue !== -1 ? cleanNum(r[map.revenue]) : 0;
+      if (n || amount) {
+        var qty = Math.max(1, n || 1);
+        legacySales.push({
+          id: 'sale-csv-' + date + '-' + plat, date: date, platform: plat,
+          plan: 'unknown', price: amount / qty, qty: qty,
+          note: 'Imported from a CSV sales column'
+        });
+      }
     });
+    /* Keyed by day and store so re-importing the same export corrects those
+       days rather than adding a second copy of every sale on them. */
+    var have = {};
+    salesList().forEach(function (x, i) { have[x.id] = i; });
+    legacySales.forEach(function (row) {
+      if (have[row.id] !== undefined) salesList()[have[row.id]] = row;
+      else salesList().push(row);
+    });
+    if (legacySales.length) sortSales();
     finishBulk();
     return count;
   }
@@ -4080,6 +5067,14 @@
   }
 
   function init() {
+    /* The one-shot move of sales out of the daily columns and into the ledger.
+       It runs HERE because boot.js calls `Sync.adopt` before `Dashboard.start`,
+       so by now the server's own shape is the sync baseline and the rewrite
+       below reads as a real change that gets pushed. Run any earlier — inside
+       hydrate, say — and the adopt would swallow it and the migration would
+       repeat, invisibly, on every device forever. */
+    migrateSales();
+
     document.querySelector('.tabs').addEventListener('click', function (ev) {
       var t = ev.target.closest('.tab');
       if (t) setView(t.dataset.view);
@@ -4171,6 +5166,7 @@
 
     /* --- data entry --- */
     wireBulk();
+    wireSales();
     wireExport();
     wireForecast();
     document.getElementById('eDate').value = asOf();
@@ -4185,8 +5181,6 @@
         impressions: cleanNum(document.getElementById('eImpressions').value),
         pageViews: cleanNum(document.getElementById('ePageViews').value),
         updates: cleanNum(document.getElementById('eUpdates').value),
-        sales: cleanNum(document.getElementById('eSales').value),
-        revenue: cleanNum(document.getElementById('eRevenue').value),
         notes: document.getElementById('eNotes').value
       };
       upsert(rec);
@@ -4197,7 +5191,7 @@
     });
 
     document.getElementById('eClear').addEventListener('click', function () {
-      ['eDownloads', 'eImpressions', 'ePageViews', 'eUpdates', 'eSales', 'eRevenue', 'eNotes']
+      ['eDownloads', 'eImpressions', 'ePageViews', 'eUpdates', 'eNotes']
         .forEach(function (id) { document.getElementById(id).value = ''; });
       document.getElementById('eStatus').textContent = '';
     });
@@ -4212,8 +5206,6 @@
         document.getElementById('eImpressions').value = e.impressions ?? '';
         document.getElementById('ePageViews').value = e.pageViews ?? '';
         document.getElementById('eUpdates').value = e.updates ?? '';
-        document.getElementById('eSales').value = e.sales ?? '';
-        document.getElementById('eRevenue').value = e.revenue ?? '';
         document.getElementById('eNotes').value = e.notes || '';
         st.textContent = 'Editing an existing entry — saving overwrites it.';
       });
@@ -4256,20 +5248,38 @@
             });
             if (parsed.settings) Object.assign(db.settings, parsed.settings);
             // A JSON backup is the whole store, so a restore has to bring the
-            // campaigns and costs back too — not just the store days. Merged by
-            // id, like every other collection, so restoring an old backup over
-            // a newer ledger adds to it rather than truncating it.
-            [['ads', 'ads'], ['costs', 'costs']].forEach(function (pair) {
-              if (!Array.isArray(parsed[pair[0]])) return;
-              var into = db[pair[1]] || (db[pair[1]] = []);
-              parsed[pair[0]].forEach(function (row) {
+            // campaigns, costs and purchases back too — not just the store days.
+            // Merged by id, like every other collection, so restoring an old
+            // backup over a newer ledger adds to it rather than truncating it.
+            ['ads', 'costs', 'sales', 'events'].forEach(function (name) {
+              if (!Array.isArray(parsed[name])) return;
+              var into = db[name] || (db[name] = []);
+              parsed[name].forEach(function (row) {
                 if (!row || !row.id) return;
                 var at = -1;
                 into.forEach(function (x, i) { if (x.id === row.id) at = i; });
                 if (at >= 0) into[at] = row; else into.push(row);
               });
             });
+
+            /* THE ROLLBACK PATH. A backup taken before sales moved out of the
+               daily columns holds entries that still carry `sales` / `revenue`
+               and settings that carry no `salesMigrated` — and `base()` no
+               longer reads those columns, so restoring one onto a migrated
+               account would put the money back on disk and nowhere on screen.
+               Clearing the flag when a restored entry still carries them makes
+               the migration run again over exactly those rows, which is what
+               turns the backup into a real undo rather than a file you cannot
+               use. The migrated id is derived from the day and store, so a row
+               already in the ledger is skipped rather than added twice — and a
+               purchase you have since classified by hand keeps that
+               classification instead of being reset to unclassified. */
+            if (list.some(function (e) { return e && (e.sales !== undefined || e.revenue !== undefined); })) {
+              db.settings.salesMigrated = false;
+            }
             finishBulk();
+            var restored = migrateSales();
+            if (restored) toast('Restored ' + restored + ' days of sales into the ledger as unclassified purchases.');
             n = list.length;
           } else {
             n = importCSV(text);
@@ -4288,8 +5298,11 @@
     });
     document.getElementById('ioDemo').addEventListener('click', loadDemo);
     document.getElementById('ioReset').addEventListener('click', function () {
-      if (!confirm('Delete every entry on your account? This cannot be undone — export a backup first if you want one.')) return;
+      if (!confirm('Delete every store entry and every purchase on your account? Costs, campaigns and events are kept. This cannot be undone — export a backup first if you want one.')) return;
       db.entries = [];
+      /* Sales left behind by a wipe would come back as revenue with no
+         downloads under it, which reads as a bug rather than as a choice. */
+      db.sales = [];
       save(); invalidate(); renderAll();
       refreshBulk();
       // A wipe is the one case where the server should be told outright rather
@@ -4323,12 +5336,20 @@
     if (Array.isArray(remote.events)) db.events = remote.events;
     if (Array.isArray(remote.ads)) db.ads = remote.ads;
     if (Array.isArray(remote.costs)) db.costs = remote.costs;
+    if (Array.isArray(remote.sales)) db.sales = remote.sales;
     if (remote.settings) Object.assign(db.settings, remote.settings);
     if (remote.ui && !keepUi) Object.assign(state, remote.ui);
     // A session saved before Explore was replaced still names it. An unknown
     // view hides every section and leaves a blank page with no way back.
     if (!VIEW_TITLES[state.view]) state.view = 'overview';
     if (!VIEW_TITLES[state.lastView]) state.lastView = 'overview';
+    /* NOTE: the sales migration deliberately does NOT run here.
+       Every caller of hydrate() follows it with `Sync.adopt`, which makes what
+       is in memory the baseline the next push diffs against — so a migration
+       run inside hydrate would be adopted as though the server had sent it, and
+       the rewritten entries and the new ledger rows would never leave the
+       browser. It runs in init() and in refreshView(), both of which are AFTER
+       the adopt. */
     try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) {}
     try { localStorage.setItem(KEY + '.ui', JSON.stringify(state)); } catch (e) {}
     invalidate();

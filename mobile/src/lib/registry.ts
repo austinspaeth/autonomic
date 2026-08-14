@@ -519,7 +519,10 @@ export const fieldLabel = (f: FieldDef) => (f.label || '') + (f.unit ? ` (${f.un
 
 /**
  * The fields to render. Auto-adds a Time input (before any free-text fields)
- * and a trailing Notes textarea when the schema doesn't define them.
+ * and a trailing Notes textarea when the schema doesn't define them, plus an
+ * optional "Ended" time straight after the start time for types that last
+ * (`def.ends` — symptoms). The end time is `optional`, so it stays empty until
+ * the user sets one: most symptoms are logged while they're still happening.
  */
 export function entryFields(def?: TypeDef): FieldDef[] {
   const fields = (def && def.fields ? def.fields : []).slice();
@@ -528,6 +531,12 @@ export function entryFields(def?: TypeDef): FieldDef[] {
     const timeField: FieldDef = { type: 'time', key: 'time', label: 'Time' };
     if (firstText >= 0) fields.splice(firstText, 0, timeField);
     else fields.push(timeField);
+  }
+  if (def && def.ends && !def.noTime && !fields.some((f) => f.key === 'endTime')) {
+    const startAt = fields.findIndex((f) => f.type === 'time');
+    const endField: FieldDef = { type: 'time', key: 'endTime', label: 'Ended (optional)', optional: true };
+    if (startAt >= 0) fields.splice(startAt + 1, 0, endField);
+    else fields.push(endField);
   }
   if (!fields.some((f) => f.key === 'note')) {
     fields.push({ type: 'textarea', key: 'note', label: 'Notes', placeholder: 'Optional note' });

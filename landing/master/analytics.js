@@ -23,6 +23,13 @@
  * filter for the times the split is the question — see `index` and
  * `platformSplit`.
  *
+ * Not every ping carries a store. Builds that shipped before the marker existed
+ * send a bare `082126`, which reads back as platform U. Those are real installs
+ * whose store is unknown, NOT installs on an unknown platform, so a platform
+ * filter counts them rather than dropping them, and reports them separately as
+ * `unattributed` — see `rowsToMap`. Dropping them is what made a filtered view
+ * read as "no pings at all" for every day before the marker shipped.
+ *
  * ---------------------------------------------------------------------------
  * The three rules this module enforces so the UI cannot break them
  * ---------------------------------------------------------------------------
@@ -94,7 +101,7 @@ window.Analytics = (function () {
 
   /* ----------------------------------------------------------------- index */
 
-  var EMPTY = { total: 0, cohorts: {} };
+  var EMPTY = { total: 0, cohorts: {}, platforms: {}, unattributed: 0 };
 
   /* The report's platform letters, and the names the filter bar speaks. */
   var PLATFORM_LETTER = { ios: 'I', android: 'A', unknown: 'U', I: 'I', A: 'A', U: 'U' };
@@ -107,7 +114,7 @@ window.Analytics = (function () {
   }
 
   /**
-   * Rows to `{ day: { total, cohorts, platforms } }`.
+   * Rows to `{ day: { total, cohorts, platforms, unattributed } }`.
    *
    * Two cohort entries can now share a cohort DAY (one per platform), so the
    * counts are pooled rather than assigned — an `=` here would silently drop
@@ -115,22 +122,36 @@ window.Analytics = (function () {
    * counted before the filter is applied, so a filtered view can still say what
    * it is a slice of. Rows written before the platform marker existed carry no
    * `platform` and pool under U.
+   *
+   * A platform filter keeps its own letter AND U. An unattributed ping is an
+   * install whose STORE we failed to record, not an install on some third
+   * platform, so excluding it from both stores' views hides real activity in
+   * every view at once — which is exactly how a dashboard holding months of
+   * pre-marker pings came to read as empty. They are counted, and totalled
+   * separately in `unattributed` so a view can disclose how much of its number
+   * it cannot assign. The consequence is deliberate and must be labelled
+   * wherever it shows: with a filter on, iOS + Android exceeds the day's total
+   * by the unattributed count, because that count is in both.
    */
   function rowsToMap(list, letter) {
     var by = {};
     (list || []).forEach(function (r) {
       if (!r || !r.day) return;
-      var c = {}, plat = {}, kept = 0;
+      var c = {}, plat = {}, kept = 0, unattributed = 0;
       (r.cohorts || []).forEach(function (x) {
         if (!x || !x.cohort) return;
         var p = PLATFORM_NAME[x.platform] ? x.platform : 'U';
         var n = Number(x.count) || 0;
         plat[p] = (plat[p] || 0) + n;
-        if (letter && p !== letter) return;
+        if (letter && p !== letter && p !== 'U') return;
+        if (letter && p === 'U') unattributed += n;
         c[x.cohort] = (c[x.cohort] || 0) + n;
         kept += n;
       });
-      by[r.day] = { total: letter ? kept : (Number(r.total) || 0), cohorts: c, platforms: plat };
+      by[r.day] = {
+        total: letter ? kept : (Number(r.total) || 0),
+        cohorts: c, platforms: plat, unattributed: unattributed,
+      };
     });
     return by;
   }
@@ -204,6 +225,9 @@ window.Analytics = (function () {
 
   /** One day's platform split, `{ I: n, A: n, U: n }`, ALWAYS unfiltered. */
   function platformsOn(ix, day) { return (ix.open[day] || EMPTY).platforms || {}; }
+
+  /** How much of a filtered day's count carries no store. 0 when unfiltered. */
+  function unattributedOn(ix, day) { return (ix.open[day] || EMPTY).unattributed || 0; }
 
   /** A cohort's size: how many installs opened the app on their own first day. */
   function cohortSize(ix, cohort) { return countOn(ix, cohort, cohort); }
@@ -721,6 +745,7 @@ window.Analytics = (function () {
     // index + accessors
     index: index, platformName: function (letter) { return PLATFORM_NAME[letter] || 'unknown'; },
     activeOn: activeOn, newOn: newOn, returningOn: returningOn, platformsOn: platformsOn,
+    unattributedOn: unattributedOn,
     countOn: countOn, purchasesOn: purchasesOn, cohortSize: cohortSize,
     maturity: maturity, isMature: isMature,
 

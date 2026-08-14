@@ -75,6 +75,18 @@ export interface TrendMetricDef {
   tail?: string;
   /** Window number for the detail line ("62"). */
   fmt: (v: number) => string;
+  /**
+   * The grade ladder this metric is charted against, as a key into the scoring
+   * engine's `BANDS` (or 'score' for the 0-100 day index).
+   *
+   * A REGISTRY FACT, like everything else here: a chart that offers "Show zones"
+   * has to grade with the same boundaries the reading rows and Progress
+   * sparklines use, and the only way to guarantee that is to name the existing
+   * ladder rather than restate its numbers. Omitted where there is no defensible
+   * ladder — a count of bowel movements, litres of water, days clean — and those
+   * charts simply have no zones to show.
+   */
+  bands?: string;
 }
 
 /* ---------- extractors ---------- */
@@ -176,6 +188,7 @@ const hm = (mins: number) => {
 export const TREND_METRICS: Record<TrendMetricId, TrendMetricDef> = {
   score: {
     id: 'score',
+    bands: 'score',
     label: 'Daily score',
     subject: 'Your daily score is',
     unit: 'pts',
@@ -216,6 +229,7 @@ export const TREND_METRICS: Record<TrendMetricId, TrendMetricDef> = {
 
   rmssd: {
     id: 'rmssd',
+    bands: 'rmssdU',
     label: 'HRV (RMSSD)',
     subject: 'Your HRV is',
     unit: 'ms',
@@ -290,6 +304,7 @@ export const TREND_METRICS: Record<TrendMetricId, TrendMetricDef> = {
 
   sleepDuration: {
     id: 'sleepDuration',
+    bands: 'sleepDur',
     label: 'Sleep',
     subject: 'Your sleep is',
     unit: 'h',
@@ -314,6 +329,7 @@ export const TREND_METRICS: Record<TrendMetricId, TrendMetricDef> = {
 
   sdnn: {
     id: 'sdnn',
+    bands: 'sdnn',
     label: 'HRV (SDNN)',
     subject: 'Your SDNN is',
     unit: 'ms',
@@ -330,6 +346,7 @@ export const TREND_METRICS: Record<TrendMetricId, TrendMetricDef> = {
 
   pnn50: {
     id: 'pnn50',
+    bands: 'pnn50',
     label: 'HRV (pNN50)',
     subject: 'Your pNN50 is',
     unit: '%',
@@ -348,6 +365,7 @@ export const TREND_METRICS: Record<TrendMetricId, TrendMetricDef> = {
 
   totalPower: {
     id: 'totalPower',
+    bands: 'totalPower',
     label: 'HRV total power',
     subject: 'Your total power is',
     unit: 'ms²',
@@ -364,6 +382,7 @@ export const TREND_METRICS: Record<TrendMetricId, TrendMetricDef> = {
 
   lfPeak: {
     id: 'lfPeak',
+    bands: 'lfPeak',
     label: 'LF peak frequency',
     subject: 'Your LF peak is',
     unit: 'Hz',
@@ -384,6 +403,7 @@ export const TREND_METRICS: Record<TrendMetricId, TrendMetricDef> = {
 
   sys: {
     id: 'sys',
+    bands: 'sys',
     label: 'Systolic pressure',
     subject: 'Your systolic pressure is',
     unit: 'mmHg',
@@ -404,6 +424,7 @@ export const TREND_METRICS: Record<TrendMetricId, TrendMetricDef> = {
 
   dia: {
     id: 'dia',
+    bands: 'dia',
     label: 'Diastolic pressure',
     subject: 'Your diastolic pressure is',
     unit: 'mmHg',
@@ -476,7 +497,9 @@ export const TREND_METRICS: Record<TrendMetricId, TrendMetricDef> = {
 
   waterIntake: {
     id: 'waterIntake',
-    label: 'Water',
+    // "Water" alone reads as a factor (a thing logged) rather than as the outcome
+    // being measured, which is the wrong half of a correlation row's arrow.
+    label: 'Water consumption',
     subject: 'Your water intake is',
     unit: 'L',
     countNoun: 'logged days',
@@ -517,6 +540,12 @@ export const TREND_METRICS: Record<TrendMetricId, TrendMetricDef> = {
 
   orthoDelta: {
     id: 'orthoDelta',
+    // `orthoIncrease`, NOT the same-named `BANDS.orthoDelta`: this row's value is
+    // `orthoMaxDelta`, a positive standing RISE, and the rise ladder is what
+    // `orthoDeltaCat` grades it with everywhere else in the app. `BANDS.orthoDelta`
+    // is the signed one-minute RECOVERY ladder (negative is good), which would
+    // paint a perfectly ordinary 20 bpm rise crash-red.
+    bands: 'orthoIncrease',
     label: 'Standing HR rise',
     subject: 'Your standing heart-rate rise is',
     unit: 'bpm',
@@ -606,3 +635,43 @@ export const OUTCOME_FAMILY: Record<TrendMetricId, string> = {
   bmCount: 'digestion',
   waterIntake: 'hydration',
 };
+
+/**
+ * Which member of an `OUTCOME_FAMILY` gets to be the one reported. Lower wins.
+ *
+ * This exists because the family collapse has to pick a survivor, and picking the
+ * STRONGEST one is not stable. RMSSD, SDNN and pNN50 are near-collinear, so a real
+ * finding arrives with three almost identical effect sizes (0.60 / 0.60 / 0.57 in
+ * one measured journal). ../insights/correlate sorted by `pips` — a coarse 1-5
+ * integer that ties constantly — and fell through to |r|, which meant noise chose
+ * the label. Measured on a planted effect large enough to be shown in 40 of 40
+ * journals and to never once appear or disappear, the reported OUTCOME still
+ * changed in 10 of 160 perturbations: "quercetin days show higher RMSSD" quietly
+ * became "...higher pNN50". Same statistics, same evidence, different sentence, and
+ * to the reader the finding they had yesterday is gone.
+ *
+ * So the representative is a property of the registry rather than of the data. The
+ * order is by how well the metric is understood: RMSSD is the number this
+ * population actually tracks, SDNN is the common second, and the frequency-domain
+ * views are last because they explain the least per word. Only survivors are
+ * eligible — this chooses among findings that already passed the statistics, it
+ * never promotes one that did not.
+ *
+ * Anything unlisted sorts last, so a new metric is stable by default.
+ */
+export const FAMILY_RANK: Partial<Record<TrendMetricId, number>> = {
+  // hrv
+  rmssd: 0, sdnn: 1, pnn50: 2, totalPower: 3, lfPeak: 4,
+  // score
+  score: 0, badDays: 1,
+  // hr
+  restingHr: 0, sleepingHr: 1,
+  // bp — neither is the obvious lead, so systolic by convention.
+  sys: 0, dia: 1,
+  // sleep — duration is the one a reader can picture; consistency is a stdev.
+  sleepDuration: 0, sleepConsistency: 1,
+};
+
+/** Sort key for choosing a family's representative. Unlisted metrics sort last. */
+export const familyRank = (id: TrendMetricId): number =>
+  FAMILY_RANK[id] ?? Number.MAX_SAFE_INTEGER;

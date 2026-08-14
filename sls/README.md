@@ -38,20 +38,35 @@ per user, which would eventually meet DynamoDB's 400KB item ceiling.
 | `DASH#<email>` | `EVENT#<id>` | a recorded release / campaign / store change |
 | `DASH#<email>` | `AD#<id>` | an advertising campaign (name, channel, dates) |
 | `DASH#<email>` | `COST#<id>` | a dated cost, optionally attributed to an ad |
+| `DASH#<email>` | `SALE#<id>` | one purchase: plan, price, and the buyer's install date |
 | `DASH#<email>` | `SETTINGS` | trial/wall lengths, currency, store commission |
 | `DASH#<email>` | `UI` | view and filter preferences |
 | `PING#OPEN` | `<day>` | that day's opens, counted per cohort |
 | `PING#SUB` | `<day>` | that day's new subscribers, counted per cohort |
 
 `LOAD` queries the whole partition. `SYNC` applies the client's diff — entries
-as `upserts` / `deletes`, and the three id-keyed collections as
+as `upserts` / `deletes`, and the four id-keyed collections as
 `eventUpserts` / `eventDeletes`, `adUpserts` / `adDeletes`,
-`costUpserts` / `costDeletes` — plus `settings` and `ui`. Each cleaner in the
+`costUpserts` / `costDeletes`, `saleUpserts` / `saleDeletes` — plus `settings`
+and `ui`. Each cleaner in the
 Lambda has a twin in `landing/master/sync.js`; **if the two shapes disagree,
 every diff reports every row as changed forever.** `REPLACE_ALL` wipes the ENTRIES and
-rewrites them — it does not touch events, ads or costs, matching a button that
+rewrites them — it does not touch events, ads, costs or sales, matching a button that
 says "delete every entry" — and is what "Delete all data" uses — a wipe is worth stating
-outright rather than trusting a diff to enumerate every deletion.
+outright rather than trusting a diff to enumerate every deletion. ("Delete all
+data" additionally clears the sales ledger through the ordinary diff: sales left
+behind by a wipe would come back as revenue with no downloads under it.)
+
+`SALE#` items are the one collection that arrived by **migration** rather than
+by being typed. Sales used to be two numeric columns on an entry, `sales` and
+`revenue`; `cleanEntry` still reads them so an unmigrated account can be loaded
+and converted, but the client strips them on its first push and never writes
+them again. A sale carries `plan` (`monthly` / `annual` / `lifetime` /
+`unknown`), a `price`, a `qty`, and optionally the buyer's install date as
+`cohort` — which the Lambda refuses on any row with `qty > 1`, since an
+aggregate of four buyers does not share one. `unknown` is a real value, not a
+missing one: those rows are money of an unknown term and must never reach MRR.
+See `MASTER_DASHBOARD.md` for the arithmetic that depends on it.
 
 The table is `DeletionPolicy: Retain` with point-in-time recovery on. A
 `sls remove` will not take the data with it.

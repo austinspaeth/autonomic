@@ -489,6 +489,11 @@ code {
 .pill.trial { color: var(--stage-trial); border-color: color-mix(in srgb, var(--stage-trial) 45%, transparent); }
 .pill.past7 { color: var(--stage-past); border-color: color-mix(in srgb, var(--stage-past) 45%, transparent); }
 .pill.past14 { color: var(--stage-wall); border-color: color-mix(in srgb, var(--stage-wall) 45%, transparent); }
+/* Ledger row status. `live` reuses the in-trial green and `refunded` the wall
+   red, so a subscription's state is the same colour as the lifecycle stage it
+   corresponds to rather than a third palette nobody has learned. */
+.pill.green { color: var(--stage-trial); border-color: color-mix(in srgb, var(--stage-trial) 45%, transparent); }
+.pill.red { color: var(--stage-wall); border-color: color-mix(in srgb, var(--stage-wall) 45%, transparent); }
 
 /* ---------- funnel ---------- */
 

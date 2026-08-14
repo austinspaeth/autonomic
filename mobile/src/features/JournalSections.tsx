@@ -23,7 +23,7 @@ import { setJournalSectionY } from '../store/nav';
 import { useTier } from '../store/tier';
 import { canCaptureHrv, hrvCaptureUsedToday } from '../lib/gating';
 import { trustedReadings } from '../lib/hrvQuality';
-import { fmtDateLong, fmtTime12, periodOf, todayKey } from '../lib/dates';
+import { fmtDateLong, fmtDuration, fmtTime12, minsBetween, periodOf, todayKey } from '../lib/dates';
 import { health, healthAppName, type SleepImport } from '../lib/health';
 import { STAGE_COLORS, STAGE_LABEL, STAGE_ORDER, fmtMin } from '../lib/sleep/stages';
 import { typicalOvernightLow } from '../lib/sleep/night';
@@ -493,8 +493,13 @@ function LoggedSection({ title, dk, arr, typeMap, onAdd, addLabel, onOpen, showV
           const def = typeMap[m.type];
           if (!def) return null;
           const value = showValue ? summarizeFields(def as never, m) : '';
+          // A symptom that has ended says so on its own line rather than in the
+          // pill, which would fight the label for the row's width.
+          const end = (m.endTime as string) || '';
+          const ran = end ? minsBetween(m.time as string, end) : null;
+          const sub = end ? `Ended ${fmtTime12(end)}${ran ? ` (${fmtDuration(ran)})` : ''}` : undefined;
           return (
-            <Row key={m.id} icon={def.icon as never} title={def.label}
+            <Row key={m.id} icon={def.icon as never} title={def.label} sub={sub}
               right={<View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 {value ? <Text style={{ color: p.text, fontWeight: '600' }}>{value}</Text> : null}
                 {showTime && m.time ? <Pill text={fmtTime12(m.time as string)} /> : null}

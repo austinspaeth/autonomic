@@ -34,6 +34,38 @@ import { noteTrendShown, trendMemory } from '../lib/trends/memory';
  *  Trend Watch, whose rows route through this over the wider WATCH_PRIORITY set.
  *  It still covers every metric, which is also what a future per-metric
  *  destination for this card would build on. */
+/**
+ * The CARD inside that section, by title, so a claim lands on its own chart.
+ *
+ * A section is several charts long: 'hrv' opens on Power distribution and
+ * 'outlook' on the score gauge, so "RMSSD" and "Clean days" both landed the
+ * reader on a different metric from the one they tapped. Titles rather than ids
+ * because that is what the cards have — `AnalysisCard.title` for a built card,
+ * the metric's own label inside `HrvProgress` — and both are matched exactly.
+ * A metric with no entry (or whose card this range has no data for) still lands
+ * on its section.
+ */
+export const METRIC_CARD: Partial<Record<TrendMetricId, string>> = {
+  badDays: 'Clean Days',
+  cleanDays: 'Clean Days',
+  rmssd: 'RMSSD',
+  sdnn: 'SDNN',
+  pnn50: 'pNN50',
+  totalPower: 'Power distribution',
+  lfPeak: 'LF peak',
+  restingHr: 'Resting Heart Rate',
+  sys: 'Blood Pressure',
+  dia: 'Blood Pressure',
+  orthoDelta: 'POTS Episodes',
+  sleepConsistency: 'Duration',
+  sleepDuration: 'Duration',
+  sleepingHr: 'Sleeping HR',
+  waterIntake: 'Hydration',
+  // No symptomLoad: Progress has no symptom chart, and its `triggers` section
+  // charts trigger EXPOSURE counts — a different quantity. It lands on the
+  // section, which is the nearest true thing.
+};
+
 export const METRIC_SECTION: Record<TrendMetricId, string> = {
   score: 'outlook',
   badDays: 'outlook',

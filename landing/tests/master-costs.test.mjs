@@ -142,7 +142,7 @@ check('it does carry a read-only campaign table', !!$('csAdPerf'));
 $('btnEditData').click();
 await settle(200);
 check('Edit data is sectioned', [...window.document.querySelectorAll('#view-data .section-title')]
-  .map((n) => n.textContent).join('|') === 'Store data|Spending|Settings|Backup & account',
+  .map((n) => n.textContent).join('|') === 'Store data|Sales|Spending|Settings|Backup & account',
   [...window.document.querySelectorAll('#view-data .section-title')].map((n) => n.textContent).join('|'));
 
 $('csAdAdd').click();

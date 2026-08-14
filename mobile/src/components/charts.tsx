@@ -415,8 +415,19 @@ export interface Zone { from: number; to: number; color: string }
 
 let lcId = 0;
 
-export function LineChart({ buckets, series, zones, integer, height = 140, target, zonesOn, hideHeader, onSelect }: {
+export function LineChart({ buckets, series, zones, integer, height = 140, target, zonesOn, hideHeader, onSelect, marks, markColor, divider }: {
   buckets: { label: string }[]; series: Series[]; zones?: Zone[] | null; integer?: boolean; height?: number; target?: { from: number; to: number; color: string };
+  /**
+   * Per-bucket highlight painted BEHIND the plot: > 0 shades that bucket, 0 leaves
+   * it clear, and **null leaves it clear too but means something different** — the
+   * day carries no information (see insights/detail). Consecutive shaded buckets
+   * are merged into one block, so "took it every day for three weeks" reads as a
+   * period rather than as twenty stripes.
+   */
+  marks?: (number | null)[];
+  markColor?: string;
+  /** A dashed vertical rule at a bucket index: where a before/after split sits. */
+  divider?: number | null;
   /** Controlled "show zones" — when provided, the internal toggle link is hidden
    *  and the caller owns the state (used by card headers that host the link). */
   zonesOn?: boolean;
@@ -485,6 +496,23 @@ export function LineChart({ buckets, series, zones, integer, height = 140, targe
     ? `${buckets[readoutIdx]?.label ?? ''}: ${series.filter((s) => s.values[readoutIdx] != null).map((s) => (series.filter((x) => x.label).length > 1 && s.label ? s.label + ' ' : '') + fmtNum(integer ? Math.round(s.values[readoutIdx] as number) : (s.values[readoutIdx] as number))).join(' · ')}`
     : '';
 
+  // Contiguous runs of shaded buckets, as [xFrom, xTo] in viewBox units. Half a
+  // bucket of bleed each side so a single marked day is still a visible block and
+  // a run reads as covering the days it names.
+  const half = n > 1 ? innerW / (n - 1) / 2 : innerW / 2;
+  const markRuns: [number, number][] = [];
+  if (marks) {
+    let start = -1;
+    for (let i = 0; i <= n; i++) {
+      const on = i < n && marks[i] != null && (marks[i] as number) > 0;
+      if (on && start < 0) start = i;
+      if (!on && start >= 0) {
+        markRuns.push([Math.max(padL, xAt(start) - half), Math.min(padL + innerW, xAt(i - 1) + half)]);
+        start = -1;
+      }
+    }
+  }
+
   // Grade-zone boundaries within range (the interior `.from` edges), for the overlay.
   const zoneLines = zones && showZones
     ? zones.map((z) => z.from).filter((v) => v > min && v < max).map((v, i) => ({ v, color: (zones.find((z) => z.from === v) || zones[0]).color, key: i }))
@@ -514,6 +542,13 @@ export function LineChart({ buckets, series, zones, integer, height = 140, targe
               </LinearGradient>
             </Defs>
           )}
+          {/* First, so gridlines, the trace and every label sit on top of it. */}
+          {markRuns.map(([x0, x1], i) => (
+            <Rect key={`mk${i}`} x={x0} y={padT} width={Math.max(1.5, x1 - x0)} height={H - padT - padB} fill={markColor || p.accent} opacity={0.14} />
+          ))}
+          {divider != null && divider >= 0 && divider < n ? (
+            <Line x1={xAt(divider)} x2={xAt(divider)} y1={padT} y2={H - padB} stroke={p.textDim} strokeWidth={1.2} strokeDasharray="4 3" opacity={0.8} />
+          ) : null}
           {[min, (min + max) / 2, max].map((val, i) => (
             <React.Fragment key={i}>
               <Line x1={padL} x2={W - padR} y1={yAt(val)} y2={yAt(val)} stroke={p.border} strokeWidth={1} strokeDasharray="3 4" opacity={0.55} />

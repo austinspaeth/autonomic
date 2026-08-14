@@ -69,6 +69,25 @@ export default function AnalysisScreen() {
   // in one frame would have every section merge into the same stale map and the
   // last write would win — leaving only one section pinnable.
   const offsetsRef = useRef<Record<string, number>>({});
+  /**
+   * Card offsets, keyed `${sectionId}#${cardTitle}`, RELATIVE to their section.
+   *
+   * Kept apart from the section map because the pinned-header worklet scans that
+   * one every frame and has no use for cards.
+   *
+   * A section whose cards are nested one level deeper (HRV, which renders one
+   * `HrvProgress` rather than a list of cards) also registers `CARD_BASE`: its
+   * children can only report their y within that wrapper, and the wrapper's own
+   * offset is added back at resolve time.
+   */
+  const cardOffsetsRef = useRef<Record<string, number>>({});
+  const cardOffset = useCallback((sectionId: string, card?: string): number | null => {
+    if (!card) return 0;
+    const within = cardOffsetsRef.current[`${sectionId}#${card}`];
+    if (within == null) return null;
+    return within + (cardOffsetsRef.current[`${sectionId}#${CARD_BASE}`] || 0);
+  }, []);
+
   const offsetsSv = useSharedValue<Record<string, number>>({});
   // y of the document wrapper itself — the offsets above are relative to it.
   const bodyRef = useRef(0);
@@ -127,7 +146,10 @@ export default function AnalysisScreen() {
   // the heavy re-render can't land a dropped frame mid-animation.
   const pillMoving = useRef(false);
   const pillTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const anchor = useRef<{ id: string; index: number } | null>(null);
+  // `card` is the chart WITHIN the anchored section to land on ('RMSSD', 'Clean
+  // Days'). Optional and best-effort: a card that never reports an offset falls
+  // back to the section, which is the neighbourhood the claim came from.
+  const anchor = useRef<{ id: string; index: number; card?: string } | null>(null);
   const awaitingBody = useRef(false);
   const floorAt = useRef(0);
   const timers = useRef<{ ceiling?: ReturnType<typeof setTimeout>; lift?: ReturnType<typeof setTimeout> }>({});
@@ -154,8 +176,14 @@ export default function AnalysisScreen() {
     // exactly what tapping the Trend card into a cold Progress tab did.
     // `force` is the ceiling timer giving up, and takes the top.
     if (a && off == null && !force) return false;
+    // The card's own offset when it has reported one — usually it has, since
+    // children lay out before the parent whose layout triggered this. It is NEVER
+    // waited for, though: the veil's lift hangs off this handshake, and anything
+    // that can fail to resolve must not be able to strand the page under a
+    // skeleton. `settleCard` below corrects the landing afterwards instead.
+    const within = a ? cardOffset(a.id, a.card) : 0;
     awaitingBody.current = false;
-    const y = off != null ? Math.max(0, off + bodyRef.current - headerRef.current - CONTENT_PAD) : 0;
+    const y = off != null ? Math.max(0, off + (within || 0) + bodyRef.current - headerRef.current - CONTENT_PAD) : 0;
     scrollRef.current?.scrollTo({ y, animated: false });
     lastYSv.value = y;
     // That landing spot is inside the handoff zone, so the anchored section is
@@ -163,7 +191,7 @@ export default function AnalysisScreen() {
     // so the pinned bar's fade-in also happens under the veil.
     if (a && off != null) { activeSv.value = a.id; setPinned(a.id, 1); }
     return true;
-  }, [lastYSv, activeSv, setPinned]);
+  }, [lastYSv, activeSv, setPinned, cardOffset]);
 
   const clearVeil = useCallback(() => {
     if (stage.current !== 'out') return;   // a new tap caught it on the way down
@@ -215,6 +243,7 @@ export default function AnalysisScreen() {
     activeSv.value = null;
     offsetsRef.current = {};
     offsetsSv.value = offsetsRef.current;
+    cardOffsetsRef.current = {};
     setPinned(null, 1);
     awaitingBody.current = true;
     raiseCeiling();
@@ -257,7 +286,7 @@ export default function AnalysisScreen() {
   /** `anchorId` overrides where the new range opens — the Journal's Trend card
    *  passes the section its claim came from, so the user lands on that chart
    *  instead of the top. Omitted, the anchor stays "wherever you were reading". */
-  const changeMode = useCallback((m: Mode, anchorId?: string) => {
+  const changeMode = useCallback((m: Mode, anchorId?: string, anchorCard?: string) => {
     if (m === modeRef.current) return;
     modeRef.current = m;
     setMode(m);            // the pill has already moved itself; this is bookkeeping
@@ -282,7 +311,11 @@ export default function AnalysisScreen() {
       // against the offsets the incoming layout seeds, so keep the id and let
       // the veil start from the top.
       const cold = i < 0 && sectionsRef.current.length === 0;
-      anchor.current = id && (i > 0 || cold) ? { id, index: Math.max(0, i) } : null;
+      // `i > 0` because landing on the FIRST section is the same as landing at
+      // the top — except when a card was asked for: Outlook is that first
+      // section and it is several charts long, so "Clean days" needs the anchor
+      // even though its section starts at the top of the page.
+      anchor.current = id && (i > 0 || cold || anchorCard) ? { id, index: Math.max(0, i), card: anchorCard } : null;
       stage.current = 'in';
       fadeStarted.current = false;
       const from = anchor.current ? anchor.current.index : 0;
@@ -304,10 +337,17 @@ export default function AnalysisScreen() {
   // same view with the Pro mask over it — meeting their own faded month sells
   // better than being dropped on a price list.
   const rangeSignal = useProgressRangeSignal();
-  const scrollToSection = useCallback((id: string) => {
+  const scrollToSection = useCallback((id: string, card?: string) => {
     const off = offsetsRef.current[id];
     if (off == null) return false;
-    const y = Math.max(0, off + bodyRef.current - headerRef.current - CONTENT_PAD);
+    // A section is several charts long, so landing on its top lands the reader on
+    // a different metric from the one they tapped. `card` adds the card's own
+    // offset WITHIN the section when that card has reported one; an unknown card
+    // (a chart this range has no data for) falls back to the section, which is
+    // still the right neighbourhood.
+    const within = cardOffset(id, card);
+    if (within == null) return false;
+    const y = Math.max(0, off + within + bodyRef.current - headerRef.current - CONTENT_PAD);
     // Not animated: arriving from another tab, a visible scroll from the top
     // down to the section reads as the page moving on its own. The section
     // should simply be what the page opened on.
@@ -316,7 +356,28 @@ export default function AnalysisScreen() {
     activeSv.value = id;
     setPinned(id, 1);
     return true;
-  }, [lastYSv, activeSv, setPinned]);
+  }, [lastYSv, activeSv, setPinned, cardOffset]);
+  /**
+   * Land on the card once it reports, after the veil has already lifted.
+   *
+   * The veil's restore is best-effort about cards on purpose (see above), so this
+   * is the half that guarantees "tap RMSSD, get RMSSD". It is a plain retry loop
+   * over `scrollToSection`, and it stops the moment it succeeds.
+   */
+  const settleCard = useCallback((section: string, card?: string) => {
+    if (!card) return undefined;
+    let tries = 0;
+    let timer: ReturnType<typeof setTimeout>;
+    const tick = () => {
+      // Never falls back to the section: whatever the veil landed on is already
+      // the section, so a failure here should leave the page exactly as it is.
+      if (scrollToSection(section, card) || ++tries > 40) return;
+      timer = setTimeout(tick, 60);
+    };
+    timer = setTimeout(tick, TAB_SETTLE_MS);
+    return () => clearTimeout(timer);
+  }, [scrollToSection]);
+
   useEffect(() => {
     const want = takeProgressRange();
     if (!want) return;
@@ -327,10 +388,17 @@ export default function AnalysisScreen() {
     // already up to hide the cost, so there is nothing to defer for.
     if (renderArgsRef.current == null) setRenderArgs(buildArgsRef.current);
     if (want.mode !== modeRef.current) {
-      // The range is changing anyway: hand the section to the veil's anchor and
-      // the existing restore() lands there while the page is still hidden.
-      changeMode(want.mode as Mode, want.section);
-      return;
+      // The range is changing anyway: hand the section AND the card to the veil's
+      // anchor, and the existing restore() lands there while the page is still
+      // hidden. Nothing else may drive the landing on this path: an earlier
+      // version ran the section retry loop below alongside the veil, which left
+      // two things scrolling the same list while the veil was deciding whether it
+      // could lift — and it stayed up.
+      changeMode(want.mode as Mode, want.section, want.card);
+      // The veil owns the LANDING; this only refines it onto the card once the new
+      // range has laid out. The two never fight over the section: `settleCard`
+      // scrolls to section+card or does nothing at all.
+      return want.section ? settleCard(want.section, want.card) : undefined;
     }
     if (!want.section) return;
     // Already on the requested range, so the veil's anchor never runs — jump
@@ -341,12 +409,17 @@ export default function AnalysisScreen() {
     anchor.current = { id: want.section, index: 0 };   // in case a veiled rebuild lands first
     let tries = 0;
     const tick = () => {
-      if (scrollToSection(want.section!) || ++tries > 20) return;
+      // The card first, and only for as long as it is worth waiting for it: a
+      // card that never reports (this range has no data for that chart) must not
+      // leave the reader at the top of the page, so the last few attempts drop
+      // back to the section.
+      const target = tries < 30 ? want.card : undefined;
+      if (scrollToSection(want.section!, target) || ++tries > 40) return;
       timer = setTimeout(tick, 60);
     };
     let timer = setTimeout(tick, TAB_SETTLE_MS);
     return () => clearTimeout(timer);
-  }, [rangeSignal, changeMode, scrollToSection]);
+  }, [rangeSignal, changeMode, scrollToSection, settleCard]);
 
   // First layout of the freshly committed range. Children lay out before their
   // parent, so every mounted section has already reported its offset by now.
@@ -512,6 +585,12 @@ export default function AnalysisScreen() {
 
   // Sections seed their y-offsets from layout (JS side) into the shared map the
   // worklet scans; onLayout re-fires whenever mounting sections shift the list.
+  const onCardLayout = useCallback((sectionId: string, card: string, y: number) => {
+    const key = `${sectionId}#${card}`;
+    if (cardOffsetsRef.current[key] === y) return;
+    cardOffsetsRef.current = { ...cardOffsetsRef.current, [key]: y };
+  }, []);
+
   const onSectionLayout = useCallback((id: string, y: number) => {
     if (offsetsRef.current[id] === y) return;
     offsetsRef.current = { ...offsetsRef.current, [id]: y };
@@ -607,12 +686,17 @@ export default function AnalysisScreen() {
             setHrvFilt={setHrvFilt}
             revealed={revealed}
             onSectionLayout={onSectionLayout}
+            onCardLayout={onCardLayout}
           />
         )}
       </View>
     </Screen>
   );
 }
+
+/** Key under which a section registers the offset of the container its cards sit
+ *  in, when they are nested one level deeper than the section itself. */
+const CARD_BASE = '\u0000base';
 
 // `Screen`'s default contentPadding — the gap an anchored section should keep
 // below the header when the veil lifts, matching the veil's own top padding.
@@ -749,7 +833,7 @@ function ColdSkeleton() {
 
 /** The whole document of category sections, memoized as one unit so pinned-bar
  *  handoffs (parent state flipping mid-scroll) never touch the chart trees. */
-const SectionsBody = React.memo(function SectionsBody({ sections, demo, days, mode, sex, height, hrvFilt, setHrvFilt, revealed, onSectionLayout }: {
+const SectionsBody = React.memo(function SectionsBody({ sections, demo, days, mode, sex, height, hrvFilt, setHrvFilt, revealed, onSectionLayout, onCardLayout }: {
   sections: Section[];
   demo: boolean;
   days: DaysMap;
@@ -760,6 +844,9 @@ const SectionsBody = React.memo(function SectionsBody({ sections, demo, days, mo
   setHrvFilt: (f: Filt) => void;
   revealed: number;
   onSectionLayout: (id: string, y: number) => void;
+  /** Where each card sits inside its section, so a claim can land on the chart it
+   *  was made about rather than on the section's first one. */
+  onCardLayout: (sectionId: string, card: string, y: number) => void;
 }) {
   const p = usePalette();
   // Stable identity — HrvProgress keys its aggregation memo on `ctx`.
@@ -786,11 +873,23 @@ const SectionsBody = React.memo(function SectionsBody({ sections, demo, days, mo
           {si >= revealed ? (
             s.id === 'hrv' ? <HrvProgressSkeleton /> : <SectionSkeleton cards={s.cards} />
           ) : s.id === 'hrv' ? (
-            <HrvProgress days={days} mode={mode} ctx={ctx} filt={hrvFilt} />
+            // Its metric blocks report their y within HrvProgress, so the
+            // wrapper's own offset is registered as the section's CARD_BASE and
+            // added back when a card is resolved.
+            <View onLayout={(e) => onCardLayout(s.id, CARD_BASE, e.nativeEvent.layout.y)}>
+              <HrvProgress
+                days={days} mode={mode} ctx={ctx} filt={hrvFilt}
+                onCardLayout={(card, y) => onCardLayout(s.id, card, y)}
+              />
+            </View>
           ) : s.cards.length === 0 ? (
             <Text style={{ color: p.textDim }}>No data logged yet for this category.</Text>
           ) : (
-            s.cards.map((card, i) => <CardView key={i} card={card} buckets={s.buckets} />)
+            s.cards.map((card, i) => (
+              <View key={i} onLayout={(e) => onCardLayout(s.id, card.title, e.nativeEvent.layout.y)}>
+                <CardView card={card} buckets={s.buckets} />
+              </View>
+            ))
           )}
         </View>
       ))}

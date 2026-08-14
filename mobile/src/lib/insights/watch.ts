@@ -44,8 +44,22 @@ export interface WatchItem {
   title: string;
   /** "Up 8.3 ms vs last month" */
   sub: string;
-  /** The window's current number, e.g. "53 ms". */
+  /** The window's current number, e.g. "53 ms". The LEVEL, kept for anything that
+   *  wants it — the row itself shows `change`, and Progress shows the level in
+   *  full when the row is opened. */
   value: string;
+  /**
+   * THE MOVEMENT, signed and in the metric's own unit: "-8 pts", "+4 days".
+   *
+   * This is what the row shows, because "has this moved?" is the only question
+   * this card answers — the level belongs on Progress, which the row opens.
+   *
+   * A DISPERSION metric carries no number here, the same rule the Journal's Trend
+   * card follows: `sleepConsistency` is a stdev, so its delta is a change in
+   * night-to-night scatter, and "-89 min" is not a quantity anybody can picture.
+   * It gets the word instead.
+   */
+  change: string;
   good: boolean;
   /** Last 30 days, oldest first, nulls preserved for the gaps. */
   series: (number | null)[];
@@ -77,6 +91,9 @@ export function findWatchItems(matrix: DayMatrix, suppressed: boolean): WatchIte
       title: shortMetric(def),
       sub: `${capitalize(def.phrase(delta.delta))} vs last month`,
       value: `${def.fmt(delta.recent)} ${def.unit}`,
+      change: def.aggregate === 'stdev'
+        ? (delta.direction === 'improving' ? 'Steadier' : 'Less steady')
+        : `${delta.delta > 0 ? '+' : '-'}${def.fmt(Math.abs(delta.delta))} ${def.unit}`,
       good: delta.direction === 'improving',
       series: series.slice(Math.max(0, series.length - WATCH_SPARK_DAYS)),
     });

@@ -37,6 +37,30 @@ export const fmtTime12 = (t?: string) => {
   return `${h}:${m[2]}${ap}`;
 };
 
+const clockMins = (t?: string) => {
+  const m = /^(\d{1,2}):(\d{2})/.exec(t || '');
+  return m ? +m[1] * 60 + +m[2] : null;
+};
+
+/** Minutes from one "HH:MM" to another on the same day. Null unless the end is
+ *  genuinely after the start: a symptom whose end reads earlier either crossed
+ *  midnight (a different day, so this entry can't say how long) or was mistyped,
+ *  and inventing a negative or wrapped duration is worse than showing none. */
+export const minsBetween = (start?: string, end?: string): number | null => {
+  const a = clockMins(start);
+  const b = clockMins(end);
+  if (a == null || b == null || b <= a) return null;
+  return b - a;
+};
+
+/** Minutes as a duration a person reads rather than converts: "2h 15m", "45 min". */
+export const fmtDuration = (mins: number) => {
+  const m = Math.round(Math.abs(mins));
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m / 60);
+  return m % 60 ? `${h}h ${m % 60}m` : `${h}h`;
+};
+
 /** Time-of-day bucket: Morning < 10:30am, Afternoon < 4pm, else Evening. */
 export const periodOf = (t?: string) => {
   const m = /^(\d{1,2}):(\d{2})/.exec(t || '');

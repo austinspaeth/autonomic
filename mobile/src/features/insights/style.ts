@@ -45,7 +45,34 @@ export const TILE_ROW: ViewStyle = { flexDirection: 'row', flexWrap: 'wrap', gap
  * a stray line above it; an inset bubble on the card's own background is the same
  * treatment the stat tiles wear, so the card holds one kind of object throughout.
  */
-export const ROW: ViewStyle = { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderRadius: radius.card, paddingVertical: 12, paddingHorizontal: 13, marginTop: 8 };
+/**
+ * The bubble's fill: one step above the card it sits in, one step below `surface2`.
+ *
+ * A literal because there is no palette token between the two, and both neighbours
+ * failed — the card's own `surface` erases the bubble, and `surface2` (what the card
+ * BUTTON wears) made every row read as a control. Lives here so ./InsightsSkeleton
+ * draws its placeholder bubbles in the same colour.
+ */
+export const ROW_BG = '#232326';
+
+/**
+ * The tone tile on a "worth a look" row, and — because it is the tallest thing any
+ * row contains — the figure every row's height is derived from.
+ *
+ * EVERY ROW IN THIS VIEW IS THE SAME HEIGHT. The cards sit one under another and a
+ * list whose rows stand half a line taller than the list below it reads as two
+ * different components. So the tile is sized first and `ROW` carries a `minHeight`
+ * of the tile plus its own padding; a text-only row (a correlation) then matches a
+ * row with a tile in it rather than sitting shorter.
+ */
+export const TONE_BOX = 26;
+const ROW_PAD_V = 12;
+export const ROW_MIN_H = TONE_BOX + ROW_PAD_V * 2;
+
+export const ROW: ViewStyle = {
+  minHeight: ROW_MIN_H, flexDirection: 'row', alignItems: 'center', gap: 12,
+  borderWidth: 1, borderRadius: radius.card, paddingVertical: ROW_PAD_V, paddingHorizontal: 13, marginTop: 8,
+};
 export const ROW_TALL: ViewStyle = { flexDirection: 'row', alignItems: 'flex-start', gap: 12, borderWidth: 1, borderRadius: radius.card, paddingVertical: 13, paddingHorizontal: 13, marginTop: 8 };
 
 /** The full-width action that closes a card, e.g. "Show all 24 correlations". */
@@ -74,11 +101,12 @@ export const BODY: TextStyle = { fontSize: 13, lineHeight: 19, marginTop: 6 };
 export const PAIR_DRIVER: TextStyle = { fontSize: 14.5, fontWeight: '700' };
 export const PAIR_METRIC: TextStyle = { fontSize: 14.5, fontWeight: '600' };
 export const ROW_NOTE: TextStyle = { fontSize: 12 };
-export const R_VALUE: TextStyle = { fontSize: 18, fontWeight: '700' };
+// Close to the pair's own size (14.5), a hair above it: the delta reads as the end
+// of the row's sentence rather than as a separate readout, but still leads it.
+export const R_VALUE: TextStyle = { fontSize: 16, fontWeight: '700' };
 
 export const ROW_TITLE: TextStyle = { fontSize: 14, fontWeight: '700' };
 export const ROW_SUB: TextStyle = { fontSize: 12.5, lineHeight: 18 };
-export const WATCH_SUB: TextStyle = { fontSize: 12.5 };
 export const WATCH_VALUE: TextStyle = { fontSize: 15, fontWeight: '700' };
 
 export const CONF_LABEL: TextStyle = { fontSize: 12.5 };
@@ -87,15 +115,13 @@ export const FOOTER_TEXT: TextStyle = { fontSize: 11.5, lineHeight: 17 };
 /* ---------- fixed sizes ---------- */
 
 /**
- * The confidence bar under the headline card, and the strength bar on a
- * correlation row: a solid fill on a dark track, the same shape as the milestone
- * progress bar. Segmented pips were a chart type nothing else in the app used.
+ * The confidence bar under the headline card, and in the confidence sheet: a solid
+ * fill on a dark track, the same shape as the milestone progress bar. Segmented
+ * pips were a chart type nothing else in the app used. Correlation ROWS carry no
+ * strength notation at all: the list's order is the strength, and the sheet spells
+ * it out for a row worth opening.
  */
 export const CONF_BAR_H = 6;
-export const STRENGTH_BAR_W = 58;
-export const STRENGTH_BAR_H = 5;
-/** The tone tile on a "worth a look" row. */
-export const TONE_BOX = 34;
 /** Trend watch sparkline. */
 export const SPARK_W = 64;
 export const SPARK_H = 26;
@@ -106,9 +132,7 @@ export const NEW_DOT = 8;
 
 export const CONF_TOP = 13;      // hairline above the confidence block
 export const CONF_GAP = 8;       // "Confidence" row -> bar
-export const PAIR_GAP = 5;       // driver->metric line -> strength line
-export const ROW_TITLE_GAP = 3;  // observation title -> body
-export const WATCH_TITLE_GAP = 2;
+export const PAIR_GAP = 5;       // pair line -> the sheet's extra note line
 export const FOOTER_TOP = 4;
 export const FOOTER_BOTTOM = 4;
 
@@ -130,8 +154,8 @@ export const VISIBLE_ROWS = VISIBLE_CORRELATIONS;
  * what the demo month really produces.
  */
 export const SAMPLE = {
-  body: 'In the 26 days since, diastolic pressure ran 38.5 mmHg higher than the 26 days before. This is an association in your own log, not proof of a cause.',
-  obsBody: 'RMSSD before noon averages 3.6 ms above the other half of the day, across 194 readings. Taking readings at a consistent hour makes every trend here sharper.',
-  rowNote: 'Next day · 47.9 vs 28.4 ms · 34 days with it, 26 without',
-  watchSub: 'Steadier by 40 min vs last month',
+  headline: 'Diastolic pressure is up since you started magnesium glycinate',
+  obsTitle: 'Magnesium glycinate and vitamin D3 travel together',
+  pair: 'Magnesium glycinate → Diastolic pressure',
+  watchTitle: 'Bedtime consistency',
 } as const;

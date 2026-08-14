@@ -86,15 +86,23 @@ export function useExpandProtocolSignal(): number {
  * the same view with its Pro mask over it — meeting their own faded data sells
  * far better than jumping them to a price list, which is why this carries a
  * range and not a paywall call. */
-export interface ProgressRequest { mode: string; section?: string }
+export interface ProgressRequest { mode: string; section?: string; card?: string }
 let requestedRange: ProgressRequest | null = null;
 let rangeSeq = 0;
 const rangeListeners = new Set<() => void>();
-/** `section` is an analysis category id ('hrv', 'vitals', 'sleep', …) — the
- *  screen scrolls there once the range has committed, so the user arrives at
- *  the chart the claim was made about rather than the top of the page. */
-export function requestProgressRange(mode: string, section?: string) {
-  requestedRange = { mode, section };
+/**
+ * `section` is an analysis category id ('hrv', 'vitals', 'sleep', …) and `card`
+ * the title of one card inside it ('Clean Days', 'RMSSD') — the screen scrolls
+ * there once the range has committed, so the user arrives at the chart the claim
+ * was made about rather than the top of the page.
+ *
+ * The card matters more than it sounds: a section is several charts long, so
+ * "RMSSD" landed the reader on Power distribution and "Clean days" on the
+ * Outlook gauge, both of which are a different metric from the one they tapped.
+ * An unknown card falls back to the section, never to the top of the page.
+ */
+export function requestProgressRange(mode: string, section?: string, card?: string) {
+  requestedRange = { mode, section, card };
   rangeSeq++;
   rangeListeners.forEach((l) => l());
 }

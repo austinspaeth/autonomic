@@ -7,6 +7,16 @@ in the app's "What's new" card are a separate, deliberately plainer log in
 `mobile/src/lib/whatsNew.ts` — update it whenever `version` in `mobile/app.json`
 crosses to a new `x.x` (a unit test fails if the shipping minor has no entry).
 
+## 1.24.1
+
+- Insights findings can be OPENED. A correlation row and the Biggest change card both lead to one sheet (`features/insights/FindingSheet.tsx`) carrying the card's own tiles and confidence strip over a chart of the days behind the claim. The columns come from `lib/insights/detail.ts`, kept per finding on the report as `detail[findingId]`, so the chart can never re-derive (and disagree with) the statistics above it.
+- `LineChart` gained `marks` / `markColor` (per-bucket shading, contiguous runs merged) and `divider` (a before/after rule). Unknown days are never shaded — the active-window rule in pixels — a continuous factor is split at its own median, and a lag is reported but never applied to the shading.
+- `TrendMetricDef.bands` names each metric's existing grade ladder in the scoring engine's `BANDS`, so the detail chart offers "Show zones" and a graded trace with the same boundaries the reading rows use.
+- Progress can be navigated to a CARD, not just a section: `requestProgressRange(mode, section, card)`, per-card offsets in `analysis.tsx` (with `CARD_BASE` for HRV, whose blocks nest a level deeper), and `METRIC_CARD` in `TrendCard.tsx`. Trend Watch rows carry chevrons and land on their own chart rather than on Power distribution or the Outlook gauge.
+- Insights row grammar: one height for every row in the view (`ROW_MIN_H`), single-line correlation and observation rows, Trend Watch shows the MOVEMENT rather than the level, and the "All correlations" sheet renders the same row component as the card.
+- The empty state is a real screen: a progress ring toward `INSIGHT_MIN_DAYS` (14, a display target documented against the engine's staggered floors and guarded by a test), the three things worth logging daily, and what the view becomes. The header reads "Keep logging" instead of stating a window.
+- Skeleton measurement samples retargeted to the text that actually renders now (`headline` / `obsTitle` / `pair` / `watchTitle`), so the once-per-install fallback stops reserving paragraphs that were removed.
+
 ## 1.23.0
 
 - "What's new" card: a pill offers the release notes once per `x.x` release (never for a patch), and Settings keeps a permanent entry to it. The pill yields the floating slot to the health-import and watch-sync pills, receding to the stacked-card treatment behind whichever holds it and springing back the moment that pill starts to fade.

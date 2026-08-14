@@ -13,7 +13,7 @@ format are documented in the dashboard's own README in the source repo
 ## How it is served
 
 `/master/` is a **prerendered SvelteKit route**. The dashboard itself is still
-framework-free — plain HTML, one stylesheet and seven scripts, edited in
+framework-free — plain HTML, one stylesheet and ten scripts, edited in
 `landing/master/` — and `src/routes/master/+page.svelte` is a shell that
 `?raw`-imports all of it and inlines it into a single self-contained document.
 Nothing is bundled, minified or scoped, so what runs in the browser is
@@ -105,6 +105,7 @@ Everything below is in `landing/master/`, except the route that assembles them.
 | `boot.js` | Boot order and sync-status/sign-out wiring |
 | `app.js` | Store, cohort derivation, all views, import/export |
 | `analytics.js` | Pure cohort/retention arithmetic behind the App usage view |
+| `sales.js` | Pure subscription arithmetic behind the Sales view |
 | `costs.js` | Pure money arithmetic behind the Costs view |
 | `releases.js` | Generated release log, read as timeline annotations |
 | `charts.js` | Dependency-free SVG chart engine |
@@ -136,10 +137,25 @@ the UI, each of them deliberate:
   slices the whole matrix to one store, so retention and conversion can be read
   per platform rather than only in aggregate. `compare` has no meaning for a
   retention matrix (it is one population, not two side by side) and reads as
-  "all"; the **Platform on <day>** tile carries the split instead, and is always
-  unfiltered, since it is what the rest of the view is a slice of. Pings from
-  builds that predate the marker show as `pre-marker`, never folded into either
-  store.
+  "all"; the **Platform on <day>** tile and the **iOS vs Android, day by day**
+  card carry the split instead, and both are always unfiltered, since they are
+  what the rest of the view is a slice of.
+- **A ping that names no store is an install whose store we failed to record,
+  not an install on a third platform.** Builds that shipped before the platform
+  marker existed send a bare `082126`, which reads back as `U`. Excluding those
+  from both slices put them in *no* view at all, which is exactly how a
+  dashboard whose history predates the marker came to read as "no pings" the
+  moment a platform filter was switched on. They are counted into **both**
+  platform views, totalled separately as `unattributed`, and drawn as their own
+  band rather than folded into either store. The deliberate consequence — with
+  a filter on, iOS + Android exceeds the day's total by that count — is
+  disclosed wherever it shows and asserted in `tests/analytics.test.mjs`.
+- The **weekday pattern** chart carries five bars: store downloads, first runs,
+  returning activity, purchases from the sales ledger, and subscribe pings. The
+  last two count the same event at different moments (the app only notices a
+  subscription on its next launch), so they should track rather than match — and
+  charting only one of them is how a weekday pattern in the *lag* gets read as a
+  weekday pattern in buying.
 - Cohorts born before the counter shipped have no day 0, so they are counted as
   active but carry no percentage. The view says how many days that affects
   rather than quietly averaging them in.
@@ -149,6 +165,97 @@ against that day's store downloads (how many people who downloaded ever opened
 the app), and the purchases chart puts subscribe pings beside store sales as a
 cross-check. They count different moments — the app only notices a subscription
 on its next launch — so they should track, not match.
+
+## The Sales view
+
+Every purchase, one row each. Sales used to be two numeric columns on a store
+entry — `sales` (a count) and `revenue` (an amount) summed per day per platform
+— and that shape cannot answer either of the questions this view exists for,
+because both are properties of a purchase rather than of a day: **what plan was
+bought**, since an annual subscription and a monthly one at the same monthly
+rate are wildly different cash, and **when did the buyer install**, since "how
+long do people take to decide?" is about a person and a daily total has averaged
+the people away.
+
+So `sales` is now its own collection, synced beside entries, events, ads and
+costs, and the arithmetic is pure and lives in `sales.js`
+(`tests/sales.test.mjs`). A row is `{ id, date, platform, plan, price, qty,
+cohort?, cancelled?, refunded?, note? }`. Four rules run through it.
+
+**Cash and recurring revenue are never the same number.** An annual plan at
+29.99 is 29.99 of *bookings* on the day it is bought and 2.49 of *MRR* every
+month for a year. The view always shows both and never a blend, because a month
+with one annual sale is a record on one and an ordinary month on the other, and
+a single figure called "revenue" that silently picked one is the thing this view
+was built to stop. `recognised` is the third: the slice of every purchase that
+belongs to a given month, which is what the bookings chart draws against.
+
+**A plan whose term we do not know is not counted in MRR.** Rows migrated from
+the old daily columns carry `plan: 'unknown'` — real money of an unknown term.
+They count in bookings, in conversion and in every per-install rate; they are
+excluded from MRR and disclosed wherever that matters, because spreading them
+over an assumed term would invent the one fact that is missing. Lifetime
+purchases are the same shape for a different reason: real cash, zero MRR.
+`active` therefore counts recurring plans only — "13 active subscriptions" beside
+an MRR of zero means nothing.
+
+**A subscription is assumed to still run until it is marked cancelled.** The
+stores tell this dashboard nothing about churn, so there is nothing to derive it
+from, and assuming a monthly plan lapses after 30 days would make MRR decay on
+its own and read as churn nobody observed. `cancelled` is a date you type;
+`refunded` removes a row from money entirely and from the unit counts, so an
+average price is never a real total divided by a sale that returned nothing.
+Churn is booked against the **cancellation's** window and not the purchase's —
+almost everything that churns was bought before the window it churns in.
+
+**Cohort-day statistics only count purchases carrying an install date.**
+`cohortDay` is purchase date minus install date, exact and per buyer. A row
+without one is not a zero and not an average: it is left out of the
+days-to-purchase histogram and counted in `withoutCohort`, and the view reports
+what share of purchases it is actually drawn from. A `qty > 1` row — which is
+what a migrated daily total is — can never carry one, since four buyers do not
+share an install date.
+
+The **migration** out of the old columns runs once, guarded by
+`settings.salesMigrated`. Each (date, platform) with a count or an amount becomes
+one `unknown` row holding the count as `qty` and the average price, and the
+columns are stripped off the entries so the same money cannot be counted twice.
+It runs in `init()` and in `refreshView()`, both of which are **after**
+`Sync.adopt` — a migration run inside `hydrate()` would be adopted as though the
+server had sent it, and neither the rewritten entries nor the new ledger rows
+would ever leave the browser.
+
+`base()` folds the ledger back into the same `sales` / `revenue` fields the
+entries used to carry, so Overview, Costs, Trial & conversion and the weekday
+chart read one source of truth without knowing the shape underneath them
+changed.
+
+Entry lives under **Edit data → Sales**: a purchase form, a paste box that
+reports the lines it could not read rather than dropping them, and the full
+ledger with edit and delete.
+
+## The forecast, and why it has two prices
+
+The forecast's default model is **Plan mix**, driven by the ledger: an annual
+share, a monthly price and an annual price, all read from real sales over the
+last 180 days. Running one pool at one average price — which is what it did
+while sales were a daily total — gets the cash curve and the MRR curve wrong in
+opposite directions the moment the mix is not what the average assumed. Two
+consequences worth knowing:
+
+- **Annual plans churn at renewal, not continuously.** Someone who has paid for
+  a year cannot leave in month three, so annual cohorts are held whole and
+  tested once a year; applying a monthly churn to them understates MRR for
+  eleven months out of twelve.
+- **Price and mix are not scenario levers.** You know what you charge and
+  roughly who picks what, so the bear/optimistic band swings conversion, volume,
+  growth and churn and leaves those two alone rather than widening the band with
+  uncertainty that is not there.
+
+`monthly` used to be the default model, so every saved UI carries it whether or
+not anyone chose it. A model nobody pressed a button for is upgraded to the mix
+once; `fc.modelChosen` is stamped the moment they do, so a deliberate "all
+monthly" is never overridden.
 
 ## The Costs view
 
@@ -210,6 +317,52 @@ net profit and cost per install once there is any spend to report, and the
 Timeline gains a Spend metric — entered by hand, so unlike every store metric
 there it is complete for today.
 
+## Dates are US Eastern, everywhere
+
+The ping counter buckets every arrival on the **US Eastern** day
+(`easternDay` in `sls/lambdas/ping/main.js`, duplicated verbatim in
+`mobile/src/lib/ping.ts`). The dashboard used to derive its own "today" from the
+browser's local calendar, so for part of every day the page and its own data
+disagreed about which day it was — opened from a machine on UTC it started
+calling tomorrow "today" at 8pm Eastern and showed a fresh, nearly empty day
+hours before one existed.
+
+`easternDay()` in `app.js` is now a third copy of the same arithmetic, and
+`today()` / `reportDay()` derive from it. **Move one and you must move all
+three.** Anchoring the dashboard rather than shifting the data is deliberate:
+the page then reads the same wherever it is opened, which is the point — these
+are the business's numbers, read against the business's calendar.
+
+### The UTC era, and why it lasted three days longer than the fix
+
+Ping rows written before the Lambda started stamping Eastern days are
+UTC-bucketed and cannot be re-stamped: pings arriving between 8pm and midnight
+Eastern were booked to the following day. Nothing records what time within a day
+a ping arrived, so there is no honest repair — any reallocation would be a guess
+about which share of a day's count came in after 8pm. **The counts are left
+alone.** The affected window is **2026-08-10 through 2026-08-13**, and the shape
+it leaves behind is a small deficit on each day paired with a matching surplus on
+the next; read as a trend it looks like a nightly dip that is not there.
+
+The fix itself landed in the repo on 2026-08-12 and did not reach production
+until 2026-08-13, because **`sls deploy` had been failing since 2026-08-10 and
+nothing said so.** Two things about that are worth carrying forward:
+
+- **The build half-succeeded, which is why it went unnoticed.** `post_build`
+  syncs the site to S3, invalidates CloudFront, and only then runs `sls deploy`.
+  The first two kept working, so articles and dashboard changes shipped normally
+  the whole time and everything looked healthy from the outside. Only the
+  backend was frozen. A pipeline that can partially fail is a pipeline whose
+  green-looking output means less than it appears to.
+- **Nothing in the repo caused it.** `buildspec.yml` installed `serverless`
+  unpinned; v4.41 began resolving its deployment bucket through an SSM parameter
+  (`/serverless-framework/deployment/s3-bucket`) that the CodeBuild role had no
+  grant for, and v4 also moved from a per-stack deployment bucket to one shared
+  bucket per account and region. Both grants are now in
+  `infrastructure/pipeline.yml`, and the serverless version is pinned so the
+  next behaviour change is one you opt into. The first failure had no commit to
+  blame, which is exactly what made it hard to spot.
+
 ## Backend
 
 `sls/` at the repo root — one DynamoDB table and two Lambdas behind an HTTP API,
@@ -256,6 +409,15 @@ activation against store downloads, the unlived cells of the grid staying blank
 rather than reading 0%, and the tiles refusing to answer where the data is too
 young. If you change how a metric is derived, that fixture is where you find out
 whether you meant to.
+
+`tests/sales.test.mjs` pins the subscription arithmetic against a hand-worked
+book — an annual plan's MRR, the gap between cash and recognised revenue, what a
+refund is counted in (nothing but its own two fields), and what the migration
+makes of the old daily columns. `tests/master-sales.test.mjs` drives the view in
+the built page, and its store fixture is deliberately in the **old** shape so
+that booting has to migrate it: if that ever half-happens, every revenue figure
+in the dashboard is wrong and nothing else in the suite would notice. It also
+covers the platform filter no longer emptying the App usage view.
 
 `tests/costs.test.mjs` pins the money arithmetic against a hand-worked fixture,
 and `tests/master-costs.test.mjs` drives the Costs view itself in the built

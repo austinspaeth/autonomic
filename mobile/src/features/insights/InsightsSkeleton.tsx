@@ -28,11 +28,13 @@
  */
 import React from 'react';
 import { Text, View } from 'react-native';
+import Svg, { Circle } from 'react-native-svg';
 import { Ghost, HelpDot } from '../../components/ui';
-import { usePalette } from '../../theme';
-import { FOOTER_COPY, OBS_DESC, WATCH_DESC } from './Sections';
+import { Icon, type IconName } from '../../components/Icon';
+import { fonts, usePalette } from '../../theme';
+import { CardRow, FOOTER_COPY, InsightCard, OBS_DESC, WATCH_DESC } from './Sections';
 import * as S from './style';
-import { INSIGHTS_HELP } from '../../lib/insights';
+import { INSIGHTS_HELP, INSIGHT_MIN_DAYS } from '../../lib/insights';
 import { ZERO_HEIGHTS, ZERO_ROWS, type CardHeights, type InsightsShape, type RowHeights } from '../../lib/insights/shape';
 
 /**
@@ -99,7 +101,7 @@ function Bubbles({ count, heights, tall, fallback }: {
       {Array.from({ length: count }, (_, i) => {
         const h = heights[i] || heights[0] || 0;
         return (
-          <View key={i} style={[base, { backgroundColor: p.bg, borderColor: p.border }, h > 0 ? { height: h } : null]}>
+          <View key={i} style={[base, { backgroundColor: S.ROW_BG, borderColor: p.border }, h > 0 ? { height: h } : null]}>
             {h > 0 ? null : (
               <Text style={[fallback ? fallback.style : S.ROW_TITLE, { opacity: 0 }]}>
                 {fallback ? fallback.sample : '\u00A0'}
@@ -111,6 +113,58 @@ function Bubbles({ count, heights, tall, fallback }: {
     </>
   );
 }
+
+/* ---------- the empty screen ---------- */
+
+/** The progress ring's diameter on the empty screen. */
+const RING = 132;
+
+/** An arc of `pct`, from twelve o'clock. Its own component rather than
+ *  `ConfidenceRing`, which grades its colour — there is nothing to grade here,
+ *  only distance covered. */
+function ProgressRing({ size, stroke, pct, color, track }: {
+  size: number; stroke: number; pct: number; color: string; track: string;
+}) {
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const done = Math.max(0, Math.min(1, pct));
+  return (
+    <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      <Circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={track} strokeWidth={stroke} />
+      <Circle
+        cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={stroke} strokeLinecap="round"
+        strokeDasharray={`${c * done} ${c}`} transform={`rotate(-90 ${size / 2} ${size / 2})`}
+      />
+    </Svg>
+  );
+}
+
+/**
+ * The fastest route to a first finding, in the order it pays off.
+ *
+ * An HRV reading leads because it is the outcome most correlations are tested
+ * against; meds are the driver side of the same test; sleep is third because on
+ * a watch it arrives by itself, which makes it the cheapest of the three.
+ */
+const WORTH_LOGGING: { title: string; icon: IconName }[] = [
+  { title: 'An HRV reading', icon: 'heartPulse' },
+  { title: 'Supplements & meds you took', icon: 'pill' },
+  { title: 'Last night\'s sleep', icon: 'moon' },
+];
+
+/**
+ * What the days buy, kept to what `INSIGHT_MIN_DAYS` can actually deliver.
+ *
+ * "Metrics drifting up or down" was here and is wrong under this heading: Trend
+ * Watch compares 30 days against 30, so it needs about sixty. A screen that
+ * promises a finding at day fourteen and then does not produce it is worse than
+ * one that promised less.
+ */
+const COMING_UP = [
+  'Which days your HRV runs higher',
+  'What your best days have in common',
+  'Where your log is thin enough to matter',
+];
 
 /** Height of the ghost bar standing in for the headline card's headline. One line. */
 const BAR_H = 13;
@@ -132,10 +186,11 @@ function ChangeGhost({ height }: { height: number }) {
   const p = usePalette();
   return (
     <CardGhost title="Biggest change" help="change" height={height}>
+      {/* Reserved space for the headline, drawn as one bar: its line count depends
+          on the metric's name, so an invisible sample of the real style reserves the
+          height and the bar shows where the sentence lands. */}
       <Ghost w="72%" h={BAR_H} r={5} style={{ marginTop: 12 }} />
-      {/* Reserved space for the body, drawn as nothing: its line count depends on
-          the metric's name and any bar there would be a guess. */}
-      <Text style={[S.BODY, { color: p.textDim, opacity: 0 }]}>{S.SAMPLE.body}</Text>
+      <Text style={[S.HEADLINE, { color: p.textDim, opacity: 0 }]}>{S.SAMPLE.headline}</Text>
 
       {/* The three tiles, as the dark bubbles they are. Empty: the labels are real
           text on the card and reading "Before / After / Change" against three blank
@@ -184,7 +239,7 @@ export function InsightsSkeleton({ shape }: { shape: InsightsShape }) {
           <Bubbles
             count={Math.min(shape.correlations, S.VISIBLE_ROWS)}
             heights={r.correlations}
-            fallback={{ style: S.ROW_NOTE, sample: S.SAMPLE.rowNote }}
+            fallback={{ style: S.PAIR_DRIVER, sample: S.SAMPLE.pair }}
           />
           {shape.correlations > S.VISIBLE_ROWS ? <ButtonGhost total={shape.correlations} /> : null}
         </CardGhost>
@@ -192,13 +247,13 @@ export function InsightsSkeleton({ shape }: { shape: InsightsShape }) {
 
       {shape.observations > 0 ? (
         <CardGhost title="Worth a look" help="observations" height={h.observations} desc={OBS_DESC}>
-          <Bubbles count={shape.observations} heights={r.observations} tall fallback={{ style: S.ROW_SUB, sample: S.SAMPLE.obsBody }} />
+          <Bubbles count={shape.observations} heights={r.observations} fallback={{ style: S.ROW_TITLE, sample: S.SAMPLE.obsTitle }} />
         </CardGhost>
       ) : null}
 
       {shape.watch > 0 ? (
         <CardGhost title="Trend watch" help="watch" height={h.watch} desc={WATCH_DESC}>
-          <Bubbles count={shape.watch} heights={r.watch} fallback={{ style: S.WATCH_SUB, sample: S.SAMPLE.watchSub }} />
+          <Bubbles count={shape.watch} heights={r.watch} fallback={{ style: S.ROW_TITLE, sample: S.SAMPLE.watchTitle }} />
         </CardGhost>
       ) : null}
 
@@ -222,14 +277,81 @@ export function InsightsSkeleton({ shape }: { shape: InsightsShape }) {
  */
 export function InsightsEmpty({ daysLogged }: { daysLogged: number }) {
   const p = usePalette();
+  // Short of the two-week target, the honest thing to show is DISTANCE: how far
+  // this journal is from the first testable pattern, then the fastest route
+  // there, then what the effort buys. Past it, none of that is true any more —
+  // the days exist and nothing separated from the noise, which is a real answer
+  // and gets a sentence instead of a target.
+  const short = daysLogged < INSIGHT_MIN_DAYS;
+  const left = Math.max(0, INSIGHT_MIN_DAYS - daysLogged);
+  if (!short) {
+    return (
+      <View style={{ paddingHorizontal: 8, paddingTop: 28, alignItems: 'center' }}>
+        <Text style={{ color: p.text, fontSize: 17, fontWeight: '700', textAlign: 'center', marginBottom: 8 }}>
+          Nothing solid to report yet
+        </Text>
+        <Text style={{ color: p.textDim, fontSize: 14, lineHeight: 21, textAlign: 'center' }}>
+          {`You have ${daysLogged} days logged, which is enough to look. Nothing has separated itself from the noise yet, and an empty screen is a real answer rather than a missing one.`}
+        </Text>
+      </View>
+    );
+  }
+
   return (
-    <View style={{ paddingHorizontal: 8, paddingTop: 28, alignItems: 'center' }}>
-      <Text style={{ color: p.text, fontSize: 17, fontWeight: '700', textAlign: 'center', marginBottom: 8 }}>
-        Nothing solid to report yet
-      </Text>
-      <Text style={{ color: p.textDim, fontSize: 14, lineHeight: 21, textAlign: 'center' }}>
-        {`You have ${daysLogged} ${daysLogged === 1 ? 'day' : 'days'} logged. Finding a pattern needs at least eight days with a thing and eight without it, so this screen fills in as you go. Nothing is hidden behind a threshold: when there is something real here, it appears.`}
-      </Text>
-    </View>
+    <>
+      {/* The count is what the reader came for, so the ring opens the screen and
+          the method sits under it in grey. Untitled: a card headed "PROGRESS"
+          over a number that large is labelling the obvious. */}
+      <InsightCard>
+        <View style={{ alignItems: 'center', paddingTop: 6, paddingBottom: 2 }}>
+          <View style={{ width: RING, height: RING, marginBottom: 16 }}>
+            <ProgressRing size={RING} stroke={9} pct={daysLogged / INSIGHT_MIN_DAYS} color={p.accent} track={p.surface2} />
+            <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ fontFamily: fonts.numHeavy, fontSize: 34, lineHeight: 38, color: p.text, fontVariant: ['tabular-nums'] }}>
+                {daysLogged}
+              </Text>
+              <Text style={{ fontSize: 12, fontWeight: '600', color: p.textDim }}>{`of ${INSIGHT_MIN_DAYS} days`}</Text>
+            </View>
+          </View>
+          <Text style={{ fontSize: 19, fontWeight: '700', letterSpacing: -0.3, color: p.text, textAlign: 'center' }}>
+            {left === 1 ? '1 more day of logging' : `${left} more days of logging`}
+          </Text>
+          <Text style={{ fontSize: 13.5, lineHeight: 21, color: p.textDim, textAlign: 'center', marginTop: 6 }}>
+            A pattern needs a couple of weeks of days to compare against each other. Nothing is being held back, there simply is not enough yet.
+          </Text>
+        </View>
+      </InsightCard>
+
+      {/* The fastest route to fourteen. Bubbles, not divided lines, because that
+          is what a row is everywhere else in this view — and no chevrons, since
+          these rows are telling rather than going. */}
+      <InsightCard title="Worth logging daily">
+        {WORTH_LOGGING.map((w) => (
+          <CardRow key={w.title}>
+            <View style={{ width: S.TONE_BOX, height: S.TONE_BOX, borderRadius: 9, backgroundColor: p.bg, alignItems: 'center', justifyContent: 'center' }}>
+              <Icon name={w.icon} size={14} color={p.accent} strokeWidth={2.2} />
+            </View>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              {/* The title alone. Each of these is a single instruction, and the
+                  line under it was explaining a phrase that needs no explaining. */}
+              <Text style={[S.ROW_TITLE, { color: p.text, fontSize: 15.5 }]}>{w.title}</Text>
+            </View>
+          </CardRow>
+        ))}
+      </InsightCard>
+
+      {/* What the effort buys. Deliberately the plainest card on the screen: it is
+          a promise about later, so it must not out-dress the two cards about now. */}
+      <InsightCard title={`What shows up at ${INSIGHT_MIN_DAYS} days`}>
+        <View style={{ marginTop: 12 }}>
+          {COMING_UP.map((line) => (
+            <View key={line} style={{ flexDirection: 'row', alignItems: 'center', gap: 11, paddingVertical: 9 }}>
+              <View style={{ width: 7, height: 7, borderRadius: 999, backgroundColor: p.border }} />
+              <Text style={{ flex: 1, fontSize: 14, color: p.textDim }}>{line}</Text>
+            </View>
+          ))}
+        </View>
+      </InsightCard>
+    </>
   );
 }

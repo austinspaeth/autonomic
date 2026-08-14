@@ -41,6 +41,12 @@ export const MAX_ONSET_AGE_DAYS = 120;
 export interface BiggestChange {
   id: string;
   kind: 'onset' | 'shift' | 'welcome';
+  /** The columns behind the claim, for ./detail. `outcome` is null only on the
+   *  fabricated welcome card, which has no data to chart. */
+  outcome: TrendMetricId | null;
+  factorId: string | null;
+  /** Index into the matrix's key range where the before/after split sits. */
+  onsetIndex: number | null;
   /** "SDNN is up since you started magnesium glycinate" */
   headline: string;
   /** "In the 24 days since, SDNN averaged 12 ms higher than the 24 days before." */
@@ -93,6 +99,12 @@ interface Cand {
   def: TrendMetricDef;
   /** The onset's noun ("magnesium glycinate"), or null for a shift. */
   driver: string | null;
+  /** Which outcome moved, and (for an onset) which factor's first day split it.
+   *  Carried so ./detail can hand the sheet the very columns this was computed
+   *  from, rather than re-deriving them from the id string. */
+  outcome: TrendMetricId;
+  factorId: string | null;
+  onsetAt: number | null;
   before: number;
   after: number;
   n: number;
@@ -165,6 +177,7 @@ function onsetCandidates(matrix: DayMatrix): Cand[] {
       if (g.median1 === g.median2) return;
       out.push({
         kind: 'onset', id: `onset:${factor.id}|${id}`, def, driver: factor.onsetNoun as string,
+        outcome: id, factorId: factor.id, onsetAt: at,
         before: g.median2, after: g.median1, n: before.length + after.length,
         spanDays: span, r: g.r, p: g.p,
       });
@@ -197,6 +210,7 @@ function shiftCandidates(matrix: DayMatrix): Cand[] {
     const g = mannWhitney(recent, prior);
     out.push({
       kind: 'shift', id: `shift:${id}`, def, driver: null,
+      outcome: id, factorId: null, onsetAt: null,
       before: delta.prior, after: delta.recent, n: delta.recentN + delta.priorN,
       spanDays: W, r: g.r, p: g.p,
     });
@@ -272,6 +286,9 @@ export function findBiggestChange(matrix: DayMatrix): BiggestChange | null {
   return {
     id: c.id,
     kind: c.kind,
+    outcome: c.outcome,
+    factorId: c.factorId,
+    onsetIndex: c.onsetAt,
     headline,
     body,
     beforeValue: def.fmt(c.before),
@@ -301,6 +318,11 @@ export function findBiggestChange(matrix: DayMatrix): BiggestChange | null {
 export const WELCOME_CHANGE: BiggestChange = {
   id: 'welcome',
   kind: 'welcome',
+  // No columns behind it, because there is no finding behind it. The detail sheet
+  // reads this as "nothing to chart" and the card stays untappable.
+  outcome: null,
+  factorId: null,
+  onsetIndex: null,
   headline: 'You downloaded this app',
   body: 'Easily the biggest change this month. Log a few days and this card starts reporting the real ones: what you changed, what moved, and how sure we are about it.',
   beforeValue: '0',

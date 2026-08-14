@@ -50,7 +50,7 @@ import { requestProgressRange } from '../../src/store/nav';
 import { usePaywall } from '../../src/features/Paywall';
 import { LockedOverlay } from '../../src/features/LockedOverlay';
 import { DemoBanner, DEMO_INSIGHTS_TEXT } from '../../src/features/DemoBanner';
-import { METRIC_SECTION } from '../../src/features/TrendCard';
+import { METRIC_CARD, METRIC_SECTION } from '../../src/features/TrendCard';
 import { AskAiPill } from '../../src/features/insights/AskAi';
 import { InsightsEmpty, InsightsSkeleton } from '../../src/features/insights/InsightsSkeleton';
 import { InsightsFailed } from '../../src/features/insights/BuildFailed';
@@ -83,8 +83,10 @@ const TAB_SETTLE_MS = 350;
  *  `onLayout` fires per card, and images/fonts can settle a frame or two later. */
 const SHAPE_SETTLE_MS = 600;
 
+
 export default function InsightsScreen() {
   const { openSheet } = useSheets();
+  const p = usePalette();
   const state = useAppState();
   const focused = useIsFocused();
   const locked = useTier() === 'free';
@@ -311,9 +313,9 @@ export default function InsightsScreen() {
    * congratulation there both land on the same evidence. A row with no section is
    * not pressable, so the guard is belt and braces.
    */
-  const openProgress = useCallback((section?: string) => {
+  const openProgress = useCallback((section?: string, card?: string) => {
     if (!section) return;
-    requestProgressRange('month', section);
+    requestProgressRange('month', section, card);
     router.navigate('/(tabs)/analysis');
   }, []);
 
@@ -349,17 +351,33 @@ export default function InsightsScreen() {
       header={
         <View style={{ paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <HeaderClaim head={head} onExplain={openSince} />
-          {/* The ring alone. It is a status light, not a labelled control: the word
+          {/* The ring is a status light, not a labelled control: the word
               "Confidence" beside it explained the glyph at the cost of competing
               with the claim on the left, and tapping it opens a card that explains
-              it properly. */}
+              it properly. The days count next to it is the one label that earns its
+              place, since it names what the whole report was computed from. */}
           <Pressable
             onPress={openConfidence}
             disabled={!head}
             hitSlop={12}
             accessibilityRole="button"
-            accessibilityLabel={head ? `Data confidence ${head.confidence.pct} percent` : 'Data confidence'}
+            accessibilityLabel={
+              head
+                ? `${head.daysLogged} ${head.daysLogged === 1 ? 'day' : 'days'} logged. Data confidence ${head.confidence.pct} percent`
+                : 'Data confidence'
+            }
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
           >
+            {/* The count sits with the ring rather than with the claim: both are
+                measures of how much the report rests on, and the ring alone never
+                said how many days it was drawn from. No "logged" under it — the
+                word is the sheet's job, and a second line there competed with the
+                claim for a label nobody needed to read twice. */}
+            {head ? (
+              <Text style={{ color: p.textDim, fontSize: 15, lineHeight: 17, fontWeight: '700', letterSpacing: -0.2 }}>
+                {head.daysLogged} days
+              </Text>
+            ) : null}
             <ConfidenceRing pct={head ? head.confidence.pct : 0} size={26} />
           </Pressable>
         </View>
@@ -391,12 +409,15 @@ export default function InsightsScreen() {
           {/* Each card measures ITSELF, not a wrapper: a wrapper's frame includes the
               card's 12pt bottom margin and the card's own frame does not, so
               measuring the wrapper made every skeleton card 12pt too tall. */}
-          {view.change ? <BiggestChangeCard change={view.change} onLayout={measure('change')} /> : null}
+          {view.change ? (
+            <BiggestChangeCard change={view.change} series={view.detail[view.change.id] || null} onLayout={measure('change')} />
+          ) : null}
           <Correlations
             list={view.correlations}
             change={view.change}
-            // Every row lands on the Progress chart its OUTCOME was computed from,
-            // the same hand-off the Journal's Trend card makes.
+            detail={view.detail}
+            // Rows open the finding itself (see features/insights/FindingSheet).
+            // Trend Watch is the card that hands off to Progress, not this one.
             onLayout={measure('correlations')}
             onRowLayout={measureRow('correlations')}
           />
@@ -407,7 +428,8 @@ export default function InsightsScreen() {
           />
           <TrendWatch
             list={view.watch}
-            onPress={(item) => openProgress(METRIC_SECTION[item.metric])}
+            onPress={(item) => openProgress(METRIC_SECTION[item.metric], METRIC_CARD[item.metric])}
+            canOpen={(item) => !!METRIC_SECTION[item.metric]}
             onLayout={measure('watch')}
             onRowLayout={measureRow('watch')}
           />
@@ -441,9 +463,13 @@ function HeaderClaim({ head, onExplain }: { head: InsightReport | null; onExplai
 
   const since = head.since;
   if (!since) {
+    // With nothing found, the window is the wrong thing to state: "Last 3 days"
+    // sounds like a range the reader picked and can widen, over a body that says
+    // there is nothing here yet. The header says what to do instead.
+    const empty = !head.change && !head.correlations.length && !head.observations.length && !head.watch.length;
     return (
       <Text numberOfLines={1} style={[CLAIM, { color: p.text, fontWeight: '600', flexShrink: 1 }]}>
-        {windowLabel(head.windowDays)}
+        {empty ? 'Keep logging' : windowLabel(head.windowDays)}
       </Text>
     );
   }

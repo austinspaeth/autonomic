@@ -55,7 +55,13 @@ export function typesFor(state: AppState, kind: TypeKind): Record<string, TypeDe
       if (isOther(merged[a]) !== isOther(merged[b])) return isOther(merged[a]) ? 1 : -1;
       return merged[a].label.localeCompare(merged[b].label, undefined, { sensitivity: 'base' });
     })
-    .forEach((k) => { out[k] = merged[k]; });
+    .forEach((k) => {
+      // A symptom lasts, so its form offers an optional end time. Stamped here
+      // rather than on each registry def so user-created symptoms — including
+      // ones saved before this shipped — get it with no migration.
+      const t = merged[k];
+      out[k] = kind === 'symptoms' && !t.ends && !t.noTime ? { ...t, ends: true } : t;
+    });
   return out;
 }
 

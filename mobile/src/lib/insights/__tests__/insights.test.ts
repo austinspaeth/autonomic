@@ -18,7 +18,7 @@ import { PROBES_BY_ID, findObservations } from '../observations';
 import { changeSinceStart, findWatchItems, overallDirection } from '../watch';
 import { buildInsights } from '../index';
 import { computeInsights, getCachedInsights, resetInsightsCache } from '../cache';
-import { INSIGHT_OUTCOMES, TREND_METRICS, keyRange } from '../../trends';
+import { INSIGHT_OUTCOMES, OUTCOME_FAMILY, TREND_METRICS, keyRange } from '../../trends';
 
 /* ---------- fixtures ---------- */
 
@@ -648,14 +648,17 @@ describe('buildInsights', () => {
     expect(rep.demo).toBe(false);
     expect(rep.correlations.length).toBeGreaterThan(0);
     expect(rep.confidence.pct).toBeGreaterThan(0);
-    expect(rep.daysLogged).toBe(120);
+    // 119, not 120: the journal runs 120 days to DK inclusive, and the analysis
+    // stops at the last COMPLETE day, so today is not counted.
+    expect(rep.daysLogged).toBe(119);
     expect(typeof rep.ms).toBe('number');
     expect(rep.correlations[0].factorId).toBe('med:magGlycinate');
   });
 
   it('reports the real window, not the engine limit', () => {
-    // 120 days of journal, so the header must not promise 180 days of analysis.
-    expect(buildInsights(state, DK).windowDays).toBe(120);
+    // 120 days of journal, so the header must not promise 180 days of analysis —
+    // and 119 rather than 120, because the window ends at the last complete day.
+    expect(buildInsights(state, DK).windowDays).toBe(119);
     expect(buildInsights(journal(1, () => null), DK).windowDays).toBe(0);
   });
 
@@ -943,5 +946,129 @@ describe('the header claim, against day one', () => {
   it('rides on the report', () => {
     expect(buildInsights(risen, DK).since!.better).toBe(true);
     expect(buildInsights(journal(5, () => null), DK).since).toBeNull();
+  });
+});
+
+describe('the analysis window ends at the last complete day', () => {
+  /**
+   * Today is a day in progress. Before this rule, it entered every window as a
+   * real "drank nothing, took nothing" day and then flipped as the user logged,
+   * which moved the header's percentage, added and removed Trend Watch rows and
+   * occasionally dropped a correlation — all within one morning. Measured across
+   * 30 synthetic journals, 39 of 150 in-day updates changed the report.
+   *
+   * The report must now be identical no matter what today holds, because today is
+   * not in it.
+   */
+  const seeded = (seed: number) => {
+    const r = rng(seed);
+    return journal(120, () => {
+      const d = blank();
+      d.readings = [hrv(Math.round(24 + r() * 26))];
+      if (r() < 0.5) d.meds.push(med('magGlycinate'));
+      if (r() < 0.4) d.symptoms.push({ id: nextId(), type: 'fatigue', time: '12:00' });
+      d.food.water = Math.round((1 + r() * 2) * 10) / 10;
+      d.sleep = { bed: '23:00', wake: '07:00' };
+      return d;
+    });
+  };
+
+  it('a full day of logging does not change the report', () => {
+    const state = seeded(9091);
+    // Wipe today back to empty, then fill it in the order a real morning does.
+    const fill: ((d: DayRecord) => void)[] = [
+      () => {},
+      (d) => { d.readings = [hrv(44)]; },
+      (d) => { d.sleep = { bed: '22:45', wake: '06:50' }; },
+      (d) => { d.food.water = 2.4; d.meds.push(med('magGlycinate')); },
+      (d) => { d.symptoms.push({ id: nextId(), type: 'fatigue', time: '14:00' }); },
+      (d) => { d.activities.push({ id: nextId(), type: 'walk', time: '17:00', minutes: '35' }); },
+    ];
+
+    state.days[DK] = blank();
+    const snapshots = fill.map((step) => {
+      step(state.days[DK]);
+      const r = buildInsights(state, DK);
+      return JSON.stringify({
+        since: r.since, overall: r.overall, change: r.change,
+        correlations: r.correlations, observations: r.observations,
+        watch: r.watch, confidence: r.confidence, windowDays: r.windowDays,
+      });
+    });
+
+    snapshots.forEach((s) => expect(s).toBe(snapshots[0]));
+  });
+
+  it('still reads the day before, so yesterday counts', () => {
+    const state = seeded(9091);
+    const before = buildInsights(state, DK).confidence.daysLogged;
+    delete state.days[addDays(DK, -1)];
+    expect(buildInsights(state, DK).confidence.daysLogged).toBeLessThan(before);
+  });
+
+  it('keeps the downturn check on today, because that is a question about now', () => {
+    // A journal that is fine through yesterday and collapses today must still
+    // report the downturn: it is the crash-safety gate, not a history reading.
+    const state = seeded(4242);
+    const crash = (): DayRecord => {
+      const d = blank();
+      d.readings = [hrv(6)];
+      ['fatigue', 'dizziness', 'nausea', 'headache'].forEach((t) =>
+        d.symptoms.push({ id: nextId(), type: t, time: '09:00' }));
+      d.sleep = { bed: '03:00', wake: '05:00' };
+      return d;
+    };
+    [0, 1, 2].forEach((i) => { state.days[addDays(DK, -i)] = crash(); });
+    expect(buildInsights(state, DK).downturn).toBe(true);
+  });
+});
+
+describe('a finding keeps its metric', () => {
+  /**
+   * RMSSD, SDNN and pNN50 are one OUTCOME_FAMILY and near-collinear, so a real
+   * finding arrives three times with almost identical effect sizes. The collapse
+   * used to keep the strongest, which meant noise chose the label: measured on a
+   * planted effect strong enough to be reported in 40 of 40 journals, the metric in
+   * the headline still drifted in 10 of 160 perturbations. The user watched
+   * "quercetin days show higher RMSSD" turn into "...higher pNN50" and reasonably
+   * read it as the finding disappearing.
+   *
+   * The representative is now FAMILY_RANK, a registry fact, so it cannot move.
+   */
+  const planted = (seed: number, lift: number) => {
+    const r = rng(seed);
+    return journal(90, () => {
+      const d = blank();
+      const q = r() < 0.5;
+      const g = Math.sqrt(-2 * Math.log(r() || 1e-9)) * Math.cos(2 * Math.PI * r());
+      d.readings = [hrv(Math.max(8, Math.round(36 + (q ? lift : 0) + g * 7)))];
+      if (q) d.meds.push(med('quercetin'));
+      if (r() < 0.5) d.meds.push(med('magGlycinate'));
+      d.sleep = { bed: '23:00', wake: '07:00' };
+      return d;
+    });
+  };
+
+  it('reports the canonical metric of the family, not the strongest sibling', () => {
+    const state = planted(2468, 9);
+    const row = findCorrelations(matrixOf(state, 90))
+      .find((c) => c.factorId === 'med:quercetin');
+    expect(row).toBeDefined();
+    // RMSSD outranks SDNN and pNN50 in FAMILY_RANK, so it is always the one shown.
+    expect(row?.outcome).toBe('rmssd');
+  });
+
+  it('does not let one day of data change which metric is named', () => {
+    const base = planted(2468, 9);
+    const hrvRow = (st: AppState) => findCorrelations(matrixOf(st, 90))
+      .find((c) => c.factorId === 'med:quercetin' && OUTCOME_FAMILY[c.outcome] === 'hrv');
+
+    const first = hrvRow(base);
+    expect(first).toBeDefined();
+    [22, 30, 38, 46, 54].forEach((v) => {
+      const alt: AppState = JSON.parse(JSON.stringify(base));
+      alt.days[DK].readings = [hrv(v)];
+      expect(hrvRow(alt)?.outcome).toBe(first?.outcome);
+    });
   });
 });

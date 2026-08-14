@@ -203,6 +203,9 @@ export interface FieldDef {
   placeholder?: string;
   signed?: boolean;
   divider?: boolean;
+  /** Time fields only: the field may be left empty (no "now" default, and the
+   *  picker offers Clear). Used by a symptom's optional end time. */
+  optional?: boolean;
   /** Number fields only: when typing makes this true, focus jumps to the next
    *  number field in the form (e.g. BP systolic → diastolic → pulse). */
   autoNext?: (v: string) => boolean;
@@ -214,6 +217,10 @@ export interface TypeDef {
   fields: FieldDef[];
   custom?: string;
   noTime?: boolean;
+  /** The entry describes something that lasts, so `entryFields` adds an
+   *  optional "Ended" time after the start time (symptoms — stamped by
+   *  `typesFor`, so custom symptoms get it too). */
+  ends?: boolean;
   /** Default dose for a user-defined medication (e.g. "400mg"); prefills Amount. */
   dosage?: string;
   /** True for user-created types (stored in state.customTypes). */

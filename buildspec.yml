@@ -17,7 +17,12 @@ phases:
       - cd sls
       - npm ci
       - cd ..
-      - npm i -g serverless
+      # PINNED. An unpinned global install is what broke this pipeline for
+      # three days: v4.41 began resolving its deployment bucket through an SSM
+      # parameter the CodeBuild role had no grant for, so every `sls deploy`
+      # failed with no commit to blame it on. Bump this deliberately, and
+      # expect to check the role's permissions when you do.
+      - npm i -g serverless@4.41.0
 
   build:
     commands:

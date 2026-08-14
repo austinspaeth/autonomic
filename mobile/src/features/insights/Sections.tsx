@@ -35,10 +35,12 @@ import { demoState, hasOwnData } from '../../lib/demo';
 import { resolveProtocol } from '../../lib/scoring/day';
 import { buildCorrelationsPrompt } from '../../lib/insights/prompt';
 import { INSIGHTS_HELP, VISIBLE_CORRELATIONS } from '../../lib/insights';
-import type { BiggestChange, ConfidencePart, Correlation, DataConfidence, Observation, WatchItem } from '../../lib/insights';
+import type { BiggestChange, ConfidencePart, Correlation, DataConfidence, DetailSeries, Observation, WatchItem } from '../../lib/insights';
+import { ChangeSheet, CorrelationSheet } from './FindingSheet';
 import * as S from './style';
 
 const GOOD = S.GOOD;
+const ROW_BG = S.ROW_BG;
 
 /** Card descriptions, exported so ./InsightsSkeleton renders the SAME strings and
  *  the copy cannot move when the report lands. */
@@ -53,9 +55,14 @@ export const WATCH_DESC = 'Metrics that have genuinely moved over the last month
  * Deliberately the same header shape as `CardView`: title, help dot, right-hand
  * action.
  */
-export function InsightCard({ title, help, desc, action, onAction, onLayout, children }: {
-  title: string;
-  help: keyof typeof INSIGHTS_HELP;
+export function InsightCard({ title, help, desc, action, onAction, onPress, onLayout, bg, children }: {
+  /** Omitted inside a sheet whose own title already names the thing: a card
+   *  headed "CORRELATION" one line under "Correlation details" is a label for a
+   *  label. Without it the card opens on the finding itself. */
+  title?: string;
+  /** Omitted inside a sheet the user opened FROM a card that already carried the
+   *  help dot: explaining the same thing twice, one tap apart, is clutter. */
+  help?: keyof typeof INSIGHTS_HELP;
   /**
    * Measures the CARD, not a wrapper around it.
    *
@@ -71,32 +78,47 @@ export function InsightCard({ title, help, desc, action, onAction, onLayout, chi
   /** Red text action on the right of the title, e.g. "Show all". */
   action?: string;
   onAction?: () => void;
+  /** Makes the WHOLE card a button, with a chevron in its title row. Used by the
+   *  Biggest change card, whose finding opens the same sheet a correlation does. */
+  onPress?: () => void;
+  /** Overrides the card fill. A sheet's own background IS `surface`, so a card
+   *  left at the default vanishes into it. */
+  bg?: string;
   children?: React.ReactNode;
 }) {
   const p = usePalette();
-  return (
-    <View onLayout={onLayout} style={[S.CARD, { backgroundColor: p.surface, borderColor: p.border }]}>
-      <View style={S.CARD_HEAD}>
-        <Text style={[S.CARD_TITLE, { color: p.textDim }]}>{title}</Text>
-        <HelpDot title={title} text={INSIGHTS_HELP[help]} />
-        {action ? (
-          <>
-            <View style={{ flex: 1 }} />
+  const inner = (
+    <>
+      {title ? (
+        <View style={S.CARD_HEAD}>
+          <Text style={[S.CARD_TITLE, { color: p.textDim }]}>{title}</Text>
+          {help ? <HelpDot title={title} text={INSIGHTS_HELP[help]} /> : null}
+          {action || onPress ? <View style={{ flex: 1 }} /> : null}
+          {action ? (
             <Pressable onPress={onAction} hitSlop={8} accessibilityRole="button">
               <Text style={[S.CARD_ACTION, { color: p.accent }]}>{action}</Text>
             </Pressable>
-          </>
-        ) : null}
-      </View>
+          ) : null}
+          {onPress && !action ? <Icon name="chevronRight" size={16} color={p.textDim} /> : null}
+        </View>
+      ) : null}
       {desc ? <Text style={[S.CARD_DESC, { color: p.textDim }]}>{desc}</Text> : null}
       {children}
-    </View>
+    </>
+  );
+  const style = [S.CARD, { backgroundColor: bg || p.surface, borderColor: p.border }];
+  if (!onPress) return <View onLayout={onLayout} style={style}>{inner}</View>;
+  return (
+    <Pressable onPress={onPress} onLayout={onLayout} accessibilityRole="button" style={({ pressed }) => [...style, pressed && { opacity: 0.75 }]}>
+      {inner}
+    </Pressable>
   );
 }
 
 /** A bubble row. Tappable only when it has somewhere to go — a chevron on a row
- *  that does nothing is a promise the app doesn't keep. */
-function CardRow({ onPress, tall, onLayout, children }: {
+ *  that does nothing is a promise the app doesn't keep. Exported so the empty
+ *  screen's rows are the same object as a correlation row rather than a copy. */
+export function CardRow({ onPress, tall, onLayout, children }: {
   onPress?: () => void;
   tall?: boolean;
   /** Reports this row's height, so the skeleton's bubble can sit exactly where it
@@ -105,7 +127,10 @@ function CardRow({ onPress, tall, onLayout, children }: {
   children: React.ReactNode;
 }) {
   const p = usePalette();
-  const base = [tall ? S.ROW_TALL : S.ROW, { backgroundColor: p.bg, borderColor: p.border }];
+  // `ROW_BG`, not `bg`: a near-black bubble on the card read as a hole rather than
+  // an object, and the black track of the strength bar inside it disappeared into
+  // its own row. A step above the card keeps the bar's remainder visible.
+  const base = [tall ? S.ROW_TALL : S.ROW, { backgroundColor: ROW_BG, borderColor: p.border }];
   if (!onPress) return <View onLayout={onLayout} style={base}>{children}</View>;
   return (
     <Pressable onPress={onPress} onLayout={onLayout} accessibilityRole="button" style={({ pressed }) => [...base, pressed && { opacity: 0.6 }]}>
@@ -121,9 +146,9 @@ function CardButton({ label, onPress }: { label: string; onPress: () => void }) 
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      style={({ pressed }) => [S.CARD_BUTTON, { borderColor: p.border, backgroundColor: p.surface2 }, pressed && { opacity: 0.7 }]}
+      style={({ pressed }) => [S.CARD_BUTTON, { borderColor: p.accent, backgroundColor: p.accent }, pressed && { opacity: 0.7 }]}
     >
-      <Text style={[S.CARD_BUTTON_TEXT, { color: p.text }]}>{label}</Text>
+      <Text style={[S.CARD_BUTTON_TEXT, { color: '#fff' }]}>{label}</Text>
     </Pressable>
   );
 }
@@ -153,31 +178,83 @@ function Tile({ value, unit, label, color }: { value: string; unit?: string; lab
   );
 }
 
-/* ---------- biggest change ---------- */
+/* ---------- a finding, as a card ---------- */
 
-export function BiggestChangeCard({ change, onLayout }: { change: BiggestChange; onLayout?: (e: LayoutChangeEvent) => void }) {
+export interface FindingTile { value: string; unit?: string; label: string; color?: string }
+
+/**
+ * ONE finding in card form: headline, three stat tiles, confidence strip.
+ *
+ * Exported because the detail sheet opens wearing this exact card, and two
+ * hand-built versions of it drift the moment either is touched — which is how the
+ * sheet ended up at the wrong type scale the first time. The Biggest change card
+ * IS this component; a correlation's sheet is the same object with different
+ * tiles.
+ */
+export function FindingCard({ title, help, headline, tiles, pips, confidence, good, onPress, onLayout, bg }: {
+  title?: string;
+  help?: keyof typeof INSIGHTS_HELP;
+  headline: string;
+  tiles: FindingTile[];
+  pips: number;
+  confidence: string;
+  good: boolean;
+  onPress?: () => void;
+  onLayout?: (e: LayoutChangeEvent) => void;
+  bg?: string;
+}) {
   const p = usePalette();
-  const color = change.good ? GOOD : p.accent;
+  const color = good ? GOOD : p.accent;
   return (
-    <InsightCard title="Biggest change" help="change" onLayout={onLayout}>
-      {/* The finding leads, then its explanation. This card has no standing
-          description: the headline IS the sentence, and a fixed line above it would
-          push the one thing worth reading down the card. */}
-      <Text style={[S.HEADLINE, { color: p.text }]}>{change.headline}</Text>
-      <Text style={[S.BODY, { color: p.textDim }]}>{change.body}</Text>
+    <InsightCard title={title} help={help} onLayout={onLayout} onPress={onPress} bg={bg}>
+      {/* The finding leads and stands alone. This card has no standing description
+          and no explanatory paragraph: the headline IS the sentence, and anything
+          above or below it pushes the one thing worth reading down the card. */}
+      <Text style={[S.HEADLINE, { color: p.text }, !title && { marginTop: 0 }]}>{headline}</Text>
       <View style={S.TILE_ROW}>
-        <Tile value={change.beforeValue} unit={change.unit} label="Before" />
-        <Tile value={change.afterValue} unit={change.unit} label="After" color={color} />
-        <Tile value={change.changeValue} unit={change.changeUnit} label="Change" color={color} />
+        {tiles.map((t) => <Tile key={t.label} value={t.value} unit={t.unit} label={t.label} color={t.color} />)}
       </View>
       <View style={{ borderTopWidth: 1, borderTopColor: p.border, paddingTop: S.CONF_TOP }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: S.CONF_GAP }}>
           <Text style={[S.CONF_LABEL, { color: p.textDim }]}>Confidence</Text>
-          <Text style={[S.CONF_LABEL, { color, fontWeight: '700' }]}>{change.confidence}</Text>
+          <Text style={[S.CONF_LABEL, { color, fontWeight: '700' }]}>{confidence}</Text>
         </View>
-        <Bar pct={(change.pips / 5) * 100} color={color} />
+        <Bar pct={(pips / 5) * 100} color={color} />
       </View>
     </InsightCard>
+  );
+}
+
+export function BiggestChangeCard({ change, series, onLayout }: {
+  change: BiggestChange;
+  /** The columns behind it. Null for the welcome card, which is fabricated and so
+   *  has nothing to open. */
+  series: DetailSeries | null;
+  onLayout?: (e: LayoutChangeEvent) => void;
+}) {
+  const p = usePalette();
+  const { openSheet } = useSheets();
+  const color = change.good ? GOOD : p.accent;
+  // The card opens the SAME sheet a correlation row does: both are one finding,
+  // and the difference between an event and an association is what the sheet
+  // says, not a different place to read it.
+  const open = change.kind === 'welcome' ? undefined : () => openSheet(() => <ChangeSheet change={change} series={series} />);
+  return (
+    <FindingCard
+      title="Biggest change"
+      help="change"
+      headline={change.headline}
+      tiles={[
+        { value: change.beforeValue, unit: change.unit, label: 'Before' },
+        { value: change.afterValue, unit: change.unit, label: 'After', color },
+        { value: change.changeValue, unit: change.changeUnit, label: 'Change', color },
+      ]}
+      pips={change.pips}
+      confidence={change.confidence}
+      good={change.good}
+      onPress={open}
+      onLayout={onLayout}
+    />
   );
 }
 
@@ -187,7 +264,9 @@ export function BiggestChangeCard({ change, onLayout }: { change: BiggestChange;
 export function PairArrow() {
   const p = usePalette();
   return (
-    <Svg width={13} height={13} viewBox="0 0 24 24">
+    // Sized to the pair's own type (S.PAIR_DRIVER), so the two words and the arrow
+    // between them read as one line rather than as text with a smaller glyph in it.
+    <Svg width={S.PAIR_DRIVER.fontSize} height={S.PAIR_DRIVER.fontSize} viewBox="0 0 24 24">
       <Path d="M5 12h14M13 6l6 6-6 6" fill="none" stroke={p.textDim} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
     </Svg>
   );
@@ -212,36 +291,49 @@ export function PairArrow() {
  * Not a button. There is no per-correlation screen to go to, and pointing the row at
  * the nearest Progress chart answered a different question than the row asked.
  */
-function CorrelationRow({ c, onLayout, sub }: {
+function CorrelationRow({ c, onLayout, onPress }: {
   c: Correlation;
   onLayout?: (e: LayoutChangeEvent) => void;
-  /** An extra line under the strength bar, in the row's own note style. */
-  sub?: string;
+  /** Opens the finding. A chevron is only drawn when this is given: on a row that
+   *  goes nowhere it would be a promise the app doesn't keep. */
+  onPress?: () => void;
 }) {
   const p = usePalette();
   const color = c.good ? GOOD : p.accent;
   return (
-    <CardRow onLayout={onLayout}>
+    <CardRow onLayout={onLayout} onPress={onPress}>
       <View style={{ flex: 1, minWidth: 0 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: S.PAIR_GAP }}>
+        {/* WHAT was found, and nothing else: the pair on the left, the difference on
+            the right. The strength notation that used to sit under it said the same
+            thing on every row it was strong enough to survive filtering for, and
+            spent a whole second line saying it. The ranking IS the strength — the
+            list is ordered by it — and the sheet spells it out for a row worth
+            opening. */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
           <Text numberOfLines={1} style={[S.PAIR_DRIVER, { color: p.text, flexShrink: 1 }]}>{c.driver}</Text>
           <PairArrow />
-          <Text numberOfLines={1} style={[S.PAIR_METRIC, { color: p.textDim }]}>{c.metric}</Text>
+          {/* Both halves of the pair are the row's subject, so both are full text;
+              only the arrow between them recedes. */}
+          <Text numberOfLines={1} style={[S.PAIR_METRIC, { color: p.text, flexShrink: 1 }]}>{c.metric}</Text>
+          <View style={{ flex: 1 }} />
+          {/* Coloured by the DIRECTION OF IMPACT, not by the sign of the number:
+              `c.good` already knows which way this metric wants to move, so a fall
+              in symptoms is green and a fall in HRV is red. */}
+          <Text numberOfLines={1} style={[S.R_VALUE, { color, fontFamily: fonts.numHeavy, fontVariant: ['tabular-nums'] }]}>
+            {c.deltaText}
+          </Text>
         </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
-          <Bar pct={(c.pips / 5) * 100} color={color} width={S.STRENGTH_BAR_W} height={S.STRENGTH_BAR_H} />
-          <Text numberOfLines={1} style={[S.ROW_NOTE, { color: p.textDim, flex: 1 }]}>{c.note}</Text>
-        </View>
-        {sub ? <Text style={[S.ROW_NOTE, { color: p.textDim, marginTop: S.PAIR_GAP }]}>{sub}</Text> : null}
       </View>
-      <Text numberOfLines={1} style={[S.R_VALUE, { color, fontFamily: fonts.numHeavy, fontVariant: ['tabular-nums'] }]}>{c.deltaText}</Text>
+      {onPress ? <Icon name="chevronRight" size={16} color={p.textDim} /> : null}
     </CardRow>
   );
 }
 
-export function Correlations({ list, change, onRowLayout, onLayout }: {
+export function Correlations({ list, change, detail, onRowLayout, onLayout }: {
   list: Correlation[];
   change: BiggestChange | null;
+  /** The evidence columns, keyed by finding id — `InsightReport.detail`. */
+  detail: Record<string, DetailSeries>;
   /** Fires per row, with its index. Feeds the skeleton's remembered row heights. */
   onRowLayout?: (i: number, e: LayoutChangeEvent) => void;
   onLayout?: (e: LayoutChangeEvent) => void;
@@ -257,12 +349,17 @@ export function Correlations({ list, change, onRowLayout, onLayout }: {
     // rather than as a header control.
     <InsightCard title="Correlations" help="correlations" onLayout={onLayout}>
       {visible.map((c, i) => (
-        <CorrelationRow key={c.id} c={c} onLayout={onRowLayout ? (e) => onRowLayout(i, e) : undefined} />
+        <CorrelationRow
+          key={c.id}
+          c={c}
+          onLayout={onRowLayout ? (e) => onRowLayout(i, e) : undefined}
+          onPress={() => openSheet(() => <CorrelationSheet c={c} series={detail[c.id] || null} />)}
+        />
       ))}
       {more ? (
         <CardButton
           label={`Show all ${list.length} correlations`}
-          onPress={() => openSheet(() => <AllCorrelationsSheet list={list} change={change} />)}
+          onPress={() => openSheet(() => <AllCorrelationsSheet list={list} change={change} detail={detail} />)}
         />
       ) : null}
     </InsightCard>
@@ -272,15 +369,17 @@ export function Correlations({ list, change, onRowLayout, onLayout }: {
 /**
  * The full ranked list.
  *
- * The SAME rows as the card, in the same bubbles at the same type scale, because this
- * is the same list continued rather than a second presentation of it. Each row carries
- * the finding's `headline` underneath as well: the sheet is where somebody has gone to
- * actually read them, and there is room here for the sentence the card has to leave
- * out. It ends with the AI hand-off, since the device can rank associations but cannot
- * tell the user which four of them are one underlying trend wearing different clothes.
+ * The SAME rows as the card — the same component, the same bubbles, the same type
+ * scale — because this is the list continued rather than a second presentation of
+ * it. Each row opens the same detail sheet, which is where the finding's own
+ * sentence and its chart live; repeating the headline under every row here made a
+ * row that reads differently depending on which screen it is on. It ends with the
+ * AI hand-off, since the device can rank associations but cannot tell the user
+ * which four of them are one underlying trend wearing different clothes.
  */
-function AllCorrelationsSheet({ list, change }: { list: Correlation[]; change: BiggestChange | null }) {
+function AllCorrelationsSheet({ list, change, detail }: { list: Correlation[]; change: BiggestChange | null; detail: Record<string, DetailSeries> }) {
   const p = usePalette();
+  const { openSheet } = useSheets();
   return (
     <View>
       <Text style={{ color: p.text, fontSize: 19, fontWeight: '800', letterSpacing: -0.3 }}>All correlations</Text>
@@ -290,7 +389,11 @@ function AllCorrelationsSheet({ list, change }: { list: Correlation[]; change: B
         {`${list.length} associations found in your own log, most trusted first. Each number is the typical difference between the two groups in that metric's own units. These are patterns, not causes.`}
       </Text>
       {list.map((c) => (
-        <CorrelationRow key={c.id} c={c} sub={c.headline} />
+        <CorrelationRow
+          key={c.id}
+          c={c}
+          onPress={() => openSheet(() => <CorrelationSheet c={c} series={detail[c.id] || null} />)}
+        />
       ))}
       <View style={{ height: 16 }} />
       <CorrelationsAiButton list={list} change={change} />
@@ -303,7 +406,13 @@ function AllCorrelationsSheet({ list, change }: { list: Correlation[]; change: B
  * puts under a reading, a workout and a POTS event, so the affordance is the one
  * the user has already met three times elsewhere.
  */
-function CorrelationsAiButton({ list, change }: { list: Correlation[]; change: BiggestChange | null }) {
+export function CorrelationsAiButton({ list, change, label }: {
+  list: Correlation[];
+  change: BiggestChange | null;
+  /** Defaults to the plural. The detail sheet passes the singular, since it is
+   *  handing over exactly one finding. */
+  label?: string;
+}) {
   const p = usePalette();
   const { openSheet } = useSheets();
   const tier = useTier();
@@ -335,7 +444,7 @@ function CorrelationsAiButton({ list, change }: { list: Correlation[]; change: B
       ]}
     >
       <Icon name="ai" size={19} color={p.accent} />
-      <Text style={{ color: p.text, fontSize: 16, fontWeight: '600' }}>Get AI Insights on these correlations</Text>
+      <Text style={{ color: p.text, fontSize: 16, fontWeight: '600' }}>{label || 'Get AI Insights on these correlations'}</Text>
     </Pressable>
   );
 }
@@ -383,13 +492,15 @@ export function WorthALook({ list, onRowLayout, onLayout }: {
         const tone = TONE[o.tone];
         const color = tone.color(p);
         return (
-          <CardRow key={o.id} tall onLayout={onRowLayout ? (e) => onRowLayout(i, e) : undefined}>
-            <View style={{ width: S.TONE_BOX, height: S.TONE_BOX, borderRadius: 12, backgroundColor: p.bg, alignItems: 'center', justifyContent: 'center' }}>
-              <Icon name={tone.icon} size={16} color={color} strokeWidth={2.3} />
+          // The title alone. Each observation's body is a full sentence of
+          // statistics, and five of them stacked turned the card into a page of
+          // prose in a view whose whole grammar is one-line rows.
+          <CardRow key={o.id} onLayout={onRowLayout ? (e) => onRowLayout(i, e) : undefined}>
+            <View style={{ width: S.TONE_BOX, height: S.TONE_BOX, borderRadius: 9, backgroundColor: p.bg, alignItems: 'center', justifyContent: 'center' }}>
+              <Icon name={tone.icon} size={14} color={color} strokeWidth={2.3} />
             </View>
             <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={[S.ROW_TITLE, { color: p.text, marginBottom: S.ROW_TITLE_GAP }]}>{o.title}</Text>
-              <Text style={[S.ROW_SUB, { color: p.textDim }]}>{o.body}</Text>
+              <Text style={[S.ROW_TITLE, { color: p.text }]}>{o.title}</Text>
             </View>
           </CardRow>
         );
@@ -421,9 +532,13 @@ function Spark({ series, color }: { series: (number | null)[]; color: string }) 
   );
 }
 
-export function TrendWatch({ list, onPress, onRowLayout, onLayout }: {
+export function TrendWatch({ list, onPress, canOpen, onRowLayout, onLayout }: {
   list: WatchItem[];
   onPress: (item: WatchItem) => void;
+  /** Whether this row has a Progress chart to land on. A metric with no section
+   *  mapped is not tappable and draws no chevron: the alternative is a row that
+   *  looks like a button and does nothing. */
+  canOpen?: (item: WatchItem) => boolean;
   onRowLayout?: (i: number, e: LayoutChangeEvent) => void;
   onLayout?: (e: LayoutChangeEvent) => void;
 }) {
@@ -438,14 +553,23 @@ export function TrendWatch({ list, onPress, onRowLayout, onLayout }: {
     >
       {list.map((t, i) => {
         const color = t.good ? GOOD : p.accent;
+        const open = !canOpen || canOpen(t);
         return (
-          <CardRow key={t.metric} onPress={() => onPress(t)} onLayout={onRowLayout ? (e) => onRowLayout(i, e) : undefined}>
+          <CardRow
+            key={t.metric}
+            onPress={open ? () => onPress(t) : undefined}
+            onLayout={onRowLayout ? (e) => onRowLayout(i, e) : undefined}
+          >
+            {/* Title, sparkline, and the CHANGE — not the level. The sentence that
+                used to sit under the title said the same thing in words ("Up 8.3 ms
+                vs last month"), so the row said it twice and stood a line taller
+                than every other row in the view. */}
             <View style={{ flex: 1, minWidth: 0 }}>
               <Text style={[S.ROW_TITLE, { color: p.text }]}>{t.title}</Text>
-              <Text numberOfLines={1} style={[S.WATCH_SUB, { color: p.textDim, marginTop: S.WATCH_TITLE_GAP }]}>{t.sub}</Text>
             </View>
             <Spark series={t.series} color={color} />
-            <Text style={[S.WATCH_VALUE, { color, fontFamily: fonts.numHeavy, fontVariant: ['tabular-nums'] }]}>{t.value}</Text>
+            <Text style={[S.WATCH_VALUE, { color, fontFamily: fonts.numHeavy, fontVariant: ['tabular-nums'] }]}>{t.change}</Text>
+            {open ? <Icon name="chevronRight" size={16} color={p.textDim} /> : null}
           </CardRow>
         );
       })}

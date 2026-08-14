@@ -38,6 +38,7 @@ import { resolveProtocol } from '../scoring/day';
 import { INSIGHT_OUTCOMES, keyRange } from '../trends';
 import type { AppState } from '../types';
 import { WELCOME_CHANGE, findBiggestChange, type BiggestChange } from './change';
+import { changeSeries, correlationSeries, type DetailSeries } from './detail';
 import { dataConfidence, type DataConfidence } from './confidence';
 import { findCorrelations, type Correlation } from './correlate';
 import { buildFactors } from './factors';
@@ -46,6 +47,8 @@ import { findObservations, type Observation } from './observations';
 import { changeSinceStart, findWatchItems, overallDirection, type Overall, type SinceStart, type WatchItem } from './watch';
 
 export type { BiggestChange } from './change';
+export type { DetailSeries } from './detail';
+export { factorPeak, markColumn } from './detail';
 export type { Correlation } from './correlate';
 export type { Observation } from './observations';
 export type { WatchItem, Overall, OverallDirection, SinceStart } from './watch';
@@ -54,6 +57,28 @@ export type { FactorDef, FactorGroup, FactorKind } from './factors';
 export type { ConfidenceLabel } from './stats';
 export { WELCOME_CHANGE } from './change';
 export { CONFIDENCE_LABELS, confidenceLabel } from './stats';
+
+/**
+ * The day the empty screen counts toward: two weeks.
+ *
+ * NOT a threshold in the engine — there isn't one number to point at. The real
+ * floors are staggered: an observation can land at 8 logged days, a correlation
+ * with a continuous driver at `MIN_PAIRS` (12) paired days, one with a binary
+ * driver at `MIN_GROUP * 2` (16), an onset change at 20, and anything
+ * month-against-month at 60. A counter aimed at the last of those would be
+ * telling someone on day three to come back in two months, which is both
+ * discouraging and false — things do show up long before then.
+ *
+ * Two weeks is where a normally-logged journal has usually cleared the first
+ * couple of floors, and it is a span people can actually picture. The counter is
+ * therefore a "you are nearly there", not a promise: the copy beside it says the
+ * screen fills in as you go, and the day-14 screen still says "nothing solid yet"
+ * when nothing has separated from the noise.
+ *
+ * `insights/__tests__/detail.test.ts` pins it inside the engine's own range, so
+ * lowering a floor cannot leave it stranded above every one of them.
+ */
+export const INSIGHT_MIN_DAYS = 14;
 export { MAX_OBSERVATIONS } from './observations';
 export { MAX_WATCH_ITEMS } from './watch';
 export { MAX_CORRELATIONS, shortMetric } from './correlate';
@@ -81,6 +106,16 @@ export interface InsightReport {
   demo: boolean;
   change: BiggestChange | null;
   correlations: Correlation[];
+  /**
+   * The evidence behind each finding, keyed by `Correlation.id` /
+   * `BiggestChange.id`: the outcome and factor columns it was computed from.
+   *
+   * Kept as a map beside the findings rather than as a field on each one, so the
+   * claim objects stay small enough to log and to diff, and so anything that only
+   * wants to READ the findings never carries a few thousand numbers with it.
+   * Built here because ./matrix exists only during a build.
+   */
+  detail: Record<string, DetailSeries>;
   observations: Observation[];
   watch: WatchItem[];
   confidence: DataConfidence;
@@ -133,12 +168,30 @@ export function buildInsights(state: AppState, dk: string, opts: { demo?: boolea
     customTypes: state.customTypes,
   };
 
-  const keys = keyRange(dk, ANALYSIS_DAYS, addDays);
+  // THE ANALYSIS ENDS AT THE LAST COMPLETE DAY, NOT AT TODAY.
+  //
+  // Today is a day in progress: at 7am it holds no water, no meds and no symptoms,
+  // and ./matrix writes those as a real 0 rather than null (the span-presence rule
+  // only nulls days from before a category was ever logged). So a half-logged today
+  // enters every window as a genuine "drank nothing, took nothing" day and then
+  // flips as the user logs. That is 1/180 for the correlation sweep and harmless,
+  // but ./watch compares 30 days against 30 and `changeSinceStart` compares 14
+  // against 14 — there today is 3% and 7% of the number in the largest text on the
+  // screen, and a single symptom logged at 3pm was enough to delete a whole Trend
+  // Watch row. Measured across 30 synthetic journals × 5 in-day updates: 39/150
+  // rebuilds changed the report with today in the window, 0/150 with it excluded.
+  //
+  // Insights answers "what does my history say", so it reads history. Today's data
+  // is not lost, it joins the analysis tomorrow, when it is a complete day.
+  const analysisDk = addDays(dk, -1);
+  const keys = keyRange(analysisDk, ANALYSIS_DAYS, addDays);
   const defs = buildFactors(state, keys);
   const matrix = buildDayMatrix(state, keys, INSIGHT_OUTCOMES, defs, ctx);
 
-  // One downturn check for the whole report: ./watch needs it as a gate and the
-  // caller needs to know why the section is empty.
+  // One downturn check for the whole report, and the ONE thing here still anchored
+  // to today: this is the crash-safety gate, and "are you heading into a crash" is a
+  // question about right now. It gates ./watch and tells the caller why the section
+  // is empty.
   const downturn = !!detectDownturn(state.days, dk, ctx, ctx.protocol, state.customTypes);
 
   const correlations = findCorrelations(matrix);
@@ -146,7 +199,14 @@ export function buildInsights(state: AppState, dk: string, opts: { demo?: boolea
   // whatever the sample month happens to contain, the honest headline for someone
   // with no data is that they just arrived.
   const change = opts.demo ? WELCOME_CHANGE : findBiggestChange(matrix);
-  const observations = findObservations({ matrix, state, dk });
+  // One pass over the findings to keep the columns they were computed from. The
+  // sheet must never re-extract them: a second extraction is a second chance to
+  // disagree with the statistics the card is showing.
+  const detail: Record<string, DetailSeries> = {};
+  correlations.forEach((c) => { const s = correlationSeries(matrix, c); if (s) detail[c.id] = s; });
+  if (change) { const s = changeSeries(matrix, change); if (s) detail[change.id] = s; }
+
+  const observations = findObservations({ matrix, state, dk: analysisDk });
   const watch = findWatchItems(matrix, downturn);
   // NOT gated on the downturn. Trend Watch hides its five red rows during one, but
   // the header saying "Trending down" in a single calm line is the honest headline
@@ -155,15 +215,15 @@ export function buildInsights(state: AppState, dk: string, opts: { demo?: boolea
   const overall = overallDirection(matrix);
   // Reads the two ENDS of the whole journal rather than the analysis window, so
   // "day one" is genuinely day one. Cheap: 28 scored days regardless of length.
-  const since = changeSinceStart(state.days, dk, ctx, opts.anchor);
-  const confidence = dataConfidence(state.days, dk);
+  const since = changeSinceStart(state.days, analysisDk, ctx, opts.anchor);
+  const confidence = dataConfidence(state.days, analysisDk);
 
   // The window a claim could have been computed from: the user's own span, capped.
   // Reported rather than assumed, so the header cannot promise 180 days of analysis
   // to somebody who has logged three weeks.
   const logged = Object.keys(state.days).sort();
   const spanDays = logged.length
-    ? Math.min(ANALYSIS_DAYS, Math.round((dateFromKey(dk).getTime() - dateFromKey(logged[0]).getTime()) / 86400000) + 1)
+    ? Math.min(ANALYSIS_DAYS, Math.round((dateFromKey(analysisDk).getTime() - dateFromKey(logged[0]).getTime()) / 86400000) + 1)
     : 0;
 
   return {
@@ -171,6 +231,7 @@ export function buildInsights(state: AppState, dk: string, opts: { demo?: boolea
     demo: !!opts.demo,
     change,
     correlations,
+    detail,
     observations,
     watch,
     overall,
@@ -194,7 +255,7 @@ export function buildInsights(state: AppState, dk: string, opts: { demo?: boolea
  */
 export function emptyReport(dk: string, failed = false): InsightReport {
   return {
-    dk, demo: false, change: null, correlations: [], observations: [], watch: [],
+    dk, demo: false, change: null, correlations: [], detail: {}, observations: [], watch: [],
     overall: { direction: 'unknown', label: null, detail: 'not enough to compare yet' },
     since: null,
     confidence: { pct: 0, parts: [], topFix: null, daysLogged: 0 },

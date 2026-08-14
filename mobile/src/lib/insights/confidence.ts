@@ -85,7 +85,11 @@ export function dataConfidence(days: DaysMap, dk: string): DataConfidence {
     if (d.sleep && (d.sleep.bed || d.sleep.wake)) withSleep++;
   });
 
-  const allKeys = Object.keys(days).filter((k) => isLogged(days, k)).sort();
+  // Bounded by `dk` like every other window here. Unbounded, the span counted a day
+  // the analysis does not read: the caller passes the last COMPLETE day, so opening
+  // today's record moved "119 days of history" to 120 and nudged the confidence ring
+  // the moment the user logged their first entry of the morning.
+  const allKeys = Object.keys(days).filter((k) => k <= dk && isLogged(days, k)).sort();
   const spanDays = allKeys.length
     ? Math.round((new Date(allKeys[allKeys.length - 1]).getTime() - new Date(allKeys[0]).getTime()) / 86400000) + 1
     : 0;
@@ -128,5 +132,10 @@ export function dataConfidence(days: DaysMap, dk: string): DataConfidence {
   // Highest-impact gap: the biggest weighted shortfall, not the smallest ratio —
   // a half-empty 30% component matters more than an empty 10% one.
   const gaps = parts.filter((p) => p.fix).sort((a, b) => (1 - a.ratio) * a.weight - (1 - b.ratio) * b.weight);
-  return { pct, parts, topFix: gaps.length ? gaps[gaps.length - 1].fix : null, daysLogged: engagedDayCount(days) };
+  // Bounded by `dk` for the same reason as the span above, and so the header's count
+  // agrees with the window every claim under it was computed from. `engagedDayCount`
+  // itself stays unbounded — the review module wants the whole journal.
+  const upTo: DaysMap = {};
+  Object.keys(days).forEach((k) => { if (k <= dk) upTo[k] = days[k]; });
+  return { pct, parts, topFix: gaps.length ? gaps[gaps.length - 1].fix : null, daysLogged: engagedDayCount(upTo) };
 }

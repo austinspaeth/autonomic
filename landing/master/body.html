@@ -102,6 +102,7 @@
     <button class="tab" role="tab" data-view="overview" aria-selected="true">Overview</button>
     <button class="tab" role="tab" data-view="ping" aria-selected="false">App usage</button>
     <button class="tab" role="tab" data-view="timeline" aria-selected="false">Timeline</button>
+    <button class="tab" role="tab" data-view="sales" aria-selected="false">Sales</button>
     <button class="tab" role="tab" data-view="costs" aria-selected="false">Costs</button>
     <button class="tab" role="tab" data-view="trial" aria-selected="false">Trial &amp; conversion</button>
     <button class="tab" role="tab" data-view="cohorts" aria-selected="false">Cohorts</button>
@@ -370,11 +371,21 @@
       </div>
     </div>
 
+    <!-- ---------- 5b. which store ---------- -->
+    <div class="card" style="margin-bottom:14px">
+      <header><h2>iOS vs Android, day by day</h2><span class="spacer"></span>
+        <button class="btn sm" data-table-toggle="pgPlatforms">Table</button></header>
+      <p class="hint">Active installs each day, split by the store the build runs on. This chart is <b>always unfiltered</b> — it is what the platform filter above is a slice of, so filtering it would leave nothing to compare. Pings from builds that shipped before the platform marker existed carry no store: they are real installs whose store we failed to record, so they are drawn as their own band rather than folded into either one. With a platform filter in force they are counted into <em>both</em> views, because putting them in neither is what made a filtered dashboard read as empty.</p>
+      <div id="pgPlatforms"></div>
+      <div id="pgPlatforms-table" class="hidden" style="margin-top:12px"></div>
+      <div id="pgPlatformNote"></div>
+    </div>
+
     <!-- ---------- 6. weekday shape ---------- -->
     <div class="card" style="margin-bottom:14px">
       <header><h2>Weekday pattern</h2><span class="spacer"></span>
         <button class="btn sm" data-table-toggle="pgWeekday">Table</button></header>
-      <p class="hint">Whether the midweek acquisition peak is real, and whether it is worth anything. Each weekday carries three bars — downloads, first runs and returning activity — as averages per weekday, so a day with five Mondays in range is not flattered by having more of them. The table below asks the harder question: do installs born midweek actually <em>retain</em> better, or are they just more numerous?</p>
+      <p class="hint">Whether the midweek acquisition peak is real, and whether it is worth anything. Each weekday carries five bars as averages per weekday, so a day with five Mondays in range is not flattered by having more of them: store downloads, first runs, returning activity, and then the two that matter most — <b>purchases</b> from your own sales ledger and <b>subscribe pings</b> from the app itself. The last two count the same event at different moments (the app only notices a subscription on its next launch), so they should track rather than match, and a persistent gap between them is worth chasing. The table below asks the harder question: do installs born midweek actually <em>retain</em> better, or are they just more numerous?</p>
       <div id="pgWeekday"></div>
       <div id="pgWeekday-table" class="hidden" style="margin-top:12px"></div>
       <div id="pgWeekdayRetention"></div>
@@ -435,6 +446,64 @@
   </section>
 
   <!-- ================= COSTS ================= -->
+  <!-- ================= SALES ================= -->
+  <section id="view-sales" class="view hidden">
+    <p class="hint" style="margin:0 0 12px">
+      Every purchase, one row each, with its plan and the buyer’s install date — the two
+      facts a daily sales total averages away. <b id="slScope"></b>
+    </p>
+    <div class="grid cards" id="slTiles"></div>
+
+    <div class="card" style="margin-top:14px">
+      <header><h2>Monthly recurring revenue</h2><span class="spacer"></span>
+        <button class="btn sm" data-table-toggle="slMrr">Table</button></header>
+      <p class="hint">The rate the book runs at on each day, stacked by plan — an annual plan counts as a twelfth of its price. A subscription is assumed to still run until you mark it cancelled under Edit data; nothing here is derived from the stores, because they tell this dashboard nothing about churn.</p>
+      <div id="slMrr"></div>
+      <div id="slMrr-table" class="hidden" style="margin-top:12px"></div>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <header><h2>Bookings vs recognised revenue</h2><span class="spacer"></span>
+        <button class="btn sm" data-table-toggle="slBookings">Table</button></header>
+      <p class="hint">Bookings is the cash that arrived that month. Recognised revenue spreads each purchase over the months it buys — an annual plan is one twelfth of its price in each of the twelve months after the sale. The gap between them is the annual book, and reading either one alone is how a month with one annual sale gets called a record or a collapse depending which number was on screen.</p>
+      <div id="slBookings"></div>
+      <div id="slBookings-table" class="hidden" style="margin-top:12px"></div>
+    </div>
+
+    <div class="grid two-col" style="margin-top:14px">
+      <div class="card">
+        <header><h2>Purchases by plan</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="slNew">Table</button></header>
+        <p class="hint">New purchases per period, grouped so the plans can be compared rather than summed.</p>
+        <div id="slNew"></div>
+        <div id="slNew-table" class="hidden" style="margin-top:12px"></div>
+      </div>
+      <div class="card">
+        <header><h2>How long people take to buy</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="slAges">Table</button></header>
+        <p class="hint">Days between installing and paying, per buyer. Drawn only from purchases that carry an install date — the coverage line below says what share of them that is.</p>
+        <div id="slAges"></div>
+        <div id="slAges-table" class="hidden" style="margin-top:12px"></div>
+        <div id="slAgeMeta"></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <header><h2>Which intake paid</h2><span class="spacer"></span>
+        <button class="btn sm" data-table-toggle="slCohortChart">Table</button></header>
+      <p class="hint">Purchases grouped by the month the buyer <b>installed</b>, not the month the money landed. A cohort younger than two months has not finished buying, so its row is marked rather than read as a bad one.</p>
+      <div id="slCohortChart"></div>
+      <div id="slCohortChart-table" class="hidden" style="margin-top:12px"></div>
+      <div id="slCohorts" style="margin-top:12px"></div>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <header><h2>Plan mix</h2></header>
+      <p class="hint">What sold in the selected range, and what is live now.</p>
+      <div id="slMix"></div>
+    </div>
+  </section>
+
   <section id="view-costs" class="view hidden">
 
     <!-- ---------- 1. the money ---------- -->
@@ -500,8 +569,9 @@
           <button data-v="36" aria-pressed="false">36 mo</button>
         </div>
         <div class="segmented" id="fcModel">
-          <button data-v="monthly" aria-pressed="true">Monthly sub</button>
-          <button data-v="annual" aria-pressed="false">Annual sub</button>
+          <button data-v="mix" aria-pressed="true">Plan mix</button>
+          <button data-v="monthly" aria-pressed="false">All monthly</button>
+          <button data-v="annual" aria-pressed="false">All annual</button>
           <button data-v="onetime" aria-pressed="false">One-time</button>
         </div>
         <button class="btn sm" id="fcReset">Reset to actuals</button>
@@ -569,7 +639,7 @@
     </div>
     <div class="card" style="margin-bottom:14px">
       <header><h2 id="entryTitle">Add / update a single day</h2></header>
-      <p class="hint">Entries are keyed by date + platform, so re-entering a day overwrites it. Store reporting lags, so the date defaults to the latest day that can have data — never the current day. Everything is stored in this browser's local storage — nothing leaves your machine.</p>
+      <p class="hint">Entries are keyed by date + platform, so re-entering a day overwrites it. Store reporting lags, so the date defaults to the latest day that can have data — never the current day. <b>Sales are not here any more</b>: a subscription's plan and the buyer's install date are properties of the purchase, not of the day, so they live in the Sales ledger below.</p>
       <div class="form-grid">
         <div class="field"><label for="eDate">Date</label><input type="date" id="eDate"></div>
         <div class="field"><label for="ePlatform">Platform</label>
@@ -578,8 +648,6 @@
         <div class="field"><label for="eImpressions">Impressions</label><input type="number" id="eImpressions" min="0" step="1" placeholder="0"></div>
         <div class="field"><label for="ePageViews">Product page views</label><input type="number" id="ePageViews" min="0" step="1" placeholder="0"></div>
         <div class="field"><label for="eUpdates">Updates</label><input type="number" id="eUpdates" min="0" step="1" placeholder="0"></div>
-        <div class="field"><label for="eSales">Sales (count)</label><input type="number" id="eSales" min="0" step="1" placeholder="0"></div>
-        <div class="field"><label for="eRevenue">Sales amount</label><input type="number" id="eRevenue" min="0" step="0.01" placeholder="0.00"></div>
         <div class="field"><label for="eNotes">Note</label><input type="text" id="eNotes" placeholder="optional"></div>
       </div>
       <div class="row-actions">
@@ -611,6 +679,36 @@
         <button class="btn" id="bClearVals">Clear values</button>
         <span class="note" id="bStatus"></span>
       </div>
+    </div>
+
+    <div class="section-head" style="margin-top:22px">
+      <h2 class="section-title">Sales</h2>
+      <span class="section-note">Every purchase, its plan, and who bought it</span>
+    </div>
+
+    <div class="card" style="margin-bottom:14px">
+      <header><h2>Add a purchase</h2><span class="spacer"></span>
+        <span class="note" id="slSaleCount"></span></header>
+      <p class="hint">One row per purchase. The <b>plan</b> is what turns a price into recurring revenue — an annual plan at the same price is a twelfth of the MRR of a monthly one — and the <b>install date</b> is what lets the Sales view say how long people take to decide. Leave the install date blank if you cannot match the buyer; the purchase still counts everywhere except the days-to-purchase chart, which says what share of sales it is drawn from. Mark a subscription <b>cancelled</b> and it leaves MRR from that date; mark it <b>refunded</b> and it leaves every money figure entirely.</p>
+      <div id="slSaleForm"></div>
+    </div>
+
+    <div class="card" style="margin-bottom:14px">
+      <header><h2>Paste a batch of purchases</h2></header>
+      <p class="hint">One purchase per line, straight from a spreadsheet or a store export. Columns, tab- or comma-separated: <code>date, platform, plan, price, install date, cancelled, note</code> — everything after the price is optional. Platform reads anything containing &ldquo;and&rdquo;, &ldquo;goog&rdquo; or &ldquo;play&rdquo; as Android and everything else as iOS; plan reads &ldquo;annual&rdquo;/&ldquo;year&rdquo;/&ldquo;yr&rdquo; as annual, &ldquo;life&rdquo; as lifetime, and anything else as monthly. Nothing is written until you press Add.</p>
+      <textarea id="slPaste" rows="6" placeholder="2026-08-11&#9;ios&#9;annual&#9;29.99&#9;2026-07-02"></textarea>
+      <div class="row-actions">
+        <button class="btn primary" id="slPasteGo">Add these purchases</button>
+        <button class="btn" id="slPasteClear">Clear</button>
+        <span class="note" id="slPasteStatus"></span>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:14px">
+      <header><h2>All purchases</h2><span class="spacer"></span>
+        <button class="btn sm" id="slExport">Export CSV</button></header>
+      <p class="hint">The whole ledger, newest first — all time, not the dashboard's selected range. This is the list you manage sales from; the Sales tab is where you read them against a period.</p>
+      <div class="table-scroll" id="slSaleTable"></div>
     </div>
 
     <div class="section-head" style="margin-top:22px">
@@ -705,7 +803,7 @@
 
     <div class="card">
       <header><h2>Backup, import &amp; reset</h2></header>
-      <p class="hint">CSV columns: <code>date,platform,downloads,impressions,pageViews,updates,sales,revenue,notes</code>. Importing merges by date + platform, overwriting matches. A conversion-rate column is ignored — it is always derived from downloads ÷ impressions.</p>
+      <p class="hint">CSV columns: <code>date,platform,downloads,impressions,pageViews,updates,notes</code>. Importing merges by date + platform, overwriting matches. A conversion-rate column is ignored — it is always derived from downloads ÷ impressions. <code>sales</code> and <code>revenue</code> columns are still read, and land in the Sales ledger as unclassified purchases rather than on the day; the JSON backup carries the whole ledger.</p>
       <div class="row-actions">
         <button class="btn" id="ioExportCsv">Export CSV</button>
         <button class="btn" id="ioExportJson">Export JSON backup</button>

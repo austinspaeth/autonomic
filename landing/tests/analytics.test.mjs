@@ -270,23 +270,38 @@ check('two platform rows for one cohort day are pooled, not overwritten',
 check('D1 pools both platforms', near(A.retentionAt(pix, [PC1], 1).pct, 37.5),
   String(A.retentionAt(pix, [PC1], 1).pct));
 
+/* A platform slice keeps its own store's counts AND the pings that named no
+   store at all: 12 + 5 iOS on PDAY, plus the 2 pre-marker. Excluding those 2
+   would put them in NO view, which is how a dashboard whose whole history
+   predates the marker came to read as empty under a filter. */
 const pios = A.index(preport, 'ios');
-check('the iOS slice keeps only iOS counts',
-  A.cohortSize(pios, PC1) === 30 && A.activeOn(pios, PDAY) === 17,
+check('the iOS slice keeps iOS counts plus the unattributed ones',
+  A.cohortSize(pios, PC1) === 30 && A.activeOn(pios, PDAY) === 19,
   A.cohortSize(pios, PC1) + ' / ' + A.activeOn(pios, PDAY));
 check('the iOS slice retains at 40%', near(A.retentionAt(pios, [PC1], 1).pct, 40),
   String(A.retentionAt(pios, [PC1], 1).pct));
+check('a slice reports how much of its count named no store',
+  A.unattributedOn(pios, PDAY) === 2, String(A.unattributedOn(pios, PDAY)));
+check('an unfiltered index attributes nothing, so it has no unattributed count',
+  A.unattributedOn(pix, PDAY) === 0, String(A.unattributedOn(pix, PDAY)));
 
 const pand = A.index(preport, 'android');
-check('the Android slice keeps only Android counts',
-  A.cohortSize(pand, PC1) === 10 && A.activeOn(pand, PDAY) === 3,
+check('the Android slice keeps Android counts plus the same unattributed ones',
+  A.cohortSize(pand, PC1) === 10 && A.activeOn(pand, PDAY) === 5,
   A.cohortSize(pand, PC1) + ' / ' + A.activeOn(pand, PDAY));
+/* The deliberate consequence, asserted so nobody "fixes" it silently: the two
+   slices overlap by the unattributed pings, so they sum past the day's total.
+   The platform tile is what discloses it. */
+check('the slices overlap by exactly the unattributed count',
+  A.activeOn(pios, PDAY) + A.activeOn(pand, PDAY) - A.unattributedOn(pios, PDAY)
+    === A.activeOn(pix, PDAY),
+  A.activeOn(pios, PDAY) + ' + ' + A.activeOn(pand, PDAY) + ' vs ' + A.activeOn(pix, PDAY));
 check('a filtered index says what it is a slice of', pand.platform === 'android', pand.platform);
 
 check('the split is counted before the filter, so a slice can still show it',
   JSON.stringify(A.platformsOn(pand, PDAY)) === JSON.stringify({ I: 17, A: 3, U: 2 }),
   JSON.stringify(A.platformsOn(pand, PDAY)));
-check('a ping with no platform counts as unknown, never as either store',
+check('the split still books unattributed pings under U, never under a store',
   pix.platformSplit.open.U === 2 && pix.platformSplit.sub.A === 1,
   JSON.stringify(pix.platformSplit));
 check('the unfiltered index is unchanged by the split',

@@ -31,7 +31,9 @@ export function useFormState(fields: FieldDef[], initial: Entry): [FormState, (k
       if (isDivider(f) || !f.key) return;
       if (f.type === 'check') s[f.key] = !!initial[f.key];
       else if (f.type === 'select') s[f.key] = (initial[f.key] as string) ?? (f.options ? f.options[0] : '');
-      else if (f.type === 'time') s[f.key] = (initial[f.key] as string) || nowTime();
+      // An optional time (a symptom's end) stays empty until the user sets one;
+      // every other time field defaults to now.
+      else if (f.type === 'time') s[f.key] = (initial[f.key] as string) || (f.optional ? '' : nowTime());
       else s[f.key] = initial[f.key] != null ? String(initial[f.key]) : '';
     });
     return s;
@@ -121,7 +123,7 @@ function AndroidPickerRow({ shown, onPress }: { shown: string; onPress: () => vo
 /** Contents of the time-picker sheet: spinner (iOS) / system dialog (Android)
  *  + full-width red Save. `note` adds a line of context under the title (used
  *  by the morning reminder, where the choice needs explaining). */
-export function TimePickerSheet({ label, note, value, onChange, controls }: { label: string; note?: string; value: string; onChange: (v: string) => void; controls: SheetControls }) {
+export function TimePickerSheet({ label, note, value, onChange, onClear, controls }: { label: string; note?: string; value: string; onChange: (v: string) => void; onClear?: () => void; controls: SheetControls }) {
   const p = usePalette();
   const [h, m] = (value || '00:00').split(':').map(Number);
   const base = new Date();
@@ -167,25 +169,28 @@ export function TimePickerSheet({ label, note, value, onChange, controls }: { la
           ) : null}
         </>
       )}
-      <View style={{ flexDirection: 'row', marginTop: 8 }}>
+      <View style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>
+        {onClear ? <Button title="Clear" onPress={() => { onClear(); controls.close(); }} /> : null}
         <Button title="Save" variant="primary" onPress={commit} />
       </View>
     </View>
   );
 }
 
-export function TimeField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+/** `optional` marks a time that may be left unset (a symptom's end time): the
+ *  field reads "Not set" while empty and the picker offers Clear once one is. */
+export function TimeField({ label, value, onChange, optional }: { label: string; value: string; onChange: (v: string) => void; optional?: boolean }) {
   const p = usePalette();
   const { openSheet } = useSheets();
   const open = () => openSheet(
-    (c) => <TimePickerSheet label={label} value={value} onChange={onChange} controls={c} />,
+    (c) => <TimePickerSheet label={label} value={value} onChange={onChange} onClear={optional && value ? () => onChange('') : undefined} controls={c} />,
     { fitContent: true },
   );
   return (
     <View style={{ marginBottom: 14, flex: 1 }}>
       <FieldLabel>{label}</FieldLabel>
       <Pressable onPress={open} style={{ backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.control, padding: 13, minHeight: 47 }}>
-        <Text style={{ color: value ? p.text : p.textDim, fontSize: 17 }}>{value ? fmtTime12(value) : 'Set time'}</Text>
+        <Text style={{ color: value ? p.text : p.textDim, fontSize: 17 }}>{value ? fmtTime12(value) : optional ? 'Not set' : 'Set time'}</Text>
       </Pressable>
     </View>
   );
@@ -373,7 +378,7 @@ export function FieldInputs({ fields, form, set }: { fields: FieldDef[]; form: F
     flush();
     if (isDivider(f)) out.push(<View key={`div-${out.length}`} style={{ height: 1, backgroundColor: p.border, marginVertical: 6, marginBottom: 18 }} />);
     else if (f.type === 'select') out.push(<SelectField key={f.key} label={fieldLabel(f)} value={form[f.key!] as string} options={f.options || []} onChange={(v) => set(f.key!, v)} />);
-    else if (f.type === 'time') out.push(<TimeField key={f.key} label={f.label || 'Time'} value={form[f.key!] as string} onChange={(v) => set(f.key!, v)} />);
+    else if (f.type === 'time') out.push(<TimeField key={f.key} label={f.label || 'Time'} value={form[f.key!] as string} onChange={(v) => set(f.key!, v)} optional={f.optional} />);
     else if (f.type === 'check') out.push(<CheckField key={f.key} label={f.label || ''} value={!!form[f.key!]} onChange={(v) => set(f.key!, v)} />);
     else if (f.type === 'textarea') out.push(<TextField key={f.key} label={f.label || ''} value={form[f.key!] as string} onChange={(v) => set(f.key!, v)} placeholder={f.placeholder} multiline />);
     else if (f.type === 'text') out.push(<TextField key={f.key} label={f.label || ''} value={form[f.key!] as string} onChange={(v) => set(f.key!, v)} placeholder={f.placeholder} />);

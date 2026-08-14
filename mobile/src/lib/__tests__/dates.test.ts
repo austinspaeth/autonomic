@@ -6,7 +6,7 @@
  * here is pure and locale-aware via `toLocaleDateString`, so these pin the parts
  * that are ours: the ordinal suffix and the bad-input fallback.
  */
-import { fmtMonthDay } from '../dates';
+import { fmtDuration, fmtMonthDay, minsBetween } from '../dates';
 
 describe('fmtMonthDay', () => {
   it('reads as a date in a sentence, with an ordinal', () => {
@@ -25,5 +25,35 @@ describe('fmtMonthDay', () => {
 
   it('hands back an unparseable key rather than "Invalid Date"', () => {
     expect(fmtMonthDay('not-a-date')).toBe('not-a-date');
+  });
+});
+
+/**
+ * A symptom can carry an optional end time, and the journal row states how long
+ * it ran. The rule that matters is what is NOT a duration: an end at or before
+ * the start crossed midnight or was mistyped, and a wrapped or negative figure
+ * would be a claim about the user's body that their log never made.
+ */
+describe('minsBetween', () => {
+  it('measures forward within the day', () => {
+    expect(minsBetween('08:15', '11:30')).toBe(195);
+    expect(minsBetween('08:15', '08:20')).toBe(5);
+  });
+
+  it('refuses anything that is not forward', () => {
+    expect(minsBetween('08:15', '08:15')).toBeNull();
+    expect(minsBetween('23:40', '00:20')).toBeNull();
+    expect(minsBetween('08:15', '')).toBeNull();
+    expect(minsBetween('', '11:30')).toBeNull();
+    expect(minsBetween(undefined, undefined)).toBeNull();
+  });
+});
+
+describe('fmtDuration', () => {
+  it('reads as a duration rather than a conversion', () => {
+    expect(fmtDuration(45)).toBe('45 min');
+    expect(fmtDuration(59)).toBe('59 min');
+    expect(fmtDuration(60)).toBe('1h');
+    expect(fmtDuration(135)).toBe('2h 15m');
   });
 });

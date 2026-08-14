@@ -302,8 +302,17 @@ old web app so old `export.json` files import directly.
   trend watch and a data-confidence score. Outcomes are rows in
   `trends/metrics.ts` (never a second registry); **factors are generated** from
   whatever this user logs, custom types included (`factors.ts`), and everything
-  reads one `buildDayMatrix` pass. The rules, all of which exist because the
-  alternative is confidently telling someone something false about their body:
+  reads one `buildDayMatrix` pass. **The analysis window ends at the last COMPLETE
+  day** (`analysisDk = dk - 1`): today is a day in progress, and `matrix.ts` writes
+  its not-yet-logged categories as a real 0, so a half-logged today entered every
+  window as a genuine "drank nothing, took nothing" day and then flipped as the user
+  logged. That is noise in a 180-day sweep but 1/30 of Trend Watch and 1/14 of
+  `changeSinceStart` — one symptom logged at 3pm deleted a whole Trend Watch row.
+  Measured: 39 of 150 in-day rebuilds changed the report with today in, 0 of 150 with
+  it out. `detectDownturn` is the ONE thing still anchored to `dk`, because
+  "are you heading into a crash" is a question about now. The rules, all of which
+  exist because the alternative is confidently telling someone something false about
+  their body:
   **rank statistics only** (Spearman / Mann–Whitney, tie-corrected — a 130 bpm
   artifact must not invent a relationship); **one Benjamini–Hochberg family per
   sweep at `FDR_Q = 0.05`**, measured against 30 noise journals, and the clinical
@@ -318,8 +327,25 @@ old web app so old `export.json` files import directly.
   between the two groups' medians in the metric's own unit** (`deltaText`, "+12 ms"),
   never the coefficient — a signed decimal with no unit reads as a percentage, and a
   rho is a statement about ordering nobody can act on, so `rText` now survives only in
-  the AI prompt; and **an empty report is
-  a correct answer**. `watch.ts` is the ONE place the app volunteers bad news —
+  the AI prompt; **a family's reported metric is a REGISTRY fact, not a data fact**
+  (`FAMILY_RANK` in `trends/metrics.ts`) — RMSSD, SDNN and pNN50 are near-collinear,
+  so the old "keep the strongest survivor" collapse let noise pick the label and
+  "quercetin days show higher RMSSD" silently became "...higher pNN50" in 10 of 160
+  perturbations of an effect that never once appeared or disappeared; the group still
+  takes its POSITION from its strongest member, but its representative is
+  `familyRank`, so the sentence cannot drift under the reader; and **an empty report is
+  a correct answer**. **A finding can be OPENED**, and when it is, the sheet draws
+  the columns the claim was computed from and never a second extraction of them:
+  `detail.ts` (pure + tested) keeps the outcome and factor columns per finding,
+  the report carries them as `detail[findingId]`, and
+  `features/insights/FindingSheet.tsx` renders the Biggest change card's own tile +
+  confidence shape over a `LineChart` whose new `marks` prop shades the days the
+  factor was present (`divider` marks an onset's before/after split). Unknown days
+  are never shaded — that is the same "months before you started logging are not
+  supplement-free days" rule, in pixels — a continuous factor is split at its own
+  median, and a lag is reported but never applied to the shading. A correlation row
+  and the Biggest change card open the SAME sheet, which is why the change is not
+  also listed as a correlation row. `watch.ts` is the ONE place the app volunteers bad news —
   Insights is a view the user deliberately opened — but it stays silent during a
   downturn, and `findTrend`'s improvements-only rule is untouched. Results are
   cached in `cache.ts` keyed `todayKey()|meta.lastUpdated|demo`; the screen's

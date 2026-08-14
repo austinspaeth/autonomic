@@ -30,7 +30,7 @@
  *
  * Pure: no store, no MMKV, no expo, no React.
  */
-import { INSIGHT_OUTCOMES, OUTCOME_FAMILY, TREND_METRICS, type TrendMetricDef, type TrendMetricId } from '../trends';
+import { INSIGHT_OUTCOMES, OUTCOME_FAMILY, TREND_METRICS, familyRank, type TrendMetricDef, type TrendMetricId } from '../trends';
 import { laggedColumn, pairs, type DayMatrix } from './matrix';
 import type { FactorDef } from './factors';
 import { benjaminiHochberg, confidenceLabel, confidencePips, mannWhitney, median, spearman, type ConfidenceLabel } from './stats';
@@ -50,9 +50,20 @@ export const MIN_PAIRS = 12;
  * measurement.
  */
 export const FDR_Q = 0.05;
-/** At most this many findings from one driver, so a single supplement can't own
- *  the list by winning in four different outcome families. */
-export const MAX_PER_FACTOR = 2;
+/**
+ * At most this many findings from one driver, so a single supplement can't own the
+ * list by winning in several outcome families.
+ *
+ * Four, not two. Two was throwing away findings that had already passed every
+ * statistical and clinical bar: measured across 25 journals, 4.4 associations
+ * survived the sweep and only 2.4 were shown, so the cap — not the statistics —
+ * was the binding constraint on a screen whose whole job is to report what it
+ * found. Because the family collapse above already runs first, the rows this
+ * admits are in DIFFERENT outcome families ("quercetin days show higher RMSSD" and
+ * "...a higher daily score"), which are genuinely different claims rather than one
+ * claim restated. The cap still exists so one driver cannot fill the visible four.
+ */
+export const MAX_PER_FACTOR = 4;
 /** Hard cap on the full list, including what "Show all" reveals. */
 export const MAX_CORRELATIONS = 24;
 /**
@@ -111,6 +122,9 @@ export interface Correlation {
    * confidence word; the SIZE of the association belongs in units, not in rho.
    */
   deltaText: string;
+  /** The same gap with the unit split off, for a stat tile — which renders its
+   *  unit smaller and dimmer and so cannot take a pre-joined string. */
+  deltaValue: string;
   /** Does the association point the healthy way for this metric? */
   good: boolean;
   q: number;
@@ -239,9 +253,13 @@ function test(matrix: DayMatrix, factor: FactorDef, def: TrendMetricDef, lag: nu
 
 /** "+12 ms" / "−0.4" — a signed median gap in the metric's own unit. The minus is a
  *  true minus sign, matching every other signed readout in the app. */
-function deltaText(def: TrendMetricDef, delta: number): string {
+function deltaValue(def: TrendMetricDef, delta: number): string {
   const sign = delta > 0 ? '+' : delta < 0 ? '\u2212' : '';
-  return `${sign}${def.fmt(Math.abs(delta))}${def.unit ? ` ${def.unit}` : ''}`;
+  return `${sign}${def.fmt(Math.abs(delta))}`;
+}
+
+function deltaText(def: TrendMetricDef, delta: number): string {
+  return `${deltaValue(def, delta)}${def.unit ? ` ${def.unit}` : ''}`;
 }
 
 function describe(c: Candidate, q: number): Correlation {
@@ -276,6 +294,7 @@ function describe(c: Candidate, q: number): Correlation {
     r: c.r,
     rText: signed(c.r),
     deltaText: deltaText(def, c.high - c.low),
+    deltaValue: deltaValue(def, c.high - c.low),
     good,
     q,
     pips,
@@ -332,23 +351,48 @@ export function findCorrelations(matrix: DayMatrix): Correlation[] {
   survivors.sort((a, b) => (b.pips - a.pips) || (Math.abs(b.r) - Math.abs(a.r)));
 
   const byId = new Map(matrix.defs.map((f) => [f.id, f]));
-  const seenFamily = new Set<string>();
-  const perFactor = new Map<string, number>();
-  const out: Correlation[] = [];
+
+  // Group first, choose second.
+  //
+  // Collapse across the driver's variant key, the outcome family, AND the lag.
+  // "Any activity", "activity minutes" and "heavy exertion" against the score is
+  // one finding; alcohol against RMSSD today and tomorrow is one finding.
+  //
+  // A group's POSITION comes from its strongest member, because `survivors` is
+  // already strongest-first and a group is registered when its best member is
+  // reached — so a family does not lose its place in the list just because its
+  // canonical metric is a shade weaker than a sibling. Its REPRESENTATIVE is then
+  // chosen by `familyRank`, not by strength: see the note on FAMILY_RANK for why
+  // picking the strongest made the reported metric drift under the reader.
+  const groups: { key: string; driverKey: string; members: Correlation[] }[] = [];
+  const groupIndex = new Map<string, number>();
   for (const c of survivors) {
     const factor = byId.get(c.factorId);
-    // Collapse across the driver's variant key, the outcome family, AND the lag.
-    // "Any activity", "activity minutes" and "heavy exertion" against the score is
-    // one finding; alcohol against RMSSD today and tomorrow is one finding,
-    // reported at whichever lag is stronger.
     const driverKey = (factor && factor.variantOf) || c.factorId;
     const familyKey = `${driverKey}|${OUTCOME_FAMILY[c.outcome]}`;
-    if (seenFamily.has(familyKey)) continue;
-    const used = perFactor.get(driverKey) || 0;
+    const at = groupIndex.get(familyKey);
+    if (at == null) {
+      groupIndex.set(familyKey, groups.length);
+      groups.push({ key: familyKey, driverKey, members: [c] });
+    } else {
+      groups[at].members.push(c);
+    }
+  }
+
+  const perFactor = new Map<string, number>();
+  const out: Correlation[] = [];
+  for (const g of groups) {
+    const used = perFactor.get(g.driverKey) || 0;
     if (used >= MAX_PER_FACTOR) continue;
-    seenFamily.add(familyKey);
-    perFactor.set(driverKey, used + 1);
-    out.push(c);
+    // Canonical metric first; among equal ranks (and for unlisted metrics) fall
+    // back to the strongest, and finally to the id so the result is total.
+    const pick = g.members.slice().sort((a, b) =>
+      (familyRank(a.outcome) - familyRank(b.outcome))
+      || (Math.abs(b.r) - Math.abs(a.r))
+      || (a.lag - b.lag)
+      || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))[0];
+    perFactor.set(g.driverKey, used + 1);
+    out.push(pick);
     if (out.length >= MAX_CORRELATIONS) break;
   }
   return out;

@@ -25,7 +25,7 @@ import { OUTCOME_FAMILY, TREND_METRICS, TREND_PRIORITY, type TrendMetricId } fro
 import { keyRange, metricSeries } from './series';
 import { compareWindows, type TrendDelta, type TrendDirection } from './compare';
 
-export { TREND_METRICS, TREND_PRIORITY, INSIGHT_OUTCOMES, WATCH_PRIORITY, OUTCOME_FAMILY } from './metrics';
+export { TREND_METRICS, TREND_PRIORITY, INSIGHT_OUTCOMES, WATCH_PRIORITY, OUTCOME_FAMILY, FAMILY_RANK, familyRank } from './metrics';
 export type { TrendMetricId, TrendMetricDef, TrendAggregate } from './metrics';
 export { metricSeries, keyRange } from './series';
 export {
