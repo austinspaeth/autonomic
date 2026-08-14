@@ -119,23 +119,32 @@ const cleanEvent = (raw) => {
    Same partition and the same diff-driven sync as entries and events: the money
    the dashboard spends is dashboard data, not app data, and nothing here ever
    goes near the anonymous ping counters. */
-const AD_PLATFORMS = ['all', 'ios', 'android'];
+
+/* An AD SPOT: one thing bought once, carrying its own price. It used to be a
+   campaign whose money lived in a pile of daily ADS cost rows; the dashboard
+   collapses those into spots on first load and pushes the result here, so this
+   accepts both shapes — `channel` and the old iOS/Android `platform` are read
+   through unchanged rather than dropped, or a browser that has not run the
+   migration yet would have its unmigrated campaigns stripped on the way past.
+   `amount` is optional for exactly the same reason: a pre-migration campaign
+   has none. Counts are what the platform reported, not what the store did. */
+const AD_NUMBERS = ['amount', 'impressions', 'clicks', 'installs'];
 
 const cleanAd = (raw) => {
   if (!raw || typeof raw !== 'object') return null;
   const id = String(raw.id || '').slice(0, 64);
   const name = String(raw.name || '').slice(0, 120);
   if (!id || !name || !isIsoDate(raw.start)) return null;
-  const out = {
-    id,
-    name,
-    start: raw.start,
-    platform: AD_PLATFORMS.includes(raw.platform) ? raw.platform : 'all',
-  };
+  const out = { id, name, start: raw.start };
+  if (raw.platform) out.platform = String(raw.platform).slice(0, 80);
   if (raw.channel) out.channel = String(raw.channel).slice(0, 80);
   if (isIsoDate(raw.end)) out.end = raw.end;
   if (raw.url) out.url = String(raw.url).slice(0, 500);
   if (raw.note) out.note = String(raw.note).slice(0, 2000);
+  AD_NUMBERS.forEach((k) => {
+    const n = Number(raw[k]);
+    if (raw[k] !== undefined && raw[k] !== null && raw[k] !== '' && Number.isFinite(n)) out[k] = n;
+  });
   return out;
 };
 

@@ -38,7 +38,7 @@ const OPEN = {
   [T(0)]: { [T(10)]: 1, [T(4)]: 2, [T(3)]: 1 },
 };
 const SUB = {
-  [T(2)]: { [T(4)]: 1 },     // bought on its D2, inside the trial
+  [T(2)]: { [T(4)]: 2 },     // bought on its D2, inside the trial (one per store)
   [T(0)]: { [T(10)]: 1 },    // bought on its D10, past the trial
 };
 
@@ -137,7 +137,7 @@ const tiles = {};
     };
   });
 });
-check('thirteen KPI tiles', Object.keys(tiles).length === 13, Object.keys(tiles).join(' | '));
+check('fourteen KPI tiles', Object.keys(tiles).length === 14, Object.keys(tiles).join(' | '));
 
 /* T(0) is 1 + 2 + 1 pings, which the fixture splits 3 iOS / 1 Android. The
    tile is what tells Austin which store phoned home; the numbers above it are
@@ -183,7 +183,23 @@ check('the trial tile still quotes how many started one',
 // today: Z 1 + A 2 + B 1 = 4 active, of which 4 are returning (nobody born today)
 check('active today is 4', tiles[Object.keys(tiles).find((k) => k.startsWith('Active on'))].value.startsWith('4'));
 
-check('purchases counted', tiles['Purchases in range'].value === '2', tiles['Purchases in range'].value);
+check('purchases counted', tiles['Purchases in range'].value === '3', tiles['Purchases in range'].value);
+
+/* A subscribe ping carries the buyer's store in the same cohort key an open
+   ping does, so both purchase tiles say which store paid. In range: T(2) sold
+   one on each store, T(0) sold one on iOS. On the newest day alone: 1 iOS. */
+const splitOfTile = (host, prefix) => {
+  const t = [].slice.call($(host).querySelectorAll('.tile'))
+    .filter((x) => x.querySelector('.label').textContent.trim().indexOf(prefix) === 0)[0];
+  return t && t.querySelector('.split') ? t.querySelector('.split').textContent.replace(/\s+/g, ' ') : '';
+};
+const rangeSplit = splitOfTile('pgTilesB', 'Purchases in range');
+check('purchases in range are split by store', /iOS 2/.test(rangeSplit) && /Android 1/.test(rangeSplit), rangeSplit);
+
+const buysToday = tiles[Object.keys(tiles).find((k) => k.startsWith('Purchases on'))];
+check('a purchases tile covers the newest day only', buysToday && buysToday.value === '1', buysToday && buysToday.value);
+const todaySplit = splitOfTile('pgTiles', 'Purchases on');
+check('and splits that day by store too', /iOS 1/.test(todaySplit) && /Android 0/.test(todaySplit), todaySplit);
 // conversion by D7 is measurable only for Z: 1 of its 8 bought within 7 days? no — it
 // bought on D10, so within-7 is 0 of 8.
 check('D7 conversion is 0% over the one eligible cohort',
@@ -288,7 +304,7 @@ $('tlChart').parentElement.querySelector('[data-table-toggle="tlChart"]').click(
 const purchaseTotal = [...$('tlChart-table').querySelectorAll('tbody tr')]
   .reduce((a, tr) => a + (Number(tr.lastElementChild.textContent.replace(/[^0-9.]/g, '')) || 0), 0);
 check('timeline purchases follow store sales, not pings',
-  purchaseTotal === 1, purchaseTotal + ' (store sales 1, subscribe pings 2)');
+  purchaseTotal === 1, purchaseTotal + ' (store sales 1, subscribe pings 3)');
 
 // switching the metric redraws
 $('tlMetric').querySelector('[data-v="downloads"]').click();
@@ -297,6 +313,11 @@ check('metric switch redraws the chart', !!$('tlChart').querySelector('svg'));
 
 /* --------------------------------------------------------------- events */
 
+/* The editor moved to Edit data — events are RECORDED there and READ here,
+   the same split every other collection on this dashboard has. */
+check('the timeline no longer carries the editor', !$('pgEventList').closest('#view-timeline'));
+$('btnEditData').click();
+await new Promise((r) => setTimeout(r, 150));
 check('empty state invites the first event', /No events recorded yet/.test($('pgEventList').textContent));
 
 $('pgEventAdd').click();
@@ -314,6 +335,8 @@ await new Promise((r) => setTimeout(r, 60));
 
 check('event saved into the list', /v1\.24 paywall copy/.test($('pgEventList').textContent));
 check('the form closed after saving', $('pgEventForm').classList.contains('hidden'));
+window.document.querySelector('.tab[data-view="timeline"]').click();
+await new Promise((r) => setTimeout(r, 150));
 check('the event is annotated onto the timeline chart',
   $('tlChart').querySelectorAll('rect[rx="2"]').length >= 1,
   String($('tlChart').querySelectorAll('rect[rx="2"]').length));
@@ -326,9 +349,11 @@ check('the same event annotates the App usage charts too',
 window.document.querySelector('.tab[data-view="timeline"]').click();
 await new Promise((r) => setTimeout(r, 150));
 
-// selecting it opens the before/after comparison
-$('pgEventList').querySelector('.event-row').click();
-await new Promise((r) => setTimeout(r, 60));
+/* Selecting it opens the before/after comparison. The flag on the chart is the
+   only way in now, which is the point: the comparison is drawn here, and a
+   selection made on the tab you enter events from could not show it. */
+$('tlChart').querySelector('rect[rx="2"]').dispatchEvent(new window.Event('click', { bubbles: true }));
+await new Promise((r) => setTimeout(r, 120));
 const analysis = $('pgEventAnalysis');
 check('before/after analysis opens', !!analysis.querySelector('table'));
 check('it is labelled observational, not causal',

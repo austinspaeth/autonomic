@@ -6,9 +6,9 @@
 
      APPLE   99 a year, first charged 2026-01-15
      HOST    12 a month, first charged 2026-01-31 (a date that tests clamping)
-     ADS-A   50 a day for the five days 2026-06-01..05, on campaign A
-     ADS-B   a single 200 on 2026-06-03, on campaign B, with reported counts
      LAPTOP  1500 one-off on 2026-03-10
+     SPOT-A  250 of Apple Search Ads, starting 2026-06-01, ended 2026-06-05
+     SPOT-B  200 on Reddit, starting 2026-06-03, no end date yet
 
    Where a number below is asserted, it was worked out by hand first. */
 import fs from 'node:fs';
@@ -27,28 +27,31 @@ const near = (a, b, eps = 0.001) => a !== null && a !== undefined && Math.abs(a 
 /* ------------------------------------------------------------- fixture */
 
 const ADS = [
-  { id: 'a', name: 'Search Ads — POTS', channel: 'Apple Search Ads', platform: 'ios', start: '2026-06-01', end: '2026-06-05' },
-  { id: 'b', name: 'Reddit test', channel: 'Reddit', platform: 'all', start: '2026-06-03' },
+  { id: 'a', name: 'Search Ads — POTS', platform: 'Apple Search Ads', start: '2026-06-01', end: '2026-06-05',
+    amount: 250, impressions: 25000, clicks: 500, installs: 50 },
+  { id: 'b', name: 'Reddit test', platform: 'Reddit', start: '2026-06-03',
+    amount: 200, impressions: 40000, clicks: 800, installs: 25 },
 ];
 
-const COSTS = [
+const ENTERED = [
   { id: 'apple', date: '2026-01-15', amount: 99, category: 'FEES', recurrence: 'yearly', label: 'Apple Developer' },
   { id: 'host', date: '2026-01-31', amount: 12, category: 'INFRA', recurrence: 'monthly', label: 'Hosting' },
   { id: 'laptop', date: '2026-03-10', amount: 1500, category: 'HARDWARE', label: 'Laptop' },
-  { id: 'b1', date: '2026-06-03', amount: 200, category: 'ADS', adId: 'b', impressions: 40000, clicks: 800, installs: 25 },
 ];
-['2026-06-01', '2026-06-02', '2026-06-03', '2026-06-04', '2026-06-05'].forEach((d, i) => {
-  COSTS.push({ id: 'a' + i, date: d, amount: 50, category: 'ADS', adId: 'a', clicks: 100, installs: 10 });
-});
+
+/* What every rollup actually reads: the entered costs with the ad spots
+   projected in. Nothing in this file may sum the two by hand — allCosts is the
+   one place they are put together, in the app as well as here. */
+const COSTS = C.allCosts(ADS, ENTERED);
 
 /* --------------------------------------------------------- occurrences */
 
 check('a one-off lands on its own day only',
-  C.occurrences(COSTS[2], '2026-03-01', '2026-03-31').join() === '2026-03-10');
+  C.occurrences(ENTERED[2], '2026-03-01', '2026-03-31').join() === '2026-03-10');
 check('a one-off outside the window contributes nothing',
-  C.occurrences(COSTS[2], '2026-04-01', '2026-04-30').length === 0);
+  C.occurrences(ENTERED[2], '2026-04-01', '2026-04-30').length === 0);
 
-const hostH1 = C.occurrences(COSTS[1], '2026-01-01', '2026-06-30');
+const hostH1 = C.occurrences(ENTERED[1], '2026-01-01', '2026-06-30');
 check('a monthly bill recurs once a month', hostH1.length === 6, hostH1.join(' '));
 /* Jan 31 → Feb 28 → Mar 31. The clamp is per-occurrence: stepping from the
    ORIGINAL day, not the clamped one, is what stops February dragging the whole
@@ -58,9 +61,9 @@ check('a monthly bill clamps short months without drifting',
   hostH1.join(' '));
 
 check('a yearly fee charges once in a year',
-  C.occurrences(COSTS[0], '2026-01-01', '2026-12-31').length === 1);
+  C.occurrences(ENTERED[0], '2026-01-01', '2026-12-31').length === 1);
 check('a yearly fee charges again the next year',
-  C.occurrences(COSTS[0], '2026-01-01', '2027-12-31').join() === '2026-01-15,2027-01-15');
+  C.occurrences(ENTERED[0], '2026-01-01', '2027-12-31').join() === '2026-01-15,2027-01-15');
 
 const until = { id: 'u', date: '2026-01-10', amount: 5, category: 'TOOLS', recurrence: 'monthly', until: '2026-03-31' };
 check('`until` stops a recurrence',
@@ -69,16 +72,19 @@ check('`until` stops a recurrence',
 /* A recurring cost with no end date is still being paid, so it runs to the end
    of the window asked about — not to some stored stop date it does not have. */
 check('an open-ended recurrence runs to the end of the window',
-  C.occurrences(COSTS[1], '2026-01-01', '2026-03-01').length === 2);
+  C.occurrences(ENTERED[1], '2026-01-01', '2026-03-01').length === 2);
 
 /* ---------------------------------------------------------- daily roll */
 
 const june = C.daily(COSTS, '2026-06-01', '2026-06-30');
-// 5 × 50 ads + 200 ads + one hosting charge on the 30th = 450 + 12
+// spot A's 250 lands on the 1st, spot B's 200 on the 3rd, hosting 12 on the 30th
 check('a month totals every occurrence in it', near(june.total, 462), june.total);
 check('marketing is separated from the rest', near(june.marketing, 450) && near(june.other, 12),
   june.marketing + ' / ' + june.other);
-check('the 3rd carries both ad rows', near(june.byDay['2026-06-03'], 250), june.byDay['2026-06-03']);
+check('a spot charges its whole price on its start day, and no other day',
+  near(june.byDay['2026-06-01'], 250) && near(june.byDay['2026-06-03'], 200) &&
+  june.byDay['2026-06-02'] === 0 && june.byDay['2026-06-04'] === 0,
+  JSON.stringify([june.byDay['2026-06-01'], june.byDay['2026-06-02'], june.byDay['2026-06-03']]));
 check('a day with nothing on it is 0, not undefined', june.byDay['2026-06-20'] === 0);
 check('categories roll up separately',
   near(june.totals.ADS, 450) && near(june.totals.INFRA, 12) && june.totals.HARDWARE === 0);
@@ -92,47 +98,46 @@ check('spend() agrees with daily()', near(C.spend(COSTS, '2026-06-01', '2026-06-
 check('spend() can be filtered',
   near(C.spend(COSTS, '2026-06-01', '2026-06-30', (c) => c.adId === 'a'), 250));
 
-/* -------------------------------------------------------------- per ad */
+/* A projected row is derived, never stored: it carries the spot's id so a
+   filter can find it, and the entered ledger is left exactly as it was. */
+check('projecting spots leaves the entered costs untouched',
+  ENTERED.length === 3 && COSTS.length === 5 &&
+  C.adCosts(ADS).every((c) => c.derived && c.category === 'ADS'));
 
-const per = C.perAd(ADS, COSTS, '2026-06-01', '2026-06-30');
+/* ------------------------------------------------------------ ad spots */
+
+const per = C.perAd(ADS, '2026-06-01', '2026-06-30');
 const rowA = per.rows.find((r) => r.id === 'a');
 const rowB = per.rows.find((r) => r.id === 'b');
-check('per-ad spend splits by campaign', near(rowA.spend, 250) && near(rowB.spend, 200),
+check('a spot reports its own price', near(rowA.spend, 250) && near(rowB.spend, 200),
   rowA.spend + ' / ' + rowB.spend);
-check('reported counts accumulate per campaign',
+check('the counts are the ones entered on the spot',
   rowA.installs === 50 && rowA.clicks === 500 && rowB.installs === 25);
-check('reported CPI is spend ÷ the network\'s own installs',
+check('reported CPI is cost \u00f7 the platform\'s own installs',
   near(rowA.cpi, 5) && near(rowB.cpi, 8), rowA.cpi + ' / ' + rowB.cpi);
 check('CPC and CTR come from the reported counts',
   near(rowB.cpc, 0.25) && near(rowB.ctr, 2), rowB.cpc + ' / ' + rowB.ctr);
 check('share of spend adds to 100', near(rowA.share + rowB.share, 100));
 check('rows are ordered by spend', per.rows[0].id === 'a');
 
-/* Money whose campaign was deleted still counts — see removeAd() in app.js. */
-const orphan = COSTS.concat([{ id: 'o', date: '2026-06-07', amount: 75, category: 'ADS' }]);
-const withOrphan = C.perAd(ADS, orphan, '2026-06-01', '2026-06-30');
-check('advertising with no campaign is reported, not dropped',
-  near(withOrphan.total, 525) &&
-  withOrphan.rows.some((r) => r.id === null && near(r.spend, 75)),
-  String(withOrphan.total));
-
-/* A campaign with no spend in the window is still a row, at zero, rather than
-   vanishing — "we ran it and it cost nothing" and "we did not run it" are
-   different answers and the table has to be able to show the first. */
-const quiet = C.perAd(ADS, [], '2026-06-01', '2026-06-30');
-check('a campaign with no spend is still listed', quiet.rows.length === 2 && quiet.rows[0].spend === 0);
-check('a rate with no denominator is null, never zero', quiet.rows[0].cpi === null);
+/* The window test is the CHARGE, not the run. Spot A ran into June 5th and was
+   paid for on the 1st: a window opening on the 2nd contains none of its money,
+   and reporting it there would double-count it against the month that did. */
+const late = C.perAd(ADS, '2026-06-02', '2026-06-30');
+check('a spot belongs to the window its cost landed in',
+  late.rows.length === 1 && late.rows[0].id === 'b', String(late.rows.length));
+check('a spot outside the window is absent, not a zero row',
+  C.perAd(ADS, '2026-07-01', '2026-07-31').rows.length === 0);
 
 /* Creative work is marketing money — it counts towards cost per install — but
-   it is not a campaign: no channel, no clicks, nothing to attribute. */
+   it is not an ad spot: no platform, no clicks, nothing to attribute. */
 const withCreative = COSTS.concat([{ id: 'art', date: '2026-06-08', amount: 400, category: 'CREATIVE', label: 'Screenshots' }]);
 check('creative spend counts as marketing',
   near(C.daily(withCreative, '2026-06-01', '2026-06-30').marketing, 850));
-check('but never appears as a campaign',
-  near(C.perAd(ADS, withCreative, '2026-06-01', '2026-06-30').total, 450));
+check('but never appears as an ad spot', near(C.perAd(ADS, '2026-06-01', '2026-06-30').total, 450));
 
-const chans = C.perChannel(ADS, COSTS, '2026-06-01', '2026-06-30');
-check('channels roll campaigns up', chans.length === 2 && near(chans[0].spend, 250));
+const plats = C.perPlatform(ADS, '2026-06-01', '2026-06-30');
+check('platforms roll spots up', plats.length === 2 && near(plats[0].spend, 250) && plats[0].ads === 1);
 
 /* --------------------------------------------------------- the money */
 
@@ -183,15 +188,20 @@ check('no spend at all is not a breakeven date', nothing.at === null);
 /* --------------------------------------------------------- annotations */
 
 const marks = C.adMarks(ADS);
-check('a finished campaign flags both ends', marks.filter((m) => m.adId === 'a').length === 2);
-check('a running campaign flags only its start', marks.filter((m) => m.adId === 'b').length === 1);
+check('a finished spot flags both ends', marks.filter((m) => m.adId === 'a').length === 2);
+check('a spot with no end date flags only its start', marks.filter((m) => m.adId === 'b').length === 1);
 check('marks come back in date order', marks.every((m, i) => i === 0 || marks[i - 1].date <= m.date));
 
 check('status reads off the day asked about',
   C.adStatus(ADS[0], '2026-06-03') === 'running' &&
   C.adStatus(ADS[0], '2026-06-30') === 'ended' &&
   C.adStatus(ADS[0], '2026-05-01') === 'scheduled' &&
-  C.adStatus(ADS[1], '2026-12-31') === 'running');
+  C.adStatus(ADS[1], '2026-12-31') === 'ongoing');
+
+/* Advertising is not offered as a cost category: the same money would then be
+   enterable as a spot AND as a cost, and the two would not add up. */
+check('the cost form is never offered the advertising category',
+  C.ENTRY_CATEGORY_KEYS.indexOf('ADS') === -1 && C.CATEGORY_KEYS.indexOf('ADS') === 0);
 
 /* ------------------------------------------------------------- report */
 

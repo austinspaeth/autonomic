@@ -217,8 +217,31 @@ input[type="number"] { -moz-appearance: textfield; }
 /* ---------- cards ---------- */
 
 .grid { display: grid; gap: 14px; align-items: start; }
-.cards { grid-template-columns: repeat(auto-fit, minmax(min(215px, 100%), 1fr)); margin-bottom: 16px; }
 .two-col { grid-template-columns: repeat(auto-fit, minmax(min(430px, 100%), 1fr)); }
+
+/* A row of stat tiles is FLEX, not grid, and that is the point.
+ *
+ * `repeat(auto-fit, minmax(215px, 1fr))` fixes the column count for the whole
+ * block, so a count that does not divide by it leaves the trailing row's
+ * columns EMPTY — six columns wide, eight tiles, and two tiles sat beside a
+ * four-column void with more tiles directly underneath it. Flex has no columns
+ * to leave empty: the last row's tiles grow into the space instead, so a tile
+ * row never shows a gap that the cards below it could have filled.
+ *
+ * Growing alone would turn a trailing pair into two half-page slabs, so
+ * `layoutTiles()` in app.js picks the column count that leaves the LAST row
+ * fullest and writes the basis back as a fraction. `--tile-min` is the minimum
+ * it measures against and the fallback basis below, in one place so the two
+ * cannot drift; `min(…, 100%)` keeps it from overflowing a narrow phone.
+ *
+ * `.tile-group` is `display: contents` so a view that builds its tiles in more
+ * than one block still flows them as ONE row — see the App usage view, whose
+ * two blocks used to break the row in half between them. */
+.cards { --tile-min: 215px; display: flex; flex-wrap: wrap; margin-bottom: 16px; }
+/* Both levels, because `display: contents` hands the grandchildren to the flex
+   container but leaves them out of reach of `.cards > *`. */
+.cards > *, .cards > .tile-group > * { flex: 1 1 min(var(--tile-min), 100%); min-width: 0; }
+.tile-group { display: contents; }
 
 .card {
   background: var(--surface-1);
@@ -584,6 +607,78 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { outline: 2px solid var
 }
 .toast.on { opacity: 1; transform: translateX(-50%) translateY(-4px); }
 
+/* ---------- live alerts ---------- */
+/* alerts.js. The confetti canvas covers the viewport and never takes a click;
+   it is transparent and idle until something is falling through it. The cards
+   stack in the bottom right, which is the one corner nothing else in this
+   dashboard uses — the toast owns the bottom centre. */
+
+#confetti {
+  position: fixed; inset: 0; width: 100%; height: 100%;
+  pointer-events: none; z-index: 150;
+}
+
+/* Cards stay until they are dismissed, so the stack is bounded by the viewport
+   rather than by a timer: it scrolls, and it carries its own "Clear all". The
+   dock is pointer-transparent so the dashboard underneath stays clickable in
+   the gaps; the cards and the button take their own clicks back. */
+.alert-dock {
+  position: fixed; right: 18px; bottom: 18px; z-index: 160;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
+  pointer-events: none;
+  max-width: min(340px, calc(100vw - 36px));
+  max-height: min(70vh, 640px);
+}
+.alert-clear {
+  pointer-events: auto; cursor: pointer; flex: none;
+  background: var(--surface-2); border: 1px solid var(--border-strong);
+  color: var(--text-secondary); border-radius: 999px;
+  padding: 4px 12px; font-size: 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.5);
+}
+.alert-clear:hover { color: var(--text-primary); background: var(--surface-3); }
+
+.alert-stack {
+  display: flex; flex-direction: column; gap: 10px; align-items: flex-end;
+  pointer-events: none;
+  min-height: 0; overflow-y: auto; overflow-x: hidden;
+  /* The scrollbar would otherwise sit against the cards' right edge. */
+  padding: 2px 2px 2px 0;
+  scrollbar-width: thin;
+}
+
+.alert-card {
+  pointer-events: auto; cursor: pointer; flex: none;
+  display: flex; align-items: center; gap: 11px;
+  padding: 12px 14px; border-radius: 12px;
+  background: var(--surface-2); border: 1px solid var(--border-strong);
+  box-shadow: 0 14px 40px rgba(0,0,0,.65);
+  opacity: 0; transform: translateY(10px) scale(.97);
+  transition: opacity .22s ease, transform .22s ease;
+}
+.alert-card.on { opacity: 1; transform: none; }
+/* The left edge carries which kind of news this is, so the two are told apart
+   before either is read. Violet is "paid" everywhere else on this page. */
+.alert-card.sale { border-left: 3px solid var(--series-7); }
+.alert-card.download { border-left: 3px solid var(--series-3); }
+.alert-mark { font-size: 20px; line-height: 1; flex: none; }
+.alert-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.alert-body b { font-size: 14px; }
+.alert-body span { color: var(--text-secondary); font-size: 12.5px; }
+.alert-x {
+  margin-left: auto; flex: none; background: none; border: 0; cursor: pointer;
+  color: var(--text-muted); font-size: 17px; line-height: 1; padding: 2px 4px;
+}
+.alert-x:hover { color: var(--text-primary); }
+
+/* The bell shows the state it is IN, not the state pressing it would reach:
+   a crossed-out bell means muted, the same way it does everywhere else. */
+.bell-icon { width: 15px; height: 15px; flex: none; display: block; }
+#btnAlerts .bell-icon.off { display: none; }
+#btnAlerts[data-muted="true"] .bell-icon.on { display: none; }
+#btnAlerts[data-muted="true"] .bell-icon.off { display: block; }
+#btnAlerts[data-muted="true"] { color: var(--text-muted); }
+
 .checks { display: flex; flex-wrap: wrap; gap: 6px 14px; }
 .checks label { display: inline-flex; align-items: center; gap: 6px; color: var(--text-secondary); font-size: 12.5px; cursor: pointer; }
 .checks input { accent-color: var(--series-1); }
@@ -598,7 +693,9 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { outline: 2px solid var
 
 body.gated { overflow: hidden; }
 body.gated .app,
-body.gated .toast { display: none; }
+body.gated .toast,
+body.gated #confetti,
+body.gated .alert-dock { display: none; }
 
 .gate {
   position: fixed; inset: 0; z-index: 200;
@@ -713,14 +810,16 @@ body.gated .toast { display: none; }
 
 /* ---------- costs ---------- */
 
-/* A campaign's state is one word, and it is the first thing you look for in a
-   list of thirty: colour carries it, the word confirms it. */
+/* An ad spot's state is one word, and it is the first thing you look for in a
+   list of thirty: colour carries it, the word confirms it. `ongoing` is a spot
+   with no end date yet and `running` one whose end is still ahead — the same
+   colour, because both are live, and two words because they are two claims. */
 .pill {
   display: inline-block; padding: 1px 8px; border-radius: 20px;
   font-size: 11.5px; border: 1px solid var(--border-strong); color: var(--text-secondary);
   white-space: nowrap;
 }
-.pill.running { color: var(--good); border-color: rgba(12, 163, 12, .45); }
+.pill.running, .pill.ongoing { color: var(--good); border-color: rgba(12, 163, 12, .45); }
 .pill.scheduled { color: var(--warning); border-color: rgba(250, 178, 25, .4); }
 .pill.ended, .pill.draft { color: var(--text-muted); }
 
@@ -735,29 +834,58 @@ th.money, td.money { text-align: right; }
    from rather than in a column of its own. */
 .repeats { color: var(--text-muted); font-size: 11.5px; white-space: nowrap; }
 
-/* The daily spend grid reuses the bulk-entry grid's cell behaviour, with a
-   sticky date column so a wide set of campaigns can scroll under it. */
-/* Auto width, unlike every other table here. With two campaigns a full-width
-   grid strands the day label and its two inputs at opposite ends of the card;
-   sized to its content the row reads as a row. It still scrolls when there are
-   enough campaigns to need it. */
-#csGrid table { width: auto; min-width: 0; }
-#csGrid th, #csGrid td { padding-right: 18px; }
-#csGrid th.day-col, #csGrid td.day-col {
-  position: sticky; left: 0; z-index: 1;
-  background: var(--surface-1); white-space: nowrap;
-}
-#csGrid th.day-col { z-index: 3; }
-#csGrid td input { width: 92px; }
-#csGrid th.ad-head { text-align: right; }
-#csGrid th.ad-head .sub { display: block; color: var(--text-muted); font-weight: 400; font-size: 11px; }
-#csGrid tbody tr.weekend td.day-col { color: var(--text-muted); }
-
 /* The category swatch column in the cost list and the category table. */
 td .cat-dot, .cat-dot {
   width: 9px; height: 9px; border-radius: 3px; flex: none;
   display: inline-block; margin-right: 7px; vertical-align: middle;
 }
+
+/* ---------- Edit data: sections and accordions ---------- */
+
+/* Edit data is a long page of forms rather than a page of charts, so it is
+   navigated rather than read top to bottom. Its section headings are therefore
+   real headings — big enough to find by scrolling past — and every card under
+   them is a <details>, so what you are not doing right now is one line tall.
+   The disclosure state lives in the DOM, which is exactly right: it is a
+   property of this browsing session, not of the account, and syncing it would
+   collapse a card on another device mid-edit. */
+#view-data .section-head {
+  align-items: baseline;
+  gap: 14px;
+  margin: 30px 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+#view-data .section-head:first-child { margin-top: 0; }
+#view-data .section-title { font-size: 20px; letter-spacing: -0.01em; }
+#view-data .section-note { font-size: 12.5px; }
+
+details.acc { margin-bottom: 12px; padding-bottom: 16px; }
+details.acc:not([open]) { padding-bottom: 10px; }
+details.acc > summary {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  min-height: 30px; cursor: pointer;
+  list-style: none;                 /* Safari + the standard, both needed */
+  margin: -2px 0 6px;
+}
+details.acc > summary::-webkit-details-marker { display: none; }
+details.acc:not([open]) > summary { margin-bottom: 0; }
+details.acc > summary::before {
+  content: '';
+  width: 6px; height: 6px; flex: none;
+  border-right: 1.5px solid var(--text-muted);
+  border-bottom: 1.5px solid var(--text-muted);
+  transform: rotate(-45deg);
+  margin: -2px 2px 0 1px;
+  transition: transform .15s ease;
+}
+details.acc[open] > summary::before { transform: rotate(45deg); margin-top: -4px; }
+details.acc > summary h2 { font-size: 14.5px; }
+details.acc > summary:hover h2 { color: var(--text-primary); }
+details.acc > summary .spacer { flex: 1; }
+/* A control in the summary must not toggle the card as well — app.js swallows
+   the toggle, this stops the row's text selecting on a double press. */
+details.acc > summary .btn { user-select: none; }
 
 /* ---------- responsive ---------- */
 /* One place for every breakpoint, so a rule and its override are read

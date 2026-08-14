@@ -449,6 +449,68 @@ check('and it carried the sales, so the ledger goes with the entries',
   server.sales.length === 0 && server.entries.length === 0,
   server.entries.length + ' entries / ' + server.sales.length + ' sales');
 
+/* ------------------------------------------- the ledger's own CSV, back in */
+
+/* Export CSV writes `qty` and `refunded`; the paste box's documented column
+   order has neither. Read positionally that file lands a count where an install
+   date goes and a refund where a note goes, so the ledger cannot round-trip
+   through its own entry path. A header row is what fixes it, and this is the
+   file the export actually produces. */
+$('slPaste').value = [
+  'date,platform,plan,price,qty,cohort,cancelled,refunded,note',
+  [T(5), 'ios', 'annual', '29.99', '1', T(30), '', '', 'a real one'].join(','),
+  [T(6), 'android', 'unknown', '9.99', '3', '', '', '', 'a migrated total'].join(','),
+  [T(7), 'ios', 'monthly', '4.99', '1', '', '', 'yes', 'refunded'].join(','),
+].join('\n');
+$('slPasteGo').click();
+await settle(250);
+check('the ledger CSV comes back in, header and all',
+  /Added 3 purchases/.test($('slPasteStatus').textContent), $('slPasteStatus').textContent);
+check('and the header line is not read as a purchase',
+  !/left in the box/.test($('slPasteStatus').textContent), $('slPasteStatus').textContent);
+
+await saved();
+const backIn = (n) => server.sales.filter((s) => s.date === T(n))[0];
+check('a count above one survives the trip', backIn(6) && backIn(6).qty === 3,
+  JSON.stringify(backIn(6)));
+check('and it carries no install date, because three buyers do not share one',
+  backIn(6) && backIn(6).cohort === undefined, JSON.stringify(backIn(6)));
+check('the install date on the single sale does survive', backIn(5) && backIn(5).cohort === T(30),
+  JSON.stringify(backIn(5)));
+check('and a refund comes back as a refund, not as a note',
+  backIn(7) && backIn(7).refunded === true && !/yes/.test(String(backIn(7).note || '')),
+  JSON.stringify(backIn(7)));
+
+/* ---------------------------------------------------------- demo data */
+
+/* The demo used to write `sales` / `revenue` back onto the store days, which
+   `base()` no longer reads — so it produced a book whose every money figure was
+   zero, silently, since those columns still parse and still sync. */
+$('ioDemo').click();
+await settle(600);
+check('the demo builds a purchase ledger', $('slSaleTable').textContent.includes('Annual') &&
+  /purchases on record/.test($('slSaleCount').textContent), $('slSaleCount').textContent);
+check('with more than one plan in it',
+  /Monthly/.test($('slSaleTable').textContent) && /Annual/.test($('slSaleTable').textContent));
+check('and it writes no sales columns back onto the store days',
+  (JSON.parse(window.localStorage.getItem('autonomic.dashboard.v1') || '{}').entries || [])
+    .every((e) => e.sales === undefined && e.revenue === undefined),
+  'entries still carry a sales column');
+
+window.document.querySelector('.tab[data-view="sales"]').click();
+await settle(400);
+const demoTiles = tileText();
+const demoMrr = Object.keys(demoTiles).find((k) => k.indexOf('MRR on ') === 0);
+check('so the Sales view reads real money rather than zero',
+  demoMrr && /[1-9]/.test(demoTiles[demoMrr].value), demoMrr && demoTiles[demoMrr].value);
+check('and bookings are non-zero too',
+  /[1-9]/.test(demoTiles['Bookings in range'].value), demoTiles['Bookings in range'].value);
+
+window.document.querySelector('.tab[data-view="overview"]').click();
+await settle(400);
+const demoOv = $('ovTiles') ? $('ovTiles').textContent : '';
+check('and Overview does as well', /\$[1-9\s,]*[1-9]/.test(demoOv), demoOv.slice(0, 200));
+
 /* ------------------------------------------------------------- errors */
 
 check('no page errors', errors.length === 0, errors[0]);

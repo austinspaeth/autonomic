@@ -13,7 +13,7 @@ format are documented in the dashboard's own README in the source repo
 ## How it is served
 
 `/master/` is a **prerendered SvelteKit route**. The dashboard itself is still
-framework-free — plain HTML, one stylesheet and ten scripts, edited in
+framework-free — plain HTML, one stylesheet and a dozen scripts, edited in
 `landing/master/` — and `src/routes/master/+page.svelte` is a shell that
 `?raw`-imports all of it and inlines it into a single self-contained document.
 Nothing is bundled, minified or scoped, so what runs in the browser is
@@ -109,6 +109,7 @@ Everything below is in `landing/master/`, except the route that assembles them.
 | `costs.js` | Pure money arithmetic behind the Costs view |
 | `releases.js` | Generated release log, read as timeline annotations |
 | `charts.js` | Dependency-free SVG chart engine |
+| `alerts.js` | Live alerts: what changed since the last refresh, said out loud |
 | `styles.css` | Dark theme tokens, layout, gate |
 
 ## The App usage view
@@ -140,6 +141,13 @@ the UI, each of them deliberate:
   "all"; the **Platform on <day>** tile and the **iOS vs Android, day by day**
   card carry the split instead, and both are always unfiltered, since they are
   what the rest of the view is a slice of.
+- **A subscribe ping carries the buyer's store in the same cohort key an open
+  ping does**, so "which store paid" needs no second source: `subPlatformsOn` /
+  `purchasePlatformsOver` read it back, and both **Purchases on <day>** (the
+  newest day alone, beside *Active on <day>*) and **Purchases in range** show
+  the iOS / Android split under their number. Those splits follow the same rule
+  as the platform tile — always unfiltered, `no store` broken out and disclosed
+  in the meta line rather than folded into either store.
 - **A ping that names no store is an install whose store we failed to record,
   not an install on a third platform.** Builds that shipped before the platform
   marker existed send a bare `082126`, which reads back as `U`. Excluding those
@@ -165,6 +173,98 @@ against that day's store downloads (how many people who downloaded ever opened
 the app), and the purchases chart puts subscribe pings beside store sales as a
 cross-check. They count different moments — the app only notices a subscription
 on its next launch — so they should track, not match.
+
+## Auto-refresh and live alerts
+
+The page refetches itself **every 10 minutes while it is visible**, and
+announces what changed. `alerts.js` is the announcement; the timer is
+`initAutoRefresh()` in `app.js`, which reuses the header refresh's own path with
+`{ silent: true }` — the "Refreshed." toast is suppressed, and nothing else is.
+
+Three conditions gate the timer, all load-bearing:
+
+- **Visible only.** `document.hidden` is read on every tick rather than trusted
+  to `setInterval` throttling, so a backgrounded tab does not burn a
+  pull-and-hydrate for a screen nobody is looking at, and does not fire its
+  celebration into an empty room. `visibilitychange` checks immediately, so a
+  laptop reopened after an hour is current in a frame rather than up to ten
+  minutes stale.
+- **App usage and Timeline only.** The ping counter is the only source on this
+  page that changes on its own, and `refreshView` only refetches it on those two
+  views. Anywhere else an auto-refresh would re-pull store CSVs it already holds
+  and have nothing to say.
+- **Signed in only.** A pull behind the gate would 401 at somebody who has not
+  typed their code yet.
+
+The clock is a timestamp compared on a 30-second tick, not a ten-minute
+interval: an interval cannot be paused for the hours a tab spent in the
+background, so it would fire the moment it returned and then again on its old
+cadence. Any refresh, including one you pressed, resets it.
+
+### What gets announced
+
+Everything is fed by the **ping counter**, deliberately and only. Store
+downloads and the sales ledger are hand-imported, so a burst of "new sales" from
+a CSV paste would be an alert about your own typing.
+
+| Event | Definition | Reaction |
+|---|---|---|
+| Visitors | a rise in open pings | two-note blip, no card |
+| Downloads | a rise in **first runs** — an open ping whose cohort key IS the day it arrived on | three-note rising chime, confetti falling from the top, a card naming the store(s) |
+| Sales | a rise in subscribe pings | brass fanfare, confetti from the top AND the bottom, a card naming the store(s) that paid |
+
+The three cues are meant to be told apart across a room with your back to the
+screen, so they differ in SHAPE and not only in pitch — two notes, three notes,
+a fanfare with a held chord — and climb in weight in the order the events
+matter. The visitor blip fires most often and is the one most easily made
+useless: the first version was a single sine at 0.055 gain, a sound you have to
+already know is coming to hear at all.
+
+**More than one arrival runs the confetti in WAVES**, one per item 320ms apart
+and capped at eight, so four downloads is a few seconds of falling rather than
+the same one-second puff four times over — which is not distinguishable from
+one. The cap is what stops a backfill of fifty pings burying the dashboard for
+half a minute. Downloads landing in the same refresh as a sale extend the sale's
+waves rather than starting a competing pattern.
+
+`snapshot` / `diff` are pure and are what `tests/alerts.test.mjs` pins;
+`tests/master-alerts.test.mjs` covers the cards on the built page. The rules:
+
+- **A download is a first run, not an open.** That is the closest thing to a
+  live download this dashboard has — the store's own number arrives a day late
+  in a CSV, and the two are never added together.
+- **The platform comes off the ping's own cohort key**, so a card can say which
+  store without a second source. A ping from a build predating the platform
+  marker reads as "unknown store" rather than being folded into either one — the
+  same rule the App usage view runs on.
+- **A delta is never negative.** The report is a sliding 400-day window, so the
+  oldest day leaves it as the calendar turns and a total can fall with nothing
+  having gone wrong. A drop is not an event: it clamps to zero and the new
+  snapshot becomes the baseline anyway.
+- **The first report of a session is a baseline, not news**, or every sign-in
+  would open with a fanfare for a month of history.
+- **One sound per refresh**, the loudest thing that happened. Cards do stack,
+  because they are read rather than heard.
+- **Cards do not expire.** The toast disappears on a timer; the whole point of
+  this stack is to still be there when you come back to the laptop, so the only
+  thing that removes a card is a press — the card itself, or "Clear all" above
+  the stack once there are two. What that costs is bounded rather than
+  unbounded: the stack scrolls past the viewport, and past `MAX_CARDS` (40) the
+  oldest is dropped, since a dashboard left open over a weekend should not hold
+  nine hundred DOM nodes to say the same thing.
+
+The sounds are **synthesized**, not sampled: this page is inlined into one
+self-contained document with nothing to resolve at runtime, so an `<audio src>`
+is out and a base64 fanfare would be a hundred kilobytes of the page. A handful
+of oscillators costs nothing and can be retuned in a diff you can read. A
+browser will not let a page make noise before it has been touched, so the audio
+context is built on the first gesture of the session — signing in is one.
+
+The bell in the header mutes the sound and remembers it in `localStorage`, not
+in the synced store: a mute is a property of the room you are sitting in, not of
+the account. **Muted means silent, not blind** — the cards still appear, because
+they are the record of what happened. Confetti is skipped entirely under
+`prefers-reduced-motion`.
 
 ## The Sales view
 
@@ -232,7 +332,32 @@ changed.
 
 Entry lives under **Edit data → Sales**: a purchase form, a paste box that
 reports the lines it could not read rather than dropping them, and the full
-ledger with edit and delete.
+ledger with edit and delete. The paste box reads a **header row** when one is
+there and falls back to the documented column order when it is not, which is
+what lets the ledger's own **Export CSV** come back in unchanged: that file
+carries `qty` and `refunded`, and read positionally its columns land one apart —
+a count taken for an install date, a refund taken for a note.
+
+Two things had to follow the money out of the daily columns, and both were
+silent failures rather than loud ones, since a `sales` column still parses and
+still syncs:
+
+- **The demo data.** It wrote `sales` / `revenue` back onto the days, so
+  "Load demo data" produced a book whose Overview, Costs, forecast and Sales
+  view all read zero. It builds a real ledger now — a plan mix rather than one
+  price, install dates so days-to-purchase has something to draw, a few
+  cancellations so MRR is not a straight line, and the odd refund.
+- **The event before/after table.** Its purchase row came from subscribe pings,
+  which fire a launch or two after the transaction, so a shift in the LAG read
+  as a shift in buying — the same trap the weekday chart's five bars exist to
+  avoid, in a table that is read to judge a release or an ad spot.
+  `A.beforeAfter` now takes the ledger, sliced to the platform the ping index is
+  sliced to, and reports **Purchases** and **Revenue** from it with the ping
+  kept beside them under its own name.
+
+The store CSV out (**Backup → Export CSV**) is store days only and says so: a
+purchase is not a property of a day any more. The ledger has its own CSV, and
+the JSON backup carries everything.
 
 ## The forecast, and why it has two prices
 
@@ -265,16 +390,23 @@ every other view already answered better for its own subject.
 
 Two collections, synced alongside entries and events:
 
-- **`ads`** — a campaign: a name, a channel from a fixed list, the store it
-  targets and the days it ran. Its start and end appear as flags on every
-  calendar chart in the dashboard, derived the same way releases are, so nobody
-  hand-enters a second copy that can drift.
-- **`costs`** — a dated amount with a category, optionally attributed to a
-  campaign. Ad spend is nothing special: it is a cost row per campaign per day
-  with category `ADS`, which is why the daily grid and the spread-a-total box
-  can both write it and either can correct the other.
+- **`ads`** — an AD SPOT: one thing bought once, carrying its own price. A name,
+  the platform it ran on (Facebook, Apple Search Ads, Reddit… from a fixed
+  list), what it cost, the day it starts, an end date that may not exist yet,
+  and the impressions / clicks / installs the platform reported back. Its start
+  and end appear as flags on every calendar chart in the dashboard, derived the
+  same way releases are, so nobody hand-enters a second copy that can drift.
+- **`costs`** — everything else the app costs to run: a dated amount with a
+  category, optionally recurring. Advertising is **not** offered as a category
+  here (`CS.ENTRY_CATEGORY_KEYS` is what the form reads), because the same money
+  would then be enterable twice in two shapes that no longer add up.
 
-The arithmetic is pure and lives in `costs.js` (`tests/costs.test.mjs`). Four
+The two are put together in exactly one place, `CS.allCosts(ads, costs)`, which
+projects each spot into a derived cost row on its start date. Every rollup —
+`daily`, `spend`, `summary`, `breakeven` — reads that, so nothing downstream
+knows there are two collections.
+
+The arithmetic is pure and lives in `costs.js` (`tests/costs.test.mjs`). Five
 rules run through it, and they are the reason to read that file before changing
 a number here.
 
@@ -283,6 +415,17 @@ occurrence dates, not smeared across the days between them: a yearly developer
 fee is a real 99 on one day. Monthly recurrences clamp short months from the
 original day, so a bill first paid on the 31st recurs on Feb 28 and then on
 Mar 31 rather than sliding to the 28th forever.
+
+**An ad spot is bought, not run daily.** This view used to model advertising as
+a campaign plus a row of daily spend — how a network's dashboard reports it, and
+not how the money is actually spent here. A spot is one line item with one
+price, so the price lands whole on the day it starts and nothing is spread
+across the days it runs. `end` describes the booking, not the money, which is
+why a spot appears in the range its cost landed in rather than every range it
+overlapped. A journal opened on the old shape is migrated once (`migrateAdSpots`
+in `app.js`, guarded by `settings.adSpotsMigrated`): each campaign collapses to
+one spot at the sum of its daily rows, an ADS row that belonged to no campaign
+becomes a spot of its own, and the totals before and after are identical.
 
 **Revenue is netted before profit is claimed.** Entries record the
 customer-facing price; the store keeps 15% or 30% of it. `settings.storeCutPct`
@@ -294,20 +437,24 @@ than silently applied.
 spend ÷ every store download, which charges organic installs to marketing and is
 therefore the honest ceiling. Reported is spend ÷ the installs the ad network
 claims, and the network is marking its own homework. The tiles and the
-cost-per-acquisition chart are blended and say so; the campaign and channel
+cost-per-acquisition chart are blended and say so; the ad-spot and platform
 tables are reported and say so.
 
-**Deleting a campaign keeps its money.** The spend happened either way, so its
-rows are detached and reported as unattributed advertising. Totals do not move.
+**Deleting an ad spot deletes its money.** The spot IS the line item now, so
+there is nothing left behind to detach — and the delete confirmation says the
+amount out loud rather than letting it go quietly.
 
 **Reading and entering are separate tabs.** The Costs tab is the analysis —
-tiles, charts, and the by-category / by-channel / by-campaign tables, all scoped
+tiles, charts, and the by-category / by-platform / by-ad-spot tables, all scoped
 to the filter bar and all read-only. Everything you type lives under **Edit
-data**, which is broken into four sections: Store data, Spending (campaigns, the
-daily ad-spend grid, the spread box and the cost ledger), Settings and Backup &
-account. The management tables there are all-time rather than range-scoped,
-because that view has no filter bar and "what has this campaign cost" is a
-lifetime question when you are deciding whether to keep running it.
+data**, which is broken into six sections: Store data, Sales, Spending (ad spots
+and the cost ledger), What happened (the events editor, moved off the Timeline
+for the same read/enter split), Settings and Backup & account. Each section
+heading is full size and every card under it is a `<details>` accordion, because
+that page is navigated rather than read top to bottom; the disclosure state
+lives in the DOM and is deliberately not synced. The ad-spot list there is
+unbounded in time rather than range-scoped — a spot bought today to start next
+month must still appear in the list you manage it from.
 
 The platform filter is hidden on the Costs view. A hosting bill is not iOS or
 Android, and no ad network splits spend the way the stores split downloads.
@@ -421,9 +568,11 @@ covers the platform filter no longer emptying the App usage view.
 
 `tests/costs.test.mjs` pins the money arithmetic against a hand-worked fixture,
 and `tests/master-costs.test.mjs` drives the Costs view itself in the built
-page — adding a campaign, filling the spend grid, spreading a total, deleting
-the campaign and watching its money survive, and the header's refresh doing a
-round trip rather than a reload. Its fetch stub is a small in-memory server that
+page — buying an ad spot, watching its price land whole on its start day,
+deleting it and watching its money go with it, and the header's refresh doing a
+round trip rather than a reload. It also boots a third page against a LEGACY
+server copy (campaigns plus daily ADS rows) and checks the migration comes out
+with the same total it went in with. Its fetch stub is a small in-memory server that
 applies the pushes it receives, because against a stub that always answers
 "nothing stored" a passing refresh test would only prove the data had been
 thrown away.

@@ -433,7 +433,7 @@ window.Sales = (function () {
   /**
    * Purchases grouped by the buyer's INSTALL month rather than their purchase
    * month — "which intake actually paid", which is a different question from
-   * "when did the money land" and the one that says whether a campaign brought
+   * "when did the money land" and the one that says whether an ad spot brought
    * in buyers or just installs.
    *
    * Each row is left open-ended on purpose: a cohort three weeks old has not

@@ -1,19 +1,27 @@
 /* costs.js — what the app costs to run, and what that makes each install worth.
  *
  * Pure arithmetic over two collections the dashboard stores alongside its store
- * entries: `ads` (a campaign: a name, a channel, the days it ran) and `costs`
- * (a dated amount, optionally attributed to an ad). No DOM, no globals beyond
+ * entries: `ads` (an AD SPOT — one thing bought once, carrying its own price)
+ * and `costs` (everything else the app costs to run). No DOM, no globals beyond
  * the one it hangs off — app.js owns the rendering, tests/costs.test.mjs pins
  * the numbers.
  *
- * Two rules run through the whole file.
+ * Three rules run through the whole file.
  *
  * ONE. A cost lands on the day it is charged. A recurring row is expanded into
  * its occurrence dates rather than smeared across the days between them: an
  * annual developer fee is a real 99 on one day, and pretending it is 0.27 a day
  * would make every daily chart lie in a small way to make itself prettier.
  *
- * TWO. Reported and blended acquisition costs are never mixed. `spend ÷ store
+ * TWO. An ad spot is bought, not run daily. This dashboard used to model
+ * advertising as a campaign plus a row of daily spend, which is how a network's
+ * dashboard reports it and is not how the money is actually spent here: a spot
+ * is one line item with one price, a start, and an end date that may not exist
+ * yet. So the price lands whole on the day the spot starts — the same rule as
+ * ONE, applied to the same kind of object — and NOTHING is spread across the
+ * days it runs. `end` describes the booking, not the money.
+ *
+ * THREE. Reported and blended acquisition costs are never mixed. `spend ÷ store
  * downloads` is blended: it charges every install to marketing, including the
  * ones that arrived from search. `spend ÷ the installs the ad network claims`
  * is reported, and the network is marking its own homework. Both are useful,
@@ -24,9 +32,12 @@ window.Costs = (function () {
   'use strict';
 
   /* Categories are fixed rather than free text: they are a colour on a stacked
-     chart and a row in a table, and a typo would silently become a new one. */
+     chart and a row in a table, and a typo would silently become a new one.
+     ADS is `derived`: advertising money is an ad spot, entered as a spot, and
+     offering it a second time in the cost form would let the same spend be
+     entered twice in two shapes that no longer add up. */
   var CATEGORIES = {
-    ADS: { label: 'Advertising', marketing: true, color: '#d95926' },
+    ADS: { label: 'Advertising', marketing: true, derived: true, color: '#d95926' },
     CREATIVE: { label: 'Creative & content', marketing: true, color: '#c98500' },
     INFRA: { label: 'Infrastructure & hosting', color: '#3987e5' },
     TOOLS: { label: 'Tools & subscriptions', color: '#9085e9' },
@@ -36,12 +47,15 @@ window.Costs = (function () {
     OTHER: { label: 'Other', color: '#898781' }
   };
   var CATEGORY_KEYS = Object.keys(CATEGORIES);
+  /* What the cost form may offer. See the note on ADS above. */
+  var ENTRY_CATEGORY_KEYS = CATEGORY_KEYS.filter(function (k) { return !CATEGORIES[k].derived; });
 
-  /* Where the money went, for ads. Free text would fragment the per-channel
+  /* Who the spot was bought from. Free text would fragment the per-platform
      roll-up the first time "meta" was typed instead of "Meta". */
-  var CHANNELS = [
-    'Apple Search Ads', 'Google Ads', 'Meta', 'Reddit', 'TikTok', 'X',
-    'YouTube', 'Newsletter', 'Influencer', 'Podcast', 'Other'
+  var PLATFORMS = [
+    'Apple Search Ads', 'Facebook', 'Instagram', 'Google Ads', 'Reddit',
+    'TikTok', 'X', 'YouTube', 'Newsletter', 'Podcast', 'Influencer',
+    'Website / blog', 'Other'
   ];
 
   var RECURRENCES = {
@@ -177,71 +191,93 @@ window.Costs = (function () {
     return sum;
   }
 
-  /* ------------------------------------------------------------ per ad */
+  /* --------------------------------------------------------- ad spots */
 
   /**
-   * One row per ad: what it cost over the window, and whatever the network
-   * reported alongside. `installs` here is the ad network's claim, never a
-   * store download — see rule TWO at the top of this file.
+   * An ad spot, as a cost row.
    *
-   * ADS only, not everything marked marketing. Creative work is marketing
-   * spend and belongs in cost-per-install, but it bought no clicks and ran on
-   * no channel, so listing it in a campaign table as "unattributed
-   * advertising" would invent a campaign that never existed. The unattributed
-   * row here is real ad money whose campaign was deleted.
+   * Every rollup in this file reads cost rows, and an ad spot is money spent on
+   * a day like any other — so rather than teaching `daily`, `spend` and
+   * `breakeven` about a second collection, a spot is projected into the shape
+   * they already understand. The row is DERIVED and carries the spot's id: it
+   * is never stored, never editable as a cost, and cannot drift from the spot
+   * it came from.
+   *
+   * The whole price lands on `start`. See rule TWO at the top of this file.
    */
-  function perAd(ads, costs, from, to) {
-    var rows = (ads || []).map(function (ad) {
+  function adCosts(ads) {
+    var out = [];
+    (ads || []).forEach(function (ad) {
+      if (!ad || !isDate(ad.start)) return;
+      var amount = num(ad.amount);
+      if (!amount) return;
+      out.push({
+        id: 'adcost-' + ad.id, adId: ad.id, date: ad.start, amount: amount,
+        category: 'ADS', label: ad.name, derived: true
+      });
+    });
+    return out;
+  }
+
+  /** Everything the app has cost: the entered costs plus the ad spots. */
+  function allCosts(ads, costs) {
+    return adCosts(ads).concat(costs || []);
+  }
+
+  /** Was this spot paid for inside the window? The charge is one day. */
+  function adInWindow(ad, from, to) {
+    return !!(ad && isDate(ad.start) && ad.start >= from && ad.start <= to);
+  }
+
+  /**
+   * One row per ad spot bought in the window, with whatever the platform
+   * reported alongside. `installs` is the platform's claim, never a store
+   * download — see rule THREE at the top of this file.
+   *
+   * Spots only, not everything marked marketing. Creative work is marketing
+   * spend and belongs in cost-per-install, but it bought no clicks and ran on
+   * no platform, so listing it here would invent a spot that was never bought.
+   */
+  function perAd(ads, from, to) {
+    var rows = (ads || []).filter(function (ad) {
+      return adInWindow(ad, from, to);
+    }).map(function (ad) {
       return {
-        ad: ad, id: ad.id, name: ad.name, channel: ad.channel,
-        platform: ad.platform || 'all',
-        spend: 0, impressions: 0, clicks: 0, installs: 0,
-        days: 0, cpi: null, cpc: null, cpm: null, ctr: null, share: null
+        ad: ad, id: ad.id, name: ad.name, platform: ad.platform || 'Other',
+        start: ad.start, end: ad.end || null,
+        spend: num(ad.amount),
+        impressions: num(ad.impressions), clicks: num(ad.clicks), installs: num(ad.installs),
+        cpi: null, cpc: null, cpm: null, ctr: null, share: null
       };
     });
-    var index = {};
-    rows.forEach(function (r) { index[r.id] = r; });
-    var unattributed = { id: null, name: 'Unattributed advertising', spend: 0, impressions: 0, clicks: 0, installs: 0, days: 0 };
 
-    (costs || []).forEach(function (c) {
-      if (!c || c.category !== 'ADS') return;
-      var hits = occurrences(c, from, to).length;
-      if (!hits) return;
-      var row = c.adId && index[c.adId] ? index[c.adId] : unattributed;
-      row.spend += num(c.amount) * hits;
-      row.impressions += num(c.impressions) * hits;
-      row.clicks += num(c.clicks) * hits;
-      row.installs += num(c.installs) * hits;
-      row.days += hits;
-    });
-
-    var all = rows.concat(unattributed.spend || unattributed.days ? [unattributed] : []);
-    var total = all.reduce(function (a, r) { return a + r.spend; }, 0);
-    all.forEach(function (r) {
+    var total = rows.reduce(function (a, r) { return a + r.spend; }, 0);
+    rows.forEach(function (r) {
       r.cpi = r.installs ? r.spend / r.installs : null;
       r.cpc = r.clicks ? r.spend / r.clicks : null;
       r.cpm = r.impressions ? (r.spend / r.impressions) * 1000 : null;
       r.ctr = r.impressions ? (r.clicks / r.impressions) * 100 : null;
       r.share = total ? (r.spend / total) * 100 : null;
     });
-    all.sort(function (a, b) { return b.spend - a.spend; });
-    return { rows: all, total: total };
+    rows.sort(function (a, b) { return b.spend - a.spend; });
+    return { rows: rows, total: total };
   }
 
-  /** Spend rolled up by channel rather than by campaign. */
-  function perChannel(ads, costs, from, to) {
-    var byAd = perAd(ads, costs, from, to);
+  /** Spend rolled up by platform rather than by spot. */
+  function perPlatform(ads, from, to) {
     var map = {};
-    byAd.rows.forEach(function (r) {
-      var key = r.channel || 'Unattributed';
-      var row = map[key] || (map[key] = { channel: key, spend: 0, installs: 0, clicks: 0, impressions: 0, ads: 0 });
+    perAd(ads, from, to).rows.forEach(function (r) {
+      var key = r.platform || 'Other';
+      var row = map[key] || (map[key] = { platform: key, spend: 0, installs: 0, clicks: 0, impressions: 0, ads: 0 });
       row.spend += r.spend; row.installs += r.installs;
       row.clicks += r.clicks; row.impressions += r.impressions;
-      if (r.id) row.ads += 1;
+      row.ads += 1;
     });
     return Object.keys(map).map(function (k) {
       var r = map[k];
       r.cpi = r.installs ? r.spend / r.installs : null;
+      r.cpc = r.clicks ? r.spend / r.clicks : null;
+      r.ctr = r.impressions ? (r.clicks / r.impressions) * 100 : null;
       return r;
     }).sort(function (a, b) { return b.spend - a.spend; });
   }
@@ -290,7 +326,7 @@ window.Costs = (function () {
       commission: gross - net,
       profit: net - d.total,
       /* Blended: every install in the window is charged to marketing, organic
-         ones included. Understates what a campaign really costs. */
+         ones included. Understates what advertising really costs. */
       costPerInstall: downloads ? d.marketing / downloads : null,
       costPerPaid: sales ? d.marketing / sales : null,
       /* Fully loaded: the whole business divided by the paying customers it
@@ -325,8 +361,9 @@ window.Costs = (function () {
   }
 
   /**
-   * The days an ad was live, for annotating a chart. An ad with no end date is
-   * still running, so only its start is flagged.
+   * The days a spot was live, for annotating a chart. A spot with no end date
+   * has not ended yet, so only its start is flagged — a booking that is still
+   * running has nothing to say about the day it stops.
    */
   function adMarks(ads) {
     var out = [];
@@ -340,18 +377,22 @@ window.Costs = (function () {
     return out.sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
   }
 
-  /** Is the ad running on `day`? Drives the status pill, nothing numeric. */
+  /** Is the spot live on `day`? Drives the status pill, nothing numeric. */
   function adStatus(ad, day) {
     if (!ad || !isDate(ad.start)) return 'draft';
     if (ad.start > day) return 'scheduled';
     if (isDate(ad.end) && ad.end < day) return 'ended';
-    return 'running';
+    /* No end date is not the same claim as an end date in the future: one is a
+       booking that has not been given an end yet, the other is one that has.
+       Both are live, and the table says which. */
+    return isDate(ad.end) ? 'running' : 'ongoing';
   }
 
   return {
     CATEGORIES: CATEGORIES,
     CATEGORY_KEYS: CATEGORY_KEYS,
-    CHANNELS: CHANNELS,
+    ENTRY_CATEGORY_KEYS: ENTRY_CATEGORY_KEYS,
+    PLATFORMS: PLATFORMS,
     RECURRENCES: RECURRENCES,
     addDays: addDays,
     addMonthsFrom: addMonthsFrom,
@@ -360,8 +401,11 @@ window.Costs = (function () {
     isMarketing: isMarketing,
     daily: daily,
     spend: spend,
+    adCosts: adCosts,
+    allCosts: allCosts,
+    adInWindow: adInWindow,
     perAd: perAd,
-    perChannel: perChannel,
+    perPlatform: perPlatform,
     netRevenue: netRevenue,
     summary: summary,
     breakeven: breakeven,

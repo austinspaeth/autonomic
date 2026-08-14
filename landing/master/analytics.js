@@ -226,6 +226,22 @@ window.Analytics = (function () {
   /** One day's platform split, `{ I: n, A: n, U: n }`, ALWAYS unfiltered. */
   function platformsOn(ix, day) { return (ix.open[day] || EMPTY).platforms || {}; }
 
+  /** The same split for SUBSCRIBE pings: a purchase carries the buyer's store
+   *  in the very same cohort key an open ping does, so "which store paid" needs
+   *  no second source. Also ALWAYS unfiltered, for the same reason. */
+  function subPlatformsOn(ix, day) { return (ix.sub[day] || EMPTY).platforms || {}; }
+
+  /** Pooled platform split over a set of days, `{ I: n, A: n, U: n }`. */
+  function platformsOver(ix, days, fn) {
+    var out = {};
+    (days || []).forEach(function (d) {
+      var p = fn(ix, d);
+      Object.keys(p).forEach(function (k) { out[k] = (out[k] || 0) + p[k]; });
+    });
+    return out;
+  }
+  function purchasePlatformsOver(ix, days) { return platformsOver(ix, days, subPlatformsOn); }
+
   /** How much of a filtered day's count carries no store. 0 when unfiltered. */
   function unattributedOn(ix, day) { return (ix.open[day] || EMPTY).unattributed || 0; }
 
@@ -620,8 +636,8 @@ window.Analytics = (function () {
     },
     MARKETING: {
       label: 'Marketing', color: '#d95926',
-      types: ['Meta campaign started', 'Meta campaign stopped', 'Budget change', 'Apple Search Ads',
-        'Reddit post', 'Newsletter', 'Influencer mention', 'Other campaign']
+      types: ['Ad spot started', 'Ad spot stopped', 'Budget change', 'Apple Search Ads',
+        'Reddit post', 'Newsletter', 'Influencer mention', 'Other marketing']
     },
     STORE: {
       label: 'App Store', color: '#c98500',
@@ -655,8 +671,16 @@ window.Analytics = (function () {
    * Retention is compared over cohorts BORN in each window that are mature
    * enough for the milestone; if the "after" window is too recent for D7, the
    * comparison reports unavailable rather than a misleading zero.
+   *
+   * `salesByDay` is the purchase ledger already sliced to the platform `ix` is
+   * sliced to — `{ 'YYYY-MM-DD': { sales, revenue } }`, which is what
+   * `Sales.dailyTotals()` returns. It is what money and purchase counts are read
+   * from; the store's transaction is the thing to judge a release or an ad spot
+   * by, and the subscribe ping (kept as its own row) fires a launch or two later,
+   * so reading only the ping puts a shift in the LAG on the event's account.
+   * Omit it and those rows are simply absent rather than zero.
    */
-  function beforeAfter(ix, entries, event, days) {
+  function beforeAfter(ix, entries, event, days, salesByDay) {
     var n = days || 14;
     var before = { from: addDays(event.date, -n), to: addDays(event.date, -1) };
     var after = { from: addDays(event.date, 1), to: addDays(event.date, n) };
@@ -691,6 +715,18 @@ window.Analytics = (function () {
       daysIn(win).forEach(function (d) { sum += purchasesOn(ix, d); });
       return sum;
     }
+    /* The ledger runs on its own calendar, not the ping index's: a purchase can
+       predate the first ping this dashboard ever saw, so these windows are NOT
+       clipped to `ix.first` the way the ping rows above are. */
+    function ledgerIn(win, field) {
+      if (!salesByDay) return null;
+      var sum = 0;
+      range(win.from, win.to).forEach(function (d) {
+        var rec = salesByDay[d];
+        if (rec) sum += Number(rec[field]) || 0;
+      });
+      return sum;
+    }
 
     var bStore = storeIn(before), aStore = storeIn(after);
     var bDays = Math.max(1, range(before.from, before.to).length);
@@ -702,9 +738,18 @@ window.Analytics = (function () {
       rate('Impression → page', bStore.impToPage, aStore.impToPage, 'pct'),
       rate('Page → download', bStore.pageToDownload, aStore.pageToDownload, 'pct'),
       rate('Active / day', avgActive(before), avgActive(after), 'count'),
-      rate('Returning / day', avgReturning(before), avgReturning(after), 'count'),
-      rate('Purchases', purchasesIn(before), purchasesIn(after), 'count')
+      rate('Returning / day', avgReturning(before), avgReturning(after), 'count')
     ];
+
+    /* Purchases and money come from the ledger; the ping is kept beside them
+       under its own name rather than being called "purchases" as well. Both
+       windows are the same number of days, so totals are comparable without
+       being averaged. */
+    if (salesByDay) {
+      metrics.push(rate('Purchases', ledgerIn(before, 'sales'), ledgerIn(after, 'sales'), 'count'));
+      metrics.push(rate('Revenue', ledgerIn(before, 'revenue'), ledgerIn(after, 'revenue'), 'money'));
+    }
+    metrics.push(rate('Subscribe pings', purchasesIn(before), purchasesIn(after), 'count'));
 
     [1, 7, 14].forEach(function (d) {
       var b = retentionAt(ix, cohortsIn(before), d);
@@ -745,6 +790,7 @@ window.Analytics = (function () {
     // index + accessors
     index: index, platformName: function (letter) { return PLATFORM_NAME[letter] || 'unknown'; },
     activeOn: activeOn, newOn: newOn, returningOn: returningOn, platformsOn: platformsOn,
+    subPlatformsOn: subPlatformsOn, purchasePlatformsOver: purchasePlatformsOver,
     unattributedOn: unattributedOn,
     countOn: countOn, purchasesOn: purchasesOn, cohortSize: cohortSize,
     maturity: maturity, isMature: isMature,

@@ -84,7 +84,14 @@ window.Sync = (function () {
      shapes disagree, every diff reports every row as changed forever. */
   var COST_CATEGORIES = ['ADS', 'CREATIVE', 'INFRA', 'TOOLS', 'FEES', 'SERVICES', 'HARDWARE', 'OTHER'];
   var RECURRENCES = ['weekly', 'monthly', 'quarterly', 'yearly'];
-  var AD_PLATFORMS = ['all', 'ios', 'android'];
+
+  /* An AD SPOT carries its own money, so `amount` and the reported counts are
+     part of what is pushed — a normalize that dropped them would sync a spot
+     whose price never left the browser, and the next device would read the
+     whole thing as free. `platform` is now the network it ran on (free text
+     from a fixed list) rather than the old iOS/Android targeting, and `channel`
+     is still carried so an unmigrated campaign survives a round trip. */
+  var AD_NUMBERS = ['amount', 'impressions', 'clicks', 'installs'];
 
   function normalizeAd(raw) {
     if (!raw || typeof raw !== 'object') return null;
@@ -92,14 +99,17 @@ window.Sync = (function () {
     var name = String(raw.name || '').slice(0, 120);
     if (!id || !name) return null;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(String(raw.start || ''))) return null;
-    var out = {
-      id: id, name: name, start: raw.start,
-      platform: AD_PLATFORMS.indexOf(raw.platform) >= 0 ? raw.platform : 'all'
-    };
+    var out = { id: id, name: name, start: raw.start };
+    if (raw.platform) out.platform = String(raw.platform).slice(0, 80);
     if (raw.channel) out.channel = String(raw.channel).slice(0, 80);
     if (/^\d{4}-\d{2}-\d{2}$/.test(String(raw.end || ''))) out.end = raw.end;
     if (raw.url) out.url = String(raw.url).slice(0, 500);
     if (raw.note) out.note = String(raw.note).slice(0, 2000);
+    AD_NUMBERS.forEach(function (k) {
+      var n = Number(raw[k]);
+      if (raw[k] === undefined || raw[k] === null || raw[k] === '' || !isFinite(n)) return;
+      out[k] = n;
+    });
     return out;
   }
 

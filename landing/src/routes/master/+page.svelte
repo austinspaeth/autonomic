@@ -25,13 +25,14 @@
   import sales from '../../../master/sales.js?raw';
   import costs from '../../../master/costs.js?raw';
   import releases from '../../../master/releases.js?raw';
+  import alerts from '../../../master/alerts.js?raw';
   import app from '../../../master/app.js?raw';
   import boot from '../../../master/boot.js?raw';
 
   /* Load order matters — see boot.js. Each file is an IIFE hanging one global
      off `window`, so concatenating them is the same as the <script src>
      tags the standalone page used. */
-  const dashboard = [config, auth, api, sync, charts, analytics, sales, costs, releases, app, boot].join('\n');
+  const dashboard = [config, auth, api, sync, charts, analytics, sales, costs, releases, alerts, app, boot].join('\n');
 
   /* Tags are assembled rather than written out, because a literal <script> or
      <style> in this file — even inside a string or a comment — is what Svelte's

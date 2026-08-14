@@ -186,7 +186,11 @@
 
   /* daily[platform][date] = summed record; built once per render pass */
   var cache = null;
-  function invalidate() { cache = null; }
+  /* Bumped on every write, so a memoised derivation can key on "has anything
+     changed" without knowing WHAT changed. An edit that leaves a list the same
+     length — correcting an ad spot's price, say — moves this. */
+  var revision = 0;
+  function invalidate() { cache = null; revision += 1; }
 
   function base() {
     if (cache) return cache;
@@ -213,7 +217,7 @@
        Trial & conversion, the weekday chart) reads one source of truth without
        knowing the shape underneath it changed. `mrr` and the plan counts are
        new and only the Sales view asks for them. */
-    var salesByDay = Sales.dailyTotals(db.sales);
+    var salesByDay = Sales.dailyTotals(salesList());
     ['ios', 'android', 'all'].forEach(function (p) {
       Object.keys(salesByDay[p]).forEach(function (d) {
         var s = salesByDay[p][d];
@@ -451,6 +455,63 @@
       split +
       (o.spark ? '<div style="margin-top:8px">' + o.spark + '</div>' : '') +
       '</div>';
+  }
+
+  /* ---------------------------------------------------------- tile layout
+   *
+   * How many tiles go on a row, decided here rather than by the stylesheet.
+   *
+   * "As many as fit" is the wrong answer whenever the count does not divide by
+   * it: six columns and eight tiles leaves the last two sitting beside a
+   * four-column void, with a whole block of tiles below it. `.cards` is a flex
+   * row (see styles.css) so the trailing row always GROWS into that space, but
+   * left alone that turns two tiles into two half-page slabs.
+   *
+   * So the column count is chosen to make the last row as full as it can be:
+   * eight tiles go 4 + 4 rather than 6 + 2, fourteen go 5 + 5 + 4 rather than
+   * 6 + 6 + 2. Only the top two or three counts are considered, so a row never
+   * thins out just to divide evenly, and a set that fits on one row keeps it.
+   *
+   * The minimum tile width lives in the stylesheet as `--tile-min`, so the
+   * measurement and the CSS fallback cannot drift apart. */
+  function tileColumns(n, maxCols) {
+    if (n <= maxCols) return n;
+    var best = maxCols, bestFill = -1;
+    for (var c = Math.max(1, maxCols - 2); c <= maxCols; c++) {
+      var rest = n % c, fill = (rest === 0 ? c : rest) / c;
+      if (fill >= bestFill) { bestFill = fill; best = c; }   // ties go to the wider row
+    }
+    return best;
+  }
+
+  function layoutTiles() {
+    document.querySelectorAll('.cards').forEach(function (host) {
+      var items = [];
+      [].slice.call(host.children).forEach(function (el) {
+        if (el.classList.contains('tile-group')) items = items.concat([].slice.call(el.children));
+        else items.push(el);
+      });
+      var w = host.clientWidth;
+      if (!items.length || !w) return;            // a hidden view has no width to divide
+      var cs = getComputedStyle(host);
+      var gap = parseFloat(cs.columnGap) || 14;
+      var min = parseFloat(cs.getPropertyValue('--tile-min')) || 215;
+      var maxCols = Math.max(1, Math.floor((w + gap) / (min + gap)));
+      var cols = tileColumns(items.length, maxCols);
+      var basis = 'calc((100% - ' + ((cols - 1) * gap) + 'px) / ' + cols + ')';
+      items.forEach(function (el) { el.style.flexBasis = basis; });
+    });
+  }
+
+  /* Tiles are written straight into `innerHTML` from a dozen render functions;
+     watching for that is one hook rather than a dozen call sites. renderAll
+     calls it too, for the case a view is shown without its content changing. */
+  function watchTileRows() {
+    if (!window.MutationObserver) return;
+    var mo = new MutationObserver(function () { layoutTiles(); });
+    document.querySelectorAll('.cards').forEach(function (host) {
+      mo.observe(host, { childList: true, subtree: true });
+    });
   }
 
   /* A delta is only honest when the comparison window is fully covered by data —
@@ -1033,6 +1094,13 @@
       pings.report = res || { open: [], sub: [] };
       pings.at = new Date();
       pings.status = 'ready';
+      /* Every path that reads the counter goes through here, so this is the one
+         place the live alerts have to hang off: the first report of a session
+         seeds their baseline silently, and every one after it is compared with
+         the last. A failure to make a noise must never cost the repaint. */
+      if (window.Alerts) {
+        try { window.Alerts.sync(pings.report); } catch (e) { /* never block the view */ }
+      }
       repaintPingViews();
     }).catch(function (err) {
       pings.status = 'error';
@@ -1070,11 +1138,11 @@
   }
 
   /**
-   * Campaigns, as annotations. Same argument as releases: the Costs view
-   * already knows the day each one started and stopped, so a hand-entered
-   * MARKETING event beside it would be a second copy free to drift. They are
-   * derived and therefore not editable from the event form — the campaign
-   * itself is edited on the Costs tab.
+   * Ad spots, as annotations. Same argument as releases: Edit data already
+   * knows the day each spot started and stopped, so a hand-entered MARKETING
+   * event beside it would be a second copy free to drift. They are derived and
+   * therefore not editable from the event form — the spot itself is edited in
+   * the Spending section.
    */
   function adEvents() {
     return CS.adMarks(ads()).map(function (m) {
@@ -1082,7 +1150,7 @@
         id: m.id,
         date: m.date,
         category: 'MARKETING',
-        type: m.ad.channel || 'Campaign',
+        type: m.ad.platform || 'Ad spot',
         title: m.ad.name + (m.edge === 'end' ? ' ended' : ' started'),
         note: m.ad.note || '',
         derived: true
@@ -1295,6 +1363,7 @@
 
     var subsRange = 0;
     days.forEach(function (d) { subsRange += A.purchasesOn(ix, d); });
+    var rangeBuys = A.purchasePlatformsOver(ix, days);
     var conv7 = A.conversion(ix, ix.cohorts, 7);
     var conv30 = A.conversion(ix, ix.cohorts, 30);
 
@@ -1305,6 +1374,11 @@
         meta: fmtInt(Math.round(avg)) + '/day across this range',
         split: [{ name: 'returning', color: PC.back, value: fmtInt(returningToday) },
                 { name: 'first run', color: PC.fresh, value: fmtInt(A.newOn(ix, ix.last)) }]
+      }),
+      tile({
+        label: 'Purchases on ' + labelDay(ix.last), color: PC.subs, value: fmtInt(A.purchasesOn(ix, ix.last)),
+        meta: 'subscribe pings on the newest day' + storeSplitNote(ix, A.subPlatformsOn(ix, ix.last)),
+        split: storeSplit(A.subPlatformsOn(ix, ix.last))
       }),
       tile({
         label: 'Returning / day', color: PC.back, value: fmtInt(Math.round(avgRet)), delta: dRet,
@@ -1333,7 +1407,8 @@
       }),
       tile({
         label: 'Purchases in range', color: PC.subs, value: fmtInt(subsRange),
-        meta: 'subscribe pings, not store receipts'
+        meta: 'subscribe pings, not store receipts' + storeSplitNote(ix, rangeBuys),
+        split: storeSplit(rangeBuys)
       }),
       tile({
         label: 'Conversion by D7', color: PC.subs, smallValue: true, value: fmtRate(conv7),
@@ -1361,15 +1436,31 @@
    * pings are also counted INTO the filtered view (see rowsToMap), so the line
    * says that too — otherwise the tile and the numbers beside it disagree with
    * no visible reason. */
+  /* The two halves every store split needs, so an open tile and a purchase tile
+     cannot disagree about what "no store" means. `split` is a raw `{I,A,U}` map
+     and is always the UNFILTERED one — see platformsOn / subPlatformsOn. */
+  function storeSplit(split) {
+    var parts = [
+      { name: 'iOS', color: ENTITY.ios, value: fmtInt(split.I || 0) },
+      { name: 'Android', color: ENTITY.android, value: fmtInt(split.A || 0) }
+    ];
+    if (split.U) parts.push({ name: 'no store', color: COLOR.muted, value: fmtInt(split.U) });
+    return parts;
+  }
+  /* Appended to a tile's meta only when there is something to disclose: pings
+     that named no store are in NEITHER half of the split, and with a filter on
+     they are also counted into the filtered number the split sits under. */
+  function storeSplitNote(ix, split) {
+    if (!split.U) return '';
+    return ' · ' + fmtInt(split.U) +
+      (ix.platform === 'all' ? ' pre-marker, store unknown' : ' pre-marker, counted into every platform view');
+  }
+
   function platformTile(ix) {
     var split = A.platformsOn(ix, ix.last);
     var ios = split.I || 0, android = split.A || 0, unknown = split.U || 0;
     var known = ios + android;
-    var parts = [
-      { name: 'iOS', color: ENTITY.ios, value: fmtInt(ios) },
-      { name: 'Android', color: ENTITY.android, value: fmtInt(android) }
-    ];
-    if (unknown) parts.push({ name: 'no store', color: COLOR.muted, value: fmtInt(unknown) });
+    var parts = storeSplit(split);
 
     var meta = 'of everything that pinged that day';
     if (unknown) {
@@ -1833,9 +1924,20 @@
 
   /* ---------------------------------------------------------- 8. events */
 
-  function renderEvents(ix) {
+  /**
+   * The events editor, which lives under Edit data.
+   *
+   * Events are RECORDED here and READ on the Timeline — the same split every
+   * other collection on this dashboard has, and the reason the list moved off
+   * the Timeline: that view is for reading a metric against the flags under it,
+   * and a form to fill in is not a thing you read. The analysis half
+   * (`renderEventAnalysis`) stayed behind, because comparing the fortnights
+   * either side of an event is a reading question.
+   */
+  function renderEventList() {
     var list = events().slice().reverse();
     var host = document.getElementById('pgEventList');
+    if (!host) return;
     host.innerHTML = list.length
       ? '<div class="event-list">' + list.map(function (ev) {
           var cat = A.EVENT_CATEGORIES[ev.category] || {};
@@ -1848,14 +1950,13 @@
             '<button class="btn sm" data-edit="' + esc(ev.id) + '">Edit</button>' +
             '</div>';
         }).join('') + '</div>'
-      : '<div class="empty">No events recorded yet. Add the last release or campaign and it will appear on every chart above.</div>';
+      : '<div class="empty">No events recorded yet. Add a store change, a press mention or anything else that might move the numbers, and it is drawn on every calendar chart in the dashboard.</div>';
 
+    /* A row here opens the editor rather than selecting the event for
+       comparison: the comparison is drawn on the Timeline, and a selection made
+       on a tab that cannot show it would look like nothing happened. */
     host.querySelectorAll('.event-row').forEach(function (row) {
-      row.addEventListener('click', function (e) {
-        if (e.target.dataset.edit) return;
-        pingUI.event = pingUI.event === row.dataset.id ? null : row.dataset.id;
-        renderTimelineView();
-      });
+      row.addEventListener('click', function () { openEventForm(row.dataset.id); });
     });
     host.querySelectorAll('[data-edit]').forEach(function (btn) {
       btn.addEventListener('click', function (e) {
@@ -1863,8 +1964,6 @@
         openEventForm(btn.dataset.edit);
       });
     });
-
-    renderEventAnalysis(ix);
   }
 
   function openEventForm(id) {
@@ -1872,7 +1971,7 @@
     // Releases come from the app's own log; this dashboard does not own them.
     if (ev && ev.derived) { toast('Releases come from the app\'s release log and are not edited here.'); return; }
     pingUI.editing = id || 'new';
-    var host = document.getElementById('pgEventForm');
+    var host = revealCard(document.getElementById('pgEventForm'));
     host.classList.remove('hidden');
 
     var catOptions = Object.keys(A.EVENT_CATEGORIES).map(function (k) {
@@ -1910,7 +2009,9 @@
       document.getElementById('evDelete').addEventListener('click', function () {
         removeEvent(ev.id);
         closeEventForm();
-        renderTimelineView();
+        /* renderAll, not renderTimelineView: the editor lives on Edit data now,
+           and drawing a chart into a hidden view measures it at zero width. */
+        renderAll();
       });
     }
     document.getElementById('evSave').addEventListener('click', function () {
@@ -1930,7 +2031,7 @@
         amount: amount === '' ? undefined : Number(amount)
       });
       closeEventForm();
-      renderTimelineView();
+      renderAll();
     });
     document.getElementById('evTitle').focus();
   }
@@ -1950,17 +2051,25 @@
     var ev = eventById(pingUI.event);
     if (!ev) { host.innerHTML = ''; return; }
 
-    var ba = A.beforeAfter(ix, db.entries, ev, 14);
+    /* The purchase and money rows read the LEDGER, sliced to the same platform
+       the ping index is, so the table cannot compare an iOS release against
+       both stores' money. */
+    var ba = A.beforeAfter(ix, db.entries, ev, 14,
+      Sales.dailyTotals(salesList())[pingPlatform()]);
     var rows = ba.metrics.map(function (m) {
       if (!m.available) {
         return '<tr><td>' + esc(m.label) + '</td><td class="na">–</td><td class="na">–</td>' +
           '<td class="na" colspan="2">not enough mature data on both sides</td></tr>';
       }
-      var fmt = m.kind === 'pct' ? fmtPct : function (v) { return fmtInt(Math.round(v * 10) / 10); };
+      var fmt = m.kind === 'pct' ? fmtPct
+        : m.kind === 'money' ? fmtMoney
+        : function (v) { return fmtInt(Math.round(v * 10) / 10); };
       var cls = m.delta > 0 ? 'up' : m.delta < 0 ? 'down' : 'flat';
       var deltaTxt = m.kind === 'pct'
         ? (m.delta > 0 ? '+' : '') + m.delta.toFixed(1) + ' pts'
-        : (m.delta > 0 ? '+' : '') + fmtInt(Math.round(m.delta * 10) / 10);
+        : m.kind === 'money'
+          ? (m.delta > 0 ? '+' : '') + fmtMoney(m.delta)
+          : (m.delta > 0 ? '+' : '') + fmtInt(Math.round(m.delta * 10) / 10);
       return '<tr><td>' + esc(m.label) + '</td>' +
         '<td>' + fmt(m.before) + '</td><td>' + fmt(m.after) + '</td>' +
         '<td class="delta ' + cls + '">' + deltaTxt + '</td>' +
@@ -2051,7 +2160,7 @@
     /* Store sales, not subscribe pings. The ping fires when the app next
        notices an entitlement, which can be a launch or two after the purchase;
        the store's number is the transaction itself, and it is the one to read
-       against a campaign or a release. The ping-derived view lives on App usage,
+       against an ad spot or a release. The ping-derived view lives on App usage,
        where it is being used for a different question (purchase age by cohort). */
     purchases: { label: 'Purchases', color: PC.subs, type: 'bar', fmt: fmtInt, store: true,
                  of: function (ix, d) { return dayRec('all', d).sales; } },
@@ -2068,9 +2177,9 @@
      cost list 400 times for one chart. */
   var spendDayCache = { key: '', byDay: {} };
   function primeSpendDays(from, to) {
-    var key = from + '|' + to + '|' + costList().length;
+    var key = from + '|' + to + '|' + revision;
     if (spendDayCache.key === key) return;
-    spendDayCache = { key: key, byDay: CS.daily(costList(), from, to).byDay };
+    spendDayCache = { key: key, byDay: CS.daily(spendList(), from, to).byDay };
   }
   function spendOnDay(d) { return spendDayCache.byDay[d] || 0; }
 
@@ -2109,7 +2218,7 @@
       }
     });
 
-    renderEvents(ix);
+    renderEventAnalysis(ix);
     renderReleases();
   }
 
@@ -2739,6 +2848,37 @@
     });
   }
 
+  /* The positional shape the hint documents. A header line overrides it, which
+     is what lets "Export CSV" below round-trip back through this box: that file
+     carries `qty` and `refunded` too, and read positionally its columns would
+     land one apart — a count read as an install date, a refund read as a note. */
+  var SALE_PASTE_COLS = ['date', 'platform', 'plan', 'price', 'cohort', 'cancelled', 'note'];
+  var SALE_COL_ALIASES = {
+    date: 'date', purchased: 'date', platform: 'platform', store: 'platform',
+    plan: 'plan', term: 'plan', price: 'price', amount: 'price', proceeds: 'price',
+    qty: 'qty', quantity: 'qty', count: 'qty', units: 'qty',
+    cohort: 'cohort', installdate: 'cohort', installed: 'cohort', install: 'cohort',
+    cancelled: 'cancelled', canceled: 'cancelled', churned: 'cancelled',
+    refunded: 'refunded', refund: 'refunded', note: 'note', notes: 'note'
+  };
+
+  function splitSaleLine(line) {
+    var sep = line.indexOf('\t') !== -1 ? '\t' : ',';
+    return line.split(sep).map(function (x) { return x.trim().replace(/^"|"$/g, ''); });
+  }
+
+  /* A header maps names to positions; without one every line reads positionally.
+     Returns null when the first line is data, which is the common case — one
+     purchase pasted out of a spreadsheet row. */
+  function saleHeaderMap(cells) {
+    var map = {}, hits = 0;
+    cells.forEach(function (cell, i) {
+      var key = SALE_COL_ALIASES[cell.toLowerCase().replace(/[^a-z]/g, '')];
+      if (key && map[key] === undefined) { map[key] = i; hits++; }
+    });
+    return (hits >= 2 && map.date !== undefined && !normalizeDate(cells[0] || '')) ? map : null;
+  }
+
   /**
    * Parse the paste box.
    *
@@ -2749,30 +2889,56 @@
    */
   function parseSalePaste(text) {
     var rows = [], bad = [];
-    String(text || '').replace(/\r\n?/g, '\n').split('\n').forEach(function (line, i) {
+    var lines = String(text || '').replace(/\r\n?/g, '\n').split('\n');
+    var header = null;
+    for (var h = 0; h < lines.length; h++) {
+      if (!lines[h].trim()) continue;
+      header = saleHeaderMap(splitSaleLine(lines[h]));
+      break;
+    }
+    var headerSeen = false;
+    lines.forEach(function (line, i) {
       if (!line.trim()) return;
-      var sep = line.indexOf('\t') !== -1 ? '\t' : ',';
-      var c = line.split(sep).map(function (x) { return x.trim().replace(/^"|"$/g, ''); });
-      var date = normalizeDate(c[0] || '');
-      if (!date) { bad.push({ line: i + 1, text: line, why: 'no readable date in the first column' }); return; }
-      var plat = /and|goog|play/i.test(c[1] || '') ? 'android' : 'ios';
-      var planRaw = (c[2] || '').toLowerCase();
+      if (header && !headerSeen) { headerSeen = true; return; }
+      var c = splitSaleLine(line);
+      function col(name) {
+        var at = header ? header[name] : SALE_PASTE_COLS.indexOf(name);
+        return (at === undefined || at < 0) ? '' : (c[at] || '');
+      }
+      var date = normalizeDate(col('date'));
+      if (!date) {
+        bad.push({ line: i + 1, text: line, why: 'no readable date in the ' + (header ? 'date column' : 'first column') });
+        return;
+      }
+      var plat = /and|goog|play/i.test(col('platform')) ? 'android' : 'ios';
+      var planRaw = col('plan').toLowerCase();
       var plan = /ann|year|yr/.test(planRaw) ? 'annual'
         : /life|perm|forever/.test(planRaw) ? 'lifetime'
+        : /unknown|unclass/.test(planRaw) ? 'unknown'
         : /month|mo\b/.test(planRaw) ? 'monthly'
         : planRaw ? 'monthly' : 'unknown';
-      var price = cleanNum(c[3]);
-      if (c[3] !== undefined && c[3] !== '' && !isFinite(price)) {
+      var priceRaw = col('price');
+      var price = cleanNum(priceRaw);
+      if (priceRaw !== '' && !isFinite(price)) {
         bad.push({ line: i + 1, text: line, why: 'the price did not read as a number' });
         return;
       }
-      var cohort = normalizeDate(c[4] || '');
-      var cancelled = normalizeDate(c[5] || '');
+      /* A count comes back only from a file that carries one. Several buyers do
+         not share an install date, so a qty above one drops the cohort rather
+         than attributing one person's install to all of them — the same rule
+         Sales.normalize enforces, applied here so the box cannot offer a row
+         the ledger would then silently strip. */
+      var qty = Math.max(1, Math.round(cleanNum(col('qty')) || 1));
+      var cohort = normalizeDate(col('cohort'));
+      var cancelled = normalizeDate(col('cancelled'));
+      var refunded = /^(y|t|1|yes|true|refunded)$/i.test(col('refunded').trim());
+      var note = col('note');
       rows.push({
-        date: date, platform: plat, plan: plan, price: price, qty: 1,
-        cohort: (cohort && cohort <= date) ? cohort : undefined,
+        date: date, platform: plat, plan: plan, price: price, qty: qty,
+        cohort: (qty === 1 && cohort && cohort <= date) ? cohort : undefined,
         cancelled: (cancelled && cancelled >= date) ? cancelled : undefined,
-        note: c[6] ? String(c[6]).slice(0, 200) : undefined
+        refunded: refunded || undefined,
+        note: note ? String(note).slice(0, 200) : undefined
       });
     });
     return { rows: rows, bad: bad };
@@ -2838,12 +3004,16 @@
      network reports the same way. The view always reads both stores combined,
      and says so in the filter bar.
 
-     Ad spend is stored as ordinary cost rows — one per campaign per day, with
-     category ADS and an `adId`. The grid and the spread box are two ways of
-     writing the same rows, which is why either can correct the other. */
+     Money comes from two collections. `ads` are AD SPOTS — one purchase each,
+     carrying their own price, impressions, clicks and the platform they ran on.
+     `costs` is everything else the app costs to run. Nothing is entered twice
+     and nothing is spread across dates: a spot's price lands whole on the day
+     it starts, and `spendList()` is the one place the two are put together. */
 
   function ads() { return db.ads || (db.ads = []); }
   function costList() { return db.costs || (db.costs = []); }
+  /** Every cost there is, ad spots projected into cost rows. Read-only. */
+  function spendList() { return CS.allCosts(ads(), costList()); }
   function adById(id) {
     return ads().filter(function (a) { return a.id === id; })[0] || null;
   }
@@ -2859,23 +3029,19 @@
     var list = ads(), at = -1;
     list.forEach(function (a, i) { if (a.id === ad.id) at = i; });
     if (at >= 0) list[at] = ad; else list.push(ad);
-    list.sort(function (a, b) { return (a.start || '') < (b.start || '') ? 1 : -1; });
+    sortAds();
+    /* A spot carries its own money, so writing one moves every derived total
+       exactly as writing a cost does — and it can predate every store entry,
+       which is what the derived cache is keyed on. */
     save(); invalidate();
   }
 
-  /* Deleting a campaign keeps its money. The spend happened whether or not the
-     campaign is still on the books, so its rows are detached rather than
-     removed — they carry on as unattributed advertising and the totals do not
-     move. Silently deleting a few thousand of spend to tidy a list would be the
-     worst kind of helpful. */
+  /* Deleting an ad spot deletes its money with it — the spot IS the line item
+     now, so there is nothing left behind to detach. The delete button says the
+     amount out loud for exactly that reason. */
   function removeAd(id) {
-    var detached = 0;
-    costList().forEach(function (c) {
-      if (c.adId === id) { delete c.adId; detached++; }
-    });
     db.ads = ads().filter(function (a) { return a.id !== id; });
     save(); invalidate();
-    return detached;
   }
 
   function putCost(c) {
@@ -2894,15 +3060,86 @@
     save(); invalidate();
   }
 
-  /** The one-off ad row for a campaign on a day, if it exists. */
-  function adCostOn(adId, date) {
-    var found = null;
+  /**
+   * The one-shot move from campaigns to ad spots.
+   *
+   * The old shape was a campaign (a name, a channel, the days it ran) plus one
+   * ADS cost row per day it spent money on. The new one is a single line item
+   * holding its own price. So each campaign collapses into one spot: its rows'
+   * amounts, impressions, clicks and reported installs are summed, and the
+   * charge date becomes the campaign's start.
+   *
+   * Nothing is invented and nothing is thrown away. An ADS row that belonged to
+   * no campaign (its campaign was deleted, back when that detached the money)
+   * becomes a spot of its own on the day it was charged, so the totals before
+   * and after this migration are identical — which is the only property that
+   * matters, since every all-time figure on the dashboard is built from them.
+   *
+   * A recurring ADS row is expanded to its occurrences first: it was N charges
+   * and it stays N charges' worth of money.
+   *
+   * Guarded by `settings.adSpotsMigrated`, and it must stay guarded — a second
+   * run over already-migrated spots would find no ADS rows and quietly zero
+   * nothing, but the guard is what stops a half-finished first run from being
+   * repeated. It runs after the sync adopt, like migrateSales(), or the rewrite
+   * would never leave the browser.
+   */
+  function migrateAdSpots() {
+    if (db.settings.adSpotsMigrated) return 0;
+    var ALL_FROM = '2000-01-01', ALL_TO = '2099-12-31';
+    var byAd = {}, orphans = [];
+    var moved = 0;
+
     costList().forEach(function (c) {
-      if (c.category !== 'ADS' || c.adId !== adId || c.date !== date) return;
-      if (c.recurrence && c.recurrence !== 'none') return;   // the grid never edits a recurring row
-      found = c;
+      if (!c || c.category !== 'ADS') return;
+      var hits = CS.occurrences(c, ALL_FROM, ALL_TO);
+      if (!hits.length) return;
+      var bucket = c.adId ? (byAd[c.adId] || (byAd[c.adId] = { amount: 0, impressions: 0, clicks: 0, installs: 0, first: null })) : null;
+      if (!bucket) {
+        orphans.push({
+          id: newId('ad'),
+          name: c.label || 'Advertising',
+          platform: 'Other',
+          start: hits[0],
+          amount: num(c.amount) * hits.length,
+          impressions: num(c.impressions) * hits.length || undefined,
+          clicks: num(c.clicks) * hits.length || undefined,
+          installs: num(c.installs) * hits.length || undefined,
+          note: c.note
+        });
+        return;
+      }
+      bucket.amount += num(c.amount) * hits.length;
+      bucket.impressions += num(c.impressions) * hits.length;
+      bucket.clicks += num(c.clicks) * hits.length;
+      bucket.installs += num(c.installs) * hits.length;
+      if (!bucket.first || hits[0] < bucket.first) bucket.first = hits[0];
     });
-    return found;
+
+    ads().forEach(function (a) {
+      if (!a || a.amount !== undefined) return;      // already a spot
+      var b = byAd[a.id] || { amount: 0, impressions: 0, clicks: 0, installs: 0, first: null };
+      /* The channel was where it ran; that is what "platform" means now. The
+         old `platform` was iOS/Android targeting, which nothing ever read. */
+      a.platform = a.channel || 'Other';
+      delete a.channel;
+      a.amount = b.amount;
+      if (b.impressions) a.impressions = b.impressions;
+      if (b.clicks) a.clicks = b.clicks;
+      if (b.installs) a.installs = b.installs;
+      moved++;
+    });
+
+    orphans.forEach(function (o) { ads().push(o); });
+    db.costs = costList().filter(function (c) { return !c || c.category !== 'ADS'; });
+    db.settings.adSpotsMigrated = true;
+    sortAds();
+    save(); invalidate();
+    return moved + orphans.length;
+  }
+
+  function sortAds() {
+    ads().sort(function (a, b) { return (a.start || '') < (b.start || '') ? 1 : -1; });
   }
 
   /* ----------------------------------------------------------- buckets */
@@ -2929,7 +3166,7 @@
     grain = grain || state.grain;
     var rows = buildBuckets('all', from, to, grain);
     if (!rows.length) rows = bareBuckets(from, to, grain);
-    var d = CS.daily(costList(), from, to);
+    var d = CS.daily(spendList(), from, to);
     var cut = storeCut();
 
     rows.forEach(function (row) {
@@ -2955,7 +3192,7 @@
   function costSummary(r) {
     var s = summarize('all', r.from, r.to);
     return CS.summary({
-      costs: costList(), from: r.from, to: r.to, storeCutPct: storeCut(),
+      costs: spendList(), from: r.from, to: r.to, storeCutPct: storeCut(),
       store: { revenue: s.revenue, downloads: s.downloads, sales: s.sales }
     });
   }
@@ -3051,13 +3288,11 @@
   }
 
   /* The entry half, which lives under Edit data. Split from renderCosts so the
-     analysis tab never rebuilds a grid the reader is typing into, and the entry
+     analysis tab never rebuilds a list the reader is working in, and the entry
      tab never recomputes four charts nobody is looking at. */
   function renderCostEntry() {
-    renderAdTable('csAdTable', allTimeRange(), true);
+    renderAdTable('csAdTable', EVER, true);
     renderCostList();
-    syncSpreadAds();
-    if (!document.getElementById('csGrid').innerHTML) buildAdGrid();
   }
 
   /* Flags land on the bucket that CONTAINS the event, not on a bucket whose
@@ -3080,7 +3315,7 @@
     var from = b.dates.length ? b.start : asOf();
     var to = asOf();
     var s = summarize('all', from, to);
-    var spend = CS.spend(costList(), from, to);
+    var spend = CS.spend(spendList(), from, to);
     var net = CS.netRevenue(s.revenue, storeCut());
     var be = breakevenSeries();
     return [
@@ -3109,7 +3344,7 @@
     CS.days(from, to).forEach(function (d) {
       netByDay[d] = CS.netRevenue(dayRec('all', d).revenue, cut);
     });
-    var out = CS.breakeven(costList(), netByDay, from, to);
+    var out = CS.breakeven(spendList(), netByDay, from, to);
     out.from = from; out.to = to;
     return out;
   }
@@ -3164,63 +3399,65 @@
         '</tbody></table>'
       : '<div class="empty">No costs in this range.</div>';
 
-    var chans = CS.perChannel(ads(), costList(), r.from, r.to);
-    document.getElementById('csChannelTable').innerHTML = chans.length
-      ? '<table><thead><tr><th>Channel</th><th class="money">Campaigns</th><th class="money">Spend</th>' +
-        '<th class="money">Reported installs</th><th class="money">Reported CPI</th></tr></thead><tbody>' +
-        chans.map(function (c) {
-          return '<tr><td>' + esc(c.channel) + '</td><td class="money">' + fmtInt(c.ads) + '</td>' +
+    var plats = CS.perPlatform(ads(), r.from, r.to);
+    document.getElementById('csChannelTable').innerHTML = plats.length
+      ? '<table><thead><tr><th>Platform</th><th class="money">Spots</th><th class="money">Spend</th>' +
+        '<th class="money">Impressions</th><th class="money">Clicks</th><th class="money">CTR</th>' +
+        '<th class="money">Cost per click</th></tr></thead><tbody>' +
+        plats.map(function (c) {
+          return '<tr><td>' + esc(c.platform) + '</td><td class="money">' + fmtInt(c.ads) + '</td>' +
             '<td class="money">' + fmtMoney(c.spend) + '</td>' +
-            '<td class="money">' + (c.installs ? fmtInt(c.installs) : '<span class="na">–</span>') + '</td>' +
-            '<td class="money">' + fmtMoney(c.cpi) + '</td></tr>';
+            '<td class="money">' + (c.impressions ? fmtInt(c.impressions) : '<span class="na">–</span>') + '</td>' +
+            '<td class="money">' + (c.clicks ? fmtInt(c.clicks) : '<span class="na">–</span>') + '</td>' +
+            '<td class="money">' + (c.ctr === null ? '<span class="na">–</span>' : c.ctr.toFixed(2) + '%') + '</td>' +
+            '<td class="money">' + fmtMoney(c.cpc) + '</td></tr>';
         }).join('') + '</tbody></table>'
-      : '<div class="empty">No advertising spend in this range.</div>';
+      : '<div class="empty">No ad spots bought in this range.</div>';
   }
 
   /**
-   * The campaign table, drawn twice from one function.
+   * The ad-spot table, drawn twice from one function.
    *
-   * On Edit data it is the management list: editable, and all-time, because
-   * that view has no filter bar and "spend on this campaign" is a lifetime
-   * question when you are deciding whether to keep running it. On the Costs tab
-   * it is read-only and scoped to the selected range, which is the reading
-   * question. Same numbers, two jobs, one place they are computed.
+   * On Edit data it is the management list: editable, and unbounded in time,
+   * because that view has no filter bar and a spot bought today for next month
+   * must still appear in the list you manage it from. On the Costs tab it is
+   * read-only and scoped to the selected range, which is the reading question.
+   * Same numbers, two jobs, one place they are computed.
    */
   function renderAdTable(hostId, r, editable) {
-    var per = CS.perAd(ads(), costList(), r.from, r.to);
+    var per = CS.perAd(ads(), r.from, r.to);
     var day = asOf();
     var host = document.getElementById(hostId);
     if (!host) return;
-    if (!ads().length && !per.rows.length) {
+    if (!per.rows.length) {
       host.innerHTML = '<div class="empty">' + (editable
-        ? 'No campaigns yet. Add one and its daily spend can be entered in the grid below.'
-        : 'No campaigns yet. Add one under Edit data.') + '</div>';
+        ? 'No ad spots yet. Add one — a spot is a single thing you bought, with its own price.'
+        : 'No ad spots bought in this range. They are entered under Edit data.') + '</div>';
       return;
     }
-    host.innerHTML = '<table><thead><tr><th>Campaign</th><th>Channel</th><th>Status</th>' +
-      '<th class="money">Spend</th><th class="money">Share</th><th class="money">Reported clicks</th>' +
-      '<th class="money">Reported installs</th><th class="money">Reported CPI</th>' +
+    host.innerHTML = '<table><thead><tr><th>Ad spot</th><th>Platform</th><th>Ran</th><th>Status</th>' +
+      '<th class="money">Cost</th><th class="money">Share</th>' +
+      '<th class="money">Impressions</th><th class="money">Clicks</th><th class="money">CTR</th>' +
+      '<th class="money">Cost per click</th>' +
       (editable ? '<th></th>' : '') + '</tr></thead><tbody>' +
       per.rows.map(function (row) {
-        var st = row.ad ? CS.adStatus(row.ad, day) : null;
-        return '<tr><td>' + esc(row.name) +
-          (row.ad && row.ad.platform && row.ad.platform !== 'all'
-            ? ' <span class="note">' + esc(PLATFORMS[row.ad.platform] || row.ad.platform) + '</span>' : '') +
-          '</td>' +
-          '<td>' + esc(row.channel || '–') + '</td>' +
-          '<td>' + (st ? '<span class="pill ' + st + '">' + st + '</span>' : '<span class="note">detached</span>') + '</td>' +
+        var st = CS.adStatus(row.ad, day);
+        return '<tr><td>' + esc(row.name) + '</td>' +
+          '<td>' + esc(row.platform || '–') + '</td>' +
+          '<td>' + esc(labelDay(row.start)) +
+          (row.end ? ' – ' + esc(labelDay(row.end)) : ' <span class="note">no end yet</span>') + '</td>' +
+          '<td><span class="pill ' + st + '">' + st + '</span></td>' +
           '<td class="money">' + fmtMoney(row.spend) + '</td>' +
           '<td class="money">' + (row.share === null ? '–' : row.share.toFixed(1) + '%') + '</td>' +
+          '<td class="money">' + (row.impressions ? fmtInt(row.impressions) : '<span class="na">–</span>') + '</td>' +
           '<td class="money">' + (row.clicks ? fmtInt(row.clicks) : '<span class="na">–</span>') + '</td>' +
-          '<td class="money">' + (row.installs ? fmtInt(row.installs) : '<span class="na">–</span>') + '</td>' +
-          '<td class="money">' + fmtMoney(row.cpi) + '</td>' +
-          (editable
-            ? '<td>' + (row.id ? '<button class="btn sm" data-ad-edit="' + esc(row.id) + '">Edit</button>' : '') + '</td>'
-            : '') +
+          '<td class="money">' + (row.ctr === null ? '<span class="na">–</span>' : row.ctr.toFixed(2) + '%') + '</td>' +
+          '<td class="money">' + fmtMoney(row.cpc) + '</td>' +
+          (editable ? '<td><button class="btn sm" data-ad-edit="' + esc(row.id) + '">Edit</button></td>' : '') +
           '</tr>';
       }).join('') +
-      '<tr><td><b>Total</b></td><td></td><td></td><td class="money"><b>' + fmtMoney(per.total) + '</b></td>' +
-      '<td colspan="' + (editable ? 5 : 4) + '"></td></tr></tbody></table>';
+      '<tr><td><b>Total</b></td><td></td><td></td><td></td><td class="money"><b>' + fmtMoney(per.total) + '</b></td>' +
+      '<td colspan="' + (editable ? 6 : 5) + '"></td></tr></tbody></table>';
 
     if (!editable) return;
     host.querySelectorAll('[data-ad-edit]').forEach(function (b) {
@@ -3234,28 +3471,37 @@
     return { from: b.dates.length ? b.start : asOf(), to: asOf() };
   }
 
+  /* Wider than all-time: a spot can be bought today to start next month, and a
+     management list that hid it would be a list you could not correct. */
+  var EVER = { from: '2000-01-01', to: '2099-12-31' };
+
   function openAdForm(id) {
     var ad = id ? adById(id) : null;
-    var host = document.getElementById('csAdForm');
+    var host = revealCard(document.getElementById('csAdForm'));
     host.classList.remove('hidden');
-    var channels = CS.CHANNELS.map(function (c) {
-      return '<option value="' + esc(c) + '"' + (ad && ad.channel === c ? ' selected' : '') + '>' + esc(c) + '</option>';
+    var plats = CS.PLATFORMS.map(function (c) {
+      return '<option value="' + esc(c) + '"' + (ad && ad.platform === c ? ' selected' : '') + '>' + esc(c) + '</option>';
     }).join('');
-    var plats = [['all', 'Both stores'], ['ios', 'iOS'], ['android', 'Android']].map(function (p) {
-      return '<option value="' + p[0] + '"' + (ad && ad.platform === p[0] ? ' selected' : '') + '>' + p[1] + '</option>';
-    }).join('');
+    var n = function (v) { return v === undefined || v === null ? '' : v; };
 
     host.innerHTML = '<div class="event-form">' +
-      '<div class="field grow"><label for="adName">Campaign name</label>' +
-      '<input type="text" id="adName" maxlength="120" placeholder="Search Ads — POTS keywords" value="' + esc(ad ? ad.name : '') + '"></div>' +
-      '<div class="field"><label for="adChannel">Channel</label><select id="adChannel">' + channels + '</select></div>' +
-      '<div class="field"><label for="adPlatform">Store</label><select id="adPlatform">' + plats + '</select></div>' +
-      '<div class="field"><label for="adStart">Started</label><input type="date" id="adStart" value="' + esc(ad ? ad.start : asOf()) + '"></div>' +
-      '<div class="field"><label for="adEnd">Ended (blank = running)</label><input type="date" id="adEnd" value="' + esc(ad && ad.end ? ad.end : '') + '"></div>' +
+      '<div class="field grow"><label for="adName">What you bought</label>' +
+      '<input type="text" id="adName" maxlength="120" placeholder="Newsletter sponsorship — August issue" value="' + esc(ad ? ad.name : '') + '"></div>' +
+      '<div class="field"><label for="adPlatform">Platform</label><select id="adPlatform">' + plats + '</select></div>' +
+      '<div class="field"><label for="adAmount">Cost</label>' +
+      '<input type="number" id="adAmount" step="0.01" min="0" value="' + esc(String(n(ad && ad.amount))) + '"></div>' +
+      '<div class="field"><label for="adStart">Starts (charged)</label><input type="date" id="adStart" value="' + esc(ad ? ad.start : asOf()) + '"></div>' +
+      '<div class="field"><label for="adEnd">Ends (blank = ongoing)</label><input type="date" id="adEnd" value="' + esc(ad && ad.end ? ad.end : '') + '"></div>' +
+      '<div class="field"><label for="adImpressions">Impressions</label>' +
+      '<input type="number" id="adImpressions" step="1" min="0" placeholder="optional" value="' + esc(String(n(ad && ad.impressions))) + '"></div>' +
+      '<div class="field"><label for="adClicks">Clicks</label>' +
+      '<input type="number" id="adClicks" step="1" min="0" placeholder="optional" value="' + esc(String(n(ad && ad.clicks))) + '"></div>' +
+      '<div class="field"><label for="adInstalls">Reported installs</label>' +
+      '<input type="number" id="adInstalls" step="1" min="0" placeholder="optional" value="' + esc(String(n(ad && ad.installs))) + '"></div>' +
       '<div class="field grow"><label for="adUrl">Link (optional)</label><input type="text" id="adUrl" placeholder="https://" value="' + esc(ad && ad.url ? ad.url : '') + '"></div>' +
       '<div class="field full"><label for="adNote">Notes</label><textarea id="adNote" rows="2" maxlength="2000">' + esc(ad && ad.note ? ad.note : '') + '</textarea></div>' +
       '<div class="event-form-actions">' +
-      '<button class="btn primary" id="adSave">' + (ad ? 'Save campaign' : 'Add campaign') + '</button>' +
+      '<button class="btn primary" id="adSave">' + (ad ? 'Save ad spot' : 'Add ad spot') + '</button>' +
       '<button class="btn" id="adCancel">Cancel</button>' +
       (ad ? '<span class="spacer"></span><button class="btn danger" id="adDelete">Delete</button>' : '') +
       '</div></div>';
@@ -3263,36 +3509,45 @@
     document.getElementById('adCancel').addEventListener('click', closeAdForm);
     if (ad) {
       document.getElementById('adDelete').addEventListener('click', function () {
-        var spent = CS.spend(costList(), '0000-01-01', '9999-12-31', function (c) { return c.adId === ad.id; });
-        if (!confirm('Delete "' + ad.name + '"? Its ' + fmtMoney(spent) +
-          ' of recorded spend is kept and reported as unattributed advertising.')) return;
-        var n = removeAd(ad.id);
+        /* The spot IS the money now, so deleting it removes the spend from
+           every total. Say the amount rather than let it go quietly. */
+        if (!confirm('Delete "' + ad.name + '"? Its ' + fmtMoney(num(ad.amount)) +
+          ' comes off every spend, profit and breakeven figure.')) return;
+        removeAd(ad.id);
         closeAdForm();
         renderAll();
-        toast(n ? 'Campaign deleted — ' + n + ' cost row' + (n === 1 ? '' : 's') + ' kept as unattributed.' : 'Campaign deleted.');
+        toast('Ad spot deleted.');
       });
     }
     document.getElementById('adSave').addEventListener('click', function () {
       var name = document.getElementById('adName').value.trim();
       var start = document.getElementById('adStart').value;
       var end = document.getElementById('adEnd').value;
-      if (!name) { toast('A campaign needs a name.'); return; }
-      if (!start) { toast('A campaign needs a start date.'); return; }
+      var amount = document.getElementById('adAmount').value;
+      if (!name) { toast('An ad spot needs a name.'); return; }
+      if (!start) { toast('An ad spot needs a start date — that is the day its cost lands.'); return; }
+      if (amount === '') { toast('An ad spot needs a cost. Enter 0 if it was free.'); return; }
       if (end && end < start) { toast('The end date is before the start date.'); return; }
+      var count = function (id) {
+        var v = document.getElementById(id).value;
+        return v === '' ? undefined : Math.round(cleanNum(v));
+      };
       putAd({
         id: ad ? ad.id : newId('ad'),
         name: name,
-        channel: document.getElementById('adChannel').value,
         platform: document.getElementById('adPlatform').value,
         start: start,
         end: end || undefined,
+        amount: cleanNum(amount),
+        impressions: count('adImpressions'),
+        clicks: count('adClicks'),
+        installs: count('adInstalls'),
         url: document.getElementById('adUrl').value.trim() || undefined,
         note: document.getElementById('adNote').value.trim() || undefined
       });
       closeAdForm();
-      buildAdGrid();
       renderAll();
-      toast(ad ? 'Campaign saved.' : 'Campaign added.');
+      toast(ad ? 'Ad spot saved.' : 'Ad spot added.');
     });
     document.getElementById('adName').focus();
   }
@@ -3305,15 +3560,16 @@
 
   /* ------------------------------------------------------- the cost list */
 
-  /* The ledger. Every row, newest first, unscoped — this is the list you check
-     a charge against, and a cost filtered out by a range selected on another
-     tab is a cost you would swear you had entered. */
+  /* The ledger of everything that is NOT an ad spot: hosting, tools, developer
+     programmes, contract work. Every row, newest first, unscoped — this is the
+     list you check a charge against, and a cost filtered out by a range
+     selected on another tab is a cost you would swear you had entered. */
   function renderCostList() {
     var list = costList();
     var host = document.getElementById('csCostTable');
     if (!host) return;
     if (!list.length) {
-      host.innerHTML = '<div class="empty">No costs recorded yet.</div>';
+      host.innerHTML = '<div class="empty">No other costs recorded yet.</div>';
       return;
     }
     var r = allTimeRange();
@@ -3324,13 +3580,11 @@
         var cat = CS.CATEGORIES[c.category] || CS.CATEGORIES.OTHER;
         var hits = CS.occurrences(c, r.from, r.to).length;
         var rec = c.recurrence && c.recurrence !== 'none' ? CS.RECURRENCES[c.recurrence] : null;
-        var ad = c.adId ? adById(c.adId) : null;
         return '<tr><td>' + esc(labelFull(c.date)) +
           (rec ? '<br><span class="repeats">' + esc(rec.label.toLowerCase()) +
             (c.until ? ' until ' + esc(labelDay(c.until)) : '') + '</span>' : '') + '</td>' +
           '<td><span class="cat-dot" style="background:' + cat.color + '"></span>' + esc(cat.label) + '</td>' +
-          '<td>' + esc(c.label || (ad ? ad.name : '') || '–') +
-          (ad ? ' <span class="note">' + esc(ad.channel || 'campaign') + '</span>' : '') +
+          '<td>' + esc(c.label || '–') +
           (c.note ? '<br><span class="note">' + esc(c.note) + '</span>' : '') + '</td>' +
           '<td class="money">' + fmtMoney(c.amount) + '</td>' +
           '<td class="money">' + (hits ? fmtMoney(num(c.amount) * hits) + (hits > 1 ? ' <span class="note">×' + hits + '</span>' : '') : '<span class="na">–</span>') + '</td>' +
@@ -3344,10 +3598,10 @@
 
   function openCostForm(id) {
     var c = id ? costList().filter(function (x) { return x.id === id; })[0] : null;
-    var host = document.getElementById('csCostForm');
+    var host = revealCard(document.getElementById('csCostForm'));
     host.classList.remove('hidden');
 
-    var cats = CS.CATEGORY_KEYS.map(function (k) {
+    var cats = CS.ENTRY_CATEGORY_KEYS.map(function (k) {
       return '<option value="' + k + '"' + (c && c.category === k ? ' selected' : (!c && k === 'INFRA' ? ' selected' : '')) + '>' +
         esc(CS.CATEGORIES[k].label) + '</option>';
     }).join('');
@@ -3355,10 +3609,6 @@
       return '<option value="' + k + '"' + (c && c.recurrence === k ? ' selected' : '') + '>' +
         esc(CS.RECURRENCES[k].label) + '</option>';
     }).join('');
-    var adOpts = '<option value="">Not a campaign</option>' + ads().map(function (a) {
-      return '<option value="' + esc(a.id) + '"' + (c && c.adId === a.id ? ' selected' : '') + '>' + esc(a.name) + '</option>';
-    }).join('');
-
     host.innerHTML = '<div class="event-form">' +
       '<div class="field"><label for="coDate">Date charged</label><input type="date" id="coDate" value="' + esc(c ? c.date : asOf()) + '"></div>' +
       '<div class="field"><label for="coCategory">Category</label><select id="coCategory">' + cats + '</select></div>' +
@@ -3367,7 +3617,6 @@
       '<div class="field"><label for="coAmount">Amount</label><input type="number" id="coAmount" step="0.01" value="' + (c && c.amount !== undefined ? c.amount : '') + '"></div>' +
       '<div class="field"><label for="coRecurrence">Repeats</label><select id="coRecurrence">' + recs + '</select></div>' +
       '<div class="field"><label for="coUntil">Repeat until (blank = still paying)</label><input type="date" id="coUntil" value="' + esc(c && c.until ? c.until : '') + '"></div>' +
-      '<div class="field"><label for="coAd">Campaign</label><select id="coAd">' + adOpts + '</select></div>' +
       '<div class="field full"><label for="coNote">Notes</label><textarea id="coNote" rows="2" maxlength="2000">' + esc(c && c.note ? c.note : '') + '</textarea></div>' +
       '<div class="event-form-actions">' +
       '<button class="btn primary" id="coSave">' + (c ? 'Save cost' : 'Add cost') + '</button>' +
@@ -3393,7 +3642,6 @@
       var until = document.getElementById('coUntil').value;
       if (until && until < date) { toast('The repeat-until date is before the first charge.'); return; }
       var rec = document.getElementById('coRecurrence').value;
-      var adId = document.getElementById('coAd').value;
       putCost({
         id: c ? c.id : newId('co'),
         date: date,
@@ -3402,15 +3650,9 @@
         amount: Number(amount),
         recurrence: rec === 'none' ? undefined : rec,
         until: rec === 'none' || !until ? undefined : until,
-        adId: adId || undefined,
-        note: document.getElementById('coNote').value.trim() || undefined,
-        // network-reported counts survive an edit through this form
-        impressions: c ? c.impressions : undefined,
-        clicks: c ? c.clicks : undefined,
-        installs: c ? c.installs : undefined
+        note: document.getElementById('coNote').value.trim() || undefined
       });
       closeCostForm();
-      buildAdGrid();
       renderAll();
       toast(c ? 'Cost saved.' : 'Cost added.');
     });
@@ -3423,247 +3665,75 @@
     host.innerHTML = '';
   }
 
-  /* --------------------------------------------------------- spend grid */
-
-  var gridDays = [];      // rows: ISO dates
-  var gridAds = [];       // columns: campaigns
-  var gridFields = ['amount'];
-
-  var GRID_FIELDS = {
-    amount: { label: 'Spend', step: '0.01' },
-    impressions: { label: 'Impressions', step: '1' },
-    clicks: { label: 'Clicks', step: '1' },
-    installs: { label: 'Installs', step: '1' }
-  };
-
-  /* Columns are the campaigns that could plausibly have spent money in the
-     window: anything running in it, plus anything that already has a row there.
-     A campaign that ended last year is not offered a column it would only be
-     scrolled past. */
-  function gridCampaigns(from, to) {
-    return ads().filter(function (a) {
-      if (!a.start || a.start > to) return false;
-      if (a.end && a.end < from) {
-        return costList().some(function (c) {
-          return c.adId === a.id && c.date >= from && c.date <= to;
-        });
-      }
-      return true;
-    });
-  }
-
-  function buildAdGrid() {
-    var fromEl = document.getElementById('csGridFrom');
-    var toEl = document.getElementById('csGridTo');
-    if (!fromEl.value) fromEl.value = addDays(asOf(), -13);
-    if (!toEl.value) toEl.value = asOf();
-    var from = fromEl.value, to = toEl.value;
-    if (from > to) { var t = from; from = to; to = t; }
-
-    gridFields = document.getElementById('csGridExtra').value === 'all'
-      ? ['amount', 'impressions', 'clicks', 'installs'] : ['amount'];
-    gridDays = CS.days(from, to).reverse();     // newest first, like every other list here
-    gridAds = gridCampaigns(from, to);
-
-    var host = document.getElementById('csGrid');
-    var count = document.getElementById('csGridCount');
-    if (!gridAds.length) {
-      host.innerHTML = '<div class="empty">No campaigns ran in this window. Add one above, or widen the dates.</div>';
-      count.textContent = '';
-      return;
-    }
-    if (!gridDays.length) { host.innerHTML = '<div class="empty">Pick a date range.</div>'; return; }
-
-    var head = '<tr><th class="day-col" rowspan="' + (gridFields.length > 1 ? 2 : 1) + '">Day</th>' +
-      gridAds.map(function (a) {
-        return '<th class="ad-head" colspan="' + gridFields.length + '">' + esc(a.name) +
-          '<span class="sub">' + esc(a.channel || '') + '</span></th>';
-      }).join('') + '</tr>';
-    if (gridFields.length > 1) {
-      head += '<tr>' + gridAds.map(function () {
-        return gridFields.map(function (f) { return '<th class="ad-head">' + GRID_FIELDS[f].label + '</th>'; }).join('');
-      }).join('') + '</tr>';
-    }
-
-    var body = gridDays.map(function (day, ri) {
-      var wd = dow(day);
-      var cells = '';
-      gridAds.forEach(function (a, ai) {
-        var existing = adCostOn(a.id, day);
-        gridFields.forEach(function (f, fi) {
-          var c = ai * gridFields.length + fi;
-          var v = existing ? existing[f] : undefined;
-          cells += '<td class="num-edit"><input type="number" step="' + GRID_FIELDS[f].step + '" min="0" ' +
-            'data-r="' + ri + '" data-c="' + c + '" data-day="' + day + '" data-ad="' + esc(a.id) + '" ' +
-            'data-field="' + f + '" value="' + (v === undefined || v === null ? '' : v) + '"></td>';
-        });
-      });
-      return '<tr' + (wd >= 5 ? ' class="weekend"' : '') + '><td class="day-col">' +
-        WD[wd] + ' ' + esc(labelDay(day)) + '</td>' + cells + '</tr>';
-    }).join('');
-
-    host.innerHTML = '<div class="table-scroll full"><table><thead>' + head + '</thead><tbody>' + body + '</tbody></table></div>';
-    count.textContent = gridDays.length + ' days × ' + gridAds.length + ' campaign' + (gridAds.length === 1 ? '' : 's');
-  }
-
-  function gridCell(r, c) {
-    return document.querySelector('#csGrid input[data-r="' + r + '"][data-c="' + c + '"]');
-  }
-
-  function saveAdGrid() {
-    var inputs = document.querySelectorAll('#csGrid input[data-day]');
-    var touched = {};
-    inputs.forEach(function (el) {
-      var key = el.dataset.ad + '|' + el.dataset.day;
-      var rec = touched[key] || (touched[key] = { adId: el.dataset.ad, day: el.dataset.day, fields: {} });
-      rec.fields[el.dataset.field] = el.value === '' ? null : cleanNum(el.value);
-    });
-
-    var written = 0, removed = 0;
-    Object.keys(touched).forEach(function (key) {
-      var rec = touched[key];
-      var existing = adCostOn(rec.adId, rec.day);
-      var amount = rec.fields.amount;
-      var hasExtras = ['impressions', 'clicks', 'installs'].some(function (f) {
-        return rec.fields[f] !== undefined && rec.fields[f] !== null && rec.fields[f] !== 0;
-      });
-
-      /* A blanked spend cell means "this day cost nothing", which is a deletion
-         rather than a zero — a wall of zero rows would make the cost list
-         unreadable and change none of the totals. Reported counts on their own
-         are not enough to keep a row: they describe spend that is not there. */
-      if ((amount === null || amount === 0) && !hasExtras) {
-        if (existing) { removeCost(existing.id); removed++; }
-        return;
-      }
-      var next = existing ? Object.assign({}, existing) : {
-        id: newId('co'), date: rec.day, category: 'ADS', adId: rec.adId
-      };
-      next.amount = amount === null ? 0 : amount;
-      ['impressions', 'clicks', 'installs'].forEach(function (f) {
-        if (rec.fields[f] === undefined) return;
-        if (rec.fields[f] === null || rec.fields[f] === 0) delete next[f];
-        else next[f] = rec.fields[f];
-      });
-      var before = existing ? JSON.stringify(existing) : null;
-      if (before !== JSON.stringify(next)) { putCost(next); written++; }
-    });
-
-    document.getElementById('csGridStatus').textContent =
-      written || removed
-        ? 'Saved ' + written + ' day' + (written === 1 ? '' : 's') +
-          (removed ? ', cleared ' + removed : '') + '.'
-        : 'Nothing changed.';
-    if (written || removed) toast('Ad spend saved.');
-    buildAdGrid();
-    renderAll();
-  }
-
-  function gridPaste(ev) {
-    var input = ev.target.closest('#csGrid input[data-r]');
-    if (!input) return;
-    var text = (ev.clipboardData || window.clipboardData).getData('text');
-    if (!text) return;
-    if (!/[\t\n\r]/.test(text) && text.indexOf(',') === -1) return;
-    ev.preventDefault();
-
-    var lines = text.replace(/\r\n?/g, '\n').replace(/\n$/, '').split('\n');
-    var sep = text.indexOf('\t') !== -1 ? '\t' : ',';
-    var r0 = +input.dataset.r, c0 = +input.dataset.c, filled = 0;
-    lines.forEach(function (line, dr) {
-      line.split(sep).forEach(function (cell, dc) {
-        var el = gridCell(r0 + dr, c0 + dc);
-        if (!el) return;
-        // currency symbols and thousands separators come along with a paste from
-        // any ad network's export; strip them rather than reject the row
-        var val = cell.trim().replace(/^"|"$/g, '').replace(/[^0-9.\-]/g, '');
-        el.value = val === '' ? '' : String(cleanNum(val));
-        filled++;
-      });
-    });
-    document.getElementById('csGridStatus').textContent = 'Pasted ' + filled + ' cells — not saved yet.';
-  }
-
-  /* ----------------------------------------------------- spread a total */
-
-  function syncSpreadAds() {
-    var sel = document.getElementById('csSpreadAd');
-    var keep = sel.value;
-    sel.innerHTML = ads().length
-      ? ads().map(function (a) { return '<option value="' + esc(a.id) + '">' + esc(a.name) + '</option>'; }).join('')
-      : '<option value="">No campaigns yet</option>';
-    if (keep) sel.value = keep;
-  }
-
-  function spreadTotal() {
-    var adId = document.getElementById('csSpreadAd').value;
-    var from = document.getElementById('csSpreadFrom').value;
-    var to = document.getElementById('csSpreadTo').value;
-    var total = document.getElementById('csSpreadTotal').value;
-    var installs = document.getElementById('csSpreadInstalls').value;
-    var status = document.getElementById('csSpreadStatus');
-
-    if (!adId) { toast('Add a campaign first.'); return; }
-    if (!from || !to) { toast('Pick both dates.'); return; }
-    if (from > to) { var t = from; from = to; to = t; }
-    if (total === '') { toast('Enter the total spent.'); return; }
-
-    var days = CS.days(from, to);
-    var cents = Math.round(cleanNum(total) * 100);
-    var per = Math.floor(cents / days.length);
-    var remainder = cents - per * days.length;
-    var inst = installs === '' ? null : Math.round(cleanNum(installs));
-    var perInst = inst === null ? null : Math.floor(inst / days.length);
-    var instRemainder = inst === null ? 0 : inst - perInst * days.length;
-
-    days.forEach(function (day, i) {
-      var last = i === days.length - 1;
-      var existing = adCostOn(adId, day);
-      var next = existing ? Object.assign({}, existing) : { id: newId('co'), date: day, category: 'ADS', adId: adId };
-      next.amount = (per + (last ? remainder : 0)) / 100;
-      if (inst !== null) {
-        var v = perInst + (last ? instRemainder : 0);
-        if (v) next.installs = v; else delete next.installs;
-      }
-      putCost(next);
-    });
-
-    status.textContent = 'Wrote ' + days.length + ' daily rows totalling ' +
-      fmtMoney(cents / 100) + ' — the grid above can correct any of them.';
-    toast('Spread ' + fmtMoney(cents / 100) + ' over ' + days.length + ' days.');
-    buildAdGrid();
-    renderAll();
-  }
-
   /* --------------------------------------------------------------- csv */
 
+  function csvLine(cols, row) {
+    return cols.map(function (k) {
+      var v = String(row[k] === undefined || row[k] === null ? '' : row[k]);
+      return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+    }).join(',');
+  }
+
+  /* Two exports, because there are two collections and folding an ad spot into
+     a cost row would throw away the platform, the run window and the counts —
+     the whole reason a spot is its own thing. */
   function costsCSV() {
-    var cols = ['date', 'category', 'label', 'amount', 'recurrence', 'until', 'campaign', 'channel',
-      'impressions', 'clicks', 'installs', 'note'];
+    var cols = ['date', 'category', 'label', 'amount', 'recurrence', 'until', 'note'];
     var lines = [cols.join(',')];
     costList().slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; }).forEach(function (c) {
-      var ad = c.adId ? adById(c.adId) : null;
-      var row = {
+      lines.push(csvLine(cols, {
         date: c.date, category: c.category, label: c.label || '', amount: num(c.amount),
-        recurrence: c.recurrence || 'none', until: c.until || '',
-        campaign: ad ? ad.name : '', channel: ad ? (ad.channel || '') : '',
-        impressions: c.impressions || '', clicks: c.clicks || '', installs: c.installs || '',
-        note: c.note || ''
-      };
-      lines.push(cols.map(function (k) {
-        var v = String(row[k] === undefined || row[k] === null ? '' : row[k]);
-        return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
-      }).join(','));
+        recurrence: c.recurrence || 'none', until: c.until || '', note: c.note || ''
+      }));
+    });
+    return lines.join('\n');
+  }
+
+  function adsCSV() {
+    var cols = ['start', 'end', 'name', 'platform', 'cost', 'impressions', 'clicks',
+      'reported_installs', 'ctr', 'cost_per_click', 'url', 'note'];
+    var lines = [cols.join(',')];
+    CS.perAd(ads(), EVER.from, EVER.to).rows.slice().sort(function (a, b) {
+      return a.start < b.start ? -1 : 1;
+    }).forEach(function (r) {
+      lines.push(csvLine(cols, {
+        start: r.start, end: r.end || '', name: r.name, platform: r.platform,
+        cost: r.spend, impressions: r.impressions || '', clicks: r.clicks || '',
+        reported_installs: r.installs || '',
+        ctr: r.ctr === null ? '' : r.ctr.toFixed(2),
+        cost_per_click: r.cpc === null ? '' : r.cpc.toFixed(2),
+        url: r.ad.url || '', note: r.ad.note || ''
+      }));
     });
     return lines.join('\n');
   }
 
   /* ------------------------------------------------------------ wiring */
 
+  /* A <summary> toggles its card when clicked, including when the click landed
+     on a button inside it — so "New ad spot" would open the form and close the
+     card it opens into. Cancelling the default keeps the button's own listener
+     (preventDefault stops the toggle, not the propagation). */
+  /* Opening a form inside a collapsed accordion would render it where nobody
+     can see it, and the press would read as "nothing happened". */
+  function revealCard(el) {
+    var d = el && el.closest ? el.closest('details.acc') : null;
+    if (d) d.open = true;
+    return el;
+  }
+
+  function wireAccordions() {
+    document.querySelectorAll('details.acc > summary').forEach(function (sum) {
+      sum.addEventListener('click', function (ev) {
+        if (ev.target.closest('button, input, select, a')) ev.preventDefault();
+      });
+    });
+  }
+
   function wireCosts() {
     document.getElementById('csGoEdit').addEventListener('click', function () {
       setView('data');
-      var head = document.getElementById('csAdTable');
+      var head = revealCard(document.getElementById('csAdTable'));
       if (head) setTimeout(function () { head.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 60);
     });
     document.getElementById('csAdAdd').addEventListener('click', function () {
@@ -3675,30 +3745,9 @@
     document.getElementById('csExport').addEventListener('click', function () {
       download('autonomic-costs-' + today() + '.csv', costsCSV(), 'text/csv');
     });
-
-    document.getElementById('csGridBuild').addEventListener('click', buildAdGrid);
-    document.getElementById('csGridExtra').addEventListener('change', buildAdGrid);
-    ['csGridFrom', 'csGridTo'].forEach(function (id) {
-      document.getElementById(id).addEventListener('change', buildAdGrid);
+    document.getElementById('csAdExport').addEventListener('click', function () {
+      download('autonomic-ad-spots-' + today() + '.csv', adsCSV(), 'text/csv');
     });
-    document.getElementById('csGridSave').addEventListener('click', saveAdGrid);
-
-    var grid = document.getElementById('csGrid');
-    grid.addEventListener('paste', gridPaste);
-    grid.addEventListener('keydown', function (ev) {
-      var i = ev.target.closest('input[data-r]');
-      if (!i) return;
-      var r = +i.dataset.r, c = +i.dataset.c, next = null;
-      if (ev.key === 'Enter' || ev.key === 'ArrowDown') next = gridCell(r + 1, c);
-      else if (ev.key === 'ArrowUp') next = gridCell(r - 1, c);
-      else return;
-      ev.preventDefault();
-      if (next) { next.focus(); next.select(); }
-    });
-
-    document.getElementById('csSpreadGo').addEventListener('click', spreadTotal);
-    document.getElementById('csSpreadTo').value = asOf();
-    document.getElementById('csSpreadFrom').value = addDays(asOf(), -6);
   }
 
   /* --------------------------------------------------------- view: data */
@@ -3725,6 +3774,7 @@
     if (!bulkRows.length) buildBulkGrid();
     renderSaleEntry();
     renderCostEntry();
+    renderEventList();
   }
 
   /* ------------------------------------------------------ view: forecast */
@@ -4688,7 +4738,9 @@
     }
 
     document.getElementById('exportMain').addEventListener('click', function () {
-      if (!db.entries.length) { toast('No data to export yet.'); return; }
+      /* Purchases are data too: a book with sales and no store CSV pasted in
+         yet still has a range worth copying. */
+      if (!db.entries.length && !salesList().length) { toast('No data to export yet.'); return; }
       var r = exportRange();
       var scope = r.from === r.to ? labelFull(r.to) : labelFull(r.from) + ' → ' + labelFull(r.to);
       copyText(buildExportText())
@@ -4742,10 +4794,19 @@
   var MIN_SPIN_MS = 480;
   var refreshing = false;
 
-  function refreshView() {
+  /**
+   * `opts.silent` suppresses the "Refreshed." confirmation, and nothing else.
+   * It is what the ten-minute auto-refresh below passes: a toast every ten
+   * minutes for a thing nobody asked for is furniture, the same reason the sync
+   * pill went away. A refresh that FAILS still says so however it was started —
+   * that one is worth interrupting for, and it can only appear once per cycle.
+   */
+  function refreshView(opts) {
     if (refreshing) return;
+    var silent = !!(opts && opts.silent);
     var btn = document.getElementById('btnRefresh');
     refreshing = true;
+    lastAutoAt = Date.now();
     if (btn) btn.dataset.busy = 'true';
     var startedAt = Date.now();
 
@@ -4757,6 +4818,7 @@
         if (window.Sync) window.Sync.adopt(store.db, store.state);
         // After the adopt, never before — see the note in hydrate().
         migrateSales();
+        migrateAdSpots();
       });
 
     // The counter is only worth a round trip on the views that show it.
@@ -4766,7 +4828,7 @@
 
     work.then(function () {
       renderAll();
-      toast('Refreshed.');
+      if (!silent) toast('Refreshed.');
     }).catch(function (err) {
       toast('Could not refresh: ' + ((err && err.message) || 'no answer from the server') + '.');
     }).then(function () {
@@ -4776,6 +4838,55 @@
         if (btn) btn.dataset.busy = 'false';
       }, wait);
     });
+  }
+
+  /* -------------------------------------------------------- auto-refresh
+
+     The dashboard refetches itself every ten minutes while it is ON SCREEN, so
+     a tab left open beside your work keeps up on its own — and so `alerts.js`
+     has a new ping report to compare with the last one. Three conditions, all
+     load-bearing:
+
+     - **Visible only.** `document.hidden` is checked on every tick rather than
+       relied on through `setInterval` throttling: a backgrounded tab that is
+       still allowed to run would otherwise burn a full pull-and-hydrate every
+       ten minutes for a screen nobody is looking at, and would fire its
+       celebration into an empty room. Coming back to the tab checks
+       immediately, so a laptop reopened after an hour is current within a
+       frame rather than up to ten minutes stale.
+     - **The two ping-fed views only.** The counter is the only source on this
+       page that changes on its own, and `refreshView` only refetches it on the
+       App usage and Timeline views. Everywhere else an auto-refresh would pull
+       the same store CSVs it already holds and announce nothing.
+     - **Signed in only.** The gate is up before any of this exists; a pull
+       behind it would 401 and toast at somebody who has not typed their code
+       yet.
+
+     The clock is a timestamp compared on a 30-second tick, not a ten-minute
+     interval, because an interval cannot be paused for the hours the tab spent
+     in the background — it would fire the moment it came back and then again on
+     its old cadence. Any refresh, including one you pressed, resets it. */
+
+  var AUTO_REFRESH_MS = 10 * 60 * 1000;
+  var AUTO_TICK_MS = 30 * 1000;
+  var lastAutoAt = 0;
+
+  function autoRefreshDue() {
+    if (document.hidden) return false;
+    if (document.body.classList.contains('gated')) return false;
+    if (state.view !== 'ping' && state.view !== 'timeline') return false;
+    return Date.now() - lastAutoAt >= AUTO_REFRESH_MS;
+  }
+
+  function autoRefreshTick() {
+    if (!autoRefreshDue()) return;
+    refreshView({ silent: true });
+  }
+
+  function initAutoRefresh() {
+    lastAutoAt = Date.now();
+    setInterval(autoRefreshTick, AUTO_TICK_MS);
+    document.addEventListener('visibilitychange', autoRefreshTick);
   }
 
   /* ------------------------------------------------------------- render */
@@ -4848,6 +4959,8 @@
     else if (state.view === 'costs') renderCosts();
     else if (state.view === 'forecast') renderForecast();
     else if (state.view === 'data') renderData();
+
+    layoutTiles();
   }
 
   function setView(v) {
@@ -4989,13 +5102,29 @@
     setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
   }
 
+  /**
+   * Demo data, in the shape the dashboard actually reads.
+   *
+   * Store days carry only what a store report carries. The money is a LEDGER,
+   * one row per purchase, because that is the only place `base()` looks for it:
+   * writing `sales` / `revenue` back onto the days — which this used to do —
+   * produced a demo whose Overview, Costs, forecast and Sales view all read
+   * zero, and did it silently, since the columns still parse and still sync.
+   *
+   * The rows are the fixture the Sales view exists for: a plan mix rather than
+   * one price, install dates so days-to-purchase has something to draw, a few
+   * cancellations so MRR is not a straight line, and the odd refund.
+   */
   function loadDemo() {
-    if (db.entries.length && !confirm('Replace the current data with demo data?')) return;
+    if ((db.entries.length || salesList().length) &&
+        !confirm('Replace the current data — store days and purchases — with demo data?')) return;
     db.entries = [];
+    db.sales = [];
     var days = 120;
     var start = addDays(reportDay(), -(days - 1));
     var seed = 7;
     function rnd() { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; }
+    var saleNo = 0;
     for (var i = 0; i < days; i++) {
       var d = addDays(start, i);
       var dow = parseISO(d).getDay();
@@ -5006,21 +5135,51 @@
         var impressions = Math.round((900 + rnd() * 500) * growth * wk * scale);
         var pageViews = Math.round(impressions * (0.16 + rnd() * 0.06));
         var downloads = Math.round(pageViews * (0.26 + rnd() * 0.1));
-        var sales = Math.round(downloads * (p === 'ios' ? 0.05 : 0.032) * (0.5 + rnd()));
         db.entries.push({
           date: d, platform: p,
           downloads: downloads, impressions: impressions, pageViews: pageViews,
           updates: Math.round(downloads * (2 + rnd() * 3)),
-          sales: sales,
-          revenue: +(sales * (p === 'ios' ? 9.99 : 7.99)).toFixed(2),
           notes: ''
         });
+        var buys = Math.round(downloads * (p === 'ios' ? 0.05 : 0.032) * (0.5 + rnd()));
+        for (var s = 0; s < buys; s++) {
+          var roll = rnd();
+          var plan = roll < 0.62 ? 'monthly' : roll < 0.94 ? 'annual' : 'lifetime';
+          var price = plan === 'monthly' ? (p === 'ios' ? 4.99 : 3.99)
+            : plan === 'annual' ? (p === 'ios' ? 39.99 : 34.99)
+              : 79.99;
+          /* Most buyers decide inside the trial; a long tail comes back weeks
+             later, which is the shape the days-to-purchase chart is for. A
+             cohort earlier than the fixture's first day is left off rather than
+             clamped onto day one, exactly like a buyer you cannot match. */
+          var lag = Math.round(Math.pow(rnd(), 2) * 45);
+          var cohort = addDays(d, -lag);
+          var row = {
+            id: 'sale-demo-' + (++saleNo),
+            date: d, platform: p, plan: plan, price: price, qty: 1
+          };
+          if (cohort >= start) row.cohort = cohort;
+          /* Churn is a date on the row, never something derived: the stores
+             tell this dashboard nothing about it. */
+          if (plan === 'monthly' && rnd() < 0.18) {
+            var lived = 30 + Math.round(rnd() * 120);
+            if (addDays(d, lived) <= reportDay()) row.cancelled = addDays(d, lived);
+          }
+          if (rnd() < 0.015) row.refunded = true;
+          salesList().push(row);
+        }
       });
     }
     db.entries.sort(function (a, b) { return a.date < b.date ? 1 : -1; });
+    sortSales();
+    /* Nothing here is in the old shape, so there is nothing to migrate — and
+       leaving the flag off would run the migration over the demo on the next
+       render just to discover that. */
+    db.settings.salesMigrated = true;
     save(); invalidate();
-    toast('Loaded 120 days of demo data for both platforms.');
+    toast('Loaded 120 days of demo data — ' + saleNo + ' purchases across both stores.');
     refreshBulk();
+    renderSaleEntry();
     renderAll();
   }
 
@@ -5072,8 +5231,10 @@
        so by now the server's own shape is the sync baseline and the rewrite
        below reads as a real change that gets pushed. Run any earlier — inside
        hydrate, say — and the adopt would swallow it and the migration would
-       repeat, invisibly, on every device forever. */
+       repeat, invisibly, on every device forever. The same is true of the move
+       from campaigns to ad spots. */
     migrateSales();
+    migrateAdSpots();
 
     document.querySelector('.tabs').addEventListener('click', function (ev) {
       var t = ev.target.closest('.tab');
@@ -5161,8 +5322,13 @@
 
     wirePingView();
     wireCosts();
+    wireAccordions();
 
-    document.getElementById('btnRefresh').addEventListener('click', refreshView);
+    /* Wrapped rather than passed straight in: the listener would hand the click
+       event to `refreshView` as its options object. */
+    document.getElementById('btnRefresh').addEventListener('click', function () { refreshView(); });
+    if (window.Alerts) window.Alerts.init();
+    initAutoRefresh();
 
     /* --- data entry --- */
     wireBulk();
@@ -5248,7 +5414,7 @@
             });
             if (parsed.settings) Object.assign(db.settings, parsed.settings);
             // A JSON backup is the whole store, so a restore has to bring the
-            // campaigns, costs and purchases back too — not just the store days.
+            // ad spots, costs and purchases back too — not just the store days.
             // Merged by id, like every other collection, so restoring an old
             // backup over a newer ledger adds to it rather than truncating it.
             ['ads', 'costs', 'sales', 'events'].forEach(function (name) {
@@ -5277,9 +5443,19 @@
             if (list.some(function (e) { return e && (e.sales !== undefined || e.revenue !== undefined); })) {
               db.settings.salesMigrated = false;
             }
+            /* Same rollback path for the move off campaigns: a backup taken
+               before it holds campaigns with no price and ADS cost rows that
+               carry it, and restoring one onto a migrated account would list
+               every campaign at $0.00. Re-running collapses exactly those rows,
+               and a spot that already has an `amount` is left alone. */
+            if ((parsed.costs || []).some(function (c) { return c && c.category === 'ADS'; }) ||
+                (parsed.ads || []).some(function (a) { return a && a.amount === undefined; })) {
+              db.settings.adSpotsMigrated = false;
+            }
             finishBulk();
             var restored = migrateSales();
             if (restored) toast('Restored ' + restored + ' days of sales into the ledger as unclassified purchases.');
+            migrateAdSpots();
             n = list.length;
           } else {
             n = importCSV(text);
@@ -5298,7 +5474,7 @@
     });
     document.getElementById('ioDemo').addEventListener('click', loadDemo);
     document.getElementById('ioReset').addEventListener('click', function () {
-      if (!confirm('Delete every store entry and every purchase on your account? Costs, campaigns and events are kept. This cannot be undone — export a backup first if you want one.')) return;
+      if (!confirm('Delete every store entry and every purchase on your account? Costs, ad spots and events are kept. This cannot be undone — export a backup first if you want one.')) return;
       db.entries = [];
       /* Sales left behind by a wipe would come back as revenue with no
          downloads under it, which reads as a bug rather than as a choice. */
@@ -5315,9 +5491,12 @@
     var rt;
     window.addEventListener('resize', function () {
       clearTimeout(rt);
-      rt = setTimeout(function () { if (state.view !== 'data') renderAll(); }, 180);
+      rt = setTimeout(function () {
+        if (state.view !== 'data') renderAll(); else layoutTiles();
+      }, 180);
     });
 
+    watchTileRows();
     renderAll();
   }
 

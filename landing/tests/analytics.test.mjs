@@ -237,6 +237,31 @@ check('before/after reports an unavailable retention rather than 0',
   d7metric && (d7metric.available === false || typeof d7metric.delta === 'number'),
   JSON.stringify(d7metric));
 
+/* Money and purchase counts come from the LEDGER, and the subscribe ping keeps
+   its own name beside them: the ping fires a launch or two after the
+   transaction, so reading it as "purchases" books a shift in the LAG against
+   the event. With no ledger passed there is nothing to say, and the rows are
+   absent rather than zero. */
+const baRow = (b, label) => b.metrics.filter((m) => m.label === label)[0];
+check('the ping row is not called "purchases" any more',
+  !baRow(ba, 'Purchases') && baRow(ba, 'Subscribe pings'),
+  ba.metrics.map((m) => m.label).join(' | '));
+check('and with no ledger there is no money row', !baRow(ba, 'Revenue'));
+const baSales = A.beforeAfter(ix, [], { date: '2026-06-14' }, 7, {
+  '2026-06-12': { sales: 1, revenue: 4.99 },
+  '2026-06-16': { sales: 3, revenue: 29.97 },
+});
+check('the ledger fills the purchase row', baRow(baSales, 'Purchases').before === 1 &&
+  baRow(baSales, 'Purchases').after === 3, JSON.stringify(baRow(baSales, 'Purchases')));
+check('and the money row, as money', baRow(baSales, 'Revenue').kind === 'money' &&
+  Math.abs(baRow(baSales, 'Revenue').delta - 24.98) < 0.001,
+  JSON.stringify(baRow(baSales, 'Revenue')));
+/* The event's own day is excluded from both windows for the ledger too — it is
+   usually half a day of each. */
+check('and the event day itself is in neither window',
+  A.beforeAfter(ix, [], { date: '2026-06-14' }, 7, { '2026-06-14': { sales: 9, revenue: 90 } })
+    .metrics.filter((m) => m.label === 'Purchases')[0].delta === 0);
+
 /* ------------------------------------------------------------- platform */
 
 /* One cohort day now arrives as two rows, one per platform. Everything above
