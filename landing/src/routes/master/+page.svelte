@@ -26,13 +26,14 @@
   import costs from '../../../master/costs.js?raw';
   import releases from '../../../master/releases.js?raw';
   import alerts from '../../../master/alerts.js?raw';
+  import pwa from '../../../master/pwa.js?raw';
   import app from '../../../master/app.js?raw';
   import boot from '../../../master/boot.js?raw';
 
   /* Load order matters — see boot.js. Each file is an IIFE hanging one global
      off `window`, so concatenating them is the same as the <script src>
      tags the standalone page used. */
-  const dashboard = [config, auth, api, sync, charts, analytics, sales, costs, releases, alerts, app, boot].join('\n');
+  const dashboard = [config, auth, api, sync, charts, analytics, sales, costs, releases, alerts, pwa, app, boot].join('\n');
 
   /* Tags are assembled rather than written out, because a literal <script> or
      <style> in this file — even inside a string or a comment — is what Svelte's
@@ -47,6 +48,15 @@
 <svelte:head>
   <title>Autonomic</title>
   <meta name="robots" content="noindex, nofollow" />
+  <!-- Installed-app metadata. The manifest itself is a real file
+       (static/master/manifest.json) rather than another inlined string:
+       a manifest is fetched by the browser as a URL, and a data: one cannot
+       carry a same-origin start_url. It is linked from the boot script below
+       rather than here — see the note there. Both meta tags are additive, so
+       they can live in the head with the site's own. -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black" />
   {@html tag('style', styles)}
 </svelte:head>
 
@@ -61,11 +71,21 @@
      them — a sideways drag on a wide table zooms the page instead of scrolling
      the table. The meta tag is REWRITTEN rather than added: app.html ships one
      for the whole site and two viewport tags is undefined behaviour, so this
-     route edits the site's rather than competing with it. -->
+     route edits the site's rather than competing with it.
+
+     The manifest link is rewritten for the same reason, and it matters more:
+     app.html links `/site.webmanifest` for the marketing site, and which of
+     two manifest links a browser honours is not something to leave to document
+     order. Pointing the existing one at the dashboard's manifest is
+     unambiguous — /master installs as its own app, with its own name, icon and
+     start_url, and the site's manifest is untouched everywhere else. -->
 {@html inlineScript(
   "document.body.classList.add('gated');" +
   "var vp=document.querySelector('meta[name=viewport]');" +
-  "if(vp)vp.setAttribute('content','width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no');"
+  "if(vp)vp.setAttribute('content','width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no');" +
+  "var mf=document.querySelector('link[rel=manifest]');" +
+  "if(mf)mf.setAttribute('href','/master/manifest.json');" +
+  "else{mf=document.createElement('link');mf.rel='manifest';mf.href='/master/manifest.json';document.head.appendChild(mf);}"
 )}
 
 {@html body}

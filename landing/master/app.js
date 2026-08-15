@@ -91,6 +91,26 @@
     if (window.Sync) window.Sync.schedule();
   }
 
+  /* Is there anything in the cache worth painting before the server answers?
+
+     The dashboard used to wait for the pull on principle: a second device
+     would otherwise flash the first one's numbers. That was the wrong trade for
+     an app one person reads on three devices — it made every open cost a round
+     trip, and on a phone with a slow connection that is the difference between
+     a dashboard and a loading screen. The cache paints first now, and the pull
+     lands on top of it a moment later. What used to be a "stale numbers" risk
+     is bounded by the same thing that always bounded it: the data is one
+     account's, the pull is already in flight, and the refresh button spins
+     until it lands. */
+  function hasCache() {
+    return !!(db.entries.length || (db.sales || []).length ||
+      (db.costs || []).length || (db.ads || []).length || (db.events || []).length);
+  }
+
+  /* True between "the page came up with nothing cached" and "the first pull
+     landed" — the only window in which the whole page is a skeleton. */
+  var bootPending = false;
+
   /* ---------------------------------------------------------------- dates */
 
   function pad(n) { return n < 10 ? '0' + n : '' + n; }
@@ -609,24 +629,8 @@
       })
     ];
 
-    /* Two lines from the Costs view, because revenue on its own is not a
-       result. They are combined-platform whatever the filter says — costs are
-       not per-store — so they are added only when there is spend to report,
-       rather than sitting at a permanent zero beside eight per-store tiles. */
-    var money = costSummary(r);
-    if (money.spend) {
-      tiles.push(tile({
-        label: 'Net profit in range', color: money.profit >= 0 ? COLOR.s3 : COLOR.red,
-        value: fmtMoney(money.profit), smallValue: true,
-        meta: fmtMoney(money.spend) + ' spent · both stores, whatever the filter says'
-      }));
-      tiles.push(tile({
-        label: 'Cost per install', value: fmtMoney(money.costPerInstall), smallValue: true,
-        meta: 'blended · ' + fmtMoney(money.costPerPaid) + ' per paid conversion'
-      }));
-    }
-
     document.getElementById('ovTiles').innerHTML = tiles.join('');
+    renderOverviewMoney(r);
 
     /* main chart — downloads with the two thresholds shaded underneath */
     var cumulative = state.ovMode === 'cumulative';
@@ -739,6 +743,106 @@
     });
 
     renderWeekday(r);
+  }
+
+  /**
+   * The Overview's money strip.
+   *
+   * It reads the same two engines the Costs and Sales views do — `CS.summary`
+   * for the cash and `Sales.summarize` for the recurring side — rather than
+   * doing any arithmetic of its own, so a number here can never disagree with
+   * the view it came from. Four rules it inherits from them, each of which was
+   * a decision made once and must not be re-made here:
+   *
+   * - **Gross and net are both shown.** Entries carry the customer-facing
+   *   price; the store keeps 15% or 30%. Profit is always struck against the
+   *   net, and the commission is named rather than silently applied.
+   * - **Cash and MRR are never blended.** An annual plan is a year of cash on
+   *   one day and a twelfth of its price every month; a single figure called
+   *   "revenue" that picked one is the thing the Sales view was built to stop.
+   * - **Everything here is BOTH stores.** No ad network splits spend the way
+   *   the stores split downloads, and a hosting bill is neither, so the filter
+   *   bar does not apply and the strip says so.
+   * - **Cost per install is blended** — marketing ÷ every install, organic
+   *   ones included — which is the honest ceiling rather than the number an ad
+   *   network reports about its own work.
+   *
+   * The whole strip is hidden when there is no money at all to report, rather
+   * than sitting at six zeroes above the funnel.
+   */
+  function renderOverviewMoney(r) {
+    var host = document.getElementById('ovMoney');
+    var head = document.getElementById('ovMoneyHead');
+    if (!host) return;
+
+    var money = costSummary(r);
+    var ix = Sales.index(salesList(), 'all');
+    var s = Sales.summarize(ix, r.from, r.to);
+    var live = money.spend || money.grossRevenue || s.mrr || s.bookings;
+
+    if (head) head.classList.toggle('hidden', !live);
+    host.classList.toggle('hidden', !live);
+    if (!live) { host.innerHTML = ''; return; }
+
+    var cut = storeCut();
+    var tiles = [
+      tile({
+        label: 'Net profit in range', color: money.profit >= 0 ? COLOR.s3 : COLOR.red,
+        value: fmtMoney(money.profit), smallValue: true,
+        meta: fmtMoney(money.netRevenue) + ' after the store cut − ' + fmtMoney(money.spend) + ' spent' +
+          (money.margin === null ? '' : ' · ' + fmtPct(money.margin) + ' margin')
+      }),
+      tile({
+        label: 'Spend in range', color: ENTITY.impressions,
+        value: fmtMoney(money.spend), smallValue: true,
+        meta: fmtMoney(money.marketing) + ' marketing · ' + fmtMoney(money.other) + ' everything else'
+      }),
+      tile({
+        label: 'Revenue, net of commission', color: ENTITY.revenue,
+        value: fmtMoney(money.netRevenue), smallValue: true,
+        meta: fmtMoney(money.grossRevenue) + ' at list · ' + fmtMoney(money.commission) +
+          ' kept by the stores at ' + cut + '%'
+      })
+    ];
+
+    /* The recurring side. `active` counts subscriptions only — a lifetime
+       purchase and an unclassified legacy row are real money with no term, so
+       counting either would put "13 active" beside an MRR that does not
+       include them. Both are named in the meta line instead. */
+    var noTerm = s.activeByPlan.lifetime.count + s.activeByPlan.unknown.count;
+    tiles.push(tile({
+      label: 'MRR at ' + labelDay(r.to), color: ENTITY.sales,
+      value: fmtMoney(s.mrr), smallValue: true,
+      meta: fmtMoney(s.arr) + ' a year · ' + fmtInt(s.active) + ' active ' +
+        (s.active === 1 ? 'subscription' : 'subscriptions') +
+        (noTerm ? ' · ' + fmtInt(noTerm) + ' more carry no term and are not in it' : '')
+    }));
+
+    tiles.push(tile({
+      label: 'Bookings in range', color: ENTITY.sales,
+      value: fmtMoney(s.bookings), smallValue: true,
+      meta: 'cash taken · ' + fmtMoney(s.newMrr) + ' of new MRR' +
+        (s.refunds ? ' · ' + fmtMoney(s.refunds) + ' refunded' : '')
+    }));
+
+    if (money.spend) {
+      tiles.push(tile({
+        label: 'Cost per install', value: fmtMoney(money.costPerInstall), smallValue: true,
+        meta: 'blended · ' + fmtMoney(money.costPerPaid) + ' per paid conversion · ' +
+          (money.roas === null ? 'no marketing spend' : fmtMoney(money.roas) + ' back per ' + (db.settings.currency || '$') + '1 of ads')
+      }));
+    }
+
+    var be = breakevenSeries();
+    tiles.push(tile({
+      label: 'All-time net', value: fmtMoney(be.revenue - be.spend), smallValue: true,
+      color: be.revenue - be.spend >= 0 ? COLOR.s3 : COLOR.red,
+      meta: be.at
+        ? 'broke even ' + labelFull(be.at) + ' · every day since ' + labelDay(be.from)
+        : fmtMoney(be.spend - be.revenue) + ' still to make back · since ' + labelDay(be.from)
+    }));
+
+    host.innerHTML = tiles.join('');
   }
 
   var DOW_METRICS = {
@@ -1050,7 +1154,47 @@
   var CS = window.Costs;
 
   var PING_DAYS = 400;                 // history pulled in one call, then cached
-  var pings = { status: 'idle', report: null, at: null, error: '' };
+  var pings = { status: 'idle', report: null, at: null, error: '', stale: false };
+
+  /* The counter's last answer, kept in localStorage beside the store.
+
+     It is the only source on this page that is NOT part of `db` — it is
+     read-only and never synced — so it used to live in memory alone, which
+     meant App usage and Timeline opened on "Reading the counter…" every single
+     time however recently you had read it. Cached, they open on the numbers you
+     last saw and swap them for the fresh ones a moment later, exactly like
+     every other view.
+
+     `stale` is what stops the cache being mistaken for a fetch: a cached report
+     is drawn immediately AND refetched, where a report fetched this session is
+     left alone until the auto-refresh comes round. It is also why the alerts
+     baseline is not seeded from this — see the note in `pingLoad`. */
+  var PING_KEY = KEY + '.pings';
+
+  function loadPingCache() {
+    try {
+      var raw = localStorage.getItem(PING_KEY);
+      if (!raw) return;
+      var p = JSON.parse(raw);
+      if (!p || !p.report) return;
+      pings.report = p.report;
+      pings.at = p.at ? new Date(p.at) : null;
+      pings.status = 'ready';
+      pings.stale = true;
+    } catch (e) { /* unreadable cache is no cache */ }
+  }
+
+  function savePingCache() {
+    try {
+      localStorage.setItem(PING_KEY, JSON.stringify({
+        at: pings.at ? pings.at.toISOString() : null, report: pings.report
+      }));
+    } catch (e) {
+      /* 400 days of cohorts is the biggest thing this page stores, and it is
+         the most disposable: if the quota is tight the journal keeps the room. */
+      try { localStorage.removeItem(PING_KEY); } catch (e2) { /* ignore */ }
+    }
+  }
   var pingUI = { tlMode: 'usage', tlMetric: 'active', curveMode: 'all', heatGrain: 'week', cohort: null, event: null, editing: null };
 
   var PC = {
@@ -1069,8 +1213,12 @@
      here is how the Timeline tab ended up rendering an empty chart: the data
      arrived, and nothing asked the view to draw it again. */
   function repaintPingViews() {
+    if (state.view !== 'ping' && state.view !== 'timeline') return;
+    /* Through renderAll while a skeleton is up, because the skeleton is what is
+       currently standing in for the view and only renderAll takes it down. */
+    if (skeletonOn) { renderAll(); return; }
     if (state.view === 'ping') renderPing();
-    else if (state.view === 'timeline') renderTimelineView();
+    else renderTimelineView();
   }
 
   /* The filter bar's platform, as the ping index speaks it. `compare` has no
@@ -1082,7 +1230,7 @@
 
   function pingLoad(force) {
     if (pings.status === 'loading') return Promise.resolve();
-    if (pings.status === 'ready' && !force) return Promise.resolve();
+    if (pings.status === 'ready' && !force && !pings.stale) return Promise.resolve();
     pings.status = 'loading';
     pings.error = '';
     /* Only repaint into the loading state when there is nothing on screen to
@@ -1094,10 +1242,16 @@
       pings.report = res || { open: [], sub: [] };
       pings.at = new Date();
       pings.status = 'ready';
+      pings.stale = false;
+      savePingCache();
       /* Every path that reads the counter goes through here, so this is the one
-         place the live alerts have to hang off: the first report of a session
-         seeds their baseline silently, and every one after it is compared with
-         the last. A failure to make a noise must never cost the repaint. */
+         place the live alerts have to hang off. The baseline they compare
+         against is REMEMBERED across sessions (alerts.js), so opening the
+         dashboard after a day away announces what arrived while it was shut —
+         which is why the cached report above is never handed to `sync`. Feeding
+         it the cache first would move the baseline forward to what you have
+         already been told about, and the news would be swallowed silently.
+         A failure to make a noise must never cost the repaint. */
       if (window.Alerts) {
         try { window.Alerts.sync(pings.report); } catch (e) { /* never block the view */ }
       }
@@ -2219,7 +2373,183 @@
     });
 
     renderEventAnalysis(ix);
+    renderStoreVersions();
     renderReleases();
+  }
+
+  /* ------------------------------------------------- what is live in the stores
+
+     Read by the Lambda, not by this page: Apple's lookup endpoint sends no CORS
+     headers and Google's listing is an HTML page. `sls/lambdas/api/storeVersions.js`
+     holds both, and the whole of the reasoning about how far each can be
+     trusted.
+
+     The rule that shapes everything below: **an unreadable version is reported
+     as unreadable.** The Android side is a scrape of a page Google never
+     promised us, so it will break; the failure mode has to be a sentence
+     saying so, never a number left over from the last time it worked. That is
+     the one thing this card exists to get right — it is read to answer "did
+     the release I cut actually go live", and a stale number answers that
+     question incorrectly and with total confidence. */
+
+  var STORE_KEY = KEY + '.stores';
+  var stores = { status: 'idle', data: null, error: '' };
+
+  function loadStoreCache() {
+    try {
+      var raw = localStorage.getItem(STORE_KEY);
+      if (!raw) return;
+      var p = JSON.parse(raw);
+      if (p && (p.ios || p.android)) { stores.data = p; stores.status = 'ready'; }
+    } catch (e) { /* unreadable cache is no cache */ }
+  }
+
+  function storeLoad(force) {
+    if (stores.status === 'loading') return Promise.resolve();
+    /* Once per session unless forced. The cached copy from localStorage does
+       NOT count as fetched, so arriving on the Timeline always goes and looks —
+       cheaply, since the Lambda answers from its own cache. */
+    if (stores.fetched && !force) return Promise.resolve();
+    stores.status = 'loading';
+    /* `force` is only ever passed by the button on the card. The five-minute
+       auto-refresh does not: the Lambda caches for half an hour, and a store
+       that publishes a new build a few times a month does not need asking
+       every five minutes from every open device. */
+    return window.Api.call('STORE_VERSIONS', force ? { force: true } : {}).then(function (res) {
+      stores.data = res || null;
+      stores.status = 'ready';
+      stores.fetched = true;
+      stores.error = '';
+      try { localStorage.setItem(STORE_KEY, JSON.stringify(res)); } catch (e) { /* ignore */ }
+      if (state.view === 'timeline') renderStoreVersions();
+    }).catch(function (err) {
+      stores.status = 'error';
+      stores.error = (err && err.message) || 'Could not reach the stores.';
+      if (state.view === 'timeline') renderStoreVersions();
+    });
+  }
+
+  /** The newest version the app's own release log knows about. */
+  function newestRelease() {
+    var list = (window.RELEASES || []).slice().sort(function (a, b) {
+      return a.date < b.date ? -1 : a.date > b.date ? 1 : 0;
+    });
+    return list[list.length - 1] || null;
+  }
+
+  /* Version strings compared as numbers, segment by segment, so 1.24.1 is
+     newer than 1.9 — which a string comparison gets backwards, and which is
+     exactly the pair this app is at. */
+  function cmpVersion(a, b) {
+    var pa = String(a || '').split('.').map(Number);
+    var pb = String(b || '').split('.').map(Number);
+    for (var i = 0; i < Math.max(pa.length, pb.length); i++) {
+      var x = pa[i] || 0, y = pb[i] || 0;
+      if (x !== y) return x < y ? -1 : 1;
+    }
+    return 0;
+  }
+
+  /* The release log carries `1.24` where a build carries `1.24.1`, so the
+     comparison is "is the store at or past the newest logged version" rather
+     than string equality. */
+  var STORE_ERRORS = {
+    'not-listed': 'Not listed in this store yet.',
+    ambiguous: 'The listing page no longer says which value is the version.',
+    'not-found': 'Google has changed the listing page — no version could be read from it.',
+    unreachable: 'Could not reach the store.',
+    unreadable: 'The store answered with something unreadable.',
+    http: 'The store refused the request.'
+  };
+
+  function storeRowHTML(o) {
+    var newest = newestRelease();
+    var body;
+
+    if (!o.info) {
+      body = '<span class="store-miss">Not checked yet.</span>';
+    } else if (o.info.error) {
+      body = '<span class="store-miss">' + esc(STORE_ERRORS[o.info.error] || 'Could not read a version.') +
+        (o.info.detail ? ' <span class="store-why">' + esc(o.info.detail) + '</span>' : '') + '</span>';
+    } else {
+      var v = o.info.version;
+      var cmp = newest ? cmpVersion(v, newest.version) : 0;
+      /* Three states worth telling apart, and the middle one is the reason to
+         look: a version BEHIND the log is a release that has not gone live
+         (or a rollout still in progress), which is not visible anywhere else
+         on this dashboard. */
+      var against = !newest ? ''
+        : cmp >= 0 ? '<span class="store-ok">current</span>'
+        : '<span class="store-behind">v' + esc(newest.version) + ' shipped ' + esc(labelDay(newest.date)) +
+          ' and is not live here yet</span>';
+      body = '<span class="store-version">v' + esc(v) + '</span>' +
+        (o.info.released ? '<span class="store-when">' + esc(labelFull(o.info.released)) + '</span>' : '') +
+        against;
+    }
+
+    return '<div class="store-row">' +
+      '<span class="store-name">' + esc(o.name) + '</span>' +
+      body +
+      /* The destination is carried as data and applied to `.href` after the
+         markup lands, rather than being concatenated into an href attribute.
+         Two reasons, and the second is the load-bearing one: the URL comes
+         from an external API, so it is checked for an https scheme before it
+         becomes a link; and the built page is scanned for RELATIVE src/href
+         attributes (tests/master-gate.test.mjs), a rule that exists because a
+         relative URL here breaks /master when it is reached without a trailing
+         slash — and an href attribute opened in source and closed by a
+         concatenation is indistinguishable from a relative one to that
+         scanner, which reads the shipped text rather than the rendered DOM. */
+      (o.info && o.info.url ? '<a class="store-link" data-url="' + esc(o.info.url) + '" target="_blank" rel="noopener">Open</a>' : '') +
+      '</div>';
+  }
+
+  function renderStoreVersions() {
+    var host = document.getElementById('tlStores');
+    if (!host) return;
+
+    var age = document.getElementById('tlStoreAge');
+    if (age) {
+      age.textContent = !stores.data || !stores.data.at ? ''
+        : 'checked ' + relTime(stores.data.at);
+    }
+
+    if (!stores.data && stores.status === 'loading') {
+      host.innerHTML = '<div class="skel-bar title" style="width:60%"></div>';
+      return;
+    }
+    if (!stores.data && stores.status === 'error') {
+      host.innerHTML = '<div class="empty">' + esc(stores.error) + '</div>';
+      return;
+    }
+
+    var d = stores.data || {};
+    host.innerHTML =
+      storeRowHTML({ name: 'App Store', info: d.ios }) +
+      storeRowHTML({ name: 'Google Play', info: d.android }) +
+      /* Said once, under the rows, rather than repeated in the Android row on
+         every render: the asymmetry is a property of the two stores, not of
+         today's answer. */
+      '<p class="note" style="margin:10px 0 0">Apple\'s figure comes from its public lookup API. Google publishes none, so the Play row is read off the listing page — ' +
+      '<a href="https://play.google.com/console" target="_blank" rel="noopener">Play Console</a> is the authority when the two disagree.</p>';
+
+    host.querySelectorAll('.store-link[data-url]').forEach(function (a) {
+      var url = a.dataset.url || '';
+      // Only an absolute https link, because this came off a store's API.
+      if (/^https:\/\//.test(url)) a.href = url;
+      else a.remove();
+    });
+  }
+
+  /** "4 minutes ago" — only ever used for how old a store check is. */
+  function relTime(ms) {
+    var s = Math.max(0, Math.round((Date.now() - Number(ms)) / 1000));
+    if (s < 90) return 'just now';
+    var m = Math.round(s / 60);
+    if (m < 60) return m + ' minute' + (m === 1 ? '' : 's') + ' ago';
+    var h = Math.round(m / 60);
+    if (h < 36) return h + ' hour' + (h === 1 ? '' : 's') + ' ago';
+    return Math.round(h / 24) + ' days ago';
   }
 
   function renderReleases() {
@@ -3775,6 +4105,9 @@
     renderSaleEntry();
     renderCostEntry();
     renderEventList();
+    /* Permission can be revoked in the browser's own settings while the page
+       is open, so the line is re-read on arrival rather than written once. */
+    syncNotifyUI();
   }
 
   /* ------------------------------------------------------ view: forecast */
@@ -4691,7 +5024,340 @@
           padL(fmtInt(row.trialEnd), 11) + padL(fmtInt(row.wallHit), 10));
       });
     });
+
+    exportMoney(L, r);
+    exportSales(L, r);
+    exportCosts(L, r);
+    exportUsage(L, r);
+    exportEvents(L, r);
+    exportForecast(L);
+    exportWeekday(L, r);
+
     return L.join('\n');
+  }
+
+  /* ------------------------------------------------- export: the rest of it
+
+     Everything below is a section of `buildExportText`, split out one function
+     per subject because the whole of it in one body is unreadable and because
+     each one has a different rule about when it has nothing to say.
+
+     The export is a PROMPT — it is copied into a chat window to be reasoned
+     about — so the shape of every section is the same: what the numbers are,
+     then the sentence a reader needs in order not to misread them. That second
+     half is the part worth protecting. "MRR 41.30" invites a model to add it to
+     bookings; "MRR is a rate, bookings are cash, and an annual plan is a year
+     of one and a twelfth of the other" does not. Every caveat this dashboard
+     enforces on screen is restated here, because a number pasted somewhere else
+     has left every one of them behind.
+
+     A section that has nothing to report emits NOTHING — not a heading with
+     zeroes under it. An empty book should produce a short export, and a heading
+     over six dashes reads as data that failed to load. */
+
+  /* How many individual purchase rows the export prints before it starts
+     summarising. A real book is nowhere near this; a demo month is well past
+     it, which is exactly the case that showed the cap was needed. */
+  var MAX_LEDGER_ROWS = 400;
+
+  function exportMoney(L, r) {
+    var money = costSummary(r);
+    var s = Sales.summarize(Sales.index(salesList(), 'all'), r.from, r.to);
+    if (!money.spend && !money.grossRevenue && !s.bookings && !s.mrr) return;
+
+    var be = breakevenSeries();
+    L.push('');
+    L.push('## Money in the window (both stores — costs are never per-store)');
+    L.push('Revenue is entered at the customer-facing price and the store keeps ' + storeCut() + '%.');
+    L.push('Profit is always struck against the NET figure; both are given so the cut is visible.');
+    L.push('');
+    [['Gross revenue', money.grossRevenue], ['Store commission', -money.commission],
+     ['Net revenue', money.netRevenue], ['Spend', -money.spend],
+     ['  of which marketing', -money.marketing], ['  of which everything else', -money.other],
+     ['Net profit', money.profit]].forEach(function (m) {
+      L.push(pad2(m[0], 28) + padL(fmtMoney(m[1]), 14));
+    });
+    L.push(pad2('Margin', 28) + padL(fmtPct(money.margin), 14));
+    L.push(pad2('Cost per install (blended)', 28) + padL(fmtMoney(money.costPerInstall), 14) +
+      '   marketing ÷ EVERY install, organic included — the honest ceiling');
+    L.push(pad2('Cost per paid (blended)', 28) + padL(fmtMoney(money.costPerPaid), 14));
+    L.push(pad2('Cost per paid (loaded)', 28) + padL(fmtMoney(money.loadedCostPerPaid), 14) +
+      '   all spend, not only marketing');
+    L.push(pad2('Revenue per install', 28) + padL(fmtMoney(money.revenuePerInstall), 14));
+    L.push(pad2('Return on ad spend', 28) + padL(money.roas === null ? '–' : money.roas.toFixed(2) + '×', 14));
+    L.push('');
+    L.push('All time, since ' + labelFull(be.from) + ':');
+    L.push(pad2('  Net revenue', 28) + padL(fmtMoney(be.revenue), 14));
+    L.push(pad2('  Spend', 28) + padL(fmtMoney(be.spend), 14));
+    L.push(pad2('  Net', 28) + padL(fmtMoney(be.revenue - be.spend), 14));
+    L.push(pad2('  Breakeven', 28) + padL(be.at ? labelFull(be.at) : 'not yet', 14) +
+      (be.at ? '' : !be.spend ? '   nothing spent yet'
+        : '   ' + fmtMoney(be.spend - be.revenue) + ' still to make back'));
+  }
+
+  function exportSales(L, r) {
+    var rows = salesList();
+    if (!rows.length) return;
+    var ix = Sales.index(rows, 'all');
+    var s = Sales.summarize(ix, r.from, r.to);
+
+    L.push('');
+    L.push('## Subscriptions (the purchase ledger — one row per purchase)');
+    L.push('CASH and RECURRING REVENUE are different numbers and are never blended: an annual');
+    L.push('plan at ' + fmtMoney(s.byPlan.annual.units ? s.byPlan.annual.bookings / s.byPlan.annual.units : 0) +
+      ' is that much BOOKINGS on the day it sells and a twelfth of it in MRR');
+    L.push('every month for a year. A plan whose term is unknown (rows migrated from the old');
+    L.push('daily columns) counts in bookings and in every rate, and is excluded from MRR —');
+    L.push('spreading it over an assumed term would invent the one fact that is missing.');
+    L.push('A subscription is assumed to still run until it is marked cancelled: the stores');
+    L.push('tell this dashboard nothing about churn, so none is inferred. A refund is counted');
+    L.push('in nothing but its own two fields.');
+    L.push('');
+    [['Purchases (units)', fmtInt(s.units)], ['Bookings (cash)', fmtMoney(s.bookings)],
+     ['New MRR in window', fmtMoney(s.newMrr)], ['Churned MRR in window', fmtMoney(s.churnedMrr)],
+     ['MRR at ' + r.to, fmtMoney(s.mrr)], ['ARR at ' + r.to, fmtMoney(s.arr)],
+     ['Active subscriptions', fmtInt(s.active)],
+     ['Active without a term', fmtInt(s.activeOther)],
+     ['Average price paid', fmtMoney(s.arpu)],
+     ['Refunds', fmtMoney(s.refunds) + ' over ' + fmtInt(s.refundedCount)],
+     ['Annual share of new MRR', fmtPct(s.annualMrrShare)],
+     ['Annual share of units', fmtPct(s.annualUnitShare)]].forEach(function (m) {
+      L.push(pad2(m[0], 28) + padL(m[1], 18));
+    });
+
+    L.push('');
+    L.push('By plan (in window):');
+    L.push(pad2('  plan', 14) + padL('units', 8) + padL('bookings', 12) + padL('new mrr', 11) + padL('active', 9));
+    Sales.PLAN_KEYS.forEach(function (k) {
+      var p = s.byPlan[k];
+      if (!p.units && !s.activeByPlan[k].count) return;
+      L.push(pad2('  ' + ((Sales.PLANS[k] || {}).label || k), 14) + padL(fmtInt(p.units), 8) +
+        padL(fmtMoney(p.bookings), 12) + padL(fmtMoney(p.mrr), 11) + padL(fmtInt(s.activeByPlan[k].count), 9));
+    });
+
+    L.push('');
+    L.push('By store (in window):');
+    Object.keys(s.byPlatform).forEach(function (k) {
+      var p = s.byPlatform[k];
+      L.push(pad2('  ' + (PLATFORMS[k] || k), 14) + padL(fmtInt(p.units), 8) +
+        padL(fmtMoney(p.bookings), 12) + padL(fmtMoney(p.mrr), 11));
+    });
+
+    /* Days-to-purchase only ever counts purchases that carry an install date.
+       A row without one is not a zero and not an average — it is left out, and
+       the share it is of the whole is stated rather than implied. */
+    var ages = Sales.purchaseAges(ix, r.from, r.to);
+    if (ages && ages.total) {
+      L.push('');
+      L.push('Days from install to purchase — drawn from ' + fmtInt(ages.total) + ' of ' +
+        fmtInt(ages.total + ages.withoutCohort) + ' purchases (' + fmtPct(ages.coverage) + ').');
+      L.push('The rest carry no install date and are LEFT OUT rather than averaged in: an');
+      L.push('aggregated row cannot have one, since several buyers do not share an install day.');
+      L.push('Median ' + fmtInt(ages.median) + ' days; the median rather than the mean, because one');
+      L.push('buyer who installed a year ago and finally paid drags a mean past the wall.');
+      (ages.buckets || []).forEach(function (b) {
+        if (!b.count) return;
+        L.push(pad2('  ' + b.label, 16) + padL(fmtInt(b.count), 8));
+      });
+    }
+
+    /* Every row in the window, verbatim. This is the point of "exhaustive": a
+       ledger summarised is a ledger you cannot re-derive anything from. */
+    var inWindow = rows.filter(function (x) { return x.date >= r.from && x.date <= r.to; })
+      .sort(function (a, b) { return a.date < b.date ? -1 : 1; });
+    if (inWindow.length) {
+      L.push('');
+      /* The one cap in the export, and it says so out loud. A silent
+         truncation reads as "that is all the purchases there were", which is
+         the single most misleading thing a ledger dump could do. */
+      var shown = inWindow;
+      if (inWindow.length > MAX_LEDGER_ROWS) {
+        shown = inWindow.slice(-MAX_LEDGER_ROWS);
+        L.push('The most recent ' + fmtInt(MAX_LEDGER_ROWS) + ' of ' + fmtInt(inWindow.length) +
+          ' purchases in the window — the older ' + fmtInt(inWindow.length - MAX_LEDGER_ROWS) +
+          ' are counted in every total above but not listed here:');
+      } else {
+        L.push('Every purchase in the window:');
+      }
+      L.push(pad2('  date', 14) + pad2('store', 9) + pad2('plan', 10) + padL('price', 9) +
+        padL('qty', 5) + '  ' + pad2('installed', 12) + pad2('cancelled', 12) + 'note');
+      shown.forEach(function (x) {
+        L.push(pad2('  ' + x.date, 14) + pad2(PLATFORMS[x.platform] || x.platform, 9) +
+          pad2(x.refunded ? x.plan + ' (refunded)' : x.plan, 10) + padL(fmtMoney(x.price), 9) +
+          padL(fmtInt(x.qty || 1), 5) + '  ' + pad2(x.cohort || '–', 12) +
+          pad2(x.cancelled || '–', 12) + (x.note || ''));
+      });
+    }
+  }
+
+  function exportCosts(L, r) {
+    var spend = spendList();
+    if (!spend.length) return;
+    var d = CS.daily(spend, r.from, r.to);
+    if (!d.total && !ads().length) return;
+
+    L.push('');
+    L.push('## What it costs to run');
+    L.push('A cost lands on the day it is CHARGED, never smeared across the days between');
+    L.push('charges: a yearly developer fee is one whole charge on one day, not a twelfth of');
+    L.push('itself every month. An ad spot is one line item bought once, so its whole price');
+    L.push('lands on its start date — the end date describes the booking, not the money.');
+    L.push('');
+    L.push('By category, in the window:');
+    CS.CATEGORY_KEYS.forEach(function (k) {
+      var v = d.totals[k];
+      if (!v) return;
+      L.push(pad2('  ' + ((CS.CATEGORIES[k] || {}).label || k), 22) + padL(fmtMoney(v), 12) +
+        (CS.isMarketing(k) ? '   marketing' : ''));
+    });
+    L.push(pad2('  Total', 22) + padL(fmtMoney(d.total), 12));
+
+    var perAd = CS.perAd(ads(), r.from, r.to);
+    if (perAd && perAd.rows.length) {
+      L.push('');
+      L.push('Ad spots whose money landed in the window. Impressions / clicks / installs are');
+      L.push('what the NETWORK reported — the network marking its own homework — so the cost per');
+      L.push('install here is REPORTED, not blended, and the two are never mixed.');
+      L.push(pad2('  spot', 24) + pad2('network', 14) + padL('spend', 10) +
+        padL('impr', 10) + padL('clicks', 9) + padL('installs', 10) + padL('cpi', 9));
+      perAd.rows.forEach(function (a) {
+        L.push(pad2('  ' + String(a.name || '').slice(0, 22), 24) + pad2(String(a.platform || '–').slice(0, 12), 14) +
+          padL(fmtMoney(a.spend), 10) + padL(fmtInt(a.impressions), 10) + padL(fmtInt(a.clicks), 9) +
+          padL(fmtInt(a.installs), 10) + padL(a.cpi === null ? '–' : fmtMoney(a.cpi), 9));
+      });
+    }
+
+    var ledger = costList().filter(function (c) { return c && c.date >= r.from && c.date <= r.to; })
+      .sort(function (a, b) { return a.date < b.date ? -1 : 1; });
+    if (ledger.length) {
+      L.push('');
+      L.push('Cost ledger rows dated in the window (recurring rows are listed once, at the row');
+      L.push('you entered; their later occurrences are in the category totals above):');
+      ledger.forEach(function (c) {
+        L.push(pad2('  ' + c.date, 14) + pad2((CS.CATEGORIES[c.category] || {}).label || c.category, 16) +
+          padL(fmtMoney(c.amount), 11) + '  ' + (c.label || '') +
+          (c.recurrence ? ' (' + c.recurrence + ')' : ''));
+      });
+    }
+  }
+
+  function exportUsage(L, r) {
+    if (!pings.report) return;
+    var ix = A.index(pings.report, 'all');
+    if (!ix.last) return;
+
+    var days = A.range(r.from < ix.first ? ix.first : r.from, r.to > ix.last ? ix.last : r.to);
+    if (!days.length) return;
+
+    L.push('');
+    L.push('## App usage (the app\'s own anonymous counter, not the stores)');
+    L.push('Each install asks a counter to add one, at most once per US Eastern day, carrying');
+    L.push('nothing but the day that install FIRST ran and one letter for its store. There is no');
+    L.push('device id, so COUNTS CAN BE COMPARED ACROSS DAYS BUT NEVER SUMMED INTO ONE: adding');
+    L.push('seven daily numbers counts the same person seven times. There is no weekly or');
+    L.push('monthly active figure below for exactly that reason. A first run is the closest');
+    L.push('thing to a live download here; the store\'s own download number arrives a day late');
+    L.push('in a CSV and the two are never added together.');
+    L.push('');
+
+    var active = 0, fresh = 0, back = 0, subs = 0;
+    days.forEach(function (d) {
+      active += A.activeOn(ix, d);
+      fresh += A.newOn(ix, d);
+      back += A.returningOn(ix, d);
+      subs += A.purchasesOn(ix, d);
+    });
+    var n = days.length;
+    L.push(pad2('Newest day counted', 26) + padL(labelFull(ix.last), 16));
+    L.push(pad2('Active on that day', 26) + padL(fmtInt(A.activeOn(ix, ix.last)), 16));
+    L.push(pad2('Active per day (mean)', 26) + padL(fmtInt(Math.round(active / n)), 16));
+    L.push(pad2('First runs per day (mean)', 26) + padL(fmtInt(Math.round(fresh / n)), 16));
+    L.push(pad2('Returning per day (mean)', 26) + padL(fmtInt(Math.round(back / n)), 16));
+    L.push(pad2('First runs in window', 26) + padL(fmtInt(fresh), 16) +
+      '   (a sum of DISTINCT people: each is born once)');
+    L.push(pad2('Subscribe pings in window', 26) + padL(fmtInt(subs), 16) +
+      '   (the app notices a purchase on its NEXT launch, so this lags the ledger)');
+
+    L.push('');
+    L.push('Retention, exact rather than modelled — day N\'s count over the cohort\'s day 0:');
+    [1, 3, 7, 14, 30, 60, 90].forEach(function (k) {
+      var rr = A.retentionAt(ix, ix.cohorts, k);
+      if (!rr || rr.pct === null) return;
+      L.push(pad2('  D' + k, 8) + padL(fmtPct(rr.pct), 9) + '   ' + fmtInt(rr.kept) + ' of ' + fmtInt(rr.of) +
+        (rr.immature ? ' · ' + rr.immature + ' cohorts too young to count' : ''));
+    });
+
+    [7, 30].forEach(function (k) {
+      var c = A.conversion(ix, ix.cohorts, k);
+      if (!c || c.pct === null) return;
+      L.push(pad2('  Convert by D' + k, 18) + padL(fmtPct(c.pct), 9) + '   ' + fmtInt(c.kept) + ' of ' + fmtInt(c.of));
+    });
+
+    var live = A.lifecycleActive(ix, ix.last);
+    L.push('');
+    L.push('Where the people active on ' + labelFull(ix.last) + ' are in the lifecycle:');
+    L.push(pad2('  In trial (day 0–' + trialDays() + ')', 26) + padL(fmtInt(live.inTrial), 9));
+    L.push(pad2('  Past the trial', 26) + padL(fmtInt(live.postTrial), 9));
+    L.push(pad2('  Past the wall', 26) + padL(fmtInt(live.pastWall), 9));
+
+    /* The store split is always unfiltered, and a ping that names no store is
+       an install whose store we failed to record — a build older than the
+       platform marker — rather than an install on a third platform. */
+    var split = A.platformsOn(ix, ix.last);
+    L.push('');
+    L.push('Store split on ' + labelFull(ix.last) + ': iOS ' + fmtInt(split.I || 0) +
+      ' · Android ' + fmtInt(split.A || 0) +
+      ((split.U || 0) ? ' · ' + fmtInt(split.U) + ' from builds that predate the store marker' : ''));
+
+    L.push('');
+    L.push('Day by day (active / first runs / returning / subscribe pings):');
+    L.push(pad2('  day', 14) + padL('active', 9) + padL('first', 8) + padL('return', 9) + padL('subs', 7));
+    days.forEach(function (d) {
+      L.push(pad2('  ' + d, 14) + padL(fmtInt(A.activeOn(ix, d)), 9) + padL(fmtInt(A.newOn(ix, d)), 8) +
+        padL(fmtInt(A.returningOn(ix, d)), 9) + padL(fmtInt(A.purchasesOn(ix, d)), 7));
+    });
+  }
+
+  function exportEvents(L, r) {
+    var items = timelineItems().filter(function (e) { return e.date >= r.from && e.date <= r.to; })
+      .sort(function (a, b) { return a.date < b.date ? -1 : 1; });
+    if (!items.length) return;
+    L.push('');
+    L.push('## What happened in the window');
+    L.push('Releases and ad spots flag themselves from the release log and the spend ledger;');
+    L.push('everything else was entered by hand. This is the context a shape in the numbers');
+    L.push('above needs before it is read as a trend.');
+    items.forEach(function (e) {
+      L.push(pad2('  ' + e.date, 14) + pad2(e.category || 'EVENT', 11) + (e.title || '') +
+        (e.note ? ' — ' + e.note : ''));
+    });
+  }
+
+  function exportForecast(L) {
+    if (!salesList().length && !db.entries.length) return;
+    L.push('');
+    L.push('## Forecast');
+    L.push('Modelled, not measured. Everything above this line happened; nothing below it has.');
+    L.push('');
+    L.push(fcExportText().split('\n').slice(1).join('\n'));
+  }
+
+  function exportWeekday(L, r) {
+    if (!base().dates.length) return;
+    L.push('');
+    L.push('## By weekday, averaged across the window');
+    L.push(pad2('  day', 12) + padL('downloads', 11) + padL('page views', 12) +
+      padL('sales', 8) + padL('revenue', 11));
+    var stats = {};
+    ['downloads', 'pageViews', 'sales', 'revenue'].forEach(function (f) {
+      stats[f] = weekdayStats('all', r.from, r.to, f);
+    });
+    var mean = function (w) { return w.count ? w.sum / w.count : 0; };
+    WD_LONG.forEach(function (name, i) {
+      L.push(pad2('  ' + name, 12) + padL(fmtInt(mean(stats.downloads[i])), 11) +
+        padL(fmtInt(mean(stats.pageViews[i])), 12) + padL(fmtInt(mean(stats.sales[i])), 8) +
+        padL(fmtMoney(mean(stats.revenue[i])), 11));
+    });
   }
 
   function copyText(text) {
@@ -4796,14 +5462,25 @@
 
   /**
    * `opts.silent` suppresses the "Refreshed." confirmation, and nothing else.
-   * It is what the ten-minute auto-refresh below passes: a toast every ten
+   * It is what the five-minute auto-refresh below passes: a toast every five
    * minutes for a thing nobody asked for is furniture, the same reason the sync
    * pill went away. A refresh that FAILS still says so however it was started —
    * that one is worth interrupting for, and it can only appear once per cycle.
+   *
+   * `opts.keepScreen` pulls and hydrates without re-rendering, and exists for
+   * exactly one case: an unattended refresh landing on **Edit data**. That view
+   * is not a dashboard, it is a set of forms, and `renderData` rebuilds the
+   * purchase form from its defaults — so a timer firing while you were halfway
+   * through typing a sale would empty the fields under your hands, or throw
+   * away an edit-in-progress by replacing the form with a blank one. The store
+   * is still updated, the counter is still fetched and the alerts still fire;
+   * only the repaint waits until you leave. A refresh you PRESSED always
+   * renders, on every view, because you asked for it.
    */
   function refreshView(opts) {
     if (refreshing) return;
     var silent = !!(opts && opts.silent);
+    var keepScreen = !!(opts && opts.keepScreen);
     var btn = document.getElementById('btnRefresh');
     refreshing = true;
     lastAutoAt = Date.now();
@@ -4821,13 +5498,24 @@
         migrateAdSpots();
       });
 
-    // The counter is only worth a round trip on the views that show it.
-    if (state.view === 'ping' || state.view === 'timeline') {
-      work = work.then(function () { return pingLoad(true); });
+    /* The counter is refetched on EVERY view, not only on the two that draw
+       it. It is the source the live alerts are computed from, and gating the
+       fetch on the view meant a sale that landed while you were reading the
+       Costs page was announced whenever you next happened to open App usage —
+       by which time it was not news, and the confetti was for something that
+       had happened an hour ago. It is one small GET every five minutes. */
+    work = work.then(function () { return pingLoad(true); });
+
+    /* The stores, on the view that shows them. A refresh you PRESSED forces a
+       real check; the five-minute one takes whatever the Lambda's half-hour
+       cache holds, because a store that publishes a few times a month does not
+       need asking every five minutes from every open device. */
+    if (state.view === 'timeline') {
+      work = work.then(function () { return storeLoad(!silent); });
     }
 
     work.then(function () {
-      renderAll();
+      if (!keepScreen) renderAll();
       if (!silent) toast('Refreshed.');
     }).catch(function (err) {
       toast('Could not refresh: ' + ((err && err.message) || 'no answer from the server') + '.');
@@ -4842,51 +5530,140 @@
 
   /* -------------------------------------------------------- auto-refresh
 
-     The dashboard refetches itself every ten minutes while it is ON SCREEN, so
-     a tab left open beside your work keeps up on its own — and so `alerts.js`
-     has a new ping report to compare with the last one. Three conditions, all
-     load-bearing:
+     The dashboard refetches itself every FIVE minutes while it is ON SCREEN,
+     on every view, so a tab left open beside your work keeps up on its own —
+     and so `alerts.js` has a new ping report to compare with the last one. Two
+     conditions, both load-bearing:
 
      - **Visible only.** `document.hidden` is checked on every tick rather than
        relied on through `setInterval` throttling: a backgrounded tab that is
        still allowed to run would otherwise burn a full pull-and-hydrate every
-       ten minutes for a screen nobody is looking at, and would fire its
-       celebration into an empty room. Coming back to the tab checks
-       immediately, so a laptop reopened after an hour is current within a
-       frame rather than up to ten minutes stale.
-     - **The two ping-fed views only.** The counter is the only source on this
-       page that changes on its own, and `refreshView` only refetches it on the
-       App usage and Timeline views. Everywhere else an auto-refresh would pull
-       the same store CSVs it already holds and announce nothing.
+       five minutes for a screen nobody is looking at. Coming back to the tab
+       checks immediately, so a laptop reopened after an hour is current within
+       a frame rather than up to five minutes stale. (A notification, unlike the
+       confetti, is deliberately allowed to fire into a window that is on screen
+       but not focused — see pwa.js.)
      - **Signed in only.** The gate is up before any of this exists; a pull
        behind it would 401 and toast at somebody who has not typed their code
        yet.
 
-     The clock is a timestamp compared on a 30-second tick, not a ten-minute
+     It used to be gated on the view as well — the counter being the only source
+     that changes on its own, the other views had nothing to say. That was true
+     of the CHARTS and false of the alerts: a sale arriving while the Costs view
+     was open went unannounced until you wandered onto App usage. Every view
+     refetches everything now, and `refreshView` fetches the counter regardless
+     of what is on screen. Edit data is the one view where the refresh happens
+     without a repaint (`keepScreen`), because a timer must not rebuild a form
+     you are typing into — see the note on `refreshView`.
+
+     The clock is a timestamp compared on a 30-second tick, not a five-minute
      interval, because an interval cannot be paused for the hours the tab spent
      in the background — it would fire the moment it came back and then again on
      its old cadence. Any refresh, including one you pressed, resets it. */
 
-  var AUTO_REFRESH_MS = 10 * 60 * 1000;
+  var AUTO_REFRESH_MS = 5 * 60 * 1000;
   var AUTO_TICK_MS = 30 * 1000;
   var lastAutoAt = 0;
 
   function autoRefreshDue() {
     if (document.hidden) return false;
     if (document.body.classList.contains('gated')) return false;
-    if (state.view !== 'ping' && state.view !== 'timeline') return false;
     return Date.now() - lastAutoAt >= AUTO_REFRESH_MS;
   }
 
   function autoRefreshTick() {
     if (!autoRefreshDue()) return;
-    refreshView({ silent: true });
+    refreshView({ silent: true, keepScreen: state.view === 'data' });
   }
 
   function initAutoRefresh() {
     lastAutoAt = Date.now();
     setInterval(autoRefreshTick, AUTO_TICK_MS);
     document.addEventListener('visibilitychange', autoRefreshTick);
+  }
+
+  /* ------------------------------------------------------------ skeleton
+
+     What a view looks like before its data has arrived.
+
+     The honest thing to say about this is that it should almost never be seen.
+     Every view except App usage and Timeline is drawn from `db`, which is in
+     localStorage before the page finishes parsing, so the ordinary open paints
+     real numbers in one frame and skips this entirely. The skeleton is for the
+     two cases where there genuinely is nothing yet: a browser signing in for
+     the first time (or after "Delete all data"), and the two ping-fed views on
+     a device that has never fetched the counter.
+
+     It reproduces a view's SHAPE — the tile strip, the wide charts, the
+     two-column grid — and nothing else. It is deliberately not a rebuild of
+     each card's interior: a placeholder that guesses at content is a
+     placeholder that jumps when the content lands, and the shape is the whole
+     of what the reader needs to know that the page is not broken. */
+
+  var SKELETON = {
+    overview:  { tiles: 10, wide: [320, 260], half: 5 },
+    ping:      { tiles: 8,  wide: [300, 260], half: 5 },
+    timeline:  { tiles: 0,  wide: [340, 240], half: 1 },
+    trial:     { tiles: 6,  wide: [300, 260], half: 2 },
+    cohorts:   { tiles: 4,  wide: [300], half: 2 },
+    platforms: { tiles: 6,  wide: [280], half: 4 },
+    sales:     { tiles: 8,  wide: [280, 260], half: 3 },
+    costs:     { tiles: 8,  wide: [300, 260], half: 3 },
+    forecast:  { tiles: 4,  wide: [320, 240], half: 0 },
+    data:      { tiles: 0,  wide: [200, 200], half: 0 }
+  };
+
+  var skeletonOn = false;
+
+  function skeletonHTML(view) {
+    var s = SKELETON[view] || SKELETON.overview;
+    var out = [];
+    if (s.tiles) {
+      out.push('<div class="grid cards">');
+      for (var i = 0; i < s.tiles; i++) out.push('<div class="skel-tile"><span class="skel-bar sm"></span><span class="skel-bar lg"></span><span class="skel-bar md"></span></div>');
+      out.push('</div>');
+    }
+    (s.wide || []).forEach(function (h) {
+      out.push('<div class="skel-card" style="margin-bottom:14px"><span class="skel-bar title"></span>' +
+        '<span class="skel-plot" style="height:' + h + 'px"></span></div>');
+    });
+    if (s.half) {
+      out.push('<div class="grid two-col">');
+      for (var j = 0; j < s.half; j++) {
+        out.push('<div class="skel-card"><span class="skel-bar title"></span><span class="skel-plot" style="height:200px"></span></div>');
+      }
+      out.push('</div>');
+    }
+    return out.join('');
+  }
+
+  function showSkeleton(on) {
+    var host = document.getElementById('skeleton');
+    if (!host) return;
+    skeletonOn = !!on;
+    if (skeletonOn) {
+      host.innerHTML = skeletonHTML(state.view);
+      /* The views are markup, not a template: `#view-overview` ships its card
+         shells in body.html and is visible until something hides it. Before
+         `renderAll` has ever run — which is exactly when the boot skeleton is
+         up — that means a page of empty headed cards sitting underneath it. */
+      document.querySelectorAll('.view').forEach(function (v) { v.classList.add('hidden'); });
+    }
+    host.classList.toggle('hidden', !skeletonOn);
+  }
+
+  /**
+   * Is there nothing to draw yet?
+   *
+   * Two conditions, and neither is "the network is busy" — a refetch over data
+   * we already hold never brings the skeleton back, or every five minutes the
+   * whole page would blink.
+   */
+  function needsSkeleton() {
+    if (bootPending) return true;
+    if ((state.view === 'ping' || state.view === 'timeline') &&
+        !pings.report && pings.status !== 'error') return true;
+    return false;
   }
 
   /* ------------------------------------------------------------- render */
@@ -4934,6 +5711,18 @@
       t.setAttribute('aria-selected', t.dataset.view === state.view ? 'true' : 'false');
     });
 
+    /* Nothing to draw yet — the shape of the view, and the fetch that will fill
+       it, are already running. The ping-fed views still ask for their counter
+       from here, or the skeleton would be all there ever was. */
+    if (needsSkeleton()) {
+      showSkeleton(true);
+      document.getElementById('view-' + state.view).classList.add('hidden');
+      document.getElementById('emptyState').classList.add('hidden');
+      if (state.view === 'ping' || state.view === 'timeline') pingLoad();
+      return;
+    }
+    showSkeleton(false);
+
     // App usage and Timeline have their own data sources, so both stand up with
     // no store CSVs at all.
     /* Sales stands up with no store CSVs for the same reason Costs does: the
@@ -4951,7 +5740,7 @@
 
     if (state.view === 'overview') renderOverview();
     else if (state.view === 'ping') { pingLoad(); renderPing(); }
-    else if (state.view === 'timeline') { pingLoad(); renderTimelineView(); }
+    else if (state.view === 'timeline') { pingLoad(); storeLoad(); renderTimelineView(); }
     else if (state.view === 'trial') renderTrial();
     else if (state.view === 'cohorts') renderCohorts();
     else if (state.view === 'platforms') renderPlatforms();
@@ -5194,6 +5983,62 @@
     toastTimer = setTimeout(function () { t.classList.remove('on'); }, 2600);
   }
 
+  /* ------------------------------------------------------ notifications
+
+     The settings card under Edit data. `pwa.js` owns the capability and the
+     honesty about what it can do; this is only the two buttons and the line of
+     status under them, which is written to say what to do next in every state
+     rather than to report an enum. */
+
+  var NOTE_COPY = {
+    granted: 'On. A download or a sale raises a notification while the dashboard is open and you are looking at something else.',
+    denied: 'Blocked by the browser. Turn notifications back on for autonomic.care in your browser or system settings — the page cannot ask twice.',
+    'default': 'Not asked yet.',
+    'needs-install': 'Add the dashboard to your home screen first (Safari → Share → Add to Home Screen), then open it from there and come back here. iOS only allows an installed app to ask.',
+    unsupported: 'This browser has no notification support.'
+  };
+
+  function syncNotifyUI() {
+    var host = document.getElementById('ntStatus');
+    if (!host || !window.Pwa) return;
+    var st = window.Pwa.state();
+    host.textContent = NOTE_COPY[st] || NOTE_COPY.unsupported;
+    var enable = document.getElementById('ntEnable');
+    var test = document.getElementById('ntTest');
+    if (enable) enable.disabled = st === 'granted' || st === 'denied' || st === 'unsupported';
+    /* A test button that only works in a window you are not looking at would
+       be untestable, so the test passes `force` — it is the one notification
+       allowed to appear over the page that asked for it. */
+    if (test) test.classList.toggle('hidden', st !== 'granted');
+  }
+
+  function wireNotifications() {
+    var enable = document.getElementById('ntEnable');
+    var test = document.getElementById('ntTest');
+    if (!enable || !window.Pwa) return;
+
+    enable.addEventListener('click', function () {
+      window.Pwa.enable().then(function (p) {
+        syncNotifyUI();
+        if (p === 'granted') toast('Notifications on.');
+        else if (p === 'denied') toast('The browser said no — turn them on in its settings.');
+        else toast('Notifications were not enabled.');
+      });
+    });
+
+    if (test) {
+      test.addEventListener('click', function () {
+        window.Pwa.notify({
+          title: 'Autonomic', body: 'Notifications are working.', tag: 'autonomic-test', force: true
+        }).then(function (ok) {
+          if (!ok) toast('Could not show a notification — check the browser permission.');
+        });
+      });
+    }
+
+    syncNotifyUI();
+  }
+
   /* -------------------------------------------------------------- wiring */
 
   /* segmented controls live inside re-rendered cards, so clicks are delegated */
@@ -5226,6 +6071,13 @@
   }
 
   function init() {
+    /* The counter's last answer, so App usage and Timeline open on numbers
+       rather than on "Reading the counter…". It is refetched immediately below
+       whatever this finds. */
+    loadPingCache();
+    loadStoreCache();
+    bootPending = false;
+
     /* The one-shot move of sales out of the daily columns and into the ledger.
        It runs HERE because boot.js calls `Sync.adopt` before `Dashboard.start`,
        so by now the server's own shape is the sync baseline and the rewrite
@@ -5324,11 +6176,40 @@
     wireCosts();
     wireAccordions();
 
+    /* "Check now" on the store-versions card. It forces a real round trip to
+       Apple and Google past the Lambda's cache, which is what you want from a
+       button pressed right after hitting Release. */
+    var storeBtn = document.getElementById('tlStoreRefresh');
+    if (storeBtn) {
+      storeBtn.addEventListener('click', function () {
+        storeBtn.disabled = true;
+        storeLoad(true).then(function () {
+          storeBtn.disabled = false;
+          if (stores.status === 'error') toast(stores.error);
+        });
+      });
+    }
+
     /* Wrapped rather than passed straight in: the listener would hand the click
        event to `refreshView` as its options object. */
     document.getElementById('btnRefresh').addEventListener('click', function () { refreshView(); });
     if (window.Alerts) window.Alerts.init();
     initAutoRefresh();
+    wireNotifications();
+
+    /* A new worker means the document on disk is no longer the one running.
+       Say so and let the reader choose the moment: an automatic reload here
+       would throw away every open card, the scroll position and any half-typed
+       row in the entry forms. */
+    if (window.Pwa) {
+      window.Pwa.onUpdate(function () { toast('A new version of the dashboard is ready — reload when you like.'); });
+    }
+
+    /* The counter, on whatever view we came up on. It is what the live alerts
+       diff against, so it is fetched at boot everywhere rather than on arrival
+       at App usage — otherwise the first thing a session hears about a sale is
+       nothing at all. */
+    pingLoad();
 
     /* --- data entry --- */
     wireBulk();
@@ -5487,9 +6368,24 @@
       toast('All data deleted.');
     });
 
-    /* redraw charts on resize */
+    /* Redraw charts on resize — but ONLY when the WIDTH moved.
+
+       Every chart here is an SVG sized to its container's width, so a resize is
+       worth a re-render when the page got wider or narrower and never when it
+       only got shorter. On a phone that distinction is the whole thing: the
+       address bar collapses as you scroll down, which fires `resize` with a
+       new innerHeight, which re-rendered every chart on the page mid-scroll.
+       The document's height changes under the scroll position while the
+       browser is still settling it, and the reader gets thrown back up a
+       quarter of the page — reliably, at the bottom of the longest views,
+       which is exactly where the collapse happens. Height-only resizes are
+       therefore ignored outright; nothing on this page is laid out against the
+       viewport's height. */
     var rt;
+    var lastWidth = window.innerWidth;
     window.addEventListener('resize', function () {
+      if (window.innerWidth === lastWidth) return;
+      lastWidth = window.innerWidth;
       clearTimeout(rt);
       rt = setTimeout(function () {
         if (state.view !== 'data') renderAll(); else layoutTiles();
@@ -5534,10 +6430,41 @@
     invalidate();
   }
 
+  /**
+   * The pull landed on a page that was already painted from the cache.
+   *
+   * Everything here has to happen AFTER `Sync.adopt` — the migrations for the
+   * reason spelled out in hydrate(), the render because it is what puts the
+   * server's copy on screen over the top of the cached one.
+   */
+  function adopted() {
+    migrateSales();
+    migrateAdSpots();
+    renderAll();
+  }
+
+  /** boot.js's half of the cache-first open: no cache, so draw the shape. */
+  function skeleton(on) {
+    bootPending = !!on;
+    showSkeleton(!!on);
+    /* The filter bar scopes data there is none of yet, and unlike the views it
+       is never hidden by `renderAll` on the way in. Only the BOOT skeleton
+       takes it down — a view-level one (App usage waiting on the counter) leaves
+       it alone, since taking a row out and putting it back is a jump. */
+    var bar = document.getElementById('filterbar');
+    if (bar) bar.classList.toggle('hidden', !!on);
+  }
+
   window.Dashboard = {
     hydrate: hydrate,
     /** What sync.js diffs against. */
     store: function () { return { db: db, state: state }; },
-    start: init
+    start: init,
+    /* alerts.js says the same line in the corner card and in the toast, and
+       the toast is the one that works wherever the reader is on the page. */
+    toast: toast,
+    hasCache: hasCache,
+    skeleton: skeleton,
+    adopted: adopted
   };
 })();

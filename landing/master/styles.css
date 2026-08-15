@@ -271,6 +271,47 @@ input[type="number"] { -moz-appearance: textfield; }
 
 .swatch { width: 9px; height: 9px; border-radius: 3px; flex: none; display: inline-block; }
 
+/* ---------- skeleton ----------
+ *
+ * The shape of a view whose data has not arrived, built per view by
+ * `skeletonHTML` in app.js. The measurements are the real ones — `.skel-tile`
+ * and `.skel-card` reuse the card surface, radius and padding rather than
+ * approximating them — so the swap when the data lands moves nothing sideways.
+ *
+ * The shimmer is one animation on a gradient, not a per-element pulse: a page
+ * of twenty independently fading blocks reads as a fault. Under
+ * `prefers-reduced-motion` it holds still and keeps the contrast, because the
+ * blocks are the message and the movement is only the reassurance. */
+
+.skel-tile, .skel-card {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px 16px;
+}
+/* The skeleton's tiles live inside a real `.grid.cards`, so they flex exactly
+   as the tiles they stand in for do — no second copy of that rule here. */
+.skel-bar, .skel-plot {
+  display: block;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--surface-2) 0%, var(--surface-3) 50%, var(--surface-2) 100%);
+  background-size: 300% 100%;
+  animation: skel-shimmer 1.6s ease-in-out infinite;
+}
+.skel-bar.sm    { width: 45%; height: 10px; margin-bottom: 12px; }
+.skel-bar.md    { width: 70%; height: 9px; }
+.skel-bar.lg    { width: 58%; height: 22px; margin-bottom: 10px; }
+.skel-bar.title { width: 32%; height: 12px; margin-bottom: 16px; }
+.skel-plot      { width: 100%; border-radius: 8px; }
+
+@keyframes skel-shimmer {
+  0%   { background-position: 100% 0; }
+  100% { background-position: 0 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skel-bar, .skel-plot { animation: none; background: var(--surface-2); }
+}
+
 /* ---------- charts ---------- */
 
 .chart-wrap { position: relative; }
@@ -398,6 +439,34 @@ tbody tr:hover { background: var(--surface-2); }
 .event-type { color: var(--text-muted); }
 .event-amount { margin-left: auto; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
 .event-row .btn { flex: none; }
+
+/* ---------- what is live in the stores ----------
+ *
+ * Deliberately shaped like an event row rather than like a stat tile: this is
+ * a fact about a version on a date, and the thing next to it in the DOM is the
+ * release log it is being compared against.
+ *
+ * The three states a row can be in are told apart by COLOUR as well as by
+ * words, and only one of them is loud. `store-behind` is amber because it is
+ * the state you opened the card to find — a version you cut that has not
+ * reached anyone yet. A version that could not be read is muted, not red: an
+ * unreadable Play listing is an expected condition of scraping a page nobody
+ * promised us, and painting it as an error every day would train it away. */
+.store-row {
+  display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+  padding: 9px 6px; border-bottom: 1px solid var(--border); font-size: 13px;
+}
+.store-row:last-of-type { border-bottom: none; }
+.store-name { width: 110px; flex: none; color: var(--text-secondary); }
+.store-version { font-size: 17px; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+.store-when { color: var(--text-muted); font-size: 12px; }
+.store-ok { color: var(--good); font-size: 12px; }
+.store-behind { color: var(--warning); font-size: 12px; }
+.store-miss { color: var(--text-muted); }
+/* The reason, on its own line on a phone: it is a sentence, not a label. */
+.store-why { display: block; color: var(--text-muted); font-size: 11.5px; margin-top: 2px; }
+.store-link { margin-left: auto; color: var(--series-1); font-size: 12px; text-decoration: none; }
+.store-link:hover { text-decoration: underline; }
 
 .event-form {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));

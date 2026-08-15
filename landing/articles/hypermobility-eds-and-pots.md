@@ -8,8 +8,8 @@ keywords: "hypermobility and POTS, hEDS POTS, Ehlers-Danlos POTS, Beighton score
 date: 2026-08-15
 updated: 2026-08-15
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1536331568701-0b15cbb1a918?q=80&w=1760&auto=format&fit=crop"
-photoAttribution: "Briana Tozour / Unsplash"
+photoLocation: "https://images.unsplash.com/photo-1552196527-bffef41ef674?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb&dl=dane-wetton-AkSJQnem75Y-unsplash.jpg"
+photoAttribution: "Dane Wetton / Unsplash"
 tldr: "Joint hypermobility and hypermobile Ehlers-Danlos syndrome (hEDS) show up in POTS far more often than chance. The leading explanation is connective tissue: more stretchy vein and vessel walls let extra blood pool in the legs and abdomen when you stand, so the heart speeds up to compensate. The Beighton score screens for hypermobility but does not diagnose hEDS, and hypermobility does not by itself prove you have a syndrome. The management is the same POTS toolkit, weighted toward abdominal compression, gentle recumbent reconditioning and joint protection. Tracking your own standing numbers is how you tell what is actually helping."
 categories:
   - pots

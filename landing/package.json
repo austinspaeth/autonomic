@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "prepare": "svelte-kit sync || echo ''",
     "qr": "node scripts/gen-qr.mjs",
-    "test:master": "vite build && node tests/analytics.test.mjs && node tests/alerts.test.mjs && node tests/costs.test.mjs && node tests/sales.test.mjs && node tests/master-gate.test.mjs && node tests/master-ping.test.mjs && node tests/master-alerts.test.mjs && node tests/master-costs.test.mjs && node tests/master-sales.test.mjs",
+    "test:master": "vite build && node tests/analytics.test.mjs && node tests/alerts.test.mjs && node tests/costs.test.mjs && node tests/sales.test.mjs && node tests/master-gate.test.mjs && node tests/master-ping.test.mjs && node tests/master-alerts.test.mjs && node tests/master-costs.test.mjs && node tests/master-sales.test.mjs && node tests/master-pwa.test.mjs && node tests/store-versions.test.mjs && node tests/master-stores.test.mjs",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "releases": "node scripts/gen-releases.mjs"
   },

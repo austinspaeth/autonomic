@@ -21,13 +21,18 @@ byte-for-byte what is in this folder.
 
 Two things follow from that, and both are load-bearing:
 
-- **The page has no assets to resolve.** No sibling stylesheet, no
-  `<script src>`, no logo file — the brand mark is an inline `<symbol>`. It
-  used to ship as `static/master/index.html` with *relative* asset URLs, which
-  meant a request for `/master` without the trailing slash resolved every one
-  of them against `/`: the page arrived unstyled, with the gate inert and the
-  dashboard on display behind it. A self-contained document cannot fail that
-  way however the URL is reached.
+- **The page has no assets to resolve in order to render.** No sibling
+  stylesheet, no `<script src>`, no logo file — the brand mark is an inline
+  `<symbol>`. It used to ship as `static/master/index.html` with *relative*
+  asset URLs, which meant a request for `/master` without the trailing slash
+  resolved every one of them against `/`: the page arrived unstyled, with the
+  gate inert and the dashboard on display behind it. A self-contained document
+  cannot fail that way however the URL is reached. The two URLs the page does
+  name — its manifest and its service worker, both under `/master/` and both
+  **root-absolute** — are the install layer rather than the page: neither is
+  fetched to draw anything, and a 404 on either costs the app icon and the
+  offline shell while the dashboard itself still works. Nothing here may be
+  *relative*, and `tests/master-gate.test.mjs` fails the build if it is.
 - **`csr = false` is why the inlining works at all.** The site ships no
   framework runtime, so `{@html}` output is parsed by the browser out of
   server-rendered HTML and its `<script>` tags execute normally. Turn CSR on
@@ -66,11 +71,76 @@ Two consequences of sharing DiscoveryMark's pool are worth knowing:
   gate is only there so the page doesn't render a useless shell. Never remove
   the server-side check.
 
-## Storage
+## It is an installed app
 
-DynamoDB is the store of record. `localStorage` is kept as a cache so the page
-paints instantly and keeps working offline, but nothing renders from it before
-the pull lands — otherwise a second device would flash the first one's numbers.
+`/master` ships a manifest and a service worker, so it installs to a home
+screen or a dock and opens like an app. Three pieces, and each is where it is
+for a reason:
+
+- **`static/master/manifest.json`** — its own name, icon, `start_url` and
+  scope, all `/master/`. It is a real file rather than another inlined string
+  because a manifest is fetched as a URL and a `data:` one cannot carry a
+  same-origin `start_url`. It is `.json` and not `.webmanifest` because the
+  deploy is `aws s3 sync`, which types files by extension and has no entry for
+  the latter. The link is **rewritten, not added**: `app.html` already links
+  `/site.webmanifest` for the marketing site, and which of two manifest links a
+  browser honours is not a thing to leave to document order — so the route's
+  boot script points the existing tag at the dashboard's, the same technique it
+  already used for the viewport meta.
+- **`static/master/sw.js`** — also a real file, because a worker cannot be
+  registered from an inline script body. Its scope is therefore `/master/` and
+  it can never see a request for the marketing site. Navigations are
+  **network-first** (the document IS the app, so a deploy must reach you on the
+  next open) with the cached copy as the fallback; same-origin static files are
+  stale-while-revalidate; **cross-origin requests are not intercepted at all**,
+  which covers every API and sign-in call — a worker that "handles" those could
+  only ever serve a stale number as a fresh one. Bump `CACHE` when you change
+  the file. A new worker **toasts** rather than reloading: a reload mid-session
+  throws away every open card, the scroll position and any half-typed row.
+- **`landing/master/pwa.js`** — the in-page half: registration, and the
+  notification capability described below.
+
+### On a phone, a resize is only a resize if the WIDTH moved
+
+Every chart here is an SVG sized to its container's width, so the resize
+listener in `app.js` re-renders the page when it gets wider or narrower and
+**ignores a height-only resize outright**. Nothing on this page is laid out
+against the viewport's height, and on a phone that distinction is the whole
+thing: the address bar collapses as you scroll down, which fires `resize` with a
+new `innerHeight`, which re-rendered every chart mid-scroll. The document's
+height then changed under the scroll position while the browser was still
+settling it, and the reader was thrown back up a quarter of the page —
+reliably, at the bottom of the longest views, which is exactly where the
+collapse happens.
+
+## Storage, and painting from the cache
+
+DynamoDB is the store of record. `localStorage` is the cache, and **the cache
+paints first**.
+
+That is a reversal. The page used to hold everything back until the pull landed,
+on the grounds that a second device would otherwise flash the first one's
+numbers. That cost is real and it is the smaller one: waiting bought a loading
+screen on every open, on every device, forever, and this is one person's
+dashboard read from a phone as often as from a laptop. What keeps the trade
+honest is that the pull is already in flight while the cache is on screen, the
+refresh control spins until it lands, and the repaint replaces the whole store
+rather than merging into it.
+
+Four things are cached, and the last two are new:
+
+| Key | What |
+|---|---|
+| `autonomic.dashboard.v1` | the store — entries, events, ads, costs, sales, settings |
+| `autonomic.dashboard.v1.ui` | the view, range, filters, forecast controls |
+| `autonomic.dashboard.v1.pings` | the counter's last report, so App usage and Timeline open on numbers rather than on "Reading the counter…" |
+| `autonomic.master.alertBase` | what this browser has already been told about (see the alerts section) |
+
+The ping cache is the biggest and the most disposable: if the quota is tight it
+deletes itself rather than costing the store its room. It is marked **stale** on
+load, which means "draw it, and refetch it" — and it is deliberately **not** fed
+to `Alerts.sync`, or the baseline would move forward to news you have not been
+told yet and the catch-up would announce nothing.
 
 `sync.js` diffs the whole store against the last state the server confirmed and
 pushes the difference, debounced. `app.js` calls `save()` from about thirty
@@ -78,16 +148,53 @@ places without saying what changed, so diffing is both cheaper to maintain than
 instrumenting each call site and impossible to leave stale. A push that fails
 does not advance the baseline, so the retry re-sends the same work.
 
-Boot order lives in `boot.js`: sign in → `LOAD` → hydrate → render.
+Boot order lives in `boot.js`: sign in → paint the cache → `LOAD` → hydrate →
+repaint. A browser with **nothing** cached — a first sign-in, or the one after
+"Delete all data" — gets the view's **skeleton** instead.
 
 There is no sync-status pill. "Saved" was on screen essentially always, which
 made it furniture rather than information, so **silence is the success state**
 and only `error` and `offline` speak — once per transition, as a toast, rather
 than on every tick of a retry loop. The header's refresh button re-runs the same
 path (flush any pending push, pull, hydrate keeping the current view, then
-re-fetch the ping counter on the two views that read it). A refetch **holds what
-is already on screen** and swaps it when the new data lands; the ping view used
-to repaint into its loading state and tear every chart down first.
+re-fetch the ping counter). A refetch **holds what is already on screen** and
+swaps it when the new data lands; the ping view used to repaint into its loading
+state and tear every chart down first.
+
+### Skeletons
+
+`SKELETON` in `app.js` is a table of view shapes — how many tiles, how many wide
+charts, how many half-width ones — and `skeletonHTML` draws it into `#skeleton`.
+Two rules:
+
+- **It reproduces the SHAPE, not the content.** `.skel-tile` and `.skel-card`
+  reuse the real card's surface, radius and padding, so the swap when data
+  lands moves nothing sideways; inside them there are bars and a plot area and
+  nothing that pretends to be a specific number.
+- **It should almost never be seen.** Every view but the two ping-fed ones is
+  drawn from a cache that is in memory before the page finishes parsing. The
+  skeleton is for a browser signing in for the first time, and for App usage or
+  Timeline on a device that has never fetched the counter. A refetch over data
+  already held never brings it back, or the page would blink every five minutes.
+
+### Notifications
+
+An installed app can raise a system notification for the same arrivals the
+corner cards announce, and the settings card under **Edit data → Notifications**
+is honest about the limit rather than implying a pager:
+
+**There is no push server.** The counter is polled by the page itself, and a
+service worker with no push subscription does not run while the app is closed.
+So a notification can only fire while the dashboard is OPEN. What it buys is
+still real: the condition is `document.hasFocus()`, not `document.hidden` — the
+dashboard on a second monitor, in a background tab, or as an installed app you
+have switched away from is exactly where a toast in the corner is worth nothing.
+(`document.hidden` would be wrong twice over: the refresh timer already refuses
+to run while hidden, so a hidden-only rule would mean it never fires at all.)
+
+iOS supports this from 16.4 and **only for a PWA added to the home screen**;
+`Pwa.state()` reports that case as `needs-install` so the card can say what to
+do instead of looking broken.
 
 ## Files
 
@@ -109,8 +216,17 @@ Everything below is in `landing/master/`, except the route that assembles them.
 | `costs.js` | Pure money arithmetic behind the Costs view |
 | `releases.js` | Generated release log, read as timeline annotations |
 | `charts.js` | Dependency-free SVG chart engine |
-| `alerts.js` | Live alerts: what changed since the last refresh, said out loud |
-| `styles.css` | Dark theme tokens, layout, gate |
+| `alerts.js` | Live alerts: what changed since you last looked, said out loud |
+| `pwa.js` | Service-worker registration and the notification capability |
+| `styles.css` | Dark theme tokens, layout, gate, skeletons |
+
+Two files sit outside that folder because they have to be real URLs rather than
+inlined strings, and both are in `landing/static/master/`:
+
+| File | Role |
+|---|---|
+| `manifest.json` | The installed app's name, icon, scope and `start_url` |
+| `sw.js` | The service worker: offline shell, scoped to `/master/` |
 
 ## The App usage view
 
@@ -176,27 +292,37 @@ on its next launch — so they should track, not match.
 
 ## Auto-refresh and live alerts
 
-The page refetches itself **every 10 minutes while it is visible**, and
-announces what changed. `alerts.js` is the announcement; the timer is
-`initAutoRefresh()` in `app.js`, which reuses the header refresh's own path with
-`{ silent: true }` — the "Refreshed." toast is suppressed, and nothing else is.
+The page refetches itself **every 5 minutes while it is visible, on every
+view**, and announces what changed. `alerts.js` is the announcement; the timer
+is `initAutoRefresh()` in `app.js`, which reuses the header refresh's own path
+with `{ silent: true }` — the "Refreshed." toast is suppressed, and nothing else
+is.
 
-Three conditions gate the timer, all load-bearing:
+Two conditions gate the timer, both load-bearing:
 
 - **Visible only.** `document.hidden` is read on every tick rather than trusted
   to `setInterval` throttling, so a backgrounded tab does not burn a
-  pull-and-hydrate for a screen nobody is looking at, and does not fire its
-  celebration into an empty room. `visibilitychange` checks immediately, so a
-  laptop reopened after an hour is current in a frame rather than up to ten
-  minutes stale.
-- **App usage and Timeline only.** The ping counter is the only source on this
-  page that changes on its own, and `refreshView` only refetches it on those two
-  views. Anywhere else an auto-refresh would re-pull store CSVs it already holds
-  and have nothing to say.
+  pull-and-hydrate for a screen nobody is looking at. `visibilitychange` checks
+  immediately, so a laptop reopened after an hour is current in a frame rather
+  than up to five minutes stale.
 - **Signed in only.** A pull behind the gate would 401 at somebody who has not
   typed their code yet.
 
-The clock is a timestamp compared on a 30-second tick, not a ten-minute
+It used to be gated on the VIEW as well — only App usage and Timeline, the
+counter being the only source that changes on its own. That was true of the
+charts and false of the alerts: a sale arriving while the Costs view was open
+went unannounced until you happened to wander onto App usage, by which time it
+was not news and the confetti was for something that had happened an hour ago.
+`refreshView` now fetches the counter regardless of what is on screen.
+
+**Edit data is refreshed without a repaint** (`keepScreen`). That view is not a
+dashboard, it is a set of forms, and `renderData` rebuilds the purchase form
+from its defaults — so an unattended timer would empty the fields under your
+hands, or replace an edit-in-progress with a blank form. The store still
+updates, the counter is still fetched and the alerts still fire; only the
+repaint waits until you leave. A refresh you PRESSED always renders.
+
+The clock is a timestamp compared on a 30-second tick, not a five-minute
 interval: an interval cannot be paused for the hours a tab spent in the
 background, so it would fire the moment it returned and then again on its old
 cadence. Any refresh, including one you pressed, resets it.
@@ -209,9 +335,9 @@ a CSV paste would be an alert about your own typing.
 
 | Event | Definition | Reaction |
 |---|---|---|
-| Visitors | a rise in open pings | two-note blip, no card |
-| Downloads | a rise in **first runs** — an open ping whose cohort key IS the day it arrived on | three-note rising chime, confetti falling from the top, a card naming the store(s) |
-| Sales | a rise in subscribe pings | brass fanfare, confetti from the top AND the bottom, a card naming the store(s) that paid |
+| Visitors | a rise in open pings | two-note blip, and nothing else in any channel |
+| Downloads | a rise in **first runs** — an open ping whose cohort key IS the day it arrived on | three-note rising chime, confetti falling from the top, a card + a toast + a notification naming the store(s) |
+| Sales | a rise in subscribe pings | brass fanfare, **ten seconds** of confetti from the top AND the bottom, a card + a toast + a notification naming the store(s) that paid |
 
 The three cues are meant to be told apart across a room with your back to the
 screen, so they differ in SHAPE and not only in pitch — two notes, three notes,
@@ -220,11 +346,27 @@ matter. The visitor blip fires most often and is the one most easily made
 useless: the first version was a single sine at 0.055 gain, a sound you have to
 already know is coming to hear at all.
 
-**More than one arrival runs the confetti in WAVES**, one per item 320ms apart
-and capped at eight, so four downloads is a few seconds of falling rather than
-the same one-second puff four times over — which is not distinguishable from
-one. The cap is what stops a backfill of fifty pings burying the dashboard for
-half a minute. Downloads landing in the same refresh as a sale extend the sale's
+**Three channels carry the same sentence.** The card is the record and it stays
+until it is pressed; the **toast** says it wherever the reader is on the page,
+since the card stack lives in one corner and a phone is mostly not that corner;
+and a **notification** reaches the window you are not looking at (see the
+Notifications section above for what that can and cannot mean). Visitors get
+none of the three — a toast for the event that fires most often would be on
+screen permanently, and a notification for it is the fastest way to have
+notifications turned back off.
+
+**A download runs the confetti in WAVES**, one per item 320ms apart and capped
+at eight, so four downloads is a few seconds of falling rather than the same
+one-second puff four times over — which is not distinguishable from one. The cap
+is what stops a backfill of fifty pings burying the dashboard for half a minute.
+
+**A sale runs for ten seconds flat**, and the difference is deliberate: this is
+the event the whole page exists for, and a second and a half of confetti for
+somebody deciding to pay for the thing you built is the same celebration a
+visitor gets, only slightly longer. Ten seconds is long enough to walk back to
+the desk for. It is a DURATION and not a wave count, so five sales in one
+refresh is still ten seconds rather than fifty — the news is "someone paid", and
+how many is on the card. Downloads landing in the same refresh extend the sale's
 waves rather than starting a competing pattern.
 
 `snapshot` / `diff` are pure and are what `tests/alerts.test.mjs` pins;
@@ -238,11 +380,31 @@ waves rather than starting a competing pattern.
   marker reads as "unknown store" rather than being folded into either one — the
   same rule the App usage view runs on.
 - **A delta is never negative.** The report is a sliding 400-day window, so the
-  oldest day leaves it as the calendar turns and a total can fall with nothing
+  oldest day leaves it as the calendar turns and a count can fall with nothing
   having gone wrong. A drop is not an event: it clamps to zero and the new
   snapshot becomes the baseline anyway.
-- **The first report of a session is a baseline, not news**, or every sign-in
-  would open with a fanfare for a month of history.
+- **Two snapshots are compared DAY BY DAY, not total against total.** This is
+  what makes the rule above survive an absence rather than only a refresh. Come
+  back after two days away and the window has dropped two old days off the back
+  as it gained two new ones at the front: compared as totals a flat week nets to
+  roughly nothing, and the two days you missed announce themselves as silence.
+  Compared per day, the new days are new days and the ones that left are simply
+  not there to be a fall. A day the baseline never saw counts whole, which is
+  exactly what "since you last looked" means.
+- **The baseline is remembered across sessions** (`autonomic.master.alertBase`),
+  so a sale that arrived overnight is announced when you open the dashboard in
+  the morning. This is the one rule the module previously got right for the
+  wrong span of time: "the first report of a session is a baseline, not news"
+  existed to stop a sign-in opening with a fanfare for a month of history, but
+  it also meant everything that arrived while the dashboard was CLOSED was
+  silently absorbed and never mentioned. A browser that has never held a
+  baseline still seeds in silence, and so does one whose baseline is older than
+  `MAX_CATCHUP_MS` (30 days) — past a month the missing stretch is not "since
+  you last looked" in any useful sense, and three hundred downloads in one go is
+  a number rather than news. It lives in `localStorage` rather than in the
+  synced store because "what this browser has already told me" is a property of
+  this browser: two devices should each get the news once, and neither should
+  swallow it for the other.
 - **One sound per refresh**, the loudest thing that happened. Cards do stack,
   because they are read rather than heard.
 - **Cards do not expire.** The toast disappears on a timer; the whole point of
@@ -265,6 +427,47 @@ in the synced store: a mute is a property of the room you are sitting in, not of
 the account. **Muted means silent, not blind** — the cards still appear, because
 they are the record of what happened. Confetti is skipped entirely under
 `prefers-reduced-motion`.
+
+## Live in the stores
+
+A card at the top of the **Timeline**, above the release log, because the
+question it answers is about that log: did the version you cut actually reach
+anyone? It shows what each store is serving right now and compares it with the
+newest entry in `releases.js`, so a build that is live on one store and still
+rolling out on the other is visible — which it is nowhere else on this
+dashboard.
+
+The reading is done by the Lambda (`STORE_VERSIONS`, documented at length in
+`sls/README.md`), because neither store can be asked from a browser. The card's
+own rules:
+
+- **The two stores are not presented as equivalent.** Apple publishes a real
+  API and its answer is exact. Google publishes none, so the Play row is
+  scraped off the listing page, and the card says so in its own hint rather
+  than leaving both rows looking equally authoritative. The Play Console is
+  named as the authority when the two disagree.
+- **A store that could not be read shows no version.** Every failure the
+  backend can return has a sentence here, and the underlying reason is printed
+  under it. There is no fallback to the last number that worked: the card
+  exists to tell you whether a release went live, and a stale version answers
+  that wrongly and confidently. This is the reason the scrape is acceptable at
+  all.
+- **Behind the log is the loud state.** A store level with (or past) the newest
+  release reads a quiet green "current"; one behind it is amber and names the
+  version and the day it shipped. An unreadable row is muted, not red — with a
+  scrape, unreadable is an expected condition, and painting it as an error
+  every day would train it away.
+- **Versions are compared numerically, segment by segment**, so 1.24.1 is newer
+  than 1.9. String comparison gets that pair backwards, and it is the pair this
+  app is at.
+- The answer is cached in `localStorage` like everything else, fetched once per
+  session on arrival at the Timeline, and re-read on a **pressed** refresh
+  (which forces past the backend's 30-minute cache) but not on the five-minute
+  automatic one.
+
+What this deliberately does not do is tell you which version people are
+**running**. That is a different question — adoption, not availability — and it
+would need the app's cohort ping to carry its version.
 
 ## The Sales view
 
@@ -459,10 +662,48 @@ month must still appear in the list you manage it from.
 The platform filter is hidden on the Costs view. A hosting bill is not iOS or
 Android, and no ad network splits spend the way the stores split downloads.
 
-Two numbers leak into other views deliberately: the Overview tile strip gains
-net profit and cost per install once there is any spend to report, and the
-Timeline gains a Spend metric — entered by hand, so unlike every store metric
-there it is complete for today.
+Money leaks into other views deliberately. The Timeline gains a Spend metric —
+entered by hand, so unlike every store metric there it is complete for today —
+and the **Overview carries a money strip of its own** (`renderOverviewMoney`),
+because revenue on its own is not a result and the question "did this month make
+or lose money" should not need a second tab. It is a separate strip under the
+funnel tiles rather than two more tiles bolted onto the end of them, it reads
+`CS.summary` and `Sales.summarize` rather than doing any arithmetic of its own,
+and it inherits every rule from them: gross shown beside net, cash never blended
+with MRR, both stores whatever the filter says, cost per install blended and
+labelled so. The whole strip hides when there is no money at all to report.
+
+## Export data — the whole book, as a prompt
+
+The header's **Export data** copies a plain-text report for the chosen window to
+the clipboard. It is built to be pasted into a chat window and reasoned about,
+which is what shapes it: `buildExportText` plus one `export*` function per
+subject in `app.js`, covering the store funnel, cohort state, the period table,
+**money** (gross, commission, net, spend by kind, profit, margin, CPI/CPA, ROAS,
+all-time net and breakeven), **subscriptions** (bookings, MRR/ARR, churn,
+refunds, plan mix, per store, days-to-purchase, and the individual purchase
+rows), **costs** (by category, every ad spot with what the network reported, the
+cost-ledger rows), **app usage** (actives, first runs, returning, retention at
+every milestone, conversion, lifecycle, the store split, and a day-by-day
+table), **what happened** (events, releases and ad spots in the window), the
+**forecast** and the **weekday pattern**.
+
+Three rules hold it together:
+
+- **Every caveat this dashboard enforces on screen is restated in the text.**
+  A number pasted somewhere else has left all of them behind. "MRR 41.30"
+  invites a reader to add it to bookings; the sentence above it saying an annual
+  plan is a year of one and a twelfth of the other does not. Same for daily
+  ping counts that must never be summed, for a blended acquisition cost, and for
+  a days-to-purchase figure drawn from only the purchases carrying an install
+  date.
+- **A section with nothing to report emits nothing** — not a heading over six
+  dashes, which reads as data that failed to load. An empty book produces a
+  short export.
+- **The one cap says so out loud.** Past `MAX_LEDGER_ROWS` (400) the purchase
+  rows are trimmed to the most recent, with a line naming how many were left out
+  and confirming they are still in every total above. A silent truncation would
+  read as "that is all the purchases there were".
 
 ## Dates are US Eastern, everywhere
 
@@ -576,3 +817,22 @@ with the same total it went in with. Its fetch stub is a small in-memory server 
 applies the pushes it receives, because against a stub that always answers
 "nothing stored" a passing refresh test would only prove the data had been
 thrown away.
+
+`tests/store-versions.test.mjs` pins the Play-listing parse — the fragile half
+of "Live in the stores" — against pages shaped the ways Google could plausibly
+reshape them, and every case is a way a scraper could keep answering
+confidently with a number that is wrong. It reaches across into
+`sls/lambdas/api/storeVersions.js` because `npm run test:master` is the one
+command in this repo that runs a suite, and a test nobody runs is a test that
+rots. `tests/master-stores.test.mjs` drives the card in the built page.
+
+`tests/master-pwa.test.mjs` covers the app half: that the shipped document links
+the dashboard's manifest and not the marketing site's, that a browser holding a
+cache paints **before** the server answers, that one holding none paints a
+skeleton with the view hidden under it, and that a remembered baseline turns an
+overnight sale into a card, a toast and a fanfare on the first report of the
+session. It seeds `localStorage` through jsdom's `beforeParse` — the only moment
+early enough, since the page reads its cache as it loads — and **holds the
+`LOAD` response open**, because "painted from the cache" is only a claim about
+what is on screen before the pull lands, and a test that let the pull land first
+would pass against the old behaviour too.
