@@ -2373,7 +2373,183 @@
     });
 
     renderEventAnalysis(ix);
+    renderStoreVersions();
     renderReleases();
+  }
+
+  /* ------------------------------------------------- what is live in the stores
+
+     Read by the Lambda, not by this page: Apple's lookup endpoint sends no CORS
+     headers and Google's listing is an HTML page. `sls/lambdas/api/storeVersions.js`
+     holds both, and the whole of the reasoning about how far each can be
+     trusted.
+
+     The rule that shapes everything below: **an unreadable version is reported
+     as unreadable.** The Android side is a scrape of a page Google never
+     promised us, so it will break; the failure mode has to be a sentence
+     saying so, never a number left over from the last time it worked. That is
+     the one thing this card exists to get right — it is read to answer "did
+     the release I cut actually go live", and a stale number answers that
+     question incorrectly and with total confidence. */
+
+  var STORE_KEY = KEY + '.stores';
+  var stores = { status: 'idle', data: null, error: '' };
+
+  function loadStoreCache() {
+    try {
+      var raw = localStorage.getItem(STORE_KEY);
+      if (!raw) return;
+      var p = JSON.parse(raw);
+      if (p && (p.ios || p.android)) { stores.data = p; stores.status = 'ready'; }
+    } catch (e) { /* unreadable cache is no cache */ }
+  }
+
+  function storeLoad(force) {
+    if (stores.status === 'loading') return Promise.resolve();
+    /* Once per session unless forced. The cached copy from localStorage does
+       NOT count as fetched, so arriving on the Timeline always goes and looks —
+       cheaply, since the Lambda answers from its own cache. */
+    if (stores.fetched && !force) return Promise.resolve();
+    stores.status = 'loading';
+    /* `force` is only ever passed by the button on the card. The five-minute
+       auto-refresh does not: the Lambda caches for half an hour, and a store
+       that publishes a new build a few times a month does not need asking
+       every five minutes from every open device. */
+    return window.Api.call('STORE_VERSIONS', force ? { force: true } : {}).then(function (res) {
+      stores.data = res || null;
+      stores.status = 'ready';
+      stores.fetched = true;
+      stores.error = '';
+      try { localStorage.setItem(STORE_KEY, JSON.stringify(res)); } catch (e) { /* ignore */ }
+      if (state.view === 'timeline') renderStoreVersions();
+    }).catch(function (err) {
+      stores.status = 'error';
+      stores.error = (err && err.message) || 'Could not reach the stores.';
+      if (state.view === 'timeline') renderStoreVersions();
+    });
+  }
+
+  /** The newest version the app's own release log knows about. */
+  function newestRelease() {
+    var list = (window.RELEASES || []).slice().sort(function (a, b) {
+      return a.date < b.date ? -1 : a.date > b.date ? 1 : 0;
+    });
+    return list[list.length - 1] || null;
+  }
+
+  /* Version strings compared as numbers, segment by segment, so 1.24.1 is
+     newer than 1.9 — which a string comparison gets backwards, and which is
+     exactly the pair this app is at. */
+  function cmpVersion(a, b) {
+    var pa = String(a || '').split('.').map(Number);
+    var pb = String(b || '').split('.').map(Number);
+    for (var i = 0; i < Math.max(pa.length, pb.length); i++) {
+      var x = pa[i] || 0, y = pb[i] || 0;
+      if (x !== y) return x < y ? -1 : 1;
+    }
+    return 0;
+  }
+
+  /* The release log carries `1.24` where a build carries `1.24.1`, so the
+     comparison is "is the store at or past the newest logged version" rather
+     than string equality. */
+  var STORE_ERRORS = {
+    'not-listed': 'Not listed in this store yet.',
+    ambiguous: 'The listing page no longer says which value is the version.',
+    'not-found': 'Google has changed the listing page — no version could be read from it.',
+    unreachable: 'Could not reach the store.',
+    unreadable: 'The store answered with something unreadable.',
+    http: 'The store refused the request.'
+  };
+
+  function storeRowHTML(o) {
+    var newest = newestRelease();
+    var body;
+
+    if (!o.info) {
+      body = '<span class="store-miss">Not checked yet.</span>';
+    } else if (o.info.error) {
+      body = '<span class="store-miss">' + esc(STORE_ERRORS[o.info.error] || 'Could not read a version.') +
+        (o.info.detail ? ' <span class="store-why">' + esc(o.info.detail) + '</span>' : '') + '</span>';
+    } else {
+      var v = o.info.version;
+      var cmp = newest ? cmpVersion(v, newest.version) : 0;
+      /* Three states worth telling apart, and the middle one is the reason to
+         look: a version BEHIND the log is a release that has not gone live
+         (or a rollout still in progress), which is not visible anywhere else
+         on this dashboard. */
+      var against = !newest ? ''
+        : cmp >= 0 ? '<span class="store-ok">current</span>'
+        : '<span class="store-behind">v' + esc(newest.version) + ' shipped ' + esc(labelDay(newest.date)) +
+          ' and is not live here yet</span>';
+      body = '<span class="store-version">v' + esc(v) + '</span>' +
+        (o.info.released ? '<span class="store-when">' + esc(labelFull(o.info.released)) + '</span>' : '') +
+        against;
+    }
+
+    return '<div class="store-row">' +
+      '<span class="store-name">' + esc(o.name) + '</span>' +
+      body +
+      /* The destination is carried as data and applied to `.href` after the
+         markup lands, rather than being concatenated into an href attribute.
+         Two reasons, and the second is the load-bearing one: the URL comes
+         from an external API, so it is checked for an https scheme before it
+         becomes a link; and the built page is scanned for RELATIVE src/href
+         attributes (tests/master-gate.test.mjs), a rule that exists because a
+         relative URL here breaks /master when it is reached without a trailing
+         slash — and an href attribute opened in source and closed by a
+         concatenation is indistinguishable from a relative one to that
+         scanner, which reads the shipped text rather than the rendered DOM. */
+      (o.info && o.info.url ? '<a class="store-link" data-url="' + esc(o.info.url) + '" target="_blank" rel="noopener">Open</a>' : '') +
+      '</div>';
+  }
+
+  function renderStoreVersions() {
+    var host = document.getElementById('tlStores');
+    if (!host) return;
+
+    var age = document.getElementById('tlStoreAge');
+    if (age) {
+      age.textContent = !stores.data || !stores.data.at ? ''
+        : 'checked ' + relTime(stores.data.at);
+    }
+
+    if (!stores.data && stores.status === 'loading') {
+      host.innerHTML = '<div class="skel-bar title" style="width:60%"></div>';
+      return;
+    }
+    if (!stores.data && stores.status === 'error') {
+      host.innerHTML = '<div class="empty">' + esc(stores.error) + '</div>';
+      return;
+    }
+
+    var d = stores.data || {};
+    host.innerHTML =
+      storeRowHTML({ name: 'App Store', info: d.ios }) +
+      storeRowHTML({ name: 'Google Play', info: d.android }) +
+      /* Said once, under the rows, rather than repeated in the Android row on
+         every render: the asymmetry is a property of the two stores, not of
+         today's answer. */
+      '<p class="note" style="margin:10px 0 0">Apple\'s figure comes from its public lookup API. Google publishes none, so the Play row is read off the listing page — ' +
+      '<a href="https://play.google.com/console" target="_blank" rel="noopener">Play Console</a> is the authority when the two disagree.</p>';
+
+    host.querySelectorAll('.store-link[data-url]').forEach(function (a) {
+      var url = a.dataset.url || '';
+      // Only an absolute https link, because this came off a store's API.
+      if (/^https:\/\//.test(url)) a.href = url;
+      else a.remove();
+    });
+  }
+
+  /** "4 minutes ago" — only ever used for how old a store check is. */
+  function relTime(ms) {
+    var s = Math.max(0, Math.round((Date.now() - Number(ms)) / 1000));
+    if (s < 90) return 'just now';
+    var m = Math.round(s / 60);
+    if (m < 60) return m + ' minute' + (m === 1 ? '' : 's') + ' ago';
+    var h = Math.round(m / 60);
+    if (h < 36) return h + ' hour' + (h === 1 ? '' : 's') + ' ago';
+    return Math.round(h / 24) + ' days ago';
   }
 
   function renderReleases() {
@@ -5330,6 +5506,14 @@
        had happened an hour ago. It is one small GET every five minutes. */
     work = work.then(function () { return pingLoad(true); });
 
+    /* The stores, on the view that shows them. A refresh you PRESSED forces a
+       real check; the five-minute one takes whatever the Lambda's half-hour
+       cache holds, because a store that publishes a few times a month does not
+       need asking every five minutes from every open device. */
+    if (state.view === 'timeline') {
+      work = work.then(function () { return storeLoad(!silent); });
+    }
+
     work.then(function () {
       if (!keepScreen) renderAll();
       if (!silent) toast('Refreshed.');
@@ -5556,7 +5740,7 @@
 
     if (state.view === 'overview') renderOverview();
     else if (state.view === 'ping') { pingLoad(); renderPing(); }
-    else if (state.view === 'timeline') { pingLoad(); renderTimelineView(); }
+    else if (state.view === 'timeline') { pingLoad(); storeLoad(); renderTimelineView(); }
     else if (state.view === 'trial') renderTrial();
     else if (state.view === 'cohorts') renderCohorts();
     else if (state.view === 'platforms') renderPlatforms();
@@ -5891,6 +6075,7 @@
        rather than on "Reading the counter…". It is refetched immediately below
        whatever this finds. */
     loadPingCache();
+    loadStoreCache();
     bootPending = false;
 
     /* The one-shot move of sales out of the daily columns and into the ledger.
@@ -5990,6 +6175,20 @@
     wirePingView();
     wireCosts();
     wireAccordions();
+
+    /* "Check now" on the store-versions card. It forces a real round trip to
+       Apple and Google past the Lambda's cache, which is what you want from a
+       button pressed right after hitting Release. */
+    var storeBtn = document.getElementById('tlStoreRefresh');
+    if (storeBtn) {
+      storeBtn.addEventListener('click', function () {
+        storeBtn.disabled = true;
+        storeLoad(true).then(function () {
+          storeBtn.disabled = false;
+          if (stores.status === 'error') toast(stores.error);
+        });
+      });
+    }
 
     /* Wrapped rather than passed straight in: the listener would hand the click
        event to `refreshView` as its options object. */

@@ -428,6 +428,47 @@ the account. **Muted means silent, not blind** — the cards still appear, becau
 they are the record of what happened. Confetti is skipped entirely under
 `prefers-reduced-motion`.
 
+## Live in the stores
+
+A card at the top of the **Timeline**, above the release log, because the
+question it answers is about that log: did the version you cut actually reach
+anyone? It shows what each store is serving right now and compares it with the
+newest entry in `releases.js`, so a build that is live on one store and still
+rolling out on the other is visible — which it is nowhere else on this
+dashboard.
+
+The reading is done by the Lambda (`STORE_VERSIONS`, documented at length in
+`sls/README.md`), because neither store can be asked from a browser. The card's
+own rules:
+
+- **The two stores are not presented as equivalent.** Apple publishes a real
+  API and its answer is exact. Google publishes none, so the Play row is
+  scraped off the listing page, and the card says so in its own hint rather
+  than leaving both rows looking equally authoritative. The Play Console is
+  named as the authority when the two disagree.
+- **A store that could not be read shows no version.** Every failure the
+  backend can return has a sentence here, and the underlying reason is printed
+  under it. There is no fallback to the last number that worked: the card
+  exists to tell you whether a release went live, and a stale version answers
+  that wrongly and confidently. This is the reason the scrape is acceptable at
+  all.
+- **Behind the log is the loud state.** A store level with (or past) the newest
+  release reads a quiet green "current"; one behind it is amber and names the
+  version and the day it shipped. An unreadable row is muted, not red — with a
+  scrape, unreadable is an expected condition, and painting it as an error
+  every day would train it away.
+- **Versions are compared numerically, segment by segment**, so 1.24.1 is newer
+  than 1.9. String comparison gets that pair backwards, and it is the pair this
+  app is at.
+- The answer is cached in `localStorage` like everything else, fetched once per
+  session on arrival at the Timeline, and re-read on a **pressed** refresh
+  (which forces past the backend's 30-minute cache) but not on the five-minute
+  automatic one.
+
+What this deliberately does not do is tell you which version people are
+**running**. That is a different question — adoption, not availability — and it
+would need the app's cohort ping to carry its version.
+
 ## The Sales view
 
 Every purchase, one row each. Sales used to be two numeric columns on a store
@@ -776,6 +817,14 @@ with the same total it went in with. Its fetch stub is a small in-memory server 
 applies the pushes it receives, because against a stub that always answers
 "nothing stored" a passing refresh test would only prove the data had been
 thrown away.
+
+`tests/store-versions.test.mjs` pins the Play-listing parse — the fragile half
+of "Live in the stores" — against pages shaped the ways Google could plausibly
+reshape them, and every case is a way a scraper could keep answering
+confidently with a number that is wrong. It reaches across into
+`sls/lambdas/api/storeVersions.js` because `npm run test:master` is the one
+command in this repo that runs a suite, and a test nobody runs is a test that
+rots. `tests/master-stores.test.mjs` drives the card in the built page.
 
 `tests/master-pwa.test.mjs` covers the app half: that the shipped document links
 the dashboard's manifest and not the marketing site's, that a browser holding a

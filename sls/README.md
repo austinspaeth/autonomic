@@ -43,6 +43,7 @@ per user, which would eventually meet DynamoDB's 400KB item ceiling.
 | `DASH#<email>` | `UI` | view and filter preferences |
 | `PING#OPEN` | `<day>` | that day's opens, counted per cohort |
 | `PING#SUB` | `<day>` | that day's new subscribers, counted per cohort |
+| `STORE#VERSIONS` | `latest` | what each store is serving, cached (see below) |
 
 `LOAD` queries the whole partition. `SYNC` applies the client's diff — entries
 as `upserts` / `deletes`, and the four id-keyed collections as
@@ -70,6 +71,46 @@ See `MASTER_DASHBOARD.md` for the arithmetic that depends on it.
 
 The table is `DeletionPolicy: Retain` with point-in-time recovery on. A
 `sls remove` will not take the data with it.
+
+## What is live in the stores (`STORE_VERSIONS`)
+
+`lambdas/api/storeVersions.js`. The dashboard cannot ask either store itself —
+Apple's endpoint sends no CORS headers and Google's listing is an HTML page —
+so the Lambda asks, behind the same allowlist as everything else, and caches
+one answer for everybody in a row that belongs to no user.
+
+The two sources are not equivalent, and pretending otherwise is the failure
+mode this file is written against:
+
+- **iOS is an API.** `itunes.apple.com/lookup?bundleId=…` is public,
+  unauthenticated and documented, and returns the live version, its release
+  date, the release notes and the rating. What it says is true. The storefront
+  is part of the answer (`country`), because an app can be live in one and not
+  another.
+- **Android is a SCRAPE.** Google publishes no equivalent; the official route
+  is the Play Developer API, which needs a service account and Play Console
+  grants. This reads the public listing instead, where the version survives
+  inside an undocumented `AF_initDataCallback` blob that Google can restructure
+  without notice and has before.
+
+So the Android half is built to **fail rather than guess**. It narrows to the
+`ds:5` payload before looking, so a version-shaped string in a review or in the
+"similar apps" rail cannot reach the answer; it collects every candidate and
+**refuses when two disagree** rather than picking one; and every failure comes
+back as a named reason (`not-found`, `ambiguous`, `not-listed`, `http`,
+`unreachable`) that the dashboard prints in full. A wrong version number is
+worse than none here — the card is read to decide whether a release actually
+went live, and a stale number answers that question incorrectly and with total
+confidence.
+
+`parsePlay` is pure and is pinned by `landing/tests/store-versions.test.mjs`
+(the AWS SDK is required inside the cache helpers rather than at the top of the
+file, so testing the parse does not need the Lambda's `node_modules`).
+`landing/tests/master-stores.test.mjs` drives the card itself.
+
+The cache is 30 minutes. The dashboard refreshes every five minutes on every
+open device, and the stores publish a few times a month; only the card's
+"Check now" button passes `force`.
 
 ## The cohort ping
 

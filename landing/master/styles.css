@@ -440,6 +440,34 @@ tbody tr:hover { background: var(--surface-2); }
 .event-amount { margin-left: auto; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
 .event-row .btn { flex: none; }
 
+/* ---------- what is live in the stores ----------
+ *
+ * Deliberately shaped like an event row rather than like a stat tile: this is
+ * a fact about a version on a date, and the thing next to it in the DOM is the
+ * release log it is being compared against.
+ *
+ * The three states a row can be in are told apart by COLOUR as well as by
+ * words, and only one of them is loud. `store-behind` is amber because it is
+ * the state you opened the card to find — a version you cut that has not
+ * reached anyone yet. A version that could not be read is muted, not red: an
+ * unreadable Play listing is an expected condition of scraping a page nobody
+ * promised us, and painting it as an error every day would train it away. */
+.store-row {
+  display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+  padding: 9px 6px; border-bottom: 1px solid var(--border); font-size: 13px;
+}
+.store-row:last-of-type { border-bottom: none; }
+.store-name { width: 110px; flex: none; color: var(--text-secondary); }
+.store-version { font-size: 17px; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+.store-when { color: var(--text-muted); font-size: 12px; }
+.store-ok { color: var(--good); font-size: 12px; }
+.store-behind { color: var(--warning); font-size: 12px; }
+.store-miss { color: var(--text-muted); }
+/* The reason, on its own line on a phone: it is a sentence, not a label. */
+.store-why { display: block; color: var(--text-muted); font-size: 11.5px; margin-top: 2px; }
+.store-link { margin-left: auto; color: var(--series-1); font-size: 12px; text-decoration: none; }
+.store-link:hover { text-decoration: underline; }
+
 .event-form {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 10px; padding: 12px; background: var(--surface-2); border-radius: 8px; margin-bottom: 12px;

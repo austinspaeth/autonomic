@@ -7,10 +7,11 @@
  * the email allowlist below is the actual access control. Never remove it.
  *
  * Actions:
- *   LOAD         -> { entries, events, ads, costs, sales, settings, ui }
- *   SYNC         { upserts, deletes, settings, ui } -> applies a client diff
- *   REPLACE_ALL  { entries, sales, settings } -> wipes and rewrites both
- *   PINGS        { since } -> the mobile app's cohort-ping counters
+ *   LOAD           -> { entries, events, ads, costs, sales, settings, ui }
+ *   SYNC           { upserts, deletes, settings, ui } -> applies a client diff
+ *   REPLACE_ALL    { entries, sales, settings } -> wipes and rewrites both
+ *   PINGS          { since } -> the mobile app's cohort-ping counters
+ *   STORE_VERSIONS { force } -> what is live in the App Store and on Play
  */
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
 const {
@@ -22,6 +23,9 @@ const {
 
 /* One implementation of the ping read, shared with the public keyed route. */
 const { report: pingReport } = require('../ping/main');
+/* Reading the two stores. Its own file because the Play half is a scrape and
+   wants explaining at length. */
+const { storeVersions } = require('./storeVersions');
 
 const TABLE = process.env.DYNAMO_TABLE_NAME;
 const ALLOWED = String(process.env.ALLOWED_EMAILS || '')
@@ -507,6 +511,11 @@ const handler = async (event) => {
       // lambda's shared key.
       case 'PINGS':
         return json(200, await pingReport(payload.since));
+      /* Read from Apple and Google rather than from us, cached in a row of
+         its own (PK STORE#VERSIONS) that belongs to no dashboard user — there
+         is one answer and it is the same for everybody who can see it. */
+      case 'STORE_VERSIONS':
+        return json(200, await storeVersions(ddb, TABLE, { force: !!payload.force }));
       default:
         return json(400, { error: `Unknown action: ${action}` });
     }

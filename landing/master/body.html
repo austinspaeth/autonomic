@@ -436,6 +436,17 @@
        same store. Releases are not entered by hand — they are read from the
        app's own release log (see landing/scripts/gen-releases.mjs). -->
   <section id="view-timeline" class="view hidden">
+    <!-- What is actually live in each store, read from the stores themselves.
+         It sits above the release log because the question it answers is about
+         that log: did the version you cut actually reach people? -->
+    <div class="card" style="margin-bottom:14px">
+      <header><h2>Live in the stores</h2><span class="spacer"></span>
+        <span class="note" id="tlStoreAge"></span>
+        <button class="btn sm" id="tlStoreRefresh">Check now</button></header>
+      <p class="hint">What each store is serving right now, checked against the newest entry in the app's release log below. Apple publishes this as an API and it is exact. <b>Google publishes no equivalent</b>, so the Android row is read off the public listing page and can only ever be best-effort — when the page changes shape it says it could not read one rather than showing a number that might be a month old.</p>
+      <div id="tlStores"></div>
+    </div>
+
     <div class="card" style="margin-bottom:14px">
       <header><h2>What happened</h2><span class="spacer"></span>
         <div class="segmented" id="tlMetric">
