@@ -171,9 +171,25 @@
     <button class="btn" id="goDemo">Load demo data</button>
   </div>
 
+  <!-- The shape of a view whose data has not arrived. Built per view by
+       `skeletonHTML` in app.js and, with the store cached in localStorage,
+       seen almost only on a browser signing in for the first time. -->
+  <div id="skeleton" class="skel hidden" aria-hidden="true"></div>
+
   <!-- ================= OVERVIEW ================= -->
   <section id="view-overview" class="view">
     <div class="grid cards" id="ovTiles"></div>
+
+    <!-- Money gets its own strip rather than two tiles bolted onto the end of
+         the funnel row. Revenue on its own is not a result: what the Overview
+         has to be able to answer, without a trip to the Costs view, is whether
+         the month made or lost money. Everything here is both stores combined,
+         because a hosting bill belongs to neither. -->
+    <div class="section-head" id="ovMoneyHead" style="margin: 2px 0 10px">
+      <h2 class="section-title">Money</h2>
+      <span class="section-note">Both stores combined, whatever the filter says</span>
+    </div>
+    <div class="grid cards" id="ovMoney"></div>
 
     <div class="card" style="margin-bottom:14px">
       <header>
@@ -788,6 +804,23 @@
         <div class="field"><label for="fCurrency">Currency symbol</label>
           <input type="text" id="fCurrency" maxlength="4" value="$"></div>
       </div>
+    </details>
+
+    <!-- The dashboard installs as an app (it links its own manifest and
+         registers a worker under /master/), and an installed app can raise a
+         system notification for the same three things the corner cards
+         announce. What it cannot do is raise one while it is CLOSED: there is
+         no push server here, the counter is polled by the page itself, and a
+         service worker with no push subscription does not run on its own. The
+         copy says so rather than implying a pager. -->
+    <details class="card acc">
+      <summary><h2>Notifications</h2></summary>
+      <p class="hint">A system notification for the same arrivals the corner cards announce — a download, a sale. They fire only while the dashboard is open and you are looking at something else (another window, another tab, another app), which is the case a toast in the corner is worth nothing in. There is no push server behind this: with the dashboard closed, nothing is polling and nothing will arrive. On an iPhone or iPad this works only once the dashboard has been added to the home screen, from Safari's share menu.</p>
+      <div class="row-actions">
+        <button class="btn" id="ntEnable">Enable notifications</button>
+        <button class="btn" id="ntTest">Send a test</button>
+      </div>
+      <p class="note" id="ntStatus" style="margin-top:10px"></p>
     </details>
 
     <div class="section-head" style="margin-top:22px">

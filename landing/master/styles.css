@@ -271,6 +271,47 @@ input[type="number"] { -moz-appearance: textfield; }
 
 .swatch { width: 9px; height: 9px; border-radius: 3px; flex: none; display: inline-block; }
 
+/* ---------- skeleton ----------
+ *
+ * The shape of a view whose data has not arrived, built per view by
+ * `skeletonHTML` in app.js. The measurements are the real ones — `.skel-tile`
+ * and `.skel-card` reuse the card surface, radius and padding rather than
+ * approximating them — so the swap when the data lands moves nothing sideways.
+ *
+ * The shimmer is one animation on a gradient, not a per-element pulse: a page
+ * of twenty independently fading blocks reads as a fault. Under
+ * `prefers-reduced-motion` it holds still and keeps the contrast, because the
+ * blocks are the message and the movement is only the reassurance. */
+
+.skel-tile, .skel-card {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px 16px;
+}
+/* The skeleton's tiles live inside a real `.grid.cards`, so they flex exactly
+   as the tiles they stand in for do — no second copy of that rule here. */
+.skel-bar, .skel-plot {
+  display: block;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--surface-2) 0%, var(--surface-3) 50%, var(--surface-2) 100%);
+  background-size: 300% 100%;
+  animation: skel-shimmer 1.6s ease-in-out infinite;
+}
+.skel-bar.sm    { width: 45%; height: 10px; margin-bottom: 12px; }
+.skel-bar.md    { width: 70%; height: 9px; }
+.skel-bar.lg    { width: 58%; height: 22px; margin-bottom: 10px; }
+.skel-bar.title { width: 32%; height: 12px; margin-bottom: 16px; }
+.skel-plot      { width: 100%; border-radius: 8px; }
+
+@keyframes skel-shimmer {
+  0%   { background-position: 100% 0; }
+  100% { background-position: 0 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skel-bar, .skel-plot { animation: none; background: var(--surface-2); }
+}
+
 /* ---------- charts ---------- */
 
 .chart-wrap { position: relative; }
