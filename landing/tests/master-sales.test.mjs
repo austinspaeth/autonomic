@@ -395,27 +395,38 @@ check('and the tiles are not blank', $('pgTiles').querySelectorAll('.tile').leng
   String($('pgTiles').querySelectorAll('.tile').length));
 check('the platform card stays unfiltered, because it is what the slice is OF',
   /Android/.test($('pgPlatforms').textContent));
-check('and discloses that pre-marker pings are counted into this view too',
-  /counted into this filtered view/.test($('pgPlatformNote').textContent), $('pgPlatformNote').textContent);
+check('and says pre-marker pings sit in neither store\'s slice',
+  /not in either store's slice/.test($('pgPlatformNote').textContent), $('pgPlatformNote').textContent);
 
-/* The consequence of that rule read as a bug the first time somebody hit it:
-   iOS 12 + Android 5 over a combined 15. Both slices carry the same 2
-   unattributed pings, so they overlap by exactly that many — and the tiles at
-   the TOP of the view said nothing about it, while the disclosure sat in a
-   card near the bottom. Stating it beside the numbers it explains is the fix. */
+/* A PLATFORM SLICE IS STRICT. The day holds 10 iOS, 3 Android and 2 that named
+   no store, and picking iOS shows the 10 — not 12.
+
+   Pooling the unattributed pings into both slices is what this used to do, and
+   it read as a bug the first time somebody hit it: iOS 12 + Android 5 over a
+   combined 15, two slices that were mostly the same shared pool, and the two
+   true numbers hidden behind it. The three buckets now add up to the total, and
+   what a slice left out is stated beside the tiles rather than only in a card
+   near the bottom of the view. */
+const activeTileValue = () => {
+  const t = [].slice.call($('pgTiles').querySelectorAll('.tile'))
+    .filter((x) => x.querySelector('.label').textContent.trim().indexOf('Active on') === 0)[0];
+  return t ? t.querySelector('.value').textContent.trim() : '';
+};
+/* 10, not 12: the 2 pre-marker pings are no longer added to this store's own
+   count. That single number is the whole change. */
+check('an iOS slice counts iOS pings only', activeTileValue() === '10', activeTileValue());
+
 const filterNote = () => $('pgFilterNote').textContent.replace(/\s+/g, ' ');
-check('a filtered slice says outright that it will not add up',
-  /will not add up/.test(filterNote()), filterNote());
-check('and decomposes the number into what named this store and what named none',
-  /10<\/b> actually named iOS/.test($('pgFilterNote').innerHTML) &&
-  /other <b>2<\/b> named no store/.test($('pgFilterNote').innerHTML),
-  $('pgFilterNote').innerHTML);
-check('and names the other view the same pings are counted into',
-  /counted into the Android view as well/.test(filterNote()), filterNote());
-check('and explains the sum against the real combined total',
-  /more than the 15 combined/.test(filterNote()), filterNote());
-check('the headline tile carries it too, since that is the number being read',
-  /named no store/.test($('pgTiles').textContent), $('pgTiles').textContent.slice(0, 200));
+check('a filtered slice says what it left out, in its heading',
+  /iOS only — 2 installs are not in this slice/.test(filterNote()), filterNote());
+check('and decomposes the day into all three buckets',
+  /10 named iOS, 3 named Android, and 2 named no store/.test(filterNote()), filterNote());
+check('and says the three add up rather than overlap',
+  /add up to the combined total/.test(filterNote()), filterNote());
+check('and records why they are not pooled into both stores any more',
+  /sum to more than the total/.test(filterNote()), filterNote());
+check('the headline tile says what it left out too, since that is the number being read',
+  /not in this slice/.test($('pgTiles').textContent), $('pgTiles').textContent.slice(0, 240));
 
 window.document.querySelector('#fPlatform [data-v="combined"]').click();
 await settle(300);

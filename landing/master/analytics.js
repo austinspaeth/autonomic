@@ -25,10 +25,10 @@
  *
  * Not every ping carries a store. Builds that shipped before the marker existed
  * send a bare `082126`, which reads back as platform U. Those are real installs
- * whose store is unknown, NOT installs on an unknown platform, so a platform
- * filter counts them rather than dropping them, and reports them separately as
- * `unattributed` — see `rowsToMap`. Dropping them is what made a filtered view
- * read as "no pings at all" for every day before the marker shipped.
+ * whose store is unknown, NOT installs on an unknown platform. A platform slice
+ * is STRICT — iOS means the pings that said iOS — and what it left out is
+ * reported as `unattributed` so the view can state it rather than hide it. See
+ * `rowsToMap` for why this was once the other way round.
  *
  * ---------------------------------------------------------------------------
  * The three rules this module enforces so the UI cannot break them
@@ -123,15 +123,13 @@ window.Analytics = (function () {
    * it is a slice of. Rows written before the platform marker existed carry no
    * `platform` and pool under U.
    *
-   * A platform filter keeps its own letter AND U. An unattributed ping is an
-   * install whose STORE we failed to record, not an install on some third
-   * platform, so excluding it from both stores' views hides real activity in
-   * every view at once — which is exactly how a dashboard holding months of
-   * pre-marker pings came to read as empty. They are counted, and totalled
-   * separately in `unattributed` so a view can disclose how much of its number
-   * it cannot assign. The consequence is deliberate and must be labelled
-   * wherever it shows: with a filter on, iOS + Android exceeds the day's total
-   * by the unattributed count, because that count is in both.
+   * A platform filter keeps ONLY its own letter. Unattributed pings are counted
+   * in `unattributed` and left out of the slice, so the three buckets — iOS,
+   * Android, unattributed — sum to the unfiltered total exactly. Combined is
+   * the everything view and always was, so nothing is hidden by that; what a
+   * slice owes the reader is a statement of what it left out, which is what
+   * `unattributed` is for and which the UI must show. See the long note inside
+   * for why this pooled them for a while and why that stopped being right.
    */
   function rowsToMap(list, letter) {
     var by = {};
@@ -143,8 +141,28 @@ window.Analytics = (function () {
         var p = PLATFORM_NAME[x.platform] ? x.platform : 'U';
         var n = Number(x.count) || 0;
         plat[p] = (plat[p] || 0) + n;
-        if (letter && p !== letter && p !== 'U') return;
-        if (letter && p === 'U') unattributed += n;
+        /* A PLATFORM SLICE IS STRICT: pick iOS and you get the pings that said
+           iOS, and nothing else.
+
+           This pooled unattributed pings into every slice for a while, so that
+           a build predating the platform marker still appeared somewhere — the
+           alternative at the time was a view that read "no pings" the moment
+           the filter was touched. That was the right trade while unattributed
+           was a small tail and the wrong one the moment it was the majority: at
+           three-quarters unattributed, iOS read 23 and Android 29 against a
+           combined 30, both slices were mostly the same pool, and the two
+           numbers that were actually true (1 and 7) were invisible.
+
+           Nothing is hidden by the change, because COMBINED is already the
+           everything view — it is the unfiltered index, so it is iOS + Android
+           + unattributed and it still counts every ping. The three now sum to
+           it exactly, which is the property that makes the page checkable. What
+           the slice owes the reader is a statement of what it LEFT OUT, which
+           is what `unattributed` is carried for. */
+        if (letter && p !== letter) {
+          if (p === 'U') unattributed += n;
+          return;
+        }
         c[x.cohort] = (c[x.cohort] || 0) + n;
         kept += n;
       });
