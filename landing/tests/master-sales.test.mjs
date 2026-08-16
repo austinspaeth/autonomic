@@ -397,8 +397,32 @@ check('the platform card stays unfiltered, because it is what the slice is OF',
   /Android/.test($('pgPlatforms').textContent));
 check('and discloses that pre-marker pings are counted into this view too',
   /counted into this filtered view/.test($('pgPlatformNote').textContent), $('pgPlatformNote').textContent);
+
+/* The consequence of that rule read as a bug the first time somebody hit it:
+   iOS 12 + Android 5 over a combined 15. Both slices carry the same 2
+   unattributed pings, so they overlap by exactly that many — and the tiles at
+   the TOP of the view said nothing about it, while the disclosure sat in a
+   card near the bottom. Stating it beside the numbers it explains is the fix. */
+const filterNote = () => $('pgFilterNote').textContent.replace(/\s+/g, ' ');
+check('a filtered slice says outright that it will not add up',
+  /will not add up/.test(filterNote()), filterNote());
+check('and decomposes the number into what named this store and what named none',
+  /10<\/b> actually named iOS/.test($('pgFilterNote').innerHTML) &&
+  /other <b>2<\/b> named no store/.test($('pgFilterNote').innerHTML),
+  $('pgFilterNote').innerHTML);
+check('and names the other view the same pings are counted into',
+  /counted into the Android view as well/.test(filterNote()), filterNote());
+check('and explains the sum against the real combined total',
+  /more than the 15 combined/.test(filterNote()), filterNote());
+check('the headline tile carries it too, since that is the number being read',
+  /named no store/.test($('pgTiles').textContent), $('pgTiles').textContent.slice(0, 200));
+
 window.document.querySelector('#fPlatform [data-v="combined"]').click();
 await settle(300);
+/* Unfiltered, nothing is being pooled, so the note would be a false statement
+   about an arithmetic that adds up perfectly well. */
+check('and it goes away with the filter', $('pgFilterNote').textContent.trim() === '',
+  $('pgFilterNote').textContent.slice(0, 120));
 
 /* ------------------------------------------------- restoring a backup */
 

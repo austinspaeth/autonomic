@@ -1435,7 +1435,7 @@
     var blank = !ix.days.length;
 
     var hosts = ['pgTiles', 'pgTilesB', 'pgHeat', 'pgCohortDetail', 'pgTransitions', 'pgConversion',
-      'pgWeekdayRetention', 'pgPlatformNote'];
+      'pgWeekdayRetention', 'pgPlatformNote', 'pgFilterNote'];
     if (!ready || blank) hosts.forEach(function (id) {
       var n = document.getElementById(id);
       if (n) n.innerHTML = '';
@@ -1521,11 +1521,20 @@
     var conv7 = A.conversion(ix, ix.cohorts, 7);
     var conv30 = A.conversion(ix, ix.cohorts, 30);
 
+    /* How much of THIS number is pings that named no store. Zero when the
+       filter is off, because nothing is being pooled then. It rides on the
+       headline tile rather than only in the platform card lower down: the
+       number a reader questions is the one they are looking at, and "23 iOS"
+       beside "29 Android" over a total of 30 is a contradiction until you know
+       that 22 of each are the same unattributed pings. */
+    var unattrToday = A.unattributedOn(ix, ix.last);
+
     document.getElementById('pgTiles').innerHTML = [
       tile({
         label: 'Active on ' + labelDay(ix.last), color: PC.active, value: fmtInt(activeToday),
         delta: dActive,
-        meta: fmtInt(Math.round(avg)) + '/day across this range',
+        meta: fmtInt(Math.round(avg)) + '/day across this range' +
+          (unattrToday ? ' · includes ' + fmtInt(unattrToday) + ' that named no store' : ''),
         split: [{ name: 'returning', color: PC.back, value: fmtInt(returningToday) },
                 { name: 'first run', color: PC.fresh, value: fmtInt(A.newOn(ix, ix.last)) }]
       }),
@@ -1574,6 +1583,70 @@
       }),
       platformTile(ix)
     ].join('');
+
+    renderFilterNote(ix, days);
+  }
+
+  /**
+   * Why a filtered slice does not add up.
+   *
+   * A ping that names no store is counted into BOTH platform views — the
+   * alternative, dropping it from both, is what once made a whole dashboard
+   * read "no pings" the moment a filter was switched on. The cost of that
+   * choice is an arithmetic that looks broken: iOS 23 + Android 29 over a
+   * combined total of 30.
+   *
+   * The dashboard has always disclosed this, in the platform card near the
+   * bottom of the view. That is the wrong place, and the proof is that it was
+   * read as a bug anyway: the tiles are at the top, the filter is at the top,
+   * and nothing between them said a word. So the same fact is stated here,
+   * with THIS view's actual numbers rather than in the abstract, and only when
+   * it is load-bearing — filter on, unattributed pings present.
+   *
+   * It also states the share, because that is what says how much the slice is
+   * worth reading at all. At 73% unattributed the filter is nearly meaningless
+   * and the reader deserves to be told so rather than left to work it out from
+   * three numbers that disagree.
+   */
+  function renderFilterNote(ix, days) {
+    var host = document.getElementById('pgFilterNote');
+    if (!host) return;
+
+    var unattr = A.unattributedOn(ix, ix.last);
+    if (ix.platform === 'all' || !unattr) { host.innerHTML = ''; return; }
+
+    var shown = A.activeOn(ix, ix.last);
+    var own = Math.max(0, shown - unattr);
+    var split = A.platformsOn(ix, ix.last);      // always unfiltered
+    var total = (split.I || 0) + (split.A || 0) + (split.U || 0);
+    var other = ix.platform === 'ios' ? 'Android' : 'iOS';
+    var here = ix.platform === 'ios' ? 'iOS' : 'Android';
+
+    /* Over the range too, since every chart below this is range-scoped and the
+       newest day alone can be unrepresentative. */
+    var rangeUnattr = 0, rangeShown = 0;
+    (days || []).forEach(function (d) {
+      rangeUnattr += A.unattributedOn(ix, d);
+      rangeShown += A.activeOn(ix, d);
+    });
+    var share = rangeShown ? (rangeUnattr / rangeShown) * 100 : 0;
+
+    host.innerHTML =
+      '<div class="card warn-note" style="margin-bottom:16px">' +
+      '<p><b>Showing ' + esc(here) + ', and it will not add up.</b> Of the ' + fmtInt(shown) +
+        ' active on ' + esc(labelDay(ix.last)) + ' in this slice, <b>' + fmtInt(own) + '</b> actually named ' +
+        esc(here) + ' — the other <b>' + fmtInt(unattr) + '</b> named no store at all and are counted into the ' +
+        esc(other) + ' view as well. That is why ' + esc(here) + ' + ' + esc(other) + ' comes to more than the ' +
+        fmtInt(total) + ' combined.</p>' +
+      '<p class="hint" style="margin:8px 0 0">A ping carries no store when it comes from a build that shipped ' +
+        'before the platform marker existed, so it is an install whose store was never recorded rather than an ' +
+        'install on a third platform. Dropping those from both views instead would leave them in no view at all. ' +
+        (share >= 50
+          ? '<b>' + fmtPct(share) + ' of this range carries no store</b>, so treat the platform filter as barely ' +
+            'informative until those installs update — the number above is mostly the unattributed pool, ' +
+            'whichever store you pick.'
+          : fmtPct(share) + ' of this range carries no store.') +
+      '</p></div>';
   }
 
   /* Which store the day's pings came from.

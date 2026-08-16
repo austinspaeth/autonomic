@@ -293,7 +293,22 @@ the UI, each of them deliberate:
   platform views, totalled separately as `unattributed`, and drawn as their own
   band rather than folded into either store. The deliberate consequence — with
   a filter on, iOS + Android exceeds the day's total by that count — is
-  disclosed wherever it shows and asserted in `tests/analytics.test.mjs`.
+  asserted in `tests/analytics.test.mjs`.
+- **That consequence has to be disclosed where the number is READ, and for a
+  long time it was not.** The explanation lived in the platform card near the
+  bottom of the view, while the tiles and the filter are both at the top with
+  nothing between them — so the first person to switch the filter reported
+  "iOS 23, Android 29, combined 30" as a bug, correctly, because from where
+  they were standing it is one. `renderFilterNote` now states it beside the
+  tiles in this view's own numbers ("of the 23 active, 1 actually named iOS;
+  the other 22 named no store and are counted into the Android view as well"),
+  and the headline tile's meta carries the count too. It renders **only** when
+  a filter is on and unattributed pings exist, since that is the only case
+  where the arithmetic needs defending. It also states the share of the range
+  that names no store, and says outright that past 50% the filter is barely
+  informative: at three-quarters unattributed both slices are mostly the same
+  pool whichever store you pick, and a reader is owed that rather than left to
+  derive it from three numbers that disagree.
 - The **weekday pattern** chart carries five bars: store downloads, first runs,
   returning activity, purchases from the sales ledger, and subscribe pings. The
   last two count the same event at different moments (the app only notices a
