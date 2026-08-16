@@ -398,6 +398,14 @@ tbody tr:hover { background: var(--surface-2); }
 }
 .warn-observational { border-left: 2px solid var(--border); padding-left: 10px; margin-top: 12px; }
 
+/* A card that explains why the numbers above it do not add up. It is a card
+   rather than a hint line because it has to be findable from the tile that
+   raised the question — but it carries a rule down its edge instead of a fill,
+   since it is describing the reading rather than warning about the data. */
+.warn-note { border-left: 3px solid var(--warning); }
+.warn-note p { margin: 0; font-size: 13px; line-height: 1.5; }
+.warn-note .hint { max-width: 78ch; }
+
 /* A purchase row under suspicion of being the same ping counted twice. Tinted,
    not coloured over: the row is still a real thing the counter recorded, and
    the only claim being made is "look at this one". */

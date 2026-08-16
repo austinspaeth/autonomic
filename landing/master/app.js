@@ -1435,7 +1435,7 @@
     var blank = !ix.days.length;
 
     var hosts = ['pgTiles', 'pgTilesB', 'pgHeat', 'pgCohortDetail', 'pgTransitions', 'pgConversion',
-      'pgWeekdayRetention', 'pgPlatformNote'];
+      'pgWeekdayRetention', 'pgPlatformNote', 'pgFilterNote'];
     if (!ready || blank) hosts.forEach(function (id) {
       var n = document.getElementById(id);
       if (n) n.innerHTML = '';
@@ -1521,11 +1521,20 @@
     var conv7 = A.conversion(ix, ix.cohorts, 7);
     var conv30 = A.conversion(ix, ix.cohorts, 30);
 
+    /* How many installs this slice LEFT OUT because they named no store. Zero
+       when the filter is off, since Combined counts everything. It rides on the
+       headline tile rather than only in the platform card lower down: the
+       number a reader questions is the one they are looking at, and "1" beside
+       a combined "30" needs its own explanation just as much as the old
+       double-counted "23" did. */
+    var unattrToday = A.unattributedOn(ix, ix.last);
+
     document.getElementById('pgTiles').innerHTML = [
       tile({
         label: 'Active on ' + labelDay(ix.last), color: PC.active, value: fmtInt(activeToday),
         delta: dActive,
-        meta: fmtInt(Math.round(avg)) + '/day across this range',
+        meta: fmtInt(Math.round(avg)) + '/day across this range' +
+          (unattrToday ? ' · ' + fmtInt(unattrToday) + ' more named no store and are not in this slice' : ''),
         split: [{ name: 'returning', color: PC.back, value: fmtInt(returningToday) },
                 { name: 'first run', color: PC.fresh, value: fmtInt(A.newOn(ix, ix.last)) }]
       }),
@@ -1574,6 +1583,67 @@
       }),
       platformTile(ix)
     ].join('');
+
+    renderFilterNote(ix, days);
+  }
+
+  /**
+   * What a strict slice left out.
+   *
+   * Picking iOS shows the pings that said iOS and nothing else, so the number
+   * on the tile is true — and, right now, small. What it cannot do is leave the
+   * rest unmentioned: with most of the population still on builds that predate
+   * the platform marker, a slice showing 1 beside a combined 30 raises exactly
+   * as much doubt as the old pooled 23 did, for the opposite reason.
+   *
+   * So the note states the decomposition in this view's own numbers, names the
+   * total it adds up to, and gives the share of the range that cannot be
+   * assigned — which is what says how much a per-store comparison is worth at
+   * all today. It renders only with a filter on and unattributed pings present,
+   * because that is the only case where anything was left out.
+   */
+  function renderFilterNote(ix, days) {
+    var host = document.getElementById('pgFilterNote');
+    if (!host) return;
+
+    var unattr = A.unattributedOn(ix, ix.last);
+    if (ix.platform === 'all' || !unattr) { host.innerHTML = ''; return; }
+
+    var shown = A.activeOn(ix, ix.last);
+    var split = A.platformsOn(ix, ix.last);      // always unfiltered
+    var total = (split.I || 0) + (split.A || 0) + (split.U || 0);
+    var other = ix.platform === 'ios' ? (split.A || 0) : (split.I || 0);
+    var otherName = ix.platform === 'ios' ? 'Android' : 'iOS';
+    var here = ix.platform === 'ios' ? 'iOS' : 'Android';
+
+    /* Over the range too, since every chart below this is range-scoped and the
+       newest day alone can be unrepresentative. */
+    var rangeUnattr = 0, rangeShown = 0;
+    (days || []).forEach(function (d) {
+      rangeUnattr += A.unattributedOn(ix, d);
+      rangeShown += A.activeOn(ix, d);
+    });
+    var pool = rangeShown + rangeUnattr;
+    var share = pool ? (rangeUnattr / pool) * 100 : 0;
+
+    host.innerHTML =
+      '<div class="card warn-note" style="margin-bottom:16px">' +
+      '<p><b>' + esc(here) + ' only — ' + fmtInt(unattr) + ' installs are not in this slice.</b> ' +
+        'Of the ' + fmtInt(total) + ' active on ' + esc(labelDay(ix.last)) + ', ' +
+        fmtInt(shown) + ' named ' + esc(here) + ', ' + fmtInt(other) + ' named ' + esc(otherName) + ', and <b>' +
+        fmtInt(unattr) + '</b> named no store at all. The three add up to the combined total; this slice is the ' +
+        'first of them.</p>' +
+      '<p class="hint" style="margin:8px 0 0">A ping carries no store when it comes from a build that shipped ' +
+        'before the platform marker existed, so it is an install whose store was never recorded rather than an ' +
+        'install on a third platform. Those are only ever counted under <b>Combined</b> — putting them in both ' +
+        'stores instead, which this view used to do, made iOS and Android sum to more than the total and hid the ' +
+        'two real numbers behind the same shared pool. ' +
+        (share >= 50
+          ? '<b>' + fmtPct(share) + ' of this range names no store</b>, so a per-store comparison is barely worth ' +
+            'making until those installs update: most of the population is in neither slice, and a quiet store ' +
+            'here means "not measured yet" rather than "nobody there".'
+          : fmtPct(share) + ' of this range names no store.') +
+      '</p></div>';
   }
 
   /* Which store the day's pings came from.
@@ -1621,7 +1691,7 @@
       meta = 'of the ' + fmtInt(known) + ' that named a store · ' + fmtInt(unknown) +
         (ix.platform === 'all'
           ? ' pre-marker, store unknown'
-          : ' pre-marker, counted into every platform view');
+          : ' pre-marker, in neither store\'s slice');
     }
     return tile({
       label: 'Platform on ' + labelDay(ix.last), color: ENTITY.ios,
@@ -2104,7 +2174,7 @@
         (known ? fmtPct((totals.A / known) * 100) + ' of the pings that named a store' : '') + '</span></div>' +
       (totals.U
         ? '<div><span>No store</span><b>' + fmtInt(totals.U) + '</b><span class="note">pre-marker builds' +
-          (ix.platform === 'all' ? ' — store unknown' : ' — counted into this filtered view as well as the other one') +
+          (ix.platform === 'all' ? ' — store unknown' : ' — counted under Combined only, not in either store\'s slice') +
           '</span></div>'
         : '') +
       '<div><span>Coverage</span><b>' + (coverage === null ? '–' : fmtPct(coverage)) +

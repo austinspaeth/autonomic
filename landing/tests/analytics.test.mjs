@@ -295,32 +295,46 @@ check('two platform rows for one cohort day are pooled, not overwritten',
 check('D1 pools both platforms', near(A.retentionAt(pix, [PC1], 1).pct, 37.5),
   String(A.retentionAt(pix, [PC1], 1).pct));
 
-/* A platform slice keeps its own store's counts AND the pings that named no
-   store at all: 12 + 5 iOS on PDAY, plus the 2 pre-marker. Excluding those 2
-   would put them in NO view, which is how a dashboard whose whole history
-   predates the marker came to read as empty under a filter. */
+/* A PLATFORM SLICE IS STRICT. Pick iOS and you get the pings that said iOS:
+   12 + 5 on PDAY, and not the 2 that named no store.
+
+   This pooled the unattributed pings into every slice for a while, so that a
+   pre-marker build still appeared somewhere rather than in no view at all. It
+   was the right trade while unattributed was a small tail and the wrong one
+   once it was the majority — at three-quarters unattributed, iOS read 23 and
+   Android 29 against a combined 30, and the two numbers that were true (1 and
+   7) were invisible behind the shared pool. Nothing is hidden by strictness,
+   because COMBINED is the unfiltered index and still counts every ping. */
 const pios = A.index(preport, 'ios');
-check('the iOS slice keeps iOS counts plus the unattributed ones',
-  A.cohortSize(pios, PC1) === 30 && A.activeOn(pios, PDAY) === 19,
+check('the iOS slice is iOS pings and nothing else',
+  A.cohortSize(pios, PC1) === 30 && A.activeOn(pios, PDAY) === 17,
   A.cohortSize(pios, PC1) + ' / ' + A.activeOn(pios, PDAY));
 check('the iOS slice retains at 40%', near(A.retentionAt(pios, [PC1], 1).pct, 40),
   String(A.retentionAt(pios, [PC1], 1).pct));
-check('a slice reports how much of its count named no store',
+check('a slice still reports what it left out',
   A.unattributedOn(pios, PDAY) === 2, String(A.unattributedOn(pios, PDAY)));
-check('an unfiltered index attributes nothing, so it has no unattributed count',
+check('an unfiltered index leaves nothing out, so it has no unattributed count',
   A.unattributedOn(pix, PDAY) === 0, String(A.unattributedOn(pix, PDAY)));
 
 const pand = A.index(preport, 'android');
-check('the Android slice keeps Android counts plus the same unattributed ones',
-  A.cohortSize(pand, PC1) === 10 && A.activeOn(pand, PDAY) === 5,
+check('the Android slice is Android pings and nothing else',
+  A.cohortSize(pand, PC1) === 10 && A.activeOn(pand, PDAY) === 3,
   A.cohortSize(pand, PC1) + ' / ' + A.activeOn(pand, PDAY));
-/* The deliberate consequence, asserted so nobody "fixes" it silently: the two
-   slices overlap by the unattributed pings, so they sum past the day's total.
-   The platform tile is what discloses it. */
-check('the slices overlap by exactly the unattributed count',
-  A.activeOn(pios, PDAY) + A.activeOn(pand, PDAY) - A.unattributedOn(pios, PDAY)
+
+/* The property that makes the page checkable, and the whole reason for the
+   change: the three buckets ADD UP to the combined total. They used to sum
+   past it, by exactly the unattributed count, because that count was in both. */
+check('the two slices plus the unattributed pings equal the combined total',
+  A.activeOn(pios, PDAY) + A.activeOn(pand, PDAY) + A.unattributedOn(pios, PDAY)
     === A.activeOn(pix, PDAY),
-  A.activeOn(pios, PDAY) + ' + ' + A.activeOn(pand, PDAY) + ' vs ' + A.activeOn(pix, PDAY));
+  A.activeOn(pios, PDAY) + ' + ' + A.activeOn(pand, PDAY) + ' + ' +
+    A.unattributedOn(pios, PDAY) + ' vs ' + A.activeOn(pix, PDAY));
+check('and neither slice can exceed the combined total',
+  A.activeOn(pios, PDAY) <= A.activeOn(pix, PDAY) && A.activeOn(pand, PDAY) <= A.activeOn(pix, PDAY));
+/* Both slices report the same figure for what neither of them holds. */
+check('what was left out is the same number whichever slice you are in',
+  A.unattributedOn(pios, PDAY) === A.unattributedOn(pand, PDAY),
+  A.unattributedOn(pios, PDAY) + ' vs ' + A.unattributedOn(pand, PDAY));
 check('a filtered index says what it is a slice of', pand.platform === 'android', pand.platform);
 
 check('the split is counted before the filter, so a slice can still show it',

@@ -286,14 +286,49 @@ the UI, each of them deliberate:
   decide that a purchase did not happen.
 - **A ping that names no store is an install whose store we failed to record,
   not an install on a third platform.** Builds that shipped before the platform
-  marker existed send a bare `082126`, which reads back as `U`. Excluding those
-  from both slices put them in *no* view at all, which is exactly how a
-  dashboard whose history predates the marker came to read as "no pings" the
-  moment a platform filter was switched on. They are counted into **both**
-  platform views, totalled separately as `unattributed`, and drawn as their own
-  band rather than folded into either store. The deliberate consequence — with
-  a filter on, iOS + Android exceeds the day's total by that count — is
-  disclosed wherever it shows and asserted in `tests/analytics.test.mjs`.
+  marker existed send a bare `082126`, which reads back as `U`.
+- **A platform slice is STRICT: iOS means the pings that said iOS.** The three
+  buckets — iOS, Android, unattributed — therefore sum to the combined total
+  exactly, which is the property that makes the page checkable, and
+  `tests/analytics.test.mjs` pins it.
+
+  It was not always this way, and the history is the point. Unattributed pings
+  used to be pooled into **both** slices, because excluding them from both put
+  them in *no* view at all — which is how a dashboard whose whole history
+  predated the marker came to read as "no pings" the moment a filter was
+  switched on. That was the right trade while unattributed was a small tail. It
+  became the wrong one the moment it was the majority: with the App Store still
+  on a build that predates the marker, a real day read **iOS 23, Android 29,
+  combined 30**, both slices were mostly the same shared pool, and the two
+  numbers that were actually true — 1 iOS install and 7 Android — were
+  invisible. It was reported as a bug, correctly.
+
+  Strictness hides nothing, because **Combined is the everything view** and
+  always was: it is the unfiltered index, so it still counts every ping
+  including the unattributed ones. What a slice owes the reader is a statement
+  of what it LEFT OUT, which is what `unattributed` carries.
+- **A slice must say what it left out, beside the number that raised the
+  question.** The old disclosure lived in the platform card near the bottom of
+  the view, while the tiles and the filter are both at the top with nothing
+  between them. `renderFilterNote` now states the decomposition beside the
+  tiles in the view's own numbers ("of the 30 active, 1 named iOS, 7 named
+  Android, and 22 named no store at all"), and the headline tile's meta carries
+  the count too. It renders **only** with a filter on and unattributed pings
+  present, since that is the only case where anything was left out. It also
+  gives the share of the range that names no store and says outright that past
+  50% a per-store comparison is barely worth making — most of the population is
+  then in neither slice, and a quiet store means "not measured yet" rather than
+  "nobody there".
+- **Two consequences of strictness, both of which look like new bugs and are
+  not.** A store with few marked installs now shows a genuinely tiny number, so
+  the `SMALL_COHORT` warnings fire constantly on it — correct, since a
+  retention curve over one install is 0% or 100%. And per-store **retention is
+  unmeasurable for cohorts born before the marker**: a cohort's size comes from
+  its day-0 pings, so an install that first ran on an older build has its
+  denominator in the unattributed pool while its later pings — after it updates
+  — land in a store's slice. Those cohorts are skipped rather than reported at
+  a wrong percentage (`retentionAt` returns early on `!size`), so the per-store
+  curves fill in only as post-marker cohorts accumulate.
 - The **weekday pattern** chart carries five bars: store downloads, first runs,
   returning activity, purchases from the sales ledger, and subscribe pings. The
   last two count the same event at different moments (the app only notices a
