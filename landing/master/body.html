@@ -404,6 +404,11 @@
         <p class="hint">How old an install was when it subscribed. <b>D15</b> has its own column deliberately: if the history wall is what converts people, this is where it shows up.</p>
         <div id="pgPurchaseAge"></div>
         <div id="pgPurchaseAge-table" class="hidden" style="margin-top:12px"></div>
+        <!-- Every purchase, one row each. Below a dozen it is open by default:
+             a bucket chart of three purchases is three bars of height one, and
+             the list is the only place the store, the install date and a
+             possible double count are readable. -->
+        <div id="pgPurchaseRows"></div>
         <div id="pgConversion"></div>
       </div>
     </div>

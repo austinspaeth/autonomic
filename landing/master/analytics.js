@@ -210,6 +210,15 @@ window.Analytics = (function () {
          second pass over the report. */
       platform: letter ? PLATFORM_NAME[letter] : 'all',
       platformSplit: { open: splitOf(open), sub: splitOf(sub) },
+      /* The subscribe rows as the counter sent them, kept because `rowsToMap`
+         sums each day's cohorts ACROSS platforms — `sub[day].cohorts` is keyed
+         by cohort date alone, and the day's `platforms` map is a separate
+         total. That is the right shape for every aggregate on this view and
+         the wrong one for a list of individual purchases, which has to carry
+         both facts on the same line. Reading them raw also makes the list
+         unfiltered by construction, which is the rule every platform-split
+         thing here already follows. */
+      rawSub: (report && report.sub) || [],
       versions: (report && report.versions) || null
     };
   }
@@ -453,6 +462,85 @@ window.Analytics = (function () {
     { key: 'd22_30', label: 'D22–30', from: 22, to: 30 },
     { key: 'd30p', label: 'D30+', from: 31, to: Infinity }
   ];
+
+  /**
+   * Every subscribe ping, one row each, newest first.
+   *
+   *   { day, cohort, platform, count, age }
+   *
+   * The histogram above answers "when do people decide" and needs a population
+   * to mean anything. This answers "what happened", and at the volumes a new
+   * app actually has, it is the more honest of the two: three purchases in a
+   * bucket chart is three bars of height one, from which nothing can be read
+   * back — not which store, not who installed when, and crucially not whether
+   * two of the bars are the same install counted twice.
+   *
+   * That last one is the reason this exists. The client cannot be de-duplicated
+   * server-side (there is no identifier, by design), so a ping whose response
+   * was lost is re-sent on the next foreground and counted again. It leaves a
+   * signature — the SAME cohort key on two adjacent days — and that signature
+   * is invisible in every aggregate on this view and obvious in a list.
+   *
+   * ALWAYS UNFILTERED, like every other platform-split figure here: the store
+   * is one of the columns, so slicing by store first would answer the question
+   * with its own premise.
+   *
+   * `age` is exact wherever it exists — a ping carries its own cohort date, so
+   * install-to-purchase needs no denominator and works for cohorts older than
+   * the counter itself. A negative age cannot happen honestly (nobody buys
+   * before installing) and is reported as null rather than clamped, since it
+   * means a device's clock disagreed with the server's.
+   */
+  function purchaseRows(ix, from, to) {
+    var out = [];
+    ((ix && ix.rawSub) || []).forEach(function (row) {
+      if (!row || !row.day) return;
+      if (from && row.day < from) return;
+      if (to && row.day > to) return;
+      (row.cohorts || []).forEach(function (c) {
+        var n = Number(c && c.count) || 0;
+        if (!(n > 0)) return;
+        var age = c.cohort ? ageDays(c.cohort, row.day) : null;
+        out.push({
+          day: row.day,
+          cohort: c.cohort || null,
+          key: c.key || null,
+          platform: PLATFORM_NAME[c.platform] ? c.platform : 'U',
+          count: n,
+          age: (age === null || age < 0) ? null : age
+        });
+      });
+    });
+    /* Newest arrival first, and within a day the oldest install first — a
+       list read top-down is then "what happened most recently". */
+    return out.sort(function (a, b) {
+      if (a.day !== b.day) return a.day < b.day ? 1 : -1;
+      return String(a.cohort) < String(b.cohort) ? -1 : 1;
+    });
+  }
+
+  /**
+   * The rows that share a cohort key with another row on an ADJACENT day —
+   * the fingerprint of one install whose ping was counted, lost on the way
+   * back, and re-sent on its next foreground.
+   *
+   * Deliberately narrow. Two purchases from the same cohort DATE are perfectly
+   * ordinary once a cohort has more than one install in it, so this does not
+   * flag a shared cohort on its own; it flags a shared cohort ONE DAY apart,
+   * which is what the retry produces and what two independent buyers almost
+   * never do. It is a suspicion, named as one in the UI, never a correction —
+   * nothing here deletes or adjusts a count.
+   */
+  function suspectRetries(rows) {
+    var flagged = {};
+    (rows || []).forEach(function (a) {
+      (rows || []).forEach(function (b) {
+        if (a === b || !a.key || a.key !== b.key) return;
+        if (Math.abs(ageDays(a.day, b.day)) === 1) { flagged[a.day + '|' + a.key] = true; }
+      });
+    });
+    return flagged;
+  }
 
   function purchaseAges(ix, from, to) {
     var buckets = PURCHASE_BUCKETS.map(function (b) {
@@ -801,7 +889,8 @@ window.Analytics = (function () {
 
     // lifecycle + money
     survival: survival, lifecycleNow: lifecycleNow, lifecycleActive: lifecycleActive,
-    purchaseAges: purchaseAges, conversion: conversion,
+    purchaseAges: purchaseAges, purchaseRows: purchaseRows, suspectRetries: suspectRetries,
+    conversion: conversion,
 
     // shape of activity
     activeByCohort: activeByCohort, preTrackingCohorts: preTrackingCohorts, peakOver: peakOver,

@@ -332,6 +332,85 @@ check('the split still books unattributed pings under U, never under a store',
 check('the unfiltered index is unchanged by the split',
   pix.platform === 'all' && A.activeOn(pix, PDAY) === 22, String(A.activeOn(pix, PDAY)));
 
+/* ------------------------------------------------------- purchase rows
+
+   The per-purchase list, which exists because every aggregate on the App usage
+   view hides the two things you need at three purchases: which store each one
+   was on, and whether two of them are the same ping counted twice. */
+
+const R0 = '2026-08-11', R1 = '2026-08-12', R2 = '2026-08-13';
+const rrow = (day, cohorts) => ({
+  day,
+  total: cohorts.reduce((a, c) => a + c.count, 0),
+  cohorts: cohorts.map((c) => Object.assign({ key: c.cohort.replace(/^20(\d\d)-(\d\d)-(\d\d)$/, '$2$3$1') + (c.platform || 'U') }, c)),
+});
+
+/* Two buyers who installed on different days, plus one cohort that appears on
+   two ADJACENT days — the retry fingerprint. */
+const rix = A.index({
+  open: [],
+  sub: [
+    rrow(R0, [{ cohort: '2026-07-30', platform: 'A', count: 1 }]),
+    rrow(R1, [{ cohort: '2026-07-30', platform: 'A', count: 1 },
+              { cohort: '2026-08-01', platform: 'U', count: 1 }]),
+    rrow(R2, [{ cohort: '2026-06-01', platform: 'I', count: 2 }]),
+  ],
+});
+const prows = A.purchaseRows(rix);
+
+check('every purchase is a row of its own', prows.length === 4, String(prows.length));
+check('newest arrival first, so the list reads as what just happened',
+  prows[0].day === R2 && prows[prows.length - 1].day === R0,
+  prows.map((r) => r.day).join(','));
+check('a row carries the store the aggregate sums away',
+  prows[0].platform === 'I' && prows.some((r) => r.platform === 'A'),
+  prows.map((r) => r.platform).join(','));
+check('a ping with no marker is "U", not folded into a store',
+  prows.filter((r) => r.platform === 'U').length === 1,
+  prows.map((r) => r.platform).join(','));
+check('age is the exact gap between installing and paying',
+  prows[0].age === A.ageDays('2026-06-01', R2), String(prows[0].age));
+check('a count above one on a single row is kept, not split into rows',
+  prows[0].count === 2, String(prows[0].count));
+
+/* The suspicion, and — more importantly — what it must NOT accuse. */
+const flagged = A.suspectRetries(prows);
+check('the same cohort on two adjacent days is flagged as a possible retry',
+  !!flagged[R0 + '|' + prows.find((r) => r.day === R0).key] &&
+  !!flagged[R1 + '|' + prows.find((r) => r.day === R1 && r.platform === 'A').key],
+  JSON.stringify(Object.keys(flagged)));
+check('and only those two rows are flagged — a shared cohort alone is ordinary',
+  Object.keys(flagged).length === 2, JSON.stringify(Object.keys(flagged)));
+
+/* Two buyers born the same day who paid a fortnight apart are not a retry, and
+   flagging them would tell the reader a real sale might not have happened. */
+const far = A.purchaseRows(A.index({
+  open: [],
+  sub: [
+    rrow('2026-08-01', [{ cohort: '2026-07-01', platform: 'I', count: 1 }]),
+    rrow('2026-08-15', [{ cohort: '2026-07-01', platform: 'I', count: 1 }]),
+  ],
+}));
+check('the same cohort far apart is never flagged',
+  Object.keys(A.suspectRetries(far)).length === 0,
+  JSON.stringify(A.suspectRetries(far)));
+
+check('a zero count is not a purchase', A.purchaseRows(A.index({
+  open: [], sub: [rrow('2026-08-01', [{ cohort: '2026-07-01', platform: 'I', count: 0 }])],
+})).length === 0);
+check('no subscribe rows is an empty list, not a throw',
+  A.purchaseRows(A.index({ open: [], sub: [] })).length === 0);
+
+/* The list is what the platform tiles are: always the whole picture, because
+   the store is one of its own columns. */
+const rslice = A.index({
+  open: [],
+  sub: [rrow(R1, [{ cohort: '2026-07-30', platform: 'A', count: 1 },
+                  { cohort: '2026-08-01', platform: 'I', count: 1 }])],
+}, 'ios');
+check('the list ignores the platform filter, since store is a column of it',
+  A.purchaseRows(rslice).length === 2, String(A.purchaseRows(rslice).length));
+
 /* -------------------------------------------------------------- report */
 
 let failed = 0;

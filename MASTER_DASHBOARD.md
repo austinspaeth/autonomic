@@ -264,6 +264,26 @@ the UI, each of them deliberate:
   the iOS / Android split under their number. Those splits follow the same rule
   as the platform tile — always unfiltered, `no store` broken out and disclosed
   in the meta line rather than folded into either store.
+- **Every purchase is also listed one row each**, under the Purchase timing
+  histogram (`A.purchaseRows` → `renderPurchaseRows`). At the volumes a new app
+  actually has, the list is the more honest of the two: three purchases in a
+  bucket chart is three bars of height one, and nothing can be read back from
+  it — not which store, not who installed when, and not whether two of the bars
+  are the same install counted twice. It is open by default below
+  `PURCHASE_ROWS_OPEN_MAX` (12) and collapses above it, where the histogram
+  starts earning its place. Like every platform-split figure here it is **never
+  filtered by the platform selector**, because the store is one of its columns.
+- **A row marked "seen twice?" is the fingerprint of a lost response.** There is
+  no identifier, so the server cannot de-duplicate and the CLIENT must — and a
+  ping the server counted whose reply never got back is re-sent on the app's
+  next foreground and counted again (an accepted trade in `mobile/src/store/ping.ts`:
+  it errs toward reporting a real user as present). That leaves the same cohort
+  key on two ADJACENT days, which is invisible in every aggregate on this page
+  and obvious in a list. `A.suspectRetries` flags exactly that and nothing
+  wider: a shared cohort *date* on its own is ordinary the moment a cohort has
+  more than one install in it, so only the one-day-apart case is marked. It is
+  worded as a question and adjusts no number — nothing here is authorised to
+  decide that a purchase did not happen.
 - **A ping that names no store is an install whose store we failed to record,
   not an install on a third platform.** Builds that shipped before the platform
   marker existed send a bare `082126`, which reads back as `U`. Excluding those

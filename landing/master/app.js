@@ -1921,6 +1921,92 @@
 
   /* ----------------------------------------------------- 6. purchase timing */
 
+  /* Below this many purchases the list is open on arrival; above it the
+     histogram beside it is the better read and the list collapses behind a
+     press. The number is "how many rows can be taken in at a glance", not a
+     performance limit. */
+  var PURCHASE_ROWS_OPEN_MAX = 12;
+
+  /* Remembered for the session only, and deliberately not in `state`: which
+     way a disclosure is currently facing is not worth syncing to another
+     device, the same call the Edit data accordions make. */
+  var purchaseRowsOpen = null;
+
+  var STORE_LABEL = { I: 'iOS', A: 'Android', U: 'no store' };
+
+  /**
+   * Every subscribe ping, one row each.
+   *
+   * The histogram above needs a population to mean anything; this is what a
+   * new app actually has. Three columns carry the whole of what a purchase
+   * ping knows — when it arrived, when that install first ran, and which store
+   * it was on — and the fourth, age, is the subtraction people actually want.
+   *
+   * The two annotations are the point of building it:
+   *
+   *   **the store**, because with the App Store still on a build that predates
+   *   the platform marker, "no store" is a real and common answer here and it
+   *   must not read as a third platform;
+   *
+   *   **"seen twice?"**, which flags a cohort key appearing on two adjacent
+   *   days. That is the fingerprint of a ping the server counted and whose
+   *   response was lost, re-sent on the next foreground — the one way this
+   *   counter can overstate a purchase, and completely invisible in every
+   *   aggregate on this page. It is worded as a question and changes no
+   *   number: nothing here is authorised to decide that a purchase did not
+   *   happen.
+   */
+  function renderPurchaseRows(ix) {
+    var host = document.getElementById('pgPurchaseRows');
+    if (!host) return;
+
+    var rows = A.purchaseRows(ix);
+    if (!rows.length) { host.innerHTML = ''; return; }
+
+    var open = purchaseRowsOpen === null ? rows.length <= PURCHASE_ROWS_OPEN_MAX : purchaseRowsOpen;
+    var flagged = A.suspectRetries(rows);
+    var total = rows.reduce(function (a, x) { return a + x.count; }, 0);
+
+    var body = rows.map(function (x) {
+      var suspect = flagged[x.day + '|' + x.key];
+      return '<tr' + (suspect ? ' class="warn-row"' : '') + '>' +
+        '<td>' + esc(labelFull(x.day)) + '</td>' +
+        '<td>' + esc(x.cohort ? labelFull(x.cohort) : '–') + '</td>' +
+        '<td>' + (x.age === null ? '–' : 'D' + fmtInt(x.age)) + '</td>' +
+        '<td>' + esc(STORE_LABEL[x.platform] || STORE_LABEL.U) + '</td>' +
+        '<td>' + fmtInt(x.count) + '</td>' +
+        '<td>' + (suspect ? '<span class="warn-small">seen twice?</span>' : '') + '</td>' +
+        '</tr>';
+    }).join('');
+
+    host.innerHTML =
+      '<div class="rows-head">' +
+        '<button class="btn sm" id="pgPurchaseRowsToggle">' + (open ? 'Hide' : 'Show') + ' all ' +
+          fmtInt(total) + ' ' + (total === 1 ? 'purchase' : 'purchases') + '</button>' +
+      '</div>' +
+      '<div id="pgPurchaseRowsTable" class="' + (open ? '' : 'hidden') + '" style="margin-top:10px">' +
+        '<div class="table-scroll"><table><thead><tr>' +
+          '<th>Paid</th><th>Installed</th><th>Age</th><th>Store</th><th>Count</th><th></th>' +
+        '</tr></thead><tbody>' + body + '</tbody></table></div>' +
+        (Object.keys(flagged).length
+          ? '<p class="note" style="margin-top:8px">A row marked <b>seen twice?</b> shares its install day with a purchase one day either side of it. ' +
+            'That is what a ping looks like when the server counted it and the reply was lost on the way back, so the app sent it again — ' +
+            'the one way this counter can overstate a sale. It is a suspicion, not a correction: nothing above has been adjusted.</p>'
+          : '') +
+        '<p class="note" style="margin-top:8px">Subscribe pings, not store receipts. <b>Store</b> comes off the ping\'s own cohort key, so ' +
+          '"no store" means a build that shipped before the platform marker rather than a third platform. This list is never filtered by ' +
+          'the platform selector — the store is one of its columns.</p>' +
+      '</div>';
+
+    var btn = document.getElementById('pgPurchaseRowsToggle');
+    if (btn) {
+      btn.addEventListener('click', function () {
+        purchaseRowsOpen = document.getElementById('pgPurchaseRowsTable').classList.contains('hidden');
+        renderPurchaseRows(ix);
+      });
+    }
+  }
+
   function renderPurchases(ix, r) {
     var ages = A.purchaseAges(ix);
     drawChart('pgPurchaseAge', {
@@ -1937,6 +2023,8 @@
         return ages.total ? pctOf(b.count, ages.total) + ' of all purchases' : '';
       }
     });
+
+    renderPurchaseRows(ix);
 
     var conv7 = A.conversion(ix, ix.cohorts, 7);
     var conv30 = A.conversion(ix, ix.cohorts, 30);
