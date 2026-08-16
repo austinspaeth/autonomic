@@ -398,6 +398,12 @@ tbody tr:hover { background: var(--surface-2); }
 }
 .warn-observational { border-left: 2px solid var(--border); padding-left: 10px; margin-top: 12px; }
 
+/* A purchase row under suspicion of being the same ping counted twice. Tinted,
+   not coloured over: the row is still a real thing the counter recorded, and
+   the only claim being made is "look at this one". */
+.warn-row > td { background: rgba(201, 133, 0, 0.07); }
+.rows-head { display: flex; margin-top: 12px; }
+
 /* Boundary crossings: two numbers that carry most of the monetization story. */
 .transitions { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 12px; }
 .transition { background: var(--surface-2); border-radius: 8px; padding: 10px 12px; }

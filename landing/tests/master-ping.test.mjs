@@ -196,6 +196,29 @@ const splitOfTile = (host, prefix) => {
 const rangeSplit = splitOfTile('pgTilesB', 'Purchases in range');
 check('purchases in range are split by store', /iOS 2/.test(rangeSplit) && /Android 1/.test(rangeSplit), rangeSplit);
 
+/* Every purchase as its own row, which is what a book with three of them can
+   actually be read from. Open by default at this size: the histogram beside it
+   is three bars of height one, and the store, the install day and any double
+   count are only legible in the list. */
+const rowCells = () => [].slice.call($('pgPurchaseRows').querySelectorAll('tbody tr'))
+  .map((tr) => [].slice.call(tr.querySelectorAll('td')).map((td) => td.textContent.trim()));
+check('every subscribe ping is a row of its own', rowCells().length === 3, String(rowCells().length));
+check('and the list is open on arrival at this size',
+  !$('pgPurchaseRows').querySelector('#pgPurchaseRowsTable').classList.contains('hidden'));
+check('a row names the store, which every aggregate above sums away',
+  rowCells().some((c) => c.indexOf('Android') >= 0) && rowCells().some((c) => c.indexOf('iOS') >= 0),
+  JSON.stringify(rowCells()));
+check('and the install age, which is the subtraction people want',
+  rowCells().some((c) => c.indexOf('D10') >= 0), JSON.stringify(rowCells()));
+check('nothing in this fixture looks like a double count',
+  !/seen twice/.test($('pgPurchaseRows').textContent), $('pgPurchaseRows').textContent.slice(0, 120));
+check('the list says it is pings rather than receipts',
+  /not store receipts/.test($('pgPurchaseRows').textContent));
+$('pgPurchaseRowsToggle').click();
+check('and it collapses in one press',
+  $('pgPurchaseRows').querySelector('#pgPurchaseRowsTable').classList.contains('hidden'));
+$('pgPurchaseRowsToggle').click();
+
 const buysToday = tiles[Object.keys(tiles).find((k) => k.startsWith('Purchases on'))];
 check('a purchases tile covers the newest day only', buysToday && buysToday.value === '1', buysToday && buysToday.value);
 const todaySplit = splitOfTile('pgTiles', 'Purchases on');
