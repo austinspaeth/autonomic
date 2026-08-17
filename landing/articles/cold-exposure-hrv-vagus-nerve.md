@@ -8,7 +8,7 @@ keywords: "cold exposure HRV, cold water vagus nerve, does cold water stimulate 
 date: 2026-08-17
 updated: 2026-08-17
 author: "Austin Spaeth"
-photoLocation: https://images.unsplash.com/photo-1547357247-65c96cee979f?q=80&w=1760&auto=format&fit=crop
+photoLocation: https://images.unsplash.com/photo-1707303674302-1a99bbd6b0c1?q=80&w=1364&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D
 photoAttribution: "Priscilla Du Preez / Unsplash"
 tldr: "Cold water can raise vagal (parasympathetic) activity, but where the cold lands decides what happens. Cold on the face triggers the diving reflex, a real vagal slowdown of the heart, and this is the most reliable cold effect. A whole-body cold plunge does the opposite first: a sympathetic cold-shock surge that speeds the heart and raises blood pressure, sometimes followed by a vagal rebound minutes later. Acute effects are well documented; a durable rise in baseline HRV from regular cold exposure is not. With POTS or dysautonomia, treat the cold plunge as a stressor and start small."
 categories:
