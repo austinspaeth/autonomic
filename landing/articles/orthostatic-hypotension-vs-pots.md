@@ -8,7 +8,7 @@ keywords: "orthostatic hypotension vs POTS, orthostatic hypotension, POTS vs ort
 date: 2026-08-18
 updated: 2026-08-18
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1519643381401-22c77e60520e?q=80&w=1760&auto=format&fit=crop"
+photoLocation: "https://images.unsplash.com/photo-1615486511484-92e172cc4fe0?q=80&w=1471&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
 photoAttribution: "Kinga Howard / Unsplash"
 tldr: "Orthostatic hypotension (OH) and POTS both cause dizziness on standing, but they are opposite readings. OH is a sustained fall in blood pressure when you stand: at least 20 mmHg systolic or 10 mmHg diastolic within three minutes. POTS is a sustained rise in heart rate of at least 30 bpm (40 for teens) with the blood pressure holding steady, and its definition specifically excludes a big BP drop. The only way to tell them apart at home is to measure BOTH your blood pressure and your heart rate across the same lie-to-stand test, and a clinician confirms which one it is."
 categories:
