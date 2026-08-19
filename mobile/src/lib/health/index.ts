@@ -516,7 +516,15 @@ function makeReal(mod: HkModule): HealthApi {
    */
   const seriesQ = async (id: string, from: Date, to: Date, base: Date): Promise<{ t: number; v: number }[]> => {
     try {
-      const rows = (await mod.queryQuantitySamples?.(id, { from, to, limit: 5000 })) || [];
+      // `limit: 0` is HKObjectQueryNoLimit, and it is load-bearing. The
+      // library's `ascending` defaults to `limit === 0`, so ANY positive limit
+      // asks HealthKit for the newest N samples in the window — a watch logs
+      // heart rate every ~5s while it tracks sleep, so a 9-hour night is well
+      // past 5000 and the query silently dropped the FIRST hour and a half of
+      // it. The line then started an hour after bedtime while breathing (a
+      // once-per-several-minutes sample) spanned the whole night. The window is
+      // one night, so unbounded here is safe; `thinSeries` does the bounding.
+      const rows = (await mod.queryQuantitySamples?.(id, { from, to, limit: 0 })) || [];
       const baseMs = base.getTime();
       const pts = rows
         .map((r) => ({ t: Math.round((r.startDate.getTime() - baseMs) / 1000), v: r.quantity }))
@@ -747,7 +755,7 @@ function makeReal(mod: HkModule): HealthApi {
         out.workouts = await mapPooled(usable, 4, async (w) => {
           let avgHr: number | null = null; let minHr: number | null = null; let maxHr: number | null = null;
           let hr: readonly QSample[] = [];
-          try { hr = (await mod.queryQuantitySamples?.(QID.heartRate, { from: w.startDate, to: w.endDate, limit: 5000 })) || []; } catch { /* HR unavailable */ }
+          try { hr = (await mod.queryQuantitySamples?.(QID.heartRate, { from: w.startDate, to: w.endDate, limit: 0 })) || []; } catch { /* HR unavailable */ } // limit 0 = no limit AND ascending; see seriesQ
           if (hr.length) {
             let sum = 0; let min = Infinity; let max = -Infinity;
             for (const s of hr) { sum += s.quantity; if (s.quantity < min) min = s.quantity; if (s.quantity > max) max = s.quantity; }
@@ -816,7 +824,7 @@ function makeReal(mod: HkModule): HealthApi {
           // workout samples every few seconds, so one query covers avg/min/max.
           let avgHr: number | null = null; let minHr: number | null = null; let maxHr: number | null = null;
           let hr: readonly QSample[] = [];
-          try { hr = (await mod.queryQuantitySamples?.(QID.heartRate, { from: w.startDate, to: w.endDate, limit: 5000 })) || []; } catch { /* HR unavailable */ }
+          try { hr = (await mod.queryQuantitySamples?.(QID.heartRate, { from: w.startDate, to: w.endDate, limit: 0 })) || []; } catch { /* HR unavailable */ } // limit 0 = no limit AND ascending; see seriesQ
           if (hr.length) {
             let sum = 0; let min = Infinity; let max = -Infinity;
             for (const s of hr) { sum += s.quantity; if (s.quantity < min) min = s.quantity; if (s.quantity > max) max = s.quantity; }

@@ -202,6 +202,51 @@ function tokens(note: string): Set<string> {
  *  test family and blunt the FDR correction for everyone else. */
 const MAX_NOTE_KEYWORDS = 20;
 
+/* ---------- almost-testable progress ---------- */
+
+/** A factor that is short of testable, and how short: `have` of `need` days. */
+export interface FactorProgress {
+  driver: string;
+  have: number;
+  need: number;
+}
+
+/**
+ * The types closest to becoming testable, for the empty screen's "keep going"
+ * rows: a sparse journal's alternative to a blank wall.
+ *
+ * Meds and activities only — the deliberate interventions, the things a person
+ * is logging BECAUSE they want to know whether they work. Only the days-WITH
+ * shortfall is reported: a supplement taken every single day is short of
+ * days-without, and "log less of it" is not advice this card should give.
+ */
+export function factorProgress(state: AppState, keys: string[]): FactorProgress[] {
+  const days = state.days;
+  const counts = { meds: new Map<string, number>(), activities: new Map<string, number>() };
+  const bump = (m: Map<string, number>, k: string) => m.set(k, (m.get(k) || 0) + 1);
+  keys.forEach((dk) => {
+    const d = days[dk];
+    if (!d) return;
+    new Set((d.meds || []).map((e) => e.type)).forEach((t) => t && bump(counts.meds, t));
+    new Set((d.activities || []).map((e) => e.type)).forEach((t) => t && bump(counts.activities, t));
+  });
+
+  const out: FactorProgress[] = [];
+  (['meds', 'activities'] as const).forEach((kind) => {
+    counts[kind].forEach((n, type) => {
+      // Two or more occurrences: a single day is not "almost" anything, and
+      // promising a finding off the back of one dose would be a nag.
+      if (n < 2 || n >= MIN_FACTOR_DAYS) return;
+      out.push({ driver: labelFor(state, kind, type), have: n, need: MIN_FACTOR_DAYS });
+    });
+  });
+
+  // Closest to the line first; alphabetical to make the order total.
+  return out
+    .sort((a, b) => ((a.need - a.have) - (b.need - b.have)) || (a.driver < b.driver ? -1 : 1))
+    .slice(0, 3);
+}
+
 /* ---------- the builder ---------- */
 
 /**
@@ -212,7 +257,15 @@ const MAX_NOTE_KEYWORDS = 20;
  * become columns. Both halves matter: a supplement taken every single day has no
  * contrast and can tell us nothing, and one taken twice has no weight.
  */
-export function buildFactors(state: AppState, keys: string[]): FactorDef[] {
+export function buildFactors(state: AppState, keys: string[], opts: {
+  /**
+   * Override for MIN_FACTOR_DAYS. The early-signals sweep (./correlate) passes
+   * a lower floor, because at day eight of a journal NO type can have eight
+   * days on each side of itself — the standard floor would leave the early
+   * tier with nothing to test. Everything else uses the default.
+   */
+  minDays?: number;
+} = {}): FactorDef[] {
   const days = state.days;
   const counts = {
     meds: new Map<string, number>(),
@@ -238,7 +291,8 @@ export function buildFactors(state: AppState, keys: string[]): FactorDef[] {
   });
 
   /** Enough days with it, and enough without it, to be a comparison. */
-  const usable = (n: number, universe: number) => n >= MIN_FACTOR_DAYS && universe - n >= MIN_FACTOR_DAYS;
+  const floor = opts.minDays ?? MIN_FACTOR_DAYS;
+  const usable = (n: number, universe: number) => n >= floor && universe - n >= floor;
 
   const out: FactorDef[] = [];
 

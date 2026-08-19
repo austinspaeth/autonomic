@@ -8,10 +8,18 @@
  * arrives, and (cohort day, arrival day) is a retention matrix. No identifier
  * is involved anywhere — see the header of src/store/ping.ts for what that
  * costs and buys.
+ *
+ * The activation ping carries one more letter — which sensor took the reading —
+ * because "did they ever get a first reading" and "with what" are the same
+ * question: a cohort that activates only on the camera is a different product
+ * problem from one that never activates at all.
  */
 
-/** Base URL of the two ping routes (`/open/<code>` and `/sub/<code>`). */
+/** Base URL of the three ping routes (`/open/<code>`, `/sub/<code>`, `/act/<code>`). */
 export const PING_BASE = 'https://api.autonomic.care/ping';
+
+/** The three routes a ping can take. */
+export type PingKind = 'open' | 'sub' | 'act';
 
 /**
  * The platform marker carried by a ping: one letter, appended to the cohort
@@ -25,6 +33,21 @@ export function platformCode(os: string | undefined): PlatformCode {
   if (os === 'ios') return 'I';
   if (os === 'android') return 'A';
   return 'U';
+}
+
+/**
+ * How the activating reading was taken: `W` Apple Watch, `B` Bluetooth strap,
+ * `F` finger on the camera. Only the activation ping carries one — the marker
+ * is a property of that one reading, not of the install.
+ */
+export type MethodCode = 'W' | 'B' | 'F';
+
+/** Map an HRV capture source (see features/hrv/SourcePicker) onto its marker. */
+export function methodCode(source: string | undefined): MethodCode | undefined {
+  if (source === 'watch') return 'W';
+  if (source === 'polar') return 'B';
+  if (source === 'camera') return 'F';
+  return undefined;
 }
 
 /* ------------------------------------------------------------------ dates */
@@ -69,21 +92,30 @@ export function easternDay(ms: number): string {
 /* ------------------------------------------------------------------- wire */
 
 /**
- * Encode a cohort as the wire format the endpoint takes: D{MMDDYY}{platform},
- * e.g. `D082126I`.
+ * Encode a cohort as the wire format the endpoint takes:
+ * D{MMDDYY}{platform}{method?}, e.g. `D082126I` or `D082126IB`.
+ *
+ * The method letter is appended rather than sent as a second path segment or a
+ * query parameter so that every route stays one opaque code the server decodes
+ * in one place, and so a row's storage key stays a single string.
  */
-export function cohortCode(isoDate: string, platform: PlatformCode = 'U'): string {
+export function cohortCode(
+  isoDate: string,
+  platform: PlatformCode = 'U',
+  method?: MethodCode,
+): string {
   const [y, m, d] = isoDate.split('-');
-  return `D${m}${d}${y.slice(2)}${platform}`;
+  return `D${m}${d}${y.slice(2)}${platform}${method || ''}`;
 }
 
 /** The full URL for one ping. */
 export function pingUrl(
-  kind: 'open' | 'sub',
+  kind: PingKind,
   cohortIso: string,
   platform: PlatformCode = 'U',
+  method?: MethodCode,
 ): string {
-  return `${PING_BASE}/${kind}/${cohortCode(cohortIso, platform)}`;
+  return `${PING_BASE}/${kind}/${cohortCode(cohortIso, platform, method)}`;
 }
 
 /**

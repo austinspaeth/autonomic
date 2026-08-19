@@ -19,10 +19,19 @@
  * only ever asks about today, and holding old reports would pin whole journals in
  * memory for no benefit.
  *
- * Pure apart from the module-level slot: no store, no MMKV, no expo, no React.
+ * This module is also the SHELL around finding retention (./stability): before a
+ * real build it reads which findings the last report showed (./findingMemory),
+ * hands them to the engine as the `retain` set, and afterwards records what this
+ * report showed. That keeps the engine pure — `buildInsights` takes retention as
+ * an argument — while every caller that builds through here (the screen, the tab
+ * badge) shares one memory. Demo builds skip both sides: the sample month's
+ * findings are not claims anyone was shown about their own body.
+ *
+ * No expo, no React; MMKV only via ./findingMemory.
  */
 import type { ScoreContext } from '../scoring';
 import type { AppState } from '../types';
+import { findingMemory, noteFindingsShown } from './findingMemory';
 import { buildInsights, type InsightReport } from './index';
 
 interface Slot { key: string; report: InsightReport }
@@ -55,7 +64,14 @@ export function computeInsights(state: AppState, dk: string, opts: { demo?: bool
   const key = cacheKey(state, dk, opts.demo, opts.anchor);
   const hit = slot && slot.key === key ? slot.report : null;
   if (hit) return hit;
-  const report = buildInsights(state, dk, opts);
+  let report: InsightReport;
+  if (opts.demo) {
+    report = buildInsights(state, dk, opts);
+  } else {
+    const mem = findingMemory();
+    report = buildInsights(state, dk, { ...opts, retain: { correlations: mem.correlationIds, change: mem.changeId } });
+    noteFindingsShown(report);
+  }
   slot = { key, report };
   return report;
 }

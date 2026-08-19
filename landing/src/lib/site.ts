@@ -67,7 +67,7 @@ export const pricing = {
   currency: 'USD',
   monthly: 7.99,
   yearly: 49.99,
-  trialDays: 7
+  trialDays: 14
 };
 
 /** `$7.99` — trailing cents kept, so the number reads like the store charge. */

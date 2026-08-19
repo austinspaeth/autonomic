@@ -6,14 +6,16 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { type LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Defs, LinearGradient as SvgGradient, Rect, Stop } from 'react-native-svg';
-import Animated, { Easing, useAnimatedProps, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
+import Animated, { Easing, useAnimatedProps, useAnimatedStyle, useSharedValue, withDelay, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 import { ScoreGauge } from '../components/charts';
-import { Icon } from '../components/Icon';
+import { BrandMark, Icon } from '../components/Icon';
 import { useSheets } from '../components/Sheet';
 import { SumCard, MetricRow } from '../components/summary';
 import { useAccordion } from '../components/ui';
 import { AnnualOfferCard } from './AnnualOffer';
+import { FounderOfferCard } from './FounderOffer';
 import { TrendCard } from './TrendCard';
+import { HrvSetup } from './hrv/Setup';
 import { MilestoneProgressCard } from './Milestones';
 import { ProtocolEditor } from './ProtocolEditor';
 import { radius, type as T, usePalette } from '../theme';
@@ -23,8 +25,9 @@ import {
   scoreCat, scoreSet, streakInfo, streakTier, type ScoreComp, type ScoreSetResult,
 } from '../lib/scoring/day';
 import { detectDownturn, type Downturn } from '../lib/scoring/downturn';
-import { trustedReadings } from '../lib/hrvQuality';
-import { buildDownturnPrompt } from '../lib/analysis/reports';
+import { detectStrain, type Strain } from '../lib/scoring/strain';
+import { hasHrvReading, trustedReadings } from '../lib/hrvQuality';
+import { buildDownturnPrompt, buildStrainPrompt } from '../lib/analysis/reports';
 import { PromptSheet } from './PromptSheet';
 import { todayKey } from '../lib/dates';
 import { getState, useAppState } from '../store/store';
@@ -32,7 +35,8 @@ import { setJournalSectionY, useExpandProtocolSignal } from '../store/nav';
 import { useTier } from '../store/tier';
 import { usePaywall } from './Paywall';
 
-import type { Band, ScoreCat } from '../lib/types';
+import type { AppState, Band, ScoreCat } from '../lib/types';
+import type { ScoreContext } from '../lib/scoring';
 
 const hexA = (hex: string, a: number) => {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex);
@@ -57,14 +61,19 @@ const mixHex = (color: string, base: string, t: number) => {
 const WARN_BASE = '#0d0d0f';
 
 
-// Status-color highlight on the top-left border edge, fading down the sides
-// into the normal border — like light shining onto the card. Mirrors the
-// webapp's gradient-border trick (linear-gradient 165deg, color → border) using
-// an SVG rounded-rect stroke overlay so it follows the corner radius. Pass
-// color=null to fall back to a plain border (awaiting / low-confidence state).
+// Status-color highlight on one top border edge, fading down the sides into
+// the normal border — like light shining onto the card. Mirrors the webapp's
+// gradient-border trick (linear-gradient 165deg, color → border) using an SVG
+// rounded-rect stroke overlay so it follows the corner radius. Pass color=null
+// to fall back to a plain border (awaiting / low-confidence state).
+//
+// `corner` picks which top corner the light comes from. The Outlook lights its
+// top-left; the baseline card that stands in for it lights its top-RIGHT, so
+// the two never read as the same card wearing a different headline — one slot,
+// two states, and the light says which.
 let obId = 0;
 const AnimatedRect = Animated.createAnimatedComponent(Rect);
-function GradientBorderCard({ color, trigger, style, children }: { color: string | null; trigger?: string; style?: any; children: React.ReactNode }) {
+function GradientBorderCard({ color, trigger, corner = 'topLeft', style, children }: { color: string | null; trigger?: string; corner?: 'topLeft' | 'topRight'; style?: any; children: React.ReactNode }) {
   const p = usePalette();
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [gid] = useState(() => `ob${obId++}`);
@@ -94,7 +103,14 @@ function GradientBorderCard({ color, trigger, style, children }: { color: string
         <View style={StyleSheet.absoluteFill} pointerEvents="none">
           <Svg width={size.w} height={size.h}>
             <Defs>
-              <SvgGradient id={gid} x1={size.w * 0.12} y1={0} x2={size.w * 0.55} y2={size.h} gradientUnits="userSpaceOnUse">
+              <SvgGradient
+                id={gid}
+                x1={corner === 'topRight' ? size.w * 0.88 : size.w * 0.12}
+                y1={0}
+                x2={corner === 'topRight' ? size.w * 0.45 : size.w * 0.55}
+                y2={size.h}
+                gradientUnits="userSpaceOnUse"
+              >
                 <Stop offset="0" stopColor={color} stopOpacity={1} />
                 <Stop offset="0.14" stopColor={color} stopOpacity={0.4} />
                 <Stop offset="1" stopColor={p.border} stopOpacity={1} />
@@ -135,25 +151,141 @@ export function DaySummary({ dk }: { dk: string }) {
     [state.days, dk, ctx, state.settings.protocol, state.customTypes],
   );
 
+  // The second way the same card fires: the score has NOT broken, but the
+  // markers that move before it have. Only asked when there is no downturn —
+  // the score sliding is the stronger statement, and two warning cards stacked
+  // on one screen is the thing this card exists to avoid.
+  const strain = useMemo(
+    () => (downturn ? null : detectStrain(state.days, dk, ctx)),
+    [downturn, state.days, dk, ctx],
+  );
+
+  // Until the journal holds one real HRV reading there is no baseline for a
+  // score to mean anything against, so the Outlook slot carries the ask instead
+  // of a dial. Not a banner above the score — the whole point is that the score
+  // is not yet worth showing.
+  const baselineWaiting = !hasHrvReading(state.days);
+
   return (
     <View>
-      <GradientBorderCard color={!scored ? null : scoreCat(all.score!).color} trigger={dk} style={{ marginBottom: 12 }}>
-        {!scored ? (
-          <UnscoredHero dk={dk} hasReadings={readings.length > 0} />
-        ) : (
-          <ScoredHero dk={dk} readings={readings} d={d} all={all} ctx={ctx} onExplain={() => openSheet(() => <ScoreExplain all={all} dk={dk} />)} />
-        )}
-      </GradientBorderCard>
+      {baselineWaiting ? (
+        <BaselineWaitingCard />
+      ) : (
+        <GradientBorderCard color={!scored ? null : scoreCat(all.score!).color} trigger={dk} style={{ marginBottom: 12 }}>
+          {!scored ? (
+            <UnscoredHero dk={dk} hasReadings={readings.length > 0} />
+          ) : (
+            <ScoredHero dk={dk} readings={readings} d={d} all={all} ctx={ctx} onExplain={() => openSheet(() => <ScoreExplain all={all} dk={dk} />)} />
+          )}
+        </GradientBorderCard>
+      )}
       {/* Directly under the Outlook: the half-off year is time-boxed to 24h and
           outranks the generic upsell, which suppresses itself while the offer's
           unlock has the tier reading 'trial'. */}
       <AnnualOfferCard />
-      {downturn ? <DownturnWarning w={downturn} dk={dk} /> : null}
+      {/* The one-day founding-member offer. Independent of the annual card
+          above: it fires inside the install trial, that one fires long after it
+          has lapsed, so the two can never be due on the same day. */}
+      <FounderOfferCard />
+      {downturn ? (
+        <WarningCard severity={downturn.severity} headline={downturn.headline}
+          onPress={() => openSheet(() => <DownturnExplain w={downturn} dk={dk} />)} />
+      ) : strain ? (
+        <WarningCard severity={strain.severity} headline={strain.headline}
+          onPress={() => openSheet(() => <StrainExplain w={strain} dk={dk} />)} />
+      ) : null}
       <TrendCard dk={dk} />
       <MilestoneProgressCard dk={dk} />
       <StreakCard dk={dk} />
     </View>
   );
+}
+
+/**
+ * The Outlook slot before the first reading exists.
+ *
+ * Everything downstream — the score, Progress, Trend Watch, every correlation —
+ * is built out of HRV, so an install with none of it has an app full of empty
+ * rooms. Showing a 0/100 dial there is worse than showing nothing: it reads as
+ * a verdict on the user rather than as a missing input. So the slot states what
+ * is waiting, shows the three things that stay blank until it arrives, and
+ * carries the one button that fixes it.
+ *
+ * It wears the Outlook's own gradient border lit from the top RIGHT, so it is
+ * legibly the same object in the same slot and legibly not the score. The three
+ * tiles are SKELETONS rather than checkboxes: the claim is "these are empty",
+ * not "here are your chores". No dismiss — this card is the only route back,
+ * and it retires itself the moment a reading lands.
+ */
+const WAITING_ROWS = [
+  { label: 'Autonomic score', width: '68%' as const, delay: 0 },
+  { label: 'Progress charts', width: '48%' as const, delay: 900 },
+  { label: 'Trends & correlations', width: '80%' as const, delay: 1800 },
+];
+
+function BaselineWaitingCard() {
+  const p = usePalette();
+  const { openSheet } = useSheets();
+  return (
+    <GradientBorderCard color={p.accent} corner="topRight" style={{ marginBottom: 12 }}>
+      <View style={{ padding: 16 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 13, marginBottom: 14 }}>
+          <View style={{ width: 46, height: 46, borderRadius: 14, backgroundColor: hexA(p.accent, 0.08), borderWidth: 1, borderColor: hexA(p.accent, 0.33), alignItems: 'center', justifyContent: 'center' }}>
+            <BrandMark size={24} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[T.section, { color: hexA(p.accent, 0.85), marginBottom: 2 }]}>First reading</Text>
+            <Text style={{ fontSize: 18, fontWeight: '700', letterSpacing: -0.3, color: p.text }}>Your baseline is waiting</Text>
+          </View>
+        </View>
+
+        <Text style={{ fontSize: 13.5, lineHeight: 20, color: p.textDim, marginBottom: 16 }}>
+          Nearly everything the app shows you is built from this reading. Scores, trends and correlations all stay
+          empty until there is one to compare against.
+        </Text>
+
+        <View style={{ borderTopWidth: 1, borderTopColor: p.border, paddingTop: 14, marginBottom: 16 }}>
+          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 11 }}>
+            {WAITING_ROWS.map((w) => (
+              <View key={w.label} style={{ flex: 1, backgroundColor: p.sunk, borderRadius: 14, padding: 11 }}>
+                <GhostBar width={w.width} delay={w.delay} />
+                <Text style={{ fontSize: 11.5, lineHeight: 15, color: p.textDim }}>{w.label}</Text>
+              </View>
+            ))}
+          </View>
+          <Text style={{ fontSize: 12, color: p.textDim }}>These fill in as you log. Nothing appears until you take a reading.</Text>
+        </View>
+
+        <Pressable
+          onPress={() => openSheet((c) => <HrvSetup controls={c} />)}
+          style={({ pressed }) => [
+            { alignItems: 'center', justifyContent: 'center', paddingVertical: 14, borderRadius: radius.control, backgroundColor: p.accent },
+            pressed && { opacity: 0.85 },
+          ]}
+        >
+          <Text style={{ color: '#fff', fontSize: 15.5, fontWeight: '700' }}>Start my first reading</Text>
+        </Pressable>
+      </View>
+    </GradientBorderCard>
+  );
+}
+
+/** One placeholder bar, breathing slowly. Deliberately not a spinner: nothing
+ *  is loading, these sections are genuinely empty. */
+function GhostBar({ width, delay }: { width: `${number}%`; delay: number }) {
+  const t = useSharedValue(0.45);
+  useEffect(() => {
+    t.value = withDelay(delay, withRepeat(
+      withSequence(
+        withTiming(1, { duration: 1600, easing: Easing.inOut(Easing.quad) }),
+        withTiming(0.45, { duration: 1600, easing: Easing.inOut(Easing.quad) }),
+      ),
+      -1,
+      false,
+    ));
+  }, [t, delay]);
+  const style = useAnimatedStyle(() => ({ opacity: t.value }));
+  return <Animated.View style={[{ width, height: 11, borderRadius: 999, backgroundColor: '#34343a', marginBottom: 10 }, style]} />;
 }
 
 // Mirrors ScoredHero's shape so the card doesn't change silhouette once a score
@@ -251,8 +383,13 @@ function ScoredHero({ dk, readings, d, all, ctx, onExplain }: { dk: string; read
   );
 }
 
-/** Trend warning card, sitting between the Outlook and the Trend card when the
- *  trailing week is clearly worsening. Deliberately the SAME object as
+/** The Journal's one warning card, sitting between the Outlook and the Trend
+ *  card. TWO detectors feed it and it looks identical for both: ./downturn when
+ *  the daily score is sliding, ../lib/scoring/strain when the score still reads
+ *  fine but the markers that move before it have drifted. One object, because a
+ *  user cannot act on the difference between "your score fell" and "your
+ *  recovery markers moved" — both mean take it easy — and two cards stacked
+ *  would turn a caution into a wall of alarm. Deliberately the SAME object as
  *  `<TrendCard/>` below it — neutral surface, sunk tile, one sentence, chevron
  *  — with the emoji carrying the severity (⚠️ watch, 🛑 alert) instead of a
  *  wash of red across the card.
@@ -261,12 +398,11 @@ function ScoredHero({ dk, readings, d, all, ctx, onExplain }: { dk: string; read
  *  on a screen someone opens while already feeling bad, and made good news and
  *  bad news look like two unrelated kinds of notice. The sheet behind it still
  *  carries the color — that's where the user went looking for it. */
-function DownturnWarning({ w, dk }: { w: Downturn; dk: string }) {
+function WarningCard({ severity, headline, onPress }: { severity: 'watch' | 'alert'; headline: string; onPress: () => void }) {
   const p = usePalette();
-  const { openSheet } = useSheets();
   return (
     <Pressable
-      onPress={() => openSheet(() => <DownturnExplain w={w} dk={dk} />)}
+      onPress={onPress}
       style={({ pressed }) => [
         {
           borderWidth: 1, borderColor: p.border, borderRadius: radius.card,
@@ -277,45 +413,89 @@ function DownturnWarning({ w, dk }: { w: Downturn; dk: string }) {
       ]}
     >
       <View style={{ width: 42, height: 42, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: p.sunk, borderWidth: 1, borderColor: p.border }}>
-        <Text style={{ fontSize: 21 }}>{w.severity === 'alert' ? '🛑' : '⚠️'}</Text>
+        <Text style={{ fontSize: 21 }}>{severity === 'alert' ? '🛑' : '⚠️'}</Text>
       </View>
-      <Text style={{ flex: 1, fontSize: 15, fontWeight: '700', color: p.text, lineHeight: 20 }}>{w.headline}</Text>
+      <Text style={{ flex: 1, fontSize: 15, fontWeight: '700', color: p.text, lineHeight: 20 }}>{headline}</Text>
       <Icon name="chevronRight" size={20} color={p.textDim} />
     </Pressable>
   );
 }
 
-/** Sheet behind the downturn warning: the full explanation, every journal
- *  finding that could be driving the slide, an AI-investigation prompt
- *  builder, and a rest/doctor note. */
-function DownturnExplain({ w, dk }: { w: Downturn; dk: string }) {
+/** The colored headline tile both explain sheets open with: severity color,
+ *  one bold readout, its window underneath, and the paragraph. The card in the
+ *  Journal is deliberately neutral; the color lives here, where the user went
+ *  looking for it. */
+function WarnTile({ color, value, sub, body }: { color: string; value: string; sub: string; body: string }) {
+  const p = usePalette();
+  return (
+    <View style={{ borderRadius: radius.card, padding: 14, marginBottom: 16, backgroundColor: mixHex(color, WARN_BASE, 0.14), borderWidth: 1, borderColor: hexA(color, 0.55) }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <View style={{ width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: mixHex(color, WARN_BASE, 0.3) }}>
+          <Icon name="trendDown" size={17} color={color} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 15, fontWeight: '800', color, fontVariant: ['tabular-nums'] }}>{value}</Text>
+          <Text style={{ fontSize: 12, fontWeight: '700', color: hexA(color, 0.8), marginTop: 1 }}>{sub}</Text>
+        </View>
+      </View>
+      <Text style={{ fontSize: 14, lineHeight: 20, color: p.text, marginTop: 10 }}>{body}</Text>
+    </View>
+  );
+}
+
+/** Pro-gated "Use AI to investigate", shared by both explain sheets. `build`
+ *  runs at press time against fresh state, exactly as the downturn's did. */
+function InvestigateButton({ label, title, build }: {
+  label: string;
+  title: string;
+  build: (s: AppState, ctx: ScoreContext) => { prompt: string; rangeText: string };
+}) {
   const p = usePalette();
   const { openSheet } = useSheets();
   const tier = useTier();
   const openPaywall = usePaywall();
-  const color = w.severity === 'alert' ? SCORE_COLORS.crash : SCORE_COLORS.bad;
-  const investigate = () => {
+  const press = () => {
     if (tier === 'free') { openPaywall(); return; }
     const s = getState();
     const ctx = { sex: s.profile.sex, height: s.profile.height, protocol: resolveProtocol(s.settings.protocol) };
-    const { prompt, rangeText } = buildDownturnPrompt(s, ctx, dk, w);
-    openSheet((c) => <PromptSheet title="Downturn Investigation" rangeText={rangeText} prompt={prompt} controls={c} />);
+    const { prompt, rangeText } = build(s, ctx);
+    openSheet((c) => <PromptSheet title={title} rangeText={rangeText} prompt={prompt} controls={c} />);
   };
+  return (
+    <Pressable
+      onPress={press}
+      style={({ pressed }) => [
+        { flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: radius.control, backgroundColor: p.accent, marginTop: 2, marginBottom: 4 },
+        pressed && { opacity: 0.8 },
+      ]}
+    >
+      <Icon name="sparkles" size={16} color="#fff" />
+      <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>{label}</Text>
+    </Pressable>
+  );
+}
+
+/** The closing note on both explain sheets. */
+function RestNote({ text }: { text: string }) {
+  const p = usePalette();
+  return (
+    <View style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start', padding: 14, borderRadius: radius.card, backgroundColor: p.surface2, borderWidth: 1, borderColor: p.border, marginBottom: 16 }}>
+      <Icon name="moon" size={17} color={p.textDim} />
+      <Text style={{ flex: 1, fontSize: 13, lineHeight: 18, color: p.textDim }}>{text}</Text>
+    </View>
+  );
+}
+
+/** Sheet behind the warning card when a SCORE downturn fired: the full
+ *  explanation, every journal finding that could be driving the slide, an
+ *  AI-investigation prompt builder, and a rest/doctor note. */
+function DownturnExplain({ w, dk }: { w: Downturn; dk: string }) {
+  const p = usePalette();
+  const color = w.severity === 'alert' ? SCORE_COLORS.crash : SCORE_COLORS.bad;
   return (
     <View>
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 16 }}>Something&apos;s off</Text>
-      <View style={{ borderRadius: radius.card, padding: 14, marginBottom: 16, backgroundColor: mixHex(color, WARN_BASE, 0.14), borderWidth: 1, borderColor: hexA(color, 0.55) }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <View style={{ width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: mixHex(color, WARN_BASE, 0.3) }}>
-            <Icon name="trendDown" size={17} color={color} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 15, fontWeight: '800', color, fontVariant: ['tabular-nums'] }}>{`Down ${w.drop} points`}</Text>
-            <Text style={{ fontSize: 12, fontWeight: '700', color: hexA(color, 0.8), marginTop: 1 }}>{`over the last ${w.spanDays} days`}</Text>
-          </View>
-        </View>
-        <Text style={{ fontSize: 14, lineHeight: 20, color: p.text, marginTop: 10 }}>{w.body}</Text>
-      </View>
+      <WarnTile color={color} value={`Down ${w.drop} points`} sub={`over the last ${w.spanDays} days`} body={w.body} />
       <SumCard title="What could be driving it">
         {w.factors.length ? (
           w.factors.map((f) => <MetricRow key={f.label} label={f.label} value={f.value} cat={false} explain={f.detail} />)
@@ -327,23 +507,36 @@ function DownturnExplain({ w, dk }: { w: Downturn; dk: string }) {
             <PossibilityRow label="An unlogged exposure" explain="A food trigger, a late meal, heat, or a rougher night than it felt like may simply not have made it into the journal." />
           </>
         )}
-        <Pressable
-          onPress={investigate}
-          style={({ pressed }) => [
-            { flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: radius.control, backgroundColor: p.accent, marginTop: 2, marginBottom: 4 },
-            pressed && { opacity: 0.8 },
-          ]}
-        >
-          <Icon name="sparkles" size={16} color="#fff" />
-          <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>Use AI to investigate</Text>
-        </Pressable>
+        <InvestigateButton label="Use AI to investigate" title="Downturn Investigation"
+          build={(s, ctx) => buildDownturnPrompt(s, ctx, dk, w)} />
       </SumCard>
-      <View style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start', padding: 14, borderRadius: radius.card, backgroundColor: p.surface2, borderWidth: 1, borderColor: p.border, marginBottom: 16 }}>
-        <Icon name="moon" size={17} color={p.textDim} />
-        <Text style={{ flex: 1, fontSize: 13, lineHeight: 18, color: p.textDim }}>
-          Get some rest and take it easy until the trend turns. If you are not feeling well, talk with your doctor.
-        </Text>
-      </View>
+      <RestNote text="Get some rest and take it easy until the trend turns. If you are not feeling well, talk with your doctor." />
+      <View style={{ height: 24 }} />
+    </View>
+  );
+}
+
+/** Sheet behind the warning card when the STRAIN detector fired.
+ *
+ *  Same shape as the downturn sheet, one section longer: because the score has
+ *  not moved, the sheet has to answer "what are you even looking at" before it
+ *  answers "what should I do", so each marker row carries the reading, its own
+ *  baseline and why that marker matters. There is no "possibilities" fallback
+ *  here — a strain warning cannot fire without at least two findings, so the
+ *  empty case does not exist. */
+function StrainExplain({ w, dk }: { w: Strain; dk: string }) {
+  const p = usePalette();
+  const color = w.severity === 'alert' ? SCORE_COLORS.crash : SCORE_COLORS.bad;
+  return (
+    <View>
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 16 }}>{w.title}</Text>
+      <WarnTile color={color} value={w.readout.value} sub={w.readout.sub} body={w.body} />
+      <SumCard title="What moved">
+        {w.factors.map((f) => <MetricRow key={f.label} label={f.label} value={f.value} cat={false} explain={f.detail} />)}
+        <InvestigateButton label="Use AI to investigate" title="Strain Investigation"
+          build={(s, ctx) => buildStrainPrompt(s, ctx, dk, w)} />
+      </SumCard>
+      <RestNote text="Nothing here is a diagnosis. Markers drifting together usually means a few lighter days, extra fluids and an earlier night. If it keeps going or you feel unwell, talk with your doctor." />
       <View style={{ height: 24 }} />
     </View>
   );

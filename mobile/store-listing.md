@@ -10,7 +10,7 @@ updated anytime (they go through a short content review, no binary needed).
 
 > **Ship order matters.** Push the freemium build to both stores *before*
 > retiring the introductory free-trial offers — see `STORE_SETUP.md`. Until the
-> offers are ended, the paywall's own CTA still reads "Start 7-day free trial"
+> offers are ended, the paywall's own CTA still reads "Start N-day free trial"
 > (it's driven by `hasTrial()` in `src/store/iap.ts`, which reads the live store
 > product), so listing copy and in-app copy stay consistent either way.
 
@@ -18,11 +18,11 @@ updated anytime (they go through a short content review, no binary needed).
 
 # App Store (iOS + watchOS)
 
-## Promotional text (168/170 chars)
+## Promotional text (167/170 chars)
 
 Free to use, no account, no ads. Journal your recovery, score every day, and
-capture a lab-quality HRV reading daily. Go Pro for unlimited HRV, POTS testing
-& analysis.
+take unlimited lab-quality HRV readings. Go Pro for POTS tests, full history &
+AI reports.
 
 ## Keywords (98/100 chars)
 
@@ -33,7 +33,26 @@ chars); added dysautonomia + watch; dropped vagal tone / sdnn / symptom. Remove
 `hrv` if it's already in the app name or subtitle — those fields are indexed too.
 Do **not** add "free" — Apple indexes the price separately and it wastes chars.
 
-## What's New (1.19.1, iOS)
+## What's New (1.25.0, both stores)
+
+HRV capture is now unlimited on the free plan. The old one-a-day cap is gone, so
+you can read your nervous system as often as you like: before and after a walk,
+either side of a bad night, or whenever something feels off. Nothing else
+changed about what is free.
+
+Autonomic Pro is still there for what the app makes of those readings: your full
+history, Insights, POTS testing and AI reports.
+
+### Play Store variant (1.25.0, Android, 337/500 chars)
+
+HRV capture is now unlimited on the free plan. The one-a-day cap is gone, so you
+can read your nervous system as often as you like: before and after a walk,
+either side of a bad night, or whenever something feels off.
+
+Pro is still there for what the app makes of those readings: your full history,
+Insights, POTS testing and AI reports.
+
+## What's New (1.19.1, iOS) — previous
 
 Your HRV numbers just got more honest. Short HRV samples from Apple Health, like
 the watch's passing background reading, are no longer averaged in with a real
@@ -66,7 +85,7 @@ Also:
 • Medication doses accept units again
 • Keyboard and Progress scrolling fixes
 
-## Description (3,982/4,000 chars)
+## Description (3,961/4,000 chars)
 
 See your nervous system actually recover.
 
@@ -74,7 +93,7 @@ Autonomic turns a heart rate chest strap, your Apple Watch, or even your finger 
 
 Built for the long haul: long covid and post viral recovery, POTS and dysautonomia, ME/CFS, and anyone rebuilding their autonomic nervous system one day at a time.
 
-Free to use, with no account, no ads or tracking. Every install starts with 7 days of full access, then keeps the core free forever.
+Free to use, with no account, no ads or tracking. Every install starts with 14 days of full access, then keeps the core free forever.
 
 
 LIVE 5-MINUTE HRV, DONE RIGHT
@@ -129,9 +148,9 @@ YOUR DATA NEVER LEAVES YOUR PHONE
 
 WHAT'S FREE, WHAT'S PRO
 
-Free forever: journaling (sleep, meds, symptoms, triggers, hydration, meals), manual readings (blood pressure, resting heart rate, episodes), your daily Autonomic Score and outlook, the Apple Watch heart-rate monitor, one live HRV capture a day, 14 days of charts, and full export.
+Free forever: unlimited live HRV captures, journaling (sleep, meds, symptoms, triggers, hydration, meals), manual readings (blood pressure, resting heart rate, episodes), your daily Autonomic Score and outlook, the Apple Watch heart-rate monitor, 14 days of charts, and full export.
 
-Autonomic Pro adds: unlimited live HRV captures, week / month / year progress views, full historical metric analysis, POTS stand testing and episode tracking, and AI insights and doctor reports.
+Autonomic Pro adds: week / month / year progress views, full historical metric analysis, on-device Insights, POTS stand testing and episode tracking, and AI doctor reports.
 
 Pro is $7.99/month or $49.99/year, billed to your Apple ID and renewing automatically until cancelled. Manage or cancel anytime in your App Store settings.
 
@@ -141,15 +160,15 @@ IMPORTANT: Autonomic is a personal journal and education tool, not a medical dev
 ## App Review notes (freemium submission)
 
 > This version removes the hard paywall — the app is now fully usable without a
-> purchase. On first launch it grants a 7-day local full-access window (no
+> purchase. On first launch it grants a 14-day local full-access window (no
 > account, no store call), after which the core (journaling, daily score, manual
-> readings, watch HR monitor, one live HRV capture per day, 14 days of charts,
+> readings, watch HR monitor, unlimited live HRV capture, 14 days of charts,
 > export) remains free indefinitely.
 >
 > Autonomic Pro (com.autonomic.journal.monthly / .yearly, one subscription
-> group) unlocks unlimited HRV captures, full progress history, POTS testing,
-> and AI reports. To reach the paywall: Insights tab → any AI report card, or
-> Analysis tab → Week/Month/Year. "Restore purchase" is on the paywall card.
+> group) unlocks the full progress history, the Insights tab, POTS testing and
+> AI reports. HRV capture itself is unlimited on the free tier. To reach the
+> paywall: Insights tab, or Analysis tab → Week/Month/Year. "Restore purchase" is on the paywall card.
 >
 > No demo account is needed. HRV capture works without hardware via the camera
 > (finger over the rear lens); a chest strap or Apple Watch is optional.
@@ -194,7 +213,7 @@ Autonomic Journal: HRV & POTS
 
 Free HRV, POTS & symptom journal for long covid recovery. Private and on-device.
 
-## Full description (3,808/4,000 chars)
+## Full description (3,787/4,000 chars)
 
 See your nervous system actually recover.
 
@@ -202,7 +221,7 @@ Autonomic turns a Bluetooth heart rate strap — or just your finger over your p
 
 Built for the long haul: long covid and post viral recovery, POTS and dysautonomia, ME/CFS, and anyone rebuilding their autonomic nervous system one day at a time.
 
-Free to use, with no account, no ads and no tracking. Every install starts with 7 days of full access, then keeps the core free forever.
+Free to use, with no account, no ads and no tracking. Every install starts with 14 days of full access, then keeps the core free forever.
 
 
 LIVE 5-MINUTE HRV, DONE RIGHT
@@ -251,9 +270,9 @@ YOUR DATA NEVER LEAVES YOUR PHONE
 
 WHAT'S FREE, WHAT'S PRO
 
-Free forever: journaling (sleep, meds, symptoms, triggers, hydration, meals, activities), manual readings (blood pressure, resting heart rate, episodes), your daily Autonomic Score and outlook, one live HRV capture a day, 14 days of progress charts, and backup and export.
+Free forever: unlimited live HRV captures, journaling (sleep, meds, symptoms, triggers, hydration, meals, activities), manual readings (blood pressure, resting heart rate, episodes), your daily Autonomic Score and outlook, 14 days of progress charts, and backup and export.
 
-Autonomic Pro adds: unlimited live HRV captures, week / month / year progress views, full historical metric analysis, POTS stand testing and episode tracking, and AI insights and doctor reports.
+Autonomic Pro adds: week / month / year progress views, full historical metric analysis, on-device Insights, POTS stand testing and episode tracking, and AI doctor reports.
 
 Pro is $7.99 per month or $49.99 per year, billed through Google Play. Subscriptions renew automatically until cancelled; manage or cancel anytime in Google Play → Subscriptions.
 

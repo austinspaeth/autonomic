@@ -32,9 +32,9 @@ import Svg, { Circle } from 'react-native-svg';
 import { Ghost, HelpDot } from '../../components/ui';
 import { Icon, type IconName } from '../../components/Icon';
 import { fonts, usePalette } from '../../theme';
-import { CardRow, FOOTER_COPY, InsightCard, OBS_DESC, WATCH_DESC } from './Sections';
+import { CardRow, FOOTER_COPY, InsightCard, NO_IMPACT_DESC, OBS_DESC, WATCH_DESC } from './Sections';
 import * as S from './style';
-import { INSIGHTS_HELP, INSIGHT_MIN_DAYS } from '../../lib/insights';
+import { INSIGHTS_HELP, INSIGHT_MIN_DAYS, type FactorProgress } from '../../lib/insights';
 import { ZERO_HEIGHTS, ZERO_ROWS, type CardHeights, type InsightsShape, type RowHeights } from '../../lib/insights/shape';
 
 /**
@@ -251,6 +251,12 @@ export function InsightsSkeleton({ shape }: { shape: InsightsShape }) {
         </CardGhost>
       ) : null}
 
+      {shape.noImpact > 0 ? (
+        <CardGhost title="No detected impact" help="noImpact" height={h.noImpact} desc={NO_IMPACT_DESC}>
+          <Bubbles count={shape.noImpact} heights={r.noImpact} fallback={{ style: S.ROW_TITLE, sample: S.SAMPLE.obsTitle }} />
+        </CardGhost>
+      ) : null}
+
       {shape.watch > 0 ? (
         <CardGhost title="Trend watch" help="watch" height={h.watch} desc={WATCH_DESC}>
           <Bubbles count={shape.watch} heights={r.watch} fallback={{ style: S.ROW_TITLE, sample: S.SAMPLE.watchTitle }} />
@@ -275,7 +281,38 @@ export function InsightsSkeleton({ shape }: { shape: InsightsShape }) {
  * different in what it should say, so it has its own component: see
  * ./BuildFailed.
  */
-export function InsightsEmpty({ daysLogged }: { daysLogged: number }) {
+/**
+ * The types closest to their first finding, with the distance: "Magnesium ·
+ * 5 of 8 days". Turns "nothing yet" into a reason to keep logging the exact
+ * things the user is already trying. Rows are not buttons — each is an
+ * instruction, not a destination.
+ */
+function AlmostTestable({ progress }: { progress?: FactorProgress[] }) {
+  const p = usePalette();
+  if (!progress || !progress.length) return null;
+  return (
+    <InsightCard
+      title="Almost testable"
+      desc="Log these a few more days and the analysis can start comparing days with them against days without."
+    >
+      {progress.map((f) => (
+        <CardRow key={f.driver}>
+          <View style={{ width: S.TONE_BOX, height: S.TONE_BOX, borderRadius: 9, backgroundColor: p.bg, alignItems: 'center', justifyContent: 'center' }}>
+            <Icon name="pill" size={14} color={p.accent} strokeWidth={2.2} />
+          </View>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text numberOfLines={1} style={[S.ROW_TITLE, { color: p.text }]}>{f.driver}</Text>
+          </View>
+          <Text style={{ color: p.textDim, fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'] }}>
+            {`${f.have} of ${f.need} days`}
+          </Text>
+        </CardRow>
+      ))}
+    </InsightCard>
+  );
+}
+
+export function InsightsEmpty({ daysLogged, progress }: { daysLogged: number; progress?: FactorProgress[] }) {
   const p = usePalette();
   // Short of the two-week target, the honest thing to show is DISTANCE: how far
   // this journal is from the first testable pattern, then the fastest route
@@ -286,14 +323,17 @@ export function InsightsEmpty({ daysLogged }: { daysLogged: number }) {
   const left = Math.max(0, INSIGHT_MIN_DAYS - daysLogged);
   if (!short) {
     return (
-      <View style={{ paddingHorizontal: 8, paddingTop: 28, alignItems: 'center' }}>
-        <Text style={{ color: p.text, fontSize: 17, fontWeight: '700', textAlign: 'center', marginBottom: 8 }}>
-          Nothing solid to report yet
-        </Text>
-        <Text style={{ color: p.textDim, fontSize: 14, lineHeight: 21, textAlign: 'center' }}>
-          {`You have ${daysLogged} days logged, which is enough to look. Nothing has separated itself from the noise yet, and an empty screen is a real answer rather than a missing one.`}
-        </Text>
-      </View>
+      <>
+        <View style={{ paddingHorizontal: 8, paddingTop: 28, alignItems: 'center', marginBottom: 20 }}>
+          <Text style={{ color: p.text, fontSize: 17, fontWeight: '700', textAlign: 'center', marginBottom: 8 }}>
+            Nothing solid to report yet
+          </Text>
+          <Text style={{ color: p.textDim, fontSize: 14, lineHeight: 21, textAlign: 'center' }}>
+            {`You have ${daysLogged} days logged, which is enough to look. Nothing has separated itself from the noise yet, and an empty screen is a real answer rather than a missing one.`}
+          </Text>
+        </View>
+        <AlmostTestable progress={progress} />
+      </>
     );
   }
 
@@ -321,6 +361,8 @@ export function InsightsEmpty({ daysLogged }: { daysLogged: number }) {
           </Text>
         </View>
       </InsightCard>
+
+      <AlmostTestable progress={progress} />
 
       {/* The fastest route to fourteen. Bubbles, not divided lines, because that
           is what a row is everywhere else in this view — and no chevrons, since

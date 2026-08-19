@@ -60,7 +60,7 @@ are open. Verified against source on 2026-07-10.
       have someone confirm it's accurate for the shipping app (data handling,
       iCloud backup, subscription terms, medical-disclaimer language).
 - [ ] **Proofread pass** over homepage + all 50 published articles for typos,
-      pricing consistency ($50/yr, 7-day trial), and factual/medical accuracy.
+      pricing consistency ($50/yr, 14-day trial), and factual/medical accuracy.
 - [ ] **Regenerate `og.png` if branding changes** (1200×630). Consider a
       per-article OG image later (each article already has a `photoLocation`
       cover it falls back to).
@@ -86,7 +86,7 @@ are open. Verified against source on 2026-07-10.
 - **Branded 404** — `static/404.html` (noindex, styled, favicons, Autonomic
   title).
 - **SEO / structured data**: site-wide Organization + WebSite JSON-LD;
-  `SoftwareApplication` with `offers` ($50/yr, 7-day trial); complete Open Graph
+  `SoftwareApplication` with `offers` ($50/yr, 14-day trial); complete Open Graph
   + Twitter cards on every page with image dimensions/alt and no duplicate tags;
   `article:*` tags + enriched `Article` JSON-LD; `CollectionPage`/`ItemList`,
   `BreadcrumbList`, `ProfilePage`/`Person` on listings.

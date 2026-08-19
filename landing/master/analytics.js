@@ -15,8 +15,16 @@
  *     open[day].cohorts[cohort] = how many installs born on `cohort`
  *                                 opened the app on `day`
  *     sub[day].cohorts[cohort]  = ...and how many first showed a subscription
+ *     act[day].cohorts[cohort]  = ...and how many saved their FIRST HRV reading
  *
  * `ageDays` is therefore derived, not transmitted: day − cohort.
+ *
+ * ACTIVATION is the third counter and the one that says whether onboarding
+ * works. An install with no first reading has no score, no trend and no reason
+ * to come back, so "installed" and "activated" are different populations and
+ * the gap between them is the funnel worth fixing. It fires once per install,
+ * so — unlike opens — activation rows DO count people, and `act[day].methods`
+ * says which sensor each one used (W watch, B Bluetooth strap, F finger).
  *
  * A stored cohort is really cohort+platform (`082126I`), so the report can hand
  * back two rows for one cohort day. `index` pools them, and takes a platform
@@ -101,7 +109,13 @@ window.Analytics = (function () {
 
   /* ----------------------------------------------------------------- index */
 
-  var EMPTY = { total: 0, cohorts: {}, platforms: {}, unattributed: 0 };
+  var EMPTY = { total: 0, cohorts: {}, platforms: {}, methods: {}, unattributed: 0 };
+
+  /* Capture methods an activation ping can name, and what to call them. Any
+     other letter, or none, pools under `?` — an activation whose sensor we
+     could not read is still an activation. */
+  var METHOD_NAME = { W: 'Apple Watch', B: 'Chest strap', F: 'Phone camera' };
+  var METHOD_ORDER = ['W', 'B', 'F', '?'];
 
   /* The report's platform letters, and the names the filter bar speaks. */
   var PLATFORM_LETTER = { ios: 'I', android: 'A', unknown: 'U', I: 'I', A: 'A', U: 'U' };
@@ -135,7 +149,7 @@ window.Analytics = (function () {
     var by = {};
     (list || []).forEach(function (r) {
       if (!r || !r.day) return;
-      var c = {}, plat = {}, kept = 0, unattributed = 0;
+      var c = {}, plat = {}, meth = {}, kept = 0, unattributed = 0;
       (r.cohorts || []).forEach(function (x) {
         if (!x || !x.cohort) return;
         var p = PLATFORM_NAME[x.platform] ? x.platform : 'U';
@@ -164,11 +178,16 @@ window.Analytics = (function () {
           return;
         }
         c[x.cohort] = (c[x.cohort] || 0) + n;
+        /* Only activation rows carry a method. It is counted INSIDE the
+           platform filter (unlike `platforms`, which is what the filter is a
+           slice of) because "which sensor do iOS users activate on" is a
+           question about the slice, not about the whole. */
+        meth[METHOD_NAME[x.method] ? x.method : '?'] = (meth[METHOD_NAME[x.method] ? x.method : '?'] || 0) + n;
         kept += n;
       });
       by[r.day] = {
         total: letter ? kept : (Number(r.total) || 0),
-        cohorts: c, platforms: plat, unattributed: unattributed,
+        cohorts: c, platforms: plat, methods: meth, unattributed: unattributed,
       };
     });
     return by;
@@ -196,9 +215,18 @@ window.Analytics = (function () {
     var letter = platformFilter(platform);
     var open = rowsToMap(report && report.open, letter);
     var sub = rowsToMap(report && report.sub, letter);
+    var act = rowsToMap(report && report.act, letter);
+    /* All three kinds feed `days`, because `days` is what every sweep below
+       iterates: an activation landing on a day the open rows happen not to
+       cover would otherwise be invisible to `activation` and `activationAges`
+       rather than merely unusual. It cannot move `first` in practice — an
+       install that activated also opened the app that day — and `cohorts`
+       below is unaffected either way, since a measurable cohort is defined by
+       an OPEN on its own day 0. */
     var seen = {};
     Object.keys(open).forEach(function (d) { seen[d] = true; });
     Object.keys(sub).forEach(function (d) { seen[d] = true; });
+    Object.keys(act).forEach(function (d) { seen[d] = true; });
     var days = Object.keys(seen).sort();
     var first = days[0] || null;
     var last = days[days.length - 1] || null;
@@ -220,7 +248,7 @@ window.Analytics = (function () {
     });
 
     return {
-      open: open, sub: sub, days: days, first: first, last: last,
+      open: open, sub: sub, act: act, days: days, first: first, last: last,
       cohorts: cohorts,
       preTracking: Object.keys(older).sort(),
       /* What this index is a slice of: the filter in force, and the platform
@@ -245,10 +273,28 @@ window.Analytics = (function () {
 
   function openOn(ix, day) { return ix.open[day] || EMPTY; }
   function subOn(ix, day) { return ix.sub[day] || EMPTY; }
+  function actOn(ix, day) { return (ix.act && ix.act[day]) || EMPTY; }
   function activeOn(ix, day) { return openOn(ix, day).total; }
   function countOn(ix, day, cohort) { return openOn(ix, day).cohorts[cohort] || 0; }
   function subCountOn(ix, day, cohort) { return subOn(ix, day).cohorts[cohort] || 0; }
   function purchasesOn(ix, day) { return subOn(ix, day).total; }
+  /** First readings saved on `day`, by installs of any cohort. */
+  function activationsOn(ix, day) { return actOn(ix, day).total; }
+  function actCountOn(ix, day, cohort) { return actOn(ix, day).cohorts[cohort] || 0; }
+  /** One day's capture-method split, `{ W: n, B: n, F: n, '?': n }`. */
+  function methodsOn(ix, day) { return actOn(ix, day).methods || {}; }
+  /** The same split pooled over a set of days. */
+  function methodsOver(ix, days) {
+    var out = {};
+    (days || []).forEach(function (d) {
+      var m = methodsOn(ix, d);
+      Object.keys(m).forEach(function (k) { out[k] = (out[k] || 0) + m[k]; });
+    });
+    return out;
+  }
+  /** The platform split of activations, always unfiltered — the twin of
+   *  `subPlatformsOn`, and read for the same reason. */
+  function actPlatformsOn(ix, day) { return actOn(ix, day).platforms || {}; }
 
   /** One day's platform split, `{ I: n, A: n, U: n }`, ALWAYS unfiltered. */
   function platformsOn(ix, day) { return (ix.open[day] || EMPTY).platforms || {}; }
@@ -429,7 +475,7 @@ window.Analytics = (function () {
    * This is the honest lifecycle number, and it is deliberately usage-based.
    * Two alternatives are worse:
    *
-   * - Store downloads would overcount: the seven days start on FIRST LAUNCH
+   * - Store downloads would overcount: the trial days start on FIRST LAUNCH
    *   (the app stamps `trialStartedAt` then), so a download that never opened
    *   the app never started a trial at all.
    * - Cohort sizes (see `lifecycleNow`) only exist for cohorts we watched being
@@ -608,6 +654,62 @@ window.Analytics = (function () {
       cohorts: eligible, immature: immature, small: of > 0 && of < SMALL_COHORT,
       available: eligible > 0, withinDays: withinDays
     };
+  }
+
+  /**
+   * Activation: the share of a cohort that ever saved a first HRV reading,
+   * restricted to cohorts old enough to have had `withinDays` to get there.
+   *
+   * Same shape and the same immaturity rule as `conversion`, because it is the
+   * same kind of claim — a one-per-install event measured against the cohort
+   * that could have produced it. Kept as its own function rather than a
+   * parameterised one so that the two rates can diverge without a flag: paying
+   * and activating are not the same decision and will not stay the same shape.
+   */
+  function activation(ix, cohorts, withinDays) {
+    var did = 0, of = 0, eligible = 0, immature = 0;
+    (cohorts || []).forEach(function (c) {
+      if (withinDays !== undefined && !isMature(ix, c, withinDays)) { immature += 1; return; }
+      var size = cohortSize(ix, c);
+      if (!size) return;
+      var limit = withinDays === undefined ? Infinity : withinDays;
+      ix.days.forEach(function (day) {
+        if (day < c) return;
+        if (ageDays(c, day) > limit) return;
+        did += actCountOn(ix, day, c);
+      });
+      of += size;
+      eligible += 1;
+    });
+    return {
+      kept: did, of: of, pct: of ? (did / of) * 100 : null,
+      cohorts: eligible, immature: immature, small: of > 0 && of < SMALL_COHORT,
+      available: eligible > 0, withinDays: withinDays
+    };
+  }
+
+  /**
+   * How old an install was when it activated, in the same buckets purchases
+   * use — so "when do people take their first reading" and "when do they pay"
+   * are read off the same axis. Day 0 is the install day, which is where a
+   * working onboarding should put nearly all of them.
+   */
+  function activationAges(ix) {
+    var buckets = PURCHASE_BUCKETS.map(function (b) { return { label: b.label, from: b.from, to: b.to, count: 0 }; });
+    var total = 0, unknown = 0;
+    ix.days.forEach(function (day) {
+      var cohorts = actOn(ix, day).cohorts;
+      Object.keys(cohorts).forEach(function (c) {
+        var n = cohorts[c];
+        total += n;
+        var age = ageDays(c, day);
+        if (age < 0) { unknown += n; return; }
+        for (var i = 0; i < buckets.length; i++) {
+          if (age >= buckets[i].from && age <= buckets[i].to) { buckets[i].count += n; return; }
+        }
+      });
+    });
+    return { buckets: buckets, total: total, unknown: unknown };
   }
 
   /* ---------------------------------------------------- active by cohort */
@@ -899,6 +1001,10 @@ window.Analytics = (function () {
     subPlatformsOn: subPlatformsOn, purchasePlatformsOver: purchasePlatformsOver,
     unattributedOn: unattributedOn,
     countOn: countOn, purchasesOn: purchasesOn, cohortSize: cohortSize,
+    activationsOn: activationsOn, actCountOn: actCountOn, actPlatformsOn: actPlatformsOn,
+    methodsOn: methodsOn, methodsOver: methodsOver,
+    methodName: function (letter) { return METHOD_NAME[letter] || 'Unknown sensor'; },
+    METHOD_ORDER: METHOD_ORDER,
     maturity: maturity, isMature: isMature,
 
     // retention
@@ -908,7 +1014,7 @@ window.Analytics = (function () {
     // lifecycle + money
     survival: survival, lifecycleNow: lifecycleNow, lifecycleActive: lifecycleActive,
     purchaseAges: purchaseAges, purchaseRows: purchaseRows, suspectRetries: suspectRetries,
-    conversion: conversion,
+    conversion: conversion, activation: activation, activationAges: activationAges,
 
     // shape of activity
     activeByCohort: activeByCohort, preTrackingCohorts: preTrackingCohorts, peakOver: peakOver,

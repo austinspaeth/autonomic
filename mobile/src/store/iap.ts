@@ -7,7 +7,7 @@
  * Model: two auto-renewable plans (yearly / monthly) — one subscription group
  * on the App Store, two subscription products with matching IDs on Google
  * Play. Holding *either* is Pro. Freemium gating happens a layer up:
- * src/store/tier.ts folds `isPro` together with the local 7-day trial window
+ * src/store/tier.ts folds `isPro` together with the local 14-day trial window
  * into a Tier, and locked surfaces raise the PaywallCard sheet on demand.
  *
  * Fails open: any store error leaves `isPro` at its last known value and
@@ -32,10 +32,17 @@ import { isSideloadedAndroidBuild, isTestFlightBuild } from '../../modules/app-e
 import { logError } from '../lib/diagnostics/errorLog';
 
 /** Product IDs — identical in App Store Connect and the Play Console. On the
- *  App Store: one subscription group holding both plans (with a 7-day
- *  free-trial intro offer where wanted). On Google Play: two subscription
- *  products, each with one base plan (and a 7-day free-trial offer where
- *  wanted). The two must be listed together in fetchProducts. */
+ *  App Store: one subscription group holding both plans. On Google Play: two
+ *  subscription products, each with one base plan. The two must be listed
+ *  together in fetchProducts.
+ *
+ *  NEITHER STORE CARRIES A FREE-TRIAL INTRO OFFER TODAY. The only free access
+ *  is the app's own local window (`TRIAL_DAYS`, src/lib/tier.ts), which needs
+ *  no store involvement. `hasTrial()` is therefore false in production and the
+ *  paywall says "Upgrade to Pro" — that is the expected state, not a fetch
+ *  that came back thin. Nothing hardcodes a trial length: if an offer is ever
+ *  configured, `trialDaysOf` reads its real length off the product and the
+ *  copy follows on builds already shipped. */
 export const YEARLY_SKU = 'com.autonomic.journal.yearly';
 export const MONTHLY_SKU = 'com.autonomic.journal.monthly';
 /**
@@ -50,6 +57,28 @@ export const MONTHLY_SKU = 'com.autonomic.journal.monthly';
  */
 export const PROMO_YEARLY_SKU = 'com.autonomic.journal.yearly.promo';
 export const PRO_SKUS = [YEARLY_SKU, MONTHLY_SKU, PROMO_YEARLY_SKU];
+
+/**
+ * The founding-member offer behind src/features/FounderOffer.tsx.
+ *
+ * On the App Store it is NOT a product of its own: it's the INTRODUCTORY offer
+ * `annual_founder_first_year` configured on YEARLY_SKU (first year discounted,
+ * then renews at the standard yearly price). Apple applies an introductory
+ * offer automatically to any eligible subscriber, so there is nothing to pass
+ * at purchase time — the card just buys YEARLY_SKU and the store discounts it.
+ * Two consequences worth remembering: an eligible user gets the same price from
+ * the ordinary paywall (the card is a prompt, not a gate), and a SKU carries at
+ * most ONE introductory offer per territory, so this one occupies the slot the
+ * free-trial intro offer would otherwise use — the app's 14-day trial is local
+ * (src/store/tier.ts), not a StoreKit one, so that is a trade we can make.
+ *
+ * Google Play has no equivalent of that offer id, so Android sends the card at
+ * PROMO_YEARLY_SKU — the existing discounted year, which RENEWS at its own
+ * price rather than reverting. The copy is derived from the two prices the
+ * store actually returned, so it stays true on both.
+ */
+export const FOUNDER_OFFER_ID = 'annual_founder_first_year';
+export const FOUNDER_SKU = Platform.OS === 'android' ? PROMO_YEARLY_SKU : YEARLY_SKU;
 const isProSku = (id?: string) => !!id && PRO_SKUS.includes(id);
 
 /** Fallback prices shown before the store returns the localized ones. */
@@ -119,6 +148,55 @@ export const priceOf = (product: IapProduct | undefined, sku: string): string =>
 
 /** Does this plan carry an introductory free trial for this user? */
 export const hasTrial = (product: IapProduct | undefined): boolean => !!product?.trial;
+
+/**
+ * Length in days of the STORE's free-trial intro offer on a plan, or null.
+ *
+ * Read from the product rather than hardcoded, because it is not ours to state:
+ * the app's own full-access window is TRIAL_DAYS (src/lib/tier.ts, local, no
+ * store involved), while this one is whatever App Store Connect / the Play
+ * Console says, and the two have been different numbers. The paywall used to
+ * print "7-day free trial" beside a `hasTrial()` boolean, which quietly became
+ * a false claim the moment either side moved. Null when the store didn't say,
+ * and the caller then drops the number rather than inventing one.
+ */
+const PERIOD_DAYS: Record<string, number> = { day: 1, week: 7, month: 30, year: 365 };
+export const trialDaysOf = (product: IapProduct | undefined): number | null => {
+  const raw = product?.raw;
+  if (!raw || !product?.trial) return null;
+  if (raw.platform === 'ios') {
+    const unit = PERIOD_DAYS[raw.introductoryPriceSubscriptionPeriodIOS || ''];
+    const n = Number(raw.introductoryPriceNumberOfPeriodsIOS);
+    return unit && Number.isFinite(n) && n > 0 ? unit * n : null;
+  }
+  // Play states the free phase as an ISO-8601 duration ("P1W", "P14D").
+  const free = bestAndroidOffer(raw)?.pricingPhases.pricingPhaseList
+    .find((ph) => Number(ph.priceAmountMicros) === 0);
+  const m = free?.billingPeriod?.match(/^P(?:(\d+)W)?(?:(\d+)D)?$/);
+  if (!m) return null;
+  const days = (Number(m[1] || 0) * 7) + Number(m[2] || 0);
+  return days > 0 ? days : null;
+};
+
+/**
+ * The localized PAID introductory price of a plan for this user, or null.
+ *
+ * iOS only, and only for a paid intro offer (`pay-up-front` / `pay-as-you-go`)
+ * — a free trial reports itself through `hasTrial` instead, and returning its
+ * "$0.00" here would let the founder card advertise a free year. Null when
+ * StoreKit says this user isn't eligible, which is exactly when the card must
+ * not make a discount claim.
+ *
+ * There is no Android branch: Play models the founder price as its own product
+ * (FOUNDER_SKU → PROMO_YEARLY_SKU), whose recurring price IS the offer price.
+ */
+export const introPriceOf = (product: IapProduct | undefined): string | null => {
+  const raw = product?.raw;
+  if (!raw || raw.platform !== 'ios') return null;
+  const mode = raw.introductoryPricePaymentModeIOS;
+  if (mode !== 'pay-up-front' && mode !== 'pay-as-you-go') return null;
+  return raw.introductoryPriceIOS || null;
+};
 
 /** Let a local dev build through the paywall so you're never locked out of your
  *  own app before the products exist in App Store Connect. */

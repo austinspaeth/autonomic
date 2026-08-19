@@ -17,7 +17,8 @@
   };
 
   /* Entity colours — fixed, never assigned by rank.
-     Downloads own slot 1, the 7-day threshold slot 2, the 14-day wall slot 3. */
+     Downloads own slot 1, the trial threshold slot 2, the 14-day wall slot 3.
+     Trial and wall now both land on day 14, so those two bands coincide. */
   var ENTITY = {
     downloads: COLOR.s1,        // blue
     inTrial: COLOR.green,       // still inside the free trial
@@ -40,7 +41,7 @@
   function load() {
     var d = {
       entries: [], events: [], ads: [], costs: [], sales: [],
-      settings: { trialDays: 7, wallDays: 14, currency: '$', storeCutPct: 15 }
+      settings: { trialDays: 14, wallDays: 14, currency: '$', storeCutPct: 15 }
     };
     try {
       var raw = localStorage.getItem(KEY);
@@ -303,7 +304,7 @@
     return c ? c[field] : 0;
   }
 
-  function trialDays() { return Math.max(1, num(db.settings.trialDays) || 7); }
+  function trialDays() { return Math.max(1, num(db.settings.trialDays) || 14); }
   function wallDays() { return Math.max(trialDays(), num(db.settings.wallDays) || 14); }
   /* Day 7 is still inside the trial and day 14 is still inside the chart window —
      both limits are inclusive, so a cohort leaves on the day AFTER the limit.
@@ -1204,6 +1205,8 @@
     downloads: COLOR.s2,       // store-sourced, deliberately not the blue above
     pageViews: COLOR.s5,
     subs: ENTITY.sales,        // violet, as "paid" is everywhere else
+    activation: COLOR.s6,      // green — the step between installing and paying,
+                               // and the same green its alert card wears
     trial: COLOR.green,
     postTrial: COLOR.gold,
     wall: COLOR.red
@@ -1239,7 +1242,7 @@
        reason the page used to blink on every refresh. */
     if (!pings.report) repaintPingViews();
     return window.Api.call('PINGS', { since: addDays(today(), -PING_DAYS) }).then(function (res) {
-      pings.report = res || { open: [], sub: [] };
+      pings.report = res || { open: [], sub: [], act: [] };
       pings.at = new Date();
       pings.status = 'ready';
       pings.stale = false;
@@ -1435,7 +1438,7 @@
     var blank = !ix.days.length;
 
     var hosts = ['pgTiles', 'pgTilesB', 'pgHeat', 'pgCohortDetail', 'pgTransitions', 'pgConversion',
-      'pgWeekdayRetention', 'pgPlatformNote', 'pgFilterNote'];
+      'pgActivationRates', 'pgMethodNote', 'pgWeekdayRetention', 'pgPlatformNote', 'pgFilterNote'];
     if (!ready || blank) hosts.forEach(function (id) {
       var n = document.getElementById(id);
       if (n) n.innerHTML = '';
@@ -1448,7 +1451,8 @@
     if (blank) {
       document.getElementById('pgHeat').innerHTML =
         '<div class="empty">No pings yet. The counter starts filling the first time a build carrying it is opened.</div>';
-      ['pgTimeline', 'pgCurve', 'pgSurvival', 'pgActiveCohort', 'pgPurchaseAge', 'pgPlatforms', 'pgWeekday'].forEach(function (id) {
+      ['pgTimeline', 'pgCurve', 'pgSurvival', 'pgActiveCohort', 'pgPurchaseAge',
+        'pgActivationAge', 'pgMethods', 'pgPlatforms', 'pgWeekday'].forEach(function (id) {
         drawChart(id, { x: [], series: [], emptyText: 'Waiting for the first ping.' });
       });
       return;
@@ -1465,6 +1469,7 @@
     renderHeat(ix);
     renderActiveByCohort(ix);
     renderPurchases(ix, r);
+    renderActivation(ix, days);
     renderPingPlatforms(ix, days);
     renderPingWeekday(ix, days);
   }
@@ -1520,6 +1525,10 @@
     var rangeBuys = A.purchasePlatformsOver(ix, days);
     var conv7 = A.conversion(ix, ix.cohorts, 7);
     var conv30 = A.conversion(ix, ix.cohorts, 30);
+    /* Activation on the install day is the onboarding's own number: everything
+       later is a recovery, not the wizard working. */
+    var act0 = A.activation(ix, ix.cohorts, 0);
+    var act7 = A.activation(ix, ix.cohorts, 7);
 
     /* How many installs this slice LEFT OUT because they named no store. Zero
        when the filter is off, since Combined counts everything. It rides on the
@@ -1547,6 +1556,12 @@
         label: 'Returning / day', color: PC.back, value: fmtInt(Math.round(avgRet)), delta: dRet,
         meta: 'the number that says the product is holding people'
       }),
+      tile({
+        label: 'First readings on ' + labelDay(ix.last), color: PC.activation,
+        value: fmtInt(A.activationsOn(ix, ix.last)),
+        meta: 'installs that activated that day' + methodSplitNote(A.methodsOn(ix, ix.last)),
+        split: methodSplit(A.methodsOn(ix, ix.last))
+      }),
       tile({ label: 'D1 retention', color: PC.fresh, smallValue: true, value: fmtRate(d1), meta: rateMeta(d1) }),
       tile({ label: 'D7 retention', color: PC.trial, smallValue: true, value: fmtRate(d7),
              meta: 'last day of the trial · ' + rateMeta(d7) }),
@@ -1572,6 +1587,14 @@
         label: 'Purchases in range', color: PC.subs, value: fmtInt(subsRange),
         meta: 'subscribe pings, not store receipts' + storeSplitNote(ix, rangeBuys),
         split: storeSplit(rangeBuys)
+      }),
+      tile({
+        label: 'Activated on day 0', color: PC.activation, smallValue: true, value: fmtRate(act0),
+        meta: 'first reading on the install day · ' + rateMeta(act0)
+      }),
+      tile({
+        label: 'Activated by D7', color: PC.activation, smallValue: true, value: fmtRate(act7),
+        meta: rateMeta(act7)
       }),
       tile({
         label: 'Conversion by D7', color: PC.subs, smallValue: true, value: fmtRate(conv7),
@@ -1671,6 +1694,23 @@
     if (split.U) parts.push({ name: 'no store', color: COLOR.muted, value: fmtInt(split.U) });
     return parts;
   }
+  /* Capture-method colours. Fixed, never assigned by rank — the same three
+     sensors appear on a tile, in a chart and in a table on this page. */
+  var METHOD_COLOR = { W: COLOR.s1, B: COLOR.s3, F: COLOR.s4, '?': COLOR.muted };
+
+  /** A method split as tile parts, in the order the app offers the sensors. */
+  function methodSplit(split) {
+    return A.METHOD_ORDER.filter(function (k) { return split[k]; }).map(function (k) {
+      return { name: A.methodName(k), color: METHOD_COLOR[k], value: fmtInt(split[k]) };
+    });
+  }
+  /* Activations whose sensor letter we could not read. Rare by construction —
+     it means a build sent a letter this dashboard does not know — so it is
+     disclosed rather than silently pooled into one of the three. */
+  function methodSplitNote(split) {
+    return split['?'] ? ' · ' + fmtInt(split['?']) + ' named no sensor' : '';
+  }
+
   /* Appended to a tile's meta only when there is something to disclose: pings
      that named no store are in NEITHER half of the split, and with a filter on
      they are also counted into the filtered number the split sits under. */
@@ -2103,6 +2143,70 @@
       '<div><span>Bought by D7</span><b>' + fmtRate(conv7) + '</b><span class="note">' + rateMeta(conv7) + '</span></div>' +
       '<div><span>Bought by D30</span><b>' + fmtRate(conv30) + '</b><span class="note">' + rateMeta(conv30) + '</span></div>' +
       '</div>';
+  }
+
+  /* ------------------------------------------------------ 5c. activation
+
+     The step between downloading and retaining. Two questions, one card each:
+     WHEN a first reading happens (the wizard's own number is day 0; anything
+     later is a recovery), and WITH WHAT.
+
+     Both read the filtered index, unlike the platform chart below: "how do iOS
+     users activate" is a question about the slice. Apple Watch is iOS-only, so
+     its share of a combined view is a share of a population half of which was
+     never offered it — which is exactly why the platform filter matters here
+     and is said out loud under the chart. */
+  function renderActivation(ix, days) {
+    var ages = A.activationAges(ix);
+    drawChart('pgActivationAge', {
+      x: ages.buckets.map(function (b) { return { label: b.label, full: b.label }; }),
+      series: [{
+        key: 'n', name: 'First readings', color: PC.activation, type: 'bar',
+        values: ages.buckets.map(function (b) { return b.count; })
+      }],
+      height: 220, format: fmtInt, legend: false, xLabel: 'Install age at first reading',
+      emptyText: 'No first readings have been recorded yet.',
+      tooltipNote: function (i) {
+        var b = ages.buckets[i];
+        return ages.total ? pctOf(b.count, ages.total) + ' of all activations' : '';
+      }
+    });
+
+    var act0 = A.activation(ix, ix.cohorts, 0);
+    var act1 = A.activation(ix, ix.cohorts, 1);
+    var act7 = A.activation(ix, ix.cohorts, 7);
+    document.getElementById('pgActivationRates').innerHTML =
+      '<div class="mini-rows">' +
+      '<div><span>Activated on day 0</span><b>' + fmtRate(act0) + '</b><span class="note">' + rateMeta(act0) + '</span></div>' +
+      '<div><span>Activated by D1</span><b>' + fmtRate(act1) + '</b><span class="note">' + rateMeta(act1) + '</span></div>' +
+      '<div><span>Activated by D7</span><b>' + fmtRate(act7) + '</b><span class="note">' + rateMeta(act7) + '</span></div>' +
+      '</div>';
+
+    /* Per day and stacked, the same shape the store split below uses: one band
+       per sensor, so a shift between them is visible rather than only a total.
+       A method with nothing in the whole range gets no band at all — an empty
+       legend entry reads as "zero today" when it means "never". */
+    var perDay = days.map(function (d) { return A.methodsOn(ix, d); });
+    var split = A.methodsOver(ix, days);
+    var keys = A.METHOD_ORDER.filter(function (k) { return split[k]; });
+    var total = keys.reduce(function (a, k) { return a + split[k]; }, 0);
+    drawChart('pgMethods', {
+      x: days.map(labelDay), stacked: true, height: 220, format: fmtInt, xLabel: 'Day',
+      series: keys.map(function (k) {
+        return {
+          key: k, name: A.methodName(k), color: METHOD_COLOR[k], type: 'area',
+          values: perDay.map(function (m) { return m[k] || 0; })
+        };
+      }),
+      emptyText: 'No first readings in this range.'
+    });
+    document.getElementById('pgMethodNote').innerHTML = !total ? '' :
+      '<p class="note" style="margin-top:10px">' + fmtInt(total) + ' first reading' + (total === 1 ? '' : 's') +
+      ' across this range' + methodSplitNote(split) +
+      (ix.platform === 'all'
+        ? ' · combined, so the Apple Watch share is a share of everyone including Android, which is never offered it'
+        : ' · ' + (ix.platform === 'ios' ? 'iOS' : 'Android') + ' only') +
+      '.</p>';
   }
 
   /* ------------------------------------------------------ 6b. platforms
@@ -5418,12 +5522,13 @@
     L.push('in a CSV and the two are never added together.');
     L.push('');
 
-    var active = 0, fresh = 0, back = 0, subs = 0;
+    var active = 0, fresh = 0, back = 0, subs = 0, acts = 0;
     days.forEach(function (d) {
       active += A.activeOn(ix, d);
       fresh += A.newOn(ix, d);
       back += A.returningOn(ix, d);
       subs += A.purchasesOn(ix, d);
+      acts += A.activationsOn(ix, d);
     });
     var n = days.length;
     L.push(pad2('Newest day counted', 26) + padL(labelFull(ix.last), 16));
@@ -5435,6 +5540,8 @@
       '   (a sum of DISTINCT people: each is born once)');
     L.push(pad2('Subscribe pings in window', 26) + padL(fmtInt(subs), 16) +
       '   (the app notices a purchase on its NEXT launch, so this lags the ledger)');
+    L.push(pad2('First readings in window', 26) + padL(fmtInt(acts), 16) +
+      '   (activation: one per install, ever — so this IS a count of people)');
 
     L.push('');
     L.push('Retention, exact rather than modelled — day N\'s count over the cohort\'s day 0:');
@@ -5450,6 +5557,31 @@
       if (!c || c.pct === null) return;
       L.push(pad2('  Convert by D' + k, 18) + padL(fmtPct(c.pct), 9) + '   ' + fmtInt(c.kept) + ' of ' + fmtInt(c.of));
     });
+
+    /* Activation is the step BEFORE retention, and it is the one onboarding
+       owns: an install with no first reading has no score and no reason to
+       return, so a retention number read without this one blames the product
+       for a wizard that never finished. */
+    L.push('');
+    L.push('Activation — the share of a cohort that ever saved a FIRST HRV reading. Fires once');
+    L.push('per install, so these rows count people. Day 0 is the onboarding\'s own number;');
+    L.push('anything later is someone coming back for it.');
+    [0, 1, 7, 30].forEach(function (k) {
+      var a = A.activation(ix, ix.cohorts, k);
+      if (!a || a.pct === null) return;
+      L.push(pad2('  ' + (k === 0 ? 'On day 0' : 'By D' + k), 18) + padL(fmtPct(a.pct), 9) +
+        '   ' + fmtInt(a.kept) + ' of ' + fmtInt(a.of) +
+        (a.immature ? ' · ' + a.immature + ' cohorts too young to count' : ''));
+    });
+    var mSplit = A.methodsOver(ix, days);
+    var mKeys = A.METHOD_ORDER.filter(function (k) { return mSplit[k]; });
+    if (mKeys.length) {
+      L.push('Which sensor those readings used (Apple Watch is offered on iOS only):');
+      mKeys.forEach(function (k) {
+        L.push(pad2('  ' + A.methodName(k), 18) + padL(fmtInt(mSplit[k]), 9) +
+          '   ' + fmtPct((mSplit[k] / acts) * 100));
+      });
+    }
 
     var live = A.lifecycleActive(ix, ix.last);
     L.push('');
@@ -5760,7 +5892,7 @@
 
   var SKELETON = {
     overview:  { tiles: 10, wide: [320, 260], half: 5 },
-    ping:      { tiles: 8,  wide: [300, 260], half: 5 },
+    ping:      { tiles: 9,  wide: [300, 260], half: 7 },
     timeline:  { tiles: 0,  wide: [340, 240], half: 1 },
     trial:     { tiles: 6,  wide: [300, 260], half: 2 },
     cohorts:   { tiles: 4,  wide: [300], half: 2 },

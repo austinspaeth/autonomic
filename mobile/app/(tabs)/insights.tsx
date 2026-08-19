@@ -55,7 +55,7 @@ import { AskAiPill } from '../../src/features/insights/AskAi';
 import { InsightsEmpty, InsightsSkeleton } from '../../src/features/insights/InsightsSkeleton';
 import { InsightsFailed } from '../../src/features/insights/BuildFailed';
 import {
-  BiggestChangeCard, ConfidenceRing, ConfidenceSheet, Correlations, InsightsFooter, TrendWatch, WorthALook,
+  BiggestChangeCard, ConfidenceRing, ConfidenceSheet, Correlations, EarlySignals, InsightsFooter, NoImpact, TrendWatch, WorthALook,
 } from '../../src/features/insights/Sections';
 import { SinceExplain } from '../../src/features/insights/SinceExplain';
 import { todayKey } from '../../src/lib/dates';
@@ -68,6 +68,7 @@ import { logError } from '../../src/lib/diagnostics/errorLog';
 import { EMPTY_SHAPE, type CardHeights, type RowHeights, type RowKey } from '../../src/lib/insights/shape';
 import { insightsShape, noteInsightsShape } from '../../src/lib/insights/shapeMemory';
 import { insightsAnchor } from '../../src/lib/insights/anchorMemory';
+import { markInsightsSeen } from '../../src/store/insightsBadge';
 
 /**
  * How long after interactions finish before the real content mounts.
@@ -262,8 +263,8 @@ export default function InsightsScreen() {
    * screen depends on them, so storing them in state would re-render the whole
    * document four times for a value only the NEXT cold launch reads.
    */
-  const heights = useRef<CardHeights>({ change: 0, correlations: 0, observations: 0, watch: 0 });
-  const rows = useRef<RowHeights>({ correlations: [], observations: [], watch: [] });
+  const heights = useRef<CardHeights>({ change: 0, correlations: 0, observations: 0, noImpact: 0, watch: 0 });
+  const rows = useRef<RowHeights>({ correlations: [], observations: [], noImpact: [], watch: [] });
   const measure = useCallback((key: keyof CardHeights) => (e: LayoutChangeEvent) => {
     heights.current[key] = e.nativeEvent.layout.height;
   }, []);
@@ -294,9 +295,10 @@ export default function InsightsScreen() {
           change: !!report.change,
           correlations: report.correlations.length,
           observations: report.observations.length,
+          noImpact: report.noImpact.length,
           watch: report.watch.length,
           heights: { ...heights.current },
-          rows: { correlations: copy('correlations'), observations: copy('observations'), watch: copy('watch') },
+          rows: { correlations: copy('correlations'), observations: copy('observations'), noImpact: copy('noImpact'), watch: copy('watch') },
         });
       } catch (e) {
         // A mis-sized skeleton next launch is the whole cost of failing here.
@@ -334,7 +336,16 @@ export default function InsightsScreen() {
   }, [openSheet]);
 
   const view = settled ? shown.current : null;
-  const hasFindings = !!view && (!!view.change || view.correlations.length > 0 || view.observations.length > 0 || view.watch.length > 0);
+
+  // Looking at the screen is what makes its findings "seen": stamp them and
+  // clear the tab bar's dot. Keyed on the report so a rebuild that surfaces a
+  // new finding WHILE the user is here is stamped too, not left lighting the
+  // tab they are already on.
+  useEffect(() => {
+    if (!focused || !report || report.demo || report.failed) return;
+    markInsightsSeen(report);
+  }, [focused, report]);
+  const hasFindings = !!view && (!!view.change || view.correlations.length > 0 || view.observations.length > 0 || view.noImpact.length > 0 || view.watch.length > 0);
   // The header's count comes from the report, but the ring shouldn't sit at zero
   // through the whole skeleton; both simply wait, which reads as loading.
   const head = shown.current;
@@ -421,10 +432,19 @@ export default function InsightsScreen() {
             onLayout={measure('correlations')}
             onRowLayout={measureRow('correlations')}
           />
+          {/* The early tier fills the Correlations slot while that card has
+              nothing — including above the days-countdown on the empty screen.
+              The engine guarantees the two are never non-empty together. */}
+          <EarlySignals list={view.early} detail={view.detail} />
           <WorthALook
             list={view.observations}
             onLayout={measure('observations')}
             onRowLayout={measureRow('observations')}
+          />
+          <NoImpact
+            list={view.noImpact}
+            onLayout={measure('noImpact')}
+            onRowLayout={measureRow('noImpact')}
           />
           <TrendWatch
             list={view.watch}
@@ -435,7 +455,7 @@ export default function InsightsScreen() {
           />
           {hasFindings ? <InsightsFooter />
             : view.failed ? <InsightsFailed onRetry={retry} />
-              : <InsightsEmpty daysLogged={view.daysLogged} />}
+              : <InsightsEmpty daysLogged={view.daysLogged} progress={view.progress} />}
         </>
       )}
     </Screen>
@@ -466,7 +486,7 @@ function HeaderClaim({ head, onExplain }: { head: InsightReport | null; onExplai
     // With nothing found, the window is the wrong thing to state: "Last 3 days"
     // sounds like a range the reader picked and can widen, over a body that says
     // there is nothing here yet. The header says what to do instead.
-    const empty = !head.change && !head.correlations.length && !head.observations.length && !head.watch.length;
+    const empty = !head.change && !head.correlations.length && !head.observations.length && !head.noImpact.length && !head.watch.length;
     return (
       <Text numberOfLines={1} style={[CLAIM, { color: p.text, fontWeight: '600', flexShrink: 1 }]}>
         {empty ? 'Keep logging' : windowLabel(head.windowDays)}

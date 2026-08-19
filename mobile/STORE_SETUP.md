@@ -1,8 +1,14 @@
 # Store setup & freemium cutover runbook
 
 Owner actions in App Store Connect and the Google Play Console. Nothing here is
-code — the app already ships freemium (`src/lib/tier.ts`, `src/lib/gating.ts`,
+code — the app already ships freemium (`src/lib/tier.ts`, `src/store/tier.ts`,
 `src/store/iap.ts`). Listing copy to paste lives in `store-listing.md`.
+
+The free/Pro boundary itself is stated in `CLAUDE.md` ("Capture is never
+metered"): capture of every kind except POTS is free and unlimited, and Pro is
+the full progress history, Insights, POTS testing and the AI reports. Five
+places repeat that boundary (paywall, Settings, Free-vs-Pro sheet,
+`store-listing.md`, the landing page's pricing table) and must move together.
 
 **Facts you'll need everywhere:**
 
@@ -35,16 +41,16 @@ live.
 3. **Then** update the listing copy (Part 4).
 
 **Why this order.** Today the only way to use the app is to subscribe, and the
-7-day free trial is the on-ramp. If you kill the intro offers first, everyone on
+store-side free trial is the on-ramp. If you kill the intro offers first, everyone on
 the old build hits a paywall whose CTA now reads "Upgrade to Pro" with no trial,
 and the app is unusable without paying — a conversion cliff and a plausible
 1-star wave. Once the freemium build is live, the app is usable without any
 purchase, so the store-side trial is redundant: the app grants its own local
-7-day full-access window on first launch, no store call, no account.
+14-day full-access window on first launch, no store call, no account.
 
 The in-app copy needs no rebuild to follow along: `hasTrial()` reads the live
-store product, so the paywall CTA flips from "Start 7-day free trial" to
-"Upgrade to Pro" on its own the moment the offers end — on old and new builds
+store product, so the paywall CTA flips from "Start N-day free trial" (N is derived from the
+store product itself — see `trialDaysOf` in `src/store/iap.ts`) to "Upgrade to Pro" on its own the moment the offers end — on old and new builds
 alike.
 
 **Existing subscribers are unaffected** at every step. Ending an introductory
@@ -96,7 +102,7 @@ Do this **after** the freemium build is live on both stores.
 1. https://appstoreconnect.apple.com → **My Apps** → Autonomic
 2. Sidebar → **Monetization** → **Subscriptions**
 3. Click the subscription group → click `com.autonomic.journal.yearly`
-4. Scroll to **Introductory Offers** → find the active 7-day free trial row
+4. Scroll to **Introductory Offers** → find the active free-trial row
 5. Click **Edit** → set an **End Date** (today, or a few days out to be kind to
    anyone mid-funnel) → **Save**
 6. Repeat for `com.autonomic.journal.monthly`
@@ -266,9 +272,9 @@ Play's model is three-tiered and unlike Apple's: **Product** → **Base plan** �
 `monthly`, billing period 1 month, price $7.99.
 
 **Free trial offers:** skip them. You're about to end the trials anyway (Part 3),
-and the app grants its own local 7-day window. Creating them just to deactivate
+and the app grants its own local 14-day window. Creating them just to deactivate
 them is churn. (If you want a store-side trial on Android later: base plan → **Add
-offer** → phase 1 = Free, 7 days. `offerHasTrial()` detects it by its zero price
+offer** → phase 1 = Free, 14 days. `offerHasTrial()` detects it by its zero price
 and the CTA flips automatically.)
 
 > **Sanity check:** two products, each with exactly one **active** base plan,
@@ -367,6 +373,61 @@ that is the promotional-offer project, and it starts with a `sls/` endpoint.
 
 ---
 
+## Part 7 — The founding-member offer (`annual_founder_first_year`)
+
+The card in `src/features/FounderOffer.tsx`, raised in the Journal on the ONE
+day after a user has logged three days of their own content, while the local
+14-day trial is still running. It never returns and the ✕ / "No thanks" retires
+it permanently — see `src/lib/upsell/founder.ts` for the rules.
+
+Unlike Part 6 this is **not** a separate product on iOS. It is an
+**introductory offer** on `com.autonomic.journal.yearly`: the first year at a
+discount, then renewal at the standard $49.99. Apple applies an introductory
+offer automatically to every eligible subscriber, so the app passes nothing at
+purchase time — `FOUNDER_SKU` is just `YEARLY_SKU` and StoreKit does the rest.
+
+**Two things to know before setting it up.**
+
+1. **An eligible user gets the same price from the ordinary paywall.** An
+   introductory offer cannot be targeted at one card. The card is a prompt, not
+   a gate. If the price must be exclusive to the card, it has to become a
+   separate SKU the way Part 6 did, or a server-signed promotional offer (which
+   needs a signing endpoint the app does not have).
+2. **A SKU carries at most one active introductory offer per territory.** This
+   one therefore occupies the slot the store-side free trial would use on the
+   yearly plan. That is fine because the app's trial is local
+   (`TRIAL_DAYS` in `src/lib/tier.ts`), not a StoreKit one — but it means
+   `hasTrial(yearly)` goes false and the paywall's yearly row stops advertising
+   a store trial. Expected, not a bug.
+
+### App Store Connect
+
+1. **Monetization → Subscriptions →** `com.autonomic.journal.yearly`
+2. **Introductory Offers → +**
+3. Reference name `annual_founder_first_year`, territories = all, no end date
+   (or one, if the founding window is meant to close).
+4. Type **Pay up front**, duration **1 year**, price **$34.99** (or whatever
+   tier you pick) + the regional matrix.
+5. Save. No new binary and no app review — introductory offers go live on their
+   own.
+
+The card's copy is **derived from the two prices the store returns**
+(`introPriceOf` + `discountPct`), so the "30% off" line and the
+"$X first year, then $Y/yr" line follow whatever you set here, in every
+currency. If StoreKit says this user isn't eligible, both the percentage and
+the "first year" clause disappear rather than making a claim.
+
+### Google Play Console
+
+Play has no equivalent of that offer id, so **Android reuses
+`com.autonomic.journal.yearly.promo`** from Part 6 — `FOUNDER_SKU` resolves to
+it on Android. Nothing extra to create. The difference to remember: on Play the
+discounted year **renews at the discount**, so the card's price line reads
+"$24.99/yr, cancel anytime" there rather than "first year, then…". Both are
+true because both come from the store's own numbers.
+
+---
+
 ## Verification checklist
 
 Before you call it done:
@@ -377,5 +438,6 @@ Before you call it done:
 - [ ] Both plans purchasable; purchase flips the app to Pro
 - [ ] "Restore purchase" works on a second device
 - [ ] Annual offer card shows a **real localized $24.99**, not the fallback, and "Claim half off" completes a purchase on both stores
-- [ ] `FORCE_TIER` is `null`, `FORCE_ANNUAL_OFFER` is `null`, and `PREVIEW_PAYWALL` is `false` in the shipped commit
-- [ ] Fresh install → 7 days full access with no store call and no account
+- [ ] `FORCE_TIER` is `null`, `FORCE_ANNUAL_OFFER` is `null`, `FORCE_FOUNDER_OFFER` is `false` and `PREVIEW_PAYWALL` is `false` in the shipped commit
+- [ ] Founding-member card: three logged days, then the next day's launch shows it once, the price line reads a **real** localized introductory price, and "No thanks" retires it permanently
+- [ ] Fresh install → 14 days full access with no store call and no account

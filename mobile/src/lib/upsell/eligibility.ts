@@ -32,6 +32,7 @@ import type { Tier } from '../tier';
 import type { ScoreContext } from '../scoring';
 import { DEFAULT_PROTOCOL, type DaysMap } from '../scoring/day';
 import { detectDownturn } from '../scoring/downturn';
+import { detectStrain } from '../scoring/strain';
 import { engagedDayCount } from '../review/eligibility';
 
 /**
@@ -208,6 +209,9 @@ export function nextUpsell(input: UpsellInput): UpsellVerdict {
   if (input.crashAlertFiredToday) return { ok: false, reason: 'crash-alert-today' };
   if (input.reviewAskedThisSession) return { ok: false, reason: 'review-this-session' };
   if (detectDownturn(days, dk, ctx, protocol, custom)) return { ok: false, reason: 'downturn' };
+  // The warning card's other detector: nothing is sold to somebody the Journal
+  // just told to take it easy, whichever of the two put the card there.
+  if (detectStrain(days, dk, ctx)) return { ok: false, reason: 'downturn' };
 
   // ---- pacing ----
   if (memory.lastPromptAtMs && nowMs - memory.lastPromptAtMs < MIN_DAYS_BETWEEN_PROMPTS * DAY_MS) {

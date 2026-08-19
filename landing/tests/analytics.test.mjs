@@ -425,6 +425,79 @@ const rslice = A.index({
 check('the list ignores the platform filter, since store is a column of it',
   A.purchaseRows(rslice).length === 2, String(A.purchaseRows(rslice).length));
 
+/* ---------------------------------------------------------- activation */
+
+/* Activation is the one counter whose rows really do count people, since the
+   app sends it once per install ever. The fixture:
+
+     C1 (100 installs)  60 activate on day 0, 10 more on D3, 5 more on D20
+     C2 (50 installs)   20 activate on day 0
+     C3 (20 installs)   8 activate on day 0
+
+   so day 0 is 88/170, by D7 is 98/170, and by D30 only C1 is old enough
+   (75/100). Methods are counted across every row. */
+const act = {};
+const putM = (day, cohort, methods) => { (act[day] = act[day] || {})[cohort] = methods; };
+putM(C1, C1, { B: 40, F: 15, W: 5 });
+putM(A.addDays(C1, 3), C1, { F: 10 });
+putM(A.addDays(C1, 20), C1, { W: 5 });
+putM(C2, C2, { B: 12, F: 8 });
+putM(C3, C3, { F: 8 });
+
+const shapeAct = (map) => Object.keys(map).sort().map((day) => ({
+  day,
+  total: Object.values(map[day]).reduce((a, m) => a + Object.values(m).reduce((x, y) => x + y, 0), 0),
+  cohorts: Object.keys(map[day]).reduce((rows, cohort) => rows.concat(
+    Object.keys(map[day][cohort]).map((method) => ({
+      cohort, platform: 'I', method, count: map[day][cohort][method],
+    })),
+  ), []),
+}));
+
+const aix = A.index({ open: shape(open), sub: shape(sub), act: shapeAct(act) });
+
+const a0 = A.activation(aix, aix.cohorts, 0);
+check('activation on day 0 pools every cohort', a0.kept === 88 && a0.of === 170, JSON.stringify(a0));
+check('and reads 51.76%', near(a0.pct, (88 / 170) * 100), String(a0.pct));
+
+const a7 = A.activation(aix, aix.cohorts, 7);
+// C3 is two days old, so it cannot have had seven days to activate.
+check('D7 activation excludes the cohort too young for it',
+  a7.of === 150 && a7.immature === 1, JSON.stringify(a7));
+check('D7 activation counts C1\'s D3 stragglers but not its D20 ones',
+  a7.kept === 70 + 20, JSON.stringify(a7));
+
+const a30 = A.activation(aix, aix.cohorts, 30);
+check('D30 activation is C1 alone, all 75 of them',
+  a30.of === 100 && a30.kept === 75 && a30.cohorts === 1, JSON.stringify(a30));
+
+check('activations on a day are counted whole', A.activationsOn(aix, C1) === 60, String(A.activationsOn(aix, C1)));
+check('a day with no activation ping is 0, never a throw',
+  A.activationsOn(aix, A.addDays(C1, 1)) === 0);
+
+const split = A.methodsOver(aix, A.range(FIRST, LAST));
+check('the method split pools every row',
+  split.B === 52 && split.F === 41 && split.W === 10, JSON.stringify(split));
+
+/* A platform slice is strict for activations exactly as it is for opens: the
+   whole fixture says iOS, so Android sees none of it. */
+const androidAct = A.index({ open: shape(open), sub: shape(sub), act: shapeAct(act) }, 'android');
+check('an Android slice keeps none of an all-iOS activation set',
+  A.activationsOn(androidAct, C1) === 0 && A.activation(androidAct, androidAct.cohorts, 0).kept === 0);
+
+/* Day 0 is where a working onboarding puts nearly everything, so the age
+   buckets have to separate it from the recoveries that follow. */
+const actAges = A.activationAges(aix);
+check('activation ages total every activation', actAges.total === 103, JSON.stringify(actAges.total));
+check('and the first bucket holds the same-day ones plus C1\'s D3',
+  actAges.buckets[0].count === 98, JSON.stringify(actAges.buckets));
+
+/* A report with no `act` key at all — every dashboard cached before this
+   shipped — must read as "no activations", never as a crash. */
+const legacy = A.index({ open: shape(open), sub: shape(sub) });
+check('a report with no activation rows is empty, not broken',
+  A.activationsOn(legacy, C1) === 0 && A.activation(legacy, legacy.cohorts, 0).kept === 0);
+
 /* -------------------------------------------------------------- report */
 
 let failed = 0;

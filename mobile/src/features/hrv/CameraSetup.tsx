@@ -288,7 +288,7 @@ export function CameraSetup({ config, controls: _controls }: { config: SessionCo
   useEffect(() => {
     if (step !== 'wait' || !signal.locked || handedOff.current) return;
     handedOff.current = true;
-    openSheet((c) => <HrvSession config={config} autoStart controls={c} />, { hideClose: true });
+    openSheet((c) => <HrvSession config={config} autoStart controls={c} />, { hideClose: true, grow: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signal.locked, step]);
 

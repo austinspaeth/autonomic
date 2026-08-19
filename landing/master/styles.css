@@ -740,10 +740,12 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { outline: 2px solid var
   transition: opacity .22s ease, transform .22s ease;
 }
 .alert-card.on { opacity: 1; transform: none; }
-/* The left edge carries which kind of news this is, so the two are told apart
-   before either is read. Violet is "paid" everywhere else on this page. */
+/* The left edge carries which kind of news this is, so the three are told
+   apart before any is read. Violet is "paid" everywhere else on this page;
+   green is activation, and matches the colour App usage gives it. */
 .alert-card.sale { border-left: 3px solid var(--series-7); }
 .alert-card.download { border-left: 3px solid var(--series-3); }
+.alert-card.activation { border-left: 3px solid var(--series-6); }
 .alert-mark { font-size: 20px; line-height: 1; flex: none; }
 .alert-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .alert-body b { font-size: 14px; }

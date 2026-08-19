@@ -46,7 +46,7 @@ to channels where the niche gives us structural advantage; nothing goes to spray
 
 ## 1. The math: what $200k ARR actually requires
 
-Pricing today: **$49.99/yr · $7.99/mo · 7-day trial · hard paywall** (whole app gated).
+Pricing today: **$49.99/yr · $7.99/mo · 14-day trial · hard paywall** (whole app gated).
 Category benchmarks (RevenueCat 2025/2026, Adapty): trial→paid for Health & Fitness
 median ~35–40%; download→paid blended 1.5–3% (good) to 4% (excellent); ~68% of revenue
 from annual plans; **only ~30% of annual subs renew at month 12** (worst category);
@@ -106,7 +106,7 @@ phone.**
 - Always show *data*, not lifestyle. The viral unit of this niche is a graph.
 - Have the paid-app answer ready for every comment section: *"One person, no VC, no data
   to sell — the subscription is the business model, and it's why the app has no reason to
-  touch your data. There's a 7-day trial and a hardship policy — DM me."*
+  touch your data. There's a 14-day trial and a hardship policy — DM me."*
 
 ### Founder story (the asset behind everything)
 Austin's own recovery is the story. Patient-founder is *the* proven credibility mechanic
@@ -119,11 +119,11 @@ nomination, and the TikTok pinned video.
 
 ## 3. Pricing & packaging (CMO recommendations to the founder)
 
-The current model — hard paywall, 7-day trial, $49.99/$7.99 — is defensible but has one
+The current model — hard paywall, 14-day trial, $49.99/$7.99 — is defensible but has one
 structural marketing problem: **every proven growth loop in this niche (Reddit
 recommendations, Facebook group threads, org partnerships, creator content) runs on a
 usable free tier.** Bearable, Visible, Guava, POTSie all have one; "which app do you use?"
-threads recommend what members actually use daily, and a 7-day-trial app falls out of
+threads recommend what members actually use daily, and a 14-day-trial app falls out of
 those threads. Recommendations, in priority order:
 
 1. **Ship a real free tier by October (awareness month).** Keep it genuinely useful but

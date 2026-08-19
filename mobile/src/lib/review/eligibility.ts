@@ -22,6 +22,7 @@ import type { CustomTypes, DayRecord, Entry, Protocol } from '../types';
 import type { ScoreContext } from '../scoring';
 import { DEFAULT_PROTOCOL, type DaysMap } from '../scoring/day';
 import { detectDownturn } from '../scoring/downturn';
+import { detectStrain } from '../scoring/strain';
 import { detectUpturn, type Upturn } from '../scoring/upturn';
 
 /** Days of the user's own entries before the prompt is even considered. */
@@ -104,6 +105,9 @@ export function shouldAskForReview(input: ReviewInput): ReviewVerdict {
   if (input.crashAlertFiredToday) return { ok: false, reason: 'crash-alert-today' };
   if (input.paywallSeenThisSession) return { ok: false, reason: 'paywall-this-session' };
   if (detectDownturn(days, dk, ctx, protocol, custom)) return { ok: false, reason: 'downturn' };
+  // Same rule for the strain warning: a day the Journal is showing a caution
+  // card is not a day to ask for a favour, however the card got there.
+  if (detectStrain(days, dk, ctx)) return { ok: false, reason: 'downturn' };
 
   // ---- is today actually going well, by their own baseline? ----
   const upturn = detectUpturn(days, dk, ctx);

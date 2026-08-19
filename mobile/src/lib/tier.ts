@@ -2,7 +2,7 @@
  * Freemium tier derivation — pure logic, unit-tested (see __tests__/tier).
  *
  * Three tiers: 'pro' (active store entitlement — paid, or a store-side trial
- * where one still exists), 'trial' (inside the local 7-day full-access window
+ * where one still exists), 'trial' (inside the local 14-day full-access window
  * stamped on first launch), and 'free' (everything else). The stateful side —
  * where the stamp persists, how changes propagate — lives in src/store/tier.ts;
  * this module is just the math so jest can pin the boundaries.
@@ -11,7 +11,7 @@
 export type Tier = 'pro' | 'trial' | 'free';
 
 /** Length of the local full-access window that starts on first launch. */
-export const TRIAL_DAYS = 7;
+export const TRIAL_DAYS = 14;
 export const TRIAL_MS = TRIAL_DAYS * 86_400_000;
 
 /**

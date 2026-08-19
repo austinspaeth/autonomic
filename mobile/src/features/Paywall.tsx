@@ -1,9 +1,10 @@
 /**
  * Pro paywall — an on-demand card sheet, not a wall. Freemium: the app is
- * always usable (journaling is free forever); locked surfaces (Progress
- * week/month/year, extra HRV captures, AI reports, watch POTS tests) call
- * usePaywall() to raise this card. It dismisses with the sheet's ✕ / backdrop
- * and closes itself the moment an entitlement lands (purchase or restore).
+ * always usable (journaling and live HRV capture are free forever, with no
+ * daily cap); locked surfaces (Progress week/month/year, Insights, AI reports,
+ * POTS captures, watch POTS tests) call usePaywall() to raise this card. It
+ * dismisses with the sheet's ✕ / backdrop and closes itself the moment an
+ * entitlement lands (purchase or restore).
  *
  * Two plans (yearly / monthly) selectable inline. Everything IAP lives in
  * src/store/iap.ts; this file is presentation only.
@@ -17,20 +18,17 @@ import { radius, usePalette } from '../theme';
 import { notePaywallSeen } from '../lib/review';
 import {
   useIap, subscribe, restore, refreshEntitlement, ensureIapReady, clearIapError,
-  YEARLY_SKU, MONTHLY_SKU, priceOf, hasTrial,
+  YEARLY_SKU, MONTHLY_SKU, priceOf, hasTrial, trialDaysOf,
 } from '../store/iap';
 
 const TERMS_URL = 'https://autonomic.care/terms-of-service/';
 const PRIVACY_URL = 'https://autonomic.care/privacy-policy/';
 
+// Capture itself is free and unlimited, so nothing here may promise it. Pro is
+// what the app makes of the readings once you have them.
 const VALUE: { icon: IconName; title: string; sub: string }[] = [
-  {
-    icon: 'activity', title: 'Unlimited lab-quality HRV',
-    sub: Platform.OS === 'ios'
-      ? 'RMSSD, frequency bands, and coherence from your strap or Apple Watch.'
-      : 'RMSSD, frequency bands, and coherence from your strap or camera.',
-  },
   { icon: 'chart', title: 'Your full history', sub: 'Week, month, and year progress views over every number you’ve logged.' },
+  { icon: 'bulb', title: 'Insights from your own log', sub: 'What is linked to what across your readings, sleep, meds and symptoms, worked out on your phone.' },
   { icon: 'standing', title: 'POTS testing', sub: 'Guided stand tests and episode capture, graded against clinical criteria.' },
   { icon: 'ai', title: 'AI-ready reports', sub: 'Turn your logged data into deep-dive prompts and doctor-visit summaries.' },
 ];
@@ -140,6 +138,11 @@ export function PaywallCard({ controls }: { controls: SheetControls }) {
   const selectedPrice = sku === YEARLY_SKU ? yPrice : mPrice;
   const period = sku === YEARLY_SKU ? 'year' : 'month';
   const trial = hasTrial(selected);
+  // The store's own trial length, never a hardcoded one — see trialDaysOf.
+  // This is NOT the app's local full-access window (src/lib/tier.ts); the two
+  // are set in different places and have been different numbers.
+  const trialDays = trialDaysOf(selected);
+  const freeFor = (d: number | null) => (d ? `${d}-day free trial` : 'Free trial');
 
   const link = (label: string, url: string) => (
     <Text style={{ textDecorationLine: 'underline' }} onPress={() => Linking.openURL(url)}>{label}</Text>
@@ -156,7 +159,7 @@ export function PaywallCard({ controls }: { controls: SheetControls }) {
           See your nervous system recover
         </Text>
         <Text style={{ color: p.textDim, fontSize: 15.5, textAlign: 'center', lineHeight: 23 }}>
-          Unlimited HRV, your full history, POTS testing, and AI-ready reports.
+          Your full history, Insights, POTS testing, and AI-ready reports.
         </Text>
       </View>
 
@@ -180,7 +183,7 @@ export function PaywallCard({ controls }: { controls: SheetControls }) {
           name="Yearly"
           price={yPrice}
           period="yr"
-          note={hasTrial(yearly) ? '7-day free trial, then billed yearly' : 'Billed yearly'}
+          note={hasTrial(yearly) ? `${freeFor(trialDaysOf(yearly))}, then billed yearly` : 'Billed yearly'}
           badge={savePct ? `Save ${savePct}%` : 'Best value'}
           selected={sku === YEARLY_SKU}
           onPress={() => setSku(YEARLY_SKU)}
@@ -189,7 +192,7 @@ export function PaywallCard({ controls }: { controls: SheetControls }) {
           name="Monthly"
           price={mPrice}
           period="mo"
-          note={hasTrial(monthly) ? '7-day free trial, then billed monthly' : 'Billed monthly'}
+          note={hasTrial(monthly) ? `${freeFor(trialDaysOf(monthly))}, then billed monthly` : 'Billed monthly'}
           selected={sku === MONTHLY_SKU}
           onPress={() => setSku(MONTHLY_SKU)}
         />
@@ -198,14 +201,16 @@ export function PaywallCard({ controls }: { controls: SheetControls }) {
       <View style={{ gap: 12 }}>
         {error ? <StoreError text={error} /> : null}
         <Button
-          title={purchasing ? 'Starting…' : trial ? 'Start 7-day free trial' : 'Upgrade to Pro'}
+          title={purchasing ? 'Starting…' : trial ? `Start ${freeFor(trialDays).toLowerCase()}` : 'Upgrade to Pro'}
           variant="primary"
           disabled={purchasing}
           onPress={() => subscribe(sku)}
         />
         {purchasing ? <ActivityIndicator color={p.accent} /> : null}
         <Text style={{ color: p.textDim, fontSize: 13, textAlign: 'center' }}>
-          {trial ? `7 days free, then ${selectedPrice}/${period}. Cancel anytime.` : `${selectedPrice}/${period}. Cancel anytime.`}
+          {trial
+            ? `${trialDays ? `${trialDays} days free` : 'Free'}, then ${selectedPrice}/${period}. Cancel anytime.`
+            : `${selectedPrice}/${period}. Cancel anytime.`}
         </Text>
         <View style={{ borderRadius: radius.control, borderWidth: 1, borderColor: p.border }}>
           <Button title="Restore purchase" variant="ghost" onPress={restore} />
@@ -234,6 +239,7 @@ const hexA = (hex: string, a: number) => {
 };
 
 const SHARED_ROWS: string[] = [
+  'Unlimited live HRV capture, from a chest strap or your camera',
   'Journaling: sleep, meds, symptoms, triggers, hydration',
   'Manual readings: BP, resting heart rate, episodes',
   'Daily autonomic score & outlook',
@@ -242,7 +248,6 @@ const SHARED_ROWS: string[] = [
 ];
 
 const PRO_ROWS: { label: string; freeText?: string; proText?: string }[] = [
-  { label: 'Live HRV capture', freeText: '1 / day', proText: 'Unlimited' },
   { label: 'Progress charts', freeText: '14 days', proText: 'All views' },
   { label: 'Full historical metric analysis' },
   { label: 'POTS testing & episode tracking' },

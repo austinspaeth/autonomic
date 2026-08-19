@@ -48,6 +48,19 @@ export function fmtReleaseDate(iso: string): string {
 
 export const RELEASES: Release[] = [
   {
+    version: '1.25',
+    date: '2026-08-19',
+    notes: [
+      'A new HRV reading view. Live heart rate, beat-to-beat and SDNN as the reading runs, with signal quality on screen so you know it is working.',
+      'You can now minimize a reading. It keeps running in the background while you use your journal, and picks up where it left off.',
+      'The app watches your readings and workouts for early warning signs and tells you when a crash may be coming.',
+      'Better Insights. Stronger correlations across what you track, and a new card for what is not moving the needle at all.',
+      'The free trial is now 14 days instead of 7.',
+      'HRV capture is now unlimited on the free plan. There is no longer a one-a-day cap, so you can read your nervous system as often as you like. Pro is for what the app makes of those readings: your full history, Insights, POTS testing and AI reports.',
+      'Plus minor fixes and interface improvements throughout the app.',
+    ],
+  },
+  {
     version: '1.24',
     date: '2026-08-11',
     notes: [

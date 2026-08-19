@@ -47,6 +47,31 @@ export function trustedReadings(readings: readonly Entry[] | undefined): Entry[]
   return arr.some((r) => !isTrustedReading(r)) ? arr.filter(isTrustedReading) : arr;
 }
 
+/**
+ * Does this journal hold a single HRV reading worth calling a baseline?
+ *
+ * The question the Journal's Outlook slot asks before it shows a score at all:
+ * until there is one, every derived number in the app is built on sleep and
+ * blood pressure alone, and the honest thing to show is the ask rather than a
+ * confident-looking dial. Untrusted imports do NOT count — a year of the
+ * watch's one-minute background samples is exactly the case this module exists
+ * for, and letting one of them retire the card would be the trust rule holding
+ * everywhere except the place the user first meets it.
+ *
+ * Short-circuits on the first hit, so the common case (a journal with readings)
+ * costs one day rather than a full scan.
+ */
+export function hasHrvReading(days: AppState['days'] | undefined): boolean {
+  for (const dk of Object.keys(days || {})) {
+    const day = (days as Record<string, DayRecord>)[dk];
+    if (!day || !Array.isArray(day.readings)) continue;
+    for (const r of day.readings) {
+      if (HRV_TYPES.has(r.type) && isTrustedReading(r)) return true;
+    }
+  }
+  return false;
+}
+
 /** RR coverage in whole seconds for a beat-to-beat series (ms intervals). */
 export const rrCoverageSec = (rr: readonly number[] | undefined): number =>
   Math.round((rr || []).reduce((s, v) => s + v, 0) / 1000);

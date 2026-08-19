@@ -9,10 +9,18 @@
  *
  *   GET /ping/open/D082126I   opened today by an install from that cohort
  *   GET /ping/sub/D082126I    an install from that cohort became a subscriber
+ *   GET /ping/act/D082126IB   an install from that cohort took its FIRST reading
  *
  * The trailing letter is the platform: I for iOS, A for Android. It is a
  * property of the build, not of the person holding it, and it is what makes
  * "how is Android doing" answerable without a second data source.
+ *
+ * The activation ping carries a second letter for the sensor that reading used
+ * (W watch / B Bluetooth strap / F finger on camera). Installing is not using:
+ * without a first HRV reading there is no score, no trend and nothing to come
+ * back for, so "how many of a cohort ever got one, and with what" is the single
+ * number that says whether onboarding works. It is the same shape as the other
+ * two — one code, no identifier — and it fires exactly once per install.
  *
  * What is deliberately absent: no device id, no install id, no session id, no
  * request body, no health data, no journal data, nothing about what the user
@@ -38,13 +46,17 @@
  */
 import { AppState as RNAppState, Platform } from 'react-native';
 import { MMKV } from 'react-native-mmkv';
-import { easternDay, pingUrl, platformCode, resolveCohort, shouldPingOpen } from '../lib/ping';
+import {
+  easternDay, methodCode, pingUrl, platformCode, resolveCohort, shouldPingOpen,
+  type MethodCode, type PingKind,
+} from '../lib/ping';
 import { getIapState, paywallBypassed, subscribeIap } from './iap';
 
 const FLAGS_ID = 'autonomic.flags';
 const KEY_COHORT = 'pingCohort';        // ISO date — this install's cohort, frozen once
 const KEY_LAST_OPEN = 'pingLastOpen';   // ISO date (Eastern) of the last open ping sent
 const KEY_SUB_SENT = 'pingSubSent';     // '1' once the subscribe ping landed
+const KEY_ACT_SENT = 'pingActSent';     // '1' once the activation ping landed
 /** Written by ./tier.ts on first launch: this install's birthday. */
 const KEY_TRIAL_STARTED = 'trialStartedAt';
 
@@ -76,10 +88,10 @@ function cohortDate(nowMs: number): string {
 /* ------------------------------------------------------------------ wire */
 
 /** Fire one ping. Resolves true only if the server actually took it. */
-async function send(kind: 'open' | 'sub', cohort: string): Promise<boolean> {
+async function send(kind: PingKind, cohort: string, method?: MethodCode): Promise<boolean> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
-  const url = pingUrl(kind, cohort, platformCode(Platform.OS));
+  const url = pingUrl(kind, cohort, platformCode(Platform.OS), method);
   try {
     const res = await fetch(url, { method: 'GET', signal: controller.signal });
     return res.ok;
@@ -128,6 +140,25 @@ async function pingSub(): Promise<void> {
   const { ready, isPro } = getIapState();
   if (!ready || !isPro) return;
   if (await send('sub', cohortDate(Date.now()))) write(KEY_SUB_SENT, '1');
+}
+
+/**
+ * Send the one-per-install activation ping, from the moment a first HRV reading
+ * is actually saved (features/hrv/Results.tsx) — never from the moment capture
+ * starts, since a session that was abandoned or produced nothing usable is the
+ * opposite of an activation.
+ *
+ * Exported rather than driven from a subscription because there is no store
+ * state to watch: the caller knows it just saved a reading, and the flag here
+ * makes every call after the first a no-op. Dev builds send nothing, the same
+ * rule `initPing` applies to opens.
+ */
+export function pingActivation(source: string | undefined): void {
+  if (__DEV__) return;
+  if (read(KEY_ACT_SENT) === '1') return;
+  void (async () => {
+    if (await send('act', cohortDate(Date.now()), methodCode(source))) write(KEY_ACT_SENT, '1');
+  })();
 }
 
 let started = false;

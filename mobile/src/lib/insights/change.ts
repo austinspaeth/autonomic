@@ -30,6 +30,7 @@ import { OUTCOME_FAMILY, TREND_METRICS, TREND_WINDOW_DAYS, compareWindows, type 
 import { CORRELATION_OUTCOMES, MIN_EFFECT, midSentence, shortMetric } from './correlate';
 import type { DayMatrix } from './matrix';
 import { benjaminiHochberg, confidenceLabel, confidencePips, mannWhitney, type ConfidenceLabel } from './stats';
+import { RETAIN_P } from './stability';
 
 /** Days of the outcome needed on each side of an onset. */
 export const MIN_SIDE = 10;
@@ -241,7 +242,15 @@ const HEADLINE_RANK: Partial<Record<TrendMetricId, number>> = {
 const loudness = (pips: number, r: number, kind: string, id: TrendMetricId) =>
   pips * 100 + Math.abs(r) * 50 + (HEADLINE_RANK[id] || 0) * 2 + (kind === 'onset' ? 1 : 0);
 
-export function findBiggestChange(matrix: DayMatrix): BiggestChange | null {
+/**
+ * `retain` — the id of the change a previous real report headlined. A strict
+ * survivor always wins the card outright ("Biggest change" must stay a
+ * superlative), but when NOTHING passes strictly and the remembered change is
+ * still plausible (raw p ≤ RETAIN_P plus the clinical bars), the card keeps
+ * saying it rather than going blank — the same hysteresis ./stability gives the
+ * correlation list, applied to the one slot up here.
+ */
+export function findBiggestChange(matrix: DayMatrix, opts: { retain?: string | null } = {}): BiggestChange | null {
   const cands = [...onsetCandidates(matrix), ...shiftCandidates(matrix)];
   if (!cands.length) return null;
 
@@ -255,6 +264,13 @@ export function findBiggestChange(matrix: DayMatrix): BiggestChange | null {
     const pips = confidencePips(fdr.q[i], Math.abs(c.r), c.n);
     if (!best || loudness(pips, c.r, c.kind, c.def.id) > loudness(best.pips, best.c.r, best.c.kind, best.c.def.id)) best = { c, q: fdr.q[i], pips };
   });
+  if (!best && opts.retain) {
+    cands.forEach((c, i) => {
+      if (c.id !== opts.retain || c.p > RETAIN_P) return;
+      if (Math.abs(c.r) < MIN_EFFECT || !worthSaying(c.def, c.after, c.before)) return;
+      best = { c, q: fdr.q[i], pips: confidencePips(fdr.q[i], Math.abs(c.r), c.n) };
+    });
+  }
   if (!best) return null;
 
   const { c, pips } = best as { c: Cand; q: number; pips: number };
@@ -264,9 +280,12 @@ export function findBiggestChange(matrix: DayMatrix): BiggestChange | null {
   const up = c.after > c.before;
   const magnitude = def.fmt(Math.abs(c.after - c.before));
 
+  // Verb agreement: "Bowel movements ARE up", "RMSSD IS up". A word ending in a
+  // lowercase plural-s marks the plural labels; the acronyms stay clear of it.
+  const plural = metric.split(' ').some((w) => /[a-z]s$/.test(w));
   const headline = c.kind === 'onset'
-    ? `${metric} is ${up ? 'up' : 'down'} since you started ${c.driver}`
-    : `${metric} has ${up ? 'risen' : 'fallen'} over the last month`;
+    ? `${metric} ${plural ? 'are' : 'is'} ${up ? 'up' : 'down'} since you started ${c.driver}`
+    : `${metric} ${plural ? 'have' : 'has'} ${up ? 'risen' : 'fallen'} over the last month`;
 
   const said = midSentence(metric);
   const body = c.kind === 'onset'

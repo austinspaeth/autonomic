@@ -401,6 +401,20 @@ describe('day scoring', () => {
     // An unsaved live preview isn't in the journal: keep the full history.
     expect(vals('unsaved')).toEqual([30, 40, 50, 60]);
   });
+  it('metricHistory walks activities when asked (workout HR @60s)', () => {
+    const act = (id: string, time: string, hr60: number, type = 'run'): Entry => ({ id, type, time, hr60: String(hr60) });
+    const days: Record<string, DayRecord> = {
+      '2026-07-01': day({ activities: [act('a', '08:00', 96)], readings: [{ id: 'r', type: 'run', hr60: '1' } as Entry] }),
+      '2026-07-02': day({ activities: [act('c', '18:00', 84), act('b', '07:00', 90), act('w', '09:00', 70, 'walk')] }),
+      '2026-07-03': day({ activities: [act('d', '09:00', 80)] }),
+    };
+    const vals = (upto?: string) => metricHistory(days, 'run', numEx('hr60'), 15, upto, 'activities').map((p) => p.v);
+    // Same type only, sorted within the day, and the readings array is not walked.
+    expect(vals()).toEqual([96, 90, 84, 80]);
+    expect(vals('b')).toEqual([96, 90]);
+    // The default kind still reads readings, so activities are invisible there.
+    expect(metricHistory(days, 'run', numEx('hr60')).map((p) => p.v)).toEqual([1]);
+  });
   it('streakInfo counts consecutive clean days', () => {
     const clean = () =>
       day({

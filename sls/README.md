@@ -13,6 +13,7 @@ Authorization: Bearer <Cognito id token>
 
 GET  https://api.autonomic.care/ping/open/D082126I    (public, no auth)
 GET  https://api.autonomic.care/ping/sub/D082126I
+GET  https://api.autonomic.care/ping/act/D082126IB
 GET  https://api.autonomic.care/ping/report?key=...&since=2026-08-01
 ```
 
@@ -43,6 +44,7 @@ per user, which would eventually meet DynamoDB's 400KB item ceiling.
 | `DASH#<email>` | `UI` | view and filter preferences |
 | `PING#OPEN` | `<day>` | that day's opens, counted per cohort |
 | `PING#SUB` | `<day>` | that day's new subscribers, counted per cohort |
+| `PING#ACT` | `<day>` | that day's activations (first HRV reading), per cohort+method |
 | `STORE#VERSIONS` | `latest` | what each store is serving, cached (see below) |
 
 `LOAD` queries the whole partition. `SYNC` applies the client's diff — entries
@@ -214,9 +216,12 @@ Two doors onto the same function, because they have different callers:
   the dashboard, which already holds a Cognito token and shouldn't also carry
   the shared key. The email allowlist guards it like everything else there.
 
-Both answer `{ since, open: [...], sub: [...] }`, each row
-`{ day, total, cohorts: [{ key, cohortDate, cohort, platform, count }] }`. Rows
-stored before the platform marker existed report `platform: "U"`.
+Both answer `{ since, open: [...], sub: [...], act: [...] }`, each row
+`{ day, total, cohorts: [{ key, cohortDate, cohort, platform, method, count }] }`.
+Rows stored before the platform marker existed report `platform: "U"`. `method`
+is the sensor an activation used — `W` watch, `B` Bluetooth strap, `F` finger on
+the camera — and is `null` on every row of the other two kinds, which carry no
+method at all.
 
 Set the key once before the first deploy (any random string):
 

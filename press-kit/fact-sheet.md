@@ -9,7 +9,7 @@ shipping app. Items in [brackets] need Austin to confirm before external use.*
 | **Tagline** | See your nervous system recover. |
 | **What it is** | A private, offline-first app that scores your daily HRV, blood pressure, sleep and orthostatic readings against published medical thresholds, built for people recovering from POTS, dysautonomia, long COVID and post-viral illness. |
 | **Platforms** | iOS + Apple Watch · Android (Health Connect). Both live as of July 2026. |
-| **Price** | Free to use (no account). Autonomic Pro: **$7.99/month or $49.99/year**. Every install opens with 7 days of full Pro access, no card and no account. |
+| **Price** | Free to use (no account). Autonomic Pro: **$7.99/month or $49.99/year**. Every install opens with 14 days of full Pro access, no card and no account. |
 | **Category** | Health & Fitness |
 | **Website** | https://autonomic.care |
 | **App Store** | https://apps.apple.com/app/id6789786971 |

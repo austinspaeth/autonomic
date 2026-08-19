@@ -11,13 +11,13 @@ describe('deriveTier', () => {
     expect(deriveTier(NOW, NOW, true)).toBe('pro');
   });
 
-  it('is trial inside the 7-day window', () => {
+  it('is trial inside the 14-day window', () => {
     expect(deriveTier(NOW, NOW, false)).toBe('trial');                    // just stamped
-    expect(deriveTier(NOW, NOW - (6 * DAY + 23 * HOUR), false)).toBe('trial');
+    expect(deriveTier(NOW, NOW - (13 * DAY + 23 * HOUR), false)).toBe('trial');
     expect(deriveTier(NOW, NOW - TRIAL_MS + 1, false)).toBe('trial');     // last ms
   });
 
-  it('is free at exactly 7 days and beyond', () => {
+  it('is free at exactly 14 days and beyond', () => {
     expect(deriveTier(NOW, NOW - TRIAL_MS, false)).toBe('free');
     expect(deriveTier(NOW, NOW - 30 * DAY, false)).toBe('free');
   });

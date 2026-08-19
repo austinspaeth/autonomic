@@ -2,9 +2,11 @@
  * The rules of the floating pill stack: who sits in front, and how far back the rest
  * recede.
  *
- * Four overlays render into the same spot above the tab bar (`bottom: insets.bottom +
- * 88`): the watch-sync pill, the health-import pill, the "What's new" pill, and the
- * Insights "Get AI Insights & Reports" button. They are not equally urgent, so they
+ * Five overlays render into the same spot above the tab bar (`bottom: insets.bottom +
+ * 88`): a minimized HRV reading, the watch-sync pill, the health-import pill, the
+ * "What's new" pill, and the Insights "Get AI Insights & Reports" button. The reading
+ * outranks all of them because it is a measurement in progress that the user set aside
+ * on purpose — losing it behind a "What's new" prompt costs them five minutes. They are not equally urgent, so they
  * STACK rather than compete: the highest-ranked visible one sits at full size and
  * everything below it recedes into the sheet stack's stacked-card look, scaled down,
  * lifted and dimmed by one step per pill above it.
@@ -16,7 +18,7 @@
  */
 
 /** Most urgent first. A key not in here ranks below everything that is. */
-export const PILL_RANK = ['watchSync', 'health', 'whatsNew', 'ai'] as const;
+export const PILL_RANK = ['hrv', 'watchSync', 'health', 'whatsNew', 'ai'] as const;
 export type PillKey = (typeof PILL_RANK)[number];
 
 /**

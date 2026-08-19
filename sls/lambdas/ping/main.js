@@ -1,10 +1,11 @@
 /**
  * Cohort ping — the only endpoint the mobile app itself talks to.
  *
- * Three routes. Two public writers, no auth, no body, no response payload:
+ * Four routes. Three public writers, no auth, no body, no response payload:
  *
  *   GET /ping/open/D082126I   the app was opened today by an install from that cohort
  *   GET /ping/sub/D082126I    an install from that cohort became a paid subscriber
+ *   GET /ping/act/D082126IB   an install from that cohort took its FIRST HRV reading
  *
  * and one reader, guarded by a shared key:
  *
@@ -18,6 +19,13 @@
  * day it arrived, so the stored shape is "one row per day, holding a count per
  * cohort+platform" — which read as a grid is a retention matrix: of the
  * installs born on cohort C, how many opened the app on day D.
+ *
+ * The activation route carries ONE more letter, the sensor that took the
+ * reading: W watch, B Bluetooth strap, F finger on the camera. It rides in the
+ * same code rather than in a query parameter so there is exactly one thing to
+ * decode and one string to store, and it turns the same matrix into "of the
+ * installs born on cohort C, how many ever got a first reading, and with what".
+ * Activation fires once per install, so its rows count installs, not sessions.
  *
  * Days here are US EASTERN days, not UTC ones: these are the business's own
  * numbers and are read against its own calendar, so a ping at 8pm in New York
@@ -56,29 +64,35 @@ const EPOCH = '2025-01-01';
 /** A cohort can't be in the future; allow a day of clock skew / timezone. */
 const SKEW_MS = 36 * 60 * 60 * 1000;
 
-const KINDS = { open: 'OPEN', sub: 'SUB' };
+const KINDS = { open: 'OPEN', sub: 'SUB', act: 'ACT' };
 
 /* ------------------------------------------------------------------ dates */
 
 /** Platforms a ping may declare. Anything else, or nothing, reads as U. */
 const PLATFORMS = { I: 'ios', A: 'android', U: 'unknown' };
 
+/** Capture methods an ACTIVATION ping may declare. Only that route sends one. */
+const METHODS = { W: 'watch', B: 'bluetooth', F: 'finger' };
+
 /**
- * Decode D{MMDDYY}{P} into `{ iso, platform }`, or null if it isn't a real
- * date. Two-digit years are 20xx — this endpoint outlives neither the app nor
- * 2099. The platform letter is optional: builds that shipped before the marker
- * existed send `D082126`, and they count as U rather than being refused.
+ * Decode D{MMDDYY}{P}{M?} into `{ iso, platform, method }`, or null if it isn't
+ * a real date. Two-digit years are 20xx — this endpoint outlives neither the app
+ * nor 2099. The platform letter is optional: builds that shipped before the
+ * marker existed send `D082126`, and they count as U rather than being refused.
+ * The method letter is optional too and only the activation route ever sends
+ * one; an unrecognised letter is dropped rather than refused, so a future
+ * sensor can ship on the client before this endpoint knows its name.
  */
 const decodeCohort = (raw) => {
-  const m = /^D(\d{2})(\d{2})(\d{2})([A-Z])?$/.exec(String(raw || ''));
+  const m = /^D(\d{2})(\d{2})(\d{2})([A-Z])?([A-Z])?$/.exec(String(raw || ''));
   if (!m) return null;
-  const [, mm, dd, yy, p] = m;
+  const [, mm, dd, yy, p, meth] = m;
   const iso = `20${yy}-${mm}-${dd}`;
   const t = Date.parse(`${iso}T00:00:00Z`);
   if (!Number.isFinite(t)) return null;
   // Round-trip guards against 02-31 and friends, which Date.parse accepts.
   if (new Date(t).toISOString().slice(0, 10) !== iso) return null;
-  return { iso, platform: PLATFORMS[p] ? p : 'U' };
+  return { iso, platform: PLATFORMS[p] ? p : 'U', method: METHODS[meth] ? meth : null };
 };
 
 /**
@@ -87,8 +101,8 @@ const decodeCohort = (raw) => {
  * that every question the matrix already answers (retention, conversion, day
  * N) can also be asked per platform. Reads split it back apart.
  */
-const cohortKey = (iso, platform) => (
-  `${iso.slice(5, 7)}${iso.slice(8, 10)}${iso.slice(2, 4)}${platform || 'U'}`
+const cohortKey = (iso, platform, method) => (
+  `${iso.slice(5, 7)}${iso.slice(8, 10)}${iso.slice(2, 4)}${platform || 'U'}${method || ''}`
 );
 
 /** Day-of-month of the `n`th Sunday of a month (1-based n, 0-based month). */
@@ -138,8 +152,8 @@ const isIsoDate = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
  * row grows with the app's age (a few thousand keys after a decade), nowhere
  * near DynamoDB's 400KB item ceiling.
  */
-const bump = async (kind, day, cohortIso, platform) => {
-  const key = cohortKey(cohortIso, platform);
+const bump = async (kind, day, cohortIso, platform, method) => {
+  const key = cohortKey(cohortIso, platform, method);
   const add = new UpdateCommand({
     TableName: TABLE,
     Key: { PK: `PING#${kind}`, SK: day },
@@ -198,16 +212,23 @@ const readDays = async (kind, since) => {
         cohorts: Object.keys(cohorts)
           .map((key) => {
             const cohortDate = key.slice(0, 6);
-            const platform = key.length > 6 ? key.slice(6) : 'U';
+            const platform = key.length > 6 ? key.slice(6, 7) : 'U';
+            // Only activation keys carry an 8th character; null everywhere else
+            // so a consumer can tell "no method in this kind of ping" apart from
+            // "a method we could not read".
+            const method = key.length > 7 ? key.slice(7, 8) : null;
             return {
               key,
               cohortDate,
               cohort: `20${cohortDate.slice(4, 6)}-${cohortDate.slice(0, 2)}-${cohortDate.slice(2, 4)}`,
               platform,
+              method,
               count: Number(cohorts[key]) || 0,
             };
           })
-          .sort((a, b) => a.cohort.localeCompare(b.cohort) || a.platform.localeCompare(b.platform)),
+          .sort((a, b) => a.cohort.localeCompare(b.cohort)
+            || a.platform.localeCompare(b.platform)
+            || String(a.method).localeCompare(String(b.method))),
       });
     });
     ExclusiveStartKey = res.LastEvaluatedKey;
@@ -216,11 +237,13 @@ const readDays = async (kind, since) => {
   return rows;
 };
 
-/** Both kinds, `{ open: [...], sub: [...] }`. Shared with the dashboard API. */
+/** All three kinds, `{ open, sub, act }`. Shared with the dashboard API. */
 const report = async (since) => {
   const from = isIsoDate(since) ? since : EPOCH;
-  const [open, sub] = await Promise.all([readDays('OPEN', from), readDays('SUB', from)]);
-  return { since: from, open, sub };
+  const [open, sub, act] = await Promise.all([
+    readDays('OPEN', from), readDays('SUB', from), readDays('ACT', from),
+  ]);
+  return { since: from, open, sub, act };
 };
 
 /* ---------------------------------------------------------------- handler */
@@ -260,20 +283,20 @@ const handler = async (event) => {
     }
   }
 
-  const kindKey = /\/ping\/(open|sub)\//.exec(path)?.[1];
+  const kindKey = /\/ping\/(open|sub|act)\//.exec(path)?.[1];
   const kind = KINDS[kindKey];
   if (!kind) return noContent;
 
   const decoded = decodeCohort(event?.pathParameters?.cohort);
   if (!decoded) return noContent;
-  const { iso: cohort, platform } = decoded;
+  const { iso: cohort, platform, method } = decoded;
 
   const now = Date.now();
   if (cohort < EPOCH) return noContent;
   if (Date.parse(`${cohort}T00:00:00Z`) > now + SKEW_MS) return noContent;
 
   try {
-    await bump(kind, easternDay(now), cohort, platform);
+    await bump(kind, easternDay(now), cohort, platform, kind === 'ACT' ? method : null);
   } catch (err) {
     // Nothing downstream cares and the client is already gone, but log the
     // failure so a flatlined chart has an explanation other than "nobody

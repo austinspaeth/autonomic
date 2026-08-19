@@ -241,10 +241,13 @@ export function SectionHead({ title, help, cat, value, unit, when, desc, right, 
 const ViewedReadingCtx = React.createContext<string | null>(null);
 const useViewedReading = () => React.useContext(ViewedReadingCtx);
 
-function MetricSection({ label, value, unit, cat, desc, help, days, type, ex, bands, hero, fmt }: {
+function MetricSection({ label, value, unit, cat, desc, help, days, type, ex, bands, hero, fmt, kind }: {
   label: string; value?: string | number | null; unit?: string; cat?: ScoreCat | null;
   desc?: string; help?: HelpContent; days: DaysMap; type: string;
   ex: (r: Entry) => number | null; bands?: Band[] | null;
+  /** Which day array the history walks. Activities (the workout report's
+   *  HR @60s) chart from `days[dk].activities`; readings are the default. */
+  kind?: 'readings' | 'activities';
   /** Hero treatment: grade-tinted container + corner tag instead of the dot. */
   hero?: boolean;
   /** How to render a sparkline-selected value. Cards whose headline number
@@ -255,7 +258,7 @@ function MetricSection({ label, value, unit, cat, desc, help, days, type, ex, ba
   const [showZones, setShowZones] = useState(false);
   const [sel, setSel] = useState<{ v: number; date: string } | null>(null);
   const upto = useViewedReading();
-  const hist = metricHistory(days, type, ex, 15, upto);
+  const hist = metricHistory(days, type, ex, 15, upto, kind);
   const hasSpark = hist.length >= 2;
   const hasValue = value != null && value !== '';
   if (!hasValue && !hasSpark) return null;
@@ -1011,6 +1014,11 @@ const WORKOUT_HELP: Record<string, HelpContent> = {
     why: 'The average shows the intensity you actually held rather than the one you intended, and the highest shows where the session peaked. Both are worth comparing against how you felt the following day.',
     learnMore: '/insights/basics/heart-rate-recovery-after-exercise/',
   },
+  hr60: {
+    what: 'Your heart rate one minute after you stopped, entered by hand on the workout (a health store does not record it). Where the workout has a peak, the card also reports the drop from it.',
+    why: 'How quickly the rate falls once you stop is a fairly direct read on vagal reactivation, and it tends to sag before anything else does on a bad week. The chart is the run of past sessions of this kind, so read the trend rather than any single number.',
+    learnMore: '/insights/basics/heart-rate-recovery-after-exercise/',
+  },
 };
 
 const fmtDur = (sec: number) => {
@@ -1051,6 +1059,10 @@ export function WorkoutSummary({ r, days, ctx: _ctx }: SummaryProps) {
     { label: 'Min', val: lo, unit: 'bpm' },
     { label: 'Max', val: hi, unit: 'bpm' },
   ];
+  // HR @60s rest is hand-entered (no health store records it), so the card only
+  // appears on workouts that carry it. Its drop from the peak is the recovery.
+  const hr60 = numOr(r.hr60);
+  const drop = hr60 != null && hi != null && hi > hr60 ? hi - hr60 : null;
   const details: { label: string; value: string }[] = [];
   if (duration != null) details.push({ label: 'Duration', value: `${fmtNum(duration)} min` });
   if (distance != null) details.push({ label: 'Distance', value: `${fmtNum(distance)} mi` });
@@ -1058,7 +1070,9 @@ export function WorkoutSummary({ r, days, ctx: _ctx }: SummaryProps) {
   const sourceLabel = sourceLabelFor(r);
   if (sourceLabel) details.push({ label: 'Source', value: sourceLabel });
   return (
-    <>
+    // The metric cards' history stops at this workout, exactly as a reading's
+    // summary stops at the reading being viewed.
+    <ViewedReadingCtx.Provider value={String(r.id)}>
       {curve ? (
         <Section>
           <SectionHead title="Heart rate over time" help={WORKOUT_HELP.curve} />
@@ -1079,6 +1093,13 @@ export function WorkoutSummary({ r, days, ctx: _ctx }: SummaryProps) {
           ))}
         </View>
       </Section>
+      {hr60 != null ? (
+        <MetricSection
+          label="HR after 60 seconds" value={fmtNum(hr60)} unit="bpm" help={WORKOUT_HELP.hr60}
+          desc={drop != null ? `Down ${fmtNum(drop)} bpm from the peak of ${hi} bpm one minute after stopping.` : 'Your heart rate one minute after you stopped.'}
+          days={days} type={r.type} ex={numEx('hr60')} kind="activities"
+        />
+      ) : null}
       {inZones && zones && zoneTotal > 0 ? (
         <Section>
           <SectionHead title="Time in zones" help={WORKOUT_HELP.zones} desc={hrMax != null ? `Zones from an estimated max HR of ${hrMax} bpm.` : undefined} />
@@ -1115,7 +1136,7 @@ export function WorkoutSummary({ r, days, ctx: _ctx }: SummaryProps) {
         </Section>
       ) : null}
       <WorkoutInsightButton r={r} days={days} hrCurve={curve} />
-    </>
+    </ViewedReadingCtx.Provider>
   );
 }
 

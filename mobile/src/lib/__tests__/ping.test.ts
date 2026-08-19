@@ -1,6 +1,7 @@
 import {
   cohortCode,
   easternDay,
+  methodCode,
   pingUrl,
   platformCode,
   resolveCohort,
@@ -23,9 +24,24 @@ describe('cohort ping wire format', () => {
     expect(platformCode(undefined)).toBe('U');
   });
 
-  it('builds the two routes', () => {
+  it('builds the three routes', () => {
     expect(pingUrl('open', '2026-08-21', 'I')).toBe('https://api.autonomic.care/ping/open/D082126I');
     expect(pingUrl('sub', '2026-08-21', 'A')).toBe('https://api.autonomic.care/ping/sub/D082126A');
+    expect(pingUrl('act', '2026-08-21', 'I', 'B')).toBe('https://api.autonomic.care/ping/act/D082126IB');
+  });
+
+  it('appends the capture method only when there is one', () => {
+    expect(cohortCode('2026-08-21', 'I', 'W')).toBe('D082126IW');
+    expect(cohortCode('2026-08-21', 'I')).toBe('D082126I');
+    expect(pingUrl('act', '2026-08-21', 'A')).toBe('https://api.autonomic.care/ping/act/D082126A');
+  });
+
+  it('maps the three capture sources onto method letters', () => {
+    expect(methodCode('watch')).toBe('W');
+    expect(methodCode('polar')).toBe('B');
+    expect(methodCode('camera')).toBe('F');
+    expect(methodCode('something-else')).toBeUndefined();
+    expect(methodCode(undefined)).toBeUndefined();
   });
 });
 

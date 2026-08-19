@@ -2,9 +2,21 @@
  * First-run welcome wizard — shown once, before any data exists. Six steps:
  * Welcome → Private & on-device → Disclaimer (gated acknowledge) → About you
  * (profile basics, skippable) → Connect data (Apple Health / heart-rate strap,
- * both optional) → You're set. Completing it stamps `meta.onboarded`, fades to
- * black, then fades the app UI in beneath. Settings can re-show it any time via
- * `showWelcomeAgain()`.
+ * both optional) → First reading. Completing it stamps `meta.onboarded`, fades
+ * to black, then fades the app UI in beneath. Settings can re-show it any time
+ * via `showWelcomeAgain()`.
+ *
+ * The last step ENDS IN AN ACTION rather than a legend. It used to be "You're
+ * all set", a list of six features that scrolled off the screen with the one
+ * thing it actually wanted — the morning reminder — below the fold. Nothing in
+ * the app works until there is a first HRV reading: no score, no trend, no
+ * correlation, nothing to come back for. So the step asks for exactly one
+ * choice (which sensor) and hands the capture card straight to the user, with
+ * the reminder riding in the footer beside the button. Its primary FINISHES the
+ * wizard first and opens the capture over the live Journal, so the reading is
+ * never taken on top of an overlay that is about to fade. Skipping is allowed
+ * and lands on `<BaselineWaitingCard/>` (features/DaySummary), which is the
+ * Journal's Outlook slot until a reading exists.
  *
  * Connecting Apple Health in the Connect-data step pops a one-time confirmation
  * card offering to backfill the last year of history (RR-based HRV, blood
@@ -22,7 +34,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BrandMark, Icon } from '../components/Icon';
+import { BrandMark, Icon, type IconName } from '../components/Icon';
 import { Button } from '../components/ui';
 import { DatePickerSheet, HeightPickerSheet, fmtHeight, onlyNumeric } from '../components/Field';
 import { CheckBox, REMINDER_BLURB, REMINDER_SETUP_TITLE, REMINDER_TITLE, useReminderToggle } from './Reminders';
@@ -37,6 +49,9 @@ import { computeScores } from '../lib/scoring';
 import { rrCoverageSec } from '../lib/hrvQuality';
 import { blankDay, getState, mutate, save, storeSleepSeries, storeWaveform, useAppState } from '../store/store';
 import { DevicesScreen } from './Devices';
+import { type SessionConfig } from './hrv/Session';
+import { defaultPeriodFor, defaultSource, openCapture, sourceBlocker } from './hrv/Setup';
+import { SOURCE_META, sourceSub, type Source } from './hrv/SourcePicker';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -58,11 +73,12 @@ const C = {
 const STEPS = 6;
 /** Opacity of the back arrow where there's nothing to go back to. */
 const BACK_GHOST = 0.22;
-const PRIMARY_LABELS = ['Get started', 'Continue', 'I understand', 'Continue', 'Continue', 'Start logging'];
+const PRIMARY_LABELS = ['Get started', 'Continue', 'I understand', 'Continue', 'Continue', 'Start my first reading'];
 const STEP_DUR = 280;
 
-/** Steps that show the top-right Skip (About you + Connect data). */
-const SKIPPABLE = new Set([3, 4]);
+/** Steps that show the top-right Skip (About you, Connect data, First reading).
+ *  Skipping the last one finishes the wizard without opening a capture. */
+const SKIPPABLE = new Set([3, 4, 5]);
 
 /** How far back the one-time historical import reaches. */
 const HISTORY_DAYS = 365;
@@ -303,6 +319,72 @@ function ReminderCard() {
   );
 }
 
+/* ---------- last step: one sensor row ---------- */
+
+/** A sensor the first reading can use. Wears the app's own icon and accuracy
+ *  badge for that source (SOURCE_META) rather than a second set of names, so
+ *  the wizard and the HRV setup sheet describe the same three things the same
+ *  way. Selection is a filled radio and an accent border — the wizard's
+ *  ConnectRow treatment, not a new one. */
+function MethodRow({ source, sub, selected, onPress }: {
+  source: Source; sub: string; selected: boolean; onPress: () => void;
+}) {
+  const meta = SOURCE_META[source];
+  const t = useSharedValue(selected ? 1 : 0);
+  useEffect(() => { t.value = withTiming(selected ? 1 : 0, { duration: 220, easing: Easing.out(Easing.cubic) }); }, [selected, t]);
+  const rowStyle = useAnimatedStyle(() => ({
+    backgroundColor: interpolateColor(t.value, [0, 1], [C.row, C.accentWash]),
+    borderColor: interpolateColor(t.value, [0, 1], [C.rowBorder, C.accentBorder]),
+  }));
+  const radioStyle = useAnimatedStyle(() => ({
+    backgroundColor: interpolateColor(t.value, [0, 1], ['rgba(0,0,0,0)', ACCENT]),
+    borderColor: interpolateColor(t.value, [0, 1], ['rgba(255,255,255,0.16)', ACCENT]),
+  }));
+  const checkStyle = useAnimatedStyle(() => ({ opacity: t.value, transform: [{ scale: 0.5 + 0.5 * t.value }] }));
+  return (
+    <AnimatedPressable
+      onPress={onPress}
+      accessibilityRole="radio"
+      accessibilityState={{ selected }}
+      style={[{ flexDirection: 'row', alignItems: 'center', gap: 14, borderWidth: 1, borderRadius: 14, padding: 14 }, rowStyle]}
+    >
+      <View style={{ width: 42, height: 42, borderRadius: 11, backgroundColor: C.tile, alignItems: 'center', justifyContent: 'center' }}>
+        <Icon name={meta.icon} size={21} color={selected ? ACCENT : C.faint} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Text style={{ fontSize: 15, fontWeight: '700', color: C.text }}>{meta.title}</Text>
+          <View style={{ paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999, borderWidth: 1, borderColor: selected ? C.accentBorder : 'rgba(255,255,255,0.14)' }}>
+            <Text style={{ fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4, color: selected ? '#e8807c' : C.faint }}>{meta.badge}</Text>
+          </View>
+        </View>
+        <Text style={{ fontSize: 12.5, lineHeight: 17, color: C.faint, marginTop: 3 }}>{sub}</Text>
+      </View>
+      <Animated.View style={[{ width: 22, height: 22, borderRadius: 11, borderWidth: 1, alignItems: 'center', justifyContent: 'center' }, radioStyle]}>
+        <Animated.View style={checkStyle}>
+          <Glyph size={12} w={3.2} color="#fff" d={['M20 6L9 17l-5-5']} />
+        </Animated.View>
+      </Animated.View>
+    </AnimatedPressable>
+  );
+}
+
+/** One of the two kinds of reading, explained. Not tappable: the primary
+ *  commits to a baseline, and this says what the other one is for. */
+function KindRow({ icon, title, children }: { icon: IconName; title: string; children: React.ReactNode }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12, borderTopWidth: 1, borderTopColor: C.tileBorder, paddingTop: 12 }}>
+      <View style={{ width: 32, height: 32, borderRadius: 11, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center' }}>
+        <Icon name={icon} size={17} color={ACCENT} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={{ fontSize: 14, fontWeight: '700', color: C.text }}>{title}</Text>
+        <Text style={{ fontSize: 12.5, lineHeight: 18, color: C.faint, marginTop: 2 }}>{children}</Text>
+      </View>
+    </View>
+  );
+}
+
 /** Bare icon + sentence bullet row. The text lives in a flexed wrapper so long
  *  lines wrap inside the padded content area (nested bold Text spans otherwise
  *  measure against the full screen width). */
@@ -349,12 +431,12 @@ function HistoryImportSheet({ controls, onImported }: {
       <View style={{ gap: 8 }}>
         <Text style={{ fontSize: 21, fontWeight: '700', letterSpacing: -0.3, color: p.text }}>Import your history?</Text>
         <Text style={{ fontSize: 14.5, lineHeight: 22, color: p.textDim }}>
-          {`Bring the past year from ${healthAppName()} into your journal so your trends start full: sleep, workouts, blood pressure, resting heart rate and HRV. This is a one-time import, and new readings sync automatically as you go.`}
+          {`Bring the past year from ${healthAppName()} into your journal so your trends start full: sleep, workouts, blood pressure${Platform.OS === 'ios' ? ', resting heart rate and HRV' : ' and resting heart rate'}. This is a one-time import, and new readings sync automatically as you go.`}
         </Text>
         <Text style={{ fontSize: 12.5, lineHeight: 18, color: p.textDim, opacity: 0.85 }}>
           {Platform.OS === 'ios'
             ? 'Only HRV recordings with beat-to-beat detail of at least four minutes come in, so the full variability panel is available. It can take a minute.'
-            : 'HRV history comes in as RMSSD values from Health Connect. It can take a minute.'}
+            : 'Health Connect keeps no beat-to-beat detail, so HRV readings are not imported. Everything else comes in. It can take a minute.'}
         </Text>
         {busy && !!status && (
           <Text style={{ fontSize: 12.5, lineHeight: 18, color: p.accent }}>{status}</Text>
@@ -386,6 +468,9 @@ function Onboarding({ onDone }: { onDone: () => void }) {
   const [ack, setAck] = useState(false);
   const [healthBusy, setHealthBusy] = useState(false);
   const [finishing, setFinishing] = useState(false);
+  // The last step's sensor choice, seeded exactly the way the HRV setup sheet
+  // seeds its own (a paired strap wins, else the camera).
+  const [source, setSource] = useState<Source>(defaultSource);
   const mounted = useRef(false);
   useEffect(() => { mounted.current = true; }, []);
 
@@ -447,20 +532,38 @@ function Onboarding({ onDone }: { onDone: () => void }) {
   const next = () => {
     if (gated || finishing) return;
     if (step === 3) saveProfile(); // Continue commits the profile; Skip doesn't
+    if (step >= STEPS - 1) startFirstReading();
+    else go(step + 1);
+  };
+  // Skip on the last step ends the wizard rather than walking off the end of
+  // it; the Journal's baseline card is where that user lands.
+  const skip = () => {
+    if (finishing) return;
     if (step >= STEPS - 1) finish();
     else go(step + 1);
   };
-  const skip = () => { if (!finishing && step < STEPS - 1) go(step + 1); };
   const back = () => { if (step > 0 && !finishing) go(step - 1); };
 
   // Finish: fade to black over the wizard, stamp the flag while the screen is
   // fully dark, then fade the whole overlay out to reveal the live app.
+  //
+  // `pending` is the capture the last step asked for. It is opened only once
+  // the overlay has finished fading, so the capture card rises over the live
+  // Journal rather than over a wizard that is still on screen — the sheet stack
+  // lives in the root layout, so it outlives this component either way.
   const cover = useSharedValue(0);
   const root = useSharedValue(1);
+  const pending = useRef<SessionConfig | null>(null);
+  const revealed = () => {
+    onDone();
+    const config = pending.current;
+    pending.current = null;
+    if (config) openCapture(config, openSheet);
+  };
   const reveal = () => {
     mutate((s) => { s.meta.onboarded = new Date().toISOString(); });
     root.value = withDelay(140, withTiming(0, { duration: 640, easing: Easing.inOut(Easing.quad) }, (fin) => {
-      if (fin) runOnJS(onDone)();
+      if (fin) runOnJS(revealed)();
     }));
   };
   const finish = () => {
@@ -468,6 +571,27 @@ function Onboarding({ onDone }: { onDone: () => void }) {
     cover.value = withTiming(1, { duration: 400, easing: Easing.in(Easing.cubic) }, (fin) => {
       if (fin) runOnJS(reveal)();
     });
+  };
+
+  /**
+   * The last step's primary. A strap with nothing paired is a detour into the
+   * devices card rather than a refusal — the same rule the HRV setup sheet
+   * follows — and anything the platform genuinely cannot do says so and stays
+   * put. Otherwise the pick is remembered (so the next capture defaults to it)
+   * and the wizard finishes with the capture queued behind the fade.
+   *
+   * BASELINE, never training: a first-time user has no idea what HRV is yet,
+   * and paced breathing is a thing to graduate to, not to be handed on day one.
+   */
+  const startFirstReading = () => {
+    if (source === 'polar' && !getState().settings.lastBleDeviceId) { connectStrap(); return; }
+    const blocked = sourceBlocker(source);
+    if (blocked) { toast(blocked); return; }
+    if (getState().settings.lastHrvSource !== source) { getState().settings.lastHrvSource = source; save(); }
+    pending.current = {
+      kind: 'unstructured', source, period: defaultPeriodFor('unstructured'), style: undefined,
+    };
+    finish();
   };
 
   const connectHealth = async () => {
@@ -499,6 +623,20 @@ function Onboarding({ onDone }: { onDone: () => void }) {
     }
   };
   const connectStrap = () => openSheet((c) => <DevicesScreen controls={c} />);
+
+  /* ---------- last step: which sensor ---------- */
+  // Apple Watch only where there is one to talk to. Everything else is offered
+  // on both platforms; `sourceBlocker` is what refuses a build that can't.
+  const showWatch = Platform.OS === 'ios' && health().available;
+  const sources: Source[] = showWatch ? ['watch', 'polar', 'camera'] : ['polar', 'camera'];
+  const strapName = state.settings.lastBleDeviceName;
+  // Picking the strap with nothing paired goes straight to the devices card,
+  // the same detour the HRV setup sheet takes — choosing a sensor you don't
+  // own yet is only half an answer.
+  const pickSource = (s: Source) => {
+    setSource(s);
+    if (s === 'polar' && !getState().settings.lastBleDeviceId) connectStrap();
+  };
 
   /* ---------- animated chrome ---------- */
   // Back stays on screen at step 0, just ghosted (and non-interactive), so the
@@ -670,40 +808,63 @@ function Onboarding({ onDone }: { onDone: () => void }) {
     return (
       <View style={{ flex: 1 }}>
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingTop: 24, gap: 22, paddingBottom: 16, flexGrow: 1 }} showsVerticalScrollIndicator={false}>
+          {/* The logo squiggle, not a heart-rate trace: this is the app asking
+              for the one thing it is built around, so it signs with its name. */}
           <View style={{ width: 72, height: 72, borderRadius: 20, backgroundColor: 'rgba(224,49,39,0.09)', borderWidth: 1, borderColor: 'rgba(224,49,39,0.25)', alignItems: 'center', justifyContent: 'center' }}>
-            <Glyph size={34} w={2.4} d={['M20 6L9 17l-5-5']} />
+            <BrandMark size={34} />
           </View>
           <View>
-            <Text style={st.h2}>You&apos;re all set</Text>
+            <Text style={st.h2}>Take your first HRV reading</Text>
             <Text style={st.para}>
-              We hope Autonomic makes your recovery journey a little easier. The more you log, the clearer your
-              patterns become and the better the insights you&apos;ll uncover.
+              This reading is what tells us everything we know about your autonomic system, and it is what every
+              trend is measured against. It only takes five minutes sitting still.
             </Text>
           </View>
-          <View style={{ gap: 14 }}>
-            <Bullet icon={<Icon name="clipboard" size={25} color={ACCENT} />}>
-              <Text style={{ fontWeight: '700' }}>Journal</Text> is your day-to-day health log.
-            </Bullet>
-            <Bullet icon={<Icon name="chart" size={25} color={ACCENT} />}>
-              <Text style={{ fontWeight: '700' }}>Progress</Text> charts your trends over time.
-            </Bullet>
-            <Bullet icon={<Icon name="ai" size={25} color={ACCENT} />}>
-              <Text style={{ fontWeight: '700' }}>Insight</Text> turns your data into AI prompts.
-            </Bullet>
-            <Bullet icon={<Icon name="plus" size={25} color={ACCENT} />}>
-              Tap <Text style={{ fontWeight: '700' }}>+</Text> on any section to log a reading.
-            </Bullet>
-            {Platform.OS === 'ios' ? (
-              <Bullet icon={<Icon name="watch" size={25} color={ACCENT} />}>
-                Check your <Text style={{ fontWeight: '700' }}>Apple Watch</Text> to record POTS episodes or monitor your HR.
-              </Bullet>
-            ) : null}
-            <Bullet icon={<Glyph size={25} circle={{ r: 9 }} d={['M9.4 9.2a2.6 2.6 0 0 1 5.1.9c0 1.7-2.5 2.3-2.5 2.3', 'M12 16h.01']} />}>
-              Tap the <Text style={{ fontWeight: '700' }}>?</Text> icons whenever you need help.
-            </Bullet>
+
+          <View>
+            <Text style={st.fieldLabel}>Measure with</Text>
+            <View style={{ gap: 10 }}>
+              {sources.map((src) => (
+                <MethodRow
+                  key={src}
+                  source={src}
+                  sub={sourceSub(src, strapName)}
+                  selected={source === src}
+                  onPress={() => pickSource(src)}
+                />
+              ))}
+            </View>
+          </View>
+
+          {/* Explanation, not a second choice: the button below commits to a
+              baseline, and training is the thing to graduate to. */}
+          <View style={{ backgroundColor: C.tile, borderRadius: 16, padding: 16, gap: 12 }}>
+            <View>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: C.text }}>Two kinds of reading</Text>
+              <Text style={{ fontSize: 13, lineHeight: 19, color: C.faint, marginTop: 3 }}>
+                Start with a baseline today. Once you have a few, add training sessions.
+              </Text>
+            </View>
+            <KindRow icon="heartPulse" title="Baseline">
+              Breathe however you normally do. Shows where your nervous system actually sits. Start here.
+            </KindRow>
+            <KindRow icon="wind" title="Training">
+              The app paces your breath, four seconds in and six out. More sensitive day to day, and the pacing
+              trains your system.
+            </KindRow>
+          </View>
+
+          <View style={{ flexDirection: 'row', gap: 11, paddingHorizontal: 2 }}>
+            <View style={{ marginTop: 1 }}>
+              <Glyph size={17} w={2} color={C.faint} circle={{ r: 10, w: 2 }} d={['M12 16v-4M12 8h.01']} />
+            </View>
+            <Text style={{ flex: 1, fontSize: 12.5, lineHeight: 19, color: C.faint }}>
+              Readings taken at the same time each day are the only ones worth comparing. Most people do it before
+              they get out of bed.
+            </Text>
           </View>
         </ScrollView>
-        {/* Pinned below the scroller so it always sits against "Start logging". */}
+        {/* Pinned below the scroller so it always sits against the primary. */}
         <ReminderCard />
       </View>
     );

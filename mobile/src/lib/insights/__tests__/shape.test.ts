@@ -21,9 +21,10 @@ const shape = (over: Partial<InsightsShape> = {}): InsightsShape => ({
   change: true,
   correlations: 4,
   observations: 3,
+  noImpact: 0,
   watch: 5,
-  heights: { change: 300, correlations: 420, observations: 260, watch: 240 },
-  rows: { correlations: [74, 74, 74, 74], observations: [96, 118, 96], watch: [58, 58] },
+  heights: { change: 300, correlations: 420, observations: 260, noImpact: 0, watch: 240 },
+  rows: { correlations: [74, 74, 74, 74], observations: [96, 118, 96], noImpact: [], watch: [58, 58] },
   ...over,
 });
 
@@ -53,7 +54,7 @@ describe('normalizeShape', () => {
   });
 
   it('clamps a height so a corrupt value cannot reserve half a screen', () => {
-    const out = normalizeShape(shape({ heights: { change: 99999, correlations: 420, observations: 260, watch: 240 } }))!;
+    const out = normalizeShape(shape({ heights: { change: 99999, correlations: 420, observations: 260, noImpact: 0, watch: 240 } }))!;
     expect(out.heights.change).toBe(MAX_CARD_H);
   });
 
@@ -72,7 +73,7 @@ describe('normalizeShape', () => {
   });
 
   it('rounds fractional heights, since onLayout reports them', () => {
-    const out = normalizeShape(shape({ heights: { change: 300.6, correlations: 419.4, observations: 260, watch: 240 } }))!;
+    const out = normalizeShape(shape({ heights: { change: 300.6, correlations: 419.4, observations: 260, noImpact: 0, watch: 240 } }))!;
     expect(out.heights.change).toBe(301);
     expect(out.heights.correlations).toBe(419);
   });
@@ -91,7 +92,7 @@ describe('normalizeShape', () => {
   });
 
   it('clamps a row height, which decides where every bubble sits', () => {
-    const out = normalizeShape(shape({ rows: { correlations: [9999, 74], observations: [-3, 96], watch: [58] } }))!;
+    const out = normalizeShape(shape({ rows: { correlations: [9999, 74], observations: [-3, 96], noImpact: [], watch: [58] } }))!;
     expect(out.rows.correlations[0]).toBe(MAX_ROW_H);
     // A junk entry reads as 0 and KEEPS ITS INDEX. Dropping it compacted the list and
     // shifted every later row up one, so row 2's bubble was drawn at row 1's height —
@@ -104,13 +105,13 @@ describe('normalizeShape', () => {
   it('trims trailing unmeasured rows, which carry no position', () => {
     // A row never measured at the END of a card says nothing about where anything
     // sits, and keeping it would make "not measured yet" read as a shape change.
-    const out = normalizeShape(shape({ rows: { correlations: [74, 74, 0, 0], observations: [], watch: [] } }))!;
+    const out = normalizeShape(shape({ rows: { correlations: [74, 74, 0, 0], observations: [], noImpact: [], watch: [] } }))!;
     expect(out.rows.correlations).toEqual([74, 74]);
   });
 
   it('caps how many row heights it will store per card', () => {
     const many = Array.from({ length: 40 }, () => 74);
-    const out = normalizeShape(shape({ rows: { correlations: many, observations: many, watch: many } }))!;
+    const out = normalizeShape(shape({ rows: { correlations: many, observations: many, noImpact: many, watch: many } }))!;
     expect(out.rows.correlations).toHaveLength(MAX_ROWS.correlations);
     expect(out.rows.observations).toHaveLength(MAX_ROWS.observations);
     expect(out.rows.watch).toHaveLength(MAX_ROWS.watch);
@@ -130,27 +131,27 @@ describe('sameShape', () => {
   it('ignores a sub-point height wobble', () => {
     // `onLayout` heights drift by a fraction between renders; writing storage for
     // each would be a write per frame for nothing visible.
-    const a = shape({ heights: { change: 300, correlations: 420, observations: 260, watch: 240 } });
-    const b = shape({ heights: { change: 300.2, correlations: 419.8, observations: 260.4, watch: 240.1 } });
+    const a = shape({ heights: { change: 300, correlations: 420, observations: 260, noImpact: 0, watch: 240 } });
+    const b = shape({ heights: { change: 300.2, correlations: 419.8, observations: 260.4, noImpact: 0.3, watch: 240.1 } });
     expect(sameShape(a, b)).toBe(true);
   });
 
   it('notices a real change of a point or more', () => {
-    const a = shape({ heights: { change: 300, correlations: 420, observations: 260, watch: 240 } });
-    const b = shape({ heights: { change: 318, correlations: 420, observations: 260, watch: 240 } });
+    const a = shape({ heights: { change: 300, correlations: 420, observations: 260, noImpact: 0, watch: 240 } });
+    const b = shape({ heights: { change: 318, correlations: 420, observations: 260, noImpact: 0, watch: 240 } });
     expect(sameShape(a, b)).toBe(false);
   });
 
   it('notices a row HEIGHT change, which moves a bubble', () => {
-    expect(sameShape(shape(), shape({ rows: { correlations: [90, 74, 74, 74], observations: [96, 118, 96], watch: [58, 58] } }))).toBe(false);
+    expect(sameShape(shape(), shape({ rows: { correlations: [90, 74, 74, 74], observations: [96, 118, 96], noImpact: [], watch: [58, 58] } }))).toBe(false);
   });
 
   it('notices a row being added or removed', () => {
-    expect(sameShape(shape(), shape({ rows: { correlations: [74, 74, 74], observations: [96, 118, 96], watch: [58, 58] } }))).toBe(false);
+    expect(sameShape(shape(), shape({ rows: { correlations: [74, 74, 74], observations: [96, 118, 96], noImpact: [], watch: [58, 58] } }))).toBe(false);
   });
 
   it('ignores a sub-point wobble in a row height too', () => {
-    expect(sameShape(shape(), shape({ rows: { correlations: [74.2, 73.8, 74, 74.1], observations: [96, 118.3, 95.7], watch: [58, 58] } }))).toBe(true);
+    expect(sameShape(shape(), shape({ rows: { correlations: [74.2, 73.8, 74, 74.1], observations: [96, 118.3, 95.7], noImpact: [], watch: [58, 58] } }))).toBe(true);
   });
 
   it('notices a row count change even when every height held', () => {

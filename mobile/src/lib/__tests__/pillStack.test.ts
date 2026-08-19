@@ -1,7 +1,7 @@
 /**
  * The pill stack's ordering.
  *
- * Four overlays share one spot above the tab bar and they are not equally urgent, so
+ * Five overlays share one spot above the tab bar and they are not equally urgent, so
  * they stack. The ordering is what is worth pinning: a mistake here shows up as an
  * urgent, time-sensitive pill hidden behind a permanent button.
  */
@@ -11,13 +11,20 @@ import {
 
 describe('ranking', () => {
   it('puts the transient pills above the waiting ones', () => {
-    // Watch sync and health imports are time-sensitive; what's new waits
-    // indefinitely; the Insights button is permanent furniture on its own tab.
-    expect([...PILL_RANK]).toEqual(['watchSync', 'health', 'whatsNew', 'ai']);
+    // A minimized reading is a measurement in progress the user set aside on
+    // purpose, so it outranks everything; watch sync and health imports are
+    // time-sensitive; what's new waits indefinitely; the Insights button is
+    // permanent furniture on its own tab.
+    expect([...PILL_RANK]).toEqual(['hrv', 'watchSync', 'health', 'whatsNew', 'ai']);
   });
 
   it('is depth 0 for everything while nothing is claimed', () => {
     PILL_RANK.forEach((k) => expect(depthOf(k, [])).toBe(0));
+  });
+
+  it('keeps a reading in front of every other pill', () => {
+    expect(depthOf('hrv', ['hrv', 'watchSync', 'health', 'whatsNew'])).toBe(0);
+    expect(depthOf('watchSync', ['hrv'])).toBe(1);
   });
 
   it('recedes the lower layers when a higher one claims', () => {

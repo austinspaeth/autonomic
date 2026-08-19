@@ -130,14 +130,24 @@ function EvidenceChart({ series, good }: { series: DetailSeries; good: boolean }
  * is — rather than a second rendering of it, so the type scale, the tiles and the
  * confidence strip cannot drift between the card and the sheet it opens.
  */
-function Body({ title, headline, tiles, pips, confidence, good, series, footer }: {
-  title: string;
+interface BodyFinding {
   headline: string;
   tiles: FindingTile[];
   pips: number;
   confidence: string;
   good: boolean;
   series: DetailSeries | null;
+}
+
+function Body({ title, findings, footer }: {
+  title: string;
+  /**
+   * Strongest first. A driver that moved several outcome families opens as ONE
+   * sheet stacking every finding — each wearing the same card + evidence chart a
+   * lone finding gets — because "quercetin helps three things" is one story and
+   * three separate sheets would make the reader reassemble it.
+   */
+  findings: BodyFinding[];
   footer?: React.ReactNode;
 }) {
   const p = usePalette();
@@ -146,19 +156,23 @@ function Body({ title, headline, tiles, pips, confidence, good, series, footer }
       {/* Held clear of the sheet's own close button, which sits over the top-right
           corner of this block. */}
       <Text style={{ color: p.text, fontSize: 19, fontWeight: '800', letterSpacing: -0.3, maxWidth: '82%', marginBottom: 14 }}>{title}</Text>
-      {/* No title and no help dot: the sheet's own title names the thing one line
-          above, and the card the user tapped to get here already carried the "?".
-          So the card opens on the finding. `surface2` because the sheet's own
-          background is `surface`. */}
-      <FindingCard
-        bg={p.surface2}
-        headline={headline}
-        tiles={tiles}
-        pips={pips}
-        confidence={confidence}
-        good={good}
-      />
-      {series ? <EvidenceChart series={series} good={good} /> : null}
+      {findings.map((f, i) => (
+        <View key={i} style={i > 0 ? { marginTop: 6 } : undefined}>
+          {/* No title and no help dot: the sheet's own title names the thing one line
+              above, and the card the user tapped to get here already carried the "?".
+              So the card opens on the finding. `surface2` because the sheet's own
+              background is `surface`. */}
+          <FindingCard
+            bg={p.surface2}
+            headline={f.headline}
+            tiles={f.tiles}
+            pips={f.pips}
+            confidence={f.confidence}
+            good={f.good}
+          />
+          {f.series ? <EvidenceChart series={f.series} good={f.good} /> : null}
+        </View>
+      ))}
       {footer}
     </View>
   );
@@ -173,27 +187,38 @@ function Body({ title, headline, tiles, pips, confidence, good, series, footer }
  * the gap between them — the same three numbers the change card shows, asking the
  * same question of a standing association rather than of an event.
  */
-export function CorrelationSheet({ c, series }: { c: Correlation; series: DetailSeries | null }) {
+export function CorrelationSheet({ findings }: { findings: { c: Correlation; series: DetailSeries | null }[] }) {
   const p = usePalette();
-  const def = TREND_METRICS[c.outcome];
-  const color = c.good ? GOOD : p.accent;
+  const list = findings.map((f) => f.c);
   return (
     <Body
       title="Correlation details"
-      headline={c.headline}
-      tiles={[
-        { value: def.fmt(c.low), unit: c.unit, label: c.lowLabel },
-        { value: def.fmt(c.high), unit: c.unit, label: c.highLabel, color },
-        { value: c.deltaValue, unit: c.unit, label: 'Difference', color },
-      ]}
-      pips={c.pips}
-      confidence={c.confidence}
-      good={c.good}
-      series={series}
-      // The same hand-off the full list ends with, narrowed to this one finding:
-      // the device can rank an association but cannot tell the user which confound
-      // explains it, which is the whole reason that button exists.
-      footer={<CorrelationsAiButton list={[c]} change={null} label="Get AI Insights on this correlation" />}
+      findings={findings.map(({ c, series }) => {
+        const def = TREND_METRICS[c.outcome];
+        const color = c.good ? GOOD : p.accent;
+        return {
+          headline: c.headline,
+          tiles: [
+            { value: def.fmt(c.low), unit: c.unit, label: c.lowLabel },
+            { value: def.fmt(c.high), unit: c.unit, label: c.highLabel, color },
+            { value: c.deltaValue, unit: c.unit, label: 'Difference', color },
+          ],
+          pips: c.pips,
+          confidence: c.confidence,
+          good: c.good,
+          series,
+        };
+      })}
+      // The same hand-off the full list ends with, narrowed to this driver's
+      // findings: the device can rank an association but cannot tell the user
+      // which confound explains it, which is the whole reason that button exists.
+      footer={
+        <CorrelationsAiButton
+          list={list}
+          change={null}
+          label={list.length > 1 ? 'Get AI Insights on these findings' : 'Get AI Insights on this correlation'}
+        />
+      }
     />
   );
 }
@@ -206,16 +231,18 @@ export function ChangeSheet({ change, series }: { change: BiggestChange; series:
   return (
     <Body
       title="Correlation details"
-      headline={change.headline}
-      tiles={[
-        { value: change.beforeValue, unit: change.unit, label: change.beforeLabel },
-        { value: change.afterValue, unit: change.unit, label: change.afterLabel, color },
-        { value: change.changeValue, unit: change.changeUnit, label: 'Change', color },
-      ]}
-      pips={change.pips}
-      confidence={change.confidence}
-      good={change.good}
-      series={series}
+      findings={[{
+        headline: change.headline,
+        tiles: [
+          { value: change.beforeValue, unit: change.unit, label: change.beforeLabel },
+          { value: change.afterValue, unit: change.unit, label: change.afterLabel, color },
+          { value: change.changeValue, unit: change.changeUnit, label: 'Change', color },
+        ],
+        pips: change.pips,
+        confidence: change.confidence,
+        good: change.good,
+        series,
+      }]}
     />
   );
 }

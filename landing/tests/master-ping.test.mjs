@@ -42,6 +42,36 @@ const SUB = {
   [T(0)]: { [T(10)]: 1 },    // bought on its D10, past the trial
 };
 
+/* Activations — the first HRV reading an install ever saves, one per install
+   ever, and each carrying the sensor it used. Cohort A (10 installs) activates
+   6 on its own day 0 and 2 more the next day, so "on day 0" and "by D1" are
+   different numbers over the same cohort — which is the whole point of the
+   pair. Cohort Z activated 4 of its 8 on day 0, all on the camera. B is too
+   young for anything past D1 and activates 1. */
+const ACT = {
+  [T(10)]: { [T(10)]: { F: 4 } },
+  [T(4)]: { [T(4)]: { W: 3, B: 1, F: 2 } },
+  [T(3)]: { [T(4)]: { B: 2 }, [T(3)]: { F: 1 } },
+};
+
+/* Activation rows carry a method letter as well as a platform one; the same
+   iOS-takes-the-odd-half split keeps the platform arithmetic identical. */
+const shapeAct = (map) => Object.keys(map).sort().map((day) => ({
+  day,
+  total: Object.values(map[day]).reduce((a, m) => a + Object.values(m).reduce((x, y) => x + y, 0), 0),
+  cohorts: Object.keys(map[day]).sort().reduce((rows, cohort) => rows.concat(
+    Object.keys(map[day][cohort]).sort().reduce((out, method) => out.concat(
+      split(map[day][cohort][method]).map(([platform, count]) => ({
+        cohort,
+        cohortDate: cohort.slice(5, 7) + cohort.slice(8, 10) + cohort.slice(2, 4),
+        platform,
+        method,
+        count,
+      })),
+    ), []),
+  ), []),
+}));
+
 /* Each cohort day arrives as it does from the counter: one row per platform,
    iOS taking the odd half. The totals are unchanged by the split, which is the
    point — every hand-worked number below still has to come out the same. */
@@ -92,7 +122,7 @@ window.fetch = (url, opts) => {
       ui: { view: 'timeline' },
     });
   }
-  if (body.action === 'PINGS') return reply({ since: body.payload.since, open: shape(OPEN), sub: shape(SUB) });
+  if (body.action === 'PINGS') return reply({ since: body.payload.since, open: shape(OPEN), sub: shape(SUB), act: shapeAct(ACT) });
   return reply({ ok: true });
 };
 
@@ -137,7 +167,7 @@ const tiles = {};
     };
   });
 });
-check('fourteen KPI tiles', Object.keys(tiles).length === 14, Object.keys(tiles).join(' | '));
+check('seventeen KPI tiles', Object.keys(tiles).length === 17, Object.keys(tiles).join(' | '));
 
 /* T(0) is 1 + 2 + 1 pings, which the fixture splits 3 iOS / 1 Android. The
    tile is what tells Austin which store phoned home; the numbers above it are
@@ -228,6 +258,38 @@ check('and splits that day by store too', /iOS 1/.test(todaySplit) && /Android 0
 check('D7 conversion is 0% over the one eligible cohort',
   tiles['Conversion by D7'].value === '0.00%', tiles['Conversion by D7'].value);
 check('D30 conversion is unavailable', tiles['Conversion by D30'].value === '–', tiles['Conversion by D30'].value);
+
+/* ---------------------------------------------------------- activation */
+
+/* Fixture arithmetic, by hand.
+   Cohorts measurable: Z (8, born T-10), A (10, born T-4), B (4, born T-3).
+   Activations on each cohort's own day 0: Z 4, A 6, B 1 → 11 of 22 = 50%.
+   By D1, A picks up 2 more (T-3 row) → 13 of 22 = 59.09%.
+   By D7 only Z is old enough: 4 of 8 = 50%.
+   Methods across the range: W 3, B 3, F 7 — but the range is anchored to the
+   newest ping day and clipped to the counter's first, so Z's day-0 row (T-10)
+   is inside a 30-day window and all 13 are counted. */
+const actToday = tiles[Object.keys(tiles).find((k) => k.startsWith('First readings on'))];
+check('an activation tile covers the newest day only', actToday && actToday.value === '0', actToday && actToday.value);
+check('activation on day 0 is measured over every cohort',
+  tiles['Activated on day 0'].value === '50.0%', tiles['Activated on day 0'].value);
+check('and D7 activation only over the cohort old enough for it',
+  tiles['Activated by D7'].value === '50.0%', tiles['Activated by D7'].value);
+check('D7 activation says how many cohorts were too young',
+  /2 cohorts too young to count/.test(tiles['Activated by D7'].meta), tiles['Activated by D7'].meta);
+
+const actRates = $('pgActivationRates').textContent;
+check('the activation card repeats the rates with their denominators',
+  /Activated on day 0/.test(actRates) && /59\.1%/.test(actRates), actRates.slice(0, 200));
+
+const methodNote = $('pgMethodNote').textContent;
+check('the method note counts every activation in range',
+  /13 first readings/.test(methodNote), methodNote);
+check('and says the Apple Watch share is a share of everyone while combined',
+  /never offered it/.test(methodNote), methodNote);
+check('the method chart drew a band per sensor used',
+  $('pgMethods').querySelectorAll('path[fill]:not([fill="none"])').length >= 3,
+  String($('pgMethods').querySelectorAll('path').length) + ' paths');
 
 /* ----------------------------------------------------------- boundaries */
 

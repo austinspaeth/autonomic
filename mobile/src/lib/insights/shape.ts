@@ -13,13 +13,13 @@
  */
 
 /** Per-card measured height in points, or 0 when this install has never shown it. */
-export type CardHeights = Record<'change' | 'correlations' | 'observations' | 'watch', number>;
+export type CardHeights = Record<'change' | 'correlations' | 'observations' | 'noImpact' | 'watch', number>;
 
-export const HEIGHT_KEYS = ['change', 'correlations', 'observations', 'watch'] as const;
+export const HEIGHT_KEYS = ['change', 'correlations', 'observations', 'noImpact', 'watch'] as const;
 
-/** The three cards that hold rows. */
-export type RowKey = 'correlations' | 'observations' | 'watch';
-export const ROW_KEYS = ['correlations', 'observations', 'watch'] as const;
+/** The four cards that hold rows. */
+export type RowKey = 'correlations' | 'observations' | 'noImpact' | 'watch';
+export const ROW_KEYS = ['correlations', 'observations', 'noImpact', 'watch'] as const;
 /**
  * Measured height of EACH bubble row, per list card. Empty when never shown.
  *
@@ -34,6 +34,7 @@ export interface InsightsShape {
   change: boolean;
   correlations: number;
   observations: number;
+  noImpact: number;
   watch: number;
   /**
    * What each card actually MEASURED last time it rendered.
@@ -58,8 +59,8 @@ export interface InsightsShape {
   rows: RowHeights;
 }
 
-export const ZERO_HEIGHTS: CardHeights = { change: 0, correlations: 0, observations: 0, watch: 0 };
-export const ZERO_ROWS: RowHeights = { correlations: [], observations: [], watch: [] };
+export const ZERO_HEIGHTS: CardHeights = { change: 0, correlations: 0, observations: 0, noImpact: 0, watch: 0 };
+export const ZERO_ROWS: RowHeights = { correlations: [], observations: [], noImpact: [], watch: [] };
 
 /** No single row is taller than this. */
 export const MAX_ROW_H = 220;
@@ -69,7 +70,7 @@ export const MAX_ROW_H = 220;
 export const MAX_CARD_H = 900;
 
 /** Most rows any one card will draw, so a stored count cannot ask for hundreds. */
-export const MAX_ROWS = { correlations: 8, observations: 3, watch: 5 } as const;
+export const MAX_ROWS = { correlations: 8, observations: 3, noImpact: 3, watch: 5 } as const;
 
 /**
  * What a first-ever launch assumes.
@@ -79,10 +80,10 @@ export const MAX_ROWS = { correlations: 8, observations: 3, watch: 5 } as const;
  * over-reserving costs a little empty space for one frame while under-reserving costs
  * a visible jump. Only ever wrong once per install.
  */
-export const DEFAULT_SHAPE: InsightsShape = { change: true, correlations: 4, observations: 3, watch: 4, heights: ZERO_HEIGHTS, rows: ZERO_ROWS };
+export const DEFAULT_SHAPE: InsightsShape = { change: true, correlations: 4, observations: 3, noImpact: 0, watch: 4, heights: ZERO_HEIGHTS, rows: ZERO_ROWS };
 
 /** Nothing at all, for the locked and genuinely-empty cases. */
-export const EMPTY_SHAPE: InsightsShape = { change: false, correlations: 0, observations: 0, watch: 0, heights: ZERO_HEIGHTS, rows: ZERO_ROWS };
+export const EMPTY_SHAPE: InsightsShape = { change: false, correlations: 0, observations: 0, noImpact: 0, watch: 0, heights: ZERO_HEIGHTS, rows: ZERO_ROWS };
 
 const clamp = (v: unknown, max: number) => {
   const n = Number(v);
@@ -119,16 +120,19 @@ export function normalizeShape(raw: unknown): InsightsShape | null {
     change: !!o.change,
     correlations: clamp(o.correlations, MAX_ROWS.correlations),
     observations: clamp(o.observations, MAX_ROWS.observations),
+    noImpact: clamp(o.noImpact, MAX_ROWS.noImpact),
     watch: clamp(o.watch, MAX_ROWS.watch),
     heights: {
       change: clamp(h.change, MAX_CARD_H),
       correlations: clamp(h.correlations, MAX_CARD_H),
       observations: clamp(h.observations, MAX_CARD_H),
+      noImpact: clamp(h.noImpact, MAX_CARD_H),
       watch: clamp(h.watch, MAX_CARD_H),
     },
     rows: {
       correlations: rowList(r.correlations, MAX_ROWS.correlations),
       observations: rowList(r.observations, MAX_ROWS.observations),
+      noImpact: rowList(r.noImpact, MAX_ROWS.noImpact),
       watch: rowList(r.watch, MAX_ROWS.watch),
     },
   };
@@ -143,7 +147,7 @@ export function normalizeShape(raw: unknown): InsightsShape | null {
  */
 export const sameShape = (a: InsightsShape, b: InsightsShape) =>
   a.change === b.change && a.correlations === b.correlations
-  && a.observations === b.observations && a.watch === b.watch
+  && a.observations === b.observations && a.noImpact === b.noImpact && a.watch === b.watch
   && HEIGHT_KEYS.every((k) => Math.round(a.heights[k]) === Math.round(b.heights[k]))
   && ROW_KEYS.every((k) => sameRows(a.rows[k], b.rows[k]));
 

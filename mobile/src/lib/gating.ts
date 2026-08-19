@@ -1,30 +1,32 @@
 /**
- * Free-tier feature limits — pure logic, unit-tested (see __tests__/gating).
+ * What the free tier may do — pure logic, unit-tested (see __tests__/gating).
  *
- * The only counted limit is live HRV capture: free users get one live session
- * per day. Only in-app captures count — readings auto-imported from the
- * platform health store carry `imported: true` (src/features/Health.tsx,
- * Onboarding backfill) and must not consume the allowance, otherwise a watch
- * owner's capture button would be locked before they ever opened the app.
- * Manual entries (BP, resting HR, …) are different reading types entirely and
- * are never limited — journaling is always free.
+ * There is no longer a counted limit here, and the file is kept as the place
+ * one would go. Live HRV capture used to be capped at a session a day on the
+ * free tier and no longer is, so every tier captures as many readings as it
+ * likes. Capture is the thing this app exists to do: a user who has run out of
+ * it for the day has no reason to open the app again until tomorrow, and the
+ * cap fell hardest on the days worth measuring twice. Pro earns its price on
+ * what the app makes of the readings (full history, Insights, POTS testing and
+ * AI reports), not on rationing them.
+ *
+ * `hrvCaptureUsedToday` survives that removal because it was never only a
+ * meter: it is also the clean-day protocol's definition of "took a reading
+ * today" (src/lib/scoring/day.ts).
  */
 import type { DayRecord } from './types';
-import type { Tier } from './tier';
-
-/** Live HRV sessions a free user may capture per calendar day. */
-export const HRV_FREE_PER_DAY = 1;
 
 /** Reading types produced by the live HRV flow (src/features/hrv/Results.tsx). */
 const LIVE_HRV_TYPES = new Set(['hrv', 'breathHrv']);
 
-/** How many of today's readings were live in-app HRV captures. */
+/**
+ * How many of today's readings were live in-app HRV captures.
+ *
+ * Only in-app captures count — readings auto-imported from the platform health
+ * store carry `imported: true` (src/features/Health.tsx, Onboarding backfill),
+ * so a watch owner's protocol doesn't tick itself before they open the app.
+ */
 export function hrvCaptureUsedToday(day: DayRecord | null | undefined): number {
   if (!day || !Array.isArray(day.readings)) return 0;
   return day.readings.filter((r) => LIVE_HRV_TYPES.has(r.type) && !r.imported).length;
-}
-
-/** Whether starting another live HRV capture is allowed on this tier. */
-export function canCaptureHrv(tier: Tier, usedToday: number): boolean {
-  return tier !== 'free' || usedToday < HRV_FREE_PER_DAY;
 }

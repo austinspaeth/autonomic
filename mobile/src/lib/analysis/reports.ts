@@ -6,6 +6,7 @@
 import { addDays, dateFromKey, fmtNum, fmtTime12, keyOf } from '../dates';
 import type { AppState, CustomTypes, DayRecord, Entry } from '../types';
 import type { Downturn } from '../scoring/downturn';
+import { RECENT_DAYS as STRAIN_RECENT_DAYS, type Strain } from '../scoring/strain';
 import { blueZone, dayCleanliness, scoreSet, sleepHours, type DaysMap } from '../scoring/day';
 import { ACTIVITY_TYPES, MED_TYPES, READING_TYPES, SYMPTOM_TYPES, TRIGGER_TYPES, bmLabel, entryFields, isDivider } from '../registry';
 import { bpBce, bpKerdo, bpKvas, bpMap, bpPP, bpRobinson, hrvComposite, numOr, orthoMaxDelta, type ScoreContext } from '../scoring';
@@ -306,6 +307,56 @@ ANALYSIS REQUESTED:
 3. SICKNESS CHECK: Autonomic shifts often precede symptoms. State which specific markers in this data do or do not look like a prodromal illness pattern (for example rising resting and sleeping HR, falling HRV with no matching load, worsening despite clean behavior).
 4. WHAT TO WATCH: The 2 or 3 measurements over the next 48 to 72 hours that would best confirm or rule out your leading explanation, with the thresholds that would change the verdict.
 5. WHAT TO DO NOW: Concrete rest-first guidance for the next few days, sized to the severity above. Note explicitly when symptoms or readings would warrant contacting a doctor.
+
+DATA FOR PERIOD (${rangeText}):
+
+${render(keys, ['scores', 'hrv', 'rhr', 'bp', 'sleep', 'activities', 'triggers', 'meds', 'supplements', 'symptoms', 'digestion', 'orthostatic', 'cleanDays', 'notes'])}`,
+  };
+}
+
+/**
+ * Investigation prompt behind the STRAIN warning, the sibling of
+ * buildDownturnPrompt above.
+ *
+ * The ask is a different one, and the difference is the whole point: the score
+ * has NOT broken here, so the question is not "what explains the drop" but "is
+ * this the start of something, or is it noise". It therefore hands over a
+ * longer window (the markers are compared against a six-week baseline, so a
+ * fortnight would not contain the comparison the app made) and asks explicitly
+ * for the case AGAINST the flag as well as for it.
+ */
+export function buildStrainPrompt(state: AppState, ctx: ScoreContext, dk: string, w: Strain): { prompt: string; rangeText: string } {
+  const DAYS = 35;
+  const start = addDays(dk, -(DAYS - 1));
+  const longFmt = (k: string) => dateFromKey(k).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
+  const rangeText = `Past ${DAYS} days (${longFmt(start)} to ${longFmt(dk)})`;
+  const allKeys: string[] = [];
+  for (let i = 0; i < DAYS; i++) allKeys.push(addDays(start, i));
+  const keys = allKeys.filter((k) => state.days[k]);
+  const render = makeSectionRenderer(state, ctx);
+
+  const findings = w.signals.map((f) => `- ${f.label} (${f.value}): ${f.detail}`).join('\n');
+
+  return {
+    rangeText,
+    prompt: `You are analyzing autonomic and recovery health data logged by a person using Autonomic (autonomic.care), a personal health-tracking app for autonomic recovery. Base every observation on the data provided below. Do not assume a diagnosis, age, sex, or medical history that is not present in the data.
+
+Approach this analysis as an honest friend examining the data carefully - direct and accurate without unnecessary softening or cruelty.
+
+REQUIREMENTS: Be concise, accurate, honest, specific (use actual numbers), research-grounded, and careful with recommendations (note doctor consultation for medications, therapeutic-dose supplements, or major protocol changes). Do not use em dashes anywhere in your response; use commas, colons, parentheses, or separate sentences instead.
+
+SITUATION: The daily autonomic score has NOT fallen, but the app flagged early signs of strain on ${longFmt(dk)} (severity: ${w.severity === 'alert' ? 'high' : 'moderate'}). It compared the last ${STRAIN_RECENT_DAYS} days against the six weeks before them, using medians on each side, and found these markers moved away from this person's own baseline:
+${findings}
+
+FOCUS: Decide whether this is the early phase of a real decline or ordinary variation. Weigh the evidence both ways and say which it is.
+
+ANALYSIS REQUESTED:
+1. VERDICT FIRST: Is this a genuine early warning or noise? Give the single most likely reading of it and how confident the data supports being.
+2. THE CASE FOR: Which of the flagged markers are corroborated elsewhere in the data (HRV, resting and sleeping HR, BP, sleep duration and quality, symptoms, standing responses), and what pattern do they form together.
+3. THE CASE AGAINST: What in the data argues this is normal variation: sparse readings, a single outlier session, a known one-off exposure, measurement conditions, or a marker that has swung this far before without anything following.
+4. LIKELY DRIVERS, RANKED: Evaluate accumulated load or post-exertional response, oncoming illness, sleep debt, dehydration or low blood volume, trigger exposure, and stress. Use the actual numbers and dates.
+5. WHAT TO WATCH: The 2 or 3 measurements over the next 48 to 72 hours that would confirm or clear this, with the specific values that would change the verdict.
+6. WHAT TO DO NOW: Concrete pacing guidance sized to the severity, aimed at preventing a crash rather than treating one. Note explicitly when readings or symptoms would warrant contacting a doctor.
 
 DATA FOR PERIOD (${rangeText}):
 

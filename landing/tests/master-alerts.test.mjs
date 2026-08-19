@@ -154,6 +154,45 @@ check('a muted dashboard still shows the card', cards().length === before + 1, t
 check('and the copy pluralises what it counts', /2 new downloads/.test(text()), text());
 AL.setMuted(false);
 
+/* -------------------------------------------------------- activations */
+
+/* CONFETTI IS FOR ARRIVALS, NEVER FOR USAGE. jsdom has no canvas, so the
+   celebration is a silent no-op here either way — hand the surface a fake 2D
+   context and the code runs far enough to resize the canvas, which is the
+   observable difference between "it fired" and "it was skipped". */
+const canvasEl = $('confetti');
+const noop = () => {};
+canvasEl.getContext = () => ({
+  setTransform: noop, clearRect: noop, save: noop, restore: noop,
+  translate: noop, rotate: noop, fillRect: noop,
+  globalAlpha: 1, fillStyle: '',
+});
+canvasEl.width = 0;
+AL.setMuted(true);   // the sound is not what is under test here
+
+AL.announce({
+  visitors: 0, downloads: 0, sales: 0, activations: 3,
+  downloadsBy: {}, salesBy: {}, activationsBy: { B: 2, F: 1 },
+});
+await new Promise((r) => setTimeout(r, 30));
+check('an activation raises a card of its own', /3 first readings/.test(text()), text());
+check('and the card names the sensors those readings used',
+  /2 chest strap/.test(text()) && /1 phone camera/.test(text()), text());
+check('it is told apart from the other two by class',
+  cards().some((c) => c.classList.contains('activation')),
+  cards().map((c) => c.className).join(' | '));
+check('and it never sets off the confetti', canvasEl.width === 0, String(canvasEl.width));
+
+/* The same fake surface, so the negative above is a real one: an arrival still
+   celebrates on exactly this page. */
+AL.announce({
+  visitors: 0, downloads: 1, sales: 0, activations: 0,
+  downloadsBy: { I: 1 }, salesBy: {}, activationsBy: {},
+});
+await new Promise((r) => setTimeout(r, 30));
+check('a new install still does', canvasEl.width > 0, String(canvasEl.width));
+AL.setMuted(false);
+
 check('no page errors', errors.length === 0, errors.join(' | '));
 
 let failed = 0;

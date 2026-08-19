@@ -185,6 +185,17 @@ function SheetView({ entry, isTop, behind, closing, requestClose, onExited, clos
   const [footerH, setFooterH] = useState(0);
   const scrollRef = useRef<ScrollView>(null);
   const scrollY = useRef(0);
+  // A sheet whose content fits should not scroll. The bounce on a card that has
+  // nowhere to go reads as looseness, and on a live HRV reading it means the
+  // rings can be dragged off centre mid-breath. Measured rather than declared,
+  // so it re-decides itself as content (or the keyboard spacer) changes.
+  const [scrollable, setScrollable] = useState(true);
+  const viewH = useRef(0);
+  const contentH = useRef(0);
+  const fitCheck = () => {
+    if (!viewH.current || !contentH.current) return;
+    setScrollable(contentH.current > viewH.current + 1);
+  };
   // Live mirrors for the keyboard listener (registered once, deps [kb]).
   const footerHRef = useRef(0);
   const hasFooterRef = useRef(false); hasFooterRef.current = !!footer;
@@ -345,6 +356,9 @@ function SheetView({ entry, isTop, behind, closing, requestClose, onExited, clos
             <ScrollView
               ref={scrollRef}
               style={{ flex: 1 }}
+              scrollEnabled={scrollable}
+              onLayout={(e) => { viewH.current = e.nativeEvent.layout.height; fitCheck(); }}
+              onContentSizeChange={(_w, h) => { contentH.current = h; fitCheck(); }}
               contentContainerStyle={{ padding: 18, paddingTop: topPad, paddingBottom: footer ? Math.max(120, footerH + 20) : 24 + insets.bottom, ...(entry.opts.grow ? { flexGrow: 1 } : null) }}
               keyboardShouldPersistTaps="handled"
               // "interactive" (iOS) keeps the keyboard up while scrolling the form —

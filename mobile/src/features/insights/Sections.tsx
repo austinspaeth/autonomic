@@ -26,7 +26,7 @@ import Svg, { Circle, Path } from 'react-native-svg';
 import { Icon, type IconName } from '../../components/Icon';
 import { HelpDot } from '../../components/ui';
 import { useSheets, type SheetControls } from '../../components/Sheet';
-import { fonts, radius, usePalette } from '../../theme';
+import { GRADE_COLORS, fonts, radius, usePalette } from '../../theme';
 import { getState } from '../../store/store';
 import { useTier } from '../../store/tier';
 import { usePaywall } from '../Paywall';
@@ -34,8 +34,8 @@ import { PromptSheet } from '../PromptSheet';
 import { demoState, hasOwnData } from '../../lib/demo';
 import { resolveProtocol } from '../../lib/scoring/day';
 import { buildCorrelationsPrompt } from '../../lib/insights/prompt';
-import { INSIGHTS_HELP, VISIBLE_CORRELATIONS } from '../../lib/insights';
-import type { BiggestChange, ConfidencePart, Correlation, DataConfidence, DetailSeries, Observation, WatchItem } from '../../lib/insights';
+import { INSIGHTS_HELP, VISIBLE_CORRELATIONS, groupCorrelations } from '../../lib/insights';
+import type { BiggestChange, ConfidencePart, Correlation, DataConfidence, DetailSeries, NoImpactItem, Observation, WatchItem } from '../../lib/insights';
 import { ChangeSheet, CorrelationSheet } from './FindingSheet';
 import * as S from './style';
 
@@ -45,6 +45,7 @@ const ROW_BG = S.ROW_BG;
 /** Card descriptions, exported so ./InsightsSkeleton renders the SAME strings and
  *  the copy cannot move when the report lands. */
 export const OBS_DESC = 'Smaller patterns and gaps the app noticed while you were logging.';
+export const NO_IMPACT_DESC = 'Things you have taken long enough to test that show no measurable effect on anything tracked here. Absence of a detected effect, not proof of none.';
 export const WATCH_DESC = 'Metrics that have genuinely moved over the last month, against the month before it.';
 
 /* ---------- the card shell ---------- */
@@ -291,8 +292,15 @@ export function PairArrow() {
  * Not a button. There is no per-correlation screen to go to, and pointing the row at
  * the nearest Progress chart answered a different question than the row asked.
  */
-function CorrelationRow({ c, onLayout, onPress }: {
+function CorrelationRow({ c, moreCount, tag, onLayout, onPress }: {
   c: Correlation;
+  /** How many further findings this driver has behind the row — the rest of its
+   *  `groupCorrelations` group. Drawn as a violet "+N" pill so the row says "this
+   *  moved more than one thing" without spending a second line on it. */
+  moreCount?: number;
+  /** A one-word qualifier pill ("Early") in the quiet grey, for rows held to a
+   *  different bar than the list they resemble. */
+  tag?: string;
   onLayout?: (e: LayoutChangeEvent) => void;
   /** Opens the finding. A chevron is only drawn when this is given: on a row that
    *  goes nowhere it would be a promise the app doesn't keep. */
@@ -322,6 +330,21 @@ function CorrelationRow({ c, onLayout, onPress }: {
           <Text numberOfLines={1} style={[S.R_VALUE, { color, fontFamily: fonts.numHeavy, fontVariant: ['tabular-nums'] }]}>
             {c.deltaText}
           </Text>
+          {moreCount ? (
+            // Violet — the palette's "noticed, not graded" colour, the same one the
+            // finding chart shades factor days with. A count of further findings is
+            // neither good nor bad, so it must not borrow the delta's green/red.
+            <View style={{ backgroundColor: p.bg, borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2 }}>
+              <Text style={{ color: GRADE_COLORS.warning, fontSize: 12, fontWeight: '800', fontVariant: ['tabular-nums'] }}>
+                {`+${moreCount}`}
+              </Text>
+            </View>
+          ) : null}
+          {tag ? (
+            <View style={{ backgroundColor: p.bg, borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2 }}>
+              <Text style={{ color: p.textDim, fontSize: 11, fontWeight: '800', letterSpacing: 0.3, textTransform: 'uppercase' }}>{tag}</Text>
+            </View>
+          ) : null}
         </View>
       </View>
       {onPress ? <Icon name="chevronRight" size={16} color={p.textDim} /> : null}
@@ -340,20 +363,26 @@ export function Correlations({ list, change, detail, onRowLayout, onLayout }: {
 }) {
   const { openSheet } = useSheets();
   if (!list.length) return null;
-  const visible = list.slice(0, VISIBLE_CORRELATIONS);
-  const more = list.length > visible.length;
+  // One row per DRIVER, not per finding: a supplement that moved three metrics is
+  // one story wearing a "+2" badge, and its sheet stacks all three. The visible
+  // cap therefore counts drivers, while the button keeps the finding count —
+  // "Show all 9 correlations" is a claim about findings, and it is still true.
+  const groups = groupCorrelations(list);
+  const visible = groups.slice(0, VISIBLE_CORRELATIONS);
+  const more = groups.length > visible.length;
   return (
     // No description: the rows say what they are, and the sentence only pushed the
     // findings down the card. No "Show all" link in the title either — the count is
     // worth stating, and a full-width button at the end reads as the end of the list
     // rather than as a header control.
     <InsightCard title="Correlations" help="correlations" onLayout={onLayout}>
-      {visible.map((c, i) => (
+      {visible.map((g, i) => (
         <CorrelationRow
-          key={c.id}
-          c={c}
+          key={g[0].id}
+          c={g[0]}
+          moreCount={g.length - 1}
           onLayout={onRowLayout ? (e) => onRowLayout(i, e) : undefined}
-          onPress={() => openSheet(() => <CorrelationSheet c={c} series={detail[c.id] || null} />)}
+          onPress={() => openSheet(() => <CorrelationSheet findings={g.map((c) => ({ c, series: detail[c.id] || null }))} />)}
         />
       ))}
       {more ? (
@@ -362,6 +391,39 @@ export function Correlations({ list, change, detail, onRowLayout, onLayout }: {
           onPress={() => openSheet(() => <AllCorrelationsSheet list={list} change={change} detail={detail} />)}
         />
       ) : null}
+    </InsightCard>
+  );
+}
+
+/**
+ * The early tier: what a young journal can already hint at.
+ *
+ * Only ever rendered when the Correlations card has nothing (the engine
+ * guarantees `early` is empty otherwise), typically sitting above the
+ * days-countdown on the empty screen — a glimpse of what the screen becomes,
+ * marked as the weaker thing it is. Every row wears an "Early" pill and opens
+ * the same finding sheet a correlation does, whose confidence strip shows the
+ * single bar these are pinned to.
+ */
+export const EARLY_DESC = 'First hints from your first days of logging. These are held to a much lower bar than a correlation, and most will fade as more days arrive.';
+
+export function EarlySignals({ list, detail, onLayout }: {
+  list: Correlation[];
+  detail: Record<string, DetailSeries>;
+  onLayout?: (e: LayoutChangeEvent) => void;
+}) {
+  const { openSheet } = useSheets();
+  if (!list.length) return null;
+  return (
+    <InsightCard title="Early signals" help="early" desc={EARLY_DESC} onLayout={onLayout}>
+      {list.map((c) => (
+        <CorrelationRow
+          key={c.id}
+          c={c}
+          tag="Early"
+          onPress={() => openSheet(() => <CorrelationSheet findings={[{ c, series: detail[c.id] || null }]} />)}
+        />
+      ))}
     </InsightCard>
   );
 }
@@ -380,6 +442,9 @@ export function Correlations({ list, change, detail, onRowLayout, onLayout }: {
 function AllCorrelationsSheet({ list, change, detail }: { list: Correlation[]; change: BiggestChange | null; detail: Record<string, DetailSeries> }) {
   const p = usePalette();
   const { openSheet } = useSheets();
+  // The same grouping the card shows: this is the list continued, so a driver that
+  // was one row with a "+2" out there must not unfold into three rows in here.
+  const groups = groupCorrelations(list);
   return (
     <View>
       <Text style={{ color: p.text, fontSize: 19, fontWeight: '800', letterSpacing: -0.3 }}>All correlations</Text>
@@ -388,11 +453,12 @@ function AllCorrelationsSheet({ list, change, detail }: { list: Correlation[]; c
       <Text style={{ color: p.textDim, fontSize: 13, lineHeight: 19, marginTop: 5, marginBottom: 16, maxWidth: '82%' }}>
         {`${list.length} associations found in your own log, most trusted first. Each number is the typical difference between the two groups in that metric's own units. These are patterns, not causes.`}
       </Text>
-      {list.map((c) => (
+      {groups.map((g) => (
         <CorrelationRow
-          key={c.id}
-          c={c}
-          onPress={() => openSheet(() => <CorrelationSheet c={c} series={detail[c.id] || null} />)}
+          key={g[0].id}
+          c={g[0]}
+          moreCount={g.length - 1}
+          onPress={() => openSheet(() => <CorrelationSheet findings={g.map((c) => ({ c, series: detail[c.id] || null }))} />)}
         />
       ))}
       <View style={{ height: 16 }} />
@@ -505,6 +571,49 @@ export function WorthALook({ list, onRowLayout, onLayout }: {
           </CardRow>
         );
       })}
+    </InsightCard>
+  );
+}
+
+/* ---------- no detectable impact ---------- */
+
+/**
+ * The null results: meds and supplements that were genuinely tested and moved
+ * nothing. Rows are NOT buttons — each is a complete statement, and there is no
+ * evidence chart for an effect that isn't there. The help dot carries the two
+ * caveats the card cannot say often enough: "no detectable effect" is not
+ * "no effect", and nobody should stop a prescription over a row here.
+ */
+export function NoImpact({ list, onRowLayout, onLayout }: {
+  list: NoImpactItem[];
+  onRowLayout?: (i: number, e: LayoutChangeEvent) => void;
+  onLayout?: (e: LayoutChangeEvent) => void;
+}) {
+  const p = usePalette();
+  if (!list.length) return null;
+  return (
+    <InsightCard
+      title="No detected impact"
+      help="noImpact"
+      onLayout={onLayout}
+      desc={NO_IMPACT_DESC}
+    >
+      {list.map((item, i) => (
+        <CardRow key={item.driverKey} onLayout={onRowLayout ? (e) => onRowLayout(i, e) : undefined}>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+              <Text numberOfLines={1} style={[S.PAIR_DRIVER, { color: p.text, flexShrink: 1 }]}>{item.driver}</Text>
+              <View style={{ flex: 1 }} />
+              {/* The readout is the EVIDENCE for the null, not a judgement of it:
+                  how long, tested against how much. Dim, because there is no
+                  direction to colour. */}
+              <Text numberOfLines={1} style={{ color: p.textDim, fontSize: 12.5, fontWeight: '600', fontVariant: ['tabular-nums'] }}>
+                {item.note}
+              </Text>
+            </View>
+          </View>
+        </CardRow>
+      ))}
     </InsightCard>
   );
 }

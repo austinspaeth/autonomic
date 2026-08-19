@@ -28,11 +28,14 @@ import { WatchPrep } from './WatchPrep';
 import { HealthRrImportSheet } from './HealthImport';
 import { SOURCE_META, SourcePicker, sourceSub, type Source } from './SourcePicker';
 
+/** The sheet opener, as `useSheets()` hands it out. */
+type OpenSheet = ReturnType<typeof useSheets>['openSheet'];
+
 // The sheet's ✕ pill floats top-right; inset the title + subtitle so neither
 // runs underneath it (was clipped on narrower screens).
 const CLOSE_CLEARANCE = 58;
 
-type Kind = 'unstructured' | 'breath';
+export type Kind = 'unstructured' | 'breath';
 
 /** The two things a reading can be for. `breath` is the daily default. */
 const MODES: { val: Kind; icon: IconName; title: string; desc: string; daily?: boolean }[] = [
@@ -46,11 +49,51 @@ const MODES: { val: Kind; icon: IconName; title: string; desc: string; daily?: b
   },
 ];
 
+/**
+ * Why a source can't be used right now, as the sentence to toast, or null when
+ * it can. Bluetooth's answer is deliberately absent: an unpaired strap is not a
+ * refusal, it's a detour into the picker, which every caller handles itself.
+ */
+export function sourceBlocker(source: Source): string | null {
+  if (source === 'watch' && (Platform.OS !== 'ios' || !health().available)) {
+    return 'Apple Watch readings need an iOS build';
+  }
+  if (source === 'camera' && !ppg().available) return 'Camera readings need a device build';
+  return null;
+}
+
+/**
+ * Open the capture card a config calls for, and nothing else — no validation,
+ * no state. The watch and the camera each get a prep card that opens the
+ * session itself once it's ready; everything else opens the session directly.
+ *
+ * Shared by the HRV setup sheet and the welcome wizard's first-reading step so
+ * the two can never drift into opening different cards for the same choice.
+ */
+export function openCapture(config: SessionConfig, openSheet: OpenSheet): void {
+  // Watch readings are taken by the Mindfulness app on the wrist, so a prep
+  // card walks through getting it ready first; its Start opens the session
+  // already running.
+  if (config.source === 'watch') {
+    openSheet((c) => <WatchPrep config={config} controls={c} />);
+    return;
+  }
+  // Camera readings get a setup card first (choose the module shape, mark the
+  // flash, wait for the finger) — it opens the session card itself once the
+  // pulse locks. `grow` lets that card center the module stage vertically and
+  // bottom-pin the placement squircle above the footer.
+  if (config.source === 'camera') {
+    openSheet((c) => <CameraSetup config={config} controls={c} />, { grow: true });
+    return;
+  }
+  openSheet((c) => <HrvSession config={config} controls={c} />, { hideClose: true, grow: true });
+}
+
 /** Default signal source: the paired strap when there is one (it's the most
  *  accurate option), else the user's last deliberate pick when it's still
  *  usable, else the camera (always on hand). Bluetooth is never defaulted
  *  while unpaired — Start would just bounce off the pairing sheet. */
-function defaultSource(): Source {
+export function defaultSource(): Source {
   const s = getState().settings;
   if (s.lastBleDeviceId) return 'polar';
   const last = s.lastHrvSource;
@@ -63,7 +106,7 @@ function defaultSource(): Source {
  *  there's no picker in the sheet anymore (shared rules in src/lib/period.ts;
  *  training and baseline each get their own morning/evening; extras
  *  fall through to Other). */
-const defaultPeriodFor = (kind: Kind) => defaultPeriod(kind === 'breath' ? 'breathHrv' : 'hrv', todayKey());
+export const defaultPeriodFor = (kind: Kind) => defaultPeriod(kind === 'breath' ? 'breathHrv' : 'hrv', todayKey());
 
 export function HrvSetup({ controls }: { controls: SheetControls }) {
   const p = usePalette();
@@ -82,36 +125,15 @@ export function HrvSetup({ controls }: { controls: SheetControls }) {
       changeSource();
       return;
     }
-    if (source === 'watch' && (Platform.OS !== 'ios' || !health().available)) {
-      toast('Apple Watch readings need an iOS build');
-      return;
-    }
-    if (source === 'camera' && !ppg().available) {
-      toast('Camera readings need a device build');
-      return;
-    }
+    const blocked = sourceBlocker(source);
+    if (blocked) { toast(blocked); return; }
     // Remember the pick so the next capture defaults to it.
     if (getState().settings.lastHrvSource !== source) { getState().settings.lastHrvSource = source; save(); }
     const config: SessionConfig = { kind, source, period: defaultPeriodFor(kind), style: kind === 'breath' ? BREATH_STYLE : undefined };
-    // Watch readings are taken by the Mindfulness app on the wrist, so a prep
-    // card walks through getting it ready first; its Start opens the session
-    // already running. This sheet stays underneath so ✕ backs out to it.
-    if (source === 'watch') {
-      openSheet((c) => <WatchPrep config={config} controls={c} />);
-      return;
-    }
-    // Camera readings get a setup card first (choose the module shape, mark
-    // the flash, wait for the finger) — it opens the session card itself once
-    // the pulse locks. Like the watch prep, this sheet stays underneath so
-    // its ✕ backs out here.
-    if (source === 'camera') {
-      // `grow` lets the card center the module stage vertically and bottom-pin
-      // the placement squircle above the footer.
-      openSheet((c) => <CameraSetup config={config} controls={c} />, { grow: true });
-      return;
-    }
-    openSheet((c) => <HrvSession config={config} controls={c} />, { hideClose: true });
-    controls.close();
+    openCapture(config, openSheet);
+    // The watch and camera prep cards open over this sheet on purpose, so their
+    // ✕ backs out here; only a session that started outright replaces it.
+    if (source !== 'watch' && source !== 'camera') controls.close();
   };
 
   const srcMeta = SOURCE_META[source];

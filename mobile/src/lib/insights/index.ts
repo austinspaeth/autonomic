@@ -40,8 +40,8 @@ import type { AppState } from '../types';
 import { WELCOME_CHANGE, findBiggestChange, type BiggestChange } from './change';
 import { changeSeries, correlationSeries, type DetailSeries } from './detail';
 import { dataConfidence, type DataConfidence } from './confidence';
-import { findCorrelations, type Correlation } from './correlate';
-import { buildFactors } from './factors';
+import { EARLY_MIN_FACTOR_DAYS, findCorrelations, findEarlySignals, findNoImpact, type Correlation, type NoImpactItem } from './correlate';
+import { buildFactors, factorProgress, type FactorProgress } from './factors';
 import { buildDayMatrix } from './matrix';
 import { findObservations, type Observation } from './observations';
 import { changeSinceStart, findWatchItems, overallDirection, type Overall, type SinceStart, type WatchItem } from './watch';
@@ -49,11 +49,11 @@ import { changeSinceStart, findWatchItems, overallDirection, type Overall, type 
 export type { BiggestChange } from './change';
 export type { DetailSeries } from './detail';
 export { factorPeak, markColumn } from './detail';
-export type { Correlation } from './correlate';
+export type { Correlation, NoImpactItem } from './correlate';
 export type { Observation } from './observations';
 export type { WatchItem, Overall, OverallDirection, SinceStart } from './watch';
 export type { ConfidencePart, DataConfidence } from './confidence';
-export type { FactorDef, FactorGroup, FactorKind } from './factors';
+export type { FactorDef, FactorGroup, FactorKind, FactorProgress } from './factors';
 export type { ConfidenceLabel } from './stats';
 export { WELCOME_CHANGE } from './change';
 export { CONFIDENCE_LABELS, confidenceLabel } from './stats';
@@ -81,7 +81,7 @@ export { CONFIDENCE_LABELS, confidenceLabel } from './stats';
 export const INSIGHT_MIN_DAYS = 14;
 export { MAX_OBSERVATIONS } from './observations';
 export { MAX_WATCH_ITEMS } from './watch';
-export { MAX_CORRELATIONS, shortMetric } from './correlate';
+export { MAX_CORRELATIONS, groupCorrelations, shortMetric } from './correlate';
 export { INSIGHTS_HELP } from './help';
 
 /**
@@ -106,6 +106,25 @@ export interface InsightReport {
   demo: boolean;
   change: BiggestChange | null;
   correlations: Correlation[];
+  /**
+   * The early tier: weak-but-striking associations found at relaxed coverage
+   * floors, for a journal the main sweep has nothing to say about yet. Only
+   * ever non-empty when `correlations` is empty; each row carries `early: true`
+   * and one confidence pip, and the UI badges it. See EARLY_* in ./correlate.
+   */
+  early: Correlation[];
+  /**
+   * Types closest to becoming testable ("Magnesium · 5 of 8 days"), for the
+   * empty screen's keep-going rows. Only populated when `correlations` is empty
+   * — the situation in which the distance to the first finding is the useful
+   * thing to show.
+   */
+  progress: FactorProgress[];
+  /**
+   * Meds/supplements the user has clearly committed to, thoroughly tested, and
+   * that moved nothing — the null results worth stating. See findNoImpact.
+   */
+  noImpact: NoImpactItem[];
   /**
    * The evidence behind each finding, keyed by `Correlation.id` /
    * `BiggestChange.id`: the outcome and factor columns it was computed from.
@@ -159,7 +178,14 @@ export interface InsightReport {
  * already decided whether to hand us the user's state or the sample month and the
  * two must not disagree about what the banner says.
  */
-export function buildInsights(state: AppState, dk: string, opts: { demo?: boolean; ctx?: ScoreContext; anchor?: string | null } = {}): InsightReport {
+export function buildInsights(state: AppState, dk: string, opts: {
+  demo?: boolean;
+  ctx?: ScoreContext;
+  anchor?: string | null;
+  /** Finding ids a previous real report showed, from ./findingMemory via the
+   *  shell (./cache). See ./stability: strict to enter, looser to stay. */
+  retain?: { correlations: readonly string[]; change: string | null };
+} = {}): InsightReport {
   const started = Date.now();
   const ctx: ScoreContext = opts.ctx || {
     sex: state.profile.sex,
@@ -194,17 +220,40 @@ export function buildInsights(state: AppState, dk: string, opts: { demo?: boolea
   // is empty.
   const downturn = !!detectDownturn(state.days, dk, ctx, ctx.protocol, state.customTypes);
 
-  const correlations = findCorrelations(matrix);
+  const correlations = findCorrelations(matrix, { retain: opts.retain?.correlations });
   // On an empty journal the headline slot is the welcome card, unconditionally —
   // whatever the sample month happens to contain, the honest headline for someone
   // with no data is that they just arrived.
-  const change = opts.demo ? WELCOME_CHANGE : findBiggestChange(matrix);
+  const change = opts.demo ? WELCOME_CHANGE : findBiggestChange(matrix, { retain: opts.retain?.change });
+
+  // The early tier, only when the strict sweep came back empty (the demo month is
+  // never "early"). Its matrix is rebuilt at the relaxed factor floor, because at
+  // day eight the standard floor produces no factors at all — a second pass, but
+  // one only ever paid on a journal too small for the first to have cost anything.
   // One pass over the findings to keep the columns they were computed from. The
   // sheet must never re-extract them: a second extraction is a second chance to
   // disagree with the statistics the card is showing.
   const detail: Record<string, DetailSeries> = {};
   correlations.forEach((c) => { const s = correlationSeries(matrix, c); if (s) detail[c.id] = s; });
   if (change) { const s = changeSeries(matrix, change); if (s) detail[change.id] = s; }
+
+  let early: Correlation[] = [];
+  let progress: FactorProgress[] = [];
+  if (!opts.demo && !correlations.length) {
+    const earlyDefs = buildFactors(state, keys, { minDays: EARLY_MIN_FACTOR_DAYS });
+    const earlyMatrix = buildDayMatrix(state, keys, INSIGHT_OUTCOMES, earlyDefs, ctx);
+    early = findEarlySignals(earlyMatrix);
+    // Evidence columns from the EARLY matrix — the relaxed factors have no
+    // columns in the main one.
+    early.forEach((c) => { const s = correlationSeries(earlyMatrix, c); if (s) detail[c.id] = s; });
+    progress = factorProgress(state, keys);
+  }
+
+  // The null results: only for real journals — the demo month is a sales floor,
+  // and "this did nothing" is not a sentence to fabricate.
+  const noImpact = opts.demo ? [] : findNoImpact(matrix, {
+    correlations, early, changeFactorId: change ? change.factorId : null,
+  });
 
   const observations = findObservations({ matrix, state, dk: analysisDk });
   const watch = findWatchItems(matrix, downturn);
@@ -231,6 +280,9 @@ export function buildInsights(state: AppState, dk: string, opts: { demo?: boolea
     demo: !!opts.demo,
     change,
     correlations,
+    early,
+    progress,
+    noImpact,
     detail,
     observations,
     watch,
@@ -255,7 +307,7 @@ export function buildInsights(state: AppState, dk: string, opts: { demo?: boolea
  */
 export function emptyReport(dk: string, failed = false): InsightReport {
   return {
-    dk, demo: false, change: null, correlations: [], detail: {}, observations: [], watch: [],
+    dk, demo: false, change: null, correlations: [], early: [], progress: [], noImpact: [], detail: {}, observations: [], watch: [],
     overall: { direction: 'unknown', label: null, detail: 'not enough to compare yet' },
     since: null,
     confidence: { pct: 0, parts: [], topFix: null, daysLogged: 0 },

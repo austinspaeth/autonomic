@@ -22,6 +22,7 @@ import { logError } from '../lib/diagnostics/errorLog';
 import { migrateLegacyJournal } from '../lib/storeMigration';
 import { stampImportedHrvCoverage } from '../lib/hrvQuality';
 import { markDeclinedKeys } from '../lib/health/declined';
+import { resetFindingMemory } from '../lib/insights/findingMemory';
 import { importFingerprint } from '../lib/health/updateSet';
 import type { AppState, DayRecord, Entry } from '../lib/types';
 import {
@@ -431,6 +432,10 @@ export function replaceState(parsed: unknown, importName?: string) {
     // waveforms are best-effort — the journal itself is intact without them
   }
   if (importName) state.meta.lastImport = { name: importName, at: new Date().toISOString() };
+  // A retained Insights finding is a claim about the journal it was computed
+  // from; letting one coast at the loose bar over a different journal would
+  // break the strict-entry rule.
+  resetFindingMemory();
   save();
   // Imports are rare and irreversible-feeling — don't ride the debounce window.
   persister.flush();
@@ -446,6 +451,9 @@ export function clearAllData() {
   try { kv().clearAll(); } catch { /* the overwrite below still lands */ }
   try { wkv().clearAll(); } catch { /* strays pruned on next launch */ }
   waveCache.clear();
+  // Unlike the rest of the flags MMKV (which is about the person, not the
+  // journal), retained findings are claims about the erased data.
+  resetFindingMemory();
   state = defaultState();
   touchDays();
   // save() stamps meta.lastUpdated, which also keeps onboarding from re-firing

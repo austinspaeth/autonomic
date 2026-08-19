@@ -1,4 +1,4 @@
-import { canCaptureHrv, hrvCaptureUsedToday, HRV_FREE_PER_DAY } from '../gating';
+import { hrvCaptureUsedToday } from '../gating';
 import { blankDay } from '../migrate';
 import type { DayRecord, Entry } from '../types';
 
@@ -40,15 +40,6 @@ describe('hrvCaptureUsedToday', () => {
   });
 });
 
-describe('canCaptureHrv', () => {
-  it('caps free users at HRV_FREE_PER_DAY', () => {
-    expect(canCaptureHrv('free', 0)).toBe(true);
-    expect(canCaptureHrv('free', HRV_FREE_PER_DAY)).toBe(false);
-    expect(canCaptureHrv('free', HRV_FREE_PER_DAY + 3)).toBe(false);
-  });
-
-  it('never caps trial or pro', () => {
-    expect(canCaptureHrv('trial', 99)).toBe(true);
-    expect(canCaptureHrv('pro', 99)).toBe(true);
-  });
-});
+// There is no canCaptureHrv any more: live HRV capture is unlimited on every
+// tier. `hrvCaptureUsedToday` stays because the clean-day protocol counts a
+// reading with it (scoring/day.ts), not because anything is metered.

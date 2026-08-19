@@ -183,6 +183,42 @@ old web app so old `export.json` files import directly.
   the engine, and it sits directly under the demo banner. See
   `src/lib/__tests__/demo.test.ts`, which asserts the arc through the real scoring engine
   and the findings through the real insights engine.
+- **A live HRV reading outlives the card that shows it.** The capture engine is
+  `src/features/hrv/sessionStore.ts` (timer, BLE/PPG collection, rolling SDNN,
+  breathing clock, haptics, keep-awake) in the same module-store shape as
+  `watchSyncStore`, because the card can now be MINIMIZED into a pill and the
+  reading must not notice. `Session.tsx` is a view over it, `SessionHost.tsx`
+  (root layout, inside SheetProvider) owns the floating pill AND the hand-off to
+  the results / watch-sync sheet — a reading can finish while minimized, so the
+  card cannot be the thing that opens Results. The session is torn down when the
+  sheet stack empties again, not when the results sheet unmounts, or the session
+  card beneath would blank out mid-exit. **The breathing pace is derived from the
+  wall clock**, never animated from wherever a component mounted:
+  `src/lib/breathClock.ts` (pure + tested) answers "where in the breath are we
+  now" and both the card's rings and the pill's bars seed the same Reanimated
+  pair from it, so a minimize/restore cannot jump the pattern — a paced reading
+  whose pattern jumps is a ruined reading, not a cosmetic glitch. Minimizing closes the WHOLE sheet stack, not just the card: the
+  picker that launched the reading is still mounted underneath (WatchPrep stays
+  on purpose so its ✕ backs out there), and dismissing one card would leave the
+  user looking at a setup sheet for a reading already running. **Camera
+  readings cannot be minimized** (`canMinimize`): the finger stream is served by
+  the camera view mounted in the setup card BENEATH, and closing the stack would
+  unmount it. The pill ranks FIRST in `PILL_RANK`. Under the timer sit three live
+  cards (`LiveStats.tsx`): heart rate and SDNN sparklines drawn through a light
+  EMA, and the beat-to-beat RR trace drawn RAW because its wobble IS the
+  measurement — that trace is the card's real answer to "is this working", which
+  is why the signal-quality dot lives there. They are readouts, NOT buttons: the
+  design they came from gave each a chevron and a full chart behind it, and there
+  is no such screen. The Apple Watch source shows one honest line beside the
+  Mindfulness mark instead of three dashes, because nothing streams off the wrist.
+  The eye button is focus mode: rings, phase word and a dimmed timer on black,
+  with NOTHING moving as it toggles (the header is a FIXED height, not two rows
+  that happen to measure the same), and its own outlined Finish button inline
+  rather than the sheet's footer, which paints the sheet's surface colour. The
+  **status takes the title's slot**, as a tinted pill ("Connecting to strap…" in
+  gold, "Signal noisy" in red): "Training" never changes and the reader chose it
+  two cards ago, whereas a status line under the charts sat below the fold on a
+  small phone — the one time it mattered was the one time it was not seen.
 - **The app sends two local notifications, both owned by `src/lib/reminders.ts`.**
   (1) The morning reminder: `settings.reminder` is the source of truth and the OS
   schedule is derived, reconciled by `syncReminder()` on launch (covers reinstall, an
@@ -212,6 +248,25 @@ old web app so old `export.json` files import directly.
   stamped BEFORE it's requested, since nothing tells us whether the sheet
   appeared. `<ReviewPrompt/>` (root layout) owns the "calm moment" half: sheet
   stack empty, app foreground, 25s after launch, 4s after a journal change.
+- **Capture is never metered; Pro is what the app makes of the readings.**
+  The freemium line runs between *taking* a measurement and *analysing* it.
+  Free forever, with no cap: journaling, manual readings, the daily score and
+  Outlook, backups/export, the Apple Watch HR monitor, and **live HRV capture
+  as often as the user likes** (strap, camera or watch). Pro: Progress
+  week/month/year (free clips at the 14-day Day view), full historical metric
+  analysis, the whole Insights tab, live POTS captures + watch POTS rows
+  (`relay.pro` in `src/lib/watch/receiver.ts`), and the AI report cards. Live
+  HRV capture WAS capped at one a day on the free tier and no longer is (1.25):
+  a user who has run out of the thing the app exists to do has no reason to
+  open it again until tomorrow, and the cap taught them to stop measuring on
+  exactly the days worth measuring twice. So `src/lib/gating.ts` now holds no
+  limit at all — only `hrvCaptureUsedToday`, which survives because the
+  clean-day protocol counts a reading with it. **Nothing in the paywall,
+  Settings, the Free-vs-Pro sheet, `store-listing.md` or the landing page's
+  pricing table may promise unlimited capture as a Pro benefit**; those five
+  places state the same boundary and drift apart silently if one moves.
+  Reactive only: `usePaywall()` is raised by tapping a locked thing, never on
+  launch (`SubscriptionGate` is long gone).
 - **Every offer the app raises on its OWN initiative goes through
   `src/lib/upsell/`.** Same split as the review module: `eligibility.ts` is pure
   (`nextUpsell`, unit-tested), `index.ts` is the shell over the plaintext
@@ -285,8 +340,8 @@ old web app so old `export.json` files import directly.
   fix cannot otherwise reach phones already holding one, and an OTA update would
   leave the old wording on the Journal for a day and its subject retired for a
   month. A bump discards the stored memory wholesale.
-- **The downturn card and the Trend card are the same object.** `DownturnWarning`
-  (`src/features/DaySummary.tsx`) was tinted in the severity colour with a
+- **The downturn card and the Trend card are the same object.** `WarningCard`
+  (`src/features/DaySummary.tsx`, once `DownturnWarning`) was tinted in the severity colour with a
   title over a "Down 8 points over the last 3 days" readout — the loudest thing
   on a screen someone opens while already feeling bad, and a different kind of
   notice from the good news directly below it. Both are now a neutral surface
@@ -296,6 +351,29 @@ old web app so old `export.json` files import directly.
   separate field from `title` because `title` still feeds the crash notification
   in `src/lib/reminders.ts`. The explain SHEET keeps the colour; that is where
   the user went looking for it.
+- **TWO detectors feed that one card, and the second one fires before the score
+  does.** `detectDownturn` asks whether the daily score is sliding, which catches
+  a crash only once it has reached the number. `src/lib/scoring/strain.ts` (pure
+  + tested) asks the earlier question: heart-rate recovery after a workout
+  (`hr60` against the session peak), legs-up low HR, resting HR, overnight low
+  HR, standing HR rise, symptom load — each a MEDIAN over the last 7 days against
+  that user's own previous 42, never a textbook range, because this population
+  runs "abnormal" numbers every day of the week and only the move away from their
+  own normal means anything. The design problem is restraint, not sensitivity: a
+  card that fires on one wobbling marker is one the user learns to ignore, so it
+  takes **two distinct signals and a combined weight of 3** (weight 2 is reserved
+  for a move that could lead on its own, and even that needs a second signal),
+  every window enforces its own coverage bar, at least one signal must be a
+  MEASUREMENT (heavy activity is context and never carries the card), and it is
+  suppressed on an Excellent day so it can never argue with the Outlook directly
+  above it. The downturn wins when both would fire — one warning card, ever.
+  It is deliberately quieter: it does NOT fire the crash notification (a push is
+  the loudest thing the app does and this is a caution), but it DOES suppress the
+  annual/founder offers and the review ask, since nothing is sold to somebody the
+  Journal just told to rest. Its sheet shares `WarnTile` / `InvestigateButton` /
+  `RestNote` with the downturn's and lists each marker beside its own baseline;
+  `buildStrainPrompt` asks the AI for the case AGAINST the flag as well as for
+  it, because the question here is "early warning or noise".
 - **"What is linked to what?" is `src/lib/insights/`, and every guard in it is
   load-bearing.** One entry point, `buildInsights(state, dk)`, returns the whole
   Insights view: the headline change, ranked correlations, heuristic observations,
@@ -360,6 +438,31 @@ old web app so old `export.json` files import directly.
   `autonomic.flags` MMKV, readable straight out of a simulator's container. The demo
   month's correlations all read ~1.00 for a structural reason documented in `demo.ts`,
   not a bug.
+  Five later additions, each with its own guard: **water is a factor, never an
+  outcome** (`waterIntake` is a fourth `CORRELATION_OUTCOMES` exclusion — drinking is
+  a behavior, so "drug X → +0.5 L water" was backwards; water keeps its Trend Watch
+  row). **Findings have hysteresis** (`stability.ts` pure + `findingMemory.ts` flags
+  MMKV, wired in `cache.ts` so the engine stays pure): strict to ENTER (BH at
+  `FDR_Q`), and once shown a finding is retained while raw `p ≤ RETAIN_P` and the
+  clinical bars hold, with pips computed from its current q so confidence honestly
+  sags — this is what stops a strong claim vanishing overnight because the BH family
+  re-formed. The memory resets on import/Clear-all (a retained claim is about THIS
+  journal) and demo builds never touch it. **One row per driver**: `Correlation`
+  carries `driverKey`, `groupCorrelations` folds the list, the row wears a violet
+  "+N" pill and the sheet stacks every member's card + evidence chart. **An early
+  tier** (`findEarlySignals`, run ONLY when the strict list is empty, on a matrix
+  rebuilt at `EARLY_MIN_FACTOR_DAYS`): relaxed coverage, much higher evidence bar
+  (`|r| ≥ 0.5`, raw p, BH at `EARLY_FDR_Q`), pinned to one pip and badged "Early" —
+  measured against 14-day noise journals like `FDR_Q`, bound pinned in the tests.
+  Beside it, `factorProgress` feeds the empty screen's "Almost testable" rows
+  ("Magnesium · 5 of 8 days"). **A "No detected impact" card** (`findNoImpact`,
+  meds/supplements only, ≥21 days on / ≥14 off / ≥5 outcomes genuinely tested, zero
+  findings of any tier for the driverKey) sits between Worth a look and Trend Watch —
+  it is a skeleton card, so its key runs through the whole `shape.ts` list. And the
+  tab bar shows a violet **unseen-findings dot** (`insights/seen.ts` ids +
+  `store/insightsBadge.ts` external store, refreshed by a wrapped deferred build from
+  the root layout, stamped seen on screen focus; fresh installs stamp silently, the
+  `whatsNewSeen` rule).
 - **Insights wears Progress's card grammar, not its own.** Each section is ONE
   card (`InsightCard` in `src/features/insights/Sections.tsx`) holding its title,
   a `HelpDot`, an optional plain-language sentence, and then its rows as inset
@@ -497,15 +600,47 @@ old web app so old `export.json` files import directly.
   fires on a calmer open rather than being wasted. `<AnnualOfferCard/>` renders
   it under the Journal's Outlook, accordion-collapsible with no ✕ (it expires on
   its own), and stamps the shared pacing clock via `noteAnnualOfferPacing()`.
+- **The founding-member offer is the other one, and it lives for a single day.**
+  `src/lib/upsell/founder.ts` (pure + tested) + `founderMemory.ts` (flags MMKV),
+  rendered by `<FounderOfferCard/>` under the Journal's Outlook. It fires on the
+  first launch AFTER three days carrying the user's OWN entries (`engagedBefore`
+  reuses `engagedDayCount`, so a health-store backfill is not three days of use)
+  and ONLY while the install trial is still running — day four of a fourteen-day
+  trial is a user who has just been convinced, where the annual card above is
+  aimed at one whose access lapsed months ago, which is why the two can never be
+  due on the same day and why this one grants no extra unlock. The day it claims
+  is its whole life: `shownDk` is stamped once, the card renders only while
+  `shownDk === todayKey()`, and the ✕ or the grey "No thanks" sets `dismissed`
+  permanently. Because of that single day, a bad day DEFERS rather than spends
+  it — a crash-alert day, a downturn or an open sheet simply leaves the offer
+  due, where every other surface would suppress and move on. The card says
+  "Today only" out loud, since an offer that quietly expires reads as a bug the
+  next morning. On iOS it sells `YEARLY_SKU`, discounted by the
+  `annual_founder_first_year` **introductory** offer, which Apple applies on its
+  own — so an eligible user meets the same price on the ordinary paywall, and
+  the yearly plan can no longer carry a store-side free trial (one intro offer
+  per SKU). Android has no such offer id and reuses `PROMO_YEARLY_SKU`. **Every
+  number in the copy is derived from the two prices the store returned**
+  (`introPriceOf` + `discountPct`, which parses comma-decimal and grouped
+  currencies): the "30% off" claim and the "first year, then" clause both vanish
+  when StoreKit says this user isn't eligible, rather than being hardcoded from
+  the App Store Connect setup. `STORE_SETUP.md` Part 7.
 - **The only thing the app sends anywhere is an anonymous cohort ping.**
   `src/store/ping.ts` (shell) over `src/lib/ping.ts` (pure + tested) GETs
-  `api.autonomic.care/ping/open/D{MMDDYY}{P}` on launch and on foreground, and
-  `/ping/sub/D{MMDDYY}{P}` once the store reports an entitlement. The path
+  `api.autonomic.care/ping/open/D{MMDDYY}{P}` on launch and on foreground,
+  `/ping/sub/D{MMDDYY}{P}` once the store reports an entitlement, and
+  `/ping/act/D{MMDDYY}{P}{M}` the first time an HRV reading is ever SAVED
+  (`pingActivation` from `features/hrv/Results.tsx`, once per install ever).
+  That third route carries one extra letter for the sensor — `W` watch, `B`
+  Bluetooth strap, `F` finger on camera — because "did onboarding work" and
+  "with what" are the same question. Activation fires on the SAVE, never on the
+  start of a capture: an abandoned session is the opposite of an activation. The path
   segment is the day this install FIRST ran (read from `trialStartedAt`, then
   frozen in its own flag) plus ONE letter for the platform (`I` iOS / `A`
   Android / `U` unknown, which is also how the server reads the missing letter
   older builds send); the server stamps the arrival day, so a row is
   (cohort day, platform, arrival day) → count, which is retention per store.
+  An activation row is (cohort day, platform, method, arrival day) → count.
   There is no device id, no install id, no body, no health data — which is
   exactly why the server can't
   de-duplicate and the CLIENT must: one open ping per install per **US Eastern**
@@ -518,16 +653,25 @@ old web app so old `export.json` files import directly.
   since nobody paid there. Failures are silent and NOT sent to `logError` —
   being offline is a phone's normal state, and it would flush the 40-entry
   support log. Storage is **one DynamoDB row per day** holding a map of
-  cohort+platform → count (`PK PING#OPEN`, `SK 2026-08-21`,
-  `cohorts: { '082126I': 12 }`) — a map, not a list, because the nested bump is
+  cohort+platform(+method) → count (`PK PING#OPEN` / `PING#SUB` / `PING#ACT`,
+  `SK 2026-08-21`, `cohorts: { '082126I': 12 }`, activations `'082126IB'`) — a map, not a list, because the nested bump is
   atomic and appending to a list would lose concurrent pings.
   Read it back with `GET /ping/report?key=`
   (shared key, `PING_REPORT_KEY`, injected by CodeBuild from SSM) or the `PINGS`
   action on the authenticated `/master` API; both return
-  `{ day, total, cohorts: [{ key, cohortDate, cohort, platform, count }] }`
-  rows. The `/master` dashboard renders them in its **App usage** view (`landing/master/`, tested by
-  `landing/tests/master-ping.test.mjs`). Details in `sls/README.md` and
-  `MASTER_DASHBOARD.md`.
+  `{ day, total, cohorts: [{ key, cohortDate, cohort, platform, method, count }] }`
+  rows under `open` / `sub` / `act` (`method` is null outside activations). The
+  `/master` dashboard renders them in its **App usage** view (`landing/master/`,
+  tested by `landing/tests/master-ping.test.mjs`): activation gets its own tiles
+  (*Activated on day 0* / *Activated by D7*), an **Activation** card and a
+  **How the first reading is taken** card, with `A.activation` obeying the same
+  "immature is not zero" rule as every other rate there. It is also announced as
+  a live alert card (`landing/master/alerts.js`) — **confetti is for ARRIVALS,
+  never for usage**, so downloads and sales keep the canvas and an activation
+  gets the card, toast and notification without it. A stored alert baseline
+  written before the counter existed announces no activations at all, or the
+  first refresh after the deploy would report the whole back catalogue as news.
+  Details in `sls/README.md` and `MASTER_DASHBOARD.md`.
 - **Home-screen widgets render one shared JSON payload** built by
   `buildWidgetPayload()` (`src/lib/widgets.ts`, pure — unit-tested) and pushed by
   `initWidgetSync()` on launch, debounced journal changes, and foreground. iOS:
@@ -548,7 +692,8 @@ old web app so old `export.json` files import directly.
   `protocolCriteria` into `payload.protocol`). Deep links point at the Journal tab
   (query param, not a path, so expo-router never hits an unmatched route), handled by
   `useCaptureDeepLink()` in `src/features/forms.tsx`: `autonomic://?capture=hrv`
-  opens HRV capture behind the freemium gate; `autonomic://?open=protocol` scrolls to
+  opens HRV capture (no tier check: capture is unlimited on every tier);
+  `autonomic://?open=protocol` scrolls to
   the Progress streak card and opens it expanded (`requestExpandProtocol` /
   `scrollJournalToSection('protocol')` in `src/store/nav.ts`).
 - **"What's new" is announced once per `x.x` release, and never wins the pill
@@ -623,12 +768,36 @@ old web app so old `export.json` files import directly.
   `state.hiddenTypes`, only while unused — `typeInUse` guards). Custom defs are
   pure JSON (no summary/detail functions) so they survive export/import. UI code
   must resolve types through `typesFor(state, kind)`, never the raw registry maps.
+- **The welcome wizard ends in an action, and the Journal holds the ask until
+  it happens.** The last step of `src/features/Onboarding.tsx` is "Take your
+  first HRV reading": the logo squiggle, one choice (which sensor, seeded by the
+  HRV sheet's own `defaultSource`), the reminder card, and a primary that
+  finishes the wizard and opens the capture over the LIVE Journal — the fade
+  runs first, the sheet stack lives in the root layout, so the reading is never
+  taken on top of an overlay that is about to disappear. It commits to a
+  **baseline**, never training: paced breathing is a thing to graduate to.
+  Picking the strap with nothing paired detours into `DevicesScreen`, the same
+  rule `HrvSetup.start` follows; `openCapture` / `sourceBlocker` /
+  `defaultSource` are exported from `features/hrv/Setup.tsx` so the wizard and
+  the setup sheet cannot open different cards for the same choice. Skipping is
+  allowed and lands on `<BaselineWaitingCard/>` (`features/DaySummary.tsx`),
+  which takes the Autonomic Outlook's whole slot — **no score is shown until
+  there is a first reading** (`hasHrvReading` in `lib/hrvQuality.ts`, so an
+  untrusted short import can't retire it). It wears the Outlook's own
+  `GradientBorderCard` lit from the top RIGHT (`corner`), so it reads as the
+  same object in the same slot and legibly not the score, and its three
+  placeholder tiles are skeletons rather than checkboxes: the claim is "these
+  are empty", not "here are your chores". No dismiss — it is the only route
+  back, and it retires itself the moment a reading lands.
 - **All logged sections share one pattern**: a section lists the day's entries;
   "+ Add" opens a `TypePicker` (or the bespoke `ReadingPicker`, which also offers
   Live HRV) of registry types; choosing one stacks its `EntryForm` to capture
   fields. See `src/features/forms.tsx` and `src/features/JournalSections.tsx`.
 - **Sheets are bottom sheets that stack iOS-style** via `useSheets` /
-  `src/components/Sheet.tsx` (`openSheet`, `closeSheet`, `closeAll`). The stack is
+  `src/components/Sheet.tsx` (`openSheet`, `closeSheet`, `closeAll`). A sheet
+  whose content FITS does not scroll — content and viewport heights are measured
+  and `scrollEnabled` follows, so the bounce on a card with nowhere to go is gone
+  (on a live HRV reading it let the breathing rings be dragged off centre). The stack is
   one RN **Modal**, which paints above every sibling of `SheetProvider` — including
   `ToastProvider`, which wraps it. So **`toast()` is invisible from inside a
   sheet**: a failure path that only calls it looks to the user like the tap did

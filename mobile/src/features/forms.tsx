@@ -28,7 +28,6 @@ import { splitWaveform } from '../lib/waveforms';
 import { defaultTimeFor, fmtTime12, todayKey, uid } from '../lib/dates';
 import { getTier } from '../store/tier';
 import { requestExpandProtocol, scrollJournalToSection } from '../store/nav';
-import { canCaptureHrv, hrvCaptureUsedToday } from '../lib/gating';
 import { usePaywall } from './Paywall';
 import { defaultPeriod } from '../lib/period';
 import { useToast } from '../components/Toast';
@@ -221,8 +220,8 @@ function softTint(hex: string): string {
  *  neutral grey. HRV kinds are live-capture only, so the manual list starts at
  *  Blood Pressure. On a past day the live-only captures (HRV, stand test)
  *  disappear — a live reading can only belong to the day it happens. */
-function ReadingPicker({ isToday, hrvLocked, potsLocked, onLocked, onLive, onPick }: {
-  isToday: boolean; hrvLocked?: boolean; potsLocked?: boolean; onLocked?: () => void;
+function ReadingPicker({ isToday, potsLocked, onLocked, onLive, onPick }: {
+  isToday: boolean; potsLocked?: boolean; onLocked?: () => void;
   onLive: () => void; onPick: (type: string) => void;
 }) {
   const p = usePalette();
@@ -236,14 +235,14 @@ function ReadingPicker({ isToday, hrvLocked, potsLocked, onLocked, onLive, onPic
   // The two POTS captures lead the manual list (the stand test is live-only but
   // stays in, pointing at the watch app); BP and resting HR follow.
   const manual = isToday ? ['standTest', 'orthostatic', 'bp', 'restingHr'] : ['orthostatic', 'bp', 'restingHr'];
-  // Freemium locks: the HRV row once today's free capture is used, and the
-  // live-only stand test on the free tier (the episode row stays — its manual
-  // entry path is free). Locked rows dim, swap the chevron for a lock, and
-  // raise the paywall.
-  const lockFor = (t: string) => (t === 'hrv' ? !!hrvLocked : t === 'standTest' ? !!potsLocked : false);
+  // One freemium lock left here: the live-only stand test on the free tier (the
+  // episode row stays — its manual entry path is free). HRV capture is unlimited
+  // on every tier. Locked rows dim, swap the chevron for a lock, and raise the
+  // paywall.
+  const lockFor = (t: string) => (t === 'standTest' ? !!potsLocked : false);
   const readingRow = (t: string) => ({ key: t, title: pickerLabel(t), sub: subFor[t] || '', icon: READING_TYPES[t].icon as string, tint: lockFor(t) ? p.textDim : tintFor(t), locked: lockFor(t), onPress: () => (lockFor(t) ? onLocked?.() : onPick(t)) });
   const rows: { key: string; title: string; sub: string; icon: string; tint: string; locked?: boolean; onPress: () => void }[] = [
-    ...(isToday ? [{ key: 'hrv', title: 'HRV Reading', sub: hrvLocked ? 'Free plan: 1 capture per day used' : Platform.OS === 'ios' ? 'From a chest strap, Apple Watch or camera' : 'From a chest strap or your camera', icon: 'heartPulse', tint: hrvLocked ? p.textDim : p.accent, locked: !!hrvLocked, onPress: onLive }] : []),
+    ...(isToday ? [{ key: 'hrv', title: 'HRV Reading', sub: Platform.OS === 'ios' ? 'From a chest strap, Apple Watch or camera' : 'From a chest strap or your camera', icon: 'heartPulse', tint: p.accent, onPress: onLive }] : []),
     ...manual.map(readingRow),
   ];
   return (
@@ -425,13 +424,12 @@ export function BikeForm({ dk, existing, prefill = null, controls, onSaved }: { 
 /** Home-screen widget deep links (the URL points at the Journal tab so
  *  expo-router never sees an unmatched path; repeated taps re-fire because each
  *  is a fresh openURL event):
- *   · autonomic://?capture=hrv     — open HRV capture setup (freemium-gated),
- *     exactly like the Readings picker's Live HRV action.
+ *   · autonomic://?capture=hrv     — open HRV capture setup, exactly like the
+ *     Readings picker's Live HRV action. No tier check: capture is unlimited.
  *   · autonomic://?open=protocol   — scroll to the Progress streak card and
  *     open it expanded (the Protocol widget). */
 export function useCaptureDeepLink() {
   const { openSheet } = useSheets();
-  const openPaywall = usePaywall();
   React.useEffect(() => {
     const handle = (url: string | null) => {
       if (!url) return;
@@ -443,7 +441,6 @@ export function useCaptureDeepLink() {
         return;
       }
       if (q?.capture !== 'hrv') return;
-      if (!canCaptureHrv(getTier(), hrvCaptureUsedToday(getState().days[todayKey()]))) { openPaywall(); return; }
       openSheet((c) => <HrvSetup controls={c} />);
     };
     void ExpoLinking.getInitialURL().then(handle);
@@ -483,11 +480,9 @@ export function useEntryForms(dk: string) {
   const openPaywall = usePaywall();
   const refresh = () => { /* store change triggers re-render */ };
 
-  // Freemium: free tier gets one live HRV capture per day; live POTS captures
+  // Freemium: live HRV capture is unlimited on every tier; live POTS captures
   // are Pro. Checked at action time (not render) so the answer is current, and
   // guarded here — the single choke point — rather than at each button.
-  const hrvCaptureLocked = () =>
-    !canCaptureHrv(getTier(), hrvCaptureUsedToday(getState().days[todayKey()]));
   const potsCaptureLocked = () => getTier() === 'free';
 
   const openReadingForm = (type: string, existing: Entry | null, prefill: Entry | null = null) =>
@@ -585,14 +580,10 @@ export function useEntryForms(dk: string) {
   // as the report; everything else opens the edit form directly, as before.
   const openActivity = (r: Entry) => (workoutCurveFor(r) ? openActivitySummary(r) : openActivityForm(r.type, r));
 
-  const captureHrv = () => {
-    if (hrvCaptureLocked()) { openPaywall(); return; }
-    openSheet((c) => <HrvSetup controls={c} />);
-  };
+  const captureHrv = () => openSheet((c) => <HrvSetup controls={c} />);
   const pickReading = () => openSheet(() => (
     <ReadingPicker
       isToday={dk === todayKey()}
-      hrvLocked={hrvCaptureLocked()}
       potsLocked={potsCaptureLocked()}
       onLocked={openPaywall}
       onLive={captureHrv}

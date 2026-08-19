@@ -20,8 +20,6 @@ import { sleepGrade, sleepHours, stagesForWindow, waterGoalL, type DaysMap } fro
 import type { SleepRecord, SleepStages } from '../lib/types';
 import { ensureDay, getState, getWaveform, save, storeSleepSeries, useAppState, useStore } from '../store/store';
 import { setJournalSectionY } from '../store/nav';
-import { useTier } from '../store/tier';
-import { canCaptureHrv, hrvCaptureUsedToday } from '../lib/gating';
 import { trustedReadings } from '../lib/hrvQuality';
 import { fmtDateLong, fmtDuration, fmtTime12, minsBetween, periodOf, todayKey } from '../lib/dates';
 import { health, healthAppName, type SleepImport } from '../lib/health';
@@ -39,11 +37,6 @@ export function JournalSections({ dk }: { dk: string }) {
   const ctx = { sex: state.profile.sex, height: state.profile.height };
   const forms = useEntryForms(dk);
   const drawers = useDrawers(dk);
-  // Freemium: after the free tier's one live capture today, the button flips
-  // to a locked look; the tap still goes through captureHrv, which raises the
-  // paywall instead of the session.
-  const tier = useTier();
-  const hrvLocked = !canCaptureHrv(tier, hrvCaptureUsedToday(state.days[todayKey()]));
   const day = d || { readings: [], activities: [], meds: [], symptoms: [], sleep: { bed: '', wake: '' }, food: { water: 0, meals: [], triggers: {} }, digestion: { movements: [] } };
   return (
     <>
@@ -67,9 +60,9 @@ export function JournalSections({ dk }: { dk: string }) {
             {/* Live HRV capture only makes sense on today — a live reading
                 belongs to the day it happens, never a back-dated one. */}
             {dk === todayKey() ? (
-              <Pressable onPress={forms.captureHrv} style={({ pressed }) => [{ flexDirection: 'row', gap: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: hrvLocked ? p.surface2 : p.accent, borderWidth: hrvLocked ? 1 : 0, borderColor: p.border, borderRadius: radius.control, paddingVertical: 13 }, pressed && { opacity: 0.7 }]}>
-                <Icon name={hrvLocked ? 'lock' : 'activity'} size={18} color={hrvLocked ? p.textDim : '#fff'} />
-                <Text style={{ color: hrvLocked ? p.textDim : '#fff', fontSize: 15, fontWeight: '600' }}>Capture HRV reading</Text>
+              <Pressable onPress={forms.captureHrv} style={({ pressed }) => [{ flexDirection: 'row', gap: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: p.accent, borderRadius: radius.control, paddingVertical: 13 }, pressed && { opacity: 0.7 }]}>
+                <Icon name="activity" size={18} color="#fff" />
+                <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>Capture HRV reading</Text>
               </Pressable>
             ) : null}
             <AddDashButton onPress={forms.pickReading} label="+ Add reading" />

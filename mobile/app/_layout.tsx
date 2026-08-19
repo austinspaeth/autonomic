@@ -13,6 +13,7 @@ import { ToastProvider } from '../src/components/Toast';
 import { OnboardingGate } from '../src/features/Onboarding';
 import { WatchArrivalCards } from '../src/features/WatchArrivals';
 import { WatchSyncPill } from '../src/features/hrv/WatchSyncPill';
+import { HrvSessionHost } from '../src/features/hrv/SessionHost';
 import { HealthUpdatePill } from '../src/features/HealthUpdates';
 import { WhatsNewPill } from '../src/features/WhatsNew';
 import { RestoreGate } from '../src/features/RestoreGate';
@@ -24,6 +25,7 @@ import { initWatchReceiver } from '../src/lib/watch/receiver';
 import { runDailyBackup } from '../src/lib/backup';
 import { initCrashWatcher, syncReminder } from '../src/lib/reminders';
 import { initWidgetSync } from '../src/lib/widgets';
+import { initInsightsBadge } from '../src/store/insightsBadge';
 import { loadIssue } from '../src/store/store';
 import { installErrorLogging, logError } from '../src/lib/diagnostics/errorLog';
 import { usePalette } from '../src/theme';
@@ -59,7 +61,7 @@ export default function RootLayout() {
     if (loadIssue?.kind === 'corrupt') logError('store.load', 'journal on disk was unreadable at launch');
     // Open the store connection and read the current Pro entitlement.
     initIap();
-    // Stamp/derive the freemium tier (7-day local trial window on first launch).
+    // Stamp/derive the freemium tier (14-day local trial window on first launch).
     initTier();
     // The one network call the app makes: an anonymous daily cohort ping
     // (install's birthday, nothing else). Must follow initTier — it reads the
@@ -83,6 +85,9 @@ export default function RootLayout() {
     // Home-screen widgets: push today's payload now, after journal changes,
     // and on foreground (which also covers the midnight rollover).
     initWidgetSync();
+    // The Insights tab's unseen-findings dot: derive it now and after journal
+    // changes, so a new finding lights the tab before the user thinks to look.
+    initInsightsBadge();
     // Pull any published EAS update in the background (preview + production
     // builds alike); a downloaded bundle applies on the next launch.
     (async () => {
@@ -111,6 +116,10 @@ export default function RootLayout() {
                   below and can recede into the stacked-card look when either
                   of them takes the slot. */}
               <WhatsNewPill />
+              {/* A reading in progress: the pill it folds into when minimized,
+                  and the hand-off to the results card when it ends (both have
+                  to outlive the card, which the user can close mid-reading). */}
+              <HrvSessionHost />
               {/* Watch companion overlays (iOS only): results card on arrival +
                   "Waiting for watch…" pill while the sync card is minimized. */}
               {Platform.OS === 'ios' ? <WatchArrivalCards /> : null}

@@ -729,8 +729,10 @@ const HR_LINE = '#ef4444';
  * own scale and its axis labels take its colour.
  *
  * The readout defaults to the night's averages rather than a date, because the
- * whole card is one night. Touch it and both values become that moment's, with
- * the time where the date would sit on the other cards.
+ * whole card is one night. Touch it and both values become that moment's, and
+ * the time rides the tail of the last value exactly as the date does on a
+ * Progress card ("62 at 3:00am") — two values fit inline, so it does not drop
+ * to its own line.
  */
 function Respiratory({ report }: { report: SleepReport }) {
   const [sel, setSel] = useState<{ t: number; v: number; rv: number | null } | null>(null);
@@ -752,7 +754,6 @@ function Respiratory({ report }: { report: SleepReport }) {
           ...(hrMean != null || sel ? [{ label: 'HR', color: HR_LINE, text: hrShown != null ? String(Math.round(hrShown)) : '–' }] : []),
         ]}
         when={sel ? `at ${fmtTime12(clockFromNoon(report.night.bedAt + sel.t / 60))}` : null}
-        tailBelow
         desc={sel
           ? 'Both lines at the moment you are touching.'
           : 'Averages across the night. Touch the chart to read any moment.'}

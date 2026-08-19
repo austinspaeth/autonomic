@@ -2,17 +2,28 @@
  *
  * The page auto-refreshes every 5 minutes while it is visible, on every view
  * (app.js), and this is what makes that worth doing: the difference between one
- * ping report and the next is announced rather than silently redrawn. Three
+ * ping report and the next is announced rather than silently redrawn. Four
  * events, in ascending order of how much they matter:
  *
- *   visitors   someone opened the app          soft blip, nothing else
- *   downloads  a first run the counter had     two-note chime, confetti falling
- *              never seen (a new install)      from the top, a card + a toast +
- *                                              a notification naming the store
- *   sales      a subscribe ping                fanfare, TEN SECONDS of confetti
- *                                              from the top and the bottom, a
- *                                              card + a toast + a notification
- *                                              naming the store that paid
+ *   visitors    someone opened the app         soft blip, nothing else
+ *   activations an install saved its FIRST      soft chime, a card + a toast +
+ *               HRV reading                     a notification naming the
+ *                                               sensor. NO confetti.
+ *   downloads   a first run the counter had     two-note chime, confetti falling
+ *               never seen (a new install)      from the top, a card + a toast +
+ *                                               a notification naming the store
+ *   sales       a subscribe ping                fanfare, TEN SECONDS of confetti
+ *                                               from the top and the bottom, a
+ *                                               card + a toast + a notification
+ *                                               naming the store that paid
+ *
+ * **Confetti is for ARRIVALS, never for usage.** A new install and a purchase
+ * are people joining and people paying; everything else here is somebody using
+ * the app they already have. That is the event this dashboard hopes to see all
+ * day, every day, and confetti for it would be confetti more or less
+ * permanently — which is the fastest way to make confetti mean nothing when a
+ * sale finally lands. Activations get the full card / toast / notification
+ * treatment and no canvas at all.
  *
  * Everything here is fed by the PING COUNTER, which is the only source on this
  * page that changes on its own. Store downloads and the sales ledger are hand
@@ -55,15 +66,27 @@
   /* Cards and copy speak store names; the report speaks letters. */
   var STORE = { I: 'iOS', A: 'Android', U: 'unknown store' };
 
+  /* The second letter an activation ping carries: which sensor took the first
+     reading. Lower case because it reads inside a sentence ("1 chest strap"),
+     unlike a store name. */
+  var SENSOR = { W: 'Apple Watch', B: 'chest strap', F: 'phone camera' };
+
   function storeName(letter) { return STORE[letter] || STORE.U; }
   function letterOf(p) { return (p === 'I' || p === 'A') ? p : 'U'; }
+  function sensorOf(m) { return SENSOR[m] ? m : '?'; }
+  function sensorName(letter) { return SENSOR[letter] || 'unknown sensor'; }
 
   /* --------------------------------------------------------------- pure */
 
   /**
    * Fold a PINGS report into the three running totals we alert on.
    *
-   *   { opens, downloads, sales, downloadsBy: {I,A,U}, salesBy: {I,A,U} }
+   *   { opens, downloads, sales, activations,
+   *     downloadsBy: {I,A,U}, salesBy: {I,A,U}, activationsBy: {W,B,F,?} }
+   *
+   * `activationsBy` is keyed by SENSOR rather than by store, because that is
+   * the fact the activation route carries that nothing else does — which store
+   * an install came from is already on its download card.
    *
    * These are counts of PINGS, not of people — summing daily actives into one
    * number would count the same install once per day it opened the app, which
@@ -72,10 +95,12 @@
    * counter whose only job is to be compared with its own previous value.
    */
   function snapshot(report) {
-    var out = { opens: 0, downloads: 0, sales: 0, downloadsBy: {}, salesBy: {}, days: {} };
+    var out = { opens: 0, downloads: 0, sales: 0, activations: 0, downloadsBy: {}, salesBy: {}, activationsBy: {}, days: {} };
 
     function day(d) {
-      return out.days[d] || (out.days[d] = { opens: 0, downloads: 0, sales: 0, downloadsBy: {}, salesBy: {} });
+      return out.days[d] || (out.days[d] = {
+        opens: 0, downloads: 0, sales: 0, activations: 0, downloadsBy: {}, salesBy: {}, activationsBy: {},
+      });
     }
 
     ((report && report.open) || []).forEach(function (row) {
@@ -110,6 +135,23 @@
         out.salesBy[p] = (out.salesBy[p] || 0) + n;
         bucket.sales += n;
         bucket.salesBy[p] = (bucket.salesBy[p] || 0) + n;
+      });
+    });
+
+    /* Activation fires once per install, ever, so unlike the open rows above
+       these really do count people — no de-duplication is being skipped here. */
+    ((report && report.act) || []).forEach(function (row) {
+      if (!row || !row.day) return;
+      var bucket = day(row.day);
+      ((row.cohorts) || []).forEach(function (x) {
+        if (!x || !x.cohort) return;
+        var n = Number(x.count) || 0;
+        if (!(n > 0)) return;
+        var m = sensorOf(x.method);
+        out.activations += n;
+        out.activationsBy[m] = (out.activationsBy[m] || 0) + n;
+        bucket.activations += n;
+        bucket.activationsBy[m] = (bucket.activationsBy[m] || 0) + n;
       });
     });
 
@@ -152,34 +194,48 @@
    *
    * The totals path is kept for a baseline written before this shipped — a
    * snapshot in localStorage from the previous version has no `days`.
+   *
+   * ACTIVATIONS ARE SKIPPED ENTIRELY against a baseline that predates them.
+   * A stored snapshot written before the activation counter existed has no
+   * `activations` field, so every day in it would read as a rise from zero and
+   * the first refresh after the deploy would announce a year of first readings
+   * as news. A baseline is a claim about what you have already been told;
+   * silence about a counter it never knew is the honest reading of it, and the
+   * snapshot it is replaced with knows about them from then on.
    */
   function diff(prev, next) {
     var p = prev || snapshot(null);
     var n = next || snapshot(null);
+    var actKnown = typeof p.activations === 'number';
     var d;
 
     if (p.days && n.days) {
-      d = { visitors: 0, downloads: 0, sales: 0, downloadsBy: {}, salesBy: {} };
+      d = { visitors: 0, downloads: 0, sales: 0, activations: 0, downloadsBy: {}, salesBy: {}, activationsBy: {} };
       Object.keys(n.days).forEach(function (key) {
-        var a = p.days[key] || { opens: 0, downloads: 0, sales: 0, downloadsBy: {}, salesBy: {} };
+        var a = p.days[key] || { opens: 0, downloads: 0, sales: 0, activations: 0, downloadsBy: {}, salesBy: {}, activationsBy: {} };
         var b = n.days[key];
         d.visitors += rise(a.opens, b.opens);
         d.downloads += rise(a.downloads, b.downloads);
         d.sales += rise(a.sales, b.sales);
         addInto(d.downloadsBy, gain(a.downloadsBy, b.downloadsBy));
         addInto(d.salesBy, gain(a.salesBy, b.salesBy));
+        if (!actKnown) return;
+        d.activations += rise(a.activations, b.activations);
+        addInto(d.activationsBy, gain(a.activationsBy, b.activationsBy));
       });
     } else {
       d = {
         visitors: rise(p.opens, n.opens),
         downloads: rise(p.downloads, n.downloads),
         sales: rise(p.sales, n.sales),
+        activations: actKnown ? rise(p.activations, n.activations) : 0,
         downloadsBy: gain(p.downloadsBy, n.downloadsBy),
-        salesBy: gain(p.salesBy, n.salesBy)
+        salesBy: gain(p.salesBy, n.salesBy),
+        activationsBy: actKnown ? gain(p.activationsBy, n.activationsBy) : {}
       };
     }
 
-    d.any = d.visitors > 0 || d.downloads > 0 || d.sales > 0;
+    d.any = d.visitors > 0 || d.downloads > 0 || d.sales > 0 || d.activations > 0;
     return d;
   }
 
@@ -187,6 +243,13 @@
   function storeLine(by) {
     return ['I', 'A', 'U'].filter(function (k) { return (by || {})[k] > 0; })
       .map(function (k) { return by[k] + ' on ' + storeName(k); })
+      .join(' · ');
+  }
+
+  /** "1 chest strap · 1 phone camera", in the order the app offers them. */
+  function sensorLine(by) {
+    return ['W', 'B', 'F', '?'].filter(function (k) { return (by || {})[k] > 0; })
+      .map(function (k) { return by[k] + ' ' + sensorName(k); })
       .join(' · ');
   }
 
@@ -343,6 +406,16 @@
     { f: 1046.50, at: 0,     d: 0.13, type: 'triangle', v: 0.20 },   // C6
     { f: 1567.98, at: 0.075, d: 0.26, type: 'triangle', v: 0.15 },   // G6
     { f: 523.25,  at: 0,     d: 0.12, type: 'sine',     v: 0.10 }    // C5, body
+  ];
+
+  /* An activation is a small good thing: two notes settling rather than
+     rising, softer than a download and unmistakably not it. It is the app
+     starting to work for somebody who already had it, which is worth hearing
+     and is not an arrival. */
+  var ACTIVATION = [
+    { f: 783.99,  at: 0,     d: 0.15, type: 'triangle', v: 0.17 },   // G5
+    { f: 1046.50, at: 0.085, d: 0.42, type: 'triangle', v: 0.16 },   // C6, rings
+    { f: 392.00,  at: 0.085, d: 0.34, type: 'sine',     v: 0.09 }    // G4, body
   ];
 
   /* A download ARRIVES, so it is three notes rising to a note that rings, with
@@ -570,6 +643,10 @@
 
   function clearAll() { cardEls().forEach(remove); }
 
+  /* One glyph per kind, so a card is identified before it is read — the left
+     edge carries the same distinction in colour (styles.css). */
+  var MARK = { sale: '💸', download: '📲', activation: '💓' };
+
   function card(kind, title, line) {
     if (!hasDom()) return;
     var stack = document.getElementById('alertStack');
@@ -577,7 +654,7 @@
     var el = document.createElement('div');
     el.className = 'alert-card ' + kind;
     el.innerHTML =
-      '<div class="alert-mark" aria-hidden="true">' + (kind === 'sale' ? '💸' : '📲') + '</div>' +
+      '<div class="alert-mark" aria-hidden="true">' + MARK[kind] + '</div>' +
       '<div class="alert-body"><b>' + esc(title) + '</b>' +
       (line ? '<span>' + esc(line) + '</span>' : '') + '</div>' +
       '<button class="alert-x" aria-label="Dismiss">×</button>';
@@ -653,11 +730,26 @@
       // refresh extend them rather than starting a competing pattern.
       celebrate(d.sales ? 'sale' : 'download', d.downloads + d.sales);
     }
+    /* An activation gets every channel a download gets EXCEPT the canvas. It
+       is somebody using the app they already have, which is the thing this
+       dashboard hopes to see all day — confetti for it would be confetti
+       permanently, and then a sale's confetti would mean nothing. The sound
+       yields to a louder event in the same refresh, the same rule the toast
+       below already follows. */
+    if (d.activations > 0) {
+      var actTitle = d.activations + ' first ' + plural(d.activations, 'reading') + '!';
+      card('activation', actTitle, sensorLine(d.activationsBy));
+      if (!d.sales && !d.downloads) {
+        say(actTitle + ' ' + sensorLine(d.activationsBy));
+        play(ACTIVATION);
+      }
+      push('💓 ' + actTitle, sensorLine(d.activationsBy), 'autonomic-activation');
+    }
     /* Visitors stay a sound and nothing else, in every channel. It is the event
        that fires most often and the least worth a line of text — a toast for it
        would be on screen more or less permanently, and a notification for it
        would be the fastest way to have notifications turned back off. */
-    if (!d.sales && !d.downloads && d.visitors > 0) play(VISITOR);
+    if (!d.sales && !d.downloads && !d.activations && d.visitors > 0) play(VISITOR);
   }
 
   /* ---------------------------------------------------------------- shell */
@@ -730,7 +822,7 @@
 
   window.Alerts = {
     // pure
-    snapshot: snapshot, diff: diff, storeLine: storeLine,
+    snapshot: snapshot, diff: diff, storeLine: storeLine, sensorLine: sensorLine,
     // shell
     init: init, sync: sync, reset: reset, announce: announce, clearAll: clearAll,
     isMuted: function () { return muted; }, setMuted: setMuted

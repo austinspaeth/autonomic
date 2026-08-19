@@ -9,44 +9,12 @@
  */
 import React, { useEffect } from 'react';
 import { Text, View } from 'react-native';
-import Svg, { Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { SheetControls, SheetFooter, useSheets } from '../../components/Sheet';
 import { Button } from '../../components/ui';
 import { radius, usePalette } from '../../theme';
 import { health } from '../../lib/health';
 import { HrvSession, type SessionConfig } from './Session';
-
-/** The watchOS Mindfulness app icon, near enough to recognize on the wrist:
- *  a teal circle with the eight-petal Breathe flower. */
-function MindfulnessIcon({ size = 72 }: { size?: number }) {
-  const c = size / 2;
-  const ring = size * 0.16; // petal centers sit on this ring
-  const petal = size * 0.19;
-  return (
-    <Svg width={size} height={size}>
-      <Defs>
-        <LinearGradient id="mindfulBg" x1="0" y1="0" x2="1" y2="1">
-          <Stop offset="0" stopColor="#35dcc8" />
-          <Stop offset="1" stopColor="#0d9c8c" />
-        </LinearGradient>
-      </Defs>
-      <Circle cx={c} cy={c} r={c} fill="url(#mindfulBg)" />
-      {Array.from({ length: 8 }, (_, i) => {
-        const a = (i / 8) * Math.PI * 2;
-        return (
-          <Circle
-            key={i}
-            cx={c + ring * Math.cos(a)}
-            cy={c + ring * Math.sin(a)}
-            r={petal}
-            fill="#eafffb"
-            opacity={0.42}
-          />
-        );
-      })}
-    </Svg>
-  );
-}
+import { MindfulnessIcon } from './MindfulnessIcon';
 
 const STEPS: { title: string; sub: string }[] = [
   {
@@ -78,7 +46,7 @@ export function WatchPrep({ config, controls }: { config: SessionConfig; control
   // Start here = start on the watch: open the session card already running and
   // let this card fall away beneath it.
   const start = () => {
-    openSheet((c) => <HrvSession config={config} autoStart controls={c} />, { hideClose: true });
+    openSheet((c) => <HrvSession config={config} autoStart controls={c} />, { hideClose: true, grow: true });
     controls.close();
   };
 

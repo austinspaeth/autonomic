@@ -11,8 +11,8 @@ import { addDays, todayKey } from '../../dates';
 import type { AppState, DayRecord, Entry } from '../../types';
 import { WELCOME_CHANGE, findBiggestChange } from '../change';
 import { dataConfidence } from '../confidence';
-import { CORRELATION_OUTCOMES, findCorrelations } from '../correlate';
-import { buildFactors } from '../factors';
+import { CORRELATION_OUTCOMES, EARLY_MIN_FACTOR_DAYS, NO_IMPACT_MIN_OUTCOMES, findCorrelations, findEarlySignals, findNoImpact, groupCorrelations } from '../correlate';
+import { buildFactors, factorProgress } from '../factors';
 import { buildDayMatrix } from '../matrix';
 import { PROBES_BY_ID, findObservations } from '../observations';
 import { changeSinceStart, findWatchItems, overallDirection } from '../watch';
@@ -197,6 +197,22 @@ describe('a planted association', () => {
     // vitD3 has no contrast at all, so it is not even a testable factor.
     expect(findAbout(found, 'med:vitD3')).toHaveLength(0);
   });
+
+  it('carries the driver key, and grouping folds one driver into one row', () => {
+    // The fixture's magnesium legitimately moves more than one outcome family, so
+    // it holds several list slots — but they share a driverKey, and the UI's
+    // grouping must fold them into ONE row (the strongest first) with the rest
+    // stacked behind it.
+    found.forEach((c) => expect(c.driverKey).toBeTruthy());
+    const groups = groupCorrelations(found);
+    const mag = groups.filter((g) => g[0].driverKey === 'med:magGlycinate');
+    expect(mag).toHaveLength(1);
+    expect(mag[0].length).toBe(findAbout(found, 'med:magGlycinate').length);
+    // Order preserved: the group sits where its strongest member ranked, and the
+    // total across groups is the whole list.
+    expect(groups.flat().length).toBe(found.length);
+    expect(groups[0][0].id).toBe(found[0].id);
+  });
 });
 
 describe('a planted next-day association', () => {
@@ -230,6 +246,225 @@ describe('a planted next-day association', () => {
   });
 });
 
+/* ---------- the early tier ---------- */
+
+describe('early signals', () => {
+  const earlyOf = (state: AppState, n: number) => {
+    const keys = keyRange(DK, n, addDays);
+    const defs = buildFactors(state, keys, { minDays: EARLY_MIN_FACTOR_DAYS });
+    return findEarlySignals(buildDayMatrix(state, keys, INSIGHT_OUTCOMES, defs, {}));
+  };
+
+  it('surfaces a striking association nine days into a journal, pinned to one pip', () => {
+    const state = journal(9, (i) => {
+      const d = blank();
+      const took = i % 2 === 0;
+      d.readings = [hrv(took ? 44 + i : 26 + i)];
+      if (took) d.meds.push(med('quercetin'));
+      d.meds.push(med('vitD3'));
+      return d;
+    });
+    const early = earlyOf(state, 9);
+    expect(early.length).toBeGreaterThan(0);
+    // One row per driver — a glimpse names the driver once, whatever it moved.
+    expect(early.filter((c) => c.driverKey === 'med:quercetin')).toHaveLength(1);
+    early.forEach((c) => {
+      expect(c.early).toBe(true);
+      expect(c.pips).toBe(1);
+      expect(c.lag).toBe(0);
+      expect(Math.abs(c.r)).toBeGreaterThanOrEqual(0.5);
+    });
+  });
+
+  it('stays near-silent on two weeks of noise (measured bound)', () => {
+    // The tier's contract is looser than the main sweep's — EARLY_FDR_Q accepts
+    // that a quarter of hints are flukes, badged as such. Measured: 3 hints
+    // across these 12 seeds. This pins the bound so a loosened constant shows
+    // up here rather than on someone's phone.
+    let total = 0;
+    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].forEach((seed) => {
+      const r = rng(seed * 7919);
+      const state = journal(14, () => {
+        const d = blank();
+        d.readings = [hrv(Math.round(20 + r() * 30))];
+        ['magGlycinate', 'coq10', 'quercetin'].forEach((t) => { if (r() < 0.5) d.meds.push(med(t)); });
+        if (r() < 0.4) d.symptoms.push({ id: nextId(), type: 'fatigue', time: '12:00' });
+        d.food.water = Math.round((1 + r() * 2) * 10) / 10;
+        return d;
+      });
+      total += earlyOf(state, 14).length;
+    });
+    expect(total).toBeLessThanOrEqual(4);
+  });
+
+  it('never rides along once the strict sweep has findings', () => {
+    // The strong planted journal from above: correlations exist, so buildInsights
+    // must not run the early tier at all.
+    const r = rng(99);
+    const state = journal(120, (i) => {
+      const d = blank();
+      const took = i % 2 === 0;
+      d.readings = [hrv(Math.round((took ? 42 : 28) + r() * 8))];
+      if (took) d.meds.push(med('magGlycinate'));
+      d.meds.push(med('vitD3'));
+      return d;
+    });
+    const report = buildInsights(state, addDays(DK, 1));
+    expect(report.correlations.length).toBeGreaterThan(0);
+    expect(report.early).toEqual([]);
+  });
+
+  it('reaches the report with its evidence columns', () => {
+    const state = journal(9, (i) => {
+      const d = blank();
+      const took = i % 2 === 0;
+      d.readings = [hrv(took ? 44 + i : 26 + i)];
+      if (took) d.meds.push(med('quercetin'));
+      d.meds.push(med('vitD3'));
+      return d;
+    });
+    const report = buildInsights(state, addDays(DK, 1));
+    expect(report.correlations).toEqual([]);
+    expect(report.early.length).toBeGreaterThan(0);
+    report.early.forEach((c) => expect(report.detail[c.id]).toBeTruthy());
+  });
+});
+
+describe('almost-testable progress', () => {
+
+  it('names the interventions closest to testable, with the distance', () => {
+    const state = journal(10, (i) => {
+      const d = blank();
+      d.readings = [hrv(30)];
+      if (i < 4) d.meds.push(med('magGlycinate'));
+      if (i < 2) d.activities.push({ id: nextId(), type: 'breathwork', time: '10:00' });
+      if (i === 0) d.meds.push(med('coq10'));
+      d.meds.push(med('vitD3'));
+      return d;
+    });
+    const keys = keyRange(DK, 10, addDays);
+    const progress = factorProgress(state, keys);
+    // Closest first; the one-off (coq10) and the every-day supplement (vitD3,
+    // short of days WITHOUT, which more logging cannot fix) both stay out.
+    expect(progress.map((f: { driver: string; have: number; need: number }) => `${f.driver} ${f.have}/${f.need}`))
+      .toEqual(['Magnesium Glycinate 4/8', 'Breathwork / meditation 2/8']);
+  });
+
+  it('rides the report only while there are no findings', () => {
+    const state = journal(10, (i) => {
+      const d = blank();
+      d.readings = [hrv(30)];
+      if (i < 4) d.meds.push(med('magGlycinate'));
+      return d;
+    });
+    const report = buildInsights(state, addDays(DK, 1));
+    expect(report.correlations).toEqual([]);
+    expect(report.progress.length).toBeGreaterThan(0);
+  });
+});
+
+describe('bowel movements as an outcome', () => {
+  it('links a supplement to a change in daily movements', () => {
+    // Constipated off the supplement (0 a day), regular on it (2 a day) — the
+    // "since you started X, your bowel movements changed" question, as a
+    // standing association.
+    const r = rng(808);
+    const state = journal(120, (i) => {
+      const d = blank();
+      const took = i % 2 === 0;
+      d.readings = [hrv(Math.round(28 + r() * 10))];
+      if (took) d.meds.push(med('magGlycinate'));
+      d.meds.push(med('vitD3'));
+      d.digestion.movements = took && r() < 0.9 ? [{ id: nextId(), time: '09:00' }, { id: nextId(), time: '18:00' }] : [];
+      return d;
+    });
+    const found = findCorrelations(matrixOf(state));
+    const bm = found.find((c) => c.factorId === 'med:magGlycinate' && c.outcome === 'bmCount');
+    expect(bm).toBeTruthy();
+    expect(bm!.good).toBe(true);
+    expect(bm!.metric).toBe('Bowel movements');
+    expect(bm!.headline).toBe('Magnesium Glycinate days show higher bowel movements');
+    expect(bm!.deltaText).toMatch(/^\+\d(\.\d)? a day$/);
+  });
+
+  it('reports an onset in plain English', () => {
+    // Started the supplement on day 60; movements went from none to one or two.
+    const r = rng(909);
+    const state = journal(120, (i) => {
+      const d = blank();
+      d.readings = [hrv(30)];
+      d.meds.push(med('vitD3'));
+      if (i >= 60) d.meds.push(med('magGlycinate'));
+      d.digestion.movements = i >= 60 && r() < 0.85
+        ? [{ id: nextId(), time: '09:00' }, ...(r() < 0.5 ? [{ id: nextId(), time: '18:00' }] : [])]
+        : [];
+      return d;
+    });
+    const change = findBiggestChange(matrixOf(state));
+    expect(change).toBeTruthy();
+    expect(change!.outcome).toBe('bmCount');
+    // "are", not "is": the headline's verb has to agree with a plural metric.
+    expect(change!.headline).toBe('Bowel movements are up since you started magnesium glycinate');
+  });
+});
+
+describe('no detectable impact', () => {
+  const none = { correlations: [], early: [], changeFactorId: null };
+
+  /** A journal where tylenol is taken often, long, and does nothing at all. */
+  const nullJournal = (onDays: (i: number) => boolean) => {
+    const r = rng(2024);
+    return journal(120, (i) => {
+      const d = blank();
+      d.readings = [
+        hrv(Math.round(25 + r() * 20)),
+        { id: nextId(), type: 'bp', time: '09:00', sys: String(Math.round(110 + r() * 22)), dia: String(Math.round(68 + r() * 16)) } as Entry,
+      ];
+      d.sleep = { bed: `${22 + Math.floor(r() * 2)}:00`, wake: '07:00' };
+      if (onDays(i)) d.meds.push(med('tylenol'));
+      d.meds.push(med('vitD3'));
+      if (r() < 0.3) d.symptoms.push({ id: nextId(), type: 'fatigue', time: '12:00' });
+      return d;
+    });
+  };
+
+  it('names a committed, well-tested med that moved nothing', () => {
+    const m = matrixOf(nullJournal((i) => i % 3 === 0));
+    expect(findCorrelations(m)).toEqual([]);
+    const items = findNoImpact(m, none);
+    const tylenol = items.find((x: { driverKey: string }) => x.driverKey === 'med:tylenol');
+    expect(tylenol).toBeTruthy();
+    expect(tylenol!.daysOn).toBe(40);
+    expect(tylenol!.tested).toBeGreaterThanOrEqual(NO_IMPACT_MIN_OUTCOMES);
+    expect(tylenol!.note).toMatch(/40 days with it · \d+ metrics/);
+  });
+
+  it('says nothing about a med still short of three weeks with it', () => {
+    const m = matrixOf(nullJournal((i) => i < 15));
+    expect(findNoImpact(m, none).filter((x: { driverKey: string }) => x.driverKey === 'med:tylenol')).toEqual([]);
+  });
+
+  it('never calls a driver with a finding a null result', () => {
+    const m = matrixOf(nullJournal((i) => i % 3 === 0));
+    const shown = { correlations: [{ driverKey: 'med:tylenol' } as never], early: [], changeFactorId: null };
+    expect(findNoImpact(m, shown).filter((x: { driverKey: string }) => x.driverKey === 'med:tylenol')).toEqual([]);
+  });
+
+  it('only ever speaks about meds and supplements', () => {
+    // Symptoms and triggers are in the same matrix with the same coverage; a
+    // "fatigue had no impact" row would be nonsense and must not exist.
+    const m = matrixOf(nullJournal((i) => i % 3 === 0));
+    findNoImpact(m, none).forEach((x: { driverKey: string }) => expect(x.driverKey).toMatch(/^med:/));
+  });
+
+  it('reaches the report, and never the demo month', () => {
+    const state = nullJournal((i) => i % 3 === 0);
+    const report = buildInsights(state, addDays(DK, 1));
+    expect(report.noImpact.some((x) => x.driverKey === 'med:tylenol')).toBe(true);
+    expect(buildInsights(state, addDays(DK, 1), { demo: true }).noImpact).toEqual([]);
+  });
+});
+
 /* ---------- the guards ---------- */
 
 describe('tautology blocks', () => {
@@ -246,6 +481,26 @@ describe('tautology blocks', () => {
 
   it('never pairs water against water intake', () => {
     expect(found.filter((c) => c.factorId.startsWith('water:') && c.outcome === 'waterIntake')).toEqual([]);
+  });
+
+  it('never reports water consumption as an outcome of anything', () => {
+    // Drinking is a behavior, not a physiological response: a med taken on the
+    // days the user happens to drink more must not come back as "quercetin days
+    // show higher water consumption". Water is only ever the factor side.
+    expect(CORRELATION_OUTCOMES).not.toContain('waterIntake');
+    const tracked = journal(120, (i) => {
+      const r = rng(555 + i);
+      const d = blank();
+      d.readings = [hrv(30 + Math.round(r() * 4))];
+      const heavy = i % 2 === 0;
+      // Water tracks the med perfectly — the strongest possible bait.
+      d.food.water = Math.round((heavy ? 3 + r() : 1 + r()) * 10) / 10;
+      d.meds.push(med('vitD3'));
+      if (heavy) d.meds.push(med('quercetin'));
+      return d;
+    });
+    const m = matrixOf(tracked);
+    expect(findCorrelations(m).filter((c) => c.outcome === 'waterIntake')).toEqual([]);
   });
 
   it('never pairs a symptom against the symptom count', () => {

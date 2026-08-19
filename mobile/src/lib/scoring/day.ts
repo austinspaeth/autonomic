@@ -469,14 +469,21 @@ export function streakInfo(days: DaysMap, dk: string, protocol: Protocol = DEFAU
  * summary opened on an older reading charts what was known *then* rather than
  * trailing off into readings taken after it. An id that isn't in `days` (an
  * unsaved live preview) leaves the full history intact.
+ *
+ * `kind` picks the day array to walk. Activities carry metrics of their own
+ * (HR @60s rest on a run), and the workout report charts them the same way a
+ * reading's summary charts its own; the trusted-HRV filter is a readings rule
+ * and does not apply there.
  */
 export function metricHistory(
   days: DaysMap, type: string, extractor: (r: Entry) => number | null, limit = 15, upto?: string | null,
+  kind: 'readings' | 'activities' = 'readings',
 ): { v: number; date: string }[] {
   const out: { v: number; date: string }[] = [];
   let cut = -1;
   Object.keys(days).sort().forEach((dk) => {
-    const list = (days[dk].readings || []).filter((r) => r.type === type && isTrustedReading(r));
+    const src = (kind === 'activities' ? days[dk].activities : days[dk].readings) || [];
+    const list = src.filter((r) => r.type === type && (kind === 'activities' || isTrustedReading(r)));
     list.sort((a, b) => ((a.time as string) || '').localeCompare((b.time as string) || ''));
     list.forEach((r) => {
       const v = extractor(r);

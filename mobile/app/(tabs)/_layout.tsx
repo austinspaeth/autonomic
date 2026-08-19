@@ -11,7 +11,8 @@ import { BrandMark, Icon, IconName } from '../../src/components/Icon';
 import { HeaderRule, headerHeight } from '../../src/components/Header';
 import { useSheets } from '../../src/components/Sheet';
 import { MenuSheet } from '../../src/features/Settings';
-import { usePalette } from '../../src/theme';
+import { GRADE_COLORS, usePalette } from '../../src/theme';
+import { useInsightsUnseen } from '../../src/store/insightsBadge';
 
 const TABS: { name: string; label: string; icon: IconName }[] = [
   { name: 'index', label: 'Journal', icon: 'clipboard' },
@@ -122,6 +123,7 @@ function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
   const p = usePalette();
   const insets = useSafeAreaInsets();
   const { openSheet } = useSheets();
+  const insightsUnseen = useInsightsUnseen();
   const tabRoutes = state.routes.filter((r) => TABS.some((t) => t.name === r.name));
   const { width: winW, fontScale } = useWindowDimensions();
 
@@ -226,7 +228,17 @@ function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
               }}
               style={{ paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999, alignItems: 'center' }}
             >
-              <Icon name={tab.icon} size={22} color={focused ? p.text : p.textDim} />
+              <View>
+                <Icon name={tab.icon} size={22} color={focused ? p.text : p.textDim} />
+                {/* Unseen-findings dot: violet, the palette's "noticed, not
+                    graded" colour — new information, not an alert. */}
+                {tab.name === 'insights' && insightsUnseen ? (
+                  <View
+                    pointerEvents="none"
+                    style={{ position: 'absolute', top: -2, right: -5, width: 7, height: 7, borderRadius: 999, backgroundColor: GRADE_COLORS.warning }}
+                  />
+                ) : null}
+              </View>
               <Text style={{ fontSize: 11, fontWeight: '600', color: focused ? p.text : p.textDim, marginTop: 3 }}>{tab.label}</Text>
             </Pressable>
           );

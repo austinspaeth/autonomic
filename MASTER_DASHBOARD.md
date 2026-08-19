@@ -238,6 +238,16 @@ for its platform. The data is fetched once per session, cached on `pings`, and
 is **read-only** — it lives outside `db`, so `sync.js` never sees it and there
 is nothing here to edit.
 
+Three counters, not two. Beside `open` and `sub` there is **`act`**: an install
+saved its FIRST HRV reading. That one carries a second letter for the sensor it
+used — `W` Apple Watch, `B` Bluetooth strap, `F` finger on the camera. It is the
+step between downloading and retaining, and the only one onboarding owns: an
+install with no first reading has no score, no trend and nothing to come back
+for, so a retention number read without an activation number beside it blames
+the product for a wizard that never finished. It fires **once per install,
+ever**, which makes it the one counter here whose rows really do count people —
+the no-summing rule below is about opens.
+
 One rule governs all the arithmetic, and every metric in the view is shaped by
 it: **counts can be compared across days but never summed into one.** With no
 identifier there is no way to tell one install from another, so adding up seven
@@ -257,6 +267,20 @@ the UI, each of them deliberate:
   "all"; the **Platform on <day>** tile and the **iOS vs Android, day by day**
   card carry the split instead, and both are always unfiltered, since they are
   what the rest of the view is a slice of.
+- **Activation is measured like conversion, and for the same reason.**
+  `A.activation(ix, cohorts, withinDays)` is the share of a cohort that ever
+  activated, with cohorts too young for day N excluded from the denominator
+  rather than counted as failures — the same immaturity rule every retention
+  function here obeys. **Day 0 is the onboarding's own number**; anything later
+  is somebody coming back for it, which is why the tile strip carries *Activated
+  on day 0* beside *Activated by D7* and the **Activation** card charts the age
+  at first reading in the same buckets purchase timing uses. The **How the first
+  reading is taken** card beside it splits those readings by sensor
+  (`methodsOn` / `methodsOver`), per day and stacked. That split follows the
+  platform filter rather than ignoring it, unlike the store splits below:
+  Apple Watch is offered on iPhone only, so its share of a combined view is a
+  share of a population half of which was never offered it — the card says so
+  under the chart, and the filter is how to read it honestly.
 - **A subscribe ping carries the buyer's store in the same cohort key an open
   ping does**, so "which store paid" needs no second source: `subPlatformsOn` /
   `purchasePlatformsOver` read it back, and both **Purchases on <day>** (the
@@ -391,15 +415,36 @@ a CSV paste would be an alert about your own typing.
 | Event | Definition | Reaction |
 |---|---|---|
 | Visitors | a rise in open pings | two-note blip, and nothing else in any channel |
+| Activations | a rise in activation pings — an install saved its **first HRV reading** | two-note settling chime, a card + a toast + a notification naming the sensor(s). **No confetti.** |
 | Downloads | a rise in **first runs** — an open ping whose cohort key IS the day it arrived on | three-note rising chime, confetti falling from the top, a card + a toast + a notification naming the store(s) |
 | Sales | a rise in subscribe pings | brass fanfare, **ten seconds** of confetti from the top AND the bottom, a card + a toast + a notification naming the store(s) that paid |
 
-The three cues are meant to be told apart across a room with your back to the
-screen, so they differ in SHAPE and not only in pitch — two notes, three notes,
-a fanfare with a held chord — and climb in weight in the order the events
-matter. The visitor blip fires most often and is the one most easily made
-useless: the first version was a single sine at 0.055 gain, a sound you have to
-already know is coming to hear at all.
+The four cues are meant to be told apart across a room with your back to the
+screen, so they differ in SHAPE and not only in pitch — two notes, two notes
+settling, three notes rising, a fanfare with a held chord — and climb in weight
+in the order the events matter. The visitor blip fires most often and is the one
+most easily made useless: the first version was a single sine at 0.055 gain, a
+sound you have to already know is coming to hear at all.
+
+**Confetti is for ARRIVALS, never for usage.** A new install and a purchase are
+people joining and people paying. An activation is somebody using the app they
+already have — the thing this dashboard hopes to see all day, every day — so
+celebrating it on the canvas would mean confetti more or less permanently, and
+then a sale's confetti would mean nothing. Activations get the full card / toast
+/ notification treatment and no canvas at all; visitors get the sound alone.
+
+**An activation card names the SENSOR, not the store** ("2 chest strap · 1 phone
+camera"), because that is the fact the activation route carries that nothing
+else does — which store an install came from is already on its download card.
+Its sound and toast yield to a download or a sale landing in the same refresh,
+the rule the download card already followed for sales.
+
+**A baseline that predates the activation counter announces nothing.** A stored
+snapshot written before this shipped has no `activations` field at all, so every
+day in it would read as a rise from zero and the first refresh after the deploy
+would announce the whole back catalogue of first readings as news. `diff` skips
+activations entirely against such a baseline; the snapshot that replaces it
+knows about them from then on.
 
 **Three channels carry the same sentence.** The card is the record and it stays
 until it is pressed; the **toast** says it wherever the reader is on the page,

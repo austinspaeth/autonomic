@@ -42,7 +42,7 @@ works with a strap you buy once and own.
 
 **What does it cost?**
 Free to use, with no account. Autonomic Pro is $7.99/month or $49.99/year, and
-every install starts with 7 days of full access. There is a hardship path for
+every install starts with 14 days of full access. There is a hardship path for
 anyone who can't afford it: email austin@autonomic.care and Austin will send a
 free code, no questions asked.
 

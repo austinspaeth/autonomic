@@ -4,21 +4,35 @@
  * exhale, paced to the chosen pattern with an eased sine curve. Patterns may
  * include holds (box breathing, 4/7/8): while you hold, the rings brighten —
  * the stroke warms toward a hotter red and thickens — then ease back to their
- * resting colour through the following exhale (or inhale, after a bottom
- * hold). Ring position runs on the UI thread via Reanimated; the phase clock
- * is a JS timer that re-targets the shared values at each phase boundary, so
- * a gentle haptic can tick alongside and the phase is reported upward for the
- * label beside the timer.
+ * resting colour through the following exhale (or inhale, after a bottom hold).
+ *
+ * The rings LIGHT, they do not grow: every ring is a fixed outline and only its
+ * brightness and stroke walk outward, so nothing scales and the shape under the
+ * timer never moves.
+ *
+ * What changed when the reading learned to minimize: the pace is no longer this
+ * component's own animation loop, it is read from the wall clock via
+ * `lib/breathClock` and the session's `breathStartMs`. Mounting halfway through
+ * an exhale therefore picks up halfway through that exhale rather than starting
+ * a fresh "breathe in", which is what lets the card fold into a pill and come
+ * back without disturbing the reading. Ring position still runs on the UI thread
+ * via Reanimated; the phase clock is a JS timer that re-targets the shared
+ * values at each boundary. The phase HAPTIC and the phase word are the session
+ * store's job now, not this view's — they have to keep going while the card is
+ * folded away.
  */
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect } from 'react';
 import { View } from 'react-native';
-import * as Haptics from 'expo-haptics';
 import Svg, { Circle } from 'react-native-svg';
 import Animated, {
   Easing, cancelAnimation, interpolate, interpolateColor, useAnimatedProps,
-  useSharedValue, withTiming,
+  useAnimatedStyle, useSharedValue, withTiming,
 } from 'react-native-reanimated';
 import { usePalette } from '../../theme';
+import { type BreathPattern, glowAt, phaseAt, progressAt } from '../../lib/breathClock';
+
+export { parsePattern } from '../../lib/breathClock';
+export type { BreathPattern, BreathPhase } from '../../lib/breathClock';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
@@ -29,64 +43,44 @@ const INNER_R = 14;   // smallest ring
 const OUTER_R = 84;   // largest ring — sits just inside the progress ring
 const GLOW_ACCENT = '#ff6a55'; // hold-brightened stroke (accent warmed toward white)
 
-export type BreathPhase = 'in' | 'holdIn' | 'out' | 'holdOut';
-
-export interface BreathPattern { inhale: number; holdIn: number; exhale: number; holdOut: number }
-
-/** "4/6" → in/out · "4/7/8" → in/hold/out · "4/4/4/4" → in/hold/out/hold. */
-export function parsePattern(style?: string): BreathPattern {
-  const parts = (style || '4/6').split('/').map(Number).filter((n) => !isNaN(n) && n > 0);
-  if (parts.length >= 4) return { inhale: parts[0], holdIn: parts[1], exhale: parts[2], holdOut: parts[3] };
-  if (parts.length === 3) return { inhale: parts[0], holdIn: parts[1], exhale: parts[2], holdOut: 0 };
-  return { inhale: parts[0] || 4, holdIn: 0, exhale: parts[1] || 6, holdOut: 0 };
-}
-
-const PHASE_HAPTIC: Record<BreathPhase, Haptics.ImpactFeedbackStyle> = {
-  in: Haptics.ImpactFeedbackStyle.Medium,
-  out: Haptics.ImpactFeedbackStyle.Light,
-  holdIn: Haptics.ImpactFeedbackStyle.Soft,
-  holdOut: Haptics.ImpactFeedbackStyle.Soft,
-};
-
-export function BreathingViz({ pattern, running, onPhase }: {
-  pattern: BreathPattern; running: boolean; onPhase?: (p: BreathPhase) => void;
-}) {
-  const p = usePalette();
-  // progress: 0 (exhaled, glow at center) -> 1 (inhaled, glow reaching the outer ring)
+/**
+ * The two shared values every breathing surface animates from: `progress`
+ * (0 exhaled → 1 inhaled) and `glow` (0 resting → 1 hold-brightened).
+ *
+ * Seeded from the clock on every boundary, so the value a view mounts with is
+ * the value the reading is actually at. `startMs` is the session's, so the rings
+ * in the card and the bars in the pill are the same breath, not two copies of it.
+ */
+export function useBreathValues(pattern: BreathPattern, startMs: number, running: boolean) {
   const progress = useSharedValue(0);
-  // glow: 0 (resting colour) -> 1 (hold brightening)
   const glow = useSharedValue(0);
-  const onPhaseRef = useRef(onPhase); onPhaseRef.current = onPhase;
 
   useEffect(() => {
-    if (!running) {
+    if (!running || !startMs) {
       cancelAnimation(progress); cancelAnimation(glow);
-      progress.value = 0; glow.value = 0;
+      // Settle rather than snap: the reading has finished and the rings should
+      // come to rest, not blink out mid-inhale.
+      progress.value = withTiming(0, { duration: 500, easing: Easing.out(Easing.quad) });
+      glow.value = withTiming(0, { duration: 500, easing: Easing.out(Easing.quad) });
       return;
     }
-    const phases = ([
-      { key: 'in', dur: pattern.inhale },
-      { key: 'holdIn', dur: pattern.holdIn },
-      { key: 'out', dur: pattern.exhale },
-      { key: 'holdOut', dur: pattern.holdOut },
-    ] as { key: BreathPhase; dur: number }[]).filter((ph) => ph.dur > 0);
     let alive = true;
     let timer: ReturnType<typeof setTimeout> | null = null;
-    let i = 0;
     const step = () => {
       if (!alive) return;
-      const ph = phases[i % phases.length];
-      i++;
-      onPhaseRef.current?.(ph.key);
-      Haptics.impactAsync(PHASE_HAPTIC[ph.key]).catch(() => {});
-      const ms = ph.dur * 1000;
-      if (ph.key === 'in') {
+      const e = Date.now() - startMs;
+      const pt = phaseAt(pattern, e);
+      // Seed from the clock first: withTiming starts wherever the value is, so
+      // this is what makes a mid-phase mount continuous instead of a jump.
+      progress.value = progressAt(pattern, e);
+      glow.value = glowAt(pattern, e);
+      const ms = Math.max(40, pt.remainMs);
+      if (pt.phase === 'in') {
         progress.value = withTiming(1, { duration: ms, easing: Easing.inOut(Easing.sin) });
         // After a bottom hold the brightening releases through the inhale.
         glow.value = withTiming(0, { duration: ms, easing: Easing.out(Easing.quad) });
-      } else if (ph.key === 'out') {
+      } else if (pt.phase === 'out') {
         progress.value = withTiming(0, { duration: ms, easing: Easing.inOut(Easing.sin) });
-        // "...then go back to their original colour as you exhale."
         glow.value = withTiming(0, { duration: ms, easing: Easing.out(Easing.quad) });
       } else {
         // Hold: position stays put while the rings brighten over the hold.
@@ -101,11 +95,22 @@ export function BreathingViz({ pattern, running, onPhase }: {
       cancelAnimation(progress); cancelAnimation(glow);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [running, pattern.inhale, pattern.holdIn, pattern.exhale, pattern.holdOut]);
+  }, [running, startMs, pattern.inhale, pattern.holdIn, pattern.exhale, pattern.holdOut]);
+
+  return { progress, glow };
+}
+
+/** Memoized: the card re-renders at the sample rate (~2 Hz) and none of that
+ *  touches the rings, which animate off shared values on the UI thread. */
+export const BreathingViz = React.memo(function BreathingViz({ pattern, startMs, running, size = SIZE }: {
+  pattern: BreathPattern; startMs: number; running: boolean; size?: number;
+}) {
+  const p = usePalette();
+  const { progress, glow } = useBreathValues(pattern, startMs, running);
 
   return (
-    <View style={{ width: SIZE, height: SIZE, alignItems: 'center', justifyContent: 'center' }}>
-      <Svg width={SIZE} height={SIZE}>
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <Svg width={size} height={size} viewBox={`0 0 ${SIZE} ${SIZE}`}>
         {Array.from({ length: RINGS }).map((_, i) => {
           const r = INNER_R + (OUTER_R - INNER_R) * (i / (RINGS - 1));
           return <Ring key={i} index={i} radius={r} progress={progress} glow={glow} accent={p.accent} track={p.border} />;
@@ -113,7 +118,7 @@ export function BreathingViz({ pattern, running, onPhase }: {
       </Svg>
     </View>
   );
-}
+});
 
 function Ring({ index, radius, progress, glow, accent, track }: {
   index: number; radius: number; progress: Animated.SharedValue<number>;
@@ -137,5 +142,51 @@ function Ring({ index, radius, progress, glow, accent, track }: {
       <Circle cx={CENTER} cy={CENTER} r={radius} stroke={track} strokeWidth={2} fill="none" opacity={0.35} />
       <AnimatedCircle cx={CENTER} cy={CENTER} r={radius} stroke={accent} fill="none" animatedProps={animatedProps} />
     </>
+  );
+}
+
+/* ---------- the pill's version of the same breath ---------- */
+
+const BAR_COUNT = 5;
+const BAR_W = 3;
+const BAR_GAP = 3;
+/** A plain ramp, short to tall. The arch this replaced peaked in the middle and
+ *  came back down, so the light walking outward on the inhale appeared to turn
+ *  around halfway through it — the shape argued with the motion. Rising the whole
+ *  way, the row grows with the breath. The LIGHT is what travels; the heights
+ *  never move. Tight (3pt bars, 3pt gaps) because widely spaced bars at pill
+ *  scale read as a loading spinner, which is a different promise entirely. */
+const BAR_H = [8, 11, 14, 17, 20];
+
+/**
+ * The breathing indicator inside the minimized pill: the same walk as the rings
+ * on a row of tight vertical bars. It reads the SAME shared-value pair from the
+ * same session clock, so the pill and the card can never show different breaths
+ * — and a user watching the pill is being paced correctly, not decorated.
+ */
+export const BreathBars = React.memo(function BreathBars({ pattern, startMs, running, color }: {
+  pattern: BreathPattern; startMs: number; running: boolean; color: string;
+}) {
+  const { progress, glow } = useBreathValues(pattern, startMs, running);
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: BAR_GAP, height: 20 }}>
+      {Array.from({ length: BAR_COUNT }).map((_, i) => (
+        <Bar key={i} index={i} progress={progress} glow={glow} color={color} />
+      ))}
+    </View>
+  );
+});
+
+function Bar({ index, progress, glow, color }: {
+  index: number; progress: Animated.SharedValue<number>;
+  glow: Animated.SharedValue<number>; color: string;
+}) {
+  const threshold = (index + 1) / BAR_COUNT;
+  const style = useAnimatedStyle(() => {
+    const near = interpolate(progress.value, [threshold - 1 / BAR_COUNT, threshold], [0, 1], 'clamp');
+    return { opacity: Math.min(1, 0.18 + near * 0.82 + glow.value * 0.18) };
+  });
+  return (
+    <Animated.View style={[{ width: BAR_W, height: BAR_H[index], borderRadius: 999, backgroundColor: color }, style]} />
   );
 }

@@ -28,6 +28,7 @@ import { SCORE_COLORS } from '../lib/scoring';
 import { todayKey } from '../lib/dates';
 import { resolveProtocol } from '../lib/scoring/day';
 import { detectDownturn } from '../lib/scoring/downturn';
+import { detectStrain } from '../lib/scoring/strain';
 import { dueMilestone, formatMsLeft, liveOffer, offerMsLeft } from '../lib/upsell/annual';
 import { FORCE_ANNUAL_OFFER, annualMemory, noteAnnualOfferCollapsed, noteAnnualOfferStarted } from '../lib/upsell/annualMemory';
 import { noteAnnualOfferPacing } from '../lib/upsell';
@@ -115,7 +116,7 @@ export function AnnualOfferCard() {
     // Functional update so re-adopting the window seeded above is a no-op
     // rather than a fresh object identity and another render.
     if (live) { settled.current = true; setOffer((o) => o ?? live); return; }
-    // 'trial' here means the 7-day install window is still running (a live
+    // 'trial' here means the 14-day install window is still running (a live
     // offer would have been adopted above) and 'pro' means there is nothing to
     // sell. Either way, don't spend a milestone on them.
     if (tier !== 'free') return;
@@ -127,6 +128,9 @@ export function AnnualOfferCard() {
     if (state.settings.crashAlert?.lastFired === todayKey()) return;
     if (detectDownturn(state.days, todayKey(), { sex: state.profile.sex, height: state.profile.height },
       resolveProtocol(state.settings.protocol), state.customTypes)) return;
+    // Same for the warning card's other detector: a caution on the Journal and
+    // a half-price offer under it is exactly the pairing to avoid.
+    if (detectStrain(state.days, todayKey(), { sex: state.profile.sex, height: state.profile.height })) return;
 
     settled.current = true;
     const next = noteAnnualOfferStarted(due, now);

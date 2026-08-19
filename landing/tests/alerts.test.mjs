@@ -126,6 +126,67 @@ AL.reset();
 check('reset drops the baseline, so the next report seeds again',
   AL.sync(NEXT) === null);
 
+/* ---------------------------------------------------------- activations */
+
+/* An activation row carries a sensor letter as well as a store one. */
+const arow = (day, cohorts) => ({
+  day,
+  total: cohorts.reduce((a, c) => a + c[3], 0),
+  cohorts: cohorts.map(([cohort, platform, method, count]) => ({ cohort, platform, method, count }))
+});
+
+const ACT_BASE = Object.assign({}, BASE, {
+  act: [
+    arow(D1, [[D1, 'I', 'B', 2], [D1, 'A', 'F', 1]]),
+    arow(D2, [[D2, 'I', 'W', 1]])
+  ]
+});
+
+const a0 = AL.snapshot(ACT_BASE);
+check('activations are counted whole', a0.activations === 4, String(a0.activations));
+check('and split by SENSOR, not by store',
+  JSON.stringify(a0.activationsBy) === JSON.stringify({ B: 2, F: 1, W: 1 }),
+  JSON.stringify(a0.activationsBy));
+check('a report with no act rows has zero activations, not undefined',
+  AL.snapshot(BASE).activations === 0 && JSON.stringify(AL.snapshot(BASE).activationsBy) === '{}');
+check('an unreadable sensor letter is still an activation',
+  AL.snapshot({ open: [], sub: [], act: [arow(D1, [[D1, 'I', 'Z', 3]])] }).activationsBy['?'] === 3);
+
+const ACT_MORE = Object.assign({}, BASE, {
+  act: ACT_BASE.act.concat([arow(D3, [[D1, 'I', 'F', 2]])])
+});
+const dAct = AL.diff(a0, AL.snapshot(ACT_MORE));
+check('a new activation day is news', dAct.activations === 2, String(dAct.activations));
+check('and names the sensor it used', AL.sensorLine(dAct.activationsBy) === '2 phone camera',
+  AL.sensorLine(dAct.activationsBy));
+check('activations alone are enough to be an event', dAct.any === true);
+
+/* The same clamp every other counter obeys: the report is a sliding window, so
+   a day dropping off the back is not a fall. */
+check('a lost activation day is never a negative',
+  AL.diff(a0, AL.snapshot(BASE)).activations === 0);
+
+/* THE DEPLOY CASE. A baseline stored by the previous version has no
+   `activations` at all, and every day in it would otherwise read as a rise
+   from zero — announcing the whole back catalogue of first readings as news on
+   the first refresh after this shipped. */
+const legacyBase = AL.snapshot(BASE);
+delete legacyBase.activations;
+delete legacyBase.activationsBy;
+Object.keys(legacyBase.days).forEach((k) => {
+  delete legacyBase.days[k].activations;
+  delete legacyBase.days[k].activationsBy;
+});
+const dLegacy = AL.diff(legacyBase, a0);
+check('a baseline that predates the counter announces no activations',
+  dLegacy.activations === 0, String(dLegacy.activations));
+check('and does not become an event on their account alone',
+  dLegacy.any === false, JSON.stringify(dLegacy));
+
+/* Once the baseline knows about them, the next arrival is news as normal. */
+check('the baseline written in its place does see the next one',
+  AL.diff(a0, AL.snapshot(ACT_MORE)).activations === 2);
+
 /* -------------------------------------------------------------- report */
 
 let failed = 0;

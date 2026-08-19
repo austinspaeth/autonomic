@@ -1,5 +1,6 @@
 import {
-  IMPORTED_HRV_MIN_SEC, isTrustedReading, rrCoverageSec, stampImportedHrvCoverage, trustedReadings,
+  IMPORTED_HRV_MIN_SEC, hasHrvReading, isTrustedReading, rrCoverageSec,
+  stampImportedHrvCoverage, trustedReadings,
 } from '../hrvQuality';
 import { defaultState, blankDay } from '../migrate';
 import { scoreSet, metricHistory } from '../scoring/day';
@@ -107,5 +108,38 @@ describe('stampImportedHrvCoverage', () => {
   it('rrCoverageSec sums RR intervals into whole seconds', () => {
     expect(rrCoverageSec([1000, 900, 1100])).toBe(3);
     expect(rrCoverageSec(undefined)).toBe(0);
+  });
+});
+
+describe('has this journal got a baseline yet', () => {
+  const days = (map: Record<string, Entry[]>) => {
+    const out: Record<string, DayRecord> = {};
+    Object.keys(map).forEach((dk) => { out[dk] = dayWith(map[dk]); });
+    return out as AppState['days'];
+  };
+
+  it('is false on an empty journal', () => {
+    expect(hasHrvReading(undefined)).toBe(false);
+    expect(hasHrvReading({} as AppState['days'])).toBe(false);
+    expect(hasHrvReading(days({ '2026-07-01': [] }))).toBe(false);
+  });
+
+  it('is false for a journal holding only non-HRV readings', () => {
+    expect(hasHrvReading(days({ '2026-07-01': [{ id: 'b', type: 'bp', time: '08:00' } as Entry] }))).toBe(false);
+  });
+
+  it('is true for an in-app capture of either kind, however short', () => {
+    expect(hasHrvReading(days({ '2026-07-01': [hrv({ durationSec: 30 })] }))).toBe(true);
+    expect(hasHrvReading(days({ '2026-07-01': [hrv({ type: 'breathHrv' })] }))).toBe(true);
+  });
+
+  it('does not let an untrusted import retire the card', () => {
+    // A year of the watch's one-minute samples is exactly what this module
+    // refuses everywhere else; the Journal's first-reading slot is no exception.
+    expect(hasHrvReading(days({ '2026-07-01': [hrv({ imported: true, durationSec: 60 })] }))).toBe(false);
+    expect(hasHrvReading(days({
+      '2026-07-01': [hrv({ imported: true, durationSec: 60 })],
+      '2026-07-02': [hrv({ id: 'r2', imported: true, durationSec: IMPORTED_HRV_MIN_SEC })],
+    }))).toBe(true);
   });
 });

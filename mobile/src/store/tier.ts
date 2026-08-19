@@ -1,7 +1,7 @@
 /**
  * Freemium tier store — the stateful side of src/lib/tier.ts.
  *
- * Composes the store entitlement (src/store/iap.ts) with a local 7-day
+ * Composes the store entitlement (src/store/iap.ts) with a local 14-day
  * full-access window stamped on first launch. The stamp lives in its own tiny
  * plaintext MMKV instance (`autonomic.flags`), deliberately outside the
  * journal: it isn't health data, must never ride export/import/replaceState,
@@ -75,7 +75,7 @@ function effectiveIsPro(): boolean {
 }
 
 /**
- * Milliseconds of full access left from either window — the 7-day install trial
+ * Milliseconds of full access left from either window — the 14-day install trial
  * or the 24-hour unlock that rides with the half-off annual offer
  * (src/lib/upsell/annual). Whichever runs longer is the one that matters.
  */
@@ -122,7 +122,7 @@ export function recheckTier(): Tier {
 
 /** Call once at app start (after initIap). Stamps the trial window on first
  *  launch — existing installs updating to the freemium build get a fresh
- *  7 days, by design. */
+ *  14 days, by design. */
 export function initTier() {
   if (started) return;
   started = true;

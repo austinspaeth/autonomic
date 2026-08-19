@@ -420,6 +420,29 @@
       </div>
     </div>
 
+    <!-- ---------- 5c. activation ----------
+         The counter's third route. Installing is not using: without a first
+         HRV reading there is no score, no trend and nothing to come back for,
+         so this is the funnel step between "downloaded" and "retained". -->
+    <div class="grid two-col" style="margin-bottom:14px">
+      <div class="card">
+        <header><h2>Activation</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="pgActivationAge">Table</button></header>
+        <p class="hint">How old an install was when it saved its <b>first HRV reading</b> — the moment the app starts working at all. Same buckets as purchase timing, so the two are read off one axis. A healthy onboarding puts nearly everything in <b>D0</b>; weight further right means people are leaving the wizard without a reading and coming back for it later. Activation fires once per install, so unlike the active counts these rows really do count people.</p>
+        <div id="pgActivationAge"></div>
+        <div id="pgActivationAge-table" class="hidden" style="margin-top:12px"></div>
+        <div id="pgActivationRates"></div>
+      </div>
+      <div class="card">
+        <header><h2>How the first reading is taken</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="pgMethods">Table</button></header>
+        <p class="hint">Which sensor the activating reading used. Apple Watch is offered on iPhone only, so its share is a share of iOS and not of everyone — the platform filter above is how to read it honestly. A camera-heavy split says people are activating on the option that needs no hardware, which activates more of them but produces the weakest signal.</p>
+        <div id="pgMethods"></div>
+        <div id="pgMethods-table" class="hidden" style="margin-top:12px"></div>
+        <div id="pgMethodNote"></div>
+      </div>
+    </div>
+
     <!-- ---------- 5b. which store ---------- -->
     <div class="card" style="margin-bottom:14px">
       <header><h2>iOS vs Android, day by day</h2><span class="spacer"></span>

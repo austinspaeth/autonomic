@@ -88,7 +88,7 @@ functions:
   # protecting: one date, no identifier, no body. See lambdas/ping/main.js.
   ping:
     handler: lambdas/ping/main.handler
-    description: Anonymous cohort ping from the mobile app (open + subscribe)
+    description: Anonymous cohort ping from the mobile app (open + subscribe + activation)
     memorySize: 256
     timeout: 5
     events:
@@ -98,6 +98,11 @@ functions:
       - httpApi:
           method: GET
           path: /ping/sub/{cohort}
+      # First HRV reading ever saved by an install. The code carries one extra
+      # letter for the sensor it used (W watch / B strap / F finger).
+      - httpApi:
+          method: GET
+          path: /ping/act/{cohort}
       # Reading the counters back. Not public — guarded by PING_REPORT_KEY,
       # which is unset by default, and an unset key refuses everyone.
       - httpApi:
@@ -196,6 +201,9 @@ resources:
     SubPingEndpoint:
       Description: Mobile app subscribe ping (cohort is D{MMDDYY}{platform})
       Value: !Sub https://${param:apiDomain}/ping/sub/{cohort}
+    ActPingEndpoint:
+      Description: Mobile app activation ping (cohort is D{MMDDYY}{platform}{method})
+      Value: !Sub https://${param:apiDomain}/ping/act/{cohort}
     PingReportEndpoint:
       Description: Read the ping counters (needs ?key= — see sls/README.md)
       Value: !Sub https://${param:apiDomain}/ping/report
