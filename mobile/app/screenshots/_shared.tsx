@@ -20,7 +20,7 @@ export const SG = {
 /** The scene catalogue (drives the index list + ordering). */
 export const SCENES: { slug: string; n: number; title: string; caption: string }[] = [
   { slug: 'journal', n: 1, title: 'See your nervous system recover', caption: 'For long COVID, POTS & dysautonomia recovery.' },
-  { slug: 'breathing', n: 2, title: 'Measure your HRV as you breathe', caption: 'Five guided minutes with a chest strap, your camera, or Apple Watch.' },
+  { slug: 'breathing', n: 2, title: 'Measure your HRV as you breathe', caption: 'Five guided minutes with a chest strap, Apple Watch, or your camera.' },
   { slug: 'measure', n: 3, title: 'A clinical HRV lab in your pocket', caption: 'Every metric, computed on-device.' },
   { slug: 'understand', n: 4, title: 'Every reading graded, and what today is good for', caption: 'A plain-language read on your day.' },
   { slug: 'plan', n: 5, title: 'Build your own recovery protocol', caption: 'You define the clean day. The app holds you to it.' },
