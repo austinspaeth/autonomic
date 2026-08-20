@@ -8,8 +8,8 @@ keywords: "respiratory sinus arrhythmia, RSA, breathing and heart rate variabili
 date: 2026-08-20
 updated: 2026-08-20
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1522075782449-e45a34f1ddfb?q=80&w=1760&auto=format&fit=crop"
-photoAttribution: "Sage Friedman / Unsplash"
+photoLocation: "https://images.unsplash.com/photo-1465409042654-5314e9d1754b?q=80&w=1470&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+photoAttribution: "Unsplash"
 tldr: "Respiratory sinus arrhythmia (RSA) is the rise and fall of your heart rate across a single breath: it speeds up as you inhale and slows as you exhale, driven by the vagus nerve. That breathing-linked swing is the largest part of your short-term HRV, which is why RMSSD and HF power climb when you breathe slowly and shrink when you breathe fast or shallow. A healthy RSA is a sign of good vagal tone. It tends to run small in POTS and long COVID, and it is one of the few HRV features you can deliberately change in real time by slowing your breath."
 categories:
   - hrv
