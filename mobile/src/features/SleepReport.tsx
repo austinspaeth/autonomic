@@ -89,11 +89,17 @@ const SLEEP_HELP: Record<string, HelpContent> = {
 
 /* ---------- the sheet ---------- */
 
-export function SleepReportSheet({ dk }: { dk: string }) {
-  const p = usePalette();
+/**
+ * Build one night's report from the journal plus the night's series in the
+ * waveform sidecar. Exported because the dev-only screenshot scenes render
+ * `SleepReportBody` in their own scroller (they need to pin the scroll
+ * position), and a second copy of this assembly would be a second chance for
+ * the two to disagree about what a night is.
+ */
+export function useSleepReport(dk: string): SleepReport | null {
   useAppState(); // re-render after an edit underneath
   const state = getState();
-  const report = useMemo(() => {
+  return useMemo(() => {
     const ctx = { sex: state.profile.sex, height: state.profile.height };
     // The night's series lives in the waveform sidecar, never the journal, so
     // it is read here and handed to the (store-free) builder.
@@ -110,6 +116,11 @@ export function SleepReportSheet({ dk }: { dk: string }) {
       hr: w?.sampledHr, resp: w?.sampledResp, spans: w?.stageSpans, hrByDay,
     });
   }, [state.days, dk, state.settings.protocol, state.profile.sex, state.profile.height]);
+}
+
+export function SleepReportSheet({ dk }: { dk: string }) {
+  const p = usePalette();
+  const report = useSleepReport(dk);
 
   if (!report) return null;
   // "Logged by hand" is the honest label for a night with no heart rate and no

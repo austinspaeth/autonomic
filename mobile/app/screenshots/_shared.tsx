@@ -26,8 +26,9 @@ export const SCENES: { slug: string; n: number; title: string; caption: string; 
   { slug: 'understand', n: 4, title: 'Every reading graded, and what today is good for', caption: 'A plain-language read on your day.' },
   { slug: 'plan', n: 5, title: 'Build your own recovery protocol', caption: 'You define the clean day. The app holds you to it.' },
   { slug: 'live', n: 6, title: 'Track it all: water, meds, even digestion', caption: 'One tap. The whole body, not just heart rate.' },
-  { slug: 'payoff', n: 7, title: 'And watch your numbers climb', caption: '12 weeks of real recovery.' },
-  { slug: 'trust', n: 8, title: '100% on your phone. No cloud, no account, no tracking.', caption: 'Your most sensitive data never leaves your device.' },
+  { slug: 'sleep', n: 7, title: 'Recovery is decided at night', caption: 'Every stage, your overnight heart rate and dip, and how the day after went.' },
+  { slug: 'payoff', n: 8, title: 'And watch your numbers climb', caption: '12 weeks of real recovery.' },
+  { slug: 'trust', n: 9, title: '100% on your phone. No cloud, no account, no tracking.', caption: 'Your most sensitive data never leaves your device.' },
 ];
 
 /** Marketing headline block shared across scenes. Type scales with the device

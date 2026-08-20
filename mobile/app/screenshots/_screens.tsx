@@ -10,6 +10,7 @@ import { BlurView } from 'expo-blur';
 import { parsePattern } from '../../src/features/hrv/BreathingViz';
 import { SessionCard } from '../../src/features/hrv/Session';
 import { HrvResults } from '../../src/features/hrv/Results';
+import { SleepReportBody, useSleepReport } from '../../src/features/SleepReport';
 import { __devMockSession } from '../../src/features/hrv/sessionStore';
 import { Button, Segmented } from '../../src/components/ui';
 import { BrandMark, Icon } from '../../src/components/Icon';
@@ -21,7 +22,7 @@ import { Onboarding } from '../../src/features/Onboarding';
 import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 import { getState, getWaveform, blankDay, __devSwapState } from '../../src/store/store';
 import { MED_TYPES } from '../../src/lib/registry';
-import { addDays, todayKey } from '../../src/lib/dates';
+import { addDays, fmtDateLong, todayKey } from '../../src/lib/dates';
 import { scoreSet, scoreCat, OUTLOOK_GUIDE } from '../../src/lib/scoring/day';
 import type { Entry, Protocol, AppState } from '../../src/lib/types';
 import { radius, usePalette } from '../../src/theme';
@@ -50,6 +51,70 @@ function StatusBar() {
           </View>
           <View style={{ width: 1.5, height: 4, borderRadius: 1, backgroundColor: 'rgba(255,255,255,0.55)', marginLeft: 1 }} />
         </View>
+      </View>
+    </View>
+  );
+}
+
+/* ---------- Scene · the night, in full ---------- */
+
+/**
+ * The real sleep report over the most recent night the journal holds, pinned to
+ * the hypnogram ("Through the night") rather than opened at the top: the verdict
+ * card above it is a grade, and what this scene is claiming is that the whole
+ * night is legible, block by block.
+ *
+ * `SleepReportBody` is the app's own, fed by the app's own `useSleepReport`, so
+ * the stages, the overnight curve and the dip are this user's night rather than
+ * a drawing of one. The scroll offset is pinned rather than measured because a
+ * capture has to be identical every time it is taken.
+ */
+const SLEEP_SCROLL_Y = 578;
+
+/** The last night the journal actually recorded, so the scene never opens on a
+ *  day that has no report to draw. */
+function lastSleepDk(): string | null {
+  const days = getState().days;
+  for (const k of Object.keys(days).sort().reverse()) {
+    const sleep = days[k]?.sleep;
+    if (sleep && sleep.bed && sleep.wake) return k;
+  }
+  return null;
+}
+
+export function SleepNightScreen() {
+  const p = usePalette();
+  const dk = useMemo(lastSleepDk, []);
+  const report = useSleepReport(dk || todayKey());
+  const scrollRef = useRef<ScrollView>(null);
+
+  return (
+    <View style={{ width: DESIGN_W, height: DESIGN_H, backgroundColor: p.bg }}>
+      <StatusBar />
+      <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: p.overlay }} />
+      <View style={{
+        position: 'absolute', left: 0, right: 0, bottom: 0, top: 52,
+        backgroundColor: p.surface, borderColor: p.border, borderWidth: StyleSheet.hairlineWidth,
+        borderTopLeftRadius: 18, borderTopRightRadius: 18, overflow: 'hidden',
+      }}>
+        <ScrollView
+          ref={scrollRef}
+          style={{ flex: 1 }}
+          contentContainerStyle={{ padding: 18, paddingTop: 22, paddingBottom: 40 }}
+          showsVerticalScrollIndicator={false}
+          scrollEnabled={false}
+          onContentSizeChange={() => scrollRef.current?.scrollTo({ y: SLEEP_SCROLL_Y, animated: false })}
+        >
+          {report && dk ? (
+            <>
+              <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, paddingRight: 100 }}>Sleep report</Text>
+              <Text style={{ color: p.textDim, fontSize: 14, marginTop: 2, marginBottom: 14, paddingRight: 100 }}>{fmtDateLong(dk)}</Text>
+              <SleepReportBody report={report} />
+            </>
+          ) : (
+            <Text style={{ color: p.textDim, fontSize: 14 }}>No night recorded. Import the journal first.</Text>
+          )}
+        </ScrollView>
       </View>
     </View>
   );
