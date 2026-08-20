@@ -21,7 +21,9 @@ export default function ScreenshotsIndex() {
             onPress={() => router.push(`/screenshots/${s.slug}` as never)}
             style={({ pressed }) => [{ borderWidth: 1, borderColor: '#303034', borderRadius: 14, padding: 16, marginBottom: 12, backgroundColor: '#1a1a1c' }, pressed && { opacity: 0.6 }]}
           >
-            <Text style={{ color: '#6b6b72', fontFamily: SG.semi, fontSize: 12, letterSpacing: 1 }}>{`SCENE ${s.n}`}</Text>
+            <Text style={{ color: '#6b6b72', fontFamily: SG.semi, fontSize: 12, letterSpacing: 1 }}>
+              {`SCENE ${s.n}${s.tag ? ` · ${s.tag.toUpperCase()}` : ''}`}
+            </Text>
             <Text style={{ color: '#f2f2f5', fontFamily: SG.bold, fontSize: 18, marginTop: 4 }}>{s.title}</Text>
             <Text style={{ color: '#9a9aa0', fontFamily: SG.med, fontSize: 13, marginTop: 3 }}>{s.caption}</Text>
           </Pressable>
