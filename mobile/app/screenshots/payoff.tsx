@@ -13,7 +13,7 @@ export default function PayoffScene() {
       <StatusBar hidden />
       <AppStoreSlide
         title="And watch your numbers climb"
-        caption="Day, week, month or year. Every reading graded and plotted."
+        caption="By day, week, month or year. Every reading graded and plotted for you."
       >
         <TrendScreen />
       </AppStoreSlide>

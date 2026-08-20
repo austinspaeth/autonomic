@@ -27,7 +27,7 @@ export const SCENES: { slug: string; n: number; title: string; caption: string; 
   { slug: 'plan', n: 5, title: 'Build your own recovery protocol', caption: 'You define the clean day. The app holds you to it.' },
   { slug: 'live', n: 6, title: 'Track it all: water, meds, even digestion', caption: 'One tap. The whole body, not just heart rate.' },
   { slug: 'sleep', n: 7, title: 'Recovery is decided at night', caption: 'Every stage, your overnight heart rate and dip, and how the day after went.' },
-  { slug: 'payoff', n: 8, title: 'And watch your numbers climb', caption: 'Day, week, month or year. Every reading graded and plotted.' },
+  { slug: 'payoff', n: 8, title: 'And watch your numbers climb', caption: 'By day, week, month or year. Every reading graded and plotted for you.' },
   { slug: 'trust', n: 9, title: '100% on your phone. No cloud, no account, no tracking.', caption: 'Your most sensitive data never leaves your device.' },
 ];
 
