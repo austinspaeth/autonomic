@@ -14,7 +14,7 @@ export default function MeasureScene() {
       <StatusBar hidden />
       <AppStoreSlide
         title="A clinical HRV lab in your pocket"
-        caption="Every metric, computed on-device."
+        caption="Every metric computed and graded on your phone. Nothing is uploaded, ever."
       >
         <ResultsScreen />
       </AppStoreSlide>

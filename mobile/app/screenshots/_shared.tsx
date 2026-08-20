@@ -22,7 +22,7 @@ export const SCENES: { slug: string; n: number; title: string; caption: string; 
   { slug: 'journal', n: 1, title: 'See your nervous system recover', caption: 'For long COVID, POTS & dysautonomia recovery.' },
   { slug: 'breathing', n: 2, title: 'Measure your HRV as you breathe', caption: 'Five guided minutes with a chest strap, Apple Watch, or your camera.', tag: 'App Store' },
   { slug: 'breathing-play', n: 2, title: 'Measure your HRV as you breathe', caption: 'Five guided minutes with a chest strap or your phone camera.', tag: 'Play Store' },
-  { slug: 'measure', n: 3, title: 'A clinical HRV lab in your pocket', caption: 'Every metric, computed on-device.' },
+  { slug: 'measure', n: 3, title: 'A clinical HRV lab in your pocket', caption: 'Every metric computed and graded on your phone. Nothing is uploaded, ever.' },
   { slug: 'understand', n: 4, title: 'Every reading graded, and what today is good for', caption: 'A plain-language read on your day.' },
   { slug: 'plan', n: 5, title: 'Build your own recovery protocol', caption: 'You define the clean day. The app holds you to it.' },
   { slug: 'live', n: 6, title: 'Track it all: water, meds, even digestion', caption: 'One tap. The whole body, not just heart rate.' },
