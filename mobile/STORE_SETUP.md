@@ -376,8 +376,8 @@ that is the promotional-offer project, and it starts with a `sls/` endpoint.
 ## Part 7 — The founding-member offer (`annual_founder_first_year`)
 
 The card in `src/features/FounderOffer.tsx`, raised in the Journal on the ONE
-day after a user has logged three days of their own content, while the local
-14-day trial is still running. It never returns and the ✕ / "No thanks" retires
+day after a user has logged five days of their own content (`FOUNDER_MIN_DAYS`),
+while the local 14-day trial is still running. It never returns and the ✕ / "No thanks" retires
 it permanently — see `src/lib/upsell/founder.ts` for the rules.
 
 Unlike Part 6 this is **not** a separate product on iOS. It is an
@@ -403,7 +403,13 @@ purchase time — `FOUNDER_SKU` is just `YEARLY_SKU` and StoreKit does the rest.
 ### App Store Connect
 
 1. **Monetization → Subscriptions →** `com.autonomic.journal.yearly`
-2. **Introductory Offers → +**
+2. **Introductory Offers → +** — this is the right section. **Promotional
+   Offers** is a different feature: those are targeted at an existing subscriber
+   and every purchase must be signed by your server with a **subscription key**,
+   which is what App Store Connect is asking for when it says "You need to
+   create a subscription key before your promotional offers can be used by
+   customers". This app signs nothing, so a promotional offer here would never
+   be redeemable. Introductory offers need no key and no server.
 3. Reference name `annual_founder_first_year`, territories = all, no end date
    (or one, if the founding window is meant to close).
 4. Type **Pay up front**, duration **1 year**, price **$34.99** (or whatever
@@ -439,5 +445,5 @@ Before you call it done:
 - [ ] "Restore purchase" works on a second device
 - [ ] Annual offer card shows a **real localized $24.99**, not the fallback, and "Claim half off" completes a purchase on both stores
 - [ ] `FORCE_TIER` is `null`, `FORCE_ANNUAL_OFFER` is `null`, `FORCE_FOUNDER_OFFER` is `false` and `PREVIEW_PAYWALL` is `false` in the shipped commit
-- [ ] Founding-member card: three logged days, then the next day's launch shows it once, the price line reads a **real** localized introductory price, and "No thanks" retires it permanently
+- [ ] Founding-member card: five logged days, then the next day's launch shows it once, the price line reads a **real** localized introductory price, and "No thanks" retires it permanently
 - [ ] Fresh install → 14 days full access with no store call and no account
