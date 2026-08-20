@@ -17,6 +17,19 @@ import { psdCurve } from '../lib/hrv';
 import { zoneFor, type HrZone } from '../lib/workoutZones';
 import { STAGE_COLORS } from '../lib/sleep/stages';
 
+/**
+ * Which x positions carry a date label: every `step`th tick, plus the last one
+ * so the range always states where it ends. The second clause is what keeps
+ * those two from colliding — with 14 buckets at a step of 3 the regular tick
+ * lands one slot short of the end, and "8/19" and "8/20" printed on top of each
+ * other. A regular tick inside half a step of the end yields to the end.
+ */
+function labelTick(i: number, n: number, step: number) {
+  if (i === n - 1) return true;
+  if (i % step !== 0) return false;
+  return n - 1 - i >= Math.ceil(step / 2);
+}
+
 /* HRV frequency bands (Hz) — kept local to the chart so it has no lib/hrv dep. */
 /* Sleep bars share the stage palette's core blue, so a night reads the same
  * colour everywhere it appears. */
@@ -563,7 +576,7 @@ export function LineChart({ buckets, series, zones, integer, height = 140, targe
               <SvgText x={padL - 4} y={yAt(val) + 3} textAnchor="end" fontSize={9} fontFamily={fonts.mono} fill={p.textDim}>{fmtNum(integer ? Math.round(val) : val)}</SvgText>
             </React.Fragment>
           ))}
-          {buckets.map((b, i) => (i % step === 0 || i === n - 1) ? <SvgText key={i} x={xAt(i)} y={H - 6} textAnchor="middle" fontSize={9} fontFamily={fonts.mono} fill={p.textDim}>{b.label}</SvgText> : null)}
+          {buckets.map((b, i) => labelTick(i, n, step) ? <SvgText key={i} x={xAt(i)} y={H - 6} textAnchor="middle" fontSize={9} fontFamily={fonts.mono} fill={p.textDim}>{b.label}</SvgText> : null)}
           {zoneLines.map((z) => (
             <React.Fragment key={`z${z.key}`}>
               <Line x1={padL} x2={padL + innerW} y1={yAt(z.v)} y2={yAt(z.v)} stroke={z.color} strokeWidth={1.2} strokeDasharray="4 3" opacity={0.85} />
@@ -1172,7 +1185,7 @@ export function BalanceChart({ pns, sns, height = 168, values, desc, defaultWhen
             <Line x1={padL} x2={W - padR} y1={zeroY} y2={zeroY} stroke={p.textDim} strokeWidth={1} strokeDasharray="2 3" opacity={0.7} />
           ) : null}
           {/* X date labels. */}
-          {pns.slice(0, n).map((d, i) => (i % step === 0 || i === n - 1) ? <SvgText key={i} x={xAt(i)} y={H - 6} textAnchor="middle" fontSize={9} fontFamily={fonts.mono} fill={p.textDim}>{xLabel(d.date)}</SvgText> : null)}
+          {pns.slice(0, n).map((d, i) => labelTick(i, n, step) ? <SvgText key={i} x={xAt(i)} y={H - 6} textAnchor="middle" fontSize={9} fontFamily={fonts.mono} fill={p.textDim}>{xLabel(d.date)}</SvgText> : null)}
           {/* Balance fill, then the two lines on top. */}
           <Path d={fill} fill={`url(#${gid})`} opacity={0.42} />
           <Path d={pnsPath} fill="none" stroke={PNS_LINE} strokeWidth={1.8} strokeLinejoin="round" strokeLinecap="round" />
@@ -1320,7 +1333,7 @@ export function BpDumbbell({ buckets, sys, dia, height = 180 }: {
               <SvgText x={padL - 4} y={yAt(val) + 3} textAnchor="end" fontSize={9} fontFamily={fonts.mono} fill={p.textDim}>{Math.round(val)}</SvgText>
             </React.Fragment>
           ))}
-          {buckets.map((b, i) => (i % step === 0 || i === n - 1) ? <SvgText key={i} x={xAt(i)} y={H - 6} textAnchor="middle" fontSize={9} fontFamily={fonts.mono} fill={p.textDim}>{b.label}</SvgText> : null)}
+          {buckets.map((b, i) => labelTick(i, n, step) ? <SvgText key={i} x={xAt(i)} y={H - 6} textAnchor="middle" fontSize={9} fontFamily={fonts.mono} fill={p.textDim}>{b.label}</SvgText> : null)}
           {buckets.map((_, i) => {
             const s = sys[i], d = dia[i];
             if (s == null || d == null) return null;
@@ -1429,7 +1442,7 @@ export function StackedBars({ buckets, segments, height = 160, unit, hideHeader,
                   const op = selIdx >= 0 ? (i === selIdx ? 1 : 0.55) : 0.9;
                   return <Rect key={si} x={x} y={y1} width={barW} height={h} rx={Math.min(3, h / 2)} fill={seg.color} opacity={op} />;
                 })}
-                {(i % step === 0 || i === n - 1) ? <SvgText x={xCenter(i)} y={H - 6} textAnchor="middle" fontSize={9} fontFamily={fonts.mono} fill={p.textDim}>{b.label}</SvgText> : null}
+                {labelTick(i, n, step) ? <SvgText x={xCenter(i)} y={H - 6} textAnchor="middle" fontSize={9} fontFamily={fonts.mono} fill={p.textDim}>{b.label}</SvgText> : null}
               </G>
             );
           })}
@@ -1553,7 +1566,7 @@ export function SleepScheduleChart({ nights, height = 200, onSelect }: {
             <SvgText x={padL - 4} y={yAt(t) + 3} textAnchor="end" fontSize={9} fontFamily={fonts.mono} fill={p.textDim}>{shortClock(t)}</SvgText>
           </React.Fragment>
         ))}
-        {nights.map((q, i) => (i % step === 0 || i === n - 1)
+        {nights.map((q, i) => labelTick(i, n, step)
           ? <SvgText key={`x${i}`} x={xAt(i)} y={H - 5} textAnchor="middle" fontSize={9} fontFamily={fonts.mono} fill={p.textDim}>{fmtShort(q.dk)}</SvgText>
           : null)}
         {nights.map((q, i) => {

@@ -528,28 +528,38 @@ export function LiveJournalScreen() {
 }
 
 /**
- * Analysis trend screen: the REAL Progress-tab HRV section (HrvProgress) over the
- * real 12-week seed data, at Week range, filter All — scrolled to the SDNN and
- * RMSSD cards, each a grade-gradient line climbing steadily with its "Show zones"
- * link. Pinned range selector + filter header and the nav bar (Progress active).
+ * Progress, at the Day range with SDNN in view. The real `HrvProgress` over the
+ * real journal, so the trace, the grade zones and the averages are the user's
+ * own fortnight rather than a drawn line.
+ *
+ * The scroll is not a magic number: HrvProgress reports where each metric block
+ * sits (`onCardLayout`), so the scene asks for SDNN by name and lands on it
+ * whatever else the section decides to draw above it.
  */
 export function TrendScreen() {
   const p = usePalette();
   const days = getState().days;
   const ctx = { sex: getState().profile.sex, height: getState().profile.height };
   const scrollRef = useRef<ScrollView>(null);
+  const cardY = useRef<number | null>(null);
+  const toSdnn = () => {
+    if (cardY.current == null) return;
+    scrollRef.current?.scrollTo({ y: Math.max(0, cardY.current - 8), animated: false });
+  };
   return (
     <View style={{ width: DESIGN_W, height: DESIGN_H, backgroundColor: '#000' }}>
       <StatusBar />
-      {/* Pinned range selector + HRV filter (matches the Analysis header). */}
+      {/* Pinned range selector + HRV filter (matches the Progress header). */}
       <View style={{ paddingHorizontal: 16, paddingTop: 6, paddingBottom: 12 }}>
         <Segmented
           options={[{ val: 'day', label: 'Day' }, { val: 'week', label: 'Week' }, { val: 'month', label: 'Month' }, { val: 'year', label: 'Year' }]}
-          value="week" onChange={() => {}}
+          value="day" onChange={() => {}}
         />
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 14 }}>
-          <Text style={{ fontSize: 21, fontWeight: '700', color: p.text }}>HRV</Text>
-          <HrvFilterLinks value="all" onChange={() => {}} />
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 14, minHeight: 34 }}>
+          <Text style={{ fontSize: 20, fontWeight: '700', color: p.text }}>HRV</Text>
+          <View style={{ flexShrink: 1, marginLeft: 12, alignItems: 'flex-end' }}>
+            <HrvFilterLinks value="all" onChange={() => {}} />
+          </View>
         </View>
       </View>
       <ScrollView
@@ -557,21 +567,19 @@ export function TrendScreen() {
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 150 }}
         showsVerticalScrollIndicator={false}
-        onContentSizeChange={() => scrollRef.current?.scrollTo({ y: 402, animated: false })}
+        scrollEnabled={false}
+        onContentSizeChange={toSdnn}
       >
-        <HrvProgress days={days} mode="week" ctx={ctx} filt="all" />
+        <HrvProgress
+          days={days} mode="day" ctx={ctx} filt="all"
+          onCardLayout={(card, y) => { if (card === 'SDNN') { cardY.current = y; toSdnn(); } }}
+        />
       </ScrollView>
       <JournalNavBar active="Progress" />
     </View>
   );
 }
 
-/**
- * Trust screen: the REAL onboarding wizard frozen on step 2 (Private & on-device)
- * — full chrome: back button + progress dots up top, the privacy content, and the
- * Continue button. A controlled SafeAreaProvider keeps the insets sane inside the
- * scaled canvas; a faux status bar sits over the top.
- */
 export function TrustScreen() {
   return (
     <View style={{ width: DESIGN_W, height: DESIGN_H, backgroundColor: '#0a0a0b' }}>

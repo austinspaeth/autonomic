@@ -13,7 +13,7 @@ export default function PayoffScene() {
       <StatusBar hidden />
       <AppStoreSlide
         title="And watch your numbers climb"
-        caption="12 weeks of real recovery."
+        caption="Day, week, month or year. Every reading graded and plotted."
       >
         <TrendScreen />
       </AppStoreSlide>
