@@ -13,8 +13,8 @@ export default function BreathingScene() {
     <>
       <StatusBar hidden />
       <AppStoreSlide
-        title="Paced breathing, beat by beat"
-        caption="Live HRV from a chest strap, your camera, or Apple Watch."
+        title="Measure your HRV as you breathe"
+        caption="Five guided minutes with a chest strap, your camera, or Apple Watch."
       >
         <BreathSessionScreen />
       </AppStoreSlide>
