@@ -59,14 +59,16 @@ equivalent field), and the terms most worth buying if space frees up are `cfs`,
 **Not a listing change, but must be true before the build is live** — see
 `STORE_SETUP.md`:
 
-- [ ] Part 7's `annual_founder_first_year` is an **Introductory Offer** on
-      `com.autonomic.journal.yearly`, NOT a promotional offer. Promotional
-      offers must be signed by your server with a subscription key, which this
-      app has no endpoint for; introductory offers are applied by StoreKit on
-      their own and need no key. If App Store Connect is asking for a
-      subscription key, the offer was created in the wrong place.
-- [ ] Part 6's `com.autonomic.journal.yearly.promo` exists on both stores (the
-      annual offer card, and the Android founder card's SKU).
+- [ ] **`annual_founder_first_year` is deleted (or inactive) in App Store
+      Connect.** The founding-member card no longer uses an introductory offer:
+      Apple applies one to every eligible subscriber from the ordinary paywall,
+      so it could never be exclusive to the card. While it exists, every new
+      yearly subscriber gets a discounted first year for nothing. See
+      `STORE_SETUP.md` Part 7.
+- [ ] Part 6's `com.autonomic.journal.yearly.promo` exists and is ACTIVE on both
+      stores. It is now the product behind BOTH the annual offer card and the
+      founding-member card, so a missing or inactive product breaks two
+      surfaces, not one.
 - [ ] Neither store has a free-trial intro offer configured. The app's 14-day
       window is local (`TRIAL_DAYS`, `src/lib/tier.ts`) and needs no store
       product; `hasTrial()` reads the live product, so with no offer the paywall

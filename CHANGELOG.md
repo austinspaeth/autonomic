@@ -7,6 +7,15 @@ in the app's "What's new" card are a separate, deliberately plainer log in
 `mobile/src/lib/whatsNew.ts` — update it whenever `version` in `mobile/app.json`
 crosses to a new `x.x` (a unit test fails if the shipping minor has no entry).
 
+## 1.25.2
+
+- **The founding-member card sells `PROMO_YEARLY_SKU`, not an introductory offer.** `FOUNDER_SKU` loses its platform branch: both stores now send the card at the same discounted year the annual offer card sells. An introductory offer belongs to the PRODUCT, so Apple applied `annual_founder_first_year` to every eligible subscriber from the ordinary paywall — the card could prompt, but never hold anything back. Apple has no mechanism that targets a never-subscribed user: promotional and win-back offers are for current or lapsed subscribers and must be signed by a server with a subscription key this app has no endpoint for. A separate SKU is the only exclusive discount there is.
+- The trade is that a separate SKU RENEWS at its own price, so the card's copy had to stop claiming otherwise: "your first year is X% off" became "you keep X% off for as long as you stay", and the footer line is now the price it actually renews at. That footer was **already wrong on Android** ("$24.99 first year, then $49.99/yr" over a product that renews at $24.99); this fixes it on both.
+- `introPriceOf` is deleted with its last consumer. Nothing reads a StoreKit introductory price any more.
+- JS only, so it can ship as an OTA update to a build already in the field.
+- `STORE_SETUP.md` Part 7 rewritten around the new shape, including what to do with the offer already created in App Store Connect, and corrected from three logged days to five (`FOUNDER_MIN_DAYS`, 1.25.1).
+- `store-listing.md`: descriptions, What's New and promotional text for 1.25.1 — the live-reading rebuild and the strain detector appeared in neither store. Keywords reviewed and deliberately unchanged.
+
 ## 1.25.0
 
 - **The install trial is 14 days, not 7.** `src/store/tier.ts` doubles the local full-access window stamped on first launch; the copy that states it moved with it (paywall, Settings, `store-listing.md`, landing page). Existing installs updating into this build get a fresh 14 days, the same rule the 7-day window had. Note there is no "trial consumed" latch — the tier is re-derived from the install stamp every launch — so this also returns anyone whose install is 7 to 14 days old to `'trial'` for the remainder.

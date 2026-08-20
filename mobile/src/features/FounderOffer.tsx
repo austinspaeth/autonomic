@@ -25,7 +25,7 @@ import { useSheets } from '../components/Sheet';
 import { radius, usePalette } from '../theme';
 import { useAppState } from '../store/store';
 import { useTier } from '../store/tier';
-import { FOUNDER_SKU, YEARLY_SKU, introPriceOf, priceOf, subscribe, useIap } from '../store/iap';
+import { FOUNDER_SKU, YEARLY_SKU, priceOf, subscribe, useIap } from '../store/iap';
 import { todayKey } from '../lib/dates';
 import { resolveProtocol } from '../lib/scoring/day';
 import { detectDownturn } from '../lib/scoring/downturn';
@@ -93,14 +93,12 @@ export function FounderOfferCard() {
 
   const full = priceOf(products.find((s) => s.productId === YEARLY_SKU), YEARLY_SKU);
   const founder = products.find((s) => s.productId === FOUNDER_SKU);
-  // iOS: the introductory price StoreKit says THIS user is eligible for.
-  // Android: FOUNDER_SKU is its own discounted product, so its recurring price
-  // is the offer price. Null on iOS means not eligible, and the card then
-  // simply sells the year at its ordinary price rather than inventing a saving.
-  const offerPrice = useMemo(
-    () => introPriceOf(founder) ?? (FOUNDER_SKU !== YEARLY_SKU ? priceOf(founder, FOUNDER_SKU) : null),
-    [founder],
-  );
+  // FOUNDER_SKU is its own discounted product on both stores, so its RECURRING
+  // price is the offer price: this is a permanently discounted year, not a
+  // discounted first one, and the copy below says so. (It used to be an iOS
+  // introductory offer, which Apple applies to every eligible user from the
+  // ordinary paywall — a card that could prompt but never hold anything back.)
+  const offerPrice = useMemo(() => priceOf(founder, FOUNDER_SKU), [founder]);
   const pct = offerPrice ? discountPct(offerPrice, full) : null;
 
   if (!live || dismissed || tier === 'pro') return null;
@@ -140,9 +138,9 @@ export function FounderOfferCard() {
             morning, but a red banner saying so turned the card into a
             countdown ad. */}
         Pro shows you your full history and every trend, so you can see what days like today are made of.
-        {pct ? ' Sign up now and your first year is ' : ' '}
+        {pct ? ' Sign up now and you keep ' : ' '}
         {pct ? <Text style={{ color: p.text, fontWeight: '600' }}>{`${pct}% off`}</Text> : null}
-        {pct ? '. Offer is only available today.' : 'Sign up now at the founding member price. Offer is only available today.'}
+        {pct ? ' for as long as you stay. Offer is only available today.' : 'Sign up now at the founding member price. Offer is only available today.'}
       </Text>
 
       <Pressable
@@ -165,9 +163,11 @@ export function FounderOfferCard() {
       ) : null}
 
       <Text style={{ fontSize: 12, color: p.textDim, textAlign: 'center', marginTop: 11 }}>
-        {offerPrice && offerPrice !== full
-          ? `${offerPrice} first year, then ${full}/yr, cancel anytime`
-          : `${full}/yr, cancel anytime`}
+        {/* The price the subscription actually renews at. It said "$X first
+            year, then $49.99/yr" while this was an iOS introductory offer;
+            a separate SKU renews at its own price, so that sentence would now
+            be a false claim about what the user will be charged. */}
+        {`${offerPrice || full}/yr, cancel anytime`}
       </Text>
     </View>
   );

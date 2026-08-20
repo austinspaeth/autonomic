@@ -59,26 +59,24 @@ export const PROMO_YEARLY_SKU = 'com.autonomic.journal.yearly.promo';
 export const PRO_SKUS = [YEARLY_SKU, MONTHLY_SKU, PROMO_YEARLY_SKU];
 
 /**
- * The founding-member offer behind src/features/FounderOffer.tsx.
+ * The founding-member card's product.
  *
- * On the App Store it is NOT a product of its own: it's the INTRODUCTORY offer
- * `annual_founder_first_year` configured on YEARLY_SKU (first year discounted,
- * then renews at the standard yearly price). Apple applies an introductory
- * offer automatically to any eligible subscriber, so there is nothing to pass
- * at purchase time — the card just buys YEARLY_SKU and the store discounts it.
- * Two consequences worth remembering: an eligible user gets the same price from
- * the ordinary paywall (the card is a prompt, not a gate), and a SKU carries at
- * most ONE introductory offer per territory, so this one occupies the slot the
- * free-trial intro offer would otherwise use — the app's 14-day trial is local
- * (src/store/tier.ts), not a StoreKit one, so that is a trade we can make.
+ * It is the SAME discounted year the annual offer card sells
+ * (`PROMO_YEARLY_SKU`), on both platforms, and that is a deliberate retreat
+ * from an iOS introductory offer on the standard yearly plan. An introductory
+ * offer belongs to the PRODUCT, not to the card: every StoreKit-eligible user
+ * would have been given the same first year from the ordinary paywall, so the
+ * card could prompt but never hold something back. Apple has no mechanism that
+ * targets a never-subscribed user — promotional and win-back offers are for
+ * current or lapsed subscribers, and both need a server-signed key this app
+ * has no endpoint for. A separate SKU is the only exclusive discount there is.
  *
- * Google Play has no equivalent of that offer id, so Android sends the card at
- * PROMO_YEARLY_SKU — the existing discounted year, which RENEWS at its own
- * price rather than reverting. The copy is derived from the two prices the
- * store actually returned, so it stays true on both.
+ * The trade is that a separate SKU RENEWS at its own price rather than
+ * reverting to $49.99, so this is a permanently discounted year rather than a
+ * discounted first one. The card's copy says so, and `FounderOffer` derives
+ * every number from the two prices the store actually returned.
  */
-export const FOUNDER_OFFER_ID = 'annual_founder_first_year';
-export const FOUNDER_SKU = Platform.OS === 'android' ? PROMO_YEARLY_SKU : YEARLY_SKU;
+export const FOUNDER_SKU = PROMO_YEARLY_SKU;
 const isProSku = (id?: string) => !!id && PRO_SKUS.includes(id);
 
 /** Fallback prices shown before the store returns the localized ones. */
@@ -176,26 +174,6 @@ export const trialDaysOf = (product: IapProduct | undefined): number | null => {
   if (!m) return null;
   const days = (Number(m[1] || 0) * 7) + Number(m[2] || 0);
   return days > 0 ? days : null;
-};
-
-/**
- * The localized PAID introductory price of a plan for this user, or null.
- *
- * iOS only, and only for a paid intro offer (`pay-up-front` / `pay-as-you-go`)
- * — a free trial reports itself through `hasTrial` instead, and returning its
- * "$0.00" here would let the founder card advertise a free year. Null when
- * StoreKit says this user isn't eligible, which is exactly when the card must
- * not make a discount claim.
- *
- * There is no Android branch: Play models the founder price as its own product
- * (FOUNDER_SKU → PROMO_YEARLY_SKU), whose recurring price IS the offer price.
- */
-export const introPriceOf = (product: IapProduct | undefined): string | null => {
-  const raw = product?.raw;
-  if (!raw || raw.platform !== 'ios') return null;
-  const mode = raw.introductoryPricePaymentModeIOS;
-  if (mode !== 'pay-up-front' && mode !== 'pay-as-you-go') return null;
-  return raw.introductoryPriceIOS || null;
 };
 
 /** Let a local dev build through the paywall so you're never locked out of your

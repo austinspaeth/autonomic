@@ -373,64 +373,58 @@ that is the promotional-offer project, and it starts with a `sls/` endpoint.
 
 ---
 
-## Part 7 — The founding-member offer (`annual_founder_first_year`)
+## Part 7 — The founding-member offer
 
 The card in `src/features/FounderOffer.tsx`, raised in the Journal on the ONE
 day after a user has logged five days of their own content (`FOUNDER_MIN_DAYS`),
-while the local 14-day trial is still running. It never returns and the ✕ / "No thanks" retires
-it permanently — see `src/lib/upsell/founder.ts` for the rules.
+while the local 14-day trial is still running. It never returns and the ✕
+retires it permanently — see `src/lib/upsell/founder.ts` for the rules.
 
-Unlike Part 6 this is **not** a separate product on iOS. It is an
-**introductory offer** on `com.autonomic.journal.yearly`: the first year at a
-discount, then renewal at the standard $49.99. Apple applies an introductory
-offer automatically to every eligible subscriber, so the app passes nothing at
-purchase time — `FOUNDER_SKU` is just `YEARLY_SKU` and StoreKit does the rest.
+**It sells `com.autonomic.journal.yearly.promo`** — the same discounted year the
+annual offer card sells (Part 6), on both stores. `FOUNDER_SKU` is that SKU with
+no platform branch, so there is nothing extra to create in either console.
 
-**Two things to know before setting it up.**
+### Why not an introductory offer on the yearly plan (the previous design)
 
-1. **An eligible user gets the same price from the ordinary paywall.** An
-   introductory offer cannot be targeted at one card. The card is a prompt, not
-   a gate. If the price must be exclusive to the card, it has to become a
-   separate SKU the way Part 6 did, or a server-signed promotional offer (which
-   needs a signing endpoint the app does not have).
-2. **A SKU carries at most one active introductory offer per territory.** This
-   one therefore occupies the slot the store-side free trial would use on the
-   yearly plan. That is fine because the app's trial is local
-   (`TRIAL_DAYS` in `src/lib/tier.ts`), not a StoreKit one — but it means
-   `hasTrial(yearly)` goes false and the paywall's yearly row stops advertising
-   a store trial. Expected, not a bug.
+An introductory offer belongs to the PRODUCT, not to the card. Apple applies it
+automatically to every eligible subscriber, so anyone who reached the ordinary
+paywall got the identical discounted first year, and the card could prompt but
+never hold anything back.
 
-### App Store Connect
+There is no Apple mechanism that targets a discount at a user who has never
+subscribed:
 
-1. **Monetization → Subscriptions →** `com.autonomic.journal.yearly`
-2. **Introductory Offers → +** — this is the right section. **Promotional
-   Offers** is a different feature: those are targeted at an existing subscriber
-   and every purchase must be signed by your server with a **subscription key**,
-   which is what App Store Connect is asking for when it says "You need to
-   create a subscription key before your promotional offers can be used by
-   customers". This app signs nothing, so a promotional offer here would never
-   be redeemable. Introductory offers need no key and no server.
-3. Reference name `annual_founder_first_year`, territories = all, no end date
-   (or one, if the founding window is meant to close).
-4. Type **Pay up front**, duration **1 year**, price **$34.99** (or whatever
-   tier you pick) + the regional matrix.
-5. Save. No new binary and no app review — introductory offers go live on their
-   own.
+- **Promotional offers** are for CURRENT or LAPSED subscribers, and every
+  redemption must be signed by your server with a **subscription key** — the
+  thing App Store Connect asks you to create when you make one. This app signs
+  nothing, so a promotional offer here would never be redeemable.
+- **Win-back offers** are also aimed at lapsed subscribers.
+- A **separate SKU** is the only exclusive discount available, which is what
+  this now is.
 
-The card's copy is **derived from the two prices the store returns**
-(`introPriceOf` + `discountPct`), so the "30% off" line and the
-"$X first year, then $Y/yr" line follow whatever you set here, in every
-currency. If StoreKit says this user isn't eligible, both the percentage and
-the "first year" clause disappear rather than making a claim.
+The trade: a separate SKU **renews at its own price**. This is a permanently
+discounted year, not a discounted first one, which is why the card reads
+"you keep 50% off for as long as you stay" over "$24.99/yr, cancel anytime"
+rather than "first year, then $49.99/yr". Every number is derived from the two
+prices the store returned, in whatever currency it returned them.
 
-### Google Play Console
+### If `annual_founder_first_year` was already created in App Store Connect
 
-Play has no equivalent of that offer id, so **Android reuses
-`com.autonomic.journal.yearly.promo`** from Part 6 — `FOUNDER_SKU` resolves to
-it on Android. Nothing extra to create. The difference to remember: on Play the
-discounted year **renews at the discount**, so the card's price line reads
-"$24.99/yr, cancel anytime" there rather than "first year, then…". Both are
-true because both come from the store's own numbers.
+Delete it, or leave it inactive. While it exists as an **introductory offer** on
+`com.autonomic.journal.yearly`, every new yearly subscriber gets the discounted
+first year whether or not they ever saw the founding-member card, and it
+occupies the one introductory-offer slot on that SKU. Nothing in the app reads
+it any more.
+
+### Both stores
+
+Nothing to set up beyond Part 6's `com.autonomic.journal.yearly.promo` existing
+and being active in each console. Because the founder card and the annual offer
+card now sell the same product, the two can never be due on the same day by
+design (`src/lib/upsell/founder.ts` fires during the install trial; the annual
+window opens at 30/90/180/365 days for a free user), but a user who declines the
+founding card CAN meet the same price again later at an annual milestone. If
+that matters, the founding card needs its own SKU at its own price.
 
 ---
 
