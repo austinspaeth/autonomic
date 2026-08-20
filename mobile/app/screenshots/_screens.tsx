@@ -28,7 +28,7 @@ import { getState, getWaveform, blankDay, __devSwapState } from '../../src/store
 import { MED_TYPES } from '../../src/lib/registry';
 import { addDays, fmtDateLong, todayKey } from '../../src/lib/dates';
 import { scoreSet, scoreCat, OUTLOOK_GUIDE } from '../../src/lib/scoring/day';
-import type { Entry, Protocol, AppState } from '../../src/lib/types';
+import type { Protocol, AppState } from '../../src/lib/types';
 import { radius, usePalette } from '../../src/theme';
 
 /** Logical iPhone canvas every screen is drawn at (points). */
@@ -483,18 +483,22 @@ function JournalNavBar({ active = 'Journal' }: { active?: string }) {
  */
 const HERO_DK = '2026-08-08';
 
-export function JournalHeroScreen() {
+/**
+ * Swap the journal so `sourceDk` reads as today: every day key shifts forward by
+ * the same amount and everything after it is dropped, which is the only way the
+ * Journal shows a past day as "Today" without lying about what that day could
+ * have known. Restores the real journal on unmount.
+ */
+function useDayAsToday(sourceDk: string) {
   const dk = todayKey();
   const [ready, setReady] = useState(false);
-
   useEffect(() => {
     const base = getState();
-    // How far 8 Aug has to travel to become today.
     let shift = 0;
-    while (addDays(HERO_DK, shift) < dk && shift < 3650) shift += 1;
+    while (addDays(sourceDk, shift) < dk && shift < 3650) shift += 1;
     const days: Record<string, unknown> = {};
     for (const k of Object.keys(base.days)) {
-      if (k > HERO_DK) continue; // the shifted "today" cannot know the future
+      if (k > sourceDk) continue; // the shifted "today" cannot know the future
       days[addDays(k, shift)] = base.days[k];
     }
     const restore = __devSwapState({ ...base, days } as AppState);
@@ -502,6 +506,11 @@ export function JournalHeroScreen() {
     return restore;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  return { dk, ready };
+}
+
+export function JournalHeroScreen() {
+  const { dk, ready } = useDayAsToday(HERO_DK);
 
   return (
     <View style={{ width: DESIGN_W, height: DESIGN_H, backgroundColor: '#000' }}>
@@ -521,48 +530,20 @@ export function JournalHeroScreen() {
 }
 
 /**
- * Journal day view: the REAL DaySummary + JournalSections for a crafted good day
- * (four meds, a headache, no triggers, water 2.0 / 2.5 L), with the real header
- * and nav bar, scrolled down to the medications / symptoms / hydration rows.
+ * Scene · "Track it all" — the Journal's logging sections over a real, heavily
+ * logged day (Mon 29 Jun 2026: eleven supplements, three meals, legs up the
+ * wall, a trigger, water, two digestion entries), shifted so it reads as today.
+ *
+ * Scrolled past the score to the sections themselves, because the claim here is
+ * not "we grade your day" (that is scene 1) but "everything you take, eat, feel
+ * and do goes in one place".
  */
-export function LiveJournalScreen() {
-  const dk = todayKey();
-  const [ready, setReady] = useState(false);
-  const scrollRef = useRef<ScrollView>(null);
+const LIVE_DK = '2026-06-29';
+const LIVE_SCROLL_Y = 1700;
 
-  useEffect(() => {
-    const base = getState();
-    const e = (o: object): Entry => o as Entry;
-    const day = {
-      ...blankDay(),
-      readings: [
-        e({ id: 'r-hrv', type: 'breathHrv', time: '07:20', period: 'Morning', style: '4/6', rmssd: '45', sdnn: '58', pnn50: '12', stressIndex: '70', vlowPower: '500', lowPower: '1700', highPower: '1200', lfPeak: '0.095', hfPeak: '0.24', hr: '56', pns: '1.4', sns: '0.1', meanRr: '1050', mode: '1040', amo50: '34', cv: '6.2', mxdmn: '0.32' }),
-        e({ id: 'r-bp', type: 'bp', time: '07:50', period: 'Morning', sys: '118', dia: '76', pulse: '58' }),
-        e({ id: 'r-rhr', type: 'restingHr', time: '07:15', position: 'Laying', hr: '56' }),
-      ],
-      meds: [
-        e({ id: 'm-pep', type: 'pepsidAc', time: '08:00', amount: '1' }),
-        e({ id: 'm-all', type: 'allegra', time: '08:00', amount: '1' }),
-        e({ id: 'm-mag', type: 'magGlycinate', time: '08:00', amount: '200' }),
-        e({ id: 'm-que', type: 'quercetin', time: '08:00', amount: '500' }),
-      ],
-      symptoms: [e({ id: 's-ha', type: 'headache', time: '15:00' })],
-      sleep: { bed: '22:40', wake: '06:50', quality: 'good' as const, hrLow: '52', hrHigh: '66' },
-      food: { water: 2.0, calories: 0, triggers: {}, meals: [] },
-      digestion: { movements: [] },
-    };
-    const keep = ['pepsidAc', 'allegra', 'magGlycinate', 'quercetin'];
-    const hiddenMeds = Object.keys(MED_TYPES).filter((k) => !keep.includes(k));
-    const next: AppState = {
-      ...base,
-      days: { ...base.days, [dk]: day },
-      hiddenTypes: { ...base.hiddenTypes, meds: hiddenMeds },
-    };
-    const restore = __devSwapState(next);
-    setReady(true);
-    return restore;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+export function LiveJournalScreen() {
+  const { dk, ready } = useDayAsToday(LIVE_DK);
+  const scrollRef = useRef<ScrollView>(null);
 
   return (
     <View style={{ width: DESIGN_W, height: DESIGN_H, backgroundColor: '#000' }}>
@@ -573,7 +554,8 @@ export function LiveJournalScreen() {
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 150 }}
         showsVerticalScrollIndicator={false}
-        onContentSizeChange={() => scrollRef.current?.scrollTo({ y: 1300, animated: false })}
+        scrollEnabled={false}
+        onContentSizeChange={() => scrollRef.current?.scrollTo({ y: LIVE_SCROLL_Y, animated: false })}
       >
         {ready ? (<><DaySummary dk={dk} /><JournalSections dk={dk} /></>) : null}
       </ScrollView>

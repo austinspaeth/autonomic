@@ -13,8 +13,8 @@ export default function LiveScene() {
     <>
       <StatusBar hidden />
       <AppStoreSlide
-        title="Track it all: water, meds, even digestion"
-        caption="One tap. The whole body, not just heart rate."
+        title="Log everything, not just the numbers"
+        caption="Supplements, triggers, symptoms, hydration and digestion, in one day."
       >
         <LiveJournalScreen />
       </AppStoreSlide>
