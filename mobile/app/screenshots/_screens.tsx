@@ -11,6 +11,10 @@ import { parsePattern } from '../../src/features/hrv/BreathingViz';
 import { SessionCard } from '../../src/features/hrv/Session';
 import { HrvResults } from '../../src/features/hrv/Results';
 import { SleepReportBody, useSleepReport } from '../../src/features/SleepReport';
+import {
+  BiggestChangeCard, ConfidenceRing, Correlations, InsightsFooter, TrendWatch, WorthALook,
+} from '../../src/features/insights/Sections';
+import { CHANGE, CHANGE_SERIES, CORRELATIONS, CORRELATION_DETAIL, OBSERVATIONS, WATCH } from './_insightsFixture';
 import { __devMockSession } from '../../src/features/hrv/sessionStore';
 import { Button, Segmented } from '../../src/components/ui';
 import { BrandMark, Icon } from '../../src/components/Icon';
@@ -55,6 +59,51 @@ function StatusBar() {
     </View>
   );
 }
+
+/* ---------- Scene · Insights ---------- */
+
+/**
+ * The Insights tab, rendered by the app's own cards over fabricated findings
+ * (see ./_insightsFixture for why this one scene is a fixture rather than real
+ * data). The header states what the real one states: the claim since day one,
+ * the days the report rests on, and the confidence ring.
+ */
+export function InsightsScreen() {
+  const p = usePalette();
+  const scrollRef = useRef<ScrollView>(null);
+  return (
+    <View style={{ width: DESIGN_W, height: DESIGN_H, backgroundColor: '#000' }}>
+      <StatusBar />
+      <View style={{ paddingHorizontal: 16, paddingTop: 6, paddingBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+        <View style={{ flexShrink: 1 }}>
+          <Text style={{ fontSize: 20, fontWeight: '800', color: GOOD_GREEN, letterSpacing: -0.3 }}>64% better</Text>
+          <Text style={{ fontSize: 13, color: p.textDim, marginTop: 1 }}>than your first two weeks</Text>
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Text style={{ color: p.textDim, fontSize: 15, lineHeight: 17, fontWeight: '700', letterSpacing: -0.2 }}>81 days</Text>
+          <ConfidenceRing pct={78} size={26} />
+        </View>
+      </View>
+      <ScrollView
+        ref={scrollRef}
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 170 }}
+        showsVerticalScrollIndicator={false}
+        scrollEnabled={false}
+      >
+        <BiggestChangeCard change={CHANGE} series={CHANGE_SERIES} />
+        <Correlations list={CORRELATIONS} change={CHANGE} detail={CORRELATION_DETAIL} />
+        <WorthALook list={OBSERVATIONS} />
+        <TrendWatch list={WATCH} />
+        <InsightsFooter />
+      </ScrollView>
+      <JournalNavBar active="Insight" />
+    </View>
+  );
+}
+
+/** The green the Insights header claims in. */
+const GOOD_GREEN = '#22c55e';
 
 /* ---------- Scene · the night, in full ---------- */
 
