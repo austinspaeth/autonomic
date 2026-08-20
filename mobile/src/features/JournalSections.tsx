@@ -23,7 +23,8 @@ import { setJournalSectionY } from '../store/nav';
 import { trustedReadings } from '../lib/hrvQuality';
 import { fmtDateLong, fmtDuration, fmtTime12, minsBetween, periodOf, todayKey } from '../lib/dates';
 import { health, healthAppName, type SleepImport } from '../lib/health';
-import { STAGE_COLORS, STAGE_LABEL, STAGE_ORDER, fmtMin } from '../lib/sleep/stages';
+import { fmtMin } from '../lib/sleep/stages';
+import { StageBar } from '../components/StageBar';
 import { typicalOvernightLow } from '../lib/sleep/night';
 import { SleepConfirmSheet } from './Health';
 import { SleepReportSheet } from './SleepReport';
@@ -218,15 +219,10 @@ function SleepSection({ dk }: { dk: string }) {
       <SectionHeader title="Sleep" />
       <View style={{ paddingHorizontal: 14, paddingBottom: 14 }}>
         {hasData ? (
-          <>
-            <SleepGrade dk={dk} sleep={sleep} />
-            <Pressable
-              onPress={() => openSheet((c) => <SleepEditSheet dk={dk} controls={c} />, { fitContent: true })}
-              style={({ pressed }) => [{ marginTop: 12, alignItems: 'center', justifyContent: 'center', borderRadius: radius.control, borderWidth: 1, borderColor: p.border, backgroundColor: p.surface2, paddingVertical: 12 }, pressed && { opacity: 0.6 }]}
-            >
-              <Text style={{ color: p.text, fontWeight: '600' }}>Edit sleep details</Text>
-            </Pressable>
-          </>
+          // No edit button here: the card opens the sleep report, which carries
+          // the edit pencil in its action pill. Two routes to the same editor
+          // from one card is one too many.
+          <SleepGrade dk={dk} sleep={sleep} />
         ) : (
           <Pressable
             onPress={openAdd}
@@ -326,8 +322,8 @@ function sleepNote(days: DaysMap, dk: string, hrs: number | null, interrupted: b
 
 /** Graded summary of a night with data: grade chip, hours asleep, stage bar.
  *  Tapping it opens the full sleep report (`SleepReport.tsx`) — the card itself
- *  is unchanged apart from the chevron that says so. The report's floating
- *  pencil reaches the same editor as the button below the card. */
+ *  is unchanged apart from the chevron that says so. The report's action-pill
+ *  pencil is the ONLY route to the editor for a night with data. */
 function SleepGrade({ dk, sleep }: { dk: string; sleep: { bed: string; wake: string; quality?: string; hrLow?: string | number; hrHigh?: string | number; stages?: SleepStages } }) {
   const p = usePalette();
   const state = useAppState();
@@ -384,30 +380,6 @@ function SleepGrade({ dk, sleep }: { dk: string; sleep: { bed: string; wake: str
   );
 }
 
-/** Stacked stage bar + legend (Deep / REM / Core / Awake with minutes). */
-function StageBar({ stages }: { stages: SleepStages }) {
-  const p = usePalette();
-  const total = STAGE_ORDER.reduce((s, k) => s + stages[k], 0);
-  if (!total) return null;
-  return (
-    <View style={{ marginTop: 12 }}>
-      <View style={{ flexDirection: 'row', height: 10, gap: 2 }}>
-        {STAGE_ORDER.filter((k) => stages[k] > 0).map((k) => (
-          <View key={k} style={{ flexGrow: stages[k], flexBasis: 0, backgroundColor: STAGE_COLORS[k], borderRadius: 3 }} />
-        ))}
-      </View>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: 16, rowGap: 6, marginTop: 10 }}>
-        {STAGE_ORDER.map((k) => (
-          <View key={k} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <View style={{ width: 9, height: 9, borderRadius: 2.5, backgroundColor: STAGE_COLORS[k] }} />
-            <Text style={{ fontSize: 13, color: p.text, fontWeight: '500' }}>{`${STAGE_LABEL[k]} ${fmtMin(stages[k])}`}</Text>
-          </View>
-        ))}
-      </View>
-    </View>
-  );
-}
-
 type SleepShape = { bed: string; wake: string; quality?: string; hrLow?: string | number; hrHigh?: string | number };
 
 /** Bed/wake/quality/HR inputs — shared by the inline manual editor and the edit sheet. */
@@ -448,8 +420,8 @@ function SleepEditFields({ dk, sleep }: { dk: string; sleep: SleepShape }) {
   );
 }
 
-/** Card-modal editor for a night — opened from "Edit sleep details", and with
- *  `add` from the import card's "Enter manually". Fields write straight through
+/** Card-modal editor for a night — opened from the sleep report's pencil, and
+ *  with `add` from the import card's "Enter manually". Fields write straight through
  *  on change, so Done only dismisses. */
 function SleepEditSheet({ dk, controls, add }: { dk: string; controls: SheetControls; add?: boolean }) {
   const p = usePalette();

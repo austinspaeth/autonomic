@@ -45,11 +45,16 @@ import { ZERO_HEIGHTS, ZERO_ROWS, type CardHeights, type InsightsShape, type Row
  * with `overflow: hidden` so a height remembered at a different width clips rather
  * than pushing the page around.
  */
-function CardGhost({ title, help, height, desc, children }: {
+function CardGhost({ title, help, height, desc, chevron, children }: {
   title: string;
   help: keyof typeof INSIGHTS_HELP;
   height: number;
   desc?: string;
+  /** Whether the real card is a button, and so carries a chevron in its title row.
+   *  Chrome that never depends on the data, which means it is drawn for real: the
+   *  Biggest change card is tappable, and having the chevron pop into existence at
+   *  the swap was one of the two things that made this card flicker. */
+  chevron?: boolean;
   children?: React.ReactNode;
 }) {
   const p = usePalette();
@@ -61,6 +66,12 @@ function CardGhost({ title, help, height, desc, children }: {
             so it works before the report exists, and reading it while the numbers
             land is a perfectly good use of the wait. */}
         <HelpDot title={title} text={INSIGHTS_HELP[help]} />
+        {chevron ? (
+          <>
+            <View style={{ flex: 1 }} />
+            <Icon name="chevronRight" size={16} color={p.textDim} />
+          </>
+        ) : null}
       </View>
       {desc ? <Text style={[S.CARD_DESC, { color: p.textDim }]}>{desc}</Text> : null}
       {children}
@@ -168,9 +179,9 @@ const COMING_UP = [
 
 /** Height of the ghost bar standing in for the headline card's headline. One line. */
 const BAR_H = 13;
-/** The stat tile's height: 12pt padding either side of a 25pt numeral and a 12pt
- *  label. Deterministic, which is why the skeleton draws the tiles for real. */
-const TILE_H = 62;
+/** Where that bar sits inside the invisible headline it is laid over: past the
+ *  headline style's own top margin, then centred in its first line. */
+const HEADLINE_BAR_TOP = (S.HEADLINE.marginTop as number) + 4;
 
 /**
  * The headline card.
@@ -184,13 +195,33 @@ const TILE_H = 62;
  */
 function ChangeGhost({ height }: { height: number }) {
   const p = usePalette();
+  // Has this install measured the real card? The frame is pinned to that height,
+  // which is what makes the swap dimensionally identical — but only for the FRAME.
+  const pinned = height > 0;
   return (
-    <CardGhost title="Biggest change" help="change" height={height}>
-      {/* Reserved space for the headline, drawn as one bar: its line count depends
-          on the metric's name, so an invisible sample of the real style reserves the
-          height and the bar shows where the sentence lands. */}
-      <Ghost w="72%" h={BAR_H} r={5} style={{ marginTop: 12 }} />
-      <Text style={[S.HEADLINE, { color: p.textDim, opacity: 0 }]}>{S.SAMPLE.headline}</Text>
+    <CardGhost title="Biggest change" help="change" height={height} chevron>
+      {/*
+        The headline's space, and the one variable thing on this card.
+
+        Everything below it — tile row, hairline, confidence strip — is fixed size,
+        so the headline is the ONLY reason the real card is the height it is: one
+        line for "Sleep is up since magnesium", two for a longer metric name. The
+        skeleton cannot know which, and reserving the sample string (which wraps to
+        two) put the tiles and the confidence bar a whole line low on every card
+        whose real headline is one — inside a frame pinned with `overflow: hidden`,
+        so they were pushed down and clipped rather than merely misplaced.
+
+        So it does not guess: when the frame is pinned, this block simply ABSORBS
+        the slack (`flex: 1`, basis 0), which lands the tiles and the strip exactly
+        at the bottom of the remembered height — exactly where the real ones are.
+        The bar floats at the top of whatever that region turns out to be. Only on
+        the very first open, with no remembered height, does the invisible sample
+        reserve the space instead.
+      */}
+      <View style={pinned ? { flex: 1 } : undefined}>
+        {pinned ? null : <Text style={[S.HEADLINE, { color: p.textDim, opacity: 0 }]}>{S.SAMPLE.headline}</Text>}
+        <Ghost w="72%" h={BAR_H} r={5} style={{ position: 'absolute', left: 0, top: HEADLINE_BAR_TOP }} />
+      </View>
 
       {/* The three tiles, as the dark bubbles they are. Empty: the labels are real
           text on the card and reading "Before / After / Change" against three blank
@@ -198,7 +229,16 @@ function ChangeGhost({ height }: { height: number }) {
           bubble's own shape at the right height is the whole placeholder. */}
       <View style={S.TILE_ROW}>
         {[0, 1, 2].map((i) => (
-          <View key={i} style={[S.TILE, { backgroundColor: p.bg, borderColor: p.border, height: TILE_H }]} />
+          // The tile's height is NOT a constant here. It was (62pt, "12 either side
+          // of a 25pt numeral and a 12pt label"), and that arithmetic ignores font
+          // metrics: the real tile measures nearer 70, so the confidence strip below
+          // sat 8pt high in the placeholder. Invisible copies of the real value and
+          // label in the real styles set the height exactly, the same trick
+          // `TextGhost` plays.
+          <View key={i} style={[S.TILE, { backgroundColor: p.bg, borderColor: p.border }]}>
+            <Text style={[S.TILE_VALUE, { fontFamily: fonts.numHeavy, opacity: 0 }]}>0</Text>
+            <Text style={[S.TILE_LABEL, { opacity: 0 }]}>Before</Text>
+          </View>
         ))}
       </View>
 
@@ -236,8 +276,14 @@ export function InsightsSkeleton({ shape }: { shape: InsightsShape }) {
 
       {shape.correlations > 0 ? (
         <CardGhost title="Correlations" help="correlations" height={h.correlations}>
+          {/* How many ROWS, which is not the same as how many findings: the real card
+              folds a driver's findings into one row with a "+N" pill, so a report of
+              six correlations can be four rows. The remembered row heights are one
+              per rendered row, so their count is the truthful one; the stored
+              `correlations` figure is the finding count and stays what the button
+              says, because "Show all 6 correlations" is a claim about findings. */}
           <Bubbles
-            count={Math.min(shape.correlations, S.VISIBLE_ROWS)}
+            count={Math.min(r.correlations.length || shape.correlations, S.VISIBLE_ROWS)}
             heights={r.correlations}
             fallback={{ style: S.PAIR_DRIVER, sample: S.SAMPLE.pair }}
           />
@@ -286,6 +332,10 @@ export function InsightsSkeleton({ shape }: { shape: InsightsShape }) {
  * 5 of 8 days". Turns "nothing yet" into a reason to keep logging the exact
  * things the user is already trying. Rows are not buttons — each is an
  * instruction, not a destination.
+ *
+ * No leading icon. Every row here is a med or supplement, so the pill glyph was the
+ * same on all of them: it graded nothing and distinguished nothing, and the count on
+ * the right is the only thing the row is really saying.
  */
 function AlmostTestable({ progress }: { progress?: FactorProgress[] }) {
   const p = usePalette();
@@ -297,9 +347,6 @@ function AlmostTestable({ progress }: { progress?: FactorProgress[] }) {
     >
       {progress.map((f) => (
         <CardRow key={f.driver}>
-          <View style={{ width: S.TONE_BOX, height: S.TONE_BOX, borderRadius: 9, backgroundColor: p.bg, alignItems: 'center', justifyContent: 'center' }}>
-            <Icon name="pill" size={14} color={p.accent} strokeWidth={2.2} />
-          </View>
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text numberOfLines={1} style={[S.ROW_TITLE, { color: p.text }]}>{f.driver}</Text>
           </View>

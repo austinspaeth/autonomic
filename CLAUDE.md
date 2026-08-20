@@ -163,7 +163,7 @@ old web app so old `export.json` files import directly.
   load by `stampImportedHrvCoverage` (store `loadState`), which stamps coverage
   from the waveform sidecar — no RR ⇒ 0 ⇒ permanently excluded. Nothing is
   deleted: the entries stay in the journal and in exports, they just don't count.
-- **Progress + Insights fall back to demo data on an empty journal.** `src/lib/demo.ts`
+- **Progress falls back to demo data on an empty journal. Insights does NOT.** `src/lib/demo.ts`
   generates a deterministic **60-day** sample history (`DEMO_DAYS`; seeded PRNG, keyed
   off today so it lands in the Analysis buckets and report ranges) that arcs from crash
   days up into the green. Two months, not one, because every windowed comparison in the
@@ -171,18 +171,42 @@ old web app so old `export.json` files import directly.
   one window and almost nothing to show. Each domain (sleep, BP, symptoms, gut, HRV)
   draws its own reading of the day around the shared arc rather than being one function
   of it, and `DEMO_MAG_START` puts a supplement onset mid-history so the before/after
-  card has something real to find. Both views render it behind `<DemoBanner/>` whenever
-  `hasOwnData(days)` is false, and swap to real data on the user's first entry.
+  card has something real to find. Progress renders it behind `<DemoBanner/>` whenever
+  `hasOwnData(days)` is false, and swaps to real data on the user's first entry.
   **Never fake the Journal**
   — it's where real data goes in, so a demo entry there would be tappable fiction; the
-  demo only ever feeds derived views. `hasOwnData` is deliberately broader than either
+  demo only ever feeds derived views. `hasOwnData` is deliberately broader than the
   view's "is there anything to chart" gate (a single logged glass of water counts), so
-  demo data can never sit on top of real data. Insights builds its report prompts from
-  `demoState()` too, resolved at press time, and overrides its headline card with
-  `WELCOME_CHANGE` ("You downloaded this app") — the only fabricated finding anywhere in
-  the engine, and it sits directly under the demo banner. See
+  demo data can never sit on top of real data. **The Insights tab has no demo
+  fallback**: its header states "57 days" beside a confidence ring, which is a
+  first-person claim about the reader, and a user who had just erased everything read it
+  as data that survived the wipe. It shows `InsightsEmpty` ("0 of 14 days", what to log,
+  what arrives at 14) instead — the honest answer, and the one a brand new user needs.
+  Everything the tab opens follows it: the AI report prompts (`AskAi.reportState`), the
+  correlations prompt and `SinceExplain` all build from `getState()` with no fallback.
+  The engine keeps its `demo` option and `WELCOME_CHANGE` ("You downloaded this app",
+  the only fabricated finding anywhere in it) for the tests and the skeleton's
+  measured-sample fallback; nothing in the app passes it any more. See
   `src/lib/__tests__/demo.test.ts`, which asserts the arc through the real scoring engine
   and the findings through the real insights engine.
+- **"Clear all data" must leave nothing that was computed FROM the data.** The
+  journal, the waveform sidecar and the plaintext backup snapshots go
+  (`clearAllData` in `src/store/store.ts` + `deleteAllBackups`); the plaintext
+  `autonomic.flags` MMKV deliberately stays, because it is about the PERSON and not
+  the journal — install/cohort day, tier + trial start, ping flags, what's-new seen,
+  and the review/upsell/founder/annual pacing all survive, so erasing a journal is
+  not a way to re-earn a trial or be sold to again. The exceptions are the things in
+  there that are CLAIMS about the erased data, and `clearAllData` resets each:
+  retained Insights findings (`resetFindingMemory`), the report cached from them
+  (`resetInsightsCache`), the Trend card's pinned headline (`resetTrendMemory` — a
+  claim is live for the rest of its journal day, so a wiped app went on
+  congratulating the user on numbers it no longer held), and the chosen "day one"
+  (`setInsightsAnchor(null)`, a date pointing into a journal that no longer exists).
+  `healthImportDeclined` is the one judgement call left the other way: keeping it is
+  the never-nag direction. **Export is the mirror image** — `serializeState` writes
+  the whole journal plus every referenced waveform (RR traces, workout HR traces,
+  overnight sleep series), and none of the flags store, which is why an export/import
+  round trip carries all the health data and no device bookkeeping.
 - **A live HRV reading outlives the card that shows it.** The capture engine is
   `src/features/hrv/sessionStore.ts` (timer, BLE/PPG collection, rolling SDNN,
   breathing clock, haptics, keep-awake) in the same module-store shape as
@@ -423,7 +447,20 @@ old web app so old `export.json` files import directly.
   supplement-free days" rule, in pixels — a continuous factor is split at its own
   median, and a lag is reported but never applied to the shading. A correlation row
   and the Biggest change card open the SAME sheet, which is why the change is not
-  also listed as a correlation row. `watch.ts` is the ONE place the app volunteers bad news —
+  also listed as a correlation row. **Every row on the Insights screen opens a
+  sheet, and nothing there navigates.** Trend watch used to hand off to Progress —
+  switching tab, forcing the range to Month and scrolling to a card — which
+  answered a different question in a different view and was the one path that
+  could leave Progress mid-rebuild. Its rows now open `WatchSheet`
+  (`features/insights/FindingSheet.tsx`), the same `FindingCard` + evidence chart
+  a correlation opens: the two window medians as tiles, a divider where last
+  month begins, and a dashed least-squares `trendLine` (a new `LineChart` prop)
+  because the claim IS a direction of travel across 60 noisy days. It carries
+  **no confidence strip** — a windowed median against the window before it is not
+  a hypothesis test — and states its coverage instead ("24 logged days vs 19 the
+  month before"), so `FindingCard`'s `pips`/`confidence` are optional and paired
+  with a `note`. A dispersion metric gets no Change tile, the same rule its row's
+  readout follows. `watch.ts` is the ONE place the app volunteers bad news —
   Insights is a view the user deliberately opened — but it stays silent during a
   downturn, and `findTrend`'s improvements-only rule is untouched. Results are
   cached in `cache.ts` keyed `todayKey()|meta.lastUpdated|demo`; the screen's
@@ -452,7 +489,10 @@ old web app so old `export.json` files import directly.
   "+N" pill and the sheet stacks every member's card + evidence chart. **An early
   tier** (`findEarlySignals`, run ONLY when the strict list is empty, on a matrix
   rebuilt at `EARLY_MIN_FACTOR_DAYS`): relaxed coverage, much higher evidence bar
-  (`|r| ≥ 0.5`, raw p, BH at `EARLY_FDR_Q`), pinned to one pip and badged "Early" —
+  (`|r| ≥ 0.5`, raw p, BH at `EARLY_FDR_Q`), pinned to one pip, under an "Early signals" card that sits ABOVE the countdown
+  screen and carries the qualifier in its own title (the rows wear no badge — inside
+  that card it is said twice, and the pill cost the pair labels the width they need
+  to be readable) —
   measured against 14-day noise journals like `FDR_Q`, bound pinned in the tests.
   Beside it, `factorProgress` feeds the empty screen's "Almost testable" rows
   ("Magnesium · 5 of 8 days"). **A "No detected impact" card** (`findNoImpact`,
@@ -463,6 +503,52 @@ old web app so old `export.json` files import directly.
   `store/insightsBadge.ts` external store, refreshed by a wrapped deferred build from
   the root layout, stamped seen on screen focus; fresh installs stamp silently, the
   `whatsNewSeen` rule).
+- **Three rules keep the sweep's OUTPUT worth reading, all measured against a real
+  81-day journal that the engine answered with two claims, both about LF peak
+  frequency.** (1) **A start/stop is not an on/off comparison.** `isRegimeChange` /
+  `regimeFactorIds` in `correlate.ts` (pure + tested): a binary factor whose
+  MINORITY group sits mostly in one contiguous run (`MAX_MINORITY_RUN_SHARE`, 0.75)
+  is a before/after wearing a correlation's clothes, and is excluded from
+  `findCorrelations`, `findEarlySignals` AND `findNoImpact` — never tested means
+  never a null result either. It goes to `change.ts` instead, whose split point is
+  fixed by the data and whose windows are equal either side. This is not a corner
+  case: it is how people take supplements. On that journal quercetin was 64 days on
+  and 14 off with 13 of the off-days one block at the start, and quercetin → RMSSD
+  read r = +0.75 in June, +0.39 in July and −0.03 in August as the on-group swallowed
+  a declining summer while the off-group stayed frozen — same supplement, opposite
+  answer, pure calendar. The demo month models magnesium the same way, so `demo.ts`'s
+  finding is now correctly the onset card rather than a correlation row. (2)
+  **`lfPeak` is never the subject of a claim** (a fifth `CORRELATION_OUTCOMES`
+  exclusion). It is a LOCATION not a magnitude, its healthy direction is not
+  monotone, its row reads "+0.03 Hz", and a spectral argmax hops a bin on one
+  corrected beat — so it is the HRV family member most likely to separate two groups
+  by chance, and `FAMILY_RANK` cannot save the sentence because the collapse only
+  chooses among SURVIVORS. It keeps its score component, its Trend Watch row and its
+  Progress chart. `totalPower` deliberately stays. (3) **A finding needs a delta the
+  row can print** (`hasVisibleDelta`): a rank test answers "does one group order
+  above the other", which is not the question the readout asks, and "Quercetin days
+  show lower daily score" over a readout of "0" is the app contradicting itself
+  inside one row. Checked through `def.fmt`, so the bar is the precision the user
+  actually sees.
+- **The weak tier answers TWO different empty screens** (`Correlation.tier`).
+  `'early'` is the original: a journal too YOUNG for the main sweep, relaxed coverage
+  floors, "Early signals". `'unconfirmed'` is the new one: a long, well-logged
+  journal where the correction cleared the board, run at FULL `MIN_PAIRS` /
+  `MIN_GROUP` on the matrix already built, titled "Unconfirmed patterns". The
+  distinction is not cosmetic — those rows are short of EVIDENCE, not of days, and
+  calling them "first hints from your first days" to somebody eighty days in is false
+  about their journal. `index.ts` tries `'unconfirmed'` first and only falls back to
+  the young-journal pass when it finds nothing, so one build never mixes the two and
+  the card can read its tier off `list[0]`. It exists because the honest alternative
+  was silence: that same 81-day journal ran 772 tests, of which 124 reached raw
+  p < 0.05 and 35 reached p < 0.01, and exactly ONE survived BH at `FDR_Q`. **The BH
+  step inside this tier is load-bearing and the naive measurement says otherwise** —
+  against noise journals with only BALANCED factors, removing it costs nothing,
+  because |r| ≥ 0.5 at 60-vs-60 is out of noise's reach. Add RARE factors (a trigger
+  eight days in a hundred, the shape of the most actionable thing in a real journal)
+  and it goes from 1 seed in 40 to 5 seeds and 12 invented rows. The noise test
+  therefore carries rare factors on purpose; do not weaken that model, and do not
+  drop the BH step, however redundant it looks beside the raw-p bar.
 - **Insights wears Progress's card grammar, not its own.** Each section is ONE
   card (`InsightCard` in `src/features/insights/Sections.tsx`) holding its title,
   a `HelpDot`, an optional plain-language sentence, and then its rows as inset
@@ -603,19 +689,22 @@ old web app so old `export.json` files import directly.
 - **The founding-member offer is the other one, and it lives for a single day.**
   `src/lib/upsell/founder.ts` (pure + tested) + `founderMemory.ts` (flags MMKV),
   rendered by `<FounderOfferCard/>` under the Journal's Outlook. It fires on the
-  first launch AFTER three days carrying the user's OWN entries (`engagedBefore`
-  reuses `engagedDayCount`, so a health-store backfill is not three days of use)
-  and ONLY while the install trial is still running — day four of a fourteen-day
+  first launch AFTER five days carrying the user's OWN entries (`engagedBefore`
+  reuses `engagedDayCount`, so a health-store backfill is not five days of use)
+  and ONLY while the install trial is still running — day six of a fourteen-day
   trial is a user who has just been convinced, where the annual card above is
   aimed at one whose access lapsed months ago, which is why the two can never be
   due on the same day and why this one grants no extra unlock. The day it claims
   is its whole life: `shownDk` is stamped once, the card renders only while
-  `shownDk === todayKey()`, and the ✕ or the grey "No thanks" sets `dismissed`
-  permanently. Because of that single day, a bad day DEFERS rather than spends
-  it — a crash-alert day, a downturn or an open sheet simply leaves the offer
-  due, where every other surface would suppress and move on. The card says
-  "Today only" out loud, since an offer that quietly expires reads as a bug the
-  next morning. On iOS it sells `YEARLY_SKU`, discounted by the
+  `shownDk === todayKey()`, and the ✕ sets `dismissed` permanently (there is no
+  second grey "No thanks" — one card, one way to say no). Because of that single
+  day, a bad day DEFERS rather than spends it — a crash-alert day, a downturn or
+  an open sheet simply leaves the offer due, where every other surface would
+  suppress and move on. The single day is said out loud, since an offer that
+  quietly expires reads as a bug the next morning, but it is said INSIDE the
+  price sentence ("...your first year is 30% off. Offer is only available
+  today.") rather than as its own red line under the button, which turned the
+  card into a countdown ad. On iOS it sells `YEARLY_SKU`, discounted by the
   `annual_founder_first_year` **introductory** offer, which Apple applies on its
   own — so an eligible user meets the same price on the ordinary paywall, and
   the yearly plan can no longer carry a store-side free trial (one intro offer

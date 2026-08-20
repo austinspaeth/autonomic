@@ -26,17 +26,16 @@ import Svg, { Circle, Path } from 'react-native-svg';
 import { Icon, type IconName } from '../../components/Icon';
 import { HelpDot } from '../../components/ui';
 import { useSheets, type SheetControls } from '../../components/Sheet';
-import { GRADE_COLORS, fonts, radius, usePalette } from '../../theme';
+import { fonts, radius, usePalette } from '../../theme';
 import { getState } from '../../store/store';
 import { useTier } from '../../store/tier';
 import { usePaywall } from '../Paywall';
 import { PromptSheet } from '../PromptSheet';
-import { demoState, hasOwnData } from '../../lib/demo';
 import { resolveProtocol } from '../../lib/scoring/day';
 import { buildCorrelationsPrompt } from '../../lib/insights/prompt';
 import { INSIGHTS_HELP, VISIBLE_CORRELATIONS, groupCorrelations } from '../../lib/insights';
 import type { BiggestChange, ConfidencePart, Correlation, DataConfidence, DetailSeries, NoImpactItem, Observation, WatchItem } from '../../lib/insights';
-import { ChangeSheet, CorrelationSheet } from './FindingSheet';
+import { ChangeSheet, CorrelationSheet, WatchSheet } from './FindingSheet';
 import * as S from './style';
 
 const GOOD = S.GOOD;
@@ -192,13 +191,22 @@ export interface FindingTile { value: string; unit?: string; label: string; colo
  * IS this component; a correlation's sheet is the same object with different
  * tiles.
  */
-export function FindingCard({ title, help, headline, tiles, pips, confidence, good, onPress, onLayout, bg }: {
+export function FindingCard({ title, help, headline, tiles, pips, confidence, note, good, onPress, onLayout, bg }: {
   title?: string;
   help?: keyof typeof INSIGHTS_HELP;
   headline: string;
   tiles: FindingTile[];
-  pips: number;
-  confidence: string;
+  /**
+   * The confidence strip, omitted TOGETHER for a finding that has no statistical
+   * test behind it. A Trend watch row is a comparison of two windowed medians,
+   * not a hypothesis test, and a bar labelled "Confidence" over it would be a
+   * number invented for the sake of the layout. Those cards carry `note` instead,
+   * which states the coverage the medians were taken over.
+   */
+  pips?: number;
+  confidence?: string;
+  /** A dim line under the tiles, where the confidence strip would be. */
+  note?: string;
   good: boolean;
   onPress?: () => void;
   onLayout?: (e: LayoutChangeEvent) => void;
@@ -215,13 +223,20 @@ export function FindingCard({ title, help, headline, tiles, pips, confidence, go
       <View style={S.TILE_ROW}>
         {tiles.map((t) => <Tile key={t.label} value={t.value} unit={t.unit} label={t.label} color={t.color} />)}
       </View>
-      <View style={{ borderTopWidth: 1, borderTopColor: p.border, paddingTop: S.CONF_TOP }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: S.CONF_GAP }}>
-          <Text style={[S.CONF_LABEL, { color: p.textDim }]}>Confidence</Text>
-          <Text style={[S.CONF_LABEL, { color, fontWeight: '700' }]}>{confidence}</Text>
+      {pips != null && confidence ? (
+        <View style={{ borderTopWidth: 1, borderTopColor: p.border, paddingTop: S.CONF_TOP }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: S.CONF_GAP }}>
+            <Text style={[S.CONF_LABEL, { color: p.textDim }]}>Confidence</Text>
+            <Text style={[S.CONF_LABEL, { color, fontWeight: '700' }]}>{confidence}</Text>
+          </View>
+          <Bar pct={(pips / 5) * 100} color={color} />
         </View>
-        <Bar pct={(pips / 5) * 100} color={color} />
-      </View>
+      ) : null}
+      {note ? (
+        <View style={{ borderTopWidth: 1, borderTopColor: p.border, paddingTop: S.CONF_TOP }}>
+          <Text style={[S.CONF_LABEL, { color: p.textDim, fontWeight: '600' }]}>{note}</Text>
+        </View>
+      ) : null}
     </InsightCard>
   );
 }
@@ -292,15 +307,13 @@ export function PairArrow() {
  * Not a button. There is no per-correlation screen to go to, and pointing the row at
  * the nearest Progress chart answered a different question than the row asked.
  */
-function CorrelationRow({ c, moreCount, tag, onLayout, onPress }: {
+function CorrelationRow({ c, moreCount, onLayout, onPress }: {
   c: Correlation;
   /** How many further findings this driver has behind the row — the rest of its
-   *  `groupCorrelations` group. Drawn as a violet "+N" pill so the row says "this
-   *  moved more than one thing" without spending a second line on it. */
+   *  `groupCorrelations` group. Drawn as a violet "+N" squircle beside the pair,
+   *  so the row says "this moved more than one thing" without spending a second
+   *  line on it. */
   moreCount?: number;
-  /** A one-word qualifier pill ("Early") in the quiet grey, for rows held to a
-   *  different bar than the list they resemble. */
-  tag?: string;
   onLayout?: (e: LayoutChangeEvent) => void;
   /** Opens the finding. A chevron is only drawn when this is given: on a row that
    *  goes nowhere it would be a promise the app doesn't keep. */
@@ -323,6 +336,23 @@ function CorrelationRow({ c, moreCount, tag, onLayout, onPress }: {
           {/* Both halves of the pair are the row's subject, so both are full text;
               only the arrow between them recedes. */}
           <Text numberOfLines={1} style={[S.PAIR_METRIC, { color: p.text, flexShrink: 1 }]}>{c.metric}</Text>
+          {moreCount ? (
+            // Grey, deliberately. A count of further findings is neither good nor
+            // bad, so it must not borrow the delta's green/red — and the violet it
+            // used to wear was the palette's "noticed" colour, which made a piece of
+            // row furniture look like a finding in its own right.
+            //
+            // It sits with the PAIR, not with the value, because it qualifies the
+            // subject: "quercetin → RMSSD, and two more things" is one phrase, and
+            // parking the count next to "+13 ms" made it read as part of the
+            // measurement. A squircle rather than a full pill, so it reads as a
+            // small label on the phrase instead of a second numeric token.
+            <View style={[S.MORE_BADGE, { backgroundColor: p.bg }]}>
+              <Text style={[S.MORE_BADGE_TEXT, { color: p.textDim, fontVariant: ['tabular-nums'] }]}>
+                {`+${moreCount}`}
+              </Text>
+            </View>
+          ) : null}
           <View style={{ flex: 1 }} />
           {/* Coloured by the DIRECTION OF IMPACT, not by the sign of the number:
               `c.good` already knows which way this metric wants to move, so a fall
@@ -330,21 +360,6 @@ function CorrelationRow({ c, moreCount, tag, onLayout, onPress }: {
           <Text numberOfLines={1} style={[S.R_VALUE, { color, fontFamily: fonts.numHeavy, fontVariant: ['tabular-nums'] }]}>
             {c.deltaText}
           </Text>
-          {moreCount ? (
-            // Violet — the palette's "noticed, not graded" colour, the same one the
-            // finding chart shades factor days with. A count of further findings is
-            // neither good nor bad, so it must not borrow the delta's green/red.
-            <View style={{ backgroundColor: p.bg, borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2 }}>
-              <Text style={{ color: GRADE_COLORS.warning, fontSize: 12, fontWeight: '800', fontVariant: ['tabular-nums'] }}>
-                {`+${moreCount}`}
-              </Text>
-            </View>
-          ) : null}
-          {tag ? (
-            <View style={{ backgroundColor: p.bg, borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2 }}>
-              <Text style={{ color: p.textDim, fontSize: 11, fontWeight: '800', letterSpacing: 0.3, textTransform: 'uppercase' }}>{tag}</Text>
-            </View>
-          ) : null}
         </View>
       </View>
       {onPress ? <Icon name="chevronRight" size={16} color={p.textDim} /> : null}
@@ -396,16 +411,27 @@ export function Correlations({ list, change, detail, onRowLayout, onLayout }: {
 }
 
 /**
- * The early tier: what a young journal can already hint at.
+ * The weak tier, which answers two different empty screens and must not use one
+ * voice for both.
  *
  * Only ever rendered when the Correlations card has nothing (the engine
- * guarantees `early` is empty otherwise), typically sitting above the
- * days-countdown on the empty screen — a glimpse of what the screen becomes,
- * marked as the weaker thing it is. Every row wears an "Early" pill and opens
- * the same finding sheet a correlation does, whose confidence strip shows the
- * single bar these are pinned to.
+ * guarantees `early` is empty otherwise). The rows themselves wear no badge — the
+ * card's title and description carry the qualifier, and a pill on every row inside
+ * a card that already says it would say it twice while costing the pair labels the
+ * width they need. Each row opens the same finding sheet a correlation does, whose
+ * confidence strip shows the single bar these are pinned to.
+ *
+ * The two variants differ in WHY they are hedged, and the caveat has to say the
+ * true one. `'early'` is a young journal: there isn't much data yet and most of
+ * these will fade, which is a promise that the screen improves. `'unconfirmed'`
+ * is a long journal where the sweep cleared the board: these rows have all the
+ * days they need and simply did not survive the false-discovery correction, so
+ * the caveat is that they are questions rather than answers. Telling somebody
+ * eighty days in that these are "first hints from your first days" would be
+ * false about their journal and would misplace the reason for the hedge.
  */
 export const EARLY_DESC = 'First hints from your first days of logging. These are held to a much lower bar than a correlation, and most will fade as more days arrive.';
+export const UNCONFIRMED_DESC = 'Patterns in your data that did not clear the bar we hold a correlation to. Worth a question, not a conclusion. They may firm up, or disappear, as you keep logging.';
 
 export function EarlySignals({ list, detail, onLayout }: {
   list: Correlation[];
@@ -414,13 +440,19 @@ export function EarlySignals({ list, detail, onLayout }: {
 }) {
   const { openSheet } = useSheets();
   if (!list.length) return null;
+  // One tier per build — the engine never mixes them — so the first row decides.
+  const unconfirmed = list[0].tier === 'unconfirmed';
   return (
-    <InsightCard title="Early signals" help="early" desc={EARLY_DESC} onLayout={onLayout}>
+    <InsightCard
+      title={unconfirmed ? 'Unconfirmed patterns' : 'Early signals'}
+      help="early"
+      desc={unconfirmed ? UNCONFIRMED_DESC : EARLY_DESC}
+      onLayout={onLayout}
+    >
       {list.map((c) => (
         <CorrelationRow
           key={c.id}
           c={c}
-          tag="Early"
           onPress={() => openSheet(() => <CorrelationSheet findings={[{ c, series: detail[c.id] || null }]} />)}
         />
       ))}
@@ -485,8 +517,9 @@ export function CorrelationsAiButton({ list, change, label }: {
   const openPaywall = usePaywall();
   const open = () => {
     if (tier === 'free') { openPaywall(); return; }
-    const s = getState();
-    const state = hasOwnData(s.days) ? s : demoState(s);
+    // The user's own journal, always (see the note in app/(tabs)/insights.tsx):
+    // this view has no sample-month fallback, so neither does the prompt.
+    const state = getState();
     const ctx = {
       sex: state.profile.sex,
       height: state.profile.height,
@@ -641,17 +674,13 @@ function Spark({ series, color }: { series: (number | null)[]; color: string }) 
   );
 }
 
-export function TrendWatch({ list, onPress, canOpen, onRowLayout, onLayout }: {
+export function TrendWatch({ list, onRowLayout, onLayout }: {
   list: WatchItem[];
-  onPress: (item: WatchItem) => void;
-  /** Whether this row has a Progress chart to land on. A metric with no section
-   *  mapped is not tappable and draws no chevron: the alternative is a row that
-   *  looks like a button and does nothing. */
-  canOpen?: (item: WatchItem) => boolean;
   onRowLayout?: (i: number, e: LayoutChangeEvent) => void;
   onLayout?: (e: LayoutChangeEvent) => void;
 }) {
   const p = usePalette();
+  const { openSheet } = useSheets();
   if (!list.length) return null;
   return (
     <InsightCard
@@ -662,11 +691,15 @@ export function TrendWatch({ list, onPress, canOpen, onRowLayout, onLayout }: {
     >
       {list.map((t, i) => {
         const color = t.good ? GOOD : p.accent;
-        const open = !canOpen || canOpen(t);
         return (
           <CardRow
             key={t.metric}
-            onPress={open ? () => onPress(t) : undefined}
+            // The row opens the FINDING, exactly as a correlation row does. It used
+            // to jump to Progress with a forced range and a scroll target, which is
+            // a different screen answering a different question, and it left the
+            // reader to find their way back. Every row on this screen now stays on
+            // this screen.
+            onPress={() => openSheet(() => <WatchSheet item={t} />)}
             onLayout={onRowLayout ? (e) => onRowLayout(i, e) : undefined}
           >
             {/* Title, sparkline, and the CHANGE — not the level. The sentence that
@@ -678,7 +711,7 @@ export function TrendWatch({ list, onPress, canOpen, onRowLayout, onLayout }: {
             </View>
             <Spark series={t.series} color={color} />
             <Text style={[S.WATCH_VALUE, { color, fontFamily: fonts.numHeavy, fontVariant: ['tabular-nums'] }]}>{t.change}</Text>
-            {open ? <Icon name="chevronRight" size={16} color={p.textDim} /> : null}
+            <Icon name="chevronRight" size={16} color={p.textDim} />
           </CardRow>
         );
       })}

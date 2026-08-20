@@ -10,9 +10,11 @@
  *
  * Lives in the plaintext `autonomic.flags` MMKV alongside the skeleton's shape memory
  * and the what's-new pill (see ../whatsNewSeen for the pattern). Device-local
- * bookkeeping about how this install wants to be shown its own data: it must not ride
- * export/import, and it should survive "Clear all data" — an anchor with no journal
- * behind it simply produces no claim, and the next journal will use it.
+ * bookkeeping about how this install wants to be shown its own data, so it must not
+ * ride export/import. It does NOT survive "Clear all data", unlike the rest of that
+ * store: a date the user picked out of a journal is a fact about that journal, and
+ * carrying it into the next one would silently start the claim somewhere other than
+ * day one. `clearAllData` clears it (see ../../store/store).
  */
 import { MMKV } from 'react-native-mmkv';
 

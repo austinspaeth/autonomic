@@ -25,8 +25,8 @@ export const INSIGHTS_HELP: Record<'change' | 'correlations' | 'early' | 'observ
     learnMore: '/insights/recovery/find-your-triggers-symptom-journal/',
   },
   early: {
-    what: 'A first glimpse from a journal too young for the full analysis: an association strong enough to stand out even in a handful of days. It is held to a much lower evidence bar than a correlation, which is why it is badged and why its confidence shows one bar.',
-    why: 'It shows you what this screen becomes once there is more to read. Treat it as a hunch, not a finding — most early signals fade as days arrive, and the ones that are real will graduate into the correlations list on their own.',
+    what: 'An association we can see but cannot stand behind yet. On a young journal it is a first glimpse: strong enough to stand out in a handful of days, held to a much lower evidence bar than a correlation. On a longer journal it is a pattern with plenty of days behind it that still did not survive the check we run to keep chance findings off this screen. Either way it is badged and its confidence shows a single bar.',
+    why: 'It shows you what this screen becomes once there is more to read, and it keeps a real pattern from being hidden entirely just because it fell short of a strict bar. Treat it as a hunch rather than a finding: some of these firm up and graduate into the correlations list on their own, and some disappear.',
     learnMore: '/insights/recovery/find-your-triggers-symptom-journal/',
   },
   observations: {

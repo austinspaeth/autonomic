@@ -328,6 +328,11 @@ const streak: ObservationProbe = (input) => {
 const coverage: ObservationProbe = (input) => {
   const logged = input.matrix.logged.slice(-30).filter(Boolean).length;
   if (logged >= 20) return null;
+  // An EMPTY journal is not thin coverage, it is no coverage: "Only 0 of the last
+  // 30 days are logged" is the absence of an observation rather than one, and as
+  // the only card on the screen it also counted as a finding — which suppressed the
+  // countdown view (`InsightsEmpty`) that is the whole answer for a new user.
+  if (!input.matrix.logged.some(Boolean)) return null;
   return {
     id: 'coverage',
     title: `Only ${logged} of the last 30 days are logged`,

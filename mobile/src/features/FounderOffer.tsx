@@ -2,17 +2,18 @@
  * The founding-member card — Claude Design "Founding Member Card".
  *
  * Raised in the Journal under the Autonomic Outlook on the ONE day after a user
- * has logged three days of their own content, while the install trial is still
+ * has logged five days of their own content, while the install trial is still
  * running. It sells the first year of Pro at the introductory price
  * (`annual_founder_first_year` on iOS, the promo year on Play — see
  * FOUNDER_SKU in src/store/iap.ts).
  *
  * Two departures from the design: the ✕ is drawn at full size rather than as a
- * 12px glyph in a 44pt target, and "Maybe later" is gone. Both because there is
- * no "later" here — the card lives for one calendar day and never returns, so a
- * control that implies a rain check would be a lie. What replaced it is a plain
- * grey "No thanks", which does the same thing the ✕ does: ends the offer for
- * good.
+ * 12px glyph in a 44pt target, and the secondary "Maybe later" is gone. Both
+ * because there is no "later" here — the card lives for one calendar day and
+ * never returns, so a control that implies a rain check would be a lie. The ✕
+ * is the whole dismissal, and it is permanent; a second grey button saying the
+ * same thing only gave the card two ways to say no and pushed the price line
+ * off the fold.
  *
  * All the decisions live in src/lib/upsell/founder.ts (pure, tested); this file
  * asks once per mount, stamps the day it claimed, and renders it.
@@ -126,17 +127,22 @@ export function FounderOfferCard() {
       </View>
 
       <Text style={{ fontSize: 19, fontWeight: '700', letterSpacing: -0.3, color: p.text, marginBottom: 8 }}>
-        Three days down. The trend starts here.
+        Five days down. The trend starts here.
       </Text>
 
       <Text style={{ fontSize: 13.5, lineHeight: 21, color: p.textDim, marginBottom: 16 }}>
         {/* The percentage is DERIVED from the two prices the store returned, so
             it stays true in every currency and disappears entirely when this
             user isn't eligible for the introductory price. */}
+        {/* The offer's one-day life is stated here, in the sentence that makes
+            the price claim, rather than as its own coloured line under the
+            button: an offer that quietly expires reads as a bug the next
+            morning, but a red banner saying so turned the card into a
+            countdown ad. */}
         Pro shows you your full history and every trend, so you can see what days like today are made of.
         {pct ? ' Sign up now and your first year is ' : ' '}
         {pct ? <Text style={{ color: p.text, fontWeight: '600' }}>{`${pct}% off`}</Text> : null}
-        {pct ? '.' : 'Sign up now at the founding member price.'}
+        {pct ? '. Offer is only available today.' : 'Sign up now at the founding member price. Offer is only available today.'}
       </Text>
 
       <Pressable
@@ -163,22 +169,6 @@ export function FounderOfferCard() {
           ? `${offerPrice} first year, then ${full}/yr, cancel anytime`
           : `${full}/yr, cancel anytime`}
       </Text>
-
-      {/* The card lives for one calendar day and never comes back, so it says
-          so. An offer that quietly expires reads as a bug the day after. */}
-      <Text style={{ fontSize: 12, fontWeight: '600', color: p.accent, textAlign: 'center', marginTop: 5 }}>
-        Today only. You won’t see this offer again.
-      </Text>
-
-      <Pressable
-        onPress={end}
-        style={({ pressed }) => [
-          { height: 44, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
-          pressed && { opacity: 0.6 },
-        ]}
-      >
-        <Text style={{ fontSize: 13, fontWeight: '600', color: p.textDim }}>No thanks</Text>
-      </Pressable>
     </View>
   );
 }

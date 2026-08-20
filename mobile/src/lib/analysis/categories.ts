@@ -6,6 +6,7 @@
 import type { Band, Entry, ScoreCat } from '../types';
 import type { HelpContent } from '../help';
 import { todayKey } from '../dates';
+import { hrRecovery } from '../hrRecovery';
 import { SCORE_COLORS, orthoMaxDelta, restingHrBands, sBP } from '../scoring';
 import { scoreCat, sleepHours, streakInfo, type DaysMap } from '../scoring/day';
 import { ACTIVITY_TYPES, MED_TYPES, TRIGGER_TYPES } from '../registry';
@@ -45,7 +46,9 @@ export type OrthoTransition = 'all' | 'lay' | 'sit' | 'stairs';
 export interface OrthoVariant { cat: ScoreCat | null; charts: Chart[]; stats: Stat[]; insights: Insight[]; counts: (number | null)[]; metricsRow?: MetricsRow }
 /** `sub` is the unit shown after the value; `when` (when set) follows it as a
  *  phrase for the period, so a tile reads "56 bpm on 7/27" or "56 bpm in July". */
-export interface Stat { label: string; value: number | string | null; sub?: string; when?: string | null; color?: string }
+export interface Stat { label: string; value: number | string | null;
+  /** Sits immediately before the number, e.g. "\u0394" on a signed change. */
+  prefix?: string; sub?: string; when?: string | null; color?: string }
 export interface Insight { text: string; strength?: 'strong' | 'mod' | null }
 export interface BarGroup { label: string; rows: { name: string; count: number; color?: string; key?: string }[]; fmt?: (c: number) => string }
 /** Per-bucket counts behind a bars card: `totals` draws a bucket chart above
@@ -443,8 +446,8 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
     let sessions = 0, totalMins = 0;
     buckets.forEach((b) => b.days.forEach((dk) => { const acts = days[dk].activities || []; acts.forEach((a) => { sessions++; totalMins += parseFloat(a.duration as string) || 0; typeCounts[a.type] = (typeCounts[a.type] || 0) + 1; }); }));
     const rows = Object.entries(typeCounts).map(([t, c]) => ({ name: ctx.customTypes?.activities?.[t]?.label || ACTIVITY_TYPES[t]?.label || t, count: c })).sort((a, b) => b.count - a.count);
-    if (!rows.length) return [];
-    return [{
+    const cards: AnalysisCard[] = [];
+    if (rows.length) cards.push({
       title: 'Activity', sub: range,
       desc: 'Exercise sessions and minutes over the range, and what kinds they were.',
       help: {
@@ -455,7 +458,35 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): C
       charts: [{ label: 'Total exercise minutes', series: [series(mins, SCORE_COLORS.bad)], integer: true }],
       bars: [{ label: 'Activity types', rows }],
       stats: [{ label: 'Sessions', value: sessions || null, sub: 'times' }, { label: 'Total', value: totalMins ? Math.round(totalMins) : null, sub: 'mins' }],
-    }];
+    });
+    // Heart-rate recovery after a workout, the same figure the workout report
+    // grades: the SIGNED fall from the rate you stopped at to the hand-entered
+    // rate a minute later, so a bigger drop is more negative (see
+    // `lib/hrRecovery.ts` for why the reference is the stop rate, not the peak).
+    // `hr60` is hand-entered, so most sessions carry nothing and the card only
+    // appears once some do.
+    const recoveryOf = (a: Entry) => hrRecovery(a, ctx.hrCurve ? (x) => ctx.hrCurve!(String(x.id)) : undefined);
+    const rec = acAgg(buckets, (d) => (d.activities || []).map(recoveryOf).filter((v): v is number => v != null));
+    if (acPresent(rec).length) {
+      // Readout + grade follow the newest bucket with a session, like the other
+      // progress cards; dragging the chart swaps in another bucket.
+      const li = acLatestIdx(rec);
+      const cur = li >= 0 && rec[li] != null ? Math.round(rec[li]!) : null;
+      cards.push({
+        title: 'HR Recovery', sub: range,
+        cat: cur != null ? catFromBands(cur, BANDS.hrRecovery) : null,
+        catBands: BANDS.hrRecovery,
+        desc: 'How far your heart rate fell in the minute after you stopped. A bigger fall is better, so the numbers are negative.',
+        help: {
+          what: 'The change from the heart rate a workout ended on to the rate you entered by hand one minute after stopping (a health store does not record that one), averaged per day, week or month. The shaded zones are the grade bands, and a drop of 12 bpm or less is the classic abnormal threshold.',
+          why: 'How quickly your rate falls once you stop is a fairly direct read on vagal reactivation, and it tends to sag before anything else does on a hard week. Read the run of sessions rather than any single number, and compare a shallow one against how the following day went.',
+          learnMore: '/insights/basics/heart-rate-recovery-after-exercise/',
+        },
+        charts: [{ label: '', series: [series(rec, '#60a5fa')], zones: acBandZones('hrRecovery'), integer: true, selectStat: true }],
+        stats: [{ label: 'Avg recovery', value: cur, prefix: '\u0394 ', sub: 'bpm', when: bucketWhen(mode, buckets[li]) }],
+      });
+    }
+    return cards;
   };
 
   const triggers = (): AnalysisCard[] => {

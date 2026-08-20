@@ -11,38 +11,43 @@ const imported = (): DaysMap[string] =>
 
 const days = (map: Record<string, DaysMap[string]>): DaysMap => map as DaysMap;
 
-const THREE = days({ '2026-03-01': own(), '2026-03-02': own(), '2026-03-03': own() });
+const FIVE = days({
+  '2026-03-01': own(), '2026-03-02': own(), '2026-03-03': own(),
+  '2026-03-04': own(), '2026-03-05': own(),
+});
 
 const ask = (over: Partial<Parameters<typeof founderVerdict>[0]> = {}) =>
   founderVerdict({
-    days: THREE, dk: '2026-03-04', tier: 'trial', memory: emptyFounderMemory(), ...over,
+    days: FIVE, dk: '2026-03-06', tier: 'trial', memory: emptyFounderMemory(), ...over,
   });
 
 describe('engagedBefore', () => {
   it('counts only days strictly earlier than dk', () => {
-    expect(engagedBefore(THREE, '2026-03-04')).toBe(3);
-    expect(engagedBefore(THREE, '2026-03-03')).toBe(2);
-    expect(engagedBefore(THREE, '2026-03-01')).toBe(0);
+    expect(engagedBefore(FIVE, '2026-03-06')).toBe(5);
+    expect(engagedBefore(FIVE, '2026-03-05')).toBe(4);
+    expect(engagedBefore(FIVE, '2026-03-01')).toBe(0);
   });
 
   it("doesn't count a health-store backfill as days of use", () => {
     const backfill = days({ '2026-03-01': imported(), '2026-03-02': imported(), '2026-03-03': imported() });
-    expect(engagedBefore(backfill, '2026-03-04')).toBe(0);
+    expect(engagedBefore(backfill, '2026-03-06')).toBe(0);
   });
 });
 
 describe('founderVerdict', () => {
-  it('fires the day after the third logged day', () => {
+  it('fires the day after the fifth logged day', () => {
     expect(ask()).toEqual({ ok: true, claim: true });
   });
 
-  it('stays quiet on the third day itself, which is still in progress', () => {
-    expect(ask({ dk: '2026-03-03' })).toEqual({ ok: false, reason: 'too-few-days' });
+  it('stays quiet on the fifth day itself, which is still in progress', () => {
+    expect(ask({ dk: '2026-03-05' })).toEqual({ ok: false, reason: 'too-few-days' });
   });
 
   it(`needs ${FOUNDER_MIN_DAYS} logged days`, () => {
-    const two = days({ '2026-03-01': own(), '2026-03-02': own() });
-    expect(ask({ days: two })).toEqual({ ok: false, reason: 'too-few-days' });
+    const four = days({
+      '2026-03-01': own(), '2026-03-02': own(), '2026-03-03': own(), '2026-03-04': own(),
+    });
+    expect(ask({ days: four })).toEqual({ ok: false, reason: 'too-few-days' });
   });
 
   it('is only ever offered inside the install trial', () => {
@@ -51,11 +56,11 @@ describe('founderVerdict', () => {
   });
 
   it('renders without re-claiming on the day it already claimed', () => {
-    expect(ask({ memory: { shownDk: '2026-03-04' } })).toEqual({ ok: true, claim: false });
+    expect(ask({ memory: { shownDk: '2026-03-06' } })).toEqual({ ok: true, claim: false });
   });
 
   it('never returns on any other day', () => {
-    expect(ask({ memory: { shownDk: '2026-03-04' }, dk: '2026-03-05' }))
+    expect(ask({ memory: { shownDk: '2026-03-06' }, dk: '2026-03-07' }))
       .toEqual({ ok: false, reason: 'day-passed' });
   });
 

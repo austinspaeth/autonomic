@@ -415,7 +415,7 @@ export interface Zone { from: number; to: number; color: string }
 
 let lcId = 0;
 
-export function LineChart({ buckets, series, zones, integer, height = 140, target, zonesOn, hideHeader, onSelect, marks, markColor, divider }: {
+export function LineChart({ buckets, series, zones, integer, height = 140, target, zonesOn, hideHeader, onSelect, marks, markColor, divider, trendLine }: {
   buckets: { label: string }[]; series: Series[]; zones?: Zone[] | null; integer?: boolean; height?: number; target?: { from: number; to: number; color: string };
   /**
    * Per-bucket highlight painted BEHIND the plot: > 0 shades that bucket, 0 leaves
@@ -428,6 +428,14 @@ export function LineChart({ buckets, series, zones, integer, height = 140, targe
   markColor?: string;
   /** A dashed vertical rule at a bucket index: where a before/after split sits. */
   divider?: number | null;
+  /**
+   * A least-squares fit through the FIRST series' present values, drawn as a
+   * straight line in this colour: "which way is this heading over the whole
+   * range", which is the one thing a day-by-day trace of a noisy metric cannot
+   * be read for. Gaps are skipped rather than interpolated (a missing day is not
+   * a value), and the line is clipped to the plot so a steep fit cannot escape it.
+   */
+  trendLine?: string;
   /** Controlled "show zones" — when provided, the internal toggle link is hidden
    *  and the caller owns the state (used by card headers that host the link). */
   zonesOn?: boolean;
@@ -575,6 +583,25 @@ export function LineChart({ buckets, series, zones, integer, height = 140, targe
               </G>
             );
           })}
+          {trendLine ? (() => {
+            const pts: [number, number][] = [];
+            series[0]?.values.forEach((v, i) => { if (v != null && !isNaN(v)) pts.push([i, v]); });
+            if (pts.length < 3) return null;
+            const mx = pts.reduce((s2, q) => s2 + q[0], 0) / pts.length;
+            const my = pts.reduce((s2, q) => s2 + q[1], 0) / pts.length;
+            let num = 0, den = 0;
+            pts.forEach(([qx, qy]) => { num += (qx - mx) * (qy - my); den += (qx - mx) ** 2; });
+            if (!den) return null;
+            const slope = num / den;
+            const at = (i: number) => Math.max(min, Math.min(max, my + slope * (i - mx)));
+            const i0 = pts[0][0], i1 = pts[pts.length - 1][0];
+            return (
+              <Line
+                x1={xAt(i0)} y1={yAt(at(i0))} x2={xAt(i1)} y2={yAt(at(i1))}
+                stroke={trendLine} strokeWidth={1.6} strokeDasharray="6 4" opacity={0.75} strokeLinecap="round"
+              />
+            );
+          })() : null}
           {/* Selection cursor only once the user has actually touched the chart —
               nothing is highlighted in the initial view. */}
           {selIdx >= 0 && <Line x1={xAt(selIdx)} x2={xAt(selIdx)} y1={padT} y2={H - padB} stroke={p.text} strokeWidth={1} opacity={0.35} />}

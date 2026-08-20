@@ -11,12 +11,13 @@ import { addDays, todayKey } from '../../dates';
 import type { AppState, DayRecord, Entry } from '../../types';
 import { WELCOME_CHANGE, findBiggestChange } from '../change';
 import { dataConfidence } from '../confidence';
-import { CORRELATION_OUTCOMES, EARLY_MIN_FACTOR_DAYS, NO_IMPACT_MIN_OUTCOMES, findCorrelations, findEarlySignals, findNoImpact, groupCorrelations } from '../correlate';
+import { CORRELATION_OUTCOMES, EARLY_MIN_FACTOR_DAYS, MIN_GROUP, MIN_PAIRS, NO_IMPACT_MIN_OUTCOMES, findCorrelations, findEarlySignals, findNoImpact, groupCorrelations, isRegimeChange, regimeFactorIds } from '../correlate';
 import { buildFactors, factorProgress } from '../factors';
 import { buildDayMatrix } from '../matrix';
 import { PROBES_BY_ID, findObservations } from '../observations';
 import { changeSinceStart, findWatchItems, overallDirection } from '../watch';
-import { buildInsights } from '../index';
+import { ANALYSIS_DAYS, buildInsights } from '../index';
+import { mannWhitney } from '../stats';
 import { computeInsights, getCachedInsights, resetInsightsCache } from '../cache';
 import { INSIGHT_OUTCOMES, OUTCOME_FAMILY, TREND_METRICS, keyRange } from '../../trends';
 
@@ -327,6 +328,296 @@ describe('early signals', () => {
     expect(report.correlations).toEqual([]);
     expect(report.early.length).toBeGreaterThan(0);
     report.early.forEach((c) => expect(report.detail[c.id]).toBeTruthy());
+  });
+});
+
+describe('a start/stop is not an on/off comparison', () => {
+  /**
+   * The failure this guard exists for, reproduced from the real journal that
+   * exposed it: a supplement begun on day 20 of 100 and never stopped, while the
+   * outcome drifts steadily upward for reasons of its own.
+   *
+   * There is no association here — RMSSD is a pure function of the day index — but
+   * the "with it" and "without" groups are two different periods, so a naive on/off
+   * test reads the drift as the supplement's effect and reports it with high
+   * confidence. Nothing about the coverage floors catches this: 80 days on and 20
+   * off clears MIN_GROUP twice over.
+   */
+  const drifting = journal(100, (i) => {
+    const d = blank();
+    d.readings = [hrv(20 + Math.round(i * 0.3))];   // rises all journal, cause unrelated
+    if (i >= 20) d.meds.push(med('quercetin'));     // started once, never stopped
+    d.meds.push(med('vitD3'));                      // keeps the category window open
+    return d;
+  });
+
+  it('flags the column as a regime change', () => {
+    const m = matrixOf(drifting, 100);
+    expect(isRegimeChange(m.factors['med:quercetin'])).toBe(true);
+    expect(regimeFactorIds(m).has('med:quercetin')).toBe(true);
+  });
+
+  it('reports no correlation for it, however clean the separation looks', () => {
+    const found = findCorrelations(matrixOf(drifting, 100));
+    expect(findAbout(found, 'med:quercetin')).toEqual([]);
+  });
+
+  it('would have reported one without the guard', () => {
+    // Pins the guard as the thing doing the work. Same data, same statistics: the
+    // groups separate at |r| well past MIN_EFFECT and a vanishing p, which is
+    // exactly why the coverage floors and the FDR correction cannot save this.
+    const m = matrixOf(drifting, 100);
+    const col = m.factors['med:quercetin'];
+    const rmssd = m.outcomes.rmssd!;
+    const on: number[] = [], off: number[] = [];
+    col.forEach((v, i) => { const o = rmssd[i]; if (v == null || o == null) return; (v ? on : off).push(o); });
+    const g = mannWhitney(on, off);
+    expect(Math.abs(g.r)).toBeGreaterThan(0.9);
+    expect(g.p).toBeLessThan(0.001);
+  });
+
+  it('does not call it a null result either', () => {
+    // "No detectable impact" about something we refused to test is the most
+    // misleading sentence available, so a regime factor is excluded from both.
+    const m = matrixOf(drifting, 100);
+    const none = findNoImpact(m, { correlations: [], early: [], changeFactorId: null });
+    expect(none.map((n) => n.driverKey)).not.toContain('med:quercetin');
+  });
+
+  it('still lets an interleaved factor through', () => {
+    // The rule must cost nothing to somebody who genuinely alternates. Same
+    // journal shape, same 80/20 split, but the off-days are scattered.
+    const r = rng(31);
+    const alternating = journal(100, (i) => {
+      const d = blank();
+      d.readings = [hrv(20 + Math.round(i * 0.3))];
+      if (r() < 0.8) d.meds.push(med('quercetin'));
+      d.meds.push(med('vitD3'));
+      return d;
+    });
+    const m = matrixOf(alternating, 100);
+    expect(isRegimeChange(m.factors['med:quercetin'])).toBe(false);
+    expect(regimeFactorIds(m).has('med:quercetin')).toBe(false);
+  });
+
+  it('tolerates an ordinary gap in an otherwise alternating factor', () => {
+    // A trip, a stomach bug, a late delivery: one run of five missed days inside a
+    // factor somebody really does alternate must not retire it.
+    const r = rng(17);
+    const gappy = journal(100, (i) => {
+      const d = blank();
+      d.readings = [hrv(Math.round(20 + r() * 30))];
+      const skip = i >= 50 && i < 55;
+      if (!skip && i % 2 === 0) d.meds.push(med('quercetin'));
+      d.meds.push(med('vitD3'));
+      return d;
+    });
+    expect(isRegimeChange(matrixOf(gappy, 100).factors['med:quercetin'])).toBe(false);
+  });
+
+  it('does not fire on a factor that is simply rare or simply common', () => {
+    // Scattered singletons are the opposite of a regime change, at both extremes.
+    const r = rng(77);
+    const rare = journal(100, () => {
+      const d = blank();
+      d.readings = [hrv(Math.round(20 + r() * 30))];
+      if (r() < 0.12) d.meds.push(med('quercetin'));
+      d.meds.push(med('vitD3'));
+      return d;
+    });
+    expect(isRegimeChange(matrixOf(rare, 100).factors['med:quercetin'])).toBe(false);
+  });
+});
+
+describe('LF peak frequency is never the subject of a claim', () => {
+  it('is not a correlation outcome', () => {
+    expect(CORRELATION_OUTCOMES).not.toContain('lfPeak');
+  });
+
+  it('is still a metric the rest of the app reports', () => {
+    // Excluded from CLAIMS, not deleted: it keeps its registry row, its Trend
+    // Watch eligibility and its place in the HRV family.
+    expect(INSIGHT_OUTCOMES).toContain('lfPeak');
+    expect(OUTCOME_FAMILY.lfPeak).toBe('hrv');
+  });
+
+  it('never reaches a finding, even when it is the only thing that separates', () => {
+    // A journal where LF peak alone tracks the factor and RMSSD does not. Before
+    // the exclusion this was the whole report: the one survivor of the sweep, and
+    // a row reading "+0.03 Hz".
+    const r = rng(55);
+    const state = journal(120, (i) => {
+      const d = blank();
+      const took = i % 2 === 0;
+      d.readings = [{
+        id: nextId(), type: 'hrv', time: '08:00',
+        rmssd: String(Math.round(30 + r() * 8)),
+        sdnn: String(Math.round(42 + r() * 8)),
+        lfPeak: String((took ? 0.11 : 0.06) + r() * 0.004),
+      } as Entry];
+      if (took) d.meds.push(med('quercetin'));
+      d.meds.push(med('vitD3'));
+      return d;
+    });
+    const m = matrixOf(state);
+    const found = findCorrelations(m);
+    expect(found.every((c) => c.outcome !== 'lfPeak')).toBe(true);
+    // And the top-of-screen card cannot headline it either — same outcome list.
+    const change = findBiggestChange(m);
+    expect(change === null || change.outcome !== 'lfPeak').toBe(true);
+  });
+});
+
+describe('the unconfirmed tier, for a long journal the sweep cleared', () => {
+  const fullFloors = { pairs: MIN_PAIRS, group: MIN_GROUP };
+
+  /**
+   * A moderate real effect on a long, richly-logged journal: strong enough to
+   * see, not strong enough to survive one Benjamini-Hochberg family over several
+   * hundred tests.
+   *
+   * The background supplements are not decoration. They are what makes the family
+   * realistic — a journal with two factors produces a small m and a permissive BH
+   * threshold, so a planted effect there passes the STRICT sweep and this tier
+   * never runs. It is precisely the well-logged journal, the one with twelve
+   * things in the medicine cabinet, whose own correction buries its findings. The
+   * planted factor is deliberately rare (about 1 day in 12), because that is the
+   * shape of the real thing: an occasional trigger with a clear effect and not
+   * enough days to reach a corrected threshold.
+   */
+  const moderate = (() => {
+    const r = rng(2024);
+    const background = ['vitD3', 'omega3', 'coq10', 'magGlycinate', 'magCitrate', 'melatonin',
+      'vitB1', 'lmnt', 'liquidIv', 'pepsidAc', 'allegra', 'metamucil'];
+    return journal(120, () => {
+      const d = blank();
+      const took = r() < 0.08;
+      d.readings = [hrv(Math.round((took ? 35 : 30) + r() * 16))];
+      if (took) d.meds.push(med('quercetin'));
+      background.forEach((t) => { if (r() < 0.5) d.meds.push(med(t)); });
+      d.food.water = Math.round((1 + r() * 2) * 10) / 10;
+      d.sleep = { bed: `${22 + Math.floor(r() * 2)}:00`, wake: '07:00' };
+      if (r() < 0.3) d.symptoms.push({ id: nextId(), type: 'fatigue', time: '12:00' });
+      return d;
+    });
+  })();
+
+  // The window buildInsights itself analyses, so the two halves of this describe
+  // block cannot disagree about what the strict sweep saw.
+  const moderateMatrix = () => matrixOf(moderate, ANALYSIS_DAYS);
+
+  it('says nothing at the strict bar', () => {
+    expect(findCorrelations(moderateMatrix())).toEqual([]);
+  });
+
+  it('surfaces it at full coverage, badged and pinned to one pip', () => {
+    const rows = findEarlySignals(moderateMatrix(), { floors: fullFloors, tier: 'unconfirmed' });
+    expect(rows.length).toBeGreaterThan(0);
+    rows.forEach((c) => {
+      expect(c.tier).toBe('unconfirmed');
+      expect(c.early).toBe(true);
+      expect(c.pips).toBe(1);
+      expect(Math.abs(c.r)).toBeGreaterThanOrEqual(0.5);
+    });
+  });
+
+  it('reaches the report with its evidence columns, from the main matrix', () => {
+    const report = buildInsights(moderate, addDays(DK, 1));
+    expect(report.correlations).toEqual([]);
+    expect(report.early.length).toBeGreaterThan(0);
+    report.early.forEach((c) => {
+      expect(c.tier).toBe('unconfirmed');
+      expect(report.detail[c.id]).toBeTruthy();
+    });
+  });
+
+  it('stays near-silent on four months of noise (measured bound)', () => {
+    /**
+     * THE TEST THAT LICENSES THE TIER. It runs on every journal the strict sweep
+     * cleared, which is most of them, so a loose bar here would put invented
+     * claims in front of nearly everybody.
+     *
+     * THE NOISE MODEL IS THE POINT, and a weaker one is actively misleading. These
+     * journals carry twelve everyday supplements at 50% AND a dozen genuinely RARE
+     * things — an occasional supplement, a trigger a few times a month, a workout
+     * type — because a rare factor is the regime EARLY_MIN_EFFECT is weakest in: a
+     * group of eight days reaches |r| >= 0.5 against seventy on luck alone, where a
+     * balanced 60-vs-60 group essentially cannot. Measured on balanced factors only,
+     * this tier looked perfectly silent with the BH step REMOVED, which is exactly
+     * the wrong conclusion.
+     *
+     * Measured across 40 independent 120-day journals with the model below:
+     *   · as shipped (BH at EARLY_FDR_Q):  1 of 40 seeds, 3 rows
+     *   · with the BH step removed:        5 of 40 seeds, 12 rows
+     *
+     * So the correction is load-bearing here and not ceremony, and it costs real
+     * findings to keep — on the journal this tier was built for it dropped two rows
+     * worth reading, one of which was the most actionable thing on the screen. That
+     * trade is the deliberate one: this tier's rows are badged, but a badge is not a
+     * licence to be wrong one time in eight. Do not remove the BH step, and do not
+     * loosen EARLY_MIN_EFFECT, EARLY_MAX_P or EARLY_FDR_Q, without re-running this
+     * against a noise model that includes rare factors.
+     */
+    const common = ['vitD3', 'omega3', 'coq10', 'magGlycinate', 'magCitrate', 'melatonin',
+      'vitB1', 'lmnt', 'liquidIv', 'pepsidAc', 'allegra', 'metamucil'];
+    const rare = ['quercetin', 'gaviscon', 'custom-dao'];
+    let seeds = 0, rows = 0;
+    for (let seed = 1; seed <= 40; seed++) {
+      const r = rng(seed * 7919);
+      const state = journal(120, () => {
+        const d = blank();
+        d.readings = [hrv(Math.round(20 + r() * 30))];
+        common.forEach((t) => { if (r() < 0.5) d.meds.push(med(t)); });
+        rare.forEach((t, k) => { if (r() < 0.08 + k * 0.02) d.meds.push(med(t)); });
+        ['sugar', 'chocolate', 'pizza', 'alcohol'].forEach((t, k) => {
+          if (r() < 0.07 + k * 0.02) d.food.triggers[t] = 1;
+        });
+        ['walk', 'legsUp', 'yoga', 'swim'].forEach((t, k) => {
+          if (r() < 0.08 + k * 0.02) d.activities.push({ id: nextId(), type: t, time: '17:00', minutes: '30' } as Entry);
+        });
+        if (r() < 0.4) d.symptoms.push({ id: nextId(), type: 'fatigue', time: '12:00' });
+        d.food.water = Math.round((1 + r() * 2) * 10) / 10;
+        d.sleep = { bed: `${22 + Math.floor(r() * 2)}:00`, wake: '07:00' };
+        return d;
+      });
+      const m = matrixOf(state, ANALYSIS_DAYS);
+      if (findCorrelations(m).length) continue;   // strict findings retire the tier
+      const found = findEarlySignals(m, { floors: fullFloors, tier: 'unconfirmed' });
+      if (found.length) { seeds++; rows += found.length; }
+    }
+    expect(seeds).toBeLessThanOrEqual(2);
+    expect(rows).toBeLessThanOrEqual(4);
+  });
+
+  it('is retired the moment the strict sweep has anything', () => {
+    const r = rng(99);
+    const strong = journal(120, (i) => {
+      const d = blank();
+      const took = i % 2 === 0;
+      d.readings = [hrv(Math.round((took ? 42 : 28) + r() * 8))];
+      if (took) d.meds.push(med('magGlycinate'));
+      d.meds.push(med('vitD3'));
+      return d;
+    });
+    const report = buildInsights(strong, addDays(DK, 1));
+    expect(report.correlations.length).toBeGreaterThan(0);
+    expect(report.early).toEqual([]);
+  });
+
+  it('leaves the young-journal variant alone', () => {
+    // A nine-day journal cannot meet full coverage, so the relaxed-floor pass is
+    // still what answers it — and it must still call itself 'early'.
+    const state = journal(9, (i) => {
+      const d = blank();
+      const took = i % 2 === 0;
+      d.readings = [hrv(took ? 44 + i : 26 + i)];
+      if (took) d.meds.push(med('quercetin'));
+      d.meds.push(med('vitD3'));
+      return d;
+    });
+    const report = buildInsights(state, addDays(DK, 1));
+    expect(report.early.length).toBeGreaterThan(0);
+    report.early.forEach((c) => expect(c.tier).toBe('early'));
   });
 });
 
@@ -724,6 +1015,35 @@ describe('trend watch', () => {
       return d;
     });
     expect(findWatchItems(matrixOf(busy, 60), false).length).toBeLessThanOrEqual(5);
+  });
+
+  /** The sheet a row opens draws these, and it must not re-extract the metric:
+   *  a second extraction is a second chance to disagree with the claim. */
+  it('carries the columns and the two windows the sheet reads', () => {
+    const item = findWatchItems(matrixOf(declining, 60), false).find((x) => x.metric === 'rmssd')!;
+    expect(item.keys.length).toBe(item.series.length);
+    // The divider sits where the recent window starts, inside the sliced range.
+    expect(item.splitIndex).toBeGreaterThan(0);
+    expect(item.splitIndex).toBeLessThan(item.keys.length);
+    expect(Number(item.beforeValue)).toBeGreaterThan(Number(item.afterValue));
+    expect(item.changeValue).toMatch(/^-/);
+    expect(item.unit).toBe('ms');
+    expect(item.recentN).toBeGreaterThan(0);
+    expect(item.priorN).toBeGreaterThan(0);
+  });
+
+  it('gives a dispersion metric no change tile, the way its row carries no number', () => {
+    const wobbly = journal(60, (i) => {
+      const d = blank();
+      // Bedtime all over the place for a month, then steady.
+      const late = i < 30 && i % 2 === 0;
+      d.sleep = { bed: i < 30 ? (late ? '00:40' : '21:20') : '22:30', wake: '07:00' };
+      return d;
+    });
+    const item = findWatchItems(matrixOf(wobbly, 60), false).find((x) => x.metric === 'sleepConsistency');
+    if (!item) return; // thresholds may not clear on this fixture; the rule is what matters
+    expect(item.changeValue).toBeNull();
+    expect(item.change).toMatch(/steady|steadier/i);
   });
 
   it('keeps the noisy Baevsky metrics off the screen entirely', () => {

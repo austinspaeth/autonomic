@@ -76,8 +76,8 @@ function refresh(): void {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { getState } = require('./store') as typeof import('./store');
       const state = getState();
-      // A journal with no own data shows the demo month, whose findings are
-      // sample data — never a dot.
+      // An empty journal has nothing to find and shows the countdown screen
+      // instead — never a dot, and no reason to pay for the build.
       if (!hasOwnData(state.days)) { set(false); return; }
       const ctx = {
         sex: state.profile.sex,

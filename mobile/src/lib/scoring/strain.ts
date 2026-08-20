@@ -39,6 +39,7 @@
  */
 import { addDays } from '../dates';
 import type { Entry } from '../types';
+import { hrRecovery } from '../hrRecovery';
 import type { ScoreContext } from './index';
 import { activityGrade, type DaysMap } from './day';
 import type { DownturnFactor } from './downturn';
@@ -174,19 +175,13 @@ export function detectStrain(days: DaysMap, dk: string, ctx: ScoreContext = {}):
   const push = (s: StrainSignal) => { signals.push(s); };
 
   /* ---------- heart-rate recovery after exercise ---------- */
-  // The drop from the session's peak to the hand-entered rate one minute after
-  // stopping. `hr60` is hand-entered (no health store records it), so these
-  // events are sparse by nature and the coverage bars are set for that.
+  // The drop from the rate the session ended on to the hand-entered rate one
+  // minute after stopping (`lib/hrRecovery.ts` owns that definition), read here
+  // as a positive drop. `hr60` is hand-entered (no health store records it), so
+  // these events are sparse by nature and the coverage bars are set for that.
   const hrrOf = (a: Entry): number | null => {
-    const h60 = num(a.hr60);
-    if (h60 == null) return null;
-    let peak = num(a.maxHr);
-    if (peak == null && ctx.hrCurve) {
-      const c = ctx.hrCurve(String(a.id));
-      if (c && c.length) peak = Math.max(...c.map((q) => q.bpm));
-    }
-    if (peak == null || peak <= h60) return null;
-    return peak - h60;
+    const d = hrRecovery(a, ctx.hrCurve ? (x) => ctx.hrCurve!(String(x.id)) : undefined);
+    return d == null ? null : -d;
   };
   const hrr = shift(pick(days, recentKeys, 'activities', hrrOf), pick(days, baseKeys, 'activities', hrrOf), 1, 3);
   if (hrr && hrr.delta <= -HRR_SAG) {

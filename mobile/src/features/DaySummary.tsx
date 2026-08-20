@@ -5,7 +5,7 @@
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { type LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native';
-import Svg, { Defs, LinearGradient as SvgGradient, Rect, Stop } from 'react-native-svg';
+import Svg, { Defs, LinearGradient as SvgGradient, RadialGradient, Rect, Stop } from 'react-native-svg';
 import Animated, { Easing, useAnimatedProps, useAnimatedStyle, useSharedValue, withDelay, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 import { ScoreGauge } from '../components/charts';
 import { BrandMark, Icon } from '../components/Icon';
@@ -73,7 +73,7 @@ const WARN_BASE = '#0d0d0f';
 // two states, and the light says which.
 let obId = 0;
 const AnimatedRect = Animated.createAnimatedComponent(Rect);
-function GradientBorderCard({ color, trigger, corner = 'topLeft', style, children }: { color: string | null; trigger?: string; corner?: 'topLeft' | 'topRight'; style?: any; children: React.ReactNode }) {
+function GradientBorderCard({ color, trigger, corner = 'topLeft', glow: wash, style, children }: { color: string | null; trigger?: string; corner?: 'topLeft' | 'topRight'; glow?: boolean; style?: any; children: React.ReactNode }) {
   const p = usePalette();
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [gid] = useState(() => `ob${obId++}`);
@@ -98,6 +98,36 @@ function GradientBorderCard({ color, trigger, corner = 'topLeft', style, childre
       onLayout={(e) => { const { width, height } = e.nativeEvent.layout; setSize({ w: width, h: height }); }}
       style={[{ borderRadius: r, backgroundColor: p.surface, overflow: 'hidden' }, color ? null : { borderWidth: 1, borderColor: p.border }, style]}
     >
+      {/* An optional WASH of the same colour bleeding out of the lit corner, under
+          the content. The border alone is a hairline: on the baseline card, which
+          has to be the thing a brand-new user looks at first, it was not enough to
+          separate the slot from the plain cards below it. Kept low-alpha and
+          fading to nothing well before the far edge — this sits behind live text,
+          so it may raise the surface, never tint it. The alpha is deliberately low
+          enough that the corner reads as warm grey rather than as red: any stronger
+          and the card starts to look like the warning cards, which are the one thing
+          in this slot that IS meant to be alarming. */}
+      {color && wash && size.w > 0 && (
+        <View style={StyleSheet.absoluteFill} pointerEvents="none">
+          <Svg width={size.w} height={size.h}>
+            <Defs>
+              <RadialGradient
+                id={`${gid}w`}
+                cx={corner === 'topRight' ? size.w : 0}
+                cy={0}
+                rx={size.w * 0.8}
+                ry={size.h * 0.9}
+                gradientUnits="userSpaceOnUse"
+              >
+                <Stop offset="0" stopColor={color} stopOpacity={0.14} />
+                <Stop offset="0.4" stopColor={color} stopOpacity={0.045} />
+                <Stop offset="1" stopColor={color} stopOpacity={0} />
+              </RadialGradient>
+            </Defs>
+            <Rect x={0} y={0} width={size.w} height={size.h} fill={`url(#${gid}w)`} />
+          </Svg>
+        </View>
+      )}
       {children}
       {color && size.w > 0 && (
         <View style={StyleSheet.absoluteFill} pointerEvents="none">
@@ -217,17 +247,22 @@ export function DaySummary({ dk }: { dk: string }) {
  * not "here are your chores". No dismiss — this card is the only route back,
  * and it retires itself the moment a reading lands.
  */
+/* Labels break where they are WRITTEN, not where the tile happens to run out.
+   Three tiles side by side on a narrow phone put "Autonomic score" on two lines
+   and "Progress charts" on one, so the three ghost bars sat at different heights
+   and the row read as three unrelated boxes. A hard break gives every tile the
+   same two lines, with the noun the tile is actually about on the second one. */
 const WAITING_ROWS = [
-  { label: 'Autonomic score', width: '68%' as const, delay: 0 },
-  { label: 'Progress charts', width: '48%' as const, delay: 900 },
-  { label: 'Trends & correlations', width: '80%' as const, delay: 1800 },
+  { label: 'Autonomic\nscore', width: '68%' as const, delay: 0 },
+  { label: 'Progress\ncharts', width: '48%' as const, delay: 900 },
+  { label: 'Trends &\ncorrelations', width: '80%' as const, delay: 1800 },
 ];
 
 function BaselineWaitingCard() {
   const p = usePalette();
   const { openSheet } = useSheets();
   return (
-    <GradientBorderCard color={p.accent} corner="topRight" style={{ marginBottom: 12 }}>
+    <GradientBorderCard color={p.accent} corner="topRight" glow style={{ marginBottom: 12 }}>
       <View style={{ padding: 16 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 13, marginBottom: 14 }}>
           <View style={{ width: 46, height: 46, borderRadius: 14, backgroundColor: hexA(p.accent, 0.08), borderWidth: 1, borderColor: hexA(p.accent, 0.33), alignItems: 'center', justifyContent: 'center' }}>

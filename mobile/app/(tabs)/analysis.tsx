@@ -1142,7 +1142,7 @@ const CardView = React.memo(function CardView({ card, buckets }: { card: Analysi
             {stats.map((s, i) => (
               <View key={i} style={{ flex: 1, minWidth: 96, backgroundColor: p.bg, borderColor: p.border, borderWidth: 1, borderRadius: radius.card, paddingVertical: 12, paddingHorizontal: 14 }}>
                 <Text style={{ fontSize: 25, fontFamily: fonts.numHeavy, color: s.color || p.text, fontVariant: ['tabular-nums'] }}>
-                  {s.value == null ? '–' : String(s.value)}
+                  {s.value == null ? '–' : `${s.prefix || ''}${s.value}`}
                   {readoutTail(s.sub, s.when) ? <Text style={TAIL_STYLE(p)}>{readoutTail(s.sub, s.when)}</Text> : null}
                 </Text>
                 <Text style={{ fontSize: 12, color: p.textDim, marginTop: 2 }}>{s.label}</Text>
@@ -1154,7 +1154,7 @@ const CardView = React.memo(function CardView({ card, buckets }: { card: Analysi
             {stats.map((s, i) => (
               <View key={i}>
                 <Text style={{ fontSize: 25, fontFamily: fonts.numHeavy, color: s.color || p.text, fontVariant: ['tabular-nums'] }}>
-                  {s.value == null ? '–' : String(s.value)}
+                  {s.value == null ? '–' : `${s.prefix || ''}${s.value}`}
                   {readoutTail(s.sub, s.when) ? <Text style={TAIL_STYLE(p)}>{readoutTail(s.sub, s.when)}</Text> : null}
                 </Text>
                 <Text style={{ fontSize: 12, color: p.textDim, marginTop: 2 }}>{s.label}</Text>

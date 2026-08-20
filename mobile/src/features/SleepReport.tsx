@@ -21,6 +21,7 @@ import {
   SleepScheduleChart, ZonesToggle,
 } from '../components/charts';
 import { Icon } from '../components/Icon';
+import { StageBar } from '../components/StageBar';
 import { useAccordion } from '../components/ui';
 import { useSheets } from '../components/Sheet';
 import { fonts, radius, usePalette } from '../theme';
@@ -495,6 +496,9 @@ function NightShape({ report }: { report: SleepReport }) {
           labels={STAGE_LABEL}
         />
       </View>
+      {/* The same stacked bar the Journal's "Last night" card carries, so the
+          hypnogram's blocks and their totals are read off one legend. */}
+      {report.night.stages ? <StageBar stages={report.night.stages} style={{ marginTop: 14 }} /> : null}
       {wake && wake.blocks.length ? (
         <View style={{ marginTop: 14, borderTopWidth: 1, borderTopColor: p.border, paddingTop: 14 }}>
           <StatTiles stats={[

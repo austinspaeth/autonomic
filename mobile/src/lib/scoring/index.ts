@@ -145,6 +145,11 @@ export const BANDS: Record<string, Band[]> = {
   // HR settled back down (good), positive means it was still climbing (bad). The
   // mirror of orthoRecovery, graded on the signed delta the readout now shows.
   orthoDelta: [{ max: -20, cat: 'great' }, { max: -12, cat: 'good' }, { max: -6, cat: 'ok' }, { max: 0, cat: 'bad' }, { max: Infinity, cat: 'concerning' }],
+  // Heart-rate recovery one minute after a workout, as the SIGNED change from
+  // the rate the session ended on (see `lib/hrRecovery.ts`), so a fall reads
+  // negative the way orthoDelta does. A drop of 12 bpm or less at one minute is the classic abnormal-HRR
+  // threshold, so it sits at the concerning boundary.
+  hrRecovery: [{ max: -35, cat: 'great' }, { max: -25, cat: 'good' }, { max: -18, cat: 'ok' }, { max: -12, cat: 'bad' }, { max: Infinity, cat: 'concerning' }],
   // Watch stand test: HR rise on standing (bpm). ≥30 sustained is the adult
   // POTS threshold, so it sits at the bad boundary.
   standDelta: [{ max: 10, cat: 'great' }, { max: 20, cat: 'good' }, { max: 30, cat: 'ok' }, { max: 40, cat: 'bad' }, { max: Infinity, cat: 'crash' }],

@@ -94,19 +94,21 @@ function Spark({ vals, color }: { vals: number[]; color: string }) {
 }
 
 function StatTile({ label, value, unit, vals, color, pulse }: {
-  label: string; value: string; unit: string; vals: number[]; color: string; pulse?: boolean;
+  label: string; value: number | null; unit: string; vals: number[]; color: string; pulse?: boolean;
 }) {
   const p = usePalette();
   return (
     <View style={{ flex: 1, backgroundColor: p.sunk, borderRadius: 18, paddingHorizontal: 14, paddingTop: 12, paddingBottom: 10 }}>
       <Text style={{ color: p.textDim, fontSize: 11, fontWeight: '700', letterSpacing: 0.8, textTransform: 'uppercase' }}>{label}</Text>
       <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4, marginTop: 5 }}>
-        {/* The em-dash placeholder drops the numeric face: Manrope draws it as a
-            long flat rule that reads as a chart line, not as "no value yet". */}
+        {/* No value yet reads as a dimmed "00" rather than a dash, the way the
+            watch's own rings do: the slot keeps its numeric shape, so the tile
+            does not reflow or change character the moment a beat lands, and the
+            colour alone carries "not yet" → "live". */}
         <Text style={{
-          color: value === '—' ? p.textDim : pulse ? color : p.text, fontSize: 29, fontWeight: '800',
-          ...(value === '—' ? null : { fontFamily: fonts.numBold, fontVariant: ['tabular-nums'] as const }),
-        }}>{value}</Text>
+          color: value == null ? p.textDim : pulse ? color : p.text, fontSize: 29, fontWeight: '800',
+          fontFamily: fonts.numBold, fontVariant: ['tabular-nums'] as const,
+        }}>{value ?? '00'}</Text>
         <Text style={{ color: p.textDim, fontSize: 12 }}>{unit}</Text>
       </View>
       <View style={{ marginTop: 7 }}><Spark vals={vals} color={color} /></View>
@@ -135,13 +137,11 @@ const RR_W = 320, RR_H = 88;
  */
 function RrTrace({ vals, color }: { vals: number[]; color: string }) {
   const p = usePalette();
-  if (vals.length < 3) {
-    return (
-      <View style={{ height: RR_H, alignItems: 'center', justifyContent: 'center' }}>
-        <Text style={{ color: p.textDim, fontSize: 12 }}>Waiting for beats…</Text>
-      </View>
-    );
-  }
+  // Empty until there is a shape to draw. The card's own dot and "No beats yet"
+  // line already say what is happening one row above; a second sentence in the
+  // middle of the chart said it twice and then vanished, which reads as the
+  // chart replacing itself rather than filling in.
+  if (vals.length < 3) return <View style={{ height: RR_H }} />;
   const pts = project(vals, RR_W, RR_H, 5);
   const head = pts[pts.length - 1];
   return (
@@ -171,8 +171,8 @@ export function LiveStats({ hr, sdnn, beats, hrTrace, sdnnTrace, rrTrace, artifa
   return (
     <View style={{ width: '100%', gap: 10 }}>
       <View style={{ flexDirection: 'row', gap: 10 }}>
-        <StatTile label="Heart rate" value={hr != null ? String(hr) : '—'} unit="bpm" vals={hrTrace} color={p.accent} pulse />
-        <StatTile label="SDNN" value={sdnn != null ? String(sdnn) : '—'} unit="ms" vals={sdnnTrace} color={p.textDim} />
+        <StatTile label="Heart rate" value={hr} unit="bpm" vals={hrTrace} color={p.accent} pulse />
+        <StatTile label="SDNN" value={sdnn} unit="ms" vals={sdnnTrace} color={p.textDim} />
       </View>
       <View style={{ backgroundColor: p.sunk, borderRadius: 18, paddingHorizontal: 14, paddingTop: 11, paddingBottom: 9 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>

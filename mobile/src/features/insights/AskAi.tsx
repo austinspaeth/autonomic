@@ -27,7 +27,7 @@ import {
 import { getState } from '../../store/store';
 import { todayKey } from '../../lib/dates';
 import { resolveProtocol } from '../../lib/scoring/day';
-import { dayHasOwnData, demoState, hasOwnData } from '../../lib/demo';
+import { dayHasOwnData } from '../../lib/demo';
 import {
   REPORT_CARDS, buildDataExport, buildDoctorPrompt, buildPrompt, reportDateRange,
   type ReportRange,
@@ -138,11 +138,13 @@ const styles = StyleSheet.create({
 /* ---------- the sheet ---------- */
 
 /**
- * The state reports are built from: the user's own, or the sample month while
- * they have logged nothing. Resolved at press time off fresh store state so it
- * can never disagree with what the view decided to render.
+ * The state reports are built from: the user's own, always. Resolved at press time
+ * off fresh store state so it can never disagree with what the view decided to
+ * render — which is also why the sample-month fallback is gone from here. Insights
+ * stopped showing demo data on an empty journal, so a report built from the sample
+ * month would have been prose about somebody else's body, under a Pro button.
  */
-const reportState = () => { const s = getState(); return hasOwnData(s.days) ? s : demoState(s); };
+const reportState = () => getState();
 
 const RANGES: { val: ReportRange; label: string }[] = [
   { val: 'day', label: 'Today' },

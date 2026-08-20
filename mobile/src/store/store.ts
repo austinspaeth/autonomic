@@ -23,6 +23,9 @@ import { migrateLegacyJournal } from '../lib/storeMigration';
 import { stampImportedHrvCoverage } from '../lib/hrvQuality';
 import { markDeclinedKeys } from '../lib/health/declined';
 import { resetFindingMemory } from '../lib/insights/findingMemory';
+import { resetInsightsCache } from '../lib/insights/cache';
+import { setInsightsAnchor } from '../lib/insights/anchorMemory';
+import { resetTrendMemory } from '../lib/trends/memory';
 import { importFingerprint } from '../lib/health/updateSet';
 import type { AppState, DayRecord, Entry } from '../lib/types';
 import {
@@ -452,8 +455,15 @@ export function clearAllData() {
   try { wkv().clearAll(); } catch { /* strays pruned on next launch */ }
   waveCache.clear();
   // Unlike the rest of the flags MMKV (which is about the person, not the
-  // journal), retained findings are claims about the erased data.
+  // journal), these four are claims ABOUT the erased data and would otherwise
+  // outlive it: a retained Insights finding, the report cached from it, the
+  // Trend card's pinned headline (still live for the rest of the journal day, so
+  // a wiped app keeps congratulating the user on numbers it no longer holds),
+  // and the chosen "day one", which now points at a day that does not exist.
   resetFindingMemory();
+  resetInsightsCache();
+  resetTrendMemory();
+  setInsightsAnchor(null);
   state = defaultState();
   touchDays();
   // save() stamps meta.lastUpdated, which also keeps onboarding from re-firing

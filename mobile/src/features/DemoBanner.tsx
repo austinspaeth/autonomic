@@ -1,6 +1,7 @@
 /**
  * The "viewing demo data" notice that sits above the sample month on Progress
- * and Insights while the journal is empty (see src/lib/demo.ts).
+ * while the journal is empty (see src/lib/demo.ts). Progress only: Insights shows
+ * the "0 of 14 days" countdown instead of a demo, so it has no banner.
  *
  * It has two jobs: make sure nobody mistakes the sample month for their own
  * numbers, and give them the one action that ends it. So it says "demo data" in
@@ -46,7 +47,3 @@ export function DemoBanner({ text }: { text: string }) {
 /** Progress view copy. */
 export const DEMO_PROGRESS_TEXT =
   'An example month, so you can see what this view looks like with some history behind it. Start logging your days in the Journal and these charts fill in with your own numbers, so you can watch your trends and work out what your body responds to.';
-
-/** Insights view copy. */
-export const DEMO_INSIGHTS_TEXT =
-  'An example month, so you can see what your reports look like with some history behind them. Start logging your days in the Journal and every report here is built from your own numbers.';

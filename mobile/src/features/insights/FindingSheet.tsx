@@ -33,7 +33,7 @@ import { usePalette, GRADE_COLORS } from '../../theme';
 import { fmtShort } from '../../lib/dates';
 import { acBandZones, acScoreZones, onDay } from '../../lib/analysis/buckets';
 import { TREND_METRICS } from '../../lib/trends';
-import { markColumn, type BiggestChange, type Correlation, type DetailSeries } from '../../lib/insights';
+import { markColumn, type BiggestChange, type Correlation, type DetailSeries, type WatchItem } from '../../lib/insights';
 import { CorrelationsAiButton, FindingCard, type FindingTile } from './Sections';
 import * as S from './style';
 
@@ -55,7 +55,18 @@ const MARK = GRADE_COLORS.warning;
  * also says whether the selected day was one of the shaded ones, which is the
  * question somebody scrubbing this chart is actually asking.
  */
-function EvidenceChart({ series, good }: { series: DetailSeries; good: boolean }) {
+function EvidenceChart({ series, good, trendLine, desc }: {
+  series: DetailSeries;
+  good: boolean;
+  /** Draw a straight least-squares fit over the whole range. Trend watch turns it
+   *  on: its claim IS the direction of travel, and a 60-day trace of a noisy
+   *  metric cannot be read for one by eye. A correlation's chart does not, because
+   *  its claim is about two GROUPS of days and a line through time would invite a
+   *  second, different reading of the same picture. */
+  trendLine?: boolean;
+  /** Overrides the chart's standing sentence. */
+  desc?: string;
+}) {
   const p = usePalette();
   const [sel, setSel] = useState<number | null>(null);
   const [showZones, setShowZones] = useState(false);
@@ -89,9 +100,10 @@ function EvidenceChart({ series, good }: { series: DetailSeries; good: boolean }
         when={onDay(fmtShort(series.keys[at]))}
         right={zones ? <ZonesToggle on={showZones} onPress={() => setShowZones((v) => !v)} /> : undefined}
         desc={
-          series.lag === 1
+          desc ??
+          (series.lag === 1
             ? 'Each point is one day. The association was found in the NEXT day’s reading, so a shaded day is the day before the one it moved.'
-            : 'Each point is one day.'
+            : 'Each point is one day.')
         }
       />
       <View style={{ marginTop: 10 }}>
@@ -103,6 +115,7 @@ function EvidenceChart({ series, good }: { series: DetailSeries; good: boolean }
           marks={marks}
           markColor={MARK}
           divider={series.onsetIndex}
+          trendLine={trendLine ? (good ? GOOD : p.accent) : undefined}
           height={170}
           hideHeader
           onSelect={setSel}
@@ -133,10 +146,15 @@ function EvidenceChart({ series, good }: { series: DetailSeries; good: boolean }
 interface BodyFinding {
   headline: string;
   tiles: FindingTile[];
-  pips: number;
-  confidence: string;
+  /** Omitted together by a finding with no statistical test behind it — see
+   *  `FindingCard`. Those carry `note`. */
+  pips?: number;
+  confidence?: string;
+  note?: string;
   good: boolean;
   series: DetailSeries | null;
+  trendLine?: boolean;
+  chartDesc?: string;
 }
 
 function Body({ title, findings, footer }: {
@@ -168,9 +186,10 @@ function Body({ title, findings, footer }: {
             tiles={f.tiles}
             pips={f.pips}
             confidence={f.confidence}
+            note={f.note}
             good={f.good}
           />
-          {f.series ? <EvidenceChart series={f.series} good={f.good} /> : null}
+          {f.series ? <EvidenceChart series={f.series} good={f.good} trendLine={f.trendLine} desc={f.chartDesc} /> : null}
         </View>
       ))}
       {footer}
@@ -242,6 +261,65 @@ export function ChangeSheet({ change, series }: { change: BiggestChange; series:
         confidence: change.confidence,
         good: change.good,
         series,
+      }]}
+    />
+  );
+}
+
+/**
+ * A Trend watch row, opened.
+ *
+ * This card used to hand off to Progress — it switched tab, forced the range to
+ * Month and scrolled to a section, which is three surprises for one tap and left
+ * the reader in a different view holding a different question. It now opens where
+ * every other Insights row opens: the claim's own numbers, then the days behind
+ * them, in the same card the Biggest change and a correlation wear.
+ *
+ * The two differences from a correlation, both of them from what the claim IS:
+ *   · No confidence strip. A windowed median against the window before it is not
+ *     a hypothesis test, so the card states its COVERAGE instead of inventing a
+ *     confidence for the sake of the layout.
+ *   · A trend line. The claim is a direction of travel across 60 days of a noisy
+ *     daily metric, which is exactly what the trace alone cannot be read for.
+ */
+export function WatchSheet({ item }: { item: WatchItem }) {
+  const p = usePalette();
+  const color = item.good ? GOOD : p.accent;
+  const def = TREND_METRICS[item.metric];
+  // The columns the comparison was computed from, in the shape the shared chart
+  // reads. There is no factor here, so nothing is shaded: the divider at the
+  // window boundary is the whole annotation, and it is the split the claim rests on.
+  const series: DetailSeries = {
+    keys: item.keys,
+    values: item.series,
+    on: item.keys.map(() => null),
+    factorKind: null,
+    factorLabel: null,
+    metric: item.metric,
+    metricLabel: def.label,
+    unit: item.unit,
+    onsetIndex: item.splitIndex > 0 && item.splitIndex < item.keys.length ? item.splitIndex : null,
+    lag: 0,
+  };
+  const tiles: FindingTile[] = [
+    { value: item.beforeValue, unit: item.unit, label: item.beforeLabel },
+    { value: item.afterValue, unit: item.unit, label: item.afterLabel, color },
+  ];
+  // A dispersion metric gets no change tile: its delta is a change in scatter,
+  // which is not a quantity anybody can picture (see lib/trends).
+  if (item.changeValue) tiles.push({ value: item.changeValue, unit: item.unit, label: 'Change', color });
+
+  return (
+    <Body
+      title={`${item.title} trend`}
+      findings={[{
+        headline: item.sub,
+        tiles,
+        note: `${item.recentN} logged ${item.recentN === 1 ? 'day' : 'days'} vs ${item.priorN} the month before`,
+        good: item.good,
+        series,
+        trendLine: true,
+        chartDesc: 'Each point is one day. The dashed line is the overall direction across the range; the vertical rule is where last month begins.',
       }]}
     />
   );

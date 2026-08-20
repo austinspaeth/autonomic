@@ -40,7 +40,7 @@ import type { AppState } from '../types';
 import { WELCOME_CHANGE, findBiggestChange, type BiggestChange } from './change';
 import { changeSeries, correlationSeries, type DetailSeries } from './detail';
 import { dataConfidence, type DataConfidence } from './confidence';
-import { EARLY_MIN_FACTOR_DAYS, findCorrelations, findEarlySignals, findNoImpact, type Correlation, type NoImpactItem } from './correlate';
+import { EARLY_MIN_FACTOR_DAYS, MIN_GROUP, MIN_PAIRS, findCorrelations, findEarlySignals, findNoImpact, type Correlation, type NoImpactItem } from './correlate';
 import { buildFactors, factorProgress, type FactorProgress } from './factors';
 import { buildDayMatrix } from './matrix';
 import { findObservations, type Observation } from './observations';
@@ -240,12 +240,26 @@ export function buildInsights(state: AppState, dk: string, opts: {
   let early: Correlation[] = [];
   let progress: FactorProgress[] = [];
   if (!opts.demo && !correlations.length) {
-    const earlyDefs = buildFactors(state, keys, { minDays: EARLY_MIN_FACTOR_DAYS });
-    const earlyMatrix = buildDayMatrix(state, keys, INSIGHT_OUTCOMES, earlyDefs, ctx);
-    early = findEarlySignals(earlyMatrix);
-    // Evidence columns from the EARLY matrix — the relaxed factors have no
-    // columns in the main one.
-    early.forEach((c) => { const s = correlationSeries(earlyMatrix, c); if (s) detail[c.id] = s; });
+    // The weak tier, in two variants that answer two different empty screens. Try
+    // the one that needs no excuses first: FULL coverage on the matrix we already
+    // built, with only the evidence bar relaxed. That is the honest tier for a
+    // long, well-logged journal where the correction happened to clear the board —
+    // those rows are short of evidence, not of days, and calling them "early"
+    // would misdescribe why they are hedged.
+    early = findEarlySignals(matrix, { floors: { pairs: MIN_PAIRS, group: MIN_GROUP }, tier: 'unconfirmed' });
+    early.forEach((c) => { const s = correlationSeries(matrix, c); if (s) detail[c.id] = s; });
+
+    // Only if that found nothing does the young-journal variant run, on a second
+    // matrix built at the relaxed factor floor — at day eight the standard floor
+    // produces no factors at all, which is the situation it exists for.
+    if (!early.length) {
+      const earlyDefs = buildFactors(state, keys, { minDays: EARLY_MIN_FACTOR_DAYS });
+      const earlyMatrix = buildDayMatrix(state, keys, INSIGHT_OUTCOMES, earlyDefs, ctx);
+      early = findEarlySignals(earlyMatrix);
+      // Evidence columns from the EARLY matrix — the relaxed factors have no
+      // columns in the main one.
+      early.forEach((c) => { const s = correlationSeries(earlyMatrix, c); if (s) detail[c.id] = s; });
+    }
     progress = factorProgress(state, keys);
   }
 

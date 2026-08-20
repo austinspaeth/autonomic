@@ -38,7 +38,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { InteractionManager, Pressable, Text, View, type LayoutChangeEvent } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
-import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Screen, headerHeight } from '../../src/components/Header';
 import { Icon } from '../../src/components/Icon';
@@ -46,11 +45,8 @@ import { useSheets } from '../../src/components/Sheet';
 import { usePalette } from '../../src/theme';
 import { useAppState } from '../../src/store/store';
 import { useTier } from '../../src/store/tier';
-import { requestProgressRange } from '../../src/store/nav';
 import { usePaywall } from '../../src/features/Paywall';
 import { LockedOverlay } from '../../src/features/LockedOverlay';
-import { DemoBanner, DEMO_INSIGHTS_TEXT } from '../../src/features/DemoBanner';
-import { METRIC_CARD, METRIC_SECTION } from '../../src/features/TrendCard';
 import { AskAiPill } from '../../src/features/insights/AskAi';
 import { InsightsEmpty, InsightsSkeleton } from '../../src/features/insights/InsightsSkeleton';
 import { InsightsFailed } from '../../src/features/insights/BuildFailed';
@@ -59,7 +55,7 @@ import {
 } from '../../src/features/insights/Sections';
 import { SinceExplain } from '../../src/features/insights/SinceExplain';
 import { todayKey } from '../../src/lib/dates';
-import { demoDays, hasOwnData } from '../../src/lib/demo';
+import { hasOwnData } from '../../src/lib/demo';
 import { resolveProtocol } from '../../src/lib/scoring/day';
 import type { AppState } from '../../src/lib/types';
 import { emptyReport, type InsightReport } from '../../src/lib/insights';
@@ -98,9 +94,17 @@ export default function InsightsScreen() {
   /**
    * Everything the report is built from, as ONE identity.
    *
-   * Memoized because it is the effect's dependency, and because the demo branch
-   * builds a new state object: without this, every render produced a new `source`,
-   * re-ran the effect, and called back into the engine on a loop.
+   * Memoized because it is the effect's dependency: without this, every render
+   * produced a new `source`, re-ran the effect, and called back into the engine on
+   * a loop.
+   *
+   * NOTE: unlike Progress, this screen has NO demo fallback. It used to swap in the
+   * 60-day sample month on an empty journal, which put "57 days" and a confidence
+   * ring in the header of an app that held nothing — a first-person claim about the
+   * reader, under a banner that is easy to miss and impossible to reconcile with a
+   * journal they had just erased. The honest empty state already exists
+   * (`InsightsEmpty`, "0 of 14 days"), and it is what a brand new user needs to see:
+   * how far off the first finding is, not what somebody else's findings look like.
    */
   // Bumped when the user picks a new day one, so the anchor re-enters `buildArgs` and
   // the report rebuilds through the normal catch-up path rather than a special case.
@@ -110,12 +114,8 @@ export default function InsightsScreen() {
   const [retrySeq, setRetrySeq] = useState(0);
 
   const buildArgs = useMemo(() => {
-    const demo = !hasOwnData(state.days);
-    // `demoDays()` is itself cached per day key, so this stays referentially
-    // stable across renders.
-    const source: AppState = demo ? { ...state, days: demoDays() } : state;
+    const source: AppState = state;
     return {
-      demo,
       source,
       anchor: insightsAnchor(),
       ctx: {
@@ -164,7 +164,7 @@ export default function InsightsScreen() {
    */
   const build = useCallback((args: typeof buildArgs): InsightReport => {
     try {
-      return computeInsights(args.source, dk, { demo: args.demo, ctx: args.ctx, anchor: args.anchor });
+      return computeInsights(args.source, dk, { ctx: args.ctx, anchor: args.anchor });
     } catch (e) {
       logError('insights.build', e);
       return emptyReport(dk, true);
@@ -308,19 +308,6 @@ export default function InsightsScreen() {
     return () => clearTimeout(t);
   }, [report, settled]);
 
-  /**
-   * Hand off to the Progress chart a claim was computed from.
-   *
-   * Same target the Journal's Trend card uses, so a finding here and a
-   * congratulation there both land on the same evidence. A row with no section is
-   * not pressable, so the guard is belt and braces.
-   */
-  const openProgress = useCallback((section?: string, card?: string) => {
-    if (!section) return;
-    requestProgressRange('month', section, card);
-    router.navigate('/(tabs)/analysis');
-  }, []);
-
   /** The claim's own breakdown, in the same shape the Outlook's "What powers this"
    *  opens: the two windows, then what moved between them. */
   const openSince = useCallback(() => {
@@ -345,7 +332,32 @@ export default function InsightsScreen() {
     if (!focused || !report || report.demo || report.failed) return;
     markInsightsSeen(report);
   }, [focused, report]);
-  const hasFindings = !!view && (!!view.change || view.correlations.length > 0 || view.observations.length > 0 || view.noImpact.length > 0 || view.watch.length > 0);
+  /**
+   * Has this journal produced a REAL finding yet — a strict-tier correlation or a
+   * biggest change?
+   *
+   * This is the gate between the two screens Insights actually has, and it counts
+   * only those two things on purpose. Observations and Trend Watch rows arrive
+   * almost immediately (the thinnest of them, "Only 8 of the last 30 days are
+   * logged", is generated BY the emptiness), and while they counted as findings a
+   * user eight days in got a lone "Worth a look" card saying how little they had
+   * logged, in place of the countdown that tells them how far off the first real
+   * finding is. The countdown holds the screen until the engine genuinely has
+   * something; the early tier is the one card allowed to appear above it.
+   */
+  const hasFindings = !!view && (!!view.change || view.correlations.length > 0);
+  /**
+   * The weak tier has two homes, because its two variants answer two different
+   * screens (see `EarlySignals`). `'early'` is a young journal's only finding and
+   * belongs ABOVE the countdown it hedges. `'unconfirmed'` is a long journal where
+   * the strict sweep cleared the board but the Biggest change card still has a real
+   * answer — and a card of "worth a question, not a conclusion" rows sitting above
+   * the one confirmed claim on the screen reads as the headline. So it drops below
+   * it, keeping the mature report's order: the confirmed thing first.
+   */
+  const belowChange = !!view?.change && view.early[0]?.tier === 'unconfirmed';
+  const earlyAbove = view && !belowChange ? view.early : [];
+  const earlyBelow = view && belowChange ? view.early : [];
   // The header's count comes from the report, but the ring shouldn't sit at zero
   // through the whole skeleton; both simply wait, which reads as loading.
   const head = shown.current;
@@ -396,8 +408,11 @@ export default function InsightsScreen() {
       footer={
         <>
           {/* Mounted before the overlay so the mask covers it too, and held back
-              until the content is up so it can't float over a skeleton. */}
-          {!locked && view ? <AskAiPill /> : null}
+              until the content is up so it can't float over a skeleton. Also held
+              back on an empty journal: the reports are built from the user's own
+              days and there are none, so it would be a Pro button that can only
+              return prose about nothing (it used to be backed by the sample month). */}
+          {!locked && view && hasOwnData(state.days) ? <AskAiPill /> : null}
           <LockedOverlay
             visible={locked}
             top={headerH}
@@ -408,54 +423,60 @@ export default function InsightsScreen() {
         </>
       }
     >
-      {/* Outside the branch on purpose: `demo` is known synchronously, so the
-          banner can be up during the skeleton and never moves when content lands. */}
-      {buildArgs.demo ? <DemoBanner text={DEMO_INSIGHTS_TEXT} /> : null}
       {!view ? (
         // A locked view has no findings to shape a skeleton from, and the mask
         // goes over the top of it regardless.
         <InsightsSkeleton shape={locked ? EMPTY_SHAPE : shape} />
       ) : (
         <>
-          {/* Each card measures ITSELF, not a wrapper: a wrapper's frame includes the
-              card's 12pt bottom margin and the card's own frame does not, so
-              measuring the wrapper made every skeleton card 12pt too tall. */}
-          {view.change ? (
-            <BiggestChangeCard change={view.change} series={view.detail[view.change.id] || null} onLayout={measure('change')} />
-          ) : null}
-          <Correlations
-            list={view.correlations}
-            change={view.change}
-            detail={view.detail}
-            // Rows open the finding itself (see features/insights/FindingSheet).
-            // Trend Watch is the card that hands off to Progress, not this one.
-            onLayout={measure('correlations')}
-            onRowLayout={measureRow('correlations')}
-          />
-          {/* The early tier fills the Correlations slot while that card has
-              nothing — including above the days-countdown on the empty screen.
-              The engine guarantees the two are never non-empty together. */}
-          <EarlySignals list={view.early} detail={view.detail} />
-          <WorthALook
-            list={view.observations}
-            onLayout={measure('observations')}
-            onRowLayout={measureRow('observations')}
-          />
-          <NoImpact
-            list={view.noImpact}
-            onLayout={measure('noImpact')}
-            onRowLayout={measureRow('noImpact')}
-          />
-          <TrendWatch
-            list={view.watch}
-            onPress={(item) => openProgress(METRIC_SECTION[item.metric], METRIC_CARD[item.metric])}
-            canOpen={(item) => !!METRIC_SECTION[item.metric]}
-            onLayout={measure('watch')}
-            onRowLayout={measureRow('watch')}
-          />
-          {hasFindings ? <InsightsFooter />
-            : view.failed ? <InsightsFailed onRetry={retry} />
-              : <InsightsEmpty daysLogged={view.daysLogged} progress={view.progress} />}
+          {/* ABOVE everything, in both states. The early tier is the first thing this
+              engine can honestly say, and while the countdown holds the screen it is
+              the only finding on it — a hint sitting over its own "8 of 14 days" is
+              the whole point of the tier. The engine guarantees it is empty once the
+              strict sweep has anything. */}
+          <EarlySignals list={earlyAbove} detail={view.detail} />
+          {hasFindings ? (
+            <>
+              {/* Each card measures ITSELF, not a wrapper: a wrapper's frame includes the
+                  card's 12pt bottom margin and the card's own frame does not, so
+                  measuring the wrapper made every skeleton card 12pt too tall. */}
+              {view.change ? (
+                <BiggestChangeCard change={view.change} series={view.detail[view.change.id] || null} onLayout={measure('change')} />
+              ) : null}
+              <EarlySignals list={earlyBelow} detail={view.detail} />
+              <Correlations
+                list={view.correlations}
+                change={view.change}
+                detail={view.detail}
+                // Rows open the finding itself (see features/insights/FindingSheet).
+                // Every row on this screen does, Trend watch included: nothing here
+                // navigates away or touches Progress's range.
+                onLayout={measure('correlations')}
+                onRowLayout={measureRow('correlations')}
+              />
+              {/* These three are the mature report's supporting cast, so they arrive
+                  WITH it rather than before it. Alone on a young journal they read as
+                  the whole answer, which is how "Only 8 of the last 30 days are
+                  logged" ended up being the entire Insights view. */}
+              <WorthALook
+                list={view.observations}
+                onLayout={measure('observations')}
+                onRowLayout={measureRow('observations')}
+              />
+              <NoImpact
+                list={view.noImpact}
+                onLayout={measure('noImpact')}
+                onRowLayout={measureRow('noImpact')}
+              />
+              <TrendWatch
+                list={view.watch}
+                onLayout={measure('watch')}
+                onRowLayout={measureRow('watch')}
+              />
+              <InsightsFooter />
+            </>
+          ) : view.failed ? <InsightsFailed onRetry={retry} />
+            : <InsightsEmpty daysLogged={view.daysLogged} progress={view.progress} />}
         </>
       )}
     </Screen>

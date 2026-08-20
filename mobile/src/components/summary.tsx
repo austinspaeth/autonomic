@@ -21,6 +21,7 @@ import {
   expectedHf, hrvComposite, numOr, orthoDeltaCat, orthoMaxDelta, restingHrBands,
   rowScoreCategory, totalPower, type ScoreContext,
 } from '../lib/scoring';
+import { hrRecovery, recoveryBaseline } from '../lib/hrRecovery';
 import { metricHistory, numEx, type DaysMap } from '../lib/scoring/day';
 import { onDay } from '../lib/analysis/buckets';
 import { entryFields, isDivider, READING_TYPES } from '../lib/registry';
@@ -1015,7 +1016,7 @@ const WORKOUT_HELP: Record<string, HelpContent> = {
     learnMore: '/insights/basics/heart-rate-recovery-after-exercise/',
   },
   hr60: {
-    what: 'Your heart rate one minute after you stopped, entered by hand on the workout (a health store does not record it). Where the workout has a peak, the card also reports the drop from it.',
+    what: 'How far your heart rate fell in the minute after you stopped, from the rate the workout ended on to the rate you entered by hand (a health store does not record that one). A bigger fall is better, so the numbers are negative and the grade improves as they get larger.',
     why: 'How quickly the rate falls once you stop is a fairly direct read on vagal reactivation, and it tends to sag before anything else does on a bad week. The chart is the run of past sessions of this kind, so read the trend rather than any single number.',
     learnMore: '/insights/basics/heart-rate-recovery-after-exercise/',
   },
@@ -1060,9 +1061,25 @@ export function WorkoutSummary({ r, days, ctx: _ctx }: SummaryProps) {
     { label: 'Max', val: hi, unit: 'bpm' },
   ];
   // HR @60s rest is hand-entered (no health store records it), so the card only
-  // appears on workouts that carry it. Its drop from the peak is the recovery.
+  // appears on workouts that carry it. What it MEANS is the fall from the rate
+  // you stopped at, not the number itself: 96 bpm is a fine recovery off 150 and
+  // a poor one off 105. The card therefore reads the signed change, graded, the
+  // same shape the orthostatic card uses. `lib/hrRecovery.ts` owns the
+  // definition (and why the reference is the stop rate, not the session peak).
   const hr60 = numOr(r.hr60);
-  const drop = hr60 != null && hi != null && hi > hr60 ? hi - hr60 : null;
+  const stopRate = recoveryBaseline(r, hrCurveFor);
+  const recovery = hrRecovery(r, hrCurveFor);
+  const recoveryCat = recovery != null ? catFromBands(recovery, BANDS.hrRecovery) : null;
+  const withSign = (v: number) => (v > 0 ? '+' + fmtNum(v) : fmtNum(v));
+  const deltaStr = (v: number) => 'Δ ' + withSign(v);
+  const recoveryEx = (rr: Entry): number | null => hrRecovery(rr, hrCurveFor);
+  const recoveryVerdict: Record<string, string> = {
+    great: 'Your rate came down quickly once you stopped, which is a strong vagal reactivation.',
+    good: 'A healthy fall in the minute after stopping.',
+    ok: 'A modest fall in the first minute. Worth watching across sessions.',
+    bad: 'Your rate came down slowly after stopping, which often shows up before anything else on a hard week.',
+    concerning: 'Your rate barely came down in the first minute. Treat this session as costlier than it felt.',
+  };
   const details: { label: string; value: string }[] = [];
   if (duration != null) details.push({ label: 'Duration', value: `${fmtNum(duration)} min` });
   if (distance != null) details.push({ label: 'Distance', value: `${fmtNum(distance)} mi` });
@@ -1093,10 +1110,17 @@ export function WorkoutSummary({ r, days, ctx: _ctx }: SummaryProps) {
           ))}
         </View>
       </Section>
-      {hr60 != null ? (
+      {recovery != null ? (
+        <MetricSection
+          label="Recovery after 1 minute" value={deltaStr(recovery)} unit="bpm" cat={recoveryCat}
+          help={WORKOUT_HELP.hr60} fmt={deltaStr}
+          desc={`${recoveryCat ? recoveryVerdict[recoveryCat] + ' ' : ''}From ${stopRate} bpm when you stopped down to ${fmtNum(hr60!)} bpm.`}
+          days={days} type={r.type} ex={recoveryEx} bands={BANDS.hrRecovery} kind="activities"
+        />
+      ) : hr60 != null ? (
         <MetricSection
           label="HR after 60 seconds" value={fmtNum(hr60)} unit="bpm" help={WORKOUT_HELP.hr60}
-          desc={drop != null ? `Down ${fmtNum(drop)} bpm from the peak of ${hi} bpm one minute after stopping.` : 'Your heart rate one minute after you stopped.'}
+          desc="Your heart rate one minute after you stopped. Log the workout's max HR to grade the recovery."
           days={days} type={r.type} ex={numEx('hr60')} kind="activities"
         />
       ) : null}

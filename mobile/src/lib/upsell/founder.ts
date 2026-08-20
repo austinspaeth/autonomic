@@ -2,16 +2,16 @@
  * The founding-member offer — pure logic, unit-tested (see __tests__/founder).
  *
  * One card, once, on ONE day: the first time a user opens the app after they
- * have logged three days of their own content, while the install trial is still
+ * have logged five days of their own content, while the install trial is still
  * running. It offers the first year of Pro at the introductory price.
  *
- * Three days is the point at which the app has something to show them that
+ * Five days is the point at which the app has something to show them that
  * isn't a demo — the Trend card, the first correlations, a real streak — and
- * the trial is the window in which they can still see it. Asking on day four of
+ * the trial is the window in which they can still see it. Asking on day six of
  * a fourteen-day trial is asking someone who has just been convinced, rather
  * than someone whose access is about to be taken away.
  *
- * The day it is due is a strict "the day AFTER the third logged day": the third
+ * The day it is due is a strict "the day AFTER the fifth logged day": the fifth
  * day's own entries are still arriving, so a card that appeared halfway through
  * it would be congratulating a day in progress. `engagedBefore` counts only day
  * keys strictly earlier than `dk`, the same "the analysis window ends at the
@@ -30,7 +30,7 @@ import type { Tier } from '../tier';
 import { engagedDayCount } from '../review/eligibility';
 
 /** Days of the user's OWN content before the offer is due. */
-export const FOUNDER_MIN_DAYS = 3;
+export const FOUNDER_MIN_DAYS = 5;
 
 export interface FounderMemory {
   /** The calendar day the card claimed. Its whole life; never re-claimed. */
@@ -45,7 +45,7 @@ export const emptyFounderMemory = (): FounderMemory => ({});
  * Days carrying the user's own entries STRICTLY BEFORE `dk`.
  *
  * Imported Health rows don't count (that's `engagedDayCount`'s rule, reused
- * here) — three days of a backfill is not three days of using the app.
+ * here) — five days of a backfill is not five days of using the app.
  */
 export function engagedBefore(days: DaysMap, dk: string): number {
   const before: DaysMap = {};

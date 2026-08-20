@@ -810,7 +810,7 @@ function Onboarding({ onDone }: { onDone: () => void }) {
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingTop: 24, gap: 22, paddingBottom: 16, flexGrow: 1 }} showsVerticalScrollIndicator={false}>
           {/* The logo squiggle, not a heart-rate trace: this is the app asking
               for the one thing it is built around, so it signs with its name. */}
-          <View style={{ width: 72, height: 72, borderRadius: 20, backgroundColor: 'rgba(224,49,39,0.09)', borderWidth: 1, borderColor: 'rgba(224,49,39,0.25)', alignItems: 'center', justifyContent: 'center' }}>
+          <View style={[st.tile, { width: 72, height: 72, borderRadius: 20 }]}>
             <BrandMark size={34} />
           </View>
           <View>

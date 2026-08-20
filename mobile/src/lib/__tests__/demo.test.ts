@@ -62,8 +62,8 @@ describe('demo journal', () => {
   });
 
   it('fills every Insights report with real content', () => {
-    // The Insights view runs its reports off demoState() while the journal is
-    // empty; a report that came back "(none recorded)" would demo nothing.
+    // Progress runs the sample month while the journal is empty (Insights no
+    // longer does); a report that came back "(none recorded)" would demo nothing.
     const blank = { version: 1, settings: {}, profile: {}, meta: {}, days: {} } as unknown as AppState;
     const st = demoState(blank);
     const { keys } = reportDateRange('week', todayKey());
@@ -80,10 +80,12 @@ describe('demo journal', () => {
 
   /**
    * The reason DEMO_DAYS is 60 rather than 30. Someone with an empty journal sees
-   * this month behind a demo banner, and a demo of a discovery engine that
-   * discovers nothing is worse than no demo at all. These assert the sample data
-   * genuinely exercises the engine — through the real statistics, with the real
-   * FDR correction, no fixtures.
+   * this month behind a demo banner on Progress, and a demo of a discovery engine
+   * that discovers nothing is worse than no demo at all. These assert the sample
+   * data genuinely exercises the engine — through the real statistics, with the
+   * real FDR correction, no fixtures. (The Insights TAB no longer has a demo
+   * fallback at all: an empty journal gets the "0 of 14 days" countdown, since a
+   * confidence ring over somebody else's 57 days is a claim about the reader.)
    */
   it('fills the Insights view with findings the real engine agrees with', () => {
     const blank = { version: 1, settings: {}, profile: {}, meta: {}, days: {} } as unknown as AppState;
@@ -95,17 +97,26 @@ describe('demo journal', () => {
     expect(rep.confidence.pct).toBeGreaterThan(60);
   });
 
-  it('makes the magnesium onset discoverable', () => {
+  it('makes the magnesium onset discoverable, as an onset', () => {
     // DEMO_MAG_START sits mid-month precisely so ../insights/change has a month
     // either side to compare, and other supplements run the whole span so the meds
     // category's active window covers everything and this is a real contrast.
     //
-    // It is not asserted to WIN the headline slot: the sample arc also has sleep
-    // lengthening, and that onset legitimately scores higher. What matters is that
-    // the supplement trial is found at all.
+    // It is found by ../insights/change and NOT by the correlation sweep, which is
+    // the correct routing rather than a limitation. The sample models the supplement
+    // the way people actually take one — started on DEMO_MAG_START and never stopped
+    // — so its "without it" days are all of them before that date and none after.
+    // `isRegimeChange` recognises that shape and hands it to the before/after
+    // analysis, whose split point is fixed by the data and whose windows are equal
+    // either side. A correlation row would have compared two different months of the
+    // recovery arc and called the difference magnesium.
     const blank = { version: 1, settings: {}, profile: {}, meta: {}, days: {} } as unknown as AppState;
     const rep = buildInsights(demoState(blank), todayKey());
-    expect(rep.correlations.some((c) => c.factorId === 'med:magGlycinate')).toBe(true);
+    expect(rep.correlations.some((c) => c.factorId === 'med:magGlycinate')).toBe(false);
+    expect(rep.change).toBeTruthy();
+    expect(rep.change!.kind).toBe('onset');
+    expect(rep.change!.factorId).toBe('med:magGlycinate');
+    expect(rep.change!.headline).toMatch(/magnesium/i);
   });
 
   it('leads with a good-news onset, since the sample arc is a recovery', () => {

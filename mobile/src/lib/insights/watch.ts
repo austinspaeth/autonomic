@@ -45,14 +45,14 @@ export interface WatchItem {
   /** "Up 8.3 ms vs last month" */
   sub: string;
   /** The window's current number, e.g. "53 ms". The LEVEL, kept for anything that
-   *  wants it — the row itself shows `change`, and Progress shows the level in
-   *  full when the row is opened. */
+   *  wants it — the row itself shows `change`, and the sheet it opens shows both
+   *  windows side by side. */
   value: string;
   /**
    * THE MOVEMENT, signed and in the metric's own unit: "-8 pts", "+4 days".
    *
    * This is what the row shows, because "has this moved?" is the only question
-   * this card answers — the level belongs on Progress, which the row opens.
+   * this card answers — the level belongs in the sheet the row opens.
    *
    * A DISPERSION metric carries no number here, the same rule the Journal's Trend
    * card follows: `sleepConsistency` is a stdev, so its delta is a change in
@@ -61,8 +61,36 @@ export interface WatchItem {
    */
   change: string;
   good: boolean;
-  /** Last 30 days, oldest first, nulls preserved for the gaps. */
+  /** Last 60 days, oldest first, nulls preserved for the gaps. */
   series: (number | null)[];
+  /** Day keys index-aligned to `series`, so the sheet's chart can label its axis
+   *  and shade the two windows without re-deriving the range. */
+  keys: string[];
+  /**
+   * Where the recent window starts inside `series` — the before/after split the
+   * whole claim rests on, drawn as the chart's divider.
+   */
+  splitIndex: number;
+  /** The two window aggregates, in the metric's own unit, already formatted:
+   *  the sheet states the comparison rather than only its result. */
+  beforeValue: string;
+  afterValue: string;
+  /** "Month before" / "Last month". */
+  beforeLabel: string;
+  afterLabel: string;
+  /**
+   * The signed movement as a tile, or NULL for a dispersion metric — a change in
+   * night-to-night scatter is not a quantity anybody can picture, so the sheet
+   * shows the two spreads (which ARE readable) and no delta tile, the same rule
+   * the row's `change` follows.
+   */
+  changeValue: string | null;
+  unit: string;
+  /** How many days each window actually holds. The sheet says this out loud
+   *  instead of a confidence bar: a windowed median is not a statistical test and
+   *  the honest measure of how much it rests on is the coverage. */
+  recentN: number;
+  priorN: number;
 }
 
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -86,16 +114,33 @@ export function findWatchItems(matrix: DayMatrix, suppressed: boolean): WatchIte
     // 'flat' and 'unknown' both say nothing worth a row, for different reasons.
     if (!delta.significant) continue;
 
+    const sliceFrom = Math.max(0, series.length - WATCH_SPARK_DAYS);
+    const keys = matrix.keys.slice(sliceFrom);
+    const values = series.slice(sliceFrom);
+    const dispersion = def.aggregate === 'stdev';
+
     out.push({
       metric: id,
       title: shortMetric(def),
       sub: `${capitalize(def.phrase(delta.delta))} vs last month`,
       value: `${def.fmt(delta.recent)} ${def.unit}`,
-      change: def.aggregate === 'stdev'
+      change: dispersion
         ? (delta.direction === 'improving' ? 'Steadier' : 'Less steady')
         : `${delta.delta > 0 ? '+' : '-'}${def.fmt(Math.abs(delta.delta))} ${def.unit}`,
       good: delta.direction === 'improving',
-      series: series.slice(Math.max(0, series.length - WATCH_SPARK_DAYS)),
+      series: values,
+      keys,
+      // The recent window is the tail of the FULL series, so its start inside the
+      // slice is measured from the slice's own end, not from the journal's.
+      splitIndex: Math.max(0, values.length - TREND_WINDOW_DAYS),
+      beforeValue: def.fmt(delta.prior),
+      afterValue: def.fmt(delta.recent),
+      beforeLabel: 'Month before',
+      afterLabel: 'Last month',
+      changeValue: dispersion ? null : `${delta.delta > 0 ? '+' : '-'}${def.fmt(Math.abs(delta.delta))}`,
+      unit: def.unit,
+      recentN: delta.recentN,
+      priorN: delta.priorN,
     });
   }
   return out;

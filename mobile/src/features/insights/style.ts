@@ -101,6 +101,18 @@ export const BODY: TextStyle = { fontSize: 13, lineHeight: 19, marginTop: 6 };
 export const PAIR_DRIVER: TextStyle = { fontSize: 14.5, fontWeight: '700' };
 export const PAIR_METRIC: TextStyle = { fontSize: 14.5, fontWeight: '600' };
 export const ROW_NOTE: TextStyle = { fontSize: 12 };
+/**
+ * The "+N" squircle on a stacked correlation row.
+ *
+ * Its text is PAIR_METRIC's size, not a smaller annotation size, because the count
+ * belongs to the phrase it sits beside — "quercetin → RMSSD, and two more" is one
+ * subject, and a shrunken numeral read as a footnote on the metric instead. At that
+ * size the box needs real height and real side padding or the glyph crowds its own
+ * corners; the radius stays well short of the height so it reads as a squircle
+ * rather than as a second pill competing with the delta on the right.
+ */
+export const MORE_BADGE: ViewStyle = { borderRadius: 8, paddingHorizontal: 9, paddingVertical: 5 };
+export const MORE_BADGE_TEXT: TextStyle = { fontSize: 14.5, fontWeight: '800' };
 // Close to the pair's own size (14.5), a hair above it: the delta reads as the end
 // of the row's sentence rather than as a separate readout, but still leads it.
 export const R_VALUE: TextStyle = { fontSize: 16, fontWeight: '700' };

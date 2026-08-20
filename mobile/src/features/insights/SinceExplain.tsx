@@ -27,7 +27,6 @@ import { fmtMonthDay, todayKey } from '../../lib/dates';
 import { fonts, radius, usePalette } from '../../theme';
 import { getState } from '../../store/store';
 import { resolveProtocol } from '../../lib/scoring/day';
-import { demoState, hasOwnData } from '../../lib/demo';
 import { insightsAnchor, setInsightsAnchor } from '../../lib/insights/anchorMemory';
 import { changeSinceStart } from '../../lib/insights/watch';
 import type { SinceStart } from '../../lib/insights';
@@ -45,8 +44,9 @@ const signed = (v: number) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).
  * two weeks of logged days, 28 days regardless of journal length.
  */
 function computeSince(anchor: string | null): SinceStart | null {
-  const s = getState();
-  const state = hasOwnData(s.days) ? s : demoState(s);
+  // The user's own journal, always: the Insights view no longer falls back to the
+  // sample month, so a claim opened from its header must not either.
+  const state = getState();
   const ctx = {
     sex: state.profile.sex,
     height: state.profile.height,
