@@ -9,17 +9,17 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { parsePattern } from '../../src/features/hrv/BreathingViz';
 import { SessionCard } from '../../src/features/hrv/Session';
+import { HrvResults } from '../../src/features/hrv/Results';
 import { __devMockSession } from '../../src/features/hrv/sessionStore';
 import { Button, Segmented } from '../../src/components/ui';
 import { BrandMark, Icon } from '../../src/components/Icon';
-import { ReadingSummary } from '../../src/components/summary';
 import { ScoreExplain, DaySummary } from '../../src/features/DaySummary';
 import { ProtocolEditor } from '../../src/features/ProtocolEditor';
 import { JournalSections } from '../../src/features/JournalSections';
 import { HrvProgress, HrvFilterLinks } from '../../src/features/HrvProgress';
 import { Onboarding } from '../../src/features/Onboarding';
 import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
-import { getState, blankDay, __devSwapState } from '../../src/store/store';
+import { getState, getWaveform, blankDay, __devSwapState } from '../../src/store/store';
 import { MED_TYPES } from '../../src/lib/registry';
 import { addDays, todayKey } from '../../src/lib/dates';
 import { scoreSet, scoreCat, OUTLOOK_GUIDE } from '../../src/lib/scoring/day';
@@ -157,85 +157,87 @@ export function BreathSessionScreen() {
   );
 }
 
-/** A lifelike RR tachogram: dense, jagged beat-to-beat variability — rapid
- *  up/down scatter every couple of beats sitting in a stable band, the way a
- *  real chest-strap trace looks. Deterministic (no RNG). */
-function makeRr(n: number): number[] {
-  const rnd = (i: number, s: number) => { const x = Math.sin(i * 12.9898 + s * 78.233 + 0.5) * 43758.5453; return x - Math.floor(x); };
-  const base = 1000;
-  const out: number[] = [];
-  for (let i = 0; i < n; i++) {
-    const a = Math.sin(i * 1.2) * 46;         // primary oscillation (~34 across the width)
-    const b = Math.sin(i * 0.75 + 0.7) * 26;  // second, offset frequency
-    const c = Math.sin(i * 0.3 + 2) * 15;     // slow band drift (stays stable)
-    const jitter = (rnd(i, 1) - 0.5) * 36;    // per-beat scatter for the jagged edge
-    out.push(base + a + b + c + jitter);
-  }
-  return out.map((v) => Math.round(v));
-}
-
-/** 14-reading history feeding the sparklines: metrics climb into the greens,
- *  but PNS starts down in the ok/bad (yellow/orange) zones so the trace grades
- *  through its colors rather than reading as flat-green. Current reading appended. */
-function synthDays(current: Entry): Record<string, ReturnType<typeof blankDay>> {
-  const pns = [-0.6, 0.1, -0.2, 0.4, 0.2, 0.8, 0.5, 1.1, 0.7, 1.2, 1.0, 1.4, 1.2, 1.5];
-  const sns = [1.3, 1.0, 1.1, 0.7, 0.8, 0.5, 0.6, 0.3, 0.4, 0.2, 0.3, 0.1, 0.2, 0.0];
-  const stress = [290, 255, 265, 235, 245, 215, 225, 195, 205, 185, 195, 175, 185, 165];
-  const rmssd = [35, 38, 36, 40, 39, 42, 41, 44, 43, 45, 44, 46, 45, 47];
-  const sdnn = [45, 48, 47, 51, 50, 53, 52, 56, 55, 57, 56, 59, 58, 60];
-  const pnn50 = [4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 8, 9, 9, 10];
-  const days: Record<string, ReturnType<typeof blankDay>> = {};
-  for (let k = 0; k < 14; k++) {
-    const dk = addDays(todayKey(), -(14 - k));
-    days[dk] = {
-      ...blankDay(),
-      readings: [{
-        id: `h${k}`, type: 'hrv', time: '07:20',
-        pns: String(pns[k]), sns: String(sns[k]), stressIndex: String(stress[k]),
-        rmssd: String(rmssd[k]), sdnn: String(sdnn[k]), pnn50: String(pnn50[k]),
-      } as Entry],
-    };
-  }
-  days[todayKey()] = { ...blankDay(), readings: [current] };
-  return days;
-}
-
 /**
- * HRV Results screen (post-capture), scrolled to the top hero. Mounts the REAL
- * ReadingSummary — hero score, beat-to-beat tachogram, and graded metric rows
- * with their own tints and sparklines. Everything is the app's own components.
+ * Scene 3 · the results of a real reading. The app's own `HrvResults` runs the
+ * real HRV pipeline over the RR series of an actual training reading (Tue 18
+ * Aug 2026, 6:26am, Polar H10, 4/6 paced) pulled from the waveform sidecar, so
+ * every metric, grade and sparkline on screen is computed here and now from
+ * 315 real beats rather than typed into a fixture.
+ *
+ * It renders inside the same stand-in sheet the live card uses, because that is
+ * where the results actually appear.
  */
+const RESULT_DK = '2026-08-18';
+const RESULT_TIME = '06:26';
+
 export function ResultsScreen() {
   const p = usePalette();
-  const rr = useMemo(() => makeRr(180), []);
-  const reading = useMemo<Entry>(() => ({
-    id: 'shot-hrv', type: 'hrv', time: '07:20', durationSec: 300, rrClean: rr,
-    rmssd: '48', sdnn: '61', pnn50: '8', pns: '1.6', sns: '0.3', stressIndex: '158',
-    meanRr: '1000', mode: '1005', amo50: '35', cv: '6.4', mxdmn: '0.33',
-    vlowPower: '500', lowPower: '1800', highPower: '1300', lfPeak: '0.095', hfPeak: '0.24', avgHr: '60',
-  }), [rr]);
+  const stub = { close: () => {}, closeAll: () => {} } as never;
 
-  const ctx = { sex: getState().profile.sex, height: getState().profile.height };
-  const days = useMemo(() => synthDays(reading), [reading]);
+  const src = useMemo(() => {
+    const day = getState().days[RESULT_DK];
+    const r = (day?.readings || []).find((x) => x.time === RESULT_TIME && x.type === 'breathHrv');
+    if (!r) return null;
+    const w = getWaveform(String(r.id));
+    if (!w || !w.rrRaw || !w.rrRaw.length) return null;
+    const [h, m] = RESULT_TIME.split(':').map(Number);
+    const [y, mo, d] = RESULT_DK.split('-').map(Number);
+    return {
+      rr: w.rrRaw as number[],
+      hrSamples: (w.sampledHr || []) as { t: number; bpm: number }[],
+      sdnnSamples: (w.sampledSdnn || []) as { t: number; sdnn: number }[],
+      startedAtMs: new Date(y, mo - 1, d, h, m).getTime(),
+      style: (r.style as string) || '4/6',
+      durationSec: Number(r.durationSec) || 300,
+    };
+  }, []);
 
   return (
-    <View style={{ width: DESIGN_W, height: DESIGN_H, backgroundColor: '#000' }}>
+    <View style={{ width: DESIGN_W, height: DESIGN_H, backgroundColor: p.bg }}>
       <StatusBar />
-      <ScrollView contentContainerStyle={{ padding: 18, paddingTop: 4 }} showsVerticalScrollIndicator={false}>
-        <Text style={{ fontSize: 25, fontWeight: '800', color: p.text, marginBottom: 4 }}>Reading complete</Text>
-        <Text style={{ color: p.textDim, fontSize: 14, marginBottom: 16 }}>{`Structured HRV reading · ${rr.length} beats`}</Text>
-        <ReadingSummary r={reading} days={days} ctx={ctx} />
-      </ScrollView>
+      <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: p.overlay }} />
+      <View style={{
+        position: 'absolute', left: 0, right: 0, bottom: 0, top: 52,
+        backgroundColor: p.surface, borderColor: p.border, borderWidth: StyleSheet.hairlineWidth,
+        borderTopLeftRadius: 18, borderTopRightRadius: 18, overflow: 'hidden',
+      }}>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ padding: 18, paddingTop: 22, paddingBottom: 140 }}
+          showsVerticalScrollIndicator={false}
+          scrollEnabled={false}
+        >
+          {src ? (
+            <HrvResults
+              rr={src.rr}
+              hrSamples={src.hrSamples}
+              sdnnSamples={src.sdnnSamples}
+              config={{ kind: 'breath', style: src.style, source: 'polar', period: 'Morning' }}
+              durationSec={src.durationSec}
+              startedAtMs={src.startedAtMs}
+              watchFallback={null}
+              controls={stub}
+            />
+          ) : (
+            <Text style={{ color: p.textDim, fontSize: 14 }}>
+              {`No reading found at ${RESULT_DK} ${RESULT_TIME}. Import the journal first.`}
+            </Text>
+          )}
+        </ScrollView>
+        {/* The real card's footer (SheetFooter is inert outside a sheet). */}
+        <View style={{
+          position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', gap: 12,
+          paddingHorizontal: 18, paddingTop: 12, paddingBottom: 34,
+          backgroundColor: p.surface, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: p.border,
+        }}>
+          <Button title="Discard" variant="danger" onPress={() => {}} />
+          <Button title="Save reading" variant="primary" onPress={() => {}} />
+        </View>
+      </View>
     </View>
   );
 }
 
-/**
- * Day outlook screen: the REAL "How this score was calculated" breakdown for
- * June 22's actual data, on the app's normal (grey) modal surface. The score
- * card becomes the grade-tinted "Autonomic Outlook" — its own gold border, the
- * Moderate tag, and the outlook guidance — then the graded What-helped/hurt rows.
- */
 export function DayOutlookScreen() {
   const p = usePalette();
   const dk = `${todayKey().slice(0, 4)}-06-22`;
