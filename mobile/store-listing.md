@@ -30,9 +30,10 @@ daily score does. Neither appeared anywhere in the descriptions.
 
 Updatable any time, no review, so do it whenever:
 
-- [ ] **Promotional text** (165/170) — reworded: leads with the live
-      beat-to-beat reading rather than repeating the free/Pro split the
-      description already carries.
+- [ ] **Promotional text** (167/170) — reworded: names the conditions first,
+      so the reader it is for knows in four words, then the reading and what
+      the app does with it. The old text spent all 170 characters restating the
+      free/Pro split the description already carries three times.
 
 **Google Play** — the store listing needs no binary, so it can go up before or
 after the release:
@@ -102,9 +103,9 @@ updated anytime (they go through a short content review, no binary needed).
 
 # App Store (iOS + watchOS)
 
-## Promotional text (165/170 chars)
+## Promotional text (167/170 chars)
 
-Free to use, no account, no ads. Journal your recovery, score every day, take unlimited HRV readings with live beat-to-beat data. Pro adds POTS tests, Insights & AI.
+For long covid, POTS and dysautonomia. Take a real 5-minute HRV reading, graded against research thresholds, then find what actually moves your numbers. Free, private.
 
 ## Keywords (98/100 chars)
 
