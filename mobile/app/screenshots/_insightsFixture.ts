@@ -43,20 +43,20 @@ export const CHANGE: BiggestChange = {
   factorId: 'meds:quercetin',
   onsetIndex: CHANGE_ONSET,
   headline: 'RMSSD is up since you started quercetin',
-  body: 'In the 31 days since, RMSSD averaged 9 ms higher than the 31 days before.',
-  beforeValue: '34', afterValue: '43', unit: 'ms',
-  changeValue: '+26', changeUnit: '%',
+  body: 'In the 31 days since, RMSSD averaged 7 ms higher than the 31 days before.',
+  beforeValue: '25', afterValue: '32', unit: 'ms',
+  changeValue: '+28', changeUnit: '%',
   beforeLabel: 'Before', afterLabel: 'After',
-  beforeText: '34 ms', afterText: '43 ms',
-  before: 34, after: 43,
+  beforeText: '25 ms', afterText: '32 ms',
+  before: 25, after: 32,
   good: true, pips: 3, confidence: 'Strong',
 };
 
 export const CHANGE_SERIES: DetailSeries = {
   keys: changeKeys,
   values: changeKeys.map((_, i) => {
-    const base = i < CHANGE_ONSET ? 34 : 43;
-    return Math.round((base + noise(i, 1) * 9) * 10) / 10;
+    const base = i < CHANGE_ONSET ? 25 : 32;
+    return Math.round((base + noise(i, 1) * 7) * 10) / 10;
   }),
   on: changeKeys.map((_, i) => (i < CHANGE_ONSET ? 0 : 1)),
   factorKind: 'binary',
@@ -87,13 +87,6 @@ export const CORRELATIONS: Correlation[] = [
     note: '29 days with it, 45 without',
   }),
   corr({
-    id: 'liquid-iv', driver: 'Liquid IV', metric: 'Daily score', outcome: 'score', unit: 'pts',
-    deltaText: '+7 pts', deltaValue: '+7', r: 0.54, pips: 3, good: true,
-    high: 71, low: 64, detail: '71 vs 64 pts',
-    headline: 'Liquid IV days score higher overall',
-    note: '38 days with it, 36 without',
-  }),
-  corr({
     id: 'sleep-8h', driver: 'Sleep over 8h', metric: 'SDNN', outcome: 'sdnn', unit: 'ms',
     deltaText: '+6 ms', deltaValue: '+6', r: 0.47, pips: 2, good: true,
     high: 58, low: 52, detail: '58 vs 52 ms',
@@ -108,7 +101,7 @@ export const CORRELATIONS: Correlation[] = [
     note: '17 days with it, 57 without',
   }),
   corr({
-    id: 'high-histamine', driver: 'High-histamine meal', metric: 'Symptom load', outcome: 'symptomLoad', unit: '',
+    id: 'high-histamine', driver: 'Histamine', metric: 'Symptom load', outcome: 'symptomLoad', unit: '',
     deltaText: '+2', deltaValue: '+2', r: -0.39, pips: 2, good: false,
     high: 5, low: 3, detail: '5 vs 3 symptoms',
     headline: 'High-histamine days show a heavier symptom load',

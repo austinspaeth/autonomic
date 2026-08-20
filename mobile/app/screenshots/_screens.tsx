@@ -74,10 +74,16 @@ export function InsightsScreen() {
   return (
     <View style={{ width: DESIGN_W, height: DESIGN_H, backgroundColor: '#000' }}>
       <StatusBar />
+      {/* The real header: one claim line (coloured half + grey tail + chevron),
+          the days count and the confidence ring. Mirrors HeaderClaim in
+          app/(tabs)/insights.tsx, including its 17.5pt type. */}
       <View style={{ paddingHorizontal: 16, paddingTop: 6, paddingBottom: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-        <View style={{ flexShrink: 1 }}>
-          <Text style={{ fontSize: 20, fontWeight: '800', color: GOOD_GREEN, letterSpacing: -0.3 }}>64% better</Text>
-          <Text style={{ fontSize: 13, color: p.textDim, marginTop: 1 }}>than your first two weeks</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', flexShrink: 1, minWidth: 0 }}>
+          <Text numberOfLines={1} style={{ flexShrink: 1 }}>
+            <Text style={{ fontSize: 17.5, color: TREND_UP, fontWeight: '800' }}>23% better</Text>
+            <Text style={{ fontSize: 17.5, color: p.textDim, fontWeight: '500' }}> than day one</Text>
+          </Text>
+          <Icon name="chevronRight" size={17} color={p.textDim} strokeWidth={2.2} />
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <Text style={{ color: p.textDim, fontSize: 15, lineHeight: 17, fontWeight: '700', letterSpacing: -0.2 }}>81 days</Text>
@@ -102,8 +108,8 @@ export function InsightsScreen() {
   );
 }
 
-/** The green the Insights header claims in. */
-const GOOD_GREEN = '#22c55e';
+/** The green the real header claims in (TREND_UP in app/(tabs)/insights.tsx). */
+const TREND_UP = '#3ec46d';
 
 /* ---------- Scene · the night, in full ---------- */
 
