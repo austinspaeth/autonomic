@@ -83,7 +83,9 @@ const HEADER_H = 52;
 /** The rings sit just inside the progress ring, at the same ratio as before. */
 const VIZ_SIZE = 168;
 
-function SessionCard({ controls }: { controls: SheetControls }) {
+/** Exported for the dev-only screenshot scenes, which mount it over a
+ *  fabricated snapshot (`__devMockSession`). The app reaches it via HrvSession. */
+export function SessionCard({ controls }: { controls: SheetControls }) {
   const p = usePalette();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -142,7 +144,7 @@ function SessionCard({ controls }: { controls: SheetControls }) {
           />
         </Svg>
         {config.kind === 'breath' ? (
-          <BreathingViz pattern={s.pattern} startMs={s.breathStartMs} running={!finished} size={VIZ_SIZE} />
+          <BreathingViz pattern={s.pattern} startMs={s.breathStartMs} running={!finished} size={VIZ_SIZE} frozenProgress={s.frozenBreath} />
         ) : (
           <Text style={{ color: p.textDim, fontSize: 16, textAlign: 'center', paddingHorizontal: 40 }}>
             Stay still,{'\n'}breathe normally

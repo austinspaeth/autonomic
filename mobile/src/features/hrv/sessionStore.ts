@@ -98,6 +98,10 @@ export interface SessionSnapshot {
   sdnnTrace: number[];
   rrTrace: number[];
   result: SessionResult | null;
+  /** Screenshot scenes only: pin the breathing rings at this point in the
+   *  breath (0 exhaled → 1 inhale peak) instead of running them off the wall
+   *  clock, so a capture is deterministic. Never set by a real reading. */
+  frozenBreath?: number;
 }
 
 const IDLE: SessionSnapshot = {
@@ -143,6 +147,18 @@ function bump(patch: Partial<SessionSnapshot> = {}) {
 /** Read through a call so TypeScript cannot narrow `snap.status` across the
  *  async BLE closures below and then declare a later re-check impossible. */
 const statusNow = (): SessionStatus => snap.status;
+
+/**
+ * Screenshot scenes only: install a fabricated snapshot and tell every view
+ * about it. Writes `snap` directly rather than going through `bump`, which
+ * recomputes the traces from the collector's own buffers — there is no
+ * collection here, the traces ARE the mock.
+ */
+export function __devMockSession(mock: Partial<SessionSnapshot>) {
+  if (!__DEV__) return;
+  snap = { ...IDLE, ...mock };
+  emit();
+}
 
 export function subscribeSession(fn: () => void): () => void {
   listeners.add(fn);

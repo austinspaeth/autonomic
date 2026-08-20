@@ -5,10 +5,11 @@
  * pixel — same geometry, type, and colour — but frozen in an ideal state.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { BlurView } from 'expo-blur';
-import Svg, { Circle } from 'react-native-svg';
-import { BreathingViz, parsePattern } from '../../src/features/hrv/BreathingViz';
+import { parsePattern } from '../../src/features/hrv/BreathingViz';
+import { SessionCard } from '../../src/features/hrv/Session';
+import { __devMockSession } from '../../src/features/hrv/sessionStore';
 import { Button, Segmented } from '../../src/components/ui';
 import { BrandMark, Icon } from '../../src/components/Icon';
 import { ReadingSummary } from '../../src/components/summary';
@@ -54,69 +55,102 @@ function StatusBar() {
   );
 }
 
+/* ---------- Scene 2 · the live reading, as the app really draws it ---------- */
+
 /**
- * Live HRV session, mid-capture at an inhale peak: glowing 5:00 ring reading
- * 2:47 remaining, breathing rings bloomed bright, live HR 64, green signal cue.
+ * A paced chest-strap reading, mid-capture. Nothing here is a recreation: the
+ * card is the app's own `SessionCard` over a fabricated store snapshot
+ * (`__devMockSession`), inside a stand-in for the sheet it normally lives in —
+ * so every measurement, tile and colour is the shipping design, and a redesign
+ * of the reading redraws this scene for free.
+ *
+ * The one thing a live card cannot give a screenshot is a fixed frame: the
+ * rings are paced off the wall clock, so a capture would land wherever the
+ * breath happened to be. `frozenBreath` pins them just below the inhale peak.
  */
-export function LiveHrvScreen() {
-  const p = usePalette();
+const MOCK_HR = 72;
+const MOCK_SDNN = 38;
+const MOCK_ELAPSED = 133; // 2:47 left of a five-minute reading
 
-  const DURATION = 300;
-  const remain = 2 * 60 + 47;
-  const elapsed = DURATION - remain;
-  const frac = elapsed / DURATION;
-  const mmss = `${Math.floor(remain / 60)}:${String(remain % 60).padStart(2, '0')}`;
-
-  const R = 108, SW = 9, C = 2 * Math.PI * R;
-  const ringSize = 2 * (R + SW);
-  const pattern = parsePattern('4/6');
-
-  return (
-    <View style={{ width: DESIGN_W, height: DESIGN_H, backgroundColor: '#000' }}>
-      <StatusBar />
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-        <Text style={{ color: p.textDim, fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, fontWeight: '700' }}>
-          Structured HRV · 4 / 6 breathing
-        </Text>
-
-        <View style={{ width: ringSize, height: ringSize, marginTop: 20, alignItems: 'center', justifyContent: 'center' }}>
-          <Svg width={ringSize} height={ringSize} style={{ position: 'absolute' }}>
-            <Circle cx={R + SW} cy={R + SW} r={R} stroke={p.surface2} strokeWidth={SW} fill="none" />
-            <Circle cx={R + SW} cy={R + SW} r={R} stroke={p.accent} strokeWidth={SW} fill="none" strokeLinecap="round" strokeDasharray={`${C}`} strokeDashoffset={C * (1 - frac)} transform={`rotate(-90 ${R + SW} ${R + SW})`} />
-          </Svg>
-          {/* Just below the inhale peak: inner rings full, the outermost only
-              ~half lit, so the bloom reads as still filling rather than maxed. */}
-          <BreathingViz pattern={pattern} running={false} frozenProgress={0.9} />
-        </View>
-
-        <Text style={{ color: p.accent, fontSize: 18, fontWeight: '700', letterSpacing: 0.3, marginTop: 20 }}>Breathe in</Text>
-        <Text style={{ color: p.text, fontSize: 52, fontWeight: '800', fontVariant: ['tabular-nums'], marginTop: 10 }}>{mmss}</Text>
-
-        <View style={{ flexDirection: 'row', gap: 34, marginTop: 24 }}>
-          <Stat label="HR" value="64" unit="bpm" />
-          <Stat label="HRV" value="71" unit="SDNN ms" />
-          <Stat label="Beats" value="142" unit="RR" />
-        </View>
-
-        {/* Hint area — empty mid-reading on a clean signal, exactly as the app. */}
-        <View style={{ minHeight: 22, marginTop: 14 }} />
-      </View>
-
-      {/* Footer mirrors the real SheetFooter (a row) so the Button's flex:1 fills it. */}
-      <View style={{ flexDirection: 'row', paddingHorizontal: 18, paddingTop: 12, paddingBottom: 40 }}>
-        <Button title="Finish now" variant="primary" onPress={() => {}} />
-      </View>
-    </View>
-  );
+/** A paced trace: RR lengthens through the exhale and shortens through the
+ *  inhale, which is exactly what the 4/6 rings are asking for — one full
+ *  respiratory wave per breath, plus per-beat scatter so it reads as a
+ *  measurement rather than a sine wave. Deterministic. */
+function mockRr(n: number): number[] {
+  const base = 60000 / MOCK_HR; // 833 ms at 72 bpm
+  const rnd = (i: number) => { const x = Math.sin(i * 91.7 + 4.3) * 43758.5453; return x - Math.floor(x); };
+  const out: number[] = [];
+  for (let i = 0; i < n; i++) {
+    const beatsPerBreath = 12;           // 10 s breath at ~72 bpm
+    const wave = Math.sin((i / beatsPerBreath) * 2 * Math.PI) * 62;
+    const drift = Math.sin(i * 0.11 + 1.2) * 9;
+    out.push(Math.round(base + wave + drift + (rnd(i) - 0.5) * 14));
+  }
+  return out;
 }
 
-function Stat({ label, value, unit }: { label: string; value: string; unit: string }) {
+/** Heart rate settling as the reading goes on, and SDNN climbing toward 38 —
+ *  the shape a paced reading actually produces. */
+function mockHrTrace(n: number): number[] {
+  return Array.from({ length: n }, (_, i) => Math.round((78 - (i / n) * 6 + Math.sin(i * 0.32) * 1.4) * 10) / 10);
+}
+function mockSdnnTrace(n: number): number[] {
+  return Array.from({ length: n }, (_, i) => Math.round((26 + (i / n) * 12 + Math.sin(i * 0.24 + 1) * 1.6) * 10) / 10);
+}
+
+export function BreathSessionScreen() {
   const p = usePalette();
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    __devMockSession({
+      status: 'running',
+      config: { kind: 'breath', style: '4/6', source: 'polar', period: 'Morning' },
+      pattern: parsePattern('4/6'),
+      durationSec: 300,
+      elapsed: MOCK_ELAPSED,
+      connected: true,
+      hr: MOCK_HR,
+      sdnn: MOCK_SDNN,
+      beats: Math.round((MOCK_HR * MOCK_ELAPSED) / 60),
+      phase: 'in',
+      hrTrace: mockHrTrace(60),
+      sdnnTrace: mockSdnnTrace(60),
+      rrTrace: mockRr(64),
+      // Just short of the peak, so the bloom reads as still filling.
+      frozenBreath: 0.9,
+    });
+    setReady(true);
+    return () => __devMockSession({});
+  }, []);
+
+  const stub = { close: () => {}, closeAll: () => {} } as never;
+
   return (
-    <View style={{ alignItems: 'center' }}>
-      <Text style={{ color: p.textDim, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '700' }}>{label}</Text>
-      <Text style={{ color: p.text, fontSize: 29, fontWeight: '800', fontVariant: ['tabular-nums'] }}>{value}</Text>
-      <Text style={{ color: p.textDim, fontSize: 11 }}>{unit}</Text>
+    <View style={{ width: DESIGN_W, height: DESIGN_H, backgroundColor: p.bg }}>
+      <StatusBar />
+      {/* The journal the sheet was raised over, dimmed the way the real
+          backdrop dims it. */}
+      <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: p.overlay }} />
+      {/* Stand-in for the sheet: same surface, border, corner radius and 18pt
+          padding as components/Sheet, with the footer as its own bottom row
+          (SheetFooter is a no-op outside the real sheet's context). */}
+      <View style={{
+        position: 'absolute', left: 0, right: 0, bottom: 0, top: 64,
+        backgroundColor: p.surface, borderColor: p.border, borderWidth: StyleSheet.hairlineWidth,
+        borderTopLeftRadius: 18, borderTopRightRadius: 18, overflow: 'hidden',
+      }}>
+        <View style={{ padding: 18, paddingTop: 22 }}>
+          {ready ? <SessionCard controls={stub} /> : null}
+        </View>
+        <View style={{
+          position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', gap: 10,
+          paddingHorizontal: 18, paddingTop: 12, paddingBottom: 34,
+          backgroundColor: p.surface, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: p.border,
+        }}>
+          <Button title="Finish now" variant="primary" onPress={() => {}} />
+        </View>
+      </View>
     </View>
   );
 }
