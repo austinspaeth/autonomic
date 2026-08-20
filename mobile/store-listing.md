@@ -41,7 +41,11 @@ after the release:
 - [ ] **Full description** → replace wholesale (3,975/4,000).
 - [ ] **Release notes** → the 1.25 Play variant below (498/500).
 
-**Unchanged, don't touch:** app name, subtitle, keywords, short description,
+- [ ] **Short description** → replace (80/80). Play rejected the previous one
+      for the word "Free": promotional and price wording is not allowed in the
+      listing fields.
+
+**Unchanged, don't touch:** app name, subtitle, keywords,
 prices, privacy labels / data-safety answers (the app still collects nothing),
 and the Health Connect justification at the end of this file (it was re-synced
 with `READ_TYPES` in 1.25.0 and nothing in `src/lib/health/healthConnect.ts` has
@@ -312,7 +316,14 @@ Autonomic Journal: HRV & POTS
 
 ## Short description (80/80 chars)
 
-Free HRV, POTS & symptom journal for long covid recovery. Private and on-device.
+HRV, POTS & symptom journal for long covid and dysautonomia. Private, on-device.
+
+Play's metadata policy bars promotional or price wording from the listing
+fields, and "Free" at the front of this line is exactly what it means: the
+previous version was rejected for it. The word is not needed anyway — Play
+labels the app Free in the install button, and the subscription pricing is
+stated in the full description, which is where Play requires it. The character
+it freed up went to "dysautonomia", a search term the old line did not carry.
 
 ## Full description (3,975/4,000 chars)
 
