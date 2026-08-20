@@ -38,12 +38,11 @@ Updatable any time, no review, so do it whenever:
 **Google Play** — the store listing needs no binary, so it can go up before or
 after the release:
 
-- [ ] **Full description** → replace wholesale (3,975/4,000).
-- [ ] **Release notes** → the 1.25 Play variant below (498/500).
-
 - [ ] **Short description** → replace (80/80). Play rejected the previous one
       for the word "Free": promotional and price wording is not allowed in the
       listing fields.
+- [ ] **Full description** → replace wholesale (3,975/4,000).
+- [ ] **Release notes** → the 1.25 Play variant below (498/500).
 
 **Unchanged, don't touch:** app name, subtitle, keywords,
 prices, privacy labels / data-safety answers (the app still collects nothing),
