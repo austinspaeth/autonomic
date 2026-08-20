@@ -8,3 +8,12 @@ web-build/
 *.swp
 .DS_Store
 expo-env.d.ts
+*.ipa
+*.apk
+*.aab
+
+# Local expo-module native build output
+modules/**/android/build/
+
+# Local build output (EAS/xcode logs, .ipa/.aab, generated fixtures)
+build-out/

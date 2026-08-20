@@ -4,27 +4,38 @@
  * a picker opens a form on top; Save closes the whole stack and refreshes.
  */
 import React, { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import * as ExpoLinking from 'expo-linking';
 import { SheetControls, SheetFooter, useSheets } from '../components/Sheet';
 import { FieldInputs, TextField, TimeField, useFormState } from '../components/Field';
 import { Button, Muted } from '../components/ui';
 import { Icon } from '../components/Icon';
-import { ReadingSummary } from '../components/summary';
+import { ReadingSummary, WorkoutSummary, workoutCurveFor } from '../components/summary';
 import { radius, usePalette } from '../theme';
 import type { Entry, TypeDef } from '../lib/types';
 import {
-  ACTIVITY_TYPES, entryFields, isDivider, isNumberField, LIVE_ONLY_READING_TYPES,
+  ACTIVITY_TYPES, entryFields, isDivider, isNumberField,
   READING_TYPES, readingLabel,
 } from '../lib/registry';
 import { typesFor, type TypeKind } from '../lib/typeCatalog';
 import { ManageTypesSheet } from './TypeManager';
+import { LogPickerSheet } from './LogPicker';
 import { computeScores } from '../lib/scoring';
-import { health } from '../lib/health';
-import { healthSourceFor, type HealthCandidate, type HealthSource } from '../lib/health/sources';
-import { deleteEntry, getState, upsertEntry, useAppState } from '../store/store';
-import { defaultTimeFor, fmtTime12, uid } from '../lib/dates';
+import { health, healthAppName, healthPermissionPath, openHealthApp } from '../lib/health';
+import { healthSourceFor, workoutCandidates, type HealthCandidate, type HealthSource, type WorkoutCandidate } from '../lib/health/sources';
+import { deleteEntry, getState, storeWaveform, upsertEntry, useAppState } from '../store/store';
+import { splitWaveform } from '../lib/waveforms';
+import { defaultTimeFor, fmtTime12, todayKey, uid } from '../lib/dates';
+import { getTier } from '../store/tier';
+import { requestExpandProtocol, scrollJournalToSection } from '../store/nav';
+import { usePaywall } from './Paywall';
+import { defaultPeriod } from '../lib/period';
 import { useToast } from '../components/Toast';
 import { HrvSetup } from './hrv/Setup';
+import { OrthostaticIntroSheet } from './OrthostaticIntro';
+import { DevicesScreen } from './Devices';
+import { StandTestSession } from './pots/StandTestSession';
+import { OrthostaticSession } from './pots/OrthostaticSession';
 
 type ArrKey = 'readings' | 'activities' | 'meds' | 'symptoms';
 
@@ -97,14 +108,14 @@ function ReadingImportSheet({ type, dk, source, onManual, onPick }: {
   return (
     <View>
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 4 }}>{`Add ${def.label}`}</Text>
-      <Text style={{ color: p.textDim, fontSize: 14, marginBottom: 16 }}>Import from Apple Health, or enter manually.</Text>
+      <Text style={{ color: p.textDim, fontSize: 14, marginBottom: 16 }}>{`Import from ${healthAppName()}, or enter manually.`}</Text>
       {loading ? (
         <View style={{ alignItems: 'center', paddingVertical: 30, gap: 12 }}>
           <ActivityIndicator color={p.accent} />
-          <Text style={{ color: p.textDim, fontSize: 14 }}>{`Getting ${lower} from Apple Health…`}</Text>
+          <Text style={{ color: p.textDim, fontSize: 14 }}>{`Getting ${lower} from ${healthAppName()}…`}</Text>
         </View>
       ) : cands.length === 0 ? (
-        <Muted>{`No ${lower} in Apple Health for this day. Enter one manually below.`}</Muted>
+        <Muted>{`No ${lower} in ${healthAppName()} for this day. Enter one manually below.`}</Muted>
       ) : (
         cands.map((c, i) => (
           <Pressable key={c.key} onPress={() => onPick(c)} style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: p.border }, pressed && { opacity: 0.5 }]}>
@@ -124,28 +135,137 @@ function ReadingImportSheet({ type, dk, source, onManual, onPick }: {
   );
 }
 
-/** Reading picker with a live-capture call-to-action above the manual list.
- *  HRV kinds are live-capture only, so they are excluded from the manual list. */
-function ReadingPicker({ onLive, onPick }: { onLive: () => void; onPick: (type: string) => void }) {
+/** On-demand workout import card. Lists the selected day's workouts from the
+ *  health store (Apple Workout sessions / Health Connect exercise); tap one to
+ *  review-and-save as an activity, or fall through to the manual type picker. */
+function ActivityImportSheet({ dk, onManual, onPick }: {
+  dk: string; onManual: () => void; onPick: (c: WorkoutCandidate) => void;
+}) {
   const p = usePalette();
-  const types = Object.keys(READING_TYPES).filter((t) => !LIVE_ONLY_READING_TYPES.has(t));
+  const [loading, setLoading] = useState(true);
+  const [cands, setCands] = useState<WorkoutCandidate[]>([]);
+  const [mayBeDenied, setMayBeDenied] = useState(false);
+  React.useEffect(() => {
+    let alive = true;
+    workoutCandidates(dk, getState().days[dk]?.activities || [])
+      .then((r) => { if (alive) { setCands(r.workouts); setMayBeDenied(r.mayBeDenied); } })
+      .catch(() => { /* graceful — falls through to the empty state */ })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, [dk]);
+  return (
+    <View>
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 4 }}>Add activity</Text>
+      <Text style={{ color: p.textDim, fontSize: 14, marginBottom: 16 }}>{`Import a workout from ${healthAppName()}, or enter one manually.`}</Text>
+      {loading ? (
+        <View style={{ alignItems: 'center', paddingVertical: 30, gap: 12 }}>
+          <ActivityIndicator color={p.accent} />
+          <Text style={{ color: p.textDim, fontSize: 14 }}>{`Getting workouts from ${healthAppName()}…`}</Text>
+        </View>
+      ) : cands.length === 0 ? (
+        <View style={{ gap: 10 }}>
+          <Muted>{`No workouts in ${healthAppName()} for this day. Enter an activity manually below.`}</Muted>
+          {mayBeDenied && (
+            // Read permission can be off without the app ever being told (iOS
+            // never reports read grants, and the permission sheet's toggles
+            // default to off), so an empty day gets a way out.
+            <Text style={{ color: p.textDim, fontSize: 13, lineHeight: 18 }}>
+              {'Expecting one? Check that workouts are shared with Autonomic in '}
+              <Text style={{ color: p.accent, fontWeight: '600' }} onPress={openHealthApp}>{healthPermissionPath()}</Text>
+              {'.'}
+            </Text>
+          )}
+        </View>
+      ) : (
+        cands.map((c, i) => (
+          <Pressable key={c.key} onPress={() => onPick(c)} style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: p.border }, pressed && { opacity: 0.5 }]}>
+            <Icon name={ACTIVITY_TYPES[c.type].icon as never} size={22} color={p.accent} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: p.text, fontSize: 17, fontWeight: '600' }}>{c.label}</Text>
+              <Text style={{ color: p.textDim, fontSize: 13, marginTop: 1 }}>{c.sub}</Text>
+            </View>
+            <Icon name="chevronRight" size={20} color={p.textDim} />
+          </Pressable>
+        ))
+      )}
+      <SheetFooter>
+        <Button title="Enter manually" variant="default" onPress={onManual} />
+      </SheetFooter>
+    </View>
+  );
+}
+
+/** Add-reading picker labels: the stand test reads more descriptively here
+ *  than the registry label the journal rows and summaries use. */
+const PICKER_LABELS: Record<string, string> = { standTest: 'POTS Standing Test' };
+const pickerLabel = (t: string) => PICKER_LABELS[t] || READING_TYPES[t].label;
+
+/** Watch companion tints for the two POTS captures, matched to the watch home
+ *  screen (DS.blue / DS.purple) so the phone and watch read as one product. */
+const POTS_BLUE = '#4aa3f0';
+const POTS_PURPLE = '#9d6bf5';
+const BP_GOLD = '#e0a030'; // watch DS.amber — the goldish-orange blood-pressure tint
+
+/** A 6-digit hex tint → its semi-transparent chip fill (the faded square the
+ *  solid icon sits on, matching the milestone cards' icon treatment). */
+function softTint(hex: string): string {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, 0.15)`;
+}
+
+/** Reading picker styled after the watch home screen: a stack of grey card
+ *  buttons, each with a tinted icon chip (semi-transparent square + solid icon,
+ *  as on the milestone cards). HRV is the live-capture call-to-action; the two
+ *  POTS captures carry their watch tints (blue / purple), the plain readings a
+ *  neutral grey. HRV kinds are live-capture only, so the manual list starts at
+ *  Blood Pressure. On a past day the live-only captures (HRV, stand test)
+ *  disappear — a live reading can only belong to the day it happens. */
+function ReadingPicker({ isToday, potsLocked, onLocked, onLive, onPick }: {
+  isToday: boolean; potsLocked?: boolean; onLocked?: () => void;
+  onLive: () => void; onPick: (type: string) => void;
+}) {
+  const p = usePalette();
+  const tintFor = (t: string) => (t === 'standTest' ? POTS_BLUE : t === 'orthostatic' ? POTS_PURPLE : t === 'bp' ? BP_GOLD : p.textDim);
+  const subFor: Record<string, string> = {
+    bp: 'Systolic, diastolic, pulse',
+    restingHr: 'At rest, laying or sitting',
+    standTest: 'Lie and stand test',
+    orthostatic: 'Stairs or other events',
+  };
+  // The two POTS captures lead the manual list (the stand test is live-only but
+  // stays in, pointing at the watch app); BP and resting HR follow.
+  const manual = isToday ? ['standTest', 'orthostatic', 'bp', 'restingHr'] : ['orthostatic', 'bp', 'restingHr'];
+  // One freemium lock left here: the live-only stand test on the free tier (the
+  // episode row stays — its manual entry path is free). HRV capture is unlimited
+  // on every tier. Locked rows dim, swap the chevron for a lock, and raise the
+  // paywall.
+  const lockFor = (t: string) => (t === 'standTest' ? !!potsLocked : false);
+  const readingRow = (t: string) => ({ key: t, title: pickerLabel(t), sub: subFor[t] || '', icon: READING_TYPES[t].icon as string, tint: lockFor(t) ? p.textDim : tintFor(t), locked: lockFor(t), onPress: () => (lockFor(t) ? onLocked?.() : onPick(t)) });
+  const rows: { key: string; title: string; sub: string; icon: string; tint: string; locked?: boolean; onPress: () => void }[] = [
+    ...(isToday ? [{ key: 'hrv', title: 'HRV Reading', sub: Platform.OS === 'ios' ? 'From a chest strap, Apple Watch or camera' : 'From a chest strap or your camera', icon: 'heartPulse', tint: p.accent, onPress: onLive }] : []),
+    ...manual.map(readingRow),
+  ];
   return (
     <View>
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 16 }}>Add reading</Text>
-      <Pressable onPress={onLive} style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: radius.control, backgroundColor: p.accentSoft, borderWidth: 1, borderColor: p.accent, marginBottom: 8 }, pressed && { opacity: 0.7 }]}>
-        <Icon name="heartPulse" size={24} color={p.accent} />
-        <View style={{ flex: 1 }}>
-          <Text style={{ color: p.accent, fontWeight: '700', fontSize: 17 }}>Capture live HRV reading</Text>
-          <Text style={{ color: p.textDim, fontSize: 13 }}>From a chest strap or Apple Watch</Text>
-        </View>
-        <Icon name="chevronRight" size={20} color={p.accent} />
-      </Pressable>
-      {types.map((t, i) => (
-        <Pressable key={t} onPress={() => onPick(t)} style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 15, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: p.border }, pressed && { opacity: 0.5 }]}>
-          <Icon name={READING_TYPES[t].icon as never} size={22} color={p.textDim} />
-          <Text style={{ color: p.text, fontSize: 17 }}>{READING_TYPES[t].label}</Text>
-        </Pressable>
-      ))}
+      <View style={{ gap: 10 }}>
+        {rows.map((r) => (
+          <Pressable
+            key={r.key}
+            onPress={r.onPress}
+            style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 13, padding: 12, borderRadius: radius.card, backgroundColor: p.surface2 }, pressed && { opacity: 0.6 }]}
+          >
+            <View style={{ width: 40, height: 40, borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: softTint(r.tint) }}>
+              <Icon name={r.icon as never} size={21} color={r.tint} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: p.text, fontSize: 16, fontWeight: '700' }}>{r.title}</Text>
+              {r.sub ? <Text style={{ color: p.textDim, fontSize: 12.5, marginTop: 1 }}>{r.sub}</Text> : null}
+            </View>
+            <Icon name={r.locked ? 'lock' : 'chevronRight'} size={18} color={p.textDim} />
+          </Pressable>
+        ))}
+      </View>
     </View>
   );
 }
@@ -155,13 +275,21 @@ function ReadingPicker({ onLive, onPick }: { onLive: () => void; onPick: (type: 
  *  that is reviewed then saved as new — it is not treated as an edit (no Delete)
  *  and, when `fromHealth`, is not re-published back to Health. */
 export function EntryForm({ typeMap, arrKey, dk, type, existing, prefill = null, fromHealth = false, controls, onSaved }: {
-  typeMap: Record<string, TypeDef>; arrKey: ArrKey; dk: string; type: string; existing: Entry | null; prefill?: Entry | null; fromHealth?: boolean; controls: SheetControls; onSaved: () => void;
+  typeMap: Record<string, TypeDef>; arrKey: ArrKey; dk: string; type: string; existing: Entry | null; prefill?: Entry | null; fromHealth?: boolean; controls: SheetControls;
+  /** Called after a save (with the saved entry) or a delete (with nothing). */
+  onSaved: (saved?: Entry) => void;
 }) {
   const p = usePalette();
   const toast = useToast();
   const def = typeMap[type];
   const fields = entryFields(def);
   const initial = existing || prefill || { id: uid(), type, time: defaultTimeFor(dk), note: '' };
+  // New entries with a Morning/Evening/Other tag auto-detect it the same way
+  // live HRV capture does, based on the entry's default time.
+  if (!existing && initial.period == null && fields.some((f) => f.type === 'select' && f.key === 'period')) {
+    const h = parseInt(String(initial.time || ''), 10);
+    initial.period = defaultPeriod(type, dk, Number.isFinite(h) ? h : undefined);
+  }
   const [form, set] = useFormState(fields, initial);
 
   const save = () => {
@@ -173,26 +301,31 @@ export function EntryForm({ typeMap, arrKey, dk, type, existing, prefill = null,
     } else if (numFields.length && !anyNum && !anyCheck) {
       return toast('Enter a value');
     }
-    const r: Entry = { ...initial };
+    let r: Entry = { ...initial };
     fields.forEach((f) => {
       if (isDivider(f) || !f.key) return;
       if (f.type === 'check') r[f.key] = !!form[f.key];
       else r[f.key] = String(form[f.key] ?? '').trim();
     });
     r.scores = computeScores(r, scoreCtx());
+    // A prefill may carry inline waveform arrays (an imported workout's HR
+    // trace) — those go to the sidecar, never into the journal blob.
+    const { entry: stripped, waveform } = splitWaveform(r);
+    if (waveform) storeWaveform(stripped.id, waveform);
+    r = stripped;
     upsertEntry(dk, arrKey, r);
-    // Auto-publish freshly-logged readings to Apple Health (fire-and-forget).
+    // Auto-publish freshly-logged readings to the health store (fire-and-forget).
     // Only new *manual* entries — never re-publish edits or Health-sourced rows.
-    if (arrKey === 'readings' && !existing && !fromHealth && r.note !== 'From Apple Health' && getState().settings.healthEnabled) {
+    if (arrKey === 'readings' && !existing && !fromHealth && r.note !== 'From Apple Health' && r.note !== 'From Health Connect' && getState().settings.healthEnabled) {
       const api = health();
       if (api.available) {
         api.publishReading(r, dk)
-          .then((n) => { if (n > 0) toast('Saved to Apple Health'); })
+          .then((n) => { if (n > 0) toast(`Saved to ${healthAppName()}`); })
           .catch(() => { /* graceful */ });
       }
     }
     controls.closeAll();
-    onSaved();
+    onSaved(r);
   };
 
   return (
@@ -207,10 +340,13 @@ export function EntryForm({ typeMap, arrKey, dk, type, existing, prefill = null,
   );
 }
 
-/** Indoor-bike bespoke form (conditional Resistance vs interval list). */
-export function BikeForm({ dk, existing, controls, onSaved }: { dk: string; existing: Entry | null; controls: SheetControls; onSaved: () => void }) {
+/** Indoor-bike bespoke form (conditional Resistance vs interval list).
+ *  `prefill` seeds a brand-new entry (a workout imported from the health
+ *  store), mirroring EntryForm — reviewed then saved as new, never an edit. */
+export function BikeForm({ dk, existing, prefill = null, controls, onSaved }: { dk: string; existing: Entry | null; prefill?: Entry | null; controls: SheetControls; onSaved: (saved?: Entry) => void }) {
   const p = usePalette();
-  const init = existing ? (JSON.parse(JSON.stringify(existing)) as Entry) : { id: uid(), type: 'indoorBike', time: defaultTimeFor(dk), note: '', interval: false, intervals: [] as unknown[] };
+  const blank: Entry = { id: uid(), type: 'indoorBike', time: defaultTimeFor(dk), note: '', interval: false, intervals: [] as unknown[] };
+  const init = existing ? (JSON.parse(JSON.stringify(existing)) as Entry) : prefill ? { ...blank, ...prefill } : blank;
   const [time, setTime] = useState((init.time as string) || defaultTimeFor(dk));
   const [num, setNum] = useState<Record<string, string>>({
     duration: (init.duration as string) || '', distance: (init.distance as string) || '', avgHr: (init.avgHr as string) || '',
@@ -229,9 +365,12 @@ export function BikeForm({ dk, existing, controls, onSaved }: { dk: string; exis
     else { r.resistance = num.resistance.trim(); r.intervals = []; }
     r.hr60 = num.hr60.trim();
     r.note = note.trim();
-    upsertEntry(dk, 'activities', r);
+    // An imported ride's prefill carries the inline HR trace — sidecar it.
+    const { entry: stripped, waveform } = splitWaveform(r);
+    if (waveform) storeWaveform(stripped.id, waveform);
+    upsertEntry(dk, 'activities', stripped);
     controls.closeAll();
-    onSaved();
+    onSaved(stripped);
   };
 
   return (
@@ -281,17 +420,134 @@ export function BikeForm({ dk, existing, controls, onSaved }: { dk: string; exis
 }
 
 /* ---------- hooks that wire the sheet stack ---------- */
+
+/** Home-screen widget deep links (the URL points at the Journal tab so
+ *  expo-router never sees an unmatched path; repeated taps re-fire because each
+ *  is a fresh openURL event):
+ *   · autonomic://?capture=hrv     — open HRV capture setup, exactly like the
+ *     Readings picker's Live HRV action. No tier check: capture is unlimited.
+ *   · autonomic://?open=protocol   — scroll to the Progress streak card and
+ *     open it expanded (the Protocol widget). */
+export function useCaptureDeepLink() {
+  const { openSheet } = useSheets();
+  React.useEffect(() => {
+    const handle = (url: string | null) => {
+      if (!url) return;
+      const q = ExpoLinking.parse(url).queryParams;
+      if (q?.open === 'protocol') {
+        requestExpandProtocol();
+        // Let the card mount/expand before scrolling (cold start lays out late).
+        setTimeout(() => scrollJournalToSection('protocol'), 350);
+        return;
+      }
+      if (q?.capture !== 'hrv') return;
+      openSheet((c) => <HrvSetup controls={c} />);
+    };
+    void ExpoLinking.getInitialURL().then(handle);
+    const sub = ExpoLinking.addEventListener('url', (e) => handle(e.url));
+    return () => sub.remove();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+}
+
+type OpenSheet = ReturnType<typeof useSheets>['openSheet'];
+
+/**
+ * Open the imported-workout report (HR-over-time with zones + stats) for an
+ * activity, with the pencil stacking that activity's normal edit form.
+ * Shared by the journal's activity rows, the add-activity import card and the
+ * health-update import sheet (features/HealthUpdates) — importing a single
+ * workout from any of them lands on its report.
+ *
+ * `justImported` marks that first post-import open: the report then carries the
+ * "Add more details" card (see WorkoutDetailsPrompt), because the fields a
+ * health store can't supply — distance on an indoor machine, HR @60s — are only
+ * worth asking for while the user is still standing there. It is a signpost to
+ * the edit form, not a second place to type: everything is entered in the one
+ * form, so nothing can be offered here that the form can't show later.
+ */
+export function openWorkoutReport(openSheet: OpenSheet, r: Entry, dk: string, justImported = false): void {
+  const openEdit = () => {
+    const noop = () => { /* store change triggers re-render */ };
+    if (ACTIVITY_TYPES[r.type]?.custom === 'bike') openSheet((c) => <BikeForm dk={dk} existing={r} controls={c} onSaved={noop} />);
+    else openSheet((c) => <EntryForm typeMap={typesFor(getState(), 'activities')} arrKey="activities" dk={dk} type={r.type} existing={r} controls={c} onSaved={noop} />);
+  };
+  openSheet(() => <WorkoutSummarySheet r={r} dk={dk} justImported={justImported} onEdit={openEdit} />, { action: { icon: 'edit', onPress: openEdit } });
+}
+
 export function useEntryForms(dk: string) {
   const { openSheet } = useSheets();
+  const openPaywall = usePaywall();
   const refresh = () => { /* store change triggers re-render */ };
 
+  // Freemium: live HRV capture is unlimited on every tier; live POTS captures
+  // are Pro. Checked at action time (not render) so the answer is current, and
+  // guarded here — the single choke point — rather than at each button.
+  const potsCaptureLocked = () => getTier() === 'free';
+
   const openReadingForm = (type: string, existing: Entry | null, prefill: Entry | null = null) =>
-    openSheet((c) => <EntryForm typeMap={READING_TYPES} arrKey="readings" dk={dk} type={type} existing={existing} prefill={prefill} fromHealth={!!prefill} controls={c} onSaved={refresh} />);
+    openSheet((c) => (
+      <EntryForm
+        typeMap={READING_TYPES} arrKey="readings" dk={dk} type={type} existing={existing} prefill={prefill} fromHealth={!!prefill} controls={c}
+        onSaved={(saved) => {
+          refresh();
+          // A freshly logged orthostatic event pops its results card, so the
+          // rise/recovery grades are seen right after entry.
+          if (saved && !existing && type === 'orthostatic') openReadingSummary(saved);
+        }}
+      />
+    ));
+
+  // The in-app live POTS captures (Bluetooth strap): same stacked-card modal
+  // treatment as a live HRV session. With no strap saved yet, the pairing
+  // sheet opens first; saving a device there flows straight into the session.
+  const startPotsLive = (type: string) => {
+    if (potsCaptureLocked()) { openPaywall(); return; }
+    const open = () => openSheet(
+      (c) => (type === 'standTest' ? <StandTestSession controls={c} /> : <OrthostaticSession controls={c} />),
+      { hideClose: true },
+    );
+    if (!getState().settings.lastBleDeviceId) {
+      openSheet((c) => (
+        <DevicesScreen controls={{
+          close: () => { c.close(); if (getState().settings.lastBleDeviceId) open(); },
+          closeAll: c.closeAll,
+        }} />
+      ));
+      return;
+    }
+    open();
+  };
 
   // Tapping a reading type: if Apple Health can supply it (and is connected),
   // open the import card (pick a sample or enter manually); otherwise go straight
-  // to the blank manual form.
+  // to the blank manual form. Orthostatic gets its own card pointing at the
+  // watch app's guided stand test (which syncs in by itself) — plus an in-app
+  // strap capture — before manual entry.
   const pickReadingSource = (type: string) => {
+    // On a past day the live captures don't apply (a live reading belongs to
+    // the day it happens) — an episode goes straight to the manual form.
+    if (type === 'orthostatic' && dk !== todayKey()) { openReadingForm(type, null); return; }
+    // Both POTS types share the watch-pointer card, each with a live strap
+    // capture behind it. The episode keeps a manual form too; the stand test
+    // is live-only, so no manual fallback.
+    if (type === 'orthostatic' || type === 'standTest') {
+      openSheet(() => (
+        <OrthostaticIntroSheet
+          title={`Add ${pickerLabel(type)}`}
+          subtitle={type === 'orthostatic'
+            ? (Platform.OS === 'ios'
+              ? 'Capture live from your watch or a chest strap, or enter an event manually.'
+              : 'Capture live from a chest strap, or enter an event manually.')
+            : (Platform.OS === 'ios'
+              ? 'Run the guided test from your Apple Watch or with a Bluetooth chest strap.'
+              : 'Run the guided test with a Bluetooth chest strap.')}
+          onManual={type === 'orthostatic' ? () => openReadingForm(type, null) : undefined}
+          onStrap={() => startPotsLive(type)}
+        />
+      ), { fitContent: true });
+      return;
+    }
     const source = healthSourceFor(type);
     if (!source || !health().available || !getState().settings.healthEnabled) { openReadingForm(type, null); return; }
     openSheet(() => (
@@ -316,29 +572,52 @@ export function useEntryForms(dk: string) {
       { action: { icon: 'edit', onPress: () => openReadingForm(r.type, r) } },
     );
 
+  // The workout report (HR-over-time with zones + stats), for activities that
+  // carry an HR trace. The pencil stacks the normal edit form on top.
+  const openActivitySummary = (r: Entry, justImported = false) => openWorkoutReport(openSheet, r, dk, justImported);
+
+  // Tapping a journal activity row: imported workouts with an HR trace open
+  // as the report; everything else opens the edit form directly, as before.
+  const openActivity = (r: Entry) => (workoutCurveFor(r) ? openActivitySummary(r) : openActivityForm(r.type, r));
+
   const captureHrv = () => openSheet((c) => <HrvSetup controls={c} />);
   const pickReading = () => openSheet(() => (
     <ReadingPicker
+      isToday={dk === todayKey()}
+      potsLocked={potsCaptureLocked()}
+      onLocked={openPaywall}
       onLive={captureHrv}
       onPick={(t) => pickReadingSource(t)}
     />
   ));
-  const pickActivity = () => openSheet(() => <TypePicker title="Add activity" kind="activities" manageLabel="Add new activity type" onPick={(t) => openActivityForm(t, null)} />);
-  const pickMed = () => openSheet(() => <TypePicker title="Add medication or supplement" kind="meds" manageLabel="Add another medication" onPick={(t) => {
-    // A user-defined med with a saved dosage prefills the Amount field.
-    const def = typesFor(getState(), 'meds')[t];
-    const prefill = def?.dosage ? ({ id: uid(), type: t, time: defaultTimeFor(dk), note: '', amount: def.dosage } as Entry) : null;
-    openSheet((c) => <EntryForm typeMap={typesFor(getState(), 'meds')} arrKey="meds" dk={dk} type={t} existing={null} prefill={prefill} controls={c} onSaved={refresh} />);
-  }} />);
-  const pickSymptom = () => openSheet(() => <TypePicker title="Add symptom" kind="symptoms" manageLabel="Add another symptom" onPick={(t) => openSheet((c) => <EntryForm typeMap={typesFor(getState(), 'symptoms')} arrKey="symptoms" dk={dk} type={t} existing={null} controls={c} onSaved={refresh} />)} />);
+  // "+ Add activity": with the health store connected, a workout import card
+  // comes first (the day's Apple Workout / exercise sessions, tap to review);
+  // "Enter manually" stacks the normal type picker. Without it, straight to
+  // the picker.
+  const pickActivityManual = () => openSheet(() => <TypePicker title="Add activity" kind="activities" manageLabel="Add new activity type" onPick={(t) => openActivityForm(t, null)} />);
+  const openWorkoutImport = (c: WorkoutCandidate) => {
+    // The HR trace rides inline on the prefill; the form's save splits it into
+    // the waveform sidecar. Saving then pops the workout report.
+    const prefill = { id: uid(), type: c.type, time: c.time, note: '', source: 'health', imported: true, ...c.entry, ...(c.hrSeries?.length ? { sampledHr: c.hrSeries } : {}) } as Entry;
+    const afterImport = (saved?: Entry) => { refresh(); if (saved && workoutCurveFor(saved)) openActivitySummary(saved, true); };
+    if (c.type === 'indoorBike') openSheet((sc) => <BikeForm dk={dk} existing={null} prefill={prefill} controls={sc} onSaved={afterImport} />);
+    else openSheet((sc) => <EntryForm typeMap={typesFor(getState(), 'activities')} arrKey="activities" dk={dk} type={c.type} existing={null} prefill={prefill} controls={sc} onSaved={afterImport} />);
+  };
+  const pickActivity = () => {
+    if (!health().available || !getState().settings.healthEnabled) { pickActivityManual(); return; }
+    openSheet(() => <ActivityImportSheet dk={dk} onManual={pickActivityManual} onPick={openWorkoutImport} />, { fitContent: true });
+  };
+  // Multi-select med logging sheet (search, checkboxes, edit-list mode).
+  const pickMed = () => openSheet((c) => <LogPickerSheet kind="meds" dk={dk} controls={c} />);
+  const pickSymptom = () => openSheet((c) => <LogPickerSheet kind="symptoms" dk={dk} controls={c} />);
 
   const openMed = (r: Entry) => openSheet((c) => <EntryForm typeMap={typesFor(getState(), 'meds')} arrKey="meds" dk={dk} type={r.type} existing={r} controls={c} onSaved={refresh} />);
   const openSymptom = (r: Entry) => openSheet((c) => <EntryForm typeMap={typesFor(getState(), 'symptoms')} arrKey="symptoms" dk={dk} type={r.type} existing={r} controls={c} onSaved={refresh} />);
 
-  return { openReadingForm, openActivityForm, openReadingSummary, captureHrv, pickReading, pickActivity, pickMed, pickSymptom, openMed, openSymptom };
+  return { openReadingForm, openActivityForm, openActivity, openReadingSummary, captureHrv, pickReading, pickActivity, pickMed, pickSymptom, openMed, openSymptom };
 }
 
-function ReadingSummarySheet({ r, dk }: { r: Entry; dk: string }) {
+export function ReadingSummarySheet({ r, dk }: { r: Entry; dk: string }) {
   const p = usePalette();
   useAppState(); // re-render on edits
   const state = getState();
@@ -352,5 +631,90 @@ function ReadingSummarySheet({ r, dk }: { r: Entry; dk: string }) {
       <ReadingSummary r={live} days={state.days} ctx={ctx} />
       <View style={{ height: 24 }} />
     </ScrollView>
+  );
+}
+
+/** The imported-workout report: the activity's HR trace with exercise zones,
+ *  HR stats, time in zones, and the workout's own details (mirror of
+ *  ReadingSummarySheet, over the day's activities). */
+export function WorkoutSummarySheet({ r, dk, justImported, onEdit }: { r: Entry; dk: string; justImported?: boolean; onEdit?: () => void }) {
+  const p = usePalette();
+  useAppState(); // re-render on edits
+  const state = getState();
+  const live = (state.days[dk]?.activities || []).find((x) => x.id === r.id) || r;
+  const def = typesFor(state, 'activities')[live.type];
+  const ctx = { sex: state.profile.sex, height: state.profile.height };
+  return (
+    <ScrollView showsVerticalScrollIndicator={false}>
+      {/* The edit + close pill floats top-right — keep the header text clear of it. */}
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, paddingRight: 100 }}>{def?.label || 'Workout'}</Text>
+      <Text style={{ color: p.textDim, fontSize: 14, marginTop: 2, marginBottom: 14, paddingRight: 100 }}>{live.time ? fmtTime12(live.time as string) : ''}</Text>
+      {justImported && onEdit ? <WorkoutDetailsPrompt r={live} def={def} onPress={onEdit} /> : null}
+      <WorkoutSummary r={live} days={state.days} ctx={ctx} />
+      <View style={{ height: 24 }} />
+    </ScrollView>
+  );
+}
+
+/** The bike form is bespoke (its registry `fields` is empty) but stores these,
+ *  so the prompt below can still name what's missing on an indoor ride. */
+const BIKE_DETAIL_FIELDS: { key: string; label: string }[] = [
+  { key: 'distance', label: 'Distance' },
+  { key: 'resistance', label: 'Resistance' },
+  { key: 'minHr', label: 'Min HR' },
+  { key: 'maxHr', label: 'Max HR' },
+  { key: 'hr60', label: 'HR @60s rest' },
+];
+
+/** The numeric details this activity type declares that the import left blank —
+ *  what the prompt names, so it asks for things this entry can actually hold. */
+function missingDetailLabels(r: Entry, def?: TypeDef): string[] {
+  const fields = def?.custom === 'bike'
+    ? BIKE_DETAIL_FIELDS
+    : entryFields(def)
+      .filter((f) => !isDivider(f) && isNumberField(f) && f.key !== 'duration')
+      .map((f) => ({ key: f.key as string, label: f.label || (f.key as string) }));
+  return fields.filter((f) => !r[f.key]).map((f) => f.label);
+}
+
+/**
+ * The card shown once, on the report that pops right after an import: a
+ * signpost into the edit form for the details a health store can't supply
+ * (distance on an indoor machine, HR @60s), named so the user knows what's
+ * worth adding while they're still standing there.
+ *
+ * It used to be an inline set of inputs in an accent-outlined box, which read
+ * as an error and as a second, competing place to enter data. There is one
+ * form; this only opens it. Later opens of the report have the pencil, the
+ * same way in as any other entry.
+ */
+function WorkoutDetailsPrompt({ r, def, onPress }: { r: Entry; def?: TypeDef; onPress: () => void }) {
+  const p = usePalette();
+  // Fixed at mount: typing a value in shouldn't make the sub-line rewrite
+  // itself under the user when they come back from the form.
+  const [missing] = useState<string[]>(() => missingDetailLabels(r, def));
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        {
+          borderWidth: 1, borderColor: p.border, borderRadius: radius.card,
+          backgroundColor: p.surface, marginBottom: 14, padding: 15,
+          flexDirection: 'row', alignItems: 'center', gap: 13,
+        },
+        pressed && { opacity: 0.75 },
+      ]}
+    >
+      <View style={{ width: 42, height: 42, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: p.sunk, borderWidth: 1, borderColor: p.border }}>
+        <Icon name="edit" size={19} color={p.textDim} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={{ fontSize: 15, fontWeight: '700', color: p.text }}>Add more details</Text>
+        <Text style={{ fontSize: 13, color: p.textDim, marginTop: 3, lineHeight: 17 }} numberOfLines={2}>
+          {missing.length ? missing.join(' · ') : 'Anything the import missed'}
+        </Text>
+      </View>
+      <Icon name="chevronRight" size={20} color={p.textDim} />
+    </Pressable>
   );
 }

@@ -10,8 +10,8 @@ import {
   restingHrBands, rowScoreCategory, sHfPeak, sLfPeak, sSys, totalPower, worstCat,
 } from '../index';
 import {
-  DEFAULT_PROTOCOL, activityGrade, blueZone, dayCleanliness, resolveProtocol, scoreCat,
-  scoreSet, sleepGrade, sleepHours, streakInfo, streakTier,
+  DEFAULT_PROTOCOL, activityGrade, blueZone, dayCleanliness, metricHistory, numEx,
+  resolveProtocol, scoreCat, scoreSet, sleepGrade, sleepHours, streakInfo, streakTier,
 } from '../day';
 
 const day = (over: Partial<DayRecord> = {}): DayRecord => ({
@@ -28,7 +28,7 @@ const day = (over: Partial<DayRecord> = {}): DayRecord => ({
 describe('constants pinned to the web app', () => {
   it('CAT_POINTS / GRADE_PTS / SCORE_RANK exact values', () => {
     expect(CAT_POINTS).toEqual({ great: 90, good: 75, ok: 55, bad: 38, crash: 18, concerning: 18, warning: 72 });
-    expect(GRADE_PTS).toEqual({ great: 95, good: 80, ok: 60, warning: 60, bad: 35, crash: 10, concerning: 10 });
+    expect(GRADE_PTS).toEqual({ great: 100, good: 80, ok: 60, warning: 60, bad: 35, crash: 10, concerning: 10 });
     expect(SCORE_RANK).toEqual({ great: 0, good: 1, ok: 2, warning: 2, bad: 3, crash: 4, concerning: 4 });
   });
   it('expectedHf per breathing style', () => {
@@ -244,29 +244,29 @@ describe('day scoring', () => {
     const a = (type: string): Entry => ({ id: 'x', type });
     expect(activityGrade([])).toBeNull();
     expect(activityGrade([a('walk')])).toBe('good');
-    expect(activityGrade([a('upperBody'), a('coreWorkout')])).toBe('ok');
+    expect(activityGrade([a('strength'), a('coreWorkout')])).toBe('ok');
     expect(activityGrade([a('strenuousWork')])).toBe('bad');
-    expect(activityGrade([a('upperBody'), a('coreWorkout'), a('indoorBike')])).toBe('bad');
+    expect(activityGrade([a('strength'), a('coreWorkout'), a('indoorBike')])).toBe('bad');
   });
   it('scoreSet: RMSSD-only reading redistributes weight', () => {
     const readings: Entry[] = [{ id: 'x', type: 'breathHrv', rmssd: '35', time: '08:00' }];
     const d = day({ readings });
     const res = scoreSet(readings, d, '2026-07-02', { '2026-07-02': d });
-    // components: HRV (great -> 95). No total power/pnn50/vlf/lfPeak (missing).
+    // components: HRV (great -> 100). No total power/pnn50/vlf/lfPeak (missing).
     // hr missing on the reading, so no resting HR either.
     expect(res.comps.map((c) => c.label)).toEqual(['HRV (RMSSD)']);
-    expect(res.score).toBe(95);
+    expect(res.score).toBe(100);
     expect(res.confidence).toBe(25);
   });
   it('scoreSet: structured + unstructured blends RMSSD 70/30', () => {
     const readings: Entry[] = [
       { id: 'u', type: 'hrv', rmssd: '20', time: '08:00' }, // bad -> 35
-      { id: 's', type: 'breathHrv', rmssd: '35', time: '08:30' }, // great -> 95
+      { id: 's', type: 'breathHrv', rmssd: '35', time: '08:30' }, // great -> 100
     ];
     const d = day({ readings });
     const res = scoreSet(readings, d, '2026-07-02', { '2026-07-02': d });
     const hrv = res.comps.find((c) => c.label === 'HRV (RMSSD)')!;
-    expect(hrv.p).toBeCloseTo(0.7 * 95 + 0.3 * 35);
+    expect(hrv.p).toBeCloseTo(0.7 * 100 + 0.3 * 35);
   });
   it('scoreCat bands', () => {
     expect(scoreCat(90).short).toBe('Excellent');
@@ -317,6 +317,7 @@ describe('day scoring', () => {
     // Custom protocol: only require a walk + 1L water, everything else off.
     const proto: Protocol = {
       triggers: { enabled: false, types: [] },
+      hrv: { enabled: false },
       water: { enabled: true, liters: 1 },
       meds: { enabled: false, types: [] },
       activities: { enabled: true, types: ['walk'] },
@@ -336,6 +337,29 @@ describe('day scoring', () => {
     expect(medCrit.map((x) => x.key)).toEqual(['meds:allegra', 'meds:pepsidAc', 'meds:magGlycinate']);
     expect(medCrit.find((x) => x.key === 'meds:allegra')!.pass).toBe(true);
     expect(medCrit.find((x) => x.key === 'meds:pepsidAc')!.pass).toBe(false);
+  });
+  it('criteria label custom types by their user-given name, not the key', () => {
+    const days: Record<string, DayRecord> = {
+      '2026-07-02': day({ meds: [{ id: '1', type: 'custom-magnesium' }] as Entry[] }),
+    };
+    const proto: Protocol = { ...DEFAULT_PROTOCOL, triggers: { enabled: false, types: [] }, water: { enabled: false, liters: 0 }, sleep: { enabled: false, hours: 0 }, meds: { enabled: true, types: ['custom-magnesium'] } };
+    const custom = { meds: { 'custom-magnesium': { label: 'Magnesium', icon: 'pill', fields: [], userDefined: true } } };
+    const crit = dayCleanliness(days, '2026-07-02', proto, custom)!.criteria.find((x) => x.key === 'meds:custom-magnesium')!;
+    expect(crit.label).toBe('Magnesium');
+    expect(crit.pass).toBe(true);
+    // Without the custom map it can only fall back to the raw key.
+    expect(dayCleanliness(days, '2026-07-02', proto)!.criteria[0].label).toBe('custom-magnesium');
+  });
+  it('daily HRV requirement passes only for an in-app HRV capture', () => {
+    const proto: Protocol = { ...DEFAULT_PROTOCOL, triggers: { enabled: false, types: [] }, water: { enabled: false, liters: 0 }, sleep: { enabled: false, hours: 0 }, hrv: { enabled: true } };
+    const passOf = (days: Record<string, DayRecord>) => dayCleanliness(days, '2026-07-02', proto)!.criteria.find((x) => x.key === 'hrv')!.pass;
+    expect(passOf({ '2026-07-02': day() })).toBe(false);
+    expect(passOf({ '2026-07-02': day({ readings: [{ id: 'r', type: 'breathHrv' }] as Entry[] }) })).toBe(true);
+    expect(passOf({ '2026-07-02': day({ readings: [{ id: 'r', type: 'hrv' }] as Entry[] }) })).toBe(true);
+    // A health-imported reading does not count — the goal is to take one in-app.
+    expect(passOf({ '2026-07-02': day({ readings: [{ id: 'r', type: 'hrv', imported: true }] as Entry[] }) })).toBe(false);
+    // A non-HRV reading (e.g. blood pressure) does not satisfy it.
+    expect(passOf({ '2026-07-02': day({ readings: [{ id: 'r', type: 'bp' }] as Entry[] }) })).toBe(false);
   });
   it('protocol trigger selection narrows which triggers break the day', () => {
     const days: Record<string, DayRecord> = {
@@ -360,6 +384,36 @@ describe('day scoring', () => {
     expect(streakTier(10).tier).toBe('Excellent');
     expect(streakTier(20).tier).toBe('Outstanding');
     expect(streakTier(45).tier).toBe('Elite');
+  });
+  it('metricHistory stops at the viewed reading', () => {
+    const rd = (id: string, time: string, rmssd: number): Entry => ({ id, type: 'hrv', time, rmssd: String(rmssd) });
+    const days: Record<string, DayRecord> = {
+      '2026-07-01': day({ readings: [rd('a', '08:00', 30)] }),
+      // Out of time order on disk: metricHistory sorts within the day.
+      '2026-07-02': day({ readings: [rd('c', '18:00', 50), rd('b', '07:00', 40)] }),
+      '2026-07-03': day({ readings: [rd('d', '09:00', 60)] }),
+    };
+    const vals = (upto?: string) => metricHistory(days, 'hrv', numEx('rmssd'), 15, upto).map((p) => p.v);
+    expect(vals()).toEqual([30, 40, 50, 60]);
+    expect(vals('b')).toEqual([30, 40]);       // earlier reading, same day as a later one
+    expect(vals('c')).toEqual([30, 40, 50]);
+    expect(vals('d')).toEqual([30, 40, 50, 60]);
+    // An unsaved live preview isn't in the journal: keep the full history.
+    expect(vals('unsaved')).toEqual([30, 40, 50, 60]);
+  });
+  it('metricHistory walks activities when asked (workout HR @60s)', () => {
+    const act = (id: string, time: string, hr60: number, type = 'run'): Entry => ({ id, type, time, hr60: String(hr60) });
+    const days: Record<string, DayRecord> = {
+      '2026-07-01': day({ activities: [act('a', '08:00', 96)], readings: [{ id: 'r', type: 'run', hr60: '1' } as Entry] }),
+      '2026-07-02': day({ activities: [act('c', '18:00', 84), act('b', '07:00', 90), act('w', '09:00', 70, 'walk')] }),
+      '2026-07-03': day({ activities: [act('d', '09:00', 80)] }),
+    };
+    const vals = (upto?: string) => metricHistory(days, 'run', numEx('hr60'), 15, upto, 'activities').map((p) => p.v);
+    // Same type only, sorted within the day, and the readings array is not walked.
+    expect(vals()).toEqual([96, 90, 84, 80]);
+    expect(vals('b')).toEqual([96, 90]);
+    // The default kind still reads readings, so activities are invisible there.
+    expect(metricHistory(days, 'run', numEx('hr60')).map((p) => p.v)).toEqual([1]);
   });
   it('streakInfo counts consecutive clean days', () => {
     const clean = () =>

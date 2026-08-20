@@ -66,7 +66,7 @@ It would be easy to read the table above and conclude the case is closed. It is 
 None of this means breathing "does not work." It means the science has not yet earned the confidence of a first-line, guideline-backed treatment. Both things can be true: many people feel real relief, and the evidence base is still thin.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 150" role="img" aria-label="An evidence scale showing HRV biofeedback for long COVID sitting toward the promising end, between anecdote and proven, marked as feasibility and pilot studies.">
+  <svg class="fig-d" viewBox="0 0 720 150" role="img" aria-label="An evidence scale showing HRV biofeedback for long COVID sitting toward the promising end, between anecdote and proven, marked as feasibility and pilot studies.">
     <line x1="60" y1="80" x2="660" y2="80" stroke="var(--line)" stroke-width="2"/>
     <circle cx="60" cy="80" r="5" fill="var(--dim-2)"/>
     <circle cx="360" cy="80" r="7" fill="#f5a524"/>
@@ -75,6 +75,16 @@ None of this means breathing "does not work." It means the science has not yet e
     <text x="360" y="45" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="15" fill="#f5a524">Feasibility &amp; pilot studies</text>
     <text x="360" y="112" text-anchor="middle" font-family="Space Mono, monospace" font-size="13" fill="var(--dim-2)">← we are here →</text>
     <text x="660" y="55" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="14" fill="var(--dim-2)">Proven (large RCTs)</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 120" role="img" aria-label="An evidence scale showing HRV biofeedback for long COVID sitting toward the promising end, between anecdote and proven, marked as feasibility and pilot studies.">
+    <text x="180" y="28" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="13" fill="#f5a524">Feasibility &amp; pilot studies</text>
+    <text x="180" y="48" text-anchor="middle" font-family="Space Mono, monospace" font-size="11.5" fill="var(--dim-2)">← we are here →</text>
+    <line x1="30" y1="76" x2="330" y2="76" stroke="var(--line)" stroke-width="2"/>
+    <circle cx="30" cy="76" r="5" fill="var(--dim-2)"/>
+    <circle cx="180" cy="76" r="7" fill="#f5a524"/>
+    <circle cx="330" cy="76" r="5" fill="var(--dim-2)"/>
+    <text x="20" y="102" font-family="Space Grotesk, sans-serif" font-size="12.5" fill="var(--dim-2)">Anecdote</text>
+    <text x="340" y="102" text-anchor="end" font-family="Space Grotesk, sans-serif" font-size="12.5" fill="var(--dim-2)">Proven (large RCTs)</text>
   </svg>
   <figcaption>The evidence sits in the middle: enough signal to take seriously, not enough to call it settled.</figcaption>
 </figure>

@@ -33,7 +33,7 @@ Your heart is not a metronome. Even when it's beating at a steady 60 times a min
 The variation exists because of the tug-of-war we cover in the [autonomic nervous system guide](/insights/basics/autonomic-nervous-system-and-dysautonomia-guide/): the **parasympathetic** ("rest and digest") branch slows the heart and *increases* variability, while the **sympathetic** ("fight or flight") branch speeds it up and *decreases* it. High HRV means the calming, parasympathetic side is engaged and your system can respond flexibly. When HRV collapses, it usually means the sympathetic side has taken over.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 220" role="img" aria-label="Two rows of heartbeats showing high variability versus low variability in the gaps between beats">
+  <svg class="fig-d" viewBox="0 0 720 220" role="img" aria-label="Two rows of heartbeats showing high variability versus low variability in the gaps between beats">
     <text x="20" y="34" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="15">High HRV: flexible, well-regulated</text>
     <line x1="20" y1="70" x2="700" y2="70" stroke="var(--line)" stroke-width="1" />
     <g stroke="#54d98a" stroke-width="2.5" fill="none">
@@ -54,6 +54,28 @@ The variation exists because of the tug-of-war we cover in the [autonomic nervou
     <text x="232" y="193" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">782ms</text>
     <text x="330" y="193" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">778ms</text>
     <text x="425" y="193" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">781ms</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 200" role="img" aria-label="Two rows of heartbeats showing high variability versus low variability in the gaps between beats">
+    <text x="20" y="20" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="12.5">High HRV: flexible, well-regulated</text>
+    <line x1="20" y1="70" x2="340" y2="70" stroke="var(--line)" stroke-width="1" />
+    <g stroke="#54d98a" stroke-width="2.5" fill="none">
+      <path d="M29 70 L29 44 M62 70 L62 44 M105 70 L105 44 M140 70 L140 44 M189 70 L189 44 M232 70 L232 44 M284 70 L284 44 M330 70 L330 44" />
+    </g>
+    <g fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="9.5" text-anchor="middle">
+      <text x="45" y="86">920ms</text>
+      <text x="84" y="86">1010ms</text>
+      <text x="122" y="86">870ms</text>
+    </g>
+    <text x="340" y="124" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="12.5" text-anchor="end">Low HRV: stuck "on"</text>
+    <line x1="20" y1="172" x2="340" y2="172" stroke="var(--line)" stroke-width="1" />
+    <g stroke="#e03127" stroke-width="2.5" fill="none">
+      <path d="M29 172 L29 146 M65 172 L65 146 M101 172 L101 146 M138 172 L138 146 M174 172 L174 146 M211 172 L211 146 M248 172 L248 146 M285 172 L285 146 M321 172 L321 146" />
+    </g>
+    <g fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="9.5" text-anchor="middle">
+      <text x="47" y="188">780ms</text>
+      <text x="83" y="188">775ms</text>
+      <text x="120" y="188">782ms</text>
+    </g>
   </svg>
   <figcaption>Same average heart rate, very different variability. HRV measures the spacing between beats, not the rate itself.</figcaption>
 </figure>

@@ -1,10 +1,13 @@
 /**
- * Apple HealthKit wrapper (iOS only).
+ * Platform health wrapper — Apple HealthKit on iOS, Health Connect on Android
+ * (see ./healthConnect.ts). Both implement the same HealthApi so consumers
+ * never branch on platform; anything else gets a stub with `available: false`.
  *
- * Read: resting/walking HR, HRV SDNN, respiratory rate, blood pressure,
- * body mass (profile weight only), sleep (with overnight HR range). Write: HRV
- * SDNN, resting/avg HR, a Mindfulness session, and blood pressure (as a proper
- * correlation). `publishReading` maps an app journal entry to the right writes.
+ * Read: resting/walking HR, HRV (SDNN on iOS, RMSSD on Android), respiratory
+ * rate, blood pressure, body mass (profile weight only), sleep (with overnight
+ * HR range), and workouts (mapped to app activity types, with per-workout HR
+ * stats). Write: HRV, resting/avg HR, a Mindfulness session (iOS), and blood
+ * pressure. `publishReading` maps an app journal entry to the right writes.
  *
  * IMPORTANT — this targets @kingstinct/react-native-healthkit v8, whose API
  * differs from older majors: `requestAuthorization(read, write)` (read first),
@@ -15,17 +18,51 @@
  * Guarded so importing on Android or without the native module returns a stub
  * with `available: false`. The module is loaded lazily.
  */
-import { Platform } from 'react-native';
+import { Linking, Platform } from 'react-native';
 import type { Entry, SleepStages } from '../types';
 import { computeHrv } from '../hrv';
 import { keyOf } from '../dates';
+import {
+  hasAskedAuth, markAskedAuth, markPromptedThisLaunch, promptedThisLaunch, shareAuthRequest,
+} from './askedAuth';
+import { requestEcgAuth } from './ecg';
+import { groupNights, summarizeSleep, type StageSpan } from './sleepSummary';
+import { thinSeries, type HrPoint, type RespPoint } from '../sleep/night';
+import { activityTypeFromHk, workoutHrSeries } from './workoutMap';
 
 /** This app's bundle id — used to skip re-importing our own write-backs. */
 const OWN_BUNDLE = 'com.autonomic.journal';
 
+/** Which slice of the read set a permission question is about. */
+export type HealthScope = 'all' | 'workouts';
+/**
+ * What we can honestly say about read access.
+ *  - `shouldRequest` — the OS still has questions to ask; requesting shows UI.
+ *  - `granted` / `denied` — provable (Health Connect reports grants).
+ *  - `unknown` — we asked and the platform won't say. HealthKit *never* reveals
+ *    read grants, so iOS lands here for every already-requested type.
+ */
+export type HealthAuthStatus = 'shouldRequest' | 'granted' | 'denied' | 'unknown';
+
 export interface HealthApi {
   available: boolean;
-  requestAuth(): Promise<boolean>;
+  /**
+   * Ask for the app's WHOLE health permission set — once. Self-gating: when the
+   * platform reports nothing left to present (or this exact set was already
+   * asked, see ./askedAuth), it resolves without any UI, so entry paths (the
+   * add-activity import card, update checks, watch sync) can call it freely
+   * without ever re-nagging. Only the explicit Connect buttons pass `force`,
+   * which skips the asked-before latch (the OS still won't re-present types it
+   * considers determined).
+   */
+  requestAuth(opts?: { force?: boolean }): Promise<boolean>;
+  /**
+   * Whether a read scope has been asked about yet, and (where the platform
+   * says) whether it was granted. Lets callers tell "nothing recorded that day"
+   * apart from "we may have been denied" instead of showing one empty state for
+   * both — see `HEALTH_PERMISSION_HINT`.
+   */
+  readAuthStatus(scope: HealthScope): Promise<HealthAuthStatus>;
   /** Pull the day's relevant samples for a YYYY-MM-DD key. */
   readDay(dk: string): Promise<HealthDaySamples>;
   /**
@@ -33,16 +70,44 @@ export interface HealthApi {
    * each keeps its real clock time and a flag for whether this app authored it.
    */
   readImports(dk: string): Promise<ImportedReading[]>;
+  /**
+   * The day's workouts (Apple Workout app / Health Connect exercise sessions),
+   * already mapped to app activity types, each with HR stats aggregated from
+   * the heart-rate samples recorded during it.
+   */
+  readWorkouts(dk: string): Promise<ImportedWorkout[]>;
   /** Read the night that *ends* on `dk` (spans the prior evening → this morning). */
   readSleep(dk: string): Promise<SleepImport | null>;
   /**
    * One-shot historical import across a date range (used once, from onboarding):
-   * RR-based HRV, blood pressure, and resting heart rate, each tagged with the
-   * local day it belongs to. HRV comes only from heartbeat series (real
-   * beat-to-beat RR); plain SDNN-only samples are intentionally excluded.
+   * readings (RR-based HRV, blood pressure, resting heart rate), nights of
+   * sleep with their overnight HR, workouts with their HR traces, and
+   * medication doses — each tagged with the local day it belongs to. HRV comes
+   * only from heartbeat series covering at least {@link HISTORY_HRV_MIN_MS}
+   * (real beat-to-beat RR); plain SDNN-only samples are excluded. A year of
+   * data takes a while to walk, so `onProgress` reports each phase.
    */
-  readHistory(opts: { fromISO: string; toISO: string }): Promise<HistoryReading[]>;
-  writeHrvSession(opts: { sdnnMs: number; avgHr: number; startISO: string; durationSec: number }): Promise<void>;
+  readHistory(opts: {
+    fromISO: string; toISO: string; onProgress?: (p: HistoryProgress) => void;
+  }): Promise<HistoryBundle>;
+  /**
+   * Heartbeat-series readings (real beat-to-beat RR) overlapping a time window,
+   * newest first — what an Apple Watch Mindfulness/Breathe session produces.
+   * Excludes samples this app authored and series with too few beats.
+   */
+  readHrvSessions(opts: { fromMs: number; toMs: number }): Promise<WatchHrvSample[]>;
+  /**
+   * The day's medication doses logged in the platform health app. Neither
+   * bridge library exposes medication reads yet (HealthKit gained a meds API
+   * in iOS 26 but @kingstinct/react-native-healthkit doesn't surface it, and
+   * Health Connect's medication record is still experimental), so both
+   * implementations currently return [] — this seam exists so the periodic
+   * import check grows a Medications group the moment a library ships it.
+   */
+  readMedications(dk: string): Promise<ImportedMed[]>;
+  /** iOS writes SDNN (HealthKit's HRV type); Android writes RMSSD (Health
+   *  Connect's). Callers pass both when they have them. */
+  writeHrvSession(opts: { sdnnMs?: number; rmssdMs?: number; avgHr?: number; startISO: string; durationSec: number }): Promise<void>;
   writeQuantity(kind: 'systolic' | 'diastolic' | 'restingHr', value: number, when: Date): Promise<void>;
   /** Publish an app journal reading to Health. Returns how many samples were written. */
   publishReading(entry: Entry, dk: string): Promise<number>;
@@ -73,6 +138,101 @@ export interface HistoryReading extends ImportedReading {
   dayKey: string;       // YYYY-MM-DD (local) the sample belongs to
 }
 
+/** An {@link ImportedWorkout} from the historical sweep, tagged with its day. */
+export interface HistoryWorkout extends ImportedWorkout { dayKey: string }
+
+/** An {@link ImportedMed} from the historical sweep, tagged with its day. */
+export interface HistoryMed extends ImportedMed { dayKey: string }
+
+/** A night from the historical sweep, tagged with the day it *ends* on —
+ *  the day whose `sleep` record it belongs to. */
+export interface HistorySleep extends SleepImport { dayKey: string }
+
+/** Everything one historical sweep found, ready to be written into the journal. */
+export interface HistoryBundle {
+  readings: HistoryReading[];
+  sleep: HistorySleep[];
+  workouts: HistoryWorkout[];
+  meds: HistoryMed[];
+}
+
+/** Progress from a historical sweep: a phase label plus its own item counts
+ *  (0/0 while the phase is still fetching its index). */
+export interface HistoryProgress { label: string; done: number; total: number }
+
+/** Minimum RR coverage for an importable historical HRV reading — the same bar
+ *  the periodic update check applies (see ./updateSet). */
+export const HISTORY_HRV_MIN_MS = 4 * 60 * 1000;
+
+/** A night this short in the historical sweep is a nap or a stray sample, not
+ *  a night worth writing into the journal's sleep record. */
+export const HISTORY_SLEEP_MIN_MIN = 120;
+
+/** Empty bundle — the stub's answer, and a safe base for partial sweeps. */
+export const emptyHistory = (): HistoryBundle => ({ readings: [], sleep: [], workouts: [], meds: [] });
+
+/**
+ * Run `work` over `items` a few at a time, reporting progress as each lands.
+ * Historical sweeps need one extra query per night/workout; unbounded
+ * Promise.all over a year of them would swamp the bridge.
+ */
+async function mapPooled<T, R>(
+  items: readonly T[],
+  size: number,
+  work: (item: T) => Promise<R | null>,
+  onEach?: (done: number, total: number) => void,
+): Promise<R[]> {
+  const out: R[] = [];
+  let done = 0;
+  for (let i = 0; i < items.length; i += size) {
+    const slice = items.slice(i, i + size);
+    const res = await Promise.all(slice.map((it) => work(it).catch(() => null)));
+    for (const r of res) if (r) out.push(r);
+    done += slice.length;
+    onEach?.(done, items.length);
+  }
+  return out;
+}
+
+/** A workout from the platform health store, mapped to an app activity type. */
+export interface ImportedWorkout {
+  type: string;              // ACTIVITY_TYPES key (via workoutMap)
+  time: string;              // HH:MM local start
+  startMs: number;           // epoch ms of the workout start, for dedup windows
+  durationMin: number;
+  distanceMi: number | null;
+  avgHr: number | null;
+  minHr: number | null;
+  maxHr: number | null;
+  /** Full HR trace over the workout ({ t: seconds from start, bpm }), for the
+   *  post-import report; null when the source recorded no HR. */
+  hrSeries: { t: number; bpm: number }[] | null;
+  sourceName: string;        // e.g. "Apple Watch"
+  ownApp: boolean;           // authored by this app (watch sessions) — skip on import
+}
+
+/** A medication dose from the platform health store (see readMedications). */
+export interface ImportedMed {
+  name: string;              // as recorded by the health app, e.g. "Magnesium Glycinate"
+  time: string;              // HH:MM local
+  startMs: number;           // epoch ms of the dose, for dedup windows
+  amount: string | null;     // display amount, e.g. "400 mg", when recorded
+  ownApp: boolean;           // authored by this app — skip on import
+}
+
+/** A watch heartbeat-series reading pulled for the live-capture sync flow. */
+export interface WatchHrvSample {
+  startMs: number;
+  endMs: number;
+  rr: number[];         // beat-to-beat RR (ms)
+  sourceName: string;   // e.g. "Apple Watch"
+}
+
+/** Points kept per night after thinning. A night is 320 pixels wide on the
+ *  chart; four hundred points is already more resolution than can be drawn,
+ *  and it bounds what a year-long backfill can put on disk. */
+export const NIGHT_SERIES_MAX = 400;
+
 export interface SleepImport {
   bed: string;        // HH:MM local
   wake: string;       // HH:MM local
@@ -85,6 +245,19 @@ export interface SleepImport {
   /** Per-stage minutes when the source recorded stages; null when every
    *  sample is plain asleepUnspecified (manual logs, older sources). */
   stages: SleepStages | null;
+  /**
+   * The night as a series rather than as totals: the overnight heart-rate
+   * curve, respiratory rate and the hypnogram, all as seconds from bed.
+   *
+   * These NEVER go into the journal — the caller writes them to the waveform
+   * sidecar under `sleepWaveformId(dk)` and keeps only the summary numbers in
+   * `day.sleep`. An inline array in persisted state trips the store's
+   * tripwire, and rightly: a year of nights inline would be re-stringified on
+   * every mutation.
+   */
+  hrSeries: HrPoint[] | null;
+  respSeries: RespPoint[] | null;
+  spans: StageSpan[];
 }
 
 const emptyDay: HealthDaySamples = {
@@ -95,9 +268,13 @@ const emptyDay: HealthDaySamples = {
 const stub: HealthApi = {
   available: false,
   async requestAuth() { return false; },
+  async readAuthStatus() { return 'unknown'; },
   async readDay() { return emptyDay; },
   async readImports() { return []; },
-  async readHistory() { return []; },
+  async readHistory() { return emptyHistory(); },
+  async readHrvSessions() { return []; },
+  async readMedications() { return []; },
+  async readWorkouts() { return []; },
   async readSleep() { return null; },
   async writeHrvSession() { /* no-op */ },
   async writeQuantity() { /* no-op */ },
@@ -108,6 +285,18 @@ let cached: HealthApi | null = null;
 
 export function health(): HealthApi {
   if (cached) return cached;
+  if (Platform.OS === 'android') {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const hc = require('react-native-health-connect');
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { makeHealthConnect } = require('./healthConnect');
+      cached = makeHealthConnect(hc);
+    } catch {
+      cached = stub;
+    }
+    return cached!;
+  }
   if (Platform.OS !== 'ios') { cached = stub; return cached; }
   let hk: typeof import('@kingstinct/react-native-healthkit');
   try {
@@ -122,8 +311,52 @@ export function health(): HealthApi {
   return cached;
 }
 
-/** For tests: force a specific implementation (or reset). */
-export function __setHealth(api: HealthApi | null) { cached = api; }
+/** User-facing name of the platform health store, for UI copy. */
+export function healthAppName(): string {
+  return Platform.OS === 'android' ? 'Health Connect' : 'Apple Health';
+}
+
+/**
+ * Where a user fixes a read permission we can't fix from here. HealthKit has no
+ * deep link into an app's Data Access page, so iOS opens the Health app itself
+ * and the copy carries the rest of the path.
+ */
+export function healthPermissionPath(): string {
+  return Platform.OS === 'android'
+    ? 'Health Connect → App permissions → Autonomic'
+    : 'Apple Health → your profile → Apps';
+}
+
+/** Open the platform health app so the user can review this app's access. */
+export function openHealthApp(): void {
+  if (Platform.OS === 'android') {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require('react-native-health-connect').openHealthConnectSettings();
+    } catch { /* Health Connect missing — nothing to open */ }
+    return;
+  }
+  Linking.openURL('x-apple-health://').catch(() => { /* Health app unavailable */ });
+}
+
+/**
+ * Hand the user the platform's own permission UI to cut access.
+ * Health Connect can actually revoke from here (Android 14+ applies it on the
+ * next app start); HealthKit has no revoke API at all, so iOS falls back to
+ * opening the Health app where the user flips the toggles themselves.
+ * Returns true when the platform revoked it for us.
+ */
+export async function revokeHealthAuth(): Promise<boolean> {
+  if (Platform.OS === 'android') {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      await require('react-native-health-connect').revokeAllPermissions();
+      return true;
+    } catch { return false; }
+  }
+  openHealthApp();
+  return false;
+}
 
 /**
  * Loosely-typed surface over the healthkit module (v8). Queries/saves take Date
@@ -135,12 +368,25 @@ type CSample = { value: number; startDate: Date; endDate: Date };
 type Heartbeat = { timeSinceSeriesStart: number; precededByGap?: boolean };
 type HeartbeatSeries = { startDate: Date; endDate: Date; heartbeats: readonly Heartbeat[]; uuid?: string; sourceRevision?: SourceRev };
 type SaveSample = { quantityType: string; unit: string; quantity: number; startDate: Date; endDate: Date };
+type HkWorkout = {
+  uuid?: string;
+  workoutActivityType: number;
+  duration: number;                                    // seconds
+  totalDistance?: { unit: string; quantity: number };  // in the requested distanceUnit
+  startDate: Date;
+  endDate: Date;
+  metadata?: { HKIndoorWorkout?: number | boolean } & Record<string, unknown>;
+  sourceRevision?: SourceRev;
+};
 interface HkModule {
   isHealthDataAvailable?: () => Promise<boolean>;
   requestAuthorization?: (read: string[], write: string[]) => Promise<boolean>;
+  /** HKAuthorizationRequestStatus: 0 unknown · 1 shouldRequest · 2 unnecessary. */
+  getRequestStatusForAuthorization?: (read: string[], write?: string[]) => Promise<number>;
   queryQuantitySamples?: (id: string, opts: Record<string, unknown>) => Promise<readonly QSample[]>;
   queryCategorySamples?: (id: string, opts: Record<string, unknown>) => Promise<readonly CSample[]>;
   queryHeartbeatSeriesSamples?: (opts: Record<string, unknown>) => Promise<readonly HeartbeatSeries[]>;
+  queryWorkoutSamples?: (opts: Record<string, unknown>) => Promise<readonly HkWorkout[]>;
   saveQuantitySample?: (id: string, unit: string, value: number, opts?: Record<string, unknown>) => Promise<boolean>;
   saveCategorySample?: (id: string, value: number, opts?: Record<string, unknown>) => Promise<boolean>;
   saveCorrelationSample?: (id: string, samples: SaveSample[], opts?: Record<string, unknown>) => Promise<boolean>;
@@ -180,15 +426,29 @@ const CID = {
 } as const;
 const CORR = { bloodPressure: 'HKCorrelationTypeIdentifierBloodPressure' } as const;
 const HEARTBEAT_SERIES = 'HKDataTypeIdentifierHeartbeatSeries';
+const WORKOUT_TYPE = 'HKWorkoutTypeIdentifier';
 
 const READ_IDS = [
   QID.restingHr, QID.heartRate, QID.hrvSdnn, QID.respiratoryRate,
   QID.systolic, QID.diastolic, QID.bodyMass, CID.sleep, HEARTBEAT_SERIES,
+  WORKOUT_TYPE,
+  // We write Mindfulness sessions; reading them back is what lets an import
+  // check tell our own session apart from one logged elsewhere.
+  CID.mindful,
 ];
 const WRITE_IDS = [
   QID.hrvSdnn, QID.restingHr, QID.heartRate,
   QID.systolic, QID.diastolic, CID.mindful,
+  // Workout SHARE is what the watch app needs (its sessions are HKWorkouts).
+  // HealthKit syncs authorization to the paired watch, so asking here — in the
+  // one connect-time sheet — means the watch never has to present its own
+  // sheet. Before this, phone (workout read) and watch (workout share) each
+  // requested a different set and kept re-prompting in turn.
+  WORKOUT_TYPE,
 ];
+
+/** Identity of the current permission set, for the once-only ask latch. */
+const HK_SET_KEY = `hk1:${READ_IDS.join(',')}|${WRITE_IDS.join(',')}`;
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const hhmm = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
@@ -204,6 +464,40 @@ function dateAt(dk: string, time?: string): Date {
   return new Date(y, m - 1, d, hh, mm, 0);
 }
 
+/**
+ * ECG authorization, folded into the main request.
+ *
+ * ECG lives outside the kingstinct permission set (a local native module, see
+ * ./ecg), so HealthKit's request-status query says nothing about it — we just
+ * make the call alongside the main one. It is silent once determined; the
+ * per-launch latch bounds the one case where it isn't (a swiped-away sheet).
+ */
+let ecgAsked = false;
+async function ecgAuth(force: boolean): Promise<void> {
+  if (!force && ecgAsked) return;
+  ecgAsked = true;
+  try { await step('ecg', () => requestEcgAuth()); } catch { /* ECG is optional */ }
+}
+
+/**
+ * Dev-only timing around each native leg of the authorization dance. Every one
+ * of them is a promise the platform may simply never settle (an OS sheet that
+ * didn't present has no callback), so when a check hangs, the packager log
+ * names which leg to blame instead of leaving it to guesswork.
+ */
+async function step<T>(name: string, run: () => Promise<T> | undefined): Promise<T | undefined> {
+  if (!__DEV__) return run();
+  const t0 = Date.now();
+  try {
+    const v = await run();
+    console.log(`[health auth] ${name} → ${String(v)} in ${Date.now() - t0}ms`);
+    return v;
+  } catch (e) {
+    console.log(`[health auth] ${name} threw after ${Date.now() - t0}ms`, e);
+    throw e;
+  }
+}
+
 function makeReal(mod: HkModule): HealthApi {
   const dayBounds = (dk: string) => ({ from: dateAt(dk, '00:00'), to: dateAt(dk, '23:59') });
 
@@ -214,19 +508,35 @@ function makeReal(mod: HkModule): HealthApi {
       return rows.reduce((s, r) => s + r.quantity, 0) / rows.length;
     } catch { return null; }
   };
+  /**
+   * A quantity as a series of {seconds-from-`base`, value} points, thinned to
+   * NIGHT_SERIES_MAX. This is the read that used to be `rangeQ` — every
+   * overnight heart-rate sample was fetched and all but min/max thrown away,
+   * which is why the report could say "49-92" but never when the 92 happened.
+   */
+  const seriesQ = async (id: string, from: Date, to: Date, base: Date): Promise<{ t: number; v: number }[]> => {
+    try {
+      // `limit: 0` is HKObjectQueryNoLimit, and it is load-bearing. The
+      // library's `ascending` defaults to `limit === 0`, so ANY positive limit
+      // asks HealthKit for the newest N samples in the window — a watch logs
+      // heart rate every ~5s while it tracks sleep, so a 9-hour night is well
+      // past 5000 and the query silently dropped the FIRST hour and a half of
+      // it. The line then started an hour after bedtime while breathing (a
+      // once-per-several-minutes sample) spanned the whole night. The window is
+      // one night, so unbounded here is safe; `thinSeries` does the bounding.
+      const rows = (await mod.queryQuantitySamples?.(id, { from, to, limit: 0 })) || [];
+      const baseMs = base.getTime();
+      const pts = rows
+        .map((r) => ({ t: Math.round((r.startDate.getTime() - baseMs) / 1000), v: r.quantity }))
+        .filter((q) => Number.isFinite(q.v) && q.v > 0)
+        .sort((a, b) => a.t - b.t);
+      return thinSeries(pts, NIGHT_SERIES_MAX);
+    } catch { return []; }
+  };
   /** Raw per-sample rows (kept: timestamp + provenance), for timestamped imports. */
   const samplesQ = async (id: string, from: Date, to: Date): Promise<readonly QSample[]> => {
     try { return (await mod.queryQuantitySamples?.(id, { from, to, limit: 500 })) || []; }
     catch { return []; }
-  };
-  const rangeQ = async (id: string, from: Date, to: Date): Promise<{ min: number; max: number } | null> => {
-    try {
-      const rows = (await mod.queryQuantitySamples?.(id, { from, to, limit: 2000 })) || [];
-      if (!rows.length) return null;
-      let min = Infinity; let max = -Infinity;
-      for (const r of rows) { if (r.quantity < min) min = r.quantity; if (r.quantity > max) max = r.quantity; }
-      return { min, max };
-    } catch { return null; }
   };
   const saveQ = async (id: string, unit: string, value: number, start: Date, end: Date) => {
     try { await mod.saveQuantitySample?.(id, unit, value, { start, end }); return true; } catch { return false; }
@@ -235,12 +545,45 @@ function makeReal(mod: HkModule): HealthApi {
   return {
     available: true,
 
-    async requestAuth() {
+    requestAuth(opts) {
+      const force = !!opts?.force;
+      return shareAuthRequest(async () => {
+        try {
+          if (mod.isHealthDataAvailable && !(await step('available', () => mod.isHealthDataAvailable!()))) return false;
+          // Fully determined (status 2 = unnecessary): a request would present
+          // nothing — skip the native round-trip entirely.
+          let st = 0;
+          try { st = (await step('status', () => mod.getRequestStatusForAuthorization?.(READ_IDS, WRITE_IDS))) ?? 0; } catch { st = 0; }
+          const settled = st === 2;
+          if (settled && hasAskedAuth(HK_SET_KEY) && !force) { await ecgAuth(force); return true; }
+          // The OS still has something to ask about: a fresh install, a type
+          // added by an app update (the phone's workout read / the watch's
+          // workout share both arrived this way), or a sheet the user swiped
+          // away. Entry paths DO ask — a missing grant is exactly why a check
+          // comes back empty — but only once per launch, so nothing nags.
+          if (!force && !settled && promptedThisLaunch()) return true;
+          if (!settled) markPromptedThisLaunch();
+          // v8 order: (read, write).
+          const ok = (await step('request', () => mod.requestAuthorization?.(READ_IDS, WRITE_IDS))) ?? false;
+          if (ok) markAskedAuth(HK_SET_KEY);
+          // ECG sits outside the kingstinct set (local native module) — same
+          // step, sequential so the two sheets can't race.
+          await ecgAuth(force);
+          return ok;
+        } catch { return false; }
+      });
+    },
+
+    async readAuthStatus(scope) {
+      // HealthKit answers only "would a request show UI?" — a determined type
+      // reads back as `unnecessary` whether the user granted it or denied it,
+      // so an already-asked scope can never resolve better than 'unknown'.
       try {
-        if (mod.isHealthDataAvailable && !(await mod.isHealthDataAvailable())) return false;
-        // v8 order: (read, write).
-        return (await mod.requestAuthorization?.(READ_IDS, WRITE_IDS)) ?? false;
-      } catch { return false; }
+        const read = scope === 'workouts' ? [WORKOUT_TYPE, QID.heartRate] : READ_IDS;
+        const write = scope === 'workouts' ? [] : WRITE_IDS;
+        const st = await mod.getRequestStatusForAuthorization?.(read, write);
+        return st === 1 ? 'shouldRequest' : 'unknown';
+      } catch { return 'unknown'; }
     },
 
     async readDay(dk) {
@@ -309,18 +652,22 @@ function makeReal(mod: HkModule): HealthApi {
       return out;
     },
 
-    async readHistory({ fromISO, toISO }) {
+    async readHistory({ fromISO, toISO, onProgress }) {
       const from = new Date(fromISO);
       const to = new Date(toISO);
-      const out: HistoryReading[] = [];
+      const out = emptyHistory();
+      const step = (label: string, done = 0, total = 0) => {
+        try { onProgress?.({ label, done, total }); } catch { /* progress is advisory */ }
+      };
       // Generous cap: resting HR is ~1/day, so this comfortably spans years.
       const LIMIT = 50000;
 
       // Resting HR — one reading each, at its real timestamp.
+      step('Resting heart rate');
       try {
         const rows = (await mod.queryQuantitySamples?.(QID.restingHr, { from, to, limit: LIMIT })) || [];
         for (const s of rows) {
-          out.push({
+          out.readings.push({
             type: 'restingHr', time: hhmm(s.startDate), startMs: s.startDate.getTime(),
             ownApp: isOwnSample(s.sourceRevision), dayKey: keyOf(s.startDate),
             fields: { hr: String(Math.round(s.quantity)), position: 'Laying' },
@@ -329,6 +676,7 @@ function makeReal(mod: HkModule): HealthApi {
       } catch { /* resting HR unavailable */ }
 
       // Blood pressure — pair systolic + diastolic saved at (near-)identical times.
+      step('Blood pressure');
       try {
         const [sys, dia] = await Promise.all([
           mod.queryQuantitySamples?.(QID.systolic, { from, to, limit: LIMIT }),
@@ -337,7 +685,7 @@ function makeReal(mod: HkModule): HealthApi {
         for (const s of sys || []) {
           const m = (dia || []).find((d) => Math.abs(d.startDate.getTime() - s.startDate.getTime()) < 2000);
           if (!m) continue;
-          out.push({
+          out.readings.push({
             type: 'bp', time: hhmm(s.startDate), startMs: s.startDate.getTime(),
             ownApp: isOwnSample(s.sourceRevision), dayKey: keyOf(s.startDate),
             fields: { sys: String(Math.round(s.quantity)), dia: String(Math.round(m.quantity)) },
@@ -345,15 +693,18 @@ function makeReal(mod: HkModule): HealthApi {
         }
       } catch { /* blood pressure unavailable */ }
 
-      // HRV — heartbeat series only, so every reading carries real RR intervals.
+      // HRV — heartbeat series only, so every reading carries real RR intervals,
+      // and only sessions long enough to trust (same bar as the daily check).
+      step('HRV sessions');
       try {
         const series = (await mod.queryHeartbeatSeriesSamples?.({ from, to, limit: LIMIT })) || [];
         for (const hb of series) {
           const rr = rrFromSeries(hb);
           if (rr.length < 20) continue;
+          if (rr.reduce((s, v) => s + v, 0) < HISTORY_HRV_MIN_MS) continue;
           const res = computeHrv(rr);
           if (!res.time || !Object.keys(res.fields).length) continue;
-          out.push({
+          out.readings.push({
             type: 'hrv', time: hhmm(hb.startDate), startMs: hb.startDate.getTime(),
             ownApp: isOwnSample(hb.sourceRevision), dayKey: keyOf(hb.startDate),
             fields: res.fields, rr, rrClean: res.rrClean,
@@ -361,49 +712,174 @@ function makeReal(mod: HkModule): HealthApi {
         }
       } catch { /* heartbeat series unavailable */ }
 
+      // Sleep — one range query bucketed into nights (see groupNights), then
+      // each night's overnight HR range. Per-night HR is a separate query, so
+      // they run pooled rather than 365-at-once.
+      step('Sleep');
+      try {
+        const rows = (await mod.queryCategorySamples?.(CID.sleep, { from, to, limit: 100000 })) || [];
+        const nights = groupNights(rows);
+        out.sleep = await mapPooled(nights, 6, async ({ dayKey, rows: night }) => {
+          const sum = summarizeSleep(night);
+          if (!sum || sum.minutesAsleep < HISTORY_SLEEP_MIN_MIN) return null;
+          const [hrPts, respPts] = await Promise.all([
+            seriesQ(QID.heartRate, sum.bed, sum.wake, sum.bed),
+            seriesQ(QID.respiratoryRate, sum.bed, sum.wake, sum.bed),
+          ]);
+          const hrSeries = hrPts.map((q) => ({ t: q.t, bpm: q.v }));
+          const bpms = hrSeries.map((q) => q.bpm);
+          return {
+            dayKey,
+            bed: hhmm(sum.bed),
+            wake: hhmm(sum.wake),
+            bedISO: sum.bed.toISOString(),
+            wakeISO: sum.wake.toISOString(),
+            hrLow: bpms.length ? Math.round(Math.min(...bpms)) : null,
+            hrHigh: bpms.length ? Math.round(Math.max(...bpms)) : null,
+            interrupted: sum.interrupted,
+            minutesAsleep: sum.minutesAsleep,
+            stages: sum.stages,
+            hrSeries: hrSeries.length ? hrSeries : null,
+            respSeries: respPts.length ? respPts.map((q) => ({ t: q.t, br: q.v })) : null,
+            spans: sum.spans,
+          } satisfies HistorySleep;
+        }, (done, total) => step('Sleep', done, total));
+      } catch { /* sleep unavailable */ }
+
+      // Workouts — one range query, then each session's HR samples for its
+      // stats and the trace the workout report draws.
+      step('Workouts');
+      try {
+        const rows = (await mod.queryWorkoutSamples?.({ from, to, distanceUnit: 'mi', limit: 5000 })) || [];
+        const usable = rows.filter((w) => Math.round((w.duration || 0) / 60) >= 1);
+        out.workouts = await mapPooled(usable, 4, async (w) => {
+          let avgHr: number | null = null; let minHr: number | null = null; let maxHr: number | null = null;
+          let hr: readonly QSample[] = [];
+          try { hr = (await mod.queryQuantitySamples?.(QID.heartRate, { from: w.startDate, to: w.endDate, limit: 0 })) || []; } catch { /* HR unavailable */ } // limit 0 = no limit AND ascending; see seriesQ
+          if (hr.length) {
+            let sum = 0; let min = Infinity; let max = -Infinity;
+            for (const s of hr) { sum += s.quantity; if (s.quantity < min) min = s.quantity; if (s.quantity > max) max = s.quantity; }
+            avgHr = Math.round(sum / hr.length); minHr = Math.round(min); maxHr = Math.round(max);
+          }
+          const dist = w.totalDistance?.quantity;
+          return {
+            type: activityTypeFromHk(w.workoutActivityType, !!w.metadata?.HKIndoorWorkout),
+            time: hhmm(w.startDate),
+            startMs: w.startDate.getTime(),
+            dayKey: keyOf(w.startDate),
+            durationMin: Math.round((w.duration || 0) / 60),
+            distanceMi: dist && dist > 0 ? Math.round(dist * 100) / 100 : null,
+            avgHr, minHr, maxHr,
+            hrSeries: workoutHrSeries(hr.map((s) => ({ ms: s.startDate.getTime(), bpm: s.quantity })), w.startDate.getTime()),
+            sourceName: w.sourceRevision?.source?.name || 'Apple Health',
+            ownApp: isOwnSample(w.sourceRevision),
+          } satisfies HistoryWorkout;
+        }, (done, total) => step('Workouts', done, total));
+        out.workouts.sort((a, b) => a.startMs - b.startMs);
+      } catch { /* workouts unavailable */ }
+
+      // Medications — no HealthKit dose query exists yet (see readMedications),
+      // so history has nothing to sweep; wired through for when it lands.
+      step('Medications');
+
       return out;
+    },
+
+    async readHrvSessions({ fromMs, toMs }) {
+      try {
+        // predicateForSamples matches on overlap, so a Breathe session that
+        // started slightly before the window still comes back.
+        const series = (await mod.queryHeartbeatSeriesSamples?.({ from: new Date(fromMs), to: new Date(toMs), limit: 50 })) || [];
+        const out: WatchHrvSample[] = [];
+        for (const hb of series) {
+          if (isOwnSample(hb.sourceRevision)) continue;
+          const rr = rrFromSeries(hb);
+          if (rr.length < 20) continue;
+          out.push({
+            startMs: hb.startDate.getTime(),
+            endMs: hb.endDate.getTime(),
+            rr,
+            sourceName: hb.sourceRevision?.source?.name || 'Apple Watch',
+          });
+        }
+        return out.sort((a, b) => b.startMs - a.startMs);
+      } catch { return []; }
+    },
+
+    async readMedications() {
+      // @kingstinct/react-native-healthkit has no medication-dose query yet
+      // (the HKMedication APIs are iOS 26+); wire it here when it lands.
+      return [];
+    },
+
+    async readWorkouts(dk) {
+      const { from, to } = dayBounds(dk);
+      try {
+        const rows = (await mod.queryWorkoutSamples?.({ from, to, distanceUnit: 'mi', limit: 200 })) || [];
+        const out: ImportedWorkout[] = [];
+        for (const w of rows) {
+          const durationMin = Math.round((w.duration || 0) / 60);
+          if (durationMin < 1) continue; // zero-length blips (triathlon transitions etc.)
+          // HR stats from the raw samples recorded during the workout — a watch
+          // workout samples every few seconds, so one query covers avg/min/max.
+          let avgHr: number | null = null; let minHr: number | null = null; let maxHr: number | null = null;
+          let hr: readonly QSample[] = [];
+          try { hr = (await mod.queryQuantitySamples?.(QID.heartRate, { from: w.startDate, to: w.endDate, limit: 0 })) || []; } catch { /* HR unavailable */ } // limit 0 = no limit AND ascending; see seriesQ
+          if (hr.length) {
+            let sum = 0; let min = Infinity; let max = -Infinity;
+            for (const s of hr) { sum += s.quantity; if (s.quantity < min) min = s.quantity; if (s.quantity > max) max = s.quantity; }
+            avgHr = Math.round(sum / hr.length); minHr = Math.round(min); maxHr = Math.round(max);
+          }
+          const dist = w.totalDistance?.quantity;
+          out.push({
+            type: activityTypeFromHk(w.workoutActivityType, !!w.metadata?.HKIndoorWorkout),
+            time: hhmm(w.startDate),
+            startMs: w.startDate.getTime(),
+            durationMin,
+            distanceMi: dist && dist > 0 ? Math.round(dist * 100) / 100 : null,
+            avgHr, minHr, maxHr,
+            hrSeries: workoutHrSeries(hr.map((s) => ({ ms: s.startDate.getTime(), bpm: s.quantity })), w.startDate.getTime()),
+            sourceName: w.sourceRevision?.source?.name || 'Apple Health',
+            ownApp: isOwnSample(w.sourceRevision),
+          });
+        }
+        return out.sort((a, b) => a.startMs - b.startMs);
+      } catch { return []; }
     },
 
     async readSleep(dk) {
       // A night that ends on `dk` usually starts the previous evening. Query a
-      // generous window (prev-day 18:00 → this-day 14:00) and pick the main block.
+      // generous window (prev-day 18:00 → this-day 14:00); summarizeSleep picks
+      // the main session out of it (so a nap doesn't skew bed/wake) and
+      // measures minutes on the interval union (so overlapping iPhone + Watch
+      // samples don't double-count).
       const [y, m, d] = dk.split('-').map(Number);
       const from = new Date(y, m - 1, d - 1, 18, 0, 0);
       const to = new Date(y, m - 1, d, 14, 0, 0);
       try {
         const rows = (await mod.queryCategorySamples?.(CID.sleep, { from, to, limit: 400 })) || [];
-        // HKCategoryValueSleepAnalysis: 0 inBed, 1 asleepUnspecified, 2 awake,
-        // 3 asleepCore, 4 asleepDeep, 5 asleepREM.
-        const asleep = rows.filter((r) => r.value === 1 || r.value === 3 || r.value === 4 || r.value === 5);
-        if (!asleep.length) return null;
-        const bed = asleep.reduce((a, b) => (a.startDate < b.startDate ? a : b)).startDate;
-        const wake = asleep.reduce((a, b) => (a.endDate > b.endDate ? a : b)).endDate;
-        const minutesAsleep = Math.round(
-          asleep.reduce((s, r) => s + (r.endDate.getTime() - r.startDate.getTime()), 0) / 60000,
-        );
-        const awakeSegments = rows.filter((r) => r.value === 2 && r.startDate >= bed && r.endDate <= wake);
-        // Per-stage minutes — only meaningful when the source staged the night;
-        // a night of plain asleepUnspecified samples reports no stages.
-        const minsOf = (rs: typeof rows) =>
-          Math.round(rs.reduce((s, r) => s + (r.endDate.getTime() - r.startDate.getTime()), 0) / 60000);
-        const staged: SleepStages = {
-          core: minsOf(asleep.filter((r) => r.value === 3)),
-          deep: minsOf(asleep.filter((r) => r.value === 4)),
-          rem: minsOf(asleep.filter((r) => r.value === 5)),
-          awake: minsOf(awakeSegments),
-        };
-        const stages = staged.core + staged.deep + staged.rem > 0 ? staged : null;
-        const hr = await rangeQ(QID.heartRate, bed, wake);
+        const night = summarizeSleep(rows);
+        if (!night) return null;
+        const [hrPts, respPts] = await Promise.all([
+          seriesQ(QID.heartRate, night.bed, night.wake, night.bed),
+          seriesQ(QID.respiratoryRate, night.bed, night.wake, night.bed),
+        ]);
+        const hrSeries = hrPts.map((q) => ({ t: q.t, bpm: q.v }));
+        const bpms = hrSeries.map((q) => q.bpm);
         return {
-          bed: hhmm(bed),
-          wake: hhmm(wake),
-          bedISO: bed.toISOString(),
-          wakeISO: wake.toISOString(),
-          hrLow: hr ? Math.round(hr.min) : null,
-          hrHigh: hr ? Math.round(hr.max) : null,
-          interrupted: awakeSegments.length >= 2,
-          minutesAsleep,
-          stages,
+          bed: hhmm(night.bed),
+          wake: hhmm(night.wake),
+          bedISO: night.bed.toISOString(),
+          wakeISO: night.wake.toISOString(),
+          // min/max come off the same series now — one query, not two.
+          hrLow: bpms.length ? Math.round(Math.min(...bpms)) : null,
+          hrHigh: bpms.length ? Math.round(Math.max(...bpms)) : null,
+          interrupted: night.interrupted,
+          minutesAsleep: night.minutesAsleep,
+          stages: night.stages,
+          hrSeries: hrSeries.length ? hrSeries : null,
+          respSeries: respPts.length ? respPts.map((q) => ({ t: q.t, br: q.v })) : null,
+          spans: night.spans,
         };
       } catch { return null; }
     },
@@ -411,8 +887,11 @@ function makeReal(mod: HkModule): HealthApi {
     async writeHrvSession({ sdnnMs, avgHr, startISO, durationSec }) {
       const start = new Date(startISO);
       const end = new Date(start.getTime() + durationSec * 1000);
-      await saveQ(QID.hrvSdnn, 'ms', sdnnMs, start, end);
-      if (Number.isFinite(avgHr) && avgHr > 0) await saveQ(QID.restingHr, 'count/min', avgHr, start, end);
+      if (sdnnMs != null && Number.isFinite(sdnnMs) && sdnnMs > 0) await saveQ(QID.hrvSdnn, 'ms', sdnnMs, start, end);
+      // Session-average HR is a HeartRate sample, NOT RestingHeartRate — that
+      // identifier is Apple's derived all-day metric and writing to it skews
+      // every consumer of resting HR (including our own readAll/import).
+      if (avgHr != null && Number.isFinite(avgHr) && avgHr > 0) await saveQ(QID.heartRate, 'count/min', avgHr, start, end);
       try { await mod.saveCategorySample?.(CID.mindful, 0, { start, end }); } catch { /* graceful */ }
     },
 

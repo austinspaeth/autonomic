@@ -120,3 +120,36 @@ describe('fingerPresent', () => {
     expect(fingerPresent(120, 118, 115)).toBe(false); // pointing at a room
   });
 });
+
+/**
+ * Capture-side quality gate. `assessPulse` grades the trailing window; the
+ * manager (camera.ts) only lets beats into the RR array when that grade is
+ * 'good'. These pin the grading behaviour that gate depends on — a window of
+ * motion/reacquisition noise must NOT read as a locked pulse, because anything
+ * that gets through here is junk no downstream filter can reliably remove.
+ */
+describe('assessPulse as the emission gate', () => {
+  it('locks onto a steady pulse', () => {
+    const { ts, vs } = makeSeries({ bpm: 68, fps: 30, seconds: 5 });
+    expect(assessPulse(ts, vs)).toBe('good');
+  });
+
+  it('tolerates a real pulse with respiratory modulation and mild noise', () => {
+    // The gate must not be so tight that genuine HRV trips it — that would
+    // throw away the signal we are trying to measure.
+    const { ts, vs } = makeSeries({ bpm: 62, fps: 30, seconds: 5, noise: 1.5, drift: true });
+    expect(assessPulse(ts, vs)).toBe('good');
+  });
+
+  it('does not lock on a finger sliding off (collapsing amplitude + drift)', () => {
+    const { ts, vs } = makeSeries({ bpm: 70, fps: 30, seconds: 5 });
+    const fading = vs.map((v, i) => 150 + (v - 150) * Math.max(0, 1 - i / vs.length) + 25 * Math.sin(i / 7));
+    expect(assessPulse(ts, fading)).not.toBe('good');
+  });
+
+  it('does not lock on broadband noise with no periodicity', () => {
+    const ts = Array.from({ length: 150 }, (_, i) => (i / 30) * 1000);
+    const vs = ts.map((_, i) => 150 + 18 * Math.sin(12.9898 * i) * Math.cos(78.233 * i));
+    expect(assessPulse(ts, vs)).not.toBe('good');
+  });
+});

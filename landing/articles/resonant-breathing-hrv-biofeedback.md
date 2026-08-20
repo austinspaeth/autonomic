@@ -35,7 +35,7 @@ Resonant breathing, also called **coherence breathing** or paced breathing, mean
 At that pace, something striking happens. Your heart rate rises smoothly on each inhale and falls on each exhale, tracing a big, regular wave. Breath, heart rate and blood pressure fall into step, the "coherence" the name refers to. And because HRV is literally the beat-to-beat variation in your heart rate, that large wave shows up as a sharp, temporary jump in HRV.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 240" role="img" aria-label="A breathing pacer wave rising for about four seconds on the inhale and falling for about six seconds on the exhale, repeating at roughly six breaths per minute.">
+  <svg class="fig-d" viewBox="0 0 720 240" role="img" aria-label="A breathing pacer wave rising for about four seconds on the inhale and falling for about six seconds on the exhale, repeating at roughly six breaths per minute.">
     <defs>
       <linearGradient id="rb-fill" x1="0" y1="0" x2="0" y2="1">
         <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.28"/>
@@ -70,6 +70,23 @@ At that pace, something striking happens. Your heart rate rises smoothly on each
     <!-- one full breath bracket -->
     <line x1="40" y1="200" x2="240" y2="200" stroke="var(--line)" stroke-width="1"/>
     <text x="140" y="232" text-anchor="middle" font-family="Space Mono, monospace" font-size="12" fill="var(--dim-2)">one breath ≈ 10s → 6 / min</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 236" role="img" aria-label="A breathing pacer wave rising for about four seconds on the inhale and falling for about six seconds on the exhale, repeating at roughly six breaths per minute.">
+    <defs>
+      <linearGradient id="rb-fill-m" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.28"/>
+        <stop offset="100%" stop-color="#38bdf8" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    <line x1="20" y1="170" x2="344" y2="170" stroke="var(--line)" stroke-width="1"/>
+    <path d="M20 170 C33 66, 51 66, 64 66 C84 66, 117 170, 130 170 C143 66, 161 66, 174 66 C194 66, 227 170, 240 170 C253 66, 271 66, 284 66 C304 66, 337 170, 350 170 L350 170 L20 170 Z" fill="url(#rb-fill-m)"/>
+    <path d="M20 170 C33 66, 51 66, 64 66 C84 66, 117 170, 130 170 C143 66, 161 66, 174 66 C194 66, 227 170, 240 170 C253 66, 271 66, 284 66 C304 66, 337 170, 350 170" fill="none" stroke="#38bdf8" stroke-width="2.5"/>
+    <text x="48" y="50" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="14" fill="var(--dim-2)">inhale</text>
+    <text x="48" y="32" text-anchor="middle" font-family="Space Mono, monospace" font-size="12" fill="#38bdf8">~4s</text>
+    <text x="102" y="196" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="14" fill="var(--dim-2)">exhale</text>
+    <text x="102" y="212" text-anchor="middle" font-family="Space Mono, monospace" font-size="12" fill="#54d98a">~6s</text>
+    <line x1="20" y1="182" x2="130" y2="182" stroke="var(--line)" stroke-width="1"/>
+    <text x="180" y="232" text-anchor="middle" font-family="Space Mono, monospace" font-size="11.5" fill="var(--dim-2)">one breath ≈ 10s → 6 / min</text>
   </svg>
   <figcaption>A resonant-breathing pacer: rise gently for about four seconds on the inhale, then let the exhale trail down for about six. One 10-second breath, repeated, is roughly six breaths a minute.</figcaption>
 </figure>

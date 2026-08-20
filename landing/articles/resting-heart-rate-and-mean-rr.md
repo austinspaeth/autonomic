@@ -88,7 +88,7 @@ Long before you'd heard of heart rate variability, you knew that a pounding hear
 When you're rested and calm, the parasympathetic brake dominates and the heart idles slowly. When you're stressed, fighting off a virus, dehydrated, or simply overreaching after too many hard days, the sympathetic branch pushes the resting rate up. That's why a **creeping resting heart rate is so often the first thing to move**: it can rise a day or two before you consciously feel a cold coming on or a crash setting in.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 220" role="img" aria-label="A resting heart rate baseline holding steady for two weeks then creeping upward over several days">
+  <svg class="fig-d" viewBox="0 0 720 220" role="img" aria-label="A resting heart rate baseline holding steady for two weeks then creeping upward over several days">
     <line x1="60" y1="180" x2="700" y2="180" stroke="var(--line-2)" stroke-width="1.5" />
     <line x1="60" y1="180" x2="60" y2="24" stroke="var(--line-2)" stroke-width="1.5" />
     <text x="30" y="60" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">80</text>
@@ -97,6 +97,16 @@ When you're rested and calm, the parasympathetic brake dominates and the heart i
     <g fill="#e03127"><circle cx="80" cy="132" r="3"/><circle cx="180" cy="134" r="3"/><circle cx="280" cy="130" r="3"/><circle cx="380" cy="124" r="3"/><circle cx="480" cy="108" r="3"/><circle cx="580" cy="74" r="3"/><circle cx="680" cy="50" r="3"/></g>
     <text x="230" y="200" text-anchor="middle" fill="var(--dim)" font-family="-apple-system, sans-serif" font-size="12">steady baseline</text>
     <text x="590" y="200" text-anchor="middle" fill="#e03127" font-family="-apple-system, sans-serif" font-size="12">creeping upward</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 208" role="img" aria-label="A resting heart rate baseline holding steady for two weeks then creeping upward over several days">
+    <line x1="40" y1="176" x2="344" y2="176" stroke="var(--line-2)" stroke-width="1.5" />
+    <line x1="40" y1="176" x2="40" y2="34" stroke="var(--line-2)" stroke-width="1.5" />
+    <text x="34" y="70" text-anchor="end" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">80</text>
+    <text x="34" y="152" text-anchor="end" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">60</text>
+    <polyline points="50,132 73,129 97,134 121,127 144,130 168,129 192,125 216,121 240,110 263,96 287,80 311,67 334,58" fill="none" stroke="#e03127" stroke-width="2.5" />
+    <g fill="#e03127"><circle cx="50" cy="132" r="3"/><circle cx="97" cy="134" r="3"/><circle cx="144" cy="130" r="3"/><circle cx="192" cy="125" r="3"/><circle cx="240" cy="110" r="3"/><circle cx="287" cy="80" r="3"/><circle cx="334" cy="58" r="3"/></g>
+    <text x="50" y="198" fill="var(--dim)" font-family="-apple-system, sans-serif" font-size="11.5">steady baseline</text>
+    <text x="344" y="198" text-anchor="end" fill="#e03127" font-family="-apple-system, sans-serif" font-size="11.5">creeping upward</text>
   </svg>
   <figcaption>A resting heart rate that drifts up over several days is often the earliest warning of illness, poor sleep or overreaching, visible before the symptoms are.</figcaption>
 </figure>

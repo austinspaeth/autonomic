@@ -1,0 +1,42 @@
+version: 0.2
+
+env:
+  variables:
+    SLS_STAGE: "prod"
+    SLS_REGION: "us-west-2"
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 20
+    commands:
+      - cd landing
+      - npm ci
+      - cd ..
+      # Backend for the /master dashboard
+      - cd sls
+      - npm ci
+      - cd ..
+      # PINNED. An unpinned global install is what broke this pipeline for
+      # three days: v4.41 began resolving its deployment bucket through an SSM
+      # parameter the CodeBuild role had no grant for, so every `sls deploy`
+      # failed with no commit to blame it on. Bump this deliberately, and
+      # expect to check the role's permissions when you do.
+      - npm i -g serverless@4.41.0
+
+  build:
+    commands:
+      - cd landing
+      - npm run build
+      - cd ..
+
+  post_build:
+    commands:
+      # Deploy landing site to S3 (includes /master, the analytics dashboard,
+      # prerendered from landing/master/ by the build above)
+      - aws s3 sync landing/build/ s3://$S3_BUCKET --delete
+      # Invalidate CloudFront cache
+      - aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_DISTRIBUTION_ID --paths "/*"
+      # Deploy the master dashboard's API + DynamoDB table
+      - cd sls
+      - sls deploy --stage $SLS_STAGE --region $SLS_REGION --conceal

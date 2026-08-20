@@ -67,7 +67,7 @@ Here is the tip worth the whole article. Histamine is not fixed when food is coo
 The workaround is temperature. Freezing freshly cooked food quickly slows histamine formation far more than refrigeration, so a portion frozen right after cooking and reheated days later is usually much lower in histamine than the same food left in the fridge. This freshness-and-storage logic is central to a practical [low-histamine approach for MCAS](https://www.rthm.com/resources/blogs/low-histamine-diet-mcas). So the leftovers problem becomes a leftovers *solution*, as long as they go to the freezer, not the fridge.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 220" role="img" aria-label="A timeline showing histamine rising steadily in refrigerated leftovers over days, while a portion frozen immediately after cooking stays low.">
+  <svg class="fig-d" viewBox="0 0 720 220" role="img" aria-label="A timeline showing histamine rising steadily in refrigerated leftovers over days, while a portion frozen immediately after cooking stays low.">
     <text x="12" y="24" font-family="Space Grotesk, sans-serif" font-size="15" fill="var(--dim-2)">Histamine over time after cooking</text>
     <line x1="60" y1="180" x2="700" y2="180" stroke="var(--line)" stroke-width="1.5"/>
     <line x1="60" y1="40" x2="60" y2="180" stroke="var(--line)" stroke-width="1.5"/>
@@ -81,6 +81,19 @@ The workaround is temperature. Freezing freshly cooked food quickly slows histam
     <text x="470" y="150" font-family="Space Grotesk, sans-serif" font-size="14" fill="#54d98a">Frozen right away</text>
     <text x="70" y="200" font-family="Space Mono, monospace" font-size="11" fill="var(--dim-2)">cook</text>
     <text x="660" y="200" font-family="Space Mono, monospace" font-size="11" fill="var(--dim-2)">days later</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 216" role="img" aria-label="A timeline showing histamine rising steadily in refrigerated leftovers over days, while a portion frozen immediately after cooking stays low.">
+    <text x="20" y="20" font-family="Space Grotesk, sans-serif" font-size="13.5" fill="var(--dim-2)">Histamine over time after cooking</text>
+    <line x1="46" y1="40" x2="46" y2="176" stroke="var(--line)" stroke-width="1.5"/>
+    <line x1="46" y1="176" x2="344" y2="176" stroke="var(--line)" stroke-width="1.5"/>
+    <text x="18" y="48" font-family="Space Mono, monospace" font-size="10.5" fill="var(--dim-2)">high</text>
+    <text x="20" y="174" font-family="Space Mono, monospace" font-size="10.5" fill="var(--dim-2)">low</text>
+    <path d="M46,166 C160,156 234,110 344,56" fill="none" stroke="#e03127" stroke-width="3"/>
+    <text x="180" y="76" font-family="Space Grotesk, sans-serif" font-size="12.5" fill="#e03127">Left in the fridge</text>
+    <path d="M46,166 L344,158" fill="none" stroke="#54d98a" stroke-width="3"/>
+    <text x="180" y="148" font-family="Space Grotesk, sans-serif" font-size="12.5" fill="#54d98a">Frozen right away</text>
+    <text x="46" y="198" font-family="Space Mono, monospace" font-size="10.5" fill="var(--dim-2)">cook</text>
+    <text x="344" y="198" text-anchor="end" font-family="Space Mono, monospace" font-size="10.5" fill="var(--dim-2)">days later</text>
   </svg>
   <figcaption>Refrigerated leftovers keep accumulating histamine; freezing fresh portions largely stops the clock.</figcaption>
 </figure>

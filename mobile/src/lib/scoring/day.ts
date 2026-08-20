@@ -5,8 +5,10 @@
  * Pure: operates on a days map + score context, no store imports.
  */
 import { dateFromKey, keyOf, todayKey } from '../dates';
+import { hrvCaptureUsedToday } from '../gating';
+import { isTrustedReading } from '../hrvQuality';
 import { ACTIVITY_TYPES, MED_TYPES, TRIGGER_TYPES } from '../registry';
-import type { Band, DayRecord, Entry, Protocol, ScoreCat } from '../types';
+import type { Band, CustomTypes, DayRecord, Entry, Protocol, ScoreCat, SleepRecord, SleepStages } from '../types';
 import {
   BANDS, GRADE_PTS, computeScores, numOr, restingHrBands, totalPower,
   type ScoreContext,
@@ -26,18 +28,23 @@ export const SCORE_CATS: DayCat[] = [
 ];
 export const scoreCat = (s: number): DayCat => SCORE_CATS.find((c) => s >= c.min) || SCORE_CATS[SCORE_CATS.length - 1];
 
+/** Guidance shown on the Autonomic Outlook card. Keep this general: it speaks to
+ *  capacity and pacing, never to a specific training plan. Nothing here should
+ *  tell someone to exercise — on strong days it offers headroom for their own
+ *  protocol and whatever activity they already tolerate, and it always defers to
+ *  their plan over the number. */
 export const OUTLOOK_GUIDE: Record<string, string> = {
-  Excellent: "Strong autonomic baseline. Good for the full protocol, including intervals, core, and strength. Capitalize on the capacity; don't push past the plan.",
-  Good: "Solid baseline. Easy cycling, strength, normal activities. Hold off on intervals unless you've trended up across several days.",
-  Moderate: 'Reduced reserves. Walking, gentle activity, light core only. Skip cycling and intervals, and lean on hydration and rest.',
-  Compromised: 'Significantly reduced reserves. Rest, gentle stretching, basic ADLs. Avoid structured exercise and late dinners. This is a recovery day.',
-  Bad: 'System is stressed. Complete rest and gentle breathing only. Look at what’s driving it: sleep, food, illness, or accumulated load.',
-  Crash: 'System in a crash state. Full rest, Liquid IV, magnesium, all meds. Check for illness or stacked triggers; seek care if symptoms warrant.',
+  Excellent: 'Strong autonomic baseline with reserves to spare. A good day for your full protocol, and for whatever activity you normally tolerate. Work within your plan rather than past it.',
+  Good: 'Solid baseline. Enough reserve for your protocol and a normal day. Keep anything demanding at a level you already know you handle well.',
+  Moderate: 'Reduced reserves. Keep the day easy and stay with the basics of your protocol. Lean on hydration, pacing, and rest, and hold back on anything demanding.',
+  Compromised: 'Significantly reduced reserves. This is a recovery day: rest, hydration, and essentials only. Avoid added load and late meals.',
+  Bad: 'System is stressed. Rest and gentle breathing. Look at what’s driving it: sleep, food, illness, or accumulated load.',
+  Crash: 'System in a crash state. Full rest and your protocol. Check for illness or stacked triggers; seek care if symptoms warrant.',
 };
 export const TOMORROW: Record<string, string> = {
   Excellent: 'Tomorrow likely Good to Excellent.',
   Good: 'Tomorrow likely Good.',
-  Moderate: 'Tomorrow likely Moderate, so skip intervals.',
+  Moderate: 'Tomorrow likely Moderate, so plan a lighter day.',
   Compromised: 'Tomorrow likely Compromised to Moderate, so keep it light.',
   Bad: 'Tomorrow likely Bad. Plan a rest day.',
   Crash: 'Tomorrow Bad to Crash. Prepare for full rest.',
@@ -83,12 +90,63 @@ export function sleepHours(days: DaysMap, dk: string): number | null {
   return mins / 60;
 }
 
-/** Sleep recovery grade for the night before `dk`. Duration + quality set the
- *  base grade; an elevated overnight heart rate then caps it — a long night
- *  spent at a high rate is not restorative sleep. The sleeping low is the
- *  strongest signal (a low that never dropped under ~65 bpm means the system
- *  never settled); a very high overnight peak also costs a step. */
-export function sleepGrade(days: DaysMap, dk: string): ScoreCat | null {
+/** Minutes covered by a stage breakdown (asleep stages + awake-in-bed). */
+const stageTotal = (s: SleepStages) => s.deep + s.rem + s.core + s.awake;
+
+/** How far the stage breakdown may sit from the bed→wake window and still be
+ *  taken as describing that night. Health sources round and drop a few minutes
+ *  at the edges; a watch that came off mid-night misses hours. */
+const STAGE_WINDOW_TOLERANCE_MIN = 30;
+
+/**
+ * The stage breakdown for a night, but only when it still matches the recorded
+ * window. Stages come from the health store; the user can afterwards correct
+ * bed/wake by hand (a watch charged mid-night records half the night, so Health
+ * reports half). Once the window is edited the old stage minutes no longer
+ * describe it, and treating them as the night's duration is what made the hours
+ * shown disagree with the times the user just entered. Returns null in that
+ * case, so duration falls back to bed→wake and the stage bar is hidden.
+ */
+export function stagesForWindow(sleep: SleepRecord | undefined | null): SleepStages | null {
+  if (!sleep || !sleep.stages) return null;
+  const days: DaysMap = { d: { sleep } as DayRecord };
+  const hrs = sleepHours(days, 'd');
+  if (hrs == null) return sleep.stages;
+  return Math.abs(hrs * 60 - stageTotal(sleep.stages)) <= STAGE_WINDOW_TOLERANCE_MIN ? sleep.stages : null;
+}
+
+/** Overnight-HR thresholds that demote the sleep grade. Exported so the sleep
+ *  report can quote the exact numbers it graded against instead of restating
+ *  them in copy that then drifts. */
+export const SLEEP_HR_LOW_1 = 65;   // sleeping low at/above this costs one step
+export const SLEEP_HR_LOW_2 = 75;   // ...and two steps at/above this
+export const SLEEP_HR_HIGH = 110;   // an overnight peak at/above this costs one
+
+/** The grade order demotion walks down. */
+const SLEEP_GRADE_ORDER: ScoreCat[] = ['great', 'good', 'ok', 'bad', 'crash'];
+
+export interface SleepGradeParts {
+  /** Hours between bed and wake (the window, not staged sleep). */
+  hours: number;
+  interrupted: boolean;
+  /** Grade from duration + quality alone, before any HR demotion. */
+  base: ScoreCat;
+  hrLow: number | null;
+  hrHigh: number | null;
+  /** Steps the sleeping low cost, and the steps the peak cost. */
+  demoteLow: number;
+  demoteHigh: number;
+  /** Steps actually applied (the larger of the two, not their sum). */
+  demote: number;
+  cat: ScoreCat;
+}
+
+/**
+ * Every input the sleep grade used, and what each one did to it. `sleepGrade`
+ * is this function's `cat` — the report explains the grade from the same
+ * computation rather than a second copy of the thresholds.
+ */
+export function sleepGradeParts(days: DaysMap, dk: string): SleepGradeParts | null {
   const dur = sleepHours(days, dk);
   if (dur == null) return null;
   const d = days[dk];
@@ -99,23 +157,33 @@ export function sleepGrade(days: DaysMap, dk: string): ScoreCat | null {
   else if (dur >= 6) cat = good ? 'ok' : 'bad';
   else if (dur >= 5) cat = 'bad';
   else cat = 'crash';
+  const base = cat;
   const num = (x: unknown) => { const v = parseFloat(String(x)); return isNaN(v) ? null : v; };
   const lo = d && d.sleep ? num(d.sleep.hrLow) : null;
   const hi = d && d.sleep ? num(d.sleep.hrHigh) : null;
-  let demote = 0;
-  if (lo != null) demote = lo >= 75 ? 2 : lo >= 65 ? 1 : 0;
-  if (hi != null && hi >= 110) demote = Math.max(demote, 1);
+  const demoteLow = lo != null ? (lo >= SLEEP_HR_LOW_2 ? 2 : lo >= SLEEP_HR_LOW_1 ? 1 : 0) : 0;
+  const demoteHigh = hi != null && hi >= SLEEP_HR_HIGH ? 1 : 0;
+  const demote = Math.max(demoteLow, demoteHigh);
   if (demote) {
-    const order: ScoreCat[] = ['great', 'good', 'ok', 'bad', 'crash'];
-    cat = order[Math.min(order.length - 1, order.indexOf(cat) + demote)];
+    cat = SLEEP_GRADE_ORDER[Math.min(SLEEP_GRADE_ORDER.length - 1, SLEEP_GRADE_ORDER.indexOf(cat) + demote)];
   }
-  return cat;
+  return { hours: dur, interrupted: !good, base, hrLow: lo, hrHigh: hi, demoteLow, demoteHigh, demote, cat };
+}
+
+/** Sleep recovery grade for the night before `dk`. Duration + quality set the
+ *  base grade; an elevated overnight heart rate then caps it — a long night
+ *  spent at a high rate is not restorative sleep. The sleeping low is the
+ *  strongest signal (a low that never dropped under ~65 bpm means the system
+ *  never settled); a very high overnight peak also costs a step. */
+export function sleepGrade(days: DaysMap, dk: string): ScoreCat | null {
+  const parts = sleepGradeParts(days, dk);
+  return parts ? parts.cat : null;
 }
 
 /** Behaviour grade from logged activity load (lightly weighted). */
 export function activityGrade(acts?: Entry[]): ScoreCat | null {
   if (!acts || !acts.length) return null;
-  const heavy = acts.filter((a) => ['stressfulWork', 'upperBody', 'coreWorkout', 'indoorBike', 'carWash'].includes(a.type));
+  const heavy = acts.filter((a) => ['stressfulWork', 'strength', 'coreWorkout', 'indoorBike', 'carWash'].includes(a.type));
   if (acts.some((a) => a.type === 'strenuousWork') || heavy.length >= 3) return 'bad';
   if (heavy.length === 2) return 'ok';
   return 'good';
@@ -139,8 +207,9 @@ export interface ScoreSetResult {
 export function scoreSet(readings: Entry[], d: DayRecord, dk: string, days: DaysMap, ctx: ScoreContext = {}): ScoreSetResult {
   const last = <T,>(a: T[]): T | undefined => a[a.length - 1];
   const pts = (cat: ScoreCat | null | undefined): number | null => (cat ? GRADE_PTS[cat] : null);
-  const structured = readings.filter((r) => r.type === 'breathHrv');
-  const unstructured = readings.filter((r) => r.type === 'hrv');
+  // Imported HRV that carries too little real RR never scores (hrvQuality.ts).
+  const structured = readings.filter((r) => r.type === 'breathHrv' && isTrustedReading(r));
+  const unstructured = readings.filter((r) => r.type === 'hrv' && isTrustedReading(r));
   const sStruct = structured.length ? computeScores(last(structured)!, ctx) : null;
   const sUn = unstructured.length ? computeScores(last(unstructured)!, ctx) : null;
 
@@ -162,8 +231,8 @@ export function scoreSet(readings: Entry[], d: DayRecord, dk: string, days: Days
   const nv = (x: unknown): number | null => { const v = parseFloat(x as string); return isNaN(v) ? null : v; };
   const rmS = bs ? nv(bs.rmssd) : null, rmU = bu ? nv(bu.rmssd) : null;
   const hrvMetrics: CompDetailMetric[] = [];
-  if (rmS != null) hrvMetrics.push({ label: 'RMSSD (structured)', raw: rmS, bands: BANDS.rmssdS, unit: 'ms' });
-  if (rmU != null) hrvMetrics.push({ label: 'RMSSD (unstructured)', raw: rmU, bands: BANDS.rmssdU, unit: 'ms' });
+  if (rmS != null) hrvMetrics.push({ label: 'RMSSD (training)', raw: rmS, bands: BANDS.rmssdS, unit: 'ms' });
+  if (rmU != null) hrvMetrics.push({ label: 'RMSSD (baseline)', raw: rmU, bands: BANDS.rmssdU, unit: 'ms' });
   const hrvDetail: CompDetail = {
     value: rmS != null && rmU != null ? `${rmS}/${rmU} ms` : rmS != null ? `${rmS} ms` : rmU != null ? `${rmU} ms` : '',
     metrics: hrvMetrics,
@@ -192,7 +261,7 @@ export function scoreSet(readings: Entry[], d: DayRecord, dk: string, days: Days
   if (rhr) {
     rhrV = nv(rhr.hr); rhrBands = restingHrBands(rhr.position);
     if (rhr.position) rhrLabel = `Resting HR (${rhr.position})`;
-  } else if (bs) { rhrV = nv(bs.hr); rhrBands = BANDS.hrBreath; rhrLabel = 'HR (from structured HRV)'; }
+  } else if (bs) { rhrV = nv(bs.hr); rhrBands = BANDS.hrBreath; rhrLabel = 'HR (from training HRV)'; }
   else if (bu) { rhrV = nv(bu.avgHr); rhrBands = BANDS.hrBreath; rhrLabel = 'Avg HR (from HRV)'; }
   const rhrDetail: CompDetail = { value: rhrV != null ? `${rhrV} bpm` : '', metrics: rhrV != null ? [{ label: rhrLabel, raw: rhrV, bands: rhrBands, unit: 'bpm', lowerBetter: true }] : [] };
 
@@ -229,10 +298,10 @@ export function scoreSet(readings: Entry[], d: DayRecord, dk: string, days: Days
   return { score: Math.round(sum / avail), confidence: Math.round(avail), hasStruct: !!sStruct, hasUnstruct: !!unstructured.length, comps };
 }
 
-/** Blue-zone flag: high unstructured readiness masking a fragile structured RMSSD. */
+/** Blue-zone flag: high baseline readiness masking a fragile training RMSSD. */
 export function blueZone(readings: Entry[], ctx: ScoreContext = {}): boolean {
-  const u = readings.find((r) => r.type === 'hrv' && numOr(r.readiness) != null);
-  const s = readings.find((r) => r.type === 'breathHrv');
+  const u = readings.find((r) => r.type === 'hrv' && isTrustedReading(r) && numOr(r.readiness) != null);
+  const s = readings.find((r) => r.type === 'breathHrv' && isTrustedReading(r));
   if (!u || !s) return false;
   const rmssd = computeScores(s, ctx).rmssd;
   return numOr(u.readiness)! >= 90 && (['ok', 'bad', 'crash'] as ScoreCat[]).includes(rmssd);
@@ -245,15 +314,16 @@ export interface Criterion {
 }
 export interface Cleanliness { clean: boolean; criteria: Criterion[] }
 
-/** Baseline protocol a user gets before ever opening the editor: 8h sleep,
+/** Baseline protocol a user gets before ever opening the editor: 7h sleep,
  *  2.5 L water, no triggers. Meds/activities start off and empty — users pick
  *  their own meds in the editor (there are no default drugs any more). */
 export const DEFAULT_PROTOCOL: Protocol = {
   triggers: { enabled: true, types: [] },
+  hrv: { enabled: false },
   water: { enabled: true, liters: 2.5 },
   meds: { enabled: false, types: [] },
   activities: { enabled: false, types: [] },
-  sleep: { enabled: true, hours: 8 },
+  sleep: { enabled: true, hours: 7 },
 };
 
 /** Fill a (possibly partial/absent) stored protocol with defaults. */
@@ -261,6 +331,7 @@ export function resolveProtocol(p?: Partial<Protocol> | null): Protocol {
   if (!p) return DEFAULT_PROTOCOL;
   return {
     triggers: { ...DEFAULT_PROTOCOL.triggers, ...p.triggers },
+    hrv: { ...DEFAULT_PROTOCOL.hrv, ...p.hrv },
     water: { ...DEFAULT_PROTOCOL.water, ...p.water },
     meds: { ...DEFAULT_PROTOCOL.meds, ...p.meds },
     activities: { ...DEFAULT_PROTOCOL.activities, ...p.activities },
@@ -269,49 +340,63 @@ export function resolveProtocol(p?: Partial<Protocol> | null): Protocol {
 }
 
 /** Daily water goal (liters): the clean-day protocol amount when one is set,
- *  otherwise the 2.5 L default. */
+ *  otherwise the 2.5 L default. The protocol holds the ONE goal number, whether
+ *  or not water is an enabled requirement — `enabled` only decides whether the
+ *  goal counts toward the clean-day streak, not what the goal is. */
 export function waterGoalL(p?: Partial<Protocol> | null): number {
   const w = resolveProtocol(p).water;
-  return w.enabled && w.liters > 0 ? w.liters : DEFAULT_PROTOCOL.water.liters;
+  return w.liters > 0 ? w.liters : DEFAULT_PROTOCOL.water.liters;
 }
 
-const typeLabel = (map: Record<string, { label: string }>, k: string) => map[k]?.label || k;
-const joinLabels = (map: Record<string, { label: string }>, keys: string[]) => keys.map((k) => typeLabel(map, k)).join(', ');
+const typeLabel = (map: Record<string, { label: string }>, k: string, custom?: Record<string, { label: string }>) => custom?.[k]?.label || map[k]?.label || k;
+const joinLabels = (map: Record<string, { label: string }>, keys: string[], custom?: Record<string, { label: string }>) => keys.map((k) => typeLabel(map, k, custom)).join(', ');
 
-export function dayCleanliness(days: DaysMap, dk: string, protocol: Protocol = DEFAULT_PROTOCOL): Cleanliness | null {
+/** Build the clean-day checklist for a day against a protocol. An absent or
+ *  empty day yields the same criteria as a blank one — every requirement simply
+ *  reads as unmet. This is the DISPLAY primitive: it lets the streak widget show
+ *  a new user their protocol before anything is logged. Streak/rate math still
+ *  goes through dayCleanliness, which returns null for days with no record so a
+ *  gap day is excluded rather than counted as a broken day. */
+export function protocolCriteria(days: DaysMap, dk: string, protocol: Protocol = DEFAULT_PROTOCOL, custom?: CustomTypes): Criterion[] {
   const d = days[dk];
-  if (!d) return null;
   const criteria: Criterion[] = [];
 
   // Triggers (hard — logging one can't be undone for the day). Empty selection
   // means "avoid all triggers"; a selection narrows it to those specific ones.
   if (protocol.triggers.enabled) {
-    const triggers = (d.food && d.food.triggers) || {};
+    const triggers = (d && d.food && d.food.triggers) || {};
     const count = (k: string) => (triggers[k] > 0 ? triggers[k] : 0);
     const sel = protocol.triggers.types;
     const logged = (sel.length ? sel : Object.keys(triggers)).reduce((s, k) => s + count(k), 0);
-    const label = sel.length ? `No ${joinLabels(TRIGGER_TYPES, sel)}` : 'No triggers';
+    const label = sel.length ? `No ${joinLabels(TRIGGER_TYPES, sel, custom?.triggers)}` : 'No triggers';
     criteria.push({ key: 'triggers', label, pass: logged === 0, hard: true, broken: logged > 0 });
   }
 
+  // At least one HRV reading captured in-app that day. Health-imported readings
+  // (imported: true) don't count — the requirement is to take a reading, same
+  // definition the freemium allowance uses (hrvCaptureUsedToday).
+  if (protocol.hrv.enabled) {
+    criteria.push({ key: 'hrv', label: 'Take an HRV reading', pass: hrvCaptureUsedToday(d) > 0 });
+  }
+
   if (protocol.water.enabled) {
-    const water = (d.food && d.food.water) || 0;
+    const water = (d && d.food && d.food.water) || 0;
     criteria.push({ key: 'water', label: `Water (${protocol.water.liters} L)`, pass: water >= protocol.water.liters });
   }
 
   // Each required medication/activity is its own criterion (own checkmark).
   if (protocol.meds.enabled) {
-    const meds = d.meds || [];
+    const meds = (d && d.meds) || [];
     protocol.meds.types.forEach((t) => {
-      const label = typeLabel(MED_TYPES, t);
+      const label = typeLabel(MED_TYPES, t, custom?.meds);
       criteria.push({ key: `meds:${t}`, label, pass: meds.some((m) => m.type === t) });
     });
   }
 
   if (protocol.activities.enabled) {
-    const acts = d.activities || [];
+    const acts = (d && d.activities) || [];
     protocol.activities.types.forEach((t) => {
-      const label = typeLabel(ACTIVITY_TYPES, t);
+      const label = typeLabel(ACTIVITY_TYPES, t, custom?.activities);
       criteria.push({ key: `activities:${t}`, label, pass: acts.some((a) => a.type === t) });
     });
   }
@@ -322,6 +407,12 @@ export function dayCleanliness(days: DaysMap, dk: string, protocol: Protocol = D
     criteria.push({ key: 'sleep', label: `Sleep ${protocol.sleep.hours}h or more`, pass: sleepLogged && hrs! >= protocol.sleep.hours, hard: true, broken: sleepLogged && hrs! < protocol.sleep.hours });
   }
 
+  return criteria;
+}
+
+export function dayCleanliness(days: DaysMap, dk: string, protocol: Protocol = DEFAULT_PROTOCOL, custom?: CustomTypes): Cleanliness | null {
+  if (!days[dk]) return null;
+  const criteria = protocolCriteria(days, dk, protocol, custom);
   const clean = criteria.length > 0 && criteria.filter((c) => !c.pending).every((c) => c.pass);
   return { clean, criteria };
 }
@@ -339,9 +430,9 @@ export interface StreakInfo {
   today: Cleanliness | null; isToday: boolean;
 }
 
-export function streakInfo(days: DaysMap, dk: string, protocol: Protocol = DEFAULT_PROTOCOL): StreakInfo {
+export function streakInfo(days: DaysMap, dk: string, protocol: Protocol = DEFAULT_PROTOCOL, custom?: CustomTypes): StreakInfo {
   const today = todayKey();
-  const cur = dayCleanliness(days, dk, protocol);
+  const cur = dayCleanliness(days, dk, protocol, custom);
   const cursor = dateFromKey(dk);
   if (dk === today && (!cur || !cur.clean)) cursor.setDate(cursor.getDate() - 1);
   let current = 0;
@@ -373,18 +464,36 @@ export function streakInfo(days: DaysMap, dk: string, protocol: Protocol = DEFAU
 /**
  * Chronological history for one metric across all days (last `limit`):
  * returns [{ v, date }] oldest -> newest.
+ *
+ * `upto` is a reading id: history stops at that reading (inclusive), so a
+ * summary opened on an older reading charts what was known *then* rather than
+ * trailing off into readings taken after it. An id that isn't in `days` (an
+ * unsaved live preview) leaves the full history intact.
+ *
+ * `kind` picks the day array to walk. Activities carry metrics of their own
+ * (HR @60s rest on a run), and the workout report charts them the same way a
+ * reading's summary charts its own; the trusted-HRV filter is a readings rule
+ * and does not apply there.
  */
-export function metricHistory(days: DaysMap, type: string, extractor: (r: Entry) => number | null, limit = 15): { v: number; date: string }[] {
+export function metricHistory(
+  days: DaysMap, type: string, extractor: (r: Entry) => number | null, limit = 15, upto?: string | null,
+  kind: 'readings' | 'activities' = 'readings',
+): { v: number; date: string }[] {
   const out: { v: number; date: string }[] = [];
+  let cut = -1;
   Object.keys(days).sort().forEach((dk) => {
-    const list = (days[dk].readings || []).filter((r) => r.type === type);
+    const src = (kind === 'activities' ? days[dk].activities : days[dk].readings) || [];
+    const list = src.filter((r) => r.type === type && (kind === 'activities' || isTrustedReading(r)));
     list.sort((a, b) => ((a.time as string) || '').localeCompare((b.time as string) || ''));
     list.forEach((r) => {
       const v = extractor(r);
-      if (v != null && !isNaN(v)) out.push({ v, date: dk });
+      if (v != null && !isNaN(v)) {
+        out.push({ v, date: dk });
+        if (upto && String(r.id) === upto) cut = out.length;
+      }
     });
   });
-  return out.slice(-limit);
+  return (cut >= 0 ? out.slice(0, cut) : out).slice(-limit);
 }
 
 export const numEx = (key: string) => (rr: Entry): number | null => {

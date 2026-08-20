@@ -40,12 +40,28 @@ const CUSTOM_ICON: Record<TypeKind, string> = {
   activities: 'activity', meds: 'pill', symptoms: 'alert', triggers: 'alert',
 };
 
-/** Registry + user-defined types, minus deleted built-ins. */
+/** Registry + user-defined types, minus deleted built-ins. Alphabetical by
+ *  label so user-created types slot in among the built-ins; "Other …"
+ *  catch-alls sink to the bottom. */
 export function typesFor(state: AppState, kind: TypeKind): Record<string, TypeDef> {
   const hidden = new Set(state.hiddenTypes?.[kind] || []);
+  const merged: Record<string, TypeDef> = {};
+  Object.keys(BUILTIN[kind]).forEach((k) => { if (!hidden.has(k)) merged[k] = BUILTIN[kind][k]; });
+  Object.assign(merged, state.customTypes?.[kind] || {});
+  const isOther = (t: TypeDef) => /^other\b/i.test(t.label);
   const out: Record<string, TypeDef> = {};
-  Object.keys(BUILTIN[kind]).forEach((k) => { if (!hidden.has(k)) out[k] = BUILTIN[kind][k]; });
-  Object.assign(out, state.customTypes?.[kind] || {});
+  Object.keys(merged)
+    .sort((a, b) => {
+      if (isOther(merged[a]) !== isOther(merged[b])) return isOther(merged[a]) ? 1 : -1;
+      return merged[a].label.localeCompare(merged[b].label, undefined, { sensitivity: 'base' });
+    })
+    .forEach((k) => {
+      // A symptom lasts, so its form offers an optional end time. Stamped here
+      // rather than on each registry def so user-created symptoms — including
+      // ones saved before this shipped — get it with no migration.
+      const t = merged[k];
+      out[k] = kind === 'symptoms' && !t.ends && !t.noTime ? { ...t, ends: true } : t;
+    });
   return out;
 }
 
@@ -79,23 +95,56 @@ export function addCustomType(kind: TypeKind, name: string, opts?: { dosage?: st
   while (existing[key] || BUILTIN[kind][key]) key += '-2';
   const def: TypeDef = { label, icon: CUSTOM_ICON[kind], fields: CUSTOM_FIELDS[kind].slice(), userDefined: true };
   if (kind === 'meds' && opts?.dosage?.trim()) def.dosage = opts.dosage.trim();
-  state.customTypes = state.customTypes || {};
-  state.customTypes[kind] = { ...(state.customTypes[kind] || {}), [key]: def };
+  // Fresh top-level object (not an in-place write) so useMemos keyed on
+  // state.customTypes see the change — save() only re-wraps state and days.
+  state.customTypes = { ...(state.customTypes || {}), [kind]: { ...(state.customTypes?.[kind] || {}), [key]: def } };
   save();
   return key;
 }
 
-/** Delete a type (custom → removed; built-in → hidden). Caller checks typeInUse. */
+/** Rename a type / change its default dose. Works on custom types and on
+ *  built-ins (stored as a same-key override that `typesFor` layers on top).
+ *  The key never changes, so entries already logged against it keep resolving —
+ *  editing is allowed even while the type is in use. Returns false for a blank
+ *  or duplicate name (caller distinguishes via `name.trim()`). */
+export function editType(kind: TypeKind, key: string, name: string, opts?: { dosage?: string }): boolean {
+  const label = name.trim();
+  if (!label) return false;
+  const state = getState();
+  const existing = typesFor(state, kind);
+  const cur = existing[key];
+  if (!cur) return false;
+  if (Object.keys(existing).some((k) => k !== key && existing[k].label.toLowerCase() === label.toLowerCase())) return false;
+  // Strip any registry-only functions so the override stays pure JSON.
+  const { summary, detail, ...json } = cur;
+  void summary; void detail;
+  const next: TypeDef = { ...json, label };
+  if (kind === 'meds') {
+    const dosage = opts?.dosage?.trim();
+    if (dosage) next.dosage = dosage;
+    else delete next.dosage;
+  }
+  // Fresh top-level object — same identity contract as addCustomType.
+  state.customTypes = { ...(state.customTypes || {}), [kind]: { ...(state.customTypes?.[kind] || {}), [key]: next } };
+  save();
+  return true;
+}
+
+/** Delete a type (custom → removed; built-in → hidden). Caller checks typeInUse.
+ *  An edited built-in has both a same-key override and a built-in behind it, so
+ *  drop the override *and* hide the built-in — otherwise the override would keep
+ *  the row visible past the hide. */
 export function deleteType(kind: TypeKind, key: string) {
   const state = getState();
   if (state.customTypes?.[kind]?.[key]) {
     const next = { ...state.customTypes[kind] };
     delete next[key];
-    state.customTypes[kind] = next;
-  } else if (BUILTIN[kind][key]) {
-    state.hiddenTypes = state.hiddenTypes || {};
-    const list = state.hiddenTypes[kind] || [];
-    if (!list.includes(key)) state.hiddenTypes[kind] = [...list, key];
+    // Fresh top-level objects — same identity contract as addCustomType.
+    state.customTypes = { ...state.customTypes, [kind]: next };
+  }
+  if (BUILTIN[kind][key]) {
+    const list = state.hiddenTypes?.[kind] || [];
+    if (!list.includes(key)) state.hiddenTypes = { ...(state.hiddenTypes || {}), [kind]: [...list, key] };
   }
   save();
 }

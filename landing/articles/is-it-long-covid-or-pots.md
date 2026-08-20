@@ -50,7 +50,7 @@ One is a story. The other is a number.
 ## The umbrella and the diagnosis, side by side
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 240" role="img" aria-label="A Venn-style diagram showing long COVID as a large umbrella circle overlapping with a smaller POTS circle, with shared symptoms in the overlap.">
+  <svg class="fig-d" viewBox="0 0 720 240" role="img" aria-label="A Venn-style diagram showing long COVID as a large umbrella circle overlapping with a smaller POTS circle, with shared symptoms in the overlap.">
     <ellipse cx="270" cy="120" rx="230" ry="100" fill="none" stroke="var(--line)" stroke-width="2"/>
     <ellipse cx="510" cy="120" rx="150" ry="90" fill="none" stroke="#38bdf8" stroke-width="2.5"/>
     <text x="150" y="55" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="17" font-weight="600" fill="var(--dim-2)">Long COVID</text>
@@ -66,6 +66,23 @@ One is a story. The other is a number.
     <text x="560" y="120" text-anchor="middle" font-family="Space Mono, monospace" font-size="13" fill="#38bdf8">&#8805;30 bpm</text>
     <text x="560" y="142" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="12" fill="#38bdf8">standing rise</text>
     <text x="560" y="164" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="12" fill="#38bdf8">measurable</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 396" role="img" aria-label="A Venn-style diagram showing long COVID as a large umbrella circle overlapping with a smaller POTS circle, with shared symptoms in the overlap.">
+    <ellipse cx="180" cy="122" rx="158" ry="108" fill="none" stroke="var(--line)" stroke-width="2"/>
+    <ellipse cx="180" cy="280" rx="132" ry="108" fill="none" stroke="#38bdf8" stroke-width="2.5"/>
+    <text x="180" y="38" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="16" font-weight="600" fill="var(--dim-2)">Long COVID</text>
+    <text x="180" y="56" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="11.5" fill="var(--dim-2)">(the umbrella)</text>
+    <text x="180" y="84" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="12.5" fill="var(--dim-2)">Brain fog</text>
+    <text x="180" y="106" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="12.5" fill="var(--dim-2)">Breathlessness</text>
+    <text x="180" y="128" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="12.5" fill="var(--dim-2)">Loss of smell</text>
+    <text x="180" y="184" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="12" fill="var(--dim-2)">Fatigue</text>
+    <text x="180" y="202" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="12" fill="var(--dim-2)">Palpitations</text>
+    <text x="180" y="220" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="12" fill="var(--dim-2)">Dizziness</text>
+    <text x="180" y="256" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="16" font-weight="600" fill="#38bdf8">POTS</text>
+    <text x="180" y="274" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="11.5" fill="#38bdf8">(the diagnosis)</text>
+    <text x="180" y="304" text-anchor="middle" font-family="Space Mono, monospace" font-size="13" fill="#38bdf8">&#8805;30 bpm</text>
+    <text x="180" y="326" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="12" fill="#38bdf8">standing rise</text>
+    <text x="180" y="348" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="12" fill="#38bdf8">measurable</text>
   </svg>
   <figcaption>Long COVID is a broad umbrella of symptoms; POTS is a specific, measurable orthostatic diagnosis that frequently overlaps with it.</figcaption>
 </figure>

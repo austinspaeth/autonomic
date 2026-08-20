@@ -56,7 +56,7 @@ ${(a.categories ?? []).map((c) => `      <category>${esc(c)}</category>`).join('
     <copyright>© Autonomic</copyright>
     <generator>Autonomic</generator>${lastBuild ? `\n    <lastBuildDate>${lastBuild}</lastBuildDate>` : ''}
     <image>
-      <url>${BASE}/favicon-512.png</url>
+      <url>${BASE}/web-app-manifest-512x512.png</url>
       <title>The Autonomic Blog</title>
       <link>${BASE}/insights/</link>
     </image>

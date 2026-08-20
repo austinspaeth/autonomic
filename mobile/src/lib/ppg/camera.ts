@@ -15,9 +15,19 @@
  * stub that reports unavailable.
  */
 import { assessPulse, detectBeats, fingerPresent, type PulseQuality } from './detect';
+import { ppgTrace } from './diagnostics';
+import { createPermissionGate } from './permission';
 import { mean } from '../hrv';
 
 export interface PpgSignal { locked: boolean; quality: PulseQuality }
+
+/**
+ * A sample carries beats plus, on the first sample after tracking resumed, a
+ * `gap` marker. Downstream that marker becomes a segment boundary: the interval
+ * either side of it is not a beat-to-beat interval, and metrics must not treat
+ * it as one. BLE never sets it (its link either delivers beats or doesn't).
+ */
+export interface PpgSample { hr: number; rr: number[]; gap?: boolean }
 
 export interface PpgManagerApi {
   available: boolean;
@@ -25,9 +35,16 @@ export interface PpgManagerApi {
   // Streams the same shape as BLE: hr (bpm) + rr intervals (ms).
   // signalState reports finger-placement quality for the pre-start lock.
   start(
-    onSample: (s: { hr: number; rr: number[] }) => void,
+    onSample: (s: PpgSample) => void,
     onSignal: (s: PpgSignal) => void,
   ): Promise<void>;
+  // Swap the sample/signal consumers of an already-running stream without
+  // resetting detection state — the session card takes over the stream the
+  // camera-setup card locked, keeping the pulse lock and RR buffer intact.
+  retarget(
+    onSample: (s: PpgSample) => void,
+    onSignal: (s: PpgSignal) => void,
+  ): void;
   stop(): Promise<void>;
 }
 
@@ -38,7 +55,7 @@ const SIGNAL_WINDOW_MS = 5000; // pulse-quality / lock assessment window
 const ANALYZE_EVERY_MS = 250; // detection cadence (frames arrive at 30–60 Hz)
 const FINGER_FLIP_FRAMES = 4; // debounce finger on/off across frames
 
-let onSampleCb: ((s: { hr: number; rr: number[] }) => void) | null = null;
+let onSampleCb: ((s: PpgSample) => void) | null = null;
 let onSignalCb: ((s: PpgSignal) => void) | null = null;
 let running = false;
 const runListeners = new Set<(running: boolean) => void>();
@@ -51,6 +68,10 @@ let lastEmittedPeak = 0;
 let lastAnalyzedAt = 0;
 let lastSignalKey = '';
 let recentRr: number[] = [];
+// Set whenever tracking lapses (finger off, or the trailing window stops
+// reading as a pulse). The next emitted sample carries it as `gap` so the
+// consumer can start a new segment, then it clears.
+let pendingGap = false;
 // Frame timestamps arrive in whatever unit the platform uses (ns/µs/ms/s);
 // the scale is inferred from the first inter-frame delta.
 let tScale: number | null = null;
@@ -65,6 +86,7 @@ function resetSignalState() {
   lastAnalyzedAt = 0;
   lastSignalKey = '';
   recentRr = [];
+  pendingGap = false;
   tScale = null;
   prevRawT = null;
 }
@@ -73,6 +95,8 @@ function emitSignal(s: PpgSignal) {
   const key = `${s.locked}:${s.quality}`;
   if (key === lastSignalKey) return;
   lastSignalKey = key;
+  ppgTrace.set({ quality: s.quality, locked: s.locked }, 'signal', key);
+  if (s.locked) ppgTrace.mark('pulse-locked');
   onSignalCb?.(s);
 }
 
@@ -86,6 +110,7 @@ function normalizeT(rawT: number): number | null {
     for (const scale of [1, 1e-3, 1e-6, 1e3]) {
       if (dt * scale >= 4 && dt * scale <= 200) { tScale = scale; break; }
     }
+    if (tScale != null) ppgTrace.set({ tScale }, 'timestamp-scale', `x${tScale} (raw delta ${Math.round(dt)})`);
     if (tScale == null) return null; // duplicate/garbage timestamp — wait
   }
   return rawT * tScale;
@@ -96,6 +121,7 @@ function analyze(now: number) {
   lastAnalyzedAt = now;
 
   if (!fingerOn) {
+    pendingGap = true;
     emitSignal({ locked: false, quality: 'none' });
     return;
   }
@@ -118,10 +144,25 @@ function analyze(now: number) {
     if (interval >= 300 && interval <= 1430) fresh.push(interval);
     lastEmittedPeak = peakTimes[i];
   }
+
+  // Quality gate. `assessPulse` already grades the trailing window; until now
+  // that grade only drove the UI indicator while every detected peak was
+  // emitted regardless. Peaks found in a window that doesn't read as a steady
+  // pulse are motion and reacquisition noise, and letting them into the RR
+  // array was the largest single source of inflated SDNN on camera readings.
+  // `lastEmittedPeak` has already advanced past them, so recovering the lock
+  // resumes cleanly instead of retroactively flushing the junk.
+  if (quality !== 'good') {
+    pendingGap = true;
+    recentRr = [];
+    return;
+  }
+
   if (fresh.length && onSampleCb) {
     recentRr = [...recentRr, ...fresh].slice(-5);
     const hr = Math.round(60000 / mean(recentRr));
-    onSampleCb({ hr, rr: fresh });
+    onSampleCb({ hr, rr: fresh, gap: pendingGap || undefined });
+    pendingGap = false;
   }
 }
 
@@ -138,6 +179,7 @@ export const ppgBridge = {
   },
   pushFrame(rawT: number, red: number, green: number, blue: number) {
     if (!running) return;
+    ppgTrace.countFrame();
     const t = normalizeT(rawT);
     if (t == null) return;
 
@@ -148,7 +190,9 @@ export const ppgBridge = {
     if (fingerStreak >= FINGER_FLIP_FRAMES) {
       fingerOn = present;
       fingerStreak = 0;
-      if (!fingerOn) { tBuf = []; vBuf = []; recentRr = []; }
+      ppgTrace.set({ fingerOn }, 'finger', fingerOn ? 'covered' : 'uncovered');
+      if (fingerOn) ppgTrace.mark('finger-detected');
+      if (!fingerOn) { tBuf = []; vBuf = []; recentRr = []; pendingGap = true; }
     }
     if (!fingerOn) { analyze(t); return; }
 
@@ -167,6 +211,7 @@ const stub: PpgManagerApi = {
   available: false,
   async requestPermissions() { return false; },
   async start() { throw new Error('The camera is not available in this build.'); },
+  retarget() { /* no-op */ },
   async stop() { /* no-op */ },
 };
 
@@ -181,24 +226,37 @@ export function createPpg(): PpgManagerApi {
   const { Camera } = CameraModule;
   if (!Camera) return stub;
 
+  // Self-gating: never prompt for a permission we already hold, and never let
+  // two callers prompt at once — Android drops the second request and leaves
+  // both promises unsettled. See permission.ts for the full story.
+  const ensurePermission = createPermissionGate({
+    status: () => String(Camera.getCameraPermissionStatus()),
+    request: () => Camera.requestCameraPermission().then(String),
+    onResult: (status, prompted) => {
+      ppgTrace.set({ permissionRequested: status }, 'permission-request', prompted ? status : `${status} (already held, not prompted)`);
+      if (status === 'granted') ppgTrace.mark('permission-granted');
+    },
+  });
+
   return {
     available: true,
-    async requestPermissions() {
-      try {
-        const status = await Camera.requestCameraPermission();
-        return status === 'granted';
-      } catch {
-        return false;
-      }
-    },
+    requestPermissions: ensurePermission,
     async start(onSample, onSignal) {
       resetSignalState();
+      ppgTrace.set({ stopped: false }, 'start');
       onSampleCb = onSample;
       onSignalCb = onSignal;
       running = true;
       runListeners.forEach((fn) => fn(true));
     },
+    retarget(onSample, onSignal) {
+      ppgTrace.note('retarget', 'session card took over the stream');
+      onSampleCb = onSample;
+      onSignalCb = onSignal;
+      lastSignalKey = ''; // force a re-emit so the new consumer sees current state
+    },
     async stop() {
+      ppgTrace.set({ stopped: true }, 'stop');
       running = false;
       onSampleCb = null;
       onSignalCb = null;

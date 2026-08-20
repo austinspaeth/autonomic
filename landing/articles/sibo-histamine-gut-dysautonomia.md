@@ -49,7 +49,7 @@ This is not a fringe association. In a review of the gut connection in dysautono
 Here is where it gets frustrating, because the pieces don't just coexist, they feed each other. SIBO can [drive histamine intolerance and food sensitivities](https://drbeckycampbell.com/sibo-histamine-intolerance-pots-and-dysautonomias-the-gut-connection/): some overgrown bacteria produce histamine directly, and an irritated, more permeable ("leaky") small-intestinal lining makes you more reactive to histamine in food. That extra histamine load lands on a body whose mast cells may already be trigger-happy, and the resulting flare (flushing, palpitations, more GI upset) is itself an autonomic and immune stressor that further degrades motility. Round and round it goes. This is the same [POTS / long COVID / MCAS overlap](/insights/postviral/pots-long-covid-and-mcas-overlap/) that so many people live inside, viewed from the gut.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 240" role="img" aria-label="A circular loop diagram showing how dysautonomia leads to weak gut motility, then SIBO, then histamine and leaky gut, then more symptoms and autonomic load, which feeds back to dysautonomia.">
+  <svg class="fig-d" viewBox="0 0 720 240" role="img" aria-label="A circular loop diagram showing how dysautonomia leads to weak gut motility, then SIBO, then histamine and leaky gut, then more symptoms and autonomic load, which feeds back to dysautonomia.">
     <defs>
       <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
         <path d="M0,0 L10,5 L0,10 z" fill="var(--dim-2)"/>
@@ -92,6 +92,36 @@ Here is where it gets frustrating, because the pieces don't just coexist, they f
       <path d="M85 142 L85 96" marker-end="url(#arrow)"/>
       <path d="M118 58 Q180 34 278 28" marker-end="url(#arrow)"/>
     </g>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 412" role="img" aria-label="A loop diagram showing how dysautonomia leads to weak gut motility, then SIBO, then histamine and leaky gut, then more symptoms and autonomic load, which feeds back to dysautonomia.">
+    <defs>
+      <marker id="arrow-m" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="var(--dim-2)"/>
+      </marker>
+    </defs>
+    <g font-family="Space Grotesk, sans-serif" font-size="13" text-anchor="middle">
+      <rect x="50" y="8" width="270" height="36" rx="8" fill="none" stroke="#f5a524" stroke-width="2"/>
+      <text x="185" y="31" fill="var(--dim-2)">Dysautonomia / POTS</text>
+      <rect x="50" y="76" width="270" height="36" rx="8" fill="none" stroke="var(--line)" stroke-width="2"/>
+      <text x="185" y="99" fill="var(--dim-2)">Weak MMC, slow gut</text>
+      <rect x="50" y="144" width="270" height="36" rx="8" fill="none" stroke="#e03127" stroke-width="2"/>
+      <text x="185" y="167" fill="var(--dim-2)">SIBO</text>
+      <rect x="50" y="212" width="270" height="36" rx="8" fill="none" stroke="#e03127" stroke-width="2"/>
+      <text x="185" y="235" fill="var(--dim-2)">Histamine, leaky gut</text>
+      <rect x="50" y="280" width="270" height="36" rx="8" fill="none" stroke="#f5a524" stroke-width="2"/>
+      <text x="185" y="303" fill="var(--dim-2)">More symptoms</text>
+      <rect x="50" y="348" width="270" height="36" rx="8" fill="none" stroke="var(--accent)" stroke-width="2"/>
+      <text x="185" y="371" fill="var(--dim-2)">Autonomic load</text>
+    </g>
+    <g stroke="var(--dim-2)" stroke-width="2" fill="none">
+      <path d="M185 44 L185 70" marker-end="url(#arrow-m)"/>
+      <path d="M185 112 L185 138" marker-end="url(#arrow-m)"/>
+      <path d="M185 180 L185 206" marker-end="url(#arrow-m)"/>
+      <path d="M185 248 L185 274" marker-end="url(#arrow-m)"/>
+      <path d="M185 316 L185 342" marker-end="url(#arrow-m)"/>
+      <path d="M50 366 L26 366 L26 26 L44 26" marker-end="url(#arrow-m)"/>
+    </g>
+    <text x="352" y="200" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10" transform="rotate(90 352 200)">the loop feeds itself</text>
   </svg>
   <figcaption>The self-reinforcing triad: dysautonomia slows the gut, overgrowth follows, histamine and inflammation rise, and the added load loops back to strain the autonomic system.</figcaption>
 </figure>

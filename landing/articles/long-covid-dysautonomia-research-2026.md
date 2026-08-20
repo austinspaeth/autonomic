@@ -50,7 +50,7 @@ Two stand out. First, **small-fiber neuropathy**: damage to the tiny nerve fiber
 These are findings a clinic can measure, which is exactly why tracking your own orthostatic numbers and HRV is more than a coping ritual. It mirrors what a lab does. For the mechanistic story behind the symptoms, see [what causes long COVID](/insights/postviral/what-causes-long-covid/) and our explainer on [post-exertional malaise](/insights/postviral/post-exertional-malaise-explained/).
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 210" role="img" aria-label="Diagram showing a viral infection leading to four converging mechanisms that produce autonomic dysfunction">
+  <svg class="fig-d" viewBox="0 0 720 210" role="img" aria-label="Diagram showing a viral infection leading to four converging mechanisms that produce autonomic dysfunction">
     <rect x="20" y="80" width="120" height="48" rx="8" fill="none" stroke="var(--line)"/>
     <text x="80" y="100" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="13" fill="var(--dim-2)">Viral</text>
     <text x="80" y="116" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="13" fill="var(--dim-2)">infection</text>
@@ -70,6 +70,26 @@ These are findings a clinic can measure, which is exactly why tracking your own 
     <rect x="470" y="80" width="230" height="48" rx="8" fill="none" stroke="#f5a524" stroke-width="2"/>
     <text x="585" y="100" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="13" fill="var(--dim-2)">Autonomic dysfunction</text>
     <text x="585" y="118" text-anchor="middle" font-family="Space Mono, monospace" font-size="11" fill="var(--dim-2)">POTS · low HRV · SFN</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 330" role="img" aria-label="Diagram showing a viral infection leading to four converging mechanisms that produce autonomic dysfunction">
+    <rect x="110" y="8" width="140" height="42" rx="8" fill="none" stroke="var(--line)"/>
+    <text x="180" y="26" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="13" fill="var(--dim-2)">Viral</text>
+    <text x="180" y="42" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="13" fill="var(--dim-2)">infection</text>
+    <line x1="180" y1="50" x2="180" y2="64" stroke="var(--line)" stroke-width="1.5"/>
+    <rect x="14" y="66" width="332" height="32" rx="7" fill="none" stroke="var(--line)"/>
+    <text x="180" y="87" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="12" fill="var(--dim-2)">Immune dysregulation</text>
+    <rect x="14" y="106" width="332" height="32" rx="7" fill="none" stroke="var(--line)"/>
+    <text x="180" y="127" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="12" fill="var(--dim-2)">Neuroinflammation</text>
+    <rect x="14" y="146" width="332" height="32" rx="7" fill="none" stroke="var(--line)"/>
+    <text x="180" y="167" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="12" fill="var(--dim-2)">Endothelial / microvascular injury</text>
+    <rect x="14" y="186" width="332" height="32" rx="7" fill="none" stroke="var(--line)"/>
+    <text x="180" y="207" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="12" fill="var(--dim-2)">Autoantibodies</text>
+    <line x1="180" y1="218" x2="180" y2="238" stroke="var(--line)" stroke-width="1.5"/>
+    <polygon points="180,244 174,232 186,232" fill="var(--line)"/>
+    <rect x="50" y="246" width="260" height="48" rx="8" fill="none" stroke="#f5a524" stroke-width="2"/>
+    <text x="180" y="266" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="13" fill="var(--dim-2)">Autonomic dysfunction</text>
+    <text x="180" y="284" text-anchor="middle" font-family="Space Mono, monospace" font-size="11" fill="var(--dim-2)">POTS · low HRV · SFN</text>
+    <text x="180" y="316" text-anchor="middle" font-family="Space Mono, monospace" font-size="10" fill="var(--dim-2)">four mechanisms, one downstream result</text>
   </svg>
   <figcaption>Multiple mechanisms appear to converge on the same downstream result: a dysregulated autonomic nervous system.</figcaption>
 </figure>

@@ -70,7 +70,7 @@ Standing up is one of the biggest everyday challenges your circulation faces. Th
 After COVID, that reflex is often sluggish or overzealous. If it overshoots, your heart rate rockets and you feel your pulse hammering, the pattern behind post-COVID POTS. A sustained rise of 30 beats per minute or more within ten minutes of standing (40 or more in teens), without a large blood pressure drop, is the defining sign.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 240" role="img" aria-label="Line chart comparing a typical heart rate response to standing against a POTS response, where the POTS line rises sharply and stays elevated.">
+  <svg class="fig-d" viewBox="0 0 720 240" role="img" aria-label="Line chart comparing a typical heart rate response to standing against a POTS response, where the POTS line rises sharply and stays elevated.">
     <line x1="70" y1="30" x2="70" y2="190" stroke="var(--line)" stroke-width="1.5"/>
     <line x1="70" y1="190" x2="680" y2="190" stroke="var(--line)" stroke-width="1.5"/>
     <text x="30" y="60" font-family="Space Mono, monospace" font-size="12" fill="var(--dim-2)">120</text>
@@ -83,6 +83,20 @@ After COVID, that reflex is often sluggish or overzealous. If it overshoots, you
     <polyline points="90,150 235,150 300,80 400,72 550,70 660,72" fill="none" stroke="#e03127" stroke-width="2.5"/>
     <text x="565" y="60" font-family="Space Grotesk, sans-serif" font-size="12" fill="#e03127">POTS: +40 bpm</text>
     <text x="565" y="160" font-family="Space Grotesk, sans-serif" font-size="12" fill="#54d98a">typical: +10 bpm</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 220" role="img" aria-label="Line chart comparing a typical heart rate response to standing against a POTS response, where the POTS line rises sharply and stays elevated.">
+    <line x1="44" y1="34" x2="44" y2="180" stroke="var(--line)" stroke-width="1.5"/>
+    <line x1="44" y1="180" x2="344" y2="180" stroke="var(--line)" stroke-width="1.5"/>
+    <text x="38" y="65" text-anchor="end" font-family="Space Mono, monospace" font-size="11" fill="var(--dim-2)">120</text>
+    <text x="38" y="124" text-anchor="end" font-family="Space Mono, monospace" font-size="11" fill="var(--dim-2)">90</text>
+    <text x="38" y="180" text-anchor="end" font-family="Space Mono, monospace" font-size="11" fill="var(--dim-2)">60</text>
+    <line x1="125" y1="34" x2="125" y2="180" stroke="var(--line)" stroke-width="1" stroke-dasharray="4 4"/>
+    <text x="48" y="198" font-family="Space Grotesk, sans-serif" font-size="11.5" fill="var(--dim-2)">lying rest</text>
+    <text x="131" y="198" font-family="Space Grotesk, sans-serif" font-size="11.5" fill="var(--dim-2)">stand up</text>
+    <polyline points="54,144 125,144 157,133 206,134 280,133 334,133" fill="none" stroke="#54d98a" stroke-width="2.5"/>
+    <polyline points="54,144 125,144 157,80 206,72 280,70 334,72" fill="none" stroke="#e03127" stroke-width="2.5"/>
+    <text x="344" y="60" text-anchor="end" font-family="Space Grotesk, sans-serif" font-size="12" fill="#e03127">POTS: +40 bpm</text>
+    <text x="344" y="160" text-anchor="end" font-family="Space Grotesk, sans-serif" font-size="12" fill="#54d98a">typical: +10 bpm</text>
   </svg>
   <figcaption>In POTS, heart rate leaps on standing and stays elevated, while a typical response settles quickly.</figcaption>
 </figure>

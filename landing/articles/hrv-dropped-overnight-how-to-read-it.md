@@ -55,7 +55,7 @@ This is the core idea this whole app is built around, and it is worth repeating:
 The fix is simple and it changes everything: stop looking at today's dot and start looking at your **7-to-14-day rolling average**. A rolling baseline smooths out the daily noise and shows you the line underneath the jitter, the direction your nervous system is actually heading.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 240" role="img" aria-label="A jagged day-to-day HRV line spiking up and down over two weeks, with a smooth rolling baseline line gently rising underneath it.">
+  <svg class="fig-d" viewBox="0 0 720 240" role="img" aria-label="A jagged day-to-day HRV line spiking up and down over two weeks, with a smooth rolling baseline line gently rising underneath it.">
     <line x1="60" y1="200" x2="700" y2="200" stroke="var(--line)" stroke-width="1.5"/>
     <line x1="60" y1="30" x2="60" y2="200" stroke="var(--line)" stroke-width="1.5"/>
     <text x="20" y="40" font-family="Space Mono, monospace" font-size="12" fill="var(--dim-2)">HRV</text>
@@ -66,6 +66,18 @@ The fix is simple and it changes everything: stop looking at today's dot and sta
     <path d="M60,158 C180,150 260,140 380,128 C500,116 600,104 660,96" fill="none" stroke="#54d98a" stroke-width="4" stroke-linecap="round"/>
     <text x="120" y="80" font-family="Space Grotesk, sans-serif" font-size="12" fill="#e03127">daily readings (noise)</text>
     <text x="470" y="150" font-family="Space Grotesk, sans-serif" font-size="12" fill="#54d98a">rolling baseline (signal)</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 232" role="img" aria-label="A jagged day-to-day HRV line spiking up and down over two weeks, with a smooth rolling baseline line gently rising underneath it.">
+    <line x1="44" y1="180" x2="336" y2="180" stroke="var(--line)" stroke-width="1.5"/>
+    <line x1="44" y1="34" x2="44" y2="180" stroke="var(--line)" stroke-width="1.5"/>
+    <text x="16" y="44" font-family="Space Mono, monospace" font-size="11.5" fill="var(--dim-2)">HRV</text>
+    <polyline fill="none" stroke="#e03127" stroke-width="2" stroke-opacity="0.85"
+      points="44,137 66,90 89,150 111,103 134,167 156,111 178,86 201,146 223,98 245,137 268,77 290,128 313,68 336,111"/>
+    <path d="M44,144 C102,137 141,128 200,118 C258,108 307,98 336,91" fill="none" stroke="#54d98a" stroke-width="4" stroke-linecap="round"/>
+    <text x="44" y="198" font-family="Space Grotesk, sans-serif" font-size="11.5" fill="var(--dim-2)">Day 1</text>
+    <text x="336" y="198" text-anchor="end" font-family="Space Grotesk, sans-serif" font-size="11.5" fill="var(--dim-2)">Day 14</text>
+    <text x="44" y="222" font-family="Space Grotesk, sans-serif" font-size="11" fill="#e03127">daily readings (noise)</text>
+    <text x="336" y="222" text-anchor="end" font-family="Space Grotesk, sans-serif" font-size="11" fill="#54d98a">rolling baseline (signal)</text>
   </svg>
   <figcaption>The jagged red line is your daily HRV. The green line is the 7-14 day trend. Ignore the spikes; watch the trend.</figcaption>
 </figure>

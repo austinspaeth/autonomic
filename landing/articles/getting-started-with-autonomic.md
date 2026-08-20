@@ -61,7 +61,7 @@ Everything else is logged as it happens, in seconds:
 None of this is meant to be a chore. A tap when you notice something, and you're done.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 210" role="img" aria-label="A weekly timeline showing day one as baseline setup and the rest of the week as short consistent daily readings, with a trend emerging after one to two weeks.">
+  <svg class="fig-d" viewBox="0 0 720 210" role="img" aria-label="A weekly timeline showing day one as baseline setup and the rest of the week as short consistent daily readings, with a trend emerging after one to two weeks.">
     <line x1="40" y1="150" x2="680" y2="150" stroke="var(--line)" stroke-width="2"/>
     <!-- Day 1 -->
     <circle cx="90" cy="150" r="8" fill="var(--accent)"/>
@@ -79,6 +79,22 @@ None of this is meant to be a chore. A tap when you notice something, and you're
     <path d="M170 90 C 320 80, 470 60, 630 42" fill="none" stroke="#54d98a" stroke-width="2.5" stroke-dasharray="5 5"/>
     <polygon points="630,42 620,44 624,52" fill="#54d98a"/>
     <text x="640" y="34" text-anchor="end" font-family="Space Grotesk, sans-serif" font-size="12" fill="#54d98a">a trend appears (~1–2 weeks)</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 180" role="img" aria-label="A weekly timeline showing day one as baseline setup and the rest of the week as short consistent daily readings, with a trend emerging after one to two weeks.">
+    <line x1="24" y1="130" x2="336" y2="130" stroke="var(--line)" stroke-width="2"/>
+    <circle cx="44" cy="130" r="8" fill="var(--accent)"/>
+    <text x="24" y="158" font-family="Space Grotesk, sans-serif" font-size="12.5" fill="var(--dim-2)">Day 1</text>
+    <text x="24" y="110" font-family="Space Grotesk, sans-serif" font-size="11.5" fill="var(--dim-2)">baseline</text>
+    <circle cx="94" cy="130" r="5" fill="#38bdf8"/>
+    <circle cx="134" cy="130" r="5" fill="#38bdf8"/>
+    <circle cx="174" cy="130" r="5" fill="#38bdf8"/>
+    <circle cx="214" cy="130" r="5" fill="#38bdf8"/>
+    <circle cx="254" cy="130" r="5" fill="#38bdf8"/>
+    <circle cx="294" cy="130" r="5" fill="#38bdf8"/>
+    <text x="336" y="158" text-anchor="end" font-family="Space Grotesk, sans-serif" font-size="12.5" fill="var(--dim-2)">short daily readings</text>
+    <path d="M84 86 C 170 78, 250 60, 330 44" fill="none" stroke="#54d98a" stroke-width="2.5" stroke-dasharray="5 5"/>
+    <polygon points="330,44 320,46 324,54" fill="#54d98a"/>
+    <text x="336" y="26" text-anchor="end" font-family="Space Grotesk, sans-serif" font-size="11.5" fill="#54d98a">a trend appears (~1–2 weeks)</text>
   </svg>
   <figcaption>One rich day-one setup, then light consistent days. The pattern only becomes readable after a week or two.</figcaption>
 </figure>

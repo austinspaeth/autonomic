@@ -77,7 +77,7 @@ Line all your RR intervals up in order and plot them (interval length on the ver
 Here's the part that surprises people: a healthy resting tachogram is **not** a flat line. It rolls.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 260" role="img" aria-label="A tachogram: RR interval length plotted over time as a wavy line rolling up and down with breathing, with one sharp downward spike labelled as an artifact from a missed or extra beat">
+  <svg class="fig-d" viewBox="0 0 720 260" role="img" aria-label="A tachogram: RR interval length plotted over time as a wavy line rolling up and down with breathing, with one sharp downward spike labelled as an artifact from a missed or extra beat">
     <text x="20" y="24" fill="var(--text)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="15">Tachogram: RR interval over time</text>
     <line x1="52" y1="40" x2="52" y2="210" stroke="var(--line-2)" stroke-width="1" />
     <line x1="52" y1="210" x2="700" y2="210" stroke="var(--line-2)" stroke-width="1" />
@@ -90,6 +90,20 @@ Here's the part that surprises people: a healthy resting tachogram is **not** a 
     <text x="700" y="116" text-anchor="end" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">mean</text>
     <path d="M60 118 C 90 78, 120 76, 150 116 C 180 156, 210 158, 240 118 C 270 80, 300 78, 330 118 C 360 156, 390 158, 420 118 C 450 80, 480 82, 510 118 C 540 154, 570 156, 600 118 C 630 82, 660 84, 690 116" fill="none" stroke="#22c55e" stroke-width="2.5" />
     <g><circle cx="285" cy="196" r="4" fill="#ef4444" /><line x1="285" y1="120" x2="285" y2="192" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="3 3" /><text x="285" y="94" text-anchor="middle" fill="#ef4444" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="11">artifact</text><text x="285" y="108" text-anchor="middle" fill="var(--dim-2)" font-family="-apple-system, sans-serif" font-size="9">extra / missed beat</text></g>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 244" role="img" aria-label="A tachogram: RR interval length plotted over time as a wavy line rolling up and down with breathing, with one sharp downward spike labelled as an artifact from a missed or extra beat">
+    <text x="20" y="18" fill="var(--text)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13">Tachogram: RR interval over time</text>
+    <line x1="40" y1="40" x2="40" y2="200" stroke="var(--line-2)" stroke-width="1" />
+    <line x1="40" y1="200" x2="344" y2="200" stroke="var(--line-2)" stroke-width="1" />
+    <text x="36" y="72" text-anchor="end" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="9.5">1000</text>
+    <text x="36" y="128" text-anchor="end" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="9.5">900</text>
+    <text x="36" y="184" text-anchor="end" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="9.5">800</text>
+    <text x="12" y="124" text-anchor="middle" fill="var(--dim)" font-family="-apple-system, sans-serif" font-size="11" transform="rotate(-90 12 124)">RR (ms)</text>
+    <text x="192" y="224" text-anchor="middle" fill="var(--dim)" font-family="-apple-system, sans-serif" font-size="11">time →</text>
+    <line x1="40" y1="115" x2="344" y2="115" stroke="var(--line-2)" stroke-width="1" stroke-dasharray="4 4" />
+    <text x="344" y="111" text-anchor="end" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="9.5">mean</text>
+    <path d="M 44,113 C 58,76 72,74 86,112 C 100,149 114,151 128,113 C 142,78 156,76 170,113 C 184,149 199,151 213,113 C 227,78 241,80 255,113 C 269,147 283,149 297,113 C 311,80 325,81 339,112" fill="none" stroke="#22c55e" stroke-width="2.5" />
+    <g><circle cx="149" cy="187" r="4" fill="#ef4444" /><line x1="149" y1="115" x2="149" y2="183" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="3 3" /><text x="149" y="52" text-anchor="middle" fill="#ef4444" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="11">artifact</text><text x="149" y="64" text-anchor="middle" fill="var(--dim-2)" font-family="-apple-system, sans-serif" font-size="9">extra / missed beat</text></g>
   </svg>
   <figcaption>A resting tachogram rolls in gentle waves as breathing speeds and slows the heart. The lone downward spike is an artifact, a beat that doesn't fit the rhythm, which software corrects before computing HRV.</figcaption>
 </figure>

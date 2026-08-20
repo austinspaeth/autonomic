@@ -102,6 +102,75 @@ a { color: inherit; text-decoration: none; }
 .btn-ghost { background: rgba(255,255,255,0.04); color: var(--text); border-color: var(--line-2); }
 .btn-ghost:hover { background: rgba(255,255,255,0.08); transform: translateY(-2px); }
 
+/* Platform-aware download button. The glyph slot is empty (and hidden) until
+   the site-wide script sniffs a phone and injects the Apple / Android icon;
+   on desktop it stays iconless and opens the dual-download modal. */
+.btn-download { gap: 8px; }
+.btn-dl-ic { display: none; }
+.btn-download.has-ic .btn-dl-ic { display: inline-flex; }
+/* flex:none + a matching min-width on both the slot and the svg: inside a
+   shrinking flex row a bare svg squashes instead of holding its box. */
+.btn-dl-ic { flex: none; }
+.btn-dl-ic svg { width: 17px; height: 17px; min-width: 17px; margin-top: -2px; flex: none; }
+
+/* ---------- Download modal ---------- */
+.dlm {
+  position: fixed; inset: 0; z-index: 300;
+  display: grid; place-items: center; padding: 20px;
+}
+.dlm[hidden] { display: none; }
+.dlm-backdrop {
+  position: absolute; inset: 0;
+  background: rgba(2,2,4,0.72);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  animation: dlm-fade 0.2s var(--ease);
+}
+.dlm-panel {
+  position: relative; z-index: 1;
+  width: 100%; max-width: 480px;
+  background: var(--panel); border: 1px solid var(--line-2);
+  border-radius: var(--r-lg); padding: 30px 28px 28px;
+  box-shadow: 0 40px 90px -30px rgba(0,0,0,0.9);
+  animation: dlm-pop 0.24s var(--bounce);
+  text-align: center;
+}
+.dlm-x {
+  position: absolute; top: 14px; right: 14px;
+  width: 34px; height: 34px; border-radius: 50%;
+  background: var(--panel-2); border: 1px solid var(--line);
+  color: var(--dim); display: grid; place-items: center; cursor: pointer;
+  transition: color 0.2s, background 0.2s;
+}
+.dlm-x:hover { color: var(--text); background: rgba(255,255,255,0.09); }
+.dlm-x svg { width: 17px; height: 17px; }
+.dlm-eyebrow {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--accent-2); margin: 0 0 8px;
+}
+.dlm-title { font-family: var(--display); font-weight: 600; font-size: 26px; letter-spacing: -0.02em; margin: 0 0 8px; }
+.dlm-sub { font-size: 14.5px; color: var(--dim); margin: 0 auto 24px; max-width: 34ch; line-height: 1.5; }
+.dlm-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.dlm-col {
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+  background: var(--panel-2); border: 1px solid var(--line);
+  border-radius: var(--r); padding: 18px 14px;
+}
+.dlm-badge { display: block; transition: transform 0.18s var(--bounce); }
+.dlm-badge:hover { transform: translateY(-2px); }
+.dlm-badge svg { width: 138px; height: 46px; }
+.dlm-qr {
+  background: #fff; border-radius: 12px; padding: 9px; line-height: 0;
+  box-shadow: 0 4px 14px -6px rgba(0,0,0,0.5);
+}
+.dlm-qr img { width: 140px; height: 140px; }
+.dlm-scan { font-family: var(--mono); font-size: 11px; letter-spacing: 0.05em; color: var(--dim); }
+@keyframes dlm-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes dlm-pop { from { opacity: 0; transform: translateY(14px) scale(0.97); } to { opacity: 1; transform: none; } }
+@media (max-width: 460px) {
+  .dlm-cols { grid-template-columns: 1fr; }
+  .dlm-panel { padding: 26px 20px 22px; }
+}
+
 /* ============================================================
    NAV
    ============================================================ */
@@ -122,6 +191,8 @@ a { color: inherit; text-decoration: none; }
   font-family: var(--display); font-weight: 700; font-size: 19px; letter-spacing: -0.01em;
 }
 .brand-mark { width: 26px; height: 26px; color: var(--accent); }
+/* The app's real mark is wide (651.59 x 348.34), so it sizes by width. */
+.brand-mark-app { width: 34px; height: 18px; }
 .nav-links { display: flex; gap: 4px; margin-left: auto; }
 .nav-links a {
   font-size: 14.5px; color: var(--dim); padding: 8px 14px; border-radius: 999px;
@@ -167,6 +238,9 @@ a { color: inherit; text-decoration: none; }
   font-size: clamp(38px, 6vw, 70px); line-height: 1.02; letter-spacing: -0.035em;
   margin: 0 0 22px; text-wrap: balance;
 }
+/* Desktop keeps "nervous system" on one line; on a phone the headline just
+   flows, so it never breaks early after "your". */
+.h1-keep { white-space: nowrap; }
 .hero-lead { font-size: clamp(17px, 1.8vw, 20px); color: var(--dim); margin: 0 0 30px; max-width: 52ch; }
 .hero-lead strong { color: var(--text); font-weight: 600; }
 .hero-actions { display: flex; gap: 12px; flex-wrap: wrap; }
@@ -175,6 +249,7 @@ a { color: inherit; text-decoration: none; }
   list-style: none; display: flex; flex-wrap: wrap; gap: 8px 22px; margin: 26px 0 0; padding: 0;
   font-size: 14px; color: var(--dim-2);
 }
+.hero-trust li { white-space: nowrap; }
 .hero-trust li { position: relative; padding-left: 18px; }
 .hero-trust li::before {
   content: ""; position: absolute; left: 0; top: 50%; width: 7px; height: 7px;
@@ -182,7 +257,7 @@ a { color: inherit; text-decoration: none; }
 }
 
 /* Hero stage + phone */
-.hero-stage { position: relative; display: flex; justify-content: center; align-items: center; min-height: 560px; }
+.hero-stage { position: relative; display: flex; justify-content: center; align-items: center; min-height: 730px; }
 .orbit-chip {
   position: absolute; z-index: 5;
   display: inline-flex; align-items: center; gap: 8px;
@@ -194,54 +269,137 @@ a { color: inherit; text-decoration: none; }
 }
 .orbit-chip .dot { width: 9px; height: 9px; border-radius: 50%; }
 .orbit-chip em { color: var(--dim); font-style: normal; font-weight: 500; }
-.chip-a { top: 8%; left: -2%; animation-delay: 0s; }
+.chip-a { top: 5%; left: -4%; animation-delay: 0s; }
 .chip-b { top: 40%; right: -6%; animation-delay: 1.4s; }
-.chip-c { bottom: 9%; left: 2%; animation-delay: 2.6s; }
+.chip-c { bottom: 44%; left: -7%; animation-delay: 2.6s; }
 @keyframes floaty { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
 
 .phone {
-  position: relative; z-index: 3; width: 300px;
+  position: relative; z-index: 3; width: 292px;
   background: #0c0c0e; border: 1px solid var(--line-2);
-  border-radius: 42px; padding: 12px;
+  border-radius: 46px; padding: 11px;
   box-shadow: 0 40px 90px -30px rgba(0,0,0,0.9), 0 0 0 1px rgba(255,255,255,0.03) inset;
 }
 .phone-float { animation: phonefloat 8s ease-in-out infinite; }
 @keyframes phonefloat { 0%,100% { transform: translateY(0) rotate(-1deg); } 50% { transform: translateY(-16px) rotate(0.5deg); } }
 .phone-screen {
-  background: #000; border-radius: 31px; overflow: hidden; padding: 14px 13px 12px;
-  font-family: var(--body);
+  position: relative; height: 648px; overflow: hidden;
+  background: #000; border-radius: 36px;
+  font-family: var(--body); color: #fff;
 }
 
-/* In-phone app mock */
-.mk-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-.mk-brand { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; }
-.mk-brand svg { width: 17px; height: 17px; color: var(--accent); }
-.mk-top-ic { color: var(--dim); font-size: 13px; letter-spacing: 4px; }
-.mk-datebar { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 12px; color: var(--dim); font-size: 13px; }
-.mk-date { background: var(--panel-2); color: var(--accent); padding: 6px 30px; border-radius: 12px; font-weight: 600; }
-.mk-daycard { border: 1px solid var(--line); border-radius: 16px; padding: 13px; margin-bottom: 10px; }
+/* ---- In-phone app mock: a close replica of the Journal tab ---- */
+/* iOS status bar */
+.mk-statusbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 9px 20px 0; color: #fff;
+}
+.mk-time { font-size: 12.5px; font-weight: 600; letter-spacing: -0.01em; }
+.mk-island { width: 66px; height: 19px; border-radius: 999px; background: #0c0c0e; }
+.mk-sysic { display: inline-flex; align-items: center; gap: 5px; }
+.mk-wifi { width: 15px; height: 11px; }
+.mk-batt { width: 24px; height: 11px; }
+
+/* Date bar */
+.mk-datebar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 10px 8px; color: var(--dim); font-size: 14px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.mk-arw { width: 20px; text-align: center; color: #8b8b93; }
+.mk-date {
+  flex: 1; text-align: center; background: #131316; color: #fff;
+  padding: 7px 0; border-radius: 11px; font-weight: 600; font-size: 12.5px;
+}
+
+/* Scrolling body */
+.mk-scroll { padding: 8px 9px 0; }
+
+.mk-daycard {
+  border: 1px solid rgba(110,224,110,0.45); border-radius: 15px; padding: 11px;
+  margin-bottom: 8px; background: rgba(22,163,74,0.10);
+}
 .mk-head { display: flex; align-items: center; justify-content: space-between; }
-.mk-mode { font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--dim); font-weight: 700; }
-.mk-chip { font-size: 9px; font-weight: 800; color: #fff; padding: 3px 9px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.03em; }
-.mk-gauge { position: relative; width: 130px; height: 130px; margin: 8px auto 2px; }
+.mk-mode { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--dim); font-weight: 800; }
+.mk-chip { font-size: 9px; font-weight: 800; color: #06210b; background: #6ee06e; padding: 4px 10px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.04em; }
+.mk-chip-good { background: #4fb95a; color: #04180a; }
+.mk-gauge { position: relative; width: 112px; height: 112px; margin: 0 auto -4px; }
 .mk-gauge svg { width: 100%; height: 100%; }
 .mk-gauge-in { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-.mk-num { font-size: 42px; font-weight: 800; line-height: 1; letter-spacing: -0.02em; font-family: var(--display); }
-.mk-den { font-size: 8px; font-weight: 700; letter-spacing: 0.12em; color: var(--dim); margin-top: 4px; }
-.mk-status { text-align: center; font-size: 11px; color: var(--dim); font-weight: 600; margin-top: 8px; }
-.mk-guide { font-size: 11.5px; line-height: 1.45; color: var(--text); margin-top: 10px; opacity: 0.92; }
-.mk-row { display: flex; align-items: center; gap: 10px; padding: 9px 2px; border-top: 1px solid var(--line); font-size: 12.5px; }
-.mk-ico { color: var(--dim); width: 16px; text-align: center; }
-.mk-rt { flex: 1; }
-.mk-rv { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.mk-rv .dot { width: 7px; height: 7px; border-radius: 50%; }
-.mk-tabbar {
-  display: flex; gap: 2px; margin-top: 12px; padding: 5px; border-radius: 999px;
-  background: rgba(255,255,255,0.05); border: 1px solid var(--line);
-  font-size: 9.5px; color: var(--dim); justify-content: space-between;
+.mk-num { font-size: 32px; font-weight: 800; line-height: 1; letter-spacing: -0.02em; font-family: var(--display); }
+.mk-den { font-size: 7.5px; font-weight: 700; letter-spacing: 0.14em; color: var(--dim); margin-top: 4px; }
+.mk-pow {
+  display: flex; align-items: center; justify-content: center; gap: 4px;
+  width: fit-content; margin: 0 auto; padding: 2.5px 9px;
+  border: 1px solid rgba(255,255,255,0.12); border-radius: 999px;
+  font-size: 8px; color: var(--dim); font-weight: 600;
 }
-.mk-tabbar span { flex: 1; text-align: center; padding: 6px 2px; border-radius: 999px; }
-.mk-tabbar .on { background: rgba(255,255,255,0.1); color: var(--text); font-weight: 600; }
+.mk-pow i {
+  width: 9px; height: 9px; border-radius: 50%; border: 1px solid currentColor;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-style: normal; font-size: 6.5px; font-weight: 700;
+}
+.mk-status { text-align: center; font-size: 9px; color: var(--dim); font-weight: 600; margin-top: 5px; }
+.mk-guide { font-size: 9.5px; line-height: 1.38; color: #fff; margin-top: 5px; opacity: 0.92; }
+
+/* Milestones / clean-day tiles */
+.mk-tile {
+  display: flex; align-items: center; gap: 10px;
+  background: #131316; border: 1px solid var(--line); border-radius: 16px;
+  padding: 8px 10px; margin-bottom: 7px;
+}
+.mk-tile-ic { flex: none; width: 30px; height: 30px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; }
+.mk-tile-ic svg { width: 17px; height: 17px; }
+.mk-tile-body { flex: 1; min-width: 0; display: block; }
+.mk-tile-body b { display: block; font-size: 11.5px; font-weight: 700; line-height: 1.25; }
+.mk-tile-mute { color: var(--dim); font-weight: 500; }
+.mk-tile-sub { display: block; font-size: 10px; color: var(--dim); margin-top: 1px; }
+.mk-bar { display: block; height: 3.5px; border-radius: 999px; background: rgba(255,255,255,0.10); margin-top: 4px; overflow: hidden; }
+.mk-bar i { display: block; height: 100%; background: #e03127; border-radius: 999px; }
+.mk-chev { flex: none; color: var(--dim); font-size: 16px; line-height: 1; }
+
+/* Sections */
+.mk-sec { margin-bottom: 8px; background: #131316; border: 1px solid var(--line); border-radius: 15px; padding: 9px; }
+.mk-sec-h { font-size: 9px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--dim); font-weight: 800; padding: 1px 2px 7px; }
+.mk-sec-card { background: #1b1b20; border: 1px solid var(--line); border-radius: 12px; padding: 10px; }
+.mk-big { display: flex; align-items: baseline; gap: 6px; margin-top: 5px; }
+.mk-big b { font-family: var(--display); font-size: 26px; font-weight: 800; line-height: 1; letter-spacing: -0.02em; }
+.mk-big span { font-size: 12.5px; font-weight: 700; color: var(--dim); }
+.mk-sub { font-size: 10.5px; color: var(--dim); margin-top: 5px; }
+.mk-stages { display: flex; gap: 2px; height: 7px; margin-top: 9px; }
+.mk-stages i { border-radius: 3px; }
+.mk-legend { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 8px; font-size: 9.5px; color: #fff; }
+.mk-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.mk-legend i { width: 8px; height: 8px; border-radius: 2px; }
+
+.mk-sec-list { background: none; border: 0; padding: 0 2px; }
+.mk-row { display: flex; align-items: center; gap: 8px; padding: 9px 0; font-size: 11.5px; }
+.mk-row + .mk-row { border-top: 1px solid var(--line); }
+.mk-ico { color: var(--dim); width: 14px; text-align: center; }
+.mk-rt { flex: 1; min-width: 0; }
+.mk-rv { display: inline-flex; align-items: center; gap: 5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.mk-rv .dot { width: 7px; height: 7px; border-radius: 50%; }
+.mk-time-pill { font-size: 9.5px; color: var(--dim); background: rgba(255,255,255,0.07); border-radius: 999px; padding: 3px 7px; }
+
+/* Floating tab bar (as in the app) */
+.mk-tabbar {
+  position: absolute; left: 14px; right: 14px; bottom: 14px; z-index: 2; overflow: hidden;
+  display: flex; align-items: center; gap: 2px; padding: 6px;
+  border-radius: 999px; background: rgba(0,0,0,0.42);
+  border: 1px solid rgba(255,255,255,0.18);
+  box-shadow: 0 14px 30px -12px rgba(0,0,0,0.95), inset 0 1px 0 rgba(255,255,255,0.06);
+  backdrop-filter: blur(22px) saturate(140%); -webkit-backdrop-filter: blur(22px) saturate(140%);
+}
+.mk-tab {
+  flex: 1; display: inline-flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 6px 2px; border-radius: 999px; color: var(--dim);
+}
+.mk-tab svg { width: 17px; height: 17px; }
+.mk-tab b { font-size: 8.5px; font-weight: 600; }
+.mk-tab.on { background: rgba(255,255,255,0.10); color: #fff; }
+.mk-tab-brand { flex: 0 0 34px; color: var(--accent); }
+.mk-tab-brand svg { width: 26px; height: 14px; }
+.mk-tab-gear { flex: 0 0 30px; }
 
 /* ============================================================
    CONDITIONS STRIP
@@ -383,6 +541,232 @@ a { color: inherit; text-decoration: none; }
 .ch-x { display: flex; justify-content: space-between; font-size: 11px; color: var(--dim); margin-top: 8px; font-variant-numeric: tabular-nums; }
 
 /* ============================================================
+   APPLE WATCH - interactive companion demo
+   The device face replicates the real watchOS app screen for screen
+   (mobile/targets/watch/*.swift): same stages, copy, glyphs and
+   colours. The --wa-* tokens below mirror DesignSystem.swift and the
+   asset catalog in targets/watch/expo-target.config.js, so the screen
+   stays true to the shipped build; the section chrome around it uses
+   the site's own tokens. Type is scaled up from the Swift point sizes
+   (a true-scale watch face is unreadable on a desktop page) but the
+   hierarchy and layout are kept.
+   ============================================================ */
+.watch {
+  --wa-accent: #e03127;                 /* DS.accent */
+  --wa-blue: #4aa3f0;                   /* DS.blue */
+  --wa-amber: #e0a030;                  /* DS.amber */
+  --wa-green: #3ec46d;                  /* DS.green */
+  --wa-purple: #9d6bf5;                 /* DS.purple */
+  --wa-card: #161618;                   /* DS.card */
+  --wa-tile: #131315;                   /* DS.tile */
+  --wa-dim: #8a8a92;                    /* DS.dim */
+  --wa-faint: rgba(255,255,255,0.3);    /* DS.faint - held-but-stale data */
+  --wa-num: "Manrope", var(--display);  /* DS.number - Manrope ExtraBold */
+  position: relative;
+  overflow: hidden;
+}
+.watch-glow { position: absolute; right: -160px; top: 8%; width: 620px; height: 620px; background: radial-gradient(circle, rgba(224,49,39,0.16), transparent 62%); filter: blur(14px); pointer-events: none; }
+.watch-grid { display: grid; grid-template-columns: 1.02fr 0.98fr; gap: 56px; align-items: center; position: relative; z-index: 2; }
+.watch-copy { max-width: 560px; }
+.watch-pill { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 12px; letter-spacing: 0.06em; color: var(--accent-2); background: var(--accent-soft); border: 1px solid rgba(224,49,39,0.3); border-radius: 999px; padding: 6px 14px; margin-bottom: 20px; }
+.watch-pill i { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 0 rgba(224,49,39,0.6); animation: wa-pulse 2s infinite; }
+@keyframes wa-pulse { 0% { box-shadow: 0 0 0 0 rgba(224,49,39,0.55); } 70% { box-shadow: 0 0 0 8px rgba(224,49,39,0); } 100% { box-shadow: 0 0 0 0 rgba(224,49,39,0); } }
+/* Platform caveat. Deliberately plain: an Android reader should meet this
+   before they've spent two minutes playing with a watch they can't buy for. */
+.watch-note {
+  margin: 16px 0 0; padding: 12px 15px; max-width: 54ch;
+  font-size: 13.5px; line-height: 1.55; color: var(--dim-2);
+  background: rgba(255,255,255,0.03); border: 1px solid var(--line); border-radius: 12px;
+}
+.watch-note b { color: var(--dim); font-weight: 600; }
+
+/* Mode selector - mirrors the watch home screen's three rows, same order */
+.wa-modes { display: flex; flex-direction: column; gap: 12px; margin-top: 30px; }
+.wa-mode {
+  display: flex; align-items: center; gap: 16px; width: 100%; text-align: left; cursor: pointer;
+  font-family: var(--body); color: inherit; background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--r); padding: 16px 18px;
+  transition: border-color 0.25s var(--ease), background 0.25s, transform 0.2s var(--bounce);
+}
+.wa-mode:hover { border-color: var(--line-2); transform: translateX(3px); }
+/* Selected: the card takes the mode's own colour, so a blue POTS Test doesn't
+   sit inside a red frame. --wa-tint / --wa-soft are set per card in the markup
+   from DS.accent / DS.blue / DS.purple. */
+.wa-mode.active { border-color: var(--wa-tint, var(--accent)); background: linear-gradient(90deg, var(--wa-soft, var(--accent-soft)), transparent 70%); }
+/* Tinted the way the watch home screen tints its rows: the glyph in the mode's
+   colour on a 12%-alpha wash of it. */
+.wa-mode-ic { flex: none; width: 46px; height: 46px; border-radius: 13px; background: var(--wa-soft, var(--panel-2)); color: var(--wa-tint, var(--dim)); display: grid; place-items: center; transition: color 0.25s, background 0.25s; }
+.wa-mode-ic svg { width: 24px; height: 24px; }
+.wa-mode.active .wa-mode-ic { background: var(--wa-tint, var(--accent)); color: #fff; }
+.wa-mode-txt { flex: 1; min-width: 0; }
+.wa-mode-txt b { display: block; font-family: var(--display); font-weight: 600; font-size: 16.5px; letter-spacing: -0.01em; }
+.wa-mode-txt span { font-size: 13.5px; color: var(--dim); line-height: 1.4; }
+.wa-mode-go { flex: none; color: var(--dim-2); font-size: 20px; transition: color 0.25s, transform 0.25s var(--bounce); }
+.wa-mode.active .wa-mode-go { color: var(--wa-tint, var(--accent-2)); transform: translateX(2px); }
+
+/* Device */
+.watch-stage { display: flex; flex-direction: column; align-items: center; gap: 20px; }
+.wa-device { position: relative; width: 300px; }
+.wa-case {
+  position: relative; border-radius: 76px; padding: 18px;
+  background: linear-gradient(150deg, #3a3a3f, #17171a 46%, #29292d);
+  box-shadow: 0 40px 90px -30px rgba(0,0,0,0.9), inset 0 0 0 1px rgba(255,255,255,0.08);
+}
+.wa-crown, .wa-side { position: absolute; right: -5px; background: linear-gradient(90deg, #46464b, #202024); border-radius: 3px 5px 5px 3px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08); }
+.wa-crown { top: 98px; width: 8px; height: 40px; }
+.wa-crown::after { content: ""; position: absolute; right: -3px; top: 50%; transform: translateY(-50%); width: 5px; height: 26px; border-radius: 4px; background: linear-gradient(90deg, #3a3a3f, #1a1a1d); }
+.wa-side { top: 158px; width: 6px; height: 52px; }
+.wa-screen {
+  position: relative; aspect-ratio: 41 / 50; border-radius: 58px; overflow: hidden;
+  background: #000; box-shadow: inset 0 0 0 2px rgba(0,0,0,0.9); color: #fff;
+}
+/* Each face is a full-screen watchOS view. Scrolling faces mirror the
+   app's ScrollView (Start on the fold, Back/Skip just below it). */
+.wa-face { position: absolute; inset: 0; padding: 16px 14px; display: none; flex-direction: column; }
+.wa-face.on { display: flex; animation: wa-in 0.32s var(--ease); }
+.wa-face.scrolls { overflow-y: auto; overflow-x: hidden; scrollbar-width: none; }
+.wa-face.scrolls::-webkit-scrollbar { display: none; }
+@keyframes wa-in { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: none; } }
+
+/* Shared watch controls (DesignSystem.swift) */
+.wa-lbl { font-size: 10px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: var(--wa-dim); text-align: center; }
+.wa-sub { font-size: 11px; color: var(--wa-dim); text-align: center; }
+.wa-btn { display: block; width: 100%; font-family: var(--body); font-size: 14.5px; font-weight: 700; color: #fff; background: var(--wa-accent); border: 0; border-radius: 15px; padding: 12px; cursor: pointer; text-align: center; }
+/* Skip to standing / Finish now / End early. The app draws these smaller than
+   the primary action (SecondaryButton 13.5pt vs PrimaryButton 16pt), so they
+   stay a step down — just not as small as before. */
+.wa-btn.sec { font-size: 13px; font-weight: 600; color: var(--wa-dim); background: var(--wa-card); border-radius: 14px; padding: 11px; }
+/* The intro Back: Start's dimensions, secondary styling. */
+.wa-btn.back { color: var(--wa-dim); background: var(--wa-card); }
+.wa-num { font-family: var(--wa-num); font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+.wa-chip { display: inline-block; font-family: var(--wa-num); font-weight: 800; font-size: 11px; font-variant-numeric: tabular-nums; padding: 2px 9px; border-radius: 999px; border: 1px solid; }
+.wa-heart { display: inline-block; color: var(--wa-accent); animation: wa-beat 0.83s ease-in-out infinite; transform-origin: center; }
+.wa-heart svg { width: 100%; height: 100%; }
+@keyframes wa-beat { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.18); } }
+
+/* Pushes the face's action button to the fold, the way the app's ScrollView
+   sizes its content to one screenful with Back/Skip scrolling in below. */
+.wa-spring { flex: 1 1 auto; min-height: 4px; }
+
+/* Home face + the episode picker (same row list) */
+.waf-home { gap: 6px; align-items: center; }
+/* Home sits centred on the face rather than riding the top of the scroll
+   view — it's short enough to never need the scroll, so nothing is stranded
+   above the fold by the centring. */
+.waf-root { justify-content: center; }
+.waf-brand { font-size: 12.5px; font-weight: 800; margin-bottom: 2px; }
+.wa-row { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; font-family: var(--body); color: #fff; background: var(--wa-card); border: 0; border-radius: 13px; padding: 11px 9px; cursor: pointer; }
+.wa-row-ic { flex: none; width: 24px; height: 24px; border-radius: 7px; display: grid; place-items: center; }
+.wa-row-ic svg { width: 14px; height: 14px; }
+.wa-row-tx { flex: 1; min-width: 0; }
+.wa-row-tx b { display: block; font-size: 12px; font-weight: 700; line-height: 1.25; }
+.wa-row-tx span { font-size: 9.5px; color: var(--wa-dim); line-height: 1.3; }
+.wa-row-go { flex: none; color: rgba(138,138,146,0.7); font-size: 10px; font-weight: 700; }
+
+/* Episode picker: its rows carry no icon or subtitle, so they get their own
+   height rather than the home screen's. Back is matched to them exactly —
+   same font, padding and line-height, so all four rows measure the same. */
+.waf-pick .wa-row { padding: 14px 12px; }
+.waf-pick .wa-row-tx b { font-size: 14px; line-height: 1.25; }
+.waf-pick .wa-btn.back { font-size: 14px; line-height: 1.25; padding: 14px 12px; border-radius: 13px; }
+
+/* Intro faces (POTS test / episode) - same archetype in the app (IntroView /
+   OrthoIntroView), so they share this styling. Centred and tight rather than
+   the app's "Start on the fold, Back scrolls in below" split, which needs a
+   scroll nobody performs on a picture of a watch. */
+.waf-intro { align-items: center; justify-content: center; text-align: center; gap: 6px; }
+.waf-intro-ic { width: 78px; height: 56px; border-radius: 16px; display: grid; place-items: center; }
+.waf-intro-ic svg { width: 38px; height: 38px; }
+.waf-intro p { margin: 2px 0 5px; font-size: 13px; line-height: 1.35; color: rgba(255,255,255,0.85); }
+/* Start and Back match here, per the app: Back is Start's size with secondary
+   styling (.wa-btn.back), not the smaller SecondaryButton used for
+   Skip/Finish/End early. Both inherit the base .wa-btn size. */
+
+/* Ring faces (resting / standing / recovery) */
+.waf-ringface { align-items: center; gap: 3px; }
+/* The app sizes the ring to the screen and lets Skip/Finish sit below the
+   fold. Nobody scrolls inside a picture of a watch, so the ring gives up a
+   little width here to keep that button on screen. */
+.waf-ring-wrap { position: relative; width: 100%; max-width: 188px; aspect-ratio: 1; margin-top: 4px; }
+/* Direct child only: the -90deg starts the ring's stroke at 12 o'clock, and
+   must not reach the heart glyph nested inside .waf-ring-in. */
+.waf-ring-wrap > svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.waf-ring-in { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 0 22px; }
+.waf-count { font-size: 26px; }
+.waf-hr-line { display: flex; align-items: baseline; gap: 3px; }
+.waf-hr-line .u { font-size: 9.5px; font-weight: 700; color: var(--wa-dim); }
+.waf-left { font-size: 10px; font-weight: 600; color: var(--wa-dim); font-variant-numeric: tabular-nums; }
+
+/* Stand prompt */
+.waf-prompt { align-items: center; justify-content: center; gap: 10px; text-align: center; background: radial-gradient(circle at 50% 38%, rgba(224,49,39,0.18), transparent 62%); }
+.waf-arrow { color: var(--wa-accent); animation: wa-bob 1.1s ease-in-out infinite; }
+.waf-arrow svg { width: 34px; height: 34px; }
+@keyframes wa-bob { 0%, 100% { transform: translateY(3px); } 50% { transform: translateY(-5px); } }
+.waf-prompt b { font-size: 22px; font-weight: 800; letter-spacing: -0.01em; }
+.waf-prompt-sub { font-size: 11.5px; color: rgba(255,255,255,0.8); }
+
+/* Episode measure (before / during) */
+.waf-measure { align-items: center; text-align: center; gap: 6px; }
+.waf-measure-hr { display: flex; align-items: baseline; justify-content: center; gap: 4px; }
+.waf-measure-hr .wa-heart { width: 15px; height: 15px; align-self: center; }
+.waf-measure-hr .n { font-size: 34px; }
+.waf-measure-hr .u { font-size: 10px; font-weight: 700; color: var(--wa-dim); }
+
+/* HR monitor */
+.waf-hr-main { align-items: center; }
+.waf-hr-main .wa-heart { width: 19px; height: 19px; margin: 4px 0 0; }
+.waf-big { font-size: 76px; line-height: 1; margin-top: 7px; }
+.waf-big-u { font-size: 13px; font-weight: 700; color: var(--wa-dim); margin-top: 2px; }
+/* margin-top:auto pins the tiles to the foot of the face; the bottom margin
+   lifts them clear of it. */
+.waf-tiles { display: flex; gap: 6px; width: 100%; margin-top: auto; margin-bottom: 14px; }
+.wa-tile { flex: 1; background: var(--wa-tile); border-radius: 11px; padding: 7px 9px; }
+.wa-tile .k { font-size: 8.5px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--wa-dim); }
+.wa-tile .v { font-size: 19px; margin-top: 2px; }
+.waf-swipe { position: absolute; right: 6px; top: 50%; padding: 6px; border: 0; background: none; cursor: pointer; color: rgba(138,138,146,0.6); animation: wa-swipe 1.4s ease-in-out infinite; }
+.waf-swipe svg { width: 11px; height: 11px; }
+@keyframes wa-swipe { 0%, 100% { transform: translateX(-3px); } 50% { transform: translateX(3px); } }
+.waf-swipe.left { right: auto; left: 6px; animation-direction: reverse; }
+/* The symptom sheet lists the phone's whole registry, so this one genuinely
+   scrolls the way it does on the wrist; the extra bottom padding keeps the
+   last row out of the screen's corner radius. */
+.waf-syms { gap: 6px; padding-bottom: 28px; }
+.waf-syms b { font-size: 12.5px; font-weight: 700; }
+.wa-sym { display: block; width: 100%; text-align: left; font-family: var(--body); font-size: 11.5px; font-weight: 600; color: #fff; background: var(--wa-card); border: 0; border-radius: 12px; padding: 9px 10px; cursor: pointer; }
+.wa-sym.done { background: var(--wa-green); color: #06210f; }
+
+/* Results */
+.waf-res { align-items: center; text-align: center; gap: 3px; }
+.waf-res-ic svg { width: 24px; height: 24px; }
+.waf-res b.t { font-size: 12.5px; font-weight: 800; margin-bottom: 2px; }
+.wa-res-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; background: var(--wa-tile); border-radius: 11px; padding: 5px 10px; }
+.wa-res-row .k { font-size: 10.5px; color: var(--wa-dim); }
+.wa-res-row .v { font-size: 13px; }
+.waf-note { font-size: 9.5px; color: #fff; margin: 2px 0 0; }
+.waf-disc { font-size: 8.5px; line-height: 1.35; color: rgba(138,138,146,0.8); margin: 0; }
+
+/* Under the device: the tap invitation, with a quiet restart beneath it. */
+.wa-under { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.wa-caption { text-align: center; font-size: 13.5px; color: var(--dim); max-width: 34ch; margin: 0; }
+.wa-caption-ic { display: inline-block; width: 15px; height: 15px; margin-right: 6px; vertical-align: -2px; color: var(--accent-2); }
+.wa-caption-ic svg { width: 100%; height: 100%; animation: wa-tap 2.4s var(--ease) infinite; transform-origin: 30% 30%; }
+@keyframes wa-tap { 0%, 70%, 100% { transform: none; } 80%, 90% { transform: translate(1.5px, 1.5px) scale(0.88); } }
+.wa-restart {
+  display: inline-flex; align-items: center; gap: 6px; font-family: var(--body); font-size: 12.5px;
+  color: var(--dim-2); background: none; border: 0; padding: 4px 8px; cursor: pointer;
+  transition: color 0.2s var(--ease);
+}
+.wa-restart:hover { color: var(--text); }
+.wa-restart-ic { display: grid; place-items: center; width: 13px; height: 13px; }
+.wa-restart-ic svg { width: 100%; height: 100%; }
+.wa-restart:hover .wa-restart-ic { color: var(--accent-2); }
+
+@media (prefers-reduced-motion: reduce) {
+  .watch-pill i, .wa-heart, .waf-arrow, .waf-swipe, .wa-caption-ic svg { animation: none !important; }
+  .wa-face.on { animation: none; }
+}
+
+/* ============================================================
    AI MARQUEE
    ============================================================ */
 .ai { overflow: hidden; }
@@ -449,6 +833,12 @@ a { color: inherit; text-decoration: none; }
   100% { box-shadow: 0 0 0 0 rgba(224,49,39,0); }
 }
 @media (prefers-reduced-motion: reduce) { .aip-copy { animation: none; } }
+/* Phones: the button gets its own full-width line under the caption. */
+@media (max-width: 720px) {
+  .aip-foot { flex-direction: column; align-items: stretch; gap: 12px; }
+  .aip-foot span { text-align: center; }
+  .aip-copy { width: 100%; }
+}
 .ai-try {
   max-width: 60ch; margin: 26px auto 0; text-align: center;
   font-size: 14.5px; line-height: 1.6; color: var(--dim);
@@ -462,7 +852,9 @@ a { color: inherit; text-decoration: none; }
 .ms-bar i { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
 .ms-row { display: flex; align-items: center; gap: 11px; padding: 11px 2px; border-top: 1px solid var(--line); font-size: 14px; }
 .ms-row:first-of-type { border-top: none; }
-.ms-row em { margin-left: auto; font-style: normal; font-size: 12px; color: var(--green); font-weight: 600; }
+/* The date holds its own line: the label beside it is a bare text node (an
+   anonymous flex item), which will happily shrink the date into a wrap. */
+.ms-row em { margin-left: auto; flex: none; white-space: nowrap; font-style: normal; font-size: 12px; color: var(--green); font-weight: 600; }
 .ms-check { width: 20px; height: 20px; border-radius: 50%; background: var(--green); color: #04210f; display: grid; place-items: center; font-size: 12px; font-weight: 800; flex: none; }
 .ms-check.off { background: transparent; border: 1.5px solid var(--line-2); color: var(--dim-2); }
 .ms-row:not(.done) { color: var(--dim-2); }
@@ -482,6 +874,164 @@ a { color: inherit; text-decoration: none; }
 .privacy-box .lead { margin: 0 auto; }
 .privacy-pills { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 28px; }
 .privacy-pills span { font-size: 13.5px; font-weight: 600; color: var(--dim); padding: 8px 16px; border: 1px solid var(--line); border-radius: 999px; background: rgba(255,255,255,0.02); }
+
+/* ============================================================
+   PRICING - free vs Pro
+   Two plan cards over one comparison grid. The Pro column of the grid is a
+   single continuous rail: an absolutely-positioned element behind the cells,
+   width-matched to the fixed last column, so it can't drift out of alignment
+   the way per-cell borders would.
+   ============================================================ */
+.pricing-sec { position: relative; overflow: hidden; }
+.pr-glow {
+  position: absolute; left: 50%; top: -160px; width: 900px; height: 520px;
+  transform: translateX(-50%);
+  background: radial-gradient(circle, rgba(224,49,39,0.18), transparent 62%);
+  filter: blur(16px); pointer-events: none;
+}
+.pricing-sec .wrap { position: relative; z-index: 1; }
+
+.pr-plans {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px;
+  max-width: 900px; margin: 0 auto;
+}
+.pr-plan {
+  position: relative; display: flex; flex-direction: column; gap: 13px;
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--r-lg); padding: 30px 26px 26px;
+}
+/* Gradient border + lift, the same treatment as .loop-step / .journey-sign. */
+.pr-plan-pro {
+  border: 1px solid transparent;
+  background:
+    linear-gradient(var(--panel), var(--panel)) padding-box,
+    radial-gradient(140% 140% at 0% 0%, var(--accent) 0%, rgba(224,49,39,0.38) 20%, var(--line-2) 55%) border-box;
+  box-shadow: 0 26px 70px -34px rgba(224,49,39,0.85);
+}
+.pr-badge {
+  position: absolute; top: -11px; left: 26px;
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase;
+  color: #fff; background: var(--accent); padding: 4px 11px; border-radius: 999px;
+  box-shadow: 0 8px 24px -8px rgba(224,49,39,0.9);
+}
+.pr-tag {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--dim-2); margin: 0;
+}
+.pr-plan-pro .pr-tag { color: var(--accent-2); }
+.pr-price { display: flex; align-items: baseline; gap: 6px; font-family: var(--display); font-weight: 700; letter-spacing: -0.03em; }
+.pr-amt { font-size: clamp(38px, 4.6vw, 50px); line-height: 1; }
+.pr-per { font-size: 15px; color: var(--dim); font-weight: 500; letter-spacing: 0; }
+.pr-sub { margin: -6px 0 0; font-size: 14px; color: var(--dim); }
+.pr-plan-pro .pr-sub { color: var(--text); }
+.pr-list {
+  list-style: none; margin: 6px 0 0; padding: 18px 0 0; border-top: 1px solid var(--line);
+  display: flex; flex-direction: column; gap: 12px; flex: 1;
+}
+.pr-list li { position: relative; padding-left: 28px; font-size: 14.5px; color: var(--dim); line-height: 1.45; }
+.pr-list li b { color: var(--text); font-weight: 600; }
+.pr-list li::before {
+  content: ""; position: absolute; left: 0; top: 2px; width: 18px; height: 18px; border-radius: 50%;
+  background: rgba(255,255,255,0.05);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239a9aa3' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: center;
+}
+/* background-color, not the `background` shorthand: the shorthand would reset
+   the repeat/position set above and tile the check instead of centring it. */
+.pr-list-pro li::before {
+  background-color: var(--accent-soft);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23ff6a5c' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+}
+.pr-btn { width: 100%; margin-top: 8px; }
+/* Risk reversal sits UNDER the button, where the hesitation is, not three
+   paragraphs below the cards where it used to live. */
+.pr-reassure { margin: 10px 0 0; text-align: center; font-size: 12.5px; color: var(--dim-2); }
+
+/* Platform caveat on a shared-plan row (e.g. the watch app, iPhone only). */
+.pr-only {
+  display: inline-block;
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--dim-2); border: 1px solid var(--line-2); border-radius: 999px; padding: 2px 6px;
+  white-space: nowrap;
+}
+
+/* Rating + platform line under the plan cards. */
+.pr-proof {
+  display: flex; align-items: center; justify-content: center; flex-wrap: wrap;
+  gap: 10px 14px; margin: 22px auto 0; text-align: center;
+}
+.pr-proof-sep { width: 1px; height: 15px; background: var(--line-2); }
+.pr-proof-note { font-size: 13.5px; color: var(--dim-2); }
+@media (max-width: 480px) {
+  .pr-proof-sep { display: none; }
+}
+
+.pr-note {
+  max-width: 620px; margin: 26px auto 0; text-align: center;
+  font-size: 14.5px; color: var(--dim); line-height: 1.6; text-wrap: pretty;
+}
+
+/* ---------- the comparison grid ---------- */
+.pr-table {
+  position: relative; display: grid;
+  grid-template-columns: minmax(0, 1fr) 92px 118px;
+  max-width: 760px; margin: 46px auto 0; padding-bottom: 14px;   /* the rail's rounded tail */
+}
+.pr-rail {
+  position: absolute; top: 0; right: 0; bottom: 0; width: 118px; z-index: 0;
+  background: rgba(224,49,39,0.07);
+  border: 1px solid rgba(224,49,39,0.19); border-radius: var(--r);
+  pointer-events: none;
+}
+.pr-cell {
+  position: relative; z-index: 1; display: flex; align-items: center;
+  min-height: 54px; padding: 11px 0; border-top: 1px solid rgba(255,255,255,0.05);
+}
+/* Wraps, so a row carrying a platform chip drops the chip onto its own line on
+   a narrow phone instead of squeezing the label into one word per line. */
+.pr-feat { flex-wrap: wrap; column-gap: 7px; row-gap: 5px; padding-right: 14px; font-size: 14px; line-height: 1.4; color: var(--text); }
+.pr-mark { justify-content: center; }
+.pr-corner, .pr-col-head, .pr-first { border-top: none; }
+.pr-col-head {
+  justify-content: center; align-items: flex-end; min-height: 0; padding: 12px 0 13px;
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--dim-2);
+}
+.pr-col-head.pr-col-pro { color: var(--accent-2); }
+.pr-group {
+  grid-column: 1 / 3; margin: 0; align-self: end; padding: 22px 0 7px;
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--dim-2);
+}
+.pr-group-cell { border-top: none; min-height: 0; padding: 0; }
+.pr-ic { width: 18px; height: 18px; flex: none; }
+.pr-mark.dim { color: var(--dim-2); }
+.pr-mark.on { color: var(--accent-2); }
+.pr-mark.on .pr-ic { width: 19px; height: 19px; }
+.pr-val { font-size: 12.5px; font-weight: 600; line-height: 1.3; text-align: center; color: inherit; }
+.pr-mark.on .pr-val { font-weight: 800; }
+.pr-dash { width: 12px; height: 2px; border-radius: 2px; background: var(--dim-2); opacity: 0.5; }
+.pr-sr {
+  position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap;
+}
+
+.pr-foot { max-width: 760px; margin: 20px auto 0; text-align: center; font-size: 13.5px; color: var(--dim-2); }
+
+@media (max-width: 720px) {
+  .pr-plans { grid-template-columns: minmax(0, 1fr); max-width: 440px; }
+  /* Pro leads on mobile: the badge is the hook, and Free is one scroll away. */
+  .pr-plan-pro { order: -1; }
+}
+@media (max-width: 560px) {
+  .pr-plan { padding: 26px 20px 22px; }
+  .pr-table { grid-template-columns: minmax(0, 1fr) 66px 84px; }
+  .pr-rail { width: 84px; }
+  .pr-feat { font-size: 12.75px; padding-right: 10px; }
+  .pr-cell { min-height: 50px; }
+  .pr-val { font-size: 11.5px; }
+  .pr-ic, .pr-mark.on .pr-ic { width: 16px; height: 16px; }
+}
 
 /* Comparison table (Autonomic vs Welltory) */
 .cmp-table {
@@ -543,6 +1093,12 @@ a { color: inherit; text-decoration: none; }
   .cmp-cell { padding: 13px 11px; font-size: 12.5px; }
   .cmp-head { padding: 20px 8px 15px; }
   .cmp-brand { font-size: 14px; gap: 5px; }
+  /* The wordmark is wider than the column and spills into the row below. The
+     mark alone identifies the column here; kept for screen readers. */
+  .cmp-us .cmp-brand b {
+    position: absolute; width: 1px; height: 1px; margin: -1px;
+    overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+  }
   .cmp-logo-them { width: 18px; height: 18px; }
   .cmp-amt { font-size: 23px; }
   .cmp-them .cmp-amt { font-size: 20px; }
@@ -592,6 +1148,32 @@ a { color: inherit; text-decoration: none; }
 .cta-h { font-family: var(--display); font-weight: 600; font-size: clamp(32px, 5.5vw, 58px); letter-spacing: -0.03em; line-height: 1.04; margin: 0 0 18px; text-wrap: balance; }
 .cta-sub { font-size: clamp(16px, 1.8vw, 19px); color: var(--dim); margin: 0 0 32px; }
 
+.cta-proof { display: flex; justify-content: center; margin-top: 22px; }
+
+/* ------------------------------------------------------------
+   Mid-page CTA blocks
+
+   The page runs long, and used to hold exactly two CTAs: the hero
+   badges and the pricing cards, ~60% of the page apart. These are
+   the in-between ones — after the AI demo, after the price
+   comparison, and after the founder story — each a centred button
+   over one line of reassurance. One shared shape so they read as
+   the same offer repeated, not three different asks.
+   ------------------------------------------------------------ */
+.mid-act, .cmp-act, .journey-act {
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+  text-align: center;
+}
+.mid-act { margin: 40px auto 0; }
+.cmp-act { margin: 26px auto 0; }
+.journey-act { margin: 38px auto 0; padding-top: 30px; border-top: 1px solid var(--line); }
+.mid-act-note, .cmp-act-note, .journey-act-note {
+  font-size: 13.5px; color: var(--dim-2); max-width: 46ch; line-height: 1.55; text-wrap: pretty;
+}
+@media (max-width: 560px) {
+  .mid-act .btn, .cmp-act .btn, .journey-act .btn { width: 100%; max-width: 360px; }
+}
+
 /* ============================================================
    FOOTER
    ============================================================ */
@@ -615,9 +1197,13 @@ a { color: inherit; text-decoration: none; }
 
 @media (max-width: 940px) {
   .hero-grid { grid-template-columns: 1fr; gap: 30px; }
-  .hero-stage { min-height: 520px; margin-top: 10px; }
+  .hero-stage { min-height: 710px; margin-top: 10px; }
   .hero-copy { max-width: 640px; }
   .feature, .ai-grid { grid-template-columns: minmax(0,1fr); gap: 36px; }
+  /* Watch: copy first, device below it (the mode cards drive the screen, so
+     they have to be read before the thing they control). */
+  .watch-grid { grid-template-columns: minmax(0,1fr); gap: 40px; }
+  .watch-copy { max-width: 640px; }
   /* Stacked: cap the prompt height so the body still reads as truncated. */
   .ai-prompt-cell > .ai-prompt { position: static; overflow: hidden; }
   .aip-body { max-height: 210px; }
@@ -650,7 +1236,7 @@ a { color: inherit; text-decoration: none; }
   }
   .nav.open .nav-links a {
     display: block; padding: 15px 8px; font-size: 19px; color: var(--text);
-    border-bottom: 1px solid var(--line);
+    border-bottom: 1px solid var(--line); border-radius: 0;
   }
 }
 @media (max-width: 560px) {
@@ -684,17 +1270,13 @@ a { color: inherit; text-decoration: none; }
 .hero-microcopy { font-size: 13.5px; color: var(--dim-2); margin: 14px 0 0; }
 .hero-microcopy b { color: var(--dim); font-weight: 600; }
 
-/* Hero dual CTA — iOS available now | Android coming soon */
+/* Hero CTA — available now on iPhone & Android */
 .hero-cta {
-  display: flex; align-items: stretch; max-width: 500px;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 14px;
+  max-width: 500px; padding: 20px 22px;
   background: var(--panel); border: 1px solid var(--line-2);
-  border-radius: var(--r-lg); overflow: hidden;
+  border-radius: var(--r-lg);
 }
-.hero-cta-col {
-  flex: 1; display: flex; flex-direction: column; align-items: flex-start;
-  justify-content: space-between; gap: 12px; padding: 18px 20px;
-}
-.hero-cta-ios { border-right: 1px solid var(--line-2); }
 .hero-cta-eyebrow {
   display: inline-flex; align-items: center; gap: 8px;
   font-size: 12.5px; font-weight: 600; color: var(--dim);
@@ -703,24 +1285,27 @@ a { color: inherit; text-decoration: none; }
   width: 7px; height: 7px; border-radius: 50%; background: var(--green);
   box-shadow: 0 0 0 3px rgba(22,163,74,0.18); flex: none;
 }
-.hero-android-ic { height: 22px; width: auto; flex: none; }
+.hero-badges { display: flex; flex-wrap: wrap; gap: 12px; }
 .hero-appstore { display: inline-flex; transition: transform 0.2s; }
 .hero-appstore:hover { transform: translateY(-1px); }
-.hero-appstore svg { height: 68px; width: auto; display: block; }
-.hero-android-link {
-  display: inline-flex; align-items: center; gap: 6px;
-  font-family: var(--display); font-size: 16px; font-weight: 600;
-  color: var(--text); text-decoration: none; padding: 11px 0;
-  transition: color 0.2s;
-}
-.hero-android-link span { transition: transform 0.2s; }
-.hero-android-link:hover { color: var(--accent); }
-.hero-android-link:hover span { transform: translateX(3px); }
+.hero-appstore svg { height: 54px; width: auto; display: block; }
 .hero-cta-note { margin: 0; font-size: 13px; color: var(--dim-2); }
 .hero-cta-note b { color: var(--dim); font-weight: 600; }
+/* Rating between the CTA card and the trust bullets — the first thing after
+   the buttons, which is where a stranger decides whether to believe them. */
+.hero-proof { display: flex; margin: 18px 0 0; }
 @media (max-width: 560px) {
-  .hero-cta { flex-direction: column; max-width: 340px; }
-  .hero-cta-ios { border-right: none; border-bottom: 1px solid var(--line-2); }
+  .h1-keep { white-space: normal; }
+  /* Phone: the CTA card runs full width and the two badges share the row,
+     scaling to fit rather than wrapping onto two lines. */
+  .hero-cta { max-width: none; width: 100%; padding: 18px; gap: 12px; }
+  .hero-badges { flex-wrap: nowrap; width: 100%; gap: 10px; }
+  .hero-appstore { flex: 1 1 0; min-width: 0; }
+  .hero-appstore svg { width: 100%; height: auto; }
+  /* The three trust points stay on one line under it. */
+  .hero-trust { flex-wrap: nowrap; gap: 10px; margin-top: 18px; font-size: clamp(11px, 3.1vw, 13px); }
+  .hero-trust li { padding-left: 13px; }
+  .hero-trust li::before { width: 6px; height: 6px; }
 }
 
 .dl-ios {
@@ -733,6 +1318,38 @@ a { color: inherit; text-decoration: none; }
 .dl-ios-badge { display: inline-flex; flex: none; transition: transform 0.2s; }
 .dl-ios-badge:hover { transform: translateY(-1px); }
 .dl-ios-badge svg { height: 48px; width: auto; display: block; }
+
+/* Download section — pricing card on top, dual store cards (badge + QR) below */
+.dl-layout {
+  display: flex; flex-direction: column; gap: 20px;
+  max-width: 620px; margin: 0 auto; text-align: left;
+}
+.dl-layout .pricing { text-align: left; }
+.dl-stores { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.dl-store {
+  display: flex; flex-direction: column; align-items: center; gap: 13px;
+  background: var(--panel); border: 1px solid var(--line-2);
+  border-radius: var(--r-lg); padding: 22px 16px;
+}
+.dl-store-badge { display: block; transition: transform 0.18s var(--bounce); }
+.dl-store-badge:hover { transform: translateY(-2px); }
+.dl-store-badge svg { width: 150px; height: 50px; }
+.dl-store-qr { background: #fff; border-radius: 12px; padding: 9px; line-height: 0; box-shadow: 0 4px 14px -6px rgba(0,0,0,0.5); }
+.dl-store-qr img { width: 132px; height: 132px; }
+.dl-store-scan { font-family: var(--mono); font-size: 11px; letter-spacing: 0.05em; color: var(--dim); }
+/* Phones: no QR (you can't scan a code with the device showing it), and the
+   two badges share one card side by side instead of stacking into two. */
+@media (max-width: 720px) {
+  .dl-store-qr, .dl-store-scan { display: none; }
+  .dl-stores {
+    grid-template-columns: 1fr 1fr; gap: 10px; align-items: center;
+    background: var(--panel); border: 1px solid var(--line-2);
+    border-radius: var(--r-lg); padding: 14px;
+  }
+  .dl-store { background: none; border: 0; border-radius: 0; padding: 0; gap: 0; }
+  .dl-store-badge { width: 100%; }
+  .dl-store-badge svg { width: 100%; height: auto; }
+}
 
 .waitlist-grid { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 32px; align-items: start; text-align: left; }
 .wl-form { background: var(--panel); border: 1px solid var(--line-2); border-radius: var(--r-lg); padding: 28px; }
@@ -757,7 +1374,10 @@ a { color: inherit; text-decoration: none; }
 .pricing { background: linear-gradient(180deg, var(--panel), var(--bg-1)); border: 1px solid var(--line-2); border-radius: var(--r-lg); padding: 28px; }
 .pricing-tag { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--accent-2); }
 .pricing-price { font-family: var(--display); font-weight: 700; letter-spacing: -0.02em; margin: 14px 0 2px; display: flex; align-items: baseline; gap: 4px; }
-.pricing-price .amt { font-size: 54px; line-height: 1; }
+/* Sized for a word ("7 days"), not just a glyph-and-digit ("$0") — the headline
+   here is the trial length, which is several characters wider than a price. */
+.pricing-price { flex-wrap: wrap; }
+.pricing-price .amt { font-size: clamp(34px, 4.4vw, 46px); line-height: 1.05; }
 .pricing-price .per { font-size: 17px; color: var(--dim); font-weight: 500; }
 .pricing-trial { font-size: 15px; color: var(--text); font-weight: 600; margin: 0 0 18px; }
 .pricing-trial b { color: var(--accent-2); }
@@ -975,7 +1595,7 @@ a { color: inherit; text-decoration: none; }
 .article-figure { margin: 0 0 36px; border-radius: var(--r-lg); overflow: hidden; border: 1px solid var(--line); }
 .article-figure img { width: 100%; height: auto; }
 .article-figure figcaption { font-size: 12px; color: var(--dim-2); padding: 8px 12px; background: var(--bg-1); }
-.article-prose { font-size: 17px; line-height: 1.7; color: #828282; }
+.article-prose { font-size: 17px; line-height: 1.7; color: #bbbbbe; }
 .article-prose > :first-child { margin-top: 0; }
 .article-prose h2 { font-family: var(--display); font-weight: 600; letter-spacing: -0.01em; font-size: 27px; color: var(--text); margin: 44px 0 14px; }
 .article-prose h3 { font-family: var(--display); font-weight: 600; font-size: 21px; color: var(--text); margin: 32px 0 12px; }
@@ -1010,6 +1630,9 @@ a { color: inherit; text-decoration: none; }
 .article-prose figure { margin: 28px 0; }
 .article-prose figure svg { width: 100%; height: auto; display: block; }
 .article-prose figure img { width: 100%; height: auto; display: block; border-radius: var(--r); border: 1px solid var(--line); }
+/* App screenshots. A portrait capture is narrower than the prose column, so it
+   centres at its own width instead of upscaling to full bleed and going soft. */
+.article-prose figure.prose-shot img { width: auto; max-width: min(100%, 420px); margin-inline: auto; }
 .article-prose figcaption {
   margin-top: 10px; font-size: 13.5px; color: var(--dim-2);
   font-family: var(--mono); letter-spacing: 0.01em; text-align: center;
@@ -1018,6 +1641,22 @@ a { color: inherit; text-decoration: none; }
   border: 1px solid var(--line); border-radius: var(--r-lg);
   background: linear-gradient(180deg, var(--panel), var(--bg-1));
   padding: 22px 20px;
+}
+
+/* Diagrams ship in two cuts. The wide one (`fig-d`, a 720-unit canvas) is
+   drawn for the full prose column; on a phone that column is ~320px, so the
+   whole drawing scales to ~0.45 and its 13px labels land at 6px — legible
+   nowhere. The mobile cut (`fig-m`) redraws the SAME content on a 360-unit
+   portrait canvas — panels stacked instead of side by side, series labelled
+   in place instead of in a legend — so it renders at roughly 1:1 and the type
+   stays at its authored size. Only one is ever in the layout, so nothing is
+   painted twice. */
+.article-prose figure svg.fig-m { display: none; }
+@media (max-width: 640px) {
+  .article-prose figure svg.fig-d { display: none; }
+  .article-prose figure svg.fig-m { display: block; }
+  /* Every millimetre the frame gives back is a millimetre of canvas. */
+  .prose-figure { padding: 14px 10px; }
 }
 
 /* Callout boxes: <div class="callout callout-tip|note|warn">…</div> */
@@ -1191,6 +1830,8 @@ a.gc { display: block; }
   .insights-cols { grid-template-columns: 1fr; gap: 40px; padding-top: 32px; }
   .insights-main { grid-column: 1; grid-row: 1; }
   .insights-side { grid-column: 1; grid-row: 2; }
+  /* Single-article view only (marked by .article-card) — no top gap above the hero image. */
+  .insights-cols:has(.article-card) { padding-top: 0; }
 }
 
 /* ── Sidebar cards ─────────────────────────────────────────── */
@@ -1265,53 +1906,102 @@ a.gc { display: block; }
   margin: 4px 0 6px;
 }
 .side-get-p { margin: 0 auto 16px; max-width: 30ch; font-size: 13px; line-height: 1.5; color: var(--dim); }
-.side-get .dl-ios-badge { justify-content: center; }
-.side-get .dl-ios-badge svg { height: 44px; }
+.side-get .dl-ios-badge { display: flex; justify-content: center; }
+.side-get .dl-ios-badge svg { width: 100%; max-width: 172px; height: auto; }
+.side-get .dl-ios-badge + .dl-ios-badge { margin-top: 12px; }
 
 /* Mini phone illustration + hovering chips */
 .side-phone-stage { position: relative; width: 178px; margin: 8px auto 20px; }
 .sg-orbit {
   position: absolute; z-index: 3;
   display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
-  font-size: 9.5px; font-weight: 600; color: var(--text);
-  background: rgba(20,20,23,0.78); border: 1px solid var(--line-2); border-radius: 999px;
-  padding: 5px 9px; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  font-size: 8px; font-weight: 600; color: var(--text);
+  background: rgba(20,20,23,0.82); border: 1px solid var(--line-2); border-radius: 999px;
+  padding: 4px 7px; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
   box-shadow: 0 10px 24px -10px rgba(0,0,0,0.75);
   animation: floaty 6s ease-in-out infinite;
 }
-.sg-orbit .dot { width: 6px; height: 6px; border-radius: 50%; flex: none; }
+.sg-orbit .dot { width: 5px; height: 5px; border-radius: 50%; flex: none; }
 .sg-orbit em { color: var(--dim); font-style: normal; font-weight: 500; }
-.sg-orbit-a { top: 30px; left: -30px; animation-delay: 0s; }
-.sg-orbit-b { top: 96px; right: -26px; animation-delay: 1.4s; }
-.sg-orbit-c { bottom: 22px; left: -24px; animation-delay: 2.6s; }
+.sg-orbit-a { top: 128px; left: -42px; animation-delay: 0s; }
+.sg-orbit-b { top: 116px; right: -40px; animation-delay: 1.4s; }
+.sg-orbit-c { bottom: 202px; left: -44px; animation-delay: 2.6s; }
 .side-phone {
-  width: 178px; margin: 0 auto; padding: 7px;
-  background: #0c0c0e; border: 1px solid var(--line-2); border-radius: 26px;
+  width: 178px; margin: 0 auto; padding: 6px;
+  background: #0c0c0e; border: 1px solid var(--line-2); border-radius: 28px;
   box-shadow: 0 26px 55px -20px rgba(0,0,0,0.9), 0 0 0 1px rgba(255,255,255,0.03) inset;
   animation: phonefloat 8s ease-in-out infinite;
 }
-.sg-scr { background: #000; border-radius: 20px; overflow: hidden; padding: 9px 9px 8px; text-align: left; }
-.sg-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 7px; }
-.sg-brand { display: inline-flex; align-items: center; gap: 4px; font-size: 9px; }
-.sg-brand svg { width: 11px; height: 11px; color: var(--accent); }
-.sg-top-ic { color: var(--dim); font-size: 8px; letter-spacing: 2px; }
-.sg-cardbox { border: 1px solid var(--line); border-radius: 12px; padding: 9px; background: rgba(22,163,74,0.10); }
+/* Same Journal replica as the hero phone, scaled to the sidebar. */
+.sg-scr {
+  position: relative; height: 400px; overflow: hidden;
+  background: #000; border-radius: 22px; text-align: left; color: #fff;
+}
+.sg-statusbar { display: flex; align-items: center; justify-content: space-between; padding: 6px 12px 0; }
+.sg-time { font-size: 8px; font-weight: 700; }
+.sg-island { width: 40px; height: 12px; border-radius: 999px; background: #0c0c0e; }
+.sg-sysic { display: inline-flex; align-items: center; gap: 3px; }
+.sg-wifi { width: 9px; height: 7px; }
+.sg-batt { width: 15px; height: 7px; }
+.sg-datebar {
+  display: flex; align-items: center; gap: 5px; padding: 5px 7px 6px;
+  border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 9px;
+}
+.sg-arw { width: 11px; text-align: center; color: #8b8b93; }
+.sg-date { flex: 1; text-align: center; background: #131316; padding: 5px 0; border-radius: 8px; font-weight: 600; font-size: 8.5px; }
+.sg-body { padding: 6px 6px 0; }
+.sg-cardbox {
+  border: 1px solid rgba(110,224,110,0.45); border-radius: 11px; padding: 8px;
+  background: rgba(22,163,74,0.10); margin-bottom: 6px;
+}
 .sg-cardhead { display: flex; align-items: center; justify-content: space-between; }
-.sg-mode { font-size: 7px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--dim); font-weight: 700; }
-.sg-chip { font-size: 6.5px; font-weight: 800; color: #fff; background: #16a34a; padding: 2px 6px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.03em; }
-.sg-gauge { position: relative; width: 82px; height: 82px; margin: 6px auto 0; }
+.sg-mode { font-size: 6px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--dim); font-weight: 800; }
+.sg-chip { font-size: 6px; font-weight: 800; color: #06210b; background: #6ee06e; padding: 2px 5px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.03em; }
+.sg-gauge { position: relative; width: 86px; height: 86px; margin: 1px auto -2px; }
 .sg-gauge svg { width: 100%; height: 100%; }
 .sg-gauge-in { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-.sg-num { font-family: var(--display); font-size: 25px; font-weight: 800; line-height: 1; letter-spacing: -0.02em; }
-.sg-den { font-size: 5.5px; font-weight: 700; letter-spacing: 0.12em; color: var(--dim); margin-top: 2px; }
-.sg-status { text-align: center; font-size: 8px; color: var(--dim); font-weight: 600; margin-top: 6px; }
-.sg-tabs {
-  display: flex; gap: 2px; margin-top: 8px; padding: 3px; border-radius: 999px;
-  background: rgba(255,255,255,0.05); border: 1px solid var(--line);
-  font-size: 6.5px; color: var(--dim);
+.sg-num { font-family: var(--display); font-size: 23px; font-weight: 800; line-height: 1; letter-spacing: -0.02em; }
+.sg-den { font-size: 5px; font-weight: 700; letter-spacing: 0.12em; color: var(--dim); margin-top: 2px; }
+.sg-status { text-align: center; font-size: 7px; color: var(--dim); font-weight: 600; margin-top: 5px; }
+.sg-tile {
+  display: flex; align-items: center; gap: 7px; background: #131316;
+  border: 1px solid var(--line); border-radius: 11px; padding: 7px 8px; margin-bottom: 6px;
 }
-.sg-tabs span { flex: 1; text-align: center; padding: 4px 1px; border-radius: 999px; }
-.sg-tabs .on { background: rgba(255,255,255,0.1); color: var(--text); font-weight: 600; }
+.sg-tile-ic { flex: none; width: 21px; height: 21px; border-radius: 7px; display: inline-flex; align-items: center; justify-content: center; }
+.sg-tile-ic svg { width: 12px; height: 12px; }
+.sg-tile-body { flex: 1; min-width: 0; }
+.sg-tile-body b { display: block; font-size: 8px; font-weight: 700; }
+.sg-tile-mute { color: var(--dim); font-weight: 500; }
+.sg-tile-sub { display: block; font-size: 7px; color: var(--dim); margin-top: 0.5px; }
+.sg-bar { display: block; height: 3px; border-radius: 999px; background: rgba(255,255,255,0.10); margin-top: 4px; overflow: hidden; }
+.sg-bar i { display: block; height: 100%; background: #e03127; border-radius: 999px; }
+.sg-sec { background: #131316; border: 1px solid var(--line); border-radius: 11px; padding: 7px; }
+.sg-sec-h { font-size: 6px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--dim); font-weight: 800; padding: 0 2px 5px; }
+.sg-sleep { background: #1b1b20; border: 1px solid var(--line); border-radius: 9px; padding: 7px; }
+.sg-chip-good { background: #4fb95a; color: #04180a; }
+.sg-big { display: flex; align-items: baseline; gap: 4px; margin-top: 3px; }
+.sg-big b { font-family: var(--display); font-size: 18px; font-weight: 800; line-height: 1; letter-spacing: -0.02em; }
+.sg-big span { font-size: 8px; font-weight: 700; color: var(--dim); }
+.sg-stages { display: flex; gap: 2px; height: 5px; margin-top: 7px; }
+.sg-stages i { border-radius: 2px; }
+.sg-tabs {
+  position: absolute; left: 8px; right: 8px; bottom: 8px; z-index: 2; overflow: hidden;
+  display: flex; align-items: center; gap: 1px; padding: 3px;
+  border-radius: 999px; background: rgba(0,0,0,0.42);
+  border: 1px solid rgba(255,255,255,0.18);
+  box-shadow: 0 10px 22px -10px rgba(0,0,0,0.95), inset 0 1px 0 rgba(255,255,255,0.06);
+  backdrop-filter: blur(20px) saturate(130%); -webkit-backdrop-filter: blur(20px) saturate(130%);
+}
+.sg-tab {
+  flex: 1; display: inline-flex; flex-direction: column; align-items: center; gap: 1px;
+  padding: 4px 1px; border-radius: 999px; color: var(--dim);
+}
+.sg-tab svg { width: 11px; height: 11px; }
+.sg-tab b { font-size: 5.5px; font-weight: 600; }
+.sg-tab.on { background: rgba(255,255,255,0.10); color: #fff; }
+.sg-tab-brand { flex: 0 0 22px; color: var(--accent); }
+.sg-tab-brand svg { width: 17px; height: 9px; }
+.sg-tab-gear { flex: 0 0 18px; }
 
 /* ============================================================
    Interactive metric widgets (in-article calculators)
@@ -1346,3 +2036,340 @@ a.gc { display: block; }
 .article-prose .metric-scale { display: flex; margin: 22px 0 10px; border-radius: 9px; overflow: hidden; border: 1px solid var(--line); }
 .metric-scale .ms-seg { flex: 1; padding: 8px 5px; text-align: center; font-family: var(--mono); font-size: 10.5px; font-weight: 700; color: #08080a; line-height: 1.25; }
 .metric-scale .ms-seg small { display: block; font-size: 9.5px; font-weight: 700; opacity: 0.8; }
+
+/* ============================================================
+   Bottom dock — cookie notice + sticky blog CTA
+   Everything that hovers over the bottom of the viewport stacks
+   in here (markup lives in app.html, outside the Svelte app).
+   Desktop keeps the old free-floating layout via display:contents;
+   mobile turns the dock into a real bottom-anchored column.
+   ============================================================ */
+
+.aj-dock { display: contents; }
+
+/* --- Cookie notice ------------------------------------------------ */
+.aj-cb {
+  position: fixed; left: 16px; right: 16px; bottom: 16px; z-index: 9999;
+  max-width: 360px; margin-left: auto;
+  font-family: var(--body);
+  color: var(--text);
+}
+.aj-cb[hidden] { display: none; }
+.aj-cb-pill { display: none; }
+.aj-cb-card {
+  background: var(--panel); border: 1px solid var(--line-2); border-radius: var(--r);
+  padding: 16px 18px; box-shadow: 0 12px 32px rgba(0,0,0,0.45);
+}
+.aj-cb-copy { margin: 0 0 12px; font-size: 14px; line-height: 1.5; color: var(--dim); }
+.aj-cb-copy a { color: var(--accent-2); text-decoration: underline; }
+.aj-cb-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.aj-cb-btn {
+  background: transparent; color: var(--dim);
+  border: 1px solid var(--line-2); border-radius: 10px;
+  padding: 8px 14px; font-size: 13px; font-family: inherit; cursor: pointer;
+}
+.aj-cb-btn--go { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+
+@media (max-width: 720px) {
+  .aj-dock {
+    display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 9999;
+    padding: 0 14px calc(7px + env(safe-area-inset-bottom));
+    pointer-events: none;
+  }
+  /* Only the visible surfaces take taps — the dock and the notice's own box
+     span the full width and would otherwise swallow them. The expanded card
+     re-enables its own below, so the collapsed (invisible) one can never sit
+     on top of the pill. */
+  .aj-dock .aj-cb-pill, .aj-dock .aj-scta { pointer-events: auto; }
+
+  /* In flow inside the dock. The sticky CTA docks underneath it (out of
+     flow, see below), so the notice lifts by the CTA's height instead of
+     being pushed — a transform tweens, a reflow doesn't. */
+  .aj-cb {
+    position: relative; left: auto; right: auto; bottom: auto;
+    width: 100%; max-width: 420px; margin: 0;
+    transition: transform 0.45s var(--ease);
+  }
+  .aj-dock.has-scta .aj-cb { transform: translateY(calc(-1 * var(--aj-scta-h, 66px))); }
+
+  /* Collapsed: a compact glass pill. Expanded (.is-open): the same card as
+     desktop, centered. Both are always in the DOM and cross-fade, the
+     collapsed one anchored bottom-center so the card grows out of it. */
+  .aj-cb-pill {
+    display: flex; align-items: center; gap: 2px;
+    width: max-content; max-width: 100%; margin: 0 auto;
+    background: rgba(8,8,10,0.62);
+    -webkit-backdrop-filter: blur(18px) saturate(150%); backdrop-filter: blur(18px) saturate(150%);
+    border: 1px solid var(--line-2); border-radius: 999px;
+    padding: 4px 5px 4px 4px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    transition: opacity 0.22s var(--ease), transform 0.3s var(--bounce);
+  }
+  /* The label is the only part allowed to give way when the pill runs out of
+     room — min-width:0 lets it shrink and truncate instead of squeezing the
+     dismiss button, which every narrow phone needs at full size. */
+  .aj-cb-open {
+    display: inline-flex; align-items: center; gap: 8px;
+    min-width: 0; flex: 0 1 auto;
+    background: none; border: 0; cursor: pointer;
+    font-family: inherit; font-size: 13px; line-height: 1; color: var(--text);
+    padding: 8px 6px 8px 10px;
+  }
+  .aj-cb-open span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .aj-cb-ic { width: 16px; height: 16px; min-width: 16px; flex: none; color: var(--dim); }
+  .aj-cb-x {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 32px; min-width: 32px; height: 32px; flex: none;
+    background: none; border: 0; border-radius: 999px; cursor: pointer; color: var(--dim);
+    /* -webkit-tap-highlight aside, the hit box is what matters: a bare 28px
+       square with a 14px glyph reads (and taps) as too small on a mini phone. */
+    padding: 0;
+  }
+  .aj-cb-x svg { width: 16px; height: 16px; min-width: 16px; flex: none; }
+
+  .aj-cb-card {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    opacity: 0; transform: translateY(6px) scale(0.94); transform-origin: 50% 100%;
+    pointer-events: none;
+    transition: opacity 0.24s var(--ease), transform 0.32s var(--bounce);
+  }
+  .aj-cb.is-open .aj-cb-pill {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    opacity: 0; transform: scale(0.86); pointer-events: none;
+  }
+  .aj-cb.is-open .aj-cb-card {
+    position: relative; opacity: 1; transform: none; pointer-events: auto;
+  }
+}
+
+/* --- Sticky blog CTA (mobile only) -------------------------------- */
+.aj-scta { display: none; }
+@media (max-width: 720px) {
+  .aj-scta {
+    /* Out of the dock's flow: it always sits on the floor, and the cookie
+       notice lifts above it. */
+    --aj-inset: 12px;
+    /* The dial's arc colour (see .aj-scta-arc's stroke in app.html) — the
+       button and the travelling border light both key off it. */
+    --aj-scta-green: #6ee06e;
+    position: absolute; left: var(--aj-inset); right: var(--aj-inset); bottom: calc(7px + env(safe-area-inset-bottom));
+    /* Score on the left, both controls right-aligned. The bar's height is
+       whatever the dial needs — half again as tall as the old one-row pill. */
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 8px 8px 8px 14px;
+    background: rgba(8,8,10,0.66);
+    -webkit-backdrop-filter: blur(18px) saturate(150%); backdrop-filter: blur(18px) saturate(150%);
+    border: 1px solid var(--line-2); border-radius: 999px;
+    /* Lifts it off whatever it's floating over — without a shadow it reads as
+       part of the article. Tight contact layer + a wide soft ambient one. */
+    box-shadow: 0 4px 14px rgba(0,0,0,0.5), 0 18px 44px rgba(0,0,0,0.62);
+    opacity: 0; transform: translateY(120%);
+    transition: opacity 0.35s var(--ease), transform 0.5s var(--ease);
+  }
+  .aj-scta[hidden] { display: none; }
+  .aj-dock.has-scta .aj-scta { opacity: 1; transform: none; }
+  /* The dial sweeps up to today's score as the bar lands, in step with the
+     number rolling up beside it (app.html). `pathLength` lets the dash maths
+     be a plain 0-100 regardless of the arc's real length. */
+  .aj-scta-arc { stroke-dasharray: 100; stroke-dashoffset: 100; }
+  .aj-dock.has-scta .aj-scta-arc { animation: aj-scta-fill 2s var(--ease) both; }
+  /* Travelling light along the border. Same "red light from the top left"
+     gradient the journey photo uses, but the source point is animated, so it
+     drifts to the middle-right and back. Drawn as a masked 1px ring on a
+     pseudo-element rather than a border-box gradient: the bar is translucent
+     glass, so a border-box layer would bleed red through the whole pill. */
+  .aj-scta::before {
+    content: ''; position: absolute; inset: -1px; z-index: 3; border-radius: inherit;
+    padding: 1px; pointer-events: none;
+    /* Green, not the site accent: the light has to read as the same signal as
+       the dial it wraps (`--aj-scta-green`, the arc's stroke). */
+    /* Both radii are animated, not just the position: the light starts as a
+       small spot that only reaches the bottom edge, then swells at the end so
+       it spans the full height and wraps the button. It runs along the bottom
+       because the score badge now overhangs the top. */
+    background: radial-gradient(
+      var(--aj-glow-rx) var(--aj-glow-ry) at var(--aj-glow-x) var(--aj-glow-y),
+      var(--aj-scta-green) 0%, rgba(110,224,110,0.6) 22%, rgba(110,224,110,0) 55%
+    );
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask-composite: exclude;
+  }
+
+  /* --- The score, inside the pill on the left -----------------------
+     In the bar's flow, so the dial is what sets the pill's height — and it
+     arrives with the bar rather than animating on its own. */
+  .aj-scta-badge {
+    flex: none; display: inline-flex; align-items: center; gap: 10px;
+  }
+
+  /* The app's own 270° dial, at a size where the number still reads. */
+  .aj-scta-gauge { position: relative; flex: none; width: 62px; height: 62px; }
+  .aj-scta-gauge svg { display: block; width: 100%; height: 100%; }
+  .aj-scta-num {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-family: var(--display); font-size: 20px; font-weight: 800; line-height: 1;
+    letter-spacing: -0.02em; color: #fff;
+  }
+  /* Two stacked words, beside the dial. */
+  .aj-scta-lbl {
+    display: flex; flex-direction: column; align-items: flex-start;
+    font-size: 9.5px; font-weight: 800; line-height: 1.18;
+    text-transform: uppercase; letter-spacing: 0.09em;
+    color: rgba(255,255,255,0.88); white-space: nowrap;
+  }
+
+  /* Kept tight on purpose: every pixel of button width comes out of the
+     badge's room between the two controls, so the padding is the smallest
+     that still reads as a button. */
+  .aj-scta-btn {
+    flex: none; display: inline-flex; align-items: center;
+    background: var(--aj-scta-green); color: var(--aj-scta-fg, #fff);
+    border-radius: 999px; padding: 18px 22px; white-space: nowrap;
+    font-size: 15.5px; font-weight: 700; letter-spacing: 0.01em; line-height: 1;
+    /* Derived from the signal colour rather than hard-coded, so a topic
+       variant that turns gold or red carries its glow with it. */
+    box-shadow: 0 4px 16px color-mix(in srgb, var(--aj-scta-green) 40%, transparent);
+    transition: background-color 0.45s var(--ease), color 0.45s var(--ease), box-shadow 0.45s var(--ease);
+  }
+
+  /* --- Topic variants ---------------------------------------------
+     Five topics swap the badge for an instrument that demonstrates what
+     that topic's article is about (markup + timing in app.html). They all
+     drive the same two tokens the default bar already keys off —
+     `--aj-scta-green` (the signal colour: button, glow, border light) and
+     `--aj-scta-fg` (its text) — so a variant that turns gold or red mid
+     animation drags the whole pill with it. Everything here is a
+     transition, never a keyframe, because the JS is what decides when a
+     stage lands. */
+
+  /* HRV: an RR trace drawn in left to right, two beats, once. It's a CTA and
+     not a monitor — a looping trace turns into wallpaper the eye stops
+     reading, and the number beside it is what should hold attention. */
+  .aj-scta-wave { flex: none; width: 88px; height: 40px; color: var(--aj-scta-green); }
+  .aj-scta-wave svg { width: 100%; height: 100%; overflow: visible; }
+  .aj-wave-line { stroke-dasharray: 100; stroke-dashoffset: 0; }
+  @media (prefers-reduced-motion: no-preference) {
+    .aj-dock.has-scta .aj-wave-line { animation: aj-wave-draw 2s linear both; }
+  }
+
+  /* Shared stat block: big number over a unit caption (HRV, Recovery). */
+  .aj-scta-stat { display: flex; flex-direction: column; align-items: flex-start; line-height: 1; }
+  .aj-scta-val {
+    font-family: var(--display); font-size: 22px; font-weight: 800;
+    letter-spacing: -0.02em; color: var(--aj-scta-green);
+    font-variant-numeric: tabular-nums; transition: color 0.4s var(--ease);
+  }
+  .aj-scta-unit {
+    margin-top: 5px; font-size: 9.5px; font-weight: 800;
+    text-transform: uppercase; letter-spacing: 0.09em; color: rgba(255,255,255,0.72);
+  }
+
+  /* POTS: the stand-test delta, counting up into its danger bands. */
+  .aj-scta-delta {
+    display: inline-flex; align-items: baseline; gap: 4px;
+    font-family: var(--display); font-weight: 800; letter-spacing: -0.02em;
+  }
+  .aj-pots-sym { font-size: 25px; color: var(--aj-scta-green); transition: color 0.25s var(--ease); }
+  /* Reserves two digits so the bar's lanes don't shuffle as it climbs. */
+  .aj-pots-num {
+    font-size: 34px; min-width: 48px; color: var(--aj-scta-green);
+    font-variant-numeric: tabular-nums; transition: color 0.25s var(--ease);
+  }
+  .aj-pots-unit { font-size: 12.5px; font-weight: 700; color: rgba(255,255,255,0.8); }
+
+  /* Gauge variants (Food, Long COVID): same 270° dial as the default, but
+     the arc is the FULL sweep and the value is the dash offset, so it can
+     be moved after it lands. */
+  .aj-vgauge-arc { transition: stroke-dashoffset 0.9s var(--ease), stroke 0.5s var(--ease); }
+  .aj-scta-gauge .aj-scta-num { transition: opacity 0.4s var(--ease), color 0.45s var(--ease); }
+  /* Food swaps the score out for the trigger that moved it. */
+  .aj-scta-emoji {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 25px; line-height: 1; opacity: 0; transition: opacity 0.45s var(--ease);
+  }
+  .aj-scta-gauge.has-emoji .aj-scta-num { opacity: 0; }
+  .aj-scta-gauge.has-emoji .aj-scta-emoji { opacity: 1; }
+  /* Long COVID's verdict, beside the dial in place of the score label. */
+  .aj-scta-tag {
+    font-family: var(--display); font-size: 14px; font-weight: 800;
+    line-height: 1.1; letter-spacing: -0.01em; white-space: nowrap;
+    color: var(--aj-scta-green); transition: color 0.4s var(--ease);
+  }
+
+  /* Recovery: a trend line drawn in through its own red → gold → green
+     gradient, so each stage reveals the colour it earned. */
+  .aj-scta-spark { flex: none; width: 74px; height: 44px; }
+  .aj-scta-spark svg { width: 100%; height: 100%; overflow: visible; }
+  .aj-spark-line { stroke-dasharray: 100; stroke-dashoffset: 100; transition: stroke-dashoffset 0.85s var(--ease); }
+
+  /* Mini phones: every millimetre the controls and the bar's own inset give
+     up goes to the phone, which is the first thing to become unreadable when
+     the lanes eat the middle. */
+  @media (max-width: 380px) {
+    .aj-scta { --aj-inset: 8px; gap: 8px; padding-left: 11px; }
+    .aj-scta-badge { gap: 8px; }
+    .aj-scta-gauge { width: 56px; height: 56px; }
+    .aj-scta-num { font-size: 18px; }
+    .aj-scta-lbl { font-size: 9px; }
+    .aj-scta-btn { font-size: 14px; padding: 16px 17px; }
+    .aj-scta-wave { width: 74px; height: 34px; }
+    .aj-scta-spark { width: 62px; height: 40px; }
+    .aj-scta-val { font-size: 20px; }
+    .aj-pots-sym { font-size: 22px; }
+    .aj-pots-num { font-size: 30px; min-width: 42px; }
+    .aj-scta-tag { font-size: 12.5px; }
+    .aj-scta-emoji { font-size: 22px; }
+  }
+
+  /* Plays once when the bar arrives and holds. `both` so the corner is
+     already lit through the start delay that lets the slide-up finish. */
+  @media (prefers-reduced-motion: no-preference) {
+    .aj-dock.has-scta .aj-scta::before { animation: aj-scta-glow 3.2s linear 0.4s both; }
+  }
+}
+
+/* Registered so the coordinates and radii interpolate — an unregistered
+   custom property is a plain token swap and would jump between keyframes.
+   Where @property is unsupported the light simply parks at the top-left. */
+@property --aj-glow-x { syntax: '<percentage>'; initial-value: 50%; inherits: false; }
+@property --aj-glow-y { syntax: '<percentage>'; initial-value: 100%; inherits: false; }
+@property --aj-glow-rx { syntax: '<percentage>'; initial-value: 68%; inherits: false; }
+@property --aj-glow-ry { syntax: '<percentage>'; initial-value: 80%; inherits: false; }
+/* Three phases on a linear clock, so the light reads as one continuous move
+   rather than an eased lurch: it travels along the BOTTOM border from left to
+   right at a constant size, then — parked at the right — grows up and out
+   until it wraps the button, holds a beat, and fades out to leave the pill's
+   own grey border. Only the second phase changes y and ry, which is what
+   keeps the travel flat. `both` holds that faded-out end state. */
+@keyframes aj-scta-fill {
+  from { stroke-dashoffset: 100; }
+  to   { stroke-dashoffset: 0; }
+}
+/* One pass of the HRV trace, left to right, then it stays drawn. */
+@keyframes aj-wave-draw {
+  from { stroke-dashoffset: 100; }
+  to   { stroke-dashoffset: 0; }
+}
+@keyframes aj-scta-glow {
+  0%   { --aj-glow-x: 18%; --aj-glow-y: 100%; --aj-glow-rx: 52%; --aj-glow-ry: 90%;   opacity: 1; }
+  47%  { --aj-glow-x: 97%; --aj-glow-y: 100%; --aj-glow-rx: 52%; --aj-glow-ry: 90%; }
+  72%  { --aj-glow-x: 97%; --aj-glow-y: 50%;  --aj-glow-rx: 42%; --aj-glow-ry: 700%; }
+  80%  { --aj-glow-x: 97%; --aj-glow-y: 50%;  --aj-glow-rx: 42%; --aj-glow-ry: 700%; opacity: 1; }
+  100% { --aj-glow-x: 97%; --aj-glow-y: 50%;  --aj-glow-rx: 42%; --aj-glow-ry: 700%; opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aj-cb, .aj-cb-pill, .aj-cb-card, .aj-scta { transition: none; }
+  /* No sweep and no roll-up (app.html skips the count): the score is simply
+     already there. */
+  .aj-scta-arc, .aj-dock.has-scta .aj-scta-arc { animation: none; stroke-dashoffset: 0; }
+  /* Topic variants: the JS jumps straight to each one's final reading, so
+     nothing here may tween it there. */
+  .aj-wave-line, .aj-dock.has-scta .aj-wave-line { animation: none; stroke-dashoffset: 0; }
+  .aj-vgauge-arc, .aj-spark-line, .aj-scta-emoji, .aj-scta-tag,
+  .aj-scta-val, .aj-pots-sym, .aj-pots-num, .aj-scta-btn,
+  .aj-scta-gauge .aj-scta-num { transition: none; }
+}

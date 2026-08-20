@@ -1,0 +1,500 @@
+/**
+ * Demo journal — the sample month the Progress and Insights views fall back to
+ * while the user has logged nothing of their own.
+ *
+ * Why it exists: both of those views are worthless on a fresh install (they are
+ * derived views over a journal that is still empty), and "nothing to show yet"
+ * teaches nobody what the app is for. So they render a generated month behind a
+ * "showing demo data" banner instead, and swap to the real thing the moment the
+ * user logs anything (`hasOwnData`). The Journal itself is never faked — it is
+ * where the real data goes in, so a demo entry there would be a lie you could
+ * tap.
+ *
+ * The arc is deliberate: a rough first stretch with crash days, a slow climb
+ * through the middle with real setbacks along the way, and a last week that
+ * settles into the green. Not a straight line, because recovery isn't one, and
+ * a demo that promised one would be dishonest.
+ *
+ * Pure and deterministic: same day key in, same journal out (seeded PRNG, no
+ * Math.random, no store access). Days are generated relative to today so the
+ * data lands inside the Analysis buckets and the report ranges.
+ */
+import { keyOf, todayKey } from './dates';
+import type { AppState, DayRecord, Entry, Movement } from './types';
+import type { DaysMap } from './scoring/day';
+
+/**
+ * Length of the sample history.
+ *
+ * Two months, not one. Every windowed comparison in the app is a month against
+ * the month before it — Progress's trends, `compareWindows`, and the whole of
+ * ../insights — so a 30-day sample could only ever produce one window and the
+ * demo Insights view came out almost empty. Sixty days is the shortest history
+ * that can demonstrate the product honestly.
+ */
+export const DEMO_DAYS = 60;
+
+/**
+ * Does this ONE day hold any trace of the user's input?
+ *
+ * Split out from `hasOwnData` because three other places need the same question
+ * asked per day and were each answering it slightly differently. In particular it
+ * is broader than `entryCount` in ../analysis/reports, which counts loggable
+ * entries and so misses a day whose only content is water, a note or a meal — real
+ * content that a report will happily render.
+ */
+export function dayHasOwnData(d: DayRecord | undefined): boolean {
+  if (!d) return false;
+  if ((d.readings || []).length || (d.activities || []).length) return true;
+  if ((d.meds || []).length || (d.symptoms || []).length) return true;
+  if ((d.digestion?.movements || []).length) return true;
+  if ((d.food?.meals || []).length) return true;
+  if (d.food && +d.food.water > 0) return true;
+  if (d.food?.triggers && Object.values(d.food.triggers).some((n) => n > 0)) return true;
+  if (d.sleep && (d.sleep.bed || d.sleep.wake)) return true;
+  if (d.notes && d.notes.trim()) return true;
+  return false;
+}
+
+/**
+ * True when the journal holds any trace of the user's own input. Deliberately
+ * broader than the Analysis/Insights "is there anything to chart" checks: a single
+ * logged water glass or day note is still the user's data, and demo data must never
+ * sit on top of it.
+ */
+export function hasOwnData(days: DaysMap): boolean {
+  return Object.keys(days).some((k) => dayHasOwnData(days[k]));
+}
+
+/* ---------- deterministic noise ---------- */
+
+/** mulberry32 — small, fast, seeded. Keeps the sample month identical run to run. */
+function rng(seed: number): () => number {
+  let s = seed >>> 0;
+  return () => {
+    s = (s + 0x6d2b79f5) >>> 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/* ---------- the recovery arc ---------- */
+
+/**
+ * Setback days, as the amount of wellness they knock off the underlying climb.
+ * These are what keep the arc honest: the heavy ones (38 and 50) land back in
+ * the red well after the trend turned.
+ */
+const DIPS: Record<number, number> = {
+  6: 0.05, 11: 0.03, 17: 0.06, 24: 0.16, 31: 0.19, 38: 0.22, 44: 0.09, 50: 0.2, 56: 0.04,
+};
+
+/**
+ * The day the sample user starts magnesium — the onset the demo's correlations
+ * are built around.
+ *
+ * Deliberately in the middle, with a month either side, because that is what
+ * ../insights/change requires to compare a before against an after: the same
+ * shape a real user's supplement trial would have. Other supplements run from
+ * day one, so the meds category's active window covers the whole span and this
+ * onset is a real contrast rather than the day logging began.
+ */
+export const DEMO_MAG_START = 26;
+
+/**
+ * Wellness for day `i` (0 = two months ago, DEMO_DAYS-1 = today), roughly 0..1.
+ * Three phases: a flat, bad first stretch, a steady climb, then a green plateau
+ * that still wobbles.
+ */
+function wellness(i: number, jitter: number): number {
+  const base =
+    i < 18 ? 0.04 + i * 0.0065              // 0.04 → 0.15   crash / bad
+      : i < 42 ? 0.16 + (i - 18) * 0.021    // 0.16 → 0.66   the climb
+        : 0.66 + (i - 42) * 0.0135;         // 0.66 → 0.90   settling green
+  const w = base - (DIPS[i] || 0) + (jitter - 0.5) * 0.06;
+  return Math.min(0.98, Math.max(0.02, w));
+}
+
+/* ---------- helpers ---------- */
+
+const hhmm = (mins: number) => {
+  const m = ((mins % 1440) + 1440) % 1440;
+  return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+};
+const r1 = (n: number) => Math.round(n * 10) / 10;
+const r2 = (n: number) => Math.round(n * 100) / 100;
+
+/**
+ * The Baevsky histogram metrics (Mode / AMo50 / MxDMn / stress index) and the
+ * Kubios PNS/SNS composites, derived exactly as the live HRV pipeline does
+ * (src/lib/hrv/index.ts) so a demo reading carries every field a real capture
+ * writes. Without these the Progress view's MxDMn, Mode, AMo50, CV, Stress index
+ * and PNS/SNS Balance sections never appear on demo data, and the day score is
+ * blended from fewer HRV metrics than a real day would be. `amo50`/`mxdmn` ride
+ * the recovery arc (a crashed rhythm is rigid and narrow, a recovered one spread
+ * out); the rest fall out of the same formulas the capture uses, so they stay
+ * internally consistent with the sdnn/meanRr/rmssd/hr already generated.
+ */
+function hrvExtra(sdnn: number, meanRr: number, rmssd: number, hr: number, amo50: number, mxdmn: number) {
+  const mode = Math.round(meanRr / 50) * 50; // modal RR, 50 ms-binned like the pipeline
+  const cv = (sdnn / meanRr) * 100;
+  const moSec = mode / 1000;
+  const stressIndex = moSec > 0 && mxdmn > 0 ? amo50 / (2 * moSec * mxdmn) : 0;
+  const sd1 = rmssd / Math.SQRT2;
+  const z = (x: number, m: number, s: number) => (x - m) / s;
+  // NORM constants copied verbatim from the pipeline's healthy-adult references.
+  const pns = (z(meanRr, 900, 110) + z(rmssd, 42, 20) + z(sd1, 30, 14)) / 3;
+  const sns = (z(hr, 67, 10) + z(stressIndex, 90, 45) - z(rmssd, 42, 20)) / 3;
+  return {
+    mode: String(mode),
+    cv: String(Number(cv.toFixed(1))),
+    amo50: String(Math.round(amo50)),
+    mxdmn: String(Number(mxdmn.toFixed(3))),
+    stressIndex: String(Math.round(stressIndex)),
+    pns: String(Number(pns.toFixed(1))),
+    sns: String(Number(sns.toFixed(1))),
+  };
+}
+
+/**
+ * How far a single domain's day may drift from the underlying arc.
+ *
+ * Originally every metric was a deterministic function of one `w`, so sleep,
+ * blood pressure, symptoms, gut and HRV moved in exact lockstep. Each domain now
+ * draws its own reading of the day around the shared arc, which is how a real
+ * body behaves: a good week for sleep is usually a good week for HRV, not always.
+ *
+ * WORTH KNOWING, because it looks like a bug and isn't: the demo's Insights view
+ * still reports most of its correlations at 0.95 or above. That is structural, not
+ * a tuning failure. This file's whole job is a two-month arc from crash to green,
+ * and rank correlation is scale-free — so any binary factor whose threshold falls
+ * mid-arc separates "early" from "late" almost perfectly no matter how much noise
+ * is layered on, because the ORDER barely changes. A real journal is not one
+ * monotone recovery and does not behave this way; the noise suite in
+ * ../insights/__tests__ is what pins the engine's actual conservatism. Widening
+ * this further only degrades the sample data without weakening those numbers.
+ */
+const DOMAIN_SPREAD = 0.5;
+/** The narrower draw HRV gets — see `hrvD` below. It has to move so the factors
+ *  above don't track it perfectly, but the day score derives from it and the arc
+ *  this file promises is pinned by tests, so it cannot wander far. */
+const HRV_SPREAD = 0.22;
+
+/**
+ * One demo day. Values are stored as strings, matching what the forms and a
+ * real export produce, so the scoring engine sees exactly the shape it does in
+ * production.
+ */
+function demoDay(i: number, rand: () => number): DayRecord {
+  const w = wellness(i, rand());
+  /** Linear interpolate a metric between its worst-day and best-day value. */
+  const at = (lo: number, hi: number) => lo + (hi - lo) * w;
+  /** ±`spread` of reading-to-reading noise on top of an interpolated value. */
+  const jit = (v: number, spread: number) => v + (rand() - 0.5) * spread;
+  /** This domain's own reading of the day, and an interpolator against it. */
+  const domain = (spread = DOMAIN_SPREAD) => {
+    const dw = Math.min(0.98, Math.max(0.02, w + (rand() - 0.5) * spread));
+    return { w: dw, at: (lo: number, hi: number) => lo + (hi - lo) * dw };
+  };
+  const sleepD = domain();
+  const bpD = domain();
+  const symD = domain();
+  const gutD = domain();
+  // HRV gets a narrower draw than the rest. It has to move, or every factor
+  // above correlates with it perfectly — but the day score is derived from it and
+  // the arc this file promises is pinned by tests, so it cannot wander far.
+  const hrvD = domain(HRV_SPREAD);
+
+  /* --- sleep: the story here is an earlier, more consistent bedtime --- */
+  const dur = jit(sleepD.at(5.0, 8.3), 0.5);
+  const bedMin = 1080 + Math.round(jit(sleepD.at(470, 285), 40)); // minutes past 18:00
+  const wakeMin = bedMin + Math.round(dur * 60);
+  const hrLow = Math.round(jit(sleepD.at(79, 54), 3));
+  const hrHigh = Math.round(jit(sleepD.at(112, 84), 5));
+  const sleep = {
+    bed: hhmm(bedMin),
+    wake: hhmm(wakeMin),
+    quality: (sleepD.w < 0.4 ? 'interrupted' : 'good') as 'good' | 'interrupted',
+    hrLow: String(hrLow),
+    hrHigh: String(hrHigh),
+  };
+
+  const wake = wakeMin % 1440;
+  const readings: Entry[] = [];
+  const id = (kind: string, n = 0) => `demo-${i}-${kind}${n ? `-${n}` : ''}`;
+
+  /* --- HRV: a training (paced-breathing) reading plus a baseline one --- */
+  const hrvPair = (slot: 'Morning' | 'Evening', mins: number, n: number) => {
+    const total = jit(hrvD.at(560, 4300), 260);
+    const vlf = Math.round(total * hrvD.at(0.6, 0.06));
+    const lf = Math.round(total * hrvD.at(0.25, 0.6));
+    const hf = Math.max(60, Math.round(total) - vlf - lf);
+    // Evening readings run a little softer than the morning baseline.
+    const bias = slot === 'Evening' ? -0.9 : 0;
+
+    // Training (paced-breathing) reading. Base metrics are captured as numbers
+    // so the Baevsky/Kubios composites derive off the same values.
+    const sSdnn = Math.round(jit(hrvD.at(26, 68), 4));
+    const sHr = Math.round(jit(hrvD.at(80, 58), 3) - bias);
+    const sMeanRr = Math.round(jit(hrvD.at(760, 1010), 25));
+    const sRmssd = r2(jit(hrvD.at(13.5, 39) + bias, 2.5));
+    const sAmo50 = jit(hrvD.at(60, 26), 5); // rigid (~60%) when crashed, spread (~26%) recovered
+    const sMxdmn = Math.max(0.05, jit(hrvD.at(0.11, 0.46), 0.03)); // narrow → wide RR range, seconds
+    readings.push({
+      id: id(`breath-${n}`),
+      type: 'breathHrv',
+      time: hhmm(mins),
+      note: '',
+      style: '4/6',
+      sdnn: String(sSdnn),
+      hr: String(sHr),
+      meanRr: String(sMeanRr),
+      rmssd: String(sRmssd),
+      pnn50: String(Math.round(Math.max(0, jit(hrvD.at(0.8, 17), 3)))),
+      ...hrvExtra(sSdnn, sMeanRr, sRmssd, sHr, sAmo50, sMxdmn),
+      vlowPower: String(vlf),
+      lowPower: String(lf),
+      highPower: String(hf),
+      // A crashed system has no baroreflex resonance to find; the peak only
+      // walks into the 0.08-0.10 Hz target band as the training takes.
+      lfPeak: String(r2(jit(hrvD.at(0.04, 0.096), 0.008))),
+      hfPeak: String(r2(jit(hrvD.at(0.21, 0.165), 0.02))),
+      period: slot,
+    });
+
+    const uSdnn = Math.round(jit(hrvD.at(22, 56), 4));
+    const uHr = Math.round(jit(hrvD.at(82, 60), 3) - bias);
+    const uMeanRr = Math.round(jit(hrvD.at(745, 990), 25));
+    const uRmssd = r2(jit(hrvD.at(11.5, 35.5) + bias, 2.5));
+    const uAmo50 = jit(hrvD.at(62, 28), 5); // a touch more rigid than the paced reading
+    const uMxdmn = Math.max(0.05, jit(hrvD.at(0.1, 0.42), 0.03));
+    readings.push({
+      id: id(`hrv-${n}`),
+      type: 'hrv',
+      time: hhmm(mins + 6),
+      note: '',
+      sdnn: String(uSdnn),
+      avgHr: String(uHr),
+      meanRr: String(uMeanRr),
+      rmssd: String(uRmssd),
+      pnn50: String(Math.round(Math.max(0, jit(hrvD.at(0.5, 14), 3)))),
+      ...hrvExtra(uSdnn, uMeanRr, uRmssd, uHr, uAmo50, uMxdmn),
+      vlowPower: String(Math.round(vlf * 0.9)),
+      lowPower: String(Math.round(lf * 0.28)), // no paced breathing, so no LF resonance peak
+      highPower: String(Math.round(hf * 1.1)),
+      lfPeak: String(r2(jit(hrvD.at(0.05, 0.12), 0.02))),
+      hfPeak: String(r2(jit(hrvD.at(0.22, 0.19), 0.03))),
+      period: slot,
+    });
+  };
+  hrvPair('Morning', wake + 25 + Math.round(rand() * 20), 1);
+  const eveningHrv = rand() < 0.6;
+  if (eveningHrv) hrvPair('Evening', 1230 + Math.round(rand() * 50), 2);
+
+  /* --- blood pressure: low and narrow early, filling out later --- */
+  const bp = (slot: 'Morning' | 'Evening', mins: number, n: number) => {
+    readings.push({
+      id: id(`bp-${n}`),
+      type: 'bp',
+      time: hhmm(mins),
+      note: '',
+      sys: String(Math.round(jit(bpD.at(97, 115), 5))),
+      dia: String(Math.round(jit(bpD.at(58, 75), 4))),
+      pulse: String(Math.round(jit(bpD.at(88, 62), 4))),
+      period: slot,
+    });
+  };
+  bp('Morning', wake + 15, 1);
+  if (rand() < 0.6) bp('Evening', 1260 + Math.round(rand() * 40), 2);
+
+  /* --- resting HR --- */
+  if (rand() < 0.7) {
+    readings.push({
+      id: id('rhr'),
+      type: 'restingHr',
+      time: hhmm(wake + 8),
+      note: '',
+      hr: String(Math.round(jit(at(90, 59), 3))),
+      position: 'Laying',
+    });
+  }
+
+  /* --- the guided stand test, run every few days --- */
+  if (i % 5 === 2) {
+    const baseline = Math.round(jit(at(82, 58), 3));
+    const sustained = Math.round(jit(at(44, 12), 4));
+    const peakDelta = sustained + Math.round(jit(at(14, 7), 3));
+    readings.push({
+      id: id('stand'),
+      type: 'standTest',
+      time: hhmm(wake + 50),
+      note: '',
+      baselineHr: String(baseline),
+      peakHr: String(baseline + peakDelta),
+      peakDelta: String(peakDelta),
+      sustainedDelta: String(sustained),
+      metThreshold: sustained >= 30,
+      maxHrReached: String(baseline + peakDelta),
+    });
+  }
+
+  /* --- everyday orthostatic events: frequent and severe early, rare later --- */
+  const TRANSITIONS = ['Laying to standing', 'Sitting to standing', 'Climbing stairs'];
+  const nEvents = w < 0.25 ? 3 : w < 0.5 ? 2 : w < 0.75 ? 1 : rand() < 0.45 ? 1 : 0;
+  for (let e = 0; e < nEvents; e++) {
+    const transition = TRANSITIONS[Math.floor(rand() * TRANSITIONS.length)];
+    const before = Math.round(jit(at(84, 62), 4));
+    // Stairs always spike, whatever shape you're in.
+    const rise = Math.round(jit(at(40, 13), 6)) + (transition === 'Climbing stairs' ? 12 : 0);
+    const drop = Math.round(jit(at(4, 19), 4));
+    readings.push({
+      id: id('ortho', e + 1),
+      type: 'orthostatic',
+      time: hhmm(600 + Math.round(rand() * 700)),
+      note: '',
+      transition,
+      beforeHr: String(before),
+      afterHr: String(before + rise),
+      hr1min: String(before + rise - drop),
+    });
+  }
+
+  /* --- activities: pacing first, then movement the body can carry --- */
+  const activities: Entry[] = [];
+  const act = (type: string, mins: number, duration: number, n: number) => {
+    activities.push({ id: id('act', n), type, time: hhmm(mins), note: '', duration: String(duration) });
+  };
+  if (w < 0.3) {
+    if (rand() < 0.7) act('legsUp', 900, Math.round(jit(15, 6)), 1);
+    if (rand() < 0.5) act('breathwork', 1200, Math.round(jit(10, 4)), 2);
+  } else if (w < 0.6) {
+    if (rand() < 0.8) act('breathwork', 540, Math.round(jit(12, 4)), 1);
+    if (rand() < 0.6) act('walk', 990, Math.round(jit(18, 8)), 2);
+  } else {
+    if (rand() < 0.85) act('breathwork', 540, Math.round(jit(12, 4)), 1);
+    if (rand() < 0.7) act('walk', 960, Math.round(jit(32, 12)), 2);
+    if (rand() < 0.35) act(rand() < 0.5 ? 'yoga' : 'indoorBike', 1020, Math.round(jit(24, 8)), 3);
+  }
+
+  /* --- meds & supplements: the protocol, kept up most days --- */
+  const meds: Entry[] = [];
+  const med = (type: string, mins: number, amount: string, n: number) => {
+    meds.push({ id: id('med', n), type, time: hhmm(mins), note: '', amount });
+  };
+  // Magnesium only from DEMO_MAG_START, so the sample month has one genuine
+  // before/after to discover. Everything else runs the whole span.
+  if (i >= DEMO_MAG_START && rand() < 0.95) med('magGlycinate', 1290, '400mg', 1);
+  if (rand() < 0.9) med('quercetin', wake + 30, '500mg', 2);
+  if (rand() < 0.85) med('vitD3', wake + 32, '5000 IU', 3);
+  if (rand() < (w < 0.5 ? 0.8 : 0.45)) med('lmnt', 660, '1 stick', 4);
+  if (w < 0.45 && rand() < 0.5) med('melatonin', 1320, '1mg', 5);
+
+  /* --- symptoms: the load that lifts as the month goes on --- */
+  const symptoms: Entry[] = [];
+  const SYMPTOM_POOL: [string, number][] = [
+    ['fatigue', 0.95], ['brainFog', 0.85], ['lightHeaded', 0.7], ['palpitations', 0.6],
+    ['pem', 0.5], ['coatHanger', 0.4], ['headache', 0.35], ['insomnia', 0.3],
+  ];
+  SYMPTOM_POOL.forEach(([type, prevalence], n) => {
+    // Common early, thinning out fast as wellness climbs — a strong day logging
+    // a stack of symptoms would contradict its own score.
+    if (rand() < prevalence * Math.pow(1 - symD.w, 1.6) * 1.5) {
+      symptoms.push({
+        id: id('sym', n + 1),
+        type,
+        time: hhmm(660 + Math.round(rand() * 600)),
+        note: '',
+        severity: String(Math.min(5, Math.max(1, Math.round(jit(at(4.4, 1.6), 1))))),
+      });
+    }
+  });
+
+  /* --- triggers & hydration --- */
+  const TRIGGER_POOL = ['histamine', 'caffeine', 'largeMeal', 'stress', 'heat', 'overexertion', 'alcohol', 'prolongedStanding'];
+  const triggers: Record<string, number> = {};
+  // A dip day is usually a day something got past the protocol; the clean last
+  // week has none at all, which is what keeps the streak alive.
+  const nTrig = w < 0.35 ? 2 : w < 0.6 || DIPS[i] ? 1 : 0;
+  for (let t = 0; t < nTrig; t++) {
+    const key = TRIGGER_POOL[Math.floor(rand() * TRIGGER_POOL.length)];
+    triggers[key] = (triggers[key] || 0) + 1;
+  }
+
+  /* --- digestion --- */
+  const movements: Movement[] = [];
+  if (rand() < 0.75) {
+    movements.push({
+      id: id('bm'),
+      time: hhmm(wake + 40 + Math.round(rand() * 120)),
+      kind: gutD.w < 0.4 ? (rand() < 0.5 ? 'Type 6' : 'Type 2') : 'Type 4',
+      straining: gutD.w < 0.4 && rand() < 0.4 ? 'mild' : false,
+    });
+  }
+
+  return {
+    sleep,
+    readings,
+    activities,
+    meds,
+    symptoms,
+    food: { water: r1(Math.max(0.5, jit(at(1.2, 3.3), 0.4))), calories: 0, triggers, meals: [] },
+    digestion: { movements },
+    notes: DEMO_NOTES[i] || '',
+  };
+}
+
+/**
+ * A few day notes scattered through the month. They only surface in the AI
+ * report prompts, where a bare wall of numbers reads as less than a real
+ * journal would.
+ */
+const DEMO_NOTES: Record<number, string> = {
+  3: 'Rough one. Couldn\'t stand long enough to cook, heart rate went to 140 putting laundry away.',
+  8: 'Third bad night in a row. Falling asleep is fine, staying asleep is not.',
+  13: 'Flat all day again. Starting to log more carefully because I cannot tell one week from another.',
+  17: 'Started splitting water across the day instead of drinking it all at once. Small thing, felt steadier by evening.',
+  21: 'Pushed too hard yesterday and paid for it today. Noting it so I stop pretending this is a coincidence.',
+  26: 'Starting magnesium glycinate tonight, 400mg before bed. Going to give it a proper run before deciding anything.',
+  31: 'Big setback. Hot day, stood in a queue too long, was flat by 2pm.',
+  35: 'Slept through the night for the first time in weeks. Woke up and actually wanted breakfast.',
+  38: 'Bad one. Stressful week at work and it caught up with me all at once.',
+  42: 'Walked 30 minutes without needing to sit down. First time since this started.',
+  47: 'Mornings are clearly better than afternoons now. Moving my readings earlier so they are comparable.',
+  50: 'Setback again after a stressful week. Less severe than the last one and I came out of it faster.',
+  54: 'Two weeks of decent sleep in a row. Everything else seems to follow it.',
+  58: 'Best week yet. Still pacing, but the ceiling is clearly higher than it was two months ago.',
+};
+
+/* ---------- assembly ---------- */
+
+let cache: { key: string; days: DaysMap } | null = null;
+
+/**
+ * The sample month, ending today. Cached per day key so a re-render doesn't
+ * rebuild it and the charts keep referential stability.
+ */
+export function demoDays(): DaysMap {
+  const key = todayKey();
+  if (cache && cache.key === key) return cache.days;
+  const rand = rng(0x5eed1a);
+  const days: DaysMap = {};
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  for (let i = 0; i < DEMO_DAYS; i++) {
+    const dt = new Date(today);
+    dt.setDate(today.getDate() - (DEMO_DAYS - 1 - i));
+    days[keyOf(dt)] = demoDay(i, rand);
+  }
+  cache = { key, days };
+  return days;
+}
+
+/**
+ * The user's state with the sample month swapped in. Everything else (profile,
+ * protocol, custom types) stays theirs, so the demo grades against the same
+ * settings their real data will.
+ */
+export function demoState(s: AppState): AppState {
+  return { ...s, days: demoDays() };
+}

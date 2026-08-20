@@ -42,7 +42,7 @@ This is the insight behind the structured programs. Instead of starting upright,
 The two best-known programs are the [Levine protocol (also called the Dallas protocol) and the CHOP protocol](https://incitefulmed.com/resources/guides/pots-comprehensive-guide/pots-lifestyle-exercise-treatment/). Both begin with recumbent aerobic exercise (a recumbent bike, a rowing machine, or swimming) because in all three your torso is level or supported and blood doesn't pool the way it does when you stand. Over months, as your heart and blood volume adapt, you gradually add duration, then intensity, then finally the upright positions you couldn't tolerate at the start.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 230" role="img" aria-label="A timeline showing exercise progression for POTS from fully recumbent in months one and two, to semi-recumbent in the middle months, to upright by month six to eight.">
+  <svg class="fig-d" viewBox="0 0 720 230" role="img" aria-label="A timeline showing exercise progression for POTS from fully recumbent in months one and two, to semi-recumbent in the middle months, to upright by month six to eight.">
     <line x1="40" y1="150" x2="680" y2="150" stroke="var(--line)" stroke-width="2"/>
     <!-- stage 1 -->
     <circle cx="140" cy="150" r="7" fill="#38bdf8"/>
@@ -61,6 +61,22 @@ The two best-known programs are the [Levine protocol (also called the Dallas pro
     <text x="580" y="86" text-anchor="middle" font-family="Space Mono, monospace" font-size="12" fill="var(--dim-2)">walk · jog · cycle</text>
     <!-- arrow -->
     <path d="M660 150 l-12 -6 v12 z" fill="var(--line)"/>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 250" role="img" aria-label="A timeline showing exercise progression for POTS from fully recumbent in months one and two, to semi-recumbent in the middle months, to upright by month six to eight.">
+    <line x1="34" y1="24" x2="34" y2="222" stroke="var(--line)" stroke-width="2"/>
+    <path d="M34 232 l-6 -12 h12 z" fill="var(--line)"/>
+    <circle cx="34" cy="44" r="7" fill="#38bdf8"/>
+    <text x="56" y="34" font-family="Space Mono, monospace" font-size="11.5" fill="var(--dim-2)">Months 1–2</text>
+    <text x="56" y="56" font-family="Space Grotesk, sans-serif" font-size="16" font-weight="700" fill="#38bdf8">Recumbent</text>
+    <text x="56" y="74" font-family="Space Mono, monospace" font-size="11.5" fill="var(--dim-2)">row · bike · swim</text>
+    <circle cx="34" cy="124" r="7" fill="#54d98a"/>
+    <text x="56" y="114" font-family="Space Mono, monospace" font-size="11.5" fill="var(--dim-2)">Months 3–5</text>
+    <text x="56" y="136" font-family="Space Grotesk, sans-serif" font-size="16" font-weight="700" fill="#54d98a">Semi-recumbent</text>
+    <text x="56" y="154" font-family="Space Mono, monospace" font-size="11.5" fill="var(--dim-2)">longer · a little harder</text>
+    <circle cx="34" cy="204" r="7" fill="var(--accent)"/>
+    <text x="56" y="194" font-family="Space Mono, monospace" font-size="11.5" fill="var(--dim-2)">Month 6–8</text>
+    <text x="56" y="216" font-family="Space Grotesk, sans-serif" font-size="16" font-weight="700" fill="var(--accent)">Upright</text>
+    <text x="56" y="234" font-family="Space Mono, monospace" font-size="11.5" fill="var(--dim-2)">walk · jog · cycle</text>
   </svg>
   <figcaption>The arc of a recumbent-first program: train the heart lying down, then slowly stand it up over roughly six to eight months.</figcaption>
 </figure>

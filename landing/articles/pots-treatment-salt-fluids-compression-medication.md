@@ -58,7 +58,7 @@ When you stand, gravity pulls blood down and it pools, in POTS, disproportionate
 The detail that trips people up: **the pooling happens mostly in the abdomen and thighs, not the calves.** That's why knee-high compression socks, the ones most people reach for first, often disappoint. Waist-high or abdominal compression at roughly **20 to 30 mmHg** covers the area that actually matters and tends to work far better. Compression garments continue to be studied formally in POTS, including a [randomized compression trial](https://clinicaltrials.gov/study/NCT04881318).
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 220" role="img" aria-label="Diagram contrasting knee-high compression, which covers only the calves, with waist-high compression, which covers the abdomen and thighs where blood pools in POTS.">
+  <svg class="fig-d" viewBox="0 0 720 220" role="img" aria-label="Diagram contrasting knee-high compression, which covers only the calves, with waist-high compression, which covers the abdomen and thighs where blood pools in POTS.">
     <rect x="0" y="0" width="720" height="220" fill="none"/>
     <!-- Left figure: knee-high -->
     <text x="150" y="28" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="15" fill="var(--dim-2)">Knee-high socks</text>
@@ -77,6 +77,23 @@ The detail that trips people up: **the pooling happens mostly in the abdomen and
     <!-- Arrow -->
     <line x1="240" y1="120" x2="440" y2="120" stroke="var(--line)" stroke-width="2" stroke-dasharray="5 5"/>
     <text x="340" y="112" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="13" fill="var(--dim-2)">cover where blood pools</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 250" role="img" aria-label="Diagram contrasting knee-high compression, which covers only the calves, with waist-high compression, which covers the abdomen and thighs where blood pools in POTS.">
+    <text x="86" y="20" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="13" fill="var(--dim-2)">Knee-high socks</text>
+    <rect x="56" y="34" width="60" height="50" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/>
+    <rect x="64" y="84" width="44" height="55" fill="none" stroke="var(--line)" stroke-width="2"/>
+    <rect x="64" y="139" width="44" height="40" rx="6" fill="#38bdf8" opacity="0.85"/>
+    <text x="86" y="164" text-anchor="middle" font-family="Space Mono, monospace" font-size="10.5" fill="#04263a">covered</text>
+    <text x="86" y="116" text-anchor="middle" font-family="Space Mono, monospace" font-size="10.5" fill="#e03127">pooling</text>
+    <text x="264" y="20" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="13" fill="var(--dim-2)">Waist-high 20–30</text>
+    <rect x="234" y="34" width="60" height="50" rx="10" fill="none" stroke="var(--line)" stroke-width="2"/>
+    <rect x="242" y="84" width="44" height="95" rx="6" fill="#54d98a" opacity="0.85"/>
+    <text x="264" y="124" text-anchor="middle" font-family="Space Mono, monospace" font-size="10.5" fill="#03361b">abdomen +</text>
+    <text x="264" y="140" text-anchor="middle" font-family="Space Mono, monospace" font-size="10.5" fill="#03361b">thighs</text>
+    <text x="264" y="156" text-anchor="middle" font-family="Space Mono, monospace" font-size="10.5" fill="#03361b">covered</text>
+    <line x1="130" y1="110" x2="222" y2="110" stroke="var(--line)" stroke-width="2" stroke-dasharray="5 5"/>
+    <text x="180" y="212" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="12.5" fill="var(--dim-2)">cover where blood pools:</text>
+    <text x="180" y="232" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="12.5" fill="var(--dim-2)">the abdomen and thighs</text>
   </svg>
   <figcaption>Blood pools in the abdomen and thighs, so waist-high compression usually beats knee-high socks.</figcaption>
 </figure>

@@ -1,0 +1,18 @@
+{
+  "name": "autonomic-sls",
+  "version": "1.0.0",
+  "description": "Autonomic master dashboard serverless backend",
+  "private": true,
+  "scripts": {
+    "deploy": "serverless deploy --stage prod --region us-west-2",
+    "logs": "serverless logs --stage prod --region us-west-2 -f api -t",
+    "remove": "serverless remove --stage prod --region us-west-2"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.600.0",
+    "@aws-sdk/lib-dynamodb": "^3.600.0"
+  },
+  "devDependencies": {
+    "serverless": "^4.0.0"
+  }
+}

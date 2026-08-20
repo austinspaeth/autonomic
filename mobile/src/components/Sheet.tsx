@@ -10,16 +10,18 @@
  * absolutely-positioned Views. (iOS can only present one RN Modal at a time, so
  * one-Modal-per-sheet silently fails to stack — the 2nd never appears.)
  */
-import React, { createContext, useContext, useRef, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import {
-  Dimensions, Keyboard, Modal, Platform, Pressable, ScrollView, StyleSheet, View,
+  BackHandler, Keyboard, Modal, Platform, Pressable, ScrollView, StyleProp, StyleSheet, TextInput,
+  View, ViewStyle,
 } from 'react-native';
 import Animated, {
   Easing, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming,
 } from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaFrame, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { radius, usePalette } from '../theme';
+import { notifyChartsBlur } from './charts';
 import { Icon } from './Icon';
 
 export interface SheetControls {
@@ -33,6 +35,9 @@ export interface SheetOptions {
   fitContent?: boolean;
   /** Hide the ✕ and make the backdrop non-dismissing — the sheet closes itself. */
   hideClose?: boolean;
+  /** Stretch the scroll content to fill the sheet so content can bottom-pin
+   *  (e.g. via marginTop: 'auto') just above the footer divider. */
+  grow?: boolean;
 }
 type Builder = (c: SheetControls) => React.ReactNode;
 
@@ -42,6 +47,8 @@ interface SheetCtx {
   openSheet: (builder: Builder, opts?: SheetOptions) => void;
   closeSheet: () => void;
   closeAll: () => void;
+  /** Open (non-closing) sheets — lets overlays outside the stack wait for it to clear. */
+  depth: number;
 }
 const Ctx = createContext<SheetCtx | null>(null);
 export const useSheets = () => {
@@ -55,7 +62,14 @@ let nextId = 1;
 export function SheetProvider({ children }: { children: React.ReactNode }) {
   const [stack, setStack] = useState<SheetEntry[]>([]);
 
+  // Double-tap guard: on a janky frame (slow Androids especially) both taps of
+  // an accidental double-press get queued and each opens the same sheet. Two
+  // deliberate opens are never this close together, so drop the echo.
+  const lastOpenAt = useRef(0);
   const openSheet = (builder: Builder, opts: SheetOptions = {}) => {
+    const now = Date.now();
+    if (now - lastOpenAt.current < 350) return;
+    lastOpenAt.current = now;
     setStack((s) => [...s, { id: nextId++, builder, opts }]);
   };
   // Closing is a two-step dance so the animation stays fluid: flag the sheet
@@ -72,11 +86,17 @@ export function SheetProvider({ children }: { children: React.ReactNode }) {
   const closeAll = () => setStack((s) => s.map((e) => ({ ...e, closing: true })));
 
   return (
-    <Ctx.Provider value={{ openSheet, closeSheet: closeTop, closeAll }}>
+    <Ctx.Provider value={{ openSheet, closeSheet: closeTop, closeAll, depth: stack.filter((e) => !e.closing).length }}>
       {children}
       {stack.length > 0 && (
-        <Modal transparent visible animationType="none" statusBarTranslucent onRequestClose={closeTop}>
-          <View style={StyleSheet.absoluteFill}>
+        <SheetHost onRequestClose={closeTop}>
+          {/* Capture-phase touch hook (never claims the responder): any touch in
+              the sheet stack blurs chart selections; a touched chart re-selects
+              in the same event, so only taps *outside* a chart deselect. */}
+          <View
+            style={StyleSheet.absoluteFill}
+            onStartShouldSetResponderCapture={() => { notifyChartsBlur(); return false; }}
+          >
             {stack.map((entry, i) => (
               <SheetView
                 key={entry.id}
@@ -90,13 +110,43 @@ export function SheetProvider({ children }: { children: React.ReactNode }) {
               />
             ))}
           </View>
-        </Modal>
+        </SheetHost>
       )}
     </Ctx.Provider>
   );
 }
 
-const SCREEN_H = Dimensions.get('window').height;
+/**
+ * Where the sheet stack lives. iOS: one RN Modal (escapes every stacking
+ * context; iOS keyboards overlay it and the manual footer-lift handles them).
+ * Android: a plain full-screen overlay View in the ACTIVITY window instead —
+ * an RN Modal is its own Android window, and that window pans itself when the
+ * keyboard covers a focused input (windowSoftInputMode doesn't reach Modals),
+ * shoving the whole sheet up on top of the footer-lift. In the activity window
+ * (edge-to-edge) the keyboard simply overlays, matching the iOS model the
+ * sheet's keyboard handling was built for. Back button mirrors onRequestClose.
+ */
+function SheetHost({ children, onRequestClose }: { children: React.ReactNode; onRequestClose: () => void }) {
+  const onRequestCloseRef = useRef(onRequestClose); onRequestCloseRef.current = onRequestClose;
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => { onRequestCloseRef.current(); return true; });
+    return () => sub.remove();
+  }, []);
+  if (Platform.OS === 'android') {
+    return (
+      <View style={[StyleSheet.absoluteFill, { zIndex: 999, elevation: 999 }]}>
+        {children}
+      </View>
+    );
+  }
+  return (
+    <Modal transparent visible animationType="none" statusBarTranslucent onRequestClose={onRequestClose}>
+      {children}
+    </Modal>
+  );
+}
+
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 function SheetView({ entry, isTop, behind, closing, requestClose, onExited, closeAll }: {
@@ -105,6 +155,14 @@ function SheetView({ entry, isTop, behind, closing, requestClose, onExited, clos
 }) {
   const p = usePalette();
   const insets = useSafeAreaInsets();
+  // Size against the ACTUAL container frame, not a module-level Dimensions
+  // snapshot. On Android the sheet host is a full-screen absoluteFill View in
+  // the (edge-to-edge) activity window, but `Dimensions.get('window').height`
+  // is device-inconsistent there — some devices subtract the status/nav bars,
+  // some don't — so a snapshot made the card open to a device-dependent height.
+  // useSafeAreaFrame() reports the frame the provider actually occupies (the
+  // same area the host fills) and is reactive to rotation.
+  const SCREEN_H = useSafeAreaFrame().height;
   const translateY = useSharedValue(SCREEN_H);
   const exiting = useRef(false);
   // 0 = front-most, 1 = pushed back behind a sheet stacked on top. Driven by the
@@ -113,12 +171,34 @@ function SheetView({ entry, isTop, behind, closing, requestClose, onExited, clos
   // Height of the on-screen keyboard, tweened in from the OS event so the sticky
   // footer rides just above it and the scroll content gains room to clear it.
   const kb = useSharedValue(0);
+  // Same height but applied to the tail spacer INSTANTLY on show — the auto-scroll
+  // below needs the extra scroll room to exist before scrollTo, or iOS clamps it.
+  const kbSpace = useSharedValue(0);
+  // Measured height of the card itself — a fitContent sheet rides up bodily on
+  // the keyboard, and this is what caps the lift so its top can't leave the screen.
+  const cardH = useSharedValue(0);
   const [kbOpen, setKbOpen] = useState(false);
   const isTopRef = useRef(isTop); isTopRef.current = isTop;
   const [footer, setFooter] = useState<React.ReactNode>(null);
   // Measured footer height so scroll content clears it exactly — footers can be
   // taller than one row (e.g. the results card's stacked button cluster).
   const [footerH, setFooterH] = useState(0);
+  const scrollRef = useRef<ScrollView>(null);
+  const scrollY = useRef(0);
+  // A sheet whose content fits should not scroll. The bounce on a card that has
+  // nowhere to go reads as looseness, and on a live HRV reading it means the
+  // rings can be dragged off centre mid-breath. Measured rather than declared,
+  // so it re-decides itself as content (or the keyboard spacer) changes.
+  const [scrollable, setScrollable] = useState(true);
+  const viewH = useRef(0);
+  const contentH = useRef(0);
+  const fitCheck = () => {
+    if (!viewH.current || !contentH.current) return;
+    setScrollable(contentH.current > viewH.current + 1);
+  };
+  // Live mirrors for the keyboard listener (registered once, deps [kb]).
+  const footerHRef = useRef(0);
+  const hasFooterRef = useRef(false); hasFooterRef.current = !!footer;
   const mounted = useRef(false);
   const full = entry.opts.fullscreen;
   const fit = entry.opts.fitContent && !full;
@@ -147,19 +227,36 @@ function SheetView({ entry, isTop, behind, closing, requestClose, onExited, clos
   // their footer put.
   React.useEffect(() => {
     const ios = Platform.OS === 'ios';
-    const onShow = (e: { endCoordinates: { height: number }; duration?: number }) => {
+    const onShow = (e: { endCoordinates: { height: number; screenY?: number }; duration?: number }) => {
       if (!isTopRef.current) return;
       kb.value = withTiming(e.endCoordinates.height, { duration: e.duration || 250, easing: Easing.out(Easing.cubic) });
+      kbSpace.value = e.endCoordinates.height; // instant — see declaration
       setKbOpen(true);
+      // Auto-scroll the focused field clear of the keyboard AND the raised footer
+      // (fields near the sheet bottom are otherwise typed into blind). iOS refires
+      // will-show on every focus change, so hopping between fields re-runs this.
+      const input = TextInput.State.currentlyFocusedInput();
+      const kbTop = e.endCoordinates.screenY ?? SCREEN_H - e.endCoordinates.height;
+      if (input && scrollRef.current) {
+        // Small delay so the spacer's new height has landed in the content size.
+        setTimeout(() => {
+          input.measureInWindow((_x, y, _w, h) => {
+            const clearBottom = kbTop - (hasFooterRef.current ? footerHRef.current : 0) - 12;
+            const overlap = y + h - clearBottom;
+            if (overlap > 0) scrollRef.current?.scrollTo({ y: scrollY.current + overlap, animated: true });
+          });
+        }, 60);
+      }
     };
     const onHide = (e?: { duration?: number }) => {
       kb.value = withTiming(0, { duration: (e && e.duration) || 250, easing: Easing.out(Easing.cubic) });
+      kbSpace.value = withTiming(0, { duration: (e && e.duration) || 250, easing: Easing.out(Easing.cubic) });
       setKbOpen(false);
     };
     const s = Keyboard.addListener(ios ? 'keyboardWillShow' : 'keyboardDidShow', onShow);
     const h = Keyboard.addListener(ios ? 'keyboardWillHide' : 'keyboardDidHide', onHide);
     return () => { s.remove(); h.remove(); };
-  }, [kb]);
+  }, [kb, kbSpace, SCREEN_H]);
 
   // Play the exit the moment we're flagged closing. The card beneath is already
   // returning (its `behind` flipped false), so the two animate simultaneously.
@@ -170,7 +267,7 @@ function SheetView({ entry, isTop, behind, closing, requestClose, onExited, clos
         if (fin) runOnJS(onExited)();
       });
     }
-  }, [closing, onExited, translateY]);
+  }, [closing, onExited, translateY, SCREEN_H]);
 
   const dismiss = requestClose;
 
@@ -192,9 +289,14 @@ function SheetView({ entry, isTop, behind, closing, requestClose, onExited, clos
     // — the iOS "stacked cards" look.
     const peek = 22 * recede.value;
     const lift = recede.value * 0.04 * sheetH + peek;
+    // A fitContent card has no scroll view to scroll a focused field clear of the
+    // keyboard, so the whole card rides up on it instead. Capped at the slack
+    // above the card so its top (and title) can never leave the screen.
+    const slack = Math.max(0, SCREEN_H - cardH.value - insets.top - 8);
+    const kbShift = fit ? Math.min(kb.value, slack) : 0;
     return {
       transform: [
-        { translateY: translateY.value - lift },
+        { translateY: translateY.value - lift - kbShift },
         { scale },
       ],
     };
@@ -202,13 +304,14 @@ function SheetView({ entry, isTop, behind, closing, requestClose, onExited, clos
 
   // Lift the footer by the keyboard height and shed the home-indicator inset as it
   // rises (the keyboard already covers that safe area).
+  // (A fitContent card lifts bodily in sheetStyle, so its footer must not lift again.)
   const footerStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: -kb.value }],
+    transform: [{ translateY: fit ? 0 : -kb.value }],
     paddingBottom: 14 + insets.bottom * (1 - Math.min(1, kb.value / 24)),
   }));
   // Spacer at the tail of the scroll content so a focused field can scroll clear
   // of both the keyboard and the raised footer.
-  const spacerStyle = useAnimatedStyle(() => ({ height: kb.value }));
+  const spacerStyle = useAnimatedStyle(() => ({ height: kbSpace.value }));
 
   const controls = React.useMemo<SheetControls>(() => ({
     close: () => requestCloseRef.current(),
@@ -236,6 +339,7 @@ function SheetView({ entry, isTop, behind, closing, requestClose, onExited, clos
       )}
       <Animated.View
         pointerEvents={isTop ? 'auto' : 'none'}
+        onLayout={(e) => { cardH.value = e.nativeEvent.layout.height; }}
         style={[
           styles.sheet,
           fit ? { maxHeight: sheetH } : { height: sheetH },
@@ -250,10 +354,18 @@ function SheetView({ entry, isTop, behind, closing, requestClose, onExited, clos
             </View>
           ) : (
             <ScrollView
+              ref={scrollRef}
               style={{ flex: 1 }}
-              contentContainerStyle={{ padding: 18, paddingTop: topPad, paddingBottom: footer ? Math.max(120, footerH + 20) : 24 + insets.bottom }}
+              scrollEnabled={scrollable}
+              onLayout={(e) => { viewH.current = e.nativeEvent.layout.height; fitCheck(); }}
+              onContentSizeChange={(_w, h) => { contentH.current = h; fitCheck(); }}
+              contentContainerStyle={{ padding: 18, paddingTop: topPad, paddingBottom: footer ? Math.max(120, footerH + 20) : 24 + insets.bottom, ...(entry.opts.grow ? { flexGrow: 1 } : null) }}
               keyboardShouldPersistTaps="handled"
-              keyboardDismissMode="on-drag"
+              // "interactive" (iOS) keeps the keyboard up while scrolling the form —
+              // it only dismisses when dragged down over the keyboard itself.
+              keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+              onScroll={(e) => { scrollY.current = e.nativeEvent.contentOffset.y; }}
+              scrollEventThrottle={16}
               showsVerticalScrollIndicator={false}
             >
               {content}
@@ -262,26 +374,17 @@ function SheetView({ entry, isTop, behind, closing, requestClose, onExited, clos
           )}
         </SheetContentContext.Provider>
 
-        {/* Close (and optional edit) live together in one tinted-glass pill:
-            blurred background, near-black tint, dark grey border. */}
+        {/* Close (and optional edit) live together in one tinted-glass pill. */}
         {((!full && !hideClose) || entry.opts.action) && (
-          <View style={[styles.headerPill, { borderColor: '#46464e' }]}>
-            <BlurView intensity={45} tint="dark" style={StyleSheet.absoluteFill} />
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(6,6,8,0.78)' }]} />
+          <SheetPill lone={!(entry.opts.action && !full && !hideClose)} style={styles.headerPill}>
             {entry.opts.action && (
-              <Pressable onPress={entry.opts.action.onPress} style={[styles.pillBtn, { backgroundColor: p.surface2 }]} hitSlop={8}>
-                <Icon name={entry.opts.action.icon} size={16} color={p.textDim} />
-              </Pressable>
+              <SheetPillButton icon={entry.opts.action.icon} size={16} onPress={entry.opts.action.onPress} label="Edit" />
             )}
-            {!full && !hideClose && (
-              <Pressable onPress={dismiss} style={[styles.pillBtn, { backgroundColor: p.surface2 }]} hitSlop={8}>
-                <Icon name="x" size={18} color={p.textDim} />
-              </Pressable>
-            )}
-          </View>
+            {!full && !hideClose && <SheetPillButton icon="x" size={18} onPress={dismiss} label="Close" />}
+          </SheetPill>
         )}
         {footer && (
-          <Animated.View onLayout={(e) => setFooterH(e.nativeEvent.layout.height)} style={[styles.footer, { backgroundColor: p.surface, borderTopColor: p.border }, footerStyle]}>
+          <Animated.View onLayout={(e) => { setFooterH(e.nativeEvent.layout.height); footerHRef.current = e.nativeEvent.layout.height; }} style={[styles.footer, { backgroundColor: p.surface, borderTopColor: p.border }, footerStyle]}>
             {kbOpen && (
               <Pressable onPress={() => Keyboard.dismiss()} style={[styles.kbDismiss, { backgroundColor: p.surface2, borderColor: p.border }]} hitSlop={6}>
                 <Icon name="chevron" size={20} color={p.textDim} />
@@ -292,6 +395,46 @@ function SheetView({ entry, isTop, behind, closing, requestClose, onExited, clos
         )}
       </Animated.View>
     </>
+  );
+}
+
+/**
+ * The floating tinted-glass pill the sheet's ✕ rides in: blurred background,
+ * near-black tint, dark grey border. Exported so sheet *content* can put its own
+ * control (the camera wizard's back arrow) in matching chrome — position it and
+ * the two read as one row. `lone` gives a single button equal padding all round
+ * so the pill is a circle, not an egg.
+ */
+export function SheetPill({ children, lone, style }: {
+  children: React.ReactNode; lone?: boolean; style?: StyleProp<ViewStyle>;
+}) {
+  return (
+    <View style={[styles.pill, lone && { paddingHorizontal: 6 }, style]}>
+      {/* Android gets no real blur (expo-blur renders plain translucency
+          there) — use a solid fill instead of glass. */}
+      {Platform.OS === 'ios' ? <BlurView intensity={45} tint="dark" style={StyleSheet.absoluteFill} /> : null}
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: Platform.OS === 'ios' ? 'rgba(6,6,8,0.67)' : '#0a0a0d' }]} />
+      {children}
+    </View>
+  );
+}
+
+/** One grey circular icon button inside a `SheetPill`. */
+export function SheetPillButton({ icon, size = 18, onPress, label, disabled }: {
+  icon: React.ComponentProps<typeof Icon>['name']; size?: number; onPress: () => void; label: string; disabled?: boolean;
+}) {
+  const p = usePalette();
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      hitSlop={8}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={[styles.pillBtn, { backgroundColor: p.surface2 }]}
+    >
+      <Icon name={icon} size={size} color={p.textDim} />
+    </Pressable>
   );
 }
 
@@ -309,7 +452,10 @@ export function SheetFooter({ children }: { children: React.ReactNode }) {
 const styles = StyleSheet.create({
   backdrop: { ...StyleSheet.absoluteFillObject },
   sheet: { position: 'absolute', left: 0, right: 0, bottom: 0, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
-  headerPill: { position: 'absolute', top: 14, right: 14, flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 999, borderWidth: 1, overflow: 'hidden' },
+  // Pill chrome (shared with SheetPill) and its fixed top-right placement, kept
+  // apart so content can reuse the chrome without the positioning.
+  pill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 999, borderWidth: 1, borderColor: '#46464e', overflow: 'hidden' },
+  headerPill: { position: 'absolute', top: 10, right: 14 },
   pillBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   footer: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 18, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, flexDirection: 'row', gap: 10 },
   kbDismiss: { width: 46, borderRadius: radius.control, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },

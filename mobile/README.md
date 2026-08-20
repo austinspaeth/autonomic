@@ -1,7 +1,9 @@
 # Autonomic (native)
 
-A native, iOS-first **Expo / React Native** app for tracking
-autonomic-nervous-system recovery. Offline-first, no backend, all data on-device.
+A native **Expo / React Native** app (iOS + Android) for tracking
+autonomic-nervous-system recovery. Offline-first, no accounts, all data
+on-device — the app's only network call is an anonymous cohort ping carrying a
+single date and no identifier (`src/store/ping.ts`).
 It carries forward the **same data model** as the original web app, so an
 `export.json` from that app imports directly.
 
@@ -24,7 +26,7 @@ guided full-screen **breathing experience**, and **Apple HealthKit** read/write.
 | HRV pipeline (artifact correction, time- & frequency-domain, coherence) | `src/lib/hrv/` |
 | Analysis / milestones / AI-insights builders | `src/lib/analysis/` |
 | BLE heart-rate manager (0x180D / 0x2A37 RR parsing) | `src/lib/ble/` |
-| Apple HealthKit wrapper (iOS-only, feature-flagged) | `src/lib/health/` |
+| Health wrapper (HealthKit on iOS · Health Connect on Android) | `src/lib/health/` |
 | MMKV store + `save()` (stamps `meta.lastUpdated`) | `src/store/` |
 | Theme (light/dark), component library, charts, sheets | `src/theme/`, `src/components/` |
 | Journal / summaries / forms / live-capture / settings | `src/features/` |
@@ -53,7 +55,7 @@ npx expo run:ios
 # or a signed dev build via EAS:
 #   eas build --profile development --platform ios
 
-# Android (BLE works; HealthKit is iOS-only and auto-disabled)
+# Android (BLE, camera PPG, Health Connect; watch features are iOS-only)
 npx expo run:android
 ```
 
@@ -86,22 +88,30 @@ per packet, reconnection, and weak signal (live artifact hint).
 
 ## Apple Health
 
-Menu (☰) → **Apple Health** → **Connect**, then **Sync today from Health** pulls
-the day's resting HR, HRV (SDNN), blood pressure, SpO₂, weight and sleep into the
-journal (deduped; manual entries are never overwritten). Saving a captured HRV
-reading can optionally write **HRV SDNN + a Mindfulness session** back to Health.
-Everything is user-initiated and gracefully degrades where data/permission is
-missing. On Android these controls are disabled.
+Menu (☰) → **Apple Health** (iOS) / **Health Connect** (Android) → **Connect**,
+then **Sync today from Health** pulls the day's resting HR, blood pressure,
+weight and sleep into the journal (deduped; manual entries are never
+overwritten). Saving a captured HRV reading can optionally write it back to the
+health store — **SDNN + a Mindfulness session** on iOS, **RMSSD** on Android
+(Health Connect's HRV type; it has no beat-to-beat series, so Android HRV
+imports are RMSSD-only). Everything is user-initiated and gracefully degrades
+where data/permission is missing.
 
 ## Live HRV & the breathing experience
 
 Readings → **+ Add** → **Live HRV reading**:
 
-- **Kind**: Unstructured (quiet, no pacing) or Breathing.
-- **Breathing pattern**: 4/4, 4/5, **4/6 (recommended)**, 5/5 — the inhale/exhale
-  seconds drive the pacing and the HF-peak grading (`expectedHf`).
-- **Source**: Bluetooth strap, or Apple Watch (run a Breathe/Mindfulness session;
-  beat-to-beat / SDNN is read from Health at the end).
+- **Kind**: **Training HRV** (paced breathing) or **Baseline HRV** (quiet, no
+  pacing). The old "structured/unstructured" wording is gone.
+- **Breathing pattern**: always **4/6** (4s in, 6s out) for training readings, the
+  resonant-frequency pace; the inhale/exhale seconds drive the pacing and the
+  HF-peak grading (`expectedHf`). Box breathing and 4/7/8 were retired because
+  they flatten RSA and break day-to-day comparability; old readings keep the
+  style they were saved with (`src/lib/breathStyle.ts`).
+- **Source**: picked in the "Measuring with" sheet (`features/hrv/SourcePicker.tsx`),
+  which also scans for nearby BLE straps inline so pairing never needs a detour
+  into Settings. Bluetooth strap, Apple Watch (run a Breathe/Mindfulness session;
+  beat-to-beat / SDNN is read from Health at the end), or phone camera.
 
 The full-screen session shows a 5:00 progress ring, live HR, a signal-quality
 hint, and — for breathing — a vertical glowing "volume-bar" visualizer paced on
@@ -124,12 +134,12 @@ fill-in-the-blank field on both HRV forms. The PNS/SNS composites are
 Kubios-style approximations; they track vagal/sympathetic balance but may not
 match a specific device's proprietary calibration to the decimal.
 
-**Unstructured and structured HRV report the identical measurements.** Both
+**Baseline and training HRV report the identical measurements.** Both
 capture and compute the same metric set (including the PNS/SNS/stress balance
 indices and coherence) and grade them against the same bands; the only
-difference is the breathing-style row (structured only) and the RMSSD/HR grade
+difference is the RMSSD/HR grade
 band that applies per kind. The per-reading *composite score* still uses the two
-documented weightings (structured weights the HF peak, unstructured weights
+documented weightings (training weights the HF peak, baseline weights
 SDNN), since a paced reading has a defined respiratory peak and an unpaced one
 does not. There is no "physiological age" field — it was a device-proprietary
 estimate not derivable from an RR series, so it's been removed.
@@ -139,12 +149,19 @@ estimate not derivable from an RR series, so it's been removed.
 One JSON object persisted under `autonomic.journal.v1` (MMKV). Shape matches the
 PWA (`version`, `settings`, `profile`, `meta`, `days[YYYY-MM-DD]{sleep, readings,
 activities, meds, symptoms, food, digestion}`), extended so a live HRV reading
-also stores `rrRaw` / `rrClean` / `sampledHr` / `source` / `durationSec`. Import
-and Export use the **exact PWA format** (Menu → Import / Export data), so you can
-move data off the web app and back.
+also stores `source` / `durationSec` plus computed metrics. The big capture
+arrays (`rrRaw` / `sampledHr` / `sampledSdnn`) live in a **waveform sidecar** —
+a second MMKV instance keyed by reading id (`storeWaveform` / `getWaveform` in
+`src/store/store.ts`, pure helpers in `src/lib/waveforms.ts`) — so the journal
+blob stays small no matter how many sessions accumulate; `rrClean` is re-derived
+from `rrRaw` on view. Import and Export still use one self-contained file (Menu →
+Import / Export data): exports append a top-level `waveforms` map, and imports
+accept both that shape and old files with arrays embedded on entries.
 
 **Every mutation goes through `save()`** (`src/store/store.ts`), which stamps
-`meta.lastUpdated` — never write MMKV directly.
+`meta.lastUpdated` — never write MMKV directly. The disk write is debounced
+(`src/lib/persist.ts`) and flushed when the app leaves the foreground; call
+`flushSave()` if a write must not wait.
 
 ## Notes on fidelity
 

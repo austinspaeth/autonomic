@@ -1,0 +1,390 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Autonomic - CI/CD pipeline (CodePipeline + CodeBuild) deploying the landing site to the existing autonomic.care bucket + CloudFront distribution
+
+Parameters:
+  GitHubConnectionArn:
+    Type: String
+    Default: arn:aws:codeconnections:us-east-1:575886192503:connection/0f692e20-b930-44a7-8d0b-855a3e6aacb2
+    Description: ARN of the CodeStar/CodeConnections connection to GitHub
+
+  GitHubRepo:
+    Type: String
+    Default: austinspaeth/autonomic
+    Description: GitHub owner/repo
+
+  GitHubBranch:
+    Type: String
+    Default: main
+    Description: Branch to build from
+
+  SiteBucket:
+    Type: String
+    Default: autonomic.care
+    Description: Existing S3 bucket the built landing site is synced to (created out-of-band, fronted by CloudFront via OAC)
+
+  CloudFrontDistributionId:
+    Type: String
+    Default: E17FMCFPDR3P3D
+    Description: Existing CloudFront distribution serving autonomic.care / www.autonomic.care
+
+  ServerlessAccessKeyParameter:
+    Type: String
+    Default: /autonomic/serverless-access-key
+    Description: >-
+      SSM SecureString parameter holding the Serverless Framework access key.
+      Kept in Parameter Store rather than this template so the key never lands
+      in the repo.
+
+  PingReportKeyParameter:
+    Type: String
+    Default: /autonomic/ping-report-key
+    Description: >-
+      SSM SecureString parameter holding the shared key for GET /ping/report.
+      Must exist before this stack is updated — CodeBuild resolves it at build
+      start, so a missing parameter fails the build rather than the deploy.
+
+  SlsStackName:
+    Type: String
+    Default: autonomic-prod
+    Description: CloudFormation stack the serverless backend deploys into
+
+Resources:
+
+  # ============================================================
+  # CodeBuild Project
+  # ============================================================
+  CodeBuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: autonomic-codebuild
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: CodeBuildPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # CloudWatch Logs
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: '*'
+              # S3 — deploy site + access pipeline artifacts
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                  - s3:PutObject
+                  - s3:DeleteObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub 'arn:aws:s3:::${SiteBucket}'
+                  - !Sub 'arn:aws:s3:::${SiteBucket}/*'
+                  - !Sub '${ArtifactBucket.Arn}'
+                  - !Sub '${ArtifactBucket.Arn}/*'
+              # CloudFront — cache invalidation
+              - Effect: Allow
+                Action:
+                  - cloudfront:CreateInvalidation
+                  - cloudfront:GetInvalidation
+                Resource: !Sub 'arn:aws:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistributionId}'
+
+              # ----------------------------------------------------------
+              # `sls deploy` for the /master dashboard backend (sls/).
+              # Serverless drives everything through CloudFormation, so the
+              # verbs below are what CFN needs on its behalf. Resource names
+              # inside the stack are generated, hence the wildcards — the
+              # stack itself is pinned by name.
+              # ----------------------------------------------------------
+              - Effect: Allow
+                Action:
+                  - cloudformation:CreateStack
+                  - cloudformation:UpdateStack
+                  - cloudformation:DeleteStack
+                  - cloudformation:DescribeStacks
+                  - cloudformation:DescribeStackEvents
+                  - cloudformation:DescribeStackResource
+                  - cloudformation:DescribeStackResources
+                  - cloudformation:ListStackResources
+                  - cloudformation:GetTemplate
+                  - cloudformation:ValidateTemplate
+                  - cloudformation:CreateChangeSet
+                  - cloudformation:DescribeChangeSet
+                  - cloudformation:ExecuteChangeSet
+                  - cloudformation:DeleteChangeSet
+                  - cloudformation:ListChangeSets
+                Resource:
+                  - !Sub 'arn:aws:cloudformation:*:${AWS::AccountId}:stack/${SlsStackName}/*'
+              - Effect: Allow
+                Action:
+                  - cloudformation:ValidateTemplate
+                  - cloudformation:ListStacks
+                Resource: '*'
+              # Serverless' own deployment bucket, created inside the stack.
+              - Effect: Allow
+                Action:
+                  - s3:CreateBucket
+                  - s3:ListBucket
+                  - s3:GetBucketLocation
+                  - s3:GetBucketPolicy
+                  - s3:PutBucketPolicy
+                  - s3:DeleteBucketPolicy
+                  - s3:PutEncryptionConfiguration
+                  - s3:GetEncryptionConfiguration
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:DeleteObject
+                  - s3:ListBucketVersions
+                Resource:
+                  - !Sub 'arn:aws:s3:::${SlsStackName}-serverlessdeploymentbuck*'
+                  - !Sub 'arn:aws:s3:::${SlsStackName}-serverlessdeploymentbuck*/*'
+                  # Serverless Framework v4 replaced the per-stack deployment
+                  # bucket with ONE shared bucket per account and region
+                  # (serverless-framework-deployments-<region>-<hash>), whose
+                  # name it keeps in the SSM parameter granted below. Both
+                  # spellings are allowed: a stack created before v4 keeps the
+                  # old bucket, and dropping it here would strand it.
+                  - !Sub 'arn:aws:s3:::serverless-framework-deployments-*'
+                  - !Sub 'arn:aws:s3:::serverless-framework-deployments-*/*'
+              - Effect: Allow
+                Action:
+                  - lambda:*
+                Resource:
+                  - !Sub 'arn:aws:lambda:*:${AWS::AccountId}:function:${SlsStackName}-*'
+              - Effect: Allow
+                Action:
+                  - lambda:GetFunction
+                  - lambda:ListFunctions
+                  - lambda:GetAccountSettings
+                Resource: '*'
+              # The execution role serverless creates for the Lambda.
+              - Effect: Allow
+                Action:
+                  - iam:CreateRole
+                  - iam:DeleteRole
+                  - iam:GetRole
+                  - iam:PassRole
+                  - iam:PutRolePolicy
+                  - iam:DeleteRolePolicy
+                  - iam:GetRolePolicy
+                  - iam:AttachRolePolicy
+                  - iam:DetachRolePolicy
+                  - iam:TagRole
+                  - iam:UntagRole
+                Resource:
+                  - !Sub 'arn:aws:iam::${AWS::AccountId}:role/${SlsStackName}-*'
+              - Effect: Allow
+                Action:
+                  - apigateway:*
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - dynamodb:CreateTable
+                  - dynamodb:DescribeTable
+                  - dynamodb:UpdateTable
+                  - dynamodb:DescribeTimeToLive
+                  - dynamodb:UpdateTimeToLive
+                  - dynamodb:DescribeContinuousBackups
+                  - dynamodb:UpdateContinuousBackups
+                  - dynamodb:ListTagsOfResource
+                  - dynamodb:TagResource
+                Resource:
+                  - !Sub 'arn:aws:dynamodb:*:${AWS::AccountId}:table/Autonomic-*'
+              # HTTPS for api.autonomic.care: ACM issues the certificate and
+              # validates it by writing records into the hosted zone.
+              - Effect: Allow
+                Action:
+                  - acm:RequestCertificate
+                  - acm:DescribeCertificate
+                  - acm:DeleteCertificate
+                  - acm:ListCertificates
+                  - acm:AddTagsToCertificate
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - route53:ChangeResourceRecordSets
+                  - route53:GetHostedZone
+                  - route53:ListResourceRecordSets
+                Resource: 'arn:aws:route53:::hostedzone/Z101404626QO1OFJN008E'
+              - Effect: Allow
+                Action:
+                  - route53:GetChange
+                  - route53:ListHostedZones
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - logs:DescribeLogGroups
+                  - logs:DeleteLogGroup
+                  - logs:PutRetentionPolicy
+                  - logs:TagResource
+                Resource: '*'
+              # The Serverless Framework licence key, plus the cohort-ping
+              # report key — both under /autonomic/, neither in the repo.
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                Resource:
+                  - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${ServerlessAccessKeyParameter}'
+                  - !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${PingReportKeyParameter}'
+              # Serverless Framework v4 keeps the name of its deployment bucket
+              # in SSM rather than deriving it per stack, and CREATES the
+              # parameter on the first deploy that does not find one — hence
+              # Put as well as Get. This is not our parameter and not under
+              # /autonomic/, which is exactly how it was missed: v4.41 started
+              # reading it, nothing in this repo changed, and every deploy
+              # failed for three days while the site half of the same build
+              # kept shipping.
+              #
+              # The region is a wildcard on purpose. This stack lives in
+              # us-east-1 and the service deploys to us-west-2, so
+              # ${AWS::Region} is the wrong answer here and would fail exactly
+              # the way the missing grant did.
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                  - ssm:PutParameter
+                Resource:
+                  - !Sub 'arn:aws:ssm:*:${AWS::AccountId}:parameter/serverless-framework/deployment/*'
+              # The parameter is a SecureString under the AWS-managed SSM key.
+              - Effect: Allow
+                Action: kms:Decrypt
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    kms:ViaService: !Sub 'ssm.${AWS::Region}.amazonaws.com'
+
+  CodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: autonomic-build
+      Description: Build and deploy the Autonomic landing site + /master backend
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+      TimeoutInMinutes: 25
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: buildspec.yml
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/amazonlinux2-x86_64-standard:5.0
+        EnvironmentVariables:
+          - Name: S3_BUCKET
+            Value: !Ref SiteBucket
+          - Name: CLOUDFRONT_DISTRIBUTION_ID
+            Value: !Ref CloudFrontDistributionId
+          - Name: SERVERLESS_ACCESS_KEY
+            Type: PARAMETER_STORE
+            Value: !Ref ServerlessAccessKeyParameter
+          # Injected as an env var rather than resolved by ${ssm:...} inside
+          # serverless.yml: CodeBuild fetches it with this role's permission,
+          # and the deploy then needs none of its own.
+          - Name: AUTONOMIC_PING_REPORT_KEY
+            Type: PARAMETER_STORE
+            Value: !Ref PingReportKeyParameter
+
+  # ============================================================
+  # CodePipeline
+  # ============================================================
+  ArtifactBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: autonomic-pipeline-artifacts
+      LifecycleConfiguration:
+        Rules:
+          - Id: CleanupOldArtifacts
+            Status: Enabled
+            ExpirationInDays: 30
+
+  CodePipelineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: autonomic-codepipeline
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codepipeline.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: CodePipelinePolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                  - s3:PutObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub '${ArtifactBucket.Arn}'
+                  - !Sub '${ArtifactBucket.Arn}/*'
+              - Effect: Allow
+                Action:
+                  - codebuild:BatchGetBuilds
+                  - codebuild:StartBuild
+                Resource: !GetAtt CodeBuildProject.Arn
+              - Effect: Allow
+                Action:
+                  - codestar-connections:UseConnection
+                  - codeconnections:UseConnection
+                Resource: !Ref GitHubConnectionArn
+
+  Pipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      Name: autonomic-prod
+      RoleArn: !GetAtt CodePipelineRole.Arn
+      ArtifactStore:
+        Type: S3
+        Location: !Ref ArtifactBucket
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: GitHubSource
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Provider: CodeStarSourceConnection
+                Version: '1'
+              Configuration:
+                ConnectionArn: !Ref GitHubConnectionArn
+                FullRepositoryId: !Ref GitHubRepo
+                BranchName: !Ref GitHubBranch
+                DetectChanges: true
+              OutputArtifacts:
+                - Name: SourceOutput
+
+        - Name: Build
+          Actions:
+            - Name: BuildAndDeploy
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref CodeBuildProject
+              InputArtifacts:
+                - Name: SourceOutput
+
+Outputs:
+  PipelineName:
+    Description: CodePipeline Name
+    Value: !Ref Pipeline
+
+  ArtifactBucketName:
+    Description: Pipeline artifact bucket
+    Value: !Ref ArtifactBucket

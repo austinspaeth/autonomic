@@ -7,7 +7,8 @@
  */
 import {
   computeHrv, correctArtifacts, fft, frequencyDomain,
-  parseHeartRateMeasurement, resampleTachogram, timeDomain,
+  parseHeartRateMeasurement, repairBeats, resampleTachogram, splitSegments, std,
+  timeDomain, timeDomainSegments,
 } from '../index';
 
 /** Build an RR series (ms) with mean HR, HF and LF sinusoidal modulation. */
@@ -113,6 +114,38 @@ describe('artifact correction', () => {
     const { flags } = correctArtifacts(rr);
     expect(flags[5]).toBe(true);
   });
+
+  it('flags an entire consecutive burst (swallow / camera dropout), not just its edges', () => {
+    // Three adjacent bad beats — a swallow burst. A one-pass median taken over
+    // the burst is dominated by bad beats, so the middle one used to hide; the
+    // iterated peel must catch all three.
+    const rr = new Array(40).fill(900);
+    rr[20] = 1350; rr[21] = 1400; rr[22] = 1300; // +44-56% run
+    const { clean, flags } = correctArtifacts(rr);
+    expect(flags[20]).toBe(true);
+    expect(flags[21]).toBe(true);
+    expect(flags[22]).toBe(true);
+    // Interpolated back onto the ~900 baseline, so SDNN isn't blown up.
+    [20, 21, 22].forEach((i) => expect(clean[i]).toBeCloseTo(900, 0));
+  });
+
+  it('preserves real respiratory sinus arrhythmia (no false positives)', () => {
+    // A smooth ±12% breathing oscillation is the HRV signal itself — every beat
+    // stays close to its neighbors, so nothing should flag.
+    const rr = Array.from({ length: 120 }, (_, i) => 900 + 110 * Math.sin((2 * Math.PI * i) / 12));
+    const { artifactPct } = correctArtifacts(rr);
+    expect(artifactPct).toBe(0);
+  });
+
+  it('cleans a scattered noise cluster without touching the clean run around it', () => {
+    const rr = new Array(60).fill(850);
+    rr[30] = 400; rr[31] = 1300; rr[32] = 450; // erratic camera cluster
+    const { clean, flags } = correctArtifacts(rr);
+    expect(flags[30] && flags[31] && flags[32]).toBe(true);
+    // Beats outside the cluster are untouched.
+    expect(flags.filter(Boolean)).toHaveLength(3);
+    [29, 33].forEach((i) => expect(clean[i]).toBe(850));
+  });
 });
 
 describe('computeHrv end to end', () => {
@@ -143,6 +176,66 @@ describe('computeHrv end to end', () => {
   });
 });
 
+describe('repairBeats (camera missed/extra beats)', () => {
+  it('splits a missed beat into two, restoring the beat count', () => {
+    const rr = new Array(40).fill(800);
+    rr[20] = 1600; // detector skipped a pulse → one interval spans two beats
+    const out = repairBeats(rr);
+    expect(out.length).toBe(41); // one beat recovered
+    expect(Math.max(...out)).toBeLessThan(1000); // no double-length interval left
+  });
+  it('merges an extra (false) beat back into one interval', () => {
+    const rr = new Array(40).fill(800);
+    rr[20] = 350; rr[21] = 450; // a spurious peak split one beat into a short pair
+    const out = repairBeats(rr);
+    expect(out.length).toBe(39); // the false beat removed
+    expect(Math.min(...out)).toBeGreaterThan(500); // no implausibly short interval left
+  });
+  it('leaves genuine sinus arrhythmia untouched', () => {
+    const rr = Array.from({ length: 120 }, (_, i) => 900 + 110 * Math.sin((2 * Math.PI * i) / 12));
+    expect(repairBeats(rr)).toEqual(rr);
+  });
+});
+
+describe('computeHrv duration gating', () => {
+  // ~100 s of clean beats: long enough for time-domain, too short for the bands.
+  const shortRr = Array.from({ length: 130 }, (_, i) => 800 + 25 * Math.sin((2 * Math.PI * i) / 12));
+  // ~180 s: LF/HF resolve, VLF (needs ~5 min) still does not.
+  const midRr = Array.from({ length: 225 }, (_, i) => 800 + 30 * Math.sin((2 * Math.PI * i) / 8));
+
+  it('keeps time-domain but omits LF/HF/VLF below ~2 minutes', () => {
+    const r = computeHrv(shortRr, { source: 'camera' });
+    expect(r.ok).toBe(true);
+    expect(r.fields.rmssd).toBeDefined();
+    expect(r.fields.pns).toBeDefined();
+    expect(r.fields.lowPower).toBeUndefined();
+    expect(r.fields.highPower).toBeUndefined();
+    expect(r.fields.vlowPower).toBeUndefined();
+  });
+  it('adds LF/HF at ~3 minutes but still withholds VLF', () => {
+    const r = computeHrv(midRr, { source: 'camera' });
+    expect(r.fields.lowPower).toBeDefined();
+    expect(r.fields.highPower).toBeDefined();
+    expect(r.fields.vlowPower).toBeUndefined();
+  });
+  // The VLF floor is 240 s, not 300 s: a nominal 5-minute strap capture always
+  // sums a few seconds short of its own timer, so a 300 s floor would pass or
+  // fail identical readings at random. These two pin the floor where it is.
+  it('withholds VLF just under the 4-minute floor', () => {
+    const rr = Array.from({ length: 290 }, (_, i) => 800 + 30 * Math.sin((2 * Math.PI * i) / 8)); // ~232 s
+    const r = computeHrv(rr);
+    expect(r.longestCleanSec).toBeLessThan(240);
+    expect(r.fields.vlowPower).toBeUndefined();
+  });
+  it('reports VLF for a 5-minute capture that lands a little short of 300 s', () => {
+    const rr = Array.from({ length: 370 }, (_, i) => 800 + 30 * Math.sin((2 * Math.PI * i) / 8)); // ~296 s
+    const r = computeHrv(rr);
+    expect(r.longestCleanSec).toBeGreaterThan(240);
+    expect(r.longestCleanSec).toBeLessThan(300);
+    expect(r.fields.vlowPower).toBeDefined();
+  });
+});
+
 
 describe('parseHeartRateMeasurement', () => {
   it('parses uint8 HR + RR intervals (1/1024 s units)', () => {
@@ -163,5 +256,158 @@ describe('parseHeartRateMeasurement', () => {
     const bytes = new Uint8Array([0x10, 60, 0x00, 0x04, 0x00, 0x02]);
     const { rr } = parseHeartRateMeasurement(bytes);
     expect(rr).toHaveLength(2);
+  });
+});
+
+/**
+ * Camera readings are captured as discontinuous segments and arrive with long
+ * noise bursts where the pulse was lost and reacquired. These cover the three
+ * defenses added for that: the wide-median burst catcher, segment-aware
+ * metrics, and segment triage + coverage gating.
+ */
+describe('long-burst artifact detection', () => {
+  it('flags a 12-beat scattered burst the local median alone cannot see', () => {
+    // A burst longer than the ±3-beat local window corrupts its own baseline,
+    // so every interior beat used to pass inspection and its swings went
+    // straight into SDNN. The wide moving median judges each beat against ~61
+    // beats, which a burst this long cannot dominate.
+    const rr = new Array(180).fill(860);
+    // Scattered across the detector's full 300-1430 ms output range, which is
+    // what lost-signal peak detection actually produces. Deterministic.
+    const scatter = [1290, 340, 980, 420, 1410, 610, 1150, 380, 890, 1360, 470, 1240];
+    for (let i = 0; i < 12; i++) rr[90 + i] = scatter[i];
+    const { flags, clean } = correctArtifacts(rr);
+    const caught = flags.slice(90, 102).filter(Boolean).length;
+    expect(caught).toBeGreaterThanOrEqual(10);
+    // Which is what matters: SDNN comes back to the clean baseline instead of
+    // being blown into the 90s.
+    expect(std(clean)).toBeLessThan(15);
+  });
+
+  it('cannot rescue junk that happens to land near the true rate', () => {
+    // The honest limit of any beat-by-beat filter. A burst that stays inside
+    // ±38% of the real interval is, one beat at a time, indistinguishable from
+    // a real beat — nothing downstream can recover it, which is exactly why
+    // the capture-side quality gate (ppg/camera.ts) has to keep it out of the
+    // array in the first place. Documented so the ceiling is not mistaken for
+    // a bug later.
+    const rr = new Array(180).fill(860);
+    for (let i = 0; i < 12; i++) rr[90 + i] = 700 + i * 30; // 700-1030, all "plausible"
+    const { flags } = correctArtifacts(rr);
+    expect(flags.slice(90, 102).filter(Boolean).length).toBeLessThan(6);
+  });
+
+  it('catches a sustained half-rate latch (dicrotic notch lock-on)', () => {
+    // The classic camera failure after repositioning: the detector locks onto
+    // the dicrotic notch and reports ~2x the true rate for many seconds.
+    const rr = new Array(200).fill(880);
+    for (let i = 0; i < 15; i++) rr[100 + i] = 435;
+    const { flags, clean } = correctArtifacts(rr);
+    for (let i = 100; i < 115; i++) expect(flags[i]).toBe(true);
+    expect(std(clean)).toBeLessThan(5); // interpolated flat, not inflated
+  });
+
+  it('still leaves deep respiratory sinus arrhythmia alone', () => {
+    // ±15% swing — deeper than the ±12% case above, at the edge of what paced
+    // breathing produces. The wide median must not mistake it for artifact.
+    const rr = Array.from({ length: 200 }, (_, i) => 900 + 135 * Math.sin((2 * Math.PI * i) / 10));
+    expect(correctArtifacts(rr).artifactPct).toBe(0);
+  });
+});
+
+describe('splitSegments', () => {
+  it('treats an absent/empty start list as one continuous take', () => {
+    expect(splitSegments([1, 2, 3])).toEqual([[1, 2, 3]]);
+    expect(splitSegments([1, 2, 3], [])).toEqual([[1, 2, 3]]);
+  });
+  it('splits at the given indices and ignores out-of-range ones', () => {
+    expect(splitSegments([1, 2, 3, 4, 5], [2])).toEqual([[1, 2], [3, 4, 5]]);
+    expect(splitSegments([1, 2, 3], [0, 99])).toEqual([[1, 2, 3]]);
+  });
+});
+
+describe('segment-aware time domain', () => {
+  it('matches the classic whole-array formulas for a single segment', () => {
+    const rr = makeFixture();
+    const flat = timeDomain(rr)!;
+    const seg = timeDomainSegments([rr])!;
+    expect(seg.sdnn).toBeCloseTo(flat.sdnn, 9);
+    expect(seg.rmssd).toBeCloseTo(flat.rmssd, 9);
+    expect(seg.pnn50).toBeCloseTo(flat.pnn50, 9);
+  });
+
+  it('does not treat a seam as a beat-to-beat difference', () => {
+    // Two flat runs 300 ms apart. Across the seam that is a 300 ms "successive
+    // difference" that never happened — it spans the dropout.
+    const a = new Array(60).fill(800);
+    const b = new Array(60).fill(1100);
+    expect(timeDomain([...a, ...b])!.rmssd).toBeGreaterThan(25);
+    expect(timeDomainSegments([a, b])!.rmssd).toBeCloseTo(0, 6);
+  });
+
+  it('does not charge a between-segment HR offset to variability', () => {
+    // Three internally-identical segments captured at different heart rates,
+    // which is what reacquiring after a dropout looks like.
+    const seg = (base: number) => Array.from({ length: 60 }, (_, i) => base + 20 * Math.sin(i));
+    const segs = [seg(860), seg(940), seg(800)];
+    const flat = timeDomain(segs.flat())!;
+    const aware = timeDomainSegments(segs)!;
+    expect(flat.sdnn).toBeGreaterThan(2 * aware.sdnn);
+    // Mean HR still reflects the whole reading — only the spread is scoped.
+    expect(aware.hr).toBeCloseTo(flat.hr, 6);
+  });
+});
+
+describe('segment triage and coverage', () => {
+  const good = (n: number, base = 860) => Array.from({ length: n }, (_, i) => base + 25 * Math.sin(i));
+
+  it('discards a stretch whose rate is nowhere near the rest of the reading', () => {
+    // 40 beats at half the true interval — the detector was not tracking a pulse.
+    const rr = [...good(120), ...good(40, 430)];
+    const r = computeHrv(rr, { source: 'camera', segmentStarts: [120] });
+    expect(r.segmentsDropped).toBe(1);
+    expect(r.segmentsUsed).toBe(1);
+    expect(r.rrClean.length).toBe(120);
+  });
+
+  it('discards a stretch too short to carry a statistic', () => {
+    const rr = [...good(120), ...good(8)];
+    const r = computeHrv(rr, { source: 'camera', segmentStarts: [120] });
+    expect(r.segmentsDropped).toBe(1);
+    expect(r.rrClean.length).toBe(120);
+  });
+
+  it('rejects a reading that lost most of its pulse', () => {
+    const r = computeHrv(good(50), { source: 'camera', segmentStarts: [25], durationSec: 180 });
+    expect(r.ok).toBe(false);
+    expect(r.reason).toMatch(/usable pulse/);
+    expect(r.confidence).toBe('low');
+  });
+
+  it('gates the frequency bands on the longest UNBROKEN stretch', () => {
+    // ~190 s of total coverage, but in two ~95 s pieces: LF cannot resolve.
+    const piece = Array.from({ length: 120 }, (_, i) => 800 + 30 * Math.sin((2 * Math.PI * i) / 8));
+    const fragmented = computeHrv([...piece, ...piece], { source: 'camera', segmentStarts: [120] });
+    expect(fragmented.fields.rmssd).toBeDefined();
+    expect(fragmented.fields.lowPower).toBeUndefined();
+    // The same beat count in one continuous take does resolve LF/HF.
+    const whole = computeHrv([...piece, ...piece], { source: 'camera' });
+    expect(whole.fields.lowPower).toBeDefined();
+  });
+
+  it('reports repair rate separately so reconstruction is not hidden', () => {
+    const rr = new Array(120).fill(800);
+    for (let i = 0; i < 10; i++) rr[10 * i + 5] = 1600; // missed beats, repairable
+    const r = computeHrv(rr, { source: 'camera' });
+    expect(r.repairPct).toBeGreaterThan(5);
+    expect(r.confidence).not.toBe('high');
+  });
+
+  it('leaves a clean continuous strap reading at high confidence', () => {
+    const r = computeHrv(makeFixture(), { source: 'polar', durationSec: 330 });
+    expect(r.ok).toBe(true);
+    expect(r.confidence).toBe('high');
+    expect(r.segmentsUsed).toBe(1);
+    expect(r.segmentsDropped).toBe(0);
   });
 });

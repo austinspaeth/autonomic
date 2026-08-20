@@ -3,27 +3,40 @@
  * flags, and the streak card — ported from renderDaySummary. The "What powers
  * this" button opens the score-explanation sheet (openScoreExplain).
  */
-import React, { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import Svg, { Defs, LinearGradient as SvgGradient, Rect, Stop } from 'react-native-svg';
-import Animated, { Easing, useAnimatedProps, useAnimatedStyle, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { type LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native';
+import Svg, { Defs, LinearGradient as SvgGradient, RadialGradient, Rect, Stop } from 'react-native-svg';
+import Animated, { Easing, useAnimatedProps, useAnimatedStyle, useSharedValue, withDelay, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 import { ScoreGauge } from '../components/charts';
-import { Icon } from '../components/Icon';
-import { SheetControls, SheetFooter, useSheets } from '../components/Sheet';
-import { HeroCard, SumCard, MetricRow } from '../components/summary';
+import { BrandMark, Icon } from '../components/Icon';
+import { type SheetControls, useSheets } from '../components/Sheet';
+import { SumCard, MetricRow } from '../components/summary';
+import { Button, useAccordion } from '../components/ui';
+import { AnnualOfferCard } from './AnnualOffer';
+import { FounderOfferCard } from './FounderOffer';
+import { TrendCard } from './TrendCard';
+import { HrvSetup } from './hrv/Setup';
 import { MilestoneProgressCard } from './Milestones';
-import { Button, Stepper } from '../components/ui';
+import { ProtocolEditor } from './ProtocolEditor';
 import { radius, type as T, usePalette } from '../theme';
 import { SCORE_COLORS, GRADE_LABEL, GRADE_PTS, catFromBands } from '../lib/scoring';
 import {
-  OUTLOOK_GUIDE, TOMORROW, SCORE_TIPS, blueZone, readingPeriod, resolveProtocol,
+  OUTLOOK_GUIDE, TOMORROW, SCORE_TIPS, blueZone, protocolCriteria, readingPeriod, resolveProtocol,
   scoreCat, scoreSet, streakInfo, streakTier, type DaysMap, type ScoreComp, type ScoreSetResult,
 } from '../lib/scoring/day';
-import { typesFor } from '../lib/typeCatalog';
+import { detectDownturn, type Downturn } from '../lib/scoring/downturn';
+import { detectStrain, type Strain } from '../lib/scoring/strain';
+import { hasHrvReading, trustedReadings } from '../lib/hrvQuality';
+import { buildDownturnPrompt, buildStrainPrompt } from '../lib/analysis/reports';
+import { PromptSheet } from './PromptSheet';
 import { todayKey } from '../lib/dates';
-import { getState, mutate, useAppState } from '../store/store';
+import { getState, useAppState } from '../store/store';
+import { setJournalSectionY, useExpandProtocolSignal } from '../store/nav';
+import { useTier } from '../store/tier';
+import { usePaywall } from './Paywall';
 
-import type { Band, Protocol, ScoreCat } from '../lib/types';
+import type { AppState, Band, ScoreCat } from '../lib/types';
+import type { ScoreContext } from '../lib/scoring';
 
 const hexA = (hex: string, a: number) => {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex);
@@ -32,14 +45,35 @@ const hexA = (hex: string, a: number) => {
   return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
 };
 
-// Status-color highlight on the top-left border edge, fading down the sides
-// into the normal border — like light shining onto the card. Mirrors the
-// webapp's gradient-border trick (linear-gradient 165deg, color → border) using
-// an SVG rounded-rect stroke overlay so it follows the corner radius. Pass
-// color=null to fall back to a plain border (awaiting / low-confidence state).
+// Opaque blend of `t` parts color into base — flag/warning containers use this
+// instead of a transparent tint so text stays readable over the hero's wash.
+const mixHex = (color: string, base: string, t: number) => {
+  const mc = /^#?([0-9a-f]{6})$/i.exec(color), mb = /^#?([0-9a-f]{6})$/i.exec(base);
+  if (!mc || !mb) return base;
+  const nc = parseInt(mc[1], 16), nb = parseInt(mb[1], 16);
+  const ch = (sh: number) => Math.round(((nc >> sh) & 255) * t + ((nb >> sh) & 255) * (1 - t));
+  return `rgb(${ch(16)},${ch(8)},${ch(0)})`;
+};
+
+// Warning/crash containers blend their severity color into this near-black
+// instead of `p.surface`, so the fill reads as a dark tinted panel rather than
+// a washed-out surface. Same mix ratios as elsewhere, darker base.
+const WARN_BASE = '#0d0d0f';
+
+
+// Status-color highlight on one top border edge, fading down the sides into
+// the normal border — like light shining onto the card. Mirrors the webapp's
+// gradient-border trick (linear-gradient 165deg, color → border) using an SVG
+// rounded-rect stroke overlay so it follows the corner radius. Pass color=null
+// to fall back to a plain border (awaiting / low-confidence state).
+//
+// `corner` picks which top corner the light comes from. The Outlook lights its
+// top-left; the baseline card that stands in for it lights its top-RIGHT, so
+// the two never read as the same card wearing a different headline — one slot,
+// two states, and the light says which.
 let obId = 0;
 const AnimatedRect = Animated.createAnimatedComponent(Rect);
-export function GradientBorderCard({ color, trigger, style, children }: { color: string | null; trigger?: string; style?: any; children: React.ReactNode }) {
+export function GradientBorderCard({ color, trigger, corner = 'topLeft', glow: wash, style, children }: { color: string | null; trigger?: string; corner?: 'topLeft' | 'topRight'; glow?: boolean; style?: any; children: React.ReactNode }) {
   const p = usePalette();
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [gid] = useState(() => `ob${obId++}`);
@@ -64,12 +98,49 @@ export function GradientBorderCard({ color, trigger, style, children }: { color:
       onLayout={(e) => { const { width, height } = e.nativeEvent.layout; setSize({ w: width, h: height }); }}
       style={[{ borderRadius: r, backgroundColor: p.surface, overflow: 'hidden' }, color ? null : { borderWidth: 1, borderColor: p.border }, style]}
     >
+      {/* An optional WASH of the same colour bleeding out of the lit corner, under
+          the content. The border alone is a hairline: on the baseline card, which
+          has to be the thing a brand-new user looks at first, it was not enough to
+          separate the slot from the plain cards below it. Kept low-alpha and
+          fading to nothing well before the far edge — this sits behind live text,
+          so it may raise the surface, never tint it. The alpha is deliberately low
+          enough that the corner reads as warm grey rather than as red: any stronger
+          and the card starts to look like the warning cards, which are the one thing
+          in this slot that IS meant to be alarming. */}
+      {color && wash && size.w > 0 && (
+        <View style={StyleSheet.absoluteFill} pointerEvents="none">
+          <Svg width={size.w} height={size.h}>
+            <Defs>
+              <RadialGradient
+                id={`${gid}w`}
+                cx={corner === 'topRight' ? size.w : 0}
+                cy={0}
+                rx={size.w * 0.8}
+                ry={size.h * 0.9}
+                gradientUnits="userSpaceOnUse"
+              >
+                <Stop offset="0" stopColor={color} stopOpacity={0.14} />
+                <Stop offset="0.4" stopColor={color} stopOpacity={0.045} />
+                <Stop offset="1" stopColor={color} stopOpacity={0} />
+              </RadialGradient>
+            </Defs>
+            <Rect x={0} y={0} width={size.w} height={size.h} fill={`url(#${gid}w)`} />
+          </Svg>
+        </View>
+      )}
       {children}
       {color && size.w > 0 && (
         <View style={StyleSheet.absoluteFill} pointerEvents="none">
           <Svg width={size.w} height={size.h}>
             <Defs>
-              <SvgGradient id={gid} x1={size.w * 0.12} y1={0} x2={size.w * 0.55} y2={size.h} gradientUnits="userSpaceOnUse">
+              <SvgGradient
+                id={gid}
+                x1={corner === 'topRight' ? size.w * 0.88 : size.w * 0.12}
+                y1={0}
+                x2={corner === 'topRight' ? size.w * 0.45 : size.w * 0.55}
+                y2={size.h}
+                gradientUnits="userSpaceOnUse"
+              >
                 <Stop offset="0" stopColor={color} stopOpacity={1} />
                 <Stop offset="0.14" stopColor={color} stopOpacity={0.4} />
                 <Stop offset="1" stopColor={p.border} stopOpacity={1} />
@@ -85,45 +156,200 @@ export function GradientBorderCard({ color, trigger, style, children }: { color:
 }
 
 export function DaySummary({ dk }: { dk: string }) {
-  const p = usePalette();
   const { openSheet } = useSheets();
   const state = useAppState();
-  const ctx = { sex: state.profile.sex, height: state.profile.height };
-  const d = state.days[dk] || { readings: [], activities: [] } as never;
-  const today = todayKey();
-  const readings = (d.readings || []).slice().sort((a, b) => ((a.time as string) || '').localeCompare((b.time as string) || ''));
-  const all = scoreSet(readings, d, dk, state.days, ctx);
+  const { sex, height } = state.profile;
+  const ctx = useMemo(() => ({ sex, height }), [sex, height]);
+  // scoreSet makes several passes over the day's readings; memoize so renders
+  // not caused by a data change (sheets, animations) don't re-score.
+  const { d, readings, all } = useMemo(() => {
+    const day = state.days[dk] || ({ readings: [], activities: [] } as never);
+    // Imported HRV without enough real RR is not shown or scored anywhere.
+    const rs = trustedReadings(day.readings).slice().sort((a, b) => ((a.time as string) || '').localeCompare((b.time as string) || ''));
+    return { d: day, readings: rs, all: scoreSet(rs, day, dk, state.days, ctx) };
+  }, [state.days, dk, ctx]);
+
+  // Any scorable input (HRV, BP, resting HR, sleep, activity) populates the
+  // outlook right away; the confidence line inside the hero carries the caveat
+  // rather than hiding the number behind an HRV requirement.
+  const scored = all.score != null;
+
+  // Trailing-week trend check. Lives out here rather than inside the hero: the
+  // warning is its own card below the Outlook, sized like Milestones/Protocol.
+  const downturn = useMemo(
+    () => detectDownturn(state.days, dk, ctx, resolveProtocol(state.settings.protocol), state.customTypes),
+    [state.days, dk, ctx, state.settings.protocol, state.customTypes],
+  );
+
+  // The second way the same card fires: the score has NOT broken, but the
+  // markers that move before it have. Only asked when there is no downturn —
+  // the score sliding is the stronger statement, and two warning cards stacked
+  // on one screen is the thing this card exists to avoid.
+  const strain = useMemo(
+    () => (downturn ? null : detectStrain(state.days, dk, ctx)),
+    [downturn, state.days, dk, ctx],
+  );
+
+  // Until the journal holds one real HRV reading there is no baseline for a
+  // score to mean anything against, so the Outlook slot carries the ask instead
+  // of a dial. Not a banner above the score — the whole point is that the score
+  // is not yet worth showing.
+  const baselineWaiting = !hasHrvReading(state.days);
 
   return (
     <View>
-      <GradientBorderCard color={all.score == null || all.confidence < 40 ? null : scoreCat(all.score).color} trigger={dk} style={{ marginBottom: 12 }}>
-        {all.score == null || all.confidence < 40 ? (
-          <View style={{ padding: 16 }}>
-            <Text style={[T.section, { color: p.textDim }]}>Autonomic Outlook</Text>
-            {!readings.length ? (
-              <>
-                <Text style={{ fontSize: 22, fontWeight: '700', color: p.text, marginTop: 6 }}>{dk > today ? 'Future day' : 'Awaiting morning data'}</Text>
-                {/* No capture button here — the Readings section below owns that
-                    action; this card just points the way, plainly. */}
-                <Text style={{ fontSize: 15, color: dk > today ? p.textDim : p.text, marginTop: 6, lineHeight: 21, fontWeight: dk > today ? '400' : '600' }}>
-                  {dk > today ? 'Nothing logged yet for this day.' : 'Capture an HRV reading below, under Readings, to unlock today’s autonomic outlook.'}
-                </Text>
-              </>
-            ) : (
-              <>
-                <Text style={{ fontSize: 22, fontWeight: '700', color: p.text, marginTop: 6 }}>Insufficient data</Text>
-                <Text style={{ fontSize: 14, color: p.textDim, marginTop: 5, lineHeight: 19 }}>
-                  {(all.score != null ? `Provisional ${all.score} / 100 at ${all.confidence}% confidence. ` : '') + (all.hasStruct ? 'Add more readings to firm up the score.' : all.hasUnstruct ? 'Awaiting a structured reading for higher confidence.' : 'Add a morning HRV reading for higher confidence.')}
-                </Text>
-              </>
-            )}
-          </View>
-        ) : (
-          <ScoredHero dk={dk} readings={readings} d={d} all={all} ctx={ctx} onExplain={() => openSheet((c) => <ScoreExplain all={all} dk={dk} controls={c} />)} />
-        )}
-      </GradientBorderCard>
-      <StreakCard dk={dk} />
+      {baselineWaiting ? (
+        <BaselineWaitingCard />
+      ) : (
+        <GradientBorderCard color={!scored ? null : scoreCat(all.score!).color} trigger={dk} style={{ marginBottom: 12 }}>
+          {!scored ? (
+            <UnscoredHero dk={dk} hasReadings={readings.length > 0} />
+          ) : (
+            <ScoredHero dk={dk} readings={readings} d={d} all={all} ctx={ctx} onExplain={() => openSheet(() => <ScoreExplain all={all} dk={dk} />)} />
+          )}
+        </GradientBorderCard>
+      )}
+      {/* Directly under the Outlook: the half-off year is time-boxed to 24h and
+          outranks the generic upsell, which suppresses itself while the offer's
+          unlock has the tier reading 'trial'. */}
+      <AnnualOfferCard />
+      {/* The one-day founding-member offer. Independent of the annual card
+          above: it fires inside the install trial, that one fires long after it
+          has lapsed, so the two can never be due on the same day. */}
+      <FounderOfferCard />
+      {downturn ? (
+        <WarningCard severity={downturn.severity} headline={downturn.headline}
+          onPress={() => openSheet(() => <DownturnExplain w={downturn} dk={dk} />)} />
+      ) : strain ? (
+        <WarningCard severity={strain.severity} headline={strain.headline}
+          onPress={() => openSheet(() => <StrainExplain w={strain} dk={dk} />)} />
+      ) : null}
+      <TrendCard dk={dk} />
       <MilestoneProgressCard dk={dk} />
+      <StreakCard dk={dk} />
+    </View>
+  );
+}
+
+/**
+ * The Outlook slot before the first reading exists.
+ *
+ * Everything downstream — the score, Progress, Trend Watch, every correlation —
+ * is built out of HRV, so an install with none of it has an app full of empty
+ * rooms. Showing a 0/100 dial there is worse than showing nothing: it reads as
+ * a verdict on the user rather than as a missing input. So the slot states what
+ * is waiting, shows the three things that stay blank until it arrives, and
+ * carries the one button that fixes it.
+ *
+ * It wears the Outlook's own gradient border lit from the top RIGHT, so it is
+ * legibly the same object in the same slot and legibly not the score. The three
+ * tiles are SKELETONS rather than checkboxes: the claim is "these are empty",
+ * not "here are your chores". No dismiss — this card is the only route back,
+ * and it retires itself the moment a reading lands.
+ */
+/* Labels break where they are WRITTEN, not where the tile happens to run out.
+   Three tiles side by side on a narrow phone put "Autonomic score" on two lines
+   and "Progress charts" on one, so the three ghost bars sat at different heights
+   and the row read as three unrelated boxes. A hard break gives every tile the
+   same two lines, with the noun the tile is actually about on the second one. */
+const WAITING_ROWS = [
+  { label: 'Autonomic\nscore', width: '68%' as const, delay: 0 },
+  { label: 'Progress\ncharts', width: '48%' as const, delay: 900 },
+  { label: 'Trends &\ncorrelations', width: '80%' as const, delay: 1800 },
+];
+
+function BaselineWaitingCard() {
+  const p = usePalette();
+  const { openSheet } = useSheets();
+  return (
+    <GradientBorderCard color={p.accent} corner="topRight" glow style={{ marginBottom: 12 }}>
+      <View style={{ padding: 16 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 13, marginBottom: 14 }}>
+          <View style={{ width: 46, height: 46, borderRadius: 14, backgroundColor: hexA(p.accent, 0.08), borderWidth: 1, borderColor: hexA(p.accent, 0.33), alignItems: 'center', justifyContent: 'center' }}>
+            <BrandMark size={24} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[T.section, { color: hexA(p.accent, 0.85), marginBottom: 2 }]}>First reading</Text>
+            <Text style={{ fontSize: 18, fontWeight: '700', letterSpacing: -0.3, color: p.text }}>Your baseline is waiting</Text>
+          </View>
+        </View>
+
+        <Text style={{ fontSize: 13.5, lineHeight: 20, color: p.textDim, marginBottom: 16 }}>
+          Nearly everything the app shows you is built from this reading. Scores, trends and correlations all stay
+          empty until there is one to compare against.
+        </Text>
+
+        <View style={{ borderTopWidth: 1, borderTopColor: p.border, paddingTop: 14, marginBottom: 16 }}>
+          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 11 }}>
+            {WAITING_ROWS.map((w) => (
+              <View key={w.label} style={{ flex: 1, backgroundColor: p.sunk, borderRadius: 14, padding: 11 }}>
+                <GhostBar width={w.width} delay={w.delay} />
+                <Text style={{ fontSize: 11.5, lineHeight: 15, color: p.textDim }}>{w.label}</Text>
+              </View>
+            ))}
+          </View>
+          <Text style={{ fontSize: 12, color: p.textDim }}>These fill in as you log. Nothing appears until you take a reading.</Text>
+        </View>
+
+        <Pressable
+          onPress={() => openSheet((c) => <HrvSetup controls={c} />)}
+          style={({ pressed }) => [
+            { alignItems: 'center', justifyContent: 'center', paddingVertical: 14, borderRadius: radius.control, backgroundColor: p.accent },
+            pressed && { opacity: 0.85 },
+          ]}
+        >
+          <Text style={{ color: '#fff', fontSize: 15.5, fontWeight: '700' }}>Start my first reading</Text>
+        </Pressable>
+      </View>
+    </GradientBorderCard>
+  );
+}
+
+/** One placeholder bar, breathing slowly. Deliberately not a spinner: nothing
+ *  is loading, these sections are genuinely empty. */
+function GhostBar({ width, delay }: { width: `${number}%`; delay: number }) {
+  const t = useSharedValue(0.45);
+  useEffect(() => {
+    t.value = withDelay(delay, withRepeat(
+      withSequence(
+        withTiming(1, { duration: 1600, easing: Easing.inOut(Easing.quad) }),
+        withTiming(0.45, { duration: 1600, easing: Easing.inOut(Easing.quad) }),
+      ),
+      -1,
+      false,
+    ));
+  }, [t, delay]);
+  const style = useAnimatedStyle(() => ({ opacity: t.value }));
+  return <Animated.View style={[{ width, height: 11, borderRadius: 999, backgroundColor: '#34343a', marginBottom: 10 }, style]} />;
+}
+
+// Mirrors ScoredHero's shape so the card doesn't change silhouette once a score
+// lands: same header, same gauge in the same spot, greyed out and reading 0.
+// No capture button here — the Readings section below owns that action; this
+// card just points the way.
+function UnscoredHero({ dk, hasReadings }: { dk: string; hasReadings: boolean }) {
+  const p = usePalette();
+  const future = dk > todayKey();
+  // The dial is deliberately recessive until there's a score to show, so the
+  // ring and its number sit well below the body copy in contrast.
+  const grey = p.textDim;
+  return (
+    <View style={{ padding: 16 }}>
+      <Text style={[T.section, { color: p.textDim }]}>Autonomic Outlook</Text>
+      <View style={{ alignItems: 'center', marginVertical: 8 }}>
+        <ScoreGauge score={0} color={grey} track={hexA(grey, 0.16)}>
+          <Text style={{ fontSize: 57, fontWeight: '800', color: hexA(grey, 0.5), fontVariant: ['tabular-nums'], letterSpacing: -1 }}>0</Text>
+          <Text style={{ fontSize: 10, fontWeight: '700', letterSpacing: 1, color: hexA(grey, 0.42), marginTop: 4 }}>OUT OF 100</Text>
+        </ScoreGauge>
+      </View>
+      <Text style={{ textAlign: 'center', fontSize: 17, fontWeight: '700', color: p.text }}>{future ? 'Future day' : 'Awaiting data'}</Text>
+      <Text style={{ fontSize: 14, color: p.textDim, marginTop: 8, lineHeight: 20 }}>
+        {future
+          ? 'Nothing logged yet for this day.'
+          : hasReadings
+            ? 'Awaiting HRV values to score this day. Capture a reading below, under Readings, and keep logging as the day goes. The more data points, the more accurate the score.'
+            : 'Start taking readings or logging data below to calculate an autonomic score for this day. The more data points, the more accurate the score.'}
+      </Text>
     </View>
   );
 }
@@ -135,7 +361,13 @@ export function ScoredHero({ dk, readings, d, all, ctx, onExplain, days }: { dk:
   const morning = readings.filter((r) => readingPeriod(r) === 'morning');
   const evening = readings.filter((r) => readingPeriod(r) === 'evening');
   const hasEvening = evening.length > 0;
-  const mornScore = morning.length ? scoreSet(morning, d, dk, days || getState().days, ctx).score : null;
+  // Second full scoreSet just for the AM delta; `readings` gets a fresh identity
+  // whenever the day data changes, so it's a sufficient cache key.
+  const mornScore = useMemo(
+    () => (morning.length ? scoreSet(morning, d, dk, days || getState().days, ctx).score : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [readings, d, dk, ctx, days],
+  );
   const delta = mornScore != null ? all.score! - mornScore : null;
   const mode = hasEvening ? (dk < today ? 'Day Complete' : 'Reflectance') : 'Autonomic Outlook';
 
@@ -151,6 +383,7 @@ export function ScoredHero({ dk, readings, d, all, ctx, onExplain, days }: { dk:
     if ((readings.length >= 2 || readings.some((r) => readingPeriod(r) === 'midday')) && delta != null && Math.abs(delta) >= 5)
       guide = (delta < 0 ? 'Trending down from this morning. Watch food and activity through the afternoon. ' : 'Trending up from this morning. ') + guide;
   }
+  if (all.confidence < 40) guide = 'Early read from limited data, so expect it to shift as more readings land. ' + guide;
 
   return (
     <Pressable onPress={onExplain} style={{ padding: 16, backgroundColor: hexA(cat.color, 0.1) }}>
@@ -162,16 +395,16 @@ export function ScoredHero({ dk, readings, d, all, ctx, onExplain, days }: { dk:
       </View>
       <View style={{ alignItems: 'center', marginVertical: 8 }}>
         <ScoreGauge score={all.score!} color={cat.color}>
-          <Text style={{ fontSize: 57, fontWeight: '800', color: p.text, fontVariant: ['tabular-nums'], letterSpacing: -1 }}>{all.score}</Text>
-          <Text style={{ fontSize: 10, fontWeight: '700', letterSpacing: 1, color: p.textDim, marginTop: 4 }}>OUT OF 100</Text>
+          <Text style={{ fontSize: 57, fontWeight: '800', color: p.text, fontVariant: ['tabular-nums'], letterSpacing: -1, lineHeight: 57, marginTop: 8 }}>{all.score}</Text>
+          <Text style={{ fontSize: 10, fontWeight: '700', letterSpacing: 1, color: p.textDim, marginTop: -2 }}>OUT OF 100</Text>
         </ScoreGauge>
         {delta != null && Math.abs(delta) >= 3 ? (
-          <Text style={{ fontSize: 12, fontWeight: '800', color: delta > 0 ? SCORE_COLORS.good : SCORE_COLORS.bad, fontVariant: ['tabular-nums'] }}>
+          <Text style={{ fontSize: 12, fontWeight: '800', color: delta > 0 ? SCORE_COLORS.good : SCORE_COLORS.bad, fontVariant: ['tabular-nums'], marginTop: -18 }}>
             {(delta > 0 ? '▲ ' : '▼ ') + Math.abs(delta) + ' vs AM'}
           </Text>
         ) : null}
       </View>
-      <View style={{ alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, paddingHorizontal: 11, paddingVertical: 6, borderRadius: 999, marginBottom: 6 }}>
+      <View style={{ alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, paddingHorizontal: 11, paddingVertical: 6, borderRadius: 999, marginBottom: 6, marginTop: delta != null && Math.abs(delta) >= 3 ? 0 : -14 }}>
         <Icon name="info" size={15} color={p.textDim} />
         <Text style={{ color: p.textDim, fontSize: 11, fontWeight: '600' }}>What powers this</Text>
       </View>
@@ -185,9 +418,180 @@ export function ScoredHero({ dk, readings, d, all, ctx, onExplain, days }: { dk:
   );
 }
 
+/** The Journal's one warning card, sitting between the Outlook and the Trend
+ *  card. TWO detectors feed it and it looks identical for both: ./downturn when
+ *  the daily score is sliding, ../lib/scoring/strain when the score still reads
+ *  fine but the markers that move before it have drifted. One object, because a
+ *  user cannot act on the difference between "your score fell" and "your
+ *  recovery markers moved" — both mean take it easy — and two cards stacked
+ *  would turn a caution into a wall of alarm. Deliberately the SAME object as
+ *  `<TrendCard/>` below it — neutral surface, sunk tile, one sentence, chevron
+ *  — with the emoji carrying the severity (⚠️ watch, 🛑 alert) instead of a
+ *  wash of red across the card.
+ *
+ *  It used to be tinted in the severity color, which made it the loudest thing
+ *  on a screen someone opens while already feeling bad, and made good news and
+ *  bad news look like two unrelated kinds of notice. The sheet behind it still
+ *  carries the color — that's where the user went looking for it. */
+function WarningCard({ severity, headline, onPress }: { severity: 'watch' | 'alert'; headline: string; onPress: () => void }) {
+  const p = usePalette();
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        {
+          borderWidth: 1, borderColor: p.border, borderRadius: radius.card,
+          backgroundColor: p.surface, marginBottom: 12, padding: 15,
+          flexDirection: 'row', alignItems: 'center', gap: 13,
+        },
+        pressed && { opacity: 0.75 },
+      ]}
+    >
+      <View style={{ width: 42, height: 42, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: p.sunk, borderWidth: 1, borderColor: p.border }}>
+        <Text style={{ fontSize: 21 }}>{severity === 'alert' ? '🛑' : '⚠️'}</Text>
+      </View>
+      <Text style={{ flex: 1, fontSize: 15, fontWeight: '700', color: p.text, lineHeight: 20 }}>{headline}</Text>
+      <Icon name="chevronRight" size={20} color={p.textDim} />
+    </Pressable>
+  );
+}
+
+/** The colored headline tile both explain sheets open with: severity color,
+ *  one bold readout, its window underneath, and the paragraph. The card in the
+ *  Journal is deliberately neutral; the color lives here, where the user went
+ *  looking for it. */
+function WarnTile({ color, value, sub, body }: { color: string; value: string; sub: string; body: string }) {
+  const p = usePalette();
+  return (
+    <View style={{ borderRadius: radius.card, padding: 14, marginBottom: 16, backgroundColor: mixHex(color, WARN_BASE, 0.14), borderWidth: 1, borderColor: hexA(color, 0.55) }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <View style={{ width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: mixHex(color, WARN_BASE, 0.3) }}>
+          <Icon name="trendDown" size={17} color={color} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 15, fontWeight: '800', color, fontVariant: ['tabular-nums'] }}>{value}</Text>
+          <Text style={{ fontSize: 12, fontWeight: '700', color: hexA(color, 0.8), marginTop: 1 }}>{sub}</Text>
+        </View>
+      </View>
+      <Text style={{ fontSize: 14, lineHeight: 20, color: p.text, marginTop: 10 }}>{body}</Text>
+    </View>
+  );
+}
+
+/** Pro-gated "Use AI to investigate", shared by both explain sheets. `build`
+ *  runs at press time against fresh state, exactly as the downturn's did. */
+function InvestigateButton({ label, title, build }: {
+  label: string;
+  title: string;
+  build: (s: AppState, ctx: ScoreContext) => { prompt: string; rangeText: string };
+}) {
+  const p = usePalette();
+  const { openSheet } = useSheets();
+  const tier = useTier();
+  const openPaywall = usePaywall();
+  const press = () => {
+    if (tier === 'free') { openPaywall(); return; }
+    const s = getState();
+    const ctx = { sex: s.profile.sex, height: s.profile.height, protocol: resolveProtocol(s.settings.protocol) };
+    const { prompt, rangeText } = build(s, ctx);
+    openSheet((c) => <PromptSheet title={title} rangeText={rangeText} prompt={prompt} controls={c} />);
+  };
+  return (
+    <Pressable
+      onPress={press}
+      style={({ pressed }) => [
+        { flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: radius.control, backgroundColor: p.accent, marginTop: 2, marginBottom: 4 },
+        pressed && { opacity: 0.8 },
+      ]}
+    >
+      <Icon name="sparkles" size={16} color="#fff" />
+      <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>{label}</Text>
+    </Pressable>
+  );
+}
+
+/** The closing note on both explain sheets. */
+function RestNote({ text }: { text: string }) {
+  const p = usePalette();
+  return (
+    <View style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-start', padding: 14, borderRadius: radius.card, backgroundColor: p.surface2, borderWidth: 1, borderColor: p.border, marginBottom: 16 }}>
+      <Icon name="moon" size={17} color={p.textDim} />
+      <Text style={{ flex: 1, fontSize: 13, lineHeight: 18, color: p.textDim }}>{text}</Text>
+    </View>
+  );
+}
+
+/** Sheet behind the warning card when a SCORE downturn fired: the full
+ *  explanation, every journal finding that could be driving the slide, an
+ *  AI-investigation prompt builder, and a rest/doctor note. */
+function DownturnExplain({ w, dk }: { w: Downturn; dk: string }) {
+  const p = usePalette();
+  const color = w.severity === 'alert' ? SCORE_COLORS.crash : SCORE_COLORS.bad;
+  return (
+    <View>
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 16 }}>Something&apos;s off</Text>
+      <WarnTile color={color} value={`Down ${w.drop} points`} sub={`over the last ${w.spanDays} days`} body={w.body} />
+      <SumCard title="What could be driving it">
+        {w.factors.length ? (
+          w.factors.map((f) => <MetricRow key={f.label} label={f.label} value={f.value} cat={false} explain={f.detail} />)
+        ) : (
+          <>
+            <PossibilityRow label="Nothing in your journal" explain="No triggers, protocol breaks, heavy activity, or short sleep were found in this stretch. When the logs are clean, the usual suspects are below." />
+            <PossibilityRow label="Oncoming sickness" explain="Your autonomic system often shifts before symptoms start. Falling HRV with a rising resting heart rate, despite clean behavior, can be the first sign of getting sick." />
+            <PossibilityRow label="Stress" explain="Mental and emotional load suppresses recovery the same way physical load does, and it rarely gets logged. Think back over the last few days." />
+            <PossibilityRow label="An unlogged exposure" explain="A food trigger, a late meal, heat, or a rougher night than it felt like may simply not have made it into the journal." />
+          </>
+        )}
+        <InvestigateButton label="Use AI to investigate" title="Downturn Investigation"
+          build={(s, ctx) => buildDownturnPrompt(s, ctx, dk, w)} />
+      </SumCard>
+      <RestNote text="Get some rest and take it easy until the trend turns. If you are not feeling well, talk with your doctor." />
+      <View style={{ height: 24 }} />
+    </View>
+  );
+}
+
+/** Sheet behind the warning card when the STRAIN detector fired.
+ *
+ *  Same shape as the downturn sheet, one section longer: because the score has
+ *  not moved, the sheet has to answer "what are you even looking at" before it
+ *  answers "what should I do", so each marker row carries the reading, its own
+ *  baseline and why that marker matters. There is no "possibilities" fallback
+ *  here — a strain warning cannot fire without at least two findings, so the
+ *  empty case does not exist. */
+function StrainExplain({ w, dk }: { w: Strain; dk: string }) {
+  const p = usePalette();
+  const color = w.severity === 'alert' ? SCORE_COLORS.crash : SCORE_COLORS.bad;
+  return (
+    <View>
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 16 }}>{w.title}</Text>
+      <WarnTile color={color} value={w.readout.value} sub={w.readout.sub} body={w.body} />
+      <SumCard title="What moved">
+        {w.factors.map((f) => <MetricRow key={f.label} label={f.label} value={f.value} cat={false} explain={f.detail} />)}
+        <InvestigateButton label="Use AI to investigate" title="Strain Investigation"
+          build={(s, ctx) => buildStrainPrompt(s, ctx, dk, w)} />
+      </SumCard>
+      <RestNote text="Nothing here is a diagnosis. Markers drifting together usually means a few lighter days, extra fluids and an earlier night. If it keeps going or you feel unwell, talk with your doctor." />
+      <View style={{ height: 24 }} />
+    </View>
+  );
+}
+
+/** A candidate explanation in the downturn sheet: label + description, no
+ *  value column (MetricRow would render a dash there). */
+function PossibilityRow({ label, explain }: { label: string; explain: string }) {
+  const p = usePalette();
+  return (
+    <View style={{ backgroundColor: p.surface, borderColor: p.border, borderWidth: 1, borderRadius: radius.control, padding: 14, marginBottom: 10 }}>
+      <Text style={{ fontSize: 16, fontWeight: '700', color: p.text }}>{label}</Text>
+      <Text style={{ fontSize: 13, color: p.textDim, marginTop: 6, lineHeight: 17 }}>{explain}</Text>
+    </View>
+  );
+}
+
 function Flag({ color, text }: { color: string; text: string }) {
   return (
-    <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start', marginTop: 11, padding: 10, borderRadius: radius.control, backgroundColor: hexA(color, 0.15) }}>
+    <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start', marginTop: 11, padding: 10, borderRadius: radius.control, backgroundColor: mixHex(color, WARN_BASE, 0.14), borderWidth: 1, borderColor: hexA(color, 0.55) }}>
       <Icon name="alert" size={15} color={color} />
       <Text style={{ flex: 1, fontSize: 13, lineHeight: 17, fontWeight: '600', color }}>{text}</Text>
     </View>
@@ -199,27 +603,29 @@ function StreakCard({ dk }: { dk: string }) {
   const { openSheet } = useSheets();
   const [expanded, setExpanded] = useState(false);
   const state = useAppState();
-  const si = streakInfo(state.days, dk, resolveProtocol(state.settings.protocol));
+
+  // The home-screen Protocol widget deep-links here (autonomic://?open=protocol):
+  // the handler bumps this signal and scrolls to us; open the card when it fires
+  // (skip the initial mount so we don't auto-expand on a normal launch).
+  const expandSignal = useExpandProtocolSignal();
+  const firstSignal = useRef(true);
+  useEffect(() => {
+    if (firstSignal.current) { firstSignal.current = false; return; }
+    setExpanded(true);
+  }, [expandSignal]);
+  // streakInfo walks the whole day history; don't redo it for the accordion
+  // toggle re-renders below.
+  const si = useMemo(
+    () => streakInfo(state.days, dk, resolveProtocol(state.settings.protocol), state.customTypes),
+    [state.days, dk, state.settings.protocol, state.customTypes],
+  );
   const tier = streakTier(si.current);
   const icon = si.current >= 14 ? 'moon' : si.current >= 7 ? 'rocket' : si.current >= 3 ? 'flame' : 'sparkles';
   const c = si.today;
 
-  // Rotate the (down-pointing) chevron in place: -90° = pointing right when
-  // collapsed, easing to 0° = pointing down when expanded. Position never moves.
-  const rot = useSharedValue(0);
-  useEffect(() => { rot.value = withTiming(expanded ? 1 : 0, { duration: 220 }); }, [expanded, rot]);
-  const chevStyle = useAnimatedStyle(() => ({ transform: [{ rotate: `${-90 + rot.value * 90}deg` }] }));
-
-  // Accordion the body open/closed by animating its measured height. The body
-  // stays mounted (clipped to 0 height while collapsed) so onLayout can report
-  // its natural height; `open` drives height 0 → contentH and a fade in step.
-  const [contentH, setContentH] = useState(0);
-  const open = useSharedValue(0);
-  useEffect(() => { open.value = withTiming(expanded ? 1 : 0, { duration: 260, easing: Easing.out(Easing.cubic) }); }, [expanded, open]);
-  const bodyStyle = useAnimatedStyle(() => ({
-    height: open.value * contentH,
-    opacity: open.value,
-  }));
+  // Chevron rotates in place (-90° right when collapsed → 0° down when open) and
+  // the body reveals by animating its measured height with a fade. See useAccordion.
+  const { chevStyle, bodyStyle, onContentLayout, measureStyle } = useAccordion(expanded);
 
   let sub = tier.msg;
   if (c) {
@@ -229,13 +635,23 @@ function StreakCard({ dk }: { dk: string }) {
       if (si.isToday) sub = hardFail ? 'Too late for today. Try again to start fresh tomorrow.' : `Today is day ${si.current + 1}.`;
       else sub = 'Not a clean day.';
     }
-  } else sub = 'No data logged for this day.';
+  } else sub = si.isToday ? `Today is day ${si.current + 1}.` : 'No data logged for this day.';
+
+  // The checklist shows the day's own criteria once anything is logged; on a
+  // still-empty today we synthesize them from the protocol so a new user sees
+  // (and can work toward) their clean-day requirements right away. Past days
+  // with no record stay in the blank "no data" state — all-unmet reads as
+  // failure there, which isn't what a simply-unlogged day means.
+  const criteria = c ? c.criteria : si.isToday ? protocolCriteria(state.days, dk, resolveProtocol(state.settings.protocol), state.customTypes) : [];
 
   const stats = [`Longest ${si.longest}`];
   if (si.rate != null) stats.push(`30-day clean ${si.rate}%`);
 
   return (
-    <View style={{ borderWidth: 1, borderColor: p.border, borderRadius: radius.card, backgroundColor: p.surface, marginBottom: 12, overflow: 'hidden' }}>
+    <View
+      onLayout={(e: LayoutChangeEvent) => setJournalSectionY('protocol', e.nativeEvent.layout.y)}
+      style={{ borderWidth: 1, borderColor: p.border, borderRadius: radius.card, backgroundColor: p.surface, marginBottom: 12, overflow: 'hidden' }}
+    >
       <Pressable onPress={() => setExpanded((v) => !v)} style={{ padding: 15 }}>
         {/* Header row: always vertically centered, so the chevron never shifts. */}
         <View style={{ flexDirection: 'row', gap: 13, alignItems: 'center' }}>
@@ -255,11 +671,11 @@ function StreakCard({ dk }: { dk: string }) {
           </Animated.View>
         </View>
         <Animated.View style={[{ overflow: 'hidden' }, bodyStyle]}>
-          <View onLayout={(e) => setContentH(e.nativeEvent.layout.height)} style={{ paddingTop: 12 }}>
+          <View onLayout={onContentLayout} style={[measureStyle, { paddingTop: 12 }]}>
             <Text style={{ fontSize: 11, color: p.textDim, fontVariant: ['tabular-nums'] }}>{stats.join(' · ')}</Text>
-            {c ? (
+            {criteria.length ? (
               <View style={{ marginTop: 12, gap: 9 }}>
-                {c.criteria.map((x) => {
+                {criteria.map((x) => {
                   let st: 'pending' | 'met' | 'broken' | 'todo';
                   if (x.pending) st = 'pending';
                   else if (x.pass) st = 'met';
@@ -291,131 +707,6 @@ function StreakCard({ dk }: { dk: string }) {
   );
 }
 
-/* ---------- Protocol editor sheet ---------- */
-function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
-  const p = usePalette();
-  return (
-    <Pressable onPress={() => onChange(!value)} hitSlop={6} style={{ width: 46, height: 28, borderRadius: 14, padding: 3, justifyContent: 'center', backgroundColor: value ? p.accent : p.surface2, borderWidth: 1, borderColor: value ? p.accent : p.border }}>
-      <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: '#fff', alignSelf: value ? 'flex-end' : 'flex-start' }} />
-    </Pressable>
-  );
-}
-
-function CheckRow({ label, checked, onToggle }: { label: string; checked: boolean; onToggle: () => void }) {
-  const p = usePalette();
-  return (
-    <Pressable onPress={onToggle} style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 11, paddingVertical: 9 }, pressed && { opacity: 0.6 }]}>
-      <View style={{ width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: checked ? p.accent : p.border, backgroundColor: checked ? p.accent : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
-        {checked ? <Icon name="check" size={13} color="#fff" /> : null}
-      </View>
-      <Text style={{ flex: 1, fontSize: 15, color: p.text }}>{label}</Text>
-    </Pressable>
-  );
-}
-
-/** One protocol requirement: title + on/off toggle, with config UI shown while on. */
-function ReqSection({ title, desc, enabled, onToggle, children }: { title: string; desc: string; enabled: boolean; onToggle: (v: boolean) => void; children?: React.ReactNode }) {
-  const p = usePalette();
-  return (
-    <View style={{ borderWidth: 1, borderColor: p.border, borderRadius: radius.card, backgroundColor: p.surface, padding: 14, marginBottom: 12 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-        <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 16, fontWeight: '700', color: p.text }}>{title}</Text>
-          <Text style={{ fontSize: 12, color: p.textDim, marginTop: 2, lineHeight: 16 }}>{desc}</Text>
-        </View>
-        <Toggle value={enabled} onChange={onToggle} />
-      </View>
-      {enabled && children ? <View style={{ marginTop: 10, borderTopWidth: 1, borderTopColor: p.border, paddingTop: 4 }}>{children}</View> : null}
-    </View>
-  );
-}
-
-export function ProtocolEditor({ controls }: { controls: SheetControls }) {
-  const p = usePalette();
-  const state = useAppState();
-  const [proto, setProto] = useState<Protocol>(() => resolveProtocol(state.settings.protocol));
-
-  const medTypes = typesFor(state, 'meds');
-  const actTypes = typesFor(state, 'activities');
-  const toggleKey = (list: string[], k: string) => (list.includes(k) ? list.filter((x) => x !== k) : [...list, k]);
-
-  const onSave = () => {
-    mutate((s) => { s.settings.protocol = proto; });
-    controls.close();
-  };
-  const onReset = () => setProto(resolveProtocol(null));
-
-  return (
-    <View>
-      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 6 }}>Clean-day protocol</Text>
-      <Text style={{ fontSize: 14, color: p.textDim, lineHeight: 20, marginBottom: 18 }}>
-        Choose what a clean day means for you. A day counts toward your streak when every requirement you turn on is met.
-      </Text>
-
-      <ReqSection
-        title="No triggers"
-        desc="Any logged trigger breaks the day."
-        enabled={proto.triggers.enabled}
-        onToggle={(v) => setProto((x) => ({ ...x, triggers: { ...x.triggers, enabled: v } }))}
-      />
-
-      <ReqSection
-        title="Water"
-        desc="Hit a minimum daily water intake."
-        enabled={proto.water.enabled}
-        onToggle={(v) => setProto((x) => ({ ...x, water: { ...x.water, enabled: v } }))}
-      >
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 }}>
-          <Text style={{ fontSize: 15, color: p.text }}>Daily goal</Text>
-          <Stepper value={proto.water.liters} step={0.25} format={(v) => `${v} L`} onChange={(v) => setProto((x) => ({ ...x, water: { ...x.water, liters: v } }))} />
-        </View>
-      </ReqSection>
-
-      <ReqSection
-        title="Medications"
-        desc="Choose which medications you must take."
-        enabled={proto.meds.enabled}
-        onToggle={(v) => setProto((x) => ({ ...x, meds: { ...x.meds, enabled: v } }))}
-      >
-        {Object.entries(medTypes).map(([k, def]) => (
-          <CheckRow key={k} label={def.label} checked={proto.meds.types.includes(k)} onToggle={() => setProto((x) => ({ ...x, meds: { ...x.meds, types: toggleKey(x.meds.types, k) } }))} />
-        ))}
-      </ReqSection>
-
-      <ReqSection
-        title="Activities"
-        desc="Select the activities you must complete."
-        enabled={proto.activities.enabled}
-        onToggle={(v) => setProto((x) => ({ ...x, activities: { ...x.activities, enabled: v } }))}
-      >
-        {Object.entries(actTypes).map(([k, def]) => (
-          <CheckRow key={k} label={def.label} checked={proto.activities.types.includes(k)} onToggle={() => setProto((x) => ({ ...x, activities: { ...x.activities, types: toggleKey(x.activities.types, k) } }))} />
-        ))}
-      </ReqSection>
-
-      <ReqSection
-        title="Sleep"
-        desc="Sleep at least this many hours."
-        enabled={proto.sleep.enabled}
-        onToggle={(v) => setProto((x) => ({ ...x, sleep: { ...x.sleep, enabled: v } }))}
-      >
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 }}>
-          <Text style={{ fontSize: 15, color: p.text }}>Minimum</Text>
-          <Stepper value={proto.sleep.hours} step={0.5} format={(v) => `${v} h`} onChange={(v) => setProto((x) => ({ ...x, sleep: { ...x.sleep, hours: v } }))} />
-        </View>
-      </ReqSection>
-
-      <Pressable onPress={onReset} style={({ pressed }) => [{ alignSelf: 'center', paddingVertical: 8 }, pressed && { opacity: 0.6 }]}>
-        <Text style={{ fontSize: 13, fontWeight: '600', color: p.textDim }}>Reset to default</Text>
-      </Pressable>
-
-      <SheetFooter>
-        <Button title="Save protocol" variant="primary" onPress={onSave} />
-      </SheetFooter>
-    </View>
-  );
-}
-
 /* ---------- Score explanation sheet ---------- */
 const fmtMetricVal = (v: number | null, u?: string) => (v == null ? '-' : Number.isInteger(v) ? String(v) : Math.abs(v) < 1 ? v.toFixed(3) : v.toFixed(1)) + (u ? ` ${u}` : '');
 
@@ -441,21 +732,25 @@ function zoneAdvice(raw: number | null, bands: Band[] | null, unit?: string) {
   return { cur, ideal, done: false, dir };
 }
 
-export function ScoreExplain({ all, dk, controls, hero, hideIntro, hideClose }: {
-  all: ScoreSetResult; dk: string; controls: SheetControls;
-  /** Override the hero card (label / grade tint+tag / guidance tip). */
+export function ScoreExplain({ all, dk, controls, hero, hideClose }: {
+  all: ScoreSetResult; dk: string; controls?: SheetControls;
+  /** Screenshot scenes only: override the hero card (label / grade tint+tag / guidance tip). */
   hero?: { label?: string; cat?: ScoreCat | null; tip?: string };
+  /** Accepted for scene compatibility; the live sheet no longer has an intro paragraph. */
   hideIntro?: boolean; hideClose?: boolean;
 }) {
   const p = usePalette();
   const cat = scoreCat(all.score!);
+  // Live, the hero wears the day's own grade. A screenshot scene may pin it.
+  const heroColor = hero?.cat ? SCORE_COLORS[hero.cat] : cat.color;
+  const heroShort = hero?.cat ? GRADE_LABEL[hero.cat] : cat.short;
   const ptsToCat = (pt: number): ScoreCat => (pt >= 88 ? 'great' : pt >= 70 ? 'good' : pt >= 48 ? 'ok' : pt >= 23 ? 'bad' : 'crash');
   const comps = all.comps.map((c) => ({ ...c, cat: ptsToCat(c.p) }));
   const byW = (a: ScoreComp, b: ScoreComp) => b.w - a.w;
   const helped = comps.filter((c) => c.cat === 'great' || c.cat === 'good').sort(byW);
   const hurt = comps.filter((c) => c.cat === 'bad' || c.cat === 'crash').sort(byW);
   const neutral = comps.filter((c) => c.cat === 'ok').sort(byW);
-  const ceil = (c: ScoreComp) => (c.detail && c.detail.maxCat ? GRADE_PTS[c.detail.maxCat] : 95);
+  const ceil = (c: ScoreComp) => (c.detail && c.detail.maxCat ? GRADE_PTS[c.detail.maxCat] : GRADE_PTS.great);
   const avail = all.confidence || 100;
   const headroom = comps.map((c) => ({ c, gain: (c.w * (ceil(c) - c.p)) / avail })).filter((x) => x.gain > 0.05).sort((a, b) => b.gain - a.gain);
 
@@ -468,20 +763,58 @@ export function ScoreExplain({ all, dk, controls, hero, hideIntro, hideClose }: 
     return c.detail.note || SCORE_TIPS[c.label] || '';
   };
 
+  // Confidence is the share of the full input set that was available today.
+  // Anything below is a component the score never saw, so it's what we're
+  // unsure of — group the missing inputs by the single action that captures
+  // them and show the confidence each would restore.
+  const CONF_INPUTS: { label: string; w: number; src: string }[] = [
+    { label: 'HRV (RMSSD)', w: 25, src: 'hrv' },
+    { label: 'Total power', w: 15, src: 'guided' },
+    { label: 'pNN50', w: 10, src: 'guided' },
+    { label: 'VLF power', w: 10, src: 'guided' },
+    { label: 'LF peak', w: 10, src: 'guided' },
+    { label: 'Blood pressure', w: 8, src: 'bp' },
+    { label: 'Resting HR', w: 7, src: 'rhr' },
+    { label: 'Sleep', w: 8, src: 'sleep' },
+    { label: 'Activity', w: 2, src: 'activity' },
+  ];
+  const CONF_SOURCES: Record<string, string> = {
+    guided: 'Capture a guided HRV reading',
+    hrv: 'Take an HRV reading',
+    bp: 'Log a blood pressure reading',
+    rhr: 'Log a resting heart rate',
+    sleep: 'Log last night’s sleep',
+    activity: 'Log today’s activity',
+  };
+  const present = new Set(comps.map((c) => c.label));
+  const missing = CONF_INPUTS.filter((f) => !present.has(f.label));
+  const confGaps = Object.keys(CONF_SOURCES)
+    .map((src) => {
+      const items = missing.filter((m) => m.src === src);
+      return { src, action: CONF_SOURCES[src], w: items.reduce((s, m) => s + m.w, 0), labels: items.map((m) => m.label) };
+    })
+    .filter((g) => g.w > 0)
+    .sort((a, b) => b.w - a.w);
+
   return (
     <View>
-      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 16 }}>How this score was calculated</Text>
-      <HeroCard
-        cat={hero ? (hero.cat ?? null) : (cat.short === 'Excellent' || cat.short === 'Good' ? 'great' : null)}
-        label={hero?.label ?? cat.label} big={all.score!} den="/ 100"
-        sub={`Confidence ${all.confidence}%, the share of the full input set available to score today.`}
-        tip={hero?.tip}
-      />
-      {hideIntro ? null : (
-        <Text style={{ fontSize: 14, color: p.textDim, lineHeight: 20, marginBottom: 16 }}>
-          {"The Autonomic Score is a weighted blend of the day's readings. Each input is graded, turned into points, and combined by weight. Missing inputs drop out and the remaining weights are rescaled, and that rescaling is the confidence percentage."}
-        </Text>
-      )}
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 16 }}>How this was calculated</Text>
+      <View style={{ borderRadius: radius.card, padding: 16, marginBottom: 16, backgroundColor: hexA(heroColor, 0.1), borderWidth: 1, borderColor: hexA(heroColor, 0.45) }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Text style={[T.section, { color: p.textDim }]}>{hero?.label ?? 'Your Score'}</Text>
+          <View style={{ backgroundColor: heroColor, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 999 }}>
+            <Text style={{ color: '#fff', fontSize: 13, fontWeight: '800', textTransform: 'uppercase' }}>{heroShort}</Text>
+          </View>
+        </View>
+        <View style={{ alignItems: 'center', marginVertical: 8 }}>
+          <ScoreGauge score={all.score!} color={heroColor}>
+            <Text style={{ fontSize: 57, fontWeight: '800', color: p.text, fontVariant: ['tabular-nums'], letterSpacing: -1, lineHeight: 57, marginTop: 8 }}>{all.score}</Text>
+            <Text style={{ fontSize: 10, fontWeight: '700', letterSpacing: 1, color: p.textDim, marginTop: -2 }}>OUT OF 100</Text>
+          </ScoreGauge>
+        </View>
+        <Text style={{ textAlign: 'center', fontSize: 13, color: p.textDim, fontWeight: '600' }}>{`Confidence ${all.confidence}%, the share of the full input set available to score today.`}</Text>
+        {hero?.tip ? <Text style={{ textAlign: 'center', fontSize: 13, color: p.textDim, marginTop: 8, lineHeight: 18 }}>{hero.tip}</Text> : null}
+      </View>
       {helped.length ? <SumCard title="What helped">{helped.map((c) => <CompRow key={c.label} c={c} improveLine={improveLine} />)}</SumCard> : null}
       {hurt.length ? <SumCard title="What hurt">{hurt.map((c) => <CompRow key={c.label} c={c} improveLine={improveLine} />)}</SumCard> : null}
       {neutral.length ? <SumCard title="Middle of the range">{neutral.map((c) => <CompRow key={c.label} c={c} improveLine={improveLine} />)}</SumCard> : null}
@@ -490,13 +823,26 @@ export function ScoreExplain({ all, dk, controls, hero, hideIntro, hideClose }: 
           <MetricRow key={c.label} label={c.label} value={`+${gain.toFixed(1)} pt`} cat={c.cat} explain={improveLine(c)} />
         )) : <MetricRow label="At the ceiling" value="" cat={false} explain="Every scored input is already in its top zone. Keep the inputs consistent to hold it." />}
       </SumCard>
-      {hideClose ? null : (
+      <SumCard title="What would raise confidence">
+        {confGaps.length ? confGaps.map((g) => (
+          <MetricRow
+            key={g.src}
+            label={g.action}
+            value={`+${g.w}%`}
+            cat={false}
+            explain={`Not captured today, so the score is estimated without ${g.labels.join(', ')}. Adding it would raise confidence by about ${g.w} points.`}
+          />
+        )) : (
+          <MetricRow label="Full input set logged" value="" cat={false} explain="Every scored input was available today, so nothing is missing. This is as confident as the score gets." />
+        )}
+      </SumCard>
+      <View style={{ height: 24 }} />
+      {controls && !hideClose ? (
         <>
-          <View style={{ height: 8 }} />
           <Button title="Close" onPress={controls.close} />
           <View style={{ height: 24 }} />
         </>
-      )}
+      ) : null}
     </View>
   );
 }
@@ -505,23 +851,30 @@ function CompRow({ c, improveLine }: { c: any; improveLine: (c: any) => string }
   const p = usePalette();
   const [open, setOpen] = useState(false);
   const contrib = c.p >= 80 ? { t: 'Lifting your score', bg: 'rgba(74,222,128,.16)', col: '#4ade80' } : c.p >= 60 ? { t: 'About neutral', bg: 'rgba(234,179,8,.16)', col: '#eab308' } : { t: 'Pulling your score down', bg: 'rgba(249,115,22,.16)', col: '#f97316' };
+
+  // Rotate the chevron in place and reveal the body by animating its measured
+  // height with a fade. See useAccordion for why the body is measured absolutely.
+  const { chevStyle, bodyStyle, onContentLayout, measureStyle } = useAccordion(open);
+
   return (
     <View style={{ backgroundColor: p.surface, borderColor: p.border, borderWidth: 1, borderRadius: radius.control, marginBottom: 10, overflow: 'hidden' }}>
       <Pressable onPress={() => setOpen((v) => !v)} style={{ flexDirection: 'row', alignItems: 'center', gap: 9, padding: 13 }}>
         <View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: SCORE_COLORS[c.cat as keyof typeof SCORE_COLORS] || p.border }} />
         <Text style={{ fontWeight: '600', fontSize: 15, color: p.text, flex: 1 }}>{c.label}</Text>
         <Text style={{ fontSize: 14, color: p.textDim, fontVariant: ['tabular-nums'] }}>{c.detail.value || ''}</Text>
-        <Icon name="chevron" size={17} color={p.textDim} />
+        <Animated.View style={chevStyle}>
+          <Icon name="chevron" size={17} color={p.textDim} />
+        </Animated.View>
       </Pressable>
-      {open ? (
-        <View style={{ paddingHorizontal: 14, paddingBottom: 14 }}>
+      <Animated.View style={[{ overflow: 'hidden' }, bodyStyle]}>
+        <View onLayout={onContentLayout} style={[measureStyle, { paddingHorizontal: 14, paddingBottom: 14 }]}>
           <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 8 }}>
             <View style={{ backgroundColor: contrib.bg, paddingHorizontal: 9, paddingVertical: 3, borderRadius: 999 }}><Text style={{ fontSize: 11, fontWeight: '700', color: contrib.col }}>{contrib.t}</Text></View>
             <Text style={{ fontSize: 12, color: p.textDim }}>{`${GRADE_LABEL[c.cat as keyof typeof GRADE_LABEL]} · weight ${c.w}%`}</Text>
           </View>
           <Text style={{ fontSize: 13, color: p.textDim, lineHeight: 18 }}>{improveLine(c)}</Text>
         </View>
-      ) : null}
+      </Animated.View>
     </View>
   );
 }

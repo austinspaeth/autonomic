@@ -1,0 +1,38 @@
+{
+  "id": "/master/",
+  "name": "Autonomic Dashboard",
+  "short_name": "Autonomic",
+  "description": "Store performance, app usage, sales and costs for Autonomic Journal.",
+  "start_url": "/master/",
+  "scope": "/master/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#0d0d0d",
+  "background_color": "#0d0d0d",
+  "icons": [
+    {
+      "src": "/web-app-manifest-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/web-app-manifest-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/web-app-manifest-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/web-app-manifest-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

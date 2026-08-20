@@ -8,18 +8,13 @@ are open. Verified against source on 2026-07-10.
 
 ## 🔴 Blockers — the site is not launch-ready without these
 
-- [ ] **Real App Store link + reconcile launch status.** The "Download on the
-      App Store" badge in `src/routes/+page.svelte` (~line 461) still links to
-      `href="#"`, and there is no `apps.apple.com` URL anywhere in `src/`. Yet the
-      copy says "available now on the Apple App Store," "Download for iOS now,"
-      and "live on iPhone" — while the hero + CTA also say "Join the waitlist."
-      Decide which is true:
-  - If **iOS is live**: point the badge at the real App Store URL, add
-        `"downloadUrl"`/`"installUrl"` to the `SoftwareApplication` JSON-LD, and
-        decide whether the waitlist becomes Android-only.
-  - If **not live yet**: soften the "available now / live on iPhone" copy back to
-        waitlist framing (and note Google can flag a `SoftwareApplication` whose
-        `offers` price isn't actually purchasable).
+- [x] **Real App Store link + reconcile launch status.** iOS is live. Every
+      "Download on the App Store" CTA (hero, nav, pricing plans, waitlist badge,
+      blog end-CTA, insights sidebar) now points at the real store URL via the
+      shared `appStoreUrl` constant in `src/lib/site.ts`
+      (`https://apps.apple.com/app/id6789786971`), and the `SoftwareApplication`
+      JSON-LD carries `downloadUrl`/`installUrl`. (The waitlist stays
+      Android-only, matching the "available now on iOS" copy.)
 - [ ] **Deploy target + DNS.** Confirm `autonomic.care` DNS points at the host,
       HTTPS/cert is valid, and the static `build/` output is what's served. Every
       canonical URL, the sitemap, and all structured data hard-code
@@ -65,7 +60,7 @@ are open. Verified against source on 2026-07-10.
       have someone confirm it's accurate for the shipping app (data handling,
       iCloud backup, subscription terms, medical-disclaimer language).
 - [ ] **Proofread pass** over homepage + all 50 published articles for typos,
-      pricing consistency ($50/yr, 7-day trial), and factual/medical accuracy.
+      pricing consistency ($50/yr, 14-day trial), and factual/medical accuracy.
 - [ ] **Regenerate `og.png` if branding changes** (1200×630). Consider a
       per-article OG image later (each article already has a `photoLocation`
       cover it falls back to).
@@ -76,13 +71,22 @@ are open. Verified against source on 2026-07-10.
 
 - **Canonical domain is `autonomic.care`** across `site.ts`, every canonical/OG
   tag, all JSON-LD, RSS, and the sitemap `BASE`.
-- **Waitlist forms wired** — hero + Android forms POST to FlowForm and fire a GA
+- **Android waitlist form wired** — POSTs to FlowForm and fires a GA
   `waitlist_signup` event; App Store badge fires an `app_store_click` event.
-- **Analytics live** — GA4 (`G-3R3E75CLGQ`) configured site-wide in `app.html`.
+  (The hero form was replaced by the App Store badge + an anchor link to the
+  Android waitlist section.)
+- **Waitlist form collects no health data** — the "What are you managing?"
+  condition dropdown and the "What do you track today?" free-text field were
+  removed (2026-07-12); the form now asks for email + optional first name only.
+  The Privacy Policy's "The website" section discloses the form and FlowForm
+  delivery, and must stay in sync if fields ever change.
+- **Analytics live** — GA4 (`G-3R3E75CLGQ`) configured site-wide in `app.html`,
+  gated by the cookie banner (opt-out: loads by default, "Block cookies"
+  disables it now and on future visits), as described in the Privacy Policy.
 - **Branded 404** — `static/404.html` (noindex, styled, favicons, Autonomic
   title).
 - **SEO / structured data**: site-wide Organization + WebSite JSON-LD;
-  `SoftwareApplication` with `offers` ($50/yr, 7-day trial); complete Open Graph
+  `SoftwareApplication` with `offers` ($50/yr, 14-day trial); complete Open Graph
   + Twitter cards on every page with image dimensions/alt and no duplicate tags;
   `article:*` tags + enriched `Article` JSON-LD; `CollectionPage`/`ItemList`,
   `BreadcrumbList`, `ProfilePage`/`Person` on listings.

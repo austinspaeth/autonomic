@@ -96,7 +96,7 @@ If you've read about the [frequency-domain bands](/insights/basics/hrv-frequency
 Think of it like a radio dial. The total loudness is the power. The exact station the needle lands on is the peak. Two readings can be equally "loud" while their needles sit in completely different places, and where the needle sits tells you which control system is doing the driving.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 260" role="img" aria-label="A frequency spectrum showing a broad LF peak near 0.1 Hz and a taller HF peak at the breathing rate, with the resonance zone marked near 0.1 Hz">
+  <svg class="fig-d" viewBox="0 0 720 260" role="img" aria-label="A frequency spectrum showing a broad LF peak near 0.1 Hz and a taller HF peak at the breathing rate, with the resonance zone marked near 0.1 Hz">
     <line x1="60" y1="210" x2="700" y2="210" stroke="var(--line-2)" stroke-width="1.5" />
     <line x1="60" y1="210" x2="60" y2="30" stroke="var(--line-2)" stroke-width="1.5" />
     <rect x="150" y="30" width="70" height="180" fill="#a78bfa" opacity="0.14" />
@@ -111,6 +111,22 @@ Think of it like a radio dial. The total loudness is the power. The exact statio
     <text x="185" y="230" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">0.10</text>
     <text x="505" y="230" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">0.25</text>
     <text x="380" y="252" text-anchor="middle" fill="var(--dim)" font-family="-apple-system, sans-serif" font-size="12">frequency (Hz)</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 236" role="img" aria-label="A frequency spectrum showing a broad LF peak near 0.1 Hz and a taller HF peak at the breathing rate, with the resonance zone marked near 0.1 Hz">
+    <line x1="40" y1="190" x2="344" y2="190" stroke="var(--line-2)" stroke-width="1.5" />
+    <line x1="40" y1="190" x2="40" y2="34" stroke="var(--line-2)" stroke-width="1.5" />
+    <rect x="83" y="34" width="33" height="156" fill="#a78bfa" opacity="0.14" />
+    <text x="99" y="26" text-anchor="middle" fill="#a78bfa" font-family="Space Mono, monospace" font-size="10">resonance</text>
+    <path d="M 40 190 Q 68 138 99 86 Q 121 138 154 181" fill="none" stroke="#58c4f2" stroke-width="2.5" />
+    <path d="M 154 181 Q 202 186 235 112 Q 254 60 268 95 Q 287 155 344 186" fill="none" stroke="#22c55e" stroke-width="2.5" />
+    <text x="99" y="112" text-anchor="middle" fill="#58c4f2" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="12.5">LF peak</text>
+    <text x="99" y="127" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">~0.1 Hz</text>
+    <text x="278" y="52" text-anchor="middle" fill="#22c55e" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="12.5">HF peak</text>
+    <text x="278" y="67" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">= breathing rate</text>
+    <text x="40" y="208" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">0</text>
+    <text x="99" y="208" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">0.10</text>
+    <text x="251" y="208" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">0.25</text>
+    <text x="192" y="230" text-anchor="middle" fill="var(--dim)" font-family="-apple-system, sans-serif" font-size="12">frequency (Hz)</text>
   </svg>
   <figcaption>The LF peak sits near 0.1 Hz in the baroreflex band; the HF peak sits wherever you happen to be breathing. Paced breathing merges them toward the resonance zone.</figcaption>
 </figure>

@@ -36,7 +36,7 @@ That daily-noise trap is where hope goes to die. And it's almost entirely an art
 If you take one thing from this article, take this. **A single reading is weather. The trend is climate.** Your HRV this morning, your heart rate right now, how you feel at 3pm, all of it is noisy enough that any one point can mislead you completely.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 260" role="img" aria-label="A noisy daily HRV scatter that zig-zags up and down, with a smooth rising baseline line showing the real upward trend">
+  <svg class="fig-d" viewBox="0 0 720 260" role="img" aria-label="A noisy daily HRV scatter that zig-zags up and down, with a smooth rising baseline line showing the real upward trend">
     <line x1="50" y1="220" x2="700" y2="220" stroke="var(--line-2)" stroke-width="1.5" />
     <line x1="50" y1="30" x2="50" y2="220" stroke="var(--line-2)" stroke-width="1.5" />
     <text x="16" y="40" fill="var(--dim)" font-family="Space Mono, monospace" font-size="11">HRV</text>
@@ -48,6 +48,19 @@ If you take one thing from this article, take this. **A single reading is weathe
     <path d="M60 178 Q200 158 360 128 T685 68" fill="none" stroke="#54d98a" stroke-width="3.5" />
     <text x="500" y="175" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="14">rolling baseline ↑</text>
     <text x="120" y="215" fill="var(--dim-2)" font-family="-apple-system, sans-serif" font-size="12">noisy daily readings</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 232" role="img" aria-label="A noisy daily HRV scatter that zig-zags up and down, with a smooth rising baseline line showing the real upward trend">
+    <line x1="20" y1="190" x2="344" y2="190" stroke="var(--line-2)" stroke-width="1.5" />
+    <line x1="20" y1="34" x2="20" y2="190" stroke="var(--line-2)" stroke-width="1.5" />
+    <text x="20" y="26" fill="var(--dim)" font-family="Space Mono, monospace" font-size="10.5">HRV</text>
+    <polyline points="25,157 37,133 50,169 62,145 75,124 87,161 100,133 112,108 125,145 137,120 150,100 162,133 175,112 187,87 199,116 212,96 224,124 237,83 249,104 262,75 274,100 287,67 299,87 312,59 324,79 337,55" fill="none" stroke="var(--dim-2)" stroke-width="1.5" opacity="0.55" />
+    <g fill="#58c4f2">
+      <circle cx="25" cy="157" r="3" /><circle cx="50" cy="169" r="3" /><circle cx="75" cy="124" r="3" /><circle cx="100" cy="133" r="3" /><circle cx="125" cy="145" r="3" /><circle cx="150" cy="100" r="3" /><circle cx="175" cy="112" r="3" /><circle cx="199" cy="116" r="3" /><circle cx="224" cy="124" r="3" /><circle cx="249" cy="104" r="3" /><circle cx="274" cy="100" r="3" /><circle cx="299" cy="87" r="3" /><circle cx="324" cy="79" r="3" />
+    </g>
+    <path d="M 25,156 Q 95,139 175,114 T 337,65" fill="none" stroke="#54d98a" stroke-width="3.5" />
+    <text x="344" y="150" text-anchor="end" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="12.5">rolling baseline ↑</text>
+    <text x="24" y="210" fill="var(--dim-2)" font-family="-apple-system, sans-serif" font-size="11.5">noisy daily readings</text>
+    <text x="344" y="210" text-anchor="end" fill="var(--dim)" font-family="Space Mono, monospace" font-size="10.5">12 weeks</text>
   </svg>
   <figcaption>The daily dots panic you. The rolling baseline tells the truth: this nervous system is recovering.</figcaption>
 </figure>

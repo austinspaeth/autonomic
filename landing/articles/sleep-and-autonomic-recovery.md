@@ -34,7 +34,7 @@ Your autonomic nervous system does its deepest repair while you sleep. As you dr
 That is also why sleep is so visible in your data. A good night tends to show up as a higher morning HRV and a lower resting heart rate; a bad night shows up as the opposite. Your morning reading is, in large part, a report card on the night before.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 240" role="img" aria-label="A line showing HRV rising through the night across sleep stages, peaking during deep sleep in the early hours before tapering toward morning.">
+  <svg class="fig-d" viewBox="0 0 720 240" role="img" aria-label="A line showing HRV rising through the night across sleep stages, peaking during deep sleep in the early hours before tapering toward morning.">
     <line x1="60" y1="200" x2="700" y2="200" stroke="var(--line)" stroke-width="1.5"/>
     <line x1="60" y1="30" x2="60" y2="200" stroke="var(--line)" stroke-width="1.5"/>
     <text x="20" y="40" font-family="Space Mono, monospace" font-size="12" fill="var(--dim-2)">HRV</text>
@@ -45,6 +45,18 @@ That is also why sleep is so visible in your data. A good night tends to show up
     <circle cx="360" cy="60" r="4" fill="#54d98a"/>
     <text x="300" y="45" font-family="Space Grotesk, sans-serif" font-size="12" fill="#54d98a">parasympathetic peak</text>
     <text x="470" y="150" font-family="Space Grotesk, sans-serif" font-size="12" fill="var(--dim-2)">lighter sleep toward morning</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 232" role="img" aria-label="A line showing HRV rising through the night across sleep stages, peaking during deep sleep in the early hours before tapering toward morning.">
+    <line x1="44" y1="186" x2="344" y2="186" stroke="var(--line)" stroke-width="1.5"/>
+    <line x1="44" y1="34" x2="44" y2="186" stroke="var(--line)" stroke-width="1.5"/>
+    <text x="16" y="44" font-family="Space Mono, monospace" font-size="11" fill="var(--dim-2)">HRV</text>
+    <path d="M 44,164 C 91,141 128,70 185,61 C 236,54 269,106 325,114" fill="none" stroke="#54d98a" stroke-width="4" stroke-linecap="round"/>
+    <circle cx="185" cy="61" r="4" fill="#54d98a"/>
+    <text x="185" y="46" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="11.5" fill="#54d98a">parasympathetic peak</text>
+    <text x="344" y="146" text-anchor="end" font-family="Space Grotesk, sans-serif" font-size="11" fill="var(--dim-2)">lighter toward morning</text>
+    <text x="44" y="206" font-family="Space Grotesk, sans-serif" font-size="11.5" fill="var(--dim-2)">Asleep</text>
+    <text x="185" y="206" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="11.5" fill="var(--dim-2)">Deep sleep</text>
+    <text x="344" y="206" text-anchor="end" font-family="Space Grotesk, sans-serif" font-size="11.5" fill="var(--dim-2)">Wake</text>
   </svg>
   <figcaption>Across a healthy night, HRV rises into a deep-sleep peak, then eases as morning approaches. Cut the night short and you lose the peak.</figcaption>
 </figure>

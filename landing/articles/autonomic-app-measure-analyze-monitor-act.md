@@ -30,7 +30,7 @@ faq:
 Read the rest of this site and a single shape keeps appearing. The [autonomic nervous system guide](/insights/basics/autonomic-nervous-system-and-dysautonomia-guide/) says dysautonomia is invisible but *measurable*. The [HRV guide](/insights/hrv/hrv-complete-guide/) says track the trend, not the day. The [recovery guide](/insights/recovery/recovery-from-post-viral-dysautonomia/) says turn that trend into decisions. Underneath all of it is one loop:
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 300" role="img" aria-label="A four-step cycle: Measure, Analyze, Monitor, Act, arranged in a loop">
+  <svg class="fig-d" viewBox="0 0 720 300" role="img" aria-label="A four-step cycle: Measure, Analyze, Monitor, Act, arranged in a loop">
     <g font-family="Space Grotesk, sans-serif" font-weight="600" font-size="17">
       <circle cx="200" cy="90" r="66" fill="#54d98a1f" stroke="#54d98a" stroke-width="2.5" />
       <text x="200" y="88" text-anchor="middle" fill="var(--text)">Measure</text>
@@ -53,6 +53,31 @@ Read the rest of this site and a single shape keeps appearing. The [autonomic ne
     </g>
     <defs>
       <marker id="ah" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="var(--dim-2)" /></marker>
+    </defs>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 320" role="img" aria-label="A four-step cycle: Measure, Analyze, Monitor, Act, arranged in a loop">
+    <g font-family="Space Grotesk, sans-serif" font-weight="600" font-size="15">
+      <circle cx="96" cy="96" r="62" fill="#54d98a1f" stroke="#54d98a" stroke-width="2.5" />
+      <text x="96" y="94" text-anchor="middle" fill="var(--text)">Measure</text>
+      <text x="96" y="113" text-anchor="middle" fill="var(--dim)" font-family="-apple-system, sans-serif" font-weight="400" font-size="11">log readings</text>
+      <circle cx="264" cy="96" r="62" fill="#58c4f21f" stroke="#58c4f2" stroke-width="2.5" />
+      <text x="264" y="94" text-anchor="middle" fill="var(--text)">Analyze</text>
+      <text x="264" y="113" text-anchor="middle" fill="var(--dim)" font-family="-apple-system, sans-serif" font-weight="400" font-size="11">score + trend</text>
+      <circle cx="264" cy="246" r="62" fill="#f973161f" stroke="#f97316" stroke-width="2.5" />
+      <text x="264" y="244" text-anchor="middle" fill="var(--text)">Monitor</text>
+      <text x="264" y="263" text-anchor="middle" fill="var(--dim)" font-family="-apple-system, sans-serif" font-weight="400" font-size="11">watch baseline</text>
+      <circle cx="96" cy="246" r="62" fill="#e031271f" stroke="#e03127" stroke-width="2.5" />
+      <text x="96" y="244" text-anchor="middle" fill="var(--text)">Act</text>
+      <text x="96" y="263" text-anchor="middle" fill="var(--dim)" font-family="-apple-system, sans-serif" font-weight="400" font-size="11">pace + decide</text>
+    </g>
+    <g stroke="var(--dim-2)" stroke-width="2" fill="none" marker-end="url(#ah-m)">
+      <path d="M162 86 L196 86" />
+      <path d="M272 162 L272 178" />
+      <path d="M196 258 L162 258" />
+      <path d="M88 178 L88 162" />
+    </g>
+    <defs>
+      <marker id="ah-m" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="var(--dim-2)" /></marker>
     </defs>
   </svg>
   <figcaption>The recovery loop. Autonomic is built to close it: every feature maps to one of these four steps.</figcaption>

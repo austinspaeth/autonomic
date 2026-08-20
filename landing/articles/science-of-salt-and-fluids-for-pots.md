@@ -36,7 +36,7 @@ A large fraction of people with POTS have **low blood volume** (hypovolemia). Wi
 Sodium is central here because it is the mineral your body uses to *hold onto* water. Eat more salt, retain more fluid, and you expand the plasma volume that keeps blood pressure and heart rate steadier when you are upright. This is the core rationale behind the [volume-expansion strategy that patient and clinician resources describe](http://www.dysautonomiainternational.org/pdf/POTSTreatmentEssentials.pdf) as a first-line, non-drug approach.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 230" role="img" aria-label="Diagram showing how added sodium and fluids expand blood volume, which lowers the standing heart-rate rise in POTS">
+  <svg class="fig-d" viewBox="0 0 720 230" role="img" aria-label="Diagram showing how added sodium and fluids expand blood volume, which lowers the standing heart-rate rise in POTS">
     <text x="20" y="30" font-family="Space Grotesk, sans-serif" font-size="15" fill="var(--dim-2)">The volume-loading rationale</text>
     <!-- step boxes -->
     <rect x="20" y="55" width="150" height="70" rx="10" fill="none" stroke="var(--line)"/>
@@ -60,6 +60,27 @@ Sodium is central here because it is the mineral your body uses to *hold onto* w
     <line x1="560" y1="90" x2="602" y2="90" stroke="var(--line)" stroke-width="2"/>
     <polygon points="602,90 594,86 594,94" fill="var(--line)"/>
     <text x="20" y="175" font-family="Space Grotesk, sans-serif" font-size="12" fill="var(--dim-2)">Well-supported for many, but response varies, and it is not for everyone.</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 356" role="img" aria-label="Diagram showing how added sodium and fluids expand blood volume, which lowers the standing heart-rate rise in POTS">
+    <text x="20" y="18" font-family="Space Grotesk, sans-serif" font-size="13.5" fill="var(--dim-2)">The volume-loading rationale</text>
+    <rect x="40" y="32" width="280" height="48" rx="10" fill="none" stroke="var(--line)"/>
+    <text x="180" y="62" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="13.5" fill="var(--dim-2)">Sodium + fluids</text>
+    <line x1="180" y1="80" x2="180" y2="96" stroke="var(--line)" stroke-width="2"/>
+    <polygon points="180,102 175,94 185,94" fill="var(--line)"/>
+    <rect x="40" y="104" width="280" height="48" rx="10" fill="none" stroke="var(--line)"/>
+    <text x="180" y="126" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="13.5" fill="var(--dim-2)">Plasma</text>
+    <text x="180" y="144" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="13.5" fill="#38bdf8">volume up</text>
+    <line x1="180" y1="152" x2="180" y2="168" stroke="var(--line)" stroke-width="2"/>
+    <polygon points="180,174 175,166 185,166" fill="var(--line)"/>
+    <rect x="40" y="176" width="280" height="48" rx="10" fill="none" stroke="var(--line)"/>
+    <text x="180" y="206" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="13.5" fill="var(--dim-2)">More blood to the heart</text>
+    <line x1="180" y1="224" x2="180" y2="240" stroke="var(--line)" stroke-width="2"/>
+    <polygon points="180,246 175,238 185,238" fill="var(--line)"/>
+    <rect x="40" y="248" width="280" height="48" rx="10" fill="none" stroke="#54d98a"/>
+    <text x="180" y="270" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="13" fill="var(--dim-2)">Standing HR rise</text>
+    <text x="180" y="288" text-anchor="middle" font-family="Space Mono, monospace" font-size="13" fill="#54d98a">lower</text>
+    <text x="20" y="326" font-family="Space Grotesk, sans-serif" font-size="11.5" fill="var(--dim-2)">Well-supported for many, but response</text>
+    <text x="20" y="344" font-family="Space Grotesk, sans-serif" font-size="11.5" fill="var(--dim-2)">varies, and it is not for everyone.</text>
   </svg>
   <figcaption>The chain is sound physiology; the size and durability of the payoff differ from person to person.</figcaption>
 </figure>

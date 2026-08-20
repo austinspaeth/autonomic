@@ -42,12 +42,29 @@ export interface Entry {
   [key: string]: unknown;
 }
 
-/** Extra fields carried by a live-captured HRV reading. */
+/** Extra fields carried by a live-captured HRV reading.
+ *
+ *  The array fields (rrRaw, rrClean, sampledHr, sampledSdnn) are NOT persisted
+ *  on the entry — they live in the waveform sidecar store keyed by reading id
+ *  (src/lib/waveforms.ts) so the journal blob stays small. Inline they exist
+ *  only on a pre-save live preview or in a not-yet-migrated import; the store
+ *  strips them on load, and persisting one trips a dev warning. */
 export interface LiveHrvExtras {
-  /** Capture source ('polar' = Bluetooth strap, best; 'camera' = phone PPG, lowest quality). */
-  source?: 'polar' | 'watch' | 'camera' | 'manual';
+  /** Capture source ('polar' = Bluetooth strap, best; 'camera' = phone PPG,
+   *  lowest quality; 'health' = imported via Health Connect on Android). */
+  source?: 'polar' | 'watch' | 'camera' | 'manual' | 'health';
+  /** True when the entry was auto-imported from the platform health store
+   *  (welcome backfill / Health sync) rather than captured in-app — drives the
+   *  "Apple Watch HRV" / "Imported HRV" label. */
+  imported?: boolean;
+  /** Bluetooth device name at capture time (source 'polar' only) — shown as the Source detail. */
+  sourceName?: string;
   rrRaw?: number[];
   rrClean?: number[];
+  /** Indices into rrRaw where camera tracking resumed after losing the pulse.
+   *  Beat-to-beat metrics must not step across these. Absent on strap/watch/ECG
+   *  readings, which are one continuous take. */
+  rrSegments?: number[];
   durationSec?: number;
   sampledHr?: { t: number; bpm: number }[];
   /** Rolling SDNN (trailing ~60 s window) sampled through the session. */
@@ -99,6 +116,8 @@ export interface DayRecord {
 export interface Protocol {
   /** Avoid triggers. Empty `types` = avoid ALL triggers; else only these. */
   triggers: { enabled: boolean; types: string[] };
+  /** Take at least one HRV reading (training or baseline) that day. */
+  hrv: { enabled: boolean };
   /** Minimum daily water (litres). */
   water: { enabled: boolean; liters: number };
   /** Medications/supplements that must be logged. */
@@ -109,6 +128,15 @@ export interface Protocol {
   sleep: { enabled: boolean; hours: number };
 }
 
+/** User-defined type defs per kind (state.customTypes shape). */
+export type CustomTypes = Partial<Record<'activities' | 'meds' | 'symptoms' | 'triggers', Record<string, TypeDef>>>;
+
+/** The rear camera-module shape the user picked in the finger-reading setup. */
+export type CameraModuleShape = 'tall' | 'wide' | 'square' | 'single';
+/** Shape + which spot the flash occupies (keys are per-shape: top/middle/
+ *  bottom, left/middle/right, tl/tr/bl/br, or right/below for a single lens). */
+export interface CameraLayout { shape: CameraModuleShape; flash: string }
+
 export interface AppState {
   version: number;
   settings: {
@@ -116,12 +144,32 @@ export interface AppState {
     lastBleDeviceId?: string;
     lastBleDeviceName?: string;
     healthEnabled?: boolean;
+    /** Signal source of the last live HRV capture — seeds the setup sheet's
+     *  default so a deliberate choice (camera / watch) sticks across sessions. */
+    lastHrvSource?: 'polar' | 'watch' | 'camera';
+    /** Remembered camera-module layout from the finger (PPG) setup card —
+     *  once set, camera readings skip straight to the wait-for-finger step.
+     *  "Start over" on that card clears it. */
+    cameraLayout?: CameraLayout;
     /** Clean-day protocol; undefined falls back to DEFAULT_PROTOCOL. */
     protocol?: Protocol;
+    /** Day key stamped the first time a protocol is saved (never cleared) —
+     *  completes the "Getting started" protocol milestone. */
+    protocolSetOn?: string;
+    /** Daily morning-reading nudge. Source of truth for the OS schedule — see
+     *  `syncReminder()` in lib/reminders. `time` survives disabling so
+     *  re-enabling can offer it back. */
+    reminder?: { enabled: boolean; time: string };
+    /** Crash warning: a notification fired when the trailing-week trend flags
+     *  a likely crash (detectDownturn), telling the user to rest. `lastFired`
+     *  is the day key last notified, so one slide alerts once per day.
+     *  Undefined means "never chosen" — first enabling the morning reminder
+     *  defaults it on; an explicit off stays off. */
+    crashAlert?: { enabled: boolean; lastFired?: string };
   };
   profile: Profile;
   /** User-defined types layered on top of the registry maps (pure JSON defs). */
-  customTypes?: Partial<Record<'activities' | 'meds' | 'symptoms' | 'triggers', Record<string, TypeDef>>>;
+  customTypes?: CustomTypes;
   /** Built-in registry types the user deleted (only allowed while unused). */
   hiddenTypes?: Partial<Record<'activities' | 'meds' | 'symptoms' | 'triggers', string[]>>;
   meta: {
@@ -155,6 +203,12 @@ export interface FieldDef {
   placeholder?: string;
   signed?: boolean;
   divider?: boolean;
+  /** Time fields only: the field may be left empty (no "now" default, and the
+   *  picker offers Clear). Used by a symptom's optional end time. */
+  optional?: boolean;
+  /** Number fields only: when typing makes this true, focus jumps to the next
+   *  number field in the form (e.g. BP systolic → diastolic → pulse). */
+  autoNext?: (v: string) => boolean;
 }
 
 export interface TypeDef {
@@ -163,6 +217,10 @@ export interface TypeDef {
   fields: FieldDef[];
   custom?: string;
   noTime?: boolean;
+  /** The entry describes something that lasts, so `entryFields` adds an
+   *  optional "Ended" time after the start time (symptoms — stamped by
+   *  `typesFor`, so custom symptoms get it too). */
+  ends?: boolean;
   /** Default dose for a user-defined medication (e.g. "400mg"); prefills Amount. */
   dosage?: string;
   /** True for user-created types (stored in state.customTypes). */

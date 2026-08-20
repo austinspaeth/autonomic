@@ -65,7 +65,7 @@ Zoom out, and a [scoping review of diet and nutrition in long COVID](https://www
 On mechanism, research on the [Mediterranean diet, olive oil, and the gut microbiome in long COVID](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC11591431/) points to the gut as a likely middleman. The pattern appears to shift the microbiome toward beneficial bacteria (including groups like *Oscillibacter*) that are associated with lower inflammation. In other words, the food may be feeding the bugs that help calm your immune system down.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 210" role="img" aria-label="A three-step diagram showing how a Mediterranean diet may lead to a shifted gut microbiome, then lower inflammation, then supported recovery in long COVID.">
+  <svg class="fig-d" viewBox="0 0 720 210" role="img" aria-label="A three-step diagram showing how a Mediterranean diet may lead to a shifted gut microbiome, then lower inflammation, then supported recovery in long COVID.">
     <rect x="20" y="70" width="180" height="70" rx="10" fill="none" stroke="#54d98a" stroke-width="2"/>
     <text x="110" y="100" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="15" fill="var(--dim-2)">Mediterranean</text>
     <text x="110" y="120" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="15" fill="var(--dim-2)">pattern</text>
@@ -80,6 +80,26 @@ On mechanism, research on the [Mediterranean diet, olive oil, and the gut microb
     <text x="360" y="180" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="12" fill="var(--dim-2)">Proposed mechanism: still being confirmed in long COVID</text>
     <defs>
       <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+        <path d="M0 0 L8 4 L0 8 z" fill="var(--line)"/>
+      </marker>
+    </defs>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 306" role="img" aria-label="A three-step diagram showing how a Mediterranean diet may lead to a shifted gut microbiome, then lower inflammation, then supported recovery in long COVID.">
+    <rect x="30" y="8" width="300" height="62" rx="10" fill="none" stroke="#54d98a" stroke-width="2"/>
+    <text x="180" y="36" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="15" fill="var(--dim-2)">Mediterranean</text>
+    <text x="180" y="56" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="15" fill="var(--dim-2)">pattern</text>
+    <path d="M180 74 L180 94" stroke="var(--line)" stroke-width="2" marker-end="url(#arr-m)"/>
+    <rect x="30" y="100" width="300" height="62" rx="10" fill="none" stroke="#38bdf8" stroke-width="2"/>
+    <text x="180" y="128" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="15" fill="var(--dim-2)">Shifted gut</text>
+    <text x="180" y="148" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="15" fill="var(--dim-2)">microbiome</text>
+    <path d="M180 166 L180 186" stroke="var(--line)" stroke-width="2" marker-end="url(#arr-m)"/>
+    <rect x="30" y="192" width="300" height="62" rx="10" fill="none" stroke="#f5a524" stroke-width="2"/>
+    <text x="180" y="220" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="15" fill="var(--dim-2)">Lower inflammation,</text>
+    <text x="180" y="240" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="15" fill="var(--dim-2)">supported recovery</text>
+    <text x="180" y="282" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="11.5" fill="var(--dim-2)">Proposed mechanism: still being</text>
+    <text x="180" y="298" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="11.5" fill="var(--dim-2)">confirmed in long COVID</text>
+    <defs>
+      <marker id="arr-m" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
         <path d="M0 0 L8 4 L0 8 z" fill="var(--line)"/>
       </marker>
     </defs>

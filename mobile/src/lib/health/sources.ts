@@ -10,9 +10,17 @@
  * manual form).
  *
  * BP + Resting HR reuse `readImports` (already timestamped + provenance-aware).
+ * Activities follow the same model via `workoutCandidates` — the day's
+ * workouts, mapped to app activity types with HR stats, for the add-activity
+ * import card.
  */
 import { fmtTime12 } from '../dates';
 import { health } from './index';
+import { workoutCandidateOf, type WorkoutCandidate } from './workoutCandidate';
+
+// The candidate shape + mapper live in ./workoutCandidate (pure module, shared
+// with the periodic update check); existing consumers keep importing them here.
+export { workoutCandidateOf, type WorkoutCandidate } from './workoutCandidate';
 
 /** One importable Apple Health reading, shaped for the picker + prefill. */
 export interface HealthCandidate {
@@ -30,6 +38,34 @@ export interface HealthSource {
 export function healthSourceFor(type: string): HealthSource | null {
   if (type === 'restingHr' || type === 'bp') return { fetch: (dk) => sampleCandidates(type, dk) };
   return null;
+}
+
+/** The day's workouts, plus whether an empty result might be a denied read. */
+export interface WorkoutImport {
+  workouts: WorkoutCandidate[];
+  /**
+   * True when we cannot prove we're allowed to read workouts, so an empty list
+   * may mean "denied" rather than "rest day". Always true on iOS (HealthKit
+   * never reports read grants); on Android only when the grant is really
+   * missing. Drives the permission hint in the empty state.
+   */
+  mayBeDenied: boolean;
+}
+
+/** The day's importable workouts: this app's own sessions and workouts already
+ *  logged (same type + start time) drop out. `logged` is the day's activities. */
+export async function workoutCandidates(dk: string, logged: { type?: unknown; time?: unknown }[]): Promise<WorkoutImport> {
+  const api = health();
+  if (!api.available) return { workouts: [], mayBeDenied: false };
+  // The user opened an import card, so a permission sheet here is expected —
+  // `force` skips the once-per-launch pacing meant for the quiet checks. Still
+  // silent whenever the platform has nothing left to ask (see requestAuth).
+  await api.requestAuth({ force: true });
+  const [raw, status] = await Promise.all([api.readWorkouts(dk), api.readAuthStatus('workouts')]);
+  const workouts = raw
+    .filter((w) => !w.ownApp && !logged.some((e) => e.type === w.type && e.time === w.time))
+    .map(workoutCandidateOf);
+  return { workouts, mayBeDenied: status !== 'granted' };
 }
 
 /** Resting HR / BP candidates for a day, from the timestamped import stream. */

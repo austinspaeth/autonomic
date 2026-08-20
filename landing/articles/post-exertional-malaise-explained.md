@@ -44,7 +44,7 @@ The feature that makes PEM so hard to manage is its **timing**. In most illnesse
 That lag sabotages the normal way humans learn their limits. By the time the crash arrives, the walk feels like ancient history, so you blame the weather, a bad night's sleep, or nothing at all. The activity that caused it gets a pass, you repeat it, and the crashes stack.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 240" role="img" aria-label="Timeline showing exertion on day zero, feeling fine that evening, a crash 24 to 48 hours later, and a slow multi-day recovery.">
+  <svg class="fig-d" viewBox="0 0 720 240" role="img" aria-label="Timeline showing exertion on day zero, feeling fine that evening, a crash 24 to 48 hours later, and a slow multi-day recovery.">
     <line x1="40" y1="170" x2="700" y2="170" stroke="var(--line)" stroke-width="2"/>
     <g font-family="Space Mono, monospace" font-size="12" fill="var(--dim-2)" text-anchor="middle">
       <text x="90" y="200">Day 0</text>
@@ -65,6 +65,25 @@ That lag sabotages the normal way humans learn their limits. By the time the cra
     <text x="430" y="40" font-family="Space Grotesk, sans-serif" font-size="12" fill="#e03127" text-anchor="middle">crash</text>
     <text x="620" y="122" font-family="Space Grotesk, sans-serif" font-size="12" fill="var(--dim-2)" text-anchor="middle">slow recovery</text>
     <text x="700" y="150" font-family="Space Grotesk, sans-serif" font-size="11" fill="var(--dim-2)" text-anchor="end">symptom load →</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 226" role="img" aria-label="Timeline showing exertion on day zero, feeling fine that evening, a crash 24 to 48 hours later, and a slow multi-day recovery.">
+    <text x="20" y="18" font-family="Space Grotesk, sans-serif" font-size="11" fill="var(--dim-2)">↑ symptom load</text>
+    <polyline points="45,114 123,105 211,58 305,142" fill="none" stroke="var(--dim-2)" stroke-width="1.5" stroke-dasharray="4 4"/>
+    <polyline points="45,142 89,142 123,140 167,114 211,54 256,77 305,132 339,142" fill="none" stroke="#e03127" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="45" cy="142" r="6" fill="var(--accent)"/>
+    <text x="20" y="128" font-family="Space Grotesk, sans-serif" font-size="11.5" fill="var(--dim-2)">exertion</text>
+    <circle cx="123" cy="140" r="6" fill="#54d98a"/>
+    <text x="123" y="126" font-family="Space Grotesk, sans-serif" font-size="11.5" fill="#54d98a" text-anchor="middle">"I feel fine"</text>
+    <circle cx="211" cy="54" r="7" fill="#e03127"/>
+    <text x="211" y="40" font-family="Space Grotesk, sans-serif" font-size="11.5" fill="#e03127" text-anchor="middle">crash</text>
+    <text x="330" y="112" font-family="Space Grotesk, sans-serif" font-size="11.5" fill="var(--dim-2)" text-anchor="end">slow recovery</text>
+    <line x1="20" y1="160" x2="344" y2="160" stroke="var(--line)" stroke-width="2"/>
+    <g font-family="Space Mono, monospace" font-size="10.5" fill="var(--dim-2)">
+      <text x="20" y="180">Day 0</text>
+      <text x="123" y="180" text-anchor="middle">Day 0 eve</text>
+      <text x="211" y="180" text-anchor="middle">+24-48 h</text>
+      <text x="344" y="180" text-anchor="end">Days later</text>
+    </g>
   </svg>
   <figcaption>The signature of PEM: effort on day 0, a deceptive "I feel fine" window, then a delayed crash a day or two later that recedes only slowly.</figcaption>
 </figure>

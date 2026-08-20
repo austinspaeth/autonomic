@@ -126,7 +126,7 @@ That gives the two extremes very different meanings:
 - **High pulse pressure (wide):** the systolic peak climbs while the diastolic trough sags, usually because the large arteries have stiffened and lost their cushion. Exercise, fever and anxiety widen it briefly; a persistently wide resting value is worth a clinician's attention.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 240" role="img" aria-label="A blood pressure reading of 116 over 74 broken into mean arterial pressure and pulse pressure on a vertical scale">
+  <svg class="fig-d" viewBox="0 0 720 240" role="img" aria-label="A blood pressure reading of 116 over 74 broken into mean arterial pressure and pulse pressure on a vertical scale">
     <line x1="120" y1="30" x2="120" y2="210" stroke="var(--line-2)" stroke-width="1.5" />
     <line x1="112" y1="50" x2="128" y2="50" stroke="var(--line-2)" stroke-width="1.5" />
     <line x1="112" y1="150" x2="128" y2="150" stroke="var(--line-2)" stroke-width="1.5" />
@@ -142,6 +142,26 @@ That gives the two extremes very different meanings:
     <text x="452" y="112" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="15">Mean arterial pressure</text>
     <text x="452" y="140" fill="var(--dim)" font-family="Space Mono, monospace" font-size="12">(116 + 2 × 74) / 3 ≈ 93 mmHg</text>
     <text x="452" y="160" fill="var(--dim)" font-family="-apple-system, sans-serif" font-size="12">sits near diastolic, not the midpoint</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 280" role="img" aria-label="A blood pressure reading of 116 over 74 broken into mean arterial pressure and pulse pressure on a vertical scale">
+    <line x1="66" y1="30" x2="66" y2="200" stroke="var(--line-2)" stroke-width="1.5" />
+    <line x1="58" y1="50" x2="74" y2="50" stroke="var(--line-2)" stroke-width="1.5" />
+    <line x1="58" y1="150" x2="74" y2="150" stroke="var(--line-2)" stroke-width="1.5" />
+    <text x="54" y="55" text-anchor="end" fill="#e03127" font-family="Space Mono, monospace" font-size="13" font-weight="700">116</text>
+    <text x="54" y="155" text-anchor="end" fill="#58c4f2" font-family="Space Mono, monospace" font-size="13" font-weight="700">74</text>
+    <text x="54" y="42" text-anchor="end" fill="var(--dim)" font-family="Space Mono, monospace" font-size="9">systolic</text>
+    <text x="54" y="168" text-anchor="end" fill="var(--dim)" font-family="Space Mono, monospace" font-size="9">diastolic</text>
+    <line x1="104" y1="50" x2="104" y2="150" stroke="#eab308" stroke-width="10" opacity="0.75" />
+    <text x="124" y="78" fill="#eab308" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="14">Pulse pressure</text>
+    <text x="124" y="96" fill="var(--dim)" font-family="Space Mono, monospace" font-size="11">116 − 74 = 42 mmHg</text>
+    <line x1="104" y1="122" x2="344" y2="122" stroke="#54d98a" stroke-width="2" stroke-dasharray="5 4" />
+    <circle cx="104" cy="122" r="5" fill="#54d98a" />
+    <text x="124" y="140" fill="#54d98a" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="14">Mean arterial pressure</text>
+    <text x="124" y="158" fill="var(--dim)" font-family="Space Mono, monospace" font-size="11">(116 + 2 × 74) / 3</text>
+    <text x="124" y="174" fill="var(--dim)" font-family="Space Mono, monospace" font-size="11">≈ 93 mmHg</text>
+    <text x="20" y="230" fill="var(--dim)" font-family="-apple-system, sans-serif" font-size="12">MAP sits near diastolic, not the</text>
+    <text x="20" y="250" fill="var(--dim)" font-family="-apple-system, sans-serif" font-size="12">midpoint: the heart rests longer</text>
+    <text x="20" y="270" fill="var(--dim)" font-family="-apple-system, sans-serif" font-size="12">than it contracts.</text>
   </svg>
   <figcaption>From one reading: pulse pressure is the height of the bar (the push), while MAP is the weighted average, pulled down toward diastolic because the heart rests longer than it contracts.</figcaption>
 </figure>

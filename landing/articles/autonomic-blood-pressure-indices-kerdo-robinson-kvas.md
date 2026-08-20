@@ -157,7 +157,7 @@ A blood-pressure cuff and a pulse are humble tools. But feed those three numbers
 ## The four indices, one reading
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 260" role="img" aria-label="Diagram showing systolic, diastolic and pulse feeding into four derived indices: Kerdo, Robinson, Kvas and BCE">
+  <svg class="fig-d" viewBox="0 0 720 260" role="img" aria-label="Diagram showing systolic, diastolic and pulse feeding into four derived indices: Kerdo, Robinson, Kvas and BCE">
     <rect x="40" y="96" width="150" height="72" rx="12" fill="none" stroke="#e03127" stroke-width="2" />
     <text x="115" y="124" text-anchor="middle" fill="var(--text)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="14">Systolic</text>
     <text x="115" y="144" text-anchor="middle" fill="var(--text)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="14">Diastolic · Pulse</text>
@@ -177,6 +177,27 @@ A blood-pressure cuff and a pulse are humble tools. But feed those three numbers
     <rect x="300" y="206" width="380" height="40" rx="9" fill="none" stroke="#eab308" stroke-width="1.5" />
     <text x="314" y="231" fill="#eab308" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13">BCE</text>
     <text x="392" y="231" fill="var(--dim)" font-family="Space Mono, monospace" font-size="11">circulation efficiency</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 322" role="img" aria-label="Diagram showing systolic, diastolic and pulse feeding into four derived indices: Kerdo, Robinson, Kvas and BCE">
+    <rect x="60" y="6" width="240" height="56" rx="12" fill="none" stroke="#e03127" stroke-width="2" />
+    <text x="180" y="30" text-anchor="middle" fill="var(--text)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="14">Systolic</text>
+    <text x="180" y="50" text-anchor="middle" fill="var(--text)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="14">Diastolic · Pulse</text>
+    <line x1="180" y1="62" x2="180" y2="78" stroke="var(--line-2)" stroke-width="1.5" />
+    <line x1="60" y1="78" x2="300" y2="78" stroke="var(--line-2)" stroke-width="1.5" />
+    <line x1="60" y1="78" x2="60" y2="84" stroke="var(--line-2)" stroke-width="1.5" />
+    <line x1="300" y1="78" x2="300" y2="84" stroke="var(--line-2)" stroke-width="1.5" />
+    <rect x="10" y="84" width="340" height="48" rx="9" fill="none" stroke="#a78bfa" stroke-width="1.5" />
+    <text x="24" y="106" fill="#a78bfa" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="14">Kérdő</text>
+    <text x="24" y="124" fill="var(--dim)" font-family="Space Mono, monospace" font-size="11.5">autonomic balance</text>
+    <rect x="10" y="144" width="340" height="48" rx="9" fill="none" stroke="#58c4f2" stroke-width="1.5" />
+    <text x="24" y="166" fill="#58c4f2" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="14">Robinson</text>
+    <text x="24" y="184" fill="var(--dim)" font-family="Space Mono, monospace" font-size="11.5">cardiac workload</text>
+    <rect x="10" y="204" width="340" height="48" rx="9" fill="none" stroke="#22c55e" stroke-width="1.5" />
+    <text x="24" y="226" fill="#22c55e" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="14">Kvas</text>
+    <text x="24" y="244" fill="var(--dim)" font-family="Space Mono, monospace" font-size="11.5">circulatory efficiency</text>
+    <rect x="10" y="264" width="340" height="48" rx="9" fill="none" stroke="#eab308" stroke-width="1.5" />
+    <text x="24" y="286" fill="#eab308" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="14">BCE</text>
+    <text x="24" y="304" fill="var(--dim)" font-family="Space Mono, monospace" font-size="11.5">circulation efficiency</text>
   </svg>
   <figcaption>Three measured numbers, four derived readouts. Each index reweights systolic, diastolic and pulse to expose a different facet of how your cardiovascular system is running.</figcaption>
 </figure>

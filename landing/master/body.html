@@ -1,0 +1,916 @@
+<!-- body.html — the master dashboard's markup.
+
+     Kept as plain HTML, not Svelte: the dashboard is a framework-free app that
+     talks to the DOM by id from its own scripts, and the route around it
+     (src/routes/master/+page.svelte) only inlines this file, its stylesheet and
+     its scripts into one prerendered document. There is no <html>, <head> or
+     <script> here — the route owns all three. -->
+<!-- The brand mark, defined once and used twice below. It is inline rather than
+     an <img> pointing at logo.svg because this page is assembled at build time
+     into a single self-contained document (see +page.svelte) — nothing it
+     renders should depend on a second request resolving. -->
+<svg width="0" height="0" aria-hidden="true" style="position:absolute">
+  <symbol id="masterLogo" viewBox="0 0 651.59 348.34"><path fill="#fff" d="M293.47,286.32c-4.46,4.22-10.3,6.66-16.35,5.93-3.48-.42-7.26-1.31-9.97-3.53-6.53-5.36-9.98-11.85-12.82-19.66l-6-16.52c-.7-1.92-2.25-5.38-4.84-4.46-1.75.62-3.73,3.12-4.77,4.6l-5.63,7.99-8.79,11.7c-6.3,8.39-19.54,18.71-29.89,17.9l-6.48-.51c-4.3-.34-8.27-3.21-11.33-5.88-4.21-3.67-6.39-7.98-8.81-12.83l-4.65-9.3c-1.86-.98-4.91-.41-6.58.79l-11.95,8.61c-11.19,8.06-20.99,12.9-35,14.63l-6.23.77-5.72.73-50.4-.09-15.68-.47-20.32-.53c-2.75-.07-5.85-.24-8.17-1.27-3.37-1.5-3.85-5.08-2.13-7.9,1.21-2,3.01-3.46,5.6-3.46h13.32s4.57.6,4.57.6l55.95-.21,14.35-1.23c5.96-.51,11.84-1.12,17.4-2.99l4.92-1.65c11.1-3.73,24.06-16.18,34.12-21.26,9.88-4.99,20.87-2.07,25.91,6.9l2.34,4.16,5.51,10.59c2.24,4.3,7.95,4.99,12.13,2.7,3.35-1.83,6.32-3.88,8.78-6.75l5.99-7.01,3.95-5.09,12.8-19.17,2.97-3.97,6.79-6.82,4.56-2.18c5.89-.5,8.8-.13,13.21,3.5,8.2,6.75,12.49,25.08,15.25,36.25,1.65,6.66,5.03,14.66,10.94,11.97,4.15-1.89,7.02-5.33,9.62-8.93,1.04-1.44,1.98-2.59,1.72-4.52l-.97-7.06-.52-20.66-.02-15.07.34-20.7.7-10.1.48-14.85,1.01-13.58.93-13.45.44-7.08.81-6.52.48-7.94.46-5.02,1.1-9.46.87-6.06.5-5.32.99-6.07.98-6,.91-6.06,1.12-7.9.99-5.45.97-4.47,1.6-7.2,3.86-15.93,4.45-13.28c2.78-8.29,7.98-18.87,15.74-22.18,6.82-2.91,13.44.51,17.2,6.76,4.18,6.95,5.75,14.56,6.84,22.61l.74,5.46.96,7.09c.33,2.47.93,4.86.7,7.51l.78,6.13.09,40.23c-1.6,3.22-.27,6.95-1.11,10.94-.38,1.81-.51,3.32-.69,5.19l-.67,7.02-.86,8.01c-1.34,12.47-4.03,24.36-6.98,36.41l-1.99,8.13-8.3,28.62-1.62,5-2.25,6.61-5.84,16.21c-3.42,9.48-7.34,18.46-12.08,27.49,1.16,4.87.89,9.58,1.39,14.43l.89,8.58,1.25,10.11c.76,6.11,2.72,11.62,5.35,17.09.35.73,2.22,1.51,2.97,1.36,3.63-.71,9.23-17.56,11.32-24.06l6.22-19.27,5.97-17.98,5.54-14.95,4.3-10.81,4.55-9.88,6.71-11.28c3.05-5.13,7.8-8.51,13.27-11.33,3.31-1.71,7.88-2.26,11.65-1.7,6.23.92,10.87,4.71,14.24,9.71,2.36,3.5,4.65,6.91,6.17,10.81l1.94,4.98,1.81,4.64,8.79,23.3c1.77,4.69,4.09,8.59,6.75,12.81,6.76,10.74,17.04,17.91,29.79,19.74l5.84,1.14,8.4.27,12.02.02,20.52-.19,8.8-.86,27.18-.12,3.03-.55,65.39.02,4.04.57,21.32.18c2.42.02,5.42,1.81,6.8,3.64.71.94.79,3.86.16,4.87-.89,1.42-2.77,2.9-4.38,3.69l-74.53.21-11.11.57-15.21.37-3.97.38-6.05.28-10.98.54-14.54.9-16.98,1.06-18.39.04-7.07-.76-5.76-.69c-9.49-1.13-18.19-4.82-25.74-11.03-3.25-2.67-6.83-5.62-9.1-9.07l-7.4-11.25-2.05-3.94-7.48-17.02c-3.37-7.65-7.91-26.07-15.83-26.17-8.6-.11-17.85,28.2-21.04,38.31l-5.52,17.47-10.52,33.47c-3.48,11.07-7.3,21.61-12.57,31.87l-3.44,6.07c-2.12,3.74-5.09,6.55-8.54,9-12.68,8.97-23.82-10.25-28.29-22.86-4.12-11.94-7.02-23.82-9.05-36.26l-.73-1.19c-.17-.27-.83.21-1.44.6ZM315.85,206.67l5.3-15.42,4.79-15.32,4.93-15.94,5.86-22.99,1.07-4.89.88-4.51,1.19-6.4.94-5.06.92-5.14,1.02-5.96.88-6.57.79-9.5.5-5.52.09-13-.13-17.49-.75-8.93-.97-7.5-.95-5.55-1.04-4.78-2.48-9.47c-2.84,5.64-4.55,11.49-5.89,17.67l-2.03,9.33-.94,5.18-.92,5.57-.75,5.04-1.01,7.97-1.26,11.96-.87,6.1-.44,6.26-.78,7.19-.65,4.65-.54,9.73c-.13,2.28-.51,4.25-.72,6.6l-.69,7.5-.79,12.97-1.04,13.05-.77,10.45-.9,12.05-1.03,14.41-.39,6.09-.44,10.18Z"/></symbol>
+</svg>
+
+
+<!-- Sign-in gate. Rendered on top of everything until Cognito hands back a
+     session; `body.gated` hides the dashboard behind it so no numbers can be
+     read from a screenshot of the login screen. -->
+<div class="gate" id="gate">
+  <div class="gate-card">
+    <svg class="gate-logo" viewBox="0 0 651.59 348.34" aria-hidden="true"><use href="#masterLogo"/></svg>
+    <h1 class="gate-title">Autonomic</h1>
+
+    <div class="gate-error" id="gateError" role="alert"></div>
+
+    <div id="gateEmailStep">
+      <label class="gate-label" for="gateEmail">Email address</label>
+      <input class="gate-input" id="gateEmail" type="email" inputmode="email"
+             autocomplete="email" spellcheck="false" placeholder="you@example.com">
+      <button class="gate-btn" id="gateSubmit">Continue</button>
+      <p class="gate-note">We'll email you a four-digit sign-in code.</p>
+    </div>
+
+    <div id="gateCodeStep" class="hidden">
+      <p class="gate-sent">Code sent to <strong id="gateSentTo"></strong></p>
+      <div class="gate-code" id="gateCodeRow">
+        <input type="text" inputmode="numeric" maxlength="1" autocomplete="one-time-code" aria-label="Digit 1">
+        <input type="text" inputmode="numeric" maxlength="1" aria-label="Digit 2">
+        <input type="text" inputmode="numeric" maxlength="1" aria-label="Digit 3">
+        <input type="text" inputmode="numeric" maxlength="1" aria-label="Digit 4">
+      </div>
+      <!-- The email is sent by DiscoveryMark's Cognito trigger, so it carries
+           DiscoveryMark branding and a magic link that will not sign you in
+           here. Say so plainly rather than let the link look broken. -->
+      <p class="gate-note">
+        The email comes from DiscoveryMark and includes a sign-in link —
+        ignore the link and enter the code above.
+      </p>
+      <div class="gate-links">
+        <button class="gate-link" id="gateResend">Resend code</button>
+        <button class="gate-link" id="gateBack">Use a different email</button>
+      </div>
+    </div>
+
+    <div class="gate-spinner" aria-hidden="true"></div>
+  </div>
+</div>
+
+<div class="app">
+
+  <header class="topbar">
+    <h1><svg class="logomark" viewBox="0 0 651.59 348.34" aria-hidden="true"><use href="#masterLogo"/></svg>Autonomic</h1>
+    <span class="spacer"></span>
+
+    <div class="split-btn" id="exportBtn">
+      <button class="btn" id="exportMain" title="Copy a data prompt to the clipboard">Export data</button>
+      <button class="btn split-caret" id="exportToggle" aria-expanded="false" aria-haspopup="true"
+              title="Choose how much to export"><span id="exportScopeLabel">1 day</span><span class="caret"></span></button>
+      <div class="popover hidden" id="exportPop">
+        <div class="pop-label">How much to export</div>
+        <div class="stepper">
+          <button class="btn sm" data-step="-1" aria-label="Fewer">−</button>
+          <input type="number" id="exportN" min="1" max="999" step="1" value="1" aria-label="Amount">
+          <button class="btn sm" data-step="1" aria-label="More">+</button>
+        </div>
+        <div class="segmented" id="exportUnit">
+          <button data-v="days" aria-pressed="true">Days</button>
+          <button data-v="weeks" aria-pressed="false">Weeks</button>
+          <button data-v="months" aria-pressed="false">Months</button>
+          <button data-v="years" aria-pressed="false">Years</button>
+        </div>
+        <p class="note" id="exportRange"></p>
+      </div>
+    </div>
+
+    <!-- Every view has a data source that can go stale behind it — the store
+         entries, the ping counter, the release log — and the only way to see
+         the new numbers used to be a page reload, which also throws away the
+         sign-in round trip. This refetches whatever the current view reads. -->
+    <button class="btn icon-btn" id="btnRefresh" title="Refetch this view's data">
+      <svg class="refresh-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none"
+           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/>
+      </svg><span class="icon-btn-label">Refresh</span>
+    </button>
+
+    <!-- The page refetches itself every 10 minutes while it is on screen and
+         says so out loud when a visitor, a download or a sale arrives. This is
+         the only way to make it stop. -->
+    <button class="btn icon-btn" id="btnAlerts" data-muted="false" aria-pressed="true"
+            title="Alert sounds are on">
+      <svg class="bell-icon on" viewBox="0 0 24 24" aria-hidden="true" fill="none"
+           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>
+      </svg>
+      <svg class="bell-icon off" viewBox="0 0 24 24" aria-hidden="true" fill="none"
+           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>
+        <path d="M3 3l18 18"/>
+      </svg><span class="icon-btn-label">Alerts</span>
+    </button>
+
+    <button class="btn primary" id="btnEditData">Edit data</button>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab" role="tab" data-view="overview" aria-selected="true">Overview</button>
+    <button class="tab" role="tab" data-view="ping" aria-selected="false">App usage</button>
+    <button class="tab" role="tab" data-view="timeline" aria-selected="false">Timeline</button>
+    <button class="tab" role="tab" data-view="sales" aria-selected="false">Sales</button>
+    <button class="tab" role="tab" data-view="costs" aria-selected="false">Costs</button>
+    <button class="tab" role="tab" data-view="trial" aria-selected="false">Trial &amp; conversion</button>
+    <button class="tab" role="tab" data-view="cohorts" aria-selected="false">Cohorts</button>
+    <button class="tab" role="tab" data-view="platforms" aria-selected="false">iOS vs Android</button>
+    <button class="tab" role="tab" data-view="forecast" aria-selected="false">Forecast</button>
+  </nav>
+
+  <!-- one filter row above everything it scopes -->
+  <div class="filterbar" id="filterbar">
+    <div class="filtergroup" id="fgRange">
+      <label for="fRange">Range</label>
+      <select id="fRange">
+        <option value="7">Last 7 days</option>
+        <option value="14">Last 14 days</option>
+        <option value="30" selected>Last 30 days</option>
+        <option value="90">Last 90 days</option>
+        <option value="180">Last 180 days</option>
+        <option value="365">Last 365 days</option>
+        <option value="all">All time</option>
+        <option value="custom">Custom…</option>
+      </select>
+      <span id="customRange" class="hidden filtergroup">
+        <input type="date" id="fFrom"> <span class="note">to</span> <input type="date" id="fTo">
+      </span>
+    </div>
+
+    <div class="filtergroup" id="fgPlatform">
+      <label>Platform</label>
+      <div class="segmented" id="fPlatform">
+        <button data-v="combined" aria-pressed="true">Combined</button>
+        <button data-v="ios" aria-pressed="false">iOS</button>
+        <button data-v="android" aria-pressed="false">Android</button>
+        <button data-v="compare" aria-pressed="false">Compare</button>
+      </div>
+    </div>
+
+    <div class="filtergroup" id="fgGrain">
+      <label>Grain</label>
+      <div class="segmented" id="fGrain">
+        <button data-v="day" aria-pressed="true">Day</button>
+        <button data-v="week" aria-pressed="false">Week</button>
+        <button data-v="month" aria-pressed="false">Month</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="emptyState" class="empty hidden">
+    Nothing to chart yet.<br><br>
+    <button class="btn primary" id="goData">Add your first day</button>
+    <button class="btn" id="goDemo">Load demo data</button>
+  </div>
+
+  <!-- The shape of a view whose data has not arrived. Built per view by
+       `skeletonHTML` in app.js and, with the store cached in localStorage,
+       seen almost only on a browser signing in for the first time. -->
+  <div id="skeleton" class="skel hidden" aria-hidden="true"></div>
+
+  <!-- ================= OVERVIEW ================= -->
+  <section id="view-overview" class="view">
+    <div class="grid cards" id="ovTiles"></div>
+
+    <!-- Money gets its own strip rather than two tiles bolted onto the end of
+         the funnel row. Revenue on its own is not a result: what the Overview
+         has to be able to answer, without a trip to the Costs view, is whether
+         the month made or lost money. Everything here is both stores combined,
+         because a hosting bill belongs to neither. -->
+    <div class="section-head" id="ovMoneyHead" style="margin: 2px 0 10px">
+      <h2 class="section-title">Money</h2>
+      <span class="section-note">Both stores combined, whatever the filter says</span>
+    </div>
+    <div class="grid cards" id="ovMoney"></div>
+
+    <div class="card" style="margin-bottom:14px">
+      <header>
+        <h2 id="ovChartTitle">Downloads over time</h2>
+        <span class="spacer"></span>
+        <div class="segmented" id="ovMode">
+          <button data-v="daily" aria-pressed="true">Per period</button>
+          <button data-v="cumulative" aria-pressed="false">Cumulative</button>
+        </div>
+        <button class="btn sm" data-table-toggle="ovChart">Table</button>
+      </header>
+      <p class="hint" id="ovChartHint"></p>
+      <div id="ovChart"></div>
+      <div id="ovChart-table" class="hidden" style="margin-top:12px"></div>
+    </div>
+
+    <div class="card" style="margin-bottom:14px">
+      <header><h2>By day of week</h2><span class="spacer"></span>
+        <div class="segmented" id="dowMetric">
+          <button data-v="downloads" aria-pressed="true">Downloads</button>
+          <button data-v="sales" aria-pressed="false">Paid</button>
+          <button data-v="pageViews" aria-pressed="false">Page views</button>
+          <button data-v="impressions" aria-pressed="false">Impressions</button>
+          <button data-v="revenue" aria-pressed="false">Revenue</button>
+        </div>
+        <button class="btn sm" data-table-toggle="ovDow">Table</button>
+      </header>
+      <p class="hint">Average per weekday across the selected range, with a tick marking the most recent occurrence of that day — so you can see at a glance whether last Monday beat a normal Monday.</p>
+      <div id="ovDow"></div>
+      <div id="ovDow-table" class="hidden" style="margin-top:12px"></div>
+    </div>
+
+    <div class="grid two-col">
+      <div class="card">
+        <header><h2>Lifecycle mix</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="ovStack">Table</button></header>
+        <p class="hint">Everyone who has ever installed, split by where they are in the lifecycle at the end of each period. Green is still inside the free trial, gold is past it, red has hit the wall and lost historical charts.</p>
+        <div id="ovStack"></div>
+        <div id="ovStack-table" class="hidden" style="margin-top:12px"></div>
+      </div>
+      <div class="card">
+        <header><h2>Store reach</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="ovReach">Table</button></header>
+        <p class="hint">How many people saw the listing. Page views sit on the next card beside the installs they produced, and the impression → page view rate is a tile above.</p>
+        <div id="ovReach"></div>
+        <div id="ovReach-table" class="hidden" style="margin-top:12px"></div>
+      </div>
+      <div class="card">
+        <header><h2>Page views → installs</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="ovStore">Table</button></header>
+        <p class="hint">The last step of the store funnel. Impressions are on their own chart because they are an order of magnitude larger — two scales never share an axis here.</p>
+        <div id="ovStore"></div>
+        <div id="ovStore-table" class="hidden" style="margin-top:12px"></div>
+      </div>
+      <div class="card">
+        <header><h2>Paid conversions</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="ovSales">Table</button></header>
+        <p class="hint">Sales recorded per period. Hover a bar for the revenue that came with it — money and counts never share an axis.</p>
+        <div id="ovSales"></div>
+        <div id="ovSales-table" class="hidden" style="margin-top:12px"></div>
+      </div>
+      <div class="card">
+        <header><h2>Conversion rates</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="ovConv">Table</button></header>
+        <p class="hint">Both steps of the store funnel, derived per period: downloads ÷ product page views, and downloads ÷ impressions. Both are percentages, so they share one axis.</p>
+        <div id="ovConv"></div>
+        <div id="ovConv-table" class="hidden" style="margin-top:12px"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= TRIAL & CONVERSION ================= -->
+  <section id="view-trial" class="view hidden">
+    <div class="grid cards" id="trTiles"></div>
+
+    <div class="card" style="margin-bottom:14px">
+      <header><h2>Install → paid funnel</h2><span class="spacer"></span>
+        <span class="note" id="trFunnelScope"></span></header>
+      <p class="hint">A nested funnel: the last two cohort steps are the <em>same installs</em> from the downloads step, aged forward to the latest reporting day — so each step is a subset of the one above it and the drop-off is purely how much time has passed. Day 7 and day 14 are inclusive, so a cohort leaves the trial on day 8 and hits the wall on day 15.</p>
+      <div id="trFunnel"></div>
+    </div>
+
+    <div class="grid two-col">
+      <div class="card">
+        <header><h2>Pressure points passed per period</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="trPressure">Table</button></header>
+        <p class="hint">How many users passed each threshold in each period, against paid conversions recorded in the same period.</p>
+        <div id="trPressure"></div>
+        <div id="trPressure-table" class="hidden" style="margin-top:12px"></div>
+      </div>
+      <div class="card">
+        <header><h2>Conversion rate over time</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="trRate">Table</button></header>
+        <p class="hint">Cumulative paid conversions as a share of everyone who has passed each threshold, evaluated at the end of every period.</p>
+        <div id="trRate"></div>
+        <div id="trRate-table" class="hidden" style="margin-top:12px"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= COHORTS ================= -->
+  <section id="view-cohorts" class="view hidden">
+    <div class="grid cards" id="cohTiles"></div>
+    <div class="card" style="margin-bottom:14px">
+      <header><h2>Install cohorts</h2><span class="spacer"></span>
+        <div class="segmented" id="cohGrain">
+          <button data-v="day" aria-pressed="true">By day</button>
+          <button data-v="week" aria-pressed="false">By week</button>
+          <button data-v="month" aria-pressed="false">By month</button>
+        </div>
+        <button class="btn sm" id="cohExport">Export CSV</button>
+      </header>
+      <p class="hint">Each row is a group of installs. Age is measured from the cohort's start to the latest reporting day. Day 7 still counts as in-trial and day 14 still counts as inside the chart window — each cohort moves on the day after.</p>
+      <div id="cohTable"></div>
+    </div>
+    <div class="card">
+      <header><h2>Cohort maturity</h2><span class="spacer"></span>
+        <button class="btn sm" data-table-toggle="cohChart">Table</button></header>
+      <p class="hint">Cohort size by install period, shaded by the furthest threshold that cohort has reached as of the latest reporting day.</p>
+      <div id="cohChart"></div>
+      <div id="cohChart-table" class="hidden" style="margin-top:12px"></div>
+    </div>
+  </section>
+
+  <!-- ================= APP USAGE (cohort pings) =================
+       The only view fed by the app itself rather than by store CSVs. Its data
+       is fetched separately (action PINGS) and is read-only: nothing here is
+       editable and nothing here is pushed back by sync.js.
+
+       Every number on this screen comes from analytics.js. No arithmetic lives
+       in the render code, because the rules about what these counters may and
+       may not claim (see that file's header) have to hold everywhere at once. -->
+  <section id="view-ping" class="view hidden">
+    <div id="pgStatus"></div>
+
+    <!-- ---------- 1. the 30-second read ---------- -->
+    <div class="section-head">
+      <h2 class="section-title">Overview</h2>
+      <span class="section-note" id="pgAsOf"></span>
+    </div>
+    <!-- Two blocks, ONE row: the tiles are written in two passes but must flow
+         as a single wrapping row, or the first block's trailing gap sits above
+         a full block of tiles. `.tile-group` is display:contents. -->
+    <div class="grid cards">
+      <div class="tile-group" id="pgTiles"></div>
+      <div class="tile-group" id="pgTilesB"></div>
+    </div>
+
+    <!-- Why a filtered slice does not add up. Rendered only when a platform
+         filter is in force AND there are pings with no store marker, which is
+         the only case where it is true — and it belongs HERE, beside the
+         numbers it explains, rather than only in the platform card further
+         down where it used to live alone. -->
+    <div id="pgFilterNote"></div>
+
+    <!-- ---------- 2. growth vs. actual usage ---------- -->
+    <div class="card" style="margin-bottom:14px">
+      <header><h2>Growth &amp; usage</h2><span class="spacer"></span>
+        <div class="segmented" id="pgTlMode">
+          <button data-v="usage" aria-pressed="true">Usage</button>
+          <button data-v="acquisition" aria-pressed="false">Acquisition</button>
+          <button data-v="both" aria-pressed="false">Both</button>
+        </div>
+        <button class="btn sm" data-table-toggle="pgTimeline">Table</button></header>
+      <p class="hint">The question this answers is <b>question 9</b>: are we acquiring more people without building a larger returning userbase? <b>Returning</b> is the line to watch — first runs rise and fall with the store, but only returning activity means the product is holding anyone. Recorded events appear as flags along the top; hover one for what it was.</p>
+      <div id="pgTimeline"></div>
+      <div id="pgTimeline-table" class="hidden" style="margin-top:12px"></div>
+    </div>
+
+    <!-- ---------- 3. retention ---------- -->
+    <div class="grid two-col" style="margin-bottom:14px">
+      <div class="card">
+        <header><h2>Retention curve</h2><span class="spacer"></span>
+          <div class="segmented" id="pgCurveMode">
+            <button data-v="all" aria-pressed="true">All</button>
+            <button data-v="split" aria-pressed="false">Recent vs earlier</button>
+          </div>
+          <button class="btn sm" data-table-toggle="pgCurve">Table</button></header>
+        <p class="hint">Share of each cohort still opening the app N days after installing, pooled over every cohort old enough to have reached that day. The two dashed rules are the product's boundaries: the trial ends after <b>D7</b>, and the history wall starts at <b>D15</b>. A cohort too young for a day is left out of it entirely rather than counted as churned.</p>
+        <div id="pgCurve"></div>
+        <div id="pgCurve-table" class="hidden" style="margin-top:12px"></div>
+      </div>
+      <div class="card">
+        <header><h2>Crossing the boundaries</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="pgSurvival">Table</button></header>
+        <p class="hint">The lifecycle as a funnel, and the two transitions that straddle a product decision. Both sides of each transition are measured over the <em>same</em> installs — only cohorts old enough for the later day — so a change cannot be an artefact of a shifting denominator.</p>
+        <div id="pgSurvival"></div>
+        <div id="pgSurvival-table" class="hidden" style="margin-top:12px"></div>
+        <div id="pgTransitions"></div>
+      </div>
+    </div>
+
+    <!-- ---------- 4. cohort heatmap ---------- -->
+    <div class="card" style="margin-bottom:14px">
+      <header><h2>Cohort retention</h2><span class="spacer"></span>
+        <div class="segmented" id="pgHeatGrain">
+          <button data-v="week" aria-pressed="true">By week</button>
+          <button data-v="day" aria-pressed="false">By day</button>
+        </div>
+        <button class="btn sm" id="pgHeatExport">Export CSV</button></header>
+      <p class="hint">Rows are install cohorts, columns are milestones either side of each boundary. Colour is retention strength. A <span class="heat-key-immature">hatched</span> cell means that cohort has not lived that long yet — which is <em>not</em> the same as 0%, and is never averaged in. Cohorts under <b>10 installs</b> are flagged, because a percentage over six people is mostly noise. Click a row to inspect it below.</p>
+      <div id="pgHeat"></div>
+      <div id="pgCohortDetail"></div>
+    </div>
+
+    <!-- ---------- 5. who is actually here ---------- -->
+    <div class="grid two-col" style="margin-bottom:14px">
+      <div class="card">
+        <header><h2>Who is using it today</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="pgActiveCohort">Table</button></header>
+        <p class="hint">Today's active installs by how old they are. If this is dominated by the youngest bars, activity is being propped up by acquisition; a long tail means older installs are still showing up. Installs older than the counter are charted here too — their age came in with the ping, only their cohort size is unknown.</p>
+        <div id="pgActiveCohort"></div>
+        <div id="pgActiveCohort-table" class="hidden" style="margin-top:12px"></div>
+        <div id="pgOlderInstalls"></div>
+      </div>
+      <div class="card">
+        <header><h2>Purchase timing</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="pgPurchaseAge">Table</button></header>
+        <p class="hint">How old an install was when it subscribed. <b>D15</b> has its own column deliberately: if the history wall is what converts people, this is where it shows up.</p>
+        <div id="pgPurchaseAge"></div>
+        <div id="pgPurchaseAge-table" class="hidden" style="margin-top:12px"></div>
+        <!-- Every purchase, one row each. Below a dozen it is open by default:
+             a bucket chart of three purchases is three bars of height one, and
+             the list is the only place the store, the install date and a
+             possible double count are readable. -->
+        <div id="pgPurchaseRows"></div>
+        <div id="pgConversion"></div>
+      </div>
+    </div>
+
+    <!-- ---------- 5c. activation ----------
+         The counter's third route. Installing is not using: without a first
+         HRV reading there is no score, no trend and nothing to come back for,
+         so this is the funnel step between "downloaded" and "retained". -->
+    <div class="grid two-col" style="margin-bottom:14px">
+      <div class="card">
+        <header><h2>Activation</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="pgActivationAge">Table</button></header>
+        <p class="hint">How old an install was when it saved its <b>first HRV reading</b> — the moment the app starts working at all. Same buckets as purchase timing, so the two are read off one axis. A healthy onboarding puts nearly everything in <b>D0</b>; weight further right means people are leaving the wizard without a reading and coming back for it later. Activation fires once per install, so unlike the active counts these rows really do count people.</p>
+        <div id="pgActivationAge"></div>
+        <div id="pgActivationAge-table" class="hidden" style="margin-top:12px"></div>
+        <div id="pgActivationRates"></div>
+      </div>
+      <div class="card">
+        <header><h2>How the first reading is taken</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="pgMethods">Table</button></header>
+        <p class="hint">Which sensor the activating reading used. Apple Watch is offered on iPhone only, so its share is a share of iOS and not of everyone — the platform filter above is how to read it honestly. A camera-heavy split says people are activating on the option that needs no hardware, which activates more of them but produces the weakest signal.</p>
+        <div id="pgMethods"></div>
+        <div id="pgMethods-table" class="hidden" style="margin-top:12px"></div>
+        <div id="pgMethodNote"></div>
+      </div>
+    </div>
+
+    <!-- ---------- 5b. which store ---------- -->
+    <div class="card" style="margin-bottom:14px">
+      <header><h2>iOS vs Android, day by day</h2><span class="spacer"></span>
+        <button class="btn sm" data-table-toggle="pgPlatforms">Table</button></header>
+      <p class="hint">Active installs each day, split by the store the build runs on. This chart is <b>always unfiltered</b> — it is what the platform filter above is a slice of, so filtering it would leave nothing to compare. Pings from builds that shipped before the platform marker existed carry no store: they are real installs whose store we failed to record, so they are drawn as their own band rather than folded into either one. With a platform filter in force they are counted into <em>both</em> views, because putting them in neither is what made a filtered dashboard read as empty.</p>
+      <div id="pgPlatforms"></div>
+      <div id="pgPlatforms-table" class="hidden" style="margin-top:12px"></div>
+      <div id="pgPlatformNote"></div>
+    </div>
+
+    <!-- ---------- 6. weekday shape ---------- -->
+    <div class="card" style="margin-bottom:14px">
+      <header><h2>Weekday pattern</h2><span class="spacer"></span>
+        <button class="btn sm" data-table-toggle="pgWeekday">Table</button></header>
+      <p class="hint">Whether the midweek acquisition peak is real, and whether it is worth anything. Each weekday carries five bars as averages per weekday, so a day with five Mondays in range is not flattered by having more of them: store downloads, first runs, returning activity, and then the two that matter most — <b>purchases</b> from your own sales ledger and <b>subscribe pings</b> from the app itself. The last two count the same event at different moments (the app only notices a subscription on its next launch), so they should track rather than match, and a persistent gap between them is worth chasing. The table below asks the harder question: do installs born midweek actually <em>retain</em> better, or are they just more numerous?</p>
+      <div id="pgWeekday"></div>
+      <div id="pgWeekday-table" class="hidden" style="margin-top:12px"></div>
+      <div id="pgWeekdayRetention"></div>
+    </div>
+
+  </section>
+
+  <!-- ================= TIMELINE =================
+       What we changed, and what happened around it. Events live here; every
+       other calendar chart in the dashboard draws them as annotations from the
+       same store. Releases are not entered by hand — they are read from the
+       app's own release log (see landing/scripts/gen-releases.mjs). -->
+  <section id="view-timeline" class="view hidden">
+    <!-- What is actually live in each store, read from the stores themselves.
+         It sits above the release log because the question it answers is about
+         that log: did the version you cut actually reach people? -->
+    <div class="card" style="margin-bottom:14px">
+      <header><h2>Live in the stores</h2><span class="spacer"></span>
+        <span class="note" id="tlStoreAge"></span>
+        <button class="btn sm" id="tlStoreRefresh">Check now</button></header>
+      <p class="hint">What each store is serving right now, checked against the newest entry in the app's release log below. Apple publishes this as an API and it is exact. <b>Google publishes no equivalent</b>, so the Android row is read off the public listing page and can only ever be best-effort — when the page changes shape it says it could not read one rather than showing a number that might be a month old.</p>
+      <div id="tlStores"></div>
+    </div>
+
+    <div class="card" style="margin-bottom:14px">
+      <header><h2>What happened</h2><span class="spacer"></span>
+        <div class="segmented" id="tlMetric">
+          <button data-v="active" aria-pressed="true">Active</button>
+          <button data-v="returning" aria-pressed="false">Returning</button>
+          <button data-v="fresh" aria-pressed="false">First runs</button>
+          <button data-v="downloads" aria-pressed="false">Downloads</button>
+          <button data-v="pageViews" aria-pressed="false">Page views</button>
+          <button data-v="purchases" aria-pressed="false">Purchases</button>
+          <button data-v="revenue" aria-pressed="false">Revenue</button>
+          <button data-v="spend" aria-pressed="false">Spend</button>
+        </div>
+        <button class="btn sm" data-table-toggle="tlChart">Table</button></header>
+      <p class="hint">One metric against the record of what changed. Each vertical rule is something that happened, and its <b>pattern</b> says what kind: <b>dashed</b> is a release <span class="mark-key release"></span> (version and notes, read from the app's release log), <b>dotted</b> is marketing <span class="mark-key marketing"></span> (ad spots flag themselves from Edit data, at both ends), <b>dash-dot</b> is an App Store change <span class="mark-key store"></span>, <b>solid</b> is external <span class="mark-key external"></span>. The rules are deliberately neutral so they never blend into the bars; the colour sits in the flag at the top of each one. Hover anywhere along a rule for what it was, click it to compare the fortnight either side.</p>
+      <div id="tlChart"></div>
+      <div id="tlChart-table" class="hidden" style="margin-top:12px"></div>
+    </div>
+
+    <div class="card" style="margin-bottom:14px">
+      <header><h2>Releases</h2><span class="spacer"></span>
+        <span class="note">from the app's release log</span></header>
+      <p class="hint">Read from <code>mobile/src/lib/whatsNew.ts</code>, which the app itself shows on its "What's new" card, so the versions and dates cannot drift from what actually shipped. They are not editable here. Select one to compare the windows either side of it.</p>
+      <p class="hint" style="margin-top:-6px">Events are recorded under <b>Edit data → What happened</b>; click any flag on the chart above to compare the fortnight either side of it.</p>
+      <div id="tlReleases"></div>
+    </div>
+
+    <div id="pgEventAnalysis"></div>
+  </section>
+
+  <!-- ================= PLATFORMS ================= -->
+  <section id="view-platforms" class="view hidden">
+    <div class="card" style="margin-bottom:14px">
+      <header><h2>iOS vs Android</h2><span class="spacer"></span>
+        <span class="note">This view always compares platforms — the platform filter above does not apply here.</span></header>
+      <div class="table-scroll full" id="pfTable"></div>
+    </div>
+    <div class="grid two-col" id="pfCharts"></div>
+  </section>
+
+  <!-- ================= COSTS ================= -->
+  <!-- ================= SALES ================= -->
+  <section id="view-sales" class="view hidden">
+    <p class="hint" style="margin:0 0 12px">
+      Every purchase, one row each, with its plan and the buyer’s install date — the two
+      facts a daily sales total averages away. <b id="slScope"></b>
+    </p>
+    <div class="grid cards" id="slTiles"></div>
+
+    <div class="card" style="margin-top:14px">
+      <header><h2>Monthly recurring revenue</h2><span class="spacer"></span>
+        <button class="btn sm" data-table-toggle="slMrr">Table</button></header>
+      <p class="hint">The rate the book runs at on each day, stacked by plan — an annual plan counts as a twelfth of its price. A subscription is assumed to still run until you mark it cancelled under Edit data; nothing here is derived from the stores, because they tell this dashboard nothing about churn.</p>
+      <div id="slMrr"></div>
+      <div id="slMrr-table" class="hidden" style="margin-top:12px"></div>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <header><h2>Bookings vs recognised revenue</h2><span class="spacer"></span>
+        <button class="btn sm" data-table-toggle="slBookings">Table</button></header>
+      <p class="hint">Bookings is the cash that arrived that month. Recognised revenue spreads each purchase over the months it buys — an annual plan is one twelfth of its price in each of the twelve months after the sale. The gap between them is the annual book, and reading either one alone is how a month with one annual sale gets called a record or a collapse depending which number was on screen.</p>
+      <div id="slBookings"></div>
+      <div id="slBookings-table" class="hidden" style="margin-top:12px"></div>
+    </div>
+
+    <div class="grid two-col" style="margin-top:14px">
+      <div class="card">
+        <header><h2>Purchases by plan</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="slNew">Table</button></header>
+        <p class="hint">New purchases per period, grouped so the plans can be compared rather than summed.</p>
+        <div id="slNew"></div>
+        <div id="slNew-table" class="hidden" style="margin-top:12px"></div>
+      </div>
+      <div class="card">
+        <header><h2>How long people take to buy</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="slAges">Table</button></header>
+        <p class="hint">Days between installing and paying, per buyer. Drawn only from purchases that carry an install date — the coverage line below says what share of them that is.</p>
+        <div id="slAges"></div>
+        <div id="slAges-table" class="hidden" style="margin-top:12px"></div>
+        <div id="slAgeMeta"></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <header><h2>Which intake paid</h2><span class="spacer"></span>
+        <button class="btn sm" data-table-toggle="slCohortChart">Table</button></header>
+      <p class="hint">Purchases grouped by the month the buyer <b>installed</b>, not the month the money landed. A cohort younger than two months has not finished buying, so its row is marked rather than read as a bad one.</p>
+      <div id="slCohortChart"></div>
+      <div id="slCohortChart-table" class="hidden" style="margin-top:12px"></div>
+      <div id="slCohorts" style="margin-top:12px"></div>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <header><h2>Plan mix</h2></header>
+      <p class="hint">What sold in the selected range, and what is live now.</p>
+      <div id="slMix"></div>
+    </div>
+  </section>
+
+  <section id="view-costs" class="view hidden">
+
+    <!-- ---------- 1. the money ---------- -->
+    <div class="grid cards" id="csTiles"></div>
+
+    <!-- ---------- 2. spend against what it bought ---------- -->
+    <div class="card" style="margin:14px 0">
+      <header><h2>Spend against revenue</h2><span class="spacer"></span>
+        <button class="btn sm" data-table-toggle="csChart">Table</button></header>
+      <p class="hint">Every cost stacked by category, with net revenue — after the store's commission — as the line over the top. A cost lands on the day it is charged, so a yearly fee is one tall column rather than a smear; the range totals above are what to read for a period.</p>
+      <div id="csChart"></div>
+      <div id="csChart-table" class="hidden" style="margin-top:12px"></div>
+    </div>
+
+    <!-- ---------- 3. breakeven ---------- -->
+    <div class="card" style="margin-bottom:14px">
+      <header><h2>Cumulative: are we ahead yet?</h2><span class="spacer"></span>
+        <button class="btn sm" data-table-toggle="csCum">Table</button></header>
+      <p class="hint" id="csCumHint"></p>
+      <div id="csCum"></div>
+      <div id="csCum-table" class="hidden" style="margin-top:12px"></div>
+    </div>
+
+    <!-- ---------- 4. cost per acquisition ---------- -->
+    <div class="card" style="margin-bottom:14px">
+      <header><h2>Cost per acquisition</h2><span class="spacer"></span>
+        <button class="btn sm" data-table-toggle="csCpa">Table</button></header>
+      <p class="hint">Blended: marketing spend divided by everything the store reported, organic installs included. It is the honest ceiling on what acquisition costs — the per-spot numbers further down use each platform's own claimed installs, which are always kinder.</p>
+      <div id="csCpa"></div>
+      <div id="csCpa-table" class="hidden" style="margin-top:12px"></div>
+    </div>
+
+    <!-- ---------- 5. where it went ---------- -->
+    <div class="grid two-col" style="margin-bottom:14px">
+      <div class="card">
+        <header><h2>By category</h2></header>
+        <div class="table-scroll" id="csCategoryTable"></div>
+      </div>
+      <div class="card">
+        <header><h2>By platform</h2></header>
+        <p class="hint">Ad spots only, rolled up across every spot bought on the same platform.</p>
+        <div class="table-scroll" id="csChannelTable"></div>
+      </div>
+    </div>
+
+    <!-- ---------- 6. per ad spot ---------- -->
+    <div class="card">
+      <header><h2>By ad spot</h2><span class="spacer"></span>
+        <button class="btn sm" id="csGoEdit">Manage ad spots &amp; costs</button></header>
+      <p class="hint">Read-only, and scoped to the range above — a spot appears in the range its cost landed in, which is the day it started. Impressions and clicks are whatever the platform claims; they never match store downloads, and both are shown so the gap is visible. Ad spots and every other cost are entered under <b>Edit data</b>.</p>
+      <div class="table-scroll" id="csAdPerf"></div>
+    </div>
+  </section>
+
+  <!-- ================= FORECAST ================= -->
+  <section id="view-forecast" class="view hidden">
+    <div class="card" style="margin-bottom:14px">
+      <header><h2>Assumptions</h2><span class="spacer"></span>
+        <div class="segmented" id="fcHorizon">
+          <button data-v="6" aria-pressed="false">6 mo</button>
+          <button data-v="12" aria-pressed="true">12 mo</button>
+          <button data-v="24" aria-pressed="false">24 mo</button>
+          <button data-v="36" aria-pressed="false">36 mo</button>
+        </div>
+        <div class="segmented" id="fcModel">
+          <button data-v="mix" aria-pressed="true">Plan mix</button>
+          <button data-v="monthly" aria-pressed="false">All monthly</button>
+          <button data-v="annual" aria-pressed="false">All annual</button>
+          <button data-v="onetime" aria-pressed="false">One-time</button>
+        </div>
+        <button class="btn sm" id="fcReset">Reset to actuals</button>
+      </header>
+      <p class="hint">Every slider starts at the value derived from your own data — drag one and every number below re-computes live. The first <span id="fcLagNote">14</span> days of the forecast convert from installs you have <em>already</em> recorded, so the near term is grounded rather than projected.</p>
+      <div class="ctrl-grid" id="fcControls"></div>
+    </div>
+
+    <div class="grid cards" id="fcTiles"></div>
+
+    <div class="card" style="margin-bottom:14px">
+      <header><h2 id="fcMainTitle">Cumulative revenue</h2><span class="spacer"></span>
+        <span class="note" id="fcScope"></span>
+        <button class="btn sm" data-table-toggle="fcRevenue">Table</button></header>
+      <p class="hint">The shaded band is the bear-to-optimistic range; the line is the expected case. Scenarios scale conversion, install volume, churn and growth by the spread you set.</p>
+      <div id="fcRevenue"></div>
+      <div id="fcRevenue-table" class="hidden" style="margin-top:12px"></div>
+    </div>
+
+    <div class="grid two-col">
+      <div class="card">
+        <header><h2 id="fcMrrTitle">MRR</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="fcMrr">Table</button></header>
+        <p class="hint" id="fcMrrHint"></p>
+        <div id="fcMrr"></div>
+        <div id="fcMrr-table" class="hidden" style="margin-top:12px"></div>
+      </div>
+      <div class="card">
+        <header><h2>Paying users</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="fcPayers">Table</button></header>
+        <p class="hint" id="fcPayersHint">Everyone paying at the end of each month, after churn.</p>
+        <div id="fcPayers"></div>
+        <div id="fcPayers-table" class="hidden" style="margin-top:12px"></div>
+      </div>
+      <div class="card">
+        <header><h2>New installs per month</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="fcInstalls">Table</button></header>
+        <p class="hint">Expected case. The first and last months are partial.</p>
+        <div id="fcInstalls"></div>
+        <div id="fcInstalls-table" class="hidden" style="margin-top:12px"></div>
+      </div>
+      <div class="card">
+        <header><h2>New paying users per month</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="fcConv">Table</button></header>
+        <p class="hint">Conversions from users hitting the wall that month, expected case.</p>
+        <div id="fcConv"></div>
+        <div id="fcConv-table" class="hidden" style="margin-top:12px"></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <header><h2>Month by month</h2><span class="spacer"></span>
+        <button class="btn sm" id="fcExport">Copy forecast</button></header>
+      <p class="hint">Expected case, with the bear-to-optimistic range on revenue.</p>
+      <div id="fcTable"></div>
+    </div>
+  </section>
+
+  <!-- ================= DATA ================= -->
+  <section id="view-data" class="view hidden">
+
+    <div class="section-head">
+      <h2 class="section-title">Store data</h2>
+      <span class="section-note">Downloads, impressions and sales, as the stores report them</span>
+    </div>
+    <details class="card acc" open>
+      <summary><h2 id="entryTitle">Add / update a single day</h2></summary>
+      <p class="hint">Entries are keyed by date + platform, so re-entering a day overwrites it. Store reporting lags, so the date defaults to the latest day that can have data — never the current day. <b>Sales are not here any more</b>: a subscription's plan and the buyer's install date are properties of the purchase, not of the day, so they live in the Sales ledger below.</p>
+      <div class="form-grid">
+        <div class="field"><label for="eDate">Date</label><input type="date" id="eDate"></div>
+        <div class="field"><label for="ePlatform">Platform</label>
+          <select id="ePlatform"><option value="ios">iOS</option><option value="android">Android</option></select></div>
+        <div class="field"><label for="eDownloads">First-time downloads</label><input type="number" id="eDownloads" min="0" step="1" placeholder="0"></div>
+        <div class="field"><label for="eImpressions">Impressions</label><input type="number" id="eImpressions" min="0" step="1" placeholder="0"></div>
+        <div class="field"><label for="ePageViews">Product page views</label><input type="number" id="ePageViews" min="0" step="1" placeholder="0"></div>
+        <div class="field"><label for="eUpdates">Updates</label><input type="number" id="eUpdates" min="0" step="1" placeholder="0"></div>
+        <div class="field"><label for="eNotes">Note</label><input type="text" id="eNotes" placeholder="optional"></div>
+      </div>
+      <div class="row-actions">
+        <button class="btn primary" id="eSave">Save entry</button>
+        <button class="btn" id="eClear">Clear form</button>
+        <span class="note" id="eStatus"></span>
+      </div>
+    </details>
+
+    <details class="card acc">
+      <summary><h2>Bulk add / edit days</h2><span class="spacer"></span>
+        <span class="note" id="bulkCount"></span></summary>
+      <p class="hint">Build a grid for a stretch of days and fill it in one pass. Days you have already entered come back pre-filled, so this doubles as bulk editing. <b>Paste straight from a spreadsheet</b> — click the top-left cell you want to land on and paste; tab- or comma-separated blocks spill across and down. <kbd>Enter</kbd> / <kbd>↑</kbd> <kbd>↓</kbd> move down and up a column, <kbd>Tab</kbd> moves across. Rows that already hold data are marked <span class="dot-existing">•</span> and can be deleted outright with the button at the end of the row.</p>
+      <div class="form-grid" style="max-width:820px">
+        <div class="field"><label for="bFrom">From</label><input type="date" id="bFrom"></div>
+        <div class="field"><label for="bTo">To</label><input type="date" id="bTo"></div>
+        <div class="field"><label for="bPlatform">Platforms</label>
+          <select id="bPlatform">
+            <option value="both">Both — a row each</option>
+            <option value="ios">iOS only</option>
+            <option value="android">Android only</option>
+          </select></div>
+        <div class="field"><label>&nbsp;</label><button class="btn" id="bBuild">Build grid</button></div>
+      </div>
+      <div id="bulkGrid" style="margin-top:14px"></div>
+      <div class="row-actions">
+        <button class="btn primary" id="bSave">Save all rows</button>
+        <button class="btn" id="bFillDown">Fill down</button>
+        <button class="btn" id="bClearVals">Clear values</button>
+        <span class="note" id="bStatus"></span>
+      </div>
+    </details>
+
+    <div class="section-head" style="margin-top:22px">
+      <h2 class="section-title">Sales</h2>
+      <span class="section-note">Every purchase, its plan, and who bought it</span>
+    </div>
+
+    <details class="card acc" open>
+      <summary><h2>Add a purchase</h2><span class="spacer"></span>
+        <span class="note" id="slSaleCount"></span></summary>
+      <p class="hint">One row per purchase. The <b>plan</b> is what turns a price into recurring revenue — an annual plan at the same price is a twelfth of the MRR of a monthly one — and the <b>install date</b> is what lets the Sales view say how long people take to decide. Leave the install date blank if you cannot match the buyer; the purchase still counts everywhere except the days-to-purchase chart, which says what share of sales it is drawn from. Mark a subscription <b>cancelled</b> and it leaves MRR from that date; mark it <b>refunded</b> and it leaves every money figure entirely.</p>
+      <div id="slSaleForm"></div>
+    </details>
+
+    <details class="card acc">
+      <summary><h2>Paste a batch of purchases</h2></summary>
+      <p class="hint">One purchase per line, straight from a spreadsheet or a store export. Columns, tab- or comma-separated: <code>date, platform, plan, price, install date, cancelled, note</code> — everything after the price is optional. Platform reads anything containing &ldquo;and&rdquo;, &ldquo;goog&rdquo; or &ldquo;play&rdquo; as Android and everything else as iOS; plan reads &ldquo;annual&rdquo;/&ldquo;year&rdquo;/&ldquo;yr&rdquo; as annual, &ldquo;life&rdquo; as lifetime, and anything else as monthly. Paste a <b>header row</b> and the columns are read by name instead of by position, which is how the ledger's own <b>Export CSV</b> — it carries <code>qty</code> and <code>refunded</code> as well — comes back in unchanged. Nothing is written until you press Add.</p>
+      <textarea id="slPaste" rows="6" placeholder="2026-08-11&#9;ios&#9;annual&#9;29.99&#9;2026-07-02"></textarea>
+      <div class="row-actions">
+        <button class="btn primary" id="slPasteGo">Add these purchases</button>
+        <button class="btn" id="slPasteClear">Clear</button>
+        <span class="note" id="slPasteStatus"></span>
+      </div>
+    </details>
+
+    <details class="card acc">
+      <summary><h2>All purchases</h2><span class="spacer"></span>
+        <button class="btn sm" id="slExport">Export CSV</button></summary>
+      <p class="hint">The whole ledger, newest first — all time, not the dashboard's selected range. This is the list you manage sales from; the Sales tab is where you read them against a period.</p>
+      <div class="table-scroll" id="slSaleTable"></div>
+    </details>
+
+    <div class="section-head" style="margin-top:22px">
+      <h2 class="section-title">Spending</h2>
+      <span class="section-note">The ad spots you bought, and everything else the app costs to run</span>
+    </div>
+
+    <details class="card acc" open>
+      <summary><h2>Ad spots</h2><span class="spacer"></span>
+        <button class="btn sm" id="csAdAdd">New ad spot</button>
+        <button class="btn sm" id="csAdExport">Export CSV</button></summary>
+      <p class="hint">One line per thing you bought: what it was, the platform it ran on, what it cost, and the impressions and clicks it reported back. <b>The cost lands whole on the start date</b> — nothing is spread across the days it runs, because that is not how the money was spent. Leave the end date blank while a spot is still running and fill it in when it stops; both ends appear as flags on the Timeline, so a spike can be read against what was live. Every spot ever bought is listed, including ones that start in the future.</p>
+      <div id="csAdForm" class="hidden" style="margin-bottom:12px"></div>
+      <div class="table-scroll" id="csAdTable"></div>
+    </details>
+
+    <details class="card acc" open>
+      <summary><h2>Other costs</h2><span class="spacer"></span>
+        <button class="btn sm" id="csCostAdd">Add a cost</button>
+        <button class="btn sm" id="csExport">Export CSV</button>
+      </summary>
+      <p class="hint">Everything that is not an ad spot, newest first — developer programmes, hosting, tools, creative work, contract work, hardware. A recurring cost is entered once and charged on every occurrence, so a monthly bill needs one row rather than twelve. Advertising is not offered here: it is an ad spot, entered above, and entering it twice in two shapes would double it.</p>
+      <div id="csCostForm" class="hidden" style="margin-bottom:12px"></div>
+      <div class="table-scroll" id="csCostTable"></div>
+    </details>
+
+    <div class="section-head" style="margin-top:22px">
+      <h2 class="section-title">What happened</h2>
+      <span class="section-note">Store changes, press, anything else that might move the numbers</span>
+    </div>
+
+    <details class="card acc" open>
+      <summary><h2>Events</h2><span class="spacer"></span>
+        <button class="btn primary sm" id="pgEventAdd">+ Add event</button></summary>
+      <p class="hint">Recorded once here and drawn on every calendar chart in the dashboard, so a spike six months from now still says what you did that week. Releases and ad spots flag themselves and are not entered here. Read them on the <b>Timeline</b>, where clicking a flag compares the fortnight either side of it.</p>
+      <div id="pgEventForm" class="hidden"></div>
+      <div id="pgEventList"></div>
+    </details>
+
+
+    <div class="section-head" style="margin-top:22px">
+      <h2 class="section-title">Settings</h2>
+      <span class="section-note">How the app behaves, and what the stores keep</span>
+    </div>
+
+    <details class="card acc">
+      <summary><h2>Trial &amp; wall lengths</h2></summary>
+      <p class="hint">These describe how your app behaves, so they live here rather than in the filter bar — changing one re-derives every cohort metric here. Both limits are inclusive: with 7 and 14, a user is still in the trial on day 7 and still has full charts on day 14, leaving the trial on day 8 and hitting the wall on day 15.</p>
+      <div class="form-grid" style="max-width:560px">
+        <div class="field"><label for="fTrial">Free trial length (days)</label>
+          <input type="number" id="fTrial" min="1" max="60" step="1" value="7"></div>
+        <div class="field"><label for="fWall">Chart window (days)</label>
+          <input type="number" id="fWall" min="1" max="120" step="1" value="14"></div>
+      </div>
+    </details>
+
+    <details class="card acc">
+      <summary><h2>Store commission</h2></summary>
+      <p class="hint">Sales amounts are entered at the customer-facing price, which is not what reaches the bank. This is the cut Apple and Google keep — 15% on the small-business programmes, 30% once you leave them. It is used everywhere profit is: the Costs view nets revenue down by it before subtracting spend, and always shows the gross figure beside the net one.</p>
+      <div class="form-grid" style="max-width:560px">
+        <div class="field"><label for="fStoreCut">Commission (%)</label>
+          <input type="number" id="fStoreCut" min="0" max="100" step="0.5" value="15"></div>
+        <div class="field"><label for="fCurrency">Currency symbol</label>
+          <input type="text" id="fCurrency" maxlength="4" value="$"></div>
+      </div>
+    </details>
+
+    <!-- The dashboard installs as an app (it links its own manifest and
+         registers a worker under /master/), and an installed app can raise a
+         system notification for the same three things the corner cards
+         announce. What it cannot do is raise one while it is CLOSED: there is
+         no push server here, the counter is polled by the page itself, and a
+         service worker with no push subscription does not run on its own. The
+         copy says so rather than implying a pager. -->
+    <details class="card acc">
+      <summary><h2>Notifications</h2></summary>
+      <p class="hint">A system notification for the same arrivals the corner cards announce — a download, a sale. They fire only while the dashboard is open and you are looking at something else (another window, another tab, another app), which is the case a toast in the corner is worth nothing in. There is no push server behind this: with the dashboard closed, nothing is polling and nothing will arrive. On an iPhone or iPad this works only once the dashboard has been added to the home screen, from Safari's share menu.</p>
+      <div class="row-actions">
+        <button class="btn" id="ntEnable">Enable notifications</button>
+        <button class="btn" id="ntTest">Send a test</button>
+      </div>
+      <p class="note" id="ntStatus" style="margin-top:10px"></p>
+    </details>
+
+    <div class="section-head" style="margin-top:22px">
+      <h2 class="section-title">Backup &amp; account</h2>
+      <span class="section-note">Everything here leaves or ends the session</span>
+    </div>
+
+    <details class="card acc">
+      <summary><h2>Backup, import &amp; reset</h2></summary>
+      <p class="hint">CSV columns: <code>date,platform,downloads,impressions,pageViews,updates,notes</code>. Importing merges by date + platform, overwriting matches. A conversion-rate column is ignored — it is always derived from downloads ÷ impressions. <code>sales</code> and <code>revenue</code> columns are still read, and land in the Sales ledger as unclassified purchases rather than on the day. <b>The CSV out is store days only</b> — it carries no purchases, because a purchase is no longer a property of a day. Export the ledger from <b>Edit data → Sales</b>, or take the JSON backup, which carries everything.</p>
+      <div class="row-actions">
+        <button class="btn" id="ioExportCsv">Export CSV</button>
+        <button class="btn" id="ioExportJson">Export JSON backup</button>
+        <button class="btn" id="ioImport">Import CSV / JSON…</button>
+        <input type="file" id="ioFile" accept=".csv,.json,text/csv,application/json" class="hidden">
+        <button class="btn" id="ioDemo">Load demo data</button>
+        <button class="btn danger" id="ioReset">Delete all data</button>
+      </div>
+      <p class="note" id="ioStatus" style="margin-top:10px"></p>
+    </details>
+
+    <!-- Signing out lives here rather than in the header: the header is a row
+         of things you press many times a day, and this is one you press twice a
+         year. -->
+    <details class="card acc">
+      <summary><h2>Account</h2></summary>
+      <p class="hint">Signed in as <b id="whoami"></b>. Signing out clears this browser's session; the data stays on your account.</p>
+      <div class="row-actions">
+        <button class="btn" id="btnSignOut">Sign out</button>
+      </div>
+    </details>
+  </section>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- Live alerts (alerts.js): the confetti surface is only painted while
+     something is falling, and the stack is empty until there is news. Cards do
+     not expire — they are still there when you come back to the laptop — so the
+     stack scrolls and clears in one press. Both sit outside .app so the gate
+     hides them with everything else. -->
+<canvas id="confetti" aria-hidden="true"></canvas>
+<div class="alert-dock">
+  <button class="alert-clear hidden" id="alertClear">Clear all</button>
+  <div class="alert-stack" id="alertStack" aria-live="polite" aria-atomic="false"></div>
+</div>

@@ -10,16 +10,32 @@
     <meta name="application-name" content="Autonomic" />
     <meta name="apple-mobile-web-app-title" content="Autonomic" />
 
-    <!-- Google Analytics (GA4). Plain script in the shell so it runs on every
-         page regardless of SvelteKit's csr setting. Pageviews (incl. enhanced
-         measurement) fire automatically; custom events are dispatched via the
-         global gtag() below and from the homepage waitlist form. -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-3R3E75CLGQ"></script>
+    <!-- Google Analytics (GA4), opt-out. The script loads by default; the
+         cookie banner (bottom of <body>) lets visitors block it. Blocking
+         persists in localStorage, stops the script from loading on future
+         visits, disables the already-loaded tag for the current page, and
+         drops all gtag() calls. Plain script in the shell so it runs on every
+         page regardless of SvelteKit's csr setting; custom events are
+         dispatched via the global gtag() below and from the homepage waitlist
+         form. -->
     <script>
       window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-      gtag('config', 'G-3R3E75CLGQ');
+      function _ajBlocked() {
+        if (window.location.hostname === 'localhost') return true;
+        // /master is the private analytics dashboard, not a page of the site:
+        // noindex, one signed-in visitor, nothing to measure.
+        if (/^\/master(\/|$)/.test(window.location.pathname)) return true;
+        try { return localStorage.getItem('aj-cookie-consent') === 'blocked'; } catch (e) { return true; }
+      }
+      function gtag(){ if (!_ajBlocked()) dataLayer.push(arguments); }
+      if (!_ajBlocked()) {
+        var s = document.createElement('script');
+        s.async = true;
+        s.src = 'https://www.googletagmanager.com/gtag/js?id=G-3R3E75CLGQ';
+        document.head.appendChild(s);
+        gtag('js', new Date());
+        gtag('config', 'G-3R3E75CLGQ');
+      }
     </script>
 
     <!-- Site-wide social/brand defaults. Per-page <svelte:head> sets og:title,
@@ -30,9 +46,11 @@
     <meta name="publisher" content="Autonomic" />
 
     %sveltekit.head%
-    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
-    <link rel="icon" type="image/png" sizes="512x512" href="/favicon-512.png" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="shortcut icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
     <link rel="alternate" type="application/rss+xml" title="The Autonomic Blog" href="/rss.xml" />
 
     <!-- Site-wide Organization + WebSite structured data (constant across every
@@ -49,12 +67,12 @@
             "url": "https://autonomic.care/",
             "logo": {
               "@type": "ImageObject",
-              "url": "https://autonomic.care/favicon-512.png",
+              "url": "https://autonomic.care/web-app-manifest-512x512.png",
               "width": 512,
               "height": 512
             },
             "image": "https://autonomic.care/og.png",
-            "description": "A private, offline iOS journal that scores daily HRV, blood pressure, sleep and orthostatic readings against medical thresholds, for recovery from POTS, dysautonomia and post-viral illness.",
+            "description": "A private, offline iOS and Android journal that scores daily HRV, blood pressure, sleep and orthostatic readings against medical thresholds, for recovery from POTS, dysautonomia and post-viral illness.",
             "slogan": "See your nervous system recover."
           },
           {
@@ -72,7 +90,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@800&family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap"
       rel="stylesheet"
     />
     <script>
@@ -82,6 +100,105 @@
   <body>
     <div style="display: contents">%sveltekit.body%</div>
 
+    <!-- Fixed bottom dock. Everything that hovers over the page bottom lives
+         here, stacked upward in DOM order, so the pieces can never overlap
+         each other. The dock itself takes no pointer events (it spans the full
+         width and would otherwise eat taps on the page behind it); each child
+         turns them back on. On desktop the dock is `display: contents` and its
+         children position themselves, exactly as they did before it existed. -->
+    <div class="aj-dock" id="aj-dock">
+      <!-- Cookie-consent banner. Analytics is opt-out: GA loads by default (see
+           the loader in <head>); "Block cookies" persists the opt-out, disables
+           the already-loaded tag for this page, and stops it loading on future
+           visits. On mobile it starts collapsed as a pill (.aj-cb-pill) and
+           expands into the same card on tap. -->
+      <div id="aj-cookie-banner" class="aj-cb" role="dialog" aria-live="polite" aria-label="Cookie notice" hidden>
+        <div class="aj-cb-pill">
+          <button id="aj-cookie-open" class="aj-cb-open" type="button" aria-expanded="false" aria-controls="aj-cookie-card">
+            <svg class="aj-cb-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+              <path d="M21 12.8A9 9 0 1 1 11.2 3a4 4 0 0 0 4.4 4.6A4 4 0 0 0 20 12a4 4 0 0 0 1 .8Z" stroke-linejoin="round" />
+              <circle cx="9" cy="10" r="1" fill="currentColor" stroke="none" />
+              <circle cx="8.5" cy="15.5" r="1" fill="currentColor" stroke="none" />
+              <circle cx="14" cy="16" r="1" fill="currentColor" stroke="none" />
+            </svg>
+            <span>Cookie preferences</span>
+          </button>
+          <button id="aj-cookie-dismiss" class="aj-cb-x" type="button" aria-label="Dismiss cookie notice">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+        </div>
+        <div class="aj-cb-card" id="aj-cookie-card">
+          <p class="aj-cb-copy">We use Google Analytics cookies to see which pages help people. Block them and we won't track you at all. <a href="/privacy-policy/">Privacy Policy</a></p>
+          <div class="aj-cb-actions">
+            <button id="aj-cookie-block" class="aj-cb-btn" type="button">Block cookies</button>
+            <button id="aj-cookie-accept" class="aj-cb-btn aj-cb-btn--go" type="button">Accept</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sticky download CTA, mobile only, on topic hubs and articles (the
+           `aj-cta-topic` meta is what makes a page eligible): rises into the
+           dock partway down the page: the app's Outlook gauge on the left,
+           its dial sweeping up to the score as the bar lands, and the CTA on
+           the right.
+           data-dl-cta wires both the score and the button into the shared
+           platform-aware download handler (store URL, glyph, tracking), and
+           either tap retires the bar for the session. -->
+      <div class="aj-scta" id="aj-sticky-cta" hidden>
+        <!-- The score is a second, decorative handle on the same download
+             link (hidden from assistive tech so the bar reads as one CTA).
+             The gauge is the app's own 270° dial, same geometry as the
+             homepage mock's. -->
+        <a class="aj-scta-badge" data-dl-cta href="/#download" aria-hidden="true" tabindex="-1">
+          <span class="aj-scta-gauge">
+            <svg viewBox="0 0 176 176" aria-hidden="true">
+              <path d="M35.67 140.33 A74 74 0 1 1 140.33 140.33" fill="none" stroke="#2b3a2c" stroke-width="15" stroke-linecap="round" />
+              <path class="aj-scta-arc" pathLength="100" d="M35.67 140.33 A74 74 0 1 1 152.6 118.3" fill="none" stroke="#6ee06e" stroke-width="15" stroke-linecap="round" />
+            </svg>
+            <span class="aj-scta-num">92</span>
+          </span>
+          <span class="aj-scta-lbl"><span>Autonomic</span><span>Score</span></span>
+        </a>
+        <!-- No store glyph here: the gauge does the selling, and the button
+             just answers the question it plants ("92 out of 100... mine?"). -->
+        <a class="aj-scta-btn" data-dl-cta href="/#download" aria-label="Get your Autonomic score, free">Get your score</a>
+      </div>
+    </div>
+    <script>
+      (function () {
+        try {
+          // Nowhere that sets no cookies asks about them — this covers
+          // localhost and /master as well as an existing "blocked" choice.
+          if (_ajBlocked()) return;
+          if (localStorage.getItem('aj-cookie-consent')) return;
+          var banner = document.getElementById('aj-cookie-banner');
+          if (!banner) return;
+          banner.hidden = false;
+          var opener = document.getElementById('aj-cookie-open');
+          opener.addEventListener('click', function () {
+            var open = banner.classList.toggle('is-open');
+            opener.setAttribute('aria-expanded', open ? 'true' : 'false');
+          });
+          function choose(value) {
+            try { localStorage.setItem('aj-cookie-consent', value); } catch (e) {}
+            banner.hidden = true;
+            banner.classList.remove('is-open');
+            if (value === 'blocked') window['ga-disable-G-3R3E75CLGQ'] = true;
+            // Track accepts only — a "blocked" event would break the promise
+            // that blocking means no tracking at all. Dismissing the pill is
+            // neither: it leaves the opt-out default (GA on) in place without
+            // claiming the visitor actively agreed to anything.
+            else if (value === 'accepted' && typeof gtag === 'function') gtag('event', 'cookie_accept', { location: window.location.pathname });
+          }
+          document.getElementById('aj-cookie-accept').addEventListener('click', function () { choose('accepted'); });
+          document.getElementById('aj-cookie-block').addEventListener('click', function () { choose('blocked'); });
+          document.getElementById('aj-cookie-dismiss').addEventListener('click', function () { choose('dismissed'); });
+        } catch (e) { /* localStorage disabled: no banner shows and nothing is tracked */ }
+      })();
+    </script>
+
     <!-- Site interactivity. The site ships with no framework runtime (csr is
          off); this small guarded script wires the nav, FAQ, forms and copy
          button on every page. -->
@@ -90,6 +207,60 @@
         'use strict';
 
         function init() {
+          // Page context, resolved once from the DOM (not the path, which the
+          // blog serves under two shapes): an article page is anything that
+          // rendered .article-prose, and its slug comes from the canonical link.
+          var proseEl = document.querySelector('.article-prose');
+          var canonicalEl = document.querySelector('link[rel="canonical"]');
+          var pagePath = window.location.pathname;
+          var articleSlug = '';
+          if (proseEl) {
+            var canon = canonicalEl ? canonicalEl.getAttribute('href') || '' : '';
+            articleSlug = (canon || pagePath).replace(/[?#].*$/, '').replace(/\/$/, '').split('/').pop() || '';
+          }
+          var pageType = proseEl
+            ? 'blog_article'
+            : pagePath === '/' ? 'home'
+            : /^\/(insights|blog)\b/.test(pagePath) ? 'blog_hub'
+            : pagePath.replace(/^\/|\/$/g, '').replace(/\//g, '_') || 'other';
+
+          // Shared GA event helper: every custom event carries the page path,
+          // the kind of page, and (on an article) which article, so any event
+          // can be split by where it happened without parsing URLs in GA.
+          // gtag() is always defined (head loader) and no-ops when blocked.
+          function ajEvent(name, params) {
+            if (typeof gtag !== 'function') return;
+            var p = params || {};
+            p.location = pagePath;
+            p.page_type = pageType;
+            if (articleSlug) p.article = articleSlug;
+            gtag('event', name, p);
+          }
+
+          // Where on the page an element sits, for the `placement` param.
+          // Ordered most-specific first; falls back to the enclosing section.
+          function placementOf(el) {
+            if (!el || !el.closest) return 'unknown';
+            if (el.closest('#dlModal')) return 'download_modal';
+            if (el.closest('#aj-sticky-cta')) return 'sticky_cta';
+            if (el.closest('#nav')) return 'nav';
+            if (el.closest('.article-cta')) return 'blog_end_cta';
+            if (el.closest('.side-get')) return 'blog_sidebar';
+            if (el.closest('.insights-side')) return 'blog_sidebar';
+            if (el.closest('.article-prose')) return 'article_body';
+            if (el.closest('.article-related')) return 'article_related';
+            if (el.closest('footer')) return 'footer';
+            if (el.closest('.hero')) return 'hero';
+            var sec = el.closest('section[id], section[aria-label]');
+            if (sec) return sec.id || (sec.getAttribute('aria-label') || '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+            return 'page';
+          }
+
+          // Slug of an article an anchor points at (for card / list clicks).
+          function slugOf(href) {
+            return String(href || '').replace(/[?#].*$/, '').replace(/\/$/, '').split('/').pop() || '';
+          }
+
           var yr = document.getElementById('yr');
           if (yr) yr.textContent = String(new Date().getFullYear());
 
@@ -115,6 +286,480 @@
               });
             }
           }
+
+          // Platform-aware download CTA + dual-download modal.
+          // Store URLs carry the site's attribution tags (Apple pt+ct, Play
+          // referrer) — keep in sync with storeUrl() in src/lib/site.ts.
+          (function () {
+            var STORE = {
+              ios: 'https://apps.apple.com/app/apple-store/id6789786971?pt=126963570&ct=Landing&mt=8',
+              android:
+                'https://play.google.com/store/apps/details?id=com.autonomic.journal&referrer=utm_source%3Dautonomic.care%26utm_medium%3Dreferral%26utm_campaign%3Dlanding'
+            };
+            var GLYPH = {
+              ios: '<svg viewBox="0 0 384 512" fill="currentColor" aria-hidden="true"><path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5c0 26.2 4.8 53.3 14.4 81.2 12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zM262.1 104.5c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 20-27.8 44.7-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/></svg>',
+              // The Play Store mark, not the Android robot: the button opens
+              // Play, and the robot head only fills the top third of a 24-box,
+              // so it rendered as a flat sliver next to the label.
+              android: '<svg viewBox="0 0 512 512" fill="currentColor" aria-hidden="true"><path d="M325.3 234.3 104.6 13l280.8 161.2-60.1 60.1zM47 0C34 6.8 25.3 19.2 25.3 35.3v441.3c0 16.1 8.7 28.5 21.7 35.3l256.6-256L47 0zm425.2 225.6-58.9-34.1-65.7 64.5 65.7 64.5 60.1-34.1c18-14.3 18-46.5-1.2-60.8zM104.6 499l280.8-161.2-60.1-60.1L104.6 499z"/></svg>'
+            };
+
+            function detectPlatform() {
+              var ua = navigator.userAgent || '';
+              if (/android/i.test(ua)) return 'android';
+              // iPadOS 13+ reports as Mac; disambiguate by touch support.
+              if (/iphone|ipad|ipod/i.test(ua)) return 'ios';
+              if (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) return 'ios';
+              return null;
+            }
+
+            // Every download click fires TWO events: the store-specific one
+            // (unchanged, so existing reports keep working) and a single
+            // `download_click` carrying platform + placement, so total download
+            // intent can be read off one event and split by where it came from
+            // (blog end CTA, blog sidebar, nav, hero, modal, …).
+            // `plan` splits free-framed CTAs from Pro-framed ones — without it
+            // every button on the site reads as the same undifferentiated
+            // "download" and paid intent can't be measured at all.
+            function trackDownload(platform, el, placement) {
+              var place = placement || placementOf(el);
+              var plan = (el && el.getAttribute && el.getAttribute('data-dl-plan')) || 'unspecified';
+              ajEvent(platform === 'android' ? 'play_store_click' : 'app_store_click', { placement: place, plan: plan });
+              ajEvent('download_click', { platform: platform, placement: place, plan: plan });
+            }
+            window.ajTrackDownload = trackDownload;
+
+            var platform = detectPlatform();
+
+            // Modal open/close (desktop / unknown platform).
+            var modal = document.getElementById('dlModal');
+            var lastFocus = null;
+            function openModal(trigger) {
+              if (!modal) return;
+              ajEvent('download_modal_open', { placement: placementOf(trigger) });
+              lastFocus = document.activeElement;
+              modal.hidden = false;
+              document.body.style.overflow = 'hidden';
+              var x = modal.querySelector('.dlm-x');
+              if (x) x.focus();
+            }
+            function closeModal() {
+              if (!modal || modal.hidden) return;
+              modal.hidden = true;
+              document.body.style.overflow = '';
+              if (lastFocus && lastFocus.focus) lastFocus.focus();
+            }
+            if (modal) {
+              modal.querySelectorAll('[data-dl-close]').forEach(function (el) {
+                el.addEventListener('click', closeModal);
+              });
+              document.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape') closeModal();
+              });
+            }
+
+            // Every download CTA: on a phone, deep-link straight to its store
+            // with the platform glyph; otherwise open the modal.
+            document.querySelectorAll('[data-dl-cta]').forEach(function (el) {
+              if (platform) {
+                el.setAttribute('href', STORE[platform]);
+                var slot = el.querySelector('.btn-dl-ic');
+                if (slot) { slot.innerHTML = GLYPH[platform]; el.classList.add('has-ic'); }
+                el.addEventListener('click', function () { trackDownload(platform, el); });
+              } else {
+                el.addEventListener('click', function (e) {
+                  e.preventDefault();
+                  openModal(el);
+                });
+              }
+            });
+          })();
+
+          // Sticky blog CTA (mobile only). Topic hubs and articles render an
+          // `aj-cta-topic` meta; its presence is what makes the page eligible.
+          // The bar rises into the bottom dock at 5% of PAGE scroll (not the
+          // prose-relative depth behind the `article_scroll` events — the page
+          // includes the header, cover and footer, so this lands later in the
+          // reading than the number reads, which is why the number is this
+          // small) and stays for the rest of the visit, unless dismissed. The
+          // CSS owns the mobile breakpoint —
+          // mirrored here so nothing is revealed on desktop.
+          (function () {
+            var cta = document.getElementById('aj-sticky-cta');
+            var meta = document.querySelector('meta[name="aj-cta-topic"]');
+            if (!cta || !meta) return;
+            var topic = (meta.getAttribute('content') || '').trim();
+            // Dismissed once, gone for the rest of the session (a reader who
+            // said no shouldn't be asked again on the next article).
+            try { if (sessionStorage.getItem('aj-scta-off')) return; } catch (e) {}
+
+            var dock = document.getElementById('aj-dock');
+            var mq = window.matchMedia('(max-width: 720px)');
+            var shown = false, parked = false, ran = false;
+
+            // One place decides whether the bar is on screen, because two
+            // things now move it: the reveal (scrolled far enough) and parking
+            // (a real CTA section is on screen, see below). Both use the same
+            // class, so the slide-in transition is reused for both.
+            function applyDock() {
+              if (!dock) return;
+              var on = shown && !parked && !cta.hidden;
+              dock.classList.toggle('has-scta', on);
+              // The intro animation waits for the bar to actually be visible —
+              // running it behind a parked bar would spend it on nobody.
+              if (on && !ran) {
+                ran = true;
+                if (variant) variant.run(); else countUp();
+              }
+            }
+
+            // The score rolls up to its value as the bar lands, over the same
+            // 2s the dial takes to sweep (see .aj-scta-arc in app.css) — it
+            // skips numbers, the point is the growth, not the tally. The markup
+            // carries the final value, so nothing here can leave it wrong:
+            // reduced motion (and any throw) simply keeps what's rendered.
+            function countUp() {
+              var el = cta.querySelector('.aj-scta-num');
+              if (!el || still()) return;
+              var end = parseInt(el.textContent, 10);
+              if (!end) return;
+              var t0 = 0;
+              var step = function (now) {
+                if (!t0) t0 = now;
+                var p = Math.min(1, (now - t0) / 2000);
+                var eased = 1 - Math.pow(1 - p, 3);
+                el.textContent = String(Math.round(end * eased));
+                if (p < 1) requestAnimationFrame(step);
+                else el.textContent = String(end);
+              };
+              el.textContent = '0';
+              requestAnimationFrame(step);
+            }
+
+            // ---- Topic variants -------------------------------------------
+            // The default bar sells the Autonomic score, which is the right
+            // pitch almost everywhere. Five topics don't want a score, they
+            // want a demonstration: the reader of an HRV piece should watch an
+            // RR trace, the reader of a POTS piece should watch a stand-test
+            // delta climb into the red. Each variant therefore replaces the
+            // badge (never the bar) and renames the button to the action its
+            // instrument just argued for.
+            //
+            // Colour is one channel, not three: `--aj-scta-green` is the pill's
+            // signal token, so setting it recolours the button, its glow and the
+            // travelling border light together, and a variant that turns gold
+            // mid-run drags all of them with it. `--aj-scta-fg` flips the button
+            // text dark where the signal is too bright to carry white.
+            // The red is the site's own accent, not a softer signal red: these
+            // bars sit on brand pages and a lighter red reads as a different
+            // product.
+            var GREEN = '#6ee06e', GOLD = '#f5c451', RED = '#e03127';
+            // The dial's FULL 270° sweep. The default badge bakes its value into
+            // a shortened arc; the variants need to move theirs afterwards, so
+            // they draw the whole sweep and use the dash offset as the value.
+            var ARC = 'M35.67 140.33 A74 74 0 1 1 140.33 140.33';
+
+            function still() {
+              return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            }
+            // Relative luminance (WCAG), for picking the button's text colour.
+            function lum(hex) {
+              var n = parseInt(hex.slice(1), 16);
+              var c = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(function (v) {
+                v /= 255;
+                return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+              });
+              return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+            }
+            // The signal colour drives the button's background, so the label has
+            // to be chosen from it rather than from a list of colour names — a
+            // new variant colour would otherwise silently inherit white. The
+            // green and gold sit around L 0.58 and read at ~1.6:1 against white;
+            // the brand red is at 0.18 and clears 4.5:1, so it keeps white and
+            // stays consistent with every other red button on the site.
+            function signal(color) {
+              cta.style.setProperty('--aj-scta-green', color);
+              cta.style.setProperty('--aj-scta-fg', lum(color) > 0.4 ? '#08080a' : '#fff');
+            }
+            // Every timer is held so a dismissal mid-run can't animate a bar
+            // that is already gone.
+            var timers = [];
+            function at(ms, fn) { timers.push(setTimeout(fn, ms)); }
+            function stopTimers() { timers.forEach(clearTimeout); timers = []; }
+            // Walks a number through a list of stops, `gap` apart, handing each
+            // to `apply` — the shape every variant's read-out shares.
+            function stepThrough(stops, gap, apply, delay) {
+              stops.forEach(function (v, i) { at((delay || 0) + i * gap, function () { apply(v, i); }); });
+            }
+
+            function gaugeHtml(extra) {
+              return '<span class="aj-scta-gauge">' +
+                  '<svg viewBox="0 0 176 176" aria-hidden="true">' +
+                    '<path d="' + ARC + '" fill="none" stroke="rgba(255,255,255,0.10)" stroke-width="15" stroke-linecap="round" />' +
+                    '<path class="aj-vgauge-arc" pathLength="100" d="' + ARC + '" fill="none" stroke="' + GREEN + '" stroke-width="15" stroke-linecap="round" stroke-dasharray="100" stroke-dashoffset="8" />' +
+                  '</svg>' +
+                  '<span class="aj-scta-num">92</span>' + (extra || '') +
+                '</span>';
+            }
+            // A score of `v` is an arc with `100 - v` of its dash still hidden.
+            function setGauge(v, color) {
+              var arc = cta.querySelector('.aj-vgauge-arc');
+              var num = cta.querySelector('.aj-scta-num');
+              if (arc) { arc.style.strokeDashoffset = String(100 - v); arc.style.stroke = color; }
+              if (num) { num.textContent = String(v); num.style.color = color; }
+            }
+
+            var VARIANTS = {
+              // Home — the app's own Outlook dial sweeping up to a strong day,
+              // which is the thing the whole homepage argues you can get back
+              // to. The button sells the trial rather than the free download:
+              // it's the same tap (every install opens with Pro) and a better
+              // offer, and it's the only persistent Pro-framed CTA on mobile.
+              home: {
+                cta: 'Try Pro free',
+                aria: 'Download Autonomic and try Pro free',
+                color: GREEN,
+                plan: 'pro',
+                badge: gaugeHtml() + '<span class="aj-scta-lbl"><span>Autonomic</span><span>Score</span></span>',
+                run: function () {
+                  setGauge(0, GREEN);
+                  if (still()) { setGauge(92, GREEN); return; }
+                  // Eased over ~1.9s, matching countUp()'s cubic ease-out on the
+                  // default bar so the two read as the same instrument.
+                  var stops = [];
+                  for (var i = 1; i <= 24; i++) {
+                    stops.push(Math.round(92 * (1 - Math.pow(1 - i / 24, 3))));
+                  }
+                  stepThrough(stops, 80, function (v) { setGauge(v, GREEN); });
+                }
+              },
+
+              // HRV — a live RR trace redrawing left to right (two beats to a
+              // pass), with the SDNN beside it lifting the way a good week's
+              // does. Red: this is the brand's own signal, and the trace is the
+              // app's headline instrument.
+              hrv: {
+                cta: 'Measure your HRV',
+                aria: 'Measure your HRV, free',
+                color: RED,
+                badge:
+                  '<span class="aj-scta-wave">' +
+                    '<svg viewBox="0 0 100 44" fill="none" aria-hidden="true">' +
+                      '<path class="aj-wave-line" pathLength="100" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" ' +
+                        'd="M0 26 L4 26 L8 21 L12 26 L14 26 L16 30 L19 4 L22 38 L25 26 L31 19 L37 26 L46 26 ' +
+                        'L50 26 L54 21 L58 26 L60 26 L62 30 L65 4 L68 38 L71 26 L77 19 L83 26 L100 26" />' +
+                    '</svg>' +
+                  '</span>' +
+                  '<span class="aj-scta-stat"><span class="aj-scta-val">38</span><span class="aj-scta-unit">SDNN</span></span>',
+                run: function (val) {
+                  var el = cta.querySelector('.aj-scta-val');
+                  if (!el) return;
+                  if (still()) { el.textContent = '42'; return; }
+                  // Held back a beat so the first pass of the trace is what the
+                  // eye catches, and the number is the thing it lands on.
+                  stepThrough([38, 39, 40, 41, 42], 240, function (v) {
+                    el.textContent = String(v);
+                  }, 900);
+                }
+              },
+
+              // POTS — the stand test itself: heart rate climbing off the
+              // baseline into the diagnostic bands. 20+ is gold, 30+ is the
+              // adult POTS threshold and goes red, and the button goes with it,
+              // so the colour IS the finding.
+              pots: {
+                cta: 'Run a stand test',
+                aria: 'Run a stand test, free',
+                color: GREEN,
+                badge:
+                  '<span class="aj-scta-delta">' +
+                    '<span class="aj-pots-sym">&#916;</span>' +
+                    '<span class="aj-pots-num">2</span>' +
+                    '<span class="aj-pots-unit">bpm</span>' +
+                  '</span>',
+                run: function () {
+                  var num = cta.querySelector('.aj-pots-num');
+                  var sym = cta.querySelector('.aj-pots-sym');
+                  if (!num || !sym) return;
+                  var paint = function (v) {
+                    var c = v >= 30 ? RED : v >= 20 ? GOLD : GREEN;
+                    num.textContent = String(v);
+                    num.style.color = c;
+                    sym.style.color = c;
+                    signal(c);
+                  };
+                  if (still()) { paint(38); return; }
+                  // Deliberately uneven: a real stand test lurches, and an
+                  // evenly-spaced count reads as a progress bar.
+                  stepThrough([2, 4, 7, 12, 18, 23, 27, 31, 35, 37, 38], 250, paint);
+                }
+              },
+
+              // Food — the score is already good, then a trigger lands on it.
+              // The dial doesn't sweep in (the point isn't the score, it's the
+              // drop), and the pizza stays where the number was as the arc
+              // falls into the gold band.
+              food: {
+                cta: 'Find your triggers',
+                aria: 'Find your food triggers, free',
+                color: GREEN,
+                badge:
+                  gaugeHtml('<span class="aj-scta-emoji">&#127829;</span>') +
+                  '<span class="aj-scta-lbl"><span>Autonomic</span><span>Score</span></span>',
+                run: function () {
+                  var g = cta.querySelector('.aj-scta-gauge');
+                  var drop = function () {
+                    if (g) g.classList.add('has-emoji');
+                    setGauge(72, GOLD);
+                    signal(GOLD);
+                  };
+                  setGauge(92, GREEN);
+                  if (still()) { drop(); return; }
+                  at(900, function () { if (g) g.classList.add('has-emoji'); });
+                  at(1500, drop);
+                }
+              },
+
+              // Long COVID — the crash, seen coming. No score label: the words
+              // beside the dial are the read-out, and they change with it.
+              postviral: {
+                cta: 'See it coming',
+                aria: 'See a crash coming, free',
+                color: GREEN,
+                badge: gaugeHtml() + '<span class="aj-scta-tag"></span>',
+                run: function () {
+                  var tag = cta.querySelector('.aj-scta-tag');
+                  var stage = function (v, color, text) {
+                    setGauge(v, color);
+                    signal(color);
+                    if (tag) { tag.textContent = text; tag.style.color = color; }
+                  };
+                  setGauge(92, GREEN);
+                  if (still()) { stage(58, RED, 'Crash!'); return; }
+                  at(900, function () { stage(78, GOLD, 'Crash coming'); });
+                  at(2200, function () { stage(58, RED, 'Crash!'); });
+                }
+              },
+
+              // Recovery — the long view. One line climbing out of the red
+              // through its own gradient, so each stage reveals the colour it
+              // earned rather than repainting what came before.
+              recovery: {
+                cta: 'See your trend',
+                aria: 'See your recovery trend, free',
+                color: RED,
+                badge:
+                  '<span class="aj-scta-spark">' +
+                    '<svg viewBox="0 0 96 48" fill="none" aria-hidden="true">' +
+                      '<defs><linearGradient id="ajSparkGrad" gradientUnits="userSpaceOnUse" x1="3" y1="43" x2="93" y2="5">' +
+                        '<stop offset="0" stop-color="' + RED + '" />' +
+                        '<stop offset="0.5" stop-color="' + GOLD + '" />' +
+                        '<stop offset="1" stop-color="' + GREEN + '" />' +
+                      '</linearGradient></defs>' +
+                      '<path class="aj-spark-line" pathLength="100" stroke="url(#ajSparkGrad)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" ' +
+                        'd="M3 43 L17 39 L30 41 L44 31 L57 27 L71 17 L93 5" />' +
+                    '</svg>' +
+                  '</span>' +
+                  '<span class="aj-scta-stat"><span class="aj-scta-val">15</span><span class="aj-scta-unit">RMSSD</span></span>',
+                run: function () {
+                  var line = cta.querySelector('.aj-spark-line');
+                  var val = cta.querySelector('.aj-scta-val');
+                  var stage = function (drawn, v, color) {
+                    if (line) line.style.strokeDashoffset = String(100 - drawn);
+                    if (val) { val.textContent = String(v); val.style.color = color; }
+                    signal(color);
+                  };
+                  if (still()) { stage(100, 32, GREEN); return; }
+                  at(120, function () { stage(34, 15, RED); });
+                  at(1000, function () { stage(67, 26, GOLD); });
+                  at(1900, function () { stage(100, 32, GREEN); });
+                }
+              }
+            };
+
+            // Swapped in at setup, not at reveal: the dismiss handlers below
+            // bind to whatever `[data-dl-cta]` nodes exist, and the bar can be
+            // revealed synchronously on a page that already starts scrolled.
+            var variant = VARIANTS[topic];
+            if (variant) {
+              var badge = cta.querySelector('.aj-scta-badge');
+              var btn = cta.querySelector('.aj-scta-btn');
+              if (badge && btn) {
+                badge.innerHTML = variant.badge;
+                btn.textContent = variant.cta;
+                btn.setAttribute('aria-label', variant.aria);
+                signal(variant.color);
+                // A variant that promises Pro says so in its tracking. The
+                // feature-framed blog variants leave `plan` unset, which reads
+                // as "unspecified" rather than pretending to be one or other.
+                if (variant.plan) {
+                  cta.querySelectorAll('[data-dl-cta]').forEach(function (el) {
+                    el.setAttribute('data-dl-plan', variant.plan);
+                  });
+                }
+              } else {
+                variant = null;
+              }
+            }
+
+            function onScroll() {
+              if (shown || !mq.matches) return;
+              var scrollable = document.documentElement.scrollHeight - window.innerHeight;
+              if (scrollable <= 0 || window.scrollY / scrollable < 0.05) return;
+              shown = true;
+              window.removeEventListener('scroll', onScroll);
+              cta.hidden = false;
+              // Two frames: the element has to be laid out in its hidden
+              // state before the class that transitions it into view lands.
+              // Measure it first — the cookie notice lifts by exactly this
+              // much.
+              requestAnimationFrame(function () {
+                if (dock) dock.style.setProperty('--aj-scta-h', cta.offsetHeight + 12 + 'px');
+                requestAnimationFrame(applyDock);
+              });
+              ajEvent('sticky_cta_view', { topic: topic || 'none' });
+            }
+            window.addEventListener('scroll', onScroll, { passive: true });
+            onScroll();
+
+            // Park the bar over the page's real CTAs. On a long page (the
+            // homepage runs ~13 phone screens between the hero and the first
+            // price) the bar has to persist, but it must not float on top of
+            // the pricing cards or the store badges it exists to drive people
+            // to. Parking slides it away without dismissing it, so it comes
+            // back when those sections scroll off.
+            if (window.IntersectionObserver) {
+              var anchors = document.querySelectorAll('#pricing, #download');
+              if (anchors.length) {
+                var covering = 0;
+                var parkObs = new IntersectionObserver(function (entries) {
+                  entries.forEach(function (en) { covering += en.isIntersecting ? 1 : -1; });
+                  covering = Math.max(0, covering);
+                  parked = covering > 0;
+                  applyDock();
+                }, { threshold: 0 });
+                anchors.forEach(function (a) { parkObs.observe(a); });
+              }
+            }
+
+            // Tapping the CTA retires the bar: once the tap has landed (a
+            // store deep-link, or the modal on a device we can't place) it has
+            // done its job and would only sit on top of what it opened. It
+            // also drops the cookie notice back onto the floor. Deferred a
+            // tick so hiding the link's own container can't race its
+            // navigation.
+            function dismiss(reason) {
+              stopTimers();
+              cta.hidden = true;
+              applyDock();
+              if (dock) dock.style.removeProperty('--aj-scta-h');
+              try { sessionStorage.setItem('aj-scta-off', '1'); } catch (e) {}
+              ajEvent('sticky_cta_dismiss', { topic: topic || 'none', reason: reason });
+            }
+            cta.querySelectorAll('[data-dl-cta]').forEach(function (el) {
+              el.addEventListener('click', function () { setTimeout(function () { dismiss('download'); }, 0); });
+            });
+          })();
 
           // AI report picker: clicking a chip swaps the mocked prompt (title +
           // body) to that report's full, pasteable prompt. Each chip carries its
@@ -142,18 +787,167 @@
             if (start) bodyEl.setAttribute('data-copy', start.getAttribute('data-prompt') || '');
           })();
 
-          // The waitlist forms are owned by the homepage Svelte component
-          // (they POST to FlowForm on submit). No handler needed here.
-
-          // Track App Store CTA clicks site-wide (these buttons appear in the
-          // nav, blog end-CTA and insights sidebar as well as the homepage).
-          document.querySelectorAll('.btn-appstore, .dl-ios-badge').forEach(function (el) {
+          // Track store CTA clicks site-wide. Every store badge/link carries
+          // data-dl-store="ios|android" (hero, download section, blog end-CTA,
+          // insights sidebar, modal); the platform-aware nav CTA tracks itself.
+          document.querySelectorAll('[data-dl-store]').forEach(function (el) {
             el.addEventListener('click', function () {
-              if (typeof gtag === 'function') {
-                gtag('event', 'app_store_click', { location: window.location.pathname });
-              }
+              var p = el.getAttribute('data-dl-store');
+              if (typeof window.ajTrackDownload === 'function') window.ajTrackDownload(p === 'android' ? 'android' : 'ios', el);
             });
           });
+
+          // ---- Engagement tracking -------------------------------------
+          // One delegated listener maps every remaining interactive element
+          // to a GA event (store badges/CTAs are wired individually above,
+          // so they're excluded here to avoid double-counting).
+          document.addEventListener('click', function (ev) {
+            var t = ev.target;
+            if (!t || !t.closest) return;
+            // Store CTAs/badges are wired individually above (they resolve the
+            // platform first); skip them here so nothing double-counts.
+            if (t.closest('[data-dl-cta],[data-dl-store]')) return;
+            var el;
+            if ((el = t.closest('[data-wa-go],[data-wa-act],[data-wa-log]'))) {
+              // Watch interactive (#watch): which face/button was tapped.
+              var action = el.getAttribute('data-wa-log') ? 'log:' + el.getAttribute('data-wa-log')
+                : el.getAttribute('data-wa-act') || 'go:' + el.getAttribute('data-wa-go');
+              ajEvent('watch_interact', { action: action });
+            } else if ((el = t.closest('.ai-chip[data-prompt]'))) {
+              // AI interactive: report chip selected.
+              ajEvent('ai_report_select', { report: el.getAttribute('data-report') || el.getAttribute('data-title') || '' });
+            } else if ((el = t.closest('.aip-copy'))) {
+              // AI interactive: prompt copied (which report was showing).
+              var sel = document.querySelector('.ai-chip.selected[data-report]');
+              ajEvent('ai_prompt_copy', { report: sel ? sel.getAttribute('data-report') : '' });
+            } else if ((el = t.closest('.article-prose a'))) {
+              // Any link inside the article body: cross-links between articles,
+              // citations out to studies, in-page jumps.
+              var ph = el.getAttribute('href') || '';
+              ajEvent('article_link_click', {
+                target: ph,
+                link_type: /^https?:/i.test(ph) && ph.indexOf('autonomic.care') < 0 ? 'external'
+                  : ph.charAt(0) === '#' ? 'anchor' : 'internal',
+                text: (el.textContent || '').trim().slice(0, 100)
+              });
+            } else if ((el = t.closest('.ash-btn'))) {
+              ajEvent('article_share', { network: (el.textContent || '').trim() });
+            } else if ((el = t.closest('.blog-card, .recent-card, .article-line, .side-recent-link, .side-pillars a'))) {
+              // Every route into an article, tagged with the surface it came
+              // from: related block, a hub/list page, or the blog sidebar.
+              ajEvent('article_click', {
+                article_target: slugOf(el.getAttribute('href')),
+                placement: el.closest('.side-pillars') ? 'sidebar_start_here'
+                  : el.closest('.insights-side') ? 'sidebar_recent'
+                  : el.closest('.article-related') ? 'related'
+                  : 'list'
+              });
+            } else if ((el = t.closest('.ac-author, .author-name a, .writer-link'))) {
+              ajEvent('author_click', { author: (el.textContent || '').trim().slice(0, 60) });
+            } else if ((el = t.closest('.ac-tag, .article-chips a, .side-all, .topic-card'))) {
+              ajEvent('topic_click', { target: el.getAttribute('href') || '', text: (el.textContent || '').trim().slice(0, 60) });
+            } else if (t.closest('#burger')) {
+              ajEvent('nav_click', { target: 'menu' });
+            } else if ((el = t.closest('#nav a'))) {
+              if (el.hasAttribute('data-dl-cta') || el.hasAttribute('data-dl-store')) return;
+              ajEvent('nav_click', { target: el.getAttribute('href') || '' });
+            } else if ((el = t.closest('a[href^="#"], a[href^="/#"]'))) {
+              // Any other in-page link (trustbar "Read my story", pricing
+              // cross-links, footer section links, …).
+              if (el.hasAttribute('data-dl-cta') || el.hasAttribute('data-dl-store')) return;
+              ajEvent('link_click', { target: el.getAttribute('href') || '' });
+            }
+          });
+
+          // FAQ (and any other <details>) opens. Toggle doesn't bubble, so
+          // listen in the capture phase. Strip the "+" indicator glyph.
+          document.addEventListener('toggle', function (ev) {
+            var d = ev.target;
+            if (d && d.tagName === 'DETAILS' && d.open) {
+              var s = d.querySelector('summary');
+              var label = s ? s.textContent.replace(/\+\s*$/, '').trim().slice(0, 100) : '';
+              // A <details> inside the article body is expandable content, not
+              // an FAQ answer; keep the two apart in reporting.
+              if (d.closest('.article-prose')) ajEvent('article_details_open', { label: label });
+              else ajEvent('faq_open', { question: label });
+            }
+          }, true);
+
+          // ---- Blog content interaction ---------------------------------
+          // In-article calculators (.metric-calc, written into the markdown):
+          // one `calc_use` the first time a widget is touched, plus a
+          // `calc_change` per committed field so we can see which inputs the
+          // reader actually explores.
+          document.querySelectorAll('.metric-calc').forEach(function (calc, i) {
+            var head = calc.querySelector('.mc-head');
+            var name = (head ? head.textContent : '').trim().slice(0, 60) || 'calculator-' + (i + 1);
+            var used = false;
+            calc.addEventListener('change', function (ev) {
+              var f = ev.target;
+              if (!f || !f.tagName || !/^(INPUT|SELECT|TEXTAREA)$/.test(f.tagName)) return;
+              if (!used) { used = true; ajEvent('calc_use', { calc: name }); }
+              var lab = f.closest('.mc-field');
+              var labEl = lab ? lab.querySelector('.mc-label') : null;
+              ajEvent('calc_change', {
+                calc: name,
+                field: (labEl ? labEl.textContent : f.name || f.type || '').trim().slice(0, 60)
+              });
+            });
+          });
+
+          if (proseEl) {
+            // Reading depth through the article body: 25/50/75/100% of the
+            // prose scrolled past the bottom of the viewport, once each.
+            var depthHit = {};
+            var onDepth = function () {
+              var box = proseEl.getBoundingClientRect();
+              var total = box.height;
+              if (total <= 0) return;
+              var read = Math.min(total, Math.max(0, window.innerHeight - box.top));
+              var pct = Math.floor((read / total) * 100);
+              [25, 50, 75, 100].forEach(function (m) {
+                if (pct >= m && !depthHit[m]) {
+                  depthHit[m] = true;
+                  ajEvent('article_scroll', { percent: m });
+                }
+              });
+              if (depthHit[100]) window.removeEventListener('scroll', onDepth);
+            };
+            window.addEventListener('scroll', onDepth, { passive: true });
+            onDepth();
+
+            // Copying out of an article is a strong "this was useful" signal.
+            var copiedOnce = false;
+            proseEl.addEventListener('copy', function () {
+              if (copiedOnce) return;
+              copiedOnce = true;
+              ajEvent('article_copy');
+            });
+          }
+          // --------------------------------------------------------------
+
+          // Section views: fire once per page load when a section crosses the
+          // middle band of the viewport (works for sections taller than the
+          // screen, where a visible-fraction threshold would never trip).
+          // Sections are keyed by id, falling back to a slug of aria-label.
+          if (window.IntersectionObserver) {
+            var seenSections = {};
+            var sectionObs = new IntersectionObserver(function (entries) {
+              entries.forEach(function (en) {
+                if (!en.isIntersecting) return;
+                var sec = en.target;
+                var key = sec.id || (sec.getAttribute('aria-label') || '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+                if (!key || seenSections[key]) return;
+                seenSections[key] = true;
+                sectionObs.unobserve(sec);
+                ajEvent('section_view', { section: key });
+              });
+            }, { rootMargin: '-40% 0px -40% 0px', threshold: 0 });
+            document.querySelectorAll('section').forEach(function (s) {
+              if (s.id || s.getAttribute('aria-label')) sectionObs.observe(s);
+            });
+          }
+          // --------------------------------------------------------------
 
           var copyBtn = document.querySelector('.aip-copy');
           if (copyBtn) {

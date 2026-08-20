@@ -1,0 +1,209 @@
+org: discoverymark
+service: autonomic
+
+# The master dashboard's backend. One DynamoDB table, one Lambda behind an
+# HTTP API guarded by a Cognito JWT authorizer. The user pool is DiscoveryMark's
+# (shared identity across the account) — which is exactly why the Lambda ALSO
+# enforces an email allowlist: a valid token from that pool proves you are a
+# DiscoveryMark customer, not that you are allowed in here.
+
+stages:
+  default:
+    params:
+      tableName: "Autonomic-${sls:stage}"
+      apiDomain: "api.autonomic.care"
+      hostedZoneId: "${env:AUTONOMIC_HOSTED_ZONE_ID, 'Z101404626QO1OFJN008E'}"
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  region: us-west-2
+  stage: prod
+  architecture: arm64
+  memorySize: 512
+  timeout: 20
+  logRetentionInDays: 30
+  httpApi:
+    cors:
+      allowedOrigins:
+        - https://autonomic.care
+        - https://www.autonomic.care
+        - http://localhost:5173
+        - http://localhost:8080
+        # A third local port, because the other two are routinely taken by other
+        # projects on the same machine. Origins only get you as far as the
+        # Cognito token and the email allowlist behind it.
+        - http://localhost:8099
+      allowedMethods:
+        - GET
+        - POST
+        - OPTIONS
+      allowedHeaders:
+        - Content-Type
+        - Authorization
+      maxAge: 3600
+    authorizers:
+      cognitoAuthorizer:
+        type: jwt
+        identitySource: $request.header.Authorization
+        # DiscoveryMark's user pool, reused per the product decision. The
+        # allowlist below is the real access control.
+        issuerUrl: https://cognito-idp.us-west-2.amazonaws.com/us-west-2_0YCieUoYt
+        audience:
+          - 472fpu6vqbtu24e4m55a5dko98
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:Query
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+            - dynamodb:BatchWriteItem
+          Resource:
+            - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${param:tableName}
+            - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${param:tableName}/index/*
+  environment:
+    DYNAMO_TABLE_NAME: ${param:tableName}
+    STAGE: ${sls:stage}
+    # Who may use the master dashboard. A valid Cognito token is necessary but
+    # not sufficient — the pool is shared with DiscoveryMark's customers.
+    ALLOWED_EMAILS: ${env:AUTONOMIC_ALLOWED_EMAILS, 'austinspaeth@msn.com'}
+
+functions:
+  api:
+    handler: lambdas/api/main.handler
+    description: Autonomic master dashboard data API
+    events:
+      - httpApi:
+          method: POST
+          path: /api/master
+          authorizer:
+            name: cognitoAuthorizer
+
+  # The mobile app's cohort ping. Public by design — the app has no accounts
+  # and no credentials to present, and the request carries nothing worth
+  # protecting: one date, no identifier, no body. See lambdas/ping/main.js.
+  ping:
+    handler: lambdas/ping/main.handler
+    description: Anonymous cohort ping from the mobile app (open + subscribe + activation)
+    memorySize: 256
+    timeout: 5
+    events:
+      - httpApi:
+          method: GET
+          path: /ping/open/{cohort}
+      - httpApi:
+          method: GET
+          path: /ping/sub/{cohort}
+      # First HRV reading ever saved by an install. The code carries one extra
+      # letter for the sensor it used (W watch / B strap / F finger).
+      - httpApi:
+          method: GET
+          path: /ping/act/{cohort}
+      # Reading the counters back. Not public — guarded by PING_REPORT_KEY,
+      # which is unset by default, and an unset key refuses everyone.
+      - httpApi:
+          method: GET
+          path: /ping/report
+    environment:
+      # CodeBuild injects this from SSM (/autonomic/ping-report-key) — see
+      # infrastructure/pipeline.yml. Deliberately NOT a ${ssm:...} lookup here:
+      # that resolves with whatever credentials the deploy runs under, and a
+      # missing permission would fail the whole deploy, landing site included.
+      # Empty is safe — the read route refuses everyone without a key.
+      PING_REPORT_KEY: ${env:AUTONOMIC_PING_REPORT_KEY, ''}
+
+resources:
+  Resources:
+
+    # ------------------------------------------------------------------
+    # Data table. Single-table: PK = DASH#<email>, SK = the record.
+    #   SK = ENTRY#<date>#<platform>   one store-metrics day
+    #   SK = SETTINGS                  trial/wall lengths, currency
+    #   SK = UI                        view/filter preferences
+    # One item per entry rather than one blob, so the document can never
+    # grow into DynamoDB's 400KB item ceiling.
+    # ------------------------------------------------------------------
+    DashboardTable:
+      Type: AWS::DynamoDB::Table
+      DeletionPolicy: Retain
+      UpdateReplacePolicy: Retain
+      Properties:
+        TableName: ${param:tableName}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: PK
+            AttributeType: S
+          - AttributeName: SK
+            AttributeType: S
+        KeySchema:
+          - AttributeName: PK
+            KeyType: HASH
+          - AttributeName: SK
+            KeyType: RANGE
+        PointInTimeRecoverySpecification:
+          PointInTimeRecoveryEnabled: true
+
+    # ------------------------------------------------------------------
+    # Custom domain: api.autonomic.care
+    # ACM validates via DNS; giving CloudFormation the HostedZoneId lets it
+    # write the validation records itself, so the whole thing is one deploy.
+    # ------------------------------------------------------------------
+    ApiCertificate:
+      Type: AWS::CertificateManager::Certificate
+      Properties:
+        DomainName: ${param:apiDomain}
+        ValidationMethod: DNS
+        DomainValidationOptions:
+          - DomainName: ${param:apiDomain}
+            HostedZoneId: ${param:hostedZoneId}
+
+    ApiDomainName:
+      Type: AWS::ApiGatewayV2::DomainName
+      Properties:
+        DomainName: ${param:apiDomain}
+        DomainNameConfigurations:
+          - CertificateArn: !Ref ApiCertificate
+            EndpointType: REGIONAL
+            SecurityPolicy: TLS_1_2
+
+    ApiMapping:
+      Type: AWS::ApiGatewayV2::ApiMapping
+      Properties:
+        ApiId: !Ref HttpApi
+        DomainName: !Ref ApiDomainName
+        Stage: $default
+
+    ApiDnsRecord:
+      Type: AWS::Route53::RecordSet
+      Properties:
+        HostedZoneId: ${param:hostedZoneId}
+        Name: ${param:apiDomain}
+        Type: A
+        AliasTarget:
+          DNSName: !GetAtt ApiDomainName.RegionalDomainName
+          HostedZoneId: !GetAtt ApiDomainName.RegionalHostedZoneId
+          EvaluateTargetHealth: false
+
+  Outputs:
+    ApiEndpoint:
+      Description: Master dashboard API endpoint
+      Value: !Sub https://${param:apiDomain}/api/master
+    TableName:
+      Description: DynamoDB table backing the dashboard
+      Value: ${param:tableName}
+    OpenPingEndpoint:
+      Description: Mobile app daily open ping (cohort is D{MMDDYY}{platform})
+      Value: !Sub https://${param:apiDomain}/ping/open/{cohort}
+    SubPingEndpoint:
+      Description: Mobile app subscribe ping (cohort is D{MMDDYY}{platform})
+      Value: !Sub https://${param:apiDomain}/ping/sub/{cohort}
+    ActPingEndpoint:
+      Description: Mobile app activation ping (cohort is D{MMDDYY}{platform}{method})
+      Value: !Sub https://${param:apiDomain}/ping/act/{cohort}
+    PingReportEndpoint:
+      Description: Read the ping counters (needs ?key= — see sls/README.md)
+      Value: !Sub https://${param:apiDomain}/ping/report

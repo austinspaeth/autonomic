@@ -49,7 +49,7 @@ Here is the cycle that keeps people stuck. You feel decent, so you seize the goo
 Each swing overshoots in both directions. The "boom" pushes you well past your envelope; the "bust" drops you *below* your previous baseline. Over weeks, the pattern can drag your average capacity down rather than up. In conditions that share an autonomic phenotype and [post-exertional malaise](/insights/postviral/post-exertional-malaise-explained/), the hallmark delayed crash after overexertion, this overshoot is not just uncomfortable, it can [set recovery back](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC12829881/).
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 260" role="img" aria-label="Two line charts contrasting a boom-and-bust pattern that crashes below baseline with a steady pacing pattern of small sustainable waves trending gently upward.">
+  <svg class="fig-d" viewBox="0 0 720 260" role="img" aria-label="Two line charts contrasting a boom-and-bust pattern that crashes below baseline with a steady pacing pattern of small sustainable waves trending gently upward.">
     <line x1="40" y1="150" x2="700" y2="150" stroke="var(--line)" stroke-width="1" stroke-dasharray="4 4"/>
     <text x="40" y="143" font-family="Space Grotesk, sans-serif" font-size="12" fill="var(--dim-2)">baseline capacity</text>
 
@@ -66,6 +66,22 @@ Each swing overshoots in both directions. The "boom" pushes you well past your e
       points="470,150 500,120 530,150 560,118 590,148 620,110 650,140 680,100"/>
     <path d="M470 150 L680 100" stroke="#54d98a" stroke-width="1" stroke-dasharray="3 3" opacity="0.5"/>
     <text x="560" y="205" font-family="Space Mono, monospace" font-size="10" fill="#54d98a">small waves, trending up</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 330" role="img" aria-label="Two line charts contrasting a boom-and-bust pattern that crashes below baseline with a steady pacing pattern of small sustainable waves trending gently upward.">
+    <text x="20" y="20" font-family="Space Grotesk, sans-serif" font-size="13.5" fill="#e03127" font-weight="700">Boom &amp; bust</text>
+    <line x1="20" y1="100" x2="344" y2="100" stroke="var(--line)" stroke-width="1" stroke-dasharray="4 4"/>
+    <text x="344" y="94" text-anchor="end" font-family="Space Grotesk, sans-serif" font-size="11" fill="var(--dim-2)">baseline capacity</text>
+    <polyline fill="none" stroke="#e03127" stroke-width="2.5"
+      points="20,100 40,100 55,58 70,132 96,100 116,100 131,54 146,140 172,100 192,100 207,62 222,148"/>
+    <text x="238" y="66" font-family="Space Mono, monospace" font-size="10" fill="#e03127">overdo the good day</text>
+    <text x="238" y="146" font-family="Space Mono, monospace" font-size="10" fill="#e03127">then crash</text>
+    <text x="20" y="200" font-family="Space Grotesk, sans-serif" font-size="13.5" fill="#54d98a" font-weight="700">Steady pacing</text>
+    <line x1="20" y1="280" x2="344" y2="280" stroke="var(--line)" stroke-width="1" stroke-dasharray="4 4"/>
+    <text x="20" y="298" font-family="Space Grotesk, sans-serif" font-size="11" fill="var(--dim-2)">baseline capacity</text>
+    <polyline fill="none" stroke="#54d98a" stroke-width="2.5"
+      points="20,280 66,250 112,280 158,248 204,278 250,240 296,270 340,230"/>
+    <path d="M20 280 L340 230" stroke="#54d98a" stroke-width="1" stroke-dasharray="3 3" opacity="0.5"/>
+    <text x="180" y="316" font-family="Space Mono, monospace" font-size="10" fill="#54d98a" text-anchor="middle">small waves, trending up</text>
   </svg>
   <figcaption>Big swings crash below baseline and stall recovery; smaller, sustainable waves stay near the line and drift gently upward over time.</figcaption>
 </figure>

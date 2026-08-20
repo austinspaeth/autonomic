@@ -76,7 +76,7 @@ The idea is simple in spirit. Treat the score as your quick answer to "how recov
 Every metric and every overall reading gets sorted into one of six grades, running best to worst, with one special seventh band standing off to the side.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 320" role="img" aria-label="A ladder of six grade bands from Excellent at the top down to Crash at the bottom, with a violet Warning tier shown separately to the right as a too-high flag">
+  <svg class="fig-d" viewBox="0 0 720 320" role="img" aria-label="A ladder of six grade bands from Excellent at the top down to Crash at the bottom, with a violet Warning tier shown separately to the right as a too-high flag">
     <text x="20" y="24" fill="var(--text)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="15">The grade ladder</text>
     <g font-family="Space Grotesk, sans-serif" font-weight="600" font-size="14">
       <rect x="20" y="40" width="360" height="36" rx="7" fill="#54d98a" /><text x="38" y="63" fill="#08140c">Excellent</text><text x="362" y="63" text-anchor="end" fill="#08140c" font-family="Space Mono, monospace" font-size="12">70–85</text>
@@ -90,6 +90,21 @@ Every metric and every overall reading gets sorted into one of six grades, runni
     <text x="600" y="150" text-anchor="middle" fill="#a78bfa" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="15">Warning</text>
     <text x="600" y="172" text-anchor="middle" fill="var(--dim)" font-family="Space Mono, monospace" font-size="11">86+ · too high</text>
     <text x="600" y="212" text-anchor="middle" fill="var(--dim)" font-family="-apple-system, sans-serif" font-size="11">a flag, not a rank</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 356" role="img" aria-label="A ladder of six grade bands from Excellent at the top down to Crash at the bottom, with a violet Warning tier shown separately as a too-high flag">
+    <text x="20" y="20" fill="var(--text)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="14">The grade ladder</text>
+    <g font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13.5">
+      <rect x="20" y="32" width="320" height="32" rx="7" fill="#54d98a" /><text x="32" y="53" fill="#08140c">Excellent</text><text x="328" y="53" text-anchor="end" fill="#08140c" font-family="Space Mono, monospace" font-size="11.5">70–85</text>
+      <rect x="20" y="70" width="300" height="32" rx="7" fill="#22c55e" /><text x="32" y="91" fill="#08140c">Good</text><text x="308" y="91" text-anchor="end" fill="#08140c" font-family="Space Mono, monospace" font-size="11.5">60–69</text>
+      <rect x="20" y="108" width="280" height="32" rx="7" fill="#eab308" /><text x="32" y="129" fill="#1a1400">Moderate</text><text x="288" y="129" text-anchor="end" fill="#1a1400" font-family="Space Mono, monospace" font-size="11.5">50–59</text>
+      <rect x="20" y="146" width="260" height="32" rx="7" fill="#f97316" /><text x="32" y="167" fill="#1a0d00">Compromised</text><text x="268" y="167" text-anchor="end" fill="#1a0d00" font-family="Space Mono, monospace" font-size="11.5">35–49</text>
+      <rect x="20" y="184" width="240" height="32" rx="7" fill="#ef4444" /><text x="32" y="205" fill="#fff">Bad</text>
+      <rect x="20" y="222" width="220" height="32" rx="7" fill="#b91c1c" /><text x="32" y="243" fill="#fff">Crash</text><text x="228" y="243" text-anchor="end" fill="#fff" font-family="Space Mono, monospace" font-size="11.5">&lt; 35</text>
+    </g>
+    <line x1="20" y1="272" x2="340" y2="272" stroke="var(--line-2)" stroke-width="1" stroke-dasharray="4 4" />
+    <rect x="20" y="284" width="320" height="64" rx="10" fill="none" stroke="#a78bfa" stroke-width="2.5" />
+    <text x="180" y="308" text-anchor="middle" fill="#a78bfa" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="14">Warning · 86+ · too high</text>
+    <text x="180" y="330" text-anchor="middle" fill="var(--dim)" font-family="-apple-system, sans-serif" font-size="11.5">a flag, not a rank</text>
   </svg>
   <figcaption>Six grades run from Excellent down to Crash. The violet Warning band sits apart: it flags a reading that's suspiciously high rather than placing it on the good-to-bad scale.</figcaption>
 </figure>

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Modern single-binary watch app. -->
+	<key>WKApplication</key>
+	<true/>
+	<!-- HKWorkoutSession needs the workout-processing background mode so the
+	     HR sensor keeps streaming with the wrist down. -->
+	<key>WKBackgroundModes</key>
+	<array>
+		<string>workout-processing</string>
+	</array>
+	<!-- Manrope faces, matching the phone app's metric numerals. -->
+	<key>UIAppFonts</key>
+	<array>
+		<string>Manrope_800ExtraBold.ttf</string>
+		<string>Manrope_700Bold.ttf</string>
+	</array>
+	<key>NSHealthShareUsageDescription</key>
+	<string>Autonomic reads your live heart rate during HR monitoring and stand tests.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>Autonomic records workout sessions while monitoring your heart rate.</string>
+</dict>
+</plist>

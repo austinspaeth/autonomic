@@ -12,7 +12,8 @@ import { BreathingViz, parsePattern } from '../../src/features/hrv/BreathingViz'
 import { Button, Segmented } from '../../src/components/ui';
 import { BrandMark, Icon } from '../../src/components/Icon';
 import { ReadingSummary } from '../../src/components/summary';
-import { ScoreExplain, ProtocolEditor, DaySummary } from '../../src/features/DaySummary';
+import { ScoreExplain, DaySummary } from '../../src/features/DaySummary';
+import { ProtocolEditor } from '../../src/features/ProtocolEditor';
 import { JournalSections } from '../../src/features/JournalSections';
 import { HrvProgress, HrvFilterLinks } from '../../src/features/HrvProgress';
 import { Onboarding } from '../../src/features/Onboarding';
@@ -239,6 +240,7 @@ export function ProtocolEditorScreen() {
     const base = getState();
     const protocol: Protocol = {
       triggers: { enabled: true, types: [] },
+      hrv: { enabled: true },
       water: { enabled: true, liters: 2.5 },
       meds: { enabled: true, types: ['allegra', 'magGlycinate'] },
       activities: { enabled: false, types: [] },

@@ -26,6 +26,8 @@ export interface Palette {
   bg: string;
   surface: string;
   surface2: string;
+  /** Insets that should recede a step below `surface` (rows nested in a card). */
+  sunk: string;
   text: string;
   textDim: string;
   border: string;
@@ -40,6 +42,7 @@ const dark: Palette = {
   bg: '#000000',
   surface: '#1a1a1c',
   surface2: '#242427',
+  sunk: '#141416',
   text: '#f2f2f5',
   textDim: '#9a9aa0',
   border: '#303034',
@@ -67,6 +70,36 @@ export const fonts = {
   mono: 'IBMPlexMono_400Regular',
 } as const;
 
+/**
+ * The dim text that trails a big Progress readout: the unit, then the period the
+ * value belongs to ("bpm on 7/27", "ms in July"). Cards that show a value for a
+ * period fold that phrase in here rather than parking it in a column of its own,
+ * so the whole line reads as one sentence. Either half may be missing (a unitless
+ * index still gets its period; a card without one shows just the unit).
+ *
+ * `when` is the complete phrase, preposition included \u2014 the range decides the
+ * wording, so it is built by `bucketWhen` (day/week/month/year) or `onDay` for a
+ * plain calendar date, never assembled here.
+ *
+ * A symbol unit hugs the number on a narrow space, so it reads as part of the
+ * value ("56 bpm"). A unit that is a word of its own takes a full space, as does
+ * a tail that opens on the phrase because its card has no unit ("82 on 7/27").
+ * The string carries its own leading space, so callers render it straight after
+ * the value and add no spacing of their own.
+ */
+const WORD_UNITS = new Set(['days', 'hours', 'mins', 'times', 'litres', 'reps', 'nights', 'asleep', 'in bed', 'dip', 'minutes']);
+const NARROW_SPACE = '\u2005';
+export const readoutTail = (unit?: string | null, when?: string | null) => {
+  const t = [unit || '', when || ''].filter(Boolean).join(' ');
+  if (!t) return '';
+  return (!unit || WORD_UNITS.has(unit) ? ' ' : NARROW_SPACE) + t;
+};
+
+/** Sized between the metric label and the big value it follows. */
+export const TAIL_STYLE = (p: { textDim: string }) => ({
+  fontSize: 16, fontWeight: '600' as const, fontFamily: undefined, color: p.textDim,
+});
+
 /** Type scale: hero number, card title, row label, caption. */
 export const type = {
   hero: { fontSize: 57, fontWeight: '800' as const, letterSpacing: -1 },
@@ -81,9 +114,5 @@ export const type = {
 
 /** Dark is the only theme now. */
 export function usePalette(): Palette {
-  return dark;
-}
-
-export function paletteFor(_theme?: 'light' | 'dark'): Palette {
   return dark;
 }

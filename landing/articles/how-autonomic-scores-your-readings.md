@@ -53,7 +53,7 @@ Rather than hand you a bare figure, Autonomic scores each reading into a **grade
 The value in each row is tinted by its zone, so a good morning reads green and a rough one reads red before you have parsed a single digit. The point is not to grade your worth or your effort. It is to make a wall of numbers legible in a second.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 210" role="img" aria-label="A horizontal scale of five grade zones from crash to great, with a reading dot placed in the good zone.">
+  <svg class="fig-d" viewBox="0 0 720 210" role="img" aria-label="A horizontal scale of five grade zones from crash to great, with a reading dot placed in the good zone.">
     <rect x="40" y="70" width="128" height="34" fill="#e03127" opacity="0.85"/>
     <rect x="168" y="70" width="128" height="34" fill="#f5a524" opacity="0.85"/>
     <rect x="296" y="70" width="128" height="34" fill="var(--dim-2)" opacity="0.55"/>
@@ -68,6 +68,22 @@ The value in each row is tinted by its zone, so a good morning reads green and a
     <text x="488" y="55" text-anchor="middle" fill="var(--accent)" font-family="Space Mono, monospace" font-size="15">HRV 34</text>
     <text x="40" y="175" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="13">Lower for this metric</text>
     <text x="680" y="175" text-anchor="end" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="13">Higher for this metric</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 176" role="img" aria-label="A horizontal scale of five grade zones from crash to great, with a reading dot placed in the good zone.">
+    <rect x="20" y="70" width="62" height="34" fill="#e03127" opacity="0.85"/>
+    <rect x="82" y="70" width="62" height="34" fill="#f5a524" opacity="0.85"/>
+    <rect x="144" y="70" width="62" height="34" fill="var(--dim-2)" opacity="0.55"/>
+    <rect x="206" y="70" width="62" height="34" fill="#54d98a" opacity="0.7"/>
+    <rect x="268" y="70" width="62" height="34" fill="#54d98a" opacity="0.95"/>
+    <text x="51" y="122" text-anchor="middle" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="12">crash</text>
+    <text x="113" y="122" text-anchor="middle" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="12">bad</text>
+    <text x="175" y="122" text-anchor="middle" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="12">ok</text>
+    <text x="237" y="122" text-anchor="middle" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="12">good</text>
+    <text x="299" y="122" text-anchor="middle" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="12">great</text>
+    <circle cx="237" cy="87" r="12" fill="var(--accent)" stroke="#fff" stroke-width="3"/>
+    <text x="237" y="52" text-anchor="middle" fill="var(--accent)" font-family="Space Mono, monospace" font-size="14">HRV 34</text>
+    <text x="20" y="160" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="11.5">Lower for this metric</text>
+    <text x="340" y="160" text-anchor="end" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="11.5">Higher for this metric</text>
   </svg>
   <figcaption>Each reading lands in a zone. The same "34" that looks meaningless on a fitness app becomes a placed, colored signal.</figcaption>
 </figure>

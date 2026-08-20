@@ -48,7 +48,7 @@ The device you wear determines both where it reads your pulse and how much motio
 The pattern is consistent: as you move from an electrical sensor on the chest, to an optical sensor hugging a finger artery, to an optical sensor on the busier, bonier wrist, accuracy gently declines and motion sensitivity rises.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 210" role="img" aria-label="A horizontal accuracy scale showing chest strap highest, finger ring very high, and wrist watch good but underestimating, relative to ECG.">
+  <svg class="fig-d" viewBox="0 0 720 210" role="img" aria-label="A horizontal accuracy scale showing chest strap highest, finger ring very high, and wrist watch good but underestimating, relative to ECG.">
     <line x1="60" y1="150" x2="680" y2="150" stroke="var(--line)" stroke-width="2"/>
     <text x="60" y="180" font-family="Space Grotesk, sans-serif" font-size="13" fill="var(--dim-2)">lower accuracy</text>
     <text x="590" y="180" font-family="Space Grotesk, sans-serif" font-size="13" fill="var(--dim-2)">near-ECG</text>
@@ -67,6 +67,22 @@ The pattern is consistent: as you move from an electrical sensor on the chest, t
     <!-- ECG marker -->
     <line x1="680" y1="140" x2="680" y2="160" stroke="var(--accent)" stroke-width="3"/>
     <text x="680" y="200" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="12" fill="var(--accent)">ECG</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 236" role="img" aria-label="A vertical accuracy scale showing chest strap highest, finger ring very high, and wrist watch good but underestimating, relative to ECG.">
+    <text x="20" y="20" font-family="Space Grotesk, sans-serif" font-size="12.5" fill="var(--dim-2)">↑ near-ECG accuracy</text>
+    <line x1="44" y1="34" x2="44" y2="200" stroke="var(--line)" stroke-width="2"/>
+    <line x1="34" y1="40" x2="54" y2="40" stroke="var(--accent)" stroke-width="3"/>
+    <text x="64" y="45" font-family="Space Grotesk, sans-serif" font-size="12.5" fill="var(--accent)">ECG (reference)</text>
+    <circle cx="44" cy="84" r="9" fill="#54d98a"/>
+    <text x="64" y="81" font-family="Space Grotesk, sans-serif" font-size="14.5" fill="var(--dim-2)">Chest strap</text>
+    <text x="64" y="98" font-family="Space Mono, monospace" font-size="11.5" fill="var(--dim-2)">~0.99</text>
+    <circle cx="44" cy="134" r="9" fill="#38bdf8"/>
+    <text x="64" y="131" font-family="Space Grotesk, sans-serif" font-size="14.5" fill="var(--dim-2)">Finger ring</text>
+    <text x="64" y="148" font-family="Space Mono, monospace" font-size="11.5" fill="var(--dim-2)">~0.99</text>
+    <circle cx="44" cy="186" r="9" fill="#f5a524"/>
+    <text x="64" y="183" font-family="Space Grotesk, sans-serif" font-size="14.5" fill="var(--dim-2)">Wrist watch</text>
+    <text x="64" y="200" font-family="Space Mono, monospace" font-size="11.5" fill="var(--dim-2)">underestimates</text>
+    <text x="20" y="226" font-family="Space Grotesk, sans-serif" font-size="12.5" fill="var(--dim-2)">↓ lower accuracy</text>
   </svg>
   <figcaption>Accuracy rises as the sensor gets closer to an artery and further from motion. All three are usable for trends.</figcaption>
 </figure>
