@@ -117,8 +117,10 @@ export function BreathSessionScreen() {
       hrTrace: mockHrTrace(60),
       sdnnTrace: mockSdnnTrace(60),
       rrTrace: mockRr(64),
-      // Just short of the peak, so the bloom reads as still filling.
-      frozenBreath: 0.9,
+      // Mid-inhale rather than at the peak: the light has walked out through
+      // the inner rings with the outer ones still dark, so the bloom reads as
+      // travelling. A nearly-full bloom is a shape at rest.
+      frozenBreath: 0.6,
     });
     setReady(true);
     return () => __devMockSession({});
