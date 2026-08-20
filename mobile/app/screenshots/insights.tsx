@@ -12,7 +12,7 @@ export default function InsightsScene() {
       <StatusBar hidden />
       <AppStoreSlide
         title="Find what moves your numbers"
-        caption="Your own log, swept for the patterns worth acting on."
+        caption="Real statistics on your own data, not a hunch about what worked."
       >
         <InsightsScreen />
       </AppStoreSlide>
