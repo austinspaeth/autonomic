@@ -104,7 +104,23 @@ async function send(kind: PingKind, cohort: string, method?: MethodCode): Promis
 
 /* --------------------------------------------------------------- pinging */
 
-let inFlight = false;
+/**
+ * One in-flight guard per route, and every route needs one.
+ *
+ * The "sent" flag is written only on success, so between the check and the
+ * write there is a window in which a second caller reads a flag that is not
+ * there yet and sends the same ping again. `pingOpen` is called from two places
+ * and has always been guarded; `pingSub` was not, and Android found the hole:
+ * Play's purchase sheet is a separate ACTIVITY, so completing a purchase
+ * backgrounds and re-foregrounds the app, and within the same second the
+ * purchase listener, the AppState handler here and the entitlement refresh in
+ * ./iap all call pingSub — three calls, one flag, written last. iOS renders
+ * StoreKit in-process, never leaves the foreground, and so only ever made the
+ * one call, which is why a real Android purchase counted twice and an iOS one
+ * did not. Since there is no identifier the server cannot de-duplicate, so a
+ * duplicate here is a permanent wrong number in the subscriber count.
+ */
+const inFlight = { open: false, sub: false, act: false };
 
 /**
  * Send today's open ping, unless this install already sent one today.
@@ -115,14 +131,14 @@ let inFlight = false;
  * than being offline, and it errs toward reporting a real user as present.
  */
 async function pingOpen(): Promise<void> {
-  if (inFlight) return;
+  if (inFlight.open) return;
   const now = Date.now();
   if (!shouldPingOpen(read(KEY_LAST_OPEN), now)) return;
-  inFlight = true;
+  inFlight.open = true;
   try {
     if (await send('open', cohortDate(now))) write(KEY_LAST_OPEN, easternDay(now));
   } finally {
-    inFlight = false;
+    inFlight.open = false;
   }
 }
 
@@ -135,11 +151,17 @@ async function pingOpen(): Promise<void> {
  * dev, TestFlight or sideloaded build.
  */
 async function pingSub(): Promise<void> {
+  if (inFlight.sub) return;
   if (read(KEY_SUB_SENT) === '1') return;
   if (paywallBypassed()) return;
   const { ready, isPro } = getIapState();
   if (!ready || !isPro) return;
-  if (await send('sub', cohortDate(Date.now()))) write(KEY_SUB_SENT, '1');
+  inFlight.sub = true;
+  try {
+    if (await send('sub', cohortDate(Date.now()))) write(KEY_SUB_SENT, '1');
+  } finally {
+    inFlight.sub = false;
+  }
 }
 
 /**
@@ -155,9 +177,15 @@ async function pingSub(): Promise<void> {
  */
 export function pingActivation(source: string | undefined): void {
   if (__DEV__) return;
+  if (inFlight.act) return;
   if (read(KEY_ACT_SENT) === '1') return;
+  inFlight.act = true;
   void (async () => {
-    if (await send('act', cohortDate(Date.now()), methodCode(source))) write(KEY_ACT_SENT, '1');
+    try {
+      if (await send('act', cohortDate(Date.now()), methodCode(source))) write(KEY_ACT_SENT, '1');
+    } finally {
+      inFlight.act = false;
+    }
   })();
 }
 

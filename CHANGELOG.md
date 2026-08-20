@@ -7,7 +7,10 @@ in the app's "What's new" card are a separate, deliberately plainer log in
 `mobile/src/lib/whatsNew.ts` — update it whenever `version` in `mobile/app.json`
 crosses to a new `x.x` (a unit test fails if the shipping minor has no entry).
 
-## 1.25.2
+## 1.25.1 (OTA)
+
+Shipped over the air onto the 1.25.1 build rather than as a new version: JS
+only, so `app.json` stays at 1.25.1 and the stores are not involved.
 
 - **The founding-member card sells `PROMO_YEARLY_SKU`, not an introductory offer.** `FOUNDER_SKU` loses its platform branch: both stores now send the card at the same discounted year the annual offer card sells. An introductory offer belongs to the PRODUCT, so Apple applied `annual_founder_first_year` to every eligible subscriber from the ordinary paywall — the card could prompt, but never hold anything back. Apple has no mechanism that targets a never-subscribed user: promotional and win-back offers are for current or lapsed subscribers and must be signed by a server with a subscription key this app has no endpoint for. A separate SKU is the only exclusive discount there is.
 - The trade is that a separate SKU RENEWS at its own price, so the card's copy had to stop claiming otherwise: "your first year is X% off" became "you keep X% off for as long as you stay", and the footer line is now the price it actually renews at. That footer was **already wrong on Android** ("$24.99 first year, then $49.99/yr" over a product that renews at $24.99); this fixes it on both.
