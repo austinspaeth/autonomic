@@ -19,11 +19,12 @@ export const SG = {
 
 /** The scene catalogue (drives the index list + ordering). */
 export const SCENES: { slug: string; n: number; title: string; caption: string }[] = [
-  { slug: 'promise', n: 1, title: 'See your nervous system recover', caption: 'For long COVID, POTS & dysautonomia recovery.' },
-  { slug: 'measure', n: 2, title: 'A clinical HRV lab in your pocket', caption: 'Every metric, computed on-device.' },
-  { slug: 'understand', n: 3, title: 'Every reading graded, and what today is good for', caption: 'A plain-language read on your day.' },
-  { slug: 'plan', n: 4, title: 'Build your own recovery protocol', caption: 'You define the clean day. The app holds you to it.' },
-  { slug: 'live', n: 5, title: 'Track it all: water, meds, even digestion', caption: 'One tap. The whole body, not just heart rate.' },
+  { slug: 'journal', n: 1, title: 'See your nervous system recover', caption: 'For long COVID, POTS & dysautonomia recovery.' },
+  { slug: 'promise', n: 2, title: 'See your nervous system recover', caption: 'For long COVID, POTS & dysautonomia recovery.' },
+  { slug: 'measure', n: 3, title: 'A clinical HRV lab in your pocket', caption: 'Every metric, computed on-device.' },
+  { slug: 'understand', n: 4, title: 'Every reading graded, and what today is good for', caption: 'A plain-language read on your day.' },
+  { slug: 'plan', n: 5, title: 'Build your own recovery protocol', caption: 'You define the clean day. The app holds you to it.' },
+  { slug: 'live', n: 6, title: 'Track it all: water, meds, even digestion', caption: 'One tap. The whole body, not just heart rate.' },
   { slug: 'payoff', n: 7, title: 'And watch your numbers climb', caption: '12 weeks of real recovery.' },
   { slug: 'trust', n: 8, title: '100% on your phone. No cloud, no account, no tracking.', caption: 'Your most sensitive data never leaves your device.' },
 ];

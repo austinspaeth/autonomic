@@ -1,5 +1,5 @@
 import React from 'react';
-import { View } from 'react-native';
+import { LogBox, View } from 'react-native';
 import { Stack } from 'expo-router';
 import {
   useFonts,
@@ -11,6 +11,10 @@ import {
 /** Headerless, pure-black stack for the screenshot scenes. Loads Space Grotesk
  *  (used only for the baked-in marketing headlines) and holds a black frame
  *  until it registers so no title flashes in a fallback face. */
+// A capture is the deliverable here, and the dev LogBox banner paints over the
+// bottom of it. Scenes are dev-only, so silencing it costs nothing elsewhere.
+LogBox.ignoreAllLogs(true);
+
 export default function ScreenshotsLayout() {
   const [loaded] = useFonts({ SpaceGrotesk_500Medium, SpaceGrotesk_600SemiBold, SpaceGrotesk_700Bold });
   if (!loaded) return <View style={{ flex: 1, backgroundColor: '#000' }} />;

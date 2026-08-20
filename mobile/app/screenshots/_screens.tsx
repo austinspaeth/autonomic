@@ -313,6 +313,56 @@ function JournalNavBar({ active = 'Journal' }: { active?: string }) {
 }
 
 /**
+ * Scene 1 · "See your nervous system recover" — the REAL Journal day view over
+ * the user's OWN journal, on the day it reads best: Sat 8 Aug 2026.
+ *
+ * Unlike the crafted scenes below, nothing here is authored. The imported
+ * journal is swapped in with every day key SHIFTED forward so 8 Aug lands on
+ * today, which is the only way the Journal can show it as "Today" — the score,
+ * the streak, the trend card and the milestone count all recompute from real
+ * history rather than being posed. Days after 8 Aug are dropped, so nothing on
+ * screen depends on data the shifted "today" would not have had.
+ */
+const HERO_DK = '2026-08-08';
+
+export function JournalHeroScreen() {
+  const dk = todayKey();
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    const base = getState();
+    // How far 8 Aug has to travel to become today.
+    let shift = 0;
+    while (addDays(HERO_DK, shift) < dk && shift < 3650) shift += 1;
+    const days: Record<string, unknown> = {};
+    for (const k of Object.keys(base.days)) {
+      if (k > HERO_DK) continue; // the shifted "today" cannot know the future
+      days[addDays(k, shift)] = base.days[k];
+    }
+    const restore = __devSwapState({ ...base, days } as AppState);
+    setReady(true);
+    return restore;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <View style={{ width: DESIGN_W, height: DESIGN_H, backgroundColor: '#000' }}>
+      <StatusBar />
+      <JournalHeader />
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 150 }}
+        showsVerticalScrollIndicator={false}
+        scrollEnabled={false}
+      >
+        {ready ? (<><DaySummary dk={dk} /><JournalSections dk={dk} /></>) : null}
+      </ScrollView>
+      <JournalNavBar />
+    </View>
+  );
+}
+
+/**
  * Journal day view: the REAL DaySummary + JournalSections for a crafted good day
  * (four meds, a headache, no triggers, water 2.0 / 2.5 L), with the real header
  * and nav bar, scrolled down to the medications / symptoms / hydration rows.
