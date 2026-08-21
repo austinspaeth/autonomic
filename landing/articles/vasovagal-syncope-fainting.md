@@ -8,7 +8,7 @@ keywords: "vasovagal syncope, fainting, reflex syncope, neurally mediated syncop
 date: 2026-08-21
 updated: 2026-08-21
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1519643381401-22c77e60520e?q=80&w=1760&auto=format&fit=crop"
+photoLocation: "https://images.unsplash.com/photo-1758691030894-b8d6fda73d38?q=80&w=2664&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
 photoAttribution: "Kinga Howard / Unsplash"
 tldr: "Vasovagal syncope is a reflex faint. A trigger (long standing, heat, pain, the sight of blood, strong emotion, dehydration) sets off a miswired autonomic response that widens your blood vessels and slows your heart at the same time, so your blood pressure falls, your brain briefly runs short of blood, and you black out for a few seconds. It is the most common cause of fainting and is usually not dangerous, but it almost always comes with a short warning: lightheadedness, warmth, nausea, sweating, ringing ears and greying vision. The single most useful skill is catching that warning early and lying down with your legs up, or using a counter-pressure maneuver like crossing and tensing your legs or gripping your hands hard, to push blood back to your brain before you go down. Fainting during exertion, while lying flat, or with no warning at all is different and needs prompt medical evaluation."
 categories:
