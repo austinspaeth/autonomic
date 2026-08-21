@@ -7,15 +7,6 @@ in the app's "What's new" card are a separate, deliberately plainer log in
 `mobile/src/lib/whatsNew.ts` — update it whenever `version` in `mobile/app.json`
 crosses to a new `x.x` (a unit test fails if the shipping minor has no entry).
 
-## 1.25.2
-
-- **A fourth ping route, `/ping/hrv`.** The counter could say how many installs opened the app and how many ever took a first reading, but nothing about whether people keep measuring — an install that launches every morning and never measures looked identical to one doing the protocol daily. The new route reports a day on which an HRV reading was saved, gated to one send per Eastern day like `/open`, so measured-over-opened is a rate on the same denominator and the same calendar. `src/lib/ping.ts` (pure + tested) and `src/store/ping.ts` carry it, `sls/lambdas/ping/main.js` stores it under `PING#HRV`, and the `/master` dashboard gains three tiles (Measured today, Measured of active, Measured per active day) and two charts.
-- **Progress gains a fifth range the user picks.** Three dots ride on the tabs' own capsule and open `CustomRangeSheet` (`src/features/ProgressRange.tsx`): two dates, three presets, and a "Compare by" row. The custom window travels alongside `mode` rather than replacing it, so bucket labels and rolling averages keep reading the one value they always did. Buckets are clamped to the window at both ends, and a grouping too fine for its window is refused in the sheet rather than silently coarsened.
-- **A back-dated write says so, in gold.** `isPastDay(dk)` drives `<DaySaveButton/>`: on today the ordinary red primary, on any earlier day a `caution` variant reading "Save for previous day". Every control that commits into one day goes through it. Three exceptions: live captures save to the moment they happened and cannot be back-dated, Delete stays red, and settings-shaped saves are not day data.
-- **The `/master` dashboard drops the history wall.** `analytics.js` still hardcoded a seven-day trial and a day-15 wall while `app.js` had moved to fourteen, and the hardcoded copy was what every chart drew from — so the dashboard reported a boundary the app stopped having. There is now ONE boundary at D14; the wall's duplicate tiles, transition, chart series and settings field are gone, and a settings record written by the old build migrates off its stored 7.
-- Dashboard: the celebration is per event — gold glitter for a sale (15s), silver for a new install (10s), a half-second house-coloured puff for a returning visitor — and the alert sounds run through a compressor loud enough to actually carry.
-- Dashboard: a new **Pings** tab lists every stored counter row with its attributes for diagnostics; the range filter now reaches the retention curve, survival funnel, cohort heatmap and active-by-age cards, which had been reporting all-time numbers beside filtered ones; release flags no longer navigate on click (on a phone they made a chart unreadable); the refresh button becomes a floating action button on mobile; and the Compare platform option is gone.
-
 ## 1.25.1 (OTA)
 
 Shipped over the air onto the 1.25.1 build rather than as a new version: JS
