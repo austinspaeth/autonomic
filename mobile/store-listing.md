@@ -18,9 +18,20 @@ daily score does. Neither appeared anywhere in the descriptions.
 
 **App Store Connect** — needs a version submission, so it rides the 1.25.1 build:
 
-- [ ] **Description** → replace wholesale with the block below (3,994/4,000).
+- [ ] **Description** → replace wholesale with the block below (3,992/4,000).
       Adds the live-reading detail, minimize, and the early heads-up bullet;
       trims where needed to stay inside the limit.
+      **The Terms of Use / Privacy Policy lines at the end are not optional and
+      never get trimmed for space.** 1.25.1 was rejected (Guideline 3.1.2) by
+      Apple's automated metadata check because a wholesale description paste
+      dropped them: the app sells auto-renewable subscriptions, so a functional
+      EULA link must be in the App Description itself. In-app links on the
+      paywall and in Settings do not satisfy the check, and neither does the
+      Privacy Policy URL field. Trim a bullet instead.
+- [ ] **App Information → License Agreement** → paste `mobile/EULA.md`'s block
+      as a Custom License Agreement for all countries (belt and braces; the
+      description link is what the automated check reads). Fill the
+      `[LEGAL NAME]` / `[MAILING ADDRESS]` / `[PHONE]` placeholders first.
 - [ ] **What's New** → the 1.25 block below. It covers the 1.25 release as a
       whole. **If 1.25.0 already shipped to the App Store**, drop its last
       bullet (unlimited capture was 1.25.0's headline and has already been
@@ -187,31 +198,31 @@ Also:
 • Medication doses accept units again
 • Keyboard and Progress scrolling fixes
 
-## Description (3,994/4,000 chars)
+## Description (3,992/4,000 chars)
 
 See your nervous system actually recover.
 
-Autonomic turns a chest strap, your Apple Watch, or your finger over the camera into a full HRV lab in your pocket, then grades every reading against published research thresholds, so you know whether today was a good day or a warning sign.
+Autonomic turns a chest strap, your Apple Watch, or your finger over the camera into a full HRV lab, then grades every reading against published research thresholds, so you know whether today was a good day or a warning sign.
 
-Built for the long haul: long covid and post viral recovery, POTS and dysautonomia, ME/CFS, and anyone rebuilding their nervous system one day at a time.
+Built for the long haul: long covid and post viral recovery, POTS and dysautonomia, ME/CFS, and anyone rebuilding their nervous system.
 
-Free to use, with no account, no ads or tracking. Every install starts with 14 days of full access, then keeps the core free forever.
+Free to use, no account, no ads, no tracking. 14 days of full access on install, then the core stays free forever.
 
 
 LIVE 5-MINUTE HRV, DONE RIGHT
 
-• Capture beat-to-beat RR intervals from a chest strap, Apple Watch, or your iPhone's camera with your finger
-• A guided session with a 5:00 ring and paced breathing (4/6 resonance), showing live heart rate, SDNN and your beat-to-beat trace as the reading runs
+• Capture beat-to-beat RR intervals from a chest strap, Apple Watch, or your finger on the iPhone camera
+• A guided session with a 5:00 ring and paced breathing (4/6 resonance), with live heart rate, SDNN and your beat-to-beat trace as it runs
 • Minimize a reading and it keeps running while you use the rest of the app
-• Every metric computed on-device: SDNN, RMSSD, pNN50, mean RR, PNS & SNS index, Baevsky stress index, VLF/LF/HF power, LF/HF, coherence, and more
-• Honest signal quality: artifacts are flagged and corrected, and a noisy reading refuses to fake a score
+• Every metric computed on-device: SDNN, RMSSD, pNN50, PNS & SNS index, Baevsky stress index, VLF/LF/HF power, LF/HF, coherence, and more
+• Artifacts are flagged and corrected, and a noisy reading refuses to fake a score
 
 
 EVERY NUMBER GRADED, NO BLACK BOX
 
 • Every number scored great / good / ok / warning / crash against real thresholds
 • One daily Autonomic Score that rolls up HRV, sleep, symptoms, blood pressure and more
-• A plain-language outlook for the day: what your body is ready for, from a full workout to a rest day
+• A plain-language outlook: what your body is ready for, from a full workout to a rest day
 • An early heads-up when your own markers drift: slower heart-rate recovery, a higher resting or overnight heart rate, a bigger standing rise
 
 
@@ -257,6 +268,9 @@ Free forever: unlimited live HRV captures, journaling (sleep, meds, symptoms, tr
 Autonomic Pro adds: week / month / year progress views, full historical metric analysis, on-device Insights, POTS stand testing and episode tracking, and AI doctor reports.
 
 Pro is $7.99/month or $49.99/year, billed to your Apple ID and renewing automatically until cancelled. Cancel anytime in your App Store settings.
+
+Terms of Use: https://autonomic.care/terms-of-service/
+Privacy Policy: https://autonomic.care/privacy-policy/
 
 
 IMPORTANT: Autonomic is a personal journal and education tool, not a medical device. It does not diagnose, treat, or prevent any disease. Always discuss protocol or medication changes with your doctor.
@@ -328,7 +342,7 @@ it freed up went to "dysautonomia", a search term the old line did not carry.
 
 See your nervous system actually recover.
 
-Autonomic turns a Bluetooth heart rate strap, or just your finger over your phone's camera, into a full HRV lab in your pocket, then grades every reading against published research thresholds, so you finally know whether today was a good day or a warning sign.
+Autonomic turns a Bluetooth heart rate strap, or just your finger over your phone's camera, into a full HRV lab, then grades every reading against published research thresholds, so you finally know whether today was a good day or a warning sign.
 
 Built for the long haul: long covid and post viral recovery, POTS and dysautonomia, ME/CFS, and anyone rebuilding their autonomic nervous system one day at a time.
 
@@ -338,17 +352,17 @@ Free to use, with no account, no ads and no tracking. Every install starts with 
 LIVE 5-MINUTE HRV, DONE RIGHT
 
 • Capture beat-to-beat RR intervals live from a Bluetooth chest strap, or with your phone's camera using your finger
-• A guided session with a 5:00 ring and paced breathing (4/6 resonance), showing live heart rate, SDNN and your beat-to-beat trace as the reading runs
+• A guided session with a 5:00 ring and paced breathing (4/6 resonance), with live heart rate, SDNN and your beat-to-beat trace as it runs
 • Minimize a reading and it keeps running while you use the rest of the app
-• Every metric computed on-device: SDNN, RMSSD, pNN50, mean RR, PNS & SNS index, Baevsky stress index, VLF/LF/HF power, LF/HF, coherence, and more
-• Honest signal quality: artifacts are flagged and corrected, and a noisy reading refuses to fake a score
+• Every metric computed on-device: SDNN, RMSSD, pNN50, PNS & SNS index, Baevsky stress index, VLF/LF/HF power, LF/HF, coherence, and more
+• Artifacts are flagged and corrected, and a noisy reading refuses to fake a score
 
 
 EVERY NUMBER GRADED, NO BLACK BOX
 
 • Every number is scored great / good / ok / warning / crash against real thresholds
 • One daily Autonomic Score that rolls up HRV, sleep, symptoms, blood pressure and more
-• A plain-language outlook for the day: what your body is ready for, from a full workout to a rest day
+• A plain-language outlook: what your body is ready for, from a full workout to a rest day
 • An early heads-up when your own markers drift: slower heart-rate recovery, a higher resting or overnight heart rate, a bigger standing rise
 
 

@@ -10,6 +10,7 @@
  *   GET /ping/open/D082126I   opened today by an install from that cohort
  *   GET /ping/sub/D082126I    an install from that cohort became a subscriber
  *   GET /ping/act/D082126IB   an install from that cohort took its FIRST reading
+ *   GET /ping/hrv/D082126I    an install from that cohort took a reading today
  *
  * The trailing letter is the platform: I for iOS, A for Android. It is a
  * property of the build, not of the person holding it, and it is what makes
@@ -21,6 +22,18 @@
  * back for, so "how many of a cohort ever got one, and with what" is the single
  * number that says whether onboarding works. It is the same shape as the other
  * two — one code, no identifier — and it fires exactly once per install.
+ *
+ * The HRV ping is the open ping's twin and the reason both exist: opening the
+ * app is not using it. An install that launches every morning, reads yesterday's
+ * score and never measures again has a retention curve that looks healthy and a
+ * journal that is going nowhere, and the open counter alone cannot tell that
+ * apart from a person taking a reading a day. So this fires at most once per
+ * Eastern day, from the moment a reading is SAVED, carrying the same cohort and
+ * platform an open ping carries and nothing else — which makes the two directly
+ * comparable: readings over opens, on one day, is the share of the people who
+ * were there who actually measured. It names no sensor; the activation ping is
+ * where that question is answered, and once a day could only ever name whichever
+ * reading happened to come first.
  *
  * What is deliberately absent: no device id, no install id, no session id, no
  * request body, no health data, no journal data, nothing about what the user
@@ -47,7 +60,7 @@
 import { AppState as RNAppState, Platform } from 'react-native';
 import { MMKV } from 'react-native-mmkv';
 import {
-  easternDay, methodCode, pingUrl, platformCode, resolveCohort, shouldPingOpen,
+  easternDay, methodCode, pingUrl, platformCode, resolveCohort, shouldPingDaily,
   type MethodCode, type PingKind,
 } from '../lib/ping';
 import { getIapState, paywallBypassed, subscribeIap } from './iap';
@@ -57,6 +70,7 @@ const KEY_COHORT = 'pingCohort';        // ISO date — this install's cohort, f
 const KEY_LAST_OPEN = 'pingLastOpen';   // ISO date (Eastern) of the last open ping sent
 const KEY_SUB_SENT = 'pingSubSent';     // '1' once the subscribe ping landed
 const KEY_ACT_SENT = 'pingActSent';     // '1' once the activation ping landed
+const KEY_LAST_HRV = 'pingLastHrv';     // ISO date (Eastern) of the last reading ping
 /** Written by ./tier.ts on first launch: this install's birthday. */
 const KEY_TRIAL_STARTED = 'trialStartedAt';
 
@@ -120,7 +134,7 @@ async function send(kind: PingKind, cohort: string, method?: MethodCode): Promis
  * did not. Since there is no identifier the server cannot de-duplicate, so a
  * duplicate here is a permanent wrong number in the subscriber count.
  */
-const inFlight = { open: false, sub: false, act: false };
+const inFlight = { open: false, sub: false, act: false, hrv: false };
 
 /**
  * Send today's open ping, unless this install already sent one today.
@@ -133,7 +147,7 @@ const inFlight = { open: false, sub: false, act: false };
 async function pingOpen(): Promise<void> {
   if (inFlight.open) return;
   const now = Date.now();
-  if (!shouldPingOpen(read(KEY_LAST_OPEN), now)) return;
+  if (!shouldPingDaily(read(KEY_LAST_OPEN), now)) return;
   inFlight.open = true;
   try {
     if (await send('open', cohortDate(now))) write(KEY_LAST_OPEN, easternDay(now));
@@ -185,6 +199,35 @@ export function pingActivation(source: string | undefined): void {
       if (await send('act', cohortDate(Date.now()), methodCode(source))) write(KEY_ACT_SENT, '1');
     } finally {
       inFlight.act = false;
+    }
+  })();
+}
+
+/**
+ * Send today's reading ping, unless this install already sent one today.
+ *
+ * Called from the same place `pingActivation` is (features/hrv/Results.tsx, on
+ * SAVE) and for the same reason: a session that was abandoned or produced
+ * nothing usable is not a reading. The difference is the memory — activation is
+ * once per install ever, this is once per Eastern day, so the pair says both
+ * "did they ever get one" and "are they still taking them".
+ *
+ * The flag is written only on success, so a reading saved offline is re-counted
+ * by the next reading that day rather than being lost — and if there is no next
+ * one, the day simply reports what it could see. The same trade `pingOpen`
+ * makes, and it errs the same way: toward reporting a real reading as taken.
+ */
+export function pingHrvReading(): void {
+  if (__DEV__) return;
+  if (inFlight.hrv) return;
+  const now = Date.now();
+  if (!shouldPingDaily(read(KEY_LAST_HRV), now)) return;
+  inFlight.hrv = true;
+  void (async () => {
+    try {
+      if (await send('hrv', cohortDate(now))) write(KEY_LAST_HRV, easternDay(now));
+    } finally {
+      inFlight.hrv = false;
     }
   })();
 }

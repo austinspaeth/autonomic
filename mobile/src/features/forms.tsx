@@ -8,7 +8,7 @@ import { ActivityIndicator, Platform, Pressable, ScrollView, Text, TextInput, Vi
 import * as ExpoLinking from 'expo-linking';
 import { SheetControls, SheetFooter, useSheets } from '../components/Sheet';
 import { FieldInputs, TextField, TimeField, useFormState } from '../components/Field';
-import { Button, Muted } from '../components/ui';
+import { Button, DaySaveButton, Muted } from '../components/ui';
 import { Icon } from '../components/Icon';
 import { ReadingSummary, WorkoutSummary, workoutCurveFor } from '../components/summary';
 import { radius, usePalette } from '../theme';
@@ -334,7 +334,7 @@ export function EntryForm({ typeMap, arrKey, dk, type, existing, prefill = null,
       <FieldInputs fields={fields} form={form} set={set} />
       <SheetFooter>
         {existing ? <Button title="Delete" variant="danger" onPress={() => { deleteEntry(dk, arrKey, existing.id); controls.closeAll(); onSaved(); }} /> : null}
-        <Button title="Save" variant="primary" onPress={save} />
+        <DaySaveButton dk={dk} title="Save" onPress={save} />
       </SheetFooter>
     </View>
   );
@@ -413,7 +413,7 @@ export function BikeForm({ dk, existing, prefill = null, controls, onSaved }: { 
       <TextField label="Notes" value={note} onChange={setNote} placeholder="Optional note" multiline />
       <SheetFooter>
         {existing ? <Button title="Delete" variant="danger" onPress={() => { deleteEntry(dk, 'activities', existing.id); controls.closeAll(); onSaved(); }} /> : null}
-        <Button title="Save" variant="primary" onPress={save} />
+        <DaySaveButton dk={dk} title="Save" onPress={save} />
       </SheetFooter>
     </View>
   );

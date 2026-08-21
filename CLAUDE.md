@@ -398,6 +398,26 @@ old web app so old `export.json` files import directly.
   `RestNote` with the downturn's and lists each marker beside its own baseline;
   `buildStrainPrompt` asks the AI for the case AGAINST the flag as well as for
   it, because the question here is "early warning or noise".
+- **Progress's fifth range is a window the user picks, and it REPLACES the four
+  tabs rather than joining them.** The three dots ride on the tabs' own capsule
+  (`trailing` on `Segmented`, so the header band's height never moves) and open
+  `CustomRangeSheet` (`src/features/ProgressRange.tsx`): two dates, three presets,
+  and a "Compare by" row reusing the same four words. A custom window travels
+  ALONGSIDE `mode` rather than replacing it — `mode` stays the grouping in both
+  states, so bucket labels, `bucketWhen`'s phrasing and the rolling-average window
+  all keep reading the one value they always did, and only `acBuckets` sees the
+  window. Buckets are **clamped to the window at both ends**: a month bucket for a
+  range starting on the 12th starts on the 12th, or the average would cover days
+  the user did not ask for. Applying goes through the same veil as a tab change
+  (one `rangeKey` identifies a range for the build cache, the commit's no-op check
+  and the body's remount key), but does NOT wait on the pill's spring — the control
+  cross-fades to the chip instead of the pill travelling, and gating on a spring
+  that will never run held the veil up for the full backstop. The chip is
+  tappable (reopens the sheet with the current values, so changing just the
+  grouping is one tap) and its ✕ is a separate target back to Day. A grouping too
+  fine for its window is REFUSED in the sheet (`MAX_CUSTOM_BUCKETS`), never
+  silently coarsened. Free tier meets it the way it meets Week/Month/Year: the
+  document builds for real and `<LockedOverlay/>` masks it.
 - **"What is linked to what?" is `src/lib/insights/`, and every guard in it is
   load-bearing.** One entry point, `buildInsights(state, dk)`, returns the whole
   Insights view: the headline change, ranked correlations, heuristic observations,
@@ -717,9 +737,11 @@ old web app so old `export.json` files import directly.
 - **The only thing the app sends anywhere is an anonymous cohort ping.**
   `src/store/ping.ts` (shell) over `src/lib/ping.ts` (pure + tested) GETs
   `api.autonomic.care/ping/open/D{MMDDYY}{P}` on launch and on foreground,
-  `/ping/sub/D{MMDDYY}{P}` once the store reports an entitlement, and
+  `/ping/sub/D{MMDDYY}{P}` once the store reports an entitlement,
   `/ping/act/D{MMDDYY}{P}{M}` the first time an HRV reading is ever SAVED
-  (`pingActivation` from `features/hrv/Results.tsx`, once per install ever).
+  (`pingActivation` from `features/hrv/Results.tsx`, once per install ever), and
+  `/ping/hrv/D{MMDDYY}{P}` at most once per Eastern day whenever an HRV reading
+  is SAVED (`pingHrvReading`, the same call site).
   That third route carries one extra letter for the sensor — `W` watch, `B`
   Bluetooth strap, `F` finger on camera — because "did onboarding work" and
   "with what" are the same question. Activation fires on the SAVE, never on the
@@ -730,6 +752,16 @@ old web app so old `export.json` files import directly.
   older builds send); the server stamps the arrival day, so a row is
   (cohort day, platform, arrival day) → count, which is retention per store.
   An activation row is (cohort day, platform, method, arrival day) → count.
+  **The HRV route is the open route's twin, and that symmetry is load-bearing**:
+  same code, same one-per-Eastern-day cap, no sensor letter, so `hrv[day] /
+  open[day]` is a share of PEOPLE (of everyone in the app that day, how many
+  measured) rather than of pings. Opening a journal app is not using it, and the
+  open counter alone cannot tell a daily measurer from someone who launches it to
+  look at yesterday's number. Nothing may be added to one of the two that is not
+  added to the other. It shipped later than the other three, so days before its
+  first row are UNKNOWN, never 0% — `hrvFirst` / `hrvKnown` in
+  `landing/master/analytics.js`, read off the unfiltered rows because Android
+  shipped it in its own release.
   There is no device id, no install id, no body, no health data — which is
   exactly why the server can't
   de-duplicate and the CLIENT must: one open ping per install per **US Eastern**
@@ -742,19 +774,25 @@ old web app so old `export.json` files import directly.
   since nobody paid there. Failures are silent and NOT sent to `logError` —
   being offline is a phone's normal state, and it would flush the 40-entry
   support log. Storage is **one DynamoDB row per day** holding a map of
-  cohort+platform(+method) → count (`PK PING#OPEN` / `PING#SUB` / `PING#ACT`,
+  cohort+platform(+method) → count (`PK PING#OPEN` / `PING#SUB` / `PING#ACT` /
+  `PING#HRV`,
   `SK 2026-08-21`, `cohorts: { '082126I': 12 }`, activations `'082126IB'`) — a map, not a list, because the nested bump is
   atomic and appending to a list would lose concurrent pings.
   Read it back with `GET /ping/report?key=`
   (shared key, `PING_REPORT_KEY`, injected by CodeBuild from SSM) or the `PINGS`
   action on the authenticated `/master` API; both return
   `{ day, total, cohorts: [{ key, cohortDate, cohort, platform, method, count }] }`
-  rows under `open` / `sub` / `act` (`method` is null outside activations). The
+  rows under `open` / `sub` / `act` / `hrv` (`method` is null outside activations). The
   `/master` dashboard renders them in its **App usage** view (`landing/master/`,
   tested by `landing/tests/master-ping.test.mjs`): activation gets its own tiles
   (*Activated on day 0* / *Activated by D7*), an **Activation** card and a
   **How the first reading is taken** card, with `A.activation` obeying the same
-  "immature is not zero" rule as every other rate there. It is also announced as
+  "immature is not zero" rule as every other rate there. The reading counter gets
+  three tiles (*Measured on <day>* / *Measured of active* / *Measured per active
+  day*), an **Opened vs measured** card and **The habit curve** — retention and
+  measuring on one axis by install age, where the GAP between the two lines is
+  the finding — plus a Readings bar on the weekday chart and its own route in the
+  raw Pings tab. Activation is also announced as
   a live alert card (`landing/master/alerts.js`) — **confetti is for ARRIVALS,
   never for usage**, so downloads and sales keep the canvas and an activation
   gets the card, toast and notification without it. A stored alert baseline
@@ -878,6 +916,24 @@ old web app so old `export.json` files import directly.
   placeholder tiles are skeletons rather than checkboxes: the claim is "these
   are empty", not "here are your chores". No dismiss — it is the only route
   back, and it retires itself the moment a reading lands.
+- **A back-dated write says so, in gold.** The Journal can be scrolled days
+  back from the Calendar, but by the time a sheet is open the date header is
+  long gone, so a save into last Tuesday looked exactly like logging right now.
+  `isPastDay(dk)` (`lib/dates.ts` — day keys are ISO, so a string compare is a
+  date compare) drives `<DaySaveButton/>` in `components/ui.tsx`: on today the
+  ordinary red primary, on any earlier day the new `caution` Button variant
+  (`CAUTION_GOLD` fill, `CAUTION_INK` label — white on gold is unreadable) with
+  an alert mark and "Save for previous day". Every control that COMMITS into one
+  day goes through it — entry + bike forms, the water drawer, bowel movements,
+  the multi-select log picker ("Log 3 items for previous day"), day notes, the
+  sleep-import confirm. Three deliberate exceptions: the live HRV/POTS captures
+  save to the moment they happened and can never be back-dated; Delete stays
+  red, since deleting is already the loud action; and settings-shaped saves (the
+  profile, the water GOAL, the type catalog) are not day data. The sleep editor
+  has no Save to re-dress — its fields write through on change — so it gets
+  `<PastDayNotice/>`, the same warning as a line above the fields, and the log
+  picker's copy drops "today" on a back-dated day ("Any triggers that day?",
+  "you already logged this day").
 - **All logged sections share one pattern**: a section lists the day's entries;
   "+ Add" opens a `TypePicker` (or the bespoke `ReadingPicker`, which also offers
   Live HRV) of registry types; choosing one stacks its `EntryForm` to capture

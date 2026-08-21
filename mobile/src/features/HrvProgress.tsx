@@ -23,7 +23,7 @@ import type { HelpContent } from '../lib/help';
 import { type DaysMap } from '../lib/scoring/day';
 import { isTrustedReading } from '../lib/hrvQuality';
 import {
-  acBandZones, acBuckets, acReadVals, bucketViews, isEvening, isMorning, makeAgg,
+  acBandZones, acBuckets, acReadVals, bucketViews, isEvening, isMorning, makeAgg, type CustomRange,
   type BucketView, type Mode,
 } from '../lib/analysis/buckets';
 
@@ -174,8 +174,8 @@ function readAnyHrv(d: DayRecord, key: string, filt?: (r: Entry) => boolean): nu
   return out;
 }
 
-export function HrvProgress({ days, mode, ctx, filt, onCardLayout }: {
-  days: DaysMap; mode: Mode; ctx: ScoreContext; filt: Filt;
+export function HrvProgress({ days, mode, custom, ctx, filt, onCardLayout }: {
+  days: DaysMap; mode: Mode; custom?: CustomRange | null; ctx: ScoreContext; filt: Filt;
   /** Reports where each metric block sits inside the HRV section, keyed by its
    *  own label ('RMSSD', 'Power distribution'), so Progress can be navigated to a
    *  metric rather than to the top of a section several charts long. */
@@ -184,7 +184,7 @@ export function HrvProgress({ days, mode, ctx, filt, onCardLayout }: {
   const p = usePalette();
 
   const view = useMemo(() => {
-    const buckets = acBuckets(days, mode);
+    const buckets = acBuckets(days, mode, custom);
     const bl = bucketViews(buckets, mode);
     const { acAgg } = makeAgg(days, ctx);
     const f = filterFor(filt);
@@ -214,7 +214,7 @@ export function HrvProgress({ days, mode, ctx, filt, onCardLayout }: {
     const hasBalance = bl.filter((_, i) => pnsB[i] != null && snsB[i] != null).length >= 2;
 
     return { bl, metricCharts, vlf, lf, hf, hasPower, pnsB, snsB, hasBalance };
-  }, [days, mode, ctx, filt]);
+  }, [days, mode, custom, ctx, filt]);
 
   const hasAny = view.metricCharts.length > 0 || view.hasPower;
 

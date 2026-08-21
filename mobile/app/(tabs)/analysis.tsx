@@ -6,7 +6,7 @@ import { useIsFocused } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BottomFade, Screen, headerHeight } from '../../src/components/Header';
 import { Icon } from '../../src/components/Icon';
-import { Ghost, HelpDot, ScoreDot, Segmented } from '../../src/components/ui';
+import { Ghost, HelpDot, ScoreDot } from '../../src/components/ui';
 import { Bars, BpDumbbell, LineChart, StackedBars, ZonesToggle, useChartsBlur } from '../../src/components/charts';
 import { TAIL_STYLE, fonts, radius, readoutTail, usePalette } from '../../src/theme';
 import { getWaveform, useAppState } from '../../src/store/store';
@@ -16,12 +16,13 @@ import { LockedOverlay } from '../../src/features/LockedOverlay';
 import { usePaywall } from '../../src/features/Paywall';
 import { buildCategories, type AnalysisCard, type BpPeriod, type OrthoTransition } from '../../src/lib/analysis/categories';
 import { resolveProtocol, type DaysMap } from '../../src/lib/scoring/day';
-import { catFromBands, type BucketView, type Mode } from '../../src/lib/analysis/buckets';
+import { catFromBands, type BucketView, type CustomRange, type Mode } from '../../src/lib/analysis/buckets';
 import { HrvFilterLinks, HrvProgress, HrvProgressSkeleton, type Filt } from '../../src/features/HrvProgress';
 import { SectionSkeleton } from '../../src/features/ProgressSkeleton';
 import { demoDays, hasOwnData } from '../../src/lib/demo';
 import { logError } from '../../src/lib/diagnostics/errorLog';
 import { DemoBanner, DEMO_PROGRESS_TEXT } from '../../src/features/DemoBanner';
+import { MODE_LABEL, ProgressRangeBar } from '../../src/features/ProgressRange';
 
 /** Sidecar lookup handed to the category builders (POTS Episodes grades each
  *  event on the max delta across its captured curve). Module-level so the
@@ -126,6 +127,16 @@ export default function AnalysisScreen() {
   const [chartMode, setChartMode] = useState<Mode>('day');
   const modeRef = useRef<Mode>('day');
   const chartModeRef = useRef<Mode>('day');
+  /* A custom window rides ALONGSIDE `mode` rather than replacing it: `mode`
+   * stays the grouping in both states, so every consumer below (bucket labels,
+   * the "for the week of" phrasing, the rolling-average window, the veil) keeps
+   * reading the one value it always did, and only the bucket boundaries change.
+   * Same commit discipline as the range itself — what the control shows and
+   * what is charted are separate until the veil is opaque. */
+  const [custom, setCustom] = useState<CustomRange | null>(null);
+  const [chartCustom, setChartCustom] = useState<CustomRange | null>(null);
+  const customRef = useRef<CustomRange | null>(null);
+  const chartCustomRef = useRef<CustomRange | null>(null);
   // The veil's contents are snapshotted at tap time (`items`) and start at the
   // section we'll restore the scroll to, so what it shows lines up with what's
   // underneath when it lifts.
@@ -138,7 +149,7 @@ export default function AnalysisScreen() {
   const veilOp = useSharedValue(0);
   const stage = useRef<'idle' | 'in' | 'opaque' | 'out'>('idle');
   const fadeStarted = useRef(false);
-  const pending = useRef<Mode | null>(null);
+  const pending = useRef<{ mode: Mode; custom: CustomRange | null } | null>(null);
   // A veil pre-raised while the tab was unfocused (stale data, or first
   // launch): it must not lift until the deferred rebuild has committed.
   const dirtyVeil = useRef(false);
@@ -230,13 +241,14 @@ export default function AnalysisScreen() {
     const to = pending.current;
     if (to == null) return;
     pending.current = null;
-    if (to === chartModeRef.current) {
+    if (rangeKey(to.mode, to.custom) === rangeKey(chartModeRef.current, chartCustomRef.current)) {
       // Rapid taps landed back on the range already rendered — nothing to
       // rebuild (and no re-render to wait on), so just take the veil down.
       scheduleLift();
       return;
     }
-    chartModeRef.current = to;
+    chartModeRef.current = to.mode;
+    chartCustomRef.current = to.custom;
     // The old range's section offsets mean nothing for the new one. Cleared
     // here rather than in an effect keyed on chartMode, so a late reset can't
     // wipe the offsets the incoming tree seeds during its first layout pass.
@@ -247,7 +259,8 @@ export default function AnalysisScreen() {
     setPinned(null, 1);
     awaitingBody.current = true;
     raiseCeiling();
-    setChartMode(to);
+    setChartMode(to.mode);
+    setChartCustom(to.custom);
   }, [activeSv, offsetsSv, setPinned, raiseCeiling, scheduleLift]);
 
   // The commit is gated on *two* things: the veil being opaque (so the frame
@@ -286,17 +299,24 @@ export default function AnalysisScreen() {
   /** `anchorId` overrides where the new range opens — the Journal's Trend card
    *  passes the section its claim came from, so the user lands on that chart
    *  instead of the top. Omitted, the anchor stays "wherever you were reading". */
-  const changeMode = useCallback((m: Mode, anchorId?: string, anchorCard?: string) => {
-    if (m === modeRef.current) return;
+  const changeRange = useCallback((m: Mode, c: CustomRange | null, anchorId?: string, anchorCard?: string) => {
+    if (rangeKey(m, c) === rangeKey(modeRef.current, customRef.current)) return;
+    // The pill only TRAVELS between two tab states. Applying or clearing a
+    // custom range cross-fades the whole control instead, and gating the commit
+    // on a spring that is never going to run would hold the veil up for the
+    // full backstop (see PILL_SETTLE_MAX_MS) on every apply.
+    const pillTravels = !c && !customRef.current;
     modeRef.current = m;
+    customRef.current = c;
     setMode(m);            // the pill has already moved itself; this is bookkeeping
-    pending.current = m;
+    setCustom(c);
+    pending.current = { mode: m, custom: c };
     // Hold the commit until the pill's spring settles (Segmented reports via
     // onSettled). The timer is the safety net in case the report never comes —
     // e.g. a mode change forced from outside while the control is off-screen.
-    pillMoving.current = true;
-    if (pillTimer.current) clearTimeout(pillTimer.current);
-    pillTimer.current = setTimeout(onPillSettled, PILL_SETTLE_MAX_MS);
+    if (pillTimer.current) { clearTimeout(pillTimer.current); pillTimer.current = null; }
+    pillMoving.current = pillTravels;
+    if (pillTravels) pillTimer.current = setTimeout(onPillSettled, PILL_SETTLE_MAX_MS);
     if (stage.current === 'idle') {
       // Where to reopen: whatever section the user was reading. Flipping
       // Day→Week to see the same metric at a coarser resolution shouldn't
@@ -328,6 +348,15 @@ export default function AnalysisScreen() {
     }
     // stage === 'in': the fade is already running and will pick up `pending`.
   }, [tryCommit, fadeUp, onPillSettled]);
+
+  /** The four tabs (and every navigation from elsewhere in the app) pick a
+   *  range with no custom window — landing on one always clears it. */
+  const changeMode = useCallback(
+    (m: Mode, anchorId?: string, anchorCard?: string) => changeRange(m, null, anchorId, anchorCard),
+    [changeRange],
+  );
+  const applyCustom = useCallback((c: CustomRange, group: Mode) => changeRange(group, c), [changeRange]);
+  const clearCustom = useCallback(() => changeRange('day', null), [changeRange]);
 
   // A trial expiring while parked on Week/Month/Year needs no forced downgrade:
   // the range stays selected and the mask simply arrives over it.
@@ -468,18 +497,22 @@ export default function AnalysisScreen() {
   // The cache holds builds for exactly one args identity — the launch pre-warm
   // fills it with `buildArgs` before the first commit adopts that same object
   // as `renderArgs`, which is why the reset lives here and not at render time.
-  const cache = useRef<{ args: typeof renderArgs; byMode: Map<Mode, Section[]> }>({ args: null, byMode: new Map() });
-  const buildWith = useCallback((args: NonNullable<typeof renderArgs>, m: Mode): Section[] => {
-    if (cache.current.args !== args) cache.current = { args, byMode: new Map() };
-    const hit = cache.current.byMode.get(m);
+  const cache = useRef<{ args: typeof renderArgs; byRange: Map<string, Section[]> }>({ args: null, byRange: new Map() });
+  const buildWith = useCallback((args: NonNullable<typeof renderArgs>, m: Mode, cr: CustomRange | null): Section[] => {
+    if (cache.current.args !== args) cache.current = { args, byRange: new Map() };
+    const key = rangeKey(m, cr);
+    const hit = cache.current.byRange.get(key);
     if (hit) return hit;
     const { days: d, ...ctx } = args;
-    const cats = buildCategories(d, m, ctx);
+    const cats = buildCategories(d, m, ctx, cr);
     const built = cats.map((c) => ({ id: c.id, title: c.title, buckets: c.buckets, cards: c.build(), hasOwn: c.hasData?.() ?? false }));
-    cache.current.byMode.set(m, built);
+    cache.current.byRange.set(key, built);
     return built;
   }, []);
-  const sections = useMemo(() => (renderArgs ? buildWith(renderArgs, chartMode) : []), [buildWith, renderArgs, chartMode]);
+  const sections = useMemo(
+    () => (renderArgs ? buildWith(renderArgs, chartMode, chartCustom) : []),
+    [buildWith, renderArgs, chartMode, chartCustom],
+  );
   sectionsRef.current = sections;
 
   // Launch pre-warm. The scene pre-mounts unbuilt so startup stays cheap, but
@@ -499,7 +532,7 @@ export default function AnalysisScreen() {
       // Insights throwing. Failing here costs an undressed veil, nothing more.
       let built: Section[];
       try {
-        built = buildWith(buildArgsRef.current, chartModeRef.current);
+        built = buildWith(buildArgsRef.current, chartModeRef.current, chartCustomRef.current);
       } catch (e) {
         logError('progress.prewarm', e);
         return;
@@ -626,19 +659,14 @@ export default function AnalysisScreen() {
       onScroll={onScroll}
       onHeaderHeight={onHeaderHeight}
       header={
-        <View style={{ paddingHorizontal: 16 }}>
-          <Segmented
-            options={[
-              { val: 'day', label: 'Day' },
-              { val: 'week', label: 'Week' },
-              { val: 'month', label: 'Month' },
-              { val: 'year', label: 'Year' },
-            ]}
-            value={mode}
-            onChange={changeMode}
-            onSettled={onPillSettled}
-          />
-        </View>
+        <ProgressRangeBar
+          mode={mode}
+          custom={custom}
+          onChangeMode={changeMode}
+          onSettled={onPillSettled}
+          onApply={applyCustom}
+          onClear={clearCustom}
+        />
       }
       footer={
         <>
@@ -659,9 +687,9 @@ export default function AnalysisScreen() {
               to the rebuild, so it must not blink off while the veil is up. */}
           {locked ? (
         <LockedOverlay
-          visible={mode !== 'day'}
+          visible={mode !== 'day' || !!custom}
           top={headerH}
-          title={`${MODE_LABEL[mode]} trends are locked`}
+          title={custom ? 'Custom ranges are locked' : `${MODE_LABEL[mode]} trends are locked`}
           body="Free keeps the last 14 days on the Day view. Pro opens every range over your full history."
           onUpgrade={openPaywall}
         />
@@ -669,10 +697,15 @@ export default function AnalysisScreen() {
         </>
       }
     >
-      <View key={`${chartMode}:${renderSeq}`} onLayout={onBodyLayout}>
+      <View key={`${rangeKey(chartMode, chartCustom)}:${renderSeq}`} onLayout={onBodyLayout}>
         {!hasData ? (
           <Text style={{ color: p.textDim, textAlign: 'center', marginTop: 48, paddingHorizontal: 24, fontSize: 15, lineHeight: 22 }}>
-            Nothing to show yet. Record readings, sleep, activities and more in your Journal and your progress will start populating here.
+            {/* A custom range with nothing in it is a statement about those
+                dates, not about the journal — telling someone with a year of
+                entries to start logging would simply be wrong. */}
+            {chartCustom
+              ? 'Nothing was logged between those two dates. Pick a wider range, or clear it to go back to the last 14 days.'
+              : 'Nothing to show yet. Record readings, sleep, activities and more in your Journal and your progress will start populating here.'}
           </Text>
         ) : (
           <SectionsBody
@@ -680,6 +713,7 @@ export default function AnalysisScreen() {
             demo={demo}
             days={renderArgs ? renderArgs.days : days}
             mode={chartMode}
+            custom={chartCustom}
             sex={sex}
             height={height}
             hrvFilt={hrvFilt}
@@ -693,6 +727,11 @@ export default function AnalysisScreen() {
     </Screen>
   );
 }
+
+/** One identity for "which range is this", so the build cache, the commit's
+ *  no-op check and the body's remount key all compare the same thing — a custom
+ *  window and the tab it is grouped by are together the range. */
+const rangeKey = (m: Mode, c: CustomRange | null) => (c ? `${m}:${c.from}~${c.to}` : m);
 
 /** Key under which a section registers the offset of the container its cards sit
  *  in, when they are nested one level deeper than the section itself. */
@@ -807,8 +846,6 @@ function RangeVeil({ top, op, items, banner, hrvFilt, onLayout }: {
   );
 }
 
-const MODE_LABEL: Record<Mode, string> = { day: 'Day', week: 'Week', month: 'Month', year: 'Year' };
-
 /** Last-resort veil filling for the moments at launch before the pre-warm has
  *  produced real cards to shape skeletons from — reachable only by tabbing to
  *  Progress faster than the background build. A generic first viewport: a
@@ -833,11 +870,12 @@ function ColdSkeleton() {
 
 /** The whole document of category sections, memoized as one unit so pinned-bar
  *  handoffs (parent state flipping mid-scroll) never touch the chart trees. */
-const SectionsBody = React.memo(function SectionsBody({ sections, demo, days, mode, sex, height, hrvFilt, setHrvFilt, revealed, onSectionLayout, onCardLayout }: {
+const SectionsBody = React.memo(function SectionsBody({ sections, demo, days, mode, custom, sex, height, hrvFilt, setHrvFilt, revealed, onSectionLayout, onCardLayout }: {
   sections: Section[];
   demo: boolean;
   days: DaysMap;
   mode: Mode;
+  custom: CustomRange | null;
   sex?: string;
   height?: string;
   hrvFilt: Filt;
@@ -878,7 +916,7 @@ const SectionsBody = React.memo(function SectionsBody({ sections, demo, days, mo
             // added back when a card is resolved.
             <View onLayout={(e) => onCardLayout(s.id, CARD_BASE, e.nativeEvent.layout.y)}>
               <HrvProgress
-                days={days} mode={mode} ctx={ctx} filt={hrvFilt}
+                days={days} mode={mode} custom={custom} ctx={ctx} filt={hrvFilt}
                 onCardLayout={(card, y) => onCardLayout(s.id, card, y)}
               />
             </View>

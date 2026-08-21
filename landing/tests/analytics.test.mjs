@@ -48,7 +48,7 @@ put(open, A.addDays(C3, 1), C3, 12);
 // installs older than the counter, phoning in on the last day
 put(open, LAST, OLD, 7);
 
-// purchases: one inside the trial, one on D15 (the wall), one late
+// purchases: one inside the trial, one on D15 (the day the trial ends), one late
 put(sub, A.addDays(C1, 5), C1, 2);
 put(sub, A.addDays(C1, 15), C1, 3);
 put(sub, A.addDays(C1, 25), C1, 1);
@@ -111,7 +111,7 @@ check('...but is for D1', A.isMature(ix, C3, 1) === true);
 const row = A.milestoneRow(ix, C3, A.MILESTONES);
 const unavailable = row.filter((cell) => !cell.available).map((cell) => cell.day);
 check('young cohort: only D0/D1 available, rest unavailable',
-  unavailable.join(',') === '3,7,8,14,15,21,30,60,90', unavailable.join(','));
+  unavailable.join(',') === '3,7,14,15,21,30,60,90', unavailable.join(','));
 check('unavailable cells carry null, never 0',
   row.filter((x) => !x.available).every((x) => x.pct === null));
 
@@ -122,40 +122,46 @@ check('cohorts group into weeks by Monday', weeks.length === 3, weeks.map((w) =>
 check('a week\'s size is the sum of its days (each install born once)',
   weeks.reduce((a, w) => a + w.size, 0) === 170, String(weeks.reduce((a, w) => a + w.size, 0)));
 
-/* ------------------------------------------------- trial / wall boundaries */
+/* -------------------------------------------------------- trial boundary */
 
-check('boundaries are the product\'s, not round numbers',
-  A.BOUNDARIES.trialLastDay === 7 && A.BOUNDARIES.firstPostTrial === 8 &&
-  A.BOUNDARIES.historyLastDay === 14 && A.BOUNDARIES.firstWallDay === 15);
+/* ONE boundary, not two. The app used to run a seven-day trial and then a
+   separate history wall a week later; it now runs a single fourteen-day trial,
+   and the free tier's history clip falls on the same day it ends. A second
+   boundary here would draw the same moment twice. */
+check('the boundary is the product\'s, not a round number',
+  A.BOUNDARIES.trialLastDay === 14 && A.BOUNDARIES.firstPostTrial === 15);
+check('the history wall is gone rather than coincident',
+  A.BOUNDARIES.firstWallDay === undefined && A.BOUNDARIES.historyLastDay === undefined,
+  JSON.stringify(A.BOUNDARIES));
 
 const s = A.survival(ix, ix.cohorts);
-// D7->D8 over cohorts mature for D8 (C1, C2): (40+20)/150 = 40% -> (30+18)/150 = 32%
-check('D7→D8 compares both sides over the same installs',
-  near(s.trialEnd.before.pct, 40) && near(s.trialEnd.after.pct, 32), JSON.stringify(s.trialEnd && s.trialEnd.after));
-check('D7→D8 change is in percentage points', near(s.trialEnd.points, -8), String(s.trialEnd && s.trialEnd.points));
-// D14->D15 is only C1 (C2 is 15 days old at LAST, so D15 exists for it too)
-check('D14→D15 is available and negative', s.historyWall && s.historyWall.points < 0,
-  JSON.stringify(s.historyWall && s.historyWall.points));
+// D14->D15 over cohorts mature for D15, both sides on the same installs
+check('D14→D15 compares both sides over the same installs',
+  s.trialEnd && s.trialEnd.before.available && s.trialEnd.after.available,
+  JSON.stringify(s.trialEnd && s.trialEnd.after));
+check('D14→D15 change is in percentage points and negative',
+  s.trialEnd && s.trialEnd.points < 0, String(s.trialEnd && s.trialEnd.points));
+check('there is no second transition to report', s.historyWall === undefined);
 
 const life = A.lifecycleNow(ix, ix.cohorts);
 check('trials-started buckets every measurable install exactly once',
-  life.inTrial + life.postTrial + life.pastWall === 170, JSON.stringify(life));
+  life.inTrial + life.postTrial === 170, JSON.stringify(life));
 check('the 2-day-old cohort counts as a trial started', life.inTrial === 20, JSON.stringify(life));
 
 /* The usage-based lifecycle is what the tiles show, because it can see every
    active install — including ones older than the counter, whose cohort size was
    never observed but whose age is exact. The only cohort pinging on LAST is the
-   pre-counter one, 7 installs at 60 days old — squarely past the wall. Under
+   pre-counter one, 7 installs at 60 days old — squarely past the trial. Under
    the old cohort-size lifecycle those 7 were invisible, which is exactly the
    bug: the most established users the app had, counted as nothing. */
 const liveNow = A.lifecycleActive(ix, LAST);
 check('active lifecycle counts everyone who pinged, not just measurable cohorts',
-  liveNow.inTrial + liveNow.postTrial + liveNow.pastWall === liveNow.total,
+  liveNow.inTrial + liveNow.postTrial === liveNow.total,
   JSON.stringify(liveNow));
 check('a pre-counter install lands in the right stage by its age',
-  liveNow.pastWall === 7 && liveNow.total === 7, JSON.stringify(liveNow));
+  liveNow.postTrial === 7 && liveNow.total === 7, JSON.stringify(liveNow));
 check('...which lifecycleNow alone would have missed',
-  A.lifecycleNow(ix, ix.cohorts).pastWall !== liveNow.pastWall);
+  A.lifecycleNow(ix, ix.cohorts).postTrial !== liveNow.postTrial);
 
 /* --------------------------------------------------------- monetization */
 
@@ -163,7 +169,7 @@ const ages = A.purchaseAges(ix);
 const byKey = {};
 ages.buckets.forEach((b) => { byKey[b.key] = b.count; });
 check('purchase at D5 lands in the trial bucket', byKey.d0_7 === 2, JSON.stringify(byKey));
-check('purchase at D15 gets its own bucket (the wall)', byKey.d15 === 3, JSON.stringify(byKey));
+check('purchase at D15 gets its own bucket (the day the trial ends)', byKey.d15 === 3, JSON.stringify(byKey));
 check('purchase at D25 lands in D22–30', byKey.d22_30 === 1, JSON.stringify(byKey));
 check('purchase ages total to every purchase seen', ages.total === 6, String(ages.total));
 
@@ -497,6 +503,93 @@ check('and the first bucket holds the same-day ones plus C1\'s D3',
 const legacy = A.index({ open: shape(open), sub: shape(sub) });
 check('a report with no activation rows is empty, not broken',
   A.activationsOn(legacy, C1) === 0 && A.activation(legacy, legacy.cohorts, 0).kept === 0);
+
+/* ------------------------------------------------------------ measuring
+
+   The reading counter (`hrv`), which shipped LATER than the other three. Its
+   whole value is that it is the open counter's twin — both one per install per
+   Eastern day — so their ratio is a share of people. Its whole risk is that the
+   days before it existed look exactly like days on which nobody measured. */
+
+const HRV_FIRST = '2026-06-16';
+const hrv = {};
+put(hrv, HRV_FIRST, C2, 9);                 // C2's D1: 9 of 50
+put(hrv, '2026-06-21', C1, 4);              // C1's D21: 4 of 100
+put(hrv, '2026-06-22', C2, 6);              // C2's D7: 6 of 50
+put(hrv, C3, C3, 8);                        // C3's D0: 8 of 20
+put(hrv, '2026-06-29', C3, 5);              // C3's D1: 5 of 20
+
+const mix = A.index({ open: shape(open), sub: shape(sub), hrv: shape(hrv) });
+
+check('the reading counter\'s own start day is found', mix.hrvFirst === HRV_FIRST, String(mix.hrvFirst));
+check('a day before it is unknown, a day after it is known',
+  A.hrvKnown(mix, '2026-06-15') === false && A.hrvKnown(mix, HRV_FIRST) === true);
+
+/* The rule the whole module turns on: a busy day before the counter shipped is
+   NOT a day on which nobody measured. C2's own day 0 had 50 installs on the
+   app and no reading rows, and reporting that as 0% would be a claim about
+   people made out of a deploy date. */
+check('a pre-counter day with real actives reads null, never 0%',
+  A.measureShare(mix, C2) === null && A.activeOn(mix, C2) === 62,
+  String(A.activeOn(mix, C2)));
+check('a covered day reports the share of the people who were there',
+  near(A.measureShare(mix, '2026-06-21'), 40), String(A.measureShare(mix, '2026-06-21')));
+check('a covered day on which nobody measured is a real 0%',
+  A.measureShare(mix, '2026-06-18') === 0, String(A.measureShare(mix, '2026-06-18')));
+
+const rate = A.measureRate(mix, A.range(FIRST, LAST));
+check('the window rate pools install-days on both sides',
+  rate.readings === 32 && rate.active === 158, JSON.stringify(rate));
+check('and leaves the pre-counter days out of both, counting them',
+  rate.days === 15 && rate.blind === 16, JSON.stringify(rate));
+check('the pooled rate is readings over install-days', near(rate.pct, (32 / 158) * 100), String(rate.pct));
+
+/* A share above 100% is information, not a bug: a reading saved either side of
+   midnight Eastern, or on a launch whose open ping was lost offline, lands in a
+   day without its open. Clamping it would hide the only signal that says the
+   two counters have drifted. */
+const drifted = A.index({
+  open: shape({ [C3]: { [C3]: 4 } }),
+  hrv: shape({ [C3]: { [C3]: 5 } }),
+});
+check('a drifted day is reported above 100%, not clamped',
+  near(A.measureShare(drifted, C3), 125), String(A.measureShare(drifted, C3)));
+
+/* Measuring at day N: retention's twin, with one extra exclusion nothing else
+   here has — a cohort whose day N fell before the counter shipped is neither
+   churned nor too young. */
+const m0 = A.measuringAt(mix, mix.cohorts, 0);
+check('D0 measuring counts only the cohort the counter could see',
+  m0.kept === 8 && m0.of === 20 && m0.cohorts === 1 && m0.blind === 2, JSON.stringify(m0));
+check('and reads 40%', near(m0.pct, 40), String(m0.pct));
+
+const m1 = A.measuringAt(mix, mix.cohorts, 1);
+check('D1 measuring pools the two covered cohorts',
+  m1.kept === 14 && m1.of === 70 && m1.cohorts === 2 && m1.blind === 1, JSON.stringify(m1));
+
+const m7 = A.measuringAt(mix, mix.cohorts, 7);
+check('D7 measuring separates too-young from before-the-counter',
+  m7.kept === 6 && m7.of === 50 && m7.immature === 1 && m7.blind === 1, JSON.stringify(m7));
+
+const m21 = A.measuringAt(mix, mix.cohorts, 21);
+check('D21 measuring is C1 alone', m21.kept === 4 && m21.of === 100 && m21.cohorts === 1, JSON.stringify(m21));
+
+const mCurve = A.measuringCurve(mix, mix.cohorts, 60);
+check('the habit curve starts at D0 and stops where nothing is knowable',
+  mCurve.length > 0 && near(mCurve[0].pct, 40) && mCurve.length <= 31, String(mCurve.length));
+
+/* The counter's start day is read UNFILTERED. Android shipped the route in its
+   own release, so dating it from a platform slice would date it from the wrong
+   build — and the slice itself is still strict. */
+const iosMix = A.index({ open: shape(open), sub: shape(sub), hrv: shape(hrv) }, 'ios');
+check('hrvFirst survives a platform slice that keeps none of the rows',
+  iosMix.hrvFirst === HRV_FIRST && A.readingsOn(iosMix, '2026-06-21') === 0);
+
+/* A report cached before the reading counter existed must read as "no readings
+   yet", never as a crash and never as a wall of zero percents. */
+check('a report with no hrv rows knows nothing rather than claiming zero',
+  legacy.hrvFirst === null && A.hrvKnown(legacy, LAST) === false &&
+  A.measureShare(legacy, LAST) === null && A.measureRate(legacy, [LAST]).available === false);
 
 /* -------------------------------------------------------------- report */
 

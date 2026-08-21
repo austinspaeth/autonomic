@@ -238,7 +238,7 @@ for its platform. The data is fetched once per session, cached on `pings`, and
 is **read-only** — it lives outside `db`, so `sync.js` never sees it and there
 is nothing here to edit.
 
-Three counters, not two. Beside `open` and `sub` there is **`act`**: an install
+Four counters, not two. Beside `open` and `sub` there is **`act`**: an install
 saved its FIRST HRV reading. That one carries a second letter for the sensor it
 used — `W` Apple Watch, `B` Bluetooth strap, `F` finger on the camera. It is the
 step between downloading and retaining, and the only one onboarding owns: an
@@ -247,6 +247,31 @@ for, so a retention number read without an activation number beside it blames
 the product for a wizard that never finished. It fires **once per install,
 ever**, which makes it the one counter here whose rows really do count people —
 the no-summing rule below is about opens.
+
+And there is **`hrv`**: an install saved a reading TODAY. It is the open
+counter's twin — same cohort code, same platform letter, no sensor letter, and
+capped at one per install per Eastern day by the same client rule — which is
+what makes it worth more than a fourth number. Because both are bucketed
+identically over the same population, `hrv[day] / open[day]` is a genuine
+**share of people**: of everyone who was in the app that day, how many actually
+measured. It is the only ratio on this page whose numerator and denominator are
+both install-days, and it answers the question retention cannot. Retention says
+somebody launched the app; a journal app can be launched every morning to look
+at yesterday's number and never gain a new one, and that install is on its way
+out while drawing a perfect curve.
+
+**The reading counter shipped later than the other three, and that is a rule,
+not a footnote.** `index` records `hrvFirst` — the first day the route was ever
+heard from — and everything derived from it is `null` before that day, never 0%.
+A day on which 60 installs opened the app and no reading rows exist is a day the
+counter was not running, and reporting it as "nobody measured" would be a claim
+about people made out of a deploy date. `A.hrvKnown(ix, day)` is the gate;
+`measureShare` returns null, `measureRate` counts those days as `blind` and
+excludes them from both sides, and `measuringAt` reports `blind` cohorts
+separately from `immature` ones. `hrvFirst` is read from the **unfiltered**
+rows even when a platform slice is in force, because Android shipped the route
+in its own release and dating the counter from an iOS-only slice would date it
+from the wrong build.
 
 One rule governs all the arithmetic, and every metric in the view is shaped by
 it: **counts can be compared across days but never summed into one.** With no
@@ -281,6 +306,24 @@ the UI, each of them deliberate:
   Apple Watch is offered on iPhone only, so its share of a combined view is a
   share of a population half of which was never offered it — the card says so
   under the chart, and the filter is how to read it honestly.
+- **Measuring has its own card, and its own pair of curves.** The **Opened vs
+  measured** card charts actives and readings on one axis per day (a gap in the
+  reading line where the counter had not shipped, never a zero), with the
+  window's pooled rate underneath and the second half of the window against the
+  first, stated in percentage POINTS. Beside it, **The habit curve** puts
+  `A.curve` and `A.measuringCurve` on one axis by install age: opened against
+  measured, over the same cohorts. **The distance between the two lines is the
+  finding** — every point of it is an install that showed up that day and did
+  not measure, which is the shape that precedes churn and which nothing else
+  here can see. The tile strip carries the same pair at a glance: *Measured on
+  <day>*, *Measured of active* (the day's share) and *Measured per active day*
+  (the range's, pooled as install-days). The reading rate can exceed 100% on a
+  day when a reading landed without its open ping — a launch made offline, or a
+  reading saved either side of midnight Eastern — and it is **shown as it comes
+  out rather than clamped**, because that gap is the only signal that says the
+  two counters have drifted. The weekday chart carries a **Readings** bar for
+  the same reason it carries the others: which weekday people actually measure
+  on is the number the morning reminder's time should follow.
 - **A subscribe ping carries the buyer's store in the same cohort key an open
   ping does**, so "which store paid" needs no second source: `subPlatformsOn` /
   `purchasePlatformsOver` read it back, and both **Purchases on <day>** (the

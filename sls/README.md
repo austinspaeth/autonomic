@@ -14,6 +14,7 @@ Authorization: Bearer <Cognito id token>
 GET  https://api.autonomic.care/ping/open/D082126I    (public, no auth)
 GET  https://api.autonomic.care/ping/sub/D082126I
 GET  https://api.autonomic.care/ping/act/D082126IB
+GET  https://api.autonomic.care/ping/hrv/D082126I
 GET  https://api.autonomic.care/ping/report?key=...&since=2026-08-01
 ```
 
@@ -45,6 +46,7 @@ per user, which would eventually meet DynamoDB's 400KB item ceiling.
 | `PING#OPEN` | `<day>` | that day's opens, counted per cohort |
 | `PING#SUB` | `<day>` | that day's new subscribers, counted per cohort |
 | `PING#ACT` | `<day>` | that day's activations (first HRV reading), per cohort+method |
+| `PING#HRV` | `<day>` | that day's measuring installs (any HRV reading), per cohort |
 | `STORE#VERSIONS` | `latest` | what each store is serving, cached (see below) |
 
 `LOAD` queries the whole partition. `SYNC` applies the client's diff — entries
@@ -116,7 +118,7 @@ open device, and the stores publish a few times a month; only the card's
 
 ## The cohort ping
 
-`lambdas/ping/main.js` — two public write routes, no auth, no body, `204` to
+`lambdas/ping/main.js` — four public write routes, no auth, no body, `204` to
 everything. The path segment is the calling install's **cohort** — the day it
 first ran the app, as `D{MMDDYY}` — followed by **one letter for the platform**:
 `I` for iOS, `A` for Android, `U` for unknown. A missing letter also reads as
@@ -179,6 +181,31 @@ Point 4 is also why the client, not the server, enforces one ping per day: with
 nothing to de-duplicate on, the server *cannot* do it, and that is the
 property, not a limitation.
 
+### The reading counter is the open counter's twin
+
+`/ping/hrv/<code>` says an install saved an HRV reading today. It carries
+exactly what `/ping/open` carries — cohort date and platform letter, **no sensor
+letter** — and it is capped at one per install per Eastern day by the same
+client rule, bucketed on the same boundary. That symmetry is the whole point:
+because both count the same kind of thing over the same population, `hrv[day] /
+open[day]` is a **share of people**, not of pings. Opening the app is not using
+it, and the open counter alone cannot tell an install that measures every
+morning apart from one that launches the app to look at yesterday's number and
+never gains a new one.
+
+Two consequences for anything reading these rows:
+
+- **Nothing may be added to one of the two that is not added to the other.** A
+  second sensor letter on the HRV route, a different day boundary, a second ping
+  per day — any of them breaks the ratio silently, since the numbers still
+  divide.
+- **Days before the route shipped are unknown, not zero.** There is no start
+  date stored anywhere (the endpoint keeps counts), so a reader has to take the
+  first day an `hrv` row exists as the counter's birthday and answer null for
+  everything before it. `landing/master/analytics.js` does exactly that
+  (`hrvFirst` / `hrvKnown`), and reads it off the UNFILTERED rows, because
+  Android shipped the route in its own release.
+
 ### Never delete a day row
 
 `PING#OPEN / <day>` is **everyone's** counts for that day, in one item. Deleting
@@ -216,12 +243,14 @@ Two doors onto the same function, because they have different callers:
   the dashboard, which already holds a Cognito token and shouldn't also carry
   the shared key. The email allowlist guards it like everything else there.
 
-Both answer `{ since, open: [...], sub: [...], act: [...] }`, each row
+Both answer `{ since, open: [...], sub: [...], act: [...], hrv: [...] }`, each row
 `{ day, total, cohorts: [{ key, cohortDate, cohort, platform, method, count }] }`.
 Rows stored before the platform marker existed report `platform: "U"`. `method`
 is the sensor an activation used — `W` watch, `B` Bluetooth strap, `F` finger on
-the camera — and is `null` on every row of the other two kinds, which carry no
-method at all.
+the camera — and is `null` on every row of the other three kinds, which carry no
+method at all. A consumer written before the `hrv` key existed ignores it; one
+written after must treat a missing `hrv` row as "the counter was not running",
+not as "nobody measured".
 
 Set the key once before the first deploy (any random string):
 
@@ -236,8 +265,10 @@ did. A cohort date is shared by every install born that day, so it names a day,
 not a person. Two consequences follow and neither is a bug:
 
 - **The server cannot de-duplicate**, so the client does: at most one open ping
-  per install per Eastern day, exactly one subscribe ping per install
-  (`mobile/src/store/ping.ts`). One ping == one active install that day.
+  and one reading ping per install per Eastern day, exactly one subscribe ping
+  and one activation ping per install, ever (`mobile/src/store/ping.ts`). One
+  open ping == one active install that day; one reading ping == one install that
+  measured that day.
 - **Counts are trusted, not verified.** Anyone can curl the URL and inflate a
   number. The alternative is an identifier, which is the thing being refused.
   If it is ever abused, the answer is a WAF rate limit on the route, not a

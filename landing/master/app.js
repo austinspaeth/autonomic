@@ -11,19 +11,22 @@
     s5: '#d55181', s6: '#008300', s7: '#9085e9', s8: '#e66767',
     // platform identities, validated as a pair on the dark surface
     ios: '#3987e5', android: '#6aa80f',
-    // lifecycle stages — green while in trial, gold once past it, red past the wall
+    // lifecycle stages — green while in trial, gold at the boundary, red once
+    // past it and on the free tier
     green: '#00a08f', gold: '#c98500', red: '#c9403f',
     muted: '#898781', text: '#c3c2b7'
   };
 
   /* Entity colours — fixed, never assigned by rank.
-     Downloads own slot 1, the trial threshold slot 2, the 14-day wall slot 3.
-     Trial and wall now both land on day 14, so those two bands coincide. */
+     Downloads own slot 1 and the trial threshold slot 2. `wallHit` is slot 3
+     and is now simply "past the trial": it kept its key when the separate
+     history wall was removed, because the colour is referenced widely and the
+     rename would have been the whole diff. */
   var ENTITY = {
     downloads: COLOR.s1,        // blue
     inTrial: COLOR.green,       // still inside the free trial
     trialEnd: COLOR.gold,       // past the trial
-    wallHit: COLOR.red,         // past the wall
+    wallHit: COLOR.red,         // past the trial, on the free tier
     sales: COLOR.s7,            // violet — "paid" covers sales and revenue
     revenue: COLOR.s7,
     impressions: COLOR.s2,      // orange
@@ -41,7 +44,7 @@
   function load() {
     var d = {
       entries: [], events: [], ads: [], costs: [], sales: [],
-      settings: { trialDays: 14, wallDays: 14, currency: '$', storeCutPct: 15 }
+      settings: { trialDays: 14, currency: '$', storeCutPct: 15 }
     };
     try {
       var raw = localStorage.getItem(KEY);
@@ -56,9 +59,30 @@
         // any stale values rather than carrying them into exports and backups
         d.entries.forEach(function (e) { if (e) delete e.conversionRate; });
         if (p && p.settings) Object.assign(d.settings, p.settings);
+        migrateSettings(d.settings);
       }
     } catch (e) { console.warn('Could not read saved data', e); }
     return d;
+  }
+
+  /**
+   * Bring a settings record written by the two-boundary build up to date.
+   *
+   * `wallDays` is the tell: only a build that still had a separate history wall
+   * ever wrote it. Such a record also carries the OLD seven-day trial, and
+   * because the field is stored per dashboard rather than derived, a stored 7
+   * would have quietly outlived the change — the code would say fourteen days
+   * everywhere and the screen would still say seven, which is exactly the drift
+   * that let `analytics.js` and `app.js` disagree in the first place.
+   *
+   * Keyed on `wallDays` and not on the value 7, so it only ever touches records
+   * the old build wrote. A trial length typed in deliberately after this ships
+   * has no `wallDays` beside it and is left alone.
+   */
+  function migrateSettings(st) {
+    if (!st || st.wallDays === undefined) return;
+    delete st.wallDays;
+    st.trialDays = 14;
   }
 
   function save() {
@@ -87,6 +111,10 @@
     var st = JSON.parse(localStorage.getItem(KEY + '.ui') || 'null');
     if (st) Object.assign(state, st);
   } catch (e) { /* ignore */ }
+  /* `compare` was a fourth platform option and is gone. A browser that had it
+     selected — or a synced UI state written by a build that still had it —
+     would otherwise land on a filter with no button to leave it by. */
+  if (state.platform === 'compare') state.platform = 'combined';
   function saveUI() {
     try { localStorage.setItem(KEY + '.ui', JSON.stringify(state)); } catch (e) {}
     if (window.Sync) window.Sync.schedule();
@@ -305,12 +333,21 @@
   }
 
   function trialDays() { return Math.max(1, num(db.settings.trialDays) || 14); }
-  function wallDays() { return Math.max(trialDays(), num(db.settings.wallDays) || 14); }
-  /* Day 7 is still inside the trial and day 14 is still inside the chart window —
-     both limits are inclusive, so a cohort leaves on the day AFTER the limit.
-     These are the shifts every threshold metric is derived with. */
+  /* The limit is inclusive — day 14 is still inside the trial — so a cohort
+     leaves on the day AFTER it. This is the shift every threshold metric is
+     derived with. */
   function trialExit() { return trialDays() + 1; }
-  function wallExit() { return wallDays() + 1; }
+
+  /* There was a SECOND boundary here once: a shorter trial, and then a separate
+     "history wall" some days later where a free user lost their older charts.
+     The app now runs one fourteen-day trial and the free tier's history clip
+     falls on the same day it ends, so the wall describes the same moment the
+     trial exit does. These two survive as aliases rather than as a stored
+     setting: every `wallHit` / `pastWall` field below is therefore numerically
+     identical to its trial twin by construction, and cannot drift back apart
+     the way a second settings field silently did. New code should say trial. */
+  function wallDays() { return trialDays(); }
+  function wallExit() { return trialExit(); }
 
   /* selected range as an inclusive [from,to] pair of ISO dates */
   function activeRange() {
@@ -370,7 +407,12 @@
       row.cumTrialEnd = cumAt(p, addDays(e, -T), 'downloads');
       row.cumWallHit = cumAt(p, addDays(e, -Wd), 'downloads');
       row.inTrial = row.cumDownloads - row.cumTrialEnd;
-      row.pastTrial = row.cumTrialEnd - row.cumWallHit;   // between trial end and the wall
+      /* One boundary now, so this band is empty by construction: it used to
+         hold the installs between the trial ending and the history wall biting,
+         and those two are the same day. Kept as a field because the export
+         columns and the stacked chart both still name it, and zero is the
+         honest value rather than a missing key. */
+      row.pastTrial = row.cumTrialEnd - row.cumWallHit;
       row.pastWall = row.cumWallHit;
 
       // store conversion is always derived — downloads over impressions
@@ -429,12 +471,18 @@
   function platKeys() {
     if (state.platform === 'ios') return ['ios'];
     if (state.platform === 'android') return ['android'];
-    if (state.platform === 'compare') return ['ios', 'android'];
     return ['all'];
   }
   function platName(k) { return k === 'all' ? 'All platforms' : PLATFORMS[k]; }
   function platColor(k) { return k === 'all' ? ENTITY.downloads : ENTITY[k]; }
-  function isCompare() { return state.platform === 'compare'; }
+  /* The filter bar once carried a fourth option, `compare`, which drew iOS and
+     Android as two series in every chart. It is gone: it doubled the series
+     count on charts that were already stacked, it had no single answer for any
+     tile (so half of them silently fell back to combined), and the iOS vs
+     Android tab answers the same question properly. This survives as a constant
+     `false` so the branches that read it collapse rather than being deleted one
+     by one — a `compare` in a saved filter state now simply reads as combined. */
+  function isCompare() { return false; }
 
   /* --------------------------------------------------------------- charts */
 
@@ -585,11 +633,6 @@
         split: splitOf(function (x) { return fmtInt(x.outOfTrial); })
       }),
       tile({
-        label: 'Hit the ' + wallDays() + '-day wall', color: ENTITY.wallHit, value: fmtInt(s.hitWall),
-        meta: pctOf(s.hitWall, s.totalInstalls) + ' of all installs · charts now locked for them',
-        split: splitOf(function (x) { return fmtInt(x.hitWall); })
-      }),
-      tile({
         label: 'Paid conversions', color: ENTITY.sales, value: fmtInt(s.totalSales),
         delta: pctDelta(s.sales, ps.sales),
         meta: fmtInt(s.sales) + ' in range · ' + fmtMoney(s.totalRevenue) + ' all time',
@@ -600,11 +643,6 @@
         label: 'Convert rate — past trial', value: fmtPct(s.convOfOutOfTrial),
         meta: fmtInt(s.totalSales) + ' paid ÷ ' + fmtInt(s.outOfTrial) + ' who finished the trial',
         split: splitOf(function (x) { return fmtPct(x.convOfOutOfTrial); })
-      }),
-      tile({
-        label: 'Convert rate — hit the wall', value: fmtPct(s.convOfWall),
-        meta: fmtInt(s.totalSales) + ' paid ÷ ' + fmtInt(s.hitWall) + ' who lost historical charts',
-        split: splitOf(function (x) { return fmtPct(x.convOfWall); })
       }),
       tile({
         label: 'Revenue', color: ENTITY.revenue, value: fmtMoney(s.revenue), smallValue: true,
@@ -639,10 +677,10 @@
       cumulative ? 'Cumulative downloads and thresholds' : 'Downloads over time';
     document.getElementById('ovChartHint').innerHTML = cumulative
       ? 'Everyone who has ever installed, and how many of them have since passed the ' + trialDays() +
-        '-day trial and the ' + wallDays() + '-day chart wall. Paid conversions are on the same axis — '
-        + 'same unit, so the gap between the wall line and the paid line is the conversion you are leaving on the table.'
-      : 'The line is new installs. The shaded bands are the same installs re-plotted on the day they aged out of the ' +
-        trialDays() + '-day trial and the day they hit the ' + wallDays() + '-day wall — so a spike moves right across the chart as that cohort matures.';
+        '-day trial. Paid conversions are on the same axis — same unit, so the gap between the '
+        + 'past-trial band and the paid line is the conversion you are leaving on the table.'
+      : 'The line is new installs. The shaded band is the same installs re-plotted on the day they aged out of the ' +
+        trialDays() + '-day trial — so a spike moves right across the chart as that cohort matures.';
 
     var series = [];
     if (isCompare()) {
@@ -654,8 +692,7 @@
     } else {
       series = [
         mk(rowsMain, main, cumulative ? 'cumDownloads' : 'downloads', 'First-time downloads', ENTITY.downloads, 'line'),
-        mk(rowsMain, main, cumulative ? 'cumTrialEnd' : 'trialEnd', 'Past the ' + trialDays() + '-day trial', ENTITY.trialEnd, 'area'),
-        mk(rowsMain, main, cumulative ? 'cumWallHit' : 'wallHit', 'Hit the ' + wallDays() + '-day wall', ENTITY.wallHit, 'area')
+        mk(rowsMain, main, cumulative ? 'cumTrialEnd' : 'trialEnd', 'Past the ' + trialDays() + '-day trial', ENTITY.trialEnd, 'area')
       ];
       // paid is the same unit (people), so it shares the axis honestly — it sits low
       // against the thresholds, which is exactly the comparison worth seeing
@@ -663,7 +700,7 @@
     }
     drawChart('ovChart', {
       x: xAxis(rowsMain), series: series, height: 320, format: fmtInt, xLabel: 'Period',
-      ariaLabel: 'Downloads over time with trial and wall thresholds',
+      ariaLabel: 'Downloads over time with the trial threshold',
       tooltipNote: (!cumulative && state.grain === 'day') ? function (i) {
         var row = rowsMain[i];
         if (!row) return '';
@@ -682,8 +719,7 @@
     } else {
       lifeSeries = [
         mk(rowsMain, main, 'inTrial', 'In free trial (day 0–' + trialDays() + ')', ENTITY.inTrial, 'area'),
-        mk(rowsMain, main, 'pastTrial', 'Past trial, charts still open', ENTITY.trialEnd, 'area'),
-        mk(rowsMain, main, 'pastWall', 'Past day ' + wallDays() + ' — charts locked', ENTITY.wallHit, 'area')
+        mk(rowsMain, main, 'pastWall', 'Past the trial — Pro features locked', ENTITY.wallHit, 'area')
       ];
       drawChart('ovStack', { x: xAxis(rowsMain), series: lifeSeries, stacked: true, height: 260, format: fmtInt });
     }
@@ -953,29 +989,19 @@
         split: splitOf(function (x) { return fmtInt(x.trialEnd); })
       }),
       tile({
-        label: 'Crossed day ' + wallDays() + ' in range', color: ENTITY.wallHit, value: fmtInt(s.wallHit),
-        meta: 'reached day ' + wallExit() + ' during this range — the harder wall, where historical charts close',
-        split: splitOf(function (x) { return fmtInt(x.wallHit); })
-      }),
-      tile({
         label: 'Paid in range', color: ENTITY.sales, value: fmtInt(s.sales),
         meta: fmtMoney(s.revenue) + ' · ' + fmtMoney(s.arppu) + ' per paying user',
         split: splitOf(function (x) { return fmtInt(x.sales); })
       }),
       tile({
-        label: 'In-range convert rate at the wall', value: fmtPct(s.wallHit ? (s.sales / s.wallHit) * 100 : null),
-        meta: fmtInt(s.sales) + ' paid ÷ ' + fmtInt(s.wallHit) + ' who crossed day ' + wallExit() + ' in this range',
-        split: splitOf(function (x) { return fmtPct(x.wallHit ? (x.sales / x.wallHit) * 100 : null); })
+        label: 'In-range convert rate', value: fmtPct(s.trialEnd ? (s.sales / s.trialEnd) * 100 : null),
+        meta: fmtInt(s.sales) + ' paid ÷ ' + fmtInt(s.trialEnd) + ' who crossed day ' + trialExit() + ' in this range',
+        split: splitOf(function (x) { return fmtPct(x.trialEnd ? (x.sales / x.trialEnd) * 100 : null); })
       }),
       tile({
         label: 'Lifetime convert — past trial', value: fmtPct(s.convOfOutOfTrial),
         meta: 'all-time paid ÷ everyone all-time past day ' + trialDays(),
         split: splitOf(function (x) { return fmtPct(x.convOfOutOfTrial); })
-      }),
-      tile({
-        label: 'Lifetime convert — at the wall', value: fmtPct(s.convOfWall),
-        meta: 'all-time paid ÷ everyone all-time past day ' + wallDays(),
-        split: splitOf(function (x) { return fmtPct(x.convOfWall); })
       }),
       tile({
         label: 'Revenue per install', value: fmtMoney(s.rpi), smallValue: true,
@@ -999,8 +1025,6 @@
       { name: 'First-time downloads', sub: 'installed', v: s.downloads, color: ENTITY.downloads },
       { name: 'Now past day ' + trialDays(), sub: 'of those installs, day ' + trialExit() + '+ by now',
         v: s.cohortPastTrial, color: ENTITY.trialEnd },
-      { name: 'Now past day ' + wallDays(), sub: 'of those installs, day ' + wallExit() + '+ by now',
-        v: s.cohortPastWall, color: ENTITY.wallHit },
       { name: 'Paid', sub: 'sales recorded in this range', v: s.sales, color: ENTITY.sales }
     ];
     var maxV = Math.max.apply(null, steps.map(function (x) { return x.v; })) || 1;
@@ -1037,7 +1061,6 @@
         }))
       : [
           mk(rows, main, 'trialEnd', 'Past day ' + trialDays(), ENTITY.trialEnd, 'bar'),
-          mk(rows, main, 'wallHit', 'Past day ' + wallDays(), ENTITY.wallHit, 'bar'),
           mk(rows, main, 'sales', 'Paid', ENTITY.sales, 'line')
         ];
     drawChart('trPressure', { x: xAxis(rows), series: pressSeries, height: 280, format: fmtInt });
@@ -1049,8 +1072,7 @@
         })
       : [
           mk(rows, main, 'paidOfInstalls', 'of all installs', ENTITY.downloads, 'line'),
-          mk(rows, main, 'paidOfTrial', 'of everyone past day ' + trialDays(), ENTITY.trialEnd, 'line'),
-          mk(rows, main, 'paidOfWall', 'of everyone past day ' + wallDays(), ENTITY.wallHit, 'line')
+          mk(rows, main, 'paidOfTrial', 'of everyone past day ' + trialDays(), ENTITY.trialEnd, 'line')
         ];
     rateSeries.forEach(function (s) { s.format = fmtPct; });
     drawChart('trRate', {
@@ -1079,15 +1101,14 @@
     var matured = { trial: 0, wall: 0, young: 0 };
     rows.forEach(function (x) {
       var age = diffDays(x.start, now);
-      if (age >= Wd) matured.wall += x.downloads;
-      else if (age >= T) matured.trial += x.downloads;
+      if (age >= T) matured.wall += x.downloads;
       else matured.young += x.downloads;
     });
 
     document.getElementById('cohTiles').innerHTML = [
       tile({ label: 'Cohorts in range', value: fmtInt(rows.length), smallValue: true, meta: 'grouped by ' + grain }),
       tile({ label: 'Installs in these cohorts', color: ENTITY.downloads, value: fmtInt(totalCohort) }),
-      tile({ label: 'Fully past the wall', color: ENTITY.wallHit, value: fmtInt(matured.wall), meta: pctOf(matured.wall, totalCohort) + ' of these installs' }),
+      tile({ label: 'Fully past the trial', color: ENTITY.wallHit, value: fmtInt(matured.wall), meta: pctOf(matured.wall, totalCohort) + ' of these installs' }),
       tile({ label: 'Still inside the trial', color: ENTITY.inTrial, value: fmtInt(matured.young), meta: 'too young to judge — ' + pctOf(matured.young, totalCohort) + ' of these installs' })
     ].join('');
 
@@ -1096,8 +1117,7 @@
     var run = 0;
     var body = rows.slice().reverse().map(function (x) {
       var age = diffDays(x.start, now);
-      var status = age >= Wd ? '<span class="pill past14">Past the ' + wallDays() + '-day window</span>'
-        : age >= T ? '<span class="pill past7">Past trial</span>'
+      var status = age >= T ? '<span class="pill past14">Past the ' + trialDays() + '-day trial</span>'
         : '<span class="pill trial">In trial</span>';
       return { x: x, age: age, status: status };
     });
@@ -1119,19 +1139,17 @@
       : '<div class="empty">No install cohorts in this range.</div>';
 
     /* maturity chart — each cohort sits in exactly one band */
-    var young = [], mid = [], old = [];
+    var young = [], old = [];
     rows.forEach(function (x) {
       var age = diffDays(x.start, now);
       young.push(age < T ? x.downloads : 0);
-      mid.push(age >= T && age < Wd ? x.downloads : 0);
-      old.push(age >= Wd ? x.downloads : 0);
+      old.push(age >= T ? x.downloads : 0);
     });
     drawChart('cohChart', {
       x: rows.map(function (x) { return bucketLabel(x.key, grain); }),
       series: [
         { key: 'young', name: 'Still in trial', color: ENTITY.inTrial, type: 'bar', values: young },
-        { key: 'mid', name: 'Past trial, charts open', color: ENTITY.trialEnd, type: 'bar', values: mid },
-        { key: 'old', name: 'Past the ' + wallDays() + '-day wall', color: ENTITY.wallHit, type: 'bar', values: old }
+        { key: 'old', name: 'Past the ' + trialDays() + '-day trial', color: ENTITY.wallHit, type: 'bar', values: old }
       ],
       stacked: true, height: 300, format: fmtInt, xLabel: 'Cohort',
       tooltipNote: function (i) { return rows[i] ? 'Age ' + diffDays(rows[i].start, now) + ' days' : ''; }
@@ -1196,7 +1214,7 @@
       try { localStorage.removeItem(PING_KEY); } catch (e2) { /* ignore */ }
     }
   }
-  var pingUI = { tlMode: 'usage', tlMetric: 'active', curveMode: 'all', heatGrain: 'week', cohort: null, event: null, editing: null };
+  var pingUI = { tlMode: 'usage', tlMetric: 'active', curveMode: 'all', heatGrain: 'week', cohort: null, event: null, editing: null, rawKind: 'all' };
 
   var PC = {
     fresh: COLOR.green,        // first run — an install the counter had not seen
@@ -1207,26 +1225,30 @@
     subs: ENTITY.sales,        // violet, as "paid" is everywhere else
     activation: COLOR.s6,      // green — the step between installing and paying,
                                // and the same green its alert card wears
+    reading: COLOR.s5,         // a reading taken TODAY — deliberately not the
+                               // activation green: one is a first, one is a
+                               // habit, and the two are read side by side
     trial: COLOR.green,
     postTrial: COLOR.gold,
     wall: COLOR.red
   };
 
-  /* Both ping-fed views repaint when the fetch lands. Naming only one of them
-     here is how the Timeline tab ended up rendering an empty chart: the data
-     arrived, and nothing asked the view to draw it again. */
+  /* All THREE counter-fed views repaint when the fetch lands. Naming only one
+     of them here is how the Timeline tab ended up rendering an empty chart: the
+     data arrived, and nothing asked the view to draw it again. */
   function repaintPingViews() {
-    if (state.view !== 'ping' && state.view !== 'timeline') return;
+    if (state.view !== 'ping' && state.view !== 'timeline' && state.view !== 'pings') return;
     /* Through renderAll while a skeleton is up, because the skeleton is what is
        currently standing in for the view and only renderAll takes it down. */
     if (skeletonOn) { renderAll(); return; }
     if (state.view === 'ping') renderPing();
+    else if (state.view === 'pings') renderPings();
     else renderTimelineView();
   }
 
-  /* The filter bar's platform, as the ping index speaks it. `compare` has no
-     meaning here — a retention matrix is one population, not two side by side —
-     so it reads as "all", and the platform tile carries the split instead. */
+  /* The filter bar's platform, as the ping index speaks it. Anything that is
+     not one of the two stores reads as "all", and the platform tile carries the
+     split instead. */
   function pingPlatform() {
     return (state.platform === 'ios' || state.platform === 'android') ? state.platform : 'all';
   }
@@ -1380,12 +1402,24 @@
     }).filter(function (m) { return m.index !== undefined; });
   }
 
-  /* Clicking a flag anywhere in the dashboard opens its before/after, which
-     lives on the Timeline tab — so a click from another view switches to it
-     rather than rendering the analysis somewhere it does not belong. */
+  /* Clicking a flag opens its before/after — but ONLY on the Timeline tab,
+     where that analysis lives.
+     A flag used to navigate: a click anywhere else switched you to Timeline and
+     scrolled you to the event. That is a whole-view change fired by a rule two
+     pixels wide, and on a touch screen it was unusable — the rules sit on top of
+     the plot, a tap near one to read a day's value landed on the flag instead,
+     and the App usage view you were reading vanished. There is no way to
+     "hover instead" on a phone, so the only safe behaviour is to do nothing:
+     the flag still carries its tooltip, and Timeline is a tab away. */
+  /* Charts only get a click handler on the tab where the click leads somewhere.
+     Everywhere else the flag is a hover target and nothing more, which is also
+     what stops `charts.js` painting a pointer cursor over a rule that does not
+     act. */
+  function markClickFor() { return state.view === 'timeline' ? onMarkClick : null; }
+
   function onMarkClick(mark) {
+    if (state.view !== 'timeline') return;
     pingUI.event = mark.id;
-    if (state.view !== 'timeline') { setView('timeline'); return; }
     renderTimelineView();
     var node = document.getElementById('pgEventAnalysis');
     if (node) node.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -1438,7 +1472,8 @@
     var blank = !ix.days.length;
 
     var hosts = ['pgTiles', 'pgTilesB', 'pgHeat', 'pgCohortDetail', 'pgTransitions', 'pgConversion',
-      'pgActivationRates', 'pgMethodNote', 'pgWeekdayRetention', 'pgPlatformNote', 'pgFilterNote'];
+      'pgActivationRates', 'pgMethodNote', 'pgMeasureNote', 'pgMeasureRates',
+      'pgWeekdayRetention', 'pgPlatformNote', 'pgFilterNote'];
     if (!ready || blank) hosts.forEach(function (id) {
       var n = document.getElementById(id);
       if (n) n.innerHTML = '';
@@ -1452,7 +1487,8 @@
       document.getElementById('pgHeat').innerHTML =
         '<div class="empty">No pings yet. The counter starts filling the first time a build carrying it is opened.</div>';
       ['pgTimeline', 'pgCurve', 'pgSurvival', 'pgActiveCohort', 'pgPurchaseAge',
-        'pgActivationAge', 'pgMethods', 'pgPlatforms', 'pgWeekday'].forEach(function (id) {
+        'pgActivationAge', 'pgMethods', 'pgMeasureDaily', 'pgMeasureCurve',
+        'pgPlatforms', 'pgWeekday'].forEach(function (id) {
         drawChart(id, { x: [], series: [], emptyText: 'Waiting for the first ping.' });
       });
       return;
@@ -1461,17 +1497,52 @@
     var r = pingRange(ix);
     var days = A.range(r.from, r.to);
     var marks = marksFor(days);
+    var scoped = scopeToRange(ix, r);
 
-    renderPingTiles(ix, r, days);
-    renderTimeline(ix, days, marks);
-    renderCurve(ix);
-    renderSurvival(ix);
-    renderHeat(ix);
-    renderActiveByCohort(ix);
-    renderPurchases(ix, r);
-    renderActivation(ix, days);
+    renderPingTiles(scoped, r, days);
+    renderTimeline(scoped, days, marks);
+    renderCurve(scoped);
+    renderSurvival(scoped);
+    renderHeat(scoped);
+    renderActiveByCohort(scoped, r);
+    renderPurchases(scoped, r);
+    renderActivation(scoped, days);
+    renderMeasuring(scoped, days);
+    /* The one card that stays on the FULL index by design: it is what the
+       platform filter is a slice of, so filtering it would leave nothing to
+       compare. Its hint says so on screen. */
     renderPingPlatforms(ix, days);
-    renderPingWeekday(ix, days);
+    renderPingWeekday(scoped, days);
+  }
+
+  /**
+   * The filter bar's range, applied to the cohort-based half of App usage.
+   *
+   * Only `cohorts` is narrowed — to the installs BORN inside the range. Every
+   * day map (`open` / `sub` / `act` / `days` / `last`) is left whole on purpose,
+   * because a cohort born inside the range has to be aged with data from after
+   * it: clipping the days too would report D30 retention as "not yet available"
+   * for every cohort in any window shorter than a month, which is not a filter,
+   * it is a lie about maturity.
+   *
+   * This exists because changing the range used to move the tiles, the timeline
+   * and the weekday chart while the retention curve, the survival funnel, the
+   * cohort heatmap and the active-by-age chart all quietly went on reporting
+   * all-time numbers — four cards on one screen answering a different question
+   * from the six above them, with nothing on screen saying so.
+   */
+  function scopeToRange(ix, r) {
+    if (!r || (!r.from && !r.to)) return ix;
+    var cohorts = ix.cohorts.filter(function (c) {
+      return (!r.from || c >= r.from) && (!r.to || c <= r.to);
+    });
+    /* A range holding no cohort at all would blank every retention card. That
+       is the honest answer — the cards say "no cohort has reached this yet"
+       rather than showing numbers the range excludes. */
+    var out = {};
+    for (var k in ix) out[k] = ix[k];
+    out.cohorts = cohorts;
+    return out;
   }
 
   /* The filter bar's range, anchored to the pings rather than to the store:
@@ -1529,6 +1600,10 @@
        later is a recovery, not the wizard working. */
     var act0 = A.activation(ix, ix.cohorts, 0);
     var act7 = A.activation(ix, ix.cohorts, 7);
+    /* Opening the app is not using it. This pair is the whole point of the
+       reading counter: the day's share, and the range's habit rate. */
+    var shareToday = A.measureShare(ix, ix.last);
+    var measured = A.measureRate(ix, days);
 
     /* How many installs this slice LEFT OUT because they named no store. Zero
        when the filter is off, since Combined counts everything. It rides on the
@@ -1562,6 +1637,25 @@
         meta: 'installs that activated that day' + methodSplitNote(A.methodsOn(ix, ix.last)),
         split: methodSplit(A.methodsOn(ix, ix.last))
       }),
+      /* The reading counter's own headline, beside the active one it is read
+         against. Both are one-per-install-per-day, so the share underneath is a
+         share of the people who were there — see measureShare. */
+      tile({
+        label: 'Measured on ' + labelDay(ix.last), color: PC.reading,
+        value: A.hrvKnown(ix, ix.last) ? fmtInt(A.readingsOn(ix, ix.last)) : '–',
+        meta: A.hrvKnown(ix, ix.last)
+          ? 'installs that saved a reading' + storeSplitNote(ix, A.hrvPlatformsOn(ix, ix.last))
+          : 'the reading counter was not running yet',
+        split: A.hrvKnown(ix, ix.last) ? storeSplit(A.hrvPlatformsOn(ix, ix.last)) : null
+      }),
+      tile({
+        label: 'Measured of active', color: PC.reading, smallValue: true,
+        value: shareToday === null ? '–' : fmtPct(shareToday),
+        meta: shareToday === null
+          ? 'no reading counter on ' + labelDay(ix.last)
+          : fmtInt(A.readingsOn(ix, ix.last)) + ' of ' + fmtInt(activeToday) +
+            ' who opened the app that day also measured'
+      }),
       tile({ label: 'D1 retention', color: PC.fresh, smallValue: true, value: fmtRate(d1), meta: rateMeta(d1) }),
       tile({ label: 'D7 retention', color: PC.trial, smallValue: true, value: fmtRate(d7),
              meta: 'last day of the trial · ' + rateMeta(d7) }),
@@ -1573,15 +1667,11 @@
     document.getElementById('pgTilesB').innerHTML = [
       tile({
         label: 'Active in trial', color: PC.trial, value: fmtInt(live.inTrial),
-        meta: 'day 0–7 · ' + fmtInt(started.inTrial) + ' started a trial in that window'
+        meta: 'day 0–14 · ' + fmtInt(started.inTrial) + ' started a trial in that window'
       }),
       tile({
         label: 'Active past the trial', color: PC.postTrial, value: fmtInt(live.postTrial),
-        meta: 'day 8–14: free, full history still open'
-      }),
-      tile({
-        label: 'Active past the wall', color: PC.wall, value: fmtInt(live.pastWall),
-        meta: 'day 15+: older history needs Pro'
+        meta: 'day 15+: free tier, Pro features locked'
       }),
       tile({
         label: 'Purchases in range', color: PC.subs, value: fmtInt(subsRange),
@@ -1595,6 +1685,16 @@
       tile({
         label: 'Activated by D7', color: PC.activation, smallValue: true, value: fmtRate(act7),
         meta: rateMeta(act7)
+      }),
+      tile({
+        label: 'Measured per active day', color: PC.reading, smallValue: true,
+        value: measured.available ? fmtPct(measured.pct) : '–',
+        meta: measured.available
+          ? fmtInt(measured.readings) + ' readings over ' + fmtInt(measured.active) +
+            ' install-days on the app across ' + measured.days + ' day' + (measured.days === 1 ? '' : 's') +
+            (measured.blind ? ' · ' + measured.blind + ' day' + (measured.blind === 1 ? '' : 's') +
+              ' predate the counter and are left out' : '')
+          : 'the reading counter has no days in this range'
       }),
       tile({
         label: 'Conversion by D7', color: PC.subs, smallValue: true, value: fmtRate(conv7),
@@ -1773,7 +1873,7 @@
 
     drawChart('pgTimeline', {
       x: x, series: series, stacked: mode !== 'acquisition', height: 330, format: fmtInt, xLabel: 'Day',
-      marks: marks, onMarkClick: onMarkClick,
+      marks: marks, onMarkClick: markClickFor(),
       tooltipNote: function (i) {
         var d = days[i];
         var bits = [];
@@ -1819,15 +1919,13 @@
       x: x, series: series, height: 300, format: fmtPct, xLabel: 'Days since install',
       emptyText: 'No cohort has reached its second day yet.',
       guides: [
-        { index: B.trialLastDay, label: 'trial ends', color: PC.trial },
-        { index: B.firstWallDay, label: 'history wall', color: PC.wall }
+        { index: B.trialLastDay, label: 'trial ends', color: PC.trial }
       ],
       tooltipNote: function (i) {
         var p = A.retentionAt(ix, ix.cohorts, i);
         var note = p.available ? 'over ' + p.cohorts + ' cohort' + (p.cohorts === 1 ? '' : 's') +
           ' · ' + fmtInt(p.kept) + ' of ' + fmtInt(p.of) : 'not yet available';
         if (i === B.firstPostTrial) note += ' · first day outside the trial';
-        if (i === B.firstWallDay) note += ' · first day the history wall applies';
         return note;
       }
     });
@@ -1837,7 +1935,7 @@
 
   function renderSurvival(ix) {
     var s = A.survival(ix, ix.cohorts);
-    var labels = { 0: 'Install', 1: 'D1', 7: 'D7 (last trial day)', 8: 'D8 (post-trial)', 14: 'D14 (history open)', 15: 'D15 (wall)', 30: 'D30' };
+    var labels = { 0: 'Install', 1: 'D1', 7: 'D7 (first week)', 14: 'D14 (last trial day)', 15: 'D15 (post-trial)', 30: 'D30' };
     var steps = s.steps.filter(function (p) { return p.available; });
 
     drawChart('pgSurvival', {
@@ -1868,8 +1966,9 @@
 
     document.getElementById('pgTransitions').innerHTML =
       '<div class="transitions">' +
-      transitionHTML(s.trialEnd, 'Trial ends: D7 → D8', 'How many keep opening the app the day their trial runs out.') +
-      transitionHTML(s.historyWall, 'History wall: D14 → D15', 'How many keep opening it the day older history closes.') +
+      transitionHTML(s.trialEnd,
+        'Trial ends: D' + A.BOUNDARIES.trialLastDay + ' → D' + A.BOUNDARIES.firstPostTrial,
+        'How many keep opening the app the day their trial runs out.') +
       '</div>';
   }
 
@@ -1897,7 +1996,7 @@
     }
 
     var head = '<tr><th>Cohort</th><th>Installs</th>' + A.MILESTONES.map(function (n) {
-      var cls = n === A.BOUNDARIES.firstPostTrial || n === A.BOUNDARIES.firstWallDay ? ' class="boundary"' : '';
+      var cls = n === A.BOUNDARIES.firstPostTrial ? ' class="boundary"' : '';
       return '<th' + cls + '>D' + n + '</th>';
     }).join('') + '</tr>';
 
@@ -1908,7 +2007,7 @@
           return '<td class="heat immature" title="This cohort has not lived ' + cell.day + ' days yet — not zero, unknown"></td>';
         }
         var a = Math.min(1, Math.sqrt(Math.max(0, cell.pct) / 100)) * 0.85;
-        var boundary = cell.day === A.BOUNDARIES.firstPostTrial || cell.day === A.BOUNDARIES.firstWallDay;
+        var boundary = cell.day === A.BOUNDARIES.firstPostTrial;
         return '<td class="heat' + (boundary ? ' boundary' : '') + '" style="background:rgba(0,160,143,' + a.toFixed(3) + ')"' +
           ' title="' + fmtInt(cell.kept) + ' of ' + fmtInt(cell.of) + ' still active on day ' + cell.day +
           (cell.partial ? ' — some days of this week are still too young' : '') + '">' +
@@ -1956,8 +2055,13 @@
 
   /* -------------------------------------------------- 5. active by cohort */
 
-  function renderActiveByCohort(ix) {
-    var abc = A.activeByCohort(ix, ix.last);
+  function renderActiveByCohort(ix, r) {
+    /* "Who is using it today" means the latest day IN THE RANGE. On the default
+       window that is simply the newest day the counter holds; on a custom range
+       ending last month it is that range's last day, which is the only reading
+       of "today" a date filter can honestly have. */
+    var day = (r && r.to && ix.last && r.to < ix.last) ? r.to : ix.last;
+    var abc = A.activeByCohort(ix, day);
     var rows = abc.rows.slice(0, 24);
     var B = A.BOUNDARIES;
 
@@ -1982,8 +2086,7 @@
       }],
       height: 240, format: fmtInt, legend: false, xLabel: 'Install age',
       emptyText: 'Nobody has pinged on the latest day yet.',
-      guides: [guideAt(B.firstPostTrial, 'post-trial', PC.trial),
-               guideAt(B.firstWallDay, 'wall', PC.wall)].filter(Boolean),
+      guides: [guideAt(B.firstPostTrial, 'post-trial', PC.trial)].filter(Boolean),
       tooltipNote: function (i) {
         var r = rows[i];
         return fmtInt(r.count) + ' of today\'s ' + fmtInt(abc.total) + ' active installs' +
@@ -2018,8 +2121,7 @@
       '<th>Active on ' + esc(labelDay(ix.last)) + '</th><th>Days seen</th><th>Last seen</th></tr></thead><tbody>' +
       rows.map(function (r) {
         var stage = r.age <= B.trialLastDay ? '<span class="pill trial">In trial</span>'
-          : r.age < B.firstWallDay ? '<span class="pill past7">Past trial</span>'
-          : '<span class="pill past14">Past the wall</span>';
+          : '<span class="pill past14">Past trial</span>';
         return '<tr><td>' + esc(labelFull(r.cohort)) + '</td>' +
           '<td>D' + r.age + '</td>' +
           '<td style="text-align:left">' + stage + '</td>' +
@@ -2209,6 +2311,147 @@
       '.</p>';
   }
 
+  /* ------------------------------------------------------ 5d. measuring
+
+     The counter's fourth route, and the one that answers the question every
+     other card here can only circle: are the people who open the app actually
+     using it?
+
+     Retention says somebody launched. A journal app can be launched every
+     morning to look at yesterday's number and never gain a new one, and that
+     install is on its way out while drawing a perfect retention curve. The
+     reading counter is capped at one per install per Eastern day by the same
+     client rule the open counter runs, and bucketed on the same boundary, so
+     the two are directly comparable and their ratio is a share of PEOPLE.
+
+     Everything here is null before `hrvFirst` — the route shipped in a build of
+     its own, and a day the counter was not running is unknown, not zero. */
+  function renderMeasuring(ix, days) {
+    var known = days.filter(function (d) { return A.hrvKnown(ix, d); });
+
+    /* Actives and readings on one axis, and the share as its own line on the
+       right of the tooltip rather than a second y-axis — the two counts are the
+       same kind of thing (people that day) and the share is a reading OF them,
+       not a third series to be compared against them by height. */
+    var active = days.map(function (d) { return A.activeOn(ix, d); });
+    var read = days.map(function (d) { return A.hrvKnown(ix, d) ? A.readingsOn(ix, d) : null; });
+
+    drawChart('pgMeasureDaily', {
+      x: days.map(labelDay), height: 280, format: fmtInt, xLabel: 'Day',
+      series: [
+        { key: 'active', name: 'Opened the app', color: PC.active, type: 'area', values: active },
+        { key: 'read', name: 'Took a reading', color: PC.reading, type: 'line', values: read }
+      ],
+      emptyText: 'No pings in this range.',
+      tooltipNote: function (i) {
+        var share = A.measureShare(ix, days[i]);
+        if (share === null) {
+          return A.hrvKnown(ix, days[i]) ? 'nobody opened the app' : 'before the reading counter shipped';
+        }
+        return fmtPct(share) + ' of the day\'s installs measured';
+      }
+    });
+
+    /* Over the WHOLE range, not over `known`: measureRate does its own
+       filtering and it is the one that knows how many days it had to leave out.
+       Handing it the pre-filtered list would report `blind: 0` and quietly drop
+       the sentence that says the window straddles the counter's release. */
+    var rate = A.measureRate(ix, days);
+    var host = document.getElementById('pgMeasureNote');
+    if (!rate.available) {
+      host.innerHTML = '<p class="note" style="margin-top:10px">' +
+        (ix.hrvFirst
+          ? 'No day in this range is covered by the reading counter, which started on ' +
+            esc(labelFull(ix.hrvFirst)) + '.'
+          : 'The reading counter has not been heard from yet. It starts filling the first time a build ' +
+            'carrying it saves a reading.') + '</p>';
+    } else {
+      /* The comparison that makes the rate mean something: the second half of
+         the window against the first. Both are pooled install-days, so this is
+         "is the habit spreading or thinning", and it is stated in percentage
+         POINTS because a ratio of two ratios is not a thing anybody can read. */
+      var half = Math.ceil(known.length / 2);
+      var early = A.measureRate(ix, known.slice(0, half));
+      var late = A.measureRate(ix, known.slice(half));
+      var move = (early.available && late.available && known.length >= 6)
+        ? late.pct - early.pct : null;
+
+      host.innerHTML = '<p class="note" style="margin-top:10px">' +
+        '<b>' + fmtPct(rate.pct) + '</b> of install-days on the app carried a reading — ' +
+        fmtInt(rate.readings) + ' of ' + fmtInt(rate.active) + ' across ' + rate.days +
+        ' counted day' + (rate.days === 1 ? '' : 's') +
+        (rate.blind ? ', with ' + rate.blind + ' earlier day' + (rate.blind === 1 ? '' : 's') +
+          ' left out because the counter was not running yet' : '') + '. ' +
+        (move === null ? ''
+          : 'Second half of the window against the first: <b>' +
+            (move >= 0 ? '+' : '') + move.toFixed(1) + ' points</b> (' +
+            fmtPct(early.pct) + ' → ' + fmtPct(late.pct) + ').') +
+        '</p>' +
+        '<p class="hint" style="margin:8px 0 0">Both counters are one per install per Eastern day, so this is a ' +
+        'share of the people who were there and not of the pings. It can read above 100% on a day when a ' +
+        'reading landed without its open ping — a launch made offline, or a reading saved either side of ' +
+        'midnight Eastern — and it is shown as it comes out rather than clamped, because that gap is the only ' +
+        'thing that says the two counters have drifted.</p>';
+    }
+
+    /* The habit curve: retention and measuring on one axis, by install age.
+       The gap between them IS the finding — every point of it is an install
+       that opened the app that day and did not measure. */
+    var maxN = 60;
+    var open = A.curve(ix, ix.cohorts, maxN);
+    var meas = A.measuringCurve(ix, ix.cohorts, maxN);
+    var len = Math.max(open.length, meas.length);
+    var x = [];
+    for (var i = 0; i < len; i++) x.push({ label: 'D' + i, full: 'Day ' + i });
+
+    drawChart('pgMeasureCurve', {
+      x: x, height: 280, format: fmtPct, xLabel: 'Days since install',
+      series: [
+        { key: 'open', name: 'Opened', color: PC.active, type: 'line',
+          values: open.map(function (p) { return p.pct; }) },
+        { key: 'meas', name: 'Measured', color: PC.reading, type: 'area',
+          values: meas.map(function (p) { return p.pct; }) }
+      ],
+      emptyText: 'No cohort has a measurable day yet.',
+      guides: [{ index: A.BOUNDARIES.trialLastDay, label: 'trial ends', color: PC.trial }],
+      tooltipNote: function (i) {
+        var m = A.measuringAt(ix, ix.cohorts, i);
+        if (!m.available) {
+          return m.blind ? 'the reading counter had not shipped by day ' + i + ' for these cohorts'
+            : 'not yet available';
+        }
+        return fmtInt(m.kept) + ' of ' + fmtInt(m.of) + ' over ' + m.cohorts +
+          ' cohort' + (m.cohorts === 1 ? '' : 's') +
+          (m.blind ? ' · ' + m.blind + ' outside the counter' : '');
+      }
+    });
+
+    document.getElementById('pgMeasureRates').innerHTML =
+      '<div class="mini-rows">' +
+      [0, 1, 7, 14, 30].map(function (n) {
+        var m = A.measuringAt(ix, ix.cohorts, n);
+        return '<div><span>Measured on D' + n + '</span><b>' + fmtRate(m) + '</b>' +
+          '<span class="note">' + measureMeta(m) + '</span></div>';
+      }).join('') +
+      '</div>';
+  }
+
+  /* `rateMeta`'s twin, plus the one thing a reading rate can be short of that a
+     retention rate cannot: cohorts whose day N fell before the counter existed.
+     They are neither churned nor too young, and calling them either would be a
+     claim about people made out of a deploy date. */
+  function measureMeta(m) {
+    if (!m.available) {
+      if (m.blind) return m.blind + ' cohort' + (m.blind === 1 ? '' : 's') + ' predate the reading counter';
+      return m.immature ? m.immature + ' cohort' + (m.immature === 1 ? '' : 's') + ' still too young'
+        : 'not enough history yet';
+    }
+    return fmtInt(m.kept) + ' of ' + fmtInt(m.of) + ' installs' +
+      (m.immature ? ' · ' + m.immature + ' too young' : '') +
+      (m.blind ? ' · ' + m.blind + ' before the counter' : '') +
+      (m.small ? ' · <span class="warn-small">small sample</span>' : '');
+  }
+
   /* ------------------------------------------------------ 6b. platforms
 
      The split the filter bar can only ever show you one side of.
@@ -2308,6 +2551,14 @@
       return rec ? rec.sales : 0;
     });
     var subs = A.byWeekday(days, function (d) { return A.purchasesOn(ix, d); });
+    /* Readings alongside first runs and returning, because "which day do people
+       measure on" is a different question from "which day do they open the app
+       on" and the answer moves the morning-reminder time. Days the counter was
+       not running contribute nothing rather than a zero, which is what handing
+       `byWeekday` a null does — it skips them and divides by the days it saw. */
+    var reads = A.byWeekday(days, function (d) {
+      return A.hrvKnown(ix, d) ? A.readingsOn(ix, d) : null;
+    });
 
     drawChart('pgWeekday', {
       x: WD.map(function (w) { return { label: w, full: WD_LONG[WD.indexOf(w)] }; }),
@@ -2318,6 +2569,7 @@
         { key: 'dl', name: 'Store downloads', color: PC.downloads, type: 'bar', values: dl.map(function (s) { return s.avg; }) },
         { key: 'fresh', name: 'First runs', color: PC.fresh, type: 'bar', values: fresh.map(function (s) { return s.avg; }) },
         { key: 'ret', name: 'Returning', color: PC.back, type: 'bar', values: ret.map(function (s) { return s.avg; }) },
+        { key: 'reads', name: 'Readings', color: PC.reading, type: 'bar', values: reads.map(function (s) { return s.avg; }) },
         { key: 'buys', name: 'Purchases (ledger)', color: PC.subs, type: 'bar', values: buys.map(function (s) { return s.avg; }) },
         { key: 'subs', name: 'Subscribe pings', color: COLOR.s4, type: 'bar', values: subs.map(function (s) { return s.avg; }) }
       ],
@@ -2531,6 +2783,28 @@
     segment('pgCurveMode', 'curveMode', renderPing);
     segment('pgHeatGrain', 'heatGrain', function () { pingUI.cohort = null; renderPing(); });
     segment('tlMetric', 'tlMetric', renderTimelineView);
+    segment('pgRawKind', 'rawKind', renderPings);
+
+    var rawExport = document.getElementById('pgRawExport');
+    if (rawExport) rawExport.addEventListener('click', function () {
+      var ix = A.index(pings.report, pingPlatform());
+      var rows = rawPingRows(ix.days && ix.days.length ? pingRange(ix) : null);
+      if (!rows.length) { toast('Nothing to export yet.'); return; }
+      /* The CSV is the WHOLE filtered set, never the capped 500 the table
+         draws — the cap is a rendering budget, and an export that silently
+         inherited it would be the same lie the table's footnote exists to
+         avoid. */
+      var out = ['route,arrived,cohort,age_days,platform,sensor,key,count'];
+      rows.forEach(function (x) {
+        out.push([
+          x.kind, x.arrived, x.cohort, x.age,
+          A.platformName(x.platform),
+          x.method ? A.methodName(x.method) : '',
+          x.key, x.count
+        ].join(','));
+      });
+      download('autonomic-pings.csv', out.join('\n'), 'text/csv');
+    });
 
     document.getElementById('pgEventAdd').addEventListener('click', function () {
       if (pingUI.editing) closeEventForm(); else openEventForm(null);
@@ -2622,7 +2896,7 @@
       series: [{ key: 'v', name: m.label, color: m.color, type: m.type,
                  values: days.map(function (d) { return m.of(ix, d); }) }],
       height: 340, format: m.fmt, legend: false, xLabel: 'Day',
-      marks: marks, onMarkClick: onMarkClick,
+      marks: marks, onMarkClick: markClickFor(),
       emptyText: 'Nothing recorded in this range yet.',
       tooltipNote: function (i) {
         var d = days[i];
@@ -2851,10 +3125,8 @@
       ['Page-view conversion', 'ppvConv', fmtPct],
       ['Installs (all time)', 'totalInstalls', fmtInt],
       ['Out of trial (all time)', 'outOfTrial', fmtInt],
-      ['Hit the wall (all time)', 'hitWall', fmtInt],
       ['Paid conversions (all time)', 'totalSales', fmtInt],
       ['Convert rate — past trial', 'convOfOutOfTrial', fmtPct],
-      ['Convert rate — at the wall', 'convOfWall', fmtPct],
       ['Revenue (range)', 'revenue', fmtMoney],
       ['Revenue (all time)', 'totalRevenue', fmtMoney],
       ['Revenue per paying user', 'arppu', fmtMoney],
@@ -2880,9 +3152,9 @@
     var x = xAxis(iosRows);
     var specs = [
       { id: 'pfDownloads', title: 'First-time downloads', field: 'downloads', fmt: fmtInt, type: 'line' },
-      { id: 'pfWall', title: 'Users hitting the ' + wallDays() + '-day wall', field: 'wallHit', fmt: fmtInt, type: 'line' },
+      { id: 'pfWall', title: 'Users finishing the ' + trialDays() + '-day trial', field: 'trialEnd', fmt: fmtInt, type: 'line' },
       { id: 'pfSales', title: 'Paid conversions', field: 'sales', fmt: fmtInt, type: 'bar' },
-      { id: 'pfConv', title: 'Cumulative convert rate at the wall', field: 'paidOfWall', fmt: fmtPct, type: 'line' },
+      { id: 'pfConv', title: 'Cumulative convert rate past the trial', field: 'paidOfTrial', fmt: fmtPct, type: 'line' },
       { id: 'pfRevenue', title: 'Revenue', field: 'revenue', fmt: fmtMoney, type: 'line' },
       { id: 'pfImpr', title: 'Impressions', field: 'impressions', fmt: fmtInt, type: 'line' }
     ];
@@ -3850,7 +4122,7 @@
     });
     drawChart('csChart', {
       x: x, series: series, height: 320, stacked: true, format: fmtMoney,
-      yTickFormat: moneyTick, marks: marks, onMarkClick: onMarkClick,
+      yTickFormat: moneyTick, marks: marks, onMarkClick: markClickFor(),
       emptyText: 'No costs recorded in this range yet.',
       tooltipNote: function (i) {
         var row = rows[i];
@@ -3960,7 +4232,7 @@
           values: be.series.map(function (p) { return p.revenue; }) }
       ],
       guides: be.at ? [{ index: days.indexOf(be.at), label: 'breakeven', color: COLOR.s3 }] : [],
-      marks: marksFor(days), onMarkClick: onMarkClick,
+      marks: marksFor(days), onMarkClick: markClickFor(),
       emptyText: 'Nothing recorded yet.',
       tooltipNote: function (i) {
         var p = be.series[i];
@@ -5233,12 +5505,12 @@
     L.push('Currency: ' + cur);
     L.push('');
     L.push('## How the app works');
-    L.push('Every install gets a ' + trialDays() + '-day free trial. After that the app stays free, but');
-    L.push('features are limited — and past day ' + wallDays() + ' the user can no longer see charts older than');
-    L.push(wallDays() + ' days, which is the hard wall where paying becomes the only way forward.');
-    L.push('Both limits are inclusive: a user is still in the trial on day ' + trialDays() + ' and leaves on day ' +
-      trialExit() + ';');
-    L.push('they still have full charts on day ' + wallDays() + ' and hit the wall on day ' + wallExit() + '.');
+    L.push('Every install gets a ' + trialDays() + '-day free trial of everything. After that the app stays');
+    L.push('free to journal and measure in, but the analysis features (Progress ranges, the whole');
+    L.push('Insights tab, the AI report) need Pro, and the free Day view is clipped to the last');
+    L.push(trialDays() + ' days.');
+    L.push('The limit is inclusive: a user is still in the trial on day ' + trialDays() +
+      ' and leaves on day ' + trialExit() + '.');
     L.push('Sales are recorded on the day of purchase and are NOT attributed back to an install cohort,');
     L.push('so conversion rates below are population ratios rather than true cohort retention.');
     L.push('');
@@ -5257,11 +5529,9 @@
     [['Installs, all time', 'totalInstalls', fmtInt],
      ['Still in trial (day 0–' + trialDays() + ')', 'inTrial', fmtInt],
      ['Past the trial (day ' + trialExit() + '+)', 'outOfTrial', fmtInt],
-     ['Past the wall (day ' + wallExit() + '+)', 'hitWall', fmtInt],
      ['Paid conversions', 'totalSales', fmtInt],
      ['Revenue, all time', 'totalRevenue', fmtMoney],
      ['Convert % of past-trial', 'convOfOutOfTrial', fmtPct],
-     ['Convert % of wall-hitters', 'convOfWall', fmtPct],
      ['Revenue per paying user', 'arppu', fmtMoney],
      ['Revenue per install', 'rpi', fmtMoney]].forEach(function (m) {
       L.push(pad2(m[0], 30) + padL(m[2](all[m[1]]), 12) +
@@ -5272,18 +5542,18 @@
     var grainWord = grain === 'day' ? 'Daily' : grain === 'week' ? 'Weekly' : 'Monthly';
     L.push('## ' + grainWord + ' figures' + (grain === 'day' ? '' : ' (rolled up to keep this readable)'));
     L.push('Columns: period, platform, downloads, impressions, page views, updates, sales, revenue,');
-    L.push('left-trial (cohort that passed day ' + trialDays() + ' in that period), hit-wall (passed day ' + wallDays() + ').');
+    L.push('left-trial (cohort that passed day ' + trialDays() + ' in that period).');
     L.push('');
     L.push(pad2('period', 15) + pad2('platform', 9) + padL('dl', 7) + padL('impr', 9) +
       padL('views', 8) + padL('upd', 7) + padL('sales', 7) + padL('revenue', 10) +
-      padL('left-trial', 11) + padL('hit-wall', 10));
+      padL('left-trial', 11));
     ['ios', 'android'].forEach(function (p) {
       buildBuckets(p, r.from, r.to, grain).forEach(function (row) {
         L.push(pad2(row.key, 15) + pad2(PLATFORMS[p], 9) +
           padL(fmtInt(row.downloads), 7) + padL(fmtInt(row.impressions), 9) +
           padL(fmtInt(row.pageViews), 8) + padL(fmtInt(row.updates), 7) +
           padL(fmtInt(row.sales), 7) + padL(fmtMoney(row.revenue), 10) +
-          padL(fmtInt(row.trialEnd), 11) + padL(fmtInt(row.wallHit), 10));
+          padL(fmtInt(row.trialEnd), 11));
       });
     });
 
@@ -5530,6 +5800,7 @@
       subs += A.purchasesOn(ix, d);
       acts += A.activationsOn(ix, d);
     });
+    var measured = A.measureRate(ix, days);
     var n = days.length;
     L.push(pad2('Newest day counted', 26) + padL(labelFull(ix.last), 16));
     L.push(pad2('Active on that day', 26) + padL(fmtInt(A.activeOn(ix, ix.last)), 16));
@@ -5542,6 +5813,37 @@
       '   (the app notices a purchase on its NEXT launch, so this lags the ledger)');
     L.push(pad2('First readings in window', 26) + padL(fmtInt(acts), 16) +
       '   (activation: one per install, ever — so this IS a count of people)');
+    if (measured.available) {
+      L.push(pad2('Readings in window', 26) + padL(fmtInt(measured.readings), 16) +
+        '   (install-DAYS carrying a reading, one per install per day)');
+      L.push(pad2('Measured per active day', 26) + padL(fmtPct(measured.pct), 16) +
+        '   (' + fmtInt(measured.readings) + ' of ' + fmtInt(measured.active) +
+        ' install-days on the app' +
+        (measured.blind ? '; ' + measured.blind + ' earlier days predate the counter' : '') + ')');
+    }
+
+    /* The reading counter beside the open one, by install age. Retention says
+       somebody launched the app; this says they used it. The gap between the
+       two columns is the part of the userbase drifting out while still showing
+       up, which is invisible in every other figure here. */
+    if (ix.hrvFirst) {
+      L.push('');
+      L.push('Opened vs measured, by install age. The second column is the share of the same cohorts');
+      L.push('that saved a READING on that day — both counters fire once per install per Eastern day,');
+      L.push('so the gap between them is people opening the app without using it. A cohort whose day N');
+      L.push('fell before the reading counter shipped (' + labelFull(ix.hrvFirst) + ') is left out of it, not');
+      L.push('counted as a zero.');
+      L.push(pad2('  day', 8) + padL('opened', 9) + padL('measured', 11) + '   over');
+      [0, 1, 7, 14, 30].forEach(function (k) {
+        var o = A.retentionAt(ix, ix.cohorts, k);
+        var m = A.measuringAt(ix, ix.cohorts, k);
+        if (!o.available && !m.available) return;
+        L.push(pad2('  D' + k, 8) + padL(o.available ? fmtPct(o.pct) : '–', 9) +
+          padL(m.available ? fmtPct(m.pct) : '–', 11) + '   ' +
+          (m.available ? fmtInt(m.kept) + ' of ' + fmtInt(m.of) + ' installs' : 'not knowable yet') +
+          (m.blind ? ' · ' + m.blind + ' cohorts before the counter' : ''));
+      });
+    }
 
     L.push('');
     L.push('Retention, exact rather than modelled — day N\'s count over the cohort\'s day 0:');
@@ -5588,7 +5890,6 @@
     L.push('Where the people active on ' + labelFull(ix.last) + ' are in the lifecycle:');
     L.push(pad2('  In trial (day 0–' + trialDays() + ')', 26) + padL(fmtInt(live.inTrial), 9));
     L.push(pad2('  Past the trial', 26) + padL(fmtInt(live.postTrial), 9));
-    L.push(pad2('  Past the wall', 26) + padL(fmtInt(live.pastWall), 9));
 
     /* The store split is always unfiltered, and a ping that names no store is
        an install whose store we failed to record — a build older than the
@@ -5600,11 +5901,14 @@
       ((split.U || 0) ? ' · ' + fmtInt(split.U) + ' from builds that predate the store marker' : ''));
 
     L.push('');
-    L.push('Day by day (active / first runs / returning / subscribe pings):');
-    L.push(pad2('  day', 14) + padL('active', 9) + padL('first', 8) + padL('return', 9) + padL('subs', 7));
+    L.push('Day by day (active / first runs / returning / readings / subscribe pings):');
+    L.push(pad2('  day', 14) + padL('active', 9) + padL('first', 8) + padL('return', 9) +
+      padL('read', 7) + padL('subs', 7));
     days.forEach(function (d) {
       L.push(pad2('  ' + d, 14) + padL(fmtInt(A.activeOn(ix, d)), 9) + padL(fmtInt(A.newOn(ix, d)), 8) +
-        padL(fmtInt(A.returningOn(ix, d)), 9) + padL(fmtInt(A.purchasesOn(ix, d)), 7));
+        padL(fmtInt(A.returningOn(ix, d)), 9) +
+        padL(A.hrvKnown(ix, d) ? fmtInt(A.readingsOn(ix, d)) : '–', 7) +
+        padL(fmtInt(A.purchasesOn(ix, d)), 7));
     });
   }
 
@@ -5900,6 +6204,7 @@
     sales:     { tiles: 8,  wide: [280, 260], half: 3 },
     costs:     { tiles: 8,  wide: [300, 260], half: 3 },
     forecast:  { tiles: 4,  wide: [320, 240], half: 0 },
+    pings:     { tiles: 5,  wide: [420], half: 0 },
     data:      { tiles: 0,  wide: [200, 200], half: 0 }
   };
 
@@ -5951,7 +6256,7 @@
    */
   function needsSkeleton() {
     if (bootPending) return true;
-    if ((state.view === 'ping' || state.view === 'timeline') &&
+    if ((state.view === 'ping' || state.view === 'timeline' || state.view === 'pings') &&
         !pings.report && pings.status !== 'error') return true;
     return false;
   }
@@ -5960,7 +6265,8 @@
 
   var VIEW_TITLES = {
     overview: 'Overview', ping: 'App usage', timeline: 'Timeline', trial: 'Trial & conversion', cohorts: 'Cohorts',
-    platforms: 'iOS vs Android', sales: 'Sales', costs: 'Costs', forecast: 'Forecast', data: 'Edit data'
+    platforms: 'iOS vs Android', sales: 'Sales', costs: 'Costs', forecast: 'Forecast',
+    pings: 'Pings', data: 'Edit data'
   };
 
   function renderAll() {
@@ -5968,7 +6274,7 @@
     if (!VIEW_TITLES[state.view]) state.view = 'overview';
     document.title = (VIEW_TITLES[state.view] || 'Overview') + ' | Autonomic';
     // don't clobber a field the user is currently typing into
-    [['fTrial', trialDays()], ['fWall', wallDays()],
+    [['fTrial', trialDays()],
       ['fStoreCut', storeCut()], ['fCurrency', db.settings.currency || '$']].forEach(function (pair) {
       var el = document.getElementById(pair[0]);
       if (el && el !== document.activeElement) el.value = pair[1];
@@ -5983,7 +6289,9 @@
     // without knowing who is who, which is exactly what the ping refuses to
     // carry. Hiding the grain is more honest than silently ignoring it.
     var grainGroup = document.getElementById('fgGrain');
-    if (grainGroup && (state.view === 'ping' || state.view === 'timeline')) grainGroup.classList.add('hidden');
+    if (grainGroup && (state.view === 'ping' || state.view === 'timeline' || state.view === 'pings')) {
+      grainGroup.classList.add('hidden');
+    }
     /* Costs are not per-store — a hosting bill belongs to neither, and no ad
        network reports spend split the way the stores report downloads. The view
        always reads both combined, so the filter is hidden rather than ignored. */
@@ -6008,7 +6316,7 @@
       showSkeleton(true);
       document.getElementById('view-' + state.view).classList.add('hidden');
       document.getElementById('emptyState').classList.add('hidden');
-      if (state.view === 'ping' || state.view === 'timeline') pingLoad();
+      if (state.view === 'ping' || state.view === 'timeline' || state.view === 'pings') pingLoad();
       return;
     }
     showSkeleton(false);
@@ -6020,7 +6328,7 @@
        with purchases and no downloads has plenty to show. */
     var empty = !db.entries.length && !salesList().length && state.view !== 'data' &&
       state.view !== 'ping' && state.view !== 'timeline' && state.view !== 'costs' &&
-      state.view !== 'sales';
+      state.view !== 'sales' && state.view !== 'pings';
     document.getElementById('emptyState').classList.toggle('hidden', !empty);
     if (empty) {
       document.getElementById('view-' + state.view).classList.add('hidden');
@@ -6037,9 +6345,157 @@
     else if (state.view === 'sales') renderSales();
     else if (state.view === 'costs') renderCosts();
     else if (state.view === 'forecast') renderForecast();
+    else if (state.view === 'pings') { pingLoad(); renderPings(); }
     else if (state.view === 'data') renderData();
 
     layoutTiles();
+  }
+
+  /* ------------------------------------------------------- view: pings ----
+   *
+   * The counter with nothing done to it.
+   *
+   * Every other ping-fed card on the dashboard is an ANSWER — retention pooled
+   * over mature cohorts, activation rates, a weekday shape. This one is the
+   * evidence those answers are computed from, one row per stored key, because
+   * the question "is that number wrong, or was that day genuinely strange?" has
+   * no answer anywhere else on the page. It is also the only place a route that
+   * has stopped firing is visible as a route rather than as a flat line.
+   *
+   * It is deliberately not a chart. A diagnostic view that rounds, buckets or
+   * pools has reintroduced exactly the layer you opened it to look underneath.
+   */
+
+  var RAW_KINDS = [
+    { key: 'open', label: 'Open', color: PC.active, note: 'app launched' },
+    { key: 'sub', label: 'Subscribe', color: PC.subs, note: 'entitlement seen' },
+    { key: 'act', label: 'Activation', color: PC.activation, note: 'first HRV reading saved' },
+    { key: 'hrv', label: 'Reading', color: PC.reading, note: 'a reading saved that day' }
+  ];
+
+  /**
+   * Flatten the report into one row per (route, arrival day, cohort key).
+   *
+   * The range filter is applied to the ARRIVAL day, not to the cohort: this
+   * view is a log of what came in, so "last 30 days" has to mean the pings that
+   * arrived in the last 30 days. That is the opposite of `scopeToRange` above,
+   * where the question is about the installs themselves — and the difference is
+   * worth keeping straight, because the two windows genuinely disagree (a ping
+   * that arrived today can belong to a cohort from March).
+   */
+  function rawPingRows(r) {
+    var letter = { ios: 'I', android: 'A' }[state.platform] || null;
+    var out = [];
+    RAW_KINDS.forEach(function (k) {
+      if (pingUI.rawKind !== 'all' && pingUI.rawKind !== k.key) return;
+      var rows = (pings.report && pings.report[k.key]) || [];
+      rows.forEach(function (day) {
+        if (r && r.from && day.day < r.from) return;
+        if (r && r.to && day.day > r.to) return;
+        (day.cohorts || []).forEach(function (c) {
+          if (letter && c.platform !== letter) return;
+          out.push({
+            kind: k.key, kindLabel: k.label, color: k.color,
+            arrived: day.day,
+            key: c.key,
+            cohort: c.cohort,
+            platform: c.platform,
+            method: c.method,
+            /* Age can legitimately be negative by a day: the cohort date is the
+               install's own local day and the arrival day is stamped US
+               Eastern, so an install west of Eastern that opens the app late
+               can stamp tomorrow's cohort onto today's arrival. Shown as it is
+               rather than clamped — this is the view where an oddity should be
+               visible, not tidied. */
+            age: A.ageBetween ? A.ageBetween(c.cohort, day.day) : diffDays(c.cohort, day.day),
+            count: c.count
+          });
+        });
+      });
+    });
+    /* Newest arrival first, then biggest count — a diagnostic list is read from
+       the top and the top should be the most recent thing that happened. */
+    out.sort(function (a, b) {
+      if (a.arrived !== b.arrived) return a.arrived < b.arrived ? 1 : -1;
+      if (a.count !== b.count) return b.count - a.count;
+      return a.key < b.key ? -1 : 1;
+    });
+    return out;
+  }
+
+  function renderPings() {
+    document.getElementById('pgRawStatus').innerHTML = pingStatusHTML();
+    var retry = document.getElementById('pgRetry');
+    if (retry) retry.addEventListener('click', function () { pingLoad(true); });
+
+    var ready = pings.status === 'ready' || !!pings.report;
+    if (!ready) {
+      document.getElementById('pgRawTiles').innerHTML = '';
+      document.getElementById('pgRawTable').innerHTML = '';
+      return;
+    }
+
+    var ix = A.index(pings.report, pingPlatform());
+    var r = ix.days && ix.days.length ? pingRange(ix) : null;
+    var rows = rawPingRows(r);
+
+    /* Tiles count PINGS, not installs: a row's `count` is how many pings shared
+       that key, so summing them is the only figure here that is not a rate. */
+    var byKind = { open: 0, sub: 0, act: 0, hrv: 0 };
+    var keys = {};
+    rows.forEach(function (x) { byKind[x.kind] += x.count; keys[x.key] = true; });
+
+    document.getElementById('pgRawTiles').innerHTML = [
+      tile({
+        label: 'Ping rows', value: fmtInt(rows.length), smallValue: true,
+        meta: r ? labelFull(r.from) + ' → ' + labelFull(r.to) : 'all time'
+      }),
+      tile({ label: 'Open pings', color: PC.active, value: fmtInt(byKind.open), meta: 'app launches counted' }),
+      tile({ label: 'Subscribe pings', color: PC.subs, value: fmtInt(byKind.sub), meta: 'once per install, ever' }),
+      tile({ label: 'Activation pings', color: PC.activation, value: fmtInt(byKind.act), meta: 'first HRV reading saved' }),
+      tile({ label: 'Reading pings', color: PC.reading, value: fmtInt(byKind.hrv), meta: 'once per install per day' }),
+      tile({
+        label: 'Distinct cohort keys', value: fmtInt(Object.keys(keys).length), smallValue: true,
+        meta: 'cohort day + platform' + (pingUI.rawKind === 'act' ? ' + sensor' : '')
+      })
+    ].join('');
+
+    var host = document.getElementById('pgRawTable');
+    if (!rows.length) {
+      host.innerHTML = '<div class="empty">No pings in this range' +
+        (state.platform === 'ios' || state.platform === 'android' ? ' for this platform' : '') + '.</div>';
+      return;
+    }
+
+    /* Capped, and the cap is SAID. A year of opens is thousands of rows, and a
+       table that silently stops at 500 reads as "that is all there is" — which
+       on a diagnostic view is the one lie that matters. */
+    var CAP = 500;
+    var shown = rows.slice(0, CAP);
+
+    host.innerHTML =
+      '<div class="table-scroll"><table><thead><tr>' +
+      '<th style="text-align:left">Route</th><th>Arrived</th><th>Cohort</th><th>Age</th>' +
+      '<th style="text-align:left">Platform</th><th style="text-align:left">Sensor</th>' +
+      '<th style="text-align:left">Key</th><th>Count</th>' +
+      '</tr></thead><tbody>' +
+      shown.map(function (x) {
+        return '<tr>' +
+          '<td style="text-align:left"><span class="swatch" style="background:' + x.color + '"></span>' + esc(x.kindLabel) + '</td>' +
+          '<td>' + esc(labelDay(x.arrived)) + '</td>' +
+          '<td>' + esc(labelDay(x.cohort)) + '</td>' +
+          '<td>D' + x.age + '</td>' +
+          '<td style="text-align:left">' + esc(A.platformName(x.platform)) + '</td>' +
+          '<td style="text-align:left">' + (x.method ? esc(A.methodName(x.method)) : '<span class="na">–</span>') + '</td>' +
+          '<td style="text-align:left"><code>' + esc(x.key) + '</code></td>' +
+          '<td>' + fmtInt(x.count) + '</td>' +
+          '</tr>';
+      }).join('') +
+      '</tbody></table></div>' +
+      (rows.length > CAP
+        ? '<p class="hint" style="margin-top:8px">Showing the ' + fmtInt(CAP) + ' most recent of ' +
+          fmtInt(rows.length) + ' rows. Narrow the range, or export the CSV for all of them.</p>'
+        : '');
   }
 
   function setView(v) {
@@ -6426,15 +6882,11 @@
       save(); renderAll();
     });
 
-    ['fTrial', 'fWall'].forEach(function (id) {
-      document.getElementById(id).addEventListener('change', function () {
-        var v = Math.max(1, Math.round(+this.value || 1));
-        db.settings[id === 'fTrial' ? 'trialDays' : 'wallDays'] = v;
-        if (db.settings.wallDays < db.settings.trialDays) db.settings.wallDays = db.settings.trialDays;
-        save(); renderAll();
-        toast('Trial ' + trialDays() + ' days · chart window ' + wallDays() +
-          ' days — cohorts leave on day ' + trialExit() + ' and hit the wall on day ' + wallExit() + '.');
-      });
+    var trialInput = document.getElementById('fTrial');
+    if (trialInput) trialInput.addEventListener('change', function () {
+      db.settings.trialDays = Math.max(1, Math.round(+this.value || 1));
+      save(); renderAll();
+      toast('Trial ' + trialDays() + ' days — cohorts leave on day ' + trialExit() + '.');
     });
 
     /* table-view toggles (delegated — cards are re-rendered) */
@@ -6456,7 +6908,7 @@
       var out = ['cohort,age_days,status,installs'];
       rows.forEach(function (x) {
         var age = diffDays(x.start, asOf());
-        var st = age >= wallExit() ? 'past_wall' : age >= trialExit() ? 'past_trial' : 'in_trial';
+        var st = age >= trialExit() ? 'past_trial' : 'in_trial';
         out.push([bucketLabel(x.key, state.cohGrain).full, age, st, x.downloads].join(','));
       });
       download('autonomic-cohorts.csv', out.join('\n'), 'text/csv');
@@ -6583,7 +7035,7 @@
               e.platform = e.platform === 'android' ? 'android' : 'ios';
               upsertQuiet(e);
             });
-            if (parsed.settings) Object.assign(db.settings, parsed.settings);
+            if (parsed.settings) { Object.assign(db.settings, parsed.settings); migrateSettings(db.settings); }
             // A JSON backup is the whole store, so a restore has to bring the
             // ad spots, costs and purchases back too — not just the store days.
             // Merged by id, like every other collection, so restoring an old
@@ -6702,8 +7154,9 @@
     if (Array.isArray(remote.ads)) db.ads = remote.ads;
     if (Array.isArray(remote.costs)) db.costs = remote.costs;
     if (Array.isArray(remote.sales)) db.sales = remote.sales;
-    if (remote.settings) Object.assign(db.settings, remote.settings);
+    if (remote.settings) { Object.assign(db.settings, remote.settings); migrateSettings(db.settings); }
     if (remote.ui && !keepUi) Object.assign(state, remote.ui);
+    if (state.platform === 'compare') state.platform = 'combined';
     // A session saved before Explore was replaced still names it. An unknown
     // view hides every section and leaves a blank page with no way back.
     if (!VIEW_TITLES[state.view]) state.view = 'overview';

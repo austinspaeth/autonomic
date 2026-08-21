@@ -11,7 +11,8 @@ import Reanimated, {
   Easing as REasing, Extrapolation, interpolate, interpolateColor, runOnJS, useAnimatedStyle,
   useSharedValue, withSpring, withTiming, type SharedValue,
 } from 'react-native-reanimated';
-import { GRADE_COLORS, radius, space, type as T, usePalette } from '../theme';
+import { CAUTION_GOLD, CAUTION_GOLD_SOFT, CAUTION_INK, GRADE_COLORS, radius, space, type as T, usePalette } from '../theme';
+import { fmtDateLong, isPastDay } from '../lib/dates';
 import type { ScoreCat } from '../lib/types';
 import { helpUrl, type HelpContent } from '../lib/help';
 import { Icon, IconName } from './Icon';
@@ -115,9 +116,18 @@ export function Muted({ children }: { children: React.ReactNode }) {
 // bounciness 8 — same feel, converted through Origami tension/friction.
 const PILL_SPRING = { stiffness: 427, damping: 27.6, mass: 1 };
 
-export function Segmented<T extends string>({ options, value, onChange, onLockedPress, onSettled, style, compact }: {
+/** Width of the optional trailing overflow button inside the capsule. The even
+ *  cells give it up rather than the control growing, so the header band's height
+ *  and the pill's own geometry are unchanged by its presence. */
+const SEG_TRAILING_W = 42;
+
+export function Segmented<T extends string>({ options, value, onChange, onLockedPress, onSettled, style, compact, trailing }: {
   options: { val: T; label: string; locked?: boolean }[]; value: T; onChange: (v: T) => void;
   onLockedPress?: (v: T) => void; onSettled?: () => void; style?: StyleProp<ViewStyle>; compact?: boolean;
+  /** An overflow control riding on the same capsule, right of the last segment.
+   *  It is NOT a segment: the pill never travels to it and it carries no
+   *  selected state — it opens something rather than choosing a value. */
+  trailing?: { icon: IconName; onPress: () => void; accessibilityLabel?: string };
 }) {
   const p = usePalette();
   const [w, setW] = React.useState(0);
@@ -147,7 +157,7 @@ export function Segmented<T extends string>({ options, value, onChange, onLocked
   const pad = compact ? 2 : 4;
   const padV = compact ? 6 : 9;
   const font = compact ? 12 : 15;
-  const cell = w > 0 ? (w - pad * 2) / n : 0;
+  const cell = w > 0 ? (w - pad * 2 - (trailing ? SEG_TRAILING_W : 0)) / n : 0;
   const measured = compact && n > 1 && cells.filter(Boolean).length === n;
   // Interpolation inputs for the compact pill. Padded to the stop list (and to
   // at least two stops) so the worklet stays valid before the cells are
@@ -208,6 +218,16 @@ export function Segmented<T extends string>({ options, value, onChange, onLocked
           )}
         </Pressable>
       ))}
+      {trailing ? (
+        <Pressable
+          onPress={trailing.onPress}
+          accessibilityRole="button"
+          accessibilityLabel={trailing.accessibilityLabel}
+          style={({ pressed }) => [{ width: SEG_TRAILING_W, alignItems: 'center', justifyContent: 'center', zIndex: 1 }, pressed && { opacity: 0.6 }]}
+        >
+          <Icon name={trailing.icon} size={19} color={p.textDim} />
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -261,15 +281,17 @@ export function Stepper({ value, step, onChange, format }: { value: number; step
 }
 
 /* ---------- Buttons ---------- */
-export function Button({ title, onPress, variant = 'default', style, disabled, onLongPress, delayLongPress }: {
-  title: string; onPress: () => void; variant?: 'default' | 'primary' | 'ghost' | 'danger' | 'dashed'; style?: StyleProp<ViewStyle>; disabled?: boolean;
+export function Button({ title, onPress, variant = 'default', icon, style, disabled, onLongPress, delayLongPress }: {
+  title: string; onPress: () => void; variant?: 'default' | 'primary' | 'ghost' | 'danger' | 'dashed' | 'caution'; style?: StyleProp<ViewStyle>; disabled?: boolean;
+  /** Optional glyph before the label; inherits the label's colour. */
+  icon?: IconName;
   /** Optional hidden affordance (e.g. hold to open diagnostics). */
   onLongPress?: () => void; delayLongPress?: number;
 }) {
   const p = usePalette();
-  const bg = variant === 'primary' ? p.accent : variant === 'danger' ? '#d63b3b' : variant === 'ghost' || variant === 'dashed' ? 'transparent' : p.surface2;
-  const border = variant === 'primary' ? p.accent : variant === 'danger' ? '#d63b3b' : p.border;
-  const color = variant === 'primary' || variant === 'danger' ? '#fff' : variant === 'dashed' ? p.accent : p.text;
+  const bg = variant === 'primary' ? p.accent : variant === 'danger' ? '#d63b3b' : variant === 'caution' ? CAUTION_GOLD : variant === 'ghost' || variant === 'dashed' ? 'transparent' : p.surface2;
+  const border = variant === 'primary' ? p.accent : variant === 'danger' ? '#d63b3b' : variant === 'caution' ? CAUTION_GOLD : p.border;
+  const color = variant === 'primary' || variant === 'danger' ? '#fff' : variant === 'caution' ? CAUTION_INK : variant === 'dashed' ? p.accent : p.text;
   return (
     <Pressable
       onPress={onPress}
@@ -277,14 +299,59 @@ export function Button({ title, onPress, variant = 'default', style, disabled, o
       delayLongPress={delayLongPress}
       disabled={disabled}
       style={({ pressed }) => [
-        { flex: 1, borderRadius: radius.control, borderWidth: variant === 'dashed' ? 1.5 : 1, borderStyle: variant === 'dashed' ? 'dashed' : 'solid', backgroundColor: bg, borderColor: border, paddingVertical: 13, alignItems: 'center' },
+        { flex: 1, flexDirection: 'row', gap: 8, justifyContent: 'center', borderRadius: radius.control, borderWidth: variant === 'dashed' ? 1.5 : 1, borderStyle: variant === 'dashed' ? 'dashed' : 'solid', backgroundColor: bg, borderColor: border, paddingVertical: 13, alignItems: 'center' },
         disabled && { opacity: 0.45 },
         pressed && { opacity: 0.7 },
         style,
       ]}
     >
+      {icon ? <Icon name={icon} size={17} color={color} /> : null}
       <Text style={{ color, fontSize: 16, fontWeight: '600' }}>{title}</Text>
     </Pressable>
+  );
+}
+
+/* ---------- Back-dated day editing ---------- */
+/**
+ * The commit control for anything written into ONE journal day. On today it is
+ * the ordinary red primary. On any earlier day it turns gold, takes a caution
+ * mark and says what it is about to do ("Save for previous day") — the journal
+ * can be scrolled days back from a calendar tap, the date lives in a header
+ * that is long gone by the time a sheet is open, and a back-dated write is
+ * otherwise indistinguishable from logging right now. `pastTitle` overrides the
+ * default `"<title> for previous day"` where that phrasing doesn't read.
+ */
+export function DaySaveButton({ dk, title, pastTitle, onPress, disabled, style }: {
+  dk: string; title: string; pastTitle?: string; onPress: () => void; disabled?: boolean; style?: StyleProp<ViewStyle>;
+}) {
+  const past = isPastDay(dk);
+  return (
+    <Button
+      title={past ? (pastTitle ?? `${title} for previous day`) : title}
+      variant={past ? 'caution' : 'primary'}
+      icon={past ? 'alert' : undefined}
+      onPress={onPress}
+      disabled={disabled}
+      style={style}
+    />
+  );
+}
+
+/**
+ * The same warning as a line of text, for a sheet whose fields commit AS THEY
+ * CHANGE (the sleep editor) and so have no Save button to re-dress. Renders
+ * nothing on today.
+ */
+export function PastDayNotice({ dk, text, style }: { dk: string; text?: string; style?: StyleProp<ViewStyle> }) {
+  const p = usePalette();
+  if (!isPastDay(dk)) return null;
+  return (
+    <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: CAUTION_GOLD_SOFT, borderWidth: 1, borderColor: 'rgba(234,179,8,0.4)', borderRadius: radius.control, paddingVertical: 10, paddingHorizontal: 12, marginBottom: 14 }, style]}>
+      <Icon name="alert" size={16} color={CAUTION_GOLD} />
+      <Text style={{ flex: 1, color: p.text, fontSize: 13, lineHeight: 18 }}>
+        {text ?? `You're editing ${fmtDateLong(dk)}, not today. Changes are saved to that day.`}
+      </Text>
+    </View>
   );
 }
 

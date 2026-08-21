@@ -11,6 +11,14 @@ export const dateFromKey = (k: string) => {
 
 export const todayKey = () => keyOf(new Date());
 
+/** Is `dk` an earlier day than today? Every control that COMMITS something
+ *  into a day is re-dressed when this is true (gold + a caution mark, see
+ *  `DaySaveButton`): the journal's date sits in a header the reader has
+ *  usually scrolled past, so a back-dated save is otherwise indistinguishable
+ *  from logging the present. Day keys are ISO, so a string compare is a date
+ *  compare. */
+export const isPastDay = (dk: string) => dk < todayKey();
+
 export const nowTime = () => {
   const d = new Date();
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
@@ -139,4 +147,13 @@ export const fmtNum = (v: number | null | undefined): string => {
   if (v == null) return '-';
   if (Number.isInteger(v)) return String(v);
   return Math.abs(v) < 1 ? v.toFixed(3) : v.toFixed(1);
+};
+
+/** "2026-01-25" -> "1/25/26". The compact stamp the Progress custom-range chip
+ *  and its sheet fields wear — the same M/D house style the chart axes use,
+ *  with the year added because a custom window can start in another one. */
+export const fmtSlashShort = (k: string) => {
+  const d = dateFromKey(k);
+  if (isNaN(d.getTime())) return k;
+  return `${d.getMonth() + 1}/${d.getDate()}/${pad(d.getFullYear() % 100)}`;
 };

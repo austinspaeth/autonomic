@@ -3,7 +3,7 @@
  *  overnight HR and lets you review/edit it before it lands in the journal. */
 import React, { useState } from 'react';
 import { ActivityIndicator, Alert, Platform, Text, View } from 'react-native';
-import { Button } from '../components/ui';
+import { Button, DaySaveButton } from '../components/ui';
 import { SheetControls, SheetFooter, useSheets } from '../components/Sheet';
 import { TimeField } from '../components/Field';
 import { useToast } from '../components/Toast';
@@ -156,7 +156,7 @@ export function SleepConfirmSheet({ dk, data, controls, onDone }: {
         </Text>
       ) : null}
       <SheetFooter>
-        <Button title="Use this" variant="primary" onPress={confirm} />
+        <DaySaveButton dk={dk} title="Use this" pastTitle="Use this for previous day" onPress={confirm} />
       </SheetFooter>
     </View>
   );

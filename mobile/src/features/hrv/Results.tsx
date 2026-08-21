@@ -16,7 +16,7 @@ import { usePalette } from '../../theme';
 import { computeHrv } from '../../lib/hrv';
 import { computeScores } from '../../lib/scoring';
 import { getState, storeWaveform, upsertEntry } from '../../store/store';
-import { pingActivation } from '../../store/ping';
+import { pingActivation, pingHrvReading } from '../../store/ping';
 import { splitWaveform } from '../../lib/waveforms';
 import { health, healthAppName } from '../../lib/health';
 import { keyOf, nowTime, pad, todayKey, uid } from '../../lib/dates';
@@ -110,6 +110,9 @@ export function HrvResults({ rr, segmentStarts, hrSamples, sdnnSamples, config, 
     // Activation: the first reading an install ever saves, tagged with the
     // sensor that took it. A no-op on every reading after that one.
     pingActivation(config.source);
+    // And the daily counter beside it: this install measured today. A no-op on
+    // every reading after the first one of the Eastern day.
+    pingHrvReading();
     if (writeHealth && health().available) {
       const sdnn = parseFloat(reading.sdnn as string);
       const rmssd = parseFloat(reading.rmssd as string);

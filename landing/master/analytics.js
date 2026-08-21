@@ -16,6 +16,7 @@
  *                                 opened the app on `day`
  *     sub[day].cohorts[cohort]  = ...and how many first showed a subscription
  *     act[day].cohorts[cohort]  = ...and how many saved their FIRST HRV reading
+ *     hrv[day].cohorts[cohort]  = ...and how many saved ANY reading that day
  *
  * `ageDays` is therefore derived, not transmitted: day − cohort.
  *
@@ -25,6 +26,23 @@
  * the gap between them is the funnel worth fixing. It fires once per install,
  * so — unlike opens — activation rows DO count people, and `act[day].methods`
  * says which sensor each one used (W watch, B Bluetooth strap, F finger).
+ *
+ * THE HRV COUNTER IS THE OPEN COUNTER'S TWIN, and that is what makes it worth
+ * more than a fourth number. Both are capped at one per install per Eastern day
+ * by the same client rule, so on any one day they count the same kind of thing
+ * over the same population: `hrv[day] / open[day]` is the SHARE OF THE PEOPLE
+ * WHO WERE THERE who actually took a reading. It is the only ratio on this
+ * page whose numerator and denominator are both install-days, which is why
+ * `measureShare` exists and why nothing may be pooled into one of them that is
+ * not pooled into the other. Opening the app is not using it: an install that
+ * launches every morning and never measures draws a healthy retention curve
+ * over an empty journal, and the open counter alone cannot see the difference.
+ *
+ * THE HRV COUNTER STARTED LATER THAN THE OTHERS, and the "immature is not zero"
+ * rule applies to a counter as much as to a cohort. Days before `hrvFirst` have
+ * no reading rows because no build was sending them, not because nobody
+ * measured, so every function here answers `null` for those days rather than
+ * 0%. `hrvKnown` is the gate; the UI must show the difference.
  *
  * A stored cohort is really cohort+platform (`082126I`), so the report can hand
  * back two rows for one cohort day. `index` pools them, and takes a platform
@@ -59,13 +77,18 @@
  *    show what a percentage was taken over and flag small ones.
  *
  * ---------------------------------------------------------------------------
- * Product boundaries are first-class
+ * The product boundary is first-class
  * ---------------------------------------------------------------------------
- * Day 7 is the last day of the trial; day 8 is the first day outside it.
- * Full history is available through day 14; day 15 is the first day the
- * history wall bites. D7→D8 and D14→D15 are therefore the two transitions
- * worth measuring, and they get their own function rather than being open-coded
- * wherever someone needs them.
+ * Day 14 is the last day of the trial; day 15 is the first day outside it.
+ * D14→D15 is therefore THE transition worth measuring, and it gets its own
+ * function rather than being open-coded wherever someone needs it.
+ *
+ * There used to be two boundaries here: a seven-day trial, and then a separate
+ * "history wall" at day 15 where free users lost their older charts. The app
+ * now runs a single fourteen-day trial, and the free tier's history clip falls
+ * on the same day the trial ends — so the second boundary described the same
+ * moment as the first and has been removed rather than drawn twice. Anything
+ * still speaking of a "wall" is stale copy, not a second product rule.
  */
 window.Analytics = (function () {
   'use strict';
@@ -73,15 +96,14 @@ window.Analytics = (function () {
   /* ------------------------------------------------------------ boundaries */
 
   var B = {
-    trialLastDay: 7,      // still in trial
-    firstPostTrial: 8,    // first day outside it
-    historyLastDay: 14,   // full charts still open
-    firstWallDay: 15      // history wall applies
+    trialLastDay: 14,     // still in trial
+    firstPostTrial: 15    // first day outside it
   };
 
   /* Columns of the cohort heatmap: the milestones worth naming, including both
-     sides of each product boundary. */
-  var MILESTONES = [0, 1, 3, 7, 8, 14, 15, 21, 30, 60, 90];
+     sides of the product boundary. D7 stays as an ordinary week-one checkpoint
+     — it is no longer a boundary, but it is still the day a first week ends. */
+  var MILESTONES = [0, 1, 3, 7, 14, 15, 21, 30, 60, 90];
 
   /* Below this a percentage is noise dressed as a number. */
   var SMALL_COHORT = 10;
@@ -216,6 +238,7 @@ window.Analytics = (function () {
     var open = rowsToMap(report && report.open, letter);
     var sub = rowsToMap(report && report.sub, letter);
     var act = rowsToMap(report && report.act, letter);
+    var hrv = rowsToMap(report && report.hrv, letter);
     /* All three kinds feed `days`, because `days` is what every sweep below
        iterates: an activation landing on a day the open rows happen not to
        cover would otherwise be invisible to `activation` and `activationAges`
@@ -227,9 +250,27 @@ window.Analytics = (function () {
     Object.keys(open).forEach(function (d) { seen[d] = true; });
     Object.keys(sub).forEach(function (d) { seen[d] = true; });
     Object.keys(act).forEach(function (d) { seen[d] = true; });
+    Object.keys(hrv).forEach(function (d) { seen[d] = true; });
     var days = Object.keys(seen).sort();
     var first = days[0] || null;
     var last = days[days.length - 1] || null;
+
+    /* The first day the READING counter itself was heard from, which is later
+       than `first` — the route shipped in a build of its own. Everything before
+       it is unknown rather than zero, and `hrvKnown` is how the rest of this
+       module says so. Taken from the data because there is nowhere else to take
+       it from: the endpoint stores counts, not a start date. The cost is one
+       edge case worth naming — if the very first day the route existed nobody
+       measured, that day reads as "before the counter" instead of as a true
+       zero. One day, once, and it errs toward silence rather than toward a
+       0% that would be a claim about people.
+
+       DELIBERATELY NOT FILTERED by the platform slice: Android shipped the
+       route in its own release, and reading `hrvFirst` off an iOS-only slice
+       would date the counter from the wrong build. */
+    var hrvAll = letter ? rowsToMap(report && report.hrv, null) : hrv;
+    var hrvDays = Object.keys(hrvAll).sort();
+    var hrvFirst = hrvDays[0] || null;
 
     /* Cohorts we can measure: born on or after the counter's first day, and
        actually seen on their own day 0. */
@@ -248,7 +289,8 @@ window.Analytics = (function () {
     });
 
     return {
-      open: open, sub: sub, act: act, days: days, first: first, last: last,
+      open: open, sub: sub, act: act, hrv: hrv,
+      days: days, first: first, last: last, hrvFirst: hrvFirst,
       cohorts: cohorts,
       preTracking: Object.keys(older).sort(),
       /* What this index is a slice of: the filter in force, and the platform
@@ -295,6 +337,122 @@ window.Analytics = (function () {
   /** The platform split of activations, always unfiltered — the twin of
    *  `subPlatformsOn`, and read for the same reason. */
   function actPlatformsOn(ix, day) { return actOn(ix, day).platforms || {}; }
+
+  /* ------------------------------------------------------------ measuring */
+
+  function hrvOn(ix, day) { return (ix.hrv && ix.hrv[day]) || EMPTY; }
+  /** Installs that saved a reading on `day`. One per install per day, so this
+   *  counts PEOPLE on that day, exactly as `activeOn` does. */
+  function readingsOn(ix, day) { return hrvOn(ix, day).total; }
+  function hrvCountOn(ix, day, cohort) { return hrvOn(ix, day).cohorts[cohort] || 0; }
+  /** The reading counter's platform split, always unfiltered. */
+  function hrvPlatformsOn(ix, day) { return hrvOn(ix, day).platforms || {}; }
+
+  /**
+   * Was the reading counter running on `day`?
+   *
+   * A day before it shipped has no rows, and reporting that as "0% of actives
+   * measured" is the counter-level version of calling an immature cohort
+   * churned. Every rate below returns null instead, and the UI says so.
+   */
+  function hrvKnown(ix, day) { return !!(ix.hrvFirst && day >= ix.hrvFirst); }
+
+  /**
+   * The share of the installs active on `day` that took a reading.
+   *
+   * The one genuine share-of-people ratio on this page. Both counters are
+   * capped at one per install per Eastern day by the same client rule and
+   * bucketed on the same boundary, so the numerator's population is a SUBSET of
+   * the denominator's rather than a different measurement of it.
+   *
+   * It can still exceed 100%, and that is information rather than a bug: a
+   * reading saved just after midnight Eastern by a phone whose open ping landed
+   * before it, or an install that measured on a launch whose open ping was lost
+   * offline, both put a reading in a day without its open. Reported as it comes
+   * out — clamping it would hide the only signal that says the two counters
+   * have drifted.
+   */
+  function measureShare(ix, day) {
+    if (!hrvKnown(ix, day)) return null;
+    var active = activeOn(ix, day);
+    if (!active) return null;
+    return (readingsOn(ix, day) / active) * 100;
+  }
+
+  /**
+   * The same share pooled over a set of days.
+   *
+   * Pooled as install-DAYS, not as people: the denominator is every (install,
+   * day) pair on which the app was opened and the numerator is the pairs that
+   * also carried a reading. That is a legitimate rate over a window even though
+   * neither total is a headcount — it is "on what fraction of the days somebody
+   * showed up did they measure", which is the habit question. It is NOT weekly
+   * actives and must never be printed as one.
+   *
+   * Days before the counter shipped are excluded from both sides and counted in
+   * `blind`, so a window that straddles the release reports on the part of
+   * itself it can see and says how much of it that was.
+   */
+  function measureRate(ix, days) {
+    var readings = 0, active = 0, counted = 0, blind = 0;
+    (days || []).forEach(function (d) {
+      if (!hrvKnown(ix, d)) { blind += 1; return; }
+      readings += readingsOn(ix, d);
+      active += activeOn(ix, d);
+      counted += 1;
+    });
+    return {
+      readings: readings, active: active,
+      pct: active ? (readings / active) * 100 : null,
+      days: counted, blind: blind, available: counted > 0 && active > 0
+    };
+  }
+
+  /**
+   * Measuring at day N over a set of cohorts: the share of a cohort that saved
+   * a reading on its own day N.
+   *
+   * `retentionAt`'s twin, and read against it — retention is the share that
+   * opened the app, this is the share that used it. The gap between the two
+   * curves is the app being opened without being used, which is the number a
+   * habit product lives or dies on and which nothing else here can see.
+   *
+   * Two exclusions, both "we cannot know" rather than "nobody did": a cohort
+   * too young for day N (`immature`, the same rule retention runs), and a
+   * cohort whose day N fell before the reading counter shipped (`blind`).
+   * Neither is counted as a zero.
+   */
+  function measuringAt(ix, cohorts, n) {
+    var did = 0, of = 0, eligible = 0, immature = 0, blind = 0;
+    (cohorts || []).forEach(function (c) {
+      if (!isMature(ix, c, n)) { immature += 1; return; }
+      var day = addDays(c, n);
+      if (!hrvKnown(ix, day)) { blind += 1; return; }
+      var size = cohortSize(ix, c);
+      if (!size) return;
+      did += hrvCountOn(ix, day, c);
+      of += size;
+      eligible += 1;
+    });
+    return {
+      day: n, kept: did, of: of,
+      pct: of ? (did / of) * 100 : null,
+      cohorts: eligible, immature: immature, blind: blind,
+      small: of > 0 && of < SMALL_COHORT,
+      available: eligible > 0
+    };
+  }
+
+  /** Measuring at every day 0..maxN, stopping where nothing is knowable. */
+  function measuringCurve(ix, cohorts, maxN) {
+    var out = [];
+    for (var n = 0; n <= (maxN === undefined ? 90 : maxN); n++) {
+      var r = measuringAt(ix, cohorts, n);
+      if (!r.available) break;
+      out.push(r);
+    }
+    return out;
+  }
 
   /** One day's platform split, `{ I: n, A: n, U: n }`, ALWAYS unfiltered. */
   function platformsOn(ix, day) { return (ix.open[day] || EMPTY).platforms || {}; }
@@ -430,18 +588,18 @@ window.Analytics = (function () {
     });
   }
 
-  /* ------------------------------------------------ trial / wall survival */
+  /* ------------------------------------------------------- trial survival */
 
   /**
-   * The monetization lifecycle as a funnel of milestones, plus the two
-   * transitions that straddle a product boundary.
+   * The monetization lifecycle as a funnel of milestones, plus the one
+   * transition that straddles the product boundary.
    *
-   * `d7to8` and `d14to15` are percentage-POINT changes in retention across the
-   * boundary, computed only over cohorts mature enough for the later day, so
-   * both sides of the comparison rest on the same installs.
+   * `trialEnd` is a percentage-POINT change in retention across D14→D15,
+   * computed only over cohorts mature enough for the later day, so both sides
+   * of the comparison rest on the same installs.
    */
   function survival(ix, cohorts) {
-    var steps = [0, 1, 7, 8, 14, 15, 30].map(function (n) { return retentionAt(ix, cohorts, n); });
+    var steps = [0, 1, 7, 14, 15, 30].map(function (n) { return retentionAt(ix, cohorts, n); });
     function at(n) {
       for (var i = 0; i < steps.length; i++) if (steps[i].day === n) return steps[i];
       return null;
@@ -463,7 +621,6 @@ window.Analytics = (function () {
     return {
       steps: steps,
       trialEnd: transition(B.trialLastDay, B.firstPostTrial),
-      historyWall: transition(B.historyLastDay, B.firstWallDay),
       at: at
     };
   }
@@ -488,11 +645,10 @@ window.Analytics = (function () {
   function lifecycleActive(ix, day) {
     var d = day || ix.last;
     var abc = activeByCohort(ix, d);
-    var out = { inTrial: 0, postTrial: 0, pastWall: 0, total: abc.total, day: d };
+    var out = { inTrial: 0, postTrial: 0, total: abc.total, day: d };
     abc.rows.forEach(function (r) {
       if (r.age <= B.trialLastDay) out.inTrial += r.count;
-      else if (r.age < B.firstWallDay) out.postTrial += r.count;
-      else out.pastWall += r.count;
+      else out.postTrial += r.count;
     });
     return out;
   }
@@ -504,24 +660,23 @@ window.Analytics = (function () {
    * older than the counter.
    */
   function lifecycleNow(ix, cohorts) {
-    var inTrial = 0, postTrial = 0, pastWall = 0;
+    var inTrial = 0, postTrial = 0;
     (cohorts || []).forEach(function (c) {
       var age = maturity(ix, c);
       var size = cohortSize(ix, c);
       if (age <= B.trialLastDay) inTrial += size;
-      else if (age < B.firstWallDay) postTrial += size;
-      else pastWall += size;
+      else postTrial += size;
     });
-    return { inTrial: inTrial, postTrial: postTrial, pastWall: pastWall };
+    return { inTrial: inTrial, postTrial: postTrial };
   }
 
   /* --------------------------------------------------------- monetization */
 
   /** Purchases bucketed by how old the install was when it bought. */
   var PURCHASE_BUCKETS = [
-    { key: 'd0_7', label: 'D0–7', note: 'inside the trial', from: 0, to: 7 },
-    { key: 'd8_14', label: 'D8–14', note: 'post-trial, history still open', from: 8, to: 14 },
-    { key: 'd15', label: 'D15', note: 'the day the wall applies', from: 15, to: 15 },
+    { key: 'd0_7', label: 'D0–7', note: 'first week of the trial', from: 0, to: 7 },
+    { key: 'd8_14', label: 'D8–14', note: 'second week, trial still running', from: 8, to: 14 },
+    { key: 'd15', label: 'D15', note: 'the day the trial ends', from: 15, to: 15 },
     { key: 'd16_21', label: 'D16–21', from: 16, to: 21 },
     { key: 'd22_30', label: 'D22–30', from: 22, to: 30 },
     { key: 'd30p', label: 'D30+', from: 31, to: Infinity }
@@ -1002,6 +1157,9 @@ window.Analytics = (function () {
     unattributedOn: unattributedOn,
     countOn: countOn, purchasesOn: purchasesOn, cohortSize: cohortSize,
     activationsOn: activationsOn, actCountOn: actCountOn, actPlatformsOn: actPlatformsOn,
+    readingsOn: readingsOn, hrvCountOn: hrvCountOn, hrvPlatformsOn: hrvPlatformsOn,
+    hrvKnown: hrvKnown, measureShare: measureShare, measureRate: measureRate,
+    measuringAt: measuringAt, measuringCurve: measuringCurve,
     methodsOn: methodsOn, methodsOver: methodsOver,
     methodName: function (letter) { return METHOD_NAME[letter] || 'Unknown sensor'; },
     METHOD_ORDER: METHOD_ORDER,

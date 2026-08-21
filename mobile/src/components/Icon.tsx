@@ -14,7 +14,7 @@ export type IconName =
   | 'bulb' | 'star' | 'brain' | 'virus' | 'clipboard' | 'smile' | 'ai' | 'chart'
   | 'trendUp' | 'trendDown' | 'triangle' | 'checklist' | 'cell' | 'gut'
   | 'bluetooth' | 'watch' | 'plus' | 'trash' | 'settings' | 'sun' | 'play' | 'stop'
-  | 'camera' | 'lock' | 'bell' | 'eye' | 'eyeOff' | 'minimize';
+  | 'camera' | 'lock' | 'bell' | 'eye' | 'eyeOff' | 'minimize' | 'calendar' | 'dots';
 
 const P: Record<IconName, string[]> = {
   heartPulse: ['M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z', 'M3.22 12H9.5l.6-1.3 1.9 4.6 2-7 1.5 3.7h5.27'],
@@ -85,6 +85,8 @@ const P: Record<IconName, string[]> = {
   eyeOff: ['M3 3l18 18', 'M10.6 5.3A9 9 0 0 1 21 12a17 17 0 0 1-2.2 2.9', 'M6.6 6.7A16 16 0 0 0 3 12a9 9 0 0 0 12.6 4.6'],
   minimize: ['M8 3v3a2 2 0 0 1-2 2H3', 'M21 8h-3a2 2 0 0 1-2-2V3', 'M3 16h3a2 2 0 0 1 2 2v3', 'M16 21v-3a2 2 0 0 1 2-2h3'],
   bell: ['M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9', 'M13.7 21a2 2 0 0 1-3.4 0'],
+  calendar: ['M3 10h18', 'M8 3v4', 'M16 3v4'],
+  dots: [],
 };
 
 // Icons that need extra <circle>/<rect> elements beyond the path list.
@@ -114,6 +116,9 @@ export function Icon({ name, size = 22, color = '#000', strokeWidth = 1.9 }: { n
       {name === 'watch' && <Rect x={7} y={7} width={10} height={10} rx={2} {...common} />}
       {name === 'stop' && <Rect x={6} y={6} width={12} height={12} rx={2} {...common} />}
       {name === 'camera' && <Circle cx={12} cy={13} r={3.5} {...common} />}
+      {name === 'calendar' && <Rect x={3} y={5} width={18} height={16} rx={3} {...common} />}
+      {/* Overflow dots: filled, so they read as a control rather than as three tiny outlined rings. */}
+      {name === 'dots' && (<>{[5, 12, 19].map((cx) => <Circle key={cx} cx={cx} cy={12} r={1.9} fill={color} stroke="none" />)}</>)}
       {name === 'lock' && <Rect x={3.5} y={11} width={17} height={10} rx={2.5} {...common} />}
       {EXTRAS[name]}
       {P[name].map((d, i) => (<Path key={i} d={d} {...common} />))}

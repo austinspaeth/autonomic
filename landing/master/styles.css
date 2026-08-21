@@ -34,7 +34,7 @@
   /* lifecycle stages — validated as a set on the dark surface */
   --stage-trial: #00a08f;  /* green — still inside the free trial */
   --stage-past:  #c98500;  /* gold  — past the trial */
-  --stage-wall:  #c9403f;  /* red   — past the wall */
+  --stage-wall:  #c9403f;  /* red   — past the trial, on the free tier */
 
   /* status (reserved — never used as a series) */
   --good:     #0ca30c;
@@ -991,14 +991,45 @@ details.acc > summary .btn { user-select: none; }
   .topbar h1 { font-size: 17px; }
   .topbar .spacer { flex: 0 0 100%; height: 0; }
   .topbar .btn { padding: 6px 11px; font-size: 13.5px; }
-  /* Export anchors the left of the controls row; refresh and Edit data are
-     pushed to the right edge, so the row reads as a pair of groups rather than
-     three buttons drifting left with a gap after them. */
-  #btnRefresh { margin-left: auto; }
-  /* The refresh button drops its label and becomes a round icon: on a phone the
+  /* The alerts bell drops its label and becomes a round icon: on a phone the
      header is already carrying Export, its scope caret and Edit data. */
   .icon-btn { padding: 0; width: 34px; height: 34px; border-radius: 50%; justify-content: center; }
   .icon-btn .icon-btn-label { display: none; }
+
+  /* Refresh leaves the header entirely and becomes a floating action button in
+     the bottom-right corner.
+     It is the most-pressed control on the page and it was the smallest and the
+     furthest from a thumb — a 34px circle in a top corner, on a view you have
+     usually scrolled a long way down. Down here it is reachable without
+     re-scrolling, it is a comfortable 56px target, and it no longer competes
+     for the header row with Export and Edit data. It sits above the alert card
+     stack's corner but below the sheet layer, and it respects the home
+     indicator via `safe-area-inset-bottom`. */
+  #btnRefresh {
+    position: fixed;
+    right: 16px;
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    z-index: 60;
+    width: 56px; height: 56px;
+    border-radius: 50%;
+    padding: 0;
+    justify-content: center;
+    background: var(--series-1);
+    color: #fff;
+    border: none;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, .45), 0 2px 6px rgba(0, 0, 0, .3);
+  }
+  #btnRefresh .refresh-icon { width: 24px; height: 24px; }
+  #btnRefresh .icon-btn-label { display: none; }
+  /* The disabled/busy state is a spin, and it must not also grey out to the
+     point of vanishing against the page — this button is now the only thing in
+     that corner. */
+  #btnRefresh[data-busy="true"] { color: #fff; opacity: .75; }
+  /* The alert cards dock in the same corner; lift the whole dock clear of the
+     button so a card is never hidden behind it. The dock is the positioned
+     element — `#alertStack` is the scroller inside it and has no offsets of its
+     own, so moving that would have done nothing. */
+  .alert-dock { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
   /* Export sits at the right of the header on a desktop and at the left of the
      controls row on a phone, so its popover has to hang the other way — anchored
      right it runs off the left edge of the screen. */

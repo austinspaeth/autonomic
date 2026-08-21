@@ -1,11 +1,12 @@
 /**
  * Cohort ping — the only endpoint the mobile app itself talks to.
  *
- * Four routes. Three public writers, no auth, no body, no response payload:
+ * Five routes. Four public writers, no auth, no body, no response payload:
  *
  *   GET /ping/open/D082126I   the app was opened today by an install from that cohort
  *   GET /ping/sub/D082126I    an install from that cohort became a paid subscriber
  *   GET /ping/act/D082126IB   an install from that cohort took its FIRST HRV reading
+ *   GET /ping/hrv/D082126I    an install from that cohort took a reading TODAY
  *
  * and one reader, guarded by a shared key:
  *
@@ -26,6 +27,16 @@
  * decode and one string to store, and it turns the same matrix into "of the
  * installs born on cohort C, how many ever got a first reading, and with what".
  * Activation fires once per install, so its rows count installs, not sessions.
+ *
+ * The HRV route is the open route's twin and carries exactly what it carries —
+ * cohort and platform, no sensor letter. Opening the app is not using it: an
+ * install that launches every morning and never measures produces a healthy
+ * retention curve and an empty journal, and the open counter cannot tell that
+ * apart from a reading a day. Because both are capped at one per install per
+ * Eastern day by the same client rule, HRV over OPEN on one day is a genuine
+ * SHARE OF PEOPLE — the only ratio on this endpoint that is, which is why the
+ * two are bucketed identically and why nothing may be added to one of them
+ * that is not added to the other.
  *
  * Days here are US EASTERN days, not UTC ones: these are the business's own
  * numbers and are read against its own calendar, so a ping at 8pm in New York
@@ -64,7 +75,7 @@ const EPOCH = '2025-01-01';
 /** A cohort can't be in the future; allow a day of clock skew / timezone. */
 const SKEW_MS = 36 * 60 * 60 * 1000;
 
-const KINDS = { open: 'OPEN', sub: 'SUB', act: 'ACT' };
+const KINDS = { open: 'OPEN', sub: 'SUB', act: 'ACT', hrv: 'HRV' };
 
 /* ------------------------------------------------------------------ dates */
 
@@ -237,13 +248,18 @@ const readDays = async (kind, since) => {
   return rows;
 };
 
-/** All three kinds, `{ open, sub, act }`. Shared with the dashboard API. */
+/** All four kinds, `{ open, sub, act, hrv }`. Shared with the dashboard API.
+ *
+ *  A consumer written before the HRV counter existed reads the same object it
+ *  always did and simply ignores the extra key; one written after it must treat
+ *  a MISSING `hrv` row the way it treats a missing day, since the counter only
+ *  starts on the day the first build carrying it shipped. */
 const report = async (since) => {
   const from = isIsoDate(since) ? since : EPOCH;
-  const [open, sub, act] = await Promise.all([
-    readDays('OPEN', from), readDays('SUB', from), readDays('ACT', from),
+  const [open, sub, act, hrv] = await Promise.all([
+    readDays('OPEN', from), readDays('SUB', from), readDays('ACT', from), readDays('HRV', from),
   ]);
-  return { since: from, open, sub, act };
+  return { since: from, open, sub, act, hrv };
 };
 
 /* ---------------------------------------------------------------- handler */
@@ -283,7 +299,7 @@ const handler = async (event) => {
     }
   }
 
-  const kindKey = /\/ping\/(open|sub|act)\//.exec(path)?.[1];
+  const kindKey = /\/ping\/(open|sub|act|hrv)\//.exec(path)?.[1];
   const kind = KINDS[kindKey];
   if (!kind) return noContent;
 

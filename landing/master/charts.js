@@ -7,6 +7,17 @@
   var NS = 'http://www.w3.org/2000/svg';
   var SURFACE = '#1a1a19';
 
+  /* Is this a finger rather than a mouse? Read once and cached: it decides how
+     much of a chart the event rules are allowed to intercept (see `hitBottom`),
+     and re-querying it per mark per redraw is a layout read in a hot path. */
+  var _coarse = null;
+  function coarsePointer() {
+    if (_coarse !== null) return _coarse;
+    try { _coarse = global.matchMedia('(hover: none) and (pointer: coarse)').matches; }
+    catch (e) { _coarse = false; }
+    return _coarse;
+  }
+
   function el(name, attrs) {
     var n = document.createElementNS(NS, name);
     for (var k in attrs) if (attrs[k] !== null && attrs[k] !== undefined) n.setAttribute(k, attrs[k]);
@@ -196,12 +207,13 @@
 
     /* ---- guides + annotations ----
        Two kinds of vertical rule. `cfg.guides` are drawn here, under the data:
-       they mark a boundary on an axis (day 8, day 15) rather than an event, and
+       they mark a boundary on an axis (day 15, the first day out of trial)
+       rather than an event, and
        the charts carrying them are line or area charts that show through.
        `cfg.marks` are recorded events and are painted at the very END of this
        function, over everything — see the block near the crosshair setup for
        why. `cfg.guides` are fixed reference lines the chart itself means (the
-       trial and history-wall boundaries on a retention curve). `cfg.marks` are
+       trial boundary on a retention curve). `cfg.marks` are
        recorded events, supplied by the caller from one central store — no chart
        decides for itself what happened on a given day. Both are positioned by
        x-index, so a chart only has to say which column it belongs on. */
@@ -249,17 +261,34 @@
          now would be deaf to hover. They are collected and appended after it
          instead. The rule itself stays back here, under the data, where it
          belongs visually. */
+      /* A flag is only a POINTER where clicking it does something. Off the
+         Timeline tab it is a hover target, and a pointer cursor over a rule
+         that does not act is a promise the chart cannot keep. */
+      var markCursor = cfg.onMarkClick ? 'cursor:pointer' : '';
+
+      /* How far down the plot the rule stays tappable.
+         On a mouse this is the full height: a 12px-wide invisible line is easy
+         to avoid and easy to hit on purpose. On a TOUCH screen it was neither.
+         The crosshair that reads a day's value is one transparent rect across
+         the whole plot, and in SVG the last element painted wins the pointer —
+         so every one of these lines punched a 12px hole through it, top to
+         bottom. Tapping a bar to read its number anywhere near a release
+         silently gave you the release instead. On coarse pointers the rule is
+         therefore only tappable in the GUTTER, where its flag sits and where no
+         data is drawn; the plot itself belongs to the crosshair. */
+      var hitBottom = coarsePointer() ? pad.t : pad.t + ih;
+
       markNodes.push({
         rule: rule,
         // the tag itself, in the gutter above the plot
         flag: el('rect', {
           x: mx - 4, y: pad.t - markGutter, width: 8, height: 8, rx: 2,
-          fill: m.color || '#898781', opacity: 0.95, style: 'cursor:pointer'
+          fill: m.color || '#898781', opacity: 0.95, style: markCursor
         }),
         // one hit target covering tag and rule together
         hitLine: el('line', {
-          x1: mx, x2: mx, y1: pad.t - markGutter, y2: pad.t + ih,
-          stroke: 'transparent', 'stroke-width': 12, style: 'cursor:pointer'
+          x1: mx, x2: mx, y1: pad.t - markGutter, y2: hitBottom,
+          stroke: 'transparent', 'stroke-width': 12, style: markCursor
         }),
         mark: m
       });

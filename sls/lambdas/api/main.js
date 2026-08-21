@@ -505,7 +505,8 @@ const handler = async (event) => {
       case 'REPLACE_ALL':
         return json(200, await replaceAll(pk, payload));
       // The mobile app's cohort counters. They live under their own partitions
-      // (PING#OPEN / PING#SUB), not any dashboard user's, but they are read
+      // (PING#OPEN / PING#SUB / PING#ACT / PING#HRV), not any dashboard user's,
+      // but they are read
       // through this handler so the allowlist above guards them too — the
       // dashboard already holds a token, and shouldn't also hold the ping
       // lambda's shared key.

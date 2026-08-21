@@ -124,6 +124,7 @@
     <button class="tab" role="tab" data-view="cohorts" aria-selected="false">Cohorts</button>
     <button class="tab" role="tab" data-view="platforms" aria-selected="false">iOS vs Android</button>
     <button class="tab" role="tab" data-view="forecast" aria-selected="false">Forecast</button>
+    <button class="tab" role="tab" data-view="pings" aria-selected="false">Pings</button>
   </nav>
 
   <!-- one filter row above everything it scopes -->
@@ -151,7 +152,6 @@
         <button data-v="combined" aria-pressed="true">Combined</button>
         <button data-v="ios" aria-pressed="false">iOS</button>
         <button data-v="android" aria-pressed="false">Android</button>
-        <button data-v="compare" aria-pressed="false">Compare</button>
       </div>
     </div>
 
@@ -226,7 +226,7 @@
       <div class="card">
         <header><h2>Lifecycle mix</h2><span class="spacer"></span>
           <button class="btn sm" data-table-toggle="ovStack">Table</button></header>
-        <p class="hint">Everyone who has ever installed, split by where they are in the lifecycle at the end of each period. Green is still inside the free trial, gold is past it, red has hit the wall and lost historical charts.</p>
+        <p class="hint">Everyone who has ever installed, split by where they are in the lifecycle at the end of each period. Green is still inside the free trial; red is past it and on the free tier, with the analysis features locked.</p>
         <div id="ovStack"></div>
         <div id="ovStack-table" class="hidden" style="margin-top:12px"></div>
       </div>
@@ -268,7 +268,7 @@
     <div class="card" style="margin-bottom:14px">
       <header><h2>Install → paid funnel</h2><span class="spacer"></span>
         <span class="note" id="trFunnelScope"></span></header>
-      <p class="hint">A nested funnel: the last two cohort steps are the <em>same installs</em> from the downloads step, aged forward to the latest reporting day — so each step is a subset of the one above it and the drop-off is purely how much time has passed. Day 7 and day 14 are inclusive, so a cohort leaves the trial on day 8 and hits the wall on day 15.</p>
+      <p class="hint">A nested funnel: the cohort step is the <em>same installs</em> from the downloads step, aged forward to the latest reporting day — so each step is a subset of the one above it and the drop-off is purely how much time has passed. Day 14 is inclusive, so a cohort leaves the trial on day 15.</p>
       <div id="trFunnel"></div>
     </div>
 
@@ -302,7 +302,7 @@
         </div>
         <button class="btn sm" id="cohExport">Export CSV</button>
       </header>
-      <p class="hint">Each row is a group of installs. Age is measured from the cohort's start to the latest reporting day. Day 7 still counts as in-trial and day 14 still counts as inside the chart window — each cohort moves on the day after.</p>
+      <p class="hint">Each row is a group of installs. Age is measured from the cohort's start to the latest reporting day. Day 14 still counts as in-trial — a cohort moves on the day after.</p>
       <div id="cohTable"></div>
     </div>
     <div class="card">
@@ -368,14 +368,14 @@
             <button data-v="split" aria-pressed="false">Recent vs earlier</button>
           </div>
           <button class="btn sm" data-table-toggle="pgCurve">Table</button></header>
-        <p class="hint">Share of each cohort still opening the app N days after installing, pooled over every cohort old enough to have reached that day. The two dashed rules are the product's boundaries: the trial ends after <b>D7</b>, and the history wall starts at <b>D15</b>. A cohort too young for a day is left out of it entirely rather than counted as churned.</p>
+        <p class="hint">Share of each cohort still opening the app N days after installing, pooled over every cohort old enough to have reached that day. The dashed rule is the product's boundary: the trial ends after <b>D14</b>, so <b>D15</b> is the first day on the free tier. A cohort too young for a day is left out of it entirely rather than counted as churned.</p>
         <div id="pgCurve"></div>
         <div id="pgCurve-table" class="hidden" style="margin-top:12px"></div>
       </div>
       <div class="card">
-        <header><h2>Crossing the boundaries</h2><span class="spacer"></span>
+        <header><h2>Crossing the boundary</h2><span class="spacer"></span>
           <button class="btn sm" data-table-toggle="pgSurvival">Table</button></header>
-        <p class="hint">The lifecycle as a funnel, and the two transitions that straddle a product decision. Both sides of each transition are measured over the <em>same</em> installs — only cohorts old enough for the later day — so a change cannot be an artefact of a shifting denominator.</p>
+        <p class="hint">The lifecycle as a funnel, and the transition that straddles the product decision. Both sides of it are measured over the <em>same</em> installs — only cohorts old enough for the later day — so a change cannot be an artefact of a shifting denominator.</p>
         <div id="pgSurvival"></div>
         <div id="pgSurvival-table" class="hidden" style="margin-top:12px"></div>
         <div id="pgTransitions"></div>
@@ -408,7 +408,7 @@
       <div class="card">
         <header><h2>Purchase timing</h2><span class="spacer"></span>
           <button class="btn sm" data-table-toggle="pgPurchaseAge">Table</button></header>
-        <p class="hint">How old an install was when it subscribed. <b>D15</b> has its own column deliberately: if the history wall is what converts people, this is where it shows up.</p>
+        <p class="hint">How old an install was when it subscribed. <b>D15</b> has its own column deliberately: if the end of the trial is what converts people, this is where it shows up.</p>
         <div id="pgPurchaseAge"></div>
         <div id="pgPurchaseAge-table" class="hidden" style="margin-top:12px"></div>
         <!-- Every purchase, one row each. Below a dozen it is open by default:
@@ -443,6 +443,30 @@
       </div>
     </div>
 
+    <!-- ---------- 5d. measuring ----------
+         The counter's fourth route. Opening the app is not using it: a journal
+         app can be launched every morning to look at yesterday's number and
+         never gain a new one. Both counters are one per install per Eastern
+         day, so their ratio is a share of people. -->
+    <div class="grid two-col" style="margin-bottom:14px">
+      <div class="card">
+        <header><h2>Opened vs measured</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="pgMeasureDaily">Table</button></header>
+        <p class="hint">Every day, how many installs opened the app and how many <b>saved an HRV reading</b>. The gap between the two lines is people launching the app without using it, which is the shape that precedes churn and which retention alone cannot see. Both counters fire at most once per install per US Eastern day, so the share underneath is a share of <em>people</em>. Days before the reading counter shipped are a <b>gap in the line, not a zero</b>.</p>
+        <div id="pgMeasureDaily"></div>
+        <div id="pgMeasureDaily-table" class="hidden" style="margin-top:12px"></div>
+        <div id="pgMeasureNote"></div>
+      </div>
+      <div class="card">
+        <header><h2>The habit curve</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="pgMeasureCurve">Table</button></header>
+        <p class="hint">Retention and measuring on one axis, by install age. <b>Opened</b> is the ordinary retention curve; <b>measured</b> is the share of the same cohorts that took a reading on that day. The distance between them is the part of the userbase that is still showing up and no longer measuring — the thing to watch after the trial ends at <b>D14</b>. A cohort too young for a day is left out of it, and so is one whose day N fell before the reading counter existed: neither is a zero.</p>
+        <div id="pgMeasureCurve"></div>
+        <div id="pgMeasureCurve-table" class="hidden" style="margin-top:12px"></div>
+        <div id="pgMeasureRates"></div>
+      </div>
+    </div>
+
     <!-- ---------- 5b. which store ---------- -->
     <div class="card" style="margin-bottom:14px">
       <header><h2>iOS vs Android, day by day</h2><span class="spacer"></span>
@@ -457,7 +481,7 @@
     <div class="card" style="margin-bottom:14px">
       <header><h2>Weekday pattern</h2><span class="spacer"></span>
         <button class="btn sm" data-table-toggle="pgWeekday">Table</button></header>
-      <p class="hint">Whether the midweek acquisition peak is real, and whether it is worth anything. Each weekday carries five bars as averages per weekday, so a day with five Mondays in range is not flattered by having more of them: store downloads, first runs, returning activity, and then the two that matter most — <b>purchases</b> from your own sales ledger and <b>subscribe pings</b> from the app itself. The last two count the same event at different moments (the app only notices a subscription on its next launch), so they should track rather than match, and a persistent gap between them is worth chasing. The table below asks the harder question: do installs born midweek actually <em>retain</em> better, or are they just more numerous?</p>
+      <p class="hint">Whether the midweek acquisition peak is real, and whether it is worth anything. Each weekday carries six bars as averages per weekday, so a day with five Mondays in range is not flattered by having more of them: store downloads, first runs, returning activity, <b>readings</b> (which weekday people actually measure on, the number the morning reminder's time should follow), and then the two that matter most — <b>purchases</b> from your own sales ledger and <b>subscribe pings</b> from the app itself. The last two count the same event at different moments (the app only notices a subscription on its next launch), so they should track rather than match, and a persistent gap between them is worth chasing. The table below asks the harder question: do installs born midweek actually <em>retain</em> better, or are they just more numerous?</p>
       <div id="pgWeekday"></div>
       <div id="pgWeekday-table" class="hidden" style="margin-top:12px"></div>
       <div id="pgWeekdayRetention"></div>
@@ -692,7 +716,7 @@
       <div class="card">
         <header><h2>New paying users per month</h2><span class="spacer"></span>
           <button class="btn sm" data-table-toggle="fcConv">Table</button></header>
-        <p class="hint">Conversions from users hitting the wall that month, expected case.</p>
+        <p class="hint">Conversions from users finishing the trial that month, expected case.</p>
         <div id="fcConv"></div>
         <div id="fcConv-table" class="hidden" style="margin-top:12px"></div>
       </div>
@@ -707,6 +731,33 @@
   </section>
 
   <!-- ================= DATA ================= -->
+  <!-- ================= PINGS =================
+       The counter, unaggregated. Every other view answers a question with these
+       rows; this one just shows them, because when a number upstream looks
+       wrong the only way to tell a bug from a genuinely odd day is to read what
+       actually arrived. -->
+  <section id="view-pings" class="view hidden">
+    <div id="pgRawStatus"></div>
+
+    <div class="grid cards">
+      <div class="tile-group" id="pgRawTiles"></div>
+    </div>
+
+    <div class="card" style="margin-bottom:14px">
+      <header><h2>Every ping received</h2><span class="spacer"></span>
+        <div class="segmented" id="pgRawKind">
+          <button data-v="all" aria-pressed="true">All</button>
+          <button data-v="open" aria-pressed="false">Opens</button>
+          <button data-v="sub" aria-pressed="false">Subscribes</button>
+          <button data-v="act" aria-pressed="false">Activations</button>
+          <button data-v="hrv" aria-pressed="false">Readings</button>
+        </div>
+        <button class="btn sm" id="pgRawExport">Export CSV</button></header>
+      <p class="hint">One row per <b>(route, arrival day, cohort key)</b> — which is exactly how the counter stores it, so nothing here is derived. <b>Arrived</b> is the day the server stamped; <b>cohort</b> is the day that install first ran, carried in the request path. <b>Age</b> is the gap between them, so an open ping at age 0 is a first run and a subscribe at age 20 is someone who paid three weeks in. The counter carries no device id and no body, which is why a row is a count and never a list of people. The range and platform filters above apply; <b>unknown</b> platform means a build that shipped before the store marker existed.</p>
+      <div id="pgRawTable"></div>
+    </div>
+  </section>
+
   <section id="view-data" class="view hidden">
 
     <div class="section-head">
@@ -831,13 +882,11 @@
     </div>
 
     <details class="card acc">
-      <summary><h2>Trial &amp; wall lengths</h2></summary>
-      <p class="hint">These describe how your app behaves, so they live here rather than in the filter bar — changing one re-derives every cohort metric here. Both limits are inclusive: with 7 and 14, a user is still in the trial on day 7 and still has full charts on day 14, leaving the trial on day 8 and hitting the wall on day 15.</p>
+      <summary><h2>Trial length</h2></summary>
+      <p class="hint">This describes how your app behaves, so it lives here rather than in the filter bar — changing it re-derives every cohort metric. The limit is inclusive: with 14, a user is still in the trial on day 14 and leaves it on day 15.</p>
       <div class="form-grid" style="max-width:560px">
         <div class="field"><label for="fTrial">Free trial length (days)</label>
-          <input type="number" id="fTrial" min="1" max="60" step="1" value="7"></div>
-        <div class="field"><label for="fWall">Chart window (days)</label>
-          <input type="number" id="fWall" min="1" max="120" step="1" value="14"></div>
+          <input type="number" id="fTrial" min="1" max="60" step="1" value="14"></div>
       </div>
     </details>
 

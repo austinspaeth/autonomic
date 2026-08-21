@@ -6,7 +6,7 @@
  * here is pure and locale-aware via `toLocaleDateString`, so these pin the parts
  * that are ours: the ordinal suffix and the bad-input fallback.
  */
-import { fmtDuration, fmtMonthDay, minsBetween } from '../dates';
+import { addDays, fmtDuration, fmtMonthDay, isPastDay, minsBetween, todayKey } from '../dates';
 
 describe('fmtMonthDay', () => {
   it('reads as a date in a sentence, with an ordinal', () => {
@@ -55,5 +55,32 @@ describe('fmtDuration', () => {
     expect(fmtDuration(59)).toBe('59 min');
     expect(fmtDuration(60)).toBe('1h');
     expect(fmtDuration(135)).toBe('2h 15m');
+  });
+});
+
+/**
+ * Every control that writes into a day is re-dressed off this predicate (gold,
+ * caution mark, "Save for previous day"), so a false here silently back-dates
+ * a save with no warning at all. Day keys are ISO, which is the only reason a
+ * string compare is allowed to stand in for a date compare.
+ */
+describe('isPastDay', () => {
+  it('is false for today and true for any earlier day', () => {
+    const t = todayKey();
+    expect(isPastDay(t)).toBe(false);
+    expect(isPastDay(addDays(t, -1))).toBe(true);
+    expect(isPastDay(addDays(t, -400))).toBe(true);
+  });
+
+  it('is false for a future day — a warning about editing the PAST would be wrong', () => {
+    expect(isPastDay(addDays(todayKey(), 1))).toBe(false);
+  });
+
+  it('orders single-digit months correctly — the padding is what makes the string compare safe', () => {
+    // Unpadded, '2026-9-30' sorts AFTER '2026-10-01'. This pins that a key
+    // built by `keyOf` is always zero-padded, since isPastDay leans on it.
+    expect(todayKey()).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(isPastDay('1999-01-01')).toBe(true);
+    expect(isPastDay('2999-12-31')).toBe(false);
   });
 });

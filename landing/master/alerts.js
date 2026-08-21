@@ -5,25 +5,31 @@
  * ping report and the next is announced rather than silently redrawn. Four
  * events, in ascending order of how much they matter:
  *
- *   visitors    someone opened the app         soft blip, nothing else
+ *   visitors    someone opened the app         soft blip, half a second of
+ *                                               house-coloured glitter
  *   activations an install saved its FIRST      soft chime, a card + a toast +
  *               HRV reading                     a notification naming the
- *                                               sensor. NO confetti.
- *   downloads   a first run the counter had     two-note chime, confetti falling
- *               never seen (a new install)      from the top, a card + a toast +
- *                                               a notification naming the store
- *   sales       a subscribe ping                fanfare, TEN SECONDS of confetti
- *                                               from the top and the bottom, a
+ *                                               sensor. No canvas.
+ *   downloads   a first run the counter had     two-note chime, TEN SECONDS of
+ *               never seen (a new install)      SILVER glitter falling from the
+ *                                               top, a card + a toast + a
+ *                                               notification naming the store
+ *   sales       a subscribe ping                fanfare, FIFTEEN SECONDS of
+ *                                               GOLD glitter from both edges, a
  *                                               card + a toast + a notification
  *                                               naming the store that paid
  *
- * **Confetti is for ARRIVALS, never for usage.** A new install and a purchase
- * are people joining and people paying; everything else here is somebody using
- * the app they already have. That is the event this dashboard hopes to see all
- * day, every day, and confetti for it would be confetti more or less
- * permanently — which is the fastest way to make confetti mean nothing when a
- * sale finally lands. Activations get the full card / toast / notification
- * treatment and no canvas at all.
+ * **The metal is the news, and the duration is the ranking.** Gold for money,
+ * silver for a new install, house colours for somebody coming back — told apart
+ * across a room with the sound off. An earlier version of this file reserved
+ * the canvas for arrivals and gave usage nothing, on the argument that a
+ * celebration for the event the dashboard hopes to see all day would run
+ * permanently and leave a sale's confetti meaning nothing. That argument was
+ * about duration, not about the canvas: half a second is over before it reads
+ * as an interruption, where a sale holds the screen for fifteen. An activation
+ * is the one event that still gets no canvas at all — it lands in the same
+ * refresh as the download that caused it often enough that its own puff would
+ * only ever be read as part of that one.
  *
  * Everything here is fed by the PING COUNTER, which is the only source on this
  * page that changes on its own. Store downloads and the sales ledger are hand
@@ -446,27 +452,88 @@
     { f: 130.81,  at: 0.76, d: 1.00, type: 'sine',     v: 0.16 }             // C3
   ];
 
+  /* How loud the whole page is allowed to be. These cues have to carry across
+     a room from a laptop speaker, and the first version summed into the
+     destination at 0.75 — comfortably below the level any other tab plays at,
+     which is why they read as "no sounds" rather than as quiet ones. */
+  var MASTER_GAIN = 2.6;
+
   function play(score) {
     var ctx = audio();
     if (!ctx) return;
     /* One gain stage for the whole cue: the fanfare stacks five voices on its
        last chord, and summing them straight into the destination is how a
-       celebration turns into a crackle. */
+       celebration turns into a crackle.
+       Past unity that crackle is a certainty rather than a risk, so the sum
+       goes through a compressor on its way out. That is what buys the headroom
+       to be loud: peaks are held down and the body of the cue comes up, where
+       simply raising the gain would clip the chord and leave the quiet notes
+       exactly as inaudible as they were. */
     var out = ctx.createGain();
-    out.gain.setValueAtTime(0.75, ctx.currentTime);
-    out.connect(ctx.destination);
+    out.gain.setValueAtTime(MASTER_GAIN, ctx.currentTime);
+
+    var comp = null;
+    try {
+      comp = ctx.createDynamicsCompressor();
+      comp.threshold.setValueAtTime(-20, ctx.currentTime);
+      comp.knee.setValueAtTime(24, ctx.currentTime);
+      comp.ratio.setValueAtTime(8, ctx.currentTime);
+      comp.attack.setValueAtTime(0.004, ctx.currentTime);
+      comp.release.setValueAtTime(0.22, ctx.currentTime);
+    } catch (e) { comp = null; }
+
+    if (comp) { out.connect(comp); comp.connect(ctx.destination); }
+    else { out.gain.setValueAtTime(1, ctx.currentTime); out.connect(ctx.destination); }
+
     var now = ctx.currentTime + 0.02;
     score.forEach(function (n) { note(ctx, now + n.at, n, out); });
   }
 
-  /* ------------------------------------------------------------ confetti
+  /* ------------------------------------------------------------ glitter
    *
    * One canvas, one RAF loop, and no loop at all while the screen is empty —
    * an idle animation frame every 16ms for the whole session is exactly the
    * kind of thing that turns a dashboard left open into a warm laptop.
+   *
+   * **Each event has its own metal, and the metal IS the news.** Told apart
+   * across a room and with the sound off:
+   *
+   *   sale      GOLD    15 seconds, bursting from both edges
+   *   download  SILVER  10 seconds, falling from the top
+   *   visitor   COLOUR   0.5 seconds, a single puff
+   *
+   * The half-second colour puff is a deliberate reversal of the older rule
+   * here, which was that the canvas belonged to arrivals only and that any
+   * celebration of ordinary usage would run more or less permanently. That
+   * argument was about DURATION, and it still holds: what makes the puff safe
+   * is that it is over before it registers as an interruption, where a sale
+   * runs for fifteen seconds. The three durations are the ranking, so a glance
+   * at the screen tells you which of the three happened without reading a word.
+   *
+   * Glitter rather than paper: the shards are small, they catch a highlight
+   * along one edge, and each one twinkles on its own phase. A metallic palette
+   * drawn as flat rectangles reads as grey confetti, not as silver.
    */
 
-  var COLORS = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#9085e9', '#ffffff'];
+  var PALETTES = {
+    /* Gold, from deep amber up to a near-white specular. The lightest two are
+       rare on purpose — they are the glint, and a glint every third shard is
+       just a pale palette. */
+    sale: ['#8a5a00', '#b8860b', '#d4a017', '#e8c252', '#f5d97a', '#fff6d5', '#ffffff'],
+    /* Silver, same shape: cold greys under two near-whites. */
+    download: ['#6b7280', '#8b94a3', '#adb5bd', '#ced4da', '#e9ecef', '#f8f9fa', '#ffffff'],
+    /* The house colours, for the puff that says somebody came back. */
+    visit: ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#9085e9', '#ffffff']
+  };
+
+  /* How long the canvas keeps emitting, per event. Duration is the ranking. */
+  var DURATION = { sale: 15000, download: 10000, visit: 500 };
+  /* How often a wave leaves the emitter, and how big a wave is. A sale runs
+     three times as long as the puff at a third of the density per wave, or
+     fifteen seconds of it would be a wall rather than glitter. */
+  var WAVE_MS = { sale: 620, download: 400, visit: 250 };
+  var WAVE_N  = { sale: 26,  download: 46,  visit: 34 };
+
   var canvas = null, cctx = null, bits = [], raf = 0;
 
   /* The pure half of this file is unit-tested in a `window`-only sandbox with
@@ -496,33 +563,53 @@
     cctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
-  function piece(x, y, vx, vy) {
+  /**
+   * One shard.
+   *
+   * `twinkle` is the per-shard phase offset that stops the field pulsing in
+   * unison — the single thing that separates glitter from a swarm of coloured
+   * rectangles. `flip` is how fast it tumbles edge-on, which is what makes a
+   * shard vanish to a line and come back.
+   */
+  function piece(pal, x, y, vx, vy) {
+    var w = 3 + Math.random() * 5;
     return {
       x: x, y: y, vx: vx, vy: vy,
-      w: 5 + Math.random() * 6, h: 8 + Math.random() * 6,
-      rot: Math.random() * Math.PI, spin: (Math.random() - 0.5) * 0.35,
-      color: COLORS[(Math.random() * COLORS.length) | 0],
-      life: 0
+      w: w, h: w * (0.5 + Math.random() * 0.7),
+      rot: Math.random() * Math.PI, spin: (Math.random() - 0.5) * 0.5,
+      flip: 0.10 + Math.random() * 0.22,
+      phase: Math.random() * Math.PI * 2,
+      color: pal[(Math.random() * pal.length) | 0],
+      life: 0, max: 260 + Math.random() * 220
     };
   }
 
   /** Falling from the top edge — the download celebration. */
-  function rain(n) {
+  function rain(pal, n) {
     var w = window.innerWidth;
     for (var i = 0; i < n; i++) {
-      bits.push(piece(Math.random() * w, -20 - Math.random() * 120,
+      bits.push(piece(pal, Math.random() * w, -20 - Math.random() * 120,
         (Math.random() - 0.5) * 1.4, 2 + Math.random() * 2.6));
     }
   }
 
   /** Shot from both edges toward the middle — the sale celebration. */
-  function burst(n) {
+  function burst(pal, n) {
     var w = window.innerWidth, h = window.innerHeight;
     for (var i = 0; i < n; i++) {
-      bits.push(piece(w * (0.15 + Math.random() * 0.7), -10,
+      bits.push(piece(pal, w * (0.15 + Math.random() * 0.7), -10,
         (Math.random() - 0.5) * 7, 4 + Math.random() * 5));
-      bits.push(piece(w * (0.15 + Math.random() * 0.7), h + 10,
+      bits.push(piece(pal, w * (0.15 + Math.random() * 0.7), h + 10,
         (Math.random() - 0.5) * 7, -(9 + Math.random() * 5)));
+    }
+  }
+
+  /** A single puff across the top — the half-second visitor cue. */
+  function puff(pal, n) {
+    var w = window.innerWidth;
+    for (var i = 0; i < n; i++) {
+      bits.push(piece(pal, Math.random() * w, -12 - Math.random() * 40,
+        (Math.random() - 0.5) * 2.2, 3 + Math.random() * 3.4));
     }
   }
 
@@ -536,13 +623,30 @@
       b.x += b.vx;
       b.y += b.vy;
       b.rot += b.spin;
-      if (b.y > h + 40 || b.life > 480) return false;
+      if (b.y > h + 40 || b.life > b.max) return false;
+
+      /* Tumble: the shard is drawn at its true width scaled by how edge-on it
+         currently is, so it narrows to a line and opens out again. `catchLight`
+         peaks at the same moment the face is square to the viewer, which is
+         when a real flake would flash. */
+      var face = Math.cos(b.life * b.flip + b.phase);
+      var open = Math.abs(face);
+      var catchLight = open * open;
+      var fade = b.life > b.max - 90 ? Math.max(0, (b.max - b.life) / 90) : 1;
+
       cctx.save();
       cctx.translate(b.x, b.y);
       cctx.rotate(b.rot);
-      cctx.globalAlpha = b.life > 300 ? Math.max(0, 1 - (b.life - 300) / 120) : 1;
+      cctx.globalAlpha = fade * (0.45 + 0.55 * open);
       cctx.fillStyle = b.color;
-      cctx.fillRect(-b.w / 2, -b.h / 2, b.w, b.h);
+      cctx.fillRect(-b.w / 2 * open, -b.h / 2, Math.max(0.6, b.w * open), b.h);
+      /* The specular edge. Cheap, and it is the whole reason the palette above
+         reads as metal rather than as beige and grey. */
+      if (catchLight > 0.55) {
+        cctx.globalAlpha = fade * (catchLight - 0.55) * 2.0;
+        cctx.fillStyle = '#ffffff';
+        cctx.fillRect(-b.w / 2 * open, -b.h / 2, Math.max(0.6, b.w * open), Math.max(0.6, b.h * 0.3));
+      }
       cctx.restore();
       return true;
     });
@@ -551,51 +655,63 @@
   }
 
   /**
-   * Celebrate `count` of something.
+   * Celebrate `kind`.
    *
-   * A download is a wave per item, 320ms apart and capped at `MAX_WAVES`, so
-   * three at once is a few seconds of falling rather than the same one-second
-   * puff three times over — which is not distinguishable from one. The cap is
-   * what stops a backfill of fifty pings burying the dashboard for half a
-   * minute.
+   * Every event is a DURATION rather than a wave count, so five sales in one
+   * refresh is still fifteen seconds rather than seventy-five — the news is
+   * "someone paid", and the number of them is on the card. The count only
+   * survives as a small density bonus, capped, so three downloads at once look
+   * heavier than one without lasting any longer.
    *
-   * A SALE runs for ten seconds flat, and the difference is deliberate. This is
-   * the event the whole page exists for; a second and a half of confetti for
-   * somebody deciding to pay for the thing you built is the same celebration as
-   * for a visitor opening the app, only slightly longer. Ten seconds is long
-   * enough to walk back to the desk for. It is a DURATION and not a wave count,
-   * so five sales in one refresh is still ten seconds rather than fifty — the
-   * news is "someone paid", and the number of them is on the card. The waves
-   * are spaced further apart and are individually smaller than a download's, or
-   * a sustained run would be a wall rather than confetti.
+   * A running celebration is not restarted by a quieter one: a download landing
+   * inside a sale's fifteen seconds tops the sale up rather than cutting it
+   * back to ten. `until` is therefore only ever pushed outward.
    */
-  var WAVE_MS = 320;
-  var MAX_WAVES = 8;
-  var SALE_MS = 10000;
-  var SALE_WAVE_MS = 640;
   var waveTimer = 0;
+  var until = 0;
+  var activeKind = null;
+
+  var RANK = { visit: 0, download: 1, sale: 2 };
 
   function celebrate(kind, count) {
     if (reducedMotion()) return;
     if (!surface()) return;
     sizeCanvas();
 
-    var sale = kind === 'sale';
-    var every = sale ? SALE_WAVE_MS : WAVE_MS;
-    var waves = sale
-      ? Math.round(SALE_MS / SALE_WAVE_MS)
-      : Math.max(1, Math.min(MAX_WAVES, Math.round(count) || 1));
-    var fired = 0;
+    var pal = PALETTES[kind] || PALETTES.visit;
+    var now = Date.now();
+    var ends = now + (DURATION[kind] || DURATION.visit);
+
+    /* The louder event owns the palette and the emitter for as long as it runs;
+       a quieter one arriving underneath it only extends the clock. */
+    if (!activeKind || RANK[kind] >= RANK[activeKind] || ends > until) {
+      if (!activeKind || RANK[kind] >= RANK[activeKind]) activeKind = kind;
+      if (ends > until) until = ends;
+    }
+
+    var boost = Math.min(2.2, 1 + (Math.max(1, Math.round(count) || 1) - 1) * 0.25);
+
     var shoot = function () {
-      if (sale) burst(22); else rain(90);
+      var k = activeKind || kind;
+      var p = PALETTES[k] || pal;
+      var n = Math.round((WAVE_N[k] || WAVE_N.visit) * boost);
+      if (k === 'sale') burst(p, n);
+      else if (k === 'download') rain(p, n);
+      else puff(p, n);
       if (!raf) raf = window.requestAnimationFrame(step);
-      fired += 1;
-      if (fired >= waves) { window.clearInterval(waveTimer); waveTimer = 0; }
+      if (Date.now() >= until) {
+        window.clearInterval(waveTimer);
+        waveTimer = 0;
+        activeKind = null;
+      }
     };
+
     shoot();
-    if (waves > 1) {
+    /* The puff is one wave by definition — half a second is not long enough for
+       a second one to read as anything but the first. */
+    if (until > Date.now() + 60) {
       window.clearInterval(waveTimer);
-      waveTimer = window.setInterval(shoot, every);
+      waveTimer = window.setInterval(shoot, WAVE_MS[activeKind || kind] || WAVE_MS.visit);
     }
   }
 
@@ -749,7 +865,13 @@
        that fires most often and the least worth a line of text — a toast for it
        would be on screen more or less permanently, and a notification for it
        would be the fastest way to have notifications turned back off. */
-    if (!d.sales && !d.downloads && !d.activations && d.visitors > 0) play(VISITOR);
+    if (!d.sales && !d.downloads && !d.activations && d.visitors > 0) {
+      play(VISITOR);
+      /* Half a second of house-coloured glitter. Short enough that it reads as
+         a flicker rather than an interruption, which is the whole licence for
+         celebrating ordinary usage at all — see the note above `PALETTES`. */
+      celebrate('visit', d.visitors);
+    }
   }
 
   /* ---------------------------------------------------------------- shell */

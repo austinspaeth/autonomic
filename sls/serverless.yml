@@ -88,7 +88,7 @@ functions:
   # protecting: one date, no identifier, no body. See lambdas/ping/main.js.
   ping:
     handler: lambdas/ping/main.handler
-    description: Anonymous cohort ping from the mobile app (open + subscribe + activation)
+    description: Anonymous cohort ping from the mobile app (open + subscribe + activation + daily reading)
     memorySize: 256
     timeout: 5
     events:
@@ -103,6 +103,13 @@ functions:
       - httpApi:
           method: GET
           path: /ping/act/{cohort}
+      # An HRV reading was saved today. Once per install per Eastern day, the
+      # same rule and the same code the open route uses — which is what makes
+      # readings-over-opens a share of people rather than of pings. No sensor
+      # letter: that question belongs to /act.
+      - httpApi:
+          method: GET
+          path: /ping/hrv/{cohort}
       # Reading the counters back. Not public — guarded by PING_REPORT_KEY,
       # which is unset by default, and an unset key refuses everyone.
       - httpApi:
@@ -204,6 +211,9 @@ resources:
     ActPingEndpoint:
       Description: Mobile app activation ping (cohort is D{MMDDYY}{platform}{method})
       Value: !Sub https://${param:apiDomain}/ping/act/{cohort}
+    HrvPingEndpoint:
+      Description: Mobile app daily HRV-reading ping (cohort is D{MMDDYY}{platform})
+      Value: !Sub https://${param:apiDomain}/ping/hrv/{cohort}
     PingReportEndpoint:
       Description: Read the ping counters (needs ?key= — see sls/README.md)
       Value: !Sub https://${param:apiDomain}/ping/report

@@ -4,7 +4,7 @@
  */
 import React, { useState } from 'react';
 import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
-import { AddDashButton, Button, Card, Muted, Pill, ProgressBar, Row, RowValue, SectionHeader, Segmented } from '../components/ui';
+import { AddDashButton, Button, Card, DaySaveButton, Muted, PastDayNotice, Pill, ProgressBar, Row, RowValue, SectionHeader, Segmented } from '../components/ui';
 import { Icon } from '../components/Icon';
 import { TimeField } from '../components/Field';
 import { useSheets, SheetFooter, type SheetControls } from '../components/Sheet';
@@ -190,9 +190,7 @@ function NotesSheet({ dk, controls }: { dk: string; controls: SheetControls }) {
         style={{ backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.control, padding: 12, fontSize: 15, lineHeight: 21, color: p.text, minHeight: 180, textAlignVertical: 'top' }}
       />
       <SheetFooter>
-        <Pressable onPress={save_} style={({ pressed }) => [{ flex: 1, borderRadius: radius.control, backgroundColor: p.accent, paddingVertical: 13, alignItems: 'center' }, pressed && { opacity: 0.7 }]}>
-          <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>Save</Text>
-        </Pressable>
+        <DaySaveButton dk={dk} title="Save" onPress={save_} />
       </SheetFooter>
     </View>
   );
@@ -430,6 +428,9 @@ function SleepEditSheet({ dk, controls, add }: { dk: string; controls: SheetCont
   return (
     <View>
       <Text style={{ fontSize: 20, fontWeight: '700', color: p.text, marginBottom: 16 }}>{add ? 'Enter sleep details' : 'Edit sleep details'}</Text>
+      {/* These fields write through on change, so there is no Save to re-dress
+          in the back-dated treatment — the warning has to be its own line. */}
+      <PastDayNotice dk={dk} text={`You're editing the night logged under ${fmtDateLong(dk)}, not last night.`} />
       <SleepEditFields dk={dk} sleep={sleep} />
       <SheetFooter>
         {/* Stacked on the import card, Done dismisses both — the night is

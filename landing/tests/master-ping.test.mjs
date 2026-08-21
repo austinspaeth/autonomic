@@ -54,6 +54,25 @@ const ACT = {
   [T(3)]: { [T(4)]: { B: 2 }, [T(3)]: { F: 1 } },
 };
 
+/* Readings — the daily counter, once per install per Eastern day. It shipped
+   LATER than the other three routes, which is the case the whole card is built
+   around: the fixture starts it at T-3, so T-10 through T-4 are days the app
+   was demonstrably being opened and the counter simply was not running. Those
+   must read as unknown, never as "nobody measured".
+
+     T-3  A 3 of the 5 A-installs on the app, B 2 of its 4     (9 active)
+     T-2  A 2                                                  (5 active)
+     T-1  A 1, B 1                                             (5 active)
+     T-0  A 1                                                  (4 active)
+
+   10 readings over 23 install-days on the app = 43.5%. */
+const HRV = {
+  [T(3)]: { [T(4)]: 3, [T(3)]: 2 },
+  [T(2)]: { [T(4)]: 2 },
+  [T(1)]: { [T(4)]: 1, [T(3)]: 1 },
+  [T(0)]: { [T(4)]: 1 },
+};
+
 /* Activation rows carry a method letter as well as a platform one; the same
    iOS-takes-the-odd-half split keeps the platform arithmetic identical. */
 const shapeAct = (map) => Object.keys(map).sort().map((day) => ({
@@ -122,7 +141,7 @@ window.fetch = (url, opts) => {
       ui: { view: 'timeline' },
     });
   }
-  if (body.action === 'PINGS') return reply({ since: body.payload.since, open: shape(OPEN), sub: shape(SUB), act: shapeAct(ACT) });
+  if (body.action === 'PINGS') return reply({ since: body.payload.since, open: shape(OPEN), sub: shape(SUB), act: shapeAct(ACT), hrv: shape(HRV) });
   return reply({ ok: true });
 };
 
@@ -167,7 +186,8 @@ const tiles = {};
     };
   });
 });
-check('seventeen KPI tiles', Object.keys(tiles).length === 17, Object.keys(tiles).join(' | '));
+/* Nineteen: sixteen, plus the three the reading counter added. */
+check('nineteen KPI tiles', Object.keys(tiles).length === 19, Object.keys(tiles).join(' | '));
 
 /* T(0) is 1 + 2 + 1 pings, which the fixture splits 3 iOS / 1 Android. The
    tile is what tells Austin which store phoned home; the numbers above it are
@@ -199,14 +219,15 @@ check('D30 is unavailable, not zero', tiles['D30 retention'].value === '–', ti
 
 /* Lifecycle tiles are usage-based: what pinged on the latest day, bucketed by
    install age. On T that is Z(age 10, 1 active), A(age 4, 2), B(age 3, 1).
-   So 3 are inside the trial and 1 is past it — and none of that depends on a
-   cohort size, which is what lets installs older than the counter appear. */
-check('active-in-trial counts today\'s actives aged 0-7',
-  tiles['Active in trial'].value === '3', tiles['Active in trial'].value);
-check('active-past-trial counts today\'s actives aged 8-14',
-  tiles['Active past the trial'].value === '1', tiles['Active past the trial'].value);
-check('active-past-wall is 0 because nobody active is 15 days old',
-  tiles['Active past the wall'].value === '0', tiles['Active past the wall'].value);
+   The trial now runs to day 14 inclusive, so all four are inside it — and none
+   of that depends on a cohort size, which is what lets installs older than the
+   counter appear. */
+check('active-in-trial counts today\'s actives aged 0-14',
+  tiles['Active in trial'].value === '4', tiles['Active in trial'].value);
+check('active-past-trial is 0 because nobody active is 15 days old',
+  tiles['Active past the trial'].value === '0', tiles['Active past the trial'].value);
+check('there is no third lifecycle tile — the history wall is gone',
+  tiles['Active past the wall'] === undefined, JSON.stringify(Object.keys(tiles)));
 check('the trial tile still quotes how many started one',
   /started a trial in that window/.test(tiles['Active in trial'].meta), tiles['Active in trial'].meta);
 
@@ -291,13 +312,54 @@ check('the method chart drew a band per sensor used',
   $('pgMethods').querySelectorAll('path[fill]:not([fill="none"])').length >= 3,
   String($('pgMethods').querySelectorAll('path').length) + ' paths');
 
+/* ------------------------------------------------------------ measuring */
+
+/* Opening the app is not using it, and this is the pair that says so. Both
+   counters are one per install per Eastern day, so the share is a share of
+   people: 1 of the 4 installs active on T-0 saved a reading. */
+const measToday = tiles[Object.keys(tiles).find((k) => k.startsWith('Measured on'))];
+check('a reading tile covers the newest day', measToday && measToday.value === '1', measToday && measToday.value);
+check('the share of actives who measured is stated as a share of people',
+  tiles['Measured of active'].value === '25.0%', tiles['Measured of active'].value);
+check('and names both sides of it',
+  /1 of 4/.test(tiles['Measured of active'].meta), tiles['Measured of active'].meta);
+check('the window rate pools install-days',
+  tiles['Measured per active day'].value === '43.5%', tiles['Measured per active day'].value);
+check('and says how many days predate the counter rather than counting them as zero',
+  /7 days predate the counter/.test(tiles['Measured per active day'].meta),
+  tiles['Measured per active day'].meta);
+
+const measNote = $('pgMeasureNote').textContent;
+check('the measuring note repeats the rate with its denominator',
+  /10 of 23/.test(measNote), measNote.slice(0, 240));
+check('and says the pre-counter days were left out, not zeroed',
+  /counter was not running yet/.test(measNote), measNote.slice(0, 400));
+
+/* B's own day 0 is the first day the counter existed, so D0 measuring is B
+   alone — 2 of its 4 — while Z's and A's day 0 are before the counter and are
+   excluded rather than counted as failures. */
+const measRates = $('pgMeasureRates').textContent;
+check('the habit rates are listed per install age',
+  /Measured on D0/.test(measRates) && /50\.0%/.test(measRates), measRates.slice(0, 240));
+check('and a cohort whose day N predates the counter is named as such, not churned',
+  /before the counter/.test(measRates), measRates.slice(0, 400));
+
+check('the opened-vs-measured chart drew both series',
+  $('pgMeasureDaily').querySelectorAll('path').length >= 2,
+  String($('pgMeasureDaily').querySelectorAll('path').length) + ' paths');
+check('the habit curve drew something',
+  $('pgMeasureCurve').querySelectorAll('path').length >= 1,
+  String($('pgMeasureCurve').querySelectorAll('path').length) + ' paths');
+
 /* ----------------------------------------------------------- boundaries */
 
 const transitions = $('pgTransitions').querySelectorAll('.transition');
-check('two boundary transitions shown', transitions.length === 2, String(transitions.length));
-check('the trial transition is named D7 → D8', /D7 → D8/.test(transitions[0].textContent), transitions[0].textContent.slice(0, 40));
-check('the wall transition reports unavailable rather than guessing',
-  /Not yet measurable/.test(transitions[1].textContent), transitions[1].textContent.slice(0, 60));
+/* ONE transition, not two: the history wall used to be a second boundary a week
+   after the trial and now falls on the same day the trial ends, so drawing it
+   would say the same thing twice. */
+check('one boundary transition shown', transitions.length === 1, String(transitions.length));
+check('the trial transition is named D14 → D15',
+  /D14 → D15/.test(transitions[0].textContent), transitions[0].textContent.slice(0, 40));
 
 /* -------------------------------------------------------------- heatmap */
 
@@ -306,8 +368,10 @@ check('immature cells are hatched, not shaded',
   $('pgHeat').querySelectorAll('td.heat.immature').length > 0);
 check('immature cells are empty, never 0%',
   [...$('pgHeat').querySelectorAll('td.heat.immature')].every((td) => td.textContent.trim() === ''));
-check('D8 and D15 columns are marked as boundaries',
-  $('pgHeat').querySelectorAll('th.boundary').length === 2,
+/* One boundary column now, D15 — the first day outside the trial. D8 stopped
+   being a boundary when the trial went from seven days to fourteen. */
+check('D15 is the one column marked as a boundary',
+  $('pgHeat').querySelectorAll('th.boundary').length === 1,
   String($('pgHeat').querySelectorAll('th.boundary').length));
 
 // switch to daily cohorts and select one
@@ -328,11 +392,17 @@ check('clicking a cohort opens its detail', !!$('pgCohortDetail').querySelector(
 // The oldest cohort is 10 days old, so the curve's axis ends at D10: the trial
 // boundary is drawable, the D15 wall is not, and drawing it anyway would put a
 // rule on an axis that does not reach it.
-check('the curve draws the boundaries its axis actually reaches',
-  $('pgCurve').querySelectorAll('line[stroke-dasharray="3 4"]').length === 1,
+/* The curve only draws a boundary its axis actually reaches, and in this
+   fixture the oldest cohort is ten days old — so the D14 trial rule is off the
+   end of the axis and must NOT be drawn. Before the trial doubled this asserted
+   the opposite case (a D7 rule inside a D0–D10 axis); it is the same rule, and
+   this is now the side of it worth pinning, because a guide drawn past the last
+   plotted day is a claim about days that have not happened. */
+check('a boundary beyond the axis is not drawn',
+  $('pgCurve').querySelectorAll('line[stroke-dasharray="3 4"]').length === 0,
   String($('pgCurve').querySelectorAll('line[stroke-dasharray="3 4"]').length));
-check('and labels it as the trial boundary',
-  /trial ends/.test($('pgCurve').textContent), $('pgCurve').textContent.slice(0, 80));
+check('and no boundary label is printed with it',
+  !/trial ends/.test($('pgCurve').textContent), $('pgCurve').textContent.slice(0, 80));
 
 /* ------------------------------------------------------ timeline tab */
 

@@ -13,13 +13,22 @@
  * because "did they ever get a first reading" and "with what" are the same
  * question: a cohort that activates only on the camera is a different product
  * problem from one that never activates at all.
+ *
+ * The HRV ping is the open ping's twin, and answers the question the open ping
+ * cannot: an install that launches the app every morning and never measures is
+ * not using it. Same shape (cohort + platform), same once-per-Eastern-day rule,
+ * so the two are directly comparable — measured over opened, on the same day,
+ * is the share of the people who were there who actually took a reading. It
+ * carries NO sensor letter: the activation ping is the one that answers "with
+ * what", and a once-a-day counter could only ever name the sensor of whichever
+ * reading happened to be first.
  */
 
-/** Base URL of the three ping routes (`/open/<code>`, `/sub/<code>`, `/act/<code>`). */
+/** Base URL of the four ping routes (`/open`, `/sub`, `/act`, `/hrv`). */
 export const PING_BASE = 'https://api.autonomic.care/ping';
 
-/** The three routes a ping can take. */
-export type PingKind = 'open' | 'sub' | 'act';
+/** The four routes a ping can take. */
+export type PingKind = 'open' | 'sub' | 'act' | 'hrv';
 
 /**
  * The platform marker carried by a ping: one letter, appended to the cohort
@@ -119,15 +128,24 @@ export function pingUrl(
 }
 
 /**
- * Should this install send an open ping now?
+ * Has the Eastern day turned over since this route last sent?
  *
  * Buckets by Eastern rather than local midnight because Eastern is what the
  * server counts into: matching the two means one install contributes at most
  * one count per row, wherever in the world the phone is.
+ *
+ * Shared by the two daily routes — opens and HRV readings — because they are
+ * only comparable if they are bucketed identically. A day on which one of them
+ * rolled over an hour before the other would put a reading and the launch that
+ * produced it in different rows.
  */
-export function shouldPingOpen(lastSentDay: string | undefined, nowMs: number): boolean {
+export function shouldPingDaily(lastSentDay: string | undefined, nowMs: number): boolean {
   return lastSentDay !== easternDay(nowMs);
 }
+
+/** The open route's daily gate. Kept as its own name because the call site
+ *  reads as a question about opens, not about days. */
+export const shouldPingOpen = shouldPingDaily;
 
 /**
  * This install's cohort, given what the flags store knows.
