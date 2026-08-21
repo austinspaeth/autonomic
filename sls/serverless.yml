@@ -65,6 +65,22 @@ provider:
           Resource:
             - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${param:tableName}
             - !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${param:tableName}/index/*
+        # The Web Push keypair, read on a cold start by `api` and `push`.
+        # This role is shared with `ping`, which is public and unauthenticated
+        # and never reads it — Serverless has no native per-function role, and
+        # the alternative (build-time injection) is the one that can break
+        # every deploy. Documented rather than hidden.
+        - Effect: Allow
+          Action: ssm:GetParameter
+          Resource:
+            - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${self:custom.vapidParam}
+        # The parameter is a SecureString under the AWS-managed SSM key.
+        - Effect: Allow
+          Action: kms:Decrypt
+          Resource: '*'
+          Condition:
+            StringEquals:
+              kms:ViaService: !Sub ssm.${AWS::Region}.amazonaws.com
   environment:
     DYNAMO_TABLE_NAME: ${param:tableName}
     STAGE: ${sls:stage}
@@ -72,10 +88,33 @@ provider:
     # not sufficient — the pool is shared with DiscoveryMark's customers.
     ALLOWED_EMAILS: ${env:AUTONOMIC_ALLOWED_EMAILS, 'austinspaeth@msn.com'}
 
+# Web Push credentials live in ONE SSM SecureString, read at RUN time.
+#
+# Not injected by CodeBuild the way PING_REPORT_KEY is, and the difference is
+# deliberate: a PARAMETER_STORE build variable is resolved at build START, so a
+# parameter that does not exist yet fails the whole build — landing site
+# included. That is the trap the note beside PingReportKeyParameter in
+# infrastructure/pipeline.yml describes, and this feature must be mergeable
+# before the secret exists.
+#
+# Not `${ssm:...}` here either, for the reason that note gives: it resolves with
+# whatever credentials the deploy runs under, and a missing permission would
+# fail the deploy rather than one feature.
+#
+# So the functions are given the parameter's NAME and read it themselves on a
+# cold start. UNSET IS SAFE AND IS THE DEFAULT: with no parameter, `PUSH_KEY`
+# reports `configured: false`, the settings card says exactly that, nothing can
+# subscribe and the hourly job sends nothing. Creating the parameter turns the
+# feature on with no redeploy — see sls/README.md.
+custom:
+  vapidParam: ${env:AUTONOMIC_VAPID_PARAM, '/autonomic/vapid'}
+
 functions:
   api:
     handler: lambdas/api/main.handler
     description: Autonomic master dashboard data API
+    environment:
+      VAPID_PARAM: ${self:custom.vapidParam}
     events:
       - httpApi:
           method: POST
@@ -122,6 +161,31 @@ functions:
       # missing permission would fail the whole deploy, landing site included.
       # Empty is safe — the read route refuses everyone without a key.
       PING_REPORT_KEY: ${env:AUTONOMIC_PING_REPORT_KEY, ''}
+
+  # The hour that actually ticks. A service worker cannot check anything on a
+  # schedule — it runs when its page is open, when a fetch it controls happens,
+  # or when a push arrives, and iOS has no Periodic Background Sync — so the
+  # hourly check lives here and the worker's job is to receive. The long form
+  # of that argument is at the top of lambdas/push/main.js.
+  push:
+    handler: lambdas/push/main.handler
+    description: Hourly check of the cohort counter; Web Push on a sale or a new install
+    memorySize: 256
+    # Web Push is one HTTPS request per subscribed device, sent in parallel.
+    # 30s is generous for a handful of phones and still well short of a run
+    # that would overlap the next hour's.
+    timeout: 30
+    events:
+      - schedule:
+          rate: rate(1 hour)
+          description: Autonomic — check the ping counter and push arrivals
+          # Disabled when no keys are set would be tidier and is not possible:
+          # the schedule is created at deploy time and the key is read at run
+          # time. The handler's first act is to check, and it returns having
+          # sent nothing. An empty run is a few milliseconds.
+          enabled: true
+    environment:
+      VAPID_PARAM: ${self:custom.vapidParam}
 
 resources:
   Resources:

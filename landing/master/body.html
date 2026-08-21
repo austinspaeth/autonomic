@@ -901,21 +901,30 @@
       </div>
     </details>
 
-    <!-- The dashboard installs as an app (it links its own manifest and
-         registers a worker under /master/), and an installed app can raise a
-         system notification for the same three things the corner cards
-         announce. What it cannot do is raise one while it is CLOSED: there is
-         no push server here, the counter is polled by the page itself, and a
-         service worker with no push subscription does not run on its own. The
-         copy says so rather than implying a pager. -->
+    <!-- Two mechanisms with different reach, kept visibly apart because they
+         fail in different ways and the difference is the whole point. The top
+         half fires only while the dashboard is open; the bottom half reaches a
+         closed phone, and can only do that because the hourly check lives on a
+         schedule in the backend rather than in the service worker, which has
+         no way to run on a timer. See landing/master/pwa.js. -->
     <details class="card acc">
       <summary><h2>Notifications</h2></summary>
-      <p class="hint">A system notification for the same arrivals the corner cards announce — a download, a sale. They fire only while the dashboard is open and you are looking at something else (another window, another tab, another app), which is the case a toast in the corner is worth nothing in. There is no push server behind this: with the dashboard closed, nothing is polling and nothing will arrive. On an iPhone or iPad this works only once the dashboard has been added to the home screen, from Safari's share menu.</p>
+      <p class="hint">A system notification for the same arrivals the corner cards announce — a download, a sale. These fire only while the dashboard is <b>open</b> and you are looking at something else (another window, another tab, another app), which is the case a toast in the corner is worth nothing in. On an iPhone or iPad this works only once the dashboard has been added to the home screen, from Safari's share menu.</p>
       <div class="row-actions">
         <button class="btn" id="ntEnable">Enable notifications</button>
         <button class="btn" id="ntTest">Send a test</button>
       </div>
       <p class="note" id="ntStatus" style="margin-top:10px"></p>
+
+      <div class="sub-head" style="margin-top:20px"><h3>Background alerts</h3></div>
+      <p class="hint">The same two arrivals — a sale, a new install — sent to this device with the dashboard <b>closed</b>. The counter is checked once an hour on the server and one notification is sent per hour that brought news, so six installs in an afternoon is one banner, not six. Nothing here reads the store CSV or the sales ledger: both are typed in by hand, and an alert about your own typing is not an alert.</p>
+      <p class="hint" style="margin-top:-6px">iPhone and iPad need iOS 16.4 or later <b>and</b> the dashboard added to the home screen — a Safari tab cannot receive these, and the button below will say so.</p>
+      <div class="row-actions">
+        <button class="btn" id="bgEnable">Turn on background alerts</button>
+        <button class="btn" id="bgTest">Send a test</button>
+        <button class="btn danger" id="bgOff">Turn off</button>
+      </div>
+      <p class="note" id="bgStatus" style="margin-top:10px"></p>
     </details>
 
     <div class="section-head" style="margin-top:22px">

@@ -12,6 +12,10 @@
  *   REPLACE_ALL    { entries, sales, settings } -> wipes and rewrites both
  *   PINGS          { since } -> the mobile app's cohort-ping counters
  *   STORE_VERSIONS { force } -> what is live in the App Store and on Play
+ *   PUSH_KEY       -> { configured, publicKey } for background alerts
+ *   PUSH_SUBSCRIBE { subscription, ua } -> registers this device
+ *   PUSH_UNSUBSCRIBE { endpoint } -> forgets it
+ *   PUSH_TEST      -> sends one now, through the real encrypted path
  */
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
 const {
@@ -19,10 +23,22 @@ const {
   QueryCommand,
   BatchWriteCommand,
   PutCommand,
+  DeleteCommand,
 } = require('@aws-sdk/lib-dynamodb');
 
 /* One implementation of the ping read, shared with the public keyed route. */
 const { report: pingReport } = require('../ping/main');
+/* The push half: registering a device here, sending to it from the hourly
+   schedule. Both halves share one definition of a subscription's key so the
+   job can find what this handler wrote. */
+const {
+  configured: pushConfigured,
+  publicKey: pushPublicKey,
+  subId,
+  pushPk,
+  listSubscriptions,
+  sendToAll,
+} = require('../push/main');
 /* Reading the two stores. Its own file because the Play half is a scrape and
    wants explaining at length. */
 const { storeVersions } = require('./storeVersions');
@@ -472,6 +488,87 @@ const replaceAll = async (pk, payload) => {
   return sync(pk, { upserts: incoming, saleUpserts: incomingSales, settings: payload.settings });
 };
 
+/* ------------------------------------------------------------ push devices
+ *
+ * Registering a phone to be told about a sale or a new install while the
+ * dashboard is CLOSED. The hourly job that does the telling is
+ * `lambdas/push/main.js`, and the long note at the top of that file is where
+ * the design lives — in particular why the hour is kept on a schedule here
+ * rather than by a timer in the service worker, which is a thing iOS does not
+ * have.
+ *
+ * These live behind the same allowlist as everything else in this handler, so
+ * only an account that may READ the numbers may ask to be woken about them.
+ * A subscription is stored under the subscriber's own partition (PUSH#<email>)
+ * keyed by a hash of its endpoint, so re-subscribing the same device replaces
+ * its row rather than adding a second one and buzzing it twice.
+ *
+ * Nothing here is a secret: the VAPID PUBLIC key is meant to be handed to the
+ * browser (it is what `pushManager.subscribe` signs against), and the private
+ * half never leaves the Lambda environment.
+ */
+const pushSubscribe = async (email, payload) => {
+  const sub = payload.subscription || {};
+  const endpoint = typeof sub.endpoint === 'string' ? sub.endpoint.trim() : '';
+  const keys = sub.keys || {};
+  const p256dh = typeof keys.p256dh === 'string' ? keys.p256dh : '';
+  const auth = typeof keys.auth === 'string' ? keys.auth : '';
+
+  /* All three or none. A row missing a key is a row the sender will throw on
+     every hour forever, and the browser never produces a partial one — so this
+     is a malformed request, not a state to store. */
+  if (!endpoint || !p256dh || !auth) {
+    return { ok: false, error: 'That subscription was missing its endpoint or keys.' };
+  }
+  if (!/^https:\/\//i.test(endpoint)) {
+    return { ok: false, error: 'A push endpoint must be https.' };
+  }
+
+  await ddb.send(new PutCommand({
+    TableName: TABLE,
+    Item: {
+      PK: pushPk(email),
+      SK: `SUB#${subId(endpoint)}`,
+      endpoint,
+      p256dh,
+      auth,
+      /* Which device this is, in the only terms the browser offers. Kept so a
+         list of three subscriptions is readable when one of them needs
+         removing; never used for anything else. */
+      ua: String(payload.ua || '').slice(0, 200),
+      at: new Date().toISOString(),
+    },
+  }));
+
+  return { ok: true, id: subId(endpoint) };
+};
+
+const pushUnsubscribe = async (email, payload) => {
+  const endpoint = typeof payload.endpoint === 'string' ? payload.endpoint.trim() : '';
+  if (!endpoint) return { ok: false, error: 'No endpoint given.' };
+  await ddb.send(new DeleteCommand({
+    TableName: TABLE,
+    Key: { PK: pushPk(email), SK: `SUB#${subId(endpoint)}` },
+  }));
+  return { ok: true };
+};
+
+/* The "Send a test" button's server half. It goes all the way through the real
+   sender on purpose: the failure this is here to catch is a key that does not
+   match the subscription, and only a real encrypted send can tell you that. */
+const pushTest = async (email) => {
+  if (!(await pushConfigured())) return { ok: false, error: 'No VAPID keys are configured on the server.' };
+  const subs = (await listSubscriptions()).filter((s) => s.email === email);
+  if (!subs.length) return { ok: false, error: 'This device is not registered for background alerts.' };
+  const result = await sendToAll(subs, {
+    title: '\u{1F44B} Autonomic',
+    body: 'Background alerts are working.',
+    tag: 'autonomic-test',
+    url: '/master/',
+  });
+  return { ok: result.sent > 0, ...result };
+};
+
 /* --------------------------------------------------------------- handler */
 
 const handler = async (event) => {
@@ -517,6 +614,19 @@ const handler = async (event) => {
          is one answer and it is the same for everybody who can see it. */
       case 'STORE_VERSIONS':
         return json(200, await storeVersions(ddb, TABLE, { force: !!payload.force }));
+      /* Background alerts. `PUSH_KEY` is what the browser needs before it can
+         subscribe at all, and it reports `configured: false` rather than
+         failing when no keys are set — an unconfigured server is a normal
+         state (see the note in lambdas/push/main.js), and the settings card
+         says so instead of showing an error. */
+      case 'PUSH_KEY':
+        return json(200, { configured: await pushConfigured(), publicKey: await pushPublicKey() });
+      case 'PUSH_SUBSCRIBE':
+        return json(200, await pushSubscribe(email, payload));
+      case 'PUSH_UNSUBSCRIBE':
+        return json(200, await pushUnsubscribe(email, payload));
+      case 'PUSH_TEST':
+        return json(200, await pushTest(email));
       default:
         return json(400, { error: `Unknown action: ${action}` });
     }

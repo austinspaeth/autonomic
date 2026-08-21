@@ -183,11 +183,14 @@ const tiles = {};
     tiles[t.querySelector('.label').textContent.trim()] = {
       value: t.querySelector('.value').textContent.trim(),
       meta: (t.querySelector('.meta') || {}).textContent || '',
+      deltas: [].slice.call(t.querySelectorAll('.deltas > div'))
+        .map((d) => d.textContent.replace(/\s+/g, ' ').trim()),
     };
   });
 });
-/* Nineteen: sixteen, plus the three the reading counter added. */
-check('nineteen KPI tiles', Object.keys(tiles).length === 19, Object.keys(tiles).join(' | '));
+/* Twenty-one: sixteen, the three the reading counter added, and the two
+   install tiles — the newest day's first runs and the range's. */
+check('twenty-one KPI tiles', Object.keys(tiles).length === 21, Object.keys(tiles).join(' | '));
 
 /* T(0) is 1 + 2 + 1 pings, which the fixture splits 3 iOS / 1 Android. The
    tile is what tells Austin which store phoned home; the numbers above it are
@@ -232,18 +235,52 @@ check('the trial tile still quotes how many started one',
   /started a trial in that window/.test(tiles['Active in trial'].meta), tiles['Active in trial'].meta);
 
 // today: Z 1 + A 2 + B 1 = 4 active, of which 4 are returning (nobody born today)
-check('active today is 4', tiles[Object.keys(tiles).find((k) => k.startsWith('Active on'))].value.startsWith('4'));
+const activeTile = tiles[Object.keys(tiles).find((k) => k.startsWith('Active on'))];
+check('active today is 4', activeTile.value.startsWith('4'));
 
 check('purchases counted', tiles['Purchases in range'].value === '3', tiles['Purchases in range'].value);
 
-/* A subscribe ping carries the buyer's store in the same cohort key an open
-   ping does, so both purchase tiles say which store paid. In range: T(2) sold
-   one on each store, T(0) sold one on iOS. On the newest day alone: 1 iOS. */
+/* ------------------------------------------------------- installs + deltas */
+
 const splitOfTile = (host, prefix) => {
   const t = [].slice.call($(host).querySelectorAll('.tile'))
     .filter((x) => x.querySelector('.label').textContent.trim().indexOf(prefix) === 0)[0];
   return t && t.querySelector('.split') ? t.querySelector('.split').textContent.replace(/\s+/g, ' ') : '';
 };
+
+/* Nobody was born on T, so the newest day's install tile is a real 0 — and it
+   is its own tile rather than a line in the active tile's split, because the
+   question it answers ("which store did they come from") the split could not.
+   Over the window: Z 8 + A 10 + B 4 = 22, and the fixture halves every cohort
+   between the stores, so 11 apiece. */
+const installsToday = tiles[Object.keys(tiles).find((k) => k.startsWith('Installs on'))];
+check('the newest day\'s installs get their own tile', !!installsToday);
+check('and read 0 on a day no cohort was born',
+  installsToday && installsToday.value === '0', installsToday && installsToday.value);
+check('installs over the range sum the cohorts born in it',
+  tiles['Installs in range'].value === '22', tiles['Installs in range'].value);
+const freshSplit = splitOfTile('pgTilesB', 'Installs in range');
+check('and the range\'s installs are split by store',
+  /iOS 11/.test(freshSplit) && /Android 11/.test(freshSplit), freshSplit);
+
+/* Yesterday had 5 actives against today's 4, so the day tile carries a −20%.
+   The other two comparisons are dropped rather than printed: T-7 is a day the
+   fixture never pinged on, and the 11-day window averages 4.1 — both baselines
+   are under the floor, and a percentage off a base that small is noise wearing
+   a trend's clothes. */
+check('a day tile is read against the day before',
+  activeTile.deltas.some((d) => /vs the day before/.test(d) && /20\.0%/.test(d)),
+  activeTile.deltas.join(' | '));
+check('a comparison whose baseline is too small is dropped, not printed',
+  !activeTile.deltas.some((d) => /last week|range average/.test(d)),
+  activeTile.deltas.join(' | '));
+check('and a tile with three tiny baselines carries no comparisons at all',
+  tiles[Object.keys(tiles).find((k) => k.startsWith('Purchases on'))].deltas.length === 0,
+  tiles[Object.keys(tiles).find((k) => k.startsWith('Purchases on'))].deltas.join(' | '));
+
+/* A subscribe ping carries the buyer's store in the same cohort key an open
+   ping does, so both purchase tiles say which store paid. In range: T(2) sold
+   one on each store, T(0) sold one on iOS. On the newest day alone: 1 iOS. */
 const rangeSplit = splitOfTile('pgTilesB', 'Purchases in range');
 check('purchases in range are split by store', /iOS 2/.test(rangeSplit) && /Android 1/.test(rangeSplit), rangeSplit);
 

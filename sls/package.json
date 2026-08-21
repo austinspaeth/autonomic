@@ -6,11 +6,14 @@
   "scripts": {
     "deploy": "serverless deploy --stage prod --region us-west-2",
     "logs": "serverless logs --stage prod --region us-west-2 -f api -t",
-    "remove": "serverless remove --stage prod --region us-west-2"
+    "remove": "serverless remove --stage prod --region us-west-2",
+    "test": "node tests/news.test.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.600.0",
-    "@aws-sdk/lib-dynamodb": "^3.600.0"
+    "@aws-sdk/client-ssm": "^3.1116.0",
+    "@aws-sdk/lib-dynamodb": "^3.600.0",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "serverless": "^4.0.0"

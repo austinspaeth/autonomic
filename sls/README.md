@@ -48,6 +48,8 @@ per user, which would eventually meet DynamoDB's 400KB item ceiling.
 | `PING#ACT` | `<day>` | that day's activations (first HRV reading), per cohort+method |
 | `PING#HRV` | `<day>` | that day's measuring installs (any HRV reading), per cohort |
 | `STORE#VERSIONS` | `latest` | what each store is serving, cached (see below) |
+| `PUSH#<email>` | `SUB#<endpointHash>` | one device registered for background alerts |
+| `PUSH#STATE` | `WATERMARK` | what the hourly push job has already announced |
 
 `LOAD` queries the whole partition. `SYNC` applies the client's diff — entries
 as `upserts` / `deletes`, and the four id-keyed collections as
@@ -278,6 +280,120 @@ The subscribe ping is skipped in builds whose Pro status comes from the
 dev/TestFlight/sideload paywall bypass — nobody paid there. Dev builds send
 nothing at all.
 
+## Background alerts (Web Push)
+
+A notification on the phone when a sale or a new install lands, **with the
+dashboard closed**. `lambdas/push/` owns it: `news.js` is pure and is what
+`tests/news.test.mjs` pins, `main.js` is the shell.
+
+### The hour is kept here, and it has to be
+
+The obvious design — have the service worker check every hour — is the one
+thing that cannot be built. A service worker runs when its page is open, when a
+fetch it controls happens, or when a **push** arrives, and is killed within
+seconds either way; no timer inside it survives. Periodic Background Sync would
+be the API to lend it one and iOS does not implement it (where it does exist it
+is gated behind engagement heuristics a private dashboard will never satisfy).
+An hourly `setInterval` in a worker is not a feature that works badly, it is a
+feature that silently never fires.
+
+So the hour is an EventBridge schedule on the `push` function, and the worker's
+job is the half it can do: receive. iOS 16.4+ delivers Web Push to a PWA that
+has been **added to the home screen** — a Safari tab cannot receive it, and the
+settings card says so rather than offering a button that cannot work.
+
+### What it will and will not tell you
+
+Two events, and they are the two the counter hears **on its own**: a *download*
+(an open ping whose cohort key is the day it arrived — a first run) and a *sale*
+(a subscribe ping). Store CSV downloads and the sales ledger are deliberately
+not read: both are typed in by hand, so a push about them would be a push about
+your own typing. That is the same rule `landing/master/alerts.js` states for the
+confetti, and the two must not be allowed to disagree — they answer the same
+question for two audiences, and a reader who saw them differ has no way to tell
+which is right.
+
+Four rules keep it honest, all in `news.js`:
+
+- **A delta is never negative.** The report is a sliding window; a count can
+  fall as the calendar turns. A drop is not an event.
+- **Day by day, not total against total.** A run that missed an hour has new
+  days in front of it and possibly one that fell off the back; as totals those
+  cancel and the hour you missed announces itself as silence.
+- **A missing watermark seeds in SILENCE.** The first run has nothing to compare
+  against, and "everything ever recorded" is not news — announcing the back
+  catalogue is how a new channel gets switched off on day one.
+- **Only the last `WINDOW_DAYS` are compared.** A correction to a three-month-old
+  row is a correction, not an arrival.
+
+One notification per run, never one per event: an hour that found six installs
+is one banner. The watermark is written **whether or not the send succeeded** —
+a run that found news, failed to deliver it and left the watermark alone would
+find the same news next hour, and a phone offline for a morning would come back
+to one arrival announced six times.
+
+### Turning it on
+
+The feature ships **dark**. With no keypair, `PUSH_KEY` reports
+`configured: false`, the settings card says exactly that, nothing can subscribe
+and the hourly job returns having sent nothing. Everything below can therefore
+be done long after the code is deployed.
+
+The keys are read at **run** time from one SSM SecureString, not injected at
+build time. That is deliberate: a `PARAMETER_STORE` CodeBuild variable is
+resolved at build *start*, so a parameter that does not exist yet fails the
+whole build — landing site included. (The note beside `PingReportKeyParameter`
+in `infrastructure/pipeline.yml` describes that trap; this avoids it, and
+needs no pipeline change at all.)
+
+```bash
+# 1. Generate a keypair. It is yours; it never goes in the repo.
+npx web-push generate-vapid-keys
+
+# 2. Store both halves plus a contact address as ONE SecureString.
+aws ssm put-parameter --region us-west-2 \
+  --name /autonomic/vapid --type SecureString --overwrite \
+  --value '{"publicKey":"...","privateKey":"...","subject":"mailto:austinspaeth@msn.com"}'
+```
+
+`subject` is required by RFC 8292 — Apple rejects a VAPID JWT without a contact
+it can use if the sender starts misbehaving.
+
+No redeploy is needed: the next cold start picks the parameter up. Then, on the
+phone: open `/master/` in Safari, **Share → Add to Home Screen**, open it from
+the home screen, and use *Edit data → Notifications → Background alerts*. Each
+device subscribes separately — a subscription is a device, not an account.
+
+**Rotating the keypair invalidates every subscription.** The stored endpoints
+were negotiated against the old public key, so after a rotation every device has
+to be turned on again; the sends fail with 410 and the job deletes the dead rows
+on its own, so the only symptom is silence until you re-subscribe.
+
+### Actions
+
+| Action | Does |
+|---|---|
+| `PUSH_KEY` | `{ configured, publicKey }` — the browser needs the public half before it can subscribe |
+| `PUSH_SUBSCRIBE` | stores `{ endpoint, keys }` under `PUSH#<email>` |
+| `PUSH_UNSUBSCRIBE` | forgets one endpoint |
+| `PUSH_TEST` | sends one now, through the real encrypted path |
+
+`PUSH_TEST` goes all the way through the sender on purpose. A local
+notification proves the permission and nothing else; the failure worth catching
+is a keypair that does not match the stored subscription, and only a real
+encrypted send surfaces that.
+
+A subscription the push service rejects as gone (404 / 410) is **deleted**
+rather than retried — an endpoint is revoked when the PWA is deleted or its
+permission withdrawn, and a job that kept retrying would spend every hour
+failing against a device that no longer wants to hear from it.
+
+`web-push` is the one dependency here that is not the AWS SDK. It does the
+RFC 8291 payload encryption and the RFC 8292 VAPID signature, and it is here
+rather than hand-rolled on `node:crypto` because ECDH + HKDF + AES-128-GCM
+written from the spec fails *silently* when it is wrong: Apple returns the same
+201 for a payload it cannot decrypt as for one it can.
+
 ## Deploying
 
 Runs automatically from CodePipeline on push to `main` (see `../buildspec.yml`);
@@ -287,6 +403,7 @@ Manually:
 
 ```bash
 npm ci
+npm test            # the push job's arithmetic (pure, no AWS)
 SERVERLESS_ACCESS_KEY=... npx serverless deploy --stage prod --region us-west-2
 npm run logs        # tail the api function
 ```
