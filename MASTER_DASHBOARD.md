@@ -97,8 +97,10 @@ for a reason:
   only ever serve a stale number as a fresh one. Bump `CACHE` when you change
   the file. A new worker **toasts** rather than reloading: a reload mid-session
   throws away every open card, the scroll position and any half-typed row.
-- **`landing/master/pwa.js`** — the in-page half: registration, and the
-  notification capability described below.
+- **`landing/master/pwa.js`** — the in-page half: registration, and the two
+  notification capabilities described below. The worker also carries the `push`
+  and `notificationclick` handlers, which are the only things in it that run
+  with the app closed.
 
 ### On a phone, a resize is only a resize if the WIDTH moved
 
@@ -179,22 +181,47 @@ Two rules:
 
 ### Notifications
 
-An installed app can raise a system notification for the same arrivals the
-corner cards announce, and the settings card under **Edit data → Notifications**
-is honest about the limit rather than implying a pager:
+Two mechanisms with different reach, kept visibly apart in the settings card
+under **Edit data → Notifications** because they fail differently and a reader
+who merges them will believe a closed phone is covered when it is not.
 
-**There is no push server.** The counter is polled by the page itself, and a
-service worker with no push subscription does not run while the app is closed.
-So a notification can only fire while the dashboard is OPEN. What it buys is
-still real: the condition is `document.hasFocus()`, not `document.hidden` — the
-dashboard on a second monitor, in a background tab, or as an installed app you
-have switched away from is exactly where a toast in the corner is worth nothing.
-(`document.hidden` would be wrong twice over: the refresh timer already refuses
-to run while hidden, so a hidden-only rule would mean it never fires at all.)
+**In-page** (`Pwa.notify`) fires only while the dashboard is OPEN. The counter
+is polled by the page itself, so there is nothing running to notice anything
+otherwise. What it buys is still real: the condition is `document.hasFocus()`,
+not `document.hidden` — the dashboard on a second monitor, in a background tab,
+or as an installed app you have switched away from is exactly where a toast in
+the corner is worth nothing. (`document.hidden` would be wrong twice over: the
+refresh timer already refuses to run while hidden, so a hidden-only rule would
+mean it never fires at all.)
 
-iOS supports this from 16.4 and **only for a PWA added to the home screen**;
+**Background alerts** (`Pwa.subscribePush`) reach a closed phone, and the reason
+they can is that **the clock is not in the browser**. A service worker cannot
+check anything hourly — it runs when its page is open, when a fetch it controls
+happens, or when a push arrives, and is killed within seconds; no timer in it
+survives, and iOS has no Periodic Background Sync to lend it one. An hourly
+`setInterval` in a worker is not a feature that works badly, it is a feature
+that silently never fires. So the hour is an EventBridge schedule on the `push`
+Lambda (`sls/lambdas/push/`, documented at length in `sls/README.md`), which
+diffs the ping counter and sends; this page only holds a subscription and
+`sw.js` only receives.
+
+It watches the same two arrivals the confetti does and for the same reason —
+a first run and a subscribe ping, never the hand-typed store CSV or sales
+ledger — and `sls/lambdas/push/news.js` is the server-side twin of the pure half
+of `alerts.js`. **If one moves, the other must**: they answer the same question
+for two audiences, and a reader who saw them disagree would have no way to tell
+which was right. One notification per hourly run, never one per event.
+
+The feature ships **dark**: with no VAPID keypair in SSM, `PUSH_KEY` reports
+`configured: false` and the card says so and offers no button. Turning it on is
+one SSM parameter and no redeploy — `sls/README.md` has the commands.
+
+Both halves need iOS 16.4+ and **a PWA added to the home screen**;
 `Pwa.state()` reports that case as `needs-install` so the card can say what to
-do instead of looking broken.
+do instead of looking broken. The background half orders its blockers so the
+most actionable one wins the status line: telling somebody on an iPhone that
+their browser "has no push support" when the real answer is "add it to your
+home screen" is the difference between a fixable state and a dead end.
 
 ## Files
 
@@ -217,7 +244,7 @@ Everything below is in `landing/master/`, except the route that assembles them.
 | `releases.js` | Generated release log, read as timeline annotations |
 | `charts.js` | Dependency-free SVG chart engine |
 | `alerts.js` | Live alerts: what changed since you last looked, said out loud |
-| `pwa.js` | Service-worker registration and the notification capability |
+| `pwa.js` | Service-worker registration, the in-page notification and the Web Push subscription |
 | `styles.css` | Dark theme tokens, layout, gate, skeletons |
 
 Two files sit outside that folder because they have to be real URLs rather than

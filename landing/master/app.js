@@ -6876,6 +6876,179 @@
     if (test) test.classList.toggle('hidden', st !== 'granted');
   }
 
+  /* ------------------------------------------------- background alerts
+   *
+   * The half that reaches a closed phone. Three states worth telling apart,
+   * and the copy names the next action in each rather than reporting an enum:
+   *
+   *   the server has no keys        nothing can subscribe; say so plainly, and
+   *                                 do not offer a button that cannot work
+   *   this browser cannot           a desktop tab, or iOS Safari not installed
+   *   subscribed / not subscribed   the only two that are about a choice
+   *
+   * `bgKey` is fetched once and cached for the session. It is the VAPID PUBLIC
+   * key — the thing `pushManager.subscribe` signs against, meant to be handed
+   * to the browser — and asking for it again on every render would be a
+   * round trip per settings open for a value that changes when the keypair is
+   * rotated and never otherwise.
+   */
+  var bgKey = null;          // { configured, publicKey } once loaded
+  var bgSubscribed = false;  // does THIS browser hold a subscription
+
+  function bgLoadKey() {
+    if (bgKey) return Promise.resolve(bgKey);
+    return window.Api.call('PUSH_KEY').then(function (r) {
+      bgKey = { configured: !!r.configured, publicKey: r.publicKey || '' };
+      return bgKey;
+    }).catch(function () {
+      /* A failed lookup is not the same as "not configured", and must not be
+         reported as it — the difference is whether Austin has a key to set. */
+      return null;
+    });
+  }
+
+  function bgSay(msg) {
+    var host = document.getElementById('bgStatus');
+    if (host) host.textContent = msg;
+  }
+
+  function bgSyncUI() {
+    var enable = document.getElementById('bgEnable');
+    var test = document.getElementById('bgTest');
+    var off = document.getElementById('bgOff');
+    if (!enable || !window.Pwa) return;
+
+    var canPush = window.Pwa.pushSupported();
+    var st = window.Pwa.state();
+
+    /* Order matters: the most actionable blocker wins the line. Telling
+       somebody on an iPhone that their browser "has no push support" when the
+       real answer is "add it to your home screen" is the difference between a
+       fixable state and a dead end. */
+    if (st === 'needs-install') {
+      enable.disabled = true;
+      test.classList.add('hidden');
+      off.classList.add('hidden');
+      bgSay('Add the dashboard to your home screen first (Safari → Share → Add to Home Screen), then open it from there. iOS only delivers push to an installed app.');
+      return;
+    }
+    if (!canPush) {
+      enable.disabled = true;
+      test.classList.add('hidden');
+      off.classList.add('hidden');
+      bgSay('This browser has no push support.');
+      return;
+    }
+    if (bgKey && !bgKey.configured) {
+      enable.disabled = true;
+      test.classList.add('hidden');
+      off.classList.add('hidden');
+      bgSay('The server has no push keys set, so nothing can subscribe yet. See sls/README.md — one SSM parameter and a redeploy.');
+      return;
+    }
+    if (st === 'denied') {
+      enable.disabled = true;
+      test.classList.add('hidden');
+      off.classList.add('hidden');
+      bgSay('Notifications are blocked for autonomic.care. Turn them back on in Settings → Notifications and reopen this page — the page cannot ask twice.');
+      return;
+    }
+
+    enable.disabled = bgSubscribed;
+    enable.textContent = bgSubscribed ? 'Background alerts are on' : 'Turn on background alerts';
+    test.classList.toggle('hidden', !bgSubscribed);
+    off.classList.toggle('hidden', !bgSubscribed);
+    bgSay(bgSubscribed
+      ? 'On for this device. The counter is checked hourly and one notification is sent per hour that brought a sale or a new install.'
+      : 'Off for this device. Nothing is sent until you turn it on here, on each device you want woken.');
+  }
+
+  function bgRefresh() {
+    if (!window.Pwa || !window.Pwa.pushSupported()) { bgSyncUI(); return; }
+    /* The BROWSER is the source of truth for whether this device is
+       subscribed, never our own remembered flag: a subscription is revoked by
+       deleting the PWA or withdrawing the permission, neither of which tells
+       the page anything. */
+    window.Pwa.currentSubscription().then(function (sub) {
+      bgSubscribed = !!sub;
+      return bgLoadKey();
+    }).then(bgSyncUI).catch(bgSyncUI);
+  }
+
+  function wireBackgroundAlerts() {
+    var enable = document.getElementById('bgEnable');
+    var test = document.getElementById('bgTest');
+    var off = document.getElementById('bgOff');
+    if (!enable || !window.Pwa) return;
+
+    enable.addEventListener('click', function () {
+      enable.disabled = true;
+      bgSay('Asking…');
+      bgLoadKey().then(function (key) {
+        if (!key || !key.configured) { bgSyncUI(); return null; }
+        return window.Pwa.subscribePush(key.publicKey).then(function (res) {
+          if (!res.ok) {
+            bgSubscribed = false;
+            bgSyncUI();
+            if (res.reason === 'dismissed') bgSay('The permission prompt was dismissed — press the button again to retry.');
+            else if (res.reason === 'failed') bgSay('Could not subscribe: ' + (res.message || 'the browser refused.'));
+            return null;
+          }
+          /* The row is written server-side BEFORE the UI claims success. A
+             browser holding a subscription the server never stored is the one
+             state that looks on and is silent forever. */
+          return window.Api.call('PUSH_SUBSCRIBE', {
+            subscription: res.subscription,
+            ua: window.navigator.userAgent
+          }).then(function (r) {
+            if (!r.ok) throw new Error(r.error || 'The server refused the subscription.');
+            bgSubscribed = true;
+            bgSyncUI();
+            toast('Background alerts on for this device.');
+          });
+        });
+      }).catch(function (e) {
+        bgSubscribed = false;
+        bgSyncUI();
+        bgSay('Could not turn these on: ' + ((e && e.message) || 'unknown error') + '.');
+      });
+    });
+
+    off.addEventListener('click', function () {
+      bgSay('Turning off…');
+      window.Pwa.unsubscribePush().then(function (res) {
+        /* Tell the server even when the browser's own unsubscribe failed: the
+           endpoint is what it keys on, and a row left behind is an hourly send
+           to a device that has stopped listening. */
+        if (!res.endpoint) return null;
+        return window.Api.call('PUSH_UNSUBSCRIBE', { endpoint: res.endpoint });
+      }).then(function () {
+        bgSubscribed = false;
+        bgSyncUI();
+        toast('Background alerts off for this device.');
+      }).catch(function () {
+        bgRefresh();
+        bgSay('Could not fully turn these off — try again, or remove the permission in your browser settings.');
+      });
+    });
+
+    test.addEventListener('click', function () {
+      bgSay('Sending…');
+      /* Through the SERVER, not through `Pwa.notify`. A local notification
+         proves the permission and nothing else; the failure this button exists
+         to catch is a keypair that does not match the stored subscription, and
+         only a real encrypted send from the sender can surface that. */
+      window.Api.call('PUSH_TEST').then(function (r) {
+        if (r.ok) bgSay('Sent. It should arrive within a few seconds — lock the screen to see it as a banner.');
+        else bgSay('Not sent: ' + (r.error || 'the push service rejected it.'));
+      }).catch(function (e) {
+        bgSay('Not sent: ' + ((e && e.message) || 'the request failed.'));
+      });
+    });
+
+    bgRefresh();
+  }
+
   function wireNotifications() {
     var enable = document.getElementById('ntEnable');
     var test = document.getElementById('ntTest');
@@ -6901,6 +7074,7 @@
     }
 
     syncNotifyUI();
+    wireBackgroundAlerts();
   }
 
   /* -------------------------------------------------------------- wiring */

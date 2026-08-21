@@ -400,6 +400,17 @@ tbody tr:hover { background: var(--surface-2); }
 .section-title { font-size: 13px; font-weight: 600; margin: 0; letter-spacing: 0.02em; }
 .section-note { color: var(--text-muted); font-size: 12px; }
 
+/* A divider INSIDE one settings card, for the case where a card holds two
+   related things that must not be read as one — the Notifications card's
+   in-page half and its background half fail differently, and a reader who
+   merges them will believe a closed phone is covered when it is not. */
+.sub-head {
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+  margin-bottom: 8px;
+}
+.sub-head h3 { font-size: 13px; font-weight: 600; margin: 0; letter-spacing: 0.02em; }
+
 /* "Not knowable yet" is a first-class state and must never look like zero. */
 .na { color: var(--text-muted); }
 .warn-small {
