@@ -331,6 +331,42 @@ the UI, each of them deliberate:
   the iOS / Android split under their number. Those splits follow the same rule
   as the platform tile — always unfiltered, `no store` broken out and disclosed
   in the meta line rather than folded into either store.
+- **Installs are the one count this view is allowed to sum.** *Installs on
+  <day>* sits directly after *Active on <day>* and *Installs in range* sits with
+  the range tiles below, both split iOS / Android under the number
+  (`newPlatformsOn` / `newPlatformsOver`, unfiltered like every split here).
+  The day's number was already on screen as the *first run* half of the active
+  tile's split, but the split could not say which store it came from, and the
+  range had no number at all. The range one is a genuine SUM on a view whose
+  governing rule is that daily counts are never summed, and the exemption is
+  exact rather than pragmatic: an open ping counts an install again on every
+  day it opens the app, whereas a **first run happens once in an install's
+  life**, on its own cohort day — so adding them across days double-counts
+  nobody. It is the same property that makes cohort size exact, and
+  `lifecycleNow` already relies on it. `rowsToMap` carries the split as a
+  `fresh` map per day, accumulated alongside `platforms` and before the
+  platform filter, so it is the whole day's split whatever slice the number
+  above it is. *Installs in range* carries the previous window of equal length
+  as its delta, on the same "only when the counter covered all of it" guard the
+  active and returning averages use.
+- **A day's count is stacked against three baselines, and a percentage off a
+  tiny base is never printed.** The day tiles (*Active*, *Installs*,
+  *Purchases*, *First readings*, *Measured*) carry `dayDeltas`: yesterday, the
+  same weekday a week back, and the range's own daily average. The weekday row
+  is not a nicety — openings here swing by a third between a Sunday and a
+  Wednesday, so "down 28% on yesterday" on a Monday morning is usually just
+  Monday, and only Monday against Monday separates a real move from the week's
+  own shape. Each row is dropped, not printed, when its baseline is under
+  `DELTA_MIN_BASE` (5): two purchases against three is not "+50%", it is two
+  and three, and a percentage off a base that small reads as a trend while
+  being noise. That is why the purchase tile usually carries no comparisons and
+  the active one always does — one rule, applied to numbers of different sizes.
+  A day the measure could not be taken on at all returns `null` and drops out
+  of every comparison including the average's denominator, which is the
+  `hrvKnown` rule ("unknown is not zero") reaching the deltas. The *Active*
+  tile's old inline delta was a range-average-against-the-previous-window
+  figure sitting next to a today count, which read as a claim about today; it
+  now sits inside the meta line beside the average it is actually about.
 - **Every purchase is also listed one row each**, under the Purchase timing
   histogram (`A.purchaseRows` → `renderPurchaseRows`). At the volumes a new app
   actually has, the list is the more honest of the two: three purchases in a

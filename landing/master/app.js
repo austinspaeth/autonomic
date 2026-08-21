@@ -503,13 +503,34 @@
 
   /* ------------------------------------------------------------ tiles */
 
+  /** One signed percentage as its own coloured span. `invert` is for the
+   *  measures where down is the good direction. */
+  function deltaSpan(pct, invert) {
+    if (pct === undefined || pct === null || !isFinite(pct)) return '';
+    var cls = pct > 0.05 ? 'up' : pct < -0.05 ? 'down' : 'flat';
+    if (invert) cls = cls === 'up' ? 'down' : cls === 'down' ? 'up' : 'flat';
+    var arrow = pct > 0.05 ? '▲' : pct < -0.05 ? '▼' : '■';
+    return '<span class="delta ' + cls + '">' + arrow + ' ' + Math.abs(pct).toFixed(1) + '%</span>';
+  }
+
   function tile(o) {
-    var delta = '';
-    if (o.delta !== undefined && o.delta !== null && isFinite(o.delta)) {
-      var cls = o.delta > 0.05 ? 'up' : o.delta < -0.05 ? 'down' : 'flat';
-      if (o.invertDelta) cls = cls === 'up' ? 'down' : cls === 'down' ? 'up' : 'flat';
-      var arrow = o.delta > 0.05 ? '▲' : o.delta < -0.05 ? '▼' : '■';
-      delta = '<span class="delta ' + cls + '">' + arrow + ' ' + Math.abs(o.delta).toFixed(1) + '%</span>';
+    var delta = deltaSpan(o.delta, o.invertDelta);
+    /* The stacked comparisons under a day tile. A count on its own says
+       nothing about whether it is a good day: `deltas` is the same number read
+       against yesterday, against the same weekday a week ago (traffic here is
+       strongly weekly, so Monday only means anything beside another Monday)
+       and against the range's own average. Rows whose baseline was too small
+       to divide by are dropped upstream — see dayDeltas — so a tile with
+       nothing honest to compare simply shows no block. */
+    var deltas = '';
+    var rows = (o.deltas || []).filter(function (d) {
+      return d && d.pct !== undefined && d.pct !== null && isFinite(d.pct);
+    });
+    if (rows.length) {
+      deltas = '<div class="deltas">' + rows.map(function (d) {
+        return '<div>' + deltaSpan(d.pct, o.invertDelta) +
+          '<span>' + esc(d.label) + '</span></div>';
+      }).join('') + '</div>';
     }
     var split = '';
     if (o.split && o.split.length) {
@@ -521,6 +542,7 @@
       '<div class="label">' + (o.color ? '<span class="swatch" style="background:' + o.color + '"></span>' : '') + esc(o.label) + '</div>' +
       '<div class="value' + (o.smallValue ? ' small' : '') + '">' + o.value + (delta ? ' ' + delta : '') + '</div>' +
       (o.meta ? '<div class="meta">' + o.meta + '</div>' : '') +
+      deltas +
       split +
       (o.spark ? '<div style="margin-top:8px">' + o.spark + '</div>' : '') +
       '</div>';
@@ -1561,6 +1583,52 @@
 
   /* ------------------------------------------------------------- 1. tiles */
 
+  /* The floor a baseline has to clear before a percentage means anything.
+     Two purchases yesterday against three today is not "+50%", it is two and
+     three; a percentage off a base that small reads as a trend and is noise.
+     Below this the row is DROPPED rather than printed, which is why the
+     purchase tile usually carries no comparisons and the active one always
+     does — the same rule, applied to numbers of different sizes. */
+  var DELTA_MIN_BASE = 5;
+
+  function pctChange(now, before) {
+    if (now === null || now === undefined) return null;
+    if (before === null || before === undefined || !isFinite(before)) return null;
+    if (before < DELTA_MIN_BASE) return null;
+    return ((now - before) / before) * 100;
+  }
+
+  /**
+   * The three comparisons a day's count is worth reading against: yesterday,
+   * the same weekday a week back, and the range's own daily average.
+   *
+   * The weekday one is not a nicety. Openings here swing by a third between a
+   * Sunday and a Wednesday, so "down 28% on yesterday" on a Monday morning is
+   * usually just Monday; only Monday against Monday separates a real move from
+   * the week's own shape.
+   *
+   * `valueOf(day)` returns the count, or `null` for a day the measure could not
+   * be taken on at all — the days before the reading counter shipped are the
+   * live case. An unknown baseline drops its row; it never becomes a zero, and
+   * it never lands in the average's denominator.
+   */
+  function dayDeltas(day, days, valueOf) {
+    var now = valueOf(day);
+    if (now === null || now === undefined) return [];
+    var weekAgoDay = addDays(day, -7);
+    var sum = 0, seen = 0;
+    (days || []).forEach(function (d) {
+      var v = valueOf(d);
+      if (v === null || v === undefined) return;
+      sum += v; seen++;
+    });
+    return [
+      { label: 'vs the day before', pct: pctChange(now, valueOf(addDays(day, -1))) },
+      { label: 'vs ' + WD[dow(weekAgoDay)] + ' last week', pct: pctChange(now, valueOf(weekAgoDay)) },
+      { label: 'vs the range average', pct: pctChange(now, seen ? sum / seen : null) }
+    ];
+  }
+
   function renderPingTiles(ix, r, days) {
     var latest = ix.last;
     var activeToday = A.activeOn(ix, latest);
@@ -1571,16 +1639,31 @@
     avg = days.length ? avg / days.length : 0;
     avgRet = days.length ? avgRet / days.length : 0;
 
+    /* Installs across the whole window, which is the acquisition number the
+       date filter is usually being moved to answer.
+       This is a SUM, on a view whose governing rule is that daily counts are
+       never summed — and it is the one measure the rule does not apply to. An
+       open ping counts the same install again on every day it opens the app,
+       which is why there is no weekly active number here; a FIRST RUN happens
+       once in an install's life, on its own cohort day, so adding them across
+       days double-counts nobody. It is the same property that makes cohort
+       size exact, and `lifecycleNow` already sums it. */
+    var freshRange = A.newOver(ix, days);
+    var rangeFresh = A.newPlatformsOver(ix, days);
+
     // previous window of equal length, only when the counter covered all of it
     var prevTo = addDays(r.from, -1), prevFrom = addDays(prevTo, -(days.length - 1));
     var covered = ix.first && prevFrom >= ix.first;
-    var prevAvg = 0, prevAvgRet = 0;
+    var prevAvg = 0, prevAvgRet = 0, prevFreshRange = 0;
     if (covered) {
-      A.range(prevFrom, prevTo).forEach(function (d) { prevAvg += A.activeOn(ix, d); prevAvgRet += A.returningOn(ix, d); });
+      var prevDays = A.range(prevFrom, prevTo);
+      prevDays.forEach(function (d) { prevAvg += A.activeOn(ix, d); prevAvgRet += A.returningOn(ix, d); });
       prevAvg /= days.length; prevAvgRet /= days.length;
+      prevFreshRange = A.newOver(ix, prevDays);
     }
     var dActive = covered && prevAvg ? ((avg - prevAvg) / prevAvg) * 100 : null;
     var dRet = covered && prevAvgRet ? ((avgRet - prevAvgRet) / prevAvgRet) * 100 : null;
+    var dFresh = covered ? pctChange(freshRange, prevFreshRange) : null;
 
     var d1 = A.retentionAt(ix, ix.cohorts, 1);
     var d7 = A.retentionAt(ix, ix.cohorts, 7);
@@ -1613,18 +1696,39 @@
        double-counted "23" did. */
     var unattrToday = A.unattributedOn(ix, ix.last);
 
+    /* The newest day's installs, as their own tile rather than only as the
+       "first run" half of the active tile's split. It is the number every
+       other number on this page is downstream of, and the one question the
+       split could not answer was which store they came from — `newPlatformsOn`
+       is that answer, and it is the unfiltered one, like every split here. */
+    var freshToday = A.newPlatformsOn(ix, ix.last);
+
+    /* The range average carries its own trend, beside the average it is about:
+       read against today's count, up on the value line, it looked like a claim
+       about today, which it never was. */
+    var avgTrend = deltaSpan(dActive);
+
     document.getElementById('pgTiles').innerHTML = [
       tile({
         label: 'Active on ' + labelDay(ix.last), color: PC.active, value: fmtInt(activeToday),
-        delta: dActive,
         meta: fmtInt(Math.round(avg)) + '/day across this range' +
+          (avgTrend ? ' ' + avgTrend : '') +
           (unattrToday ? ' · ' + fmtInt(unattrToday) + ' more named no store and are not in this slice' : ''),
+        deltas: dayDeltas(ix.last, days, function (d) { return A.activeOn(ix, d); }),
         split: [{ name: 'returning', color: PC.back, value: fmtInt(returningToday) },
                 { name: 'first run', color: PC.fresh, value: fmtInt(A.newOn(ix, ix.last)) }]
       }),
       tile({
+        label: 'Installs on ' + labelDay(ix.last), color: PC.fresh,
+        value: fmtInt(A.newOn(ix, ix.last)),
+        meta: 'first-run pings on the newest day' + storeSplitNote(ix, freshToday),
+        deltas: dayDeltas(ix.last, days, function (d) { return A.newOn(ix, d); }),
+        split: storeSplit(freshToday)
+      }),
+      tile({
         label: 'Purchases on ' + labelDay(ix.last), color: PC.subs, value: fmtInt(A.purchasesOn(ix, ix.last)),
         meta: 'subscribe pings on the newest day' + storeSplitNote(ix, A.subPlatformsOn(ix, ix.last)),
+        deltas: dayDeltas(ix.last, days, function (d) { return A.purchasesOn(ix, d); }),
         split: storeSplit(A.subPlatformsOn(ix, ix.last))
       }),
       tile({
@@ -1635,6 +1739,7 @@
         label: 'First readings on ' + labelDay(ix.last), color: PC.activation,
         value: fmtInt(A.activationsOn(ix, ix.last)),
         meta: 'installs that activated that day' + methodSplitNote(A.methodsOn(ix, ix.last)),
+        deltas: dayDeltas(ix.last, days, function (d) { return A.activationsOn(ix, d); }),
         split: methodSplit(A.methodsOn(ix, ix.last))
       }),
       /* The reading counter's own headline, beside the active one it is read
@@ -1646,6 +1751,12 @@
         meta: A.hrvKnown(ix, ix.last)
           ? 'installs that saved a reading' + storeSplitNote(ix, A.hrvPlatformsOn(ix, ix.last))
           : 'the reading counter was not running yet',
+        /* A day before the counter shipped is not a day nobody measured, so it
+           returns null and drops out of every comparison rather than dragging
+           an average down — the `hrvKnown` rule, in the deltas. */
+        deltas: dayDeltas(ix.last, days, function (d) {
+          return A.hrvKnown(ix, d) ? A.readingsOn(ix, d) : null;
+        }),
         split: A.hrvKnown(ix, ix.last) ? storeSplit(A.hrvPlatformsOn(ix, ix.last)) : null
       }),
       tile({
@@ -1672,6 +1783,13 @@
       tile({
         label: 'Active past the trial', color: PC.postTrial, value: fmtInt(live.postTrial),
         meta: 'day 15+: free tier, Pro features locked'
+      }),
+      tile({
+        label: 'Installs in range', color: PC.fresh, value: fmtInt(freshRange),
+        delta: dFresh,
+        meta: fmtInt(days.length) + ' day' + (days.length === 1 ? '' : 's') +
+          ' of first runs' + storeSplitNote(ix, rangeFresh),
+        split: storeSplit(rangeFresh)
       }),
       tile({
         label: 'Purchases in range', color: PC.subs, value: fmtInt(subsRange),

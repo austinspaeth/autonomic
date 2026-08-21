@@ -131,7 +131,7 @@ window.Analytics = (function () {
 
   /* ----------------------------------------------------------------- index */
 
-  var EMPTY = { total: 0, cohorts: {}, platforms: {}, methods: {}, unattributed: 0 };
+  var EMPTY = { total: 0, cohorts: {}, platforms: {}, fresh: {}, methods: {}, unattributed: 0 };
 
   /* Capture methods an activation ping can name, and what to call them. Any
      other letter, or none, pools under `?` — an activation whose sensor we
@@ -171,12 +171,20 @@ window.Analytics = (function () {
     var by = {};
     (list || []).forEach(function (r) {
       if (!r || !r.day) return;
-      var c = {}, plat = {}, meth = {}, kept = 0, unattributed = 0;
+      var c = {}, plat = {}, fresh = {}, meth = {}, kept = 0, unattributed = 0;
       (r.cohorts || []).forEach(function (x) {
         if (!x || !x.cohort) return;
         var p = PLATFORM_NAME[x.platform] ? x.platform : 'U';
         var n = Number(x.count) || 0;
         plat[p] = (plat[p] || 0) + n;
+        /* The same split, narrowed to the pings whose cohort IS this day —
+           i.e. first runs. `cohorts` alone cannot answer "which store did
+           today's installs come from", because it pools every platform under
+           the cohort date; this is the one extra fact that does, and it is
+           kept UNFILTERED for the same reason `platforms` is (see storeSplit
+           in app.js: a split is always the whole day's, whatever slice the
+           number above it is). */
+        if (x.cohort === r.day) fresh[p] = (fresh[p] || 0) + n;
         /* A PLATFORM SLICE IS STRICT: pick iOS and you get the pings that said
            iOS, and nothing else.
 
@@ -209,7 +217,7 @@ window.Analytics = (function () {
       });
       by[r.day] = {
         total: letter ? kept : (Number(r.total) || 0),
-        cohorts: c, platforms: plat, methods: meth, unattributed: unattributed,
+        cohorts: c, platforms: plat, fresh: fresh, methods: meth, unattributed: unattributed,
       };
     });
     return by;
@@ -462,6 +470,10 @@ window.Analytics = (function () {
    *  no second source. Also ALWAYS unfiltered, for the same reason. */
   function subPlatformsOn(ix, day) { return (ix.sub[day] || EMPTY).platforms || {}; }
 
+  /** One day's FIRST-RUN platform split, `{ I: n, A: n, U: n }`. Unfiltered,
+   *  exactly like `platformsOn` — this is the split of `newOn`. */
+  function newPlatformsOn(ix, day) { return (ix.open[day] || EMPTY).fresh || {}; }
+
   /** Pooled platform split over a set of days, `{ I: n, A: n, U: n }`. */
   function platformsOver(ix, days, fn) {
     var out = {};
@@ -472,6 +484,7 @@ window.Analytics = (function () {
     return out;
   }
   function purchasePlatformsOver(ix, days) { return platformsOver(ix, days, subPlatformsOn); }
+  function newPlatformsOver(ix, days) { return platformsOver(ix, days, newPlatformsOn); }
 
   /** How much of a filtered day's count carries no store. 0 when unfiltered. */
   function unattributedOn(ix, day) { return (ix.open[day] || EMPTY).unattributed || 0; }
@@ -484,6 +497,10 @@ window.Analytics = (function () {
     return Math.max(0, activeOn(ix, day) - countOn(ix, day, day));
   }
   function newOn(ix, day) { return countOn(ix, day, day); }
+  /** First runs pooled over a set of days: the range's installs. */
+  function newOver(ix, days) {
+    return (days || []).reduce(function (a, d) { return a + newOn(ix, d); }, 0);
+  }
 
   /** How old a cohort is as of the newest day we have. */
   function maturity(ix, cohort) { return ix.last ? ageDays(cohort, ix.last) : 0; }
@@ -1152,7 +1169,8 @@ window.Analytics = (function () {
 
     // index + accessors
     index: index, platformName: function (letter) { return PLATFORM_NAME[letter] || 'unknown'; },
-    activeOn: activeOn, newOn: newOn, returningOn: returningOn, platformsOn: platformsOn,
+    activeOn: activeOn, newOn: newOn, newOver: newOver, returningOn: returningOn,
+    platformsOn: platformsOn, newPlatformsOn: newPlatformsOn, newPlatformsOver: newPlatformsOver,
     subPlatformsOn: subPlatformsOn, purchasePlatformsOver: purchasePlatformsOver,
     unattributedOn: unattributedOn,
     countOn: countOn, purchasesOn: purchasesOn, cohortSize: cohortSize,
