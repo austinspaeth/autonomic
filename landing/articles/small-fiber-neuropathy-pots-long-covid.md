@@ -8,8 +8,8 @@ keywords: "small fiber neuropathy, small fiber neuropathy POTS, small fiber neur
 date: 2026-08-22
 updated: 2026-08-22
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1511295742362-92c96b1cf484?q=80&w=1760&auto=format&fit=crop"
-photoAttribution: "Kari Shea / Unsplash"
+photoLocation: "https://images.unsplash.com/photo-1615669527499-501446dd48e1?q=80&w=2342&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+photoAttribution: "Unsplash"
 tldr: "Small fiber neuropathy (SFN) is damage to the thin nerve fibers that carry pain, temperature and autonomic signals. It causes burning or tingling in the feet and hands plus autonomic problems like a racing heart on standing, poor sweating and gut trouble, which is why it overlaps heavily with POTS and long COVID. Because the same small fibers feed the heart's vagal control, SFN often travels with low HRV and orthostatic intolerance. It is diagnosed with a skin biopsy and autonomic tests, not a routine nerve conduction study. You cannot diagnose it at home, but tracking HRV, resting and standing heart rate and symptoms builds the picture your clinician needs."
 categories:
   - pots

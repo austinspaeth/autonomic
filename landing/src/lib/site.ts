@@ -50,6 +50,29 @@ export function storeUrl(platform: 'ios' | 'android', campaign = DEFAULT_CAMPAIG
   return `${playStoreUrl}&referrer=${encodeURIComponent(referrer)}`;
 }
 
+/**
+ * `/download` — the short link printed in videos (autonomic.care/download).
+ *
+ * It is a redirect page, not a page of the site: an iPhone lands on the App
+ * Store, an Android phone on Play, and a desktop on the home page. All three
+ * carry the same "video" attribution, so one campaign reads across the stores
+ * and GA:
+ *
+ *  iOS     -> App Store Connect, Acquisition -> Campaigns, campaign `Videos`.
+ *  Play    -> Play Console, User acquisition, utm_source `video`.
+ *  Desktop -> GA4, the same utm triple on the home page.
+ *
+ * Play has no `pt`/`ct` pair, so the source has to say "video" itself; the
+ * medium stays `referral` to match every other tagged link on the site.
+ */
+export const VIDEO_CAMPAIGN = 'Videos';
+
+const VIDEO_UTM = 'utm_source=video&utm_medium=referral&utm_campaign=videos';
+
+export const videoAppStoreLink = storeUrl('ios', VIDEO_CAMPAIGN);
+export const videoPlayStoreLink = `${playStoreUrl}&referrer=${encodeURIComponent(VIDEO_UTM)}`;
+export const videoSiteLink = `${site.url}/?${VIDEO_UTM}`;
+
 /** Tagged store URLs for the ordinary site-wide download CTAs. */
 export const appStoreLink = storeUrl('ios');
 export const playStoreLink = storeUrl('android');
