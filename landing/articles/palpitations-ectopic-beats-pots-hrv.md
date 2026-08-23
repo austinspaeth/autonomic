@@ -8,8 +8,8 @@ keywords: "heart palpitations POTS, ectopic beats, PVC, PAC, skipped beat, palpi
 date: 2026-08-23
 updated: 2026-08-23
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1758691030894-b8d6fda73d38?q=80&w=2664&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
-photoAttribution: "Sage Friedman / Unsplash"
+photoLocation: "https://images.unsplash.com/photo-1463736932348-4915535cf6f9?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb&dl=giulia-bertelli-dvXGnwnYweM-unsplash.jpg"
+photoAttribution: "Giulia Bertelli / Unsplash"
 tldr: "Palpitations are just awareness of your own heartbeat, and in POTS and long COVID they are extremely common. Most fall into two harmless groups: sinus tachycardia (a fast but steady rhythm from an adrenaline-primed nervous system) and ectopic beats (single early beats, PACs or PVCs, that feel like a skip, flip or thud). In a structurally normal heart these are almost always benign. The real red flags are palpitations with fainting, chest pain, or severe breathlessness, or a sustained very fast regular racing that will not stop. Ectopic beats also quietly corrupt HRV: one early beat throws off RMSSD and SDNN, which is why good HRV tools correct artifacts before scoring a reading."
 categories:
   - pots
