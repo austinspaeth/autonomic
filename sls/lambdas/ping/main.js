@@ -6,7 +6,7 @@
  *   GET /ping/open/D082126I   the app was opened today by an install from that cohort
  *   GET /ping/sub/D082126I    an install from that cohort became a paid subscriber
  *   GET /ping/act/D082126IB   an install from that cohort took its FIRST HRV reading
- *   GET /ping/hrv/D082126I    an install from that cohort took a reading TODAY
+ *   GET /ping/hrv/D082126IB   an install from that cohort took a reading TODAY
  *
  * and one reader, guarded by a shared key:
  *
@@ -21,22 +21,31 @@
  * cohort+platform" — which read as a grid is a retention matrix: of the
  * installs born on cohort C, how many opened the app on day D.
  *
- * The activation route carries ONE more letter, the sensor that took the
+ * The two READING routes carry ONE more letter, the sensor that took the
  * reading: W watch, B Bluetooth strap, F finger on the camera. It rides in the
  * same code rather than in a query parameter so there is exactly one thing to
  * decode and one string to store, and it turns the same matrix into "of the
- * installs born on cohort C, how many ever got a first reading, and with what".
- * Activation fires once per install, so its rows count installs, not sessions.
+ * installs born on cohort C, how many got a reading, and with what". Activation
+ * fires once per install, so its rows count installs; the HRV route fires once
+ * per install per day, so its rows count install-days. Read together they are
+ * the only way to ask whether people who START on the camera KEEP measuring:
+ * there is no identifier here, so the two routes cannot be joined per person,
+ * and comparing their sensor mixes by install age is what is left.
  *
- * The HRV route is the open route's twin and carries exactly what it carries —
- * cohort and platform, no sensor letter. Opening the app is not using it: an
+ * The HRV route is the open route's twin. Opening the app is not using it: an
  * install that launches every morning and never measures produces a healthy
  * retention curve and an empty journal, and the open counter cannot tell that
  * apart from a reading a day. Because both are capped at one per install per
  * Eastern day by the same client rule, HRV over OPEN on one day is a genuine
- * SHARE OF PEOPLE — the only ratio on this endpoint that is, which is why the
- * two are bucketed identically and why nothing may be added to one of them
- * that is not added to the other.
+ * SHARE OF PEOPLE — the only ratio on this endpoint that is.
+ *
+ * The sensor letter does not cost that, because a row's letters partition its
+ * installs rather than multiplying them: summing an HRV day across W/B/F/none
+ * gives back exactly the count the letterless route reported. What must never
+ * be added to one of the two without the other is anything that changes the
+ * POPULATION — a second ping per day, a different day boundary, a different
+ * trigger than "the app was used". Those would break the ratio; a breakdown
+ * does not.
  *
  * Days here are US EASTERN days, not UTC ones: these are the business's own
  * numbers and are read against its own calendar, so a ping at 8pm in New York
@@ -82,17 +91,23 @@ const KINDS = { open: 'OPEN', sub: 'SUB', act: 'ACT', hrv: 'HRV' };
 /** Platforms a ping may declare. Anything else, or nothing, reads as U. */
 const PLATFORMS = { I: 'ios', A: 'android', U: 'unknown' };
 
-/** Capture methods an ACTIVATION ping may declare. Only that route sends one. */
+/** Capture methods a READING ping may declare. */
 const METHODS = { W: 'watch', B: 'bluetooth', F: 'finger' };
+
+/** The kinds whose rows may carry a method letter — the two reading routes.
+ *  An open or a subscribe has no sensor, so a letter arriving on one of those
+ *  is discarded at the write. */
+const METHOD_KINDS = { ACT: true, HRV: true };
 
 /**
  * Decode D{MMDDYY}{P}{M?} into `{ iso, platform, method }`, or null if it isn't
  * a real date. Two-digit years are 20xx — this endpoint outlives neither the app
  * nor 2099. The platform letter is optional: builds that shipped before the
  * marker existed send `D082126`, and they count as U rather than being refused.
- * The method letter is optional too and only the activation route ever sends
- * one; an unrecognised letter is dropped rather than refused, so a future
- * sensor can ship on the client before this endpoint knows its name.
+ * The method letter is optional too and only the two reading routes send one
+ * (the handler discards it on the others); an unrecognised letter is dropped
+ * rather than refused, so a future sensor can ship on the client before this
+ * endpoint knows its name.
  */
 const decodeCohort = (raw) => {
   const m = /^D(\d{2})(\d{2})(\d{2})([A-Z])?([A-Z])?$/.exec(String(raw || ''));
@@ -224,9 +239,12 @@ const readDays = async (kind, since) => {
           .map((key) => {
             const cohortDate = key.slice(0, 6);
             const platform = key.length > 6 ? key.slice(6, 7) : 'U';
-            // Only activation keys carry an 8th character; null everywhere else
-            // so a consumer can tell "no method in this kind of ping" apart from
-            // "a method we could not read".
+            // Only the two reading kinds carry an 8th character, and the HRV
+            // route only from the build that started sending it — so null here
+            // means "this row names no sensor", which a consumer must read as
+            // UNKNOWN rather than as a sensor it could not identify. Days of
+            // HRV rows written before the letter shipped are all null, and the
+            // dashboard dates the breakdown from the first row that isn't.
             const method = key.length > 7 ? key.slice(7, 8) : null;
             return {
               key,
@@ -312,7 +330,11 @@ const handler = async (event) => {
   if (Date.parse(`${cohort}T00:00:00Z`) > now + SKEW_MS) return noContent;
 
   try {
-    await bump(kind, easternDay(now), cohort, platform, kind === 'ACT' ? method : null);
+    // Only the two READING routes carry a sensor letter. Opens and subscribes
+    // are not readings, so a letter on one of those is junk from a prober and
+    // is dropped rather than stored — otherwise it would fork their cohort keys
+    // and quietly split one day's count across two of them.
+    await bump(kind, easternDay(now), cohort, platform, METHOD_KINDS[kind] ? method : null);
   } catch (err) {
     // Nothing downstream cares and the client is already gone, but log the
     // failure so a flatlined chart has an explanation other than "nobody

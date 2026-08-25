@@ -44,6 +44,23 @@
  * measured, so every function here answers `null` for those days rather than
  * 0%. `hrvKnown` is the gate; the UI must show the difference.
  *
+ * THE HRV COUNTER'S SENSOR LETTER STARTED LATER AGAIN — the daily route shipped
+ * anonymous as to sensor and gained the letter in a build after that, so there
+ * are THREE staggered starts to respect, not two. `hrv[day].methods` is the
+ * same shape as `act[day].methods`, and the pair is the only way this data can
+ * be asked whether people who START on a sensor KEEP using it: there is no
+ * identifier, so the two routes cannot be joined per person, and comparing
+ * their two mixes by install age is what is left. `hrvMethodFirst` /
+ * `hrvMethodKnown` are that third gate, and reading rows from before it pool
+ * under `?` — which means "we were not asking", NOT "a sensor we could not
+ * read", and must never be drawn as a band.
+ *
+ * `hrv[day].cohortMethods` keeps cohort and sensor UNCOLLAPSED, because
+ * `methods` pools every cohort in a day and `cohorts` pools every sensor in a
+ * cohort — so neither can answer "what were installs of age N measuring on".
+ * The storage key already carries both facts; this is only declining to throw
+ * one away. See `hrvMethodsAt`.
+ *
  * A stored cohort is really cohort+platform (`082126I`), so the report can hand
  * back two rows for one cohort day. `index` pools them, and takes a platform
  * filter for the times the split is the question — see `index` and
@@ -131,11 +148,16 @@ window.Analytics = (function () {
 
   /* ----------------------------------------------------------------- index */
 
-  var EMPTY = { total: 0, cohorts: {}, platforms: {}, fresh: {}, methods: {}, unattributed: 0 };
+  var EMPTY = {
+    total: 0, cohorts: {}, platforms: {}, fresh: {}, methods: {}, cohortMethods: {}, unattributed: 0,
+  };
 
-  /* Capture methods an activation ping can name, and what to call them. Any
-     other letter, or none, pools under `?` — an activation whose sensor we
-     could not read is still an activation. */
+  /* Capture methods a READING ping can name, and what to call them — both the
+     activation route and the daily one carry the letter. Any other letter, or
+     none, pools under `?`: a reading whose sensor we could not read is still a
+     reading. On the daily route `?` also covers every row from before the
+     letter shipped, which is why nothing sensor-shaped may be drawn without
+     `hrvMethodKnown` gating it first. */
   var METHOD_NAME = { W: 'Apple Watch', B: 'Chest strap', F: 'Phone camera' };
   var METHOD_ORDER = ['W', 'B', 'F', '?'];
 
@@ -171,7 +193,7 @@ window.Analytics = (function () {
     var by = {};
     (list || []).forEach(function (r) {
       if (!r || !r.day) return;
-      var c = {}, plat = {}, fresh = {}, meth = {}, kept = 0, unattributed = 0;
+      var c = {}, plat = {}, fresh = {}, meth = {}, cohMeth = {}, kept = 0, unattributed = 0;
       (r.cohorts || []).forEach(function (x) {
         if (!x || !x.cohort) return;
         var p = PLATFORM_NAME[x.platform] ? x.platform : 'U';
@@ -212,12 +234,23 @@ window.Analytics = (function () {
            platform filter (unlike `platforms`, which is what the filter is a
            slice of) because "which sensor do iOS users activate on" is a
            question about the slice, not about the whole. */
-        meth[METHOD_NAME[x.method] ? x.method : '?'] = (meth[METHOD_NAME[x.method] ? x.method : '?'] || 0) + n;
+        var mk = METHOD_NAME[x.method] ? x.method : '?';
+        meth[mk] = (meth[mk] || 0) + n;
+        /* The same counts kept UNCOLLAPSED, cohort by cohort.
+           `methods` pools every cohort in the day and `cohorts` pools every
+           sensor in the cohort, so neither can answer "what were installs of
+           age N measuring on" — the question the reading route's letter was
+           added for. The storage key already carries both facts
+           (MMDDYY+platform+method, see sls/lambdas/ping), so this is only
+           declining to throw one of them away. */
+        if (!cohMeth[x.cohort]) cohMeth[x.cohort] = {};
+        cohMeth[x.cohort][mk] = (cohMeth[x.cohort][mk] || 0) + n;
         kept += n;
       });
       by[r.day] = {
         total: letter ? kept : (Number(r.total) || 0),
-        cohorts: c, platforms: plat, fresh: fresh, methods: meth, unattributed: unattributed,
+        cohorts: c, platforms: plat, fresh: fresh, methods: meth,
+        cohortMethods: cohMeth, unattributed: unattributed,
       };
     });
     return by;
@@ -280,6 +313,21 @@ window.Analytics = (function () {
     var hrvDays = Object.keys(hrvAll).sort();
     var hrvFirst = hrvDays[0] || null;
 
+    /* And the first day a reading row named its SENSOR, which is later again:
+       the HRV route shipped anonymous as to sensor and gained the letter in a
+       build after that. Every row before it pools under '?', which is "we were
+       not asking" and emphatically not "a sensor we could not read" — charting
+       those as an unknown band would draw a wall of grey across the history and
+       call it data. Dated off the rows for the same reason `hrvFirst` is, and
+       unfiltered for the same reason too: the two stores ship separately, and
+       an iOS-only slice would date the letter from the wrong build. */
+    var hrvMethodFirst = null;
+    hrvDays.forEach(function (d) {
+      if (hrvMethodFirst) return;
+      var m = hrvAll[d].methods || {};
+      if (Object.keys(m).some(function (k) { return k !== '?' && m[k]; })) hrvMethodFirst = d;
+    });
+
     /* Cohorts we can measure: born on or after the counter's first day, and
        actually seen on their own day 0. */
     var cohorts = [];
@@ -299,6 +347,7 @@ window.Analytics = (function () {
     return {
       open: open, sub: sub, act: act, hrv: hrv,
       days: days, first: first, last: last, hrvFirst: hrvFirst,
+      hrvMethodFirst: hrvMethodFirst,
       cohorts: cohorts,
       preTracking: Object.keys(older).sort(),
       /* What this index is a slice of: the filter in force, and the platform
@@ -355,6 +404,94 @@ window.Analytics = (function () {
   function hrvCountOn(ix, day, cohort) { return hrvOn(ix, day).cohorts[cohort] || 0; }
   /** The reading counter's platform split, always unfiltered. */
   function hrvPlatformsOn(ix, day) { return hrvOn(ix, day).platforms || {}; }
+
+  /**
+   * One day's reading split by SENSOR, `{ W: n, B: n, F: n, '?': n }`.
+   *
+   * `methodsOn`'s twin, and the reason both exist. Activation answers "how did
+   * people take their FIRST reading"; this answers "what are they using now",
+   * across installs of every age. There is no identifier on this endpoint, so
+   * the two can never be joined per person — comparing the two MIXES is the
+   * whole of what is available, and it is enough to see a sensor that starts
+   * people and then stops appearing.
+   *
+   * Counts install-DAYS, not readings and not people: the client caps this
+   * route at one per install per Eastern day, so a day on which someone
+   * measured twice on different sensors is one count, under the first one.
+   */
+  function hrvMethodsOn(ix, day) { return hrvOn(ix, day).methods || {}; }
+
+  /** The same split pooled over a set of days. Days before the letter shipped
+   *  contribute nothing rather than a pile of '?' — see `hrvMethodKnown`. */
+  function hrvMethodsOver(ix, days) {
+    var out = {};
+    (days || []).forEach(function (d) {
+      if (!hrvMethodKnown(ix, d)) return;
+      var m = hrvMethodsOn(ix, d);
+      Object.keys(m).forEach(function (k) { out[k] = (out[k] || 0) + m[k]; });
+    });
+    return out;
+  }
+
+  /**
+   * Was the reading counter naming its sensor on `day`?
+   *
+   * `hrvKnown` one level down. A reading row from before the letter shipped is
+   * a real reading whose sensor was never asked for, and pooling those under
+   * '?' would read as "we could not identify it" — a claim about the data
+   * rather than about the instrument. Everything sensor-shaped returns null or
+   * skips before this day, exactly as the rate cards do before `hrvFirst`.
+   */
+  function hrvMethodKnown(ix, day) { return !!(ix.hrvMethodFirst && day >= ix.hrvMethodFirst); }
+
+  /**
+   * The sensor mix of readings taken at install age `n`, over every cohort old
+   * enough to have reached it.
+   *
+   * The question the two routes exist to answer together: if the camera starts
+   * a third of people and appears on a tenth of week-old reading days, camera
+   * starters are either leaving or moving to hardware. WHICH of those it is
+   * cannot be told apart here — that would need an identifier — and any reading
+   * of this chart has to say so.
+   */
+  function hrvMethodsAt(ix, cohorts, n) {
+    var out = {}, eligible = 0, blind = 0, total = 0;
+    (cohorts || []).forEach(function (c) {
+      if (!isMature(ix, c, n)) return;
+      var day = addDays(c, n);
+      // Not a zero: this cohort's day N happened before the letter shipped, so
+      // its sensor mix is unknown and stays out of both sides. The same rule
+      // `measuringAt` runs one level up.
+      if (!hrvMethodKnown(ix, day)) { blind += 1; return; }
+      var m = (hrvOn(ix, day).cohortMethods || {})[c];
+      if (!m) return;
+      Object.keys(m).forEach(function (k) { out[k] = (out[k] || 0) + m[k]; total += m[k]; });
+      eligible += 1;
+    });
+    return {
+      day: n, methods: out, total: total,
+      cohorts: eligible, blind: blind, available: total > 0
+    };
+  }
+
+  /**
+   * The age curve of that mix, 0..maxN, with the empty tail trimmed.
+   *
+   * Unlike `measuringCurve` an empty age does NOT stop the sweep. That one is
+   * a RATE over whole cohorts, so the first age nobody can answer for is the
+   * end of what is knowable; this is a mix of the reading-days that happen to
+   * exist, and a young counter leaves ages with nothing scattered right through
+   * the middle — a cohort can measure at age 1, be too young for 2 through 6,
+   * and its older sibling turn up again at 7. Stopping at the first gap would
+   * cut the sweep off exactly where the interesting comparison starts, so the
+   * whole bounded range is swept and only the trailing empties are dropped.
+   */
+  function hrvMethodCurve(ix, cohorts, maxN) {
+    var out = [];
+    for (var n = 0; n <= (maxN === undefined ? 30 : maxN); n++) out.push(hrvMethodsAt(ix, cohorts, n));
+    while (out.length && !out[out.length - 1].available) out.pop();
+    return out;
+  }
 
   /**
    * Was the reading counter running on `day`?
@@ -1179,6 +1316,9 @@ window.Analytics = (function () {
     hrvKnown: hrvKnown, measureShare: measureShare, measureRate: measureRate,
     measuringAt: measuringAt, measuringCurve: measuringCurve,
     methodsOn: methodsOn, methodsOver: methodsOver,
+    hrvMethodsOn: hrvMethodsOn, hrvMethodsOver: hrvMethodsOver,
+    hrvMethodKnown: hrvMethodKnown,
+    hrvMethodsAt: hrvMethodsAt, hrvMethodCurve: hrvMethodCurve,
     methodName: function (letter) { return METHOD_NAME[letter] || 'Unknown sensor'; },
     METHOD_ORDER: METHOD_ORDER,
     maturity: maturity, isMature: isMature,

@@ -10,14 +10,14 @@
  *   GET /ping/open/D082126I   opened today by an install from that cohort
  *   GET /ping/sub/D082126I    an install from that cohort became a subscriber
  *   GET /ping/act/D082126IB   an install from that cohort took its FIRST reading
- *   GET /ping/hrv/D082126I    an install from that cohort took a reading today
+ *   GET /ping/hrv/D082126IB   an install from that cohort took a reading today
  *
  * The trailing letter is the platform: I for iOS, A for Android. It is a
  * property of the build, not of the person holding it, and it is what makes
  * "how is Android doing" answerable without a second data source.
  *
- * The activation ping carries a second letter for the sensor that reading used
- * (W watch / B Bluetooth strap / F finger on camera). Installing is not using:
+ * The two READING routes carry a second letter for the sensor (W watch /
+ * B Bluetooth strap / F finger on camera). Installing is not using:
  * without a first HRV reading there is no score, no trend and nothing to come
  * back for, so "how many of a cohort ever got one, and with what" is the single
  * number that says whether onboarding works. It is the same shape as the other
@@ -29,11 +29,15 @@
  * journal that is going nowhere, and the open counter alone cannot tell that
  * apart from a person taking a reading a day. So this fires at most once per
  * Eastern day, from the moment a reading is SAVED, carrying the same cohort and
- * platform an open ping carries and nothing else — which makes the two directly
- * comparable: readings over opens, on one day, is the share of the people who
- * were there who actually measured. It names no sensor; the activation ping is
- * where that question is answered, and once a day could only ever name whichever
- * reading happened to come first.
+ * platform an open ping carries — which makes the two directly comparable:
+ * readings over opens, on one day, is the share of the people who were there
+ * who actually measured. It carries the sensor letter as well, which is what
+ * lets the sensor mix of ONGOING readings be read against the mix of first
+ * ones: activation says how people start, this says what they keep using, and
+ * with no identifier the two routes cannot otherwise be joined. Summing the
+ * letters returns the number the letterless route reported, so the share of
+ * people is untouched — the comparability that matters is one install, one
+ * count, one Eastern day, and that is unchanged.
  *
  * What is deliberately absent: no device id, no install id, no session id, no
  * request body, no health data, no journal data, nothing about what the user
@@ -212,12 +216,25 @@ export function pingActivation(source: string | undefined): void {
  * once per install ever, this is once per Eastern day, so the pair says both
  * "did they ever get one" and "are they still taking them".
  *
+ * It carries the same sensor letter the activation ping does, and that is the
+ * only reason the pair can answer "does a camera-first user stay a measurer":
+ * activation gives the mix of FIRST readings, this gives the mix of readings
+ * from installs of every age, and there is no identifier here to join them on.
+ * Because the daily cap is unchanged, summing this route's letters returns the
+ * anonymous number it reported before, so `hrv / open` is still a share of
+ * people (see the header of ../lib/ping).
+ *
+ * The letter names the day's FIRST reading, since that is the one that gets
+ * through the cap. A day on which someone measured on the camera and again on
+ * a strap counts once, as camera — a day-level fact about how this install
+ * measured, never a count of readings by sensor.
+ *
  * The flag is written only on success, so a reading saved offline is re-counted
  * by the next reading that day rather than being lost — and if there is no next
  * one, the day simply reports what it could see. The same trade `pingOpen`
  * makes, and it errs the same way: toward reporting a real reading as taken.
  */
-export function pingHrvReading(): void {
+export function pingHrvReading(source: string | undefined): void {
   if (__DEV__) return;
   if (inFlight.hrv) return;
   const now = Date.now();
@@ -225,7 +242,7 @@ export function pingHrvReading(): void {
   inFlight.hrv = true;
   void (async () => {
     try {
-      if (await send('hrv', cohortDate(now))) write(KEY_LAST_HRV, easternDay(now));
+      if (await send('hrv', cohortDate(now), methodCode(source))) write(KEY_LAST_HRV, easternDay(now));
     } finally {
       inFlight.hrv = false;
     }

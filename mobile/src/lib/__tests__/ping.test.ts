@@ -24,10 +24,26 @@ describe('cohort ping wire format', () => {
     expect(platformCode(undefined)).toBe('U');
   });
 
-  it('builds the three routes', () => {
+  it('builds the four routes', () => {
     expect(pingUrl('open', '2026-08-21', 'I')).toBe('https://api.autonomic.care/ping/open/D082126I');
     expect(pingUrl('sub', '2026-08-21', 'A')).toBe('https://api.autonomic.care/ping/sub/D082126A');
     expect(pingUrl('act', '2026-08-21', 'I', 'B')).toBe('https://api.autonomic.care/ping/act/D082126IB');
+  });
+
+  // Both READING routes name their sensor. Activation says how somebody took
+  // their first reading ever; the daily route says what they were using on a
+  // given day, and with no identifier here the gap between those two mixes is
+  // the only way to ask whether a sensor keeps the people it starts.
+  it('carries the sensor letter on the daily reading route too', () => {
+    expect(pingUrl('hrv', '2026-08-21', 'I', 'F')).toBe('https://api.autonomic.care/ping/hrv/D082126IF');
+    expect(pingUrl('hrv', '2026-08-21', 'A', 'W')).toBe('https://api.autonomic.care/ping/hrv/D082126AW');
+  });
+
+  // A build that cannot name the sensor still counts the reading: the letter is
+  // dropped rather than guessed, and the server pools those under '?'.
+  it('still sends a reading ping when the sensor is unknown', () => {
+    expect(pingUrl('hrv', '2026-08-21', 'I', methodCode('mystery-sensor')))
+      .toBe('https://api.autonomic.care/ping/hrv/D082126I');
   });
 
   it('appends the capture method only when there is one', () => {

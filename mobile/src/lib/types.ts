@@ -65,11 +65,36 @@ export interface LiveHrvExtras {
    *  Beat-to-beat metrics must not step across these. Absent on strap/watch/ECG
    *  readings, which are one continuous take. */
   rrSegments?: number[];
+  /** On an in-app capture this is the ELAPSED session, not the usable signal —
+   *  `coverageSec` is the usable part. (On an IMPORTED reading it means real RR
+   *  coverage instead, which is what `hrvQuality.isTrustedReading` gates on.
+   *  The two meanings share a field because the import path has no session to
+   *  measure; keep them apart when reasoning about capture quality.) */
   durationSec?: number;
   sampledHr?: { t: number; bpm: number }[];
   /** Rolling SDNN (trailing ~60 s window) sampled through the session. */
   sampledSdnn?: { t: number; sdnn: number }[];
+
+  /* ---- how good the capture was (src/lib/hrv computes these; the results
+     card shows them; they are stamped so a reading can still be judged on its
+     own quality months later).
+
+     Declared here since the sidecar split, and written since 1.25.3. A reading
+     from an earlier build carries none of them, so every consumer must treat
+     `undefined` as UNKNOWN rather than as clean — the same rule the reading
+     counter's `hrvKnown` follows on the dashboard. Nothing de-weights on them
+     yet: they are recorded first so there is something to decide with. */
+
+  /** % of beats the artifact correction had to replace. Capture already
+   *  refuses anything over 15% on camera / 30% on strap (lib/hrv), so this is
+   *  how marginal a KEPT reading was, not whether it was kept. */
   artifactPct?: number;
+  /** Seconds of usable cardiac data actually behind the numbers. Below
+   *  `durationSec` whenever the signal dropped out — on a camera reading the
+   *  gap between the two is the finger moving. */
+  coverageSec?: number;
+  /** The results card's own verdict, from coverage + artifacts + segments. */
+  confidence?: 'high' | 'fair' | 'low';
 }
 
 export interface Meal {

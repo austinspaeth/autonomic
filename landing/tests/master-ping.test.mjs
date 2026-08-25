@@ -69,8 +69,18 @@ const ACT = {
 const HRV = {
   [T(3)]: { [T(4)]: 3, [T(3)]: 2 },
   [T(2)]: { [T(4)]: 2 },
-  [T(1)]: { [T(4)]: 1, [T(3)]: 1 },
-  [T(0)]: { [T(4)]: 1 },
+};
+
+/* ...and the SENSOR letter shipped later again, in a build after the counter
+   itself. T-3 and T-2 above are reading days that name no sensor: real
+   readings taken on something, from before the app was asked which. They must
+   read as a gap in the sensor breakdown, never as an "unknown" band — the same
+   distinction `hrvKnown` draws one level up, and the reason `hrvMethodFirst`
+   exists at all. Counts are unchanged from the letterless version (2 then 1),
+   so every measuring number below still has to come out the same. */
+const HRV_M = {
+  [T(1)]: { [T(4)]: { F: 1 }, [T(3)]: { B: 1 } },
+  [T(0)]: { [T(4)]: { F: 1 } },
 };
 
 /* Activation rows carry a method letter as well as a platform one; the same
@@ -141,7 +151,12 @@ window.fetch = (url, opts) => {
       ui: { view: 'timeline' },
     });
   }
-  if (body.action === 'PINGS') return reply({ since: body.payload.since, open: shape(OPEN), sub: shape(SUB), act: shapeAct(ACT), hrv: shape(HRV) });
+  if (body.action === 'PINGS') {
+    // The reading rows are the two eras spliced together, in day order: the
+    // letterless days the counter first sent, then the ones naming a sensor.
+    const hrv = shape(HRV).concat(shapeAct(HRV_M)).sort((a, b) => a.day.localeCompare(b.day));
+    return reply({ since: body.payload.since, open: shape(OPEN), sub: shape(SUB), act: shapeAct(ACT), hrv });
+  }
   return reply({ ok: true });
 };
 
@@ -185,6 +200,7 @@ const tiles = {};
       meta: (t.querySelector('.meta') || {}).textContent || '',
       deltas: [].slice.call(t.querySelectorAll('.deltas > div'))
         .map((d) => d.textContent.replace(/\s+/g, ' ').trim()),
+      split: ((t.querySelector('.split') || {}).textContent || '').replace(/\s+/g, ' ').trim(),
     };
   });
 });
@@ -348,6 +364,47 @@ check('and says the Apple Watch share is a share of everyone while combined',
 check('the method chart drew a band per sensor used',
   $('pgMethods').querySelectorAll('path[fill]:not([fill="none"])').length >= 3,
   String($('pgMethods').querySelectorAll('path').length) + ' paths');
+
+/* ------------------------------------------- the active tile's two splits
+
+   One number, partitioned twice: who they were and which store they came from.
+   Both pairs have to add up to the tile's own value or the row is lying — T(0)
+   is 4 active, 3 iOS + 1 Android, and returning + first run makes 4 as well. */
+check('the active tile still splits returning from first run',
+  /returning/.test(activeTile.split) && /first run/.test(activeTile.split), activeTile.split);
+check('and now carries the store split beside it',
+  /iOS 3/.test(activeTile.split) && /Android 1/.test(activeTile.split), activeTile.split);
+check('the store half of that split sums to the tile\'s own number',
+  activeTile.value.startsWith('4'), activeTile.value);
+
+/* --------------------------------------- which sensor, on EVERY reading
+
+   The first-reading split says how people start; this says what they keep
+   using. T(0)'s single reading was taken on the camera, and the two earlier
+   reading days named no sensor at all — so the breakdown counts 3, not 5, and
+   the two letterless days are a gap rather than an "unknown" band. */
+const readSplit = tiles[Object.keys(tiles).find((k) => k.startsWith('Measured on'))].split;
+check('the reading tile names the sensor behind the day\'s readings',
+  /Phone camera 1/.test(readSplit), readSplit);
+check('and keeps its store split too', /iOS 1/.test(readSplit), readSplit);
+
+const readNote = $('pgReadMethodNote').textContent;
+check('the reading-sensor note counts only the days that named one',
+  /3 install-days/.test(readNote), readNote);
+check('and says which day the letter started, so the gap is explained',
+  /counted from/.test(readNote), readNote);
+check('it reports each sensor as a share of those days',
+  /Chest strap 33\.3%/.test(readNote) && /Phone camera 66\.7%/.test(readNote), readNote);
+check('the ongoing-sensor chart drew a band per sensor used',
+  $('pgReadMethods').querySelectorAll('path[fill]:not([fill="none"])').length >= 2,
+  String($('pgReadMethods').querySelectorAll('path').length) + ' paths');
+
+/* The age card is honest about having nothing yet: no cohort born after the
+   letter shipped has reached a week old in this fixture, so the day-0 vs day-7+
+   comparison must decline to be drawn rather than divide by a handful. */
+const ageNote = $('pgReadMethodAgeNote').textContent;
+check('the sensor-by-age card says when it cannot compare yet',
+  /Not enough aged reading-days/.test(ageNote), ageNote);
 
 /* ------------------------------------------------------------ measuring */
 
