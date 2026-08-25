@@ -7,6 +7,88 @@ in the app's "What's new" card are a separate, deliberately plainer log in
 `mobile/src/lib/whatsNew.ts` — update it whenever `version` in `mobile/app.json`
 crosses to a new `x.x` (a unit test fails if the shipping minor has no entry).
 
+## 1.25.2 (OTA)
+
+Shipped over the air onto the 1.25.2 build rather than as a new version: JS
+only, so `app.json` stays at 1.25.2 and the stores are not involved. The
+`runtimeVersion` policy is `fingerprint`, which hashes the native project — a
+JS-only change leaves it alone, so the update matches builds already in the
+field and lands on next launch.
+
+- **The daily reading ping carries its sensor letter.** `/ping/hrv` was the one
+  reading route that did not say which sensor took the reading, so the app knew
+  how people STARTED (`/ping/act`) and not what they were still using a month
+  later. Those are different questions, and with no identifier on this endpoint
+  the two routes can never be joined per person — comparing their two sensor
+  MIXES by install age is the only way to ask whether a sensor keeps the people
+  it starts, which is the question about camera readings specifically.
+- The open/HRV symmetry is intact, and the note in `lib/ping.ts` now says why in
+  the terms that actually matter. A day's letters PARTITION its installs, so
+  summing an HRV day across W/B/F/none returns exactly the count the letterless
+  route reported and `hrv[day] / open[day]` is still a share of people. What may
+  never be added to one route without the other is anything that changes WHO is
+  counted or WHEN — a second ping per day, a different Eastern boundary, a
+  different trigger. A breakdown is not that.
+- Server: one line. `decodeCohort`, `cohortKey`, `bump` and `readDays` were
+  already generic over the method letter; only the `kind === 'ACT'` guard at the
+  write needed widening to the two reading kinds. A letter arriving on
+  `open`/`sub` is still dropped, so a prober cannot fork their cohort keys.
+- **Capture quality is stamped on the reading**: `artifactPct`, `coverageSec`
+  and `confidence` (`features/hrv/Results.tsx`). `lib/hrv` has always computed
+  all three and the results card has always shown them, but the entry carried
+  none of them — so once that card closed a reading could not be judged on its
+  own quality, which is exactly what one wants to know about a camera reading,
+  and it was being discarded on every single one. `artifactPct` was already
+  declared on `LiveHrvExtras` and never written; `coverageSec` and `confidence`
+  are new fields beside it.
+- Stamped only when the metrics came from the beat series. The `watchFallback`
+  branch takes its numbers from the watch's own summary with no RR behind them,
+  and a 0% artifact rate there would be a quality claim about a measurement we
+  never saw.
+- **Nothing de-weights on the new fields yet.** They are recorded first so there
+  is something to decide with in a fortnight; capture-time gating is unchanged
+  and is already stricter for the camera (`maxArtifactPct` 15 vs 30, plus beat
+  repair and segment triage), so these say how MARGINAL a kept reading was and
+  not whether to keep it. A reading from an older build carries none of them,
+  so `undefined` means UNKNOWN and never "clean".
+- `types.ts` now says out loud that `durationSec` means two different things:
+  real RR coverage on an imported reading (what `isTrustedReading` gates on) and
+  the elapsed session on an in-app capture. The 4-minute bar would pass a
+  5-minute camera reading holding 90 seconds of usable pulse, so it is not the
+  field to reach for when asking about capture quality.
+- **`/master`: two new cards.** *How readings are taken* is the ongoing twin of
+  *How the first reading is taken* — the daily sensor mix across installs of
+  every age. *Does the sensor mix change with age?* redraws it by install age as
+  SHARES (counts there would just redraw the retention curve) and reports day 0
+  against day 7+ in percentage points. Its copy keeps saying what it cannot
+  answer: a falling share does not mean those people left, they may have bought
+  a strap, and nothing without an identifier separates the two.
+- A THIRD staggered start to respect. The reading route shipped later than the
+  other three (`hrvFirst` / `hrvKnown`); its sensor letter shipped later again
+  (`hrvMethodFirst` / `hrvMethodKnown`). Reading rows from between the two name
+  no sensor and pool under `?`, which means "we were not asking" and NOT "a
+  sensor we could not read" — so they are a gap in the breakdown, never a grey
+  band across the history.
+- `rowsToMap` keeps `cohortMethods`, the cohort × sensor cross. `methods` pools
+  every cohort in a day and `cohorts` pools every sensor in a cohort, so neither
+  can answer "what were installs of age N measuring on" — building the age mix
+  from the day's `methods` map would hand a young cohort's day 7 the readings an
+  old cohort took the same afternoon. The storage key already carried both
+  facts; this is only declining to throw one away.
+- The *Measured on <day>* tile gains sensor dots, and **the *Active on <day>*
+  tile now splits its day twice** — returning / first run, then iOS / Android.
+  The store half goes through `storeSplit` so it keeps its `no store` band:
+  without it the second pair would silently fail to sum on any day that still
+  has pre-marker installs in it. `.tile .split` wraps, since four swatches do
+  not fit a narrow tile on one line.
+- Tests: the sensor letter on the HRV route and the letterless fallback
+  (`lib/__tests__/ping.test.ts`); `hrvMethodFirst`, the pre-letter gap, pooling,
+  and the cohort × sensor cross on a day two cohorts measured on different
+  sensors (`landing/tests/analytics.test.mjs`); both new cards, the two tile
+  splits and the age card's honest empty state (`landing/tests/master-ping.test.mjs`),
+  whose HRV fixture now models the letterless era and the lettered one on the
+  same counts.
+
 ## 1.25.1 (OTA)
 
 Shipped over the air onto the 1.25.1 build rather than as a new version: JS

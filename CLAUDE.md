@@ -163,6 +163,25 @@ old web app so old `export.json` files import directly.
   load by `stampImportedHrvCoverage` (store `loadState`), which stamps coverage
   from the waveform sidecar — no RR ⇒ 0 ⇒ permanently excluded. Nothing is
   deleted: the entries stay in the journal and in exports, they just don't count.
+  **Note `durationSec` means two different things.** On an IMPORTED reading it is
+  real RR coverage, which is what the rule above gates on; on an IN-APP capture it
+  is the elapsed session. So the 4-minute bar would pass a 5-minute camera reading
+  holding 90 seconds of usable pulse, and it is not the field to reach for when
+  asking about capture quality.
+- **A capture's own quality is stamped on the reading** (`artifactPct`,
+  `coverageSec`, `confidence` — `src/lib/hrv` computes them, `features/hrv/Results.tsx`
+  writes them). It shipped in 1.25.2 (OTA); before that the results card SHOWED all
+  three and the entry carried none, so a reading could not be judged on its own
+  quality once the card closed — which is exactly the question about camera
+  readings, and it was thrown away on every one. Stamped only when the metrics came
+  from the beat series: the watch-summary fallback has no RR behind it, and a 0%
+  artifact rate there would be a quality claim about a measurement we never saw.
+  Capture-time gating is unchanged and is stricter for the camera already
+  (`maxArtifactPct` 15 vs 30, plus beat repair and segment triage in `lib/hrv`), so
+  these say how MARGINAL a kept reading was, not whether to keep it. **Nothing
+  de-weights on them yet** — they are recorded first so there is something to
+  decide with, and a reading from an older build carries none of them, so every
+  consumer must read `undefined` as UNKNOWN rather than as clean.
 - **Progress falls back to demo data on an empty journal. Insights does NOT.** `src/lib/demo.ts`
   generates a deterministic **60-day** sample history (`DEMO_DAYS`; seeded PRNG, keyed
   off today so it lands in the Analysis buckets and report ranges) that arcs from crash
@@ -740,28 +759,46 @@ old web app so old `export.json` files import directly.
   `/ping/sub/D{MMDDYY}{P}` once the store reports an entitlement,
   `/ping/act/D{MMDDYY}{P}{M}` the first time an HRV reading is ever SAVED
   (`pingActivation` from `features/hrv/Results.tsx`, once per install ever), and
-  `/ping/hrv/D{MMDDYY}{P}` at most once per Eastern day whenever an HRV reading
+  `/ping/hrv/D{MMDDYY}{P}{M}` at most once per Eastern day whenever an HRV reading
   is SAVED (`pingHrvReading`, the same call site).
-  That third route carries one extra letter for the sensor — `W` watch, `B`
-  Bluetooth strap, `F` finger on camera — because "did onboarding work" and
-  "with what" are the same question. Activation fires on the SAVE, never on the
+  **Both READING routes carry one extra letter for the sensor** — `W` watch, `B`
+  Bluetooth strap, `F` finger on camera. Activation answers "did onboarding work,
+  and with what"; the daily route answers "what are they still using", and the two
+  together are the only way to ask whether a sensor KEEPS the people it starts —
+  there is no identifier, so the routes can never be joined per person and
+  comparing their two mixes by install age is what is left. Activation fires on
+  the SAVE, never on the
   start of a capture: an abandoned session is the opposite of an activation. The path
   segment is the day this install FIRST ran (read from `trialStartedAt`, then
   frozen in its own flag) plus ONE letter for the platform (`I` iOS / `A`
   Android / `U` unknown, which is also how the server reads the missing letter
   older builds send); the server stamps the arrival day, so a row is
   (cohort day, platform, arrival day) → count, which is retention per store.
-  An activation row is (cohort day, platform, method, arrival day) → count.
+  A reading row is (cohort day, platform, method, arrival day) → count.
   **The HRV route is the open route's twin, and that symmetry is load-bearing**:
-  same code, same one-per-Eastern-day cap, no sensor letter, so `hrv[day] /
+  same code, same one-per-Eastern-day cap, so `hrv[day] /
   open[day]` is a share of PEOPLE (of everyone in the app that day, how many
   measured) rather than of pings. Opening a journal app is not using it, and the
   open counter alone cannot tell a daily measurer from someone who launches it to
-  look at yesterday's number. Nothing may be added to one of the two that is not
-  added to the other. It shipped later than the other three, so days before its
-  first row are UNKNOWN, never 0% — `hrvFirst` / `hrvKnown` in
-  `landing/master/analytics.js`, read off the unfiltered rows because Android
-  shipped it in its own release.
+  look at yesterday's number. The symmetry that matters is one of POPULATION, not
+  of fields: a day's letters PARTITION its installs, so summing them returns the
+  letterless number and the ratio is untouched. **Nothing may be added to one of
+  the two that changes who is counted or when** — a second ping per day, a
+  different day boundary, a different trigger than "the app was used". A
+  breakdown is not that; a change of population is.
+  There are now THREE staggered starts to respect, not two: the HRV route shipped
+  later than the other three (days before its first row are UNKNOWN, never 0% —
+  `hrvFirst` / `hrvKnown`), and its sensor letter shipped later again
+  (`hrvMethodFirst` / `hrvMethodKnown`). A reading row from between the two names
+  no sensor and pools under `?`, which means "we were not asking" and NOT "a
+  sensor we could not read" — so nothing sensor-shaped may be drawn without the
+  gate, or the history fills with a grey band that is really a gap. All in
+  `landing/master/analytics.js`, all read off the unfiltered rows because Android
+  ships each release of its own.
+  `hrv[day].cohortMethods` keeps cohort × sensor uncollapsed (the storage key
+  already carries both), because `methods` pools every cohort in a day and
+  `cohorts` pools every sensor in a cohort — neither can answer "what were
+  installs of age N measuring on", which is the question the letter was added for.
   There is no device id, no install id, no body, no health data — which is
   exactly why the server can't
   de-duplicate and the CLIENT must: one open ping per install per **US Eastern**
@@ -776,13 +813,15 @@ old web app so old `export.json` files import directly.
   support log. Storage is **one DynamoDB row per day** holding a map of
   cohort+platform(+method) → count (`PK PING#OPEN` / `PING#SUB` / `PING#ACT` /
   `PING#HRV`,
-  `SK 2026-08-21`, `cohorts: { '082126I': 12 }`, activations `'082126IB'`) — a map, not a list, because the nested bump is
+  `SK 2026-08-21`, `cohorts: { '082126I': 12 }`, readings `'082126IB'`) — a map, not a list, because the nested bump is
   atomic and appending to a list would lose concurrent pings.
   Read it back with `GET /ping/report?key=`
   (shared key, `PING_REPORT_KEY`, injected by CodeBuild from SSM) or the `PINGS`
   action on the authenticated `/master` API; both return
   `{ day, total, cohorts: [{ key, cohortDate, cohort, platform, method, count }] }`
-  rows under `open` / `sub` / `act` / `hrv` (`method` is null outside activations). The
+  rows under `open` / `sub` / `act` / `hrv` (`method` is null on the two non-reading
+  routes, and on HRV rows written before the letter shipped — the handler drops a
+  letter arriving on `open`/`sub` so a prober cannot fork their cohort keys). The
   `/master` dashboard renders them in its **App usage** view (`landing/master/`,
   tested by `landing/tests/master-ping.test.mjs`): activation gets its own tiles
   (*Activated on day 0* / *Activated by D7*), an **Activation** card and a
@@ -792,7 +831,17 @@ old web app so old `export.json` files import directly.
   day*), an **Opened vs measured** card and **The habit curve** — retention and
   measuring on one axis by install age, where the GAP between the two lines is
   the finding — plus a Readings bar on the weekday chart and its own route in the
-  raw Pings tab. Activation is also announced as
+  raw Pings tab. The sensor letter adds two more: **How readings are taken** (the
+  daily mix by date, the ongoing twin of the first-reading card) and **Does the
+  sensor mix change with age?** (the same split by install age, as SHARES — counts
+  there would just redraw the retention curve), and it puts sensor dots on the
+  *Measured on* tile. That second card is the camera question, and its copy has to
+  keep saying what it cannot answer: a sensor's share falling with age does not
+  say those people LEFT, since they may have bought a strap, and nothing without
+  an identifier can separate the two. The *Active on* tile carries iOS/Android
+  dots beside returning/first-run — two partitions of one number, which is why
+  the store half goes through `storeSplit` and keeps its "no store" band, or the
+  pair would silently fail to sum. Activation is also announced as
   a live alert card (`landing/master/alerts.js`) — **confetti is for ARRIVALS,
   never for usage**, so downloads and sales keep the canvas and an activation
   gets the card, toast and notification without it. A stored alert baseline

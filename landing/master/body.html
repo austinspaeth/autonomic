@@ -467,6 +467,32 @@
       </div>
     </div>
 
+    <!-- ---------- 5e. which sensor, on every reading ----------
+         "How the first reading is taken" (5c) answers how people START. These
+         two answer what they KEEP using, which is a different question and the
+         one that says whether a sensor is holding anybody. There is no
+         identifier on the ping endpoint, so the two routes cannot be joined per
+         person: comparing their two MIXES is what is available, and the second
+         card here is that comparison laid out by install age. -->
+    <div class="grid two-col" style="margin-bottom:14px">
+      <div class="card">
+        <header><h2>How readings are taken</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="pgReadMethods">Table</button></header>
+        <p class="hint">Which sensor was behind each day's readings, across installs of <em>every</em> age — the ongoing twin of the first-reading split above. Each install counts <b>once per day</b>, under the sensor of that day's first reading, so these are install-days and never a count of readings. Days before the reading counter began naming its sensor are a <b>gap, not an unknown band</b>: those readings had a sensor, the app was simply not sending it.</p>
+        <div id="pgReadMethods"></div>
+        <div id="pgReadMethods-table" class="hidden" style="margin-top:12px"></div>
+        <div id="pgReadMethodNote"></div>
+      </div>
+      <div class="card">
+        <header><h2>Does the sensor mix change with age?</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="pgReadMethodAge">Table</button></header>
+        <p class="hint">The same split by <b>install age</b> rather than by date, against the mix of first readings at D0. If a sensor starts a third of people and then thins out of later days, its users are either leaving or moving to other hardware — and <b>nothing here can tell those two apart</b>, which would need an identifier this endpoint deliberately does not collect. Read it as a question worth chasing, never as a churn number. Ages whose day fell before the sensor letter shipped are left out rather than counted empty.</p>
+        <div id="pgReadMethodAge"></div>
+        <div id="pgReadMethodAge-table" class="hidden" style="margin-top:12px"></div>
+        <div id="pgReadMethodAgeNote"></div>
+      </div>
+    </div>
+
     <!-- ---------- 5b. which store ---------- -->
     <div class="card" style="margin-bottom:14px">
       <header><h2>iOS vs Android, day by day</h2><span class="spacer"></span>

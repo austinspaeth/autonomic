@@ -14,7 +14,7 @@ Authorization: Bearer <Cognito id token>
 GET  https://api.autonomic.care/ping/open/D082126I    (public, no auth)
 GET  https://api.autonomic.care/ping/sub/D082126I
 GET  https://api.autonomic.care/ping/act/D082126IB
-GET  https://api.autonomic.care/ping/hrv/D082126I
+GET  https://api.autonomic.care/ping/hrv/D082126IB
 GET  https://api.autonomic.care/ping/report?key=...&since=2026-08-01
 ```
 
@@ -185,10 +185,11 @@ property, not a limitation.
 
 ### The reading counter is the open counter's twin
 
-`/ping/hrv/<code>` says an install saved an HRV reading today. It carries
-exactly what `/ping/open` carries — cohort date and platform letter, **no sensor
-letter** — and it is capped at one per install per Eastern day by the same
-client rule, bucketed on the same boundary. That symmetry is the whole point:
+`/ping/hrv/<code>` says an install saved an HRV reading today. It carries what
+`/ping/open` carries — cohort date and platform letter — plus the **sensor
+letter** the activation route carries, and it is capped at one per install per
+Eastern day by the same client rule, bucketed on the same boundary. That
+symmetry is the whole point:
 because both count the same kind of thing over the same population, `hrv[day] /
 open[day]` is a **share of people**, not of pings. Opening the app is not using
 it, and the open counter alone cannot tell an install that measures every
@@ -197,10 +198,19 @@ never gains a new one.
 
 Two consequences for anything reading these rows:
 
-- **Nothing may be added to one of the two that is not added to the other.** A
-  second sensor letter on the HRV route, a different day boundary, a second ping
-  per day — any of them breaks the ratio silently, since the numbers still
-  divide.
+- **Nothing may be added to one of the two that changes WHO is counted, or
+  WHEN.** A different day boundary, a second ping per day, a different trigger
+  than "the app was used" — any of them breaks the ratio silently, since the
+  numbers still divide. The sensor letter is not one of those: a day's letters
+  PARTITION its installs, so summing an HRV day across W/B/F/none gives back
+  exactly the count the letterless route reported. A breakdown is safe; a change
+  of population is not.
+- **The sensor letter has its own birthday, later than the route's.** The HRV
+  route shipped anonymous as to sensor and gained the letter afterwards, so rows
+  from between the two carry `method: null`. That is "we were not asking", NOT
+  "a sensor we could not read", and a reader must gate on it separately
+  (`hrvMethodFirst` / `hrvMethodKnown` in `landing/master/analytics.js`) or the
+  history fills with an "unknown sensor" band that is really a gap.
 - **Days before the route shipped are unknown, not zero.** There is no start
   date stored anywhere (the endpoint keeps counts), so a reader has to take the
   first day an `hrv` row exists as the counter's birthday and answer null for

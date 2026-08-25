@@ -16,12 +16,27 @@
  *
  * The HRV ping is the open ping's twin, and answers the question the open ping
  * cannot: an install that launches the app every morning and never measures is
- * not using it. Same shape (cohort + platform), same once-per-Eastern-day rule,
- * so the two are directly comparable — measured over opened, on the same day,
- * is the share of the people who were there who actually took a reading. It
- * carries NO sensor letter: the activation ping is the one that answers "with
- * what", and a once-a-day counter could only ever name the sensor of whichever
- * reading happened to be first.
+ * not using it. Same once-per-Eastern-day rule on the same Eastern boundary, so
+ * the two stay directly comparable — measured over opened, on the same day, is
+ * the share of the people who were there who actually took a reading.
+ *
+ * It carries the sensor letter TOO, which the activation ping alone could not
+ * answer for. Activation says how somebody took their FIRST reading; only this
+ * says what they are still using a month later, and the difference between
+ * those two mixes is the question "does a camera-first user stay a measurer"
+ * — unanswerable while the daily route was anonymous as to sensor, because
+ * there is no identifier here to join the two routes on.
+ *
+ * The symmetry that matters is preserved because it is a symmetry of
+ * POPULATION, not of fields: both routes still count one install once per
+ * Eastern day, so summing the HRV row across its sensor letters gives back
+ * exactly the number the anonymous route reported, and `hrv[day] / open[day]`
+ * is still a share of people. Nothing may be added to either route that breaks
+ * THAT — a second ping per day, or a different day boundary, would.
+ *
+ * A once-a-day counter can only ever name the sensor of whichever reading
+ * happened to be first that day, which is why the letter is read as "how this
+ * install measured that day" and never as a count of readings.
  */
 
 /** Base URL of the four ping routes (`/open`, `/sub`, `/act`, `/hrv`). */
@@ -45,13 +60,19 @@ export function platformCode(os: string | undefined): PlatformCode {
 }
 
 /**
- * How the activating reading was taken: `W` Apple Watch, `B` Bluetooth strap,
- * `F` finger on the camera. Only the activation ping carries one — the marker
- * is a property of that one reading, not of the install.
+ * How a reading was taken: `W` Apple Watch, `B` Bluetooth strap, `F` finger on
+ * the camera. Carried by the two reading routes — `act` (the sensor behind
+ * this install's first reading, ever) and `hrv` (the sensor behind its first
+ * reading of this day). The marker is a property of a READING, never of the
+ * install: the same install can activate on the camera and measure on a strap
+ * a fortnight later, and that pair of facts is the point of having both.
  */
 export type MethodCode = 'W' | 'B' | 'F';
 
-/** Map an HRV capture source (see features/hrv/SourcePicker) onto its marker. */
+/** Map an HRV capture source (see features/hrv/SourcePicker) onto its marker.
+ *  An unrecognised source yields undefined rather than a guess — the server
+ *  pools a letterless ping under `?`, which is honest, and a wrong letter
+ *  would not be. */
 export function methodCode(source: string | undefined): MethodCode | undefined {
   if (source === 'watch') return 'W';
   if (source === 'polar') return 'B';

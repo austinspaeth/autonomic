@@ -591,6 +591,88 @@ check('a report with no hrv rows knows nothing rather than claiming zero',
   legacy.hrvFirst === null && A.hrvKnown(legacy, LAST) === false &&
   A.measureShare(legacy, LAST) === null && A.measureRate(legacy, [LAST]).available === false);
 
+/* ------------------------------------------ the reading route's SENSOR
+ *
+ * A third staggered start, one level below `hrvFirst`: the reading route
+ * shipped anonymous as to sensor and gained the letter in a later build. Rows
+ * from between the two are real readings whose sensor was never asked for, and
+ * pooling them under '?' would put a wall of "unknown sensor" across the
+ * history — a claim about the data standing in for a fact about the instrument.
+ *
+ * The fixture's load-bearing day is 2026-06-22, where TWO cohorts measured on
+ * DIFFERENT sensors. A day's `methods` map pools every cohort in it, so an
+ * age-based mix built from that map would hand C2's day 7 the strap readings
+ * that belonged to C1's day 22. `cohortMethods` keeps the cross that the
+ * storage key already carried, and this is the case that proves it. */
+const METHOD_FIRST = '2026-06-22';
+const hrvM = {};                                    // day -> cohort -> {method: n}
+put(hrvM, METHOD_FIRST, C2, { W: 2, F: 4 });        // C2's D7  — 6 of 50
+put(hrvM, METHOD_FIRST, C1, { B: 3 });              // C1's D22 — same day, other sensor
+put(hrvM, C3, C3, { F: 6, B: 2 });                  // C3's D0  — 8 of 20
+put(hrvM, '2026-06-29', C3, { F: 1, B: 3 });        // C3's D1
+
+const shapeM = (plain, withMethod) => {
+  const days = [...new Set([...Object.keys(plain), ...Object.keys(withMethod)])].sort();
+  return days.map((day) => {
+    const rows = [];
+    Object.keys(plain[day] || {}).forEach((cohort) => rows.push({ cohort, count: plain[day][cohort] }));
+    Object.keys(withMethod[day] || {}).forEach((cohort) => {
+      Object.keys(withMethod[day][cohort]).forEach((method) => {
+        rows.push({ cohort, method, count: withMethod[day][cohort][method] });
+      });
+    });
+    return { day, total: rows.reduce((a, r) => a + r.count, 0), cohorts: rows };
+  });
+};
+
+// The letterless days that survive from the block above, plus the new ones.
+const sensored = A.index({
+  open: shape(open),
+  hrv: shapeM({ [HRV_FIRST]: { [C2]: 9 }, '2026-06-21': { [C1]: 4 } }, hrvM),
+});
+
+check('the sensor letter has its own start day, later than the counter\'s',
+  sensored.hrvFirst === HRV_FIRST && sensored.hrvMethodFirst === METHOD_FIRST,
+  sensored.hrvFirst + ' / ' + sensored.hrvMethodFirst);
+check('a reading day before the letter is unknown as to sensor, not "?"',
+  A.hrvMethodKnown(sensored, '2026-06-21') === false &&
+  A.hrvMethodKnown(sensored, METHOD_FIRST) === true);
+check('a day\'s sensor split pools every cohort measuring that day',
+  JSON.stringify(A.hrvMethodsOn(sensored, METHOD_FIRST)) === JSON.stringify({ W: 2, F: 4, B: 3 }),
+  JSON.stringify(A.hrvMethodsOn(sensored, METHOD_FIRST)));
+/* Pooled: the two letterless days (C2's 9 and C1's 4) drop out entirely, so
+   this is 06-22 + C3's D0 + C3's D1 and nothing else. */
+const pooledM = A.hrvMethodsOver(sensored, A.range(FIRST, LAST));
+check('pooling over a range drops the days the letter had not shipped',
+  pooledM.W === 2 && pooledM.B === 8 && pooledM.F === 11 && pooledM['?'] === undefined,
+  JSON.stringify(pooledM));
+
+/* THE cross test: C2's day 7 is 2026-06-22, the day C1 also measured on a
+   strap. C2 used a watch and the camera; the strap must not appear. */
+const mix7 = A.hrvMethodsAt(sensored, sensored.cohorts, 7);
+check('an age\'s sensor mix takes only its own cohort\'s readings from a shared day',
+  JSON.stringify(mix7.methods) === JSON.stringify({ W: 2, F: 4 }) && mix7.total === 6,
+  JSON.stringify(mix7));
+
+const mix0 = A.hrvMethodsAt(sensored, sensored.cohorts, 0);
+check('D0 sensor mix counts the one cohort born after the letter shipped',
+  mix0.total === 8 && mix0.cohorts === 1 && mix0.blind === 2, JSON.stringify(mix0));
+check('and the older cohorts are blind, never a zero band',
+  JSON.stringify(mix0.methods) === JSON.stringify({ F: 6, B: 2 }), JSON.stringify(mix0.methods));
+
+const mCurveM = A.hrvMethodCurve(sensored, sensored.cohorts, 30);
+check('the age curve starts at D0 and ends on a day with readings',
+  mCurveM.length > 0 && mCurveM[0].total === 8 &&
+  mCurveM[mCurveM.length - 1].available === true, String(mCurveM.length));
+
+/* A report whose reading rows all predate the letter must say so, rather than
+   drawing every reading as an unknown sensor. */
+const anon = A.index({ open: shape(open), hrv: shape(hrv) });
+check('reading rows that never named a sensor leave the breakdown empty',
+  anon.hrvMethodFirst === null &&
+  A.hrvMethodKnown(anon, LAST) === false &&
+  JSON.stringify(A.hrvMethodsOver(anon, A.range(FIRST, LAST))) === '{}');
+
 /* -------------------------------------------------------------- report */
 
 let failed = 0;
