@@ -8,8 +8,8 @@ keywords: "ivabradine for POTS, ivabradine POTS, ivabradine heart rate, Corlanor
 date: 2026-08-26
 updated: 2026-08-26
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1506126613408-eca07ce68773?q=80&w=1760&auto=format&fit=crop"
-photoAttribution: "Jared Rice / Unsplash"
+photoLocation: "https://images.unsplash.com/photo-1624727828489-a1e03b79bba8?q=80&w=1171&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+photoAttribution: "Unsplash"
 tldr: "Ivabradine lowers heart rate by slowing the sinoatrial node's pacemaker current directly, so it can calm the standing tachycardia of POTS without lowering blood pressure or reducing how hard the heart contracts. That selectivity is why it is often tried when beta blockers cause too much fatigue or drop blood pressure too far. It does not fix what is underneath POTS, and it needs heart-rate-guided titration, so track your resting heart rate, your stand-test jump, and your symptoms rather than one number. It is prescription-only, has a distinctive visual side effect called phosphenes, and every dose decision belongs with your clinician."
 categories:
   - pots
