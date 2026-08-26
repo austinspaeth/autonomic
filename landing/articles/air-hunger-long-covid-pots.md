@@ -8,8 +8,8 @@ keywords: "air hunger, air hunger long covid, shortness of breath POTS, breathle
 date: 2026-08-25
 updated: 2026-08-25
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1506126613408-eca07ce68773?q=80&w=1760&auto=format&fit=crop"
-photoAttribution: "Jared Rice / Unsplash"
+photoLocation: "https://images.unsplash.com/photo-1596236978986-f6e54632cc2a?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+photoAttribution: "Unsplash"
 tldr: "Air hunger is the feeling that a breath won't complete, an unsatisfied urge to breathe deeper. In long COVID and POTS it is usually driven by dysfunctional breathing and a dysregulated autonomic nervous system, not by low blood oxygen, which is why a pulse oximeter so often reads a reassuring 97 to 99 percent while you still feel starved for air. Rapid, shallow, upper-chest breathing blows off carbon dioxide, and low CO2 is itself a powerful trigger for the sensation. The pattern is often trainable: slow, low, nasal, diaphragmatic breathing raises CO2 back into range and calms the signal. Sudden, severe breathlessness, chest pain or a genuinely low oxygen reading is different and needs urgent medical care."
 categories:
   - postviral
