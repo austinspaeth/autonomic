@@ -8,8 +8,8 @@ keywords: "coat hanger pain, coat hanger headache, POTS neck pain, orthostatic i
 date: 2026-08-27
 updated: 2026-08-27
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1519643381401-22c77e60520e?q=80&w=1760&auto=format&fit=crop"
-photoAttribution: "Kinga Howard / Unsplash"
+photoLocation: "https://images.unsplash.com/photo-1643237131522-bbf79b062ca1?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb&dl=camila-seves-espasandin-N1b617BsQJs-unsplash.jpg"
+photoAttribution: "Camila Seves Espasandin / Unsplash"
 tldr: "Coat hanger pain is an aching, tight band across the base of the skull, the back of the neck, and the tops of the shoulders, shaped roughly like a coat hanger. It builds the longer you are upright and fades within minutes of lying down. The leading explanation is that the postural muscles holding your head up are not getting enough blood flow while you stand, the same underperfusion behind other orthostatic symptoms. It is a recognized sign of orthostatic intolerance and shows up in POTS and orthostatic hypotension. Because it tracks upright time and blood flow, it responds to the same measures that help the rest of orthostatic intolerance, and it is worth logging beside your stand test."
 categories:
   - pots
