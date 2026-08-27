@@ -1,0 +1,10 @@
+dist/
+bin/
+*.prg
+*.prg.debug.xml
+developer_key*
+companion-example/
+# store/ IS committed: the cover and icon are listing assets, not build output.
+
+# generated from mobile/app.json at build time
+resources/strings/version.xml

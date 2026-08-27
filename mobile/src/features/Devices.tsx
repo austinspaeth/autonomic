@@ -9,6 +9,7 @@ import { useToast } from '../components/Toast';
 import { radius, usePalette } from '../theme';
 import { ble } from '../lib/ble/manager';
 import { formatDiagnostics, sortDevices, type BleDevice } from '../lib/ble/devices';
+import { partitionStraps } from '../lib/watch/brands';
 import { NO_STRAPS_HINT } from './hrv/SourcePicker';
 import { PromptSheet } from './PromptSheet';
 import { getState, save, useAppState } from '../store/store';
@@ -105,6 +106,11 @@ export function DevicesScreen({ controls }: { controls?: SheetControls } = {}) {
     setBattery(null);
   };
 
+  // A watch advertising heart rate connects here like any strap and then
+  // produces a reading with no intervals to score, so it is never offered as
+  // one. Saying WHY beats a silent omission: the user can see it on the wrist.
+  const { straps, watches } = partitionStraps(found);
+
   return (
     <View>
       {/* Inset the header text so it clears the floating ✕ pill. */}
@@ -135,7 +141,7 @@ export function DevicesScreen({ controls }: { controls?: SheetControls } = {}) {
       {scanning || diagnosing ? <View style={{ alignItems: 'center', marginTop: 14 }}><ActivityIndicator color={p.accent} /></View> : null}
 
       <View style={{ marginTop: 16 }}>
-        {found.map((d) => (
+        {straps.map((d) => (
           <Pressable key={d.id} onPress={() => remember(d)} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderTopWidth: 1, borderTopColor: p.border }}>
             <Icon name="bluetooth" size={18} color={p.textDim} />
             <Text style={{ flex: 1, color: p.text }}>{d.name}</Text>
@@ -143,8 +149,13 @@ export function DevicesScreen({ controls }: { controls?: SheetControls } = {}) {
             {d.id === savedId ? <Icon name="check" size={16} color={p.accent} /> : null}
           </Pressable>
         ))}
-        {scanned && !scanning && !found.length ? (
+        {scanned && !scanning && !straps.length ? (
           <Text style={{ color: p.textDim, fontSize: 13, lineHeight: 19 }}>{blocked ?? NO_STRAPS_HINT}</Text>
+        ) : null}
+        {watches.length > 0 && !blocked ? (
+          <Text style={{ color: p.textDim, fontSize: 13, lineHeight: 19, marginTop: straps.length ? 12 : 0 }}>
+            A nearby watch was hidden from this list. Watches broadcast a heart rate but not the beat-to-beat timing a reading needs. Use Capture instead, and pick your watch there.
+          </Text>
         ) : null}
       </View>
       <View style={{ height: 24 }} />

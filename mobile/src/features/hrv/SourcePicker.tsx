@@ -1,25 +1,37 @@
 /**
  * "Measuring with" picker — the one place you choose where the heartbeat signal
  * comes from. Lists the available sources (Bluetooth strap, Apple Watch on iOS,
- * phone camera) and, in the same view, scans for nearby BLE heart-rate straps so
- * adding a device never means a detour into Settings. Tapping a nearby device
- * remembers it and selects Bluetooth in one go.
+ * other watch brands, phone camera) and, in the same view, scans for nearby BLE
+ * heart-rate straps so adding a device never means a detour into Settings.
+ * Tapping a nearby device remembers it and selects Bluetooth in one go.
+ *
+ * The list is GROUPED BY ACCURACY TIER, and that is the only ranking it draws.
+ * With five watch brands, a strap and the camera, an accuracy pill on every row
+ * meant seven pills competing with seven names; a section label says the same
+ * thing once and frees the row for the device and its state. The four
+ * non-Apple brands collapse behind a single "Other watches" row (see
+ * ./WatchBrands) because every one of them lands in the same tier as the Apple
+ * Watch — a wrist optical sensor — so listing them flat would spend the whole
+ * sheet on a distinction that does not exist.
  *
  * Opened from the HRV setup card's "Change" link; picking closes it and reports
  * back to that card.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, Text, View } from 'react-native';
-import type { SheetControls } from '../../components/Sheet';
+import { useSheets, type SheetControls } from '../../components/Sheet';
 import { useToast } from '../../components/Toast';
 import { Icon } from '../../components/Icon';
 import { radius, usePalette } from '../../theme';
 import { ble } from '../../lib/ble/manager';
 import { sortDevices, type BleDevice } from '../../lib/ble/devices';
+import { garminDevices, subscribeGarminDevices, type GarminDevice } from '../../lib/garmin/receiver';
 import { health } from '../../lib/health';
 import { getState, save, useStore } from '../../store/store';
+import { partitionStraps } from '../../lib/watch/brands';
+import { hasOtherWatches, otherWatchesSub, PickerRow, WatchBrandsSheet } from './WatchBrands';
 
-export type Source = 'polar' | 'watch' | 'camera';
+export type Source = 'polar' | 'watch' | 'garmin' | 'camera';
 
 const CLOSE_CLEARANCE = 58;
 const SCAN_MS = 12000;
@@ -35,10 +47,14 @@ export const NO_STRAPS_HINT =
   + '·  Its battery is flat.';
 
 /** One source's static copy. `sub` is resolved at render (the strap's line
- *  depends on whether a device is remembered). */
+ *  depends on whether a device is remembered). `badge` is the accuracy tier as
+ *  a PILL — this sheet says it once as a section heading instead, so the badge
+ *  now only serves the welcome wizard's one-row-per-sensor step, which has no
+ *  sections to hang it on. */
 export const SOURCE_META: Record<Source, { icon: 'bluetooth' | 'watch' | 'camera'; title: string; badge: string }> = {
   polar: { icon: 'bluetooth', title: 'Bluetooth strap', badge: 'Best accuracy' },
   watch: { icon: 'watch', title: 'Apple Watch', badge: 'High accuracy' },
+  garmin: { icon: 'watch', title: 'Garmin', badge: 'High accuracy' },
   camera: { icon: 'camera', title: 'Phone camera', badge: 'Lower accuracy' },
 };
 
@@ -46,6 +62,9 @@ export const SOURCE_META: Record<Source, { icon: 'bluetooth' | 'watch' | 'camera
 export function sourceSub(src: Source, savedName?: string): string {
   if (src === 'polar') return savedName ? `${savedName} · paired` : 'No device paired yet';
   if (src === 'watch') return 'Breathe or ECG on the watch, syncs in after';
+  // Named device rather than "Garmin" alone: someone who linked a watch months
+  // ago should see which one this row means.
+  if (src === 'garmin') return savedName ? `${savedName} · linked` : 'Run Autonomic on the watch, syncs in after';
   return 'Fingertip on the rear camera, no device needed';
 }
 
@@ -54,6 +73,7 @@ export function SourcePicker({ value, onPick, controls }: {
 }) {
   const p = usePalette();
   const toast = useToast();
+  const { openSheet } = useSheets();
   const savedName = useStore((s) => s.state.settings.lastBleDeviceName);
   const savedId = useStore((s) => s.state.settings.lastBleDeviceId);
   const [scanning, setScanning] = useState(false);
@@ -102,32 +122,77 @@ export function SourcePicker({ value, onPick, controls }: {
   };
 
   const showWatch = Platform.OS === 'ios' && health().available;
-  const sources: Source[] = showWatch ? ['polar', 'watch', 'camera'] : ['polar', 'camera'];
+  // A linked Garmin is a SOURCE (it delivers raw beat-to-beat straight to us);
+  // an unlinked one is only a setup task, and stays inside Other watches.
+  // Subscribed, not read once: the device list arrives from Garmin Connect
+  // through a URL callback well after this sheet first rendered, so a plain
+  // read leaves the row missing until the sheet is reopened.
+  const [garmin, setGarmin] = useState<GarminDevice[]>(garminDevices);
+  // Just mirror the list. Selecting on link is the setup card's job (it knows
+  // the user actually asked); doing it here too would let a device discovered
+  // at launch quietly change a source the user had already chosen.
+  useEffect(() => subscribeGarminDevices(setGarmin), []);
+  const linkedGarmin = garmin[0];
+  const showBrands = hasOtherWatches();
   // A remembered strap is already listed as the Bluetooth source; don't repeat
   // it in the nearby list.
-  const nearby = found.filter((d) => d.id !== savedId);
+  // A watch broadcasting its heart rate advertises exactly like a strap, but
+  // sends no beat-to-beat intervals — pairing one here yields a reading that
+  // cannot be scored. They are pulled out and pointed at the proper route.
+  const { straps, watches } = partitionStraps(found);
+  const nearby = straps.filter((d) => d.id !== savedId);
+  const watchesSeen = watches.length > 0;
 
   return (
     <View>
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 6, paddingRight: CLOSE_CLEARANCE }}>Measuring with</Text>
       <Text style={{ color: p.textDim, fontSize: 14, lineHeight: 20, marginBottom: 18, paddingRight: CLOSE_CLEARANCE }}>
-        Where the heartbeat signal comes from. A Bluetooth chest strap is the most accurate.
+        {/* The tier headings below already rank these, so the old
+            "a chest strap is the most accurate" tail would say it twice. */}
+        Where the heartbeat signal comes from.
       </Text>
 
-      <View style={{ gap: 8 }}>
-        {sources.map((s) => (
-          <SourceRow
-            key={s}
-            source={s}
-            sub={sourceSub(s, savedName)}
-            active={value === s}
-            onPress={() => choose(s)}
-          />
-        ))}
-      </View>
+
+      <TierLabel text="Best accuracy" />
+      <SourceRow source="polar" sub={sourceSub('polar', savedName)} active={value === 'polar'} onPress={() => choose('polar')} />
+
+      {showWatch || linkedGarmin || showBrands ? (
+        <>
+          <TierLabel text="High accuracy" top />
+          <View style={{ gap: 8 }}>
+            {showWatch ? (
+              <SourceRow source="watch" sub={sourceSub('watch', savedName)} active={value === 'watch'} onPress={() => choose('watch')} />
+            ) : null}
+            {linkedGarmin ? (
+              <SourceRow source="garmin" sub={sourceSub('garmin', linkedGarmin.name)} active={value === 'garmin'} onPress={() => choose('garmin')} />
+            ) : null}
+            {/* Not a source — a card. Picking a brand is a setup task, so the
+                row opens the brand list stacked on top of this sheet rather
+                than selecting anything. */}
+            {showBrands ? (
+              <PickerRow
+                icon="watch"
+                title="Other watches"
+                sub={otherWatchesSub()}
+                onPress={() => openSheet((c) => (
+                  <WatchBrandsSheet
+                    controls={c}
+                    onLinked={() => { onPick('garmin'); }}
+                  />
+                ))}
+              >
+                <Icon name="chevronRight" size={16} color={p.textDim} />
+              </PickerRow>
+            ) : null}
+          </View>
+        </>
+      ) : null}
+
+      <TierLabel text="Lower accuracy" top />
+      <SourceRow source="camera" sub={sourceSub('camera', savedName)} active={value === 'camera'} onPress={() => choose('camera')} />
 
       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 24, marginBottom: 10 }}>
-        <Text style={{ flex: 1, fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.6, color: p.textDim, fontWeight: '700' }}>Nearby devices</Text>
+        <Text style={{ flex: 1, fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.6, color: p.textDim, fontWeight: '700' }}>Nearby straps</Text>
         {scanning ? (
           <ActivityIndicator size="small" color={p.accent} />
         ) : (
@@ -165,8 +230,25 @@ export function SourcePicker({ value, onPick, controls }: {
                 : blocked ?? NO_STRAPS_HINT}
         </Text>
       )}
+
+      {watchesSeen ? (
+        <Text style={{ color: p.textDim, fontSize: 13, lineHeight: 19, marginTop: 10 }}>
+          A watch is broadcasting its heart rate nearby. Set it up under Other
+          watches instead. Broadcast mode sends a pulse rate only, without the
+          beat-to-beat detail an HRV reading needs.
+        </Text>
+      ) : null}
       <View style={{ height: 16 }} />
     </View>
+  );
+}
+
+/** One accuracy tier's heading. Same treatment as the "Nearby straps" label
+ *  below it — this sheet has one kind of section label, not two. */
+function TierLabel({ text, top }: { text: string; top?: boolean }) {
+  const p = usePalette();
+  return (
+    <Text style={{ fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.6, color: p.textDim, fontWeight: '700', marginTop: top ? 20 : 0, marginBottom: 10 }}>{text}</Text>
   );
 }
 
@@ -178,16 +260,10 @@ function SourceRow({ source, sub, active, onPress }: {
   return (
     <Pressable onPress={onPress} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: radius.control, borderWidth: 1, borderColor: active ? p.accent : p.border, backgroundColor: active ? p.accentSoft : p.surface2 }}>
       <Icon name={meta.icon} size={22} color={active ? p.accent : p.textDim} />
-      <View style={{ flex: 1 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Text style={{ color: active ? p.accent : p.text, fontWeight: '700' }}>{meta.title}</Text>
-          {/* Unselected rows wear a slightly lighter grey pill border so the
-              accuracy tag stays legible without competing with the selection. */}
-          <View style={{ paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999, borderWidth: 1, borderColor: active ? p.accent : '#47474e' }}>
-            <Text style={{ color: active ? p.accent : p.textDim, fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 }}>{meta.badge}</Text>
-          </View>
-        </View>
-        <Text style={{ color: p.textDim, fontSize: 12, lineHeight: 17, marginTop: 5 }}>{sub}</Text>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        {/* No accuracy pill: the tier heading above the row already said it. */}
+        <Text style={{ color: active ? p.accent : p.text, fontWeight: '700' }}>{meta.title}</Text>
+        <Text style={{ color: p.textDim, fontSize: 12, lineHeight: 17, marginTop: 4 }}>{sub}</Text>
       </View>
       {active ? <Icon name="check" size={18} color={p.accent} /> : null}
     </Pressable>

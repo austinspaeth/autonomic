@@ -40,7 +40,7 @@ import {
 export interface SessionConfig {
   kind: 'breath' | 'unstructured';
   style?: string; // e.g. "4/6"
-  source: 'polar' | 'watch' | 'camera';
+  source: 'polar' | 'watch' | 'garmin' | 'camera';
   period?: 'Morning' | 'Evening' | 'Other';
 }
 
@@ -59,6 +59,17 @@ export interface SessionResult {
  * dedicated app), still realistic to hold a fingertip still.
  */
 export const durationFor = (config: SessionConfig) => (config.source === 'camera' ? 180 : 300);
+
+/**
+ * Does this source feed live beats to the phone DURING the reading?
+ *
+ * A wrist source does not: the Apple Watch shares nothing in real time, and
+ * Garmin sends its whole series in one message at the end. Anything that shows
+ * a running heart rate or SDNN has to check this first, or it renders dashes
+ * for five minutes and reads as broken rather than as "not applicable".
+ */
+export const streamsLive = (source: SessionConfig['source']) =>
+  source !== 'watch' && source !== 'garmin';
 
 /**
  * How much of each live series the views get. The traces are redrawn on every
@@ -352,7 +363,11 @@ export function beginCollection() {
   startedAtMs = Date.now();
   // watch: the ECG is recorded on the wrist; camera + BLE: already streaming
   // since the card opened (their samples start being collected now).
-  const connected = snap.config?.source === 'watch' || snap.config?.source === 'camera' ? true : snap.connected;
+  // Watch, Garmin and camera are all "connected" by definition: none of them is
+  // a BLE peripheral this session dials into, so waiting on a connection would
+  // hang a session that is working perfectly.
+  const src = snap.config?.source;
+  const connected = (src === 'watch' || src === 'garmin' || src === 'camera') ? true : snap.connected;
   bump({ status: 'running', connected, elapsed: 0, startedAtMs });
   if (timer) clearInterval(timer);
   timer = setInterval(syncElapsed, 1000);

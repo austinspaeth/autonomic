@@ -15,7 +15,7 @@ describe('ranking', () => {
     // purpose, so it outranks everything; watch sync and health imports are
     // time-sensitive; what's new waits indefinitely; the Insights button is
     // permanent furniture on its own tab.
-    expect([...PILL_RANK]).toEqual(['hrv', 'watchSync', 'health', 'whatsNew', 'ai']);
+    expect([...PILL_RANK]).toEqual(['hrv', 'watchSync', 'garminSync', 'health', 'whatsNew', 'ai']);
   });
 
   it('is depth 0 for everything while nothing is claimed', () => {

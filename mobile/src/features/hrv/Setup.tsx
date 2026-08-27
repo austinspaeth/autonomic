@@ -9,7 +9,7 @@
  * that flatten RSA and broke day-to-day comparability, which is the whole point
  * of a daily measure. Legacy readings keep whatever style they were saved with.
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Platform, Pressable, Text, View } from 'react-native';
 import Animated, { Easing, interpolateColor, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { SheetControls, useSheets } from '../../components/Sheet';
@@ -24,8 +24,11 @@ import { defaultPeriod } from '../../lib/period';
 import { ppg } from '../../lib/ppg/camera';
 import { BREATH_STYLE, HrvSession, type SessionConfig } from './Session';
 import { CameraSetup } from './CameraSetup';
+import { GarminPrep } from './GarminPrep';
 import { WatchPrep } from './WatchPrep';
 import { HealthRrImportSheet } from './HealthImport';
+import { garminDevices, subscribeGarminDevices } from '../../lib/garmin/receiver';
+import { hasOtherWatches } from './WatchBrands';
 import { SOURCE_META, SourcePicker, sourceSub, type Source } from './SourcePicker';
 
 /** The sheet opener, as `useSheets()` hands it out. */
@@ -78,6 +81,13 @@ export function openCapture(config: SessionConfig, openSheet: OpenSheet): void {
     openSheet((c) => <WatchPrep config={config} controls={c} />);
     return;
   }
+  // Garmin never streams to the phone — the whole series arrives in one message
+  // at the end — so there is no live session card to open. A prep card that
+  // explains what to do on the wrist, and then waits, is the honest UI.
+  if (config.source === 'garmin') {
+    openSheet((c) => <GarminPrep config={config} controls={c} />);
+    return;
+  }
   // Camera readings get a setup card first (choose the module shape, mark the
   // flash, wait for the finger) — it opens the session card itself once the
   // pulse locks. `grow` lets that card center the module stage vertically and
@@ -95,8 +105,12 @@ export function openCapture(config: SessionConfig, openSheet: OpenSheet): void {
  *  while unpaired — Start would just bounce off the pairing sheet. */
 export function defaultSource(): Source {
   const s = getState().settings;
-  if (s.lastBleDeviceId) return 'polar';
   const last = s.lastHrvSource;
+  // Garmin outranks a remembered strap: linking a watch is a deliberate act
+  // and it is the thing the user just set up. Guarded on a device actually
+  // being linked, so an old preference cannot select a source that is not there.
+  if (last === 'garmin' && garminDevices().length) return 'garmin';
+  if (s.lastBleDeviceId) return 'polar';
   if (last === 'watch' && Platform.OS === 'ios' && health().available) return 'watch';
   if (last === 'camera' && ppg().available) return 'camera';
   return ppg().available ? 'camera' : 'polar';
@@ -117,6 +131,8 @@ export function HrvSetup({ controls }: { controls: SheetControls }) {
   // Reactive so the summary row updates the moment a strap is saved from the
   // source picker stacked on top of this one.
   const savedName = useStore((s) => s.state.settings.lastBleDeviceName);
+  const [garminLinked, setGarminLinked] = useState(garminDevices().length > 0);
+  useEffect(() => subscribeGarminDevices((l) => setGarminLinked(l.length > 0)), []);
 
   const changeSource = () => openSheet((c) => <SourcePicker value={source} onPick={setSource} controls={c} />);
 
@@ -150,6 +166,30 @@ export function HrvSetup({ controls }: { controls: SheetControls }) {
       </View>
 
       <Text style={{ fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.6, color: p.textDim, fontWeight: '700', marginTop: 22, marginBottom: 10 }}>Measuring with</Text>
+
+      {/* Announcement, not a source. One slim line above the bubble so it
+          cannot compete with it, and it retires itself once a Garmin is linked:
+          at that point it is no longer news and the thing it points at has
+          already been used. */}
+      {hasOtherWatches() && !garminLinked ? (
+        <Pressable
+          onPress={changeSource}
+          style={{
+            flexDirection: 'row', alignItems: 'center', gap: 9,
+            paddingVertical: 9, paddingHorizontal: 12, marginBottom: 8,
+            borderRadius: radius.control, backgroundColor: p.sunk,
+          }}
+        >
+          <View style={{ paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, backgroundColor: p.accentSoft }}>
+            <Text style={{ color: p.accent, fontSize: 10.5, fontWeight: '800', letterSpacing: 0.3 }}>NEW</Text>
+          </View>
+          <Text style={{ flex: 1, color: p.text, fontSize: 13, fontWeight: '600' }}>
+            Garmin watches are now supported
+          </Text>
+          <Icon name="chevronRight" size={15} color={p.textDim} />
+        </Pressable>
+      ) : null}
+
       <Pressable
         onPress={changeSource}
         style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: radius.control, borderWidth: 1, borderColor: p.border, backgroundColor: p.surface2 }}

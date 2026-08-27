@@ -12,6 +12,7 @@ import { SheetProvider } from '../src/components/Sheet';
 import { ToastProvider } from '../src/components/Toast';
 import { OnboardingGate } from '../src/features/Onboarding';
 import { WatchArrivalCards } from '../src/features/WatchArrivals';
+import { GarminSyncPill } from '../src/features/hrv/GarminSyncPill';
 import { WatchSyncPill } from '../src/features/hrv/WatchSyncPill';
 import { HrvSessionHost } from '../src/features/hrv/SessionHost';
 import { HealthUpdatePill } from '../src/features/HealthUpdates';
@@ -21,6 +22,8 @@ import { ReviewPrompt } from '../src/features/ReviewPrompt';
 import { initIap } from '../src/store/iap';
 import { initTier } from '../src/store/tier';
 import { initPing } from '../src/store/ping';
+import { initGarminReceiver } from '../src/lib/garmin/receiver';
+import { repairWatchPairedAsStrap } from '../src/lib/watch/repair';
 import { initWatchReceiver } from '../src/lib/watch/receiver';
 import { runDailyBackup } from '../src/lib/backup';
 import { initCrashWatcher, syncReminder } from '../src/lib/reminders';
@@ -70,6 +73,15 @@ export default function RootLayout() {
     // Watch companion (iOS only): drain queued stand-test results + relay
     // entitlement. Safe elsewhere (the bridge no-ops), but don't even try.
     if (Platform.OS === 'ios') initWatchReceiver();
+    // A watch paired as a strap can never produce an HRV reading (broadcast
+    // mode carries no beat-to-beat data), so forget it rather than let the
+    // source sit there looking configured.
+    repairWatchPairedAsStrap();
+    // Garmin companion: re-attach to a paired watch so readings it queued while
+    // the phone was away can drain. Connect IQ's transmit fails outright when
+    // the phone is unreachable, so the watch holds readings until acked — this
+    // is where that backlog is collected. The module self-guards off-platform.
+    initGarminReceiver();
     // First-launch-of-the-day JSON snapshot (rotating, kept in Documents/backups).
     // Deferred: serializing a year of waveforms is a single long synchronous
     // stringify, and running it while the first screen is still mounting shows
@@ -122,8 +134,14 @@ export default function RootLayout() {
               <HrvSessionHost />
               {/* Watch companion overlays (iOS only): results card on arrival +
                   "Waiting for watch…" pill while the sync card is minimized. */}
-              {Platform.OS === 'ios' ? <WatchArrivalCards /> : null}
+              {/* NOT iOS-gated: the Apple Watch is iOS-only, but Garmin
+                  delivers readings on both platforms, and a reading that lands
+                  with nothing listening drops the user on the Journal with no
+                  sign their reading arrived. */}
+              <WatchArrivalCards />
               {Platform.OS === 'ios' ? <WatchSyncPill /> : null}
+              {/* Garmin ships on both platforms, so this one is not iOS-gated. */}
+              <GarminSyncPill />
               {/* Hourly "anything new in the health store?" pill (both
                   platforms — it no-ops until Health is connected). */}
               <HealthUpdatePill />

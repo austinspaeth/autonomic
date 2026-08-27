@@ -30,7 +30,7 @@
  *   because a breathing guide that jumps position mid-reading is the same
  *   problem as one that jumps phase.
  */
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Pressable, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
@@ -41,6 +41,7 @@ import { fonts, usePalette, GRADE_COLORS } from '../../theme';
 import { BreathingViz } from './BreathingViz';
 import { BREATH_STYLE, styleTitle } from '../../lib/breathStyle';
 import { LiveStats } from './LiveStats';
+import { GarminIcon } from './GarminIcon';
 import { MindfulnessIcon } from './MindfulnessIcon';
 import {
   beginCollection, canMinimize, endSession, finishSession, minimizeSession,
@@ -99,9 +100,26 @@ function SessionCard({ controls }: { controls: SheetControls }) {
   // way" — it should land on the journal with the pill, nothing else.
   useEffect(() => { if (s.minimized) controls.closeAll(); }, [s.minimized, controls]);
 
+
+  // A session ended from OUTSIDE this card takes the card with it. That happens
+  // when a Garmin reading arrives before the phone's countdown runs out: the
+  // result is already in hand, so a countdown for it is stale, and leaving it on
+  // the stack means the user finds it again underneath the summary they just
+  // dismissed.
+  //
+  // Reads status off the snapshot rather than the destructure below, because
+  // this must run before the `!s.config` early return — a hook after a
+  // conditional return breaks the rules of hooks.
+  const everStarted = useRef(false);
+  useEffect(() => {
+    if (s.status === 'running' || s.status === 'finished') { everStarted.current = true; }
+    else if (s.status === 'idle' && everStarted.current) { controls.close(); }
+  }, [s.status, controls]);
+
   if (!s.config) return null;
   const { config, hidden, status } = s;
   const started = status === 'running' || status === 'finished';
+
   const finished = status === 'finished';
   const frac = started ? s.elapsed / s.durationSec : 0;
   const remain = s.durationSec - s.elapsed;
@@ -160,7 +178,8 @@ function SessionCard({ controls }: { controls: SheetControls }) {
 
       {hidden ? null : (
         <View style={{ width: '100%', marginTop: 14 }}>
-          {config.source === 'watch' ? <WatchNote /> : (
+          {config.source === 'watch' ? <WatchNote />
+            : config.source === 'garmin' ? <GarminNote /> : (
             <LiveStats
               hr={s.hr} sdnn={s.sdnn} beats={s.beats} artifact={s.artifact}
               hrTrace={s.hrTrace} sdnnTrace={s.sdnnTrace} rrTrace={s.rrTrace}
@@ -258,6 +277,18 @@ function Header({ config, hidden, width, hint, onMinimize, onHide }: {
  * says exactly that instead of showing empty tiles — and says it beside the
  * Mindfulness mark, since that is the app the wearer is looking at.
  */
+function GarminNote() {
+  const p = usePalette();
+  return (
+    <View style={{ backgroundColor: p.sunk, borderRadius: 20, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 13 }}>
+      <GarminIcon size={46} />
+      <Text style={{ flex: 1, color: p.textDim, fontSize: 13.5, lineHeight: 20 }}>
+        Garmin does not share data in real time. Your reading syncs in when it finishes.
+      </Text>
+    </View>
+  );
+}
+
 function WatchNote() {
   const p = usePalette();
   return (

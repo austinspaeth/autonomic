@@ -2,7 +2,7 @@
   "expo": {
     "name": "Autonomic",
     "slug": "autonomic",
-    "version": "1.25.2",
+    "version": "1.26.0",
     "scheme": "autonomic",
     "orientation": "portrait",
     "icon": "./assets/autonomic-icon.png",
@@ -231,6 +231,7 @@
         }
       ],
       "./plugins/withWatchBuildVersion",
+      "./plugins/withGarminLink",
       "expo-iap"
     ],
     "experiments": {

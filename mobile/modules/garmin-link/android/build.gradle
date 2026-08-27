@@ -1,0 +1,38 @@
+apply plugin: 'com.android.library'
+apply plugin: 'kotlin-android'
+
+group = 'care.autonomic.garminlink'
+version = '1.0.0'
+
+android {
+  namespace 'care.autonomic.garminlink'
+  compileSdkVersion safeExtGet('compileSdkVersion', 35)
+
+  defaultConfig {
+    minSdkVersion safeExtGet('minSdkVersion', 24)
+    targetSdkVersion safeExtGet('targetSdkVersion', 35)
+  }
+
+  compileOptions {
+    sourceCompatibility JavaVersion.VERSION_17
+    targetCompatibility JavaVersion.VERSION_17
+  }
+  kotlinOptions { jvmTarget = '17' }
+}
+
+def safeExtGet(prop, fallback) {
+  rootProject.ext.has(prop) ? rootProject.ext.get(prop) : fallback
+}
+
+repositories {
+  mavenCentral()
+}
+
+dependencies {
+  implementation project(':expo-modules-core')
+  implementation "org.jetbrains.kotlin:kotlin-stdlib:${safeExtGet('kotlinVersion', '2.2.0')}"
+  // Garmin's Connect IQ companion SDK. Unlike iOS this is the LIVE transport
+  // path: it talks to the Garmin Connect app over a bound service, so Garmin
+  // Connect must be installed and running for a reading to arrive.
+  implementation 'com.garmin.connectiq:ciq-companion-app-sdk:2.4.0'
+}

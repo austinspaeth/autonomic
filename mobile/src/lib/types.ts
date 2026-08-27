@@ -51,8 +51,12 @@ export interface Entry {
  *  strips them on load, and persisting one trips a dev warning. */
 export interface LiveHrvExtras {
   /** Capture source ('polar' = Bluetooth strap, best; 'camera' = phone PPG,
-   *  lowest quality; 'health' = imported via Health Connect on Android). */
-  source?: 'polar' | 'watch' | 'camera' | 'manual' | 'health';
+   *  lowest quality; 'garmin' = raw beat-to-beat delivered by the Connect IQ
+   *  watch app; 'health' = imported via Health Connect on Android).
+   *  'garmin' is deliberately distinct from 'health': a Garmin reading that
+   *  arrived through the health store carries no RR and is an import, whereas
+   *  this one carries the real series and is a capture. */
+  source?: 'polar' | 'watch' | 'garmin' | 'camera' | 'manual' | 'health';
   /** True when the entry was auto-imported from the platform health store
    *  (welcome backfill / Health sync) rather than captured in-app — drives the
    *  "Apple Watch HRV" / "Imported HRV" label. */
@@ -146,7 +150,7 @@ export interface AppState {
     healthEnabled?: boolean;
     /** Signal source of the last live HRV capture — seeds the setup sheet's
      *  default so a deliberate choice (camera / watch) sticks across sessions. */
-    lastHrvSource?: 'polar' | 'watch' | 'camera';
+    lastHrvSource?: 'polar' | 'watch' | 'garmin' | 'camera';
     /** Remembered camera-module layout from the finger (PPG) setup card —
      *  once set, camera readings skip straight to the wait-for-finger step.
      *  "Start over" on that card clears it. */
