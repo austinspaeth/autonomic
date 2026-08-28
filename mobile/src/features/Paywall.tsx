@@ -16,6 +16,7 @@ import { SheetControls, SheetFooter, useSheets } from '../components/Sheet';
 import { Button } from '../components/ui';
 import { radius, usePalette } from '../theme';
 import { notePaywallSeen } from '../lib/review';
+import { pingPaywall } from '../store/ping';
 import {
   useIap, subscribe, restore, refreshEntitlement, ensureIapReady, clearIapError,
   YEARLY_SKU, MONTHLY_SKU, priceOf, hasTrial, trialDaysOf,
@@ -97,12 +98,36 @@ function PlanCard({ name, price, period, note, badge, selected, onPress }: {
   );
 }
 
-/** Raise the paywall card from any locked surface. */
-export function usePaywall(): () => void {
+/**
+ * Which locked surface is raising the card. Required, not optional: this is the
+ * only place the app can name a wall, so a lock that shipped without a name
+ * would be counted as a paywall from nowhere. Adding a locked surface is
+ * therefore a compile error until it says where it is — see `surfaceCode` in
+ * lib/ping, which maps these onto the letter the ping carries.
+ */
+export type PaywallSource =
+  | 'progress'      // a locked Progress range: Week / Month / Year / custom
+  | 'insights'      // the Insights tab's locked overlay
+  | 'pots'          // a live POTS capture
+  | 'outlook-ai'    // the Outlook's AI report
+  | 'metric-ai'     // a metric card's AI report
+  | 'insights-ai'   // the Insights AI report
+  | 'settings';     // the Upgrade button in Settings — the one that isn't a wall
+
+/**
+ * Raise the paywall card from any locked surface.
+ *
+ * The ping fires here rather than inside `PaywallCard` so that it counts the
+ * REQUEST, not the render: the card is one sheet in a stack and a failed open
+ * is still a user who met a wall. It is capped at one per Eastern day inside
+ * `pingPaywall`, so this stays a plain call with no bookkeeping of its own.
+ */
+export function usePaywall(source: PaywallSource): () => void {
   const { openSheet } = useSheets();
   return React.useCallback(() => {
+    pingPaywall(source);
     openSheet((c) => <PaywallCard controls={c} />);
-  }, [openSheet]);
+  }, [openSheet, source]);
 }
 
 export function PaywallCard({ controls }: { controls: SheetControls }) {

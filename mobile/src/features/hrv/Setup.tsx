@@ -16,7 +16,7 @@ import { SheetControls, useSheets } from '../../components/Sheet';
 import { Button } from '../../components/ui';
 import { Icon, type IconName } from '../../components/Icon';
 import { useToast } from '../../components/Toast';
-import { radius, usePalette } from '../../theme';
+import { GRADE_COLORS, radius, usePalette } from '../../theme';
 import { getState, save, useStore } from '../../store/store';
 import { todayKey } from '../../lib/dates';
 import { health } from '../../lib/health';
@@ -37,6 +37,12 @@ type OpenSheet = ReturnType<typeof useSheets>['openSheet'];
 // The sheet's ✕ pill floats top-right; inset the title + subtitle so neither
 // runs underneath it (was clipped on narrower screens).
 const CLOSE_CLEARANCE = 58;
+
+/** The "now supported" tab above the source bubble. Violet is the palette's
+ *  "noticed" colour (the tab bar's unseen dot wears it); the red accent is
+ *  reserved for things that are tapped, and this notice isn't one. */
+const NOTICE = GRADE_COLORS.warning;
+const NOTICE_SOFT = 'rgba(167,139,250,0.16)';
 
 export type Kind = 'unstructured' | 'breath';
 
@@ -167,27 +173,43 @@ export function HrvSetup({ controls }: { controls: SheetControls }) {
 
       <Text style={{ fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.6, color: p.textDim, fontWeight: '700', marginTop: 22, marginBottom: 10 }}>Measuring with</Text>
 
-      {/* Announcement, not a source. One slim line above the bubble so it
-          cannot compete with it, and it retires itself once a Garmin is linked:
-          at that point it is no longer news and the thing it points at has
-          already been used. */}
+      {/* Announcement, not a source, and not a CONTROL either: it says one thing
+          and there is nothing behind it, so it is a plain View. It rides the top
+          edge of the source bubble like the tab on a folder — narrower than the
+          card, rounded on top only, flush at the bottom — which is what makes it
+          read as a label ON that card rather than as a second row above it. It
+          retires itself once a Garmin is linked: at that point it is no longer
+          news and the thing it points at has already been used.
+
+          Violet, not the red accent: the accent is what the user TAPS, and a
+          notice wearing it invites a tap that does nothing. */}
       {hasOtherWatches() && !garminLinked ? (
-        <Pressable
-          onPress={changeSource}
+        <View
           style={{
-            flexDirection: 'row', alignItems: 'center', gap: 9,
-            paddingVertical: 9, paddingHorizontal: 12, marginBottom: 8,
-            borderRadius: radius.control, backgroundColor: p.sunk,
+            // Inset a hair on both sides: the tab is the same shape as the card
+            // it sits on, just narrower, which is what reads as "attached to"
+            // rather than "another row".
+            marginHorizontal: 10,
+            // Fixed height with centred contents rather than padding either
+            // side of the text: the NEW chip and the sentence have different
+            // line boxes, and only a real height centres both.
+            height: 36,
+            flexDirection: 'row', alignItems: 'center', gap: 8,
+            paddingHorizontal: 11,
+            borderTopLeftRadius: radius.control, borderTopRightRadius: radius.control,
+            backgroundColor: p.sunk,
+            // Flush: the bubble below starts where this ends, and the 1pt overlap
+            // hides the seam its border would otherwise draw across the join.
+            marginBottom: -1,
           }}
         >
-          <View style={{ paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, backgroundColor: p.accentSoft }}>
-            <Text style={{ color: p.accent, fontSize: 10.5, fontWeight: '800', letterSpacing: 0.3 }}>NEW</Text>
+          <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, backgroundColor: NOTICE_SOFT }}>
+            <Text style={{ color: NOTICE, fontSize: 10, fontWeight: '800', letterSpacing: 0.3 }}>NEW</Text>
           </View>
-          <Text style={{ flex: 1, color: p.text, fontSize: 13, fontWeight: '600' }}>
+          <Text numberOfLines={1} style={{ color: p.text, fontSize: 12.5, fontWeight: '600', flexShrink: 1 }}>
             Garmin watches are now supported
           </Text>
-          <Icon name="chevronRight" size={15} color={p.textDim} />
-        </Pressable>
+        </View>
       ) : null}
 
       <Pressable

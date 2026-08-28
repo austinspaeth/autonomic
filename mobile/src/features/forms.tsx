@@ -8,7 +8,7 @@ import { ActivityIndicator, Platform, Pressable, ScrollView, Text, TextInput, Vi
 import * as ExpoLinking from 'expo-linking';
 import { SheetControls, SheetFooter, useSheets } from '../components/Sheet';
 import { FieldInputs, TextField, TimeField, useFormState } from '../components/Field';
-import { Button, DaySaveButton, Muted } from '../components/ui';
+import { Button, ConfirmDeleteSheet, DaySaveButton, Muted } from '../components/ui';
 import { Icon } from '../components/Icon';
 import { ReadingSummary, WorkoutSummary, workoutCurveFor } from '../components/summary';
 import { radius, usePalette } from '../theme';
@@ -472,12 +472,37 @@ export function openWorkoutReport(openSheet: OpenSheet, r: Entry, dk: string, ju
     if (ACTIVITY_TYPES[r.type]?.custom === 'bike') openSheet((c) => <BikeForm dk={dk} existing={r} controls={c} onSaved={noop} />);
     else openSheet((c) => <EntryForm typeMap={typesFor(getState(), 'activities')} arrKey="activities" dk={dk} type={r.type} existing={r} controls={c} onSaved={noop} />);
   };
-  openSheet(() => <WorkoutSummarySheet r={r} dk={dk} justImported={justImported} onEdit={openEdit} />, { action: { icon: 'edit', onPress: openEdit } });
+  openSheet(() => <WorkoutSummarySheet r={r} dk={dk} justImported={justImported} onEdit={openEdit} />, {
+    action: { icon: 'edit', onPress: openEdit },
+    destructive: { onPress: () => confirmDelete(openSheet, dk, 'activities', r, ACTIVITY_TYPES[r.type]?.label || 'workout') },
+  });
+}
+
+/**
+ * The one delete path for an entry opened as a CARD (a reading summary, a
+ * workout report) — the cards whose own header pill carries the trash button.
+ * A form has its own Delete in the footer and doesn't come through here.
+ *
+ * Asks first, in a small `fitContent` card, then deletes and closes the whole
+ * stack: the card underneath is a view OF that entry, so leaving it up would
+ * show the user something that no longer exists (and `deleteEntry` also records
+ * the row in the health-import declined list, so it must not be re-offered
+ * either).
+ */
+export function confirmDelete(openSheet: OpenSheet, dk: string, arrKey: 'readings' | 'activities', r: Entry, label: string): void {
+  openSheet((c) => (
+    <ConfirmDeleteSheet
+      title={`Delete this ${label.toLowerCase()}?`}
+      message="It will be removed from your journal. This can't be undone."
+      onConfirm={() => { deleteEntry(dk, arrKey, r.id); c.closeAll(); }}
+      controls={c}
+    />
+  ), { fitContent: true });
 }
 
 export function useEntryForms(dk: string) {
   const { openSheet } = useSheets();
-  const openPaywall = usePaywall();
+  const openPaywall = usePaywall('pots');
   const refresh = () => { /* store change triggers re-render */ };
 
   // Freemium: live HRV capture is unlimited on every tier; live POTS captures
@@ -569,7 +594,10 @@ export function useEntryForms(dk: string) {
   const openReadingSummary = (r: Entry) =>
     openSheet(
       () => <ReadingSummarySheet r={r} dk={dk} />,
-      { action: { icon: 'edit', onPress: () => openReadingForm(r.type, r) } },
+      {
+        action: { icon: 'edit', onPress: () => openReadingForm(r.type, r) },
+        destructive: { onPress: () => confirmDelete(openSheet, dk, 'readings', r, READING_TYPES[r.type]?.label || 'reading') },
+      },
     );
 
   // The workout report (HR-over-time with zones + stats), for activities that

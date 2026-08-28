@@ -34,7 +34,17 @@ phases:
     commands:
       # Deploy landing site to S3 (includes /master, the analytics dashboard,
       # prerendered from landing/master/ by the build above)
-      - aws s3 sync landing/build/ s3://$S3_BUCKET --delete
+      #
+      # `download/` is fenced off. Campaign download pages (/download/facebook
+      # and friends) are written into that prefix by the master dashboard's API
+      # at the moment a campaign is saved, so they exist in the bucket and never
+      # in the build output — and an unqualified `--delete` would take every one
+      # of them out on the next push to main. The exclude protects them; the
+      # re-include hands back the three files the build genuinely owns
+      # (index.html and its .br/.gz twins), which are /download itself.
+      # See sls/lambdas/api/links.js; move one of these two things and you
+      # must move the other.
+      - aws s3 sync landing/build/ s3://$S3_BUCKET --delete --exclude "download/*" --include "download/index.html*"
       # Invalidate CloudFront cache
       - aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_DISTRIBUTION_ID --paths "/*"
       # Deploy the master dashboard's API + DynamoDB table

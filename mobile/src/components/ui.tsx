@@ -568,3 +568,33 @@ export function useAccordion(open: boolean, startOpen = false, chevron: { from?:
  *  animated container it sits inside (see useAccordion). Full-width, natural
  *  height, top-anchored — the reveal clips it from the bottom. */
 const MEASURE_STYLE = { position: 'absolute' as const, left: 0, right: 0, top: 0 };
+
+/* ---------- Destructive confirmation ---------- */
+/**
+ * The small card modal every delete goes through: one question, one way out,
+ * one way through. Open it with `fitContent` so it sits as a card rather than a
+ * full sheet — it asks a single question and a half-height sheet would read as
+ * a screen.
+ *
+ * `onConfirm` runs after this card closes itself, so the caller decides what
+ * happens to the stack beneath (an entry card whose entry is now gone must go
+ * with it — see `confirmDelete` in features/forms.tsx).
+ */
+export function ConfirmDeleteSheet({ title, message, confirmTitle = 'Delete', onConfirm, controls }: {
+  title: string; message?: string; confirmTitle?: string; onConfirm: () => void;
+  controls: { close: () => void };
+}) {
+  const p = usePalette();
+  return (
+    <View>
+      <Text style={{ fontSize: 20, fontWeight: '700', color: p.text, marginBottom: message ? 8 : 20 }}>{title}</Text>
+      {message ? (
+        <Text style={{ fontSize: 14, color: p.textDim, lineHeight: 20, marginBottom: 20 }}>{message}</Text>
+      ) : null}
+      <View style={{ flexDirection: 'row', gap: 12 }}>
+        <Button title="Cancel" onPress={() => controls.close()} />
+        <Button title={confirmTitle} variant="danger" onPress={() => { controls.close(); onConfirm(); }} />
+      </View>
+    </View>
+  );
+}

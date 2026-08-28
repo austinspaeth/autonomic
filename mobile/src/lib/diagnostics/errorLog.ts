@@ -52,6 +52,14 @@ export function logError(tag: string, err: unknown, opts?: { fatal?: boolean }):
       ...(opts?.fatal ? { fatal: true } : null),
     }, MAX_ERRORS);
     try { store()?.set(KEY, JSON.stringify(mem)); } catch { /* in-memory only this session */ }
+    // Say once, ever, that something on this install failed — no tag, no
+    // message, no count (see pingErrorSeen). Required lazily rather than
+    // imported: the ping store reaches the IAP and tier stores, both of which
+    // log errors, and a static import would close that circle at module-init
+    // time. It can never route back here — pings do not log failures, precisely
+    // so that a phone with no signal cannot flush this window.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    try { require('../../store/ping').pingErrorSeen(); } catch { /* not wired up yet */ }
   } catch { /* logging must never throw */ }
 }
 

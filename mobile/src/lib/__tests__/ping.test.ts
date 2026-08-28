@@ -6,6 +6,10 @@ import {
   platformCode,
   resolveCohort,
   shouldPingOpen,
+  notifyCode,
+  surfaceCode,
+  tierCode,
+  versionCode,
 } from '../ping';
 
 const at = (iso: string) => Date.parse(iso);
@@ -28,6 +32,9 @@ describe('cohort ping wire format', () => {
     expect(pingUrl('open', '2026-08-21', 'I')).toBe('https://api.autonomic.care/ping/open/D082126I');
     expect(pingUrl('sub', '2026-08-21', 'A')).toBe('https://api.autonomic.care/ping/sub/D082126A');
     expect(pingUrl('act', '2026-08-21', 'I', 'B')).toBe('https://api.autonomic.care/ping/act/D082126IB');
+    // The daily reading route carries the sensor too — see the header of
+    // ../ping for why that costs the open/hrv symmetry nothing.
+    expect(pingUrl('hrv', '2026-08-21', 'I', 'G')).toBe('https://api.autonomic.care/ping/hrv/D082126IG');
   });
 
   it('appends the capture method only when there is one', () => {
@@ -36,12 +43,77 @@ describe('cohort ping wire format', () => {
     expect(pingUrl('act', '2026-08-21', 'A')).toBe('https://api.autonomic.care/ping/act/D082126A');
   });
 
-  it('maps the three capture sources onto method letters', () => {
+  it('maps every capture source onto a method letter', () => {
     expect(methodCode('watch')).toBe('W');
     expect(methodCode('polar')).toBe('B');
     expect(methodCode('camera')).toBe('F');
+    expect(methodCode('garmin')).toBe('G');
     expect(methodCode('something-else')).toBeUndefined();
     expect(methodCode(undefined)).toBeUndefined();
+  });
+
+  it('maps every locked surface onto a letter, in the sensor slot', () => {
+    expect(surfaceCode('progress')).toBe('R');
+    expect(surfaceCode('insights')).toBe('I');
+    expect(surfaceCode('pots')).toBe('P');
+    expect(surfaceCode('outlook-ai')).toBe('O');
+    expect(surfaceCode('metric-ai')).toBe('M');
+    expect(surfaceCode('insights-ai')).toBe('N');
+    expect(surfaceCode('settings')).toBe('S');
+    expect(surfaceCode('nowhere')).toBeUndefined();
+    expect(pingUrl('pay', '2026-08-21', 'I', 'R'))
+      .toBe('https://api.autonomic.care/ping/pay/D082126IR');
+  });
+
+  it('gives every route that carries a letter its own alphabet', () => {
+    expect(notifyCode('reminder')).toBe('M');
+    expect(notifyCode('crash')).toBe('C');
+    expect(notifyCode('something-else')).toBeUndefined();
+    // The capture pair: two routes, one alphabet, so a completion rate can be
+    // read per sensor.
+    expect(pingUrl('cap', '2026-08-21', 'I', 'B'))
+      .toBe('https://api.autonomic.care/ping/cap/D082126IB');
+    expect(pingUrl('hrv', '2026-08-21', 'I', 'B'))
+      .toBe('https://api.autonomic.care/ping/hrv/D082126IB');
+    // The offer funnel: three routes, one alphabet, read against each other.
+    expect(pingUrl('osh', '2026-08-21', 'I', 'A'))
+      .toBe('https://api.autonomic.care/ping/osh/D082126IA');
+    expect(pingUrl('oac', '2026-08-21', 'I', 'F'))
+      .toBe('https://api.autonomic.care/ping/oac/D082126IF');
+    // And the one route with nothing to say beyond "this install had a failure".
+    expect(pingUrl('err', '2026-08-21', 'A'))
+      .toBe('https://api.autonomic.care/ping/err/D082126A');
+  });
+
+  it('maps a tier onto a letter, and anything unknown onto free', () => {
+    expect(tierCode('free')).toBe('F');
+    expect(tierCode('trial')).toBe('T');
+    expect(tierCode('pro')).toBe('P');
+    expect(tierCode(undefined)).toBe('F');
+    expect(tierCode('something-else')).toBe('F');
+  });
+
+  it('sends only a version it can vouch for', () => {
+    expect(versionCode('1.26.0')).toBe('1.26.0');
+    expect(versionCode('1.26')).toBe('1.26');
+    expect(versionCode('2')).toBe('2');
+    // A key nobody can read is worse than a key that is absent.
+    expect(versionCode('1.26.0-beta.3')).toBeUndefined();
+    expect(versionCode('')).toBeUndefined();
+    expect(versionCode(undefined)).toBeUndefined();
+  });
+
+  it('appends tier and version as tagged tokens, in a fixed order', () => {
+    expect(cohortCode('2026-08-21', 'I', 'G', 'P', '1.26.0')).toBe('D082126IG-TP-V1.26.0');
+    // Every field after the head is independently optional, which is the whole
+    // point of tagging them: no token can be mistaken for a missing one.
+    expect(cohortCode('2026-08-21', 'I', undefined, 'F', '1.26.0')).toBe('D082126I-TF-V1.26.0');
+    expect(cohortCode('2026-08-21', 'I', 'G', 'P')).toBe('D082126IG-TP');
+    expect(cohortCode('2026-08-21', 'I', 'G', undefined, '1.26.0')).toBe('D082126IG-V1.26.0');
+    // An unusable version drops out rather than corrupting the code.
+    expect(cohortCode('2026-08-21', 'I', undefined, 'T', 'nightly')).toBe('D082126I-TT');
+    // And a build sending nothing new is byte-identical to the old format.
+    expect(cohortCode('2026-08-21', 'I', 'G')).toBe('D082126IG');
   });
 });
 

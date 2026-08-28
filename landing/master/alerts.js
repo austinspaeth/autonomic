@@ -2,11 +2,14 @@
  *
  * The page auto-refreshes every 5 minutes while it is visible, on every view
  * (app.js), and this is what makes that worth doing: the difference between one
- * ping report and the next is announced rather than silently redrawn. Four
+ * ping report and the next is announced rather than silently redrawn. Five
  * events, in ascending order of how much they matter:
  *
  *   visitors    someone opened the app         soft blip, half a second of
  *                                               house-coloured glitter
+ *   readings    an install saved a reading      soft tap, a card + a toast + a
+ *               TODAY (any reading, not the      notification naming the
+ *               first)                           sensor. No canvas.
  *   activations an install saved its FIRST      soft chime, a card + a toast +
  *               HRV reading                     a notification naming the
  *                                               sensor. No canvas.
@@ -29,7 +32,10 @@
  * as an interruption, where a sale holds the screen for fifteen. An activation
  * is the one event that still gets no canvas at all — it lands in the same
  * refresh as the download that caused it often enough that its own puff would
- * only ever be read as part of that one.
+ * only ever be read as part of that one, and the reading counter beside it is
+ * the same event one rung quieter: the app being USED, which is the thing this
+ * dashboard hopes to see all day and therefore the last thing that may hold the
+ * screen. Both are told, neither is celebrated.
  *
  * Everything here is fed by the PING COUNTER, which is the only source on this
  * page that changes on its own. Store downloads and the sales ledger are hand
@@ -72,10 +78,10 @@
   /* Cards and copy speak store names; the report speaks letters. */
   var STORE = { I: 'iOS', A: 'Android', U: 'unknown store' };
 
-  /* The second letter an activation ping carries: which sensor took the first
-     reading. Lower case because it reads inside a sentence ("1 chest strap"),
-     unlike a store name. */
-  var SENSOR = { W: 'Apple Watch', B: 'chest strap', F: 'phone camera' };
+  /* The second letter a READING ping carries — activations and daily readings
+     both do: which sensor took it. Lower case because it reads inside a
+     sentence ("1 chest strap"), unlike a store name. */
+  var SENSOR = { W: 'Apple Watch', B: 'chest strap', F: 'phone camera', G: 'Garmin watch' };
 
   function storeName(letter) { return STORE[letter] || STORE.U; }
   function letterOf(p) { return (p === 'I' || p === 'A') ? p : 'U'; }
@@ -87,8 +93,9 @@
   /**
    * Fold a PINGS report into the three running totals we alert on.
    *
-   *   { opens, downloads, sales, activations,
-   *     downloadsBy: {I,A,U}, salesBy: {I,A,U}, activationsBy: {W,B,F,?} }
+   *   { opens, downloads, sales, activations, readings,
+   *     downloadsBy: {I,A,U}, salesBy: {I,A,U},
+   *     activationsBy: {W,G,B,F,?}, readingsBy: {W,G,B,F,?} }
    *
    * `activationsBy` is keyed by SENSOR rather than by store, because that is
    * the fact the activation route carries that nothing else does — which store
@@ -101,11 +108,15 @@
    * counter whose only job is to be compared with its own previous value.
    */
   function snapshot(report) {
-    var out = { opens: 0, downloads: 0, sales: 0, activations: 0, downloadsBy: {}, salesBy: {}, activationsBy: {}, days: {} };
+    var out = {
+      opens: 0, downloads: 0, sales: 0, activations: 0, readings: 0,
+      downloadsBy: {}, salesBy: {}, activationsBy: {}, readingsBy: {}, days: {},
+    };
 
     function day(d) {
       return out.days[d] || (out.days[d] = {
-        opens: 0, downloads: 0, sales: 0, activations: 0, downloadsBy: {}, salesBy: {}, activationsBy: {},
+        opens: 0, downloads: 0, sales: 0, activations: 0, readings: 0,
+        downloadsBy: {}, salesBy: {}, activationsBy: {}, readingsBy: {},
       });
     }
 
@@ -161,6 +172,26 @@
       });
     });
 
+    /* The daily reading counter. Unlike activation this fires again tomorrow,
+       so a row counts install-DAYS rather than people — which is exactly the
+       news it is for: somebody who already has the app used it today. Its
+       sensor letter names that install's FIRST reading of the day, since the
+       counter is capped at one per install per Eastern day. */
+    ((report && report.hrv) || []).forEach(function (row) {
+      if (!row || !row.day) return;
+      var bucket = day(row.day);
+      ((row.cohorts) || []).forEach(function (x) {
+        if (!x || !x.cohort) return;
+        var n = Number(x.count) || 0;
+        if (!(n > 0)) return;
+        var sensor = sensorOf(x.method);
+        out.readings += n;
+        out.readingsBy[sensor] = (out.readingsBy[sensor] || 0) + n;
+        bucket.readings += n;
+        bucket.readingsBy[sensor] = (bucket.readingsBy[sensor] || 0) + n;
+      });
+    });
+
     return out;
   }
 
@@ -201,30 +232,39 @@
    * The totals path is kept for a baseline written before this shipped — a
    * snapshot in localStorage from the previous version has no `days`.
    *
-   * ACTIVATIONS ARE SKIPPED ENTIRELY against a baseline that predates them.
-   * A stored snapshot written before the activation counter existed has no
-   * `activations` field, so every day in it would read as a rise from zero and
-   * the first refresh after the deploy would announce a year of first readings
-   * as news. A baseline is a claim about what you have already been told;
-   * silence about a counter it never knew is the honest reading of it, and the
-   * snapshot it is replaced with knows about them from then on.
+   * A COUNTER THE BASELINE NEVER KNEW IS SKIPPED ENTIRELY. A stored snapshot
+   * written before the activation counter existed has no `activations` field,
+   * so every day in it would read as a rise from zero and the first refresh
+   * after the deploy would announce a year of first readings as news. A
+   * baseline is a claim about what you have already been told; silence about a
+   * counter it never knew is the honest reading of it, and the snapshot it is
+   * replaced with knows about it from then on. The reading counter is newer
+   * still and gets its own gate for the same reason — one flag cannot answer
+   * for two counters that shipped on different days.
    */
   function diff(prev, next) {
     var p = prev || snapshot(null);
     var n = next || snapshot(null);
     var actKnown = typeof p.activations === 'number';
+    var readKnown = typeof p.readings === 'number';
     var d;
 
     if (p.days && n.days) {
-      d = { visitors: 0, downloads: 0, sales: 0, activations: 0, downloadsBy: {}, salesBy: {}, activationsBy: {} };
+      d = { visitors: 0, downloads: 0, sales: 0, activations: 0, readings: 0,
+            downloadsBy: {}, salesBy: {}, activationsBy: {}, readingsBy: {} };
       Object.keys(n.days).forEach(function (key) {
-        var a = p.days[key] || { opens: 0, downloads: 0, sales: 0, activations: 0, downloadsBy: {}, salesBy: {}, activationsBy: {} };
+        var a = p.days[key] || { opens: 0, downloads: 0, sales: 0, activations: 0, readings: 0,
+                                 downloadsBy: {}, salesBy: {}, activationsBy: {}, readingsBy: {} };
         var b = n.days[key];
         d.visitors += rise(a.opens, b.opens);
         d.downloads += rise(a.downloads, b.downloads);
         d.sales += rise(a.sales, b.sales);
         addInto(d.downloadsBy, gain(a.downloadsBy, b.downloadsBy));
         addInto(d.salesBy, gain(a.salesBy, b.salesBy));
+        if (readKnown) {
+          d.readings += rise(a.readings, b.readings);
+          addInto(d.readingsBy, gain(a.readingsBy, b.readingsBy));
+        }
         if (!actKnown) return;
         d.activations += rise(a.activations, b.activations);
         addInto(d.activationsBy, gain(a.activationsBy, b.activationsBy));
@@ -235,13 +275,15 @@
         downloads: rise(p.downloads, n.downloads),
         sales: rise(p.sales, n.sales),
         activations: actKnown ? rise(p.activations, n.activations) : 0,
+        readings: readKnown ? rise(p.readings, n.readings) : 0,
         downloadsBy: gain(p.downloadsBy, n.downloadsBy),
         salesBy: gain(p.salesBy, n.salesBy),
-        activationsBy: actKnown ? gain(p.activationsBy, n.activationsBy) : {}
+        activationsBy: actKnown ? gain(p.activationsBy, n.activationsBy) : {},
+        readingsBy: readKnown ? gain(p.readingsBy, n.readingsBy) : {}
       };
     }
 
-    d.any = d.visitors > 0 || d.downloads > 0 || d.sales > 0 || d.activations > 0;
+    d.any = d.visitors > 0 || d.downloads > 0 || d.sales > 0 || d.activations > 0 || d.readings > 0;
     return d;
   }
 
@@ -254,7 +296,7 @@
 
   /** "1 chest strap · 1 phone camera", in the order the app offers them. */
   function sensorLine(by) {
-    return ['W', 'B', 'F', '?'].filter(function (k) { return (by || {})[k] > 0; })
+    return ['W', 'G', 'B', 'F', '?'].filter(function (k) { return (by || {})[k] > 0; })
       .map(function (k) { return by[k] + ' ' + sensorName(k); })
       .join(' · ');
   }
@@ -422,6 +464,16 @@
     { f: 783.99,  at: 0,     d: 0.15, type: 'triangle', v: 0.17 },   // G5
     { f: 1046.50, at: 0.085, d: 0.42, type: 'triangle', v: 0.16 },   // C6, rings
     { f: 392.00,  at: 0.085, d: 0.34, type: 'sine',     v: 0.09 }    // G4, body
+  ];
+
+  /* A reading is the quietest thing here that still gets said out loud: one
+     struck note with a short body under it, softer than the activation above
+     and unmistakably not it. It is somebody using the app they already have,
+     which is the event this dashboard hopes to see all day — anything with a
+     rise or a ring in it would wear out by lunchtime. */
+  var READING = [
+    { f: 880.00,  at: 0,    d: 0.16, type: 'triangle', v: 0.13 },   // A5
+    { f: 440.00,  at: 0,    d: 0.13, type: 'sine',     v: 0.07 }    // A4, body
   ];
 
   /* A download ARRIVES, so it is three notes rising to a note that rings, with
@@ -761,7 +813,7 @@
 
   /* One glyph per kind, so a card is identified before it is read — the left
      edge carries the same distinction in colour (styles.css). */
-  var MARK = { sale: '💸', download: '📲', activation: '💓' };
+  var MARK = { sale: '💸', download: '📲', activation: '💓', reading: '🫀' };
 
   function card(kind, title, line) {
     if (!hasDom()) return;
@@ -861,11 +913,28 @@
       }
       push('💓 ' + actTitle, sensorLine(d.activationsBy), 'autonomic-activation');
     }
+    /* Readings get the same three channels and the same missing fourth. This is
+       the app being USED — not an arrival, not a first — so it is the last thing
+       allowed to make a noise and the first to yield when anything above it
+       happened in the same refresh. No exclamation mark either: a sentence that
+       shouts every time somebody takes their morning reading stops being read.
+       An activation in the same refresh is the SAME reading counted twice (a
+       first reading is also a reading of that day), so the count is stated but
+       the sound and the toast defer to it. */
+    if (d.readings > 0) {
+      var readTitle = d.readings + ' ' + plural(d.readings, 'reading') + ' today';
+      card('reading', readTitle, sensorLine(d.readingsBy));
+      if (!d.sales && !d.downloads && !d.activations) {
+        say(readTitle + (sensorLine(d.readingsBy) ? ' · ' + sensorLine(d.readingsBy) : ''));
+        play(READING);
+      }
+      push('🫀 ' + readTitle, sensorLine(d.readingsBy), 'autonomic-reading');
+    }
     /* Visitors stay a sound and nothing else, in every channel. It is the event
        that fires most often and the least worth a line of text — a toast for it
        would be on screen more or less permanently, and a notification for it
        would be the fastest way to have notifications turned back off. */
-    if (!d.sales && !d.downloads && !d.activations && d.visitors > 0) {
+    if (!d.sales && !d.downloads && !d.activations && !d.readings && d.visitors > 0) {
       play(VISITOR);
       /* Half a second of house-coloured glitter. Short enough that it reads as
          a flicker rather than an interruption, which is the whole licence for

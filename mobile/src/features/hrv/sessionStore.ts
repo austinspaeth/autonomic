@@ -36,6 +36,7 @@ import { getState } from '../../store/store';
 import {
   type BreathPattern, type BreathPhase, parsePattern, phaseAt,
 } from '../../lib/breathClock';
+import { pingActivation, pingCaptureCompleted, pingCaptureStarted } from '../../store/ping';
 
 export interface SessionConfig {
   kind: 'breath' | 'unstructured';
@@ -369,6 +370,11 @@ export function beginCollection() {
   const src = snap.config?.source;
   const connected = (src === 'watch' || src === 'garmin' || src === 'camera') ? true : snap.connected;
   bump({ status: 'running', connected, elapsed: 0, startedAtMs });
+  // A reading has genuinely begun — the counterpart of the completion ping in
+  // `finishSession`. Counted in the engine rather than where the card is
+  // mounted because this is the one path a running reading can start from,
+  // whatever opened it and wherever it is later minimized to.
+  pingCaptureStarted(src);
   if (timer) clearInterval(timer);
   timer = setInterval(syncElapsed, 1000);
 }
@@ -401,6 +407,11 @@ export async function finishSession() {
       durationSec: capturedSec,
     },
   });
+  // A reading exists now, whether or not it is ever saved. Both counters fire
+  // here: the daily one, and the once-per-install activation for whoever has
+  // just finished their first.
+  pingCaptureCompleted(snap.config?.source);
+  pingActivation(snap.config?.source);
   void completionBuzz();
   // Backgrounded (a BLE reading keeps running while the phone is set aside), iOS
   // never plays the buzz above — post a notification so completion is still

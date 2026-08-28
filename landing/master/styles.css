@@ -281,6 +281,81 @@ input[type="number"] { -moz-appearance: textfield; }
 
 .swatch { width: 9px; height: 9px; border-radius: 3px; flex: none; display: inline-block; }
 
+/* ---------- condensed tiles (phones) ----------
+ *
+ * A stat tile on a phone is its label and its number, two to a row, and
+ * everything under the number is one tap away. The reasoning, and the FLIP that
+ * moves the neighbours out of the way, are in `toggleTile` in app.js — what
+ * lives here is the resting state of each half and the tween between them.
+ *
+ * `.tile-more` folds with an inline `max-height` written by the animation and
+ * cleared when it finishes, so the open state is `none` (free to reflow) and
+ * the closed state is 0. Nothing here may set a max-height an animation would
+ * have to fight.
+ *
+ * `.tiles-still` is the one frame the FLIP needs with no transition running.
+ * It has to beat `prefers-reduced-motion` and every rule below it, hence the
+ * importants: an inverted frame that animates is the animation played
+ * backwards. */
+/* Outside `.label` on purpose: the label is read as text (by the tests, and by
+   anything that treats a tile as a name and a number), and a glyph inside it
+   would become part of that name. */
+.tile-chev { display: none; }
+.tile-more { min-width: 0; }
+.cards.condensed .tile.has-more { position: relative; }
+
+/* The row is the containing block for the tile that leaves it — see
+   `toggleTile`, and the note there for why a tile that grows has to. */
+.cards.condensed { position: relative; }
+.cards.condensed .tile { transition: transform .42s cubic-bezier(.22, .78, .28, 1); }
+/* Out of flow for the length of the tween, and the only element on the page
+   whose box is animated outright. `overflow: hidden` is what turns the height
+   into the reveal: the body is already laid out at the full width underneath. */
+.cards.condensed .tile.tile-flying {
+  overflow: hidden;
+  transition: left .42s cubic-bezier(.22, .78, .28, 1),
+              top .42s cubic-bezier(.22, .78, .28, 1),
+              width .42s cubic-bezier(.22, .78, .28, 1),
+              height .42s cubic-bezier(.22, .78, .28, 1);
+}
+/* The stand-in holding that tile's slot. It draws nothing; its height is what
+   carries the tiles and the charts below the row down as the card opens. */
+.tile-ph { visibility: hidden; }
+.cards.condensed .tile-ph { transition: height .42s cubic-bezier(.22, .78, .28, 1); }
+.cards.condensed .tile.has-more { cursor: pointer; }
+.cards.condensed .tile > .tile-more {
+  overflow: hidden;
+  transition: max-height .42s cubic-bezier(.22, .78, .28, 1), opacity .26s ease;
+}
+.cards.condensed .tile:not(.expanded) > .tile-more { max-height: 0; opacity: 0; }
+.cards.condensed .tile.expanded > .tile-more { opacity: 1; }
+/* The chevron is the only thing that says a tile has a back to it. It turns
+   rather than swapping glyph, so the open and closed states are one object. */
+.cards.condensed .tile.has-more .tile-chev {
+  display: block; position: absolute; right: 11px; top: 11px;
+  color: var(--text-muted); font-size: 17px; line-height: 1;
+  transform: rotate(90deg); transform-origin: 50% 50%;
+  transition: transform .42s cubic-bezier(.22, .78, .28, 1), color .2s ease;
+}
+.cards.condensed .tile.has-more .label { padding-right: 16px; }
+.cards.condensed .tile.expanded .tile-chev { transform: rotate(270deg); color: var(--text-secondary); }
+/* Closed, the tile is a label and a number and nothing else — the inline
+   percentage goes with the rest of the detail, or the "no extra info" half of
+   the design is undone by the one line that sits inside the value. */
+.cards.condensed .tile:not(.expanded) .value { margin-bottom: 0; }
+.cards.condensed .tile:not(.expanded) .value .delta { display: none; }
+.cards.tiles-still .tile,
+.cards.tiles-still .tile-ph,
+.cards.tiles-still .tile > .tile-more,
+.cards.tiles-still .tile .tile-chev { transition: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  /* The fold still works; it simply arrives. */
+  .cards.condensed .tile,
+  .cards.condensed .tile-ph,
+  .cards.condensed .tile > .tile-more,
+  .cards.condensed .tile .tile-chev { transition: none; }
+}
+
 /* ---------- skeleton ----------
  *
  * The shape of a view whose data has not arrived, built per view by
@@ -767,6 +842,9 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { outline: 2px solid var
 .alert-card.sale { border-left: 3px solid var(--series-7); }
 .alert-card.download { border-left: 3px solid var(--series-3); }
 .alert-card.activation { border-left: 3px solid var(--series-6); }
+/* Magenta, the colour App usage gives the daily reading counter — deliberately
+   not the activation green beside it: one is a first, one is a habit. */
+.alert-card.reading { border-left: 3px solid var(--series-5); }
 .alert-mark { font-size: 20px; line-height: 1; flex: none; }
 .alert-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .alert-body b { font-size: 14px; }
@@ -1099,6 +1177,12 @@ details.acc > summary .btn { user-select: none; }
   .grid { gap: 12px; }
   .tile .value { font-size: 27px; }
   .tile .value.small { font-size: 22px; }
+  /* Two columns, always: the measurement in `layoutTiles` divides the row by
+     this, so a phone gets a pair of tiles per line and a small tablet still
+     gets three or four. */
+  .cards { --tile-min: 148px; }
+  .cards.condensed .tile { padding: 12px 12px 13px; }
+  .cards.condensed .tile:not(.expanded) .label { font-size: 12px; }
 
   .gate { padding: 20px; }
   .gate-code { gap: 8px; }

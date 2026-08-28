@@ -115,6 +115,31 @@ settling it, and the reader was thrown back up a quarter of the page —
 reliably, at the bottom of the longest views, which is exactly where the
 collapse happens.
 
+### On a phone, a stat tile is a label and a number
+
+Two columns, and everything under the number — the store split, the sensor
+split, the three baselines a day is read against — is one tap away. A row of
+eleven tiles is a screenful of scrolling before the first chart on a 390px
+screen, and the reader is looking for one number.
+
+Tapping one opens it across the row, and that movement is not decoration: it is
+the only thing that says the wide card you are now reading is the small one you
+just pressed, on a screen where everything else moved at the same moment. How it
+is done is in `toggleTile` in `app.js`, and the part worth knowing here is why
+the opening tile leaves the flow with a **placeholder** in its slot. A flex item
+cannot be widened smoothly in place — the moment its basis passes half the row
+its neighbour wraps to the next line and `flex-grow` snaps it across the whole
+row in one frame (measured: 177px to 366px between two frames, while the height
+tweened perfectly). Out of flow it is a box with a left, a top, a width and a
+height, all four of which animate, and the placeholder holds the slot so nothing
+else has to guess where the row is going. The other tiles are FLIPped, because
+their move is a change of flex line and reflow does that instantly whatever you
+transition.
+
+`tileColumns` will not thin a row below two columns while two fit. One column
+divides any tile count perfectly, so "leave the last row fullest" chose it every
+time on a phone and the condensed row was a stack of full-width cards.
+
 ## Storage, and painting from the cache
 
 DynamoDB is the store of record. `localStorage` is the cache, and **the cache
@@ -265,9 +290,10 @@ for its platform. The data is fetched once per session, cached on `pings`, and
 is **read-only** — it lives outside `db`, so `sync.js` never sees it and there
 is nothing here to edit.
 
-Four counters, not two. Beside `open` and `sub` there is **`act`**: an install
+Thirteen counters, not two. Beside `open` and `sub` there is **`act`**: an install
 saved its FIRST HRV reading. That one carries a second letter for the sensor it
-used — `W` Apple Watch, `B` Bluetooth strap, `F` finger on the camera. It is the
+used — `W` Apple Watch, `G` Garmin watch, `B` Bluetooth strap, `F` finger on the
+camera. It is the
 step between downloading and retaining, and the only one onboarding owns: an
 install with no first reading has no score, no trend and nothing to come back
 for, so a retention number read without an activation number beside it blames
@@ -276,9 +302,9 @@ ever**, which makes it the one counter here whose rows really do count people �
 the no-summing rule below is about opens.
 
 And there is **`hrv`**: an install saved a reading TODAY. It is the open
-counter's twin — same cohort code, same platform letter, no sensor letter, and
-capped at one per install per Eastern day by the same client rule — which is
-what makes it worth more than a fourth number. Because both are bucketed
+counter's twin — same cohort code, same platform letter, and capped at one per
+install per Eastern day by the same client rule — which is what makes it worth
+more than a fourth number. Because both are bucketed
 identically over the same population, `hrv[day] / open[day]` is a genuine
 **share of people**: of everyone who was in the app that day, how many actually
 measured. It is the only ratio on this page whose numerator and denominator are
@@ -286,6 +312,99 @@ both install-days, and it answers the question retention cannot. Retention says
 somebody launched the app; a journal app can be launched every morning to look
 at yesterday's number and never gain a new one, and that install is on its way
 out while drawing a perfect curve.
+
+It carries the **sensor letter** too, and that costs the twinning nothing: the
+letter splits the KEY a count lands under, never the count, so a day's readings
+still sum to one per install and the share of people is exactly what it was. The
+one thing it may not be read as is a person's whole day — the daily cap means it
+names whichever reading came FIRST, so somebody who straps up in the morning and
+checks on the camera at night is one chest strap. `hrvMethodsOn` /
+`hrvMethodKnown` in `analytics.js`, and a reading from a build that predates the
+letter is **no sensor**, not a guess: the counter's birthday and the letter's
+birthday are different days, and each has its own gate.
+
+And there is **`pay`**: an install met the paywall TODAY. The third daily
+counter, capped the same way and for the same reason — uncapped it would count
+TAPS, and one frustrated user tapping a locked range four times would read as
+four people meeting a wall. Capped, `pay[day] / open[day]` is a share of people
+exactly as the reading share is, and it is the number that says how hard the app
+is pushing: a share that climbs while purchases sit still is a wall people are
+bouncing off, not a funnel.
+
+Its letter names the **surface** that raised the card — `R` a locked Progress
+range, `I` the Insights tab, `P` a POTS capture, `O`/`M`/`N` the Outlook, metric
+and Insights AI reports, `S` the Upgrade button in Settings. Two things it must
+not be read as. It is not a ranking of how often each feature is locked: the
+daily cap names the FIRST wall of the day, so a surface people always meet
+second is invisible here however often it fires, and the card is titled *Which
+wall they meet first* for that reason. And `S` is not a wall — somebody who
+opened Settings and tapped Upgrade went LOOKING for the paywall, which is the
+opposite signal from somebody who walked into one, so it is named separately and
+kept out of the ranking. `surfacesOn` / `paySurfaceKnown` in `analytics.js`.
+
+And there is the **capture pair**, `cap` and `hrv`: a reading STARTED, and a
+reading COMPLETED. Two routes rather than one with a phase letter, because they
+are read against each other — `hrv / cap` is the completion rate — and a route is
+the one distinction a consumer cannot accidentally pool away. Neither fires on
+*save*: the measurement is the event, and a reading the user discards is still
+one this app took. The gap between them is the only place an abandoned reading
+exists at all, and because both carry the sensor letter it is a completion rate
+**per sensor** — which is the form that implies an action. "Camera readings
+finish half the time and strap readings nine times in ten" is a decision about
+what to put in front of a new user; a single pooled rate is only a number to
+worry about.
+
+**Beyond those, six routes with a different cap.** `not` (a notification turned
+on), `pot` (a POTS capture finished), `see` (a gated view opened) and the three
+offer routes are capped once per install per day **per letter**, not per route.
+Their letters are choices the user made between real alternatives — a stand test
+is not an episode, Insights is not Progress — and a whole-route cap would have
+silently dropped whichever came second, which on a bad day is exactly the one
+worth knowing about. The consequence is a rule for reading them: each LETTER'S
+count is a headcount, the route's daily TOTAL is not, and the lines on *What
+people do in there* must never be added together. `A.isHeadcount(kind)` is the
+question to ask before dividing by anything.
+
+The **offer funnel** is three routes over one alphabet, so `oac / osh` is that
+offer's conversion. One distinction there has to survive any rewording:
+**accepted means the card's buy button was tapped, not that money moved.** The
+subscribe counter is where money is counted, and the gap between the two is the
+store sheet — abandoned, or declined. Calling this "converted" would close that
+gap silently. The third outcome is the common one: an offer neither accepted nor
+dismissed was **ignored**, and the card counts it rather than leaving it implied.
+
+And `err` is not a daily counter at all. It fires **once per install, ever**, so
+a day's count is new installs joining that population and the running total is
+the population. It carries no tag, no message and no count of failures, because a
+tag is a string this app chose and a message is a string it did not, and neither
+belongs in a counter that carries no identifier. It says how many phones are
+having a bad time; the support dump, from the user's own device and with their
+consent, is where one is diagnosed.
+
+**Every counter now carries two more fields, and they are what turn each of the
+above from one number into a number per population.** `tier` is what the install
+could do at the instant it pinged — `P` paid, `T` trial, `F` free — so the same
+day can be read as "who is in the app", "who measures" and "who meets walls",
+which is the comparison the *Who is in the app* card puts in one place. A Pro
+share on the paywall row is not a curiosity: it is the paywall coming up for
+somebody who has already paid. `version` is the build, and it answers the
+question a deploy cannot — whether the fix has actually reached anybody.
+
+Both obey the rule the counters already taught, one level down: `?` is a real
+bucket and is **never folded into a named value**. A ping from a build too old to
+state its tier is not a free user, and one too old to state its version is not
+running something else; every share here is measured against the pings that
+answered (`tierKnown`, `buildKnown`), and the unanswered band is drawn rather
+than divided away. Adoption computed without it would be the share of the builds
+new enough to talk, which is a claim about the wrong population.
+
+One asymmetry worth knowing: **version is not crossed with the cohort.** It rides
+in a second map on the day row (`builds`, keyed platform+tier+version) rather
+than in the cohort key, because the cohort key gains an entry per combination
+seen that day and cohorts accumulate forever — multiplying it by the live builds
+walks a busy row toward DynamoDB's 400KB item ceiling, at which point the day
+stops counting. So "how fast did 1.26 spread" is answerable and "pro share of the
+day-30 cohort on 1.26" is not, deliberately.
 
 **The reading counter shipped later than the other three, and that is a rule,
 not a footnote.** `index` records `hrvFirst` — the first day the route was ever
@@ -328,7 +447,11 @@ the UI, each of them deliberate:
   on day 0* beside *Activated by D7* and the **Activation** card charts the age
   at first reading in the same buckets purchase timing uses. The **How the first
   reading is taken** card beside it splits those readings by sensor
-  (`methodsOn` / `methodsOver`), per day and stacked. That split follows the
+  (`methodsOn` / `methodsOver`), per day and stacked. **What readings are taken
+  with**, down in the measuring row, is its twin over the DAILY counter
+  (`hrvMethodsOn` / `hrvMethodsOver`) — what people keep reaching for rather than
+  what they started on — and the *Measured on <day>* tile carries the same split
+  as a second row under its store split. That split follows the
   platform filter rather than ignoring it, unlike the store splits below:
   Apple Watch is offered on iPhone only, so its share of a combined view is a
   share of a population half of which was never offered it — the card says so
@@ -522,12 +645,14 @@ a CSV paste would be an alert about your own typing.
 |---|---|---|
 | Visitors | a rise in open pings | two-note blip, and nothing else in any channel |
 | Activations | a rise in activation pings — an install saved its **first HRV reading** | two-note settling chime, a card + a toast + a notification naming the sensor(s). **No confetti.** |
+| Readings | a rise in daily reading pings — an install measured **today** | one struck note, a card + a toast + a notification naming the sensor(s). **No confetti**, and it yields every channel to anything above it in this table — it is the app being used, which is what this dashboard hopes to see all day |
 | Downloads | a rise in **first runs** — an open ping whose cohort key IS the day it arrived on | three-note rising chime, confetti falling from the top, a card + a toast + a notification naming the store(s) |
 | Sales | a rise in subscribe pings | brass fanfare, **ten seconds** of confetti from the top AND the bottom, a card + a toast + a notification naming the store(s) that paid |
 
-The four cues are meant to be told apart across a room with your back to the
-screen, so they differ in SHAPE and not only in pitch — two notes, two notes
-settling, three notes rising, a fanfare with a held chord — and climb in weight
+The five cues are meant to be told apart across a room with your back to the
+screen, so they differ in SHAPE and not only in pitch — two notes, one struck
+note, two notes settling, three notes rising, a fanfare with a held chord — and
+climb in weight
 in the order the events matter. The visitor blip fires most often and is the one
 most easily made useless: the first version was a single sine at 0.055 gain, a
 sound you have to already know is coming to hear at all.

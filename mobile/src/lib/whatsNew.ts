@@ -51,7 +51,12 @@ export const RELEASES: Release[] = [
     version: '1.26',
     date: '2026-08-27',
     notes: [
-      'NEW - Garmin watch support added! Take an HRV reading on your Garmin and it lands in your journal when it finishes.',
+      // Held back until the Garmin Connect IQ app is published. Uncomment it
+      // (and flip WATCH_BRANDS_RELEASED in features/hrv/WatchBrands.tsx) once
+      // the watch app is live, so the announcement and the thing it announces
+      // ship together.
+      // 'NEW - Garmin watch support added! Take an HRV reading on your Garmin and it lands in your journal when it finishes.',
+      'A more streamlined onboarding process, plus other interface and performance improvements.',
     ],
   },
   {

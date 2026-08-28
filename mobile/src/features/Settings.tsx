@@ -186,7 +186,7 @@ function SubscriptionSheet({ controls }: { controls: SheetControls }) {
   const toast = useToast();
   const { isPro, products, activeSku } = useIap();
   const tier = useTier();
-  const openPaywall = usePaywall();
+  const openPaywall = usePaywall('settings');
   const [busy, setBusy] = useState(false);
   const active = products.find((s) => s.productId === activeSku);
   const price = active ? priceOf(active, activeSku ?? YEARLY_SKU) : undefined;

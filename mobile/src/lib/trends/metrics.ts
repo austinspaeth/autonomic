@@ -167,6 +167,14 @@ const dayCount = (d: DayRecord | undefined, pick: (d: DayRecord) => number): num
 const round1 = (v: number) => Math.round(v * 10) / 10;
 const round2 = (v: number) => Math.round(v * 100) / 100;
 const dir = (delta: number, up: string, down: string) => (delta > 0 ? up : down);
+/**
+ * Singular/plural for a counted unit.
+ *
+ * ALWAYS pass the number the phrase actually PRINTS (the rounded one), never the
+ * raw delta: a delta of 1.4 renders as "1" and must read "1 entry", and a delta
+ * of 0.96 renders as "1" too. Passing the raw value put "1 entries" and
+ * "1 points" on the Journal's one congratulatory card.
+ */
 const plural = (n: number, one: string, many: string) => (Math.abs(n) === 1 ? one : many);
 
 /**
@@ -183,6 +191,21 @@ const hm = (mins: number) => {
   return m % 60 ? `${h}h ${m % 60}m` : `${h}h`;
 };
 
+/**
+ * A row's phrase with its averaging qualifier: "up 1 point on average".
+ *
+ * Every sentence the app builds from this registry is about a WINDOW, but only a
+ * median row's number is a typical DAY inside it — without saying "on average"
+ * that reads as a claim about today, which is both wrong and the kind of wrong a
+ * user checks against this morning's number and disbelieves. A `count` row
+ * (`badDays`, `symptomLoad`, `cleanDays`) is a window TOTAL and a `stdev` row has
+ * no per-day value at all, so neither is an average of anything and neither says
+ * it. Callers use this rather than `def.phrase` directly, so the qualifier can
+ * never appear on one surface and not the other.
+ */
+export const phraseOf = (def: TrendMetricDef, delta: number): string =>
+  (def.aggregate === 'median' ? `${def.phrase(delta)} on average` : def.phrase(delta));
+
 /* ---------- the registry ---------- */
 
 export const TREND_METRICS: Record<TrendMetricId, TrendMetricDef> = {
@@ -190,7 +213,10 @@ export const TREND_METRICS: Record<TrendMetricId, TrendMetricDef> = {
     id: 'score',
     bands: 'score',
     label: 'Daily score',
-    subject: 'Your daily score is',
+    // Plural, because the claim is about a month of days and not about today:
+    // "Your daily scores are up 1 point on average" is what the window actually
+    // measured, where "Your daily score is up 1 point" reads as this morning's.
+    subject: 'Your daily scores are',
     unit: 'pts',
     countNoun: 'scored days',
     better: 'up',
@@ -199,7 +225,7 @@ export const TREND_METRICS: Record<TrendMetricId, TrendMetricDef> = {
     deltaKind: 'absolute',
     minPoints: 8,
     value: (d, dk, days, ctx) => dayScore(d, dk, days, ctx),
-    phrase: (delta) => `${dir(delta, 'up', 'down')} ${round1(Math.abs(delta))} points`,
+    phrase: (delta) => `${dir(delta, 'up', 'down')} ${round1(Math.abs(delta))} ${plural(round1(delta), 'point', 'points')}`,
     fmt: (v) => String(round1(v)),
   },
 
@@ -223,7 +249,7 @@ export const TREND_METRICS: Record<TrendMetricId, TrendMetricDef> = {
       const short = scoreCat(s).short;
       return short === 'Bad' || short === 'Crash' ? 1 : 0;
     },
-    phrase: (delta) => `${dir(delta, 'up', 'down')} ${Math.abs(Math.round(delta))} days`,
+    phrase: (delta) => `${dir(delta, 'up', 'down')} ${Math.abs(Math.round(delta))} ${plural(Math.round(delta), 'day', 'days')}`,
     fmt: (v) => String(Math.round(v)),
   },
 
@@ -359,7 +385,7 @@ export const TREND_METRICS: Record<TrendMetricId, TrendMetricDef> = {
     deltaKind: 'relative',
     minPoints: 5,
     value: (d) => hrvAvg(d, 'pnn50'),
-    phrase: (delta) => `${dir(delta, 'up', 'down')} ${round1(Math.abs(delta))} points`,
+    phrase: (delta) => `${dir(delta, 'up', 'down')} ${round1(Math.abs(delta))} ${plural(round1(delta), 'point', 'points')}`,
     fmt: (v) => String(round1(v)),
   },
 
@@ -472,7 +498,7 @@ export const TREND_METRICS: Record<TrendMetricId, TrendMetricDef> = {
     deltaKind: 'absolute',
     minPoints: 8,
     value: (d) => dayCount(d, (x) => (x.symptoms || []).length),
-    phrase: (delta) => `${dir(delta, 'up', 'down')} ${Math.abs(Math.round(delta))} ${plural(delta, 'entry', 'entries')}`,
+    phrase: (delta) => `${dir(delta, 'up', 'down')} ${Math.abs(Math.round(delta))} ${plural(Math.round(delta), 'entry', 'entries')}`,
     fmt: (v) => String(Math.round(v)),
   },
 
@@ -534,7 +560,7 @@ export const TREND_METRICS: Record<TrendMetricId, TrendMetricDef> = {
       const c = dayCleanliness(days, dk, ctx.protocol || DEFAULT_PROTOCOL, ctx.customTypes);
       return c ? (c.clean ? 1 : 0) : null;
     },
-    phrase: (delta) => `${dir(delta, 'up', 'down')} ${Math.abs(Math.round(delta))} ${plural(delta, 'day', 'days')}`,
+    phrase: (delta) => `${dir(delta, 'up', 'down')} ${Math.abs(Math.round(delta))} ${plural(Math.round(delta), 'day', 'days')}`,
     fmt: (v) => String(Math.round(v)),
   },
 

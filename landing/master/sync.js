@@ -171,6 +171,34 @@ window.Sync = (function () {
     return out;
   }
 
+  /* Mirrors cleanLink() in the Lambda — the same rule as every normalize above,
+     with one extra consequence: a campaign that this side keeps and the server
+     reshapes is a campaign whose PAGE gets rewritten on every single push. */
+  var LINK_SLUG = /^[a-z0-9][a-z0-9-]{0,47}$/;
+
+  function normalizeLinkUrl(raw) {
+    var v = String(raw === undefined || raw === null ? '' : raw).trim();
+    if (!v || v.length > 900) return '';
+    return /^https?:\/\/[^\s"'<>]+$/i.test(v) ? v : '';
+  }
+
+  function normalizeLink(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    var slug = String(raw.slug || '').trim().toLowerCase();
+    if (!LINK_SLUG.test(slug)) return null;
+    var out = { slug: slug };
+    var label = String(raw.label || '').trim().slice(0, 120);
+    if (label) out.label = label;
+    ['ios', 'android', 'web'].forEach(function (k) {
+      var u = normalizeLinkUrl(raw[k]);
+      if (u) out[k] = u;
+    });
+    var note = String(raw.note || '').trim().slice(0, 2000);
+    if (note) out.note = note;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(String(raw.created || ''))) out.created = raw.created;
+    return out;
+  }
+
   function snapshotOf(db, state) {
     var entries = new Map();
     (db.entries || []).forEach(function (e) {
@@ -197,8 +225,17 @@ window.Sync = (function () {
       var n = normalizeSale(r);
       if (n) salesMap.set(n.id, stable(n));
     });
+    /* Keyed by SLUG, not by an id: the slug is the URL, so renaming a campaign
+       is a delete and a create — which is exactly what the diff below then
+       reports, and exactly what has to happen in the bucket. */
+    var linksMap = new Map();
+    (db.links || []).forEach(function (l) {
+      var n = normalizeLink(l);
+      if (n) linksMap.set(n.slug, stable(n));
+    });
     return {
       entries: entries, events: events, ads: adsMap, costs: costsMap, sales: salesMap,
+      links: linksMap,
       settings: stable(db.settings || {}), ui: stable(state || {})
     };
   }
@@ -271,6 +308,9 @@ window.Sync = (function () {
     var adDiff = diffById('ads');
     var costDiff = diffById('costs');
     var saleDiff = diffById('sales');
+    /* Same loop — `diffById` keys off the map, not off a field, so a
+       slug-keyed collection walks it unchanged. */
+    var linkDiff = diffById('links');
 
     var payload = {};
     if (adDiff.ups.length) payload.adUpserts = adDiff.ups;
@@ -279,6 +319,8 @@ window.Sync = (function () {
     if (costDiff.dels.length) payload.costDeletes = costDiff.dels;
     if (saleDiff.ups.length) payload.saleUpserts = saleDiff.ups;
     if (saleDiff.dels.length) payload.saleDeletes = saleDiff.dels;
+    if (linkDiff.ups.length) payload.linkUpserts = linkDiff.ups;
+    if (linkDiff.dels.length) payload.linkDeletes = linkDiff.dels;
     if (upserts.length) payload.upserts = upserts;
     if (deletes.length) payload.deletes = deletes;
     if (eventUpserts.length) payload.eventUpserts = eventUpserts;
@@ -393,6 +435,7 @@ window.Sync = (function () {
     onStatus: onStatus,
     normalize: normalize,
     normalizeAd: normalizeAd,
-    normalizeCost: normalizeCost
+    normalizeCost: normalizeCost,
+    normalizeLink: normalizeLink
   };
 })();

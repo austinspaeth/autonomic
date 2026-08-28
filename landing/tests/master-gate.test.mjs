@@ -79,7 +79,12 @@ const $ = (id) => window.document.getElementById(id);
 // without the trailing slash resolved every one of them against /, so the page
 // arrived with no stylesheet and no scripts — unstyled, gate inert, dashboard
 // on display. Nothing the page references may be relative.
-const html = fs.readFileSync(PAGE, 'utf8').replace(/<!--[\s\S]*?-->/g, '');
+// Scan the document's own MARKUP only. A script body is inlined code, and a JS
+// string that builds a link ('<a href="' + url) is not an asset reference. The
+// opening tags survive the strip, so a relative <script src> still fails here.
+const html = fs.readFileSync(PAGE, 'utf8')
+  .replace(/<!--[\s\S]*?-->/g, '')
+  .replace(/(<script\b[^>]*>)[\s\S]*?<\/script>/gi, '$1</script>');
 const relative = [...html.matchAll(/(?:src|href)="(?!https?:|\/\/|\/|#|data:|mailto:)([^"]*)"/g)].map((m) => m[1]);
 check('no relative asset references', relative.length === 0, relative.join(', '));
 check('stylesheet is inlined', html.includes('Autonomic Dashboard — dark theme tokens'));

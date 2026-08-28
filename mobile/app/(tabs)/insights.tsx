@@ -30,10 +30,24 @@
  * a pulsing dot when the findings changed since the last visit. There is no range
  * control because there is no range; the engine owns its own windows.
  *
- * Gating mirrors Progress exactly, via `<LockedOverlay/>`. A free tier gets the
- * real document built and laid out, then masked, with one upgrade card over the
- * top. The AI button is not rendered at all in that state: offering a Pro action
- * inside a locked view is a dead end, not an upsell.
+ * Gating shares Progress's `<LockedOverlay/>`, with one measurement of its own. A
+ * free tier gets the real document built and laid out, then masked, with one
+ * upgrade card over the top — but the TOP CARD is left readable and the mask
+ * starts below it (`revealTop`). A screen of blurred ghosts is a promise that the
+ * engine found something; one real finding about the reader's own log is the
+ * evidence, and it is the most persuasive thing this screen has. Two rules keep
+ * that honest:
+ *   - The mask appears ONLY when there is a genuine finding to withhold
+ *     (`hasFindings`). On a young journal the first card IS the countdown, and
+ *     blurring "0 of 14 days" would be charging for a screen that is empty on
+ *     every tier. The early tier is treated the same way: it sits above the
+ *     countdown, which the user still needs to read.
+ *   - The revealed card is a READOUT, not a door. Its rows open FindingSheet,
+ *     which is the Pro product, so the whole card is wrapped in one press target
+ *     that raises the paywall instead — routed through the same `usePaywall`, so
+ *     the wall is counted like any other.
+ * The AI button is not rendered in the locked state: offering a Pro action inside
+ * a locked view is a dead end, not an upsell.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { InteractionManager, Pressable, Text, View, type LayoutChangeEvent } from 'react-native';
@@ -46,6 +60,7 @@ import { usePalette } from '../../src/theme';
 import { useAppState } from '../../src/store/store';
 import { useTier } from '../../src/store/tier';
 import { usePaywall } from '../../src/features/Paywall';
+import { pingViewOpened } from '../../src/store/ping';
 import { LockedOverlay } from '../../src/features/LockedOverlay';
 import { AskAiPill } from '../../src/features/insights/AskAi';
 import { InsightsEmpty, InsightsSkeleton } from '../../src/features/insights/InsightsSkeleton';
@@ -61,7 +76,7 @@ import type { AppState } from '../../src/lib/types';
 import { emptyReport, type InsightReport } from '../../src/lib/insights';
 import { computeInsights } from '../../src/lib/insights/cache';
 import { logError } from '../../src/lib/diagnostics/errorLog';
-import { EMPTY_SHAPE, type CardHeights, type RowHeights, type RowKey } from '../../src/lib/insights/shape';
+import { type CardHeights, type RowHeights, type RowKey } from '../../src/lib/insights/shape';
 import { insightsShape, noteInsightsShape } from '../../src/lib/insights/shapeMemory';
 import { insightsAnchor } from '../../src/lib/insights/anchorMemory';
 import { markInsightsSeen } from '../../src/store/insightsBadge';
@@ -87,7 +102,13 @@ export default function InsightsScreen() {
   const state = useAppState();
   const focused = useIsFocused();
   const locked = useTier() === 'free';
-  const openPaywall = usePaywall();
+  const openPaywall = usePaywall('insights');
+
+  // Someone opened this view. Fired for every tier — for a free user it is the
+  // demand side of the question the paywall counter answers from the supply
+  // side, and for a paying one it is whether the thing they bought is the thing
+  // they use. Capped at once per Eastern day per view inside the store.
+  useEffect(() => { if (focused) pingViewOpened('insights'); }, [focused]);
 
   const dk = todayKey();
 
@@ -112,6 +133,22 @@ export default function InsightsScreen() {
 
   /** Bumped by "Try again" on the failed state, to re-enter the build effect. */
   const [retrySeq, setRetrySeq] = useState(0);
+
+  /**
+   * Where the one card a locked view leaves readable ENDS, in scroll-content
+   * coordinates (its own `y` plus its height, which already includes the header's
+   * padding — see Screen's contentContainerStyle).
+   *
+   * Its BOTTOM rather than its height, so nothing has to assume the card is the
+   * first thing in the document; the engine guarantees it today, and a measurement
+   * that survives that changing is free. State rather than a ref because the
+   * overlay is positioned from it, and taken on the WRAPPER on purpose: a
+   * wrapper's frame includes the card's 12pt bottom margin (the trap documented in
+   * insights/shape.ts), which is exactly where the seam should fall. Half of that
+   * margin is given back below, so the scrim starts in the middle of the gutter
+   * rather than flush against the card beneath.
+   */
+  const [revealBottom, setRevealBottom] = useState(0);
 
   const buildArgs = useMemo(() => {
     const source: AppState = state;
@@ -362,6 +399,39 @@ export default function InsightsScreen() {
   // through the whole skeleton; both simply wait, which reads as loading.
   const head = shown.current;
 
+  /**
+   * Is the mask up — and therefore, is there a card being spared from it?
+   *
+   * Only with a real finding in hand. `hasFindings` is the same gate the screen
+   * already uses to choose between the report and the countdown, so a locked young
+   * journal sees exactly what a Pro one does: there is nothing to sell yet.
+   */
+  const gated = locked && hasFindings;
+  /**
+   * Wraps the top card so it can be read but not opened.
+   *
+   * `pointerEvents="none"` on the inner view is what makes this work: the card's
+   * own rows are Pressables that open FindingSheet, and a press target merely
+   * placed on top of them would lose the race on some of them. The card renders
+   * exactly as it does for a Pro user; only the touch goes somewhere else.
+   */
+  const reveal = (node: React.ReactNode) => (!gated ? node : (
+    <Pressable
+      onPress={openPaywall}
+      onLayout={(e) => setRevealBottom(e.nativeEvent.layout.y + e.nativeEvent.layout.height)}
+      accessibilityRole="button"
+      accessibilityLabel="Upgrade to Pro to see the rest of your insights"
+      style={({ pressed }) => (pressed ? { opacity: 0.75 } : null)}
+    >
+      <View pointerEvents="none">{node}</View>
+    </Pressable>
+  ));
+  /** Which card the mask spares. `earlyAbove` is empty whenever the strict sweep
+   *  found anything (the engine guarantees it), so with `hasFindings` true the top
+   *  card is the Biggest change if there is one and the Correlations card if not. */
+  const revealCorrelations = gated && !view?.change;
+  const asIs = (n: React.ReactNode) => n;
+
   return (
     <Screen
       // Clears the tab bar plus the AI button above it.
@@ -369,7 +439,9 @@ export default function InsightsScreen() {
       // The skeleton is a promise about a layout that doesn't exist yet, so
       // scrolling it would land the user at an offset the real content may not
       // reach, and throw them when it arrives.
-      scrollEnabled={!!view}
+      // A masked document has nothing to scroll to, and scrolling one would slide
+      // the revealed card out from under a mask anchored to the header.
+      scrollEnabled={!!view && !gated}
       onHeaderHeight={setHeaderH}
       header={
         <View style={{ paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
@@ -413,20 +485,22 @@ export default function InsightsScreen() {
               days and there are none, so it would be a Pro button that can only
               return prose about nothing (it used to be backed by the sample month). */}
           {!locked && view && hasOwnData(state.days) ? <AskAiPill /> : null}
+          {/* Held back until the card above it has reported a height: at 0 the mask
+              would cover that card for a frame and then jump off it, which reads as
+              a flicker on the one thing the reader is meant to look at. */}
           <LockedOverlay
-            visible={locked}
+            visible={gated && revealBottom > headerH}
             top={headerH}
-            title="Insights are locked"
-            body="Pro finds the patterns in your own log: what changed, what moves with what, and the trends worth watching. All computed on your device."
+            revealTop={Math.max(0, revealBottom - headerH - 6)}
+            title="The rest is locked"
+            body="Pro shows every pattern found in your own log: what changed, what moves with what, and the trends worth watching. All computed on your device."
             onUpgrade={openPaywall}
           />
         </>
       }
     >
       {!view ? (
-        // A locked view has no findings to shape a skeleton from, and the mask
-        // goes over the top of it regardless.
-        <InsightsSkeleton shape={locked ? EMPTY_SHAPE : shape} />
+        <InsightsSkeleton shape={shape} />
       ) : (
         <>
           {/* ABOVE everything, in both states. The early tier is the first thing this
@@ -440,20 +514,22 @@ export default function InsightsScreen() {
               {/* Each card measures ITSELF, not a wrapper: a wrapper's frame includes the
                   card's 12pt bottom margin and the card's own frame does not, so
                   measuring the wrapper made every skeleton card 12pt too tall. */}
-              {view.change ? (
-                <BiggestChangeCard change={view.change} series={view.detail[view.change.id] || null} onLayout={measure('change')} />
+              {view.change ? reveal(
+                <BiggestChangeCard change={view.change} series={view.detail[view.change.id] || null} onLayout={measure('change')} />,
               ) : null}
               <EarlySignals list={earlyBelow} detail={view.detail} />
-              <Correlations
-                list={view.correlations}
-                change={view.change}
-                detail={view.detail}
-                // Rows open the finding itself (see features/insights/FindingSheet).
-                // Every row on this screen does, Trend watch included: nothing here
-                // navigates away or touches Progress's range.
-                onLayout={measure('correlations')}
-                onRowLayout={measureRow('correlations')}
-              />
+              {(revealCorrelations ? reveal : asIs)(
+                <Correlations
+                  list={view.correlations}
+                  change={view.change}
+                  detail={view.detail}
+                  // Rows open the finding itself (see features/insights/FindingSheet).
+                  // Every row on this screen does, Trend watch included: nothing here
+                  // navigates away or touches Progress's range.
+                  onLayout={measure('correlations')}
+                  onRowLayout={measureRow('correlations')}
+                />,
+              )}
               {/* These three are the mature report's supporting cast, so they arrive
                   WITH it rather than before it. Alone on a young journal they read as
                   the whole answer, which is how "Only 8 of the last 30 days are

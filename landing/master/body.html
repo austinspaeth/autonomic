@@ -125,6 +125,7 @@
     <button class="tab" role="tab" data-view="platforms" aria-selected="false">iOS vs Android</button>
     <button class="tab" role="tab" data-view="forecast" aria-selected="false">Forecast</button>
     <button class="tab" role="tab" data-view="pings" aria-selected="false">Pings</button>
+    <button class="tab" role="tab" data-view="links" aria-selected="false">Links</button>
   </nav>
 
   <!-- one filter row above everything it scopes -->
@@ -465,6 +466,91 @@
         <div id="pgMeasureCurve-table" class="hidden" style="margin-top:12px"></div>
         <div id="pgMeasureRates"></div>
       </div>
+      <div class="card">
+        <header><h2>What readings are taken with</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="pgReadMethods">Table</button></header>
+        <p class="hint">The same days as <b>Opened vs measured</b>, split by the sensor. This is the habit's hardware: the card above says how many people measured, this says what they reached for. The daily counter is capped at one ping per install per Eastern day, so a band is each install's <b>first reading of that day</b> and not everything it used — somebody who straps up in the morning and checks on the camera at night is one chest strap here. Readings from builds that shipped before the sensor letter did are drawn as <b>no sensor</b> rather than guessed at, so a range that straddles that release reads honestly.</p>
+        <div id="pgReadMethods"></div>
+        <div id="pgReadMethods-table" class="hidden" style="margin-top:12px"></div>
+        <div id="pgReadMethodNote"></div>
+      </div>
+    </div>
+
+    <!-- ---------- 5d2. the capture funnel ----------
+         Two counters, started and completed, and the gap between them is the
+         only place an abandoned reading is visible at all. -->
+    <div class="card" style="margin-bottom:14px">
+      <header><h2>Started vs completed</h2><span class="spacer"></span>
+        <button class="btn sm" data-table-toggle="pgFunnel">Table</button></header>
+      <p class="hint">Readings <b>begun</b> against readings <b>finished</b>, by day. A five-minute reading is a long time to sit still, and a start with no completion is the specific shape of the app asking for something the person could not give it — a strap that would not pair, a pace that was wrong, a session that was too long. Neither counter fires on <em>save</em>: the measurement is the event, and a reading the user discards is still one this app took. Both are capped once per install per Eastern day, so the rate below is over install-days, and the rows split it <b>by sensor</b> — which is the form of the number that implies an action.</p>
+      <div id="pgFunnel"></div>
+      <div id="pgFunnel-table" class="hidden" style="margin-top:12px"></div>
+      <div id="pgFunnelNote"></div>
+    </div>
+
+    <!-- ---------- 5e. the paywall ----------
+         The counter's fifth route, and the only one that is not about a
+         measurement. Capped once per install per Eastern day like the two
+         above, so it counts PEOPLE who met a wall and not taps on it. -->
+    <div class="grid two-col" style="margin-bottom:14px">
+      <div class="card">
+        <header><h2>Opened vs paywalled</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="pgPayDaily">Table</button></header>
+        <p class="hint">Every day, how many installs opened the app and how many <b>met the paywall</b>. Capped at one ping per install per Eastern day, exactly like opens and readings, so the share underneath is a share of <em>people</em> and not a count of taps — one frustrated user tapping a locked range four times is one person here. Read it against conversion: a share that climbs while purchases do not is a wall people are bouncing off, not a funnel. Days before the paywall counter shipped are a <b>gap in the line, not a zero</b>.</p>
+        <div id="pgPayDaily"></div>
+        <div id="pgPayDaily-table" class="hidden" style="margin-top:12px"></div>
+        <div id="pgPayNote"></div>
+      </div>
+      <div class="card">
+        <header><h2>Which wall they meet first</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="pgSurfaces">Table</button></header>
+        <p class="hint">Which locked surface raised the card. Because the counter fires once a day, a band is the <b>first</b> wall that install met that day and not every wall it met — so this answers <em>what is the app's front door to Pro</em>, and emphatically not <em>how often is each feature locked</em>. A surface that is always met second is invisible here. <b>Settings</b> is listed apart from the rest because it is not a wall: somebody who opened Settings and tapped Upgrade went looking for the paywall, which is the opposite signal from somebody who walked into it.</p>
+        <div id="pgSurfaces"></div>
+        <div id="pgSurfaces-table" class="hidden" style="margin-top:12px"></div>
+        <div id="pgSurfaceNote"></div>
+      </div>
+    </div>
+
+    <!-- ---------- 5f. tier and build ----------
+         Two fields every route now carries, which is what turns each counter
+         above from one number into a number per population. -->
+    <div class="grid two-col" style="margin-bottom:14px">
+      <div class="card">
+        <header><h2>Who is in the app</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="pgTiers">Table</button></header>
+        <p class="hint">Each day's actives split by what the install could do at the moment it pinged: <b>Pro</b>, <b>Trial</b>, or <b>Free</b>. Every route carries the letter, so the same split is available for readings and for paywalls — the rows underneath compare them, and the interesting number is whether the people who measure are the people who pay. Pings from builds too old to name a tier are drawn as <b>not stated</b> and are never folded into Free: not asking is not an answer.</p>
+        <div id="pgTiers"></div>
+        <div id="pgTiers-table" class="hidden" style="margin-top:12px"></div>
+        <div id="pgTierNote"></div>
+      </div>
+      <div class="card">
+        <header><h2>What they are running</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="pgBuilds">Table</button></header>
+        <p class="hint">Active installs by app version — how fast a release actually reaches phones, which is the difference between "shipped" and "fixed". Version is counted against platform and tier but <b>not</b> against the install's age, deliberately: crossing it with the cohort would multiply a table that grows forever. Pings from builds that predate the version field are drawn as <b>not stated</b>, so adoption is a share of everyone rather than a share of the builds that can talk.</p>
+        <div id="pgBuilds"></div>
+        <div id="pgBuilds-table" class="hidden" style="margin-top:12px"></div>
+        <div id="pgBuildNote"></div>
+      </div>
+    </div>
+
+    <!-- ---------- 5g. offers and product events ---------- -->
+    <div class="grid two-col" style="margin-bottom:14px">
+      <div class="card">
+        <header><h2>Offers</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="pgOffers">Table</button></header>
+        <p class="hint">Each offer <b>shown</b>, and what happened next. <b>Accepted</b> means the card's own buy button was tapped — not that money moved, which is the subscribe counter's question; the gap between the two is the store sheet being abandoned or declining. The third outcome is the common one: an offer that was neither accepted nor dismissed was <b>ignored</b>, and it is counted rather than left implied. The half-off annual card has no ✕ (it expires on its own), so collapsing it is what counts as a dismissal there; the founding-member card's ✕ is permanent.</p>
+        <div id="pgOffers"></div>
+        <div id="pgOffers-table" class="hidden" style="margin-top:12px"></div>
+        <div id="pgOfferNote"></div>
+      </div>
+      <div class="card">
+        <header><h2>What people do in there</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="pgEvents">Table</button></header>
+        <p class="hint">The rest of the counters, per day: the two gated views being <b>opened</b> (every tier — for a free user this is the demand side of the paywall counter, for a paying one it is whether the thing they bought is the thing they use), <b>POTS captures</b> finishing, and <b>notifications being turned on</b>. These routes are capped once per install per day <em>per letter</em> rather than per route, so each line is a headcount for that one thing and somebody who did two of them is counted in both — a stand test and an episode on the same bad day are not one event.</p>
+        <div id="pgEvents"></div>
+        <div id="pgEvents-table" class="hidden" style="margin-top:12px"></div>
+        <div id="pgEventNote"></div>
+      </div>
     </div>
 
     <!-- ---------- 5b. which store ---------- -->
@@ -751,11 +837,52 @@
           <button data-v="sub" aria-pressed="false">Subscribes</button>
           <button data-v="act" aria-pressed="false">Activations</button>
           <button data-v="hrv" aria-pressed="false">Readings</button>
+          <button data-v="cap" aria-pressed="false">Started</button>
+          <button data-v="pay" aria-pressed="false">Paywalls</button>
+          <button data-v="see" aria-pressed="false">Views</button>
+          <button data-v="pot" aria-pressed="false">POTS</button>
+          <button data-v="not" aria-pressed="false">Notifications</button>
+          <button data-v="osh" aria-pressed="false">Offers shown</button>
+          <button data-v="oac" aria-pressed="false">Offers accepted</button>
+          <button data-v="odm" aria-pressed="false">Offers dismissed</button>
+          <button data-v="err" aria-pressed="false">Failures</button>
         </div>
         <button class="btn sm" id="pgRawExport">Export CSV</button></header>
       <p class="hint">One row per <b>(route, arrival day, cohort key)</b> — which is exactly how the counter stores it, so nothing here is derived. <b>Arrived</b> is the day the server stamped; <b>cohort</b> is the day that install first ran, carried in the request path. <b>Age</b> is the gap between them, so an open ping at age 0 is a first run and a subscribe at age 20 is someone who paid three weeks in. The counter carries no device id and no body, which is why a row is a count and never a list of people. The range and platform filters above apply; <b>unknown</b> platform means a build that shipped before the store marker existed.</p>
       <div id="pgRawTable"></div>
     </div>
+  </section>
+
+
+  <!-- ================= LINKS ================= -->
+  <!-- Campaign download links. Not an analytics view: it is the one place on
+       this dashboard that CHANGES the public site, which is why it stands on
+       its own tab rather than under Edit data with the ad spots. -->
+  <section id="view-links" class="view hidden">
+
+    <div class="section-head">
+      <h2 class="section-title">Campaign download links</h2>
+      <span class="section-note">One short link per campaign, sent to whichever store the visitor is holding</span>
+    </div>
+
+    <div class="card" style="margin-bottom:14px">
+      <header><h2>What these are</h2></header>
+      <p class="hint"><code>autonomic.care/download</code> is the site's own signpost and is not managed here: it sniffs the phone and sends it to its store with the standard <b>Videos</b> attribution. A campaign link is the same page with <b>destinations you choose</b> — <code>autonomic.care/download/facebook</code> can carry its own App Store campaign token and its own Play referrer, so the two campaigns are told apart in App Store Connect and in the Play Console.</p>
+      <p class="hint">Saving a campaign <b>publishes the page immediately</b>. It is written into the site as a finished file with both URLs already in it, so the redirect never calls this API and keeps working whether or not the dashboard does. Deleting one takes the page down. A visitor on a desktop lands on the site instead, and a platform left blank falls back to <code>/download</code>, so the phone still reaches the right store with the default credit.</p>
+      <div class="row-actions">
+        <button class="btn" id="lkRepublish">Republish every page</button>
+        <span class="note" id="lkRepublishStatus"></span>
+      </div>
+      <p class="hint" style="margin-top:8px">Rewrites every campaign page from what is stored here. Nothing needs it in normal use — it is the repair button for a page that has gone missing.</p>
+    </div>
+
+    <details class="card acc" open>
+      <summary><h2>Campaigns</h2><span class="spacer"></span>
+        <button class="btn primary sm" id="lkAdd">+ New link</button></summary>
+      <p class="hint">The <b>path</b> is what goes after <code>/download/</code> — lowercase letters, numbers and hyphens. Changing it retires the old link and publishes a new one, so anything already printed stops working; add a second campaign instead if the old link is out in the world.</p>
+      <div id="lkForm" class="hidden" style="margin-bottom:12px"></div>
+      <div class="table-scroll" id="lkTable"></div>
+    </details>
   </section>
 
   <section id="view-data" class="view hidden">

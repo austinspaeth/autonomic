@@ -12,6 +12,13 @@ stages:
     params:
       tableName: "Autonomic-${sls:stage}"
       apiDomain: "api.autonomic.care"
+      # The live site's bucket and distribution. Created out-of-band (the
+      # pipeline stack only references them), and passed to CodeBuild as
+      # S3_BUCKET / CLOUDFRONT_DISTRIBUTION_ID — see infrastructure/pipeline.yml.
+      # They are here because saving a campaign download link writes its page
+      # straight into that bucket; see lambdas/api/links.js.
+      siteBucket: "${env:S3_BUCKET, 'autonomic.care'}"
+      siteDistributionId: "${env:CLOUDFRONT_DISTRIBUTION_ID, 'E17FMCFPDR3P3D'}"
       hostedZoneId: "${env:AUTONOMIC_HOSTED_ZONE_ID, 'Z101404626QO1OFJN008E'}"
 
 provider:
@@ -70,6 +77,21 @@ provider:
         # and never reads it — Serverless has no native per-function role, and
         # the alternative (build-time injection) is the one that can break
         # every deploy. Documented rather than hidden.
+        # Campaign download pages. Scoped to the `download/` prefix: this role
+        # can publish a campaign link and can never touch the rest of the site,
+        # which the pipeline owns. No ListBucket — nothing here enumerates.
+        - Effect: Allow
+          Action:
+            - s3:PutObject
+            - s3:DeleteObject
+          Resource:
+            - arn:aws:s3:::${param:siteBucket}/download/*
+        # Clearing the edge after an edit. Best effort in the code; the objects
+        # also carry a 60s max-age, so a missing grant costs a minute.
+        - Effect: Allow
+          Action: cloudfront:CreateInvalidation
+          Resource:
+            - !Sub arn:aws:cloudfront::${AWS::AccountId}:distribution/${param:siteDistributionId}
         - Effect: Allow
           Action: ssm:GetParameter
           Resource:
@@ -115,6 +137,11 @@ functions:
     description: Autonomic master dashboard data API
     environment:
       VAPID_PARAM: ${self:custom.vapidParam}
+      # Where a campaign download page is published. Unset is safe: the
+      # dashboard stores and syncs campaigns either way and says they are not
+      # live. See lambdas/api/links.js.
+      SITE_BUCKET: ${param:siteBucket}
+      CLOUDFRONT_DISTRIBUTION_ID: ${param:siteDistributionId}
     events:
       - httpApi:
           method: POST
@@ -127,7 +154,7 @@ functions:
   # protecting: one date, no identifier, no body. See lambdas/ping/main.js.
   ping:
     handler: lambdas/ping/main.handler
-    description: Anonymous cohort ping from the mobile app (open + subscribe + activation + daily reading)
+    description: Anonymous cohort ping from the mobile app (installs, captures, paywall, offers, product events)
     memorySize: 256
     timeout: 5
     events:
@@ -138,17 +165,64 @@ functions:
           method: GET
           path: /ping/sub/{cohort}
       # First HRV reading ever saved by an install. The code carries one extra
-      # letter for the sensor it used (W watch / B strap / F finger).
+      # letter for the sensor it used (W watch / B strap / F finger / G Garmin).
       - httpApi:
           method: GET
           path: /ping/act/{cohort}
-      # An HRV reading was saved today. Once per install per Eastern day, the
+      # A reading STARTED. Its twin below fires when one completes, and the gap
+      # between them is abandonment — the thing neither counter sees alone.
+      - httpApi:
+          method: GET
+          path: /ping/cap/{cohort}
+      # An HRV reading COMPLETED today. Once per install per Eastern day, the
       # same rule and the same code the open route uses — which is what makes
-      # readings-over-opens a share of people rather than of pings. No sensor
-      # letter: that question belongs to /act.
+      # readings-over-opens a share of people rather than of pings. It carries
+      # the sensor letter too — the letter splits the key, never the count.
       - httpApi:
           method: GET
           path: /ping/hrv/{cohort}
+      # The paywall came up today. Once per install per Eastern day, like the
+      # two above, so it is a share of PEOPLE who met a wall and not a count of
+      # taps. One letter for which surface raised it (R progress range /
+      # I insights / P POTS / O,M,N the AI reports / S the Settings button).
+      - httpApi:
+          method: GET
+          path: /ping/pay/{cohort}
+      # A notification was turned ON (M morning reminder / C crash warning),
+      # a POTS capture finished (T stand test / E episode), a gated view was
+      # opened (I insights / P progress). All three are capped once per install
+      # per Eastern day PER LETTER, not per route: their letters are choices the
+      # user made between real alternatives, and a whole-route cap would drop
+      # whichever came second every time somebody did both.
+      - httpApi:
+          method: GET
+          path: /ping/not/{cohort}
+      - httpApi:
+          method: GET
+          path: /ping/pot/{cohort}
+      - httpApi:
+          method: GET
+          path: /ping/see/{cohort}
+      # Something on this install failed. Once per install EVER, and it carries
+      # no tag and no message: how many phones are having a bad time, never what
+      # went wrong. Diagnosis is the support dump, from the user's own device.
+      - httpApi:
+          method: GET
+          path: /ping/err/{cohort}
+      # The offer funnel — shown, then dismissed or accepted — as three routes
+      # over one alphabet (A the half-off annual window / F founding member), so
+      # accepts over shows is that offer's conversion. "Accepted" is a tap on the
+      # card's own buy button, not a completed purchase: that is /ping/sub, and
+      # the gap between the two is the store sheet.
+      - httpApi:
+          method: GET
+          path: /ping/osh/{cohort}
+      - httpApi:
+          method: GET
+          path: /ping/odm/{cohort}
+      - httpApi:
+          method: GET
+          path: /ping/oac/{cohort}
       # Reading the counters back. Not public — guarded by PING_REPORT_KEY,
       # which is unset by default, and an unset key refuses everyone.
       - httpApi:
@@ -276,8 +350,11 @@ resources:
       Description: Mobile app activation ping (cohort is D{MMDDYY}{platform}{method})
       Value: !Sub https://${param:apiDomain}/ping/act/{cohort}
     HrvPingEndpoint:
-      Description: Mobile app daily HRV-reading ping (cohort is D{MMDDYY}{platform})
+      Description: Mobile app daily HRV-reading ping (cohort is D{MMDDYY}{platform}{method})
       Value: !Sub https://${param:apiDomain}/ping/hrv/{cohort}
+    PayPingEndpoint:
+      Description: Mobile app daily paywall ping (cohort is D{MMDDYY}{platform}{surface})
+      Value: !Sub https://${param:apiDomain}/ping/pay/{cohort}
     PingReportEndpoint:
       Description: Read the ping counters (needs ?key= — see sls/README.md)
       Value: !Sub https://${param:apiDomain}/ping/report

@@ -17,6 +17,13 @@
  *    live is the point. `top` is where the host's header ends.
  * 3. THE SCRIM EATS EVERY TOUCH beneath it, so the masked document can't be
  *    scrolled or tapped. There is nothing readable down there to scroll to.
+ *
+ * `revealTop` is the one thing that differs between the two hosts, and it is a
+ * measurement rather than a treatment: Insights leaves its TOP CARD unmasked, so
+ * a free user reads one real finding about their own log before the mask, and the
+ * scrim starts that many points below the header instead of at it. Progress passes
+ * nothing — its free clip is the whole Day range, so there is no first card to
+ * spare. Same scrim, same card, same copy shape; only where the mask begins.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { Platform, Text, View } from 'react-native';
@@ -31,10 +38,20 @@ import { MONTHLY_SKU, YEARLY_SKU, priceOf, useIap } from '../store/iap';
 const ENTER_SPRING = { damping: 23, stiffness: 200, mass: 0.9 } as const;
 const EXIT = { duration: 220, easing: REasing.in(REasing.cubic) };
 
-export function LockedOverlay({ visible, top, title, body, onUpgrade }: {
+export function LockedOverlay({ visible, top, revealTop = 0, title, body, onUpgrade }: {
   visible: boolean;
   /** Where the host's header ends — the overlay covers everything below it. */
   top: number;
+  /**
+   * How far BELOW `top` the mask starts, leaving that band readable and live.
+   *
+   * The host measures it (see app/(tabs)/insights.tsx) and is expected to land the
+   * seam in the gutter BETWEEN two cards: a scrim edge that cuts across a card
+   * reads as a rendering fault, and expo-blur can't be feathered without a mask
+   * layer. The card and the touch-eating scrim both start here; the upgrade card
+   * still docks to the bottom of the screen.
+   */
+  revealTop?: number;
   /** "Month trends are locked" / "Insights are locked". */
   title: string;
   body: string;
@@ -75,7 +92,7 @@ export function LockedOverlay({ visible, top, title, body, onUpgrade }: {
           mask on its OWN — expo-blur on Android is plain translucency unless the
           experimental Dimezis path is opted into, so Android leans on the tint
           instead and gets a correspondingly darker one. */}
-      <Animated.View style={[{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }, scrimStyle]}>
+      <Animated.View style={[{ position: 'absolute', top: revealTop, left: 0, right: 0, bottom: 0 }, scrimStyle]}>
         <BlurView intensity={44} tint="dark" style={{ flex: 1, backgroundColor: Platform.OS === 'ios' ? 'rgba(6,6,9,0.72)' : 'rgba(6,6,9,0.84)' }} />
       </Animated.View>
       <Animated.View

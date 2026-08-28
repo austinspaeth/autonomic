@@ -14,8 +14,19 @@ Authorization: Bearer <Cognito id token>
 GET  https://api.autonomic.care/ping/open/D082126I    (public, no auth)
 GET  https://api.autonomic.care/ping/sub/D082126I
 GET  https://api.autonomic.care/ping/act/D082126IB
-GET  https://api.autonomic.care/ping/hrv/D082126I
+GET  https://api.autonomic.care/ping/cap/D082126IG   (a reading started)
+GET  https://api.autonomic.care/ping/hrv/D082126IG   (...and completed)
+GET  https://api.autonomic.care/ping/pay/D082126IR
+GET  https://api.autonomic.care/ping/not/D082126IM   (notification turned on)
+GET  https://api.autonomic.care/ping/pot/D082126IT   (POTS capture finished)
+GET  https://api.autonomic.care/ping/see/D082126II   (gated view opened)
+GET  https://api.autonomic.care/ping/err/D082126I    (a failure; once per install)
+GET  https://api.autonomic.care/ping/osh/D082126IA   (offer shown)
+GET  https://api.autonomic.care/ping/odm/D082126IA   (...dismissed)
+GET  https://api.autonomic.care/ping/oac/D082126IA   (...accepted)
 GET  https://api.autonomic.care/ping/report?key=...&since=2026-08-01
+
+     ...each of which may carry a tagged tail: D082126IG-TP-V1.26.0
 ```
 
 ## Authorization is two checks, not one
@@ -46,7 +57,14 @@ per user, which would eventually meet DynamoDB's 400KB item ceiling.
 | `PING#OPEN` | `<day>` | that day's opens, counted per cohort |
 | `PING#SUB` | `<day>` | that day's new subscribers, counted per cohort |
 | `PING#ACT` | `<day>` | that day's activations (first HRV reading), per cohort+method |
-| `PING#HRV` | `<day>` | that day's measuring installs (any HRV reading), per cohort |
+| `PING#HRV` | `<day>` | that day's measuring installs (any HRV reading), per cohort+method |
+| `PING#CAP` | `<day>` | that day's installs that STARTED a reading, per cohort+sensor |
+| `PING#PAY` | `<day>` | that day's installs that met the paywall, per cohort+surface |
+| `PING#NOT` | `<day>` | notifications turned on, per cohort+letter (per-letter cap) |
+| `PING#POT` | `<day>` | POTS captures finished, per cohort+letter (per-letter cap) |
+| `PING#SEE` | `<day>` | gated views opened, per cohort+letter (per-letter cap) |
+| `PING#ERR` | `<day>` | installs reporting a first failure — once per install, ever |
+| `PING#OSH` / `#ODM` / `#OAC` | `<day>` | an offer shown · dismissed · accepted, per cohort+offer |
 | `STORE#VERSIONS` | `latest` | what each store is serving, cached (see below) |
 | `PUSH#<email>` | `SUB#<endpointHash>` | one device registered for background alerts |
 | `PUSH#STATE` | `WATERMARK` | what the hourly push job has already announced |
@@ -185,9 +203,9 @@ property, not a limitation.
 
 ### The reading counter is the open counter's twin
 
-`/ping/hrv/<code>` says an install saved an HRV reading today. It carries
-exactly what `/ping/open` carries — cohort date and platform letter, **no sensor
-letter** — and it is capped at one per install per Eastern day by the same
+`/ping/hrv/<code>` says an install saved an HRV reading today. It carries what
+`/ping/open` carries — cohort date and platform letter — plus the sensor letter
+(see below), and it is capped at one per install per Eastern day by the same
 client rule, bucketed on the same boundary. That symmetry is the whole point:
 because both count the same kind of thing over the same population, `hrv[day] /
 open[day]` is a **share of people**, not of pings. Opening the app is not using
@@ -197,16 +215,145 @@ never gains a new one.
 
 Two consequences for anything reading these rows:
 
-- **Nothing may be added to one of the two that is not added to the other.** A
-  second sensor letter on the HRV route, a different day boundary, a second ping
-  per day — any of them breaks the ratio silently, since the numbers still
-  divide.
+- **Nothing may be added to one of the two that CHANGES WHAT A COUNT MEANS in
+  one and not the other.** A different day boundary, a second ping per day —
+  either breaks the ratio silently, since the numbers still divide. The sensor
+  letter is not one of those things: it splits the KEY a count lands under, not
+  the count, so a day's HRV rows still sum to one per install and a consumer
+  that ignores the letter reads the number it always read. What the letter
+  cannot claim is a person's whole day — the daily cap means it names whichever
+  reading came FIRST — and the dashboard says so.
 - **Days before the route shipped are unknown, not zero.** There is no start
   date stored anywhere (the endpoint keeps counts), so a reader has to take the
   first day an `hrv` row exists as the counter's birthday and answer null for
   everything before it. `landing/master/analytics.js` does exactly that
   (`hrvFirst` / `hrvKnown`), and reads it off the UNFILTERED rows, because
   Android shipped the route in its own release.
+
+### Capture is two counters, and neither is the save
+
+`/ping/cap` fires when a reading STARTS and `/ping/hrv` when one COMPLETES.
+Separate routes rather than one route with a phase letter, because they are read
+AGAINST each other and a route is the one distinction a consumer cannot
+accidentally pool away.
+
+Neither fires on Save, and that is the correction that created the pair. The
+measurement is the event; whether the results card survived long enough to be
+tapped is a different fact about a different moment. Counting the save
+undercounted every completed reading that was discarded, backgrounded or lost to
+a closing sheet stack — and could not see an abandoned session at all, which is
+the failure worth seeing. Five minutes is a long time to sit still, and a start
+with no completion is the specific shape of the app asking for something the
+person could not give it.
+
+Both carry the sensor letter, so `hrv / cap` is a completion rate **per sensor**.
+That is the form of the number that implies an action; pooled, it is only ever a
+figure to worry about.
+
+### The paywall counter is the third daily one
+
+`/ping/pay/<code>` says a locked surface raised the paywall for this install
+today. Capped at one per install per Eastern day like the two above, and capped
+for the same reason: uncapped it would count TAPS, and one user tapping a locked
+range four times would read as four people meeting a wall. Capped, `pay[day] /
+open[day]` is a share of people, and it is the number that says how hard the app
+is pushing.
+
+Its letter rides in the same slot the sensor letter uses — a route only ever
+speaks one alphabet, so the two can never be confused, and the handler validates
+the letter against the alphabet the route actually speaks (a letter appended to
+an `open` ping is dropped, or one cohort's opens would split across keys nobody
+knows to re-add). The surfaces are `R` a locked Progress range, `I` the Insights
+tab, `P` a POTS capture, `O`/`M`/`N` the Outlook, metric and Insights AI reports,
+and `S` the Upgrade button in Settings.
+
+`S` is the one that needs saying out loud: it is **not a wall**. Somebody who
+opened Settings and tapped Upgrade went looking for the paywall, which is the
+opposite signal from somebody who walked into a lock, and a "top wall" ranking
+with it in would answer neither question. The dashboard names it separately.
+Like the sensor letter, the daily cap means the surface is the day's FIRST wall,
+so these rows rank front doors and not lock frequency.
+
+### Two shapes of daily cap, and the difference is load-bearing
+
+`open`, `cap`, `hrv` and `pay` are capped once per install per Eastern day for
+the WHOLE route. A day's rows therefore sum to a headcount, which is what makes
+`hrv[day] / open[day]` a share of people — and it is also why the letter on those
+routes can only ever describe the FIRST event of the day.
+
+`not`, `pot`, `see`, `osh`, `odm` and `oac` are capped per LETTER. Their letters
+are choices the user made between real alternatives: a stand test is not an
+episode, Insights is not Progress, the morning reminder is not the crash warning.
+A whole-route cap would have silently dropped whichever came second, which on a
+bad day is exactly the one worth knowing about. The trade is that those routes'
+daily TOTALS are not headcounts; each letter's count still is, which is the
+number anyone actually wants. Anything reading these rows must not add the
+letters of a per-letter route together and call the result people.
+
+`err` is neither. It fires once per install EVER and carries no letter, so a
+day's count is new installs joining a population and the running total is the
+population itself. It carries no tag and no message either: a tag is a string
+this app chose and a message is a string it did not, and neither belongs in a
+counter with no identifier. It says how many phones are having a bad time, and
+the support dump — from the user's own device, with their consent — is where one
+is diagnosed.
+
+### The offer funnel counts a tap, not a purchase
+
+`osh` / `odm` / `oac` are three routes over one alphabet (`A` the half-off annual
+window, `F` founding member), so `oac / osh` is that offer's conversion.
+
+**Accepted means the card's own buy button was tapped.** Whether the purchase
+then went through is `/ping/sub`'s question, and the gap between the two is the
+store sheet being abandoned or the payment declining. Keeping them apart is what
+makes that gap visible instead of silently folded into the offer's conversion
+rate, so nothing downstream may rename this to "converted". The third outcome is
+the common one: an offer neither accepted nor dismissed was ignored, and the
+dashboard counts it rather than leaving it implied.
+
+### Every route carries a tier and a version
+
+Behind the fixed head, a ping may append `-T{F|T|P}` (what the install could do
+at that instant) and `-V1.26.0` (the build). They are TAGGED rather than
+positional because the head cannot be extended: `[A-Z]?[A-Z]?` cannot tell a
+missing sensor from a tier letter sitting in the sensor's place, so one more
+bare letter would have made `D082126IP` ambiguous forever. A tag says what a
+token is whatever else is present, so the next field costs a letter and breaks
+nothing — and a build sending no tokens writes exactly the code and exactly the
+key it always did.
+
+Where they land is not symmetric, and the asymmetry is deliberate:
+
+- **Tier goes into the cohort key** (`082126IG-P`), so every question the matrix
+  already answers can also be asked per tier — including conversion, which is
+  simply a cohort's rows drifting from `F` to `P` over time.
+- **Version goes into a second map** on the same row (`builds`, keyed
+  platform+tier+version). The cohort map gains an entry per combination seen that
+  day and cohorts accumulate forever; multiplying it by the live builds too walks
+  a busy row toward DynamoDB's 400KB item ceiling, at which point the day stops
+  counting rather than failing loudly. The cost is the three-way question ("pro
+  share of the day-30 cohort on 1.26"), which nothing asks.
+
+`builds` is a **complete partition**: missing parts are stored as `?` rather than
+omitted, so every ping lands in exactly one build key and the map sums to the
+day's total. That is what lets a reader say "68% of today's opens came from
+builds too old to name themselves" instead of reporting 32% adoption as though
+the rest were on something else. The same rule governs the tier: `?` is never
+folded into free, because "we did not ask" and "they had not paid" are different
+facts and only one of them is about the user.
+
+An unrecognised letter is dropped rather than refused, in both fields and in the
+slot, so a new sensor, surface or tier can ship on the client before this
+endpoint learns its name. It lands as unknown, never as a lost count.
+
+**Deploy this endpoint BEFORE shipping a client that sends the tail.** The
+leniency above is about LETTERS, not about the shape: a decoder that predates
+the tagged tail matches the whole segment against a fixed-width pattern, so
+`D082126IG-TP-V1.26.0` does not decode as "cohort plus something I don't know",
+it fails outright and the ping is silently dropped — 204, no count, no log. It
+is the one ordering constraint here, it fails in the direction that looks like
+nobody opened the app, and it is invisible from the phone. `sls deploy` first,
+then release the build.
 
 ### Never delete a day row
 
@@ -245,14 +392,35 @@ Two doors onto the same function, because they have different callers:
   the dashboard, which already holds a Cognito token and shouldn't also carry
   the shared key. The email allowlist guards it like everything else there.
 
-Both answer `{ since, open: [...], sub: [...], act: [...], hrv: [...] }`, each row
-`{ day, total, cohorts: [{ key, cohortDate, cohort, platform, method, count }] }`.
-Rows stored before the platform marker existed report `platform: "U"`. `method`
-is the sensor an activation used — `W` watch, `B` Bluetooth strap, `F` finger on
-the camera — and is `null` on every row of the other three kinds, which carry no
-method at all. A consumer written before the `hrv` key existed ignores it; one
-written after must treat a missing `hrv` row as "the counter was not running",
-not as "nobody measured".
+Both answer one key per route — `{ since, open, sub, act, cap, hrv, pay, not,
+pot, see, err, osh, odm, oac }` — each row
+
+```jsonc
+{
+  day: '2026-08-21',
+  total: 137,
+  cohorts: [{ key, cohortDate, cohort, platform, slot, method, surface, tier, count }],
+  builds:  [{ key, platform, tier, version, count }]
+}
+```
+
+Rows stored before the platform marker existed report `platform: "U"`. The 8th
+character of a cohort key is reported three ways so a consumer never has to know
+which kind it is holding: `slot` is it raw, `method` is it on the two reading
+kinds and `null` elsewhere, `surface` is it on `pay` and `null` elsewhere.
+Sensors are `W` Apple Watch, `B` Bluetooth strap, `F` finger on the camera, `G`
+Garmin watch; surfaces are `R`/`I`/`P`/`O`/`M`/`N`/`S` as above; the rest are
+`M`/`C` notifications, `T`/`E` POTS, `I`/`P` views, `A`/`F` offers. Every row also
+carries `label`, the letter resolved to a name by the route's own alphabet, so a
+consumer can print it without holding a copy of every table. `tier` is `F`,
+`T`, `P` or `null`, and `version` is a dotted number or `null` — in both cases
+`null` means the ping predates the field or the endpoint did not recognise it,
+which is never the same as a named value.
+
+A consumer written before a key existed ignores it; one written after must treat
+a missing row as "the counter was not running", not as "nobody did the thing".
+That applies to `hrv` and `pay` as counters, and one level down to `tier` and
+`version` as fields.
 
 Set the key once before the first deploy (any random string):
 

@@ -4,7 +4,7 @@
  * card back up. When the reading lands while minimized, the pill fades away
  * and the results card rises on its own — unless another sheet is open, in
  * which case it waits for the stack to empty first (the results card's
- * Save/Discard closes the whole stack, and it must not take an unrelated
+ * Done closes the whole stack, and it must not take an unrelated
  * half-filled form down with it). Mounted once in the root layout, inside
  * SheetProvider (it opens sheets), floating above the tab bar.
  */

@@ -58,7 +58,11 @@ ok('obsolete wallDays field is gone from the DOM', $('fWall')===null, 'fWall sti
 ok('Compare button removed', window.document.querySelector('#fPlatform [data-v="compare"]')===null, 'still there');
 // pings tab
 const tab=[...window.document.querySelectorAll('.tab')].find(t=>t.dataset.view==='pings');
-ok('Pings tab exists and is last', !!tab && [...window.document.querySelectorAll('.tab')].pop()===tab, 'missing/not last');
+// Pings is the last of the DATA tabs. Links, which is a tool rather than a
+// view of the numbers, was added after it and is the only thing past it.
+const tabs=[...window.document.querySelectorAll('.tab')];
+ok('Pings is the last data tab', !!tab && tabs.slice(tabs.indexOf(tab)+1).every(t=>t.dataset.view==='links'),
+   'missing, or a data tab follows it');
 tab.click();
 await new Promise(r=>setTimeout(r,400));
 const table=$('pgRawTable');

@@ -19,7 +19,7 @@
  *
  * Pure: no store, no MMKV, no expo, no React.
  */
-import { TREND_METRICS, TREND_WINDOW_DAYS, WATCH_PRIORITY, compareWindows, metricSeries, type TrendMetricId } from '../trends';
+import { TREND_METRICS, TREND_WINDOW_DAYS, WATCH_PRIORITY, compareWindows, metricSeries, phraseOf, type TrendMetricId } from '../trends';
 import type { ScoreContext } from '../scoring';
 import { scoreSet, type DaysMap } from '../scoring/day';
 import { median } from './stats';
@@ -122,7 +122,7 @@ export function findWatchItems(matrix: DayMatrix, suppressed: boolean): WatchIte
     out.push({
       metric: id,
       title: shortMetric(def),
-      sub: `${capitalize(def.phrase(delta.delta))} vs last month`,
+      sub: `${capitalize(phraseOf(def, delta.delta))} vs last month`,
       value: `${def.fmt(delta.recent)} ${def.unit}`,
       change: dispersion
         ? (delta.direction === 'improving' ? 'Steadier' : 'Less steady')
@@ -190,7 +190,7 @@ export function overallDirection(matrix: DayMatrix): Overall {
     const delta = compareWindows(scores, TREND_WINDOW_DAYS, TREND_WINDOW_DAYS, TREND_METRICS.score);
     if (delta.significant) {
       return verdict(delta.direction === 'improving' ? 'up' : 'down',
-        `daily score ${TREND_METRICS.score.phrase(delta.delta)} vs last month`);
+        `daily score ${phraseOf(TREND_METRICS.score, delta.delta)} vs last month`);
     }
     // A score that is present and genuinely flat is an answer in itself.
     if (delta.direction === 'flat') return verdict('flat', 'daily score level vs last month');

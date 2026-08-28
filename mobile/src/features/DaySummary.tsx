@@ -209,9 +209,7 @@ export function DaySummary({ dk }: { dk: string }) {
           )}
         </GradientBorderCard>
       )}
-      {/* Directly under the Outlook: the half-off year is time-boxed to 24h and
-          outranks the generic upsell, which suppresses itself while the offer's
-          unlock has the tier reading 'trial'. */}
+      {/* Directly under the Outlook: the half-off year, time-boxed to 24h. */}
       <AnnualOfferCard />
       {/* The one-day founding-member offer. Independent of the annual card
           above: it fires inside the install trial, that one fires long after it
@@ -488,7 +486,7 @@ function InvestigateButton({ label, title, build }: {
   const p = usePalette();
   const { openSheet } = useSheets();
   const tier = useTier();
-  const openPaywall = usePaywall();
+  const openPaywall = usePaywall('outlook-ai');
   const press = () => {
     if (tier === 'free') { openPaywall(); return; }
     const s = getState();

@@ -31,7 +31,7 @@ import { detectDownturn } from '../lib/scoring/downturn';
 import { detectStrain } from '../lib/scoring/strain';
 import { dueMilestone, formatMsLeft, liveOffer, offerMsLeft } from '../lib/upsell/annual';
 import { FORCE_ANNUAL_OFFER, annualMemory, noteAnnualOfferCollapsed, noteAnnualOfferStarted } from '../lib/upsell/annualMemory';
-import { noteAnnualOfferPacing } from '../lib/upsell';
+import { pingOfferAccepted, pingOfferDismissed, pingOfferShown } from '../store/ping';
 
 const hexA = (hex: string, a: number) => {
   const n = parseInt(hex.slice(1), 16);
@@ -103,6 +103,10 @@ export function AnnualOfferCard() {
     const next = !expanded;
     setExpanded(next);
     noteAnnualOfferCollapsed(!next);
+    // This card has no ✕ — it expires on its own — so collapsing it IS the
+    // "no thanks", and that is what the dismissal counter records. Expanding
+    // again is not counted as anything: the offer was already counted as shown.
+    if (!next) pingOfferDismissed('annual');
   };
 
   // Adopt a window that's already running, or open a due one. Ask once and then
@@ -134,10 +138,15 @@ export function AnnualOfferCard() {
 
     settled.current = true;
     const next = noteAnnualOfferStarted(due, now);
-    noteAnnualOfferPacing();   // the generic upsell keeps its distance afterwards
     recheckTier();             // Pro lights up in the same frame the card appears
     setOffer({ milestone: due, msLeft: offerMsLeft(now, next) });
   }, [tier, depth, state]);
+
+  // Shown: the moment there is a live window and this card is rendering it —
+  // whether it was opened just now or adopted from an earlier launch, since
+  // from the reader's side those are the same event. Capped per Eastern day in
+  // the store, so re-entering the Journal all day counts once.
+  useEffect(() => { if (offer) pingOfferShown('annual'); }, [offer]);
 
   // Countdown. Also what retires the card: when the window closes, the tier
   // re-derives back to free and the card unmounts itself.
@@ -220,7 +229,7 @@ export function AnnualOfferCard() {
             </View>
 
             <Pressable
-              onPress={() => subscribe(PROMO_YEARLY_SKU)}
+              onPress={() => { pingOfferAccepted('annual'); subscribe(PROMO_YEARLY_SKU); }}
               disabled={purchasing}
               style={({ pressed }) => [
                 { height: 50, borderRadius: 16, backgroundColor: p.accent, alignItems: 'center', justifyContent: 'center', marginTop: 15 },

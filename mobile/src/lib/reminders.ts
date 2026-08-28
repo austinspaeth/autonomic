@@ -19,6 +19,7 @@ import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { todayKey } from './dates';
 import { logError } from './diagnostics/errorLog';
+import { pingNotifyEnabled } from '../store/ping';
 import { resolveProtocol } from './scoring/day';
 import { detectDownturn } from './scoring/downturn';
 import { getState, save, subscribeStore } from '../store/store';
@@ -185,6 +186,10 @@ export async function enableReminder(hhmm: string): Promise<boolean> {
   // worth having. An explicit off (crashAlert already set) is never overridden.
   if (s.settings.crashAlert === undefined) s.settings.crashAlert = { enabled: true };
   save();
+  // Counted here and not at the tap: on iOS the schedule above THROWS when the
+  // app isn't authorized, so a ping fired earlier would count an ask that
+  // produced no notification. Reaching this line means one is really armed.
+  pingNotifyEnabled('reminder');
   // The journal may already show a slide today; warn now rather than on the
   // next data point.
   void checkCrashRisk();
@@ -211,6 +216,8 @@ export async function setCrashAlert(on: boolean): Promise<boolean> {
   const prev = getState().settings.crashAlert;
   getState().settings.crashAlert = { ...(prev || {}), enabled: on };
   save();
+  // Only an enable is counted; a disable is a different event (see pingNotifyEnabled).
+  if (on) pingNotifyEnabled('crash');
   if (on) void checkCrashRisk();
   return true;
 }

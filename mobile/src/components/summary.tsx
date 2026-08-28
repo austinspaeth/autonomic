@@ -286,7 +286,7 @@ function MetricSection({ label, value, unit, cat, desc, help, days, type, ex, ba
 }
 
 /** The entry's free-text note, read-only. Editing lives in the entry's edit
- *  form (and, pre-save, in `NoteDraftCard` on the results step). */
+ *  form (and, on a live capture's results step, in `NoteDraftCard`). */
 function Notes({ r }: { r: Entry }) {
   const p = usePalette();
   if (!r.note) return null;
@@ -299,9 +299,10 @@ function Notes({ r }: { r: Entry }) {
 }
 
 /**
- * Note field for the keep-or-discard results step, where the reading only
- * exists in memory: shows the draft note and opens the editor sheet on tap.
- * Once saved, notes are edited through the entry's edit form instead.
+ * Note field for a live capture's results step: shows the note and opens the
+ * editor sheet on tap. The reading is already saved by the time this renders,
+ * so `onChange` writes straight through to the entry. Everywhere else, notes
+ * are edited through the entry's edit form.
  */
 export function NoteDraftCard({ note, onChange }: { note: string; onChange: (next: string) => void }) {
   const p = usePalette();
@@ -772,7 +773,7 @@ function InsightButton({ noun, title, build }: {
   const p = usePalette();
   const { openSheet } = useSheets();
   const tier = useTier();
-  const openPaywall = usePaywall();
+  const openPaywall = usePaywall('metric-ai');
   const open = () => {
     if (tier === 'free') { openPaywall(); return; }
     const { prompt, rangeText } = build();

@@ -12,7 +12,7 @@
  * opened HERE, not by the card, because a reading can finish while minimized
  * (the strap keeps streaming with the phone face down and the card gone). The
  * session is then torn down when the sheet stack empties again — not when the
- * results sheet unmounts, since Save/Discard calls closeAll() and the session
+ * results sheet unmounts, since its Done button calls closeAll() and the session
  * card beneath is still playing its exit; clearing the store a beat early would
  * blank that card out on its way down.
  */
@@ -98,7 +98,7 @@ export function HrvSessionHost() {
 
     // Strap and camera both finish with the RR array in hand — same Results
     // path. It rises OVER the session card, which recedes beneath it; Results'
-    // Save/Discard calls closeAll(), so both animate out together.
+    // Done calls closeAll(), so both animate out together.
     const { rr, segmentStarts, hrSamples, sdnnSamples, durationSec } = s.result;
     const config = s.config;
     openSheet((c) => (

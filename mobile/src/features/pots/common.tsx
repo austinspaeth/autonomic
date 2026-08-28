@@ -13,7 +13,6 @@ import Svg, { Circle } from 'react-native-svg';
 import { SheetControls, SheetFooter } from '../../components/Sheet';
 import { Button } from '../../components/ui';
 import { NoteDraftCard, ReadingSummary } from '../../components/summary';
-import { useToast } from '../../components/Toast';
 import { usePalette, GRADE_COLORS } from '../../theme';
 import { BANDS, catFromBands } from '../../lib/scoring';
 import { ble } from '../../lib/ble/manager';
@@ -145,48 +144,58 @@ export function deltaColor(d: number | null, bands: 'standDelta' | 'orthoIncreas
 /**
  * Results card stacked over the finished session (mirror of HrvResults): the
  * built entry previews through the same ReadingSummary the journal row opens,
- * with its HR series still inline; Save splits it into the waveform sidecar
- * before the journal write, exactly like a synced watch result.
+ * with its HR series still inline.
+ *
+ * Like HrvResults, the reading is SAVED THE MOMENT THIS CARD OPENS — split into
+ * the waveform sidecar before the journal write, exactly like a synced watch
+ * result. There is no keep-or-discard question; deleting it is one tap on the
+ * journal row.
  */
 export function PotsResultsSheet({ entry, dayKey, title, sub, controls }: {
   entry: Entry; dayKey: string; title: string; sub: string; controls: SheetControls;
 }) {
   const p = usePalette();
-  const toast = useToast();
   const ctx = { sex: getState().profile.sex, height: getState().profile.height };
 
-  // Sparklines should already include this unsaved result — hand the summary a
-  // days map with the live reading appended to its day.
+  // Sparklines should already include this result — hand the summary a days map
+  // with the reading appended to its day.
   const daysWithCurrent = useMemo(() => {
     const days = getState().days;
     const day = days[dayKey] as DayRecord | undefined;
     return { ...days, [dayKey]: { ...(day || {}), readings: [...((day && day.readings) || []), entry] } } as typeof days;
   }, [entry, dayKey]);
 
-  // Notes can be written before the reading is saved; the entry only exists in
-  // memory until Save, so hold the text here.
+  // The note is written onto the already-saved entry; the draft is held here
+  // only to render it.
   const [note, setNote] = useState('');
+  /** The persisted (waveform-stripped) entry, once the auto-save has run. */
+  const saved = useRef<Entry | null>(null);
   const shown = useMemo(() => (note ? { ...entry, note } : entry), [entry, note]);
 
-  const save = () => {
-    const { entry: stripped, waveform } = splitWaveform(shown);
+  useEffect(() => {
+    if (saved.current) return;
+    const { entry: stripped, waveform } = splitWaveform(entry);
     if (waveform) storeWaveform(stripped.id, waveform);
+    saved.current = stripped;
     upsertEntry(dayKey, 'readings', stripped);
-    toast('Reading saved');
-    controls.closeAll(); // close the results card AND the session card beneath it
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const onNote = (next: string) => {
+    setNote(next);
+    const e = saved.current;
+    if (e) upsertEntry(dayKey, 'readings', { ...e, note: next });
   };
 
   return (
     <View>
       <Text style={{ fontSize: 25, fontWeight: '800', color: p.text, marginBottom: 4 }}>{title}</Text>
-      <Text style={{ color: p.textDim, fontSize: 14, marginBottom: 16 }}>{sub}</Text>
+      <Text style={{ color: p.textDim, fontSize: 14, marginBottom: 4 }}>{sub}</Text>
+      <Text style={{ color: p.textDim, fontSize: 13, marginBottom: 16 }}>Saved to your journal</Text>
       <ReadingSummary r={shown} days={daysWithCurrent} ctx={ctx} />
-      <NoteDraftCard note={note} onChange={setNote} />
+      <NoteDraftCard note={note} onChange={onNote} />
       <SheetFooter>
-        <View style={{ flex: 1, flexDirection: 'row', gap: 12 }}>
-          <Button title="Discard" variant="danger" onPress={() => controls.closeAll()} />
-          <Button title="Save reading" variant="primary" onPress={save} />
-        </View>
+        <Button title="Done" variant="primary" onPress={() => controls.closeAll()} />
       </SheetFooter>
     </View>
   );

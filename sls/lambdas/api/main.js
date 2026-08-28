@@ -7,8 +7,9 @@
  * the email allowlist below is the actual access control. Never remove it.
  *
  * Actions:
- *   LOAD           -> { entries, events, ads, costs, sales, settings, ui }
+ *   LOAD           -> { entries, events, ads, costs, sales, links, settings, ui }
  *   SYNC           { upserts, deletes, settings, ui } -> applies a client diff
+ *   LINKS_REPUBLISH-> rewrites every stored campaign page into the site bucket
  *   REPLACE_ALL    { entries, sales, settings } -> wipes and rewrites both
  *   PINGS          { since } -> the mobile app's cohort-ping counters
  *   STORE_VERSIONS { force } -> what is live in the App Store and on Play
@@ -16,6 +17,10 @@
  *   PUSH_SUBSCRIBE { subscription, ua } -> registers this device
  *   PUSH_UNSUBSCRIBE { endpoint } -> forgets it
  *   PUSH_TEST      -> sends one now, through the real encrypted path
+ *
+ * One action here has a side effect outside DynamoDB: SYNC publishes campaign
+ * download pages into the site bucket. See lambdas/api/links.js for why the
+ * page is a written object rather than a runtime lookup.
  */
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
 const {
@@ -42,6 +47,15 @@ const {
 /* Reading the two stores. Its own file because the Play half is a scrape and
    wants explaining at length. */
 const { storeVersions } = require('./storeVersions');
+/* Campaign download links — `/download/<slug>`. Its own file because the S3
+   publish, and the reasons for it, want explaining at length. */
+const {
+  cleanLink,
+  applyLinkWrites,
+  publishLink,
+  invalidate: invalidateLinks,
+  configured: linksConfigured,
+} = require('./links');
 
 const TABLE = process.env.DYNAMO_TABLE_NAME;
 const ALLOWED = String(process.env.ALLOWED_EMAILS || '')
@@ -294,6 +308,7 @@ const load = async (pk) => {
   const ads = [];
   const costs = [];
   const sales = [];
+  const links = [];
   let settings = { ...DEFAULT_SETTINGS };
   let ui = null;
 
@@ -317,6 +332,9 @@ const load = async (pk) => {
     } else if (typeof item.SK === 'string' && item.SK.startsWith('SALE#')) {
       const sale = cleanSale(item.sale || item);
       if (sale) sales.push(sale);
+    } else if (typeof item.SK === 'string' && item.SK.startsWith('LINK#')) {
+      const link = cleanLink(item.link || item);
+      if (link) links.push(link);
     }
   });
 
@@ -333,7 +351,11 @@ const load = async (pk) => {
     ? a.platform.localeCompare(b.platform)
     : a.date.localeCompare(b.date)));
 
-  return { entries, events, ads, costs, sales, settings, ui };
+  /* Alphabetical by slug — the campaign list is read as a directory of links,
+     and a creation order nobody can see is not an order. */
+  links.sort((a, b) => a.slug.localeCompare(b.slug));
+
+  return { entries, events, ads, costs, sales, links, settings, ui };
 };
 
 const sync = async (pk, payload) => {
@@ -402,6 +424,28 @@ const sync = async (pk, payload) => {
     idKeptCounts[kind.prefix] = { upserted: ups.length, deleted: dels.length };
   });
 
+  /* Campaign download links. Keyed by SLUG rather than by a generated id —
+     the slug IS the URL, so renaming one is deleting a link and creating
+     another, and the loop above (which keys on `item.id`) cannot express that.
+     Kept apart for that reason rather than folded in for tidiness. */
+  const linkUpserts = (Array.isArray(payload.linkUpserts) ? payload.linkUpserts : [])
+    .map(cleanLink)
+    .filter(Boolean);
+  linkUpserts.forEach((link) => {
+    requests.push({
+      PutRequest: {
+        Item: { PK: pk, SK: `LINK#${link.slug}`, entityType: 'DASH_LINK', link, updatedAt: now },
+      },
+    });
+  });
+
+  const linkDeletes = (Array.isArray(payload.linkDeletes) ? payload.linkDeletes : [])
+    .map((slug) => String(slug || '').trim().toLowerCase())
+    .filter(Boolean);
+  linkDeletes.forEach((slug) => {
+    requests.push({ DeleteRequest: { Key: { PK: pk, SK: `LINK#${slug}` } } });
+  });
+
   const deletes = Array.isArray(payload.deletes) ? payload.deletes : [];
   deletes.forEach((d) => {
     if (!d || !isIsoDate(d.date)) return;
@@ -422,6 +466,16 @@ const sync = async (pk, payload) => {
   }
 
   if (deduped.length) await writeBatches(deduped);
+
+  /* The one write that leaves DynamoDB. It runs AFTER the record is stored, so
+     a published page always has a row behind it, and it is allowed to throw:
+     the dashboard's push retries with backoff and only adopts its snapshot on
+     success, so a transient S3 failure re-publishes on the next attempt rather
+     than leaving a campaign the dashboard believes is live and is not. */
+  let linkWrites = { published: 0, removed: 0, configured: linksConfigured() };
+  if (linkUpserts.length || linkDeletes.length) {
+    linkWrites = await applyLinkWrites(linkUpserts, linkDeletes);
+  }
 
   const settings = cleanSettings(payload.settings);
   if (settings) {
@@ -444,7 +498,28 @@ const sync = async (pk, payload) => {
     adsUpserted: idKeptCounts.AD.upserted, adsDeleted: idKeptCounts.AD.deleted,
     costsUpserted: idKeptCounts.COST.upserted, costsDeleted: idKeptCounts.COST.deleted,
     salesUpserted: idKeptCounts.SALE.upserted, salesDeleted: idKeptCounts.SALE.deleted,
+    linksPublished: linkWrites.published, linksRemoved: linkWrites.removed,
+    linksConfigured: linkWrites.configured,
   };
+};
+
+/**
+ * Rewrite every stored campaign page into the site bucket.
+ *
+ * DynamoDB is the record and the S3 object is a rendering of it, so this is
+ * always safe to run: it is the recovery path if an object is lost (a bad
+ * deploy, a hand-edited bucket) and the way a change to the page template
+ * reaches campaigns that have not been edited since.
+ */
+const republishLinks = async (pk) => {
+  const { links } = await load(pk);
+  if (!linksConfigured()) return { published: 0, total: links.length, configured: false };
+  for (const link of links) {
+    // eslint-disable-next-line no-await-in-loop
+    await publishLink(link);
+  }
+  await invalidateLinks(links.map((l) => l.slug));
+  return { published: links.length, total: links.length, configured: true };
 };
 
 /**
@@ -602,7 +677,7 @@ const handler = async (event) => {
       case 'REPLACE_ALL':
         return json(200, await replaceAll(pk, payload));
       // The mobile app's cohort counters. They live under their own partitions
-      // (PING#OPEN / PING#SUB / PING#ACT / PING#HRV), not any dashboard user's,
+      // (PING#OPEN / PING#SUB / PING#ACT / PING#HRV / PING#PAY), not any dashboard user's,
       // but they are read
       // through this handler so the allowlist above guards them too — the
       // dashboard already holds a token, and shouldn't also hold the ping
@@ -627,6 +702,10 @@ const handler = async (event) => {
         return json(200, await pushUnsubscribe(email, payload));
       case 'PUSH_TEST':
         return json(200, await pushTest(email));
+      /* Campaign links publish themselves on save. This is the button for the
+         cases where that is not enough — a lost object, a template change. */
+      case 'LINKS_REPUBLISH':
+        return json(200, await republishLinks(pk));
       default:
         return json(400, { error: `Unknown action: ${action}` });
     }

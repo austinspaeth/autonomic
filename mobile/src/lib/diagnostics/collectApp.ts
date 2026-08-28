@@ -25,7 +25,6 @@ import { getState, loadIssue, storageStats } from '../../store/store';
 import { getIapState } from '../../store/iap';
 import { getTier, getTrialDaysLeft } from '../../store/tier';
 import { reviewMemory } from '../review';
-import { lastUpsellSurface } from '../upsell';
 import { formatMsLeft, offerMsLeft } from '../upsell/annual';
 import { annualMemory } from '../upsell/annualMemory';
 import { getDeclinedKeys } from '../health/declined';
@@ -177,9 +176,6 @@ function distributionRows(): Rows {
     'android sideload': Platform.OS === 'android' ? isSideloadedAndroidBuild() : null,
     'review asked': review.lastAskedAtMs ? daysAgo(review.lastAskedAtMs) : 'never',
     'review asked on version': review.askedVersion ?? null,
-    // Which proactive offer this user last saw — the only conversion signal an
-    // app with no analytics has. A surface name, never a count of their data.
-    'last upsell surface': lastUpsellSurface() ?? 'none',
     // The half-off annual offer: which milestone was awarded and whether its
     // 24h window (and the Pro unlock riding on it) is still open. Two integers.
     'annual offer': annualOfferRow(),

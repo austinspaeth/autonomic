@@ -591,6 +591,45 @@ check('a report with no hrv rows knows nothing rather than claiming zero',
   legacy.hrvFirst === null && A.hrvKnown(legacy, LAST) === false &&
   A.measureShare(legacy, LAST) === null && A.measureRate(legacy, [LAST]).available === false);
 
+/* --------------------------------------------- what readings are taken with
+
+   The daily counter carries the same sensor letter the activation route does.
+   Two rules the UI leans on: the letter splits the KEY and never the count (so
+   a day's readings still sum to what they always summed to), and a row written
+   before the letter shipped is "no sensor", which is NOT the same as a day the
+   counter itself was not running. */
+
+const sensed = A.index({
+  hrv: [
+    { day: C3, total: 9, cohorts: [
+      { cohort: C3, platform: 'I', method: 'W', count: 3 },
+      { cohort: C3, platform: 'I', method: 'G', count: 2 },
+      { cohort: C3, platform: 'A', method: 'F', count: 1 },
+      // the same cohort+platform again with no letter: a build that predates it
+      { cohort: C3, platform: 'I', method: null, count: 3 },
+    ] },
+    { day: A.addDays(C3, 1), total: 2, cohorts: [
+      { cohort: C3, platform: 'I', method: 'B', count: 2 },
+    ] },
+  ],
+});
+
+check('the sensor letter does not change what a day counts',
+  A.readingsOn(sensed, C3) === 9, String(A.readingsOn(sensed, C3)));
+check('a day splits by sensor, with the letterless rows disclosed as unknown',
+  JSON.stringify(A.hrvMethodsOn(sensed, C3)) === JSON.stringify({ W: 3, G: 2, F: 1, '?': 3 }),
+  JSON.stringify(A.hrvMethodsOn(sensed, C3)));
+check('Garmin is a sensor of its own',
+  A.methodName('G') === 'Garmin watch' && A.METHOD_ORDER.indexOf('G') > -1);
+check('the split pools over days',
+  A.hrvMethodsOver(sensed, [C3, A.addDays(C3, 1)]).B === 2);
+check('a day that named a sensor is separable from one that only has unknowns',
+  A.hrvMethodKnown(sensed, C3) === true &&
+  A.hrvMethodKnown(A.index({ hrv: [{ day: C3, total: 2, cohorts: [
+    { cohort: C3, platform: 'I', method: null, count: 2 }] }] }), C3) === false);
+check('a report whose hrv rows predate the letter still knows the counter ran',
+  A.hrvKnown(sensed, C3) === true);
+
 /* -------------------------------------------------------------- report */
 
 let failed = 0;

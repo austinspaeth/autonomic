@@ -28,8 +28,9 @@
 import React, { useState } from 'react';
 import { Text, View } from 'react-native';
 import { LineChart, ZonesToggle } from '../../components/charts';
+import { Icon } from '../../components/Icon';
 import { Section, SectionHead } from '../../components/summary';
-import { usePalette, GRADE_COLORS } from '../../theme';
+import { usePalette, GRADE_COLORS, radius } from '../../theme';
 import { fmtShort } from '../../lib/dates';
 import { acBandZones, acScoreZones, onDay } from '../../lib/analysis/buckets';
 import { TREND_METRICS } from '../../lib/trends';
@@ -43,6 +44,35 @@ const GOOD = S.GOOD;
  *  factor is neither good nor bad in itself, and tinting it green or red would
  *  pre-judge the very thing the chart is being read to decide. */
 const MARK = GRADE_COLORS.warning;
+
+/**
+ * The one line that has to be read before the numbers below it.
+ *
+ * Everything under it compares two groups of days, and the engine's copy stays
+ * associational for that reason ("magnesium days show higher RMSSD", never
+ * "magnesium raises it"). But three big numbers, a confidence strip and a shaded
+ * chart read as proof, and the app cannot know what else was true on those days.
+ *
+ * It LEADS rather than closes, because a caveat under the chart arrives after the
+ * conclusion has been drawn. It is one sentence, because a paragraph here is
+ * scrolled past and takes the finding's own numbers below the fold with it. Not on
+ * the Trend watch sheet: that claim is one metric against its own past, with no
+ * second variable to mistake for a cause.
+ */
+function CausationNote() {
+  const p = usePalette();
+  return (
+    <View style={{
+      flexDirection: 'row', gap: 8, alignItems: 'center', paddingVertical: 9, paddingHorizontal: 11, marginBottom: 12,
+      borderRadius: radius.card, backgroundColor: p.surface2, borderWidth: 1, borderColor: p.border,
+    }}>
+      <Icon name="info" size={15} color={p.textDim} />
+      <Text style={{ flex: 1, fontSize: 12.5, lineHeight: 17, color: p.textDim }}>
+        Correlation is not causation. Treat this as a lead to test, not an answer.
+      </Text>
+    </View>
+  );
+}
 
 /* ---------- the shared body ---------- */
 
@@ -157,8 +187,11 @@ interface BodyFinding {
   chartDesc?: string;
 }
 
-function Body({ title, findings, footer }: {
+function Body({ title, intro, findings, footer }: {
   title: string;
+  /** Rendered between the title and the first card. `CausationNote` on the two
+   *  association sheets; nothing on Trend watch. */
+  intro?: React.ReactNode;
   /**
    * Strongest first. A driver that moved several outcome families opens as ONE
    * sheet stacking every finding — each wearing the same card + evidence chart a
@@ -174,6 +207,7 @@ function Body({ title, findings, footer }: {
       {/* Held clear of the sheet's own close button, which sits over the top-right
           corner of this block. */}
       <Text style={{ color: p.text, fontSize: 19, fontWeight: '800', letterSpacing: -0.3, maxWidth: '82%', marginBottom: 14 }}>{title}</Text>
+      {intro}
       {findings.map((f, i) => (
         <View key={i} style={i > 0 ? { marginTop: 6 } : undefined}>
           {/* No title and no help dot: the sheet's own title names the thing one line
@@ -212,6 +246,7 @@ export function CorrelationSheet({ findings }: { findings: { c: Correlation; ser
   return (
     <Body
       title="Correlation details"
+      intro={<CausationNote />}
       findings={findings.map(({ c, series }) => {
         const def = TREND_METRICS[c.outcome];
         const color = c.good ? GOOD : p.accent;
@@ -250,6 +285,10 @@ export function ChangeSheet({ change, series }: { change: BiggestChange; series:
   return (
     <Body
       title="Correlation details"
+      // An onset is a before/after rather than an on/off, but it is the same kind
+      // of claim: the weeks after someone started something differ from the weeks
+      // before in more than the one thing they started.
+      intro={<CausationNote />}
       findings={[{
         headline: change.headline,
         tiles: [

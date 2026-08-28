@@ -7,10 +7,12 @@
     "deploy": "serverless deploy --stage prod --region us-west-2",
     "logs": "serverless logs --stage prod --region us-west-2 -f api -t",
     "remove": "serverless remove --stage prod --region us-west-2",
-    "test": "node tests/news.test.mjs"
+    "test": "node --test tests/*.test.mjs"
   },
   "dependencies": {
+    "@aws-sdk/client-cloudfront": "^3.1120.0",
     "@aws-sdk/client-dynamodb": "^3.600.0",
+    "@aws-sdk/client-s3": "^3.1120.0",
     "@aws-sdk/client-ssm": "^3.1116.0",
     "@aws-sdk/lib-dynamodb": "^3.600.0",
     "web-push": "^3.6.7"

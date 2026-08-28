@@ -25,7 +25,8 @@
  * to come back, so "installed" and "activated" are different populations and
  * the gap between them is the funnel worth fixing. It fires once per install,
  * so — unlike opens — activation rows DO count people, and `act[day].methods`
- * says which sensor each one used (W watch, B Bluetooth strap, F finger).
+ * says which sensor each one used (W Apple Watch, G Garmin, B Bluetooth strap,
+ * F finger on the camera).
  *
  * THE HRV COUNTER IS THE OPEN COUNTER'S TWIN, and that is what makes it worth
  * more than a fourth number. Both are capped at one per install per Eastern day
@@ -34,7 +35,11 @@
  * WHO WERE THERE who actually took a reading. It is the only ratio on this
  * page whose numerator and denominator are both install-days, which is why
  * `measureShare` exists and why nothing may be pooled into one of them that is
- * not pooled into the other. Opening the app is not using it: an install that
+ * not pooled into the other. The reading rows carry a SENSOR letter as well
+ * (`hrv[day].methods`), which does not touch that: the letter splits the key a
+ * count lands under, never the count, so a day's readings still sum to one per
+ * install. What it cannot say is which sensors somebody used all day — the cap
+ * names whichever reading came first — see `hrvMethodsOn`. Opening the app is not using it: an install that
  * launches every morning and never measures draws a healthy retention curve
  * over an empty journal, and the open counter alone cannot see the difference.
  *
@@ -131,13 +136,77 @@ window.Analytics = (function () {
 
   /* ----------------------------------------------------------------- index */
 
-  var EMPTY = { total: 0, cohorts: {}, platforms: {}, fresh: {}, methods: {}, unattributed: 0 };
+  var EMPTY = { total: 0, cohorts: {}, platforms: {}, fresh: {}, methods: {}, surfaces: {}, slots: {}, tiers: {}, builds: {}, unattributed: 0 };
 
-  /* Capture methods an activation ping can name, and what to call them. Any
-     other letter, or none, pools under `?` — an activation whose sensor we
-     could not read is still an activation. */
-  var METHOD_NAME = { W: 'Apple Watch', B: 'Chest strap', F: 'Phone camera' };
-  var METHOD_ORDER = ['W', 'B', 'F', '?'];
+  /* Capture methods a READING ping can name — activations and daily readings
+     both carry one — and what to call them. Any other letter, or none, pools
+     under `?`: a reading whose sensor we could not read is still a reading, and
+     that bucket is also where every HRV row written before the letter shipped
+     lands. It is disclosed, never dropped. */
+  var METHOD_NAME = { W: 'Apple Watch', B: 'Chest strap', F: 'Phone camera', G: 'Garmin watch' };
+  var METHOD_ORDER = ['W', 'G', 'B', 'F', '?'];
+
+  /* Where the paywall came up. Same slot in the ping code as the sensor letter,
+     same `?` rule: a wall we could not name is still a wall.
+
+     `S` is deliberately last and deliberately separate. Every other entry is a
+     LOCK somebody walked into; `S` is the Upgrade button in Settings, tapped by
+     somebody who went looking. Reading them as one number answers neither
+     question, so the UI keeps the sought row out of the wall ranking and says
+     what it is. */
+  var SURFACE_NAME = {
+    R: 'Progress range',
+    I: 'Insights tab',
+    P: 'POTS capture',
+    O: 'Outlook AI report',
+    M: 'Metric AI report',
+    N: 'Insights AI report',
+    S: 'Settings — went looking'
+  };
+  var SURFACE_ORDER = ['R', 'I', 'P', 'O', 'M', 'N', 'S', '?'];
+  /* The walls, i.e. everything except the one that isn't one. */
+  var WALL_ORDER = ['R', 'I', 'P', 'O', 'M', 'N', '?'];
+
+  /* What an install could do at the instant it pinged. `?` is every ping sent
+     before the tier letter shipped and is never folded into free: "we did not
+     ask" and "they had not paid" are different facts, and only one of them is
+     about the user. */
+  var TIER_NAME = { F: 'Free', T: 'Trial', P: 'Pro' };
+  var TIER_ORDER = ['P', 'T', 'F', '?'];
+
+  /* The remaining routes' alphabets. Same `?` rule throughout: a letter we
+     could not read is disclosed, never dropped and never folded into a named
+     one. */
+  var NOTIFY_NAME = { M: 'Morning reminder', C: 'Crash warning' };
+  var POTS_NAME = { T: 'Stand test', E: 'Episode' };
+  var VIEW_NAME = { I: 'Insights', P: 'Progress' };
+  var OFFER_NAME = { A: 'Half-off annual', F: 'Founding member' };
+
+  /**
+   * Which alphabet each route speaks, and in what order to draw it.
+   *
+   * The dashboard's copy of the lambda's `ALPHABET`, and it has to stay in step
+   * with it — a letter the endpoint accepts and this table does not know pools
+   * under `?` and reads as "a letter we could not name", which is indistinguish-
+   * able on screen from a build too old to send one.
+   */
+  var SLOT_NAME = {
+    act: METHOD_NAME, cap: METHOD_NAME, hrv: METHOD_NAME,
+    pay: SURFACE_NAME, not: NOTIFY_NAME, pot: POTS_NAME, see: VIEW_NAME,
+    osh: OFFER_NAME, odm: OFFER_NAME, oac: OFFER_NAME
+  };
+  var SLOT_ORDER = {
+    act: METHOD_ORDER, cap: METHOD_ORDER, hrv: METHOD_ORDER,
+    pay: SURFACE_ORDER,
+    not: ['M', 'C', '?'], pot: ['T', 'E', '?'], see: ['I', 'P', '?'],
+    osh: ['A', 'F', '?'], odm: ['A', 'F', '?'], oac: ['A', 'F', '?']
+  };
+
+  /* Every route the report can carry, in the order the UI reads them. `open`,
+     `sub` and `act` predate this list and keep their own bespoke accessors; the
+     rest are read through the generic ones below. */
+  var KINDS = ['open', 'sub', 'act', 'cap', 'hrv', 'pay', 'not', 'pot', 'see', 'err',
+    'osh', 'odm', 'oac'];
 
   /* The report's platform letters, and the names the filter bar speaks. */
   var PLATFORM_LETTER = { ios: 'I', android: 'A', unknown: 'U', I: 'I', A: 'A', U: 'U' };
@@ -171,7 +240,7 @@ window.Analytics = (function () {
     var by = {};
     (list || []).forEach(function (r) {
       if (!r || !r.day) return;
-      var c = {}, plat = {}, fresh = {}, meth = {}, kept = 0, unattributed = 0;
+      var c = {}, plat = {}, fresh = {}, meth = {}, surf = {}, slot = {}, tier = {}, kept = 0, unattributed = 0;
       (r.cohorts || []).forEach(function (x) {
         if (!x || !x.cohort) return;
         var p = PLATFORM_NAME[x.platform] ? x.platform : 'U';
@@ -208,16 +277,51 @@ window.Analytics = (function () {
           return;
         }
         c[x.cohort] = (c[x.cohort] || 0) + n;
-        /* Only activation rows carry a method. It is counted INSIDE the
-           platform filter (unlike `platforms`, which is what the filter is a
-           slice of) because "which sensor do iOS users activate on" is a
-           question about the slice, not about the whole. */
+        /* Only the reading rows carry a method (act and hrv). It is counted
+           INSIDE the platform filter (unlike `platforms`, which is what the
+           filter is a slice of) because "which sensor do iOS users measure on"
+           is a question about the slice, not about the whole. */
         meth[METHOD_NAME[x.method] ? x.method : '?'] = (meth[METHOD_NAME[x.method] ? x.method : '?'] || 0) + n;
+        /* The paywall rows' equivalent: which locked surface raised the card.
+           It rides in the same slot as the sensor and is read the same way. */
+        var sk = SURFACE_NAME[x.surface] ? x.surface : '?';
+        surf[sk] = (surf[sk] || 0) + n;
+        /* EVERY kind carries the tier, which is what makes each of these
+           counters answerable per population: opens by pro vs free is
+           engagement by tier, readings by tier is whether Pro is what the
+           measuring users buy, and paywalls by tier is a bug report when P
+           appears at all. Counted inside the platform filter, like the sensor,
+           because it is a question about the slice. */
+        var tk = TIER_NAME[x.tier] ? x.tier : '?';
+        tier[tk] = (tier[tk] || 0) + n;
+        /* The letter under its generic name, for the routes that are neither
+           captures nor paywalls. Kept alongside `methods`/`surfaces` rather
+           than replacing them so nothing written against those has to move. */
+        var gk = x.slot || '?';
+        slot[gk] = (slot[gk] || 0) + n;
         kept += n;
+      });
+      /* The build split of the same day, carried alongside rather than derived
+         from the cohort keys: version is NOT in the cohort key (it would
+         multiply a map that grows forever — see cohortKey in the ping lambda),
+         so this is a second, bounded map the endpoint sends beside it. It obeys
+         the same platform filter and the same `?` disclosure. */
+      var builds = {};
+      (r.builds || []).forEach(function (b) {
+        if (!b) return;
+        var bp = PLATFORM_NAME[b.platform] ? b.platform : 'U';
+        if (letter && bp !== letter) return;
+        var key = b.version || '?';
+        var slot = builds[key] || (builds[key] = { total: 0, tiers: {} });
+        var bn = Number(b.count) || 0;
+        slot.total += bn;
+        var bt = TIER_NAME[b.tier] ? b.tier : '?';
+        slot.tiers[bt] = (slot.tiers[bt] || 0) + bn;
       });
       by[r.day] = {
         total: letter ? kept : (Number(r.total) || 0),
-        cohorts: c, platforms: plat, fresh: fresh, methods: meth, unattributed: unattributed,
+        cohorts: c, platforms: plat, fresh: fresh, methods: meth,
+        surfaces: surf, slots: slot, tiers: tier, builds: builds, unattributed: unattributed,
       };
     });
     return by;
@@ -247,6 +351,13 @@ window.Analytics = (function () {
     var sub = rowsToMap(report && report.sub, letter);
     var act = rowsToMap(report && report.act, letter);
     var hrv = rowsToMap(report && report.hrv, letter);
+    var pay = rowsToMap(report && report.pay, letter);
+    /* Every other route, mapped the same way and held under its own name. Done
+       in one pass because the UI reads them against each other — completions
+       against starts, accepts against shows — and a view that fetched or built
+       them one at a time would draw a funnel a stage at a time. */
+    var byKind = {};
+    KINDS.forEach(function (k) { byKind[k] = rowsToMap(report && report[k], letter); });
     /* All three kinds feed `days`, because `days` is what every sweep below
        iterates: an activation landing on a day the open rows happen not to
        cover would otherwise be invisible to `activation` and `activationAges`
@@ -259,6 +370,10 @@ window.Analytics = (function () {
     Object.keys(sub).forEach(function (d) { seen[d] = true; });
     Object.keys(act).forEach(function (d) { seen[d] = true; });
     Object.keys(hrv).forEach(function (d) { seen[d] = true; });
+    Object.keys(pay).forEach(function (d) { seen[d] = true; });
+    KINDS.forEach(function (k) {
+      Object.keys(byKind[k]).forEach(function (d) { seen[d] = true; });
+    });
     var days = Object.keys(seen).sort();
     var first = days[0] || null;
     var last = days[days.length - 1] || null;
@@ -280,6 +395,39 @@ window.Analytics = (function () {
     var hrvDays = Object.keys(hrvAll).sort();
     var hrvFirst = hrvDays[0] || null;
 
+    /* The same rule for the two counters that shipped after it, and it is the
+       same rule for a reason: every one of these routes started on the day a
+       build carrying it reached a phone, and a day before that day is UNKNOWN,
+       never 0%. Read unfiltered for the same reason `hrvFirst` is — a route
+       ships per platform, and dating it off one slice dates it off the wrong
+       build.
+
+       `tierFirst` is not a route but a FIELD, which makes it the same problem
+       one level down: rows written before it carry no tier letter, so a day
+       whose pings are all `?` is not a day when everybody was free. It is the
+       day before we asked. */
+    var payAll = letter ? rowsToMap(report && report.pay, null) : pay;
+    var payFirst = Object.keys(payAll).sort()[0] || null;
+
+    /* Each counter's own birthday, on the same rule and read UNFILTERED for the
+       same reason: a route ships in a build, a build ships per store, and dating
+       a counter off one platform's slice dates it off the wrong release. Days
+       before a counter's first row are unknown, never zero — `kindKnown` is the
+       gate every rate below goes through. */
+    var firstDay = {};
+    KINDS.forEach(function (k) {
+      var all = letter ? rowsToMap(report && report[k], null) : byKind[k];
+      firstDay[k] = Object.keys(all).sort()[0] || null;
+    });
+    var tierFirst = null;
+    var allOpen = letter ? rowsToMap(report && report.open, null) : open;
+    Object.keys(allOpen).sort().some(function (d) {
+      var t = allOpen[d].tiers || {};
+      var named = TIER_ORDER.some(function (k) { return k !== '?' && t[k] > 0; });
+      if (named) tierFirst = d;
+      return named;
+    });
+
     /* Cohorts we can measure: born on or after the counter's first day, and
        actually seen on their own day 0. */
     var cohorts = [];
@@ -296,9 +444,11 @@ window.Analytics = (function () {
       });
     });
 
-    return {
-      open: open, sub: sub, act: act, hrv: hrv,
-      days: days, first: first, last: last, hrvFirst: hrvFirst,
+    var out = {
+      open: open, sub: sub, act: act, hrv: hrv, pay: pay,
+      byKind: byKind, firstDay: firstDay,
+      days: days, first: first, last: last,
+      hrvFirst: hrvFirst, payFirst: payFirst, tierFirst: tierFirst,
       cohorts: cohorts,
       preTracking: Object.keys(older).sort(),
       /* What this index is a slice of: the filter in force, and the platform
@@ -317,6 +467,12 @@ window.Analytics = (function () {
       rawSub: (report && report.sub) || [],
       versions: (report && report.versions) || null
     };
+    /* The three original kinds are ALSO reachable generically, so a caller can
+       loop over routes without special-casing the ones that happen to have
+       bespoke accessors. Same objects, two names. */
+    out.byKind.open = open; out.byKind.sub = sub;
+    out.byKind.act = act; out.byKind.hrv = hrv; out.byKind.pay = pay;
+    return out;
   }
 
   /* -------------------------------------------------------------- accessors */
@@ -331,17 +487,20 @@ window.Analytics = (function () {
   /** First readings saved on `day`, by installs of any cohort. */
   function activationsOn(ix, day) { return actOn(ix, day).total; }
   function actCountOn(ix, day, cohort) { return actOn(ix, day).cohorts[cohort] || 0; }
-  /** One day's capture-method split, `{ W: n, B: n, F: n, '?': n }`. */
+  /** One day's FIRST-reading capture-method split, `{ W, G, B, F, '?' }`. */
   function methodsOn(ix, day) { return actOn(ix, day).methods || {}; }
-  /** The same split pooled over a set of days. */
-  function methodsOver(ix, days) {
+  /** Pool a per-day split over a set of days. Shared by both counters, since
+   *  the shape is the same and only the row it is read off differs. */
+  function poolMethods(read, ix, days) {
     var out = {};
     (days || []).forEach(function (d) {
-      var m = methodsOn(ix, d);
+      var m = read(ix, d);
       Object.keys(m).forEach(function (k) { out[k] = (out[k] || 0) + m[k]; });
     });
     return out;
   }
+  /** The same split pooled over a set of days. */
+  function methodsOver(ix, days) { return poolMethods(methodsOn, ix, days); }
   /** The platform split of activations, always unfiltered — the twin of
    *  `subPlatformsOn`, and read for the same reason. */
   function actPlatformsOn(ix, day) { return actOn(ix, day).platforms || {}; }
@@ -355,6 +514,342 @@ window.Analytics = (function () {
   function hrvCountOn(ix, day, cohort) { return hrvOn(ix, day).cohorts[cohort] || 0; }
   /** The reading counter's platform split, always unfiltered. */
   function hrvPlatformsOn(ix, day) { return hrvOn(ix, day).platforms || {}; }
+  /**
+   * One day's split of WHICH SENSOR the readings were taken with.
+   *
+   * Read exactly as the counter is capped: one ping per install per Eastern
+   * day, so a row names the sensor of that install's FIRST reading of the day,
+   * not every sensor it used. A person who straps up in the morning and checks
+   * on the camera at night is one strap here, and the UI says so.
+   *
+   * Rows written before the HRV route carried a letter pool under `?`, which is
+   * why a day can be perfectly well known to the reading counter (`hrvKnown`)
+   * and still have nothing to say about sensors. `hrvMethodKnown` is that
+   * second gate, and it is deliberately separate: the counter's birthday and
+   * the letter's birthday are different days.
+   */
+  function hrvMethodsOn(ix, day) { return hrvOn(ix, day).methods || {}; }
+  /** The same split pooled over a set of days. */
+  function hrvMethodsOver(ix, days) { return poolMethods(hrvMethodsOn, ix, days); }
+  /** Did any reading on `day` name a sensor? Days before the letter shipped
+   *  answer no, so the UI can stay silent rather than draw a bar of unknowns. */
+  function hrvMethodKnown(ix, day) {
+    var m = hrvMethodsOn(ix, day);
+    return METHOD_ORDER.some(function (k) { return k !== '?' && m[k] > 0; });
+  }
+
+  /* ------------------------------------------------------------- paywall */
+
+  function payOn(ix, day) { return (ix.pay && ix.pay[day]) || EMPTY; }
+
+  /**
+   * Installs that met the paywall on `day`.
+   *
+   * The third counter capped at one per install per Eastern day, and capped for
+   * the same reason: uncapped it would count TAPS, and one frustrated user
+   * tapping a locked range four times would read as four people meeting a wall.
+   * Capped, it counts PEOPLE, which is what makes `paywallShare` a share of the
+   * same population `measureShare` is a share of.
+   */
+  function paywallsOn(ix, day) { return payOn(ix, day).total; }
+  function payCountOn(ix, day, cohort) { return payOn(ix, day).cohorts[cohort] || 0; }
+  /** The paywall counter's platform split, always unfiltered. */
+  function payPlatformsOn(ix, day) { return payOn(ix, day).platforms || {}; }
+
+  /**
+   * One day's split of WHICH SURFACE raised the paywall.
+   *
+   * Read exactly as the counter is capped: a row names the FIRST wall that
+   * install met that day, not every wall it met. So this answers "what is the
+   * app's front door to Pro" and emphatically not "how often is each feature
+   * locked" — a surface that is always met second is invisible here, and the UI
+   * must not be written as though it were a ranking of lock frequency.
+   */
+  function surfacesOn(ix, day) { return payOn(ix, day).surfaces || {}; }
+  function surfacesOver(ix, days) { return poolMethods(surfacesOn, ix, days); }
+  /** Did any paywall on `day` name a surface? */
+  function paySurfaceKnown(ix, day) {
+    var m = surfacesOn(ix, day);
+    return SURFACE_ORDER.some(function (k) { return k !== '?' && m[k] > 0; });
+  }
+  /** Was the paywall counter running on `day`? The `hrvKnown` rule, again. */
+  function payKnown(ix, day) { return !!(ix.payFirst && day >= ix.payFirst); }
+
+  /**
+   * The share of the installs active on `day` that met the paywall.
+   *
+   * The twin of `measureShare` and read the same way: both counters are capped
+   * per install per Eastern day on the same boundary, so this is a share of the
+   * people who were there. It is the number that says how hard the app is
+   * pushing — a figure that climbs without conversion climbing is a wall people
+   * are bouncing off, not a funnel.
+   */
+  function paywallShare(ix, day) {
+    if (!payKnown(ix, day)) return null;
+    var active = activeOn(ix, day);
+    if (!active) return null;
+    return (paywallsOn(ix, day) / active) * 100;
+  }
+
+  /* ------------------------------------------------- the generic counters
+
+     Everything below reads ANY route by name, because past the first five they
+     are all the same object: a day's rows, a letter, and a `?` bucket. Adding a
+     route to the app should not mean adding a block here.
+
+     Two things a caller must keep straight, both of which the UI states on
+     screen rather than hiding:
+
+     (1) Some routes are capped once per install per Eastern day for the WHOLE
+     route (`open`, `cap`, `hrv`, `pay`), so their daily TOTAL is a headcount and
+     their letter describes only the first event of the day. Others are capped
+     per LETTER (`not`, `pot`, `see`, the three offer routes), so each LETTER'S
+     count is a headcount and the route's total is not. `PER_LETTER` records
+     which, and `isHeadcount` is the question worth asking before dividing.
+
+     (2) `err` carries no letter and is once per install EVER, so it is a running
+     population and not a daily count at all — see `errorInstalls`. */
+  var PER_LETTER = { not: 1, pot: 1, see: 1, osh: 1, odm: 1, oac: 1 };
+
+  /** Is this route's DAILY TOTAL a count of people? */
+  function isHeadcount(kind) { return !PER_LETTER[kind] && kind !== 'err'; }
+
+  function kindOn(ix, kind, day) {
+    var map = ix.byKind && ix.byKind[kind];
+    return (map && map[day]) || EMPTY;
+  }
+  /** One day's total for a route. A headcount only where `isHeadcount` says so. */
+  function eventsOn(ix, kind, day) { return kindOn(ix, kind, day).total; }
+  /** One day's split by the route's own letter. */
+  function slotsOn(ix, kind, day) { return kindOn(ix, kind, day).slots || {}; }
+  function slotsOver(ix, kind, days) {
+    return poolMethods(function (i, d) { return slotsOn(i, kind, d); }, ix, days);
+  }
+  /** One letter's count on one day — always a headcount, whichever cap the
+   *  route uses, which is why the per-letter routes are worth reading this way
+   *  and never by their total. */
+  function slotOn(ix, kind, day, letter) { return slotsOn(ix, kind, day)[letter] || 0; }
+  function slotOver(ix, kind, days, letter) {
+    return (days || []).reduce(function (a, d) {
+      return a + (kindKnown(ix, kind, d) ? slotOn(ix, kind, d, letter) : 0);
+    }, 0);
+  }
+
+  /**
+   * Was this counter running on `day`?
+   *
+   * The `hrvKnown` rule, generalised: every route started on the day a build
+   * carrying it reached a phone, and a day before that is UNKNOWN. Reporting it
+   * as zero would be a claim about people made out of a deploy date.
+   */
+  function kindKnown(ix, kind, day) {
+    var f = ix.firstDay && ix.firstDay[kind];
+    return !!(f && day >= f);
+  }
+
+  /**
+   * A route's share of the installs active on `day`.
+   *
+   * Only meaningful for the whole-route-capped counters, so it refuses the
+   * others rather than returning a number that looks like a percentage of
+   * people and is not. `measureShare` and `paywallShare` are this function with
+   * their own names kept for the call sites that read better that way.
+   */
+  function shareOfActive(ix, kind, day) {
+    if (!isHeadcount(kind)) return null;
+    if (!kindKnown(ix, kind, day)) return null;
+    var active = activeOn(ix, day);
+    if (!active) return null;
+    return (eventsOn(ix, kind, day) / active) * 100;
+  }
+
+  /**
+   * One letter's share of the installs active on `day` — the right ratio for a
+   * per-letter route, since each letter IS a headcount there.
+   */
+  function slotShare(ix, kind, day, letter) {
+    if (!kindKnown(ix, kind, day)) return null;
+    var active = activeOn(ix, day);
+    if (!active) return null;
+    return (slotOn(ix, kind, day, letter) / active) * 100;
+  }
+
+  /**
+   * The capture funnel: starts, completions, and the rate between them, pooled
+   * over `days` and optionally narrowed to one sensor.
+   *
+   * The number this whole pair exists for. Five minutes is a long time to sit
+   * still, and a start with no completion is the specific shape of "the app
+   * asked for something the person could not give it". Per sensor it implies an
+   * action; pooled it is only ever a figure to worry about.
+   *
+   * Both counters are capped per install per day, so this is a rate over
+   * install-DAYS: of the days somebody began a reading, the share on which they
+   * finished one. It can read above 100% on a day when a reading begun before
+   * midnight Eastern finished after it — reported as it comes, since that drift
+   * is the only thing that says the two counters disagree.
+   */
+  function captureFunnel(ix, days, letter) {
+    var known = (days || []).filter(function (d) {
+      return kindKnown(ix, 'cap', d) && kindKnown(ix, 'hrv', d);
+    });
+    var started = 0, done = 0;
+    known.forEach(function (d) {
+      started += letter ? slotOn(ix, 'cap', d, letter) : eventsOn(ix, 'cap', d);
+      done += letter ? slotOn(ix, 'hrv', d, letter) : eventsOn(ix, 'hrv', d);
+    });
+    return {
+      available: known.length > 0 && started > 0,
+      started: started,
+      completed: done,
+      abandoned: Math.max(0, started - done),
+      pct: started ? (done / started) * 100 : null,
+      days: known.length,
+      blind: (days || []).length - known.length
+    };
+  }
+
+  /**
+   * An offer's funnel: shown, dismissed, accepted, over `days`.
+   *
+   * `accepted` is a tap on the card's own buy button and NOT a purchase — the
+   * store sheet is a separate act with its own failure modes, and `sub` is where
+   * money is counted. Keeping them apart is what makes the gap between them
+   * visible rather than silently folded into the offer's conversion rate, so
+   * nothing here may be renamed to suggest otherwise.
+   *
+   * `answered` is what the two responses sum to, and it is deliberately NOT
+   * assumed to be `shown`: an offer that is neither accepted nor dismissed was
+   * ignored, which is a third outcome and the most common one.
+   */
+  function offerFunnel(ix, days, letter) {
+    var shown = slotOver(ix, 'osh', days, letter);
+    var dismissed = slotOver(ix, 'odm', days, letter);
+    var accepted = slotOver(ix, 'oac', days, letter);
+    return {
+      available: shown > 0,
+      shown: shown,
+      dismissed: dismissed,
+      accepted: accepted,
+      ignored: Math.max(0, shown - dismissed - accepted),
+      acceptPct: shown ? (accepted / shown) * 100 : null,
+      dismissPct: shown ? (dismissed / shown) * 100 : null
+    };
+  }
+
+  /**
+   * Installs that have reported at least one failure, cumulatively.
+   *
+   * The `err` route fires once per install EVER, so a day's count is new
+   * installs joining that population and the running sum is the population
+   * itself. It says how many phones are having a bad time and NOTHING about
+   * what went wrong — there is no tag and no message in the ping, by design.
+   * Diagnosis is the support dump, from the user's own device and with their
+   * consent; this is only the number that says how many are worth asking for.
+   */
+  function errorInstalls(ix, days) {
+    var total = 0, known = 0;
+    (days || []).forEach(function (d) {
+      if (!kindKnown(ix, 'err', d)) return;
+      known += 1;
+      total += eventsOn(ix, 'err', d);
+    });
+    return { available: known > 0, installs: total, days: known };
+  }
+
+  /* ---------------------------------------------------------------- tiers */
+
+  /**
+   * One day's split of WHAT THE PINGING INSTALLS COULD DO — `{ P, T, F, '?' }`
+   * — for any counter, since every route carries the letter.
+   *
+   * `kind` is the counter to read it off: 'open' is the population (how today's
+   * actives divide), 'hrv' is who measures, 'pay' is who meets walls. Reading a
+   * tier split off the wrong counter is the easiest mistake to make here and
+   * the hardest to see afterwards, which is why the caller has to name one.
+   */
+  function tiersOn(ix, day, kind) {
+    var map = ix[kind || 'open'];
+    return ((map && map[day]) || EMPTY).tiers || {};
+  }
+  function tiersOver(ix, days, kind) {
+    return poolMethods(function (i, d) { return tiersOn(i, d, kind); }, ix, days);
+  }
+  /** Did any ping on `day` name a tier? Pings predating the field say `?`, and
+   *  `?` is not free — see TIER_NAME. */
+  function tierKnown(ix, day, kind) {
+    var t = tiersOn(ix, day, kind);
+    return TIER_ORDER.some(function (k) { return k !== '?' && t[k] > 0; });
+  }
+
+  /**
+   * The share of one day's pings that came from a PAYING install.
+   *
+   * Measured against the pings that named a tier, not against the day's total:
+   * a build too old to say is not a free user, and dividing by everything would
+   * report a rising number every time an old build was retired. Null when
+   * nothing named one, which is every day before the field shipped.
+   */
+  function proShare(ix, day, kind) {
+    if (!tierKnown(ix, day, kind)) return null;
+    var t = tiersOn(ix, day, kind);
+    var named = TIER_ORDER.reduce(function (a, k) { return k === '?' ? a : a + (t[k] || 0); }, 0);
+    if (!named) return null;
+    return ((t.P || 0) / named) * 100;
+  }
+
+  /* --------------------------------------------------------------- builds */
+
+  /**
+   * One day's split by BUILD — `{ '1.26.0': { total, tiers }, '?': {...} }`.
+   *
+   * Version is the one field that is not in the cohort key, so this comes off
+   * its own map and cannot be crossed with cohort age. That is the deliberate
+   * trade documented in the ping lambda: the questions this answers are "has
+   * the fix reached anybody" and "are the paying users on the new build", and
+   * neither of them needs to know how old the install is.
+   *
+   * `?` is every ping from a build too old to name itself. It is a real bucket
+   * and the UI must show it: adoption computed without it is the share of the
+   * builds that can talk, which is not the share of anything real.
+   */
+  function buildsOn(ix, day, kind) {
+    var map = ix[kind || 'open'];
+    return ((map && map[day]) || EMPTY).builds || {};
+  }
+  /** The same, pooled over days, keeping the per-version tier split. */
+  function buildsOver(ix, days, kind) {
+    var out = {};
+    (days || []).forEach(function (d) {
+      var b = buildsOn(ix, d, kind);
+      Object.keys(b).forEach(function (v) {
+        var slot = out[v] || (out[v] = { total: 0, tiers: {} });
+        slot.total += b[v].total || 0;
+        Object.keys(b[v].tiers || {}).forEach(function (t) {
+          slot.tiers[t] = (slot.tiers[t] || 0) + b[v].tiers[t];
+        });
+      });
+    });
+    return out;
+  }
+  /** Did any ping on `day` name a build? */
+  function buildKnown(ix, day, kind) {
+    var b = buildsOn(ix, day, kind);
+    return Object.keys(b).some(function (v) { return v !== '?' && b[v].total > 0; });
+  }
+  /** Versions seen over `days`, newest first by ordinal compare of the parts. */
+  function versionsOver(ix, days, kind) {
+    var b = buildsOver(ix, days, kind);
+    return Object.keys(b).sort(function (x, y) {
+      if (x === '?') return 1;
+      if (y === '?') return -1;
+      var a = x.split('.').map(Number), c = y.split('.').map(Number);
+      for (var i = 0; i < 3; i += 1) {
+        if ((c[i] || 0) !== (a[i] || 0)) return (c[i] || 0) - (a[i] || 0);
+      }
+      return 0;
+    });
+  }
 
   /**
    * Was the reading counter running on `day`?
@@ -1176,11 +1671,38 @@ window.Analytics = (function () {
     countOn: countOn, purchasesOn: purchasesOn, cohortSize: cohortSize,
     activationsOn: activationsOn, actCountOn: actCountOn, actPlatformsOn: actPlatformsOn,
     readingsOn: readingsOn, hrvCountOn: hrvCountOn, hrvPlatformsOn: hrvPlatformsOn,
+    hrvMethodsOn: hrvMethodsOn, hrvMethodsOver: hrvMethodsOver, hrvMethodKnown: hrvMethodKnown,
     hrvKnown: hrvKnown, measureShare: measureShare, measureRate: measureRate,
     measuringAt: measuringAt, measuringCurve: measuringCurve,
     methodsOn: methodsOn, methodsOver: methodsOver,
     methodName: function (letter) { return METHOD_NAME[letter] || 'Unknown sensor'; },
     METHOD_ORDER: METHOD_ORDER,
+
+    // the generic counters — any route by name
+    eventsOn: eventsOn, slotsOn: slotsOn, slotsOver: slotsOver,
+    slotOn: slotOn, slotOver: slotOver,
+    kindKnown: kindKnown, isHeadcount: isHeadcount,
+    shareOfActive: shareOfActive, slotShare: slotShare,
+    captureFunnel: captureFunnel, offerFunnel: offerFunnel, errorInstalls: errorInstalls,
+    slotName: function (kind, letter) {
+      return (SLOT_NAME[kind] && SLOT_NAME[kind][letter]) || 'Not stated';
+    },
+    slotOrder: function (kind) { return SLOT_ORDER[kind] || ['?']; },
+    KINDS: KINDS, PER_LETTER: PER_LETTER,
+
+    // paywall
+    paywallsOn: paywallsOn, payCountOn: payCountOn, payPlatformsOn: payPlatformsOn,
+    surfacesOn: surfacesOn, surfacesOver: surfacesOver, paySurfaceKnown: paySurfaceKnown,
+    payKnown: payKnown, paywallShare: paywallShare,
+    surfaceName: function (letter) { return SURFACE_NAME[letter] || 'Unknown surface'; },
+    SURFACE_ORDER: SURFACE_ORDER, WALL_ORDER: WALL_ORDER,
+
+    // tier + build, carried by every counter
+    tiersOn: tiersOn, tiersOver: tiersOver, tierKnown: tierKnown, proShare: proShare,
+    tierName: function (letter) { return TIER_NAME[letter] || 'Unknown'; },
+    TIER_ORDER: TIER_ORDER,
+    buildsOn: buildsOn, buildsOver: buildsOver, buildKnown: buildKnown,
+    versionsOver: versionsOver,
     maturity: maturity, isMature: isMature,
 
     // retention

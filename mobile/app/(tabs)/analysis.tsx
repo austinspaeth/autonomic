@@ -14,6 +14,7 @@ import { useTier } from '../../src/store/tier';
 import { takeProgressRange, useProgressRangeSignal } from '../../src/store/nav';
 import { LockedOverlay } from '../../src/features/LockedOverlay';
 import { usePaywall } from '../../src/features/Paywall';
+import { pingViewOpened } from '../../src/store/ping';
 import { buildCategories, type AnalysisCard, type BpPeriod, type OrthoTransition } from '../../src/lib/analysis/categories';
 import { resolveProtocol, type DaysMap } from '../../src/lib/scoring/day';
 import { catFromBands, type BucketView, type CustomRange, type Mode } from '../../src/lib/analysis/buckets';
@@ -42,7 +43,7 @@ export default function AnalysisScreen() {
   // `<LockedOverlay/>` masks it and docks a small upgrade card over the top
   // (Claude Design "Locked Progress"). Switching back to Day clears it.
   const locked = useTier() === 'free';
-  const openPaywall = usePaywall();
+  const openPaywall = usePaywall('progress');
   // HRV filter lives here (not inside HrvProgress) so the same All/Morning/Evening
   // toggle can appear both inline beside the section title and in the pinned bar.
   const [hrvFilt, setHrvFilt] = useState<Filt>('all');
@@ -490,6 +491,12 @@ export default function AnalysisScreen() {
   const [renderSeq, setRenderSeq] = useState(0);
   const dirty = renderArgs !== buildArgs;
   const focused = useIsFocused();
+
+  // Someone opened this view. Fired for every tier — for a free user it is the
+  // demand side of the question the paywall counter answers from the supply
+  // side, and for a paying one it is whether the thing they bought is the thing
+  // they use. Capped at once per Eastern day per view inside the store.
+  useEffect(() => { if (focused) pingViewOpened('progress'); }, [focused]);
   const buildArgsRef = useRef(buildArgs);
   buildArgsRef.current = buildArgs;
   const renderArgsRef = useRef(renderArgs);

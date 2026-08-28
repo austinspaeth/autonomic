@@ -315,11 +315,14 @@ export interface Criterion {
 export interface Cleanliness { clean: boolean; criteria: Criterion[] }
 
 /** Baseline protocol a user gets before ever opening the editor: 7h sleep,
- *  2.5 L water, no triggers. Meds/activities start off and empty — users pick
- *  their own meds in the editor (there are no default drugs any more). */
+ *  2.5 L water, no triggers, and an HRV reading. Meds/activities start off and
+ *  empty — users pick their own meds in the editor (there are no default drugs
+ *  any more). HRV is on because taking the reading is the one habit the whole
+ *  app is built around, and a checklist that never asks for it teaches the
+ *  opposite. */
 export const DEFAULT_PROTOCOL: Protocol = {
   triggers: { enabled: true, types: [] },
-  hrv: { enabled: false },
+  hrv: { enabled: true },
   water: { enabled: true, liters: 2.5 },
   meds: { enabled: false, types: [] },
   activities: { enabled: false, types: [] },

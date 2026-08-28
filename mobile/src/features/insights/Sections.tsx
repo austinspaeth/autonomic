@@ -514,7 +514,7 @@ export function CorrelationsAiButton({ list, change, label }: {
   const p = usePalette();
   const { openSheet } = useSheets();
   const tier = useTier();
-  const openPaywall = usePaywall();
+  const openPaywall = usePaywall('insights-ai');
   const open = () => {
     if (tier === 'free') { openPaywall(); return; }
     // The user's own journal, always (see the note in app/(tabs)/insights.tsx):

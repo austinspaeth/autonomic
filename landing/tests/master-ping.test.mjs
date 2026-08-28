@@ -65,16 +65,22 @@ const ACT = {
      T-1  A 1, B 1                                             (5 active)
      T-0  A 1                                                  (4 active)
 
-   10 readings over 23 install-days on the app = 43.5%. */
+   10 readings over 23 install-days on the app = 43.5%.
+
+   Each row also names the sensor, exactly as an activation row does. The counts
+   are grouped so the platform arithmetic is unchanged by the split — every
+   number below still has to come out the same as it did before the letter
+   existed. */
 const HRV = {
-  [T(3)]: { [T(4)]: 3, [T(3)]: 2 },
-  [T(2)]: { [T(4)]: 2 },
-  [T(1)]: { [T(4)]: 1, [T(3)]: 1 },
-  [T(0)]: { [T(4)]: 1 },
+  [T(3)]: { [T(4)]: { G: 2, W: 1 }, [T(3)]: { F: 2 } },
+  [T(2)]: { [T(4)]: { B: 2 } },
+  [T(1)]: { [T(4)]: { W: 1 }, [T(3)]: { F: 1 } },
+  [T(0)]: { [T(4)]: { G: 1 } },
 };
 
-/* Activation rows carry a method letter as well as a platform one; the same
-   iOS-takes-the-odd-half split keeps the platform arithmetic identical. */
+/* Reading rows — both counters — carry a method letter as well as a platform
+   one; the same iOS-takes-the-odd-half split keeps the platform arithmetic
+   identical. */
 const shapeAct = (map) => Object.keys(map).sort().map((day) => ({
   day,
   total: Object.values(map[day]).reduce((a, m) => a + Object.values(m).reduce((x, y) => x + y, 0), 0),
@@ -141,7 +147,7 @@ window.fetch = (url, opts) => {
       ui: { view: 'timeline' },
     });
   }
-  if (body.action === 'PINGS') return reply({ since: body.payload.since, open: shape(OPEN), sub: shape(SUB), act: shapeAct(ACT), hrv: shape(HRV) });
+  if (body.action === 'PINGS') return reply({ since: body.payload.since, open: shape(OPEN), sub: shape(SUB), act: shapeAct(ACT), hrv: shapeAct(HRV) });
   return reply({ ok: true });
 };
 
@@ -387,6 +393,36 @@ check('the opened-vs-measured chart drew both series',
 check('the habit curve drew something',
   $('pgMeasureCurve').querySelectorAll('path').length >= 1,
   String($('pgMeasureCurve').querySelectorAll('path').length) + ' paths');
+
+/* ------------------------------------------- what readings are taken with
+
+   The daily counter's sensor letter. The tile carries TWO split rows — which
+   store, and which sensor — because they answer different questions about the
+   same count and run together they read as one list that sums to nothing. */
+const measTile = [].slice.call($('pgTiles').querySelectorAll('.tile'))
+  .filter((t) => /^Measured on/.test(t.querySelector('.label').textContent))[0];
+const measSplits = [].slice.call(measTile.querySelectorAll('.split'));
+check('the reading tile carries a store split and a sensor split',
+  measSplits.length === 2, String(measSplits.length));
+check('and the sensor row names the device', /Garmin watch/.test(measSplits[1].textContent),
+  measSplits[1].textContent);
+
+const readMethodNote = $('pgReadMethodNote').textContent;
+check('the readings-by-sensor card states its range total',
+  /10 readings across this range/.test(readMethodNote), readMethodNote.slice(0, 200));
+check('the readings-by-sensor chart drew a band per sensor',
+  $('pgReadMethods').querySelectorAll('path').length >= 3,
+  String($('pgReadMethods').querySelectorAll('path').length) + ' paths');
+
+/* A tile with detail under it folds on a phone, which is the markup half of
+   that: one wrapper to measure and animate, and a chevron OUTSIDE the label so
+   the label stays readable as text. */
+check('a tile with detail wraps it in one foldable block',
+  measTile.classList.contains('has-more') && !!measTile.querySelector('.tile-more'));
+check('and the fold marker is not part of the label',
+  !!measTile.querySelector('.tile-chev') &&
+  !/›/.test(measTile.querySelector('.label').textContent),
+  measTile.querySelector('.label').textContent);
 
 /* ----------------------------------------------------------- boundaries */
 

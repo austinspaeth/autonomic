@@ -36,8 +36,15 @@ export const watchPlatform = (): WatchPlatform => (Platform.OS === 'android' ? '
 /** Sub-line for the picker's collapsed "Other watches" row. */
 export const otherWatchesSub = () => brandNames();
 
+/** Release gate. The Garmin Connect IQ app is not published yet, and nothing
+ *  in the app may point a user at a watch app they cannot install — so the
+ *  picker's "Other watches" row and the Setup card's "now supported" tab are
+ *  both held behind this one flag rather than being ripped out. Flip it to
+ *  true once the watch app is live in the Connect IQ store. */
+const WATCH_BRANDS_RELEASED = false;
+
 /** True when there is at least one non-Apple watch worth offering here. */
-export const hasOtherWatches = () => watchBrands().length > 0;
+export const hasOtherWatches = () => WATCH_BRANDS_RELEASED && watchBrands().length > 0;
 
 export function WatchBrandsSheet({ controls, onLinked }: { controls: SheetControls; onLinked?: () => void }) {
   const p = usePalette();

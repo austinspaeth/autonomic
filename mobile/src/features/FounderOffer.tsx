@@ -32,6 +32,7 @@ import { detectDownturn } from '../lib/scoring/downturn';
 import { detectStrain } from '../lib/scoring/strain';
 import { discountPct, founderVerdict } from '../lib/upsell/founder';
 import { FORCE_FOUNDER_OFFER, founderMemory, noteFounderDismissed, noteFounderShown } from '../lib/upsell/founderMemory';
+import { pingOfferAccepted, pingOfferDismissed, pingOfferShown } from '../store/ping';
 
 export function FounderOfferCard() {
   const p = usePalette();
@@ -85,8 +86,16 @@ export function FounderOfferCard() {
     setLive(true);
   }, [tier, depth, state, dk, dismissed]);
 
+  // Shown: this card lives for a single day, so the day it claims is the day
+  // this fires. Capped per Eastern day in the store, which for this card means
+  // once in its whole life.
+  useEffect(() => { if (live && tier !== 'pro') pingOfferShown('founder'); }, [live, tier]);
+
   const end = () => {
     noteFounderDismissed();
+    // The ✕ is the whole dismissal here and it is permanent, so this is the one
+    // offer whose rejection is unambiguous — no accordion, no second button.
+    pingOfferDismissed('founder');
     setDismissed(true);
     setLive(false);
   };
@@ -144,7 +153,7 @@ export function FounderOfferCard() {
       </Text>
 
       <Pressable
-        onPress={() => subscribe(FOUNDER_SKU)}
+        onPress={() => { pingOfferAccepted('founder'); subscribe(FOUNDER_SKU); }}
         disabled={purchasing}
         style={({ pressed }) => [
           { height: 50, borderRadius: 14, backgroundColor: p.accent, alignItems: 'center', justifyContent: 'center' },

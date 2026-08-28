@@ -9,8 +9,7 @@
  * IT RENDERS FOR EVERY TIER. It is a feature, not an upsell, and a card that
  * only appears when you haven't paid teaches people to ignore it. Free and Pro
  * see the identical card, and it goes nowhere for either — see the note on the
- * render below for why it is no longer tappable. Consequently the CARD does not
- * pass through `nextUpsell()`; only its optional upgrade sub-line would.
+ * render below for why it is no longer tappable.
  *
  * All the decisions live in src/lib/trends (pure, tested), including the rule
  * that this never reports a decline and stays silent during a downturn, and the

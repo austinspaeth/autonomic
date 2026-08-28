@@ -288,6 +288,7 @@ describe('day scoring', () => {
     const days: Record<string, DayRecord> = {
       '2026-07-02': day({
         sleep: { bed: '22:00', wake: '06:00' },
+        readings: [{ id: 'h', type: 'hrv' }] as Entry[], // the default protocol asks for a reading
         meds: [
           { id: '1', type: 'allegra' },
           { id: '2', type: 'pepsidAc' },
@@ -348,7 +349,7 @@ describe('day scoring', () => {
     expect(crit.label).toBe('Magnesium');
     expect(crit.pass).toBe(true);
     // Without the custom map it can only fall back to the raw key.
-    expect(dayCleanliness(days, '2026-07-02', proto)!.criteria[0].label).toBe('custom-magnesium');
+    expect(dayCleanliness(days, '2026-07-02', proto)!.criteria.find((x) => x.key === 'meds:custom-magnesium')!.label).toBe('custom-magnesium');
   });
   it('daily HRV requirement passes only for an in-app HRV capture', () => {
     const proto: Protocol = { ...DEFAULT_PROTOCOL, triggers: { enabled: false, types: [] }, water: { enabled: false, liters: 0 }, sleep: { enabled: false, hours: 0 }, hrv: { enabled: true } };
@@ -419,6 +420,7 @@ describe('day scoring', () => {
     const clean = () =>
       day({
         sleep: { bed: '21:00', wake: '06:00' },
+        readings: [{ id: 'h', type: 'hrv' }] as Entry[],
         meds: [{ id: '1', type: 'allegra' }, { id: '2', type: 'pepsidAc' }, { id: '3', type: 'magGlycinate' }] as Entry[],
         food: { water: 3, calories: 0, triggers: {}, meals: [{ id: 'm', type: 'dinner', time: '16:30' }] },
       });

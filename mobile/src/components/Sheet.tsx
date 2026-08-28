@@ -24,12 +24,21 @@ import { radius, usePalette } from '../theme';
 import { notifyChartsBlur } from './charts';
 import { Icon } from './Icon';
 
+/** The pill's delete tint: the Button `danger` red (#d63b3b) lifted a step,
+ *  because the pill it sits in is near-black glass and the darker red reads as
+ *  brown there. */
+const DANGER = '#e05a5a';
+
 export interface SheetControls {
   close: () => void;
   closeAll: () => void;
 }
 export interface SheetOptions {
   action?: { icon: 'edit'; onPress: () => void };
+  /** A delete button in the header pill, left of Edit, tinted danger. The
+   *  handler is responsible for confirming — see `confirmDelete` in
+   *  features/forms.tsx, which is what every entry card uses. */
+  destructive?: { onPress: () => void; label?: string };
   fullscreen?: boolean;
   /** Size the sheet to its content (up to ~90% cap). */
   fitContent?: boolean;
@@ -374,9 +383,17 @@ function SheetView({ entry, isTop, behind, closing, requestClose, onExited, clos
           )}
         </SheetContentContext.Provider>
 
-        {/* Close (and optional edit) live together in one tinted-glass pill. */}
-        {((!full && !hideClose) || entry.opts.action) && (
-          <SheetPill lone={!(entry.opts.action && !full && !hideClose)} style={styles.headerPill}>
+        {/* Close (and the optional delete + edit) live together in one
+            tinted-glass pill. Delete sits furthest from ✕, so the two taps that
+            end the card are never neighbours. */}
+        {((!full && !hideClose) || entry.opts.action || entry.opts.destructive) && (
+          <SheetPill
+            lone={[!full && !hideClose, !!entry.opts.action, !!entry.opts.destructive].filter(Boolean).length === 1}
+            style={styles.headerPill}
+          >
+            {entry.opts.destructive && (
+              <SheetPillButton icon="trash" size={16} onPress={entry.opts.destructive.onPress} label={entry.opts.destructive.label || 'Delete'} color={DANGER} />
+            )}
             {entry.opts.action && (
               <SheetPillButton icon={entry.opts.action.icon} size={16} onPress={entry.opts.action.onPress} label="Edit" />
             )}
@@ -420,8 +437,10 @@ export function SheetPill({ children, lone, style }: {
 }
 
 /** One grey circular icon button inside a `SheetPill`. */
-export function SheetPillButton({ icon, size = 18, onPress, label, disabled }: {
+export function SheetPillButton({ icon, size = 18, onPress, label, disabled, color }: {
   icon: React.ComponentProps<typeof Icon>['name']; size?: number; onPress: () => void; label: string; disabled?: boolean;
+  /** Overrides the default dim-grey glyph (the delete button's red). */
+  color?: string;
 }) {
   const p = usePalette();
   return (
@@ -433,7 +452,7 @@ export function SheetPillButton({ icon, size = 18, onPress, label, disabled }: {
       accessibilityLabel={label}
       style={[styles.pillBtn, { backgroundColor: p.surface2 }]}
     >
-      <Icon name={icon} size={size} color={p.textDim} />
+      <Icon name={icon} size={size} color={color || p.textDim} />
     </Pressable>
   );
 }
