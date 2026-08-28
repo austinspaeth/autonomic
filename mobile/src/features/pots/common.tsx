@@ -10,14 +10,15 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import Svg, { Circle } from 'react-native-svg';
-import { SheetControls, SheetFooter } from '../../components/Sheet';
-import { Button } from '../../components/ui';
+import { SheetControls, useSheets } from '../../components/Sheet';
 import { NoteDraftCard, ReadingSummary } from '../../components/summary';
 import { usePalette, GRADE_COLORS } from '../../theme';
 import { BANDS, catFromBands } from '../../lib/scoring';
 import { ble } from '../../lib/ble/manager';
 import { getState, storeWaveform, upsertEntry } from '../../store/store';
 import { splitWaveform } from '../../lib/waveforms';
+import { confirmDelete, EntryForm } from '../EntryForm';
+import { READING_TYPES } from '../../lib/registry';
 import type { DayRecord, Entry } from '../../lib/types';
 
 /** ~1 s strong buzz (same trick as the HRV session): a dense train of heavy
@@ -155,6 +156,7 @@ export function PotsResultsSheet({ entry, dayKey, title, sub, controls }: {
   entry: Entry; dayKey: string; title: string; sub: string; controls: SheetControls;
 }) {
   const p = usePalette();
+  const { openSheet } = useSheets();
   const ctx = { sex: getState().profile.sex, height: getState().profile.height };
 
   // Sparklines should already include this result — hand the summary a days map
@@ -181,6 +183,28 @@ export function PotsResultsSheet({ entry, dayKey, title, sub, controls }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Edit, delete, close in the header pill — the same three every entry card
+  // carries, and the same arming HrvResults does: the buttons need the entry
+  // the effect above persisted, so they are set after it rather than at
+  // openSheet time. The ✕ closes the whole stack, since the session card
+  // beneath this one is finished with.
+  useEffect(() => {
+    const e = saved.current;
+    if (!e) return;
+    controls.setOptions({
+      hideClose: false,
+      dismissAll: true,
+      action: { icon: 'edit', onPress: () => openSheet((c) => (
+        <EntryForm
+          typeMap={READING_TYPES} arrKey="readings" dk={dayKey}
+          type={e.type} existing={saved.current} controls={c} onSaved={() => {}}
+        />
+      )) },
+      destructive: { onPress: () => confirmDelete(openSheet, dayKey, 'readings', e, READING_TYPES[e.type]?.label || 'reading') },
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const onNote = (next: string) => {
     setNote(next);
     const e = saved.current;
@@ -194,9 +218,6 @@ export function PotsResultsSheet({ entry, dayKey, title, sub, controls }: {
       <Text style={{ color: p.textDim, fontSize: 13, marginBottom: 16 }}>Saved to your journal</Text>
       <ReadingSummary r={shown} days={daysWithCurrent} ctx={ctx} />
       <NoteDraftCard note={note} onChange={onNote} />
-      <SheetFooter>
-        <Button title="Done" variant="primary" onPress={() => controls.closeAll()} />
-      </SheetFooter>
     </View>
   );
 }

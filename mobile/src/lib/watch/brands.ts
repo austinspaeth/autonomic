@@ -47,7 +47,7 @@ export interface WatchBrand {
   /** Steps for the direct route, when there is one. `connectSteps` falls back
    *  to the health-store steps whenever the direct link isn't available (a
    *  platform without the native module, say). */
-  directSteps?: { title: string; sub: string }[];
+  directSteps?: WatchStep[];
   /** Deep link into that app, and where to get it when it isn't installed. */
   scheme: string;
   store: Record<WatchPlatform, string>;
@@ -83,6 +83,30 @@ export interface WatchBrand {
   direct?: WatchPlatform[];
 }
 
+/**
+ * The action a step carries, when the app can perform it. The button lives IN
+ * the step rather than under the list: a step that says "install it from the
+ * Connect IQ store" beside a footer button that does exactly that reads as two
+ * different instructions, and the user has to guess they are the same one.
+ *
+ * `'pickDevice'` must come before `'getApp'` and the order here is not a
+ * preference. Connect IQ's store request is `showStore(for: IQApp)` and an
+ * `IQApp` is built against a DEVICE (`GarminLinkModule.register`), so there is
+ * nothing to ask the store about until a watch has been chosen.
+ *
+ * `'finish'` is the last step and the way out. Nothing can tell us the watch
+ * app was actually installed (Connect IQ reports it as absent for a sideloaded
+ * one), so the user saying so is the only signal there is — which makes it a
+ * step like the others, not a footer under them.
+ */
+export type WatchStepAction = 'pickDevice' | 'getApp' | 'finish';
+
+export interface WatchStep {
+  title: string;
+  sub: string;
+  action?: WatchStepAction;
+}
+
 const BRANDS: WatchBrand[] = [
   {
     id: 'garmin',
@@ -93,16 +117,23 @@ const BRANDS: WatchBrand[] = [
     transport: 'direct',
     directSteps: [
       {
+        title: 'Connect your Garmin',
+        // The prerequisite is named IN the step rather than as a step of its
+        // own: nobody owns a Garmin without Garmin Connect, so it is a check
+        // before the tap, not a task. The Connect IQ store lives inside that
+        // app too, which is why step 2 can assume it.
+        sub: 'Garmin Connect needs to be installed on this phone with your watch paired to it. Then the button below hands you to Garmin Connect to pick the watch, and comes straight back here.',
+        action: 'pickDevice',
+      },
+      {
         title: 'Install Autonomic on the watch',
-        sub: 'From the Connect IQ store. It is the app that reads beat to beat and sends it over.',
+        sub: 'The app that reads beat to beat and sends it over. Garmin Connect installs it on the watch for you.',
+        action: 'getApp',
       },
       {
-        title: 'Pick your watch in Garmin Connect',
-        sub: 'The button below hands you to Garmin Connect to choose it, then comes straight back here.',
-      },
-      {
-        title: 'Start the reading on the watch',
-        sub: 'The watch sends the whole reading over when it finishes. No health store in the middle, and nothing for you to sync.',
+        title: 'Use your watch for readings',
+        sub: 'That is the setup done. Your watch becomes the source for HRV readings: start one on the wrist and it lands in your journal when it finishes.',
+        action: 'finish',
       },
     ],
     scheme: 'garminconnect://',
@@ -222,9 +253,13 @@ export function watchBrand(id: WatchBrandId): WatchBrand | undefined {
   return BRANDS.find((b) => b.id === id);
 }
 
-/** The list row's second line for the collapsed "Other watches" row. */
+/**
+ * The collapsed row's second line. LISTED brands only — the others are entries
+ * in the registry waiting to be built, and naming a watch the app cannot yet
+ * connect to is a promise, not a hint. Today that makes it "Garmin" alone.
+ */
 export function brandNames(): string {
-  return BRANDS.map((b) => b.short).join(', ');
+  return watchBrands().map((b) => b.short).join(', ');
 }
 
 /**
@@ -238,7 +273,7 @@ export function brandNames(): string {
  * path is "watch → companion app → health store → here", and naming the wrong
  * store is the one thing that makes these steps useless.
  */
-export function connectSteps(brand: WatchBrand, hub: string, direct = false): { title: string; sub: string }[] {
+export function connectSteps(brand: WatchBrand, hub: string, direct = false): WatchStep[] {
   if (direct && brand.directSteps) return brand.directSteps;
   return [
     {

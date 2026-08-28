@@ -8,8 +8,7 @@
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
-import { SheetControls, SheetFooter } from '../../components/Sheet';
-import { Button } from '../../components/ui';
+import { SheetControls, useSheets } from '../../components/Sheet';
 import { NoteDraftCard, ReadingSummary } from '../../components/summary';
 import { usePalette } from '../../theme';
 import { computeHrv } from '../../lib/hrv';
@@ -17,6 +16,8 @@ import { computeScores } from '../../lib/scoring';
 import { getState, storeWaveform, upsertEntry } from '../../store/store';
 import { splitWaveform } from '../../lib/waveforms';
 import { health, healthAppName } from '../../lib/health';
+import { confirmDelete, EntryForm } from '../EntryForm';
+import { READING_TYPES } from '../../lib/registry';
 import { keyOf, nowTime, pad, todayKey, uid } from '../../lib/dates';
 import { nudgeDecision, nudgeDismissed, nudgeSkipped, suggestedReminderTime } from '../../lib/reminderNudge';
 import { nudgeMemory, writeNudgeMemory } from '../../lib/reminderNudgeMemory';
@@ -42,6 +43,7 @@ export function HrvResults({ rr, segmentStarts, hrSamples, sdnnSamples, config, 
   watchFallback: { sdnn?: number; hr?: number } | null; controls: SheetControls;
 }) {
   const p = usePalette();
+  const { openSheet } = useSheets();
   const ctx = { sex: getState().profile.sex, height: getState().profile.height };
 
   const result = useMemo(
@@ -166,6 +168,30 @@ export function HrvResults({ rr, segmentStarts, hrSamples, sdnnSamples, config, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // The header pill: edit, delete, close, the same three every entry card
+  // carries. It can only be armed once the auto-save above has run, because
+  // until then there is no persisted entry to edit or delete — which is why
+  // it is set through `controls.setOptions` rather than at openSheet time.
+  // A reading with nothing usable in it was never written, so it gets the ✕
+  // alone. The ✕ closes the WHOLE stack either way: this card is raised over
+  // the session it belongs to, and that session is finished with.
+  useEffect(() => {
+    const e = saved.current;
+    if (!e) { controls.setOptions({ hideClose: false, dismissAll: true }); return; }
+    controls.setOptions({
+      hideClose: false,
+      dismissAll: true,
+      action: { icon: 'edit', onPress: () => openSheet((c) => (
+        <EntryForm
+          typeMap={READING_TYPES} arrKey="readings" dk={dk}
+          type={e.type} existing={saved.current} controls={c} onSaved={() => {}}
+        />
+      )) },
+      destructive: { onPress: () => confirmDelete(openSheet, dk, 'readings', e, READING_TYPES[e.type]?.label || 'reading') },
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // A note committed after the auto-save is an edit of a real entry.
   const onNote = (next: string) => {
     setNote(next);
@@ -219,10 +245,6 @@ export function HrvResults({ rr, segmentStarts, hrSamples, sdnnSamples, config, 
           to save, so there is nothing to annotate either. */}
       {enoughData ? <NoteDraftCard note={note} onChange={onNote} /> : null}
 
-      {/* One way out: the reading is already saved. */}
-      <SheetFooter>
-        <Button title={enoughData ? 'Done' : 'Close'} variant="primary" onPress={() => controls.closeAll()} />
-      </SheetFooter>
     </View>
   );
 }

@@ -1,8 +1,9 @@
 /**
  * First-run welcome wizard — shown once, before any data exists. Three steps:
  * Before you begin (the disclaimer and the privacy promise in one view, its
- * primary IS the acknowledgement) → Connect data (Apple Health / heart-rate
- * strap, both optional) → First reading. Completing it stamps `meta.onboarded`,
+ * primary IS the acknowledgement) → Connect data (Apple Health alone, optional;
+ * a strap is a sensor, not data, and belongs to the step that uses it) →
+ * First reading. Completing it stamps `meta.onboarded`,
  * fades to black, then fades the app UI in beneath. Settings can re-show it any
  * time via `showWelcomeAgain()`.
  *
@@ -14,7 +15,8 @@
  * all set", a list of six features that scrolled off the screen. Nothing in
  * the app works until there is a first HRV reading: no score, no trend, no
  * correlation, nothing to come back for. So the step asks for exactly one
- * choice (which sensor) and hands the capture card straight to the user. Its
+ * choice (which sensor, grouped under the same accuracy-tier headings the HRV
+ * setup sheet uses, best first) and hands the capture card straight to the user. Its
  * primary FINISHES the wizard first and opens the capture over the live
  * Journal, so the reading is never taken on top of an overlay that is about to
  * fade. Skipping is allowed and lands on `<BaselineWaitingCard/>`
@@ -42,9 +44,10 @@ import { Button } from '../components/ui';
 import { uid } from '../lib/dates';
 import { SheetControls, SheetPill, SheetPillButton, useSheets } from '../components/Sheet';
 import { useToast } from '../components/Toast';
-import { ACCENT, radius, usePalette } from '../theme';
+import { ACCENT, CAUTION_GOLD, CAUTION_GOLD_SOFT, radius, usePalette } from '../theme';
 import { health, healthAppName, type HistoryProgress } from '../lib/health';
 import { workoutCandidateOf } from '../lib/health/workoutCandidate';
+import { dayAlreadyHas } from '../lib/health/updateSet';
 import { typesFor } from '../lib/typeCatalog';
 import { computeScores } from '../lib/scoring';
 import { rrCoverageSec } from '../lib/hrvQuality';
@@ -52,7 +55,9 @@ import { blankDay, getState, mutate, save, storeSleepSeries, storeWaveform, useA
 import { DevicesScreen } from './Devices';
 import { type SessionConfig } from './hrv/Session';
 import { defaultPeriodFor, defaultSource, openCapture, sourceBlocker } from './hrv/Setup';
-import { SOURCE_META, sourceSub, type Source } from './hrv/SourcePicker';
+import { SOURCE_META, sourceSub, TIER_LABEL, TIER_ORDER, type Source } from './hrv/SourcePicker';
+import { brandTag, hasOtherWatches, openBrandSetup, otherWatchesSub, otherWatchesTitle } from './hrv/WatchBrands';
+import { garminDevices, subscribeGarminDevices } from '../lib/garmin/receiver';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -72,8 +77,10 @@ const C = {
 };
 
 const STEPS = 3;
-/** Opacity of the back arrow where there's nothing to go back to. */
-const BACK_GHOST = 0.22;
+/** Opacity of the back arrow where there's nothing to go back to. Fully
+ *  invisible, not ghosted: a visible control that does nothing is a dead
+ *  button. It keeps its space, so the bar still never reflows. */
+const BACK_GHOST = 0;
 /** The first step's primary IS the acknowledgement — there is no checkbox. */
 const PRIMARY_LABELS = ['I understand', 'Continue', 'Start my first reading'];
 const STEP_DUR = 280;
@@ -91,8 +98,11 @@ const HISTORY_DAYS = 365;
  * nights of sleep with their overnight HR and stages, workouts with their HR
  * traces, and medication doses — each written into the day it was recorded and
  * scored like a live capture. Assumes read permission is already granted.
- * Idempotent — stamps (and is guarded by) meta.healthHistoryImported, so it can
- * never double-import. Returns how many items were added.
+ * Idempotent twice over: it stamps (and is guarded by)
+ * meta.healthHistoryImported, so it can never run a second time, and every
+ * candidate is checked against what the day already holds (dayAlreadyHas), so
+ * a backfill accepted after the daily import pill has been running cannot write
+ * a second copy of those days. Returns how many items were added.
  */
 async function importHealthHistory(onProgress?: (p: HistoryProgress) => void): Promise<number> {
   const api = health();
@@ -122,6 +132,10 @@ async function importHealthHistory(onProgress?: (p: HistoryProgress) => void): P
 
     for (const r of bundle.readings) {
       if (r.ownApp) continue;                           // skip our own write-backs
+      // Already in the journal — the daily import pill may have brought this
+      // week in before the backfill was ever accepted. Checked against the LIVE
+      // day, so it also catches a bundle that repeats itself.
+      if (dayAlreadyHas(s.days[r.dayKey], 'reading', r.type, r.time)) continue;
       const entry: Record<string, unknown> = {
         id: uid(), type: r.type, time: r.time, note, source, imported: true, ...r.fields,
       };
@@ -139,6 +153,7 @@ async function importHealthHistory(onProgress?: (p: HistoryProgress) => void): P
     for (const w of bundle.workouts) {
       if (w.ownApp) continue;                           // our own watch sessions
       const cand = workoutCandidateOf(w);
+      if (dayAlreadyHas(s.days[w.dayKey], 'workout', cand.type, cand.time)) continue;
       const entry: Record<string, unknown> = {
         id: uid(), type: cand.type, time: cand.time, note: '', source: 'health', imported: true, ...cand.entry,
       };
@@ -153,6 +168,7 @@ async function importHealthHistory(onProgress?: (p: HistoryProgress) => void): P
       if (m.ownApp) continue;
       const type = medKeyByLabel.get(m.name.trim().toLowerCase());
       if (!type) continue;                              // nothing sane to file it under
+      if (dayAlreadyHas(s.days[m.dayKey], 'med', type, m.time)) continue;
       const amount = m.amount ? (m.amount.match(/[\d.]+/)?.[0] ?? '') : '';
       day(m.dayKey).meds.push({ id: uid(), type, time: m.time, note, amount } as never);
       added++;
@@ -260,11 +276,48 @@ function ConnectRow({ glyph, title, sub, on, busy, onPress }: {
 
 /* ---------- last step: one sensor row ---------- */
 
-/** A sensor the first reading can use. Wears the app's own icon and accuracy
- *  badge for that source (SOURCE_META) rather than a second set of names, so
- *  the wizard and the HRV setup sheet describe the same three things the same
- *  way. Selection is a filled radio and an accent border — the wizard's
- *  ConnectRow treatment, not a new one.
+/** The brand row: same shape as a sensor row, but a CHEVRON where the radio
+ *  goes, because it selects nothing. It opens the brand card, exactly as the
+ *  HRV setup sheet's row does — the two surfaces rank and route these the same
+ *  way or the ranking means nothing. Its title comes from the same helper, so
+ *  it names the one built brand rather than a category (see otherWatchesTitle).
+ */
+function BrandsRow({ title, tag, sub, onPress }: { title: string; tag?: string; sub: string; onPress: () => void }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={title}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 14, borderWidth: 1, borderRadius: 14, padding: 14, backgroundColor: C.row, borderColor: C.rowBorder }}
+    >
+      <View style={{ width: 42, height: 42, borderRadius: 11, backgroundColor: C.tile, alignItems: 'center', justifyContent: 'center' }}>
+        <Icon name="watch" size={21} color={C.faint} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+          <Text style={{ fontSize: 15, fontWeight: '700', color: C.text }}>{title}</Text>
+          {tag ? (
+            <View style={{ paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, backgroundColor: CAUTION_GOLD_SOFT }}>
+              <Text style={{ color: CAUTION_GOLD, fontSize: 10.5, fontWeight: '600', letterSpacing: 0.3 }}>{tag}</Text>
+            </View>
+          ) : null}
+        </View>
+        <Text style={{ fontSize: 12.5, lineHeight: 17, color: C.faint, marginTop: 3 }}>{sub}</Text>
+      </View>
+      {/* Says what the tap does. A chevron only says "there is more", which is
+          the one thing a row leading to a setup errand should not imply. */}
+      <Text style={{ fontSize: 13, fontWeight: '700', color: ACCENT }}>Set up</Text>
+    </Pressable>
+  );
+}
+
+
+/** A sensor the first reading can use. Wears the app's own icon and name for
+ *  that source (SOURCE_META) rather than a second set of names, and carries NO
+ *  accuracy pill: the rows are grouped under the same tier headings the HRV
+ *  setup sheet uses, so the ranking is said once, in order, by the heading
+ *  above the row. Selection is a filled radio and an accent border — the
+ *  wizard's ConnectRow treatment, not a new one.
  *
  *  A row can carry its own `onChange` link (the strap does, once one is
  *  paired): picking a sensor and swapping the device behind it are two
@@ -296,12 +349,7 @@ function MethodRow({ source, sub, selected, onPress, onChange }: {
         <Icon name={meta.icon} size={21} color={selected ? ACCENT : C.faint} />
       </View>
       <View style={{ flex: 1 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Text style={{ fontSize: 15, fontWeight: '700', color: C.text }}>{meta.title}</Text>
-          <View style={{ paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999, borderWidth: 1, borderColor: selected ? C.accentBorder : 'rgba(255,255,255,0.14)' }}>
-            <Text style={{ fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4, color: selected ? '#e8807c' : C.faint }}>{meta.badge}</Text>
-          </View>
-        </View>
+        <Text style={{ fontSize: 15, fontWeight: '700', color: C.text }}>{meta.title}</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 3 }}>
           <Text style={{ flexShrink: 1, fontSize: 12.5, lineHeight: 17, color: C.faint }}>{sub}</Text>
           {onChange ? (
@@ -405,6 +453,11 @@ function Onboarding({ onDone }: { onDone: () => void }) {
   // The last step's sensor choice, seeded exactly the way the HRV setup sheet
   // seeds its own (a paired strap wins, else the camera).
   const [source, setSource] = useState<Source>(defaultSource);
+  // A linked Garmin is a real source on this step. Subscribed rather than read
+  // once: linking round-trips through Garmin Connect and the chosen watch
+  // arrives back through a URL callback while this screen is still mounted.
+  const [garminName, setGarminName] = useState(() => garminDevices()[0]?.name);
+  useEffect(() => subscribeGarminDevices((l) => setGarminName(l[0]?.name)), []);
   const mounted = useRef(false);
   useEffect(() => { mounted.current = true; }, []);
 
@@ -412,6 +465,9 @@ function Onboarding({ onDone }: { onDone: () => void }) {
 
   const healthOn = !!state.settings.healthEnabled;
   const strapOn = !!state.settings.lastBleDeviceId;
+  // Stamped by importHealthHistory only when the backfill actually ran, so this
+  // is the one honest answer to "did anything come in".
+  const historyImported = !!state.meta.healthHistoryImported;
 
   // Step navigation. Direction is committed a frame before the step so the
   // outgoing view's `exiting` preset matches the direction of travel.
@@ -475,6 +531,7 @@ function Onboarding({ onDone }: { onDone: () => void }) {
    */
   const startFirstReading = () => {
     if (source === 'polar' && !getState().settings.lastBleDeviceId) { connectStrap(); return; }
+    if (source === 'garmin' && !garminDevices().length) { connectGarmin(); return; }
     const blocked = sourceBlocker(source);
     if (blocked) { toast(blocked); return; }
     if (getState().settings.lastHrvSource !== source) { getState().settings.lastHrvSource = source; save(); }
@@ -484,8 +541,30 @@ function Onboarding({ onDone }: { onDone: () => void }) {
     finish();
   };
 
+  /** The one-time backfill offer. Safe to re-open: importHealthHistory is
+   *  guarded by meta.healthHistoryImported AND dedupes every candidate against
+   *  the day it would land in, so accepting it late cannot duplicate anything
+   *  the daily import pill has already brought in. */
+  const offerHistory = () => openSheet(
+    (c) => (
+      <HistoryImportSheet
+        controls={c}
+        onImported={(n) => {
+          if (n == null) toast('Import failed');
+          else toast(n ? `Imported ${n} item${n === 1 ? '' : 's'}` : `No history found in ${healthAppName()}`);
+        }}
+      />
+    ),
+    { fitContent: true, hideClose: true },
+  );
+
   const connectHealth = async () => {
-    if (healthOn || healthBusy) return;
+    // Connected already: the row's remaining job is the history offer, so
+    // tapping it re-opens the card the user declined rather than doing nothing.
+    // A row that reports "no data imported" and ignores the tap is a dead
+    // control saying there is something left to do.
+    if (healthOn) { if (!historyImported) offerHistory(); return; }
+    if (healthBusy) return;
     const api = health();
     if (!api.available) { toast(`${healthAppName()} needs a full app build`); return; }
     setHealthBusy(true);
@@ -497,28 +576,37 @@ function Onboarding({ onDone }: { onDone: () => void }) {
     if (!ok) { toast('Permission denied'); return; }
     getState().settings.healthEnabled = true; save(); toast('Health connected');
     // Offer the one-time historical backfill right after connecting (once only).
-    if (!getState().meta.healthHistoryImported) {
-      openSheet(
-        (c) => (
-          <HistoryImportSheet
-            controls={c}
-            onImported={(n) => {
-              if (n == null) toast('Import failed');
-              else toast(n ? `Imported ${n} item${n === 1 ? '' : 's'}` : `No history found in ${healthAppName()}`);
-            }}
-          />
-        ),
-        { fitContent: true, hideClose: true },
-      );
-    }
+    if (!getState().meta.healthHistoryImported) offerHistory();
   };
   const connectStrap = () => openSheet((c) => <DevicesScreen controls={c} />);
+  // The brand's setup card, where a watch is chosen and its watch app
+  // installed. On linking, the new source is selected here too, so the user
+  // comes back to a step that already reflects what they just set up.
+  const connectGarmin = () => openBrandSetup(openSheet, () => setSource('garmin'));
 
   /* ---------- last step: which sensor ---------- */
   // Apple Watch only where there is one to talk to. Everything else is offered
   // on both platforms; `sourceBlocker` is what refuses a build that can't.
   const showWatch = Platform.OS === 'ios' && health().available;
-  const sources: Source[] = showWatch ? ['watch', 'polar', 'camera'] : ['polar', 'camera'];
+  // Garmin appears on exactly the terms the HRV setup sheet gives it: a LINKED
+  // watch is a source, an unlinked one is a setup task and lives behind the
+  // "Other watches" row below. Two surfaces offering the same brand under
+  // different rules is how a user learns the app is guessing.
+  const sources: Source[] = [
+    ...(showWatch ? (['watch'] as Source[]) : []),
+    ...(garminName ? (['garmin'] as Source[]) : []),
+    'polar', 'camera',
+  ];
+  const showBrands = hasOtherWatches();
+  // One group per accuracy tier, in TIER_ORDER, empty tiers dropped. The order
+  // is the ladder's, never the platform's: a strap outranks a watch whether or
+  // not this build can see one.
+  const tiers = TIER_ORDER
+    .map((tier) => ({ tier, list: sources.filter((s) => SOURCE_META[s].tier === tier) }))
+    // The brands row is not a source but it hangs in the High accuracy group,
+    // so that heading survives an empty tier (an Android phone with no linked
+    // watch has nothing else to put there).
+    .filter((g) => g.list.length > 0 || (g.tier === 'high' && showBrands));
   const strapName = state.settings.lastBleDeviceName;
   // Picking the strap with nothing paired goes straight to the devices card,
   // the same detour the HRV setup sheet takes — choosing a sensor you don't
@@ -526,11 +614,13 @@ function Onboarding({ onDone }: { onDone: () => void }) {
   const pickSource = (s: Source) => {
     setSource(s);
     if (s === 'polar' && !getState().settings.lastBleDeviceId) connectStrap();
+    if (s === 'garmin' && !garminDevices().length) connectGarmin();
   };
 
   /* ---------- animated chrome ---------- */
-  // Back stays on screen at step 0, just ghosted (and non-interactive), so the
-  // bar doesn't reflow the moment you leave the first step.
+  // Back holds its slot at step 0 but is invisible and non-interactive, and
+  // fades in on the way to step 1 — the bar never reflows, and nothing tappable
+  // is ever shown with nowhere to go.
   const backO = useSharedValue(BACK_GHOST);
   const skipO = useSharedValue(0);
   useEffect(() => { backO.value = withTiming(step > 0 ? 1 : BACK_GHOST, { duration: 200 }); }, [step, backO]);
@@ -582,37 +672,39 @@ function Onboarding({ onDone }: { onDone: () => void }) {
         </View>
         <View>
           <Text style={st.h2}>Connect your data</Text>
-          <Text style={st.para}>Optional. You can always do this later in Settings.</Text>
-        </View>
-        <View style={{ gap: 12 }}>
-          <ConnectRow
-            glyph={<Glyph size={22} d={['M12 21c-5-3.5-8-6.6-8-10.3A4.7 4.7 0 0 1 12 7a4.7 4.7 0 0 1 8 3.7C20 14.4 17 17.5 12 21z']} />}
-            title={`Connect ${healthAppName()}`}
-            sub={healthOn
-              ? (Platform.OS === 'android' ? 'Connected · RMSSD available' : 'Connected · SDNN available')
-              : (Platform.OS === 'android' ? 'Recommended on Android' : 'Recommended on iPhone')}
-            on={healthOn}
-            busy={healthBusy}
-            onPress={connectHealth}
-          />
-          <ConnectRow
-            glyph={<Icon name="bluetooth" size={20} color={ACCENT} />}
-            title="Connect a heart-rate strap"
-            sub={strapOn ? 'Connected · full HRV panel' : 'Full RMSSD, frequency, coherence'}
-            on={strapOn}
-            onPress={connectStrap}
-          />
-        </View>
-        <View style={st.note}>
-          <View style={{ marginTop: 1 }}>
-            <Glyph size={17} w={2} circle={{ r: 10, w: 2 }} d={['M12 16v-4M12 8h.01']} />
-          </View>
-          <Text style={{ flex: 1, fontSize: 12.5, lineHeight: 19, color: '#c9a3a0' }}>
-            {Platform.OS === 'ios'
-              ? 'Works with Apple Watch without pairing to the app, but Bluetooth chest straps will get more accurate data.'
-              : 'A Bluetooth chest strap gets the most accurate data. You can also take readings with your phone camera.'}
+          {/* What connecting BUYS, not that it can be deferred: the Skip in the
+              header already says that, and saying it twice is the friction this
+              step was meant to lose. The second sentence is the reason, and it
+              deliberately avoids the word "baseline" — in this app that means
+              the first HRV reading, which is the NEXT step's job and the one
+              thing a history import cannot supply. */}
+          <Text style={st.para}>
+            Brings in your sleep, workouts and heart-rate history. You start with real
+            context behind you instead of an empty journal.
           </Text>
         </View>
+        {/* One row, because a strap is not data — it is a sensor for a reading
+            that has not been taken yet, and the next step already asks for it
+            (and detours into the devices card when nothing is paired). Asking
+            here made the same request twice, the first time with no reason
+            attached. */}
+        <ConnectRow
+          glyph={<Glyph size={22} d={['M12 21c-5-3.5-8-6.6-8-10.3A4.7 4.7 0 0 1 12 7a4.7 4.7 0 0 1 8 3.7C20 14.4 17 17.5 12 21z']} />}
+          // Once connected the row drops the imperative: a button reading
+          // "Connect Apple Health · Connected" contradicts itself.
+          title={healthOn ? healthAppName() : `Connect ${healthAppName()}`}
+          // The backfill is OFFERED, not automatic, so "data imported" is a
+          // claim and `meta.healthHistoryImported` is the only thing that can
+          // make it. Declining the offer says so rather than staying silent:
+          // permission granted and nothing imported is a real state with
+          // something still to do in it, and the row is where that is visible.
+          sub={healthOn
+            ? (historyImported ? 'Connected · data imported' : 'Connected · no data imported')
+            : (Platform.OS === 'android' ? 'Recommended on Android' : 'Recommended on iPhone')}
+          on={healthOn}
+          busy={healthBusy}
+          onPress={connectHealth}
+        />
       </ScrollView>
     );
     return (
@@ -629,30 +721,39 @@ function Onboarding({ onDone }: { onDone: () => void }) {
           </Text>
         </View>
 
-        <View>
-          <Text style={st.fieldLabel}>Measure with</Text>
-          <View style={{ gap: 10 }}>
-            {sources.map((src) => (
-              <MethodRow
-                key={src}
-                source={src}
-                sub={sourceSub(src, strapName)}
-                selected={source === src}
-                onPress={() => pickSource(src)}
-                onChange={src === 'polar' && strapOn ? connectStrap : undefined}
-              />
-            ))}
-          </View>
-        </View>
-
-        <View style={{ flexDirection: 'row', gap: 11, paddingHorizontal: 2 }}>
-          <View style={{ marginTop: 1 }}>
-            <Glyph size={17} w={2} color={C.faint} circle={{ r: 10, w: 2 }} d={['M12 16v-4M12 8h.01']} />
-          </View>
-          <Text style={{ flex: 1, fontSize: 12.5, lineHeight: 19, color: C.faint }}>
-            Readings taken at the same time each day are the only ones worth comparing. Most people do it before
-            they get out of bed.
-          </Text>
+        {/* Grouped by accuracy tier, best first, exactly as the HRV setup
+            sheet groups them. A per-row pill let the two drift; a heading
+            cannot, and a new sensor (a Garmin, another watch brand) joins its
+            tier without this step learning anything about it. */}
+        <View style={{ gap: 18 }}>
+          {tiers.map(({ tier, list }) => (
+            <View key={tier}>
+              <Text style={st.fieldLabel}>{TIER_LABEL[tier]}</Text>
+              <View style={{ gap: 10 }}>
+                {list.map((src) => (
+                  <MethodRow
+                    key={src}
+                    source={src}
+                    sub={sourceSub(src, src === 'garmin' ? garminName : strapName)}
+                    selected={source === src}
+                    onPress={() => pickSource(src)}
+                    onChange={
+                      src === 'polar' && strapOn ? connectStrap
+                        : src === 'garmin' && garminName ? connectGarmin
+                          : undefined
+                    }
+                  />
+                ))}
+                {/* Not a source: picking a brand is a setup errand (Garmin
+                    Connect, then the watch app), so this opens the same card
+                    the HRV sheet's row opens rather than selecting anything.
+                    Once a watch is linked it becomes a real row above. */}
+                {tier === 'high' && showBrands ? (
+                  <BrandsRow title={otherWatchesTitle()} tag={brandTag()} sub={otherWatchesSub()} onPress={connectGarmin} />
+                ) : null}
+              </View>
+            </View>
+          ))}
         </View>
       </ScrollView>
     );
@@ -739,5 +840,4 @@ const st = StyleSheet.create({
   privRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 14, paddingVertical: 6, paddingHorizontal: 2 },
   privLabel: { fontSize: 16, lineHeight: 23, color: C.text },
   fieldLabel: { fontSize: 12, letterSpacing: 0.6, textTransform: 'uppercase', color: C.faint, fontWeight: '700', marginBottom: 7 },
-  note: { flexDirection: 'row', gap: 11, backgroundColor: C.accentWash, borderWidth: 1, borderColor: 'rgba(224,49,39,0.19)', borderRadius: 12, padding: 14 },
 });

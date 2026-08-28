@@ -182,11 +182,24 @@ let cf = null;
 /* Required lazily so a unit test — and every request that publishes nothing —
    never pays for the client, and so this file can be imported with no AWS SDK
    S3 package present at all. */
+/* THE SITE BUCKET IS NOT IN THIS LAMBDA'S REGION, and a default client assumes
+   it is. This function runs in us-west-2; `autonomic.care` was created in
+   us-east-1, so every PutObject came back `PermanentRedirect` (HTTP 301, "the
+   bucket you are attempting to access must be addressed using the specified
+   endpoint") and a campaign save failed with the generic retry message — the
+   one error in this module that is not transient and that retrying can never
+   fix.
+
+   `followRegionRedirects` makes the SDK read the region off that 301 and reissue
+   the request against the right endpoint, once per client. Chosen over a
+   `SITE_BUCKET_REGION` env var deliberately: the bucket is created out-of-band
+   and this repo only ever holds its NAME, so a hardcoded region here is a second
+   fact about someone else's resource that can silently go stale. This asks. */
 const s3Client = () => {
   if (!s3) {
     // eslint-disable-next-line global-require
     const { S3Client } = require('@aws-sdk/client-s3');
-    s3 = new S3Client({});
+    s3 = new S3Client({ followRegionRedirects: true });
   }
   return s3;
 };

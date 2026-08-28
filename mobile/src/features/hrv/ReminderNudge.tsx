@@ -1,5 +1,5 @@
 /**
- * The morning-reminder offer at the top of the reading-complete card.
+ * The daily-reminder offer at the top of the reading-complete card.
  *
  * A reading just landed, which is the one moment "take it at the same time
  * each morning" is self-evidently true rather than a setting nobody opens. The
@@ -77,7 +77,7 @@ export function ReminderNudgeCard({ initialTime, onDismiss, onEnabled }: {
           onPress={() => openSheet(
             (c) => (
               <TimePickerSheet
-                label="Morning reminder"
+                label="Daily reminder"
                 note="Pick a time you are usually awake but still resting, before coffee or exercise. Readings taken under the same conditions each day are the ones you can actually compare."
                 value={time}
                 onChange={setTime}

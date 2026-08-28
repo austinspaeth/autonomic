@@ -32,6 +32,9 @@ import { detectDownturn } from '../lib/scoring/downturn';
 import { detectStrain } from '../lib/scoring/strain';
 import { discountPct, founderVerdict } from '../lib/upsell/founder';
 import { FORCE_FOUNDER_OFFER, founderMemory, noteFounderDismissed, noteFounderShown } from '../lib/upsell/founderMemory';
+import { noteOfferShown, offerPacingClear } from '../lib/upsell/pacingMemory';
+import { offerMsLeft } from '../lib/upsell/annual';
+import { annualMemory } from '../lib/upsell/annualMemory';
 import { pingOfferAccepted, pingOfferDismissed, pingOfferShown } from '../store/ping';
 
 export function FounderOfferCard() {
@@ -41,6 +44,12 @@ export function FounderOfferCard() {
   const state = useAppState();
   const tier = useTier();
   const dk = todayKey();
+
+  /** The half-off annual window is running. It carries a Pro unlock and it is
+   *  over within a day, so it wins the slot outright — see `annualOfferLive`
+   *  in ../lib/upsell/founder. Read on every render rather than latched,
+   *  because this card must come back when that window closes. */
+  const annualOfferLive = offerMsLeft(Date.now(), annualMemory()) > 0;
 
   // Resolve an already-claimed day during the first render (a pure read), the
   // same reason AnnualOfferCard does: settling it a frame later pops the card
@@ -53,6 +62,10 @@ export function FounderOfferCard() {
   const settled = useRef(false);
   useEffect(() => {
     if (settled.current || dismissed) return;
+    // Nothing to sell a subscriber. Returned before anything is claimed or
+    // stamped, so an entitlement that lands late can't leave a spent offer and
+    // a stopped clock behind it.
+    if (tier === 'pro') return;
     const mem = founderMemory();
     // The dev force skips the earning conditions (trial + three logged days),
     // never the memory: a card that reappeared after being dismissed would be
@@ -66,6 +79,13 @@ export function FounderOfferCard() {
       sheetOpen: depth > 0,
       crashAlertFiredToday: state.settings.crashAlert?.lastFired === dk,
       downturn,
+      // One offer at a time, then a week of quiet (../lib/upsell/pacing). This
+      // is also what keeps the annual card's 24h unlock from making this card
+      // due: that unlock reports 'trial', which is otherwise exactly the state
+      // this offer waits for. Asked only on the claim path — a day already
+      // claimed is handled above, by the memory.
+      offerCooldown: !offerPacingClear(),
+      annualOfferLive,
     });
     // Asked twice, deliberately: this effect re-runs on every journal change,
     // and detectDownturn is an O(week) sweep. The cheap gates (memory, tier,
@@ -82,14 +102,14 @@ export function FounderOfferCard() {
     }
     if (!v.ok) return;
     settled.current = true;
-    if (v.claim) noteFounderShown(dk);
+    if (v.claim) { noteFounderShown(dk); noteOfferShown('founder'); }
     setLive(true);
-  }, [tier, depth, state, dk, dismissed]);
+  }, [tier, depth, state, dk, dismissed, annualOfferLive]);
 
   // Shown: this card lives for a single day, so the day it claims is the day
   // this fires. Capped per Eastern day in the store, which for this card means
   // once in its whole life.
-  useEffect(() => { if (live && tier !== 'pro') pingOfferShown('founder'); }, [live, tier]);
+  useEffect(() => { if (live && tier !== 'pro' && !annualOfferLive) pingOfferShown('founder'); }, [live, tier, annualOfferLive]);
 
   const end = () => {
     noteFounderDismissed();
@@ -110,7 +130,13 @@ export function FounderOfferCard() {
   const offerPrice = useMemo(() => priceOf(founder, FOUNDER_SKU), [founder]);
   const pct = offerPrice ? discountPct(offerPrice, full) : null;
 
-  if (!live || dismissed || tier === 'pro') return null;
+  // Both gates again, because `live` can have been seeded from a day this card
+  // claimed on an earlier launch without ever consulting the verdict. The tier
+  // is re-read for the same reason: this offer exists only inside the install
+  // trial, so a subscription bought (or a trial expiring) later the same day
+  // retires the card rather than leaving it selling into a state it doesn't
+  // apply to.
+  if (!live || dismissed || tier !== 'trial' || annualOfferLive) return null;
 
   return (
     <View style={{

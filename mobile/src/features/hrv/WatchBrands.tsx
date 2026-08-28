@@ -13,18 +13,20 @@
  * actually help: open the companion app, or re-ask for the health permission
  * for someone who wired this up months ago.
  */
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Linking, Platform, Pressable, Text, View } from 'react-native';
-import type { SheetControls } from '../../components/Sheet';
-import { useSheets } from '../../components/Sheet';
+import { useSheets, type SheetControls } from '../../components/Sheet';
 import { Button } from '../../components/ui';
 import { useToast } from '../../components/Toast';
 import { Icon } from '../../components/Icon';
 import { CAUTION_GOLD, CAUTION_GOLD_SOFT, GRADE_COLORS, radius, usePalette } from '../../theme';
+import { SupportCard } from '../SupportCard';
 import { health, healthAppName, healthPermissionPath, openHealthApp } from '../../lib/health';
 import { garminDevices, pickGarminDevice, subscribeGarminDevices } from '../../lib/garmin/receiver';
-import { garminAvailable, garminNative } from '../../../modules/garmin-link';
-import { brandNames, connectSteps, watchBrands, type WatchBrand, type WatchPlatform } from '../../lib/watch/brands';
+import { garminNative } from '../../../modules/garmin-link';
+import { brandNames, connectSteps, hasDirectLink, watchBrands, type WatchBrand, type WatchPlatform } from '../../lib/watch/brands';
+
+type OpenSheet = ReturnType<typeof useSheets>['openSheet'];
 
 // The sheet's ✕ pill floats top-right; inset the title + subtitle so neither
 // runs underneath it.
@@ -33,15 +35,51 @@ const CLOSE_CLEARANCE = 58;
 /** The platform whose health store a reading would land in. */
 export const watchPlatform = (): WatchPlatform => (Platform.OS === 'android' ? 'android' : 'ios');
 
-/** Sub-line for the picker's collapsed "Other watches" row. */
-export const otherWatchesSub = () => brandNames();
+/**
+ * The collapsed row that opens the brand list, in the source picker and in the
+ * welcome wizard. It names the ONE brand while only one is built ("Garmin",
+ * over that brand's models): "Other watches · Garmin" reads as a category with
+ * something hidden behind it, and what is behind it is nothing.
+ */
+/**
+ * Open the brand SETUP directly.
+ *
+ * While one brand is built there is nothing to choose, so the list card in
+ * between was a screen that existed only to be tapped through. It comes back on
+ * its own the day a second brand is listed. `onLinked` fires once the setup card
+ * confirms, exactly as it did through the list.
+ */
+export function openBrandSetup(openSheet: OpenSheet, onLinked?: () => void): void {
+  const list = watchBrands();
+  if (list.length === 1) {
+    openSheet((c) => <WatchBrandSetup brand={list[0]} controls={c} onLinked={onLinked} />);
+    return;
+  }
+  openSheet((c) => <WatchBrandsSheet controls={c} onLinked={onLinked} />);
+}
 
-/** Release gate. The Garmin Connect IQ app is not published yet, and nothing
- *  in the app may point a user at a watch app they cannot install — so the
- *  picker's "Other watches" row and the Setup card's "now supported" tab are
- *  both held behind this one flag rather than being ripped out. Flip it to
- *  true once the watch app is live in the Connect IQ store. */
-const WATCH_BRANDS_RELEASED = false;
+/** The tag a listed brand wears wherever it is offered, so "not fully proven"
+ *  travels with the name instead of living only inside the setup card. */
+export const brandTag = () => {
+  const list = watchBrands();
+  return list.length === 1 && list[0].experimental ? 'Experimental' : undefined;
+};
+
+export const otherWatchesTitle = () => {
+  const list = watchBrands();
+  return list.length === 1 ? list[0].name : 'Other watches';
+};
+export const otherWatchesSub = () => {
+  const list = watchBrands();
+  return list.length === 1 ? list[0].models : brandNames();
+};
+
+/** Release gate. Nothing in the app may point a user at a watch app they
+ *  cannot install, so the picker's "Other watches" row and the Setup card's
+ *  "now supported" tab were held behind this one flag until the Garmin Connect
+ *  IQ app was published. It is live, so this is open. Close it again (rather
+ *  than ripping anything out) if a brand ever has to be pulled. */
+const WATCH_BRANDS_RELEASED = true;
 
 /** True when there is at least one non-Apple watch worth offering here. */
 export const hasOtherWatches = () => WATCH_BRANDS_RELEASED && watchBrands().length > 0;
@@ -121,7 +159,7 @@ export function PickerRow({ icon, title, sub, onPress, children, tag }: {
               // the same gold already means "proceed knowingly" on the
               // back-dated save button.
               <View style={{ paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, backgroundColor: CAUTION_GOLD_SOFT }}>
-                <Text style={{ color: CAUTION_GOLD, fontSize: 10.5, fontWeight: '800', letterSpacing: 0.3 }}>{tag}</Text>
+                <Text style={{ color: CAUTION_GOLD, fontSize: 10.5, fontWeight: '600', letterSpacing: 0.3 }}>{tag}</Text>
               </View>
             ) : null}
           </View>
@@ -133,24 +171,38 @@ export function PickerRow({ icon, title, sub, onPress, children, tag }: {
   );
 }
 
-/** True when this brand's OWN link to the app is built into this binary. Garmin
- *  is the one that has one (the Connect IQ module, iOS only); everywhere else
- *  the reading still travels through the platform health store, so the card
- *  falls back to those steps rather than promising a route that isn't there. */
-function directLinkReady(brand: WatchBrand): boolean {
-  if (brand.transport !== 'direct') return false;
-  return brand.id === 'garmin' && garminAvailable();
+/**
+ * Which ROUTE this brand's card describes. A property of the brand and the
+ * platform, never of the build.
+ *
+ * It used to also require the native module to be present (`garminAvailable`),
+ * so a build without it silently showed the health-store card instead: three
+ * steps telling a Garmin owner to share with Apple Health, on the one brand
+ * that does not go through Apple Health at all. Wrong instructions are worse
+ * than absent ones, and it looked exactly like the direct card had been lost.
+ *
+ * Nothing here checks the module any more. A shipped build always carries it —
+ * adding it changes the native fingerprint, so it arrives with the binary and
+ * never as an update to an older one — which leaves only stale DEV builds, and
+ * those are not a state to write copy for.
+ */
+function directRoute(brand: WatchBrand): boolean {
+  return brand.transport === 'direct' && hasDirectLink(brand, watchPlatform());
 }
 
 /** One brand's setup card: three steps, the models that are known to work, and
- *  the two ways out. What those two are depends on the route — a direct link
- *  ends in "choose your watch", a health-store hand-off ends in the companion
- *  app and a permission re-check. */
+ *  the way out. What that is depends on the route.
+ *
+ *  On the DIRECT route the card has no footer button at all: each step that the
+ *  app can perform carries its own button, because a footer pair sitting under
+ *  a numbered list is a second set of instructions the reader has to match up
+ *  with the first. The health-store route keeps its footer — its steps happen
+ *  in another app entirely, so there is nothing there to attach a button to. */
 export function WatchBrandSetup({ brand, controls, onLinked }: { brand: WatchBrand; controls: SheetControls; onLinked?: () => void }) {
   const p = usePalette();
   const toast = useToast();
   const hub = healthAppName();
-  const direct = directLinkReady(brand);
+  const direct = directRoute(brand);
   const steps = connectSteps(brand, hub, direct);
 
   // On iOS the linked device arrives through Garmin Connect's URL callback,
@@ -162,14 +214,62 @@ export function WatchBrandSetup({ brand, controls, onLinked }: { brand: WatchBra
   // opens, so a count comparison never fires and re-linking silently does
   // nothing — which is exactly what it did.
   const asked = useRef(false);
+  // Step 2 cannot act until step 1 has: `showStore` wants an IQApp, which is
+  // built against a chosen device. Tracked as state, not read once, because the
+  // device arrives asynchronously through Garmin Connect's URL callback while
+  // this card is open.
+  const [linked, setLinked] = useState(() => garminDevices().length > 0);
+  // Step 3 waits on step 2 the same way step 2 waits on step 1: confirming an
+  // install nobody has been sent to do is a confirmation of nothing. It cannot
+  // be a real check — Connect IQ reports a sideloaded app as absent, and the
+  // store hand-off tells us nothing about what happened over there — so the
+  // gate is the TAP, plus an advisory yes from the watch for someone who set
+  // this up on an earlier visit (a positive there is trustworthy; only its
+  // negatives are not).
+  const [appSent, setAppSent] = useState(false);
   const finish = useCallback(() => {
+    const d = garminDevices()[0];
     controls.close();
     onLinked?.();
-  }, [controls, onLinked]);
+    // Said out loud because the card that made the change is gone by the time
+    // it lands: the source row underneath is what changed, and a user who came
+    // in through Other watches is not looking at it.
+    toast(d ? `Using ${d.name} for readings` : `Using ${brand.name} for readings`);
+  }, [brand.name, controls, onLinked, toast]);
 
   useEffect(() => subscribeGarminDevices((list) => {
-    if (direct && asked.current && list.length) finish();
-  }), [direct, finish]);
+    setLinked(list.length > 0);
+    // Choosing a watch no longer closes the card: the next thing to do (install
+    // the watch app) is a step further down THIS list, and closing would drop
+    // the user back a card away from it. The card closes when the whole brand
+    // is set up, which the last step's "Done" says.
+  }), [direct]);
+
+  const getWatchApp = () => {
+    const d = garminDevices()[0];
+    if (!d) { toast('Choose your watch first'); return; }
+    setAppSent(true);
+    void garminNative()?.openStoreForApp(d.id);
+  };
+
+  // Returning to a card that was finished days ago: ask the watch. Only a yes
+  // is acted on, so a sideloaded app (always reported absent) simply leaves the
+  // step where the tap would put it.
+  useEffect(() => {
+    if (!direct || !linked || appSent) return;
+    const d = garminDevices()[0];
+    if (!d) return;
+    let live = true;
+    void garminNative()?.getAppStatus(d.id)
+      .then((st) => { if (live && st?.installed) setAppSent(true); })
+      .catch(() => { /* advisory only — the tap is the real gate */ });
+    return () => { live = false; };
+  }, [direct, linked, appSent]);
+
+  const pickDevice = () => {
+    asked.current = true;
+    void pickGarminDevice();
+  };
 
   const openApp = () => {
     const store = brand.store[watchPlatform()];
@@ -200,17 +300,41 @@ export function WatchBrandSetup({ brand, controls, onLinked }: { brand: WatchBra
       </Text>
 
       <View style={{ gap: 8 }}>
-        {steps.map((s, i) => (
-          <View key={i} style={{ flexDirection: 'row', gap: 12, padding: 14, borderRadius: radius.control, borderWidth: 1, borderColor: p.border, backgroundColor: p.surface2 }}>
-            <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: p.accentSoft, alignItems: 'center', justifyContent: 'center', marginTop: 1 }}>
-              <Text style={{ color: p.accent, fontWeight: '800', fontSize: 13 }}>{i + 1}</Text>
+        {steps.map((s, i) => {
+          // The button belongs to the step, so it sits under the step's own
+          // text and inside its border rather than under the whole list.
+          const action = s.action === 'pickDevice'
+            ? { title: linked ? `Change ${brand.name}` : `Choose your ${brand.name}`, onPress: pickDevice, disabled: false }
+            : s.action === 'getApp'
+              ? { title: 'Get the watch app', onPress: getWatchApp, disabled: !linked }
+              // The confirm, and the card's only exit besides the ✕: it selects
+              // this watch as the reading source. Can't be true until step 1
+              // has chosen one.
+              : s.action === 'finish'
+                ? { title: "I've installed the watch app", onPress: finish, disabled: !linked || !appSent }
+                : null;
+          return (
+            // Column, not a row: the step's button spans the card's full width
+            // under the text rather than being inset into the text column, so
+            // it reads as the step's action and not as a footnote to it.
+            <View key={i} style={{ padding: 14, borderRadius: radius.control, borderWidth: 1, borderColor: p.border, backgroundColor: p.surface2 }}>
+              <View style={{ flexDirection: 'row', gap: 12 }}>
+                <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: p.accentSoft, alignItems: 'center', justifyContent: 'center', marginTop: 1 }}>
+                  <Text style={{ color: p.accent, fontWeight: '800', fontSize: 13 }}>{i + 1}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: p.text, fontWeight: '700' }}>{s.title}</Text>
+                  <Text style={{ color: p.textDim, fontSize: 12, lineHeight: 17, marginTop: 4 }}>{s.sub}</Text>
+                </View>
+              </View>
+              {action ? (
+                <View style={{ flexDirection: 'row', marginTop: 12 }}>
+                  <Button title={action.title} variant="primary" disabled={action.disabled} onPress={action.onPress} />
+                </View>
+              ) : null}
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ color: p.text, fontWeight: '700' }}>{s.title}</Text>
-              <Text style={{ color: p.textDim, fontSize: 12, lineHeight: 17, marginTop: 4 }}>{s.sub}</Text>
-            </View>
-          </View>
-        ))}
+          );
+        })}
       </View>
 
       <View style={{ marginTop: 18, padding: 14, borderRadius: radius.control, backgroundColor: p.sunk }}>
@@ -248,47 +372,24 @@ export function WatchBrandSetup({ brand, controls, onLinked }: { brand: WatchBra
         <Text style={{ color: p.textDim, fontSize: 12.5, lineHeight: 18, marginTop: 11 }}>{brand.caveat}</Text>
       </View>
 
-      <View style={{ height: 20 }} />
-      {direct ? (
-        <>
-          {/* Opens our Connect IQ store page on the watch. Needs a linked
-              device, which is why it appears after one is chosen rather than
-              beside the step that mentions it. */}
-          <Button
-            title="Get the watch app"
-            variant="ghost"
-            onPress={() => {
-              const d = garminDevices()[0];
-              if (!d) { toast('Choose your watch first'); return; }
-              void garminNative()?.openStoreForApp(d.id);
-            }}
-          />
-          <View style={{ height: 10 }} />
-          <Button
-            title={`Choose your ${brand.name}`}
-            variant="primary"
-            onPress={() => {
-              // Linking is not the goal — measuring is. On success the whole
-              // sheet stack closes and the watch is selected as the source, so
-              // the user is not left tapping through cards to arrive at the
-              // thing they just set up.
-              asked.current = true;
-              // Success may also arrive via the URL callback above; whichever
-              // lands first closes the card.
-              void pickGarminDevice().then((list) => {
-                if (list.length) finish();
-              });
-            }}
-          />
-
-        </>
-      ) : (
+      {/* The gap the footer buttons need. With no footer there is nothing to
+          separate, so the direct route closes it up and the support card sits
+          just under the models block. */}
+      {direct ? null : <View style={{ height: 20 }} />}
+      {/* Nothing on the direct route: every action it has, the way out
+          included, belongs to a numbered step above. The health-store route
+          keeps its footer, because its steps happen inside another app and
+          there is nothing there to attach a button to. */}
+      {direct ? null : (
         <>
           <Button title={`Open ${brand.app}`} variant="primary" onPress={openApp} />
           <View style={{ height: 10 }} />
           <Button title="I've already set this up" variant="ghost" onPress={() => { void alreadyConnected(); }} />
         </>
       )}
+      {/* Everything above crosses into Garmin's apps, where nothing of ours can
+          see a failure. A dead end there has to lead to a person. */}
+      <SupportCard prompt="Stuck, or something not working? Email us!" style={{ marginTop: direct ? 14 : 22 }} />
       <View style={{ height: 20 }} />
     </View>
   );

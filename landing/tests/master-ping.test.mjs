@@ -183,8 +183,12 @@ check('asked the API for pings', calls.some((c) => c.action === 'PINGS'));
 
 /* ------------------------------------------------------------------ tiles */
 
+/* THREE HOSTS, one per scope. The host a tile lives in is now part of what it
+   claims: "Active on Aug 28" is about one day, "Returning / day" is about the
+   range, and "D7 retention" is about every cohort that ever installed. They
+   used to share one wrapping row. */
 const tiles = {};
-['pgTiles', 'pgTilesB'].forEach((id) => {
+['pgTilesToday', 'pgTilesRange', 'pgTilesLife'].forEach((id) => {
   $(id).querySelectorAll('.tile').forEach((t) => {
     tiles[t.querySelector('.label').textContent.trim()] = {
       value: t.querySelector('.value').textContent.trim(),
@@ -195,15 +199,67 @@ const tiles = {};
     };
   });
 });
-/* Twenty-one: sixteen, the three the reading counter added, and the two
-   install tiles — the newest day's first runs and the range's. */
-check('twenty-one KPI tiles', Object.keys(tiles).length === 21, Object.keys(tiles).join(' | '));
+/* Twenty-three: the twenty-one there were, plus the two the range group gained
+   when the tiles were split by scope — an average-active tile (the number that
+   used to hide in the today tile's meta line) and first readings over the
+   range beside the one for the day. */
+check('twenty-three KPI tiles', Object.keys(tiles).length === 23, Object.keys(tiles).join(' | '));
+
+/* Each group holds only what it can honestly claim. A range average under
+   "Today", or a retention curve under "This range", is the exact confusion the
+   split exists to end. */
+const labelsIn = (id) => [].slice.call($(id).querySelectorAll('.tile'))
+  .map((t) => t.querySelector('.label').textContent.trim());
+check('every tile under Today names the day it is about, or is a count of that day',
+  labelsIn('pgTilesToday').every((l) => / on /.test(l) || /^Measured of active$/.test(l) || /^Active (in trial|past the trial)$/.test(l)),
+  labelsIn('pgTilesToday').join(' | '));
+check('nothing under This range claims a single day',
+  labelsIn('pgTilesRange').every((l) => !/ on [A-Z]/.test(l)), labelsIn('pgTilesRange').join(' | '));
+check('the lifetime group holds the by-age rates and nothing else',
+  labelsIn('pgTilesLife').every((l) => /retention|Activated|Conversion/.test(l)),
+  labelsIn('pgTilesLife').join(' | '));
 
 /* T(0) is 1 + 2 + 1 pings, which the fixture splits 3 iOS / 1 Android. The
    tile is what tells Austin which store phoned home; the numbers above it are
    the proof the split pooled back into the same totals. */
-const platTile = [].slice.call($('pgTilesB').querySelectorAll('.tile'))
+const platTile = [].slice.call($('pgTilesToday').querySelectorAll('.tile'))
   .filter((t) => /^Platform on/.test(t.querySelector('.label').textContent))[0];
+/* ------------------------------------------- the previous-range comparison
+
+   A range tile may say "up 12% on the range before" only when the counter was
+   actually running for that earlier window. The fixture's history starts at
+   T(10), so on the default 30-day range the previous 30 days are days nobody
+   was counting — and a comparison against them would report the deploy date as
+   a collapse. Nothing in the range group may carry a delta here. */
+check('no range tile compares against a window the counter never covered',
+  $('pgTilesRange').querySelectorAll('.delta').length === 0,
+  $('pgTilesRange').textContent.replace(/\s+/g, ' ').slice(0, 200));
+
+/* Narrow the window until the one before it is inside the fixture's history,
+   and the same tiles gain the comparison. T(4)..T(0) has T(9)..T(5) behind it,
+   which the counter was running for. */
+window.document.getElementById('fRange').value = 'custom';
+window.document.getElementById('fRange').dispatchEvent(new window.Event('change', { bubbles: true }));
+window.document.getElementById('fFrom').value = T(4);
+window.document.getElementById('fFrom').dispatchEvent(new window.Event('change', { bubbles: true }));
+window.document.getElementById('fTo').value = T(0);
+window.document.getElementById('fTo').dispatchEvent(new window.Event('change', { bubbles: true }));
+await new Promise((r) => setTimeout(r, 300));
+check('a covered previous window brings the comparison out',
+  $('pgTilesRange').querySelectorAll('.delta').length > 0,
+  $('pgTilesRange').textContent.replace(/\s+/g, ' ').slice(0, 240));
+/* A rate's move is in POINTS, never in per cent of a per cent: 20% to 25% is
+   up 5 points, and calling it "up 25%" is the oldest wrong number here. */
+const ratePts = [].slice.call($('pgTilesRange').querySelectorAll('.tile'))
+  .filter((t) => /Measured per active day/.test(t.querySelector('.label').textContent))[0];
+check('and a rate tile states its move in points, not per cent',
+  !ratePts || !/\d% *$/.test((ratePts.querySelector('.delta') || {}).textContent || ''),
+  (ratePts && (ratePts.querySelector('.delta') || {}).textContent) || 'no delta');
+
+window.document.getElementById('fRange').value = '30';
+window.document.getElementById('fRange').dispatchEvent(new window.Event('change', { bubbles: true }));
+await new Promise((r) => setTimeout(r, 300));
+
 check('a platform tile names the day\'s split', !!platTile);
 check('and reads it as a share of iOS',
   platTile && /75% iOS/.test(platTile.querySelector('.value').textContent),
@@ -266,7 +322,7 @@ check('and read 0 on a day no cohort was born',
   installsToday && installsToday.value === '0', installsToday && installsToday.value);
 check('installs over the range sum the cohorts born in it',
   tiles['Installs in range'].value === '22', tiles['Installs in range'].value);
-const freshSplit = splitOfTile('pgTilesB', 'Installs in range');
+const freshSplit = splitOfTile('pgTilesRange', 'Installs in range');
 check('and the range\'s installs are split by store',
   /iOS 11/.test(freshSplit) && /Android 11/.test(freshSplit), freshSplit);
 
@@ -288,7 +344,7 @@ check('and a tile with three tiny baselines carries no comparisons at all',
 /* A subscribe ping carries the buyer's store in the same cohort key an open
    ping does, so both purchase tiles say which store paid. In range: T(2) sold
    one on each store, T(0) sold one on iOS. On the newest day alone: 1 iOS. */
-const rangeSplit = splitOfTile('pgTilesB', 'Purchases in range');
+const rangeSplit = splitOfTile('pgTilesRange', 'Purchases in range');
 check('purchases in range are split by store', /iOS 2/.test(rangeSplit) && /Android 1/.test(rangeSplit), rangeSplit);
 
 /* Every purchase as its own row, which is what a book with three of them can
@@ -316,7 +372,7 @@ $('pgPurchaseRowsToggle').click();
 
 const buysToday = tiles[Object.keys(tiles).find((k) => k.startsWith('Purchases on'))];
 check('a purchases tile covers the newest day only', buysToday && buysToday.value === '1', buysToday && buysToday.value);
-const todaySplit = splitOfTile('pgTiles', 'Purchases on');
+const todaySplit = splitOfTile('pgTilesToday', 'Purchases on');
 check('and splits that day by store too', /iOS 1/.test(todaySplit) && /Android 0/.test(todaySplit), todaySplit);
 // conversion by D7 is measurable only for Z: 1 of its 8 bought within 7 days? no — it
 // bought on D10, so within-7 is 0 of 8.
@@ -438,7 +494,7 @@ check('the habit curve drew something',
    The daily counter's sensor letter. The tile carries TWO split rows — which
    store, and which sensor — because they answer different questions about the
    same count and run together they read as one list that sums to nothing. */
-const measTile = [].slice.call($('pgTiles').querySelectorAll('.tile'))
+const measTile = [].slice.call($('pgTilesToday').querySelectorAll('.tile'))
   .filter((t) => /^Measured on/.test(t.querySelector('.label').textContent))[0];
 const measSplits = [].slice.call(measTile.querySelectorAll('.split'));
 check('the reading tile carries a store split and a sensor split',
@@ -665,7 +721,7 @@ check('the grid is still there mid-refresh', $('pgHeat').innerHTML.length > 0,
   String($('pgHeat').innerHTML.length));
 check('no "reading the counter" banner over data we already have',
   !/Reading the counter/.test($('pgStatus').textContent), $('pgStatus').textContent);
-check('the tiles survived the refresh too', $('pgTiles').querySelectorAll('.tile').length > 0);
+check('the tiles survived the refresh too', $('pgTilesToday').querySelectorAll('.tile').length > 0);
 
 releasePings();
 await new Promise((r) => setTimeout(r, 700));

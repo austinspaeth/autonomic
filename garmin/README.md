@@ -5,8 +5,11 @@ beat-to-beat intervals to the phone over Connect IQ's device-to-app messaging.
 **No Garmin cloud API is involved**: nothing leaves the watch except to the
 paired phone, which is the same privacy contract the rest of Autonomic keeps.
 
-It carries three captures — HRV reading, HR monitor, and the orthostatic /
-stand test — mirroring the Apple Watch companion in `mobile/targets/watch/`.
+It carries two captures — HRV reading and HR monitor — mirroring the Apple
+Watch companion in `mobile/targets/watch/`. The orthostatic / POTS captures the
+Apple Watch offers are deliberately NOT here: the Connect IQ store rejected
+them, so `StandTest.mc` / `Orthostatic.mc` / `Views.mc` were removed rather
+than hidden. Do not re-add them to this target.
 
 ## The two rules that make the sensor work
 
@@ -33,7 +36,7 @@ commented at length in `source/RrCollector.mc`; do not "clean up" either one.
 | `source/Payload.mc` | Wire format (`SCHEMA`), local-ISO timestamps with no timezone suffix (the phone parses them as local). |
 | `source/Theme.mc` | Design tokens ported from the Apple Watch's `DesignSystem.swift`, plus pill/chevron/heart drawing. CIQ has no anti-aliasing, so the heart and check are bitmaps. |
 | `source/Home.mc` | The `CustomMenu` home screen. |
-| `source/RrView.mc`, `HrMonitor.mc`, `StandTest.mc`, `Orthostatic.mc` | The three captures. |
+| `source/RrView.mc`, `HrMonitor.mc` | The two captures. |
 
 The phone side is `mobile/modules/garmin-link/` (the native module, wrapping
 Garmin's Companion SDK) and `mobile/src/lib/garmin/receiver.ts` (which writes

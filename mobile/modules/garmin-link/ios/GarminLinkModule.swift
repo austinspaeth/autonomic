@@ -39,8 +39,16 @@ private class GarminDelegates: NSObject, IQUIOverrideDelegate, IQDeviceEventDele
 
 public class GarminLinkModule: Module {
 
-  /// The watch app's Connect IQ id (garmin/manifest.xml).
+  /// The watch app's Connect IQ id (garmin/manifest.xml). This is what messages
+  /// are addressed to and it is NOT the store id below.
   private static let watchAppUuid = UUID(uuidString: "D9EF6511-63FA-4339-A11E-1CED0E8E9036")!
+
+  /// The app's id in the Connect IQ store — a DIFFERENT uuid, issued by Garmin
+  /// when the app is published, and the only thing `showStore(for:)` uses. It
+  /// was a random placeholder until now, which meant "Get the watch app" opened
+  /// a store page that does not exist.
+  /// https://apps-developer.garmin.com/apps/f3c33e42-aa1e-46e8-b033-89667133042a
+  private static let watchAppStoreUuid = UUID(uuidString: "F3C33E42-AA1E-46E8-B033-89667133042A")!
 
   // Held strongly: ConnectIQ keeps only a weak reference to its delegates, so
   // without this they would be deallocated the moment initialize() returned and
@@ -152,7 +160,7 @@ public class GarminLinkModule: Module {
 
   private func register(_ device: IQDevice) {
     devices[device.uuid] = device
-    apps[device.uuid] = IQApp(uuid: Self.watchAppUuid, store: UUID(), device: device)
+    apps[device.uuid] = IQApp(uuid: Self.watchAppUuid, store: Self.watchAppStoreUuid, device: device)
   }
 
   private func app(for deviceId: String) -> IQApp? {

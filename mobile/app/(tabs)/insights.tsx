@@ -70,7 +70,6 @@ import {
 } from '../../src/features/insights/Sections';
 import { SinceExplain } from '../../src/features/insights/SinceExplain';
 import { todayKey } from '../../src/lib/dates';
-import { hasOwnData } from '../../src/lib/demo';
 import { resolveProtocol } from '../../src/lib/scoring/day';
 import type { AppState } from '../../src/lib/types';
 import { emptyReport, type InsightReport } from '../../src/lib/insights';
@@ -426,11 +425,23 @@ export default function InsightsScreen() {
       <View pointerEvents="none">{node}</View>
     </Pressable>
   ));
-  /** Which card the mask spares. `earlyAbove` is empty whenever the strict sweep
-   *  found anything (the engine guarantees it), so with `hasFindings` true the top
-   *  card is the Biggest change if there is one and the Correlations card if not. */
-  const revealCorrelations = gated && !view?.change;
   const asIs = (n: React.ReactNode) => n;
+  /**
+   * Which card the mask spares: the FIRST one in document order, whatever it is.
+   *
+   * It is not always the Biggest change. `earlyAbove` was assumed to be empty
+   * whenever the strict sweep had anything, but the sweep and the change card are
+   * different engines: a young journal with a regime change (an onset finding) and
+   * no confirmed correlations gets an 'early' card AND a change card, and the mask,
+   * anchored to the change card below it, then left BOTH readable. So the choice is
+   * made here, in the order the cards are actually rendered, and every other card
+   * falls under the mask.
+   */
+  const topCard: 'early' | 'change' | 'correlations' =
+    earlyAbove.length ? 'early' : view?.change ? 'change' : 'correlations';
+  /** `reveal` for the one spared card, pass-through for the rest. `reveal` is
+   *  already a no-op when the screen isn't gated. */
+  const revealIf = (which: typeof topCard) => (gated && topCard === which ? reveal : asIs);
 
   return (
     <Screen
@@ -479,12 +490,17 @@ export default function InsightsScreen() {
       }
       footer={
         <>
-          {/* Mounted before the overlay so the mask covers it too, and held back
-              until the content is up so it can't float over a skeleton. Also held
-              back on an empty journal: the reports are built from the user's own
-              days and there are none, so it would be a Pro button that can only
-              return prose about nothing (it used to be backed by the sample month). */}
-          {!locked && view && hasOwnData(state.days) ? <AskAiPill /> : null}
+          {/* Under the mask (which claims its own zIndex — see LockedOverlay), and held back
+              until the content is up so it can't float over a skeleton. That is
+              now the ONLY condition. It used to be hidden from free users and
+              from an empty journal, which meant the tab's one permanent piece of
+              furniture appeared out of nowhere on the day someone subscribed or
+              logged their first entry, and until then nothing said the reports
+              existed. The pill states what the tab can do; the tap is where the
+              answer lives — the paywall for a free user (`AskAiPill`), and the
+              period list for an empty journal, which already shows each range's
+              day count and refuses to open an empty one. */}
+          {view ? <AskAiPill /> : null}
           {/* Held back until the card above it has reported a height: at 0 the mask
               would cover that card for a frame and then jump off it, which reads as
               a flicker on the one thing the reader is meant to look at. */}
@@ -506,19 +522,19 @@ export default function InsightsScreen() {
           {/* ABOVE everything, in both states. The early tier is the first thing this
               engine can honestly say, and while the countdown holds the screen it is
               the only finding on it — a hint sitting over its own "8 of 14 days" is
-              the whole point of the tier. The engine guarantees it is empty once the
-              strict sweep has anything. */}
-          <EarlySignals list={earlyAbove} detail={view.detail} />
+              the whole point of the tier. It is empty once the strict sweep has
+              anything, but NOT once the change card does (see `topCard`). */}
+          {revealIf('early')(<EarlySignals list={earlyAbove} detail={view.detail} />)}
           {hasFindings ? (
             <>
               {/* Each card measures ITSELF, not a wrapper: a wrapper's frame includes the
                   card's 12pt bottom margin and the card's own frame does not, so
                   measuring the wrapper made every skeleton card 12pt too tall. */}
-              {view.change ? reveal(
+              {view.change ? revealIf('change')(
                 <BiggestChangeCard change={view.change} series={view.detail[view.change.id] || null} onLayout={measure('change')} />,
               ) : null}
               <EarlySignals list={earlyBelow} detail={view.detail} />
-              {(revealCorrelations ? reveal : asIs)(
+              {revealIf('correlations')(
                 <Correlations
                   list={view.correlations}
                   change={view.change}

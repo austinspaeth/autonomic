@@ -166,16 +166,27 @@ const WORTH_LOGGING: { title: string; icon: IconName }[] = [
 /**
  * What the days buy, kept to what `INSIGHT_MIN_DAYS` can actually deliver.
  *
- * "Metrics drifting up or down" was here and is wrong under this heading: Trend
- * Watch compares 30 days against 30, so it needs about sixty. A screen that
- * promises a finding at day fourteen and then does not produce it is worse than
- * one that promised less.
+ * Every line has to name a card the reader will genuinely meet at fourteen
+ * days, because they will come back and check. The list that shipped did not:
+ * "metrics drifting up or down" is Trend Watch, which compares 30 days against
+ * 30 and so needs about sixty, and "which days your HRV runs higher" describes
+ * no card in this view at all. A screen that promises a finding at day fourteen
+ * and then does not produce it is worse than one that promised less.
+ *
+ * So these four map one to one onto what arrives: the early-signals tier, the
+ * correlation rows, the biggest-change headline and the confidence ring. What
+ * needs two windows gets its own line underneath rather than being folded in,
+ * because "around two months" is a different promise from "in a week".
  */
 const COMING_UP = [
-  'Which days your HRV runs higher',
-  'What your best days have in common',
-  'Where your log is thin enough to matter',
+  'The first links between what you do and how you feel',
+  'Which meds and habits line up with your better days',
+  'How far you have come since day one',
+  'A confidence score, so you know how much to trust it',
 ];
+
+/** The honest tail on that promise: a windowed comparison needs two windows. */
+const COMING_LATER = 'Around two months in: the trends worth watching, and which of your meds are doing nothing at all.';
 
 /** Height of the ghost bar standing in for the headline card's headline. One line. */
 const BAR_H = 13;
@@ -431,15 +442,21 @@ export function InsightsEmpty({ daysLogged, progress }: { daysLogged: number; pr
 
       {/* What the effort buys. Deliberately the plainest card on the screen: it is
           a promise about later, so it must not out-dress the two cards about now. */}
-      <InsightCard title={`What shows up at ${INSIGHT_MIN_DAYS} days`}>
+      <InsightCard
+        title={`What shows up at ${INSIGHT_MIN_DAYS} days`}
+        desc="Autonomic compares your own logged days against each other and reports only what stands up. All of it computed on this phone."
+      >
         <View style={{ marginTop: 12 }}>
           {COMING_UP.map((line) => (
             <View key={line} style={{ flexDirection: 'row', alignItems: 'center', gap: 11, paddingVertical: 9 }}>
-              <View style={{ width: 7, height: 7, borderRadius: 999, backgroundColor: p.border }} />
-              <Text style={{ flex: 1, fontSize: 14, color: p.textDim }}>{line}</Text>
+              {/* Accent dots and full-strength text: this is the one card on the
+                  screen making a case, and the dim treatment read as fine print. */}
+              <View style={{ width: 7, height: 7, borderRadius: 999, backgroundColor: p.accent }} />
+              <Text style={{ flex: 1, fontSize: 14, color: p.text }}>{line}</Text>
             </View>
           ))}
         </View>
+        <Text style={{ fontSize: 13, lineHeight: 19, color: p.textDim, marginTop: 10 }}>{COMING_LATER}</Text>
       </InsightCard>
     </>
   );

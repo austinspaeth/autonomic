@@ -68,7 +68,7 @@ function CausationNote() {
     }}>
       <Icon name="info" size={15} color={p.textDim} />
       <Text style={{ flex: 1, fontSize: 12.5, lineHeight: 17, color: p.textDim }}>
-        Correlation is not causation. Treat this as a lead to test, not an answer.
+        Correlation is not causation. Treat this as a lead to explore, not an answer.
       </Text>
     </View>
   );

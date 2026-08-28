@@ -240,6 +240,23 @@ check('a baseline that predates the reading counter announces no readings',
 check('and still hears the counter it does know about',
   dHalf.activations === 2, JSON.stringify(dHalf));
 
+/* ------------------------------------------------- confetti arithmetic
+
+   The canvas ranks nothing — all three celebrations run at once — so the only
+   thing left to pin here is how a COUNT becomes a duration. It halves each
+   time: two sales are 20s + 10s, three are 20 + 10 + 5. The series converges,
+   which is what stops a hundred of them wedging the canvas on for an hour. */
+check('a sale is twenty seconds, a new install ten, a return three',
+  AL.DURATION.sale === 20000 && AL.DURATION.download === 10000 && AL.DURATION.visit === 3000,
+  JSON.stringify(AL.DURATION));
+check('one event is its own base duration', AL.stackedMs(20000, 0, 1) === 20000);
+check('two stack at half', AL.stackedMs(20000, 0, 2) === 30000);
+check('three stack at half again', AL.stackedMs(20000, 0, 3) === 35000);
+check('an event landing on a celebration already counting two picks up the decay',
+  AL.stackedMs(20000, 2, 1) === 5000, String(AL.stackedMs(20000, 2, 1)));
+check('and the total can never exceed twice the base, however many arrive',
+  AL.stackedMs(20000, 0, 500) <= 40000, String(AL.stackedMs(20000, 0, 500)));
+
 /* -------------------------------------------------------------- report */
 
 let failed = 0;

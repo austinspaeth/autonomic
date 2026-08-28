@@ -162,6 +162,7 @@ Four things are cached, and the last two are new:
 | `autonomic.dashboard.v1.ui` | the view, range, filters, forecast controls |
 | `autonomic.dashboard.v1.pings` | the counter's last report, so App usage and Timeline open on numbers rather than on "Reading the counter…" |
 | `autonomic.master.alertBase` | what this browser has already been told about (see the alerts section) |
+| `autonomic.master.alertLog` | every card raised today, replayed by the header's Alerts button |
 
 The ping cache is the biggest and the most disposable: if the quota is tight it
 deletes itself rather than costing the store its room. It is marked **stale** on
@@ -398,6 +399,20 @@ answered (`tierKnown`, `buildKnown`), and the unanswered band is drawn rather
 than divided away. Adoption computed without it would be the share of the builds
 new enough to talk, which is a claim about the wrong population.
 
+Version gets **two cards, and the second one is the adoption curve.** *What they
+are running* stacks the versions per day as counts, which is the honest picture
+of the population but not of a release: the stack's height is that day's active
+total, so a build reaching more phones every day can still draw a narrowing band
+across a quiet weekend. *How fast a release spreads* redraws the same bands as a
+share of each day's own total, summing to 100% at every day, so the only thing
+moving is the climb — an OTA lands as a near-vertical edge, a store release as a
+week-long ramp. Its note states the newest build's share on the latest day that
+carried any ping and how long that build has been out, because that is the
+number the curve is read for and eyeballing it off a stacked area is exactly the
+kind of reading this dashboard tries not to make you do. A day with no ping at
+all is a **gap, not a zero** — nobody ran anything that day, which is not the
+same as nobody running the new build.
+
 One asymmetry worth knowing: **version is not crossed with the cohort.** It rides
 in a second map on the day row (`builds`, keyed platform+tier+version) rather
 than in the cohort key, because the cohort key gains an entry per combination
@@ -554,8 +569,50 @@ the UI, each of them deliberate:
   of every comparison including the average's denominator, which is the
   `hrvKnown` rule ("unknown is not zero") reaching the deltas. The *Active*
   tile's old inline delta was a range-average-against-the-previous-window
-  figure sitting next to a today count, which read as a claim about today; it
-  now sits inside the meta line beside the average it is actually about.
+  figure sitting next to a today count, which read as a claim about today; the
+  average has its own tile under **This range** now, and carries its own trend.
+- **The view is grouped by SCOPE, into Today / This range / All installs**, and
+  the group a number sits in is part of what it claims. These tiles were one
+  wrapping row in which "Active on Aug 28", "Returning / day" (an average over
+  thirty days) and "D7 retention" (every cohort that ever installed) sat side by
+  side, told apart only by whether the label happened to end in a date. The
+  charts had the same problem one level up: a card about today and a card about
+  install age were paired in the same two-column row because they were about
+  the same subject. Three headings, three tile blocks, and every card filed
+  under the scope it actually answers in.
+
+  **All installs is not a third nicety, it is the reason the split is not two.**
+  A retention curve, a cohort heatmap, purchase and activation timing, the habit
+  curve and the sensor-mix-by-age card ignore the date range entirely — they
+  pool every cohort old enough to have reached the day being asked about. Filing
+  them under "This range" would be a claim they do not make, which is the same
+  class of error as summing daily actives.
+
+  The old **Overview** heading and its *"counter data through &lt;date&gt;"* row
+  are gone. The row stated the counter's newest day above a wall of tiles that
+  each already carried that date in their own label; what it was FOR is the
+  caveat, and the caveat is only sometimes true. The Today heading carries it
+  when it applies ("Aug 28 — still running, so it is a partial day") and names
+  the day instead when the counter's newest day is not today, because then
+  "Today" is not the day it means.
+- **A range tile compares against the range before it, and only when that
+  window was counted.** `prevWindow` / `rangeDelta` are the shared version of
+  the guard the active and returning averages always had: the previous window of
+  equal length, refused outright when it reaches back past `ix.first`, because
+  "up 12% on the previous 30 days" is only a fact if the previous 30 days were
+  being counted — otherwise it reports a deploy date as a surge. A single
+  unknown day in EITHER window returns null for the whole comparison rather than
+  counting as a zero (the `hrvKnown` rule again, one level up), which is why the
+  paywall and reading comparisons stay absent while those counters are young.
+  It rides on *Installs in range*, *Purchases in range*, *Active / day*,
+  *Returning / day*, *First readings in range* and *Measured per active day*,
+  and as a trailing clause (`rangeTrendNote`) on the first-reading, reading,
+  paywall and offer card notes.
+- **A RATE's move is stated in POINTS, never in per cent** (`ptsSpan`, and
+  `deltaPts` on a tile). A share that goes from 20% to 25% did not go up 5% — it
+  went up 5 points, or up 25%, and only one of those is what a reader takes from
+  a "%" glued to a percentage tile. *Measured per active day* is the tile that
+  needed it.
 - **Every purchase is also listed one row each**, under the Purchase timing
   histogram (`A.purchaseRows` → `renderPurchaseRows`). At the volumes a new app
   actually has, the list is the more honest of the two: three purchases in a
@@ -682,11 +739,11 @@ a CSV paste would be an alert about your own typing.
 
 | Event | Definition | Reaction |
 |---|---|---|
-| Visitors | a rise in open pings | two-note blip, and nothing else in any channel |
+| Visitors | a rise in open pings, minus that day's first runs — somebody **coming back** | two-note blip, **three seconds** of house-coloured glitter, and nothing else in any channel |
 | Activations | a rise in activation pings — an install saved its **first HRV reading** | two-note settling chime, a card + a toast + a notification naming the sensor(s). **No confetti.** |
 | Readings | a rise in daily reading pings — an install measured **today** | one struck note, a card + a toast + a notification naming the sensor(s). **No confetti**, and it yields every channel to anything above it in this table — it is the app being used, which is what this dashboard hopes to see all day |
-| Downloads | a rise in **first runs** — an open ping whose cohort key IS the day it arrived on | three-note rising chime, confetti falling from the top, a card + a toast + a notification naming the store(s) |
-| Sales | a rise in subscribe pings | brass fanfare, **ten seconds** of confetti from the top AND the bottom, a card + a toast + a notification naming the store(s) that paid |
+| Downloads | a rise in **first runs** — an open ping whose cohort key IS the day it arrived on | three-note rising chime, **ten seconds** of SILVER glitter falling from the top, a card + a toast + a notification naming the store(s) |
+| Sales | a rise in subscribe pings | brass fanfare, **twenty seconds** of GOLD glitter from the top AND the bottom, a card + a toast + a notification naming the store(s) that paid |
 
 The five cues are meant to be told apart across a room with your back to the
 screen, so they differ in SHAPE and not only in pitch — two notes, one struck
@@ -696,12 +753,32 @@ in the order the events matter. The visitor blip fires most often and is the one
 most easily made useless: the first version was a single sine at 0.055 gain, a
 sound you have to already know is coming to hear at all.
 
-**Confetti is for ARRIVALS, never for usage.** A new install and a purchase are
-people joining and people paying. An activation is somebody using the app they
-already have — the thing this dashboard hopes to see all day, every day — so
-celebrating it on the canvas would mean confetti more or less permanently, and
-then a sale's confetti would mean nothing. Activations get the full card / toast
-/ notification treatment and no canvas at all; visitors get the sound alone.
+**The metal is the news and the duration is the ranking.** Gold for money for
+twenty seconds, silver for a new install for ten, house colours for somebody
+coming back for three — told apart across a room with the sound off. Ordinary
+usage is celebrated only because it is over before it registers as an
+interruption; an ACTIVATION still gets no canvas at all, because it lands in the
+same refresh as the download that caused it often enough that its own puff would
+only ever be read as part of that one, and a daily reading is the same event one
+rung quieter. Both are told in card, toast and notification; neither is
+celebrated.
+
+**The canvas ranks nothing; only the sound does.** All three celebrations run at
+the same time, each on its own emitter and its own clock, sharing one shard list
+and one animation loop — so a refresh carrying a sale, a new install and
+somebody coming back draws gold, silver and colour together. That IS the news,
+and drawing only the loudest of the three threw two thirds of it away. One cue
+is still played per refresh, the best outcome that happened (pay > sign up >
+return): three simultaneous sounds are a noise where three simultaneous emitters
+are a party.
+
+**Count stacks at a DECAYED rate, halving each time.** Two sales are twenty
+seconds plus ten, three are twenty plus ten plus five, and an event landing on a
+celebration already running picks up the decay where that celebration left off
+rather than starting a fresh one. More money is visibly more celebration, and
+the series converges to twice the base, so a backfill of a hundred pings can
+never wedge the canvas on for an hour. The arithmetic is `stackedMs`, pinned in
+`tests/alerts.test.mjs`.
 
 **An activation card names the SENSOR, not the store** ("2 chest strap · 1 phone
 camera"), because that is the fact the activation route carries that nothing
@@ -725,19 +802,10 @@ none of the three — a toast for the event that fires most often would be on
 screen permanently, and a notification for it is the fastest way to have
 notifications turned back off.
 
-**A download runs the confetti in WAVES**, one per item 320ms apart and capped
-at eight, so four downloads is a few seconds of falling rather than the same
-one-second puff four times over — which is not distinguishable from one. The cap
-is what stops a backfill of fifty pings burying the dashboard for half a minute.
-
-**A sale runs for ten seconds flat**, and the difference is deliberate: this is
-the event the whole page exists for, and a second and a half of confetti for
-somebody deciding to pay for the thing you built is the same celebration a
-visitor gets, only slightly longer. Ten seconds is long enough to walk back to
-the desk for. It is a DURATION and not a wave count, so five sales in one
-refresh is still ten seconds rather than fifty — the news is "someone paid", and
-how many is on the card. Downloads landing in the same refresh extend the sale's
-waves rather than starting a competing pattern.
+**A sale runs for twenty seconds**, and the length is deliberate: this is the
+event the whole page exists for, and it is long enough to walk back to the desk
+for. Duration is a function of the COUNT and not of the wave, per the decay rule
+above.
 
 `snapshot` / `diff` are pure and are what `tests/alerts.test.mjs` pins;
 `tests/master-alerts.test.mjs` covers the cards on the built page. The rules:
@@ -775,8 +843,8 @@ waves rather than starting a competing pattern.
   synced store because "what this browser has already told me" is a property of
   this browser: two devices should each get the news once, and neither should
   swallow it for the other.
-- **One sound per refresh**, the loudest thing that happened. Cards do stack,
-  because they are read rather than heard.
+- **One sound per refresh**, the best outcome that happened. Cards do stack,
+  because they are read rather than heard, and so does the canvas.
 - **Cards do not expire.** The toast disappears on a timer; the whole point of
   this stack is to still be there when you come back to the laptop, so the only
   thing that removes a card is a press — the card itself, or "Clear all" above
@@ -784,6 +852,16 @@ waves rather than starting a competing pattern.
   unbounded: the stack scrolls past the viewport, and past `MAX_CARDS` (40) the
   oldest is dropped, since a dashboard left open over a weekend should not hold
   nine hundred DOM nodes to say the same thing.
+- **The Alerts button in the header shows the day, it does not silence it.**
+  Every card raised is also written to a log of today
+  (`autonomic.master.alertLog`, rolled over on this browser's own local
+  midnight), and pressing Alerts empties the stack and re-raises the lot, each
+  one stamped with the time it happened. A button whose one job was muting was a
+  button you pressed by accident and then heard nothing for the rest of the
+  afternoon; the thing actually wanted from that corner is "what have I missed",
+  and dismissing a card used to be the only copy of it. Muting survives as
+  `Alerts.setMuted`, which nothing in the header calls; the bell still shows
+  whether sound is on.
 
 The sounds are **synthesized**, not sampled: this page is inlined into one
 self-contained document with nothing to resolve at runtime, so an `<audio src>`
@@ -837,7 +915,8 @@ own rules:
 
 What this deliberately does not do is tell you which version people are
 **running**. That is a different question — adoption, not availability — and it
-would need the app's cohort ping to carry its version.
+is answered in App usage instead, by *What they are running* and *How fast a
+release spreads*, off the version tag the cohort ping carries.
 
 ## The Sales view
 

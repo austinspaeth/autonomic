@@ -29,7 +29,7 @@ import { garminDevices, subscribeGarminDevices, type GarminDevice } from '../../
 import { health } from '../../lib/health';
 import { getState, save, useStore } from '../../store/store';
 import { partitionStraps } from '../../lib/watch/brands';
-import { hasOtherWatches, otherWatchesSub, PickerRow, WatchBrandsSheet } from './WatchBrands';
+import { brandTag, hasOtherWatches, openBrandSetup, otherWatchesSub, otherWatchesTitle, PickerRow } from './WatchBrands';
 
 export type Source = 'polar' | 'watch' | 'garmin' | 'camera';
 
@@ -46,25 +46,34 @@ export const NO_STRAPS_HINT =
   + '·  Something else is holding it — unpair it in system Bluetooth settings and quit other heart-rate apps.\n'
   + '·  Its battery is flat.';
 
+/** The accuracy ladder, best first. It is a TABLE rather than a pill on each
+ *  row because two surfaces rank these sources — this sheet and the welcome
+ *  wizard's first-reading step — and a per-row badge let them drift: the wizard
+ *  once listed a "High accuracy" watch above a "Best accuracy" strap, which
+ *  reads as a descending list until the second row contradicts it. Both now
+ *  group by tier in TIER_ORDER, so a new sensor is one row here. */
+export type SourceTier = 'best' | 'high' | 'lower';
+export const TIER_ORDER: SourceTier[] = ['best', 'high', 'lower'];
+export const TIER_LABEL: Record<SourceTier, string> = {
+  best: 'Best accuracy', high: 'High accuracy', lower: 'Lower accuracy',
+};
+
 /** One source's static copy. `sub` is resolved at render (the strap's line
- *  depends on whether a device is remembered). `badge` is the accuracy tier as
- *  a PILL — this sheet says it once as a section heading instead, so the badge
- *  now only serves the welcome wizard's one-row-per-sensor step, which has no
- *  sections to hang it on. */
-export const SOURCE_META: Record<Source, { icon: 'bluetooth' | 'watch' | 'camera'; title: string; badge: string }> = {
-  polar: { icon: 'bluetooth', title: 'Bluetooth strap', badge: 'Best accuracy' },
-  watch: { icon: 'watch', title: 'Apple Watch', badge: 'High accuracy' },
-  garmin: { icon: 'watch', title: 'Garmin', badge: 'High accuracy' },
-  camera: { icon: 'camera', title: 'Phone camera', badge: 'Lower accuracy' },
+ *  depends on whether a device is remembered). */
+export const SOURCE_META: Record<Source, { icon: 'bluetooth' | 'watch' | 'camera'; title: string; tier: SourceTier }> = {
+  polar: { icon: 'bluetooth', title: 'Bluetooth strap', tier: 'best' },
+  watch: { icon: 'watch', title: 'Apple Watch', tier: 'high' },
+  garmin: { icon: 'watch', title: 'Garmin', tier: 'high' },
+  camera: { icon: 'camera', title: 'Phone camera', tier: 'lower' },
 };
 
 /** Sub-line for a source, used both here and on the setup card's summary row. */
 export function sourceSub(src: Source, savedName?: string): string {
   if (src === 'polar') return savedName ? `${savedName} · paired` : 'No device paired yet';
-  if (src === 'watch') return 'Breathe or ECG on the watch, syncs in after';
+  if (src === 'watch') return 'Breathe or ECG on the watch, results sync in afterwards';
   // Named device rather than "Garmin" alone: someone who linked a watch months
   // ago should see which one this row means.
-  if (src === 'garmin') return savedName ? `${savedName} · linked` : 'Run Autonomic on the watch, syncs in after';
+  if (src === 'garmin') return savedName ? `${savedName} · linked` : 'Run Autonomic on the watch, results sync in afterwards';
   return 'Fingertip on the rear camera, no device needed';
 }
 
@@ -153,42 +162,49 @@ export function SourcePicker({ value, onPick, controls }: {
       </Text>
 
 
-      <TierLabel text="Best accuracy" />
+      <TierLabel text={TIER_LABEL.best} />
       <SourceRow source="polar" sub={sourceSub('polar', savedName)} active={value === 'polar'} onPress={() => choose('polar')} />
 
       {showWatch || linkedGarmin || showBrands ? (
         <>
-          <TierLabel text="High accuracy" top />
+          <TierLabel text={TIER_LABEL.high} top />
           <View style={{ gap: 8 }}>
             {showWatch ? (
               <SourceRow source="watch" sub={sourceSub('watch', savedName)} active={value === 'watch'} onPress={() => choose('watch')} />
             ) : null}
             {linkedGarmin ? (
-              <SourceRow source="garmin" sub={sourceSub('garmin', linkedGarmin.name)} active={value === 'garmin'} onPress={() => choose('garmin')} />
+              // Set up and done with: the row is now a plain source, and setup
+              // moves into its sub-line as a link — a "Set up" button beside a
+              // watch that IS set up asks the user to redo the thing they
+              // finished, and hides the fact that the row can now be chosen.
+              <SourceRow
+                source="garmin"
+                sub={sourceSub('garmin', linkedGarmin.name)}
+                active={value === 'garmin'}
+                onPress={() => choose('garmin')}
+                link={{ label: 'Set up', onPress: () => openBrandSetup(openSheet, () => onPick('garmin')) }}
+              />
             ) : null}
-            {/* Not a source — a card. Picking a brand is a setup task, so the
-                row opens the brand list stacked on top of this sheet rather
-                than selecting anything. */}
+            {/* Not a source — a setup task, so the row says so and opens the
+                brand's own card rather than selecting anything. It goes STRAIGHT
+                to setup: with one brand built, the list card in between was a
+                screen that existed only to be tapped through. */}
             {showBrands ? (
               <PickerRow
                 icon="watch"
-                title="Other watches"
+                title={otherWatchesTitle()}
+                tag={brandTag()}
                 sub={otherWatchesSub()}
-                onPress={() => openSheet((c) => (
-                  <WatchBrandsSheet
-                    controls={c}
-                    onLinked={() => { onPick('garmin'); }}
-                  />
-                ))}
+                onPress={() => openBrandSetup(openSheet, () => onPick('garmin'))}
               >
-                <Icon name="chevronRight" size={16} color={p.textDim} />
+                <Text style={{ color: p.accent, fontSize: 13, fontWeight: '700' }}>Set up</Text>
               </PickerRow>
             ) : null}
           </View>
         </>
       ) : null}
 
-      <TierLabel text="Lower accuracy" top />
+      <TierLabel text={TIER_LABEL.lower} top />
       <SourceRow source="camera" sub={sourceSub('camera', savedName)} active={value === 'camera'} onPress={() => choose('camera')} />
 
       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 24, marginBottom: 10 }}>
@@ -252,8 +268,12 @@ function TierLabel({ text, top }: { text: string; top?: boolean }) {
   );
 }
 
-function SourceRow({ source, sub, active, onPress }: {
+function SourceRow({ source, sub, active, onPress, link }: {
   source: Source; sub: string; active: boolean; onPress: () => void;
+  /** Optional second action in the sub-line (e.g. "Set up" on a linked watch):
+   *  choosing a source and re-opening its setup are different questions, and a
+   *  row that only selects strands anyone who needs the second one. */
+  link?: { label: string; onPress: () => void };
 }) {
   const p = usePalette();
   const meta = SOURCE_META[source];
@@ -263,7 +283,14 @@ function SourceRow({ source, sub, active, onPress }: {
       <View style={{ flex: 1, minWidth: 0 }}>
         {/* No accuracy pill: the tier heading above the row already said it. */}
         <Text style={{ color: active ? p.accent : p.text, fontWeight: '700' }}>{meta.title}</Text>
-        <Text style={{ color: p.textDim, fontSize: 12, lineHeight: 17, marginTop: 4 }}>{sub}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
+          <Text style={{ flexShrink: 1, color: p.textDim, fontSize: 12, lineHeight: 17 }}>{sub}</Text>
+          {link ? (
+            <Pressable onPress={link.onPress} hitSlop={10} accessibilityRole="button" accessibilityLabel={link.label}>
+              <Text style={{ color: p.accent, fontSize: 12, lineHeight: 17, fontWeight: '700' }}>{link.label}</Text>
+            </Pressable>
+          ) : null}
+        </View>
       </View>
       {active ? <Icon name="check" size={18} color={p.accent} /> : null}
     </Pressable>

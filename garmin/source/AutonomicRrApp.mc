@@ -11,8 +11,6 @@ class AutonomicRrApp extends Application.AppBase {
 
     hidden var _link;
     hidden var _collector;
-    hidden var _standTest;
-    hidden var _episode;
     hidden var _monitor;
     hidden var _seq;
 
@@ -20,8 +18,6 @@ class AutonomicRrApp extends Application.AppBase {
         AppBase.initialize();
         _link = new Link(null);
         _collector = new RrCollector();
-        _standTest = new StandTest();
-        _episode = new Orthostatic();
         _monitor = new HrMonitor();
         _seq = 0;
     }
@@ -100,25 +96,4 @@ class AutonomicRrApp extends Application.AppBase {
     }
 
 
-    function openStandTest() {
-        WatchUi.pushView(new StandTestView(_standTest, _link),
-            new StandTestDelegate(_standTest, self), WatchUi.SLIDE_LEFT);
-    }
-
-    // The picker is a menu of its own; choosing a row starts the capture.
-    function openEpisode() {
-        var h = System.getDeviceSettings().screenHeight;
-        WatchUi.pushView(EpisodeMenu.menu(h), new EpisodeMenuDelegate(self),
-            WatchUi.SLIDE_LEFT);
-    }
-
-    // switchToView, not pushView: the capture REPLACES the picker rather than
-    // stacking on it. Otherwise the stack is two deep and finishing an episode
-    // pops back to the list of transition types instead of home.
-    function startEpisode(typeIndex) {
-        // Arm at the instructions; the capture starts from there.
-        _episode.arm(typeIndex);
-        WatchUi.switchToView(new EpisodeView(_episode, _link),
-            new EpisodeDelegate(_episode, self), WatchUi.SLIDE_LEFT);
-    }
 }

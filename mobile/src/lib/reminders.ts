@@ -2,7 +2,7 @@
  * The app's notifications, both local (no push, no server, nothing leaves the
  * device):
  *
- * - Morning reminder: a single repeating notification nudging the user to take
+ * - Daily reminder: a single repeating notification nudging the user to take
  *   their reading at the same time each morning, which is what makes a
  *   baseline comparable day to day.
  * - Crash warning: fired when the trailing-week trend flags a likely crash
@@ -25,6 +25,9 @@ import { detectDownturn } from './scoring/downturn';
 import { getState, save, subscribeStore } from '../store/store';
 
 /** Stable id so scheduling twice replaces rather than stacks. */
+// NEVER change this id. It is what cancelReminder targets, so a rename would
+// orphan every schedule already on a phone and the next sync would stack a
+// second daily notification beside one nothing can cancel.
 const ID = 'morning-reminder';
 const CHANNEL = 'reminders';
 const CRASH_CHANNEL = 'crash-warnings';

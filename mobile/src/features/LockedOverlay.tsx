@@ -87,7 +87,12 @@ export function LockedOverlay({ visible, top, revealTop = 0, title, body, onUpgr
   const yPrice = priceOf(products.find((s) => s.productId === YEARLY_SKU), YEARLY_SKU);
 
   return (
-    <View pointerEvents="box-none" style={{ position: 'absolute', top, left: 0, right: 0, bottom: 0 }}>
+    /* Above every floating pill in the host's footer. Mounting order alone is
+       not enough: the Ask-AI pill claims zIndex 1 (and elevation 8) to sit under
+       the priority pills, which put it over a mask that claimed nothing — a
+       locked screen offering a live button to the thing it just locked. So the
+       mask states its own layer, on both platforms. */
+    <View pointerEvents="box-none" style={{ position: 'absolute', top, left: 0, right: 0, bottom: 0, zIndex: 4, elevation: 24 }}>
       {/* Blur where the platform has one, plus a scrim heavy enough to carry the
           mask on its OWN — expo-blur on Android is plain translucency unless the
           experimental Dimezis path is opted into, so Android leans on the tint

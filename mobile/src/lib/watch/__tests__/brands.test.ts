@@ -64,9 +64,12 @@ describe('watch brand registry', () => {
     expect(connectSteps(fitbit, 'Apple Health', true)).toEqual(connectSteps(fitbit, 'Apple Health', false));
   });
 
-  it('uses one-word names in the collapsed row', () => {
-    // Four have to fit on one line under "Other watches".
-    expect(brandNames()).toBe('Garmin, Samsung, Pixel, Fitbit');
+  it('names only the brands that are actually built', () => {
+    // The unbuilt brands are registry entries waiting their turn: naming one in
+    // the collapsed row promises a watch the app cannot connect to. Short,
+    // one-word names, because they have to fit on a single line.
+    expect(brandNames()).toBe(watchBrands().map((b) => b.short).join(', '));
+    expect(brandNames()).toBe('Garmin');
   });
 });
 

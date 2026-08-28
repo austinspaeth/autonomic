@@ -27,11 +27,15 @@ import { Icon } from './Icon';
 /** The pill's delete tint: the Button `danger` red (#d63b3b) lifted a step,
  *  because the pill it sits in is near-black glass and the darker red reads as
  *  brown there. */
-const DANGER = '#e05a5a';
 
 export interface SheetControls {
   close: () => void;
   closeAll: () => void;
+  /** Patch this sheet's own options after it has opened. A card that only
+   *  learns what its header buttons should do once its content has run (the
+   *  reading-complete card saves its entry on mount, and only then has one to
+   *  edit or delete) cannot pass them at openSheet time. */
+  setOptions: (patch: Partial<SheetOptions>) => void;
 }
 export interface SheetOptions {
   action?: { icon: 'edit'; onPress: () => void };
@@ -44,6 +48,11 @@ export interface SheetOptions {
   fitContent?: boolean;
   /** Hide the ✕ and make the backdrop non-dismissing — the sheet closes itself. */
   hideClose?: boolean;
+  /** The ✕ (and the backdrop) close the WHOLE stack rather than this sheet.
+   *  For a card raised over something that is finished with — the results card
+   *  over its own session card — where closing one step would leave the user
+   *  looking at the screen the card was the answer to. */
+  dismissAll?: boolean;
   /** Stretch the scroll content to fill the sheet so content can bottom-pin
    *  (e.g. via marginTop: 'auto') just above the footer divider. */
   grow?: boolean;
@@ -66,7 +75,17 @@ export const useSheets = () => {
   return c;
 };
 
-let nextId = 1;
+// Sheet ids are keys, so they have to be unique for the LIFE OF THE STACK, not
+// just of this module. A plain module-level counter is not: Fast Refresh
+// re-evaluates the module and resets it to 1 while the provider's state still
+// holds a sheet with id 1, and the next open collides with it ("Encountered two
+// children with the same key"). Parking the counter on globalThis survives the
+// re-evaluation. Dev-only in practice, but the fix costs nothing.
+const idHome = globalThis as unknown as { __autonomicSheetId?: number };
+const nextSheetId = () => {
+  idHome.__autonomicSheetId = (idHome.__autonomicSheetId ?? 0) + 1;
+  return idHome.__autonomicSheetId;
+};
 
 export function SheetProvider({ children }: { children: React.ReactNode }) {
   const [stack, setStack] = useState<SheetEntry[]>([]);
@@ -79,7 +98,7 @@ export function SheetProvider({ children }: { children: React.ReactNode }) {
     const now = Date.now();
     if (now - lastOpenAt.current < 350) return;
     lastOpenAt.current = now;
-    setStack((s) => [...s, { id: nextId++, builder, opts }]);
+    setStack((s) => [...s, { id: nextSheetId(), builder, opts }]);
   };
   // Closing is a two-step dance so the animation stays fluid: flag the sheet
   // `closing` (it plays its exit AND the card beneath immediately un-recedes,
@@ -209,9 +228,14 @@ function SheetView({ entry, isTop, behind, closing, requestClose, onExited, clos
   const footerHRef = useRef(0);
   const hasFooterRef = useRef(false); hasFooterRef.current = !!footer;
   const mounted = useRef(false);
-  const full = entry.opts.fullscreen;
-  const fit = entry.opts.fitContent && !full;
-  const hideClose = entry.opts.hideClose;
+  // Options as opened, patched by anything the content set through
+  // controls.setOptions. Kept here rather than on the stack entry so a card
+  // arming its own header buttons doesn't re-render the whole stack.
+  const [optPatch, setOptPatch] = useState<Partial<SheetOptions>>({});
+  const opts = React.useMemo(() => ({ ...entry.opts, ...optPatch }), [entry.opts, optPatch]);
+  const full = opts.fullscreen;
+  const fit = opts.fitContent && !full;
+  const hideClose = opts.hideClose;
   // No swipe-to-dismiss and no grabber on any sheet — closing is always the ✕ (or a
   // backdrop tap). Reclaim the space the grabber used to occupy so content clears the ✕.
   const topPad = full ? insets.top + 12 : 24;
@@ -278,13 +302,13 @@ function SheetView({ entry, isTop, behind, closing, requestClose, onExited, clos
     }
   }, [closing, onExited, translateY, SCREEN_H]);
 
-  const dismiss = requestClose;
-
   // Keep the latest close handlers in refs so `controls` (below) can be built once
   // and stay referentially stable — the provider re-creates these prop functions
   // on every render, but the sheet body must not see a new `controls` each time.
   const requestCloseRef = useRef(requestClose); requestCloseRef.current = requestClose;
   const closeAllRef = useRef(closeAll); closeAllRef.current = closeAll;
+
+  const dismiss = () => (opts.dismissAll ? closeAllRef.current() : requestClose());
 
   // Backdrop fades in/out with the card's position — 1 when fully up, 0 offscreen.
   const backdropStyle = useAnimatedStyle(() => ({
@@ -325,6 +349,7 @@ function SheetView({ entry, isTop, behind, closing, requestClose, onExited, clos
   const controls = React.useMemo<SheetControls>(() => ({
     close: () => requestCloseRef.current(),
     closeAll: () => closeAllRef.current(),
+    setOptions: (patch) => setOptPatch((o) => ({ ...o, ...patch })),
   }), []);
   // Build the sheet body once per entry. Memoizing is load-bearing: a sheet's
   // content can register a fixed footer via SheetFooter -> setFooter, which
@@ -368,7 +393,7 @@ function SheetView({ entry, isTop, behind, closing, requestClose, onExited, clos
               scrollEnabled={scrollable}
               onLayout={(e) => { viewH.current = e.nativeEvent.layout.height; fitCheck(); }}
               onContentSizeChange={(_w, h) => { contentH.current = h; fitCheck(); }}
-              contentContainerStyle={{ padding: 18, paddingTop: topPad, paddingBottom: footer ? Math.max(120, footerH + 20) : 24 + insets.bottom, ...(entry.opts.grow ? { flexGrow: 1 } : null) }}
+              contentContainerStyle={{ padding: 18, paddingTop: topPad, paddingBottom: footer ? Math.max(120, footerH + 20) : 24 + insets.bottom, ...(opts.grow ? { flexGrow: 1 } : null) }}
               keyboardShouldPersistTaps="handled"
               // "interactive" (iOS) keeps the keyboard up while scrolling the form —
               // it only dismisses when dragged down over the keyboard itself.
@@ -386,16 +411,16 @@ function SheetView({ entry, isTop, behind, closing, requestClose, onExited, clos
         {/* Close (and the optional delete + edit) live together in one
             tinted-glass pill. Delete sits furthest from ✕, so the two taps that
             end the card are never neighbours. */}
-        {((!full && !hideClose) || entry.opts.action || entry.opts.destructive) && (
+        {((!full && !hideClose) || opts.action || opts.destructive) && (
           <SheetPill
-            lone={[!full && !hideClose, !!entry.opts.action, !!entry.opts.destructive].filter(Boolean).length === 1}
+            lone={[!full && !hideClose, !!opts.action, !!opts.destructive].filter(Boolean).length === 1}
             style={styles.headerPill}
           >
-            {entry.opts.destructive && (
-              <SheetPillButton icon="trash" size={16} onPress={entry.opts.destructive.onPress} label={entry.opts.destructive.label || 'Delete'} color={DANGER} />
+            {opts.destructive && (
+              <SheetPillButton icon="trash" size={16} onPress={opts.destructive.onPress} label={opts.destructive.label || 'Delete'} />
             )}
-            {entry.opts.action && (
-              <SheetPillButton icon={entry.opts.action.icon} size={16} onPress={entry.opts.action.onPress} label="Edit" />
+            {opts.action && (
+              <SheetPillButton icon={opts.action.icon} size={16} onPress={opts.action.onPress} label="Edit" />
             )}
             {!full && !hideClose && <SheetPillButton icon="x" size={18} onPress={dismiss} label="Close" />}
           </SheetPill>

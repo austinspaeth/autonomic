@@ -43,6 +43,12 @@ const CLOSE_CLEARANCE = 58;
  *  reserved for things that are tapped, and this notice isn't one. */
 const NOTICE = GRADE_COLORS.warning;
 const NOTICE_SOFT = 'rgba(167,139,250,0.16)';
+/** The tab's visible band, and how far it runs on UNDER the source bubble. The
+ *  tuck is the bubble's own corner radius, so the tab is hidden exactly where
+ *  the bubble stops covering it — any less and its square bottom corners peek
+ *  out beside the rounded ones. */
+const NOTICE_BAND = 34;
+const NOTICE_TUCK = radius.control;
 
 export type Kind = 'unstructured' | 'breath';
 
@@ -186,21 +192,24 @@ export function HrvSetup({ controls }: { controls: SheetControls }) {
       {hasOtherWatches() && !garminLinked ? (
         <View
           style={{
-            // Inset a hair on both sides: the tab is the same shape as the card
-            // it sits on, just narrower, which is what reads as "attached to"
-            // rather than "another row".
-            marginHorizontal: 10,
-            // Fixed height with centred contents rather than padding either
-            // side of the text: the NEW chip and the sentence have different
-            // line boxes, and only a real height centres both.
-            height: 36,
+            // Full width and tucked BEHIND the source bubble: the tab is one
+            // object with the card, sliding out from under its top edge, rather
+            // than a narrower plate balanced on it. It is drawn first, so the
+            // bubble (a later sibling) paints over the overlap on its own.
+            //
+            // Height carries the overlap: the visible band stays NOTICE_BAND
+            // tall, and the extra NOTICE_TUCK is hidden under the bubble's
+            // rounded top, so no corner of the tab is ever exposed beside it.
+            height: NOTICE_BAND + NOTICE_TUCK,
+            paddingBottom: NOTICE_TUCK,
+            marginBottom: -NOTICE_TUCK,
+            // Centred contents rather than padding either side of the text: the
+            // NEW chip and the sentence have different line boxes, and only a
+            // real height centres both.
             flexDirection: 'row', alignItems: 'center', gap: 8,
-            paddingHorizontal: 11,
+            paddingHorizontal: 14,
             borderTopLeftRadius: radius.control, borderTopRightRadius: radius.control,
             backgroundColor: p.sunk,
-            // Flush: the bubble below starts where this ends, and the 1pt overlap
-            // hides the seam its border would otherwise draw across the join.
-            marginBottom: -1,
           }}
         >
           <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, backgroundColor: NOTICE_SOFT }}>

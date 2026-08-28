@@ -14,6 +14,16 @@ import { MenuSheet } from '../../src/features/Settings';
 import { GRADE_COLORS, usePalette } from '../../src/theme';
 import { useInsightsUnseen } from '../../src/store/insightsBadge';
 
+/**
+ * The Journal is where the app opens, always.
+ *
+ * Without this the initial tab is whatever the router resolves the launch URL
+ * to, which in a dev client is not always `/` — and landing a cold start on
+ * Insights is both wrong and expensive (it is the one tab that builds a report
+ * before it can paint).
+ */
+export const unstable_settings = { initialRouteName: 'index' };
+
 const TABS: { name: string; label: string; icon: IconName }[] = [
   { name: 'index', label: 'Journal', icon: 'clipboard' },
   { name: 'analysis', label: 'Progress', icon: 'chart' },
