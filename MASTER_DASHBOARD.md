@@ -409,6 +409,10 @@ day-30 cohort on 1.26" is not, deliberately.
 **The reading counter shipped later than the other three, and that is a rule,
 not a footnote.** `index` records `hrvFirst` — the first day the route was ever
 heard from — and everything derived from it is `null` before that day, never 0%.
+The sensor letter shipped later again, so there are THREE staggered starts:
+`hrvMethodFirst` / `hrvMethodKnown` gate everything sensor-shaped on the reading
+route, and rows from between the two starts pool under `?` meaning "we were not
+asking" rather than "a sensor we could not read".
 A day on which 60 installs opened the app and no reading rows exist is a day the
 counter was not running, and reporting it as "nobody measured" would be a claim
 about people made out of a deploy date. `A.hrvKnown(ix, day)` is the gate;
@@ -474,6 +478,31 @@ the UI, each of them deliberate:
   two counters have drifted. The weekday chart carries a **Readings** bar for
   the same reason it carries the others: which weekday people actually measure
   on is the number the morning reminder's time should follow.
+- **Which sensor, on EVERY reading and not just the first.** The first-reading
+  card above says how people START; **How readings are taken** (`hrvMethodsOn` /
+  `hrvMethodsOver`) says what they KEEP using, per day and stacked, and the
+  *Measured on <day>* tile carries the same dots. Both are silent before
+  `hrvMethodFirst` — a reading row from before the letter shipped names no
+  sensor, and drawing those as an "unknown" band would put a claim about the
+  data ("we could not tell") where a fact about the instrument belongs ("we were
+  not asking"). Each install counts once per day under the sensor of that day's
+  FIRST reading, so these are install-days and never a count of readings.
+- **Does the sensor mix change with age?** is the card that pair exists for, and
+  the only place this data can be asked whether a sensor keeps the people it
+  starts. `hrvMethodsAt` / `hrvMethodCurve` redraw the split by install age
+  rather than by date, as **shares**: counts there would simply redraw the
+  retention curve, every sensor falling together, which says nothing about the
+  mix. A band that narrows as the ages rise is a sensor losing its place — and
+  the copy has to keep saying what it cannot answer, because a falling share
+  does **not** mean those people left. They may have bought a strap, and nothing
+  without an identifier can separate the two. The card reports day 0 against day
+  7+ in percentage POINTS, and declines to draw the comparison at all until
+  cohorts born after the letter shipped have reached a week old.
+  This is the one place `cohortMethods` is read: a day's `methods` map pools
+  every cohort in it, so building an age mix from that map would hand a young
+  cohort's day 7 the readings an old cohort took the same afternoon. The storage
+  key already carries cohort AND sensor; `rowsToMap` keeps the cross rather than
+  collapsing it twice.
 - **A subscribe ping carries the buyer's store in the same cohort key an open
   ping does**, so "which store paid" needs no second source: `subPlatformsOn` /
   `purchasePlatformsOver` read it back, and both **Purchases on <day>** (the
@@ -481,6 +510,16 @@ the UI, each of them deliberate:
   the iOS / Android split under their number. Those splits follow the same rule
   as the platform tile — always unfiltered, `no store` broken out and disclosed
   in the meta line rather than folded into either store.
+- **The active tile splits its day TWICE**: returning / first run, and then
+  iOS / Android beside them. Two partitions of one number on one row, and both
+  have to add up to the tile's own value or the row is lying — which is why the
+  store half goes through `storeSplit` rather than reading two letters off the
+  map directly: that helper carries the `no store` band when there is one, and
+  without it the second pair would silently fail to sum on any day that still
+  has pre-marker installs in it. Like every split here it is the UNFILTERED
+  day's, so with a platform filter on, the tile's number is the slice and its
+  dots are what the slice is a slice of. `.tile .split` wraps for the same
+  reason (four swatches do not fit a narrow tile on one line).
 - **Installs are the one count this view is allowed to sum.** *Installs on
   <day>* sits directly after *Active on <day>* and *Installs in range* sits with
   the range tiles below, both split iOS / Android under the number

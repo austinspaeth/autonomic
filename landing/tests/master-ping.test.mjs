@@ -191,6 +191,7 @@ const tiles = {};
       meta: (t.querySelector('.meta') || {}).textContent || '',
       deltas: [].slice.call(t.querySelectorAll('.deltas > div'))
         .map((d) => d.textContent.replace(/\s+/g, ' ').trim()),
+      split: ((t.querySelector('.split') || {}).textContent || '').replace(/\s+/g, ' ').trim(),
     };
   });
 });
@@ -355,6 +356,44 @@ check('the method chart drew a band per sensor used',
   $('pgMethods').querySelectorAll('path[fill]:not([fill="none"])').length >= 3,
   String($('pgMethods').querySelectorAll('path').length) + ' paths');
 
+/* ------------------------------------------- the active tile's two splits
+
+   One number, partitioned twice: who they were and which store they came from.
+   Both pairs have to add up to the tile's own value or the row is lying — T(0)
+   is 4 active, 3 iOS + 1 Android, and returning + first run makes 4 as well. */
+check('the active tile still splits returning from first run',
+  /returning/.test(activeTile.split) && /first run/.test(activeTile.split), activeTile.split);
+check('and now carries the store split beside it',
+  /iOS 3/.test(activeTile.split) && /Android 1/.test(activeTile.split), activeTile.split);
+check('the store half of that split sums to the tile\'s own number',
+  activeTile.value.startsWith('4'), activeTile.value);
+
+/* --------------------------------------- which sensor, on EVERY reading
+
+   The first-reading split says how people start; this says what they keep
+   using. The fixture's ten reading-days name four different sensors, and the
+   note has to read as install-DAYS rather than as readings: the counter is
+   capped once per install per Eastern day, so a band is that install's first
+   reading of the day and never a count of sessions. */
+const readNote = $('pgReadMethodNote').textContent;
+check('the reading-sensor note counts install-days, not readings',
+  /10 install-days carried a reading/.test(readNote), readNote);
+check('and says which day the letter started, so the gap is explained',
+  /counted from/.test(readNote), readNote);
+check('it reports each sensor as a share of those days',
+  /Apple Watch 20\.0%/.test(readNote) && /Garmin watch 30\.0%/.test(readNote) &&
+  /Chest strap 20\.0%/.test(readNote) && /Phone camera 30\.0%/.test(readNote), readNote);
+check('the ongoing-sensor chart drew a band per sensor used',
+  $('pgReadMethods').querySelectorAll('path[fill]:not([fill="none"])').length >= 2,
+  String($('pgReadMethods').querySelectorAll('path').length) + ' paths');
+
+/* The age card is honest about having nothing yet: no cohort born after the
+   letter shipped has reached a week old in this fixture, so the day-0 vs day-7+
+   comparison must decline to be drawn rather than divide by a handful. */
+const ageNote = $('pgReadMethodAgeNote').textContent;
+check('the sensor-by-age card says when it cannot compare yet',
+  /Not enough aged reading-days/.test(ageNote), ageNote);
+
 /* ------------------------------------------------------------ measuring */
 
 /* Opening the app is not using it, and this is the pair that says so. Both
@@ -409,7 +448,7 @@ check('and the sensor row names the device', /Garmin watch/.test(measSplits[1].t
 
 const readMethodNote = $('pgReadMethodNote').textContent;
 check('the readings-by-sensor card states its range total',
-  /10 readings across this range/.test(readMethodNote), readMethodNote.slice(0, 200));
+  /10 install-days carried a reading in this range/.test(readMethodNote), readMethodNote.slice(0, 200));
 check('the readings-by-sensor chart drew a band per sensor',
   $('pgReadMethods').querySelectorAll('path').length >= 3,
   String($('pgReadMethods').querySelectorAll('path').length) + ' paths');

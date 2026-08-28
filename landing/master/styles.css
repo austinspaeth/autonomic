@@ -262,7 +262,13 @@ input[type="number"] { -moz-appearance: textfield; }
 .tile .value { font-size: 30px; line-height: 1.15; margin: 7px 0 2px; letter-spacing: -0.02em; }
 .tile .value.small { font-size: 24px; }
 .tile .meta { color: var(--text-muted); font-size: 12px; line-height: 1.45; }
-.tile .split { display: flex; gap: 14px; margin-top: 8px; font-size: 12px; color: var(--text-secondary); }
+/* Wraps because a tile can now carry four swatches (the active tile splits its
+   day two ways at once — returning/first-run and iOS/Android). Without the wrap
+   the fourth is squeezed off the end of a narrow tile rather than moving down. */
+.tile .split {
+  display: flex; flex-wrap: wrap; gap: 4px 14px;
+  margin-top: 8px; font-size: 12px; color: var(--text-secondary);
+}
 .tile .split b { font-weight: 600; color: var(--text-primary); }
 /* The stacked comparisons under a day tile: one row per baseline, the
    percentage in its own column so three arrows line up and the eye can run

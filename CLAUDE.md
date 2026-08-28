@@ -163,6 +163,25 @@ old web app so old `export.json` files import directly.
   load by `stampImportedHrvCoverage` (store `loadState`), which stamps coverage
   from the waveform sidecar — no RR ⇒ 0 ⇒ permanently excluded. Nothing is
   deleted: the entries stay in the journal and in exports, they just don't count.
+  **Note `durationSec` means two different things.** On an IMPORTED reading it is
+  real RR coverage, which is what the rule above gates on; on an IN-APP capture it
+  is the elapsed session. So the 4-minute bar would pass a 5-minute camera reading
+  holding 90 seconds of usable pulse, and it is not the field to reach for when
+  asking about capture quality.
+- **A capture's own quality is stamped on the reading** (`artifactPct`,
+  `coverageSec`, `confidence` — `src/lib/hrv` computes them, `features/hrv/Results.tsx`
+  writes them). It shipped in 1.25.2 (OTA); before that the results card SHOWED all
+  three and the entry carried none, so a reading could not be judged on its own
+  quality once the card closed — which is exactly the question about camera
+  readings, and it was thrown away on every one. Stamped only when the metrics came
+  from the beat series: the watch-summary fallback has no RR behind it, and a 0%
+  artifact rate there would be a quality claim about a measurement we never saw.
+  Capture-time gating is unchanged and is stricter for the camera already
+  (`maxArtifactPct` 15 vs 30, plus beat repair and segment triage in `lib/hrv`), so
+  these say how MARGINAL a kept reading was, not whether to keep it. **Nothing
+  de-weights on them yet** — they are recorded first so there is something to
+  decide with, and a reading from an older build carries none of them, so every
+  consumer must read `undefined` as UNKNOWN rather than as clean.
 - **Progress falls back to demo data on an empty journal. Insights does NOT.** `src/lib/demo.ts`
   generates a deterministic **60-day** sample history (`DEMO_DAYS`; seeded PRNG, keyed
   off today so it lands in the Analysis buckets and report ranges) that arcs from crash
@@ -859,7 +878,7 @@ old web app so old `export.json` files import directly.
   support log. Storage is **one DynamoDB row per day** holding a map of
   cohort+platform(+method) → count (`PK PING#OPEN` / `PING#SUB` / `PING#ACT` /
   `PING#HRV`,
-  `SK 2026-08-21`, `cohorts: { '082126I': 12 }`, activations `'082126IB'`) — a map, not a list, because the nested bump is
+  `SK 2026-08-21`, `cohorts: { '082126I': 12 }`, readings `'082126IB'`) — a map, not a list, because the nested bump is
   atomic and appending to a list would lose concurrent pings.
   Read it back with `GET /ping/report?key=`
   (shared key, `PING_REPORT_KEY`, injected by CodeBuild from SSM) or the `PINGS`

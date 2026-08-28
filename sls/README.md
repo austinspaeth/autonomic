@@ -249,9 +249,10 @@ property, not a limitation.
 ### The reading counter is the open counter's twin
 
 `/ping/hrv/<code>` says an install saved an HRV reading today. It carries what
-`/ping/open` carries — cohort date and platform letter — plus the sensor letter
-(see below), and it is capped at one per install per Eastern day by the same
-client rule, bucketed on the same boundary. That symmetry is the whole point:
+`/ping/open` carries — cohort date and platform letter — plus the **sensor
+letter** the activation route carries, and it is capped at one per install per
+Eastern day by the same client rule, bucketed on the same boundary. That
+symmetry is the whole point:
 because both count the same kind of thing over the same population, `hrv[day] /
 open[day]` is a **share of people**, not of pings. Opening the app is not using
 it, and the open counter alone cannot tell an install that measures every
@@ -261,13 +262,20 @@ never gains a new one.
 Two consequences for anything reading these rows:
 
 - **Nothing may be added to one of the two that CHANGES WHAT A COUNT MEANS in
-  one and not the other.** A different day boundary, a second ping per day —
-  either breaks the ratio silently, since the numbers still divide. The sensor
-  letter is not one of those things: it splits the KEY a count lands under, not
-  the count, so a day's HRV rows still sum to one per install and a consumer
-  that ignores the letter reads the number it always read. What the letter
-  cannot claim is a person's whole day — the daily cap means it names whichever
-  reading came FIRST — and the dashboard says so.
+  one and not the other.** A different day boundary, a second ping per day, a
+  different trigger than "the app was used" — any of them breaks the ratio
+  silently, since the numbers still divide. The sensor letter is not one of
+  those things: it splits the KEY a count lands under, not the count, so a day's
+  HRV rows still sum to one per install and a consumer that ignores the letter
+  reads the number it always read. What the letter cannot claim is a person's
+  whole day — the daily cap means it names whichever reading came FIRST — and
+  the dashboard says so.
+- **The sensor letter has its own birthday, later than the route's.** The HRV
+  route shipped anonymous as to sensor and gained the letter afterwards, so rows
+  from between the two carry `method: null`. That is "we were not asking", NOT
+  "a sensor we could not read", and a reader must gate on it separately
+  (`hrvMethodFirst` / `hrvMethodKnown` in `landing/master/analytics.js`) or the
+  history fills with an "unknown sensor" band that is really a gap.
 - **Days before the route shipped are unknown, not zero.** There is no start
   date stored anywhere (the endpoint keeps counts), so a reader has to take the
   first day an `hrv` row exists as the counter's birthday and answer null for

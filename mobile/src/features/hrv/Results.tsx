@@ -76,6 +76,20 @@ export function HrvResults({ rr, segmentStarts, hrSamples, sdnnSamples, config, 
     if (config.kind === 'breath' && config.style) base.style = config.style;
     if (result.ok || Object.keys(result.fields).length) {
       Object.assign(base, result.fields);
+      // How good this capture was, kept with the numbers it produced. The
+      // results card below has always SHOWN these and the entry has never
+      // carried them, so a reading could not be judged on its own quality once
+      // this card closed — which is the whole question about camera readings,
+      // and it was being thrown away on every one of them.
+      //
+      // Stamped only on this branch: here the metrics came from the beat
+      // series, so there is a series to grade. The `watchFallback` branch below
+      // takes its numbers from the watch's own summary with no RR behind them,
+      // and a 0% artifact rate there would be a quality claim about a
+      // measurement we never saw.
+      base.artifactPct = Math.round(result.artifactPct * 10) / 10;
+      base.coverageSec = Math.round(result.coverageSec);
+      base.confidence = result.confidence;
     } else if (watchFallback) {
       if (watchFallback.sdnn != null) base.sdnn = String(watchFallback.sdnn);
       if (watchFallback.hr != null) { base.hr = String(watchFallback.hr); base.avgHr = String(watchFallback.hr); }

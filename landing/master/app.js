@@ -1774,6 +1774,7 @@
     renderActivation(scoped, days);
     renderMeasuring(scoped, days);
     renderCaptureFunnel(scoped, days);
+    renderReadingMethods(scoped, days);
     renderPaywall(scoped, days);
     renderOffers(scoped, days);
     renderEvents(scoped, days);
@@ -1951,6 +1952,12 @@
        is that answer, and it is the unfiltered one, like every split here. */
     var freshToday = A.newPlatformsOn(ix, ix.last);
 
+    /* The store split of everyone active that day, for the active tile's second
+       pair of swatches. Unfiltered like every split on this page — with a
+       platform filter on, the tile's own number is the slice and this says what
+       the whole day was. */
+    var activeStores = A.platformsOn(ix, ix.last);
+
     /* The range average carries its own trend, beside the average it is about:
        read against today's count, up on the value line, it looked like a claim
        about today, which it never was. */
@@ -1963,8 +1970,15 @@
           (avgTrend ? ' ' + avgTrend : '') +
           (unattrToday ? ' · ' + fmtInt(unattrToday) + ' more named no store and are not in this slice' : ''),
         deltas: dayDeltas(ix.last, days, function (d) { return A.activeOn(ix, d); }),
+        /* TWO partitions of the same day, on one row: who they were
+           (returning / first run) and which store they came from. Both add up
+           to the tile's own number, which is why the store half goes through
+           `storeSplit` — it carries the "no store" band when there is one, and
+           without it the second pair would silently fail to sum on any day
+           that still has pre-marker installs in it. */
         split: [{ name: 'returning', color: PC.back, value: fmtInt(returningToday) },
                 { name: 'first run', color: PC.fresh, value: fmtInt(A.newOn(ix, ix.last)) }]
+          .concat(storeSplit(activeStores))
       }),
       tile({
         label: 'Installs on ' + labelDay(ix.last), color: PC.fresh,
@@ -2700,6 +2714,131 @@
 
      Everything here is null before `hrvFirst` — the route shipped in a build of
      its own, and a day the counter was not running is unknown, not zero. */
+  /* ------------------------------------------- 5e. which sensor, ongoing
+   *
+   * The first-reading split (5c) says how people START. These two say what they
+   * KEEP using, and the pair is the only way this endpoint can be asked whether
+   * a sensor holds anybody: there is no identifier, so the activation route and
+   * the reading route cannot be joined per person, and the comparison left is
+   * between their two MIXES.
+   *
+   * Both are silent before `hrvMethodFirst`. A reading row from before the
+   * letter shipped names no sensor, and drawing those as an unknown band would
+   * be a claim about the data ("we could not tell") standing in for a fact
+   * about the instrument ("we were not asking"). Same rule as `hrvKnown`, one
+   * level down. */
+  function renderReadingMethods(ix, days) {
+    var keysOf = function (split) {
+      return A.METHOD_ORDER.filter(function (k) { return split[k]; });
+    };
+    /* The sensors we can actually name. '?' is a real bucket and is disclosed
+       in the note, but it can never be the subject of a sentence about which
+       sensor people use. */
+    var named = function (keys) {
+      return keys.filter(function (k) { return k !== '?'; });
+    };
+
+    /* ---- by date. Null (not 0) before the letter, so the stack breaks into a
+       gap rather than drawing a floor of zeroes nobody measured on. */
+    var pooled = A.hrvMethodsOver(ix, days);
+    var keys = keysOf(pooled);
+    var total = keys.reduce(function (a, k) { return a + pooled[k]; }, 0);
+
+    drawChart('pgReadMethods', {
+      x: days.map(labelDay), stacked: true, height: 220, format: fmtInt, xLabel: 'Day',
+      series: keys.map(function (k) {
+        return {
+          key: k, name: A.methodName(k), color: METHOD_COLOR[k], type: 'area',
+          values: days.map(function (d) {
+            return A.hrvMethodKnown(ix, d) ? (A.hrvMethodsOn(ix, d)[k] || 0) : null;
+          })
+        };
+      }),
+      emptyText: 'No readings have named a sensor yet.',
+      tooltipNote: function (i) {
+        return A.hrvMethodKnown(ix, days[i]) ? '' : 'before the reading counter named its sensor';
+      }
+    });
+
+    document.getElementById('pgReadMethodNote').innerHTML = !total
+      ? '<p class="note" style="margin-top:10px">' +
+        (ix.hrvMethodFirst
+          ? 'No reading in this range named a sensor.'
+          : 'Readings have not started naming their sensor yet. This fills from the first ' +
+            'reading saved by a build that sends the letter.') + '</p>'
+      : '<p class="note" style="margin-top:10px">' + fmtInt(total) + ' install-day' +
+        (total === 1 ? '' : 's') + ' carried a reading in this range' + methodSplitNote(pooled) +
+        /* Named sensors only, and the segment drops out entirely when there are
+           none — every reading in range naming no sensor is a real state (a
+           build sending a letter this dashboard does not know), and it is
+           already disclosed by methodSplitNote above. */
+        named(keys).map(function (k) {
+          return ' · ' + A.methodName(k) + ' ' + pctOf(pooled[k], total);
+        }).join('') +
+        (ix.hrvMethodFirst ? ' · counted from ' + esc(labelFull(ix.hrvMethodFirst)) : '') + '.</p>';
+
+    /* ---- by install age, as SHARES. Counts would just redraw the retention
+       curve — every sensor's line falling together says nothing about the mix,
+       which is the whole question. Shares sum to 100% at every age, so a band
+       that narrows as the ages rise is a sensor losing its place. */
+    var curve = A.hrvMethodCurve(ix, ix.cohorts, 30);
+    var ageKeys = keysOf(curve.reduce(function (acc, p) {
+      Object.keys(p.methods).forEach(function (k) { acc[k] = (acc[k] || 0) + p.methods[k]; });
+      return acc;
+    }, {}));
+
+    drawChart('pgReadMethodAge', {
+      x: curve.map(function (p) { return { label: 'D' + p.day, full: 'Day ' + p.day }; }),
+      stacked: true, height: 220, format: fmtPct, xLabel: 'Days since install',
+      series: ageKeys.map(function (k) {
+        return {
+          key: k, name: A.methodName(k), color: METHOD_COLOR[k], type: 'area',
+          values: curve.map(function (p) {
+            return p.total ? ((p.methods[k] || 0) / p.total) * 100 : null;
+          })
+        };
+      }),
+      emptyText: 'No cohort has a reading with a sensor on it yet.',
+      tooltipNote: function (i) {
+        var p = curve[i];
+        if (!p || !p.total) return 'no readings from these cohorts at that age';
+        return fmtInt(p.total) + ' reading-day' + (p.total === 1 ? '' : 's') +
+          ' from ' + fmtInt(p.cohorts) + ' cohort' + (p.cohorts === 1 ? '' : 's') +
+          (p.blind ? ' · ' + p.blind + ' left out, before the sensor letter' : '');
+      }
+    });
+
+    /* The one sentence worth drawing out: how each sensor's share at day 0
+       compares with its share across the oldest ages that have data. Stated in
+       percentage POINTS, and hedged, because a share of a handful of
+       reading-days is not a trend and the leaving/upgrading ambiguity is real. */
+    var first = curve[0];
+    var tail = curve.filter(function (p) { return p.total && p.day >= 7; });
+    var tailTotal = tail.reduce(function (a, p) { return a + p.total; }, 0);
+    var note = document.getElementById('pgReadMethodAgeNote');
+    if (!first || !first.total || !tailTotal || !named(ageKeys).length) {
+      note.innerHTML = '<p class="note" style="margin-top:10px">' +
+        'Not enough aged reading-days yet to compare the day-0 mix against a later one. ' +
+        'This needs cohorts born after the sensor letter shipped to reach a week old.</p>';
+    } else {
+      var moves = named(ageKeys).map(function (k) {
+        var d0 = ((first.methods[k] || 0) / first.total) * 100;
+        var later = tail.reduce(function (a, p) { return a + (p.methods[k] || 0); }, 0) / tailTotal * 100;
+        return { name: A.methodName(k), move: later - d0, d0: d0, later: later };
+      });
+      note.innerHTML = '<p class="note" style="margin-top:10px">' +
+        'Day 0 against day 7+ (' + fmtInt(first.total) + ' reading-day' + (first.total === 1 ? '' : 's') +
+        ' vs ' + fmtInt(tailTotal) + '): ' +
+        moves.map(function (m) {
+          return '<b>' + esc(m.name) + '</b> ' + fmtPct(m.d0) + ' → ' + fmtPct(m.later) +
+            ' (' + (m.move >= 0 ? '+' : '') + m.move.toFixed(1) + ' pts)';
+        }).join(' · ') + '.</p>' +
+        '<p class="hint" style="margin:8px 0 0">A share that falls with age means that sensor is behind ' +
+        'a smaller slice of later reading-days. It does <b>not</b> say those people left — they may have ' +
+        'bought a strap — and nothing on this endpoint can separate the two.</p>';
+    }
+  }
+
   function renderMeasuring(ix, days) {
     var known = days.filter(function (d) { return A.hrvKnown(ix, d); });
 
@@ -2810,47 +2949,6 @@
       '</div>';
 
     renderReadingMethods(ix, days);
-  }
-
-  /* WHAT the readings were taken with — the activation card's twin, over the
-     daily counter rather than the once-per-install one.
-     Two things it must not pretend to be. It is not a count of sessions: the
-     counter fires once per install per Eastern day, so a band is that install's
-     FIRST reading of the day and a person who uses two sensors appears as one.
-     And a reading from a build that predates the sensor letter is drawn as "no
-     sensor" rather than dropped or guessed, which is the only way a range
-     straddling that release reads as what it is — the same rule `hrvKnown`
-     applies to the counter itself, one level down. */
-  function renderReadingMethods(ix, days) {
-    var perDay = days.map(function (d) { return A.hrvKnown(ix, d) ? A.hrvMethodsOn(ix, d) : {}; });
-    var split = A.hrvMethodsOver(ix, days);
-    var keys = A.METHOD_ORDER.filter(function (k) { return split[k]; });
-    var total = keys.reduce(function (a, k) { return a + split[k]; }, 0);
-    var named = keys.filter(function (k) { return k !== '?'; })
-      .reduce(function (a, k) { return a + split[k]; }, 0);
-
-    drawChart('pgReadMethods', {
-      x: days.map(labelDay), stacked: true, height: 280, format: fmtInt, xLabel: 'Day',
-      series: keys.map(function (k) {
-        return {
-          key: k, name: A.methodName(k), color: METHOD_COLOR[k], type: 'area',
-          values: perDay.map(function (m) { return m[k] || 0; })
-        };
-      }),
-      emptyText: 'No readings in this range.',
-      tooltipNote: function (i) {
-        return A.hrvKnown(ix, days[i]) ? '' : 'before the reading counter shipped';
-      }
-    });
-
-    document.getElementById('pgReadMethodNote').innerHTML = !total ? '' :
-      '<p class="note" style="margin-top:10px">' + fmtInt(total) + ' reading' + (total === 1 ? '' : 's') +
-      ' across this range' + methodSplitNote(split) +
-      (named ? ', ' + fmtPct((named / total) * 100) + ' of them naming a sensor' : '') +
-      (ix.platform === 'all'
-        ? ' · combined, so the Apple Watch share is a share of everyone including Android, which is never offered it'
-        : ' · ' + (ix.platform === 'ios' ? 'iOS' : 'Android') + ' only') +
-      '.</p>';
   }
 
   /* ------------------------------------------------ 5d2. the capture funnel

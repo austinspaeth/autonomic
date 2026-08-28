@@ -118,7 +118,10 @@ export function platformCode(os: string | undefined): PlatformCode {
  */
 export type MethodCode = 'W' | 'B' | 'F' | 'G';
 
-/** Map an HRV capture source (see features/hrv/SourcePicker) onto its marker. */
+/** Map an HRV capture source (see features/hrv/SourcePicker) onto its marker.
+ *  An unrecognised source yields undefined rather than a guess — the server
+ *  pools a letterless ping under `?`, which is honest, and a wrong letter
+ *  would not be. */
 export function methodCode(source: string | undefined): MethodCode | undefined {
   if (source === 'watch') return 'W';
   if (source === 'polar') return 'B';
