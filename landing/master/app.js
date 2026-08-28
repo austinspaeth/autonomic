@@ -7424,21 +7424,31 @@
   var APPLE_APP_ID = '6789786971';
   var PLAY_PACKAGE = 'com.autonomic.journal';
 
-  function suggestedIosUrl(campaign) {
+  /* Apple's campaign token is free-form and capped at 40 characters, so it can
+     be the campaign's real name. Google's is a utm triple parsed out of one
+     referrer string, and a utm value with spaces and punctuation in it is a
+     mess in every report that groups on it — so the two are fed different
+     things on purpose: Apple gets the name, Play and GA get the slug. */
+  function suggestedIosUrl(name) {
     return 'https://apps.apple.com/app/apple-store/id' + APPLE_APP_ID +
-      '?pt=' + APPLE_PROVIDER_TOKEN + '&ct=' + encodeURIComponent(campaign) + '&mt=8';
+      '?pt=' + APPLE_PROVIDER_TOKEN + '&ct=' + encodeURIComponent(name.slice(0, 40)) + '&mt=8';
   }
 
-  function suggestedAndroidUrl(campaign) {
-    var referrer = 'utm_source=' + campaign.toLowerCase() +
-      '&utm_medium=referral&utm_campaign=' + campaign.toLowerCase();
+  function suggestedAndroidUrl(tag) {
+    var referrer = 'utm_source=' + tag + '&utm_medium=referral&utm_campaign=' + tag;
     return 'https://play.google.com/store/apps/details?id=' + PLAY_PACKAGE +
       '&referrer=' + encodeURIComponent(referrer);
   }
 
-  function suggestedWebUrl(campaign) {
-    var c = campaign.toLowerCase();
-    return 'https://autonomic.care/?utm_source=' + c + '&utm_medium=referral&utm_campaign=' + c;
+  function suggestedWebUrl(tag) {
+    return 'https://autonomic.care/?utm_source=' + tag +
+      '&utm_medium=referral&utm_campaign=' + tag;
+  }
+
+  /* A campaign name reduced to something that can sit in a URL unencoded. Also
+     what the New link form offers as a path when only a name has been typed. */
+  function slugify(s) {
+    return String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48);
   }
 
   function validLinkUrl(v) {
@@ -7534,7 +7544,17 @@
         ? 'Publishes at <b>' + esc(linkUrl(s)) + '</b>'
         : 'Enter a path to see the link.';
     }
-    slugEl.addEventListener('input', drawPreview);
+    /* Typing a name fills the path in, until the path is typed in by hand.
+       The path is the thing that has to be right — it is the printed URL — so
+       it is offered rather than derived: once touched it is never rewritten
+       under the reader, and an existing link's path is never touched at all. */
+    var slugTouched = !!link;
+    slugEl.addEventListener('input', function () { slugTouched = true; drawPreview(); });
+    document.getElementById('lkLabel').addEventListener('input', function () {
+      if (slugTouched) return;
+      slugEl.value = slugify(this.value);
+      drawPreview();
+    });
     drawPreview();
 
     /* Builds the store URLs the site would build for a campaign of this name,
@@ -7542,10 +7562,11 @@
        assembled by hand in App Store Connect's own format. Fills only what is
        empty — it must never quietly overwrite a URL that was pasted in. */
     document.getElementById('lkFill').addEventListener('click', function () {
-      var campaign = document.getElementById('lkLabel').value.trim() || slugEl.value.trim();
-      if (!campaign) { toast('Give the campaign a name or a path first.'); return; }
-      var pairs = [['lkIos', suggestedIosUrl(campaign)], ['lkAndroid', suggestedAndroidUrl(campaign)],
-        ['lkWeb', suggestedWebUrl(campaign)]];
+      var name = document.getElementById('lkLabel').value.trim() || slugEl.value.trim();
+      var tag = slugify(slugEl.value.trim() || name);
+      if (!name || !tag) { toast('Give the campaign a name or a path first.'); return; }
+      var pairs = [['lkIos', suggestedIosUrl(name)], ['lkAndroid', suggestedAndroidUrl(tag)],
+        ['lkWeb', suggestedWebUrl(tag)]];
       var filled = 0;
       pairs.forEach(function (pair) {
         var el = document.getElementById(pair[0]);

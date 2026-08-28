@@ -9,7 +9,7 @@ the ping is a bare counter with no identifier attached (see below).
 ```
 POST https://api.autonomic.care/api/master
 Authorization: Bearer <Cognito id token>
-{ "action": "LOAD" | "SYNC" | "REPLACE_ALL" | "PINGS", "payload": { ... } }
+{ "action": "LOAD" | "SYNC" | "REPLACE_ALL" | "PINGS" | "LINKS_REPUBLISH", ... }
 
 GET  https://api.autonomic.care/ping/open/D082126I    (public, no auth)
 GET  https://api.autonomic.care/ping/sub/D082126I
@@ -52,6 +52,7 @@ per user, which would eventually meet DynamoDB's 400KB item ceiling.
 | `DASH#<email>` | `AD#<id>` | an advertising campaign (name, channel, dates) |
 | `DASH#<email>` | `COST#<id>` | a dated cost, optionally attributed to an ad |
 | `DASH#<email>` | `SALE#<id>` | one purchase: plan, price, and the buyer's install date |
+| `DASH#<email>` | `LINK#<slug>` | a campaign download link, and the page published from it |
 | `DASH#<email>` | `SETTINGS` | trial/wall lengths, currency, store commission |
 | `DASH#<email>` | `UI` | view and filter preferences |
 | `PING#OPEN` | `<day>` | that day's opens, counted per cohort |
@@ -72,11 +73,12 @@ per user, which would eventually meet DynamoDB's 400KB item ceiling.
 `LOAD` queries the whole partition. `SYNC` applies the client's diff — entries
 as `upserts` / `deletes`, and the four id-keyed collections as
 `eventUpserts` / `eventDeletes`, `adUpserts` / `adDeletes`,
-`costUpserts` / `costDeletes`, `saleUpserts` / `saleDeletes` — plus `settings`
-and `ui`. Each cleaner in the
+`costUpserts` / `costDeletes`, `saleUpserts` / `saleDeletes`, and campaign links
+as `linkUpserts` / `linkDeletes` — plus `settings` and `ui`. Each cleaner in the
 Lambda has a twin in `landing/master/sync.js`; **if the two shapes disagree,
 every diff reports every row as changed forever.** `REPLACE_ALL` wipes the ENTRIES and
-rewrites them — it does not touch events, ads, costs or sales, matching a button that
+rewrites them — it does not touch events, ads, costs, sales or campaign links,
+matching a button that
 says "delete every entry" — and is what "Delete all data" uses — a wipe is worth stating
 outright rather than trusting a diff to enumerate every deletion. ("Delete all
 data" additionally clears the sales ledger through the ordinary diff: sales left
@@ -95,6 +97,49 @@ See `MASTER_DASHBOARD.md` for the arithmetic that depends on it.
 
 The table is `DeletionPolicy: Retain` with point-in-time recovery on. A
 `sls remove` will not take the data with it.
+
+## Campaign download links (`LINK#`)
+
+The one thing this API writes outside DynamoDB. A `LINK#<slug>` row is a
+campaign download link — `autonomic.care/download/facebook` — with up to three
+destinations (iPhone, Android, everything else), and saving one **publishes a
+real HTML page into the site bucket** with those URLs already baked in.
+
+Why a written object rather than a lookup: the site is a static bucket behind
+CloudFront with an OAC origin, so a path with no object behind it is a 403 —
+there is nothing a client-side router could rescue, and the destinations are
+typed into the dashboard and cannot be known at build time. The published page
+therefore costs one request, never touches this API, and keeps working when this
+API does not.
+
+`lambdas/api/links.js` holds the whole of it, and the reasoning at length. The
+parts to know:
+
+* **The slug is the identity.** It is the URL, so editing it is a delete and a
+  create, which is exactly what the diff reports and exactly what has to happen
+  in the bucket. `SLUG_RE` refuses anything that would need encoding rather than
+  escaping it — the link gets typed into a video description by hand.
+* **A destination is an http(s) URL or it is dropped.** The page assigns it to
+  `location.replace`, so a `javascript:` destination typed into the dashboard
+  would run on autonomic.care's own origin.
+* **Both keys are written** — `download/<slug>/index.html` and the extensionless
+  `download/<slug>` — because the distribution's directory handling is
+  out-of-band configuration this repo does not own.
+* **Publishing runs after the row is stored and is allowed to throw.** The
+  dashboard's push retries with backoff and only adopts its snapshot on success,
+  so a transient S3 failure re-publishes on the next attempt rather than leaving
+  a campaign the dashboard believes is live and is not.
+* **`LINKS_REPUBLISH` rewrites every page from what is stored.** Always safe:
+  the rows are the record and the objects are a rendering of them. It is the
+  repair path for a lost object, and how a change to the page template reaches
+  campaigns nobody has edited since.
+* **The pipeline must not delete them.** `buildspec.yml` excludes `download/*`
+  from its `aws s3 sync --delete`, re-including only the three files the build
+  owns. Move one of those two things and you must move the other.
+* **Unset is safe.** With no `SITE_BUCKET` the campaign stores and syncs and is
+  simply not live; the dashboard says so. Same rule as the Web Push keys. The
+  role's grant is scoped to `download/*` in the site bucket, so it can publish a
+  campaign link and can never touch the rest of the site.
 
 ## What is live in the stores (`STORE_VERSIONS`)
 

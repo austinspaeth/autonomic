@@ -1004,6 +1004,67 @@ and it inherits every rule from them: gross shown beside net, cash never blended
 with MRR, both stores whatever the filter says, cost per install blended and
 labelled so. The whole strip hides when there is no money at all to report.
 
+
+## The Links view — the one tab that changes the public site
+
+Every other view here reads numbers. This one writes: saving a campaign
+publishes a real page at `autonomic.care/download/<slug>`.
+
+`/download` itself is a page of the landing site and is not managed here. It is
+a prerendered signpost that sniffs the user agent and sends a phone to its store
+with the site's own `Videos` attribution. Nothing about it changed.
+
+A CAMPAIGN link is the same object with the destinations supplied by hand, so
+`/download/facebook` can carry its own App Store campaign token (`ct=`) and its
+own Play referrer, and the two campaigns are told apart in App Store Connect and
+in the Play Console. Three destinations per campaign — iPhone, Android, and
+everything else — each of which may be left blank: a blank phone platform falls
+back to `/download`, so the visitor still lands in the right store with the
+default credit, and a blank desktop destination falls back to the home page.
+**Fill in tagged store URLs** builds the two store URLs the site itself would
+build (`storeUrl()` in `landing/src/lib/site.ts`, duplicated in `app.js` because
+this dashboard has no build step), and never overwrites a destination that is
+already set. Apple's token gets the campaign's real NAME — it is free-form and
+capped at 40 characters — while Play's referrer and the GA triple get the SLUG,
+because a utm value with spaces in it is a mess in every report that groups on
+it.
+
+### Why the page is written rather than resolved
+
+The site is a static bucket behind CloudFront with an OAC origin, so a path with
+no object behind it is a 403 — there is nothing a client-side router could
+rescue, and the destinations are typed in here and cannot be known at build
+time. So the page is **published**: `SYNC` renders it and writes it into the
+bucket with both URLs already in it (`sls/lambdas/api/links.js`). Three
+consequences worth keeping in mind:
+
+1. The redirect costs one request and never touches the API. A campaign link
+   keeps working if the dashboard, the Lambda or DynamoDB are down — the
+   opposite of what a runtime lookup would give us.
+2. DynamoDB is still the record and the object is a rendering of it. That is
+   what makes **Republish every page** safe to press at any time: it is the
+   repair path for a lost object, and how a change to the page template reaches
+   campaigns nobody has edited since.
+3. The pipeline's `aws s3 sync --delete` would otherwise delete every campaign
+   object on the next deploy, because none of them exist in the build output.
+   `buildspec.yml` excludes `download/*` from the sync for exactly that reason,
+   re-including only the three files the build owns. Move one of those two
+   things and you must move the other.
+
+Both `download/<slug>/index.html` and the extensionless `download/<slug>` are
+written, because the distribution's directory handling is out-of-band
+configuration this repo does not own, and which of the two it asks S3 for is not
+ours to assume. They are bytes; write both.
+
+The **slug is the identity**, not a generated id — which is what makes editing
+the path a delete and a create rather than a rename, and why the form says the
+old link stops working before it will do it. A campaign link is printed in a
+video description or under a QR code, where a dead URL is not recoverable.
+
+Unset is safe. With no `SITE_BUCKET` on the Lambda the campaign still stores and
+still syncs; it simply is not live, and the republish button says so. Same rule
+as the Web Push keys.
+
 ## Export data — the whole book, as a prompt
 
 The header's **Export data** copies a plain-text report for the chosen window to
@@ -1089,6 +1150,12 @@ the dashboard's own behind a Cognito JWT authorizer and the app's ping counter
 public. It deploys from the same CodePipeline as the landing site on push to
 `main`.
 
+The dashboard's Lambda holds one grant that is not about its own table:
+`s3:PutObject` / `s3:DeleteObject` scoped to `download/*` in the site bucket,
+plus `cloudfront:CreateInvalidation`, so it can publish campaign download pages.
+Scoped to that prefix on purpose — it can publish a campaign link and can never
+touch the rest of the site, which the pipeline owns.
+
 ## Running locally
 
 ```bash
@@ -1128,6 +1195,14 @@ activation against store downloads, the unlived cells of the grid staying blank
 rather than reading 0%, and the tiles refusing to answer where the data is too
 young. If you change how a metric is derived, that fixture is where you find out
 whether you meant to.
+
+`tests/master-links.test.mjs` drives the Links view: that a path is validated
+before it can become a URL, that a campaign reaches the server as the
+`linkUpserts` payload the Lambda publishes a page from, that changing a path
+retires the old link rather than leaving two live, and that deleting takes the
+page down. Its other half is `sls/tests/links.test.mjs`, which pins what the
+published page actually says — including that a destination which is not an
+http(s) URL never reaches `location.replace`.
 
 `tests/sales.test.mjs` pins the subscription arithmetic against a hand-worked
 book — an annual plan's MRR, the gap between cash and recognised revenue, what a

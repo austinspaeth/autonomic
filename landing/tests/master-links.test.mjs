@@ -173,7 +173,13 @@ check('a settled campaign stops being pushed', pushes.length === before,
 
 $('lkAdd').click();
 await settle(40);
+/* The path is offered from the name, because the path is the printed URL and
+   typing it twice is how the two end up disagreeing. */
+type('lkLabel', 'The Podcast Read');
+check('a name fills the path in', $('lkSlug').value === 'the-podcast-read', $('lkSlug').value);
 type('lkSlug', 'podcast');
+type('lkLabel', 'Podcast read — September');
+check('and stops the moment the path is typed by hand', $('lkSlug').value === 'podcast', $('lkSlug').value);
 $('lkAndroid').value = 'https://play.google.com/store/apps/details?id=com.autonomic.journal&referrer=pod';
 $('lkSave').click();
 await settle(60);

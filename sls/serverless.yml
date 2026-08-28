@@ -80,6 +80,11 @@ provider:
         # Campaign download pages. Scoped to the `download/` prefix: this role
         # can publish a campaign link and can never touch the rest of the site,
         # which the pipeline owns. No ListBucket — nothing here enumerates.
+        #
+        # Serverless has no native per-function role, so `ping` and `push` are
+        # handed this too. Neither reads it, and neither ever will: publishing
+        # lives behind the Cognito authorizer and the email allowlist. Same
+        # trade, and the same reasoning, as the SSM grant below.
         - Effect: Allow
           Action:
             - s3:PutObject
