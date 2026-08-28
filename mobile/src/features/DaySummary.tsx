@@ -73,7 +73,7 @@ const WARN_BASE = '#0d0d0f';
 // two states, and the light says which.
 let obId = 0;
 const AnimatedRect = Animated.createAnimatedComponent(Rect);
-function GradientBorderCard({ color, trigger, corner = 'topLeft', glow: wash, style, children }: { color: string | null; trigger?: string; corner?: 'topLeft' | 'topRight'; glow?: boolean; style?: any; children: React.ReactNode }) {
+function GradientBorderCard({ color, trigger, corner = 'topLeft', glow: wash, flash, style, children }: { color: string | null; trigger?: string; corner?: 'topLeft' | 'topRight'; glow?: boolean; flash?: boolean; style?: any; children: React.ReactNode }) {
   const p = usePalette();
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [gid] = useState(() => `ob${obId++}`);
@@ -82,17 +82,39 @@ function GradientBorderCard({ color, trigger, corner = 'topLeft', glow: wash, st
   // border flashes full status color (thick + opaque), then eases down to reveal
   // the resting top-left gradient underneath. `glow` runs 1 → 0 over the settle.
   const glow = useSharedValue(0);
+  // The surface fill runs on its own, SHORTER clock than the border. The border
+  // is a hairline settling into place and can take its time; a tinted fill over
+  // live text is the loudest thing on the screen, so it gets out of the way
+  // first and leaves the border still arriving.
+  const fill = useSharedValue(0);
   useEffect(() => {
     if (!color) return;
     glow.value = withSequence(
       withTiming(1, { duration: 0 }),
       withTiming(0, { duration: 3200, easing: Easing.out(Easing.cubic) }),
     );
-  }, [color, trigger, glow]);
+    fill.value = withSequence(
+      withTiming(1, { duration: 0 }),
+      withTiming(0, { duration: 1700, easing: Easing.out(Easing.cubic) }),
+    );
+  }, [color, trigger, glow, fill]);
   const glowProps = useAnimatedProps(() => ({
     strokeOpacity: glow.value,
     strokeWidth: 1 + glow.value * 2,
   }));
+  // `flash` gives the SURFACE its own arrival beside the border's: the whole
+  // card starts filled with the status colour and, over a shorter settle, that
+  // fill collapses into the resting corner wash underneath it. Two stacked layers
+  // rather than one animated gradient — the flash layer is a radial wide enough
+  // to cover the card (so at full opacity it reads as a solid coloured card),
+  // and fading its opacity to 0 reveals the tight top-corner wash beneath. A
+  // View opacity is cheap; animating an SVG gradient's radii is not.
+  const flashStyle = useAnimatedStyle(() => ({ opacity: fill.value }));
+  // Mixed INTO the surface rather than laid over it: a fill of the raw status
+  // colour is a bright panel, and the tight corner wash it collapses into then
+  // has nothing to pop against. Blending toward the dark surface first keeps the
+  // arrival a dark tinted card, so the corner is the brightest thing left.
+  const fillColor = color ? mixHex(color, p.surface, 0.24) : p.surface;
   return (
     <View
       onLayout={(e) => { const { width, height } = e.nativeEvent.layout; setSize({ w: width, h: height }); }}
@@ -127,6 +149,27 @@ function GradientBorderCard({ color, trigger, corner = 'topLeft', glow: wash, st
             <Rect x={0} y={0} width={size.w} height={size.h} fill={`url(#${gid}w)`} />
           </Svg>
         </View>
+      )}
+      {color && flash && size.w > 0 && (
+        <Animated.View style={[StyleSheet.absoluteFill, flashStyle]} pointerEvents="none">
+          <Svg width={size.w} height={size.h}>
+            <Defs>
+              <RadialGradient
+                id={`${gid}f`}
+                cx={corner === 'topRight' ? size.w : 0}
+                cy={0}
+                rx={size.w * 2.2}
+                ry={size.h * 2.6}
+                gradientUnits="userSpaceOnUse"
+              >
+                <Stop offset="0" stopColor={fillColor} stopOpacity={0.95} />
+                <Stop offset="0.55" stopColor={fillColor} stopOpacity={0.75} />
+                <Stop offset="1" stopColor={fillColor} stopOpacity={0.5} />
+              </RadialGradient>
+            </Defs>
+            <Rect x={0} y={0} width={size.w} height={size.h} fill={`url(#${gid}f)`} />
+          </Svg>
+        </Animated.View>
       )}
       {children}
       {color && size.w > 0 && (
@@ -201,7 +244,7 @@ export function DaySummary({ dk }: { dk: string }) {
       {baselineWaiting ? (
         <BaselineWaitingCard />
       ) : (
-        <GradientBorderCard color={!scored ? null : scoreCat(all.score!).color} trigger={dk} style={{ marginBottom: 12 }}>
+        <GradientBorderCard color={!scored ? null : scoreCat(all.score!).color} trigger={dk} glow flash style={{ marginBottom: 12 }}>
           {!scored ? (
             <UnscoredHero dk={dk} hasReadings={readings.length > 0} />
           ) : (
@@ -211,9 +254,13 @@ export function DaySummary({ dk }: { dk: string }) {
       )}
       {/* Directly under the Outlook: the half-off year, time-boxed to 24h. */}
       <AnnualOfferCard />
-      {/* The one-day founding-member offer. Independent of the annual card
-          above: it fires inside the install trial, that one fires long after it
-          has lapsed, so the two can never be due on the same day. */}
+      {/* The one-day founding-member offer. It and the card above share ONE
+          cool-down clock (src/lib/upsell/pacing): whichever opens first stamps
+          it, and nothing else may be raised for a week — so these two can never
+          be on screen together. They used to be able to: the annual card's 24h
+          unlock reports 'trial', which is exactly the state this one waits for,
+          so opening the half-price year made the founder card due underneath
+          it. */}
       <FounderOfferCard />
       {downturn ? (
         <WarningCard severity={downturn.severity} headline={downturn.headline}

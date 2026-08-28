@@ -264,6 +264,17 @@ check('the builds too old to name themselves are disclosed',
 
 check('the build chart drew a band per version', $('pgBuilds').querySelectorAll('path, rect').length > 0);
 
+/* The adoption twin. Counts move with the day's active total, so the same
+   release can be spreading and still draw a narrower band; shares are what make
+   the climb readable. On the last day every ping is 1.26.0, so its share is
+   100% even though that is only four pings. */
+check('the share chart drew a band per version too',
+  $('pgBuildShare').querySelectorAll('path, rect').length > 0);
+check('adoption is reported against the latest day with pings',
+  /1\.26\.0 is on 100\.0% of the latest day/.test(text('pgBuildShareNote')), text('pgBuildShareNote'));
+check('and says how long the release has been out',
+  /first seen .*4 days ago so far/.test(text('pgBuildShareNote')), text('pgBuildShareNote'));
+
 /* --------------------------------------------------------- capture funnel */
 
 check('the capture funnel drew both counters', $('pgFunnel').querySelectorAll('path, rect').length > 0);

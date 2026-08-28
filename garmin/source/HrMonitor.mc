@@ -126,8 +126,7 @@ class HrMonitor {
         if (_displayHr != null) { _delta = _displayHr - _avg; }
     }
 
-    // Same thresholds and hysteresis as the stand test: a delta hovering on a
-    // boundary must not buzz every second.
+    // A delta hovering on a boundary must not buzz every second.
     hidden function checkBuzz() {
         if (_delta == null) { return; }
         var band = 0;

@@ -1,11 +1,11 @@
 /**
- * Notification opt-ins. The morning-reminder toggle is shared by the welcome
+ * Notification opt-ins. The daily-reminder toggle is shared by the welcome
  * wizard's last step and the Notifications view — the same interaction (a
  * checkbox that opens a time picker on the way on, and cancels the schedule on
  * the way off), so the behavior lives in `useReminderToggle()` and only the
  * chrome differs (the wizard paints itself in its own dark palette). Settings
  * links here through `NotificationsRow`, which opens `NotificationsSheet`:
- * the morning reminder plus the crash warning.
+ * the daily reminder plus the crash warning.
  */
 import React, { useState } from 'react';
 import { Alert, Linking, Pressable, Text, View } from 'react-native';
@@ -34,10 +34,10 @@ async function guardCanAsk(): Promise<boolean> {
   return false;
 }
 
-export const REMINDER_TITLE = 'Morning reminder';
+export const REMINDER_TITLE = 'Daily reminder';
 /** Wizard card while it's still off: an invitation, not a label. Once it's on,
  *  the card states the fact (REMINDER_TITLE + the time) instead. */
-export const REMINDER_SETUP_TITLE = 'Set up morning reminder';
+export const REMINDER_SETUP_TITLE = 'Set up daily reminder';
 /** Kept to a single line — the wizard card is tight, and the full reasoning
  *  lives in PICKER_NOTE once they open the picker. */
 export const REMINDER_BLURB = 'Same time daily, accurate baseline.';
@@ -56,7 +56,7 @@ export function useReminderToggle() {
     if (busy) return;
     if (on) {
       await disableReminder();
-      toast('Morning reminder off');
+      toast('Daily reminder off');
       return;
     }
     if (!(await guardCanAsk())) return;
@@ -146,10 +146,10 @@ function NotifRow({ icon, title, sub, on, onToggle }: { icon: IconName; title: s
   );
 }
 
-/** The Notifications view: morning reminder + crash warning. */
+/** The Notifications view: daily reminder + crash warning. */
 export function NotificationsSheet() {
   const p = usePalette();
-  const morning = useReminderToggle();
+  const daily = useReminderToggle();
   const crash = useCrashAlertToggle();
   return (
     <View>
@@ -160,9 +160,9 @@ export function NotificationsSheet() {
       <NotifRow
         icon="bell"
         title={REMINDER_TITLE}
-        sub={morning.on ? `Every morning at ${fmtTime12(morning.time)}` : 'Daily nudge to take your reading'}
-        on={morning.on}
-        onToggle={morning.toggle}
+        sub={daily.on ? `Every day at ${fmtTime12(daily.time)}` : 'A nudge to take your reading'}
+        on={daily.on}
+        onToggle={daily.toggle}
       />
       <NotifRow
         icon="trendDown"
@@ -186,12 +186,12 @@ export function NotificationsRow() {
   const state = useAppState();
   const { openSheet } = useSheets();
   const r = state.settings.reminder;
-  const morningOn = !!r?.enabled;
+  const dailyOn = !!r?.enabled;
   const crashOn = !!state.settings.crashAlert?.enabled;
-  const sub = morningOn && crashOn ? `Morning at ${fmtTime12(r!.time || DEFAULT_REMINDER_TIME)} · Crash warnings`
-    : morningOn ? `Morning at ${fmtTime12(r!.time || DEFAULT_REMINDER_TIME)}`
+  const sub = dailyOn && crashOn ? `Daily at ${fmtTime12(r!.time || DEFAULT_REMINDER_TIME)} · Crash warnings`
+    : dailyOn ? `Daily at ${fmtTime12(r!.time || DEFAULT_REMINDER_TIME)}`
     : crashOn ? 'Crash warnings'
-    : 'Morning reminder & crash warnings';
+    : 'Daily reminder & crash warnings';
   return (
     <Pressable
       onPress={() => openSheet(() => <NotificationsSheet />)}

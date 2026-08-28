@@ -3,8 +3,9 @@ using Toybox.Graphics;
 
 // The home screen is a CustomMenu rather than a plain View.
 //
-// A View does not scroll: three comfortably-tappable rows plus a title do not
-// fit on one 454px face, and the third was simply clipped. CustomMenu gives
+// A View does not scroll: comfortably-tappable rows plus a title and footer do
+// not always fit on one 454px face, and the overflow was simply clipped.
+// CustomMenu gives
 // native scrolling — momentum, edge bounce, the Venu's own touch handling —
 // while still letting each row be drawn by hand, so the pill language survives.
 // The alternative (a manual scroll offset driven by swipe events) reimplements
@@ -14,7 +15,7 @@ class HomeItem extends WatchUi.CustomMenuItem {
 
     hidden var _title;
     hidden var _tint;
-    hidden var _glyph;   // :heart | :monitor | :stand | :stairs
+    hidden var _glyph;   // :heart | :monitor
 
     function initialize(id, title, tint, glyph) {
         CustomMenuItem.initialize(id, {});
@@ -40,9 +41,7 @@ class HomeItem extends WatchUi.CustomMenuItem {
         Theme.iconDisc(dc, icx, icy, r, _tint);
         var g = r * 0.56;
         if (_glyph == :heart) { Theme.heart(dc, icx, icy, g, _tint); }
-        else if (_glyph == :monitor) { Theme.pulseLine(dc, icx, icy, g, _tint); }
-        else if (_glyph == :stand) { Theme.personStanding(dc, icx, icy, g, _tint); }
-        else { Theme.stairs(dc, icx, icy, g, _tint); }
+        else { Theme.pulseLine(dc, icx, icy, g, _tint); }
 
         // Title only: the subtitles restated what the icon and the title
         // already said, and cost the row the height that makes it easy to hit.
@@ -118,15 +117,13 @@ class HomeMenuDelegate extends WatchUi.Menu2InputDelegate {
         var id = item.getId();
         if (id == :hrv) { _app.openHrv(); }
         else if (id == :monitor) { _app.openMonitor(); }
-        else if (id == :pots) { _app.openStandTest(); }
-        else if (id == :episode) { _app.openEpisode(); }
     }
 }
 
 module Home {
 
-    // Icon tints match the Apple Watch companion exactly: heart on accent,
-    // stand test on blue, episodes on purple. Same product, same colour keys.
+    // Icon tints match the Apple Watch companion exactly: heart on accent.
+    // Same product, same colour keys.
     function menu(deviceHeight) {
         var m = new WatchUi.CustomMenu(
             (deviceHeight * 0.21).toNumber(),
@@ -139,8 +136,6 @@ module Home {
         );
         m.addItem(new HomeItem(:hrv, "HRV Reading", Theme.ACCENT, :monitor));
         m.addItem(new HomeItem(:monitor, "HR Monitor", Theme.ACCENT, :heart));
-        m.addItem(new HomeItem(:pots, "POTS Test", Theme.BLUE, :stand));
-        m.addItem(new HomeItem(:episode, "POTS Episode", Theme.PURPLE, :stairs));
         return m;
     }
 }

@@ -11,6 +11,7 @@ import Reanimated, {
   Easing as REasing, Extrapolation, interpolate, interpolateColor, runOnJS, useAnimatedStyle,
   useSharedValue, withSpring, withTiming, type SharedValue,
 } from 'react-native-reanimated';
+import Svg, { Defs, Line, Pattern, Rect } from 'react-native-svg';
 import { CAUTION_GOLD, CAUTION_GOLD_SOFT, CAUTION_INK, GRADE_COLORS, radius, space, type as T, usePalette } from '../theme';
 import { fmtDateLong, isPastDay } from '../lib/dates';
 import type { ScoreCat } from '../lib/types';
@@ -281,6 +282,60 @@ export function Stepper({ value, step, onChange, format }: { value: number; step
 }
 
 /* ---------- Buttons ---------- */
+
+/**
+ * The one disabled treatment, app-wide.
+ *
+ * It used to be `opacity: 0.45` over whatever the variant was, which on a red
+ * primary reads as a slightly muted red button rather than as an unavailable
+ * one — people tap it, nothing happens, and nothing says why. A disabled
+ * control should not look like a quiet version of the live one: it should look
+ * like a different kind of object.
+ *
+ * So a disabled button drops its variant entirely and wears a MEDIUM grey with
+ * a semi-transparent label, plus a barely-there diagonal hatch. The hatch is
+ * the part that carries it at a glance — it is a texture no live control in the
+ * app has, so "not available" is legible before the colour is even read. Kept
+ * at ~4% so it never becomes a pattern anyone has to look at.
+ */
+const DISABLED_BG = '#4a4a51';
+const DISABLED_BORDER = '#5b5b63';
+const DISABLED_TEXT = 'rgba(255,255,255,0.44)';
+const HATCH_ID = 'btnDisabledHatch';
+const HATCH_STEP = 7;
+/* Deliberately OVERSIZED and clipped by the button's `overflow: hidden`, rather
+   than sized to the button. A percentage width/height on the Svg (and on the
+   Rect inside it) does not resolve against the absolute-filled box the way it
+   reads: it covered only the top half of every button. Nothing here needs to
+   know the real size, so the cheap fix is to out-measure any button that could
+   exist and let the clip do the work. */
+const HATCH_BOX = 1200;
+
+/** The hatch itself. One shared pattern id: every instance draws exactly the
+ *  same thing, so a collision between two of them is a no-op (unlike the score
+ *  card's gradients, which differ per card and so count their ids). */
+function DisabledHatch() {
+  return (
+    <Svg
+      width={HATCH_BOX}
+      height={HATCH_BOX}
+      pointerEvents="none"
+      style={{ position: 'absolute', top: 0, left: 0 }}
+    >
+      <Defs>
+        <Pattern id={HATCH_ID} patternUnits="userSpaceOnUse" width={HATCH_STEP} height={HATCH_STEP}>
+          {/* Bottom-left to top-right, drawn corner to corner so it tiles
+              seamlessly at any button width. Black rather than white: on a
+              medium grey the darker line is the one that reads as texture
+              instead of as a sheen. */}
+          <Line x1={0} y1={HATCH_STEP} x2={HATCH_STEP} y2={0} stroke="#000000" strokeOpacity={0.09} strokeWidth={1.1} />
+        </Pattern>
+      </Defs>
+      <Rect x={0} y={0} width={HATCH_BOX} height={HATCH_BOX} fill={`url(#${HATCH_ID})`} />
+    </Svg>
+  );
+}
+
 export function Button({ title, onPress, variant = 'default', icon, style, disabled, onLongPress, delayLongPress }: {
   title: string; onPress: () => void; variant?: 'default' | 'primary' | 'ghost' | 'danger' | 'dashed' | 'caution'; style?: StyleProp<ViewStyle>; disabled?: boolean;
   /** Optional glyph before the label; inherits the label's colour. */
@@ -289,9 +344,14 @@ export function Button({ title, onPress, variant = 'default', icon, style, disab
   onLongPress?: () => void; delayLongPress?: number;
 }) {
   const p = usePalette();
-  const bg = variant === 'primary' ? p.accent : variant === 'danger' ? '#d63b3b' : variant === 'caution' ? CAUTION_GOLD : variant === 'ghost' || variant === 'dashed' ? 'transparent' : p.surface2;
-  const border = variant === 'primary' ? p.accent : variant === 'danger' ? '#d63b3b' : variant === 'caution' ? CAUTION_GOLD : p.border;
-  const color = variant === 'primary' || variant === 'danger' ? '#fff' : variant === 'caution' ? CAUTION_INK : variant === 'dashed' ? p.accent : p.text;
+  // Disabled is not a shade of the variant, it REPLACES it — one grey skin for
+  // every button in the app, whatever it looks like when it is live.
+  const bg = disabled ? DISABLED_BG
+    : variant === 'primary' ? p.accent : variant === 'danger' ? '#d63b3b' : variant === 'caution' ? CAUTION_GOLD : variant === 'ghost' || variant === 'dashed' ? 'transparent' : p.surface2;
+  const border = disabled ? DISABLED_BORDER
+    : variant === 'primary' ? p.accent : variant === 'danger' ? '#d63b3b' : variant === 'caution' ? CAUTION_GOLD : p.border;
+  const color = disabled ? DISABLED_TEXT
+    : variant === 'primary' || variant === 'danger' ? '#fff' : variant === 'caution' ? CAUTION_INK : variant === 'dashed' ? p.accent : p.text;
   return (
     <Pressable
       onPress={onPress}
@@ -299,12 +359,14 @@ export function Button({ title, onPress, variant = 'default', icon, style, disab
       delayLongPress={delayLongPress}
       disabled={disabled}
       style={({ pressed }) => [
-        { flex: 1, flexDirection: 'row', gap: 8, justifyContent: 'center', borderRadius: radius.control, borderWidth: variant === 'dashed' ? 1.5 : 1, borderStyle: variant === 'dashed' ? 'dashed' : 'solid', backgroundColor: bg, borderColor: border, paddingVertical: 13, alignItems: 'center' },
-        disabled && { opacity: 0.45 },
-        pressed && { opacity: 0.7 },
+        // overflow: the hatch is drawn at full size and clipped to the radius,
+        // rather than being inset to guess at the corners.
+        { flex: 1, flexDirection: 'row', gap: 8, justifyContent: 'center', borderRadius: radius.control, borderWidth: variant === 'dashed' && !disabled ? 1.5 : 1, borderStyle: variant === 'dashed' && !disabled ? 'dashed' : 'solid', backgroundColor: bg, borderColor: border, paddingVertical: 13, alignItems: 'center', overflow: 'hidden' },
+        pressed && !disabled && { opacity: 0.7 },
         style,
       ]}
     >
+      {disabled ? <DisabledHatch /> : null}
       {icon ? <Icon name={icon} size={17} color={color} /> : null}
       <Text style={{ color, fontSize: 16, fontWeight: '600' }}>{title}</Text>
     </Pressable>

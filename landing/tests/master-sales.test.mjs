@@ -391,8 +391,8 @@ check('and says a quiet store may mean "not measured yet" rather than "nobody th
 window.document.querySelector('#fPlatform [data-v="ios"]').click();
 await settle(400);
 check('filtering to iOS still shows pings', !/No pings yet/.test($('view-ping').textContent));
-check('and the tiles are not blank', $('pgTiles').querySelectorAll('.tile').length > 0,
-  String($('pgTiles').querySelectorAll('.tile').length));
+check('and the tiles are not blank', $('pgTilesToday').querySelectorAll('.tile').length > 0,
+  String($('pgTilesToday').querySelectorAll('.tile').length));
 check('the platform card stays unfiltered, because it is what the slice is OF',
   /Android/.test($('pgPlatforms').textContent));
 check('and says pre-marker pings sit in neither store\'s slice',
@@ -408,7 +408,7 @@ check('and says pre-marker pings sit in neither store\'s slice',
    what a slice left out is stated beside the tiles rather than only in a card
    near the bottom of the view. */
 const activeTileValue = () => {
-  const t = [].slice.call($('pgTiles').querySelectorAll('.tile'))
+  const t = [].slice.call($('pgTilesToday').querySelectorAll('.tile'))
     .filter((x) => x.querySelector('.label').textContent.trim().indexOf('Active on') === 0)[0];
   return t ? t.querySelector('.value').textContent.trim() : '';
 };
@@ -426,7 +426,7 @@ check('and says the three add up rather than overlap',
 check('and records why they are not pooled into both stores any more',
   /sum to more than the total/.test(filterNote()), filterNote());
 check('the headline tile says what it left out too, since that is the number being read',
-  /not in this slice/.test($('pgTiles').textContent), $('pgTiles').textContent.slice(0, 240));
+  /not in this slice/.test($('pgTilesToday').textContent), $('pgTilesToday').textContent.slice(0, 240));
 
 window.document.querySelector('#fPlatform [data-v="combined"]').click();
 await settle(300);

@@ -7,7 +7,6 @@ import { Alert, Linking, Pressable, Text, View } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import * as Clipboard from 'expo-clipboard';
 import Constants from 'expo-constants';
 import * as Haptics from 'expo-haptics';
 import { SheetControls, useSheets } from '../components/Sheet';
@@ -35,7 +34,7 @@ import { formatAppDiagnostics } from '../lib/diagnostics/appReport';
 // One address for every route into support: this card and the Insights failure
 // state. A second copy is a second thing to forget when it changes, and the one
 // the user is told to write to must be the one that is watched.
-import { SUPPORT_EMAIL } from '../lib/diagnostics/supportEmail';
+import { SupportCard } from './SupportCard';
 
 const PRIVACY_URL = 'https://autonomic.care/privacy-policy/';
 const TERMS_URL = 'https://autonomic.care/terms-of-service/';
@@ -125,15 +124,7 @@ export function MenuSheet({ controls }: { controls: SheetControls }) {
       {item('sparkles', 'Show welcome screen', 'Replay the first-run guide', () => { controls.closeAll(); showWelcomeAgain(); })}
       {item('info', 'Legal information', 'Disclaimer, privacy & terms', () => openSheet((c) => <LegalSheet controls={c} />))}
       {item('rocket', "What's new", `Release notes for v${appVer}`, () => openWhatsNew(openSheet))}
-      {/* Dark card in both themes (like the brand card above), so its text is
-          hardcoded light rather than palette-driven. */}
-      <Pressable
-        onPress={() => emailSupport(toast)}
-        style={({ pressed }) => [{ marginTop: 22, paddingVertical: 18, paddingHorizontal: 16, borderRadius: radius.card, backgroundColor: '#242427' }, pressed && { opacity: 0.6 }]}
-      >
-        <Text style={{ fontSize: 13.5, color: '#c9c9cf', textAlign: 'center' }}>Questions? Concerns? Email us!</Text>
-        <Text style={{ fontSize: 14.5, fontWeight: '600', color: '#f2f2f5', textAlign: 'center', marginTop: 5 }}>{SUPPORT_EMAIL}</Text>
-      </Pressable>
+      <SupportCard />
       <View style={{ marginTop: 22 }}>
         <Text style={{ fontSize: 12.5, color: p.textDim, textAlign: 'center', lineHeight: 18 }}>
           We appreciate you for using Autonomic, we hope it genuinely helps you in your journey!
@@ -291,18 +282,6 @@ function ClearDataSheet({ controls }: { controls: SheetControls }) {
       <View style={{ height: 8 }} />
     </View>
   );
-}
-
-/** Open the user's mail client at the support address. Devices with no mail
- *  account (and the iOS Simulator, which has no Mail.app at all) can't handle
- *  `mailto:` — copy the address instead of failing silently. */
-async function emailSupport(toast: (m: string) => void) {
-  try {
-    await Linking.openURL(`mailto:${SUPPORT_EMAIL}`);
-  } catch {
-    await Clipboard.setStringAsync(SUPPORT_EMAIL);
-    toast(`Email copied: ${SUPPORT_EMAIL}`);
-  }
 }
 
 /* ---------- import / export ---------- */

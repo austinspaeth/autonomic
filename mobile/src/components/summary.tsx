@@ -48,14 +48,16 @@ const hexA = (hex: string, a: number) => {
 };
 
 /** Map a reading's capture source to a human label for the Details card.
- *  Bluetooth ('polar') readings prefer the stamped device name (`sourceName`);
- *  this map is the fallback for readings captured before names were stamped. */
+ *  Bluetooth ('polar') and Garmin readings prefer the stamped device name
+ *  (`sourceName` — "Venu 4" says more than "Garmin watch", and a household with
+ *  two watches needs it to tell them apart); this map is the fallback for
+ *  readings captured before names were stamped. */
 // 'health' = imported from the platform health store — named for the store on
 // THIS device (Apple Health / Health Connect).
-const SOURCE_LABEL: Record<string, string> = { polar: 'Bluetooth device', watch: 'Apple Watch', camera: 'Device camera', manual: 'Manual entry', health: healthAppName() };
+const SOURCE_LABEL: Record<string, string> = { polar: 'Bluetooth device', watch: 'Apple Watch', garmin: 'Garmin watch', camera: 'Device camera', manual: 'Manual entry', health: healthAppName() };
 
 function sourceLabelFor(r: Entry): string | undefined {
-  if (r.source === 'polar' && r.sourceName) return String(r.sourceName);
+  if ((r.source === 'polar' || r.source === 'garmin') && r.sourceName) return String(r.sourceName);
   return r.source ? SOURCE_LABEL[r.source as string] : undefined;
 }
 

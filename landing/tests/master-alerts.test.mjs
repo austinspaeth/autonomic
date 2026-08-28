@@ -134,15 +134,23 @@ await new Promise((r) => setTimeout(r, 400));
 check('clear-all empties the stack', cards().length === 0, text());
 check('and takes itself away with the cards', $('alertClear').classList.contains('hidden'));
 
-/* The bell. It shows the state it is in, and it is remembered across a reload,
-   which is why it is in localStorage rather than in the synced store — a mute
-   is a property of the room you are sitting in, not of the account. */
+/* The Alerts button is NOT a mute. Cards are dismissed by pressing them, so
+   pressing Alerts is how the day comes back: every card raised today, re-raised
+   in order, however many of them have since been cleared. */
 check('sound is on by default', AL.isMuted() === false && $('btnAlerts').dataset.muted === 'false');
 $('btnAlerts').click();
-check('the bell mutes', AL.isMuted() === true && $('btnAlerts').dataset.muted === 'true');
-check('and the mute is remembered', window.localStorage.getItem('autonomic.master.alertsMuted') === '1');
+check('pressing Alerts does not silence the dashboard', AL.isMuted() === false);
+await new Promise((r) => setTimeout(r, 40));
+check('it replays the day instead — including cards already dismissed',
+  /1 new download/.test(text()) && /1 new sale/.test(text()), text());
+check('and a replayed card is stamped with the time it happened',
+  cards().length > 0 && cards().every((c) => /\d:\d\d/.test(c.textContent)), text());
+const replayed = cards().length;
 $('btnAlerts').click();
-check('and it unmutes again', AL.isMuted() === false);
+await new Promise((r) => setTimeout(r, 40));
+check('pressing it twice does not show the day twice', cards().length === replayed, text());
+$('alertClear').click();
+await new Promise((r) => setTimeout(r, 400));
 
 /* Muted means silent, not blind: the cards are the record of what happened and
    they keep coming. */

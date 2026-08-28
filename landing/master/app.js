@@ -514,8 +514,24 @@
     return '<span class="delta ' + cls + '">' + arrow + ' ' + Math.abs(pct).toFixed(1) + '%</span>';
   }
 
+  /** A RATE's move, in percentage POINTS.
+   *
+   *  A share that goes from 20% to 25% did not go up 5%, and reporting it that
+   *  way is the oldest wrong number in analytics — it is up 5 points, or up
+   *  25%, and only one of those two is what a reader takes from a "%" glued to
+   *  a percentage tile. Every tile whose VALUE is already a percentage takes
+   *  this instead of `delta`. */
+  function ptsSpan(pts, invert) {
+    if (pts === undefined || pts === null || !isFinite(pts)) return '';
+    var cls = pts > 0.05 ? 'up' : pts < -0.05 ? 'down' : 'flat';
+    if (invert) cls = cls === 'up' ? 'down' : cls === 'down' ? 'up' : 'flat';
+    var arrow = pts > 0.05 ? '\u25b2' : pts < -0.05 ? '\u25bc' : '\u25a0';
+    return '<span class="delta ' + cls + '">' + arrow + ' ' +
+      Math.abs(pts).toFixed(1) + ' pts</span>';
+  }
+
   function tile(o) {
-    var delta = deltaSpan(o.delta, o.invertDelta);
+    var delta = deltaSpan(o.delta, o.invertDelta) || ptsSpan(o.deltaPts, o.invertDelta);
     /* The stacked comparisons under a day tile. A count on its own says
        nothing about whether it is a good day: `deltas` is the same number read
        against yesterday, against the same weekday a week ago (traffic here is
@@ -1732,9 +1748,9 @@
     var ready = pings.status === 'ready' || !!pings.report;
     var blank = !ix.days.length;
 
-    var hosts = ['pgTiles', 'pgTilesB', 'pgHeat', 'pgCohortDetail', 'pgTransitions', 'pgConversion',
+    var hosts = ['pgTilesToday', 'pgTilesRange', 'pgTilesLife', 'pgTodayNote', 'pgRangeNote', 'pgHeat', 'pgCohortDetail', 'pgTransitions', 'pgConversion',
       'pgActivationRates', 'pgMethodNote', 'pgMeasureNote', 'pgMeasureRates', 'pgReadMethodNote',
-      'pgPayNote', 'pgSurfaceNote', 'pgTierNote', 'pgBuildNote',
+      'pgPayNote', 'pgSurfaceNote', 'pgTierNote', 'pgBuildNote', 'pgBuildShareNote',
       'pgFunnelNote', 'pgOfferNote', 'pgEventNote',
       'pgWeekdayRetention', 'pgPlatformNote', 'pgFilterNote'];
     if (!ready || blank) hosts.forEach(function (id) {
@@ -1743,15 +1759,42 @@
     });
     if (!ready) return;
 
-    document.getElementById('pgAsOf').textContent = blank ? '' :
-      'counter data through ' + labelFull(ix.last) + (ix.last === today() ? ' · today still running' : '');
+    /* The two group notes. This is what is left of the old "counter data
+       through <date>" row, which stated the counter's last day above a wall of
+       tiles that each already carried that date in their own label.
+
+       What the row was actually FOR is the caveat, and the caveat is only
+       sometimes true: a last day that IS today is a partial count, so every
+       comparison against it is reading a day that is not finished. That is
+       said here, under the heading it applies to, and nothing is said when
+       there is nothing to say. When the counter's newest day is not today —
+       nobody has opened the app yet, or the report is cached — the note names
+       the day instead, because then "Today" is not the day it means. */
+    /* The range heading names the window it covers. The filter bar says which
+       range is selected; this says what that resolved to, which is not the
+       same thing on a counter whose history is shorter than the selection. */
+    var rangeNote = document.getElementById('pgRangeNote');
+    if (rangeNote) {
+      var rr = blank ? null : pingRange(ix);
+      rangeNote.textContent = rr
+        ? labelFull(rr.from) + ' – ' + labelFull(rr.to) +
+          ' · ' + fmtInt(A.range(rr.from, rr.to).length) + ' days'
+        : '';
+    }
+
+    var todayNote = document.getElementById('pgTodayNote');
+    if (todayNote) {
+      todayNote.textContent = blank ? ''
+        : ix.last === today() ? labelDay(ix.last) + ' — still running, so it is a partial day'
+        : 'Newest day with pings: ' + labelFull(ix.last);
+    }
 
     if (blank) {
       document.getElementById('pgHeat').innerHTML =
         '<div class="empty">No pings yet. The counter starts filling the first time a build carrying it is opened.</div>';
       ['pgTimeline', 'pgCurve', 'pgSurvival', 'pgActiveCohort', 'pgPurchaseAge',
         'pgActivationAge', 'pgMethods', 'pgMeasureDaily', 'pgMeasureCurve', 'pgReadMethods',
-        'pgPayDaily', 'pgSurfaces', 'pgTiers', 'pgBuilds',
+        'pgPayDaily', 'pgSurfaces', 'pgTiers', 'pgBuilds', 'pgBuildShare',
         'pgFunnel', 'pgOffers', 'pgEvents',
         'pgPlatforms', 'pgWeekday'].forEach(function (id) {
         drawChart(id, { x: [], series: [], emptyText: 'Waiting for the first ping.' });
@@ -1848,6 +1891,60 @@
   }
 
   /**
+   * The window immediately before this one, of the same length — or null when
+   * the counter did not cover all of it.
+   *
+   * "Up 12% on the previous 30 days" is only a fact if the previous 30 days
+   * were being counted. A range that reaches back past `ix.first` has a
+   * previous window the counter was not running for, and comparing against it
+   * would report the deploy date as a surge. Same rule the tiles' own
+   * `covered` check has always used, lifted out so every card can share it.
+   */
+  function prevWindow(ix, days) {
+    if (!days || !days.length) return null;
+    var to = addDays(days[0], -1);
+    var from = addDays(to, -(days.length - 1));
+    if (!ix.first || from < ix.first) return null;
+    return A.range(from, to);
+  }
+
+  /**
+   * This range's total against the previous range's, as a signed percentage.
+   *
+   * `valueOf(day)` returns the day's count, or **null** for a day the measure
+   * could not be taken on at all — the days before a staggered counter shipped
+   * are the live case. A single unknown day in EITHER window returns null for
+   * the whole comparison rather than being treated as a zero: a counter that
+   * was not running is not a quiet day, and half a window compared against a
+   * whole one is not a comparison. This is `hrvKnown`'s rule, one level up.
+   */
+  function rangeDelta(ix, days, valueOf) {
+    var prev = prevWindow(ix, days);
+    if (!prev) return null;
+    var now = 0, before = 0, i, v;
+    for (i = 0; i < days.length; i += 1) {
+      v = valueOf(days[i]);
+      if (v === null || v === undefined) return null;
+      now += v;
+    }
+    for (i = 0; i < prev.length; i += 1) {
+      v = valueOf(prev[i]);
+      if (v === null || v === undefined) return null;
+      before += v;
+    }
+    return pctChange(now, before);
+  }
+
+  /** The same, as a trailing clause a card note can end with. Empty when there
+      is nothing honest to say, so the sentence simply does not gain a tail. */
+  function rangeTrendNote(ix, days, valueOf) {
+    var pct = rangeDelta(ix, days, valueOf);
+    if (pct === null) return '';
+    return ' · ' + deltaSpan(pct) + ' vs the previous ' + fmtInt(days.length) +
+      ' day' + (days.length === 1 ? '' : 's');
+  }
+
+  /**
    * The three comparisons a day's count is worth reading against: yesterday,
    * the same weekday a week back, and the range's own daily average.
    *
@@ -1936,6 +2033,21 @@
        reading counter: the day's share, and the range's habit rate. */
     var shareToday = A.measureShare(ix, ix.last);
     var measured = A.measureRate(ix, days);
+    /* The same rate over the window before this one, so the range tile can say
+       which way it moved. Null unless that window was fully counted AND the
+       rate is available on both sides — `measureRate` already refuses a window
+       whose days predate the counter, so this inherits that refusal. */
+    var prevRangeDays = prevWindow(ix, days);
+    var measuredPrevRate = prevRangeDays ? A.measureRate(ix, prevRangeDays) : null;
+    var measuredPrev = measuredPrevRate && measuredPrevRate.available
+      ? measuredPrevRate.pct : null;
+
+    /* Activations across the window, the range twin of the day tile above.
+       First readings are once-per-install-ever, so summing them across days
+       double-counts nobody — the same property that makes `newOver` legal. */
+    var actRange = 0;
+    days.forEach(function (d) { actRange += A.activationsOn(ix, d); });
+    var rangeActMethods = A.methodsOver(ix, days);
 
     /* How many installs this slice LEFT OUT because they named no store. Zero
        when the filter is off, since Combined counts everything. It rides on the
@@ -1958,16 +2070,21 @@
        the whole day was. */
     var activeStores = A.platformsOn(ix, ix.last);
 
-    /* The range average carries its own trend, beside the average it is about:
-       read against today's count, up on the value line, it looked like a claim
-       about today, which it never was. */
-    var avgTrend = deltaSpan(dActive);
-
-    document.getElementById('pgTiles').innerHTML = [
+    /* THREE HOSTS, THREE SCOPES, and the split is the point. These tiles used
+       to be one wrapping row in which "Active on Aug 28", "Returning / day"
+       (a range average) and "D7 retention" (every cohort that ever installed)
+       sat side by side, told apart only by whether the label happened to end
+       in a date. Each block now sits under the heading that says what its
+       numbers are about. Nothing here is recomputed — the tiles are the same
+       tiles, dealt into the pile they always belonged to. */
+    document.getElementById('pgTilesToday').innerHTML = [
       tile({
         label: 'Active on ' + labelDay(ix.last), color: PC.active, value: fmtInt(activeToday),
-        meta: fmtInt(Math.round(avg)) + '/day across this range' +
-          (avgTrend ? ' ' + avgTrend : '') +
+        /* The range average used to ride here, which is exactly the confusion
+           the three groups exist to end: it is a claim about thirty days,
+           printed under a number about one. It has its own tile under
+           "This range" now. */
+        meta: 'installs that opened the app that day' +
           (unattrToday ? ' · ' + fmtInt(unattrToday) + ' more named no store and are not in this slice' : ''),
         deltas: dayDeltas(ix.last, days, function (d) { return A.activeOn(ix, d); }),
         /* TWO partitions of the same day, on one row: who they were
@@ -1992,10 +2109,6 @@
         meta: 'subscribe pings on the newest day' + storeSplitNote(ix, A.subPlatformsOn(ix, ix.last)),
         deltas: dayDeltas(ix.last, days, function (d) { return A.purchasesOn(ix, d); }),
         split: storeSplit(A.subPlatformsOn(ix, ix.last))
-      }),
-      tile({
-        label: 'Returning / day', color: PC.back, value: fmtInt(Math.round(avgRet)), delta: dRet,
-        meta: 'the number that says the product is holding people'
       }),
       tile({
         label: 'First readings on ' + labelDay(ix.last), color: PC.activation,
@@ -2036,15 +2149,9 @@
           : fmtInt(A.readingsOn(ix, ix.last)) + ' of ' + fmtInt(activeToday) +
             ' who opened the app that day also measured'
       }),
-      tile({ label: 'D1 retention', color: PC.fresh, smallValue: true, value: fmtRate(d1), meta: rateMeta(d1) }),
-      tile({ label: 'D7 retention', color: PC.trial, smallValue: true, value: fmtRate(d7),
-             meta: 'last day of the trial · ' + rateMeta(d7) }),
-      tile({ label: 'D14 retention', color: PC.postTrial, smallValue: true, value: fmtRate(d14),
-             meta: 'last day of full history · ' + rateMeta(d14) }),
-      tile({ label: 'D30 retention', color: PC.wall, smallValue: true, value: fmtRate(d30), meta: rateMeta(d30) })
-    ].join('');
-
-    document.getElementById('pgTilesB').innerHTML = [
+      /* Both lifecycle counts are of installs active on the SAME newest day,
+         split by where they are in their own life — a today number wearing an
+         age label, which is why they sit here and not under All installs. */
       tile({
         label: 'Active in trial', color: PC.trial, value: fmtInt(live.inTrial),
         meta: 'day 0–14 · ' + fmtInt(started.inTrial) + ' started a trial in that window'
@@ -2052,6 +2159,16 @@
       tile({
         label: 'Active past the trial', color: PC.postTrial, value: fmtInt(live.postTrial),
         meta: 'day 15+: free tier, Pro features locked'
+      }),
+      platformTile(ix)
+    ].join('');
+
+    /* Everything scoped to the date range, each one read against the range
+       before it wherever that comparison is honest — see `rangeDelta`. */
+    document.getElementById('pgTilesRange').innerHTML = [
+      tile({
+        label: 'Returning / day', color: PC.back, value: fmtInt(Math.round(avgRet)), delta: dRet,
+        meta: 'the number that says the product is holding people'
       }),
       tile({
         label: 'Installs in range', color: PC.fresh, value: fmtInt(freshRange),
@@ -2062,9 +2179,50 @@
       }),
       tile({
         label: 'Purchases in range', color: PC.subs, value: fmtInt(subsRange),
+        delta: rangeDelta(ix, days, function (d) { return A.purchasesOn(ix, d); }),
         meta: 'subscribe pings, not store receipts' + storeSplitNote(ix, rangeBuys),
         split: storeSplit(rangeBuys)
       }),
+      tile({
+        label: 'Active / day', color: PC.active, value: fmtInt(Math.round(avg)), delta: dActive,
+        meta: 'installs opening the app on an average day of this range'
+      }),
+      tile({
+        label: 'First readings in range', color: PC.activation, value: fmtInt(actRange),
+        delta: rangeDelta(ix, days, function (d) { return A.activationsOn(ix, d); }),
+        meta: 'installs that activated' + methodSplitNote(rangeActMethods),
+        split: methodSplit(rangeActMethods)
+      }),
+      tile({
+        /* A RATE, so its move is in POINTS. It is also the one tile here whose
+           counter has a start date inside living memory, so the comparison
+           drops out entirely rather than reporting the deploy as a surge —
+           `rangeDelta` returns null the moment either window holds a day the
+           counter was not running for. */
+        label: 'Measured per active day', color: PC.reading, smallValue: true,
+        value: measured.available ? fmtPct(measured.pct) : '–',
+        deltaPts: measuredPrev === null || !measured.available
+          ? null : measured.pct - measuredPrev,
+        meta: measured.available
+          ? fmtInt(measured.readings) + ' readings over ' + fmtInt(measured.active) +
+            ' install-days on the app across ' + measured.days + ' day' + (measured.days === 1 ? '' : 's') +
+            (measured.blind ? ' · ' + measured.blind + ' day' + (measured.blind === 1 ? '' : 's') +
+              ' predate the counter and are left out' : '')
+          : 'the reading counter has no days in this range'
+      })
+    ].join('');
+
+    /* By install AGE, pooled over every cohort old enough to have reached the
+       day being asked about. None of these move when the date range does, and
+       none of them has a "previous range" to be read against — a retention
+       curve is a claim about cohorts, not about a fortnight. */
+    document.getElementById('pgTilesLife').innerHTML = [
+      tile({ label: 'D1 retention', color: PC.fresh, smallValue: true, value: fmtRate(d1), meta: rateMeta(d1) }),
+      tile({ label: 'D7 retention', color: PC.trial, smallValue: true, value: fmtRate(d7),
+             meta: 'last day of the trial · ' + rateMeta(d7) }),
+      tile({ label: 'D14 retention', color: PC.postTrial, smallValue: true, value: fmtRate(d14),
+             meta: 'last day of full history · ' + rateMeta(d14) }),
+      tile({ label: 'D30 retention', color: PC.wall, smallValue: true, value: fmtRate(d30), meta: rateMeta(d30) }),
       tile({
         label: 'Activated on day 0', color: PC.activation, smallValue: true, value: fmtRate(act0),
         meta: 'first reading on the install day · ' + rateMeta(act0)
@@ -2074,24 +2232,13 @@
         meta: rateMeta(act7)
       }),
       tile({
-        label: 'Measured per active day', color: PC.reading, smallValue: true,
-        value: measured.available ? fmtPct(measured.pct) : '–',
-        meta: measured.available
-          ? fmtInt(measured.readings) + ' readings over ' + fmtInt(measured.active) +
-            ' install-days on the app across ' + measured.days + ' day' + (measured.days === 1 ? '' : 's') +
-            (measured.blind ? ' · ' + measured.blind + ' day' + (measured.blind === 1 ? '' : 's') +
-              ' predate the counter and are left out' : '')
-          : 'the reading counter has no days in this range'
-      }),
-      tile({
         label: 'Conversion by D7', color: PC.subs, smallValue: true, value: fmtRate(conv7),
         meta: rateMeta(conv7)
       }),
       tile({
         label: 'Conversion by D30', color: PC.subs, smallValue: true, value: fmtRate(conv30),
         meta: rateMeta(conv30)
-      }),
-      platformTile(ix)
+      })
     ].join('');
 
     renderFilterNote(ix, days);
@@ -2692,29 +2839,16 @@
     });
     document.getElementById('pgMethodNote').innerHTML = !total ? '' :
       '<p class="note" style="margin-top:10px">' + fmtInt(total) + ' first reading' + (total === 1 ? '' : 's') +
-      ' across this range' + methodSplitNote(split) +
+      ' across this range' +
+      rangeTrendNote(ix, days, function (d) { return A.activationsOn(ix, d); }) +
+      methodSplitNote(split) +
       (ix.platform === 'all'
         ? ' · combined, so the Apple Watch share is a share of everyone including Android, which is never offered it'
         : ' · ' + (ix.platform === 'ios' ? 'iOS' : 'Android') + ' only') +
       '.</p>';
   }
 
-  /* ------------------------------------------------------ 5d. measuring
-
-     The counter's fourth route, and the one that answers the question every
-     other card here can only circle: are the people who open the app actually
-     using it?
-
-     Retention says somebody launched. A journal app can be launched every
-     morning to look at yesterday's number and never gain a new one, and that
-     install is on its way out while drawing a perfect retention curve. The
-     reading counter is capped at one per install per Eastern day by the same
-     client rule the open counter runs, and bucketed on the same boundary, so
-     the two are directly comparable and their ratio is a share of PEOPLE.
-
-     Everything here is null before `hrvFirst` — the route shipped in a build of
-     its own, and a day the counter was not running is unknown, not zero. */
-  /* ------------------------------------------- 5e. which sensor, ongoing
+  /* ------------------------------------------- 5d. which sensor, ongoing
    *
    * The first-reading split (5c) says how people START. These two say what they
    * KEEP using, and the pair is the only way this endpoint can be asked whether
@@ -2767,7 +2901,11 @@
           : 'Readings have not started naming their sensor yet. This fills from the first ' +
             'reading saved by a build that sends the letter.') + '</p>'
       : '<p class="note" style="margin-top:10px">' + fmtInt(total) + ' install-day' +
-        (total === 1 ? '' : 's') + ' carried a reading in this range' + methodSplitNote(pooled) +
+        (total === 1 ? '' : 's') + ' carried a reading in this range' +
+        rangeTrendNote(ix, days, function (d) {
+          return A.hrvKnown(ix, d) ? A.readingsOn(ix, d) : null;
+        }) +
+        methodSplitNote(pooled) +
         /* Named sensors only, and the segment drops out entirely when there are
            none — every reading in range naming no sensor is a real state (a
            build sending a letter this dashboard does not know), and it is
@@ -2839,6 +2977,21 @@
     }
   }
 
+  /* ------------------------------------------------------ 5e. measuring
+
+     The counter's fourth route, and the one that answers the question every
+     other card here can only circle: are the people who open the app actually
+     using it?
+
+     Retention says somebody launched. A journal app can be launched every
+     morning to look at yesterday's number and never gain a new one, and that
+     install is on its way out while drawing a perfect retention curve. The
+     reading counter is capped at one per install per Eastern day by the same
+     client rule the open counter runs, and bucketed on the same boundary, so
+     the two are directly comparable and their ratio is a share of PEOPLE.
+
+     Everything here is null before `hrvFirst` — the route shipped in a build of
+     its own, and a day the counter was not running is unknown, not zero. */
   function renderMeasuring(ix, days) {
     var known = days.filter(function (d) { return A.hrvKnown(ix, d); });
 
@@ -3023,7 +3176,7 @@
       'shown as it comes out rather than clamped.</p>';
   }
 
-  /* ------------------------------------------------------ 5e. the paywall
+  /* ------------------------------------------------------ 5f. the paywall
 
      The counter's fifth route. Everything here obeys the same two rules the
      reading counter taught: a day before the route shipped is a GAP and not a
@@ -3082,7 +3235,13 @@
         '</b> of install-days on the app met the paywall — ' + fmtInt(wallDays) + ' of ' +
         fmtInt(openDays) + ' across ' + known.length + ' counted day' + (known.length === 1 ? '' : 's') +
         (blind ? ', with ' + blind + ' earlier day' + (blind === 1 ? '' : 's') +
-          ' left out because the counter was not running yet' : '') + '. ' +
+          ' left out because the counter was not running yet' : '') +
+        /* Walls met, this range against the one before it. Null — and so
+           absent — whenever either window holds a day the counter was not
+           running for, which is most ranges while this counter is young. */
+        rangeTrendNote(ix, days, function (d) {
+          return A.payKnown(ix, d) ? A.paywallsOn(ix, d) : null;
+        }) + '. ' +
         fmtInt(bought) + ' purchase' + (bought === 1 ? '' : 's') + ' landed in the same window.</p>' +
         '<p class="hint" style="margin:8px 0 0">One ping per install per Eastern day, so this is the share of the ' +
         'people who were there and not the number of times a lock fired. The two numbers are worth reading ' +
@@ -3134,7 +3293,7 @@
       '</p>';
   }
 
-  /* --------------------------------------------- 5g. offers and events
+  /* --------------------------------------------- 5h. offers and events
 
      Everything on the per-letter routes. The cap there is per LETTER, not per
      route, which is what makes each line below a headcount for its own thing —
@@ -3177,9 +3336,16 @@
 
     host.innerHTML = '<div class="mini-rows">' + letters.map(function (k) {
       var f = A.offerFunnel(ix, days, k);
+      /* How many of this offer were RAISED, this range against the one before
+         it. On the count, never on the accept rate: an offer shown three times
+         and taken once is 33%, and a percentage over three events moves in
+         thirty-point jumps that mean nothing. */
+      var trend = rangeTrendNote(ix, days, function (d) {
+        return A.kindKnown(ix, 'osh', d) ? A.slotOn(ix, 'osh', d, k) : null;
+      });
       return '<div><span>' + esc(A.slotName('osh', k)) + '</span><b>' + fmtPct(f.acceptPct) + '</b>' +
-        '<span class="note">' + fmtInt(f.accepted) + ' accepted of ' + fmtInt(f.shown) + ' shown · ' +
-        fmtInt(f.dismissed) + ' dismissed · ' + fmtInt(f.ignored) + ' ignored</span></div>';
+        '<span class="note">' + fmtInt(f.accepted) + ' accepted of ' + fmtInt(f.shown) + ' shown' +
+        trend + ' · ' + fmtInt(f.dismissed) + ' dismissed · ' + fmtInt(f.ignored) + ' ignored</span></div>';
     }).join('') + '</div>' +
       '<p class="hint" style="margin:8px 0 0"><b>Accepted</b> is a tap on the card\'s buy button, not a ' +
       'completed purchase — compare it with the subscribe counter, and the difference is the store sheet. ' +
@@ -3253,7 +3419,7 @@
       'and no message, only a count of phones worth asking for a support dump.</p>';
   }
 
-  /* ------------------------------------------------- 5f. tier and build
+  /* ------------------------------------------------- 5g. tier and build
 
      Two fields every route carries, so both of these can be read off any
      counter. `kind` is always named at the call site for that reason: a tier
@@ -3340,7 +3506,60 @@
       emptyText: 'No pings in this range.'
     });
 
+    /* The same bands as SHARES of each day's own total. Counts alone cannot
+       answer "is the release spreading": the stack's height is the day's active
+       count, so a new build can be reaching more phones every day and still
+       draw a narrower band across a quiet weekend. Shares sum to 100% at every
+       day, which makes the climb the only thing moving.
+
+       A day with no ping at all is NULL, not 0 — a gap in the line rather than
+       a day on which nobody ran the new build. */
+    var dayTotals = perDay.map(function (m) {
+      return Object.keys(m).reduce(function (a, v) { return a + (m[v].total || 0); }, 0);
+    });
+    drawChart('pgBuildShare', {
+      x: days.map(labelDay), stacked: true, height: 260, format: fmtPct, xLabel: 'Day',
+      series: versions.map(function (v, i) {
+        return {
+          key: v, name: v === '?' ? 'Not stated' : v,
+          color: v === '?' ? COLOR.muted : BUILD_RING[i % BUILD_RING.length], type: 'area',
+          values: perDay.map(function (m, j) {
+            return dayTotals[j] ? (((m[v] && m[v].total) || 0) / dayTotals[j]) * 100 : null;
+          })
+        };
+      }),
+      emptyText: 'No pings in this range.',
+      tooltipNote: function (i) {
+        return dayTotals[i] ? fmtInt(dayTotals[i]) + ' active' : 'no pings this day';
+      }
+    });
+
+    /* How long the newest build took to get where it is — the one number the
+       share chart is read for, stated rather than eyeballed off the curve.
+       Measured from the first day it appeared at all, and it says "so far"
+       because a release still climbing has no final figure. */
     var newest = versions.filter(function (v) { return v !== '?'; })[0];
+    var firstSeen = null, latestShare = null;
+    if (newest) {
+      perDay.forEach(function (m, j) {
+        if (firstSeen === null && m[newest] && m[newest].total > 0) firstSeen = j;
+      });
+      for (var j = perDay.length - 1; j >= 0; j -= 1) {
+        if (dayTotals[j]) {
+          latestShare = (((perDay[j][newest] && perDay[j][newest].total) || 0) / dayTotals[j]) * 100;
+          break;
+        }
+      }
+    }
+    document.getElementById('pgBuildShareNote').innerHTML = !total || !newest ? '' :
+      '<p class="note" style="margin-top:10px"><b>' + esc(newest) + '</b> is on ' +
+      (latestShare === null ? '—' : fmtPct(latestShare)) + ' of the latest day with pings' +
+      (firstSeen === null ? '' :
+        ' · first seen ' + esc(labelFull(days[firstSeen])) + ', ' +
+        (days.length - firstSeen) + ' day' + (days.length - firstSeen === 1 ? '' : 's') +
+        ' ago so far') +
+      '.</p>';
+
     document.getElementById('pgBuildNote').innerHTML = !total ? '' :
       '<p class="note" style="margin-top:10px">' +
       (newest

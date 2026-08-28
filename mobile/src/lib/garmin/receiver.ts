@@ -99,6 +99,18 @@ function receive(msg: GarminMessage) {
   }
 
   const deviceId = deviceIdRaw;
+  // Which watch took it, stamped the way a strap capture stamps its device
+  // name (Results.tsx) — the reading's Details card and the AI prompts both
+  // read `sourceName` first, and "Venu 4" says more than "Garmin watch". The
+  // payload carries no name, so it is resolved from the linked device list by
+  // the id the message arrived on, falling back to the only linked watch.
+  // Fall back to the linked list only when there is ONE watch on it: with two
+  // linked, guessing would put the wrong watch's name on a reading, which is
+  // worse than the generic "Garmin watch" the Details card falls back to.
+  const named = (deviceId ? devices.find((d) => d.id === deviceId) : undefined)
+    ?? (devices.length === 1 ? devices[0] : undefined);
+  if (named?.name && !mapped.entry.sourceName) mapped.entry.sourceName = named.name;
+
   const existing = getState().days[mapped.dayKey]?.[mapped.section] || [];
   const fresh = !existing.some((e) => e.id === mapped.entry.id);
 

@@ -7,8 +7,8 @@ import React, { useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import * as ExpoLinking from 'expo-linking';
 import { SheetControls, SheetFooter, useSheets } from '../components/Sheet';
-import { FieldInputs, TextField, TimeField, useFormState } from '../components/Field';
-import { Button, ConfirmDeleteSheet, DaySaveButton, Muted } from '../components/ui';
+import { TextField, TimeField } from '../components/Field';
+import { Button, DaySaveButton, Muted } from '../components/ui';
 import { Icon } from '../components/Icon';
 import { ReadingSummary, WorkoutSummary, workoutCurveFor } from '../components/summary';
 import { radius, usePalette } from '../theme';
@@ -20,7 +20,6 @@ import {
 import { typesFor, type TypeKind } from '../lib/typeCatalog';
 import { ManageTypesSheet } from './TypeManager';
 import { LogPickerSheet } from './LogPicker';
-import { computeScores } from '../lib/scoring';
 import { health, healthAppName, healthPermissionPath, openHealthApp } from '../lib/health';
 import { healthSourceFor, workoutCandidates, type HealthCandidate, type HealthSource, type WorkoutCandidate } from '../lib/health/sources';
 import { deleteEntry, getState, storeWaveform, upsertEntry, useAppState } from '../store/store';
@@ -29,20 +28,16 @@ import { defaultTimeFor, fmtTime12, todayKey, uid } from '../lib/dates';
 import { getTier } from '../store/tier';
 import { requestExpandProtocol, scrollJournalToSection } from '../store/nav';
 import { usePaywall } from './Paywall';
-import { defaultPeriod } from '../lib/period';
-import { useToast } from '../components/Toast';
 import { HrvSetup } from './hrv/Setup';
 import { OrthostaticIntroSheet } from './OrthostaticIntro';
 import { DevicesScreen } from './Devices';
 import { StandTestSession } from './pots/StandTestSession';
 import { OrthostaticSession } from './pots/OrthostaticSession';
-
-type ArrKey = 'readings' | 'activities' | 'meds' | 'symptoms';
-
-function scoreCtx() {
-  const p = getState().profile;
-  return { sex: p.sex, height: p.height };
-}
+// Re-exported so `./forms` stays the one import site for entry editing; they
+// live in their own module to keep the capture sheets out of a require cycle.
+import { confirmDelete, EntryForm, type ArrKey } from './EntryForm';
+export { confirmDelete, EntryForm };
+export type { ArrKey };
 
 /** Filterable picker of catalog types; choosing one stacks its form. A fixed
  *  footer lets the user create/manage their own types for this kind. */
@@ -274,72 +269,6 @@ function ReadingPicker({ isToday, potsLocked, onLocked, onLive, onPick }: {
  *  `prefill` seeds a brand-new entry (e.g. a reading imported from Apple Health)
  *  that is reviewed then saved as new — it is not treated as an edit (no Delete)
  *  and, when `fromHealth`, is not re-published back to Health. */
-export function EntryForm({ typeMap, arrKey, dk, type, existing, prefill = null, fromHealth = false, controls, onSaved }: {
-  typeMap: Record<string, TypeDef>; arrKey: ArrKey; dk: string; type: string; existing: Entry | null; prefill?: Entry | null; fromHealth?: boolean; controls: SheetControls;
-  /** Called after a save (with the saved entry) or a delete (with nothing). */
-  onSaved: (saved?: Entry) => void;
-}) {
-  const p = usePalette();
-  const toast = useToast();
-  const def = typeMap[type];
-  const fields = entryFields(def);
-  const initial = existing || prefill || { id: uid(), type, time: defaultTimeFor(dk), note: '' };
-  // New entries with a Morning/Evening/Other tag auto-detect it the same way
-  // live HRV capture does, based on the entry's default time.
-  if (!existing && initial.period == null && fields.some((f) => f.type === 'select' && f.key === 'period')) {
-    const h = parseInt(String(initial.time || ''), 10);
-    initial.period = defaultPeriod(type, dk, Number.isFinite(h) ? h : undefined);
-  }
-  const [form, set] = useFormState(fields, initial);
-
-  const save = () => {
-    const numFields = fields.filter(isNumberField);
-    const anyNum = numFields.some((f) => String(form[f.key!] ?? '').trim() !== '');
-    const anyCheck = fields.filter((f) => f.type === 'check').some((f) => !!form[f.key!]);
-    if (type === 'bp') {
-      if (!String(form.sys || '').trim() && !String(form.dia || '').trim()) return toast('Enter a blood pressure');
-    } else if (numFields.length && !anyNum && !anyCheck) {
-      return toast('Enter a value');
-    }
-    let r: Entry = { ...initial };
-    fields.forEach((f) => {
-      if (isDivider(f) || !f.key) return;
-      if (f.type === 'check') r[f.key] = !!form[f.key];
-      else r[f.key] = String(form[f.key] ?? '').trim();
-    });
-    r.scores = computeScores(r, scoreCtx());
-    // A prefill may carry inline waveform arrays (an imported workout's HR
-    // trace) — those go to the sidecar, never into the journal blob.
-    const { entry: stripped, waveform } = splitWaveform(r);
-    if (waveform) storeWaveform(stripped.id, waveform);
-    r = stripped;
-    upsertEntry(dk, arrKey, r);
-    // Auto-publish freshly-logged readings to the health store (fire-and-forget).
-    // Only new *manual* entries — never re-publish edits or Health-sourced rows.
-    if (arrKey === 'readings' && !existing && !fromHealth && r.note !== 'From Apple Health' && r.note !== 'From Health Connect' && getState().settings.healthEnabled) {
-      const api = health();
-      if (api.available) {
-        api.publishReading(r, dk)
-          .then((n) => { if (n > 0) toast(`Saved to ${healthAppName()}`); })
-          .catch(() => { /* graceful */ });
-      }
-    }
-    controls.closeAll();
-    onSaved(r);
-  };
-
-  return (
-    <View>
-      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 16 }}>{(existing ? 'Edit ' : '') + def.label}</Text>
-      <FieldInputs fields={fields} form={form} set={set} />
-      <SheetFooter>
-        {existing ? <Button title="Delete" variant="danger" onPress={() => { deleteEntry(dk, arrKey, existing.id); controls.closeAll(); onSaved(); }} /> : null}
-        <DaySaveButton dk={dk} title="Save" onPress={save} />
-      </SheetFooter>
-    </View>
-  );
-}
-
 /** Indoor-bike bespoke form (conditional Resistance vs interval list).
  *  `prefill` seeds a brand-new entry (a workout imported from the health
  *  store), mirroring EntryForm — reviewed then saved as new, never an edit. */
@@ -428,6 +357,18 @@ export function BikeForm({ dk, existing, prefill = null, controls, onSaved }: { 
  *     Readings picker's Live HRV action. No tier check: capture is unlimited.
  *   · autonomic://?open=protocol   — scroll to the Progress streak card and
  *     open it expanded (the Protocol widget). */
+/**
+ * The launch URL is answered ONCE per process, not once per mount.
+ *
+ * `getInitialURL()` does not clear: it keeps returning the URL that opened the
+ * app for as long as the process lives. So without this latch every remount of
+ * the Journal replayed it — and a JS reload (Metro `r`) is a remount with the
+ * same process — which is why the Protocol card kept springing open by itself
+ * on a phone whose last launch came from that widget. Live taps are unaffected:
+ * each one arrives as a fresh `url` event.
+ */
+let initialLinkHandled = false;
+
 export function useCaptureDeepLink() {
   const { openSheet } = useSheets();
   React.useEffect(() => {
@@ -443,7 +384,17 @@ export function useCaptureDeepLink() {
       if (q?.capture !== 'hrv') return;
       openSheet((c) => <HrvSetup controls={c} />);
     };
-    void ExpoLinking.getInitialURL().then(handle);
+    if (!initialLinkHandled) {
+      initialLinkHandled = true;
+      // Never on a phone that has not finished the welcome wizard. These links
+      // come from home-screen widgets, which a first-run install does not have,
+      // so a URL sitting there is a leftover from however the app was started
+      // (a dev launch, a relaunch that reused the last URL) and not something
+      // this user did. It was landing the reader on a Journal with the Protocol
+      // card already open before they had logged anything.
+      if (!getState().meta.onboarded && !getState().meta.lastUpdated) return;
+      void ExpoLinking.getInitialURL().then(handle);
+    }
     const sub = ExpoLinking.addEventListener('url', (e) => handle(e.url));
     return () => sub.remove();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -478,27 +429,6 @@ export function openWorkoutReport(openSheet: OpenSheet, r: Entry, dk: string, ju
   });
 }
 
-/**
- * The one delete path for an entry opened as a CARD (a reading summary, a
- * workout report) — the cards whose own header pill carries the trash button.
- * A form has its own Delete in the footer and doesn't come through here.
- *
- * Asks first, in a small `fitContent` card, then deletes and closes the whole
- * stack: the card underneath is a view OF that entry, so leaving it up would
- * show the user something that no longer exists (and `deleteEntry` also records
- * the row in the health-import declined list, so it must not be re-offered
- * either).
- */
-export function confirmDelete(openSheet: OpenSheet, dk: string, arrKey: 'readings' | 'activities', r: Entry, label: string): void {
-  openSheet((c) => (
-    <ConfirmDeleteSheet
-      title={`Delete this ${label.toLowerCase()}?`}
-      message="It will be removed from your journal. This can't be undone."
-      onConfirm={() => { deleteEntry(dk, arrKey, r.id); c.closeAll(); }}
-      controls={c}
-    />
-  ), { fitContent: true });
-}
 
 export function useEntryForms(dk: string) {
   const { openSheet } = useSheets();
@@ -537,6 +467,7 @@ export function useEntryForms(dk: string) {
         <DevicesScreen controls={{
           close: () => { c.close(); if (getState().settings.lastBleDeviceId) open(); },
           closeAll: c.closeAll,
+          setOptions: c.setOptions,
         }} />
       ));
       return;

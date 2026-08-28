@@ -96,10 +96,13 @@
     </button>
 
     <!-- The page refetches itself every 10 minutes while it is on screen and
-         says so out loud when a visitor, a download or a sale arrives. This is
-         the only way to make it stop. -->
-    <button class="btn icon-btn" id="btnAlerts" data-muted="false" aria-pressed="true"
-            title="Alert sounds are on">
+         says so out loud when a visitor, a download or a sale arrives. Cards
+         are dismissed by pressing them, so this is the day's record: pressing
+         Alerts re-raises every card raised today. It is deliberately NOT a
+         mute — see `showToday` in alerts.js. The bell still shows whether
+         sound is on. -->
+    <button class="btn icon-btn" id="btnAlerts" data-muted="false"
+            title="Show today's alerts">
       <svg class="bell-icon on" viewBox="0 0 24 24" aria-hidden="true" fill="none"
            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>
@@ -326,27 +329,52 @@
   <section id="view-ping" class="view hidden">
     <div id="pgStatus"></div>
 
-    <!-- ---------- 1. the 30-second read ---------- -->
+    <!-- ============================ TODAY ============================
+         Everything under this heading is about ONE day: the newest day the
+         counter has rows for. It is first because it is the question the
+         dashboard is opened to answer, and it is separated because a number
+         about today and a number about the last 30 days were previously
+         interleaved in one wall of tiles, where the only thing telling them
+         apart was whether the label happened to end in a date.
+
+         The heading carries the caveat the old "counter data through ..."
+         row existed for, and only when it is true: a day still running is a
+         partial count, and every comparison on this screen would otherwise
+         read it as a fall. -->
     <div class="section-head">
-      <h2 class="section-title">Overview</h2>
-      <span class="section-note" id="pgAsOf"></span>
+      <h2 class="section-title">Today</h2>
+      <span class="section-note" id="pgTodayNote"></span>
     </div>
-    <!-- Two blocks, ONE row: the tiles are written in two passes but must flow
-         as a single wrapping row, or the first block's trailing gap sits above
-         a full block of tiles. `.tile-group` is display:contents. -->
     <div class="grid cards">
-      <div class="tile-group" id="pgTiles"></div>
-      <div class="tile-group" id="pgTilesB"></div>
+      <div class="tile-group" id="pgTilesToday"></div>
     </div>
 
     <!-- Why a filtered slice does not add up. Rendered only when a platform
          filter is in force AND there are pings with no store marker, which is
-         the only case where it is true — and it belongs HERE, beside the
-         numbers it explains, rather than only in the platform card further
-         down where it used to live alone. -->
+         the only case where it is true. -->
     <div id="pgFilterNote"></div>
 
-    <!-- ---------- 2. growth vs. actual usage ---------- -->
+    <div class="card" style="margin-bottom:14px">
+      <header><h2>Who is using it today</h2><span class="spacer"></span>
+        <button class="btn sm" data-table-toggle="pgActiveCohort">Table</button></header>
+      <p class="hint">Today's active installs by how old they are. If this is dominated by the youngest bars, activity is being propped up by acquisition; a long tail means older installs are still showing up. Installs older than the counter are charted here too — their age came in with the ping, only their cohort size is unknown.</p>
+      <div id="pgActiveCohort"></div>
+      <div id="pgActiveCohort-table" class="hidden" style="margin-top:12px"></div>
+      <div id="pgOlderInstalls"></div>
+    </div>
+
+    <!-- ============================ RANGE ============================
+         Everything under this heading is scoped to the date range in the
+         filter bar, and moves when it moves. The tiles come first for the
+         same reason they do above. -->
+    <div class="section-head" style="margin-top:22px">
+      <h2 class="section-title">This range</h2>
+      <span class="section-note" id="pgRangeNote"></span>
+    </div>
+    <div class="grid cards">
+      <div class="tile-group" id="pgTilesRange"></div>
+    </div>
+
     <div class="card" style="margin-bottom:14px">
       <header><h2>Growth &amp; usage</h2><span class="spacer"></span>
         <div class="segmented" id="pgTlMode">
@@ -360,7 +388,145 @@
       <div id="pgTimeline-table" class="hidden" style="margin-top:12px"></div>
     </div>
 
-    <!-- ---------- 3. retention ---------- -->
+    <!-- Which sensor, first and ongoing. The pair reads as one question in
+         two tenses: how people START, and what they KEEP using. -->
+    <div class="grid two-col" style="margin-bottom:14px">
+      <div class="card">
+        <header><h2>How the first reading is taken</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="pgMethods">Table</button></header>
+        <p class="hint">Which sensor the activating reading used. Apple Watch is offered on iPhone only, so its share is a share of iOS and not of everyone — the platform filter above is how to read it honestly. A camera-heavy split says people are activating on the option that needs no hardware, which activates more of them but produces the weakest signal.</p>
+        <div id="pgMethods"></div>
+        <div id="pgMethods-table" class="hidden" style="margin-top:12px"></div>
+        <div id="pgMethodNote"></div>
+      </div>
+      <div class="card">
+        <header><h2>How readings are taken</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="pgReadMethods">Table</button></header>
+        <p class="hint">Which sensor was behind each day's readings, across installs of <em>every</em> age — the ongoing twin of the first-reading split above. Each install counts <b>once per day</b>, under the sensor of that day's first reading, so these are install-days and never a count of readings. Days before the reading counter began naming its sensor are a <b>gap, not an unknown band</b>: those readings had a sensor, the app was simply not sending it.</p>
+        <div id="pgReadMethods"></div>
+        <div id="pgReadMethods-table" class="hidden" style="margin-top:12px"></div>
+        <div id="pgReadMethodNote"></div>
+      </div>
+    </div>
+
+    <div class="grid two-col" style="margin-bottom:14px">
+      <div class="card">
+        <header><h2>Opened vs measured</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="pgMeasureDaily">Table</button></header>
+        <p class="hint">Every day, how many installs opened the app and how many <b>saved an HRV reading</b>. The gap between the two lines is people launching the app without using it, which is the shape that precedes churn and which retention alone cannot see. Both counters fire at most once per install per US Eastern day, so the share underneath is a share of <em>people</em>. Days before the reading counter shipped are a <b>gap in the line, not a zero</b>.</p>
+        <div id="pgMeasureDaily"></div>
+        <div id="pgMeasureDaily-table" class="hidden" style="margin-top:12px"></div>
+        <div id="pgMeasureNote"></div>
+      </div>
+      <div class="card" style="margin-bottom:14px">
+        <header><h2>Started vs completed</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="pgFunnel">Table</button></header>
+        <p class="hint">Readings <b>begun</b> against readings <b>finished</b>, by day. A five-minute reading is a long time to sit still, and a start with no completion is the specific shape of the app asking for something the person could not give it — a strap that would not pair, a pace that was wrong, a session that was too long. Neither counter fires on <em>save</em>: the measurement is the event, and a reading the user discards is still one this app took. Both are capped once per install per Eastern day, so the rate below is over install-days, and the rows split it <b>by sensor</b> — which is the form of the number that implies an action.</p>
+        <div id="pgFunnel"></div>
+        <div id="pgFunnel-table" class="hidden" style="margin-top:12px"></div>
+        <div id="pgFunnelNote"></div>
+      </div>
+    </div>
+
+    <div class="grid two-col" style="margin-bottom:14px">
+      <div class="card">
+        <header><h2>Opened vs paywalled</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="pgPayDaily">Table</button></header>
+        <p class="hint">Every day, how many installs opened the app and how many <b>met the paywall</b>. Capped at one ping per install per Eastern day, exactly like opens and readings, so the share underneath is a share of <em>people</em> and not a count of taps — one frustrated user tapping a locked range four times is one person here. Read it against conversion: a share that climbs while purchases do not is a wall people are bouncing off, not a funnel. Days before the paywall counter shipped are a <b>gap in the line, not a zero</b>.</p>
+        <div id="pgPayDaily"></div>
+        <div id="pgPayDaily-table" class="hidden" style="margin-top:12px"></div>
+        <div id="pgPayNote"></div>
+      </div>
+      <div class="card">
+        <header><h2>Which wall they meet first</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="pgSurfaces">Table</button></header>
+        <p class="hint">Which locked surface raised the card. Because the counter fires once a day, a band is the <b>first</b> wall that install met that day and not every wall it met — so this answers <em>what is the app's front door to Pro</em>, and emphatically not <em>how often is each feature locked</em>. A surface that is always met second is invisible here. <b>Settings</b> is listed apart from the rest because it is not a wall: somebody who opened Settings and tapped Upgrade went looking for the paywall, which is the opposite signal from somebody who walked into it.</p>
+        <div id="pgSurfaces"></div>
+        <div id="pgSurfaces-table" class="hidden" style="margin-top:12px"></div>
+        <div id="pgSurfaceNote"></div>
+      </div>
+    </div>
+
+    <div class="grid two-col" style="margin-bottom:14px">
+      <div class="card">
+        <header><h2>Who is in the app</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="pgTiers">Table</button></header>
+        <p class="hint">Each day's actives split by what the install could do at the moment it pinged: <b>Pro</b>, <b>Trial</b>, or <b>Free</b>. Every route carries the letter, so the same split is available for readings and for paywalls — the rows underneath compare them, and the interesting number is whether the people who measure are the people who pay. Pings from builds too old to name a tier are drawn as <b>not stated</b> and are never folded into Free: not asking is not an answer.</p>
+        <div id="pgTiers"></div>
+        <div id="pgTiers-table" class="hidden" style="margin-top:12px"></div>
+        <div id="pgTierNote"></div>
+      </div>
+      <div class="card">
+        <header><h2>What they are running</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="pgBuilds">Table</button></header>
+        <p class="hint">Active installs by app version — how fast a release actually reaches phones, which is the difference between "shipped" and "fixed". Version is counted against platform and tier but <b>not</b> against the install's age, deliberately: crossing it with the cohort would multiply a table that grows forever. Pings from builds that predate the version field are drawn as <b>not stated</b>, so adoption is a share of everyone rather than a share of the builds that can talk.</p>
+        <div id="pgBuilds"></div>
+        <div id="pgBuilds-table" class="hidden" style="margin-top:12px"></div>
+        <div id="pgBuildNote"></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:14px">
+      <header><h2>How fast a release spreads</h2><span class="spacer"></span>
+        <button class="btn sm" data-table-toggle="pgBuildShare">Table</button></header>
+      <p class="hint">The same versions as a <b>share of each day's actives</b>, so the bands sum to 100% and a release's climb is readable without the day's total getting in the way. This is the adoption curve: a new build's band widening as the ones below it thin out. An OTA update lands within a day or two and shows up as a near-vertical edge; a store release climbs for a week or more. Builds too old to name a version are <b>not stated</b> and stay in the denominator — adoption computed without them is the share of the builds that can talk, which is not a share of anything real. A day with no ping at all is a gap, never a zero.</p>
+      <div id="pgBuildShare"></div>
+      <div id="pgBuildShare-table" class="hidden" style="margin-top:12px"></div>
+      <div id="pgBuildShareNote"></div>
+    </div>
+
+    <div class="grid two-col" style="margin-bottom:14px">
+      <div class="card">
+        <header><h2>Offers</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="pgOffers">Table</button></header>
+        <p class="hint">Each offer <b>shown</b>, and what happened next. <b>Accepted</b> means the card's own buy button was tapped — not that money moved, which is the subscribe counter's question; the gap between the two is the store sheet being abandoned or declining. The third outcome is the common one: an offer that was neither accepted nor dismissed was <b>ignored</b>, and it is counted rather than left implied. The half-off annual card has no ✕ (it expires on its own), so collapsing it is what counts as a dismissal there; the founding-member card's ✕ is permanent.</p>
+        <div id="pgOffers"></div>
+        <div id="pgOffers-table" class="hidden" style="margin-top:12px"></div>
+        <div id="pgOfferNote"></div>
+      </div>
+      <div class="card">
+        <header><h2>What people do in there</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="pgEvents">Table</button></header>
+        <p class="hint">The rest of the counters, per day: the two gated views being <b>opened</b> (every tier — for a free user this is the demand side of the paywall counter, for a paying one it is whether the thing they bought is the thing they use), <b>POTS captures</b> finishing, and <b>notifications being turned on</b>. These routes are capped once per install per day <em>per letter</em> rather than per route, so each line is a headcount for that one thing and somebody who did two of them is counted in both — a stand test and an episode on the same bad day are not one event.</p>
+        <div id="pgEvents"></div>
+        <div id="pgEvents-table" class="hidden" style="margin-top:12px"></div>
+        <div id="pgEventNote"></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:14px">
+      <header><h2>iOS vs Android, day by day</h2><span class="spacer"></span>
+        <button class="btn sm" data-table-toggle="pgPlatforms">Table</button></header>
+      <p class="hint">Active installs each day, split by the store the build runs on. This chart is <b>always unfiltered</b> — it is what the platform filter above is a slice of, so filtering it would leave nothing to compare. Pings from builds that shipped before the platform marker existed carry no store: they are real installs whose store we failed to record, so they are drawn as their own band rather than folded into either one. With a platform filter in force they are counted into <em>both</em> views, because putting them in neither is what made a filtered dashboard read as empty.</p>
+      <div id="pgPlatforms"></div>
+      <div id="pgPlatforms-table" class="hidden" style="margin-top:12px"></div>
+      <div id="pgPlatformNote"></div>
+    </div>
+
+    <div class="card" style="margin-bottom:14px">
+      <header><h2>Weekday pattern</h2><span class="spacer"></span>
+        <button class="btn sm" data-table-toggle="pgWeekday">Table</button></header>
+      <p class="hint">Whether the midweek acquisition peak is real, and whether it is worth anything. Each weekday carries six bars as averages per weekday, so a day with five Mondays in range is not flattered by having more of them: store downloads, first runs, returning activity, <b>readings</b> (which weekday people actually measure on, the number the morning reminder's time should follow), and then the two that matter most — <b>purchases</b> from your own sales ledger and <b>subscribe pings</b> from the app itself. The last two count the same event at different moments (the app only notices a subscription on its next launch), so they should track rather than match, and a persistent gap between them is worth chasing. The table below asks the harder question: do installs born midweek actually <em>retain</em> better, or are they just more numerous?</p>
+      <div id="pgWeekday"></div>
+      <div id="pgWeekday-table" class="hidden" style="margin-top:12px"></div>
+      <div id="pgWeekdayRetention"></div>
+    </div>
+
+    <!-- ========================= ALL INSTALLS =========================
+         The third scope, and the reason the split is not simply two: these
+         cards answer questions about an install's AGE, pooled over every
+         cohort old enough to have reached the day being asked about. They
+         ignore the date range entirely — filing them under "This range"
+         would be a claim they do not make — and they are last because they
+         are the slowest-moving numbers on the page. -->
+    <div class="section-head" style="margin-top:22px">
+      <h2 class="section-title">All installs</h2>
+      <span class="section-note">By install age, pooled over every cohort old enough to count — the date range does not apply</span>
+    </div>
+    <div class="grid cards">
+      <div class="tile-group" id="pgTilesLife"></div>
+    </div>
+
     <div class="grid two-col" style="margin-bottom:14px">
       <div class="card">
         <header><h2>Retention curve</h2><span class="spacer"></span>
@@ -383,7 +549,6 @@
       </div>
     </div>
 
-    <!-- ---------- 4. cohort heatmap ---------- -->
     <div class="card" style="margin-bottom:14px">
       <header><h2>Cohort retention</h2><span class="spacer"></span>
         <div class="segmented" id="pgHeatGrain">
@@ -396,16 +561,7 @@
       <div id="pgCohortDetail"></div>
     </div>
 
-    <!-- ---------- 5. who is actually here ---------- -->
     <div class="grid two-col" style="margin-bottom:14px">
-      <div class="card">
-        <header><h2>Who is using it today</h2><span class="spacer"></span>
-          <button class="btn sm" data-table-toggle="pgActiveCohort">Table</button></header>
-        <p class="hint">Today's active installs by how old they are. If this is dominated by the youngest bars, activity is being propped up by acquisition; a long tail means older installs are still showing up. Installs older than the counter are charted here too — their age came in with the ping, only their cohort size is unknown.</p>
-        <div id="pgActiveCohort"></div>
-        <div id="pgActiveCohort-table" class="hidden" style="margin-top:12px"></div>
-        <div id="pgOlderInstalls"></div>
-      </div>
       <div class="card">
         <header><h2>Purchase timing</h2><span class="spacer"></span>
           <button class="btn sm" data-table-toggle="pgPurchaseAge">Table</button></header>
@@ -419,13 +575,6 @@
         <div id="pgPurchaseRows"></div>
         <div id="pgConversion"></div>
       </div>
-    </div>
-
-    <!-- ---------- 5c. activation ----------
-         The counter's third route. Installing is not using: without a first
-         HRV reading there is no score, no trend and nothing to come back for,
-         so this is the funnel step between "downloaded" and "retained". -->
-    <div class="grid two-col" style="margin-bottom:14px">
       <div class="card">
         <header><h2>Activation</h2><span class="spacer"></span>
           <button class="btn sm" data-table-toggle="pgActivationAge">Table</button></header>
@@ -434,30 +583,9 @@
         <div id="pgActivationAge-table" class="hidden" style="margin-top:12px"></div>
         <div id="pgActivationRates"></div>
       </div>
-      <div class="card">
-        <header><h2>How the first reading is taken</h2><span class="spacer"></span>
-          <button class="btn sm" data-table-toggle="pgMethods">Table</button></header>
-        <p class="hint">Which sensor the activating reading used. Apple Watch is offered on iPhone only, so its share is a share of iOS and not of everyone — the platform filter above is how to read it honestly. A camera-heavy split says people are activating on the option that needs no hardware, which activates more of them but produces the weakest signal.</p>
-        <div id="pgMethods"></div>
-        <div id="pgMethods-table" class="hidden" style="margin-top:12px"></div>
-        <div id="pgMethodNote"></div>
-      </div>
     </div>
 
-    <!-- ---------- 5d. measuring ----------
-         The counter's fourth route. Opening the app is not using it: a journal
-         app can be launched every morning to look at yesterday's number and
-         never gain a new one. Both counters are one per install per Eastern
-         day, so their ratio is a share of people. -->
     <div class="grid two-col" style="margin-bottom:14px">
-      <div class="card">
-        <header><h2>Opened vs measured</h2><span class="spacer"></span>
-          <button class="btn sm" data-table-toggle="pgMeasureDaily">Table</button></header>
-        <p class="hint">Every day, how many installs opened the app and how many <b>saved an HRV reading</b>. The gap between the two lines is people launching the app without using it, which is the shape that precedes churn and which retention alone cannot see. Both counters fire at most once per install per US Eastern day, so the share underneath is a share of <em>people</em>. Days before the reading counter shipped are a <b>gap in the line, not a zero</b>.</p>
-        <div id="pgMeasureDaily"></div>
-        <div id="pgMeasureDaily-table" class="hidden" style="margin-top:12px"></div>
-        <div id="pgMeasureNote"></div>
-      </div>
       <div class="card">
         <header><h2>The habit curve</h2><span class="spacer"></span>
           <button class="btn sm" data-table-toggle="pgMeasureCurve">Table</button></header>
@@ -465,101 +593,6 @@
         <div id="pgMeasureCurve"></div>
         <div id="pgMeasureCurve-table" class="hidden" style="margin-top:12px"></div>
         <div id="pgMeasureRates"></div>
-      </div>
-    </div>
-
-    <!-- ---------- 5d2. the capture funnel ----------
-         Two counters, started and completed, and the gap between them is the
-         only place an abandoned reading is visible at all. -->
-    <div class="card" style="margin-bottom:14px">
-      <header><h2>Started vs completed</h2><span class="spacer"></span>
-        <button class="btn sm" data-table-toggle="pgFunnel">Table</button></header>
-      <p class="hint">Readings <b>begun</b> against readings <b>finished</b>, by day. A five-minute reading is a long time to sit still, and a start with no completion is the specific shape of the app asking for something the person could not give it — a strap that would not pair, a pace that was wrong, a session that was too long. Neither counter fires on <em>save</em>: the measurement is the event, and a reading the user discards is still one this app took. Both are capped once per install per Eastern day, so the rate below is over install-days, and the rows split it <b>by sensor</b> — which is the form of the number that implies an action.</p>
-      <div id="pgFunnel"></div>
-      <div id="pgFunnel-table" class="hidden" style="margin-top:12px"></div>
-      <div id="pgFunnelNote"></div>
-    </div>
-
-    <!-- ---------- 5e. the paywall ----------
-         The counter's fifth route, and the only one that is not about a
-         measurement. Capped once per install per Eastern day like the two
-         above, so it counts PEOPLE who met a wall and not taps on it. -->
-    <div class="grid two-col" style="margin-bottom:14px">
-      <div class="card">
-        <header><h2>Opened vs paywalled</h2><span class="spacer"></span>
-          <button class="btn sm" data-table-toggle="pgPayDaily">Table</button></header>
-        <p class="hint">Every day, how many installs opened the app and how many <b>met the paywall</b>. Capped at one ping per install per Eastern day, exactly like opens and readings, so the share underneath is a share of <em>people</em> and not a count of taps — one frustrated user tapping a locked range four times is one person here. Read it against conversion: a share that climbs while purchases do not is a wall people are bouncing off, not a funnel. Days before the paywall counter shipped are a <b>gap in the line, not a zero</b>.</p>
-        <div id="pgPayDaily"></div>
-        <div id="pgPayDaily-table" class="hidden" style="margin-top:12px"></div>
-        <div id="pgPayNote"></div>
-      </div>
-      <div class="card">
-        <header><h2>Which wall they meet first</h2><span class="spacer"></span>
-          <button class="btn sm" data-table-toggle="pgSurfaces">Table</button></header>
-        <p class="hint">Which locked surface raised the card. Because the counter fires once a day, a band is the <b>first</b> wall that install met that day and not every wall it met — so this answers <em>what is the app's front door to Pro</em>, and emphatically not <em>how often is each feature locked</em>. A surface that is always met second is invisible here. <b>Settings</b> is listed apart from the rest because it is not a wall: somebody who opened Settings and tapped Upgrade went looking for the paywall, which is the opposite signal from somebody who walked into it.</p>
-        <div id="pgSurfaces"></div>
-        <div id="pgSurfaces-table" class="hidden" style="margin-top:12px"></div>
-        <div id="pgSurfaceNote"></div>
-      </div>
-    </div>
-
-    <!-- ---------- 5f. tier and build ----------
-         Two fields every route now carries, which is what turns each counter
-         above from one number into a number per population. -->
-    <div class="grid two-col" style="margin-bottom:14px">
-      <div class="card">
-        <header><h2>Who is in the app</h2><span class="spacer"></span>
-          <button class="btn sm" data-table-toggle="pgTiers">Table</button></header>
-        <p class="hint">Each day's actives split by what the install could do at the moment it pinged: <b>Pro</b>, <b>Trial</b>, or <b>Free</b>. Every route carries the letter, so the same split is available for readings and for paywalls — the rows underneath compare them, and the interesting number is whether the people who measure are the people who pay. Pings from builds too old to name a tier are drawn as <b>not stated</b> and are never folded into Free: not asking is not an answer.</p>
-        <div id="pgTiers"></div>
-        <div id="pgTiers-table" class="hidden" style="margin-top:12px"></div>
-        <div id="pgTierNote"></div>
-      </div>
-      <div class="card">
-        <header><h2>What they are running</h2><span class="spacer"></span>
-          <button class="btn sm" data-table-toggle="pgBuilds">Table</button></header>
-        <p class="hint">Active installs by app version — how fast a release actually reaches phones, which is the difference between "shipped" and "fixed". Version is counted against platform and tier but <b>not</b> against the install's age, deliberately: crossing it with the cohort would multiply a table that grows forever. Pings from builds that predate the version field are drawn as <b>not stated</b>, so adoption is a share of everyone rather than a share of the builds that can talk.</p>
-        <div id="pgBuilds"></div>
-        <div id="pgBuilds-table" class="hidden" style="margin-top:12px"></div>
-        <div id="pgBuildNote"></div>
-      </div>
-    </div>
-
-    <!-- ---------- 5g. offers and product events ---------- -->
-    <div class="grid two-col" style="margin-bottom:14px">
-      <div class="card">
-        <header><h2>Offers</h2><span class="spacer"></span>
-          <button class="btn sm" data-table-toggle="pgOffers">Table</button></header>
-        <p class="hint">Each offer <b>shown</b>, and what happened next. <b>Accepted</b> means the card's own buy button was tapped — not that money moved, which is the subscribe counter's question; the gap between the two is the store sheet being abandoned or declining. The third outcome is the common one: an offer that was neither accepted nor dismissed was <b>ignored</b>, and it is counted rather than left implied. The half-off annual card has no ✕ (it expires on its own), so collapsing it is what counts as a dismissal there; the founding-member card's ✕ is permanent.</p>
-        <div id="pgOffers"></div>
-        <div id="pgOffers-table" class="hidden" style="margin-top:12px"></div>
-        <div id="pgOfferNote"></div>
-      </div>
-      <div class="card">
-        <header><h2>What people do in there</h2><span class="spacer"></span>
-          <button class="btn sm" data-table-toggle="pgEvents">Table</button></header>
-        <p class="hint">The rest of the counters, per day: the two gated views being <b>opened</b> (every tier — for a free user this is the demand side of the paywall counter, for a paying one it is whether the thing they bought is the thing they use), <b>POTS captures</b> finishing, and <b>notifications being turned on</b>. These routes are capped once per install per day <em>per letter</em> rather than per route, so each line is a headcount for that one thing and somebody who did two of them is counted in both — a stand test and an episode on the same bad day are not one event.</p>
-        <div id="pgEvents"></div>
-        <div id="pgEvents-table" class="hidden" style="margin-top:12px"></div>
-        <div id="pgEventNote"></div>
-      </div>
-    </div>
-
-    <!-- ---------- 5e. which sensor, on every reading ----------
-         "How the first reading is taken" (5c) answers how people START. These
-         two answer what they KEEP using, which is a different question and the
-         one that says whether a sensor is holding anybody. There is no
-         identifier on the ping endpoint, so the two routes cannot be joined per
-         person: comparing their two MIXES is what is available, and the second
-         card here is that comparison laid out by install age. -->
-    <div class="grid two-col" style="margin-bottom:14px">
-      <div class="card">
-        <header><h2>How readings are taken</h2><span class="spacer"></span>
-          <button class="btn sm" data-table-toggle="pgReadMethods">Table</button></header>
-        <p class="hint">Which sensor was behind each day's readings, across installs of <em>every</em> age — the ongoing twin of the first-reading split above. Each install counts <b>once per day</b>, under the sensor of that day's first reading, so these are install-days and never a count of readings. Days before the reading counter began naming its sensor are a <b>gap, not an unknown band</b>: those readings had a sensor, the app was simply not sending it.</p>
-        <div id="pgReadMethods"></div>
-        <div id="pgReadMethods-table" class="hidden" style="margin-top:12px"></div>
-        <div id="pgReadMethodNote"></div>
       </div>
       <div class="card">
         <header><h2>Does the sensor mix change with age?</h2><span class="spacer"></span>
@@ -569,26 +602,6 @@
         <div id="pgReadMethodAge-table" class="hidden" style="margin-top:12px"></div>
         <div id="pgReadMethodAgeNote"></div>
       </div>
-    </div>
-
-    <!-- ---------- 5b. which store ---------- -->
-    <div class="card" style="margin-bottom:14px">
-      <header><h2>iOS vs Android, day by day</h2><span class="spacer"></span>
-        <button class="btn sm" data-table-toggle="pgPlatforms">Table</button></header>
-      <p class="hint">Active installs each day, split by the store the build runs on. This chart is <b>always unfiltered</b> — it is what the platform filter above is a slice of, so filtering it would leave nothing to compare. Pings from builds that shipped before the platform marker existed carry no store: they are real installs whose store we failed to record, so they are drawn as their own band rather than folded into either one. With a platform filter in force they are counted into <em>both</em> views, because putting them in neither is what made a filtered dashboard read as empty.</p>
-      <div id="pgPlatforms"></div>
-      <div id="pgPlatforms-table" class="hidden" style="margin-top:12px"></div>
-      <div id="pgPlatformNote"></div>
-    </div>
-
-    <!-- ---------- 6. weekday shape ---------- -->
-    <div class="card" style="margin-bottom:14px">
-      <header><h2>Weekday pattern</h2><span class="spacer"></span>
-        <button class="btn sm" data-table-toggle="pgWeekday">Table</button></header>
-      <p class="hint">Whether the midweek acquisition peak is real, and whether it is worth anything. Each weekday carries six bars as averages per weekday, so a day with five Mondays in range is not flattered by having more of them: store downloads, first runs, returning activity, <b>readings</b> (which weekday people actually measure on, the number the morning reminder's time should follow), and then the two that matter most — <b>purchases</b> from your own sales ledger and <b>subscribe pings</b> from the app itself. The last two count the same event at different moments (the app only notices a subscription on its next launch), so they should track rather than match, and a persistent gap between them is worth chasing. The table below asks the harder question: do installs born midweek actually <em>retain</em> better, or are they just more numerous?</p>
-      <div id="pgWeekday"></div>
-      <div id="pgWeekday-table" class="hidden" style="margin-top:12px"></div>
-      <div id="pgWeekdayRetention"></div>
     </div>
 
   </section>

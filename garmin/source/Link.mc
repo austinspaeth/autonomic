@@ -72,7 +72,7 @@ class Link extends Communications.ConnectionListener {
     function pending() { return outbox().size(); }
 
     // Queue a payload and try to send it. `payload` must already carry its
-    // `type` (standTest / orthostatic / symptom / hrv) and `id`.
+    // `type` (hrv) and `id`.
     function enqueue(payload) {
         var q = outbox();
         q.add(payload);

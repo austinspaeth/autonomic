@@ -17,7 +17,6 @@ module Theme {
     const BLUE     = 0x4aa3f0;
     const AMBER    = 0xe0a030;   // caution delta
     const GREEN    = 0x3ec46d;   // healthy delta
-    const PURPLE   = 0x9d6bf5;   // orthostatic events
     const CARD     = 0x161618;
     const TILE     = 0x131315;
     const DIM      = 0x8a8a92;
@@ -99,7 +98,7 @@ module Theme {
         dc.drawText(x + 1, y, font, text, justify);
     }
 
-    // Circular progress ring, used by the stand test's stage timer. Drawn with
+    // Circular progress ring, used by the completion badge's halo. Drawn with
     // arcs rather than a bitmap so it costs no resource memory.
     function ring(dc, cx, cy, radius, thickness, fraction, track, color) {
         dc.setPenWidth(thickness);
@@ -168,43 +167,6 @@ module Theme {
         dc.drawLine(cx - r * 0.2, cy - r * 0.75, cx + r * 0.1, cy + r * 0.7);
         dc.drawLine(cx + r * 0.1, cy + r * 0.7, cx + r * 0.35, cy);
         dc.drawLine(cx + r * 0.35, cy, cx + r, cy);
-        dc.setPenWidth(1);
-    }
-
-    // An upward arrow, for the "stand up" prompt. Straight strokes, so no
-    // bitmap is needed.
-    function arrowUp(dc, cx, cy, r, color) {
-        dc.setColor(color, Graphics.COLOR_TRANSPARENT);
-        dc.setPenWidth(5);
-        dc.drawLine(cx, cy + r, cx, cy - r);
-        dc.drawLine(cx, cy - r, cx - r * 0.62, cy - r * 0.34);
-        dc.drawLine(cx, cy - r, cx + r * 0.62, cy - r * 0.34);
-        dc.setPenWidth(1);
-    }
-
-    function personStanding(dc, cx, cy, r, color) {
-        dc.setColor(color, Graphics.COLOR_TRANSPARENT);
-        dc.fillCircle(cx, cy - r * 0.62, r * 0.26);
-        dc.setPenWidth(3);
-        dc.drawLine(cx, cy - r * 0.3, cx, cy + r * 0.22);      // torso
-        dc.drawLine(cx - r * 0.55, cy - r * 0.1, cx + r * 0.55, cy - r * 0.1); // arms
-        dc.drawLine(cx, cy + r * 0.22, cx - r * 0.38, cy + r * 0.9);  // legs
-        dc.drawLine(cx, cy + r * 0.22, cx + r * 0.38, cy + r * 0.9);
-        dc.setPenWidth(1);
-    }
-
-    function stairs(dc, cx, cy, r, color) {
-        dc.setColor(color, Graphics.COLOR_TRANSPARENT);
-        dc.setPenWidth(3);
-        var x = cx - r * 0.85;
-        var y = cy + r * 0.75;
-        var step = r * 0.56;
-        for (var i = 0; i < 3; i = i + 1) {
-            dc.drawLine(x, y, x + step, y);            // tread
-            dc.drawLine(x + step, y, x + step, y - step); // riser
-            x = x + step;
-            y = y - step;
-        }
         dc.setPenWidth(1);
     }
 

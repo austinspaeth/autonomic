@@ -33,6 +33,8 @@ import {
   type ReportRange,
 } from '../../lib/analysis/reports';
 import { PromptSheet } from '../PromptSheet';
+import { usePaywall } from '../Paywall';
+import { useTier } from '../../store/tier';
 
 /* ---------- pill chrome, matched to HealthUpdates / WhatsNew ---------- */
 
@@ -73,6 +75,19 @@ export function AskAiPill() {
   // the sliver is a mis-tap, not an intent.
   const buried = depth > 0;
 
+  // Locked is not hidden. The AI reports are Pro, and the app's rule for a Pro
+  // surface is that the user meets it and the paywall answers the tap — the same
+  // shape `CorrelationsAiButton` has three cards down this screen. Hiding the
+  // pill from free users instead meant the one permanent piece of furniture on
+  // this tab appeared out of nowhere on the day they subscribed, and nothing on
+  // the tab ever said the reports existed.
+  const tier = useTier();
+  const openPaywall = usePaywall('insights-ai');
+  const open = () => {
+    if (tier === 'free') { openPaywall(); return; }
+    openSheet((c) => <AiReportsSheet controls={c} />, { fitContent: true });
+  };
+
   return (
     <Animated.View pointerEvents="box-none" style={[styles.wrap, { bottom: insets.bottom + 88 }, style]}>
       {/* Shadow OUTSIDE, clipping inside. A shadow and `overflow: hidden` on the same
@@ -83,7 +98,7 @@ export function AskAiPill() {
       <View style={styles.shadow}>
         <View style={styles.pill}>
           <Pressable
-            onPress={buried ? undefined : () => openSheet((c) => <AiReportsSheet controls={c} />, { fitContent: true })}
+            onPress={buried ? undefined : open}
             accessibilityRole="button"
             accessibilityLabel={ASK_AI_LABEL}
           >

@@ -332,9 +332,19 @@ old web app so old `export.json` files import directly.
   Reactive only: `usePaywall()` is raised by tapping a locked thing, never on
   launch (`SubscriptionGate` is long gone).
 - **The app raises exactly TWO offers on its own initiative, and each owns its
-  own rules.** `src/lib/upsell/` holds only `annual.ts` + `annualMemory.ts` and
-  `founder.ts` + `founderMemory.ts` (each a pure module plus its flags-MMKV
-  shell). There is deliberately no generic surface engine: `eligibility.ts` /
+  own rules.** `src/lib/upsell/` holds only `annual.ts` + `annualMemory.ts`,
+  `founder.ts` + `founderMemory.ts` and the one thing they SHARE,
+  `pacing.ts` + `pacingMemory.ts` (each a pure module plus its flags-MMKV
+  shell). **The two offers share ONE cool-down clock**: an offer may only be
+  RAISED when nothing else has been raised in the last 7 days, whichever opens
+  first stamps it, and a blocked offer is DEFERRED, never spent. That gate is on
+  STARTING only — a window already claimed (the annual card's live 24 hours, the
+  founder card's claimed day) renders from its own memory, or the clock it set
+  would retire it a frame after it appeared. It exists because the two were not
+  in fact independent: the annual card's 24h unlock reports `'trial'`, which is
+  exactly the state the founder card waits for, so opening the half-price year
+  made "join us early" due underneath it. A phone that raised an offer before
+  this shipped has its clock backfilled once from the two offer memories. There is deliberately no generic surface engine: `eligibility.ts` /
   `index.ts` (`nextUpsell`, a rotating six-surface rota with a shared pacing
   clock, retirement counters and a `lastUpsellSurface` diagnostics row) was built
   and never wired to anything — four of its six surfaces were permanent TODOs,
@@ -752,8 +762,9 @@ old web app so old `export.json` files import directly.
   reuses `engagedDayCount`, so a health-store backfill is not five days of use)
   and ONLY while the install trial is still running — day six of a fourteen-day
   trial is a user who has just been convinced, where the annual card above is
-  aimed at one whose access lapsed months ago, which is why the two can never be
-  due on the same day and why this one grants no extra unlock. The day it claims
+  aimed at one whose access lapsed months ago, which is why this one grants no
+  extra unlock (the shared 7-day clock above is what keeps the two off the
+  screen together). The day it claims
   is its whole life: `shownDk` is stamped once, the card renders only while
   `shownDk === todayKey()`, and the ✕ sets `dismissed` permanently (there is no
   second grey "No thanks" — one card, one way to say no). Because of that single
