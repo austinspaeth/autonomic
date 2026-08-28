@@ -32,6 +32,10 @@ type OpenSheet = ReturnType<typeof useSheets>['openSheet'];
 // runs underneath it.
 const CLOSE_CLEARANCE = 58;
 
+/** How long to wait for Garmin Connect's device-selection callback before
+ *  telling the user nothing came back. Covers the app switch out and in. */
+const PICK_TIMEOUT_MS = 6000;
+
 /** The platform whose health store a reading would land in. */
 export const watchPlatform = (): WatchPlatform => (Platform.OS === 'android' ? 'android' : 'ios');
 
@@ -227,6 +231,13 @@ export function WatchBrandSetup({ brand, controls, onLinked }: { brand: WatchBra
   // this up on an earlier visit (a positive there is trustworthy; only its
   // negatives are not).
   const [appSent, setAppSent] = useState(false);
+  // Garmin Connect returning EMPTY is indistinguishable from it never having
+  // been asked: the app backgrounds, comes straight back, and nothing changes.
+  // It is the normal outcome for a watch that is not paired over there yet, so
+  // it has to be SAID — the sheet stack sits in a Modal above the toast layer,
+  // which is why this is state rendered inside the card rather than a toast.
+  const [pickedNothing, setPickedNothing] = useState(false);
+  const pickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const finish = useCallback(() => {
     const d = garminDevices()[0];
     controls.close();
@@ -239,6 +250,12 @@ export function WatchBrandSetup({ brand, controls, onLinked }: { brand: WatchBra
 
   useEffect(() => subscribeGarminDevices((list) => {
     setLinked(list.length > 0);
+    if (list.length) {
+      // The answer landed (it arrives through Garmin Connect's URL callback,
+      // well after the button's own promise resolved), so retire the wait.
+      if (pickTimer.current) { clearTimeout(pickTimer.current); pickTimer.current = null; }
+      setPickedNothing(false);
+    }
     // Choosing a watch no longer closes the card: the next thing to do (install
     // the watch app) is a step further down THIS list, and closing would drop
     // the user back a card away from it. The card closes when the whole brand
@@ -268,8 +285,18 @@ export function WatchBrandSetup({ brand, controls, onLinked }: { brand: WatchBra
 
   const pickDevice = () => {
     asked.current = true;
+    setPickedNothing(false);
+    if (pickTimer.current) clearTimeout(pickTimer.current);
     void pickGarminDevice();
+    // Nothing to await: on iOS the chosen device arrives later through the URL
+    // callback, and an empty return sends no callback at all. So the failure is
+    // a TIMEOUT — long enough to cover the hop out to Garmin Connect and back.
+    pickTimer.current = setTimeout(() => {
+      pickTimer.current = null;
+      if (!garminDevices().length) setPickedNothing(true);
+    }, PICK_TIMEOUT_MS);
   };
+  useEffect(() => () => { if (pickTimer.current) clearTimeout(pickTimer.current); }, []);
 
   const openApp = () => {
     const store = brand.store[watchPlatform()];
@@ -324,12 +351,39 @@ export function WatchBrandSetup({ brand, controls, onLinked }: { brand: WatchBra
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={{ color: p.text, fontWeight: '700' }}>{s.title}</Text>
+                  {/* The prerequisite, above the body: it has to be read BEFORE
+                      the button, so it cannot sit under the paragraph that
+                      explains what the button does. */}
+                  {s.note ? (
+                    <Text style={{ color: CAUTION_GOLD, fontSize: 12, lineHeight: 17, fontWeight: '700', marginTop: 4 }}>{s.note}</Text>
+                  ) : null}
                   <Text style={{ color: p.textDim, fontSize: 12, lineHeight: 17, marginTop: 4 }}>{s.sub}</Text>
                 </View>
               </View>
               {action ? (
                 <View style={{ flexDirection: 'row', marginTop: 12 }}>
                   <Button title={action.title} variant="primary" disabled={action.disabled} onPress={action.onPress} />
+                </View>
+              ) : null}
+              {/* Only under the step that asked. Says what happened and what to
+                  do about it, because "it came straight back" is otherwise
+                  indistinguishable from the button doing nothing. */}
+              {s.action === 'pickDevice' && pickedNothing && !linked ? (
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 10, padding: 11, borderRadius: radius.control, backgroundColor: CAUTION_GOLD_SOFT }}>
+                  <Icon name="alert" size={14} color={CAUTION_GOLD} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: CAUTION_GOLD, fontSize: 12, lineHeight: 17 }}>
+                      {`Garmin Connect came back without a watch. Pair your ${brand.name} there, then tap the button again.`}
+                    </Text>
+                    {/* The next move, one tap away rather than described. Same
+                        handler the health-store route uses, so a phone without
+                        the app still lands in its store page. */}
+                    <Pressable onPress={openApp} hitSlop={8} accessibilityRole="button">
+                      <Text style={{ color: CAUTION_GOLD, fontSize: 12, lineHeight: 17, fontWeight: '800', marginTop: 6 }}>
+                        {`Open ${brand.app}`}
+                      </Text>
+                    </Pressable>
+                  </View>
                 </View>
               ) : null}
             </View>

@@ -104,6 +104,11 @@ export type WatchStepAction = 'pickDevice' | 'getApp' | 'finish';
 export interface WatchStep {
   title: string;
   sub: string;
+  /** A prerequisite the user must satisfy BEFORE the step's button, called out
+   *  above the body text rather than buried in it. Connect IQ's device picker
+   *  only offers watches Garmin Connect has already paired, so tapping it too
+   *  early returns nothing and looks broken. */
+  note?: string;
   action?: WatchStepAction;
 }
 
@@ -122,7 +127,13 @@ const BRANDS: WatchBrand[] = [
         // own: nobody owns a Garmin without Garmin Connect, so it is a check
         // before the tap, not a task. The Connect IQ store lives inside that
         // app too, which is why step 2 can assume it.
-        sub: 'Garmin Connect needs to be installed on this phone with your watch paired to it. Then the button below hands you to Garmin Connect to pick the watch, and comes straight back here.',
+        //
+        // It is a `note` rather than the first line of `sub` because it is not
+        // background, it is a gate: Garmin's picker lists only what Garmin
+        // Connect has already paired, so tapping the button first sends you
+        // there and straight back with nothing, and the card looks broken.
+        note: 'Pair your watch in Garmin Connect before tapping this.',
+        sub: 'The button hands you to Garmin Connect to pick the watch, then comes straight back here. With nothing paired there it comes back empty.',
         action: 'pickDevice',
       },
       {
