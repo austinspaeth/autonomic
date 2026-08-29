@@ -125,6 +125,19 @@ parts to know:
 * **Both keys are written** — `download/<slug>/index.html` and the extensionless
   `download/<slug>` — because the distribution's directory handling is
   out-of-band configuration this repo does not own.
+* **The page measures itself, and waits for the send before it leaves.** A
+  campaign page inherits nothing from the site's build, so it carries its own
+  copy of the GA tag and of the `aj-cookie-consent` opt-out (same origin, so a
+  visitor who blocked tracking on the site is redirected immediately with
+  nothing sent). The wait is the load-bearing part: `location.replace` aborts
+  the document load along with the still-loading tag, so a redirect page that
+  fires and goes records nothing at all and a printed campaign reads as though
+  nobody ever scanned it. It fires `app_store_redirect` / `play_store_redirect`
+  / `site_redirect` plus a pooled `download_redirect` carrying `platform`,
+  `destination` and the campaign slug, then goes on gtag's `event_callback` —
+  capped at one second, because a blocked tag never calls back and a signpost
+  must never become a dead end. `/download` implements the same contract from
+  the shell's tag; the two must agree or GA splits every report in two.
 * **Publishing runs after the row is stored and is allowed to throw.** The
   dashboard's push retries with backoff and only adopts its snapshot on success,
   so a transient S3 failure re-publishes on the next attempt rather than leaving

@@ -107,6 +107,62 @@ const escapeHtml = (s) => String(s)
    a Vite build. It is a logo, and it does not move. */
 const BRAND_POLYLINE = '41,266 179,266 200,225 220,307 246,92 272,420 297,240 317,266 471,266';
 
+/* --------------------------------------------------------------- analytics */
+
+/**
+ * A campaign page is a page of autonomic.care that the site's build never sees,
+ * so it inherits NOTHING from `landing/src/app.html` — not the GA tag, and not
+ * the cookie choice that governs it. Both are therefore written into the object
+ * itself, and both must keep matching the shell.
+ *
+ * Duplicated for the same reason `BRAND_POLYLINE` above is: this file runs in
+ * Lambda, `app.html` is a Vite build artifact, and there is no import between
+ * them. The measurement id is public either way — it ships in the shell of
+ * every page of the site.
+ *
+ * KEEP IN SYNC WITH `landing/src/app.html`:
+ *   - the measurement id
+ *   - the consent key `aj-cookie-consent` and the meaning of `'blocked'`
+ * and with the redirect-event contract documented on `REDIRECT_MAX_WAIT_MS` in
+ * `landing/src/lib/site.ts`, which `/download` itself implements.
+ *
+ * There is deliberately no cookie banner here. The page is gone inside a
+ * second, so a banner could not be read, let alone answered — but a choice
+ * already made on the site is same-origin, and IS honoured: a visitor who
+ * blocked tracking is redirected immediately with nothing sent at all.
+ */
+const GA_MEASUREMENT_ID = 'G-3R3E75CLGQ';
+
+/** Capped wait before redirecting, so a blocked tag can never strand a visitor. */
+const REDIRECT_MAX_WAIT_MS = 1000;
+
+const REDIRECT_EVENT = 'download_redirect';
+
+/**
+ * The three ways out, in the shape the page's script reads them.
+ *
+ * Keyed by the field name `destinations()` uses (`web` is this module's word
+ * for "not a phone"), but the `platform` VALUE is `desktop`, because that is
+ * what `/download` reports and the two pages have to land in the same GA
+ * bucket. A campaign page that said `web` would quietly split every report in
+ * two, and nothing would look broken.
+ */
+const REDIRECT_PLAN = {
+  ios: { platform: 'ios', destination: 'app_store', event: 'app_store_redirect' },
+  android: { platform: 'android', destination: 'play_store', event: 'play_store_redirect' },
+  web: { platform: 'desktop', destination: 'site', event: 'site_redirect' },
+};
+
+/** What the published page's sniffer decides between, destinations resolved. */
+const redirectPlan = (link) => {
+  const d = destinations(link);
+  const out = {};
+  Object.keys(REDIRECT_PLAN).forEach((key) => {
+    out[key] = Object.assign({ dest: d[key] }, REDIRECT_PLAN[key]);
+  });
+  return out;
+};
+
 /**
  * The finished page. Deliberately the same object the SvelteKit `/download`
  * page is — same sniff, same fallback links, same styling — because a visitor
@@ -116,9 +172,18 @@ const BRAND_POLYLINE = '41,266 179,266 200,225 220,307 246,92 272,420 297,240 31
  *
  * `location.replace`, not `href`: this page is a signpost, and Back from the
  * store should return to wherever the link was clicked, not to the signpost.
+ *
+ * It also MEASURES ITSELF, which a page written outside the build has to do
+ * from scratch — see the `GA_MEASUREMENT_ID` block above. The tag goes in the
+ * head so the page_view is queued before anything else runs, and the sniffer
+ * announces which way it went and waits for the send before replacing the
+ * location. Without that wait nothing is ever recorded: `location.replace`
+ * aborts the document load, taking the still-loading tag with it, and the
+ * campaign printed on a flyer reads as though it were never scanned.
  */
 const renderLinkPage = (link) => {
   const d = destinations(link);
+  const plan = redirectPlan(link);
   const title = link.label ? `${link.label} — Autonomic` : 'Download Autonomic';
   return `<!doctype html>
 <html lang="en">
@@ -127,6 +192,22 @@ const renderLinkPage = (link) => {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>${escapeHtml(title)}</title>
+<script>
+window.dataLayer = window.dataLayer || [];
+function _ajBlocked() {
+  if (window.location.hostname === 'localhost') return true;
+  try { return localStorage.getItem('aj-cookie-consent') === 'blocked'; } catch (e) { return true; }
+}
+function gtag(){ if (!_ajBlocked()) dataLayer.push(arguments); }
+if (!_ajBlocked()) {
+  var _ajs = document.createElement('script');
+  _ajs.async = true;
+  _ajs.src = 'https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}';
+  document.head.appendChild(_ajs);
+  gtag('js', new Date());
+  gtag('config', ${JSON.stringify(GA_MEASUREMENT_ID)});
+}
+</script>
 <style>
 body{margin:0;background:#050506;color:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Helvetica,Arial,sans-serif}
 main{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:32px 24px;box-sizing:border-box;text-align:center}
@@ -154,15 +235,48 @@ p{margin:0;font-size:15px;color:#a1a1aa}
 (function () {
   'use strict';
   var ua = navigator.userAgent || '';
-  var dest = ${JSON.stringify(d.web)};
+  var to = ${JSON.stringify(plan.web)};
   if (/android/i.test(ua)) {
-    dest = ${JSON.stringify(d.android)};
+    to = ${JSON.stringify(plan.android)};
   } else if (/iphone|ipad|ipod/i.test(ua)) {
-    dest = ${JSON.stringify(d.ios)};
+    to = ${JSON.stringify(plan.ios)};
   } else if (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) {
-    dest = ${JSON.stringify(d.ios)};
+    to = ${JSON.stringify(plan.ios)};
   }
-  window.location.replace(dest);
+
+  // The callback and the cap race on purpose; whichever wins, the page leaves
+  // exactly once.
+  var gone = false;
+  function go() {
+    if (gone) return;
+    gone = true;
+    window.location.replace(to.dest);
+  }
+
+  // Tracking blocked on this origin: leave now, send nothing.
+  if (_ajBlocked()) { go(); return; }
+
+  // A fresh object per event — gtag holds what it was handed until its library
+  // flushes, so one shared literal would put the callback on both.
+  function params(extra) {
+    var p = {
+      platform: to.platform,
+      destination: to.destination,
+      campaign: ${JSON.stringify(link.slug)},
+      location: ${JSON.stringify(`/download/${link.slug}`)},
+      page_type: 'download'
+    };
+    if (extra) { for (var k in extra) { if (extra.hasOwnProperty(k)) p[k] = extra[k]; } }
+    return p;
+  }
+
+  setTimeout(go, ${REDIRECT_MAX_WAIT_MS});
+  gtag('event', to.event, params());
+  // The callback rides the last event queued, so both are away before we go.
+  gtag('event', ${JSON.stringify(REDIRECT_EVENT)}, params({
+    event_callback: go,
+    event_timeout: ${REDIRECT_MAX_WAIT_MS}
+  }));
 })();
 </script>
 </body>
@@ -306,9 +420,13 @@ module.exports = {
   RESERVED,
   DEFAULT_STORE,
   DEFAULT_SITE,
+  GA_MEASUREMENT_ID,
+  REDIRECT_EVENT,
+  REDIRECT_MAX_WAIT_MS,
   cleanLink,
   cleanUrl,
   destinations,
+  redirectPlan,
   renderLinkPage,
   keysFor,
   configured,
