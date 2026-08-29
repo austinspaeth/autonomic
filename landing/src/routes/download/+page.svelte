@@ -1,6 +1,6 @@
 <script lang="ts">
   import {
-    BRAND_POLYLINE,
+    APP_MARK_PATH,
     REDIRECT_DESTINATION,
     REDIRECT_EVENT,
     REDIRECT_EVENT_BY_PLATFORM,
@@ -114,8 +114,12 @@
 </svelte:head>
 
 <main>
-  <svg class="mark" viewBox="0 0 512 512" aria-hidden="true">
-    <polyline points={BRAND_POLYLINE} />
+  <!-- The app's own mark, not the decorative ECG waveform: this is the last
+       thing a visitor sees before the store, so it has to be the same object
+       they are about to install. It is wide (651.59 x 348.34), so it sizes by
+       width and is filled rather than stroked — same treatment as the footer. -->
+  <svg class="mark" viewBox="0 0 651.59 348.34" aria-hidden="true">
+    <path d={APP_MARK_PATH} />
   </svg>
   <h1>Opening your app store…</h1>
   <p>If nothing happens, pick your phone:</p>
@@ -149,14 +153,12 @@
     text-align: center;
   }
 
+  /* Sized by WIDTH: the mark is 1.87:1, so a square box would letterbox it into
+     something much smaller than the old squiggle occupied. */
   .mark {
-    width: 84px;
-    height: 84px;
-    fill: none;
-    stroke: #e03127;
-    stroke-width: 30;
-    stroke-linecap: round;
-    stroke-linejoin: round;
+    width: 160px;
+    height: 86px;
+    fill: #e03127;
   }
 
   h1 {
