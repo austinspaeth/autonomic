@@ -249,9 +249,15 @@ export function SourcePicker({ value, onPick, controls }: {
 
       {watchesSeen ? (
         <Text style={{ color: p.textDim, fontSize: 13, lineHeight: 19, marginTop: 10 }}>
-          A watch is broadcasting its heart rate nearby. Set it up under Other
-          watches instead. Broadcast mode sends a pulse rate only, without the
-          beat-to-beat detail an HRV reading needs.
+          {/* The REASON always holds — broadcast mode cannot be scored however
+              the app is configured — but the pointer only holds while the row
+              it points at is on screen. With the brands row held back, "set it
+              up under Other watches" sends the user looking for something that
+              is not there, which reads as a bug in the sheet rather than as a
+              feature that has not shipped. */}
+          {showBrands
+            ? 'A watch is broadcasting its heart rate nearby. Set it up under Other watches instead. Broadcast mode sends a pulse rate only, without the beat-to-beat detail an HRV reading needs.'
+            : 'A watch is broadcasting its heart rate nearby. It cannot be used for a reading: broadcast mode sends a pulse rate only, without the beat-to-beat detail an HRV reading needs.'}
         </Text>
       ) : null}
       <View style={{ height: 16 }} />

@@ -26,6 +26,8 @@
  * build with no entry shows no pill.
  */
 
+import { GARMIN_RELEASED } from './watch/release';
+
 export interface Release {
   /** Minor version only, e.g. "1.22" — patch releases share their minor's notes. */
   version: string;
@@ -51,7 +53,14 @@ export const RELEASES: Release[] = [
     version: '1.26',
     date: '2026-08-27',
     notes: [
-      'NEW - Garmin watch support added! Take an HRV reading on your Garmin and it lands in your journal when it finishes.',
+      // Announced only once the watch app it points at can actually be
+      // installed. Held rather than deleted, and spread rather than commented
+      // out, so flipping GARMIN_RELEASED restores the bullet in its own place —
+      // the card is the loudest Garmin surface in the app and it would be the
+      // easiest one to forget to write again.
+      ...(GARMIN_RELEASED
+        ? ['NEW - Garmin watch support added! Take an HRV reading on your Garmin and it lands in your journal when it finishes.']
+        : []),
       'A more streamlined onboarding process, plus other interface and performance improvements.',
     ],
   },
