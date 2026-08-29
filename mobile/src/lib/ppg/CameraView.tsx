@@ -4,9 +4,12 @@
  * preview (`preview` = diameter; the parent clips it round) — and keeps it
  * mounted underneath the session card so the stream survives the handoff.
  * Without `preview` it renders invisibly at 1×1. `ppg().start()/stop()`
- * toggles `running`, which drives the camera's active state and torch. The
- * frame processor is deliberately trivial — a strided mean of B/G/R over a
- * center crop — with all detection done in JS (`camera.ts` → `detect.ts`).
+ * toggles `running`, which drives the camera's active state and torch — but
+ * NOT the frame processor, whose identity must stay fixed for the life of a
+ * `<Camera>` or vision-camera calls into the native view by tag at the moment
+ * it may already be gone (see the prop for the crash that caused). The frame
+ * processor is deliberately trivial — a strided mean of B/G/R over a center
+ * crop — with all detection done in JS (`camera.ts` → `detect.ts`).
  *
  * Renders null when react-native-vision-camera / worklets aren't in the build
  * (Expo Go / simulator / web), mirroring the manager's graceful stub.
@@ -197,6 +200,9 @@ function PpgCameraInner({ preview }: { preview?: number }) {
     return () => { clearTimeout(off); clearTimeout(on); setTorchBlip(false); };
   }, [running, initialized]);
 
+  // Stable for the life of this component: `useRunOnJS([])` and
+  // `useFrameProcessor` are both `useMemo`, and the deps below never change.
+  // That identity is load-bearing — see the frameProcessor prop at the bottom.
   const push = useRunOnJS((t: number, r: number, g: number, b: number) => {
     ppgBridge.pushFrame(t, r, g, b);
   }, []);
@@ -269,7 +275,27 @@ function PpgCameraInner({ preview }: { preview?: number }) {
       format={format}
       fps={fps}
       pixelFormat="rgb"
-      frameProcessor={running ? frameProcessor : undefined}
+      // ALWAYS attached, never toggled with `running`. vision-camera's
+      // componentDidUpdate reacts to a change of this prop's identity by calling
+      // VisionCameraProxy.setFrameProcessor / removeFrameProcessor, which post a
+      // runnable to the Android UI thread that resolves the native view by tag
+      // and throws ViewNotFoundError — an uncaught crash on the UI thread — if
+      // the view has gone by the time it runs. Under Fabric that is a genuine
+      // race: view removal is dispatched by the mount queue, the proxy's call is
+      // a plain handler post, and the two are not ordered against each other.
+      // Toggling put both calls in exactly the wrong places — `setFrameProcessor`
+      // when the stream starts, and `removeFrameProcessor` from `ppg().stop()`,
+      // which fires during teardown while the card that owns this view is being
+      // dismissed. Passing it unconditionally leaves `onViewReady` (native view
+      // demonstrably alive) as the only call into the proxy.
+      //
+      // Nothing is lost by leaving it on: `isActive={running}` means CameraX
+      // isn't streaming while stopped, so the worklet is not called, and
+      // `ppgBridge.pushFrame` drops anything that slips through. It also stops
+      // `enableFrameProcessor` (which vision-camera derives from `!= null`)
+      // flipping mid-flight, which rebound the whole capture session twice per
+      // reading — once on start, once on teardown.
+      frameProcessor={frameProcessor}
       audio={false}
       onInitialized={() => {
         setInitialized(true);
