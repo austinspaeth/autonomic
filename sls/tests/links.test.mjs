@@ -260,3 +260,23 @@ test('a destination still cannot break out of the script it is written into', ()
   assert.ok(!html.includes('alert(1)'));
   assert.equal(snifferOf(html).includes('</script'), false);
 });
+
+test('the page shows the app\'s own mark, and it has not drifted from the site', () => {
+  /* A 3KB path duplicated across a Lambda and a Vite build is the one thing
+     here that can rot silently — a wrong glyph still renders, it is just not
+     the logo. So the two copies are compared rather than eyeballed. */
+  const site = fs.readFileSync(new URL('../../landing/src/lib/site.ts', import.meta.url), 'utf8');
+  const inSite = site.match(/export const APP_MARK_PATH =\s*\n\s*'([^']+)';/);
+  assert.ok(inSite, 'APP_MARK_PATH still lives in site.ts');
+
+  const html = renderLinkPage(CAMPAIGN);
+  const drawn = html.match(/<svg class="mark"[^>]*viewBox="([^"]+)"[^>]*><path d="([^"]+)"/);
+  assert.ok(drawn, 'the mark is a filled path, not a stroked polyline');
+  assert.equal(drawn[1], '0 0 651.59 348.34', 'the app mark\'s own viewBox');
+  assert.equal(drawn[2], inSite[1], 'byte-identical to the site\'s copy');
+
+  /* Wide mark: sized by width and filled. A square box would letterbox it. */
+  assert.match(html, /\.mark\{width:160px;height:86px;fill:#e03127\}/);
+  // The decorative ECG waveform is gone from this page entirely.
+  assert.ok(!html.includes('polyline'));
+});
