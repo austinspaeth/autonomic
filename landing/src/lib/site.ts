@@ -73,6 +73,55 @@ export const videoAppStoreLink = storeUrl('ios', VIDEO_CAMPAIGN);
 export const videoPlayStoreLink = `${playStoreUrl}&referrer=${encodeURIComponent(VIDEO_UTM)}`;
 export const videoSiteLink = `${site.url}/?${VIDEO_UTM}`;
 
+/** The campaign slug `/download` reports itself under, matching its utm_campaign. */
+export const VIDEO_CAMPAIGN_SLUG = 'videos';
+
+/**
+ * How a redirect page measures itself.
+ *
+ * A redirect page — `/download`, and every `/download/<slug>` the master
+ * dashboard publishes — is the one page of the site nobody reads: the sniffer
+ * sends the visitor on within a frame of the markup being parsed. That is also
+ * what makes GA's ordinary page_view useless here. The gtag library is loaded
+ * ASYNC from the shell, so it is still in flight when the sniffer runs, and
+ * `location.replace` aborts the document load along with that pending request.
+ * Nothing is sent. The page every printed link, QR code and video points at
+ * reads in GA as though nobody ever opened it, and the split that actually
+ * matters — how many of those visitors were on a phone at all — is not
+ * recoverable from anywhere else.
+ *
+ * So a redirect page ANNOUNCES ITSELF BEFORE IT LEAVES: it fires its events,
+ * then waits for gtag's `event_callback` before calling `location.replace`.
+ * The wait is capped at `REDIRECT_MAX_WAIT_MS`, because a blocked tag never
+ * calls back at all and a signpost must never become a dead end — a measurement
+ * that fails has to cost the visitor a beat, not the trip.
+ *
+ * Two events per visitor, the same pairing the site-wide download CTAs use
+ * (see the `trackDownload` comment in `app.html`): one PLATFORM-NAMED event, so
+ * the three-way split shows up in GA's standard Events report with no custom
+ * dimension registered, and one pooled `download_redirect` carrying
+ * `platform` / `destination` / `campaign`, so total redirect volume is one row
+ * and can be split by campaign once the dimensions are registered.
+ */
+export const REDIRECT_MAX_WAIT_MS = 1000;
+
+/** The pooled event, fired on every redirect whatever the platform. */
+export const REDIRECT_EVENT = 'download_redirect';
+
+/** The platform-named events, readable in GA with nothing configured. */
+export const REDIRECT_EVENT_BY_PLATFORM = {
+  ios: 'app_store_redirect',
+  android: 'play_store_redirect',
+  desktop: 'site_redirect'
+} as const;
+
+/** The `destination` parameter: what kind of place the visitor was sent to. */
+export const REDIRECT_DESTINATION = {
+  ios: 'app_store',
+  android: 'play_store',
+  desktop: 'site'
+} as const;
+
 /** Tagged store URLs for the ordinary site-wide download CTAs. */
 export const appStoreLink = storeUrl('ios');
 export const playStoreLink = storeUrl('android');

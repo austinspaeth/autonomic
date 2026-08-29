@@ -1130,7 +1130,7 @@ publishes a real page at `autonomic.care/download/<slug>`.
 
 `/download` itself is a page of the landing site and is not managed here. It is
 a prerendered signpost that sniffs the user agent and sends a phone to its store
-with the site's own `Videos` attribution. Nothing about it changed.
+with the site's own `Videos` attribution.
 
 A CAMPAIGN link is the same object with the destinations supplied by hand, so
 `/download/facebook` can carry its own App Store campaign token (`ct=`) and its
@@ -1173,6 +1173,32 @@ Both `download/<slug>/index.html` and the extensionless `download/<slug>` are
 written, because the distribution's directory handling is out-of-band
 configuration this repo does not own, and which of the two it asks S3 for is not
 ours to assume. They are bytes; write both.
+
+### Where these numbers are actually read
+
+Not here. A campaign page is a redirect, so it never phones this API — the
+stores' own consoles are where a campaign's downloads land (App Store Connect
+via `ct=`, the Play Console via the `referrer`), and **Google Analytics** is
+where the traffic to the page itself lands.
+
+Which means the page has to report itself, which a page written outside the
+build has to do from scratch: it carries its own copy of the GA tag and of the
+site's `aj-cookie-consent` opt-out (same origin, so blocking on the site blocks
+here — nothing is sent and the visitor is redirected at once). Each way out is
+an event — `app_store_redirect` / `play_store_redirect` / `site_redirect`, plus
+a pooled `download_redirect` carrying `platform`, `destination` and the campaign
+slug — so "of everyone who scanned this QR code, how many were on a phone at
+all" is one report.
+
+The order is the whole of it. `location.replace` aborts the document load along
+with the tag still loading beside it, so a redirect page that fires and goes
+records **nothing**, not even a page view: the page every printed link points at
+reads in GA as though it were never opened. So the page sends first and leaves
+on gtag's `event_callback`, capped at one second — a blocked tag never calls
+back, and a signpost must never become a dead end. `/download` does the same
+thing from the shell's tag, and the two have to agree on the event names and on
+the word `desktop`, or every report splits in two with nothing looking broken.
+`sls/tests/links.test.mjs` and `landing/tests/download.test.mjs` pin the pair.
 
 The **slug is the identity**, not a generated id — which is what makes editing
 the path a delete and a create rather than a rename, and why the form says the

@@ -1,5 +1,15 @@
 <script lang="ts">
-  import { BRAND_POLYLINE, videoAppStoreLink, videoPlayStoreLink, videoSiteLink } from '$lib/site';
+  import {
+    BRAND_POLYLINE,
+    REDIRECT_DESTINATION,
+    REDIRECT_EVENT,
+    REDIRECT_EVENT_BY_PLATFORM,
+    REDIRECT_MAX_WAIT_MS,
+    VIDEO_CAMPAIGN_SLUG,
+    videoAppStoreLink,
+    videoPlayStoreLink,
+    videoSiteLink
+  } from '$lib/site';
 
   /* The sniffer. The site ships no framework runtime, so this rides along as a
      plain inline script in the prerendered HTML (emitted via {@html redirect}
@@ -16,6 +26,13 @@
      `location.replace` rather than `href`: this page is a signpost, and Back
      from the store should return to the video, not to the signpost.
 
+     It TELLS GA WHICH WAY IT WENT BEFORE IT GOES. `gtag` and `_ajBlocked` are
+     both defined in the shell's head script, so they are available here even
+     though the tag's own library is still loading — see the
+     `REDIRECT_MAX_WAIT_MS` comment in `site.ts` for why the wait exists and why
+     it is capped. Everything about the redirect itself is unchanged: the same
+     three destinations, the same `location.replace`, just a beat later.
+
      The markup below is the fallback, not a loading screen — it is what a
      visitor with JS off (or a sniff that matched nothing) is left holding, so
      it carries all three links by hand. */
@@ -23,16 +40,67 @@
 (function () {
   'use strict';
   var ua = navigator.userAgent || '';
-  var dest = ${JSON.stringify(videoSiteLink)};
+  var platform = 'desktop';
   if (/android/i.test(ua)) {
-    dest = ${JSON.stringify(videoPlayStoreLink)};
+    platform = 'android';
   } else if (/iphone|ipad|ipod/i.test(ua)) {
-    dest = ${JSON.stringify(videoAppStoreLink)};
+    platform = 'ios';
   } else if (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) {
     // iPadOS 13+ reports as a Mac; touch points disambiguate it.
-    dest = ${JSON.stringify(videoAppStoreLink)};
+    platform = 'ios';
   }
-  window.location.replace(dest);
+
+  var DEST = {
+    ios: ${JSON.stringify(videoAppStoreLink)},
+    android: ${JSON.stringify(videoPlayStoreLink)},
+    desktop: ${JSON.stringify(videoSiteLink)}
+  };
+  var NAMED = ${JSON.stringify(REDIRECT_EVENT_BY_PLATFORM)};
+  var WHERE = ${JSON.stringify(REDIRECT_DESTINATION)};
+
+  // Whichever fires first wins, and the other becomes a no-op: the callback and
+  // the cap are racing on purpose, and a double replace would be a real bug on
+  // a page whose whole job is to leave exactly once.
+  var gone = false;
+  function go() {
+    if (gone) return;
+    gone = true;
+    window.location.replace(DEST[platform]);
+  }
+
+  // Consent blocked, or no shell on the page: nothing will ever call back, so
+  // there is nothing to wait for. Blocking means blocked — not "measured, then
+  // sent" — so this returns before a single event is built.
+  if (typeof gtag !== 'function' || (typeof _ajBlocked === 'function' && _ajBlocked())) {
+    go();
+    return;
+  }
+
+  // A fresh object per event: gtag holds the arguments it was handed until the
+  // library flushes them, so one shared literal would put the callback on both.
+  function params(extra) {
+    var p = {
+      platform: platform,
+      destination: WHERE[platform],
+      campaign: ${JSON.stringify(VIDEO_CAMPAIGN_SLUG)},
+      location: '/download',
+      page_type: 'download'
+    };
+    if (extra) { for (var k in extra) { if (extra.hasOwnProperty(k)) p[k] = extra[k]; } }
+    return p;
+  }
+
+  // The cap. \`event_timeout\` is what GA itself honours once its library is
+  // loaded; the timer is what covers the case where it never loads at all.
+  setTimeout(go, ${REDIRECT_MAX_WAIT_MS});
+
+  gtag('event', NAMED[platform], params());
+  // The callback rides the LAST event queued, so both have been sent by the
+  // time it fires.
+  gtag('event', ${JSON.stringify(REDIRECT_EVENT)}, params({
+    event_callback: go,
+    event_timeout: ${REDIRECT_MAX_WAIT_MS}
+  }));
 })();
 <\/script>`;
 </script>
