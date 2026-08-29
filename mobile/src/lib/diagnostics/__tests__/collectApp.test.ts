@@ -22,6 +22,18 @@ jest.mock('expo-notifications', () => ({
   getPermissionsAsync: async () => ({ status: 'granted', granted: true, canAskAgain: false, ios: { status: 2 } }),
   getAllScheduledNotificationsAsync: async () => [{ identifier: 'morning-reminder' }],
 }), { virtual: true });
+// The flags MMKV, reached through `../upsell/annualMemory`. It is the one
+// native this file did not mock, and leaving it real made the suite flaky
+// rather than broken: resolved to the package's CommonJS build it loads and
+// then throws on construction (no native module here), which is the degrade
+// path `annualMemory` already handles, but resolved to its TypeScript sources
+// it is an untransformed ESM file in node_modules and the whole suite fails to
+// load. Which of the two happens depended on how jest scheduled the run. A
+// constructor that throws pins the behaviour to the first case, which is what a
+// phone missing the native module does.
+jest.mock('react-native-mmkv', () => ({
+  MMKV: class { constructor() { throw new Error('no native MMKV in this build'); } },
+}), { virtual: true });
 jest.mock('react-native-vision-camera', () => { throw new Error('not in this build'); }, { virtual: true });
 jest.mock('react-native-worklets-core', () => ({ useRunOnJS: () => {} }), { virtual: true });
 jest.mock('react-native-ble-plx', () => ({ BleManager: class {} }), { virtual: true });

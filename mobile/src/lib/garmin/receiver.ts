@@ -31,6 +31,7 @@ import { logError } from '../diagnostics/errorLog';
 import { computeScores } from '../scoring';
 import type { Entry } from '../types';
 import { mapWatchPayload } from '../watch/payload';
+import { GARMIN_RELEASED } from '../watch/release';
 
 export type { GarminDevice };
 
@@ -71,6 +72,14 @@ function setDevices(list: GarminDevice[]) {
 }
 
 export function garminDevices(): GarminDevice[] {
+  // The one read every Garmin surface goes through — the source picker's linked
+  // row, the wizard's, the Setup card's "already linked" check, the sync sheet's
+  // device name. Answering empty while the link is unreleased is what keeps a
+  // watch paired on an earlier build from putting a Garmin row in front of a
+  // user who cannot install the watch app. `initGarminReceiver` already declines
+  // to populate this; both are here because they stop different things (one the
+  // behaviour, one the display) and neither should have to trust the other.
+  if (!GARMIN_RELEASED) return [];
   return devices;
 }
 
@@ -180,6 +189,10 @@ export async function handleGarminUrl(url: string): Promise<GarminDevice[]> {
 export function initGarminReceiver() {
   if (started) return;
   started = true;
+  // Held with the rest of the Garmin surfaces: with no way to install the watch
+  // app there is nothing to listen for, and initializing the link anyway would
+  // claim the URL callback and re-attach to a watch paired on an earlier build.
+  if (!GARMIN_RELEASED) return;
   const native = garminNative();
   if (!native) return;
 

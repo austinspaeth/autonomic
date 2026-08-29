@@ -25,6 +25,7 @@ import { health, healthAppName, healthPermissionPath, openHealthApp } from '../.
 import { garminDevices, pickGarminDevice, subscribeGarminDevices } from '../../lib/garmin/receiver';
 import { garminNative } from '../../../modules/garmin-link';
 import { brandNames, connectSteps, hasDirectLink, watchBrands, type WatchBrand, type WatchPlatform } from '../../lib/watch/brands';
+import { GARMIN_RELEASED } from '../../lib/watch/release';
 
 type OpenSheet = ReturnType<typeof useSheets>['openSheet'];
 
@@ -80,10 +81,11 @@ export const otherWatchesSub = () => {
 
 /** Release gate. Nothing in the app may point a user at a watch app they
  *  cannot install, so the picker's "Other watches" row and the Setup card's
- *  "now supported" tab were held behind this one flag until the Garmin Connect
- *  IQ app was published. It is live, so this is open. Close it again (rather
- *  than ripping anything out) if a brand ever has to be pulled. */
-const WATCH_BRANDS_RELEASED = true;
+ *  "now supported" tab are held behind this one flag until the Garmin Connect
+ *  IQ app is published. It now reads the shared `GARMIN_RELEASED` rather than a
+ *  literal of its own: the same release covers the receiver and the release
+ *  notes, and two flags to flip is one flag to forget. */
+const WATCH_BRANDS_RELEASED = GARMIN_RELEASED;
 
 /** True when there is at least one non-Apple watch worth offering here. */
 export const hasOtherWatches = () => WATCH_BRANDS_RELEASED && watchBrands().length > 0;
