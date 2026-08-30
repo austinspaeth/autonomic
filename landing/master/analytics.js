@@ -1785,6 +1785,220 @@ window.Analytics = (function () {
     return { event: event, days: n, before: before, after: after, metrics: metrics };
   }
 
+  /* --------------------------------------------------------------- faults
+   *
+   * The one part of the report that is not a counter.
+   *
+   * `errorInstalls` above reads `/ping/err`, which fires ONCE PER INSTALL EVER
+   * and carries no tag: it is a population ("how many phones have had something
+   * go wrong") and it is structurally unable to say what. An install that
+   * hiccuped in March spent its ping and stayed silent through every bug
+   * shipped since, so a release that broke Health imports for every Android
+   * phone would not move that number by one.
+   *
+   * `/fault` is the answer to the next question. The server stores one row per
+   * (day, call site, failure), holding a count and the platform / version /
+   * tier splits — see sls/lambdas/ping/main.js. Everything below is grouping
+   * over those rows, and it makes exactly two claims:
+   *
+   *   A COUNT IS INSTALL-DAYS, NOT OCCURRENCES. The client reports one per
+   *   signature per install per Eastern day, so a phone stuck in a retry loop
+   *   contributes 1. `installDays` is named for what it is, because "count" in
+   *   a crash list is universally read as "how many crashes" and that is the
+   *   one thing it is not. How many PHONES is unknowable — there is no
+   *   identifier anywhere in this system — so a signature seen on 9 install-days
+   *   might be 9 phones once each or one phone for 9 days, and the UI says so.
+   *
+   *   A VERSION SPLIT IS THE FIX. "Which build" is the first question a crash
+   *   asks and the only one this data can answer sharply, because the row
+   *   carries it directly rather than deriving it.
+   */
+
+  /** One fault row, normalised. Absent parts are named rather than guessed. */
+  function faultRow(r) {
+    return {
+      key: String(r.key || ''),
+      day: String(r.day || ''),
+      tag: String(r.tag || 'unknown'),
+      msg: String(r.msg || ''),
+      fatal: !!r.fatal,
+      /* Two numbers, never one. Occurrences is how many TIMES it happened;
+         installs is install-days, which is how many phone-days SAW it and the
+         closest thing to a phone count this system can honestly produce. */
+      occurrences: Number(r.occurrences) || 0,
+      installs: Number(r.installs) || 0,
+      firstAt: r.firstAt || null,
+      lastAt: r.lastAt || null,
+      /* platforms / versions / tiers are install-days and each sums to
+         `installs`; occPlatforms is occurrences and sums to `occurrences`. */
+      platforms: r.platforms || {},
+      versions: r.versions || {},
+      tiers: r.tiers || {},
+      occPlatforms: r.occPlatforms || {}
+    };
+  }
+
+  /** Sum a `{ key: count }` split, honouring a platform filter where one
+   *  applies. Used to decide whether a row survives the filter at all. */
+  function splitTotal(map, only) {
+    return Object.keys(map || {}).reduce(function (a, k) {
+      return (only && k !== only) ? a : a + (Number(map[k]) || 0);
+    }, 0);
+  }
+
+  function mergeSplit(into, from, only) {
+    Object.keys(from || {}).forEach(function (k) {
+      if (only && k !== only) return;
+      into[k] = (into[k] || 0) + (Number(from[k]) || 0);
+    });
+  }
+
+  /**
+   * Every fault in the range, grouped by SIGNATURE — the same failure at the
+   * same call site, however many days it spanned.
+   *
+   * Grouped rather than listed per day because a bug is a thing, not a series
+   * of daily things: a list that shows "health.check timeout" nine times with a
+   * different date on each is nine rows saying one fact, and the fact ("this
+   * has been happening for nine days") is exactly what gets lost. `days` is the
+   * span, `lastDay` is whether it is still live, and `daily` keeps the shape
+   * for a sparkline.
+   *
+   * The platform filter narrows a row's SPLITS rather than dropping the row, so
+   * "iOS" means "these failures, as iOS saw them" — and a failure that only
+   * Android ever hit falls out entirely, which is the right answer and the one
+   * a filtered crash list has to give. Both numbers narrow together, which is
+   * what `occPlatforms` exists for: an iOS slice showing iOS install-days
+   * beside everybody's occurrence count would be a made-up ratio.
+   */
+  function faultGroups(report, platform, from, to) {
+    var only = platformFilter(platform);
+    var by = {};
+    ((report && report.faults) || []).forEach(function (raw) {
+      var r = faultRow(raw);
+      if (!r.day || !r.msg) return;
+      if (from && r.day < from) return;
+      if (to && r.day > to) return;
+      var installs = only ? splitTotal(r.platforms, only) : r.installs;
+      var occurrences = only ? splitTotal(r.occPlatforms, only) : r.occurrences;
+      if (!installs && !occurrences) return;
+      var sig = r.tag + '#' + r.msg + (r.fatal ? '!' : '');
+      var g = by[sig];
+      if (!g) {
+        g = by[sig] = {
+          sig: sig, tag: r.tag, msg: r.msg, fatal: r.fatal,
+          installDays: 0, occurrences: 0, days: 0,
+          firstDay: r.day, lastDay: r.day,
+          firstAt: r.firstAt, lastAt: r.lastAt,
+          platforms: {}, versions: {}, tiers: {}, daily: {}
+        };
+      }
+      g.installDays += installs;
+      g.occurrences += occurrences;
+      g.days += 1;
+      if (r.day < g.firstDay) g.firstDay = r.day;
+      if (r.day > g.lastDay) g.lastDay = r.day;
+      if (r.firstAt && (!g.firstAt || r.firstAt < g.firstAt)) g.firstAt = r.firstAt;
+      if (r.lastAt && (!g.lastAt || r.lastAt > g.lastAt)) g.lastAt = r.lastAt;
+      g.daily[r.day] = (g.daily[r.day] || 0) + installs;
+      mergeSplit(g.platforms, r.platforms, only);
+      mergeSplit(g.versions, r.versions);
+      mergeSplit(g.tiers, r.tiers);
+    });
+
+    /* Ranked by how many installs it reached, then by how often. BREADTH
+       first, deliberately: what decides a hotfix is how many people a failure
+       happened to, and ranking by occurrences would put one phone stuck in a
+       retry loop above a bug that hit everybody once. A fatal breaks a
+       remaining tie — it took the app down. */
+    return Object.keys(by).map(function (k) { return by[k]; }).sort(function (a, b) {
+      if (a.installDays !== b.installDays) return b.installDays - a.installDays;
+      if (a.occurrences !== b.occurrences) return b.occurrences - a.occurrences;
+      if (a.lastDay !== b.lastDay) return a.lastDay < b.lastDay ? 1 : -1;
+      if (a.fatal !== b.fatal) return a.fatal ? -1 : 1;
+      return a.sig < b.sig ? -1 : 1;
+    });
+  }
+
+  /** One day's failing installs, for a chart against opens. Install-days, so it
+   *  is comparable with the open counter beside it — occurrences are not, since
+   *  one phone can contribute hundreds. */
+  function faultsOn(report, platform, day) {
+    var only = platformFilter(platform);
+    return ((report && report.faults) || []).reduce(function (a, raw) {
+      var r = faultRow(raw);
+      if (r.day !== day) return a;
+      return a + (only ? splitTotal(r.platforms, only) : r.installs);
+    }, 0);
+  }
+
+  /**
+   * The headline: how many distinct failures, how many install-days, how many
+   * times in total, how many are fatal, and how many are NEW — first seen on
+   * the range's last day.
+   *
+   * `fresh` is the number worth alerting on. A list of forty known failures is
+   * a backlog; one that appeared this morning on the build that shipped
+   * yesterday is a release going wrong, and the two look identical in a total.
+   */
+  function faultSummary(groups, lastDay) {
+    var out = { signatures: 0, installDays: 0, occurrences: 0, fatal: 0, fresh: 0, live: 0 };
+    (groups || []).forEach(function (g) {
+      out.signatures += 1;
+      out.installDays += g.installDays;
+      out.occurrences += g.occurrences;
+      if (g.fatal) out.fatal += 1;
+      if (lastDay && g.firstDay === lastDay) out.fresh += 1;
+      if (lastDay && g.lastDay === lastDay) out.live += 1;
+    });
+    return out;
+  }
+
+  /**
+   * How concentrated a failure is on one phone.
+   *
+   * Occurrences over install-days. It is the difference between "everybody hit
+   * this once" (≈1) and "one device is in a retry loop" (hundreds), which are
+   * completely different bugs that a single count cannot tell apart — and the
+   * reason both numbers are always reported together.
+   */
+  function faultIntensity(g) {
+    if (!g || !g.installDays) return null;
+    return g.occurrences / g.installDays;
+  }
+
+  /**
+   * Is this failure concentrated on ONE build?
+   *
+   * The question a crash list exists to answer. A failure spread evenly across
+   * every version is the app's normal background — a flaky network, an OS quirk
+   * — and one that is 95% on the newest build is a regression that shipped. The
+   * share is of the reports that NAMED a version: builds too old to say so are
+   * a real and separate population (`unknown`), and folding them in either
+   * direction would invent the answer.
+   *
+   * Measured in INSTALL-DAYS, like the split it reads: weighting by occurrences
+   * would let one looping phone report whichever build it happens to run as the
+   * whole of a failure, which is the exact wrong answer to "should I revert".
+   */
+  function faultTopVersion(g) {
+    var vs = (g && g.versions) || {};
+    var known = 0, unknown = 0, top = null, topN = 0;
+    Object.keys(vs).forEach(function (v) {
+      var n = Number(vs[v]) || 0;
+      if (v === '?' || v === 'unknown') { unknown += n; return; }
+      known += n;
+      if (n > topN) { topN = n; top = v; }
+    });
+    return {
+      version: top,
+      count: topN,
+      share: known ? (topN / known) * 100 : null,
+      known: known,
+      unknown: unknown
+    };
+  }
+
   /* --------------------------------------------------------------- export */
 
   return {
@@ -1822,6 +2036,11 @@ window.Analytics = (function () {
     kindKnown: kindKnown, isHeadcount: isHeadcount,
     shareOfActive: shareOfActive, slotShare: slotShare,
     captureFunnel: captureFunnel, offerFunnel: offerFunnel, errorInstalls: errorInstalls,
+
+    // faults — not a counter; see the block above `export`
+    faultGroups: faultGroups, faultsOn: faultsOn, faultSummary: faultSummary,
+    faultTopVersion: faultTopVersion, faultIntensity: faultIntensity,
+
     slotName: function (kind, letter) {
       return (SLOT_NAME[kind] && SLOT_NAME[kind][letter]) || 'Not stated';
     },

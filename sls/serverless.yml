@@ -228,6 +228,21 @@ functions:
       - httpApi:
           method: GET
           path: /ping/oac/{cohort}
+      # A FAULT report — the one route here that is not a counter. Its own path
+      # prefix on purpose: every route above is a fixed alphabet and a number
+      # that means "how many people", and this one carries text (a tag naming
+      # the call site, a short redacted message) so the two can never be read
+      # the same way. /ping/err stays exactly as it is — it fires once per
+      # install ever and says HOW MANY phones have had something go wrong; this
+      # says WHAT, once per distinct failure per install per Eastern day, which
+      # is the question that counter is structurally unable to answer.
+      #
+      # The message is redacted on the client AND again in the handler, so
+      # nothing unredacted can be written by a build we did not ship. Rows carry
+      # a TTL (see FAULT_TTL_DAYS): they are diagnostic, not a series.
+      - httpApi:
+          method: GET
+          path: /fault/{cohort}
       # Reading the counters back. Not public — guarded by PING_REPORT_KEY,
       # which is unset by default, and an unset key refuses everyone.
       - httpApi:
@@ -296,6 +311,15 @@ resources:
             KeyType: RANGE
         PointInTimeRecoverySpecification:
           PointInTimeRecoveryEnabled: true
+        # Only fault rows (PK FAULT) carry `expiresAt`, so only they expire —
+        # every dashboard record and every ping counter is written without the
+        # attribute and is untouched by this. Faults are diagnostic rather than
+        # a historical series (nobody asks what was crashing fourteen months
+        # ago), and an expiry is also what bounds the one public route that
+        # CREATES a row rather than incrementing one.
+        TimeToLiveSpecification:
+          AttributeName: expiresAt
+          Enabled: true
 
     # ------------------------------------------------------------------
     # Custom domain: api.autonomic.care

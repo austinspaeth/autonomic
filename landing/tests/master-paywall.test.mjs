@@ -331,12 +331,17 @@ check('the lines are never presented as addable',
     .test(text('pgEventNote')), text('pgEventNote'));
 
 /* The error counter is a population, not a daily event, and says nothing about
-   what went wrong — there is no tag in the ping and the card must not imply one. */
+   what went wrong — there is no tag in the ping and the card must not imply
+   one. That is the whole reason the Failures view exists beside it, and the
+   copy has to point there rather than leaving the reader at a dead end. */
 check('the failure counter reports installs, once per install ever',
-  /Installsreportingafailure3/.test(text('pgEventNote').replace(/\s+/g, '')), text('pgEventNote'));
+  /Installsreportingafirstfailure3/.test(text('pgEventNote').replace(/\s+/g, '')), text('pgEventNote'));
 
-check('the failure counter promises no diagnosis',
-  /no tag, no message/.test(text('pgEventNote')), text('pgEventNote'));
+check('the failure counter still promises no diagnosis of its own',
+  /can never say what broke/.test(text('pgEventNote')), text('pgEventNote'));
+
+check('...and sends the reader to the route that can',
+  /What broke is the Failures tab/.test(text('pgEventNote')), text('pgEventNote'));
 
 /* --------------------------------------------------------- the raw ping tab */
 

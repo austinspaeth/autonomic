@@ -847,7 +847,10 @@ old web app so old `export.json` files import directly.
   is not; `A.isHeadcount(kind)` is the question to ask before dividing. `err` is
   neither: once per install EVER, carrying no tag and no message, so it is a
   running population of phones worth asking for a support dump and never a
-  statement about what broke.
+  statement about what broke. It is deliberately left that blunt — what broke is
+  `/fault`, a separate route that is not a ping at all (see the error-log bullet
+  below), and because that one is grouped by FAILURE rather than by install,
+  summing it would count one phone once per bug it hit.
   **The paywall route is the third daily counter**, capped for the same reason
   the other two are: uncapped it would count TAPS, and one user tapping a locked
   range four times would read as four people meeting a wall. Its letter names
@@ -1007,8 +1010,55 @@ old web app so old `export.json` files import directly.
   tested). `installErrorLogging()` in the root layout also routes uncaught
   errors there on their way to the default handler — it observes, it never
   swallows. Call `logError('area.thing', e)` from a catch that would otherwise
-  be silent (already wired: store persist/load, IAP, health reads, reminders,
-  backups, widgets), and prefer an existing tag over a new phrasing of one.
+  be silent (already wired: store persist/load, the waveform sidecar, IAP,
+  health reads + the one-shot history backfill, the strap connect loop,
+  reminders, backups, widgets, Garmin, Insights), and prefer an existing tag
+  over a new phrasing of one. **The tag IS the location**: a release build's
+  stack is minified bytecode offsets and worth nothing, so `area.thing` plus the
+  error's own type (`describeError` leads with `TypeError` / a native
+  `errorCode` when there is one) is the whole of the diagnosis. Most `catch`
+  blocks in the app are deliberately silent and should stay that way — a
+  cleanup, an optional native module, a permission read. The ones that must log
+  are where the app DEGRADES INVISIBLY: a lost waveform (the reading looks
+  complete and only its trace is gone), a strap that never connects (a loop that
+  retried forever leaving no trace), a one-shot backfill that will never run
+  again.
+- **A failure is also REPORTED, and that is a different route from the failure
+  COUNTER.** `logError` fires two things. `pingErrorSeen` (`/ping/err`) is
+  unchanged: once per install EVER, no tag, no message — a population, "how many
+  phones have had something go wrong". `reportFault` (`/fault`,
+  `src/lib/errorReport.ts` pure + `src/store/errorReport.ts` shell) is the log:
+  the same install code every ping sends, plus a **tag** naming the call site, a
+  **short redacted message**, and how many occurrences it accounts for. It exists
+  because the counter is spent on an install's first hiccup and can never say
+  what broke — a release that broke Health imports for every Android phone would
+  not move it by one. **EVERY OCCURRENCE IS COUNTED**, and the only reason that
+  is safe is that COUNTING and SENDING are decoupled: occurrences accumulate in a
+  persisted buffer (flags MMKV) and a report carries the count it accumulated
+  (`n`), so a signature's first sighting goes out immediately and the rest of a
+  storm rides a 20s debounce, a background, or the next launch. A per-second
+  retry loop is three requests a minute carrying all sixty occurrences, not sixty
+  requests from a phone already having a bad time. **Suppressing a REQUEST
+  therefore never loses a COUNT** — the debounce, the per-launch request budget
+  and a dead network all defer; `takePending`/`restorePending` is what holds that
+  across a failed send, and `initFaultReporting()` (root layout) drains what was
+  left buffered when the app last stopped. **TWO NUMBERS come out and neither is
+  reported alone**: `n` sums to occurrences, and `d` — set on a signature's first
+  report each Eastern day — sums to install-days, which is as close to "how many
+  phones" as a system with no identifier gets. Occurrences alone cannot tell one
+  looping phone from a bug everybody has; install-days alone cannot tell a glitch
+  from a storm. **The platform/version/tier splits move with INSTALL-DAYS**, so
+  one looping phone cannot report whichever build it runs as the whole of a
+  failure (`occPlatforms` is the exception, since platform is the dashboard's
+  filter). **The message is redacted before it leaves AND again in the lambda** —
+  emails, URLs to their host, paths to a basename, anything id-shaped, digit runs
+  of 4+ — the second pass being the one that makes it true of the TABLE rather
+  than of the builds we shipped; the digit rule is also what groups a retry loop
+  into one signature. And **it must never route back into `logError`**, or a
+  failing network turns one error into a loop. Rows expire after 120 days
+  (`expiresAt`, TTL on the table): diagnostic, not a series. Read back under
+  `faults` on the same report call; drawn by the dashboard's **Failures** tab,
+  which ranks by breadth and keeps the two counters visibly apart.
 - **Types come in two layers.** Built-ins live in the `*_TYPES` maps in
   `src/lib/registry.ts` (add an icon in `src/components/Icon.tsx` when adding one).
   Users can also create their own activities, meds/supplements, symptoms and
