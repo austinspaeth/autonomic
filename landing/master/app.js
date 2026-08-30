@@ -1491,7 +1491,7 @@
       try { localStorage.removeItem(PING_KEY); } catch (e2) { /* ignore */ }
     }
   }
-  var pingUI = { tlMode: 'usage', tlMetric: 'active', curveMode: 'all', heatGrain: 'week', cohort: null, event: null, editing: null, rawKind: 'all' };
+  var pingUI = { tlMode: 'usage', tlMetric: 'active', curveMode: 'all', heatGrain: 'week', cohort: null, event: null, editing: null, rawKind: 'all', fltSort: 'installs' };
 
   var PC = {
     fresh: COLOR.green,        // first run — an install the counter had not seen
@@ -3403,20 +3403,25 @@
 
     /* And the error counter, which is not a daily event at all: it fires once
        per install ever, so this is a population and the running total IS the
-       number of phones that have had something go wrong. It says nothing about
-       WHAT — there is no tag in the ping — and the honest next step is the
-       support dump from the user's own device. */
+       number of phones whose FIRST failure landed in this range. It says
+       nothing about WHAT — there is no tag in the ping, by design — and that
+       is exactly the wall the Failures view exists on the other side of. Kept
+       here rather than retired: this is the clean headcount, and the fault log
+       next door is grouped by failure, so summing that would count a phone
+       once per bug it hit. */
     var err = A.errorInstalls(ix, days);
     var errRow = !err.available ? '' :
-      '<div><span>Installs reporting a failure</span><b>' + fmtInt(err.installs) + '</b>' +
-      '<span class="note">once per install, ever · no tag, no message</span></div>';
+      '<div><span>Installs reporting a first failure</span><b>' + fmtInt(err.installs) + '</b>' +
+      '<span class="note">once per install, ever · what broke is in <b>Failures</b></span></div>';
 
     document.getElementById('pgEventNote').innerHTML =
       (rows || errRow ? '<div class="mini-rows">' + rows + errRow + '</div>' : '') +
       '<p class="hint" style="margin:8px 0 0">These routes are capped per install per day <b>per line</b>, so ' +
       'each number is a headcount for that one thing and the lines must not be added together. The failure ' +
-      'row is different again: once per install ever, so it is a running population — and it carries no tag ' +
-      'and no message, only a count of phones worth asking for a support dump.</p>';
+      'row is different again: once per install <b>ever</b>, so it is a running population of phones that ' +
+      'have had a bad time — and because it fires only once, it goes quiet on an install that hiccuped ' +
+      'months ago and can never say what broke. <b>What</b> broke is the Failures tab, which is fed by a ' +
+      'separate route carrying a tag and a redacted message.</p>';
   }
 
   /* ------------------------------------------------- 5g. tier and build
@@ -3919,6 +3924,33 @@
     segment('pgHeatGrain', 'heatGrain', function () { pingUI.cohort = null; renderPing(); });
     segment('tlMetric', 'tlMetric', renderTimelineView);
     segment('pgRawKind', 'rawKind', renderPings);
+    segment('fltSort', 'fltSort', renderFaults);
+
+    var fltExport = document.getElementById('fltExport');
+    if (fltExport) fltExport.addEventListener('click', function () {
+      var ix = A.index(pings.report, pingPlatform());
+      var rows = faultRows(ix.days && ix.days.length ? pingRange(ix) : null);
+      if (!rows.length) { toast('Nothing to export yet.'); return; }
+      /* The whole filtered set, never the capped rows the table draws — the cap
+         is a rendering budget, and an export that inherited it would be the
+         same lie the table's footnote exists to avoid. The message is quoted
+         because it is free text; nothing else here can contain a comma. */
+      var out = ['message,tag,fatal,install_days,days,first_day,last_day,top_build,'
+        + 'top_build_share,build_unknown,platforms,tiers'];
+      rows.forEach(function (g) {
+        var v = A.faultTopVersion(g);
+        var split = function (m) {
+          return Object.keys(m).sort().map(function (k) { return k + ':' + m[k]; }).join(' ');
+        };
+        out.push([
+          '"' + String(g.msg).replace(/"/g, '""') + '"',
+          g.tag, g.fatal ? 'yes' : '', g.installDays, g.days, g.firstDay, g.lastDay,
+          v.version || '', v.share === null ? '' : v.share.toFixed(1), v.unknown,
+          '"' + split(g.platforms) + '"', '"' + split(g.tiers) + '"'
+        ].join(','));
+      });
+      download('autonomic-failures.csv', out.join('\n'), 'text/csv');
+    });
 
     var rawExport = document.getElementById('pgRawExport');
     if (rawExport) rawExport.addEventListener('click', function () {
@@ -7419,7 +7451,8 @@
    */
   function needsSkeleton() {
     if (bootPending) return true;
-    if ((state.view === 'ping' || state.view === 'timeline' || state.view === 'pings') &&
+    if ((state.view === 'ping' || state.view === 'timeline' || state.view === 'pings'
+         || state.view === 'faults') &&
         !pings.report && pings.status !== 'error') return true;
     return false;
   }
@@ -7429,7 +7462,7 @@
   var VIEW_TITLES = {
     overview: 'Overview', ping: 'App usage', timeline: 'Timeline', trial: 'Trial & conversion', cohorts: 'Cohorts',
     platforms: 'iOS vs Android', sales: 'Sales', costs: 'Costs', forecast: 'Forecast',
-    pings: 'Pings', links: 'Links', data: 'Edit data'
+    faults: 'Failures', pings: 'Pings', links: 'Links', data: 'Edit data'
   };
 
   function renderAll() {
@@ -7456,7 +7489,8 @@
     // without knowing who is who, which is exactly what the ping refuses to
     // carry. Hiding the grain is more honest than silently ignoring it.
     var grainGroup = document.getElementById('fgGrain');
-    if (grainGroup && (state.view === 'ping' || state.view === 'timeline' || state.view === 'pings')) {
+    if (grainGroup && (state.view === 'ping' || state.view === 'timeline' || state.view === 'pings'
+        || state.view === 'faults')) {
       grainGroup.classList.add('hidden');
     }
     /* Costs are not per-store — a hosting bill belongs to neither, and no ad
@@ -7483,7 +7517,8 @@
       showSkeleton(true);
       document.getElementById('view-' + state.view).classList.add('hidden');
       document.getElementById('emptyState').classList.add('hidden');
-      if (state.view === 'ping' || state.view === 'timeline' || state.view === 'pings') pingLoad();
+      if (state.view === 'ping' || state.view === 'timeline' || state.view === 'pings'
+          || state.view === 'faults') pingLoad();
       return;
     }
     showSkeleton(false);
@@ -7499,7 +7534,8 @@
        count. */
     var empty = !db.entries.length && !salesList().length && state.view !== 'data' &&
       state.view !== 'ping' && state.view !== 'timeline' && state.view !== 'costs' &&
-      state.view !== 'sales' && state.view !== 'pings' && state.view !== 'links';
+      state.view !== 'sales' && state.view !== 'pings' && state.view !== 'faults' &&
+      state.view !== 'links';
     document.getElementById('emptyState').classList.toggle('hidden', !empty);
     if (empty) {
       document.getElementById('view-' + state.view).classList.add('hidden');
@@ -7516,11 +7552,204 @@
     else if (state.view === 'sales') renderSales();
     else if (state.view === 'costs') renderCosts();
     else if (state.view === 'forecast') renderForecast();
+    else if (state.view === 'faults') { pingLoad(); renderFaults(); }
     else if (state.view === 'pings') { pingLoad(); renderPings(); }
     else if (state.view === 'links') renderLinks();
     else if (state.view === 'data') renderData();
 
     layoutTiles();
+  }
+
+  /* ------------------------------------------------ view: failures --------
+   *
+   * What is going wrong out there, and on which build.
+   *
+   * The only view on this dashboard fed by something that is not a counter.
+   * `/ping/err` — the "Installs reporting a failure" row over in App usage —
+   * fires ONCE PER INSTALL EVER and carries no tag, so it is a population and
+   * permanently unable to say what broke: a phone that hiccuped in March spent
+   * its ping and stayed silent through every bug shipped since. `/fault` is the
+   * answer to the next question, and it is stored by SIGNATURE (day, call site,
+   * failure) rather than by cohort, because a bug is a thing and not a property
+   * of an install age.
+   *
+   * TWO SENTENCES THIS VIEW HAS TO KEEP SAYING, because both are easy and
+   * expensive to misread:
+   *
+   *   a count is INSTALL-DAYS, not occurrences — the app reports a signature at
+   *   most once per install per day, so a phone in a retry loop counts once;
+   *
+   *   and there is no identifier anywhere in this system, so nine install-days
+   *   might be nine phones once each or one phone for nine days.
+   *
+   * The grouping, ranking and version arithmetic are all in analytics.js. This
+   * function draws them.
+   */
+
+  var FLT_MAX_ROWS = 300;
+
+  /** The signatures in view, after the sort control. Grouping and the platform
+   *  filter are analytics' job; this only reorders. */
+  function faultRows(r) {
+    var groups = A.faultGroups(pings.report, pingPlatform(), r && r.from, r && r.to);
+    var last = r && r.to;
+    if (pingUI.fltSort === 'recent') {
+      groups = groups.slice().sort(function (a, b) {
+        if (a.lastDay !== b.lastDay) return a.lastDay < b.lastDay ? 1 : -1;
+        return b.installDays - a.installDays;
+      });
+    } else if (pingUI.fltSort === 'new') {
+      /* Not a sort but a FILTER, and deliberately so: "new" is the question
+         "did today's release break something", and a list that merely floated
+         new rows to the top still buries the answer under a backlog of known
+         failures the moment there are more than a screenful. */
+      groups = groups.filter(function (g) { return last && g.firstDay === last; });
+    } else if (pingUI.fltSort === 'fatal') {
+      groups = groups.filter(function (g) { return g.fatal; });
+    }
+    return groups;
+  }
+
+  function faultTiles(groups, r, ix) {
+    var last = r && r.to;
+    var s = A.faultSummary(groups, last);
+    /* Against the people who were in the app, because a count of failures is
+       not a rate. The denominator is the same `open` counter every other rate
+       on this dashboard uses, so this number is comparable with them. */
+    var actives = ix && last ? A.activeOn(ix, last) : 0;
+    var todayFaults = A.faultsOn(pings.report, pingPlatform(), last);
+
+    document.getElementById('fltTiles').innerHTML = [
+      tile({
+        label: 'Distinct failures', value: fmtInt(s.signatures),
+        meta: s.signatures ? 'over ' + fmtInt(s.installDays) + ' install-day'
+          + (s.installDays === 1 ? '' : 's') : 'nothing reported in this range'
+      }),
+      tile({
+        label: 'New on ' + (last ? labelDay(last) : 'the last day'),
+        value: fmtInt(s.fresh), color: s.fresh ? COLOR.red : COLOR.muted,
+        /* The number worth alerting on. Forty known failures is a backlog;
+           one that appeared this morning on the build that shipped yesterday
+           is a release going wrong, and a total cannot tell them apart. */
+        meta: 'first seen that day'
+      }),
+      tile({
+        label: 'Still happening', value: fmtInt(s.live),
+        meta: last ? 'reported on ' + labelDay(last) : ''
+      }),
+      tile({
+        label: 'Crashes', value: fmtInt(s.fatal),
+        color: s.fatal ? COLOR.red : COLOR.muted,
+        /* A fatal reached the global handler rather than a catch block, so it
+           took the app down in front of somebody. It is a different severity
+           from a swallowed error and is never pooled with one. */
+        meta: 'uncaught — the app went down'
+      }),
+      tile({
+        label: 'Failing installs on ' + (last ? labelDay(last) : 'the last day'),
+        value: fmtInt(todayFaults),
+        meta: actives ? fmtPct((todayFaults / actives) * 100) + ' of the ' + fmtInt(actives)
+          + ' in the app' + ' · install-days, not phones' : 'no opens that day to compare with'
+      })
+    ].join('');
+  }
+
+  function renderFaults() {
+    document.getElementById('fltStatus').innerHTML = pingStatusHTML();
+    var retry = document.getElementById('pgRetry');
+    if (retry) retry.addEventListener('click', function () { pingLoad(true); });
+
+    var ready = pings.status === 'ready' || !!pings.report;
+    var hosts = ['fltTiles', 'fltTable'];
+    if (!ready) {
+      hosts.forEach(function (id) {
+        var n = document.getElementById(id);
+        if (n) n.innerHTML = '';
+      });
+      drawChart('fltDaily', { x: [], series: [], emptyText: 'Reading the counter…' });
+      return;
+    }
+
+    var ix = A.index(pings.report, pingPlatform());
+    var r = ix.days && ix.days.length ? pingRange(ix) : null;
+    var days = r ? A.range(r.from, r.to) : [];
+    var groups = faultRows(r);
+
+    faultTiles(groups, r, ix);
+
+    /* Failures beside opens. Two axes would be a lie of scale here — the whole
+       point is that one line is normally a rounding error against the other,
+       and a chart that normalises them hides the only thing worth seeing. */
+    drawChart('fltDaily', {
+      x: days.map(labelDay), height: 240, format: fmtInt, xLabel: 'Day',
+      series: [
+        {
+          key: 'open', name: 'Opened the app', color: PC.active, type: 'line',
+          values: days.map(function (d) { return A.activeOn(ix, d); })
+        },
+        {
+          key: 'fault', name: 'Reported a failure', color: COLOR.red, type: 'line',
+          values: days.map(function (d) { return A.faultsOn(pings.report, pingPlatform(), d); })
+        }
+      ],
+      emptyText: 'No failures reported in this range.'
+    });
+
+    var shown = groups.slice(0, FLT_MAX_ROWS);
+    if (!shown.length) {
+      document.getElementById('fltTable').innerHTML =
+        '<div class="empty">' + (pingUI.fltSort === 'new'
+          ? 'Nothing new on the last day — every failure in this range was already known.'
+          : pingUI.fltSort === 'fatal'
+            ? 'No crashes in this range. Every failure here was caught and handled.'
+            : 'No failures reported in this range.') + '</div>';
+      return;
+    }
+
+    var last = r && r.to;
+    document.getElementById('fltTable').innerHTML =
+      '<table><thead><tr>' +
+      '<th>What failed</th><th>Where</th><th class="num">Installs</th>' +
+      '<th class="num">Days</th><th>Build</th><th>Platform</th><th>Last seen</th>' +
+      '</tr></thead><tbody>' +
+      shown.map(function (g) {
+        var v = A.faultTopVersion(g);
+        /* One build carrying nearly all of a failure is a regression that
+           shipped, and it is called out rather than left to be spotted in a
+           percentage. The share is of the reports that NAMED a version — an
+           old build cannot — so `unknown` is stated beside it and never folded
+           in either direction. */
+        var concentrated = v.version && v.share !== null && v.share >= 80 && v.known >= 3;
+        /* The unknown line is drawn WHENEVER there are unknowns, including on a
+           row where no version was named at all — that row is the one where the
+           disclosure matters most, because "not stated" alone reads as a
+           missing field rather than as a real population of old builds. */
+        var build = (!v.version ? '<span class="note">not stated</span>'
+          : '<b>' + esc(v.version) + '</b> <span class="note">'
+            + (v.share === null ? '' : fmtPct(v.share)) + '</span>'
+            + (concentrated ? ' <span class="pill warn">only this build</span>' : ''))
+          + (v.unknown ? '<br><span class="note">' + fmtInt(v.unknown) + ' from builds too old to say</span>' : '');
+        var plat = Object.keys(g.platforms).sort().map(function (p) {
+          return esc(A.platformName(p)) + ' ' + fmtInt(g.platforms[p]);
+        }).join(' · ') || '<span class="note">unknown</span>';
+        return '<tr>' +
+          '<td><code>' + esc(g.msg) + '</code>' +
+          (g.fatal ? ' <span class="pill bad">crash</span>' : '') +
+          (last && g.firstDay === last ? ' <span class="pill warn">new</span>' : '') + '</td>' +
+          '<td><code class="note">' + esc(g.tag) + '</code></td>' +
+          '<td class="num"><b>' + fmtInt(g.installDays) + '</b></td>' +
+          '<td class="num">' + fmtInt(g.days) + '</td>' +
+          '<td>' + build + '</td>' +
+          '<td>' + plat + '</td>' +
+          '<td>' + esc(labelDay(g.lastDay)) +
+          (g.firstDay !== g.lastDay ? '<br><span class="note">since ' + esc(labelDay(g.firstDay)) + '</span>' : '') +
+          '</td></tr>';
+      }).join('') +
+      '</tbody></table>' +
+      (groups.length > shown.length
+        ? '<p class="hint">Showing the first ' + fmtInt(shown.length) + ' of ' + fmtInt(groups.length)
+          + ' — the export carries all of them.</p>'
+        : '');
   }
 
   /* ------------------------------------------------------- view: pings ----

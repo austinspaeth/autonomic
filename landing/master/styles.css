@@ -702,6 +702,17 @@ code {
    corresponds to rather than a third palette nobody has learned. */
 .pill.green { color: var(--stage-trial); border-color: color-mix(in srgb, var(--stage-trial) 45%, transparent); }
 .pill.red { color: var(--stage-wall); border-color: color-mix(in srgb, var(--stage-wall) 45%, transparent); }
+/* Failure severity. `bad` is a crash — it reached the global handler, so the
+   app went down in front of somebody — and `warn` is "new on the last day",
+   which is the one thing on that table worth reacting to today. Two levels and
+   no more: a crash list where everything is coloured is a crash list nobody
+   reads twice. */
+.pill.bad { color: var(--stage-wall); border-color: color-mix(in srgb, var(--stage-wall) 45%, transparent); }
+.pill.warn { color: var(--warning); border-color: color-mix(in srgb, var(--warning) 45%, transparent); }
+
+/* Right-aligned numeric cells, so a column of counts can be compared down its
+   own edge rather than by reading each one. */
+th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 /* ---------- funnel ---------- */
 

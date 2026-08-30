@@ -45,21 +45,35 @@ function load(): LoggedError[] {
  */
 export function logError(tag: string, err: unknown, opts?: { fatal?: boolean }): void {
   try {
+    const msg = describeError(err);
     mem = pushError(load(), {
       at: new Date().toISOString(),
       tag,
-      msg: describeError(err),
+      msg,
       ...(opts?.fatal ? { fatal: true } : null),
     }, MAX_ERRORS);
     try { store()?.set(KEY, JSON.stringify(mem)); } catch { /* in-memory only this session */ }
-    // Say once, ever, that something on this install failed — no tag, no
-    // message, no count (see pingErrorSeen). Required lazily rather than
-    // imported: the ping store reaches the IAP and tier stores, both of which
-    // log errors, and a static import would close that circle at module-init
-    // time. It can never route back here — pings do not log failures, precisely
-    // so that a phone with no signal cannot flush this window.
+    // TWO things are told, and they answer different questions.
+    //
+    // `pingErrorSeen` is the counter: once per install EVER, no tag, no
+    // message — how many phones have had something go wrong. It is a
+    // population and it stays exactly as blunt as it was.
+    //
+    // `reportFault` is the log: what went wrong and roughly where, once per
+    // distinct failure per install per day, with the message redacted before it
+    // leaves (see lib/errorReport). It exists because the counter is spent on
+    // an install's first hiccup and can never say what broke afterwards — a
+    // release that broke Health imports for everyone would not move it at all.
+    //
+    // Both are required lazily rather than imported: the ping store reaches the
+    // IAP and tier stores, both of which log errors, and a static import would
+    // close that circle at module-init time. Neither can route back here —
+    // neither logs its own failures, precisely so that a phone with no signal
+    // cannot flush this window.
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     try { require('../../store/ping').pingErrorSeen(); } catch { /* not wired up yet */ }
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    try { require('../../store/errorReport').reportFault(tag, msg, opts?.fatal); } catch { /* not wired up yet */ }
   } catch { /* logging must never throw */ }
 }
 

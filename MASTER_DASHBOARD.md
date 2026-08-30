@@ -376,11 +376,42 @@ dismissed was **ignored**, and the card counts it rather than leaving it implied
 
 And `err` is not a daily counter at all. It fires **once per install, ever**, so
 a day's count is new installs joining that population and the running total is
-the population. It carries no tag, no message and no count of failures, because a
-tag is a string this app chose and a message is a string it did not, and neither
-belongs in a counter that carries no identifier. It says how many phones are
-having a bad time; the support dump, from the user's own device and with their
-consent, is where one is diagnosed.
+the population. It carries no tag and no message, so it says how many phones are
+having a bad time and nothing whatsoever about what. It is kept exactly that
+blunt: it is the clean headcount, and the fault log described next is grouped by
+FAILURE, so summing that would count one phone once per bug it hit.
+
+**What broke is the `Failures` tab, and it is fed by something that is not a
+counter.** `/fault` (see `sls/README.md`) carries a **tag** naming the call site
+and a **short redacted message**, and is stored per `(day, call site, failure)`.
+It exists because `err` is structurally unable to answer the next question: it
+fires once, so an install that hiccuped in March is silent through every bug
+shipped since, and a release that broke Health imports for every Android phone
+would not move it by one.
+
+Three things that view has to keep saying, because each is easy and expensive to
+misread:
+
+- **A count is INSTALL-DAYS, not occurrences.** The app reports a signature at
+  most once per install per Eastern day, so a phone stuck in a retry loop counts
+  once. That is the number that decides a hotfix — how many phones are affected —
+  and how often it happened on one phone is what a support dump is for.
+- **It is not a phone count either.** There is no identifier anywhere in this
+  system, so nine install-days may be nine phones once each or one phone for
+  nine days. The view says so rather than letting the column header imply
+  otherwise.
+- **The version split is the answer.** A failure spread evenly across builds is
+  the app's background; one sitting almost entirely on the newest build is a
+  regression that shipped, and the table calls that out. The share is of the
+  reports that **named** a version — a build too old to say so is counted apart
+  and never folded in either direction, the same `?` rule everything else here
+  obeys.
+
+`New` and `Crashes` are **filters**, not sorts: "did today's release break
+something" and "what took the app down" are both questions a list that merely
+reordered would bury under a backlog the moment there is more than a screenful.
+The support dump is still where a single user's problem is diagnosed; this is
+what says which problem is worth chasing.
 
 **Every counter now carries two more fields, and they are what turn each of the
 above from one number into a number per population.** `tier` is what the install

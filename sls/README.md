@@ -26,6 +26,9 @@ GET  https://api.autonomic.care/ping/odm/D082126IA   (...dismissed)
 GET  https://api.autonomic.care/ping/oac/D082126IA   (...accepted)
 GET  https://api.autonomic.care/ping/report?key=...&since=2026-08-01
 
+GET  https://api.autonomic.care/fault/D082126I-TP-V1.26.0?t=health.check&m=timeout+after+%3Cn%3Ems
+     (a FAULT REPORT, not a counter — carries a call site and a redacted message)
+
      ...each of which may carry a tagged tail: D082126IG-TP-V1.26.0
 ```
 
@@ -65,6 +68,7 @@ per user, which would eventually meet DynamoDB's 400KB item ceiling.
 | `PING#POT` | `<day>` | POTS captures finished, per cohort+letter (per-letter cap) |
 | `PING#SEE` | `<day>` | gated views opened, per cohort+letter (per-letter cap) |
 | `PING#ERR` | `<day>` | installs reporting a first failure — once per install, ever |
+| `FAULT` | `<day>#<tag>#<hash>` | one distinct failure on one day: count, message, platform / version / tier splits. **Expires** (`expiresAt`, 120 days) |
 | `PING#OSH` / `#ODM` / `#OAC` | `<day>` | an offer shown · dismissed · accepted, per cohort+offer |
 | `STORE#VERSIONS` | `latest` | what each store is serving, cached (see below) |
 | `PUSH#<email>` | `SUB#<endpointHash>` | one device registered for background alerts |
@@ -420,6 +424,89 @@ it fails outright and the ping is silently dropped — 204, no count, no log. It
 is the one ordering constraint here, it fails in the direction that looks like
 nobody opened the app, and it is invisible from the phone. `sls deploy` first,
 then release the build.
+
+### `/fault` is not a ping, and that is the whole design
+
+Every route above is a **counter**: a fixed alphabet, no free text, and a number
+at the end of it that means "how many people". `/ping/err` is one of them — it
+fires **once per install, ever**, carries no tag and no message, and answers
+exactly one question: how many phones have had something go wrong.
+
+It cannot answer the next one, and never will. Firing once means an install that
+hiccuped in March has spent its ping and is silent through every bug shipped
+since; carrying no tag means the answer to "what broke" was always "ask that
+user for a support dump", which needs a user who wrote in. A release that broke
+Health imports for every Android install would not move that counter by one.
+
+`/fault` is the answer to the next question, and it lives under its own path
+prefix so nothing reads the two the same way.
+
+```
+GET /fault/D082126I-TP-V1.26.0?t=health.check&m=timeout+after+%3Cn%3Ems&f=1
+```
+
+The path is the **same install code every ping sends**, so cohort day, platform,
+tier and build version arrive with no second decoder. `t` is a **tag** naming the
+call site — a stable dotted key the app chose (`store.persist`, `health.check`,
+`uncaught.fatal`) — and `m` is a **short redacted message**. `f=1` marks an
+uncaught error, i.e. the app went down. The variable-length parts ride in the
+query string because an error string is full of slashes and an encoded slash in
+a path parameter is a fight with API Gateway nobody wins.
+
+**Stored by signature, not by event.** One row per `(day, call site, failure)`:
+
+```jsonc
+{ "PK": "FAULT", "SK": "2026-08-30#health.check#3fa21b0c",
+  "day": "2026-08-30", "tag": "health.check", "msg": "timeout after <n>ms",
+  "fatal": false, "count": 9,
+  "firstAt": "...", "lastAt": "...",
+  "platforms": { "I": 6, "A": 3 },
+  "versions":  { "1.26.0": 7, "?": 2 },
+  "tiers":     { "F": 8, "P": 1 },
+  "expiresAt": 1780000000 }
+```
+
+So the table grows with the number of **bugs**, not with the number of crashes:
+a thousand phones hitting one failure is one row, and the row carries the only
+three splits a fix is decided from. The day leads the sort key, so reading a
+range is one query.
+
+Four rules hold it in place, and each is load-bearing:
+
+1. **A count is INSTALL-DAYS, not occurrences.** The client sends one report per
+   signature per install per Eastern day, so a phone stuck in a retry loop
+   contributes 1. That is the number worth having — how many phones are affected
+   — and how often it happened on one phone is what the support dump is for. It
+   is not a phone count either: there is no identifier anywhere in this system,
+   so nine install-days may be nine phones once each or one phone for nine days.
+   The dashboard says exactly that.
+2. **Every distinct failure is reported, every day it is still happening.** The
+   dedupe key is the failure's own signature, not the install, which is the
+   whole difference from `/ping/err`. A phone that breaks in a new way tomorrow
+   says so tomorrow.
+3. **The message is redacted twice** — on the client
+   (`mobile/src/lib/errorReport.ts`) and again in `redactFault` here before
+   anything is written. Not belt and braces: the client's pass is a promise
+   about builds we shipped, and this one is the promise about what can ever be
+   **written**, which has to hold for an old build, a modified client and
+   somebody curling the URL. Emails, URLs down to their host, paths down to a
+   basename, anything id-shaped, and any digit run of four or more all go. That
+   last rule also does the grouping: `timeout after 3012ms` and `timeout after
+   4188ms` are one signature.
+4. **Rows expire** (`expiresAt`, `FAULT_TTL_DAYS` = 120, TTL enabled on the
+   table). These are diagnostic, not a series — and this is the one public route
+   that **creates** a row rather than incrementing one, so an expiry is what
+   bounds what a prober can leave behind. Only fault rows carry the attribute;
+   every ping counter and every dashboard record is written without it and is
+   untouched by TTL.
+
+The cohort date is decoded for its platform, tier and version and then **thrown
+away**. Adding it to the key would fragment one bug across every install age
+that hit it, turning the one number that decides a hotfix into a scatter — and
+it is the one field here with no bearing on a fix.
+
+It reads back on the same `/ping/report` and `PINGS` calls, under `faults`, and
+is drawn by the dashboard's **Failures** tab.
 
 ### Never delete a day row
 

@@ -127,6 +127,7 @@
     <button class="tab" role="tab" data-view="cohorts" aria-selected="false">Cohorts</button>
     <button class="tab" role="tab" data-view="platforms" aria-selected="false">iOS vs Android</button>
     <button class="tab" role="tab" data-view="forecast" aria-selected="false">Forecast</button>
+    <button class="tab" role="tab" data-view="faults" aria-selected="false">Failures</button>
     <button class="tab" role="tab" data-view="pings" aria-selected="false">Pings</button>
     <button class="tab" role="tab" data-view="links" aria-selected="false">Links</button>
   </nav>
@@ -846,6 +847,62 @@
       <div id="fcTable"></div>
     </div>
   </section>
+
+  <!-- ================= FAILURES =================
+       What is going wrong out there, and on which build.
+
+       This is the one view fed by something that is not a counter. Every other
+       ping is a fixed alphabet and a number; a fault carries a tag naming the
+       call site and a short redacted message, because the failure counter next
+       door (/ping/err) fires once per install EVER and can only ever say HOW
+       MANY phones have had a bad time — never what, and never again after an
+       install's first hiccup.
+
+       Two things this view must keep saying out loud, because both are easy to
+       misread and expensive to misread: a count here is INSTALL-DAYS and not
+       occurrences, and there is no identifier anywhere in this system, so
+       "9 install-days" might be nine phones once each or one phone for nine
+       days. -->
+  <section id="view-faults" class="view hidden">
+    <div id="fltStatus"></div>
+
+    <div class="section-head">
+      <h2 class="section-title">Failures</h2>
+      <span class="section-note">What broke, where, and on which build</span>
+    </div>
+
+    <div class="grid cards">
+      <div class="tile-group" id="fltTiles"></div>
+    </div>
+
+    <div class="card" style="margin-bottom:14px">
+      <header><h2>Failures against the people in the app</h2></header>
+      <p class="hint">Reported failures a day against <b>opens</b>, which is how many installs were in the app at all. The gap is the only thing that turns a count into a rate: ten failures on a day with ten actives is a broken release, and ten on a day with a thousand is background.</p>
+      <div class="chart" id="fltDaily"></div>
+    </div>
+
+    <div class="card" style="margin-bottom:14px">
+      <header><h2>What is failing</h2><span class="spacer"></span>
+        <div class="segmented" id="fltSort">
+          <button data-v="installs" aria-pressed="true">Most installs</button>
+          <button data-v="recent" aria-pressed="false">Most recent</button>
+          <button data-v="new" aria-pressed="false">New</button>
+          <button data-v="fatal" aria-pressed="false">Crashes</button>
+        </div>
+        <button class="btn sm" id="fltExport">Export CSV</button></header>
+      <p class="hint">One row per <b>distinct failure</b> — the same message at the same call site, however many days it has been happening. <b>Installs</b> is install-days: the app reports a failure at most <b>once per install per day</b>, so a phone stuck in a retry loop counts once and a number here is how many phones are affected, never how many times it happened. There is no device id anywhere in this system, so nine install-days may be nine phones once each or one phone for nine days. How often it happened on one phone is what a support dump is for.</p>
+      <p class="hint"><b>Build</b> is the question worth asking first: a failure spread evenly across every version is the app's background noise, and one sitting almost entirely on the newest build is a regression that shipped. The share is of the reports that <b>named</b> a version — builds too old to say so are counted separately and never folded in either direction.</p>
+      <div class="table-scroll" id="fltTable"></div>
+    </div>
+
+    <div class="card">
+      <header><h2>What is in a report, and what is not</h2></header>
+      <p class="hint">A report is one <code>GET</code> carrying the install's cohort day, platform, tier and build version — the same code every ping sends — plus a <b>tag</b> naming the call site and a <b>message</b>. There is no device id, no install id, no body, and no health or journal data.</p>
+      <p class="hint">The message is <b>redacted twice</b>, on the phone before it is sent and again in the handler before it is stored: emails, URLs down to their host, file paths down to a basename, anything id-shaped, and any digit run long enough to be a timestamp or a key. The second pass is the one that matters — it is what makes this true of the <b>table</b> rather than only of the builds we shipped. That last rule is also what groups a retry loop: <code>timeout after 3012ms</code> and <code>timeout after 4188ms</code> are one failure, not two.</p>
+      <p class="hint">Rows <b>expire</b> after four months. These are diagnostic, not a series — and an expiry bounds the one public route that creates a row rather than incrementing one.</p>
+    </div>
+  </section>
+
 
   <!-- ================= DATA ================= -->
   <!-- ================= PINGS =================

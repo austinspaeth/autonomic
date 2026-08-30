@@ -17,6 +17,10 @@
  *   GET /ping/odm/D082126IA   ...and dismissed
  *   GET /ping/oac/D082126IA   ...or accepted
  *
+ * plus ONE route that is not a ping at all:
+ *
+ *   GET /fault/D082126I-TP-V1.26.0?t=health.check&m=timeout+after+<n>ms&f=1
+ *
  * and one reader, guarded by a shared key:
  *
  *   GET /ping/report?key=...&since=2026-08-01   the counts back out as JSON
@@ -81,6 +85,48 @@
  * The trade this makes: counts are trusted rather than verified. Anyone can
  * curl a write URL and inflate a number. That is accepted — the alternative is
  * an identifier, which is the thing we are refusing to collect.
+ *
+ * ------------------------------------------------------------------ faults
+ *
+ * `/fault` is the one route here that is NOT a counter, and it lives under its
+ * own path prefix so nothing reads the two the same way. Every ping above is a
+ * fixed alphabet and a number that means "how many people"; a fault carries
+ * TEXT — a tag naming the call site and a short redacted message — because the
+ * counter it sits beside cannot say what broke and never will.
+ *
+ * `/ping/err` fires once per install EVER. That makes it a clean population
+ * ("how many phones have had something go wrong") and permanently blind to the
+ * next question: an install that hiccuped in March has spent its ping and is
+ * silent through every bug shipped since, so a release that broke Health
+ * imports for every Android phone would not move it by one. Both now run. The
+ * counter says how many; this says what, once per distinct failure per install
+ * per Eastern day, so a bug that is still live is still reported tomorrow.
+ *
+ * Stored by SIGNATURE rather than by event: PK `FAULT`, SK
+ * `<day>#<tag>#<hash>`, holding a count and the platform / version / tier
+ * splits. One row per distinct failure per day, however many phones hit it, so
+ * the table grows with the number of BUGS and not with the number of crashes —
+ * and the row answers the only question that decides a hotfix: how many
+ * installs, on which build, on which OS.
+ *
+ * A COUNT HERE IS INSTALL-DAYS, NOT OCCURRENCES. The client sends one report
+ * per signature per day, so a phone stuck in a retry loop contributes 1. That
+ * is the number worth having — how many phones are affected — and how often it
+ * happened on one phone is what the support dump is for.
+ *
+ * THE MESSAGE IS REDACTED TWICE, on the client before it is sent and again
+ * here before it is stored. Not belt and braces: the client's redaction is a
+ * promise about builds we shipped, and this one is the promise about what can
+ * ever be WRITTEN — a modified client, an old build, or somebody curling the
+ * URL cannot put a path, an email or an id into this table. `redactFault`
+ * below is the client's `redactMessage` (mobile/src/lib/errorReport.ts) again,
+ * the same duplication `easternDay` already carries and for the same reason:
+ * the two runtimes must agree and neither may depend on the other.
+ *
+ * Fault rows carry a TTL and expire after FAULT_TTL_DAYS. They are diagnostic,
+ * not a historical series — nobody asks what was crashing fourteen months ago —
+ * and an expiry is also what bounds the damage a prober can do, since this is
+ * the one route where a request creates a ROW rather than incrementing one.
  */
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
 const { DynamoDBDocumentClient, UpdateCommand, QueryCommand } = require('@aws-sdk/lib-dynamodb');
@@ -461,6 +507,201 @@ const readDays = async (kind, since) => {
   return rows;
 };
 
+/* ----------------------------------------------------------------- faults */
+
+/** How long a fault row lives. Diagnostic, not a series: nobody asks what was
+ *  crashing fourteen months ago, and an expiry bounds the one route here that
+ *  creates rows rather than incrementing them. */
+const FAULT_TTL_DAYS = 120;
+
+/** Caps on what may be stored. The client already applies both; these are what
+ *  make them true of the TABLE rather than of the builds we shipped. */
+const FAULT_MSG_MAX = 160;
+const FAULT_TAG_MAX = 40;
+
+/** Rows one read may return. A dashboard that has to draw ten thousand rows has
+ *  stopped being a diagnostic tool; if this is ever hit, the answer is on the
+ *  first page anyway (the query is newest-day-last, and the UI sorts). */
+const FAULT_READ_MAX = 4000;
+
+/**
+ * A tag is a stable dotted key the app chose (`store.persist`, `health.check`).
+ * Checked rather than cleaned: a string that is not one of ours is not a tag
+ * with bad characters in it, and sanitising it would invent a call site.
+ */
+const safeTag = (raw) => {
+  const t = String(raw || '').trim().toLowerCase().slice(0, FAULT_TAG_MAX);
+  return /^[a-z0-9][a-z0-9._-]*$/.test(t) ? t : 'unknown';
+};
+
+/**
+ * The client's `redactMessage`, again.
+ *
+ * Duplicated rather than shared, the same way `easternDay` is: the two run in
+ * different runtimes, neither can import the other, and the property that
+ * matters is that NOTHING unredacted can be written here whatever the caller
+ * is. If these two ever disagree, this one wins, because this one is the only
+ * promise that survives a build we did not ship.
+ *
+ * Each rule catches a real shape a real failure produces: an email in a file
+ * name, a URL's path or query, an iOS container path holding the device's own
+ * UUID, a receipt or update id, and any digit run long enough to be a timestamp
+ * or a key. Short digit runs survive so `code 404` still reads as `code 404`.
+ */
+const redactFault = (raw) => {
+  let s = String(raw == null ? '' : raw);
+  s = s.replace(/[\u0000-\u001f\u007f]+/g, ' ');
+  s = s.replace(/[\w.+-]+@[\w-]+\.[\w.]+/g, '<email>');
+  s = s.replace(/\b([a-z][a-z0-9+.-]*):\/\/([^\s/?#]*)[^\s]*/gi, '$1://$2');
+  s = s.replace(/(^|[\s"'(\[<])((?:\/[^\s/]+){2,}\/?)/g, (_all, pre, p) => {
+    const parts = p.split('/').filter(Boolean);
+    return `${pre}…/${parts[parts.length - 1] || ''}`;
+  });
+  s = s.replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, '<id>');
+  s = s.replace(/\b[0-9a-f]{12,}\b/gi, '<id>');
+  s = s.replace(/\b[A-Za-z0-9_-]{24,}\b/g, '<id>');
+  s = s.replace(/\d{4,}/g, '<n>');
+  s = s.replace(/\s+/g, ' ').trim();
+  return s.length > FAULT_MSG_MAX ? `${s.slice(0, FAULT_MSG_MAX - 1)}…` : s;
+};
+
+/** FNV-1a, 32 bits, 8 hex characters. Not a security hash: it is the stable
+ *  part of a signature's key, so the same failure lands on the same row. */
+const hash8 = (s) => {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i += 1) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h.toString(16).padStart(8, '0');
+};
+
+/**
+ * The row one fault lands on: `<day>#<tag>#<hash of the redacted message>`.
+ *
+ * The hash is taken of the message AS STORED, so what the dashboard shows is
+ * what the grouping was computed from — hashing the raw text instead would let
+ * two rows that read identically sit apart because of a timestamp neither of
+ * them displays. A fatal is its own row: a crash and a swallowed error that
+ * read alike are not the same bug.
+ */
+const faultKey = (day, tag, msg, fatal) => `${day}#${tag}#${hash8(msg)}${fatal ? '!' : ''}`;
+
+/**
+ * Count one fault, creating its row on first sight.
+ *
+ * `count` is install-days, per the header. The three splits beside it are the
+ * ones a fix is actually decided from — which build, which OS, which tier —
+ * and they are maps for the same reason the ping counters' are: a nested map
+ * key is addressable, so the whole thing is one atomic UpdateItem and two
+ * phones reporting in the same millisecond cannot lose a count.
+ *
+ * `msg` and `tag` are written with `if_not_exists` so the FIRST spelling of a
+ * failure is the one that sticks. They hash to the same row by construction, so
+ * this only matters if the redaction ever changes under a live key — and then
+ * the stored row keeping its original text is the right answer, not a race.
+ */
+const bumpFault = async (day, tag, msg, fatal, platform, tier, version, nowMs) => {
+  const key = faultKey(day, tag, msg, fatal);
+  const add = new UpdateCommand({
+    TableName: TABLE,
+    Key: { PK: 'FAULT', SK: key },
+    UpdateExpression: [
+      'SET #platforms.#p = if_not_exists(#platforms.#p, :zero) + :one',
+      '#versions.#v = if_not_exists(#versions.#v, :zero) + :one',
+      '#tiers.#t = if_not_exists(#tiers.#t, :zero) + :one',
+      '#count = if_not_exists(#count, :zero) + :one',
+      '#day = :day, #tag = :tag, #fatal = :fatal',
+      '#msg = if_not_exists(#msg, :msg)',
+      '#first = if_not_exists(#first, :now)',
+      '#last = :now',
+      '#ttl = :ttl',
+      'entityType = :et',
+    ].join(', '),
+    ExpressionAttributeNames: {
+      '#platforms': 'platforms', '#p': platform || 'U',
+      '#versions': 'versions', '#v': version || '?',
+      '#tiers': 'tiers', '#t': tier || '?',
+      '#count': 'count', '#day': 'day', '#tag': 'tag', '#msg': 'msg',
+      '#fatal': 'fatal', '#first': 'firstAt', '#last': 'lastAt', '#ttl': 'expiresAt',
+    },
+    ExpressionAttributeValues: {
+      ':zero': 0,
+      ':one': 1,
+      ':day': day,
+      ':tag': tag,
+      ':msg': msg,
+      ':fatal': !!fatal,
+      ':now': new Date(nowMs).toISOString(),
+      ':ttl': Math.floor(nowMs / 1000) + FAULT_TTL_DAYS * 86400,
+      ':et': 'FAULT',
+    },
+  });
+
+  try {
+    await ddb.send(add);
+  } catch (err) {
+    // Same shape as `bump`: a nested path can't be written while its parent map
+    // does not exist, i.e. on a signature's first ever sighting. Create the
+    // three maps, then redo. `if_not_exists` keeps that safe against a race.
+    if (err?.name !== 'ValidationException') throw err;
+    await ddb.send(new UpdateCommand({
+      TableName: TABLE,
+      Key: { PK: 'FAULT', SK: key },
+      UpdateExpression: 'SET #platforms = if_not_exists(#platforms, :empty), '
+        + '#versions = if_not_exists(#versions, :empty), #tiers = if_not_exists(#tiers, :empty)',
+      ExpressionAttributeNames: { '#platforms': 'platforms', '#versions': 'versions', '#tiers': 'tiers' },
+      ExpressionAttributeValues: { ':empty': {} },
+    }));
+    await ddb.send(add);
+  }
+};
+
+/**
+ * Every fault row from `since` onwards. The day leads the sort key, so the
+ * range condition is the query and nothing is filtered afterwards.
+ *
+ * The three splits come back as plain objects rather than as decoded arrays
+ * (the shape `cohorts` and `builds` use) because their keys are single facts
+ * with obvious names — a platform letter, a tier letter, a version string —
+ * and there is no composite key to take apart.
+ */
+const readFaults = async (since) => {
+  const rows = [];
+  let ExclusiveStartKey;
+  do {
+    // eslint-disable-next-line no-await-in-loop
+    const res = await ddb.send(new QueryCommand({
+      TableName: TABLE,
+      KeyConditionExpression: 'PK = :pk AND SK >= :since',
+      ExpressionAttributeValues: { ':pk': 'FAULT', ':since': since },
+      ExclusiveStartKey,
+    }));
+    (res.Items || []).forEach((item) => {
+      const num = (m) => Object.keys(m || {}).reduce((a, k) => {
+        a[k] = Number(m[k]) || 0;
+        return a;
+      }, {});
+      rows.push({
+        key: item.SK,
+        day: item.day || String(item.SK || '').slice(0, 10),
+        tag: item.tag || 'unknown',
+        msg: item.msg || '',
+        fatal: !!item.fatal,
+        count: Number(item.count) || 0,
+        firstAt: item.firstAt || null,
+        lastAt: item.lastAt || null,
+        platforms: num(item.platforms),
+        versions: num(item.versions),
+        tiers: num(item.tiers),
+      });
+    });
+    ExclusiveStartKey = res.LastEvaluatedKey;
+  } while (ExclusiveStartKey && rows.length < FAULT_READ_MAX);
+  rows.sort((a, b) => a.key.localeCompare(b.key));
+  return rows.slice(0, FAULT_READ_MAX);
+};
+
 /**
  * Every kind, keyed by route name. Shared with the dashboard API.
  *
@@ -478,8 +719,21 @@ const REPORT_KINDS = Object.keys(KINDS);
 
 const report = async (since) => {
   const from = isIsoDate(since) ? since : EPOCH;
-  const rows = await Promise.all(REPORT_KINDS.map((k) => readDays(KINDS[k], from)));
-  const out = { since: from };
+  const [rows, faults] = await Promise.all([
+    Promise.all(REPORT_KINDS.map((k) => readDays(KINDS[k], from))),
+    // Read alongside the counters rather than behind a second call: the
+    // dashboard shows failures against opens ("of the phones in the app today,
+    // how many hit this"), and a view that fetched them separately would draw
+    // the numerator before the denominator.
+    readFaults(from).catch((err) => {
+      // A fault read must never take the counters down with it. This is the
+      // newest partition in the table and the only one with no rows at all on a
+      // stage that has never received one.
+      console.error('fault read failed', err);
+      return [];
+    }),
+  ]);
+  const out = { since: from, faults };
   REPORT_KINDS.forEach((k, i) => { out[k] = rows[i]; });
   return out;
 };
@@ -509,6 +763,44 @@ const handleReport = async (event) => {
   return json(200, await report(q.since));
 };
 
+/**
+ * One fault report: `/fault/{code}?t=<tag>&m=<message>&f=1`.
+ *
+ * The path is the same install code every ping sends, so cohort day, platform,
+ * tier and build version arrive with no second decoder. The variable-length
+ * parts ride in the query string, which is where a message can go without
+ * fighting path encoding — error text is full of slashes, and an encoded slash
+ * in a path parameter is a fight with API Gateway nobody wins.
+ *
+ * The cohort is decoded for its PLATFORM, TIER and VERSION and then thrown
+ * away. That is deliberate: a fault is grouped by what broke, and adding the
+ * cohort to the key would fragment one bug across every install age that hit
+ * it — turning the one number that decides a hotfix ("how many phones") into a
+ * scatter nobody can add up. It is also the one field here with no bearing on a
+ * fix, so keeping it would be collecting for its own sake.
+ */
+const handleFault = async (event) => {
+  const decoded = decodeCohort(event?.pathParameters?.cohort);
+  if (!decoded) return noContent;
+  const { iso: cohort, platform, tier, version } = decoded;
+
+  const now = Date.now();
+  if (cohort < EPOCH) return noContent;
+  if (Date.parse(`${cohort}T00:00:00Z`) > now + SKEW_MS) return noContent;
+
+  const q = event?.queryStringParameters || {};
+  const msg = redactFault(q.m);
+  // A report with nothing in it is not a report. Refusing it here is what stops
+  // an empty-message row existing at all, which would otherwise be the one row
+  // a prober could create for free and nobody could act on.
+  if (!msg) return noContent;
+
+  await bumpFault(
+    easternDay(now), safeTag(q.t), msg, q.f === '1', platform, tier, version, now,
+  );
+  return noContent;
+};
+
 const handler = async (event) => {
   const path = event?.requestContext?.http?.path || '';
 
@@ -518,6 +810,19 @@ const handler = async (event) => {
     } catch (err) {
       console.error('ping report failed', err);
       return json(500, { error: 'Could not read the ping counters.' });
+    }
+  }
+
+  // The fault route. Its own prefix, because it is not a counter: it carries
+  // text, it is stored by signature rather than by cohort, and reading the two
+  // the same way is the one mistake this endpoint's shape is designed to
+  // prevent. Same 204-for-everything rule as the writers above.
+  if (path.startsWith('/fault/')) {
+    try {
+      return await handleFault(event);
+    } catch (err) {
+      console.error('fault write failed', err);
+      return noContent;
     }
   }
 
@@ -557,4 +862,7 @@ const handler = async (event) => {
   return noContent;
 };
 
-module.exports = { handler, decodeCohort, cohortKey, buildKey, easternDay, report, ALPHABET, KINDS };
+module.exports = {
+  handler, decodeCohort, cohortKey, buildKey, easternDay, report, ALPHABET, KINDS,
+  redactFault, safeTag, faultKey, hash8, FAULT_MSG_MAX, FAULT_TTL_DAYS,
+};
