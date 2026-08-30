@@ -1017,26 +1017,37 @@ old web app so old `export.json` files import directly.
   unchanged: once per install EVER, no tag, no message — a population, "how many
   phones have had something go wrong". `reportFault` (`/fault`,
   `src/lib/errorReport.ts` pure + `src/store/errorReport.ts` shell) is the log:
-  the same install code every ping sends, plus a **tag** naming the call site and
-  a **short redacted message**. It exists because the counter is spent on an
-  install's first hiccup and can never say what broke — a release that broke
-  Health imports for every Android phone would not move it by one. Four rules,
-  all load-bearing. **Every DISTINCT failure is reported, every day it is still
-  happening**: the dedupe key is the failure's SIGNATURE (tag + redacted
-  message), capped at one send per signature per install per Eastern day, plus a
-  hard `MAX_REPORTS_PER_LAUNCH` backstop — an app that answers a failure by
-  hammering an endpoint has made the user's problem worse. **A count is
-  INSTALL-DAYS, not occurrences** (a retry loop contributes 1) and not phones
-  either (no identifier exists anywhere in this system); how often it happened on
-  one phone is what the support dump is for. **The message is redacted before it
-  leaves AND again in the lambda** — emails, URLs to their host, paths to a
-  basename, anything id-shaped, digit runs of 4+ — the second pass being the one
-  that makes it true of the TABLE rather than of the builds we shipped; the digit
-  rule is also what groups a retry loop into one signature. And **it must never
-  route back into `logError`**, or a failing network turns one error into a loop.
-  Rows expire after 120 days (`expiresAt`, TTL on the table): diagnostic, not a
-  series. Read back under `faults` on the same report call; drawn by the
-  dashboard's **Failures** tab, which keeps the two counters visibly apart.
+  the same install code every ping sends, plus a **tag** naming the call site, a
+  **short redacted message**, and how many occurrences it accounts for. It exists
+  because the counter is spent on an install's first hiccup and can never say
+  what broke — a release that broke Health imports for every Android phone would
+  not move it by one. **EVERY OCCURRENCE IS COUNTED**, and the only reason that
+  is safe is that COUNTING and SENDING are decoupled: occurrences accumulate in a
+  persisted buffer (flags MMKV) and a report carries the count it accumulated
+  (`n`), so a signature's first sighting goes out immediately and the rest of a
+  storm rides a 20s debounce, a background, or the next launch. A per-second
+  retry loop is three requests a minute carrying all sixty occurrences, not sixty
+  requests from a phone already having a bad time. **Suppressing a REQUEST
+  therefore never loses a COUNT** — the debounce, the per-launch request budget
+  and a dead network all defer; `takePending`/`restorePending` is what holds that
+  across a failed send, and `initFaultReporting()` (root layout) drains what was
+  left buffered when the app last stopped. **TWO NUMBERS come out and neither is
+  reported alone**: `n` sums to occurrences, and `d` — set on a signature's first
+  report each Eastern day — sums to install-days, which is as close to "how many
+  phones" as a system with no identifier gets. Occurrences alone cannot tell one
+  looping phone from a bug everybody has; install-days alone cannot tell a glitch
+  from a storm. **The platform/version/tier splits move with INSTALL-DAYS**, so
+  one looping phone cannot report whichever build it runs as the whole of a
+  failure (`occPlatforms` is the exception, since platform is the dashboard's
+  filter). **The message is redacted before it leaves AND again in the lambda** —
+  emails, URLs to their host, paths to a basename, anything id-shaped, digit runs
+  of 4+ — the second pass being the one that makes it true of the TABLE rather
+  than of the builds we shipped; the digit rule is also what groups a retry loop
+  into one signature. And **it must never route back into `logError`**, or a
+  failing network turns one error into a loop. Rows expire after 120 days
+  (`expiresAt`, TTL on the table): diagnostic, not a series. Read back under
+  `faults` on the same report call; drawn by the dashboard's **Failures** tab,
+  which ranks by breadth and keeps the two counters visibly apart.
 - **Types come in two layers.** Built-ins live in the `*_TYPES` maps in
   `src/lib/registry.ts` (add an icon in `src/components/Icon.tsx` when adding one).
   Users can also create their own activities, meds/supplements, symptoms and

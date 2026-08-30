@@ -13,7 +13,7 @@ import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 const {
-  redactFault, safeTag, faultKey, hash8, FAULT_MSG_MAX, FAULT_TTL_DAYS,
+  redactFault, safeTag, faultKey, hash8, FAULT_MSG_MAX, FAULT_TTL_DAYS, FAULT_MAX_N,
 } = require('../lambdas/ping/main.js');
 
 test('nothing identifying can reach the table', () => {
@@ -113,4 +113,20 @@ test('faults expire, and the counters never do', () => {
   // A row that lived forever would make the one public route that CREATES rows
   // an unbounded one. Four months is longer than any investigation.
   assert.ok(FAULT_TTL_DAYS >= 30 && FAULT_TTL_DAYS <= 400);
+});
+
+test('an occurrence count is clamped, never trusted', () => {
+  // `n` lands in a counter behind an unauthenticated GET. The ceiling is the
+  // difference between somebody inflating a number and somebody destroying it,
+  // and no honest report gets near it.
+  const clamp = (raw) => Math.max(1, Math.min(Math.floor(Number(raw)) || 1, FAULT_MAX_N));
+  assert.equal(clamp('17'), 17);
+  // A missing or unreadable value is 1: the request itself is evidence of at
+  // least one occurrence, so the floor is honest rather than zero.
+  assert.equal(clamp(undefined), 1);
+  assert.equal(clamp('nonsense'), 1);
+  assert.equal(clamp('0'), 1);
+  assert.equal(clamp('-9'), 1);
+  assert.equal(clamp('1e12'), FAULT_MAX_N);
+  assert.equal(clamp('999999999'), FAULT_MAX_N);
 });

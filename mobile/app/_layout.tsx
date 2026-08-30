@@ -21,6 +21,7 @@ import { RestoreGate } from '../src/features/RestoreGate';
 import { ReviewPrompt } from '../src/features/ReviewPrompt';
 import { initIap } from '../src/store/iap';
 import { initTier } from '../src/store/tier';
+import { initFaultReporting } from '../src/store/errorReport';
 import { initPing } from '../src/store/ping';
 import { initGarminReceiver } from '../src/lib/garmin/receiver';
 import { repairWatchPairedAsStrap } from '../src/lib/watch/repair';
@@ -70,6 +71,12 @@ export default function RootLayout() {
     // (install's birthday, nothing else). Must follow initTier — it reads the
     // stamp that lands there. See src/store/ping.ts.
     initPing();
+    // Drain any fault reports left buffered when the app last stopped — a
+    // storm that outran the launch budget, occurrences recorded while offline,
+    // a phone killed mid-debounce. Without this, "every occurrence is counted"
+    // would quietly mean "every occurrence we got a chance to send". Also
+    // registers the background flush. See src/store/errorReport.ts.
+    initFaultReporting();
     // Watch companion (iOS only): drain queued stand-test results + relay
     // entitlement. Safe elsewhere (the bridge no-ops), but don't even try.
     if (Platform.OS === 'ios') initWatchReceiver();

@@ -29,14 +29,29 @@
  *
  * THREE RULES HOLD IT IN PLACE.
  *
- * (1) EVERY DISTINCT FAILURE IS REPORTED, not just the first ever. The dedupe
- *     key is the failure's own SIGNATURE (tag + redacted message), and the cap
- *     is one send per signature per install per Eastern day — the same day
- *     boundary every counter uses. A phone that breaks in a new way tomorrow
- *     says so tomorrow; a phone stuck in a retry loop says so once. That is the
- *     fix: "anything new, every day" rather than "one thing, once, forever".
+ * (1) EVERY OCCURRENCE IS COUNTED. Not the first one, not one a day — every
+ *     time it happens. That is the whole ask, and the only reason it is safe is
+ *     that COUNTING and SENDING are separate things here. Occurrences
+ *     accumulate in a persisted buffer and a report carries the count it
+ *     accumulated (`n`), so a signature's first sighting goes out immediately
+ *     and the rest of a storm rides three requests a minute instead of sixty.
+ *     Suppressing a REQUEST — the debounce, the launch budget, a dead network —
+ *     therefore never loses a COUNT: the occurrences simply wait, on disk, and
+ *     go out on the next report or the next launch. A request per occurrence
+ *     would have the app answering a failure by hammering an endpoint from a
+ *     phone that is already having a bad time, and the user would pay for our
+ *     telemetry in battery and data.
  *
- * (2) THE MESSAGE IS REDACTED BEFORE IT LEAVES, and the redaction is the price
+ * (2) TWO NUMBERS COME OUT, and the pair is the point. `n` sums to OCCURRENCES
+ *     ("this happened 412 times"); `d`, sent on a signature's first report each
+ *     Eastern day and only then, sums to INSTALL-DAYS ("...across 3
+ *     phone-days"). Either alone misleads in a way that matters — occurrences
+ *     alone cannot tell one phone in a retry loop from a bug everybody has, and
+ *     install-days alone cannot tell a single glitch from a storm. There is no
+ *     identifier anywhere in this system, so install-days is as close to "how
+ *     many phones" as anything here can honestly get, and the dashboard says so.
+ *
+ * (3) THE MESSAGE IS REDACTED BEFORE IT LEAVES, and the redaction is the price
  *     of admission. An error string is the one field in this app with any real
  *     chance of carrying user content — a file name from a failed import, a
  *     value quoted by a parse error, a path with a device owner's name in it —
@@ -44,14 +59,8 @@
  *     leave the phone. `redactMessage` strips emails, URLs down to their host,
  *     paths down to a basename, anything id-shaped, and every digit run long
  *     enough to be a timestamp or a key, then truncates hard. What survives is
- *     the SHAPE of the failure, which is what a fix needs.
- *
- * (3) A COUNT HERE IS INSTALL-DAYS, NOT OCCURRENCES. Because of (1), one phone
- *     failing four hundred times in a loop contributes 1 to the day's count for
- *     that signature. That is deliberate and it is the number worth having: it
- *     says how many phones are affected, which is what decides whether a bug
- *     ships a hotfix. How OFTEN it happened on one phone is a question the
- *     support dump answers, and the dump is where it belongs.
+ *     the SHAPE of the failure, which is what a fix needs — and, usefully, what
+ *     makes two attempts of the same failure one signature rather than two.
  */
 
 /** Base URL of the fault route. Deliberately not under /ping — this is not a
@@ -67,16 +76,35 @@ export const MAX_FAULT_MSG = 140;
  *  sanity bound rather than a real limit. */
 export const MAX_FAULT_TAG = 40;
 
-/** Distinct signatures remembered per day. A phone failing in more than this
- *  many distinct ways in one day has one problem, not thirty, and the memory is
- *  a bounded string in the flags MMKV rather than a key per signature. */
-export const MAX_DAY_SIGNATURES = 24;
+/** Signatures whose install-day is remembered per day. Bounded because it is a
+ *  string in the flags MMKV; a phone hitting more distinct failures than this
+ *  in one day has one problem, not thirty. */
+export const MAX_DAY_SIGNATURES = 32;
 
-/** Reports one launch may send, whatever happens. The backstop behind the
- *  per-signature rule: a phone melting down must not also become a phone
- *  hammering an endpoint, and an app that DDoSes its own API while the user
- *  waits for it has made their problem worse. */
-export const MAX_REPORTS_PER_LAUNCH = 8;
+/** Distinct failures that may be buffered at once. The bound is on VARIETY and
+ *  never on volume: an already-buffered signature's count keeps climbing
+ *  however full this is, so a storm is never undercounted — only a phone
+ *  failing in dozens of genuinely different ways stops adding new kinds. */
+export const MAX_PENDING_SIGNATURES = 24;
+
+/** Ceiling on one signature's occurrence count. It rides in a URL and lands in
+ *  a counter; past five digits the number has stopped being information and
+ *  started being a way to corrupt a total. */
+export const MAX_OCCURRENCES = 99999;
+
+/** How long occurrences of an ALREADY-REPORTED signature accumulate before the
+ *  next report goes out. A signature's first sighting is sent immediately, so
+ *  this is never the latency of learning that something broke — only of
+ *  learning how hard. Twenty seconds turns a per-second retry loop into three
+ *  requests a minute carrying every one of its sixty occurrences. */
+export const FLUSH_DEBOUNCE_MS = 20000;
+
+/** Requests one launch may send. A CAP ON REQUESTS, NOT ON OCCURRENCES — this
+ *  is the whole reason the two are separate. Hitting it leaves occurrences
+ *  buffered and persisted, and they go out on the next launch rather than being
+ *  discarded, so the count stays true even when the phone is stopped from
+ *  talking. */
+export const MAX_REPORTS_PER_LAUNCH = 40;
 
 /* -------------------------------------------------------------- redaction */
 
@@ -188,12 +216,21 @@ export function faultUrl(
   code: string,
   tag: string,
   msg: string,
-  fatal?: boolean,
+  opts?: { fatal?: boolean; n?: number; installDay?: boolean },
 ): string {
+  const n = Math.max(1, Math.min(Math.floor(Number(opts?.n) || 1), MAX_OCCURRENCES));
   const q = [
     `t=${encodeURIComponent(safeTag(tag))}`,
     `m=${encodeURIComponent(redactMessage(msg))}`,
-    ...(fatal ? ['f=1'] : []),
+    // Occurrences carried by THIS report. Always sent, even when it is 1, so
+    // the server never has to guess whether a missing parameter means one
+    // occurrence or a client too old to say.
+    `n=${n}`,
+    ...(opts?.fatal ? ['f=1'] : []),
+    // Does this report own the day's install-day for this signature? It is the
+    // only thing here still capped per day, and it is what keeps "how many
+    // phones" answerable beside "how many times".
+    ...(opts?.installDay ? ['d=1'] : []),
   ].join('&');
   return `${FAULT_BASE}/${code}?${q}`;
 }
@@ -201,51 +238,152 @@ export function faultUrl(
 /* ----------------------------------------------------------------- memory */
 
 /**
- * What this install has already reported today: the Eastern day, and the
- * signatures sent on it.
+ * The pending buffer, and the day's install-day ledger.
  *
- * One bounded JSON blob rather than a flag per signature, because a flag per
- * signature is a key per bug per day accumulating in the flags MMKV forever —
- * device bookkeeping that grows with how badly the app is behaving is the wrong
- * shape twice over.
+ * EVERY OCCURRENCE IS COUNTED. That is the rule this shape exists to make
+ * possible, and it is worth being precise about what it costs. A request per
+ * occurrence is not the same thing and is not acceptable: a retry loop firing
+ * every second would have the app answering a failure by hammering an endpoint
+ * — from a phone that is, by definition, already having a bad time — and the
+ * user would pay for our telemetry in battery and data.
+ *
+ * So the two are DECOUPLED. Occurrences accumulate here; a report carries the
+ * count it accumulated (`n`). Suppressing a REQUEST therefore never loses a
+ * COUNT — the occurrences simply ride the next one — which is what lets the
+ * rate limiting be as aggressive as it needs to be without lying about volume.
+ *
+ * A signature's FIRST sighting flushes immediately, so a one-off failure is
+ * reported the moment it happens with no delay at all. Everything after it in
+ * that window accumulates.
+ *
+ * TWO NUMBERS COME OUT OF THIS, and the pair is the point. `n` sums to
+ * OCCURRENCES ("this happened 412 times"), and `d` — set on the first report of
+ * a signature each day and only then — sums to INSTALL-DAYS ("...across 3
+ * phone-days"). Either alone is misleading in a way that matters: occurrences
+ * alone cannot tell one phone in a loop from a bug everybody has, and
+ * install-days alone cannot tell a single glitch from a hundred-a-minute storm.
  */
-export interface FaultMemory {
-  /** Eastern day these signatures belong to. */
-  day: string;
-  /** Signatures already reported on that day, newest last. */
-  sigs: string[];
+
+/** Occurrences buffered for one signature, waiting to be reported. */
+export interface PendingFault {
+  tag: string;
+  msg: string;
+  fatal?: boolean;
+  /** Occurrences accumulated since the last report went out. */
+  n: number;
 }
 
+export interface FaultMemory {
+  /** Eastern day `counted` belongs to. */
+  day: string;
+  /** Signatures that have already contributed an install-day on `day`. */
+  counted: string[];
+  /** Occurrences seen but not yet reported. */
+  pending: Record<string, PendingFault>;
+}
+
+export const EMPTY_FAULT_MEMORY: FaultMemory = { day: '', counted: [], pending: {} };
+
 export function parseFaultMemory(raw: string | null | undefined): FaultMemory {
-  if (!raw) return { day: '', sigs: [] };
+  if (!raw) return EMPTY_FAULT_MEMORY;
   try {
-    const p: unknown = JSON.parse(raw);
-    const o = p as FaultMemory;
-    if (!o || typeof o !== 'object' || typeof o.day !== 'string') return { day: '', sigs: [] };
-    const sigs = Array.isArray(o.sigs) ? o.sigs.filter((s) => typeof s === 'string') : [];
-    return { day: o.day, sigs: sigs.slice(Math.max(0, sigs.length - MAX_DAY_SIGNATURES)) };
+    const o = JSON.parse(raw) as FaultMemory;
+    if (!o || typeof o !== 'object' || typeof o.day !== 'string') return EMPTY_FAULT_MEMORY;
+    const counted = Array.isArray(o.counted) ? o.counted.filter((s) => typeof s === 'string') : [];
+    const pending: Record<string, PendingFault> = {};
+    const src = (o.pending && typeof o.pending === 'object') ? o.pending : {};
+    Object.keys(src).slice(0, MAX_PENDING_SIGNATURES).forEach((k) => {
+      const p = src[k];
+      if (!p || typeof p.tag !== 'string' || typeof p.msg !== 'string') return;
+      const n = Math.floor(Number(p.n));
+      if (!(n > 0)) return;
+      pending[k] = { tag: p.tag, msg: p.msg, n: Math.min(n, MAX_OCCURRENCES), ...(p.fatal ? { fatal: true } : null) };
+    });
+    return { day: o.day, counted: counted.slice(Math.max(0, counted.length - MAX_DAY_SIGNATURES)), pending };
   } catch {
-    return { day: '', sigs: [] };
+    return EMPTY_FAULT_MEMORY;
   }
 }
 
 /**
- * Should this signature be sent?
+ * Add one occurrence.
  *
- * A new day answers yes to everything — the memory is per day, so a failure
- * that is still happening tomorrow is reported again tomorrow, which is what
- * makes "is this bug still live" answerable at all. Within a day, only a
- * signature not already sent, and only while the day's list has room.
+ * The day rolls the install-day ledger over and nothing else — pending
+ * occurrences survive a midnight, because they happened and are owed a report
+ * whichever day they are finally sent on.
+ *
+ * Beyond MAX_PENDING_SIGNATURES DISTINCT failures the buffer stops taking new
+ * ones. A phone failing in thirty distinct ways at once has one problem, and
+ * the bound is on distinct signatures rather than on occurrences precisely so
+ * that the thing it refuses is variety and never volume: an existing
+ * signature's count keeps climbing however full the buffer is.
  */
-export function shouldReportFault(mem: FaultMemory, sig: string, day: string): boolean {
-  if (mem.day !== day) return true;
-  if (mem.sigs.indexOf(sig) !== -1) return false;
-  return mem.sigs.length < MAX_DAY_SIGNATURES;
+export function notePending(
+  mem: FaultMemory, sig: string, entry: Omit<PendingFault, 'n'>, day: string,
+): FaultMemory {
+  const counted = mem.day === day ? mem.counted : [];
+  const prev = mem.pending[sig];
+  if (!prev && Object.keys(mem.pending).length >= MAX_PENDING_SIGNATURES) {
+    return { day, counted, pending: mem.pending };
+  }
+  return {
+    day,
+    counted,
+    pending: {
+      ...mem.pending,
+      [sig]: prev
+        ? { ...prev, n: Math.min(prev.n + 1, MAX_OCCURRENCES) }
+        : { ...entry, n: 1 },
+    },
+  };
 }
 
-/** Record a sent signature, rolling the memory over on a new day. */
-export function noteFaultReported(mem: FaultMemory, sig: string, day: string): FaultMemory {
-  const sigs = mem.day === day ? mem.sigs.slice() : [];
-  if (sigs.indexOf(sig) === -1) sigs.push(sig);
-  return { day, sigs: sigs.slice(Math.max(0, sigs.length - MAX_DAY_SIGNATURES)) };
+/** Remove a signature's buffered occurrences, to be carried by a report. */
+export function takePending(mem: FaultMemory, sig: string): FaultMemory {
+  if (!mem.pending[sig]) return mem;
+  const pending = { ...mem.pending };
+  delete pending[sig];
+  return { ...mem, pending };
+}
+
+/**
+ * Put occurrences back after a report failed to land.
+ *
+ * The half of the take/restore pair that makes "every occurrence is counted"
+ * true across a bad network. Occurrences that arrived while the request was in
+ * flight are already buffered under the same key, so this ADDS rather than
+ * assigns — assigning would drop them, which is the exact bug the decoupling
+ * exists to avoid.
+ */
+export function restorePending(
+  mem: FaultMemory, sig: string, entry: Omit<PendingFault, 'n'>, n: number,
+): FaultMemory {
+  const prev = mem.pending[sig];
+  return {
+    ...mem,
+    pending: {
+      ...mem.pending,
+      [sig]: { ...(prev || entry), n: Math.min((prev?.n || 0) + n, MAX_OCCURRENCES) },
+    },
+  };
+}
+
+/**
+ * Does this report own the day's install-day for this signature?
+ *
+ * True once per signature per Eastern day. It is what keeps a count of PHONES
+ * available beside the count of occurrences, and it is the one thing in this
+ * module that is still capped per day — because "how many phones" is a
+ * different question from "how many times", and answering it needs a counter
+ * that only moves once per phone per day whatever the volume.
+ */
+export function needsInstallDay(mem: FaultMemory, sig: string, day: string): boolean {
+  if (mem.day !== day) return true;
+  return mem.counted.indexOf(sig) === -1;
+}
+
+export function noteInstallDay(mem: FaultMemory, sig: string, day: string): FaultMemory {
+  const counted = mem.day === day ? mem.counted.slice() : [];
+  if (counted.indexOf(sig) === -1) counted.push(sig);
+  return { ...mem, day, counted: counted.slice(Math.max(0, counted.length - MAX_DAY_SIGNATURES)) };
 }

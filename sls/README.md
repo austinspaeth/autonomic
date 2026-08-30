@@ -26,8 +26,9 @@ GET  https://api.autonomic.care/ping/odm/D082126IA   (...dismissed)
 GET  https://api.autonomic.care/ping/oac/D082126IA   (...accepted)
 GET  https://api.autonomic.care/ping/report?key=...&since=2026-08-01
 
-GET  https://api.autonomic.care/fault/D082126I-TP-V1.26.0?t=health.check&m=timeout+after+%3Cn%3Ems
-     (a FAULT REPORT, not a counter — carries a call site and a redacted message)
+GET  https://api.autonomic.care/fault/D082126I-TP-V1.26.0?t=health.check&m=timeout+after+%3Cn%3Ems&n=17&d=1
+     (a FAULT REPORT, not a counter — a call site, a redacted message, and how
+      many occurrences it accounts for)
 
      ...each of which may carry a tagged tail: D082126IG-TP-V1.26.0
 ```
@@ -68,7 +69,7 @@ per user, which would eventually meet DynamoDB's 400KB item ceiling.
 | `PING#POT` | `<day>` | POTS captures finished, per cohort+letter (per-letter cap) |
 | `PING#SEE` | `<day>` | gated views opened, per cohort+letter (per-letter cap) |
 | `PING#ERR` | `<day>` | installs reporting a first failure — once per install, ever |
-| `FAULT` | `<day>#<tag>#<hash>` | one distinct failure on one day: count, message, platform / version / tier splits. **Expires** (`expiresAt`, 120 days) |
+| `FAULT` | `<day>#<tag>#<hash>` | one distinct failure on one day: occurrences, install-days, message, platform / version / tier splits. **Expires** (`expiresAt`, 120 days) |
 | `PING#OSH` / `#ODM` / `#OAC` | `<day>` | an offer shown · dismissed · accepted, per cohort+offer |
 | `STORE#VERSIONS` | `latest` | what each store is serving, cached (see below) |
 | `PUSH#<email>` | `SUB#<endpointHash>` | one device registered for background alerts |
@@ -442,49 +443,94 @@ Health imports for every Android install would not move that counter by one.
 prefix so nothing reads the two the same way.
 
 ```
-GET /fault/D082126I-TP-V1.26.0?t=health.check&m=timeout+after+%3Cn%3Ems&f=1
+GET /fault/D082126I-TP-V1.26.0?t=health.check&m=timeout+after+%3Cn%3Ems&n=17&f=1&d=1
 ```
 
 The path is the **same install code every ping sends**, so cohort day, platform,
 tier and build version arrive with no second decoder. `t` is a **tag** naming the
 call site — a stable dotted key the app chose (`store.persist`, `health.check`,
-`uncaught.fatal`) — and `m` is a **short redacted message**. `f=1` marks an
-uncaught error, i.e. the app went down. The variable-length parts ride in the
-query string because an error string is full of slashes and an encoded slash in
-a path parameter is a fight with API Gateway nobody wins.
+`uncaught.fatal`) — `m` is a **short redacted message**, `n` is how many
+**occurrences** this report accounts for, `f=1` marks an uncaught error, and
+`d=1` says this report owns the day's install-day for that signature. The
+variable-length parts ride in the query string because an error string is full of
+slashes and an encoded slash in a path parameter is a fight with API Gateway
+nobody wins.
 
 **Stored by signature, not by event.** One row per `(day, call site, failure)`:
 
 ```jsonc
 { "PK": "FAULT", "SK": "2026-08-30#health.check#3fa21b0c",
   "day": "2026-08-30", "tag": "health.check", "msg": "timeout after <n>ms",
-  "fatal": false, "count": 9,
+  "fatal": false,
+  "occurrences": 840,          // how many TIMES it happened
+  "installs": 2,               // install-days: how many phone-days saw it
+  "reports": 7,                // requests that carried them; diagnostic only
   "firstAt": "...", "lastAt": "...",
-  "platforms": { "I": 6, "A": 3 },
-  "versions":  { "1.26.0": 7, "?": 2 },
-  "tiers":     { "F": 8, "P": 1 },
+  "platforms":    { "A": 2 },          // install-days, sums to `installs`
+  "versions":     { "1.26.0": 2 },     // ditto
+  "tiers":        { "F": 2 },          // ditto
+  "occPlatforms": { "A": 840 },        // occurrences, sums to `occurrences`
   "expiresAt": 1780000000 }
 ```
 
 So the table grows with the number of **bugs**, not with the number of crashes:
-a thousand phones hitting one failure is one row, and the row carries the only
-three splits a fix is decided from. The day leads the sort key, so reading a
-range is one query.
+a thousand phones hitting one failure is one row, and so is one phone hitting it
+a thousand times. The day leads the sort key, so reading a range is one query.
 
-Four rules hold it in place, and each is load-bearing:
+### Every occurrence is counted; a request is not made for each one
 
-1. **A count is INSTALL-DAYS, not occurrences.** The client sends one report per
-   signature per install per Eastern day, so a phone stuck in a retry loop
-   contributes 1. That is the number worth having — how many phones are affected
-   — and how often it happened on one phone is what the support dump is for. It
-   is not a phone count either: there is no identifier anywhere in this system,
-   so nine install-days may be nine phones once each or one phone for nine days.
-   The dashboard says exactly that.
-2. **Every distinct failure is reported, every day it is still happening.** The
-   dedupe key is the failure's own signature, not the install, which is the
-   whole difference from `/ping/err`. A phone that breaks in a new way tomorrow
-   says so tomorrow.
-3. **The message is redacted twice** — on the client
+This is the rule the whole design turns on, and the two halves of it are
+separate on purpose.
+
+The client **buffers** occurrences in the flags MMKV and a report carries the
+count it accumulated. A signature's first sighting flushes immediately — nothing
+about learning that something broke is delayed — and everything after it in that
+window accumulates and goes out on a 20s debounce, when the app is backgrounded,
+or on the next launch. A per-second retry loop therefore arrives as three
+requests a minute carrying all sixty of its occurrences, rather than as sixty
+requests from a phone that is by definition already having a bad time and whose
+battery and data the user pays for.
+
+The property that makes the rate limiting honest: **suppressing a request never
+loses a count.** The debounce, the per-launch request budget and a dead network
+all leave occurrences buffered on disk. The client takes a count out of the
+buffer to send it and puts it back if the report does not land, so occurrences
+that arrive mid-flight are neither lost nor double-sent.
+
+### Two numbers, and neither is reported without the other
+
+- **`occurrences`** — how many times it happened. Summed from each report's `n`,
+  so it counts events, not requests.
+- **`installs`** — install-days, moved only by a report with `d=1`, which the
+  client sets once per signature per Eastern day. There is no identifier
+  anywhere in this system, so this is as close to "how many phones" as anything
+  here can honestly get: nine install-days may be nine phones once each or one
+  phone for nine days, and the dashboard says exactly that.
+
+Occurrences alone cannot tell one phone in a retry loop from a bug everybody
+has; install-days alone cannot tell a single glitch from a hundred-a-minute
+storm. `occurrences / installs` is the difference, and the dashboard flags a row
+whose ratio is high.
+
+**The three splits move with install-days, not with occurrences**, and that is
+load-bearing. "Which build is this on" is a question about breadth, and a
+version split weighted by occurrences would let one phone looping four hundred
+times report whichever build it happens to run as 99% of the failure — the exact
+wrong answer to the exact question the column exists for, since it would send
+somebody to revert a release on the strength of one device. Weighted by
+install-days, each of `platforms`, `versions` and `tiers` sums to `installs`.
+`occPlatforms` is the one exception and exists only because platform is the
+dashboard's global filter: without it, an iOS slice would show iOS install-days
+beside everybody's occurrence count.
+
+Ranking follows the same logic — **breadth first**. How many people a failure
+reached is what decides a hotfix; the dashboard's *Most often* view is for
+finding a loop, which is a real problem for those users even when the headline
+count is small.
+
+### The rest of the rules
+
+1. **The message is redacted twice** — on the client
    (`mobile/src/lib/errorReport.ts`) and again in `redactFault` here before
    anything is written. Not belt and braces: the client's pass is a promise
    about builds we shipped, and this one is the promise about what can ever be
@@ -493,7 +539,12 @@ Four rules hold it in place, and each is load-bearing:
    basename, anything id-shaped, and any digit run of four or more all go. That
    last rule also does the grouping: `timeout after 3012ms` and `timeout after
    4188ms` are one signature.
-4. **Rows expire** (`expiresAt`, `FAULT_TTL_DAYS` = 120, TTL enabled on the
+2. **`n` is clamped, never trusted** (`FAULT_MAX_N`). It lands in a counter
+   behind an unauthenticated GET, and a five-digit ceiling is the difference
+   between somebody inflating a number and somebody destroying it. A missing or
+   unreadable value reads as 1 — the honest floor, since the request itself is
+   evidence of at least one occurrence.
+3. **Rows expire** (`expiresAt`, `FAULT_TTL_DAYS` = 120, TTL enabled on the
    table). These are diagnostic, not a series — and this is the one public route
    that **creates** a row rather than incrementing one, so an expiry is what
    bounds what a prober can leave behind. Only fault rows carry the attribute;

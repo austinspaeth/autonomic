@@ -389,23 +389,34 @@ fires once, so an install that hiccuped in March is silent through every bug
 shipped since, and a release that broke Health imports for every Android phone
 would not move it by one.
 
-Three things that view has to keep saying, because each is easy and expensive to
-misread:
+**Two numbers per row, and neither is reported without the other.** *Times* is
+how often it actually happened — every occurrence is counted, so a retry loop
+shows its real volume — and *Installs* is install-days, how many phone-days saw
+it. Occurrences alone cannot tell one device in a loop from a bug everybody has;
+install-days alone cannot tell a single glitch from a hundred-a-minute storm. A
+row whose ratio is high is flagged as such (`420× per install`).
 
-- **A count is INSTALL-DAYS, not occurrences.** The app reports a signature at
-  most once per install per Eastern day, so a phone stuck in a retry loop counts
-  once. That is the number that decides a hotfix — how many phones are affected —
-  and how often it happened on one phone is what a support dump is for.
-- **It is not a phone count either.** There is no identifier anywhere in this
+Two more things that view has to keep saying, because both are easy and
+expensive to misread:
+
+- **Install-days is not a phone count.** There is no identifier anywhere in this
   system, so nine install-days may be nine phones once each or one phone for
   nine days. The view says so rather than letting the column header imply
   otherwise.
-- **The version split is the answer.** A failure spread evenly across builds is
-  the app's background; one sitting almost entirely on the newest build is a
-  regression that shipped, and the table calls that out. The share is of the
-  reports that **named** a version — a build too old to say so is counted apart
-  and never folded in either direction, the same `?` rule everything else here
-  obeys.
+- **The version split is the answer, and it is measured in install-days.** A
+  failure spread evenly across builds is the app's background; one sitting
+  almost entirely on the newest build is a regression that shipped, and the
+  table calls that out. Weighting it by *occurrences* would let one looping
+  phone report whichever build it runs as 99% of a failure — and send somebody
+  to revert a release on the strength of one device. The share is of the reports
+  that **named** a version, with old builds counted apart and never folded in
+  either direction, the same `?` rule everything else here obeys.
+
+Ranking is by **breadth** by default: how many people a failure reached is what
+decides a hotfix, and ranking by occurrences would put one phone's retry loop
+above a bug that hit everybody once. *Most often* is the view for finding that
+loop, which is a real battery and data problem for those users even when the
+headline count is small.
 
 `New` and `Crashes` are **filters**, not sorts: "did today's release break
 something" and "what took the app down" are both questions a list that merely

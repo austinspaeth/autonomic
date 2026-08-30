@@ -19,7 +19,7 @@
  *
  * plus ONE route that is not a ping at all:
  *
- *   GET /fault/D082126I-TP-V1.26.0?t=health.check&m=timeout+after+<n>ms&f=1
+ *   GET /fault/D082126I-TP-V1.26.0?t=health.check&m=timeout+after+<n>ms&n=17&d=1
  *
  * and one reader, guarded by a shared key:
  *
@@ -99,20 +99,30 @@
  * next question: an install that hiccuped in March has spent its ping and is
  * silent through every bug shipped since, so a release that broke Health
  * imports for every Android phone would not move it by one. Both now run. The
- * counter says how many; this says what, once per distinct failure per install
- * per Eastern day, so a bug that is still live is still reported tomorrow.
+ * counter says how many; this says WHAT, and HOW OFTEN.
  *
  * Stored by SIGNATURE rather than by event: PK `FAULT`, SK
- * `<day>#<tag>#<hash>`, holding a count and the platform / version / tier
- * splits. One row per distinct failure per day, however many phones hit it, so
- * the table grows with the number of BUGS and not with the number of crashes —
- * and the row answers the only question that decides a hotfix: how many
- * installs, on which build, on which OS.
+ * `<day>#<tag>#<hash>`. One row per distinct failure per day, however many
+ * phones hit it and however many times, so the table grows with the number of
+ * BUGS and not with the number of crashes.
  *
- * A COUNT HERE IS INSTALL-DAYS, NOT OCCURRENCES. The client sends one report
- * per signature per day, so a phone stuck in a retry loop contributes 1. That
- * is the number worth having — how many phones are affected — and how often it
- * happened on one phone is what the support dump is for.
+ * THREE COUNTERS PER ROW, and the first two are read together or not at all:
+ *
+ *   `occurrences`  how many times it happened, summed from each report's `n`.
+ *                  EVERY OCCURRENCE IS COUNTED — the client buffers them and a
+ *                  report carries the count it accumulated, so counting and
+ *                  sending are decoupled and a suppressed request never costs a
+ *                  count. A per-second retry loop therefore arrives as three
+ *                  requests a minute carrying all sixty of its occurrences.
+ *   `installs`     install-days, moved only by a report whose client says it
+ *                  owns the day for this signature (`d=1`). It is as close to
+ *                  "how many phones" as a system with no identifier can get.
+ *   `reports`      how many requests arrived. Diagnostic: it describes the
+ *                  client's batching and nothing about the app.
+ *
+ * Occurrences alone cannot tell one phone in a loop from a bug everybody has;
+ * install-days alone cannot tell a single glitch from a hundred-a-minute storm.
+ * Neither is reported without the other, here or in the dashboard.
  *
  * THE MESSAGE IS REDACTED TWICE, on the client before it is sent and again
  * here before it is stored. Not belt and braces: the client's redaction is a
@@ -519,6 +529,12 @@ const FAULT_TTL_DAYS = 120;
 const FAULT_MSG_MAX = 160;
 const FAULT_TAG_MAX = 40;
 
+/** Ceiling on the occurrences one report may claim. This lands in a counter
+ *  behind an unauthenticated GET, so it is clamped rather than trusted: five
+ *  digits is the difference between somebody inflating a number and somebody
+ *  destroying it, and no honest report gets near it. */
+const FAULT_MAX_N = 99999;
+
 /** Rows one read may return. A dashboard that has to draw ten thousand rows has
  *  stopped being a diagnostic tool; if this is ever hit, the answer is on the
  *  first page anyway (the query is newest-day-last, and the UI sorts). */
@@ -590,27 +606,56 @@ const faultKey = (day, tag, msg, fatal) => `${day}#${tag}#${hash8(msg)}${fatal ?
 /**
  * Count one fault, creating its row on first sight.
  *
- * `count` is install-days, per the header. The three splits beside it are the
- * ones a fix is actually decided from — which build, which OS, which tier —
- * and they are maps for the same reason the ping counters' are: a nested map
- * key is addressable, so the whole thing is one atomic UpdateItem and two
- * phones reporting in the same millisecond cannot lose a count.
+ * THREE COUNTERS, and each answers a question the others cannot.
+ *
+ *   `occurrences`  how many times it happened, summed from every report's `n`.
+ *                  The client buffers occurrences and a report carries the
+ *                  count it accumulated, so this counts EVENTS, not requests.
+ *   `installs`     install-days: how many phone-days saw it, moved only by a
+ *                  report whose client says it owns the day for this signature
+ *                  (`d=1`). Without it, one phone in a retry loop and a bug
+ *                  everybody has look identical.
+ *   `reports`      how many requests arrived. Diagnostic: it describes the
+ *                  client's batching and nothing about the app.
+ *
+ * THE THREE SPLITS MOVE WITH INSTALL-DAYS, NOT WITH OCCURRENCES, and that is
+ * the load-bearing choice here. "Which build is this failure on" is a question
+ * about BREADTH — how many phones on 1.26.0 — and a version split weighted by
+ * occurrences would let a single phone looping four hundred times on the newest
+ * build report that build as 99% of the failure. That is the exact wrong answer
+ * to the exact question the column exists for: it would send somebody to revert
+ * a release on the strength of one device. Weighted by install-days, each of
+ * `platforms`, `versions` and `tiers` sums to `installs`, which is the
+ * invariant the dashboard checks against.
+ *
+ * `occPlatforms` is the one exception, and it exists only because platform is
+ * the dashboard's global FILTER: without occurrences split by platform, an iOS
+ * slice could show iOS install-days beside everybody's occurrence count. It
+ * sums to `occurrences`.
+ *
+ * All of them are maps for the reason the ping counters' are: a nested map key
+ * is addressable, so the whole thing is one atomic UpdateItem and two phones
+ * reporting in the same millisecond cannot lose a count.
  *
  * `msg` and `tag` are written with `if_not_exists` so the FIRST spelling of a
  * failure is the one that sticks. They hash to the same row by construction, so
  * this only matters if the redaction ever changes under a live key — and then
  * the stored row keeping its original text is the right answer, not a race.
  */
-const bumpFault = async (day, tag, msg, fatal, platform, tier, version, nowMs) => {
+const bumpFault = async (day, tag, msg, fatal, platform, tier, version, n, installDay, nowMs) => {
   const key = faultKey(day, tag, msg, fatal);
+  const d = installDay ? 1 : 0;
   const add = new UpdateCommand({
     TableName: TABLE,
     Key: { PK: 'FAULT', SK: key },
     UpdateExpression: [
-      'SET #platforms.#p = if_not_exists(#platforms.#p, :zero) + :one',
-      '#versions.#v = if_not_exists(#versions.#v, :zero) + :one',
-      '#tiers.#t = if_not_exists(#tiers.#t, :zero) + :one',
-      '#count = if_not_exists(#count, :zero) + :one',
+      'SET #platforms.#p = if_not_exists(#platforms.#p, :zero) + :d',
+      '#versions.#v = if_not_exists(#versions.#v, :zero) + :d',
+      '#tiers.#t = if_not_exists(#tiers.#t, :zero) + :d',
+      '#occPlatforms.#p = if_not_exists(#occPlatforms.#p, :zero) + :n',
+      '#occurrences = if_not_exists(#occurrences, :zero) + :n',
+      '#installs = if_not_exists(#installs, :zero) + :d',
+      '#reports = if_not_exists(#reports, :zero) + :one',
       '#day = :day, #tag = :tag, #fatal = :fatal',
       '#msg = if_not_exists(#msg, :msg)',
       '#first = if_not_exists(#first, :now)',
@@ -622,12 +667,16 @@ const bumpFault = async (day, tag, msg, fatal, platform, tier, version, nowMs) =
       '#platforms': 'platforms', '#p': platform || 'U',
       '#versions': 'versions', '#v': version || '?',
       '#tiers': 'tiers', '#t': tier || '?',
-      '#count': 'count', '#day': 'day', '#tag': 'tag', '#msg': 'msg',
+      '#occPlatforms': 'occPlatforms',
+      '#occurrences': 'occurrences', '#installs': 'installs', '#reports': 'reports',
+      '#day': 'day', '#tag': 'tag', '#msg': 'msg',
       '#fatal': 'fatal', '#first': 'firstAt', '#last': 'lastAt', '#ttl': 'expiresAt',
     },
     ExpressionAttributeValues: {
       ':zero': 0,
       ':one': 1,
+      ':n': n,
+      ':d': d,
       ':day': day,
       ':tag': tag,
       ':msg': msg,
@@ -642,15 +691,19 @@ const bumpFault = async (day, tag, msg, fatal, platform, tier, version, nowMs) =
     await ddb.send(add);
   } catch (err) {
     // Same shape as `bump`: a nested path can't be written while its parent map
-    // does not exist, i.e. on a signature's first ever sighting. Create the
-    // three maps, then redo. `if_not_exists` keeps that safe against a race.
+    // does not exist, i.e. on a signature's first ever sighting. Create the four
+    // maps, then redo. `if_not_exists` keeps that safe against a race.
     if (err?.name !== 'ValidationException') throw err;
     await ddb.send(new UpdateCommand({
       TableName: TABLE,
       Key: { PK: 'FAULT', SK: key },
       UpdateExpression: 'SET #platforms = if_not_exists(#platforms, :empty), '
-        + '#versions = if_not_exists(#versions, :empty), #tiers = if_not_exists(#tiers, :empty)',
-      ExpressionAttributeNames: { '#platforms': 'platforms', '#versions': 'versions', '#tiers': 'tiers' },
+        + '#versions = if_not_exists(#versions, :empty), #tiers = if_not_exists(#tiers, :empty), '
+        + '#occPlatforms = if_not_exists(#occPlatforms, :empty)',
+      ExpressionAttributeNames: {
+        '#platforms': 'platforms', '#versions': 'versions', '#tiers': 'tiers',
+        '#occPlatforms': 'occPlatforms',
+      },
       ExpressionAttributeValues: { ':empty': {} },
     }));
     await ddb.send(add);
@@ -688,12 +741,23 @@ const readFaults = async (since) => {
         tag: item.tag || 'unknown',
         msg: item.msg || '',
         fatal: !!item.fatal,
-        count: Number(item.count) || 0,
+        // Three numbers, never one. `occurrences` is how many times it
+        // happened; `installs` is install-days, which is as close to "how many
+        // phones" as a system with no identifier can honestly get; `reports` is
+        // how many requests carried them and is diagnostic only.
+        occurrences: Number(item.occurrences) || 0,
+        installs: Number(item.installs) || 0,
+        reports: Number(item.reports) || 0,
         firstAt: item.firstAt || null,
         lastAt: item.lastAt || null,
+        // The three splits are install-days and each sums to `installs`;
+        // `occPlatforms` is occurrences and sums to `occurrences`. Weighting a
+        // version split by occurrences would let one looping phone report the
+        // build it happens to be on as the whole of a failure.
         platforms: num(item.platforms),
         versions: num(item.versions),
         tiers: num(item.tiers),
+        occPlatforms: num(item.occPlatforms),
       });
     });
     ExclusiveStartKey = res.LastEvaluatedKey;
@@ -764,7 +828,7 @@ const handleReport = async (event) => {
 };
 
 /**
- * One fault report: `/fault/{code}?t=<tag>&m=<message>&f=1`.
+ * One fault report: `/fault/{code}?t=<tag>&m=<message>&n=<occurrences>&f=1&d=1`.
  *
  * The path is the same install code every ping sends, so cohort day, platform,
  * tier and build version arrive with no second decoder. The variable-length
@@ -795,8 +859,26 @@ const handleFault = async (event) => {
   // a prober could create for free and nobody could act on.
   if (!msg) return noContent;
 
+  // How many OCCURRENCES this one report carries. The client buffers
+  // occurrences and sends the count it accumulated, so a per-second retry loop
+  // arrives as three requests a minute carrying all sixty of its occurrences
+  // rather than as sixty requests from a phone already having a bad time.
+  //
+  // Clamped rather than trusted: this lands in a counter reached by an
+  // unauthenticated GET, and a five-digit ceiling is the difference between
+  // somebody inflating a number and somebody destroying it. A missing or
+  // unreadable value is 1 — the honest floor, since the request itself is
+  // evidence of at least one occurrence.
+  const n = Math.max(1, Math.min(Math.floor(Number(q.n)) || 1, FAULT_MAX_N));
+  // Does this report own the day's install-day for this signature? Only the
+  // client can know — it is the only party aware of whether this phone has
+  // already reported this failure today — which is exactly why it is a flag it
+  // sets rather than something derived here from a request we cannot identify.
+  const installDay = q.d === '1';
+
   await bumpFault(
-    easternDay(now), safeTag(q.t), msg, q.f === '1', platform, tier, version, now,
+    easternDay(now), safeTag(q.t), msg, q.f === '1',
+    platform, tier, version, n, installDay, now,
   );
   return noContent;
 };
@@ -864,5 +946,5 @@ const handler = async (event) => {
 
 module.exports = {
   handler, decodeCohort, cohortKey, buildKey, easternDay, report, ALPHABET, KINDS,
-  redactFault, safeTag, faultKey, hash8, FAULT_MSG_MAX, FAULT_TTL_DAYS,
+  redactFault, safeTag, faultKey, hash8, FAULT_MSG_MAX, FAULT_TTL_DAYS, FAULT_MAX_N,
 };

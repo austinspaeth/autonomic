@@ -3935,8 +3935,8 @@
          is a rendering budget, and an export that inherited it would be the
          same lie the table's footnote exists to avoid. The message is quoted
          because it is free text; nothing else here can contain a comma. */
-      var out = ['message,tag,fatal,install_days,days,first_day,last_day,top_build,'
-        + 'top_build_share,build_unknown,platforms,tiers'];
+      var out = ['message,tag,fatal,install_days,occurrences,days,first_day,last_day,'
+        + 'top_build,top_build_share,build_unknown,platforms,tiers'];
       rows.forEach(function (g) {
         var v = A.faultTopVersion(g);
         var split = function (m) {
@@ -3944,7 +3944,8 @@
         };
         out.push([
           '"' + String(g.msg).replace(/"/g, '""') + '"',
-          g.tag, g.fatal ? 'yes' : '', g.installDays, g.days, g.firstDay, g.lastDay,
+          g.tag, g.fatal ? 'yes' : '', g.installDays, g.occurrences, g.days,
+          g.firstDay, g.lastDay,
           v.version || '', v.share === null ? '' : v.share.toFixed(1), v.unknown,
           '"' + split(g.platforms) + '"', '"' + split(g.tiers) + '"'
         ].join(','));
@@ -7593,7 +7594,17 @@
   function faultRows(r) {
     var groups = A.faultGroups(pings.report, pingPlatform(), r && r.from, r && r.to);
     var last = r && r.to;
-    if (pingUI.fltSort === 'recent') {
+    if (pingUI.fltSort === 'often') {
+      /* Ranked by occurrences rather than by breadth. The default is breadth,
+         because that is what decides a hotfix; this is the view for finding a
+         loop — a failure firing hundreds of times on a handful of phones is a
+         battery and data problem for those users even when the headline count
+         is small. */
+      groups = groups.slice().sort(function (a, b) {
+        if (a.occurrences !== b.occurrences) return b.occurrences - a.occurrences;
+        return b.installDays - a.installDays;
+      });
+    } else if (pingUI.fltSort === 'recent') {
       groups = groups.slice().sort(function (a, b) {
         if (a.lastDay !== b.lastDay) return a.lastDay < b.lastDay ? 1 : -1;
         return b.installDays - a.installDays;
@@ -7615,15 +7626,19 @@
     var s = A.faultSummary(groups, last);
     /* Against the people who were in the app, because a count of failures is
        not a rate. The denominator is the same `open` counter every other rate
-       on this dashboard uses, so this number is comparable with them. */
+       on this dashboard uses, so this number is comparable with them — which is
+       also why the numerator is install-days and not occurrences: one phone can
+       contribute hundreds of the latter, and the ratio would exceed 100%. */
     var actives = ix && last ? A.activeOn(ix, last) : 0;
     var todayFaults = A.faultsOn(pings.report, pingPlatform(), last);
 
     document.getElementById('fltTiles').innerHTML = [
       tile({
         label: 'Distinct failures', value: fmtInt(s.signatures),
-        meta: s.signatures ? 'over ' + fmtInt(s.installDays) + ' install-day'
-          + (s.installDays === 1 ? '' : 's') : 'nothing reported in this range'
+        meta: s.signatures ? fmtInt(s.occurrences) + ' time'
+          + (s.occurrences === 1 ? '' : 's') + ', across ' + fmtInt(s.installDays)
+          + ' install-day' + (s.installDays === 1 ? '' : 's')
+          : 'nothing reported in this range'
       }),
       tile({
         label: 'New on ' + (last ? labelDay(last) : 'the last day'),
@@ -7710,7 +7725,8 @@
     document.getElementById('fltTable').innerHTML =
       '<table><thead><tr>' +
       '<th>What failed</th><th>Where</th><th class="num">Installs</th>' +
-      '<th class="num">Days</th><th>Build</th><th>Platform</th><th>Last seen</th>' +
+      '<th class="num">Times</th><th class="num">Days</th>' +
+      '<th>Build</th><th>Platform</th><th>Last seen</th>' +
       '</tr></thead><tbody>' +
       shown.map(function (g) {
         var v = A.faultTopVersion(g);
@@ -7718,12 +7734,11 @@
            shipped, and it is called out rather than left to be spotted in a
            percentage. The share is of the reports that NAMED a version — an
            old build cannot — so `unknown` is stated beside it and never folded
-           in either direction. */
+           in either direction. The unknown line is drawn WHENEVER there are
+           unknowns, including on a row where no version was named at all:
+           there "not stated" alone reads as a missing field rather than as a
+           real population of old builds. */
         var concentrated = v.version && v.share !== null && v.share >= 80 && v.known >= 3;
-        /* The unknown line is drawn WHENEVER there are unknowns, including on a
-           row where no version was named at all — that row is the one where the
-           disclosure matters most, because "not stated" alone reads as a
-           missing field rather than as a real population of old builds. */
         var build = (!v.version ? '<span class="note">not stated</span>'
           : '<b>' + esc(v.version) + '</b> <span class="note">'
             + (v.share === null ? '' : fmtPct(v.share)) + '</span>'
@@ -7732,12 +7747,21 @@
         var plat = Object.keys(g.platforms).sort().map(function (p) {
           return esc(A.platformName(p)) + ' ' + fmtInt(g.platforms[p]);
         }).join(' · ') || '<span class="note">unknown</span>';
+        /* Times per install is the difference between "everybody hit this once"
+           and "one device is in a retry loop" — two completely different bugs
+           that either number alone cannot tell apart, which is exactly why both
+           columns are here. It is only called out when it is high enough to
+           mean something. */
+        var intensity = A.faultIntensity(g);
+        var loop = intensity !== null && intensity >= 5
+          ? '<br><span class="note">' + fmtInt(Math.round(intensity)) + '× per install</span>' : '';
         return '<tr>' +
           '<td><code>' + esc(g.msg) + '</code>' +
           (g.fatal ? ' <span class="pill bad">crash</span>' : '') +
           (last && g.firstDay === last ? ' <span class="pill warn">new</span>' : '') + '</td>' +
           '<td><code class="note">' + esc(g.tag) + '</code></td>' +
           '<td class="num"><b>' + fmtInt(g.installDays) + '</b></td>' +
+          '<td class="num">' + fmtInt(g.occurrences) + loop + '</td>' +
           '<td class="num">' + fmtInt(g.days) + '</td>' +
           '<td>' + build + '</td>' +
           '<td>' + plat + '</td>' +

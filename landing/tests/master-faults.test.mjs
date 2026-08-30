@@ -3,22 +3,31 @@
    What this file is really protecting is the difference between the two things
    the dashboard now calls a failure. `/ping/err` fires ONCE PER INSTALL EVER
    and carries no tag: it is a population and can never say what broke.
-   `/fault` carries a tag and a redacted message, is stored per (day, call site,
-   failure), and is reported once per install per day — so its numbers are
-   INSTALL-DAYS and not occurrences, and not phones either, because there is no
-   identifier anywhere in this system.
+   `/fault` carries a tag and a redacted message and is stored per (day, call
+   site, failure). It reports EVERY OCCURRENCE — the client buffers them and a
+   report carries the count it accumulated — so a row has two numbers, and the
+   pair is the point: occurrences alone cannot tell one phone in a retry loop
+   from a bug everybody has, and install-days alone cannot tell a single glitch
+   from a storm. Neither is a phone count, because there is no identifier
+   anywhere in this system.
 
    Every assertion below is one of those two claims, or the arithmetic that
    depends on getting them right.
 
    The fixture, relative to today (the view anchors to the newest ping day):
 
-     health.check "timeout after <n>ms"   T-2:3  T-1:4  T-0:2   = 9 install-days
+     health.check "timeout after <n>ms"
+       T-2: 3 installs / 3 times   T-1: 4/4   T-0: 2/2   = 9 installs, 9 times
        ...spread across two builds, so it is NOT a regression
-     store.persist "disk full"            T-0:5                 = 5, brand new,
-       ...all on 1.26.0, so it IS one
-     uncaught.fatal "boom"                T-1:1                 = 1, a crash,
-       ...and stale: not seen on the last day                                */
+     store.persist "disk full"
+       T-0: 5 installs / 5 times                         = 5 installs, 5 times
+       ...all on 1.26.0, brand new, so it IS one
+     widgets.sync "write failed"
+       T-0: 2 installs / 840 times                       = 2 installs, 840 times
+       ...a RETRY LOOP: barely anybody, constantly. It must rank BELOW the two
+       above by default (breadth decides a hotfix) and top the Most-often list.
+     uncaught.fatal "boom"
+       T-1: 1 install / 1 time                           = a crash, and stale  */
 import { JSDOM } from 'jsdom';
 import fs from 'node:fs';
 
@@ -35,14 +44,16 @@ const pad = (n) => (n < 10 ? '0' + n : '' + n);
 const iso = (d) => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
 const T = (back) => { const d = new Date(); d.setDate(d.getDate() - back); return iso(d); };
 
-/* Opens, so the failure lines have a population to be read against. 40
-   install-days over five days. */
+/* Opens, so the failure lines have a population to be read against. Comfortably
+   larger than the fault counts on every day: the failing-installs tile is a
+   share of the people who were in the app, and a fixture where the numerator
+   exceeded the denominator would enshrine a rate over 100% as expected. */
 const OPEN = {
-  [T(4)]: { [T(4)]: 10 },
-  [T(3)]: { [T(4)]: 8 },
-  [T(2)]: { [T(4)]: 8 },
-  [T(1)]: { [T(4)]: 7 },
-  [T(0)]: { [T(4)]: 7 },
+  [T(4)]: { [T(4)]: 24 },
+  [T(3)]: { [T(4)]: 22 },
+  [T(2)]: { [T(4)]: 21 },
+  [T(1)]: { [T(4)]: 20 },
+  [T(0)]: { [T(4)]: 20 },
 };
 
 const shapeOpen = () => Object.keys(OPEN).sort().map((day) => ({
@@ -78,40 +89,59 @@ const shapeErr = () => Object.keys(ERR).sort().map((day) => ({
 
 /* The fault rows, in the shape sls/lambdas/ping/main.js returns them: one per
    (day, call site, failure), with the three splits as plain maps. */
+const fault = (day, tag, msg, opts) => ({
+  key: `${day}#${tag}#${(opts.hash || 'aaaaaaaa')}${opts.fatal ? '!' : ''}`,
+  day, tag, msg, fatal: !!opts.fatal,
+  /* Two numbers. `installs` is install-days and `occurrences` is times. */
+  installs: opts.installs, occurrences: opts.occurrences,
+  firstAt: `${day}T08:00:00Z`, lastAt: `${day}T20:00:00Z`,
+  /* platforms / versions / tiers are INSTALL-DAYS and each sums to `installs`
+     — weighting them by occurrences would let one looping phone report
+     whichever build it runs as the whole of a failure. `occPlatforms` is
+     occurrences and sums to `occurrences`; it exists so a platform slice can
+     narrow both numbers together. */
+  platforms: opts.platforms, occPlatforms: opts.occPlatforms,
+  versions: opts.versions, tiers: opts.tiers,
+});
+
 const FAULTS = [
-  {
-    key: `${T(2)}#health.check#aaaaaaaa`, day: T(2), tag: 'health.check',
-    msg: 'timeout after <n>ms', fatal: false, count: 3,
-    firstAt: `${T(2)}T09:00:00Z`, lastAt: `${T(2)}T20:00:00Z`,
-    platforms: { I: 2, A: 1 }, versions: { '1.25.1': 3 }, tiers: { F: 3 },
-  },
-  {
-    key: `${T(1)}#health.check#aaaaaaaa`, day: T(1), tag: 'health.check',
-    msg: 'timeout after <n>ms', fatal: false, count: 4,
-    firstAt: `${T(1)}T08:00:00Z`, lastAt: `${T(1)}T21:00:00Z`,
-    platforms: { I: 3, A: 1 }, versions: { '1.25.1': 2, '1.26.0': 2 }, tiers: { F: 4 },
-  },
-  {
-    key: `${T(0)}#health.check#aaaaaaaa`, day: T(0), tag: 'health.check',
-    msg: 'timeout after <n>ms', fatal: false, count: 2,
-    firstAt: `${T(0)}T08:00:00Z`, lastAt: `${T(0)}T12:00:00Z`,
-    platforms: { I: 2 }, versions: { '1.26.0': 2 }, tiers: { P: 2 },
-  },
+  fault(T(2), 'health.check', 'timeout after <n>ms', {
+    installs: 3, occurrences: 3,
+    platforms: { I: 2, A: 1 }, occPlatforms: { I: 2, A: 1 },
+    versions: { '1.25.1': 3 }, tiers: { F: 3 },
+  }),
+  fault(T(1), 'health.check', 'timeout after <n>ms', {
+    installs: 4, occurrences: 4,
+    platforms: { I: 3, A: 1 }, occPlatforms: { I: 3, A: 1 },
+    versions: { '1.25.1': 2, '1.26.0': 2 }, tiers: { F: 4 },
+  }),
+  fault(T(0), 'health.check', 'timeout after <n>ms', {
+    installs: 2, occurrences: 2,
+    platforms: { I: 2 }, occPlatforms: { I: 2 },
+    versions: { '1.26.0': 2 }, tiers: { P: 2 },
+  }),
   /* Brand new, on the last day, entirely on the newest build. This is the row
      the whole view exists for. */
-  {
-    key: `${T(0)}#store.persist#bbbbbbbb`, day: T(0), tag: 'store.persist',
-    msg: 'disk full', fatal: false, count: 5,
-    firstAt: `${T(0)}T07:00:00Z`, lastAt: `${T(0)}T19:00:00Z`,
-    platforms: { A: 5 }, versions: { '1.26.0': 5 }, tiers: { F: 5 },
-  },
+  fault(T(0), 'store.persist', 'disk full', {
+    hash: 'bbbbbbbb', installs: 5, occurrences: 5,
+    platforms: { A: 5 }, occPlatforms: { A: 5 },
+    versions: { '1.26.0': 5 }, tiers: { F: 5 },
+  }),
+  /* THE RETRY LOOP. Two phones, 840 occurrences — 420 apiece. Every one of them
+     is counted, which is the whole point of the change, and the two numbers
+     have to stay legible side by side: this is a battery and data problem for
+     two users, not a bug that reached 840 people. */
+  fault(T(0), 'widgets.sync', 'write failed', {
+    hash: 'dddddddd', installs: 2, occurrences: 840,
+    platforms: { A: 2 }, occPlatforms: { A: 840 },
+    versions: { '1.26.0': 2 }, tiers: { F: 2 },
+  }),
   /* A crash, and a stale one: last seen the day before. */
-  {
-    key: `${T(1)}#uncaught.fatal#cccccccc!`, day: T(1), tag: 'uncaught.fatal',
-    msg: 'boom', fatal: true, count: 1,
-    firstAt: `${T(1)}T10:00:00Z`, lastAt: `${T(1)}T10:00:00Z`,
-    platforms: { I: 1 }, versions: { '?': 1 }, tiers: { F: 1 },
-  },
+  fault(T(1), 'uncaught.fatal', 'boom', {
+    hash: 'cccccccc', fatal: true, installs: 1, occurrences: 1,
+    platforms: { I: 1 }, occPlatforms: { I: 1 },
+    versions: { '?': 1 }, tiers: { F: 1 },
+  }),
 ];
 
 const b64u = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
@@ -184,32 +214,36 @@ check('the Failures view is the one showing',
 
 /* ------------------------------------------------------------ the tiles */
 
-/* Three distinct failures over 9 + 5 + 1 = 15 install-days. */
+/* Four distinct failures. 9 + 5 + 840 + 1 = 855 occurrences across
+   9 + 5 + 2 + 1 = 17 install-days. BOTH numbers are stated, because 855 alone
+   reads as a catastrophe and 17 alone hides a phone burning its battery. */
 check('distinct failures are counted, not occurrences',
-  /Distinctfailures3/.test(flat('fltTiles')), text('fltTiles'));
-check('the install-day total is stated as install-days',
-  /over15install-days/.test(flat('fltTiles')), text('fltTiles'));
+  /Distinctfailures4/.test(flat('fltTiles')), text('fltTiles'));
+check('every occurrence is counted, and stated as times',
+  /855times/.test(flat('fltTiles')), text('fltTiles'));
+check('install-days are stated beside them, never instead of them',
+  /across17install-days/.test(flat('fltTiles')), text('fltTiles'));
 
-/* One of the three was first seen on the last day. This is the number worth
-   reacting to: a backlog of known failures and a release going wrong look
-   identical in a total. */
+/* Two of the four were first seen on the last day (disk full, write failed).
+   This is the number worth reacting to: a backlog of known failures and a
+   release going wrong look identical in a total. */
 check('a failure first seen on the last day is called new',
-  /Newon.*1/.test(flat('fltTiles').replace(/Newon[A-Za-z0-9]+/, (m) => m + '|')), text('fltTiles'));
+  /2first seen that day/.test(text('fltTiles')), text('fltTiles'));
 
-/* Two of the three were reported on the last day (health.check and
-   store.persist); the crash was not. "Still happening" and "new" are different
-   questions and must give different answers. */
+/* Three of the four were reported on the last day; the crash was not.
+   "Still happening" and "new" are different questions and give different
+   answers. */
 check('still-happening and new are different numbers',
-  /Stillhappening2/.test(flat('fltTiles')), text('fltTiles'));
+  /Stillhappening3/.test(flat('fltTiles')), text('fltTiles'));
 
 check('a crash is counted apart from a caught error',
   /Crashes1/.test(flat('fltTiles')), text('fltTiles'));
 
-/* 7 failing install-days on the last day (2 + 5) against 7 opens. The share is
-   against the open counter, which is the same denominator every other rate on
-   this dashboard uses. */
+/* 9 failing install-days on the last day (2 + 5 + 2) against 20 opens = 45.0%.
+   The numerator is install-days and NOT occurrences on purpose: 847 occurrences
+   against 20 opens would render as 4,235%, which is not a rate at all. */
 check('the last day is read against the people who were in the app',
-  /ofthe7intheapp/.test(flat('fltTiles')), text('fltTiles'));
+  /45\.0%ofthe20intheapp/.test(flat('fltTiles')), text('fltTiles'));
 
 check('and says the count is install-days rather than phones',
   /install-days, not phones/.test(text('fltTiles')), text('fltTiles'));
@@ -220,8 +254,13 @@ check('the daily chart drew both lines', $('fltDaily').querySelectorAll('path, r
 
 const table = () => text('fltTable');
 
-check('the worst failure leads the table',
-  table().indexOf('timeout after <n>ms') < table().indexOf('disk full'), table().slice(0, 200));
+/* BREADTH RANKS FIRST. `timeout` (9 installs, 9 times) leads `disk full`
+   (5, 5), which leads the retry loop (2 installs, 840 times). Ranking by
+   occurrences would put the loop on top — two users' battery above a bug that
+   reached nine — and that is the wrong first thing to fix. */
+check('the widest failure leads the table, not the loudest',
+  table().indexOf('timeout after <n>ms') < table().indexOf('disk full')
+  && table().indexOf('disk full') < table().indexOf('write failed'), table().slice(0, 300));
 
 check('a failure is grouped across the days it spanned, not listed per day',
   /timeout after <n>ms/.test(table())
@@ -232,12 +271,29 @@ check('the message is shown as it was stored — already redacted',
 
 check('the call site is shown beside it', /health\.check/.test(table()));
 
+/* A row where a handful of phones account for hundreds of occurrences is a
+   loop, and the two columns are the only way to see it. 840 / 2 = 420. */
+check('both numbers are in the table',
+  /Installs/.test(table()) && /Times/.test(table()), table().slice(0, 120));
+check('a retry loop is called out as one',
+  /420× per install/.test(table()), table().slice(0, 600));
+check('...and an ordinary failure is not',
+  table().split('× per install').length === 2, table());
+
 /* The load-bearing one. `disk full` is 5 of 5 on 1.26.0, so it is a regression
    that shipped; `timeout` is split across 1.25.1 (5) and 1.26.0 (4), so it is
    not, and calling it one would send somebody to revert the wrong release. */
 check('a failure concentrated on one build is called out',
   /only this build/.test(table()), table().slice(0, 600));
 check('a failure spread across builds is NOT',
+  !table().slice(table().indexOf('timeout after <n>ms'), table().indexOf('disk full'))
+    .includes('only this build'), table().slice(0, 400));
+
+/* Nor is a failure that only two builds' worth of installs could speak for.
+   `write failed` is 100% on 1.26.0 — but on two install-days, which is not
+   enough to call a regression, and a flag that fires on two devices is a flag
+   nobody trusts by the third time they see it. */
+check('...and neither is one whose "100%" rests on almost no installs',
   table().split('only this build').length === 2, table());
 
 check('the top build is named with its share',
@@ -253,6 +309,13 @@ check('a failure first seen on the last day is marked new',
   /disk full new/.test(table()), table().slice(0, 300));
 
 /* ------------------------------------------------------------ the filters */
+
+/* Most often is the view for finding a loop: the same rows, ranked by how hard
+   they are hitting rather than by how wide they reached. */
+window.document.querySelector('#fltSort button[data-v="often"]').click();
+await new Promise((r) => setTimeout(r, 200));
+check('Most often puts the retry loop on top',
+  table().indexOf('write failed') < table().indexOf('timeout after <n>ms'), table().slice(0, 300));
 
 /* "New" is a FILTER rather than a sort: a list that merely floated new rows to
    the top still buries the answer under a backlog once there is more than a
@@ -274,12 +337,18 @@ await new Promise((r) => setTimeout(r, 200));
 
 const page = () => ($('view-faults').textContent || '').replace(/\s+/g, ' ').trim();
 
-check('the view says a count is install-days and not occurrences',
-  /once per install per day/.test(page()), page().slice(0, 400));
+check('the view says every occurrence is counted',
+  /every occurrence is counted/i.test(page()), page().slice(0, 500));
+
+check('the view says a request is NOT made per occurrence',
+  /a request is not made for each one/i.test(page()), page().slice(0, 600));
+
+check('the view says a deferred report never loses a count',
+  /it never discards a count/.test(page()), page());
 
 check('the view refuses to claim a phone count',
   /nine install-days may be nine phones once each or one phone for nine days/.test(page()),
-  page().slice(0, 400));
+  page().slice(0, 600));
 
 check('the view says the message is redacted twice',
   /redacted twice/.test(page()), page());
