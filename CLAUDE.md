@@ -1010,8 +1010,19 @@ old web app so old `export.json` files import directly.
   tested). `installErrorLogging()` in the root layout also routes uncaught
   errors there on their way to the default handler — it observes, it never
   swallows. Call `logError('area.thing', e)` from a catch that would otherwise
-  be silent (already wired: store persist/load, IAP, health reads, reminders,
-  backups, widgets), and prefer an existing tag over a new phrasing of one.
+  be silent (already wired: store persist/load, the waveform sidecar, IAP,
+  health reads + the one-shot history backfill, the strap connect loop,
+  reminders, backups, widgets, Garmin, Insights), and prefer an existing tag
+  over a new phrasing of one. **The tag IS the location**: a release build's
+  stack is minified bytecode offsets and worth nothing, so `area.thing` plus the
+  error's own type (`describeError` leads with `TypeError` / a native
+  `errorCode` when there is one) is the whole of the diagnosis. Most `catch`
+  blocks in the app are deliberately silent and should stay that way — a
+  cleanup, an optional native module, a permission read. The ones that must log
+  are where the app DEGRADES INVISIBLY: a lost waveform (the reading looks
+  complete and only its trace is gone), a strap that never connects (a loop that
+  retried forever leaving no trace), a one-shot backfill that will never run
+  again.
 - **A failure is also REPORTED, and that is a different route from the failure
   COUNTER.** `logError` fires two things. `pingErrorSeen` (`/ping/err`) is
   unchanged: once per install EVER, no tag, no message — a population, "how many

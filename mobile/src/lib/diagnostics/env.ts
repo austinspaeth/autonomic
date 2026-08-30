@@ -59,15 +59,7 @@ export function platformInfo(): Record<string, string | number | boolean | null>
   };
 }
 
-/** Native errors arrive in three different shapes (ble-plx codes, VisionCamera
- *  `code`, plain Error) — flatten whichever one turned up into one line. */
-export function describeError(e: unknown): string {
-  const err = e as {
-    errorCode?: number; code?: string; reason?: string; message?: string; cause?: { message?: string };
-  } | null;
-  if (!err) return 'unknown';
-  const head = err.errorCode != null ? `code ${err.errorCode}` : err.code ? String(err.code) : '';
-  const body = err.reason || err.message || String(e);
-  const cause = err.cause?.message ? ` (cause: ${err.cause.message})` : '';
-  return [head, body].filter(Boolean).join(': ') + cause;
-}
+/* `describeError` moved to ./format — it is pure, and this file imports
+   `react-native`, which jest here cannot load. Re-exported so the call sites
+   that reach for it beside `appInfo` and `platformInfo` keep working. */
+export { describeError } from './format';

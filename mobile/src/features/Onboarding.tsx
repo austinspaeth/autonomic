@@ -58,6 +58,7 @@ import { defaultPeriodFor, defaultSource, openCapture, sourceBlocker } from './h
 import { SOURCE_META, sourceSub, TIER_LABEL, TIER_ORDER, type Source } from './hrv/SourcePicker';
 import { brandTag, hasOtherWatches, openBrandSetup, otherWatchesSub, otherWatchesTitle } from './hrv/WatchBrands';
 import { garminDevices, subscribeGarminDevices } from '../lib/garmin/receiver';
+import { logError } from '../lib/diagnostics/errorLog';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -401,7 +402,13 @@ function HistoryImportSheet({ controls, onImported }: {
       n = await importHealthHistory((pr) => {
         setStatus(pr.total > 1 ? `${pr.label} · ${pr.done}/${pr.total}` : pr.label);
       });
-    } catch { n = null; }
+    } catch (e) {
+      // The backfill runs ONCE in an install's life. A silent failure here is a
+      // user who connected Health, got nothing, and has no second chance — the
+      // most expensive failure in the app to not know about.
+      logError('health.history', e);
+      n = null;
+    }
     setBusy(false);
     onImported(n);
     controls.close();

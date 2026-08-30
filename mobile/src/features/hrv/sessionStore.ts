@@ -350,7 +350,15 @@ function connectStrap() {
           if (bleAlive && snap.status !== 'finished') bleRetry = setTimeout(attempt, 2000);
         },
       );
-    } catch {
+    } catch (e) {
+      // A strap that will not pair is the single most common way a reading
+      // never happens, and this loop retried every three seconds forever
+      // without leaving a trace anywhere — so "my strap doesn't work" arrived
+      // with no evidence at all. Logged on every attempt on purpose: the log
+      // collapses consecutive repeats into a count, and the fault report
+      // buffers occurrences, so a phone that never connects reports the
+      // failure once and then its true volume rather than one line or forty.
+      logError('hrv.strap.connect', e);
       bump({ connected: false });
       if (bleAlive && snap.status !== 'finished') bleRetry = setTimeout(attempt, 3000);
     }
