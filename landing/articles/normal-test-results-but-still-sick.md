@@ -8,8 +8,8 @@ keywords: "normal test results but still sick, all my tests are normal, normal E
 date: 2026-08-31
 updated: 2026-08-31
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1499750310107-5fef28a66643?q=80&w=1760&auto=format&fit=crop"
-photoAttribution: "Andrew Neel / Unsplash"
+photoLocation: "https://images.unsplash.com/photo-1752650735615-9829d8008a01?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb&dl=vitaly-gariev-AP7KmJXEVVI-unsplash.jpg"
+photoAttribution: "Vitaly Gariev / Unsplash"
 tldr: "A normal ECG, blood panel and echocardiogram mostly rule out dangerous structural and rhythm disease, which is genuinely good news, but they are still snapshots taken while you sit or lie down. Dysautonomia and POTS are disorders of how your body adjusts to standing, eating and activity, so the abnormality often only appears when you change position. The test that catches it is a simple repeated stand test showing a sustained heart-rate rise of 30 bpm or more, and that measured pattern, not a description of how you feel, is what moves an appointment forward."
 categories:
   - pots
