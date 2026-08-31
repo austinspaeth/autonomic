@@ -362,6 +362,45 @@ export function pingCaptureCompleted(source: string | undefined): void {
 }
 
 /**
+ * The wrist route's counterpart to the pair above: a reading taken ON a watch,
+ * with the phone never asked to run a session at all.
+ *
+ * The phone-side counters live in `sessionStore` because that is the one path a
+ * phone-driven reading can start from. A watch reading has no such path — the
+ * wearer starts it on the wrist, walks away, and the whole beat-to-beat series
+ * arrives in one message when it finishes. Counted only where the session runs,
+ * those readings were invisible: no `hrv` row, and worse, an install whose FIRST
+ * ever reading was taken this way never registered as activated at all. That is
+ * the normal way to use the Garmin app and a normal way to use the Apple Watch,
+ * so the two receivers call this from their arrival path.
+ *
+ * It fires the STARTED ping as well as the completed one, and that is the whole
+ * design decision here. A reading that arrives did begin — we simply learned of
+ * the start and the finish in the same instant — and `hrv / cap` is read as a
+ * completion rate, so crediting the completion alone would let `hrv` exceed
+ * `cap` and turn a rate into a number above 100%. What this cannot see is a
+ * wrist reading that was ABANDONED: the watch sends nothing, so the completion
+ * rate is measured only over phone-driven sessions and reads high for the watch
+ * sensors. That is a disclosure, not a distortion of the headcount, which is
+ * what `hrv` is actually for.
+ *
+ * Both daily routes are capped per install per Eastern day, so a wrist reading
+ * landing after a phone-driven one adds nothing, and activation is capped per
+ * install ever — no call here can double count.
+ *
+ * The CALLER decides whether the reading belongs to today (`dayKey ===
+ * todayKey()`). A watch that queued a reading while the app was closed can
+ * deliver last night's on this morning's launch, and counting that as measuring
+ * today would put a reading on the wrong day — the one thing the daily counters
+ * cannot recover from.
+ */
+export function pingWristReading(source: string | undefined): void {
+  pingCaptureStarted(source);
+  pingCaptureCompleted(source);
+  pingActivation(source);
+}
+
+/**
  * Send today's paywall ping — the first time in an Eastern day that a locked
  * surface raises the card — carrying one letter for WHICH surface raised it.
  *

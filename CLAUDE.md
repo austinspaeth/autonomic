@@ -799,6 +799,22 @@ old web app so old `export.json` files import directly.
   (`pingPaywall`, from `usePaywall()`), plus `not` (a notification turned on),
   `pot` (a POTS capture finished), `see` (a gated view opened), `err` (something
   failed) and `osh`/`odm`/`oac` (an offer shown, dismissed, accepted).
+  **A reading taken on the WRIST fires `cap`, `hrv` and `act` from the RECEIVER
+  instead** (`pingWristReading` in `store/ping.ts`, called by
+  `lib/watch/receiver.ts` and `lib/garmin/receiver.ts` on a fresh HRV arrival
+  dated today). The wearer starts it on the watch and the whole beat-to-beat
+  series lands in one message, so no session ever ran and those readings were
+  invisible — worse, an install whose FIRST ever reading was taken that way never
+  registered as activated at all, and that is the normal way to use the Garmin
+  app. It fires the STARTED ping as well as the completed one, because a reading
+  that arrives did begin — we simply learn of both in the same instant — and
+  `hrv / cap` is read as a completion rate, so crediting the completion alone
+  would let `hrv` exceed `cap`. What it cannot see is an ABANDONED wrist reading:
+  the watch sends nothing, so the completion rate is measured over phone-driven
+  sessions and reads high for the watch sensors. The today gate is load-bearing —
+  a watch queues while the phone is unreachable, and last night's reading
+  delivered on this morning's launch is not a reading taken today — and the daily
+  caps make a wrist arrival that follows a phone-driven reading a no-op.
   **NOTHING fires on Save.** The measurement is the event; whether the results
   card survived long enough to be filed is a different fact about a different
   moment, and counting the save undercounted every completed reading that was

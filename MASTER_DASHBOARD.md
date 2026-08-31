@@ -355,6 +355,16 @@ finish half the time and strap readings nine times in ten" is a decision about
 what to put in front of a new user; a single pooled rate is only a number to
 worry about.
 
+**One asymmetry inside that rate: the watch sensors cannot report an abandoned
+reading.** A Garmin or Apple Watch reading is taken on the wrist, and the phone
+hears about it only when the whole beat-to-beat series arrives — so the app fires
+`cap` and `hrv` together at that moment (`pingWristReading`), and a wrist reading
+the wearer gave up on sends nothing at all. `W` and `G` therefore complete at or
+near 100% by construction, where `B` and `F` are measured over sessions the phone
+actually watched. The completion rate is a real question for the strap and the
+camera and a formality for the watches; read the watch letters on `hrv` as a
+headcount, which is what that route is for, and not against `cap`.
+
 **Beyond those, six routes with a different cap.** `not` (a notification turned
 on), `pot` (a POTS capture finished), `see` (a gated view opened) and the three
 offer routes are capped once per install per day **per letter**, not per route.
