@@ -158,7 +158,7 @@ Four things are cached, and the last two are new:
 
 | Key | What |
 |---|---|
-| `autonomic.dashboard.v1` | the store — entries, events, ads, costs, sales, settings |
+| `autonomic.dashboard.v1` | the store — entries, events, ads, costs, sales, churn, settings |
 | `autonomic.dashboard.v1.ui` | the view, range, filters, forecast controls |
 | `autonomic.dashboard.v1.pings` | the counter's last report, so App usage and Timeline open on numbers rather than on "Reading the counter…" |
 | `autonomic.master.alertBase` | what this browser has already been told about (see the alerts section) |
@@ -1012,6 +1012,58 @@ average price is never a real total divided by a sale that returned nothing.
 Churn is booked against the **cancellation's** window and not the purchase's —
 almost everything that churns was bought before the window it churns in.
 
+**Churn you cannot attach to a purchase is its own ledger.** Marking `cancelled`
+needs to know *which* subscription ended, and a store report does not say — it
+says "you lost four subscribers last month and about $20 a month with them".
+That is a real, knowable fact with nowhere to go under the rule above, so churn
+read as zero forever and the forecast fell back to its 5% assumption. `churn` is
+a second collection, a row per **occurrence** rather than per subscription:
+`{ id, date, mrr, units?, plan?, platform?, note? }`. `mrr` is the monthly rate
+that stopped (an annual plan's twelfth, not its yearly price) and is the only
+required field; the rest are **absent rather than defaulted** when unknown,
+because a dollar figure off a bank statement is not a claim about a headcount, a
+term or a store. Four rules:
+
+- **It moves the rate, never the cash.** MRR, ARR, the active count, the churn
+  rate and every projection built on them net it out from its date forward.
+  Bookings and recognised revenue do not move: money that already arrived does
+  not un-arrive — that is what `refunded` is for — and there is no purchase here
+  whose recognition schedule could be stopped.
+- **The book is floored at zero.** An unattached figure is an estimate typed by
+  hand and it can overshoot the ledger. `mrrOn` reports `churnFloored` when it
+  clamps, so the view says the estimate has outrun the ledger rather than
+  quietly showing a plausible number. Inside the plan split, a plan that cannot
+  absorb its share spills onto the rest, so the stack always sums to the netted
+  total and no band is ever negative.
+- **Only a row that named a count may move the headcount.** A row with a dollar
+  figure and no count takes the money off the book and leaves `active` alone,
+  and the tile says so — the plan split beside it comes from purchase rows and
+  stays gross, because an unattached row names no subscription to take off one.
+- **A row with no store is in neither store.** A filtered index drops it rather
+  than guessing, and reports `churnUnattributed` so the view can disclose the
+  hole instead of showing a smaller figure under a store's name.
+
+The Sales view gains a **Churned MRR in range** tile and a **Churn** card that
+stacks cancellations against unattached rows — different evidence, kept visibly
+apart — and the MRR chart grows a dashed *Before churn* line whose gap from the
+top of the stack is what the ledger is costing. Entry is under **Edit data →
+Churn**, the same form/paste/table shape the purchase ledger has, with its own
+`autonomic-churn.csv`.
+
+**The churn rate is struck against the MEAN daily book, not the opening one.**
+`forecastBasis` reads a 180-day window, so an account whose first sale falls
+inside it has an opening book of zero — an opening-MRR rate is undefined there,
+which is every young account and exactly the one this ledger was built for. On a
+book that grew several times over inside the window it is worse than undefined:
+dividing the whole window's losses by the handful of subscriptions that existed
+on day one reports a multiple of the real rate and the projection drives the
+book into the ground. The mean is the MRR the churn actually came out of, it is
+defined whenever the book was ever non-empty, and it does not jump because one
+purchase fell either side of the window's edge. `meanBook` travels with the rate
+so a view can show its own denominator. The forecast's opening payer counts are
+scaled by the surviving share of MRR for the same reason — the model's state is
+a payer count, and unattached churn cannot name the payers to remove.
+
 **Cohort-day statistics only count purchases carrying an install date.**
 `cohortDay` is purchase date minus install date, exact and per buyer. A row
 without one is not a zero and not an average: it is left out of the
@@ -1110,7 +1162,7 @@ projects each spot into a derived cost row on its start date. Every rollup —
 `daily`, `spend`, `summary`, `breakeven` — reads that, so nothing downstream
 knows there are two collections.
 
-The arithmetic is pure and lives in `costs.js` (`tests/costs.test.mjs`). Five
+The arithmetic is pure and lives in `costs.js` (`tests/costs.test.mjs`). Six
 rules run through it, and they are the reason to read that file before changing
 a number here.
 
@@ -1136,6 +1188,35 @@ customer-facing price; the store keeps 15% or 30% of it. `settings.storeCutPct`
 (Edit data → Store commission) is applied everywhere profit appears, and the
 gross figure is always shown beside the net one so the cut is visible rather
 than silently applied.
+
+**Building the thing and running the thing are different money.** A cost carries
+a `capex` boolean — a one-off investment in the product (the R&D, hardware
+bought once, a contractor who built a feature) rather than part of what the app
+costs to keep running. It is **orthogonal to the category on purpose**: R&D
+arrives as HARDWARE, as SERVICES, as a one-off TOOLS licence, so a "CAPEX"
+category could not hold it without making you abandon the category that already
+describes it. The form asks it as *Kind of money*; the ledger table wears a
+`build` pill; the CSV carries a `kind` column.
+
+What the flag changes is which **per-customer rates** it is allowed into, and
+the rule is that a rate is about the ongoing business or it is meaningless. A
+$5,000 build divided by this month's twelve buyers is $417 a customer, which is
+not what a customer costs, will never be, and gets *worse* the more product you
+build. So `loadedCostPerPaid` is struck against **operating** spend and
+`capexPerPaid` states the build separately. `costPerInstall` never saw capex —
+it has always been marketing-only — and `isCapex` and `isMarketing` are mutually
+exclusive with the former winning, so a flagged CREATIVE row cannot put a
+permanent step in the cost-per-install series on the day it was paid for.
+
+What it does **not** change is profit. The money left the bank, and a profit you
+can improve by spending more is not one. `profit`, `margin` and the breakeven
+curve are struck against total spend exactly as before; `operatingProfit` and
+`operatingMargin` sit beside them in the tiles' meta lines and in the text
+export, so the honest sentence — "the app is operationally profitable and has
+this much build cost still to earn back" — has both halves. `daily()` returns
+`capex` / `capexByDay` / `operating`; `other` is unchanged (everything that is
+not marketing) because three charts read it under their own labels, and the two
+axes deliberately overlap rather than one being a subset of the other.
 
 **Blended and reported acquisition costs are never mixed.** Blended is marketing
 spend ÷ every store download, which charges organic installs to marketing and is

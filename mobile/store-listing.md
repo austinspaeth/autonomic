@@ -263,9 +263,9 @@ YOUR DATA NEVER LEAVES YOUR PHONE
 
 WHAT'S FREE, WHAT'S PRO
 
-Free forever: unlimited live HRV captures, journaling (sleep, meds, symptoms, triggers, hydration, meals), manual readings, your daily Autonomic Score and outlook, the Apple Watch heart-rate monitor, 14 days of charts, and full export.
+Free forever: unlimited live HRV captures, POTS stand tests and episode captures (Apple Watch or chest strap), journaling (sleep, meds, symptoms, triggers, hydration, meals), manual readings, your daily Autonomic Score and outlook, the Apple Watch heart-rate monitor, 14 days of charts, and full export.
 
-Autonomic Pro adds: week / month / year progress views, full historical metric analysis, on-device Insights, POTS stand testing and episode tracking, and AI doctor reports.
+Autonomic Pro adds: week / month / year progress views, full historical metric analysis, on-device Insights, POTS test and episode results, and AI doctor reports.
 
 Pro is $7.99/month or $49.99/year, billed to your Apple ID and renewing automatically until cancelled. Cancel anytime in your App Store settings.
 
@@ -284,8 +284,9 @@ IMPORTANT: Autonomic is a personal journal and education tool, not a medical dev
 > export) remains free indefinitely.
 >
 > Autonomic Pro (com.autonomic.journal.monthly / .yearly, one subscription
-> group) unlocks the full progress history, the Insights tab, POTS testing and
-> AI reports. HRV capture itself is unlimited on the free tier. To reach the
+> group) unlocks the full progress history, the Insights tab, POTS results and
+> AI reports. HRV capture itself is unlimited on the free tier, as are the Apple
+> Watch and chest-strap POTS captures (the graded result is what Pro opens). To reach the
 > paywall: Insights tab, or Analysis tab → Week/Month/Year. "Restore purchase" is on the paywall card.
 >
 > No demo account is needed. HRV capture works without hardware via the camera
@@ -398,9 +399,9 @@ YOUR DATA NEVER LEAVES YOUR PHONE
 
 WHAT'S FREE, WHAT'S PRO
 
-Free forever: unlimited live HRV captures, journaling (sleep, meds, symptoms, triggers, hydration, meals, activities), manual readings (blood pressure, resting heart rate, episodes), your daily Autonomic Score and outlook, 14 days of progress charts, and backup and export.
+Free forever: unlimited live HRV captures, POTS stand tests and episode captures from a chest strap, journaling (sleep, meds, symptoms, triggers, hydration, meals, activities), manual readings (blood pressure, resting heart rate, episodes), your daily Autonomic Score and outlook, 14 days of progress charts, and backup and export.
 
-Autonomic Pro adds: week / month / year progress views, full historical metric analysis, on-device Insights, POTS stand testing and episode tracking, and AI doctor reports.
+Autonomic Pro adds: week / month / year progress views, full historical metric analysis, on-device Insights, POTS test and episode results, and AI doctor reports.
 
 Pro is $7.99 per month or $49.99 per year, billed through Google Play. Subscriptions renew automatically until cancelled; manage or cancel anytime in Google Play → Subscriptions.
 

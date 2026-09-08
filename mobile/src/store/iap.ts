@@ -30,6 +30,7 @@ import {
 } from 'expo-iap';
 import { isSideloadedAndroidBuild, isTestFlightBuild } from '../../modules/app-env';
 import { logError } from '../lib/diagnostics/errorLog';
+import { describeError } from '../lib/diagnostics/format';
 
 /** Product IDs — identical in App Store Connect and the Play Console. On the
  *  App Store: one subscription group holding both plans. On Google Play: two
@@ -247,8 +248,40 @@ const storeUnavailable = () =>
  *  did nothing for a whole session. Anything below that talks to the store goes
  *  through `withBilling`, which reconnects once and retries. */
 const NOT_READY = new Set(['service-error', 'service-disconnected', 'connection-closed', 'not-prepared', 'init-connection']);
+
+/** Play FLATTENS every `queryProductDetailsAsync` failure into one code.
+ *  Whatever Billing answered — a dead binding, no network, an account that
+ *  can't buy subscriptions — openiap-google rethrows it as `query-product`
+ *  ("Failed to query product"), and the response code that actually says which
+ *  rides alongside as `responseCode`. So a dropped binding reached `withBilling`
+ *  wearing a code that isn't in NOT_READY, the reconnect never fired, and all
+ *  three launch attempts failed identically against the same dead client. These
+ *  two are the reconnectable ones: SERVICE_DISCONNECTED and SERVICE_UNAVAILABLE. */
+const PLAY_RECONNECTABLE = new Set([-1, 2]);
+const responseCodeOf = (e: unknown): number | undefined => {
+  const c = (e as { responseCode?: unknown } | undefined)?.responseCode;
+  return typeof c === 'number' ? c : undefined;
+};
+
 const isDisconnected = (e: unknown) =>
-  NOT_READY.has(codeOf(e)) || /not ready|disconnect/i.test(String((e as Error)?.message ?? ''));
+  NOT_READY.has(codeOf(e))
+  || PLAY_RECONNECTABLE.has(responseCodeOf(e) ?? NaN)
+  || /not ready|disconnect/i.test(String((e as Error)?.message ?? ''));
+
+/** What `describeError` cannot see, folded into the message so the fault report
+ *  carries the diagnosis instead of the same opaque line every time. Play's
+ *  `query-product` is the whole reason this exists: the code names the CALL that
+ *  failed, never the reason, and the reason is a number in a sibling field. */
+function iapDetail(e: unknown): unknown {
+  const d = e as { responseCode?: number; debugMessage?: string; isEmptyProductList?: boolean } | undefined;
+  const bits = [
+    d?.responseCode != null ? `response ${d.responseCode}` : '',
+    d?.isEmptyProductList ? 'no products returned' : '',
+    d?.debugMessage ? String(d.debugMessage) : '',
+  ].filter(Boolean);
+  if (!bits.length) return e;
+  return Object.assign(new Error(`${describeError(e)} [${bits.join('; ')}]`), { code: codeOf(e) });
+}
 
 /** Re-establish the billing connection for real.
  *
@@ -280,7 +313,19 @@ async function withBilling<T>(fn: () => Promise<T>): Promise<T> {
  *  callers can report it; leaves `connected` false so the next call retries. */
 async function connect() {
   if (connected) return;
-  await initConnection();   // expo-iap is StoreKit 2 on iOS by default
+  // `initConnection` RESOLVES FALSE rather than throwing when the platform
+  // refuses billing outright — on iOS that is `AppStore.canMakePayments`, i.e.
+  // In-app Purchases switched off under Screen Time, or an MDM-managed device.
+  // Trusting it to have thrown left `connected` true against a store that
+  // rejects every call, so the refusal surfaced a layer later as an
+  // unexplained `iap-not-available` out of fetchProducts.
+  const ok = await initConnection();   // expo-iap is StoreKit 2 on iOS by default
+  if (ok === false) {
+    throw Object.assign(
+      new Error(`${storeName()} purchases are unavailable on this device.`),
+      { code: 'iap-not-available' },
+    );
+  }
   connected = true;
   if (!purchaseSub) {
     purchaseSub = purchaseUpdatedListener(async (purchase) => {
@@ -297,7 +342,7 @@ async function connect() {
       // The store's own failure path (Play's dialog closing on an error, a
       // declined card). A cancel is not a failure and says nothing.
       if (isCancel(e)) { set({ purchasing: false }); return; }
-      logError('iap.purchaseError', e);
+      logError('iap.purchaseError', iapDetail(e));
       set({ purchasing: false, error: purchaseMessage(e) });
     });
   }
@@ -340,7 +385,7 @@ export async function initIap() {
       // bricked). Logged because "it says I'm not subscribed" arrives with no
       // other evidence. Only the last attempt is logged, so a cold-start
       // hiccup that heals on retry doesn't flush the 40-entry support log.
-      if (attempt === INIT_ATTEMPTS - 1) logError('iap.init', e);
+      if (attempt === INIT_ATTEMPTS - 1) logError('iap.init', iapDetail(e));
       else await delay(INIT_BACKOFF_MS[attempt]);
     } finally {
       set({ ready: true });
@@ -366,7 +411,7 @@ const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
  *  working button. Silent: the card shows fallback prices either way. */
 export async function ensureIapReady() {
   if (storeUnavailable() || state.products.length) return;
-  try { await loadProducts(); } catch (e) { logError('iap.retryProducts', e); }
+  try { await loadProducts(); } catch (e) { logError('iap.retryProducts', iapDetail(e)); }
 }
 
 /** Active entitlements only — StoreKit 2 currentEntitlements on iOS, the
@@ -381,7 +426,7 @@ export async function refreshEntitlement(): Promise<boolean> {
     ));
     const hit = (active || []).find((p) => isProSku(p.productId) && p.purchaseState !== 'pending');
     set({ isPro: !!hit, activeSku: hit?.productId });
-  } catch (e) { logError('iap.entitlement', e); /* keep last known entitlement */ }
+  } catch (e) { logError('iap.entitlement', iapDetail(e)); /* keep last known entitlement */ }
   return state.isPro;
 }
 
@@ -410,8 +455,14 @@ function purchaseMessage(e: unknown): string {
     case 'network-error':
     case 'service-timeout':
       return `Couldn’t reach ${store}. Check your connection and try again.`;
-    case 'billing-unavailable':
     case 'iap-not-available':
+      // NOT a hiccup and not worth a "try again": the device has been told not
+      // to allow purchases, and no amount of retrying changes that. iOS can
+      // name the exact switch, so it does.
+      return Platform.OS === 'ios'
+        ? 'In-app purchases are turned off on this device. Turn them on in Settings, under Screen Time, in Content & Privacy Restrictions.'
+        : `${store} won’t allow purchases on this device. Check that purchases aren’t restricted for this account, then try again.`;
+    case 'billing-unavailable':
     case 'service-disconnected':
     case 'service-error':
       return `${store} isn’t available on this device right now. Make sure you’re signed in to ${store}, then try again.`;
@@ -483,7 +534,7 @@ export async function subscribe(sku: string = YEARLY_SKU): Promise<boolean> {
     return true;
   } catch (e) {
     if (isCancel(e)) { set({ purchasing: false }); return false; }
-    logError('iap.purchase', e);
+    logError('iap.purchase', iapDetail(e));
     set({ purchasing: false, error: purchaseMessage(e) });
     return false;
   }

@@ -315,11 +315,31 @@ old web app so old `export.json` files import directly.
 - **Capture is never metered; Pro is what the app makes of the readings.**
   The freemium line runs between *taking* a measurement and *analysing* it.
   Free forever, with no cap: journaling, manual readings, the daily score and
-  Outlook, backups/export, the Apple Watch HR monitor, and **live HRV capture
-  as often as the user likes** (strap, camera or watch). Pro: Progress
+  Outlook, backups/export, the Apple Watch HR monitor, **live HRV capture
+  as often as the user likes** (strap, camera or watch), and **both POTS
+  captures, on the watch and on a strap**. Pro: Progress
   week/month/year (free clips at the 14-day Day view), full historical metric
-  analysis, the whole Insights tab, live POTS captures + watch POTS rows
-  (`relay.pro` in `src/lib/watch/receiver.ts`), and the AI report cards. Live
+  analysis, the whole Insights tab, **reading a POTS RESULT** and the AI report
+  cards. The watch used to lock its POTS Test and POTS Episode rows on
+  `relay.pro` and the picker locked the in-app stand test; neither gates
+  anything now (the flag is still mirrored). A stand test and an episode happen
+  at a moment that cannot be rescheduled around a subscription, and a device
+  that refuses to record one loses it for good — so the capture runs, syncs and
+  saves on every tier, and the gate sits on the RESULT: `src/features/PotsLock.tsx`.
+  It is a CARD, not a mask, and that is the one place it parts company with
+  Progress and Insights. Those build the real document and blur it, because
+  there the SHAPE of what is locked is itself information and the header that
+  raised the gate has to stay live. A single reading has neither — the shape
+  behind the blur is one number the user just measured, so a dimmed preview is a
+  tease rather than an honest one — so the tap opens the lock card and nothing
+  else, `fitContent`, which is to say it rises from the bottom of the device
+  like every other one-answer card. `openPotsLockIfNeeded` in `features/forms.tsx`
+  is the single choke point (journal row + watch/Garmin arrival); the live
+  session's own results sheet renders the card in place of the summary, keeps
+  its "Saved to your journal" line, and swaps the real summary in if the user
+  upgrades from it rather than closing — it is the receipt for a capture they
+  just sat through. Delete stays armed on a locked result and the pencil does
+  not, since the edit form is the numbers, listed. Live
   HRV capture WAS capped at one a day on the free tier and no longer is (1.25):
   a user who has run out of the thing the app exists to do has no reason to
   open it again until tomorrow, and the cap taught them to stop measuring on
@@ -962,8 +982,10 @@ old web app so old `export.json` files import directly.
   `useCaptureDeepLink()` in `src/features/forms.tsx`: `autonomic://?capture=hrv`
   opens HRV capture (no tier check: capture is unlimited on every tier);
   `autonomic://?open=protocol` scrolls to
-  the Progress streak card and opens it expanded (`requestExpandProtocol` /
-  `scrollJournalToSection('protocol')` in `src/store/nav.ts`).
+  the Progress streak card (`scrollJournalToSection('protocol')` in
+  `src/store/nav.ts`) and leaves it as the reader left it. It does NOT open the
+  card: an accordion that expands itself overwrites the one piece of Journal
+  state the user had actually set, so the deep link does the useful half only.
 - **"What's new" is announced once per `x.x` release, and never wins the pill
   slot.** The customer-facing release log lives in `src/lib/whatsNew.ts` (product
   copy, deliberately not `CHANGELOG.md`, which stays the engineering record);

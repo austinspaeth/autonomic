@@ -1,7 +1,9 @@
 # Autonomic for Garmin — Connect IQ watch app
 
-A Venu 4 watch app that takes an HRV reading on the wrist and delivers the raw
-beat-to-beat intervals to the phone over Connect IQ's device-to-app messaging.
+A Connect IQ watch app that takes an HRV reading on the wrist and delivers the
+raw beat-to-beat intervals to the phone over Connect IQ's device-to-app
+messaging. It ships to 100+ products (see **Devices**); the Venu 4 is the one it
+was written on and the only one a real reading has been taken with.
 **No Garmin cloud API is involved**: nothing leaves the watch except to the
 paired phone, which is the same privacy contract the rest of Autonomic keeps.
 
@@ -27,6 +29,72 @@ commented at length in `source/RrCollector.mc`; do not "clean up" either one.
    `setEnabledSensors` is likewise called exactly once, in `arm()`. A second
    call anywhere breaks it.
 
+## Devices
+
+The manifest lists 100+ products, and the list is DERIVED, not curated by hand.
+A device qualifies only if it passes all of:
+
+* `Sensor.HeartRateData.heartBeatIntervals` — the whole point, beat-to-beat
+* `Sensor.registerSensorDataListener`, `Communications.transmit` +
+  `registerForPhoneAppMessages`, `WatchUi.CustomMenu`, `Attention.vibrate`
+  (that last one is what removes every Edge bike computer, correctly: they have
+  no wrist sensor)
+* Connect IQ **>= 3.2.0** — `SENSOR_ONBOARD_HEARTRATE` is a 3.2 API, so fenix 5
+  / 5S / 5X, fenix Chronos, FR 645, FR 935, vivoactive 3, Descent Mk1 and
+  Approach S62 can never be supported through this path however new the firmware
+* a `watchApp` app type
+
+Garmin's own per-API device tables are in the SDK docs
+(`doc/Toybox/Sensor/HeartRateData.html` and friends) — intersect those rather
+than guessing from model names.
+
+**Those tables lag the device packages, and absence from them is not a "no".**
+The SDK ships fenix 9 and Forerunner 70/170 device definitions while listing
+them in NO API table at all — not `heartBeatIntervals`, and not
+`Attention.vibrate` either, which every Garmin watch has had for a decade. A
+device missing from every table is undocumented, not unsupported; a device
+present in the tables but missing from ONE is the real exclusion. Those ten are
+in the manifest on that reading, since each succeeds a listed device (fenix 9
+follows fenix 8, FR 70/170 follow the FR 165) and Garmin does not drop
+beat-to-beat in a newer generation.
+
+**Compiling proves nothing; launching does.** `drawScaledBitmap` is missing on
+most of the list and a compile is perfectly happy with it, so the app built
+cleanly and then died on launch with `Symbol Not Found`. Every product in the
+manifest has been launched in the simulator and seen to reach its home screen.
+
+### Per-screen-family assets
+
+Nothing scales at runtime. `tools/gen-glyphs.py` renders the heart, the dim
+heart, the completion check and the logo from the 96px / 104x56 masters into
+`resources-<family>/drawables/`, at the exact size each call site draws them,
+and the default jungle picks those directories up on its own — no jungle
+entries and no `has :drawScaledBitmap` branch. Ratios are taken FROM the 454px
+Venu 4 masters, so the device the app already shipped on renders identical
+pixels.
+
+Run it after adding a product; `build.sh` refuses to build when a product's
+family has no assets, which is what keeps "listing a device is a claim that it
+works" true rather than a convention.
+
+The sizes live in the script and are derived from the call sites
+(`Home.mc` for the heart and the logo, `Theme.completion` for the check) — move
+one and you must move the other.
+
+### What the simulator cannot tell you
+
+It synthesises sensor data, so a render sweep says the UI works and says
+NOTHING about beat-to-beat. Only the Venu 4 has had a real reading taken on it;
+`mobile/src/lib/watch/brands.ts` keeps that distinction as `verified` vs
+`likely` and the two lists must move together.
+
+Low-colour devices are usable but not pretty: on 1bpp Instinct/Descent the
+accent, the tinted icon discs and the pill fills all quantise to black, leaving
+white glyphs and white text. That is a deliberate accept, not an oversight. The
+Instinct sub-screen also physically overlays the top-right of the display and
+clips the end of centred text there; everything load-bearing is centred clear
+of it.
+
 ## Layout
 
 | File | Purpose |
@@ -34,7 +102,8 @@ commented at length in `source/RrCollector.mc`; do not "clean up" either one.
 | `source/RrCollector.mc` | The capture engine. Owns both rules above. |
 | `source/Link.mc` | Store-and-forward to the phone: queues readings, retries with backoff, clears only on the phone's ack. |
 | `source/Payload.mc` | Wire format (`SCHEMA`), local-ISO timestamps with no timezone suffix (the phone parses them as local). |
-| `source/Theme.mc` | Design tokens ported from the Apple Watch's `DesignSystem.swift`, plus pill/chevron/heart drawing. CIQ has no anti-aliasing, so the heart and check are bitmaps. |
+| `source/Theme.mc` | Design tokens ported from the Apple Watch's `DesignSystem.swift`, plus pill/chevron/heart drawing. CIQ has no anti-aliasing, so the heart and check are bitmaps, drawn at their own size from the per-family assets. |
+| `tools/gen-glyphs.py` | Generates those per-family assets from the masters. |
 | `source/Home.mc` | The `CustomMenu` home screen. |
 | `source/RrView.mc`, `HrMonitor.mc` | The two captures. |
 
@@ -78,4 +147,4 @@ gitignored (`developer_key*`) and must never be committed.
 ## Store listing
 
 `store/` holds the submitted assets (`cover-500.png`, `icon-128.png`) and IS
-committed. Screenshots are 454×454 for this device and are not kept here.
+committed. Screenshots are 454×454 for the Venu 4 and are not kept here.

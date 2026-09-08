@@ -82,11 +82,23 @@
     return d;
   }
 
+  /* An x entry is `{ label, full }`. A caller that hands us a bare string means
+     both, and reading `.label` off it would print "undefined" on the axis and in
+     the hover title. Normalise once, at the two entry points. */
+  function normalizeX(x) {
+    return (x || []).map(function (e) {
+      if (e && typeof e === 'object') return e;
+      var s = (e === null || e === undefined) ? '' : String(e);
+      return { label: s, full: s };
+    });
+  }
+
   /* ---------- main render ---------- */
 
   function render(container, cfg) {
     container.innerHTML = '';
     cfg.height = cfg.height || 300;
+    cfg.x = normalizeX(cfg.x);
 
     var visible = cfg.series.filter(function (s) { return !s.hidden; });
     var hasData = cfg.x.length > 0 && visible.length > 0;
@@ -526,7 +538,7 @@
   function tableHTML(cfg) {
     var head = '<tr><th>' + escapeHTML(cfg.xLabel || 'Period') + '</th>' +
       cfg.series.map(function (s) { return '<th>' + escapeHTML(s.name) + '</th>'; }).join('') + '</tr>';
-    var body = cfg.x.map(function (x, i) {
+    var body = normalizeX(cfg.x).map(function (x, i) {
       return '<tr><td>' + escapeHTML(x.full || x.label) + '</td>' + cfg.series.map(function (s) {
         var v = s.values[i];
         var f = s.format || cfg.format || fmtCompact;

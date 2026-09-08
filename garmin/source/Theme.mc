@@ -67,17 +67,6 @@ module Theme {
         return y + h;
     }
 
-    // A row on the home screen: full-width pill, label left, chevron right.
-    function row(dc, cx, y, w, h, fill, ink, font, text, locked) {
-        pill(dc, cx - w / 2, y, w, h, fill);
-        dc.setColor(ink, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx - w / 2 + h * 0.42, y + (h - dc.getFontHeight(font)) / 2,
-            font, text, Graphics.TEXT_JUSTIFY_LEFT);
-        chevron(dc, cx + w / 2 - h * 0.44, y + h / 2, h * 0.12,
-            locked ? DIM : ink);
-        return y + h;
-    }
-
     // A drawn chevron rather than a ">" glyph. The text form is a typographic
     // character with its own baseline and side bearings, so it sits off-centre
     // in a pill and reads as punctuation; two strokes read as an affordance.
@@ -130,19 +119,27 @@ module Theme {
         dc.fillCircle(cx, cy, r);
     }
 
-    // Glyphs are drawn, not bundled: these three are simple enough that
-    // primitives cost nothing and stay sharp at any size.
     // The heart is a BITMAP, not a polygon.
     //
     // It was drawn as a 40-segment polygon and still read as jagged, because
     // Connect IQ does not anti-alias primitives at all — more facets cannot fix
-    // a hard-edged fill. A PNG carries its own alpha, so the edge stays smooth
-    // at any size, and drawScaledBitmap lets one asset per colour serve every
-    // size the app draws it at.
+    // a hard-edged fill. A PNG carries its own alpha, so the edge stays smooth.
     //
     // Two colours are baked because Connect IQ cannot tint a bitmap: live
     // (accent) and held/no-signal (dim). Those are the only two states the
     // heart has anywhere in the app.
+    //
+    // It is drawn at the asset's OWN size and never scaled. `drawScaledBitmap`
+    // exists on only 47 of the ~117 devices this app can otherwise run on, and
+    // its absence is not graceful: the heart is the first thing the home screen
+    // draws, so calling it on a fenix 6, a vivoactive 4/5, a Forerunner 245/255,
+    // a MARQ, a Venu 1, an Instinct or a Descent crashes the app on launch with
+    // "Could not find symbol 'drawScaledBitmap'". tools/gen-glyphs.py therefore
+    // renders every glyph per screen family at the exact size its call site
+    // draws it, into resources-<family>/, which the default jungle picks up on
+    // its own. Do not reintroduce a scaled draw, and do not hardcode a size
+    // here — the size lives in the asset, and build.sh checks every product in
+    // the manifest has one.
     var _heart = null;
     var _heartDim = null;
 
@@ -155,8 +152,15 @@ module Theme {
             if (_heart == null) { _heart = WatchUi.loadResource(Rez.Drawables.Heart); }
             bmp = _heart;
         }
-        var d = (r * 2).toNumber();
-        dc.drawScaledBitmap(cx - r, cy - r, d, d, bmp);
+        drawGlyph(dc, cx, cy, bmp);
+    }
+
+    // Centre a glyph on a point at its own size. `r` is what the LAYOUT wanted;
+    // the asset is already that size for this screen family, and trusting the
+    // bitmap keeps a family whose asset is missing visibly wrong rather than
+    // quietly mis-scaled.
+    function drawGlyph(dc, cx, cy, bmp) {
+        dc.drawBitmap(cx - bmp.getWidth() / 2, cy - bmp.getHeight() / 2, bmp);
     }
 
     function pulseLine(dc, cx, cy, r, color) {
@@ -177,8 +181,7 @@ module Theme {
 
     function checkBadge(dc, cx, cy, r) {
         if (_check == null) { _check = WatchUi.loadResource(Rez.Drawables.CheckBadge); }
-        var d = (r * 2).toNumber();
-        dc.drawScaledBitmap(cx - r, cy - r, d, d, _check);
+        drawGlyph(dc, cx, cy, _check);
     }
 
     // Word wrap. Connect IQ's drawText does not wrap — it draws one line and

@@ -39,6 +39,25 @@
  * is a date the user types, `refunded` removes the row from money entirely, and
  * `activeMrrOn` says so wherever it is shown.
  *
+ * THREE-AND-A-HALF. **Churn you cannot attach to a purchase is its own
+ * ledger.** Marking `cancelled` needs to know WHICH subscription ended, and a
+ * store report does not say — it says "you lost four subscribers last month and
+ * about $20 a month with them". That is a real, knowable fact and the old shape
+ * had nowhere to put it, so churn read as zero forever and the forecast fell
+ * back to its 5% assumption. `churn` is a second collection, a row per
+ * OCCURRENCE rather than per subscription: a date, the MRR that stopped and
+ * optionally how many subscriptions and which plan. It subtracts from the book
+ * from its date forward. Two rules keep it honest. It is a RATE fact and never
+ * a CASH one — it moves MRR, ARR, the active count and the churn rate, and it
+ * does NOT touch bookings or recognised revenue, because money that already
+ * arrived does not un-arrive (that is what `refunded` is for) and there is no
+ * purchase here whose recognition schedule could be stopped. And the book is
+ * FLOORED at zero: unattached churn is an estimate typed by hand, and an
+ * estimate that overshoots the measured book must read as "everything churned",
+ * never as negative MRR. `mrrOn` reports `churnFloored` when it has clamped, so
+ * a view can say the estimate has outrun the ledger instead of quietly showing
+ * a plausible number.
+ *
  * FOUR. **Cohort-day statistics only count rows that carry an install date.**
  * `cohortDay` is `purchase date − install date`, exact and per buyer. A row
  * without one (every migrated row, and any purchase whose buyer you could not
@@ -118,6 +137,48 @@ window.Sales = (function () {
       .sort(function (a, b) { return a.date === b.date ? a.id.localeCompare(b.id) : a.date.localeCompare(b.date); });
   }
 
+  /* ---------------------------------------------------------- churn rows */
+
+  /**
+   * One unattached churn event, cleaned.
+   *
+   * `mrr` is the monthly recurring revenue that STOPPED, in the same units
+   * `mrrOf` returns — an annual plan's twelfth, not its yearly price. It is the
+   * only field this row exists for and the only one that has to be there.
+   *
+   * `units` (how many subscriptions ended) and `plan` are both optional and
+   * both genuinely unknown when absent, which is why they are absent rather
+   * than defaulted: a store report that says "$20/mo lost" and nothing else
+   * must not become a claim about four monthly subscribers. `plan: 'unknown'`
+   * is the honest label and it is what the stacked MRR chart draws it under.
+   *
+   * `platform` is optional for the same reason. A churn figure you cannot
+   * attribute to a store belongs in the combined view and NOWHERE in a filtered
+   * one — `index` drops it under a store filter rather than guessing, and the
+   * view says how much it dropped.
+   */
+  function normalizeChurn(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    if (!isDate(raw.date)) return null;
+    var out = {
+      id: String(raw.id || ''),
+      date: raw.date,
+      mrr: Math.max(0, num(raw.mrr))
+    };
+    if (!out.id) return null;
+    if (PLATFORMS[raw.platform]) out.platform = raw.platform;
+    out.plan = PLANS[raw.plan] && raw.plan !== 'lifetime' ? raw.plan : 'unknown';
+    var units = Math.round(num(raw.units));
+    if (units > 0) out.units = units;
+    if (raw.note) out.note = String(raw.note);
+    return out;
+  }
+
+  function normalizeChurnAll(list) {
+    return (list || []).map(normalizeChurn).filter(Boolean)
+      .sort(function (a, b) { return a.date === b.date ? a.id.localeCompare(b.id) : a.date.localeCompare(b.date); });
+  }
+
   /* --------------------------------------------------------------- money */
 
   /** Cash the purchase brought in on its own day. A refund never happened. */
@@ -153,20 +214,103 @@ window.Sales = (function () {
    * index states its own, so a view can never show a filtered number under an
    * unfiltered label. `all` keeps every row.
    */
-  function index(list, platform) {
+  function index(list, platform, churnList) {
     var rows = normalizeAll(list).filter(function (s) {
       return !PLATFORMS[platform] || s.platform === platform;
     });
+    var allChurn = normalizeChurnAll(churnList);
+    /* A churn row with no store is not in EITHER store, so a filtered index
+       drops it. `churnUnattributed` is how many it dropped and what they were
+       worth, so a filtered view can disclose the hole rather than report a
+       smaller churn figure under a store's name as though that were the whole
+       of it. */
+    var filtered = PLATFORMS[platform] ? platform : null;
+    var churn = allChurn.filter(function (c) {
+      return !filtered || c.platform === filtered;
+    });
+    var unattributed = { count: 0, mrr: 0 };
+    if (filtered) {
+      allChurn.forEach(function (c) {
+        if (!c.platform) { unattributed.count += 1; unattributed.mrr += c.mrr; }
+      });
+    }
     var byDay = {};
     rows.forEach(function (s) { (byDay[s.date] || (byDay[s.date] = [])).push(s); });
     var days = Object.keys(byDay).sort();
+    var churnDays = churn.map(function (c) { return c.date; }).sort();
     return {
       rows: rows,
+      churn: churn,
+      churnUnattributed: unattributed,
       byDay: byDay,
       days: days,
       first: days[0] || null,
       last: days[days.length - 1] || null,
+      /* The ledger's own first and last day, churn included — a book whose only
+         event in a window is a cancellation still has something to draw. */
+      firstEvent: [days[0], churnDays[0]].filter(Boolean).sort()[0] || null,
       platform: PLATFORMS[platform] ? platform : 'all'
+    };
+  }
+
+  /* ------------------------------------------------------ unattached churn */
+
+  /** MRR that unattached churn has removed from the book on or before `day`. */
+  function churnMrrThrough(ix, day) {
+    var t = 0;
+    (ix.churn || []).forEach(function (c) { if (c.date <= day) t += c.mrr; });
+    return t;
+  }
+
+  /** Subscriptions unattached churn has removed on or before `day`. */
+  function churnUnitsThrough(ix, day) {
+    var t = 0;
+    (ix.churn || []).forEach(function (c) { if (c.date <= day) t += (c.units || 0); });
+    return t;
+  }
+
+  /**
+   * The book's MRR on one day, purchases and unattached churn together.
+   *
+   * `gross` is what the purchase rows alone say, `churned` is what the churn
+   * ledger removes, `mrr` is the two netted and floored at zero, and
+   * `churnFloored` is true when the flooring actually bit — see rule
+   * THREE-AND-A-HALF: a hand-typed estimate that overshoots must say so rather
+   * than report a negative book as a small one.
+   */
+  function mrrOn(ix, day) {
+    var gross = 0;
+    var byPlan = {};
+    PLAN_KEYS.forEach(function (k) { byPlan[k] = 0; });
+    ix.rows.forEach(function (r) {
+      if (!isLiveOn(r, day)) return;
+      var m = mrrOf(r);
+      gross += m;
+      byPlan[r.plan] += m;
+    });
+    var churned = churnMrrThrough(ix, day);
+    /* Charged against the plan the churn row names, and what that plan cannot
+       absorb spills onto the rest — the stacked chart has to sum to the netted
+       total whatever plan the estimate was filed under, and a negative band is
+       not a thing that can be drawn. */
+    var spill = 0;
+    (ix.churn || []).forEach(function (c) {
+      if (c.date > day) return;
+      var take = Math.min(c.mrr, byPlan[c.plan] || 0);
+      byPlan[c.plan] -= take;
+      spill += c.mrr - take;
+    });
+    PLAN_KEYS.forEach(function (k) {
+      if (spill <= 0) return;
+      var take = Math.min(spill, byPlan[k]);
+      byPlan[k] -= take;
+      spill -= take;
+    });
+    return {
+      gross: gross, churned: churned,
+      mrr: Math.max(0, gross - churned),
+      byPlan: byPlan,
+      churnFloored: churned > gross + 1e-9
     };
   }
 
@@ -185,9 +329,17 @@ window.Sales = (function () {
   function summarize(ix, from, to) {
     var s = {
       count: 0, units: 0, bookings: 0, newMrr: 0, churnedMrr: 0,
+      /* The two halves of churn, kept apart because they are different
+         evidence: `cancelledMrr` is subscriptions you could point at, and
+         `unattachedMrr` is a figure off a store report with no purchase behind
+         it. `churnedMrr` is their sum and is what everything downstream reads;
+         the split exists so a view can say which kind it is looking at. */
+      cancelledMrr: 0, unattachedMrr: 0,
+      cancelledCount: 0, unattachedCount: 0, churnedUnits: 0, churnUnitsKnown: 0,
       refunds: 0, refundedCount: 0,
       byPlan: {}, byPlatform: {},
-      mrr: 0, arr: 0, active: 0, activeOther: 0, activeByPlan: {},
+      mrr: 0, grossMrr: 0, churnDrag: 0, churnFloored: false,
+      arr: 0, active: 0, activeOther: 0, activeByPlan: {},
       unknownBookings: 0, unknownCount: 0,
       withCohort: 0, withoutCohort: 0
     };
@@ -225,10 +377,11 @@ window.Sales = (function () {
          approximately none of them. The forecast read the resulting 0 as "no
          churn to measure" and fell back to its 5% assumption forever. */
       if (r.cancelled && !r.refunded && r.cancelled >= from && r.cancelled <= to) {
-        s.churnedMrr += mrrOf(r);
+        s.cancelledMrr += mrrOf(r);
+        s.cancelledCount += r.qty;
+        s.churnedUnits += r.qty;
       }
       if (isLiveOn(r, to)) {
-        s.mrr += mrrOf(r);
         /* `active` counts SUBSCRIPTIONS — the recurring plans, the ones that
            can still be cancelled. A lifetime purchase is not a subscription and
            an unclassified row has no term to still be running, so counting
@@ -241,6 +394,35 @@ window.Sales = (function () {
         a.count += r.qty; a.mrr += mrrOf(r);
       }
     });
+
+    /* Unattached churn, booked against the window it happened in — the same
+       rule the block above follows for a cancellation, and for the same
+       reason. */
+    (ix.churn || []).forEach(function (c) {
+      if (c.date < from || c.date > to) return;
+      s.unattachedMrr += c.mrr;
+      s.unattachedCount += 1;
+      if (c.units) { s.churnedUnits += c.units; s.churnUnitsKnown += c.units; }
+    });
+    s.churnedMrr = s.cancelledMrr + s.unattachedMrr;
+
+    /* The book on `to`, netted. `grossMrr` is what the purchase rows alone say
+       and `churnDrag` the gap, so a view can show the estimate's weight rather
+       than only its result. */
+    var book = mrrOn(ix, to);
+    s.grossMrr = book.gross;
+    s.mrr = book.mrr;
+    s.churnDrag = book.churned;
+    s.churnFloored = book.churnFloored;
+    PLAN_KEYS.forEach(function (k) { s.activeByPlan[k].mrr = book.byPlan[k]; });
+    /* The active COUNT nets out only the churn rows that said how many
+       subscriptions they were, because a row that named a dollar figure and no
+       count is not evidence about the headcount. Floored at zero for the same
+       reason the MRR is. */
+    var lostUnits = churnUnitsThrough(ix, to);
+    s.activeGross = s.active;
+    s.active = Math.max(0, s.active - lostUnits);
+    s.activeChurned = Math.min(lostUnits, s.activeGross);
 
     s.arr = s.mrr * 12;
     s.arpu = s.units ? s.bookings / s.units : null;
@@ -262,18 +444,38 @@ window.Sales = (function () {
     return out;
   }
 
-  /** MRR live on each day of a window, split by plan. The book's running rate. */
+  /** MRR live on each day of a window, split by plan. The book's running rate.
+   *  Net of unattached churn, which is what makes the line fall on a day
+   *  nothing was cancelled on: `gross` and `churned` travel alongside so a
+   *  chart can draw the drag rather than only the result. */
   function mrrSeries(ix, from, to) {
     return range(from, to).map(function (d) {
-      var row = { date: d, total: 0 };
-      PLAN_KEYS.forEach(function (k) { row[k] = 0; });
-      ix.rows.forEach(function (r) {
-        if (!isLiveOn(r, d)) return;
-        var m = mrrOf(r);
-        row[r.plan] += m;
-        row.total += m;
-      });
+      var book = mrrOn(ix, d);
+      var row = { date: d, total: book.mrr, gross: book.gross, churned: book.churned };
+      PLAN_KEYS.forEach(function (k) { row[k] = book.byPlan[k]; });
       return row;
+    });
+  }
+
+  /** Churned MRR per day, for the window. Unattached rows plus the
+   *  cancellations you could point at, which is the whole of churn. */
+  function churnSeries(ix, from, to) {
+    var byDay = {};
+    function bump(day, mrr, units, kind) {
+      var r = byDay[day] || (byDay[day] = { date: day, mrr: 0, units: 0, cancelled: 0, unattached: 0 });
+      r.mrr += mrr; r.units += units; r[kind] += mrr;
+    }
+    ix.rows.forEach(function (r) {
+      if (r.refunded || !r.cancelled) return;
+      if (r.cancelled < from || r.cancelled > to) return;
+      bump(r.cancelled, mrrOf(r), r.qty, 'cancelled');
+    });
+    (ix.churn || []).forEach(function (c) {
+      if (c.date < from || c.date > to) return;
+      bump(c.date, c.mrr, c.units || 0, 'unattached');
+    });
+    return range(from, to).map(function (d) {
+      return byDay[d] || { date: d, mrr: 0, units: 0, cancelled: 0, unattached: 0 };
     });
   }
 
@@ -542,17 +744,38 @@ window.Sales = (function () {
     var s = summarize(ix, from, to);
     var mo = s.byPlan.monthly, an = s.byPlan.annual;
 
-    /* Churn we actually saw, as a monthly rate: MRR cancelled in the window
-       over the MRR that was live when it opened, scaled to 30 days. Null unless
-       something was actually cancelled — a 0% churn reported from a window in
-       which nobody could have cancelled yet is a claim, not a measurement, and
-       the forecast's own fallback says "assumption" where this says nothing. */
+    /* Churn we actually saw, as a monthly rate: MRR that left the window over
+       the MRR that was AT RISK across it, scaled to 30 days. Null unless
+       something actually churned — a 0% churn reported from a window in which
+       nobody could have cancelled yet is a claim, not a measurement, and the
+       forecast's own fallback says "assumption" where this says nothing.
+       Cancellations and unattached churn both count; they are the same event
+       recorded with different evidence.
+
+       THE DENOMINATOR IS THE MEAN DAILY BOOK, not the book on the opening day,
+       and the difference is not academic. The forecast reads a 180-day window.
+       An account whose first sale is inside that window has an opening book of
+       ZERO, so an opening-MRR rate is undefined and the projection fell back to
+       its 5% assumption forever — which is every young account, and exactly the
+       one the churn ledger was built for. On a book that grew several times
+       over inside the window it is worse than undefined: dividing a whole
+       window's losses by the handful of subscriptions that existed on day one
+       reports a churn rate several times the real one, and the forecast then
+       projects the book into the ground. The mean is the MRR the window's churn
+       actually had to come out of, it is defined whenever the book was ever
+       non-empty, and it does not jump because one purchase happens to fall
+       either side of the window's edge. Net of churn already recorded, so a
+       book that has been churning for a while is not measured against a gross
+       one it never had. */
     var churnPct = null;
-    var opening = 0;
-    ix.rows.forEach(function (r) { if (isLiveOn(r, from)) opening += mrrOf(r); });
-    if (opening > 0 && s.churnedMrr > 0) {
-      var days = Math.max(1, diffDays(from, to) + 1);
-      churnPct = Math.min(100, (s.churnedMrr / opening) * (30 / days) * 100);
+    var atRisk = 0, coveredDays = 0;
+    range(from, to).forEach(function (d) {
+      atRisk += mrrOn(ix, d).mrr;
+      coveredDays += 1;
+    });
+    var meanBook = coveredDays ? atRisk / coveredDays : 0;
+    if (meanBook > 0 && s.churnedMrr > 0) {
+      churnPct = Math.min(100, (s.churnedMrr / meanBook) * (30 / coveredDays) * 100);
     }
 
     return {
@@ -560,6 +783,14 @@ window.Sales = (function () {
       annualPrice: an.units ? an.bookings / an.units : null,
       annualShare: s.annualUnitShare,
       churnPct: churnPct,
+      /* The book the rate was struck against, so a view can show its own
+         denominator rather than asking the reader to trust a percentage. */
+      meanBook: meanBook,
+      /* What the rate was measured from, so the forecast can say whether it is
+         reading cancellations it can point at or a hand-entered estimate. */
+      churnedMrr: s.churnedMrr,
+      cancelledMrr: s.cancelledMrr,
+      unattachedMrr: s.unattachedMrr,
       units: mo.units + an.units,
       unknownCount: s.unknownCount
     };
@@ -569,9 +800,11 @@ window.Sales = (function () {
     PLANS: PLANS, PLAN_KEYS: PLAN_KEYS, PLATFORMS: PLATFORMS, AGE_BUCKETS: AGE_BUCKETS,
     isRecurring: isRecurring,
     normalize: normalize, normalizeAll: normalizeAll,
+    normalizeChurn: normalizeChurn, normalizeChurnAll: normalizeChurnAll,
     bookingsOf: bookingsOf, mrrOf: mrrOf, isLiveOn: isLiveOn, cohortDayOf: cohortDayOf,
     index: index, summarize: summarize,
-    mrrSeries: mrrSeries, monthlyRevenue: monthlyRevenue,
+    mrrOn: mrrOn, churnMrrThrough: churnMrrThrough, churnUnitsThrough: churnUnitsThrough,
+    mrrSeries: mrrSeries, churnSeries: churnSeries, monthlyRevenue: monthlyRevenue,
     purchaseAges: purchaseAges, ageByPlan: ageByPlan, byInstallMonth: byInstallMonth,
     dailyTotals: dailyTotals, migrateEntries: migrateEntries, forecastBasis: forecastBasis,
     median: median, range: range

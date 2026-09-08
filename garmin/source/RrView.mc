@@ -154,16 +154,25 @@ class RrView extends WatchUi.View {
         // desk and a watch that simply has not produced intervals yet look
         // identical. A number here means the sensor has contact; no number
         // means it does not, and the fix is the strap, not patience.
+        // Floor for the button, raised by whatever is drawn between it and the
+        // timer. Fixed fractions of h alone are not enough: the fonts do not
+        // shrink in step with the screen, so a gap that merely looks tight on a
+        // 454px Venu is a genuine overlap on a 176px Instinct, where the pulse
+        // line was drawn straight through FINISH EARLY.
+        var floor = 0;
+
         if (running && !_c.hasLock()) {
             var hr = _c.lastHr();
+            var hrY = numY + numH - h * 0.045;
             dc.setColor(Theme.DIM, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(cx, numY + numH - h * 0.045, small,
+            dc.drawText(cx, hrY, small,
                 hr == null ? "no pulse detected" : hr.format("%d") + " bpm",
                 Graphics.TEXT_JUSTIFY_CENTER);
-
+            floor = hrY + smallH;
         }
 
         var btnY = numY + numH + gap;
+        if (btnY < floor) { btnY = floor; }
         _btnTop = btnY;
         Theme.pillLabel(dc, cx, btnY, w * 0.44, h * 0.125,
             running ? Theme.CARD : Theme.ACCENT, Theme.INK, small,

@@ -25,9 +25,8 @@ import { healthSourceFor, workoutCandidates, type HealthCandidate, type HealthSo
 import { deleteEntry, getState, storeWaveform, upsertEntry, useAppState } from '../store/store';
 import { splitWaveform } from '../lib/waveforms';
 import { defaultTimeFor, fmtTime12, todayKey, uid } from '../lib/dates';
-import { getTier } from '../store/tier';
-import { requestExpandProtocol, scrollJournalToSection } from '../store/nav';
-import { usePaywall } from './Paywall';
+import { scrollJournalToSection } from '../store/nav';
+import { isPotsResultLocked, PotsLockedCard } from './PotsLock';
 import { HrvSetup } from './hrv/Setup';
 import { OrthostaticIntroSheet } from './OrthostaticIntro';
 import { DevicesScreen } from './Devices';
@@ -215,8 +214,8 @@ function softTint(hex: string): string {
  *  neutral grey. HRV kinds are live-capture only, so the manual list starts at
  *  Blood Pressure. On a past day the live-only captures (HRV, stand test)
  *  disappear — a live reading can only belong to the day it happens. */
-function ReadingPicker({ isToday, potsLocked, onLocked, onLive, onPick }: {
-  isToday: boolean; potsLocked?: boolean; onLocked?: () => void;
+function ReadingPicker({ isToday, onLive, onPick }: {
+  isToday: boolean;
   onLive: () => void; onPick: (type: string) => void;
 }) {
   const p = usePalette();
@@ -230,13 +229,11 @@ function ReadingPicker({ isToday, potsLocked, onLocked, onLive, onPick }: {
   // The two POTS captures lead the manual list (the stand test is live-only but
   // stays in, pointing at the watch app); BP and resting HR follow.
   const manual = isToday ? ['standTest', 'orthostatic', 'bp', 'restingHr'] : ['orthostatic', 'bp', 'restingHr'];
-  // One freemium lock left here: the live-only stand test on the free tier (the
-  // episode row stays — its manual entry path is free). HRV capture is unlimited
-  // on every tier. Locked rows dim, swap the chevron for a lock, and raise the
-  // paywall.
-  const lockFor = (t: string) => (t === 'standTest' ? !!potsLocked : false);
-  const readingRow = (t: string) => ({ key: t, title: pickerLabel(t), sub: subFor[t] || '', icon: READING_TYPES[t].icon as string, tint: lockFor(t) ? p.textDim : tintFor(t), locked: lockFor(t), onPress: () => (lockFor(t) ? onLocked?.() : onPick(t)) });
-  const rows: { key: string; title: string; sub: string; icon: string; tint: string; locked?: boolean; onPress: () => void }[] = [
+  // Nothing here is gated any more. Capture is never metered — the stand test
+  // included, on a strap as on the watch — and reading a POTS RESULT is the Pro
+  // half (src/features/PotsLock.tsx).
+  const readingRow = (t: string) => ({ key: t, title: pickerLabel(t), sub: subFor[t] || '', icon: READING_TYPES[t].icon as string, tint: tintFor(t), onPress: () => onPick(t) });
+  const rows: { key: string; title: string; sub: string; icon: string; tint: string; onPress: () => void }[] = [
     ...(isToday ? [{ key: 'hrv', title: 'HRV Reading', sub: Platform.OS === 'ios' ? 'From a chest strap, Apple Watch or camera' : 'From a chest strap or your camera', icon: 'heartPulse', tint: p.accent, onPress: onLive }] : []),
     ...manual.map(readingRow),
   ];
@@ -257,7 +254,7 @@ function ReadingPicker({ isToday, potsLocked, onLocked, onLive, onPick }: {
               <Text style={{ color: p.text, fontSize: 16, fontWeight: '700' }}>{r.title}</Text>
               {r.sub ? <Text style={{ color: p.textDim, fontSize: 12.5, marginTop: 1 }}>{r.sub}</Text> : null}
             </View>
-            <Icon name={r.locked ? 'lock' : 'chevronRight'} size={18} color={p.textDim} />
+            <Icon name="chevronRight" size={18} color={p.textDim} />
           </Pressable>
         ))}
       </View>
@@ -376,8 +373,9 @@ export function useCaptureDeepLink() {
       if (!url) return;
       const q = ExpoLinking.parse(url).queryParams;
       if (q?.open === 'protocol') {
-        requestExpandProtocol();
-        // Let the card mount/expand before scrolling (cold start lays out late).
+        // Scroll to the card, and stop there. It is NOT opened: the widget knows
+        // the reader wants to see the protocol, not that they want the accordion
+        // they left closed to be open. Cold start lays out late, so this waits.
         setTimeout(() => scrollJournalToSection('protocol'), 350);
         return;
       }
@@ -432,13 +430,7 @@ export function openWorkoutReport(openSheet: OpenSheet, r: Entry, dk: string, ju
 
 export function useEntryForms(dk: string) {
   const { openSheet } = useSheets();
-  const openPaywall = usePaywall('pots');
   const refresh = () => { /* store change triggers re-render */ };
-
-  // Freemium: live HRV capture is unlimited on every tier; live POTS captures
-  // are Pro. Checked at action time (not render) so the answer is current, and
-  // guarded here — the single choke point — rather than at each button.
-  const potsCaptureLocked = () => getTier() === 'free';
 
   const openReadingForm = (type: string, existing: Entry | null, prefill: Entry | null = null) =>
     openSheet((c) => (
@@ -457,7 +449,6 @@ export function useEntryForms(dk: string) {
   // treatment as a live HRV session. With no strap saved yet, the pairing
   // sheet opens first; saving a device there flows straight into the session.
   const startPotsLive = (type: string) => {
-    if (potsCaptureLocked()) { openPaywall(); return; }
     const open = () => openSheet(
       (c) => (type === 'standTest' ? <StandTestSession controls={c} /> : <OrthostaticSession controls={c} />),
       { hideClose: true },
@@ -522,7 +513,8 @@ export function useEntryForms(dk: string) {
     else openSheet((c) => <EntryForm typeMap={typesFor(getState(), 'activities')} arrKey="activities" dk={dk} type={type} existing={existing} controls={c} onSaved={refresh} />);
   };
 
-  const openReadingSummary = (r: Entry) =>
+  const openReadingSummary = (r: Entry) => {
+    if (openPotsLockIfNeeded(openSheet, r, dk)) return;
     openSheet(
       () => <ReadingSummarySheet r={r} dk={dk} />,
       {
@@ -530,6 +522,7 @@ export function useEntryForms(dk: string) {
         destructive: { onPress: () => confirmDelete(openSheet, dk, 'readings', r, READING_TYPES[r.type]?.label || 'reading') },
       },
     );
+  };
 
   // The workout report (HR-over-time with zones + stats), for activities that
   // carry an HR trace. The pencil stacks the normal edit form on top.
@@ -543,8 +536,6 @@ export function useEntryForms(dk: string) {
   const pickReading = () => openSheet(() => (
     <ReadingPicker
       isToday={dk === todayKey()}
-      potsLocked={potsCaptureLocked()}
-      onLocked={openPaywall}
       onLive={captureHrv}
       onPick={(t) => pickReadingSource(t)}
     />
@@ -591,6 +582,21 @@ export function ReadingSummarySheet({ r, dk }: { r: Entry; dk: string }) {
       <View style={{ height: 24 }} />
     </ScrollView>
   );
+}
+
+/**
+ * A POTS result on the free tier never opens: the capture ran on every tier (the
+ * watch doesn't gate it), and reading the result is the Pro half — so the row
+ * raises the lock card instead of the summary. Returns true when it took the
+ * tap. Delete stays armed: the reading is the user's, locked or not.
+ */
+export function openPotsLockIfNeeded(openSheet: OpenSheet, r: Entry, dk: string): boolean {
+  if (!isPotsResultLocked(r)) return false;
+  openSheet((c) => <PotsLockedCard r={r} controls={c} />, {
+    fitContent: true,
+    destructive: { onPress: () => confirmDelete(openSheet, dk, 'readings', r, READING_TYPES[r.type]?.label || 'reading') },
+  });
+  return true;
 }
 
 /** The imported-workout report: the activity's HR trace with exercise zones,

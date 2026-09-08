@@ -54,8 +54,9 @@ per user, which would eventually meet DynamoDB's 400KB item ceiling.
 | `DASH#<email>` | `ENTRY#<date>#<platform>` | one day of store metrics |
 | `DASH#<email>` | `EVENT#<id>` | a recorded release / campaign / store change |
 | `DASH#<email>` | `AD#<id>` | an advertising campaign (name, channel, dates) |
-| `DASH#<email>` | `COST#<id>` | a dated cost, optionally attributed to an ad |
+| `DASH#<email>` | `COST#<id>` | a dated cost, optionally attributed to an ad; `capex` marks a one-off build |
 | `DASH#<email>` | `SALE#<id>` | one purchase: plan, price, and the buyer's install date |
+| `DASH#<email>` | `CHURN#<id>` | one unattached churn event: the MRR that stopped, and optionally how many subscriptions |
 | `DASH#<email>` | `LINK#<slug>` | a campaign download link, and the page published from it |
 | `DASH#<email>` | `SETTINGS` | trial/wall lengths, currency, store commission |
 | `DASH#<email>` | `UI` | view and filter preferences |
@@ -78,7 +79,8 @@ per user, which would eventually meet DynamoDB's 400KB item ceiling.
 `LOAD` queries the whole partition. `SYNC` applies the client's diff — entries
 as `upserts` / `deletes`, and the four id-keyed collections as
 `eventUpserts` / `eventDeletes`, `adUpserts` / `adDeletes`,
-`costUpserts` / `costDeletes`, `saleUpserts` / `saleDeletes`, and campaign links
+`costUpserts` / `costDeletes`, `saleUpserts` / `saleDeletes`,
+`churnUpserts` / `churnDeletes`, and campaign links
 as `linkUpserts` / `linkDeletes` — plus `settings` and `ui`. Each cleaner in the
 Lambda has a twin in `landing/master/sync.js`; **if the two shapes disagree,
 every diff reports every row as changed forever.** `REPLACE_ALL` wipes the ENTRIES and
@@ -87,7 +89,30 @@ matching a button that
 says "delete every entry" — and is what "Delete all data" uses — a wipe is worth stating
 outright rather than trusting a diff to enumerate every deletion. ("Delete all
 data" additionally clears the sales ledger through the ordinary diff: sales left
-behind by a wipe would come back as revenue with no downloads under it.)
+behind by a wipe would come back as revenue with no downloads under it. The
+CHURN ledger is carried by `REPLACE_ALL` alongside the sales, for a stronger
+reason: it is a claim ABOUT purchases, so left behind it would floor the empty
+book's MRR at zero and report churn against nothing.)
+
+`CHURN#` items exist because the stores report churn as a NUMBER and never as a
+subscription. A store report says "four cancellations, about $20 a month" with
+no way back to which four, and `cancelled` on a `SALE#` needs exactly that — so
+with nowhere to put it, churn read as zero forever and the dashboard's forecast
+fell back to its 5% assumption. A row carries `date`, `mrr` (the *monthly* rate
+that stopped — an annual plan's twelfth, not its yearly price) and optionally
+`units`, `plan` and `platform`. The optional three are stored only when present,
+never defaulted: a dollar figure off a bank statement is not a claim about a
+headcount, a term or a store, and the dashboard treats each absence as unknown
+rather than as zero. `cleanChurn` has its twin in `sync.js` like every other
+cleaner.
+
+A `COST#` may carry `capex: true` — a one-off build (R&D, hardware bought once,
+a contractor who built a feature) rather than what the app costs to keep
+running. It is orthogonal to the category on purpose, since a build arrives as
+HARDWARE, as SERVICES or as a one-off TOOLS licence. Stored **only when true**,
+so a row that is not one is byte-identical to what older builds wrote and the
+client's diff does not re-push every cost it has. The dashboard keeps it out of
+every per-customer rate and in every total; see `MASTER_DASHBOARD.md`.
 
 `SALE#` items are the one collection that arrived by **migration** rather than
 by being typed. Sales used to be two numeric columns on an entry, `sales` and

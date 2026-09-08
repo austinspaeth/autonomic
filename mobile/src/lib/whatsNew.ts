@@ -50,6 +50,24 @@ export function fmtReleaseDate(iso: string): string {
 
 export const RELEASES: Release[] = [
   {
+    version: '1.27',
+    date: '2026-09-08',
+    notes: [
+      'A redesigned Autonomic Outlook card. Your score now shows how it is trending against your own recent days, with the details that matter most on the card itself.',
+      // Spread rather than commented out, for the reason the 1.26 bullet below
+      // gives: the flag is the one switch that pulls every Garmin surface, and
+      // the release note must come back with them.
+      ...(GARMIN_RELEASED
+        ? ['Expanded Garmin watch support. The companion app now runs on a much wider range of Garmin watches.']
+        : []),
+      // Device-neutral on purpose. The captures run on a watch or a strap on
+      // iPhone and on a strap on Android, so naming the hardware here would be
+      // wrong on one of the two stores.
+      'POTS stand tests and episode captures are now part of the free plan. Take a reading whenever you need one. Reading the graded result stays part of Pro.',
+      'A number of bug fixes and performance improvements.',
+    ],
+  },
+  {
     version: '1.26',
     date: '2026-08-27',
     notes: [

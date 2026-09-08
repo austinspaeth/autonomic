@@ -9,8 +9,12 @@
  * is never re-sent by the watch.
  *
  * Outbound: the applicationContext the watch mirrors — `pro` (freemium tier:
- * true while trialing or subscribed, gating the watch POTS captures), plus
- * `age`/`sex` so the watch can compute a max-HR ceiling. Re-pushed on tier
+ * true while trialing or subscribed), plus `age`/`sex` so the watch can compute
+ * a max-HR ceiling. Nothing on the watch is gated on `pro` any more: the POTS
+ * captures run on every tier and the gate moved to READING the result on the
+ * phone (src/features/PotsLock.tsx). It is still mirrored because the watch is
+ * where a future tier-aware surface would read it, and because a watch already
+ * holding it must not be left with a stale value. Re-pushed on tier
  * changes (entitlement AND local-trial expiry), profile edits, and session
  * activation; deduped so journal churn doesn't spam WCSession.
  */

@@ -10,7 +10,7 @@ import { useSheets } from '../components/Sheet';
 import { subscribeGarminArrivals } from '../lib/garmin/receiver';
 import { subscribeWatchArrivals } from '../lib/watch/receiver';
 import { READING_TYPES } from '../lib/registry';
-import { confirmDelete, ReadingSummarySheet } from './forms';
+import { confirmDelete, openPotsLockIfNeeded, ReadingSummarySheet } from './forms';
 
 export function WatchArrivalCards() {
   const { openSheet } = useSheets();
@@ -18,6 +18,10 @@ export function WatchArrivalCards() {
     // "If open" means foregrounded: a background delivery still lands in the
     // journal, it just doesn't pop a card at the user hours later.
     if (AppState.currentState !== 'active') return;
+    // A POTS result on the free tier: the watch captured it and it is saved,
+    // but reading it is Pro — the lock card takes the slot the summary would
+    // have had (see features/PotsLock).
+    if (openPotsLockIfNeeded(openSheet, entry, dk)) return;
     // Same card the journal row opens, so it carries the same delete button —
     // a reading that arrived from a wrist is the one most likely to be unwanted.
     openSheet(() => <ReadingSummarySheet r={entry} dk={dk} />, {

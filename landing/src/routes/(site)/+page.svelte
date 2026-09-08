@@ -22,13 +22,14 @@
     { label: 'Manual readings: BP, resting heart rate, episodes' },
     { label: 'Daily autonomic score & outlook' },
     { label: 'Unlimited live HRV capture, from a chest strap or your camera' },
+    { label: 'POTS stand tests & episode captures' },
     { label: 'Apple Watch heart-rate monitor', only: 'iPhone' },
     { label: 'Backups & data export' }
   ];
   const proRows: { label: string; free?: string; pro?: string }[] = [
     { label: 'Progress charts', free: '14 days', pro: 'All views' },
     { label: 'Full historical metric analysis' },
-    { label: 'POTS testing & episode tracking' },
+    { label: 'POTS test & episode results' },
     { label: 'AI insights & doctor reports' }
   ];
   const CHECK =
@@ -410,7 +411,7 @@
       '@type': 'Offer',
       price: '0',
       priceCurrency: pricing.currency,
-      description: `Free to download; the journal is free forever. Autonomic Pro is ${monthly}/month or ${yearly}/year and unlocks your full history, Insights, POTS testing and AI reports. HRV capture itself is unlimited and free. Every install starts with ${pricing.trialDays} days of Pro.`
+      description: `Free to download; the journal is free forever. Autonomic Pro is ${monthly}/month or ${yearly}/year and unlocks your full history, Insights, POTS results and AI reports. HRV capture is unlimited and free, as are POTS stand tests and episode captures. Every install starts with ${pricing.trialDays} days of Pro.`
     },
     featureList:
       'HRV scoring, chest-strap and fingertip-camera HRV capture, blood pressure tracking, orthostatic testing, sleep and symptom logging, trend analysis, clean-day streaks, AI insight reports, offline-first storage',
@@ -434,8 +435,8 @@
     '@context': 'https://schema.org',
     '@type': 'FAQPage',
     mainEntity: [
-      { '@type': 'Question', name: 'How much does Autonomic cost?', acceptedAnswer: { '@type': 'Answer', text: `Autonomic is free to download and the journal is free forever, with no account and no ads. Autonomic Pro is ${monthly} per month or ${yearly} per year and unlocks your full history, Insights, POTS testing and AI reports. Live HRV capture is unlimited on the free plan. Every install opens with ${pricing.trialDays} days of Pro so you can try it before paying. Your data stays private on your device and is never sold.` } },
-      { '@type': 'Question', name: 'What is free and what needs Pro?', acceptedAnswer: { '@type': 'Answer', text: 'Free covers the daily journal (sleep, meds, symptoms, triggers, hydration), manual readings like blood pressure and resting heart rate, your daily autonomic score and outlook, unlimited chest-strap and fingertip-camera HRV capture with no daily cap, the Apple Watch heart-rate monitor on iPhone, backups and export, plus 14 days of progress charts. Pro adds all progress views, full historical metric analysis, on-device Insights, POTS testing and episode tracking, and AI insight and doctor reports.' } },
+      { '@type': 'Question', name: 'How much does Autonomic cost?', acceptedAnswer: { '@type': 'Answer', text: `Autonomic is free to download and the journal is free forever, with no account and no ads. Autonomic Pro is ${monthly} per month or ${yearly} per year and unlocks your full history, Insights, POTS results and AI reports. Live HRV capture is unlimited on the free plan, and so are POTS stand tests and episode captures. Every install opens with ${pricing.trialDays} days of Pro so you can try it before paying. Your data stays private on your device and is never sold.` } },
+      { '@type': 'Question', name: 'What is free and what needs Pro?', acceptedAnswer: { '@type': 'Answer', text: 'Free covers the daily journal (sleep, meds, symptoms, triggers, hydration), manual readings like blood pressure and resting heart rate, your daily autonomic score and outlook, unlimited chest-strap and fingertip-camera HRV capture with no daily cap, POTS stand tests and episode captures, the Apple Watch heart-rate monitor on iPhone, backups and export, plus 14 days of progress charts. Pro adds all progress views, full historical metric analysis, on-device Insights, POTS test and episode results, and AI insight and doctor reports.' } },
       { '@type': 'Question', name: 'Does it work offline?', acceptedAnswer: { '@type': 'Answer', text: 'Completely. Autonomic is a fully offline app for iOS and Android. All scoring, trends and reports are computed locally, so it works on a plane, in a clinic basement, or anywhere without signal.' } },
       { '@type': 'Question', name: 'Which conditions is it for?', acceptedAnswer: { '@type': 'Answer', text: 'It is built for people managing POTS, dysautonomia, long COVID and post-viral or post-illness autonomic recovery, where day-to-day HRV, heart rate and orthostatic patterns matter.' } },
       { '@type': 'Question', name: 'Is Autonomic available on Android?', acceptedAnswer: { '@type': 'Answer', text: 'Yes, on both iPhone (App Store) and Android (Google Play), at the same price and with the same private, offline design. The Apple Watch companion app is iPhone-only; on Android the stand test, episode capture and HRV readings run in the app itself using a Bluetooth chest strap or the phone camera, and sleep and workouts come from Health Connect.' } },
@@ -1156,7 +1157,7 @@
     <div class="section-head center">
       <p class="eyebrow">Pricing</p>
       <h2 class="h2">The journal is free. Forever.</h2>
-      <p class="lead">Log everything, score every day, read your HRV as often as you like, keep your data, pay nothing. Pro is for when you want to go deeper: your whole history, Insights, POTS testing and AI reports.</p>
+      <p class="lead">Log everything, score every day, read your HRV as often as you like, keep your data, pay nothing. Pro is for when you want to go deeper: your whole history, Insights, POTS results and AI reports.</p>
     </div>
 
     <div class="pr-plans">
@@ -1181,7 +1182,7 @@
         <ul class="pr-list pr-list-pro">
           <li><b>Your full history, visualized</b>, watch every metric move across weeks, months and years, so slow recovery becomes something you can actually see</li>
           <li><b>Insights from your own log</b>, an on-device analysis that finds what is actually linked to what across your readings, sleep, meds and symptoms, and says how sure it is</li>
-          <li><b>POTS testing</b>, run guided stand tests, record episodes as they hit, and monitor whether your POTS is easing over time</li>
+          <li><b>POTS results</b>, the tests and episodes are free to run, and Pro grades each one against the clinical criteria and tracks whether your POTS is easing over time</li>
           <li><b>Doctor-ready AI reports</b>, turn your data into answers about what's helping and what's hurting, ready for your next appointment</li>
         </ul>
         <!-- data-dl-cta, NOT a bare store URL: this is the page's highest-intent
@@ -1309,7 +1310,7 @@
     </div>
     <div class="faq">
       <details><summary>How much does it cost, and is my data private?<span class="fq-i">+</span></summary><p>The app is free to download and your journal is free forever, with no account and no ads. Autonomic Pro is {monthly}/month or {yearly}/year and unlocks the deep-analysis tools. Every install opens with {pricing.trialDays} days of Pro, no card, so you can try all of it first. Your data is always private: stored on your device, never sold, never sent to a server.</p></details>
-      <details><summary>What’s free, and what needs Pro?<span class="fq-i">+</span></summary><p>Free covers the daily journal, your manual readings, your daily Autonomic Outlook, unlimited live HRV capture with no daily cap, the Apple Watch heart-rate monitor, backups and export, plus 14 days of charts. Pro adds your full history, Insights, POTS testing and episode tracking, and AI insight and doctor reports. There’s a full breakdown in <a href="#pricing">the pricing table</a>, and the same table lives inside the app.</p></details>
+      <details><summary>What’s free, and what needs Pro?<span class="fq-i">+</span></summary><p>Free covers the daily journal, your manual readings, your daily Autonomic Outlook, unlimited live HRV capture with no daily cap, POTS stand tests and episode captures, the Apple Watch heart-rate monitor, backups and export, plus 14 days of charts. Pro adds your full history, Insights, POTS test and episode results, and AI insight and doctor reports. There’s a full breakdown in <a href="#pricing">the pricing table</a>, and the same table lives inside the app.</p></details>
       <details><summary>Does it really work offline?<span class="fq-i">+</span></summary><p>Completely. It’s a fully offline app on both iOS and Android. Scoring, trends and reports are computed locally, so it works anywhere, no signal required.</p></details>
       <details><summary>Which conditions is it built for?<span class="fq-i">+</span></summary><p>POTS, dysautonomia, long COVID and post-viral or post-illness recovery, anywhere daily HRV, heart-rate and orthostatic patterns matter.</p></details>
       <details><summary>Is Autonomic available on Android?<span class="fq-i">+</span></summary><p>Yes. Autonomic is available now on both iPhone (App Store) and Android (Google Play), at the same price, with the same private, offline design. One honest difference: the Apple Watch companion app is iPhone-only. On Android the stand test, episode capture and HRV readings all run in the app itself, using a Bluetooth chest strap or your phone’s camera, and it reads your sleep and workouts from Health Connect the way the iPhone build reads Apple Health.</p></details>
@@ -1342,7 +1343,7 @@
         <div class="pricing-price"><span class="amt">{pricing.trialDays} days</span><span class="per">of Pro, free</span></div>
         <p class="pricing-trial">Then <b>{monthly}/month</b>, or stay free forever</p>
         <ul class="pricing-list">
-          <li>Everything unlocked for {pricing.trialDays} days: full history, Insights, POTS testing &amp; AI reports</li>
+          <li>Everything unlocked for {pricing.trialDays} days: full history, Insights, POTS results &amp; AI reports</li>
           <li>No card and no sign-up to start, cancel anytime</li>
           <li>When the trial ends nothing is deleted, the deep-analysis tools just lock</li>
           <li>Your journal, readings and daily score stay free forever</li>

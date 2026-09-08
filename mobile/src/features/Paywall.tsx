@@ -2,7 +2,7 @@
  * Pro paywall — an on-demand card sheet, not a wall. Freemium: the app is
  * always usable (journaling and live HRV capture are free forever, with no
  * daily cap); locked surfaces (Progress week/month/year, Insights, AI reports,
- * POTS captures, watch POTS tests) call usePaywall() to raise this card. It
+ * POTS results) call usePaywall() to raise this card. It
  * dismisses with the sheet's ✕ / backdrop and closes itself the moment an
  * entitlement lands (purchase or restore).
  *
@@ -30,7 +30,7 @@ const PRIVACY_URL = 'https://autonomic.care/privacy-policy/';
 const VALUE: { icon: IconName; title: string; sub: string }[] = [
   { icon: 'chart', title: 'Your full history', sub: 'Week, month, and year progress views over every number you’ve logged.' },
   { icon: 'bulb', title: 'Insights from your own log', sub: 'What is linked to what across your readings, sleep, meds and symptoms, worked out on your phone.' },
-  { icon: 'standing', title: 'POTS testing', sub: 'Guided stand tests and episode capture, graded against clinical criteria.' },
+  { icon: 'standing', title: 'POTS results', sub: 'Stand test and episode results, graded against clinical criteria and tracked over time.' },
   { icon: 'ai', title: 'AI-ready reports', sub: 'Turn your logged data into deep-dive prompts and doctor-visit summaries.' },
 ];
 
@@ -108,7 +108,7 @@ function PlanCard({ name, price, period, note, badge, selected, onPress }: {
 export type PaywallSource =
   | 'progress'      // a locked Progress range: Week / Month / Year / custom
   | 'insights'      // the Insights tab's locked overlay
-  | 'pots'          // a live POTS capture
+  | 'pots'          // a POTS result (the capture itself is free)
   | 'outlook-ai'    // the Outlook's AI report
   | 'metric-ai'     // a metric card's AI report
   | 'insights-ai'   // the Insights AI report
@@ -184,7 +184,7 @@ export function PaywallCard({ controls }: { controls: SheetControls }) {
           See your nervous system recover
         </Text>
         <Text style={{ color: p.textDim, fontSize: 15.5, textAlign: 'center', lineHeight: 23 }}>
-          Your full history, Insights, POTS testing, and AI-ready reports.
+          Your full history, Insights, POTS results, and AI-ready reports.
         </Text>
       </View>
 
@@ -268,6 +268,9 @@ const SHARED_ROWS: string[] = [
   'Journaling: sleep, meds, symptoms, triggers, hydration',
   'Manual readings: BP, resting heart rate, episodes',
   'Daily autonomic score & outlook',
+  Platform.OS === 'ios'
+    ? 'POTS stand tests & episode captures, on your watch or a strap'
+    : 'POTS stand tests & episode captures from a chest strap',
   ...(Platform.OS === 'ios' ? ['Apple Watch heart-rate monitor'] : []),
   'Backups & data export',
 ];
@@ -275,7 +278,7 @@ const SHARED_ROWS: string[] = [
 const PRO_ROWS: { label: string; freeText?: string; proText?: string }[] = [
   { label: 'Progress charts', freeText: '14 days', proText: 'All views' },
   { label: 'Full historical metric analysis' },
-  { label: 'POTS testing & episode tracking' },
+  { label: 'POTS test & episode results' },
   { label: 'AI insights & doctor reports' },
 ];
 

@@ -7,8 +7,10 @@
  * likes. Capture is the thing this app exists to do: a user who has run out of
  * it for the day has no reason to open the app again until tomorrow, and the
  * cap fell hardest on the days worth measuring twice. Pro earns its price on
- * what the app makes of the readings (full history, Insights, POTS testing and
- * AI reports), not on rationing them.
+ * what the app makes of the readings (full history, Insights, POTS RESULTS and
+ * AI reports), not on rationing them. The POTS captures follow the same line as
+ * of 1.26: they run on every tier, on the watch and on a strap, and reading the
+ * result is the Pro half (src/features/PotsLock.tsx).
  *
  * `hrvCaptureUsedToday` survives that removal because it was never only a
  * meter: it is also the clean-day protocol's definition of "took a reading

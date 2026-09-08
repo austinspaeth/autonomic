@@ -403,7 +403,15 @@ class RrCollector {
             "nullCallbacks" => _nullCallbacks,
             "rrMs" => _intervals,
             "source" => "garmin-optical",
-            "device" => "venu4"
+            // The device's OWN part number, not a model name. This was
+            // hardcoded "venu4" while that was the only product in the
+            // manifest; with 100+ listed it would have labelled every reading
+            // from every watch as a Venu 4. The phone does not read this field
+            // for display — receiver.ts resolves the watch's name from Garmin
+            // Connect's linked-device list — so it exists purely so a support
+            // dump can say which hardware a reading came off, and a wrong
+            // answer there is worse than a raw part number.
+            "device" => System.getDeviceSettings().partNumber
         };
     }
 

@@ -675,9 +675,18 @@
     <div class="card" style="margin-top:14px">
       <header><h2>Monthly recurring revenue</h2><span class="spacer"></span>
         <button class="btn sm" data-table-toggle="slMrr">Table</button></header>
-      <p class="hint">The rate the book runs at on each day, stacked by plan — an annual plan counts as a twelfth of its price. A subscription is assumed to still run until you mark it cancelled under Edit data; nothing here is derived from the stores, because they tell this dashboard nothing about churn.</p>
+      <p class="hint">The rate the book runs at on each day, stacked by plan — an annual plan counts as a twelfth of its price, net of churn. A subscription is assumed to still run until you mark it cancelled, or until churn you entered under Edit data takes it off; nothing here is derived from the stores, because they tell this dashboard nothing about churn on their own. Where churn has been recorded, the dashed line is what the purchase ledger alone would say and the gap below it is what the churn is costing.</p>
       <div id="slMrr"></div>
       <div id="slMrr-table" class="hidden" style="margin-top:12px"></div>
+    </div>
+
+    <div class="card hidden" id="slChurnCard" style="margin-top:14px">
+      <header><h2>Churn</h2><span class="spacer"></span>
+        <button class="btn sm" data-table-toggle="slChurn">Table</button></header>
+      <p class="hint">Monthly recurring revenue that stopped, by the day it stopped. <b>Cancellations</b> are purchase rows you marked cancelled — a subscription you can point at. <b>Unattached churn</b> is a figure off a store report with no purchase behind it: how much monthly revenue went away, and sometimes how many subscriptions, entered under Edit data. Both leave MRR from their date forward and both feed the churn rate the forecast reads. Neither touches bookings or recognised revenue — money that already arrived does not un-arrive, which is what a refund is for.</p>
+      <div id="slChurn"></div>
+      <div id="slChurn-table" class="hidden" style="margin-top:12px"></div>
+      <div id="slChurnMeta"></div>
     </div>
 
     <div class="card" style="margin-top:14px">
@@ -1054,6 +1063,38 @@
         <button class="btn sm" id="slExport">Export CSV</button></summary>
       <p class="hint">The whole ledger, newest first — all time, not the dashboard's selected range. This is the list you manage sales from; the Sales tab is where you read them against a period.</p>
       <div class="table-scroll" id="slSaleTable"></div>
+    </details>
+
+    <div class="section-head" style="margin-top:22px">
+      <h2 class="section-title">Churn</h2>
+      <span class="section-note">Cancellations you cannot pin to a purchase</span>
+    </div>
+
+    <details class="card acc">
+      <summary><h2>Record churn</h2><span class="spacer"></span>
+        <span class="note" id="chCount"></span></summary>
+      <p class="hint">For churn you know happened but cannot attach to a row above. A store report says &ldquo;four cancellations, about $20 a month&rdquo; and never says <i>which</i> four, so marking a purchase cancelled is not an option — and with nowhere to put it, churn read as zero forever and the forecast fell back to a 5% guess.
+      <br><br><b>MRR lost</b> is the only field that has to be there, and it is a <i>monthly</i> figure: if an annual plan at $29.99 churned, that is $2.50 a month, not $29.99. Everything else is optional and genuinely unknown when blank rather than assumed — leave the count off and the money still counts while the active-subscription figure does not move; leave the store off and the row sits in the combined view and out of a filtered one, which says so.
+      <br><br>This moves the <b>rate</b> and never the <b>cash</b>: MRR, ARR, the active count, the churn rate and every projection built on them drop from this date forward. Bookings and recognised revenue do not, because money that already arrived does not un-arrive — mark the purchase <b>refunded</b> for that.</p>
+      <div id="chForm"></div>
+    </details>
+
+    <details class="card acc">
+      <summary><h2>Paste a batch of churn</h2></summary>
+      <p class="hint">One event per line, tab- or comma-separated: <code>date, mrr, units, plan, store, note</code> — everything after the MRR is optional. A <b>header row</b> makes the columns read by name instead of by position, which is how this ledger's own <b>Export CSV</b> comes back in unchanged. Nothing is written until you press Add.</p>
+      <textarea id="chPaste" rows="5" placeholder="2026-08-31&#9;19.96&#9;4&#9;monthly&#9;ios&#9;August store report"></textarea>
+      <div class="row-actions">
+        <button class="btn primary" id="chPasteGo">Add these churn events</button>
+        <button class="btn" id="chPasteClear">Clear</button>
+        <span class="note" id="chPasteStatus"></span>
+      </div>
+    </details>
+
+    <details class="card acc">
+      <summary><h2>All churn</h2><span class="spacer"></span>
+        <button class="btn sm" id="chExport">Export CSV</button></summary>
+      <p class="hint">Every churn event on record, newest first — all time, not the dashboard's selected range.</p>
+      <div class="table-scroll" id="chTable"></div>
     </details>
 
     <div class="section-head" style="margin-top:22px">

@@ -203,6 +203,67 @@ check('status reads off the day asked about',
 check('the cost form is never offered the advertising category',
   C.ENTRY_CATEGORY_KEYS.indexOf('ADS') === -1 && C.CATEGORY_KEYS.indexOf('ADS') === 0);
 
+/* ------------------------------------------------- capex vs operating
+
+   Building the thing and running the thing are different money. The flag is
+   ORTHOGONAL to the category on purpose — R&D arrives as hardware, as a
+   contractor, as a one-off licence — so the fixture flags the laptop, which is
+   HARDWARE and stays HARDWARE.
+
+   June's spend from COSTS: 250 + 200 (the two spots) + 12 (hosting) = 462, of
+   which 450 is marketing. The laptop is March, so June has no capex; the capex
+   assertions below run over a March window where it does. */
+
+const CAPEX_COSTS = C.allCosts(ADS, ENTERED.map((c) => (c.id === 'laptop' ? { ...c, capex: true } : c)));
+
+check('a flagged row reads as capex', C.isCapex({ capex: true }));
+check('an ordinary row does not', !C.isCapex({ category: 'HARDWARE' }));
+/* Capex wins over the category's marketing bit, so a row can never be counted
+   as both a build cost and an acquisition cost. */
+check('a capex row is never marketing, whatever its category',
+  !C.isMarketing({ category: 'CREATIVE', capex: true }) && C.isMarketing({ category: 'CREATIVE' }));
+/* The text export asks the question of a category KEY rather than of a row,
+   and used to get false for every one of them. */
+check('isMarketing answers for a bare category key too',
+  C.isMarketing('CREATIVE') && C.isMarketing('ADS') && !C.isMarketing('INFRA'));
+
+const mar = C.daily(CAPEX_COSTS, '2026-03-01', '2026-03-31');
+check('March holds the laptop and one month of hosting', near(mar.total, 1512));
+check('the build cost is split out', near(mar.capex, 1500));
+check('and running costs are the rest', near(mar.operating, 12));
+check('the category total is untouched — capex cuts across it, it is not one of them',
+  near(mar.totals.HARDWARE, 1500));
+check('a window with no capex reports zero rather than undefined',
+  C.daily(CAPEX_COSTS, '2026-06-01', '2026-06-30').capex === 0);
+
+const cap = C.summary({
+  costs: CAPEX_COSTS, from: '2026-03-01', to: '2026-03-31', storeCutPct: 15,
+  store: { revenue: 1000, downloads: 500, sales: 40 },
+});
+/* The whole point: 1500 of R&D divided by 40 buyers is $37.50 a customer,
+   which is not what a customer costs and gets worse the more you build. */
+check('the loaded cost per paid is struck against RUNNING spend only',
+  near(cap.loadedCostPerPaid, 12 / 40), String(cap.loadedCostPerPaid));
+check('and the build is reported beside it rather than hidden',
+  near(cap.capexPerPaid, 1500 / 40));
+check('cost per install never saw capex in the first place',
+  cap.costPerInstall === 0, String(cap.costPerInstall));
+/* Profit still counts it. The money left the bank, and a profit you can
+   improve by spending more is not one. */
+check('profit is still struck against TOTAL spend', near(cap.profit, 850 - 1512));
+check('and operating profit is the other half of the sentence', near(cap.operatingProfit, 850 - 12));
+check('margin follows profit', near(cap.margin, ((850 - 1512) / 850) * 100));
+check('and operating margin follows operating profit',
+  near(cap.operatingMargin, ((850 - 12) / 850) * 100));
+/* Nothing above may move for an account that has never flagged a row. */
+const plain = C.summary({
+  costs: COSTS, from: '2026-03-01', to: '2026-03-31', storeCutPct: 15,
+  store: { revenue: 1000, downloads: 500, sales: 40 },
+});
+check('an account with no capex sees the loaded figure it always saw',
+  near(plain.loadedCostPerPaid, 1512 / 40) && plain.capexPerPaid === null);
+check('and operating profit equals profit there', near(plain.operatingProfit, plain.profit));
+
 /* ------------------------------------------------------------- report */
 
 let failed = 0;

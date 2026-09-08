@@ -156,7 +156,29 @@ const BRANDS: WatchBrand[] = [
     listed: true,
     experimental: true,
     verified: ['Venu 4'],
-    likely: ['Forerunner 255 / 265 / 955 / 965', 'fēnix 6 and newer', 'Venu 2 / 3', 'Vívoactive 4 / 5', 'Epix Pro'],
+    // The Connect IQ manifest is the real list — 100+ products, kept there
+    // because adding one is a claim the app runs on it. These chips are that
+    // list said in the words someone reads off their own wrist, so the two move
+    // together: garmin/manifest.xml is the source, this is the summary.
+    //
+    // Every one of them is `likely`, not `verified`, and the distinction is the
+    // point. What has been checked is that the app installs, renders and
+    // navigates on each — done in the Connect IQ simulator, which synthesises
+    // sensor data and therefore cannot prove a single beat-to-beat interval.
+    // Only the Venu 4 has had a real reading taken on it.
+    likely: [
+      'fēnix 5 Plus and newer, including fēnix 8 and 9',
+      'Forerunner 55 / 70 / 165 / 170 / 245 / 255 / 265 / 570',
+      'Forerunner 745 / 945 / 955 / 965 / 970',
+      'Venu, Venu 2 / 3 / 4, Venu Sq, Venu X1',
+      'Vívoactive 3 Music, 4, 5, 6',
+      'epix Gen 2 and epix Pro',
+      'Instinct 2 / 3 / E / Crossover',
+      'Descent G1 / G2 / Mk2 / Mk3',
+      'MARQ and MARQ Gen 2',
+      'Approach S50 / S70',
+      'Enduro, Enduro 3, tactix, quatix, D2',
+    ],
     caveat: 'Right sensor, not yet tested by us. Older models without beat to beat logging sync heart rate only.',
   },
   {

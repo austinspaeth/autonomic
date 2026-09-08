@@ -133,7 +133,7 @@
      account's, the pull is already in flight, and the refresh button spins
      until it lands. */
   function hasCache() {
-    return !!(db.entries.length || (db.sales || []).length ||
+    return !!(db.entries.length || (db.sales || []).length || (db.churn || []).length ||
       (db.costs || []).length || (db.ads || []).length || (db.events || []).length);
   }
 
@@ -372,6 +372,13 @@
     if (grain === 'week') return { label: labelDay(key), full: 'Week of ' + WD[dow(key)] + ' ' + labelFull(key) };
     return { label: labelDay(key), full: WD[dow(key)] + ' ' + labelFull(key) };
   }
+
+  /* One calendar day as a chart x-entry. Charts that plot a run of days used to
+     map `labelDay` straight in, which yields a STRING — and every consumer here
+     reads `.label` / `.full` off the entry, so the axis and the hover title both
+     rendered the word "undefined". Always hand the engine an entry, never a
+     string. */
+  function dayX(d) { return bucketLabel(d, 'day'); }
 
   /* Build per-bucket metrics for one platform key over a date range. */
   function buildBuckets(p, from, to, grain) {
@@ -1090,7 +1097,7 @@
     if (!host) return;
 
     var money = costSummary(r);
-    var ix = Sales.index(salesList(), 'all');
+    var ix = Sales.index(salesList(), 'all', churnList());
     var s = Sales.summarize(ix, r.from, r.to);
     var live = money.spend || money.grossRevenue || s.mrr || s.bookings;
 
@@ -2828,7 +2835,7 @@
     var keys = A.METHOD_ORDER.filter(function (k) { return split[k]; });
     var total = keys.reduce(function (a, k) { return a + split[k]; }, 0);
     drawChart('pgMethods', {
-      x: days.map(labelDay), stacked: true, height: 220, format: fmtInt, xLabel: 'Day',
+      x: days.map(dayX), stacked: true, height: 220, format: fmtInt, xLabel: 'Day',
       series: keys.map(function (k) {
         return {
           key: k, name: A.methodName(k), color: METHOD_COLOR[k], type: 'area',
@@ -2879,7 +2886,7 @@
     var total = keys.reduce(function (a, k) { return a + pooled[k]; }, 0);
 
     drawChart('pgReadMethods', {
-      x: days.map(labelDay), stacked: true, height: 220, format: fmtInt, xLabel: 'Day',
+      x: days.map(dayX), stacked: true, height: 220, format: fmtInt, xLabel: 'Day',
       series: keys.map(function (k) {
         return {
           key: k, name: A.methodName(k), color: METHOD_COLOR[k], type: 'area',
@@ -3003,7 +3010,7 @@
     var read = days.map(function (d) { return A.hrvKnown(ix, d) ? A.readingsOn(ix, d) : null; });
 
     drawChart('pgMeasureDaily', {
-      x: days.map(labelDay), height: 280, format: fmtInt, xLabel: 'Day',
+      x: days.map(dayX), height: 280, format: fmtInt, xLabel: 'Day',
       series: [
         { key: 'active', name: 'Opened the app', color: PC.active, type: 'area', values: active },
         { key: 'read', name: 'Took a reading', color: PC.reading, type: 'line', values: read }
@@ -3120,7 +3127,7 @@
     var done = days.map(function (d) { return A.kindKnown(ix, 'hrv', d) ? A.eventsOn(ix, 'hrv', d) : null; });
 
     drawChart('pgFunnel', {
-      x: days.map(labelDay), height: 280, format: fmtInt, xLabel: 'Day',
+      x: days.map(dayX), height: 280, format: fmtInt, xLabel: 'Day',
       series: [
         { key: 'start', name: 'Started a reading', color: PC.active, type: 'area', values: started },
         { key: 'done', name: 'Finished one', color: PC.reading, type: 'line', values: done }
@@ -3198,7 +3205,7 @@
     var walls = days.map(function (d) { return A.payKnown(ix, d) ? A.paywallsOn(ix, d) : null; });
 
     drawChart('pgPayDaily', {
-      x: days.map(labelDay), height: 280, format: fmtInt, xLabel: 'Day',
+      x: days.map(dayX), height: 280, format: fmtInt, xLabel: 'Day',
       series: [
         { key: 'active', name: 'Opened the app', color: PC.active, type: 'area', values: active },
         { key: 'wall', name: 'Met the paywall', color: PC.wall, type: 'line', values: walls }
@@ -3267,7 +3274,7 @@
     var walls = total - sought;
 
     drawChart('pgSurfaces', {
-      x: days.map(labelDay), stacked: true, height: 280, format: fmtInt, xLabel: 'Day',
+      x: days.map(dayX), stacked: true, height: 280, format: fmtInt, xLabel: 'Day',
       series: keys.map(function (k) {
         return {
           key: k, name: A.surfaceName(k), color: SURFACE_COLOR[k], type: 'area',
@@ -3309,7 +3316,7 @@
     var letters = ['A', 'F'].filter(function (k) { return A.slotOver(ix, 'osh', days, k) > 0; });
 
     drawChart('pgOffers', {
-      x: days.map(labelDay), stacked: true, height: 240, format: fmtInt, xLabel: 'Day',
+      x: days.map(dayX), stacked: true, height: 240, format: fmtInt, xLabel: 'Day',
       series: letters.map(function (k) {
         return {
           key: k, name: A.slotName('osh', k), color: OFFER_COLOR[k], type: 'area',
@@ -3381,7 +3388,7 @@
     var live = lines.filter(function (l) { return l.total > 0; });
 
     drawChart('pgEvents', {
-      x: days.map(labelDay), height: 240, format: fmtInt, xLabel: 'Day',
+      x: days.map(dayX), height: 240, format: fmtInt, xLabel: 'Day',
       series: live.map(function (l) {
         return { key: l.L.kind + l.L.slot, name: l.L.name, color: l.L.color, type: 'line', values: l.values };
       }),
@@ -3443,7 +3450,7 @@
     var keys = A.TIER_ORDER.filter(function (k) { return split[k]; });
 
     drawChart('pgTiers', {
-      x: days.map(labelDay), stacked: true, height: 260, format: fmtInt, xLabel: 'Day',
+      x: days.map(dayX), stacked: true, height: 260, format: fmtInt, xLabel: 'Day',
       series: keys.map(function (k) {
         return {
           key: k, name: A.tierName(k), color: TIER_COLOR[k], type: 'area',
@@ -3500,7 +3507,7 @@
     var total = versions.reduce(function (a, v) { return a + pooled[v].total; }, 0);
 
     drawChart('pgBuilds', {
-      x: days.map(labelDay), stacked: true, height: 260, format: fmtInt, xLabel: 'Day',
+      x: days.map(dayX), stacked: true, height: 260, format: fmtInt, xLabel: 'Day',
       series: versions.map(function (v, i) {
         return {
           key: v, name: v === '?' ? 'Not stated' : v,
@@ -3523,7 +3530,7 @@
       return Object.keys(m).reduce(function (a, v) { return a + (m[v].total || 0); }, 0);
     });
     drawChart('pgBuildShare', {
-      x: days.map(labelDay), stacked: true, height: 260, format: fmtPct, xLabel: 'Day',
+      x: days.map(dayX), stacked: true, height: 260, format: fmtPct, xLabel: 'Day',
       series: versions.map(function (v, i) {
         return {
           key: v, name: v === '?' ? 'Not stated' : v,
@@ -3626,7 +3633,7 @@
     }
 
     drawChart('pgPlatforms', {
-      x: days.map(labelDay), stacked: true, height: 260, format: fmtInt, xLabel: 'Day',
+      x: days.map(dayX), stacked: true, height: 260, format: fmtInt, xLabel: 'Day',
       series: series,
       emptyText: 'No pings in this range.'
     });
@@ -4407,7 +4414,44 @@
   function salesPlatform() {
     return (state.platform === 'ios' || state.platform === 'android') ? state.platform : 'all';
   }
-  function salesIndex() { return Sales.index(salesList(), salesPlatform()); }
+  function salesIndex() { return Sales.index(salesList(), salesPlatform(), churnList()); }
+
+  /* ------------------------------------------------- the churn ledger
+
+     Churn you cannot attach to a purchase. The stores report it as a number —
+     "four cancellations, about $20 a month" — with no way back to which four
+     subscriptions ended, and marking `cancelled` on a purchase row needs
+     exactly that. So it is a second collection: a date, the MRR that stopped,
+     and optionally a count, a plan and a store.
+
+     It moves the RATE and never the CASH. MRR, ARR, the active count, the churn
+     rate and every projection built on them net it out from its date forward;
+     bookings and recognised revenue do not move, because money that already
+     arrived does not un-arrive — that is what `refunded` is for — and there is
+     no purchase here whose recognition schedule could be stopped. See rule
+     THREE-AND-A-HALF in sales.js. */
+
+  function churnList() { return db.churn || (db.churn = []); }
+  function churnById(id) {
+    var l = churnList();
+    for (var i = 0; i < l.length; i++) if (l[i].id === id) return l[i];
+    return null;
+  }
+  function putChurn(rec) {
+    var l = churnList(), ex = churnById(rec.id);
+    if (ex) Object.assign(ex, rec); else l.push(rec);
+    sortChurn();
+    save(); invalidate();
+  }
+  function removeChurn(id) {
+    db.churn = churnList().filter(function (c) { return c.id !== id; });
+    save(); invalidate();
+  }
+  function sortChurn() {
+    churnList().sort(function (a, b) {
+      return a.date === b.date ? String(b.id).localeCompare(String(a.id)) : (a.date < b.date ? 1 : -1);
+    });
+  }
 
   /**
    * The one-shot migration out of the old daily columns.
@@ -4477,6 +4521,7 @@
 
     renderSalesTiles(ix, s, prev, r);
     renderMrrChart(ix, r);
+    renderChurnChart(ix, r, s);
     renderNewSubs(ix, r);
     renderBookingsChart(ix, r);
     renderPurchaseAges(ix, r);
@@ -4489,13 +4534,26 @@
       ? ' · ' + fmtInt(s.activeByPlan.unknown.count) + ' unclassified sales carry no term and are not in it'
       : '';
     var churnNote = s.churnedMrr
-      ? fmtMoney(s.churnedMrr) + ' cancelled in range'
-      : 'nothing marked cancelled — MRR assumes every subscription still runs';
+      ? fmtMoney(s.churnedMrr) + ' churned in range'
+      : 'nothing cancelled or churned — MRR assumes every subscription still runs';
+    /* The estimate has outrun the ledger. Said on the tile itself rather than
+       only in the export, because a floored book is a number you would
+       otherwise read as a real one. */
+    if (s.churnFloored) {
+      churnNote = 'churn entered exceeds the book — MRR floored at zero, check the ledger';
+    }
+    /* A store filter drops churn rows that name no store, and the figure under
+       that store's name is then not the whole of the churn. Say so where the
+       number is, not in a footnote. */
+    var dropped = ix.churnUnattributed || { count: 0, mrr: 0 };
+    var churnScope = dropped.count
+      ? ' · ' + fmtMoney(dropped.mrr) + ' of churn names no store and is left out of this filter'
+      : '';
 
     document.getElementById('slTiles').innerHTML = [
       tile({
         label: 'MRR on ' + labelDay(r.to), color: ENTITY.revenue, value: fmtMoney(s.mrr),
-        meta: churnNote + unknownNote,
+        meta: churnNote + unknownNote + churnScope,
         split: [
           { name: 'Monthly', color: planColor('monthly'), value: fmtMoney(s.activeByPlan.monthly.mrr) },
           { name: 'Annual', color: planColor('annual'), value: fmtMoney(s.activeByPlan.annual.mrr) }
@@ -4527,10 +4585,36 @@
       tile({
         label: 'Active subscriptions', color: ENTITY.trialEnd, value: fmtInt(s.active),
         meta: 'recurring plans live on ' + labelDay(r.to) + ' · ' + fmtInt(s.units) + ' sold in range' +
+          /* The plan split below is drawn from the purchase rows and so is
+             GROSS. An unattached churn row names no subscription, so it cannot
+             be taken off a plan's headcount — it comes off the total and the
+             split is labelled rather than silently made not to add up. */
+          (s.activeChurned ? ' · ' + fmtInt(s.activeChurned) + ' churned off unattached, so the split below is before that' : '') +
           (s.activeOther ? ' · ' + fmtInt(s.activeOther) + ' lifetime or unclassified purchases are not subscriptions and sit outside this' : ''),
         split: Sales.PLAN_KEYS.filter(function (k) { return s.activeByPlan[k].count; }).map(function (k) {
           return { name: planLabel(k), color: planColor(k), value: fmtInt(s.activeByPlan[k].count) };
         })
+      }),
+      tile({
+        /* Churn's own tile, and it is a full-size one: it is the number the
+           book's direction turns on, and it was invisible in this dashboard
+           until there was somewhere to type it. Net new MRR is what the reader
+           actually wants — new minus churned — so it leads the meta line. */
+        label: 'Churned MRR in range', color: ENTITY.wallHit,
+        value: s.churnedMrr ? fmtMoney(s.churnedMrr) : '–',
+        delta: pctDelta(s.churnedMrr, prev.churnedMrr), invertDelta: true,
+        meta: s.churnedMrr
+          ? fmtMoney(s.newMrr - s.churnedMrr) + ' net new MRR after it' +
+            (s.churnedUnits ? ' · ' + fmtInt(s.churnedUnits) + ' subscription' + (s.churnedUnits === 1 ? '' : 's') + ' lost' : '') +
+            (s.unattachedMrr && s.cancelledMrr
+              ? ' · ' + fmtMoney(s.cancelledMrr) + ' from cancellations you can point at, ' + fmtMoney(s.unattachedMrr) + ' unattached'
+              : s.unattachedMrr ? ' · all of it unattached — entered as a total, not per subscription'
+              : ' · all of it from purchases marked cancelled')
+          : 'nothing cancelled and no churn entered in this range',
+        split: (s.cancelledMrr && s.unattachedMrr) ? [
+          { name: 'Cancellations', color: planColor('monthly'), value: fmtMoney(s.cancelledMrr) },
+          { name: 'Unattached', color: COLOR.muted, value: fmtMoney(s.unattachedMrr) }
+        ] : null
       }),
       tile({
         label: 'Average price', value: s.arpu === null ? '–' : fmtMoney(s.arpu), smallValue: true,
@@ -4556,7 +4640,7 @@
   function renderMrrChart(ix, r) {
     var rows = Sales.mrrSeries(ix, r.from, r.to);
     drawChart('slMrr', {
-      x: rows.map(function (m) { return labelDay(m.date); }),
+      x: rows.map(function (m) { return dayX(m.date); }),
       stacked: true, height: 300, format: fmtMoney, xLabel: 'Day',
       yTickFormat: moneyTick,
       series: [
@@ -4564,9 +4648,70 @@
           values: rows.map(function (m) { return m.monthly; }) },
         { key: 'annual', name: 'Annual plans', color: planColor('annual'), type: 'area',
           values: rows.map(function (m) { return m.annual; }) }
-      ],
+      ].concat(
+        /* The book BEFORE unattached churn, as a dashed line over the stack.
+           Only drawn when there is churn to see, because on a book with none it
+           would sit exactly on the total and read as a second series that does
+           not exist. The gap between the line and the top of the stack is what
+           the churn ledger is costing, which is the one thing a stacked area
+           cannot show by itself. */
+        rows.some(function (m) { return m.churned > 0; }) ? [{
+          key: 'gross', name: 'Before churn', color: COLOR.muted, type: 'line', dashed: true,
+          values: rows.map(function (m) { return m.gross; })
+        }] : []
+      ),
       emptyText: 'No subscriptions on the books in this range yet.'
     });
+  }
+
+  /* Churned MRR per day — cancellations you can point at and unattached rows,
+     stacked, because the two genuinely sum to the churn and the reader's
+     question is how much of it is an estimate. The card hides itself on a book
+     that has never churned rather than showing an empty plot: a flat zero line
+     reads as a measurement, and until something is entered here there is
+     nothing measured at all. */
+  function renderChurnChart(ix, r, s) {
+    var card = document.getElementById('slChurnCard');
+    var everChurned = (ix.churn || []).length ||
+      ix.rows.some(function (row) { return row.cancelled && !row.refunded; });
+    if (card) card.classList.toggle('hidden', !everChurned);
+    if (!everChurned) return;
+
+    var rows = Sales.churnSeries(ix, r.from, r.to);
+    drawChart('slChurn', {
+      x: rows.map(function (m) { return dayX(m.date); }),
+      stacked: true, height: 240, format: fmtMoney, xLabel: 'Day',
+      yTickFormat: moneyTick,
+      series: [
+        { key: 'cancelled', name: 'Cancellations', color: planColor('monthly'), type: 'bar',
+          values: rows.map(function (m) { return m.cancelled; }) },
+        { key: 'unattached', name: 'Unattached churn', color: COLOR.red, type: 'bar',
+          values: rows.map(function (m) { return m.unattached; }) }
+      ],
+      emptyText: 'Nothing churned in this range.'
+    });
+
+    var meta = document.getElementById('slChurnMeta');
+    if (!meta) return;
+    var parts = [];
+    parts.push(fmtMoney(s.churnedMrr) + ' of MRR left the book in this range against ' +
+      fmtMoney(s.newMrr) + ' that joined it, so net new MRR is <b>' + fmtMoney(s.newMrr - s.churnedMrr) + '</b>.');
+    if (s.churnedUnits) {
+      parts.push(fmtInt(s.churnedUnits) + ' subscription' + (s.churnedUnits === 1 ? '' : 's') +
+        ' ended' + (s.unattachedMrr && !s.churnUnitsKnown
+          ? ', all of them from purchases you marked cancelled — the unattached rows named a dollar figure and no count'
+          : '') + '.');
+    } else if (s.unattachedMrr) {
+      parts.push('No count was entered with the unattached rows, so the active-subscription figure above is unchanged by them. Only the money is.');
+    }
+    if (s.churnDrag) {
+      parts.push('All time, unattached churn is holding the book ' + fmtMoney(s.churnDrag) +
+        ' below what the purchase ledger alone would say (' + fmtMoney(s.grossMrr) + ').');
+    }
+    if (s.churnFloored) {
+      parts.push('<b>The churn entered is worth more than the ledger holds</b>, so MRR is floored at zero rather than shown negative. Either purchases are missing or an estimate is too high.');
+    }
+    meta.innerHTML = '<p class="hint" style="margin:10px 0 0">' + parts.join(' ') + '</p>';
   }
 
   /* New purchases per bucket, GROUPED by plan rather than stacked: the question
@@ -4739,6 +4884,7 @@
   function renderSaleEntry() {
     renderSaleForm(null);
     renderSaleTable();
+    renderChurnEntry();
   }
 
   function saleFormDefaults() {
@@ -4979,6 +5125,230 @@
     return { rows: rows, bad: bad };
   }
 
+  /* ------------------------------------------------- churn entry (Edit data)
+
+     Same shape as the purchase form beside it: a form, a paste box and a table,
+     with the last row's plan and store pre-filled because entering churn is the
+     same batch job entering sales is. */
+
+  var lastChurn = null;
+
+  function renderChurnEntry() {
+    renderChurnForm(null);
+    renderChurnTable();
+  }
+
+  function renderChurnForm(id) {
+    var host = document.getElementById('chForm');
+    if (!host) return;
+    var row = id ? churnById(id) : null;
+    var d = row || lastChurn || { platform: '', plan: 'monthly' };
+    var plans = ['monthly', 'annual', 'unknown'].map(function (k) {
+      return '<option value="' + k + '"' + (d.plan === k ? ' selected' : '') + '>' + esc(planLabel(k)) + '</option>';
+    }).join('');
+    /* "Not sure" is a real answer here and the DEFAULT one, unlike the purchase
+       form where the store is always known. A store report is per store, but a
+       figure you worked out from a bank statement is not, and forcing a guess
+       would put half the churn under the wrong filter. */
+    var plats = [['', 'Not sure / both'], ['ios', 'iOS'], ['android', 'Android']].map(function (p) {
+      return '<option value="' + p[0] + '"' + ((d.platform || '') === p[0] ? ' selected' : '') + '>' + p[1] + '</option>';
+    }).join('');
+
+    host.innerHTML = '<div class="event-form">' +
+      '<div class="field"><label for="chDate">Date it happened</label>' +
+        '<input type="date" id="chDate" value="' + esc(row ? row.date : today()) + '"></div>' +
+      '<div class="field"><label for="chMrr">MRR lost (per month)</label>' +
+        '<input type="number" id="chMrr" min="0" step="0.01" placeholder="0.00" value="' +
+        esc(row ? row.mrr : '') + '"></div>' +
+      '<div class="field"><label for="chUnits">Subscriptions lost (optional)</label>' +
+        '<input type="number" id="chUnits" min="0" step="1" placeholder="unknown" value="' +
+        esc(row && row.units ? row.units : '') + '"></div>' +
+      '<div class="field"><label for="chPlan">Plan</label><select id="chPlan">' + plans + '</select></div>' +
+      '<div class="field"><label for="chPlatform">Store</label><select id="chPlatform">' + plats + '</select></div>' +
+      '<div class="field grow"><label for="chNote">Note</label>' +
+        '<input type="text" id="chNote" maxlength="200" placeholder="where this number came from" value="' +
+        esc(row && row.note ? row.note : '') + '"></div>' +
+      '<div class="event-form-actions">' +
+      '<button class="btn primary" id="chSave">' + (row ? 'Save churn' : 'Add churn') + '</button>' +
+      (row ? '<button class="btn" id="chCancelEdit">Cancel</button>' +
+        '<span class="spacer"></span><button class="btn danger" id="chDelete">Delete</button>' : '') +
+      '</div>' +
+      '<p class="note" id="chFormHint" style="margin:0"></p>' +
+      '</div>';
+
+    /* The live book, stated beside the field, because "MRR lost" is a number
+       you have to work out and the thing you work it out FROM is on the other
+       tab. Four monthly subscribers is only $19.96 if that is what they paid. */
+    var book = Sales.mrrOn(Sales.index(salesList(), 'all', churnList()), today());
+    var hint = document.getElementById('chFormHint');
+    if (hint && book.mrr) {
+      hint.textContent = 'The book is running at ' + fmtMoney(book.mrr) +
+        ' a month today. An annual plan that churns is a twelfth of its price, not its price.';
+    }
+
+    if (row) {
+      document.getElementById('chCancelEdit').addEventListener('click', function () { renderChurnForm(null); });
+      document.getElementById('chDelete').addEventListener('click', function () {
+        if (!confirm('Delete the ' + fmtMoney(row.mrr) + ' churn recorded on ' + labelFull(row.date) + '?')) return;
+        removeChurn(row.id);
+        renderChurnEntry();
+        renderAll();
+        toast('Churn deleted.');
+      });
+    }
+
+    document.getElementById('chSave').addEventListener('click', function () {
+      var date = document.getElementById('chDate').value;
+      var mrr = document.getElementById('chMrr').value;
+      var units = document.getElementById('chUnits').value;
+      if (!date) { toast('A churn event needs a date.'); return; }
+      if (mrr === '' || !isFinite(+mrr) || +mrr < 0) {
+        toast('Enter the monthly revenue that stopped — 0 if you only want to record the count.'); return;
+      }
+      if (+mrr === 0 && !(+units > 0)) {
+        /* Nothing to record. Refused rather than stored, because a row of two
+           blanks is a churn event in every count and a change to nothing. */
+        toast('A churn event needs an amount or a count — this one has neither.'); return;
+      }
+      var rec = {
+        id: row ? row.id : newId('churn'),
+        date: date,
+        mrr: +mrr,
+        units: (+units > 0) ? Math.round(+units) : undefined,
+        plan: document.getElementById('chPlan').value,
+        platform: document.getElementById('chPlatform').value || undefined,
+        note: document.getElementById('chNote').value.trim() || undefined
+      };
+      putChurn(rec);
+      lastChurn = { platform: rec.platform || '', plan: rec.plan };
+      renderChurnEntry();
+      renderAll();
+      toast(row ? 'Churn saved.' : 'Churn recorded.');
+    });
+  }
+
+  function renderChurnTable() {
+    var list = churnList();
+    var host = document.getElementById('chTable');
+    if (!host) return;
+    var count = document.getElementById('chCount');
+    if (count) {
+      count.textContent = list.length
+        ? list.length + ' churn event' + (list.length === 1 ? '' : 's') + ' on record' : '';
+    }
+    if (!list.length) {
+      host.innerHTML = '<div class="empty">No churn recorded. Mark a purchase cancelled above when you know which one it was; record it here when you only know the total.</div>';
+      return;
+    }
+    host.innerHTML = '<table><thead><tr><th>Date</th><th>Store</th><th>Plan</th>' +
+      '<th class="money">MRR lost</th><th class="money">Subs</th><th>Note</th><th></th></tr></thead><tbody>' +
+      list.map(function (raw) {
+        var c = Sales.normalizeChurn(raw);
+        if (!c) return '';
+        return '<tr><td>' + esc(labelFull(c.date)) + '</td>' +
+          '<td>' + (c.platform
+            ? '<span class="pill ' + c.platform + '">' + PLATFORMS[c.platform] + '</span>'
+            : '<span class="na">unattributed</span>') + '</td>' +
+          '<td><span class="swatch" style="background:' + planColor(c.plan) + '"></span> ' + esc(planLabel(c.plan)) + '</td>' +
+          '<td class="money">' + fmtMoney(c.mrr) + '</td>' +
+          '<td class="money">' + (c.units ? fmtInt(c.units) : '<span class="na">–</span>') + '</td>' +
+          '<td>' + esc(c.note || '') + '</td>' +
+          '<td><button class="btn sm" data-churn-edit="' + esc(c.id) + '">Edit</button></td></tr>';
+      }).join('') + '</tbody></table>';
+
+    host.querySelectorAll('[data-churn-edit]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        renderChurnForm(b.dataset.churnEdit);
+        document.getElementById('chForm').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+    });
+  }
+
+  var CHURN_PASTE_COLS = ['date', 'mrr', 'units', 'plan', 'platform', 'note'];
+  var CHURN_COL_ALIASES = {
+    date: 'date', when: 'date', cancelled: 'date', canceled: 'date', churned: 'date',
+    mrr: 'mrr', amount: 'mrr', lost: 'mrr', mrrlost: 'mrr', revenue: 'mrr', value: 'mrr',
+    units: 'units', subs: 'units', subscriptions: 'units', count: 'units', qty: 'units',
+    cancellations: 'units', churn: 'units',
+    plan: 'plan', term: 'plan', platform: 'platform', store: 'platform',
+    note: 'note', notes: 'note', reason: 'note'
+  };
+
+  function churnHeaderMap(cells) {
+    var map = {}, hits = 0;
+    cells.forEach(function (cell, i) {
+      var key = CHURN_COL_ALIASES[cell.toLowerCase().replace(/[^a-z]/g, '')];
+      if (key && map[key] === undefined) { map[key] = i; hits++; }
+    });
+    return (hits >= 2 && map.date !== undefined && !normalizeDate(cells[0] || '')) ? map : null;
+  }
+
+  /* Same contract as the purchase paste box: the lines it could not read come
+     back rather than being dropped, because churn you pasted and never landed
+     is indistinguishable from churn you never had. */
+  function parseChurnPaste(text) {
+    var rows = [], bad = [];
+    var lines = String(text || '').replace(/\r\n?/g, '\n').split('\n');
+    var header = null;
+    for (var h = 0; h < lines.length; h++) {
+      if (!lines[h].trim()) continue;
+      header = churnHeaderMap(splitSaleLine(lines[h]));
+      break;
+    }
+    var headerSeen = false;
+    lines.forEach(function (line, i) {
+      if (!line.trim()) return;
+      if (header && !headerSeen) { headerSeen = true; return; }
+      var c = splitSaleLine(line);
+      function col(name) {
+        var at = header ? header[name] : CHURN_PASTE_COLS.indexOf(name);
+        return (at === undefined || at < 0) ? '' : (c[at] || '');
+      }
+      var date = normalizeDate(col('date'));
+      if (!date) {
+        bad.push({ line: i + 1, text: line, why: 'no readable date in the ' + (header ? 'date column' : 'first column') });
+        return;
+      }
+      var mrr = cleanNum(col('mrr'));
+      if (!isFinite(mrr) || mrr < 0) {
+        bad.push({ line: i + 1, text: line, why: 'the MRR lost did not read as a number' });
+        return;
+      }
+      var units = Math.round(cleanNum(col('units')) || 0);
+      if (!mrr && units <= 0) {
+        bad.push({ line: i + 1, text: line, why: 'no amount and no count — nothing to record' });
+        return;
+      }
+      var planRaw = col('plan').toLowerCase();
+      var plan = /ann|year|yr/.test(planRaw) ? 'annual'
+        : /month|mo\b/.test(planRaw) ? 'monthly' : 'unknown';
+      var platRaw = col('platform');
+      var plat = /and|goog|play/i.test(platRaw) ? 'android'
+        : /ios|apple|app ?store/i.test(platRaw) ? 'ios' : undefined;
+      var note = col('note');
+      rows.push({
+        date: date, mrr: mrr, units: units > 0 ? units : undefined,
+        plan: plan, platform: plat,
+        note: note ? String(note).slice(0, 200) : undefined
+      });
+    });
+    return { rows: rows, bad: bad };
+  }
+
+  function churnCSV() {
+    var cols = ['date', 'mrr', 'units', 'plan', 'platform', 'note'];
+    var lines = [cols.join(',')];
+    Sales.normalizeChurnAll(churnList()).forEach(function (c) {
+      lines.push(cols.map(function (k) {
+        var v = c[k];
+        if (v === null || v === undefined) v = '';
+        v = String(v);
+        return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+      }).join(','));
+    });
+    return lines.join('\n');
+  }
+
   function salesCSV() {
     var cols = ['date', 'platform', 'plan', 'price', 'qty', 'cohort', 'cancelled', 'refunded', 'note'];
     var lines = [cols.join(',')];
@@ -5023,6 +5393,32 @@
     });
     document.getElementById('slExport').addEventListener('click', function () {
       download('autonomic-sales.csv', salesCSV(), 'text/csv');
+    });
+
+    document.getElementById('chPasteClear').addEventListener('click', function () {
+      document.getElementById('chPaste').value = '';
+      document.getElementById('chPasteStatus').textContent = '';
+    });
+    document.getElementById('chPasteGo').addEventListener('click', function () {
+      var box = document.getElementById('chPaste');
+      var out = parseChurnPaste(box.value);
+      if (!out.rows.length && !out.bad.length) { toast('Nothing to add — paste some rows first.'); return; }
+      out.rows.forEach(function (r) {
+        r.id = newId('churn');
+        churnList().push(r);
+      });
+      if (out.rows.length) { sortChurn(); save(); invalidate(); }
+      box.value = out.bad.map(function (b) { return b.text; }).join('\n');
+      document.getElementById('chPasteStatus').textContent =
+        'Added ' + out.rows.length + ' churn event' + (out.rows.length === 1 ? '' : 's') +
+        (out.bad.length ? ' · ' + out.bad.length + ' line' + (out.bad.length === 1 ? '' : 's') +
+          ' left in the box: ' + out.bad[0].why : '');
+      renderSaleEntry();
+      renderAll();
+      toast('Added ' + out.rows.length + ' churn events.');
+    });
+    document.getElementById('chExport').addEventListener('click', function () {
+      download('autonomic-churn.csv', churnCSV(), 'text/csv');
     });
   }
 
@@ -5241,27 +5637,39 @@
     var cut = storeCut();
 
     /* ---- tiles ---- */
+    /* Profit is struck against TOTAL spend and always will be — the money left
+       the bank, and a profit you can improve by spending more is not one. The
+       operating figure sits in the meta line beside it rather than replacing
+       it, so the honest sentence has both halves. */
     var profitTile = tile({
       label: 'Net profit in range', color: sum.profit >= 0 ? COLOR.s3 : COLOR.red,
       value: fmtMoney(sum.profit), smallValue: true,
       meta: fmtMoney(sum.netRevenue) + ' net revenue − ' + fmtMoney(sum.spend) + ' spend · ' +
-        fmtMoney(sum.grossRevenue) + ' gross before the ' + cut + '% store cut'
+        fmtMoney(sum.grossRevenue) + ' gross before the ' + cut + '% store cut' +
+        (sum.capex ? ' · ' + fmtMoney(sum.operatingProfit) + ' before the one-off build cost' : '')
     });
     document.getElementById('csTiles').innerHTML = [
       tile({
         label: 'Total spend', color: COLOR.s2, value: fmtMoney(sum.spend), smallValue: true,
-        meta: fmtMoney(sum.marketing) + ' marketing · ' + fmtMoney(sum.other) + ' everything else',
-        spark: Chart.sparkline(rows.map(function (x) { return x.spend; }), COLOR.s2)
+        meta: fmtMoney(sum.marketing) + ' marketing · ' + fmtMoney(sum.other) + ' everything else' +
+          (sum.capex ? ' · ' + fmtMoney(sum.capex) + ' of it one-off build cost, which is in this total and in no per-customer rate below' : ''),
+        spark: Chart.sparkline(rows.map(function (x) { return x.spend; }), COLOR.s2),
+        split: sum.capex ? [
+          { name: 'Running the app', color: COLOR.s2, value: fmtMoney(sum.operating) },
+          { name: 'Building it', color: COLOR.s6, value: fmtMoney(sum.capex) }
+        ] : null
       }),
       profitTile,
       tile({
         label: 'Cost per install', value: fmtMoney(sum.costPerInstall), smallValue: true,
-        meta: 'blended — marketing spend ÷ every store download in range'
+        meta: 'blended — marketing spend ÷ every store download in range' +
+          (sum.capex ? ' · one-off build cost is never in this' : '')
       }),
       tile({
         label: 'Cost per paid conversion', value: fmtMoney(sum.costPerPaid), smallValue: true,
         meta: sum.loadedCostPerPaid === null ? 'no paid conversions in range'
-          : 'marketing only · ' + fmtMoney(sum.loadedCostPerPaid) + ' with every cost loaded in'
+          : 'marketing only · ' + fmtMoney(sum.loadedCostPerPaid) + ' with every RUNNING cost loaded in' +
+            (sum.capexPerPaid ? ' · the one-off build adds ' + fmtMoney(sum.capexPerPaid) + ' on top, once' : '')
       }),
       tile({
         label: 'Return on ad spend', value: sum.roas === null ? '–' : sum.roas.toFixed(2) + '×',
@@ -5271,7 +5679,8 @@
       }),
       tile({
         label: 'Margin', value: fmtPct(sum.margin), smallValue: true,
-        meta: 'of net revenue, after every cost in range'
+        meta: 'of net revenue, after every cost in range' +
+          (sum.capex ? ' · ' + fmtPct(sum.operatingMargin) + ' on running costs alone' : '')
       })
     ].join('') + allTimeTiles();
 
@@ -5618,7 +6027,8 @@
         return '<tr><td>' + esc(labelFull(c.date)) +
           (rec ? '<br><span class="repeats">' + esc(rec.label.toLowerCase()) +
             (c.until ? ' until ' + esc(labelDay(c.until)) : '') + '</span>' : '') + '</td>' +
-          '<td><span class="cat-dot" style="background:' + cat.color + '"></span>' + esc(cat.label) + '</td>' +
+          '<td><span class="cat-dot" style="background:' + cat.color + '"></span>' + esc(cat.label) +
+            (c.capex ? ' <span class="pill">build</span>' : '') + '</td>' +
           '<td>' + esc(c.label || '–') +
           (c.note ? '<br><span class="note">' + esc(c.note) + '</span>' : '') + '</td>' +
           '<td class="money">' + fmtMoney(c.amount) + '</td>' +
@@ -5652,6 +6062,13 @@
       '<div class="field"><label for="coAmount">Amount</label><input type="number" id="coAmount" step="0.01" value="' + (c && c.amount !== undefined ? c.amount : '') + '"></div>' +
       '<div class="field"><label for="coRecurrence">Repeats</label><select id="coRecurrence">' + recs + '</select></div>' +
       '<div class="field"><label for="coUntil">Repeat until (blank = still paying)</label><input type="date" id="coUntil" value="' + esc(c && c.until ? c.until : '') + '"></div>' +
+      /* Orthogonal to the category on purpose: R&D arrives as hardware, as a
+         contractor, as a one-off licence, so a "CAPEX" category could not hold
+         it without making you abandon the category that already describes it. */
+      '<div class="field"><label for="coCapex">Kind of money</label><select id="coCapex">' +
+        '<option value=""' + (c && c.capex ? '' : ' selected') + '>Operating — what it costs to run</option>' +
+        '<option value="1"' + (c && c.capex ? ' selected' : '') + '>One-off build (R&amp;D / capex)</option>' +
+      '</select></div>' +
       '<div class="field full"><label for="coNote">Notes</label><textarea id="coNote" rows="2" maxlength="2000">' + esc(c && c.note ? c.note : '') + '</textarea></div>' +
       '<div class="event-form-actions">' +
       '<button class="btn primary" id="coSave">' + (c ? 'Save cost' : 'Add cost') + '</button>' +
@@ -5685,6 +6102,7 @@
         amount: Number(amount),
         recurrence: rec === 'none' ? undefined : rec,
         until: rec === 'none' || !until ? undefined : until,
+        capex: document.getElementById('coCapex').value ? true : undefined,
         note: document.getElementById('coNote').value.trim() || undefined
       });
       closeCostForm();
@@ -5713,11 +6131,12 @@
      a cost row would throw away the platform, the run window and the counts —
      the whole reason a spot is its own thing. */
   function costsCSV() {
-    var cols = ['date', 'category', 'label', 'amount', 'recurrence', 'until', 'note'];
+    var cols = ['date', 'category', 'kind', 'label', 'amount', 'recurrence', 'until', 'note'];
     var lines = [cols.join(',')];
     costList().slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; }).forEach(function (c) {
       lines.push(csvLine(cols, {
-        date: c.date, category: c.category, label: c.label || '', amount: num(c.amount),
+        date: c.date, category: c.category, kind: c.capex ? 'capex' : 'operating',
+        label: c.label || '', amount: num(c.amount),
         recurrence: c.recurrence || 'none', until: c.until || '', note: c.note || ''
       }));
     });
@@ -6377,6 +6796,10 @@
        say "assumption" instead of "from your data". */
     var six = Sales.forecastBasis(salesIndex(), addDays(end, -179), end);
     var live = Sales.summarize(salesIndex(), addDays(end, -(FC_WINDOW - 1)), end);
+    /* The share of the purchase ledger's book that unattached churn has left
+       standing. 1 when nothing was entered, which is every account that has
+       not used the churn ledger. */
+    var bookSurvival = live.grossMrr > 0 ? live.mrr / live.grossMrr : 1;
 
     return {
       installs: recent.downloads / covered,
@@ -6389,11 +6812,19 @@
       annualPrice: six.annualPrice === null ? 39.99 : six.annualPrice,
       annualShare: six.annualShare === null ? 25 : six.annualShare,
       churn: six.churnPct,
+      churnCancelled: six.cancelledMrr,
+      churnUnattached: six.unattachedMrr,
       payers: all.totalSales,
       /* The book the forecast starts from, split by plan, so month one opens
-         at the MRR you actually have rather than at payers × one price. */
-      startMonthly: live.activeByPlan.monthly.count,
-      startAnnual: live.activeByPlan.annual.count,
+         at the MRR you actually have rather than at payers × one price.
+         SCALED DOWN by whatever unattached churn has taken off the book. The
+         model's state is a payer COUNT and the counts come from purchase rows,
+         which unattached churn cannot name — so it is applied as the surviving
+         share of MRR rather than by subtracting subscriptions we cannot
+         identify. Without this the projection opened at the gross book and
+         spent six months quietly undoing churn that had already happened. */
+      startMonthly: live.activeByPlan.monthly.count * bookSurvival,
+      startAnnual: live.activeByPlan.annual.count * bookSurvival,
       startMrr: live.mrr,
       hasSales: hasSales,
       hasPlans: six.units > 0,
@@ -6436,8 +6867,15 @@
       derived: function (a) { return a.hasPlans ? null : 'nothing recurring sold yet — assumption'; } },
     { key: 'churn', label: 'Monthly churn', step: 0.25, fmt: function (v) { return v.toFixed(2) + '%'; },
       min: function () { return 0; }, max: function () { return 40; }, subsOnly: true,
+      /* Where the measured rate came from, because the two sources are
+         different evidence and the reader is about to project six months off
+         it. An estimate typed off a store report is a real measurement and it
+         is not the same as a cancellation you could point at. */
       derived: function (a) {
-        return a.churn === null ? 'nothing marked cancelled yet — assumption' : null;
+        if (a.churn === null) return 'nothing cancelled or churned yet — assumption';
+        if (a.churnUnattached && !a.churnCancelled) return 'from churn you entered by hand, not per subscription';
+        if (a.churnUnattached) return 'from cancellations and hand-entered churn together';
+        return null;
       } },
     { key: 'spread', label: 'Scenario spread', step: 5, fmt: function (v) { return '±' + v.toFixed(0) + '%'; },
       min: function () { return 5; }, max: function () { return 80; },
@@ -6774,7 +7212,7 @@
 
   function exportMoney(L, r) {
     var money = costSummary(r);
-    var s = Sales.summarize(Sales.index(salesList(), 'all'), r.from, r.to);
+    var s = Sales.summarize(Sales.index(salesList(), 'all', churnList()), r.from, r.to);
     if (!money.spend && !money.grossRevenue && !s.bookings && !s.mrr) return;
 
     var be = breakevenSeries();
@@ -6783,18 +7221,32 @@
     L.push('Revenue is entered at the customer-facing price and the store keeps ' + storeCut() + '%.');
     L.push('Profit is always struck against the NET figure; both are given so the cut is visible.');
     L.push('');
+    L.push('A cost marked as a one-off BUILD (R&D / capex) is in every total below and in');
+    L.push('none of the per-customer rates: a five-figure build divided by this window\'s buyers');
+    L.push('is not what a customer costs and gets worse the more product you build. Profit and');
+    L.push('margin still count it, because the money left the bank.');
+    L.push('');
     [['Gross revenue', money.grossRevenue], ['Store commission', -money.commission],
      ['Net revenue', money.netRevenue], ['Spend', -money.spend],
      ['  of which marketing', -money.marketing], ['  of which everything else', -money.other],
-     ['Net profit', money.profit]].forEach(function (m) {
+     ['  of which one-off build', -money.capex],
+     ['  running costs only', -money.operating],
+     ['Net profit', money.profit],
+     ['Operating profit', money.operatingProfit]].forEach(function (m) {
       L.push(pad2(m[0], 28) + padL(fmtMoney(m[1]), 14));
     });
     L.push(pad2('Margin', 28) + padL(fmtPct(money.margin), 14));
+    L.push(pad2('Operating margin', 28) + padL(fmtPct(money.operatingMargin), 14) +
+      '   before one-off build cost');
     L.push(pad2('Cost per install (blended)', 28) + padL(fmtMoney(money.costPerInstall), 14) +
       '   marketing ÷ EVERY install, organic included — the honest ceiling');
     L.push(pad2('Cost per paid (blended)', 28) + padL(fmtMoney(money.costPerPaid), 14));
     L.push(pad2('Cost per paid (loaded)', 28) + padL(fmtMoney(money.loadedCostPerPaid), 14) +
-      '   all spend, not only marketing');
+      '   all RUNNING spend, not only marketing');
+    if (money.capexPerPaid) {
+      L.push(pad2('  build cost per paid', 28) + padL(fmtMoney(money.capexPerPaid), 14) +
+        '   once, not per month — kept out of the rate above');
+    }
     L.push(pad2('Revenue per install', 28) + padL(fmtMoney(money.revenuePerInstall), 14));
     L.push(pad2('Return on ad spend', 28) + padL(money.roas === null ? '–' : money.roas.toFixed(2) + '×', 14));
     L.push('');
@@ -6809,8 +7261,8 @@
 
   function exportSales(L, r) {
     var rows = salesList();
-    if (!rows.length) return;
-    var ix = Sales.index(rows, 'all');
+    if (!rows.length && !churnList().length) return;
+    var ix = Sales.index(rows, 'all', churnList());
     var s = Sales.summarize(ix, r.from, r.to);
 
     L.push('');
@@ -6824,10 +7276,23 @@
     L.push('A subscription is assumed to still run until it is marked cancelled: the stores');
     L.push('tell this dashboard nothing about churn, so none is inferred. A refund is counted');
     L.push('in nothing but its own two fields.');
+    L.push('CHURN comes from two places and they are different evidence. A CANCELLATION is a');
+    L.push('purchase row you can point at. An UNATTACHED churn row is a figure off a store');
+    L.push('report with no purchase behind it — how much monthly revenue stopped, and');
+    L.push('sometimes how many subscriptions. Both leave MRR from their date; NEITHER touches');
+    L.push('bookings or recognised revenue, because money that already arrived does not');
+    L.push('un-arrive — that is what a refund is — and an unattached row has no purchase');
+    L.push('whose recognition could be stopped.');
     L.push('');
     [['Purchases (units)', fmtInt(s.units)], ['Bookings (cash)', fmtMoney(s.bookings)],
      ['New MRR in window', fmtMoney(s.newMrr)], ['Churned MRR in window', fmtMoney(s.churnedMrr)],
-     ['MRR at ' + r.to, fmtMoney(s.mrr)], ['ARR at ' + r.to, fmtMoney(s.arr)],
+     ['  of which cancellations', fmtMoney(s.cancelledMrr)],
+     ['  of which unattached', fmtMoney(s.unattachedMrr)],
+     ['Net new MRR in window', fmtMoney(s.newMrr - s.churnedMrr)],
+     ['MRR at ' + r.to, fmtMoney(s.mrr)],
+     ['  before churn', fmtMoney(s.grossMrr)],
+     ['  churn drag (all time)', fmtMoney(s.churnDrag)],
+     ['ARR at ' + r.to, fmtMoney(s.arr)],
      ['Active subscriptions', fmtInt(s.active)],
      ['Active without a term', fmtInt(s.activeOther)],
      ['Average price paid', fmtMoney(s.arpu)],
@@ -6900,6 +7365,29 @@
           pad2(x.cancelled || '–', 12) + (x.note || ''));
       });
     }
+
+    /* The unattached churn ledger, verbatim and all time rather than windowed:
+       the MRR drag on the figures above is cumulative, so listing only the
+       window's rows would leave the reader unable to reconstruct the book. */
+    var churn = Sales.normalizeChurnAll(churnList());
+    if (churn.length) {
+      L.push('');
+      L.push('Unattached churn — every row, all time. These reduce MRR, ARR, the active count');
+      L.push('and the churn rate from their date forward, and nothing else.');
+      L.push(pad2('  date', 14) + pad2('store', 11) + pad2('plan', 10) +
+        padL('mrr lost', 11) + padL('subs', 7) + '  note');
+      churn.slice().sort(function (a, b) { return a.date < b.date ? -1 : 1; }).forEach(function (c) {
+        L.push(pad2('  ' + c.date, 14) + pad2(c.platform ? (PLATFORMS[c.platform] || c.platform) : 'unattributed', 11) +
+          pad2(c.plan, 10) + padL(fmtMoney(c.mrr), 11) +
+          padL(c.units ? fmtInt(c.units) : '–', 7) + '  ' + (c.note || ''));
+      });
+      if (s.churnFloored) {
+        L.push('');
+        L.push('NOTE: the churn entered is worth more MRR than the purchase ledger holds, so');
+        L.push('the book above is floored at zero rather than reported negative. Either some');
+        L.push('purchases are missing from the ledger or a churn estimate is too high.');
+      }
+    }
   }
 
   function exportCosts(L, r) {
@@ -6923,6 +7411,15 @@
         (CS.isMarketing(k) ? '   marketing' : ''));
     });
     L.push(pad2('  Total', 22) + padL(fmtMoney(d.total), 12));
+    if (d.capex) {
+      /* Cuts ACROSS the categories above rather than being one of them — a
+         build arrives as hardware, as a contractor, as a one-off licence — so
+         it is stated as its own line and never as a category row that the
+         total would then double-count. */
+      L.push(pad2('  of which one-off build', 22) + padL(fmtMoney(d.capex), 12) +
+        '   cuts across the categories above; out of every per-customer rate');
+      L.push(pad2('  running costs only', 22) + padL(fmtMoney(d.operating), 12));
+    }
 
     var perAd = CS.perAd(ads(), r.from, r.to);
     if (perAd && perAd.rows.length) {
@@ -7397,7 +7894,7 @@
     trial:     { tiles: 6,  wide: [300, 260], half: 2 },
     cohorts:   { tiles: 4,  wide: [300], half: 2 },
     platforms: { tiles: 6,  wide: [280], half: 4 },
-    sales:     { tiles: 8,  wide: [280, 260], half: 3 },
+    sales:     { tiles: 9,  wide: [280, 240, 260], half: 3 },
     costs:     { tiles: 8,  wide: [300, 260], half: 3 },
     forecast:  { tiles: 4,  wide: [320, 240], half: 0 },
     pings:     { tiles: 5,  wide: [420], half: 0 },
@@ -7696,7 +8193,7 @@
        point is that one line is normally a rounding error against the other,
        and a chart that normalises them hides the only thing worth seeing. */
     drawChart('fltDaily', {
-      x: days.map(labelDay), height: 240, format: fmtInt, xLabel: 'Day',
+      x: days.map(dayX), height: 240, format: fmtInt, xLabel: 'Day',
       series: [
         {
           key: 'open', name: 'Opened the app', color: PC.active, type: 'line',
@@ -8388,10 +8885,11 @@
    * cancellations so MRR is not a straight line, and the odd refund.
    */
   function loadDemo() {
-    if ((db.entries.length || salesList().length) &&
-        !confirm('Replace the current data — store days and purchases — with demo data?')) return;
+    if ((db.entries.length || salesList().length || churnList().length) &&
+        !confirm('Replace the current data — store days, purchases and churn — with demo data?')) return;
     db.entries = [];
     db.sales = [];
+    db.churn = [];
     var days = 120;
     var start = addDays(reportDay(), -(days - 1));
     var seed = 7;
@@ -8442,8 +8940,27 @@
         }
       });
     }
+    /* A month-end churn figure of the kind a store report gives you: a total
+       and a count, with no way back to which subscriptions ended. The demo
+       carries a few so the Churn card has the case it exists for — the one the
+       `cancelled` column above cannot express. */
+    for (var mi = 1; mi <= 3; mi++) {
+      var when = addDays(reportDay(), -(mi * 30));
+      if (when < start) break;
+      var lostSubs = 2 + Math.round(rnd() * 3);
+      churnList().push({
+        id: 'churn-demo-' + mi,
+        date: when,
+        mrr: +(lostSubs * (3.99 + rnd() * 1.5)).toFixed(2),
+        units: lostSubs,
+        plan: 'monthly',
+        platform: mi === 2 ? 'android' : undefined,
+        note: 'Store report, month end'
+      });
+    }
     db.entries.sort(function (a, b) { return a.date < b.date ? 1 : -1; });
     sortSales();
+    sortChurn();
     /* Nothing here is in the old shape, so there is nothing to migrate — and
        leaving the flag off would run the migration over the demo on the next
        render just to discover that. */
@@ -8952,7 +9469,7 @@
             // ad spots, costs and purchases back too — not just the store days.
             // Merged by id, like every other collection, so restoring an old
             // backup over a newer ledger adds to it rather than truncating it.
-            ['ads', 'costs', 'sales', 'events'].forEach(function (name) {
+            ['ads', 'costs', 'sales', 'churn', 'events'].forEach(function (name) {
               if (!Array.isArray(parsed[name])) return;
               var into = db[name] || (db[name] = []);
               parsed[name].forEach(function (row) {
@@ -9023,11 +9540,15 @@
     });
     document.getElementById('ioDemo').addEventListener('click', loadDemo);
     document.getElementById('ioReset').addEventListener('click', function () {
-      if (!confirm('Delete every store entry and every purchase on your account? Costs, ad spots and events are kept. This cannot be undone — export a backup first if you want one.')) return;
+      if (!confirm('Delete every store entry, every purchase and the churn ledger on your account? Costs, ad spots and events are kept. This cannot be undone — export a backup first if you want one.')) return;
       db.entries = [];
       /* Sales left behind by a wipe would come back as revenue with no
-         downloads under it, which reads as a bug rather than as a choice. */
+         downloads under it, which reads as a bug rather than as a choice. The
+         churn ledger goes with them for the same reason and a stronger one: it
+         is a claim ABOUT purchases, so left behind it would floor the empty
+         book's MRR at zero and report churn against nothing. */
       db.sales = [];
+      db.churn = [];
       save(); invalidate(); renderAll();
       refreshBulk();
       // A wipe is the one case where the server should be told outright rather
@@ -9080,6 +9601,7 @@
     if (Array.isArray(remote.ads)) db.ads = remote.ads;
     if (Array.isArray(remote.costs)) db.costs = remote.costs;
     if (Array.isArray(remote.sales)) db.sales = remote.sales;
+    if (Array.isArray(remote.churn)) db.churn = remote.churn;
     if (Array.isArray(remote.links)) db.links = remote.links;
     if (remote.settings) { Object.assign(db.settings, remote.settings); migrateSettings(db.settings); }
     if (remote.ui && !keepUi) Object.assign(state, remote.ui);

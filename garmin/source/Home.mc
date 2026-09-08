@@ -73,11 +73,22 @@ class HomeTitle extends WatchUi.Drawable {
         // the only control over the distance to the first row.
         var font = Graphics.FONT_XTINY;
         var logo = WatchUi.loadResource(Rez.Drawables.Logo);
-        var block = logo.getHeight() + dc.getFontHeight(font) - 4;
+        var text = dc.getFontHeight(font);
+
+        // The wordmark is pulled UP into the squiggle's last few pixels, which
+        // are sparse. That lift has to be a PROPORTION of the mark, not a fixed
+        // 4px: the logo is now sized per screen family (tools/gen-glyphs.py), so
+        // a constant tuned against the 454px master ate 7% of the mark there and
+        // 21% of it on a 163px Instinct 2S — where it stopped grazing the tail
+        // of the squiggle and started striking through the app's own name.
+        // 4/56 is that constant expressed against the master it was chosen for,
+        // so the Venu 4 draws the pixels it always did.
+        var lift = logo.getHeight() * 4 / 56;
+        var block = logo.getHeight() + text - lift;
         var y = h - block - (h * 0.13);
         if (y < 0) { y = 0; }
         dc.drawBitmap(cx - logo.getWidth() / 2, y, logo);
-        Theme.boldText(dc, cx, y + logo.getHeight() - 4, font,
+        Theme.boldText(dc, cx, y + logo.getHeight() - lift, font,
             "Autonomic", Graphics.TEXT_JUSTIFY_CENTER, Theme.INK);
     }
 }

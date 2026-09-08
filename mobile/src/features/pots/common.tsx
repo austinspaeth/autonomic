@@ -18,6 +18,7 @@ import { ble } from '../../lib/ble/manager';
 import { getState, storeWaveform, upsertEntry } from '../../store/store';
 import { splitWaveform } from '../../lib/waveforms';
 import { confirmDelete, EntryForm } from '../EntryForm';
+import { isPotsResultLocked, PotsLockedCard } from '../PotsLock';
 import { READING_TYPES } from '../../lib/registry';
 import type { DayRecord, Entry } from '../../lib/types';
 
@@ -169,6 +170,11 @@ export function PotsResultsSheet({ entry, dayKey, title, sub, controls }: {
 
   // The note is written onto the already-saved entry; the draft is held here
   // only to render it.
+  // Free tier: the capture ran and is saved, but reading the result is Pro.
+  // Upgrading from the card swaps the real summary in underneath rather than
+  // closing it — this one is the receipt for a capture the user just sat
+  // through, so it is the wrong card to take away.
+  const [locked, setLocked] = useState(() => isPotsResultLocked(entry));
   const [note, setNote] = useState('');
   /** The persisted (waveform-stripped) entry, once the auto-save has run. */
   const saved = useRef<Entry | null>(null);
@@ -194,16 +200,23 @@ export function PotsResultsSheet({ entry, dayKey, title, sub, controls }: {
     controls.setOptions({
       hideClose: false,
       dismissAll: true,
-      action: { icon: 'edit', onPress: () => openSheet((c) => (
-        <EntryForm
-          typeMap={READING_TYPES} arrKey="readings" dk={dayKey}
-          type={e.type} existing={saved.current} controls={c} onSaved={() => {}}
-        />
-      )) },
+      // No pencil on a locked result: the edit form is the numbers, listed.
+      // Delete stays either way — the reading is the user's, locked or not.
+      ...(locked ? null : {
+        action: { icon: 'edit' as const, onPress: () => openSheet((c) => (
+          <EntryForm
+            typeMap={READING_TYPES} arrKey="readings" dk={dayKey}
+            type={e.type} existing={saved.current} controls={c} onSaved={() => {}}
+          />
+        )) },
+      }),
       destructive: { onPress: () => confirmDelete(openSheet, dayKey, 'readings', e, READING_TYPES[e.type]?.label || 'reading') },
+      // A locked card has nothing to scroll, so let it sit at the bottom of the
+      // device like every other one-answer card (see features/PotsLock).
+      fitContent: locked,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [locked]);
 
   const onNote = (next: string) => {
     setNote(next);
@@ -216,8 +229,12 @@ export function PotsResultsSheet({ entry, dayKey, title, sub, controls }: {
       <Text style={{ fontSize: 25, fontWeight: '800', color: p.text, marginBottom: 4 }}>{title}</Text>
       <Text style={{ color: p.textDim, fontSize: 14, marginBottom: 4 }}>{sub}</Text>
       <Text style={{ color: p.textDim, fontSize: 13, marginBottom: 16 }}>Saved to your journal</Text>
-      <ReadingSummary r={shown} days={daysWithCurrent} ctx={ctx} />
-      <NoteDraftCard note={note} onChange={onNote} />
+      {locked ? <PotsLockedCard r={shown} controls={controls} subject={false} onUnlocked={() => setLocked(false)} /> : (
+        <>
+          <ReadingSummary r={shown} days={daysWithCurrent} ctx={ctx} />
+          <NoteDraftCard note={note} onChange={onNote} />
+        </>
+      )}
     </View>
   );
 }

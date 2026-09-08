@@ -27,6 +27,32 @@
  * is reported, and the network is marking its own homework. Both are useful,
  * neither is the truth, and a single "CPI" that quietly switched between them
  * would be worse than either.
+ *
+ * FOUR. **Building the thing and running the thing are different money.** A
+ * cost carries a `capex` flag, orthogonal to its category: it says this was a
+ * one-off investment in the product — the R&D, the hardware you bought once,
+ * the contractor who built a feature — rather than part of what the app costs
+ * to keep running. It is orthogonal on purpose. R&D arrives as HARDWARE, as
+ * SERVICES, as a one-off TOOLS licence, so a "CAPEX" category could not hold it
+ * without making the reader abandon the category that already describes it.
+ *
+ * What the flag changes is which PER-CUSTOMER rates it is allowed into, and the
+ * rule is that a rate is about the ongoing business or it is meaningless. A
+ * $5,000 build divided by this month's twelve buyers is $417 a customer, which
+ * is not what a customer costs, will never be what a customer costs, and gets
+ * worse the more of the product you build. So `loadedCostPerPaid` is struck
+ * against OPERATING spend and `capexPerPaid` states the build separately.
+ * Marketing rates never saw capex in the first place; `isCapex` and
+ * `isMarketing` are mutually exclusive and the former wins, so a row cannot be
+ * both a one-off build and an acquisition cost.
+ *
+ * What it does NOT change is PROFIT. The money left the bank, and a "profit"
+ * that skipped the build cost would be a number you could improve by spending
+ * more. `profit`, `margin` and the breakeven curve are struck against total
+ * spend exactly as before; `operatingProfit` and `operatingMargin` sit beside
+ * them so the honest sentence — "the app is operationally profitable and has
+ * this much build cost still to earn back" — can be said with both halves
+ * present.
  */
 window.Costs = (function () {
   'use strict';
@@ -136,7 +162,29 @@ window.Costs = (function () {
     return out;
   }
 
+  /* A one-off investment in the product rather than a cost of running it. The
+     flag is the whole of the definition — there is no category that means this
+     and no way to infer it from an amount. */
+  function isCapex(cost) {
+    return !!(cost && cost.capex);
+  }
+
+  /* Capex wins over the category's marketing bit, so a row can never be counted
+     as both a build cost and an acquisition cost. In practice that is a
+     CREATIVE row someone flagged: a brand identity commissioned once is a
+     build, and charging it to cost-per-install would put a permanent step in
+     the series on the day it was paid for. */
+  /* Takes a cost ROW or a bare category key. The key form exists because the
+     text export walks `CATEGORY_KEYS` and asks the question of a category
+     rather than of a row — and passing a string used to return false for every
+     one of them, so the export's "marketing" annotation never appeared on a
+     single line. A row is the form that can be capex; a key never is. */
   function isMarketing(cost) {
+    if (typeof cost === 'string') {
+      var byKey = CATEGORIES[cost];
+      return !!(byKey && byKey.marketing);
+    }
+    if (isCapex(cost)) return false;
     var cat = CATEGORIES[cost && cost.category];
     return !!(cat && cat.marketing);
   }
@@ -151,16 +199,20 @@ window.Costs = (function () {
    * feeds every chart and tile on the view, so a cost is expanded once.
    */
   function daily(costs, from, to) {
-    var byDay = {}, marketingByDay = {}, byCategory = {}, totals = {};
-    var total = 0, marketing = 0;
-    days(from, to).forEach(function (d) { byDay[d] = 0; marketingByDay[d] = 0; });
+    var byDay = {}, marketingByDay = {}, capexByDay = {}, byCategory = {}, totals = {};
+    var total = 0, marketing = 0, capex = 0;
+    days(from, to).forEach(function (d) { byDay[d] = 0; marketingByDay[d] = 0; capexByDay[d] = 0; });
     CATEGORY_KEYS.forEach(function (k) { byCategory[k] = {}; totals[k] = 0; });
 
     (costs || []).forEach(function (c) {
       var amount = num(c && c.amount);
       if (!amount) return;
       var cat = CATEGORIES[c.category] ? c.category : 'OTHER';
-      var mk = isMarketing({ category: cat });
+      /* The whole row, not a reconstructed `{ category }` — the capex flag is
+         on the row, so testing a synthesised object would silently classify
+         every build cost as ordinary marketing again. */
+      var cap = isCapex(c);
+      var mk = isMarketing(c);
       occurrences(c, from, to).forEach(function (d) {
         byDay[d] = (byDay[d] || 0) + amount;
         byCategory[cat][d] = (byCategory[cat][d] || 0) + amount;
@@ -170,12 +222,24 @@ window.Costs = (function () {
           marketingByDay[d] = (marketingByDay[d] || 0) + amount;
           marketing += amount;
         }
+        if (cap) {
+          capexByDay[d] = (capexByDay[d] || 0) + amount;
+          capex += amount;
+        }
       });
     });
 
     return {
-      byDay: byDay, byCategory: byCategory, marketingByDay: marketingByDay,
-      totals: totals, total: total, marketing: marketing, other: total - marketing
+      byDay: byDay, byCategory: byCategory,
+      marketingByDay: marketingByDay, capexByDay: capexByDay,
+      totals: totals, total: total, marketing: marketing, capex: capex,
+      /* `other` is unchanged — everything that is not marketing — because it is
+         what the existing split reads and moving it would rewrite three charts
+         under their own labels. `operating` is the new axis: the cost of
+         RUNNING the app, marketing included, with the one-off builds taken out.
+         The two overlap on purpose and neither is a subset of the other. */
+      other: total - marketing,
+      operating: total - capex
     };
   }
 
@@ -320,6 +384,11 @@ window.Costs = (function () {
       spend: d.total,
       marketing: d.marketing,
       other: d.other,
+      /* One-off build cost, and everything else. See rule FOUR: this is the
+         split that keeps a $5,000 R&D month out of "what a customer costs"
+         without pretending the money was never spent. */
+      capex: d.capex,
+      operating: d.operating,
       byCategory: d.totals,
       grossRevenue: gross,
       netRevenue: net,
@@ -332,10 +401,22 @@ window.Costs = (function () {
       /* Fully loaded: the whole business divided by the paying customers it
          produced. The number that has to come down under revenue per customer
          for any of this to work. */
-      loadedCostPerPaid: sales ? d.total / sales : null,
+      /* OPERATING spend, not total — the run-rate cost of serving a paying
+         customer. A one-off build divided by this month's buyers is not what a
+         customer costs and gets worse the more product you build, so it is
+         reported beside this rather than inside it. */
+      loadedCostPerPaid: sales ? d.operating / sales : null,
+      capexPerPaid: sales && d.capex ? d.capex / sales : null,
       revenuePerInstall: downloads ? net / downloads : null,
       roas: d.marketing ? net / d.marketing : null,
-      margin: net ? ((net - d.total) / net) * 100 : null
+      margin: net ? ((net - d.total) / net) * 100 : null,
+      /* Profit and margin above are struck against TOTAL spend and always will
+         be: the money left the bank, and a profit figure you can improve by
+         spending more is not one. These two are the other half of the sentence
+         — is the app profitable to RUN, with the build treated as the
+         investment it is — and neither replaces the pair above. */
+      operatingProfit: net - d.operating,
+      operatingMargin: net ? ((net - d.operating) / net) * 100 : null
     };
   }
 
@@ -398,7 +479,7 @@ window.Costs = (function () {
     addMonthsFrom: addMonthsFrom,
     days: days,
     occurrences: occurrences,
-    isMarketing: isMarketing,
+    isMarketing: isMarketing, isCapex: isCapex,
     daily: daily,
     spend: spend,
     adCosts: adCosts,

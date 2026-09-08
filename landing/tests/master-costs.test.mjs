@@ -143,7 +143,7 @@ check('it does carry a read-only ad-spot table', !!$('csAdPerf'));
 $('btnEditData').click();
 await settle(200);
 check('Edit data is sectioned', [...window.document.querySelectorAll('#view-data .section-title')]
-  .map((n) => n.textContent).join('|') === 'Store data|Sales|Spending|What happened|Settings|Backup & account',
+  .map((n) => n.textContent).join('|') === 'Store data|Sales|Churn|Spending|What happened|Settings|Backup & account',
   [...window.document.querySelectorAll('#view-data .section-title')].map((n) => n.textContent).join('|'));
 check('every card under it is an accordion',
   [...window.document.querySelectorAll('#view-data .card')].every((c) => c.tagName === 'DETAILS'));

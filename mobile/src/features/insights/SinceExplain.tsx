@@ -134,7 +134,7 @@ export function SinceExplain({ since: initial, onAnchorChange }: {
       <View style={{ backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.card, padding: 16, marginBottom: 10 }}>
         <View style={{ alignItems: 'center', marginBottom: 4 }}>
           <ScoreGauge score={Math.round(since.nowScore)} color={color} marker={{ score: Math.round(since.thenScore) }}>
-            <Text style={{ fontSize: 44, fontWeight: '800', color: p.text, fontVariant: ['tabular-nums'], letterSpacing: -1, lineHeight: 48 }}>
+            <Text style={{ fontSize: 44, fontFamily: fonts.numHeavy, color: p.text, fontVariant: ['tabular-nums'], letterSpacing: -1, lineHeight: 48 }}>
               {Math.round(since.nowScore)}
             </Text>
             <Text style={{ fontSize: 10, fontWeight: '700', letterSpacing: 1, color: p.textDim, marginTop: -2 }}>

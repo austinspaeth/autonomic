@@ -7,10 +7,10 @@
  * the email allowlist below is the actual access control. Never remove it.
  *
  * Actions:
- *   LOAD           -> { entries, events, ads, costs, sales, links, settings, ui }
+ *   LOAD           -> { entries, events, ads, costs, sales, churn, links, settings, ui }
  *   SYNC           { upserts, deletes, settings, ui } -> applies a client diff
  *   LINKS_REPUBLISH-> rewrites every stored campaign page into the site bucket
- *   REPLACE_ALL    { entries, sales, settings } -> wipes and rewrites both
+ *   REPLACE_ALL    { entries, sales, churn, settings } -> wipes and rewrites all three
  *   PINGS          { since } -> the mobile app's cohort-ping counters
  *   STORE_VERSIONS { force } -> what is live in the App Store and on Play
  *   PUSH_KEY       -> { configured, publicKey } for background alerts
@@ -216,6 +216,29 @@ const cleanSale = (raw) => {
   return out;
 };
 
+/* One UNATTACHED churn event: revenue that stopped, with no purchase row
+   behind it. A store report says how many subscriptions ended and roughly what
+   they were worth and never says WHICH ones, so `cancelled` on a sale has
+   nothing to attach to — this is where that fact lives instead. `mrr` is the
+   monthly rate that stopped and is the only required field; `units`, `plan` and
+   `platform` are absent rather than defaulted when they are unknown, because a
+   dollar figure off a bank statement is not a claim about a headcount, a term
+   or a store. */
+const cleanChurn = (raw) => {
+  if (!raw || typeof raw !== 'object') return null;
+  const id = String(raw.id || '').slice(0, 64);
+  if (!id || !isIsoDate(raw.date)) return null;
+  const mrr = Number(raw.mrr);
+  if (!Number.isFinite(mrr)) return null;
+  const out = { id, date: raw.date, mrr: Math.max(0, mrr) };
+  if (PLATFORMS.includes(raw.platform)) out.platform = raw.platform;
+  out.plan = raw.plan === 'monthly' || raw.plan === 'annual' ? raw.plan : 'unknown';
+  const units = Number(raw.units);
+  if (Number.isFinite(units) && units > 0) out.units = Math.round(units);
+  if (raw.note) out.note = String(raw.note).slice(0, 2000);
+  return out;
+};
+
 const COST_CATEGORIES = ['ADS', 'CREATIVE', 'INFRA', 'TOOLS', 'FEES', 'SERVICES', 'HARDWARE', 'OTHER'];
 const RECURRENCES = ['weekly', 'monthly', 'quarterly', 'yearly'];
 const COST_NUMBERS = ['impressions', 'clicks', 'installs'];
@@ -238,6 +261,13 @@ const cleanCost = (raw) => {
   if (raw.label) out.label = String(raw.label).slice(0, 200);
   if (raw.note) out.note = String(raw.note).slice(0, 2000);
   if (raw.adId) out.adId = String(raw.adId).slice(0, 64);
+  /* A one-off build cost — R&D, hardware bought once, a contractor who built a
+     feature — as opposed to what the app costs to keep running. Orthogonal to
+     the category on purpose: a build arrives as HARDWARE, as SERVICES, as a
+     one-off TOOLS licence, so a category could not hold it. Stored only when
+     true, so a row that is not one is byte-identical to what older builds
+     wrote and the client's diff does not re-push every cost it has. */
+  if (raw.capex) out.capex = true;
   if (RECURRENCES.includes(raw.recurrence)) out.recurrence = raw.recurrence;
   if (out.recurrence && isIsoDate(raw.until)) out.until = raw.until;
   COST_NUMBERS.forEach((k) => {
@@ -308,6 +338,7 @@ const load = async (pk) => {
   const ads = [];
   const costs = [];
   const sales = [];
+  const churn = [];
   const links = [];
   let settings = { ...DEFAULT_SETTINGS };
   let ui = null;
@@ -332,6 +363,9 @@ const load = async (pk) => {
     } else if (typeof item.SK === 'string' && item.SK.startsWith('SALE#')) {
       const sale = cleanSale(item.sale || item);
       if (sale) sales.push(sale);
+    } else if (typeof item.SK === 'string' && item.SK.startsWith('CHURN#')) {
+      const c = cleanChurn(item.churn || item);
+      if (c) churn.push(c);
     } else if (typeof item.SK === 'string' && item.SK.startsWith('LINK#')) {
       const link = cleanLink(item.link || item);
       if (link) links.push(link);
@@ -346,6 +380,8 @@ const load = async (pk) => {
   // Sales ascend, unlike ads and costs: the ledger is a history read forwards
   // and every series built from it walks it in order.
   sales.sort((a, b) => (a.date === b.date ? a.id.localeCompare(b.id) : a.date.localeCompare(b.date)));
+  // Churn ascends with the sales it describes, for the same reason.
+  churn.sort((a, b) => (a.date === b.date ? a.id.localeCompare(b.id) : a.date.localeCompare(b.date)));
 
   entries.sort((a, b) => (a.date === b.date
     ? a.platform.localeCompare(b.platform)
@@ -355,7 +391,7 @@ const load = async (pk) => {
      and a creation order nobody can see is not an order. */
   links.sort((a, b) => a.slug.localeCompare(b.slug));
 
-  return { entries, events, ads, costs, sales, links, settings, ui };
+  return { entries, events, ads, costs, sales, churn, links, settings, ui };
 };
 
 const sync = async (pk, payload) => {
@@ -401,6 +437,7 @@ const sync = async (pk, payload) => {
     { prefix: 'AD', entityType: 'DASH_AD', field: 'ad', clean: cleanAd, ups: payload.adUpserts, dels: payload.adDeletes },
     { prefix: 'COST', entityType: 'DASH_COST', field: 'cost', clean: cleanCost, ups: payload.costUpserts, dels: payload.costDeletes },
     { prefix: 'SALE', entityType: 'DASH_SALE', field: 'sale', clean: cleanSale, ups: payload.saleUpserts, dels: payload.saleDeletes },
+    { prefix: 'CHURN', entityType: 'DASH_CHURN', field: 'churn', clean: cleanChurn, ups: payload.churnUpserts, dels: payload.churnDeletes },
   ];
   const idKeptCounts = {};
   idKeyed.forEach((kind) => {
@@ -498,6 +535,7 @@ const sync = async (pk, payload) => {
     adsUpserted: idKeptCounts.AD.upserted, adsDeleted: idKeptCounts.AD.deleted,
     costsUpserted: idKeptCounts.COST.upserted, costsDeleted: idKeptCounts.COST.deleted,
     salesUpserted: idKeptCounts.SALE.upserted, salesDeleted: idKeptCounts.SALE.deleted,
+    churnUpserted: idKeptCounts.CHURN.upserted, churnDeleted: idKeptCounts.CHURN.deleted,
     linksPublished: linkWrites.published, linksRemoved: linkWrites.removed,
     linksConfigured: linkWrites.configured,
   };
@@ -545,14 +583,21 @@ const replaceAll = async (pk, payload) => {
   const incomingSales = (Array.isArray(payload.sales) ? payload.sales : [])
     .map(cleanSale)
     .filter(Boolean);
+  /* The churn ledger goes with the sales it describes. Left behind by a wipe it
+     would floor an empty book's MRR at zero and report churn against nothing. */
+  const incomingChurn = (Array.isArray(payload.churn) ? payload.churn : [])
+    .map(cleanChurn)
+    .filter(Boolean);
 
   // Keys we're about to rewrite don't need deleting first.
   const keeping = new Set([
     ...incoming.map((e) => entrySk(e.date, e.platform)),
     ...incomingSales.map((s) => `SALE#${s.id}`),
+    ...incomingChurn.map((c) => `CHURN#${c.id}`),
   ]);
   const toDelete = existing
-    .filter((i) => typeof i.SK === 'string' && (i.SK.startsWith('ENTRY#') || i.SK.startsWith('SALE#')))
+    .filter((i) => typeof i.SK === 'string'
+      && (i.SK.startsWith('ENTRY#') || i.SK.startsWith('SALE#') || i.SK.startsWith('CHURN#')))
     .map((i) => i.SK)
     .filter((sk) => !keeping.has(sk));
 
@@ -560,7 +605,10 @@ const replaceAll = async (pk, payload) => {
     await writeBatches(toDelete.map((SK) => ({ DeleteRequest: { Key: { PK: pk, SK } } })));
   }
 
-  return sync(pk, { upserts: incoming, saleUpserts: incomingSales, settings: payload.settings });
+  return sync(pk, {
+    upserts: incoming, saleUpserts: incomingSales, churnUpserts: incomingChurn,
+    settings: payload.settings,
+  });
 };
 
 /* ------------------------------------------------------------ push devices
