@@ -537,6 +537,43 @@
       Math.abs(pts).toFixed(1) + ' pts</span>';
   }
 
+  /**
+   * The all-time-high badge, and the line under the number that backs it up.
+   *
+   * `A.dayRecord` decides whether there IS a record — every rule about what
+   * "ever" may mean lives there. This only says it, in two places at once,
+   * because the two have different jobs: the badge is the glance and the meta
+   * line is the evidence, and a badge with no stated previous best is a boast.
+   *
+   * The badge rides in the VALUE line rather than the meta, which is the one
+   * layout decision here. On a phone a tile is condensed to its label and its
+   * number and everything else folds away — including, by an explicit rule in
+   * the stylesheet, the delta. The badge deliberately survives that: "the best
+   * we have ever had" is the single thing on a stat tile worth seeing without
+   * opening it.
+   */
+  function athBadge(rec) {
+    if (!rec || !rec.isRecord) return '';
+    return '<span class="ath" title="Higher than any of the other ' +
+      fmtInt(rec.days) + ' days on record">ATH</span>';
+  }
+  /**
+   * The evidence, for the tile's meta line. `fmt` is the tile's own formatter,
+   * so the previous best is printed in the units the value above it is in.
+   *
+   * A record off a floor of NOTHING gets its own sentence. "Past 0 on Aug 20"
+   * is true and reads as nonsense — it names the day that happened to be first
+   * among a run of identical zeros, as though that day were the thing being
+   * beaten. What actually happened is that a number moved for the first time,
+   * and on the purchases tile that is a first sale, which deserves saying.
+   */
+  function athNote(rec, fmt) {
+    if (!rec || !rec.isRecord) return '';
+    if (!rec.best) return ' · best day yet — nothing on any day before it';
+    return ' · best day yet, past ' + (fmt || fmtInt)(rec.best) +
+      (rec.bestDay ? ' on ' + labelDay(rec.bestDay) : '');
+  }
+
   function tile(o) {
     var delta = deltaSpan(o.delta, o.invertDelta) || ptsSpan(o.deltaPts, o.invertDelta);
     /* The stacked comparisons under a day tile. A count on its own says
@@ -572,14 +609,22 @@
        is folded away — see `.cards.condensed` in styles.css and `toggleTile`
        below. One element to measure and one to animate; the desktop tile is
        unchanged, since the wrapper carries no styling of its own. */
-    var more = (o.meta ? '<div class="meta">' + o.meta + '</div>' : '') +
+    /* A record's evidence is appended to whatever the tile was already saying
+       about itself, rather than replacing it: the meta line is where a tile
+       explains its number, and "best day yet" is one more thing about it. */
+    var meta = (o.meta || '') + athNote(o.record, o.recordFmt);
+    var more = (meta ? '<div class="meta">' + meta + '</div>' : '') +
       deltas + split +
       (o.spark ? '<div style="margin-top:8px">' + o.spark + '</div>' : '');
 
-    return '<div class="card tile' + (more ? ' has-more' : '') + '">' +
+    /* The badge sits closest to the number, ahead of the delta: one of the two
+       is a comparison with yesterday and the other is a comparison with every
+       day there has ever been. */
+    var ath = athBadge(o.record);
+    return '<div class="card tile' + (more ? ' has-more' : '') + (ath ? ' is-ath' : '') + '">' +
       (more ? '<span class="tile-chev" aria-hidden="true">›</span>' : '') +
       '<div class="label">' + (o.color ? '<span class="swatch" style="background:' + o.color + '"></span>' : '') + esc(o.label) + '</div>' +
-      '<div class="value' + (o.smallValue ? ' small' : '') + '">' + o.value + (delta ? ' ' + delta : '') + '</div>' +
+      '<div class="value' + (o.smallValue ? ' small' : '') + '">' + o.value + ath + (delta ? ' ' + delta : '') + '</div>' +
       (more ? '<div class="tile-more">' + more + '</div>' : '') +
       '</div>';
   }
@@ -2082,6 +2127,43 @@
        the whole day was. */
     var activeStores = A.platformsOn(ix, ix.last);
 
+    /* ALL-TIME HIGHS, opt-in per tile.
+     *
+     * Every rule about what "ever" may mean is in `A.dayRecord`; this table is
+     * only which day series may carry the claim and what makes a day of it
+     * comparable. Opt-in rather than automatic, because a record is a
+     * CONGRATULATION and most numbers here are not the kind of thing to be
+     * congratulated on: "Active past the trial" hitting a high is a pile of
+     * people who did not convert, and a record iOS share is not good news, it
+     * is Android news. Both would wear the badge under any rule that simply
+     * looked for a maximum.
+     *
+     * Only the TODAY tiles are eligible, and that is the same restraint: their
+     * value is one day's number, which is the only thing "the best we have ever
+     * had" can be checked against without inventing a comparison. A range tile
+     * is a window aggregate — a record there would mean the best thirty-day
+     * window ever, which is a different claim needing a rolling sweep — and the
+     * lifetime tiles are pooled over cohorts and are not a day series at all.
+     *
+     * Two shapes of `comparable`. A counter's pre-ship days are excluded, or a
+     * history of false zeros would hand the badge to an ordinary day; and a
+     * RATE additionally needs a denominator worth dividing by, at the same
+     * `SMALL_COHORT` bar the rest of this module refuses to divide below —
+     * 100% measured on a day when one person opened the app is not a record,
+     * it is a small number. */
+    var bigEnough = function (known) {
+      return function (i, d) { return known(i, d) && A.activeOn(i, d) >= A.SMALL_COHORT; };
+    };
+    var recordOf = function (read, comparable) {
+      return A.dayRecord(ix, ix.last, read, { comparable: comparable });
+    };
+    var recActive = recordOf(A.activeOn);
+    var recFresh = recordOf(A.newOn);
+    var recBuys = recordOf(A.purchasesOn);
+    var recAct = recordOf(A.activationsOn, A.actKnown);
+    var recRead = recordOf(A.readingsOn, A.hrvKnown);
+    var recShare = recordOf(A.measureShare, bigEnough(A.hrvKnown));
+
     /* THREE HOSTS, THREE SCOPES, and the split is the point. These tiles used
        to be one wrapping row in which "Active on Aug 28", "Returning / day"
        (a range average) and "D7 retention" (every cohort that ever installed)
@@ -2107,27 +2189,31 @@
            that still has pre-marker installs in it. */
         split: [{ name: 'returning', color: PC.back, value: fmtInt(returningToday) },
                 { name: 'first run', color: PC.fresh, value: fmtInt(A.newOn(ix, ix.last)) }]
-          .concat(storeSplit(activeStores))
+          .concat(storeSplit(activeStores)),
+        record: recActive
       }),
       tile({
         label: 'Installs on ' + labelDay(ix.last), color: PC.fresh,
         value: fmtInt(A.newOn(ix, ix.last)),
         meta: 'first-run pings on the newest day' + storeSplitNote(ix, freshToday),
         deltas: dayDeltas(ix.last, days, function (d) { return A.newOn(ix, d); }),
-        split: storeSplit(freshToday)
+        split: storeSplit(freshToday),
+        record: recFresh
       }),
       tile({
         label: 'Purchases on ' + labelDay(ix.last), color: PC.subs, value: fmtInt(A.purchasesOn(ix, ix.last)),
         meta: 'subscribe pings on the newest day' + storeSplitNote(ix, A.subPlatformsOn(ix, ix.last)),
         deltas: dayDeltas(ix.last, days, function (d) { return A.purchasesOn(ix, d); }),
-        split: storeSplit(A.subPlatformsOn(ix, ix.last))
+        split: storeSplit(A.subPlatformsOn(ix, ix.last)),
+        record: recBuys
       }),
       tile({
         label: 'First readings on ' + labelDay(ix.last), color: PC.activation,
         value: fmtInt(A.activationsOn(ix, ix.last)),
         meta: 'installs that activated that day' + methodSplitNote(A.methodsOn(ix, ix.last)),
         deltas: dayDeltas(ix.last, days, function (d) { return A.activationsOn(ix, d); }),
-        split: methodSplit(A.methodsOn(ix, ix.last))
+        split: methodSplit(A.methodsOn(ix, ix.last)),
+        record: recAct
       }),
       /* The reading counter's own headline, beside the active one it is read
          against. Both are one-per-install-per-day, so the share underneath is a
@@ -2151,7 +2237,8 @@
            each install's FIRST reading that day and not everything it used —
            `hrvMethodKnown` keeps the line off a day whose builds predated the
            letter, where every reading would otherwise read as "no sensor". */
-        splitB: A.hrvMethodKnown(ix, ix.last) ? methodSplit(A.hrvMethodsOn(ix, ix.last)) : null
+        splitB: A.hrvMethodKnown(ix, ix.last) ? methodSplit(A.hrvMethodsOn(ix, ix.last)) : null,
+        record: recRead
       }),
       tile({
         label: 'Measured of active', color: PC.reading, smallValue: true,
@@ -2168,7 +2255,13 @@
            and a day heavy with regulars reach the same number for opposite
            reasons — and the gap between the two IS whether the wizard's first
            reading is landing. */
-        split: measureSplit(shareSplit)
+        split: measureSplit(shareSplit),
+        /* The one RATE that may hold a record, and the only one whose
+           comparable-day test has a second half: a day whose active count is
+           below `SMALL_COHORT` is left out of the history AND cannot claim the
+           badge, because the highest share this app has ever seen would
+           otherwise be the day two people opened it and one of them measured. */
+        record: recShare, recordFmt: fmtPct
       }),
       /* Both lifecycle counts are of installs active on the SAME newest day,
          split by where they are in their own life — a today number wearing an

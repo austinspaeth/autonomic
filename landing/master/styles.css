@@ -285,6 +285,26 @@ input[type="number"] { -moz-appearance: textfield; }
 .delta.down { color: var(--critical); }
 .delta.flat { color: var(--text-muted); }
 
+/* An all-time high. Outlined rather than filled: it sits beside the number
+   itself, and a solid block there competes with the one thing on the tile that
+   is meant to be read first. Green because it is unambiguously good news — the
+   same green a rising delta wears, since they are the same kind of statement at
+   two different distances. Deliberately NOT hidden on a condensed phone tile
+   the way the delta is (see below): "the best we have ever had" is the one
+   thing worth seeing without opening the tile. */
+.ath {
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--good);
+  border: 1px solid var(--good);
+  border-radius: 5px;
+  padding: 1px 4px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
 .swatch { width: 9px; height: 9px; border-radius: 3px; flex: none; display: inline-block; }
 
 /* ---------- condensed tiles (phones) ----------

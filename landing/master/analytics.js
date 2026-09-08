@@ -439,6 +439,16 @@ window.Analytics = (function () {
     var payAll = letter ? rowsToMap(report && report.pay, null) : pay;
     var payFirst = Object.keys(payAll).sort()[0] || null;
 
+    /* And the activation counter's, which had gone without one because nothing
+       divided by it: `activation` works over COHORTS, and a cohort born before
+       the route existed is excluded by `first` already. `dayRecord` is the
+       first thing to read activations as a DAY SERIES, and a day series needs
+       the birthday — a day before the route shipped reads as 0 activations,
+       which would depress the history a record is measured against and hand the
+       badge to an ordinary day. Unfiltered, for the reason above. */
+    var actAll = letter ? rowsToMap(report && report.act, null) : act;
+    var actFirst = Object.keys(actAll).sort()[0] || null;
+
     /* Each counter's own birthday, on the same rule and read UNFILTERED for the
        same reason: a route ships in a build, a build ships per store, and dating
        a counter off one platform's slice dates it off the wrong release. Days
@@ -495,7 +505,7 @@ window.Analytics = (function () {
       byKind: byKind, firstDay: firstDay,
       days: days, first: first, last: last,
       hrvFirst: hrvFirst, hrvMethodFirst: hrvMethodFirst,
-      payFirst: payFirst, tierFirst: tierFirst,
+      payFirst: payFirst, actFirst: actFirst, tierFirst: tierFirst,
       cohorts: cohorts,
       preTracking: Object.keys(older).sort(),
       /* What this index is a slice of: the filter in force, and the platform
@@ -1056,6 +1066,10 @@ window.Analytics = (function () {
    */
   function hrvKnown(ix, day) { return !!(ix.hrvFirst && day >= ix.hrvFirst); }
 
+  /** Was the activation counter running on `day`? The `hrvKnown` rule again,
+   *  and it exists for `dayRecord` — see `actFirst`. */
+  function actKnown(ix, day) { return !!(ix.actFirst && day >= ix.actFirst); }
+
   /**
    * The share of the installs active on `day` that took a reading.
    *
@@ -1196,6 +1210,93 @@ window.Analytics = (function () {
       out.push(r);
     }
     return out;
+  }
+
+  /* ------------------------------------------------------------- records
+
+     "Is this the best number we have ever had?" — one question, answered in one
+     place, for any day series a caller can express as a function. Adding a
+     record to a tile is a row at the call site, never a comparison written out
+     there. */
+
+  /**
+   * How much history a record needs before the word "ever" is honest.
+   *
+   * A fortnight, and the number is not arbitrary: traffic here swings by a
+   * third between a Sunday and a Wednesday (see `dayDeltas` in app.js), so two
+   * weeks is the shortest window holding two of every weekday. Below it a
+   * counter's own first days would all be records — the third day a route ever
+   * ran is the best day it ever had, trivially and uselessly.
+   */
+  var RECORD_MIN_DAYS = 14;
+
+  /**
+   * Is `day` the highest this series has ever been?
+   *
+   * `read(ix, d)` is the series and `opts.comparable(ix, d)` is the one gate:
+   * whether a day can be put beside the others at all. It carries two jobs on
+   * purpose, because they are the same question — a day before the counter
+   * shipped is not comparable, and neither is a day whose denominator is too
+   * small to divide by. Both would otherwise be read as a low number, and a
+   * history full of false lows hands the badge to an ordinary day.
+   *
+   * The rules, each of which exists because its absence makes the badge lie:
+   *
+   * — ALL TIME IS ALL TIME, not this range. The sweep is over `ix.days`, the
+   *   whole index, and the date range on screen does not enter into it. Scoped
+   *   to the range, a seven-day view would call most of its days records.
+   *
+   * — THE PLATFORM FILTER DOES SCOPE IT, because `ix` is already that slice.
+   *   The badge has to be about the same population as the number wearing it,
+   *   so on an iOS view it means the best iOS day, which is a real claim.
+   *
+   * — EVERY OTHER DAY, not just the earlier ones. The tiles show the newest day
+   *   and for that day the two are identical, but "no other day was higher" is
+   *   true whichever day is being shown, where "was a record when it happened"
+   *   is a weaker claim wearing the same word.
+   *
+   * — STRICTLY GREATER, so a tie is not a record. A plateau would otherwise tag
+   *   every day of itself and the badge would stop meaning anything; the first
+   *   day to reach the height keeps it.
+   *
+   * — NOT ON NOTHING. A series that has never moved sits at zero on every day,
+   *   and zero is not a record however long it has been the maximum.
+   *
+   * — ENOUGH HISTORY, or no claim: `RECORD_MIN_DAYS` comparable days besides
+   *   this one. `days` is returned so a caller can say why it is silent.
+   *
+   * A partial day can hold a record and that is deliberate, not an oversight.
+   * The newest day is still running, so its number can only grow — a day that
+   * is already above every complete day is genuinely above them, and the tag
+   * can never have to be taken back.
+   */
+  function dayRecord(ix, day, read, opts) {
+    opts = opts || {};
+    var ok = opts.comparable || function () { return true; };
+    var minDays = opts.minDays === undefined ? RECORD_MIN_DAYS : opts.minDays;
+    var num = function (v) {
+      return (v === null || v === undefined || !isFinite(v)) ? null : v;
+    };
+    if (!day || !ok(ix, day)) return null;
+    var value = num(read(ix, day));
+    if (value === null) return null;
+
+    var best = null, bestDay = null, against = 0;
+    (ix.days || []).forEach(function (d) {
+      if (d === day || !ok(ix, d)) return;
+      var v = num(read(ix, d));
+      if (v === null) return;
+      against += 1;
+      if (best === null || v > best) { best = v; bestDay = d; }
+    });
+
+    return {
+      value: value,
+      best: best, bestDay: bestDay,
+      days: against,
+      enough: against >= minDays,
+      isRecord: against >= minDays && value > 0 && best !== null && value > best
+    };
   }
 
   /** One day's platform split, `{ I: n, A: n, U: n }`, ALWAYS unfiltered. */
@@ -2127,8 +2228,12 @@ window.Analytics = (function () {
     activationsOn: activationsOn, actCountOn: actCountOn, actPlatformsOn: actPlatformsOn,
     readingsOn: readingsOn, hrvCountOn: hrvCountOn, hrvPlatformsOn: hrvPlatformsOn,
     hrvMethodsOn: hrvMethodsOn, hrvMethodsOver: hrvMethodsOver, hrvMethodKnown: hrvMethodKnown,
-    hrvKnown: hrvKnown, measureShare: measureShare, measureShareSplit: measureShareSplit,
+    hrvKnown: hrvKnown, actKnown: actKnown,
+    measureShare: measureShare, measureShareSplit: measureShareSplit,
     measureRate: measureRate,
+
+    // records — "the best number we have ever had", for any day series
+    dayRecord: dayRecord, RECORD_MIN_DAYS: RECORD_MIN_DAYS,
     measuringAt: measuringAt, measuringCurve: measuringCurve,
     methodsOn: methodsOn, methodsOver: methodsOver,
     hrvMethodsOn: hrvMethodsOn, hrvMethodsOver: hrvMethodsOver,

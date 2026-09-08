@@ -548,6 +548,42 @@ the UI, each of them deliberate:
   Apple Watch is offered on iPhone only, so its share of a combined view is a
   share of a population half of which was never offered it — the card says so
   under the chart, and the filter is how to read it honestly.
+- **A day tile can wear an `ATH` badge, and it is opt-in.** `A.dayRecord`
+  answers "is this the best number we have ever had" for any day series a caller
+  can express as a function, and every rule that stops the badge lying lives
+  there. **All time is all time, not the range on screen** — the sweep is over
+  the whole index, or a seven-day view would call most of its days records —
+  though the platform filter does scope it, because `ix` is already that slice
+  and the badge has to be about the same population as the number wearing it.
+  It compares against **every other day**, not just the earlier ones, so a day
+  beaten later cannot keep the word; it is **strictly greater**, so matching the
+  best day is a tie and not a high (a plateau would otherwise tag every day of
+  itself); zero is never a record; and it wants `RECORD_MIN_DAYS` — a fortnight,
+  two of every weekday on a series that swings by a third between a Sunday and a
+  Wednesday — of comparable days before "ever" means anything. `comparable` is
+  ONE gate doing two jobs because they are the same question: a day before the
+  counter shipped is not comparable (a history of false zeros hands the badge to
+  an ordinary day) and neither is a rate's day whose denominator is under
+  `SMALL_COHORT` — the highest share this app has ever seen must not be the day
+  two people opened it and one of them measured. A partial day CAN hold a
+  record, deliberately: today is still running so its number can only grow, and
+  a day already above every complete one is genuinely above them.
+  Only the **Today** tiles are eligible, and only by opting in. A range tile is
+  a window aggregate, where a record would mean the best thirty-day window ever
+  — a different claim needing a rolling sweep — and the lifetime tiles are
+  pooled over cohorts and are not a day series at all. Opt-in rather than
+  automatic because a record is a CONGRATULATION, and a record iOS share is not
+  good news but Android news, while a record pile of installs past the trial is
+  a pile of people who did not convert; both would wear the badge under any rule
+  that simply looked for a maximum. The badge rides in the value line rather
+  than the meta, so it survives the phone's condensed tile where the delta is
+  hidden, and the meta line carries the evidence — a badge with no stated
+  previous best is a boast. A record off a floor of nothing gets its own
+  sentence rather than "past 0 on Aug 20", which names whichever day happened to
+  be first among a run of zeros as though it were the thing beaten.
+  Pinned by `landing/tests/master-records.test.mjs`, which is its own file
+  because every other App usage fixture is a handful of days built to pin some
+  other arithmetic exactly, and this needs a fortnight.
 - **Measuring has its own card, and its own pair of curves.** The **Opened vs
   measured** card charts actives and readings on one axis per day (a gap in the
   reading line where the counter had not shipped, never a zero), with the
