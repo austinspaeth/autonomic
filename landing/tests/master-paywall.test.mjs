@@ -315,6 +315,52 @@ check('the funnel splits by sensor',
 
 /* --------------------------------------------------------------- offers */
 
+/* The card's two headline tiles: how many were RAISED, and how many were
+   TAKEN. Two tiles rather than one with a rate on it, because they answer
+   different questions — the first is a fact about the app's own pacing, the
+   second a fact about the people — and the rate between them lives in the
+   funnel rows below, over enough cards to carry a decimal point. */
+const offerTiles = [...$('pgOfferTiles').querySelectorAll('.tile')].map((el) => ({
+  label: el.querySelector('.label').textContent.trim(),
+  value: el.querySelector('.value').textContent.trim(),
+  meta: (el.querySelector('.meta') || { textContent: '' }).textContent.replace(/\s+/g, ' ').trim(),
+  splits: [...el.querySelectorAll('.split')].map((s) => s.textContent.replace(/\s+/g, ' ').trim()),
+}));
+const raised = offerTiles.find((t) => t.label === 'Offers raised');
+const taken = offerTiles.find((t) => t.label === 'Offers accepted');
+
+/* Every card raised, the one with the unreadable letter included: the tile is
+   the route pooled, so it must agree with the bars and the day table rather
+   than with the two offers the app currently knows how to name. */
+check('the raised tile counts every offer the route carried',
+  raised && raised.value === '12', raised && raised.value);
+
+/* TWO split rows, not one. What became of these cards and who they were raised
+   in front of are two partitions of the same count, and run together they read
+   as one list of six things that sums to nothing. */
+check('the raised tile splits by outcome and by platform, on separate rows',
+  raised.splits.length === 2, JSON.stringify(raised.splits));
+check('the outcome row adds back up to the cards raised',
+  /accepted 3/.test(raised.splits[0]) && /dismissed 3/.test(raised.splits[0]) &&
+  /ignored 6/.test(raised.splits[0]), raised.splits[0]);
+check('and the platform row says which store they were raised on',
+  /iOS 7/.test(raised.splits[1]) && /Android 5/.test(raised.splits[1]), raised.splits[1]);
+
+/* The accepted tile splits by OFFER TYPE and only that. The two cards are
+   aimed at different people — one whose access lapsed months ago, one who has
+   just been convinced — so which is actually being bought is the whole
+   question, and a second row underneath would answer a quieter one at the same
+   volume. */
+check('the accepted tile counts the buy-button taps', taken && taken.value === '3', taken && taken.value);
+check('and splits them by which offer was taken, and only that',
+  taken.splits.length === 1 && /Half-off annual 2/.test(taken.splits[0]) &&
+  /Founding member 1/.test(taken.splits[0]), JSON.stringify(taken.splits));
+
+/* The distinction that must survive any rewording, on the tile as much as in
+   the note below it. */
+check('the accepted tile does not call a tap a purchase',
+  /not a completed purchase/.test(taken.meta), taken.meta);
+
 check('the offer card drew a band per outcome', $('pgOffers').querySelectorAll('path, rect').length > 0);
 
 /* The chart is now about WHAT HAPPENED rather than which card was raised: the

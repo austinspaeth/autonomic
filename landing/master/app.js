@@ -3463,8 +3463,92 @@
     { key: 'ignored', name: 'Ignored', color: COLOR.muted }
   ];
 
+  /**
+   * The two headline numbers of the offers card: how many were RAISED, and how
+   * many were TAKEN.
+   *
+   * Two tiles rather than one with a rate on it, because they answer different
+   * questions and the second is not a property of the first. How many offers
+   * the app put in front of people is a fact about the app's own pacing — the
+   * shared 7-day cool-down, the annual milestones, the founding-member card's
+   * single day — and how many were accepted is a fact about the people. The
+   * rate between them is in the funnel rows below, per offer, where it is over
+   * enough cards to carry a decimal point.
+   *
+   * Each tile's splits are the ones its own number divides by:
+   *
+   *   RAISED  splits by OUTCOME, which is what became of these very cards, and
+   *           by PLATFORM, which is who they were raised in front of. Two rows,
+   *           because they are two partitions of one count and run together
+   *           they read as one list of six things that sums to nothing.
+   *
+   *   TAKEN   splits by OFFER TYPE, and only that. The two cards are aimed at
+   *           different people — one whose access lapsed months ago, one who
+   *           has just been convinced — so which of them is actually being
+   *           bought is the whole question, and a platform row underneath would
+   *           be answering a quieter one at the same volume.
+   */
+  function renderOfferTiles(ix, days) {
+    var host = document.getElementById('pgOfferTiles');
+    if (!host) return;
+    var all = A.offerFunnel(ix, days, null);
+    if (!all.shown && !all.accepted) { host.innerHTML = ''; return; }
+
+    /* The outcomes as tile parts. They are a partition of `shown` — unless the
+       range caught a card raised on its last evening and answered after
+       midnight, which `settled` is the check for; the note says so rather than
+       letting three numbers quietly overrun the one above them. */
+    var outcomeSplit = OUTCOME.map(function (o) {
+      return { name: o.name.toLowerCase(), color: o.color, value: fmtInt(all[o.key]) };
+    });
+    var shownStores = A.kindPlatformsOver(ix, 'osh', days);
+    var takenStores = A.kindPlatformsOver(ix, 'oac', days);
+
+    /* Which offer was taken. Ordered by the route's own alphabet rather than by
+       size, the same rule every split on this page follows — a colour that
+       moves with rank is a colour that means nothing. */
+    var typeSplit = A.slotOrder('oac').filter(function (k) {
+      return A.slotOver(ix, 'oac', days, k) > 0;
+    }).map(function (k) {
+      return {
+        name: A.slotName('oac', k), color: OFFER_COLOR[k],
+        value: fmtInt(A.slotOver(ix, 'oac', days, k))
+      };
+    });
+
+    host.innerHTML = [
+      tile({
+        label: 'Offers raised', color: ENTITY.sales, value: fmtInt(all.shown),
+        meta: 'cards put in front of somebody, across ' + fmtInt(days.length) + ' day' +
+          (days.length === 1 ? '' : 's') +
+          rangeTrendNote(ix, days, function (d) {
+            return A.kindKnown(ix, 'osh', d) ? A.eventsOn(ix, 'osh', d) : null;
+          }) +
+          storeSplitNote(ix, shownStores) +
+          (all.settled ? ''
+            : ' · more were answered than raised in this window, so ignored is a floor rather ' +
+              'than a count — a card raised the evening before the range began, answered inside it'),
+        split: outcomeSplit,
+        splitB: storeSplit(shownStores)
+      }),
+      tile({
+        label: 'Offers accepted', color: COLOR.green, value: fmtInt(all.accepted),
+        /* The one line this tile must never lose: an accept is a tap on the
+           card's buy button and not a purchase. The subscribe counter is where
+           money is counted and the gap between them is the store sheet. */
+        meta: 'buy button tapped — not a completed purchase, which is the subscribe counter' +
+          rangeTrendNote(ix, days, function (d) {
+            return A.kindKnown(ix, 'oac', d) ? A.eventsOn(ix, 'oac', d) : null;
+          }) +
+          storeSplitNote(ix, takenStores),
+        split: typeSplit
+      })
+    ].join('');
+  }
+
   function renderOffers(ix, days) {
     var letters = ['A', 'F'].filter(function (k) { return A.slotOver(ix, 'osh', days, k) > 0; });
+    renderOfferTiles(ix, days);
 
     /* WHAT HAPPENED, per day, rather than how many cards were raised. The three
        bands sum to the day's shows, so the stack's height is still the old

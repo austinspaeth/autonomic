@@ -686,6 +686,20 @@ window.Analytics = (function () {
    *  route uses, which is why the per-letter routes are worth reading this way
    *  and never by their total. */
   function slotOn(ix, kind, day, letter) { return slotsOn(ix, kind, day)[letter] || 0; }
+  /**
+   * Any route's platform split on `day`, ALWAYS unfiltered.
+   *
+   * The generic twin of `platformsOn` / `subPlatformsOn` / `actPlatformsOn`,
+   * and unfiltered for the same reason all three are: a split is the whole
+   * day's, whatever slice the number above it is. On a filtered view the parts
+   * therefore will not add to the value they sit under, which is what
+   * `storeSplitNote` in app.js exists to disclose.
+   */
+  function kindPlatformsOn(ix, kind, day) { return kindOn(ix, kind, day).platforms || {}; }
+  /** The same split pooled over a set of days. */
+  function kindPlatformsOver(ix, kind, days) {
+    return poolMethods(function (i, d) { return kindPlatformsOn(i, kind, d); }, ix, days);
+  }
   function slotOver(ix, kind, days, letter) {
     return (days || []).reduce(function (a, d) {
       return a + (kindKnown(ix, kind, d) ? slotOn(ix, kind, d, letter) : 0);
@@ -778,17 +792,37 @@ window.Analytics = (function () {
    * `answered` is what the two responses sum to, and it is deliberately NOT
    * assumed to be `shown`: an offer that is neither accepted nor dismissed was
    * ignored, which is a third outcome and the most common one.
+   *
+   * With no letter it pools the route, on the same terms and with the same
+   * caveat `offerDay` carries: a per-letter route's total is not a headcount of
+   * PEOPLE, and nothing may divide by it as though it were. It is legitimate
+   * here because these are counts of CARDS, and "how many offers did the app
+   * raise" is a question about cards.
    */
   function offerFunnel(ix, days, letter) {
-    var shown = slotOver(ix, 'osh', days, letter);
-    var dismissed = slotOver(ix, 'odm', days, letter);
-    var accepted = slotOver(ix, 'oac', days, letter);
+    var over = function (kind) {
+      if (letter) return slotOver(ix, kind, days, letter);
+      return (days || []).reduce(function (a, d) {
+        return a + (kindKnown(ix, kind, d) ? eventsOn(ix, kind, d) : 0);
+      }, 0);
+    };
+    var shown = over('osh');
+    var dismissed = over('odm');
+    var accepted = over('oac');
     return {
       available: shown > 0,
       shown: shown,
       dismissed: dismissed,
       accepted: accepted,
       ignored: Math.max(0, shown - dismissed - accepted),
+      /* `offerDay.settled`, over a window. The crossings that make a single
+         day's arithmetic fail — a card raised in the evening and answered after
+         midnight — cancel out inside a range and survive only at its two edges,
+         so this is almost always true and is worth checking exactly because of
+         that: where it is false, `ignored` is a clamp and the three outcomes do
+         not add up to `shown`. Anything printing them as a partition has to
+         say so. */
+      settled: dismissed + accepted <= shown,
       acceptPct: shown ? (accepted / shown) * 100 : null,
       dismissPct: shown ? (dismissed / shown) * 100 : null
     };
@@ -2245,6 +2279,7 @@ window.Analytics = (function () {
     // the generic counters — any route by name
     eventsOn: eventsOn, slotsOn: slotsOn, slotsOver: slotsOver,
     slotOn: slotOn, slotOver: slotOver,
+    kindPlatformsOn: kindPlatformsOn, kindPlatformsOver: kindPlatformsOver,
     kindKnown: kindKnown, isHeadcount: isHeadcount,
     shareOfActive: shareOfActive, slotShare: slotShare,
     captureFunnel: captureFunnel, offerFunnel: offerFunnel,

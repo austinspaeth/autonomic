@@ -384,7 +384,26 @@ store sheet — abandoned, or declined. Calling this "converted" would close tha
 gap silently. The third outcome is the common one: an offer neither accepted nor
 dismissed was **ignored**, and the card counts it rather than leaving it implied.
 
-The card is drawn **by outcome, not by offer**: the bars stack accepted /
+The card leads with **two tiles, not one with a rate on it**. *Offers raised* is
+a fact about the app's own pacing — the shared 7-day cool-down, the annual
+milestones at 30/90/180/365 days, the founding-member card's single day — and
+*Offers accepted* is a fact about the people; the rate between them lives in the
+funnel rows below, per offer, where it is over enough cards to carry a decimal
+point. Raised carries **two split rows**, outcome and platform, because they are
+two partitions of the same count and run together they read as one list of six
+things that sums to nothing; the platform row is unfiltered like every store
+split here, so `storeSplitNote` discloses the gap on a sliced view. Accepted
+carries **one**, the offer type, and deliberately no second: the two cards are
+aimed at different people — one whose access lapsed months ago, one who has just
+been convinced — so which is actually being bought is the whole question, and a
+platform row underneath would answer a quieter one at the same volume. Both tiles
+read the route POOLED (`offerFunnel` with no letter, `kindPlatformsOver`), which
+is legal for the reason `offerDay` states: these are counts of CARDS, and a
+per-letter route's total is not a headcount of people, so nothing divides by it.
+Where a window's answers outnumber its shows, `offerFunnel.settled` is false, the
+three outcomes stop being a partition, and the tile says so.
+
+The chart is drawn **by outcome, not by offer**: the bars stack accepted /
 dismissed / ignored per day, so the stack's height is still the day's shows and
 the split inside it is the answer. They are BARS rather than the areas this page
 uses elsewhere, because offers are a handful of discrete cards on a handful of
