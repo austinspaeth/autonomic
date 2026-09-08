@@ -1195,15 +1195,24 @@ Device builds ship via EAS — see `mobile/EAS_UPDATE.md` and the workflows in
 **Android release builds are minified.** `enableProguardInReleaseBuilds` +
 `enableShrinkResourcesInReleaseBuilds` are on in `expo-build-properties`, so R8
 shrinks and obfuscates every release (dex 42 MB → 13 MB, 5 dex files → 2).
-Consequences worth remembering: keep rules for anything reached by reflection or
-from C++ live in the same `extraProguardRules` block in `app.json` (libraries
+Consequences worth remembering: keep rules for anything reached by reflection,
+from C++, **or by NAME from another process** live in the same
+`extraProguardRules` block in `app.json` (libraries
 that ship their own `consumerProguardFiles` need no entry — expo,
 expo-modules-core, expo-updates, reanimated, svg, health-connect,
-openiap-google); `plugins/withR8Memory.js` raises the Gradle heap because R8
+openiap-google). That third category is the one that does not look like a
+minification problem: a Parcelable arriving in an Intent EXTRA is resolved by
+its class-name string through our ClassLoader, so a renamed class throws
+`BadParcelableException` inside the library's own `BroadcastReceiver`, on the
+main thread, where no `catch` of ours can reach it. It is why
+`com.garmin.android.connectiq.**` is kept — Garmin Connect answers the Connect
+IQ SDK by broadcast, while the outbound AIDL call is name-independent (typed
+`CREATOR`), so the device list worked and only the REPLY killed the app.
+`plugins/withR8Memory.js` raises the Gradle heap because R8
 OOMs at the template's 2 GB; release stack traces are obfuscated, but AGP embeds
 the mapping in the AAB itself
 (`BUNDLE-METADATA/com.android.tools.build.obfuscation/proguard.map`), so Play
 deobfuscates crashes with no upload step. **A green build proves nothing here** —
 a missing keep rule fails at
 runtime, so launch the minified APK and exercise BLE / camera / Health Connect /
-IAP / widgets before shipping.
+IAP / widgets / the Garmin setup card before shipping.
