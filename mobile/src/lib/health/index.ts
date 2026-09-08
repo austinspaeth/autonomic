@@ -225,6 +225,9 @@ export interface WatchHrvSample {
   startMs: number;
   endMs: number;
   rr: number[];         // beat-to-beat RR (ms)
+  /** Indices into `rr` where the series resumed after a dropout the watch
+   *  flagged. Empty on a continuous take. */
+  segmentStarts: number[];
   sourceName: string;   // e.g. "Apple Watch"
 }
 
@@ -399,16 +402,32 @@ const isOwnSample = (rev?: SourceRev): boolean => {
   return b === OWN_BUNDLE || /autonomic/i.test(nm);
 };
 
-/** RR intervals (ms) from a heartbeat series; drops beats flagged after a gap. */
-const rrFromSeries = (hb: HeartbeatSeries): number[] => {
+/**
+ * RR intervals (ms) from a heartbeat series, WITH the seams marked.
+ *
+ * The watch flags a beat it lost track of (`precededByGap`), and the interval
+ * spanning that gap is not a real RR. Dropping it is right; concatenating the
+ * survivors as if they were one take is not — `computeHrv` then runs Welch over
+ * a tachogram stitched across the dropouts and reads the seams as spectral
+ * content, the exact artifact the camera path builds `segmentStarts` to avoid.
+ * So return the boundaries too: every caller passes them straight through, and
+ * a gappy watch reading gets its frequency domain from its longest unbroken
+ * stretch, the same as a camera one.
+ */
+const rrFromSeries = (hb: HeartbeatSeries): { rr: number[]; segmentStarts: number[] } => {
   const beats = hb.heartbeats || [];
   const rr: number[] = [];
+  const segmentStarts: number[] = [];
+  let broken = false; // the next kept interval begins a new segment
   for (let i = 1; i < beats.length; i++) {
-    if (beats[i].precededByGap) continue;
+    if (beats[i].precededByGap) { broken = true; continue; }
     const dt = (beats[i].timeSinceSeriesStart - beats[i - 1].timeSinceSeriesStart) * 1000;
-    if (dt > 250 && dt < 2500) rr.push(dt);
+    if (dt <= 250 || dt >= 2500) { broken = true; continue; }
+    if (broken && rr.length) segmentStarts.push(rr.length);
+    broken = false;
+    rr.push(dt);
   }
-  return rr;
+  return { rr, segmentStarts };
 };
 
 const QID = {
@@ -634,9 +653,9 @@ function makeReal(mod: HkModule): HealthApi {
       try {
         const series = (await mod.queryHeartbeatSeriesSamples?.({ from, to, limit: 100 })) || [];
         for (const hb of series) {
-          const rr = rrFromSeries(hb);
+          const { rr, segmentStarts } = rrFromSeries(hb);
           if (rr.length < 20) continue;
-          const res = computeHrv(rr);
+          const res = computeHrv(rr, { segmentStarts });
           if (!res.time || !Object.keys(res.fields).length) continue;
           hrvSeriesTimes.push(hb.startDate.getTime());
           out.push({ type: 'hrv', time: hhmm(hb.startDate), startMs: hb.startDate.getTime(), ownApp: isOwnSample(hb.sourceRevision), fields: res.fields, rr, rrClean: res.rrClean });
@@ -699,10 +718,10 @@ function makeReal(mod: HkModule): HealthApi {
       try {
         const series = (await mod.queryHeartbeatSeriesSamples?.({ from, to, limit: LIMIT })) || [];
         for (const hb of series) {
-          const rr = rrFromSeries(hb);
+          const { rr, segmentStarts } = rrFromSeries(hb);
           if (rr.length < 20) continue;
           if (rr.reduce((s, v) => s + v, 0) < HISTORY_HRV_MIN_MS) continue;
-          const res = computeHrv(rr);
+          const res = computeHrv(rr, { segmentStarts });
           if (!res.time || !Object.keys(res.fields).length) continue;
           out.readings.push({
             type: 'hrv', time: hhmm(hb.startDate), startMs: hb.startDate.getTime(),
@@ -793,12 +812,13 @@ function makeReal(mod: HkModule): HealthApi {
         const out: WatchHrvSample[] = [];
         for (const hb of series) {
           if (isOwnSample(hb.sourceRevision)) continue;
-          const rr = rrFromSeries(hb);
+          const { rr, segmentStarts } = rrFromSeries(hb);
           if (rr.length < 20) continue;
           out.push({
             startMs: hb.startDate.getTime(),
             endMs: hb.endDate.getTime(),
             rr,
+            segmentStarts,
             sourceName: hb.sourceRevision?.source?.name || 'Apple Watch',
           });
         }

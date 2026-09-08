@@ -483,8 +483,20 @@ const r0 = (v: number) => Math.round(v);
  * only averages fewer segments (8 at 300 s vs 6 at 240 s), so VLF is slightly
  * noisier, not coarser.
  */
-const MIN_SEC_LFHF = 120;
-const MIN_SEC_VLF = 240;
+export const MIN_SEC_LFHF = 120;
+export const MIN_SEC_VLF = 240;
+
+/** What a record of `sec` seconds of clean beats will be able to resolve.
+ *  'full' carries every metric, 'noVlf' loses VLF power (and with it the day
+ *  score's VLF component), 'timeOnly' carries no frequency domain at all — a
+ *  reading that cannot say anything about Total power, VLF or LF peak. Kept
+ *  next to the floors so nothing has to restate 120/240 at a call site. */
+export type ReadingCompleteness = { grade: 'full' | 'noVlf' | 'timeOnly'; label: string; short: string };
+export function readingCompleteness(sec: number): ReadingCompleteness {
+  if (sec >= MIN_SEC_VLF) return { grade: 'full', label: 'Full metrics', short: 'Full' };
+  if (sec >= MIN_SEC_LFHF) return { grade: 'noVlf', label: 'Too short for VLF power', short: 'No VLF' };
+  return { grade: 'timeOnly', label: 'Too short for frequency metrics', short: 'No frequency metrics' };
+}
 /** A stable reading needs a floor of clean beats behind its statistics. */
 const MIN_CLEAN_BEATS = 30;
 /** Fraction of the attempted reading that must survive cleaning to be trusted. */
@@ -536,9 +548,14 @@ export function computeHrv(
   const durationSec = opts.durationSec ?? coverageSec;
   const noisy = artifactPct > maxArt;
   const tooFew = clean.length < MIN_CLEAN_BEATS;
-  // Only a segmented (live camera) capture knows its own wall-clock gaps, so
-  // only it can be judged on coverage. An imported series has no such notion.
-  const thin = segmented && durationSec > 0 && coverageSec / durationSec < MIN_COVERAGE_RATIO;
+  // Only a live camera capture knows its own wall-clock gaps, so only it can be
+  // judged on coverage. An imported series has no such notion — and a watch
+  // heartbeat series became `segmented` the moment rrFromSeries started
+  // reporting its dropouts honestly, so charging it this check would REJECT
+  // exactly the gappy Mindfulness sessions the segmentation was added to score
+  // properly. Those degrade through `confidence` instead (coverageRatio feeds
+  // it below), which is a caveat on a reading rather than the loss of one.
+  const thin = segmented && opts.source === 'camera' && durationSec > 0 && coverageSec / durationSec < MIN_COVERAGE_RATIO;
   if (!time || !freq || tooFew) {
     const reason = tooFew && time
       ? 'Not enough clean beats to compute HRV. Try a longer, steadier reading.'

@@ -7,7 +7,7 @@
  */
 import {
   computeHrv, correctArtifacts, fft, frequencyDomain,
-  parseHeartRateMeasurement, repairBeats, resampleTachogram, splitSegments, std,
+  parseHeartRateMeasurement, readingCompleteness, repairBeats, resampleTachogram, splitSegments, std,
   timeDomain, timeDomainSegments,
 } from '../index';
 
@@ -409,5 +409,93 @@ describe('segment triage and coverage', () => {
     expect(r.confidence).toBe('high');
     expect(r.segmentsUsed).toBe(1);
     expect(r.segmentsDropped).toBe(0);
+  });
+});
+
+describe('the frequency cliff, by nominal session length', () => {
+  /** `sec` seconds of clean beats at ~75 bpm with LF/HF/VLF content in them. */
+  const secondsOf = (sec: number) => {
+    const rr: number[] = [];
+    let t = 0;
+    while (t < sec) {
+      const v = 800 + 25 * Math.sin(2 * Math.PI * 0.25 * t) + 20 * Math.sin(2 * Math.PI * 0.1 * t);
+      rr.push(v);
+      t += v / 1000;
+    }
+    return rr;
+  };
+
+  // The measured cliff from the support case: a reading is not "short" or
+  // "fine", it is one of three records, and only the last one can carry the
+  // four structured components of the day score.
+  it.each([60, 90, 118])('%ss resolves no frequency domain at all', (sec) => {
+    const f = computeHrv(secondsOf(sec)).fields;
+    expect(f.rmssd).toBeDefined();
+    expect(f.lowPower).toBeUndefined();
+    expect(f.vlowPower).toBeUndefined();
+  });
+
+  it.each([120, 180, 239])('%ss resolves LF/HF but not VLF', (sec) => {
+    const f = computeHrv(secondsOf(sec)).fields;
+    expect(f.lowPower).toBeDefined();
+    expect(f.highPower).toBeDefined();
+    expect(f.vlowPower).toBeUndefined();
+  });
+
+  it.each([240, 300])('%ss resolves everything', (sec) => {
+    const f = computeHrv(secondsOf(sec)).fields;
+    expect(f.lowPower).toBeDefined();
+    expect(f.vlowPower).toBeDefined();
+  });
+
+  it('readingCompleteness answers the same question without running the pipeline', () => {
+    expect(readingCompleteness(90).grade).toBe('timeOnly');
+    expect(readingCompleteness(119.9).grade).toBe('timeOnly');
+    expect(readingCompleteness(120).grade).toBe('noVlf');
+    expect(readingCompleteness(239).grade).toBe('noVlf');
+    expect(readingCompleteness(240).grade).toBe('full');
+    expect(readingCompleteness(300).grade).toBe('full');
+  });
+});
+
+describe('a gappy watch series is segmented, not stitched', () => {
+  const seg = (sec: number, phase: number) => {
+    const rr: number[] = [];
+    let t = phase;
+    while (t < phase + sec) {
+      const v = 850 + 30 * Math.sin(2 * Math.PI * 0.25 * t) + 20 * Math.sin(2 * Math.PI * 0.1 * t);
+      rr.push(v);
+      t += v / 1000;
+    }
+    return rr;
+  };
+  // A 5-minute Mindfulness session the watch lost track of twice: 260 s, then
+  // 70 s, then 60 s. Wall clock is 300 s in HealthKit either way.
+  const a = seg(260, 0), b = seg(70, 500), c = seg(60, 900);
+  const rr = [...a, ...b, ...c];
+  const segmentStarts = [a.length, a.length + b.length];
+
+  it('takes the frequency domain from the longest segment, not the concatenation', () => {
+    const r = computeHrv(rr, { segmentStarts, durationSec: 300 });
+    expect(r.segmentsUsed).toBeGreaterThan(1);
+    // VLF resolves because the longest UNBROKEN stretch clears 240 s; summing
+    // all three (390 s) would be the stitched answer.
+    expect(r.longestCleanSec).toBeGreaterThan(240);
+    expect(r.longestCleanSec).toBeLessThan(r.coverageSec);
+    const alone = computeHrv(a, { durationSec: 260 });
+    expect(Number(r.fields.vlowPower)).toBeCloseTo(Number(alone.fields.vlowPower), -1);
+  });
+
+  it('degrades a gappy watch reading rather than rejecting it', () => {
+    // Half the wall clock has no beats behind it. On a camera capture that is
+    // the "finger moved" refusal; on a watch series it is just a caveat.
+    const gappy = [...seg(150, 0), ...seg(30, 600)];
+    const starts = [seg(150, 0).length];
+    const watch = computeHrv(gappy, { segmentStarts: starts, durationSec: 600 });
+    expect(watch.ok).toBe(true);
+    expect(watch.confidence).toBe('low');
+    const camera = computeHrv(gappy, { segmentStarts: starts, durationSec: 600, source: 'camera' });
+    expect(camera.ok).toBe(false);
+    expect(camera.reason).toMatch(/usable pulse/);
   });
 });
