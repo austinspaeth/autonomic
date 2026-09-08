@@ -8,8 +8,8 @@ keywords: "menopause and HRV, perimenopause HRV, does menopause lower HRV, perim
 date: 2026-09-08
 updated: 2026-09-08
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1541199249251-f713e6145474?q=80&w=1760&auto=format&fit=crop"
-photoAttribution: "Kinga Howard / Unsplash"
+photoLocation: "https://images.unsplash.com/photo-1515027037286-7da2d06130cf?q=80&w=764&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+photoAttribution: "Unsplash"
 tldr: "Estrogen supports vagal (parasympathetic) tone and the baroreflex, so as it swings and falls through perimenopause and drops in menopause, HRV tends to decline, resting heart rate rises a few beats, and palpitations, hot flashes, and orthostatic symptoms become more common. Perimenopause is the noisy part: hormones fluctuate erratically, so your HRV gets more variable before it settles lower. A lower reading in this stage is often expected physiology, not a crash. Compare the months-long trend, not one morning, and bring persistent palpitations or new orthostatic intolerance to a clinician."
 categories:
   - hrv

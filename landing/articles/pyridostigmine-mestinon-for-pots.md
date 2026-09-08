@@ -8,8 +8,8 @@ keywords: "pyridostigmine for POTS, Mestinon POTS, pyridostigmine POTS heart rat
 date: 2026-09-07
 updated: 2026-09-07
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1523362628745-0c100150b504?q=80&w=1760&auto=format&fit=crop"
-photoAttribution: "Kobu Agency / Unsplash"
+photoLocation: "https://images.unsplash.com/photo-1587854692152-cbe660dbde88?q=80&w=1469&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+photoAttribution: "Unsplash"
 tldr: "Pyridostigmine (Mestinon) is an acetylcholinesterase inhibitor. By stopping the enzyme that clears acetylcholine, it lets that signal linger, which strengthens vagal tone at the heart's pacemaker and eases transmission through the autonomic ganglia. The practical result in POTS is a lower standing heart rate without lowering blood pressure, which is why it is often useful for people who also run low or who cannot tolerate a beta blocker. Its main drawback is cholinergic side effects, mostly gut cramping and loose stools. It treats the fast heart rate, not the cause of POTS, so track your resting heart rate, your stand-test jump, and how you feel, and keep every dose decision with your clinician."
 categories:
   - pots

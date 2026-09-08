@@ -8,8 +8,8 @@ keywords: "inappropriate sinus tachycardia vs POTS, IST vs POTS, inappropriate s
 date: 2026-09-01
 updated: 2026-09-01
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1517898717281-8e4385a41802?q=80&w=1760&auto=format&fit=crop"
-photoAttribution: "Kinga Howard / Unsplash"
+photoLocation: "https://images.unsplash.com/photo-1515871204537-49a5fe66a31f?q=80&w=1382&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+photoAttribution: "Unsplash"
 tldr: "Inappropriate sinus tachycardia (IST) and POTS both make your heart pound, but they differ in when it happens. IST is a fast resting heart rate, over 100 bpm at rest or a 24-hour average over 90 bpm, that is present whether you are lying down, sitting or standing. POTS is a heart rate that is roughly normal while you rest but rises at least 30 bpm (40 for teens) within ten minutes of standing. The way to tell them apart at home is to measure your heart rate at rest and again after standing, on several calm days, and read the two numbers together. Confirming either one needs a clinician, an ECG and usually a 24-hour monitor."
 categories:
   - pots

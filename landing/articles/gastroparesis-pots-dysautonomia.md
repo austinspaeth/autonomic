@@ -8,8 +8,8 @@ keywords: "gastroparesis POTS, delayed gastric emptying dysautonomia, POTS nause
 date: 2026-09-06
 updated: 2026-09-06
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1490818387583-1baba5e638af?q=80&w=1760&auto=format&fit=crop"
-photoAttribution: "Brooke Lark / Unsplash"
+photoLocation: "https://images.unsplash.com/photo-1654588831411-5ebbd8245994?q=80&w=1470&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+photoAttribution: "Unsplash"
 tldr: "Gastroparesis means the stomach empties too slowly, and it is common in POTS, long COVID, and other forms of dysautonomia because the same vagus nerve that steadies your heart rate also drives digestion. The signature is feeling full after only a few bites, along with nausea, bloating, and upper-belly discomfort that can last for hours. It overlaps with, but is distinct from, post-meal blood pooling (which hits in the first hour) and reactive blood-sugar swings (two to four hours later). The highest-yield changes are smaller and more frequent meals, going easier on fat and tough fiber, leaning on liquid nutrition when solids feel heavy, and a gentle walk after eating. Persistent vomiting, weight loss, or dehydration is a clinician's conversation, and formal diagnosis uses a gastric emptying study."
 categories:
   - pots

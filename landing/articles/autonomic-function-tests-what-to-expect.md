@@ -8,7 +8,7 @@ keywords: "autonomic function tests, autonomic reflex screen, autonomic testing,
 date: 2026-09-05
 updated: 2026-09-05
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1615669527499-501446dd48e1?q=80&w=1760&auto=format&fit=crop"
+photoLocation: "https://images.unsplash.com/photo-1624727828489-a1e03b79bba8?q=80&w=1471&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
 photoAttribution: "Unsplash"
 tldr: "Autonomic function testing is a short battery of non-invasive tests that check how your nervous system controls heart rate, blood pressure and sweating. The core four are the deep breathing test (paced slow breathing while your heart rate is watched), the Valsalva maneuver (a hard, sustained blow against resistance), a tilt table or standing test, and the QSART sweat test. None involves needles into nerves and none is painful in the way people fear. Together they build a picture of your parasympathetic (vagal) and sympathetic function, often summarized as a composite score. Results vary with hydration, medications, caffeine and sleep, so preparation matters and no single test is read alone."
 categories:

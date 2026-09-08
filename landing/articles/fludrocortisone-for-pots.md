@@ -8,8 +8,8 @@ keywords: "fludrocortisone for POTS, fludrocortisone POTS, florinef POTS, fludro
 date: 2026-09-03
 updated: 2026-09-03
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1523362628745-0c100150b504?q=80&w=1760&auto=format&fit=crop"
-photoAttribution: "Kobu Agency / Unsplash"
+photoLocation: "https://images.unsplash.com/photo-1562243061-204550d8a2c9?q=80&w=687&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+photoAttribution: "Unsplash"
 tldr: "Fludrocortisone treats POTS from a third direction, different from both beta blockers and midodrine: instead of slowing the heart or tightening blood vessels, it acts on the kidneys as a synthetic mineralocorticoid, telling them to hold on to sodium and, with it, water. That expands plasma volume, which is what a low-volume, pooling body lacks when standing. It only works if you are eating enough salt and drinking enough fluid, because it retains what you take in rather than creating it. It is slow to build over days, and it carries a specific rule of its own: because it makes the kidneys dump potassium in exchange for sodium, your clinician watches your potassium and often your blood pressure and weight. Track your standing heart-rate jump, your resting heart rate, and how much salt and fluid you are actually taking, and keep every dose decision with your clinician."
 categories:
   - pots
