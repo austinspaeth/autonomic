@@ -384,6 +384,46 @@ store sheet — abandoned, or declined. Calling this "converted" would close tha
 gap silently. The third outcome is the common one: an offer neither accepted nor
 dismissed was **ignored**, and the card counts it rather than leaving it implied.
 
+The card leads with **two tiles, not one with a rate on it**. *Offers raised* is
+a fact about the app's own pacing — the shared 7-day cool-down, the annual
+milestones at 30/90/180/365 days, the founding-member card's single day — and
+*Offers accepted* is a fact about the people; the rate between them lives in the
+funnel rows below, per offer, where it is over enough cards to carry a decimal
+point. Raised carries **two split rows**, outcome and platform, because they are
+two partitions of the same count and run together they read as one list of six
+things that sums to nothing; the platform row is unfiltered like every store
+split here, so `storeSplitNote` discloses the gap on a sliced view. Accepted
+carries **one**, the offer type, and deliberately no second: the two cards are
+aimed at different people — one whose access lapsed months ago, one who has just
+been convinced — so which is actually being bought is the whole question, and a
+platform row underneath would answer a quieter one at the same volume. Both tiles
+read the route POOLED (`offerFunnel` with no letter, `kindPlatformsOver`), which
+is legal for the reason `offerDay` states: these are counts of CARDS, and a
+per-letter route's total is not a headcount of people, so nothing divides by it.
+Where a window's answers outnumber its shows, `offerFunnel.settled` is false, the
+three outcomes stop being a partition, and the tile says so.
+
+The chart is drawn **by outcome, not by offer**: the bars stack accepted /
+dismissed / ignored per day, so the stack's height is still the day's shows and
+the split inside it is the answer. They are BARS rather than the areas this page
+uses elsewhere, because offers are a handful of discrete cards on a handful of
+days and a filled slope between one Tuesday's two and one Friday's three draws
+four days of offers that never happened. Which offer each bar was made of moves
+to a **day-by-day table** under it (`A.offerDay` / `A.offerDays`), one row per
+day per offer, and that table walks the route's whole alphabet rather than the
+two offers the app currently raises — a card whose letter this dashboard cannot
+read is in the bars, so it has to be in a row too or the two stop adding up.
+Two rules there. **No per-day accept rate**, for the reason the range trend
+above it is on the count: a percentage over three events moves in thirty-point
+jumps that mean nothing, so the table is counts and the rates stay in the range
+rows. And **`ignored` is a subtraction, not a counter**: an outcome lands on the
+day the GESTURE happened, and the annual window is 24 hours while the founding
+member card lives a calendar day, so a card seen in the evening can be answered
+after midnight. Where a day's answers outnumber its shows that has demonstrably
+happened; `offerDay.settled` says so, the row leaves ignored blank rather than
+printing a zero that would read as "everybody responded", and the range totals
+above — where the crossings cancel out — are the figures to trust.
+
 And `err` is not a daily counter at all. It fires **once per install, ever**, so
 a day's count is new installs joining that population and the running total is
 the population. It carries no tag and no message, so it says how many phones are
@@ -527,6 +567,42 @@ the UI, each of them deliberate:
   Apple Watch is offered on iPhone only, so its share of a combined view is a
   share of a population half of which was never offered it — the card says so
   under the chart, and the filter is how to read it honestly.
+- **A day tile can wear an `ATH` badge, and it is opt-in.** `A.dayRecord`
+  answers "is this the best number we have ever had" for any day series a caller
+  can express as a function, and every rule that stops the badge lying lives
+  there. **All time is all time, not the range on screen** — the sweep is over
+  the whole index, or a seven-day view would call most of its days records —
+  though the platform filter does scope it, because `ix` is already that slice
+  and the badge has to be about the same population as the number wearing it.
+  It compares against **every other day**, not just the earlier ones, so a day
+  beaten later cannot keep the word; it is **strictly greater**, so matching the
+  best day is a tie and not a high (a plateau would otherwise tag every day of
+  itself); zero is never a record; and it wants `RECORD_MIN_DAYS` — a fortnight,
+  two of every weekday on a series that swings by a third between a Sunday and a
+  Wednesday — of comparable days before "ever" means anything. `comparable` is
+  ONE gate doing two jobs because they are the same question: a day before the
+  counter shipped is not comparable (a history of false zeros hands the badge to
+  an ordinary day) and neither is a rate's day whose denominator is under
+  `SMALL_COHORT` — the highest share this app has ever seen must not be the day
+  two people opened it and one of them measured. A partial day CAN hold a
+  record, deliberately: today is still running so its number can only grow, and
+  a day already above every complete one is genuinely above them.
+  Only the **Today** tiles are eligible, and only by opting in. A range tile is
+  a window aggregate, where a record would mean the best thirty-day window ever
+  — a different claim needing a rolling sweep — and the lifetime tiles are
+  pooled over cohorts and are not a day series at all. Opt-in rather than
+  automatic because a record is a CONGRATULATION, and a record iOS share is not
+  good news but Android news, while a record pile of installs past the trial is
+  a pile of people who did not convert; both would wear the badge under any rule
+  that simply looked for a maximum. The badge rides in the value line rather
+  than the meta, so it survives the phone's condensed tile where the delta is
+  hidden, and the meta line carries the evidence — a badge with no stated
+  previous best is a boast. A record off a floor of nothing gets its own
+  sentence rather than "past 0 on Aug 20", which names whichever day happened to
+  be first among a run of zeros as though it were the thing beaten.
+  Pinned by `landing/tests/master-records.test.mjs`, which is its own file
+  because every other App usage fixture is a handful of days built to pin some
+  other arithmetic exactly, and this needs a fortnight.
 - **Measuring has its own card, and its own pair of curves.** The **Opened vs
   measured** card charts actives and readings on one axis per day (a gap in the
   reading line where the counter had not shipped, never a zero), with the
@@ -538,7 +614,17 @@ the UI, each of them deliberate:
   not measure, which is the shape that precedes churn and which nothing else
   here can see. The tile strip carries the same pair at a glance: *Measured on
   <day>*, *Measured of active* (the day's share) and *Measured per active day*
-  (the range's, pooled as install-days). The reading rate can exceed 100% on a
+  (the range's, pooled as install-days). *Measured of active* also carries the
+  day's share cut by **first run vs returning** (`A.measureShareSplit`), which
+  the pooled figure cannot see: a day heavy with installs and a day heavy with
+  regulars reach the same number for opposite reasons, and the gap between the
+  two halves is whether the wizard's first reading is landing. It is the one
+  split on the page that is **not a partition** — two rates over two
+  populations, not two parts of the number above them — so both are printed as
+  percentages with their denominator in the name ("of first runs"), and the
+  counts behind them go in the meta line where they cannot be read as addable.
+  A day with nobody of one kind reports nothing for it rather than 0%: there was
+  no one to measure, and a rate over nobody is not a low rate. The reading rate can exceed 100% on a
   day when a reading landed without its open ping — a launch made offline, or a
   reading saved either side of midnight Eastern — and it is **shown as it comes
   out rather than clamped**, because that gap is the only signal that says the

@@ -122,9 +122,28 @@ const HRV = {
 
 /* The offer funnel. The annual card is shown 10 times, accepted 2, dismissed 3
    — so 5 were IGNORED, which is the outcome with no gesture attached and has to
-   be counted rather than left implied. */
-const OSH = { [T(2)]: { [T(4)]: { A: 4 } }, [T(1)]: { [T(4)]: { A: 4 } }, [T(0)]: { [T(4)]: { A: 2 } } };
-const OAC = { [T(1)]: { [T(4)]: { A: 1 } }, [T(0)]: { [T(4)]: { A: 1 } } };
+   be counted rather than left implied.
+
+   Per day, which is what the outcome chart and the table under it draw:
+
+     T-2  A shown 4, dismissed 2      → 2 ignored
+     T-1  A shown 4, accepted 1       → 3 ignored
+     T-0  A shown 2, accepted 1, dismissed 1 → 0 ignored
+
+   The founding-member card carries the case the range totals hide: raised once
+   on T-2 and accepted on T-1, the way a card seen in the evening is answered
+   after midnight. So T-1 holds an F accept against no F show, its `ignored` is
+   a clamp rather than a count, and the table has to say so rather than print a
+   zero that reads as "everybody responded".
+
+   And one card on T-0 from a build sending a letter this dashboard does not
+   know. It is in the chart's bars, which pool every letter, so it has to be in
+   a row too or the table and the chart quietly stop adding up. */
+const OSH = {
+  [T(2)]: { [T(4)]: { A: 4, F: 1 } }, [T(1)]: { [T(4)]: { A: 4 } },
+  [T(0)]: { [T(4)]: { A: 2, '?': 1 } },
+};
+const OAC = { [T(1)]: { [T(4)]: { A: 1, F: 1 } }, [T(0)]: { [T(4)]: { A: 1 } } };
 const ODM = { [T(2)]: { [T(4)]: { A: 2 } }, [T(0)]: { [T(4)]: { A: 1 } } };
 
 /* The per-letter routes. Somebody who opens both views in a day is counted in
@@ -296,7 +315,61 @@ check('the funnel splits by sensor',
 
 /* --------------------------------------------------------------- offers */
 
-check('the offer card drew a band per offer', $('pgOffers').querySelectorAll('path, rect').length > 0);
+/* The card's two headline tiles: how many were RAISED, and how many were
+   TAKEN. Two tiles rather than one with a rate on it, because they answer
+   different questions — the first is a fact about the app's own pacing, the
+   second a fact about the people — and the rate between them lives in the
+   funnel rows below, over enough cards to carry a decimal point. */
+const offerTiles = [...$('pgOfferTiles').querySelectorAll('.tile')].map((el) => ({
+  label: el.querySelector('.label').textContent.trim(),
+  value: el.querySelector('.value').textContent.trim(),
+  meta: (el.querySelector('.meta') || { textContent: '' }).textContent.replace(/\s+/g, ' ').trim(),
+  splits: [...el.querySelectorAll('.split')].map((s) => s.textContent.replace(/\s+/g, ' ').trim()),
+}));
+const raised = offerTiles.find((t) => t.label === 'Offers raised');
+const taken = offerTiles.find((t) => t.label === 'Offers accepted');
+
+/* Every card raised, the one with the unreadable letter included: the tile is
+   the route pooled, so it must agree with the bars and the day table rather
+   than with the two offers the app currently knows how to name. */
+check('the raised tile counts every offer the route carried',
+  raised && raised.value === '12', raised && raised.value);
+
+/* TWO split rows, not one. What became of these cards and who they were raised
+   in front of are two partitions of the same count, and run together they read
+   as one list of six things that sums to nothing. */
+check('the raised tile splits by outcome and by platform, on separate rows',
+  raised.splits.length === 2, JSON.stringify(raised.splits));
+check('the outcome row adds back up to the cards raised',
+  /accepted 3/.test(raised.splits[0]) && /dismissed 3/.test(raised.splits[0]) &&
+  /ignored 6/.test(raised.splits[0]), raised.splits[0]);
+check('and the platform row says which store they were raised on',
+  /iOS 7/.test(raised.splits[1]) && /Android 5/.test(raised.splits[1]), raised.splits[1]);
+
+/* The accepted tile splits by OFFER TYPE and only that. The two cards are
+   aimed at different people — one whose access lapsed months ago, one who has
+   just been convinced — so which is actually being bought is the whole
+   question, and a second row underneath would answer a quieter one at the same
+   volume. */
+check('the accepted tile counts the buy-button taps', taken && taken.value === '3', taken && taken.value);
+check('and splits them by which offer was taken, and only that',
+  taken.splits.length === 1 && /Half-off annual 2/.test(taken.splits[0]) &&
+  /Founding member 1/.test(taken.splits[0]), JSON.stringify(taken.splits));
+
+/* The distinction that must survive any rewording, on the tile as much as in
+   the note below it. */
+check('the accepted tile does not call a tap a purchase',
+  /not a completed purchase/.test(taken.meta), taken.meta);
+
+check('the offer card drew a band per outcome', $('pgOffers').querySelectorAll('path, rect').length > 0);
+
+/* The chart is now about WHAT HAPPENED rather than which card was raised: the
+   three outcomes are the legend, and the offer type moved to the table below
+   where it can be read beside its own outcomes. */
+const offerLegend = $('pgOffers').querySelector('.legend').textContent;
+check('the chart is legended by outcome, not by offer',
+  ['Accepted', 'Dismissed', 'Ignored'].every((n) => offerLegend.includes(n)) &&
+  !/Half-off annual/.test(offerLegend), offerLegend);
 
 /* 2 accepted of 10 shown = 20%, 3 dismissed, and the remaining 5 ignored. */
 check('the offer funnel reports accepts over shows',
@@ -311,6 +384,62 @@ check('the ignored outcome is counted rather than left implied',
 check('accepted is not described as a purchase',
   /tap on the card's buy button, not a completed purchase/.test(text('pgOfferNote')),
   text('pgOfferNote'));
+
+/* ---------------------------------------------------- offers, day by day */
+
+const offerRows = [...$('pgOfferDays').querySelectorAll('tbody tr')]
+  .map((tr) => [...tr.querySelectorAll('td')].map((td) => td.textContent.trim()));
+
+check('every day carrying an offer gets a row per offer type',
+  offerRows.length === 6, JSON.stringify(offerRows));
+
+/* Newest first: the range can be ninety rows long and the day being asked
+   about is almost always the last one. */
+check('the newest day leads the table',
+  offerRows[0][2] === '2' && offerRows[0][3] === '1' && offerRows[0][4] === '1' && offerRows[0][5] === '0',
+  JSON.stringify(offerRows[0]));
+
+check('the offer type is named on its own row rather than pooled',
+  offerRows.filter((r) => /Half-off annual/.test(r[1])).length === 3 &&
+  offerRows.filter((r) => /Founding member/.test(r[1])).length === 2,
+  offerRows.map((r) => r[1]).join(' | '));
+
+/* Shown, and then what became of it. T-2's annual card: 4 raised, 2 dismissed,
+   nothing accepted, so 2 were ignored — and the three add back up to the 4. */
+const t2Annual = offerRows.find((r) => /Half-off annual/.test(r[1]) && r[2] === '4' && r[4] === '2');
+check('the outcomes add back up to the offers raised',
+  !!t2Annual && t2Annual[3] === '0' && t2Annual[5] === '2', JSON.stringify(t2Annual));
+
+/* The caveat the range totals hide: an offer raised in the evening is answered
+   after midnight and lands on the next day's row, against a `shown` it was
+   never part of. `ignored` is then a clamp and not a count of anything — it has
+   to read as unknown, never as a zero saying everybody responded. */
+const crossed = offerRows.find((r) => /Founding member/.test(r[1]) && r[2] === '0');
+check('a day answering more offers than it raised leaves ignored blank, not zero',
+  !!crossed && crossed[3] === '1' && crossed[5] === '–', JSON.stringify(crossed));
+
+check('and the table says why that row is blank',
+  /answered more offers than were raised/.test(text('pgOfferDays')) &&
+  /counted on the day the gesture landed/.test(text('pgOfferDays')), text('pgOfferDays'));
+
+/* No per-day accept RATE, for the reason the range trend is on the count: a
+   percentage over three events moves in thirty-point jumps that mean nothing. */
+check('the day table is counts, never a per-day accept rate',
+  !/%/.test(offerRows.map((r) => r.join(' ')).join(' ')),
+  offerRows.map((r) => r.join(' ')).join(' | '));
+
+/* The table and the chart above it must be two views of one set of numbers.
+   The bars pool every letter the route can speak, so the rows have to walk the
+   whole alphabet rather than the two offers the app currently raises — a card
+   from a build sending a letter this dashboard does not know would otherwise
+   be in the bar and in no row, and the two would silently stop adding up.
+   10 annual + 1 founding member + 1 unreadable letter = 12 raised. */
+check('an offer whose letter we cannot read still gets a row',
+  offerRows.filter((r) => /Not stated/.test(r[1])).length === 1,
+  offerRows.map((r) => r[1]).join(' | '));
+check('the rows add up to every offer the chart bars pool',
+  offerRows.reduce((a, r) => a + Number(r[2]), 0) === 12,
+  String(offerRows.reduce((a, r) => a + Number(r[2]), 0)));
 
 /* ------------------------------------------------------- product events */
 

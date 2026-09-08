@@ -439,6 +439,16 @@ window.Analytics = (function () {
     var payAll = letter ? rowsToMap(report && report.pay, null) : pay;
     var payFirst = Object.keys(payAll).sort()[0] || null;
 
+    /* And the activation counter's, which had gone without one because nothing
+       divided by it: `activation` works over COHORTS, and a cohort born before
+       the route existed is excluded by `first` already. `dayRecord` is the
+       first thing to read activations as a DAY SERIES, and a day series needs
+       the birthday — a day before the route shipped reads as 0 activations,
+       which would depress the history a record is measured against and hand the
+       badge to an ordinary day. Unfiltered, for the reason above. */
+    var actAll = letter ? rowsToMap(report && report.act, null) : act;
+    var actFirst = Object.keys(actAll).sort()[0] || null;
+
     /* Each counter's own birthday, on the same rule and read UNFILTERED for the
        same reason: a route ships in a build, a build ships per store, and dating
        a counter off one platform's slice dates it off the wrong release. Days
@@ -495,7 +505,7 @@ window.Analytics = (function () {
       byKind: byKind, firstDay: firstDay,
       days: days, first: first, last: last,
       hrvFirst: hrvFirst, hrvMethodFirst: hrvMethodFirst,
-      payFirst: payFirst, tierFirst: tierFirst,
+      payFirst: payFirst, actFirst: actFirst, tierFirst: tierFirst,
       cohorts: cohorts,
       preTracking: Object.keys(older).sort(),
       /* What this index is a slice of: the filter in force, and the platform
@@ -676,6 +686,20 @@ window.Analytics = (function () {
    *  route uses, which is why the per-letter routes are worth reading this way
    *  and never by their total. */
   function slotOn(ix, kind, day, letter) { return slotsOn(ix, kind, day)[letter] || 0; }
+  /**
+   * Any route's platform split on `day`, ALWAYS unfiltered.
+   *
+   * The generic twin of `platformsOn` / `subPlatformsOn` / `actPlatformsOn`,
+   * and unfiltered for the same reason all three are: a split is the whole
+   * day's, whatever slice the number above it is. On a filtered view the parts
+   * therefore will not add to the value they sit under, which is what
+   * `storeSplitNote` in app.js exists to disclose.
+   */
+  function kindPlatformsOn(ix, kind, day) { return kindOn(ix, kind, day).platforms || {}; }
+  /** The same split pooled over a set of days. */
+  function kindPlatformsOver(ix, kind, days) {
+    return poolMethods(function (i, d) { return kindPlatformsOn(i, kind, d); }, ix, days);
+  }
   function slotOver(ix, kind, days, letter) {
     return (days || []).reduce(function (a, d) {
       return a + (kindKnown(ix, kind, d) ? slotOn(ix, kind, d, letter) : 0);
@@ -768,20 +792,101 @@ window.Analytics = (function () {
    * `answered` is what the two responses sum to, and it is deliberately NOT
    * assumed to be `shown`: an offer that is neither accepted nor dismissed was
    * ignored, which is a third outcome and the most common one.
+   *
+   * With no letter it pools the route, on the same terms and with the same
+   * caveat `offerDay` carries: a per-letter route's total is not a headcount of
+   * PEOPLE, and nothing may divide by it as though it were. It is legitimate
+   * here because these are counts of CARDS, and "how many offers did the app
+   * raise" is a question about cards.
    */
   function offerFunnel(ix, days, letter) {
-    var shown = slotOver(ix, 'osh', days, letter);
-    var dismissed = slotOver(ix, 'odm', days, letter);
-    var accepted = slotOver(ix, 'oac', days, letter);
+    var over = function (kind) {
+      if (letter) return slotOver(ix, kind, days, letter);
+      return (days || []).reduce(function (a, d) {
+        return a + (kindKnown(ix, kind, d) ? eventsOn(ix, kind, d) : 0);
+      }, 0);
+    };
+    var shown = over('osh');
+    var dismissed = over('odm');
+    var accepted = over('oac');
     return {
       available: shown > 0,
       shown: shown,
       dismissed: dismissed,
       accepted: accepted,
       ignored: Math.max(0, shown - dismissed - accepted),
+      /* `offerDay.settled`, over a window. The crossings that make a single
+         day's arithmetic fail — a card raised in the evening and answered after
+         midnight — cancel out inside a range and survive only at its two edges,
+         so this is almost always true and is worth checking exactly because of
+         that: where it is false, `ignored` is a clamp and the three outcomes do
+         not add up to `shown`. Anything printing them as a partition has to
+         say so. */
+      settled: dismissed + accepted <= shown,
       acceptPct: shown ? (accepted / shown) * 100 : null,
       dismissPct: shown ? (dismissed / shown) * 100 : null
     };
+  }
+
+  /**
+   * ONE DAY's offer outcomes, for one offer or (with no letter) for both.
+   *
+   * `offerFunnel` over a single day would give the same four numbers, and the
+   * reason this exists separately is the caveat it carries: `ignored` is a
+   * SUBTRACTION, and over one day the three counters it subtracts from each
+   * other are not guaranteed to be about the same cards.
+   *
+   * An offer is raised on one day and answered whenever the person next picks
+   * up the phone. The annual card's window is 24 hours and the founding-member
+   * card's is a calendar day, so a card raised in the evening can perfectly
+   * well be accepted after midnight — and that accept lands on the NEXT day's
+   * row, against a `shown` it was never part of. Over a range those crossings
+   * cancel out except at the two edges, which is why `offerFunnel` is the
+   * figure to trust and this one is a shape.
+   *
+   * So `settled` says whether the day's own arithmetic held. When responses
+   * outnumber the day's shows, `ignored` clamps at 0 and `settled` is false —
+   * the row is still drawn, because a day on which more offers were answered
+   * than raised is a real and readable thing, but nothing may print its
+   * `ignored` as a finding.
+   *
+   * With no letter this reads the route TOTAL, which everywhere else on a
+   * per-letter route is the number not to divide by. It is legitimate here
+   * because nothing here divides by it: these are counts of CARDS, and the
+   * question "how many offers were raised today and what became of them" is
+   * about cards. It is emphatically not a headcount of people — see
+   * `isHeadcount` — and no share may be computed off it.
+   */
+  function offerDay(ix, day, letter) {
+    var read = function (kind) {
+      if (!kindKnown(ix, kind, day)) return 0;
+      return letter ? slotOn(ix, kind, day, letter) : eventsOn(ix, kind, day);
+    };
+    var shown = read('osh');
+    var dismissed = read('odm');
+    var accepted = read('oac');
+    var answered = dismissed + accepted;
+    return {
+      day: day,
+      known: kindKnown(ix, 'osh', day),
+      shown: shown,
+      dismissed: dismissed,
+      accepted: accepted,
+      ignored: Math.max(0, shown - answered),
+      settled: answered <= shown,
+      acceptPct: shown ? (accepted / shown) * 100 : null,
+      /* Anything at all to draw a row for. A day with no shows but a response
+         on it is exactly the midnight crossing above, and dropping it would
+         hide the evidence for the caveat. */
+      any: shown > 0 || answered > 0
+    };
+  }
+
+  /** `offerDay` across a range, newest last, keeping only the days with
+   *  something on them. */
+  function offerDays(ix, days, letter) {
+    return (days || []).map(function (d) { return offerDay(ix, d, letter); })
+      .filter(function (r) { return r.any; });
   }
 
   /**
@@ -995,6 +1100,10 @@ window.Analytics = (function () {
    */
   function hrvKnown(ix, day) { return !!(ix.hrvFirst && day >= ix.hrvFirst); }
 
+  /** Was the activation counter running on `day`? The `hrvKnown` rule again,
+   *  and it exists for `dayRecord` — see `actFirst`. */
+  function actKnown(ix, day) { return !!(ix.actFirst && day >= ix.actFirst); }
+
   /**
    * The share of the installs active on `day` that took a reading.
    *
@@ -1015,6 +1124,51 @@ window.Analytics = (function () {
     var active = activeOn(ix, day);
     if (!active) return null;
     return (readingsOn(ix, day) / active) * 100;
+  }
+
+  /**
+   * `measureShare` split by whether the install was on its FIRST RUN that day
+   * or coming back.
+   *
+   * TWO RATES, NOT A PARTITION. Everything else on this page that splits a
+   * count divides it into parts that add back up to it; these two do not, and a
+   * caller that prints them like a store split is stating something false. Each
+   * is its own share of its own population — of the day's first runs, how many
+   * measured; of the day's returners, how many measured — and the two
+   * denominators are the halves of `activeOn` that `newOn` and `returningOn`
+   * already name.
+   *
+   * It is the one cut of the measuring rate that says whether the onboarding
+   * works, because the pooled figure cannot: a day heavy with installs and a
+   * day heavy with regulars produce the same number for opposite reasons, and
+   * the ratio between these two IS the gap the wizard's first reading is meant
+   * to close.
+   *
+   * The reading rows carry the same cohort key the open rows do, so the
+   * numerator splits on exactly the fact the denominator splits on — no second
+   * source, no attribution. A day's readings by first-run installs are the ones
+   * whose cohort is the day itself; the rest came back for them.
+   *
+   * Either side can be null and it means "nobody of that kind was here", never
+   * 0%: a day with no installs at all has no first-run rate to report, the same
+   * "unknown is not zero" rule `hrvKnown` applies one level up. And either side
+   * can exceed 100% for the reason `measureShare` can, so neither is clamped.
+   */
+  function measureShareSplit(ix, day) {
+    if (!hrvKnown(ix, day)) return null;
+    var freshOf = newOn(ix, day);
+    var freshDid = hrvCountOn(ix, day, day);
+    var backOf = returningOn(ix, day);
+    /* The returning half is the remainder, deliberately: it is every reading
+       that day minus the ones its own first-run installs took, so a reading
+       from a cohort the open rows never saw still lands somewhere rather than
+       being dropped for failing to match a known cohort. */
+    var backDid = Math.max(0, readingsOn(ix, day) - freshDid);
+    return {
+      fresh: { did: freshDid, of: freshOf, pct: freshOf ? (freshDid / freshOf) * 100 : null },
+      returning: { did: backDid, of: backOf, pct: backOf ? (backDid / backOf) * 100 : null },
+      available: freshOf > 0 || backOf > 0
+    };
   }
 
   /**
@@ -1090,6 +1244,93 @@ window.Analytics = (function () {
       out.push(r);
     }
     return out;
+  }
+
+  /* ------------------------------------------------------------- records
+
+     "Is this the best number we have ever had?" — one question, answered in one
+     place, for any day series a caller can express as a function. Adding a
+     record to a tile is a row at the call site, never a comparison written out
+     there. */
+
+  /**
+   * How much history a record needs before the word "ever" is honest.
+   *
+   * A fortnight, and the number is not arbitrary: traffic here swings by a
+   * third between a Sunday and a Wednesday (see `dayDeltas` in app.js), so two
+   * weeks is the shortest window holding two of every weekday. Below it a
+   * counter's own first days would all be records — the third day a route ever
+   * ran is the best day it ever had, trivially and uselessly.
+   */
+  var RECORD_MIN_DAYS = 14;
+
+  /**
+   * Is `day` the highest this series has ever been?
+   *
+   * `read(ix, d)` is the series and `opts.comparable(ix, d)` is the one gate:
+   * whether a day can be put beside the others at all. It carries two jobs on
+   * purpose, because they are the same question — a day before the counter
+   * shipped is not comparable, and neither is a day whose denominator is too
+   * small to divide by. Both would otherwise be read as a low number, and a
+   * history full of false lows hands the badge to an ordinary day.
+   *
+   * The rules, each of which exists because its absence makes the badge lie:
+   *
+   * — ALL TIME IS ALL TIME, not this range. The sweep is over `ix.days`, the
+   *   whole index, and the date range on screen does not enter into it. Scoped
+   *   to the range, a seven-day view would call most of its days records.
+   *
+   * — THE PLATFORM FILTER DOES SCOPE IT, because `ix` is already that slice.
+   *   The badge has to be about the same population as the number wearing it,
+   *   so on an iOS view it means the best iOS day, which is a real claim.
+   *
+   * — EVERY OTHER DAY, not just the earlier ones. The tiles show the newest day
+   *   and for that day the two are identical, but "no other day was higher" is
+   *   true whichever day is being shown, where "was a record when it happened"
+   *   is a weaker claim wearing the same word.
+   *
+   * — STRICTLY GREATER, so a tie is not a record. A plateau would otherwise tag
+   *   every day of itself and the badge would stop meaning anything; the first
+   *   day to reach the height keeps it.
+   *
+   * — NOT ON NOTHING. A series that has never moved sits at zero on every day,
+   *   and zero is not a record however long it has been the maximum.
+   *
+   * — ENOUGH HISTORY, or no claim: `RECORD_MIN_DAYS` comparable days besides
+   *   this one. `days` is returned so a caller can say why it is silent.
+   *
+   * A partial day can hold a record and that is deliberate, not an oversight.
+   * The newest day is still running, so its number can only grow — a day that
+   * is already above every complete day is genuinely above them, and the tag
+   * can never have to be taken back.
+   */
+  function dayRecord(ix, day, read, opts) {
+    opts = opts || {};
+    var ok = opts.comparable || function () { return true; };
+    var minDays = opts.minDays === undefined ? RECORD_MIN_DAYS : opts.minDays;
+    var num = function (v) {
+      return (v === null || v === undefined || !isFinite(v)) ? null : v;
+    };
+    if (!day || !ok(ix, day)) return null;
+    var value = num(read(ix, day));
+    if (value === null) return null;
+
+    var best = null, bestDay = null, against = 0;
+    (ix.days || []).forEach(function (d) {
+      if (d === day || !ok(ix, d)) return;
+      var v = num(read(ix, d));
+      if (v === null) return;
+      against += 1;
+      if (best === null || v > best) { best = v; bestDay = d; }
+    });
+
+    return {
+      value: value,
+      best: best, bestDay: bestDay,
+      days: against,
+      enough: against >= minDays,
+      isRecord: against >= minDays && value > 0 && best !== null && value > best
+    };
   }
 
   /** One day's platform split, `{ I: n, A: n, U: n }`, ALWAYS unfiltered. */
@@ -2021,7 +2262,12 @@ window.Analytics = (function () {
     activationsOn: activationsOn, actCountOn: actCountOn, actPlatformsOn: actPlatformsOn,
     readingsOn: readingsOn, hrvCountOn: hrvCountOn, hrvPlatformsOn: hrvPlatformsOn,
     hrvMethodsOn: hrvMethodsOn, hrvMethodsOver: hrvMethodsOver, hrvMethodKnown: hrvMethodKnown,
-    hrvKnown: hrvKnown, measureShare: measureShare, measureRate: measureRate,
+    hrvKnown: hrvKnown, actKnown: actKnown,
+    measureShare: measureShare, measureShareSplit: measureShareSplit,
+    measureRate: measureRate,
+
+    // records — "the best number we have ever had", for any day series
+    dayRecord: dayRecord, RECORD_MIN_DAYS: RECORD_MIN_DAYS,
     measuringAt: measuringAt, measuringCurve: measuringCurve,
     methodsOn: methodsOn, methodsOver: methodsOver,
     hrvMethodsOn: hrvMethodsOn, hrvMethodsOver: hrvMethodsOver,
@@ -2033,9 +2279,11 @@ window.Analytics = (function () {
     // the generic counters — any route by name
     eventsOn: eventsOn, slotsOn: slotsOn, slotsOver: slotsOver,
     slotOn: slotOn, slotOver: slotOver,
+    kindPlatformsOn: kindPlatformsOn, kindPlatformsOver: kindPlatformsOver,
     kindKnown: kindKnown, isHeadcount: isHeadcount,
     shareOfActive: shareOfActive, slotShare: slotShare,
-    captureFunnel: captureFunnel, offerFunnel: offerFunnel, errorInstalls: errorInstalls,
+    captureFunnel: captureFunnel, offerFunnel: offerFunnel,
+    offerDay: offerDay, offerDays: offerDays, errorInstalls: errorInstalls,
 
     // faults — not a counter; see the block above `export`
     faultGroups: faultGroups, faultsOn: faultsOn, faultSummary: faultSummary,

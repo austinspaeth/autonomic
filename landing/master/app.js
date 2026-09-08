@@ -537,6 +537,43 @@
       Math.abs(pts).toFixed(1) + ' pts</span>';
   }
 
+  /**
+   * The all-time-high badge, and the line under the number that backs it up.
+   *
+   * `A.dayRecord` decides whether there IS a record — every rule about what
+   * "ever" may mean lives there. This only says it, in two places at once,
+   * because the two have different jobs: the badge is the glance and the meta
+   * line is the evidence, and a badge with no stated previous best is a boast.
+   *
+   * The badge rides in the VALUE line rather than the meta, which is the one
+   * layout decision here. On a phone a tile is condensed to its label and its
+   * number and everything else folds away — including, by an explicit rule in
+   * the stylesheet, the delta. The badge deliberately survives that: "the best
+   * we have ever had" is the single thing on a stat tile worth seeing without
+   * opening it.
+   */
+  function athBadge(rec) {
+    if (!rec || !rec.isRecord) return '';
+    return '<span class="ath" title="Higher than any of the other ' +
+      fmtInt(rec.days) + ' days on record">ATH</span>';
+  }
+  /**
+   * The evidence, for the tile's meta line. `fmt` is the tile's own formatter,
+   * so the previous best is printed in the units the value above it is in.
+   *
+   * A record off a floor of NOTHING gets its own sentence. "Past 0 on Aug 20"
+   * is true and reads as nonsense — it names the day that happened to be first
+   * among a run of identical zeros, as though that day were the thing being
+   * beaten. What actually happened is that a number moved for the first time,
+   * and on the purchases tile that is a first sale, which deserves saying.
+   */
+  function athNote(rec, fmt) {
+    if (!rec || !rec.isRecord) return '';
+    if (!rec.best) return ' · best day yet — nothing on any day before it';
+    return ' · best day yet, past ' + (fmt || fmtInt)(rec.best) +
+      (rec.bestDay ? ' on ' + labelDay(rec.bestDay) : '');
+  }
+
   function tile(o) {
     var delta = deltaSpan(o.delta, o.invertDelta) || ptsSpan(o.deltaPts, o.invertDelta);
     /* The stacked comparisons under a day tile. A count on its own says
@@ -572,14 +609,22 @@
        is folded away — see `.cards.condensed` in styles.css and `toggleTile`
        below. One element to measure and one to animate; the desktop tile is
        unchanged, since the wrapper carries no styling of its own. */
-    var more = (o.meta ? '<div class="meta">' + o.meta + '</div>' : '') +
+    /* A record's evidence is appended to whatever the tile was already saying
+       about itself, rather than replacing it: the meta line is where a tile
+       explains its number, and "best day yet" is one more thing about it. */
+    var meta = (o.meta || '') + athNote(o.record, o.recordFmt);
+    var more = (meta ? '<div class="meta">' + meta + '</div>' : '') +
       deltas + split +
       (o.spark ? '<div style="margin-top:8px">' + o.spark + '</div>' : '');
 
-    return '<div class="card tile' + (more ? ' has-more' : '') + '">' +
+    /* The badge sits closest to the number, ahead of the delta: one of the two
+       is a comparison with yesterday and the other is a comparison with every
+       day there has ever been. */
+    var ath = athBadge(o.record);
+    return '<div class="card tile' + (more ? ' has-more' : '') + (ath ? ' is-ath' : '') + '">' +
       (more ? '<span class="tile-chev" aria-hidden="true">›</span>' : '') +
       '<div class="label">' + (o.color ? '<span class="swatch" style="background:' + o.color + '"></span>' : '') + esc(o.label) + '</div>' +
-      '<div class="value' + (o.smallValue ? ' small' : '') + '">' + o.value + (delta ? ' ' + delta : '') + '</div>' +
+      '<div class="value' + (o.smallValue ? ' small' : '') + '">' + o.value + ath + (delta ? ' ' + delta : '') + '</div>' +
       (more ? '<div class="tile-more">' + more + '</div>' : '') +
       '</div>';
   }
@@ -2039,6 +2084,11 @@
     /* Opening the app is not using it. This pair is the whole point of the
        reading counter: the day's share, and the range's habit rate. */
     var shareToday = A.measureShare(ix, ix.last);
+    /* And the same day's rate cut by who the person was. See measureShareSplit:
+       these are TWO RATES over two populations and not a partition of the tile
+       above them, which is why they are printed as percentages rather than as
+       the counts every other split on this page carries. */
+    var shareSplit = A.measureShareSplit(ix, ix.last);
     var measured = A.measureRate(ix, days);
     /* The same rate over the window before this one, so the range tile can say
        which way it moved. Null unless that window was fully counted AND the
@@ -2077,6 +2127,43 @@
        the whole day was. */
     var activeStores = A.platformsOn(ix, ix.last);
 
+    /* ALL-TIME HIGHS, opt-in per tile.
+     *
+     * Every rule about what "ever" may mean is in `A.dayRecord`; this table is
+     * only which day series may carry the claim and what makes a day of it
+     * comparable. Opt-in rather than automatic, because a record is a
+     * CONGRATULATION and most numbers here are not the kind of thing to be
+     * congratulated on: "Active past the trial" hitting a high is a pile of
+     * people who did not convert, and a record iOS share is not good news, it
+     * is Android news. Both would wear the badge under any rule that simply
+     * looked for a maximum.
+     *
+     * Only the TODAY tiles are eligible, and that is the same restraint: their
+     * value is one day's number, which is the only thing "the best we have ever
+     * had" can be checked against without inventing a comparison. A range tile
+     * is a window aggregate — a record there would mean the best thirty-day
+     * window ever, which is a different claim needing a rolling sweep — and the
+     * lifetime tiles are pooled over cohorts and are not a day series at all.
+     *
+     * Two shapes of `comparable`. A counter's pre-ship days are excluded, or a
+     * history of false zeros would hand the badge to an ordinary day; and a
+     * RATE additionally needs a denominator worth dividing by, at the same
+     * `SMALL_COHORT` bar the rest of this module refuses to divide below —
+     * 100% measured on a day when one person opened the app is not a record,
+     * it is a small number. */
+    var bigEnough = function (known) {
+      return function (i, d) { return known(i, d) && A.activeOn(i, d) >= A.SMALL_COHORT; };
+    };
+    var recordOf = function (read, comparable) {
+      return A.dayRecord(ix, ix.last, read, { comparable: comparable });
+    };
+    var recActive = recordOf(A.activeOn);
+    var recFresh = recordOf(A.newOn);
+    var recBuys = recordOf(A.purchasesOn);
+    var recAct = recordOf(A.activationsOn, A.actKnown);
+    var recRead = recordOf(A.readingsOn, A.hrvKnown);
+    var recShare = recordOf(A.measureShare, bigEnough(A.hrvKnown));
+
     /* THREE HOSTS, THREE SCOPES, and the split is the point. These tiles used
        to be one wrapping row in which "Active on Aug 28", "Returning / day"
        (a range average) and "D7 retention" (every cohort that ever installed)
@@ -2102,27 +2189,31 @@
            that still has pre-marker installs in it. */
         split: [{ name: 'returning', color: PC.back, value: fmtInt(returningToday) },
                 { name: 'first run', color: PC.fresh, value: fmtInt(A.newOn(ix, ix.last)) }]
-          .concat(storeSplit(activeStores))
+          .concat(storeSplit(activeStores)),
+        record: recActive
       }),
       tile({
         label: 'Installs on ' + labelDay(ix.last), color: PC.fresh,
         value: fmtInt(A.newOn(ix, ix.last)),
         meta: 'first-run pings on the newest day' + storeSplitNote(ix, freshToday),
         deltas: dayDeltas(ix.last, days, function (d) { return A.newOn(ix, d); }),
-        split: storeSplit(freshToday)
+        split: storeSplit(freshToday),
+        record: recFresh
       }),
       tile({
         label: 'Purchases on ' + labelDay(ix.last), color: PC.subs, value: fmtInt(A.purchasesOn(ix, ix.last)),
         meta: 'subscribe pings on the newest day' + storeSplitNote(ix, A.subPlatformsOn(ix, ix.last)),
         deltas: dayDeltas(ix.last, days, function (d) { return A.purchasesOn(ix, d); }),
-        split: storeSplit(A.subPlatformsOn(ix, ix.last))
+        split: storeSplit(A.subPlatformsOn(ix, ix.last)),
+        record: recBuys
       }),
       tile({
         label: 'First readings on ' + labelDay(ix.last), color: PC.activation,
         value: fmtInt(A.activationsOn(ix, ix.last)),
         meta: 'installs that activated that day' + methodSplitNote(A.methodsOn(ix, ix.last)),
         deltas: dayDeltas(ix.last, days, function (d) { return A.activationsOn(ix, d); }),
-        split: methodSplit(A.methodsOn(ix, ix.last))
+        split: methodSplit(A.methodsOn(ix, ix.last)),
+        record: recAct
       }),
       /* The reading counter's own headline, beside the active one it is read
          against. Both are one-per-install-per-day, so the share underneath is a
@@ -2146,15 +2237,31 @@
            each install's FIRST reading that day and not everything it used —
            `hrvMethodKnown` keeps the line off a day whose builds predated the
            letter, where every reading would otherwise read as "no sensor". */
-        splitB: A.hrvMethodKnown(ix, ix.last) ? methodSplit(A.hrvMethodsOn(ix, ix.last)) : null
+        splitB: A.hrvMethodKnown(ix, ix.last) ? methodSplit(A.hrvMethodsOn(ix, ix.last)) : null,
+        record: recRead
       }),
       tile({
         label: 'Measured of active', color: PC.reading, smallValue: true,
         value: shareToday === null ? '–' : fmtPct(shareToday),
-        meta: shareToday === null
+        meta: (shareToday === null
           ? 'no reading counter on ' + labelDay(ix.last)
           : fmtInt(A.readingsOn(ix, ix.last)) + ' of ' + fmtInt(activeToday) +
-            ' who opened the app that day also measured'
+            ' who opened the app that day also measured') + measureSplitNote(shareSplit),
+        /* The one split on this page that is not a partition, said in the only
+           way that cannot be misread as one: both parts are PERCENTAGES, of two
+           different denominators, and the counts behind them are spelled out in
+           the meta above rather than sitting here looking addable. It is the
+           question the pooled rate cannot answer — a day heavy with installs
+           and a day heavy with regulars reach the same number for opposite
+           reasons — and the gap between the two IS whether the wizard's first
+           reading is landing. */
+        split: measureSplit(shareSplit),
+        /* The one RATE that may hold a record, and the only one whose
+           comparable-day test has a second half: a day whose active count is
+           below `SMALL_COHORT` is left out of the history AND cannot claim the
+           badge, because the highest share this app has ever seen would
+           otherwise be the day two people opened it and one of them measured. */
+        record: recShare, recordFmt: fmtPct
       }),
       /* Both lifecycle counts are of installs active on the SAME newest day,
          split by where they are in their own life — a today number wearing an
@@ -2351,6 +2458,38 @@
      one of the named sensors. */
   function methodSplitNote(split) {
     return split['?'] ? ' · ' + fmtInt(split['?']) + ' named no sensor' : '';
+  }
+
+  /**
+   * The measuring rate cut by first run vs returning, as tile parts.
+   *
+   * Deliberately unlike every other split helper here: those hand back COUNTS
+   * that sum to the number above them, and these are two independent rates. So
+   * each part is a percentage, and each is NAMED with its denominator — "of
+   * first runs", not "first run" — because a swatch, a word and a number in
+   * this position is otherwise read as a share of the tile.
+   *
+   * A side with no population that day (no installs at all, or nobody coming
+   * back) is dropped rather than drawn as 0%: there was nobody to measure, and
+   * a rate over nobody is not a low rate.
+   */
+  function measureSplit(s) {
+    if (!s || !s.available) return null;
+    var parts = [];
+    if (s.fresh.of) parts.push({ name: 'of first runs', color: PC.fresh, value: fmtPct(s.fresh.pct) });
+    if (s.returning.of) parts.push({ name: 'of returning', color: PC.back, value: fmtPct(s.returning.pct) });
+    return parts;
+  }
+  /** The counts behind those two rates, so the split above can stay percentages
+   *  without hiding how few people either of them is a rate over. */
+  function measureSplitNote(s) {
+    if (!s || !s.available) return '';
+    var say = function (part, name) {
+      return part.of ? fmtInt(part.did) + ' of ' + fmtInt(part.of) + ' ' + name : '';
+    };
+    var bits = [say(s.fresh, 'first runs'), say(s.returning, 'returning')]
+      .filter(function (x) { return x; });
+    return bits.length ? ' · ' + bits.join(', ') : '';
   }
 
   /* Appended to a tile's meta only when there is something to disclose: pings
@@ -3312,34 +3451,150 @@
      would quietly close that gap. */
   var OFFER_COLOR = { A: ENTITY.sales, F: COLOR.gold, '?': COLOR.muted };
 
+  /* The three OUTCOMES, which are what the chart is now about. Fixed colours,
+     never assigned by rank, and read the same way on the chart as in the table
+     under it: green is the only good one, orange is a gesture that said no, and
+     grey is no gesture at all. Ignored is grey for the same reason "not stated"
+     is grey everywhere else on this page — it is an absence, and colouring an
+     absence like a decision would make the commonest outcome the loudest. */
+  var OUTCOME = [
+    { key: 'accepted', name: 'Accepted', color: COLOR.green },
+    { key: 'dismissed', name: 'Dismissed', color: COLOR.s2 },
+    { key: 'ignored', name: 'Ignored', color: COLOR.muted }
+  ];
+
+  /**
+   * The two headline numbers of the offers card: how many were RAISED, and how
+   * many were TAKEN.
+   *
+   * Two tiles rather than one with a rate on it, because they answer different
+   * questions and the second is not a property of the first. How many offers
+   * the app put in front of people is a fact about the app's own pacing — the
+   * shared 7-day cool-down, the annual milestones, the founding-member card's
+   * single day — and how many were accepted is a fact about the people. The
+   * rate between them is in the funnel rows below, per offer, where it is over
+   * enough cards to carry a decimal point.
+   *
+   * Each tile's splits are the ones its own number divides by:
+   *
+   *   RAISED  splits by OUTCOME, which is what became of these very cards, and
+   *           by PLATFORM, which is who they were raised in front of. Two rows,
+   *           because they are two partitions of one count and run together
+   *           they read as one list of six things that sums to nothing.
+   *
+   *   TAKEN   splits by OFFER TYPE, and only that. The two cards are aimed at
+   *           different people — one whose access lapsed months ago, one who
+   *           has just been convinced — so which of them is actually being
+   *           bought is the whole question, and a platform row underneath would
+   *           be answering a quieter one at the same volume.
+   */
+  function renderOfferTiles(ix, days) {
+    var host = document.getElementById('pgOfferTiles');
+    if (!host) return;
+    var all = A.offerFunnel(ix, days, null);
+    if (!all.shown && !all.accepted) { host.innerHTML = ''; return; }
+
+    /* The outcomes as tile parts. They are a partition of `shown` — unless the
+       range caught a card raised on its last evening and answered after
+       midnight, which `settled` is the check for; the note says so rather than
+       letting three numbers quietly overrun the one above them. */
+    var outcomeSplit = OUTCOME.map(function (o) {
+      return { name: o.name.toLowerCase(), color: o.color, value: fmtInt(all[o.key]) };
+    });
+    var shownStores = A.kindPlatformsOver(ix, 'osh', days);
+    var takenStores = A.kindPlatformsOver(ix, 'oac', days);
+
+    /* Which offer was taken. Ordered by the route's own alphabet rather than by
+       size, the same rule every split on this page follows — a colour that
+       moves with rank is a colour that means nothing. */
+    var typeSplit = A.slotOrder('oac').filter(function (k) {
+      return A.slotOver(ix, 'oac', days, k) > 0;
+    }).map(function (k) {
+      return {
+        name: A.slotName('oac', k), color: OFFER_COLOR[k],
+        value: fmtInt(A.slotOver(ix, 'oac', days, k))
+      };
+    });
+
+    host.innerHTML = [
+      tile({
+        label: 'Offers raised', color: ENTITY.sales, value: fmtInt(all.shown),
+        meta: 'cards put in front of somebody, across ' + fmtInt(days.length) + ' day' +
+          (days.length === 1 ? '' : 's') +
+          rangeTrendNote(ix, days, function (d) {
+            return A.kindKnown(ix, 'osh', d) ? A.eventsOn(ix, 'osh', d) : null;
+          }) +
+          storeSplitNote(ix, shownStores) +
+          (all.settled ? ''
+            : ' · more were answered than raised in this window, so ignored is a floor rather ' +
+              'than a count — a card raised the evening before the range began, answered inside it'),
+        split: outcomeSplit,
+        splitB: storeSplit(shownStores)
+      }),
+      tile({
+        label: 'Offers accepted', color: COLOR.green, value: fmtInt(all.accepted),
+        /* The one line this tile must never lose: an accept is a tap on the
+           card's buy button and not a purchase. The subscribe counter is where
+           money is counted and the gap between them is the store sheet. */
+        meta: 'buy button tapped — not a completed purchase, which is the subscribe counter' +
+          rangeTrendNote(ix, days, function (d) {
+            return A.kindKnown(ix, 'oac', d) ? A.eventsOn(ix, 'oac', d) : null;
+          }) +
+          storeSplitNote(ix, takenStores),
+        split: typeSplit
+      })
+    ].join('');
+  }
+
   function renderOffers(ix, days) {
     var letters = ['A', 'F'].filter(function (k) { return A.slotOver(ix, 'osh', days, k) > 0; });
+    renderOfferTiles(ix, days);
 
+    /* WHAT HAPPENED, per day, rather than how many cards were raised. The three
+       bands sum to the day's shows, so the stack's height is still the old
+       chart's number and the split inside it is the answer — which is the whole
+       trade: the offer TYPE moves to the table below, where it can be read
+       beside its own outcomes instead of competing with them for the same axis.
+
+       BARS, not the areas this page uses elsewhere. An area says a quantity was
+       continuous between two days; offers are a handful of discrete cards on a
+       handful of days, and a filled slope between one Tuesday's two and one
+       Friday's three draws four days of offers that never existed. */
+    var perDay = days.map(function (d) { return A.offerDay(ix, d); });
     drawChart('pgOffers', {
       x: days.map(dayX), stacked: true, height: 240, format: fmtInt, xLabel: 'Day',
-      series: letters.map(function (k) {
+      series: OUTCOME.map(function (o) {
         return {
-          key: k, name: A.slotName('osh', k), color: OFFER_COLOR[k], type: 'area',
-          values: days.map(function (d) {
-            return A.kindKnown(ix, 'osh', d) ? A.slotOn(ix, 'osh', d, k) : 0;
-          })
+          key: o.key, name: o.name, color: o.color, type: 'bar',
+          values: perDay.map(function (r) { return r[o.key]; })
         };
       }),
       emptyText: 'No offers shown in this range.',
       tooltipNote: function (i) {
-        return A.kindKnown(ix, 'osh', days[i]) ? '' : 'before the offer counters shipped';
+        if (!perDay[i].known) return 'before the offer counters shipped';
+        /* The one caveat this chart cannot draw: an offer raised in the evening
+           can be answered after midnight, and that answer lands on the next
+           day's bar. Where a day's responses outnumber its shows that has
+           demonstrably happened, and its `ignored` is a clamp rather than a
+           count — said on the day it applies to rather than buried in the hint,
+           since it is the only place the reader would otherwise be misled. */
+        return perDay[i].settled ? ''
+          : 'more answers than offers on this day — a card raised the evening before, answered after midnight';
       }
     });
 
     var host = document.getElementById('pgOfferNote');
+    var dayHost = document.getElementById('pgOfferDays');
     if (!letters.length) {
       host.innerHTML = '<p class="note" style="margin-top:10px">' +
         (ix.firstDay && ix.firstDay.osh
           ? 'No offer was shown in this range. Both are paced — the annual window opens at 30, 90, 180 and ' +
             '365 days since install, and the founding-member card lives for a single day.'
           : 'The offer counters have not been heard from yet.') + '</p>';
+      if (dayHost) dayHost.innerHTML = '';
       return;
     }
+    renderOfferDays(dayHost, ix, days);
 
     host.innerHTML = '<div class="mini-rows">' + letters.map(function (k) {
       var f = A.offerFunnel(ix, days, k);
@@ -3357,6 +3612,74 @@
       '<p class="hint" style="margin:8px 0 0"><b>Accepted</b> is a tap on the card\'s buy button, not a ' +
       'completed purchase — compare it with the subscribe counter, and the difference is the store sheet. ' +
       'Ignored is the outcome with no gesture attached to it, and usually the largest.</p>';
+  }
+
+  /**
+   * One row per day per offer: how many were raised, and what became of them.
+   *
+   * The chart above pools the two offers so the outcomes have the axis to
+   * themselves; this is where the pooling is undone, because the annual card
+   * and the founding-member card are aimed at two different people — one whose
+   * access lapsed months ago and one who has just been convinced — and a
+   * combined accept rate is an average over that gap rather than a fact about
+   * either.
+   *
+   * NO PER-DAY ACCEPT RATE, deliberately, and for the reason the range trend
+   * above is on the count: an offer shown three times and taken once is 33%,
+   * and a percentage over three events moves in thirty-point jumps that mean
+   * nothing. The rates live in the range rows above, over enough cards to be
+   * worth a decimal point. This table is counts.
+   *
+   * Newest day first: the range can be ninety rows long and the day being asked
+   * about is almost always the last one.
+   *
+   * Its letters are its OWN, not the funnel rows' above: those are the two
+   * offers the app raises, and this walks the whole alphabet the route can
+   * speak so that a card from a build sending a letter this dashboard does not
+   * know still gets a row. Otherwise the rows would silently fail to add up to
+   * the chart's bars, which pool every letter.
+   */
+  function renderOfferDays(host, ix, days) {
+    if (!host) return;
+    var letters = A.slotOrder('osh').filter(function (k) {
+      return ['osh', 'oac', 'odm'].some(function (kind) { return A.slotOver(ix, kind, days, k) > 0; });
+    });
+    var rows = [];
+    var unsettled = 0;
+    days.slice().reverse().forEach(function (d) {
+      letters.forEach(function (k) {
+        var r = A.offerDay(ix, d, k);
+        if (!r.any) return;
+        if (!r.settled) unsettled += 1;
+        rows.push('<tr><td>' + esc(labelDay(d)) + '</td>' +
+          '<td><span class="swatch" style="background:' + OFFER_COLOR[k] + '"></span> ' +
+          esc(A.slotName('osh', k)) + '</td>' +
+          '<td>' + fmtInt(r.shown) + '</td>' +
+          '<td>' + fmtInt(r.accepted) + '</td>' +
+          '<td>' + fmtInt(r.dismissed) + '</td>' +
+          /* A clamped `ignored` is marked rather than printed flat: on a day
+             whose answers outnumbered its shows the subtraction is not a count
+             of anything, and 0 there would read as "everybody responded". */
+          '<td>' + (r.settled ? fmtInt(r.ignored) : '<span class="na">–</span>') + '</td></tr>');
+      });
+    });
+    if (!rows.length) { host.innerHTML = ''; return; }
+    host.innerHTML =
+      '<div class="sub-head" style="margin-top:16px"><h3>Day by day, per offer</h3></div>' +
+      '<div class="table-scroll"><table><thead><tr><th>Day</th><th>Offer</th><th>Shown</th>' +
+      '<th>Accepted</th><th>Dismissed</th><th>Ignored</th></tr></thead><tbody>' +
+      rows.join('') + '</tbody></table></div>' +
+      '<p class="hint" style="margin:8px 0 0">Each row is one offer on one day. <b>Shown</b> is the ' +
+      'card being raised; the three columns beside it are what happened to it, and they add back up to ' +
+      'it. An outcome is counted on the day the <b>gesture</b> landed, not the day the card was raised — ' +
+      'the annual window is 24 hours and the founding-member card lives for a calendar day, so an offer ' +
+      'seen in the evening can be answered after midnight and answered on the next row.' +
+      (unsettled
+        ? ' <b>' + fmtInt(unsettled) + '</b> row' + (unsettled === 1 ? '' : 's') + ' here answered more ' +
+          'offers than were raised on the day, which is that crossing happening: ignored is not a count ' +
+          'on those and is left blank rather than shown as zero.'
+        : '') +
+      ' Range totals are above, where the crossings cancel out.</p>';
   }
 
   /* The remaining per-letter routes on one axis. They are drawn together

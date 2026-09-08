@@ -555,6 +555,140 @@ const drifted = A.index({
 check('a drifted day is reported above 100%, not clamped',
   near(A.measureShare(drifted, C3), 125), String(A.measureShare(drifted, C3)));
 
+/* The same day cut by WHO the person was, which the pooled share cannot see: a
+   day heavy with installs and a day heavy with regulars reach the same number
+   for opposite reasons, and the ratio between the two halves is the only thing
+   that says whether the wizard's first reading is landing.
+
+     D1  20 active — 8 first runs, 12 back for a second day
+         8 readings — 2 by first runs (25%), 6 by returners (50%)
+     D2  5 active, all returning, 2 of them measured (40%) and no first run
+         at all, which must read as unknown rather than as a 0% first-run rate */
+const D1 = A.addDays(C3, 1), D2 = A.addDays(C3, 2);
+const cut = A.index({
+  open: shape({ [C3]: { [C3]: 20 }, [D1]: { [C3]: 12, [D1]: 8 }, [D2]: { [C3]: 5 } }),
+  hrv: shape({ [C3]: { [C3]: 6 }, [D1]: { [C3]: 6, [D1]: 2 }, [D2]: { [C3]: 2 } }),
+});
+const cs = A.measureShareSplit(cut, D1);
+check('the split reads the numerator off the same cohort key the denominator does',
+  cs.fresh.did === 2 && cs.fresh.of === 8 && cs.returning.did === 6 && cs.returning.of === 12,
+  JSON.stringify(cs));
+check('and each side is a rate over its OWN population, not a part of the whole',
+  near(cs.fresh.pct, 25) && near(cs.returning.pct, 50) && near(A.measureShare(cut, D1), 40),
+  JSON.stringify(cs));
+/* The two halves are the two halves of `activeOn`, and their readings are all
+   of the day's readings — so the counts partition even though the rates do not,
+   which is what stops a reading from a cohort the open rows never saw being
+   dropped on the floor. */
+check('the counts behind the two rates account for the whole day',
+  cs.fresh.did + cs.returning.did === A.readingsOn(cut, D1) &&
+  cs.fresh.of + cs.returning.of === A.activeOn(cut, D1), JSON.stringify(cs));
+
+const cs2 = A.measureShareSplit(cut, D2);
+check('a day with nobody of one kind reports unknown for it, never 0%',
+  cs2.fresh.of === 0 && cs2.fresh.pct === null && near(cs2.returning.pct, 40),
+  JSON.stringify(cs2));
+
+check('the split obeys the counter\'s birthday exactly as the share does',
+  A.measureShareSplit(mix, C2) === null && A.measureShareSplit(legacy, LAST) === null);
+
+/* ------------------------------------------------------------- records
+
+   "Is this the best number we have ever had?" The badge on a day tile is one
+   line of copy over this function, so every rule that stops it lying lives
+   here.
+
+   A twenty-day series, one install per cohort so the arithmetic IS the series:
+   sixteen quiet days at 2, then 5, 3, 9, 4. Only the 9 has ever been beaten by
+   nothing. */
+const REC0 = '2026-07-01';
+const rDay = (n) => A.addDays(REC0, n);
+const recSeries = [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 5, 3, 9, 4];
+const recOpen = {};
+recSeries.forEach((n, i) => put(recOpen, rDay(i), rDay(i), n));
+const recIx = A.index({ open: shape(recOpen) });
+const athOf = (day, opts) => A.dayRecord(recIx, day, A.activeOn, opts);
+
+check('a day above every other day is a record',
+  athOf(rDay(18)).isRecord === true && athOf(rDay(18)).best === 5 &&
+  athOf(rDay(18)).bestDay === rDay(16), JSON.stringify(athOf(rDay(18))));
+check('an ordinary day is not', athOf(rDay(19)).isRecord === false);
+
+/* EVERY OTHER DAY, not just the earlier ones. rDay(16) was the highest thing
+   we had when it happened, and it is not the highest thing we have — the badge
+   says the second, so a day beaten later must not wear it. */
+check('a day beaten LATER is not called a record',
+  athOf(rDay(16)).isRecord === false && athOf(rDay(16)).best === 9,
+  JSON.stringify(athOf(rDay(16))));
+
+/* STRICTLY GREATER. Matching the best day is not an all-time high, it is a
+   tie, and the two are different claims — so a joint top gives nobody the
+   badge rather than giving it to both. */
+const tieSeries = recSeries.slice(0, 19).concat([9]);
+const tieOpen = {};
+tieSeries.forEach((n, i) => put(tieOpen, rDay(i), rDay(i), n));
+const tieIx = A.index({ open: shape(tieOpen) });
+check('a day that only MATCHES the best is not a record',
+  A.dayRecord(tieIx, rDay(19), A.activeOn).isRecord === false &&
+  A.dayRecord(tieIx, rDay(19), A.activeOn).best === 9,
+  JSON.stringify(A.dayRecord(tieIx, rDay(19), A.activeOn)));
+check('and neither is the day it tied with',
+  A.dayRecord(tieIx, rDay(18), A.activeOn).isRecord === false);
+
+/* "Ever" needs enough history to mean anything, or the third day a counter ran
+   is the best day it ever had — trivially, and uselessly. */
+check('the bar is a fortnight of comparable days', A.RECORD_MIN_DAYS === 14);
+const tooNew = A.index({ open: shape({ [REC0]: { [REC0]: 1 }, [rDay(1)]: { [rDay(1)]: 9 } }) });
+check('a series with no history yet claims nothing',
+  A.dayRecord(tooNew, rDay(1), A.activeOn).isRecord === false &&
+  A.dayRecord(tooNew, rDay(1), A.activeOn).days === 1,
+  JSON.stringify(A.dayRecord(tooNew, rDay(1), A.activeOn)));
+check('and says how little it had, so the UI can explain its silence',
+  athOf(rDay(18)).days === 19 && athOf(rDay(18)).enough === true, JSON.stringify(athOf(rDay(18))));
+
+/* A series that has never moved sits at its maximum every day, and zero is not
+   a record however long it has held the top. */
+const flatDays = {};
+for (let i = 0; i < 20; i++) put(flatDays, rDay(i), rDay(i), 0);
+const flatIx = A.index({ open: shape(flatDays) });
+check('a series that has never moved has no record in it',
+  A.dayRecord(flatIx, rDay(19), A.activeOn).isRecord === false);
+
+/* `comparable` is ONE gate doing two jobs, because they are the same question.
+   A counter's pre-ship days would read as zeros, and a history of false lows
+   hands the badge to an ordinary day: with the first sixteen days excluded the
+   window is [5, 3, 9, 4], where the quiet 4 is now second-best and still not a
+   record, and the real high still is one. */
+const late = (i, d) => d >= rDay(16);
+const lateOpts = { comparable: late, minDays: 3 };
+check('days before a counter shipped are excluded rather than counted as lows',
+  A.dayRecord(recIx, rDay(19), A.activeOn, lateOpts).isRecord === false &&
+  A.dayRecord(recIx, rDay(19), A.activeOn, lateOpts).days === 3,
+  JSON.stringify(A.dayRecord(recIx, rDay(19), A.activeOn, lateOpts)));
+check('and the real high still holds the record inside that window',
+  A.dayRecord(recIx, rDay(18), A.activeOn, lateOpts).isRecord === true);
+check('a day the gate refuses makes no claim at all',
+  A.dayRecord(recIx, rDay(2), A.activeOn, lateOpts) === null);
+
+/* The other half of the same gate: a rate over a denominator too small to
+   divide by. The highest share this app has ever seen must not be the day two
+   people opened it and one of them measured — so a thin day leaves the history
+   as well as failing to claim the badge. */
+const thinDay = (i, d) => A.activeOn(i, d) >= 3;
+check('a denominator too small to divide by drops out of both sides',
+  A.dayRecord(recIx, rDay(18), A.activeOn, { comparable: thinDay, minDays: 3 }).days === 3,
+  JSON.stringify(A.dayRecord(recIx, rDay(18), A.activeOn, { comparable: thinDay, minDays: 3 })));
+
+/* The activation counter gained a birthday for this: `activation` works over
+   cohorts, where `first` already excludes the unmeasurable, but a DAY SERIES
+   needs to know which days the route was even running. */
+const actRec = A.index({ open: shape(open), sub: shape(sub), act: shapeAct(act) });
+check('the activation counter has a birthday of its own now',
+  actRec.actFirst === C1 && A.actKnown(actRec, C1) === true &&
+  A.actKnown(actRec, A.addDays(C1, -1)) === false, String(actRec.actFirst));
+check('and a report with no activation rows has none, rather than claiming day one',
+  legacy.actFirst === null && A.actKnown(legacy, LAST) === false);
+
 /* Measuring at day N: retention's twin, with one extra exclusion nothing else
    here has — a cohort whose day N fell before the counter shipped is neither
    churned nor too young. */

@@ -461,6 +461,24 @@ check('the share of actives who measured is stated as a share of people',
   tiles['Measured of active'].value === '25.0%', tiles['Measured of active'].value);
 check('and names both sides of it',
   /1 of 4/.test(tiles['Measured of active'].meta), tiles['Measured of active'].meta);
+
+/* And the same day cut by who the person was — the question the pooled rate
+   cannot answer, since a day heavy with installs and a day heavy with regulars
+   reach the same number for opposite reasons.
+   T-0 has four returning installs and no first run at all, which is the case
+   worth pinning here: the missing half is DROPPED rather than drawn as 0%,
+   because there was nobody to measure and a rate over nobody is not a low rate.
+   Both halves' arithmetic is pinned in analytics.test.mjs. */
+const shareTile = [].slice.call($('pgTilesToday').querySelectorAll('.tile'))
+  .filter((t) => t.querySelector('.label').textContent.trim() === 'Measured of active')[0];
+const shareSplit = shareTile.querySelector('.split');
+check('the measuring share is split by first run vs returning',
+  !!shareSplit && /of returning\s*25\.0%/.test(shareSplit.textContent.replace(/\s+/g, ' ')),
+  shareSplit && shareSplit.textContent);
+check('and a side nobody was in that day is left out, not drawn as 0%',
+  !/of first runs/.test(shareSplit.textContent), shareSplit.textContent);
+check('the counts behind the two rates are spelled out, so neither reads as a part of the whole',
+  /4 returning/.test(tiles['Measured of active'].meta), tiles['Measured of active'].meta);
 check('the window rate pools install-days',
   tiles['Measured per active day'].value === '43.5%', tiles['Measured per active day'].value);
 check('and says how many days predate the counter rather than counting them as zero',
