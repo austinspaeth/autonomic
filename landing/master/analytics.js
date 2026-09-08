@@ -785,6 +785,67 @@ window.Analytics = (function () {
   }
 
   /**
+   * ONE DAY's offer outcomes, for one offer or (with no letter) for both.
+   *
+   * `offerFunnel` over a single day would give the same four numbers, and the
+   * reason this exists separately is the caveat it carries: `ignored` is a
+   * SUBTRACTION, and over one day the three counters it subtracts from each
+   * other are not guaranteed to be about the same cards.
+   *
+   * An offer is raised on one day and answered whenever the person next picks
+   * up the phone. The annual card's window is 24 hours and the founding-member
+   * card's is a calendar day, so a card raised in the evening can perfectly
+   * well be accepted after midnight — and that accept lands on the NEXT day's
+   * row, against a `shown` it was never part of. Over a range those crossings
+   * cancel out except at the two edges, which is why `offerFunnel` is the
+   * figure to trust and this one is a shape.
+   *
+   * So `settled` says whether the day's own arithmetic held. When responses
+   * outnumber the day's shows, `ignored` clamps at 0 and `settled` is false —
+   * the row is still drawn, because a day on which more offers were answered
+   * than raised is a real and readable thing, but nothing may print its
+   * `ignored` as a finding.
+   *
+   * With no letter this reads the route TOTAL, which everywhere else on a
+   * per-letter route is the number not to divide by. It is legitimate here
+   * because nothing here divides by it: these are counts of CARDS, and the
+   * question "how many offers were raised today and what became of them" is
+   * about cards. It is emphatically not a headcount of people — see
+   * `isHeadcount` — and no share may be computed off it.
+   */
+  function offerDay(ix, day, letter) {
+    var read = function (kind) {
+      if (!kindKnown(ix, kind, day)) return 0;
+      return letter ? slotOn(ix, kind, day, letter) : eventsOn(ix, kind, day);
+    };
+    var shown = read('osh');
+    var dismissed = read('odm');
+    var accepted = read('oac');
+    var answered = dismissed + accepted;
+    return {
+      day: day,
+      known: kindKnown(ix, 'osh', day),
+      shown: shown,
+      dismissed: dismissed,
+      accepted: accepted,
+      ignored: Math.max(0, shown - answered),
+      settled: answered <= shown,
+      acceptPct: shown ? (accepted / shown) * 100 : null,
+      /* Anything at all to draw a row for. A day with no shows but a response
+         on it is exactly the midnight crossing above, and dropping it would
+         hide the evidence for the caveat. */
+      any: shown > 0 || answered > 0
+    };
+  }
+
+  /** `offerDay` across a range, newest last, keeping only the days with
+   *  something on them. */
+  function offerDays(ix, days, letter) {
+    return (days || []).map(function (d) { return offerDay(ix, d, letter); })
+      .filter(function (r) { return r.any; });
+  }
+
+  /**
    * Installs that have reported at least one failure, cumulatively.
    *
    * The `err` route fires once per install EVER, so a day's count is new
@@ -1015,6 +1076,51 @@ window.Analytics = (function () {
     var active = activeOn(ix, day);
     if (!active) return null;
     return (readingsOn(ix, day) / active) * 100;
+  }
+
+  /**
+   * `measureShare` split by whether the install was on its FIRST RUN that day
+   * or coming back.
+   *
+   * TWO RATES, NOT A PARTITION. Everything else on this page that splits a
+   * count divides it into parts that add back up to it; these two do not, and a
+   * caller that prints them like a store split is stating something false. Each
+   * is its own share of its own population — of the day's first runs, how many
+   * measured; of the day's returners, how many measured — and the two
+   * denominators are the halves of `activeOn` that `newOn` and `returningOn`
+   * already name.
+   *
+   * It is the one cut of the measuring rate that says whether the onboarding
+   * works, because the pooled figure cannot: a day heavy with installs and a
+   * day heavy with regulars produce the same number for opposite reasons, and
+   * the ratio between these two IS the gap the wizard's first reading is meant
+   * to close.
+   *
+   * The reading rows carry the same cohort key the open rows do, so the
+   * numerator splits on exactly the fact the denominator splits on — no second
+   * source, no attribution. A day's readings by first-run installs are the ones
+   * whose cohort is the day itself; the rest came back for them.
+   *
+   * Either side can be null and it means "nobody of that kind was here", never
+   * 0%: a day with no installs at all has no first-run rate to report, the same
+   * "unknown is not zero" rule `hrvKnown` applies one level up. And either side
+   * can exceed 100% for the reason `measureShare` can, so neither is clamped.
+   */
+  function measureShareSplit(ix, day) {
+    if (!hrvKnown(ix, day)) return null;
+    var freshOf = newOn(ix, day);
+    var freshDid = hrvCountOn(ix, day, day);
+    var backOf = returningOn(ix, day);
+    /* The returning half is the remainder, deliberately: it is every reading
+       that day minus the ones its own first-run installs took, so a reading
+       from a cohort the open rows never saw still lands somewhere rather than
+       being dropped for failing to match a known cohort. */
+    var backDid = Math.max(0, readingsOn(ix, day) - freshDid);
+    return {
+      fresh: { did: freshDid, of: freshOf, pct: freshOf ? (freshDid / freshOf) * 100 : null },
+      returning: { did: backDid, of: backOf, pct: backOf ? (backDid / backOf) * 100 : null },
+      available: freshOf > 0 || backOf > 0
+    };
   }
 
   /**
@@ -2021,7 +2127,8 @@ window.Analytics = (function () {
     activationsOn: activationsOn, actCountOn: actCountOn, actPlatformsOn: actPlatformsOn,
     readingsOn: readingsOn, hrvCountOn: hrvCountOn, hrvPlatformsOn: hrvPlatformsOn,
     hrvMethodsOn: hrvMethodsOn, hrvMethodsOver: hrvMethodsOver, hrvMethodKnown: hrvMethodKnown,
-    hrvKnown: hrvKnown, measureShare: measureShare, measureRate: measureRate,
+    hrvKnown: hrvKnown, measureShare: measureShare, measureShareSplit: measureShareSplit,
+    measureRate: measureRate,
     measuringAt: measuringAt, measuringCurve: measuringCurve,
     methodsOn: methodsOn, methodsOver: methodsOver,
     hrvMethodsOn: hrvMethodsOn, hrvMethodsOver: hrvMethodsOver,
@@ -2035,7 +2142,8 @@ window.Analytics = (function () {
     slotOn: slotOn, slotOver: slotOver,
     kindKnown: kindKnown, isHeadcount: isHeadcount,
     shareOfActive: shareOfActive, slotShare: slotShare,
-    captureFunnel: captureFunnel, offerFunnel: offerFunnel, errorInstalls: errorInstalls,
+    captureFunnel: captureFunnel, offerFunnel: offerFunnel,
+    offerDay: offerDay, offerDays: offerDays, errorInstalls: errorInstalls,
 
     // faults — not a counter; see the block above `export`
     faultGroups: faultGroups, faultsOn: faultsOn, faultSummary: faultSummary,

@@ -384,6 +384,27 @@ store sheet — abandoned, or declined. Calling this "converted" would close tha
 gap silently. The third outcome is the common one: an offer neither accepted nor
 dismissed was **ignored**, and the card counts it rather than leaving it implied.
 
+The card is drawn **by outcome, not by offer**: the bars stack accepted /
+dismissed / ignored per day, so the stack's height is still the day's shows and
+the split inside it is the answer. They are BARS rather than the areas this page
+uses elsewhere, because offers are a handful of discrete cards on a handful of
+days and a filled slope between one Tuesday's two and one Friday's three draws
+four days of offers that never happened. Which offer each bar was made of moves
+to a **day-by-day table** under it (`A.offerDay` / `A.offerDays`), one row per
+day per offer, and that table walks the route's whole alphabet rather than the
+two offers the app currently raises — a card whose letter this dashboard cannot
+read is in the bars, so it has to be in a row too or the two stop adding up.
+Two rules there. **No per-day accept rate**, for the reason the range trend
+above it is on the count: a percentage over three events moves in thirty-point
+jumps that mean nothing, so the table is counts and the rates stay in the range
+rows. And **`ignored` is a subtraction, not a counter**: an outcome lands on the
+day the GESTURE happened, and the annual window is 24 hours while the founding
+member card lives a calendar day, so a card seen in the evening can be answered
+after midnight. Where a day's answers outnumber its shows that has demonstrably
+happened; `offerDay.settled` says so, the row leaves ignored blank rather than
+printing a zero that would read as "everybody responded", and the range totals
+above — where the crossings cancel out — are the figures to trust.
+
 And `err` is not a daily counter at all. It fires **once per install, ever**, so
 a day's count is new installs joining that population and the running total is
 the population. It carries no tag and no message, so it says how many phones are
@@ -538,7 +559,17 @@ the UI, each of them deliberate:
   not measure, which is the shape that precedes churn and which nothing else
   here can see. The tile strip carries the same pair at a glance: *Measured on
   <day>*, *Measured of active* (the day's share) and *Measured per active day*
-  (the range's, pooled as install-days). The reading rate can exceed 100% on a
+  (the range's, pooled as install-days). *Measured of active* also carries the
+  day's share cut by **first run vs returning** (`A.measureShareSplit`), which
+  the pooled figure cannot see: a day heavy with installs and a day heavy with
+  regulars reach the same number for opposite reasons, and the gap between the
+  two halves is whether the wizard's first reading is landing. It is the one
+  split on the page that is **not a partition** — two rates over two
+  populations, not two parts of the number above them — so both are printed as
+  percentages with their denominator in the name ("of first runs"), and the
+  counts behind them go in the meta line where they cannot be read as addable.
+  A day with nobody of one kind reports nothing for it rather than 0%: there was
+  no one to measure, and a rate over nobody is not a low rate. The reading rate can exceed 100% on a
   day when a reading landed without its open ping — a launch made offline, or a
   reading saved either side of midnight Eastern — and it is **shown as it comes
   out rather than clamped**, because that gap is the only signal that says the

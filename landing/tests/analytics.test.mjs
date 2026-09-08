@@ -555,6 +555,43 @@ const drifted = A.index({
 check('a drifted day is reported above 100%, not clamped',
   near(A.measureShare(drifted, C3), 125), String(A.measureShare(drifted, C3)));
 
+/* The same day cut by WHO the person was, which the pooled share cannot see: a
+   day heavy with installs and a day heavy with regulars reach the same number
+   for opposite reasons, and the ratio between the two halves is the only thing
+   that says whether the wizard's first reading is landing.
+
+     D1  20 active — 8 first runs, 12 back for a second day
+         8 readings — 2 by first runs (25%), 6 by returners (50%)
+     D2  5 active, all returning, 2 of them measured (40%) and no first run
+         at all, which must read as unknown rather than as a 0% first-run rate */
+const D1 = A.addDays(C3, 1), D2 = A.addDays(C3, 2);
+const cut = A.index({
+  open: shape({ [C3]: { [C3]: 20 }, [D1]: { [C3]: 12, [D1]: 8 }, [D2]: { [C3]: 5 } }),
+  hrv: shape({ [C3]: { [C3]: 6 }, [D1]: { [C3]: 6, [D1]: 2 }, [D2]: { [C3]: 2 } }),
+});
+const cs = A.measureShareSplit(cut, D1);
+check('the split reads the numerator off the same cohort key the denominator does',
+  cs.fresh.did === 2 && cs.fresh.of === 8 && cs.returning.did === 6 && cs.returning.of === 12,
+  JSON.stringify(cs));
+check('and each side is a rate over its OWN population, not a part of the whole',
+  near(cs.fresh.pct, 25) && near(cs.returning.pct, 50) && near(A.measureShare(cut, D1), 40),
+  JSON.stringify(cs));
+/* The two halves are the two halves of `activeOn`, and their readings are all
+   of the day's readings — so the counts partition even though the rates do not,
+   which is what stops a reading from a cohort the open rows never saw being
+   dropped on the floor. */
+check('the counts behind the two rates account for the whole day',
+  cs.fresh.did + cs.returning.did === A.readingsOn(cut, D1) &&
+  cs.fresh.of + cs.returning.of === A.activeOn(cut, D1), JSON.stringify(cs));
+
+const cs2 = A.measureShareSplit(cut, D2);
+check('a day with nobody of one kind reports unknown for it, never 0%',
+  cs2.fresh.of === 0 && cs2.fresh.pct === null && near(cs2.returning.pct, 40),
+  JSON.stringify(cs2));
+
+check('the split obeys the counter\'s birthday exactly as the share does',
+  A.measureShareSplit(mix, C2) === null && A.measureShareSplit(legacy, LAST) === null);
+
 /* Measuring at day N: retention's twin, with one extra exclusion nothing else
    here has — a cohort whose day N fell before the counter shipped is neither
    churned nor too young. */
