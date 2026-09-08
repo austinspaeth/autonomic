@@ -56,6 +56,42 @@ const hexA = (hex: string, a: number) => {
 // THIS device (Apple Health / Health Connect).
 const SOURCE_LABEL: Record<string, string> = { polar: 'Bluetooth device', watch: 'Apple Watch', garmin: 'Garmin watch', camera: 'Device camera', manual: 'Manual entry', health: healthAppName() };
 
+/**
+ * How good the capture itself was, for the reading's Details card — duration,
+ * beats, usable pulse, artifacts, the pipeline's own verdict, and the segments
+ * behind it. These are stamped at capture time (Results.tsx); a reading from an
+ * older build carries none of them, and each row is simply OMITTED there rather
+ * than shown as 0 — "0% artifacts" about a measurement nobody graded is a
+ * quality claim we cannot make. Same rule per field, so a reading that stamped
+ * artifacts but not beats shows the one it has.
+ */
+const CONFIDENCE_WORD: Record<string, string> = { high: 'High', fair: 'Fair', low: 'Low' };
+function captureFacts(r: Entry): { label: string; value: string }[] {
+  const out: { label: string; value: string }[] = [];
+  const num = (v: unknown): number | null => { const n = parseFloat(v as string); return isNaN(n) ? null : n; };
+  const dur = num(r.durationSec);
+  // An IMPORTED reading's `durationSec` means real RR coverage, not an elapsed
+  // session (see LiveHrvExtras) — so it is reported as coverage, not duration.
+  if (dur != null && !r.imported) out.push({ label: 'Duration', value: fmtDuration(dur) });
+  const beats = num(r.beatCount);
+  if (beats != null) out.push({ label: 'Beats', value: String(Math.round(beats)) });
+  const cov = num(r.coverageSec) ?? (r.imported ? dur : null);
+  if (cov != null) out.push({ label: 'Usable pulse', value: fmtDuration(cov) });
+  const art = num(r.artifactPct);
+  if (art != null) out.push({ label: 'Artifacts', value: `${Math.round(art * 10) / 10}%` });
+  const conf = CONFIDENCE_WORD[String(r.confidence)];
+  if (conf) out.push({ label: 'Confidence', value: conf });
+  const used = num(r.segmentsUsed), droppedSeg = num(r.segmentsDropped);
+  if (used != null && used > 1) out.push({ label: 'Segments used', value: String(Math.round(used)) });
+  if (droppedSeg != null && droppedSeg > 0) out.push({ label: 'Segments dropped', value: String(Math.round(droppedSeg)) });
+  return out;
+}
+
+const fmtDuration = (sec: number) => {
+  const s = Math.max(0, Math.round(sec));
+  return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, '0')}s`;
+};
+
 function sourceLabelFor(r: Entry): string | undefined {
   if ((r.source === 'polar' || r.source === 'garmin') && r.sourceName) return String(r.sourceName);
   return r.source ? SOURCE_LABEL[r.source as string] : undefined;
@@ -437,7 +473,8 @@ function HrvSummaryBody({ r, days, ctx, type }: SummaryProps & { type: 'breathHr
   // Training readings are all 4/6 now, so the style row would just restate the
   // type. It only earns its place on legacy readings taken on a retired pattern.
   const legacyStyle = type === 'breathHrv' && r.style && r.style !== BREATH_STYLE ? styleTitle(r.style as string) : null;
-  const hasDetails = !!sourceLabel || !!legacyStyle || !!r.period;
+  const capture = captureFacts(r);
+  const hasDetails = !!sourceLabel || !!legacyStyle || !!r.period || capture.length > 0;
   return (
     <>
       <Section cat={overall}>
@@ -562,6 +599,7 @@ function HrvSummaryBody({ r, days, ctx, type }: SummaryProps & { type: 'breathHr
             {sourceLabel ? <MetricRow label="Source" value={sourceLabel} cat={false} /> : null}
             {legacyStyle ? <MetricRow label="Breathing style" value={legacyStyle} cat={false} /> : null}
             {r.period ? <MetricRow label="Reading type" value={r.period as string} cat={false} /> : null}
+            {capture.map((f) => <MetricRow key={f.label} label={f.label} value={f.value} cat={false} />)}
           </View>
         </Section>
       ) : null}

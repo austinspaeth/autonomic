@@ -22,12 +22,21 @@ import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { SheetControls, SheetFooter } from '../../components/Sheet';
 import { Button } from '../../components/ui';
 import { Icon } from '../../components/Icon';
-import { usePalette } from '../../theme';
+import { GRADE_COLORS, usePalette } from '../../theme';
 import { fmtTime12, pad } from '../../lib/dates';
+import { readingCompleteness } from '../../lib/hrv';
+import { rrSeconds } from '../../lib/health/rrCandidates';
 import { HrvResults } from './Results';
 import {
   getWatchSyncState, minimizeWatchSync, stopWatchSync, subscribeWatchSync, type WatchCandidate,
 } from './watchSyncStore';
+
+const hexA = (hex: string, a: number) => {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex);
+  if (!m) return hex;
+  const n = parseInt(m[1], 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+};
 
 const timeOf = (ms: number) => {
   const d = new Date(ms);
@@ -39,9 +48,17 @@ const durLabel = (c: WatchCandidate) => {
 };
 
 /** One tappable RR-backed reading, shared by the which-one picker and the
- *  waiting card's found-in-Health list. */
+ *  waiting card's found-in-Health list.
+ *
+ *  The chip is the point: the frequency floors are charged against SUMMED RR
+ *  (lib/hrv), so a reading that looks like a 5-minute session by the clock can
+ *  still resolve no Total power, VLF or LF peak — and until the user has picked
+ *  it there is no other place that fact could be shown. Warning violet, through
+ *  the shared grade scale, because it is a caveat rather than a refusal: the
+ *  reading is still worth saving, it just won't carry those metrics. */
 export function CandidateRow({ c, onPress }: { c: WatchCandidate; onPress: () => void }) {
   const p = usePalette();
+  const comp = readingCompleteness(rrSeconds(c));
   return (
     <Pressable
       onPress={onPress}
@@ -53,6 +70,13 @@ export function CandidateRow({ c, onPress }: { c: WatchCandidate; onPress: () =>
       <Text style={{ color: p.textDim, fontSize: 13, marginTop: 3 }}>
         {durLabel(c)} · {c.rr.length} beats · {c.sourceName}
       </Text>
+      {comp.grade !== 'full' ? (
+        <View style={{ flexDirection: 'row', marginTop: 8 }}>
+          <View style={{ backgroundColor: hexA(GRADE_COLORS.warning, 0.18), borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 }}>
+            <Text style={{ color: GRADE_COLORS.warning, fontSize: 12, fontWeight: '700' }}>{comp.label}</Text>
+          </View>
+        </View>
+      ) : null}
     </Pressable>
   );
 }
@@ -77,6 +101,7 @@ export function WatchSyncSheet({ controls }: { controls: SheetControls }) {
     return (
       <HrvResults
         rr={chosen.rr}
+        segmentStarts={chosen.segmentStarts}
         hrSamples={[]}
         config={st.config}
         durationSec={durationSec}

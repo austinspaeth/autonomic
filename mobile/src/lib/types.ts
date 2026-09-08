@@ -99,6 +99,15 @@ export interface LiveHrvExtras {
   coverageSec?: number;
   /** The results card's own verdict, from coverage + artifacts + segments. */
   confidence?: 'high' | 'fair' | 'low';
+  /** Clean beats behind the numbers. Stamped rather than counted off the
+   *  waveform sidecar, which can be pruned. */
+  beatCount?: number;
+  /** Unbroken stretches the record was built from, and how many were thrown
+   *  out. Only written when there was more than one / more than none, so their
+   *  absence means "one continuous take" on a stamped reading and UNKNOWN on
+   *  one from a build before 1.26. */
+  segmentsUsed?: number;
+  segmentsDropped?: number;
 }
 
 export interface Meal {

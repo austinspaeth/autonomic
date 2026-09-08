@@ -92,6 +92,11 @@ export function HrvResults({ rr, segmentStarts, hrSamples, sdnnSamples, config, 
       base.artifactPct = Math.round(result.artifactPct * 10) / 10;
       base.coverageSec = Math.round(result.coverageSec);
       base.confidence = result.confidence;
+      // Beat count is stamped rather than derived: the waveform sidecar can be
+      // pruned, and "how many beats is this built on" has to survive that.
+      base.beatCount = result.rrClean.length;
+      if (result.segmentsUsed > 1) base.segmentsUsed = result.segmentsUsed;
+      if (result.segmentsDropped) base.segmentsDropped = result.segmentsDropped;
     } else if (watchFallback) {
       if (watchFallback.sdnn != null) base.sdnn = String(watchFallback.sdnn);
       if (watchFallback.hr != null) { base.hr = String(watchFallback.hr); base.avgHr = String(watchFallback.hr); }
@@ -213,10 +218,14 @@ export function HrvResults({ rr, segmentStarts, hrSamples, sdnnSamples, config, 
         </Text>
       ) : null}
 
-      {/* Camera readings are stitched from however much clean pulse we got, so
-          say how much that was. A number built from 90 s of a 3 min attempt is
-          a different claim than one built from all of it. */}
-      {config.source === 'camera' && enoughData ? (
+      {/* Every reading here is stitched from however much clean pulse we got,
+          so say how much that was. A number built from 90 s of a 3 min attempt
+          is a different claim than one built from all of it. This was gated to
+          camera captures, on the reasoning that only they drop out — but a
+          watch heartbeat series carries its own dropouts (rrFromSeries reports
+          them now), and the reading that started this whole fix looked like a
+          5-minute session and held under 2 minutes of usable beats. */}
+      {enoughData ? (
         <Text style={{ color: p.textDim, fontSize: 13, marginTop: -10, marginBottom: 16 }}>
           {`${CONFIDENCE_LABEL[result.confidence]} · ${Math.round(result.coverageSec)}s of usable pulse`
             + (result.segmentsDropped ? ` · ${result.segmentsDropped} unusable stretch${result.segmentsDropped > 1 ? 'es' : ''} discarded` : '')
