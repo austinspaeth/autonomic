@@ -363,7 +363,9 @@ function comparePartsOf(days: DaysMap, first: string[], last: string[], ctx: Sco
       const readings = (d.readings || []).slice().sort((a, b) => ((a.time as string) || '').localeCompare((b.time as string) || ''));
       const set = scoreSet(readings, d, k, days, ctx);
       if (set.score == null) return;
-      confs.push(set.confidence);
+      // The RAW weight sum, not the percentage — this is the divisor that makes
+      // the parts add up to the headline (see the comment below).
+      confs.push(set.weightSum);
       set.comps.forEach((c) => {
         const cur = out.get(c.label) || { w: c.w, pts: [] };
         cur.pts.push(c.p);
@@ -377,7 +379,7 @@ function comparePartsOf(days: DaysMap, first: string[], last: string[], ctx: Sco
   const b = grade(last);
   // DIVIDE BY THE AVAILABLE WEIGHT, NOT BY 100.
   //
-  // `scoreSet` normalises: score = sum(w * p) / confidence, where confidence is the
+  // `scoreSet` normalises: score = sum(w * p) / weightSum, where weightSum is the
   // weight it actually had. So a day scored from HRV alone has 25% of the weight
   // carrying the whole 0-100 range, and dividing by 100 understated every component
   // by a factor of four — the parts summed to 10 against a headline of 40. Using the

@@ -21,8 +21,9 @@ import { ProtocolEditor } from './ProtocolEditor';
 import { radius, type as T, usePalette } from '../theme';
 import { SCORE_COLORS, GRADE_LABEL, GRADE_PTS, catFromBands } from '../lib/scoring';
 import {
-  OUTLOOK_GUIDE, TOMORROW, SCORE_TIPS, blueZone, protocolCriteria, readingPeriod, resolveProtocol,
-  scoreCat, scoreSet, streakInfo, streakTier, type ScoreComp, type ScoreSetResult,
+  OUTLOOK_GUIDE, SCORE_TOTAL_WEIGHT, SCORE_WEIGHTS, TOMORROW, SCORE_TIPS, blueZone, protocolCriteria,
+  readingPeriod, resolveProtocol, scoreCat, scoreSet, streakInfo, streakTier,
+  type ScoreComp, type ScoreSetResult,
 } from '../lib/scoring/day';
 import { detectDownturn, type Downturn } from '../lib/scoring/downturn';
 import { detectStrain, type Strain } from '../lib/scoring/strain';
@@ -428,7 +429,8 @@ function ScoredHero({ dk, readings, d, all, ctx, onExplain }: { dk: string; read
     if ((readings.length >= 2 || readings.some((r) => readingPeriod(r) === 'midday')) && delta != null && Math.abs(delta) >= 5)
       guide = (delta < 0 ? 'Trending down from this morning. Watch food and activity through the afternoon. ' : 'Trending up from this morning. ') + guide;
   }
-  if (all.confidence < 40) guide = 'Early read from limited data, so expect it to shift as more readings land. ' + guide;
+  // 40 of the 95 available weight, restated on the 0-100 confidence scale.
+  if (all.confidence < Math.round((40 / SCORE_TOTAL_WEIGHT) * 100)) guide = 'Early read from limited data, so expect it to shift as more readings land. ' + guide;
 
   return (
     <Pressable onPress={onExplain} style={{ padding: 16, backgroundColor: hexA(cat.color, 0.1) }}>
@@ -787,7 +789,10 @@ function ScoreExplain({ all, dk }: { all: ScoreSetResult; dk: string }) {
   const hurt = comps.filter((c) => c.cat === 'bad' || c.cat === 'crash').sort(byW);
   const neutral = comps.filter((c) => c.cat === 'ok').sort(byW);
   const ceil = (c: ScoreComp) => (c.detail && c.detail.maxCat ? GRADE_PTS[c.detail.maxCat] : GRADE_PTS.great);
-  const avail = all.confidence || 100;
+  // THE RAW WEIGHT SUM, NOT THE PERCENTAGE. `confidence` is now a percentage of
+  // the full input set, and dividing by it would inflate every "+X pt" number
+  // by 95/100 — the score is sum(w * p) / weightSum.
+  const avail = all.weightSum || SCORE_TOTAL_WEIGHT;
   const headroom = comps.map((c) => ({ c, gain: (c.w * (ceil(c) - c.p)) / avail })).filter((x) => x.gain > 0.05).sort((a, b) => b.gain - a.gain);
 
   const improveLine = (c: (typeof comps)[number]) => {
@@ -803,19 +808,18 @@ function ScoreExplain({ all, dk }: { all: ScoreSetResult; dk: string }) {
   // Anything below is a component the score never saw, so it's what we're
   // unsure of — group the missing inputs by the single action that captures
   // them and show the confidence each would restore.
-  const CONF_INPUTS: { label: string; w: number; src: string }[] = [
-    { label: 'HRV (RMSSD)', w: 25, src: 'hrv' },
-    { label: 'Total power', w: 15, src: 'guided' },
-    { label: 'pNN50', w: 10, src: 'guided' },
-    { label: 'VLF power', w: 10, src: 'guided' },
-    { label: 'LF peak', w: 10, src: 'guided' },
-    { label: 'Blood pressure', w: 8, src: 'bp' },
-    { label: 'Resting HR', w: 7, src: 'rhr' },
-    { label: 'Sleep', w: 8, src: 'sleep' },
-    { label: 'Activity', w: 2, src: 'activity' },
-  ];
+  // Weights come from the scoring engine's own table, so this can't drift from
+  // what the score actually uses; only the "which action captures it" mapping
+  // lives here.
+  const CONF_SRC: Record<string, string> = {
+    'HRV (RMSSD)': 'hrv',
+    'Total power': 'training', 'pNN50': 'training', 'VLF power': 'training', 'LF peak': 'training',
+    'Blood pressure': 'bp', 'Resting HR': 'rhr', 'Sleep': 'sleep', 'Activity': 'activity',
+  };
   const CONF_SOURCES: Record<string, string> = {
-    guided: 'Capture a guided HRV reading',
+    // "Training HRV" is what the app calls this everywhere else (registry.ts,
+    // the HRV setup sheet). "Guided" appeared nowhere but here.
+    training: 'Capture a training HRV reading',
     hrv: 'Take an HRV reading',
     bp: 'Log a blood pressure reading',
     rhr: 'Log a resting heart rate',
@@ -823,14 +827,33 @@ function ScoreExplain({ all, dk }: { all: ScoreSetResult; dk: string }) {
     activity: 'Log today’s activity',
   };
   const present = new Set(comps.map((c) => c.label));
-  const missing = CONF_INPUTS.filter((f) => !present.has(f.label));
+  const missing = SCORE_WEIGHTS.filter((f) => !present.has(f.label));
+  const pctOf = (w: number) => Math.round((w / SCORE_TOTAL_WEIGHT) * 100);
   const confGaps = Object.keys(CONF_SOURCES)
     .map((src) => {
-      const items = missing.filter((m) => m.src === src);
+      const items = missing.filter((m) => CONF_SRC[m.label] === src);
       return { src, action: CONF_SOURCES[src], w: items.reduce((s, m) => s + m.w, 0), labels: items.map((m) => m.label) };
     })
     .filter((g) => g.w > 0)
     .sort((a, b) => b.w - a.w);
+
+  // "Not captured today" is false when a training reading WAS taken and simply
+  // could not resolve those metrics — the frequency floors are charged against
+  // usable pulse, so a 5-minute session holding 1m 38s of clean beats resolves
+  // none of them. Saying the reading does not exist is how the reported user
+  // ended up being told to take a seventh one.
+  const hm = (sec: number) => (sec < 60 ? `${Math.round(sec)}s` : `${Math.floor(sec / 60)}m ${String(Math.round(sec % 60)).padStart(2, '0')}s`);
+  const gapExplain = (g: { src: string; w: number; labels: string[] }) => {
+    const raise = `Adding it would raise confidence by about ${pctOf(g.w)} points.`;
+    if (g.src !== 'training' || all.structCount === 0) {
+      return `Not captured today, so the score is estimated without ${g.labels.join(', ')}. ${raise}`;
+    }
+    const took = all.structCount === 1 ? 'Your training reading today was' : `Your ${all.structCount} training readings today were`;
+    const held = all.lastStructCoverageSec != null
+      ? ` The most recent one held ${hm(all.lastStructCoverageSec)} of usable pulse.`
+      : '';
+    return `${took} too short to resolve ${g.labels.join(', ')}.${held} These bands need 2 minutes of unbroken signal, and VLF power needs 4. ${raise}`;
+  };
 
   return (
     <View>
@@ -863,9 +886,9 @@ function ScoreExplain({ all, dk }: { all: ScoreSetResult; dk: string }) {
           <MetricRow
             key={g.src}
             label={g.action}
-            value={`+${g.w}%`}
+            value={`+${pctOf(g.w)}%`}
             cat={false}
-            explain={`Not captured today, so the score is estimated without ${g.labels.join(', ')}. Adding it would raise confidence by about ${g.w} points.`}
+            explain={gapExplain(g)}
           />
         )) : (
           <MetricRow label="Full input set logged" value="" cat={false} explain="Every scored input was available today, so nothing is missing. This is as confident as the score gets." />

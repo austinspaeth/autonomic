@@ -256,7 +256,10 @@ describe('day scoring', () => {
     // hr missing on the reading, so no resting HR either.
     expect(res.comps.map((c) => c.label)).toEqual(['HRV (RMSSD)']);
     expect(res.score).toBe(100);
-    expect(res.confidence).toBe(25);
+    // 25 of the 95-point input set was available: the raw sum stays on
+    // `weightSum` (the divisor for headroom math), `confidence` is the share.
+    expect(res.weightSum).toBe(25);
+    expect(res.confidence).toBe(26);
   });
   it('scoreSet: structured + unstructured blends RMSSD 70/30', () => {
     const readings: Entry[] = [
