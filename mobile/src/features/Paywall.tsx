@@ -14,7 +14,7 @@ import { ActivityIndicator, Linking, Platform, Pressable, Text, View } from 'rea
 import { BrandMark, Icon, IconName } from '../components/Icon';
 import { SheetControls, SheetFooter, useSheets } from '../components/Sheet';
 import { Button } from '../components/ui';
-import { radius, usePalette } from '../theme';
+import { CAUTION_GOLD, CAUTION_GOLD_SOFT, radius, usePalette } from '../theme';
 import { notePaywallSeen } from '../lib/review';
 import { pingPaywall } from '../store/ping';
 import {
@@ -35,6 +35,31 @@ const VALUE: { icon: IconName; title: string; sub: string }[] = [
 ];
 
 const numeric = (s: string) => parseFloat(s.replace(/[^0-9.]/g, '')) || 0;
+
+/**
+ * Shown IN PLACE OF the buy button when the store has told us this device can
+ * never complete a purchase (`blocked` in src/store/iap.ts).
+ *
+ * A button here would be a button that cannot work, and the app already has a
+ * rule about that: the impossible option is made unavailable rather than
+ * tappable-then-refused (the same reason a strap sending no beat intervals
+ * disables Start rather than spending five minutes on a reading it will
+ * decline). A greyed-out button with no explanation would be worse than the
+ * failure it replaces, so the reason and the remedy ARE the control.
+ *
+ * Caution gold rather than the red of `StoreError`: nothing has failed, and
+ * nothing the user did caused it. It is a condition on the device with one
+ * thing to do about it.
+ */
+export function StoreBlockedNotice({ text }: { text: string }) {
+  const p = usePalette();
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 9, padding: 12, borderRadius: radius.control, borderWidth: 1, borderColor: 'rgba(234,179,8,0.4)', backgroundColor: CAUTION_GOLD_SOFT }}>
+      <Icon name="alert" size={16} color={CAUTION_GOLD} />
+      <Text style={{ flex: 1, color: p.text, fontSize: 13, lineHeight: 19 }}>{text}</Text>
+    </View>
+  );
+}
 
 /** A store failure has to be reported INSIDE the sheet: the sheet stack is one
  *  RN Modal painted above the ToastProvider, so a toast here is invisible and
@@ -132,7 +157,7 @@ export function usePaywall(source: PaywallSource): () => void {
 
 export function PaywallCard({ controls }: { controls: SheetControls }) {
   const p = usePalette();
-  const { isPro, products, purchasing, error } = useIap();
+  const { isPro, products, purchasing, error, blocked } = useIap();
   const { openSheet } = useSheets();
   const [sku, setSku] = useState(YEARLY_SKU);
 
@@ -224,13 +249,17 @@ export function PaywallCard({ controls }: { controls: SheetControls }) {
       </View>
 
       <View style={{ gap: 12 }}>
-        {error ? <StoreError text={error} /> : null}
-        <Button
-          title={purchasing ? 'Starting…' : trial ? `Start ${freeFor(trialDays).toLowerCase()}` : 'Upgrade to Pro'}
-          variant="primary"
-          disabled={purchasing}
-          onPress={() => subscribe(sku)}
-        />
+        {error && !blocked ? <StoreError text={error} /> : null}
+        {blocked ? (
+          <StoreBlockedNotice text={blocked} />
+        ) : (
+          <Button
+            title={purchasing ? 'Starting…' : trial ? `Start ${freeFor(trialDays).toLowerCase()}` : 'Upgrade to Pro'}
+            variant="primary"
+            disabled={purchasing}
+            onPress={() => subscribe(sku)}
+          />
+        )}
         {purchasing ? <ActivityIndicator color={p.accent} /> : null}
         <Text style={{ color: p.textDim, fontSize: 13, textAlign: 'center' }}>
           {trial
@@ -287,7 +316,7 @@ const PRO_W = 88;
 
 export function FreeVsProCard({ controls }: { controls: SheetControls }) {
   const p = usePalette();
-  const { isPro, products, purchasing, error } = useIap();
+  const { isPro, products, purchasing, error, blocked } = useIap();
   // Purchase landed (from the CTA below, or restored) — close up.
   useEffect(() => { if (isPro) controls.close(); }, [isPro, controls]);
   const mPrice = priceOf(products.find((s) => s.productId === MONTHLY_SKU), MONTHLY_SKU);
@@ -366,17 +395,21 @@ export function FreeVsProCard({ controls }: { controls: SheetControls }) {
           (paddingBottom = footerH + 20), so no extra tail spacer here. */}
       <SheetFooter>
         <View style={{ flex: 1 }}>
-          {error ? <View style={{ marginBottom: 10 }}><StoreError text={error} /></View> : null}
-          <Pressable
-            onPress={() => subscribe(MONTHLY_SKU)}
-            disabled={purchasing}
-            style={({ pressed }) => [{ height: 52, borderRadius: 14, backgroundColor: p.accent, alignItems: 'center', justifyContent: 'center' }, (pressed || purchasing) && { opacity: 0.8 }]}
-          >
-            <Text style={{ color: '#fff', fontSize: 15.5, fontWeight: '700' }}>{purchasing ? 'Starting…' : `Upgrade to Pro · ${mPrice}/mo`}</Text>
-          </Pressable>
-          <Text style={{ color: p.textDim, fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: 9 }}>
-            {`or ${yPrice}/yr · cancel anytime\nYour journal is always yours: private, on-device, exportable.`}
-          </Text>
+          {error && !blocked ? <View style={{ marginBottom: 10 }}><StoreError text={error} /></View> : null}
+          {blocked ? <StoreBlockedNotice text={blocked} /> : (
+            <>
+              <Pressable
+                onPress={() => subscribe(MONTHLY_SKU)}
+                disabled={purchasing}
+                style={({ pressed }) => [{ height: 52, borderRadius: 14, backgroundColor: p.accent, alignItems: 'center', justifyContent: 'center' }, (pressed || purchasing) && { opacity: 0.8 }]}
+              >
+                <Text style={{ color: '#fff', fontSize: 15.5, fontWeight: '700' }}>{purchasing ? 'Starting…' : `Upgrade to Pro · ${mPrice}/mo`}</Text>
+              </Pressable>
+              <Text style={{ color: p.textDim, fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: 9 }}>
+                {`or ${yPrice}/yr · cancel anytime\nYour journal is always yours: private, on-device, exportable.`}
+              </Text>
+            </>
+          )}
         </View>
       </SheetFooter>
     </View>

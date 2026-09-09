@@ -24,6 +24,7 @@ import { radius, usePalette } from '../theme';
 import { useAppState } from '../store/store';
 import { getInstalledAtMs, recheckTier, useTier } from '../store/tier';
 import { PROMO_YEARLY_SKU, YEARLY_SKU, priceOf, subscribe, useIap } from '../store/iap';
+import { StoreBlockedNotice } from './Paywall';
 import { SCORE_COLORS } from '../lib/scoring';
 import { todayKey } from '../lib/dates';
 import { resolveProtocol } from '../lib/scoring/day';
@@ -82,7 +83,7 @@ const TICK_MS = 30_000;
 
 export function AnnualOfferCard() {
   const p = usePalette();
-  const { products, purchasing, error } = useIap();
+  const { products, purchasing, error, blocked } = useIap();
   const { depth } = useSheets();
   const state = useAppState();
   const tier = useTier();
@@ -239,20 +240,28 @@ export function AnnualOfferCard() {
               </View>
             </View>
 
-            <Pressable
-              onPress={() => { pingOfferAccepted('annual'); subscribe(PROMO_YEARLY_SKU); }}
-              disabled={purchasing}
-              style={({ pressed }) => [
-                { height: 50, borderRadius: 16, backgroundColor: p.accent, alignItems: 'center', justifyContent: 'center', marginTop: 15 },
-                (pressed || purchasing) && { opacity: 0.8 },
-              ]}
-            >
-              <Text style={{ color: '#fff', fontSize: 15.5, fontWeight: '700' }}>{purchasing ? 'Starting…' : 'Claim half off'}</Text>
-            </Pressable>
+            {/* No button when the store has told us this device can never
+                complete a purchase: the tap would fire `oac` and then die in
+                loadProducts before requestPurchase, recording an offer as
+                accepted that could not convert. */}
+            {blocked ? (
+              <View style={{ marginTop: 15 }}><StoreBlockedNotice text={blocked} /></View>
+            ) : (
+              <Pressable
+                onPress={() => { pingOfferAccepted('annual'); subscribe(PROMO_YEARLY_SKU); }}
+                disabled={purchasing}
+                style={({ pressed }) => [
+                  { height: 50, borderRadius: 16, backgroundColor: p.accent, alignItems: 'center', justifyContent: 'center', marginTop: 15 },
+                  (pressed || purchasing) && { opacity: 0.8 },
+                ]}
+              >
+                <Text style={{ color: '#fff', fontSize: 15.5, fontWeight: '700' }}>{purchasing ? 'Starting…' : 'Claim half off'}</Text>
+              </Pressable>
+            )}
 
             {/* A store failure has to be said out loud here too, or the button
                 just flashes "Starting…" and reverts (see src/store/iap.ts). */}
-            {error ? (
+            {error && !blocked ? (
               <Text style={{ color: '#d63b3b', fontSize: 12, lineHeight: 17, textAlign: 'center', marginTop: 9 }}>{error}</Text>
             ) : null}
 

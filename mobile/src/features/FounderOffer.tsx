@@ -26,6 +26,7 @@ import { radius, usePalette } from '../theme';
 import { useAppState } from '../store/store';
 import { useTier } from '../store/tier';
 import { FOUNDER_SKU, YEARLY_SKU, priceOf, subscribe, useIap } from '../store/iap';
+import { StoreBlockedNotice } from './Paywall';
 import { todayKey } from '../lib/dates';
 import { resolveProtocol } from '../lib/scoring/day';
 import { detectDownturn } from '../lib/scoring/downturn';
@@ -39,7 +40,7 @@ import { pingOfferAccepted, pingOfferDismissed, pingOfferShown } from '../store/
 
 export function FounderOfferCard() {
   const p = usePalette();
-  const { products, purchasing, error } = useIap();
+  const { products, purchasing, error, blocked } = useIap();
   const { depth } = useSheets();
   const state = useAppState();
   const tier = useTier();
@@ -178,22 +179,28 @@ export function FounderOfferCard() {
         {pct ? ' for as long as you stay. Offer is only available today.' : 'Sign up now at the founding member price. Offer is only available today.'}
       </Text>
 
-      <Pressable
-        onPress={() => { pingOfferAccepted('founder'); subscribe(FOUNDER_SKU); }}
-        disabled={purchasing}
-        style={({ pressed }) => [
-          { height: 50, borderRadius: 14, backgroundColor: p.accent, alignItems: 'center', justifyContent: 'center' },
-          (pressed || purchasing) && { opacity: 0.8 },
-        ]}
-      >
-        <Text style={{ color: '#fff', fontSize: 15.5, fontWeight: '700' }}>
-          {purchasing ? 'Starting…' : 'Join at the early price'}
-        </Text>
-      </Pressable>
+      {/* No button when the store has told us this device can never complete a
+          purchase: the tap would fire `oac` and then die in loadProducts before
+          requestPurchase, recording an offer as accepted that could not
+          convert. */}
+      {blocked ? <StoreBlockedNotice text={blocked} /> : (
+        <Pressable
+          onPress={() => { pingOfferAccepted('founder'); subscribe(FOUNDER_SKU); }}
+          disabled={purchasing}
+          style={({ pressed }) => [
+            { height: 50, borderRadius: 14, backgroundColor: p.accent, alignItems: 'center', justifyContent: 'center' },
+            (pressed || purchasing) && { opacity: 0.8 },
+          ]}
+        >
+          <Text style={{ color: '#fff', fontSize: 15.5, fontWeight: '700' }}>
+            {purchasing ? 'Starting…' : 'Join at the early price'}
+          </Text>
+        </Pressable>
+      )}
 
       {/* A store failure has to be said out loud here, or the button just
           flashes "Starting…" and reverts (see src/store/iap.ts). */}
-      {error ? (
+      {error && !blocked ? (
         <Text style={{ color: '#d63b3b', fontSize: 12, lineHeight: 17, textAlign: 'center', marginTop: 9 }}>{error}</Text>
       ) : null}
 

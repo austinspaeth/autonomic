@@ -220,6 +220,12 @@ type IapState = {
   /** Last purchase failure, in the user's words. Cleared when a purchase
    *  starts. Never set for a user cancellation — that isn't a failure. */
   error?: string;
+  /** Set once this device has told us it can NEVER complete a purchase, in the
+   *  user's words and naming the one thing they can do about it. Distinct from
+   *  `error`, which is about an attempt: this is about the device, it is not
+   *  cleared by trying again, and it is known BEFORE the tap. Every buy button
+   *  reads it and offers the remedy in place of a button that cannot work. */
+  blocked?: string;
 };
 let state: IapState = { ready: false, isPro: false, products: [], purchasing: false };
 const listeners = new Set<() => void>();
@@ -267,6 +273,46 @@ const isDisconnected = (e: unknown) =>
   NOT_READY.has(codeOf(e))
   || PLAY_RECONNECTABLE.has(responseCodeOf(e) ?? NaN)
   || /not ready|disconnect/i.test(String((e as Error)?.message ?? ''));
+
+/** Play's FEATURE_NOT_SUPPORTED, arriving as `query-product` with a
+ *  debugMessage of "Client does not support ProductDetails." It means the
+ *  GOOGLE PLAY STORE APP on the device is too old to serve the ProductDetails
+ *  API that Billing 5+ queries through, so `fetchProducts` can never return
+ *  anything here. Nothing on our side reaches it: not a reconnect, not a
+ *  console change, not a retry a minute later. It is deliberately NOT in
+ *  PLAY_RECONNECTABLE for that reason.
+ *
+ *  It has to be its own state rather than another `error` string because of
+ *  what it does to the funnel. The paywall and both offer cards fall back to
+ *  FALLBACK_PRICE, so a device that can return no products still draws a
+ *  complete, healthy-looking card with a live button; the tap fires the
+ *  accepted-offer ping and then dies in `loadProducts` before `requestPurchase`
+ *  is ever reached. That is an offer recorded as accepted that could not have
+ *  converted. Knowing before the tap is what lets the button be replaced by the
+ *  remedy instead of refused after it. */
+const PLAY_FEATURE_NOT_SUPPORTED = -2;
+
+/** Said in full because the remedy is the whole point: for most of these
+ *  devices this IS fixable, by updating an app the user already has. For the
+ *  rest (a stubbed Play Store, microG, an emulator with no Play) it at least
+ *  names the real obstacle, which "try again shortly" did not. */
+const BLOCKED_MSG =
+  'Your Google Play Store app is out of date, so it can’t show subscriptions. '
+  + 'Open the Play Store, go to Settings, About, and tap Update Play Store, then come back.';
+
+/** Latch a terminal store refusal. Returns true if this error was one.
+ *  Logged ONCE per session under its own tag: it repeats on every launch of an
+ *  affected phone, and left under `iap.init` it would both flush the 40-entry
+ *  support log and inflate the fault report's occurrence count off a handful of
+ *  devices. */
+function noteBlocked(e: unknown): boolean {
+  if (responseCodeOf(e) !== PLAY_FEATURE_NOT_SUPPORTED) return false;
+  if (!state.blocked) {
+    logError('iap.storeIncapable', iapDetail(e));
+    set({ blocked: BLOCKED_MSG, ready: true });
+  }
+  return true;
+}
 
 /** What `describeError` cannot see, folded into the message so the fault report
  *  carries the diagnosis instead of the same opaque line every time. Play's
@@ -381,6 +427,10 @@ export async function initIap() {
       await refreshEntitlement();
       break;
     } catch (e) {
+      // A device that cannot serve ProductDetails will answer the next two
+      // attempts identically, so stop rather than spend 6.5s of backoff proving
+      // it. `noteBlocked` has already logged, under a tag that says which.
+      if (noteBlocked(e)) break;
       // Not fatal: treated as not-Pro (the paywall shows, the app is not
       // bricked). Logged because "it says I'm not subscribed" arrives with no
       // other evidence. Only the last attempt is logged, so a cold-start
@@ -410,8 +460,8 @@ const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
  *  opens, so a card raised after a failed launch still has real prices and a
  *  working button. Silent: the card shows fallback prices either way. */
 export async function ensureIapReady() {
-  if (storeUnavailable() || state.products.length) return;
-  try { await loadProducts(); } catch (e) { logError('iap.retryProducts', iapDetail(e)); }
+  if (storeUnavailable() || state.products.length || state.blocked) return;
+  try { await loadProducts(); } catch (e) { if (!noteBlocked(e)) logError('iap.retryProducts', iapDetail(e)); }
 }
 
 /** Active entitlements only — StoreKit 2 currentEntitlements on iOS, the
@@ -451,6 +501,11 @@ const isCancel = (e: unknown) => {
  *  can act — the store's name, or "try again". */
 function purchaseMessage(e: unknown): string {
   const store = storeName();
+  // Read BEFORE the code switch. Play flattens this into `query-product`,
+  // which is bucketed below with the genuinely transient "not live yet" cases
+  // and answered "try again shortly" — the one thing that is definitely false
+  // here, since no amount of retrying updates the Play Store app.
+  if (responseCodeOf(e) === PLAY_FEATURE_NOT_SUPPORTED) return BLOCKED_MSG;
   switch (codeOf(e)) {
     case 'network-error':
     case 'service-timeout':
@@ -493,6 +548,9 @@ export const clearIapError = () => { if (state.error) set({ error: undefined });
  *  handed off; false when it couldn't start (and `state.error` says why). */
 export async function subscribe(sku: string = YEARLY_SKU): Promise<boolean> {
   if (state.purchasing) return false;
+  // Already known impossible on this device. Say so without touching the store,
+  // so the answer is the remedy rather than another failed round trip.
+  if (state.blocked) { set({ error: state.blocked }); return false; }
   set({ purchasing: true, error: undefined });
   try {
     if (storeUnavailable()) throw new Error(`${storeName()} purchases aren’t available in this build.`);
@@ -534,7 +592,7 @@ export async function subscribe(sku: string = YEARLY_SKU): Promise<boolean> {
     return true;
   } catch (e) {
     if (isCancel(e)) { set({ purchasing: false }); return false; }
-    logError('iap.purchase', iapDetail(e));
+    if (!noteBlocked(e)) logError('iap.purchase', iapDetail(e));
     set({ purchasing: false, error: purchaseMessage(e) });
     return false;
   }
