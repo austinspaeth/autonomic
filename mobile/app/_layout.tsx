@@ -31,7 +31,7 @@ import { initCrashWatcher, syncReminder } from '../src/lib/reminders';
 import { initWidgetSync } from '../src/lib/widgets';
 import { initInsightsBadge } from '../src/store/insightsBadge';
 import { loadIssue } from '../src/store/store';
-import { installErrorLogging, logError } from '../src/lib/diagnostics/errorLog';
+import { drainNativeCrashes, installErrorLogging, logError } from '../src/lib/diagnostics/errorLog';
 import { usePalette } from '../src/theme';
 
 function Themed({ children }: { children: React.ReactNode }) {
@@ -77,6 +77,11 @@ export default function RootLayout() {
     // would quietly mean "every occurrence we got a chance to send". Also
     // registers the background flush. See src/store/errorReport.ts.
     initFaultReporting();
+    // Anything the native crash handler caught last time the process was killed
+    // outright. AFTER initFaultReporting, so the report is buffered into a
+    // sender that is already draining and goes out on THIS launch — a crash
+    // that waits for the launch after is a crash the user may never give us.
+    drainNativeCrashes();
     // Watch companion (iOS only): drain queued stand-test results + relay
     // entitlement. Safe elsewhere (the bridge no-ops), but don't even try.
     if (Platform.OS === 'ios') initWatchReceiver();

@@ -25,6 +25,7 @@ import {
   type GarminDevice,
   type GarminMessage,
 } from '../../../modules/garmin-link';
+import { missingClasses } from '../../../modules/app-env';
 import * as ExpoLinking from 'expo-linking';
 import { flushSave, getState, save, storeWaveform, upsertEntry } from '../../store/store';
 import { pingWristReading } from '../../store/ping';
@@ -36,6 +37,54 @@ import { mapWatchPayload } from '../watch/payload';
 import { GARMIN_RELEASED } from '../watch/release';
 
 export type { GarminDevice };
+
+/**
+ * The Connect IQ classes that must still answer to their own names.
+ *
+ * Garmin Connect replies to us by BROADCAST, and every inbound intent carries
+ * these as Parcelable EXTRAS — which Android unmarshals by looking the
+ * class-name STRING up through our ClassLoader. The SDK ships no consumer
+ * proguard rules, so without a keep rule R8 renames them and
+ * `IQMessageReceiver.onReceive` throws `BadParcelableException` on the main
+ * thread, inside Garmin's own receiver, where nothing of ours can catch it.
+ * The app does not degrade; it dies.
+ *
+ * The outbound half is name-independent (AIDL writes typed parcelables through
+ * `CREATOR`), which is what made this so hard to see: the device list populated
+ * perfectly and only the REPLY was fatal.
+ *
+ * `app.json` keeps them. This is the belt to that braces — a keep rule is a
+ * line in a build config that no test exercises and any refactor can drop, and
+ * the cost of dropping it is a crash on every Android phone that owns a Garmin.
+ */
+const GARMIN_PARCELABLES = [
+  'com.garmin.android.connectiq.IQDevice',
+  'com.garmin.android.connectiq.IQApp',
+  'com.garmin.android.connectiq.IQMessage',
+];
+
+let intact: boolean | undefined;
+
+/**
+ * Can this BUILD actually talk to a Garmin, or did minification break the link?
+ *
+ * Lazy and memoized rather than computed at init, because the surfaces that
+ * read it (the source picker, the setup card, the wizard's last step) can be
+ * built before or after `initGarminReceiver` runs, and a gate that answers
+ * differently depending on when it is asked is not a gate.
+ *
+ * A `false` here is a BUILD defect, never a device state — no user action
+ * causes it and none can fix it — so it is logged once, loudly, with the names
+ * that went missing. It is the one error in this file that is about us rather
+ * than about a watch.
+ */
+export function garminLinkIntact(): boolean {
+  if (intact !== undefined) return intact;
+  const missing = missingClasses(GARMIN_PARCELABLES);
+  intact = missing.length === 0;
+  if (!intact) logError('garmin.obfuscated', new Error(`renamed by R8: ${missing.join(', ')}`));
+  return intact;
+}
 
 let started = false;
 let devices: GarminDevice[] = [];
@@ -81,7 +130,7 @@ export function garminDevices(): GarminDevice[] {
   // user who cannot install the watch app. `initGarminReceiver` already declines
   // to populate this; both are here because they stop different things (one the
   // behaviour, one the display) and neither should have to trust the other.
-  if (!GARMIN_RELEASED) return [];
+  if (!GARMIN_RELEASED || !garminLinkIntact()) return [];
   return devices;
 }
 
@@ -200,6 +249,11 @@ export function initGarminReceiver() {
   // app there is nothing to listen for, and initializing the link anyway would
   // claim the URL callback and re-attach to a watch paired on an earlier build.
   if (!GARMIN_RELEASED) return;
+  // Do not start a link this build cannot finish. Initializing anyway would
+  // register for the very broadcasts that kill the process — the first reading
+  // a watch delivered would take the app down, and the user would report it as
+  // "it crashes when I open it".
+  if (!garminLinkIntact()) return;
   const native = garminNative();
   if (!native) return;
 
