@@ -22,7 +22,7 @@ import { Icon } from '../../components/Icon';
 import { CAUTION_GOLD, CAUTION_GOLD_SOFT, GRADE_COLORS, radius, usePalette } from '../../theme';
 import { SupportCard } from '../SupportCard';
 import { health, healthAppName, healthPermissionPath, openHealthApp } from '../../lib/health';
-import { garminDevices, pickGarminDevice, subscribeGarminDevices } from '../../lib/garmin/receiver';
+import { garminDevices, garminLinkIntact, pickGarminDevice, subscribeGarminDevices } from '../../lib/garmin/receiver';
 import { garminNative } from '../../../modules/garmin-link';
 import { brandNames, connectSteps, hasDirectLink, watchBrands, type WatchBrand, type WatchPlatform } from '../../lib/watch/brands';
 import { GARMIN_RELEASED } from '../../lib/watch/release';
@@ -54,8 +54,29 @@ export const watchPlatform = (): WatchPlatform => (Platform.OS === 'android' ? '
  * its own the day a second brand is listed. `onLinked` fires once the setup card
  * confirms, exactly as it did through the list.
  */
+/**
+ * The brands this BUILD can actually connect, which is not always the brands
+ * the registry lists.
+ *
+ * Garmin's route is the Connect IQ link, and a release build whose keep rules
+ * lost `com.garmin.android.connectiq.**` cannot use it — the reply from Garmin
+ * Connect kills the process (see `garminLinkIntact`). Offering the setup card
+ * anyway would be pointing a user at a crash.
+ *
+ * Filtered per BRAND rather than gating the whole list, because the failure is
+ * Garmin's transport and not a fact about watches: the day a second brand is
+ * listed, a broken Connect IQ link must not take it down too.
+ */
+function usableBrands(): WatchBrand[] {
+  return watchBrands().filter((b) => b.id !== 'garmin' || garminLinkIntact());
+}
+
 export function openBrandSetup(openSheet: OpenSheet, onLinked?: () => void): void {
-  const list = watchBrands();
+  const list = usableBrands();
+  // Every caller is already behind `hasOtherWatches()`, so this is belt to that
+  // braces — but the failure it guards is a sheet rising with nothing in it,
+  // which reads as a broken app rather than as a feature that is off.
+  if (list.length === 0) return;
   if (list.length === 1) {
     openSheet((c) => <WatchBrandSetup brand={list[0]} controls={c} onLinked={onLinked} />);
     return;
@@ -66,16 +87,16 @@ export function openBrandSetup(openSheet: OpenSheet, onLinked?: () => void): voi
 /** The tag a listed brand wears wherever it is offered, so "not fully proven"
  *  travels with the name instead of living only inside the setup card. */
 export const brandTag = () => {
-  const list = watchBrands();
+  const list = usableBrands();
   return list.length === 1 && list[0].experimental ? 'Experimental' : undefined;
 };
 
 export const otherWatchesTitle = () => {
-  const list = watchBrands();
+  const list = usableBrands();
   return list.length === 1 ? list[0].name : 'Other watches';
 };
 export const otherWatchesSub = () => {
-  const list = watchBrands();
+  const list = usableBrands();
   return list.length === 1 ? list[0].models : brandNames();
 };
 
@@ -87,13 +108,14 @@ export const otherWatchesSub = () => {
  *  notes, and two flags to flip is one flag to forget. */
 const WATCH_BRANDS_RELEASED = GARMIN_RELEASED;
 
-/** True when there is at least one non-Apple watch worth offering here. */
-export const hasOtherWatches = () => WATCH_BRANDS_RELEASED && watchBrands().length > 0;
+/** True when there is at least one non-Apple watch worth offering here — which
+ *  means released AND actually connectable by this build (`usableBrands`). */
+export const hasOtherWatches = () => WATCH_BRANDS_RELEASED && usableBrands().length > 0;
 
 export function WatchBrandsSheet({ controls, onLinked }: { controls: SheetControls; onLinked?: () => void }) {
   const p = usePalette();
   const { openSheet } = useSheets();
-  const brands = watchBrands();
+  const brands = usableBrands();
 
   return (
     <View>

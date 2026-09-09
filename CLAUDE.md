@@ -1047,7 +1047,27 @@ old web app so old `export.json` files import directly.
   a count so a retry loop can't flush the window (`errorBuffer.ts`, pure +
   tested). `installErrorLogging()` in the root layout also routes uncaught
   errors there on their way to the default handler — it observes, it never
-  swallows. Call `logError('area.thing', e)` from a catch that would otherwise
+  swallows. **It installs TWO hooks, and for a long time only one existed.**
+  `ErrorUtils` is JavaScript's global handler and sees JavaScript throws; a Java
+  exception on the Android main thread never passes through it, so a native
+  crash killed the process and left this log EMPTY — a support dump that said
+  "nothing has failed" about a phone that had been crashing for days, which is
+  the worst answer available. So `modules/app-env` now also carries a Java
+  `UncaughtExceptionHandler`. It runs in a process that is already dying, which
+  fixes its shape: one synchronous file write (never MMKV — that is JSI and the
+  runtime may be gone), no network, and the previous handler is ALWAYS called so
+  the crash stays a crash. `drainNativeCrashes()` picks the file up on the next
+  launch, AFTER `initFaultReporting()` so the report rides a sender that is
+  already draining, and lands under the single tag `native.crash`
+  (`diagnostics/nativeCrash.ts`, pure + tested). It is the one place the MESSAGE
+  outranks the tag: there is only one call site, so the tag can say nothing
+  about where, and the exception type plus its ROOT cause carry the whole
+  finding — `BadParcelableException: ClassNotFoundException when unmarshalling:
+  com.garmin.android.connectiq.IQDevice` IS the bug report. A test pins that it
+  survives `redactMessage` intact. iOS is deliberately a stub:
+  `NSSetUncaughtExceptionHandler` catches ObjC exceptions, and almost nothing
+  that kills an iOS build is one, so installing it would report a handful of
+  crashes and imply we were watching for the rest. Call `logError('area.thing', e)` from a catch that would otherwise
   be silent (already wired: store persist/load, the waveform sidecar, IAP,
   health reads + the one-shot history backfill, the strap connect loop,
   reminders, backups, widgets, Garmin, Insights), and prefer an existing tag
@@ -1195,15 +1215,36 @@ Device builds ship via EAS — see `mobile/EAS_UPDATE.md` and the workflows in
 **Android release builds are minified.** `enableProguardInReleaseBuilds` +
 `enableShrinkResourcesInReleaseBuilds` are on in `expo-build-properties`, so R8
 shrinks and obfuscates every release (dex 42 MB → 13 MB, 5 dex files → 2).
-Consequences worth remembering: keep rules for anything reached by reflection or
-from C++ live in the same `extraProguardRules` block in `app.json` (libraries
+Consequences worth remembering: keep rules for anything reached by reflection,
+from C++, **or by NAME from another process** live in the same
+`extraProguardRules` block in `app.json` (libraries
 that ship their own `consumerProguardFiles` need no entry — expo,
 expo-modules-core, expo-updates, reanimated, svg, health-connect,
-openiap-google); `plugins/withR8Memory.js` raises the Gradle heap because R8
+openiap-google). That third category is the one that does not look like a
+minification problem: a Parcelable arriving in an Intent EXTRA is resolved by
+its class-name string through our ClassLoader, so a renamed class throws
+`BadParcelableException` inside the library's own `BroadcastReceiver`, on the
+main thread, where no `catch` of ours can reach it. It is why
+`com.garmin.android.connectiq.**` is kept — Garmin Connect answers the Connect
+IQ SDK by broadcast, while the outbound AIDL call is name-independent (typed
+`CREATOR`), so the device list worked and only the REPLY killed the app.
+**A keep rule is a line in a build config no test exercises, so that one is
+also checked at runtime**: `garminLinkIntact()` (`lib/garmin/receiver.ts`) asks
+`modules/app-env`'s `missingClasses` whether the three Connect IQ parcelables
+still resolve, and a `false` switches every Garmin surface off —
+`garminDevices()` answers empty, `initGarminReceiver` declines to register for
+the very broadcasts that would kill the process, and `usableBrands()` in
+`WatchBrands.tsx` drops the brand so no setup card can be opened. It fails SAFE
+in the other direction (an unreadable answer means "nothing missing"), because a
+module that cannot answer must not be able to disable working hardware on a
+hunch. It logs `garmin.obfuscated` once and the support dump carries a
+`garmin link` row, since "the Garmin rows are just not there" is otherwise
+indistinguishable from the feature never having shipped.
+`plugins/withR8Memory.js` raises the Gradle heap because R8
 OOMs at the template's 2 GB; release stack traces are obfuscated, but AGP embeds
 the mapping in the AAB itself
 (`BUNDLE-METADATA/com.android.tools.build.obfuscation/proguard.map`), so Play
 deobfuscates crashes with no upload step. **A green build proves nothing here** —
 a missing keep rule fails at
 runtime, so launch the minified APK and exercise BLE / camera / Health Connect /
-IAP / widgets before shipping.
+IAP / widgets / the Garmin setup card before shipping.

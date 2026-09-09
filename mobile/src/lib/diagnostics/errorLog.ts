@@ -1,5 +1,10 @@
 /**
- * The on-device error log: storage + the global uncaught-error hook.
+ * The on-device error log: storage + the global uncaught-error hooks, of which
+ * there are two — JavaScript's `ErrorUtils` and, on Android, a Java
+ * uncaught-exception handler. Both are needed, and for a while only the first
+ * existed: a Java exception never passes through JS, so a native crash left
+ * this log empty and a support dump said "nothing has failed" about a phone
+ * that had been crashing for days.
  *
  * Lives in the plaintext `autonomic.flags` MMKV (same instance as the tier
  * stamp, the health import memory and the review memory) rather than the
@@ -14,6 +19,7 @@
 import { MMKV } from 'react-native-mmkv';
 import { describeError } from './env';
 import { MAX_ERRORS, parseErrorLog, pushError, type LoggedError } from './errorBuffer';
+import { describeNativeCrash, NATIVE_CRASH_TAG, parseNativeCrashes } from './nativeCrash';
 
 export type { LoggedError };
 
@@ -103,6 +109,21 @@ let installed = false;
 export function installErrorLogging(): void {
   if (installed) return;
   installed = true;
+  // The NATIVE half, first, because the JS block below can bail early.
+  //
+  // `ErrorUtils` is JavaScript's global handler and sees JavaScript throws.
+  // Nothing routes a Java exception through it, so an exception on the Android
+  // main thread — thrown inside a library's own BroadcastReceiver, say, where
+  // no `catch` of ours can reach it — killed the process and left this log
+  // completely empty. An empty log reads as "nothing went wrong", which is the
+  // worst possible answer: the one bug class the app degrades WORST on was the
+  // one class it recorded nothing about. The handler writes to a file (the
+  // process is dying; MMKV is JSI and the runtime may already be gone) and
+  // `drainNativeCrashes` picks it up next launch.
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    require('../../../modules/app-env').installNativeCrashHandler();
+  } catch { /* no native module here — the JS hook below still applies */ }
   try {
     const EU = (globalThis as { ErrorUtils?: {
       getGlobalHandler(): (e: unknown, isFatal?: boolean) => void;
@@ -115,4 +136,27 @@ export function installErrorLogging(): void {
       prev?.(e, isFatal);
     });
   } catch { /* no ErrorUtils here — explicit logError calls still work */ }
+}
+
+/**
+ * Record whatever the native handler wrote before the process died.
+ *
+ * Called on launch, AFTER `initFaultReporting()`: that drains the fault buffer
+ * and registers the background flush, so a crash logged here is buffered and
+ * sent on this launch rather than waiting for the one after. Ordering is the
+ * only reason this is a separate call from `installErrorLogging` — installing
+ * the handler must happen as early as possible, and reporting what it caught
+ * must happen once there is something to report through.
+ *
+ * Marked `fatal`, because that is exactly what it was: unlike a logged
+ * failure, the app did not carry on afterwards.
+ */
+export function drainNativeCrashes(): void {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const raw = require('../../../modules/app-env').takeNativeCrashLog() as string;
+    for (const crash of parseNativeCrashes(raw)) {
+      logError(NATIVE_CRASH_TAG, new Error(describeNativeCrash(crash)), { fatal: true });
+    }
+  } catch { /* nothing recorded, or no native module — either way there is nothing to say */ }
 }
