@@ -8,7 +8,7 @@ keywords: "clonidine for POTS, guanfacine for POTS, hyperadrenergic POTS treatme
 date: 2026-09-09
 updated: 2026-09-09
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1522075782449-e45a34f1ddfb?q=80&w=1760&auto=format&fit=crop"
+photoLocation: "https://images.unsplash.com/photo-1674049406313-abb5511e0111?q=80&w=1470&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
 photoAttribution: "Sage Friedman / Unsplash"
 tldr: "Clonidine and guanfacine are central alpha-2 agonists. They act in the brainstem to reduce how much sympathetic signal leaves the brain, which lowers norepinephrine, heart rate, and blood pressure. That makes them a considered option for the hyperadrenergic form of POTS, where a high standing norepinephrine drives a racing, wired feeling, often with normal or high blood pressure. They are sedating, they can lower blood pressure too far in people who already run low, and clonidine in particular must never be stopped abruptly because of rebound hypertension. They are prescription-only and used off-label here, so every dose decision belongs with your clinician, and the most useful thing you can bring is a steady record of your resting heart rate, your stand test, and your symptoms."
 categories:
