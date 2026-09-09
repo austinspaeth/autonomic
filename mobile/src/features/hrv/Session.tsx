@@ -38,6 +38,7 @@ import { SheetControls, SheetFooter, SheetPill, SheetPillButton } from '../../co
 import { Button } from '../../components/ui';
 import { Icon } from '../../components/Icon';
 import { fonts, usePalette, GRADE_COLORS } from '../../theme';
+import { useStore } from '../../store/store';
 import { BreathingViz } from './BreathingViz';
 import { BREATH_STYLE, styleTitle } from '../../lib/breathStyle';
 import { LiveStats } from './LiveStats';
@@ -89,6 +90,9 @@ function SessionCard({ controls }: { controls: SheetControls }) {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const s = useSession((x) => x);
+  // Named rather than described: "Charge 6 sends a heart rate" is a sentence the
+  // reader can act on, where "your device" makes them work out which one we mean.
+  const strapName = useStore((x) => x.state.settings.lastBleDeviceName);
 
   // Minimizing dismisses the card and leaves the reading running; the pill in
   // the root layout takes over. Restoring re-opens this same component.
@@ -126,6 +130,11 @@ function SessionCard({ controls }: { controls: SheetControls }) {
   const mmss = `${Math.floor(remain / 60)}:${String(remain % 60).padStart(2, '0')}`;
   // The strap connects while this card sits open; don't start until it's live.
   const strapPending = config.source === 'polar' && !started && !s.connected;
+  // ...and never at all on a device that has shown it sends no beat intervals.
+  // A reading there is five minutes that end in `Results` declining to save
+  // anything, so the button that would spend them is unavailable rather than
+  // tappable-and-refused-later.
+  const strapUseless = s.rrSupport === 'absent';
   const phaseWord = finished ? 'Done' : s.phase === 'in' ? 'Breathe in' : s.phase === 'out' ? 'Breathe out' : 'Hold';
 
   return (
@@ -179,7 +188,8 @@ function SessionCard({ controls }: { controls: SheetControls }) {
       {hidden ? null : (
         <View style={{ width: '100%', marginTop: 14 }}>
           {config.source === 'watch' ? <WatchNote />
-            : config.source === 'garmin' ? <GarminNote /> : (
+            : config.source === 'garmin' ? <GarminNote />
+            : strapUseless ? <NoBeatsNote name={strapName} /> : (
             <LiveStats
               hr={s.hr} sdnn={s.sdnn} beats={s.beats} artifact={s.artifact}
               hrTrace={s.hrTrace} sdnnTrace={s.sdnnTrace} rrTrace={s.rrTrace}
@@ -209,8 +219,9 @@ function SessionCard({ controls }: { controls: SheetControls }) {
           ) : (
             <>
               <Button title="Cancel" variant="ghost" onPress={() => { endSession(); controls.close(); }} />
-              {/* A 5-minute reading must not start before the strap answers. */}
-              <Button title="Start reading" variant="primary" onPress={beginCollection} disabled={strapPending} />
+              {/* A 5-minute reading must not start before the strap answers —
+                  nor at all once it has answered with a pulse and nothing else. */}
+              <Button title="Start reading" variant="primary" onPress={beginCollection} disabled={strapPending || strapUseless} />
             </>
           )}
         </SheetFooter>
@@ -289,6 +300,30 @@ function GarminNote() {
   );
 }
 
+/**
+ * A device that connected, streamed a pulse, and never sent a beat interval.
+ *
+ * It takes the live tiles' slot for the same reason the two notes above do: what
+ * `LiveStats` would draw here is a real heart rate beside a permanently blank
+ * SDNN, an empty trace and "No beats yet" — which reads as the app failing
+ * rather than as the device declining, and invites the reader to wait it out.
+ * The heart rate is deliberately left out. It is genuine, and showing it would
+ * suggest the reading is half-working when the missing half is the whole
+ * measurement.
+ */
+function NoBeatsNote({ name }: { name?: string }) {
+  const p = usePalette();
+  return (
+    <View style={{ backgroundColor: p.sunk, borderRadius: 20, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 13 }}>
+      <Icon name="heartPulse" size={38} color={GRADE_COLORS.bad} strokeWidth={1.7} />
+      <Text style={{ flex: 1, color: p.textDim, fontSize: 13.5, lineHeight: 20 }}>
+        {name || 'This device'} sends a heart rate but not the beat-to-beat timing HRV
+        is measured from. A chest strap or your phone’s camera will work.
+      </Text>
+    </View>
+  );
+}
+
 function WatchNote() {
   const p = usePalette();
   return (
@@ -324,6 +359,15 @@ function statusHint(s: SessionSnapshot): Hint | null {
   const finished = s.status === 'finished';
   const src = s.config?.source;
   if (finished) return null;
+  // A device that streams a pulse and no beat intervals. This is a fact about
+  // the hardware rather than a passing signal state, so it outranks everything
+  // below it — and nothing below it could even be computed, since the artifact
+  // hint and the SDNN it guards are both statistics over intervals that will
+  // never arrive. Only the strap path can reach this (see `rrSupport` in the
+  // session store), so it needs no source test.
+  if (s.rrSupport === 'absent') {
+    return { tone: GRADE_COLORS.bad, icon: 'triangle', text: 'Heart rate only, no beat data' };
+  }
   if (s.artifact) {
     return {
       tone: GRADE_COLORS.bad, icon: 'triangle',

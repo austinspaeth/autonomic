@@ -282,6 +282,31 @@ old web app so old `export.json` files import directly.
   gold, "Signal noisy" in red): "Training" never changes and the reader chose it
   two cards ago, whereas a status line under the charts sat below the fold on a
   small phone — the one time it mattered was the one time it was not seen.
+- **A strap that streams a pulse and no beats is refused BEFORE the reading, not
+  after it.** The Heart Rate Measurement characteristic (0x2A37) carries RR
+  intervals only when bit 4 of its flags byte is set, and plenty of devices
+  advertising 0x180D never set it: a Fitbit Charge 6 sharing to gym equipment
+  connects, pairs cleanly in the strap picker and sends `71 bpm` in a TWO-BYTE
+  packet with nowhere for an interval to live. Every metric in `lib/hrv` is a
+  statistic over the intervals, so such a device can produce nothing — yet it
+  used to buy a full five-minute paced session that `Results` then declined to
+  save, which is the right outcome at the worst possible moment and, on a
+  clean-day protocol, a reading that cannot be retaken.
+  `src/lib/ble/rrSupport.ts` (pure + tested) folds each sample into a
+  three-valued verdict, fed from `connectStrap`'s own callback rather than from
+  `collect` because pre-start nothing is collected and pre-start is exactly when
+  the answer is worth having. **`'unknown'` is never reported as `'absent'`**:
+  the bar is 20 pulse-carrying notifications (~20 s at 1 Hz) with no interval,
+  and a sample with `hr: 0` — a strap connected but not yet on the chest — is
+  not evidence and does not count, since accusing somebody's working strap of a
+  fault is a worse failure than making them wait a few seconds longer. One RR
+  interval latches `'present'` for good, so a slow starter is never convicted.
+  On `'absent'` the header pill says so, the live tiles give way to
+  `NoBeatsNote` — the `WatchNote` / `GarminNote` treatment, for the same reason
+  those exist: a real heart rate beside a permanently blank SDNN and an empty
+  trace reads as the app failing rather than as the device declining — and Start
+  is DISABLED, the impossible option made unavailable rather than
+  tappable-then-refused.
 - **The app sends two local notifications, both owned by `src/lib/reminders.ts`.**
   (1) The morning reminder: `settings.reminder` is the source of truth and the OS
   schedule is derived, reconciled by `syncReminder()` on launch (covers reinstall, an
