@@ -1,0 +1,4 @@
+# plugins/withVisionCameraViewRace.js patches this file during prebuild, and EAS
+# fingerprints AFTER prebuild while the local CLI fingerprints before it, so the
+# runtime versions never matched and every local Android build aborted.
+node_modules/react-native-vision-camera/android/src/main/java/com/mrousavy/camera/frameprocessors/VisionCameraProxy.kt
