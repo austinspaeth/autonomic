@@ -17,9 +17,8 @@
  * WHAT IT CANNOT TELL APART, and the reasons the copy says "estimated": a
  * seated argument, a hot room, a fever, caffeine. All of them can hold a heart
  * in the band. The mitigations are deliberate and layered: the row names
- * itself an estimate, the drill-in shades every inferred stretch on the trace
- * with its clock time so the user can see whether 12:40 was a queue or a phone
- * call, the posture tap overrides the whole day, and the calibration loop is
+ * itself an estimate, the drill-in draws the inferred minutes hour by hour so
+ * the user can see whether noon was a queue or a phone call, the posture tap overrides the whole day, and the calibration loop is
  * the long-run corrective — if inferred upright time does not predict this
  * user's dips, the ceiling moves around it.
  *

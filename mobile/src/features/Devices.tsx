@@ -46,31 +46,44 @@ export function DevicesScreen({ controls }: { controls?: SheetControls } = {}) {
   const savedId = state.settings.lastBleDeviceId;
   const savedName = state.settings.lastBleDeviceName;
 
-  useEffect(() => () => { mgr.stopScan(); }, [mgr]);
-  // Ask on arrival rather than on the first Scan tap. The permission sheet is
-  // the one thing that must not land *during* a scan: on Android the scan runs
-  // regardless and quietly returns nothing, so the user reads "no straps found"
-  // when the real answer is "never allowed to look".
-  useEffect(() => { if (mgr.available) mgr.requestPermissions().catch(() => {}); }, [mgr]);
+  const stopTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    mgr.stopScan();
+    if (stopTimer.current) clearTimeout(stopTimer.current);
+  }, [mgr]);
   useEffect(() => {
     if (savedId) mgr.readBattery(savedId).then(setBattery).catch(() => {});
   }, [savedId, mgr]);
 
   const startScan = async () => {
     if (!mgr.available) { toast('Bluetooth needs a development build'); return; }
+    if (stopTimer.current) clearTimeout(stopTimer.current);
     // Mark the attempt BEFORE any await: everything below can bail, and a scan
-    // that explains itself is the whole point of this screen.
+    // that explains itself is the whole point of this screen. `scanning` goes
+    // up now too, or the empty-list hint flashes under the permission sheet.
     setFound([]);
     setBlocked(null);
     setScanned(true);
-    const state = await mgr.ready();
-    if (!state.ok) { setBlocked(state.message); return; }
-    const ok = await mgr.requestPermissions();
-    if (!ok) { setBlocked('Bluetooth permission denied. Allow it for Autonomic in system Settings, then scan again.'); return; }
     setScanning(true);
+    // Permission BEFORE the adapter check and the scan. The permission sheet is
+    // the one thing that must not land *during* a scan: on Android the scan runs
+    // regardless and quietly returns nothing, so the user reads "no straps found"
+    // when the real answer is "never allowed to look".
+    const ok = await mgr.requestPermissions();
+    if (!ok) { setScanning(false); setBlocked('Bluetooth permission denied. Allow it for Autonomic in system Settings, then scan again.'); return; }
+    const state = await mgr.ready();
+    if (!state.ok) { setScanning(false); setBlocked(state.message); return; }
     await mgr.scan((d) => setFound((prev) => (prev.some((x) => x.id === d.id) ? prev : sortDevices([...prev, d]))));
-    setTimeout(() => { mgr.stopScan(); setScanning(false); }, 12000);
+    stopTimer.current = setTimeout(() => { mgr.stopScan(); setScanning(false); }, 12000);
   };
+
+  // Scan on arrival. Nobody opens this card for any reason but to find a strap,
+  // so a Scan button standing between them and the list was a tap for nothing;
+  // it stays as the way to look again.
+  useEffect(() => {
+    if (mgr.available) startScan();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Held the Scan button for 8s: collect a dump the user can paste into a
   // support email. Runs its own unfiltered scan, so stop the visible one first
@@ -123,11 +136,20 @@ export function DevicesScreen({ controls }: { controls?: SheetControls } = {}) {
   return (
     <View>
       {/* Inset the header text so it clears the floating ✕ pill. */}
-      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 6, paddingRight: 58 }}>Devices</Text>
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 6, paddingRight: 58 }}>Bluetooth straps</Text>
       <Text style={{ color: p.textDim, fontSize: 14, marginBottom: 16, paddingRight: 58 }}>Connect a Bluetooth heart-rate strap (e.g. Polar H10) for live HRV readings.</Text>
 
       {savedId ? (
-        <View style={{ backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.card, padding: 14, marginBottom: 16 }}>
+        // Opened mid-flow, the remembered strap is itself a choice: tapping it
+        // keeps it and hands back to the card beneath, exactly as picking it
+        // from the scan list would. A strap the phone is already linked to may
+        // never show up in that list, so this card is often the only way to.
+        <Pressable
+          onPress={controls ? () => controls.close() : undefined}
+          disabled={!controls}
+          accessibilityRole={controls ? 'button' : undefined}
+          style={{ backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.card, padding: 14, marginBottom: 16 }}
+        >
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             <Icon name="bluetooth" size={20} color={p.accent} />
             <View style={{ flex: 1 }}>
@@ -136,7 +158,7 @@ export function DevicesScreen({ controls }: { controls?: SheetControls } = {}) {
             </View>
             <Pressable onPress={forget}><Text style={{ color: p.accent, fontWeight: '600' }}>Forget</Text></Pressable>
           </View>
-        </View>
+        </Pressable>
       ) : <Muted>No saved device.</Muted>}
 
       <Button

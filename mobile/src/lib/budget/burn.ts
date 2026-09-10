@@ -262,6 +262,27 @@ export function hrMinutesBelow(
   lineBpm: number | null,
   exclude: Span[],
 ): number | null {
+  const hours = belowByHour(series, lineBpm, exclude);
+  return hours ? Math.round(hours.reduce((a, b) => a + b, 0)) : null;
+}
+
+/** `hrMinutesBelow`, split by the clock hour each minute fell in, so the
+ *  drill-in can show WHEN the day paid something back. Same samples, same
+ *  exclusions, so the bars and the total cannot disagree about what counted. */
+export function hrMinutesBelowByHour(
+  series: { t: number; bpm: number }[] | null | undefined,
+  lineBpm: number | null,
+  exclude: Span[],
+): number[] | null {
+  const hours = belowByHour(series, lineBpm, exclude);
+  return hours ? hours.map((m) => Math.round(m)) : null;
+}
+
+function belowByHour(
+  series: { t: number; bpm: number }[] | null | undefined,
+  lineBpm: number | null,
+  exclude: Span[],
+): number[] | null {
   if (!series || !series.length || lineBpm == null) return null;
   const pts = series
     .filter((p) => Number.isFinite(p.t) && Number.isFinite(p.bpm) && p.bpm > 0)
@@ -269,15 +290,40 @@ export function hrMinutesBelow(
   if (pts.length < 2) return null;
   const out = (m: number) => exclude.some((e) => m >= e.startMin && m < e.endMin);
 
-  let below = 0;
+  const below: number[] = new Array(HOURS).fill(0);
   for (let i = 1; i < pts.length; i++) {
     const gapMin = (pts[i].t - pts[i - 1].t) / 60;
     if (gapMin <= 0 || gapMin > HR_GAP_MIN) continue;
     const midMin = (pts[i - 1].t + pts[i].t) / 120;
     if (out(midMin)) continue;
-    if ((pts[i - 1].bpm + pts[i].bpm) / 2 < lineBpm) below += gapMin;
+    if ((pts[i - 1].bpm + pts[i].bpm) / 2 < lineBpm) {
+      below[Math.min(HOURS - 1, Math.max(0, Math.floor(midMin / 60)))] += gapMin;
+    }
   }
-  return Math.round(below);
+  return below;
+}
+
+/** Clock hours in a day's by-hour arrays. */
+export const HOURS = 24;
+
+/** Spans the journal keeps in `uprightSpans`. A day holding exactly this many
+ *  was cut off, so its spans cannot describe the whole day. */
+export const UPRIGHT_SPANS_MAX = 60;
+
+/** Clean, cap each span at `maxSpanMin`, sort and merge. */
+function mergeSpans(spans: Span[] | null | undefined, maxSpanMin: number): Span[] {
+  if (!spans || !spans.length) return [];
+  const clean = spans
+    .filter((s) => Number.isFinite(s.startMin) && Number.isFinite(s.endMin) && s.endMin > s.startMin)
+    .map((s) => ({ startMin: s.startMin, endMin: Math.min(s.endMin, s.startMin + maxSpanMin) }))
+    .sort((a, b) => a.startMin - b.startMin);
+  const out: Span[] = [];
+  clean.forEach((s) => {
+    const last = out[out.length - 1];
+    if (last && s.startMin <= last.endMin) last.endMin = Math.max(last.endMin, s.endMin);
+    else out.push({ ...s });
+  });
+  return out;
 }
 
 /**
@@ -288,25 +334,56 @@ export function hrMinutesBelow(
  * would report two hours of walking for one hour of it.
  */
 export function walkingMinutes(spans: Span[] | null | undefined): number | null {
-  if (!spans || !spans.length) return null;
-  const clean = spans
-    .filter((s) => Number.isFinite(s.startMin) && Number.isFinite(s.endMin) && s.endMin > s.startMin)
-    .map((s) => ({ startMin: s.startMin, endMin: Math.min(s.endMin, s.startMin + MAX_SPAN_MIN) }))
-    .sort((a, b) => a.startMin - b.startMin);
-  if (!clean.length) return null;
+  const merged = mergeSpans(spans, MAX_SPAN_MIN);
+  if (!merged.length) return null;
+  return Math.round(merged.reduce((t, s) => t + s.endMin - s.startMin, 0));
+}
 
-  let total = 0;
-  let cur = { ...clean[0] };
-  for (let i = 1; i < clean.length; i++) {
-    if (clean[i].startMin <= cur.endMin) {
-      cur.endMin = Math.max(cur.endMin, clean[i].endMin);
-    } else {
-      total += cur.endMin - cur.startMin;
-      cur = { ...clean[i] };
+/**
+ * Merged span minutes split across the clock hours they cover, 24 long.
+ *
+ * `maxSpanMin` defaults to the step cap so walking by the hour sums to
+ * `walkingMinutes`; inferred standing and logged entries pass `Infinity`,
+ * since a long stretch there is a real long stretch.
+ */
+export function minutesByHour(spans: Span[] | null | undefined, maxSpanMin: number = MAX_SPAN_MIN): number[] | null {
+  const merged = mergeSpans(spans, maxSpanMin);
+  if (!merged.length) return null;
+  const out: number[] = new Array(HOURS).fill(0);
+  merged.forEach((s) => {
+    const a = Math.max(0, s.startMin);
+    const b = Math.min(HOURS * 60, s.endMin);
+    for (let h = Math.floor(a / 60); h < HOURS && h * 60 < b; h++) {
+      out[h] += Math.max(0, Math.min(b, (h + 1) * 60) - Math.max(a, h * 60));
     }
+  });
+  return out.map((m) => Math.round(m));
+}
+
+/**
+ * Where a day's upright minutes fell, by hour, in the SAME source order
+ * `uprightMinutes` charges them, so the bars always describe the number on the
+ * row. Watch stand time is one series; otherwise walking plus, when there is
+ * a heart-rate series, the inferred standing.
+ *
+ * A day read before hours were kept falls back to its stored spans, but only
+ * when those were not cut off. Null when the hours cannot be told honestly.
+ */
+export function uprightHours(load: DayLoad | undefined | null): { walk: number[] | null; still: number[] | null; stand: number[] | null } | null {
+  const up = uprightMinutes(load);
+  if (!load || !up) return null;
+  if (up.source === 'stand') {
+    const stand = load.uprightByHour?.stand ?? null;
+    return stand ? { walk: null, still: null, stand } : null;
   }
-  total += cur.endMin - cur.startMin;
-  return Math.round(total);
+  let walk = load.uprightByHour?.walk ?? null;
+  let still = load.uprightByHour?.still ?? null;
+  if (!load.uprightByHour && load.uprightSpans && load.uprightSpans.length < UPRIGHT_SPANS_MAX) {
+    walk = minutesByHour(load.uprightSpans.filter((s) => s.kind === 'walk'));
+    still = minutesByHour(load.uprightSpans.filter((s) => s.kind === 'still'), Infinity);
+  }
+  if (up.source === 'walk') still = null;
+  return walk || still ? { walk, still, stand: null } : null;
 }
 
 /* ------------------------------------------------------------------ *

@@ -39,12 +39,12 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BrandMark, Icon } from '../components/Icon';
+import { BrandMark } from '../components/Icon';
 import { Button } from '../components/ui';
 import { uid } from '../lib/dates';
 import { SheetControls, SheetPill, SheetPillButton, useSheets } from '../components/Sheet';
 import { useToast } from '../components/Toast';
-import { ACCENT, CAUTION_GOLD, CAUTION_GOLD_SOFT, radius, usePalette } from '../theme';
+import { ACCENT, radius, usePalette } from '../theme';
 import { health, healthAppName, type HistoryProgress } from '../lib/health';
 import { workoutCandidateOf } from '../lib/health/workoutCandidate';
 import { dayAlreadyHas } from '../lib/health/updateSet';
@@ -55,8 +55,8 @@ import { blankDay, getState, mutate, save, storeSleepSeries, storeWaveform, useA
 import { DevicesScreen } from './Devices';
 import { type SessionConfig } from './hrv/Session';
 import { defaultPeriodFor, defaultSource, openCapture, sourceBlocker } from './hrv/Setup';
-import { SOURCE_META, sourceSub, TIER_LABEL, TIER_ORDER, type Source } from './hrv/SourcePicker';
-import { brandTag, hasOtherWatches, openBrandSetup, otherWatchesSub, otherWatchesTitle } from './hrv/WatchBrands';
+import { SOURCE_META, SourceRow, sourceSub, TIER_LABEL, TIER_ORDER, TierLabel, type Source } from './hrv/SourcePicker';
+import { brandTag, hasOtherWatches, openBrandSetup, otherWatchesSub, otherWatchesTitle, PickerRow } from './hrv/WatchBrands';
 import { garminDevices, subscribeGarminDevices } from '../lib/garmin/receiver';
 import { logError } from '../lib/diagnostics/errorLog';
 
@@ -275,100 +275,6 @@ function ConnectRow({ glyph, title, sub, on, busy, onPress }: {
   );
 }
 
-/* ---------- last step: one sensor row ---------- */
-
-/** The brand row: same shape as a sensor row, but a CHEVRON where the radio
- *  goes, because it selects nothing. It opens the brand card, exactly as the
- *  HRV setup sheet's row does — the two surfaces rank and route these the same
- *  way or the ranking means nothing. Its title comes from the same helper, so
- *  it names the one built brand rather than a category (see otherWatchesTitle).
- */
-function BrandsRow({ title, tag, sub, onPress }: { title: string; tag?: string; sub: string; onPress: () => void }) {
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={title}
-      style={{ flexDirection: 'row', alignItems: 'center', gap: 14, borderWidth: 1, borderRadius: 14, padding: 14, backgroundColor: C.row, borderColor: C.rowBorder }}
-    >
-      <View style={{ width: 42, height: 42, borderRadius: 11, backgroundColor: C.tile, alignItems: 'center', justifyContent: 'center' }}>
-        <Icon name="watch" size={21} color={C.faint} />
-      </View>
-      <View style={{ flex: 1 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
-          <Text style={{ fontSize: 15, fontWeight: '700', color: C.text }}>{title}</Text>
-          {tag ? (
-            <View style={{ paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, backgroundColor: CAUTION_GOLD_SOFT }}>
-              <Text style={{ color: CAUTION_GOLD, fontSize: 10.5, fontWeight: '600', letterSpacing: 0.3 }}>{tag}</Text>
-            </View>
-          ) : null}
-        </View>
-        <Text style={{ fontSize: 12.5, lineHeight: 17, color: C.faint, marginTop: 3 }}>{sub}</Text>
-      </View>
-      {/* Says what the tap does. A chevron only says "there is more", which is
-          the one thing a row leading to a setup errand should not imply. */}
-      <Text style={{ fontSize: 13, fontWeight: '700', color: ACCENT }}>Set up</Text>
-    </Pressable>
-  );
-}
-
-
-/** A sensor the first reading can use. Wears the app's own icon and name for
- *  that source (SOURCE_META) rather than a second set of names, and carries NO
- *  accuracy pill: the rows are grouped under the same tier headings the HRV
- *  setup sheet uses, so the ranking is said once, in order, by the heading
- *  above the row. Selection is a filled radio and an accent border — the
- *  wizard's ConnectRow treatment, not a new one.
- *
- *  A row can carry its own `onChange` link (the strap does, once one is
- *  paired): picking a sensor and swapping the device behind it are two
- *  different questions, and a row that only ever selects strands anyone who
- *  wants a different strap than the one already remembered. */
-function MethodRow({ source, sub, selected, onPress, onChange }: {
-  source: Source; sub: string; selected: boolean; onPress: () => void; onChange?: () => void;
-}) {
-  const meta = SOURCE_META[source];
-  const t = useSharedValue(selected ? 1 : 0);
-  useEffect(() => { t.value = withTiming(selected ? 1 : 0, { duration: 220, easing: Easing.out(Easing.cubic) }); }, [selected, t]);
-  const rowStyle = useAnimatedStyle(() => ({
-    backgroundColor: interpolateColor(t.value, [0, 1], [C.row, C.accentWash]),
-    borderColor: interpolateColor(t.value, [0, 1], [C.rowBorder, C.accentBorder]),
-  }));
-  const radioStyle = useAnimatedStyle(() => ({
-    backgroundColor: interpolateColor(t.value, [0, 1], ['rgba(0,0,0,0)', ACCENT]),
-    borderColor: interpolateColor(t.value, [0, 1], ['rgba(255,255,255,0.16)', ACCENT]),
-  }));
-  const checkStyle = useAnimatedStyle(() => ({ opacity: t.value, transform: [{ scale: 0.5 + 0.5 * t.value }] }));
-  return (
-    <AnimatedPressable
-      onPress={onPress}
-      accessibilityRole="radio"
-      accessibilityState={{ selected }}
-      style={[{ flexDirection: 'row', alignItems: 'center', gap: 14, borderWidth: 1, borderRadius: 14, padding: 14 }, rowStyle]}
-    >
-      <View style={{ width: 42, height: 42, borderRadius: 11, backgroundColor: C.tile, alignItems: 'center', justifyContent: 'center' }}>
-        <Icon name={meta.icon} size={21} color={selected ? ACCENT : C.faint} />
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={{ fontSize: 15, fontWeight: '700', color: C.text }}>{meta.title}</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 3 }}>
-          <Text style={{ flexShrink: 1, fontSize: 12.5, lineHeight: 17, color: C.faint }}>{sub}</Text>
-          {onChange ? (
-            <Pressable onPress={onChange} hitSlop={10} accessibilityRole="button" accessibilityLabel="Change strap">
-              <Text style={{ fontSize: 12.5, lineHeight: 17, fontWeight: '700', color: ACCENT }}>Change</Text>
-            </Pressable>
-          ) : null}
-        </View>
-      </View>
-      <Animated.View style={[{ width: 22, height: 22, borderRadius: 11, borderWidth: 1, alignItems: 'center', justifyContent: 'center' }, radioStyle]}>
-        <Animated.View style={checkStyle}>
-          <Glyph size={12} w={3.2} color="#fff" d={['M20 6L9 17l-5-5']} />
-        </Animated.View>
-      </Animated.View>
-    </AnimatedPressable>
-  );
-}
-
 /** Bare icon + sentence bullet row. The text lives in a flexed wrapper so long
  *  lines wrap inside the padded content area (nested bold Text spans otherwise
  *  measure against the full screen width). */
@@ -471,7 +377,6 @@ function Onboarding({ onDone }: { onDone: () => void }) {
   const actionBarStyle = { paddingBottom: 12 + (insets.bottom - 4) };
 
   const healthOn = !!state.settings.healthEnabled;
-  const strapOn = !!state.settings.lastBleDeviceId;
   // Stamped by importHealthHistory only when the backfill actually ran, so this
   // is the one honest answer to "did anything come in".
   const historyImported = !!state.meta.healthHistoryImported;
@@ -585,7 +490,12 @@ function Onboarding({ onDone }: { onDone: () => void }) {
     // Offer the one-time historical backfill right after connecting (once only).
     if (!getState().meta.healthHistoryImported) offerHistory();
   };
-  const connectStrap = () => openSheet((c) => <DevicesScreen controls={c} />);
+  // Pairing a strap there closes that card (its `controls.close`) and selects
+  // the strap here; its ✕ backs out without changing anything — the HRV
+  // picker's `setUpStrap`, line for line.
+  const connectStrap = () => openSheet((c) => (
+    <DevicesScreen controls={{ ...c, close: () => { c.close(); setSource('polar'); } }} />
+  ));
   // The brand's setup card, where a watch is chosen and its watch app
   // installed. On linking, the new source is selected here too, so the user
   // comes back to a step that already reflects what they just set up.
@@ -615,13 +525,14 @@ function Onboarding({ onDone }: { onDone: () => void }) {
     // watch has nothing else to put there).
     .filter((g) => g.list.length > 0 || (g.tier === 'high' && showBrands));
   const strapName = state.settings.lastBleDeviceName;
-  // Picking the strap with nothing paired goes straight to the devices card,
-  // the same detour the HRV setup sheet takes — choosing a sensor you don't
-  // own yet is only half an answer.
+  // The HRV picker's routing: picking the strap with nothing paired opens the
+  // strap card and selects only once a strap is saved there (choosing a sensor
+  // you don't own yet is only half an answer), so backing out of that card
+  // leaves the previous choice checked rather than a strap that isn't there.
   const pickSource = (s: Source) => {
+    if (s === 'polar' && !getState().settings.lastBleDeviceId) { connectStrap(); return; }
+    if (s === 'garmin' && !garminDevices().length) { connectGarmin(); return; }
     setSource(s);
-    if (s === 'polar' && !getState().settings.lastBleDeviceId) connectStrap();
-    if (s === 'garmin' && !garminDevices().length) connectGarmin();
   };
 
   /* ---------- animated chrome ---------- */
@@ -728,27 +639,24 @@ function Onboarding({ onDone }: { onDone: () => void }) {
           </Text>
         </View>
 
-        {/* Grouped by accuracy tier, best first, exactly as the HRV setup
-            sheet groups them. A per-row pill let the two drift; a heading
-            cannot, and a new sensor (a Garmin, another watch brand) joins its
-            tier without this step learning anything about it. */}
-        <View style={{ gap: 18 }}>
-          {tiers.map(({ tier, list }) => (
+        {/* The HRV setup sheet's "Measuring with" list, drawn with its own
+            components: tier headings best first, the strap (and a linked
+            Garmin) split into a select target and a "Set up" link, a red
+            hairline and a check once chosen. Two surfaces offering the same
+            choice in two designs is how one of them quietly goes stale. */}
+        <View>
+          {tiers.map(({ tier, list }, i) => (
             <View key={tier}>
-              <Text style={st.fieldLabel}>{TIER_LABEL[tier]}</Text>
-              <View style={{ gap: 10 }}>
+              <TierLabel text={TIER_LABEL[tier]} top={i > 0} />
+              <View style={{ gap: 8 }}>
                 {list.map((src) => (
-                  <MethodRow
+                  <SourceRow
                     key={src}
                     source={src}
                     sub={sourceSub(src, src === 'garmin' ? garminName : strapName)}
-                    selected={source === src}
+                    active={source === src}
                     onPress={() => pickSource(src)}
-                    onChange={
-                      src === 'polar' && strapOn ? connectStrap
-                        : src === 'garmin' && garminName ? connectGarmin
-                          : undefined
-                    }
+                    onSetUp={src === 'polar' ? connectStrap : src === 'garmin' ? connectGarmin : undefined}
                   />
                 ))}
                 {/* Not a source: picking a brand is a setup errand (Garmin
@@ -756,7 +664,9 @@ function Onboarding({ onDone }: { onDone: () => void }) {
                     the HRV sheet's row opens rather than selecting anything.
                     Once a watch is linked it becomes a real row above. */}
                 {tier === 'high' && showBrands ? (
-                  <BrandsRow title={otherWatchesTitle()} tag={brandTag()} sub={otherWatchesSub()} onPress={connectGarmin} />
+                  <PickerRow icon="watch" title={otherWatchesTitle()} tag={brandTag()} sub={otherWatchesSub()} onPress={connectGarmin}>
+                    <Text style={{ color: ACCENT, fontSize: 13, fontWeight: '700' }}>Set up</Text>
+                  </PickerRow>
                 ) : null}
               </View>
             </View>

@@ -8,22 +8,37 @@
 import React from 'react';
 import { Text, View } from 'react-native';
 import { CardRow, InsightCard } from '../insights/Sections';
-import { LineChart } from '../../components/charts';
+import { NightSeriesChart, StackedBars } from '../../components/charts';
 
 import { hexA } from '../../lib/color';
 import { SCORE_COLORS } from '../../lib/scoring';
-import { fonts, usePalette } from '../../theme';
+import type { Band, ScoreCat } from '../../lib/types';
+import { GRADE_COLORS, fonts, usePalette } from '../../theme';
 import { clock, hm, type BudgetView, type SpendRow } from '../../lib/budget';
 import { BAND_FRACTION } from '../../lib/budget/upright';
-import { HR_BAND_EDGES, HR_BAND_OFFSETS } from '../../lib/budget/burn';
+import { HR_BAND_EDGES, HR_BAND_OFFSETS, HR_MIN_COVERAGE, HOURS, minutesByHour, uprightHours } from '../../lib/budget/burn';
+import { minutesOf } from '../../lib/budget/pace';
 import { hrBoostFor } from '../../lib/budget/load';
 import { getWaveform, useAppState } from '../../store/store';
 import { loadWaveformId } from '../../lib/waveforms';
 import type { OpenSheet } from '../forms';
 
-/** Buckets the all-day curve is drawn in. Enough to show the shape of a day
- *  without pretending to per-minute resolution on a 350pt-wide chart. */
-const CHART_BUCKETS = 48;
+/**
+ * The chart's grades: under the line, then one per `HR_BAND_EDGES` band, so
+ * the colours on the dots are the same bands the "Why" rows count minutes in.
+ * Green / yellow / orange / red, straight out of the grade palette.
+ */
+const TRACE_CATS: ScoreCat[] = ['good', 'ok', 'bad', 'crash'];
+
+function traceBands(lineBpm: number): (Band & { label: string })[] {
+  const lo = Math.round(lineBpm);
+  const maxes = [lo, ...HR_BAND_EDGES.slice(1).map((e) => lo + e), Infinity];
+  return maxes.map((max, i) => ({
+    max,
+    cat: TRACE_CATS[i],
+    label: i === 0 ? `Under ${lo}` : max === Infinity ? `${maxes[i - 1]}+` : `${maxes[i - 1]} to ${max}`,
+  }));
+}
 
 function Why({ rows }: { rows: { label: string; value: string; good?: boolean }[] }) {
   const p = usePalette();
@@ -45,13 +60,14 @@ function Why({ rows }: { rows: { label: string; value: string; good?: boolean }[
 }
 
 /**
- * The day's heart-rate curve, coloured by the user's own exertion line.
+ * The day's heart rate, one dot per stored sample, graded by the user's own
+ * exertion line.
  *
- * Same mechanism the workout report and every Progress chart use: `zones` hand
- * `LineChart` a set of value bands and it paints the trace through them, so the
- * minutes that cost something are hot and the rest is quiet. Nothing bespoke —
- * a second way of colouring a line by threshold is a second thing to keep in
- * step with the grade palette.
+ * Dots, not a line: this used to average the day into half-hour buckets, so a
+ * "49m at 94 to 104 bpm" row sat over a trace that never left green — a short
+ * climb averaged into the quiet around it. The minutes are counted from the
+ * samples, so the chart draws the samples. Same scatter the overnight heart
+ * rate uses, with its smoothing line off for the same reason.
  */
 function DayTrace({ dk, lineBpm, onPick }: {
   dk: string;
@@ -62,85 +78,99 @@ function DayTrace({ dk, lineBpm, onPick }: {
   const curve = getWaveform(loadWaveformId(dk))?.sampledHr;
   if (!curve || curve.length < 4) return null;
 
-  const span = 1440 / CHART_BUCKETS;
-  const sums: number[] = new Array(CHART_BUCKETS).fill(0);
-  const counts = new Array(CHART_BUCKETS).fill(0);
-  curve.forEach((pt) => {
-    const i = Math.min(CHART_BUCKETS - 1, Math.floor(pt.t / 60 / span));
-    sums[i] += pt.bpm;
-    counts[i]++;
-  });
-  const series = sums.map((v, i) => (counts[i] ? Math.round(v / counts[i]) : null));
-
-  // Two bands: below the line is quiet, at or above it is the cost. `1e9` is
-  // the same open-ended top the band tables use.
-  const zones = lineBpm != null
-    ? [{ from: -1e9, to: lineBpm, color: hexA(p.text, 0.45) }, { from: lineBpm, to: 1e9, color: p.accent }]
-    : null;
-
-  const buckets = Array.from({ length: CHART_BUCKETS }, (_, i) => {
-    const m = Math.round(i * span);
-    return { label: i % 12 === 0 ? clock(m).replace(':00', '') : '' };
-  });
-
   return (
     <View style={{ marginTop: 12 }}>
-      <LineChart
-        buckets={buckets}
-        series={[{ label: 'Heart rate', values: series, color: hexA(p.text, 0.45) }]}
-        zones={zones}
-        zonesOn={false}
-        height={150}
-        hideHeader
-        integer
-        onSelect={(i) => {
-          const v = i == null ? null : series[i];
-          onPick(v == null || i == null ? null : { bpm: v, min: Math.round(i * span) });
-        }}
+      <NightSeriesChart
+        // `t` is seconds past midnight; the chart's clock counts from noon.
+        bedAt={-720}
+        points={curve.map((q) => ({ t: q.t, v: q.bpm }))}
+        color={hexA(p.text, 0.45)}
+        bands={lineBpm != null ? traceBands(lineBpm) : null}
+        scatter
+        trend={false}
+        onSelect={(sel) => onPick(sel ? { bpm: Math.round(sel.v), min: Math.round(sel.t / 60) } : null)}
       />
     </View>
   );
 }
 
-/** One key per line ON the chart, and the dashed entry is the threshold rather
- *  than a series — labelling the solid line with a bpm made the reader look for
- *  a line that sat at that value. */
-function Legend({ items }: { items: { label: string; color: string; dashed?: boolean }[] }) {
+/** A dot per series the chart draws, each naming itself. */
+function Key({ items, unit }: { items: { label: string; color: string }[]; unit?: string }) {
   const p = usePalette();
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 10, flexWrap: 'wrap' }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', columnGap: 14, rowGap: 6, marginTop: 10, flexWrap: 'wrap' }}>
       {items.map((it) => (
         <View key={it.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          {it.dashed ? (
-            <View style={{ flexDirection: 'row', gap: 2 }}>
-              {[0, 1, 2].map((i) => (
-                <View key={i} style={{ width: 4, height: 2, backgroundColor: it.color }} />
-              ))}
-            </View>
-          ) : (
-            <View style={{ width: 14, height: 3, borderRadius: 999, backgroundColor: it.color }} />
-          )}
-          <Text style={{ fontSize: 11.5, color: p.textDim }}>{it.label}</Text>
+          <View style={{ width: 8, height: 8, borderRadius: 999, backgroundColor: it.color }} />
+          <Text style={{ fontSize: 11.5, color: p.textDim, fontVariant: ['tabular-nums'] }}>{it.label}</Text>
         </View>
       ))}
+      {unit ? <Text style={{ fontSize: 11.5, color: p.textDim }}>{unit}</Text> : null}
     </View>
   );
 }
 
+/** A dot per grade the trace can draw, each naming its own range. */
+function Legend({ lineBpm }: { lineBpm: number }) {
+  return <Key items={traceBands(lineBpm).map((b) => ({ label: b.label, color: GRADE_COLORS[b.cat] }))} unit="bpm" />;
+}
+
 /** What the finger is on. Only ever shown while something is picked: a
  *  readout that falls back to the latest value reads as a claim about now. */
-function Readout({ picked }: { picked: { bpm: number; min: number } | null }) {
+function ReadoutLine({ text, hint }: { text: React.ReactNode; hint: string }) {
   const p = usePalette();
   return (
     <View style={{ height: 20, justifyContent: 'center', marginTop: 6 }}>
-      {picked ? (
-        <Text style={{ fontSize: 12.5, color: hexA(p.text, 0.8) }}>
-          <Text style={{ fontFamily: fonts.numHeavy }}>{picked.bpm}</Text>
-          {` bpm at ${clock(picked.min)}`}
-        </Text>
+      {text ? (
+        <Text numberOfLines={1} style={{ fontSize: 12.5, color: hexA(p.text, 0.8) }}>{text}</Text>
       ) : (
-        <Text style={{ fontSize: 12.5, color: p.textDim }}>Touch the trace for a reading</Text>
+        <Text style={{ fontSize: 12.5, color: p.textDim }}>{hint}</Text>
       )}
+    </View>
+  );
+}
+
+function Readout({ picked }: { picked: { bpm: number; min: number } | null }) {
+  return (
+    <ReadoutLine
+      hint="Touch the trace for a reading"
+      text={picked ? <><Text style={{ fontFamily: fonts.numHeavy }}>{picked.bpm}</Text>{` bpm at ${clock(picked.min)}`}</> : null}
+    />
+  );
+}
+
+type HourSeries = { label: string; noun: string; color: string; values: number[] };
+
+const hourLabel = (h: number) => clock(h * 60).replace(':00', '');
+
+/**
+ * When the minutes behind a row happened: one bar per clock hour.
+ *
+ * Upright time and recovery time are questions of WHEN. The heart-rate trace
+ * that used to sit here answered a different one, and read as though heart
+ * rate were what the row charged. These are the minutes the row counted,
+ * split by the hour they fell in, so the bars add up to the row.
+ */
+function HourBars({ series }: { series: HourSeries[] }) {
+  const [sel, setSel] = React.useState<number | null>(null);
+  if (!series.some((s) => s.values.some((v) => v > 0))) return null;
+  const parts = sel == null ? [] : series
+    .filter((s) => (s.values[sel] || 0) >= 1)
+    .map((s) => `${hm(s.values[sel])} ${s.noun}`);
+  return (
+    <View style={{ marginTop: 12 }}>
+      <StackedBars
+        buckets={Array.from({ length: HOURS }, (_, h) => ({ label: h % 4 === 0 ? hourLabel(h) : '' }))}
+        segments={series}
+        height={150}
+        hideHeader
+        onSelect={setSel}
+      />
+      <ReadoutLine
+        hint="Touch a bar for that hour"
+        text={sel == null ? null : `${hourLabel(sel)} to ${hourLabel(sel + 1)}: ${parts.join(', ')}`}
+      />
+      <Key items={series} unit="minutes per hour" />
     </View>
   );
 }
@@ -168,10 +198,7 @@ export function SpendSheet({ dk, budget, row }: { dk: string; budget: BudgetView
       <>
         <DayTrace dk={dk} lineBpm={line ?? null} onPick={setPicked} />
         <Readout picked={picked} />
-        <Legend items={[
-          { label: 'HR', color: hexA(p.text, 0.45) },
-          { label: line ? `${Math.round(line)} bpm` : 'Your line', color: p.accent, dashed: true },
-        ]} />
+        {line ? <Legend lineBpm={line} /> : null}
       </>
     );
     // One row per intensity band, so the minutes and the effort minutes can be
@@ -195,7 +222,6 @@ export function SpendSheet({ dk, budget, row }: { dk: string; budget: BudgetView
       const s = load.longestStretch;
       whyRows.push({ label: `Longest stretch, ${clock(s.startMin)} to ${clock(s.endMin)}`, value: hm(s.endMin - s.startMin) });
     }
-    if (load?.peakBpm != null && line) whyRows.push({ label: `Peak, ${load.peakBpm} bpm`, value: `${Math.round(load.peakBpm - line)} above` });
   } else if (row.source === 'upright') {
     const estimated = load?.stillUprightMin != null && load?.standMin == null;
     sentence = estimated
@@ -203,13 +229,14 @@ export function SpendSheet({ dk, budget, row }: { dk: string; budget: BudgetView
       : load?.standMin != null
         ? 'Standing and walking minutes, as your watch recorded them.'
         : 'Minutes holding steps, from your phone. Standing still is not counted without a heart-rate series.';
-    body = (
-      <>
-        <DayTrace dk={dk} lineBpm={load?.lineBpm ?? null} onPick={setPicked} />
-        <Readout picked={picked} />
-        <Legend items={[{ label: 'HR', color: hexA(p.text, 0.45) }]} />
-      </>
-    );
+    // Measured walking in the stronger grey, estimated standing in the fainter
+    // one on top of it; watch stand time is a single measured series.
+    const hours = uprightHours(load);
+    const series: HourSeries[] = [];
+    if (hours?.stand) series.push({ label: 'Standing or walking', noun: 'upright', color: hexA(p.text, 0.75), values: hours.stand });
+    if (hours?.walk) series.push({ label: 'Walking', noun: 'walking', color: hexA(p.text, 0.75), values: hours.walk });
+    if (hours?.still) series.push({ label: 'Standing, estimated', noun: 'standing', color: hexA(p.text, 0.35), values: hours.still });
+    body = <HourBars series={series} />;
     if (load?.walkingMin != null) whyRows.push({ label: `${hm(load.walkingMin)} walking`, value: hm(load.walkingMin * 0.2) });
     if (load?.stillUprightMin != null) whyRows.push({ label: `${hm(load.stillUprightMin)} standing, estimated`, value: hm(load.stillUprightMin * 0.2) });
     if (load?.standMin != null) whyRows.push({ label: `${hm(load.standMin)} standing or walking`, value: hm(load.standMin * 0.2) });
@@ -217,8 +244,23 @@ export function SpendSheet({ dk, budget, row }: { dk: string; budget: BudgetView
     sentence = row.source === 'credits'
       ? `Restorative entries give minutes back, up to a quarter of what the day ${budget.past ? 'cost' : 'has cost'}.`
       : 'Each logged activity, charged by how long it ran and how heavy that kind of thing tends to be.';
+    const series: HourSeries[] = [];
+    if (row.source === 'credits') {
+      // Resting minutes count only when the series was trusted enough to be
+      // credited at all (the same bar `buildBurn` applies).
+      const trusted = load?.hrAboveMin != null && (load.hrCoverageMin || 0) >= HR_MIN_COVERAGE;
+      const resting = trusted ? load?.hrBelowByHour ?? null : null;
+      const acts = state.days[dk]?.activities || [];
+      const logged = minutesByHour((row.members || []).flatMap((m) => {
+        const start = minutesOf(acts.find((a) => String(a.id || '') === m.entryId)?.time);
+        return start == null || m.minutes <= 0 ? [] : [{ startMin: start, endMin: start + m.minutes }];
+      }), Infinity);
+      if (resting) series.push({ label: 'Resting', noun: 'resting', color: SCORE_COLORS.good, values: resting });
+      if (logged) series.push({ label: 'Logged rest', noun: 'logged', color: hexA(SCORE_COLORS.good, 0.45), values: logged });
+    }
     body = (
       <View style={{ marginTop: 4 }}>
+        {series.length ? <HourBars series={series} /> : null}
         {(row.members || []).map((m) => (
           <CardRow key={m.entryId} bg={p.bg}>
             <View style={{ flex: 1, minWidth: 0 }}>

@@ -32,7 +32,7 @@ import { LEARN_DAYS } from '../../lib/budget/baseline';
 import { BUDGET_HELP } from '../../lib/budget/help';
 import { MIN_EVALUATED, MIN_TREND_WEEKS, STRIP_DAYS, type AccuracyWeek } from '../../lib/budget/accuracy';
 import { healthAppName } from '../../lib/health';
-import { connectPacingHealth } from '../../store/budget';
+import { connectPacingHealth, useStepsMissing } from '../../store/budget';
 import { enablePacingNotifications } from '../../store/pacingAlerts';
 import { useAppState } from '../../store/store';
 import { BudgetBar } from './Bar';
@@ -258,27 +258,29 @@ function TodayCard({ dk, budget }: { dk: string; budget: BudgetView }) {
           no marker on it, and a paragraph explaining a white line the reader
           cannot see is worse than no paragraph. */}
       {budget.pace && !over ? (
-        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 9, backgroundColor: p.bg, borderRadius: 14, padding: 12, marginBottom: 15 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: p.bg, borderRadius: 14, padding: 12, marginBottom: 15 }}>
           {/* The mark itself, drawn the way the bar draws it: the line above,
-              the caret under it. A bare triangle here was a different object
-              from the thing it was explaining. */}
-          <View style={{ alignItems: 'center', marginTop: 3 }}>
-            <View style={{ width: 2, height: 11, borderRadius: 999, backgroundColor: hexA(p.text, 0.84) }} />
+              the caret under it and overlapping its foot by 2pt, as `Bar`
+              does (line to height + 4, caret from height + 2). A bare
+              triangle, or a caret floating under a gap, was a different
+              object from the thing it was explaining. */}
+          <View style={{ alignItems: 'center' }}>
+            <View style={{ width: 2, height: 18, borderRadius: 999, backgroundColor: hexA(p.text, 0.84) }} />
             <View style={{
-              marginTop: 2, width: 0, height: 0,
+              marginTop: -2, width: 0, height: 0,
               borderLeftWidth: 5, borderRightWidth: 5, borderBottomWidth: 6,
               borderLeftColor: 'transparent', borderRightColor: 'transparent',
               borderBottomColor: hexA(p.text, 0.84),
             }} />
           </View>
           <Text style={{ flex: 1, fontSize: 12.5, lineHeight: 18, color: p.textDim }}>
-            The white mark is where you are in the day. If the bar has not reached it, you have energy in reserve. Past it, you are running out for today.
+            The white mark is where you are in the day. Short of it, energy in reserve. Past it, running out.
           </Text>
         </View>
       ) : null}
 
       <View style={{ flexDirection: 'row', gap: 9 }}>
-        <Tile value={env != null ? hm(env) : '--'} label={budget.past ? "That day's budget" : "Today's budget"} />
+        <Tile value={env != null ? hm(env) : '--'} label="Budget" />
         <Tile value={hm(spent)} label="Spent" />
         {over
           ? <Tile value={hm(budget.overByMin || 0)} label="Over" color={p.accent} />
@@ -639,6 +641,10 @@ export function BudgetSheet({ dk, budget }: { dk: string; budget: BudgetView; co
   // A finished day the app never saw has nothing to break down, so the sheet
   // is the note and the reason, not four empty cards.
   const blank = budget.state === 'unknown';
+  // `budget` is the view as it stood when the sheet opened, and the Connect
+  // button lives inside this sheet: the card must leave the moment the grant
+  // does, not the next time the sheet is opened.
+  const stepsMiss = useStepsMissing(dk);
 
   return (
     <View style={{ paddingHorizontal: 2 }}>
@@ -646,7 +652,7 @@ export function BudgetSheet({ dk, budget }: { dk: string; budget: BudgetView; co
         <Text style={{ fontSize: 21, fontWeight: '700', letterSpacing: -0.3, color: p.text }}>Pacing</Text>
         <Text style={{ fontSize: 13, color: p.textDim, marginTop: 2 }}>{sub}</Text>
       </View>
-      {budget.stepsMissing ? <StepsCard /> : null}
+      {budget.stepsMissing && stepsMiss ? <StepsCard /> : null}
       {isToday ? <NotifyCard dk={dk} /> : null}
       {blank ? (
         <InsightCard title="That day" bg={p.sunk}>

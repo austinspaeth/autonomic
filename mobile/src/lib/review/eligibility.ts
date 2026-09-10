@@ -70,18 +70,19 @@ export type ReviewVerdict =
  */
 const own = (list: Entry[] | undefined): boolean => (list || []).some((e) => !e.imported);
 
+export function isEngagedDay(d: DayRecord | undefined): boolean {
+  if (!d) return false;
+  if (own(d.readings) || own(d.activities) || own(d.meds) || own(d.symptoms)) return true;
+  if ((d.digestion?.movements || []).length) return true;
+  if ((d.food?.meals || []).length) return true;
+  if (d.food && +d.food.water > 0) return true;
+  if (d.food?.triggers && Object.values(d.food.triggers).some((n) => n > 0)) return true;
+  if (d.notes && d.notes.trim()) return true;
+  return false;
+}
+
 export function engagedDayCount(days: DaysMap): number {
-  return Object.keys(days).filter((k) => {
-    const d: DayRecord | undefined = days[k];
-    if (!d) return false;
-    if (own(d.readings) || own(d.activities) || own(d.meds) || own(d.symptoms)) return true;
-    if ((d.digestion?.movements || []).length) return true;
-    if ((d.food?.meals || []).length) return true;
-    if (d.food && +d.food.water > 0) return true;
-    if (d.food?.triggers && Object.values(d.food.triggers).some((n) => n > 0)) return true;
-    if (d.notes && d.notes.trim()) return true;
-    return false;
-  }).length;
+  return Object.keys(days).filter((k) => isEngagedDay(days[k])).length;
 }
 
 const DAY_MS = 86400000;

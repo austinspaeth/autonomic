@@ -335,7 +335,7 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
         const has = (recordType: string) => granted.some(
           (g) => g.recordType === recordType && g.accessType === 'read',
         );
-        const need = scope === 'workouts' ? ['ExerciseSession', 'HeartRate'] : READ_TYPES;
+        const need = scope === 'workouts' ? ['ExerciseSession', 'HeartRate'] : scope === 'steps' ? ['Steps'] : READ_TYPES;
         return need.every(has) ? 'granted' : 'denied';
       } catch { return 'unknown'; }
     },
@@ -424,6 +424,7 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
         steps: stepRecords.length ? Math.round(steps) : null,
         stepSpans: stepSpans.length ? stepSpans : null,
         standMin: null,
+        standByHour: null,
         hr: hr.length ? hr : null,
       };
     },

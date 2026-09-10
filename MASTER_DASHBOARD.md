@@ -882,7 +882,7 @@ a CSV paste would be an alert about your own typing.
 
 | Event | Definition | Reaction |
 |---|---|---|
-| Visitors | a rise in open pings, minus that day's first runs — somebody **coming back** | two-note blip, **three seconds** of house-coloured glitter, and nothing else in any channel |
+| Visitors | a rise in open pings, minus that day's first runs — somebody **coming back** | two-note blip, **three seconds** of house-coloured glitter, and a toast saying how old the returning installs are (only when nothing louder toasted). No card, no notification |
 | Activations | a rise in activation pings — an install saved its **first HRV reading** | two-note settling chime, a card + a toast + a notification naming the sensor(s). **No confetti.** |
 | Readings | a rise in daily reading pings — an install measured **today** | one struck note, a card + a toast + a notification naming the sensor(s). **No confetti**, and it yields every channel to anything above it in this table — it is the app being used, which is what this dashboard hopes to see all day |
 | Downloads | a rise in **first runs** — an open ping whose cohort key IS the day it arrived on | three-note rising chime, **ten seconds** of SILVER glitter falling from the top, a card + a toast + a notification naming the store(s) |
@@ -941,9 +941,19 @@ until it is pressed; the **toast** says it wherever the reader is on the page,
 since the card stack lives in one corner and a phone is mostly not that corner;
 and a **notification** reaches the window you are not looking at (see the
 Notifications section above for what that can and cannot mean). Visitors get
-none of the three — a toast for the event that fires most often would be on
-screen permanently, and a notification for it is the fastest way to have
-notifications turned back off.
+only the toast. A card for the event that fires most often would bury the
+stack, and a notification for it is the fastest way to have notifications
+turned back off.
+
+**Every sentence says how old the installs behind it are.** A sale, a first
+reading, a reading and a returning visit each end with the install day and age
+("1 on iOS · installed Aug 29, 12 days ago"; several read "installed Sep 8 (2d),
+Aug 29 (12d) ×2, +3 more", youngest first). A download carries none, since it
+is "today" by definition. The snapshot keeps a per-cohort map (`who`) only for
+the last `COHORT_DAYS` (45) days, because it is the stored baseline and a year
+of cohort maps is most of a localStorage quota. A baseline day with no map
+(written before this shipped) contributes counts as before and no age detail,
+or every cohort in it would read as new.
 
 **A sale runs for twenty seconds**, and the length is deliberate: this is the
 event the whole page exists for, and it is long enough to walk back to the desk

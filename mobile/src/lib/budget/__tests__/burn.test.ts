@@ -1,7 +1,8 @@
 import { ACTIVITY_TYPES } from '../../registry';
 import {
   HR_BAND_EDGES, HR_MIN_COVERAGE, HR_PER_MIN, STEP_EFFORT, UPRIGHT_PER_MIN,
-  buildBurn, hrBandEffort, hrBandsLess, hrMinutesAbove, uprightMinutes, walkingMinutes,
+  buildBurn, hrBandEffort, hrBandsLess, hrMinutesAbove, hrMinutesBelow, hrMinutesBelowByHour, minutesByHour,
+  uprightHours, uprightMinutes, walkingMinutes,
 } from '../burn';
 import { HR_BOOST_CAP } from '../load';
 import type { DayLoad, DayRecord, Entry } from '../../types';
@@ -18,7 +19,7 @@ const day = (over: Partial<DayRecord>): DayRecord => ({
 
 const load = (over: Partial<DayLoad>): DayLoad => ({
   steps: null, walkingMin: null, standMin: null, stillUprightMin: null,
-  uprightSpans: null, hrAboveMin: null, hrBands: null, hrBelowMin: null, hrCoverageMin: null, hrStretches: null,
+  uprightSpans: null, uprightByHour: null, hrAboveMin: null, hrBands: null, hrBelowMin: null, hrBelowByHour: null, hrCoverageMin: null, hrStretches: null,
   longestStretch: null, peakBpm: null, lineBpm: null, readAt: null,
   ...over,
 });
@@ -88,6 +89,55 @@ describe('walkingMinutes', () => {
   it('is null with nothing to merge', () => {
     expect(walkingMinutes([])).toBeNull();
     expect(walkingMinutes(null)).toBeNull();
+  });
+});
+
+describe('by the hour', () => {
+  const sum = (xs: number[] | null) => (xs || []).reduce((a, b) => a + b, 0);
+
+  it('splits a span across the hours it covers and sums to walkingMinutes', () => {
+    const spans = [{ startMin: 590, endMin: 620 }, { startMin: 595, endMin: 625 }, { startMin: 800, endMin: 810 }];
+    const hours = minutesByHour(spans)!;
+    expect(hours).toHaveLength(24);
+    expect(hours[9]).toBe(10);
+    expect(hours[10]).toBe(25);
+    expect(hours[13]).toBe(10);
+    expect(sum(hours)).toBe(walkingMinutes(spans));
+  });
+
+  it('keeps a long inferred stretch whole when uncapped', () => {
+    expect(sum(minutesByHour([{ startMin: 600, endMin: 750 }], Infinity))).toBe(150);
+  });
+
+  it('puts resting minutes in the hour they happened, and agrees with the total', () => {
+    const hr = Array.from({ length: 121 }, (_, i) => ({ t: (840 + i) * 60, bpm: 60 }));
+    const hours = hrMinutesBelowByHour(hr, 70, [])!;
+    expect(hours[14]).toBe(60);
+    expect(hours[15]).toBe(60);
+    expect(sum(hours)).toBe(hrMinutesBelow(hr, 70, []));
+    expect(hrMinutesBelowByHour(hr, 70, [{ startMin: 840, endMin: 900 }])![14]).toBe(0);
+  });
+
+  it('draws upright hours from the source the row charged', () => {
+    const walk = new Array(24).fill(0);
+    walk[9] = 30;
+    const stand = new Array(24).fill(0);
+    stand[12] = 40;
+    const byHour = { walk, still: null, stand };
+    // Watch stand time outranks walking, exactly as uprightMinutes does.
+    expect(uprightHours(load({ standMin: 40, walkingMin: 30, uprightByHour: byHour }))).toEqual({ walk: null, still: null, stand });
+    expect(uprightHours(load({ walkingMin: 30, uprightByHour: { ...byHour, stand: null } }))!.walk).toBe(walk);
+    // A watch total with no hours behind it is not redrawn from walking.
+    expect(uprightHours(load({ standMin: 40, walkingMin: 30 }))).toBeNull();
+  });
+
+  it('falls back to stored spans only when they were not cut off', () => {
+    const spans = [{ startMin: 540, endMin: 560, kind: 'walk' as const }, { startMin: 700, endMin: 760, kind: 'still' as const }];
+    const h = uprightHours(load({ walkingMin: 20, stillUprightMin: 60, uprightSpans: spans }))!;
+    expect(h.walk![9]).toBe(20);
+    expect(sum(h.still)).toBe(60);
+    const cut = Array.from({ length: 60 }, (_, i) => ({ startMin: i * 2, endMin: i * 2 + 1, kind: 'walk' as const }));
+    expect(uprightHours(load({ walkingMin: 60, uprightSpans: cut }))).toBeNull();
   });
 });
 

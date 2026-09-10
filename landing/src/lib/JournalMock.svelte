@@ -84,7 +84,7 @@
           </span>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(154,154,160,0.8)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
         </div>
-        <div class="jm-pc-note">Behind pace for 12:40pm, which leaves room</div>
+        <div class="jm-pc-note">Pacing well for 12:40pm, with some in reserve</div>
       </div>
 
       <!-- The three key figures -->

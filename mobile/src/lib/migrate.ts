@@ -188,6 +188,11 @@ function cleanLoad(v: unknown): DayLoad | undefined {
       .filter((s) => s.startMin != null && s.endMin != null);
     return out.length ? (out as never) : null;
   };
+  const hours = (x: unknown): number[] | null =>
+    Array.isArray(x) && x.length === 24 ? x.map((h) => n(h) ?? 0) : null;
+  const byHour = isPlainObject(v.uprightByHour)
+    ? { walk: hours(v.uprightByHour.walk), still: hours(v.uprightByHour.still), stand: hours(v.uprightByHour.stand) }
+    : null;
   const bands = Array.isArray(v.hrBands)
     ? v.hrBands.map((b) => n(b) ?? 0)
     : null;
@@ -200,9 +205,11 @@ function cleanLoad(v: unknown): DayLoad | undefined {
     standMin: n(v.standMin),
     stillUprightMin: n(v.stillUprightMin),
     uprightSpans: spans(v.uprightSpans, true),
+    uprightByHour: byHour,
     hrAboveMin: n(v.hrAboveMin),
     hrBands: bands,
     hrBelowMin: n(v.hrBelowMin),
+    hrBelowByHour: hours(v.hrBelowByHour),
     hrCoverageMin: n(v.hrCoverageMin),
     hrStretches: n(v.hrStretches),
     longestStretch: longest,

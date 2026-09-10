@@ -143,6 +143,9 @@ export interface DayLoadRead {
    *  the same minutes) and are merged by `walkingMinutes`, never summed. */
   stepSpans: { startMin: number; endMin: number }[] | null;
   standMin: number | null;
+  /** Stand minutes per clock hour, 24 long, for the drill-in's bars. Null
+   *  wherever `standMin` is. */
+  standByHour: number[] | null;
   /** Seconds from local midnight, raw. */
   hr: { t: number; bpm: number }[] | null;
 }
@@ -307,7 +310,7 @@ const stub: HealthApi = {
   async requestAuth() { return false; },
   async readAuthStatus() { return 'unknown'; },
   async readDay() { return emptyDay; },
-  async readDayLoad() { return { steps: null, stepSpans: null, standMin: null, hr: null }; },
+  async readDayLoad() { return { steps: null, stepSpans: null, standMin: null, standByHour: null, hr: null }; },
   async readImports() { return []; },
   async readHistory() { return emptyHistory(); },
   async readHrvSessions() { return []; },
@@ -536,6 +539,18 @@ const HK_SET_KEY = `hk1:${CORE_READ_IDS.join(',')}|${WRITE_IDS.join(',')}`;
 /** The wider set, with its own latch so asking for it never disturbs the core. */
 const HK_STEPS_SET_KEY = `hk1steps:${[...CORE_READ_IDS, ...STEPS_READ_IDS].join(',')}|${WRITE_IDS.join(',')}`;
 
+/**
+ * Has HealthKit been asked about this set yet? The only honest question iOS
+ * lets us ask about read access. It matters for observer queries: HealthKit
+ * errors an observer on a type whose authorization is NOT DETERMINED (a denied
+ * one is silently treated as empty), and the library rejects a promise it has
+ * already resolved when that happens, which surfaces as a native error. So an
+ * observer may only be registered for a set that has been asked.
+ */
+export function healthKitAsked(scope: 'core' | 'steps'): boolean {
+  return hasAskedAuth(scope === 'steps' ? HK_STEPS_SET_KEY : HK_SET_KEY);
+}
+
 const pad = (n: number) => String(n).padStart(2, '0');
 const hhmm = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 const num = (v: unknown): number | null => {
@@ -687,9 +702,11 @@ function makeReal(mod: HkModule): HealthApi {
       // HealthKit answers only "would a request show UI?" — a determined type
       // reads back as `unnecessary` whether the user granted it or denied it,
       // so an already-asked scope can never resolve better than 'unknown'.
+      // For 'steps' that still answers the one question the pacing ask needs:
+      // `shouldRequest` means the sheet has never been shown for them.
       try {
-        const read = scope === 'workouts' ? [WORKOUT_TYPE, QID.heartRate] : READ_IDS;
-        const write = scope === 'workouts' ? [] : WRITE_IDS;
+        const read = scope === 'workouts' ? [WORKOUT_TYPE, QID.heartRate] : scope === 'steps' ? STEPS_READ_IDS : READ_IDS;
+        const write = scope === 'all' ? WRITE_IDS : [];
         const st = await mod.getRequestStatusForAuthorization?.(read, write);
         return st === 1 ? 'shouldRequest' : 'unknown';
       } catch { return 'unknown'; }
@@ -726,10 +743,22 @@ function makeReal(mod: HkModule): HealthApi {
       // Today stops at now; a past day runs to its end.
       const to = now < end ? now : end;
 
-      const [steps, standMin, stepRows, hrPts] = await Promise.all([
+      const [steps, standMin, stepRows, standRows, hrPts] = await Promise.all([
         sumQ(QID.steps, start, to, 'count'),
         sumQ(QID.standTime, start, to, 'min'),
-        samplesQ(QID.steps, start, to),
+        // Unlimited, not `samplesQ`: its 500 cap keeps the NEWEST samples, and
+        // a phone plus a watch write well past that on an active day, which
+        // dropped the morning's walking from the minutes and the hourly bars.
+        (async () => {
+          try { return (await mod.queryQuantitySamples?.(QID.steps, { from: start, to, limit: 0 })) || []; }
+          catch { return []; }
+        })(),
+        // Only for WHEN: the total above stays the statistics query. Only a
+        // watch writes stand time, so there is no second device to double.
+        (async () => {
+          try { return (await mod.queryQuantitySamples?.(QID.standTime, { from: start, to, limit: 0, unit: 'min' })) || []; }
+          catch { return []; }
+        })(),
         // Raw and unthinned: the caller integrates over it. `limit: 0` for the
         // same reason seriesQ documents — any positive limit silently returns
         // the NEWEST N and drops the start of the day.
@@ -754,11 +783,19 @@ function makeReal(mod: HkModule): HealthApi {
         }))
         .filter((sp) => sp.endMin > sp.startMin);
 
+      const standByHour: number[] = new Array(24).fill(0);
+      standRows.forEach((r) => {
+        const h = Math.floor((r.startDate.getTime() - baseMs) / 3600000);
+        if (h >= 0 && h < 24 && Number.isFinite(r.quantity) && r.quantity > 0) standByHour[h] += r.quantity;
+      });
+      const hasStand = standMin != null && standMin > 0;
+
       return {
         steps,
         stepSpans: stepSpans.length ? stepSpans : null,
         // A zero with no sample behind it is "no watch", not "did not stand".
-        standMin: standMin != null && standMin > 0 ? Math.round(standMin) : null,
+        standMin: hasStand ? Math.round(standMin) : null,
+        standByHour: hasStand && standRows.length ? standByHour.map((m) => Math.round(m)) : null,
         hr: hrPts.length ? hrPts : null,
       };
     },

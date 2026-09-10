@@ -331,7 +331,7 @@ export function buildBudgetAt(
     } else if (recommendation && recommendation.id !== 'learning') {
       sub = recommendation.title;
     } else {
-      sub = `Behind pace for ${clock(nowMin)}, which leaves room`;
+      sub = `Pacing well for ${clock(nowMin)}, with some in reserve`;
     }
 
     return {

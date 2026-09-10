@@ -3,11 +3,12 @@
  * Produces per-day derived metrics then evaluates first/consecutive/rolling
  * achievement predicates into grouped, dated milestone rows.
  */
-import { addDays, dateFromKey, keyOf, todayKey } from '../dates';
+import { dateFromKey, keyOf } from '../dates';
 import type { DayRecord, Entry } from '../types';
 import { type ScoreContext } from '../scoring';
 import { dayCleanliness, scoreSet, sleepHours, type DaysMap } from '../scoring/day';
 import { isTrustedReading, trustedReadings } from '../hrvQuality';
+import { isEngagedDay } from '../review/eligibility';
 
 
 export interface MDay {
@@ -21,20 +22,16 @@ export interface MDay {
   hasHrv: boolean; loggedDay: boolean;
 }
 
-/** Labels of the "Getting started" onboarding milestones — the journal card's
- *  "Up first" checklist keys its tap actions off these. */
+/** Labels of the "Getting started" milestones. They are achievements in the
+ *  tracker, never a checklist on the Journal: the first HRV reading is already
+ *  the welcome wizard's own last step (and `BaselineWaitingCard` holds the
+ *  Outlook slot until it lands), and the Insights empty state is where the case
+ *  for logging daily is made. */
 export const STARTERS = {
   hrv: 'Capture your first HRV reading',
-  fullDay: 'Log everything for one full day',
+  firstEntry: 'Log your first entry',
   protocol: 'Set up your daily protocol',
 } as const;
-
-/** The only starter the journal card offers as a CHECKLIST. The other two stay
- *  achievements in the tracker, but are not chores a new user needs handed to
- *  them: the first HRV reading is already the welcome wizard's own last step
- *  (and `BaselineWaitingCard` holds the Outlook slot until it lands), and the
- *  protocol is an advanced setting nobody should meet on day one. */
-export const CHECKLIST_STARTERS: readonly string[] = [STARTERS.fullDay];
 
 export interface MilestoneItem { label: string; done: boolean; date: string | null; value: number | string | null }
 export interface MilestoneGroup { title: string; items: MilestoneItem[] }
@@ -95,7 +92,8 @@ export function buildMilestoneDays(days: DaysMap, ctx: ScoreContext): { map: Rec
       sys: bpAvg('sys'), dia: bpAvg('dia'),
       waterGood: (d.food && +d.food.water >= 2.5) || false,
       hasHrv: rd.some((r) => r.type === 'hrv' || r.type === 'breathHrv'),
-      loggedDay: (d.food && +d.food.water > 0) || (d.meds || []).length > 0 || syms.length > 0 || acts.length > 0,
+      // Something the user entered by hand; a Health import is not use.
+      loggedDay: isEngagedDay(d),
     };
   });
   return { map, keys };
@@ -137,13 +135,10 @@ export function buildMilestoneGroups(md: MD, extras?: { protocolSetOn?: string |
   const consec = (p: (d: MDay) => boolean, n: number) => () => msConsec(md, p, n);
   const firstV = (key: keyof MDay, p: (d: MDay) => boolean) => () => { const dk = msFirst(md, p); return dk ? { date: dk, value: md.map[dk][key] as number } : null; };
   type Res = string | null | { date: string; value: number };
-  const today = todayKey();
   const defs: [string, [string, () => Res][]][] = [
     ['Getting started', [
       [STARTERS.hrv, first((d) => d.hasHrv)],
-      // A "full day" can only be judged once the day is over: the first past
-      // day with core logging completes this the morning after.
-      [STARTERS.fullDay, () => { const dk = msFirst(md, (d) => d.loggedDay && d.dk < today); return dk ? addDays(dk, 1) : null; }],
+      [STARTERS.firstEntry, first((d) => d.loggedDay)],
       [STARTERS.protocol, () => extras?.protocolSetOn || null],
     ]],
     ['HRV · RMSSD', [

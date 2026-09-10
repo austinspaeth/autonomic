@@ -1920,12 +1920,15 @@ let nightId = 0;
  * `scatter` draws one dot per sample graded through `bands`, with a smoothed
  * line through them: an overnight trace is noisy enough that a single line
  * hides the spikes, and the spikes are the whole reason someone opens this.
- * Without it the series is drawn as a plain line in `color`.
+ * Without it the series is drawn as a plain line in `color`. `trend={false}`
+ * drops that smoothed line and leaves the dots alone, for a chart whose claim
+ * is a count of minutes in each band: any averaged line through them flattens
+ * exactly the minutes the claim is counting.
  *
  * The x-axis is real clock time, because "when did that happen" is the only
  * question this chart exists to answer.
  */
-export function NightSeriesChart({ points, bedAt, color, bands, scatter, refLine, right, height = 150, onSelect }: {
+export function NightSeriesChart({ points, bedAt, color, bands, scatter, trend = true, refLine, right, height = 150, onSelect }: {
   points: { t: number; v: number }[];
   /** Bedtime in minutes past noon, for the clock labels. */
   bedAt: number;
@@ -1933,6 +1936,8 @@ export function NightSeriesChart({ points, bedAt, color, bands, scatter, refLine
   /** Grades each sample's colour (scatter mode). */
   bands?: Band[] | null;
   scatter?: boolean;
+  /** Scatter only: draw the moving-average line through the dots. */
+  trend?: boolean;
   /** A dashed reference line with its own label, e.g. the user's typical low. */
   refLine?: { v: number; label: string; color: string } | null;
   /**
@@ -2060,12 +2065,14 @@ export function NightSeriesChart({ points, bedAt, color, bands, scatter, refLine
         {scatter
           ? points.map((q, i) => <Circle key={i} cx={xAt(q.t)} cy={yAt(q.v)} r={1.7} fill={colAt(q.v)} opacity={0.9} />)
           : null}
-        <Path
-          d={smoothPath(linePts)} fill="none"
-          stroke={scatter ? (p.dark ? '#c9c9d0' : '#52525b') : (bands ? `url(#${gid})` : color)}
-          strokeWidth={scatter ? 1.8 : 2.2} strokeLinecap="round" strokeLinejoin="round"
-          opacity={scatter ? 0.85 : 1}
-        />
+        {!scatter || trend ? (
+          <Path
+            d={smoothPath(linePts)} fill="none"
+            stroke={scatter ? (p.dark ? '#c9c9d0' : '#52525b') : (bands ? `url(#${gid})` : color)}
+            strokeWidth={scatter ? 1.8 : 2.2} strokeLinecap="round" strokeLinejoin="round"
+            opacity={scatter ? 0.85 : 1}
+          />
+        ) : null}
         {selIdx >= 0 ? (
           <G>
             <Line x1={xAt(points[selIdx].t)} x2={xAt(points[selIdx].t)} y1={padT} y2={H - padB} stroke={p.text} strokeWidth={1} opacity={0.35} />

@@ -19,8 +19,8 @@ const day = (over: Partial<DayRecord> = {}): DayRecord => ({
 } as DayRecord);
 
 const load = (over: Record<string, unknown> = {}) => ({
-  steps: 4210, walkingMin: 62, standMin: null, stillUprightMin: 45, uprightSpans: null,
-  hrAboveMin: 38, hrBands: [20, 12, 6], hrBelowMin: 90, hrCoverageMin: 900,
+  steps: 4210, walkingMin: 62, standMin: null, stillUprightMin: 45, uprightSpans: null, uprightByHour: null,
+  hrAboveMin: 38, hrBands: [20, 12, 6], hrBelowMin: 90, hrBelowByHour: null, hrCoverageMin: 900,
   hrStretches: 3, longestStretch: null, peakBpm: 128, lineBpm: 95,
   readAt: '2026-09-02T22:00:00.000Z', ...over,
 } as DayRecord['load']);

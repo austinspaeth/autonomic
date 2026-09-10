@@ -66,7 +66,7 @@ export const SOURCE_META: Record<Source, { icon: 'bluetooth' | 'watch' | 'camera
 /** Sub-line for a source, used both here and on the setup card's summary row. */
 export function sourceSub(src: Source, savedName?: string): string {
   if (src === 'polar') return savedName ? `${savedName} · paired` : 'No device paired yet';
-  if (src === 'watch') return 'Breathe or ECG on the watch, results sync in afterwards';
+  if (src === 'watch') return 'Capture on the watch, results sync afterwards';
   // Named device rather than "Garmin" alone: someone who linked a watch months
   // ago should see which one this row means.
   if (src === 'garmin') return savedName ? `${savedName} · linked` : 'Run Autonomic on the watch, results sync in afterwards';
@@ -164,15 +164,17 @@ export function SourcePicker({ value, onPick, controls }: {
   );
 }
 
-/** One accuracy tier's heading. */
-function TierLabel({ text, top }: { text: string; top?: boolean }) {
+/** One accuracy tier's heading. Exported, with SourceRow, for the welcome
+ *  wizard's first-reading step: the two surfaces offer the same choice, so they
+ *  draw it with the same components rather than a lookalike each. */
+export function TierLabel({ text, top }: { text: string; top?: boolean }) {
   const p = usePalette();
   return (
     <Text style={{ fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.6, color: p.textDim, fontWeight: '700', marginTop: top ? 20 : 0, marginBottom: 10 }}>{text}</Text>
   );
 }
 
-function SourceRow({ source, sub, active, onPress, onSetUp }: {
+export function SourceRow({ source, sub, active, onPress, onSetUp }: {
   source: Source; sub: string; active: boolean; onPress: () => void;
   /** The device behind this source has a card of its own. Given, the row splits
    *  into two targets: the left selects, a "Set up" link on the right opens the
@@ -213,7 +215,7 @@ function SourceRow({ source, sub, active, onPress, onSetUp }: {
           </Pressable>
           {active ? (
             <>
-              <View style={{ width: 1, height: 18, backgroundColor: p.border, marginLeft: 4, marginRight: 12 }} />
+              <View style={{ width: 1, height: 18, backgroundColor: p.accent, marginLeft: 4, marginRight: 12 }} />
               {check}
             </>
           ) : null}

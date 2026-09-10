@@ -176,6 +176,13 @@ export interface DayLoad {
   stillUprightMin: number | null;
   /** Walking and standing stretches, for the drill-in's shading. */
   uprightSpans: { startMin: number; endMin: number; kind: 'walk' | 'still' }[] | null;
+  /** Upright minutes per clock hour (each array 24 long), counted from the
+   *  same spans as the totals, for the drill-in's hourly bars. `stand` is
+   *  Apple Stand Time, iOS with a watch only. Null on a day read before hours
+   *  were kept; a null array inside means that source was not measured. */
+  uprightByHour: { walk: number[] | null; still: number[] | null; stand: number[] | null } | null;
+  /** `hrBelowMin` per clock hour, 24 long. Null when unknown. */
+  hrBelowByHour: number[] | null;
   /** Minutes the heart sat above the user's own exertion line. */
   hrAboveMin: number | null;
   /** Those minutes split by how far above the line they sat (budget/burn.ts

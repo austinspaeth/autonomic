@@ -41,6 +41,7 @@ import { holdBackgroundTime } from '../../modules/app-env';
 import { alertsEnabled } from '../lib/budget/alerts';
 import { todayKey } from '../lib/dates';
 import { logError } from '../lib/diagnostics/errorLog';
+import { healthKitAsked } from '../lib/health';
 import { syncNotificationPermission } from '../lib/reminders';
 import { syncWidgetsNow } from '../lib/widgets';
 import { refreshDayLoad } from './budget';
@@ -60,8 +61,8 @@ const BG_STALE_MIN = 10;
 /** HKUpdateFrequency: 1 immediate, 2 hourly. Steps are capped at hourly by
  *  Apple whatever is asked for; asking for it outright keeps the intent honest. */
 const HK_TYPES = [
-  { id: 'HKQuantityTypeIdentifierHeartRate', frequency: 1 },
-  { id: 'HKQuantityTypeIdentifierStepCount', frequency: 2 },
+  { id: 'HKQuantityTypeIdentifierHeartRate', frequency: 1, scope: 'core' },
+  { id: 'HKQuantityTypeIdentifierStepCount', frequency: 2, scope: 'steps' },
 ] as const;
 
 interface TaskModules {
@@ -146,17 +147,29 @@ function onHealthChange(): void {
   void runPacingBackgroundCheck();
 }
 
-let observing = false;
+const observing = new Set<string>();
 
+/**
+ * Register an observer per type, but only for a type HealthKit has already
+ * been ASKED about (`healthKitAsked`). On a not-determined type HealthKit errors
+ * the observer after the library has resolved the subscribe call, and the
+ * library then rejects that settled promise — a native "Tried to reject a
+ * promise after it's already been resolved" error, which no catch here can
+ * reach. Steps are asked only from the pacing Connect tap, so their observer
+ * typically arrives later: per type, on the foreground sync after that tap.
+ */
 async function observeHealthKit(): Promise<void> {
-  if (observing || !getState().settings?.healthEnabled) return;
+  if (!getState().settings?.healthEnabled) return;
   const hk = healthKit();
   if (!hk?.subscribeToChanges) return;
-  observing = true;
   for (const t of HK_TYPES) {
+    if (observing.has(t.id) || !healthKitAsked(t.scope)) continue;
+    observing.add(t.id);
     try {
       await hk.subscribeToChanges(t.id, onHealthChange);
-    } catch { /* type not authorised: nothing to observe */ }
+    } catch {
+      observing.delete(t.id);
+    }
   }
 }
 

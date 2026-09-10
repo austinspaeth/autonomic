@@ -27,7 +27,7 @@ import {
 } from '../lib/scoring/day';
 import { detectDownturn, type Downturn } from '../lib/scoring/downturn';
 import { buildBudget, type BudgetView } from '../lib/budget';
-import { stepsMissing } from '../store/budget';
+import { useStepsMissing } from '../store/budget';
 import { BudgetStrip } from './budget/Strip';
 import { useBudgetPulse, type BudgetPulse } from './budget/pulse';
 import { openBudgetSheet } from './budget/open';
@@ -265,6 +265,7 @@ export function DaySummary({ dk }: { dk: string }) {
   // the data, and a past day's marker has nowhere to go.
   const isToday = dk === todayKey();
   const now = useNow(5 * 60_000, isToday);
+  const stepsMiss = useStepsMissing(dk);
   const budget = useMemo(
     () => buildBudget(state, dk, ctx, {
       now: isToday ? now : new Date(`${dk}T23:59:00`),
@@ -272,9 +273,9 @@ export function DaySummary({ dk }: { dk: string }) {
       downturn: !!downturn,
       strain: strain ? strain.severity : null,
       past: !isToday,
-      stepsGranted: !stepsMissing(dk),
+      stepsGranted: !stepsMiss,
     }),
-    [state, dk, ctx, now, isToday, downturn, strain],
+    [state, dk, ctx, now, isToday, downturn, strain, stepsMiss],
   );
   // The bar narrates its own movement. Computed here, once, and handed to
   // whichever of the three heroes below is rendering the strip — a hook per

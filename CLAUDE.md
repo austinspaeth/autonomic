@@ -874,11 +874,20 @@ old web app so old `export.json` files import directly.
   drop "today", "so far", "yet" and "this morning" (`past` is threaded into
   `buildBurn` and `buildEnvelope` for copy alone — the arithmetic is identical,
   and a coverage test pins that no present-tense string reaches a past view).
-  **The steps ask is an accusation, so it is latched**: `stepsMissing` clears
-  for good once a read has ever brought back a count
-  (`budget/stepsMemory.ts`, flags MMKV), on top of the seven-day journal
-  lookback — telling somebody who granted the permission that it is missing is
-  worse than staying quiet.
+  **The steps ask is an accusation, so it is answered from the PERMISSION,
+  never from whether steps landed** (`budget/stepsAsk.ts`, pure + tested). It
+  used to be "a read ran and brought back no count", which is also what a
+  granted permission over an empty store looks like, so the card survived the
+  very grant it asked for on both platforms. Now it shows only for
+  `readAuthStatus('steps')` = `shouldRequest` (never asked) or `denied`
+  (Health Connect proves it); HealthKit's `unknown` means the sheet was
+  answered and is never an accusation. Steps in hand still clear it for good
+  (`budget/stepsMemory.ts` + the seven-day lookback). `connectPacingHealth`
+  turns `settings.healthEnabled` on, since its request is the whole set and a
+  user who skipped Health in the wizard otherwise granted everything into a
+  switch that stopped every read. The strip and the OPEN sheet both read
+  `useStepsMissing`, because the sheet is opened with a snapshot of the view
+  and the Connect button lives inside it.
   **Held-day spend is a LOWER BOUND on capacity, never an estimate of
   it**: it may only RAISE the ceiling, and lowering needs a DIP as its reason
   (`calibrate.ts`). Letting a quiet week pull it down was this model's first real
@@ -890,8 +899,11 @@ old web app so old `export.json` files import directly.
   run of minutes with no steps, outside sleep and outside a workout's recovery
   tail, where the heart sits in the user's own stand-test band. It needs a
   heart-rate series, caps at five hours, is dropped under six hours of coverage,
-  and the row reads "estimated" with every stretch shaded on the drill-in's
-  trace. Progress gets a `pacing` category after Activity charting MARGIN, not
+  and the row reads "estimated". The drill-ins for Upright time and Recovery
+  time draw WHEN, never heart rate: minutes per clock hour as stacked bars,
+  from `DayLoad.uprightByHour` (walking, estimated standing, or Apple Stand
+  Time) and `hrBelowByHour`, counted at read time from the same spans and
+  exclusions as the totals, so the bars sum to the row. Progress gets a `pacing` category after Activity charting MARGIN, not
   spend, and the budget also **leaves the app in the exports**: `secPacing`
   (`lib/analysis/reports.ts`, over `budgetSeries`) is a section of the raw data
   export, the Overall Health Report, the crash analysis and the doctor summary,
@@ -1410,11 +1422,14 @@ old web app so old `export.json` files import directly.
   runs first, the sheet stack lives in the root layout, so the reading is never
   taken on top of an overlay that is about to disappear. It commits to a
   **baseline**, never training: paced breathing is a thing to graduate to.
-  Picking the strap with nothing paired detours into `DevicesScreen`, the same
-  rule `HrvSetup.start` follows, and once one IS paired the row carries its own
-  "Change" link into that same card — selecting a sensor and swapping the device
-  behind it are different questions, and a row that only selects strands anyone
-  who owns a second strap; `openCapture` / `sourceBlocker` /
+  The sensor list IS the HRV picker's: `SourceRow`, `TierLabel` and `PickerRow`
+  are the same components, so the strap row (and a linked Garmin) splits into a
+  select target and a "Set up" link into its own card, with a red hairline and a
+  check once chosen, and picking the strap with nothing paired detours into
+  `DevicesScreen` and selects only once a strap is saved there — the same rule
+  `HrvSetup.start` follows. Selecting a sensor and swapping the device behind it
+  are different questions, and a row that only selects strands anyone who owns a
+  second strap; `openCapture` / `sourceBlocker` /
   `defaultSource` are exported from `features/hrv/Setup.tsx` so the wizard and
   the setup sheet cannot open different cards for the same choice. Skipping is
   allowed and lands on `<BaselineWaitingCard/>` (`features/DaySummary.tsx`),

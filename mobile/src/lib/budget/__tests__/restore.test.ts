@@ -5,13 +5,13 @@ import type { DayLoad, DayRecord } from '../../types';
 
 const load = (over: Partial<DayLoad>): DayLoad => ({
   steps: null, walkingMin: null, standMin: null, stillUprightMin: null,
-  uprightSpans: null, hrAboveMin: null, hrBands: null, hrBelowMin: null, hrCoverageMin: null, hrStretches: null,
+  uprightSpans: null, uprightByHour: null, hrAboveMin: null, hrBands: null, hrBelowMin: null, hrBelowByHour: null, hrCoverageMin: null, hrStretches: null,
   longestStretch: null, peakBpm: null, lineBpm: null, readAt: null,
   ...over,
 });
 
 const read = (over: Partial<DayLoadRead>): DayLoadRead => ({
-  steps: null, stepSpans: null, standMin: null, hr: null, ...over,
+  steps: null, stepSpans: null, standMin: null, standByHour: null, hr: null, ...over,
 });
 
 const day = (over: Partial<DayRecord> = {}): DayRecord => ({

@@ -50,7 +50,7 @@ const act = (type: string, duration: string): Entry =>
  *  steps, which is a different state from the one these tests are about. */
 const seen = (over: Partial<DayLoad> = {}): DayLoad => ({
   steps: 3000, walkingMin: 30, standMin: null, stillUprightMin: null,
-  uprightSpans: null, hrAboveMin: 0, hrBands: null, hrBelowMin: null, hrCoverageMin: 800, hrStretches: 0,
+  uprightSpans: null, uprightByHour: null, hrAboveMin: 0, hrBands: null, hrBelowMin: null, hrBelowByHour: null, hrCoverageMin: 800, hrStretches: 0,
   longestStretch: null, peakBpm: 90, lineBpm: 100, readAt: null,
   ...over,
 });
@@ -225,11 +225,11 @@ describe('states', () => {
     }),
   });
 
-  it('is healthy with room and behind pace', () => {
+  it('is healthy with some in reserve when under an even day', () => {
     const v = buildBudget(wellLogged([act('walk', '20')]), dk, {}, { ...OPTS, now: AT_2PM() });
     expect(v.state).toBe('healthy');
     expect(v.flag).toBeNull();
-    expect(v.sub).toContain('leaves room');
+    expect(v.sub).toMatch(/^Pacing well for .+, with some in reserve$/);
   });
 
   it('goes over with a caution, never a scolding', () => {

@@ -18,12 +18,14 @@
  *   an extra HealthKit sheet appearing during a background update check is the
  *   exact nag lib/health/askedAuth exists to prevent.
  */
+import { useSyncExternalStore } from 'react';
 import { AppState as RNAppState } from 'react-native';
 import { addDays, todayKey } from '../lib/dates';
-import { health } from '../lib/health';
+import { health, type HealthAuthStatus } from '../lib/health';
+import { stepsAskDue } from '../lib/budget/stepsAsk';
 import { logError } from '../lib/diagnostics/errorLog';
 import { exertionLine, hrMinutesAbove, stillUprightMinutes, uprightSignature, walkingMinutes } from '../lib/budget';
-import { hrMinutesBelow } from '../lib/budget/burn';
+import { UPRIGHT_SPANS_MAX, hrMinutesBelow, hrMinutesBelowByHour, minutesByHour } from '../lib/budget/burn';
 import { BASELINE_DAYS, recoveryLine } from '../lib/budget/baseline';
 import { thinSeries } from '../lib/sleep/night';
 import { loadWaveformId } from '../lib/waveforms';
@@ -33,7 +35,7 @@ import { RESTORE_MAX_ATTEMPTS, erasedLoadDays, readHasEvidence, readLosesEvidenc
 import { noteRestoreAttempt, restoreAttempts } from '../lib/budget/restoreMemory';
 import type { DayLoad, Entry } from '../lib/types';
 import { blankDay } from '../lib/migrate';
-import { getState, getWaveform, mutate, storeWaveform } from './store';
+import { getState, getWaveform, mutate, save, storeWaveform, subscribeStore } from './store';
 
 /** Days scanned for any evidence that steps are reaching us. */
 const STEPS_LOOKBACK_DAYS = 7;
@@ -138,6 +140,9 @@ export async function refreshDayLoad(
       if (!state.settings?.healthEnabled) return;
       const api = health();
       if (!api.available) return;
+      // Before the freshness gate: it is one cheap platform call, and the ask
+      // has to be able to clear on a launch whose load is still fresh.
+      await refreshStepsAuth();
 
       const existing = state.days[dk]?.load;
       if (!opts.force && existing?.readAt) {
@@ -159,23 +164,32 @@ export async function refreshDayLoad(
       // Recovery is measured over the WAKING day only: the same excluded
       // windows the upright inference uses already carve out the night.
       const excluded = excludedWindows(dk);
-      const settled = hrMinutesBelow(read.hr, recoveryLine(state.days, dk, {}, addDays), excluded);
+      const restLine = recoveryLine(state.days, dk, {}, addDays);
+      const settled = hrMinutesBelow(read.hr, restLine, excluded);
       const sig = uprightSignature(state.days, dk, {}, addDays);
       const still = stillUprightMinutes(read.hr, read.stepSpans, sig, excluded, lineBpm);
       const walkMin = walkingMinutes(read.stepSpans);
 
       const walkSpans = (read.stepSpans || []).map((s) => ({ ...s, kind: 'walk' as const }));
       const spans = [...walkSpans, ...(still?.spans || [])].sort((a, b) => a.startMin - b.startMin);
+      // By the hour from the FULL span lists: `uprightSpans` is cut off at a
+      // cap, and a busy morning would otherwise empty the afternoon's bars.
+      const walkHours = minutesByHour(read.stepSpans);
+      const stillHours = still ? minutesByHour(still.spans, Infinity) : null;
 
       const next: DayLoad = {
         steps: read.steps,
         walkingMin: walkMin,
         standMin: read.standMin,
         stillUprightMin: still ? still.stillMin : null,
-        uprightSpans: spans.length ? spans.slice(0, 60) : null,
+        uprightSpans: spans.length ? spans.slice(0, UPRIGHT_SPANS_MAX) : null,
+        uprightByHour: walkHours || stillHours || read.standByHour
+          ? { walk: walkHours, still: stillHours, stand: read.standByHour }
+          : null,
         hrAboveMin: above ? above.aboveMin : null,
         hrBands: above ? above.bands : null,
         hrBelowMin: settled,
+        hrBelowByHour: hrMinutesBelowByHour(read.hr, restLine, excluded),
         hrCoverageMin: above ? above.coverageMin : null,
         hrStretches: above ? above.stretches : null,
         longestStretch: above?.longest ?? null,
@@ -285,34 +299,59 @@ export async function restoreErasedDays(dk: string = todayKey()): Promise<void> 
 }
 
 /**
- * Are we getting this user's steps?
+ * The platform's answer for the steps read scope, as last read this launch.
+ * Memory only: it is re-read on every day-load refresh and after Connect, and a
+ * permission changed in system settings must not be answered from disk.
+ */
+let stepsAuth: HealthAuthStatus | null = null;
+const stepsAuthListeners = new Set<() => void>();
+
+async function refreshStepsAuth(): Promise<void> {
+  try {
+    const next = await health().readAuthStatus('steps');
+    if (next === stepsAuth) return;
+    stepsAuth = next;
+    stepsAuthListeners.forEach((cb) => cb());
+  } catch { /* keeps its last answer */ }
+}
+
+/**
+ * Is steps access missing? See lib/budget/stepsAsk for the rule.
  *
- * Answered from what actually LANDED rather than from a permission API, and
- * deliberately so: on iOS `readAuthStatus` cannot distinguish granted from
- * denied once a type is determined, so it would answer "unknown" forever. The
- * observable fact is the useful one — a read ran today and brought back no step
- * count — and it is also the one the user can act on.
- *
- * False (nothing missing) until a read has actually happened, so the mark never
- * appears on a launch that has not looked yet.
+ * This used to be answered from what LANDED — a read ran and brought back no
+ * step count — and a granted permission over an empty health store looks
+ * exactly like that, so the ask survived the very grant it asked for.
  */
 export function stepsMissing(dk: string = todayKey()): boolean {
   const state = getState();
   if (!health().available) return false;
-  // Steps have reached this install before, so whatever today looks like, the
-  // permission is not the problem and the mark would be an accusation.
-  if (stepsEverSeen()) return false;
-  if (!state.settings?.healthEnabled) return true;
-  // Look back a week, not just at today. Two things go wrong with reading only
-  // today: a step count that has not landed YET (the read right after a grant
-  // can beat the grant) reads as denied, and so does a genuinely stepless day,
-  // since the health store returns nothing rather than zero. One day in the
-  // last week carrying a count is proof the permission works.
-  for (let i = 0; i < STEPS_LOOKBACK_DAYS; i++) {
-    if (state.days[addDays(dk, -i)]?.load?.steps != null) return false;
+  // A week, not just today: one day in it carrying a count is proof enough.
+  let recentSteps = false;
+  for (let i = 0; i < STEPS_LOOKBACK_DAYS && !recentSteps; i++) {
+    recentSteps = state.days[addDays(dk, -i)]?.load?.steps != null;
   }
-  // Nothing yet, and nothing has even been read: too early to accuse anything.
-  return !!state.days[dk]?.load?.readAt;
+  return stepsAskDue({
+    healthEnabled: !!state.settings?.healthEnabled,
+    everSeen: stepsEverSeen(),
+    recentSteps,
+    auth: stepsAuth,
+  });
+}
+
+/**
+ * `stepsMissing`, live. The permission answer changes without the journal
+ * changing, and the budget sheet is opened with a snapshot of the view, so both
+ * the strip and the open sheet subscribe here rather than to the store alone.
+ */
+export function useStepsMissing(dk: string = todayKey()): boolean {
+  return useSyncExternalStore(
+    (cb) => {
+      const off = subscribeStore(cb);
+      stepsAuthListeners.add(cb);
+      return () => { off(); stepsAuthListeners.delete(cb); };
+    },
+    () => stepsMissing(dk),
+  );
 }
 
 /**
@@ -325,11 +364,21 @@ export async function connectPacingHealth(): Promise<boolean> {
     const api = health();
     if (!api.available) return false;
     const ok = await api.requestAuth({ force: true, scope: 'steps' });
+    // The request is the whole health set on both platforms, so answering it
+    // IS connecting Health, the same as Settings' Connect. Without the switch a
+    // user who skipped Health in the wizard granted everything and then every
+    // read declined to run (and `stepsMissing` reads Health-off as missing), so
+    // the card they had just obeyed stayed on screen for good.
+    if (ok && !getState().settings?.healthEnabled) {
+      getState().settings.healthEnabled = true;
+      save();
+    }
+    await refreshStepsAuth();
     // Twice, a moment apart. HealthKit can report the grant before it will
     // actually answer a query with it, and the first read then comes back
-    // empty — which is exactly the state that keeps the Todo on screen.
+    // empty. The ask no longer depends on that read; the budget's floor does.
     await refreshDayLoad(todayKey(), { force: true });
-    if (stepsMissing()) {
+    if (getState().days[todayKey()]?.load?.steps == null) {
       await new Promise((r) => setTimeout(r, 1200));
       await refreshDayLoad(todayKey(), { force: true });
     }
