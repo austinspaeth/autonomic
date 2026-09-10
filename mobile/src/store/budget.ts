@@ -29,6 +29,8 @@ import { thinSeries } from '../lib/sleep/night';
 import { loadWaveformId } from '../lib/waveforms';
 import { RECOVERY_MIN } from '../lib/budget/upright';
 import { noteStepsSeen, stepsEverSeen } from '../lib/budget/stepsMemory';
+import { RESTORE_MAX_ATTEMPTS, erasedLoadDays, readHasEvidence, readLosesEvidence } from '../lib/budget/restore';
+import { noteRestoreAttempt, restoreAttempts } from '../lib/budget/restoreMemory';
 import type { DayLoad, Entry } from '../lib/types';
 import { blankDay } from '../lib/migrate';
 import { getState, getWaveform, mutate, storeWaveform } from './store';
@@ -120,7 +122,7 @@ function excludedWindows(dk: string): { startMin: number; endMin: number }[] {
  */
 export async function refreshDayLoad(
   dk: string = todayKey(),
-  opts: { force?: boolean; maxAgeMin?: number } = {},
+  opts: { force?: boolean; maxAgeMin?: number; requireEvidence?: boolean } = {},
 ): Promise<void> {
   // A FORCED refresh waits for whatever is running and then runs anyway. It
   // used to return the in-flight promise, which is how "I just granted steps"
@@ -144,6 +146,13 @@ export async function refreshDayLoad(
       }
 
       const read = await api.readDayLoad(dk);
+
+      // A read that lost a source the record already holds FAILED (a locked
+      // phone reads HealthKit as empty); writing it would seal the day as a
+      // quiet one. The record stands, and an unsealed day is retried later.
+      if (readLosesEvidence(read, getState().days[dk]?.load)) return;
+      // Reading a past day back must not create a record out of nothing.
+      if (opts.requireEvidence && !readHasEvidence(read)) return;
 
       const lineBpm = exertionLine(state.days, dk, {}, addDays);
       const above = hrMinutesAbove(read.hr, lineBpm);
@@ -235,6 +244,39 @@ export async function sealYesterday(dk: string = todayKey()): Promise<void> {
     await refreshDayLoad(yk, { force: true });
   } catch (e) {
     logError('budget.seal', e);
+  }
+}
+
+let restoreTried = false;
+
+/**
+ * Read back the days a migrator erased (see lib/budget/restore).
+ *
+ * Runs at most once per launch, only in the foreground (a background launch on
+ * a locked iPhone reads nothing, and that would spend an attempt), and gives up
+ * after RESTORE_MAX_ATTEMPTS launches. Each day goes through the ordinary read,
+ * so it is priced against that day's own exertion line exactly as a live read
+ * would have been; a day the health store has nothing for stays unknown.
+ */
+export async function restoreErasedDays(dk: string = todayKey()): Promise<void> {
+  if (restoreTried) return;
+  try {
+    const state = getState();
+    if (!state.settings?.healthEnabled || !health().available) return;
+    // Skip only a launch KNOWN to be in the background: a cold start in the
+    // foreground can still report 'unknown' here, and that is the launch the
+    // user is waiting on.
+    if (RNAppState.currentState === 'background') return;
+    const todo = erasedLoadDays(state.days, dk, addDays, stepsEverSeen());
+    if (!todo.length || restoreAttempts() >= RESTORE_MAX_ATTEMPTS) return;
+    restoreTried = true;
+    noteRestoreAttempt();
+    for (const k of todo) {
+      if (RNAppState.currentState === 'background') break;
+      await refreshDayLoad(k, { force: true, requireEvidence: true });
+    }
+  } catch (e) {
+    logError('budget.restore', e);
   }
 }
 
@@ -346,7 +388,7 @@ export function backfillHrBands(dk: string = todayKey()): void {
  */
 export function initBudgetSync(): () => void {
   backfillHrBands();
-  void refreshDayLoad(undefined, { maxAgeMin: LOAD_FOCUS_STALE_MIN }).then(() => sealYesterday());
+  void refreshDayLoad(undefined, { maxAgeMin: LOAD_FOCUS_STALE_MIN }).then(() => sealYesterday()).then(() => restoreErasedDays());
 
   let timer: ReturnType<typeof setInterval> | null = null;
   const stop = () => { if (timer) { clearInterval(timer); timer = null; } };
@@ -358,7 +400,7 @@ export function initBudgetSync(): () => void {
 
   const sub = RNAppState.addEventListener('change', (st) => {
     if (st === 'active') {
-      void refreshDayLoad(undefined, { maxAgeMin: LOAD_FOCUS_STALE_MIN }).then(() => sealYesterday());
+      void refreshDayLoad(undefined, { maxAgeMin: LOAD_FOCUS_STALE_MIN }).then(() => sealYesterday()).then(() => restoreErasedDays());
       start();
     } else {
       stop();
