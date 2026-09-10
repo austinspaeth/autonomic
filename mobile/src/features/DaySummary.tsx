@@ -26,6 +26,12 @@ import {
   type ScoreComp, type ScoreSetResult,
 } from '../lib/scoring/day';
 import { detectDownturn, type Downturn } from '../lib/scoring/downturn';
+import { buildBudget, type BudgetView } from '../lib/budget';
+import { stepsMissing } from '../store/budget';
+import { BudgetStrip } from './budget/Strip';
+import { useBudgetPulse, type BudgetPulse } from './budget/pulse';
+import { openBudgetSheet } from './budget/open';
+import { useNow } from '../lib/useNow';
 import { detectStrain, type Strain } from '../lib/scoring/strain';
 import { hasHrvReading, trustedReadings } from '../lib/hrvQuality';
 import { buildDownturnPrompt, buildStrainPrompt } from '../lib/analysis/reports';
@@ -36,6 +42,7 @@ import { LEVEL_DELTA, scoreTrend, type ScoreTrend } from '../lib/scoring/scoreTr
 import { getState, useAppState } from '../store/store';
 import { setJournalSectionY } from '../store/nav';
 import { useTier } from '../store/tier';
+import { usePacingUnlocked } from '../store/pacingTrial';
 import { usePaywall } from './Paywall';
 
 import type { AppState, Band, ScoreCat } from '../lib/types';
@@ -49,6 +56,10 @@ const WARN_BASE = '#0d0d0f';
 /** The grade tag's height. The Outlook's explain mark takes it as an invisible
  *  tap target, so the two sit on one baseline and the row's height never moves. */
 const GRADE_PILL_H = 26;
+
+/** Grades whose gauge burns. Compromised and below: the point at which the
+ *  card stops describing a day and starts flagging one. */
+const EMBER_GRADES = new Set(['Compromised', 'Bad', 'Crash']);
 
 
 // Status-color highlight on one top border edge, fading down the sides into
@@ -246,16 +257,42 @@ export function DaySummary({ dk }: { dk: string }) {
   // is not yet worth showing.
   const baselineWaiting = !hasHrvReading(state.days);
 
+  // The pacing budget. Built beside the other memos rather than deferred: it
+  // reads the same `state.days` they do and the strip lives inside the card
+  // they render, so a deferred build would pop in under a card that had
+  // already settled. `now` ticks every 5 minutes on today only — the pace
+  // marker is the one thing here that moves with the clock instead of with
+  // the data, and a past day's marker has nowhere to go.
+  const isToday = dk === todayKey();
+  const now = useNow(5 * 60_000, isToday);
+  const budget = useMemo(
+    () => buildBudget(state, dk, ctx, {
+      now: isToday ? now : new Date(`${dk}T23:59:00`),
+      addDays,
+      downturn: !!downturn,
+      strain: strain ? strain.severity : null,
+      past: !isToday,
+      stepsGranted: !stepsMissing(dk),
+    }),
+    [state, dk, ctx, now, isToday, downturn, strain],
+  );
+  // The bar narrates its own movement. Computed here, once, and handed to
+  // whichever of the three heroes below is rendering the strip — a hook per
+  // hero would keep three separate memories of the previous build and the two
+  // that are not mounted would fire the whole flash the moment they were.
+  const budgetLocked = !usePacingUnlocked();
+  const pulse = useBudgetPulse(dk, budget, isToday && !budgetLocked);
+
   return (
     <View>
       {baselineWaiting ? (
-        <BaselineWaitingCard />
+        <BaselineWaitingCard dk={dk} budget={budget} pulse={pulse} />
       ) : (
-        <GradientBorderCard color={!scored ? null : scoreCat(all.score!).color} trigger={dk} glow={0.17} flash style={{ marginBottom: 12 }}>
+        <GradientBorderCard color={!scored ? null : scoreCat(all.score!).color} trigger={dk} glow={0.10} flash style={{ marginBottom: 12 }}>
           {!scored ? (
-            <UnscoredHero dk={dk} all={all} hasReadings={readings.length > 0} />
+            <UnscoredHero dk={dk} all={all} hasReadings={readings.length > 0} budget={budget} pulse={pulse} />
           ) : (
-            <ScoredHero dk={dk} readings={readings} d={d} all={all} ctx={ctx} trend={trend} onExplain={() => openSheet(() => <ScoreExplain all={all} dk={dk} />)} />
+            <ScoredHero dk={dk} readings={readings} d={d} all={all} ctx={ctx} trend={trend} budget={budget} pulse={pulse} onExplain={() => openSheet(() => <ScoreExplain all={all} dk={dk} />)} />
           )}
         </GradientBorderCard>
       )}
@@ -310,9 +347,10 @@ const WAITING_ROWS = [
   { label: 'Trends &\ncorrelations', width: '80%' as const, delay: 1800 },
 ];
 
-function BaselineWaitingCard() {
+function BaselineWaitingCard({ dk, budget, pulse }: { dk: string; budget: BudgetView; pulse: BudgetPulse | null }) {
   const p = usePalette();
   const { openSheet } = useSheets();
+  const budgetLocked = !usePacingUnlocked();
   return (
     <GradientBorderCard color={p.accent} corner="topRight" glow style={{ marginBottom: 12 }}>
       <View style={{ padding: 16 }}>
@@ -334,13 +372,23 @@ function BaselineWaitingCard() {
         <View style={{ borderTopWidth: 1, borderTopColor: p.border, paddingTop: 14, marginBottom: 16 }}>
           <View style={{ flexDirection: 'row', gap: 8, marginBottom: 11 }}>
             {WAITING_ROWS.map((w) => (
-              <View key={w.label} style={{ flex: 1, backgroundColor: p.sunk, borderRadius: 14, padding: 11 }}>
+              <View key={w.label} style={{ flex: 1, backgroundColor: p.sunk, borderWidth: 1, borderColor: p.border, borderRadius: 14, paddingHorizontal: 10, paddingTop: 12, paddingBottom: 8 }}>
                 <GhostBar width={w.width} delay={w.delay} />
                 <Text style={{ fontSize: 11.5, lineHeight: 15, color: p.textDim }}>{w.label}</Text>
               </View>
             ))}
           </View>
           <Text style={{ fontSize: 12, color: p.textDim }}>These fill in as you log. Nothing appears until you take a reading.</Text>
+        </View>
+
+        {/* The one thing that is NOT empty on day one.
+            Everything above waits on a reading; the pacing budget does not,
+            because it starts from a conservative estimate and fits itself to
+            the person as their days play out. So this card can hand a brand
+            new user something real to look at and act on, wearing its own
+            "Learning" label so the claim is honest. */}
+        <View style={{ marginTop: -2, marginBottom: 16 }}>
+          <BudgetStrip budget={budget} locked={budgetLocked} pulse={pulse} onPress={() => openBudgetSheet(openSheet, dk, budget)} />
         </View>
 
         <Pressable
@@ -379,9 +427,10 @@ function GhostBar({ width, delay, mb = 10 }: { width: `${number}%`; delay: numbe
 // lands: same header, same gauge in the same spot, greyed out and reading 0.
 // No capture button here — the Readings section below owns that action; this
 // card just points the way.
-function UnscoredHero({ dk, all, hasReadings }: { dk: string; all: ScoreSetResult; hasReadings: boolean }) {
+function UnscoredHero({ dk, all, hasReadings, budget, pulse }: { dk: string; all: ScoreSetResult; hasReadings: boolean; budget: BudgetView; pulse: BudgetPulse | null }) {
   const p = usePalette();
   const { openSheet } = useSheets();
+  const budgetLocked = !usePacingUnlocked();
   const today = todayKey();
   const future = dk > today;
   // The dial is deliberately recessive until there's a score to show, so the
@@ -412,6 +461,14 @@ function UnscoredHero({ dk, all, hasReadings }: { dk: string; all: ScoreSetResul
           Not on a future day. Every tile would be a ghost, and a breathing
           placeholder on a day that has not happened yet promises something is on
           its way rather than saying the day is empty. */}
+      {/* The pacing budget shows here TOO, and that is the point of having a
+          prior at all: a day with no score still has a defensible estimate of
+          what it can absorb, wearing its own low confidence and asking for the
+          one reading that would sharpen it. An empty slot here would mean the
+          feature is invisible to exactly the user who most needs a way in. */}
+      {future ? null : (
+        <BudgetStrip budget={budget} locked={budgetLocked} pulse={pulse} onPress={() => openBudgetSheet(openSheet, dk, budget)} />
+      )}
       {future ? null : <KeyFigures dk={dk} all={all} />}
       {/* The same offer the baseline card makes, on the one day it can be acted
           on. Wears the Readings section's own icon and label, because it is the
@@ -525,8 +582,20 @@ const HOURS = (v: number) => {
 };
 
 /** Top of the 21pt value box to the top of its digits, so a ghost bar stands
- *  exactly where the figure it replaces will. */
-const FIG_INK = 3;
+ *  exactly where the figure it replaces will. Follows FIG_DROP: the digits sit
+ *  low in their box, so the bar that stands in for them has to as well. */
+const FIG_INK = 5;
+
+/** The figures sit slightly below the top of their box: at 21pt the box is not
+ *  tall enough to centre them, and dropping them buys air under the tile's new
+ *  top border without moving the label, which stays pinned by the box's fixed
+ *  height. */
+const FIG_DROP = 2;
+
+/** The value box's fixed height — FIG_DROP plus the 21pt line. Both states use
+ *  it, so a tile does not change height the moment a figure lands, and the label
+ *  under it does not move when the figures inside it are resized. */
+const FIG_BOX = 23;
 
 type Figure = { text: string; unit: string | null; cat: ScoreCat | null };
 
@@ -568,22 +637,28 @@ function KeyFigures({ dk, all }: { dk: string; all: ScoreSetResult }) {
     <View style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: p.border, marginTop: 16, paddingTop: 14 }}>
       <View style={{ flexDirection: 'row', gap: 8 }}>
         {rows.map((r) => (
-          <View key={r.label} style={{ flex: 1, backgroundColor: p.sunk, borderRadius: 14, padding: 10 }}>
+          <View key={r.label} style={{ flex: 1, backgroundColor: p.sunk, borderWidth: 1, borderColor: p.border, borderRadius: 14, paddingHorizontal: 9, paddingTop: 11, paddingBottom: 7 }}>
             {/* Both states occupy the SAME box, so the three labels sit on one line
                 whether their figures have landed or not, and a tile does not change
                 height the moment one does. FIG_INK is where the digits' ink lands
-                inside that box — Manrope at 19/21 puts its cap top 1.6 down and its
-                baseline 15.3 down, so the bar is placed to span that, not centred
-                in the box, which sat it visibly below the figures beside it.
-                The gap to the label is small because the box already carries the
-                descender space under the digits; 10 here read as a hole. */}
+                inside that box — Manrope at 21pt with FIG_DROP above it puts its
+                cap top ~2.7 down and its baseline ~17.8 down, so the bar is placed
+                to span that, not centred in the box, which sat it visibly below the
+                figures beside it. FIG_BOX is what pins the label: the figures grew
+                and dropped inside it, the box did not, so the three labels sit on
+                the same line they always did. It carries no bottom margin because
+                the box already holds the descender space under the digits.
+                The tile's padding is asymmetric for the same reason: the box and
+                the label line both carry slack UNDER their ink and none above it,
+                so equal padding hangs the whole group off the top edge. Top and
+                bottom here are what centre the INK, not the boxes. */}
             {!r.fig ? (
-              <View style={{ height: 21, marginBottom: 2, paddingTop: FIG_INK }}>
+              <View style={{ height: FIG_BOX, marginBottom: 0, paddingTop: FIG_INK }}>
                 <GhostBar width={r.ghost} delay={r.delay} mb={0} />
               </View>
             ) : (
-              <View style={{ flexDirection: 'row', alignItems: 'baseline', height: 21, marginBottom: 2 }}>
-                <Text style={{ fontFamily: fonts.numHeavy, fontSize: 19, lineHeight: 21, color: r.fig.cat ? SCORE_COLORS[r.fig.cat] : p.text, fontVariant: ['tabular-nums'] }}>
+              <View style={{ flexDirection: 'row', alignItems: 'baseline', height: FIG_BOX, marginBottom: 0, paddingTop: FIG_DROP }}>
+                <Text style={{ fontFamily: fonts.numHeavy, fontSize: 21, lineHeight: 21, color: r.fig.cat ? SCORE_COLORS[r.fig.cat] : p.text, fontVariant: ['tabular-nums'] }}>
                   {r.fig.text}
                 </Text>
                 {r.fig.unit ? (
@@ -602,8 +677,10 @@ function KeyFigures({ dk, all }: { dk: string; all: ScoreSetResult }) {
   );
 }
 
-function ScoredHero({ dk, readings, d, all, ctx, trend, onExplain }: { dk: string; readings: any[]; d: any; all: ScoreSetResult; ctx: any; trend: ScoreTrend | null; onExplain: () => void }) {
+function ScoredHero({ dk, readings, d, all, ctx, trend, budget, pulse, onExplain }: { dk: string; readings: any[]; d: any; all: ScoreSetResult; ctx: any; trend: ScoreTrend | null; budget: BudgetView; pulse: BudgetPulse | null; onExplain: () => void }) {
   const p = usePalette();
+  const { openSheet } = useSheets();
+  const budgetLocked = !usePacingUnlocked();
   const today = todayKey();
   const cat = scoreCat(all.score!);
   const morning = readings.filter((r) => readingPeriod(r) === 'morning');
@@ -674,7 +751,10 @@ function ScoredHero({ dk, readings, d, all, ctx, trend, onExplain }: { dk: strin
         </View>
       </View>
       <View style={{ alignItems: 'center', marginVertical: 8 }}>
-        <ScoreGauge score={all.score!} color={cat.color}>
+        {/* The ember runs on a Compromised day or worse, in that day's own
+            grade colour. It is the same motion as the over-budget pacing bar
+            below, deliberately: one card, one way of saying "running hot". */}
+        <ScoreGauge score={all.score!} color={cat.color} ember={EMBER_GRADES.has(cat.short)}>
           <Text style={{ fontSize: 57, fontFamily: fonts.numHeavy, color: p.text, fontVariant: ['tabular-nums'], letterSpacing: -1, lineHeight: 62, marginTop: 13 }}>{all.score}</Text>
           <GaugeDeltas trend={trend} amDelta={delta} />
         </ScoreGauge>
@@ -692,6 +772,10 @@ function ScoredHero({ dk, readings, d, all, ctx, trend, onExplain }: { dk: strin
         <Flag color={SCORE_COLORS.warning} text="Blue-zone risk. High readiness may mask fragility, so do less today, not more." />
       ) : null}
       {cat.short === 'Crash' ? <Flag color={SCORE_COLORS.crash} text="Mandatory recovery day. Full rest, hydration, and protocol." /> : null}
+      {/* The pacing budget. Between the guidance paragraph and the three sunk
+          tiles, which is where the design puts it: the gauge above stays the
+          hero and the tiles below keep their own hairline. */}
+      <BudgetStrip budget={budget} locked={budgetLocked} pulse={pulse} onPress={() => openBudgetSheet(openSheet, dk, budget)} />
       <KeyFigures dk={dk} all={all} />
     </Pressable>
   );
@@ -1092,7 +1176,10 @@ function ScoreExplain({ all, dk }: { all: ScoreSetResult; dk: string }) {
           </View>
         </View>
         <View style={{ alignItems: 'center', marginVertical: 8 }}>
-          <ScoreGauge score={all.score!} color={cat.color}>
+          {/* The ember runs on a Compromised day or worse, in that day's own
+            grade colour. It is the same motion as the over-budget pacing bar
+            below, deliberately: one card, one way of saying "running hot". */}
+        <ScoreGauge score={all.score!} color={cat.color} ember={EMBER_GRADES.has(cat.short)}>
             <Text style={{ fontSize: 57, fontFamily: fonts.numHeavy, color: p.text, fontVariant: ['tabular-nums'], letterSpacing: -1, lineHeight: 62, marginTop: 13 }}>{all.score}</Text>
           </ScoreGauge>
         </View>

@@ -16,6 +16,7 @@ import { addDays, todayKey, uid } from './dates';
 import { MED_TYPES } from './registry';
 import type {
   AppState,
+  DayLoad,
   DayRecord,
   Entry,
   FoodRecord,
@@ -152,6 +153,62 @@ function cleanFood(v: unknown): FoodRecord {
     calories: num(f.calories),
     triggers,
     meals: cleanEntries(f.meals) as Meal[],
+  };
+}
+
+/**
+ * The day's passive load, kept.
+ *
+ * This is a MIGRATION of real health data, not a cosmetic field: the pacing
+ * budget writes `days[dk].load` once per day and can never write it again —
+ * `refreshDayLoad` only ever reads TODAY, because a finished day is finished.
+ * So a cleaner that dropped it (as this one silently did) erased every past
+ * day's pacing on the next launch, and each morning the app opened having
+ * forgotten what yesterday cost. Anything added to DayLoad must be added here
+ * too, or it will not survive a relaunch.
+ *
+ * Nulls are preserved as nulls: in DayLoad null means UNKNOWN, and coercing an
+ * unknown to zero would report a day nobody watched as a quiet one.
+ */
+function cleanLoad(v: unknown): DayLoad | undefined {
+  if (!isPlainObject(v)) return undefined;
+  const n = (x: unknown): number | null => {
+    const f = typeof x === 'string' ? parseFloat(x) : x;
+    return typeof f === 'number' && isFinite(f) ? f : null;
+  };
+  const spans = (x: unknown, kinds: boolean) => {
+    if (!Array.isArray(x)) return null;
+    const out = x
+      .filter(isPlainObject)
+      .map((s) => ({
+        startMin: n(s.startMin),
+        endMin: n(s.endMin),
+        ...(kinds ? { kind: s.kind === 'still' ? 'still' as const : 'walk' as const } : {}),
+      }))
+      .filter((s) => s.startMin != null && s.endMin != null);
+    return out.length ? (out as never) : null;
+  };
+  const bands = Array.isArray(v.hrBands)
+    ? v.hrBands.map((b) => n(b) ?? 0)
+    : null;
+  const longest = isPlainObject(v.longestStretch)
+    ? { startMin: n(v.longestStretch.startMin) ?? 0, endMin: n(v.longestStretch.endMin) ?? 0 }
+    : null;
+  return {
+    steps: n(v.steps),
+    walkingMin: n(v.walkingMin),
+    standMin: n(v.standMin),
+    stillUprightMin: n(v.stillUprightMin),
+    uprightSpans: spans(v.uprightSpans, true),
+    hrAboveMin: n(v.hrAboveMin),
+    hrBands: bands,
+    hrBelowMin: n(v.hrBelowMin),
+    hrCoverageMin: n(v.hrCoverageMin),
+    hrStretches: n(v.hrStretches),
+    longestStretch: longest,
+    peakBpm: n(v.peakBpm),
+    lineBpm: n(v.lineBpm),
+    readAt: typeof v.readAt === 'string' && v.readAt ? v.readAt : null,
   };
 }
 
@@ -321,6 +378,7 @@ export function migrate(s: unknown): AppState {
       const prevBed = isPlainObject(prev) && isPlainObject(prev.sleep) ? str(prev.sleep.bed) : '';
       sleep = { ...sleep, bed: prevBed };
     }
+    const load = cleanLoad(d.load);
     out.days[k] = {
       sleep,
       readings: cleanEntries(d.readings),
@@ -330,6 +388,7 @@ export function migrate(s: unknown): AppState {
       food: cleanFood(d.food),
       digestion: { movements: cleanMovements(isPlainObject(d.digestion) ? d.digestion.movements : undefined) },
       ...(typeof d.notes === 'string' && d.notes ? { notes: d.notes } : {}),
+      ...(load ? { load } : {}),
     };
   });
   out.meta.sleepReframed = true;

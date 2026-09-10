@@ -145,6 +145,59 @@ export interface DayRecord {
   digestion: { movements: Movement[]; bm?: number };
   /** Free-text day notes; only surfaced in AI-insights prompts. */
   notes?: string;
+  /** What the health store said this day cost, summarised at read time.
+   *  Written by src/store/budget.ts, consumed by src/lib/budget. It lives in
+   *  the journal (not the flags store) because it is the user's own health
+   *  data and must ride export/import the way `sleep` does. */
+  load?: DayLoad;
+}
+
+/**
+ * A day's passive load, read from Apple Health / Health Connect and summarised
+ * before it is stored: the raw all-day heart-rate series never enters the
+ * journal, only the thinned curve in the waveform sidecar under `load:<dk>`.
+ *
+ * Every field is nullable and null means UNKNOWN, never zero. A phone with no
+ * watch reports steps and walking minutes and nothing else; a day the watch
+ * spent on the charger reports low coverage rather than a restful day.
+ */
+export interface DayLoad {
+  /** Whole-day step count so far. */
+  steps: number | null;
+  /** Minutes holding any steps, merged from the sample timestamps. Works on a
+   *  phone with no wearable — every phone counts its own steps. */
+  walkingMin: number | null;
+  /** Apple Stand Time minutes. iOS with a paired watch only: the phone cannot
+   *  know you are standing, and Health Connect has no equivalent record. */
+  standMin: number | null;
+  /** Minutes standing STILL, inferred from the user's own orthostatic
+   *  signature (src/lib/budget/upright.ts). Null without a heart-rate series;
+   *  never claimed from steps alone. */
+  stillUprightMin: number | null;
+  /** Walking and standing stretches, for the drill-in's shading. */
+  uprightSpans: { startMin: number; endMin: number; kind: 'walk' | 'still' }[] | null;
+  /** Minutes the heart sat above the user's own exertion line. */
+  hrAboveMin: number | null;
+  /** Those minutes split by how far above the line they sat (budget/burn.ts
+   *  HR_BAND_EDGES), which is what lets the day be priced by intensity. The
+   *  curve itself cannot live here, so this is the resolution the journal
+   *  keeps. Null means UNKNOWN — a day read before bands existed, charged
+   *  flat rather than guessed at; an empty array means "looked, nothing". */
+  hrBands: number[] | null;
+  /** Minutes the heart sat BELOW the user's own recovery line while awake.
+   *  Genuine parasympathetic time, and the budget pays it back. */
+  hrBelowMin: number | null;
+  /** Minutes the series actually covered, so a charger gap reads as unknown. */
+  hrCoverageMin: number | null;
+  /** Contiguous runs above the line ("in three stretches"). */
+  hrStretches: number | null;
+  /** The longest such run, minutes past midnight. */
+  longestStretch: { startMin: number; endMin: number } | null;
+  peakBpm: number | null;
+  /** The line the minutes were counted against, so a later baseline shift
+   *  cannot silently re-mean a stored count. */
+  lineBpm: number | null;
+  readAt: string | null;
 }
 
 /** User-configurable definition of a "clean day" (the streak protocol). Each
@@ -263,6 +316,12 @@ export interface TypeDef {
   dosage?: string;
   /** True for user-created types (stored in state.customTypes). */
   userDefined?: boolean;
+  /** How much a minute of this costs, for the pacing budget. Built-in
+   *  activities never carry it — LOAD_TABLE in src/lib/budget/load.ts is the
+   *  source for those, so the weights live in one readable table the way the
+   *  scoring thresholds do. It is set only on user-created activities, where
+   *  the create-type form asks once (light / moderate / heavy). */
+  load?: 'rest' | 'light' | 'moderate' | 'heavy' | 'strenuous';
   summary?: (r: Entry) => string;
   detail?: (r: Entry) => string;
 }

@@ -7,85 +7,20 @@
  * Custom defs are pure JSON (no summary/detail functions) so they persist
  * through MMKV and export/import untouched.
  */
-import { ACTIVITY_TYPES, MED_TYPES, SYMPTOM_TYPES, TRIGGER_TYPES } from './registry';
-import type { AppState, TypeDef } from './types';
+import type { TypeDef } from './types';
+import type { LoadWeight } from './budget/load';
 import { getState, save } from '../store/store';
+import { BUILTIN, CUSTOM_FIELDS, CUSTOM_ICON, slugify, typesFor, type TypeKind } from './typeResolve';
 
-export type TypeKind = 'activities' | 'meds' | 'symptoms' | 'triggers';
+// The pure half lives in ./typeResolve so the pure libraries (src/lib/budget)
+// can resolve types without importing the store. Re-exported so every existing
+// `from './typeCatalog'` import keeps working.
+export { typesFor, typeInUse } from './typeResolve';
+export type { TypeKind } from './typeResolve';
 
-const BUILTIN: Record<TypeKind, Record<string, TypeDef>> = {
-  activities: ACTIVITY_TYPES,
-  meds: MED_TYPES,
-  symptoms: SYMPTOM_TYPES,
-  triggers: TRIGGER_TYPES,
-};
-
-/** Default field schema for a user-created type of each kind. Custom activities
- *  capture the metrics the analysis cares about: duration and min/max HR. */
-const CUSTOM_FIELDS: Record<TypeKind, TypeDef['fields']> = {
-  activities: [
-    { key: 'duration', label: 'Duration', unit: 'min' },
-    { key: 'minHr', label: 'Min HR' },
-    { key: 'maxHr', label: 'Max HR' },
-  ],
-  meds: [
-    { type: 'time', key: 'time', label: 'Time' },
-    { type: 'number', key: 'amount', label: 'Amount' },
-  ],
-  symptoms: [],
-  triggers: [],
-};
-
-const CUSTOM_ICON: Record<TypeKind, string> = {
-  activities: 'activity', meds: 'pill', symptoms: 'alert', triggers: 'alert',
-};
-
-/** Registry + user-defined types, minus deleted built-ins. Alphabetical by
- *  label so user-created types slot in among the built-ins; "Other …"
- *  catch-alls sink to the bottom. */
-export function typesFor(state: AppState, kind: TypeKind): Record<string, TypeDef> {
-  const hidden = new Set(state.hiddenTypes?.[kind] || []);
-  const merged: Record<string, TypeDef> = {};
-  Object.keys(BUILTIN[kind]).forEach((k) => { if (!hidden.has(k)) merged[k] = BUILTIN[kind][k]; });
-  Object.assign(merged, state.customTypes?.[kind] || {});
-  const isOther = (t: TypeDef) => /^other\b/i.test(t.label);
-  const out: Record<string, TypeDef> = {};
-  Object.keys(merged)
-    .sort((a, b) => {
-      if (isOther(merged[a]) !== isOther(merged[b])) return isOther(merged[a]) ? 1 : -1;
-      return merged[a].label.localeCompare(merged[b].label, undefined, { sensitivity: 'base' });
-    })
-    .forEach((k) => {
-      // A symptom lasts, so its form offers an optional end time. Stamped here
-      // rather than on each registry def so user-created symptoms — including
-      // ones saved before this shipped — get it with no migration.
-      const t = merged[k];
-      out[k] = kind === 'symptoms' && !t.ends && !t.noTime ? { ...t, ends: true } : t;
-    });
-  return out;
-}
-
-/** True when any day references the type (blocks deletion). */
-export function typeInUse(state: AppState, kind: TypeKind, key: string): boolean {
-  const days = state.days || {};
-  for (const dk of Object.keys(days)) {
-    const d = days[dk];
-    if (!d) continue;
-    if (kind === 'triggers') {
-      if ((d.food?.triggers?.[key] || 0) > 0) return true;
-    } else if ((d[kind] || []).some((e) => e.type === key)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-function slugify(name: string): string {
-  return name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-}
 
 /** Create a user-defined type. Returns its key, or null for a blank/dupe name. */
-export function addCustomType(kind: TypeKind, name: string, opts?: { dosage?: string }): string | null {
+export function addCustomType(kind: TypeKind, name: string, opts?: { dosage?: string; load?: LoadWeight }): string | null {
   const label = name.trim();
   if (!label) return null;
   const state = getState();
@@ -95,6 +30,10 @@ export function addCustomType(kind: TypeKind, name: string, opts?: { dosage?: st
   while (existing[key] || BUILTIN[kind][key]) key += '-2';
   const def: TypeDef = { label, icon: CUSTOM_ICON[kind], fields: CUSTOM_FIELDS[kind].slice(), userDefined: true };
   if (kind === 'meds' && opts?.dosage?.trim()) def.dosage = opts.dosage.trim();
+  // What a minute of it costs the pacing budget. Asked once, as three plain
+  // words rather than a number: nobody can pick 1.4 for gardening, and the
+  // table in lib/budget/load.ts only ever needed the three buckets anyway.
+  if (kind === 'activities') def.load = opts?.load || 'moderate';
   // Fresh top-level object (not an in-place write) so useMemos keyed on
   // state.customTypes see the change — save() only re-wraps state and days.
   state.customTypes = { ...(state.customTypes || {}), [kind]: { ...(state.customTypes?.[kind] || {}), [key]: def } };
@@ -107,7 +46,7 @@ export function addCustomType(kind: TypeKind, name: string, opts?: { dosage?: st
  *  The key never changes, so entries already logged against it keep resolving —
  *  editing is allowed even while the type is in use. Returns false for a blank
  *  or duplicate name (caller distinguishes via `name.trim()`). */
-export function editType(kind: TypeKind, key: string, name: string, opts?: { dosage?: string }): boolean {
+export function editType(kind: TypeKind, key: string, name: string, opts?: { dosage?: string; load?: LoadWeight }): boolean {
   const label = name.trim();
   if (!label) return false;
   const state = getState();
@@ -124,6 +63,7 @@ export function editType(kind: TypeKind, key: string, name: string, opts?: { dos
     if (dosage) next.dosage = dosage;
     else delete next.dosage;
   }
+  if (kind === 'activities' && opts?.load) next.load = opts.load;
   // Fresh top-level object — same identity contract as addCustomType.
   state.customTypes = { ...(state.customTypes || {}), [kind]: { ...(state.customTypes?.[kind] || {}), [key]: next } };
   save();

@@ -53,6 +53,9 @@ export function dayHasOwnData(d: DayRecord | undefined): boolean {
   if (d.food?.triggers && Object.values(d.food.triggers).some((n) => n > 0)) return true;
   if (d.sleep && (d.sleep.bed || d.sleep.wake)) return true;
   if (d.notes && d.notes.trim()) return true;
+  // `d.load` is deliberately NOT checked. A step count the phone recorded on
+  // its own is not the user logging anything, so it must not retire the demo
+  // month or count as "they have started using it".
   return false;
 }
 
@@ -371,10 +374,17 @@ function demoDay(i: number, rand: () => number): DayRecord {
   } else if (w < 0.6) {
     if (rand() < 0.8) act('breathwork', 540, Math.round(jit(12, 4)), 1);
     if (rand() < 0.6) act('walk', 990, Math.round(jit(18, 8)), 2);
+    // The errand is what makes a middling day cost something. Without it the
+    // sample journal is all short walks and breathwork, the pacing budget has
+    // nothing to bill, and its Progress card reads as a flat line of unused
+    // room — which is not what a real week looks like for this population.
+    if (rand() < 0.5) act('errands', 780, Math.round(jit(45, 20)), 4);
   } else {
     if (rand() < 0.85) act('breathwork', 540, Math.round(jit(12, 4)), 1);
     if (rand() < 0.7) act('walk', 960, Math.round(jit(32, 12)), 2);
     if (rand() < 0.35) act(rand() < 0.5 ? 'yoga' : 'indoorBike', 1020, Math.round(jit(24, 8)), 3);
+    if (rand() < 0.55) act('errands', 780, Math.round(jit(50, 20)), 4);
+    if (w > 0.75 && rand() < 0.3) act('strength', 1080, Math.round(jit(30, 10)), 5);
   }
 
   /* --- meds & supplements: the protocol, kept up most days --- */

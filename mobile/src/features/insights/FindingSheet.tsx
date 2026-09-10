@@ -25,7 +25,7 @@
  *     against the day the user did the thing, because that is the day they
  *     recognise; the header says which lag it was.
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
 import { LineChart, ZonesToggle } from '../../components/charts';
 import { Icon } from '../../components/Icon';
@@ -37,6 +37,7 @@ import { TREND_METRICS } from '../../lib/trends';
 import { markColumn, type BiggestChange, type Correlation, type DetailSeries, type WatchItem } from '../../lib/insights';
 import { CorrelationsAiButton, FindingCard, type FindingTile } from './Sections';
 import * as S from './style';
+import { pingFinding } from '../../store/ping';
 
 const GOOD = S.GOOD;
 
@@ -243,6 +244,13 @@ function Body({ title, intro, findings, footer }: {
 export function CorrelationSheet({ findings }: { findings: { c: Correlation; series: DetailSeries | null }[] }) {
   const p = usePalette();
   const list = findings.map((f) => f.c);
+  // One sheet serves three rows: a weak-tier finding carries its tier, and a
+  // grouped row's members always share one (`index.ts` never mixes them).
+  useEffect(() => {
+    const tier = findings[0]?.c.tier;
+    pingFinding(tier === 'early' ? 'early' : tier === 'unconfirmed' ? 'unconfirmed' : 'correlation');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   return (
     <Body
       title="Correlation details"
@@ -281,6 +289,7 @@ export function CorrelationSheet({ findings }: { findings: { c: Correlation; ser
  *  so they are reused verbatim rather than rebuilt from the raw numbers. */
 export function ChangeSheet({ change, series }: { change: BiggestChange; series: DetailSeries | null }) {
   const p = usePalette();
+  useEffect(() => { pingFinding('change'); }, []);
   const color = change.good ? GOOD : p.accent;
   return (
     <Body

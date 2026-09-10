@@ -51,6 +51,14 @@ export const WAVEFORM_FIELDS = ['rrRaw', 'rrClean', 'rrSegments', 'sampledHr', '
 export const sleepWaveformId = (dk: string) => `sleep:${dk}`;
 
 /**
+ * Sidecar key for a day's all-day heart-rate curve, read for the pacing
+ * budget. Same namespacing rule as the night above, and the same trap: it MUST
+ * be listed in `waveformIds` or `pruneWaveforms` deletes every curve on the
+ * next launch.
+ */
+export const loadWaveformId = (dk: string) => `load:${dk}`;
+
+/**
  * Split an entry into its journal half (waveform fields removed) and its
  * sidecar payload (null when it carries none). rrClean is NOT stored when
  * rrRaw is present — it's derived (correctArtifacts) and recomputed on view,
@@ -123,6 +131,8 @@ export function waveformIds(state: AppState): Set<string> {
     // would delete every overnight curve on the next launch (it drops any key
     // this set does not name), and exports would leave them behind.
     if (day.sleep && day.sleep.bed && day.sleep.wake) ids.add(sleepWaveformId(dk));
+    // ...and so does a day whose passive load was read (src/store/budget.ts).
+    if (day.load && day.load.readAt) ids.add(loadWaveformId(dk));
   }
   return ids;
 }

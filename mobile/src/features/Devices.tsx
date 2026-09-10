@@ -10,9 +10,18 @@ import { radius, usePalette } from '../theme';
 import { ble } from '../lib/ble/manager';
 import { formatDiagnostics, sortDevices, type BleDevice } from '../lib/ble/devices';
 import { partitionStraps } from '../lib/watch/brands';
-import { NO_STRAPS_HINT } from './hrv/SourcePicker';
 import { PromptSheet } from './PromptSheet';
 import { getState, save, useAppState } from '../store/store';
+
+/** Shown when a scan finishes empty. Straps are found by their advertisement,
+ *  so the three ways to be invisible are: not broadcasting (dry/not worn),
+ *  already held by the OS or another app, or out of battery. Naming them beats
+ *  "no straps found", which reads as "unsupported". */
+export const NO_STRAPS_HINT =
+  'No straps found. Three things make a strap invisible:\n\n'
+  + '·  It is not broadcasting — wet the electrodes and put the strap on, then scan again.\n'
+  + '·  Something else is holding it — unpair it in system Bluetooth settings and quit other heart-rate apps.\n'
+  + '·  Its battery is flat.';
 
 /** Hold "Scan for straps" this long to collect a Bluetooth diagnostics dump.
  *  Deliberately far past any accidental press — it is a support tool, not a

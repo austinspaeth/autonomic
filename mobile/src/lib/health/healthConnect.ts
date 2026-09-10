@@ -36,6 +36,7 @@ type RestingHrRecord = { time: string; beatsPerMinute: number; metadata?: Metada
 type HrSample = { time: string; beatsPerMinute: number };
 type HrRecord = { startTime: string; endTime: string; samples: HrSample[]; metadata?: Metadata };
 type RmssdRecord = { time: string; heartRateVariabilityMillis: number; metadata?: Metadata };
+type StepsRecord = { startTime: string; endTime: string; count: number; metadata?: Metadata };
 type PressureValue = { inMillimetersOfMercury: number };
 type BpRecord = { time: string; systolic: PressureValue; diastolic: PressureValue; metadata?: Metadata };
 type WeightRecord = { time: string; weight: { inKilograms: number }; metadata?: Metadata };
@@ -61,6 +62,15 @@ const READ_TYPES = [
   'RestingHeartRate', 'HeartRate', 'HeartRateVariabilityRmssd',
   'RespiratoryRate', 'BloodPressure', 'Weight', 'SleepSession',
   'ExerciseSession', 'Distance',
+  // The pacing budget's passive floor. Android phones write their own step
+  // count through the system provider, so this works with no wearable.
+  // NOTE: android.permission.health.READ_STEPS must be declared in app.json
+  // alongside this. Requesting a record type with no manifest permission
+  // behind it can never be granted and loops the consent sheet forever — we
+  // have shipped that bug once already (ExerciseSession/Distance).
+  // Health Connect has no stand-time record, which is why `standMin` is
+  // always null here and the caller falls back to walking minutes.
+  'Steps',
 ];
 const WRITE_TYPES = [
   'HeartRateVariabilityRmssd', 'HeartRate', 'RestingHeartRate', 'BloodPressure',
@@ -355,6 +365,48 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
         diastolic: diastolic != null ? Math.round(diastolic) : null,
         weightLb: weightKg != null ? Math.round(weightKg * 2.20462) : null,
         sleep,
+      };
+    },
+
+    async readDayLoad(dk) {
+      const { from, to: dayEnd } = dayBounds(dk);
+      const now = new Date();
+      const to = now < dayEnd ? now : dayEnd;
+
+      const [stepRecords, hrRecords] = await Promise.all([
+        readAll<StepsRecord>('Steps', from, to),
+        readAll<HrRecord>('HeartRate', from, to),
+      ]);
+
+      const baseMs = from.getTime();
+      let steps = 0;
+      const stepSpans: { startMin: number; endMin: number }[] = [];
+      stepRecords.forEach((r) => {
+        const n = Number(r.count);
+        if (!Number.isFinite(n) || n <= 0) return;
+        steps += n;
+        const a = Math.floor((new Date(r.startTime).getTime() - baseMs) / 60000);
+        const b = Math.ceil((new Date(r.endTime).getTime() - baseMs) / 60000);
+        if (Number.isFinite(a) && Number.isFinite(b) && b > a) stepSpans.push({ startMin: a, endMin: b });
+      });
+
+      // Flattened the way `nightOf` does it: a Health Connect heart-rate
+      // record is a bucket of samples, not one reading.
+      const hr: { t: number; bpm: number }[] = [];
+      hrRecords.forEach((r) => {
+        (r.samples || []).forEach((sm) => {
+          const bpm = Number(sm.beatsPerMinute);
+          const t = Math.round((new Date(sm.time).getTime() - baseMs) / 1000);
+          if (Number.isFinite(bpm) && bpm > 0 && Number.isFinite(t)) hr.push({ t, bpm });
+        });
+      });
+      hr.sort((a, b) => a.t - b.t);
+
+      return {
+        steps: stepRecords.length ? Math.round(steps) : null,
+        stepSpans: stepSpans.length ? stepSpans : null,
+        standMin: null,
+        hr: hr.length ? hr : null,
       };
     },
 

@@ -1,8 +1,10 @@
-import { buildWidgetPayload } from '../widgets';
+import { buildWidgetPayload, currentPacingFrame, PACING_FRAME_MIN } from '../widgets';
+import { buildBudget, buildBudgetAt } from '../budget';
 import { demoDays } from '../demo';
 import { defaultState } from '../migrate';
 import { addDays, todayKey } from '../dates';
 import { SCORE_CATS } from '../scoring/day';
+import type { Entry } from '../types';
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
 const TREND = /^[▲▼]$/;
@@ -129,5 +131,105 @@ describe('widget trend arrows', () => {
   it('never puts an arrow on SDNN — it has no trend-registry entry', () => {
     const state = { ...defaultState(), days: fortnight(40, 60) };
     expect(buildWidgetPayload(state).rows.find((r) => r.name === 'SDNN')!.trend).toBeNull();
+  });
+});
+
+describe('pacing widgets', () => {
+  const at = (h: number, m = 0) => {
+    const d = new Date();
+    d.setHours(h, m, 0, 0);
+    return d;
+  };
+  const demo = () => ({ ...defaultState(), days: demoDays() });
+
+  it('are awaiting on an empty journal, never a prior', () => {
+    const { frames } = buildWidgetPayload(defaultState(), todayKey(), { now: at(10) }).pacing;
+    expect(frames).toHaveLength(1);
+    expect(frames[0].state).toBe('awaiting');
+    expect(frames[0].pace).toBeNull();
+    expect(frames[0].fill).toBe(0);
+  });
+
+  it('show a free install no number at all', () => {
+    const { frames } = buildWidgetPayload(demo(), todayKey(), { now: at(10), locked: true }).pacing;
+    expect(frames).toHaveLength(1);
+    const f = frames[0];
+    expect(f.state).toBe('locked');
+    expect(f.tiles).toEqual([]);
+    expect(f.pace).toBeNull();
+    [f.figure, f.sub, f.subWide].forEach((s) => expect(s).not.toMatch(/\d/));
+  });
+
+  it('walk the pace marker across the rest of the day', () => {
+    const now = at(9, 7);
+    const { frames } = buildWidgetPayload(demo(), todayKey(), { now, stepsGranted: true }).pacing;
+    expect(frames.length).toBeGreaterThan(20);
+    expect(new Date(frames[0].at).getTime()).toBe(now.getTime());
+    const times = frames.map((f) => new Date(f.at).getTime());
+    expect([...times].sort((a, b) => a - b)).toEqual(times);
+    frames.slice(1).forEach((f) => expect(new Date(f.at).getMinutes() % PACING_FRAME_MIN).toBe(0));
+    expect(Math.max(...times)).toBeLessThanOrEqual(at(22, 30).getTime());
+    const paces = frames.map((f) => f.pace).filter((p): p is number => p != null);
+    paces.slice(1).forEach((p, i) => expect(p).toBeGreaterThanOrEqual(paces[i]));
+    frames.forEach((f) => {
+      expect(f.fill).toBeGreaterThanOrEqual(0);
+      expect(f.fill).toBeLessThanOrEqual(1);
+      expect(f.tiles.length).toBeLessThanOrEqual(2);
+      [f.figureColor, f.fillColor, f.badgeColor, ...f.tiles.map((t) => t.color)].forEach((c) => expect(c).toMatch(HEX));
+      // A widget states the budget. The strip's "About 3h 30m" hedge has the
+      // words beside it that explain what is still being learned; here it is a
+      // bare qualifier on a number, and its half-hour rounding would put a
+      // different figure on the home screen from the one in the app.
+      [f.figure, f.sub, f.subWide, ...f.tiles.flatMap((t) => [t.value, t.label])]
+        .forEach((t) => expect(t).not.toMatch(/about|approx/i));
+    });
+  });
+
+  it('draw whichever frame has already started', () => {
+    const { pacing } = buildWidgetPayload(demo(), todayKey(), { now: at(9, 7) });
+    const noon = at(12, 5);
+    const f = currentPacingFrame(pacing, noon);
+    expect(new Date(f.at).getTime()).toBeLessThanOrEqual(noon.getTime());
+    const next = pacing.frames[pacing.frames.indexOf(f) + 1];
+    if (next) expect(new Date(next.at).getTime()).toBeGreaterThan(noon.getTime());
+  });
+
+  it('bake the ember and drop the marker once over budget', () => {
+    const state = demo();
+    const dk = todayKey();
+    const day = state.days[dk];
+    state.days[dk] = {
+      ...day,
+      activities: [...(day.activities || []), { id: 'over', type: 'strenuousWork', time: '08:30', duration: '900' } as Entry],
+    };
+    const f = currentPacingFrame(buildWidgetPayload(state, dk, { now: at(14), stepsGranted: true }).pacing, at(14));
+    expect(f.state).toBe('over');
+    expect(f.unit).toBe('over');
+    expect(f.figure).toMatch(/^\d/);
+    expect(f.pace).toBeNull();
+    expect(f.ember!.length).toBeGreaterThan(2);
+    f.ember!.forEach((s) => expect(s.c).toMatch(HEX));
+    expect(f.tiles.map((t) => t.label)).toEqual(['Spent', 'Budget']);
+  });
+});
+
+describe('buildBudgetAt', () => {
+  it('answers exactly what buildBudget does at each moment', () => {
+    const state = { ...defaultState(), days: demoDays() };
+    const dk = todayKey();
+    const opts = { addDays, downturn: false, strain: null, stepsGranted: true, brief: true };
+    const nows = [8, 11, 15, 20].map((h) => {
+      const d = new Date();
+      d.setHours(h, 0, 0, 0);
+      return d;
+    });
+    const many = buildBudgetAt(state, dk, {}, { ...opts, now: nows[0] }, nows);
+    nows.forEach((now, i) => {
+      const one = buildBudget(state, dk, {}, { ...opts, now });
+      expect(many[i].state).toBe(one.state);
+      expect(many[i].figure).toBe(one.figure);
+      expect(many[i].sub).toBe(one.sub);
+      expect(many[i].pace).toEqual(one.pace);
+    });
   });
 });

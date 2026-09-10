@@ -34,7 +34,7 @@ import { activityTypeFromHk, workoutHrSeries } from './workoutMap';
 const OWN_BUNDLE = 'com.autonomic.journal';
 
 /** Which slice of the read set a permission question is about. */
-export type HealthScope = 'all' | 'workouts';
+export type HealthScope = 'all' | 'workouts' | 'steps';
 /**
  * What we can honestly say about read access.
  *  - `shouldRequest` — the OS still has questions to ask; requesting shows UI.
@@ -55,7 +55,7 @@ export interface HealthApi {
    * which skips the asked-before latch (the OS still won't re-present types it
    * considers determined).
    */
-  requestAuth(opts?: { force?: boolean }): Promise<boolean>;
+  requestAuth(opts?: { force?: boolean; scope?: HealthScope }): Promise<boolean>;
   /**
    * Whether a read scope has been asked about yet, and (where the platform
    * says) whether it was granted. Lets callers tell "nothing recorded that day"
@@ -65,6 +65,21 @@ export interface HealthApi {
   readAuthStatus(scope: HealthScope): Promise<HealthAuthStatus>;
   /** Pull the day's relevant samples for a YYYY-MM-DD key. */
   readDay(dk: string): Promise<HealthDaySamples>;
+  /**
+   * The day's PASSIVE load, for the pacing budget: steps, the timestamps they
+   * fell in, stand minutes, and the all-day heart-rate series.
+   *
+   * Steps and their spans work with no wearable at all — every phone counts
+   * its own — which is what gives a budget something to see on day one.
+   * `standMin` is Apple Watch only (the phone cannot know you are standing,
+   * and Health Connect has no equivalent record), so it is null everywhere
+   * else and the caller falls back to walking minutes.
+   *
+   * The heart-rate series is returned RAW and unthinned: the caller summarises
+   * it (minutes above the line, standing stretches) and thins what it keeps,
+   * so the all-day curve never reaches the journal.
+   */
+  readDayLoad(dk: string): Promise<DayLoadRead>;
   /**
    * Per-sample, timestamped readings for a day (resting HR, BP, HRV) —
    * each keeps its real clock time and a flag for whether this app authored it.
@@ -111,6 +126,18 @@ export interface HealthApi {
   writeQuantity(kind: 'systolic' | 'diastolic' | 'restingHr', value: number, when: Date): Promise<void>;
   /** Publish an app journal reading to Health. Returns how many samples were written. */
   publishReading(entry: Entry, dk: string): Promise<number>;
+}
+
+/** What one day's passive load looks like coming off the health store. */
+export interface DayLoadRead {
+  steps: number | null;
+  /** One span per step sample/record that carried any steps, minutes past
+   *  local midnight. Overlapping spans are expected (phone AND watch write
+   *  the same minutes) and are merged by `walkingMinutes`, never summed. */
+  stepSpans: { startMin: number; endMin: number }[] | null;
+  standMin: number | null;
+  /** Seconds from local midnight, raw. */
+  hr: { t: number; bpm: number }[] | null;
 }
 
 export interface HealthDaySamples {
@@ -273,6 +300,7 @@ const stub: HealthApi = {
   async requestAuth() { return false; },
   async readAuthStatus() { return 'unknown'; },
   async readDay() { return emptyDay; },
+  async readDayLoad() { return { steps: null, stepSpans: null, standMin: null, hr: null }; },
   async readImports() { return []; },
   async readHistory() { return emptyHistory(); },
   async readHrvSessions() { return []; },
@@ -387,6 +415,12 @@ interface HkModule {
   /** HKAuthorizationRequestStatus: 0 unknown · 1 shouldRequest · 2 unnecessary. */
   getRequestStatusForAuthorization?: (read: string[], write?: string[]) => Promise<number>;
   queryQuantitySamples?: (id: string, opts: Record<string, unknown>) => Promise<readonly QSample[]>;
+  /** HKStatisticsQuery. Used for step and stand totals because it MERGES
+   *  sources: with a watch paired, iPhone and Watch both write steps for the
+   *  same minutes and summing the samples double-counts them. */
+  queryStatisticsForQuantity?: (
+    id: string, options: readonly string[], from: Date, to?: Date, unit?: string,
+  ) => Promise<{ sumQuantity?: { quantity: number } | undefined } | undefined>;
   queryCategorySamples?: (id: string, opts: Record<string, unknown>) => Promise<readonly CSample[]>;
   queryHeartbeatSeriesSamples?: (opts: Record<string, unknown>) => Promise<readonly HeartbeatSeries[]>;
   queryWorkoutSamples?: (opts: Record<string, unknown>) => Promise<readonly HkWorkout[]>;
@@ -438,6 +472,8 @@ const QID = {
   systolic: 'HKQuantityTypeIdentifierBloodPressureSystolic',
   diastolic: 'HKQuantityTypeIdentifierBloodPressureDiastolic',
   bodyMass: 'HKQuantityTypeIdentifierBodyMass',
+  steps: 'HKQuantityTypeIdentifierStepCount',
+  standTime: 'HKQuantityTypeIdentifierAppleStandTime',
 } as const;
 const CID = {
   sleep: 'HKCategoryTypeIdentifierSleepAnalysis',
@@ -447,7 +483,14 @@ const CORR = { bloodPressure: 'HKCorrelationTypeIdentifierBloodPressure' } as co
 const HEARTBEAT_SERIES = 'HKDataTypeIdentifierHeartbeatSeries';
 const WORKOUT_TYPE = 'HKWorkoutTypeIdentifier';
 
-const READ_IDS = [
+/**
+ * The set every background path asks for. UNCHANGED, and it has to stay that
+ * way: HK_SET_KEY below is derived from it, and the key is the once-only ask
+ * latch. Adding a type here changes the key, which makes `hasAskedAuth` read
+ * false for every existing install and re-presents the sheet on the next
+ * update check — a permission prompt nobody tapped anything to get.
+ */
+const CORE_READ_IDS = [
   QID.restingHr, QID.heartRate, QID.hrvSdnn, QID.respiratoryRate,
   QID.systolic, QID.diastolic, QID.bodyMass, CID.sleep, HEARTBEAT_SERIES,
   WORKOUT_TYPE,
@@ -455,6 +498,19 @@ const READ_IDS = [
   // check tell our own session apart from one logged elsewhere.
   CID.mindful,
 ];
+
+/**
+ * The pacing budget's additions, asked for SEPARATELY and only from a tap.
+ *
+ * Steps give a phone-only user a passive floor under their day; stand time is
+ * the watch's own upright measure. They are not in the core set because that
+ * set is asked for on launch paths, and one extra prompt appearing out of
+ * nowhere after an app update is exactly the nag ./askedAuth exists to
+ * prevent. `connectPacingHealth` in src/store/budget.ts is the only caller.
+ */
+const STEPS_READ_IDS = [QID.steps, QID.standTime];
+
+const READ_IDS = CORE_READ_IDS;
 const WRITE_IDS = [
   QID.hrvSdnn, QID.restingHr, QID.heartRate,
   QID.systolic, QID.diastolic, CID.mindful,
@@ -466,8 +522,12 @@ const WRITE_IDS = [
   WORKOUT_TYPE,
 ];
 
-/** Identity of the current permission set, for the once-only ask latch. */
-const HK_SET_KEY = `hk1:${READ_IDS.join(',')}|${WRITE_IDS.join(',')}`;
+/** Identity of the current permission set, for the once-only ask latch.
+ *  Derived from CORE_READ_IDS so it stays byte-identical across the pacing
+ *  release — a test in ./__tests__/authSets pins that. */
+const HK_SET_KEY = `hk1:${CORE_READ_IDS.join(',')}|${WRITE_IDS.join(',')}`;
+/** The wider set, with its own latch so asking for it never disturbs the core. */
+const HK_STEPS_SET_KEY = `hk1steps:${[...CORE_READ_IDS, ...STEPS_READ_IDS].join(',')}|${WRITE_IDS.join(',')}`;
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const hhmm = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
@@ -552,6 +612,23 @@ function makeReal(mod: HkModule): HealthApi {
       return thinSeries(pts, NIGHT_SERIES_MAX);
     } catch { return []; }
   };
+  /**
+   * A cumulative total over a window, MERGED ACROSS SOURCES.
+   *
+   * This is the only correct way to total steps on iOS. With a watch paired,
+   * HealthKit holds the phone's step samples AND the watch's for the same
+   * minutes; `queryQuantitySamples` returns both and summing them reports
+   * roughly twice the day. HKStatisticsQuery de-duplicates by source, which is
+   * what the Health app itself shows.
+   */
+  const sumQ = async (id: string, from: Date, to: Date, unit?: string): Promise<number | null> => {
+    try {
+      const r = await mod.queryStatisticsForQuantity?.(id, ['cumulativeSum'], from, to, unit);
+      const v = r?.sumQuantity?.quantity;
+      return typeof v === 'number' && Number.isFinite(v) ? v : null;
+    } catch { return null; }
+  };
+
   /** Raw per-sample rows (kept: timestamp + provenance), for timestamped imports. */
   const samplesQ = async (id: string, from: Date, to: Date): Promise<readonly QSample[]> => {
     try { return (await mod.queryQuantitySamples?.(id, { from, to, limit: 500 })) || []; }
@@ -566,15 +643,21 @@ function makeReal(mod: HkModule): HealthApi {
 
     requestAuth(opts) {
       const force = !!opts?.force;
+      // The pacing budget asks for a WIDER set under its own latch, so the
+      // core set's key — and therefore every background path's once-only ask —
+      // is untouched by this feature existing.
+      const wide = opts?.scope === 'steps';
+      const readIds = wide ? [...CORE_READ_IDS, ...STEPS_READ_IDS] : CORE_READ_IDS;
+      const setKey = wide ? HK_STEPS_SET_KEY : HK_SET_KEY;
       return shareAuthRequest(async () => {
         try {
           if (mod.isHealthDataAvailable && !(await step('available', () => mod.isHealthDataAvailable!()))) return false;
           // Fully determined (status 2 = unnecessary): a request would present
           // nothing — skip the native round-trip entirely.
           let st = 0;
-          try { st = (await step('status', () => mod.getRequestStatusForAuthorization?.(READ_IDS, WRITE_IDS))) ?? 0; } catch { st = 0; }
+          try { st = (await step('status', () => mod.getRequestStatusForAuthorization?.(readIds, WRITE_IDS))) ?? 0; } catch { st = 0; }
           const settled = st === 2;
-          if (settled && hasAskedAuth(HK_SET_KEY) && !force) { await ecgAuth(force); return true; }
+          if (settled && hasAskedAuth(setKey) && !force) { await ecgAuth(force); return true; }
           // The OS still has something to ask about: a fresh install, a type
           // added by an app update (the phone's workout read / the watch's
           // workout share both arrived this way), or a sheet the user swiped
@@ -583,8 +666,8 @@ function makeReal(mod: HkModule): HealthApi {
           if (!force && !settled && promptedThisLaunch()) return true;
           if (!settled) markPromptedThisLaunch();
           // v8 order: (read, write).
-          const ok = (await step('request', () => mod.requestAuthorization?.(READ_IDS, WRITE_IDS))) ?? false;
-          if (ok) markAskedAuth(HK_SET_KEY);
+          const ok = (await step('request', () => mod.requestAuthorization?.(readIds, WRITE_IDS))) ?? false;
+          if (ok) { markAskedAuth(setKey); if (wide) markAskedAuth(HK_SET_KEY); }
           // ECG sits outside the kingstinct set (local native module) — same
           // step, sequential so the two sheets can't race.
           await ecgAuth(force);
@@ -626,6 +709,50 @@ function makeReal(mod: HkModule): HealthApi {
         diastolic: diastolic != null ? Math.round(diastolic) : null,
         weightLb: weightKg != null ? Math.round(weightKg * 2.20462) : null,
         sleep,
+      };
+    },
+
+    async readDayLoad(dk) {
+      const start = dateAt(dk, '00:00');
+      const now = new Date();
+      const end = dateAt(dk, '23:59');
+      // Today stops at now; a past day runs to its end.
+      const to = now < end ? now : end;
+
+      const [steps, standMin, stepRows, hrPts] = await Promise.all([
+        sumQ(QID.steps, start, to, 'count'),
+        sumQ(QID.standTime, start, to, 'min'),
+        samplesQ(QID.steps, start, to),
+        // Raw and unthinned: the caller integrates over it. `limit: 0` for the
+        // same reason seriesQ documents — any positive limit silently returns
+        // the NEWEST N and drops the start of the day.
+        (async () => {
+          try {
+            const rows = (await mod.queryQuantitySamples?.(QID.heartRate, { from: start, to, limit: 0 })) || [];
+            const baseMs = start.getTime();
+            return rows
+              .map((r) => ({ t: Math.round((r.startDate.getTime() - baseMs) / 1000), bpm: r.quantity }))
+              .filter((q) => Number.isFinite(q.bpm) && q.bpm > 0)
+              .sort((a, b) => a.t - b.t);
+          } catch { return []; }
+        })(),
+      ]);
+
+      const baseMs = start.getTime();
+      const stepSpans = stepRows
+        .filter((r) => r.quantity > 0)
+        .map((r) => ({
+          startMin: Math.floor((r.startDate.getTime() - baseMs) / 60000),
+          endMin: Math.ceil(((r.endDate || r.startDate).getTime() - baseMs) / 60000),
+        }))
+        .filter((sp) => sp.endMin > sp.startMin);
+
+      return {
+        steps,
+        stepSpans: stepSpans.length ? stepSpans : null,
+        // A zero with no sample behind it is "no watch", not "did not stand".
+        standMin: standMin != null && standMin > 0 ? Math.round(standMin) : null,
+        hr: hrPts.length ? hrPts : null,
       };
     },
 

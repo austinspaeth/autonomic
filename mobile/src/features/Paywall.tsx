@@ -1,7 +1,8 @@
 /**
  * Pro paywall — an on-demand card sheet, not a wall. Freemium: the app is
  * always usable (journaling and live HRV capture are free forever, with no
- * daily cap); locked surfaces (Progress week/month/year, Insights, AI reports,
+ * daily cap); locked surfaces (Progress week/month/year, Insights, the pacing
+ * budget, AI reports,
  * POTS results) call usePaywall() to raise this card. It
  * dismisses with the sheet's ✕ / backdrop and closes itself the moment an
  * entitlement lands (purchase or restore).
@@ -134,10 +135,12 @@ export type PaywallSource =
   | 'progress'      // a locked Progress range: Week / Month / Year / custom
   | 'insights'      // the Insights tab's locked overlay
   | 'pots'          // a POTS result (the capture itself is free)
+  | 'pacing'        // the pacing budget's locked row, on the Journal itself
   | 'outlook-ai'    // the Outlook's AI report
   | 'metric-ai'     // a metric card's AI report
   | 'insights-ai'   // the Insights AI report
-  | 'settings';     // the Upgrade button in Settings — the one that isn't a wall
+  | 'settings'      // the Upgrade button in Settings — the one that isn't a wall
+  | 'plan-bar';     // the plan status tab hanging under the nav bar — not a wall either
 
 /**
  * Raise the paywall card from any locked surface.
@@ -146,20 +149,22 @@ export type PaywallSource =
  * REQUEST, not the render: the card is one sheet in a stack and a failed open
  * is still a user who met a wall. It is capped at one per Eastern day inside
  * `pingPaywall`, so this stays a plain call with no bookkeeping of its own.
+ *
+ * `plan` picks which plan the card opens on; yearly unless a surface asks.
  */
-export function usePaywall(source: PaywallSource): () => void {
+export function usePaywall(source: PaywallSource, plan: 'yearly' | 'monthly' = 'yearly'): () => void {
   const { openSheet } = useSheets();
   return React.useCallback(() => {
     pingPaywall(source);
-    openSheet((c) => <PaywallCard controls={c} />);
-  }, [openSheet, source]);
+    openSheet((c) => <PaywallCard controls={c} initialSku={plan === 'monthly' ? MONTHLY_SKU : YEARLY_SKU} />);
+  }, [openSheet, source, plan]);
 }
 
-export function PaywallCard({ controls }: { controls: SheetControls }) {
+export function PaywallCard({ controls, initialSku = YEARLY_SKU }: { controls: SheetControls; initialSku?: string }) {
   const p = usePalette();
   const { isPro, products, purchasing, error, blocked } = useIap();
   const { openSheet } = useSheets();
-  const [sku, setSku] = useState(YEARLY_SKU);
+  const [sku, setSku] = useState(initialSku);
 
   // Entitlement may have changed outside the purchase listener (e.g. returning
   // from the App Store subscribe sheet) — re-check whenever the card opens.
@@ -306,6 +311,7 @@ const SHARED_ROWS: string[] = [
 
 const PRO_ROWS: { label: string; freeText?: string; proText?: string }[] = [
   { label: 'Progress charts', freeText: '14 days', proText: 'All views' },
+  { label: 'Daily pacing budget' },
   { label: 'Full historical metric analysis' },
   { label: 'POTS test & episode results' },
   { label: 'AI insights & doctor reports' },

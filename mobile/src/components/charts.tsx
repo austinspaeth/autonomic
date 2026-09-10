@@ -6,12 +6,19 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { LayoutChangeEvent, Pressable, Text as RNText, View } from 'react-native';
 import Svg, {
-  Circle, Defs, G, Line, LinearGradient, Path, Rect, Stop, Text as SvgText,
+  Circle, Defs, G, Line, LinearGradient, Mask, Path, Rect, Stop, Text as SvgText,
 } from 'react-native-svg';
+import Reanimated, {
+  Easing as REasing2, useAnimatedProps, useAnimatedStyle, useSharedValue, withRepeat, withTiming,
+} from 'react-native-reanimated';
+import {
+  EMBER_GLOW_MAX, EMBER_GLOW_MIN, EMBER_GLOW_MS, EMBER_MS, emberStops,
+} from '../lib/ember';
 import { fmtNum, fmtShort } from '../lib/dates';
 import { GRADE_COLORS, TAIL_STYLE, fonts, radius, readoutTail, usePalette } from '../theme';
+import { hexA } from '../lib/color';
 import type { Band, ScoreCat } from '../lib/types';
-import { BANDS, catFromBands } from '../lib/scoring';
+import { BANDS, SCORE_COLORS, catFromBands } from '../lib/scoring';
 import { onDay, type BucketView } from '../lib/analysis/buckets';
 import { psdCurve } from '../lib/hrv';
 import { zoneFor, type HrZone } from '../lib/workoutZones';
@@ -202,11 +209,24 @@ export function Sparkline({ points, bands, height = 92, onSelect, showReadout = 
 /* ---------- Score gauge (270° arc) ---------- */
 // `track` overrides the ring behind the score arc. The default reads as a well
 // on a status-tinted card; the unscored card has no tint, so it passes a grey.
-export function ScoreGauge({ score, color, size = 176, track, marker, children }: {
+/** An SVG rect whose x can be driven from the UI thread. The ember's drift is
+ *  one animated attribute; everything else about the gauge stays static. */
+const AnimatedRect = Reanimated.createAnimatedComponent(Rect);
+
+export function ScoreGauge({ score, color, size = 176, track, marker, ember, children }: {
   score: number;
   color: string;
   size?: number;
   track?: string;
+  /**
+   * Run the pacing bar's ember along the arc.
+   *
+   * Reserved for a Compromised day or worse. It is the same object in the same
+   * card as the over-budget bar below it, so it has to be the same motion at
+   * the same speed in the day's own colour: two different slow animations on
+   * one card would read as decoration rather than as a state.
+   */
+  ember?: boolean;
   /**
    * A tick across the ring at `score`. Used by the Insights day-one explainer to show
    * where the comparison started, so the arc carries both numbers instead of the sheet
@@ -237,14 +257,72 @@ export function ScoreGauge({ score, color, size = 176, track, marker, children }
   const mAt = (rad: number): [number, number] => { const a = (mDeg * Math.PI) / 180; return [cx + rad * Math.cos(a), cy + rad * Math.sin(a)]; };
   const [mx0, my0] = mAt(r - sw / 2 - 3);
   const [mx1, my1] = mAt(r + sw / 2 + 3);
+
+  /* The ember. Same rules as the pacing bar's (see ./ember): the pattern is
+     doubled and periodic, and it travels EXACTLY one period before snapping
+     back, so the loop has no seam. Here the period is the gauge's own width,
+     which is known rather than measured. The drifting rectangle is clipped to
+     the arc by a mask, so the arc's own shape and cap stay authoritative. */
+  const shift = useSharedValue(0);
+  const glow = useSharedValue(1);
+  useEffect(() => {
+    if (!ember) { shift.value = 0; glow.value = 1; return; }
+    shift.value = 0;
+    shift.value = withRepeat(withTiming(1, { duration: EMBER_MS, easing: REasing2.linear }), -1, false);
+    glow.value = EMBER_GLOW_MIN;
+    glow.value = withRepeat(
+      withTiming(EMBER_GLOW_MAX, { duration: EMBER_GLOW_MS, easing: REasing2.inOut(REasing2.quad) }),
+      -1, true,
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ember]);
+  const emberProps = useAnimatedProps(() => ({ x: -shift.value * size }));
+  const glowStyle = useAnimatedStyle(() => ({ opacity: glow.value }));
+  const uid = React.useMemo(() => Math.random().toString(36).slice(2, 8), []);
+  const gid = `gaugeEmber${uid}`;
+  const mid = `gaugeMask${uid}`;
+  const stops = React.useMemo(() => emberStops(color), [color]);
+
+  const glowArc = (
+    <Path d={arc(frac)} fill="none" stroke={color} strokeWidth={sw + 7} strokeLinecap="round" opacity={0.16} />
+  );
+
   return (
     <View style={{ width: size, height: size }} pointerEvents="none">
+      {/* The halo, lifted out of the static Svg only when it has to breathe.
+          Same figure either way — a wider, low-alpha copy of the arc. */}
+      {ember && frac > 0 ? (
+        <Reanimated.View style={[{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }, glowStyle]}>
+          <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>{glowArc}</Svg>
+        </Reanimated.View>
+      ) : null}
       <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
         <Path d={arc(1)} fill="none" stroke={track || p.gaugeTrack} strokeWidth={sw} strokeLinecap="round" />
         {frac > 0 ? (
           <>
-            <Path d={arc(frac)} fill="none" stroke={color} strokeWidth={sw + 7} strokeLinecap="round" opacity={0.16} />
+            {ember ? null : glowArc}
             <Path d={arc(frac)} fill="none" stroke={color} strokeWidth={sw} strokeLinecap="round" />
+            {ember ? (
+              <>
+                <Defs>
+                  <LinearGradient id={gid} x1="0" y1="0" x2="1" y2="0">
+                    {stops.map((st) => <Stop key={st.offset} offset={st.offset} stopColor={st.color} />)}
+                  </LinearGradient>
+                  <Mask id={mid} maskUnits="userSpaceOnUse" x={0} y={0} width={size} height={size}>
+                    <Path d={arc(frac)} fill="none" stroke="#fff" strokeWidth={sw} strokeLinecap="round" />
+                  </Mask>
+                </Defs>
+                <G mask={`url(#${mid})`}>
+                  <AnimatedRect
+                    animatedProps={emberProps}
+                    y={0}
+                    width={size * 2}
+                    height={size}
+                    fill={`url(#${gid})`}
+                  />
+                </G>
+              </>
+            ) : null}
           </>
         ) : null}
         {marker ? (
@@ -256,6 +334,133 @@ export function ScoreGauge({ score, color, size = 176, track, marker, children }
       </View>
     </View>
   );
+}
+
+
+/* ---------- Budget margin: columns hanging off a ceiling at zero ---------- */
+
+/**
+ * How much room each day had left over, against what that day could absorb.
+ *
+ * A zero-line column chart rather than a line: over and under are opposite
+ * DIRECTIONS from a ceiling, not two colours of the same shape, and a line
+ * crossing an axis reads as a value passing through zero rather than as a day
+ * that ran out. The ceiling is the only solid rule on the chart; every other
+ * gridline is dashed and recessive, because zero is the one number here that
+ * means something.
+ *
+ * Null days are simply absent — a day the app could not describe leaves a gap,
+ * never a zero-height bar sitting on the ceiling, which would read as a day
+ * that landed exactly on budget.
+ */
+export function MarginColumns({ values, labels, height = 184, onSelect }: {
+  values: (number | null)[];
+  labels: string[];
+  height?: number;
+  onSelect?: (i: number | null) => void;
+}) {
+  const p = usePalette();
+  const [sel, setSel] = useState<number | null>(null);
+  const [layoutW, setLayoutW] = useState(0);
+  const W = 344, padL = 30, padR = 6, padB = 18, padT = 8;
+  const n = values.length;
+  const present = values.filter((v): v is number => v != null);
+  if (!present.length || n < 2) return null;
+
+  // The scale always contains zero: a chart of margins whose axis starts above
+  // it would hide the very thing it is drawn to show.
+  const hi = Math.max(0, ...present);
+  const lo = Math.min(0, ...present);
+  const pad = Math.max(20, (hi - lo) * 0.12);
+  const max = hi + pad;
+  const min = lo - pad;
+
+  const x = (i: number) => padL + (i / (n - 1)) * (W - padL - padR);
+  const y = (v: number) => padT + (1 - (v - min) / (max - min)) * (height - padT - padB);
+  const spacing = (W - padL - padR) / Math.max(1, n - 1);
+  const bw = Math.max(1.5, Math.min(15, spacing * 0.62));
+
+  /** A couple of round gridlines either side of zero, plus zero itself. */
+  const step = niceStep((max - min) / 4);
+  const ticks: number[] = [0];
+  for (let v = step; v <= max; v += step) ticks.push(v);
+  for (let v = -step; v >= min; v -= step) ticks.push(v);
+
+  const labelAt = [0, Math.round((n - 1) / 3), Math.round(((n - 1) * 2) / 3), n - 1]
+    .filter((v, i, arr) => arr.indexOf(v) === i);
+
+  const pick = (px: number) => {
+    if (layoutW <= 0) return;
+    const i = Math.max(0, Math.min(n - 1, Math.round((((px / layoutW) * W) - padL) / spacing)));
+    if (values[i] == null) return;
+    setSel(i);
+    onSelect?.(i);
+  };
+
+  return (
+    <View
+      onLayout={(e) => setLayoutW(e.nativeEvent.layout.width)}
+      onStartShouldSetResponder={() => true}
+      onMoveShouldSetResponder={() => true}
+      onResponderGrant={(e) => pick(e.nativeEvent.locationX)}
+      onResponderMove={(e) => pick(e.nativeEvent.locationX)}
+      onResponderRelease={() => { setSel(null); onSelect?.(null); }}
+      style={{ height }}
+    >
+      <Svg width="100%" height="100%" viewBox={`0 0 ${W} ${height}`} preserveAspectRatio="none">
+        {ticks.map((v) => (
+          <G key={`a${v}`}>
+            <Line
+              x1={padL} x2={W - padR} y1={y(v)} y2={y(v)}
+              stroke={v === 0 ? hexA(p.text, 0.26) : hexA(p.text, 0.05)}
+              strokeWidth={v === 0 ? 1.4 : 1}
+              strokeDasharray={v === 0 ? undefined : '3 5'}
+            />
+            <SvgText
+              x={padL - 6} y={y(v) + 3.5} textAnchor="end"
+              fill={v === 0 ? hexA(p.text, 0.66) : p.textDim}
+              fontSize={9} fontWeight={v === 0 ? '700' : '400'} fontFamily={fonts.numMed}
+            >
+              {v > 0 ? `+${Math.round(v)}` : String(Math.round(v))}
+            </SvgText>
+          </G>
+        ))}
+        {values.map((v, i) => {
+          if (v == null) return null;
+          const y0 = y(0), y1 = y(v);
+          const up = v >= 0;
+          // Today reads at full strength and the days behind it sit back, so
+          // the eye lands on now without the colours changing meaning.
+          const dim = sel == null ? i === n - 1 : i === sel;
+          return (
+            <Rect
+              key={`b${i}`}
+              x={x(i) - bw / 2} y={up ? y1 : y0}
+              width={bw} height={Math.max(2, Math.abs(y1 - y0))} rx={Math.min(4, bw / 2)}
+              fill={up ? SCORE_COLORS.good : p.accent}
+              opacity={dim ? 1 : 0.82}
+            />
+          );
+        })}
+        {labelAt.map((i) => (
+          <SvgText
+            key={`x${i}`} x={x(i)} y={height - 4}
+            textAnchor={i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle'}
+            fill={p.textDim} fontSize={9} fontFamily={fonts.numMed}
+          >
+            {labels[i] || ''}
+          </SvgText>
+        ))}
+      </Svg>
+    </View>
+  );
+}
+
+/** 1 / 2 / 5 x 10^n, so the gridlines land on numbers a reader recognises. */
+function niceStep(raw: number): number {
+  const pow = Math.pow(10, Math.floor(Math.log10(Math.max(1, raw))));
+  const n = raw / pow;
+  return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * pow;
 }
 
 /* ---------- Power bar (VLF / LF / HF) ---------- */

@@ -7,5 +7,11 @@
       <key>NSExtensionPointIdentifier</key>
       <string>com.apple.widgetkit-extension</string>
     </dict>
+    <!-- Manrope ExtraBold for the pacing widgets' figures, matching the phone
+         app's metric numerals (fonts.numHeavy). -->
+    <key>UIAppFonts</key>
+    <array>
+      <string>Manrope_800ExtraBold.ttf</string>
+    </array>
   </dict>
 </plist>

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Dimensions, Platform, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { AppState, Dimensions, Platform, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import Animated, { Easing, Extrapolation, interpolate, runOnJS, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Screen, headerHeight } from '../../src/components/Header';
@@ -10,9 +10,11 @@ import { JournalSections } from '../../src/features/JournalSections';
 import { useCaptureDeepLink } from '../../src/features/forms';
 import { Calendar } from '../../src/features/Calendar';
 import { requestHealthUpdateCheck } from '../../src/features/HealthUpdates';
+import { refreshDayLoad, refreshDayLoadOnFocus } from '../../src/store/budget';
 import { usePalette } from '../../src/theme';
 import { fmtDateLong, todayKey } from '../../src/lib/dates';
 import { getCurrentKey, registerJournalScroller, setCurrentKey, shiftCurrent, useCurrentKey } from '../../src/store/nav';
+import { useFocusEffect } from 'expo-router';
 
 // Date changes echo the tab-switch motion (TAB_TRANSITION in _layout.tsx) but
 // run it strictly in sequence so the two days never overlap: the current day
@@ -44,13 +46,43 @@ const DayContent = React.memo(function DayContent({ dk }: { dk: string }) {
   );
 });
 
+/** The pacing budget's half of pull-to-refresh. Forced, because the gesture is
+ *  the user asking for it and the staleness window is for the automatic
+ *  checks. */
+const pullBudget = () => { void refreshDayLoad(undefined, { force: true }); };
+
 export default function JournalScreen() {
   const p = usePalette();
   const dk = useCurrentKey();
-  const { openSheet } = useSheets();
+  const { openSheet, depth } = useSheets();
   const isToday = dk === todayKey();
   // Home-screen widgets' Start HRV buttons land here (autonomic://?capture=hrv).
   useCaptureDeepLink();
+  // Arriving on the Journal is the moment the pacing strip is actually looked
+  // at. AppState alone does not see it: coming back from Progress foregrounds
+  // nothing, and the bar would carry whatever the last tick left it with.
+  useFocusEffect(useCallback(() => { refreshDayLoadOnFocus(); }, []));
+
+  // Coming back to the app lands on today, not on whichever past day was being
+  // browsed when it was left. Only a real trip to the BACKGROUND counts:
+  // pulling down Control Center or a system alert passes through 'inactive'
+  // and should not throw away the day being read. A sheet left open is a task
+  // in progress (a back-dated entry form writes to its own day either way), so
+  // the day beneath it is left alone rather than swapped out under the card.
+  const depthRef = useRef(depth);
+  depthRef.current = depth;
+  useEffect(() => {
+    let wasBackground = false;
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s === 'background') { wasBackground = true; return; }
+      if (s !== 'active' || !wasBackground) return;
+      wasBackground = false;
+      if (depthRef.current > 0) return;
+      const t = todayKey();
+      if (getCurrentKey() !== t) setCurrentKey(t);
+    });
+    return () => sub.remove();
+  }, []);
 
   // Content renders `shownDk`, which trails `dk` by one out-animation.
   const [shownDk, setShownDk] = useState(dk);
@@ -70,7 +102,7 @@ export default function JournalScreen() {
   const pullScroll = useAnimatedScrollHandler({
     onScroll: (e) => { pullY.value = e.contentOffset.y; },
     onEndDrag: (e) => {
-      if (e.contentOffset.y <= -PULL_TRIGGER) runOnJS(requestHealthUpdateCheck)();
+      if (e.contentOffset.y <= -PULL_TRIGGER) { runOnJS(requestHealthUpdateCheck)(); runOnJS(pullBudget)(); }
     },
   });
   // The graphic is anchored at the header's bottom edge and counter-translated
@@ -98,6 +130,7 @@ export default function JournalScreen() {
   const androidRefresh = () => {
     setRefreshing(true);
     requestHealthUpdateCheck();
+    pullBudget();
     // The spinner only acknowledges the gesture — the pill shows real progress.
     setTimeout(() => setRefreshing(false), 700);
   };

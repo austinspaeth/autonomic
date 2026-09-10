@@ -1,9 +1,19 @@
 /**
  * "Measuring with" picker — the one place you choose where the heartbeat signal
  * comes from. Lists the available sources (Bluetooth strap, Apple Watch on iOS,
- * other watch brands, phone camera) and, in the same view, scans for nearby BLE
- * heart-rate straps so adding a device never means a detour into Settings.
- * Tapping a nearby device remembers it and selects Bluetooth in one go.
+ * other watch brands, phone camera).
+ *
+ * A source that needs a DEVICE behind it (the strap, a linked Garmin) is two
+ * targets in one row: the left of the row selects it, and a "Set up" link on the
+ * right opens that device's own card — the strap scanner (`DevicesScreen`) or the
+ * brand's setup. Choosing a source and swapping the device behind it are
+ * different questions, and a row that only selects strands anyone who owns a
+ * second strap. Selecting a strap source with nothing paired goes straight to the
+ * scanner, since choosing a sensor you don't own yet is only half an answer.
+ *
+ * The strap scan itself lives on that card, never here: this sheet is about
+ * which KIND of sensor, and a live list of nearby Bluetooth devices under the
+ * camera and watch rows was noise for everyone not using a strap.
  *
  * The list is GROUPED BY ACCURACY TIER, and that is the only ranking it draws.
  * With five watch brands, a strap and the camera, an accuracy pill on every row
@@ -17,34 +27,20 @@
  * Opened from the HRV setup card's "Change" link; picking closes it and reports
  * back to that card.
  */
-import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Platform, Pressable, Text, View } from 'react-native';
 import { useSheets, type SheetControls } from '../../components/Sheet';
-import { useToast } from '../../components/Toast';
 import { Icon } from '../../components/Icon';
 import { radius, usePalette } from '../../theme';
-import { ble } from '../../lib/ble/manager';
-import { sortDevices, type BleDevice } from '../../lib/ble/devices';
 import { garminDevices, subscribeGarminDevices, type GarminDevice } from '../../lib/garmin/receiver';
 import { health } from '../../lib/health';
-import { getState, save, useStore } from '../../store/store';
-import { partitionStraps } from '../../lib/watch/brands';
+import { useStore } from '../../store/store';
+import { DevicesScreen } from '../Devices';
 import { brandTag, hasOtherWatches, openBrandSetup, otherWatchesSub, otherWatchesTitle, PickerRow } from './WatchBrands';
 
 export type Source = 'polar' | 'watch' | 'garmin' | 'camera';
 
 const CLOSE_CLEARANCE = 58;
-const SCAN_MS = 12000;
-
-/** Shown when a scan finishes empty — also used by Settings → Devices. Straps
- *  are found by their advertisement, so the three ways to be invisible are: not
- *  broadcasting (dry/not worn), already held by the OS or another app, or out
- *  of battery. Naming them beats "no straps found", which reads as "unsupported". */
-export const NO_STRAPS_HINT =
-  'No straps found. Three things make a strap invisible:\n\n'
-  + '·  It is not broadcasting — wet the electrodes and put the strap on, then scan again.\n'
-  + '·  Something else is holding it — unpair it in system Bluetooth settings and quit other heart-rate apps.\n'
-  + '·  Its battery is flat.';
 
 /** The accuracy ladder, best first. It is a TABLE rather than a pill on each
  *  row because two surfaces rank these sources — this sheet and the welcome
@@ -81,54 +77,24 @@ export function SourcePicker({ value, onPick, controls }: {
   value: Source; onPick: (s: Source) => void; controls: SheetControls;
 }) {
   const p = usePalette();
-  const toast = useToast();
   const { openSheet } = useSheets();
   const savedName = useStore((s) => s.state.settings.lastBleDeviceName);
   const savedId = useStore((s) => s.state.settings.lastBleDeviceId);
-  const [scanning, setScanning] = useState(false);
-  const [scanned, setScanned] = useState(false);
-  /** Why the last scan could not run (adapter off, permission denied). */
-  const [blocked, setBlocked] = useState<string | null>(null);
-  const [found, setFound] = useState<BleDevice[]>([]);
-  const mgr = useRef(ble()).current;
-  const stopTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Mirrored locally: a device set up from a card stacked on top selects its
+  // source WITHOUT closing this sheet, and `value` is the snapshot this sheet
+  // was opened with, so the check would otherwise stay on the old row.
+  const [picked, setPicked] = useState(value);
 
-  const startScan = async () => {
-    if (!mgr.available) { toast('Bluetooth needs a development build'); return; }
-    // Before any await: this sheet scans on open, so a bail-out that left
-    // `scanned` false rendered an empty panel with no explanation at all.
-    setFound([]);
-    setBlocked(null);
-    setScanned(true);
-    const state = await mgr.ready();
-    if (!state.ok) { setBlocked(state.message); return; }
-    const ok = await mgr.requestPermissions();
-    if (!ok) { setBlocked('Bluetooth permission denied. Allow it for Autonomic in system Settings, then scan again.'); return; }
-    setScanning(true);
-    await mgr.scan((d) => setFound((prev) => (prev.some((x) => x.id === d.id) ? prev : sortDevices([...prev, d]))));
-    stopTimer.current = setTimeout(() => { mgr.stopScan(); setScanning(false); }, SCAN_MS);
-  };
+  const select = (s: Source) => { setPicked(s); onPick(s); };
+  const choose = (s: Source) => { select(s); controls.close(); };
 
-  // Scan as soon as the sheet opens: the whole point of listing devices here is
-  // that a strap you just switched on shows up without another tap.
-  useEffect(() => {
-    startScan();
-    return () => {
-      if (stopTimer.current) clearTimeout(stopTimer.current);
-      mgr.stopScan();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const choose = (s: Source) => { onPick(s); controls.close(); };
-
-  const pair = (d: BleDevice) => {
-    getState().settings.lastBleDeviceId = d.id;
-    getState().settings.lastBleDeviceName = d.name;
-    save();
-    toast(`Saved ${d.name}`);
-    choose('polar');
-  };
+  // The strap scanner, as a card of its own. Pairing a strap there closes it
+  // (its `controls.close`) and selects Bluetooth here; its ✕ backs out without
+  // changing anything, because that is the sheet's own close, not this one.
+  const setUpStrap = () => openSheet((c) => (
+    <DevicesScreen controls={{ ...c, close: () => { c.close(); select('polar'); } }} />
+  ));
+  const pickStrap = () => (savedId ? choose('polar') : setUpStrap());
 
   const showWatch = Platform.OS === 'ios' && health().available;
   // A linked Garmin is a SOURCE (it delivers raw beat-to-beat straight to us);
@@ -143,14 +109,7 @@ export function SourcePicker({ value, onPick, controls }: {
   useEffect(() => subscribeGarminDevices(setGarmin), []);
   const linkedGarmin = garmin[0];
   const showBrands = hasOtherWatches();
-  // A remembered strap is already listed as the Bluetooth source; don't repeat
-  // it in the nearby list.
-  // A watch broadcasting its heart rate advertises exactly like a strap, but
-  // sends no beat-to-beat intervals — pairing one here yields a reading that
-  // cannot be scored. They are pulled out and pointed at the proper route.
-  const { straps, watches } = partitionStraps(found);
-  const nearby = straps.filter((d) => d.id !== savedId);
-  const watchesSeen = watches.length > 0;
+  const setUpGarmin = () => openBrandSetup(openSheet, () => select('garmin'));
 
   return (
     <View>
@@ -161,41 +120,35 @@ export function SourcePicker({ value, onPick, controls }: {
         Where the heartbeat signal comes from.
       </Text>
 
-
       <TierLabel text={TIER_LABEL.best} />
-      <SourceRow source="polar" sub={sourceSub('polar', savedName)} active={value === 'polar'} onPress={() => choose('polar')} />
+      <SourceRow source="polar" sub={sourceSub('polar', savedName)} active={picked === 'polar'} onPress={pickStrap} onSetUp={setUpStrap} />
 
       {showWatch || linkedGarmin || showBrands ? (
         <>
           <TierLabel text={TIER_LABEL.high} top />
           <View style={{ gap: 8 }}>
             {showWatch ? (
-              <SourceRow source="watch" sub={sourceSub('watch', savedName)} active={value === 'watch'} onPress={() => choose('watch')} />
+              <SourceRow source="watch" sub={sourceSub('watch')} active={picked === 'watch'} onPress={() => choose('watch')} />
             ) : null}
             {linkedGarmin ? (
-              // Set up and done with: the row is now a plain source, and setup
-              // moves into its sub-line as a link — a "Set up" button beside a
-              // watch that IS set up asks the user to redo the thing they
-              // finished, and hides the fact that the row can now be chosen.
               <SourceRow
                 source="garmin"
                 sub={sourceSub('garmin', linkedGarmin.name)}
-                active={value === 'garmin'}
+                active={picked === 'garmin'}
                 onPress={() => choose('garmin')}
-                link={{ label: 'Set up', onPress: () => openBrandSetup(openSheet, () => onPick('garmin')) }}
+                onSetUp={setUpGarmin}
               />
-            ) : null}
-            {/* Not a source — a setup task, so the row says so and opens the
-                brand's own card rather than selecting anything. It goes STRAIGHT
-                to setup: with one brand built, the list card in between was a
-                screen that existed only to be tapped through. */}
-            {showBrands ? (
+            ) : showBrands ? (
+              // Not a source yet — a setup task, so the whole row opens the
+              // brand's own card rather than selecting anything. It goes
+              // STRAIGHT to setup: with one brand built, the list card in
+              // between was a screen that existed only to be tapped through.
               <PickerRow
                 icon="watch"
                 title={otherWatchesTitle()}
                 tag={brandTag()}
                 sub={otherWatchesSub()}
-                onPress={() => openBrandSetup(openSheet, () => onPick('garmin'))}
+                onPress={setUpGarmin}
               >
                 <Text style={{ color: p.accent, fontSize: 13, fontWeight: '700' }}>Set up</Text>
               </PickerRow>
@@ -205,68 +158,13 @@ export function SourcePicker({ value, onPick, controls }: {
       ) : null}
 
       <TierLabel text={TIER_LABEL.lower} top />
-      <SourceRow source="camera" sub={sourceSub('camera', savedName)} active={value === 'camera'} onPress={() => choose('camera')} />
-
-      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 24, marginBottom: 10 }}>
-        <Text style={{ flex: 1, fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.6, color: p.textDim, fontWeight: '700' }}>Nearby straps</Text>
-        {scanning ? (
-          <ActivityIndicator size="small" color={p.accent} />
-        ) : (
-          <Pressable onPress={startScan} hitSlop={8}><Text style={{ color: p.accent, fontSize: 13, fontWeight: '700' }}>{scanned ? 'Scan again' : 'Scan'}</Text></Pressable>
-        )}
-      </View>
-
-      {nearby.length ? (
-        <View style={{ gap: 8 }}>
-          {nearby.map((d) => (
-            <Pressable
-              key={d.id}
-              onPress={() => pair(d)}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: radius.control, borderWidth: 1, borderColor: p.border, backgroundColor: p.surface2 }}
-            >
-              <Icon name="bluetooth" size={20} color={p.textDim} />
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: p.text, fontWeight: '700' }}>{d.name}</Text>
-                <Text style={{ color: p.textDim, fontSize: 12, marginTop: 3 }}>{d.connected ? 'Already connected to this phone' : `Signal ${d.rssi} dBm`}</Text>
-              </View>
-              <Text style={{ color: p.accent, fontSize: 13, fontWeight: '700' }}>Use</Text>
-            </Pressable>
-          ))}
-        </View>
-      ) : (
-        <Text style={{ color: p.textDim, fontSize: 13, lineHeight: 19 }}>
-          {scanning
-            ? 'Looking for heart-rate straps. Put yours on and make sure it is not connected to another app.'
-            : !scanned
-              ? 'Tap Scan to look for heart-rate straps nearby.'
-              // `nearby` hides the remembered strap, so an empty list here still
-              // means success when the scan did find it — don't cry wolf.
-              : found.length
-                ? 'Your saved strap is listed above. No other straps nearby.'
-                : blocked ?? NO_STRAPS_HINT}
-        </Text>
-      )}
-
-      {watchesSeen ? (
-        <Text style={{ color: p.textDim, fontSize: 13, lineHeight: 19, marginTop: 10 }}>
-          {/* The REASON always holds — broadcast mode cannot be scored however
-              the app is configured — but the pointer only holds while the row
-              it points at is on screen. With the brands row held back, "set it
-              up under Other watches" sends the user looking for something that
-              is not there, which reads as a bug in the sheet rather than as a
-              feature that has not shipped. */}
-          {showBrands
-            ? 'A watch is broadcasting its heart rate nearby. Set it up under Other watches instead. Broadcast mode sends a pulse rate only, without the beat-to-beat detail an HRV reading needs.'
-            : 'A watch is broadcasting its heart rate nearby. It cannot be used for a reading: broadcast mode sends a pulse rate only, without the beat-to-beat detail an HRV reading needs.'}
-        </Text>
-      ) : null}
+      <SourceRow source="camera" sub={sourceSub('camera')} active={picked === 'camera'} onPress={() => choose('camera')} />
       <View style={{ height: 16 }} />
     </View>
   );
 }
 
-/** One accuracy tier's heading. Same treatment as the "Nearby straps" label
- *  below it — this sheet has one kind of section label, not two. */
+/** One accuracy tier's heading. */
 function TierLabel({ text, top }: { text: string; top?: boolean }) {
   const p = usePalette();
   return (
@@ -274,31 +172,53 @@ function TierLabel({ text, top }: { text: string; top?: boolean }) {
   );
 }
 
-function SourceRow({ source, sub, active, onPress, link }: {
+function SourceRow({ source, sub, active, onPress, onSetUp }: {
   source: Source; sub: string; active: boolean; onPress: () => void;
-  /** Optional second action in the sub-line (e.g. "Set up" on a linked watch):
-   *  choosing a source and re-opening its setup are different questions, and a
-   *  row that only selects strands anyone who needs the second one. */
-  link?: { label: string; onPress: () => void };
+  /** The device behind this source has a card of its own. Given, the row splits
+   *  into two targets: the left selects, a "Set up" link on the right opens the
+   *  card, and a selected row puts a hairline between that link and its check
+   *  so the two never read as one control. */
+  onSetUp?: () => void;
 }) {
   const p = usePalette();
   const meta = SOURCE_META[source];
+  const check = <Icon name="check" size={18} color={p.accent} />;
   return (
-    <Pressable onPress={onPress} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: radius.control, borderWidth: 1, borderColor: active ? p.accent : p.border, backgroundColor: active ? p.accentSoft : p.surface2 }}>
-      <Icon name={meta.icon} size={22} color={active ? p.accent : p.textDim} />
-      <View style={{ flex: 1, minWidth: 0 }}>
-        {/* No accuracy pill: the tier heading above the row already said it. */}
-        <Text style={{ color: active ? p.accent : p.text, fontWeight: '700' }}>{meta.title}</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
-          <Text style={{ flexShrink: 1, color: p.textDim, fontSize: 12, lineHeight: 17 }}>{sub}</Text>
-          {link ? (
-            <Pressable onPress={link.onPress} hitSlop={10} accessibilityRole="button" accessibilityLabel={link.label}>
-              <Text style={{ color: p.accent, fontSize: 12, lineHeight: 17, fontWeight: '700' }}>{link.label}</Text>
-            </Pressable>
+    <View style={{ flexDirection: 'row', borderRadius: radius.control, borderWidth: 1, borderColor: active ? p.accent : p.border, backgroundColor: active ? p.accentSoft : p.surface2 }}>
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="radio"
+        accessibilityState={{ selected: active }}
+        style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, paddingRight: onSetUp ? 6 : 14 }}
+      >
+        <Icon name={meta.icon} size={22} color={active ? p.accent : p.textDim} />
+        <View style={{ flex: 1, minWidth: 0 }}>
+          {/* No accuracy pill: the tier heading above the row already said it. */}
+          <Text style={{ color: active ? p.accent : p.text, fontWeight: '700' }}>{meta.title}</Text>
+          <Text style={{ color: p.textDim, fontSize: 12, lineHeight: 17, marginTop: 4 }}>{sub}</Text>
+        </View>
+        {!onSetUp && active ? check : null}
+      </Pressable>
+      {onSetUp ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', paddingRight: 14 }}>
+          {/* Full row height, so the link's target is the whole right edge of
+              the row and not just the height of its text. */}
+          <Pressable
+            onPress={onSetUp}
+            accessibilityRole="button"
+            accessibilityLabel={`Set up ${meta.title}`}
+            style={{ alignSelf: 'stretch', justifyContent: 'center', paddingHorizontal: 8 }}
+          >
+            <Text style={{ color: p.accent, fontSize: 13, fontWeight: '700' }}>Set up</Text>
+          </Pressable>
+          {active ? (
+            <>
+              <View style={{ width: 1, height: 18, backgroundColor: p.border, marginLeft: 4, marginRight: 12 }} />
+              {check}
+            </>
           ) : null}
         </View>
-      </View>
-      {active ? <Icon name="check" size={18} color={p.accent} /> : null}
-    </Pressable>
+      ) : null}
+    </View>
   );
 }

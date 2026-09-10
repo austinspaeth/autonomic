@@ -265,7 +265,7 @@ WHAT'S FREE, WHAT'S PRO
 
 Free forever: unlimited live HRV captures, POTS stand tests and episode captures (Apple Watch or chest strap), journaling (sleep, meds, symptoms, triggers, hydration, meals), manual readings, your daily Autonomic Score and outlook, the Apple Watch heart-rate monitor, 14 days of charts, and full export.
 
-Autonomic Pro adds: week / month / year progress views, full historical metric analysis, on-device Insights, POTS test and episode results, and AI doctor reports.
+Autonomic Pro adds: your daily pacing budget, week / month / year progress views, full historical metric analysis, on-device Insights, POTS test and episode results, and AI doctor reports.
 
 Pro is $7.99/month or $49.99/year, billed to your Apple ID and renewing automatically until cancelled. Cancel anytime in your App Store settings.
 
@@ -401,7 +401,7 @@ WHAT'S FREE, WHAT'S PRO
 
 Free forever: unlimited live HRV captures, POTS stand tests and episode captures from a chest strap, journaling (sleep, meds, symptoms, triggers, hydration, meals, activities), manual readings (blood pressure, resting heart rate, episodes), your daily Autonomic Score and outlook, 14 days of progress charts, and backup and export.
 
-Autonomic Pro adds: week / month / year progress views, full historical metric analysis, on-device Insights, POTS test and episode results, and AI doctor reports.
+Autonomic Pro adds: your daily pacing budget, week / month / year progress views, full historical metric analysis, on-device Insights, POTS test and episode results, and AI doctor reports.
 
 Pro is $7.99 per month or $49.99 per year, billed through Google Play. Subscriptions renew automatically until cancelled; manage or cancel anytime in Google Play → Subscriptions.
 

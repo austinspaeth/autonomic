@@ -286,8 +286,13 @@ function PpgCameraInner({ preview }: { preview?: number }) {
       // Toggling put both calls in exactly the wrong places — `setFrameProcessor`
       // when the stream starts, and `removeFrameProcessor` from `ppg().stop()`,
       // which fires during teardown while the card that owns this view is being
-      // dismissed. Passing it unconditionally leaves `onViewReady` (native view
-      // demonstrably alive) as the only call into the proxy.
+      // dismissed. Passing it unconditionally leaves `onViewReady` as the
+      // only call into the proxy — a much narrower window, but still a race:
+      // this view is mounted and unmounted by the setup card's own wizard
+      // state, so backing out of (or closing) the flash step in the frame or
+      // two before JS answers still crashed. That last one cannot be closed
+      // from JS, so it is closed in the proxy itself — see
+      // plugins/withVisionCameraViewRace.js.
       //
       // Nothing is lost by leaving it on: `isActive={running}` means CameraX
       // isn't streaming while stopped, so the worklet is not called, and

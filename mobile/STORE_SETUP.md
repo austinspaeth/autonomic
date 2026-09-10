@@ -204,11 +204,16 @@ app**:
 - **Government apps** — No.
 - **Financial features** — No.
 - **Health apps** — declare **Health Connect** usage here. Justification: HRV,
-  resting HR, sleep and blood pressure are **read** to display and grade in the
-  user's own on-device journal. HRV, heart rate, resting HR and blood pressure
-  are **written back** only when the user explicitly saves a reading; **sleep is
-  read-only**. No transmission, no ads, no analytics, no sharing. (Source of
-  truth: `READ_TYPES` / `WRITE_TYPES` in `src/lib/health/healthConnect.ts`.)
+  resting HR, sleep, blood pressure and **steps** are **read** to display and
+  grade in the user's own on-device journal, and steps additionally feed the
+  pacing budget's estimate of what the day has cost. HRV, heart rate, resting HR
+  and blood pressure are **written back** only when the user explicitly saves a
+  reading; **sleep and steps are read-only**. No transmission, no ads, no
+  analytics, no sharing. (Source of truth: `READ_TYPES` / `WRITE_TYPES` in
+  `src/lib/health/healthConnect.ts`.)
+  **New in 1.28.0: `Steps`.** It must be added to the data-type declaration form
+  before that release ships or Play rejects it. See
+  `ANDROID_HEALTH_PERMISSIONS.md`.
 - **Privacy policy** — https://autonomic.care/privacy-policy/
 
 ### 5.3 Data safety

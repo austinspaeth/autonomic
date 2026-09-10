@@ -347,3 +347,49 @@ describe('migrate: idempotence', () => {
     expect(migrate(JSON.parse(JSON.stringify(once)))).toEqual(once);
   });
 });
+
+/**
+ * The pacing budget writes `days[dk].load` once, on the day itself, and can
+ * never write it again: `refreshDayLoad` reads today only. A cleaner that
+ * dropped the field therefore erased every past day's pacing on the next
+ * launch, which is exactly how the app came to forget what yesterday cost.
+ */
+describe('migrate: day load', () => {
+  const load = {
+    steps: 8432,
+    walkingMin: 74,
+    standMin: null,
+    stillUprightMin: 121,
+    uprightSpans: [{ startMin: 540, endMin: 560, kind: 'walk' }, { startMin: 700, endMin: 760, kind: 'still' }],
+    hrAboveMin: 96,
+    hrBands: [60, 30, 6],
+    hrBelowMin: 210,
+    hrCoverageMin: 812,
+    hrStretches: 5,
+    longestStretch: { startMin: 700, endMin: 745 },
+    peakBpm: 141,
+    lineBpm: 84,
+    readAt: '2026-09-09T21:04:00.000Z',
+  };
+
+  it('survives a relaunch intact', () => {
+    const out = migrate({ meta: { sleepReframed: true }, days: { '2026-09-09': { load } } });
+    expect(out.days['2026-09-09'].load).toEqual(load);
+  });
+
+  it('keeps null as unknown rather than coercing it to zero', () => {
+    const out = migrate({ meta: { sleepReframed: true }, days: { '2026-09-09': { load: { steps: null } } } });
+    expect(out.days['2026-09-09'].load!.steps).toBeNull();
+    expect(out.days['2026-09-09'].load!.hrAboveMin).toBeNull();
+  });
+
+  it('leaves a day with no load without one', () => {
+    const out = migrate({ meta: { sleepReframed: true }, days: { '2026-09-09': { readings: [] } } });
+    expect(out.days['2026-09-09'].load).toBeUndefined();
+  });
+
+  it.each([null, 'garbage', 42, []])('drops a non-object load %p', (v) => {
+    const out = migrate({ meta: { sleepReframed: true }, days: { '2026-09-09': { load: v } } });
+    expect(out.days['2026-09-09'].load).toBeUndefined();
+  });
+});

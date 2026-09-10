@@ -10,6 +10,7 @@ import { radius, usePalette } from '../theme';
 import { fmtNum, fmtShort, todayKey } from '../lib/dates';
 import { useAppState } from '../store/store';
 import { scrollJournalToSection } from '../store/nav';
+import { pingFeature } from '../store/ping';
 import { CHECKLIST_STARTERS, STARTERS, buildMilestoneDays, buildMilestoneGroups } from '../lib/analysis/milestones';
 import { resolveProtocol } from '../lib/scoring/day';
 
@@ -117,6 +118,8 @@ export function MilestonesSheet() {
   const p = usePalette();
   const { groups, done, total, pct } = useMilestones();
   const [filter, setFilter] = React.useState<'all' | 'done' | 'next'>('all');
+  // Counted on mount, so every route into the sheet is covered.
+  React.useEffect(() => { pingFeature('milestones'); }, []);
   if (!total) {
     return <Text style={{ color: p.textDim, textAlign: 'center', marginTop: 40, paddingHorizontal: 20, lineHeight: 20 }}>Log readings, sleep, and clean days to start unlocking recovery milestones.</Text>;
   }

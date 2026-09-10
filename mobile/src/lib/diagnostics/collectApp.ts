@@ -24,6 +24,7 @@ import type { AppDiagnostics, Rows } from './appReport';
 import { getState, loadIssue, storageStats } from '../../store/store';
 import { getIapState } from '../../store/iap';
 import { getTier, getTrialDaysLeft } from '../../store/tier';
+import { pacingTrial } from '../../store/pacingTrial';
 import { reviewMemory } from '../review';
 import { formatMsLeft, offerMsLeft } from '../upsell/annual';
 import { annualMemory } from '../upsell/annualMemory';
@@ -90,7 +91,7 @@ const kb = (bytes: number | null): string | null =>
 function journalRows(s: AppState): Rows {
   const keys = Object.keys(s.days).sort();
   let readings = 0, activities = 0, meds = 0, symptoms = 0, movements = 0, meals = 0;
-  let hrv = 0, hrvTrusted = 0, imported = 0, sleepNights = 0, staged = 0, water = 0;
+  let hrv = 0, hrvTrusted = 0, imported = 0, sleepNights = 0, staged = 0, water = 0, loadDays = 0;
   for (const k of keys) {
     const d = s.days[k];
     readings += d.readings?.length ?? 0;
@@ -101,6 +102,7 @@ function journalRows(s: AppState): Rows {
     meals += d.food?.meals?.length ?? 0;
     if (d.food?.water) water++;
     if (d.sleep?.bed || d.sleep?.wake) sleepNights++;
+    if (d.load?.readAt) loadDays++;
     if (d.sleep?.stages) staged++;
     const hrvRows = (d.readings ?? []).filter((r) => r.type === 'hrv');
     hrv += hrvRows.length;
@@ -128,6 +130,10 @@ function journalRows(s: AppState): Rows {
     'days with water': water,
     'nights of sleep': sleepNights,
     'nights with stages': staged,
+    // A COUNT, like everything else here. "The pacing budget sees nothing" and
+    // "the pacing budget is wrong" are different support questions and this is
+    // the only row that tells them apart.
+    'days with load read': loadDays,
     'imported entries': imported,
   };
 }
@@ -166,8 +172,18 @@ function subscriptionRows(): Rows {
     'active plan': iap.activeSku ?? null,
     'products loaded': iap.products.map((p) => p.productId).join(', ') || 'none',
     'trial days left': tier === 'trial' ? getTrialDaysLeft() : null,
+    // "Pacing is locked" and "Pacing is gone since last week" are the same
+    // report without this row (src/lib/pacingTrial.ts).
+    'pacing trial': pacingTrialRow(),
     'purchase in flight': iap.purchasing ?? false,
   };
+}
+
+/** The pacing budget's seven-day free window, in the three states it has. */
+function pacingTrialRow(): string {
+  const t = pacingTrial();
+  if (t.active) return `${t.daysLeft} day${t.daysLeft === 1 ? '' : 's'} left`;
+  return t.spent ? 'ended' : 'not started';
 }
 
 function distributionRows(): Rows {

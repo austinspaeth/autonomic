@@ -80,11 +80,13 @@
 import { AppState as RNAppState, Platform } from 'react-native';
 import { MMKV } from 'react-native-mmkv';
 import {
-  easternDay, methodCode, notifyCode, pingUrl, platformCode, resolveCohort,
-  shouldPingDaily, surfaceCode, tierCode,
-  type OfferCode, type PingKind, type PotsCode, type SlotCode, type ViewCode,
+  easternDay, featureCode, findingCode, logCode, methodCode, notifyCode, offerCode,
+  offerFailureBody, pingUrl, platformCode, reportCode, resolveCohort, shouldPingDaily,
+  surfaceCode, tierCode,
+  type LogKind, type OfferFailureBody, type PingKind, type PotsCode, type PurchaseOutcome,
+  type SlotCode, type ViewCode,
 } from '../lib/ping';
-import { getIapState, paywallBypassed, subscribeIap } from './iap';
+import { getIapState, onPurchaseOutcome, paywallBypassed, subscribeIap } from './iap';
 import { getTier } from './tier';
 
 const FLAGS_ID = 'autonomic.flags';
@@ -100,6 +102,12 @@ const KEY_LAST_POT = 'pingLastPot';     // + the POTS letter
 const KEY_LAST_SEE = 'pingLastSee';     // + the view letter
 const KEY_LAST_OFF = 'pingLastOff';     // + the phase letter + the offer letter
 const KEY_ERR_SENT = 'pingErrSent';     // '1' once this install has reported a failure
+const KEY_LAST_OFL = 'pingLastOfl';     // + the offer letter — the day's headcount claim
+const KEY_OFL_QUEUE = 'pingOflQueue';   // offer fall-through reports not yet delivered
+const KEY_LAST_LOG = 'pingLastLog';     // + the logged-kind letter
+const KEY_LAST_USE = 'pingLastUse';     // + the feature letter
+const KEY_LAST_FND = 'pingLastFnd';     // + the finding letter
+const KEY_LAST_RPT = 'pingLastRpt';     // + the report letter
 /** Written by ./tier.ts on first launch: this install's birthday. */
 const KEY_TRIAL_STARTED = 'trialStartedAt';
 
@@ -482,6 +490,54 @@ export function pingViewOpened(view: 'insights' | 'progress'): void {
 }
 
 /**
+ * The four journal-and-feature routes. All capped per LETTER, for the reason
+ * `not`, `pot` and `see` are: each letter is a separate thing somebody chose to
+ * do, so each letter's count is a headcount and the route's total is not.
+ *
+ * A call that maps to no letter sends NOTHING, rather than falling back to the
+ * route's own key the way the routes above do. A letterless `log` ping would be
+ * "logged something we cannot name", which answers none of the questions the
+ * route exists for — and `logCode` returns undefined on purpose for most
+ * reading types.
+ */
+function pingPerLetter(kind: 'log' | 'use' | 'fnd' | 'rpt', base: string, slot: SlotCode | undefined): void {
+  if (!slot) return;
+  pingDaily(kind, slotKey(base, slot), slot);
+}
+
+/**
+ * Something was logged by hand: a night of sleep, an activity, a med or
+ * supplement, a symptom, water, a bowel movement, or a blood pressure / resting
+ * heart rate reading (`type` picks those two out of `'readings'`).
+ *
+ * Callers fire it for NEW user-entered data only. An edit, a live capture, or a
+ * row brought in from Apple Health / Health Connect is not somebody deciding to
+ * write something down, and counting imports would make a year's backfill look
+ * like the most engaged day an install ever had.
+ */
+export function pingLogged(kind: LogKind, type?: string): void {
+  pingPerLetter('log', KEY_LAST_LOG, logCode(kind, type));
+}
+
+/** A feature was used: `'milestones'` (the sheet opened) or `'protocol'` (the
+ *  clean-day protocol saved). */
+export function pingFeature(feature: 'milestones' | 'protocol'): void {
+  pingPerLetter('use', KEY_LAST_USE, featureCode(feature));
+}
+
+/** An Insights finding was opened into its deep-dive card. Fired from the
+ *  sheet itself, so every row that opens one is covered. */
+export function pingFinding(finding: 'early' | 'unconfirmed' | 'change' | 'correlation'): void {
+  pingPerLetter('fnd', KEY_LAST_FND, findingCode(finding));
+}
+
+/** An AI report was built: `'data'` (data for prompt), `'overall'` (the full
+ *  health report) or `'doctor'` (the medical summary). */
+export function pingReport(report: 'data' | 'overall' | 'doctor'): void {
+  pingPerLetter('rpt', KEY_LAST_RPT, reportCode(report));
+}
+
+/**
  * Say once, ever, that something on this install failed.
  *
  * ONCE PER INSTALL and never repeated, which is a deliberately blunt shape. It
@@ -525,7 +581,8 @@ export function pingErrorSeen(): void {
  * statement about the card, not about money. Whether the purchase then went
  * through is the `sub` counter's question, and keeping the two separate is what
  * makes the gap between them (store sheet abandoned, payment declined) visible
- * instead of silently folded into the offer's conversion rate.
+ * instead of silently folded into the offer's conversion rate. `ofl` below is
+ * that gap reported from the inside, with the store's reason attached.
  *
  * Per-letter caps, so the two offers never mask each other — though in practice
  * they cannot both be due on one day, by their own design.
@@ -541,8 +598,119 @@ export function pingOfferAccepted(offer: 'annual' | 'founder'): void {
 }
 
 function offerPing(kind: 'osh' | 'odm' | 'oac', offer: 'annual' | 'founder'): void {
-  const slot: OfferCode | undefined = offer === 'annual' ? 'A' : offer === 'founder' ? 'F' : undefined;
+  const slot = offerCode(offer);
   pingDaily(kind, slotKey(`${KEY_LAST_OFF}${kind}`, slot), slot);
+}
+
+/* ------------------------------------------------ offers that fell through */
+
+/** Reports one launch may create. Each needs a tap on a buy button, so this
+ *  guards against a bug, not against a person. */
+const OFL_MAX_PER_LAUNCH = 12;
+/** Undelivered reports kept for retry, oldest dropped first. */
+const OFL_QUEUE_MAX = 10;
+let oflCreated = 0;
+
+type QueuedOfl = { id: string; url: string; body: OfferFailureBody };
+
+function readOflQueue(): QueuedOfl[] {
+  try {
+    const v = JSON.parse(read(KEY_OFL_QUEUE) || '[]');
+    return Array.isArray(v) ? v.filter((q) => q && typeof q.url === 'string' && q.body) : [];
+  } catch {
+    return [];
+  }
+}
+function writeOflQueue(q: QueuedOfl[]) {
+  write(KEY_OFL_QUEUE, JSON.stringify(q.slice(-OFL_QUEUE_MAX)));
+}
+
+async function post(url: string, body: unknown): Promise<boolean> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    return res.ok;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * An offer was ACCEPTED (`oac`) and the purchase did not become a subscription:
+ * `POST /ping/ofl/{code}` with the offer letter in the slot and a JSON body
+ * saying which way it fell through and, in the store's own words, why (see
+ * `OfferFailureBody`).
+ *
+ * The one ping with a body. What it may carry is fixed by `offerFailureBody`:
+ * the billing library's own enumerations and a redacted message, nothing about
+ * the person and nothing from the journal.
+ *
+ * Wired to `onPurchaseOutcome` in ./iap, and only for attempts an offer card
+ * started — the paywall's own buttons carry no origin and are dropped here.
+ *
+ * Two shapes of count, the same split the fault route makes. EVERY attempt is
+ * reported, because a person who is declined three times has told us three
+ * things; `d` rides only the first report per offer per Eastern day, so the day
+ * counter is a headcount directly comparable with `oac`.
+ *
+ * QUEUED, not fire-and-forget like every other ping. `network-error` is one of
+ * the likeliest reasons a purchase fails, and it is the one moment our own
+ * request is likely to fail too, so a report that does not land is kept and
+ * retried on the next foreground. The URL (tier, version) and the day claim are
+ * fixed when the attempt ends, not when the report finally lands.
+ */
+export function reportOfferOutcome(o: { origin?: string; outcome: PurchaseOutcome; error?: unknown }): void {
+  if (__DEV__) return;
+  if (o.outcome === 'purchased') return;
+  const slot = offerCode(o.origin);
+  if (!slot) return;
+  // A bypassed build cannot reach the store at all, so every attempt there
+  // "fails" with the bypass's own message. That is not a funnel.
+  if (paywallBypassed()) return;
+  if (oflCreated >= OFL_MAX_PER_LAUNCH) return;
+  oflCreated += 1;
+  try {
+    const now = Date.now();
+    const dayKey = `${KEY_LAST_OFL}${slot}`;
+    const ownsDay = shouldPingDaily(read(dayKey), now);
+    // Claimed at creation rather than on delivery: the queue is what delivers
+    // it, and claiming later would let a second attempt made while the first is
+    // still queued offline claim the same day again.
+    if (ownsDay) write(dayKey, easternDay(now));
+    const url = pingUrl(
+      'ofl', cohortDate(now), platformCode(Platform.OS), slot, tierCode(getTier()), appVersion(),
+    );
+    writeOflQueue([
+      ...readOflQueue(),
+      { id: `${now}-${oflCreated}`, url, body: offerFailureBody(o.outcome, o.error, ownsDay) },
+    ]);
+  } catch {
+    return;
+  }
+  void flushOfferFailures();
+}
+
+/** Deliver queued reports in order, stopping at the first that does not land so
+ *  the rest wait for the next foreground rather than failing one by one. */
+async function flushOfferFailures(): Promise<void> {
+  if (inFlight.ofl) return;
+  inFlight.ofl = true;
+  try {
+    for (const item of readOflQueue()) {
+      if (!(await post(item.url, item.body))) break;
+      writeOflQueue(readOflQueue().filter((q) => q.id !== item.id));
+    }
+  } finally {
+    inFlight.ofl = false;
+  }
 }
 
 let started = false;
@@ -561,11 +729,14 @@ export function initPing(): void {
   void pingOpen();
   void pingSub();
   subscribeIap(() => { void pingSub(); });
+  onPurchaseOutcome(reportOfferOutcome);
+  void flushOfferFailures();
   try {
     RNAppState.addEventListener('change', (s) => {
       if (s !== 'active') return;
       void pingOpen();
       void pingSub();
+      void flushOfferFailures();
     });
   } catch { /* no AppState here (jest / bare node) */ }
 }
