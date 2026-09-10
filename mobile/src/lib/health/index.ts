@@ -63,6 +63,13 @@ export interface HealthApi {
    * both — see `HEALTH_PERMISSION_HINT`.
    */
   readAuthStatus(scope: HealthScope): Promise<HealthAuthStatus>;
+  /**
+   * Android only: ask for Health Connect's READ_HEALTH_DATA_IN_BACKGROUND,
+   * without which a background job reads nothing at all. Tap paths only (turning
+   * a pacing alert on). Absent on iOS, where HealthKit background delivery rides
+   * an entitlement instead of a grant.
+   */
+  requestBackgroundRead?(): Promise<boolean>;
   /** Pull the day's relevant samples for a YYYY-MM-DD key. */
   readDay(dk: string): Promise<HealthDaySamples>;
   /**

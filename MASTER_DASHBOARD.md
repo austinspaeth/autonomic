@@ -365,9 +365,14 @@ actually watched. The completion rate is a real question for the strap and the
 camera and a formality for the watches; read the watch letters on `hrv` as a
 headcount, which is what that route is for, and not against `cap`.
 
-**Beyond those, six routes with a different cap.** `not` (a notification turned
-on), `pot` (a POTS capture finished), `see` (a gated view opened) and the three
-offer routes are capped once per install per day **per letter**, not per route.
+**Beyond those, ten routes with a different cap.** `not` (a notification turned
+on), `pot` (a POTS capture finished), `see` (a gated view opened), the three
+offer routes, and the four journal-and-feature routes — `log` (something logged
+by hand: sleep, activity, med, symptom, water, bowel movement, blood pressure,
+resting HR), `use` (Milestones opened, protocol saved), `fnd` (an Insights
+finding opened into its deep dive) and `rpt` (which AI report was built), drawn
+on *What they log* and *What they dig into* — are capped once per install per
+day **per letter**, not per route.
 Their letters are choices the user made between real alternatives — a stand test
 is not an episode, Insights is not Progress — and a whole-route cap would have
 silently dropped whichever came second, which on a bad day is exactly the one

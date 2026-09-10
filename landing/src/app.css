@@ -288,118 +288,8 @@ a { color: inherit; text-decoration: none; }
   font-family: var(--body); color: #fff;
 }
 
-/* ---- In-phone app mock: a close replica of the Journal tab ---- */
-/* iOS status bar */
-.mk-statusbar {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 9px 20px 0; color: #fff;
-}
-.mk-time { font-size: 12.5px; font-weight: 600; letter-spacing: -0.01em; }
-.mk-island { width: 66px; height: 19px; border-radius: 999px; background: #0c0c0e; }
-.mk-sysic { display: inline-flex; align-items: center; gap: 5px; }
-.mk-wifi { width: 15px; height: 11px; }
-.mk-batt { width: 24px; height: 11px; }
-
-/* Date bar */
-.mk-datebar {
-  display: flex; align-items: center; gap: 8px;
-  padding: 7px 10px 8px; color: var(--dim); font-size: 14px;
-  border-bottom: 1px solid rgba(255,255,255,0.06);
-}
-.mk-arw { width: 20px; text-align: center; color: #8b8b93; }
-.mk-date {
-  flex: 1; text-align: center; background: #131316; color: #fff;
-  padding: 7px 0; border-radius: 11px; font-weight: 600; font-size: 12.5px;
-}
-
-/* Scrolling body */
-.mk-scroll { padding: 8px 9px 0; }
-
-.mk-daycard {
-  border: 1px solid rgba(110,224,110,0.45); border-radius: 15px; padding: 11px;
-  margin-bottom: 8px; background: rgba(22,163,74,0.10);
-}
-.mk-head { display: flex; align-items: center; justify-content: space-between; }
-.mk-mode { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--dim); font-weight: 800; }
+/* Journal tab replica lives in $lib/JournalMock.svelte. .mk-chip is still used by the explain mock. */
 .mk-chip { font-size: 9px; font-weight: 800; color: #06210b; background: #6ee06e; padding: 4px 10px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.04em; }
-.mk-chip-good { background: #4fb95a; color: #04180a; }
-.mk-gauge { position: relative; width: 112px; height: 112px; margin: 0 auto -4px; }
-.mk-gauge svg { width: 100%; height: 100%; }
-.mk-gauge-in { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-.mk-num { font-size: 32px; font-weight: 800; line-height: 1; letter-spacing: -0.02em; font-family: var(--display); }
-.mk-den { font-size: 7.5px; font-weight: 700; letter-spacing: 0.14em; color: var(--dim); margin-top: 4px; }
-.mk-pow {
-  display: flex; align-items: center; justify-content: center; gap: 4px;
-  width: fit-content; margin: 0 auto; padding: 2.5px 9px;
-  border: 1px solid rgba(255,255,255,0.12); border-radius: 999px;
-  font-size: 8px; color: var(--dim); font-weight: 600;
-}
-.mk-pow i {
-  width: 9px; height: 9px; border-radius: 50%; border: 1px solid currentColor;
-  display: inline-flex; align-items: center; justify-content: center;
-  font-style: normal; font-size: 6.5px; font-weight: 700;
-}
-.mk-status { text-align: center; font-size: 9px; color: var(--dim); font-weight: 600; margin-top: 5px; }
-.mk-guide { font-size: 9.5px; line-height: 1.38; color: #fff; margin-top: 5px; opacity: 0.92; }
-
-/* Milestones / clean-day tiles */
-.mk-tile {
-  display: flex; align-items: center; gap: 10px;
-  background: #131316; border: 1px solid var(--line); border-radius: 16px;
-  padding: 8px 10px; margin-bottom: 7px;
-}
-.mk-tile-ic { flex: none; width: 30px; height: 30px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; }
-.mk-tile-ic svg { width: 17px; height: 17px; }
-.mk-tile-body { flex: 1; min-width: 0; display: block; }
-.mk-tile-body b { display: block; font-size: 11.5px; font-weight: 700; line-height: 1.25; }
-.mk-tile-mute { color: var(--dim); font-weight: 500; }
-.mk-tile-sub { display: block; font-size: 10px; color: var(--dim); margin-top: 1px; }
-.mk-bar { display: block; height: 3.5px; border-radius: 999px; background: rgba(255,255,255,0.10); margin-top: 4px; overflow: hidden; }
-.mk-bar i { display: block; height: 100%; background: #e03127; border-radius: 999px; }
-.mk-chev { flex: none; color: var(--dim); font-size: 16px; line-height: 1; }
-
-/* Sections */
-.mk-sec { margin-bottom: 8px; background: #131316; border: 1px solid var(--line); border-radius: 15px; padding: 9px; }
-.mk-sec-h { font-size: 9px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--dim); font-weight: 800; padding: 1px 2px 7px; }
-.mk-sec-card { background: #1b1b20; border: 1px solid var(--line); border-radius: 12px; padding: 10px; }
-.mk-big { display: flex; align-items: baseline; gap: 6px; margin-top: 5px; }
-.mk-big b { font-family: var(--display); font-size: 26px; font-weight: 800; line-height: 1; letter-spacing: -0.02em; }
-.mk-big span { font-size: 12.5px; font-weight: 700; color: var(--dim); }
-.mk-sub { font-size: 10.5px; color: var(--dim); margin-top: 5px; }
-.mk-stages { display: flex; gap: 2px; height: 7px; margin-top: 9px; }
-.mk-stages i { border-radius: 3px; }
-.mk-legend { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 8px; font-size: 9.5px; color: #fff; }
-.mk-legend span { display: inline-flex; align-items: center; gap: 5px; }
-.mk-legend i { width: 8px; height: 8px; border-radius: 2px; }
-
-.mk-sec-list { background: none; border: 0; padding: 0 2px; }
-.mk-row { display: flex; align-items: center; gap: 8px; padding: 9px 0; font-size: 11.5px; }
-.mk-row + .mk-row { border-top: 1px solid var(--line); }
-.mk-ico { color: var(--dim); width: 14px; text-align: center; }
-.mk-rt { flex: 1; min-width: 0; }
-.mk-rv { display: inline-flex; align-items: center; gap: 5px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.mk-rv .dot { width: 7px; height: 7px; border-radius: 50%; }
-.mk-time-pill { font-size: 9.5px; color: var(--dim); background: rgba(255,255,255,0.07); border-radius: 999px; padding: 3px 7px; }
-
-/* Floating tab bar (as in the app) */
-.mk-tabbar {
-  position: absolute; left: 14px; right: 14px; bottom: 14px; z-index: 2; overflow: hidden;
-  display: flex; align-items: center; gap: 2px; padding: 6px;
-  border-radius: 999px; background: rgba(0,0,0,0.42);
-  border: 1px solid rgba(255,255,255,0.18);
-  box-shadow: 0 14px 30px -12px rgba(0,0,0,0.95), inset 0 1px 0 rgba(255,255,255,0.06);
-  backdrop-filter: blur(22px) saturate(140%); -webkit-backdrop-filter: blur(22px) saturate(140%);
-}
-.mk-tab {
-  flex: 1; display: inline-flex; flex-direction: column; align-items: center; gap: 2px;
-  padding: 6px 2px; border-radius: 999px; color: var(--dim);
-}
-.mk-tab svg { width: 17px; height: 17px; }
-.mk-tab b { font-size: 8.5px; font-weight: 600; }
-.mk-tab.on { background: rgba(255,255,255,0.10); color: #fff; }
-.mk-tab-brand { flex: 0 0 34px; color: var(--accent); }
-.mk-tab-brand svg { width: 26px; height: 14px; }
-.mk-tab-gear { flex: 0 0 30px; }
 
 /* ============================================================
    CONDITIONS STRIP
@@ -483,6 +373,53 @@ a { color: inherit; text-decoration: none; }
 .loop-n { font-family: var(--mono); font-size: 13px; color: var(--accent-2); }
 .loop-t { font-family: var(--display); font-size: 22px; font-weight: 600; margin: 14px 0 8px; letter-spacing: -0.01em; }
 .loop-step p { margin: 0; font-size: 14.5px; color: var(--dim); line-height: 1.55; }
+
+/* Pacing */
+.pacing { overflow: hidden; border-top: 1px solid var(--line); }
+.pc-glow { position: absolute; left: 50%; top: 42%; width: 900px; height: 520px; transform: translate(-50%, -50%); background: radial-gradient(closest-side, rgba(224,49,39,0.11), transparent 70%); filter: blur(10px); pointer-events: none; }
+.pacing .wrap { position: relative; z-index: 1; }
+.pacing .section-head { max-width: 680px; }
+.pc-eyebrow { display: inline-flex; align-items: center; gap: 12px; }
+.pc-new { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.12em; color: var(--accent-2); background: var(--accent-soft); border: 1px solid rgba(224,49,39,0.35); border-radius: 999px; padding: 3px 9px; line-height: 1.4; }
+.pc-grid { display: grid; grid-template-columns: 1.08fr 0.92fr; gap: 24px; max-width: 1000px; margin: 0 auto; align-items: stretch; }
+.pc-card {
+  background: var(--panel); border: 1px solid var(--line-2); border-radius: var(--r-lg);
+  padding: 26px 24px 24px; box-shadow: 0 30px 70px -34px rgba(0,0,0,0.85); min-width: 0;
+}
+.pc-top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+.pc-tag { font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dim); }
+.pc-state { font-size: 13px; font-weight: 700; color: var(--accent-2); }
+.pc-fig { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; margin-bottom: 20px; }
+.pc-fig b { font-family: var(--display); font-variant-numeric: tabular-nums; font-size: clamp(38px, 5vw, 48px); font-weight: 700; line-height: 1; letter-spacing: -0.03em; }
+.pc-fig span { font-size: 15px; color: var(--dim); }
+.pc-bar { position: relative; margin-bottom: 14px; }
+.pc-bar::before { content: ""; position: absolute; left: 6px; right: 6px; top: 4px; bottom: -6px; border-radius: 999px; background: var(--accent); filter: blur(13px); opacity: 0.45; animation: pcGlow 3s ease-in-out infinite; }
+.pc-bar i { position: relative; display: block; height: 15px; border-radius: 999px; background: linear-gradient(90deg, #8f1a12, #e03127, #f4703a, #e03127, #8f1a12); background-size: 200% 100%; animation: pcEmber 3s linear infinite; }
+@keyframes pcEmber { from { background-position: 0% 50%; } to { background-position: 200% 50%; } }
+@keyframes pcGlow { 0%, 100% { opacity: 0.32; } 50% { opacity: 0.72; } }
+.pc-pace { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 6px 12px; padding-bottom: 18px; border-bottom: 1px solid var(--line); font-size: 13.5px; color: var(--dim); }
+.pc-conf { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; }
+.pc-conf i { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+.pc-note { margin: 18px 0 0; font-size: 15px; line-height: 1.55; color: #c9c9d0; text-wrap: pretty; }
+.pc-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 20px; }
+.pc-row-h { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.pc-row-h b { font-size: 14.5px; font-weight: 600; }
+.pc-row-h span { flex: none; font-family: var(--display); font-variant-numeric: tabular-nums; font-size: 15px; font-weight: 700; color: var(--accent-2); }
+.pc-track { position: relative; height: 5px; border-radius: 999px; background: rgba(255,255,255,0.05); overflow: hidden; margin-bottom: 7px; }
+.pc-track i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px; background: var(--accent); }
+.pc-row p { margin: 0; font-size: 12.5px; line-height: 1.45; color: var(--dim); }
+.pc-row.refund .pc-row-h span { color: var(--green); }
+.pc-row.refund .pc-track i { background: var(--green); }
+.pc-foot { text-align: center; margin: 36px 0 0; font-size: 13.5px; color: var(--dim-2); }
+@media (prefers-reduced-motion: reduce) {
+  .pc-bar::before, .pc-bar i { animation: none; }
+}
+@media (max-width: 940px) {
+  .pc-grid { grid-template-columns: minmax(0, 1fr); max-width: 560px; }
+}
+@media (max-width: 560px) {
+  .pc-card { padding: 22px 18px 20px; }
+}
 
 /* Feature rows */
 .feature { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: center; }
@@ -580,7 +517,7 @@ a { color: inherit; text-decoration: none; }
 }
 .watch-note b { color: var(--dim); font-weight: 600; }
 
-/* Mode selector - mirrors the watch home screen's three rows, same order */
+/* Mode selector - mirrors the watch home screen's four rows, same order */
 .wa-modes { display: flex; flex-direction: column; gap: 12px; margin-top: 30px; }
 .wa-mode {
   display: flex; align-items: center; gap: 16px; width: 100%; text-align: left; cursor: pointer;
@@ -662,6 +599,25 @@ a { color: inherit; text-decoration: none; }
 .wa-row-tx b { display: block; font-size: 12px; font-weight: 700; line-height: 1.25; }
 .wa-row-tx span { font-size: 9.5px; color: var(--wa-dim); line-height: 1.3; }
 .wa-row-go { flex: none; color: rgba(138,138,146,0.7); font-size: 10px; font-weight: 700; }
+
+/* Pacing (PacingView.PacingBody): figure, the spend bar with its pace
+   marker, then two StatTiles. The label stays at the top, Back stays in view
+   along the bottom, and the reading is centred vertically between them. An
+   ahead-of-pace day: the fill is gold and past the marker, and there is no
+   ember, which the app keeps for a day that is actually over. */
+.waf-pace { gap: 0; padding-top: 18px; padding-bottom: 14px; }
+.waf-pace-body { flex: 1 1 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 3px; }
+.waf-pace-fig { font-size: 31px; line-height: 1.05; color: #f2f2f5; }
+.waf-pace-sub { font-size: 10.5px; color: var(--wa-dim); text-align: center; margin-top: 4px; }
+.waf-pace-bar { position: relative; width: 100%; height: 18px; margin-top: 12px; }
+.waf-pace-bar i { position: absolute; display: block; }
+.waf-pace-bar .track { left: 0; right: 0; top: 0; height: 10px; border-radius: 999px; background: rgba(255,255,255,0.07); }
+.waf-pace-bar .fill { left: 0; top: 0; height: 10px; min-width: 10px; border-radius: 999px; background: #eab308; box-shadow: 0 0 3px 3px rgba(234,179,8,0.16); transition: width 0.9s var(--ease); }
+.waf-pace-bar .mark { top: -4px; width: 2px; height: 18px; margin-left: -1px; border-radius: 1px; background: rgba(255,255,255,0.84); transition: left 0.9s var(--ease); }
+.waf-pace-bar .caret { top: 12px; width: 10px; height: 6px; margin-left: -5px; background: rgba(255,255,255,0.84); clip-path: polygon(50% 0, 100% 100%, 0 100%); transition: left 0.9s var(--ease); }
+.waf-pace .waf-tiles { gap: 5px; margin: 11px 0 0; }
+/* Inset from the full width so the button clears the screen's corner radius. */
+.waf-pace .wa-btn.back { flex: none; width: calc(100% - 20px); align-self: center; margin-top: 8px; font-size: 14px; padding: 11px; }
 
 /* Episode picker: its rows carry no icon or subtitle, so they get their own
    height rather than the home screen's. Back is matched to them exactly —
@@ -955,6 +911,15 @@ a { color: inherit; text-decoration: none; }
   white-space: nowrap;
 }
 
+/* "New" marker on a Pro plan feature (the pacing budget). The .pr-only chip's
+   shape, in the accent, so it reads as the same family of label. */
+.pr-new {
+  display: inline-block; vertical-align: 2px; margin-left: 7px;
+  font-family: var(--mono); font-size: 9.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  color: #fff; background: var(--accent); border-radius: 999px; padding: 2px 7px;
+  white-space: nowrap;
+}
+
 /* Rating + platform line under the plan cards. */
 .pr-proof {
   display: flex; align-items: center; justify-content: center; flex-wrap: wrap;
@@ -1033,10 +998,11 @@ a { color: inherit; text-decoration: none; }
   .pr-ic, .pr-mark.on .pr-ic { width: 16px; height: 16px; }
 }
 
-/* Comparison table (Autonomic vs Welltory) */
+/* Comparison table (Autonomic vs Welltory vs Visible) */
+.cmp-scroll { max-width: 980px; margin: 0 auto; }
 .cmp-table {
-  display: grid; grid-template-columns: minmax(0,1.5fr) minmax(0,1fr) minmax(0,1fr);
-  max-width: 840px; margin: 0 auto;
+  display: grid; grid-template-columns: minmax(0,1.4fr) repeat(3, minmax(0,1fr));
+  max-width: 980px; margin: 0 auto;
   border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--panel);
 }
 .cmp-cell { padding: 15px 18px; border-top: 1px solid var(--line); font-size: 14.5px; display: flex; align-items: center; }
@@ -1049,6 +1015,7 @@ a { color: inherit; text-decoration: none; }
 .cmp-brand-them { color: var(--dim); }
 .cmp-mark { color: var(--accent); }
 .cmp-logo-them { width: 31px; height: 31px; border-radius: 8px; flex: none; }
+.cmp-logo-visible { border-radius: 40px; }
 .cmp-price { margin-top: 8px; font-family: var(--display); }
 .cmp-amt { font-size: 30px; font-weight: 700; color: var(--text); letter-spacing: -0.02em; }
 .cmp-them .cmp-amt { font-size: 26px; color: var(--dim); }
@@ -1088,8 +1055,26 @@ a { color: inherit; text-decoration: none; }
 .cmp-foot { max-width: 840px; margin: 22px auto 0; text-align: center; font-size: 14.5px; color: var(--dim); }
 .cmp-foot { text-wrap: balance; }
 
+/* Four columns cannot share a phone's width without one word per line, so the
+   table keeps a readable minimum and scrolls sideways inside its own box. The
+   savings badge moves INSIDE the Autonomic head here: hanging above the table
+   it sat outside the pinned label column and poked out past it on scroll. */
+@media (max-width: 760px) {
+  /* The scroll box does the rounding and clipping: rounding the pinned cells
+     instead left a transparent corner the scrolled plans showed through. */
+  .cmp-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: var(--r-lg); }
+  .cmp-table { min-width: 620px; }
+  .cmp-head.cmp-us { padding-top: 40px; }
+  .cmp-badge { top: 10px; }
+  /* The row labels stay pinned while the plans scroll under them, or a reader
+     who has swiped to Visible no longer knows which row they are reading. */
+  .cmp-feat, .cmp-corner {
+    position: sticky; left: 0; z-index: 2; background: var(--panel);
+    box-shadow: 1px 0 0 var(--line);
+  }
+}
 @media (max-width: 600px) {
-  .cmp-table { grid-template-columns: minmax(0,1.35fr) minmax(0,1fr) minmax(0,1fr); }
+  .cmp-table { grid-template-columns: minmax(0,1.35fr) repeat(3, minmax(0,1fr)); }
   .cmp-cell { padding: 13px 11px; font-size: 12.5px; }
   .cmp-head { padding: 20px 8px 15px; }
   .cmp-brand { font-size: 14px; gap: 5px; }
@@ -1925,83 +1910,18 @@ a.gc { display: block; }
 .sg-orbit em { color: var(--dim); font-style: normal; font-weight: 500; }
 .sg-orbit-a { top: 128px; left: -42px; animation-delay: 0s; }
 .sg-orbit-b { top: 116px; right: -40px; animation-delay: 1.4s; }
-.sg-orbit-c { bottom: 202px; left: -44px; animation-delay: 2.6s; }
+.sg-orbit-c { bottom: 14px; left: -44px; animation-delay: 2.6s; }
 .side-phone {
   width: 178px; margin: 0 auto; padding: 6px;
   background: #0c0c0e; border: 1px solid var(--line-2); border-radius: 28px;
   box-shadow: 0 26px 55px -20px rgba(0,0,0,0.9), 0 0 0 1px rgba(255,255,255,0.03) inset;
   animation: phonefloat 8s ease-in-out infinite;
 }
-/* Same Journal replica as the hero phone, scaled to the sidebar. */
+/* Same Journal replica as the hero phone ($lib/JournalMock.svelte), scaled to the sidebar. */
 .sg-scr {
   position: relative; height: 400px; overflow: hidden;
   background: #000; border-radius: 22px; text-align: left; color: #fff;
 }
-.sg-statusbar { display: flex; align-items: center; justify-content: space-between; padding: 6px 12px 0; }
-.sg-time { font-size: 8px; font-weight: 700; }
-.sg-island { width: 40px; height: 12px; border-radius: 999px; background: #0c0c0e; }
-.sg-sysic { display: inline-flex; align-items: center; gap: 3px; }
-.sg-wifi { width: 9px; height: 7px; }
-.sg-batt { width: 15px; height: 7px; }
-.sg-datebar {
-  display: flex; align-items: center; gap: 5px; padding: 5px 7px 6px;
-  border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 9px;
-}
-.sg-arw { width: 11px; text-align: center; color: #8b8b93; }
-.sg-date { flex: 1; text-align: center; background: #131316; padding: 5px 0; border-radius: 8px; font-weight: 600; font-size: 8.5px; }
-.sg-body { padding: 6px 6px 0; }
-.sg-cardbox {
-  border: 1px solid rgba(110,224,110,0.45); border-radius: 11px; padding: 8px;
-  background: rgba(22,163,74,0.10); margin-bottom: 6px;
-}
-.sg-cardhead { display: flex; align-items: center; justify-content: space-between; }
-.sg-mode { font-size: 6px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--dim); font-weight: 800; }
-.sg-chip { font-size: 6px; font-weight: 800; color: #06210b; background: #6ee06e; padding: 2px 5px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.03em; }
-.sg-gauge { position: relative; width: 86px; height: 86px; margin: 1px auto -2px; }
-.sg-gauge svg { width: 100%; height: 100%; }
-.sg-gauge-in { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-.sg-num { font-family: var(--display); font-size: 23px; font-weight: 800; line-height: 1; letter-spacing: -0.02em; }
-.sg-den { font-size: 5px; font-weight: 700; letter-spacing: 0.12em; color: var(--dim); margin-top: 2px; }
-.sg-status { text-align: center; font-size: 7px; color: var(--dim); font-weight: 600; margin-top: 5px; }
-.sg-tile {
-  display: flex; align-items: center; gap: 7px; background: #131316;
-  border: 1px solid var(--line); border-radius: 11px; padding: 7px 8px; margin-bottom: 6px;
-}
-.sg-tile-ic { flex: none; width: 21px; height: 21px; border-radius: 7px; display: inline-flex; align-items: center; justify-content: center; }
-.sg-tile-ic svg { width: 12px; height: 12px; }
-.sg-tile-body { flex: 1; min-width: 0; }
-.sg-tile-body b { display: block; font-size: 8px; font-weight: 700; }
-.sg-tile-mute { color: var(--dim); font-weight: 500; }
-.sg-tile-sub { display: block; font-size: 7px; color: var(--dim); margin-top: 0.5px; }
-.sg-bar { display: block; height: 3px; border-radius: 999px; background: rgba(255,255,255,0.10); margin-top: 4px; overflow: hidden; }
-.sg-bar i { display: block; height: 100%; background: #e03127; border-radius: 999px; }
-.sg-sec { background: #131316; border: 1px solid var(--line); border-radius: 11px; padding: 7px; }
-.sg-sec-h { font-size: 6px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--dim); font-weight: 800; padding: 0 2px 5px; }
-.sg-sleep { background: #1b1b20; border: 1px solid var(--line); border-radius: 9px; padding: 7px; }
-.sg-chip-good { background: #4fb95a; color: #04180a; }
-.sg-big { display: flex; align-items: baseline; gap: 4px; margin-top: 3px; }
-.sg-big b { font-family: var(--display); font-size: 18px; font-weight: 800; line-height: 1; letter-spacing: -0.02em; }
-.sg-big span { font-size: 8px; font-weight: 700; color: var(--dim); }
-.sg-stages { display: flex; gap: 2px; height: 5px; margin-top: 7px; }
-.sg-stages i { border-radius: 2px; }
-.sg-tabs {
-  position: absolute; left: 8px; right: 8px; bottom: 8px; z-index: 2; overflow: hidden;
-  display: flex; align-items: center; gap: 1px; padding: 3px;
-  border-radius: 999px; background: rgba(0,0,0,0.42);
-  border: 1px solid rgba(255,255,255,0.18);
-  box-shadow: 0 10px 22px -10px rgba(0,0,0,0.95), inset 0 1px 0 rgba(255,255,255,0.06);
-  backdrop-filter: blur(20px) saturate(130%); -webkit-backdrop-filter: blur(20px) saturate(130%);
-}
-.sg-tab {
-  flex: 1; display: inline-flex; flex-direction: column; align-items: center; gap: 1px;
-  padding: 4px 1px; border-radius: 999px; color: var(--dim);
-}
-.sg-tab svg { width: 11px; height: 11px; }
-.sg-tab b { font-size: 5.5px; font-weight: 600; }
-.sg-tab.on { background: rgba(255,255,255,0.10); color: #fff; }
-.sg-tab-brand { flex: 0 0 22px; color: var(--accent); }
-.sg-tab-brand svg { width: 17px; height: 9px; }
-.sg-tab-gear { flex: 0 0 18px; }
 
 /* ============================================================
    Interactive metric widgets (in-article calculators)

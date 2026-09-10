@@ -175,6 +175,11 @@ describe('pacing widgets', () => {
       expect(f.fill).toBeGreaterThanOrEqual(0);
       expect(f.fill).toBeLessThanOrEqual(1);
       expect(f.tiles.length).toBeLessThanOrEqual(2);
+      // The two tiles are the same two in every live state. The second slot
+      // used to swap to "HR above 94" whenever the day had exertion minutes,
+      // which took the ceiling off the home screen and the wrist on exactly
+      // the days it was worth reading.
+      expect(f.tiles.map((t) => t.label)).toEqual(['Spent', 'Budget']);
       [f.figureColor, f.fillColor, f.badgeColor, ...f.tiles.map((t) => t.color)].forEach((c) => expect(c).toMatch(HEX));
       // A widget states the budget. The strip's "About 3h 30m" hedge has the
       // words beside it that explain what is still being learned; here it is a
@@ -192,6 +197,25 @@ describe('pacing widgets', () => {
     expect(new Date(f.at).getTime()).toBeLessThanOrEqual(noon.getTime());
     const next = pacing.frames[pacing.frames.indexOf(f) + 1];
     if (next) expect(new Date(next.at).getTime()).toBeGreaterThan(noon.getTime());
+  });
+
+  it('keep Spent and Budget as the two tiles on a day with exertion minutes', () => {
+    // The case the old tiles swapped on: the heart sat above this user's own
+    // line for 38 minutes, so the second tile became "HR above 94" and the
+    // ceiling left the home screen and the wrist.
+    const state = demo();
+    const dk = todayKey();
+    const day = state.days[dk];
+    state.days[dk] = {
+      ...day,
+      load: {
+        ...(day.load || {}),
+        readAt: new Date().toISOString(),
+        hrAboveMin: 38, lineBpm: 94, hrCoverageMin: 600,
+      } as NonNullable<typeof day.load>,
+    };
+    const { frames } = buildWidgetPayload(state, dk, { now: at(15), stepsGranted: true }).pacing;
+    frames.forEach((f) => expect(f.tiles.map((t) => t.label)).toEqual(['Spent', 'Budget']));
   });
 
   it('bake the ember and drop the marker once over budget', () => {

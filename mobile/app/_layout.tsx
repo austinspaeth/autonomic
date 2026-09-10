@@ -31,6 +31,8 @@ import { runDailyBackup } from '../src/lib/backup';
 import { initCrashWatcher, syncReminder } from '../src/lib/reminders';
 import { initWidgetSync } from '../src/lib/widgets';
 import { initBudgetSync } from '../src/store/budget';
+import { initPacingAlertWatcher } from '../src/store/pacingAlerts';
+import { initPacingBackground } from '../src/store/pacingBackground';
 import { initInsightsBadge } from '../src/store/insightsBadge';
 import { loadIssue } from '../src/store/store';
 import { drainNativeCrashes, installErrorLogging, logError } from '../src/lib/diagnostics/errorLog';
@@ -122,6 +124,11 @@ export default function RootLayout() {
     // on launch and on foreground. It never REQUESTS a permission — it reads
     // with whatever grants exist, so this cannot raise a health sheet.
     const budgetSync = initBudgetSync();
+    // Pacing alerts: re-check after every journal change (the health reads
+    // above land as journal changes), and keep the background half registered
+    // exactly while an alert could fire. The task itself is defined in index.js.
+    initPacingAlertWatcher();
+    initPacingBackground();
     // Pull any published EAS update in the background (preview + production
     // builds alike); a downloaded bundle applies on the next launch.
     (async () => {

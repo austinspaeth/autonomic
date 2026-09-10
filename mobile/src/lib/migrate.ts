@@ -305,6 +305,20 @@ export function migrate(s: unknown): AppState {
       if (typeof ca.lastFired === 'string' && DATE_KEY_RE.test(ca.lastFired)) settings.crashAlert.lastFired = ca.lastFired;
     } else delete settings.crashAlert;
   }
+  // pacingAlerts keeps only real booleans for kinds this build knows. A kind
+  // left out means "never chosen", which reads as on, so a junk value must be
+  // dropped rather than coerced to false and silently switch an alert off.
+  const pa = settings.pacingAlerts as unknown;
+  if (pa !== undefined) {
+    if (isPlainObject(pa)) {
+      const clean: NonNullable<AppState['settings']['pacingAlerts']> = {};
+      (['ahead', 'nearly', 'over', 'exertion', 'easy'] as const).forEach((k) => {
+        if (typeof pa[k] === 'boolean') clean[k] = pa[k] as boolean;
+      });
+      settings.pacingAlerts = clean;
+    } else delete settings.pacingAlerts;
+  }
+  if (settings.pacingAlertsEnabled !== undefined && typeof settings.pacingAlertsEnabled !== 'boolean') delete settings.pacingAlertsEnabled;
 
   const profile: Record<string, unknown> = isPlainObject(src.profile) ? src.profile : {};
   const meta: Record<string, unknown> = isPlainObject(src.meta) ? src.meta : {};

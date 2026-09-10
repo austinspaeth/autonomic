@@ -84,12 +84,22 @@ test('each route validates the slot against ITS OWN alphabet', () => {
   assert.ok(speaks('PAY', 'R'));
   assert.ok(!speaks('PAY', 'G'));
   assert.ok(speaks('NOT', 'M') && speaks('POT', 'T') && speaks('SEE', 'I'));
+  assert.ok(speaks('NOT', 'P'));      // pacing alerts
   assert.ok(!speaks('NOT', 'T'));     // a POTS letter is not a notification
 
   // The three offer routes share one alphabet on purpose: accepts over shows is
   // only a conversion rate if both are counted per the same offer.
   assert.deepEqual(ALPHABET.OSH, ALPHABET.ODM);
   assert.deepEqual(ALPHABET.OSH, ALPHABET.OAC);
+
+  // The journal-and-feature routes: each its own alphabet, and a letter shared
+  // by spelling (M, P, C, R) means something different on each.
+  assert.ok(['S', 'A', 'M', 'Y', 'W', 'B', 'P', 'R'].every((l) => speaks('LOG', l)));
+  assert.ok(!speaks('LOG', 'G'));
+  assert.ok(speaks('USE', 'M') && speaks('USE', 'P') && !speaks('USE', 'S'));
+  assert.ok(['E', 'U', 'C', 'R'].every((l) => speaks('FND', l)));
+  assert.ok(['D', 'H', 'C'].every((l) => speaks('RPT', l)));
+  assert.ok(!speaks('RPT', 'E'));
 
   // And the routes that carry nothing accept nothing.
   ['OPEN', 'SUB', 'ERR'].forEach((k) => assert.equal(ALPHABET[k], undefined));
@@ -98,7 +108,8 @@ test('each route validates the slot against ITS OWN alphabet', () => {
 test('every route name the client can send has a storage kind', () => {
   // The handler resolves a route by name, so a route added to serverless.yml
   // but not here answers 204 and counts nothing — silently.
-  ['open', 'sub', 'act', 'cap', 'hrv', 'pay', 'not', 'pot', 'see', 'err', 'osh', 'odm', 'oac']
+  ['open', 'sub', 'act', 'cap', 'hrv', 'pay', 'not', 'pot', 'see', 'err', 'osh', 'odm', 'oac', 'ofl',
+    'log', 'use', 'fnd', 'rpt']
     .forEach((k) => assert.ok(KINDS[k], `no storage kind for /ping/${k}`));
 });
 

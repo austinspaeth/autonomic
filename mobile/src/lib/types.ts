@@ -228,6 +228,9 @@ export type CameraModuleShape = 'tall' | 'wide' | 'square' | 'single';
  *  bottom, left/middle/right, tl/tr/bl/br, or right/below for a single lens). */
 export interface CameraLayout { shape: CameraModuleShape; flash: string }
 
+/** The five pacing alerts (src/lib/budget/alerts.ts). */
+export type PacingAlertKind = 'ahead' | 'nearly' | 'over' | 'exertion' | 'easy';
+
 export interface AppState {
   version: number;
   settings: {
@@ -257,6 +260,15 @@ export interface AppState {
      *  Undefined means "never chosen" — first enabling the morning reminder
      *  defaults it on; an explicit off stays off. */
     crashAlert?: { enabled: boolean; lastFired?: string };
+    /** Pacing alerts, per kind (src/lib/budget/alerts.ts). A kind that is
+     *  undefined is ON: nobody chose against it, and granting notification
+     *  permission is the choice. Only an explicit `false` turns one off. What
+     *  has fired today lives in the flags MMKV, not here. */
+    pacingAlerts?: Partial<Record<PacingAlertKind, boolean>>;
+    /** The master switch over all five. Undefined is ON; `false` silences every
+     *  kind without touching `pacingAlerts`, so turning it back on restores
+     *  the per-kind choices. */
+    pacingAlertsEnabled?: boolean;
   };
   profile: Profile;
   /** User-defined types layered on top of the registry maps (pure JSON defs). */

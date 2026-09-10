@@ -26,6 +26,7 @@ import { resetFindingMemory } from '../lib/insights/findingMemory';
 import { resetInsightsCache } from '../lib/insights/cache';
 import { setInsightsAnchor } from '../lib/insights/anchorMemory';
 import { resetTrendMemory } from '../lib/trends/memory';
+import { resetAlertMemory } from '../lib/budget/alertMemory';
 import { importFingerprint } from '../lib/health/updateSet';
 import type { AppState, DayRecord, Entry } from '../lib/types';
 import {
@@ -465,9 +466,11 @@ export function clearAllData() {
   // Trend card's pinned headline (still live for the rest of the journal day, so
   // a wiped app keeps congratulating the user on numbers it no longer holds),
   // and the chosen "day one", which now points at a day that does not exist.
+  // Today's fired pacing alerts go too: they describe a day being erased.
   resetFindingMemory();
   resetInsightsCache();
   resetTrendMemory();
+  resetAlertMemory();
   setInsightsAnchor(null);
   state = defaultState();
   touchDays();

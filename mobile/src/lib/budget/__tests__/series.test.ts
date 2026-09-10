@@ -73,7 +73,11 @@ describe('the Progress section', () => {
     expect(cards.length).toBe(1);
     const card = cards[0];
     expect(card.title).toBe('Budget margin');
-    expect(card.stats!.map((s) => s.label)).toEqual(['Over budget', 'Under', 'Average margin']);
+    expect(card.stats!.map((s) => s.label)).toEqual(['Over budget', 'Under budget', 'Avg margin']);
+    // A zero count is a real answer here, not a dash: the card is on screen
+    // because the range HAS scored days, so "none of them went over" is
+    // something to say.
+    card.stats!.slice(0, 2).forEach((st) => expect(st.value).not.toBeNull());
     // Columns off a ceiling at zero, not a line: over and under are opposite
     // directions from the budget, not two colours of one shape.
     expect(card.margin).toBeDefined();
@@ -95,10 +99,12 @@ describe('the Progress section', () => {
     stats.slice(0, 2).forEach((s) => {
       expect(s.sub === 'day' || s.sub === 'days').toBe(true);
     });
-    // The average margin carries a sign and a unit the reader can picture.
+    // The average margin carries a sign and NO unit: the label says margin,
+    // the tiles beside it are days, and the whole feature speaks in effort
+    // minutes, so a unit here is a third small word on one number.
     const avg = stats[2];
     if (avg.value != null) {
-      expect(avg.sub).toBe('mins');
+      expect(avg.sub).toBeUndefined();
       expect(['+', '-']).toContain(avg.prefix);
     }
   });

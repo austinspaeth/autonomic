@@ -149,18 +149,21 @@ export const priceLabel = (n: number): string => `$${n.toFixed(2)}`;
 export const yearlySavePct = Math.round((1 - pricing.yearly / (pricing.monthly * 12)) * 100);
 
 /**
- * The App Store rating, shown as social proof beside the CTAs. `reviews` is the
+ * The store rating, shown as social proof beside the CTAs. `reviews` is the
  * public review COUNT — leave it null until there are enough of them to help
  * (a "5.0 from 2 ratings" reads worse than no number at all); once set, every
  * surface that renders the stars picks it up.
  *
- * Only ever state what the App Store page actually shows. Google Play has its
- * own, separate rating, so this is deliberately labelled as Apple's.
+ * Only ever state what the store pages actually show. The App Store and Google
+ * Play rate separately, and this names both only because both read 5.0; the
+ * moment they differ, name the one the number belongs to.
  */
 export const rating: { stars: number; label: string; store: string; reviews: number | null } = {
   stars: 5,
   label: '5.0',
-  store: 'App Store',
+  // "&", not "and": the row is white-space: nowrap, and at 375px the longer
+  // form ran past the gutter in the pricing and closing CTA placements.
+  store: 'App Store & Google Play',
   reviews: null
 };
 
@@ -173,6 +176,19 @@ export const competitor = {
   name: 'Welltory',
   monthly: 19.99,
   yearly: 119.99
+};
+
+/**
+ * The pacing app in the #compare table (makevisible.com, not the Verizon carrier
+ * of the same name). Checked Sept 2026: one membership, $19.99 monthly or
+ * $14.99/mo billed annually ($179.88), and pacing also needs their band
+ * ($79.70 one-off), which is why the page says "plus band". Re-check before a
+ * release, like the competitor above.
+ */
+export const visibleApp = {
+  name: 'Visible',
+  monthly: 19.99,
+  yearly: 179.88
 };
 
 /** Whole dollars saved per year against the competitor's yearly plan. */

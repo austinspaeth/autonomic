@@ -307,7 +307,8 @@ old web app so old `export.json` files import directly.
   trace reads as the app failing rather than as the device declining — and Start
   is DISABLED, the impossible option made unavailable rather than
   tappable-then-refused.
-- **The app sends two local notifications, both owned by `src/lib/reminders.ts`.**
+- **The app's local notifications live in `src/lib/reminders.ts`, plus pacing
+  alerts in `src/store/pacingAlerts.ts` (next bullet).**
   (1) The morning reminder: `settings.reminder` is the source of truth and the OS
   schedule is derived, reconciled by `syncReminder()` on launch (covers reinstall, an
   imported journal, or permission revoked in system settings). It schedules under one
@@ -315,14 +316,58 @@ old web app so old `export.json` files import directly.
   `scheduleNotificationAsync` when unauthorized — always request permission first and
   only persist `enabled: true` once the schedule actually succeeded. (2) The crash
   warning (`settings.crashAlert`): `checkCrashRisk()` runs `detectDownturn` on today —
-  on launch and, debounced, after journal changes via `initCrashWatcher()` (no
-  background execution exists) — and fires an immediate notification reusing the
-  Outlook downturn copy, at most once per day (`crashAlert.lastFired`). Enabling the
-  morning reminder while `crashAlert` is undefined defaults crash warnings on (the
-  welcome wizard's opt-in); an explicit off is never overridden. UI: Settings →
-  `NotificationsRow` opens `NotificationsSheet` (`src/features/Reminders.tsx`). The
-  wizard no longer asks: the reminder card is gone from its last step, which now
-  holds nothing but the sensor choice.
+  on launch and, debounced, after journal changes via `initCrashWatcher()` — and fires
+  an immediate notification reusing the Outlook downturn copy, at most once per day
+  (`crashAlert.lastFired`). (3) Reading complete (`notifyHrvComplete`), for a reading
+  that finished while backgrounded. **A grant turns on everything never chosen**:
+  when `requestReminderPermission` produces a fresh grant it runs
+  `applyNotificationDefaults()`, and `syncNotificationPermission()` (launch +
+  foreground, last answer remembered as `notifPermissionSeen` in `autonomic.flags`)
+  does the same for a grant made in system settings. Every undefined setting goes on
+  (morning reminder at 08:00, crash warnings, every pacing kind); an explicit off is
+  never overridden; a phone whose permission predates this is only recorded, not
+  treated as a new yes. UI: Settings → `NotificationsRow` opens `NotificationsSheet`
+  (`src/features/Reminders.tsx`), whose pacing rows show only while pacing is
+  unlocked and read OFF whenever the OS permission is missing. The wizard no longer
+  asks: the reminder card is gone from its last step, which now holds nothing but the
+  sensor choice.
+- **Pacing alerts are paced harder than the budget they describe, and they are the
+  only thing the app does with the app closed.** `src/lib/budget/alerts.ts` (pure +
+  tested) decides; `src/store/pacingAlerts.ts` gathers the inputs (the same
+  `buildBudget` the strip runs, `brief`) and posts on its own HIGH Android channel;
+  `src/lib/budget/alertMemory.ts` (flags MMKV, stamped BEFORE scheduling, reset by
+  Clear all data) remembers what fired today. A master switch
+  (`settings.pacingAlertsEnabled`, off silences all five without forgetting them) over
+  five kinds in `settings.pacingAlerts`, undefined = on for both. Every budget alert
+  says "pacing budget" in its body ("Over by 25m of your pacing budget"), because a
+  notification arrives with no screen around it to say what the minutes are of. The
+  kinds: **over**, **nearly spent** (85%), **heart rate** (a stretch above
+  the user's own exertion line still running, 20 min, and the copy NAMES THE BPM,
+  "Heart rate above 95 bpm for 28m", never "your line"), **the morning after** an
+  over day (before noon) and **ahead of pace** (after 90 min of day and a quarter of
+  the budget). One per check; one of each per day (heart rate: two, 3h apart); 45 min
+  between any two; three a day; escalation only; nothing before the logged wake or
+  after `DAY_END_MIN`; nothing on a day the crash warning fired; no budget number on a
+  suppressed day (the heart-rate alert carries none, so it may still speak); a stretch
+  inside a logged activity is not news; and no alert ever invites spending what is
+  left. **Background is `src/store/pacingBackground.ts`.** `definePacingBackground()`
+  runs from `index.js` at bundle load, because TaskManager only finds tasks defined in
+  the global scope and a WorkManager job can start a headless runtime that never
+  mounts the app. Each wake-up is `refreshDayLoad(requireEvidence)` →
+  `checkPacingAlerts` → `syncWidgetsNow` → `flushSave`. Android: expo-background-task,
+  every 15 min at best, and Health Connect reads nothing from the background without
+  `READ_HEALTH_DATA_IN_BACKGROUND` (declared in app.json, asked by
+  `requestBackgroundRead` from the tap that turns an alert on, never from a launch
+  path). iOS: HealthKit background delivery (`healthkit.background-delivery`
+  entitlement; observers on heart rate and steps, steps capped hourly by Apple),
+  holding extra time through `modules/app-env`'s `beginBackgroundTask`; the same task
+  is registered but iOS runs it mostly overnight. HealthKit reads EMPTY while the
+  phone is locked, which the evidence guards turn into "write nothing", so on iOS an
+  alert usually lands shortly after the next unlock. `syncPacingBackground()`
+  registers only while Health is on, pacing is unlocked, an alert is on and
+  notifications are granted, and undoes it otherwise. The pacing sheet shows a "Turn
+  on pacing alerts" card under the steps ask while permission is missing. Turning one
+  on sends `not` letter `P`. None of this is OTA-able: it needs a native build.
 - **The store review ask is earned, never scheduled.** `src/lib/review/` decides
   it: `eligibility.ts` is pure (four days holding the user's OWN entries —
   imported Health rows don't count — plus `detectUpturn`, the mirror of
@@ -376,6 +421,32 @@ old web app so old `export.json` files import directly.
   places state the same boundary and drift apart silently if one moves.
   Reactive only: `usePaywall()` is raised by tapping a locked thing, never on
   launch (`SubscriptionGate` is long gone).
+- **The pacing budget is the one Pro feature with a trial of its own.**
+  `src/lib/pacingTrial.ts` (pure + tested) + `src/store/pacingTrial.ts` (flags
+  MMKV shell, `pacingTrialStartedAt`): a free install gets ONE seven-day window
+  in which the budget is simply on. A budget in minutes is not a thing anybody
+  can judge from a lock card — it only means something after a few of the
+  reader's own afternoons — so the pitch is the feature itself. It is NOT the
+  14-day install trial: that one is stamped the first time the app ever runs, so
+  an install updating into the pacing release had spent it months earlier and
+  would never see pacing at all. This window is stamped LAZILY, at the first
+  launch where the tier is actually `'free'` (`initPacingTrial()`, after
+  `initTier()`), which is the update's first launch for an existing user and the
+  day the full trial lapses for a new one; stamping at first launch regardless
+  would burn it underneath the install trial, where it grants nothing. One
+  window per install ever — a lapsed subscriber does not earn a fresh week each
+  time they cancel — and it survives "Clear all data" for the same reason every
+  other flag there does. **`isPacingUnlocked()` is the single question**, asked
+  at tap time by `isBudgetLocked` (`features/budget/open.tsx`), by
+  `liveWidgetOpts` (so the Journal and the home screen can never disagree) and
+  as `usePacingUnlocked()` by the strip; nothing else may compose the tier and
+  the window itself. The countdown is said in ONE place, the nav bar's plan tab
+  ("Free plan · Pacing free for 5 more days"), never beside the strip: a number
+  counting down next to the feature turns every glance at the budget into a
+  reminder that it is being taken away. When the window is spent the pitch card
+  says so once, plainly, because a feature that worked last week and is gone
+  today otherwise reads as a fault. The support dump carries a `pacing trial`
+  row for the same reason.
 - **The app raises exactly TWO offers on its own initiative, and each owns its
   own rules.** `src/lib/upsell/` holds only `annual.ts` + `annualMemory.ts`,
   `founder.ts` + `founderMemory.ts` and the one thing they SHARE,
@@ -713,6 +784,138 @@ old web app so old `export.json` files import directly.
   earliest and latest fortnight of LOGGED days, so "day one" is genuinely day one
   rather than the start of the 180-day analysis window, and it falls back to stating
   the window when there is too little to compare.
+- **"How much can today absorb?" is `src/lib/budget/`, and every bound in it is
+  load-bearing.** One entry point, `buildBudget(state, dk, ctx, opts)`, returns
+  the whole pacing view: an envelope in EFFORT MINUTES (a minute of moderate
+  effort costs one; `LOAD_TABLE` in `load.ts` is the product, the way the
+  scoring thresholds are), what the day has spent, the pace marker, and how
+  often the estimate has held. The unit is minutes EVERYWHERE the user reads it
+  — points exist only inside the module and a percent would be a second score
+  competing with the Outlook's. The strip lives inside the Outlook card between
+  the guidance paragraph and the three tiles, and the whole thing is one tap
+  target. **The shell is `src/store/budget.ts`** and is the only impure part:
+  it reads steps, stand time and the all-day heart rate, summarises them into
+  `days[dk].load`, and puts the thinned curve in the waveform sidecar under
+  `load:<dk>` (listed in `waveformIds`, or `pruneWaveforms` deletes it on the
+  next launch). **`days[dk].load` is written ONCE, on the day itself**, so
+  everything that touches it has to preserve it: `migrate()` rebuilds every day
+  record field by field and for one release simply dropped `load`, which erased
+  every past day's pacing on the next launch — the app opened each morning
+  having forgotten what yesterday cost and reported it as "logged activities
+  only". `cleanLoad` in `src/lib/migrate.ts` is the fix, and a new `DayLoad`
+  field must be added there too. Fixing the migrator did not return what it
+  had already erased, so `restoreErasedDays` (`src/lib/budget/restore.ts`, pure
+  + tested) reads those days back from Health ONCE: only when steps have reached
+  this install (`pacingStepsSeen`, outside the journal) and yet no past day in
+  the last 42 holds a record, newest first, skipped on a launch known to be in
+  the background (a foreground cold start can report `'unknown'`), capped at three
+  launches, self-retiring on the first day restored. And `refreshDayLoad`
+  refuses any read that LOSES a source the stored record already had
+  (`readLosesEvidence`): a locked iPhone reads HealthKit as empty rather than
+  failing, and the seal below is a forced write. The day is also SEALED once: on launch and
+  foreground `sealYesterday` re-reads the previous day in full if its `readAt`
+  predates that day's end, because a record only ever ran to the last moment
+  the app was open and the missing evening then fed the ceiling medians and the
+  accuracy strip. A day that was never read at all is left alone — reading it
+  now would invent a record for a day nobody watched. There is NO memory file: the ceiling is a pure function of
+  history, so "has it moved this month" is `ceilingAt` at two dates and
+  "Clear all data" needs no new reset. The rules, all of which exist because the
+  alternative is confidently telling a chronically ill person something false
+  about their body: **the outcome window is +1 AND +2, never tomorrow** (PEM is
+  delayed, and a verdict read off tomorrow alone clears a day that put somebody
+  on the floor on Thursday); **a minute above the exertion line is priced by how
+  far above it sat** (`hrBoostFor` in `budget/load.ts` is the ONE slope and cap,
+  shared by a logged activity's `avgHr` and the passive row, so the same
+  afternoon cannot be worth two numbers depending on how diligent the journal
+  was — it is relative to the person, never a textbook rate, and continuous, so
+  somebody hovering at their own line is not one beat of watch error away from a
+  different day; the journal cannot hold the curve, so `DayLoad.hrBands` keeps
+  the minutes in three bands, `null` there means UNKNOWN and is charged FLAT,
+  and `backfillHrBands` re-prices older days from the sidecar curve because the
+  ceiling medians graded and flat days together); **steps are a FLOOR, never a sum** (a day with
+  nothing logged still shows a number, and on iOS the total must come from a
+  statistics query, since a paired watch writes the same minutes as the phone
+  and summing the samples double-counts them); **the ember is the only CONTINUOUS
+  animation in the card and runs only when over ON TODAY** — gold is ahead of
+  pace, red is over, and slow motion reads as heat rather than as loading; a
+  finished day keeps the red and loses the motion, enforced in the bar itself
+  (`final-over` can never be hot) rather than only at the call site; **a movement
+  narrates itself once and then stops** (`src/lib/budget/delta.ts` pure +
+  `features/budget/pulse.ts`, one timeline in `features/budget/style.ts` shared
+  by the bar and the subtext): the bar simply travels to its new length while
+  the subtext steps aside for the phrase naming the movement ("+14m · HR above
+  95 bpm"). **LENGTH AND COLOUR ARE THE BAR'S WHOLE VOCABULARY, and a colour is
+  always a STATE.** It used to grow the moved slice in a colour of its own —
+  red for minutes spent, green for minutes bought back — which put a red chip
+  on a plain green bar for two seconds on a day that was never over anything,
+  reading as a verdict on the minutes rather than as the bar arriving
+  somewhere new. What changes colour now is the WHOLE fill, and only when the
+  state does: green to gold across the pace marker, gold to red past the
+  ceiling, and back the same way when minutes are bought back, with the ember
+  fading out on the same clock rather than snapping off (`PULSE_TINT_MS`). The
+  phrase names the biggest SPEND ROW
+  that moved the way the bar went, never the net and never a cause of its own
+  invention; a movement it cannot attribute to a row gets no phrase. It is UI
+  memory only, so the first build after a cold start never pulses; **filling the
+  bar is never an achievement**, so nothing may congratulate it and no copy may imply
+  unspent budget was wasted; **a downturn, a crash-grade day or a strain ALERT
+  publishes NO number at all**, because a small budget on a bad day is still an
+  invitation to spend it; and **credits REFUND** (legs-up and breathwork buy
+  minutes back, capped at a quarter of what the day cost, and the copy says
+  "bought back" — a test pins that it never says "eased", since the words and
+  the maths have to agree). **There is a budget from day one.** `PRIOR_BY_GRADE`
+  starts it from the day's own score and every held day pulls it toward what
+  this person has actually absorbed; the strip wears "Learning · day 3" and the
+  softened "About 4h" form until it is fitted, and it shows on the unscored and
+  baseline-waiting cards too, which is the one thing on those cards that is not
+  empty.
+  **A finished day speaks in the past tense**, everywhere: the strip's figure
+  is what the day COST, and the sheet, the spend drill-in and the envelope rows
+  drop "today", "so far", "yet" and "this morning" (`past` is threaded into
+  `buildBurn` and `buildEnvelope` for copy alone — the arithmetic is identical,
+  and a coverage test pins that no present-tense string reaches a past view).
+  **The steps ask is an accusation, so it is latched**: `stepsMissing` clears
+  for good once a read has ever brought back a count
+  (`budget/stepsMemory.ts`, flags MMKV), on top of the seven-day journal
+  lookback — telling somebody who granted the permission that it is missing is
+  worse than staying quiet.
+  **Held-day spend is a LOWER BOUND on capacity, never an estimate of
+  it**: it may only RAISE the ceiling, and lowering needs a DIP as its reason
+  (`calibrate.ts`). Letting a quiet week pull it down was this model's first real
+  bug — run against the demo journal it collapsed a two-month recovery arc to a
+  flat 33 minutes, which is not a person whose capacity is half an hour, it is a
+  person whose phone only saw half an hour. For the same reason a finished day
+  with no logged activity and no health read has an UNKNOWN margin on Progress,
+  not a full one. **Standing still is INFERRED, and says so** (`upright.ts`): a
+  run of minutes with no steps, outside sleep and outside a workout's recovery
+  tail, where the heart sits in the user's own stand-test band. It needs a
+  heart-rate series, caps at five hours, is dropped under six hours of coverage,
+  and the row reads "estimated" with every stretch shaded on the drill-in's
+  trace. Progress gets a `pacing` category after Activity charting MARGIN, not
+  spend, and the budget also **leaves the app in the exports**: `secPacing`
+  (`lib/analysis/reports.ts`, over `budgetSeries`) is a section of the raw data
+  export, the Overall Health Report, the crash analysis and the doctor summary,
+  in effort minutes, with the ceiling framing intact and unobserved days OMITTED
+  rather than reported as having cost nothing. The doctor document gets a
+  matching "ACTIVITY & PACING" instruction saying in as many words that the
+  budget is fitted from this patient's own history and is not a prescribed
+  activity limit. **The Apple Watch mirrors the widgets' frames, it does not compute**
+  (`targets/watch/PacingModel.swift` decodes the SAME `WidgetPacingFrame` the
+  widget target does): `setWatchPacing` in `src/lib/watch/receiver.ts` rides
+  `pushWidgetData`, so one budget build feeds the strip, the widgets and the
+  wrist and three surfaces cannot answer differently. The block is deduped by
+  `watchPacingKey` (`lib/watch/pacing.ts`, pure + tested) with every frame's
+  `at` stripped — frames are absolute instants, so an unchanged budget is not
+  news and the watch simply picks a later frame out of the list it holds, which
+  is also what walks the pace marker while the phone is unreachable. It carries
+  the day key and a block whose day has passed renders as "not reached your
+  watch yet", never as yesterday's figure. The paywall surface is `'pacing'` → ping letter `B`, so **the lambda
+  must be deployed before a build carrying it ships**. Adding steps changed the
+  health read set, so it lives in `STEPS_READ_IDS` under its OWN latch key and is
+  requested only from a tap (`connectPacingHealth`) — `CORE_READ_IDS` and
+  `HK_SET_KEY` are byte-identical to what they were, pinned by
+  `health/__tests__/authSets.test.ts`, or every existing install would meet a
+  HealthKit sheet it tapped nothing to get.
 - **The sleep report is the workout report's twin, and all its math is
   `src/lib/sleep/`.** Tapping the Journal's "Last night" card opens
   `<SleepReportSheet/>` (`src/features/SleepReport.tsx`) with the edit pencil in
@@ -843,7 +1046,31 @@ old web app so old `export.json` files import directly.
   `/ping/pay/D{MMDDYY}{P}{S}` when a locked surface raises the paywall
   (`pingPaywall`, from `usePaywall()`), plus `not` (a notification turned on),
   `pot` (a POTS capture finished), `see` (a gated view opened), `err` (something
-  failed) and `osh`/`odm`/`oac` (an offer shown, dismissed, accepted).
+  failed), `osh`/`odm`/`oac` (an offer shown, dismissed, accepted), and four
+  routes for what people DO in the app, all per-letter capped: `log` (logged BY
+  HAND — `S` sleep once bed and wake are both set, `A` activity, `M` med, `Y`
+  symptom, `W` water, `B` bowel movement, `P` blood pressure, `R` resting HR;
+  `pingLogged`, fired only for NEW entries, never an edit, a live capture or a
+  health-store import, and sending nothing for a reading type with no letter),
+  `use` (`M` Milestones sheet opened, `P` protocol saved), `fnd` (a finding's
+  deep dive opened, fired from `CorrelationSheet` / `ChangeSheet` themselves:
+  `E` early, `U` unconfirmed, `C` biggest change, `R` correlation) and `rpt`
+  (`D` data for prompt, `H` full health report, `C` doctor summary, counted when
+  the prompt sheet opens). The dashboard draws them on *What they log* and *What
+  they dig into*.
+  **An accepted offer that did not become a subscription is `POST /ping/ofl`,
+  the one ping with a BODY** (`reportOfferOutcome`, fed by `onPurchaseOutcome`
+  in `store/iap.ts`, which settles each `subscribe(sku, origin)` attempt ONCE as
+  purchased / cancelled / failed / pending / unstarted / timeout; only attempts
+  an offer card started are reported). The body is `offerFailureBody` in
+  `lib/ping.ts`: expo-iap's `code`, Play's `response` and `sub` codes, and the
+  store's message + debugMessage redacted with the fault rules (again in the
+  lambda). Every attempt lands on an `OFFERFAIL` row; `d` rides the first per
+  offer per Eastern day and alone moves `PING#OFL`, so `ofl / oac` is a
+  headcount. Unlike every other ping it is QUEUED (`pingOflQueue`) and retried on
+  foreground, since `network-error` is a likely reason the purchase failed at
+  all. Read back as `ofl` + `offerFailures` on the report; the dashboard does not
+  draw it yet.
   **A reading taken on the WRIST fires `cap`, `hrv` and `act` from the RECEIVER
   instead** (`pingWristReading` in `store/ping.ts`, called by
   `lib/watch/receiver.ts` and `lib/garmin/receiver.ts` on a fresh HRV arrival
@@ -990,7 +1217,24 @@ old web app so old `export.json` files import directly.
   `initWidgetSync()` on launch, debounced journal changes, and foreground. iOS:
   `modules/widget-bridge` writes it to the `group.com.autonomic.journal` app group
   and reloads WidgetKit; the SwiftUI widgets live in `targets/widget/` (6 widgets,
-  fixed pure-black, the Outlook 270° dial). Android: `react-native-android-widget`
+  fixed pure-black, the Outlook 270° dial). **The two pacing widgets** (small
+  `Pacing`, medium `PacingDetail`, both platforms; `PacingWidgets.swift`) read
+  `payload.pacing.frames`: `buildBudgetAt` builds the budget ONCE and re-derives
+  only the clock-dependent tail every `PACING_FRAME_MIN`, so iOS gets a timeline
+  in which the pace marker walks the day without the app running (Android's
+  periodic headless tick just draws `currentPacingFrame`). A free install gets a
+  `locked` frame carrying no number, an empty journal `awaiting`, a suppressed
+  day `paused` beside its two morning readings. **The medium widget's two tiles
+  are always Spent then Budget** (`liveTiles`), and the wrist shows the same
+  block: the second slot used to swap to the minutes the heart spent above the
+  user's own line whenever there were any, so an ahead-of-pace afternoon read
+  "1h 41m Spent · 38m HR above 94" and the ceiling was nowhere on the home
+  screen or the watch. A tile whose SUBJECT changes with the state is two
+  widgets wearing one layout; the exertion minutes are a row in the spend
+  drill-in, where a number that needs a sentence belongs. The ember is baked static
+  (WidgetKit cannot animate) and there is no hatching anywhere. Figures use
+  Manrope ExtraBold, bundled via the widget `Info.plist` on iOS and the
+  android-widget plugin's `fonts` on Android. Android: `react-native-android-widget`
   (pinned 0.17.1 — 0.18+ needs Expo 54); JSX renderers in `src/widgets/android.tsx`,
   headless handler registered in the custom entry `index.js`, widget list configured
   in app.json. **Android sizing gotcha:** a launcher can hand a widget a taller cell

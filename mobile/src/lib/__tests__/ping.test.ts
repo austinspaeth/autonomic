@@ -89,6 +89,7 @@ describe('cohort ping wire format', () => {
   it('gives every route that carries a letter its own alphabet', () => {
     expect(notifyCode('reminder')).toBe('M');
     expect(notifyCode('crash')).toBe('C');
+    expect(notifyCode('pacing')).toBe('P');
     expect(notifyCode('something-else')).toBeUndefined();
     // The capture pair: two routes, one alphabet, so a completion rate can be
     // read per sensor.

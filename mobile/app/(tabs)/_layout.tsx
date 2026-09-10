@@ -281,14 +281,22 @@ function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
       </View>
       </BarShell>
       </View>
-      {/* The bar's bottom edge is only flat between its two rounded ends, so the
-          tab is capped to that span or its corners would poke out past the curve. */}
-      {showPlan ? <PlanStatusTab trial={tier === 'trial'} maxWidth={rowW > 0 && rowH > 0 ? rowW - rowH : undefined} /> : null}
+      {/* The tab is the bar's full outer width (row + its 1px border) and starts at
+          the bar's vertical midpoint, where the pill is widest, so its straight
+          sides continue the bar's outline and it reads as coming out of the bar. */}
+      {showPlan ? (
+        <PlanStatusTab
+          trial={tier === 'trial'}
+          width={rowW > 0 ? rowW + 2 : undefined}
+          overlap={rowH > 0 ? rowH / 2 + 1 : PLAN_OVERLAP}
+        />
+      ) : null}
     </View>
   );
 }
 
-// Plan status tab: visible height, how far it tucks up under the bar, and the
+// Plan status tab: visible height, how far it tucks up under the bar before the
+// bar has been measured (after that it runs up to the bar's midpoint), and the
 // least clearance it keeps from the bottom of the screen.
 const PLAN_TAB_H = 30;
 const PLAN_OVERLAP = 2;
@@ -296,14 +304,14 @@ const PLAN_EDGE_GAP = 6;
 
 /**
  * A small folder tab hanging off the bottom of the nav bar for anyone who is not
- * on Pro: days left for a trial, the monthly price for the free plan. It shares
- * the bar's material and border, tucks up behind it with no top edge, and sizes
- * to its text, so it reads as part of the nav rather than a second floating pill.
+ * on Pro: days left for a trial, the monthly price for the free plan. It is the
+ * bar's dark glass, borderless, as wide as the bar and running up behind it to its
+ * midpoint, so it reads as part of the nav rather than a second floating pill.
  * The action is a link, not a button: this is a footnote, not a promotion. The
  * whole tab is the tap target and opens the paywall on the monthly plan. Pro
  * never renders it; their plan lives in Settings.
  */
-function PlanStatusTab({ trial, maxWidth }: { trial: boolean; maxWidth?: number }) {
+function PlanStatusTab({ trial, width, overlap }: { trial: boolean; width?: number; overlap: number }) {
   const p = usePalette();
   const { products } = useIap();
   const openPaywall = usePaywall('plan-bar', 'monthly');
@@ -327,13 +335,12 @@ function PlanStatusTab({ trial, maxWidth }: { trial: boolean; maxWidth?: number 
     ? 'of Pro trial'
     : pacing.active
       ? `· Pacing free for ${pacing.daysLeft} more day${pacing.daysLeft === 1 ? '' : 's'}`
-      : `· ${priceOf(products.find((s) => s.productId === MONTHLY_SKU), MONTHLY_SKU)} a month`;
-  const cta = trial ? 'Keep it' : 'Upgrade';
+      : `· ${priceOf(products.find((s) => s.productId === MONTHLY_SKU), MONTHLY_SKU)}/mo for Pro`;
+  const cta = trial ? 'Keep it' : 'Upgrade Now';
 
   const shell = {
-    maxWidth, height: PLAN_TAB_H + PLAN_OVERLAP, paddingTop: PLAN_OVERLAP, paddingHorizontal: 20,
-    flexDirection: 'row' as const, alignItems: 'center' as const, gap: 9,
-    borderWidth: 1, borderTopWidth: 0, borderColor: '#34343b',
+    width, height: PLAN_TAB_H + overlap, paddingTop: overlap, paddingHorizontal: 20,
+    flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'space-between' as const, gap: 9,
     borderBottomLeftRadius: 16, borderBottomRightRadius: 16, overflow: 'hidden' as const,
   };
   const content = (
@@ -356,11 +363,11 @@ function PlanStatusTab({ trial, maxWidth }: { trial: boolean; maxWidth?: number 
       accessibilityLabel={`${headline} ${detail}. ${cta}`}
       onPress={openPaywall}
       hitSlop={{ bottom: 8, left: 6, right: 6 }}
-      style={({ pressed }) => [{ marginTop: -PLAN_OVERLAP, zIndex: 1, elevation: 0 }, pressed && { opacity: 0.7 }]}
+      style={({ pressed }) => [{ marginTop: -overlap, zIndex: 1, elevation: 0 }, pressed && { opacity: 0.7 }]}
     >
       {Platform.OS === 'android'
         ? <View style={[shell, { backgroundColor: '#0a0a0e' }]}>{content}</View>
-        : <BlurView intensity={40} tint="dark" style={[shell, { backgroundColor: 'rgba(6,6,9,0.9)' }]}>{content}</BlurView>}
+        : <BlurView intensity={60} tint="dark" style={[shell, { backgroundColor: 'rgba(6,6,9,0.7)' }]}>{content}</BlurView>}
     </Pressable>
   );
 }

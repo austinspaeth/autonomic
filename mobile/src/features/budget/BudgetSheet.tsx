@@ -16,9 +16,10 @@
  *   zero. The absence is the information.
  */
 import React from 'react';
-import { Text, View } from 'react-native';
+import { Linking, Text, View } from 'react-native';
 import { CardRow, InsightCard } from '../insights/Sections';
 import * as S from '../insights/style';
+import { useNotificationPermission } from '../Reminders';
 import { Icon } from '../../components/Icon';
 import { Button } from '../../components/ui';
 import { hexA } from '../../lib/color';
@@ -26,11 +27,13 @@ import { SCORE_COLORS } from '../../lib/scoring';
 import { CAUTION_GOLD, fonts, usePalette } from '../../theme';
 import { fmtDateLong, todayKey } from '../../lib/dates';
 import { clock, hm, type BudgetView, type SpendRow } from '../../lib/budget';
+import { EXERTION_RUN_MIN } from '../../lib/budget/alerts';
 import { LEARN_DAYS } from '../../lib/budget/baseline';
 import { BUDGET_HELP } from '../../lib/budget/help';
 import { MIN_EVALUATED, MIN_TREND_WEEKS, STRIP_DAYS, type AccuracyWeek } from '../../lib/budget/accuracy';
 import { healthAppName } from '../../lib/health';
 import { connectPacingHealth } from '../../store/budget';
+import { enablePacingNotifications } from '../../store/pacingAlerts';
 import { useAppState } from '../../store/store';
 import { BudgetBar } from './Bar';
 import { CELL_H, CELL_RADIUS, FIGURE_SIZE, TILE_FIGURE } from './style';
@@ -62,6 +65,22 @@ function Tile({ value, label, color }: { value: string; label: string; color?: s
   );
 }
 
+/**
+ * How sure the ceiling is, said in words — the SAME words the Journal strip
+ * puts in its right-hand slot, and in the same order of precedence.
+ *
+ * The strip already says "Low confidence" / "Medium confidence" there, and
+ * says "Learning · day 3" INSTEAD while the ceiling is still being fitted,
+ * because which of those two a reader is looking at is the more useful fact.
+ * It stays quiet on a confident day; the sheet is where the reader came for
+ * the answer, so it names that case too. Reading the strip's own label rather
+ * than the raw confidence is what stops the sheet claiming "High confidence"
+ * on a day the card outside it called day 13 of learning.
+ */
+function confidenceLabel(budget: BudgetView): string {
+  return budget.rightLabel ?? 'High confidence';
+}
+
 /** An empty row's bar: the track, and nothing in it. No texture — the words
  *  beside it already say "Not logged today". */
 function EmptyBar() {
@@ -89,6 +108,47 @@ function StepsCard() {
         Without it the budget only sees what you write down, so it reads a busy day as a quiet one.
       </Text>
       <Action title={`Connect steps from ${healthAppName()}`} onPress={() => { void connectPacingHealth(); }} />
+    </InsightCard>
+  );
+}
+
+/**
+ * The other ask: pacing alerts need notification permission, and the budget is
+ * most useful at exactly the moments nobody has the app open.
+ *
+ * Below the steps card when both show, since steps change what the budget
+ * knows and this only changes who hears about it. Gone the moment permission
+ * lands, which is also the moment every alert the user never chose for turns
+ * on. When the OS will not ask again the button goes to system settings rather
+ * than offering a tap that could only fail.
+ */
+function NotifyCard({ dk }: { dk: string }) {
+  const p = usePalette();
+  const { status, refresh } = useNotificationPermission();
+  const lineBpm = useAppState().days[dk]?.load?.lineBpm ?? null;
+  if (status == null || status === 'granted') return null;
+  const blocked = status === 'blocked';
+  const heart = lineBpm != null
+    ? `your heart rate stays above ${Math.round(lineBpm)} bpm for ${EXERTION_RUN_MIN} minutes`
+    : `your heart rate stays high for ${EXERTION_RUN_MIN} minutes`;
+  const onPress = () => {
+    if (blocked) { void Linking.openSettings(); return; }
+    void enablePacingNotifications().then((r) => {
+      if (r === 'blocked') void Linking.openSettings();
+      refresh();
+    });
+  };
+  return (
+    <InsightCard title="Turn on pacing alerts" bg={p.sunk}>
+      <Text style={{ fontSize: 13.5, lineHeight: 20, color: hexA(p.text, 0.78), marginTop: 2 }}>
+        {`Get a notification when today is running ahead of pace, nearly spent or over budget, and when ${heart}.`}
+      </Text>
+      <Text style={{ fontSize: 12.5, lineHeight: 18, color: p.textDim, marginTop: 8 }}>
+        {blocked
+          ? 'Notifications are turned off for Autonomic in system settings.'
+          : 'Checked through the day, even with the app closed. Nothing leaves your phone.'}
+      </Text>
+      <Action title={blocked ? 'Open Settings' : 'Turn on notifications'} onPress={onPress} />
     </InsightCard>
   );
 }
@@ -129,7 +189,6 @@ function TodayCard({ dk, budget }: { dk: string; budget: BudgetView }) {
     );
   }
 
-  const byNow = budget.pace ? budget.pace.byNowMin : 0;
   // A finished day that went over is still an over-budget day: the figure is
   // red and the third tile counts the overage, exactly as it does live.
   const over = budget.state === 'over' || budget.state === 'final-over';
@@ -171,13 +230,28 @@ function TodayCard({ dk, budget }: { dk: string; budget: BudgetView }) {
         height={14}
       />
 
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 14, marginBottom: 14 }}>
-        <Text style={{ fontSize: 11.5, color: p.textDim }}>{hm(spent)} spent</Text>
-        {/* Only while the pace line still means something. Past the ceiling
-            "2h 05m by now" sits next to an overage of the same shape and reads
-            as the same quantity, which it is not. */}
-        {budget.pace && !over ? <Text style={{ fontSize: 11.5, color: p.textDim }}>{hm(byNow)} by now</Text> : null}
-        {budget.past ? <Text style={{ fontSize: 11.5, color: p.textDim }}>{budget.sub}</Text> : null}
+      {/* Under the bar: what the day has spent OUT OF WHAT IT HAS, and how sure
+          the app is of that ceiling.
+
+          Both halves replaced numbers that read as the same quantity as the
+          bar's own. "1h 41m spent" left the reader to find the ceiling in a
+          tile below, and "1h 06m by now" was a third duration in a row of
+          durations — the pace figure is what the white mark already says, in
+          the one place it can be compared against the fill without arithmetic.
+          The confidence word is the thing the reader cannot see anywhere else
+          on this card. */}
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 10, marginTop: 14, marginBottom: 14 }}>
+        <Text style={{ flexShrink: 1, fontSize: 11.5, color: p.textDim }} numberOfLines={1}>
+          {env != null ? `${hm(spent)} spent of ${hm(env)}` : `${hm(spent)} spent`}
+        </Text>
+        {/* On a finished day the question is not "how sure are you" but "how
+            much of that day did you see", which is the same swap the strip's
+            own right-hand label makes — and it keeps this line short enough to
+            sit beside the spend on a narrow phone. The day's margin is not
+            repeated here: the figure above and the tiles below both state it. */}
+        <Text style={{ flexShrink: 1, fontSize: 11.5, color: p.textDim }} numberOfLines={1}>
+          {budget.past ? (budget.rightLabel ?? '') : confidenceLabel(budget)}
+        </Text>
       </View>
 
       {/* Only while the mark is actually drawn. Past the ceiling the bar has
@@ -185,14 +259,20 @@ function TodayCard({ dk, budget }: { dk: string; budget: BudgetView }) {
           cannot see is worse than no paragraph. */}
       {budget.pace && !over ? (
         <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 9, backgroundColor: p.bg, borderRadius: 14, padding: 12, marginBottom: 15 }}>
-          <View style={{
-            marginTop: 4, width: 0, height: 0,
-            borderLeftWidth: 5, borderRightWidth: 5, borderBottomWidth: 6,
-            borderLeftColor: 'transparent', borderRightColor: 'transparent',
-            borderBottomColor: hexA(p.text, 0.84),
-          }} />
+          {/* The mark itself, drawn the way the bar draws it: the line above,
+              the caret under it. A bare triangle here was a different object
+              from the thing it was explaining. */}
+          <View style={{ alignItems: 'center', marginTop: 3 }}>
+            <View style={{ width: 2, height: 11, borderRadius: 999, backgroundColor: hexA(p.text, 0.84) }} />
+            <View style={{
+              marginTop: 2, width: 0, height: 0,
+              borderLeftWidth: 5, borderRightWidth: 5, borderBottomWidth: 6,
+              borderLeftColor: 'transparent', borderRightColor: 'transparent',
+              borderBottomColor: hexA(p.text, 0.84),
+            }} />
+          </View>
           <Text style={{ flex: 1, fontSize: 12.5, lineHeight: 18, color: p.textDim }}>
-            {`The white mark is where an even day would have you by ${clock(nowMin())}. Left of it is room, past it is ahead.`}
+            The white mark is where you are in the day. If the bar has not reached it, you have energy in reserve. Past it, you are running out for today.
           </Text>
         </View>
       ) : null}
@@ -233,7 +313,7 @@ function coverageLine(budget: BudgetView, steps: number | null): string {
   const parts: string[] = [];
   if (acts) parts.push(`${acts} logged ${acts === 1 ? 'activity' : 'activities'}`);
   if (steps != null) parts.push(`${Math.round(steps).toLocaleString('en-US')} steps`);
-  if (budget.burn.coverage === 'full' || budget.burn.coverage === 'partial') parts.push('your heart-rate day');
+  if (budget.burn.coverage === 'full' || budget.burn.coverage === 'partial') parts.push('your heart rate');
   if (!parts.length) {
     return budget.past
       ? 'Nothing was connected that day, so this is a starting estimate.'
@@ -567,6 +647,7 @@ export function BudgetSheet({ dk, budget }: { dk: string; budget: BudgetView; co
         <Text style={{ fontSize: 13, color: p.textDim, marginTop: 2 }}>{sub}</Text>
       </View>
       {budget.stepsMissing ? <StepsCard /> : null}
+      {isToday ? <NotifyCard dk={dk} /> : null}
       {blank ? (
         <InsightCard title="That day" bg={p.sunk}>
           <Text style={{ fontSize: 13.5, lineHeight: 20, color: hexA(p.text, 0.78), marginTop: 2 }}>

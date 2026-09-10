@@ -622,13 +622,19 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext, cu
       cat: avg == null ? null : avg >= 0 ? 'good' : 'bad',
       catBands: MARGIN_BANDS,
       stats: [
-        { label: 'Over budget', value: over || null, sub: over === 1 ? 'day' : 'days', color: over ? SCORE_COLORS.bad : undefined },
-        { label: 'Under', value: under || null, sub: under === 1 ? 'day' : 'days' },
+        /* A real ZERO, not a dash. There were scored days here — that is what
+           put this card on the screen — so "no days over budget" is an answer
+           and a good one, where the dash the other tiles use means "nothing to
+           say". Both day counts read the same way for the same reason. */
+        { label: 'Over budget', value: over, sub: over === 1 ? 'day' : 'days', color: over ? SCORE_COLORS.bad : undefined },
+        { label: 'Under budget', value: under, sub: under === 1 ? 'day' : 'days' },
         {
-          label: 'Average margin',
+          label: 'Avg margin',
           value: avg == null ? null : Math.round(Math.abs(avg)),
           prefix: avg == null ? undefined : avg >= 0 ? '+' : '-',
-          sub: 'mins',
+          /* No unit. The label says margin, the two tiles beside it are days,
+             and the whole feature speaks in effort minutes — so a unit here is
+             a third small word on a tile that already reads as one number. */
           color: avg == null ? undefined : avg >= 0 ? SCORE_COLORS.good : SCORE_COLORS.bad,
         },
       ],

@@ -178,14 +178,15 @@ window.Analytics = (function () {
     R: 'Progress range',
     I: 'Insights tab',
     P: 'POTS capture',
+    B: 'Pacing budget',
     O: 'Outlook AI report',
     M: 'Metric AI report',
     N: 'Insights AI report',
     S: 'Settings — went looking'
   };
-  var SURFACE_ORDER = ['R', 'I', 'P', 'O', 'M', 'N', 'S', '?'];
+  var SURFACE_ORDER = ['R', 'I', 'P', 'B', 'O', 'M', 'N', 'S', '?'];
   /* The walls, i.e. everything except the one that isn't one. */
-  var WALL_ORDER = ['R', 'I', 'P', 'O', 'M', 'N', '?'];
+  var WALL_ORDER = ['R', 'I', 'P', 'B', 'O', 'M', 'N', '?'];
 
   /* What an install could do at the instant it pinged. `?` is every ping sent
      before the tier letter shipped and is never folded into free: "we did not
@@ -197,10 +198,17 @@ window.Analytics = (function () {
   /* The remaining routes' alphabets. Same `?` rule throughout: a letter we
      could not read is disclosed, never dropped and never folded into a named
      one. */
-  var NOTIFY_NAME = { M: 'Morning reminder', C: 'Crash warning' };
+  var NOTIFY_NAME = { M: 'Morning reminder', C: 'Crash warning', P: 'Pacing alerts' };
   var POTS_NAME = { T: 'Stand test', E: 'Episode' };
   var VIEW_NAME = { I: 'Insights', P: 'Progress' };
   var OFFER_NAME = { A: 'Half-off annual', F: 'Founding member' };
+  var LOG_NAME = {
+    S: 'Sleep', A: 'Activity', M: 'Med or supplement', Y: 'Symptom',
+    W: 'Water', B: 'Bowel movement', P: 'Blood pressure', R: 'Resting heart rate'
+  };
+  var FEATURE_NAME = { M: 'Milestones opened', P: 'Protocol saved' };
+  var FINDING_NAME = { E: 'Early signal', U: 'Unconfirmed pattern', C: 'Biggest change', R: 'Correlation' };
+  var REPORT_NAME = { D: 'Data for prompt', H: 'Full health report', C: 'Doctor summary' };
 
   /**
    * Which alphabet each route speaks, and in what order to draw it.
@@ -213,20 +221,23 @@ window.Analytics = (function () {
   var SLOT_NAME = {
     act: METHOD_NAME, cap: METHOD_NAME, hrv: METHOD_NAME,
     pay: SURFACE_NAME, not: NOTIFY_NAME, pot: POTS_NAME, see: VIEW_NAME,
-    osh: OFFER_NAME, odm: OFFER_NAME, oac: OFFER_NAME
+    osh: OFFER_NAME, odm: OFFER_NAME, oac: OFFER_NAME,
+    log: LOG_NAME, use: FEATURE_NAME, fnd: FINDING_NAME, rpt: REPORT_NAME
   };
   var SLOT_ORDER = {
     act: METHOD_ORDER, cap: METHOD_ORDER, hrv: METHOD_ORDER,
     pay: SURFACE_ORDER,
     not: ['M', 'C', '?'], pot: ['T', 'E', '?'], see: ['I', 'P', '?'],
-    osh: ['A', 'F', '?'], odm: ['A', 'F', '?'], oac: ['A', 'F', '?']
+    osh: ['A', 'F', '?'], odm: ['A', 'F', '?'], oac: ['A', 'F', '?'],
+    log: ['S', 'A', 'M', 'Y', 'W', 'B', 'P', 'R', '?'],
+    use: ['M', 'P', '?'], fnd: ['E', 'U', 'C', 'R', '?'], rpt: ['D', 'H', 'C', '?']
   };
 
   /* Every route the report can carry, in the order the UI reads them. `open`,
      `sub` and `act` predate this list and keep their own bespoke accessors; the
      rest are read through the generic ones below. */
   var KINDS = ['open', 'sub', 'act', 'cap', 'hrv', 'pay', 'not', 'pot', 'see', 'err',
-    'osh', 'odm', 'oac'];
+    'osh', 'odm', 'oac', 'log', 'use', 'fnd', 'rpt'];
 
   /* The report's platform letters, and the names the filter bar speaks. */
   var PLATFORM_LETTER = { ios: 'I', android: 'A', unknown: 'U', I: 'I', A: 'A', U: 'U' };
@@ -660,13 +671,14 @@ window.Analytics = (function () {
      (1) Some routes are capped once per install per Eastern day for the WHOLE
      route (`open`, `cap`, `hrv`, `pay`), so their daily TOTAL is a headcount and
      their letter describes only the first event of the day. Others are capped
-     per LETTER (`not`, `pot`, `see`, the three offer routes), so each LETTER'S
-     count is a headcount and the route's total is not. `PER_LETTER` records
-     which, and `isHeadcount` is the question worth asking before dividing.
+     per LETTER (`not`, `pot`, `see`, the three offer routes, and `log`, `use`,
+     `fnd`, `rpt`), so each LETTER'S count is a headcount and the route's total
+     is not. `PER_LETTER` records which, and `isHeadcount` is the question worth
+     asking before dividing.
 
      (2) `err` carries no letter and is once per install EVER, so it is a running
      population and not a daily count at all — see `errorInstalls`. */
-  var PER_LETTER = { not: 1, pot: 1, see: 1, osh: 1, odm: 1, oac: 1 };
+  var PER_LETTER = { not: 1, pot: 1, see: 1, osh: 1, odm: 1, oac: 1, log: 1, use: 1, fnd: 1, rpt: 1 };
 
   /** Is this route's DAILY TOTAL a count of people? */
   function isHeadcount(kind) { return !PER_LETTER[kind] && kind !== 'err'; }

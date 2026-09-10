@@ -196,8 +196,8 @@ function SubscriptionSheet({ controls }: { controls: SheetControls }) {
   const blurb = isPro
     ? `${price ? `Your plan renews ${period}ly at ${price}. ` : ''}Change your plan or cancel anytime in ${storeName()}. Cancelling keeps access until the period ends.`
     : tier === 'trial'
-      ? 'You have full access while your trial lasts. After it ends you keep journaling and unlimited HRV and POTS capture free forever; Pro unlocks the deep-analysis tools.'
-      : `You're on the free plan — journaling, HRV and POTS captures stay free forever. Upgrade for your full history, Insights, POTS results and AI reports, or restore a previous purchase from ${storeName()}.`;
+      ? 'You have full access while your trial lasts. After it ends you keep journaling and unlimited HRV and POTS capture free forever; Pro unlocks your pacing budget and the deep-analysis tools.'
+      : `You're on the free plan. Journaling, HRV and POTS captures stay free forever. Upgrade for your daily pacing budget, full history, Insights, POTS results and AI reports, or restore a previous purchase from ${storeName()}.`;
   return (
     <View>
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 14 }}>Subscription</Text>

@@ -340,6 +340,24 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
       } catch { return 'unknown'; }
     },
 
+    async requestBackgroundRead() {
+      // Its own request and never part of requestAuth's set: that set is asked
+      // from launch paths, and on a Health Connect too old to know this
+      // permission the set could never read as fully granted, which is the
+      // re-prompt-forever bug ungrantableScope exists for.
+      // NOTE: android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND must be
+      // declared in app.json, for the same reason READ_STEPS must.
+      try {
+        if (!(await ensureInit())) return false;
+        const isBg = (g: { recordType?: string }) => g.recordType === 'BackgroundAccessPermission';
+        let have: { accessType?: string; recordType?: string }[] = [];
+        try { have = await mod.getGrantedPermissions(); } catch { /* treat as none */ }
+        if (have.some(isBg)) return true;
+        await mod.requestPermission([{ accessType: 'read', recordType: 'BackgroundAccessPermission' }]);
+        return (await mod.getGrantedPermissions()).some(isBg);
+      } catch { return false; }
+    },
+
     async readDay(dk) {
       const { from, to } = dayBounds(dk);
       const [rhr, resp, bp, weight] = await Promise.all([

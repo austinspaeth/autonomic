@@ -14,13 +14,16 @@ export type IconName =
   | 'bulb' | 'star' | 'brain' | 'virus' | 'clipboard' | 'smile' | 'ai' | 'chart'
   | 'trendUp' | 'trendDown' | 'triangle' | 'checklist' | 'cell' | 'gut'
   | 'bluetooth' | 'watch' | 'plus' | 'trash' | 'settings' | 'sun' | 'play' | 'stop'
-  | 'camera' | 'lock' | 'bell' | 'clock' | 'eye' | 'eyeOff' | 'minimize' | 'calendar' | 'dots';
+  | 'camera' | 'lock' | 'bell' | 'clock' | 'eye' | 'eyeOff' | 'minimize' | 'calendar' | 'dots'
+  | 'battery';
 
 const P: Record<IconName, string[]> = {
   heartPulse: ['M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z', 'M3.22 12H9.5l.6-1.3 1.9 4.6 2-7 1.5 3.7h5.27'],
   wind: ['M12.8 19.6A2 2 0 1 0 14 16H2', 'M17.5 8a2.5 2.5 0 1 1 2 4H2', 'M9.8 4.4A2 2 0 1 1 11 8H2'],
   droplet: ['M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z'],
   gauge: ['m12 14 4-4', 'M3.34 19a10 10 0 1 1 17.32 0'],
+  // Battery with a charging bolt (Lucide battery-charging): the pacing budget.
+  battery: ['M15 7h1a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-2', 'M6 7H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h1', 'm11 7-3 5h4l-3 5', 'M22 11v2'],
   info: ['M12 16v-4', 'M12 8h.01'],
   download: ['M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4', 'M7 10l5 5 5-5', 'M12 15V3'],
   upload: ['M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4', 'M17 8l-5-5-5 5', 'M12 3v12'],

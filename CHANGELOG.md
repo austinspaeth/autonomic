@@ -7,6 +7,144 @@ in the app's "What's new" card are a separate, deliberately plainer log in
 `mobile/src/lib/whatsNew.ts` — update it whenever `version` in `mobile/app.json`
 crosses to a new `x.x` (a unit test fails if the shipping minor has no entry).
 
+## 1.28.0
+
+**The pacing budget.** Each morning the app estimates how much effort the day
+can absorb, charges what the day actually costs against it, and then checks over
+the following days whether that estimate was right for this person. The engine
+is `mobile/src/lib/budget/` (pure), the shell is `mobile/src/store/budget.ts`
+(the only impure part), and `CLAUDE.md` carries the rules; what follows is what
+is worth knowing that is not in either.
+
+- **Effort minutes, not points or percent.** `LOAD_TABLE` in `budget/load.ts`
+  gives every one of the 27 registry activity types a per-minute weight, checked
+  by a coverage test so a new type cannot ship without a decision about what it
+  costs. The non-exercise rows are the correction the table exists to make:
+  `activityGrade` in `scoring/day.ts` already knew that errands and stressful
+  work are load-bearing for this population, but it only COUNTS entries and
+  cannot tell a five-minute strength set from a ninety-minute one.
+- **Steps are a floor, never a sum**, and on iOS the total comes from
+  `queryStatisticsForQuantity`, not a sample sum: with a watch paired HealthKit
+  holds both devices' step records for the same minutes and summing them reports
+  roughly twice the day. Walking minutes are merged from the sample timestamps
+  for the same reason.
+- **Standing still is inferred** (`budget/upright.ts`) from a run of minutes with
+  no steps where the heart sits in the user's own stand-test band, outside sleep
+  and outside a workout's recovery tail. It needs a heart-rate series, caps at
+  five hours, is dropped under six hours of coverage, and says "estimated".
+  There is no Apple Stand Time equivalent on Android.
+- **Two model bugs found and fixed by the pre-UI check on the demo journal.**
+  (1) Medianing held-day SPEND collapsed a two-month recovery arc to a flat 33
+  minutes, because the app only ever saw a couple of short walks a day. Held-day
+  spend is a LOWER BOUND on capacity, so it may only raise the ceiling; lowering
+  needs a dip as its reason (`calibrate.ts`). (2) A finished day with no logged
+  activity and no health read has an UNKNOWN margin on Progress, not a full one.
+- **The ember loops without a seam, and the gauge burns too.** The drift is a
+  doubled, periodic gradient translated by exactly ONE PERIOD before it snaps
+  back, which is the only translation that lands the pattern where it started.
+  The first version translated a fixed 200pt along a bar nearer 300 wide, so it
+  jolted once every three and a half seconds. The period is now MEASURED
+  (`onLayout` for the bar, the known box for the gauge), and the pattern's
+  periodicity is pinned by `src/lib/__tests__/ember.test.ts`. The palette,
+  timings and stops moved to `src/lib/ember.ts` and are shared, so
+  `ScoreGauge` can run the same motion along its arc — masked to the arc, in the
+  day's OWN grade colour — on a Compromised day or worse. One card, one way of
+  saying "running hot".
+- **Refinements after real use.** The sheet's bar was forced to `'healthy'`, so
+  a day the Journal card had just called over budget opened onto a full green
+  one; it now draws the state the strip drew. The pace explainer and the "by
+  now" readout are hidden past the ceiling, where the marker they describe is
+  not on the chart and "2h 05m by now" sits beside an overage of the same shape.
+  Every action is the app's own primary button rather than a row dressed as one,
+  and the Todo never repeats an ask the card above it already made. Spend rows
+  lost their per-source icons and colours (six tinted glyphs turned a ranked
+  list into a legend to learn first) and name their own threshold: "Minutes HR
+  above 95 bpm", not "Minutes above your line". Gold is gone from the sheet
+  entirely — the grade ladder or a neutral grey, nothing in between. The
+  low-confidence hatch is gone too: it never tiled cleanly to the bar's real
+  width, and the grey fill, the softened figure and the label already said it
+  three times.
+- **The empty bar breathes with the tiles below it.** On a card waiting for a
+  first reading the pacing track wears the Outlook's own placeholder grey and
+  pulses on the same 1600ms as the three ghost bars under it, so the card reads
+  as one object waiting rather than a still bar over three moving ones.
+- **Minutes the heart spends settled are RECOVERY, and pay back.** The symmetric
+  half of the heart-rate row: above the exertion line the day is charged, below
+  a recovery line (the user's own resting median minus a few beats, or 75 when
+  there is no baseline yet) an awake minute pays back. Sleep is excluded, or
+  eight hours of the lowest heart rate of the day would refund more than any
+  real day could spend. It is the only credit nobody has to remember to log,
+  which for this population matters more than it sounds.
+- **Todos are only ever things the app already does.** The posture question is
+  gone from the model, the sheet and the Todo list: a card that interrogates the
+  reader is one they stop opening. What is left is take a reading, log a night,
+  log a stand test, connect steps, log the morning.
+- **The steps signal reads a week, not a day.** "I just granted steps and the
+  Todo is still there" had two causes: a forced refresh returned the in-flight
+  promise of a background check that had already decided the data was fresh, and
+  a step count that had not landed yet (or a genuinely stepless day, which the
+  health store returns as nothing rather than zero) read as denied. Any day in
+  the last week carrying a count is now proof the permission works.
+- **Progress draws margin as columns off a ceiling at zero** (`MarginColumns`),
+  not as a line: over and under are opposite DIRECTIONS from the budget, and a
+  line crossing an axis reads as a value passing through zero rather than as a
+  day that ran out. A day the app could not describe is a gap, never a
+  zero-height column sitting on the ceiling.
+- **The accuracy card grew a weekly trend.** Four weeks of verdicts or more and
+  it draws held-share per week with the ceiling's own movement beside it, which
+  is the only version that answers "is this getting smarter". Under that it
+  falls back to the day strip, which can say something true from a handful of
+  days.
+- **A past day reflects; it does not track.** The Journal card for a finished
+  day reports what it COST against what it had ("2h 10m of 5h 30m", "Finished
+  3h 20m under budget") rather than what is left, which is a live quantity that
+  means nothing once the day is over. No pace marker, no projection, no Todo, and
+  the over-budget bar keeps its red and its halo but loses the drift — a record
+  is not a live warning. Past days ARE computable: the envelope is a pure
+  function of history up to that day and the spend is what was logged plus
+  whatever the health read stored at the time.
+- **A finished day the app never saw says so.** No logged activity and no health
+  read means the spend is UNKNOWN, not zero, so there is no bar at all — just
+  "No pacing data for this day". Days before this shipped mostly read that way,
+  and a margin computed from a zero would have reported the whole budget as room
+  the user had left over on days nobody watched. `dayIsKnown` is the one rule,
+  shared by the strip and the Progress series.
+- **A missing step permission is marked, not buried.** `stepsMissing` answers
+  from what actually LANDED rather than from a permission API — on iOS
+  `readAuthStatus` cannot tell granted from denied once a type is determined, so
+  it would answer "unknown" forever. The strip wears a gold circled "!" and the
+  sheet leads with a card saying what is missing and what it buys. Today only:
+  on a finished day it would be an offer to fix something that has happened.
+- **The pacing bar always wears its halo**, not only when over: a wider,
+  low-alpha copy of the fill in the fill's colour, which is the same figure the
+  gauge above has always drawn under its arc. Only the breathing is reserved for
+  the hot state. Skipped on a zero-width fill, where an outward-inset halo
+  renders as a blob floating at the left end of an empty track.
+- **Performance.** `makeScoreLookup` / `makeSpendLookup` are created once per
+  build and threaded through every pass. Without them the accuracy strip alone
+  is ~1,800 repeated scores and spends on the Journal's render path.
+- **`typesFor` moved to `src/lib/typeResolve.ts`.** It was always pure but lived
+  beside `addCustomType`, which imports the store, so the pure libraries could
+  not resolve a user's own activity types. `typeCatalog.ts` re-exports it and
+  every existing import still works.
+- `shift` / `pick` lifted out of `scoring/strain.ts` into `scoring/baseline.ts`
+  and shared. Strain's own tests pass unchanged.
+- **Permissions.** `StepCount` and `AppleStandTime` on iOS, `Steps` on Android
+  (declared in `app.json` in the same commit, per
+  `ANDROID_HEALTH_PERMISSIONS.md`, and now checked by a unit test). They live in
+  `STEPS_READ_IDS` under their own latch key so `CORE_READ_IDS` and `HK_SET_KEY`
+  stay byte-identical — otherwise every existing install would meet a HealthKit
+  sheet it tapped nothing to get. Asked only from a tap. **Play Console: Steps
+  must be added to the Health Connect data-type declaration before release.**
+- **Ping.** New paywall surface `'pacing'` → letter `B`, in the app, the lambda
+  and the dashboard. **Deploy the lambda before this build ships**: a decoder
+  that predates the letter fails outright rather than degrading.
+- **Two pre-existing breakages fixed.** `landing/scripts/gen-releases.mjs` threw
+  on the build flag spread into the 1.27 note, so `master/releases.js` had been
+  stale since then and `master-ping.test.mjs` crashed once the newest release
+  fell off the chart's window. The generator now reads build flags out of source,
+  and the test fails with a readable message instead of a jsdom TypeError.
+
 ## 1.25.2 (OTA)
 
 Shipped over the air onto the 1.25.2 build rather than as a new version: JS

@@ -11,6 +11,11 @@
  * It is deliberately a UI-only memory. Nothing is persisted: a movement that
  * happened while the app was closed is not news the user needs on launch, and
  * the first build after a cold start therefore never pulses.
+ *
+ * What it publishes is the PHRASE and the direction it points, not a pair of
+ * fill positions: the bar reads its own length off the budget and simply
+ * travels there. It used to be handed a from/to so it could grow a slice in
+ * the change's own colour, which is the part of this gesture that is gone.
  */
 import React from 'react';
 import { budgetDelta } from '../../lib/budget/delta';
@@ -19,20 +24,9 @@ import type { BudgetView, SpendRow } from '../../lib/budget';
 
 export interface BudgetPulse {
   id: number;
-  /** Displayed fill (0..1, already clamped) before and after. */
-  from: number;
-  to: number;
   dir: 'up' | 'down';
   /** "+14m · HR above 95 bpm" */
   text: string;
-}
-
-/** What the bar actually draws, which is not `fill` once the day is over the
- *  ceiling. Exported so the pulse and the bar cannot disagree about where the
- *  slice starts. */
-export function displayFill(budget: BudgetView): number {
-  if (budget.state === 'over' || budget.state === 'final-over') return 1;
-  return Math.max(0, Math.min(1, budget.fill));
 }
 
 /** States with no bar to move, or no live day behind it. */
@@ -40,17 +34,11 @@ const inert = (b: BudgetView) => b.past || b.skeleton || b.state === 'suppressed
 
 export function useBudgetPulse(dk: string, budget: BudgetView, enabled: boolean): BudgetPulse | null {
   const [pulse, setPulse] = React.useState<BudgetPulse | null>(null);
-  const prev = React.useRef<{ dk: string; spent: number; rows: SpendRow[]; fill: number; inert: boolean } | null>(null);
+  const prev = React.useRef<{ dk: string; spent: number; rows: SpendRow[]; inert: boolean } | null>(null);
   const seq = React.useRef(0);
 
   React.useEffect(() => {
-    const cur = {
-      dk,
-      spent: budget.burn.effortMin,
-      rows: budget.burn.rows,
-      fill: displayFill(budget),
-      inert: inert(budget),
-    };
+    const cur = { dk, spent: budget.burn.effortMin, rows: budget.burn.rows, inert: inert(budget) };
     const before = prev.current;
     prev.current = cur;
     // A different day is a different object, not a movement; and a build on
@@ -59,7 +47,7 @@ export function useBudgetPulse(dk: string, budget: BudgetView, enabled: boolean)
     const d = budgetDelta(before.rows, cur.rows, cur.spent - before.spent);
     if (!d) return;
     seq.current += 1;
-    setPulse({ id: seq.current, from: before.fill, to: cur.fill, dir: d.dir, text: d.text });
+    setPulse({ id: seq.current, dir: d.dir, text: d.text });
   }, [dk, budget, enabled]);
 
   React.useEffect(() => {

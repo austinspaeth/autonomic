@@ -1803,7 +1803,7 @@
     var hosts = ['pgTilesToday', 'pgTilesRange', 'pgTilesLife', 'pgTodayNote', 'pgRangeNote', 'pgHeat', 'pgCohortDetail', 'pgTransitions', 'pgConversion',
       'pgActivationRates', 'pgMethodNote', 'pgMeasureNote', 'pgMeasureRates', 'pgReadMethodNote',
       'pgPayNote', 'pgSurfaceNote', 'pgTierNote', 'pgBuildNote', 'pgBuildShareNote',
-      'pgFunnelNote', 'pgOfferNote', 'pgEventNote',
+      'pgFunnelNote', 'pgOfferNote', 'pgEventNote', 'pgLogNote', 'pgDigNote',
       'pgWeekdayRetention', 'pgPlatformNote', 'pgFilterNote'];
     if (!ready || blank) hosts.forEach(function (id) {
       var n = document.getElementById(id);
@@ -1847,7 +1847,7 @@
       ['pgTimeline', 'pgCurve', 'pgSurvival', 'pgActiveCohort', 'pgPurchaseAge',
         'pgActivationAge', 'pgMethods', 'pgMeasureDaily', 'pgMeasureCurve', 'pgReadMethods',
         'pgPayDaily', 'pgSurfaces', 'pgTiers', 'pgBuilds', 'pgBuildShare',
-        'pgFunnel', 'pgOffers', 'pgEvents',
+        'pgFunnel', 'pgOffers', 'pgEvents', 'pgLogs', 'pgDig',
         'pgPlatforms', 'pgWeekday'].forEach(function (id) {
         drawChart(id, { x: [], series: [], emptyText: 'Waiting for the first ping.' });
       });
@@ -1873,6 +1873,7 @@
     renderPaywall(scoped, days);
     renderOffers(scoped, days);
     renderEvents(scoped, days);
+    renderUsage(scoped, days);
     renderTierBuild(scoped, days);
     /* The one card that stays on the FULL index by design: it is what the
        platform filter is a slice of, so filtering it would leave nothing to
@@ -3752,6 +3753,92 @@
       'have had a bad time — and because it fires only once, it goes quiet on an install that hiccuped ' +
       'months ago and can never say what broke. <b>What</b> broke is the Failures tab, which is fed by a ' +
       'separate route carrying a tag and a redacted message.</p>';
+  }
+
+  /* ------------------------------------------------- journal and feature use
+
+     The four routes that say what people DO once they are in: what they log by
+     hand (`log`), and what they dig into — Milestones and the protocol (`use`),
+     an Insights finding's deep dive (`fnd`), which AI report (`rpt`). Two cards,
+     because seventeen lines on one axis is a legend, not a chart.
+
+     All four are capped per LETTER, so each line is a headcount for that one
+     thing. The number beside each is a share of ACTIVE INSTALL-DAYS over the
+     days the route was running: summed letter counts over summed opens. That is
+     the right ratio for a per-letter route over a range — "of the days somebody
+     was in the app, on how many did they log sleep" — where the last day's share
+     alone would be read off a day that is usually still in progress. Days before
+     a build carrying the route are unknown and left out of both sums. */
+  var LOG_LINES = [
+    { kind: 'log', slot: 'S', name: 'Logged sleep', color: COLOR.s1 },
+    { kind: 'log', slot: 'A', name: 'Added an activity', color: COLOR.s3 },
+    { kind: 'log', slot: 'M', name: 'Logged a med or supplement', color: COLOR.s7 },
+    { kind: 'log', slot: 'Y', name: 'Logged a symptom', color: COLOR.s8 },
+    { kind: 'log', slot: 'W', name: 'Logged water', color: COLOR.s4 },
+    { kind: 'log', slot: 'B', name: 'Logged a bowel movement', color: COLOR.s5 },
+    { kind: 'log', slot: 'P', name: 'Logged blood pressure', color: COLOR.s2 },
+    { kind: 'log', slot: 'R', name: 'Logged resting heart rate', color: COLOR.s6 }
+  ];
+  var DIG_LINES = [
+    { kind: 'use', slot: 'M', name: 'Opened Milestones', color: COLOR.s1 },
+    { kind: 'use', slot: 'P', name: 'Saved their protocol', color: COLOR.s3 },
+    { kind: 'fnd', slot: 'E', name: 'Opened an early signal', color: COLOR.s7 },
+    { kind: 'fnd', slot: 'U', name: 'Opened an unconfirmed pattern', color: COLOR.s8 },
+    { kind: 'fnd', slot: 'C', name: 'Opened the biggest change', color: COLOR.s5 },
+    { kind: 'fnd', slot: 'R', name: 'Opened a correlation', color: COLOR.s6 },
+    { kind: 'rpt', slot: 'D', name: 'AI: data for prompt', color: COLOR.s4 },
+    { kind: 'rpt', slot: 'H', name: 'AI: full health report', color: COLOR.s2 },
+    { kind: 'rpt', slot: 'C', name: 'AI: medical summary for doctor', color: COLOR.green }
+  ];
+
+  function renderSlotLines(ix, days, lines, chartId, noteId, emptyText) {
+    var built = lines.map(function (L) {
+      var known = days.filter(function (d) { return A.kindKnown(ix, L.kind, d); });
+      var active = known.reduce(function (a, d) { return a + A.activeOn(ix, d); }, 0);
+      var total = A.slotOver(ix, L.kind, days, L.slot);
+      return {
+        L: L,
+        total: total,
+        known: known.length,
+        share: active ? (total / active) * 100 : null,
+        values: days.map(function (d) {
+          return A.kindKnown(ix, L.kind, d) ? A.slotOn(ix, L.kind, d, L.slot) : null;
+        })
+      };
+    });
+    /* Flat-zero lines are dropped, the rule `renderEvents` follows: an empty
+       band in a legend reads as "none today" when it means "never". */
+    var live = built.filter(function (l) { return l.total > 0; });
+
+    drawChart(chartId, {
+      x: days.map(dayX), height: 240, format: fmtInt, xLabel: 'Day',
+      series: live.map(function (l) {
+        return { key: l.L.kind + l.L.slot, name: l.L.name, color: l.L.color, type: 'line', values: l.values };
+      }),
+      emptyText: emptyText
+    });
+
+    var running = built.some(function (l) { return l.known > 0; });
+    var rows = live.map(function (l) {
+      return '<div><span>' + esc(l.L.name) + '</span><b>' + fmtInt(l.total) + '</b>' +
+        '<span class="note">' +
+        (l.share === null ? 'over ' + l.known + ' day' + (l.known === 1 ? '' : 's')
+          : fmtPct(l.share) + ' of active install-days') +
+        '</span></div>';
+    }).join('');
+
+    document.getElementById(noteId).innerHTML = rows
+      ? '<div class="mini-rows">' + rows + '</div>'
+      : '<p class="hint" style="margin:8px 0 0">' +
+        (running
+          ? 'Nothing counted in this range.'
+          : 'No build carrying these counters has pinged in this range yet. Days before one did are unknown, not zero.') +
+        '</p>';
+  }
+
+  function renderUsage(ix, days) {
+    renderSlotLines(ix, days, LOG_LINES, 'pgLogs', 'pgLogNote', 'Nothing logged by hand in this range.');
+    renderSlotLines(ix, days, DIG_LINES, 'pgDig', 'pgDigNote', 'Nothing opened in this range.');
   }
 
   /* ------------------------------------------------- 5g. tier and build
@@ -8624,7 +8711,11 @@
     { key: 'err', label: 'Failure', color: COLOR.red, note: 'once per install, ever' },
     { key: 'osh', label: 'Offer shown', color: ENTITY.sales, note: 'an offer was shown' },
     { key: 'odm', label: 'Offer dismissed', color: COLOR.muted, note: 'and turned down' },
-    { key: 'oac', label: 'Offer accepted', color: COLOR.green, note: 'buy button tapped' }
+    { key: 'oac', label: 'Offer accepted', color: COLOR.green, note: 'buy button tapped' },
+    { key: 'log', label: 'Logged', color: COLOR.s1, note: 'logged something by hand' },
+    { key: 'use', label: 'Feature', color: COLOR.s3, note: 'Milestones opened or protocol saved' },
+    { key: 'fnd', label: 'Finding', color: COLOR.s7, note: 'opened a finding\'s deep dive' },
+    { key: 'rpt', label: 'AI report', color: COLOR.s4, note: 'built an AI report' }
   ];
 
   /**

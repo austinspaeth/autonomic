@@ -27,7 +27,7 @@ import {
 import { detectDownturn } from './scoring/downturn';
 import { detectStrain } from './scoring/strain';
 import { WIDGET_WINDOW_DAYS, trendDirection, type TrendMetricId } from './trends';
-import type { AppState, DayLoad, DayRecord } from './types';
+import type { AppState, DayRecord } from './types';
 
 /* ---------- payload shape (decoded verbatim by the Swift widgets) ---------- */
 
@@ -307,28 +307,22 @@ function hardFigure(v: BudgetView): { figure: string; sub: string } {
 }
 
 /**
- * The medium widget's two tiles.
+ * The medium widget's two tiles, and they are the same two in every state.
  *
- * Spent always leads. Beside it: the minutes the heart sat above the user's
- * own exertion line when there were any, since that is the part of a day a
- * figure alone cannot show — and the budget itself otherwise, because an
- * empty "0m above" tile would invent a problem. Over budget it is always the
- * budget, so the overage is checkable in place. The label names the actual
- * line in bpm rather than an abstraction of it.
+ * Spent, then Budget. The second slot used to be given to the minutes the
+ * heart sat above the user's own exertion line whenever there were any, which
+ * meant the widget stopped answering "out of how much" on exactly the days it
+ * mattered: an ahead-of-pace afternoon read "1h 41m Spent · 38m HR above 94"
+ * and the ceiling was nowhere on the home screen or the wrist. A tile whose
+ * SUBJECT changes with the state is not a readout, it is two different widgets
+ * wearing one layout. The exertion minutes are still a row in the spend
+ * drill-in, which is where a number that needs a sentence belongs.
  */
-function liveTiles(v: BudgetView, state: WidgetPacingState, load: DayLoad | undefined): WidgetPacingTile[] {
-  const env = v.envelope.effortMin ?? 0;
-  const spent: WidgetPacingTile = { value: hm(v.burn.effortMin), label: 'Spent', color: TEXT };
-  const budget: WidgetPacingTile = { value: hm(env), label: 'Budget', color: DIM };
-  const above = load?.hrAboveMin;
-  if (state !== 'over' && above != null && above >= 1 && load?.lineBpm != null) {
-    return [spent, {
-      value: hm(above),
-      label: `HR above ${Math.round(load.lineBpm)}`,
-      color: state === 'ahead' ? CAUTION_GOLD : TEXT,
-    }];
-  }
-  return [spent, budget];
+function liveTiles(v: BudgetView): WidgetPacingTile[] {
+  return [
+    { value: hm(v.burn.effortMin), label: 'Spent', color: TEXT },
+    { value: hm(v.envelope.effortMin ?? 0), label: 'Budget', color: DIM },
+  ];
 }
 
 /** A paused day shows the two morning readings the budget reads first, so the
@@ -343,7 +337,7 @@ function pausedTiles(v: BudgetView): WidgetPacingTile[] {
   return [pick('hrv', 'HRV, ms'), pick('restingHr', 'Resting HR')].filter((t): t is WidgetPacingTile => t != null);
 }
 
-export function pacingFrame(v: BudgetView, at: Date, load?: DayLoad): WidgetPacingFrame {
+export function pacingFrame(v: BudgetView, at: Date): WidgetPacingFrame {
   const base = blankFrame(at);
 
   if (v.state === 'suppressed') {
@@ -369,12 +363,12 @@ export function pacingFrame(v: BudgetView, at: Date, load?: DayLoad): WidgetPaci
       sub: 'Resting brings this down', subWide: v.sub,
       fill: 1, fillColor: ACCENT, ember: staticEmber(ACCENT),
       badge: 'OVER', badgeColor: ACCENT,
-      tiles: liveTiles(v, state, load),
+      tiles: liveTiles(v),
     };
   }
 
   const fill = Math.max(0, Math.min(1, v.fill));
-  const tiles = liveTiles(v, state, load);
+  const tiles = liveTiles(v);
 
   if (state === 'ahead') {
     const runsOut = v.pace?.runsOutMin;
@@ -431,11 +425,10 @@ function buildPacing(state: AppState, days: DaysMap, dk: string, ctx: ScoreConte
     brief: true,
   }, nows);
 
-  const load = days[dk]?.load;
   const frames: WidgetPacingFrame[] = [];
   let last = '';
   views.forEach((v, i) => {
-    const f = pacingFrame(v, nows[i], load);
+    const f = pacingFrame(v, nows[i]);
     // Before wake and after the day ends the marker does not move, so those
     // frames are identical to their neighbour and would only pad the payload.
     const sig = JSON.stringify({ ...f, at: '' });
@@ -601,6 +594,12 @@ async function pushWidgetData(): Promise<void> {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     try { (require('./diagnostics/errorLog') as typeof import('./diagnostics/errorLog')).logError('widgets.push', e); } catch { /* ignore */ }
   }
+}
+
+/** Push now, without waiting on the journal debounce. For a background
+ *  wake-up, where that timer may never fire before the app is suspended. */
+export function syncWidgetsNow(): Promise<void> {
+  return pushWidgetData();
 }
 
 let widgetSyncArmed = false;

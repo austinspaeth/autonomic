@@ -24,6 +24,11 @@ GET  https://api.autonomic.care/ping/err/D082126I    (a failure; once per instal
 GET  https://api.autonomic.care/ping/osh/D082126IA   (offer shown)
 GET  https://api.autonomic.care/ping/odm/D082126IA   (...dismissed)
 GET  https://api.autonomic.care/ping/oac/D082126IA   (...accepted)
+POST https://api.autonomic.care/ping/ofl/D082126IA   (...accepted, then did NOT subscribe; JSON body says why)
+GET  https://api.autonomic.care/ping/log/D082126IS   (logged by hand: S sleep, A activity, M med, Y symptom, W water, B bowel, P BP, R resting HR)
+GET  https://api.autonomic.care/ping/use/D082126IM   (feature used: M Milestones opened, P protocol saved)
+GET  https://api.autonomic.care/ping/fnd/D082126IR   (finding opened: E early, U unconfirmed, C biggest change, R correlation)
+GET  https://api.autonomic.care/ping/rpt/D082126IH   (AI report built: D data for prompt, H full health report, C doctor summary)
 GET  https://api.autonomic.care/ping/report?key=...&since=2026-08-01
 
 GET  https://api.autonomic.care/fault/D082126I-TP-V1.26.0?t=health.check&m=timeout+after+%3Cn%3Ems&n=17&d=1
@@ -377,9 +382,13 @@ the WHOLE route. A day's rows therefore sum to a headcount, which is what makes
 `hrv[day] / open[day]` a share of people — and it is also why the letter on those
 routes can only ever describe the FIRST event of the day.
 
-`not`, `pot`, `see`, `osh`, `odm` and `oac` are capped per LETTER. Their letters
-are choices the user made between real alternatives: a stand test is not an
-episode, Insights is not Progress, the morning reminder is not the crash warning.
+`not`, `pot`, `see`, `osh`, `odm`, `oac`, `log`, `use`, `fnd` and `rpt` are
+capped per LETTER. Their letters are choices the user made between real
+alternatives: a stand test is not an episode, Insights is not Progress, the
+morning reminder is not the crash warning, logging a symptom is not logging water.
+`log` counts only NEW entries the user typed in — never an edit, a live capture
+or a health-store import — and `rpt` counts the report being BUILT (its prompt
+sheet opening), since the app cannot see whether it was copied.
 A whole-route cap would have silently dropped whichever came second, which on a
 bad day is exactly the one worth knowing about. The trade is that those routes'
 daily TOTALS are not headcounts; each letter's count still is, which is the
@@ -398,6 +407,15 @@ is diagnosed.
 
 `osh` / `odm` / `oac` are three routes over one alphabet (`A` the half-off annual
 window, `F` founding member), so `oac / osh` is that offer's conversion.
+
+**`POST /ping/ofl` is the gap between `oac` and `sub`, told from the inside.** Same
+code and offer letter, plus a JSON body: `outcome` (`cancelled` / `failed` /
+`pending` / `unstarted` / `timeout`), expo-iap's error `code`, Play's `response`
+and `sub` codes, and the store's message redacted with the fault rules. Every
+attempt lands on an `OFFERFAIL` row (`<day>#<offer>#<outcome>#<hash>`, 400-day TTL,
+`attempts` + `installs`); only a body with `d: 1` (first per offer per install per
+Eastern day) moves the `PING#OFL` day counter, so `ofl / oac` is a share of people.
+Read back as `ofl` and `offerFailures` on the report.
 
 **Accepted means the card's own buy button was tapped.** Whether the purchase
 then went through is `/ping/sub`'s question, and the gap between the two is the
@@ -622,7 +640,7 @@ Two doors onto the same function, because they have different callers:
   the shared key. The email allowlist guards it like everything else there.
 
 Both answer one key per route — `{ since, open, sub, act, cap, hrv, pay, not,
-pot, see, err, osh, odm, oac }` — each row
+pot, see, err, osh, odm, oac, ofl, log, use, fnd, rpt }` — each row
 
 ```jsonc
 {

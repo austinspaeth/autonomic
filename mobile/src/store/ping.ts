@@ -436,7 +436,7 @@ export function pingPaywall(surface: string | undefined): void {
 
 /**
  * Send today's notification-enabled ping: `'reminder'` for the morning nudge,
- * `'crash'` for the rest warning.
+ * `'crash'` for the rest warning, `'pacing'` for pacing alerts.
  *
  * Fired only when one is turned ON and only once the OS schedule actually
  * succeeded — on iOS `scheduleNotificationAsync` throws when the app is not
@@ -448,7 +448,7 @@ export function pingPaywall(surface: string | undefined): void {
  * both. They are separate decisions and one of them is much easier to say yes
  * to than the other.
  */
-export function pingNotifyEnabled(kind: 'reminder' | 'crash'): void {
+export function pingNotifyEnabled(kind: 'reminder' | 'crash' | 'pacing'): void {
   const slot = notifyCode(kind);
   pingDaily('not', slotKey(KEY_LAST_NOT, slot), slot);
 }

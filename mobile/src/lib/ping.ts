@@ -178,16 +178,18 @@ export function surfaceCode(surface: string | undefined): SurfaceCode | undefine
 
 /**
  * Which notification the user just turned ON: `M` the morning reminder, `C` the
- * crash warning. Only an enable is counted — a disable is a different event and
- * counting both here would make the number meaningless in the direction that
- * matters, which is "did anyone accept the ask".
+ * crash warning, `P` pacing alerts (any of the five: they are one ask). Only an
+ * enable is counted — a disable is a different event and counting both here
+ * would make the number meaningless in the direction that matters, which is
+ * "did anyone accept the ask".
  */
-export type NotifyCode = 'M' | 'C';
+export type NotifyCode = 'M' | 'C' | 'P';
 
 /** Map a notification kind onto its marker. */
 export function notifyCode(kind: string | undefined): NotifyCode | undefined {
   if (kind === 'reminder') return 'M';
   if (kind === 'crash') return 'C';
+  if (kind === 'pacing') return 'P';
   return undefined;
 }
 

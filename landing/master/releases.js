@@ -199,5 +199,53 @@ window.RELEASES = [
       "The app now tells you what changed in each new version. This card is it, and it is always here under Settings.",
       "Small refinements to the reading cards."
     ]
+  },
+  {
+    "version": "1.24",
+    "date": "2026-08-11",
+    "notes": [
+      "NEW FEATURE: Insights. A real analysis of your own log rather than a set of AI prompts. It finds what changed and what is linked to what across everything you track, rates its confidence in each finding, and leaves out anything it is unsure of. It all runs on your device, and the AI reports are still there under Ask AI.",
+      "NEW FEATURE: Sleep reports. Tapping the sleep card opens the whole night: why it graded the way it did, your heart rate and breathing through the night, when each stage happened, and how your schedule and hours compare with your recent nights.",
+      "Your Journal now points out real improvements as they happen, like a lower resting heart rate or steadier sleep, and takes you straight to the chart behind it.",
+      "Every metric explains itself. Tap the \"?\" on any card for what it is in plain terms and what it means for you."
+    ]
+  },
+  {
+    "version": "1.25",
+    "date": "2026-08-19",
+    "notes": [
+      "A new HRV reading view. Live heart rate, beat-to-beat and SDNN as the reading runs, with signal quality on screen so you know it is working.",
+      "You can now minimize a reading. It keeps running in the background while you use your journal, and picks up where it left off.",
+      "The app watches your readings and workouts for early warning signs and tells you when a crash may be coming.",
+      "Better Insights. Stronger correlations across what you track, and a new card for what is not moving the needle at all.",
+      "Plus minor fixes and interface improvements throughout the app."
+    ]
+  },
+  {
+    "version": "1.26",
+    "date": "2026-08-27",
+    "notes": [
+      "NEW - Garmin watch support added! Take an HRV reading on your Garmin and it lands in your journal when it finishes.",
+      "A more streamlined onboarding process, plus other interface and performance improvements."
+    ]
+  },
+  {
+    "version": "1.27",
+    "date": "2026-09-08",
+    "notes": [
+      "A redesigned Autonomic Outlook card. Your score now shows how it is trending against your own recent days, with the details that matter most on the card itself.",
+      "Expanded Garmin watch support. The companion app now runs on a much wider range of Garmin watches.",
+      "POTS stand tests and episode captures are now part of the free plan. Take a reading whenever you need one. Reading the graded result stays part of Pro.",
+      "A number of bug fixes and performance improvements."
+    ]
+  },
+  {
+    "version": "1.28",
+    "date": "2026-09-09",
+    "notes": [
+      "NEW FEATURE: Pacing budget. Each morning your own readings set a budget for the day, in minutes of effort you can actually picture. The app tracks what the day spends and shows you where you stand, right on your Outlook card.",
+      "It bills for the things that really cost you. Not just workouts: time on your feet, minutes above your own exertion line, errands, a hot shower, a hard morning. Lying down with your legs up buys minutes back.",
+      "It gets to know you. The budget starts from a careful estimate and fits itself to your history as the days play out, then tells you honestly how often staying under it actually held."
+    ]
   }
 ];

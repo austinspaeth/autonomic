@@ -1,7 +1,8 @@
 /**
  * Cohort ping — the only endpoint the mobile app itself talks to.
  *
- * Thirteen routes. Twelve public writers, no auth, no body, no response payload:
+ * Eighteen routes. Seventeen public writers, no auth, no response payload, and no
+ * body on any of them but the one POST:
  *
  *   GET /ping/open/D082126I   the app was opened today by an install from that cohort
  *   GET /ping/sub/D082126I    an install from that cohort became a paid subscriber
@@ -16,6 +17,17 @@
  *   GET /ping/osh/D082126IA   an OFFER was shown today
  *   GET /ping/odm/D082126IA   ...and dismissed
  *   GET /ping/oac/D082126IA   ...or accepted
+ *  POST /ping/ofl/D082126IA   ...accepted, and it did NOT become a subscription
+ *                             (JSON body: which way it fell through, and why)
+ *   GET /ping/log/D082126IS   an install LOGGED something by hand today (S sleep,
+ *                             A activity, M med, Y symptom, W water, B bowel,
+ *                             P blood pressure, R resting HR)
+ *   GET /ping/use/D082126IM   an install used a FEATURE (M Milestones, P protocol saved)
+ *   GET /ping/fnd/D082126IR   an install opened a FINDING's deep dive (E early,
+ *                             U unconfirmed, C biggest change, R correlation)
+ *   GET /ping/rpt/D082126IH   an install built an AI REPORT (D data, H health, C doctor)
+ *
+ * The last four are all capped per install per day PER LETTER, like `see`.
  *
  * plus ONE route that is not a ping at all:
  *
@@ -161,7 +173,8 @@ const KINDS = {
   open: 'OPEN', sub: 'SUB', act: 'ACT',
   cap: 'CAP', hrv: 'HRV',
   pay: 'PAY', not: 'NOT', pot: 'POT', see: 'SEE', err: 'ERR',
-  osh: 'OSH', odm: 'ODM', oac: 'OAC',
+  osh: 'OSH', odm: 'ODM', oac: 'OAC', ofl: 'OFL',
+  log: 'LOG', use: 'USE', fnd: 'FND', rpt: 'RPT',
 };
 
 /** The routes whose slot letter is a capture SENSOR. */
@@ -190,6 +203,7 @@ const SURFACES = {
   R: 'progress-range',
   I: 'insights',
   P: 'pots',
+  B: 'pacing',
   O: 'outlook-ai',
   M: 'metric-ai',
   N: 'insights-ai',
@@ -205,7 +219,7 @@ const SURFACES = {
 const TIERS = { F: 'free', T: 'trial', P: 'pro' };
 
 /** Which notification was turned ON — the NOT route. Only enables are sent. */
-const NOTIFY = { M: 'morning-reminder', C: 'crash-warning' };
+const NOTIFY = { M: 'morning-reminder', C: 'crash-warning', P: 'pacing-alerts' };
 
 /** Which POTS capture finished — the POT route. */
 const POTS = { T: 'stand-test', E: 'episode' };
@@ -216,6 +230,23 @@ const VIEWS = { I: 'insights', P: 'progress' };
 /** Which offer — the OSH / ODM / OAC routes, one alphabet across all three so
  *  the three counts are directly comparable per offer. */
 const OFFERS = { A: 'annual-half-off', F: 'founding-member' };
+
+/** What was logged by hand — the LOG route. New, user-entered entries only;
+ *  edits, captures and health-store imports send nothing. */
+const LOGS = {
+  S: 'sleep', A: 'activity', M: 'med-or-supplement', Y: 'symptom',
+  W: 'water', B: 'bowel-movement', P: 'blood-pressure', R: 'resting-heart-rate',
+};
+
+/** Which feature was used — the USE route. Not gated, which is why these are
+ *  not on SEE. */
+const FEATURES = { M: 'milestones-opened', P: 'protocol-saved' };
+
+/** Which Insights finding was opened into its deep dive — the FND route. */
+const FINDINGS = { E: 'early-signal', U: 'unconfirmed-pattern', C: 'biggest-change', R: 'correlation' };
+
+/** Which AI report was built — the RPT route. */
+const REPORTS = { D: 'data-for-prompt', H: 'full-health-report', C: 'doctor-summary' };
 
 /**
  * The alphabet each route speaks, or null for the routes that carry no letter.
@@ -230,7 +261,8 @@ const OFFERS = { A: 'annual-half-off', F: 'founding-member' };
 const ALPHABET = {
   ACT: METHODS, CAP: METHODS, HRV: METHODS,
   PAY: SURFACES, NOT: NOTIFY, POT: POTS, SEE: VIEWS,
-  OSH: OFFERS, ODM: OFFERS, OAC: OFFERS,
+  OSH: OFFERS, ODM: OFFERS, OAC: OFFERS, OFL: OFFERS,
+  LOG: LOGS, USE: FEATURES, FND: FINDINGS, RPT: REPORTS,
 };
 
 /**
@@ -783,7 +815,7 @@ const REPORT_KINDS = Object.keys(KINDS);
 
 const report = async (since) => {
   const from = isIsoDate(since) ? since : EPOCH;
-  const [rows, faults] = await Promise.all([
+  const [rows, faults, offerFailures] = await Promise.all([
     Promise.all(REPORT_KINDS.map((k) => readDays(KINDS[k], from))),
     // Read alongside the counters rather than behind a second call: the
     // dashboard shows failures against opens ("of the phones in the app today,
@@ -796,8 +828,14 @@ const report = async (since) => {
       console.error('fault read failed', err);
       return [];
     }),
+    // Same rule for the same reason: a partition with no rows at all on any
+    // stage that has not yet seen an offer fall through.
+    readOfferFailures(from).catch((err) => {
+      console.error('offer failure read failed', err);
+      return [];
+    }),
   ]);
-  const out = { since: from, faults };
+  const out = { since: from, faults, offerFailures };
   REPORT_KINDS.forEach((k, i) => { out[k] = rows[i]; });
   return out;
 };
@@ -883,6 +921,219 @@ const handleFault = async (event) => {
   return noContent;
 };
 
+/* ------------------------------------------------ offers that fell through */
+
+/**
+ * `POST /ping/ofl/{code}`: an offer was ACCEPTED (its buy button tapped,
+ * `/ping/oac`) and did not become a subscription. The code is the one every
+ * ping sends, its slot letter the offer (A / F); the JSON body says which way
+ * the purchase fell through and, in the store's own words, why:
+ *
+ *   { "outcome": "failed", "code": "network-error", "response": 12,
+ *     "sub": "payment-declined-due-to-insufficient-funds",
+ *     "message": "Network unavailable", "d": 1 }
+ *
+ * The one ping with a body, and a POST for that reason: the store's text is the
+ * diagnosis and it is free text. `code`, `response` and `sub` are the billing
+ * library's own enumerations; `message` goes through `redactFault` here
+ * whatever the client did.
+ *
+ * TWO THINGS ARE WRITTEN, the same split the fault route makes:
+ *
+ *   PING#OFL    the day counter, moved ONLY by a report carrying `d` (the
+ *               client's first per offer per Eastern day). Same shape and same
+ *               per-letter cap as `oac`, so `ofl / oac` is a share of the people
+ *               who accepted rather than of taps.
+ *   OFFERFAIL   one row per distinct way of falling through per day,
+ *               `<day>#<offer>#<outcome>#<hash>`, counting every ATTEMPT — so
+ *               somebody declined three times is one install and three attempts.
+ *
+ * Outcomes: `cancelled` (backed out of the store sheet), `failed` (the store
+ * answered with an error), `pending` (Ask to Buy, a Play cash payment: it may
+ * still charge, and `sub` will say), `unstarted` (the app never reached the
+ * store sheet), `timeout` (neither answer inside two minutes; a purchase that
+ * completes later still lands as `sub`). An outcome this file does not know is
+ * stored as `unknown` rather than refused, so the client can learn one first.
+ */
+const OUTCOMES = { cancelled: 1, failed: 1, pending: 1, unstarted: 1, timeout: 1 };
+
+/** Long enough to read every annual milestone (30, 90, 180 and 365 days after
+ *  install) against the one before it. Rows are per distinct failure, not per
+ *  attempt, so this costs little. */
+const OFFER_FAIL_TTL_DAYS = 400;
+
+/** A body larger than this is not one the app wrote. */
+const OFFER_BODY_MAX = 4096;
+
+/** A billing-library enumeration (`network-error`, `user-ineligible`). Checked,
+ *  not cleaned: anything else is not one of theirs. */
+const safeCode = (raw) => {
+  if (typeof raw !== 'string') return null;
+  const s = raw.trim().toLowerCase();
+  return /^[a-z0-9][a-z0-9_-]{0,47}$/.test(s) ? s : null;
+};
+
+/** Decode and clamp one report body, or null if it is not one. Pure. */
+const readOfferFailure = (event) => {
+  let raw = event?.body;
+  if (typeof raw !== 'string' || !raw) return null;
+  if (event.isBase64Encoded) raw = Buffer.from(raw, 'base64').toString('utf8');
+  if (raw.length > OFFER_BODY_MAX) return null;
+  let b;
+  try { b = JSON.parse(raw); } catch { return null; }
+  if (!b || typeof b !== 'object' || Array.isArray(b)) return null;
+  const r = b.response;
+  return {
+    outcome: OUTCOMES[b.outcome] ? b.outcome : 'unknown',
+    code: safeCode(b.code),
+    response: typeof r === 'number' && Number.isInteger(r) && Math.abs(r) < 1000 ? r : null,
+    sub: safeCode(b.sub),
+    msg: redactFault(b.message),
+    installDay: b.d === 1 || b.d === '1',
+  };
+};
+
+/** The row one fall-through lands on. Everything the dashboard shows is in the
+ *  hash, so two rows that read identically are one row. */
+const offerFailKey = (day, offer, f) => `${day}#${offer}#${f.outcome}#${
+  hash8([f.code || '', f.response == null ? '' : f.response, f.sub || '', f.msg].join('|'))}`;
+
+/**
+ * Count one attempt on its row, creating it on first sight. The splits count
+ * ATTEMPTS and each sums to `attempts`; `installs` is install-days, moved only
+ * by `d`. Unlike the fault route there is no retry loop to guard against here —
+ * every attempt is a tap on a buy button — so weighting by attempts is honest.
+ */
+const bumpOfferFailure = async (day, offer, f, platform, tier, version, nowMs) => {
+  const add = new UpdateCommand({
+    TableName: TABLE,
+    Key: { PK: 'OFFERFAIL', SK: offerFailKey(day, offer, f) },
+    UpdateExpression: [
+      'SET #platforms.#p = if_not_exists(#platforms.#p, :zero) + :one',
+      '#versions.#v = if_not_exists(#versions.#v, :zero) + :one',
+      '#tiers.#t = if_not_exists(#tiers.#t, :zero) + :one',
+      '#attempts = if_not_exists(#attempts, :zero) + :one',
+      '#installs = if_not_exists(#installs, :zero) + :d',
+      '#day = :day, #offer = :offer, #outcome = :outcome',
+      '#code = :code, #response = :response, #sub = :sub, #msg = :msg',
+      '#first = if_not_exists(#first, :now)',
+      '#last = :now',
+      '#ttl = :ttl',
+      'entityType = :et',
+    ].join(', '),
+    ExpressionAttributeNames: {
+      '#platforms': 'platforms', '#p': platform || 'U',
+      '#versions': 'versions', '#v': version || '?',
+      '#tiers': 'tiers', '#t': tier || '?',
+      '#attempts': 'attempts', '#installs': 'installs',
+      '#day': 'day', '#offer': 'offer', '#outcome': 'outcome',
+      '#code': 'code', '#response': 'response', '#sub': 'sub', '#msg': 'msg',
+      '#first': 'firstAt', '#last': 'lastAt', '#ttl': 'expiresAt',
+    },
+    ExpressionAttributeValues: {
+      ':zero': 0,
+      ':one': 1,
+      ':d': f.installDay ? 1 : 0,
+      ':day': day,
+      ':offer': offer,
+      ':outcome': f.outcome,
+      ':code': f.code,
+      ':response': f.response,
+      ':sub': f.sub,
+      ':msg': f.msg,
+      ':now': new Date(nowMs).toISOString(),
+      ':ttl': Math.floor(nowMs / 1000) + OFFER_FAIL_TTL_DAYS * 86400,
+      ':et': 'OFFER_FAIL',
+    },
+  });
+
+  try {
+    await ddb.send(add);
+  } catch (err) {
+    // Same shape as `bump`: nested maps cannot be written before they exist.
+    if (err?.name !== 'ValidationException') throw err;
+    await ddb.send(new UpdateCommand({
+      TableName: TABLE,
+      Key: { PK: 'OFFERFAIL', SK: offerFailKey(day, offer, f) },
+      UpdateExpression: 'SET #platforms = if_not_exists(#platforms, :empty), '
+        + '#versions = if_not_exists(#versions, :empty), #tiers = if_not_exists(#tiers, :empty)',
+      ExpressionAttributeNames: { '#platforms': 'platforms', '#versions': 'versions', '#tiers': 'tiers' },
+      ExpressionAttributeValues: { ':empty': {} },
+    }));
+    await ddb.send(add);
+  }
+};
+
+/** Every offer fall-through row from `since` onwards, returned under
+ *  `offerFailures` on the report. */
+const readOfferFailures = async (since) => {
+  const rows = [];
+  let ExclusiveStartKey;
+  do {
+    // eslint-disable-next-line no-await-in-loop
+    const res = await ddb.send(new QueryCommand({
+      TableName: TABLE,
+      KeyConditionExpression: 'PK = :pk AND SK >= :since',
+      ExpressionAttributeValues: { ':pk': 'OFFERFAIL', ':since': since },
+      ExclusiveStartKey,
+    }));
+    (res.Items || []).forEach((item) => {
+      const num = (m) => Object.keys(m || {}).reduce((a, k) => {
+        a[k] = Number(m[k]) || 0;
+        return a;
+      }, {});
+      rows.push({
+        key: item.SK,
+        day: item.day || String(item.SK || '').slice(0, 10),
+        offer: item.offer || null,
+        offerName: OFFERS[item.offer] || null,
+        outcome: item.outcome || 'unknown',
+        code: item.code || null,
+        response: typeof item.response === 'number' ? item.response : null,
+        sub: item.sub || null,
+        msg: item.msg || '',
+        attempts: Number(item.attempts) || 0,
+        installs: Number(item.installs) || 0,
+        firstAt: item.firstAt || null,
+        lastAt: item.lastAt || null,
+        platforms: num(item.platforms),
+        versions: num(item.versions),
+        tiers: num(item.tiers),
+      });
+    });
+    ExclusiveStartKey = res.LastEvaluatedKey;
+  } while (ExclusiveStartKey && rows.length < FAULT_READ_MAX);
+  rows.sort((a, b) => a.key.localeCompare(b.key));
+  return rows.slice(0, FAULT_READ_MAX);
+};
+
+const handleOfferFailure = async (event) => {
+  if (event?.requestContext?.http?.method !== 'POST') return noContent;
+  const decoded = decodeCohort(event?.pathParameters?.cohort);
+  if (!decoded) return noContent;
+  const { iso: cohort, platform, slot, tier, version } = decoded;
+  // A fall-through that names no offer belongs to nobody's funnel.
+  if (!OFFERS[slot]) return noContent;
+
+  const now = Date.now();
+  if (cohort < EPOCH) return noContent;
+  if (Date.parse(`${cohort}T00:00:00Z`) > now + SKEW_MS) return noContent;
+
+  const f = readOfferFailure(event);
+  if (!f) return noContent;
+
+  const day = easternDay(now);
+  if (f.installDay) {
+    try {
+      await bump('OFL', day, cohort, platform, slot, tier, version);
+    } catch (err) {
+      console.error('ping write failed', 'OFL', err);
+    }
+  }
+  await bumpOfferFailure(day, slot, f, platform, tier, version, now);
+  return noContent;
+};
+
 const handler = async (event) => {
   const path = event?.requestContext?.http?.path || '';
 
@@ -904,6 +1155,17 @@ const handler = async (event) => {
       return await handleFault(event);
     } catch (err) {
       console.error('fault write failed', err);
+      return noContent;
+    }
+  }
+
+  // Before the counters below, which would otherwise take it for one: this
+  // route has a body and its own rows, and the day counter is only one of them.
+  if (path.startsWith('/ping/ofl/')) {
+    try {
+      return await handleOfferFailure(event);
+    } catch (err) {
+      console.error('offer failure write failed', err);
       return noContent;
     }
   }
@@ -946,5 +1208,7 @@ const handler = async (event) => {
 
 module.exports = {
   handler, decodeCohort, cohortKey, buildKey, easternDay, report, ALPHABET, KINDS,
+  LOGS, FEATURES, FINDINGS, REPORTS,
   redactFault, safeTag, faultKey, hash8, FAULT_MSG_MAX, FAULT_TTL_DAYS, FAULT_MAX_N,
+  readOfferFailure, offerFailKey, OUTCOMES, OFFER_FAIL_TTL_DAYS,
 };

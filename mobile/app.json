@@ -39,6 +39,7 @@
       },
       "entitlements": {
         "com.apple.developer.healthkit": true,
+        "com.apple.developer.healthkit.background-delivery": true,
         "com.apple.security.application-groups": [
           "group.com.autonomic.journal"
         ]
@@ -102,6 +103,7 @@
         "android.permission.health.READ_EXERCISE",
         "android.permission.health.READ_DISTANCE",
         "android.permission.health.READ_STEPS",
+        "android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND",
         "android.permission.health.WRITE_HEART_RATE",
         "android.permission.health.WRITE_RESTING_HEART_RATE",
         "android.permission.health.WRITE_HEART_RATE_VARIABILITY",
@@ -261,7 +263,8 @@
       ],
       "./plugins/withWatchBuildVersion",
       "./plugins/withGarminLink",
-      "expo-iap"
+      "expo-iap",
+      "expo-background-task"
     ],
     "experiments": {
       "typedRoutes": false

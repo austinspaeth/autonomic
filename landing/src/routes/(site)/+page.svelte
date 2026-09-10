@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { BRAND_POLYLINE, APP_MARK_PATH, pricing, priceLabel, yearlySavePct, appStoreUrl, playStoreUrl, appStoreLink, playStoreLink, rating, competitor, yearlySaveVsCompetitor } from '$lib/site';
+  import { BRAND_POLYLINE, APP_MARK_PATH, pricing, priceLabel, yearlySavePct, appStoreUrl, playStoreUrl, appStoreLink, playStoreLink, rating, competitor, visibleApp, yearlySaveVsCompetitor } from '$lib/site';
+  import JournalMock from '$lib/JournalMock.svelte';
   import BrandMark from '$lib/BrandMark.svelte';
   import Stars from '$lib/Stars.svelte';
   import { demoReports as reports } from '$lib/demoPrompts';
@@ -8,6 +9,8 @@
   const yearly = priceLabel(pricing.yearly);
   const themMonthly = priceLabel(competitor.monthly);
   const themYearly = priceLabel(competitor.yearly);
+  const visMonthly = priceLabel(visibleApp.monthly);
+  const visYearly = priceLabel(visibleApp.yearly);
 
   // The #pricing comparison, mirroring the app's own "What's free vs Pro" sheet
   // (mobile/src/features/Paywall.tsx — SHARED_ROWS / PRO_ROWS). Keep the two in
@@ -28,10 +31,23 @@
   ];
   const proRows: { label: string; free?: string; pro?: string }[] = [
     { label: 'Progress charts', free: '14 days', pro: 'All views' },
+    { label: 'Daily pacing budget', free: '1 week' },
     { label: 'Full historical metric analysis' },
     { label: 'POTS test & episode results' },
     { label: 'AI insights & doctor reports' }
   ];
+  // ── Pacing section ─────────────────────────────────────────────────────
+  // A still of the app's pacing budget on an over-budget day: the Outlook
+  // strip (figure, ember bar, pace line) beside the "Where it went" drill-in.
+  // Rows mirror the spend rows in mobile/src/lib/budget; `share` is each row's
+  // bar length, and recovery is a refund, so it reads green and negative.
+  const pacingSpend: { label: string; cost: string; share: number; detail: string; refund?: boolean }[] = [
+    { label: 'Minutes above 94 bpm', cost: '1h 48m', share: 72, detail: '48m over 94 bpm, in three stretches' },
+    { label: 'Upright time', cost: '1h 44m', share: 62, detail: '3h 40m standing or walking' },
+    { label: 'Logged activities', cost: '1h 31m', share: 44, detail: 'Running exercise' },
+    { label: 'Recovery time', cost: '-27m', share: 22, detail: 'Legs up 20 minutes, 7 minutes resting', refund: true }
+  ];
+
   const CHECK =
     '<svg class="pr-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>';
 
@@ -60,7 +76,13 @@
     // device, and the restart arrow.
     pointer: { d: ['M9 9l5 12 1.8-5.2L21 14Z', 'M7.2 2.2 8 5.1', 'm5.1 7.2-2.9-.8', 'M14 4.1 12 6', 'm6 12-1.9 2'] },
     restart: { d: ['M3 12a9 9 0 1 0 3-6.7L3 8', 'M3 3v5h5'] },
-    check: { d: ['M20 6 9 17l-5-5'], extra: '<circle cx="12" cy="12" r="10" />' }
+    check: { d: ['M20 6 9 17l-5-5'], extra: '<circle cx="12" cy="12" r="10" />' },
+    // The one glyph with no Icon.tsx twin: the watch's Pacing row draws the SF
+    // Symbol `bolt.batteryblock`, redrawn here at the same weight.
+    batteryBolt: {
+      d: ['M7.5 6V3.8h3V6', 'M13.5 6V3.8h3V6', 'm12.9 9.2-3.1 4.5h4.4l-3.1 4.5'],
+      extra: '<rect x="3" y="6" width="18" height="15" rx="3" />'
+    }
   };
   const waIcon = (name: string, sw = 1.9) => {
     const ic = WA_ICONS[name];
@@ -68,10 +90,22 @@
     return `<svg viewBox="0 0 24 24" fill="${ic.fill ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}${ic.extra ?? ''}</svg>`;
   };
 
-  // The three modes, in the watch home screen's own order. `sub` is the
+  // The four modes, in the watch home screen's own order. `sub` is the
   // subtitle the watch itself shows; `blurb` is the page's longer read.
-  // Tints are DS.accent / DS.blue / DS.purple from DesignSystem.swift.
+  // Tints are DS.gold / DS.accent / DS.blue / DS.purple from DesignSystem.swift.
+  // Pacing leads, as on the watch: it is a thing you CHECK, and its subtitle
+  // is today's figure (PacingFrame.homeSubtitle), kept live by the script.
   const waModes = [
+    {
+      face: 'pace-main',
+      mode: 'pacing',
+      icon: 'batteryBolt',
+      tint: '#f2c740',
+      soft: 'rgba(242,199,64,0.12)',
+      title: 'Pacing',
+      sub: '1h 35m left today',
+      blurb: 'Today’s budget at a glance: what’s left, what’s spent, and where an even day would be by now. Part of Pro.'
+    },
     {
       face: 'hr-main',
       mode: 'hr',
@@ -201,6 +235,46 @@
     if (btn) btn.textContent = during ? e.done : e.start;
   }
 
+  // Pacing (PacingView). A day running AHEAD of pace but not over: the same
+  // 4h 40m budget as the #pacing section, gold fill past the white marker.
+  // It is a day, not a session, so it survives Back and only Restart resets
+  // it. While the face is open the afternoon plays sped up: a minute or two
+  // of spend lands every couple of seconds and the marker creeps, and spend
+  // stops short of the budget, since over is a different state with its own
+  // red ember that this demo is deliberately not showing.
+  var PACE_BUDGET = 280;
+  function paceStart() { return { spent: 185, above: 38, pace: 0.45, nextAt: 0 }; }
+  var pace = paceStart();
+  // budget/format.ts hm(): "45m", "3h", "1h 05m".
+  function hm(min) {
+    var m = Math.max(0, Math.round(min));
+    if (m < 60) return m + 'm';
+    var h = Math.floor(m / 60), r = m % 60;
+    return r ? h + 'h ' + ('0' + r).slice(-2) + 'm' : h + 'h';
+  }
+  function renderPace() {
+    var left = hm(PACE_BUDGET - pace.spent);
+    section.querySelectorAll('[data-wa-pace-home]').forEach(function (n) { n.textContent = left + ' left today'; });
+    var set = function (sel, v) { var n = q('pace-main', sel); if (n) n.textContent = v; };
+    set('[data-wa-pace-fig]', left);
+    set('[data-wa-pace-spent]', hm(pace.spent));
+    set('[data-wa-pace-above]', hm(pace.above));
+    var fill = q('pace-main', '.fill'), mark = q('pace-main', '.mark'), caret = q('pace-main', '.caret');
+    if (fill) fill.style.width = (100 * pace.spent / PACE_BUDGET).toFixed(2) + '%';
+    if (mark) mark.style.left = (100 * pace.pace).toFixed(2) + '%';
+    if (caret) caret.style.left = (100 * pace.pace).toFixed(2) + '%';
+  }
+  function stepPace() {
+    if (now() < pace.nextAt) return;
+    if (pace.nextAt && pace.spent < 250) {
+      pace.spent = Math.min(250, pace.spent + 1 + (Math.random() < 0.45 ? 1 : 0));
+      if (Math.random() < 0.35) pace.above += 1;
+      pace.pace = Math.min(0.66, pace.pace + 0.004);
+    }
+    pace.nextAt = now() + 1800 + Math.random() * 900;
+    renderPace();
+  }
+
   function setRes(f, key, text) { var n = q(f, '[data-wa-res="' + key + '"]'); if (n) n.textContent = text; }
 
   function fillTest() {
@@ -256,7 +330,7 @@
 
   function ensure() {
     var needs = visible && (face === 'test-resting' || face === 'test-standing' ||
-      face === 'ep-measure' || face === 'ep-recovery' || face === 'hr-main');
+      face === 'ep-measure' || face === 'ep-recovery' || face === 'hr-main' || face === 'pace-main');
     if (needs && !ticker) ticker = setInterval(step, 150);
     else if (!needs && ticker) { clearInterval(ticker); ticker = null; }
   }
@@ -268,7 +342,14 @@
     t0 = now();
     for (var k in faces) faces[k].classList.toggle('on', k === name);
     faces[name].scrollTop = 0;
-    var mode = name.indexOf('test-') === 0 ? 'test' : name.indexOf('ep-') === 0 ? 'episode' : name.indexOf('hr-') === 0 ? 'hr' : '';
+    if (name === 'pace-main') {
+      // The bar travels to its length as the face opens, the way the strip's
+      // does in the app, rather than appearing already drawn.
+      var fill = q('pace-main', '.fill');
+      if (fill) { fill.style.transition = 'none'; fill.style.width = '0%'; void fill.offsetWidth; fill.style.transition = ''; }
+      pace.nextAt = 0;
+    }
+    var mode = name.indexOf('test-') === 0 ? 'test' : name.indexOf('ep-') === 0 ? 'episode' : name.indexOf('hr-') === 0 ? 'hr' : name.indexOf('pace-') === 0 ? 'pacing' : '';
     modeBtns.forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-wa-mode') === mode); });
     // The workout session spans a whole flow, so the sensor's first reading is
     // only awaited once — swiping between the HR pages or moving resting →
@@ -286,6 +367,7 @@
   function step() {
     var el = faces[face];
     if (!el) return;
+    if (face === 'pace-main') { stepPace(); return; }
     var ms = now() - t0;
     var st = STAGE[face];
     var t = st ? Math.min(1, ms / st.demo) : 0;
@@ -385,6 +467,7 @@
     var log = el.getAttribute('data-wa-log');
     if (log) { logSymptom(el); return; }
     if (el.getAttribute('data-wa-act') === 'ep-next') { epNext(); return; }
+    if (el.classList.contains('wa-restart')) { pace = paceStart(); renderPace(); }
     var to = el.getAttribute('data-wa-go');
     if (to) go(to);
   });
@@ -411,7 +494,7 @@
       '@type': 'Offer',
       price: '0',
       priceCurrency: pricing.currency,
-      description: `Free to download; the journal is free forever. Autonomic Pro is ${monthly}/month or ${yearly}/year and unlocks your full history, Insights, POTS results and AI reports. HRV capture is unlimited and free, as are POTS stand tests and episode captures. Every install starts with ${pricing.trialDays} days of Pro.`
+      description: `Free to download; the journal is free forever. Autonomic Pro is ${monthly}/month or ${yearly}/year and unlocks your daily pacing budget, your full history, Insights, POTS results and AI reports. HRV capture is unlimited and free, as are POTS stand tests and episode captures. Every install starts with ${pricing.trialDays} days of Pro.`
     },
     featureList:
       'HRV scoring, chest-strap and fingertip-camera HRV capture, blood pressure tracking, orthostatic testing, sleep and symptom logging, trend analysis, clean-day streaks, AI insight reports, offline-first storage',
@@ -435,8 +518,8 @@
     '@context': 'https://schema.org',
     '@type': 'FAQPage',
     mainEntity: [
-      { '@type': 'Question', name: 'How much does Autonomic cost?', acceptedAnswer: { '@type': 'Answer', text: `Autonomic is free to download and the journal is free forever, with no account and no ads. Autonomic Pro is ${monthly} per month or ${yearly} per year and unlocks your full history, Insights, POTS results and AI reports. Live HRV capture is unlimited on the free plan, and so are POTS stand tests and episode captures. Every install opens with ${pricing.trialDays} days of Pro so you can try it before paying. Your data stays private on your device and is never sold.` } },
-      { '@type': 'Question', name: 'What is free and what needs Pro?', acceptedAnswer: { '@type': 'Answer', text: 'Free covers the daily journal (sleep, meds, symptoms, triggers, hydration), manual readings like blood pressure and resting heart rate, your daily autonomic score and outlook, unlimited chest-strap and fingertip-camera HRV capture with no daily cap, POTS stand tests and episode captures, the Apple Watch heart-rate monitor on iPhone, backups and export, plus 14 days of progress charts. Pro adds all progress views, full historical metric analysis, on-device Insights, POTS test and episode results, and AI insight and doctor reports.' } },
+      { '@type': 'Question', name: 'How much does Autonomic cost?', acceptedAnswer: { '@type': 'Answer', text: `Autonomic is free to download and the journal is free forever, with no account and no ads. Autonomic Pro is ${monthly} per month or ${yearly} per year and unlocks your daily pacing budget, your full history, Insights, POTS results and AI reports. Live HRV capture is unlimited on the free plan, and so are POTS stand tests and episode captures. Every install opens with ${pricing.trialDays} days of Pro so you can try it before paying. Your data stays private on your device and is never sold.` } },
+      { '@type': 'Question', name: 'What is free and what needs Pro?', acceptedAnswer: { '@type': 'Answer', text: 'Free covers the daily journal (sleep, meds, symptoms, triggers, hydration), manual readings like blood pressure and resting heart rate, your daily autonomic score and outlook, unlimited chest-strap and fingertip-camera HRV capture with no daily cap, POTS stand tests and episode captures, the Apple Watch heart-rate monitor on iPhone, backups and export, plus 14 days of progress charts. Pro adds your daily pacing budget, all progress views, full historical metric analysis, on-device Insights, POTS test and episode results, and AI insight and doctor reports.' } },
       { '@type': 'Question', name: 'Does it work offline?', acceptedAnswer: { '@type': 'Answer', text: 'Completely. Autonomic is a fully offline app for iOS and Android. All scoring, trends and reports are computed locally, so it works on a plane, in a clinic basement, or anywhere without signal.' } },
       { '@type': 'Question', name: 'Which conditions is it for?', acceptedAnswer: { '@type': 'Answer', text: 'It is built for people managing POTS, dysautonomia, long COVID and post-viral or post-illness autonomic recovery, where day-to-day HRV, heart rate and orthostatic patterns matter.' } },
       { '@type': 'Question', name: 'Is Autonomic available on Android?', acceptedAnswer: { '@type': 'Answer', text: 'Yes, on both iPhone (App Store) and Android (Google Play), at the same price and with the same private, offline design. The Apple Watch companion app is iPhone-only; on Android the stand test, episode capture and HRV readings run in the app itself using a Bluetooth chest strap or the phone camera, and sleep and workouts come from Health Connect.' } },
@@ -543,111 +626,13 @@
     </div>
 
     <div class="hero-stage">
-      <div class="orbit-chip chip-a"><span class="dot" style="background:var(--sky)"></span>RMSSD 34 <em>great</em></div>
-      <div class="orbit-chip chip-b"><span class="dot" style="background:var(--green)"></span>Outlook +12 vs AM</div>
-      <div class="orbit-chip chip-c"><span class="dot" style="background:var(--accent)"></span>2 clean days</div>
+      <div class="orbit-chip chip-a"><span class="dot" style="background:#2ee06a"></span>HRV 42 ms <em>excellent</em></div>
+      <div class="orbit-chip chip-b"><span class="dot" style="background:#16a34a"></span>Outlook ▲ 10 vs 7d avg</div>
+      <div class="orbit-chip chip-c"><span class="dot" style="background:var(--accent)"></span>2h 50m of pacing left</div>
 
       <div class="phone phone-float">
-        <div class="phone-screen">
-          <!-- iOS status bar -->
-          <div class="mk-statusbar">
-            <span class="mk-time">8:00</span>
-            <span class="mk-island"></span>
-            <span class="mk-sysic">
-              <svg class="mk-wifi" viewBox="0 0 16 12" aria-hidden="true"><path d="M8 10.6 5.9 8.4a3 3 0 0 1 4.2 0zM3.8 6.3a6 6 0 0 1 8.4 0l1.3-1.4a8 8 0 0 0-11 0zM1.6 4a9.2 9.2 0 0 1 12.8 0l1.3-1.4a11.1 11.1 0 0 0-15.4 0z" fill="currentColor"/></svg>
-              <svg class="mk-batt" viewBox="0 0 27 12" aria-hidden="true"><rect x="0.5" y="0.5" width="22" height="11" rx="3.2" fill="none" stroke="currentColor" stroke-opacity="0.45"/><rect x="2" y="2" width="19" height="8" rx="2" fill="currentColor"/><path d="M24.2 4.2v3.6a2 2 0 0 0 0-3.6z" fill="currentColor" fill-opacity="0.45"/></svg>
-            </span>
-          </div>
-
-          <!-- Date bar -->
-          <div class="mk-datebar"><span class="mk-arw">‹</span><span class="mk-date">Sat, Aug 1</span><span class="mk-arw">›</span></div>
-
-          <div class="mk-scroll">
-            <!-- Autonomic Outlook -->
-            <div class="mk-daycard">
-              <div class="mk-head">
-                <span class="mk-mode">Autonomic Outlook</span>
-                <span class="mk-chip">Excellent</span>
-              </div>
-              <div class="mk-gauge">
-                <svg viewBox="0 0 176 176" aria-hidden="true">
-                  <path d="M35.67 140.33 A74 74 0 1 1 140.33 140.33" fill="none" stroke="#2b3a2c" stroke-width="15" stroke-linecap="round" />
-                  <path d="M35.67 140.33 A74 74 0 1 1 152.6 118.3" fill="none" stroke="#6ee06e" stroke-width="15" stroke-linecap="round" />
-                </svg>
-                <div class="mk-gauge-in"><div class="mk-num">92</div><div class="mk-den">OUT OF 100</div></div>
-              </div>
-              <div class="mk-pow"><i>i</i> What powers this</div>
-              <div class="mk-status">95% confidence</div>
-              <div class="mk-guide">Strong baseline with reserves to spare. Good for your full protocol.</div>
-            </div>
-
-            <!-- Milestones -->
-            <div class="mk-tile">
-              <span class="mk-tile-ic" style="background:rgba(224,49,39,.16);color:#e03127">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8L3.5 9.7l5.9-.9z"/></svg>
-              </span>
-              <span class="mk-tile-body">
-                <b>Milestones</b>
-                <span class="mk-tile-sub">52 of 75 achieved</span>
-                <span class="mk-bar"><i style="width:69%"></i></span>
-              </span>
-              <span class="mk-chev">›</span>
-            </div>
-
-            <!-- Clean day streak -->
-            <div class="mk-tile">
-              <span class="mk-tile-ic" style="background:rgba(245,158,11,.16);color:#f59e0b">
-                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13 2.5l1.7 4.3 4.3 1.7-4.3 1.7L13 14.5l-1.7-4.3L7 8.5l4.3-1.7zM6.5 14l.9 2.3 2.3.9-2.3.9-.9 2.3-.9-2.3-2.3-.9 2.3-.9z"/></svg>
-              </span>
-              <span class="mk-tile-body">
-                <b>2 <span class="mk-tile-mute">clean days</span> · Building</b>
-                <span class="mk-tile-sub">Clean day. Streak continues.</span>
-              </span>
-              <span class="mk-chev">›</span>
-            </div>
-
-            <!-- Sleep -->
-            <div class="mk-sec">
-              <div class="mk-sec-h">Sleep</div>
-              <div class="mk-sec-card">
-                <div class="mk-head"><span class="mk-mode">Last night</span><span class="mk-chip mk-chip-good">Good</span></div>
-                <div class="mk-big"><b>7.8</b><span>hrs asleep</span></div>
-                <div class="mk-sub">11:24pm → 7:35am · HR 58–91 bpm</div>
-                <div class="mk-stages"><i style="flex:22;background:#4f7cff"></i><i style="flex:19;background:#a06bff"></i><i style="flex:52;background:#3aa0d8"></i><i style="flex:7;background:#4a4a52"></i></div>
-                <div class="mk-legend"><span><i style="background:#4f7cff"></i>Deep 1h 42m</span><span><i style="background:#a06bff"></i>REM 1h 29m</span><span><i style="background:#3aa0d8"></i>Core 4h 5m</span></div>
-              </div>
-            </div>
-
-            <!-- Readings -->
-            <div class="mk-sec">
-              <div class="mk-sec-h">Readings</div>
-              <div class="mk-sec-card mk-sec-list">
-                <div class="mk-row"><span class="mk-ico">✚</span><span class="mk-rt">Morning HRV</span><span class="mk-rv"><i class="dot" style="background:#6ee06e"></i>63 SDNN</span><span class="mk-time-pill">8:28am</span></div>
-                <div class="mk-row"><span class="mk-ico">♡</span><span class="mk-rt">Blood Pressure</span><span class="mk-rv"><i class="dot" style="background:#6ee06e"></i>112/72</span><span class="mk-time-pill">8:40am</span></div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Real tab bar -->
-          <div class="mk-tabbar">
-            <span class="mk-tab mk-tab-brand"><svg viewBox="0 0 651.59 348.34" aria-hidden="true"><path d={APP_MARK_PATH} fill="currentColor" /></svg></span>
-            <span class="mk-tab on">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2.5"/><path d="M9 3.5h6v2H9z" fill="currentColor" stroke="none"/><path d="M9 11h6M9 15h4"/></svg>
-              <b>Journal</b>
-            </span>
-            <span class="mk-tab">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8.5 15v-3M12 15V9.5M15.5 15v-1.8"/></svg>
-              <b>Progress</b>
-            </span>
-            <span class="mk-tab">
-              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3l1.5 3.9L17.4 8.4l-3.9 1.5L12 13.8l-1.5-3.9L6.6 8.4l3.9-1.5zM6.6 14.4l.8 2.1 2.1.8-2.1.8-.8 2.1-.8-2.1-2.1-.8 2.1-.8z"/></svg>
-              <b>Insight</b>
-            </span>
-            <span class="mk-tab mk-tab-gear">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 13.5a7.7 7.7 0 0 0 0-3l1.8-1.4-1.8-3.1-2.2.8a7.6 7.6 0 0 0-2.6-1.5L14.2 3h-3.6l-.4 2.3A7.6 7.6 0 0 0 7.6 6.8l-2.2-.8-1.8 3.1L5.4 10.5a7.7 7.7 0 0 0 0 3l-1.8 1.4 1.8 3.1 2.2-.8a7.6 7.6 0 0 0 2.6 1.5l.4 2.3h3.6l.4-2.3a7.6 7.6 0 0 0 2.6-1.5l2.2.8 1.8-3.1z"/></svg>
-            </span>
-          </div>
-        </div>
+        <!-- The Journal tab as it is today; see $lib/JournalMock.svelte. -->
+        <div class="phone-screen"><JournalMock zoom={268 / 402} height={972} /></div>
       </div>
     </div>
   </div>
@@ -702,6 +687,52 @@
         <p>Get structured prompts packed with your data to share with your AI provider (ChatGPT, Claude, etc) or doctor, so you can find what's working and what's not.</p>
       </li>
     </ol>
+  </div>
+</section>
+
+<!-- ============ PACING ============
+     A still of the app's pacing budget (mobile/src/lib/budget) on an
+     over-budget day. The ember only moves when over, exactly as in the app,
+     and the figures are minutes because that is the only unit the app shows. -->
+<section class="section alt pacing" id="pacing">
+  <div class="pc-glow" aria-hidden="true"></div>
+  <div class="wrap">
+    <div class="section-head center">
+      <p class="eyebrow pc-eyebrow">Pacing <span class="pc-new">New</span></p>
+      <h2 class="h2">Know how much today can take.</h2>
+      <p class="lead">Your morning readings tell Autonomic how much effort today can absorb. That becomes a budget, and it spends down as you move. You see the ceiling coming instead of finding it afterwards.</p>
+    </div>
+
+    <div class="pc-grid">
+      <div class="pc-card">
+        <div class="pc-top">
+          <span class="pc-tag">Pacing budget</span>
+          <span class="pc-state">Over budget</span>
+        </div>
+        <div class="pc-fig"><b>5h 30m</b><span>spent of 4h 40m</span></div>
+        <div class="pc-bar" aria-hidden="true"><i></i></div>
+        <div class="pc-pace">
+          <span>50 minutes past today's estimate</span>
+          <span class="pc-conf"><i aria-hidden="true"></i>High confidence</span>
+        </div>
+        <p class="pc-note">This is the point to ease off. Push much further and tomorrow's HRV usually pays for it.</p>
+      </div>
+
+      <div class="pc-card">
+        <div class="pc-top"><span class="pc-tag">Where it went</span></div>
+        <ul class="pc-rows">
+          {#each pacingSpend as s}
+            <li class="pc-row" class:refund={s.refund}>
+              <div class="pc-row-h"><b>{s.label}</b><span>{s.cost}</span></div>
+              <div class="pc-track" aria-hidden="true"><i style="width:{s.share}%"></i></div>
+              <p>{s.detail}</p>
+            </li>
+          {/each}
+        </ul>
+      </div>
+    </div>
+
+    <p class="pc-foot">Pacing is part of Pro · {pricing.trialDays} days free on install, no card</p>
   </div>
 </section>
 
@@ -814,9 +845,9 @@
   <div class="watch-glow" aria-hidden="true"></div>
   <div class="wrap watch-grid">
     <div class="watch-copy">
-      <span class="watch-pill"><i></i>Apple Watch companion</span>
+      <span class="watch-pill"><i></i>Apple Watch &amp; Garmin companion app</span>
       <h2 class="h2">POTS tools that never leave your wrist.</h2>
-      <p class="lead">The moment the room tilts, the data’s already there. Run the stand test, catch an episode as it happens, or just keep an eye on your heart rate — no phone, no waiting, nothing to miss.</p>
+      <p class="lead">The moment the room tilts, the data’s already there. Check what’s left of today’s budget, run the stand test, catch an episode as it happens, or just keep an eye on your heart rate. No phone, no waiting, nothing to miss.</p>
       <!-- Said up front, not discovered after install. The watch app is iOS-only;
            Android gets the same stand test and episode capture in the phone app,
            reading from a strap or the camera. -->
@@ -847,10 +878,35 @@
               {#each waModes as m}
                 <button type="button" class="wa-row" data-wa-go={m.face}>
                   <span class="wa-row-ic" style="color:{m.tint};background:{m.soft}">{@html waIcon(m.icon)}</span>
-                  <span class="wa-row-tx"><b>{m.title}</b><span>{m.sub}</span></span>
+                  <span class="wa-row-tx"><b>{m.title}</b><span data-wa-pace-home={m.mode === 'pacing' ? '' : undefined}>{m.sub}</span></span>
                   <span class="wa-row-go">›</span>
                 </button>
               {/each}
+            </div>
+
+            <!-- PACING (PacingView). An ahead-of-pace frame as widgets.ts
+                 pacingFrame() resolves it: figure left, "left, running ahead",
+                 CAUTION_GOLD fill past the pace marker, then Spent beside the
+                 minutes HR sat above the user's line, gold because the day
+                 is ahead. Values here are the no-JS still; the script keeps
+                 them moving. -->
+            <div class="wa-face waf-pace" data-wa-face="pace-main">
+              <span class="wa-lbl">Pacing</span>
+              <div class="waf-pace-body">
+                <span class="wa-num waf-pace-fig" data-wa-pace-fig>1h 35m</span>
+                <span class="waf-pace-sub">left, running ahead</span>
+                <div class="waf-pace-bar" aria-hidden="true">
+                  <i class="track"></i>
+                  <i class="fill" style="width:66.07%"></i>
+                  <i class="mark" style="left:45%"></i>
+                  <i class="caret" style="left:45%"></i>
+                </div>
+                <div class="waf-tiles">
+                  <div class="wa-tile"><div class="k">Spent</div><div class="v wa-num" style="color:#f2f2f5" data-wa-pace-spent>3h 05m</div></div>
+                  <div class="wa-tile"><div class="k">HR above 94</div><div class="v wa-num" style="color:#eab308" data-wa-pace-above>38m</div></div>
+                </div>
+              </div>
+              <button type="button" class="wa-btn back" data-wa-go="home">Back</button>
             </div>
 
             <!-- POTS TEST · intro (StandTestViews.IntroView) -->
@@ -1157,7 +1213,7 @@
     <div class="section-head center">
       <p class="eyebrow">Pricing</p>
       <h2 class="h2">The journal is free. Forever.</h2>
-      <p class="lead">Log everything, score every day, read your HRV as often as you like, keep your data, pay nothing. Pro is for when you want to go deeper: your whole history, Insights, POTS results and AI reports.</p>
+      <p class="lead">Log everything, score every day, read your HRV as often as you like, keep your data, pay nothing. Pro is for when you want to go deeper: a daily pacing budget, your whole history, Insights, POTS results and AI reports.</p>
     </div>
 
     <div class="pr-plans">
@@ -1181,6 +1237,7 @@
         <p class="pr-sub">or {yearly} a year, saving {yearlySavePct}%. Cancel anytime.</p>
         <ul class="pr-list pr-list-pro">
           <li><b>Your full history, visualized</b>, watch every metric move across weeks, months and years, so slow recovery becomes something you can actually see</li>
+          <li class="pr-li-new"><b>A daily pacing budget</b><span class="pr-new">New</span>, how much today can take in minutes of effort, fitted to your own history, counting workouts, steps and time on your feet as the day goes</li>
           <li><b>Insights from your own log</b>, an on-device analysis that finds what is actually linked to what across your readings, sleep, meds and symptoms, and says how sure it is</li>
           <li><b>POTS results</b>, the tests and episodes are free to run, and Pro grades each one against the clinical criteria and tracks whether your POTS is easing over time</li>
           <li><b>Doctor-ready AI reports</b>, turn your data into answers about what's helping and what's hurting, ready for your next appointment</li>
@@ -1238,11 +1295,17 @@
 <section class="section compare" id="compare">
   <div class="wrap">
     <div class="section-head center">
-      <p class="eyebrow">Autonomic vs {competitor.name}</p>
+      <p class="eyebrow">Autonomic vs {competitor.name} &amp; {visibleApp.name}</p>
       <h2 class="h2">More of what matters, at less than half the price.</h2>
-      <p class="lead">The same clinical grade HRV from your Apple Watch or a chest strap, without the tracking, the lock in, or the {priceLabel(competitor.yearly)} a year bill. And a journal that stays free.</p>
+      <p class="lead">Clinical grade HRV and a pacing budget from the Apple Watch or chest strap you already own, without the tracking, the lock in, or a {themYearly} to {visYearly} a year bill. And a journal that stays free.</p>
     </div>
 
+    <!-- Visible facts checked Sept 2026 against makevisible.com, its help centre,
+         privacy policy and store listings. Its pacing (PacePoints) needs a paid
+         membership AND its own band (Band 2.0 or Polar Verity Sense); Apple Watch,
+         Garmin and Fitbit are unsupported. No AI report feature was found. Re-check
+         prices and these cells before a release, as with Welltory. -->
+    <div class="cmp-scroll">
     <div class="cmp-table">
       <div class="cmp-cell cmp-corner"></div>
       <div class="cmp-cell cmp-head cmp-us">
@@ -1262,33 +1325,56 @@
         <div class="cmp-price"><span class="cmp-amt">{themMonthly}</span><span class="cmp-per">/mo</span></div>
         <div class="cmp-price-sub">or {themYearly} / year</div>
       </div>
+      <div class="cmp-cell cmp-head cmp-them">
+        <div class="cmp-brand cmp-brand-them">
+          <img class="cmp-logo-them cmp-logo-visible" src="/visible.png" width="512" height="512" alt="" loading="lazy" />
+          <b>{visibleApp.name}</b>
+        </div>
+        <div class="cmp-price"><span class="cmp-amt">{visMonthly}</span><span class="cmp-per">/mo</span></div>
+        <div class="cmp-price-sub">or {visYearly} / year, plus band</div>
+      </div>
 
       <div class="cmp-cell cmp-feat">Focus of the app</div>
       <div class="cmp-cell cmp-val cmp-us"><svg class="cmp-ic yes" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg><span>Long COVID &amp; autonomic recovery</span></div>
       <div class="cmp-cell cmp-val cmp-them"><svg class="cmp-ic dash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14" /></svg><span>General wellness</span></div>
+      <div class="cmp-cell cmp-val cmp-them"><svg class="cmp-ic yes-dim" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg><span>Pacing for chronic illness</span></div>
+
+      <!-- Checked Sept 2026: Welltory's nearest feature is "Battery", an energy
+           level that heart rate drains and rest recharges (iOS, Watch or Oura),
+           with no minutes and no limit for the day. Re-check before a release. -->
+      <div class="cmp-cell cmp-feat">Daily pacing budget</div>
+      <div class="cmp-cell cmp-val cmp-us"><svg class="cmp-ic yes" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg><span>Minutes of effort, fitted to you</span></div>
+      <div class="cmp-cell cmp-val cmp-them"><svg class="cmp-ic yes-dim" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg><span>Limited</span></div>
+      <div class="cmp-cell cmp-val cmp-them"><svg class="cmp-ic yes-dim" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg><span>Needs their band</span></div>
 
       <div class="cmp-cell cmp-feat">HRV from Apple Watch &amp; BLE straps</div>
       <div class="cmp-cell cmp-val cmp-us"><svg class="cmp-ic yes" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg><span>Fully supported</span></div>
       <div class="cmp-cell cmp-val cmp-them"><svg class="cmp-ic yes-dim" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg><span>Supported</span></div>
+      <div class="cmp-cell cmp-val cmp-them"><svg class="cmp-ic no" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg><span>Their band only</span></div>
 
       <div class="cmp-cell cmp-feat">Your data stays on your device</div>
       <div class="cmp-cell cmp-val cmp-us"><svg class="cmp-ic yes" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg><span>We never see it</span></div>
+      <div class="cmp-cell cmp-val cmp-them"><svg class="cmp-ic no" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg><span>Stored on their servers</span></div>
       <div class="cmp-cell cmp-val cmp-them"><svg class="cmp-ic no" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg><span>Stored on their servers</span></div>
 
       <div class="cmp-cell cmp-feat">Zero tracking</div>
       <div class="cmp-cell cmp-val cmp-us"><svg class="cmp-ic yes" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg><span>None, ever</span></div>
       <div class="cmp-cell cmp-val cmp-them"><svg class="cmp-ic no" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg><span>Tracks your activity</span></div>
+      <div class="cmp-cell cmp-val cmp-them"><svg class="cmp-ic no" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg><span>Third-party analytics</span></div>
 
       <div class="cmp-cell cmp-feat">Use your own AI (Claude · Gemini · ChatGPT)</div>
       <div class="cmp-cell cmp-val cmp-us"><svg class="cmp-ic yes" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg><span>Your provider, your choice</span></div>
       <div class="cmp-cell cmp-val cmp-them"><svg class="cmp-ic no" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg><span>Locked to {competitor.name}’s AI</span></div>
+      <div class="cmp-cell cmp-val cmp-them"><svg class="cmp-ic no" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg><span>Not offered</span></div>
 
       <div class="cmp-cell cmp-feat cmp-feat-last">Export all your data</div>
       <div class="cmp-cell cmp-val cmp-us cmp-us-last"><svg class="cmp-ic yes" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg><span>Everything, anytime</span></div>
       <div class="cmp-cell cmp-val cmp-them cmp-them-last"><svg class="cmp-ic no" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg><span>Not available</span></div>
+      <div class="cmp-cell cmp-val cmp-them cmp-them-last"><svg class="cmp-ic yes-dim" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg><span>Partial CSV</span></div>
+    </div>
     </div>
 
-    <p class="cmp-foot">Same readings. Your data, your AI, fully exportable, for less than half the price, on top of a journal that costs nothing at all.</p>
+    <p class="cmp-foot">Same readings, plus pacing on the watch you already wear. Your data, your AI, fully exportable, for less than half the price, on top of a journal that costs nothing at all.</p>
 
     <!-- The section argues the price; it should also be somewhere you can act on
          it. The old footer linked back UP to #pricing, which is above this
@@ -1310,7 +1396,7 @@
     </div>
     <div class="faq">
       <details><summary>How much does it cost, and is my data private?<span class="fq-i">+</span></summary><p>The app is free to download and your journal is free forever, with no account and no ads. Autonomic Pro is {monthly}/month or {yearly}/year and unlocks the deep-analysis tools. Every install opens with {pricing.trialDays} days of Pro, no card, so you can try all of it first. Your data is always private: stored on your device, never sold, never sent to a server.</p></details>
-      <details><summary>What’s free, and what needs Pro?<span class="fq-i">+</span></summary><p>Free covers the daily journal, your manual readings, your daily Autonomic Outlook, unlimited live HRV capture with no daily cap, POTS stand tests and episode captures, the Apple Watch heart-rate monitor, backups and export, plus 14 days of charts. Pro adds your full history, Insights, POTS test and episode results, and AI insight and doctor reports. There’s a full breakdown in <a href="#pricing">the pricing table</a>, and the same table lives inside the app.</p></details>
+      <details><summary>What’s free, and what needs Pro?<span class="fq-i">+</span></summary><p>Free covers the daily journal, your manual readings, your daily Autonomic Outlook, unlimited live HRV capture with no daily cap, POTS stand tests and episode captures, the Apple Watch heart-rate monitor, backups and export, plus 14 days of charts and one free week of the pacing budget. Pro adds your daily pacing budget, your full history, Insights, POTS test and episode results, and AI insight and doctor reports. There’s a full breakdown in <a href="#pricing">the pricing table</a>, and the same table lives inside the app.</p></details>
       <details><summary>Does it really work offline?<span class="fq-i">+</span></summary><p>Completely. It’s a fully offline app on both iOS and Android. Scoring, trends and reports are computed locally, so it works anywhere, no signal required.</p></details>
       <details><summary>Which conditions is it built for?<span class="fq-i">+</span></summary><p>POTS, dysautonomia, long COVID and post-viral or post-illness recovery, anywhere daily HRV, heart-rate and orthostatic patterns matter.</p></details>
       <details><summary>Is Autonomic available on Android?<span class="fq-i">+</span></summary><p>Yes. Autonomic is available now on both iPhone (App Store) and Android (Google Play), at the same price, with the same private, offline design. One honest difference: the Apple Watch companion app is iPhone-only. On Android the stand test, episode capture and HRV readings all run in the app itself, using a Bluetooth chest strap or your phone’s camera, and it reads your sleep and workouts from Health Connect the way the iPhone build reads Apple Health.</p></details>
@@ -1343,7 +1429,7 @@
         <div class="pricing-price"><span class="amt">{pricing.trialDays} days</span><span class="per">of Pro, free</span></div>
         <p class="pricing-trial">Then <b>{monthly}/month</b>, or stay free forever</p>
         <ul class="pricing-list">
-          <li>Everything unlocked for {pricing.trialDays} days: full history, Insights, POTS results &amp; AI reports</li>
+          <li>Everything unlocked for {pricing.trialDays} days: the pacing budget, full history, Insights, POTS results &amp; AI reports</li>
           <li>No card and no sign-up to start, cancel anytime</li>
           <li>When the trial ends nothing is deleted, the deep-analysis tools just lock</li>
           <li>Your journal, readings and daily score stay free forever</li>
