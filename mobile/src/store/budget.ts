@@ -249,6 +249,10 @@ export async function sealYesterday(dk: string = todayKey()): Promise<void> {
 
 let restoreTried = false;
 
+/** A call, not an inline comparison: the state changes across the awaits in
+ *  the restore loop, and an inline check would be narrowed away by the first. */
+const inBackground = (): boolean => RNAppState.currentState === 'background';
+
 /**
  * Read back the days a migrator erased (see lib/budget/restore).
  *
@@ -266,13 +270,13 @@ export async function restoreErasedDays(dk: string = todayKey()): Promise<void> 
     // Skip only a launch KNOWN to be in the background: a cold start in the
     // foreground can still report 'unknown' here, and that is the launch the
     // user is waiting on.
-    if (RNAppState.currentState === 'background') return;
+    if (inBackground()) return;
     const todo = erasedLoadDays(state.days, dk, addDays, stepsEverSeen());
     if (!todo.length || restoreAttempts() >= RESTORE_MAX_ATTEMPTS) return;
     restoreTried = true;
     noteRestoreAttempt();
     for (const k of todo) {
-      if (RNAppState.currentState === 'background') break;
+      if (inBackground()) break;
       await refreshDayLoad(k, { force: true, requireEvidence: true });
     }
   } catch (e) {
