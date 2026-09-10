@@ -20,6 +20,8 @@ import { sleepGrade, sleepHours, stagesForWindow, waterGoalL, type DaysMap } fro
 import type { SleepRecord, SleepStages } from '../lib/types';
 import { ensureDay, getState, getWaveform, save, storeSleepSeries, useAppState, useStore } from '../store/store';
 import { setJournalSectionY } from '../store/nav';
+import { pingLogged } from '../store/ping';
+import type { OpenSheet } from './forms';
 import { trustedReadings } from '../lib/hrvQuality';
 import { fmtDateLong, fmtDuration, fmtTime12, minsBetween, periodOf, todayKey } from '../lib/dates';
 import { health, healthAppName, type SleepImport } from '../lib/health';
@@ -196,6 +198,24 @@ function NotesSheet({ dk, controls }: { dk: string; controls: SheetControls }) {
   );
 }
 
+
+/**
+ * "Log your sleep" and "Log an activity", reachable from outside this file.
+ *
+ * The sleep editor is deliberately module-private (it writes through on change
+ * and has no Save of its own), so the pacing budget's one Todo row cannot open
+ * it directly. This is the seam: one exported function, so the Todo lands on
+ * exactly the card the Journal's own "+ Add" lands on rather than a second
+ * copy of it that could drift.
+ */
+export function openSleepAdd(openSheet: OpenSheet, dk: string, canHealth = health().available) {
+  return canHealth
+    ? openSheet(() => <SleepImportSheet dk={dk} />, { fitContent: true })
+    : openSheet((c) => <SleepEditSheet dk={dk} controls={c} add />, { fitContent: true });
+}
+
+
+
 function SleepSection({ dk }: { dk: string }) {
   const p = usePalette();
   const state = useAppState();
@@ -208,9 +228,7 @@ function SleepSection({ dk }: { dk: string }) {
   // opening a mini card that looks the night up in the health store and always
   // offers manual entry — the same shape as "+ Add activity"'s import card.
   // Without a health store there's nothing to look up, so it opens the editor.
-  const openAdd = () => (canHealth
-    ? openSheet(() => <SleepImportSheet dk={dk} />, { fitContent: true })
-    : openSheet((c) => <SleepEditSheet dk={dk} controls={c} add />, { fitContent: true }));
+  const openAdd = () => openSleepAdd(openSheet, dk, canHealth);
 
   return (
     <Card>
@@ -396,6 +414,10 @@ function SleepEditFields({ dk, sleep }: { dk: string; sleep: SleepShape }) {
       storeSleepSeries(dk);
     }
     save();
+    // These fields write through, so there is no Save to count. A night is
+    // logged once it holds both ends; the ping is capped per day, so the rest of
+    // the edits that follow cost nothing.
+    if ((field === 'bed' || field === 'wake') && s.bed && s.wake) pingLogged('sleep');
   };
   return (
     <>

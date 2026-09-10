@@ -5,10 +5,10 @@
  * ping report and the next is announced rather than silently redrawn. Five
  * events, in ascending order of how much they matter:
  *
- *   visitors    someone opened the app         soft blip, THREE SECONDS of
- *               (returning: a first run is       house-coloured glitter
- *               counted as a download, not
- *               as a return)
+ *   visitors    someone opened the app         soft blip, a toast saying how
+ *               (returning: a first run is       old the installs are, THREE
+ *               counted as a download, not       SECONDS of house-coloured
+ *               as a return)                     glitter
  *   readings    an install saved a reading      soft tap, a card + a toast + a
  *               TODAY (any reading, not the      notification naming the
  *               first)                           sensor. No canvas.
@@ -99,6 +99,24 @@
   function sensorOf(m) { return SENSOR[m] ? m : '?'; }
   function sensorName(letter) { return SENSOR[letter] || 'unknown sensor'; }
 
+  /* How many days back a snapshot keeps its per-cohort maps. Past the 30-day
+     catch-up window (MAX_CATCHUP_MS) with room to spare. */
+  var COHORT_DAYS = 45;
+
+  var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  /* Day keys are YYYY-MM-DD. Read as UTC so a DST change can't make one day 23h. */
+  function dayNum(s) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || '');
+    return m ? Date.UTC(+m[1], +m[2] - 1, +m[3]) / 864e5 : null;
+  }
+
+  /** Whole days from install day `cohort` to arrival day `day`; null if either is unreadable. */
+  function ageDays(cohort, day) {
+    var a = dayNum(cohort), b = dayNum(day);
+    return (a === null || b === null) ? null : Math.max(0, Math.round(b - a));
+  }
+
   /* --------------------------------------------------------------- pure */
 
   /**
@@ -124,11 +142,34 @@
       downloadsBy: {}, salesBy: {}, activationsBy: {}, readingsBy: {}, days: {},
     };
 
+    /* The newest day in the report, which is what "recent" is measured from
+       for the per-cohort maps below. */
+    var newest = '';
+    ['open', 'sub', 'act', 'hrv'].forEach(function (k) {
+      ((report && report[k]) || []).forEach(function (r) {
+        if (r && r.day && r.day > newest) newest = r.day;
+      });
+    });
+
     function day(d) {
-      return out.days[d] || (out.days[d] = {
+      if (out.days[d]) return out.days[d];
+      var bucket = out.days[d] = {
         opens: 0, downloads: 0, sales: 0, activations: 0, readings: 0,
         downloadsBy: {}, salesBy: {}, activationsBy: {}, readingsBy: {},
-      });
+      };
+      /* WHO arrived, by install day, so a toast can say how old they are. Only
+         kept for recent days: this snapshot is the stored baseline, a year of
+         cohort maps is most of a localStorage quota, and a day older than the
+         catch-up window can never rise into an announcement anyway. */
+      var age = ageDays(d, newest);
+      if (age !== null && age <= COHORT_DAYS) {
+        bucket.who = { returns: {}, sales: {}, activations: {}, readings: {} };
+      }
+      return bucket;
+    }
+
+    function bump(map, key, n) {
+      if (map) map[key] = (map[key] || 0) + n;
     }
 
     ((report && report.open) || []).forEach(function (row) {
@@ -147,6 +188,8 @@
           out.downloadsBy[p] = (out.downloadsBy[p] || 0) + n;
           bucket.downloads += n;
           bucket.downloadsBy[p] = (bucket.downloadsBy[p] || 0) + n;
+        } else {
+          bump(bucket.who && bucket.who.returns, x.cohort, n);
         }
       });
     });
@@ -163,6 +206,7 @@
         out.salesBy[p] = (out.salesBy[p] || 0) + n;
         bucket.sales += n;
         bucket.salesBy[p] = (bucket.salesBy[p] || 0) + n;
+        bump(bucket.who && bucket.who.sales, x.cohort, n);
       });
     });
 
@@ -180,6 +224,7 @@
         out.activationsBy[m] = (out.activationsBy[m] || 0) + n;
         bucket.activations += n;
         bucket.activationsBy[m] = (bucket.activationsBy[m] || 0) + n;
+        bump(bucket.who && bucket.who.activations, x.cohort, n);
       });
     });
 
@@ -200,6 +245,7 @@
         out.readingsBy[sensor] = (out.readingsBy[sensor] || 0) + n;
         bucket.readings += n;
         bucket.readingsBy[sensor] = (bucket.readingsBy[sensor] || 0) + n;
+        bump(bucket.who && bucket.who.readings, x.cohort, n);
       });
     });
 
@@ -216,6 +262,20 @@
   }
 
   function rise(a, b) { return Math.max(0, (b || 0) - (a || 0)); }
+
+  /* Per-cohort rises for one arrival day, folded into `into` as
+     cohort -> { n, age, day }. `age` is how old the install was when it
+     arrived; across several arrival days the latest (oldest age) wins. */
+  function whoGain(into, prevMap, nextMap, day) {
+    Object.keys(nextMap || {}).forEach(function (c) {
+      var r = (nextMap[c] || 0) - ((prevMap && prevMap[c]) || 0);
+      var age = ageDays(c, day);
+      if (!(r > 0) || age === null) return;
+      var e = into[c] || (into[c] = { n: 0, age: age, day: day });
+      e.n += r;
+      if (age > e.age) { e.age = age; e.day = day; }
+    });
+  }
 
   function addInto(into, from) {
     Object.keys(from || {}).forEach(function (k) {
@@ -262,11 +322,23 @@
 
     if (p.days && n.days) {
       d = { visitors: 0, downloads: 0, sales: 0, activations: 0, readings: 0,
-            downloadsBy: {}, salesBy: {}, activationsBy: {}, readingsBy: {} };
+            downloadsBy: {}, salesBy: {}, activationsBy: {}, readingsBy: {},
+            who: { returns: {}, sales: {}, activations: {}, readings: {} } };
       Object.keys(n.days).forEach(function (key) {
         var a = p.days[key] || { opens: 0, downloads: 0, sales: 0, activations: 0, readings: 0,
                                  downloadsBy: {}, salesBy: {}, activationsBy: {}, readingsBy: {} };
         var b = n.days[key];
+        /* Who arrived. A baseline day that exists but carries no cohort map
+           (written before this shipped, or too old to keep one) would make every
+           cohort in it look new, so its detail is skipped; the COUNTS above it
+           are unaffected, and a day the baseline never saw counts whole. */
+        if (b.who && (!p.days[key] || a.who)) {
+          var aw = a.who || {};
+          whoGain(d.who.returns, aw.returns, b.who.returns, key);
+          whoGain(d.who.sales, aw.sales, b.who.sales, key);
+          if (actKnown) whoGain(d.who.activations, aw.activations, b.who.activations, key);
+          if (readKnown) whoGain(d.who.readings, aw.readings, b.who.readings, key);
+        }
         d.visitors += rise(a.opens, b.opens);
         d.downloads += rise(a.downloads, b.downloads);
         d.sales += rise(a.sales, b.sales);
@@ -290,7 +362,8 @@
         downloadsBy: gain(p.downloadsBy, n.downloadsBy),
         salesBy: gain(p.salesBy, n.salesBy),
         activationsBy: actKnown ? gain(p.activationsBy, n.activationsBy) : {},
-        readingsBy: readKnown ? gain(p.readingsBy, n.readingsBy) : {}
+        readingsBy: readKnown ? gain(p.readingsBy, n.readingsBy) : {},
+        who: { returns: {}, sales: {}, activations: {}, readings: {} }
       };
     }
 
@@ -313,6 +386,43 @@
   }
 
   function plural(n, one, many) { return n === 1 ? one : (many || (one + 's')); }
+
+  /* "Aug 29", with the year only when it isn't the arrival's year. */
+  function dateLabel(cohort, day) {
+    var p = cohort.split('-');
+    return MONTHS[+p[1] - 1] + ' ' + (+p[2]) + (p[0] !== String(day).slice(0, 4) ? ' ' + p[0] : '');
+  }
+
+  /**
+   * How old the installs behind an event are, from a diff's `who` map.
+   *
+   *   one cohort    "installed Aug 29, 12 days ago"  ("installed today" / "yesterday")
+   *   several       "installed Sep 8 (2d), Aug 29 (12d) ×2, +3 more"
+   *
+   * Youngest first. Empty when nothing is known, so a caller can drop it.
+   */
+  function cohortLine(who, max) {
+    var list = Object.keys(who || {}).map(function (c) {
+      return { c: c, n: who[c].n, age: who[c].age, day: who[c].day };
+    }).filter(function (e) { return e.n > 0; });
+    if (!list.length) return '';
+    list.sort(function (x, y) { return (x.age - y.age) || (x.c < y.c ? 1 : -1); });
+
+    if (list.length === 1) {
+      var e = list[0];
+      if (e.age === 0) return 'installed today';
+      return 'installed ' + dateLabel(e.c, e.day) + ', ' + (e.age === 1 ? 'yesterday' : e.age + ' days ago');
+    }
+
+    var cap = max || 3;
+    var shown = list.slice(0, cap).map(function (e) {
+      return (e.age === 0 ? 'today' : dateLabel(e.c, e.day) + ' (' + e.age + 'd)') + (e.n > 1 ? ' ×' + e.n : '');
+    });
+    var rest = list.slice(cap).reduce(function (a, e) { return a + e.n; }, 0);
+    return 'installed ' + shown.join(', ') + (rest ? ', +' + rest + ' more' : '');
+  }
+
+  function joinLine(a, b) { return a && b ? a + ' · ' + b : (a || b || ''); }
 
   /* ------------------------------------------------------------ settings */
 
@@ -983,11 +1093,16 @@
    * gold, silver and colour at the same time.
    */
   function announce(d) {
+    /* How old the installs behind each event are ("installed Aug 29, 12 days
+       ago"). A download is always "today", so it carries none. */
+    var who = d.who || {};
+
     if (d.sales > 0) {
       var saleTitle = d.sales + ' new ' + plural(d.sales, 'sale') + '!';
-      card('sale', saleTitle, storeLine(d.salesBy));
-      say(saleTitle + ' ' + storeLine(d.salesBy));
-      push('💸 ' + saleTitle, storeLine(d.salesBy), 'autonomic-sale');
+      var saleLine = joinLine(storeLine(d.salesBy), cohortLine(who.sales));
+      card('sale', saleTitle, saleLine);
+      say(saleTitle + ' ' + saleLine);
+      push('💸 ' + saleTitle, saleLine, 'autonomic-sale');
       play(SALE);
       celebrate('sale', d.sales);
     }
@@ -1013,12 +1128,13 @@
        below already follows. */
     if (d.activations > 0) {
       var actTitle = d.activations + ' first ' + plural(d.activations, 'reading') + '!';
-      card('activation', actTitle, sensorLine(d.activationsBy));
+      var actLine = joinLine(sensorLine(d.activationsBy), cohortLine(who.activations));
+      card('activation', actTitle, actLine);
       if (!d.sales && !d.downloads) {
-        say(actTitle + ' ' + sensorLine(d.activationsBy));
+        say(actTitle + ' ' + actLine);
         play(ACTIVATION);
       }
-      push('💓 ' + actTitle, sensorLine(d.activationsBy), 'autonomic-activation');
+      push('💓 ' + actTitle, actLine, 'autonomic-activation');
     }
     /* Readings get the same three channels and the same missing fourth. This is
        the app being USED — not an arrival, not a first — so it is the last thing
@@ -1030,25 +1146,30 @@
        the sound and the toast defer to it. */
     if (d.readings > 0) {
       var readTitle = d.readings + ' ' + plural(d.readings, 'reading') + ' today';
-      card('reading', readTitle, sensorLine(d.readingsBy));
+      var readLine = joinLine(sensorLine(d.readingsBy), cohortLine(who.readings));
+      card('reading', readTitle, readLine);
       if (!d.sales && !d.downloads && !d.activations) {
-        say(readTitle + (sensorLine(d.readingsBy) ? ' · ' + sensorLine(d.readingsBy) : ''));
+        say(readTitle + (readLine ? ' · ' + readLine : ''));
         play(READING);
       }
-      push('🫀 ' + readTitle, sensorLine(d.readingsBy), 'autonomic-reading');
+      push('🫀 ' + readTitle, readLine, 'autonomic-reading');
     }
-    /* Visitors stay a sound and nothing else, in every channel. It is the event
-       that fires most often and the least worth a line of text — a toast for it
-       would be on screen more or less permanently, and a notification for it
-       would be the fastest way to have notifications turned back off. */
+    /* RETURNING users, so the new installs are taken out of it: a first run is
+       also an open, and it already has ten seconds of silver of its own. */
+    var returning = Math.max(0, d.visitors - d.downloads);
+    /* Visitors get a sound and a TOAST saying how old the returning installs
+       are, and never a card or a notification. It is the event that fires most
+       often: a card for it would bury the stack, and a notification for it
+       would be the fastest way to have notifications turned back off. The toast
+       is one line that clears itself, and yields to any louder toast. */
     if (!d.sales && !d.downloads && !d.activations && !d.readings && d.visitors > 0) {
       play(VISITOR);
+      if (returning > 0) {
+        say(joinLine(returning + ' returning ' + plural(returning, 'visitor'), cohortLine(who.returns)));
+      }
     }
     /* Three seconds of house-coloured glitter, and it runs whatever else
-       happened — the canvas ranks nothing, only the sound does. RETURNING
-       users, so the new installs are taken out of it: a first run is also an
-       open, and it already has ten seconds of silver of its own. */
-    var returning = Math.max(0, d.visitors - d.downloads);
+       happened — the canvas ranks nothing, only the sound does. */
     if (returning > 0) celebrate('visit', returning);
   }
 
@@ -1124,7 +1245,7 @@
 
   window.Alerts = {
     // pure
-    snapshot: snapshot, diff: diff, storeLine: storeLine, sensorLine: sensorLine,
+    snapshot: snapshot, diff: diff, storeLine: storeLine, sensorLine: sensorLine, cohortLine: cohortLine,
     stackedMs: stackedMs, DURATION: DURATION,
     // shell
     init: init, sync: sync, reset: reset, announce: announce, clearAll: clearAll,

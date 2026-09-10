@@ -14,6 +14,7 @@ import { resolveProtocol } from '../lib/scoring/day';
 import { typesFor } from '../lib/typeCatalog';
 import { todayKey } from '../lib/dates';
 import { mutate, useAppState } from '../store/store';
+import { pingFeature } from '../store/ping';
 
 import type { Protocol } from '../lib/types';
 
@@ -69,6 +70,7 @@ export function ProtocolEditor({ controls }: { controls: SheetControls }) {
       s.settings.protocol = proto;
       if (!s.settings.protocolSetOn) s.settings.protocolSetOn = todayKey();
     });
+    pingFeature('protocol');
     controls.close();
   };
   const onReset = () => setProto(resolveProtocol(null));

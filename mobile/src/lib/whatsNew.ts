@@ -50,6 +50,14 @@ export function fmtReleaseDate(iso: string): string {
 
 export const RELEASES: Release[] = [
   {
+    version: '1.28',
+    date: '2026-09-09',
+    notes: [
+      'NEW FEATURE: Pacing budget. Your readings set a daily budget in minutes of effort. It counts what really costs you, from workouts to time on your feet, shows where you stand on your Outlook card, and learns your limits.',
+      'A number of performance and UI improvements.',
+    ],
+  },
+  {
     version: '1.27',
     date: '2026-09-08',
     notes: [

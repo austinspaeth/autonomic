@@ -31,6 +31,7 @@ import {
 import { isSideloadedAndroidBuild, isTestFlightBuild } from '../../modules/app-env';
 import { logError } from '../lib/diagnostics/errorLog';
 import { describeError } from '../lib/diagnostics/format';
+import type { PurchaseOutcome } from '../lib/ping';
 
 /** Product IDs — identical in App Store Connect and the Play Console. On the
  *  App Store: one subscription group holding both plans. On Google Play: two
@@ -378,17 +379,19 @@ async function connect() {
       // Fires on a new purchase, a trial start, and each renewal.
       // Android can deliver PENDING purchases (e.g. cash top-up pending);
       // don't grant Pro or acknowledge until it completes.
-      if (purchase.purchaseState === 'pending') return;
+      if (purchase.purchaseState === 'pending') { settleAttempt('pending'); return; }
       try { await finishTransaction({ purchase, isConsumable: false }); } catch { /* already finished */ }
       set({ isPro: true, activeSku: purchase.productId, purchasing: false, error: undefined });
+      settleAttempt('purchased');
     });
   }
   if (!errorSub) {
     errorSub = purchaseErrorListener((e) => {
       // The store's own failure path (Play's dialog closing on an error, a
       // declined card). A cancel is not a failure and says nothing.
-      if (isCancel(e)) { set({ purchasing: false }); return; }
+      if (isCancel(e)) { settleAttempt('cancelled', e); set({ purchasing: false }); return; }
       logError('iap.purchaseError', iapDetail(e));
+      settleAttempt(outcomeOf(e), e);
       set({ purchasing: false, error: purchaseMessage(e) });
     });
   }
@@ -543,15 +546,66 @@ function purchaseMessage(e: unknown): string {
 /** Clear a stale failure (e.g. when the paywall re-opens). */
 export const clearIapError = () => { if (state.error) set({ error: undefined }); };
 
+/* ---------- purchase outcomes ----------
+ * Which way a purchase attempt ended, told to whoever asked
+ * (`onPurchaseOutcome`). The cohort ping is the one listener, and it reports
+ * only attempts an OFFER card started: `oac` counts the tap and `sub` the
+ * entitlement, and the gap between them (a cancelled sheet, a declined payment,
+ * a store that never answered) otherwise has no shape at all.
+ *
+ * One attempt at a time, settled ONCE. The same failure can arrive twice (the
+ * error listener AND `requestPurchase` rejecting) and whichever lands first owns
+ * it. A listener rather than an import, because ./ping already imports this. */
+
+/** The offer card a purchase was started from, when one was. */
+export type PurchaseOrigin = 'annual' | 'founder';
+export type PurchaseOutcomeEvent = {
+  sku: string; origin?: PurchaseOrigin; outcome: PurchaseOutcome; error?: unknown;
+};
+
+let attempt: { sku: string; origin?: PurchaseOrigin } | undefined;
+const outcomeListeners = new Set<(o: PurchaseOutcomeEvent) => void>();
+
+export function onPurchaseOutcome(cb: (o: PurchaseOutcomeEvent) => void): () => void {
+  outcomeListeners.add(cb);
+  return () => outcomeListeners.delete(cb);
+}
+
+function settleAttempt(outcome: PurchaseOutcome, error?: unknown) {
+  const a = attempt;
+  if (!a) return;
+  attempt = undefined;
+  outcomeListeners.forEach((l) => {
+    try { l({ ...a, outcome, error }); } catch { /* a reporter must never break a purchase */ }
+  });
+}
+
+/** Ask to Buy and a Play cash payment arrive as ERRORS with these codes. Neither
+ *  is a refusal: the store took the order, has not charged it, and may yet. */
+const PENDING_CODES = new Set(['deferred-payment', 'pending']);
+const outcomeOf = (e: unknown): PurchaseOutcome => (PENDING_CODES.has(codeOf(e)) ? 'pending' : 'failed');
+
 /** Start the subscribe/free-trial flow for a specific plan. Success arrives via
  *  the listener. Defaults to yearly. Resolves true when the store flow was
  *  handed off; false when it couldn't start (and `state.error` says why). */
-export async function subscribe(sku: string = YEARLY_SKU): Promise<boolean> {
+export async function subscribe(sku: string = YEARLY_SKU, origin?: PurchaseOrigin): Promise<boolean> {
   if (state.purchasing) return false;
+  attempt = { sku, origin };
   // Already known impossible on this device. Say so without touching the store,
   // so the answer is the remedy rather than another failed round trip.
-  if (state.blocked) { set({ error: state.blocked }); return false; }
+  if (state.blocked) {
+    settleAttempt('unstarted', {
+      code: 'feature-not-supported',
+      responseCode: PLAY_FEATURE_NOT_SUPPORTED,
+      message: 'Play Store app too old to sell subscriptions',
+    });
+    set({ error: state.blocked });
+    return false;
+  }
   set({ purchasing: true, error: undefined });
+  // Whether the store was actually asked. A failure before it is ours (no
+  // products, no offer token); a failure after it is the store's answer.
+  let reached = false;
   try {
     if (storeUnavailable()) throw new Error(`${storeName()} purchases aren’t available in this build.`);
     // Retry the connection/fetch here rather than trusting launch: on Android
@@ -577,11 +631,13 @@ export async function subscribe(sku: string = YEARLY_SKU): Promise<boolean> {
           { code: product ? 'sku-offer-mismatch' : 'sku-not-found' },
         );
       }
+      reached = true;
       await withBilling(() => requestPurchase({
         type: 'subs',
         request: { google: { skus: [sku], subscriptionOffers: [{ sku, offerToken: offer.offerToken }] } },
       }));
     } else {
+      reached = true;
       await withBilling(() => requestPurchase({ type: 'subs', request: { apple: { sku } } }));
     }
     // The store sheet is up. purchasing clears on the purchase or error
@@ -591,8 +647,9 @@ export async function subscribe(sku: string = YEARLY_SKU): Promise<boolean> {
     armPurchaseWatchdog();
     return true;
   } catch (e) {
-    if (isCancel(e)) { set({ purchasing: false }); return false; }
+    if (isCancel(e)) { settleAttempt('cancelled', e); set({ purchasing: false }); return false; }
     if (!noteBlocked(e)) logError('iap.purchase', iapDetail(e));
+    settleAttempt(reached ? outcomeOf(e) : 'unstarted', e);
     set({ purchasing: false, error: purchaseMessage(e) });
     return false;
   }
@@ -603,6 +660,8 @@ function armPurchaseWatchdog() {
   if (watchdog) clearTimeout(watchdog);
   watchdog = setTimeout(() => {
     watchdog = undefined;
+    // Neither listener answered. A no-op when one already did.
+    settleAttempt('timeout');
     if (state.purchasing) set({ purchasing: false });
   }, 120_000);
 }

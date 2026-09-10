@@ -21,6 +21,7 @@ import { RestoreGate } from '../src/features/RestoreGate';
 import { ReviewPrompt } from '../src/features/ReviewPrompt';
 import { initIap } from '../src/store/iap';
 import { initTier } from '../src/store/tier';
+import { initPacingTrial } from '../src/store/pacingTrial';
 import { initFaultReporting } from '../src/store/errorReport';
 import { initPing } from '../src/store/ping';
 import { initGarminReceiver } from '../src/lib/garmin/receiver';
@@ -29,6 +30,9 @@ import { initWatchReceiver } from '../src/lib/watch/receiver';
 import { runDailyBackup } from '../src/lib/backup';
 import { initCrashWatcher, syncReminder } from '../src/lib/reminders';
 import { initWidgetSync } from '../src/lib/widgets';
+import { initBudgetSync } from '../src/store/budget';
+import { initPacingAlertWatcher } from '../src/store/pacingAlerts';
+import { initPacingBackground } from '../src/store/pacingBackground';
 import { initInsightsBadge } from '../src/store/insightsBadge';
 import { loadIssue } from '../src/store/store';
 import { drainNativeCrashes, installErrorLogging, logError } from '../src/lib/diagnostics/errorLog';
@@ -67,6 +71,10 @@ export default function RootLayout() {
     initIap();
     // Stamp/derive the freemium tier (14-day local trial window on first launch).
     initTier();
+    // The pacing budget's seven-day free window for a free install. Must follow
+    // initTier: the window is only stamped once the tier is actually 'free', so
+    // it can't be spent underneath the 14-day install trial.
+    initPacingTrial();
     // The one network call the app makes: an anonymous daily cohort ping
     // (install's birthday, nothing else). Must follow initTier — it reads the
     // stamp that lands there. See src/store/ping.ts.
@@ -112,6 +120,15 @@ export default function RootLayout() {
     // The Insights tab's unseen-findings dot: derive it now and after journal
     // changes, so a new finding lights the tab before the user thinks to look.
     initInsightsBadge();
+    // The pacing budget's passive half: today's steps and heart-rate day, read
+    // on launch and on foreground. It never REQUESTS a permission — it reads
+    // with whatever grants exist, so this cannot raise a health sheet.
+    const budgetSync = initBudgetSync();
+    // Pacing alerts: re-check after every journal change (the health reads
+    // above land as journal changes), and keep the background half registered
+    // exactly while an alert could fire. The task itself is defined in index.js.
+    initPacingAlertWatcher();
+    initPacingBackground();
     // Pull any published EAS update in the background (preview + production
     // builds alike); a downloaded bundle applies on the next launch.
     (async () => {
@@ -123,7 +140,7 @@ export default function RootLayout() {
         // updates are best-effort
       }
     })();
-    return () => backup.cancel();
+    return () => { backup.cancel(); budgetSync(); };
   }, []);
   // Hold the (black) splash a beat until the custom faces are registered, so the
   // numeric readouts never flash in a fallback font first.

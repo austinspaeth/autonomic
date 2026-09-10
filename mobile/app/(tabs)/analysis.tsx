@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BottomFade, Screen, headerHeight } from '../../src/components/Header';
 import { Icon } from '../../src/components/Icon';
 import { Ghost, HelpDot, ScoreDot } from '../../src/components/ui';
-import { Bars, BpDumbbell, LineChart, StackedBars, ZonesToggle, useChartsBlur } from '../../src/components/charts';
+import { Bars, BpDumbbell, LineChart, MarginColumns, StackedBars, ZonesToggle, useChartsBlur } from '../../src/components/charts';
 import { TAIL_STYLE, fonts, radius, readoutTail, usePalette } from '../../src/theme';
 import { getWaveform, useAppState } from '../../src/store/store';
 import { useTier } from '../../src/store/tier';
@@ -15,7 +15,9 @@ import { takeProgressRange, useProgressRangeSignal } from '../../src/store/nav';
 import { LockedOverlay } from '../../src/features/LockedOverlay';
 import { usePaywall } from '../../src/features/Paywall';
 import { pingViewOpened } from '../../src/store/ping';
-import { buildCategories, type AnalysisCard, type BpPeriod, type OrthoTransition } from '../../src/lib/analysis/categories';
+import { buildCategories, type AnalysisCard, type BpPeriod, type MarginChart, type OrthoTransition } from '../../src/lib/analysis/categories';
+import { SCORE_COLORS } from '../../src/lib/scoring';
+import { hexA } from '../../src/lib/color';
 import { resolveProtocol, type DaysMap } from '../../src/lib/scoring/day';
 import { catFromBands, type BucketView, type CustomRange, type Mode } from '../../src/lib/analysis/buckets';
 import { HrvFilterLinks, HrvProgress, HrvProgressSkeleton, type Filt } from '../../src/features/HrvProgress';
@@ -1067,6 +1069,54 @@ function FilterLinks<T extends string>({ options, value, onChange }: { options: 
   );
 }
 
+
+/**
+ * The pacing card's margin chart, with its own readout and legend.
+ *
+ * The legend is three entries and all three are load-bearing: two directions
+ * and the ceiling they hang off. Without the third the solid white rule reads
+ * as another gridline.
+ */
+function MarginBlock({ margin, buckets }: { margin: MarginChart; buckets: BucketView[] }) {
+  const p = usePalette();
+  const [sel, setSel] = useState<number | null>(null);
+  const vals = margin.values;
+  const shown = sel != null ? sel : lastPresent(vals);
+  const v = shown == null ? null : vals[shown];
+  const when = shown == null ? '' : (buckets[shown]?.label || '');
+
+  return (
+    <View style={{ marginTop: 14 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8, marginBottom: 8 }}>
+        <Text style={{ fontSize: 12, color: p.text, fontWeight: '600' }}>{margin.label}</Text>
+        {v != null ? (
+          <Text style={{ fontSize: 12, color: p.textDim, fontFamily: fonts.numMed, fontVariant: ['tabular-nums'] }}>
+            {`${when}: ${v >= 0 ? '+' : ''}${Math.round(v)}`}
+          </Text>
+        ) : null}
+      </View>
+      <MarginColumns values={vals} labels={buckets.map((b) => b.label)} onSelect={setSel} />
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, borderTopWidth: 1, borderTopColor: p.border, marginTop: 13, paddingTop: 12 }}>
+        {[
+          { label: 'Room left', color: SCORE_COLORS.good, rule: false },
+          { label: 'Over budget', color: p.accent, rule: false },
+          { label: 'Ceiling', color: hexA(p.text, 0.26), rule: true },
+        ].map((l) => (
+          <View key={l.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+            <View style={{ width: 12, height: l.rule ? 2 : 12, borderRadius: l.rule ? 999 : 3, backgroundColor: l.color }} />
+            <Text style={{ fontSize: 11.5, color: p.textDim }}>{l.label}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+const lastPresent = (vals: (number | null)[]) => {
+  for (let i = vals.length - 1; i >= 0; i--) if (vals[i] != null) return i;
+  return null;
+};
+
 const CardView = React.memo(function CardView({ card, buckets }: { card: AnalysisCard; buckets: BucketView[] }) {
   const p = usePalette();
   // A `selectStat` chart drives the card's first stat: dragging the chart swaps
@@ -1276,6 +1326,10 @@ const CardView = React.memo(function CardView({ card, buckets }: { card: Analysi
           ) : null}
         </View>
       ))}
+      {/* Budget margin: columns off a ceiling at zero, with the touched day's
+          own figure in the header row. Its own block rather than a `Chart`
+          because the shape is different, not the styling. */}
+      {card.margin ? <MarginBlock margin={card.margin} buckets={buckets} /> : null}
       {(card.bars || []).map((bg, i) => {
         // `barBuckets` rides with the first bars group: a per-bucket totals
         // chart above the rows, narrowed to one row's counts while selected.

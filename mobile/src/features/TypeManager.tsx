@@ -8,11 +8,12 @@ import React, { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { TextField } from '../components/Field';
 import { Icon } from '../components/Icon';
-import { Button } from '../components/ui';
+import { Button, LinkToggle } from '../components/ui';
 import { SheetFooter, useSheets } from '../components/Sheet';
 import { useToast } from '../components/Toast';
 import { radius, usePalette } from '../theme';
 import { addCustomType, deleteType, editType, typeInUse, typesFor, type TypeKind } from '../lib/typeCatalog';
+import { loadOf, type LoadWeight } from '../lib/budget/load';
 import { useAppState } from '../store/store';
 
 const COPY: Record<TypeKind, { title: string; nameLabel: string; noun: string }> = {
@@ -33,11 +34,12 @@ function EditTypeSheet({ kind, typeKey }: { kind: TypeKind; typeKey: string }) {
   const def = typesFor(state, kind)[typeKey];
   const [name, setName] = useState(def?.label || '');
   const [dosage, setDosage] = useState(def?.dosage || '');
+  const [load, setLoad] = useState<LoadWeight>(() => loadOf(def, typeKey));
   if (!def) return null;
   const used = typeInUse(state, kind, typeKey);
 
   const save = () => {
-    if (!editType(kind, typeKey, name, { dosage })) {
+    if (!editType(kind, typeKey, name, { dosage, load })) {
       toast(name.trim() ? 'That name already exists' : 'Enter a name');
       return;
     }
@@ -50,10 +52,40 @@ function EditTypeSheet({ kind, typeKey }: { kind: TypeKind; typeKey: string }) {
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 16 }}>{`Edit ${copy.noun}`}</Text>
       <TextField label={copy.nameLabel} value={name} onChange={setName} />
       {kind === 'meds' && <TextField label="Default dose" value={dosage} onChange={setDosage} placeholder="e.g. 400mg" />}
+      {kind === 'activities' && def.userDefined ? <EffortField value={load} onChange={setLoad} /> : null}
       <SheetFooter>
         {!used ? <Button title="Delete" variant="danger" onPress={() => { deleteType(kind, typeKey); toast(`Deleted ${def.label}`); closeSheet(); }} /> : null}
         <Button title="Save" variant="primary" onPress={save} />
       </SheetFooter>
+    </View>
+  );
+}
+
+
+/**
+ * How much a minute of a user-created activity costs the pacing budget.
+ *
+ * Three words rather than a number, asked once. Nobody can pick 1.4 for
+ * gardening, and the weight table only ever needed three buckets — see
+ * src/lib/budget/load.ts, which is where the built-in types get theirs.
+ */
+export function EffortField({ value, onChange }: { value: LoadWeight; onChange: (v: LoadWeight) => void }) {
+  const p = usePalette();
+  return (
+    <View style={{ marginBottom: 14 }}>
+      <Text style={{ fontSize: 12.5, fontWeight: '600', color: p.textDim, marginBottom: 6 }}>Effort</Text>
+      <LinkToggle
+        options={[
+          { val: 'light', label: 'Light' },
+          { val: 'moderate', label: 'Moderate' },
+          { val: 'heavy', label: 'Heavy' },
+        ]}
+        value={value}
+        onChange={(v) => onChange(v as LoadWeight)}
+      />
+      <Text style={{ fontSize: 11.5, color: p.textDim, marginTop: 6 }}>
+        Used by your pacing budget to work out what a session of this costs.
+      </Text>
     </View>
   );
 }
@@ -65,14 +97,16 @@ export function ManageTypesSheet({ kind }: { kind: TypeKind }) {
   const { openSheet } = useSheets();
   const [name, setName] = useState('');
   const [dosage, setDosage] = useState('');
+  const [load, setLoad] = useState<LoadWeight>('moderate');
   const copy = COPY[kind];
   const all = typesFor(state, kind);
 
   const add = () => {
-    const key = addCustomType(kind, name, { dosage });
+    const key = addCustomType(kind, name, { dosage, load });
     if (!key) { toast(name.trim() ? 'That name already exists' : 'Enter a name'); return; }
     setName('');
     setDosage('');
+    setLoad('moderate');
     toast(`Added ${copy.noun}`);
   };
 
@@ -81,6 +115,7 @@ export function ManageTypesSheet({ kind }: { kind: TypeKind }) {
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 16 }}>{copy.title}</Text>
       <TextField label={copy.nameLabel} value={name} onChange={setName} placeholder={`e.g. ${kind === 'meds' ? 'Magnesium Taurate' : kind === 'activities' ? 'Rowing' : kind === 'symptoms' ? 'Brain fog' : 'Spicy food'}`} />
       {kind === 'meds' && <TextField label="Dosage" value={dosage} onChange={setDosage} placeholder="e.g. 400mg" />}
+      {kind === 'activities' && <EffortField value={load} onChange={setLoad} />}
       <View style={{ marginTop: 4, marginBottom: 20 }}>
         <Button title="Add" variant="primary" onPress={add} />
       </View>

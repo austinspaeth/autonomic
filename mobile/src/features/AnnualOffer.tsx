@@ -248,7 +248,7 @@ export function AnnualOfferCard() {
               <View style={{ marginTop: 15 }}><StoreBlockedNotice text={blocked} /></View>
             ) : (
               <Pressable
-                onPress={() => { pingOfferAccepted('annual'); subscribe(PROMO_YEARLY_SKU); }}
+                onPress={() => { pingOfferAccepted('annual'); subscribe(PROMO_YEARLY_SKU, 'annual'); }}
                 disabled={purchasing}
                 style={({ pressed }) => [
                   { height: 50, borderRadius: 16, backgroundColor: p.accent, alignItems: 'center', justifyContent: 'center', marginTop: 15 },

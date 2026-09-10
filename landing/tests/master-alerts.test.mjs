@@ -105,6 +105,8 @@ check('a new first run raises a download card', /1 new download/.test(text()), t
 check('and the card names the store it came from', /1 on Android/.test(text()), text());
 check('a subscribe ping raises a sale card of its own', /1 new sale/.test(text()), text());
 check('and that card names the store that paid', /1 on iOS/.test(text()), text());
+check('and how old the install that paid is', /1 on iOS · installed .+, yesterday/.test(text()), text());
+check('the sale toast says the install age too', /installed .+, yesterday/.test($('toast').textContent), $('toast').textContent);
 check('the two are told apart by class, not only by copy',
   cards().some((c) => c.classList.contains('sale')) && cards().some((c) => c.classList.contains('download')),
   cards().map((c) => c.className).join(' | '));
@@ -199,6 +201,29 @@ AL.announce({
 });
 await new Promise((r) => setTimeout(r, 30));
 check('a new install still does', canvasEl.width > 0, String(canvasEl.width));
+
+/* A returning visit gets a toast naming the install age, and no card. */
+const cardsBeforeVisit = cards().length;
+AL.announce({
+  visitors: 3, downloads: 0, sales: 0, activations: 0, readings: 0,
+  downloadsBy: {}, salesBy: {}, activationsBy: {}, readingsBy: {},
+  who: { returns: { '2026-08-01': { n: 3, age: 12, day: '2026-08-13' } } },
+});
+await new Promise((r) => setTimeout(r, 30));
+check('a returning visit toasts how old the installs are',
+  $('toast').textContent === '3 returning visitors · installed Aug 1, 12 days ago', $('toast').textContent);
+check('and raises no card', cards().length === cardsBeforeVisit, text());
+
+AL.announce({
+  visitors: 0, downloads: 0, sales: 0, activations: 0, readings: 2,
+  downloadsBy: {}, salesBy: {}, activationsBy: {}, readingsBy: { W: 2 },
+  who: { readings: { '2026-08-10': { n: 2, age: 3, day: '2026-08-13' } } },
+});
+await new Promise((r) => setTimeout(r, 30));
+check('a reading card and toast carry the install age',
+  /2 Apple Watch · installed Aug 10, 3 days ago/.test(text()) &&
+  $('toast').textContent === '2 readings today · 2 Apple Watch · installed Aug 10, 3 days ago',
+  text() + ' | toast: ' + $('toast').textContent);
 AL.setMuted(false);
 
 check('no page errors', errors.length === 0, errors.join(' | '));

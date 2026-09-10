@@ -16,7 +16,9 @@
  * where a future tier-aware surface would read it, and because a watch already
  * holding it must not be left with a stale value. Re-pushed on tier
  * changes (entitlement AND local-trial expiry), profile edits, and session
- * activation; deduped so journal churn doesn't spam WCSession.
+ * activation; deduped so journal churn doesn't spam WCSession. It also carries
+ * `pacing` — today's budget frames, handed in by the widget sync (see
+ * `setWatchPacing`), which is what the watch's Pacing mode draws.
  */
 import { watchBridge, type WatchUserInfo } from '../../../modules/watch-bridge';
 import { getTier, subscribeTier } from '../../store/tier';
@@ -27,9 +29,27 @@ import { SYMPTOM_TYPES } from '../registry';
 import { computeScores } from '../scoring';
 import type { Entry } from '../types';
 import { mapWatchPayload } from './payload';
+import { watchPacing, watchPacingKey, type WatchPacing } from './pacing';
+import type { WidgetPayload } from '../widgets';
 
 let started = false;
 let lastContext = '';
+/** Today's pacing frames, pushed in by the widget sync (the one place the
+ *  budget is built) so the wrist and the widgets can never disagree. */
+let pacing: WatchPacing | null = null;
+
+/**
+ * Hand the watch the pacing block off a freshly built widget payload.
+ *
+ * Called from `pushWidgetData` rather than from here: the budget build is the
+ * expensive part and it already happens there, on the same triggers (launch,
+ * a debounced journal change, foreground, a tier change). Deduped like every
+ * other field of the context — see `watchPacingKey`.
+ */
+export function setWatchPacing(payload: WidgetPayload): void {
+  pacing = watchPacing(payload);
+  pushContext();
+}
 
 /** Readings that arrive from the watch while the app is running: the UI
  *  subscribes to auto-open the results card. Only live deliveries notify —
@@ -52,9 +72,12 @@ function pushContext() {
   if (profile?.sex) context.sex = profile.sex;
   // The quick-log symptom list the watch mirrors — id + label in registry order.
   context.symptomTypes = Object.entries(SYMPTOM_TYPES).map(([id, def]) => ({ id, label: def.label }));
-  const key = JSON.stringify(context);
+  const key = JSON.stringify(context) + (pacing ? `|${watchPacingKey(pacing)}` : '');
   if (key === lastContext) return; // journal churn — nothing the watch cares about
   lastContext = key;
+  // Sent as a JSON string: the frames are the widgets' own shape, decoded on
+  // the watch by the same struct the widget target uses.
+  if (pacing) context.pacing = JSON.stringify(pacing);
   // sentAt makes each payload unique: WCSession silently skips delivery of an
   // applicationContext identical to the previous one, which strands a watch
   // whose app was installed after the first push. Excluded from the dedupe key.

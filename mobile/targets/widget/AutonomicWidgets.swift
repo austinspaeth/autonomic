@@ -316,6 +316,10 @@ struct ProtocolWidget: Widget {
 @main
 struct AutonomicWidgetsBundle: WidgetBundle {
     var body: some Widget {
+        // Gallery order is bundle order. Pacing leads because it is the one
+        // widget that answers a question the day is still open on.
+        PacingWidget()
+        PacingDetailWidget()
         ScoreWidget()
         ScoreMetricsWidget()
         OverviewWidget()

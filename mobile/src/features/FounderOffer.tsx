@@ -185,7 +185,7 @@ export function FounderOfferCard() {
           convert. */}
       {blocked ? <StoreBlockedNotice text={blocked} /> : (
         <Pressable
-          onPress={() => { pingOfferAccepted('founder'); subscribe(FOUNDER_SKU); }}
+          onPress={() => { pingOfferAccepted('founder'); subscribe(FOUNDER_SKU, 'founder'); }}
           disabled={purchasing}
           style={({ pressed }) => [
             { height: 50, borderRadius: 14, backgroundColor: p.accent, alignItems: 'center', justifyContent: 'center' },

@@ -17,8 +17,10 @@ struct SymptomType: Identifiable, Equatable {
  * backgrounded); on every activation we re-queue outbox items that have no
  * outstanding transfer. The phone dedupes by id, so re-delivery is safe.
  *
- * Inbound: applicationContext { pro, age, sex } mirrored from the phone —
- * cached in UserDefaults for cold offline launches.
+ * Inbound: applicationContext { pro, age, sex, symptomTypes, pacing } mirrored
+ * from the phone — cached in UserDefaults for cold offline launches. `pacing`
+ * is today's budget frames, resolved on the phone (see PacingModel): the watch
+ * draws them and computes nothing.
  */
 final class PhoneRelay: NSObject, ObservableObject, WCSessionDelegate {
     static let shared = PhoneRelay()
@@ -38,6 +40,10 @@ final class PhoneRelay: NSObject, ObservableObject, WCSessionDelegate {
     @Published var sex: String?
     /// Quick-log symptom list mirrored from the phone (empty until first sync).
     @Published var symptomTypes: [SymptomType] = []
+    /// Today's pacing budget, resolved on the phone. nil until one arrives, and
+    /// still nil once its day has passed — the Pacing screen says so rather
+    /// than showing yesterday's figure.
+    @Published var pacing: WatchPacing?
 
     override private init() {
         super.init()
@@ -49,6 +55,15 @@ final class PhoneRelay: NSObject, ObservableObject, WCSessionDelegate {
         if let raw = defaults.array(forKey: "ctx.symptomTypes") as? [[String: Any]] {
             symptomTypes = Self.parseSymptomTypes(raw)
         }
+        pacing = Self.parsePacing(defaults.string(forKey: "ctx.pacing"))
+    }
+
+    /// Malformed or newer-than-we-understand decodes to nil, which the screen
+    /// renders as "no budget yet" — never as a partial one.
+    private static func parsePacing(_ json: String?) -> WatchPacing? {
+        guard let json, let data = json.data(using: .utf8) else { return nil }
+        guard let p = try? JSONDecoder().decode(WatchPacing.self, from: data) else { return nil }
+        return p.schemaVersion <= WatchPacing.schema ? p : nil
     }
 
     private static func parseSymptomTypes(_ raw: [[String: Any]]) -> [SymptomType] {
@@ -117,6 +132,9 @@ final class PhoneRelay: NSObject, ObservableObject, WCSessionDelegate {
         defaults.set(proFlag, forKey: "ctx.pro")
         if let a = context["age"] as? Int { defaults.set(a, forKey: "ctx.age") } else { defaults.removeObject(forKey: "ctx.age") }
         if let s = context["sex"] as? String { defaults.set(s, forKey: "ctx.sex") } else { defaults.removeObject(forKey: "ctx.sex") }
+        let pacingJson = context["pacing"] as? String
+        if let pacingJson { defaults.set(pacingJson, forKey: "ctx.pacing") }
+        let parsedPacing = pacingJson.flatMap { Self.parsePacing($0) }
         var parsedSymptoms: [SymptomType]?
         if let raw = context["symptomTypes"] as? [[String: Any]] {
             defaults.set(raw, forKey: "ctx.symptomTypes")
@@ -127,6 +145,9 @@ final class PhoneRelay: NSObject, ObservableObject, WCSessionDelegate {
             self.age = context["age"] as? Int
             self.sex = context["sex"] as? String
             if let parsedSymptoms { self.symptomTypes = parsedSymptoms }
+            // Absent means "this phone build sends none", not "the budget is
+            // gone" — a context that carries no pacing leaves the last one be.
+            if let parsedPacing { self.pacing = parsedPacing }
         }
     }
 

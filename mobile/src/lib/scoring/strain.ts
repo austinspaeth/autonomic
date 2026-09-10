@@ -45,7 +45,7 @@ import { activityGrade, type DaysMap } from './day';
 import type { DownturnFactor } from './downturn';
 import { dayScore } from '../trends/metrics';
 import { keyRange, metricSeries } from '../trends/series';
-import { median } from '../trends/compare';
+import { pick, shift } from './baseline';
 
 export type StrainSignalId =
   | 'hrRecovery' | 'legsUpHr' | 'restingHr' | 'sleepingHr'
@@ -132,35 +132,6 @@ const num = (v: unknown): number | null => {
 };
 
 const bpm = (v: number) => `${Math.round(Math.abs(v))} bpm`;
-
-/** Median of each window plus the move between them, or null when either
- *  window is too thin to compare (rule 2). */
-function shift(recent: number[], base: number[], minRecent: number, minBase: number) {
-  if (recent.length < minRecent || base.length < minBase) return null;
-  const r = median(recent);
-  const b = median(base);
-  if (!Number.isFinite(r) || !Number.isFinite(b)) return null;
-  return { r, b, delta: r - b, recentN: recent.length, baseN: base.length };
-}
-
-/** Every entry value of one kind across a key range, flattened and filtered. */
-function pick(
-  days: DaysMap,
-  keys: string[],
-  kind: 'activities' | 'readings' | 'symptoms',
-  of: (e: Entry) => number | null,
-): number[] {
-  const out: number[] = [];
-  keys.forEach((k) => {
-    const d = days[k];
-    if (!d) return;
-    (d[kind] || []).forEach((e: Entry) => {
-      const v = of(e);
-      if (v != null) out.push(v);
-    });
-  });
-  return out;
-}
 
 export function detectStrain(days: DaysMap, dk: string, ctx: ScoreContext = {}): Strain | null {
   // Rule 5: never argue with an Excellent Outlook sitting directly above.

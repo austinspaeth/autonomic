@@ -1,6 +1,10 @@
 import {
   cohortCode,
   easternDay,
+  featureCode,
+  findingCode,
+  logCode,
+  reportCode,
   methodCode,
   pingUrl,
   platformCode,
@@ -72,6 +76,7 @@ describe('cohort ping wire format', () => {
     expect(surfaceCode('progress')).toBe('R');
     expect(surfaceCode('insights')).toBe('I');
     expect(surfaceCode('pots')).toBe('P');
+    expect(surfaceCode('pacing')).toBe('B');
     expect(surfaceCode('outlook-ai')).toBe('O');
     expect(surfaceCode('metric-ai')).toBe('M');
     expect(surfaceCode('insights-ai')).toBe('N');
@@ -84,6 +89,7 @@ describe('cohort ping wire format', () => {
   it('gives every route that carries a letter its own alphabet', () => {
     expect(notifyCode('reminder')).toBe('M');
     expect(notifyCode('crash')).toBe('C');
+    expect(notifyCode('pacing')).toBe('P');
     expect(notifyCode('something-else')).toBeUndefined();
     // The capture pair: two routes, one alphabet, so a completion rate can be
     // read per sensor.
@@ -99,6 +105,41 @@ describe('cohort ping wire format', () => {
     // And the one route with nothing to say beyond "this install had a failure".
     expect(pingUrl('err', '2026-08-21', 'A'))
       .toBe('https://api.autonomic.care/ping/err/D082126A');
+  });
+
+  it('names what was logged, and only the readings that were asked about', () => {
+    expect(logCode('sleep')).toBe('S');
+    expect(logCode('activities')).toBe('A');
+    expect(logCode('meds')).toBe('M');
+    expect(logCode('symptoms')).toBe('Y');
+    expect(logCode('water')).toBe('W');
+    expect(logCode('bowel')).toBe('B');
+    expect(logCode('readings', 'bp')).toBe('P');
+    expect(logCode('readings', 'restingHr')).toBe('R');
+    // Other reading types have their own routes (capture, POTS) and send nothing
+    // here, rather than a letterless ping nobody can read.
+    expect(logCode('readings', 'hrv')).toBeUndefined();
+    expect(logCode('readings')).toBeUndefined();
+    expect(logCode('triggers')).toBeUndefined();
+    expect(pingUrl('log', '2026-08-21', 'I', 'S'))
+      .toBe('https://api.autonomic.care/ping/log/D082126IS');
+  });
+
+  it('names the feature, the finding and the AI report', () => {
+    expect(featureCode('milestones')).toBe('M');
+    expect(featureCode('protocol')).toBe('P');
+    expect(featureCode('settings')).toBeUndefined();
+    expect(findingCode('early')).toBe('E');
+    expect(findingCode('unconfirmed')).toBe('U');
+    expect(findingCode('change')).toBe('C');
+    expect(findingCode('correlation')).toBe('R');
+    expect(findingCode('watch')).toBeUndefined();
+    expect(reportCode('data')).toBe('D');
+    expect(reportCode('overall')).toBe('H');
+    expect(reportCode('doctor')).toBe('C');
+    expect(reportCode('other')).toBeUndefined();
+    expect(pingUrl('rpt', '2026-08-21', 'A', 'C', 'P', '1.28.0'))
+      .toBe('https://api.autonomic.care/ping/rpt/D082126AC-TP-V1.28.0');
   });
 
   it('maps a tier onto a letter, and anything unknown onto free', () => {

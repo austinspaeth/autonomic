@@ -240,6 +240,55 @@ check('a baseline that predates the reading counter announces no readings',
 check('and still hears the counter it does know about',
   dHalf.activations === 2, JSON.stringify(dHalf));
 
+/* ------------------------------------------------------ install age
+
+   Every announcement says how old the installs behind it are. The age is
+   measured from the cohort (install) day to the day the ping ARRIVED. */
+
+check('a returning visit knows which cohort came back, and how old it was',
+  JSON.stringify(back.who.returns) === JSON.stringify({ '2026-08-01': { n: 5, age: 12, day: D2 } }),
+  JSON.stringify(back.who));
+check('which reads as one install day and an age',
+  AL.cohortLine(back.who.returns) === 'installed Aug 1, 12 days ago', AL.cohortLine(back.who.returns));
+check('a first run is never a returning visit',
+  !('2026-08-13' in s0.days[D2].who.returns), JSON.stringify(s0.days[D2].who.returns));
+check('a sale from an install born that day reads as today',
+  AL.cohortLine(d.who.sales) === 'installed today', AL.cohortLine(d.who.sales));
+check('a first reading carries its install age too',
+  AL.cohortLine(dAct.who.activations) === 'installed Aug 12, 2 days ago', AL.cohortLine(dAct.who.activations));
+check('and so does a reading',
+  AL.cohortLine(dHrv.who.readings) === 'installed Aug 12, 2 days ago', AL.cohortLine(dHrv.who.readings));
+check('an age of one day is yesterday',
+  AL.cohortLine({ '2026-08-12': { n: 1, age: 1, day: D2 } }) === 'installed Aug 12, yesterday');
+
+const many = {
+  '2025-11-01': { n: 3, age: 313, day: '2026-09-10' },
+  '2026-08-29': { n: 2, age: 12, day: '2026-09-10' },
+  '2025-12-01': { n: 1, age: 283, day: '2026-09-10' },
+  '2026-09-08': { n: 1, age: 2, day: '2026-09-10' }
+};
+check('several cohorts list youngest first, with a count, a year when it differs, and the rest folded',
+  AL.cohortLine(many) === 'installed Sep 8 (2d), Aug 29 (12d) ×2, Dec 1 2025 (283d), +3 more',
+  AL.cohortLine(many));
+check('nothing known is an empty line, not a crash',
+  AL.cohortLine({}) === '' && AL.cohortLine(undefined) === '');
+
+/* A baseline stored before cohort maps existed. Its counts still diff; its
+   cohort detail must not, or every cohort already there would read as new. */
+const noWho = AL.snapshot(BASE);
+Object.keys(noWho.days).forEach((k) => { delete noWho.days[k].who; });
+const dNoWho = AL.diff(noWho, AL.snapshot(RETURNS));
+check('a baseline without cohort maps still counts the visitors',
+  dNoWho.visitors === 5, String(dNoWho.visitors));
+check('but claims no install age for them',
+  AL.cohortLine(dNoWho.who.returns) === '', JSON.stringify(dNoWho.who.returns));
+
+/* The stored baseline only keeps cohort maps for recent days. */
+const OLD = { open: [row('2026-06-01', [['2026-05-01', 'I', 2]]), row(D2, [['2026-08-01', 'I', 1]])], sub: [] };
+const sOld = AL.snapshot(OLD);
+check('a day well outside the catch-up window keeps no cohort map',
+  !sOld.days['2026-06-01'].who && !!sOld.days[D2].who, JSON.stringify(sOld.days));
+
 /* ------------------------------------------------- confetti arithmetic
 
    The canvas ranks nothing — all three celebrations run at once — so the only

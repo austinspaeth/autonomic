@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated as RNAnimated, Dimensions, Easing, Platform, Pressable, Text, useWindowDimensions, View } from 'react-native';
+import { Animated as RNAnimated, AppState, Dimensions, Easing, Platform, Pressable, Text, useWindowDimensions, View } from 'react-native';
 import { Tabs } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
 import { BlurView } from 'expo-blur';
@@ -13,6 +13,10 @@ import { useSheets } from '../../src/components/Sheet';
 import { MenuSheet } from '../../src/features/Settings';
 import { GRADE_COLORS, usePalette } from '../../src/theme';
 import { useInsightsUnseen } from '../../src/store/insightsBadge';
+import { usePaywall } from '../../src/features/Paywall';
+import { MONTHLY_SKU, priceOf, useIap } from '../../src/store/iap';
+import { getTrialDaysLeft, useTier } from '../../src/store/tier';
+import { usePacingTrial } from '../../src/store/pacingTrial';
 
 /**
  * The Journal is where the app opens, always.
@@ -203,11 +207,20 @@ function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
   }, [shownIndex, layouts]);
   const pillStyle = useAnimatedStyle(() => ({ transform: [{ translateX: pillX.value }], width: pillW.value }));
 
+  // The plan tab hangs BELOW the bar, into the space the bar already floats
+  // over, so no screen's bottom padding moves. Only a phone with too little
+  // inset for it to clear the edge lifts the bar, and only by the shortfall.
+  const tier = useTier();
+  const showPlan = tier !== 'pro';
+  const [rowH, setRowH] = useState(0);
+  const lift = showPlan ? Math.max(0, PLAN_TAB_H + PLAN_EDGE_GAP - 12 - insets.bottom) : 0;
+
   return (
-    <View pointerEvents="box-none" style={{ position: 'absolute', bottom: insets.bottom + 12, left: 0, right: 0, alignItems: 'center' }}>
+    <View pointerEvents="box-none" style={{ position: 'absolute', bottom: insets.bottom + 12 + lift - (showPlan ? PLAN_TAB_H : 0), left: 0, right: 0, alignItems: 'center' }}>
+      <View style={{ zIndex: 2, elevation: 8 }}>
       <BarShell maxWidth={avail}>
       <View
-        onLayout={(e) => setRowW(e.nativeEvent.layout.width)}
+        onLayout={(e) => { setRowW(e.nativeEvent.layout.width); setRowH(e.nativeEvent.layout.height); }}
         style={{ flexDirection: 'row', alignItems: 'center', gap: 2, padding: PAD, backgroundColor: Platform.OS === 'ios' ? 'rgba(6,6,9,0.82)' : '#0a0a0e' }}
       >
         {markFits ? (
@@ -267,7 +280,95 @@ function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
         </Pressable>
       </View>
       </BarShell>
+      </View>
+      {/* The tab is the bar's full outer width (row + its 1px border) and starts at
+          the bar's vertical midpoint, where the pill is widest, so its straight
+          sides continue the bar's outline and it reads as coming out of the bar. */}
+      {showPlan ? (
+        <PlanStatusTab
+          trial={tier === 'trial'}
+          width={rowW > 0 ? rowW + 2 : undefined}
+          overlap={rowH > 0 ? rowH / 2 + 1 : PLAN_OVERLAP}
+        />
+      ) : null}
     </View>
+  );
+}
+
+// Plan status tab: visible height, how far it tucks up under the bar before the
+// bar has been measured (after that it runs up to the bar's midpoint), and the
+// least clearance it keeps from the bottom of the screen.
+const PLAN_TAB_H = 30;
+const PLAN_OVERLAP = 2;
+const PLAN_EDGE_GAP = 6;
+
+/**
+ * A small folder tab hanging off the bottom of the nav bar for anyone who is not
+ * on Pro: days left for a trial, the monthly price for the free plan. It is the
+ * bar's dark glass, borderless, as wide as the bar and running up behind it to its
+ * midpoint, so it reads as part of the nav rather than a second floating pill.
+ * The action is a link, not a button: this is a footnote, not a promotion. The
+ * whole tab is the tap target and opens the paywall on the monthly plan. Pro
+ * never renders it; their plan lives in Settings.
+ */
+function PlanStatusTab({ trial, width, overlap }: { trial: boolean; width?: number; overlap: number }) {
+  const p = usePalette();
+  const { products } = useIap();
+  const openPaywall = usePaywall('plan-bar', 'monthly');
+  // Days left is a function of the clock, and the tier store only notifies when
+  // the tier itself flips, so re-read it whenever the app comes back.
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (s) => { if (s === 'active') setTick((t) => t + 1); });
+    return () => sub.remove();
+  }, []);
+
+  const days = getTrialDaysLeft();
+  const pacing = usePacingTrial();
+  const headline = trial ? `${days} day${days === 1 ? '' : 's'} left` : 'Free plan';
+  // A free install inside its seven-day pacing window is told what it has and
+  // for how long, in place of the price. The countdown lives here rather than
+  // on the pacing strip itself because the strip is the feature working: a
+  // number counting down beside it turns every glance at the budget into a
+  // reminder that it is about to be taken away.
+  const detail = trial
+    ? 'of Pro trial'
+    : pacing.active
+      ? `· Pacing free for ${pacing.daysLeft} more day${pacing.daysLeft === 1 ? '' : 's'}`
+      : `· ${priceOf(products.find((s) => s.productId === MONTHLY_SKU), MONTHLY_SKU)}/mo for Pro`;
+  const cta = trial ? 'Keep it' : 'Upgrade Now';
+
+  const shell = {
+    width, height: PLAN_TAB_H + overlap, paddingTop: overlap, paddingHorizontal: 20,
+    flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'space-between' as const, gap: 9,
+    borderBottomLeftRadius: 16, borderBottomRightRadius: 16, overflow: 'hidden' as const,
+  };
+  const content = (
+    <>
+      <Text numberOfLines={1} maxFontSizeMultiplier={1.3} style={{ flexShrink: 1, fontSize: 12, color: p.textDim }}>
+        <Text style={{ fontWeight: '700', color: p.text }}>{headline}</Text> {detail}
+      </Text>
+      <Text
+        maxFontSizeMultiplier={1.3}
+        style={{ fontSize: 12, fontWeight: '700', color: p.accent, textDecorationLine: 'underline', textDecorationColor: 'rgba(224,49,39,0.33)' }}
+      >
+        {cta}
+      </Text>
+    </>
+  );
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${headline} ${detail}. ${cta}`}
+      onPress={openPaywall}
+      hitSlop={{ bottom: 8, left: 6, right: 6 }}
+      style={({ pressed }) => [{ marginTop: -overlap, zIndex: 1, elevation: 0 }, pressed && { opacity: 0.7 }]}
+    >
+      {Platform.OS === 'android'
+        ? <View style={[shell, { backgroundColor: '#0a0a0e' }]}>{content}</View>
+        : <BlurView intensity={60} tint="dark" style={[shell, { backgroundColor: 'rgba(6,6,9,0.7)' }]}>{content}</BlurView>}
+    </Pressable>
   );
 }
 

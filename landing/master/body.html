@@ -497,6 +497,25 @@
       </div>
     </div>
 
+    <div class="grid two-col" style="margin-bottom:14px">
+      <div class="card">
+        <header><h2>What they log</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="pgLogs">Table</button></header>
+        <p class="hint">Installs that logged each thing <b>by hand</b> that day: a night of sleep (both bed and wake entered), a new activity, med or supplement, symptom, water, bowel movement, blood pressure or resting heart rate. Edits, live captures and anything imported from Apple Health or Health Connect are not counted. Capped once per install per day <em>per line</em>, so each line is a headcount and the lines must not be added together. The share beside each is of <b>active install-days</b>: of the days somebody was in the app, how many they logged this on.</p>
+        <div id="pgLogs"></div>
+        <div id="pgLogs-table" class="hidden" style="margin-top:12px"></div>
+        <div id="pgLogNote"></div>
+      </div>
+      <div class="card">
+        <header><h2>What they dig into</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="pgDig">Table</button></header>
+        <p class="hint">Milestones being <b>opened</b>, the clean-day protocol being <b>saved</b>, an Insights finding opened into its <b>deep-dive card</b> (early signal, unconfirmed pattern, biggest change or correlation), and which <b>AI report</b> was built. A report counts when its prompt sheet opens; whether it was then copied is not something the app can see. Same per-line cap and the same share of active install-days as the card beside it.</p>
+        <div id="pgDig"></div>
+        <div id="pgDig-table" class="hidden" style="margin-top:12px"></div>
+        <div id="pgDigNote"></div>
+      </div>
+    </div>
+
     <div class="card" style="margin-bottom:14px">
       <header><h2>iOS vs Android, day by day</h2><span class="spacer"></span>
         <button class="btn sm" data-table-toggle="pgPlatforms">Table</button></header>
@@ -947,6 +966,10 @@
           <button data-v="osh" aria-pressed="false">Offers shown</button>
           <button data-v="oac" aria-pressed="false">Offers accepted</button>
           <button data-v="odm" aria-pressed="false">Offers dismissed</button>
+          <button data-v="log" aria-pressed="false">Logged</button>
+          <button data-v="use" aria-pressed="false">Features</button>
+          <button data-v="fnd" aria-pressed="false">Findings</button>
+          <button data-v="rpt" aria-pressed="false">AI reports</button>
           <button data-v="err" aria-pressed="false">Failures</button>
         </div>
         <button class="btn sm" id="pgRawExport">Export CSV</button></header>

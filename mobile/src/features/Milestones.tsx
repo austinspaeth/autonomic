@@ -9,8 +9,8 @@ import { useSheets } from '../components/Sheet';
 import { radius, usePalette } from '../theme';
 import { fmtNum, fmtShort, todayKey } from '../lib/dates';
 import { useAppState } from '../store/store';
-import { scrollJournalToSection } from '../store/nav';
-import { CHECKLIST_STARTERS, STARTERS, buildMilestoneDays, buildMilestoneGroups } from '../lib/analysis/milestones';
+import { pingFeature } from '../store/ping';
+import { buildMilestoneDays, buildMilestoneGroups } from '../lib/analysis/milestones';
 import { resolveProtocol } from '../lib/scoring/day';
 
 export function useMilestones() {
@@ -27,24 +27,17 @@ export function useMilestones() {
     let done = 0, total = 0;
     groups.forEach((g) => g.items.forEach((it) => { total++; if (it.done) done++; }));
     const pct = total ? Math.round((done / total) * 100) : 0;
-    const starters = groups.find((g) => g.title === 'Getting started')?.items ?? [];
-    return { groups, done, total, pct, starters };
+    return { groups, done, total, pct };
   }, [days, sex, height, protocol, protocolSetOn, customTypes]);
 }
 
 /** Compact card for the journal view; taps open the full tracker in a sheet.
- * Undone starters in CHECKLIST_STARTERS render as a tappable "Up first"
- * checklist (each row jumps straight to the surface that completes it); when milestones
- * were unlocked on `dk`, a divider + checklist of them appears below. */
+ * When milestones were unlocked on `dk`, a divider + list of them appears below.
+ * It hands the user no checklist: milestones are achievements, not chores. */
 export function MilestoneProgressCard({ dk }: { dk?: string }) {
   const p = usePalette();
   const { openSheet } = useSheets();
-  const { groups, done, total, pct, starters } = useMilestones();
-  // Only CHECKLIST_STARTERS are offered as chores; the rest stay achievements.
-  const upFirst = starters.filter((it) => !it.done && CHECKLIST_STARTERS.includes(it.label));
-  const starterAction: Record<string, () => void> = {
-    [STARTERS.fullDay]: () => scrollJournalToSection('activities'),
-  };
+  const { groups, done, total, pct } = useMilestones();
   const achievedToday = dk ? groups.flatMap((g) => g.items).filter((it) => it.done && it.date === dk) : [];
   return (
     <Pressable
@@ -64,30 +57,6 @@ export function MilestoneProgressCard({ dk }: { dk?: string }) {
         </View>
         <Icon name="chevronRight" size={18} color={p.textDim} />
       </View>
-      {upFirst.length ? (
-        <>
-          <View style={{ height: 1, backgroundColor: p.border, marginTop: 15 }} />
-          <Text style={{ fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, color: p.textDim, marginTop: 13, marginBottom: 10 }}>
-            Up first
-          </Text>
-          <View style={{ gap: 8 }}>
-            {upFirst.map((it) => (
-              <Pressable
-                key={it.label}
-                onPress={starterAction[it.label]}
-                style={({ pressed }) => [
-                  { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: p.sunk, borderRadius: radius.control, paddingVertical: 16, paddingHorizontal: 13 },
-                  pressed && { opacity: 0.6 },
-                ]}
-              >
-                <View style={{ width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: p.border, backgroundColor: p.surface2 }} />
-                <Text numberOfLines={1} style={{ flex: 1, fontSize: 14, color: p.text, fontWeight: '500' }}>{it.label}</Text>
-                <Icon name="chevronRight" size={18} color={p.textDim} />
-              </Pressable>
-            ))}
-          </View>
-        </>
-      ) : null}
       {achievedToday.length ? (
         <>
           <View style={{ height: 1, backgroundColor: p.border, marginTop: 15 }} />
@@ -117,6 +86,8 @@ export function MilestonesSheet() {
   const p = usePalette();
   const { groups, done, total, pct } = useMilestones();
   const [filter, setFilter] = React.useState<'all' | 'done' | 'next'>('all');
+  // Counted on mount, so every route into the sheet is covered.
+  React.useEffect(() => { pingFeature('milestones'); }, []);
   if (!total) {
     return <Text style={{ color: p.textDim, textAlign: 'center', marginTop: 40, paddingHorizontal: 20, lineHeight: 20 }}>Log readings, sleep, and clean days to start unlocking recovery milestones.</Text>;
   }

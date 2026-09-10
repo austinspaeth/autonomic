@@ -624,15 +624,23 @@ const crosshairRect = $('tlChart').querySelector('rect[fill="transparent"]');
 /* The rule must be painted after the bars, or a full-height bar hides all of
    it but the sliver above its top — which is most of the chart on a busy day. */
 const lastBar = [...$('tlChart').querySelectorAll('path[fill]')].pop();
+/* Guarded rather than indexed straight in. When master/releases.js went stale
+   the newest release fell off the left of the window, `relLines` emptied, and
+   this line threw a jsdom TypeError that killed the whole file — so every
+   check after it stopped running and the failure looked like a jsdom bug
+   rather than a stale generated file. A missing rule is a real failure and
+   should read as one. */
 check('rules are painted over the data, not under it',
-  lastBar && (lastBar.compareDocumentPosition(relLines[0]) & window.Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
-  'a bar must come before the rule in document order');
+  !!lastBar && !!relLines[0]
+  && (lastBar.compareDocumentPosition(relLines[0]) & window.Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+  relLines.length ? 'a bar must come before the rule in document order'
+    : 'no release rules on the chart: is master/releases.js stale? run `npm run releases`');
 
 check('mark hit targets are painted above the crosshair layer',
   crosshairRect && hitLines.length > 0 &&
   (crosshairRect.compareDocumentPosition(hitLines[0]) & window.Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
   'crosshair must come first in document order');
-hitLines[0].dispatchEvent(new window.MouseEvent('mouseenter', { bubbles: false }));
+if (hitLines[0]) hitLines[0].dispatchEvent(new window.MouseEvent('mouseenter', { bubbles: false }));
 const tip = $('tlChart').querySelector('.tt-title');
 check('hovering a rule names the release', tip && /^v\d+\.\d+$/.test(tip.textContent.trim()),
   tip && tip.textContent);

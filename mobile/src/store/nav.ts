@@ -51,8 +51,7 @@ export function getCurrentKey() { return current; }
 
 /* Journal scroll-to-section: sections report their content y as they lay out
  * (setJournalSectionY), the Journal screen registers its scroller, and anything
- * rendered inside the journal (e.g. the milestone "Up first" checklist) can jump
- * the view to a section. */
+ * rendered inside the journal can jump the view to a section. */
 const sectionYs: Record<string, number> = {};
 let journalScroller: ((y: number) => void) | null = null;
 export function setJournalSectionY(section: string, y: number) { sectionYs[section] = y; }

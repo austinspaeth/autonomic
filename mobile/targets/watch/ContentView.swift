@@ -16,9 +16,10 @@ import SwiftUI
  * still captured, synced and saved to the journal on every tier.
  */
 struct ContentView: View {
-    enum Mode { case home, hr, pots, orthostatic }
+    enum Mode { case home, pacing, hr, pots, orthostatic }
 
     @State private var mode: Mode = .home
+    @EnvironmentObject private var relay: PhoneRelay
     @EnvironmentObject private var workout: WorkoutManager
     @Environment(\.scenePhase) private var scenePhase
 
@@ -39,6 +40,7 @@ struct ContentView: View {
             case .resolved:
                 switch mode {
                 case .home: home
+                case .pacing: PacingView { mode = .home }
                 case .hr: HrMonitorView { mode = .home }
                 case .pots: StandTestView { mode = .home }
                 case .orthostatic: OrthostaticView { mode = .home }
@@ -86,6 +88,14 @@ struct ContentView: View {
                     Text("Autonomic")
                         .font(.system(size: 15, weight: .heavy))
                 }
+                // Pacing leads. HR Monitor and the two POTS captures are
+                // things you START; pacing is a thing you CHECK, several times
+                // a day, so it takes the top slot and carries today's figure
+                // in its subtitle rather than a description of itself.
+                modeButton(
+                    title: "Pacing", subtitle: pacingSubtitle,
+                    icon: "bolt.batteryblock", tint: DS.gold
+                ) { mode = .pacing }
                 modeButton(
                     title: "HR Monitor", subtitle: "Persistent heart rate",
                     icon: "heart.fill", tint: DS.accent
@@ -104,6 +114,12 @@ struct ContentView: View {
                     .padding(.top, 2)
             }
         }
+    }
+
+    /// Today's figure, or where to get one. Never a stale figure: a budget
+    /// whose day has passed decodes to nil (see `WatchPacing.frame(at:)`).
+    private var pacingSubtitle: String {
+        relay.pacing?.frame()?.homeSubtitle ?? "Open on your iPhone"
     }
 
     // MARK: - Permission gate

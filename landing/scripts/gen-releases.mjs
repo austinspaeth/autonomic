@@ -21,6 +21,7 @@ import { fileURLToPath } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const SRC = path.resolve(here, '../../mobile/src/lib/whatsNew.ts');
 const OUT = path.resolve(here, '../master/releases.js');
+const APP = path.resolve(here, '../../mobile');
 
 const src = fs.readFileSync(SRC, 'utf8');
 const start = src.indexOf('export const RELEASES');
@@ -50,7 +51,36 @@ for (let i = open; i < src.length; i += 1) {
 }
 if (end < 0) { console.error('Could not find the end of the RELEASES array.'); process.exit(1); }
 
-const releases = vm.runInNewContext('(' + src.slice(open, end + 1) + ')');
+/* The array can spread a build flag into a note list (1.27 does it for the
+   Garmin rollout, so the release note appears and disappears with the feature
+   itself). Those flags are plain `export const X = true|false` lines in other
+   modules, so they are read out of source and handed to the sandbox rather
+   than stubbed to a guess — a stubbed `false` would silently drop a shipped
+   release note from the dashboard's timeline.
+
+   Anything still undefined evaluates as `false` rather than throwing: a new
+   flag should cost a note on the dashboard, never a broken build script. */
+function buildFlags() {
+  const out = {};
+  const files = [path.join(APP, 'src', 'lib', 'watch', 'release.ts')];
+  files.forEach((f) => {
+    let text = '';
+    try { text = fs.readFileSync(f, 'utf8'); } catch { return; }
+    const re = /export const ([A-Z][A-Z0-9_]*) = (true|false);/g;
+    let m;
+    while ((m = re.exec(text))) out[m[1]] = m[2] === 'true';
+  });
+  return out;
+}
+
+const sandbox = buildFlags();
+const releases = vm.runInNewContext(
+  '(' + src.slice(open, end + 1) + ')',
+  new Proxy(sandbox, {
+    has: () => true,
+    get: (t, k) => (k in t ? t[k] : undefined),
+  }),
+);
 
 const clean = releases
   .filter((r) => r && typeof r.version === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.date || ''))

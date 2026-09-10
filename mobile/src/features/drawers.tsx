@@ -14,6 +14,7 @@ import { resolveProtocol, waterGoalL } from '../lib/scoring/day';
 import { BM_KINDS, BM_VOLUMES, bmLabel } from '../lib/registry';
 import { LogPickerSheet } from './LogPicker';
 import { ensureDay, getState, save, useStore } from '../store/store';
+import { pingLogged } from '../store/ping';
 import { defaultTimeFor, uid } from '../lib/dates';
 import type { Movement } from '../lib/types';
 
@@ -106,7 +107,18 @@ function WaterDrawer({ dk, controls }: { dk: string; controls: SheetControls }) 
         onPress={() => openSheet((c) => <WaterGoalCard controls={c} />, { fitContent: true })}
       />
       <SheetFooter>
-        <DaySaveButton dk={dk} title="Save" onPress={() => { ensureDay(dk).food.water = roundL(liters); save(); controls.closeAll(); }} />
+        <DaySaveButton
+          dk={dk}
+          title="Save"
+          onPress={() => {
+            const l = roundL(liters);
+            ensureDay(dk).food.water = l;
+            save();
+            // Saving zero is clearing the day's water, not logging any.
+            if (l > 0) pingLogged('water');
+            controls.closeAll();
+          }}
+        />
       </SheetFooter>
     </View>
   );
@@ -206,6 +218,7 @@ function BowelForm({ dk, existing, controls }: { dk: string; existing: Movement 
     const i = dig.movements.findIndex((x) => x.id === m.id);
     if (i >= 0) dig.movements[i] = m; else dig.movements.push(m);
     save();
+    if (i < 0) pingLogged('bowel');
     controls.closeAll();
   };
   const card = (active: boolean) => ({

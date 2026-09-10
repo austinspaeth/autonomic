@@ -145,6 +145,66 @@ export interface DayRecord {
   digestion: { movements: Movement[]; bm?: number };
   /** Free-text day notes; only surfaced in AI-insights prompts. */
   notes?: string;
+  /** What the health store said this day cost, summarised at read time.
+   *  Written by src/store/budget.ts, consumed by src/lib/budget. It lives in
+   *  the journal (not the flags store) because it is the user's own health
+   *  data and must ride export/import the way `sleep` does. */
+  load?: DayLoad;
+}
+
+/**
+ * A day's passive load, read from Apple Health / Health Connect and summarised
+ * before it is stored: the raw all-day heart-rate series never enters the
+ * journal, only the thinned curve in the waveform sidecar under `load:<dk>`.
+ *
+ * Every field is nullable and null means UNKNOWN, never zero. A phone with no
+ * watch reports steps and walking minutes and nothing else; a day the watch
+ * spent on the charger reports low coverage rather than a restful day.
+ */
+export interface DayLoad {
+  /** Whole-day step count so far. */
+  steps: number | null;
+  /** Minutes holding any steps, merged from the sample timestamps. Works on a
+   *  phone with no wearable — every phone counts its own steps. */
+  walkingMin: number | null;
+  /** Apple Stand Time minutes. iOS with a paired watch only: the phone cannot
+   *  know you are standing, and Health Connect has no equivalent record. */
+  standMin: number | null;
+  /** Minutes standing STILL, inferred from the user's own orthostatic
+   *  signature (src/lib/budget/upright.ts). Null without a heart-rate series;
+   *  never claimed from steps alone. */
+  stillUprightMin: number | null;
+  /** Walking and standing stretches, for the drill-in's shading. */
+  uprightSpans: { startMin: number; endMin: number; kind: 'walk' | 'still' }[] | null;
+  /** Upright minutes per clock hour (each array 24 long), counted from the
+   *  same spans as the totals, for the drill-in's hourly bars. `stand` is
+   *  Apple Stand Time, iOS with a watch only. Null on a day read before hours
+   *  were kept; a null array inside means that source was not measured. */
+  uprightByHour: { walk: number[] | null; still: number[] | null; stand: number[] | null } | null;
+  /** `hrBelowMin` per clock hour, 24 long. Null when unknown. */
+  hrBelowByHour: number[] | null;
+  /** Minutes the heart sat above the user's own exertion line. */
+  hrAboveMin: number | null;
+  /** Those minutes split by how far above the line they sat (budget/burn.ts
+   *  HR_BAND_EDGES), which is what lets the day be priced by intensity. The
+   *  curve itself cannot live here, so this is the resolution the journal
+   *  keeps. Null means UNKNOWN — a day read before bands existed, charged
+   *  flat rather than guessed at; an empty array means "looked, nothing". */
+  hrBands: number[] | null;
+  /** Minutes the heart sat BELOW the user's own recovery line while awake.
+   *  Genuine parasympathetic time, and the budget pays it back. */
+  hrBelowMin: number | null;
+  /** Minutes the series actually covered, so a charger gap reads as unknown. */
+  hrCoverageMin: number | null;
+  /** Contiguous runs above the line ("in three stretches"). */
+  hrStretches: number | null;
+  /** The longest such run, minutes past midnight. */
+  longestStretch: { startMin: number; endMin: number } | null;
+  peakBpm: number | null;
+  /** The line the minutes were counted against, so a later baseline shift
+   *  cannot silently re-mean a stored count. */
+  lineBpm: number | null;
+  readAt: string | null;
 }
 
 /** User-configurable definition of a "clean day" (the streak protocol). Each
@@ -175,6 +235,9 @@ export type CameraModuleShape = 'tall' | 'wide' | 'square' | 'single';
  *  bottom, left/middle/right, tl/tr/bl/br, or right/below for a single lens). */
 export interface CameraLayout { shape: CameraModuleShape; flash: string }
 
+/** The five pacing alerts (src/lib/budget/alerts.ts). */
+export type PacingAlertKind = 'ahead' | 'nearly' | 'over' | 'exertion' | 'easy';
+
 export interface AppState {
   version: number;
   settings: {
@@ -204,6 +267,15 @@ export interface AppState {
      *  Undefined means "never chosen" — first enabling the morning reminder
      *  defaults it on; an explicit off stays off. */
     crashAlert?: { enabled: boolean; lastFired?: string };
+    /** Pacing alerts, per kind (src/lib/budget/alerts.ts). A kind that is
+     *  undefined is ON: nobody chose against it, and granting notification
+     *  permission is the choice. Only an explicit `false` turns one off. What
+     *  has fired today lives in the flags MMKV, not here. */
+    pacingAlerts?: Partial<Record<PacingAlertKind, boolean>>;
+    /** The master switch over all five. Undefined is ON; `false` silences every
+     *  kind without touching `pacingAlerts`, so turning it back on restores
+     *  the per-kind choices. */
+    pacingAlertsEnabled?: boolean;
   };
   profile: Profile;
   /** User-defined types layered on top of the registry maps (pure JSON defs). */
@@ -263,6 +335,12 @@ export interface TypeDef {
   dosage?: string;
   /** True for user-created types (stored in state.customTypes). */
   userDefined?: boolean;
+  /** How much a minute of this costs, for the pacing budget. Built-in
+   *  activities never carry it — LOAD_TABLE in src/lib/budget/load.ts is the
+   *  source for those, so the weights live in one readable table the way the
+   *  scoring thresholds do. It is set only on user-created activities, where
+   *  the create-type form asks once (light / moderate / heavy). */
+  load?: 'rest' | 'light' | 'moderate' | 'heavy' | 'strenuous';
   summary?: (r: Entry) => string;
   detail?: (r: Entry) => string;
 }

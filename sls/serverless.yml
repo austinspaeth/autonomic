@@ -228,6 +228,35 @@ functions:
       - httpApi:
           method: GET
           path: /ping/oac/{cohort}
+      # ...and the gap itself: an accepted offer that did NOT become a
+      # subscription (cancelled sheet, store error, pending, never reached the
+      # store, no answer). The one POST, because its JSON body carries the
+      # store's error code and redacted message. Moves PING#OFL once per offer
+      # per install per Eastern day and an OFFERFAIL row on every attempt.
+      - httpApi:
+          method: POST
+          path: /ping/ofl/{cohort}
+      # What people do in the journal and around it. All four capped once per
+      # install per Eastern day PER LETTER, like /ping/see:
+      #   log  logged by hand (S sleep / A activity / M med / Y symptom /
+      #        W water / B bowel movement / P blood pressure / R resting HR)
+      #   use  a feature (M Milestones opened / P protocol saved)
+      #   fnd  an Insights finding opened (E early / U unconfirmed /
+      #        C biggest change / R correlation)
+      #   rpt  an AI report built (D data for prompt / H full health report /
+      #        C doctor summary)
+      - httpApi:
+          method: GET
+          path: /ping/log/{cohort}
+      - httpApi:
+          method: GET
+          path: /ping/use/{cohort}
+      - httpApi:
+          method: GET
+          path: /ping/fnd/{cohort}
+      - httpApi:
+          method: GET
+          path: /ping/rpt/{cohort}
       # A FAULT report — the one route here that is not a counter. Its own path
       # prefix on purpose: every route above is a fixed alphabet and a number
       # that means "how many people", and this one carries text (a tag naming

@@ -3,10 +3,11 @@
  * renders these generically with LineChart / Bars / stat tiles. Simplified from
  * the PWA: a few good charts + stat tiles per category, grade-zone shaded.
  */
-import type { Band, Entry, ScoreCat } from '../types';
+import type { AppState, Band, Entry, ScoreCat } from '../types';
 import type { HelpContent } from '../help';
-import { todayKey } from '../dates';
+import { addDays, todayKey } from '../dates';
 import { hrRecovery } from '../hrRecovery';
+import { budgetSeries } from '../budget/series';
 import { SCORE_COLORS, orthoMaxDelta, restingHrBands, sBP } from '../scoring';
 import { scoreCat, sleepHours, streakInfo, type DaysMap } from '../scoring/day';
 import { ACTIVITY_TYPES, MED_TYPES, TRIGGER_TYPES } from '../registry';
@@ -55,6 +56,10 @@ export interface BarGroup { label: string; rows: { name: string; count: number; 
  *  the horizontal bars, and tapping a row (matched by its `key`) narrows the
  *  chart to that row's own counts until a tap elsewhere resets it. */
 export interface BarBuckets { totals: (number | null)[]; byKey: Record<string, (number | null)[]> }
+/** Minutes left over per bucket, drawn as columns hanging off a ceiling at
+ *  zero (components/charts MarginColumns). Its own field rather than a `Chart`
+ *  because it is a different shape, not a differently-styled line. */
+export interface MarginChart { label: string; values: (number | null)[]; labels: string[] }
 export interface AnalysisCard {
   title: string;
   sub?: string;
@@ -65,6 +70,8 @@ export interface AnalysisCard {
   charts?: Chart[]; stats?: Stat[]; insights?: Insight[]; bars?: BarGroup[];
   /** Per-bucket counts charted above the first bars group (see BarBuckets). */
   barBuckets?: BarBuckets;
+  /** Budget margin columns (see MarginChart). */
+  margin?: MarginChart;
   /** Balance-style metric readout under the description (ortho cards carry one
    *  per transition variant instead, on `OrthoVariant`). */
   metricsRow?: MetricsRow;
@@ -552,6 +559,94 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext, cu
     }];
   };
 
+
+  /* Two bands, split at zero: room left over, or an overspend. Deliberately
+     not a ladder — "40 minutes in hand" is not twice as good as 20, and
+     grading the size of the margin would turn an unspent budget into a score
+     to beat, which is the one thing this feature must never do. */
+  const MARGIN_BANDS: Band[] = [{ max: 0, cat: 'bad' }, { max: Infinity, cat: 'good' }];
+
+  /**
+   * Pacing: how far over or under the day's own budget it ran.
+   *
+   * Margin, not spend. "You did 90 minutes" is a fact about the day; "you had
+   * 40 minutes in hand" is a fact about the day AGAINST what that day could
+   * absorb, which is the only version worth charting for somebody whose
+   * capacity moves week to week.
+   *
+   * Suppressed days contribute null rather than a huge fake overspend: a crash
+   * day publishes no budget, so it has no margin either.
+   */
+  const pacing = (): AnalysisCard[] => {
+    const allKeys: string[] = [];
+    buckets.forEach((b) => b.days.forEach((dk) => allKeys.push(dk)));
+    if (!allKeys.length) return [];
+    const state = { days, customTypes: ctx.customTypes || {}, hiddenTypes: {} } as unknown as AppState;
+    const rows = budgetSeries(state, allKeys, ctx, addDays);
+    if (!rows.length) return [];
+
+    const byDay = new Map(rows.map((r) => [r.dk, r]));
+    const margins = acAgg(buckets, (_d, dk) => byDay.get(dk)?.marginMin ?? null);
+    if (!acPresent(margins).length) return [];
+
+    const scored = rows.filter((r) => r.marginMin != null);
+    const over = scored.filter((r) => (r.marginMin as number) < 0).length;
+    const under = scored.length - over;
+    const avg = scored.length
+      ? scored.reduce((s, r) => s + (r.marginMin as number), 0) / scored.length
+      : null;
+    const learningDays = rows.filter((r) => r.learning).length;
+
+    const held = scored.filter((r) => (r.marginMin as number) >= 0 && r.outcome === 'held').length;
+    const evaluated = scored.filter((r) => (r.marginMin as number) >= 0 && r.outcome !== 'unknown').length;
+
+    const insights: Insight[] = [];
+    if (evaluated >= 5) {
+      insights.push({
+        text: `Your budget held on ${held} of ${evaluated} under-budget days in this range.`,
+        strength: held / evaluated >= 0.75 ? 'strong' : 'mod',
+      });
+    }
+
+    return [{
+      title: 'Budget margin',
+      sub: range,
+      desc: learningDays
+        ? `How much room each day had left over. Includes ${learningDays} learning ${learningDays === 1 ? 'day' : 'days'}, while the ceiling was still being fitted.`
+        : 'How much room each day had left over, against what that day could absorb.',
+      help: {
+        what: 'The gap between the day\'s pacing budget and what the day actually cost, in effort minutes. Above the line is room you did not need; below it is an overspend. Days the budget was paused are left out rather than counted as zero.',
+        why: 'A single day over budget is ordinary. A run of them is the shape that tends to come before a bad week, and seeing the margin rather than the raw spend is what lets you compare a heavy day when you were well against a light one when you were not.',
+      },
+      tiles: true,
+      cat: avg == null ? null : avg >= 0 ? 'good' : 'bad',
+      catBands: MARGIN_BANDS,
+      stats: [
+        /* A real ZERO, not a dash. There were scored days here — that is what
+           put this card on the screen — so "no days over budget" is an answer
+           and a good one, where the dash the other tiles use means "nothing to
+           say". Both day counts read the same way for the same reason. */
+        { label: 'Over budget', value: over, sub: over === 1 ? 'day' : 'days', color: over ? SCORE_COLORS.bad : undefined },
+        { label: 'Under budget', value: under, sub: under === 1 ? 'day' : 'days' },
+        {
+          label: 'Avg margin',
+          value: avg == null ? null : Math.round(Math.abs(avg)),
+          prefix: avg == null ? undefined : avg >= 0 ? '+' : '-',
+          /* No unit. The label says margin, the two tiles beside it are days,
+             and the whole feature speaks in effort minutes — so a unit here is
+             a third small word on a tile that already reads as one number. */
+          color: avg == null ? undefined : avg >= 0 ? SCORE_COLORS.good : SCORE_COLORS.bad,
+        },
+      ],
+      margin: {
+        label: 'Minutes left over',
+        values: margins,
+        labels: bl.map((b) => b.label),
+      },
+      insights,
+    }];
+  };
+
   const bl = bucketViews(buckets, mode);
   return [
     { id: 'outlook', icon: 'gauge', title: 'Outlook', desc: 'Recovery score & trends', buckets: bl, build: () => nonEmpty([...outlook(), heat()]) },
@@ -560,6 +655,7 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext, cu
     { id: 'pots', icon: 'standing', title: 'POTS', desc: 'Stand tests & events', buckets: bl, build: () => nonEmpty([...standTest(), ...ortho()]) },
     { id: 'sleep', icon: 'moon', title: 'Sleep', desc: 'Duration & timing', buckets: bl, build: () => nonEmpty(sleep()) },
     { id: 'activity', icon: 'bike', title: 'Activity', desc: 'Workouts & exercise', buckets: bl, build: () => nonEmpty(activity()) },
+    { id: 'pacing', icon: 'gauge', title: 'Pacing', desc: 'Budget vs what the day cost', buckets: bl, build: () => nonEmpty(pacing()) },
     { id: 'triggers', icon: 'triangle', title: 'Triggers', desc: 'Triggers & hydration', buckets: bl, build: () => nonEmpty(triggers()) },
     { id: 'supps', icon: 'pill', title: 'Meds', desc: 'Meds & supplements', buckets: bl, build: () => nonEmpty(supps()) },
   ];

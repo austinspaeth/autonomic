@@ -35,6 +35,7 @@ import {
 import { PromptSheet } from '../PromptSheet';
 import { usePaywall } from '../Paywall';
 import { useTier } from '../../store/tier';
+import { pingReport } from '../../store/ping';
 
 /* ---------- pill chrome, matched to HealthUpdates / WhatsNew ---------- */
 
@@ -212,6 +213,7 @@ export function AiReportsSheet(_props: { controls?: SheetControls }) {
   }, []);
 
   const open = (kind: 'data' | 'overall' | 'doctor', range: ReportRange = 'all') => {
+    pingReport(kind);
     const state = reportState();
     // The builders resolve their own keys from the range; only the label is needed
     // here. Nothing is gated on emptiness any more — an empty period is disabled in

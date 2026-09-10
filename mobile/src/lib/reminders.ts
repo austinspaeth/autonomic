@@ -1,5 +1,5 @@
 /**
- * The app's notifications, both local (no push, no server, nothing leaves the
+ * The app's notifications, all local (no push, no server, nothing leaves the
  * device):
  *
  * - Daily reminder: a single repeating notification nudging the user to take
@@ -7,18 +7,29 @@
  *   baseline comparable day to day.
  * - Crash warning: fired when the trailing-week trend flags a likely crash
  *   (detectDownturn — the same engine behind the Outlook card), telling the
- *   user to rest. There is no background execution, so it's evaluated whenever
- *   the app is running: on launch and after journal changes (initCrashWatcher).
+ *   user to rest. Evaluated whenever the app is running: on launch and after
+ *   journal changes (initCrashWatcher).
+ * - Reading complete: a reading that finished while the app was backgrounded.
+ * - Pacing alerts: src/store/pacingAlerts.ts, which also runs from the
+ *   background (src/store/pacingBackground.ts). Only the shared permission
+ *   handling for them lives here.
  *
  * The scheduled reminder is derived state: `settings.reminder` in the journal
  * is the source of truth, and `syncReminder()` reconciles the OS schedule to
  * it on launch. That keeps the two from drifting after a reinstall, a restore
  * from an export, or the user revoking permission in system settings.
+ *
+ * SAYING YES TURNS ON EVERYTHING NEVER CHOSEN. The moment permission first
+ * becomes granted, whether through one of our prompts or in system settings,
+ * `applyNotificationDefaults()` switches on every notification the user has
+ * not decided about. An explicit off is never overridden.
  */
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
+import { MMKV } from 'react-native-mmkv';
 import { todayKey } from './dates';
 import { logError } from './diagnostics/errorLog';
+import { alertsEnabled } from './budget/alerts';
 import { pingNotifyEnabled } from '../store/ping';
 import { resolveProtocol } from './scoring/day';
 import { detectDownturn } from './scoring/downturn';
@@ -53,6 +64,29 @@ const parse = (hhmm: string): { hour: number; minute: number } => {
     minute: Number.isFinite(m) ? Math.min(59, Math.max(0, m)) : 0,
   };
 };
+
+/* ---------- the last permission answer we saw ---------- */
+
+// Plaintext flags MMKV: it is about the device's permission, not the journal,
+// so it must not ride an import. It exists only so a grant made in system
+// settings can be told apart from one that was already there.
+const FLAGS_ID = 'autonomic.flags';
+const PERM_KEY = 'notifPermissionSeen';
+let flags: MMKV | null | undefined;
+
+function flagStore(): MMKV | null {
+  if (flags !== undefined) return flags;
+  try { flags = new MMKV({ id: FLAGS_ID }); } catch { flags = null; }
+  return flags;
+}
+
+function permSeen(): boolean | undefined {
+  try { return flagStore()?.getBoolean(PERM_KEY); } catch { return undefined; }
+}
+
+function notePermSeen(granted: boolean): void {
+  try { flagStore()?.set(PERM_KEY, granted); } catch { /* best-effort */ }
+}
 
 /** Android needs an explicit channel or the notification posts silently. */
 async function ensureChannel() {
@@ -124,6 +158,9 @@ export async function notifyHrvComplete(): Promise<void> {
  * Only prompts when the OS hasn't already decided — a previous "don't allow"
  * can't be re-prompted, so that path resolves false and the caller should send
  * the user to system settings.
+ *
+ * A prompt that comes back granted turns on every notification never chosen
+ * for (`applyNotificationDefaults`), whichever toggle raised it.
  */
 export async function requestReminderPermission(): Promise<boolean> {
   const current = await Notifications.getPermissionsAsync();
@@ -132,6 +169,8 @@ export async function requestReminderPermission(): Promise<boolean> {
   const asked = await Notifications.requestPermissionsAsync({
     ios: { allowAlert: true, allowSound: true, allowBadge: false },
   });
+  notePermSeen(asked.granted);
+  if (asked.granted) await applyNotificationDefaults();
   return asked.granted;
 }
 
@@ -139,6 +178,83 @@ export async function requestReminderPermission(): Promise<boolean> {
 export async function canAskForReminders(): Promise<boolean> {
   const p = await Notifications.getPermissionsAsync();
   return p.granted || p.canAskAgain;
+}
+
+export type NotificationPermission = 'granted' | 'ask' | 'blocked';
+
+/** The permission as a UI needs it: on, askable, or only fixable in settings. */
+export async function readNotificationPermission(): Promise<NotificationPermission> {
+  try {
+    const p = await Notifications.getPermissionsAsync();
+    return p.granted ? 'granted' : p.canAskAgain ? 'ask' : 'blocked';
+  } catch {
+    return 'ask';
+  }
+}
+
+/**
+ * Turn on every notification the user has never decided about: the morning
+ * reminder at its default time, crash warnings, and (by leaving them undefined,
+ * which reads as on) every pacing alert. An explicit off stays off.
+ *
+ * Called the moment permission becomes granted. The reminder is only persisted
+ * once its schedule succeeded, the `enableReminder` rule.
+ */
+export async function applyNotificationDefaults(): Promise<void> {
+  try {
+    const s = getState();
+    let changed = false;
+    if (s.settings.reminder === undefined) {
+      try {
+        await scheduleMorningReminder(DEFAULT_REMINDER_TIME);
+        s.settings.reminder = { enabled: true, time: DEFAULT_REMINDER_TIME };
+        changed = true;
+        pingNotifyEnabled('reminder');
+      } catch (e) {
+        logError('reminder.schedule', e);
+      }
+    }
+    if (s.settings.crashAlert === undefined) {
+      s.settings.crashAlert = { enabled: true };
+      changed = true;
+      pingNotifyEnabled('crash');
+    }
+    if (changed) save();
+    if (Object.values(alertsEnabled(s.settings)).some(Boolean) && pacingUnlocked()) pingNotifyEnabled('pacing');
+    if (changed) void checkCrashRisk();
+  } catch (e) {
+    logError('notify.defaults', e);
+  }
+}
+
+/** Lazy: the tier store is a heavier dependency than this module should carry. */
+function pacingUnlocked(): boolean {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    return (require('../store/pacingTrial') as typeof import('../store/pacingTrial')).isPacingUnlocked();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Notice a permission that changed while we were not asking: granted, or
+ * taken away, in system settings. Launch and foreground call it. A grant seen
+ * here for the first time applies the defaults exactly as a prompt would.
+ *
+ * A phone seen for the first time is only recorded: permission that was
+ * already there before this shipped is not a new yes.
+ */
+export async function syncNotificationPermission(): Promise<boolean> {
+  try {
+    const granted = (await Notifications.getPermissionsAsync()).granted;
+    const prev = permSeen();
+    notePermSeen(granted);
+    if (granted && prev === false) await applyNotificationDefaults();
+    return granted;
+  } catch {
+    return false;
+  }
 }
 
 /** Replace any scheduled reminder with one firing daily at `hhmm`. */
@@ -227,11 +343,10 @@ export async function setCrashAlert(on: boolean): Promise<boolean> {
 
 /**
  * Evaluate today's trend and fire the rest warning if it's sliding. Called on
- * launch and (debounced) after every journal change — there's no background
- * execution, so the moment new data lands is the moment we can warn. Dedupe is
- * one notification per calendar day (`crashAlert.lastFired`), and the message
- * reuses the Outlook card's downturn copy so the notification and the app
- * always tell the same story.
+ * launch and (debounced) after every journal change — the moment new data
+ * lands is the moment we can warn. Dedupe is one notification per calendar day
+ * (`crashAlert.lastFired`), and the message reuses the Outlook card's downturn
+ * copy so the notification and the app always tell the same story.
  */
 export async function checkCrashRisk(): Promise<void> {
   try {

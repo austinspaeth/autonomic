@@ -13,6 +13,10 @@ interface AppEnvNative {
   installCrashHandler?: () => boolean;
   /** Crashes recorded since the last call, as raw JSON, clearing them. */
   takeCrashLog?: () => string;
+  /** iOS: UIApplication.beginBackgroundTask, resolving its identifier. */
+  beginBackgroundTask?: (name: string) => Promise<number>;
+  /** iOS: end a task `beginBackgroundTask` started. */
+  endBackgroundTask?: (id: number) => Promise<void>;
 }
 
 let mod: AppEnvNative | null | undefined;
@@ -90,6 +94,31 @@ export function installNativeCrashHandler(): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * Ask iOS for extra background time around `name`, returning the release.
+ *
+ * A background-delivery launch is given a few seconds, and a health read plus
+ * a budget build can outlast them; without this the process is suspended mid
+ * write. Everywhere else, and on a binary predating the native half, it is a
+ * no-op. The release is idempotent and safe to call before the begin resolves.
+ */
+export function holdBackgroundTime(name: string): () => void {
+  if (Platform.OS !== 'ios') return () => {};
+  const native = appEnvNative();
+  if (!native?.beginBackgroundTask) return () => {};
+  let id: number | null = null;
+  let released = false;
+  const end = (v: number) => { void native.endBackgroundTask?.(v).catch(() => {}); };
+  native.beginBackgroundTask(name)
+    .then((v) => { if (released) end(v); else id = v; })
+    .catch(() => {});
+  return () => {
+    if (released) return;
+    released = true;
+    if (id != null) end(id);
+  };
 }
 
 /** Crashes recorded since the last call, as raw JSON. Reading them clears them. */

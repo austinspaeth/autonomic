@@ -24,6 +24,7 @@ import { defaultPeriod } from '../../lib/period';
 import { ppg } from '../../lib/ppg/camera';
 import { BREATH_STYLE, HrvSession, type SessionConfig } from './Session';
 import { CameraSetup } from './CameraSetup';
+import { DevicesScreen } from '../Devices';
 import { GarminPrep } from './GarminPrep';
 import { WatchPrep } from './WatchPrep';
 import { HealthRrImportSheet } from './HealthImport';
@@ -149,8 +150,10 @@ export function HrvSetup({ controls }: { controls: SheetControls }) {
   const changeSource = () => openSheet((c) => <SourcePicker value={source} onPick={setSource} controls={c} />);
 
   const start = () => {
+    // Straight to the strap scanner rather than the picker: the picker no longer
+    // scans, so detouring through it would only add a tap before the same card.
     if (source === 'polar' && !getState().settings.lastBleDeviceId) {
-      changeSource();
+      openSheet((c) => <DevicesScreen controls={c} />);
       return;
     }
     const blocked = sourceBlocker(source);

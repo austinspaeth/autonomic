@@ -20,6 +20,7 @@ import { entryFields, isDivider, isNumberField } from '../lib/registry';
 import { computeScores } from '../lib/scoring';
 import { health, healthAppName } from '../lib/health';
 import { deleteEntry, getState, storeWaveform, upsertEntry } from '../store/store';
+import { pingLogged } from '../store/ping';
 import { splitWaveform } from '../lib/waveforms';
 import { defaultTimeFor, uid } from '../lib/dates';
 import { defaultPeriod } from '../lib/period';
@@ -74,6 +75,9 @@ export function EntryForm({ typeMap, arrKey, dk, type, existing, prefill = null,
     if (waveform) storeWaveform(stripped.id, waveform);
     r = stripped;
     upsertEntry(dk, arrKey, r);
+    // Counted only when the user entered it by hand: an edit or a health-store
+    // import is not somebody choosing to log something.
+    if (!existing && !prefill && !fromHealth) pingLogged(arrKey, type);
     // Auto-publish freshly-logged readings to the health store (fire-and-forget).
     // Only new *manual* entries — never re-publish edits or Health-sourced rows.
     if (arrKey === 'readings' && !existing && !fromHealth && r.note !== 'From Apple Health' && r.note !== 'From Health Connect' && getState().settings.healthEnabled) {

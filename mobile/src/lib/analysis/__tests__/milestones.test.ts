@@ -1,6 +1,6 @@
 /**
- * "Getting started" onboarding milestones: first HRV reading, first full day of
- * core logging (only checkable the day after), and saving a clean-day protocol
+ * "Getting started" onboarding milestones: first HRV reading, first entry the
+ * user logged by hand (imports don't count), and saving a clean-day protocol
  * (driven by settings.protocolSetOn, not day data).
  */
 import { STARTERS, buildMilestoneDays, buildMilestoneGroups } from '../milestones';
@@ -29,7 +29,7 @@ describe('Getting started milestones', () => {
   it('are all undone on an empty journal, and the group still exists', () => {
     const s = starters({});
     expect(s[STARTERS.hrv].done).toBe(false);
-    expect(s[STARTERS.fullDay].done).toBe(false);
+    expect(s[STARTERS.firstEntry].done).toBe(false);
     expect(s[STARTERS.protocol].done).toBe(false);
   });
 
@@ -39,18 +39,23 @@ describe('Getting started milestones', () => {
     expect(s[STARTERS.hrv]).toMatchObject({ done: true, date: dk });
   });
 
-  it('does not complete the full-day milestone from today alone', () => {
+  it('completes the first-entry milestone on the same day something is logged', () => {
     const today = todayKey();
     const d = { ...blankDay(), food: { water: 2, calories: 0, triggers: {}, meals: [] } };
     const s = starters({ [today]: d });
-    expect(s[STARTERS.fullDay].done).toBe(false);
+    expect(s[STARTERS.firstEntry]).toMatchObject({ done: true, date: today });
   });
 
-  it('completes the full-day milestone the day after logging', () => {
-    const yesterday = dayKey(1);
+  it('dates the first-entry milestone to the earliest day logged', () => {
+    const earlier = dayKey(3);
     const d = { ...blankDay(), meds: [{ id: 'm1', type: 'custom-x', time: '09:00', note: '' } as Entry] };
-    const s = starters({ [yesterday]: d });
-    expect(s[STARTERS.fullDay]).toMatchObject({ done: true, date: todayKey() });
+    const s = starters({ [earlier]: d, [dayKey(1)]: d });
+    expect(s[STARTERS.firstEntry]).toMatchObject({ done: true, date: earlier });
+  });
+
+  it('does not count a Health import as a first entry', () => {
+    const d = { ...blankDay(), activities: [{ id: 'a1', type: 'walk', time: '09:00', note: '', imported: true } as Entry] };
+    expect(starters({ [dayKey(2)]: d })[STARTERS.firstEntry].done).toBe(false);
   });
 
   it('drives the protocol milestone off protocolSetOn', () => {

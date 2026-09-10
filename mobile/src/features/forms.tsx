@@ -26,6 +26,7 @@ import { deleteEntry, getState, storeWaveform, upsertEntry, useAppState } from '
 import { splitWaveform } from '../lib/waveforms';
 import { defaultTimeFor, fmtTime12, todayKey, uid } from '../lib/dates';
 import { scrollJournalToSection } from '../store/nav';
+import { pingLogged } from '../store/ping';
 import { isPotsResultLocked, PotsLockedCard } from './PotsLock';
 import { HrvSetup } from './hrv/Setup';
 import { OrthostaticIntroSheet } from './OrthostaticIntro';
@@ -295,6 +296,8 @@ export function BikeForm({ dk, existing, prefill = null, controls, onSaved }: { 
     const { entry: stripped, waveform } = splitWaveform(r);
     if (waveform) storeWaveform(stripped.id, waveform);
     upsertEntry(dk, 'activities', stripped);
+    // A prefill is an imported ride, not one the user logged.
+    if (!existing && !prefill) pingLogged('activities');
     controls.closeAll();
     onSaved(stripped);
   };
@@ -399,7 +402,7 @@ export function useCaptureDeepLink() {
   }, []);
 }
 
-type OpenSheet = ReturnType<typeof useSheets>['openSheet'];
+export type OpenSheet = ReturnType<typeof useSheets>['openSheet'];
 
 /**
  * Open the imported-workout report (HR-over-time with zones + stats) for an

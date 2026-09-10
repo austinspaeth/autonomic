@@ -68,6 +68,8 @@
  * version is shared by everyone who updated.
  */
 
+import { redactMessage } from './errorReport';
+
 /** Base URL of every ping route. */
 export const PING_BASE = 'https://api.autonomic.care/ping';
 
@@ -88,7 +90,12 @@ export type PingKind =
   | 'pot'                           // finished a POTS capture
   | 'see'                           // opened a gated view
   | 'err'                           // something failed on this install
-  | 'osh' | 'odm' | 'oac';          // an offer was shown · dismissed · accepted
+  | 'osh' | 'odm' | 'oac'           // an offer was shown · dismissed · accepted
+  | 'ofl'                           // ...accepted, and it did NOT become a subscription (POST)
+  | 'log'                           // logged something by hand
+  | 'use'                           // used a feature (Milestones, protocol)
+  | 'fnd'                           // opened an Insights finding's deep dive
+  | 'rpt';                          // built an AI report
 
 /**
  * The platform marker carried by a ping: one letter, appended to the cohort
@@ -148,32 +155,41 @@ export function methodCode(source: string | undefined): MethodCode | undefined {
  * it, and a conversion rate that mixes the two is telling you about the wrong
  * population.
  */
-export type SurfaceCode = 'R' | 'I' | 'P' | 'O' | 'M' | 'N' | 'S';
+export type SurfaceCode = 'R' | 'I' | 'P' | 'B' | 'O' | 'M' | 'N' | 'S';
 
 /** Map a `usePaywall()` call site's name onto its marker. */
 export function surfaceCode(surface: string | undefined): SurfaceCode | undefined {
   if (surface === 'progress') return 'R';
   if (surface === 'insights') return 'I';
   if (surface === 'pots') return 'P';
+  // B for budget: P is taken by POTS, and the pacing budget is the one wall a
+  // user can meet on the Journal itself rather than by opening a locked view.
+  if (surface === 'pacing') return 'B';
   if (surface === 'outlook-ai') return 'O';
   if (surface === 'metric-ai') return 'M';
   if (surface === 'insights-ai') return 'N';
   if (surface === 'settings') return 'S';
+  // The plan status tab under the nav bar is also somebody going looking rather
+  // than walking into a lock, so it shares S until it earns a letter of its own
+  // (which needs the lambda's SURFACES and the dashboard's SURFACE_NAME first).
+  if (surface === 'plan-bar') return 'S';
   return undefined;
 }
 
 /**
  * Which notification the user just turned ON: `M` the morning reminder, `C` the
- * crash warning. Only an enable is counted — a disable is a different event and
- * counting both here would make the number meaningless in the direction that
- * matters, which is "did anyone accept the ask".
+ * crash warning, `P` pacing alerts (any of the five: they are one ask). Only an
+ * enable is counted — a disable is a different event and counting both here
+ * would make the number meaningless in the direction that matters, which is
+ * "did anyone accept the ask".
  */
-export type NotifyCode = 'M' | 'C';
+export type NotifyCode = 'M' | 'C' | 'P';
 
 /** Map a notification kind onto its marker. */
 export function notifyCode(kind: string | undefined): NotifyCode | undefined {
   if (kind === 'reminder') return 'M';
   if (kind === 'crash') return 'C';
+  if (kind === 'pacing') return 'P';
   return undefined;
 }
 
@@ -196,6 +212,97 @@ export type ViewCode = 'I' | 'P';
 /** Which offer: `A` the half-off annual window, `F` the founding-member card. */
 export type OfferCode = 'A' | 'F';
 
+/** Map an offer card's name onto its marker. */
+export function offerCode(offer: string | undefined): OfferCode | undefined {
+  if (offer === 'annual') return 'A';
+  if (offer === 'founder') return 'F';
+  return undefined;
+}
+
+/**
+ * What was logged by hand: `S` a night of sleep, `A` an activity, `M` a
+ * medication or supplement, `Y` a symptom, `W` water, `B` a bowel movement,
+ * `P` a blood pressure reading, `R` a resting heart rate reading.
+ *
+ * Each is a separate decision about what is worth writing down, so the route
+ * is capped per letter: somebody who logs a symptom and a med on the same day
+ * is a headcount for both. Only NEW entries entered by the user count — an
+ * edit, a delete, a live capture or a health-store import is not somebody
+ * choosing to log.
+ *
+ * Readings other than blood pressure and resting heart rate are deliberately
+ * letterless (`logCode` returns undefined and nothing is sent): HRV already has
+ * the capture routes, and a POTS capture has `pot`.
+ */
+export type LogCode = 'S' | 'A' | 'M' | 'Y' | 'W' | 'B' | 'P' | 'R';
+
+/** The journal's own names for what can be logged. */
+export type LogKind = 'sleep' | 'activities' | 'meds' | 'symptoms' | 'water' | 'bowel' | 'readings';
+
+/** Map a logged entry onto its marker. `type` matters only for readings. */
+export function logCode(kind: LogKind | string | undefined, type?: string): LogCode | undefined {
+  if (kind === 'sleep') return 'S';
+  if (kind === 'activities') return 'A';
+  if (kind === 'meds') return 'M';
+  if (kind === 'symptoms') return 'Y';
+  if (kind === 'water') return 'W';
+  if (kind === 'bowel') return 'B';
+  if (kind === 'readings') {
+    if (type === 'bp') return 'P';
+    if (type === 'restingHr') return 'R';
+  }
+  return undefined;
+}
+
+/**
+ * Which feature was used: `M` the Milestones sheet was opened, `P` the
+ * clean-day protocol was saved. Neither is gated, which is why they are not on
+ * the `see` route — that one means "a Pro view", and a free user opening
+ * Milestones is not demand for anything.
+ */
+export type FeatureCode = 'M' | 'P';
+
+export function featureCode(feature: string | undefined): FeatureCode | undefined {
+  if (feature === 'milestones') return 'M';
+  if (feature === 'protocol') return 'P';
+  return undefined;
+}
+
+/**
+ * Which Insights finding was opened into its deep-dive card: `E` an early
+ * signal (a young journal), `U` an unconfirmed pattern (a long journal the
+ * correction cleared), `C` the biggest change, `R` a confirmed correlation.
+ *
+ * Early and unconfirmed are one card on screen under two titles, and they are
+ * told apart here for the reason the engine tells them apart: one is short of
+ * days and the other of evidence, and whether either gets opened is a
+ * different question about a different reader.
+ */
+export type FindingCode = 'E' | 'U' | 'C' | 'R';
+
+export function findingCode(finding: string | undefined): FindingCode | undefined {
+  if (finding === 'early') return 'E';
+  if (finding === 'unconfirmed') return 'U';
+  if (finding === 'change') return 'C';
+  if (finding === 'correlation') return 'R';
+  return undefined;
+}
+
+/**
+ * Which AI report was built: `D` data for prompt, `H` the full health report,
+ * `C` the medical summary for a doctor. Fired when the prompt sheet opens —
+ * the report is built at that moment, and whether it was then copied is not
+ * something the app can see.
+ */
+export type ReportCode = 'D' | 'H' | 'C';
+
+export function reportCode(report: string | undefined): ReportCode | undefined {
+  if (report === 'data') return 'D';
+  if (report === 'overall') return 'H';
+  if (report === 'doctor') return 'C';
+  return undefined;
+}
+
 /**
  * The 8th-character slot, whatever the route calls it: a sensor on the capture
  * routes, a surface on the paywall route, a notification, a POTS kind, a view or
@@ -203,7 +310,9 @@ export type OfferCode = 'A' | 'F';
  * it is drawn from — so no route can be handed another's letters, and a
  * consumer that knows the route always knows what the letter means.
  */
-export type SlotCode = MethodCode | SurfaceCode | NotifyCode | PotsCode | ViewCode | OfferCode;
+export type SlotCode =
+  | MethodCode | SurfaceCode | NotifyCode | PotsCode | ViewCode | OfferCode
+  | LogCode | FeatureCode | FindingCode | ReportCode;
 
 /**
  * What this install could do at the moment it pinged: `F` free, `T` trial (the
@@ -372,4 +481,86 @@ export function resolveCohort(
   if (frozen) return frozen;
   const stamped = Date.parse(trialStartedAtIso || '');
   return easternDay(Number.isFinite(stamped) && stamped <= nowMs ? stamped : nowMs);
+}
+
+/* ------------------------------------------------ offers that fell through */
+
+/**
+ * How a purchase attempt ended. `onPurchaseOutcome` in store/iap.ts reports all
+ * six; the `ofl` route carries the five that are not a subscription.
+ *
+ *   cancelled  the store sheet opened and the user backed out of it
+ *   failed     the store answered with an error (declined, network, not allowed)
+ *   pending    the store took the order and has not charged it: Ask to Buy, a
+ *              Play cash payment. It may still become a subscription, and `sub`
+ *              says so if it does
+ *   unstarted  the app never reached the store sheet (no products came back, no
+ *              offer token, a Play Store too old to sell anything)
+ *   timeout    the sheet opened and neither answer arrived before the purchase
+ *              watchdog. Play's sheet can close without an error, so this is a
+ *              real outcome; a purchase that completes after it still lands as
+ *              `sub`
+ */
+export type PurchaseOutcome = 'purchased' | 'cancelled' | 'failed' | 'pending' | 'unstarted' | 'timeout';
+
+/**
+ * The JSON body of `POST /ping/ofl/{code}`, the one ping with a body.
+ *
+ * It is a POST because the store's own words are the diagnosis and they are
+ * free text. Everything else in it is an enumeration the billing library owns,
+ * and `message` is redacted with the fault route's rules before it leaves
+ * (and again on the server).
+ */
+export interface OfferFailureBody {
+  outcome: Exclude<PurchaseOutcome, 'purchased'>;
+  /** expo-iap's ErrorCode: `network-error`, `item-unavailable`, `user-cancelled`… */
+  code?: string;
+  /** Play's BillingResponseCode. Android only. */
+  response?: number;
+  /** Play's sub-response code (Billing 8+), e.g. a payment declined for funds. */
+  sub?: string;
+  /** The store's message, plus Play's debugMessage when it says something else. */
+  message?: string;
+  /** This report owns today's headcount for its offer. */
+  d?: 1;
+}
+
+/** A billing-library enumeration. Checked rather than cleaned: anything that is
+ *  not shaped like one is not one of theirs. */
+const cleanCode = (v: unknown): string | undefined => {
+  if (typeof v !== 'string') return undefined;
+  const s = v.trim().toLowerCase();
+  return /^[a-z0-9][a-z0-9_-]{0,47}$/.test(s) ? s : undefined;
+};
+
+/**
+ * Build the report body from whatever the store threw. Every field is optional
+ * except the outcome, and a field is sent only when the error actually had it:
+ * a timeout has no error at all, and an iOS failure has no Play response code.
+ */
+export function offerFailureBody(
+  outcome: Exclude<PurchaseOutcome, 'purchased'>,
+  error: unknown,
+  ownsDay: boolean,
+): OfferFailureBody {
+  const e = (error && typeof error === 'object' ? error : {}) as {
+    code?: unknown; message?: unknown; responseCode?: unknown;
+    debugMessage?: unknown; subResponseCodeAndroid?: unknown;
+  };
+  const code = cleanCode(e.code);
+  const response = typeof e.responseCode === 'number' && Number.isInteger(e.responseCode)
+    && Math.abs(e.responseCode) < 1000 ? e.responseCode : undefined;
+  const sub = cleanCode(e.subResponseCodeAndroid);
+  const main = String(typeof error === 'string' ? error : e.message ?? '').trim();
+  const debug = String(e.debugMessage ?? '').trim();
+  const raw = [main, debug && debug !== main ? debug : ''].filter(Boolean).join(' · ');
+  const message = raw ? redactMessage(raw) : '';
+  return {
+    outcome,
+    ...(code ? { code } : null),
+    ...(response !== undefined ? { response } : null),
+    ...(sub ? { sub } : null),
+    ...(message ? { message } : null),
+    ...(ownsDay ? { d: 1 as const } : null),
+  };
 }

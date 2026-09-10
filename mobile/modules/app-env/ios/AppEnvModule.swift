@@ -1,4 +1,5 @@
 import ExpoModulesCore
+import UIKit
 
 /**
  * Reports whether the running build uses a StoreKit *sandbox* receipt.
@@ -37,6 +38,25 @@ public class AppEnvModule: Module {
     // a signal handler in it, not a line here.
     Function("installCrashHandler") { () -> Bool in false }
     Function("takeCrashLog") { () -> String in "" }
+
+    // Background time for a pacing refresh (src/store/pacingBackground.ts). A
+    // HealthKit background-delivery launch gets a few seconds before iOS
+    // suspends it, and a health read plus a budget build can outlast that. The
+    // expiration handler ends the task itself, so a JS side that never answers
+    // cannot get the app killed for overrunning.
+    AsyncFunction("beginBackgroundTask") { (name: String) -> Int in
+      var task: UIBackgroundTaskIdentifier = .invalid
+      task = UIApplication.shared.beginBackgroundTask(withName: name) {
+        UIApplication.shared.endBackgroundTask(task)
+        task = .invalid
+      }
+      return task.rawValue
+    }.runOnQueue(.main)
+
+    AsyncFunction("endBackgroundTask") { (raw: Int) in
+      let task = UIBackgroundTaskIdentifier(rawValue: raw)
+      if task != .invalid { UIApplication.shared.endBackgroundTask(task) }
+    }.runOnQueue(.main)
   }
 
   private static func isSandboxReceipt() -> Bool {

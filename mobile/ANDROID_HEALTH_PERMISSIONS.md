@@ -34,6 +34,31 @@ Consequences while it stands:
       declaration form.** Without it the release is rejected.
 - [ ] Verify on a device after installing 1.24.2 (step 4 below).
 
+## Steps, added in 1.28.0 (pacing budget)
+
+Same shape, same trap, so it is tracked here rather than in a second file.
+
+`READ_TYPES` gained `'Steps'` for the pacing budget's passive floor, and
+`android.permission.health.READ_STEPS` was declared in `app.json` **in the same
+commit** — which is the rule this document exists to enforce. A phone counts its
+own steps through the system provider, so this works with no wearable, and it is
+what gives a phone-only user a budget that sees anything at all.
+
+- [x] `'Steps'` in `READ_TYPES` (`src/lib/health/healthConnect.ts`).
+- [x] `android.permission.health.READ_STEPS` in `app.json`.
+- [x] Checked by a unit test: `src/lib/health/__tests__/authSets.test.ts`
+      asserts every read type has a manifest permission behind it, so this
+      cannot regress silently.
+- [ ] **Play Console: add Steps to the Health Connect data-type declaration
+      form** before the 1.28.0 release. Same rejection risk as Exercise and
+      Distance above.
+- [ ] Verify on a device: grant, then confirm a step count appears in the
+      pacing sheet's "Built from ..." line.
+
+There is no Android equivalent of Apple Stand Time, so nothing is declared for
+it; `standMin` is always null on Android and the budget falls back to walking
+minutes derived from the step timestamps.
+
 ## The fix (for reference)
 
 1. Add both permissions to `app.json`:

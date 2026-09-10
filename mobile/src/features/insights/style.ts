@@ -167,7 +167,7 @@ export const VISIBLE_ROWS = VISIBLE_CORRELATIONS;
  */
 export const SAMPLE = {
   headline: 'Diastolic pressure is up since you started magnesium glycinate',
-  obsTitle: 'Magnesium glycinate and vitamin D3 travel together',
+  obsTitle: 'Post-exertional malaise and Headache travel together',
   pair: 'Magnesium glycinate → Diastolic pressure',
   watchTitle: 'Bedtime consistency',
 } as const;

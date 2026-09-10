@@ -11,3 +11,14 @@ if (Platform.OS === 'android') {
   const { widgetTaskHandler } = require('./src/widgets/android');
   registerWidgetTaskHandler(widgetTaskHandler);
 }
+
+// Pacing alerts with the app closed. Defined here, at bundle load, and not in
+// the root layout: a WorkManager job can start a headless runtime that never
+// mounts the app (TaskManager only finds tasks defined in the global scope),
+// and an iOS HealthKit background-delivery launch needs its observers
+// registered before the pending samples are handed over.
+try {
+  require('./src/store/pacingBackground').definePacingBackground();
+} catch {
+  // The foreground watcher still runs without it.
+}

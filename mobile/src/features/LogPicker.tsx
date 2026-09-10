@@ -26,7 +26,9 @@ import { useToast } from '../components/Toast';
 import { radius, usePalette } from '../theme';
 import type { Entry } from '../lib/types';
 import { addCustomType, deleteType, editType, typeInUse, typesFor } from '../lib/typeCatalog';
+import { loadOf, type LoadWeight } from '../lib/budget/load';
 import { ensureDay, getState, save, upsertEntry, useAppState } from '../store/store';
+import { pingLogged } from '../store/ping';
 import { defaultTimeFor, isPastDay, uid } from '../lib/dates';
 
 export type LogKind = 'meds' | 'symptoms' | 'triggers';
@@ -95,16 +97,19 @@ function TypeCard({ kind, typeKey, initialName, onAdded }: {
   const def = typeKey ? typesFor(getState(), kind)[typeKey] : undefined;
   const [name, setName] = useState(def?.label ?? initialName ?? '');
   const [dosage, setDosage] = useState(def?.dosage || '');
+  // LogPicker only ever creates meds/symptoms/triggers, so there is no effort
+  // question here; the weight is carried so an edit cannot drop it.
+  const [load] = useState<LoadWeight>(() => loadOf(def, typeKey || ''));
 
   const save = () => {
     if (typeKey) {
-      if (!editType(kind, typeKey, name, { dosage })) {
+      if (!editType(kind, typeKey, name, { dosage, load })) {
         toast(name.trim() ? 'That name already exists' : 'Enter a name');
         return;
       }
       toast('Saved');
     } else {
-      const key = addCustomType(kind, name, { dosage });
+      const key = addCustomType(kind, name, { dosage, load });
       if (!key) { toast(name.trim() ? 'That name already exists' : 'Enter a name'); return; }
       onAdded?.(key);
     }
@@ -201,6 +206,7 @@ export function LogPickerSheet({ kind, dk, controls }: { kind: LogKind; dk: stri
         if (kind === 'meds' && typeMap[k].dosage) entry.amount = typeMap[k].dosage;
         upsertEntry(dk, kind, entry);
       });
+      pingLogged(kind);
     }
     toast(count === 1 ? 'Logged 1 item' : `Logged ${count} items`);
     controls.closeAll();

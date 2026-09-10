@@ -34,6 +34,7 @@ import { PromptSheet } from '../PromptSheet';
 import { resolveProtocol } from '../../lib/scoring/day';
 import { buildCorrelationsPrompt } from '../../lib/insights/prompt';
 import { INSIGHTS_HELP, VISIBLE_CORRELATIONS, groupCorrelations } from '../../lib/insights';
+import type { HelpContent } from '../../lib/help';
 import type { BiggestChange, ConfidencePart, Correlation, DataConfidence, DetailSeries, NoImpactItem, Observation, WatchItem } from '../../lib/insights';
 import { ChangeSheet, CorrelationSheet, WatchSheet } from './FindingSheet';
 import * as S from './style';
@@ -55,7 +56,7 @@ export const WATCH_DESC = 'Metrics that have genuinely moved over the last month
  * Deliberately the same header shape as `CardView`: title, help dot, right-hand
  * action.
  */
-export function InsightCard({ title, help, desc, action, onAction, onPress, onLayout, bg, children }: {
+export function InsightCard({ title, help, helpText, desc, action, onAction, onPress, onLayout, bg, children }: {
   /** Omitted inside a sheet whose own title already names the thing: a card
    *  headed "CORRELATION" one line under "Correlation details" is a label for a
    *  label. Without it the card opens on the finding itself. */
@@ -63,6 +64,10 @@ export function InsightCard({ title, help, desc, action, onAction, onPress, onLa
   /** Omitted inside a sheet the user opened FROM a card that already carried the
    *  help dot: explaining the same thing twice, one tap apart, is clutter. */
   help?: keyof typeof INSIGHTS_HELP;
+  /** Help copy passed directly, for a card outside the Insights tab. The
+   *  pacing sheet borrows this card grammar and keeps its copy in
+   *  src/lib/budget/help.ts beside the engine it describes. */
+  helpText?: HelpContent;
   /**
    * Measures the CARD, not a wrapper around it.
    *
@@ -92,7 +97,7 @@ export function InsightCard({ title, help, desc, action, onAction, onPress, onLa
       {title ? (
         <View style={S.CARD_HEAD}>
           <Text style={[S.CARD_TITLE, { color: p.textDim }]}>{title}</Text>
-          {help ? <HelpDot title={title} text={INSIGHTS_HELP[help]} /> : null}
+          {help || helpText ? <HelpDot title={title} text={helpText || INSIGHTS_HELP[help!]} /> : null}
           {action || onPress ? <View style={{ flex: 1 }} /> : null}
           {action ? (
             <Pressable onPress={onAction} hitSlop={8} accessibilityRole="button">
@@ -118,9 +123,13 @@ export function InsightCard({ title, help, desc, action, onAction, onPress, onLa
 /** A bubble row. Tappable only when it has somewhere to go — a chevron on a row
  *  that does nothing is a promise the app doesn't keep. Exported so the empty
  *  screen's rows are the same object as a correlation row rather than a copy. */
-export function CardRow({ onPress, tall, onLayout, children }: {
+export function CardRow({ onPress, tall, bg, onLayout, children }: {
   onPress?: () => void;
   tall?: boolean;
+  /** Overrides the bubble fill. The pacing sheet's cards are `sunk`, so their
+   *  rows step DOWN to the screen background rather than up to ROW_BG, which
+   *  on that darker card would read as a raised slab. */
+  bg?: string;
   /** Reports this row's height, so the skeleton's bubble can sit exactly where it
    *  will. Every row, not just the first: observation rows genuinely differ in height. */
   onLayout?: (e: LayoutChangeEvent) => void;
@@ -130,7 +139,7 @@ export function CardRow({ onPress, tall, onLayout, children }: {
   // `ROW_BG`, not `bg`: a near-black bubble on the card read as a hole rather than
   // an object, and the black track of the strength bar inside it disappeared into
   // its own row. A step above the card keeps the bar's remainder visible.
-  const base = [tall ? S.ROW_TALL : S.ROW, { backgroundColor: ROW_BG, borderColor: p.border }];
+  const base = [tall ? S.ROW_TALL : S.ROW, { backgroundColor: bg || ROW_BG, borderColor: p.border }];
   if (!onPress) return <View onLayout={onLayout} style={base}>{children}</View>;
   return (
     <Pressable onPress={onPress} onLayout={onLayout} accessibilityRole="button" style={({ pressed }) => [...base, pressed && { opacity: 0.6 }]}>
