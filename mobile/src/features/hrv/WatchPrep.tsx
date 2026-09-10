@@ -26,8 +26,8 @@ const STEPS: { title: string; sub: string }[] = [
     sub: 'If it doesn’t, tap the three dots next to Breathe and set the duration to 5 minutes.',
   },
   {
-    title: 'Tap Breathe, then Start below',
-    sub: 'Start both together, then sit still through the whole reading.',
+    title: 'Tap Breathe on the watch',
+    sub: 'Then tell us below, and sit still through the whole reading.',
   },
 ];
 
@@ -75,9 +75,11 @@ export function WatchPrep({ config, controls }: { config: SessionConfig; control
       </View>
 
       <SheetFooter>
-        {/* Red like the watch's own start control — pressed in the same moment
-            as Breathe on the wrist. */}
-        <Button title="Start" variant="danger" onPress={start} />
+        {/* "I started the reading", not "Start": the phone starts nothing here.
+            The reading begins on the wrist and this button is the user telling
+            us so, which is also why it is pressed AFTER the watch, not before.
+            Red like the watch's own control, pressed moments apart. */}
+        <Button title="I started the reading" variant="danger" onPress={start} />
       </SheetFooter>
     </View>
   );

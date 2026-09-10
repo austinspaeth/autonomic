@@ -12,7 +12,7 @@
  * opened HERE, not by the card, because a reading can finish while minimized
  * (the strap keeps streaming with the phone face down and the card gone). The
  * session is then torn down when the sheet stack empties again — not when the
- * results sheet unmounts, since Save/Discard calls closeAll() and the session
+ * results sheet unmounts, since its Done button calls closeAll() and the session
  * card beneath is still playing its exit; clearing the store a beat early would
  * blank that card out on its way down.
  */
@@ -26,11 +26,14 @@ import { fonts, usePalette } from '../../theme';
 import { BreathBars } from './BreathingViz';
 import { HrvSession } from './Session';
 import { HrvResults } from './Results';
+import { GarminSyncSheet } from './GarminSync';
+import { startGarminSync, stopGarminSync } from './garminSyncStore';
+import { garminDevices, subscribeGarminArrivals } from '../../lib/garmin/receiver';
 import { WatchSyncSheet } from './WatchSync';
 import { startWatchSync } from './watchSyncStore';
 import { setPillSlotClaim } from '../../store/pillSlot';
 import {
-  endSession, getSessionSnapshot, restoreSession, useSession,
+  endSession, getSessionSnapshot, restoreSession, streamsLive, useSession,
 } from './sessionStore';
 
 export function HrvSessionHost() {
@@ -40,6 +43,24 @@ export function HrvSessionHost() {
   // second results card while the first is still animating in.
   const handed = useRef(false);
   const sawSheet = useRef(false);
+
+  // The reading can land BEFORE the phone's countdown runs out, and routinely
+  // does: the watch's clock starts when its sensor locks, while the phone's
+  // starts when the user says they began — and they tap the phone after the
+  // watch. So the session is still ticking when the result arrives.
+  //
+  // Without this the phone kept counting down over a reading it already had,
+  // then raised "Finish on your watch" ON TOP of the results card. Ending the
+  // session here stops the clock and, because the finish handler only runs on
+  // a 'finished' status, prevents the sync card entirely.
+  useEffect(() => subscribeGarminArrivals(() => {
+    const s = getSessionSnapshot();
+    if (s.config?.source === 'garmin' && s.status !== 'idle') {
+      handed.current = true;   // the results card is already being raised
+      endSession();
+    }
+    stopGarminSync();
+  }), []);
 
   useEffect(() => {
     if (status !== 'finished') { handed.current = false; sawSheet.current = false; return; }
@@ -65,9 +86,19 @@ export function HrvSessionHost() {
       return;
     }
 
+    // Garmin: the phone captured nothing, because nothing streams from the
+    // wrist. Falling through to the Results path below would build a reading
+    // out of an empty array and report "0 beats". The watch pushes the real one
+    // over the Connect IQ link when the wearer finishes there.
+    if (s.config.source === 'garmin') {
+      startGarminSync(garminDevices()[0]?.name ?? null);
+      openSheet((c) => <GarminSyncSheet controls={c} />, { hideClose: true });
+      return;
+    }
+
     // Strap and camera both finish with the RR array in hand — same Results
     // path. It rises OVER the session card, which recedes beneath it; Results'
-    // Save/Discard calls closeAll(), so both animate out together.
+    // Done calls closeAll(), so both animate out together.
     const { rr, segmentStarts, hrSamples, sdnnSamples, durationSec } = s.result;
     const config = s.config;
     openSheet((c) => (
@@ -137,7 +168,7 @@ function SessionPill() {
   const remain = Math.max(0, s.durationSec - s.elapsed);
   const mmss = `${Math.floor(remain / 60)}:${String(remain % 60).padStart(2, '0')}`;
   const frac = s.status === 'running' ? s.elapsed / s.durationSec : 0;
-  const live = s.config.source !== 'watch';
+  const live = streamsLive(s.config.source);
   const reopen = () => {
     restoreSession();
     openSheet((c) => <HrvSession controls={c} />, { hideClose: true, grow: true });
@@ -159,6 +190,12 @@ function SessionPill() {
                     is, not which estimator. The card spells out SDNN. */}
                 <Metric value={s.sdnn != null ? String(s.sdnn) : '—'} unit="HRV" />
               </>
+            ) : null}
+            {/* A wrist reading has no metrics, so the breathing bars need the
+                divider that the metric block would otherwise have provided —
+                without it the pace sits flush against the clock. */}
+            {!live && s.config.kind === 'breath' ? (
+              <View style={[styles.rule, { backgroundColor: p.border }]} />
             ) : null}
             {s.config.kind === 'breath' ? (
               <View style={{ marginLeft: 4 }}>

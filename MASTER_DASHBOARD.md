@@ -97,8 +97,10 @@ for a reason:
   only ever serve a stale number as a fresh one. Bump `CACHE` when you change
   the file. A new worker **toasts** rather than reloading: a reload mid-session
   throws away every open card, the scroll position and any half-typed row.
-- **`landing/master/pwa.js`** — the in-page half: registration, and the
-  notification capability described below.
+- **`landing/master/pwa.js`** — the in-page half: registration, and the two
+  notification capabilities described below. The worker also carries the `push`
+  and `notificationclick` handlers, which are the only things in it that run
+  with the app closed.
 
 ### On a phone, a resize is only a resize if the WIDTH moved
 
@@ -112,6 +114,31 @@ height then changed under the scroll position while the browser was still
 settling it, and the reader was thrown back up a quarter of the page —
 reliably, at the bottom of the longest views, which is exactly where the
 collapse happens.
+
+### On a phone, a stat tile is a label and a number
+
+Two columns, and everything under the number — the store split, the sensor
+split, the three baselines a day is read against — is one tap away. A row of
+eleven tiles is a screenful of scrolling before the first chart on a 390px
+screen, and the reader is looking for one number.
+
+Tapping one opens it across the row, and that movement is not decoration: it is
+the only thing that says the wide card you are now reading is the small one you
+just pressed, on a screen where everything else moved at the same moment. How it
+is done is in `toggleTile` in `app.js`, and the part worth knowing here is why
+the opening tile leaves the flow with a **placeholder** in its slot. A flex item
+cannot be widened smoothly in place — the moment its basis passes half the row
+its neighbour wraps to the next line and `flex-grow` snaps it across the whole
+row in one frame (measured: 177px to 366px between two frames, while the height
+tweened perfectly). Out of flow it is a box with a left, a top, a width and a
+height, all four of which animate, and the placeholder holds the slot so nothing
+else has to guess where the row is going. The other tiles are FLIPped, because
+their move is a change of flex line and reflow does that instantly whatever you
+transition.
+
+`tileColumns` will not thin a row below two columns while two fit. One column
+divides any tile count perfectly, so "leave the last row fullest" chose it every
+time on a phone and the condensed row was a stack of full-width cards.
 
 ## Storage, and painting from the cache
 
@@ -131,10 +158,11 @@ Four things are cached, and the last two are new:
 
 | Key | What |
 |---|---|
-| `autonomic.dashboard.v1` | the store — entries, events, ads, costs, sales, settings |
+| `autonomic.dashboard.v1` | the store — entries, events, ads, costs, sales, churn, settings |
 | `autonomic.dashboard.v1.ui` | the view, range, filters, forecast controls |
 | `autonomic.dashboard.v1.pings` | the counter's last report, so App usage and Timeline open on numbers rather than on "Reading the counter…" |
 | `autonomic.master.alertBase` | what this browser has already been told about (see the alerts section) |
+| `autonomic.master.alertLog` | every card raised today, replayed by the header's Alerts button |
 
 The ping cache is the biggest and the most disposable: if the quota is tight it
 deletes itself rather than costing the store its room. It is marked **stale** on
@@ -179,22 +207,47 @@ Two rules:
 
 ### Notifications
 
-An installed app can raise a system notification for the same arrivals the
-corner cards announce, and the settings card under **Edit data → Notifications**
-is honest about the limit rather than implying a pager:
+Two mechanisms with different reach, kept visibly apart in the settings card
+under **Edit data → Notifications** because they fail differently and a reader
+who merges them will believe a closed phone is covered when it is not.
 
-**There is no push server.** The counter is polled by the page itself, and a
-service worker with no push subscription does not run while the app is closed.
-So a notification can only fire while the dashboard is OPEN. What it buys is
-still real: the condition is `document.hasFocus()`, not `document.hidden` — the
-dashboard on a second monitor, in a background tab, or as an installed app you
-have switched away from is exactly where a toast in the corner is worth nothing.
-(`document.hidden` would be wrong twice over: the refresh timer already refuses
-to run while hidden, so a hidden-only rule would mean it never fires at all.)
+**In-page** (`Pwa.notify`) fires only while the dashboard is OPEN. The counter
+is polled by the page itself, so there is nothing running to notice anything
+otherwise. What it buys is still real: the condition is `document.hasFocus()`,
+not `document.hidden` — the dashboard on a second monitor, in a background tab,
+or as an installed app you have switched away from is exactly where a toast in
+the corner is worth nothing. (`document.hidden` would be wrong twice over: the
+refresh timer already refuses to run while hidden, so a hidden-only rule would
+mean it never fires at all.)
 
-iOS supports this from 16.4 and **only for a PWA added to the home screen**;
+**Background alerts** (`Pwa.subscribePush`) reach a closed phone, and the reason
+they can is that **the clock is not in the browser**. A service worker cannot
+check anything hourly — it runs when its page is open, when a fetch it controls
+happens, or when a push arrives, and is killed within seconds; no timer in it
+survives, and iOS has no Periodic Background Sync to lend it one. An hourly
+`setInterval` in a worker is not a feature that works badly, it is a feature
+that silently never fires. So the hour is an EventBridge schedule on the `push`
+Lambda (`sls/lambdas/push/`, documented at length in `sls/README.md`), which
+diffs the ping counter and sends; this page only holds a subscription and
+`sw.js` only receives.
+
+It watches the same two arrivals the confetti does and for the same reason —
+a first run and a subscribe ping, never the hand-typed store CSV or sales
+ledger — and `sls/lambdas/push/news.js` is the server-side twin of the pure half
+of `alerts.js`. **If one moves, the other must**: they answer the same question
+for two audiences, and a reader who saw them disagree would have no way to tell
+which was right. One notification per hourly run, never one per event.
+
+The feature ships **dark**: with no VAPID keypair in SSM, `PUSH_KEY` reports
+`configured: false` and the card says so and offers no button. Turning it on is
+one SSM parameter and no redeploy — `sls/README.md` has the commands.
+
+Both halves need iOS 16.4+ and **a PWA added to the home screen**;
 `Pwa.state()` reports that case as `needs-install` so the card can say what to
-do instead of looking broken.
+do instead of looking broken. The background half orders its blockers so the
+most actionable one wins the status line: telling somebody on an iPhone that
+their browser "has no push support" when the real answer is "add it to your
+home screen" is the difference between a fixable state and a dead end.
 
 ## Files
 
@@ -217,7 +270,7 @@ Everything below is in `landing/master/`, except the route that assembles them.
 | `releases.js` | Generated release log, read as timeline annotations |
 | `charts.js` | Dependency-free SVG chart engine |
 | `alerts.js` | Live alerts: what changed since you last looked, said out loud |
-| `pwa.js` | Service-worker registration and the notification capability |
+| `pwa.js` | Service-worker registration, the in-page notification and the Web Push subscription |
 | `styles.css` | Dark theme tokens, layout, gate, skeletons |
 
 Two files sit outside that folder because they have to be real URLs rather than
@@ -238,15 +291,244 @@ for its platform. The data is fetched once per session, cached on `pings`, and
 is **read-only** — it lives outside `db`, so `sync.js` never sees it and there
 is nothing here to edit.
 
-Three counters, not two. Beside `open` and `sub` there is **`act`**: an install
+Thirteen counters, not two. Beside `open` and `sub` there is **`act`**: an install
 saved its FIRST HRV reading. That one carries a second letter for the sensor it
-used — `W` Apple Watch, `B` Bluetooth strap, `F` finger on the camera. It is the
+used — `W` Apple Watch, `G` Garmin watch, `B` Bluetooth strap, `F` finger on the
+camera. It is the
 step between downloading and retaining, and the only one onboarding owns: an
 install with no first reading has no score, no trend and nothing to come back
 for, so a retention number read without an activation number beside it blames
 the product for a wizard that never finished. It fires **once per install,
 ever**, which makes it the one counter here whose rows really do count people —
 the no-summing rule below is about opens.
+
+And there is **`hrv`**: an install saved a reading TODAY. It is the open
+counter's twin — same cohort code, same platform letter, and capped at one per
+install per Eastern day by the same client rule — which is what makes it worth
+more than a fourth number. Because both are bucketed
+identically over the same population, `hrv[day] / open[day]` is a genuine
+**share of people**: of everyone who was in the app that day, how many actually
+measured. It is the only ratio on this page whose numerator and denominator are
+both install-days, and it answers the question retention cannot. Retention says
+somebody launched the app; a journal app can be launched every morning to look
+at yesterday's number and never gain a new one, and that install is on its way
+out while drawing a perfect curve.
+
+It carries the **sensor letter** too, and that costs the twinning nothing: the
+letter splits the KEY a count lands under, never the count, so a day's readings
+still sum to one per install and the share of people is exactly what it was. The
+one thing it may not be read as is a person's whole day — the daily cap means it
+names whichever reading came FIRST, so somebody who straps up in the morning and
+checks on the camera at night is one chest strap. `hrvMethodsOn` /
+`hrvMethodKnown` in `analytics.js`, and a reading from a build that predates the
+letter is **no sensor**, not a guess: the counter's birthday and the letter's
+birthday are different days, and each has its own gate.
+
+And there is **`pay`**: an install met the paywall TODAY. The third daily
+counter, capped the same way and for the same reason — uncapped it would count
+TAPS, and one frustrated user tapping a locked range four times would read as
+four people meeting a wall. Capped, `pay[day] / open[day]` is a share of people
+exactly as the reading share is, and it is the number that says how hard the app
+is pushing: a share that climbs while purchases sit still is a wall people are
+bouncing off, not a funnel.
+
+Its letter names the **surface** that raised the card — `R` a locked Progress
+range, `I` the Insights tab, `P` a POTS capture, `O`/`M`/`N` the Outlook, metric
+and Insights AI reports, `S` the Upgrade button in Settings. Two things it must
+not be read as. It is not a ranking of how often each feature is locked: the
+daily cap names the FIRST wall of the day, so a surface people always meet
+second is invisible here however often it fires, and the card is titled *Which
+wall they meet first* for that reason. And `S` is not a wall — somebody who
+opened Settings and tapped Upgrade went LOOKING for the paywall, which is the
+opposite signal from somebody who walked into one, so it is named separately and
+kept out of the ranking. `surfacesOn` / `paySurfaceKnown` in `analytics.js`.
+
+And there is the **capture pair**, `cap` and `hrv`: a reading STARTED, and a
+reading COMPLETED. Two routes rather than one with a phase letter, because they
+are read against each other — `hrv / cap` is the completion rate — and a route is
+the one distinction a consumer cannot accidentally pool away. Neither fires on
+*save*: the measurement is the event, and a reading the user discards is still
+one this app took. The gap between them is the only place an abandoned reading
+exists at all, and because both carry the sensor letter it is a completion rate
+**per sensor** — which is the form that implies an action. "Camera readings
+finish half the time and strap readings nine times in ten" is a decision about
+what to put in front of a new user; a single pooled rate is only a number to
+worry about.
+
+**One asymmetry inside that rate: the watch sensors cannot report an abandoned
+reading.** A Garmin or Apple Watch reading is taken on the wrist, and the phone
+hears about it only when the whole beat-to-beat series arrives — so the app fires
+`cap` and `hrv` together at that moment (`pingWristReading`), and a wrist reading
+the wearer gave up on sends nothing at all. `W` and `G` therefore complete at or
+near 100% by construction, where `B` and `F` are measured over sessions the phone
+actually watched. The completion rate is a real question for the strap and the
+camera and a formality for the watches; read the watch letters on `hrv` as a
+headcount, which is what that route is for, and not against `cap`.
+
+**Beyond those, six routes with a different cap.** `not` (a notification turned
+on), `pot` (a POTS capture finished), `see` (a gated view opened) and the three
+offer routes are capped once per install per day **per letter**, not per route.
+Their letters are choices the user made between real alternatives — a stand test
+is not an episode, Insights is not Progress — and a whole-route cap would have
+silently dropped whichever came second, which on a bad day is exactly the one
+worth knowing about. The consequence is a rule for reading them: each LETTER'S
+count is a headcount, the route's daily TOTAL is not, and the lines on *What
+people do in there* must never be added together. `A.isHeadcount(kind)` is the
+question to ask before dividing by anything.
+
+The **offer funnel** is three routes over one alphabet, so `oac / osh` is that
+offer's conversion. One distinction there has to survive any rewording:
+**accepted means the card's buy button was tapped, not that money moved.** The
+subscribe counter is where money is counted, and the gap between the two is the
+store sheet — abandoned, or declined. Calling this "converted" would close that
+gap silently. The third outcome is the common one: an offer neither accepted nor
+dismissed was **ignored**, and the card counts it rather than leaving it implied.
+
+The card leads with **two tiles, not one with a rate on it**. *Offers raised* is
+a fact about the app's own pacing — the shared 7-day cool-down, the annual
+milestones at 30/90/180/365 days, the founding-member card's single day — and
+*Offers accepted* is a fact about the people; the rate between them lives in the
+funnel rows below, per offer, where it is over enough cards to carry a decimal
+point. Raised carries **two split rows**, outcome and platform, because they are
+two partitions of the same count and run together they read as one list of six
+things that sums to nothing; the platform row is unfiltered like every store
+split here, so `storeSplitNote` discloses the gap on a sliced view. Accepted
+carries **one**, the offer type, and deliberately no second: the two cards are
+aimed at different people — one whose access lapsed months ago, one who has just
+been convinced — so which is actually being bought is the whole question, and a
+platform row underneath would answer a quieter one at the same volume. Both tiles
+read the route POOLED (`offerFunnel` with no letter, `kindPlatformsOver`), which
+is legal for the reason `offerDay` states: these are counts of CARDS, and a
+per-letter route's total is not a headcount of people, so nothing divides by it.
+Where a window's answers outnumber its shows, `offerFunnel.settled` is false, the
+three outcomes stop being a partition, and the tile says so.
+
+The chart is drawn **by outcome, not by offer**: the bars stack accepted /
+dismissed / ignored per day, so the stack's height is still the day's shows and
+the split inside it is the answer. They are BARS rather than the areas this page
+uses elsewhere, because offers are a handful of discrete cards on a handful of
+days and a filled slope between one Tuesday's two and one Friday's three draws
+four days of offers that never happened. Which offer each bar was made of moves
+to a **day-by-day table** under it (`A.offerDay` / `A.offerDays`), one row per
+day per offer, and that table walks the route's whole alphabet rather than the
+two offers the app currently raises — a card whose letter this dashboard cannot
+read is in the bars, so it has to be in a row too or the two stop adding up.
+Two rules there. **No per-day accept rate**, for the reason the range trend
+above it is on the count: a percentage over three events moves in thirty-point
+jumps that mean nothing, so the table is counts and the rates stay in the range
+rows. And **`ignored` is a subtraction, not a counter**: an outcome lands on the
+day the GESTURE happened, and the annual window is 24 hours while the founding
+member card lives a calendar day, so a card seen in the evening can be answered
+after midnight. Where a day's answers outnumber its shows that has demonstrably
+happened; `offerDay.settled` says so, the row leaves ignored blank rather than
+printing a zero that would read as "everybody responded", and the range totals
+above — where the crossings cancel out — are the figures to trust.
+
+And `err` is not a daily counter at all. It fires **once per install, ever**, so
+a day's count is new installs joining that population and the running total is
+the population. It carries no tag and no message, so it says how many phones are
+having a bad time and nothing whatsoever about what. It is kept exactly that
+blunt: it is the clean headcount, and the fault log described next is grouped by
+FAILURE, so summing that would count one phone once per bug it hit.
+
+**What broke is the `Failures` tab, and it is fed by something that is not a
+counter.** `/fault` (see `sls/README.md`) carries a **tag** naming the call site
+and a **short redacted message**, and is stored per `(day, call site, failure)`.
+It exists because `err` is structurally unable to answer the next question: it
+fires once, so an install that hiccuped in March is silent through every bug
+shipped since, and a release that broke Health imports for every Android phone
+would not move it by one.
+
+**Two numbers per row, and neither is reported without the other.** *Times* is
+how often it actually happened — every occurrence is counted, so a retry loop
+shows its real volume — and *Installs* is install-days, how many phone-days saw
+it. Occurrences alone cannot tell one device in a loop from a bug everybody has;
+install-days alone cannot tell a single glitch from a hundred-a-minute storm. A
+row whose ratio is high is flagged as such (`420× per install`).
+
+Two more things that view has to keep saying, because both are easy and
+expensive to misread:
+
+- **Install-days is not a phone count.** There is no identifier anywhere in this
+  system, so nine install-days may be nine phones once each or one phone for
+  nine days. The view says so rather than letting the column header imply
+  otherwise.
+- **The version split is the answer, and it is measured in install-days.** A
+  failure spread evenly across builds is the app's background; one sitting
+  almost entirely on the newest build is a regression that shipped, and the
+  table calls that out. Weighting it by *occurrences* would let one looping
+  phone report whichever build it runs as 99% of a failure — and send somebody
+  to revert a release on the strength of one device. The share is of the reports
+  that **named** a version, with old builds counted apart and never folded in
+  either direction, the same `?` rule everything else here obeys.
+
+Ranking is by **breadth** by default: how many people a failure reached is what
+decides a hotfix, and ranking by occurrences would put one phone's retry loop
+above a bug that hit everybody once. *Most often* is the view for finding that
+loop, which is a real battery and data problem for those users even when the
+headline count is small.
+
+`New` and `Crashes` are **filters**, not sorts: "did today's release break
+something" and "what took the app down" are both questions a list that merely
+reordered would bury under a backlog the moment there is more than a screenful.
+The support dump is still where a single user's problem is diagnosed; this is
+what says which problem is worth chasing.
+
+**Every counter now carries two more fields, and they are what turn each of the
+above from one number into a number per population.** `tier` is what the install
+could do at the instant it pinged — `P` paid, `T` trial, `F` free — so the same
+day can be read as "who is in the app", "who measures" and "who meets walls",
+which is the comparison the *Who is in the app* card puts in one place. A Pro
+share on the paywall row is not a curiosity: it is the paywall coming up for
+somebody who has already paid. `version` is the build, and it answers the
+question a deploy cannot — whether the fix has actually reached anybody.
+
+Both obey the rule the counters already taught, one level down: `?` is a real
+bucket and is **never folded into a named value**. A ping from a build too old to
+state its tier is not a free user, and one too old to state its version is not
+running something else; every share here is measured against the pings that
+answered (`tierKnown`, `buildKnown`), and the unanswered band is drawn rather
+than divided away. Adoption computed without it would be the share of the builds
+new enough to talk, which is a claim about the wrong population.
+
+Version gets **two cards, and the second one is the adoption curve.** *What they
+are running* stacks the versions per day as counts, which is the honest picture
+of the population but not of a release: the stack's height is that day's active
+total, so a build reaching more phones every day can still draw a narrowing band
+across a quiet weekend. *How fast a release spreads* redraws the same bands as a
+share of each day's own total, summing to 100% at every day, so the only thing
+moving is the climb — an OTA lands as a near-vertical edge, a store release as a
+week-long ramp. Its note states the newest build's share on the latest day that
+carried any ping and how long that build has been out, because that is the
+number the curve is read for and eyeballing it off a stacked area is exactly the
+kind of reading this dashboard tries not to make you do. A day with no ping at
+all is a **gap, not a zero** — nobody ran anything that day, which is not the
+same as nobody running the new build.
+
+One asymmetry worth knowing: **version is not crossed with the cohort.** It rides
+in a second map on the day row (`builds`, keyed platform+tier+version) rather
+than in the cohort key, because the cohort key gains an entry per combination
+seen that day and cohorts accumulate forever — multiplying it by the live builds
+walks a busy row toward DynamoDB's 400KB item ceiling, at which point the day
+stops counting. So "how fast did 1.26 spread" is answerable and "pro share of the
+day-30 cohort on 1.26" is not, deliberately.
+
+**The reading counter shipped later than the other three, and that is a rule,
+not a footnote.** `index` records `hrvFirst` — the first day the route was ever
+heard from — and everything derived from it is `null` before that day, never 0%.
+The sensor letter shipped later again, so there are THREE staggered starts:
+`hrvMethodFirst` / `hrvMethodKnown` gate everything sensor-shaped on the reading
+route, and rows from between the two starts pool under `?` meaning "we were not
+asking" rather than "a sensor we could not read".
+A day on which 60 installs opened the app and no reading rows exist is a day the
+counter was not running, and reporting it as "nobody measured" would be a claim
+about people made out of a deploy date. `A.hrvKnown(ix, day)` is the gate;
+`measureShare` returns null, `measureRate` counts those days as `blind` and
+excludes them from both sides, and `measuringAt` reports `blind` cohorts
+separately from `immature` ones. `hrvFirst` is read from the **unfiltered**
+rows even when a platform slice is in force, because Android shipped the route
+in its own release and dating the counter from an iOS-only slice would date it
+from the wrong build.
 
 One rule governs all the arithmetic, and every metric in the view is shaped by
 it: **counts can be compared across days but never summed into one.** With no
@@ -276,11 +558,104 @@ the UI, each of them deliberate:
   on day 0* beside *Activated by D7* and the **Activation** card charts the age
   at first reading in the same buckets purchase timing uses. The **How the first
   reading is taken** card beside it splits those readings by sensor
-  (`methodsOn` / `methodsOver`), per day and stacked. That split follows the
+  (`methodsOn` / `methodsOver`), per day and stacked. **What readings are taken
+  with**, down in the measuring row, is its twin over the DAILY counter
+  (`hrvMethodsOn` / `hrvMethodsOver`) — what people keep reaching for rather than
+  what they started on — and the *Measured on <day>* tile carries the same split
+  as a second row under its store split. That split follows the
   platform filter rather than ignoring it, unlike the store splits below:
   Apple Watch is offered on iPhone only, so its share of a combined view is a
   share of a population half of which was never offered it — the card says so
   under the chart, and the filter is how to read it honestly.
+- **A day tile can wear an `ATH` badge, and it is opt-in.** `A.dayRecord`
+  answers "is this the best number we have ever had" for any day series a caller
+  can express as a function, and every rule that stops the badge lying lives
+  there. **All time is all time, not the range on screen** — the sweep is over
+  the whole index, or a seven-day view would call most of its days records —
+  though the platform filter does scope it, because `ix` is already that slice
+  and the badge has to be about the same population as the number wearing it.
+  It compares against **every other day**, not just the earlier ones, so a day
+  beaten later cannot keep the word; it is **strictly greater**, so matching the
+  best day is a tie and not a high (a plateau would otherwise tag every day of
+  itself); zero is never a record; and it wants `RECORD_MIN_DAYS` — a fortnight,
+  two of every weekday on a series that swings by a third between a Sunday and a
+  Wednesday — of comparable days before "ever" means anything. `comparable` is
+  ONE gate doing two jobs because they are the same question: a day before the
+  counter shipped is not comparable (a history of false zeros hands the badge to
+  an ordinary day) and neither is a rate's day whose denominator is under
+  `SMALL_COHORT` — the highest share this app has ever seen must not be the day
+  two people opened it and one of them measured. A partial day CAN hold a
+  record, deliberately: today is still running so its number can only grow, and
+  a day already above every complete one is genuinely above them.
+  Only the **Today** tiles are eligible, and only by opting in. A range tile is
+  a window aggregate, where a record would mean the best thirty-day window ever
+  — a different claim needing a rolling sweep — and the lifetime tiles are
+  pooled over cohorts and are not a day series at all. Opt-in rather than
+  automatic because a record is a CONGRATULATION, and a record iOS share is not
+  good news but Android news, while a record pile of installs past the trial is
+  a pile of people who did not convert; both would wear the badge under any rule
+  that simply looked for a maximum. The badge rides in the value line rather
+  than the meta, so it survives the phone's condensed tile where the delta is
+  hidden, and the meta line carries the evidence — a badge with no stated
+  previous best is a boast. A record off a floor of nothing gets its own
+  sentence rather than "past 0 on Aug 20", which names whichever day happened to
+  be first among a run of zeros as though it were the thing beaten.
+  Pinned by `landing/tests/master-records.test.mjs`, which is its own file
+  because every other App usage fixture is a handful of days built to pin some
+  other arithmetic exactly, and this needs a fortnight.
+- **Measuring has its own card, and its own pair of curves.** The **Opened vs
+  measured** card charts actives and readings on one axis per day (a gap in the
+  reading line where the counter had not shipped, never a zero), with the
+  window's pooled rate underneath and the second half of the window against the
+  first, stated in percentage POINTS. Beside it, **The habit curve** puts
+  `A.curve` and `A.measuringCurve` on one axis by install age: opened against
+  measured, over the same cohorts. **The distance between the two lines is the
+  finding** — every point of it is an install that showed up that day and did
+  not measure, which is the shape that precedes churn and which nothing else
+  here can see. The tile strip carries the same pair at a glance: *Measured on
+  <day>*, *Measured of active* (the day's share) and *Measured per active day*
+  (the range's, pooled as install-days). *Measured of active* also carries the
+  day's share cut by **first run vs returning** (`A.measureShareSplit`), which
+  the pooled figure cannot see: a day heavy with installs and a day heavy with
+  regulars reach the same number for opposite reasons, and the gap between the
+  two halves is whether the wizard's first reading is landing. It is the one
+  split on the page that is **not a partition** — two rates over two
+  populations, not two parts of the number above them — so both are printed as
+  percentages with their denominator in the name ("of first runs"), and the
+  counts behind them go in the meta line where they cannot be read as addable.
+  A day with nobody of one kind reports nothing for it rather than 0%: there was
+  no one to measure, and a rate over nobody is not a low rate. The reading rate can exceed 100% on a
+  day when a reading landed without its open ping — a launch made offline, or a
+  reading saved either side of midnight Eastern — and it is **shown as it comes
+  out rather than clamped**, because that gap is the only signal that says the
+  two counters have drifted. The weekday chart carries a **Readings** bar for
+  the same reason it carries the others: which weekday people actually measure
+  on is the number the morning reminder's time should follow.
+- **Which sensor, on EVERY reading and not just the first.** The first-reading
+  card above says how people START; **How readings are taken** (`hrvMethodsOn` /
+  `hrvMethodsOver`) says what they KEEP using, per day and stacked, and the
+  *Measured on <day>* tile carries the same dots. Both are silent before
+  `hrvMethodFirst` — a reading row from before the letter shipped names no
+  sensor, and drawing those as an "unknown" band would put a claim about the
+  data ("we could not tell") where a fact about the instrument belongs ("we were
+  not asking"). Each install counts once per day under the sensor of that day's
+  FIRST reading, so these are install-days and never a count of readings.
+- **Does the sensor mix change with age?** is the card that pair exists for, and
+  the only place this data can be asked whether a sensor keeps the people it
+  starts. `hrvMethodsAt` / `hrvMethodCurve` redraw the split by install age
+  rather than by date, as **shares**: counts there would simply redraw the
+  retention curve, every sensor falling together, which says nothing about the
+  mix. A band that narrows as the ages rise is a sensor losing its place — and
+  the copy has to keep saying what it cannot answer, because a falling share
+  does **not** mean those people left. They may have bought a strap, and nothing
+  without an identifier can separate the two. The card reports day 0 against day
+  7+ in percentage POINTS, and declines to draw the comparison at all until
+  cohorts born after the letter shipped have reached a week old.
+  This is the one place `cohortMethods` is read: a day's `methods` map pools
+  every cohort in it, so building an age mix from that map would hand a young
+  cohort's day 7 the readings an old cohort took the same afternoon. The storage
+  key already carries cohort AND sensor; `rowsToMap` keeps the cross rather than
+  collapsing it twice.
 - **A subscribe ping carries the buyer's store in the same cohort key an open
   ping does**, so "which store paid" needs no second source: `subPlatformsOn` /
   `purchasePlatformsOver` read it back, and both **Purchases on <day>** (the
@@ -288,6 +663,94 @@ the UI, each of them deliberate:
   the iOS / Android split under their number. Those splits follow the same rule
   as the platform tile — always unfiltered, `no store` broken out and disclosed
   in the meta line rather than folded into either store.
+- **The active tile splits its day TWICE**: returning / first run, and then
+  iOS / Android beside them. Two partitions of one number on one row, and both
+  have to add up to the tile's own value or the row is lying — which is why the
+  store half goes through `storeSplit` rather than reading two letters off the
+  map directly: that helper carries the `no store` band when there is one, and
+  without it the second pair would silently fail to sum on any day that still
+  has pre-marker installs in it. Like every split here it is the UNFILTERED
+  day's, so with a platform filter on, the tile's number is the slice and its
+  dots are what the slice is a slice of. `.tile .split` wraps for the same
+  reason (four swatches do not fit a narrow tile on one line).
+- **Installs are the one count this view is allowed to sum.** *Installs on
+  <day>* sits directly after *Active on <day>* and *Installs in range* sits with
+  the range tiles below, both split iOS / Android under the number
+  (`newPlatformsOn` / `newPlatformsOver`, unfiltered like every split here).
+  The day's number was already on screen as the *first run* half of the active
+  tile's split, but the split could not say which store it came from, and the
+  range had no number at all. The range one is a genuine SUM on a view whose
+  governing rule is that daily counts are never summed, and the exemption is
+  exact rather than pragmatic: an open ping counts an install again on every
+  day it opens the app, whereas a **first run happens once in an install's
+  life**, on its own cohort day — so adding them across days double-counts
+  nobody. It is the same property that makes cohort size exact, and
+  `lifecycleNow` already relies on it. `rowsToMap` carries the split as a
+  `fresh` map per day, accumulated alongside `platforms` and before the
+  platform filter, so it is the whole day's split whatever slice the number
+  above it is. *Installs in range* carries the previous window of equal length
+  as its delta, on the same "only when the counter covered all of it" guard the
+  active and returning averages use.
+- **A day's count is stacked against three baselines, and a percentage off a
+  tiny base is never printed.** The day tiles (*Active*, *Installs*,
+  *Purchases*, *First readings*, *Measured*) carry `dayDeltas`: yesterday, the
+  same weekday a week back, and the range's own daily average. The weekday row
+  is not a nicety — openings here swing by a third between a Sunday and a
+  Wednesday, so "down 28% on yesterday" on a Monday morning is usually just
+  Monday, and only Monday against Monday separates a real move from the week's
+  own shape. Each row is dropped, not printed, when its baseline is under
+  `DELTA_MIN_BASE` (5): two purchases against three is not "+50%", it is two
+  and three, and a percentage off a base that small reads as a trend while
+  being noise. That is why the purchase tile usually carries no comparisons and
+  the active one always does — one rule, applied to numbers of different sizes.
+  A day the measure could not be taken on at all returns `null` and drops out
+  of every comparison including the average's denominator, which is the
+  `hrvKnown` rule ("unknown is not zero") reaching the deltas. The *Active*
+  tile's old inline delta was a range-average-against-the-previous-window
+  figure sitting next to a today count, which read as a claim about today; the
+  average has its own tile under **This range** now, and carries its own trend.
+- **The view is grouped by SCOPE, into Today / This range / All installs**, and
+  the group a number sits in is part of what it claims. These tiles were one
+  wrapping row in which "Active on Aug 28", "Returning / day" (an average over
+  thirty days) and "D7 retention" (every cohort that ever installed) sat side by
+  side, told apart only by whether the label happened to end in a date. The
+  charts had the same problem one level up: a card about today and a card about
+  install age were paired in the same two-column row because they were about
+  the same subject. Three headings, three tile blocks, and every card filed
+  under the scope it actually answers in.
+
+  **All installs is not a third nicety, it is the reason the split is not two.**
+  A retention curve, a cohort heatmap, purchase and activation timing, the habit
+  curve and the sensor-mix-by-age card ignore the date range entirely — they
+  pool every cohort old enough to have reached the day being asked about. Filing
+  them under "This range" would be a claim they do not make, which is the same
+  class of error as summing daily actives.
+
+  The old **Overview** heading and its *"counter data through &lt;date&gt;"* row
+  are gone. The row stated the counter's newest day above a wall of tiles that
+  each already carried that date in their own label; what it was FOR is the
+  caveat, and the caveat is only sometimes true. The Today heading carries it
+  when it applies ("Aug 28 — still running, so it is a partial day") and names
+  the day instead when the counter's newest day is not today, because then
+  "Today" is not the day it means.
+- **A range tile compares against the range before it, and only when that
+  window was counted.** `prevWindow` / `rangeDelta` are the shared version of
+  the guard the active and returning averages always had: the previous window of
+  equal length, refused outright when it reaches back past `ix.first`, because
+  "up 12% on the previous 30 days" is only a fact if the previous 30 days were
+  being counted — otherwise it reports a deploy date as a surge. A single
+  unknown day in EITHER window returns null for the whole comparison rather than
+  counting as a zero (the `hrvKnown` rule again, one level up), which is why the
+  paywall and reading comparisons stay absent while those counters are young.
+  It rides on *Installs in range*, *Purchases in range*, *Active / day*,
+  *Returning / day*, *First readings in range* and *Measured per active day*,
+  and as a trailing clause (`rangeTrendNote`) on the first-reading, reading,
+  paywall and offer card notes.
+- **A RATE's move is stated in POINTS, never in per cent** (`ptsSpan`, and
+  `deltaPts` on a tile). A share that goes from 20% to 25% did not go up 5% — it
+  went up 5 points, or up 25%, and only one of those is what a reader takes from
+  a "%" glued to a percentage tile. *Measured per active day* is the tile that
+  needed it.
 - **Every purchase is also listed one row each**, under the Purchase timing
   histogram (`A.purchaseRows` → `renderPurchaseRows`). At the volumes a new app
   actually has, the list is the more honest of the two: three purchases in a
@@ -414,24 +877,46 @@ a CSV paste would be an alert about your own typing.
 
 | Event | Definition | Reaction |
 |---|---|---|
-| Visitors | a rise in open pings | two-note blip, and nothing else in any channel |
+| Visitors | a rise in open pings, minus that day's first runs — somebody **coming back** | two-note blip, **three seconds** of house-coloured glitter, and nothing else in any channel |
 | Activations | a rise in activation pings — an install saved its **first HRV reading** | two-note settling chime, a card + a toast + a notification naming the sensor(s). **No confetti.** |
-| Downloads | a rise in **first runs** — an open ping whose cohort key IS the day it arrived on | three-note rising chime, confetti falling from the top, a card + a toast + a notification naming the store(s) |
-| Sales | a rise in subscribe pings | brass fanfare, **ten seconds** of confetti from the top AND the bottom, a card + a toast + a notification naming the store(s) that paid |
+| Readings | a rise in daily reading pings — an install measured **today** | one struck note, a card + a toast + a notification naming the sensor(s). **No confetti**, and it yields every channel to anything above it in this table — it is the app being used, which is what this dashboard hopes to see all day |
+| Downloads | a rise in **first runs** — an open ping whose cohort key IS the day it arrived on | three-note rising chime, **ten seconds** of SILVER glitter falling from the top, a card + a toast + a notification naming the store(s) |
+| Sales | a rise in subscribe pings | brass fanfare, **twenty seconds** of GOLD glitter from the top AND the bottom, a card + a toast + a notification naming the store(s) that paid |
 
-The four cues are meant to be told apart across a room with your back to the
-screen, so they differ in SHAPE and not only in pitch — two notes, two notes
-settling, three notes rising, a fanfare with a held chord — and climb in weight
+The five cues are meant to be told apart across a room with your back to the
+screen, so they differ in SHAPE and not only in pitch — two notes, one struck
+note, two notes settling, three notes rising, a fanfare with a held chord — and
+climb in weight
 in the order the events matter. The visitor blip fires most often and is the one
 most easily made useless: the first version was a single sine at 0.055 gain, a
 sound you have to already know is coming to hear at all.
 
-**Confetti is for ARRIVALS, never for usage.** A new install and a purchase are
-people joining and people paying. An activation is somebody using the app they
-already have — the thing this dashboard hopes to see all day, every day — so
-celebrating it on the canvas would mean confetti more or less permanently, and
-then a sale's confetti would mean nothing. Activations get the full card / toast
-/ notification treatment and no canvas at all; visitors get the sound alone.
+**The metal is the news and the duration is the ranking.** Gold for money for
+twenty seconds, silver for a new install for ten, house colours for somebody
+coming back for three — told apart across a room with the sound off. Ordinary
+usage is celebrated only because it is over before it registers as an
+interruption; an ACTIVATION still gets no canvas at all, because it lands in the
+same refresh as the download that caused it often enough that its own puff would
+only ever be read as part of that one, and a daily reading is the same event one
+rung quieter. Both are told in card, toast and notification; neither is
+celebrated.
+
+**The canvas ranks nothing; only the sound does.** All three celebrations run at
+the same time, each on its own emitter and its own clock, sharing one shard list
+and one animation loop — so a refresh carrying a sale, a new install and
+somebody coming back draws gold, silver and colour together. That IS the news,
+and drawing only the loudest of the three threw two thirds of it away. One cue
+is still played per refresh, the best outcome that happened (pay > sign up >
+return): three simultaneous sounds are a noise where three simultaneous emitters
+are a party.
+
+**Count stacks at a DECAYED rate, halving each time.** Two sales are twenty
+seconds plus ten, three are twenty plus ten plus five, and an event landing on a
+celebration already running picks up the decay where that celebration left off
+rather than starting a fresh one. More money is visibly more celebration, and
+the series converges to twice the base, so a backfill of a hundred pings can
+never wedge the canvas on for an hour. The arithmetic is `stackedMs`, pinned in
+`tests/alerts.test.mjs`.
 
 **An activation card names the SENSOR, not the store** ("2 chest strap · 1 phone
 camera"), because that is the fact the activation route carries that nothing
@@ -455,19 +940,10 @@ none of the three — a toast for the event that fires most often would be on
 screen permanently, and a notification for it is the fastest way to have
 notifications turned back off.
 
-**A download runs the confetti in WAVES**, one per item 320ms apart and capped
-at eight, so four downloads is a few seconds of falling rather than the same
-one-second puff four times over — which is not distinguishable from one. The cap
-is what stops a backfill of fifty pings burying the dashboard for half a minute.
-
-**A sale runs for ten seconds flat**, and the difference is deliberate: this is
-the event the whole page exists for, and a second and a half of confetti for
-somebody deciding to pay for the thing you built is the same celebration a
-visitor gets, only slightly longer. Ten seconds is long enough to walk back to
-the desk for. It is a DURATION and not a wave count, so five sales in one
-refresh is still ten seconds rather than fifty — the news is "someone paid", and
-how many is on the card. Downloads landing in the same refresh extend the sale's
-waves rather than starting a competing pattern.
+**A sale runs for twenty seconds**, and the length is deliberate: this is the
+event the whole page exists for, and it is long enough to walk back to the desk
+for. Duration is a function of the COUNT and not of the wave, per the decay rule
+above.
 
 `snapshot` / `diff` are pure and are what `tests/alerts.test.mjs` pins;
 `tests/master-alerts.test.mjs` covers the cards on the built page. The rules:
@@ -505,8 +981,8 @@ waves rather than starting a competing pattern.
   synced store because "what this browser has already told me" is a property of
   this browser: two devices should each get the news once, and neither should
   swallow it for the other.
-- **One sound per refresh**, the loudest thing that happened. Cards do stack,
-  because they are read rather than heard.
+- **One sound per refresh**, the best outcome that happened. Cards do stack,
+  because they are read rather than heard, and so does the canvas.
 - **Cards do not expire.** The toast disappears on a timer; the whole point of
   this stack is to still be there when you come back to the laptop, so the only
   thing that removes a card is a press — the card itself, or "Clear all" above
@@ -514,6 +990,16 @@ waves rather than starting a competing pattern.
   unbounded: the stack scrolls past the viewport, and past `MAX_CARDS` (40) the
   oldest is dropped, since a dashboard left open over a weekend should not hold
   nine hundred DOM nodes to say the same thing.
+- **The Alerts button in the header shows the day, it does not silence it.**
+  Every card raised is also written to a log of today
+  (`autonomic.master.alertLog`, rolled over on this browser's own local
+  midnight), and pressing Alerts empties the stack and re-raises the lot, each
+  one stamped with the time it happened. A button whose one job was muting was a
+  button you pressed by accident and then heard nothing for the rest of the
+  afternoon; the thing actually wanted from that corner is "what have I missed",
+  and dismissing a card used to be the only copy of it. Muting survives as
+  `Alerts.setMuted`, which nothing in the header calls; the bell still shows
+  whether sound is on.
 
 The sounds are **synthesized**, not sampled: this page is inlined into one
 self-contained document with nothing to resolve at runtime, so an `<audio src>`
@@ -567,7 +1053,8 @@ own rules:
 
 What this deliberately does not do is tell you which version people are
 **running**. That is a different question — adoption, not availability — and it
-would need the app's cohort ping to carry its version.
+is answered in App usage instead, by *What they are running* and *How fast a
+release spreads*, off the version tag the cohort ping carries.
 
 ## The Sales view
 
@@ -610,6 +1097,58 @@ its own and read as churn nobody observed. `cancelled` is a date you type;
 average price is never a real total divided by a sale that returned nothing.
 Churn is booked against the **cancellation's** window and not the purchase's —
 almost everything that churns was bought before the window it churns in.
+
+**Churn you cannot attach to a purchase is its own ledger.** Marking `cancelled`
+needs to know *which* subscription ended, and a store report does not say — it
+says "you lost four subscribers last month and about $20 a month with them".
+That is a real, knowable fact with nowhere to go under the rule above, so churn
+read as zero forever and the forecast fell back to its 5% assumption. `churn` is
+a second collection, a row per **occurrence** rather than per subscription:
+`{ id, date, mrr, units?, plan?, platform?, note? }`. `mrr` is the monthly rate
+that stopped (an annual plan's twelfth, not its yearly price) and is the only
+required field; the rest are **absent rather than defaulted** when unknown,
+because a dollar figure off a bank statement is not a claim about a headcount, a
+term or a store. Four rules:
+
+- **It moves the rate, never the cash.** MRR, ARR, the active count, the churn
+  rate and every projection built on them net it out from its date forward.
+  Bookings and recognised revenue do not move: money that already arrived does
+  not un-arrive — that is what `refunded` is for — and there is no purchase here
+  whose recognition schedule could be stopped.
+- **The book is floored at zero.** An unattached figure is an estimate typed by
+  hand and it can overshoot the ledger. `mrrOn` reports `churnFloored` when it
+  clamps, so the view says the estimate has outrun the ledger rather than
+  quietly showing a plausible number. Inside the plan split, a plan that cannot
+  absorb its share spills onto the rest, so the stack always sums to the netted
+  total and no band is ever negative.
+- **Only a row that named a count may move the headcount.** A row with a dollar
+  figure and no count takes the money off the book and leaves `active` alone,
+  and the tile says so — the plan split beside it comes from purchase rows and
+  stays gross, because an unattached row names no subscription to take off one.
+- **A row with no store is in neither store.** A filtered index drops it rather
+  than guessing, and reports `churnUnattributed` so the view can disclose the
+  hole instead of showing a smaller figure under a store's name.
+
+The Sales view gains a **Churned MRR in range** tile and a **Churn** card that
+stacks cancellations against unattached rows — different evidence, kept visibly
+apart — and the MRR chart grows a dashed *Before churn* line whose gap from the
+top of the stack is what the ledger is costing. Entry is under **Edit data →
+Churn**, the same form/paste/table shape the purchase ledger has, with its own
+`autonomic-churn.csv`.
+
+**The churn rate is struck against the MEAN daily book, not the opening one.**
+`forecastBasis` reads a 180-day window, so an account whose first sale falls
+inside it has an opening book of zero — an opening-MRR rate is undefined there,
+which is every young account and exactly the one this ledger was built for. On a
+book that grew several times over inside the window it is worse than undefined:
+dividing the whole window's losses by the handful of subscriptions that existed
+on day one reports a multiple of the real rate and the projection drives the
+book into the ground. The mean is the MRR the churn actually came out of, it is
+defined whenever the book was ever non-empty, and it does not jump because one
+purchase fell either side of the window's edge. `meanBook` travels with the rate
+so a view can show its own denominator. The forecast's opening payer counts are
+scaled by the surviving share of MRR for the same reason — the model's state is
+a payer count, and unattached churn cannot name the payers to remove.
 
 **Cohort-day statistics only count purchases carrying an install date.**
 `cohortDay` is purchase date minus install date, exact and per buyer. A row
@@ -709,7 +1248,7 @@ projects each spot into a derived cost row on its start date. Every rollup —
 `daily`, `spend`, `summary`, `breakeven` — reads that, so nothing downstream
 knows there are two collections.
 
-The arithmetic is pure and lives in `costs.js` (`tests/costs.test.mjs`). Five
+The arithmetic is pure and lives in `costs.js` (`tests/costs.test.mjs`). Six
 rules run through it, and they are the reason to read that file before changing
 a number here.
 
@@ -735,6 +1274,35 @@ customer-facing price; the store keeps 15% or 30% of it. `settings.storeCutPct`
 (Edit data → Store commission) is applied everywhere profit appears, and the
 gross figure is always shown beside the net one so the cut is visible rather
 than silently applied.
+
+**Building the thing and running the thing are different money.** A cost carries
+a `capex` boolean — a one-off investment in the product (the R&D, hardware
+bought once, a contractor who built a feature) rather than part of what the app
+costs to keep running. It is **orthogonal to the category on purpose**: R&D
+arrives as HARDWARE, as SERVICES, as a one-off TOOLS licence, so a "CAPEX"
+category could not hold it without making you abandon the category that already
+describes it. The form asks it as *Kind of money*; the ledger table wears a
+`build` pill; the CSV carries a `kind` column.
+
+What the flag changes is which **per-customer rates** it is allowed into, and
+the rule is that a rate is about the ongoing business or it is meaningless. A
+$5,000 build divided by this month's twelve buyers is $417 a customer, which is
+not what a customer costs, will never be, and gets *worse* the more product you
+build. So `loadedCostPerPaid` is struck against **operating** spend and
+`capexPerPaid` states the build separately. `costPerInstall` never saw capex —
+it has always been marketing-only — and `isCapex` and `isMarketing` are mutually
+exclusive with the former winning, so a flagged CREATIVE row cannot put a
+permanent step in the cost-per-install series on the day it was paid for.
+
+What it does **not** change is profit. The money left the bank, and a profit you
+can improve by spending more is not one. `profit`, `margin` and the breakeven
+curve are struck against total spend exactly as before; `operatingProfit` and
+`operatingMargin` sit beside them in the tiles' meta lines and in the text
+export, so the honest sentence — "the app is operationally profitable and has
+this much build cost still to earn back" — has both halves. `daily()` returns
+`capex` / `capexByDay` / `operating`; `other` is unchanged (everything that is
+not marketing) because three charts read it under their own labels, and the two
+axes deliberately overlap rather than one being a subset of the other.
 
 **Blended and reported acquisition costs are never mixed.** Blended is marketing
 spend ÷ every store download, which charges organic installs to marketing and is
@@ -772,6 +1340,93 @@ funnel tiles rather than two more tiles bolted onto the end of them, it reads
 and it inherits every rule from them: gross shown beside net, cash never blended
 with MRR, both stores whatever the filter says, cost per install blended and
 labelled so. The whole strip hides when there is no money at all to report.
+
+
+## The Links view — the one tab that changes the public site
+
+Every other view here reads numbers. This one writes: saving a campaign
+publishes a real page at `autonomic.care/download/<slug>`.
+
+`/download` itself is a page of the landing site and is not managed here. It is
+a prerendered signpost that sniffs the user agent and sends a phone to its store
+with the site's own `Videos` attribution.
+
+A CAMPAIGN link is the same object with the destinations supplied by hand, so
+`/download/facebook` can carry its own App Store campaign token (`ct=`) and its
+own Play referrer, and the two campaigns are told apart in App Store Connect and
+in the Play Console. Three destinations per campaign — iPhone, Android, and
+everything else — each of which may be left blank: a blank phone platform falls
+back to `/download`, so the visitor still lands in the right store with the
+default credit, and a blank desktop destination falls back to the home page.
+**Fill in tagged store URLs** builds the two store URLs the site itself would
+build (`storeUrl()` in `landing/src/lib/site.ts`, duplicated in `app.js` because
+this dashboard has no build step), and never overwrites a destination that is
+already set. Apple's token gets the campaign's real NAME — it is free-form and
+capped at 40 characters — while Play's referrer and the GA triple get the SLUG,
+because a utm value with spaces in it is a mess in every report that groups on
+it.
+
+### Why the page is written rather than resolved
+
+The site is a static bucket behind CloudFront with an OAC origin, so a path with
+no object behind it is a 403 — there is nothing a client-side router could
+rescue, and the destinations are typed in here and cannot be known at build
+time. So the page is **published**: `SYNC` renders it and writes it into the
+bucket with both URLs already in it (`sls/lambdas/api/links.js`). Three
+consequences worth keeping in mind:
+
+1. The redirect costs one request and never touches the API. A campaign link
+   keeps working if the dashboard, the Lambda or DynamoDB are down — the
+   opposite of what a runtime lookup would give us.
+2. DynamoDB is still the record and the object is a rendering of it. That is
+   what makes **Republish every page** safe to press at any time: it is the
+   repair path for a lost object, and how a change to the page template reaches
+   campaigns nobody has edited since.
+3. The pipeline's `aws s3 sync --delete` would otherwise delete every campaign
+   object on the next deploy, because none of them exist in the build output.
+   `buildspec.yml` excludes `download/*` from the sync for exactly that reason,
+   re-including only the three files the build owns. Move one of those two
+   things and you must move the other.
+
+Both `download/<slug>/index.html` and the extensionless `download/<slug>` are
+written, because the distribution's directory handling is out-of-band
+configuration this repo does not own, and which of the two it asks S3 for is not
+ours to assume. They are bytes; write both.
+
+### Where these numbers are actually read
+
+Not here. A campaign page is a redirect, so it never phones this API — the
+stores' own consoles are where a campaign's downloads land (App Store Connect
+via `ct=`, the Play Console via the `referrer`), and **Google Analytics** is
+where the traffic to the page itself lands.
+
+Which means the page has to report itself, which a page written outside the
+build has to do from scratch: it carries its own copy of the GA tag and of the
+site's `aj-cookie-consent` opt-out (same origin, so blocking on the site blocks
+here — nothing is sent and the visitor is redirected at once). Each way out is
+an event — `app_store_redirect` / `play_store_redirect` / `site_redirect`, plus
+a pooled `download_redirect` carrying `platform`, `destination` and the campaign
+slug — so "of everyone who scanned this QR code, how many were on a phone at
+all" is one report.
+
+The order is the whole of it. `location.replace` aborts the document load along
+with the tag still loading beside it, so a redirect page that fires and goes
+records **nothing**, not even a page view: the page every printed link points at
+reads in GA as though it were never opened. So the page sends first and leaves
+on gtag's `event_callback`, capped at one second — a blocked tag never calls
+back, and a signpost must never become a dead end. `/download` does the same
+thing from the shell's tag, and the two have to agree on the event names and on
+the word `desktop`, or every report splits in two with nothing looking broken.
+`sls/tests/links.test.mjs` and `landing/tests/download.test.mjs` pin the pair.
+
+The **slug is the identity**, not a generated id — which is what makes editing
+the path a delete and a create rather than a rename, and why the form says the
+old link stops working before it will do it. A campaign link is printed in a
+video description or under a QR code, where a dead URL is not recoverable.
+
+Unset is safe. With no `SITE_BUCKET` on the Lambda the campaign still stores and
+still syncs; it simply is not live, and the republish button says so. Same rule
+as the Web Push keys.
 
 ## Export data — the whole book, as a prompt
 
@@ -858,6 +1513,12 @@ the dashboard's own behind a Cognito JWT authorizer and the app's ping counter
 public. It deploys from the same CodePipeline as the landing site on push to
 `main`.
 
+The dashboard's Lambda holds one grant that is not about its own table:
+`s3:PutObject` / `s3:DeleteObject` scoped to `download/*` in the site bucket,
+plus `cloudfront:CreateInvalidation`, so it can publish campaign download pages.
+Scoped to that prefix on purpose — it can publish a campaign link and can never
+touch the rest of the site, which the pipeline owns.
+
 ## Running locally
 
 ```bash
@@ -897,6 +1558,14 @@ activation against store downloads, the unlived cells of the grid staying blank
 rather than reading 0%, and the tiles refusing to answer where the data is too
 young. If you change how a metric is derived, that fixture is where you find out
 whether you meant to.
+
+`tests/master-links.test.mjs` drives the Links view: that a path is validated
+before it can become a URL, that a campaign reaches the server as the
+`linkUpserts` payload the Lambda publishes a page from, that changing a path
+retires the old link rather than leaving two live, and that deleting takes the
+page down. Its other half is `sls/tests/links.test.mjs`, which pins what the
+published page actually says — including that a destination which is not an
+http(s) URL never reaches `location.replace`.
 
 `tests/sales.test.mjs` pins the subscription arithmetic against a hand-worked
 book — an annual plan's MRR, the gap between cash and recognised revenue, what a

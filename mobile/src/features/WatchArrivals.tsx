@@ -1,22 +1,36 @@
 /**
- * Auto-open the results card for readings that arrive from the watch while
- * the app is in the foreground (POTS test results). Renders nothing — it just
- * bridges the watch receiver's arrival events onto the sheet stack, so it
- * must be mounted inside SheetProvider.
+ * Auto-open the results card for readings that arrive from a watch while the
+ * app is in the foreground — Apple Watch POTS results, and Garmin readings of
+ * every kind. Renders nothing: it just bridges the receivers' arrival events
+ * onto the sheet stack, so it must be mounted inside SheetProvider.
  */
-import React, { useEffect } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { AppState } from 'react-native';
 import { useSheets } from '../components/Sheet';
+import { subscribeGarminArrivals } from '../lib/garmin/receiver';
 import { subscribeWatchArrivals } from '../lib/watch/receiver';
-import { ReadingSummarySheet } from './forms';
+import { READING_TYPES } from '../lib/registry';
+import { confirmDelete, openPotsLockIfNeeded, ReadingSummarySheet } from './forms';
 
 export function WatchArrivalCards() {
   const { openSheet } = useSheets();
-  useEffect(() => subscribeWatchArrivals((dk, entry) => {
+  const show = useCallback((dk: string, entry: Parameters<Parameters<typeof subscribeWatchArrivals>[0]>[1]) => {
     // "If open" means foregrounded: a background delivery still lands in the
     // journal, it just doesn't pop a card at the user hours later.
     if (AppState.currentState !== 'active') return;
-    openSheet(() => <ReadingSummarySheet r={entry} dk={dk} />);
-  }), [openSheet]);
+    // A POTS result on the free tier: the watch captured it and it is saved,
+    // but reading it is Pro — the lock card takes the slot the summary would
+    // have had (see features/PotsLock).
+    if (openPotsLockIfNeeded(openSheet, entry, dk)) return;
+    // Same card the journal row opens, so it carries the same delete button —
+    // a reading that arrived from a wrist is the one most likely to be unwanted.
+    openSheet(() => <ReadingSummarySheet r={entry} dk={dk} />, {
+      destructive: { onPress: () => confirmDelete(openSheet, dk, 'readings', entry, READING_TYPES[entry.type]?.label || 'reading') },
+    });
+  }, [openSheet]);
+  useEffect(() => subscribeWatchArrivals(show), [show]);
+  // Garmin readings arrive the same way and deserve the same card: the user
+  // took the reading on their wrist and the phone is where the result lives.
+  useEffect(() => subscribeGarminArrivals(show), [show]);
   return null;
 }

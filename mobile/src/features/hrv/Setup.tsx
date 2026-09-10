@@ -9,14 +9,14 @@
  * that flatten RSA and broke day-to-day comparability, which is the whole point
  * of a daily measure. Legacy readings keep whatever style they were saved with.
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Platform, Pressable, Text, View } from 'react-native';
 import Animated, { Easing, interpolateColor, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { SheetControls, useSheets } from '../../components/Sheet';
 import { Button } from '../../components/ui';
 import { Icon, type IconName } from '../../components/Icon';
 import { useToast } from '../../components/Toast';
-import { radius, usePalette } from '../../theme';
+import { GRADE_COLORS, radius, usePalette } from '../../theme';
 import { getState, save, useStore } from '../../store/store';
 import { todayKey } from '../../lib/dates';
 import { health } from '../../lib/health';
@@ -24,8 +24,11 @@ import { defaultPeriod } from '../../lib/period';
 import { ppg } from '../../lib/ppg/camera';
 import { BREATH_STYLE, HrvSession, type SessionConfig } from './Session';
 import { CameraSetup } from './CameraSetup';
+import { GarminPrep } from './GarminPrep';
 import { WatchPrep } from './WatchPrep';
 import { HealthRrImportSheet } from './HealthImport';
+import { garminDevices, subscribeGarminDevices } from '../../lib/garmin/receiver';
+import { hasOtherWatches } from './WatchBrands';
 import { SOURCE_META, SourcePicker, sourceSub, type Source } from './SourcePicker';
 
 /** The sheet opener, as `useSheets()` hands it out. */
@@ -34,6 +37,18 @@ type OpenSheet = ReturnType<typeof useSheets>['openSheet'];
 // The sheet's ✕ pill floats top-right; inset the title + subtitle so neither
 // runs underneath it (was clipped on narrower screens).
 const CLOSE_CLEARANCE = 58;
+
+/** The "now supported" tab above the source bubble. Violet is the palette's
+ *  "noticed" colour (the tab bar's unseen dot wears it); the red accent is
+ *  reserved for things that are tapped, and this notice isn't one. */
+const NOTICE = GRADE_COLORS.warning;
+const NOTICE_SOFT = 'rgba(167,139,250,0.16)';
+/** The tab's visible band, and how far it runs on UNDER the source bubble. The
+ *  tuck is the bubble's own corner radius, so the tab is hidden exactly where
+ *  the bubble stops covering it — any less and its square bottom corners peek
+ *  out beside the rounded ones. */
+const NOTICE_BAND = 34;
+const NOTICE_TUCK = radius.control;
 
 export type Kind = 'unstructured' | 'breath';
 
@@ -78,6 +93,13 @@ export function openCapture(config: SessionConfig, openSheet: OpenSheet): void {
     openSheet((c) => <WatchPrep config={config} controls={c} />);
     return;
   }
+  // Garmin never streams to the phone — the whole series arrives in one message
+  // at the end — so there is no live session card to open. A prep card that
+  // explains what to do on the wrist, and then waits, is the honest UI.
+  if (config.source === 'garmin') {
+    openSheet((c) => <GarminPrep config={config} controls={c} />);
+    return;
+  }
   // Camera readings get a setup card first (choose the module shape, mark the
   // flash, wait for the finger) — it opens the session card itself once the
   // pulse locks. `grow` lets that card center the module stage vertically and
@@ -95,8 +117,12 @@ export function openCapture(config: SessionConfig, openSheet: OpenSheet): void {
  *  while unpaired — Start would just bounce off the pairing sheet. */
 export function defaultSource(): Source {
   const s = getState().settings;
-  if (s.lastBleDeviceId) return 'polar';
   const last = s.lastHrvSource;
+  // Garmin outranks a remembered strap: linking a watch is a deliberate act
+  // and it is the thing the user just set up. Guarded on a device actually
+  // being linked, so an old preference cannot select a source that is not there.
+  if (last === 'garmin' && garminDevices().length) return 'garmin';
+  if (s.lastBleDeviceId) return 'polar';
   if (last === 'watch' && Platform.OS === 'ios' && health().available) return 'watch';
   if (last === 'camera' && ppg().available) return 'camera';
   return ppg().available ? 'camera' : 'polar';
@@ -117,6 +143,8 @@ export function HrvSetup({ controls }: { controls: SheetControls }) {
   // Reactive so the summary row updates the moment a strap is saved from the
   // source picker stacked on top of this one.
   const savedName = useStore((s) => s.state.settings.lastBleDeviceName);
+  const [garminLinked, setGarminLinked] = useState(garminDevices().length > 0);
+  useEffect(() => subscribeGarminDevices((l) => setGarminLinked(l.length > 0)), []);
 
   const changeSource = () => openSheet((c) => <SourcePicker value={source} onPick={setSource} controls={c} />);
 
@@ -150,6 +178,49 @@ export function HrvSetup({ controls }: { controls: SheetControls }) {
       </View>
 
       <Text style={{ fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.6, color: p.textDim, fontWeight: '700', marginTop: 22, marginBottom: 10 }}>Measuring with</Text>
+
+      {/* Announcement, not a source, and not a CONTROL either: it says one thing
+          and there is nothing behind it, so it is a plain View. It rides the top
+          edge of the source bubble like the tab on a folder — narrower than the
+          card, rounded on top only, flush at the bottom — which is what makes it
+          read as a label ON that card rather than as a second row above it. It
+          retires itself once a Garmin is linked: at that point it is no longer
+          news and the thing it points at has already been used.
+
+          Violet, not the red accent: the accent is what the user TAPS, and a
+          notice wearing it invites a tap that does nothing. */}
+      {hasOtherWatches() && !garminLinked ? (
+        <View
+          style={{
+            // Full width and tucked BEHIND the source bubble: the tab is one
+            // object with the card, sliding out from under its top edge, rather
+            // than a narrower plate balanced on it. It is drawn first, so the
+            // bubble (a later sibling) paints over the overlap on its own.
+            //
+            // Height carries the overlap: the visible band stays NOTICE_BAND
+            // tall, and the extra NOTICE_TUCK is hidden under the bubble's
+            // rounded top, so no corner of the tab is ever exposed beside it.
+            height: NOTICE_BAND + NOTICE_TUCK,
+            paddingBottom: NOTICE_TUCK,
+            marginBottom: -NOTICE_TUCK,
+            // Centred contents rather than padding either side of the text: the
+            // NEW chip and the sentence have different line boxes, and only a
+            // real height centres both.
+            flexDirection: 'row', alignItems: 'center', gap: 8,
+            paddingHorizontal: 14,
+            borderTopLeftRadius: radius.control, borderTopRightRadius: radius.control,
+            backgroundColor: p.sunk,
+          }}
+        >
+          <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, backgroundColor: NOTICE_SOFT }}>
+            <Text style={{ color: NOTICE, fontSize: 10, fontWeight: '800', letterSpacing: 0.3 }}>NEW</Text>
+          </View>
+          <Text numberOfLines={1} style={{ color: p.text, fontSize: 12.5, fontWeight: '600', flexShrink: 1 }}>
+            Garmin watches are now supported
+          </Text>
+        </View>
+      ) : null}
+
       <Pressable
         onPress={changeSource}
         style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: radius.control, borderWidth: 1, borderColor: p.border, backgroundColor: p.surface2 }}

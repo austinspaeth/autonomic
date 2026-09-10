@@ -10,15 +10,16 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import Svg, { Circle } from 'react-native-svg';
-import { SheetControls, SheetFooter } from '../../components/Sheet';
-import { Button } from '../../components/ui';
+import { SheetControls, useSheets } from '../../components/Sheet';
 import { NoteDraftCard, ReadingSummary } from '../../components/summary';
-import { useToast } from '../../components/Toast';
 import { usePalette, GRADE_COLORS } from '../../theme';
 import { BANDS, catFromBands } from '../../lib/scoring';
 import { ble } from '../../lib/ble/manager';
 import { getState, storeWaveform, upsertEntry } from '../../store/store';
 import { splitWaveform } from '../../lib/waveforms';
+import { confirmDelete, EntryForm } from '../EntryForm';
+import { isPotsResultLocked, PotsLockedCard } from '../PotsLock';
+import { READING_TYPES } from '../../lib/registry';
 import type { DayRecord, Entry } from '../../lib/types';
 
 /** ~1 s strong buzz (same trick as the HRV session): a dense train of heavy
@@ -145,49 +146,95 @@ export function deltaColor(d: number | null, bands: 'standDelta' | 'orthoIncreas
 /**
  * Results card stacked over the finished session (mirror of HrvResults): the
  * built entry previews through the same ReadingSummary the journal row opens,
- * with its HR series still inline; Save splits it into the waveform sidecar
- * before the journal write, exactly like a synced watch result.
+ * with its HR series still inline.
+ *
+ * Like HrvResults, the reading is SAVED THE MOMENT THIS CARD OPENS — split into
+ * the waveform sidecar before the journal write, exactly like a synced watch
+ * result. There is no keep-or-discard question; deleting it is one tap on the
+ * journal row.
  */
 export function PotsResultsSheet({ entry, dayKey, title, sub, controls }: {
   entry: Entry; dayKey: string; title: string; sub: string; controls: SheetControls;
 }) {
   const p = usePalette();
-  const toast = useToast();
+  const { openSheet } = useSheets();
   const ctx = { sex: getState().profile.sex, height: getState().profile.height };
 
-  // Sparklines should already include this unsaved result — hand the summary a
-  // days map with the live reading appended to its day.
+  // Sparklines should already include this result — hand the summary a days map
+  // with the reading appended to its day.
   const daysWithCurrent = useMemo(() => {
     const days = getState().days;
     const day = days[dayKey] as DayRecord | undefined;
     return { ...days, [dayKey]: { ...(day || {}), readings: [...((day && day.readings) || []), entry] } } as typeof days;
   }, [entry, dayKey]);
 
-  // Notes can be written before the reading is saved; the entry only exists in
-  // memory until Save, so hold the text here.
+  // The note is written onto the already-saved entry; the draft is held here
+  // only to render it.
+  // Free tier: the capture ran and is saved, but reading the result is Pro.
+  // Upgrading from the card swaps the real summary in underneath rather than
+  // closing it — this one is the receipt for a capture the user just sat
+  // through, so it is the wrong card to take away.
+  const [locked, setLocked] = useState(() => isPotsResultLocked(entry));
   const [note, setNote] = useState('');
+  /** The persisted (waveform-stripped) entry, once the auto-save has run. */
+  const saved = useRef<Entry | null>(null);
   const shown = useMemo(() => (note ? { ...entry, note } : entry), [entry, note]);
 
-  const save = () => {
-    const { entry: stripped, waveform } = splitWaveform(shown);
+  useEffect(() => {
+    if (saved.current) return;
+    const { entry: stripped, waveform } = splitWaveform(entry);
     if (waveform) storeWaveform(stripped.id, waveform);
+    saved.current = stripped;
     upsertEntry(dayKey, 'readings', stripped);
-    toast('Reading saved');
-    controls.closeAll(); // close the results card AND the session card beneath it
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Edit, delete, close in the header pill — the same three every entry card
+  // carries, and the same arming HrvResults does: the buttons need the entry
+  // the effect above persisted, so they are set after it rather than at
+  // openSheet time. The ✕ closes the whole stack, since the session card
+  // beneath this one is finished with.
+  useEffect(() => {
+    const e = saved.current;
+    if (!e) return;
+    controls.setOptions({
+      hideClose: false,
+      dismissAll: true,
+      // No pencil on a locked result: the edit form is the numbers, listed.
+      // Delete stays either way — the reading is the user's, locked or not.
+      ...(locked ? null : {
+        action: { icon: 'edit' as const, onPress: () => openSheet((c) => (
+          <EntryForm
+            typeMap={READING_TYPES} arrKey="readings" dk={dayKey}
+            type={e.type} existing={saved.current} controls={c} onSaved={() => {}}
+          />
+        )) },
+      }),
+      destructive: { onPress: () => confirmDelete(openSheet, dayKey, 'readings', e, READING_TYPES[e.type]?.label || 'reading') },
+      // A locked card has nothing to scroll, so let it sit at the bottom of the
+      // device like every other one-answer card (see features/PotsLock).
+      fitContent: locked,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locked]);
+
+  const onNote = (next: string) => {
+    setNote(next);
+    const e = saved.current;
+    if (e) upsertEntry(dayKey, 'readings', { ...e, note: next });
   };
 
   return (
     <View>
       <Text style={{ fontSize: 25, fontWeight: '800', color: p.text, marginBottom: 4 }}>{title}</Text>
-      <Text style={{ color: p.textDim, fontSize: 14, marginBottom: 16 }}>{sub}</Text>
-      <ReadingSummary r={shown} days={daysWithCurrent} ctx={ctx} />
-      <NoteDraftCard note={note} onChange={setNote} />
-      <SheetFooter>
-        <View style={{ flex: 1, flexDirection: 'row', gap: 12 }}>
-          <Button title="Discard" variant="danger" onPress={() => controls.closeAll()} />
-          <Button title="Save reading" variant="primary" onPress={save} />
-        </View>
-      </SheetFooter>
+      <Text style={{ color: p.textDim, fontSize: 14, marginBottom: 4 }}>{sub}</Text>
+      <Text style={{ color: p.textDim, fontSize: 13, marginBottom: 16 }}>Saved to your journal</Text>
+      {locked ? <PotsLockedCard r={shown} controls={controls} subject={false} onUnlocked={() => setLocked(false)} /> : (
+        <>
+          <ReadingSummary r={shown} days={daysWithCurrent} ctx={ctx} />
+          <NoteDraftCard note={note} onChange={onNote} />
+        </>
+      )}
     </View>
   );
 }

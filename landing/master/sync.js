@@ -129,6 +129,10 @@ window.Sync = (function () {
     if (raw.label) out.label = String(raw.label).slice(0, 200);
     if (raw.note) out.note = String(raw.note).slice(0, 2000);
     if (raw.adId) out.adId = String(raw.adId).slice(0, 64);
+    /* A one-off build cost (R&D / capex). Absent rather than false when it is
+       not one, matching the lambda, or the diff would report every existing
+       cost row as changed on the first push after this shipped. */
+    if (raw.capex) out.capex = true;
     if (RECURRENCES.indexOf(raw.recurrence) >= 0) out.recurrence = raw.recurrence;
     if (out.recurrence && /^\d{4}-\d{2}-\d{2}$/.test(String(raw.until || ''))) out.until = raw.until;
     COST_NUMBERS.forEach(function (k) {
@@ -171,6 +175,56 @@ window.Sync = (function () {
     return out;
   }
 
+  /* Unattached churn, reshaped exactly as the lambda's `cleanChurn` does — same
+     rule as the sale above: a field the server drops or rewrites has to be
+     dropped or rewritten here too, or the diff reports the row as changed on
+     every push forever. `platform` is genuinely optional (a figure you cannot
+     attribute to a store belongs to neither) and `units` is absent rather than
+     zero when it is unknown. */
+  function normalizeChurn(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    var id = String(raw.id || '').slice(0, 64);
+    if (!id) return null;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(raw.date || ''))) return null;
+    var mrr = Number(raw.mrr);
+    if (!isFinite(mrr)) return null;
+    var out = { id: id, date: raw.date, mrr: Math.max(0, mrr) };
+    if (raw.platform === 'ios' || raw.platform === 'android') out.platform = raw.platform;
+    out.plan = (raw.plan === 'monthly' || raw.plan === 'annual') ? raw.plan : 'unknown';
+    var units = Number(raw.units);
+    if (isFinite(units) && units > 0) out.units = Math.round(units);
+    if (raw.note) out.note = String(raw.note).slice(0, 2000);
+    return out;
+  }
+
+  /* Mirrors cleanLink() in the Lambda — the same rule as every normalize above,
+     with one extra consequence: a campaign that this side keeps and the server
+     reshapes is a campaign whose PAGE gets rewritten on every single push. */
+  var LINK_SLUG = /^[a-z0-9][a-z0-9-]{0,47}$/;
+
+  function normalizeLinkUrl(raw) {
+    var v = String(raw === undefined || raw === null ? '' : raw).trim();
+    if (!v || v.length > 900) return '';
+    return /^https?:\/\/[^\s"'<>]+$/i.test(v) ? v : '';
+  }
+
+  function normalizeLink(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    var slug = String(raw.slug || '').trim().toLowerCase();
+    if (!LINK_SLUG.test(slug)) return null;
+    var out = { slug: slug };
+    var label = String(raw.label || '').trim().slice(0, 120);
+    if (label) out.label = label;
+    ['ios', 'android', 'web'].forEach(function (k) {
+      var u = normalizeLinkUrl(raw[k]);
+      if (u) out[k] = u;
+    });
+    var note = String(raw.note || '').trim().slice(0, 2000);
+    if (note) out.note = note;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(String(raw.created || ''))) out.created = raw.created;
+    return out;
+  }
+
   function snapshotOf(db, state) {
     var entries = new Map();
     (db.entries || []).forEach(function (e) {
@@ -197,8 +251,22 @@ window.Sync = (function () {
       var n = normalizeSale(r);
       if (n) salesMap.set(n.id, stable(n));
     });
+    var churnMap = new Map();
+    (db.churn || []).forEach(function (c) {
+      var n = normalizeChurn(c);
+      if (n) churnMap.set(n.id, stable(n));
+    });
+    /* Keyed by SLUG, not by an id: the slug is the URL, so renaming a campaign
+       is a delete and a create — which is exactly what the diff below then
+       reports, and exactly what has to happen in the bucket. */
+    var linksMap = new Map();
+    (db.links || []).forEach(function (l) {
+      var n = normalizeLink(l);
+      if (n) linksMap.set(n.slug, stable(n));
+    });
     return {
       entries: entries, events: events, ads: adsMap, costs: costsMap, sales: salesMap,
+      churn: churnMap, links: linksMap,
       settings: stable(db.settings || {}), ui: stable(state || {})
     };
   }
@@ -271,6 +339,10 @@ window.Sync = (function () {
     var adDiff = diffById('ads');
     var costDiff = diffById('costs');
     var saleDiff = diffById('sales');
+    var churnDiff = diffById('churn');
+    /* Same loop — `diffById` keys off the map, not off a field, so a
+       slug-keyed collection walks it unchanged. */
+    var linkDiff = diffById('links');
 
     var payload = {};
     if (adDiff.ups.length) payload.adUpserts = adDiff.ups;
@@ -279,6 +351,10 @@ window.Sync = (function () {
     if (costDiff.dels.length) payload.costDeletes = costDiff.dels;
     if (saleDiff.ups.length) payload.saleUpserts = saleDiff.ups;
     if (saleDiff.dels.length) payload.saleDeletes = saleDiff.dels;
+    if (churnDiff.ups.length) payload.churnUpserts = churnDiff.ups;
+    if (churnDiff.dels.length) payload.churnDeletes = churnDiff.dels;
+    if (linkDiff.ups.length) payload.linkUpserts = linkDiff.ups;
+    if (linkDiff.dels.length) payload.linkDeletes = linkDiff.dels;
     if (upserts.length) payload.upserts = upserts;
     if (deletes.length) payload.deletes = deletes;
     if (eventUpserts.length) payload.eventUpserts = eventUpserts;
@@ -344,6 +420,7 @@ window.Sync = (function () {
          as the baseline and cancels any pending push — a sale delete produced
          by the ordinary diff a moment earlier would be thrown away unsent. */
       sales: (store.db.sales || []).map(normalizeSale).filter(Boolean),
+      churn: (store.db.churn || []).map(normalizeChurn).filter(Boolean),
       settings: store.db.settings
     }).then(function () {
       inFlight = false;
@@ -393,6 +470,7 @@ window.Sync = (function () {
     onStatus: onStatus,
     normalize: normalize,
     normalizeAd: normalizeAd,
-    normalizeCost: normalizeCost
+    normalizeCost: normalizeCost,
+    normalizeLink: normalizeLink
   };
 })();

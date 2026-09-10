@@ -2,7 +2,7 @@
  * The app's notifications, both local (no push, no server, nothing leaves the
  * device):
  *
- * - Morning reminder: a single repeating notification nudging the user to take
+ * - Daily reminder: a single repeating notification nudging the user to take
  *   their reading at the same time each morning, which is what makes a
  *   baseline comparable day to day.
  * - Crash warning: fired when the trailing-week trend flags a likely crash
@@ -19,11 +19,15 @@ import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { todayKey } from './dates';
 import { logError } from './diagnostics/errorLog';
+import { pingNotifyEnabled } from '../store/ping';
 import { resolveProtocol } from './scoring/day';
 import { detectDownturn } from './scoring/downturn';
 import { getState, save, subscribeStore } from '../store/store';
 
 /** Stable id so scheduling twice replaces rather than stacks. */
+// NEVER change this id. It is what cancelReminder targets, so a rename would
+// orphan every schedule already on a phone and the next sync would stack a
+// second daily notification beside one nothing can cancel.
 const ID = 'morning-reminder';
 const CHANNEL = 'reminders';
 const CRASH_CHANNEL = 'crash-warnings';
@@ -185,6 +189,10 @@ export async function enableReminder(hhmm: string): Promise<boolean> {
   // worth having. An explicit off (crashAlert already set) is never overridden.
   if (s.settings.crashAlert === undefined) s.settings.crashAlert = { enabled: true };
   save();
+  // Counted here and not at the tap: on iOS the schedule above THROWS when the
+  // app isn't authorized, so a ping fired earlier would count an ask that
+  // produced no notification. Reaching this line means one is really armed.
+  pingNotifyEnabled('reminder');
   // The journal may already show a slide today; warn now rather than on the
   // next data point.
   void checkCrashRisk();
@@ -211,6 +219,8 @@ export async function setCrashAlert(on: boolean): Promise<boolean> {
   const prev = getState().settings.crashAlert;
   getState().settings.crashAlert = { ...(prev || {}), enabled: on };
   save();
+  // Only an enable is counted; a disable is a different event (see pingNotifyEnabled).
+  if (on) pingNotifyEnabled('crash');
   if (on) void checkCrashRisk();
   return true;
 }

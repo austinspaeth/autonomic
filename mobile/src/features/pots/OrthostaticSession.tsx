@@ -21,6 +21,7 @@ import { ble } from '../../lib/ble/manager';
 import { meanBpm, type HrPoint } from '../../lib/pots/live';
 import { computeScores } from '../../lib/scoring';
 import { getState } from '../../store/store';
+import { pingPots } from '../../store/ping';
 import { keyOf, pad, uid } from '../../lib/dates';
 import type { Entry } from '../../lib/types';
 import {
@@ -88,6 +89,8 @@ export function OrthostaticSession({ controls }: { controls: SheetControls }) {
   const finish = () => {
     if (finishedRef.current) return;
     finishedRef.current = true;
+    // Counted on completion, like the stand test and like an HRV reading.
+    pingPots('episode');
     if (timerRef.current) clearInterval(timerRef.current);
     completionBuzz();
     const hr1min = strap.freshHr();

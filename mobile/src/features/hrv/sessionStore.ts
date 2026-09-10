@@ -28,6 +28,9 @@ import { AppState, type NativeEventSubscription } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { ble } from '../../lib/ble/manager';
+import {
+  noteRrSample, rrSupport, RR_WATCH_START, type RrSupport, type RrWatch,
+} from '../../lib/ble/rrSupport';
 import { ppg, type PpgSignal } from '../../lib/ppg/camera';
 import { correctArtifacts, std } from '../../lib/hrv';
 import { notifyHrvComplete } from '../../lib/reminders';
@@ -36,11 +39,12 @@ import { getState } from '../../store/store';
 import {
   type BreathPattern, type BreathPhase, parsePattern, phaseAt,
 } from '../../lib/breathClock';
+import { pingActivation, pingCaptureCompleted, pingCaptureStarted } from '../../store/ping';
 
 export interface SessionConfig {
   kind: 'breath' | 'unstructured';
   style?: string; // e.g. "4/6"
-  source: 'polar' | 'watch' | 'camera';
+  source: 'polar' | 'watch' | 'garmin' | 'camera';
   period?: 'Morning' | 'Evening' | 'Other';
 }
 
@@ -59,6 +63,17 @@ export interface SessionResult {
  * dedicated app), still realistic to hold a fingertip still.
  */
 export const durationFor = (config: SessionConfig) => (config.source === 'camera' ? 180 : 300);
+
+/**
+ * Does this source feed live beats to the phone DURING the reading?
+ *
+ * A wrist source does not: the Apple Watch shares nothing in real time, and
+ * Garmin sends its whole series in one message at the end. Anything that shows
+ * a running heart rate or SDNN has to check this first, or it renders dashes
+ * for five minutes and reads as broken rather than as "not applicable".
+ */
+export const streamsLive = (source: SessionConfig['source']) =>
+  source !== 'watch' && source !== 'garmin';
 
 /**
  * How much of each live series the views get. The traces are redrawn on every
@@ -87,6 +102,12 @@ export interface SessionSnapshot {
   sdnn: number | null;
   beats: number;
   connected: boolean;
+  /**
+   * Whether the connected BLE device sends beat intervals at all. Only the strap
+   * path ever feeds this, so it stays 'unknown' for the camera, watch and Garmin
+   * sources — none of them is a device we discover a capability of.
+   */
+  rrSupport: RrSupport;
   artifact: boolean;
   signal: PpgSignal;
   phase: BreathPhase;
@@ -107,6 +128,7 @@ export interface SessionSnapshot {
 const IDLE: SessionSnapshot = {
   status: 'idle', config: null, pattern: parsePattern('4/6'), durationSec: 300,
   breathStartMs: 0, startedAtMs: 0, elapsed: 0, hr: null, sdnn: null, beats: 0, connected: false,
+  rrSupport: 'unknown',
   artifact: false, signal: { locked: false, quality: 'none' }, phase: 'in',
   minimized: false, hidden: false, hrTrace: [], sdnnTrace: [], rrTrace: [], result: null,
 };
@@ -121,6 +143,9 @@ let segmentStarts: number[] = [];
 let hrSamples: { t: number; bpm: number }[] = [];
 let sdnnSamples: { t: number; sdnn: number }[] = [];
 let recentRr: number[] = [];
+/** What the strap has told us about its own capability. Not reset on a
+ *  reconnect: this is a fact about the device, not about the link. */
+let rrWatch: RrWatch = RR_WATCH_START;
 
 let startedAtMs = 0;
 let timer: ReturnType<typeof setInterval> | null = null;
@@ -137,6 +162,7 @@ function bump(patch: Partial<SessionSnapshot> = {}) {
     ...snap,
     ...patch,
     beats: rr.length,
+    rrSupport: rrSupport(rrWatch),
     hrTrace: hrSamples.length ? hrSamples.slice(-HR_TRACE).map((s) => s.bpm) : [],
     sdnnTrace: sdnnSamples.length ? sdnnSamples.slice(-SDNN_TRACE).map((s) => s.sdnn) : [],
     rrTrace: rr.length ? rr.slice(-RR_TRACE) : [],
@@ -277,6 +303,7 @@ export function startSession(config: SessionConfig, autoStart?: boolean) {
   // cannot exist. Reopening from the pill relies on exactly this.
   if (snap.status !== 'idle') return;
   rr = []; segmentStarts = []; hrSamples = []; sdnnSamples = []; recentRr = [];
+  rrWatch = RR_WATCH_START;
   startedAtMs = 0;
   const now = Date.now();
   snap = {
@@ -338,10 +365,21 @@ function connectStrap() {
       await mgr.connect(
         saved,
         (s) => {
+          // Learn whether this device sends beats at all, from what it actually
+          // sends. It has to happen HERE rather than in `collect`: pre-start
+          // nothing is collected, and pre-start is exactly when the answer is
+          // worth having — a device that streams a pulse and no intervals can
+          // never produce a reading, and the alternative is the user finding
+          // out five minutes later.
+          rrWatch = noteRrSample(rrWatch, s);
           // Pre-start, the live HR IS the connection cue, so it is pushed here.
           // Once running, `collect` owns it — bumping in both places would
           // re-render every view twice per sample for one number.
-          if (!snap.connected) bump({ connected: true });
+          //
+          // The verdict above is derived inside `bump`, but on a steady heart
+          // rate nothing below here would call it, so the moment it settles has
+          // to force one of its own.
+          if (!snap.connected || rrSupport(rrWatch) !== snap.rrSupport) bump({ connected: true });
           if (statusNow() !== 'running' && s.hr && s.hr !== snap.hr) bump({ hr: s.hr });
           // Backgrounded, the 1 s interval is frozen but BLE samples still
           // arrive — drive the clock from them so the reading finishes on time
@@ -354,7 +392,15 @@ function connectStrap() {
           if (bleAlive && snap.status !== 'finished') bleRetry = setTimeout(attempt, 2000);
         },
       );
-    } catch {
+    } catch (e) {
+      // A strap that will not pair is the single most common way a reading
+      // never happens, and this loop retried every three seconds forever
+      // without leaving a trace anywhere — so "my strap doesn't work" arrived
+      // with no evidence at all. Logged on every attempt on purpose: the log
+      // collapses consecutive repeats into a count, and the fault report
+      // buffers occurrences, so a phone that never connects reports the
+      // failure once and then its true volume rather than one line or forty.
+      logError('hrv.strap.connect', e);
       bump({ connected: false });
       if (bleAlive && snap.status !== 'finished') bleRetry = setTimeout(attempt, 3000);
     }
@@ -368,8 +414,17 @@ export function beginCollection() {
   startedAtMs = Date.now();
   // watch: the ECG is recorded on the wrist; camera + BLE: already streaming
   // since the card opened (their samples start being collected now).
-  const connected = snap.config?.source === 'watch' || snap.config?.source === 'camera' ? true : snap.connected;
+  // Watch, Garmin and camera are all "connected" by definition: none of them is
+  // a BLE peripheral this session dials into, so waiting on a connection would
+  // hang a session that is working perfectly.
+  const src = snap.config?.source;
+  const connected = (src === 'watch' || src === 'garmin' || src === 'camera') ? true : snap.connected;
   bump({ status: 'running', connected, elapsed: 0, startedAtMs });
+  // A reading has genuinely begun — the counterpart of the completion ping in
+  // `finishSession`. Counted in the engine rather than where the card is
+  // mounted because this is the one path a running reading can start from,
+  // whatever opened it and wherever it is later minimized to.
+  pingCaptureStarted(src);
   if (timer) clearInterval(timer);
   timer = setInterval(syncElapsed, 1000);
 }
@@ -402,6 +457,11 @@ export async function finishSession() {
       durationSec: capturedSec,
     },
   });
+  // A reading exists now, whether or not it is ever saved. Both counters fire
+  // here: the daily one, and the once-per-install activation for whoever has
+  // just finished their first.
+  pingCaptureCompleted(snap.config?.source);
+  pingActivation(snap.config?.source);
   void completionBuzz();
   // Backgrounded (a BLE reading keeps running while the phone is set aside), iOS
   // never plays the buzz above — post a notification so completion is still
@@ -434,6 +494,7 @@ export function endSession() {
   void releaseCapture();
   deactivateKeepAwake('hrv-session');
   rr = []; segmentStarts = []; hrSamples = []; sdnnSamples = []; recentRr = [];
+  rrWatch = RR_WATCH_START;
   snap = IDLE;
   emit();
 }

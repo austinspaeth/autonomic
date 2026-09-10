@@ -51,8 +51,12 @@ export interface Entry {
  *  strips them on load, and persisting one trips a dev warning. */
 export interface LiveHrvExtras {
   /** Capture source ('polar' = Bluetooth strap, best; 'camera' = phone PPG,
-   *  lowest quality; 'health' = imported via Health Connect on Android). */
-  source?: 'polar' | 'watch' | 'camera' | 'manual' | 'health';
+   *  lowest quality; 'garmin' = raw beat-to-beat delivered by the Connect IQ
+   *  watch app; 'health' = imported via Health Connect on Android).
+   *  'garmin' is deliberately distinct from 'health': a Garmin reading that
+   *  arrived through the health store carries no RR and is an import, whereas
+   *  this one carries the real series and is a capture. */
+  source?: 'polar' | 'watch' | 'garmin' | 'camera' | 'manual' | 'health';
   /** True when the entry was auto-imported from the platform health store
    *  (welcome backfill / Health sync) rather than captured in-app — drives the
    *  "Apple Watch HRV" / "Imported HRV" label. */
@@ -65,11 +69,45 @@ export interface LiveHrvExtras {
    *  Beat-to-beat metrics must not step across these. Absent on strap/watch/ECG
    *  readings, which are one continuous take. */
   rrSegments?: number[];
+  /** On an in-app capture this is the ELAPSED session, not the usable signal —
+   *  `coverageSec` is the usable part. (On an IMPORTED reading it means real RR
+   *  coverage instead, which is what `hrvQuality.isTrustedReading` gates on.
+   *  The two meanings share a field because the import path has no session to
+   *  measure; keep them apart when reasoning about capture quality.) */
   durationSec?: number;
   sampledHr?: { t: number; bpm: number }[];
   /** Rolling SDNN (trailing ~60 s window) sampled through the session. */
   sampledSdnn?: { t: number; sdnn: number }[];
+
+  /* ---- how good the capture was (src/lib/hrv computes these; the results
+     card shows them; they are stamped so a reading can still be judged on its
+     own quality months later).
+
+     Declared here since the sidecar split, and written since 1.25.3. A reading
+     from an earlier build carries none of them, so every consumer must treat
+     `undefined` as UNKNOWN rather than as clean — the same rule the reading
+     counter's `hrvKnown` follows on the dashboard. Nothing de-weights on them
+     yet: they are recorded first so there is something to decide with. */
+
+  /** % of beats the artifact correction had to replace. Capture already
+   *  refuses anything over 15% on camera / 30% on strap (lib/hrv), so this is
+   *  how marginal a KEPT reading was, not whether it was kept. */
   artifactPct?: number;
+  /** Seconds of usable cardiac data actually behind the numbers. Below
+   *  `durationSec` whenever the signal dropped out — on a camera reading the
+   *  gap between the two is the finger moving. */
+  coverageSec?: number;
+  /** The results card's own verdict, from coverage + artifacts + segments. */
+  confidence?: 'high' | 'fair' | 'low';
+  /** Clean beats behind the numbers. Stamped rather than counted off the
+   *  waveform sidecar, which can be pruned. */
+  beatCount?: number;
+  /** Unbroken stretches the record was built from, and how many were thrown
+   *  out. Only written when there was more than one / more than none, so their
+   *  absence means "one continuous take" on a stamped reading and UNKNOWN on
+   *  one from a build before 1.26. */
+  segmentsUsed?: number;
+  segmentsDropped?: number;
 }
 
 export interface Meal {
@@ -146,7 +184,7 @@ export interface AppState {
     healthEnabled?: boolean;
     /** Signal source of the last live HRV capture — seeds the setup sheet's
      *  default so a deliberate choice (camera / watch) sticks across sessions. */
-    lastHrvSource?: 'polar' | 'watch' | 'camera';
+    lastHrvSource?: 'polar' | 'watch' | 'garmin' | 'camera';
     /** Remembered camera-module layout from the finger (PPG) setup card —
      *  once set, camera readings skip straight to the wait-for-finger step.
      *  "Start over" on that card clears it. */

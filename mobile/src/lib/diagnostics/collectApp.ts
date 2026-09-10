@@ -25,12 +25,12 @@ import { getState, loadIssue, storageStats } from '../../store/store';
 import { getIapState } from '../../store/iap';
 import { getTier, getTrialDaysLeft } from '../../store/tier';
 import { reviewMemory } from '../review';
-import { lastUpsellSurface } from '../upsell';
 import { formatMsLeft, offerMsLeft } from '../upsell/annual';
 import { annualMemory } from '../upsell/annualMemory';
 import { getDeclinedKeys } from '../health/declined';
 import { health, healthAppName } from '../health';
 import { bleIfStarted } from '../ble/manager';
+import { garminLinkIntact } from '../garmin/receiver';
 import { isSideloadedAndroidBuild, isTestFlightBuild } from '../../../modules/app-env';
 import { watchBridge } from '../../../modules/watch-bridge';
 import { trustedReadings } from '../hrvQuality';
@@ -177,9 +177,6 @@ function distributionRows(): Rows {
     'android sideload': Platform.OS === 'android' ? isSideloadedAndroidBuild() : null,
     'review asked': review.lastAskedAtMs ? daysAgo(review.lastAskedAtMs) : 'never',
     'review asked on version': review.askedVersion ?? null,
-    // Which proactive offer this user last saw — the only conversion signal an
-    // app with no analytics has. A surface name, never a count of their data.
-    'last upsell surface': lastUpsellSurface() ?? 'none',
     // The half-off annual offer: which milestone was awarded and whether its
     // 24h window (and the Pro unlock riding on it) is still open. Two integers.
     'annual offer': annualOfferRow(),
@@ -291,6 +288,13 @@ async function capabilityRows(): Promise<Rows> {
   });
 
   rows['health module'] = health().available ? `${healthAppName()} available` : `${healthAppName()} unavailable`;
+  // Says WHY, when a Garmin owner reports that the Garmin rows are simply not
+  // there. A broken link hides every Garmin surface on purpose (the reply from
+  // Garmin Connect would kill the process), and without this row that looks
+  // identical to the feature never having shipped.
+  rows['garmin link'] = Platform.OS === 'android'
+    ? (garminLinkIntact() ? 'ok' : 'BROKEN — Connect IQ classes renamed by R8, keep rules missing')
+    : 'n/a';
   rows['watch bridge'] = watchBridge() ? 'loaded' : Platform.OS === 'ios' ? 'MISSING' : 'n/a';
   rows['widget bridge'] = await safeText(() => {
     if (Platform.OS === 'ios') {
@@ -414,6 +418,9 @@ function buildNotes(d: Omit<AppDiagnostics, 'notes'>): string[] {
   }
   if (d.capabilities['worklets-core'] !== 'loaded' || d.capabilities['vision-camera'] !== 'loaded') {
     notes.push('A camera native module is missing from this build, so camera readings cannot work here at all.');
+  }
+  if (typeof d.capabilities['garmin link'] === 'string' && String(d.capabilities['garmin link']).startsWith('BROKEN')) {
+    notes.push('This build lost its Connect IQ keep rules, so every Garmin surface is switched off deliberately — a reply from Garmin Connect would kill the app. It is a build defect, not anything this user can fix: they need the next release.');
   }
   if (d.bluetooth['native module'] === true && d.bluetooth['can scan now'] === false) {
     notes.push(`Bluetooth cannot scan right now: adapter is ${d.bluetooth['adapter state']}.`);

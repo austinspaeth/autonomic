@@ -21,11 +21,11 @@ import type { ScoreContext } from '../scoring';
 import { DEFAULT_PROTOCOL, type DaysMap } from '../scoring/day';
 import { detectDownturn } from '../scoring/downturn';
 import type { CustomTypes, Protocol } from '../types';
-import { OUTCOME_FAMILY, TREND_METRICS, TREND_PRIORITY, type TrendMetricId } from './metrics';
+import { OUTCOME_FAMILY, phraseOf, TREND_METRICS, TREND_PRIORITY, type TrendMetricId } from './metrics';
 import { keyRange, metricSeries } from './series';
 import { compareWindows, type TrendDelta, type TrendDirection } from './compare';
 
-export { TREND_METRICS, TREND_PRIORITY, INSIGHT_OUTCOMES, WATCH_PRIORITY, OUTCOME_FAMILY, FAMILY_RANK, familyRank } from './metrics';
+export { TREND_METRICS, TREND_PRIORITY, INSIGHT_OUTCOMES, WATCH_PRIORITY, OUTCOME_FAMILY, FAMILY_RANK, familyRank, phraseOf } from './metrics';
 export type { TrendMetricId, TrendMetricDef, TrendAggregate } from './metrics';
 export { metricSeries, keyRange } from './series';
 export {
@@ -90,7 +90,10 @@ export function findTrend(
       metric: id,
       // The exclamation is the point of the card: it is the only place the app
       // congratulates anyone, and ./pacing is what keeps it earned.
-      headline: `${def.subject} ${def.phrase(delta.delta)} ${def.tail ?? 'since last month'}!`,
+      // Subject, magnitude, "on average" where the number is one (`phraseOf`),
+      // then the window — the reader has to be told all four or the sentence is
+      // a claim about today.
+      headline: `${def.subject} ${phraseOf(def, delta.delta)} ${def.tail ?? 'since last month'}!`,
       detail: `${def.fmt(delta.prior)} → ${def.fmt(delta.recent)} ${def.unit} · ${delta.recentN} ${def.countNoun}`,
       delta,
     };

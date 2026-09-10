@@ -24,6 +24,7 @@ import { radius, usePalette } from '../theme';
 import { useAppState } from '../store/store';
 import { getInstalledAtMs, recheckTier, useTier } from '../store/tier';
 import { PROMO_YEARLY_SKU, YEARLY_SKU, priceOf, subscribe, useIap } from '../store/iap';
+import { StoreBlockedNotice } from './Paywall';
 import { SCORE_COLORS } from '../lib/scoring';
 import { todayKey } from '../lib/dates';
 import { resolveProtocol } from '../lib/scoring/day';
@@ -31,7 +32,8 @@ import { detectDownturn } from '../lib/scoring/downturn';
 import { detectStrain } from '../lib/scoring/strain';
 import { dueMilestone, formatMsLeft, liveOffer, offerMsLeft } from '../lib/upsell/annual';
 import { FORCE_ANNUAL_OFFER, annualMemory, noteAnnualOfferCollapsed, noteAnnualOfferStarted } from '../lib/upsell/annualMemory';
-import { noteAnnualOfferPacing } from '../lib/upsell';
+import { noteOfferShown, offerPacingClear } from '../lib/upsell/pacingMemory';
+import { pingOfferAccepted, pingOfferDismissed, pingOfferShown } from '../store/ping';
 
 const hexA = (hex: string, a: number) => {
   const n = parseInt(hex.slice(1), 16);
@@ -81,7 +83,7 @@ const TICK_MS = 30_000;
 
 export function AnnualOfferCard() {
   const p = usePalette();
-  const { products, purchasing, error } = useIap();
+  const { products, purchasing, error, blocked } = useIap();
   const { depth } = useSheets();
   const state = useAppState();
   const tier = useTier();
@@ -103,6 +105,10 @@ export function AnnualOfferCard() {
     const next = !expanded;
     setExpanded(next);
     noteAnnualOfferCollapsed(!next);
+    // This card has no ✕ — it expires on its own — so collapsing it IS the
+    // "no thanks", and that is what the dismissal counter records. Expanding
+    // again is not counted as anything: the offer was already counted as shown.
+    if (!next) pingOfferDismissed('annual');
   };
 
   // Adopt a window that's already running, or open a due one. Ask once and then
@@ -118,11 +124,17 @@ export function AnnualOfferCard() {
     if (live) { settled.current = true; setOffer((o) => o ?? live); return; }
     // 'trial' here means the 14-day install window is still running (a live
     // offer would have been adopted above) and 'pro' means there is nothing to
-    // sell. Either way, don't spend a milestone on them.
+    // sell. Either way, don't spend a milestone — or the shared clock — on them.
     if (tier !== 'free') return;
     if (depth > 0) return;                       // a sheet is open; not now
     const due = (__DEV__ && FORCE_ANNUAL_OFFER) || dueMilestone(getInstalledAtMs(), now, mem);
     if (!due) return;
+    // The app raises ONE offer at a time and then goes quiet for a week
+    // (../lib/upsell/pacing). Blocked defers rather than spends: the milestone
+    // stays due and opens on a later launch, exactly like the bad-day gates
+    // below. Asked only here, on the START path — a window already running was
+    // adopted above and must not be retired by the clock it set itself.
+    if (!offerPacingClear(now)) return;
     // Never open the window on a day the user is already having a bad time. The
     // milestone is not spent, so it fires on a calmer open instead.
     if (state.settings.crashAlert?.lastFired === todayKey()) return;
@@ -134,10 +146,19 @@ export function AnnualOfferCard() {
 
     settled.current = true;
     const next = noteAnnualOfferStarted(due, now);
-    noteAnnualOfferPacing();   // the generic upsell keeps its distance afterwards
+    noteOfferShown('annual', now);
     recheckTier();             // Pro lights up in the same frame the card appears
     setOffer({ milestone: due, msLeft: offerMsLeft(now, next) });
   }, [tier, depth, state]);
+
+  // Shown: the moment there is a live window and this card is rendering it —
+  // whether it was opened just now or adopted from an earlier launch, since
+  // from the reader's side those are the same event. Capped per Eastern day in
+  // the store, so re-entering the Journal all day counts once.
+  // Not for a subscriber: the card returns null for 'pro' below, and a counter
+  // that says an offer was shown to somebody who never saw it is worse than no
+  // counter. ('trial' IS shown — that's this card's own unlock.)
+  useEffect(() => { if (offer && tier !== 'pro') pingOfferShown('annual'); }, [offer, tier]);
 
   // Countdown. Also what retires the card: when the window closes, the tier
   // re-derives back to free and the card unmounts itself.
@@ -219,20 +240,28 @@ export function AnnualOfferCard() {
               </View>
             </View>
 
-            <Pressable
-              onPress={() => subscribe(PROMO_YEARLY_SKU)}
-              disabled={purchasing}
-              style={({ pressed }) => [
-                { height: 50, borderRadius: 16, backgroundColor: p.accent, alignItems: 'center', justifyContent: 'center', marginTop: 15 },
-                (pressed || purchasing) && { opacity: 0.8 },
-              ]}
-            >
-              <Text style={{ color: '#fff', fontSize: 15.5, fontWeight: '700' }}>{purchasing ? 'Starting…' : 'Claim half off'}</Text>
-            </Pressable>
+            {/* No button when the store has told us this device can never
+                complete a purchase: the tap would fire `oac` and then die in
+                loadProducts before requestPurchase, recording an offer as
+                accepted that could not convert. */}
+            {blocked ? (
+              <View style={{ marginTop: 15 }}><StoreBlockedNotice text={blocked} /></View>
+            ) : (
+              <Pressable
+                onPress={() => { pingOfferAccepted('annual'); subscribe(PROMO_YEARLY_SKU); }}
+                disabled={purchasing}
+                style={({ pressed }) => [
+                  { height: 50, borderRadius: 16, backgroundColor: p.accent, alignItems: 'center', justifyContent: 'center', marginTop: 15 },
+                  (pressed || purchasing) && { opacity: 0.8 },
+                ]}
+              >
+                <Text style={{ color: '#fff', fontSize: 15.5, fontWeight: '700' }}>{purchasing ? 'Starting…' : 'Claim half off'}</Text>
+              </Pressable>
+            )}
 
             {/* A store failure has to be said out loud here too, or the button
                 just flashes "Starting…" and reverts (see src/store/iap.ts). */}
-            {error ? (
+            {error && !blocked ? (
               <Text style={{ color: '#d63b3b', fontSize: 12, lineHeight: 17, textAlign: 'center', marginTop: 9 }}>{error}</Text>
             ) : null}
 

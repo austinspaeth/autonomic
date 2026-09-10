@@ -54,8 +54,33 @@ const ACT = {
   [T(3)]: { [T(4)]: { B: 2 }, [T(3)]: { F: 1 } },
 };
 
-/* Activation rows carry a method letter as well as a platform one; the same
-   iOS-takes-the-odd-half split keeps the platform arithmetic identical. */
+/* Readings — the daily counter, once per install per Eastern day. It shipped
+   LATER than the other three routes, which is the case the whole card is built
+   around: the fixture starts it at T-3, so T-10 through T-4 are days the app
+   was demonstrably being opened and the counter simply was not running. Those
+   must read as unknown, never as "nobody measured".
+
+     T-3  A 3 of the 5 A-installs on the app, B 2 of its 4     (9 active)
+     T-2  A 2                                                  (5 active)
+     T-1  A 1, B 1                                             (5 active)
+     T-0  A 1                                                  (4 active)
+
+   10 readings over 23 install-days on the app = 43.5%.
+
+   Each row also names the sensor, exactly as an activation row does. The counts
+   are grouped so the platform arithmetic is unchanged by the split — every
+   number below still has to come out the same as it did before the letter
+   existed. */
+const HRV = {
+  [T(3)]: { [T(4)]: { G: 2, W: 1 }, [T(3)]: { F: 2 } },
+  [T(2)]: { [T(4)]: { B: 2 } },
+  [T(1)]: { [T(4)]: { W: 1 }, [T(3)]: { F: 1 } },
+  [T(0)]: { [T(4)]: { G: 1 } },
+};
+
+/* Reading rows — both counters — carry a method letter as well as a platform
+   one; the same iOS-takes-the-odd-half split keeps the platform arithmetic
+   identical. */
 const shapeAct = (map) => Object.keys(map).sort().map((day) => ({
   day,
   total: Object.values(map[day]).reduce((a, m) => a + Object.values(m).reduce((x, y) => x + y, 0), 0),
@@ -122,7 +147,7 @@ window.fetch = (url, opts) => {
       ui: { view: 'timeline' },
     });
   }
-  if (body.action === 'PINGS') return reply({ since: body.payload.since, open: shape(OPEN), sub: shape(SUB), act: shapeAct(ACT) });
+  if (body.action === 'PINGS') return reply({ since: body.payload.since, open: shape(OPEN), sub: shape(SUB), act: shapeAct(ACT), hrv: shapeAct(HRV) });
   return reply({ ok: true });
 };
 
@@ -158,22 +183,83 @@ check('asked the API for pings', calls.some((c) => c.action === 'PINGS'));
 
 /* ------------------------------------------------------------------ tiles */
 
+/* THREE HOSTS, one per scope. The host a tile lives in is now part of what it
+   claims: "Active on Aug 28" is about one day, "Returning / day" is about the
+   range, and "D7 retention" is about every cohort that ever installed. They
+   used to share one wrapping row. */
 const tiles = {};
-['pgTiles', 'pgTilesB'].forEach((id) => {
+['pgTilesToday', 'pgTilesRange', 'pgTilesLife'].forEach((id) => {
   $(id).querySelectorAll('.tile').forEach((t) => {
     tiles[t.querySelector('.label').textContent.trim()] = {
       value: t.querySelector('.value').textContent.trim(),
       meta: (t.querySelector('.meta') || {}).textContent || '',
+      deltas: [].slice.call(t.querySelectorAll('.deltas > div'))
+        .map((d) => d.textContent.replace(/\s+/g, ' ').trim()),
+      split: ((t.querySelector('.split') || {}).textContent || '').replace(/\s+/g, ' ').trim(),
     };
   });
 });
-check('seventeen KPI tiles', Object.keys(tiles).length === 17, Object.keys(tiles).join(' | '));
+/* Twenty-three: the twenty-one there were, plus the two the range group gained
+   when the tiles were split by scope — an average-active tile (the number that
+   used to hide in the today tile's meta line) and first readings over the
+   range beside the one for the day. */
+check('twenty-three KPI tiles', Object.keys(tiles).length === 23, Object.keys(tiles).join(' | '));
+
+/* Each group holds only what it can honestly claim. A range average under
+   "Today", or a retention curve under "This range", is the exact confusion the
+   split exists to end. */
+const labelsIn = (id) => [].slice.call($(id).querySelectorAll('.tile'))
+  .map((t) => t.querySelector('.label').textContent.trim());
+check('every tile under Today names the day it is about, or is a count of that day',
+  labelsIn('pgTilesToday').every((l) => / on /.test(l) || /^Measured of active$/.test(l) || /^Active (in trial|past the trial)$/.test(l)),
+  labelsIn('pgTilesToday').join(' | '));
+check('nothing under This range claims a single day',
+  labelsIn('pgTilesRange').every((l) => !/ on [A-Z]/.test(l)), labelsIn('pgTilesRange').join(' | '));
+check('the lifetime group holds the by-age rates and nothing else',
+  labelsIn('pgTilesLife').every((l) => /retention|Activated|Conversion/.test(l)),
+  labelsIn('pgTilesLife').join(' | '));
 
 /* T(0) is 1 + 2 + 1 pings, which the fixture splits 3 iOS / 1 Android. The
    tile is what tells Austin which store phoned home; the numbers above it are
    the proof the split pooled back into the same totals. */
-const platTile = [].slice.call($('pgTilesB').querySelectorAll('.tile'))
+const platTile = [].slice.call($('pgTilesToday').querySelectorAll('.tile'))
   .filter((t) => /^Platform on/.test(t.querySelector('.label').textContent))[0];
+/* ------------------------------------------- the previous-range comparison
+
+   A range tile may say "up 12% on the range before" only when the counter was
+   actually running for that earlier window. The fixture's history starts at
+   T(10), so on the default 30-day range the previous 30 days are days nobody
+   was counting — and a comparison against them would report the deploy date as
+   a collapse. Nothing in the range group may carry a delta here. */
+check('no range tile compares against a window the counter never covered',
+  $('pgTilesRange').querySelectorAll('.delta').length === 0,
+  $('pgTilesRange').textContent.replace(/\s+/g, ' ').slice(0, 200));
+
+/* Narrow the window until the one before it is inside the fixture's history,
+   and the same tiles gain the comparison. T(4)..T(0) has T(9)..T(5) behind it,
+   which the counter was running for. */
+window.document.getElementById('fRange').value = 'custom';
+window.document.getElementById('fRange').dispatchEvent(new window.Event('change', { bubbles: true }));
+window.document.getElementById('fFrom').value = T(4);
+window.document.getElementById('fFrom').dispatchEvent(new window.Event('change', { bubbles: true }));
+window.document.getElementById('fTo').value = T(0);
+window.document.getElementById('fTo').dispatchEvent(new window.Event('change', { bubbles: true }));
+await new Promise((r) => setTimeout(r, 300));
+check('a covered previous window brings the comparison out',
+  $('pgTilesRange').querySelectorAll('.delta').length > 0,
+  $('pgTilesRange').textContent.replace(/\s+/g, ' ').slice(0, 240));
+/* A rate's move is in POINTS, never in per cent of a per cent: 20% to 25% is
+   up 5 points, and calling it "up 25%" is the oldest wrong number here. */
+const ratePts = [].slice.call($('pgTilesRange').querySelectorAll('.tile'))
+  .filter((t) => /Measured per active day/.test(t.querySelector('.label').textContent))[0];
+check('and a rate tile states its move in points, not per cent',
+  !ratePts || !/\d% *$/.test((ratePts.querySelector('.delta') || {}).textContent || ''),
+  (ratePts && (ratePts.querySelector('.delta') || {}).textContent) || 'no delta');
+
+window.document.getElementById('fRange').value = '30';
+window.document.getElementById('fRange').dispatchEvent(new window.Event('change', { bubbles: true }));
+await new Promise((r) => setTimeout(r, 300));
+
 check('a platform tile names the day\'s split', !!platTile);
 check('and reads it as a share of iOS',
   platTile && /75% iOS/.test(platTile.querySelector('.value').textContent),
@@ -199,31 +285,66 @@ check('D30 is unavailable, not zero', tiles['D30 retention'].value === '–', ti
 
 /* Lifecycle tiles are usage-based: what pinged on the latest day, bucketed by
    install age. On T that is Z(age 10, 1 active), A(age 4, 2), B(age 3, 1).
-   So 3 are inside the trial and 1 is past it — and none of that depends on a
-   cohort size, which is what lets installs older than the counter appear. */
-check('active-in-trial counts today\'s actives aged 0-7',
-  tiles['Active in trial'].value === '3', tiles['Active in trial'].value);
-check('active-past-trial counts today\'s actives aged 8-14',
-  tiles['Active past the trial'].value === '1', tiles['Active past the trial'].value);
-check('active-past-wall is 0 because nobody active is 15 days old',
-  tiles['Active past the wall'].value === '0', tiles['Active past the wall'].value);
+   The trial now runs to day 14 inclusive, so all four are inside it — and none
+   of that depends on a cohort size, which is what lets installs older than the
+   counter appear. */
+check('active-in-trial counts today\'s actives aged 0-14',
+  tiles['Active in trial'].value === '4', tiles['Active in trial'].value);
+check('active-past-trial is 0 because nobody active is 15 days old',
+  tiles['Active past the trial'].value === '0', tiles['Active past the trial'].value);
+check('there is no third lifecycle tile — the history wall is gone',
+  tiles['Active past the wall'] === undefined, JSON.stringify(Object.keys(tiles)));
 check('the trial tile still quotes how many started one',
   /started a trial in that window/.test(tiles['Active in trial'].meta), tiles['Active in trial'].meta);
 
 // today: Z 1 + A 2 + B 1 = 4 active, of which 4 are returning (nobody born today)
-check('active today is 4', tiles[Object.keys(tiles).find((k) => k.startsWith('Active on'))].value.startsWith('4'));
+const activeTile = tiles[Object.keys(tiles).find((k) => k.startsWith('Active on'))];
+check('active today is 4', activeTile.value.startsWith('4'));
 
 check('purchases counted', tiles['Purchases in range'].value === '3', tiles['Purchases in range'].value);
 
-/* A subscribe ping carries the buyer's store in the same cohort key an open
-   ping does, so both purchase tiles say which store paid. In range: T(2) sold
-   one on each store, T(0) sold one on iOS. On the newest day alone: 1 iOS. */
+/* ------------------------------------------------------- installs + deltas */
+
 const splitOfTile = (host, prefix) => {
   const t = [].slice.call($(host).querySelectorAll('.tile'))
     .filter((x) => x.querySelector('.label').textContent.trim().indexOf(prefix) === 0)[0];
   return t && t.querySelector('.split') ? t.querySelector('.split').textContent.replace(/\s+/g, ' ') : '';
 };
-const rangeSplit = splitOfTile('pgTilesB', 'Purchases in range');
+
+/* Nobody was born on T, so the newest day's install tile is a real 0 — and it
+   is its own tile rather than a line in the active tile's split, because the
+   question it answers ("which store did they come from") the split could not.
+   Over the window: Z 8 + A 10 + B 4 = 22, and the fixture halves every cohort
+   between the stores, so 11 apiece. */
+const installsToday = tiles[Object.keys(tiles).find((k) => k.startsWith('Installs on'))];
+check('the newest day\'s installs get their own tile', !!installsToday);
+check('and read 0 on a day no cohort was born',
+  installsToday && installsToday.value === '0', installsToday && installsToday.value);
+check('installs over the range sum the cohorts born in it',
+  tiles['Installs in range'].value === '22', tiles['Installs in range'].value);
+const freshSplit = splitOfTile('pgTilesRange', 'Installs in range');
+check('and the range\'s installs are split by store',
+  /iOS 11/.test(freshSplit) && /Android 11/.test(freshSplit), freshSplit);
+
+/* Yesterday had 5 actives against today's 4, so the day tile carries a −20%.
+   The other two comparisons are dropped rather than printed: T-7 is a day the
+   fixture never pinged on, and the 11-day window averages 4.1 — both baselines
+   are under the floor, and a percentage off a base that small is noise wearing
+   a trend's clothes. */
+check('a day tile is read against the day before',
+  activeTile.deltas.some((d) => /vs the day before/.test(d) && /20\.0%/.test(d)),
+  activeTile.deltas.join(' | '));
+check('a comparison whose baseline is too small is dropped, not printed',
+  !activeTile.deltas.some((d) => /last week|range average/.test(d)),
+  activeTile.deltas.join(' | '));
+check('and a tile with three tiny baselines carries no comparisons at all',
+  tiles[Object.keys(tiles).find((k) => k.startsWith('Purchases on'))].deltas.length === 0,
+  tiles[Object.keys(tiles).find((k) => k.startsWith('Purchases on'))].deltas.join(' | '));
+
+/* A subscribe ping carries the buyer's store in the same cohort key an open
+   ping does, so both purchase tiles say which store paid. In range: T(2) sold
+   one on each store, T(0) sold one on iOS. On the newest day alone: 1 iOS. */
+const rangeSplit = splitOfTile('pgTilesRange', 'Purchases in range');
 check('purchases in range are split by store', /iOS 2/.test(rangeSplit) && /Android 1/.test(rangeSplit), rangeSplit);
 
 /* Every purchase as its own row, which is what a book with three of them can
@@ -251,7 +372,7 @@ $('pgPurchaseRowsToggle').click();
 
 const buysToday = tiles[Object.keys(tiles).find((k) => k.startsWith('Purchases on'))];
 check('a purchases tile covers the newest day only', buysToday && buysToday.value === '1', buysToday && buysToday.value);
-const todaySplit = splitOfTile('pgTiles', 'Purchases on');
+const todaySplit = splitOfTile('pgTilesToday', 'Purchases on');
 check('and splits that day by store too', /iOS 1/.test(todaySplit) && /Android 0/.test(todaySplit), todaySplit);
 // conversion by D7 is measurable only for Z: 1 of its 8 bought within 7 days? no — it
 // bought on D10, so within-7 is 0 of 8.
@@ -291,13 +412,140 @@ check('the method chart drew a band per sensor used',
   $('pgMethods').querySelectorAll('path[fill]:not([fill="none"])').length >= 3,
   String($('pgMethods').querySelectorAll('path').length) + ' paths');
 
+/* ------------------------------------------- the active tile's two splits
+
+   One number, partitioned twice: who they were and which store they came from.
+   Both pairs have to add up to the tile's own value or the row is lying — T(0)
+   is 4 active, 3 iOS + 1 Android, and returning + first run makes 4 as well. */
+check('the active tile still splits returning from first run',
+  /returning/.test(activeTile.split) && /first run/.test(activeTile.split), activeTile.split);
+check('and now carries the store split beside it',
+  /iOS 3/.test(activeTile.split) && /Android 1/.test(activeTile.split), activeTile.split);
+check('the store half of that split sums to the tile\'s own number',
+  activeTile.value.startsWith('4'), activeTile.value);
+
+/* --------------------------------------- which sensor, on EVERY reading
+
+   The first-reading split says how people start; this says what they keep
+   using. The fixture's ten reading-days name four different sensors, and the
+   note has to read as install-DAYS rather than as readings: the counter is
+   capped once per install per Eastern day, so a band is that install's first
+   reading of the day and never a count of sessions. */
+const readNote = $('pgReadMethodNote').textContent;
+check('the reading-sensor note counts install-days, not readings',
+  /10 install-days carried a reading/.test(readNote), readNote);
+check('and says which day the letter started, so the gap is explained',
+  /counted from/.test(readNote), readNote);
+check('it reports each sensor as a share of those days',
+  /Apple Watch 20\.0%/.test(readNote) && /Garmin watch 30\.0%/.test(readNote) &&
+  /Chest strap 20\.0%/.test(readNote) && /Phone camera 30\.0%/.test(readNote), readNote);
+check('the ongoing-sensor chart drew a band per sensor used',
+  $('pgReadMethods').querySelectorAll('path[fill]:not([fill="none"])').length >= 2,
+  String($('pgReadMethods').querySelectorAll('path').length) + ' paths');
+
+/* The age card is honest about having nothing yet: no cohort born after the
+   letter shipped has reached a week old in this fixture, so the day-0 vs day-7+
+   comparison must decline to be drawn rather than divide by a handful. */
+const ageNote = $('pgReadMethodAgeNote').textContent;
+check('the sensor-by-age card says when it cannot compare yet',
+  /Not enough aged reading-days/.test(ageNote), ageNote);
+
+/* ------------------------------------------------------------ measuring */
+
+/* Opening the app is not using it, and this is the pair that says so. Both
+   counters are one per install per Eastern day, so the share is a share of
+   people: 1 of the 4 installs active on T-0 saved a reading. */
+const measToday = tiles[Object.keys(tiles).find((k) => k.startsWith('Measured on'))];
+check('a reading tile covers the newest day', measToday && measToday.value === '1', measToday && measToday.value);
+check('the share of actives who measured is stated as a share of people',
+  tiles['Measured of active'].value === '25.0%', tiles['Measured of active'].value);
+check('and names both sides of it',
+  /1 of 4/.test(tiles['Measured of active'].meta), tiles['Measured of active'].meta);
+
+/* And the same day cut by who the person was — the question the pooled rate
+   cannot answer, since a day heavy with installs and a day heavy with regulars
+   reach the same number for opposite reasons.
+   T-0 has four returning installs and no first run at all, which is the case
+   worth pinning here: the missing half is DROPPED rather than drawn as 0%,
+   because there was nobody to measure and a rate over nobody is not a low rate.
+   Both halves' arithmetic is pinned in analytics.test.mjs. */
+const shareTile = [].slice.call($('pgTilesToday').querySelectorAll('.tile'))
+  .filter((t) => t.querySelector('.label').textContent.trim() === 'Measured of active')[0];
+const shareSplit = shareTile.querySelector('.split');
+check('the measuring share is split by first run vs returning',
+  !!shareSplit && /of returning\s*25\.0%/.test(shareSplit.textContent.replace(/\s+/g, ' ')),
+  shareSplit && shareSplit.textContent);
+check('and a side nobody was in that day is left out, not drawn as 0%',
+  !/of first runs/.test(shareSplit.textContent), shareSplit.textContent);
+check('the counts behind the two rates are spelled out, so neither reads as a part of the whole',
+  /4 returning/.test(tiles['Measured of active'].meta), tiles['Measured of active'].meta);
+check('the window rate pools install-days',
+  tiles['Measured per active day'].value === '43.5%', tiles['Measured per active day'].value);
+check('and says how many days predate the counter rather than counting them as zero',
+  /7 days predate the counter/.test(tiles['Measured per active day'].meta),
+  tiles['Measured per active day'].meta);
+
+const measNote = $('pgMeasureNote').textContent;
+check('the measuring note repeats the rate with its denominator',
+  /10 of 23/.test(measNote), measNote.slice(0, 240));
+check('and says the pre-counter days were left out, not zeroed',
+  /counter was not running yet/.test(measNote), measNote.slice(0, 400));
+
+/* B's own day 0 is the first day the counter existed, so D0 measuring is B
+   alone — 2 of its 4 — while Z's and A's day 0 are before the counter and are
+   excluded rather than counted as failures. */
+const measRates = $('pgMeasureRates').textContent;
+check('the habit rates are listed per install age',
+  /Measured on D0/.test(measRates) && /50\.0%/.test(measRates), measRates.slice(0, 240));
+check('and a cohort whose day N predates the counter is named as such, not churned',
+  /before the counter/.test(measRates), measRates.slice(0, 400));
+
+check('the opened-vs-measured chart drew both series',
+  $('pgMeasureDaily').querySelectorAll('path').length >= 2,
+  String($('pgMeasureDaily').querySelectorAll('path').length) + ' paths');
+check('the habit curve drew something',
+  $('pgMeasureCurve').querySelectorAll('path').length >= 1,
+  String($('pgMeasureCurve').querySelectorAll('path').length) + ' paths');
+
+/* ------------------------------------------- what readings are taken with
+
+   The daily counter's sensor letter. The tile carries TWO split rows — which
+   store, and which sensor — because they answer different questions about the
+   same count and run together they read as one list that sums to nothing. */
+const measTile = [].slice.call($('pgTilesToday').querySelectorAll('.tile'))
+  .filter((t) => /^Measured on/.test(t.querySelector('.label').textContent))[0];
+const measSplits = [].slice.call(measTile.querySelectorAll('.split'));
+check('the reading tile carries a store split and a sensor split',
+  measSplits.length === 2, String(measSplits.length));
+check('and the sensor row names the device', /Garmin watch/.test(measSplits[1].textContent),
+  measSplits[1].textContent);
+
+const readMethodNote = $('pgReadMethodNote').textContent;
+check('the readings-by-sensor card states its range total',
+  /10 install-days carried a reading in this range/.test(readMethodNote), readMethodNote.slice(0, 200));
+check('the readings-by-sensor chart drew a band per sensor',
+  $('pgReadMethods').querySelectorAll('path').length >= 3,
+  String($('pgReadMethods').querySelectorAll('path').length) + ' paths');
+
+/* A tile with detail under it folds on a phone, which is the markup half of
+   that: one wrapper to measure and animate, and a chevron OUTSIDE the label so
+   the label stays readable as text. */
+check('a tile with detail wraps it in one foldable block',
+  measTile.classList.contains('has-more') && !!measTile.querySelector('.tile-more'));
+check('and the fold marker is not part of the label',
+  !!measTile.querySelector('.tile-chev') &&
+  !/›/.test(measTile.querySelector('.label').textContent),
+  measTile.querySelector('.label').textContent);
+
 /* ----------------------------------------------------------- boundaries */
 
 const transitions = $('pgTransitions').querySelectorAll('.transition');
-check('two boundary transitions shown', transitions.length === 2, String(transitions.length));
-check('the trial transition is named D7 → D8', /D7 → D8/.test(transitions[0].textContent), transitions[0].textContent.slice(0, 40));
-check('the wall transition reports unavailable rather than guessing',
-  /Not yet measurable/.test(transitions[1].textContent), transitions[1].textContent.slice(0, 60));
+/* ONE transition, not two: the history wall used to be a second boundary a week
+   after the trial and now falls on the same day the trial ends, so drawing it
+   would say the same thing twice. */
+check('one boundary transition shown', transitions.length === 1, String(transitions.length));
+check('the trial transition is named D14 → D15',
+  /D14 → D15/.test(transitions[0].textContent), transitions[0].textContent.slice(0, 40));
 
 /* -------------------------------------------------------------- heatmap */
 
@@ -306,8 +554,10 @@ check('immature cells are hatched, not shaded',
   $('pgHeat').querySelectorAll('td.heat.immature').length > 0);
 check('immature cells are empty, never 0%',
   [...$('pgHeat').querySelectorAll('td.heat.immature')].every((td) => td.textContent.trim() === ''));
-check('D8 and D15 columns are marked as boundaries',
-  $('pgHeat').querySelectorAll('th.boundary').length === 2,
+/* One boundary column now, D15 — the first day outside the trial. D8 stopped
+   being a boundary when the trial went from seven days to fourteen. */
+check('D15 is the one column marked as a boundary',
+  $('pgHeat').querySelectorAll('th.boundary').length === 1,
   String($('pgHeat').querySelectorAll('th.boundary').length));
 
 // switch to daily cohorts and select one
@@ -328,11 +578,17 @@ check('clicking a cohort opens its detail', !!$('pgCohortDetail').querySelector(
 // The oldest cohort is 10 days old, so the curve's axis ends at D10: the trial
 // boundary is drawable, the D15 wall is not, and drawing it anyway would put a
 // rule on an axis that does not reach it.
-check('the curve draws the boundaries its axis actually reaches',
-  $('pgCurve').querySelectorAll('line[stroke-dasharray="3 4"]').length === 1,
+/* The curve only draws a boundary its axis actually reaches, and in this
+   fixture the oldest cohort is ten days old — so the D14 trial rule is off the
+   end of the axis and must NOT be drawn. Before the trial doubled this asserted
+   the opposite case (a D7 rule inside a D0–D10 axis); it is the same rule, and
+   this is now the side of it worth pinning, because a guide drawn past the last
+   plotted day is a claim about days that have not happened. */
+check('a boundary beyond the axis is not drawn',
+  $('pgCurve').querySelectorAll('line[stroke-dasharray="3 4"]').length === 0,
   String($('pgCurve').querySelectorAll('line[stroke-dasharray="3 4"]').length));
-check('and labels it as the trial boundary',
-  /trial ends/.test($('pgCurve').textContent), $('pgCurve').textContent.slice(0, 80));
+check('and no boundary label is printed with it',
+  !/trial ends/.test($('pgCurve').textContent), $('pgCurve').textContent.slice(0, 80));
 
 /* ------------------------------------------------------ timeline tab */
 
@@ -483,7 +739,7 @@ check('the grid is still there mid-refresh', $('pgHeat').innerHTML.length > 0,
   String($('pgHeat').innerHTML.length));
 check('no "reading the counter" banner over data we already have',
   !/Reading the counter/.test($('pgStatus').textContent), $('pgStatus').textContent);
-check('the tiles survived the refresh too', $('pgTiles').querySelectorAll('.tile').length > 0);
+check('the tiles survived the refresh too', $('pgTilesToday').querySelectorAll('.tile').length > 0);
 
 releasePings();
 await new Promise((r) => setTimeout(r, 700));

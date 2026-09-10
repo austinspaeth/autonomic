@@ -7,8 +7,8 @@ import React, { useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import * as ExpoLinking from 'expo-linking';
 import { SheetControls, SheetFooter, useSheets } from '../components/Sheet';
-import { FieldInputs, TextField, TimeField, useFormState } from '../components/Field';
-import { Button, Muted } from '../components/ui';
+import { TextField, TimeField } from '../components/Field';
+import { Button, DaySaveButton, Muted } from '../components/ui';
 import { Icon } from '../components/Icon';
 import { ReadingSummary, WorkoutSummary, workoutCurveFor } from '../components/summary';
 import { radius, usePalette } from '../theme';
@@ -20,29 +20,23 @@ import {
 import { typesFor, type TypeKind } from '../lib/typeCatalog';
 import { ManageTypesSheet } from './TypeManager';
 import { LogPickerSheet } from './LogPicker';
-import { computeScores } from '../lib/scoring';
 import { health, healthAppName, healthPermissionPath, openHealthApp } from '../lib/health';
 import { healthSourceFor, workoutCandidates, type HealthCandidate, type HealthSource, type WorkoutCandidate } from '../lib/health/sources';
 import { deleteEntry, getState, storeWaveform, upsertEntry, useAppState } from '../store/store';
 import { splitWaveform } from '../lib/waveforms';
 import { defaultTimeFor, fmtTime12, todayKey, uid } from '../lib/dates';
-import { getTier } from '../store/tier';
-import { requestExpandProtocol, scrollJournalToSection } from '../store/nav';
-import { usePaywall } from './Paywall';
-import { defaultPeriod } from '../lib/period';
-import { useToast } from '../components/Toast';
+import { scrollJournalToSection } from '../store/nav';
+import { isPotsResultLocked, PotsLockedCard } from './PotsLock';
 import { HrvSetup } from './hrv/Setup';
 import { OrthostaticIntroSheet } from './OrthostaticIntro';
 import { DevicesScreen } from './Devices';
 import { StandTestSession } from './pots/StandTestSession';
 import { OrthostaticSession } from './pots/OrthostaticSession';
-
-type ArrKey = 'readings' | 'activities' | 'meds' | 'symptoms';
-
-function scoreCtx() {
-  const p = getState().profile;
-  return { sex: p.sex, height: p.height };
-}
+// Re-exported so `./forms` stays the one import site for entry editing; they
+// live in their own module to keep the capture sheets out of a require cycle.
+import { confirmDelete, EntryForm, type ArrKey } from './EntryForm';
+export { confirmDelete, EntryForm };
+export type { ArrKey };
 
 /** Filterable picker of catalog types; choosing one stacks its form. A fixed
  *  footer lets the user create/manage their own types for this kind. */
@@ -220,8 +214,8 @@ function softTint(hex: string): string {
  *  neutral grey. HRV kinds are live-capture only, so the manual list starts at
  *  Blood Pressure. On a past day the live-only captures (HRV, stand test)
  *  disappear — a live reading can only belong to the day it happens. */
-function ReadingPicker({ isToday, potsLocked, onLocked, onLive, onPick }: {
-  isToday: boolean; potsLocked?: boolean; onLocked?: () => void;
+function ReadingPicker({ isToday, onLive, onPick }: {
+  isToday: boolean;
   onLive: () => void; onPick: (type: string) => void;
 }) {
   const p = usePalette();
@@ -235,13 +229,11 @@ function ReadingPicker({ isToday, potsLocked, onLocked, onLive, onPick }: {
   // The two POTS captures lead the manual list (the stand test is live-only but
   // stays in, pointing at the watch app); BP and resting HR follow.
   const manual = isToday ? ['standTest', 'orthostatic', 'bp', 'restingHr'] : ['orthostatic', 'bp', 'restingHr'];
-  // One freemium lock left here: the live-only stand test on the free tier (the
-  // episode row stays — its manual entry path is free). HRV capture is unlimited
-  // on every tier. Locked rows dim, swap the chevron for a lock, and raise the
-  // paywall.
-  const lockFor = (t: string) => (t === 'standTest' ? !!potsLocked : false);
-  const readingRow = (t: string) => ({ key: t, title: pickerLabel(t), sub: subFor[t] || '', icon: READING_TYPES[t].icon as string, tint: lockFor(t) ? p.textDim : tintFor(t), locked: lockFor(t), onPress: () => (lockFor(t) ? onLocked?.() : onPick(t)) });
-  const rows: { key: string; title: string; sub: string; icon: string; tint: string; locked?: boolean; onPress: () => void }[] = [
+  // Nothing here is gated any more. Capture is never metered — the stand test
+  // included, on a strap as on the watch — and reading a POTS RESULT is the Pro
+  // half (src/features/PotsLock.tsx).
+  const readingRow = (t: string) => ({ key: t, title: pickerLabel(t), sub: subFor[t] || '', icon: READING_TYPES[t].icon as string, tint: tintFor(t), onPress: () => onPick(t) });
+  const rows: { key: string; title: string; sub: string; icon: string; tint: string; onPress: () => void }[] = [
     ...(isToday ? [{ key: 'hrv', title: 'HRV Reading', sub: Platform.OS === 'ios' ? 'From a chest strap, Apple Watch or camera' : 'From a chest strap or your camera', icon: 'heartPulse', tint: p.accent, onPress: onLive }] : []),
     ...manual.map(readingRow),
   ];
@@ -262,7 +254,7 @@ function ReadingPicker({ isToday, potsLocked, onLocked, onLive, onPick }: {
               <Text style={{ color: p.text, fontSize: 16, fontWeight: '700' }}>{r.title}</Text>
               {r.sub ? <Text style={{ color: p.textDim, fontSize: 12.5, marginTop: 1 }}>{r.sub}</Text> : null}
             </View>
-            <Icon name={r.locked ? 'lock' : 'chevronRight'} size={18} color={p.textDim} />
+            <Icon name="chevronRight" size={18} color={p.textDim} />
           </Pressable>
         ))}
       </View>
@@ -274,72 +266,6 @@ function ReadingPicker({ isToday, potsLocked, onLocked, onLive, onPick }: {
  *  `prefill` seeds a brand-new entry (e.g. a reading imported from Apple Health)
  *  that is reviewed then saved as new — it is not treated as an edit (no Delete)
  *  and, when `fromHealth`, is not re-published back to Health. */
-export function EntryForm({ typeMap, arrKey, dk, type, existing, prefill = null, fromHealth = false, controls, onSaved }: {
-  typeMap: Record<string, TypeDef>; arrKey: ArrKey; dk: string; type: string; existing: Entry | null; prefill?: Entry | null; fromHealth?: boolean; controls: SheetControls;
-  /** Called after a save (with the saved entry) or a delete (with nothing). */
-  onSaved: (saved?: Entry) => void;
-}) {
-  const p = usePalette();
-  const toast = useToast();
-  const def = typeMap[type];
-  const fields = entryFields(def);
-  const initial = existing || prefill || { id: uid(), type, time: defaultTimeFor(dk), note: '' };
-  // New entries with a Morning/Evening/Other tag auto-detect it the same way
-  // live HRV capture does, based on the entry's default time.
-  if (!existing && initial.period == null && fields.some((f) => f.type === 'select' && f.key === 'period')) {
-    const h = parseInt(String(initial.time || ''), 10);
-    initial.period = defaultPeriod(type, dk, Number.isFinite(h) ? h : undefined);
-  }
-  const [form, set] = useFormState(fields, initial);
-
-  const save = () => {
-    const numFields = fields.filter(isNumberField);
-    const anyNum = numFields.some((f) => String(form[f.key!] ?? '').trim() !== '');
-    const anyCheck = fields.filter((f) => f.type === 'check').some((f) => !!form[f.key!]);
-    if (type === 'bp') {
-      if (!String(form.sys || '').trim() && !String(form.dia || '').trim()) return toast('Enter a blood pressure');
-    } else if (numFields.length && !anyNum && !anyCheck) {
-      return toast('Enter a value');
-    }
-    let r: Entry = { ...initial };
-    fields.forEach((f) => {
-      if (isDivider(f) || !f.key) return;
-      if (f.type === 'check') r[f.key] = !!form[f.key];
-      else r[f.key] = String(form[f.key] ?? '').trim();
-    });
-    r.scores = computeScores(r, scoreCtx());
-    // A prefill may carry inline waveform arrays (an imported workout's HR
-    // trace) — those go to the sidecar, never into the journal blob.
-    const { entry: stripped, waveform } = splitWaveform(r);
-    if (waveform) storeWaveform(stripped.id, waveform);
-    r = stripped;
-    upsertEntry(dk, arrKey, r);
-    // Auto-publish freshly-logged readings to the health store (fire-and-forget).
-    // Only new *manual* entries — never re-publish edits or Health-sourced rows.
-    if (arrKey === 'readings' && !existing && !fromHealth && r.note !== 'From Apple Health' && r.note !== 'From Health Connect' && getState().settings.healthEnabled) {
-      const api = health();
-      if (api.available) {
-        api.publishReading(r, dk)
-          .then((n) => { if (n > 0) toast(`Saved to ${healthAppName()}`); })
-          .catch(() => { /* graceful */ });
-      }
-    }
-    controls.closeAll();
-    onSaved(r);
-  };
-
-  return (
-    <View>
-      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 16 }}>{(existing ? 'Edit ' : '') + def.label}</Text>
-      <FieldInputs fields={fields} form={form} set={set} />
-      <SheetFooter>
-        {existing ? <Button title="Delete" variant="danger" onPress={() => { deleteEntry(dk, arrKey, existing.id); controls.closeAll(); onSaved(); }} /> : null}
-        <Button title="Save" variant="primary" onPress={save} />
-      </SheetFooter>
-    </View>
-  );
-}
-
 /** Indoor-bike bespoke form (conditional Resistance vs interval list).
  *  `prefill` seeds a brand-new entry (a workout imported from the health
  *  store), mirroring EntryForm — reviewed then saved as new, never an edit. */
@@ -413,7 +339,7 @@ export function BikeForm({ dk, existing, prefill = null, controls, onSaved }: { 
       <TextField label="Notes" value={note} onChange={setNote} placeholder="Optional note" multiline />
       <SheetFooter>
         {existing ? <Button title="Delete" variant="danger" onPress={() => { deleteEntry(dk, 'activities', existing.id); controls.closeAll(); onSaved(); }} /> : null}
-        <Button title="Save" variant="primary" onPress={save} />
+        <DaySaveButton dk={dk} title="Save" onPress={save} />
       </SheetFooter>
     </View>
   );
@@ -428,6 +354,18 @@ export function BikeForm({ dk, existing, prefill = null, controls, onSaved }: { 
  *     Readings picker's Live HRV action. No tier check: capture is unlimited.
  *   · autonomic://?open=protocol   — scroll to the Progress streak card and
  *     open it expanded (the Protocol widget). */
+/**
+ * The launch URL is answered ONCE per process, not once per mount.
+ *
+ * `getInitialURL()` does not clear: it keeps returning the URL that opened the
+ * app for as long as the process lives. So without this latch every remount of
+ * the Journal replayed it — and a JS reload (Metro `r`) is a remount with the
+ * same process — which is why the Protocol card kept springing open by itself
+ * on a phone whose last launch came from that widget. Live taps are unaffected:
+ * each one arrives as a fresh `url` event.
+ */
+let initialLinkHandled = false;
+
 export function useCaptureDeepLink() {
   const { openSheet } = useSheets();
   React.useEffect(() => {
@@ -435,15 +373,26 @@ export function useCaptureDeepLink() {
       if (!url) return;
       const q = ExpoLinking.parse(url).queryParams;
       if (q?.open === 'protocol') {
-        requestExpandProtocol();
-        // Let the card mount/expand before scrolling (cold start lays out late).
+        // Scroll to the card, and stop there. It is NOT opened: the widget knows
+        // the reader wants to see the protocol, not that they want the accordion
+        // they left closed to be open. Cold start lays out late, so this waits.
         setTimeout(() => scrollJournalToSection('protocol'), 350);
         return;
       }
       if (q?.capture !== 'hrv') return;
       openSheet((c) => <HrvSetup controls={c} />);
     };
-    void ExpoLinking.getInitialURL().then(handle);
+    if (!initialLinkHandled) {
+      initialLinkHandled = true;
+      // Never on a phone that has not finished the welcome wizard. These links
+      // come from home-screen widgets, which a first-run install does not have,
+      // so a URL sitting there is a leftover from however the app was started
+      // (a dev launch, a relaunch that reused the last URL) and not something
+      // this user did. It was landing the reader on a Journal with the Protocol
+      // card already open before they had logged anything.
+      if (!getState().meta.onboarded && !getState().meta.lastUpdated) return;
+      void ExpoLinking.getInitialURL().then(handle);
+    }
     const sub = ExpoLinking.addEventListener('url', (e) => handle(e.url));
     return () => sub.remove();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -472,18 +421,16 @@ export function openWorkoutReport(openSheet: OpenSheet, r: Entry, dk: string, ju
     if (ACTIVITY_TYPES[r.type]?.custom === 'bike') openSheet((c) => <BikeForm dk={dk} existing={r} controls={c} onSaved={noop} />);
     else openSheet((c) => <EntryForm typeMap={typesFor(getState(), 'activities')} arrKey="activities" dk={dk} type={r.type} existing={r} controls={c} onSaved={noop} />);
   };
-  openSheet(() => <WorkoutSummarySheet r={r} dk={dk} justImported={justImported} onEdit={openEdit} />, { action: { icon: 'edit', onPress: openEdit } });
+  openSheet(() => <WorkoutSummarySheet r={r} dk={dk} justImported={justImported} onEdit={openEdit} />, {
+    action: { icon: 'edit', onPress: openEdit },
+    destructive: { onPress: () => confirmDelete(openSheet, dk, 'activities', r, ACTIVITY_TYPES[r.type]?.label || 'workout') },
+  });
 }
+
 
 export function useEntryForms(dk: string) {
   const { openSheet } = useSheets();
-  const openPaywall = usePaywall();
   const refresh = () => { /* store change triggers re-render */ };
-
-  // Freemium: live HRV capture is unlimited on every tier; live POTS captures
-  // are Pro. Checked at action time (not render) so the answer is current, and
-  // guarded here — the single choke point — rather than at each button.
-  const potsCaptureLocked = () => getTier() === 'free';
 
   const openReadingForm = (type: string, existing: Entry | null, prefill: Entry | null = null) =>
     openSheet((c) => (
@@ -502,7 +449,6 @@ export function useEntryForms(dk: string) {
   // treatment as a live HRV session. With no strap saved yet, the pairing
   // sheet opens first; saving a device there flows straight into the session.
   const startPotsLive = (type: string) => {
-    if (potsCaptureLocked()) { openPaywall(); return; }
     const open = () => openSheet(
       (c) => (type === 'standTest' ? <StandTestSession controls={c} /> : <OrthostaticSession controls={c} />),
       { hideClose: true },
@@ -512,6 +458,7 @@ export function useEntryForms(dk: string) {
         <DevicesScreen controls={{
           close: () => { c.close(); if (getState().settings.lastBleDeviceId) open(); },
           closeAll: c.closeAll,
+          setOptions: c.setOptions,
         }} />
       ));
       return;
@@ -566,11 +513,16 @@ export function useEntryForms(dk: string) {
     else openSheet((c) => <EntryForm typeMap={typesFor(getState(), 'activities')} arrKey="activities" dk={dk} type={type} existing={existing} controls={c} onSaved={refresh} />);
   };
 
-  const openReadingSummary = (r: Entry) =>
+  const openReadingSummary = (r: Entry) => {
+    if (openPotsLockIfNeeded(openSheet, r, dk)) return;
     openSheet(
       () => <ReadingSummarySheet r={r} dk={dk} />,
-      { action: { icon: 'edit', onPress: () => openReadingForm(r.type, r) } },
+      {
+        action: { icon: 'edit', onPress: () => openReadingForm(r.type, r) },
+        destructive: { onPress: () => confirmDelete(openSheet, dk, 'readings', r, READING_TYPES[r.type]?.label || 'reading') },
+      },
     );
+  };
 
   // The workout report (HR-over-time with zones + stats), for activities that
   // carry an HR trace. The pencil stacks the normal edit form on top.
@@ -584,8 +536,6 @@ export function useEntryForms(dk: string) {
   const pickReading = () => openSheet(() => (
     <ReadingPicker
       isToday={dk === todayKey()}
-      potsLocked={potsCaptureLocked()}
-      onLocked={openPaywall}
       onLive={captureHrv}
       onPick={(t) => pickReadingSource(t)}
     />
@@ -632,6 +582,21 @@ export function ReadingSummarySheet({ r, dk }: { r: Entry; dk: string }) {
       <View style={{ height: 24 }} />
     </ScrollView>
   );
+}
+
+/**
+ * A POTS result on the free tier never opens: the capture ran on every tier (the
+ * watch doesn't gate it), and reading the result is the Pro half — so the row
+ * raises the lock card instead of the summary. Returns true when it took the
+ * tap. Delete stays armed: the reading is the user's, locked or not.
+ */
+export function openPotsLockIfNeeded(openSheet: OpenSheet, r: Entry, dk: string): boolean {
+  if (!isPotsResultLocked(r)) return false;
+  openSheet((c) => <PotsLockedCard r={r} controls={c} />, {
+    fitContent: true,
+    destructive: { onPress: () => confirmDelete(openSheet, dk, 'readings', r, READING_TYPES[r.type]?.label || 'reading') },
+  });
+  return true;
 }
 
 /** The imported-workout report: the activity's HR trace with exercise zones,

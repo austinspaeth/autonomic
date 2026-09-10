@@ -7,7 +7,6 @@ import { Alert, Linking, Pressable, Text, View } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import * as Clipboard from 'expo-clipboard';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -36,7 +35,7 @@ import { formatAppDiagnostics } from '../lib/diagnostics/appReport';
 // One address for every route into support: this card and the Insights failure
 // state. A second copy is a second thing to forget when it changes, and the one
 // the user is told to write to must be the one that is watched.
-import { SUPPORT_EMAIL } from '../lib/diagnostics/supportEmail';
+import { SupportCard } from './SupportCard';
 
 const PRIVACY_URL = 'https://autonomic.care/privacy-policy/';
 const TERMS_URL = 'https://autonomic.care/terms-of-service/';
@@ -127,15 +126,7 @@ export function MenuSheet({ controls }: { controls: SheetControls }) {
       {item('sparkles', 'Show welcome screen', 'Replay the first-run guide', () => { controls.closeAll(); showWelcomeAgain(); })}
       {item('info', 'Legal information', 'Disclaimer, privacy & terms', () => openSheet((c) => <LegalSheet controls={c} />))}
       {item('rocket', "What's new", `Release notes for v${appVer}`, () => openWhatsNew(openSheet))}
-      {/* Dark card in both themes (like the brand card above), so its text is
-          hardcoded light rather than palette-driven. */}
-      <Pressable
-        onPress={() => emailSupport(toast)}
-        style={({ pressed }) => [{ marginTop: 22, paddingVertical: 18, paddingHorizontal: 16, borderRadius: radius.card, backgroundColor: '#242427' }, pressed && { opacity: 0.6 }]}
-      >
-        <Text style={{ fontSize: 13.5, color: '#c9c9cf', textAlign: 'center' }}>Questions? Concerns? Email us!</Text>
-        <Text style={{ fontSize: 14.5, fontWeight: '600', color: '#f2f2f5', textAlign: 'center', marginTop: 5 }}>{SUPPORT_EMAIL}</Text>
-      </Pressable>
+      <SupportCard />
       {__DEV__ ? item('camera', 'Screenshot scenes', 'Dev-only marketing captures', () => { controls.closeAll(); router.push('/screenshots' as never); }) : null}
       <View style={{ marginTop: 22 }}>
         <Text style={{ fontSize: 12.5, color: p.textDim, textAlign: 'center', lineHeight: 18 }}>
@@ -189,7 +180,7 @@ function SubscriptionSheet({ controls }: { controls: SheetControls }) {
   const toast = useToast();
   const { isPro, products, activeSku } = useIap();
   const tier = useTier();
-  const openPaywall = usePaywall();
+  const openPaywall = usePaywall('settings');
   const [busy, setBusy] = useState(false);
   const active = products.find((s) => s.productId === activeSku);
   const price = active ? priceOf(active, activeSku ?? YEARLY_SKU) : undefined;
@@ -208,8 +199,8 @@ function SubscriptionSheet({ controls }: { controls: SheetControls }) {
   const blurb = isPro
     ? `${price ? `Your plan renews ${period}ly at ${price}. ` : ''}Change your plan or cancel anytime in ${storeName()}. Cancelling keeps access until the period ends.`
     : tier === 'trial'
-      ? 'You have full access while your trial lasts. After it ends you keep journaling and unlimited HRV capture free forever; Pro unlocks the deep-analysis tools.'
-      : `You're on the free plan — journaling and HRV capture stay free forever. Upgrade for your full history, Insights, POTS testing and AI reports, or restore a previous purchase from ${storeName()}.`;
+      ? 'You have full access while your trial lasts. After it ends you keep journaling and unlimited HRV and POTS capture free forever; Pro unlocks the deep-analysis tools.'
+      : `You're on the free plan — journaling, HRV and POTS captures stay free forever. Upgrade for your full history, Insights, POTS results and AI reports, or restore a previous purchase from ${storeName()}.`;
   return (
     <View>
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 14 }}>Subscription</Text>
@@ -294,18 +285,6 @@ function ClearDataSheet({ controls }: { controls: SheetControls }) {
       <View style={{ height: 8 }} />
     </View>
   );
-}
-
-/** Open the user's mail client at the support address. Devices with no mail
- *  account (and the iOS Simulator, which has no Mail.app at all) can't handle
- *  `mailto:` — copy the address instead of failing silently. */
-async function emailSupport(toast: (m: string) => void) {
-  try {
-    await Linking.openURL(`mailto:${SUPPORT_EMAIL}`);
-  } catch {
-    await Clipboard.setStringAsync(SUPPORT_EMAIL);
-    toast(`Email copied: ${SUPPORT_EMAIL}`);
-  }
 }
 
 /* ---------- import / export ---------- */

@@ -11,7 +11,9 @@ import Reanimated, {
   Easing as REasing, Extrapolation, interpolate, interpolateColor, runOnJS, useAnimatedStyle,
   useSharedValue, withSpring, withTiming, type SharedValue,
 } from 'react-native-reanimated';
-import { GRADE_COLORS, radius, space, type as T, usePalette } from '../theme';
+import Svg, { Defs, Line, Pattern, Rect } from 'react-native-svg';
+import { CAUTION_GOLD, CAUTION_GOLD_SOFT, CAUTION_INK, GRADE_COLORS, radius, space, type as T, usePalette } from '../theme';
+import { fmtDateLong, isPastDay } from '../lib/dates';
 import type { ScoreCat } from '../lib/types';
 import { helpUrl, type HelpContent } from '../lib/help';
 import { Icon, IconName } from './Icon';
@@ -115,9 +117,18 @@ export function Muted({ children }: { children: React.ReactNode }) {
 // bounciness 8 — same feel, converted through Origami tension/friction.
 const PILL_SPRING = { stiffness: 427, damping: 27.6, mass: 1 };
 
-export function Segmented<T extends string>({ options, value, onChange, onLockedPress, onSettled, style, compact }: {
+/** Width of the optional trailing overflow button inside the capsule. The even
+ *  cells give it up rather than the control growing, so the header band's height
+ *  and the pill's own geometry are unchanged by its presence. */
+const SEG_TRAILING_W = 42;
+
+export function Segmented<T extends string>({ options, value, onChange, onLockedPress, onSettled, style, compact, trailing }: {
   options: { val: T; label: string; locked?: boolean }[]; value: T; onChange: (v: T) => void;
   onLockedPress?: (v: T) => void; onSettled?: () => void; style?: StyleProp<ViewStyle>; compact?: boolean;
+  /** An overflow control riding on the same capsule, right of the last segment.
+   *  It is NOT a segment: the pill never travels to it and it carries no
+   *  selected state — it opens something rather than choosing a value. */
+  trailing?: { icon: IconName; onPress: () => void; accessibilityLabel?: string };
 }) {
   const p = usePalette();
   const [w, setW] = React.useState(0);
@@ -147,7 +158,7 @@ export function Segmented<T extends string>({ options, value, onChange, onLocked
   const pad = compact ? 2 : 4;
   const padV = compact ? 6 : 9;
   const font = compact ? 12 : 15;
-  const cell = w > 0 ? (w - pad * 2) / n : 0;
+  const cell = w > 0 ? (w - pad * 2 - (trailing ? SEG_TRAILING_W : 0)) / n : 0;
   const measured = compact && n > 1 && cells.filter(Boolean).length === n;
   // Interpolation inputs for the compact pill. Padded to the stop list (and to
   // at least two stops) so the worklet stays valid before the cells are
@@ -208,6 +219,16 @@ export function Segmented<T extends string>({ options, value, onChange, onLocked
           )}
         </Pressable>
       ))}
+      {trailing ? (
+        <Pressable
+          onPress={trailing.onPress}
+          accessibilityRole="button"
+          accessibilityLabel={trailing.accessibilityLabel}
+          style={({ pressed }) => [{ width: SEG_TRAILING_W, alignItems: 'center', justifyContent: 'center', zIndex: 1 }, pressed && { opacity: 0.6 }]}
+        >
+          <Icon name={trailing.icon} size={19} color={p.textDim} />
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -261,15 +282,76 @@ export function Stepper({ value, step, onChange, format }: { value: number; step
 }
 
 /* ---------- Buttons ---------- */
-export function Button({ title, onPress, variant = 'default', style, disabled, onLongPress, delayLongPress }: {
-  title: string; onPress: () => void; variant?: 'default' | 'primary' | 'ghost' | 'danger' | 'dashed'; style?: StyleProp<ViewStyle>; disabled?: boolean;
+
+/**
+ * The one disabled treatment, app-wide.
+ *
+ * It used to be `opacity: 0.45` over whatever the variant was, which on a red
+ * primary reads as a slightly muted red button rather than as an unavailable
+ * one — people tap it, nothing happens, and nothing says why. A disabled
+ * control should not look like a quiet version of the live one: it should look
+ * like a different kind of object.
+ *
+ * So a disabled button drops its variant entirely and wears a MEDIUM grey with
+ * a semi-transparent label, plus a barely-there diagonal hatch. The hatch is
+ * the part that carries it at a glance — it is a texture no live control in the
+ * app has, so "not available" is legible before the colour is even read. Kept
+ * at ~4% so it never becomes a pattern anyone has to look at.
+ */
+const DISABLED_BG = '#4a4a51';
+const DISABLED_BORDER = '#5b5b63';
+const DISABLED_TEXT = 'rgba(255,255,255,0.44)';
+const HATCH_ID = 'btnDisabledHatch';
+const HATCH_STEP = 7;
+/* Deliberately OVERSIZED and clipped by the button's `overflow: hidden`, rather
+   than sized to the button. A percentage width/height on the Svg (and on the
+   Rect inside it) does not resolve against the absolute-filled box the way it
+   reads: it covered only the top half of every button. Nothing here needs to
+   know the real size, so the cheap fix is to out-measure any button that could
+   exist and let the clip do the work. */
+const HATCH_BOX = 1200;
+
+/** The hatch itself. One shared pattern id: every instance draws exactly the
+ *  same thing, so a collision between two of them is a no-op (unlike the score
+ *  card's gradients, which differ per card and so count their ids). */
+function DisabledHatch() {
+  return (
+    <Svg
+      width={HATCH_BOX}
+      height={HATCH_BOX}
+      pointerEvents="none"
+      style={{ position: 'absolute', top: 0, left: 0 }}
+    >
+      <Defs>
+        <Pattern id={HATCH_ID} patternUnits="userSpaceOnUse" width={HATCH_STEP} height={HATCH_STEP}>
+          {/* Bottom-left to top-right, drawn corner to corner so it tiles
+              seamlessly at any button width. Black rather than white: on a
+              medium grey the darker line is the one that reads as texture
+              instead of as a sheen. */}
+          <Line x1={0} y1={HATCH_STEP} x2={HATCH_STEP} y2={0} stroke="#000000" strokeOpacity={0.09} strokeWidth={1.1} />
+        </Pattern>
+      </Defs>
+      <Rect x={0} y={0} width={HATCH_BOX} height={HATCH_BOX} fill={`url(#${HATCH_ID})`} />
+    </Svg>
+  );
+}
+
+export function Button({ title, onPress, variant = 'default', icon, style, disabled, onLongPress, delayLongPress }: {
+  title: string; onPress: () => void; variant?: 'default' | 'primary' | 'ghost' | 'danger' | 'dashed' | 'caution'; style?: StyleProp<ViewStyle>; disabled?: boolean;
+  /** Optional glyph before the label; inherits the label's colour. */
+  icon?: IconName;
   /** Optional hidden affordance (e.g. hold to open diagnostics). */
   onLongPress?: () => void; delayLongPress?: number;
 }) {
   const p = usePalette();
-  const bg = variant === 'primary' ? p.accent : variant === 'danger' ? '#d63b3b' : variant === 'ghost' || variant === 'dashed' ? 'transparent' : p.surface2;
-  const border = variant === 'primary' ? p.accent : variant === 'danger' ? '#d63b3b' : p.border;
-  const color = variant === 'primary' || variant === 'danger' ? '#fff' : variant === 'dashed' ? p.accent : p.text;
+  // Disabled is not a shade of the variant, it REPLACES it — one grey skin for
+  // every button in the app, whatever it looks like when it is live.
+  const bg = disabled ? DISABLED_BG
+    : variant === 'primary' ? p.accent : variant === 'danger' ? '#d63b3b' : variant === 'caution' ? CAUTION_GOLD : variant === 'ghost' || variant === 'dashed' ? 'transparent' : p.surface2;
+  const border = disabled ? DISABLED_BORDER
+    : variant === 'primary' ? p.accent : variant === 'danger' ? '#d63b3b' : variant === 'caution' ? CAUTION_GOLD : p.border;
+  const color = disabled ? DISABLED_TEXT
+    : variant === 'primary' || variant === 'danger' ? '#fff' : variant === 'caution' ? CAUTION_INK : variant === 'dashed' ? p.accent : p.text;
   return (
     <Pressable
       onPress={onPress}
@@ -277,14 +359,61 @@ export function Button({ title, onPress, variant = 'default', style, disabled, o
       delayLongPress={delayLongPress}
       disabled={disabled}
       style={({ pressed }) => [
-        { flex: 1, borderRadius: radius.control, borderWidth: variant === 'dashed' ? 1.5 : 1, borderStyle: variant === 'dashed' ? 'dashed' : 'solid', backgroundColor: bg, borderColor: border, paddingVertical: 13, alignItems: 'center' },
-        disabled && { opacity: 0.45 },
-        pressed && { opacity: 0.7 },
+        // overflow: the hatch is drawn at full size and clipped to the radius,
+        // rather than being inset to guess at the corners.
+        { flex: 1, flexDirection: 'row', gap: 8, justifyContent: 'center', borderRadius: radius.control, borderWidth: variant === 'dashed' && !disabled ? 1.5 : 1, borderStyle: variant === 'dashed' && !disabled ? 'dashed' : 'solid', backgroundColor: bg, borderColor: border, paddingVertical: 13, alignItems: 'center', overflow: 'hidden' },
+        pressed && !disabled && { opacity: 0.7 },
         style,
       ]}
     >
+      {disabled ? <DisabledHatch /> : null}
+      {icon ? <Icon name={icon} size={17} color={color} /> : null}
       <Text style={{ color, fontSize: 16, fontWeight: '600' }}>{title}</Text>
     </Pressable>
+  );
+}
+
+/* ---------- Back-dated day editing ---------- */
+/**
+ * The commit control for anything written into ONE journal day. On today it is
+ * the ordinary red primary. On any earlier day it turns gold, takes a caution
+ * mark and says what it is about to do ("Save for previous day") — the journal
+ * can be scrolled days back from a calendar tap, the date lives in a header
+ * that is long gone by the time a sheet is open, and a back-dated write is
+ * otherwise indistinguishable from logging right now. `pastTitle` overrides the
+ * default `"<title> for previous day"` where that phrasing doesn't read.
+ */
+export function DaySaveButton({ dk, title, pastTitle, onPress, disabled, style }: {
+  dk: string; title: string; pastTitle?: string; onPress: () => void; disabled?: boolean; style?: StyleProp<ViewStyle>;
+}) {
+  const past = isPastDay(dk);
+  return (
+    <Button
+      title={past ? (pastTitle ?? `${title} for previous day`) : title}
+      variant={past ? 'caution' : 'primary'}
+      icon={past ? 'alert' : undefined}
+      onPress={onPress}
+      disabled={disabled}
+      style={style}
+    />
+  );
+}
+
+/**
+ * The same warning as a line of text, for a sheet whose fields commit AS THEY
+ * CHANGE (the sleep editor) and so have no Save button to re-dress. Renders
+ * nothing on today.
+ */
+export function PastDayNotice({ dk, text, style }: { dk: string; text?: string; style?: StyleProp<ViewStyle> }) {
+  const p = usePalette();
+  if (!isPastDay(dk)) return null;
+  return (
+    <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: CAUTION_GOLD_SOFT, borderWidth: 1, borderColor: 'rgba(234,179,8,0.4)', borderRadius: radius.control, paddingVertical: 10, paddingHorizontal: 12, marginBottom: 14 }, style]}>
+      <Icon name="alert" size={16} color={CAUTION_GOLD} />
+      <Text style={{ flex: 1, color: p.text, fontSize: 13, lineHeight: 18 }}>
+        {text ?? `You're editing ${fmtDateLong(dk)}, not today. Changes are saved to that day.`}
+      </Text>
+    </View>
   );
 }
 
@@ -501,3 +630,33 @@ export function useAccordion(open: boolean, startOpen = false, chevron: { from?:
  *  animated container it sits inside (see useAccordion). Full-width, natural
  *  height, top-anchored — the reveal clips it from the bottom. */
 const MEASURE_STYLE = { position: 'absolute' as const, left: 0, right: 0, top: 0 };
+
+/* ---------- Destructive confirmation ---------- */
+/**
+ * The small card modal every delete goes through: one question, one way out,
+ * one way through. Open it with `fitContent` so it sits as a card rather than a
+ * full sheet — it asks a single question and a half-height sheet would read as
+ * a screen.
+ *
+ * `onConfirm` runs after this card closes itself, so the caller decides what
+ * happens to the stack beneath (an entry card whose entry is now gone must go
+ * with it — see `confirmDelete` in features/forms.tsx).
+ */
+export function ConfirmDeleteSheet({ title, message, confirmTitle = 'Delete', onConfirm, controls }: {
+  title: string; message?: string; confirmTitle?: string; onConfirm: () => void;
+  controls: { close: () => void };
+}) {
+  const p = usePalette();
+  return (
+    <View>
+      <Text style={{ fontSize: 20, fontWeight: '700', color: p.text, marginBottom: message ? 8 : 20 }}>{title}</Text>
+      {message ? (
+        <Text style={{ fontSize: 14, color: p.textDim, lineHeight: 20, marginBottom: 20 }}>{message}</Text>
+      ) : null}
+      <View style={{ flexDirection: 'row', gap: 12 }}>
+        <Button title="Cancel" onPress={() => controls.close()} />
+        <Button title={confirmTitle} variant="danger" onPress={() => { controls.close(); onConfirm(); }} />
+      </View>
+    </View>
+  );
+}

@@ -8,22 +8,34 @@
  * ------------------------------------------------------------------ scope
  *
  * Be clear about what a notification can and cannot be here, because the
- * limitation is not ours to fix and the copy in Settings says the same thing.
+ * limitations are not ours to fix and the copy in Settings says the same thing.
  *
- * This page has NO push server. The `/ping/report` counter is polled by the
- * page itself, every five minutes, while the page is on screen (`app.js`), and
- * a service worker with no push subscription does not run when the app is
- * closed. So a notification can only ever fire while the dashboard is OPEN.
- * What it buys you is real but bounded: the dashboard sitting on a second
- * monitor, or in a background tab, or as an installed app you have switched
- * away from but not closed — all cases where a toast in the corner of a window
- * you are not looking at is worth nothing.
+ * There are now TWO of them, and they are different mechanisms with different
+ * reach. Do not conflate them.
+ *
+ * **In-page** (`notify`) is the original. The `/ping/report` counter is polled
+ * by the page itself, every five minutes, while the page is on screen
+ * (`app.js`), so this can only ever fire while the dashboard is OPEN. What it
+ * buys is real but bounded: the dashboard on a second monitor, in a background
+ * tab, or as an installed app you have switched away from but not closed — all
+ * cases where a toast in the corner of a window you are not looking at is
+ * worth nothing.
  *
  * That is exactly the condition used: `document.hasFocus()`. Not
  * `document.hidden`, which would be wrong twice over — the refresh timer
  * already refuses to run while hidden, so a hidden-only rule would mean the
  * notification never fires at all; and a visible-but-unfocused window is the
  * single most likely place for this dashboard to live.
+ *
+ * **Background** (`subscribePush`) reaches a closed app, and the reason it can
+ * is that the CLOCK IS NOT HERE. A service worker cannot check anything
+ * hourly — it runs when its page is open, when a fetch it controls happens, or
+ * when a push arrives, and is killed within seconds; there is no timer in it
+ * that survives, and iOS has no Periodic Background Sync to lend it one. So
+ * the hour is kept by an EventBridge schedule (`sls/lambdas/push/main.js`),
+ * which diffs the counter and sends. This half only holds a subscription.
+ * Unconfigured servers are normal — see that file — so every call here fails
+ * soft rather than throwing.
  *
  * iOS supports this from 16.4, and only for a PWA added to the home screen —
  * `Notification.requestPermission` in an ordinary Safari tab does nothing
@@ -162,6 +174,104 @@ window.Pwa = (function () {
     }).catch(function () { return false; });
   }
 
+  /* ------------------------------------------------------------------ push
+   *
+   * The upgrade the section above says this page did not have: a notification
+   * that arrives with the dashboard CLOSED.
+   *
+   * What changed is not this file, it is where the clock lives. A service
+   * worker cannot check anything hourly — it runs when its page is open, when
+   * a fetch it controls happens, or when a push arrives, and iOS has no
+   * Periodic Background Sync — so the hour is kept by an EventBridge schedule
+   * (`sls/lambdas/push/main.js`), which diffs the ping counter and sends. All
+   * this half does is hold a subscription.
+   *
+   * The iOS conditions are unchanged and unforgiving: 16.4+, added to the home
+   * screen, and the permission asked from a real user gesture. `state()` above
+   * already reports `needs-install` for the tab case, and every function here
+   * refuses rather than throwing when the capability is absent — a dashboard
+   * opened in a desktop browser must not show an error for a feature it simply
+   * cannot have.
+   */
+
+  /** The applicationServerKey has to be bytes; the server sends base64url. */
+  function urlBase64ToUint8Array(base64) {
+    var padding = '='.repeat((4 - (base64.length % 4)) % 4);
+    var raw = window.atob((base64 + padding).replace(/-/g, '+').replace(/_/g, '/'));
+    var out = new Uint8Array(raw.length);
+    for (var i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+    return out;
+  }
+
+  function pushSupported() {
+    return ('serviceWorker' in window.navigator) &&
+      typeof window.PushManager === 'function' &&
+      supported();
+  }
+
+  /** The subscription this browser already holds, or null. */
+  function currentSubscription() {
+    if (!pushSupported()) return Promise.resolve(null);
+    return registration().then(function (r) {
+      if (!r || !r.pushManager) return null;
+      return r.pushManager.getSubscription().catch(function () { return null; });
+    }).catch(function () { return null; });
+  }
+
+  /**
+   * Subscribe this device and hand the result to the server.
+   *
+   * `applicationServerKey` is the VAPID PUBLIC key, fetched by the caller —
+   * this module does not know about the API. Re-subscribing an already
+   * subscribed browser returns the existing subscription rather than a second
+   * one, which is what keeps the server's row count equal to the device count.
+   *
+   * Permission is requested FIRST and from the caller's gesture. Safari drops
+   * a `requestPermission` that is not in one, silently, and a `subscribe` on an
+   * ungranted permission throws — so the order here is the difference between
+   * a button that works and one that appears to do nothing.
+   */
+  function subscribePush(publicKey) {
+    if (!pushSupported()) return Promise.resolve({ ok: false, reason: 'unsupported' });
+    if (!publicKey) return Promise.resolve({ ok: false, reason: 'no-key' });
+
+    return enable().then(function (p) {
+      if (p !== 'granted') return { ok: false, reason: p === 'denied' ? 'denied' : 'dismissed' };
+      return registration().then(function (r) {
+        if (!r || !r.pushManager) return { ok: false, reason: 'unsupported' };
+        return r.pushManager.getSubscription().then(function (existing) {
+          if (existing) return existing;
+          return r.pushManager.subscribe({
+            /* Required, and required to be true: a push that shows nothing is
+               a permission the browser takes back. The worker's push handler
+               always ends in a showNotification for the same reason. */
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(publicKey)
+          });
+        }).then(function (sub) {
+          return { ok: true, subscription: sub.toJSON ? sub.toJSON() : sub };
+        });
+      });
+    }).catch(function (e) {
+      return { ok: false, reason: 'failed', message: (e && e.message) || '' };
+    });
+  }
+
+  /** Drop this device's subscription. Returns the endpoint that was dropped so
+   *  the caller can tell the server which row to delete — after `unsubscribe()`
+   *  resolves there is nothing left to read it off. */
+  function unsubscribePush() {
+    return currentSubscription().then(function (sub) {
+      if (!sub) return { ok: true, endpoint: null };
+      var endpoint = sub.endpoint;
+      return sub.unsubscribe().then(function () {
+        return { ok: true, endpoint: endpoint };
+      }).catch(function () {
+        return { ok: false, endpoint: endpoint };
+      });
+    });
+  }
+
   /* ------------------------------------------------------------------ init */
 
   function init() {
@@ -187,6 +297,10 @@ window.Pwa = (function () {
     state: state,
     enable: enable,
     notify: notify,
-    onUpdate: onUpdate
+    onUpdate: onUpdate,
+    pushSupported: pushSupported,
+    currentSubscription: currentSubscription,
+    subscribePush: subscribePush,
+    unsubscribePush: unsubscribePush
   };
 })();

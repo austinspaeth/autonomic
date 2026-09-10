@@ -9,12 +9,28 @@ the ping is a bare counter with no identifier attached (see below).
 ```
 POST https://api.autonomic.care/api/master
 Authorization: Bearer <Cognito id token>
-{ "action": "LOAD" | "SYNC" | "REPLACE_ALL" | "PINGS", "payload": { ... } }
+{ "action": "LOAD" | "SYNC" | "REPLACE_ALL" | "PINGS" | "LINKS_REPUBLISH", ... }
 
 GET  https://api.autonomic.care/ping/open/D082126I    (public, no auth)
 GET  https://api.autonomic.care/ping/sub/D082126I
 GET  https://api.autonomic.care/ping/act/D082126IB
+GET  https://api.autonomic.care/ping/cap/D082126IG   (a reading started)
+GET  https://api.autonomic.care/ping/hrv/D082126IG   (...and completed)
+GET  https://api.autonomic.care/ping/pay/D082126IR
+GET  https://api.autonomic.care/ping/not/D082126IM   (notification turned on)
+GET  https://api.autonomic.care/ping/pot/D082126IT   (POTS capture finished)
+GET  https://api.autonomic.care/ping/see/D082126II   (gated view opened)
+GET  https://api.autonomic.care/ping/err/D082126I    (a failure; once per install)
+GET  https://api.autonomic.care/ping/osh/D082126IA   (offer shown)
+GET  https://api.autonomic.care/ping/odm/D082126IA   (...dismissed)
+GET  https://api.autonomic.care/ping/oac/D082126IA   (...accepted)
 GET  https://api.autonomic.care/ping/report?key=...&since=2026-08-01
+
+GET  https://api.autonomic.care/fault/D082126I-TP-V1.26.0?t=health.check&m=timeout+after+%3Cn%3Ems&n=17&d=1
+     (a FAULT REPORT, not a counter — a call site, a redacted message, and how
+      many occurrences it accounts for)
+
+     ...each of which may carry a tagged tail: D082126IG-TP-V1.26.0
 ```
 
 ## Authorization is two checks, not one
@@ -38,27 +54,65 @@ per user, which would eventually meet DynamoDB's 400KB item ceiling.
 | `DASH#<email>` | `ENTRY#<date>#<platform>` | one day of store metrics |
 | `DASH#<email>` | `EVENT#<id>` | a recorded release / campaign / store change |
 | `DASH#<email>` | `AD#<id>` | an advertising campaign (name, channel, dates) |
-| `DASH#<email>` | `COST#<id>` | a dated cost, optionally attributed to an ad |
+| `DASH#<email>` | `COST#<id>` | a dated cost, optionally attributed to an ad; `capex` marks a one-off build |
 | `DASH#<email>` | `SALE#<id>` | one purchase: plan, price, and the buyer's install date |
+| `DASH#<email>` | `CHURN#<id>` | one unattached churn event: the MRR that stopped, and optionally how many subscriptions |
+| `DASH#<email>` | `LINK#<slug>` | a campaign download link, and the page published from it |
 | `DASH#<email>` | `SETTINGS` | trial/wall lengths, currency, store commission |
 | `DASH#<email>` | `UI` | view and filter preferences |
 | `PING#OPEN` | `<day>` | that day's opens, counted per cohort |
 | `PING#SUB` | `<day>` | that day's new subscribers, counted per cohort |
 | `PING#ACT` | `<day>` | that day's activations (first HRV reading), per cohort+method |
+| `PING#HRV` | `<day>` | that day's measuring installs (any HRV reading), per cohort+method |
+| `PING#CAP` | `<day>` | that day's installs that STARTED a reading, per cohort+sensor |
+| `PING#PAY` | `<day>` | that day's installs that met the paywall, per cohort+surface |
+| `PING#NOT` | `<day>` | notifications turned on, per cohort+letter (per-letter cap) |
+| `PING#POT` | `<day>` | POTS captures finished, per cohort+letter (per-letter cap) |
+| `PING#SEE` | `<day>` | gated views opened, per cohort+letter (per-letter cap) |
+| `PING#ERR` | `<day>` | installs reporting a first failure — once per install, ever |
+| `FAULT` | `<day>#<tag>#<hash>` | one distinct failure on one day: occurrences, install-days, message, platform / version / tier splits. **Expires** (`expiresAt`, 120 days) |
+| `PING#OSH` / `#ODM` / `#OAC` | `<day>` | an offer shown · dismissed · accepted, per cohort+offer |
 | `STORE#VERSIONS` | `latest` | what each store is serving, cached (see below) |
+| `PUSH#<email>` | `SUB#<endpointHash>` | one device registered for background alerts |
+| `PUSH#STATE` | `WATERMARK` | what the hourly push job has already announced |
 
 `LOAD` queries the whole partition. `SYNC` applies the client's diff — entries
 as `upserts` / `deletes`, and the four id-keyed collections as
 `eventUpserts` / `eventDeletes`, `adUpserts` / `adDeletes`,
-`costUpserts` / `costDeletes`, `saleUpserts` / `saleDeletes` — plus `settings`
-and `ui`. Each cleaner in the
+`costUpserts` / `costDeletes`, `saleUpserts` / `saleDeletes`,
+`churnUpserts` / `churnDeletes`, and campaign links
+as `linkUpserts` / `linkDeletes` — plus `settings` and `ui`. Each cleaner in the
 Lambda has a twin in `landing/master/sync.js`; **if the two shapes disagree,
 every diff reports every row as changed forever.** `REPLACE_ALL` wipes the ENTRIES and
-rewrites them — it does not touch events, ads, costs or sales, matching a button that
+rewrites them — it does not touch events, ads, costs, sales or campaign links,
+matching a button that
 says "delete every entry" — and is what "Delete all data" uses — a wipe is worth stating
 outright rather than trusting a diff to enumerate every deletion. ("Delete all
 data" additionally clears the sales ledger through the ordinary diff: sales left
-behind by a wipe would come back as revenue with no downloads under it.)
+behind by a wipe would come back as revenue with no downloads under it. The
+CHURN ledger is carried by `REPLACE_ALL` alongside the sales, for a stronger
+reason: it is a claim ABOUT purchases, so left behind it would floor the empty
+book's MRR at zero and report churn against nothing.)
+
+`CHURN#` items exist because the stores report churn as a NUMBER and never as a
+subscription. A store report says "four cancellations, about $20 a month" with
+no way back to which four, and `cancelled` on a `SALE#` needs exactly that — so
+with nowhere to put it, churn read as zero forever and the dashboard's forecast
+fell back to its 5% assumption. A row carries `date`, `mrr` (the *monthly* rate
+that stopped — an annual plan's twelfth, not its yearly price) and optionally
+`units`, `plan` and `platform`. The optional three are stored only when present,
+never defaulted: a dollar figure off a bank statement is not a claim about a
+headcount, a term or a store, and the dashboard treats each absence as unknown
+rather than as zero. `cleanChurn` has its twin in `sync.js` like every other
+cleaner.
+
+A `COST#` may carry `capex: true` — a one-off build (R&D, hardware bought once,
+a contractor who built a feature) rather than what the app costs to keep
+running. It is orthogonal to the category on purpose, since a build arrives as
+HARDWARE, as SERVICES or as a one-off TOOLS licence. Stored **only when true**,
+so a row that is not one is byte-identical to what older builds wrote and the
+client's diff does not re-push every cost it has. The dashboard keeps it out of
+every per-customer rate and in every total; see `MASTER_DASHBOARD.md`.
 
 `SALE#` items are the one collection that arrived by **migration** rather than
 by being typed. Sales used to be two numeric columns on an entry, `sales` and
@@ -73,6 +127,62 @@ See `MASTER_DASHBOARD.md` for the arithmetic that depends on it.
 
 The table is `DeletionPolicy: Retain` with point-in-time recovery on. A
 `sls remove` will not take the data with it.
+
+## Campaign download links (`LINK#`)
+
+The one thing this API writes outside DynamoDB. A `LINK#<slug>` row is a
+campaign download link — `autonomic.care/download/facebook` — with up to three
+destinations (iPhone, Android, everything else), and saving one **publishes a
+real HTML page into the site bucket** with those URLs already baked in.
+
+Why a written object rather than a lookup: the site is a static bucket behind
+CloudFront with an OAC origin, so a path with no object behind it is a 403 —
+there is nothing a client-side router could rescue, and the destinations are
+typed into the dashboard and cannot be known at build time. The published page
+therefore costs one request, never touches this API, and keeps working when this
+API does not.
+
+`lambdas/api/links.js` holds the whole of it, and the reasoning at length. The
+parts to know:
+
+* **The slug is the identity.** It is the URL, so editing it is a delete and a
+  create, which is exactly what the diff reports and exactly what has to happen
+  in the bucket. `SLUG_RE` refuses anything that would need encoding rather than
+  escaping it — the link gets typed into a video description by hand.
+* **A destination is an http(s) URL or it is dropped.** The page assigns it to
+  `location.replace`, so a `javascript:` destination typed into the dashboard
+  would run on autonomic.care's own origin.
+* **Both keys are written** — `download/<slug>/index.html` and the extensionless
+  `download/<slug>` — because the distribution's directory handling is
+  out-of-band configuration this repo does not own.
+* **The page measures itself, and waits for the send before it leaves.** A
+  campaign page inherits nothing from the site's build, so it carries its own
+  copy of the GA tag and of the `aj-cookie-consent` opt-out (same origin, so a
+  visitor who blocked tracking on the site is redirected immediately with
+  nothing sent). The wait is the load-bearing part: `location.replace` aborts
+  the document load along with the still-loading tag, so a redirect page that
+  fires and goes records nothing at all and a printed campaign reads as though
+  nobody ever scanned it. It fires `app_store_redirect` / `play_store_redirect`
+  / `site_redirect` plus a pooled `download_redirect` carrying `platform`,
+  `destination` and the campaign slug, then goes on gtag's `event_callback` —
+  capped at one second, because a blocked tag never calls back and a signpost
+  must never become a dead end. `/download` implements the same contract from
+  the shell's tag; the two must agree or GA splits every report in two.
+* **Publishing runs after the row is stored and is allowed to throw.** The
+  dashboard's push retries with backoff and only adopts its snapshot on success,
+  so a transient S3 failure re-publishes on the next attempt rather than leaving
+  a campaign the dashboard believes is live and is not.
+* **`LINKS_REPUBLISH` rewrites every page from what is stored.** Always safe:
+  the rows are the record and the objects are a rendering of them. It is the
+  repair path for a lost object, and how a change to the page template reaches
+  campaigns nobody has edited since.
+* **The pipeline must not delete them.** `buildspec.yml` excludes `download/*`
+  from its `aws s3 sync --delete`, re-including only the three files the build
+  owns. Move one of those two things and you must move the other.
+* **Unset is safe.** With no `SITE_BUCKET` the campaign stores and syncs and is
+  simply not live; the dashboard says so. Same rule as the Web Push keys. The
+  role's grant is scoped to `download/*` in the site bucket, so it can publish a
+  campaign link and can never touch the rest of the site.
 
 ## What is live in the stores (`STORE_VERSIONS`)
 
@@ -116,7 +226,7 @@ open device, and the stores publish a few times a month; only the card's
 
 ## The cohort ping
 
-`lambdas/ping/main.js` — two public write routes, no auth, no body, `204` to
+`lambdas/ping/main.js` — four public write routes, no auth, no body, `204` to
 everything. The path segment is the calling install's **cohort** — the day it
 first ran the app, as `D{MMDDYY}` — followed by **one letter for the platform**:
 `I` for iOS, `A` for Android, `U` for unknown. A missing letter also reads as
@@ -179,6 +289,301 @@ Point 4 is also why the client, not the server, enforces one ping per day: with
 nothing to de-duplicate on, the server *cannot* do it, and that is the
 property, not a limitation.
 
+### The reading counter is the open counter's twin
+
+`/ping/hrv/<code>` says an install saved an HRV reading today. It carries what
+`/ping/open` carries — cohort date and platform letter — plus the **sensor
+letter** the activation route carries, and it is capped at one per install per
+Eastern day by the same client rule, bucketed on the same boundary. That
+symmetry is the whole point:
+because both count the same kind of thing over the same population, `hrv[day] /
+open[day]` is a **share of people**, not of pings. Opening the app is not using
+it, and the open counter alone cannot tell an install that measures every
+morning apart from one that launches the app to look at yesterday's number and
+never gains a new one.
+
+Two consequences for anything reading these rows:
+
+- **Nothing may be added to one of the two that CHANGES WHAT A COUNT MEANS in
+  one and not the other.** A different day boundary, a second ping per day, a
+  different trigger than "the app was used" — any of them breaks the ratio
+  silently, since the numbers still divide. The sensor letter is not one of
+  those things: it splits the KEY a count lands under, not the count, so a day's
+  HRV rows still sum to one per install and a consumer that ignores the letter
+  reads the number it always read. What the letter cannot claim is a person's
+  whole day — the daily cap means it names whichever reading came FIRST — and
+  the dashboard says so.
+- **The sensor letter has its own birthday, later than the route's.** The HRV
+  route shipped anonymous as to sensor and gained the letter afterwards, so rows
+  from between the two carry `method: null`. That is "we were not asking", NOT
+  "a sensor we could not read", and a reader must gate on it separately
+  (`hrvMethodFirst` / `hrvMethodKnown` in `landing/master/analytics.js`) or the
+  history fills with an "unknown sensor" band that is really a gap.
+- **Days before the route shipped are unknown, not zero.** There is no start
+  date stored anywhere (the endpoint keeps counts), so a reader has to take the
+  first day an `hrv` row exists as the counter's birthday and answer null for
+  everything before it. `landing/master/analytics.js` does exactly that
+  (`hrvFirst` / `hrvKnown`), and reads it off the UNFILTERED rows, because
+  Android shipped the route in its own release.
+
+### Capture is two counters, and neither is the save
+
+`/ping/cap` fires when a reading STARTS and `/ping/hrv` when one COMPLETES.
+Separate routes rather than one route with a phase letter, because they are read
+AGAINST each other and a route is the one distinction a consumer cannot
+accidentally pool away.
+
+Neither fires on Save, and that is the correction that created the pair. The
+measurement is the event; whether the results card survived long enough to be
+tapped is a different fact about a different moment. Counting the save
+undercounted every completed reading that was discarded, backgrounded or lost to
+a closing sheet stack — and could not see an abandoned session at all, which is
+the failure worth seeing. Five minutes is a long time to sit still, and a start
+with no completion is the specific shape of the app asking for something the
+person could not give it.
+
+Both carry the sensor letter, so `hrv / cap` is a completion rate **per sensor**.
+That is the form of the number that implies an action; pooled, it is only ever a
+figure to worry about.
+
+### The paywall counter is the third daily one
+
+`/ping/pay/<code>` says a locked surface raised the paywall for this install
+today. Capped at one per install per Eastern day like the two above, and capped
+for the same reason: uncapped it would count TAPS, and one user tapping a locked
+range four times would read as four people meeting a wall. Capped, `pay[day] /
+open[day]` is a share of people, and it is the number that says how hard the app
+is pushing.
+
+Its letter rides in the same slot the sensor letter uses — a route only ever
+speaks one alphabet, so the two can never be confused, and the handler validates
+the letter against the alphabet the route actually speaks (a letter appended to
+an `open` ping is dropped, or one cohort's opens would split across keys nobody
+knows to re-add). The surfaces are `R` a locked Progress range, `I` the Insights
+tab, `P` a POTS capture, `O`/`M`/`N` the Outlook, metric and Insights AI reports,
+and `S` the Upgrade button in Settings.
+
+`S` is the one that needs saying out loud: it is **not a wall**. Somebody who
+opened Settings and tapped Upgrade went looking for the paywall, which is the
+opposite signal from somebody who walked into a lock, and a "top wall" ranking
+with it in would answer neither question. The dashboard names it separately.
+Like the sensor letter, the daily cap means the surface is the day's FIRST wall,
+so these rows rank front doors and not lock frequency.
+
+### Two shapes of daily cap, and the difference is load-bearing
+
+`open`, `cap`, `hrv` and `pay` are capped once per install per Eastern day for
+the WHOLE route. A day's rows therefore sum to a headcount, which is what makes
+`hrv[day] / open[day]` a share of people — and it is also why the letter on those
+routes can only ever describe the FIRST event of the day.
+
+`not`, `pot`, `see`, `osh`, `odm` and `oac` are capped per LETTER. Their letters
+are choices the user made between real alternatives: a stand test is not an
+episode, Insights is not Progress, the morning reminder is not the crash warning.
+A whole-route cap would have silently dropped whichever came second, which on a
+bad day is exactly the one worth knowing about. The trade is that those routes'
+daily TOTALS are not headcounts; each letter's count still is, which is the
+number anyone actually wants. Anything reading these rows must not add the
+letters of a per-letter route together and call the result people.
+
+`err` is neither. It fires once per install EVER and carries no letter, so a
+day's count is new installs joining a population and the running total is the
+population itself. It carries no tag and no message either: a tag is a string
+this app chose and a message is a string it did not, and neither belongs in a
+counter with no identifier. It says how many phones are having a bad time, and
+the support dump — from the user's own device, with their consent — is where one
+is diagnosed.
+
+### The offer funnel counts a tap, not a purchase
+
+`osh` / `odm` / `oac` are three routes over one alphabet (`A` the half-off annual
+window, `F` founding member), so `oac / osh` is that offer's conversion.
+
+**Accepted means the card's own buy button was tapped.** Whether the purchase
+then went through is `/ping/sub`'s question, and the gap between the two is the
+store sheet being abandoned or the payment declining. Keeping them apart is what
+makes that gap visible instead of silently folded into the offer's conversion
+rate, so nothing downstream may rename this to "converted". The third outcome is
+the common one: an offer neither accepted nor dismissed was ignored, and the
+dashboard counts it rather than leaving it implied.
+
+### Every route carries a tier and a version
+
+Behind the fixed head, a ping may append `-T{F|T|P}` (what the install could do
+at that instant) and `-V1.26.0` (the build). They are TAGGED rather than
+positional because the head cannot be extended: `[A-Z]?[A-Z]?` cannot tell a
+missing sensor from a tier letter sitting in the sensor's place, so one more
+bare letter would have made `D082126IP` ambiguous forever. A tag says what a
+token is whatever else is present, so the next field costs a letter and breaks
+nothing — and a build sending no tokens writes exactly the code and exactly the
+key it always did.
+
+Where they land is not symmetric, and the asymmetry is deliberate:
+
+- **Tier goes into the cohort key** (`082126IG-P`), so every question the matrix
+  already answers can also be asked per tier — including conversion, which is
+  simply a cohort's rows drifting from `F` to `P` over time.
+- **Version goes into a second map** on the same row (`builds`, keyed
+  platform+tier+version). The cohort map gains an entry per combination seen that
+  day and cohorts accumulate forever; multiplying it by the live builds too walks
+  a busy row toward DynamoDB's 400KB item ceiling, at which point the day stops
+  counting rather than failing loudly. The cost is the three-way question ("pro
+  share of the day-30 cohort on 1.26"), which nothing asks.
+
+`builds` is a **complete partition**: missing parts are stored as `?` rather than
+omitted, so every ping lands in exactly one build key and the map sums to the
+day's total. That is what lets a reader say "68% of today's opens came from
+builds too old to name themselves" instead of reporting 32% adoption as though
+the rest were on something else. The same rule governs the tier: `?` is never
+folded into free, because "we did not ask" and "they had not paid" are different
+facts and only one of them is about the user.
+
+An unrecognised letter is dropped rather than refused, in both fields and in the
+slot, so a new sensor, surface or tier can ship on the client before this
+endpoint learns its name. It lands as unknown, never as a lost count.
+
+**Deploy this endpoint BEFORE shipping a client that sends the tail.** The
+leniency above is about LETTERS, not about the shape: a decoder that predates
+the tagged tail matches the whole segment against a fixed-width pattern, so
+`D082126IG-TP-V1.26.0` does not decode as "cohort plus something I don't know",
+it fails outright and the ping is silently dropped — 204, no count, no log. It
+is the one ordering constraint here, it fails in the direction that looks like
+nobody opened the app, and it is invisible from the phone. `sls deploy` first,
+then release the build.
+
+### `/fault` is not a ping, and that is the whole design
+
+Every route above is a **counter**: a fixed alphabet, no free text, and a number
+at the end of it that means "how many people". `/ping/err` is one of them — it
+fires **once per install, ever**, carries no tag and no message, and answers
+exactly one question: how many phones have had something go wrong.
+
+It cannot answer the next one, and never will. Firing once means an install that
+hiccuped in March has spent its ping and is silent through every bug shipped
+since; carrying no tag means the answer to "what broke" was always "ask that
+user for a support dump", which needs a user who wrote in. A release that broke
+Health imports for every Android install would not move that counter by one.
+
+`/fault` is the answer to the next question, and it lives under its own path
+prefix so nothing reads the two the same way.
+
+```
+GET /fault/D082126I-TP-V1.26.0?t=health.check&m=timeout+after+%3Cn%3Ems&n=17&f=1&d=1
+```
+
+The path is the **same install code every ping sends**, so cohort day, platform,
+tier and build version arrive with no second decoder. `t` is a **tag** naming the
+call site — a stable dotted key the app chose (`store.persist`, `health.check`,
+`uncaught.fatal`) — `m` is a **short redacted message**, `n` is how many
+**occurrences** this report accounts for, `f=1` marks an uncaught error, and
+`d=1` says this report owns the day's install-day for that signature. The
+variable-length parts ride in the query string because an error string is full of
+slashes and an encoded slash in a path parameter is a fight with API Gateway
+nobody wins.
+
+**Stored by signature, not by event.** One row per `(day, call site, failure)`:
+
+```jsonc
+{ "PK": "FAULT", "SK": "2026-08-30#health.check#3fa21b0c",
+  "day": "2026-08-30", "tag": "health.check", "msg": "timeout after <n>ms",
+  "fatal": false,
+  "occurrences": 840,          // how many TIMES it happened
+  "installs": 2,               // install-days: how many phone-days saw it
+  "reports": 7,                // requests that carried them; diagnostic only
+  "firstAt": "...", "lastAt": "...",
+  "platforms":    { "A": 2 },          // install-days, sums to `installs`
+  "versions":     { "1.26.0": 2 },     // ditto
+  "tiers":        { "F": 2 },          // ditto
+  "occPlatforms": { "A": 840 },        // occurrences, sums to `occurrences`
+  "expiresAt": 1780000000 }
+```
+
+So the table grows with the number of **bugs**, not with the number of crashes:
+a thousand phones hitting one failure is one row, and so is one phone hitting it
+a thousand times. The day leads the sort key, so reading a range is one query.
+
+### Every occurrence is counted; a request is not made for each one
+
+This is the rule the whole design turns on, and the two halves of it are
+separate on purpose.
+
+The client **buffers** occurrences in the flags MMKV and a report carries the
+count it accumulated. A signature's first sighting flushes immediately — nothing
+about learning that something broke is delayed — and everything after it in that
+window accumulates and goes out on a 20s debounce, when the app is backgrounded,
+or on the next launch. A per-second retry loop therefore arrives as three
+requests a minute carrying all sixty of its occurrences, rather than as sixty
+requests from a phone that is by definition already having a bad time and whose
+battery and data the user pays for.
+
+The property that makes the rate limiting honest: **suppressing a request never
+loses a count.** The debounce, the per-launch request budget and a dead network
+all leave occurrences buffered on disk. The client takes a count out of the
+buffer to send it and puts it back if the report does not land, so occurrences
+that arrive mid-flight are neither lost nor double-sent.
+
+### Two numbers, and neither is reported without the other
+
+- **`occurrences`** — how many times it happened. Summed from each report's `n`,
+  so it counts events, not requests.
+- **`installs`** — install-days, moved only by a report with `d=1`, which the
+  client sets once per signature per Eastern day. There is no identifier
+  anywhere in this system, so this is as close to "how many phones" as anything
+  here can honestly get: nine install-days may be nine phones once each or one
+  phone for nine days, and the dashboard says exactly that.
+
+Occurrences alone cannot tell one phone in a retry loop from a bug everybody
+has; install-days alone cannot tell a single glitch from a hundred-a-minute
+storm. `occurrences / installs` is the difference, and the dashboard flags a row
+whose ratio is high.
+
+**The three splits move with install-days, not with occurrences**, and that is
+load-bearing. "Which build is this on" is a question about breadth, and a
+version split weighted by occurrences would let one phone looping four hundred
+times report whichever build it happens to run as 99% of the failure — the exact
+wrong answer to the exact question the column exists for, since it would send
+somebody to revert a release on the strength of one device. Weighted by
+install-days, each of `platforms`, `versions` and `tiers` sums to `installs`.
+`occPlatforms` is the one exception and exists only because platform is the
+dashboard's global filter: without it, an iOS slice would show iOS install-days
+beside everybody's occurrence count.
+
+Ranking follows the same logic — **breadth first**. How many people a failure
+reached is what decides a hotfix; the dashboard's *Most often* view is for
+finding a loop, which is a real problem for those users even when the headline
+count is small.
+
+### The rest of the rules
+
+1. **The message is redacted twice** — on the client
+   (`mobile/src/lib/errorReport.ts`) and again in `redactFault` here before
+   anything is written. Not belt and braces: the client's pass is a promise
+   about builds we shipped, and this one is the promise about what can ever be
+   **written**, which has to hold for an old build, a modified client and
+   somebody curling the URL. Emails, URLs down to their host, paths down to a
+   basename, anything id-shaped, and any digit run of four or more all go. That
+   last rule also does the grouping: `timeout after 3012ms` and `timeout after
+   4188ms` are one signature.
+2. **`n` is clamped, never trusted** (`FAULT_MAX_N`). It lands in a counter
+   behind an unauthenticated GET, and a five-digit ceiling is the difference
+   between somebody inflating a number and somebody destroying it. A missing or
+   unreadable value reads as 1 — the honest floor, since the request itself is
+   evidence of at least one occurrence.
+3. **Rows expire** (`expiresAt`, `FAULT_TTL_DAYS` = 120, TTL enabled on the
+   table). These are diagnostic, not a series — and this is the one public route
+   that **creates** a row rather than incrementing one, so an expiry is what
+   bounds what a prober can leave behind. Only fault rows carry the attribute;
+   every ping counter and every dashboard record is written without it and is
+   untouched by TTL.
+
+The cohort date is decoded for its platform, tier and version and then **thrown
+away**. Adding it to the key would fragment one bug across every install age
+that hit it, turning the one number that decides a hotfix into a scatter — and
+it is the one field here with no bearing on a fix.
+
+It reads back on the same `/ping/report` and `PINGS` calls, under `faults`, and
+is drawn by the dashboard's **Failures** tab.
+
 ### Never delete a day row
 
 `PING#OPEN / <day>` is **everyone's** counts for that day, in one item. Deleting
@@ -216,12 +621,35 @@ Two doors onto the same function, because they have different callers:
   the dashboard, which already holds a Cognito token and shouldn't also carry
   the shared key. The email allowlist guards it like everything else there.
 
-Both answer `{ since, open: [...], sub: [...], act: [...] }`, each row
-`{ day, total, cohorts: [{ key, cohortDate, cohort, platform, method, count }] }`.
-Rows stored before the platform marker existed report `platform: "U"`. `method`
-is the sensor an activation used — `W` watch, `B` Bluetooth strap, `F` finger on
-the camera — and is `null` on every row of the other two kinds, which carry no
-method at all.
+Both answer one key per route — `{ since, open, sub, act, cap, hrv, pay, not,
+pot, see, err, osh, odm, oac }` — each row
+
+```jsonc
+{
+  day: '2026-08-21',
+  total: 137,
+  cohorts: [{ key, cohortDate, cohort, platform, slot, method, surface, tier, count }],
+  builds:  [{ key, platform, tier, version, count }]
+}
+```
+
+Rows stored before the platform marker existed report `platform: "U"`. The 8th
+character of a cohort key is reported three ways so a consumer never has to know
+which kind it is holding: `slot` is it raw, `method` is it on the two reading
+kinds and `null` elsewhere, `surface` is it on `pay` and `null` elsewhere.
+Sensors are `W` Apple Watch, `B` Bluetooth strap, `F` finger on the camera, `G`
+Garmin watch; surfaces are `R`/`I`/`P`/`O`/`M`/`N`/`S` as above; the rest are
+`M`/`C` notifications, `T`/`E` POTS, `I`/`P` views, `A`/`F` offers. Every row also
+carries `label`, the letter resolved to a name by the route's own alphabet, so a
+consumer can print it without holding a copy of every table. `tier` is `F`,
+`T`, `P` or `null`, and `version` is a dotted number or `null` — in both cases
+`null` means the ping predates the field or the endpoint did not recognise it,
+which is never the same as a named value.
+
+A consumer written before a key existed ignores it; one written after must treat
+a missing row as "the counter was not running", not as "nobody did the thing".
+That applies to `hrv` and `pay` as counters, and one level down to `tier` and
+`version` as fields.
 
 Set the key once before the first deploy (any random string):
 
@@ -236,8 +664,10 @@ did. A cohort date is shared by every install born that day, so it names a day,
 not a person. Two consequences follow and neither is a bug:
 
 - **The server cannot de-duplicate**, so the client does: at most one open ping
-  per install per Eastern day, exactly one subscribe ping per install
-  (`mobile/src/store/ping.ts`). One ping == one active install that day.
+  and one reading ping per install per Eastern day, exactly one subscribe ping
+  and one activation ping per install, ever (`mobile/src/store/ping.ts`). One
+  open ping == one active install that day; one reading ping == one install that
+  measured that day.
 - **Counts are trusted, not verified.** Anyone can curl the URL and inflate a
   number. The alternative is an identifier, which is the thing being refused.
   If it is ever abused, the answer is a WAF rate limit on the route, not a
@@ -246,6 +676,120 @@ not a person. Two consequences follow and neither is a bug:
 The subscribe ping is skipped in builds whose Pro status comes from the
 dev/TestFlight/sideload paywall bypass — nobody paid there. Dev builds send
 nothing at all.
+
+## Background alerts (Web Push)
+
+A notification on the phone when a sale or a new install lands, **with the
+dashboard closed**. `lambdas/push/` owns it: `news.js` is pure and is what
+`tests/news.test.mjs` pins, `main.js` is the shell.
+
+### The hour is kept here, and it has to be
+
+The obvious design — have the service worker check every hour — is the one
+thing that cannot be built. A service worker runs when its page is open, when a
+fetch it controls happens, or when a **push** arrives, and is killed within
+seconds either way; no timer inside it survives. Periodic Background Sync would
+be the API to lend it one and iOS does not implement it (where it does exist it
+is gated behind engagement heuristics a private dashboard will never satisfy).
+An hourly `setInterval` in a worker is not a feature that works badly, it is a
+feature that silently never fires.
+
+So the hour is an EventBridge schedule on the `push` function, and the worker's
+job is the half it can do: receive. iOS 16.4+ delivers Web Push to a PWA that
+has been **added to the home screen** — a Safari tab cannot receive it, and the
+settings card says so rather than offering a button that cannot work.
+
+### What it will and will not tell you
+
+Two events, and they are the two the counter hears **on its own**: a *download*
+(an open ping whose cohort key is the day it arrived — a first run) and a *sale*
+(a subscribe ping). Store CSV downloads and the sales ledger are deliberately
+not read: both are typed in by hand, so a push about them would be a push about
+your own typing. That is the same rule `landing/master/alerts.js` states for the
+confetti, and the two must not be allowed to disagree — they answer the same
+question for two audiences, and a reader who saw them differ has no way to tell
+which is right.
+
+Four rules keep it honest, all in `news.js`:
+
+- **A delta is never negative.** The report is a sliding window; a count can
+  fall as the calendar turns. A drop is not an event.
+- **Day by day, not total against total.** A run that missed an hour has new
+  days in front of it and possibly one that fell off the back; as totals those
+  cancel and the hour you missed announces itself as silence.
+- **A missing watermark seeds in SILENCE.** The first run has nothing to compare
+  against, and "everything ever recorded" is not news — announcing the back
+  catalogue is how a new channel gets switched off on day one.
+- **Only the last `WINDOW_DAYS` are compared.** A correction to a three-month-old
+  row is a correction, not an arrival.
+
+One notification per run, never one per event: an hour that found six installs
+is one banner. The watermark is written **whether or not the send succeeded** —
+a run that found news, failed to deliver it and left the watermark alone would
+find the same news next hour, and a phone offline for a morning would come back
+to one arrival announced six times.
+
+### Turning it on
+
+The feature ships **dark**. With no keypair, `PUSH_KEY` reports
+`configured: false`, the settings card says exactly that, nothing can subscribe
+and the hourly job returns having sent nothing. Everything below can therefore
+be done long after the code is deployed.
+
+The keys are read at **run** time from one SSM SecureString, not injected at
+build time. That is deliberate: a `PARAMETER_STORE` CodeBuild variable is
+resolved at build *start*, so a parameter that does not exist yet fails the
+whole build — landing site included. (The note beside `PingReportKeyParameter`
+in `infrastructure/pipeline.yml` describes that trap; this avoids it, and
+needs no pipeline change at all.)
+
+```bash
+# 1. Generate a keypair. It is yours; it never goes in the repo.
+npx web-push generate-vapid-keys
+
+# 2. Store both halves plus a contact address as ONE SecureString.
+aws ssm put-parameter --region us-west-2 \
+  --name /autonomic/vapid --type SecureString --overwrite \
+  --value '{"publicKey":"...","privateKey":"...","subject":"mailto:austinspaeth@msn.com"}'
+```
+
+`subject` is required by RFC 8292 — Apple rejects a VAPID JWT without a contact
+it can use if the sender starts misbehaving.
+
+No redeploy is needed: the next cold start picks the parameter up. Then, on the
+phone: open `/master/` in Safari, **Share → Add to Home Screen**, open it from
+the home screen, and use *Edit data → Notifications → Background alerts*. Each
+device subscribes separately — a subscription is a device, not an account.
+
+**Rotating the keypair invalidates every subscription.** The stored endpoints
+were negotiated against the old public key, so after a rotation every device has
+to be turned on again; the sends fail with 410 and the job deletes the dead rows
+on its own, so the only symptom is silence until you re-subscribe.
+
+### Actions
+
+| Action | Does |
+|---|---|
+| `PUSH_KEY` | `{ configured, publicKey }` — the browser needs the public half before it can subscribe |
+| `PUSH_SUBSCRIBE` | stores `{ endpoint, keys }` under `PUSH#<email>` |
+| `PUSH_UNSUBSCRIBE` | forgets one endpoint |
+| `PUSH_TEST` | sends one now, through the real encrypted path |
+
+`PUSH_TEST` goes all the way through the sender on purpose. A local
+notification proves the permission and nothing else; the failure worth catching
+is a keypair that does not match the stored subscription, and only a real
+encrypted send surfaces that.
+
+A subscription the push service rejects as gone (404 / 410) is **deleted**
+rather than retried — an endpoint is revoked when the PWA is deleted or its
+permission withdrawn, and a job that kept retrying would spend every hour
+failing against a device that no longer wants to hear from it.
+
+`web-push` is the one dependency here that is not the AWS SDK. It does the
+RFC 8291 payload encryption and the RFC 8292 VAPID signature, and it is here
+rather than hand-rolled on `node:crypto` because ECDH + HKDF + AES-128-GCM
+written from the spec fails *silently* when it is wrong: Apple returns the same
+201 for a payload it cannot decrypt as for one it can.
 
 ## Deploying
 
@@ -256,6 +800,7 @@ Manually:
 
 ```bash
 npm ci
+npm test            # the push job's arithmetic (pure, no AWS)
 SERVERLESS_ACCESS_KEY=... npx serverless deploy --stage prod --region us-west-2
 npm run logs        # tail the api function
 ```

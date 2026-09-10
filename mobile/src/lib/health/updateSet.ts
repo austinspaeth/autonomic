@@ -103,6 +103,30 @@ export function importFingerprint(dk: string, kind: ItemKind, type: string, time
   return `fp:${dk}:${kind}:${type}:${time}`;
 }
 
+/**
+ * Is this imported item ALREADY in the day?
+ *
+ * `buildUpdateSet` asks this per type as it filters the daily check. The
+ * one-shot historical sweep needs the same question but has no item keys to
+ * compare (a HistoryBundle carries none), and it can now be run at any time
+ * rather than only on a virgin journal — so a year-long backfill accepted after
+ * a week of daily imports would otherwise write a second copy of that week.
+ * Time proximity is the only identity both paths share: both write the sample's
+ * local HH:MM verbatim, so the same sample lands within the tolerance of
+ * itself. Deliberately NOT limited to `imported` entries — a health sample and
+ * a hand-logged reading ten minutes apart are one event logged twice, which is
+ * exactly what `buildUpdateSet` already assumes.
+ */
+export function dayAlreadyHas(
+  day: DayRecord | undefined, kind: ItemKind, type: string, time: string,
+): boolean {
+  const list = kind === 'reading' ? day?.readings : kind === 'workout' ? day?.activities : day?.meds;
+  // A watch Breathe session files as `breathHrv` but is the same measurement,
+  // the pairing buildUpdateSet makes above.
+  const same = (t: unknown) => (type === 'hrv' ? t === 'hrv' || t === 'breathHrv' : t === type);
+  return (list || []).some((e) => same(e.type) && near(e.time, time, kind === 'med' ? MED_NEAR_MIN : NEAR_MIN));
+}
+
 /** Drop items the user imported and then DELETED (./declined) — matched by
  *  item key or by fingerprint, so pre-`healthKey` entries count too. The pill
  *  never re-offers these; the Settings check skips this filter. */

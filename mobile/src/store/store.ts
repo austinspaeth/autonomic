@@ -173,10 +173,15 @@ function putWaveform(id: string, data: WaveformData) {
   try {
     wkv().set(id, JSON.stringify(data));
     waveCachePut(id, data);
-  } catch {
-    // plots degrade, journal unaffected — drop any stale cache entry so a
-    // failed write can't keep serving a value the disk doesn't hold
+  } catch (e) {
+    // Plots degrade, journal unaffected — drop any stale cache entry so a
+    // failed write can't keep serving a value the disk doesn't hold.
+    //
+    // Logged because the DEGRADING is invisible: the reading is saved and looks
+    // complete, and only its beat-to-beat trace is gone. Nobody notices until
+    // they open a chart weeks later, by which point the cause is unknowable.
     waveCache.delete(id);
+    logError('store.waveform', e);
   }
 }
 

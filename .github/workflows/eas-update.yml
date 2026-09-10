@@ -47,6 +47,13 @@ jobs:
         uses: expo/expo-github-action@v8
         with:
           eas-version: latest
+          # NPM, not the action's default. It installs eas-cli with the packager
+          # named here, and `yarn global add` fails outright on the current
+          # runner image ("/usr/local/bin/yarn failed with exit code 1") — which
+          # killed the job before it reached a single EAS command, so no OTA was
+          # ever published from a push to main. This project has no yarn lockfile
+          # and every other step uses npm.
+          packager: npm
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Install dependencies

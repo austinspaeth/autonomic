@@ -622,7 +622,7 @@ export function TrustScreen() {
     <View style={{ width: DESIGN_W, height: DESIGN_H, backgroundColor: '#0a0a0b' }}>
       {/* Fixed insets: top clears the status bar so the back/dots sit below it. */}
       <SafeAreaInsetsContext.Provider value={{ top: 66, left: 0, right: 0, bottom: 50 }}>
-        <Onboarding onDone={() => {}} initialStep={1} />
+        <Onboarding onDone={() => {}} initialStep={0} />
       </SafeAreaInsetsContext.Provider>
       {/* Above the wizard (which sets zIndex:100) so the time/battery show. */}
       <View style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 200, elevation: 200 }} pointerEvents="none"><StatusBar /></View>

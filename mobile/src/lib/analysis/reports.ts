@@ -376,7 +376,7 @@ function profileAge(profile: AppState['profile']): number | null {
 }
 
 /** Human label for an entry's capture source (device name wins when stamped). */
-const CAPTURE_SOURCE: Record<string, string> = { polar: 'Bluetooth heart-rate strap', watch: 'Apple Watch', camera: 'Phone-camera PPG', manual: 'Manual entry', health: 'Imported from the platform health store' };
+const CAPTURE_SOURCE: Record<string, string> = { polar: 'Bluetooth heart-rate strap', watch: 'Apple Watch', garmin: 'Garmin watch', camera: 'Phone-camera PPG', manual: 'Manual entry', health: 'Imported from the platform health store' };
 const sourceLine = (r: Entry): string | null => (r.sourceName as string) || (r.source ? CAPTURE_SOURCE[r.source as string] : null);
 
 /**

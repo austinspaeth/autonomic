@@ -11,7 +11,7 @@ import { SCORE_COLORS, orthoMaxDelta, restingHrBands, sBP } from '../scoring';
 import { scoreCat, sleepHours, streakInfo, type DaysMap } from '../scoring/day';
 import { ACTIVITY_TYPES, MED_TYPES, TRIGGER_TYPES } from '../registry';
 import {
-  BANDS, Mode, acBandZones, acBandsToZones, acBuckets, acLatestIdx, acMean, acPresent, acRangeLabel,
+  BANDS, CustomRange, Mode, acBandZones, acBandsToZones, acBuckets, acLatestIdx, acMean, acPresent, acRangeLabel,
   acReadVals, acScoreZones, avgRound, bucketViews, bucketWhen, catFromBands, isEvening, isMorning,
   makeAgg, type BucketView, type ScoreContext,
 } from './buckets';
@@ -89,10 +89,12 @@ export interface Category {
   hasData?: () => boolean;
 }
 
-export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext): Category[] {
-  const buckets = acBuckets(days, mode);
+/** `custom` replaces the window the four tabs describe with one the user picked;
+ *  `mode` still carries the grouping either way. */
+export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext, custom?: CustomRange | null): Category[] {
+  const buckets = acBuckets(days, mode, custom);
   const { acDayScore, acAgg, acAggSum } = makeAgg(days, ctx);
-  const range = acRangeLabel(mode);
+  const range = acRangeLabel(mode, custom);
   const nonEmpty = (cards: (AnalysisCard | null)[]) => cards.filter((c): c is AnalysisCard => !!c && !!((c.charts && c.charts.length) || (c.stats && c.stats.length) || (c.insights && c.insights.length) || (c.bars && c.bars.length)));
 
   const series = (vals: (number | null)[], color: string, label?: string, extra?: Partial<Series>): Series => ({ values: vals, color, label, ...extra });

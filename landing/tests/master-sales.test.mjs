@@ -89,7 +89,7 @@ window.confirm = () => true;
 
 const server = {
   entries: JSON.parse(JSON.stringify(entries)),
-  events: [], ads: [], costs: [], sales: [],
+  events: [], ads: [], costs: [], sales: [], churn: [],
   settings: { trialDays: 7, wallDays: 14, currency: '$', storeCutPct: 15 },
   ui: { view: 'sales', range: '30' },
 };
@@ -107,6 +107,8 @@ const applySync = (p) => {
     if (at >= 0) server.entries[at] = row; else server.entries.push(row);
   });
   upsert(server.sales, p.saleUpserts); remove(server.sales, p.saleDeletes);
+  server.churn = server.churn || [];
+  upsert(server.churn, p.churnUpserts); remove(server.churn, p.churnDeletes);
   upsert(server.ads, p.adUpserts); remove(server.ads, p.adDeletes);
   upsert(server.costs, p.costUpserts); remove(server.costs, p.costDeletes);
   if (p.settings) server.settings = { ...server.settings, ...p.settings };
@@ -131,6 +133,11 @@ window.fetch = (url, opts) => {
     replaced.push(body.payload || {});
     server.entries = (body.payload.entries || []).slice();
     server.sales = (body.payload.sales || []).slice();
+    /* The churn ledger is a claim ABOUT purchases, so a wipe that left it
+       behind would floor the empty book's MRR at zero and report churn against
+       nothing. The stub therefore wipes it too, or a REPLACE_ALL that forgot to
+       carry it would pass this file. */
+    server.churn = (body.payload.churn || []).slice();
     return reply({ ok: true });
   }
   if (body.action === 'PINGS') return reply({ since: body.payload.since, open: PING_OPEN, sub: PING_SUB });
@@ -391,8 +398,8 @@ check('and says a quiet store may mean "not measured yet" rather than "nobody th
 window.document.querySelector('#fPlatform [data-v="ios"]').click();
 await settle(400);
 check('filtering to iOS still shows pings', !/No pings yet/.test($('view-ping').textContent));
-check('and the tiles are not blank', $('pgTiles').querySelectorAll('.tile').length > 0,
-  String($('pgTiles').querySelectorAll('.tile').length));
+check('and the tiles are not blank', $('pgTilesToday').querySelectorAll('.tile').length > 0,
+  String($('pgTilesToday').querySelectorAll('.tile').length));
 check('the platform card stays unfiltered, because it is what the slice is OF',
   /Android/.test($('pgPlatforms').textContent));
 check('and says pre-marker pings sit in neither store\'s slice',
@@ -408,7 +415,7 @@ check('and says pre-marker pings sit in neither store\'s slice',
    what a slice left out is stated beside the tiles rather than only in a card
    near the bottom of the view. */
 const activeTileValue = () => {
-  const t = [].slice.call($('pgTiles').querySelectorAll('.tile'))
+  const t = [].slice.call($('pgTilesToday').querySelectorAll('.tile'))
     .filter((x) => x.querySelector('.label').textContent.trim().indexOf('Active on') === 0)[0];
   return t ? t.querySelector('.value').textContent.trim() : '';
 };
@@ -426,7 +433,7 @@ check('and says the three add up rather than overlap',
 check('and records why they are not pooled into both stores any more',
   /sum to more than the total/.test(filterNote()), filterNote());
 check('the headline tile says what it left out too, since that is the number being read',
-  /not in this slice/.test($('pgTiles').textContent), $('pgTiles').textContent.slice(0, 240));
+  /not in this slice/.test($('pgTilesToday').textContent), $('pgTilesToday').textContent.slice(0, 240));
 
 window.document.querySelector('#fPlatform [data-v="combined"]').click();
 await settle(300);
@@ -434,6 +441,101 @@ await settle(300);
    about an arithmetic that adds up perfectly well. */
 check('and it goes away with the filter', $('pgFilterNote').textContent.trim() === '',
   $('pgFilterNote').textContent.slice(0, 120));
+
+/* --------------------------------------------------- unattached churn
+
+   The case marking a purchase `cancelled` cannot express: a store report says
+   subscriptions went away and roughly what they were worth, and never says
+   which ones. Recorded here rather than derived, and it moves the RATE without
+   touching the CASH. */
+
+$('btnEditData').click();
+await settle(250);
+check('Edit data has a Churn section of its own',
+  [...window.document.querySelectorAll('#view-data .section-title')].map((n) => n.textContent).includes('Churn'));
+check('and the form defaults the store to "not sure", because a figure off a bank statement has none',
+  $('chPlatform').value === '');
+check('the form states the live book, since MRR lost is a number you have to work out',
+  /running at/.test($('chFormHint').textContent), $('chFormHint').textContent);
+
+/* Neither an amount nor a count is nothing to record, and it is refused rather
+   than stored — a row of two blanks is a churn event in every count and a
+   change to nothing. */
+$('chDate').value = T(1);
+$('chMrr').value = '0';
+$('chUnits').value = '';
+$('chSave').click();
+await settle(120);
+check('an empty churn row is refused rather than stored', $('chTable').textContent.includes('No churn recorded'),
+  $('chTable').textContent.slice(0, 120));
+
+$('chDate').value = T(1);
+$('chMrr').value = '2.50';
+$('chUnits').value = '1';
+$('chPlan').value = 'monthly';
+$('chSave').click();
+await settle(200);
+check('a churn event lands in its own table', /\$2\.50/.test($('chTable').textContent), $('chTable').textContent.slice(0, 200));
+check('and a row with no store reads as unattributed rather than as iOS',
+  /unattributed/.test($('chTable').textContent), $('chTable').textContent.slice(0, 200));
+
+await saved();
+check('the churn event reached the server on its own route',
+  (server.churn || []).some((c) => c.mrr === 2.5 && c.units === 1),
+  JSON.stringify(server.churn));
+check('and it carries no store, rather than being defaulted to one',
+  (server.churn || []).every((c) => c.platform === undefined), JSON.stringify(server.churn));
+
+$('chPaste').value = [T(2) + '\t1.25\t1\tannual\tios\tstore report',
+  'not-a-date\t5.00\t1'].join('\n');
+$('chPasteGo').click();
+await settle(200);
+check('a pasted churn batch lands', /Added 1 churn event/.test($('chPasteStatus').textContent),
+  $('chPasteStatus').textContent);
+check('and the unreadable line stays in the box', /not-a-date/.test($('chPaste').value));
+await saved();
+
+$('btnEditData').click();
+await settle(250);
+window.document.querySelector('.tab[data-view="sales"]').click();
+await settle(350);
+
+tiles = tileText();
+const mrrKey = Object.keys(tiles).find((k) => k.indexOf('MRR on ') === 0);
+/* The book was 12.48. 2.50 + 1.25 of churn takes it to 8.73, and that fall
+   happened on days nothing was CANCELLED on — which is the whole point. */
+check('churn comes off MRR', /8\.73/.test(tiles[mrrKey].value), tiles[mrrKey].value);
+check('and the tile says churn is why', /churned in range/.test(tiles[mrrKey].meta), tiles[mrrKey].meta);
+check('churn has a tile of its own', !!tiles['Churned MRR in range'],
+  Object.keys(tiles).join(' | '));
+check('and it leads with net new MRR, which is the number being asked for',
+  /net new MRR/.test(tiles['Churned MRR in range'].meta), tiles['Churned MRR in range'].meta);
+check('the churn card reveals itself once there is churn',
+  !$('slChurnCard').classList.contains('hidden'));
+check('and draws the two kinds apart',
+  /Cancellations/.test($('slChurn').textContent) && /Unattached churn/.test($('slChurn').textContent),
+  $('slChurn').textContent.slice(0, 200));
+check('with a sentence under it stating the net',
+  /net new MRR/.test($('slChurnMeta').textContent), $('slChurnMeta').textContent.slice(0, 200));
+
+/* CASH does not move. Money that already arrived does not un-arrive — that is
+   what a refund is for. */
+check('bookings are untouched by churn',
+  /\$/.test(tiles['Bookings in range'].value) && !/–/.test(tiles['Bookings in range'].value),
+  tiles['Bookings in range'].value);
+
+window.document.querySelector('.tab[data-view="forecast"]').click();
+await settle(350);
+check('the forecast now has a measured churn rate rather than its 5% assumption',
+  /Monthly churn/.test($('fcControls').textContent) &&
+  !/nothing cancelled or churned yet/.test($('fcControls').textContent),
+  $('fcControls').textContent.slice(0, 400));
+check('and says the rate came from churn entered by hand',
+  /entered by hand|hand-entered/.test($('fcControls').textContent),
+  $('fcControls').textContent.slice(0, 400));
+
+window.document.querySelector('.tab[data-view="sales"]').click();
+await settle(300);
 
 /* ------------------------------------------------- restoring a backup */
 

@@ -10,10 +10,8 @@ import { radius, usePalette } from '../theme';
 import { fmtNum, fmtShort, todayKey } from '../lib/dates';
 import { useAppState } from '../store/store';
 import { scrollJournalToSection } from '../store/nav';
-import { STARTERS, buildMilestoneDays, buildMilestoneGroups } from '../lib/analysis/milestones';
+import { CHECKLIST_STARTERS, STARTERS, buildMilestoneDays, buildMilestoneGroups } from '../lib/analysis/milestones';
 import { resolveProtocol } from '../lib/scoring/day';
-import { useEntryForms } from './forms';
-import { ProtocolEditor } from './ProtocolEditor';
 
 export function useMilestones() {
   const state = useAppState();
@@ -35,19 +33,17 @@ export function useMilestones() {
 }
 
 /** Compact card for the journal view; taps open the full tracker in a sheet.
- * Undone "Getting started" milestones render as a tappable "Up first" checklist
- * (each row jumps straight to the surface that completes it); when milestones
+ * Undone starters in CHECKLIST_STARTERS render as a tappable "Up first"
+ * checklist (each row jumps straight to the surface that completes it); when milestones
  * were unlocked on `dk`, a divider + checklist of them appears below. */
 export function MilestoneProgressCard({ dk }: { dk?: string }) {
   const p = usePalette();
   const { openSheet } = useSheets();
   const { groups, done, total, pct, starters } = useMilestones();
-  const forms = useEntryForms(todayKey());
-  const upFirst = starters.filter((it) => !it.done);
+  // Only CHECKLIST_STARTERS are offered as chores; the rest stay achievements.
+  const upFirst = starters.filter((it) => !it.done && CHECKLIST_STARTERS.includes(it.label));
   const starterAction: Record<string, () => void> = {
-    [STARTERS.hrv]: forms.captureHrv,
     [STARTERS.fullDay]: () => scrollJournalToSection('activities'),
-    [STARTERS.protocol]: () => openSheet((c) => <ProtocolEditor controls={c} />),
   };
   const achievedToday = dk ? groups.flatMap((g) => g.items).filter((it) => it.done && it.date === dk) : [];
   return (

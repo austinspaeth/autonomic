@@ -48,7 +48,7 @@ put(open, A.addDays(C3, 1), C3, 12);
 // installs older than the counter, phoning in on the last day
 put(open, LAST, OLD, 7);
 
-// purchases: one inside the trial, one on D15 (the wall), one late
+// purchases: one inside the trial, one on D15 (the day the trial ends), one late
 put(sub, A.addDays(C1, 5), C1, 2);
 put(sub, A.addDays(C1, 15), C1, 3);
 put(sub, A.addDays(C1, 25), C1, 1);
@@ -111,7 +111,7 @@ check('...but is for D1', A.isMature(ix, C3, 1) === true);
 const row = A.milestoneRow(ix, C3, A.MILESTONES);
 const unavailable = row.filter((cell) => !cell.available).map((cell) => cell.day);
 check('young cohort: only D0/D1 available, rest unavailable',
-  unavailable.join(',') === '3,7,8,14,15,21,30,60,90', unavailable.join(','));
+  unavailable.join(',') === '3,7,14,15,21,30,60,90', unavailable.join(','));
 check('unavailable cells carry null, never 0',
   row.filter((x) => !x.available).every((x) => x.pct === null));
 
@@ -122,40 +122,46 @@ check('cohorts group into weeks by Monday', weeks.length === 3, weeks.map((w) =>
 check('a week\'s size is the sum of its days (each install born once)',
   weeks.reduce((a, w) => a + w.size, 0) === 170, String(weeks.reduce((a, w) => a + w.size, 0)));
 
-/* ------------------------------------------------- trial / wall boundaries */
+/* -------------------------------------------------------- trial boundary */
 
-check('boundaries are the product\'s, not round numbers',
-  A.BOUNDARIES.trialLastDay === 7 && A.BOUNDARIES.firstPostTrial === 8 &&
-  A.BOUNDARIES.historyLastDay === 14 && A.BOUNDARIES.firstWallDay === 15);
+/* ONE boundary, not two. The app used to run a seven-day trial and then a
+   separate history wall a week later; it now runs a single fourteen-day trial,
+   and the free tier's history clip falls on the same day it ends. A second
+   boundary here would draw the same moment twice. */
+check('the boundary is the product\'s, not a round number',
+  A.BOUNDARIES.trialLastDay === 14 && A.BOUNDARIES.firstPostTrial === 15);
+check('the history wall is gone rather than coincident',
+  A.BOUNDARIES.firstWallDay === undefined && A.BOUNDARIES.historyLastDay === undefined,
+  JSON.stringify(A.BOUNDARIES));
 
 const s = A.survival(ix, ix.cohorts);
-// D7->D8 over cohorts mature for D8 (C1, C2): (40+20)/150 = 40% -> (30+18)/150 = 32%
-check('D7→D8 compares both sides over the same installs',
-  near(s.trialEnd.before.pct, 40) && near(s.trialEnd.after.pct, 32), JSON.stringify(s.trialEnd && s.trialEnd.after));
-check('D7→D8 change is in percentage points', near(s.trialEnd.points, -8), String(s.trialEnd && s.trialEnd.points));
-// D14->D15 is only C1 (C2 is 15 days old at LAST, so D15 exists for it too)
-check('D14→D15 is available and negative', s.historyWall && s.historyWall.points < 0,
-  JSON.stringify(s.historyWall && s.historyWall.points));
+// D14->D15 over cohorts mature for D15, both sides on the same installs
+check('D14→D15 compares both sides over the same installs',
+  s.trialEnd && s.trialEnd.before.available && s.trialEnd.after.available,
+  JSON.stringify(s.trialEnd && s.trialEnd.after));
+check('D14→D15 change is in percentage points and negative',
+  s.trialEnd && s.trialEnd.points < 0, String(s.trialEnd && s.trialEnd.points));
+check('there is no second transition to report', s.historyWall === undefined);
 
 const life = A.lifecycleNow(ix, ix.cohorts);
 check('trials-started buckets every measurable install exactly once',
-  life.inTrial + life.postTrial + life.pastWall === 170, JSON.stringify(life));
+  life.inTrial + life.postTrial === 170, JSON.stringify(life));
 check('the 2-day-old cohort counts as a trial started', life.inTrial === 20, JSON.stringify(life));
 
 /* The usage-based lifecycle is what the tiles show, because it can see every
    active install — including ones older than the counter, whose cohort size was
    never observed but whose age is exact. The only cohort pinging on LAST is the
-   pre-counter one, 7 installs at 60 days old — squarely past the wall. Under
+   pre-counter one, 7 installs at 60 days old — squarely past the trial. Under
    the old cohort-size lifecycle those 7 were invisible, which is exactly the
    bug: the most established users the app had, counted as nothing. */
 const liveNow = A.lifecycleActive(ix, LAST);
 check('active lifecycle counts everyone who pinged, not just measurable cohorts',
-  liveNow.inTrial + liveNow.postTrial + liveNow.pastWall === liveNow.total,
+  liveNow.inTrial + liveNow.postTrial === liveNow.total,
   JSON.stringify(liveNow));
 check('a pre-counter install lands in the right stage by its age',
-  liveNow.pastWall === 7 && liveNow.total === 7, JSON.stringify(liveNow));
+  liveNow.postTrial === 7 && liveNow.total === 7, JSON.stringify(liveNow));
 check('...which lifecycleNow alone would have missed',
-  A.lifecycleNow(ix, ix.cohorts).pastWall !== liveNow.pastWall);
+  A.lifecycleNow(ix, ix.cohorts).postTrial !== liveNow.postTrial);
 
 /* --------------------------------------------------------- monetization */
 
@@ -163,7 +169,7 @@ const ages = A.purchaseAges(ix);
 const byKey = {};
 ages.buckets.forEach((b) => { byKey[b.key] = b.count; });
 check('purchase at D5 lands in the trial bucket', byKey.d0_7 === 2, JSON.stringify(byKey));
-check('purchase at D15 gets its own bucket (the wall)', byKey.d15 === 3, JSON.stringify(byKey));
+check('purchase at D15 gets its own bucket (the day the trial ends)', byKey.d15 === 3, JSON.stringify(byKey));
 check('purchase at D25 lands in D22–30', byKey.d22_30 === 1, JSON.stringify(byKey));
 check('purchase ages total to every purchase seen', ages.total === 6, String(ages.total));
 
@@ -497,6 +503,347 @@ check('and the first bucket holds the same-day ones plus C1\'s D3',
 const legacy = A.index({ open: shape(open), sub: shape(sub) });
 check('a report with no activation rows is empty, not broken',
   A.activationsOn(legacy, C1) === 0 && A.activation(legacy, legacy.cohorts, 0).kept === 0);
+
+/* ------------------------------------------------------------ measuring
+
+   The reading counter (`hrv`), which shipped LATER than the other three. Its
+   whole value is that it is the open counter's twin — both one per install per
+   Eastern day — so their ratio is a share of people. Its whole risk is that the
+   days before it existed look exactly like days on which nobody measured. */
+
+const HRV_FIRST = '2026-06-16';
+const hrv = {};
+put(hrv, HRV_FIRST, C2, 9);                 // C2's D1: 9 of 50
+put(hrv, '2026-06-21', C1, 4);              // C1's D21: 4 of 100
+put(hrv, '2026-06-22', C2, 6);              // C2's D7: 6 of 50
+put(hrv, C3, C3, 8);                        // C3's D0: 8 of 20
+put(hrv, '2026-06-29', C3, 5);              // C3's D1: 5 of 20
+
+const mix = A.index({ open: shape(open), sub: shape(sub), hrv: shape(hrv) });
+
+check('the reading counter\'s own start day is found', mix.hrvFirst === HRV_FIRST, String(mix.hrvFirst));
+check('a day before it is unknown, a day after it is known',
+  A.hrvKnown(mix, '2026-06-15') === false && A.hrvKnown(mix, HRV_FIRST) === true);
+
+/* The rule the whole module turns on: a busy day before the counter shipped is
+   NOT a day on which nobody measured. C2's own day 0 had 50 installs on the
+   app and no reading rows, and reporting that as 0% would be a claim about
+   people made out of a deploy date. */
+check('a pre-counter day with real actives reads null, never 0%',
+  A.measureShare(mix, C2) === null && A.activeOn(mix, C2) === 62,
+  String(A.activeOn(mix, C2)));
+check('a covered day reports the share of the people who were there',
+  near(A.measureShare(mix, '2026-06-21'), 40), String(A.measureShare(mix, '2026-06-21')));
+check('a covered day on which nobody measured is a real 0%',
+  A.measureShare(mix, '2026-06-18') === 0, String(A.measureShare(mix, '2026-06-18')));
+
+const rate = A.measureRate(mix, A.range(FIRST, LAST));
+check('the window rate pools install-days on both sides',
+  rate.readings === 32 && rate.active === 158, JSON.stringify(rate));
+check('and leaves the pre-counter days out of both, counting them',
+  rate.days === 15 && rate.blind === 16, JSON.stringify(rate));
+check('the pooled rate is readings over install-days', near(rate.pct, (32 / 158) * 100), String(rate.pct));
+
+/* A share above 100% is information, not a bug: a reading saved either side of
+   midnight Eastern, or on a launch whose open ping was lost offline, lands in a
+   day without its open. Clamping it would hide the only signal that says the
+   two counters have drifted. */
+const drifted = A.index({
+  open: shape({ [C3]: { [C3]: 4 } }),
+  hrv: shape({ [C3]: { [C3]: 5 } }),
+});
+check('a drifted day is reported above 100%, not clamped',
+  near(A.measureShare(drifted, C3), 125), String(A.measureShare(drifted, C3)));
+
+/* The same day cut by WHO the person was, which the pooled share cannot see: a
+   day heavy with installs and a day heavy with regulars reach the same number
+   for opposite reasons, and the ratio between the two halves is the only thing
+   that says whether the wizard's first reading is landing.
+
+     D1  20 active — 8 first runs, 12 back for a second day
+         8 readings — 2 by first runs (25%), 6 by returners (50%)
+     D2  5 active, all returning, 2 of them measured (40%) and no first run
+         at all, which must read as unknown rather than as a 0% first-run rate */
+const D1 = A.addDays(C3, 1), D2 = A.addDays(C3, 2);
+const cut = A.index({
+  open: shape({ [C3]: { [C3]: 20 }, [D1]: { [C3]: 12, [D1]: 8 }, [D2]: { [C3]: 5 } }),
+  hrv: shape({ [C3]: { [C3]: 6 }, [D1]: { [C3]: 6, [D1]: 2 }, [D2]: { [C3]: 2 } }),
+});
+const cs = A.measureShareSplit(cut, D1);
+check('the split reads the numerator off the same cohort key the denominator does',
+  cs.fresh.did === 2 && cs.fresh.of === 8 && cs.returning.did === 6 && cs.returning.of === 12,
+  JSON.stringify(cs));
+check('and each side is a rate over its OWN population, not a part of the whole',
+  near(cs.fresh.pct, 25) && near(cs.returning.pct, 50) && near(A.measureShare(cut, D1), 40),
+  JSON.stringify(cs));
+/* The two halves are the two halves of `activeOn`, and their readings are all
+   of the day's readings — so the counts partition even though the rates do not,
+   which is what stops a reading from a cohort the open rows never saw being
+   dropped on the floor. */
+check('the counts behind the two rates account for the whole day',
+  cs.fresh.did + cs.returning.did === A.readingsOn(cut, D1) &&
+  cs.fresh.of + cs.returning.of === A.activeOn(cut, D1), JSON.stringify(cs));
+
+const cs2 = A.measureShareSplit(cut, D2);
+check('a day with nobody of one kind reports unknown for it, never 0%',
+  cs2.fresh.of === 0 && cs2.fresh.pct === null && near(cs2.returning.pct, 40),
+  JSON.stringify(cs2));
+
+check('the split obeys the counter\'s birthday exactly as the share does',
+  A.measureShareSplit(mix, C2) === null && A.measureShareSplit(legacy, LAST) === null);
+
+/* ------------------------------------------------------------- records
+
+   "Is this the best number we have ever had?" The badge on a day tile is one
+   line of copy over this function, so every rule that stops it lying lives
+   here.
+
+   A twenty-day series, one install per cohort so the arithmetic IS the series:
+   sixteen quiet days at 2, then 5, 3, 9, 4. Only the 9 has ever been beaten by
+   nothing. */
+const REC0 = '2026-07-01';
+const rDay = (n) => A.addDays(REC0, n);
+const recSeries = [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 5, 3, 9, 4];
+const recOpen = {};
+recSeries.forEach((n, i) => put(recOpen, rDay(i), rDay(i), n));
+const recIx = A.index({ open: shape(recOpen) });
+const athOf = (day, opts) => A.dayRecord(recIx, day, A.activeOn, opts);
+
+check('a day above every other day is a record',
+  athOf(rDay(18)).isRecord === true && athOf(rDay(18)).best === 5 &&
+  athOf(rDay(18)).bestDay === rDay(16), JSON.stringify(athOf(rDay(18))));
+check('an ordinary day is not', athOf(rDay(19)).isRecord === false);
+
+/* EVERY OTHER DAY, not just the earlier ones. rDay(16) was the highest thing
+   we had when it happened, and it is not the highest thing we have — the badge
+   says the second, so a day beaten later must not wear it. */
+check('a day beaten LATER is not called a record',
+  athOf(rDay(16)).isRecord === false && athOf(rDay(16)).best === 9,
+  JSON.stringify(athOf(rDay(16))));
+
+/* STRICTLY GREATER. Matching the best day is not an all-time high, it is a
+   tie, and the two are different claims — so a joint top gives nobody the
+   badge rather than giving it to both. */
+const tieSeries = recSeries.slice(0, 19).concat([9]);
+const tieOpen = {};
+tieSeries.forEach((n, i) => put(tieOpen, rDay(i), rDay(i), n));
+const tieIx = A.index({ open: shape(tieOpen) });
+check('a day that only MATCHES the best is not a record',
+  A.dayRecord(tieIx, rDay(19), A.activeOn).isRecord === false &&
+  A.dayRecord(tieIx, rDay(19), A.activeOn).best === 9,
+  JSON.stringify(A.dayRecord(tieIx, rDay(19), A.activeOn)));
+check('and neither is the day it tied with',
+  A.dayRecord(tieIx, rDay(18), A.activeOn).isRecord === false);
+
+/* "Ever" needs enough history to mean anything, or the third day a counter ran
+   is the best day it ever had — trivially, and uselessly. */
+check('the bar is a fortnight of comparable days', A.RECORD_MIN_DAYS === 14);
+const tooNew = A.index({ open: shape({ [REC0]: { [REC0]: 1 }, [rDay(1)]: { [rDay(1)]: 9 } }) });
+check('a series with no history yet claims nothing',
+  A.dayRecord(tooNew, rDay(1), A.activeOn).isRecord === false &&
+  A.dayRecord(tooNew, rDay(1), A.activeOn).days === 1,
+  JSON.stringify(A.dayRecord(tooNew, rDay(1), A.activeOn)));
+check('and says how little it had, so the UI can explain its silence',
+  athOf(rDay(18)).days === 19 && athOf(rDay(18)).enough === true, JSON.stringify(athOf(rDay(18))));
+
+/* A series that has never moved sits at its maximum every day, and zero is not
+   a record however long it has held the top. */
+const flatDays = {};
+for (let i = 0; i < 20; i++) put(flatDays, rDay(i), rDay(i), 0);
+const flatIx = A.index({ open: shape(flatDays) });
+check('a series that has never moved has no record in it',
+  A.dayRecord(flatIx, rDay(19), A.activeOn).isRecord === false);
+
+/* `comparable` is ONE gate doing two jobs, because they are the same question.
+   A counter's pre-ship days would read as zeros, and a history of false lows
+   hands the badge to an ordinary day: with the first sixteen days excluded the
+   window is [5, 3, 9, 4], where the quiet 4 is now second-best and still not a
+   record, and the real high still is one. */
+const late = (i, d) => d >= rDay(16);
+const lateOpts = { comparable: late, minDays: 3 };
+check('days before a counter shipped are excluded rather than counted as lows',
+  A.dayRecord(recIx, rDay(19), A.activeOn, lateOpts).isRecord === false &&
+  A.dayRecord(recIx, rDay(19), A.activeOn, lateOpts).days === 3,
+  JSON.stringify(A.dayRecord(recIx, rDay(19), A.activeOn, lateOpts)));
+check('and the real high still holds the record inside that window',
+  A.dayRecord(recIx, rDay(18), A.activeOn, lateOpts).isRecord === true);
+check('a day the gate refuses makes no claim at all',
+  A.dayRecord(recIx, rDay(2), A.activeOn, lateOpts) === null);
+
+/* The other half of the same gate: a rate over a denominator too small to
+   divide by. The highest share this app has ever seen must not be the day two
+   people opened it and one of them measured — so a thin day leaves the history
+   as well as failing to claim the badge. */
+const thinDay = (i, d) => A.activeOn(i, d) >= 3;
+check('a denominator too small to divide by drops out of both sides',
+  A.dayRecord(recIx, rDay(18), A.activeOn, { comparable: thinDay, minDays: 3 }).days === 3,
+  JSON.stringify(A.dayRecord(recIx, rDay(18), A.activeOn, { comparable: thinDay, minDays: 3 })));
+
+/* The activation counter gained a birthday for this: `activation` works over
+   cohorts, where `first` already excludes the unmeasurable, but a DAY SERIES
+   needs to know which days the route was even running. */
+const actRec = A.index({ open: shape(open), sub: shape(sub), act: shapeAct(act) });
+check('the activation counter has a birthday of its own now',
+  actRec.actFirst === C1 && A.actKnown(actRec, C1) === true &&
+  A.actKnown(actRec, A.addDays(C1, -1)) === false, String(actRec.actFirst));
+check('and a report with no activation rows has none, rather than claiming day one',
+  legacy.actFirst === null && A.actKnown(legacy, LAST) === false);
+
+/* Measuring at day N: retention's twin, with one extra exclusion nothing else
+   here has — a cohort whose day N fell before the counter shipped is neither
+   churned nor too young. */
+const m0 = A.measuringAt(mix, mix.cohorts, 0);
+check('D0 measuring counts only the cohort the counter could see',
+  m0.kept === 8 && m0.of === 20 && m0.cohorts === 1 && m0.blind === 2, JSON.stringify(m0));
+check('and reads 40%', near(m0.pct, 40), String(m0.pct));
+
+const m1 = A.measuringAt(mix, mix.cohorts, 1);
+check('D1 measuring pools the two covered cohorts',
+  m1.kept === 14 && m1.of === 70 && m1.cohorts === 2 && m1.blind === 1, JSON.stringify(m1));
+
+const m7 = A.measuringAt(mix, mix.cohorts, 7);
+check('D7 measuring separates too-young from before-the-counter',
+  m7.kept === 6 && m7.of === 50 && m7.immature === 1 && m7.blind === 1, JSON.stringify(m7));
+
+const m21 = A.measuringAt(mix, mix.cohorts, 21);
+check('D21 measuring is C1 alone', m21.kept === 4 && m21.of === 100 && m21.cohorts === 1, JSON.stringify(m21));
+
+const mCurve = A.measuringCurve(mix, mix.cohorts, 60);
+check('the habit curve starts at D0 and stops where nothing is knowable',
+  mCurve.length > 0 && near(mCurve[0].pct, 40) && mCurve.length <= 31, String(mCurve.length));
+
+/* The counter's start day is read UNFILTERED. Android shipped the route in its
+   own release, so dating it from a platform slice would date it from the wrong
+   build — and the slice itself is still strict. */
+const iosMix = A.index({ open: shape(open), sub: shape(sub), hrv: shape(hrv) }, 'ios');
+check('hrvFirst survives a platform slice that keeps none of the rows',
+  iosMix.hrvFirst === HRV_FIRST && A.readingsOn(iosMix, '2026-06-21') === 0);
+
+/* A report cached before the reading counter existed must read as "no readings
+   yet", never as a crash and never as a wall of zero percents. */
+check('a report with no hrv rows knows nothing rather than claiming zero',
+  legacy.hrvFirst === null && A.hrvKnown(legacy, LAST) === false &&
+  A.measureShare(legacy, LAST) === null && A.measureRate(legacy, [LAST]).available === false);
+
+/* --------------------------------------------- what readings are taken with
+
+   The daily counter carries the same sensor letter the activation route does.
+   Two rules the UI leans on: the letter splits the KEY and never the count (so
+   a day's readings still sum to what they always summed to), and a row written
+   before the letter shipped is "no sensor", which is NOT the same as a day the
+   counter itself was not running. */
+
+const sensed = A.index({
+  hrv: [
+    { day: C3, total: 9, cohorts: [
+      { cohort: C3, platform: 'I', method: 'W', count: 3 },
+      { cohort: C3, platform: 'I', method: 'G', count: 2 },
+      { cohort: C3, platform: 'A', method: 'F', count: 1 },
+      // the same cohort+platform again with no letter: a build that predates it
+      { cohort: C3, platform: 'I', method: null, count: 3 },
+    ] },
+    { day: A.addDays(C3, 1), total: 2, cohorts: [
+      { cohort: C3, platform: 'I', method: 'B', count: 2 },
+    ] },
+  ],
+});
+
+check('the sensor letter does not change what a day counts',
+  A.readingsOn(sensed, C3) === 9, String(A.readingsOn(sensed, C3)));
+check('a day splits by sensor, with the letterless rows disclosed as unknown',
+  JSON.stringify(A.hrvMethodsOn(sensed, C3)) === JSON.stringify({ W: 3, G: 2, F: 1, '?': 3 }),
+  JSON.stringify(A.hrvMethodsOn(sensed, C3)));
+check('Garmin is a sensor of its own',
+  A.methodName('G') === 'Garmin watch' && A.METHOD_ORDER.indexOf('G') > -1);
+check('the split pools over days',
+  A.hrvMethodsOver(sensed, [C3, A.addDays(C3, 1)]).B === 2);
+check('a day that named a sensor is separable from one that only has unknowns',
+  A.hrvMethodKnown(sensed, C3) === true &&
+  A.hrvMethodKnown(A.index({ hrv: [{ day: C3, total: 2, cohorts: [
+    { cohort: C3, platform: 'I', method: null, count: 2 }] }] }), C3) === false);
+check('a report whose hrv rows predate the letter still knows the counter ran',
+  A.hrvKnown(sensed, C3) === true);
+/* ------------------------------------------ the reading route's SENSOR
+ *
+ * A third staggered start, one level below `hrvFirst`: the reading route
+ * shipped anonymous as to sensor and gained the letter in a later build. Rows
+ * from between the two are real readings whose sensor was never asked for, and
+ * pooling them under '?' would put a wall of "unknown sensor" across the
+ * history — a claim about the data standing in for a fact about the instrument.
+ *
+ * The fixture's load-bearing day is 2026-06-22, where TWO cohorts measured on
+ * DIFFERENT sensors. A day's `methods` map pools every cohort in it, so an
+ * age-based mix built from that map would hand C2's day 7 the strap readings
+ * that belonged to C1's day 22. `cohortMethods` keeps the cross that the
+ * storage key already carried, and this is the case that proves it. */
+const METHOD_FIRST = '2026-06-22';
+const hrvM = {};                                    // day -> cohort -> {method: n}
+put(hrvM, METHOD_FIRST, C2, { W: 2, F: 4 });        // C2's D7  — 6 of 50
+put(hrvM, METHOD_FIRST, C1, { B: 3 });              // C1's D22 — same day, other sensor
+put(hrvM, C3, C3, { F: 6, B: 2 });                  // C3's D0  — 8 of 20
+put(hrvM, '2026-06-29', C3, { F: 1, B: 3 });        // C3's D1
+
+const shapeM = (plain, withMethod) => {
+  const days = [...new Set([...Object.keys(plain), ...Object.keys(withMethod)])].sort();
+  return days.map((day) => {
+    const rows = [];
+    Object.keys(plain[day] || {}).forEach((cohort) => rows.push({ cohort, count: plain[day][cohort] }));
+    Object.keys(withMethod[day] || {}).forEach((cohort) => {
+      Object.keys(withMethod[day][cohort]).forEach((method) => {
+        rows.push({ cohort, method, count: withMethod[day][cohort][method] });
+      });
+    });
+    return { day, total: rows.reduce((a, r) => a + r.count, 0), cohorts: rows };
+  });
+};
+
+// The letterless days that survive from the block above, plus the new ones.
+const sensored = A.index({
+  open: shape(open),
+  hrv: shapeM({ [HRV_FIRST]: { [C2]: 9 }, '2026-06-21': { [C1]: 4 } }, hrvM),
+});
+
+check('the sensor letter has its own start day, later than the counter\'s',
+  sensored.hrvFirst === HRV_FIRST && sensored.hrvMethodFirst === METHOD_FIRST,
+  sensored.hrvFirst + ' / ' + sensored.hrvMethodFirst);
+check('a reading day before the letter is unknown as to sensor, not "?"',
+  A.hrvMethodKnown(sensored, '2026-06-21') === false &&
+  A.hrvMethodKnown(sensored, METHOD_FIRST) === true);
+check('a day\'s sensor split pools every cohort measuring that day',
+  JSON.stringify(A.hrvMethodsOn(sensored, METHOD_FIRST)) === JSON.stringify({ W: 2, F: 4, B: 3 }),
+  JSON.stringify(A.hrvMethodsOn(sensored, METHOD_FIRST)));
+/* Pooled: the two letterless days (C2's 9 and C1's 4) drop out entirely, so
+   this is 06-22 + C3's D0 + C3's D1 and nothing else. */
+const pooledM = A.hrvMethodsOver(sensored, A.range(FIRST, LAST));
+check('pooling over a range drops the days the letter had not shipped',
+  pooledM.W === 2 && pooledM.B === 8 && pooledM.F === 11 && pooledM['?'] === undefined,
+  JSON.stringify(pooledM));
+
+/* THE cross test: C2's day 7 is 2026-06-22, the day C1 also measured on a
+   strap. C2 used a watch and the camera; the strap must not appear. */
+const mix7 = A.hrvMethodsAt(sensored, sensored.cohorts, 7);
+check('an age\'s sensor mix takes only its own cohort\'s readings from a shared day',
+  JSON.stringify(mix7.methods) === JSON.stringify({ W: 2, F: 4 }) && mix7.total === 6,
+  JSON.stringify(mix7));
+
+const mix0 = A.hrvMethodsAt(sensored, sensored.cohorts, 0);
+check('D0 sensor mix counts the one cohort born after the letter shipped',
+  mix0.total === 8 && mix0.cohorts === 1 && mix0.blind === 2, JSON.stringify(mix0));
+check('and the older cohorts are blind, never a zero band',
+  JSON.stringify(mix0.methods) === JSON.stringify({ F: 6, B: 2 }), JSON.stringify(mix0.methods));
+
+const mCurveM = A.hrvMethodCurve(sensored, sensored.cohorts, 30);
+check('the age curve starts at D0 and ends on a day with readings',
+  mCurveM.length > 0 && mCurveM[0].total === 8 &&
+  mCurveM[mCurveM.length - 1].available === true, String(mCurveM.length));
+
+/* A report whose reading rows all predate the letter must say so, rather than
+   drawing every reading as an unknown sensor. */
+const anon = A.index({ open: shape(open), hrv: shape(hrv) });
+check('reading rows that never named a sensor leave the breakdown empty',
+  anon.hrvMethodFirst === null &&
+  A.hrvMethodKnown(anon, LAST) === false &&
+  JSON.stringify(A.hrvMethodsOver(anon, A.range(FIRST, LAST))) === '{}');
 
 /* -------------------------------------------------------------- report */
 

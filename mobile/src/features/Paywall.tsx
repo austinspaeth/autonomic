@@ -2,7 +2,7 @@
  * Pro paywall — an on-demand card sheet, not a wall. Freemium: the app is
  * always usable (journaling and live HRV capture are free forever, with no
  * daily cap); locked surfaces (Progress week/month/year, Insights, AI reports,
- * POTS captures, watch POTS tests) call usePaywall() to raise this card. It
+ * POTS results) call usePaywall() to raise this card. It
  * dismisses with the sheet's ✕ / backdrop and closes itself the moment an
  * entitlement lands (purchase or restore).
  *
@@ -14,8 +14,9 @@ import { ActivityIndicator, Linking, Platform, Pressable, Text, View } from 'rea
 import { BrandMark, Icon, IconName } from '../components/Icon';
 import { SheetControls, SheetFooter, useSheets } from '../components/Sheet';
 import { Button } from '../components/ui';
-import { radius, usePalette } from '../theme';
+import { CAUTION_GOLD, CAUTION_GOLD_SOFT, radius, usePalette } from '../theme';
 import { notePaywallSeen } from '../lib/review';
+import { pingPaywall } from '../store/ping';
 import {
   useIap, subscribe, restore, refreshEntitlement, ensureIapReady, clearIapError,
   YEARLY_SKU, MONTHLY_SKU, priceOf, hasTrial, trialDaysOf,
@@ -29,11 +30,36 @@ const PRIVACY_URL = 'https://autonomic.care/privacy-policy/';
 const VALUE: { icon: IconName; title: string; sub: string }[] = [
   { icon: 'chart', title: 'Your full history', sub: 'Week, month, and year progress views over every number you’ve logged.' },
   { icon: 'bulb', title: 'Insights from your own log', sub: 'What is linked to what across your readings, sleep, meds and symptoms, worked out on your phone.' },
-  { icon: 'standing', title: 'POTS testing', sub: 'Guided stand tests and episode capture, graded against clinical criteria.' },
+  { icon: 'standing', title: 'POTS results', sub: 'Stand test and episode results, graded against clinical criteria and tracked over time.' },
   { icon: 'ai', title: 'AI-ready reports', sub: 'Turn your logged data into deep-dive prompts and doctor-visit summaries.' },
 ];
 
 const numeric = (s: string) => parseFloat(s.replace(/[^0-9.]/g, '')) || 0;
+
+/**
+ * Shown IN PLACE OF the buy button when the store has told us this device can
+ * never complete a purchase (`blocked` in src/store/iap.ts).
+ *
+ * A button here would be a button that cannot work, and the app already has a
+ * rule about that: the impossible option is made unavailable rather than
+ * tappable-then-refused (the same reason a strap sending no beat intervals
+ * disables Start rather than spending five minutes on a reading it will
+ * decline). A greyed-out button with no explanation would be worse than the
+ * failure it replaces, so the reason and the remedy ARE the control.
+ *
+ * Caution gold rather than the red of `StoreError`: nothing has failed, and
+ * nothing the user did caused it. It is a condition on the device with one
+ * thing to do about it.
+ */
+export function StoreBlockedNotice({ text }: { text: string }) {
+  const p = usePalette();
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 9, padding: 12, borderRadius: radius.control, borderWidth: 1, borderColor: 'rgba(234,179,8,0.4)', backgroundColor: CAUTION_GOLD_SOFT }}>
+      <Icon name="alert" size={16} color={CAUTION_GOLD} />
+      <Text style={{ flex: 1, color: p.text, fontSize: 13, lineHeight: 19 }}>{text}</Text>
+    </View>
+  );
+}
 
 /** A store failure has to be reported INSIDE the sheet: the sheet stack is one
  *  RN Modal painted above the ToastProvider, so a toast here is invisible and
@@ -97,17 +123,41 @@ function PlanCard({ name, price, period, note, badge, selected, onPress }: {
   );
 }
 
-/** Raise the paywall card from any locked surface. */
-export function usePaywall(): () => void {
+/**
+ * Which locked surface is raising the card. Required, not optional: this is the
+ * only place the app can name a wall, so a lock that shipped without a name
+ * would be counted as a paywall from nowhere. Adding a locked surface is
+ * therefore a compile error until it says where it is — see `surfaceCode` in
+ * lib/ping, which maps these onto the letter the ping carries.
+ */
+export type PaywallSource =
+  | 'progress'      // a locked Progress range: Week / Month / Year / custom
+  | 'insights'      // the Insights tab's locked overlay
+  | 'pots'          // a POTS result (the capture itself is free)
+  | 'outlook-ai'    // the Outlook's AI report
+  | 'metric-ai'     // a metric card's AI report
+  | 'insights-ai'   // the Insights AI report
+  | 'settings';     // the Upgrade button in Settings — the one that isn't a wall
+
+/**
+ * Raise the paywall card from any locked surface.
+ *
+ * The ping fires here rather than inside `PaywallCard` so that it counts the
+ * REQUEST, not the render: the card is one sheet in a stack and a failed open
+ * is still a user who met a wall. It is capped at one per Eastern day inside
+ * `pingPaywall`, so this stays a plain call with no bookkeeping of its own.
+ */
+export function usePaywall(source: PaywallSource): () => void {
   const { openSheet } = useSheets();
   return React.useCallback(() => {
+    pingPaywall(source);
     openSheet((c) => <PaywallCard controls={c} />);
-  }, [openSheet]);
+  }, [openSheet, source]);
 }
 
 export function PaywallCard({ controls }: { controls: SheetControls }) {
   const p = usePalette();
-  const { isPro, products, purchasing, error } = useIap();
+  const { isPro, products, purchasing, error, blocked } = useIap();
   const { openSheet } = useSheets();
   const [sku, setSku] = useState(YEARLY_SKU);
 
@@ -159,7 +209,7 @@ export function PaywallCard({ controls }: { controls: SheetControls }) {
           See your nervous system recover
         </Text>
         <Text style={{ color: p.textDim, fontSize: 15.5, textAlign: 'center', lineHeight: 23 }}>
-          Your full history, Insights, POTS testing, and AI-ready reports.
+          Your full history, Insights, POTS results, and AI-ready reports.
         </Text>
       </View>
 
@@ -199,13 +249,17 @@ export function PaywallCard({ controls }: { controls: SheetControls }) {
       </View>
 
       <View style={{ gap: 12 }}>
-        {error ? <StoreError text={error} /> : null}
-        <Button
-          title={purchasing ? 'Starting…' : trial ? `Start ${freeFor(trialDays).toLowerCase()}` : 'Upgrade to Pro'}
-          variant="primary"
-          disabled={purchasing}
-          onPress={() => subscribe(sku)}
-        />
+        {error && !blocked ? <StoreError text={error} /> : null}
+        {blocked ? (
+          <StoreBlockedNotice text={blocked} />
+        ) : (
+          <Button
+            title={purchasing ? 'Starting…' : trial ? `Start ${freeFor(trialDays).toLowerCase()}` : 'Upgrade to Pro'}
+            variant="primary"
+            disabled={purchasing}
+            onPress={() => subscribe(sku)}
+          />
+        )}
         {purchasing ? <ActivityIndicator color={p.accent} /> : null}
         <Text style={{ color: p.textDim, fontSize: 13, textAlign: 'center' }}>
           {trial
@@ -243,6 +297,9 @@ const SHARED_ROWS: string[] = [
   'Journaling: sleep, meds, symptoms, triggers, hydration',
   'Manual readings: BP, resting heart rate, episodes',
   'Daily autonomic score & outlook',
+  Platform.OS === 'ios'
+    ? 'POTS stand tests & episode captures, on your watch or a strap'
+    : 'POTS stand tests & episode captures from a chest strap',
   ...(Platform.OS === 'ios' ? ['Apple Watch heart-rate monitor'] : []),
   'Backups & data export',
 ];
@@ -250,7 +307,7 @@ const SHARED_ROWS: string[] = [
 const PRO_ROWS: { label: string; freeText?: string; proText?: string }[] = [
   { label: 'Progress charts', freeText: '14 days', proText: 'All views' },
   { label: 'Full historical metric analysis' },
-  { label: 'POTS testing & episode tracking' },
+  { label: 'POTS test & episode results' },
   { label: 'AI insights & doctor reports' },
 ];
 
@@ -259,7 +316,7 @@ const PRO_W = 88;
 
 export function FreeVsProCard({ controls }: { controls: SheetControls }) {
   const p = usePalette();
-  const { isPro, products, purchasing, error } = useIap();
+  const { isPro, products, purchasing, error, blocked } = useIap();
   // Purchase landed (from the CTA below, or restored) — close up.
   useEffect(() => { if (isPro) controls.close(); }, [isPro, controls]);
   const mPrice = priceOf(products.find((s) => s.productId === MONTHLY_SKU), MONTHLY_SKU);
@@ -338,17 +395,21 @@ export function FreeVsProCard({ controls }: { controls: SheetControls }) {
           (paddingBottom = footerH + 20), so no extra tail spacer here. */}
       <SheetFooter>
         <View style={{ flex: 1 }}>
-          {error ? <View style={{ marginBottom: 10 }}><StoreError text={error} /></View> : null}
-          <Pressable
-            onPress={() => subscribe(MONTHLY_SKU)}
-            disabled={purchasing}
-            style={({ pressed }) => [{ height: 52, borderRadius: 14, backgroundColor: p.accent, alignItems: 'center', justifyContent: 'center' }, (pressed || purchasing) && { opacity: 0.8 }]}
-          >
-            <Text style={{ color: '#fff', fontSize: 15.5, fontWeight: '700' }}>{purchasing ? 'Starting…' : `Upgrade to Pro · ${mPrice}/mo`}</Text>
-          </Pressable>
-          <Text style={{ color: p.textDim, fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: 9 }}>
-            {`or ${yPrice}/yr · cancel anytime\nYour journal is always yours: private, on-device, exportable.`}
-          </Text>
+          {error && !blocked ? <View style={{ marginBottom: 10 }}><StoreError text={error} /></View> : null}
+          {blocked ? <StoreBlockedNotice text={blocked} /> : (
+            <>
+              <Pressable
+                onPress={() => subscribe(MONTHLY_SKU)}
+                disabled={purchasing}
+                style={({ pressed }) => [{ height: 52, borderRadius: 14, backgroundColor: p.accent, alignItems: 'center', justifyContent: 'center' }, (pressed || purchasing) && { opacity: 0.8 }]}
+              >
+                <Text style={{ color: '#fff', fontSize: 15.5, fontWeight: '700' }}>{purchasing ? 'Starting…' : `Upgrade to Pro · ${mPrice}/mo`}</Text>
+              </Pressable>
+              <Text style={{ color: p.textDim, fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: 9 }}>
+                {`or ${yPrice}/yr · cancel anytime\nYour journal is always yours: private, on-device, exportable.`}
+              </Text>
+            </>
+          )}
         </View>
       </SheetFooter>
     </View>

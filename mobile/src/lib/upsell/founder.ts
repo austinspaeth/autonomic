@@ -72,6 +72,21 @@ export interface FounderInput {
   crashAlertFiredToday?: boolean;
   /** `detectDownturn` says the user is sliding. */
   downturn?: boolean;
+  /**
+   * Another offer was raised inside the shared cool-down (./pacing). The app
+   * shows ONE offer at a time — and the annual card's 24h unlock reports
+   * 'trial', so without this it made THIS card due the moment it appeared.
+   */
+  offerCooldown?: boolean;
+  /**
+   * The half-off annual window is running right now (./annual). Suppresses this
+   * card outright — INCLUDING on a day it had already claimed, which is the one
+   * thing the cool-down can't reach, because a claimed day renders from memory
+   * and never asks again. That's how a phone already holding both offers gets
+   * back to showing one: the live window wins, since it is the offer the user
+   * can currently act on and it is over within a day.
+   */
+  annualOfferLive?: boolean;
 }
 
 export type FounderVerdict =
@@ -93,6 +108,9 @@ export function founderVerdict(input: FounderInput): FounderVerdict {
   const { days, dk, tier, memory } = input;
 
   if (memory.dismissed) return { ok: false, reason: 'dismissed' };
+  // Checked BEFORE the claimed-day shortcut below: two offers on screen at once
+  // is worse than this one going quiet, whatever it has already claimed.
+  if (input.annualOfferLive) return { ok: false, reason: 'annual-offer-live' };
   // Already claimed a day. Today or never.
   if (memory.shownDk) {
     return memory.shownDk === dk ? { ok: true, claim: false } : { ok: false, reason: 'day-passed' };
@@ -105,6 +123,7 @@ export function founderVerdict(input: FounderInput): FounderVerdict {
   if (input.sheetOpen) return { ok: false, reason: 'sheet-open' };
   if (input.crashAlertFiredToday) return { ok: false, reason: 'crash-alert-today' };
   if (input.downturn) return { ok: false, reason: 'downturn' };
+  if (input.offerCooldown) return { ok: false, reason: 'offer-cooldown' };
 
   return { ok: true, claim: true };
 }

@@ -20,23 +20,24 @@ import { Pressable, Text, TextInput, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { SheetControls, SheetFooter, useSheets } from '../components/Sheet';
 import { TextField } from '../components/Field';
-import { Button } from '../components/ui';
+import { Button, DaySaveButton } from '../components/ui';
 import { Icon } from '../components/Icon';
 import { useToast } from '../components/Toast';
 import { radius, usePalette } from '../theme';
 import type { Entry } from '../lib/types';
 import { addCustomType, deleteType, editType, typeInUse, typesFor } from '../lib/typeCatalog';
 import { ensureDay, getState, save, upsertEntry, useAppState } from '../store/store';
-import { defaultTimeFor, uid } from '../lib/dates';
+import { defaultTimeFor, isPastDay, uid } from '../lib/dates';
 
 export type LogKind = 'meds' | 'symptoms' | 'triggers';
 
 const COPY: Record<LogKind, {
-  logTitle: string; logSub: string; zeroLabel: string; editListLabel: string; editSub: string;
+  logTitle: string; logTitlePast: string; logSub: string; zeroLabel: string; editListLabel: string; editSub: string;
   cardAddTitle: string; cardEditTitle: string; namePlaceholder: string;
 }> = {
   meds: {
     logTitle: 'What did you take?',
+    logTitlePast: 'What did you take that day?',
     logSub: 'Select everything you took, then log it together.',
     zeroLabel: 'Select what you took',
     editListLabel: 'Edit medication list',
@@ -47,6 +48,7 @@ const COPY: Record<LogKind, {
   },
   symptoms: {
     logTitle: 'What are you feeling?',
+    logTitlePast: 'What were you feeling?',
     logSub: 'Select every symptom that applies.',
     zeroLabel: 'Select your symptoms',
     editListLabel: 'Edit symptom list',
@@ -57,6 +59,7 @@ const COPY: Record<LogKind, {
   },
   triggers: {
     logTitle: 'Any triggers today?',
+    logTitlePast: 'Any triggers that day?',
     logSub: 'Select everything you were exposed to.',
     zeroLabel: 'Select your triggers',
     editListLabel: 'Edit trigger list',
@@ -167,6 +170,8 @@ export function LogPickerSheet({ kind, dk, controls }: { kind: LogKind; dk: stri
   const [confirmKey, setConfirmKey] = useState<string | null>(null);
 
   const isEdit = mode === 'edit';
+  // Back-dated day: the copy can't say "today", and the footer commits in gold.
+  const past = isPastDay(dk);
   const typeMap = typesFor(state, kind);
   const q = query.trim();
   const keys = Object.keys(typeMap);
@@ -205,7 +210,7 @@ export function LogPickerSheet({ kind, dk, controls }: { kind: LogKind; dk: stri
     <View>
       <Animated.View layout={SPRING}>
         <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, paddingRight: 56 }}>
-          {isEdit ? 'Edit your list' : copy.logTitle}
+          {isEdit ? 'Edit your list' : past ? copy.logTitlePast : copy.logTitle}
         </Text>
         <Text style={{ color: p.textDim, fontSize: 14, marginTop: 2, marginBottom: 14 }}>
           {isEdit ? copy.editSub : copy.logSub}
@@ -337,7 +342,7 @@ export function LogPickerSheet({ kind, dk, controls }: { kind: LogKind; dk: stri
                   style={{ flexDirection: 'row', alignItems: 'center', gap: 7, paddingBottom: 11, paddingLeft: 37 }}
                 >
                   <Icon name="alert" size={14} color={CAUTION} />
-                  <Text style={{ flex: 1, color: CAUTION, fontSize: 12.5 }}>Heads up: you already logged this today.</Text>
+                  <Text style={{ flex: 1, color: CAUTION, fontSize: 12.5 }}>{`Heads up: you already logged this ${past ? 'day' : 'today'}.`}</Text>
                 </Animated.View>
               )}
               </View>
@@ -360,12 +365,19 @@ export function LogPickerSheet({ kind, dk, controls }: { kind: LogKind; dk: stri
             <Button title="Done editing" variant="primary" onPress={() => { setConfirmKey(null); setMode('log'); }} />
           ) : (
             <>
-              <Button
-                title={count === 0 ? copy.zeroLabel : count === 1 ? 'Log 1 item' : `Log ${count} items`}
-                variant="primary"
-                disabled={count === 0}
-                onPress={logSelected}
-              />
+              {/* Nothing selected: the button is a prompt, not an action, so
+                  it stays neutral rather than announcing a day it won't write
+                  to. Once something IS selected it becomes a commit, and on a
+                  back-dated day it says which day it commits to. */}
+              {count === 0 ? (
+                <Button title={copy.zeroLabel} variant="primary" disabled onPress={logSelected} />
+              ) : (
+                <DaySaveButton
+                  dk={dk}
+                  title={count === 1 ? 'Log 1 item' : `Log ${count} items`}
+                  onPress={logSelected}
+                />
+              )}
               <Button title={copy.editListLabel} onPress={() => { setQuery(''); setMode('edit'); }} />
             </>
           )}

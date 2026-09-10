@@ -165,6 +165,7 @@ async function signIn(window) {
   /* Same rule the gate test pins, restated because this change added two new
      absolute URLs and a relative one would break /master with no slash. */
   const relative = [...html.replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/(<script\b[^>]*>)[\s\S]*?<\/script>/gi, '$1</script>')
     .matchAll(/(?:src|href)="(?!https?:|\/\/|\/|#|data:|mailto:)([^"]*)"/g)].map((m) => m[1]);
   check('nothing the page references is relative', relative.length === 0, relative.join(', '));
 }

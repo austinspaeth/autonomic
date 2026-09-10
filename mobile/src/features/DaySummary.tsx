@@ -3,7 +3,7 @@
  * flags, and the streak card — ported from renderDaySummary. The "What powers
  * this" button opens the score-explanation sheet (openScoreExplain).
  */
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { type LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Defs, LinearGradient as SvgGradient, RadialGradient, Rect, Stop } from 'react-native-svg';
 import Animated, { Easing, useAnimatedProps, useAnimatedStyle, useSharedValue, withDelay, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
@@ -18,47 +18,37 @@ import { TrendCard } from './TrendCard';
 import { HrvSetup } from './hrv/Setup';
 import { MilestoneProgressCard } from './Milestones';
 import { ProtocolEditor } from './ProtocolEditor';
-import { radius, type as T, usePalette } from '../theme';
+import { fonts, radius, type as T, usePalette } from '../theme';
 import { SCORE_COLORS, GRADE_LABEL, GRADE_PTS, catFromBands } from '../lib/scoring';
 import {
-  OUTLOOK_GUIDE, TOMORROW, SCORE_TIPS, blueZone, protocolCriteria, readingPeriod, resolveProtocol,
-  scoreCat, scoreSet, streakInfo, streakTier, type DaysMap, type ScoreComp, type ScoreSetResult,
+  OUTLOOK_GUIDE, SCORE_TOTAL_WEIGHT, SCORE_WEIGHTS, TOMORROW, SCORE_TIPS, blueZone, protocolCriteria,
+  readingPeriod, resolveProtocol, scoreCat, scoreSet, sleepGrade, sleepHours, streakInfo, streakTier,
+  type DaysMap, type ScoreComp, type ScoreSetResult,
 } from '../lib/scoring/day';
 import { detectDownturn, type Downturn } from '../lib/scoring/downturn';
 import { detectStrain, type Strain } from '../lib/scoring/strain';
 import { hasHrvReading, trustedReadings } from '../lib/hrvQuality';
 import { buildDownturnPrompt, buildStrainPrompt } from '../lib/analysis/reports';
 import { PromptSheet } from './PromptSheet';
-import { todayKey } from '../lib/dates';
+import { addDays, todayKey } from '../lib/dates';
+import { hexA, mixHex } from '../lib/color';
+import { LEVEL_DELTA, scoreTrend, type ScoreTrend } from '../lib/scoring/scoreTrend';
 import { getState, useAppState } from '../store/store';
-import { setJournalSectionY, useExpandProtocolSignal } from '../store/nav';
+import { setJournalSectionY } from '../store/nav';
 import { useTier } from '../store/tier';
 import { usePaywall } from './Paywall';
 
 import type { AppState, Band, ScoreCat } from '../lib/types';
 import type { ScoreContext } from '../lib/scoring';
 
-const hexA = (hex: string, a: number) => {
-  const m = /^#?([0-9a-f]{6})$/i.exec(hex);
-  if (!m) return hex;
-  const n = parseInt(m[1], 16);
-  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
-};
-
-// Opaque blend of `t` parts color into base — flag/warning containers use this
-// instead of a transparent tint so text stays readable over the hero's wash.
-const mixHex = (color: string, base: string, t: number) => {
-  const mc = /^#?([0-9a-f]{6})$/i.exec(color), mb = /^#?([0-9a-f]{6})$/i.exec(base);
-  if (!mc || !mb) return base;
-  const nc = parseInt(mc[1], 16), nb = parseInt(mb[1], 16);
-  const ch = (sh: number) => Math.round(((nc >> sh) & 255) * t + ((nb >> sh) & 255) * (1 - t));
-  return `rgb(${ch(16)},${ch(8)},${ch(0)})`;
-};
-
 // Warning/crash containers blend their severity color into this near-black
 // instead of `p.surface`, so the fill reads as a dark tinted panel rather than
 // a washed-out surface. Same mix ratios as elsewhere, darker base.
 const WARN_BASE = '#0d0d0f';
+
+/** The grade tag's height. The Outlook's explain mark takes it as an invisible
+ *  tap target, so the two sit on one baseline and the row's height never moves. */
+const GRADE_PILL_H = 26;
 
 
 // Status-color highlight on one top border edge, fading down the sides into
@@ -73,7 +63,7 @@ const WARN_BASE = '#0d0d0f';
 // two states, and the light says which.
 let obId = 0;
 const AnimatedRect = Animated.createAnimatedComponent(Rect);
-export function GradientBorderCard({ color, trigger, corner = 'topLeft', glow: wash, style, children }: { color: string | null; trigger?: string; corner?: 'topLeft' | 'topRight'; glow?: boolean; style?: any; children: React.ReactNode }) {
+export function GradientBorderCard({ color, trigger, corner = 'topLeft', glow: wash, flash, style, children }: { color: string | null; trigger?: string; corner?: 'topLeft' | 'topRight'; glow?: boolean | number; flash?: boolean; style?: any; children: React.ReactNode }) {
   const p = usePalette();
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [gid] = useState(() => `ob${obId++}`);
@@ -82,17 +72,40 @@ export function GradientBorderCard({ color, trigger, corner = 'topLeft', glow: w
   // border flashes full status color (thick + opaque), then eases down to reveal
   // the resting top-left gradient underneath. `glow` runs 1 → 0 over the settle.
   const glow = useSharedValue(0);
+  // The surface fill runs on its own, SHORTER clock than the border. The border
+  // is a hairline settling into place and can take its time; a tinted fill over
+  // live text is the loudest thing on the screen, so it gets out of the way
+  // first and leaves the border still arriving.
+  const fill = useSharedValue(0);
   useEffect(() => {
     if (!color) return;
     glow.value = withSequence(
       withTiming(1, { duration: 0 }),
       withTiming(0, { duration: 3200, easing: Easing.out(Easing.cubic) }),
     );
-  }, [color, trigger, glow]);
+    fill.value = withSequence(
+      withTiming(1, { duration: 0 }),
+      withTiming(0, { duration: 1700, easing: Easing.out(Easing.cubic) }),
+    );
+  }, [color, trigger, glow, fill]);
   const glowProps = useAnimatedProps(() => ({
     strokeOpacity: glow.value,
     strokeWidth: 1 + glow.value * 2,
   }));
+  // `flash` gives the SURFACE its own arrival beside the border's: the whole
+  // card starts filled with the status colour and, over a shorter settle, that
+  // fill collapses into the resting corner wash underneath it. Two stacked layers
+  // rather than one animated gradient — the flash layer is a radial wide enough
+  // to cover the card (so at full opacity it reads as a solid coloured card),
+  // and fading its opacity to 0 reveals the tight top-corner wash beneath. A
+  // View opacity is cheap; animating an SVG gradient's radii is not.
+  const flashStyle = useAnimatedStyle(() => ({ opacity: fill.value }));
+  // Mixed INTO the surface rather than laid over it: a fill of the raw status
+  // colour is a bright panel, and the tight corner wash it collapses into then
+  // has nothing to pop against. Blending toward the dark surface first keeps the
+  // arrival a dark tinted card, so the corner is the brightest thing left.
+  const fillColor = color ? mixHex(color, p.surface, 0.24) : p.surface;
+  const washPeak = typeof wash === 'number' ? wash : 0.14;
   return (
     <View
       onLayout={(e) => { const { width, height } = e.nativeEvent.layout; setSize({ w: width, h: height }); }}
@@ -106,7 +119,18 @@ export function GradientBorderCard({ color, trigger, corner = 'topLeft', glow: w
           so it may raise the surface, never tint it. The alpha is deliberately low
           enough that the corner reads as warm grey rather than as red: any stronger
           and the card starts to look like the warning cards, which are the one thing
-          in this slot that IS meant to be alarming. */}
+          in this slot that IS meant to be alarming.
+
+          `glow` may be a NUMBER, which sets the peak alpha at the lit corner. The
+          Outlook passes one: it used to lay a flat 10% tint of the grade colour
+          over its whole surface, and this wash only had to add a corner on top of
+          that. With the flat tint gone the card is honest dark grey everywhere and
+          the corner carries the colour on its own. It is deliberately set BELOW
+          what the flat tint and the old wash came to together: the corner is a hint
+          that the card has a grade, not a second way of stating it, and the tag and
+          the border say it already. The radial's REACH is unchanged either way — it
+          is down to a third of peak by 40% and gone well before the far edge, which
+          is what keeps "most of the card" out of it. */}
       {color && wash && size.w > 0 && (
         <View style={StyleSheet.absoluteFill} pointerEvents="none">
           <Svg width={size.w} height={size.h}>
@@ -119,14 +143,35 @@ export function GradientBorderCard({ color, trigger, corner = 'topLeft', glow: w
                 ry={size.h * 0.9}
                 gradientUnits="userSpaceOnUse"
               >
-                <Stop offset="0" stopColor={color} stopOpacity={0.14} />
-                <Stop offset="0.4" stopColor={color} stopOpacity={0.045} />
+                <Stop offset="0" stopColor={color} stopOpacity={washPeak} />
+                <Stop offset="0.4" stopColor={color} stopOpacity={washPeak * 0.32} />
                 <Stop offset="1" stopColor={color} stopOpacity={0} />
               </RadialGradient>
             </Defs>
             <Rect x={0} y={0} width={size.w} height={size.h} fill={`url(#${gid}w)`} />
           </Svg>
         </View>
+      )}
+      {color && flash && size.w > 0 && (
+        <Animated.View style={[StyleSheet.absoluteFill, flashStyle]} pointerEvents="none">
+          <Svg width={size.w} height={size.h}>
+            <Defs>
+              <RadialGradient
+                id={`${gid}f`}
+                cx={corner === 'topRight' ? size.w : 0}
+                cy={0}
+                rx={size.w * 2.2}
+                ry={size.h * 2.6}
+                gradientUnits="userSpaceOnUse"
+              >
+                <Stop offset="0" stopColor={fillColor} stopOpacity={0.95} />
+                <Stop offset="0.55" stopColor={fillColor} stopOpacity={0.75} />
+                <Stop offset="1" stopColor={fillColor} stopOpacity={0.5} />
+              </RadialGradient>
+            </Defs>
+            <Rect x={0} y={0} width={size.w} height={size.h} fill={`url(#${gid}f)`} />
+          </Svg>
+        </Animated.View>
       )}
       {children}
       {color && size.w > 0 && (
@@ -190,6 +235,11 @@ export function DaySummary({ dk }: { dk: string }) {
     [downturn, state.days, dk, ctx],
   );
 
+  // The footer's trend line and its vs-window delta. Memoized for the same
+  // reason `downturn` and `strain` are: a 'score' series runs a full scoreSet per
+  // day, so a fortnight of them on every Journal render is not free.
+  const trend = useMemo(() => scoreTrend(state.days, dk, ctx, addDays), [state.days, dk, ctx]);
+
   // Until the journal holds one real HRV reading there is no baseline for a
   // score to mean anything against, so the Outlook slot carries the ask instead
   // of a dial. Not a banner above the score — the whole point is that the score
@@ -201,21 +251,23 @@ export function DaySummary({ dk }: { dk: string }) {
       {baselineWaiting ? (
         <BaselineWaitingCard />
       ) : (
-        <GradientBorderCard color={!scored ? null : scoreCat(all.score!).color} trigger={dk} style={{ marginBottom: 12 }}>
+        <GradientBorderCard color={!scored ? null : scoreCat(all.score!).color} trigger={dk} glow={0.17} flash style={{ marginBottom: 12 }}>
           {!scored ? (
-            <UnscoredHero dk={dk} hasReadings={readings.length > 0} />
+            <UnscoredHero dk={dk} all={all} hasReadings={readings.length > 0} />
           ) : (
-            <ScoredHero dk={dk} readings={readings} d={d} all={all} ctx={ctx} onExplain={() => openSheet(() => <ScoreExplain all={all} dk={dk} />)} />
+            <ScoredHero dk={dk} readings={readings} d={d} all={all} ctx={ctx} trend={trend} onExplain={() => openSheet(() => <ScoreExplain all={all} dk={dk} />)} />
           )}
         </GradientBorderCard>
       )}
-      {/* Directly under the Outlook: the half-off year is time-boxed to 24h and
-          outranks the generic upsell, which suppresses itself while the offer's
-          unlock has the tier reading 'trial'. */}
+      {/* Directly under the Outlook: the half-off year, time-boxed to 24h. */}
       <AnnualOfferCard />
-      {/* The one-day founding-member offer. Independent of the annual card
-          above: it fires inside the install trial, that one fires long after it
-          has lapsed, so the two can never be due on the same day. */}
+      {/* The one-day founding-member offer. It and the card above share ONE
+          cool-down clock (src/lib/upsell/pacing): whichever opens first stamps
+          it, and nothing else may be raised for a week — so these two can never
+          be on screen together. They used to be able to: the annual card's 24h
+          unlock reports 'trial', which is exactly the state this one waits for,
+          so opening the half-price year made the founder card due underneath
+          it. */}
       <FounderOfferCard />
       {downturn ? (
         <WarningCard severity={downturn.severity} headline={downturn.headline}
@@ -307,7 +359,7 @@ function BaselineWaitingCard() {
 
 /** One placeholder bar, breathing slowly. Deliberately not a spinner: nothing
  *  is loading, these sections are genuinely empty. */
-function GhostBar({ width, delay }: { width: `${number}%`; delay: number }) {
+function GhostBar({ width, delay, mb = 10 }: { width: `${number}%`; delay: number; mb?: number }) {
   const t = useSharedValue(0.45);
   useEffect(() => {
     t.value = withDelay(delay, withRepeat(
@@ -320,16 +372,18 @@ function GhostBar({ width, delay }: { width: `${number}%`; delay: number }) {
     ));
   }, [t, delay]);
   const style = useAnimatedStyle(() => ({ opacity: t.value }));
-  return <Animated.View style={[{ width, height: 11, borderRadius: 999, backgroundColor: '#34343a', marginBottom: 10 }, style]} />;
+  return <Animated.View style={[{ width, height: 11, borderRadius: 999, backgroundColor: '#34343a', marginBottom: mb }, style]} />;
 }
 
 // Mirrors ScoredHero's shape so the card doesn't change silhouette once a score
 // lands: same header, same gauge in the same spot, greyed out and reading 0.
 // No capture button here — the Readings section below owns that action; this
 // card just points the way.
-function UnscoredHero({ dk, hasReadings }: { dk: string; hasReadings: boolean }) {
+function UnscoredHero({ dk, all, hasReadings }: { dk: string; all: ScoreSetResult; hasReadings: boolean }) {
   const p = usePalette();
-  const future = dk > todayKey();
+  const { openSheet } = useSheets();
+  const today = todayKey();
+  const future = dk > today;
   // The dial is deliberately recessive until there's a score to show, so the
   // ring and its number sit well below the body copy in contrast.
   const grey = p.textDim;
@@ -338,8 +392,7 @@ function UnscoredHero({ dk, hasReadings }: { dk: string; hasReadings: boolean })
       <Text style={[T.section, { color: p.textDim }]}>Autonomic Outlook</Text>
       <View style={{ alignItems: 'center', marginVertical: 8 }}>
         <ScoreGauge score={0} color={grey} track={hexA(grey, 0.16)}>
-          <Text style={{ fontSize: 57, fontWeight: '800', color: hexA(grey, 0.5), fontVariant: ['tabular-nums'], letterSpacing: -1 }}>0</Text>
-          <Text style={{ fontSize: 10, fontWeight: '700', letterSpacing: 1, color: hexA(grey, 0.42), marginTop: 4 }}>OUT OF 100</Text>
+          <Text style={{ fontSize: 57, fontFamily: fonts.numHeavy, color: hexA(grey, 0.5), fontVariant: ['tabular-nums'], letterSpacing: -1 }}>0</Text>
         </ScoreGauge>
       </View>
       <Text style={{ textAlign: 'center', fontSize: 17, fontWeight: '700', color: p.text }}>{future ? 'Future day' : 'Awaiting data'}</Text>
@@ -347,14 +400,209 @@ function UnscoredHero({ dk, hasReadings }: { dk: string; hasReadings: boolean })
         {future
           ? 'Nothing logged yet for this day.'
           : hasReadings
-            ? 'Awaiting HRV values to score this day. Capture a reading below, under Readings, and keep logging as the day goes. The more data points, the more accurate the score.'
+            ? 'Awaiting HRV values to score this day. Take a reading and keep logging as the day goes. The more data points, the more accurate the score.'
             : 'Start taking readings or logging data below to calculate an autonomic score for this day. The more data points, the more accurate the score.'}
       </Text>
+      {/* The same three tiles the scored card ends on. A day with no SCORE is not
+          a day with no data — sleep arrives from Health overnight and a resting HR
+          can be logged before any HRV exists — so this is where the row does its
+          most useful work: it shows which of the three is still missing, which is
+          exactly what the card above it is asking for.
+
+          Not on a future day. Every tile would be a ghost, and a breathing
+          placeholder on a day that has not happened yet promises something is on
+          its way rather than saying the day is empty. */}
+      {future ? null : <KeyFigures dk={dk} all={all} />}
+      {/* The same offer the baseline card makes, on the one day it can be acted
+          on. Wears the Readings section's own icon and label, because it is the
+          same action one scroll further down the same screen and two names for it
+          would read as two different things.
+
+          TODAY only, and that is a correctness rule rather than a taste one: a
+          live capture saves to the moment it happens and can never be back-dated,
+          so on a past day this button would quietly write into today and leave the
+          day the reader is looking at exactly as empty as before. The Journal's
+          Readings section is still the way to enter a value for an earlier day. */}
+      {dk === today ? (
+        <View style={{ flexDirection: 'row', marginTop: 16 }}>
+          <Button title="Capture HRV reading" icon="activity" variant="primary" onPress={() => openSheet((c) => <HrvSetup controls={c} />)} />
+        </View>
+      ) : null}
     </View>
   );
 }
 
-export function ScoredHero({ dk, readings, d, all, ctx, onExplain, days }: { dk: string; readings: any[]; d: any; all: ScoreSetResult; ctx: any; onExplain: () => void; days?: DaysMap }) {
+/**
+ * The two lines under the score, in the slot "OUT OF 100" used to hold.
+ *
+ * A denominator the reader learns once and then reads past, replaced by the two
+ * things on the card that are about THEM: has today moved against their own
+ * recent days, and has it moved since this morning. Both belong inside the ring
+ * because both are statements about the number they sit under — a divider at the
+ * foot of the card put one of them a paragraph of guidance away from the figure
+ * it described, and the reader had to carry a number down the card to use it.
+ *
+ * Stacked, in the same shape, so the pair reads as one block with two spans
+ * rather than as two findings: direction, figure, window. The window is named
+ * every time, never a vague "vs usual" — a delta whose window the reader has to
+ * guess at is a number they cannot use. The 7-day figure is a MEDIAN, read out as
+ * "avg" because the ring has a ring's worth of width and the distinction belongs
+ * in the explain sheet. `scoreTrend` owns which window it is and why.
+ *
+ * The vs-AM line only exists once a second reading lands, so on most days this is
+ * one line and the block does not reserve room for the other.
+ */
+function DeltaLine({ delta, label, level }: { delta: number; label: string; level?: boolean }) {
+  const p = usePalette();
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+      <Text
+        style={{
+          fontSize: 12, lineHeight: 14, fontWeight: '800', fontVariant: ['tabular-nums'],
+          color: level ? p.textDim : delta > 0 ? SCORE_COLORS.good : SCORE_COLORS.bad,
+        }}
+      >
+        {level ? 'Flat' : `${delta > 0 ? '\u25b2' : '\u25bc'} ${Math.abs(delta)}`}
+      </Text>
+      <Text style={{ fontSize: 12, lineHeight: 14, color: p.textDim, fontWeight: '600' }}>{label}</Text>
+    </View>
+  );
+}
+
+function GaugeDeltas({ trend, amDelta }: { trend: ScoreTrend | null; amDelta: number | null }) {
+  const window = trend && trend.delta != null && trend.direction != null && trend.windowDays != null ? trend : null;
+  const am = amDelta != null && Math.abs(amDelta) >= LEVEL_DELTA ? amDelta : null;
+  if (!window && am == null) return null;
+  return (
+    <>
+      {window ? (
+        <DeltaLine delta={window.delta!} level={window.direction === 'level'} label={`vs ${window.windowDays}d avg`} />
+      ) : null}
+      {am != null ? <DeltaLine delta={am} label="vs AM" /> : null}
+    </>
+  );
+}
+
+/**
+ * The three figures at the foot of the Outlook.
+ *
+ * The score above them is one number with nine inputs behind it, so a reader who
+ * wants to know WHY it moved has nowhere to go but the explain sheet. These are
+ * the three that answer it at a glance, and they are deliberately drawn from
+ * three DIFFERENT sources rather than the three heaviest weights: total power and
+ * pNN50 outrank resting HR and sleep in the score, but they arrive in the same
+ * reading RMSSD does, so all three tiles would fill together and empty together
+ * and a blank row would name one action instead of three.
+ *
+ *   HRV (RMSSD)   the score's largest single input, 25 of 95 — take a reading
+ *   Resting HR    the other autonomic axis, and the one every device supplies
+ *   Sleep         the biggest lever the reader actually controls overnight
+ *
+ * **Every figure is read back out of `ScoreSetResult`, never recomputed.** This
+ * shipped reading `TREND_METRICS[id].value` instead, which is a different
+ * question with a different answer, and the card contradicted its own explain
+ * sheet: the registry takes the plain MEAN of the day's readings, while the score
+ * blends them toward the most recent and quotes the latest reading that resolved
+ * the metric. A day holding three training readings showed 28.1 ms here and
+ * "21.62/20 ms" one tap away. Worse for HRV specifically, the registry averages
+ * TRAINING and BASELINE RMSSD into one figure, and those are graded on different
+ * bands (`rmssdS` / `rmssdU`) precisely because a paced reading runs higher — so
+ * the mean was two scales added together and then coloured against one of them.
+ * Reading `comps` makes the two physically incapable of disagreeing, and the band
+ * that tints a tile is the one that graded that same number upstairs.
+ *
+ * It also fixes what "empty" means: a tile is a ghost exactly when the component
+ * is absent from `comps`, which is to say exactly when the score could not use it.
+ *
+ * An empty tile is a GHOST BAR, not a dash or a zero: the same shape the baseline
+ * card uses for the sections that stay blank before a first reading, because the
+ * claim is identical — this is empty, not this is nothing. A dash reads as a
+ * measurement that came back void, and a 0 reads as a verdict.
+ */
+const HOURS = (v: number) => {
+  const mins = Math.round(v * 60);
+  return mins % 60 === 0 ? `${mins / 60}h` : `${Math.floor(mins / 60)}h ${mins % 60}m`;
+};
+
+/** Top of the 21pt value box to the top of its digits, so a ghost bar stands
+ *  exactly where the figure it replaces will. */
+const FIG_INK = 3;
+
+type Figure = { text: string; unit: string | null; cat: ScoreCat | null };
+
+/** The raw number the explain sheet quotes for a component, with the band that
+ *  graded it. HRV lists training first and baseline second (scoreSet's own
+ *  order), and the score weights training 0.7, so the first metric is the one
+ *  the tile shows. */
+const fromComp = (all: ScoreSetResult, label: string): Figure | null => {
+  const m = all.comps.find((c) => c.label === label)?.detail.metrics[0];
+  if (!m) return null;
+  return { text: String(m.raw), unit: m.unit || null, cat: catFromBands(m.raw, m.bands) };
+};
+
+const KEY_FIGURES: { label: string; ghost: `${number}%`; delay: number; pick: (all: ScoreSetResult, days: any, dk: string) => Figure | null }[] = [
+  { label: 'HRV', ghost: '68%', delay: 0, pick: (all) => fromComp(all, 'HRV (RMSSD)') },
+  { label: 'Resting HR', ghost: '48%', delay: 900, pick: (all) => fromComp(all, 'Resting HR') },
+  {
+    label: 'Sleep',
+    ghost: '80%',
+    delay: 1800,
+    // The sleep component carries no raw metric of its own (its detail is the
+    // targets copy), so the figure comes from the two functions the component
+    // itself is built out of. Hours read "7h 36m" here as everywhere else in the
+    // app, never as a decimal the reader has to convert.
+    pick: (all, days, dk) => {
+      if (!all.comps.some((c) => c.label === 'Sleep')) return null;
+      const h = sleepHours(days, dk);
+      return h == null ? null : { text: HOURS(h), unit: null, cat: sleepGrade(days, dk) };
+    },
+  },
+];
+
+function KeyFigures({ dk, all }: { dk: string; all: ScoreSetResult }) {
+  const p = usePalette();
+  const days = getState().days;
+  const rows = KEY_FIGURES.map((f) => ({ ...f, fig: f.pick(all, days, dk) }));
+  const anyMissing = rows.some((r) => !r.fig);
+  return (
+    <View style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: p.border, marginTop: 16, paddingTop: 14 }}>
+      <View style={{ flexDirection: 'row', gap: 8 }}>
+        {rows.map((r) => (
+          <View key={r.label} style={{ flex: 1, backgroundColor: p.sunk, borderRadius: 14, padding: 10 }}>
+            {/* Both states occupy the SAME box, so the three labels sit on one line
+                whether their figures have landed or not, and a tile does not change
+                height the moment one does. FIG_INK is where the digits' ink lands
+                inside that box — Manrope at 19/21 puts its cap top 1.6 down and its
+                baseline 15.3 down, so the bar is placed to span that, not centred
+                in the box, which sat it visibly below the figures beside it.
+                The gap to the label is small because the box already carries the
+                descender space under the digits; 10 here read as a hole. */}
+            {!r.fig ? (
+              <View style={{ height: 21, marginBottom: 2, paddingTop: FIG_INK }}>
+                <GhostBar width={r.ghost} delay={r.delay} mb={0} />
+              </View>
+            ) : (
+              <View style={{ flexDirection: 'row', alignItems: 'baseline', height: 21, marginBottom: 2 }}>
+                <Text style={{ fontFamily: fonts.numHeavy, fontSize: 19, lineHeight: 21, color: r.fig.cat ? SCORE_COLORS[r.fig.cat] : p.text, fontVariant: ['tabular-nums'] }}>
+                  {r.fig.text}
+                </Text>
+                {r.fig.unit ? (
+                  <Text style={{ fontSize: 11, color: p.textDim, fontWeight: '600', marginLeft: 2 }}>{r.fig.unit}</Text>
+                ) : null}
+              </View>
+            )}
+            <Text style={{ fontSize: 11.5, lineHeight: 15, color: p.textDim }}>{r.label}</Text>
+          </View>
+        ))}
+      </View>
+      {anyMissing ? (
+        <Text style={{ fontSize: 12, color: p.textDim, marginTop: 11 }}>Waiting on more data. Empty tiles fill in as you log the day.</Text>
+      ) : null}
+    </View>
+  );
+}
+
+export function ScoredHero({ dk, readings, d, all, ctx, trend = null, onExplain, days }: { dk: string; readings: any[]; d: any; all: ScoreSetResult; ctx: any; trend?: ScoreTrend | null; onExplain: () => void; days?: DaysMap }) {
   const p = usePalette();
   const today = todayKey();
   const cat = scoreCat(all.score!);
@@ -383,37 +631,68 @@ export function ScoredHero({ dk, readings, d, all, ctx, onExplain, days }: { dk:
     if ((readings.length >= 2 || readings.some((r) => readingPeriod(r) === 'midday')) && delta != null && Math.abs(delta) >= 5)
       guide = (delta < 0 ? 'Trending down from this morning. Watch food and activity through the afternoon. ' : 'Trending up from this morning. ') + guide;
   }
-  if (all.confidence < 40) guide = 'Early read from limited data, so expect it to shift as more readings land. ' + guide;
+  // 40 of the 95 available weight, restated on the 0-100 confidence scale.
+  if (all.confidence < Math.round((40 / SCORE_TOTAL_WEIGHT) * 100)) guide = 'Early read from limited data, so expect it to shift as more readings land. ' + guide;
 
   return (
-    <Pressable onPress={onExplain} style={{ padding: 16, backgroundColor: hexA(cat.color, 0.1) }}>
+    /* No fill of its own: the card's colour is the wash bleeding out of its lit
+       top-left corner and nothing else. A flat tint across the whole surface made
+       every day read as a coloured card, which spends the one signal the slot has
+       on a grade the tag beside it already states, and left a Bad day looking like
+       a warning it is not. Dark grey everywhere, a hint in the corner, the
+       gradient border doing the rest. */
+    <Pressable onPress={onExplain} style={{ padding: 16 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
         <Text style={[T.section, { color: p.textDim }]}>{mode}</Text>
-        <View style={{ backgroundColor: cat.color, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 999 }}>
-          <Text style={{ color: '#fff', fontSize: 13, fontWeight: '800', textTransform: 'uppercase' }}>{cat.short}</Text>
+        {/* The explainer used to be a "What powers this" pill under the gauge,
+            which is the widest part of the card and the one place the eye has
+            already left by the time it wants the answer. As a circle beside the
+            grade it sits where the question is actually asked — next to the word
+            the score was turned into — and gives that corner a pair: the tag says
+            what today is, the button says how it was worked out. Sized to the
+            pill's own height so the two read as one object, and it duplicates the
+            card's press rather than owning it. */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Pressable
+            onPress={onExplain}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="What powers this score"
+            style={{ width: GRADE_PILL_H, height: GRADE_PILL_H, alignItems: 'center', justifyContent: 'center' }}
+          >
+            {/* The glyph IS the button: no fill, no outline. A grey chip beside
+                the grade tag read as a second, muted badge — two pills in a row,
+                one of which happened to be tappable. Stripped to the mark, the
+                tag is the only object in the corner and the ⓘ is an affordance
+                on it. It keeps the tag's height as an invisible target rather
+                than shrinking to the glyph. */}
+            <Icon name="info" size={20} color={hexA(p.text, 0.72)} />
+          </Pressable>
+          <View style={{ backgroundColor: cat.color, height: GRADE_PILL_H, justifyContent: 'center', paddingHorizontal: 12, borderRadius: 999 }}>
+            <Text style={{ color: '#fff', fontSize: 13, fontWeight: '800', textTransform: 'uppercase' }}>{cat.short}</Text>
+          </View>
         </View>
       </View>
       <View style={{ alignItems: 'center', marginVertical: 8 }}>
         <ScoreGauge score={all.score!} color={cat.color}>
-          <Text style={{ fontSize: 57, fontWeight: '800', color: p.text, fontVariant: ['tabular-nums'], letterSpacing: -1, lineHeight: 57, marginTop: 8 }}>{all.score}</Text>
-          <Text style={{ fontSize: 10, fontWeight: '700', letterSpacing: 1, color: p.textDim, marginTop: -2 }}>OUT OF 100</Text>
+          <Text style={{ fontSize: 57, fontFamily: fonts.numHeavy, color: p.text, fontVariant: ['tabular-nums'], letterSpacing: -1, lineHeight: 62, marginTop: 13 }}>{all.score}</Text>
+          <GaugeDeltas trend={trend} amDelta={delta} />
         </ScoreGauge>
-        {delta != null && Math.abs(delta) >= 3 ? (
-          <Text style={{ fontSize: 12, fontWeight: '800', color: delta > 0 ? SCORE_COLORS.good : SCORE_COLORS.bad, fontVariant: ['tabular-nums'], marginTop: -18 }}>
-            {(delta > 0 ? '▲ ' : '▼ ') + Math.abs(delta) + ' vs AM'}
-          </Text>
-        ) : null}
       </View>
-      <View style={{ alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, paddingHorizontal: 11, paddingVertical: 6, borderRadius: 999, marginBottom: 6, marginTop: delta != null && Math.abs(delta) >= 3 ? 0 : -14 }}>
-        <Icon name="info" size={15} color={p.textDim} />
-        <Text style={{ color: p.textDim, fontSize: 11, fontWeight: '600' }}>What powers this</Text>
-      </View>
-      <Text style={{ textAlign: 'center', fontSize: 14, color: p.textDim, fontWeight: '600' }}>{`${cat.label} · ${all.confidence}% confidence`}</Text>
+      {/* The 270° arc leaves its own gap at the bottom of the gauge's square box,
+          so this rides up into it rather than sitting below the whitespace. */}
+      {/* Confidence only. The grade used to lead this line as "Moderate Autonomic
+          Day · 74% confidence", which is the third time the card says Moderate:
+          the tag states it, the ring's colour states it, and the guidance below is
+          written from it. What the reader cannot get anywhere else on the card is
+          how much of the input set today's number was built from. */}
+      <Text style={{ textAlign: 'center', fontSize: 14, color: p.textDim, fontWeight: '600', marginTop: -14 }}>{`${all.confidence}% confidence`}</Text>
       <Text style={{ fontSize: 15, marginTop: 14, lineHeight: 21, color: p.text }}>{guide}</Text>
       {blueZone(readings, ctx) ? (
         <Flag color={SCORE_COLORS.warning} text="Blue-zone risk. High readiness may mask fragility, so do less today, not more." />
       ) : null}
       {cat.short === 'Crash' ? <Flag color={SCORE_COLORS.crash} text="Mandatory recovery day. Full rest, hydration, and protocol." /> : null}
+      <KeyFigures dk={dk} all={all} />
     </Pressable>
   );
 }
@@ -488,7 +767,7 @@ function InvestigateButton({ label, title, build }: {
   const p = usePalette();
   const { openSheet } = useSheets();
   const tier = useTier();
-  const openPaywall = usePaywall();
+  const openPaywall = usePaywall('outlook-ai');
   const press = () => {
     if (tier === 'free') { openPaywall(); return; }
     const s = getState();
@@ -604,15 +883,9 @@ function StreakCard({ dk }: { dk: string }) {
   const [expanded, setExpanded] = useState(false);
   const state = useAppState();
 
-  // The home-screen Protocol widget deep-links here (autonomic://?open=protocol):
-  // the handler bumps this signal and scrolls to us; open the card when it fires
-  // (skip the initial mount so we don't auto-expand on a normal launch).
-  const expandSignal = useExpandProtocolSignal();
-  const firstSignal = useRef(true);
-  useEffect(() => {
-    if (firstSignal.current) { firstSignal.current = false; return; }
-    setExpanded(true);
-  }, [expandSignal]);
+  // Nothing may open this card but its own header. The Protocol widget's deep
+  // link used to arrive with a signal that expanded it; that is gone, and the
+  // link now only scrolls here. See the note in ../store/nav.
   // streakInfo walks the whole day history; don't redo it for the accordion
   // toggle re-renders below.
   const si = useMemo(
@@ -751,7 +1024,10 @@ export function ScoreExplain({ all, dk, controls, hero, hideClose }: {
   const hurt = comps.filter((c) => c.cat === 'bad' || c.cat === 'crash').sort(byW);
   const neutral = comps.filter((c) => c.cat === 'ok').sort(byW);
   const ceil = (c: ScoreComp) => (c.detail && c.detail.maxCat ? GRADE_PTS[c.detail.maxCat] : GRADE_PTS.great);
-  const avail = all.confidence || 100;
+  // THE RAW WEIGHT SUM, NOT THE PERCENTAGE. `confidence` is now a percentage of
+  // the full input set, and dividing by it would inflate every "+X pt" number
+  // by 95/100 — the score is sum(w * p) / weightSum.
+  const avail = all.weightSum || SCORE_TOTAL_WEIGHT;
   const headroom = comps.map((c) => ({ c, gain: (c.w * (ceil(c) - c.p)) / avail })).filter((x) => x.gain > 0.05).sort((a, b) => b.gain - a.gain);
 
   const improveLine = (c: (typeof comps)[number]) => {
@@ -767,19 +1043,18 @@ export function ScoreExplain({ all, dk, controls, hero, hideClose }: {
   // Anything below is a component the score never saw, so it's what we're
   // unsure of — group the missing inputs by the single action that captures
   // them and show the confidence each would restore.
-  const CONF_INPUTS: { label: string; w: number; src: string }[] = [
-    { label: 'HRV (RMSSD)', w: 25, src: 'hrv' },
-    { label: 'Total power', w: 15, src: 'guided' },
-    { label: 'pNN50', w: 10, src: 'guided' },
-    { label: 'VLF power', w: 10, src: 'guided' },
-    { label: 'LF peak', w: 10, src: 'guided' },
-    { label: 'Blood pressure', w: 8, src: 'bp' },
-    { label: 'Resting HR', w: 7, src: 'rhr' },
-    { label: 'Sleep', w: 8, src: 'sleep' },
-    { label: 'Activity', w: 2, src: 'activity' },
-  ];
+  // Weights come from the scoring engine's own table, so this can't drift from
+  // what the score actually uses; only the "which action captures it" mapping
+  // lives here.
+  const CONF_SRC: Record<string, string> = {
+    'HRV (RMSSD)': 'hrv',
+    'Total power': 'training', 'pNN50': 'training', 'VLF power': 'training', 'LF peak': 'training',
+    'Blood pressure': 'bp', 'Resting HR': 'rhr', 'Sleep': 'sleep', 'Activity': 'activity',
+  };
   const CONF_SOURCES: Record<string, string> = {
-    guided: 'Capture a guided HRV reading',
+    // "Training HRV" is what the app calls this everywhere else (registry.ts,
+    // the HRV setup sheet). "Guided" appeared nowhere but here.
+    training: 'Capture a training HRV reading',
     hrv: 'Take an HRV reading',
     bp: 'Log a blood pressure reading',
     rhr: 'Log a resting heart rate',
@@ -787,14 +1062,33 @@ export function ScoreExplain({ all, dk, controls, hero, hideClose }: {
     activity: 'Log today’s activity',
   };
   const present = new Set(comps.map((c) => c.label));
-  const missing = CONF_INPUTS.filter((f) => !present.has(f.label));
+  const missing = SCORE_WEIGHTS.filter((f) => !present.has(f.label));
+  const pctOf = (w: number) => Math.round((w / SCORE_TOTAL_WEIGHT) * 100);
   const confGaps = Object.keys(CONF_SOURCES)
     .map((src) => {
-      const items = missing.filter((m) => m.src === src);
+      const items = missing.filter((m) => CONF_SRC[m.label] === src);
       return { src, action: CONF_SOURCES[src], w: items.reduce((s, m) => s + m.w, 0), labels: items.map((m) => m.label) };
     })
     .filter((g) => g.w > 0)
     .sort((a, b) => b.w - a.w);
+
+  // "Not captured today" is false when a training reading WAS taken and simply
+  // could not resolve those metrics — the frequency floors are charged against
+  // usable pulse, so a 5-minute session holding 1m 38s of clean beats resolves
+  // none of them. Saying the reading does not exist is how the reported user
+  // ended up being told to take a seventh one.
+  const hm = (sec: number) => (sec < 60 ? `${Math.round(sec)}s` : `${Math.floor(sec / 60)}m ${String(Math.round(sec % 60)).padStart(2, '0')}s`);
+  const gapExplain = (g: { src: string; w: number; labels: string[] }) => {
+    const raise = `Adding it would raise confidence by about ${pctOf(g.w)} points.`;
+    if (g.src !== 'training' || all.structCount === 0) {
+      return `Not captured today, so the score is estimated without ${g.labels.join(', ')}. ${raise}`;
+    }
+    const took = all.structCount === 1 ? 'Your training reading today was' : `Your ${all.structCount} training readings today were`;
+    const held = all.lastStructCoverageSec != null
+      ? ` The most recent one held ${hm(all.lastStructCoverageSec)} of usable pulse.`
+      : '';
+    return `${took} too short to resolve ${g.labels.join(', ')}.${held} These bands need 2 minutes of unbroken signal, and VLF power needs 4. ${raise}`;
+  };
 
   return (
     <View>
@@ -808,8 +1102,7 @@ export function ScoreExplain({ all, dk, controls, hero, hideClose }: {
         </View>
         <View style={{ alignItems: 'center', marginVertical: 8 }}>
           <ScoreGauge score={all.score!} color={heroColor}>
-            <Text style={{ fontSize: 57, fontWeight: '800', color: p.text, fontVariant: ['tabular-nums'], letterSpacing: -1, lineHeight: 57, marginTop: 8 }}>{all.score}</Text>
-            <Text style={{ fontSize: 10, fontWeight: '700', letterSpacing: 1, color: p.textDim, marginTop: -2 }}>OUT OF 100</Text>
+            <Text style={{ fontSize: 57, fontFamily: fonts.numHeavy, color: p.text, fontVariant: ['tabular-nums'], letterSpacing: -1, lineHeight: 62, marginTop: 13 }}>{all.score}</Text>
           </ScoreGauge>
         </View>
         <Text style={{ textAlign: 'center', fontSize: 13, color: p.textDim, fontWeight: '600' }}>{`Confidence ${all.confidence}%, the share of the full input set available to score today.`}</Text>
@@ -828,9 +1121,9 @@ export function ScoreExplain({ all, dk, controls, hero, hideClose }: {
           <MetricRow
             key={g.src}
             label={g.action}
-            value={`+${g.w}%`}
+            value={`+${pctOf(g.w)}%`}
             cat={false}
-            explain={`Not captured today, so the score is estimated without ${g.labels.join(', ')}. Adding it would raise confidence by about ${g.w} points.`}
+            explain={gapExplain(g)}
           />
         )) : (
           <MetricRow label="Full input set logged" value="" cat={false} explain="Every scored input was available today, so nothing is missing. This is as confident as the score gets." />

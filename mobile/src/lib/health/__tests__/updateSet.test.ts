@@ -3,7 +3,7 @@
  * aren't ours and wouldn't duplicate a journal entry may be offered.
  */
 import {
-  allItemKeys, buildUpdateSet, filterDeclined, filterSeen, importFingerprint,
+  allItemKeys, buildUpdateSet, dayAlreadyHas, filterDeclined, filterSeen, importFingerprint,
   sleepItemKey, updateCount, updateSignature, type RawHealthDay,
 } from '../updateSet';
 import type { ImportedReading, ImportedWorkout, SleepImport } from '../index';
@@ -179,6 +179,41 @@ describe('buildUpdateSet', () => {
     // Sleep is day-level, not an entry the user can delete — never declined.
     const withSleep = buildUpdateSet(DK, day(), raw({ sleep: night }), MED_TYPES);
     expect(filterDeclined(withSleep, new Set()).sleep).not.toBeNull();
+  });
+
+  /* The historical backfill's only defence against writing a second copy of a
+     week the daily import pill already brought in. */
+  describe('dayAlreadyHas', () => {
+    const withReading = (e: Partial<Entry>) => day({ readings: [{ id: 'a', time: '06:52', type: 'hrv', ...e } as Entry] });
+
+    it('matches the same sample within the near window, on either side', () => {
+      expect(dayAlreadyHas(withReading({}), 'reading', 'hrv', '06:52')).toBe(true);
+      expect(dayAlreadyHas(withReading({}), 'reading', 'hrv', '07:01')).toBe(true);
+      expect(dayAlreadyHas(withReading({}), 'reading', 'hrv', '06:43')).toBe(true);
+    });
+
+    it('lets a genuinely separate reading through', () => {
+      expect(dayAlreadyHas(withReading({}), 'reading', 'hrv', '07:03')).toBe(false);
+      expect(dayAlreadyHas(withReading({}), 'reading', 'bp', '06:52')).toBe(false);
+      expect(dayAlreadyHas(undefined, 'reading', 'hrv', '06:52')).toBe(false);
+      expect(dayAlreadyHas(day(), 'reading', 'hrv', '06:52')).toBe(false);
+    });
+
+    it('treats a watch Breathe session as the same measurement as an HRV reading', () => {
+      expect(dayAlreadyHas(withReading({ type: 'breathHrv' }), 'reading', 'hrv', '06:52')).toBe(true);
+    });
+
+    it('reads the right list per kind, and meds get the wider window', () => {
+      const d = day({
+        activities: [{ id: 'w', time: '07:15', type: 'walk' } as Entry],
+        meds: [{ id: 'm', time: '08:00', type: 'magnesium' } as Entry],
+      });
+      expect(dayAlreadyHas(d, 'workout', 'walk', '07:20')).toBe(true);
+      expect(dayAlreadyHas(d, 'reading', 'walk', '07:20')).toBe(false);
+      // 60 minutes for a dose, 10 for everything else.
+      expect(dayAlreadyHas(d, 'med', 'magnesium', '08:55')).toBe(true);
+      expect(dayAlreadyHas(d, 'med', 'magnesium', '09:05')).toBe(false);
+    });
   });
 
   it('signature changes when the found set changes', () => {

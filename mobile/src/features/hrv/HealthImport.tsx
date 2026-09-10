@@ -68,6 +68,7 @@ export function HealthRrImportSheet({ kind }: { kind: 'breath' | 'unstructured' 
     openSheet((sc) => (
       <HrvResults
         rr={c.rr}
+        segmentStarts={c.segmentStarts}
         hrSamples={[]}
         config={config}
         durationSec={durationSec}

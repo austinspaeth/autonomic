@@ -1,4 +1,4 @@
-# Store listing — v1.25.0
+# Store listing — v1.25.1
 
 Copy-paste source for **App Store Connect** and the **Google Play Console**.
 Character counts verified against each store's limits.
@@ -8,63 +8,97 @@ Console *configuration* (products, offers, price changes) is not here — that i
 
 ---
 
-## Submission checklist — 1.25.0
+## Submission checklist — 1.25.1
 
-What changed since the listings were last touched: live HRV capture is no longer
-capped on the free tier (1.25.0), the install trial went 7 → 14 days, and the
-descriptions were a release behind on features (Insights and sleep reports, both
-1.24, appeared nowhere).
+What changed since the listings were last written (1.25.0): the live reading was
+rebuilt (live HR / SDNN / beat-to-beat trace with signal quality on screen, and
+a reading that can be minimized and keeps running), and a second warning
+detector landed — `scoring/strain.ts` flags the markers that drift BEFORE the
+daily score does. Neither appeared anywhere in the descriptions.
 
-**App Store Connect** — needs a version submission, so it rides the 1.25.0 build:
+**App Store Connect** — needs a version submission, so it rides the 1.25.1 build:
 
-- [ ] **Description** → replace wholesale with the block below (3,993/4,000).
-      Reworded free-vs-Pro paragraph, plus new Insights and sleep-report bullets.
-- [ ] **What's New** → the 1.25.0 block below.
-- [ ] **App Review notes** → replace; the old text told review that HRV capture
-      was limited to one a day, which is now false and is the kind of thing a
-      reviewer checks.
+- [ ] **Description** → replace wholesale with the block below (3,992/4,000).
+      Adds the live-reading detail, minimize, and the early heads-up bullet;
+      trims where needed to stay inside the limit.
+      **The Terms of Use / Privacy Policy lines at the end are not optional and
+      never get trimmed for space.** 1.25.1 was rejected (Guideline 3.1.2) by
+      Apple's automated metadata check because a wholesale description paste
+      dropped them: the app sells auto-renewable subscriptions, so a functional
+      EULA link must be in the App Description itself. In-app links on the
+      paywall and in Settings do not satisfy the check, and neither does the
+      Privacy Policy URL field. Trim a bullet instead.
+- [ ] **App Information → License Agreement** → paste `mobile/EULA.md`'s block
+      as a Custom License Agreement for all countries (belt and braces; the
+      description link is what the automated check reads). Fill the
+      `[LEGAL NAME]` / `[MAILING ADDRESS]` / `[PHONE]` placeholders first.
+- [ ] **What's New** → the 1.25 block below. It covers the 1.25 release as a
+      whole. **If 1.25.0 already shipped to the App Store**, drop its last
+      bullet (unlimited capture was 1.25.0's headline and has already been
+      announced).
+- [ ] **App Review notes** → unchanged from 1.25.0, still accurate. Re-paste the
+      block below if the field was cleared.
 
 Updatable any time, no review, so do it whenever:
 
-- [ ] **Promotional text** (167/170) — no longer says "capture a reading daily".
+- [ ] **Promotional text** (167/170) — reworded: names the conditions first,
+      so the reader it is for knows in four words, then the reading and what
+      the app does with it. The old text spent all 170 characters restating the
+      free/Pro split the description already carries three times.
 
 **Google Play** — the store listing needs no binary, so it can go up before or
 after the release:
 
-- [ ] **Full description** → replace wholesale (3,996/4,000).
-- [ ] **Release notes** → the 1.25.0 Play variant (337/500).
-- [ ] **Data safety → Health Connect justification** → the paragraph at the end
-      of this file, which was stale: the app also reads respiratory rate,
-      weight, exercise sessions and distance now (`READ_TYPES` in
-      `src/lib/health/healthConnect.ts`). If the Health Connect declaration form
-      was submitted before 1.24.2 added exercise + distance, it needs
-      resubmitting with those two.
+- [ ] **Short description** → replace (80/80). Play rejected the previous one
+      for the word "Free": promotional and price wording is not allowed in the
+      listing fields.
+- [ ] **Full description** → replace wholesale (3,975/4,000).
+- [ ] **Release notes** → the 1.25 Play variant below (498/500).
 
-**Unchanged, don't touch:** app name, subtitle, keywords, short description,
-prices, privacy labels / data-safety answers (the app still collects nothing).
+**Unchanged, don't touch:** app name, subtitle, keywords,
+prices, privacy labels / data-safety answers (the app still collects nothing),
+and the Health Connect justification at the end of this file (it was re-synced
+with `READ_TYPES` in 1.25.0 and nothing in `src/lib/health/healthConnect.ts` has
+moved since).
+
+**Keywords: reviewed, no change.** The 98/100 string still covers the intent
+that matters (long covid, HRV, POTS, dysautonomia, orthostatic, RMSSD, pacing,
+chest strap) and 1.25 added no new search term worth the characters — "minimize"
+and "early warning" are not things anyone searches the store for. Two notes for
+whenever it IS reworked: any word already in the App Store *name* or *subtitle*
+is indexed from there and is wasted here (on Play the app name is
+"Autonomic Journal: HRV & POTS", so `hrv` and `pots` would be dead weight in an
+equivalent field), and the terms most worth buying if space frees up are `cfs`,
+`fatigue` and `vagus`.
 
 **Not a listing change, but must be true before the build is live** — see
 `STORE_SETUP.md`:
 
-- [ ] Part 7's introductory offer `annual_founder_first_year` exists on
-      `com.autonomic.journal.yearly` (iOS). Without it the founding-member card
-      still renders, but `introPriceOf` returns null and it sells the year at
-      full price with no saving to claim — a founding offer that isn't one.
-- [ ] Part 6's `com.autonomic.journal.yearly.promo` exists on both stores (the
-      annual offer card, and the Android founder card's SKU).
+- [ ] **`annual_founder_first_year` is deleted (or inactive) in App Store
+      Connect.** The founding-member card no longer uses an introductory offer:
+      Apple applies one to every eligible subscriber from the ordinary paywall,
+      so it could never be exclusive to the card. While it exists, every new
+      yearly subscriber gets a discounted first year for nothing. See
+      `STORE_SETUP.md` Part 7.
+- [ ] Part 6's `com.autonomic.journal.yearly.promo` exists and is ACTIVE on both
+      stores. It is now the product behind BOTH the annual offer card and the
+      founding-member card, so a missing or inactive product breaks two
+      surfaces, not one.
 - [ ] Neither store has a free-trial intro offer configured. The app's 14-day
       window is local (`TRIAL_DAYS`, `src/lib/tier.ts`) and needs no store
       product; `hasTrial()` reads the live product, so with no offer the paywall
       correctly says "Upgrade to Pro" and promises no trial.
 - [ ] `eas.json` has `autoIncrement: true`, so build number / versionCode look
-      after themselves. Only `version` in `app.json` is hand-set (now 1.25.0).
+      after themselves. Only `version` in `app.json` is hand-set (now 1.25.1).
 
-**Screenshots — the one thing no grep can check.** Audit the live carousels on
-both stores for: captions reading "7-day free trial" (the window is 14 days now),
-any shot of the Journal's HRV button in its old greyed-out locked state, and any
-"1 / day" row in a paywall screenshot. Nothing in the current carousels shows
-Insights or the sleep report either, which are the two biggest things added since
-the shots were taken.
+**Screenshots — the one thing no grep can check.** The carousels predate
+Insights, the sleep report and the rebuilt reading card. The scenes that produce
+replacements live on the `screenshots` branch (`mobile/app/screenshots/`, dev
+only): journal, breathing (+ a Play cut with no Apple Watch), measure, insights,
+sleep, payoff. Shoot them on an iPhone 17 Pro Max simulator, which captures at
+1320 × 2868 — the required 6.9" size. Audit anything still live for captions
+reading "7-day free trial" (it is 14 days now) or a "1 / day" capture row (the
+cap is gone).
 
 ---
 
@@ -85,9 +119,7 @@ updated anytime (they go through a short content review, no binary needed).
 
 ## Promotional text (167/170 chars)
 
-Free to use, no account, no ads. Journal your recovery, score every day, and
-take unlimited lab-quality HRV readings. Go Pro for POTS tests, full history &
-AI reports.
+For long covid, POTS and dysautonomia. Take a real 5-minute HRV reading, graded against research thresholds, then find what actually moves your numbers. Free, private.
 
 ## Keywords (98/100 chars)
 
@@ -98,7 +130,32 @@ chars); added dysautonomia + watch; dropped vagal tone / sdnn / symptom. Remove
 `hrv` if it's already in the app name or subtitle — those fields are indexed too.
 Do **not** add "free" — Apple indexes the price separately and it wastes chars.
 
-## What's New (1.25.0, both stores)
+## What's New (1.25, both stores — 886/4,000 chars)
+
+A new live reading. Heart rate, SDNN and your beat-to-beat trace update as the reading runs, with signal quality on screen so you know it is working.
+
+You can now minimize a reading. It keeps running while you use the rest of the app, and the breathing pace never loses its place.
+
+The app also watches for the drift that usually comes before a crash: slower heart-rate recovery after activity, a higher resting or overnight heart rate, a bigger standing rise. When two of them move together, the Journal says so.
+
+Also in this release:
+• Insights holds on to a finding while the evidence holds, instead of dropping it overnight
+• One row per supplement or trigger, with everything it moved behind it
+• A new card for what has been tested and moved nothing at all
+• Early signals on younger journals, held to a higher bar and labelled as such
+• HRV capture is unlimited on the free plan
+
+### Play Store variant (1.25, Android, 498/500 chars)
+
+A new live reading: heart rate, SDNN and your beat-to-beat trace update as it runs, with signal quality on screen.
+
+You can now minimize a reading. It keeps running while you use the rest of the app.
+
+The app also watches for the drift that comes before a crash: slower heart-rate recovery, a higher resting or overnight heart rate, a bigger standing rise. When two move together, the Journal says so.
+
+Insights also keeps a finding while the evidence holds, and adds a card for what moved nothing.
+
+## What's New (1.25.0) — previous
 
 HRV capture is now unlimited on the free plan. The old one-a-day cap is gone, so
 you can read your nervous system as often as you like: before and after a walk,
@@ -107,15 +164,6 @@ changed about what is free.
 
 Autonomic Pro is still there for what the app makes of those readings: your full
 history, Insights, POTS testing and AI reports.
-
-### Play Store variant (1.25.0, Android, 337/500 chars)
-
-HRV capture is now unlimited on the free plan. The one-a-day cap is gone, so you
-can read your nervous system as often as you like: before and after a walk,
-either side of a bad night, or whenever something feels off.
-
-Pro is still there for what the app makes of those readings: your full history,
-Insights, POTS testing and AI reports.
 
 ## What's New (1.19.1, iOS) — previous
 
@@ -150,37 +198,39 @@ Also:
 • Medication doses accept units again
 • Keyboard and Progress scrolling fixes
 
-## Description (3,993/4,000 chars)
+## Description (3,992/4,000 chars)
 
 See your nervous system actually recover.
 
-Autonomic turns a chest strap, your Apple Watch, or your finger over the camera into a full HRV lab in your pocket, then grades every reading against published research thresholds, so you know whether today was a good day or a warning sign.
+Autonomic turns a chest strap, your Apple Watch, or your finger over the camera into a full HRV lab, then grades every reading against published research thresholds, so you know whether today was a good day or a warning sign.
 
-Built for the long haul: long covid and post viral recovery, POTS and dysautonomia, ME/CFS, and anyone rebuilding their autonomic nervous system one day at a time.
+Built for the long haul: long covid and post viral recovery, POTS and dysautonomia, ME/CFS, and anyone rebuilding their nervous system.
 
-Free to use, with no account, no ads or tracking. Every install starts with 14 days of full access, then keeps the core free forever.
+Free to use, no account, no ads, no tracking. 14 days of full access on install, then the core stays free forever.
 
 
 LIVE 5-MINUTE HRV, DONE RIGHT
 
-• Capture beat-to-beat RR intervals live from a Bluetooth chest strap, Apple Watch, or with your iPhone's camera using your finger
-• A guided full-screen session with a 5:00 ring, live heart rate and a paced breathing visualizer (4/6 resonance breathing)
-• Every metric computed on-device: SDNN, RMSSD, pNN50, mean RR, PNS & SNS index, Baevsky stress index, VLF/LF/HF power, LF/HF, coherence, and more
-• Honest signal quality: artifacts are flagged and corrected, and a noisy reading refuses to fake a score
+• Capture beat-to-beat RR intervals from a chest strap, Apple Watch, or your finger on the iPhone camera
+• A guided session with a 5:00 ring and paced breathing (4/6 resonance), with live heart rate, SDNN and your beat-to-beat trace as it runs
+• Minimize a reading and it keeps running while you use the rest of the app
+• Every metric computed on-device: SDNN, RMSSD, pNN50, PNS & SNS index, Baevsky stress index, VLF/LF/HF power, LF/HF, coherence, and more
+• Artifacts are flagged and corrected, and a noisy reading refuses to fake a score
 
 
 EVERY NUMBER GRADED, NO BLACK BOX
 
-• Every number is scored great / good / ok / warning / crash against real thresholds
+• Every number scored great / good / ok / warning / crash against real thresholds
 • One daily Autonomic Score that rolls up HRV, sleep, symptoms, blood pressure and more
-• A plain-language outlook for the day: what your body is ready for, from a full workout to a rest day
+• A plain-language outlook: what your body is ready for, from a full workout to a rest day
+• An early heads-up when your own markers drift: slower heart-rate recovery, a higher resting or overnight heart rate, a bigger standing rise
 
 
 POTS TESTING ON YOUR WRIST: THE APPLE WATCH APP
 
-• A guided lie-and-stand test on your watch: rest, stand when it taps you, and watch your live delta against your resting baseline
-• Haptic alerts the moment your heart rate climbs 30+ bpm over baseline, the stand test threshold
-• One tap on the watch face complication starts a POTS Episode capture: baseline, the climb, and a 60 second recovery
+• A guided lie-and-stand test on your watch: rest, stand when it taps you, and watch your live delta against baseline
+• Haptic alerts the moment your heart rate climbs 30+ bpm over baseline
+• One tap on the watch complication starts a POTS Episode capture: baseline, the climb, and 60 seconds of recovery
 • A live HR monitor for symptomatic moments, with a rolling average and spike alerts
 
 
@@ -192,32 +242,35 @@ BUILD YOUR PROTOCOL, KEEP YOUR STREAK
 
 TRACK EVERYTHING THAT MOVES THE NEEDLE
 
-• Water, meals and food triggers, meds and supplements, symptoms, activities, sleep, blood pressure, orthostatic stand tests, and digestion
+• Water, meals and food triggers, meds and supplements, symptoms, activities, sleep, blood pressure, stand tests and digestion
 • Tap a night for its full sleep report: stages, overnight heart rate and breathing, and how it compares with recent nights
-• Add your own meds, supplements, activities, symptoms and triggers as custom types
+• Add your own meds, supplements, activities, symptoms and triggers
 
 
 FIND WHAT HELPS OR HURTS
 
-• Insights: an on-device read of your own log that finds what is genuinely linked to what, and how sure it is
-• Analysis across days, weeks and months: spot the salt, sleep, pacing or medication changes that move your numbers
-• Bring your own AI for a deeper read of your data, or a report for your doctor
+• Insights: an on-device read of your own log that finds what is linked to what, and how sure it is
+• Analysis across days, weeks and months, to see what moves your numbers
+• Bring your own AI for a deeper read, or a report for your doctor
 
 
 YOUR DATA NEVER LEAVES YOUR PHONE
 
 • 100% offline-first: no account, no cloud, no tracking, no ads
-• Everything is stored on device; you own it and can export it anytime
-• Reads HRV, resting HR, sleep, workouts and blood pressure from Apple Health, and writes back what you log, only when you ask
+• Stored on device; you own it and can export it anytime
+• Reads HRV, resting HR, sleep, workouts and blood pressure from Apple Health, and writes back only what you ask
 
 
 WHAT'S FREE, WHAT'S PRO
 
-Free forever: unlimited live HRV captures, journaling (sleep, meds, symptoms, triggers, hydration, meals), manual readings (BP, resting heart rate, episodes), your daily Autonomic Score and outlook, the Apple Watch heart-rate monitor, 14 days of charts, and full export.
+Free forever: unlimited live HRV captures, POTS stand tests and episode captures (Apple Watch or chest strap), journaling (sleep, meds, symptoms, triggers, hydration, meals), manual readings, your daily Autonomic Score and outlook, the Apple Watch heart-rate monitor, 14 days of charts, and full export.
 
-Autonomic Pro adds: week / month / year progress views, full historical metric analysis, on-device Insights, POTS stand testing and episode tracking, and AI doctor reports.
+Autonomic Pro adds: week / month / year progress views, full historical metric analysis, on-device Insights, POTS test and episode results, and AI doctor reports.
 
-Pro is $7.99/month or $49.99/year, billed to your Apple ID and renewing automatically until cancelled. Manage or cancel anytime in your App Store settings.
+Pro is $7.99/month or $49.99/year, billed to your Apple ID and renewing automatically until cancelled. Cancel anytime in your App Store settings.
+
+Terms of Use: https://autonomic.care/terms-of-service/
+Privacy Policy: https://autonomic.care/privacy-policy/
 
 
 IMPORTANT: Autonomic is a personal journal and education tool, not a medical device. It does not diagnose, treat, or prevent any disease. Always discuss protocol or medication changes with your doctor.
@@ -231,8 +284,9 @@ IMPORTANT: Autonomic is a personal journal and education tool, not a medical dev
 > export) remains free indefinitely.
 >
 > Autonomic Pro (com.autonomic.journal.monthly / .yearly, one subscription
-> group) unlocks the full progress history, the Insights tab, POTS testing and
-> AI reports. HRV capture itself is unlimited on the free tier. To reach the
+> group) unlocks the full progress history, the Insights tab, POTS results and
+> AI reports. HRV capture itself is unlimited on the free tier, as are the Apple
+> Watch and chest-strap POTS captures (the graded result is what Pro opens). To reach the
 > paywall: Insights tab, or Analysis tab → Week/Month/Year. "Restore purchase" is on the paywall card.
 >
 > No demo account is needed. HRV capture works without hardware via the camera
@@ -276,13 +330,20 @@ Autonomic Journal: HRV & POTS
 
 ## Short description (80/80 chars)
 
-Free HRV, POTS & symptom journal for long covid recovery. Private and on-device.
+HRV, POTS & symptom journal for long covid and dysautonomia. Private, on-device.
 
-## Full description (3,996/4,000 chars)
+Play's metadata policy bars promotional or price wording from the listing
+fields, and "Free" at the front of this line is exactly what it means: the
+previous version was rejected for it. The word is not needed anyway — Play
+labels the app Free in the install button, and the subscription pricing is
+stated in the full description, which is where Play requires it. The character
+it freed up went to "dysautonomia", a search term the old line did not carry.
+
+## Full description (3,975/4,000 chars)
 
 See your nervous system actually recover.
 
-Autonomic turns a Bluetooth heart rate strap — or just your finger over your phone's camera — into a full HRV lab in your pocket, then grades every reading against published research thresholds, so you finally know whether today was a good day or a warning sign.
+Autonomic turns a Bluetooth heart rate strap, or just your finger over your phone's camera, into a full HRV lab, then grades every reading against published research thresholds, so you finally know whether today was a good day or a warning sign.
 
 Built for the long haul: long covid and post viral recovery, POTS and dysautonomia, ME/CFS, and anyone rebuilding their autonomic nervous system one day at a time.
 
@@ -292,22 +353,24 @@ Free to use, with no account, no ads and no tracking. Every install starts with 
 LIVE 5-MINUTE HRV, DONE RIGHT
 
 • Capture beat-to-beat RR intervals live from a Bluetooth chest strap, or with your phone's camera using your finger
-• A full screen guided session with a 5:00 ring, live heart rate, and a paced breathing visualizer (4/6 resonance breathing and more)
-• Every metric computed on-device: SDNN, RMSSD, pNN50, mean RR, PNS & SNS index, Baevsky stress index, VLF/LF/HF power, LF/HF, coherence, and more
-• Honest signal quality: artifacts are flagged and corrected, and a noisy reading refuses to fake a score
+• A guided session with a 5:00 ring and paced breathing (4/6 resonance), with live heart rate, SDNN and your beat-to-beat trace as it runs
+• Minimize a reading and it keeps running while you use the rest of the app
+• Every metric computed on-device: SDNN, RMSSD, pNN50, PNS & SNS index, Baevsky stress index, VLF/LF/HF power, LF/HF, coherence, and more
+• Artifacts are flagged and corrected, and a noisy reading refuses to fake a score
 
 
 EVERY NUMBER GRADED, NO BLACK BOX
 
-• Every number is scored great / good / ok / warning / crash against real thresholds, with no mystery "readiness" black box
+• Every number is scored great / good / ok / warning / crash against real thresholds
 • One daily Autonomic Score that rolls up HRV, sleep, symptoms, blood pressure and more
-• A plain-language outlook for the day: what your body is ready for, from a full workout to a rest day
+• A plain-language outlook: what your body is ready for, from a full workout to a rest day
+• An early heads-up when your own markers drift: slower heart-rate recovery, a higher resting or overnight heart rate, a bigger standing rise
 
 
 BUILD YOUR PROTOCOL, KEEP YOUR STREAK
 
 • Define your own "clean day": a hydration target, sleep hours, the meds and supplements to take, the triggers to avoid
-• Every day is matched against your protocol automatically, so you see at a glance whether you stayed on plan
+• Every day is matched against your protocol automatically
 • Clean days build a streak, with your longest run and a 30 day consistency rate
 
 
@@ -316,16 +379,15 @@ TRACK EVERYTHING THAT MOVES THE NEEDLE
 • Water, meals and food triggers, medications and supplements, symptoms, activities, sleep, blood pressure and orthostatic stand tests
 • Digestion and bowel movements too: the whole picture, not just heart rate
 • Tap a night for its full sleep report: stages, overnight heart rate and breathing, and how it compares with your recent nights
-• Make it yours: add your own meds, supplements, activities, symptoms and triggers as custom types
+• Add your own meds, supplements, activities, symptoms and triggers
 
 
 FIND WHAT HELPS OR HURTS
 
 • Insights: an on-device read of your own log that finds what is genuinely linked to what, ranks it, and shows the days behind every claim
-• Analysis across days, weeks and months: spot the salt, sleep, pacing or medication changes that move your numbers
-• On-device trigger and symptom trends over time
+• Analysis across days, weeks and months, to see what moves your numbers
 • Milestones so recovery actually adds up
-• Optional: bring your own AI for a deeper written read of your data, or to create a report to share with your doctor
+• Optional: bring your own AI for a deeper read, or a report for your doctor
 
 
 YOUR DATA NEVER LEAVES YOUR PHONE
@@ -337,9 +399,9 @@ YOUR DATA NEVER LEAVES YOUR PHONE
 
 WHAT'S FREE, WHAT'S PRO
 
-Free forever: unlimited live HRV captures, journaling (sleep, meds, symptoms, triggers, hydration, meals, activities), manual readings (blood pressure, resting heart rate, episodes), your daily Autonomic Score and outlook, 14 days of progress charts, and backup and export.
+Free forever: unlimited live HRV captures, POTS stand tests and episode captures from a chest strap, journaling (sleep, meds, symptoms, triggers, hydration, meals, activities), manual readings (blood pressure, resting heart rate, episodes), your daily Autonomic Score and outlook, 14 days of progress charts, and backup and export.
 
-Autonomic Pro adds: week / month / year progress views, full historical metric analysis, on-device Insights, POTS stand testing and episode tracking, and AI doctor reports.
+Autonomic Pro adds: week / month / year progress views, full historical metric analysis, on-device Insights, POTS test and episode results, and AI doctor reports.
 
 Pro is $7.99 per month or $49.99 per year, billed through Google Play. Subscriptions renew automatically until cancelled; manage or cancel anytime in Google Play → Subscriptions.
 

@@ -7,11 +7,20 @@
  * the email allowlist below is the actual access control. Never remove it.
  *
  * Actions:
- *   LOAD           -> { entries, events, ads, costs, sales, settings, ui }
+ *   LOAD           -> { entries, events, ads, costs, sales, churn, links, settings, ui }
  *   SYNC           { upserts, deletes, settings, ui } -> applies a client diff
- *   REPLACE_ALL    { entries, sales, settings } -> wipes and rewrites both
+ *   LINKS_REPUBLISH-> rewrites every stored campaign page into the site bucket
+ *   REPLACE_ALL    { entries, sales, churn, settings } -> wipes and rewrites all three
  *   PINGS          { since } -> the mobile app's cohort-ping counters
  *   STORE_VERSIONS { force } -> what is live in the App Store and on Play
+ *   PUSH_KEY       -> { configured, publicKey } for background alerts
+ *   PUSH_SUBSCRIBE { subscription, ua } -> registers this device
+ *   PUSH_UNSUBSCRIBE { endpoint } -> forgets it
+ *   PUSH_TEST      -> sends one now, through the real encrypted path
+ *
+ * One action here has a side effect outside DynamoDB: SYNC publishes campaign
+ * download pages into the site bucket. See lambdas/api/links.js for why the
+ * page is a written object rather than a runtime lookup.
  */
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
 const {
@@ -19,13 +28,34 @@ const {
   QueryCommand,
   BatchWriteCommand,
   PutCommand,
+  DeleteCommand,
 } = require('@aws-sdk/lib-dynamodb');
 
 /* One implementation of the ping read, shared with the public keyed route. */
 const { report: pingReport } = require('../ping/main');
+/* The push half: registering a device here, sending to it from the hourly
+   schedule. Both halves share one definition of a subscription's key so the
+   job can find what this handler wrote. */
+const {
+  configured: pushConfigured,
+  publicKey: pushPublicKey,
+  subId,
+  pushPk,
+  listSubscriptions,
+  sendToAll,
+} = require('../push/main');
 /* Reading the two stores. Its own file because the Play half is a scrape and
    wants explaining at length. */
 const { storeVersions } = require('./storeVersions');
+/* Campaign download links — `/download/<slug>`. Its own file because the S3
+   publish, and the reasons for it, want explaining at length. */
+const {
+  cleanLink,
+  applyLinkWrites,
+  publishLink,
+  invalidate: invalidateLinks,
+  configured: linksConfigured,
+} = require('./links');
 
 const TABLE = process.env.DYNAMO_TABLE_NAME;
 const ALLOWED = String(process.env.ALLOWED_EMAILS || '')
@@ -186,6 +216,29 @@ const cleanSale = (raw) => {
   return out;
 };
 
+/* One UNATTACHED churn event: revenue that stopped, with no purchase row
+   behind it. A store report says how many subscriptions ended and roughly what
+   they were worth and never says WHICH ones, so `cancelled` on a sale has
+   nothing to attach to — this is where that fact lives instead. `mrr` is the
+   monthly rate that stopped and is the only required field; `units`, `plan` and
+   `platform` are absent rather than defaulted when they are unknown, because a
+   dollar figure off a bank statement is not a claim about a headcount, a term
+   or a store. */
+const cleanChurn = (raw) => {
+  if (!raw || typeof raw !== 'object') return null;
+  const id = String(raw.id || '').slice(0, 64);
+  if (!id || !isIsoDate(raw.date)) return null;
+  const mrr = Number(raw.mrr);
+  if (!Number.isFinite(mrr)) return null;
+  const out = { id, date: raw.date, mrr: Math.max(0, mrr) };
+  if (PLATFORMS.includes(raw.platform)) out.platform = raw.platform;
+  out.plan = raw.plan === 'monthly' || raw.plan === 'annual' ? raw.plan : 'unknown';
+  const units = Number(raw.units);
+  if (Number.isFinite(units) && units > 0) out.units = Math.round(units);
+  if (raw.note) out.note = String(raw.note).slice(0, 2000);
+  return out;
+};
+
 const COST_CATEGORIES = ['ADS', 'CREATIVE', 'INFRA', 'TOOLS', 'FEES', 'SERVICES', 'HARDWARE', 'OTHER'];
 const RECURRENCES = ['weekly', 'monthly', 'quarterly', 'yearly'];
 const COST_NUMBERS = ['impressions', 'clicks', 'installs'];
@@ -208,6 +261,13 @@ const cleanCost = (raw) => {
   if (raw.label) out.label = String(raw.label).slice(0, 200);
   if (raw.note) out.note = String(raw.note).slice(0, 2000);
   if (raw.adId) out.adId = String(raw.adId).slice(0, 64);
+  /* A one-off build cost — R&D, hardware bought once, a contractor who built a
+     feature — as opposed to what the app costs to keep running. Orthogonal to
+     the category on purpose: a build arrives as HARDWARE, as SERVICES, as a
+     one-off TOOLS licence, so a category could not hold it. Stored only when
+     true, so a row that is not one is byte-identical to what older builds
+     wrote and the client's diff does not re-push every cost it has. */
+  if (raw.capex) out.capex = true;
   if (RECURRENCES.includes(raw.recurrence)) out.recurrence = raw.recurrence;
   if (out.recurrence && isIsoDate(raw.until)) out.until = raw.until;
   COST_NUMBERS.forEach((k) => {
@@ -278,6 +338,8 @@ const load = async (pk) => {
   const ads = [];
   const costs = [];
   const sales = [];
+  const churn = [];
+  const links = [];
   let settings = { ...DEFAULT_SETTINGS };
   let ui = null;
 
@@ -301,6 +363,12 @@ const load = async (pk) => {
     } else if (typeof item.SK === 'string' && item.SK.startsWith('SALE#')) {
       const sale = cleanSale(item.sale || item);
       if (sale) sales.push(sale);
+    } else if (typeof item.SK === 'string' && item.SK.startsWith('CHURN#')) {
+      const c = cleanChurn(item.churn || item);
+      if (c) churn.push(c);
+    } else if (typeof item.SK === 'string' && item.SK.startsWith('LINK#')) {
+      const link = cleanLink(item.link || item);
+      if (link) links.push(link);
     }
   });
 
@@ -312,12 +380,18 @@ const load = async (pk) => {
   // Sales ascend, unlike ads and costs: the ledger is a history read forwards
   // and every series built from it walks it in order.
   sales.sort((a, b) => (a.date === b.date ? a.id.localeCompare(b.id) : a.date.localeCompare(b.date)));
+  // Churn ascends with the sales it describes, for the same reason.
+  churn.sort((a, b) => (a.date === b.date ? a.id.localeCompare(b.id) : a.date.localeCompare(b.date)));
 
   entries.sort((a, b) => (a.date === b.date
     ? a.platform.localeCompare(b.platform)
     : a.date.localeCompare(b.date)));
 
-  return { entries, events, ads, costs, sales, settings, ui };
+  /* Alphabetical by slug — the campaign list is read as a directory of links,
+     and a creation order nobody can see is not an order. */
+  links.sort((a, b) => a.slug.localeCompare(b.slug));
+
+  return { entries, events, ads, costs, sales, churn, links, settings, ui };
 };
 
 const sync = async (pk, payload) => {
@@ -363,6 +437,7 @@ const sync = async (pk, payload) => {
     { prefix: 'AD', entityType: 'DASH_AD', field: 'ad', clean: cleanAd, ups: payload.adUpserts, dels: payload.adDeletes },
     { prefix: 'COST', entityType: 'DASH_COST', field: 'cost', clean: cleanCost, ups: payload.costUpserts, dels: payload.costDeletes },
     { prefix: 'SALE', entityType: 'DASH_SALE', field: 'sale', clean: cleanSale, ups: payload.saleUpserts, dels: payload.saleDeletes },
+    { prefix: 'CHURN', entityType: 'DASH_CHURN', field: 'churn', clean: cleanChurn, ups: payload.churnUpserts, dels: payload.churnDeletes },
   ];
   const idKeptCounts = {};
   idKeyed.forEach((kind) => {
@@ -386,6 +461,28 @@ const sync = async (pk, payload) => {
     idKeptCounts[kind.prefix] = { upserted: ups.length, deleted: dels.length };
   });
 
+  /* Campaign download links. Keyed by SLUG rather than by a generated id —
+     the slug IS the URL, so renaming one is deleting a link and creating
+     another, and the loop above (which keys on `item.id`) cannot express that.
+     Kept apart for that reason rather than folded in for tidiness. */
+  const linkUpserts = (Array.isArray(payload.linkUpserts) ? payload.linkUpserts : [])
+    .map(cleanLink)
+    .filter(Boolean);
+  linkUpserts.forEach((link) => {
+    requests.push({
+      PutRequest: {
+        Item: { PK: pk, SK: `LINK#${link.slug}`, entityType: 'DASH_LINK', link, updatedAt: now },
+      },
+    });
+  });
+
+  const linkDeletes = (Array.isArray(payload.linkDeletes) ? payload.linkDeletes : [])
+    .map((slug) => String(slug || '').trim().toLowerCase())
+    .filter(Boolean);
+  linkDeletes.forEach((slug) => {
+    requests.push({ DeleteRequest: { Key: { PK: pk, SK: `LINK#${slug}` } } });
+  });
+
   const deletes = Array.isArray(payload.deletes) ? payload.deletes : [];
   deletes.forEach((d) => {
     if (!d || !isIsoDate(d.date)) return;
@@ -406,6 +503,16 @@ const sync = async (pk, payload) => {
   }
 
   if (deduped.length) await writeBatches(deduped);
+
+  /* The one write that leaves DynamoDB. It runs AFTER the record is stored, so
+     a published page always has a row behind it, and it is allowed to throw:
+     the dashboard's push retries with backoff and only adopts its snapshot on
+     success, so a transient S3 failure re-publishes on the next attempt rather
+     than leaving a campaign the dashboard believes is live and is not. */
+  let linkWrites = { published: 0, removed: 0, configured: linksConfigured() };
+  if (linkUpserts.length || linkDeletes.length) {
+    linkWrites = await applyLinkWrites(linkUpserts, linkDeletes);
+  }
 
   const settings = cleanSettings(payload.settings);
   if (settings) {
@@ -428,7 +535,29 @@ const sync = async (pk, payload) => {
     adsUpserted: idKeptCounts.AD.upserted, adsDeleted: idKeptCounts.AD.deleted,
     costsUpserted: idKeptCounts.COST.upserted, costsDeleted: idKeptCounts.COST.deleted,
     salesUpserted: idKeptCounts.SALE.upserted, salesDeleted: idKeptCounts.SALE.deleted,
+    churnUpserted: idKeptCounts.CHURN.upserted, churnDeleted: idKeptCounts.CHURN.deleted,
+    linksPublished: linkWrites.published, linksRemoved: linkWrites.removed,
+    linksConfigured: linkWrites.configured,
   };
+};
+
+/**
+ * Rewrite every stored campaign page into the site bucket.
+ *
+ * DynamoDB is the record and the S3 object is a rendering of it, so this is
+ * always safe to run: it is the recovery path if an object is lost (a bad
+ * deploy, a hand-edited bucket) and the way a change to the page template
+ * reaches campaigns that have not been edited since.
+ */
+const republishLinks = async (pk) => {
+  const { links } = await load(pk);
+  if (!linksConfigured()) return { published: 0, total: links.length, configured: false };
+  for (const link of links) {
+    // eslint-disable-next-line no-await-in-loop
+    await publishLink(link);
+  }
+  await invalidateLinks(links.map((l) => l.slug));
+  return { published: links.length, total: links.length, configured: true };
 };
 
 /**
@@ -454,14 +583,21 @@ const replaceAll = async (pk, payload) => {
   const incomingSales = (Array.isArray(payload.sales) ? payload.sales : [])
     .map(cleanSale)
     .filter(Boolean);
+  /* The churn ledger goes with the sales it describes. Left behind by a wipe it
+     would floor an empty book's MRR at zero and report churn against nothing. */
+  const incomingChurn = (Array.isArray(payload.churn) ? payload.churn : [])
+    .map(cleanChurn)
+    .filter(Boolean);
 
   // Keys we're about to rewrite don't need deleting first.
   const keeping = new Set([
     ...incoming.map((e) => entrySk(e.date, e.platform)),
     ...incomingSales.map((s) => `SALE#${s.id}`),
+    ...incomingChurn.map((c) => `CHURN#${c.id}`),
   ]);
   const toDelete = existing
-    .filter((i) => typeof i.SK === 'string' && (i.SK.startsWith('ENTRY#') || i.SK.startsWith('SALE#')))
+    .filter((i) => typeof i.SK === 'string'
+      && (i.SK.startsWith('ENTRY#') || i.SK.startsWith('SALE#') || i.SK.startsWith('CHURN#')))
     .map((i) => i.SK)
     .filter((sk) => !keeping.has(sk));
 
@@ -469,7 +605,91 @@ const replaceAll = async (pk, payload) => {
     await writeBatches(toDelete.map((SK) => ({ DeleteRequest: { Key: { PK: pk, SK } } })));
   }
 
-  return sync(pk, { upserts: incoming, saleUpserts: incomingSales, settings: payload.settings });
+  return sync(pk, {
+    upserts: incoming, saleUpserts: incomingSales, churnUpserts: incomingChurn,
+    settings: payload.settings,
+  });
+};
+
+/* ------------------------------------------------------------ push devices
+ *
+ * Registering a phone to be told about a sale or a new install while the
+ * dashboard is CLOSED. The hourly job that does the telling is
+ * `lambdas/push/main.js`, and the long note at the top of that file is where
+ * the design lives — in particular why the hour is kept on a schedule here
+ * rather than by a timer in the service worker, which is a thing iOS does not
+ * have.
+ *
+ * These live behind the same allowlist as everything else in this handler, so
+ * only an account that may READ the numbers may ask to be woken about them.
+ * A subscription is stored under the subscriber's own partition (PUSH#<email>)
+ * keyed by a hash of its endpoint, so re-subscribing the same device replaces
+ * its row rather than adding a second one and buzzing it twice.
+ *
+ * Nothing here is a secret: the VAPID PUBLIC key is meant to be handed to the
+ * browser (it is what `pushManager.subscribe` signs against), and the private
+ * half never leaves the Lambda environment.
+ */
+const pushSubscribe = async (email, payload) => {
+  const sub = payload.subscription || {};
+  const endpoint = typeof sub.endpoint === 'string' ? sub.endpoint.trim() : '';
+  const keys = sub.keys || {};
+  const p256dh = typeof keys.p256dh === 'string' ? keys.p256dh : '';
+  const auth = typeof keys.auth === 'string' ? keys.auth : '';
+
+  /* All three or none. A row missing a key is a row the sender will throw on
+     every hour forever, and the browser never produces a partial one — so this
+     is a malformed request, not a state to store. */
+  if (!endpoint || !p256dh || !auth) {
+    return { ok: false, error: 'That subscription was missing its endpoint or keys.' };
+  }
+  if (!/^https:\/\//i.test(endpoint)) {
+    return { ok: false, error: 'A push endpoint must be https.' };
+  }
+
+  await ddb.send(new PutCommand({
+    TableName: TABLE,
+    Item: {
+      PK: pushPk(email),
+      SK: `SUB#${subId(endpoint)}`,
+      endpoint,
+      p256dh,
+      auth,
+      /* Which device this is, in the only terms the browser offers. Kept so a
+         list of three subscriptions is readable when one of them needs
+         removing; never used for anything else. */
+      ua: String(payload.ua || '').slice(0, 200),
+      at: new Date().toISOString(),
+    },
+  }));
+
+  return { ok: true, id: subId(endpoint) };
+};
+
+const pushUnsubscribe = async (email, payload) => {
+  const endpoint = typeof payload.endpoint === 'string' ? payload.endpoint.trim() : '';
+  if (!endpoint) return { ok: false, error: 'No endpoint given.' };
+  await ddb.send(new DeleteCommand({
+    TableName: TABLE,
+    Key: { PK: pushPk(email), SK: `SUB#${subId(endpoint)}` },
+  }));
+  return { ok: true };
+};
+
+/* The "Send a test" button's server half. It goes all the way through the real
+   sender on purpose: the failure this is here to catch is a key that does not
+   match the subscription, and only a real encrypted send can tell you that. */
+const pushTest = async (email) => {
+  if (!(await pushConfigured())) return { ok: false, error: 'No VAPID keys are configured on the server.' };
+  const subs = (await listSubscriptions()).filter((s) => s.email === email);
+  if (!subs.length) return { ok: false, error: 'This device is not registered for background alerts.' };
+  const result = await sendToAll(subs, {
+    title: '\u{1F44B} Autonomic',
+    body: 'Background alerts are working.',
+    tag: 'autonomic-test',
+    url: '/master/',
+  });
+  return { ok: result.sent > 0, ...result };
 };
 
 /* --------------------------------------------------------------- handler */
@@ -505,7 +725,8 @@ const handler = async (event) => {
       case 'REPLACE_ALL':
         return json(200, await replaceAll(pk, payload));
       // The mobile app's cohort counters. They live under their own partitions
-      // (PING#OPEN / PING#SUB), not any dashboard user's, but they are read
+      // (PING#OPEN / PING#SUB / PING#ACT / PING#HRV / PING#PAY), not any dashboard user's,
+      // but they are read
       // through this handler so the allowlist above guards them too — the
       // dashboard already holds a token, and shouldn't also hold the ping
       // lambda's shared key.
@@ -516,6 +737,23 @@ const handler = async (event) => {
          is one answer and it is the same for everybody who can see it. */
       case 'STORE_VERSIONS':
         return json(200, await storeVersions(ddb, TABLE, { force: !!payload.force }));
+      /* Background alerts. `PUSH_KEY` is what the browser needs before it can
+         subscribe at all, and it reports `configured: false` rather than
+         failing when no keys are set — an unconfigured server is a normal
+         state (see the note in lambdas/push/main.js), and the settings card
+         says so instead of showing an error. */
+      case 'PUSH_KEY':
+        return json(200, { configured: await pushConfigured(), publicKey: await pushPublicKey() });
+      case 'PUSH_SUBSCRIBE':
+        return json(200, await pushSubscribe(email, payload));
+      case 'PUSH_UNSUBSCRIBE':
+        return json(200, await pushUnsubscribe(email, payload));
+      case 'PUSH_TEST':
+        return json(200, await pushTest(email));
+      /* Campaign links publish themselves on save. This is the button for the
+         cases where that is not enough — a lost object, a template change. */
+      case 'LINKS_REPUBLISH':
+        return json(200, await republishLinks(pk));
       default:
         return json(400, { error: `Unknown action: ${action}` });
     }

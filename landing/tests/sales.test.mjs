@@ -301,24 +301,151 @@ check('the annual price is the average of annual plans only',
   near(basis.annualPrice, (29.99 + 59.88) / 2), String(basis.annualPrice));
 check('annual share is by unit, which is the question a forecast asks',
   near(basis.annualShare, (2 / 5) * 100), String(basis.annualShare));
-/* Churn needs a book to churn OUT of. Over the whole year the window opens
-   before the first sale, so there is no opening MRR and no rate to state — the
-   forecast's own fallback is what says "assumption" there. */
-check('a window that opens on an empty book reports unknown churn, not zero',
-  basis.churnPct === null, String(basis.churnPct));
+/* Churn needs a book to churn OUT of, and the book it is measured against is
+   the MEAN daily one over the window rather than the book on the opening day.
+   The forecast reads a 180-day window, so an account whose first sale is inside
+   it has an opening book of zero — an opening-MRR rate is undefined there, and
+   that is every young account, which is exactly the one the churn ledger exists
+   for. The whole year opens before the first sale and still has eleven months
+   of book and one real cancellation in it, so a rate can be stated. */
+check('a window that opens on an empty book is still measurable against the book it had',
+  basis.churnPct !== null && basis.churnPct > 0, String(basis.churnPct));
+check('and it is struck against the mean book, which is reported with it',
+  near(basis.churnPct, (basis.churnedMrr / basis.meanBook) * (30 / 365) * 100, 0.01),
+  String(basis.churnPct));
 
-/* Q2 opens with a real book (17.47 of MRR) and M3 cancels inside it, so a rate
-   can be stated: 4.99 / 17.469 over 91 days, scaled to 30. */
+/* Q2: M3's 4.99 cancels on 2026-05-01, over the mean book across those 91 days.
+   The mean rather than the opening 17.469, so a book that grew inside the
+   window is not measured against the handful of subscriptions it opened with. */
 const q2 = S.forecastBasis(ix, '2026-04-01', '2026-06-30');
 check('churn comes back measured once there is a book to measure against',
-  near(q2.churnPct, (4.99 / (4.99 * 3 + 29.99 / 12)) * (30 / 91) * 100, 0.01),
-  String(q2.churnPct));
+  near(q2.churnPct, (4.99 / q2.meanBook) * (30 / 91) * 100, 0.01), String(q2.churnPct));
+/* The book does not fall monotonically across Q2 — A2 joins on the 20th before
+   M3 leaves on 2026-05-01 — so the mean sits ABOVE both edges, which is the
+   case an opening-MRR denominator gets most wrong. */
+check('the mean book is the MRR the window\'s churn actually came out of',
+  q2.meanBook > S.mrrOn(ix, '2026-04-01').mrr && q2.meanBook < S.mrrOn(ix, '2026-04-30').mrr,
+  String(q2.meanBook));
 
 /* A window with a book but nothing cancelled must report null rather than 0: a
    0% churn nobody could have churned in is a claim, not a measurement. */
 const quiet = S.forecastBasis(ix, '2026-02-01', '2026-02-28');
 check('a window with nothing cancelled reports unknown churn, not zero',
   quiet.churnPct === null, String(quiet.churnPct));
+
+/* And a window with no book at all reports nothing rather than dividing by
+   zero, whatever is entered against it. */
+const empty = S.forecastBasis(S.index([], 'all', [{ id: 'e', date: '2025-01-05', mrr: 5 }]),
+  '2025-01-01', '2025-01-31');
+check('a window with no book at all still reports unknown', empty.churnPct === null,
+  String(empty.churnPct));
+
+/* ------------------------------------------------- unattached churn
+
+   The case the `cancelled` column cannot express: a store report says four
+   subscriptions went away and about $19.96 a month with them, and never says
+   WHICH four. Two rows against the fixture book:
+
+     C1  2026-06-01  monthly  9.98 lost, 2 subs, no store   (unattributed)
+     C2  2026-07-01  monthly  4.99 lost, 1 sub,  ios
+
+   The book on 2026-06-30 from purchases alone: M1 + M2 (4.99 each, both live),
+   M3 cancelled 2026-05-01, A1 2.499166…, A2 4.99, lifetime 0, unknown 0, R1
+   refunded. That is 4.99 + 4.99 + 2.4991666 + 4.99 = 17.469166…
+*/
+
+const CHURN = [
+  { id: 'C1', date: '2026-06-01', mrr: 9.98, units: 2, plan: 'monthly' },
+  { id: 'C2', date: '2026-07-01', mrr: 4.99, units: 1, plan: 'monthly', platform: 'ios' }
+];
+const cix = S.index(ROWS, 'all', CHURN);
+
+check('the churn ledger rides on the index', cix.churn.length === 2);
+check('a churn row with no store keeps none rather than defaulting to iOS',
+  cix.churn[0].platform === undefined, String(cix.churn[0].platform));
+
+const grossJun = 4.99 + 4.99 + 29.99 / 12 + 4.99;
+const bookJun = S.mrrOn(cix, '2026-06-30');
+check('the book before churn is the purchase ledger alone', near(bookJun.gross, grossJun));
+check('and after it, one churn row has been taken off', near(bookJun.mrr, grossJun - 9.98));
+check('churn dated after the day is not counted yet', near(bookJun.churned, 9.98));
+check('a book that survives is not flagged as floored', bookJun.churnFloored === false);
+/* The stacked chart has to sum to the netted total whatever plan the estimate
+   was filed under, so a plan that cannot absorb its share spills onto the rest
+   and no band ever goes negative. */
+check('the plan split still sums to the netted total',
+  near(S.PLAN_KEYS.reduce((a, k) => a + bookJun.byPlan[k], 0), bookJun.mrr));
+check('and no plan band is negative',
+  S.PLAN_KEYS.every((k) => bookJun.byPlan[k] >= -1e-9));
+
+/* An estimate typed by hand can overshoot the ledger. It must read as
+   "everything churned", never as a negative book. */
+const over = S.index(ROWS, 'all', [{ id: 'X', date: '2026-06-01', mrr: 500, plan: 'monthly' }]);
+const overBook = S.mrrOn(over, '2026-06-30');
+check('an overshooting estimate floors the book at zero', overBook.mrr === 0);
+check('and says so, rather than reporting a plausible small number',
+  overBook.churnFloored === true);
+
+const csum = S.summarize(cix, '2026-06-01', '2026-06-30');
+check('churn is booked against the window it happened in', near(csum.unattachedMrr, 9.98));
+check('and the two kinds of churn are kept apart', csum.cancelledMrr === 0);
+check('churnedMrr is their sum', near(csum.churnedMrr, 9.98));
+check('the summarised book is netted', near(csum.mrr, grossJun - 9.98));
+check('and the gross is still reported beside it', near(csum.grossMrr, grossJun));
+
+/* Only the churn rows that named a COUNT may move the headcount. A row with a
+   dollar figure and no count is not evidence about how many people left. */
+const noCount = S.index(ROWS, 'all', [{ id: 'N', date: '2026-06-01', mrr: 9.98, plan: 'monthly' }]);
+const nsum = S.summarize(noCount, '2026-06-01', '2026-06-30');
+const gsum = S.summarize(S.index(ROWS, 'all', []), '2026-06-01', '2026-06-30');
+check('a churn row with no count leaves the active count alone',
+  nsum.active === gsum.active, `${nsum.active} vs ${gsum.active}`);
+check('but it still takes the money off the book', near(nsum.mrr, grossJun - 9.98));
+check('a churn row with a count does move it', csum.active === gsum.active - 2,
+  `${csum.active} vs ${gsum.active}`);
+
+/* CASH is untouched. Money that already arrived does not un-arrive — that is
+   what a refund is for — and an unattached row has no purchase whose
+   recognition schedule could be stopped. */
+check('churn does not touch bookings', near(csum.bookings, gsum.bookings));
+const recWith = S.monthlyRevenue(cix, '2026-06-01', '2026-06-30');
+const recWithout = S.monthlyRevenue(S.index(ROWS, 'all', []), '2026-06-01', '2026-06-30');
+check('nor recognised revenue', near(recWith[0].recognised, recWithout[0].recognised));
+
+/* A store filter drops the rows that name no store rather than guessing, and
+   reports what it dropped so the view can disclose the hole. */
+const iosChurnIx = S.index(ROWS, 'ios', CHURN);
+check('a filtered index keeps only that store\'s churn',
+  iosChurnIx.churn.length === 1 && iosChurnIx.churn[0].id === 'C2');
+check('and says what it left out', iosChurnIx.churnUnattributed.count === 1
+  && near(iosChurnIx.churnUnattributed.mrr, 9.98));
+
+/* The series the chart is drawn from. Unattached rows and cancellations sit in
+   their own bands because they are different evidence. */
+const cs = S.churnSeries(cix, '2026-05-01', '2026-07-01');
+const total = cs.reduce((a, d) => a + d.mrr, 0);
+check('the churn series carries both kinds', near(total, 4.99 + 9.98 + 4.99));
+check('and splits them', near(cs.reduce((a, d) => a + d.cancelled, 0), 4.99)
+  && near(cs.reduce((a, d) => a + d.unattached, 0), 9.98 + 4.99));
+const jun1 = cs.filter((d) => d.date === '2026-06-01')[0];
+check('a day with no churn is a real zero rather than a gap',
+  cs.filter((d) => d.date === '2026-06-15')[0].mrr === 0);
+check('and a day with churn carries it', near(jun1.unattached, 9.98));
+
+/* The MRR series has to fall on a day nothing was CANCELLED on — that is the
+   whole point of the ledger. */
+const ms = S.mrrSeries(cix, '2026-05-31', '2026-06-02');
+check('the MRR line falls on an unattached churn date',
+  near(ms[0].total - ms[2].total, 9.98), `${ms[0].total} -> ${ms[2].total}`);
+check('and the gross line does not', near(ms[0].gross, ms[2].gross));
+
+/* And it reaches the forecast, which is the reason the ledger exists: with
+   nowhere to put this, churn read as zero forever and the projection fell back
+   to its 5% assumption. */
+const cb = S.forecastBasis(cix, '2026-06-01', '2026-06-30');
+check('hand-entered churn gives the forecast a measured rate', cb.churnPct !== null);
+check('and the forecast can see it was hand-entered, not a cancellation',
+  near(cb.unattachedMrr, 9.98) && cb.cancelledMrr === 0);
 
 /* ------------------------------------------------------------- report */
 

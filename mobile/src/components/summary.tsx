@@ -28,7 +28,7 @@ import { entryFields, isDivider, READING_TYPES } from '../lib/registry';
 import { healthAppName } from '../lib/health';
 import { ageFromBirthday, fmtNum, fmtShort, todayKey } from '../lib/dates';
 import { estimatedHrMax, hrZones, timeInZones } from '../lib/workoutZones';
-import { correctArtifacts, splitSegments } from '../lib/hrv';
+import { computeHrv, correctArtifacts, splitSegments } from '../lib/hrv';
 import { BREATH_STYLE, styleTitle } from '../lib/breathStyle';
 import { buildEventInsightPrompt, buildReadingInsightPrompt, buildWorkoutInsightPrompt } from '../lib/analysis/reports';
 import { getState, getWaveform } from '../store/store';
@@ -48,14 +48,118 @@ const hexA = (hex: string, a: number) => {
 };
 
 /** Map a reading's capture source to a human label for the Details card.
- *  Bluetooth ('polar') readings prefer the stamped device name (`sourceName`);
- *  this map is the fallback for readings captured before names were stamped. */
+ *  Bluetooth ('polar') and Garmin readings prefer the stamped device name
+ *  (`sourceName` — "Venu 4" says more than "Garmin watch", and a household with
+ *  two watches needs it to tell them apart); this map is the fallback for
+ *  readings captured before names were stamped. */
 // 'health' = imported from the platform health store — named for the store on
 // THIS device (Apple Health / Health Connect).
-const SOURCE_LABEL: Record<string, string> = { polar: 'Bluetooth device', watch: 'Apple Watch', camera: 'Device camera', manual: 'Manual entry', health: healthAppName() };
+const SOURCE_LABEL: Record<string, string> = { polar: 'Bluetooth device', watch: 'Apple Watch', garmin: 'Garmin watch', camera: 'Device camera', manual: 'Manual entry', health: healthAppName() };
+
+/**
+ * How good the capture itself was, for the reading's Details card — duration,
+ * beats, usable pulse, artifacts, the pipeline's own verdict, and the segments
+ * behind it. These are stamped at capture time (Results.tsx); a reading from an
+ * older build carries none of them, and each row is simply OMITTED there rather
+ * than shown as 0 — "0% artifacts" about a measurement nobody graded is a
+ * quality claim we cannot make. Same rule per field, so a reading that stamped
+ * artifacts but not beats shows the one it has.
+ */
+const CONFIDENCE_WORD: Record<string, string> = { high: 'High', fair: 'Fair', low: 'Low' };
+
+/** Quality stamped by a build older than 1.25.3 — i.e. none — recovered by
+ *  re-running the pipeline over the RR series still in the waveform sidecar.
+ *
+ *  This is not a guess dressed up as a stamp: it is the SAME computation on the
+ *  SAME beats, so a recovered verdict and a stamped one mean the same thing. It
+ *  is a fallback rather than the primary because the sidecar can be pruned and
+ *  the stamp cannot — and because a stamped reading records what the pipeline
+ *  said AT CAPTURE, which is the honest answer if the thresholds ever move.
+ *
+ *  Returns null when there is no series: a watch-summary reading has no beats
+ *  behind it, so its quality stays UNKNOWN and the rows stay absent, which is
+ *  the same rule the stamped path follows. */
+function recoverQuality(r: Entry): Partial<Entry> | null {
+  const w = getWaveform(String(r.id));
+  const raw = (w && w.rrRaw) || (r.rrRaw as number[] | undefined);
+  if (!raw || raw.length < 3) return null;
+  const dur = parseFloat(r.durationSec as string);
+  const res = computeHrv(raw, {
+    source: r.source as string | undefined,
+    segmentStarts: (w && w.rrSegments) || (r.rrSegments as number[] | undefined),
+    // An imported reading's `durationSec` is RR coverage, not an elapsed
+    // session, so it is not a wall clock to charge coverage against.
+    durationSec: !r.imported && !isNaN(dur) ? dur : undefined,
+  });
+  return {
+    beatCount: res.rrClean.length,
+    coverageSec: res.coverageSec,
+    artifactPct: res.artifactPct,
+    confidence: res.confidence,
+    segmentsUsed: res.segmentsUsed,
+    segmentsDropped: res.segmentsDropped,
+  };
+}
+
+type Fact = { label: string; value: string; alt?: { label: string; value: string } };
+
+function captureFacts(r: Entry, recovered?: Partial<Entry> | null): Fact[] {
+  const out: Fact[] = [];
+  const num = (v: unknown): number | null => { const n = parseFloat(v as string); return isNaN(n) ? null : n; };
+  // Stamped value first, recovered series second, nothing third.
+  const q = (k: keyof Entry): number | null => num(r[k]) ?? (recovered ? num(recovered[k]) : null);
+  const dur = num(r.durationSec);
+  const cov = q('coverageSec') ?? (r.imported ? dur : null);
+  // An IMPORTED reading's `durationSec` means real RR coverage, not an elapsed
+  // session (see LiveHrvExtras) — so it is reported as coverage, not duration.
+  //
+  // Usable pulse gets no row of its own: on every source but the camera it is
+  // within a beat of the duration, so a second near-identical time sat in the
+  // card looking like a mistake. It is the SAME quantity measured a second way,
+  // so the row FLIPS between the two on a tap — one line, and the gap between
+  // them (the finger moving, the strap losing contact) is there when the reader
+  // goes looking for it.
+  if (dur != null && !r.imported) {
+    out.push({
+      label: 'Duration',
+      value: fmtDuration(dur),
+      alt: cov != null ? { label: 'Usable pulse', value: fmtDuration(cov) } : undefined,
+    });
+  } else if (cov != null) {
+    out.push({ label: 'Usable pulse', value: fmtDuration(cov) });
+  }
+  const beats = q('beatCount');
+  if (beats != null) out.push({ label: 'Beats', value: String(Math.round(beats)) });
+  const art = q('artifactPct');
+  if (art != null) out.push({ label: 'Artifacts', value: `${Math.round(art * 10) / 10}%` });
+  const conf = CONFIDENCE_WORD[String(r.confidence || (recovered && recovered.confidence))];
+  if (conf) out.push({ label: 'Confidence', value: conf });
+  const used = q('segmentsUsed'), droppedSeg = q('segmentsDropped');
+  if (used != null && used > 1) out.push({ label: 'Segments used', value: String(Math.round(used)) });
+  if (droppedSeg != null && droppedSeg > 0) out.push({ label: 'Segments dropped', value: String(Math.round(droppedSeg)) });
+  return out;
+}
+
+/** A Details row. One that carries an `alt` is the same fact measured a second
+ *  way and swaps to it on a tap, rather than costing the card a second line. */
+function FactRow({ fact }: { fact: Fact }) {
+  const [alt, setAlt] = useState(false);
+  const shown = alt && fact.alt ? fact.alt : fact;
+  if (!fact.alt) return <MetricRow label={fact.label} value={fact.value} cat={false} />;
+  return (
+    <Pressable onPress={() => setAlt((v) => !v)} style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1 })}>
+      <MetricRow label={shown.label} value={shown.value} cat={false} />
+    </Pressable>
+  );
+}
+
+const fmtDuration = (sec: number) => {
+  const s = Math.max(0, Math.round(sec));
+  return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, '0')}s`;
+};
 
 function sourceLabelFor(r: Entry): string | undefined {
-  if (r.source === 'polar' && r.sourceName) return String(r.sourceName);
+  if ((r.source === 'polar' || r.source === 'garmin') && r.sourceName) return String(r.sourceName);
   return r.source ? SOURCE_LABEL[r.source as string] : undefined;
 }
 
@@ -286,7 +390,7 @@ function MetricSection({ label, value, unit, cat, desc, help, days, type, ex, ba
 }
 
 /** The entry's free-text note, read-only. Editing lives in the entry's edit
- *  form (and, pre-save, in `NoteDraftCard` on the results step). */
+ *  form (and, on a live capture's results step, in `NoteDraftCard`). */
 function Notes({ r }: { r: Entry }) {
   const p = usePalette();
   if (!r.note) return null;
@@ -299,9 +403,10 @@ function Notes({ r }: { r: Entry }) {
 }
 
 /**
- * Note field for the keep-or-discard results step, where the reading only
- * exists in memory: shows the draft note and opens the editor sheet on tap.
- * Once saved, notes are edited through the entry's edit form instead.
+ * Note field for a live capture's results step: shows the note and opens the
+ * editor sheet on tap. The reading is already saved by the time this renders,
+ * so `onChange` writes straight through to the entry. Everywhere else, notes
+ * are edited through the entry's edit form.
  */
 export function NoteDraftCard({ note, onChange }: { note: string; onChange: (next: string) => void }) {
   const p = usePalette();
@@ -434,7 +539,8 @@ function HrvSummaryBody({ r, days, ctx, type }: SummaryProps & { type: 'breathHr
   // Training readings are all 4/6 now, so the style row would just restate the
   // type. It only earns its place on legacy readings taken on a retired pattern.
   const legacyStyle = type === 'breathHrv' && r.style && r.style !== BREATH_STYLE ? styleTitle(r.style as string) : null;
-  const hasDetails = !!sourceLabel || !!legacyStyle || !!r.period;
+  const capture = useMemo(() => captureFacts(r, recoverQuality(r)), [r]);
+  const hasDetails = !!sourceLabel || !!legacyStyle || !!r.period || capture.length > 0;
   return (
     <>
       <Section cat={overall}>
@@ -559,6 +665,7 @@ function HrvSummaryBody({ r, days, ctx, type }: SummaryProps & { type: 'breathHr
             {sourceLabel ? <MetricRow label="Source" value={sourceLabel} cat={false} /> : null}
             {legacyStyle ? <MetricRow label="Breathing style" value={legacyStyle} cat={false} /> : null}
             {r.period ? <MetricRow label="Reading type" value={r.period as string} cat={false} /> : null}
+            {capture.map((f) => <FactRow key={f.label} fact={f} />)}
           </View>
         </Section>
       ) : null}
@@ -772,7 +879,7 @@ function InsightButton({ noun, title, build }: {
   const p = usePalette();
   const { openSheet } = useSheets();
   const tier = useTier();
-  const openPaywall = usePaywall();
+  const openPaywall = usePaywall('metric-ai');
   const open = () => {
     if (tier === 'free') { openPaywall(); return; }
     const { prompt, rangeText } = build();

@@ -40,7 +40,15 @@ function dayColor(k: string): string | null {
   return scoreCat(all.score).color;
 }
 
-export function Calendar({ current, onPick, controls }: { current: string; onPick: (k: string) => void; controls: SheetControls }) {
+export function Calendar({ current, onPick, controls, title = 'Select date', showToday = true }: {
+  current: string; onPick: (k: string) => void; controls: SheetControls;
+  /** What the picker is choosing, when it isn't just "a date" — the Progress
+   *  custom range opens two of these and they must not both say the same thing. */
+  title?: string;
+  /** "Jump to Today" belongs to the Journal's own day picker; a range endpoint
+   *  has no such shortcut worth a full-width button. */
+  showToday?: boolean;
+}) {
   const p = usePalette();
   const [view, setView] = useState(() => { const d = dateFromKey(current); d.setDate(1); return d; });
   const now = new Date();
@@ -75,7 +83,7 @@ export function Calendar({ current, onPick, controls }: { current: string; onPic
 
   return (
     <View style={{ width: '100%', maxWidth: 400, alignSelf: 'center' }}>
-      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, lineHeight: 32, marginBottom: 16 }}>Select date</Text>
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, lineHeight: 32, marginBottom: 16 }}>{title}</Text>
       {/* Month nav sits fully below the sheet's ✕ pill — the extra top margin
           keeps the next-month chevron from crowding the close button. */}
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, marginBottom: 12 }}>
@@ -117,8 +125,12 @@ export function Calendar({ current, onPick, controls }: { current: string; onPic
           </View>
         ))}
       </View>
-      <View style={{ height: 12 }} />
-      <Button title="Jump to Today" onPress={() => { onPick(tk); controls.close(); }} />
+      {showToday ? (
+        <>
+          <View style={{ height: 12 }} />
+          <Button title="Jump to Today" onPress={() => { onPick(tk); controls.close(); }} />
+        </>
+      ) : null}
       <View style={{ height: 12 }} />
     </View>
   );

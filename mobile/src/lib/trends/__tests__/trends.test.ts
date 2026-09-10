@@ -13,7 +13,7 @@ import { IMPORTED_HRV_MIN_SEC } from '../../hrvQuality';
 import {
   INSIGHT_OUTCOMES, OUTCOME_FAMILY, TREND_METRICS, TREND_PRIORITY, TREND_WINDOW_DAYS, WATCH_PRIORITY,
   TREND_FAMILY_COOLDOWN_DAYS, TREND_LIVE_HOURS, TREND_MIN_DAYS_BETWEEN,
-  claimTrend, compareWindows, emptyTrendMemory, findTrend, keyRange, metricSeries,
+  claimTrend, compareWindows, emptyTrendMemory, findTrend, keyRange, metricSeries, phraseOf,
   trendDirection, trendGate,
   type TrendMetricId,
 } from '../index';
@@ -229,8 +229,34 @@ describe('findTrend', () => {
     const days = build(() => rhrDay(70), () => rhrDay(60));
     const f = findTrend(days, DK);
     expect(f!.metric).toBe('score');
-    expect(f!.headline).toMatch(/^Your daily score is up [\d.]+ points since last month!$/);
+    expect(f!.headline).toMatch(/^Your daily scores are up [\d.]+ points on average since last month!$/);
     expect(f!.detail).toMatch(/^[\d.]+ → [\d.]+ pts · 30 scored days$/);
+  });
+
+  it('agrees in number with the figure it prints', () => {
+    // "up 1 points" was on the Journal's one congratulatory card. The rounded
+    // number is what the reader sees, so it is what decides the noun.
+    expect(TREND_METRICS.score.phrase(1)).toBe('up 1 point');
+    expect(TREND_METRICS.score.phrase(-1)).toBe('down 1 point');
+    expect(TREND_METRICS.score.phrase(2.4)).toBe('up 2.4 points');
+    expect(TREND_METRICS.badDays.phrase(-1)).toBe('down 1 day');
+    expect(TREND_METRICS.badDays.phrase(-3)).toBe('down 3 days');
+    expect(TREND_METRICS.cleanDays.phrase(1)).toBe('up 1 day');
+    // A delta that ROUNDS to one is still one: 1.4 prints "1".
+    expect(TREND_METRICS.symptomLoad.phrase(-1.4)).toBe('down 1 entry');
+    expect(TREND_METRICS.symptomLoad.phrase(-4)).toBe('down 4 entries');
+    expect(TREND_METRICS.pnn50.phrase(1)).toBe('up 1 point');
+  });
+
+  it('says "on average" for a median row and only for a median row', () => {
+    // The window's number for a median row is a typical DAY, and a sentence that
+    // doesn't say so reads as a claim about this morning.
+    expect(phraseOf(TREND_METRICS.score, 1)).toBe('up 1 point on average');
+    expect(phraseOf(TREND_METRICS.restingHr, -6)).toBe('down 6 bpm on average');
+    // A count is a window TOTAL, and a stdev has no per-day value at all.
+    expect(phraseOf(TREND_METRICS.badDays, -3)).toBe('down 3 days');
+    expect(phraseOf(TREND_METRICS.symptomLoad, -4)).toBe('down 4 entries');
+    expect(phraseOf(TREND_METRICS.sleepConsistency, -89)).toBe('much more consistent');
   });
 
   it('phrases resting heart rate as a fall, not a rise', () => {

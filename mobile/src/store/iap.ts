@@ -30,6 +30,7 @@ import {
 } from 'expo-iap';
 import { isSideloadedAndroidBuild, isTestFlightBuild } from '../../modules/app-env';
 import { logError } from '../lib/diagnostics/errorLog';
+import { describeError } from '../lib/diagnostics/format';
 
 /** Product IDs — identical in App Store Connect and the Play Console. On the
  *  App Store: one subscription group holding both plans. On Google Play: two
@@ -59,26 +60,24 @@ export const PROMO_YEARLY_SKU = 'com.autonomic.journal.yearly.promo';
 export const PRO_SKUS = [YEARLY_SKU, MONTHLY_SKU, PROMO_YEARLY_SKU];
 
 /**
- * The founding-member offer behind src/features/FounderOffer.tsx.
+ * The founding-member card's product.
  *
- * On the App Store it is NOT a product of its own: it's the INTRODUCTORY offer
- * `annual_founder_first_year` configured on YEARLY_SKU (first year discounted,
- * then renews at the standard yearly price). Apple applies an introductory
- * offer automatically to any eligible subscriber, so there is nothing to pass
- * at purchase time — the card just buys YEARLY_SKU and the store discounts it.
- * Two consequences worth remembering: an eligible user gets the same price from
- * the ordinary paywall (the card is a prompt, not a gate), and a SKU carries at
- * most ONE introductory offer per territory, so this one occupies the slot the
- * free-trial intro offer would otherwise use — the app's 14-day trial is local
- * (src/store/tier.ts), not a StoreKit one, so that is a trade we can make.
+ * It is the SAME discounted year the annual offer card sells
+ * (`PROMO_YEARLY_SKU`), on both platforms, and that is a deliberate retreat
+ * from an iOS introductory offer on the standard yearly plan. An introductory
+ * offer belongs to the PRODUCT, not to the card: every StoreKit-eligible user
+ * would have been given the same first year from the ordinary paywall, so the
+ * card could prompt but never hold something back. Apple has no mechanism that
+ * targets a never-subscribed user — promotional and win-back offers are for
+ * current or lapsed subscribers, and both need a server-signed key this app
+ * has no endpoint for. A separate SKU is the only exclusive discount there is.
  *
- * Google Play has no equivalent of that offer id, so Android sends the card at
- * PROMO_YEARLY_SKU — the existing discounted year, which RENEWS at its own
- * price rather than reverting. The copy is derived from the two prices the
- * store actually returned, so it stays true on both.
+ * The trade is that a separate SKU RENEWS at its own price rather than
+ * reverting to $49.99, so this is a permanently discounted year rather than a
+ * discounted first one. The card's copy says so, and `FounderOffer` derives
+ * every number from the two prices the store actually returned.
  */
-export const FOUNDER_OFFER_ID = 'annual_founder_first_year';
-export const FOUNDER_SKU = Platform.OS === 'android' ? PROMO_YEARLY_SKU : YEARLY_SKU;
+export const FOUNDER_SKU = PROMO_YEARLY_SKU;
 const isProSku = (id?: string) => !!id && PRO_SKUS.includes(id);
 
 /** Fallback prices shown before the store returns the localized ones. */
@@ -178,26 +177,6 @@ export const trialDaysOf = (product: IapProduct | undefined): number | null => {
   return days > 0 ? days : null;
 };
 
-/**
- * The localized PAID introductory price of a plan for this user, or null.
- *
- * iOS only, and only for a paid intro offer (`pay-up-front` / `pay-as-you-go`)
- * — a free trial reports itself through `hasTrial` instead, and returning its
- * "$0.00" here would let the founder card advertise a free year. Null when
- * StoreKit says this user isn't eligible, which is exactly when the card must
- * not make a discount claim.
- *
- * There is no Android branch: Play models the founder price as its own product
- * (FOUNDER_SKU → PROMO_YEARLY_SKU), whose recurring price IS the offer price.
- */
-export const introPriceOf = (product: IapProduct | undefined): string | null => {
-  const raw = product?.raw;
-  if (!raw || raw.platform !== 'ios') return null;
-  const mode = raw.introductoryPricePaymentModeIOS;
-  if (mode !== 'pay-up-front' && mode !== 'pay-as-you-go') return null;
-  return raw.introductoryPriceIOS || null;
-};
-
 /** Let a local dev build through the paywall so you're never locked out of your
  *  own app before the products exist in App Store Connect. */
 const BYPASS_IN_DEV = true;
@@ -241,6 +220,12 @@ type IapState = {
   /** Last purchase failure, in the user's words. Cleared when a purchase
    *  starts. Never set for a user cancellation — that isn't a failure. */
   error?: string;
+  /** Set once this device has told us it can NEVER complete a purchase, in the
+   *  user's words and naming the one thing they can do about it. Distinct from
+   *  `error`, which is about an attempt: this is about the device, it is not
+   *  cleared by trying again, and it is known BEFORE the tap. Every buy button
+   *  reads it and offers the remedy in place of a button that cannot work. */
+  blocked?: string;
 };
 let state: IapState = { ready: false, isPro: false, products: [], purchasing: false };
 const listeners = new Set<() => void>();
@@ -269,8 +254,80 @@ const storeUnavailable = () =>
  *  did nothing for a whole session. Anything below that talks to the store goes
  *  through `withBilling`, which reconnects once and retries. */
 const NOT_READY = new Set(['service-error', 'service-disconnected', 'connection-closed', 'not-prepared', 'init-connection']);
+
+/** Play FLATTENS every `queryProductDetailsAsync` failure into one code.
+ *  Whatever Billing answered — a dead binding, no network, an account that
+ *  can't buy subscriptions — openiap-google rethrows it as `query-product`
+ *  ("Failed to query product"), and the response code that actually says which
+ *  rides alongside as `responseCode`. So a dropped binding reached `withBilling`
+ *  wearing a code that isn't in NOT_READY, the reconnect never fired, and all
+ *  three launch attempts failed identically against the same dead client. These
+ *  two are the reconnectable ones: SERVICE_DISCONNECTED and SERVICE_UNAVAILABLE. */
+const PLAY_RECONNECTABLE = new Set([-1, 2]);
+const responseCodeOf = (e: unknown): number | undefined => {
+  const c = (e as { responseCode?: unknown } | undefined)?.responseCode;
+  return typeof c === 'number' ? c : undefined;
+};
+
 const isDisconnected = (e: unknown) =>
-  NOT_READY.has(codeOf(e)) || /not ready|disconnect/i.test(String((e as Error)?.message ?? ''));
+  NOT_READY.has(codeOf(e))
+  || PLAY_RECONNECTABLE.has(responseCodeOf(e) ?? NaN)
+  || /not ready|disconnect/i.test(String((e as Error)?.message ?? ''));
+
+/** Play's FEATURE_NOT_SUPPORTED, arriving as `query-product` with a
+ *  debugMessage of "Client does not support ProductDetails." It means the
+ *  GOOGLE PLAY STORE APP on the device is too old to serve the ProductDetails
+ *  API that Billing 5+ queries through, so `fetchProducts` can never return
+ *  anything here. Nothing on our side reaches it: not a reconnect, not a
+ *  console change, not a retry a minute later. It is deliberately NOT in
+ *  PLAY_RECONNECTABLE for that reason.
+ *
+ *  It has to be its own state rather than another `error` string because of
+ *  what it does to the funnel. The paywall and both offer cards fall back to
+ *  FALLBACK_PRICE, so a device that can return no products still draws a
+ *  complete, healthy-looking card with a live button; the tap fires the
+ *  accepted-offer ping and then dies in `loadProducts` before `requestPurchase`
+ *  is ever reached. That is an offer recorded as accepted that could not have
+ *  converted. Knowing before the tap is what lets the button be replaced by the
+ *  remedy instead of refused after it. */
+const PLAY_FEATURE_NOT_SUPPORTED = -2;
+
+/** Said in full because the remedy is the whole point: for most of these
+ *  devices this IS fixable, by updating an app the user already has. For the
+ *  rest (a stubbed Play Store, microG, an emulator with no Play) it at least
+ *  names the real obstacle, which "try again shortly" did not. */
+const BLOCKED_MSG =
+  'Your Google Play Store app is out of date, so it can’t show subscriptions. '
+  + 'Open the Play Store, go to Settings, About, and tap Update Play Store, then come back.';
+
+/** Latch a terminal store refusal. Returns true if this error was one.
+ *  Logged ONCE per session under its own tag: it repeats on every launch of an
+ *  affected phone, and left under `iap.init` it would both flush the 40-entry
+ *  support log and inflate the fault report's occurrence count off a handful of
+ *  devices. */
+function noteBlocked(e: unknown): boolean {
+  if (responseCodeOf(e) !== PLAY_FEATURE_NOT_SUPPORTED) return false;
+  if (!state.blocked) {
+    logError('iap.storeIncapable', iapDetail(e));
+    set({ blocked: BLOCKED_MSG, ready: true });
+  }
+  return true;
+}
+
+/** What `describeError` cannot see, folded into the message so the fault report
+ *  carries the diagnosis instead of the same opaque line every time. Play's
+ *  `query-product` is the whole reason this exists: the code names the CALL that
+ *  failed, never the reason, and the reason is a number in a sibling field. */
+function iapDetail(e: unknown): unknown {
+  const d = e as { responseCode?: number; debugMessage?: string; isEmptyProductList?: boolean } | undefined;
+  const bits = [
+    d?.responseCode != null ? `response ${d.responseCode}` : '',
+    d?.isEmptyProductList ? 'no products returned' : '',
+    d?.debugMessage ? String(d.debugMessage) : '',
+  ].filter(Boolean);
+  if (!bits.length) return e;
+  return Object.assign(new Error(`${describeError(e)} [${bits.join('; ')}]`), { code: codeOf(e) });
+}
 
 /** Re-establish the billing connection for real.
  *
@@ -302,7 +359,19 @@ async function withBilling<T>(fn: () => Promise<T>): Promise<T> {
  *  callers can report it; leaves `connected` false so the next call retries. */
 async function connect() {
   if (connected) return;
-  await initConnection();   // expo-iap is StoreKit 2 on iOS by default
+  // `initConnection` RESOLVES FALSE rather than throwing when the platform
+  // refuses billing outright — on iOS that is `AppStore.canMakePayments`, i.e.
+  // In-app Purchases switched off under Screen Time, or an MDM-managed device.
+  // Trusting it to have thrown left `connected` true against a store that
+  // rejects every call, so the refusal surfaced a layer later as an
+  // unexplained `iap-not-available` out of fetchProducts.
+  const ok = await initConnection();   // expo-iap is StoreKit 2 on iOS by default
+  if (ok === false) {
+    throw Object.assign(
+      new Error(`${storeName()} purchases are unavailable on this device.`),
+      { code: 'iap-not-available' },
+    );
+  }
   connected = true;
   if (!purchaseSub) {
     purchaseSub = purchaseUpdatedListener(async (purchase) => {
@@ -319,7 +388,7 @@ async function connect() {
       // The store's own failure path (Play's dialog closing on an error, a
       // declined card). A cancel is not a failure and says nothing.
       if (isCancel(e)) { set({ purchasing: false }); return; }
-      logError('iap.purchaseError', e);
+      logError('iap.purchaseError', iapDetail(e));
       set({ purchasing: false, error: purchaseMessage(e) });
     });
   }
@@ -358,11 +427,15 @@ export async function initIap() {
       await refreshEntitlement();
       break;
     } catch (e) {
+      // A device that cannot serve ProductDetails will answer the next two
+      // attempts identically, so stop rather than spend 6.5s of backoff proving
+      // it. `noteBlocked` has already logged, under a tag that says which.
+      if (noteBlocked(e)) break;
       // Not fatal: treated as not-Pro (the paywall shows, the app is not
       // bricked). Logged because "it says I'm not subscribed" arrives with no
       // other evidence. Only the last attempt is logged, so a cold-start
       // hiccup that heals on retry doesn't flush the 40-entry support log.
-      if (attempt === INIT_ATTEMPTS - 1) logError('iap.init', e);
+      if (attempt === INIT_ATTEMPTS - 1) logError('iap.init', iapDetail(e));
       else await delay(INIT_BACKOFF_MS[attempt]);
     } finally {
       set({ ready: true });
@@ -387,8 +460,8 @@ const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
  *  opens, so a card raised after a failed launch still has real prices and a
  *  working button. Silent: the card shows fallback prices either way. */
 export async function ensureIapReady() {
-  if (storeUnavailable() || state.products.length) return;
-  try { await loadProducts(); } catch (e) { logError('iap.retryProducts', e); }
+  if (storeUnavailable() || state.products.length || state.blocked) return;
+  try { await loadProducts(); } catch (e) { if (!noteBlocked(e)) logError('iap.retryProducts', iapDetail(e)); }
 }
 
 /** Active entitlements only — StoreKit 2 currentEntitlements on iOS, the
@@ -403,7 +476,7 @@ export async function refreshEntitlement(): Promise<boolean> {
     ));
     const hit = (active || []).find((p) => isProSku(p.productId) && p.purchaseState !== 'pending');
     set({ isPro: !!hit, activeSku: hit?.productId });
-  } catch (e) { logError('iap.entitlement', e); /* keep last known entitlement */ }
+  } catch (e) { logError('iap.entitlement', iapDetail(e)); /* keep last known entitlement */ }
   return state.isPro;
 }
 
@@ -428,12 +501,23 @@ const isCancel = (e: unknown) => {
  *  can act — the store's name, or "try again". */
 function purchaseMessage(e: unknown): string {
   const store = storeName();
+  // Read BEFORE the code switch. Play flattens this into `query-product`,
+  // which is bucketed below with the genuinely transient "not live yet" cases
+  // and answered "try again shortly" — the one thing that is definitely false
+  // here, since no amount of retrying updates the Play Store app.
+  if (responseCodeOf(e) === PLAY_FEATURE_NOT_SUPPORTED) return BLOCKED_MSG;
   switch (codeOf(e)) {
     case 'network-error':
     case 'service-timeout':
       return `Couldn’t reach ${store}. Check your connection and try again.`;
-    case 'billing-unavailable':
     case 'iap-not-available':
+      // NOT a hiccup and not worth a "try again": the device has been told not
+      // to allow purchases, and no amount of retrying changes that. iOS can
+      // name the exact switch, so it does.
+      return Platform.OS === 'ios'
+        ? 'In-app purchases are turned off on this device. Turn them on in Settings, under Screen Time, in Content & Privacy Restrictions.'
+        : `${store} won’t allow purchases on this device. Check that purchases aren’t restricted for this account, then try again.`;
+    case 'billing-unavailable':
     case 'service-disconnected':
     case 'service-error':
       return `${store} isn’t available on this device right now. Make sure you’re signed in to ${store}, then try again.`;
@@ -464,6 +548,9 @@ export const clearIapError = () => { if (state.error) set({ error: undefined });
  *  handed off; false when it couldn't start (and `state.error` says why). */
 export async function subscribe(sku: string = YEARLY_SKU): Promise<boolean> {
   if (state.purchasing) return false;
+  // Already known impossible on this device. Say so without touching the store,
+  // so the answer is the remedy rather than another failed round trip.
+  if (state.blocked) { set({ error: state.blocked }); return false; }
   set({ purchasing: true, error: undefined });
   try {
     if (storeUnavailable()) throw new Error(`${storeName()} purchases aren’t available in this build.`);
@@ -505,7 +592,7 @@ export async function subscribe(sku: string = YEARLY_SKU): Promise<boolean> {
     return true;
   } catch (e) {
     if (isCancel(e)) { set({ purchasing: false }); return false; }
-    logError('iap.purchase', e);
+    if (!noteBlocked(e)) logError('iap.purchase', iapDetail(e));
     set({ purchasing: false, error: purchaseMessage(e) });
     return false;
   }

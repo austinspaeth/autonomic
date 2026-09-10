@@ -163,6 +163,25 @@ old web app so old `export.json` files import directly.
   load by `stampImportedHrvCoverage` (store `loadState`), which stamps coverage
   from the waveform sidecar — no RR ⇒ 0 ⇒ permanently excluded. Nothing is
   deleted: the entries stay in the journal and in exports, they just don't count.
+  **Note `durationSec` means two different things.** On an IMPORTED reading it is
+  real RR coverage, which is what the rule above gates on; on an IN-APP capture it
+  is the elapsed session. So the 4-minute bar would pass a 5-minute camera reading
+  holding 90 seconds of usable pulse, and it is not the field to reach for when
+  asking about capture quality.
+- **A capture's own quality is stamped on the reading** (`artifactPct`,
+  `coverageSec`, `confidence` — `src/lib/hrv` computes them, `features/hrv/Results.tsx`
+  writes them). It shipped in 1.25.2 (OTA); before that the results card SHOWED all
+  three and the entry carried none, so a reading could not be judged on its own
+  quality once the card closed — which is exactly the question about camera
+  readings, and it was thrown away on every one. Stamped only when the metrics came
+  from the beat series: the watch-summary fallback has no RR behind it, and a 0%
+  artifact rate there would be a quality claim about a measurement we never saw.
+  Capture-time gating is unchanged and is stricter for the camera already
+  (`maxArtifactPct` 15 vs 30, plus beat repair and segment triage in `lib/hrv`), so
+  these say how MARGINAL a kept reading was, not whether to keep it. **Nothing
+  de-weights on them yet** — they are recorded first so there is something to
+  decide with, and a reading from an older build carries none of them, so every
+  consumer must read `undefined` as UNKNOWN rather than as clean.
 - **Progress falls back to demo data on an empty journal. Insights does NOT.** `src/lib/demo.ts`
   generates a deterministic **60-day** sample history (`DEMO_DAYS`; seeded PRNG, keyed
   off today so it lands in the Analysis buckets and report ranges) that arcs from crash
@@ -194,7 +213,7 @@ old web app so old `export.json` files import directly.
   (`clearAllData` in `src/store/store.ts` + `deleteAllBackups`); the plaintext
   `autonomic.flags` MMKV deliberately stays, because it is about the PERSON and not
   the journal — install/cohort day, tier + trial start, ping flags, what's-new seen,
-  and the review/upsell/founder/annual pacing all survive, so erasing a journal is
+  and the review/founder/annual pacing all survive, so erasing a journal is
   not a way to re-earn a trial or be sold to again. The exceptions are the things in
   there that are CLAIMS about the erased data, and `clearAllData` resets each:
   retained Insights findings (`resetFindingMemory`), the report cached from them
@@ -207,6 +226,26 @@ old web app so old `export.json` files import directly.
   the whole journal plus every referenced waveform (RR traces, workout HR traces,
   overnight sleep series), and none of the flags store, which is why an export/import
   round trip carries all the health data and no device bookkeeping.
+- **A finished reading is SAVED, not offered.** The HRV and POTS results cards
+  (`features/hrv/Results.tsx`, `features/pots/common.tsx`) write the entry the
+  moment they open — journal + waveform sidecar, plus the health store on the
+  same terms a manually logged reading is published (`settings.healthEnabled`,
+  never a watch reading, which came FROM there). There is no Save/Discard pair
+  and no "also write to Apple Health" toggle: a measurement somebody sat still
+  for five minutes to take is not a draft, and the question turned every reading
+  into a second decision. The card is a receipt — it says what it did, its note
+  field edits the saved entry in place, and its one button is Done. Undoing is a
+  DELETE, which is a real thing the user can see and reverse-engineer, and it
+  lives on the card's own trash button. The single exception is a reading with no
+  usable data, which is never written: there is nothing to keep.
+- **Every entry CARD carries edit, delete and close, in that order.**
+  `SheetOptions.destructive` (`components/Sheet.tsx`) puts a red trash button in
+  the header pill, furthest from the ✕ so the two taps that end the card are
+  never neighbours. It always goes through `confirmDelete` (`features/forms.tsx`)
+  → `<ConfirmDeleteSheet/>` (`components/ui.tsx`), a `fitContent` card asking one
+  question, which then closes the WHOLE stack: the card beneath is a view of an
+  entry that no longer exists. Forms are not cards and keep their own footer
+  Delete.
 - **A live HRV reading outlives the card that shows it.** The capture engine is
   `src/features/hrv/sessionStore.ts` (timer, BLE/PPG collection, rolling SDNN,
   breathing clock, haptics, keep-awake) in the same module-store shape as
@@ -243,6 +282,31 @@ old web app so old `export.json` files import directly.
   gold, "Signal noisy" in red): "Training" never changes and the reader chose it
   two cards ago, whereas a status line under the charts sat below the fold on a
   small phone — the one time it mattered was the one time it was not seen.
+- **A strap that streams a pulse and no beats is refused BEFORE the reading, not
+  after it.** The Heart Rate Measurement characteristic (0x2A37) carries RR
+  intervals only when bit 4 of its flags byte is set, and plenty of devices
+  advertising 0x180D never set it: a Fitbit Charge 6 sharing to gym equipment
+  connects, pairs cleanly in the strap picker and sends `71 bpm` in a TWO-BYTE
+  packet with nowhere for an interval to live. Every metric in `lib/hrv` is a
+  statistic over the intervals, so such a device can produce nothing — yet it
+  used to buy a full five-minute paced session that `Results` then declined to
+  save, which is the right outcome at the worst possible moment and, on a
+  clean-day protocol, a reading that cannot be retaken.
+  `src/lib/ble/rrSupport.ts` (pure + tested) folds each sample into a
+  three-valued verdict, fed from `connectStrap`'s own callback rather than from
+  `collect` because pre-start nothing is collected and pre-start is exactly when
+  the answer is worth having. **`'unknown'` is never reported as `'absent'`**:
+  the bar is 20 pulse-carrying notifications (~20 s at 1 Hz) with no interval,
+  and a sample with `hr: 0` — a strap connected but not yet on the chest — is
+  not evidence and does not count, since accusing somebody's working strap of a
+  fault is a worse failure than making them wait a few seconds longer. One RR
+  interval latches `'present'` for good, so a slow starter is never convicted.
+  On `'absent'` the header pill says so, the live tiles give way to
+  `NoBeatsNote` — the `WatchNote` / `GarminNote` treatment, for the same reason
+  those exist: a real heart rate beside a permanently blank SDNN and an empty
+  trace reads as the app failing rather than as the device declining — and Start
+  is DISABLED, the impossible option made unavailable rather than
+  tappable-then-refused.
 - **The app sends two local notifications, both owned by `src/lib/reminders.ts`.**
   (1) The morning reminder: `settings.reminder` is the source of truth and the OS
   schedule is derived, reconciled by `syncReminder()` on launch (covers reinstall, an
@@ -256,8 +320,9 @@ old web app so old `export.json` files import directly.
   Outlook downturn copy, at most once per day (`crashAlert.lastFired`). Enabling the
   morning reminder while `crashAlert` is undefined defaults crash warnings on (the
   welcome wizard's opt-in); an explicit off is never overridden. UI: Settings →
-  `NotificationsRow` opens `NotificationsSheet` (`src/features/Reminders.tsx`); the
-  wizard's last step still uses `useReminderToggle()`.
+  `NotificationsRow` opens `NotificationsSheet` (`src/features/Reminders.tsx`). The
+  wizard no longer asks: the reminder card is gone from its last step, which now
+  holds nothing but the sensor choice.
 - **The store review ask is earned, never scheduled.** `src/lib/review/` decides
   it: `eligibility.ts` is pure (four days holding the user's OWN entries —
   imported Health rows don't count — plus `detectUpturn`, the mirror of
@@ -275,11 +340,31 @@ old web app so old `export.json` files import directly.
 - **Capture is never metered; Pro is what the app makes of the readings.**
   The freemium line runs between *taking* a measurement and *analysing* it.
   Free forever, with no cap: journaling, manual readings, the daily score and
-  Outlook, backups/export, the Apple Watch HR monitor, and **live HRV capture
-  as often as the user likes** (strap, camera or watch). Pro: Progress
+  Outlook, backups/export, the Apple Watch HR monitor, **live HRV capture
+  as often as the user likes** (strap, camera or watch), and **both POTS
+  captures, on the watch and on a strap**. Pro: Progress
   week/month/year (free clips at the 14-day Day view), full historical metric
-  analysis, the whole Insights tab, live POTS captures + watch POTS rows
-  (`relay.pro` in `src/lib/watch/receiver.ts`), and the AI report cards. Live
+  analysis, the whole Insights tab, **reading a POTS RESULT** and the AI report
+  cards. The watch used to lock its POTS Test and POTS Episode rows on
+  `relay.pro` and the picker locked the in-app stand test; neither gates
+  anything now (the flag is still mirrored). A stand test and an episode happen
+  at a moment that cannot be rescheduled around a subscription, and a device
+  that refuses to record one loses it for good — so the capture runs, syncs and
+  saves on every tier, and the gate sits on the RESULT: `src/features/PotsLock.tsx`.
+  It is a CARD, not a mask, and that is the one place it parts company with
+  Progress and Insights. Those build the real document and blur it, because
+  there the SHAPE of what is locked is itself information and the header that
+  raised the gate has to stay live. A single reading has neither — the shape
+  behind the blur is one number the user just measured, so a dimmed preview is a
+  tease rather than an honest one — so the tap opens the lock card and nothing
+  else, `fitContent`, which is to say it rises from the bottom of the device
+  like every other one-answer card. `openPotsLockIfNeeded` in `features/forms.tsx`
+  is the single choke point (journal row + watch/Garmin arrival); the live
+  session's own results sheet renders the card in place of the summary, keeps
+  its "Saved to your journal" line, and swaps the real summary in if the user
+  upgrades from it rather than closing — it is the receipt for a capture they
+  just sat through. Delete stays armed on a locked result and the pencil does
+  not, since the edit form is the numbers, listed. Live
   HRV capture WAS capped at one a day on the free tier and no longer is (1.25):
   a user who has run out of the thing the app exists to do has no reason to
   open it again until tomorrow, and the cap taught them to stop measuring on
@@ -291,20 +376,29 @@ old web app so old `export.json` files import directly.
   places state the same boundary and drift apart silently if one moves.
   Reactive only: `usePaywall()` is raised by tapping a locked thing, never on
   launch (`SubscriptionGate` is long gone).
-- **Every offer the app raises on its OWN initiative goes through
-  `src/lib/upsell/`.** Same split as the review module: `eligibility.ts` is pure
-  (`nextUpsell`, unit-tested), `index.ts` is the shell over the plaintext
-  `autonomic.flags` MMKV. It returns a winning **surface** plus the `trigger`
-  phrase that picked it ("31 days logged"), so exactly one proactive offer can be
-  live and the card's copy can't drift from the condition that fired it.
-  Suppressed for pro/trial, an open sheet, a crash-alert day, an active
-  downturn, a session where the review ask already went out
-  (`noteReviewAsked()`), and for 10 days after any offer; two dismissals or three
-  ignored sessions retire a surface for 30 days (`noteUpsellShown` /
-  `noteUpsellDismissed` / `noteUpsellTapped`). The one consumer today is
-  the annual offer below (`ProUpsellCard`, the old generic card, is gone —
-  replaced in the Journal by `<TrendCard/>`, which is a feature and not an
-  offer). **Reactive paywalls are not
+- **The app raises exactly TWO offers on its own initiative, and each owns its
+  own rules.** `src/lib/upsell/` holds only `annual.ts` + `annualMemory.ts`,
+  `founder.ts` + `founderMemory.ts` and the one thing they SHARE,
+  `pacing.ts` + `pacingMemory.ts` (each a pure module plus its flags-MMKV
+  shell). **The two offers share ONE cool-down clock**: an offer may only be
+  RAISED when nothing else has been raised in the last 7 days, whichever opens
+  first stamps it, and a blocked offer is DEFERRED, never spent. That gate is on
+  STARTING only — a window already claimed (the annual card's live 24 hours, the
+  founder card's claimed day) renders from its own memory, or the clock it set
+  would retire it a frame after it appeared. It exists because the two were not
+  in fact independent: the annual card's 24h unlock reports `'trial'`, which is
+  exactly the state the founder card waits for, so opening the half-price year
+  made "join us early" due underneath it. A phone that raised an offer before
+  this shipped has its clock backfilled once from the two offer memories. There is deliberately no generic surface engine: `eligibility.ts` /
+  `index.ts` (`nextUpsell`, a rotating six-surface rota with a shared pacing
+  clock, retirement counters and a `lastUpsellSurface` diagnostics row) was built
+  and never wired to anything — four of its six surfaces were permanent TODOs,
+  its two live triggers fired on engaged-day COUNTS regardless of whether the
+  user had taken enough readings for the app to have anything to show them, and
+  its only remaining callers were bookkeeping for itself. It is gone; do not
+  reintroduce a generic rota. A new proactive offer is a new module beside those
+  two, with its own trigger stated in terms of the user's own data.
+  **Reactive paywalls are not
   upsells**: a user who taps a locked thing gets `usePaywall()` instantly and is
   never gated, delayed or counted. Greyed-out UI is neither, and never counted.
 - **"Has this metric moved?" is answered in exactly one place: `src/lib/trends/`.**
@@ -398,6 +492,26 @@ old web app so old `export.json` files import directly.
   `RestNote` with the downturn's and lists each marker beside its own baseline;
   `buildStrainPrompt` asks the AI for the case AGAINST the flag as well as for
   it, because the question here is "early warning or noise".
+- **Progress's fifth range is a window the user picks, and it REPLACES the four
+  tabs rather than joining them.** The three dots ride on the tabs' own capsule
+  (`trailing` on `Segmented`, so the header band's height never moves) and open
+  `CustomRangeSheet` (`src/features/ProgressRange.tsx`): two dates, three presets,
+  and a "Compare by" row reusing the same four words. A custom window travels
+  ALONGSIDE `mode` rather than replacing it — `mode` stays the grouping in both
+  states, so bucket labels, `bucketWhen`'s phrasing and the rolling-average window
+  all keep reading the one value they always did, and only `acBuckets` sees the
+  window. Buckets are **clamped to the window at both ends**: a month bucket for a
+  range starting on the 12th starts on the 12th, or the average would cover days
+  the user did not ask for. Applying goes through the same veil as a tab change
+  (one `rangeKey` identifies a range for the build cache, the commit's no-op check
+  and the body's remount key), but does NOT wait on the pill's spring — the control
+  cross-fades to the chip instead of the pill travelling, and gating on a spring
+  that will never run held the veil up for the full backstop. The chip is
+  tappable (reopens the sheet with the current values, so changing just the
+  grouping is one tap) and its ✕ is a separate target back to Day. A grouping too
+  fine for its window is REFUSED in the sheet (`MAX_CUSTOM_BUCKETS`), never
+  silently coarsened. Free tier meets it the way it meets Week/Month/Year: the
+  document builds for real and `<LockedOverlay/>` masks it.
 - **"What is linked to what?" is `src/lib/insights/`, and every guard in it is
   load-bearing.** One entry point, `buildInsights(state, dk)`, returns the whole
   Insights view: the headline change, ranked correlations, heuristic observations,
@@ -693,8 +807,9 @@ old web app so old `export.json` files import directly.
   reuses `engagedDayCount`, so a health-store backfill is not five days of use)
   and ONLY while the install trial is still running — day six of a fourteen-day
   trial is a user who has just been convinced, where the annual card above is
-  aimed at one whose access lapsed months ago, which is why the two can never be
-  due on the same day and why this one grants no extra unlock. The day it claims
+  aimed at one whose access lapsed months ago, which is why this one grants no
+  extra unlock (the shared 7-day clock above is what keeps the two off the
+  screen together). The day it claims
   is its whole life: `shownDk` is stamped once, the card renders only while
   `shownDk === todayKey()`, and the ✕ sets `dismissed` permanently (there is no
   second grey "No thanks" — one card, one way to say no). Because of that single
@@ -717,19 +832,113 @@ old web app so old `export.json` files import directly.
 - **The only thing the app sends anywhere is an anonymous cohort ping.**
   `src/store/ping.ts` (shell) over `src/lib/ping.ts` (pure + tested) GETs
   `api.autonomic.care/ping/open/D{MMDDYY}{P}` on launch and on foreground,
-  `/ping/sub/D{MMDDYY}{P}` once the store reports an entitlement, and
-  `/ping/act/D{MMDDYY}{P}{M}` the first time an HRV reading is ever SAVED
-  (`pingActivation` from `features/hrv/Results.tsx`, once per install ever).
-  That third route carries one extra letter for the sensor — `W` watch, `B`
-  Bluetooth strap, `F` finger on camera — because "did onboarding work" and
-  "with what" are the same question. Activation fires on the SAVE, never on the
+  `/ping/sub/D{MMDDYY}{P}` once the store reports an entitlement,
+  `/ping/act/D{MMDDYY}{P}{M}` the first time an HRV reading ever COMPLETES
+  (`pingActivation` from `features/hrv/sessionStore.ts`, once per install ever),
+  `/ping/cap/D{MMDDYY}{P}{M}` when a reading STARTS and
+  `/ping/hrv/D{MMDDYY}{P}{M}` when one COMPLETES (`pingCaptureStarted` /
+  `pingCaptureCompleted`, both fired from the ENGINE — `beginCollection` and
+  `finishSession` in `features/hrv/sessionStore.ts` — never from a view, since a
+  reading can be minimized, restored and finished from three different places),
+  `/ping/pay/D{MMDDYY}{P}{S}` when a locked surface raises the paywall
+  (`pingPaywall`, from `usePaywall()`), plus `not` (a notification turned on),
+  `pot` (a POTS capture finished), `see` (a gated view opened), `err` (something
+  failed) and `osh`/`odm`/`oac` (an offer shown, dismissed, accepted).
+  **A reading taken on the WRIST fires `cap`, `hrv` and `act` from the RECEIVER
+  instead** (`pingWristReading` in `store/ping.ts`, called by
+  `lib/watch/receiver.ts` and `lib/garmin/receiver.ts` on a fresh HRV arrival
+  dated today). The wearer starts it on the watch and the whole beat-to-beat
+  series lands in one message, so no session ever ran and those readings were
+  invisible — worse, an install whose FIRST ever reading was taken that way never
+  registered as activated at all, and that is the normal way to use the Garmin
+  app. It fires the STARTED ping as well as the completed one, because a reading
+  that arrives did begin — we simply learn of both in the same instant — and
+  `hrv / cap` is read as a completion rate, so crediting the completion alone
+  would let `hrv` exceed `cap`. What it cannot see is an ABANDONED wrist reading:
+  the watch sends nothing, so the completion rate is measured over phone-driven
+  sessions and reads high for the watch sensors. The today gate is load-bearing —
+  a watch queues while the phone is unreachable, and last night's reading
+  delivered on this morning's launch is not a reading taken today — and the daily
+  caps make a wrist arrival that follows a phone-driven reading a no-op.
+  **NOTHING fires on Save.** The measurement is the event; whether the results
+  card survived long enough to be filed is a different fact about a different
+  moment, and counting the save undercounted every completed reading that was
+  discarded, backgrounded or lost to a closing sheet stack — and could not see an
+  abandoned session at all. `hrv / cap` is the completion rate, per sensor
+  because both carry the letter, and the gap between them is the only place an
+  abandoned reading exists.
+  All three CAPTURE routes carry one extra letter for the sensor — `W` Apple Watch,
+  `B` Bluetooth strap, `F` finger on camera, `G` Garmin watch — because "did
+  onboarding work" and "with what" are the same question, and so are "are they
+  still measuring" and "with what". Activation fires on the SAVE, never on the
   start of a capture: an abandoned session is the opposite of an activation. The path
   segment is the day this install FIRST ran (read from `trialStartedAt`, then
   frozen in its own flag) plus ONE letter for the platform (`I` iOS / `A`
   Android / `U` unknown, which is also how the server reads the missing letter
   older builds send); the server stamps the arrival day, so a row is
   (cohort day, platform, arrival day) → count, which is retention per store.
-  An activation row is (cohort day, platform, method, arrival day) → count.
+  A capture row is (cohort day, platform, method, arrival day) → count.
+  **Every route also carries the install's TIER and the build's VERSION**, as
+  tagged tokens behind the fixed head: `D082126IG-TP-V1.26.0`. Tagged, because
+  the head cannot be extended — `[A-Z]?[A-Z]?` cannot tell a missing sensor from
+  a tier letter in the sensor's place — so a new field costs a letter and breaks
+  nothing, and a build sending no tokens is byte-identical to the old format.
+  Both are stamped inside `send()` rather than by each caller, which is the only
+  reason "every ping carries them" is a fact about the app and not a convention
+  four call sites must remember. **The lambda must be deployed before a build
+  carrying the tail is released**: a decoder that predates it matches the whole
+  segment against a fixed-width pattern, so the ping does not degrade, it fails
+  outright — 204, no count, no log, and it looks exactly like nobody opened the
+  app. Tier is `F`/`T`/`P` off `getTier()` at the
+  instant of the send, so a cohort's drift from F to P IS the conversion curve;
+  version is dropped rather than sent when it is not a dotted number, since it
+  becomes a map key and an unreadable key is worse than an absent one.
+  **Phases of one thing get their own ROUTE; flavours share a route and are told
+  apart by the letter.** Started/completed and shown/dismissed/accepted are read
+  AGAINST each other, and a route is the one distinction a consumer cannot
+  accidentally pool away; a sensor, a wall, a view or an offer is a flavour.
+  **Two shapes of daily cap, and the difference is load-bearing.** `open`, `cap`,
+  `hrv` and `pay` are capped once per install per Eastern day for the WHOLE
+  route, so a day's total is a headcount and the letter can only describe the
+  day's FIRST event. `not`, `pot`, `see` and the three offer routes are capped
+  per LETTER (`slotKey` in `store/ping.ts`), because their letters are choices
+  the user made between real alternatives — a stand test is not an episode,
+  Insights is not Progress — and a whole-route cap would silently drop whichever
+  came second. There, each LETTER'S count is the headcount and the route's total
+  is not; `A.isHeadcount(kind)` is the question to ask before dividing. `err` is
+  neither: once per install EVER, carrying no tag and no message, so it is a
+  running population of phones worth asking for a support dump and never a
+  statement about what broke. It is deliberately left that blunt — what broke is
+  `/fault`, a separate route that is not a ping at all (see the error-log bullet
+  below), and because that one is grouped by FAILURE rather than by install,
+  summing it would count one phone once per bug it hit.
+  **The paywall route is the third daily counter**, capped for the same reason
+  the other two are: uncapped it would count TAPS, and one user tapping a locked
+  range four times would read as four people meeting a wall. Its letter names
+  the surface (`R` Progress range / `I` Insights / `P` POTS / `O`,`M`,`N` the
+  three AI reports / `S` the Settings Upgrade button), it fires for EVERY tier
+  (a pro user meeting a wall is a bug, and the counter that would hide it is the
+  one filtered by tier), and `S` is kept out of every "top wall" ranking because
+  it is not a wall — somebody who opened Settings and tapped Upgrade went
+  looking. Like the sensor letter it names the day's FIRST wall, so it answers
+  "what is the front door to Pro" and never "how often is each feature locked".
+  **The HRV route is the open route's twin, and that symmetry is load-bearing**:
+  same code, same one-per-Eastern-day cap, so `hrv[day] / open[day]` is a share
+  of PEOPLE (of everyone in the app that day, how many measured) rather than of
+  pings. Opening a journal app is not using it, and the open counter alone cannot
+  tell a daily measurer from someone who launches it to look at yesterday's
+  number. Nothing may be added to one of the two that CHANGES WHAT A COUNT MEANS
+  in one and not the other — a second ping per day, a different boundary. The
+  sensor letter is not such a thing and that is why this route carries one: it
+  splits the KEY a count lands under, never the count, so a day's readings still
+  sum to one per install and the share is untouched. What it cannot claim is a
+  person's whole day, since the cap names whichever reading came FIRST — the
+  dashboard says so (`hrvMethodsOn`), and the "What readings are taken with"
+  card is where it is read. The route shipped later than the other three, so days
+  before its first row are UNKNOWN, never 0% — `hrvFirst` / `hrvKnown` in
+  `landing/master/analytics.js`, read off the unfiltered rows because Android
+  shipped it in its own release; the sensor letter is later still, so a reading
+  from before it reads as "no sensor" (`hrvMethodKnown`) rather than as a guess.
   There is no device id, no install id, no body, no health data — which is
   exactly why the server can't
   de-duplicate and the CLIENT must: one open ping per install per **US Eastern**
@@ -742,19 +951,34 @@ old web app so old `export.json` files import directly.
   since nobody paid there. Failures are silent and NOT sent to `logError` —
   being offline is a phone's normal state, and it would flush the 40-entry
   support log. Storage is **one DynamoDB row per day** holding a map of
-  cohort+platform(+method) → count (`PK PING#OPEN` / `PING#SUB` / `PING#ACT`,
-  `SK 2026-08-21`, `cohorts: { '082126I': 12 }`, activations `'082126IB'`) — a map, not a list, because the nested bump is
+  cohort+platform(+method) → count (`PK PING#OPEN` / `PING#SUB` / `PING#ACT` /
+  `PING#HRV`,
+  `SK 2026-08-21`, `cohorts: { '082126I': 12 }`, readings `'082126IB'`) — a map, not a list, because the nested bump is
   atomic and appending to a list would lose concurrent pings.
   Read it back with `GET /ping/report?key=`
   (shared key, `PING_REPORT_KEY`, injected by CodeBuild from SSM) or the `PINGS`
   action on the authenticated `/master` API; both return
-  `{ day, total, cohorts: [{ key, cohortDate, cohort, platform, method, count }] }`
-  rows under `open` / `sub` / `act` (`method` is null outside activations). The
+  `{ day, total, cohorts: [{ key, cohortDate, cohort, platform, slot, method,
+  surface, tier, count }], builds: [{ key, platform, tier, version, count }] }`
+  rows under `open` / `sub` / `act` / `hrv` / `pay`. The 8th character is reported
+  under both the generic name (`slot`) and the name its route gives it, so a
+  consumer can tell "this kind of ping has no sensor" from "a sensor we could not
+  read" without knowing which kind it holds. The
   `/master` dashboard renders them in its **App usage** view (`landing/master/`,
   tested by `landing/tests/master-ping.test.mjs`): activation gets its own tiles
   (*Activated on day 0* / *Activated by D7*), an **Activation** card and a
   **How the first reading is taken** card, with `A.activation` obeying the same
-  "immature is not zero" rule as every other rate there. It is also announced as
+  "immature is not zero" rule as every other rate there. The reading counter gets
+  three tiles (*Measured on <day>* / *Measured of active* / *Measured per active
+  day*), an **Opened vs measured** card and **The habit curve** — retention and
+  measuring on one axis by install age, where the GAP between the two lines is
+  the finding — plus a Readings bar on the weekday chart and its own route in the
+  raw Pings tab. The paywall counter gets **Opened vs paywalled** and **Which
+  wall they meet first**, and the two new fields get **Who is in the app** (the
+  tier split, with a Pro share read off three different counters side by side)
+  and **What they are running** (version adoption); all four are pinned by
+  `landing/tests/master-paywall.test.mjs`, and the lambda's decode and key
+  shapes by `sls/tests/ping.test.mjs`. Activation is also announced as
   a live alert card (`landing/master/alerts.js`) — **confetti is for ARRIVALS,
   never for usage**, so downloads and sales keep the canvas and an activation
   gets the card, toast and notification without it. A stored alert baseline
@@ -783,8 +1007,10 @@ old web app so old `export.json` files import directly.
   `useCaptureDeepLink()` in `src/features/forms.tsx`: `autonomic://?capture=hrv`
   opens HRV capture (no tier check: capture is unlimited on every tier);
   `autonomic://?open=protocol` scrolls to
-  the Progress streak card and opens it expanded (`requestExpandProtocol` /
-  `scrollJournalToSection('protocol')` in `src/store/nav.ts`).
+  the Progress streak card (`scrollJournalToSection('protocol')` in
+  `src/store/nav.ts`) and leaves it as the reader left it. It does NOT open the
+  card: an accordion that expands itself overwrites the one piece of Journal
+  state the user had actually set, so the deep link does the useful half only.
 - **"What's new" is announced once per `x.x` release, and never wins the pill
   slot.** The customer-facing release log lives in `src/lib/whatsNew.ts` (product
   copy, deliberately not `CHANGELOG.md`, which stays the engineering record);
@@ -846,9 +1072,76 @@ old web app so old `export.json` files import directly.
   a count so a retry loop can't flush the window (`errorBuffer.ts`, pure +
   tested). `installErrorLogging()` in the root layout also routes uncaught
   errors there on their way to the default handler — it observes, it never
-  swallows. Call `logError('area.thing', e)` from a catch that would otherwise
-  be silent (already wired: store persist/load, IAP, health reads, reminders,
-  backups, widgets), and prefer an existing tag over a new phrasing of one.
+  swallows. **It installs TWO hooks, and for a long time only one existed.**
+  `ErrorUtils` is JavaScript's global handler and sees JavaScript throws; a Java
+  exception on the Android main thread never passes through it, so a native
+  crash killed the process and left this log EMPTY — a support dump that said
+  "nothing has failed" about a phone that had been crashing for days, which is
+  the worst answer available. So `modules/app-env` now also carries a Java
+  `UncaughtExceptionHandler`. It runs in a process that is already dying, which
+  fixes its shape: one synchronous file write (never MMKV — that is JSI and the
+  runtime may be gone), no network, and the previous handler is ALWAYS called so
+  the crash stays a crash. `drainNativeCrashes()` picks the file up on the next
+  launch, AFTER `initFaultReporting()` so the report rides a sender that is
+  already draining, and lands under the single tag `native.crash`
+  (`diagnostics/nativeCrash.ts`, pure + tested). It is the one place the MESSAGE
+  outranks the tag: there is only one call site, so the tag can say nothing
+  about where, and the exception type plus its ROOT cause carry the whole
+  finding — `BadParcelableException: ClassNotFoundException when unmarshalling:
+  com.garmin.android.connectiq.IQDevice` IS the bug report. A test pins that it
+  survives `redactMessage` intact. iOS is deliberately a stub:
+  `NSSetUncaughtExceptionHandler` catches ObjC exceptions, and almost nothing
+  that kills an iOS build is one, so installing it would report a handful of
+  crashes and imply we were watching for the rest. Call `logError('area.thing', e)` from a catch that would otherwise
+  be silent (already wired: store persist/load, the waveform sidecar, IAP,
+  health reads + the one-shot history backfill, the strap connect loop,
+  reminders, backups, widgets, Garmin, Insights), and prefer an existing tag
+  over a new phrasing of one. **The tag IS the location**: a release build's
+  stack is minified bytecode offsets and worth nothing, so `area.thing` plus the
+  error's own type (`describeError` leads with `TypeError` / a native
+  `errorCode` when there is one) is the whole of the diagnosis. Most `catch`
+  blocks in the app are deliberately silent and should stay that way — a
+  cleanup, an optional native module, a permission read. The ones that must log
+  are where the app DEGRADES INVISIBLY: a lost waveform (the reading looks
+  complete and only its trace is gone), a strap that never connects (a loop that
+  retried forever leaving no trace), a one-shot backfill that will never run
+  again.
+- **A failure is also REPORTED, and that is a different route from the failure
+  COUNTER.** `logError` fires two things. `pingErrorSeen` (`/ping/err`) is
+  unchanged: once per install EVER, no tag, no message — a population, "how many
+  phones have had something go wrong". `reportFault` (`/fault`,
+  `src/lib/errorReport.ts` pure + `src/store/errorReport.ts` shell) is the log:
+  the same install code every ping sends, plus a **tag** naming the call site, a
+  **short redacted message**, and how many occurrences it accounts for. It exists
+  because the counter is spent on an install's first hiccup and can never say
+  what broke — a release that broke Health imports for every Android phone would
+  not move it by one. **EVERY OCCURRENCE IS COUNTED**, and the only reason that
+  is safe is that COUNTING and SENDING are decoupled: occurrences accumulate in a
+  persisted buffer (flags MMKV) and a report carries the count it accumulated
+  (`n`), so a signature's first sighting goes out immediately and the rest of a
+  storm rides a 20s debounce, a background, or the next launch. A per-second
+  retry loop is three requests a minute carrying all sixty occurrences, not sixty
+  requests from a phone already having a bad time. **Suppressing a REQUEST
+  therefore never loses a COUNT** — the debounce, the per-launch request budget
+  and a dead network all defer; `takePending`/`restorePending` is what holds that
+  across a failed send, and `initFaultReporting()` (root layout) drains what was
+  left buffered when the app last stopped. **TWO NUMBERS come out and neither is
+  reported alone**: `n` sums to occurrences, and `d` — set on a signature's first
+  report each Eastern day — sums to install-days, which is as close to "how many
+  phones" as a system with no identifier gets. Occurrences alone cannot tell one
+  looping phone from a bug everybody has; install-days alone cannot tell a glitch
+  from a storm. **The platform/version/tier splits move with INSTALL-DAYS**, so
+  one looping phone cannot report whichever build it runs as the whole of a
+  failure (`occPlatforms` is the exception, since platform is the dashboard's
+  filter). **The message is redacted before it leaves AND again in the lambda** —
+  emails, URLs to their host, paths to a basename, anything id-shaped, digit runs
+  of 4+ — the second pass being the one that makes it true of the TABLE rather
+  than of the builds we shipped; the digit rule is also what groups a retry loop
+  into one signature. And **it must never route back into `logError`**, or a
+  failing network turns one error into a loop. Rows expire after 120 days
+  (`expiresAt`, TTL on the table): diagnostic, not a series. Read back under
+  `faults` on the same report call; drawn by the dashboard's **Failures** tab,
+  which ranks by breadth and keeps the two counters visibly apart.
 - **Types come in two layers.** Built-ins live in the `*_TYPES` maps in
   `src/lib/registry.ts` (add an icon in `src/components/Icon.tsx` when adding one).
   Users can also create their own activities, meds/supplements, symptoms and
@@ -857,16 +1150,27 @@ old web app so old `export.json` files import directly.
   `state.hiddenTypes`, only while unused — `typeInUse` guards). Custom defs are
   pure JSON (no summary/detail functions) so they survive export/import. UI code
   must resolve types through `typesFor(state, kind)`, never the raw registry maps.
+- **The welcome wizard is three steps: Before you begin → Connect your data →
+  Take your first HRV reading.** The first folds the disclaimer and the privacy
+  promise into one scrolling view and carries NO acknowledge checkbox — the
+  primary is labelled "I understand", so pressing it IS the acknowledgement and
+  the same question is never asked twice. There is no logo splash and no About
+  you step: a profile nobody has a reason to fill in yet is a form standing
+  between a new user and their first reading, and every field of it is still in
+  Settings.
 - **The welcome wizard ends in an action, and the Journal holds the ask until
   it happens.** The last step of `src/features/Onboarding.tsx` is "Take your
   first HRV reading": the logo squiggle, one choice (which sensor, seeded by the
-  HRV sheet's own `defaultSource`), the reminder card, and a primary that
+  HRV sheet's own `defaultSource`), and a primary that
   finishes the wizard and opens the capture over the LIVE Journal — the fade
   runs first, the sheet stack lives in the root layout, so the reading is never
   taken on top of an overlay that is about to disappear. It commits to a
   **baseline**, never training: paced breathing is a thing to graduate to.
   Picking the strap with nothing paired detours into `DevicesScreen`, the same
-  rule `HrvSetup.start` follows; `openCapture` / `sourceBlocker` /
+  rule `HrvSetup.start` follows, and once one IS paired the row carries its own
+  "Change" link into that same card — selecting a sensor and swapping the device
+  behind it are different questions, and a row that only selects strands anyone
+  who owns a second strap; `openCapture` / `sourceBlocker` /
   `defaultSource` are exported from `features/hrv/Setup.tsx` so the wizard and
   the setup sheet cannot open different cards for the same choice. Skipping is
   allowed and lands on `<BaselineWaitingCard/>` (`features/DaySummary.tsx`),
@@ -878,6 +1182,24 @@ old web app so old `export.json` files import directly.
   placeholder tiles are skeletons rather than checkboxes: the claim is "these
   are empty", not "here are your chores". No dismiss — it is the only route
   back, and it retires itself the moment a reading lands.
+- **A back-dated write says so, in gold.** The Journal can be scrolled days
+  back from the Calendar, but by the time a sheet is open the date header is
+  long gone, so a save into last Tuesday looked exactly like logging right now.
+  `isPastDay(dk)` (`lib/dates.ts` — day keys are ISO, so a string compare is a
+  date compare) drives `<DaySaveButton/>` in `components/ui.tsx`: on today the
+  ordinary red primary, on any earlier day the new `caution` Button variant
+  (`CAUTION_GOLD` fill, `CAUTION_INK` label — white on gold is unreadable) with
+  an alert mark and "Save for previous day". Every control that COMMITS into one
+  day goes through it — entry + bike forms, the water drawer, bowel movements,
+  the multi-select log picker ("Log 3 items for previous day"), day notes, the
+  sleep-import confirm. Three deliberate exceptions: the live HRV/POTS captures
+  save to the moment they happened and can never be back-dated; Delete stays
+  red, since deleting is already the loud action; and settings-shaped saves (the
+  profile, the water GOAL, the type catalog) are not day data. The sleep editor
+  has no Save to re-dress — its fields write through on change — so it gets
+  `<PastDayNotice/>`, the same warning as a line above the fields, and the log
+  picker's copy drops "today" on a back-dated day ("Any triggers that day?",
+  "you already logged this day").
 - **All logged sections share one pattern**: a section lists the day's entries;
   "+ Add" opens a `TypePicker` (or the bespoke `ReadingPicker`, which also offers
   Live HRV) of registry types; choosing one stacks its `EntryForm` to capture
@@ -918,15 +1240,36 @@ Device builds ship via EAS — see `mobile/EAS_UPDATE.md` and the workflows in
 **Android release builds are minified.** `enableProguardInReleaseBuilds` +
 `enableShrinkResourcesInReleaseBuilds` are on in `expo-build-properties`, so R8
 shrinks and obfuscates every release (dex 42 MB → 13 MB, 5 dex files → 2).
-Consequences worth remembering: keep rules for anything reached by reflection or
-from C++ live in the same `extraProguardRules` block in `app.json` (libraries
+Consequences worth remembering: keep rules for anything reached by reflection,
+from C++, **or by NAME from another process** live in the same
+`extraProguardRules` block in `app.json` (libraries
 that ship their own `consumerProguardFiles` need no entry — expo,
 expo-modules-core, expo-updates, reanimated, svg, health-connect,
-openiap-google); `plugins/withR8Memory.js` raises the Gradle heap because R8
+openiap-google). That third category is the one that does not look like a
+minification problem: a Parcelable arriving in an Intent EXTRA is resolved by
+its class-name string through our ClassLoader, so a renamed class throws
+`BadParcelableException` inside the library's own `BroadcastReceiver`, on the
+main thread, where no `catch` of ours can reach it. It is why
+`com.garmin.android.connectiq.**` is kept — Garmin Connect answers the Connect
+IQ SDK by broadcast, while the outbound AIDL call is name-independent (typed
+`CREATOR`), so the device list worked and only the REPLY killed the app.
+**A keep rule is a line in a build config no test exercises, so that one is
+also checked at runtime**: `garminLinkIntact()` (`lib/garmin/receiver.ts`) asks
+`modules/app-env`'s `missingClasses` whether the three Connect IQ parcelables
+still resolve, and a `false` switches every Garmin surface off —
+`garminDevices()` answers empty, `initGarminReceiver` declines to register for
+the very broadcasts that would kill the process, and `usableBrands()` in
+`WatchBrands.tsx` drops the brand so no setup card can be opened. It fails SAFE
+in the other direction (an unreadable answer means "nothing missing"), because a
+module that cannot answer must not be able to disable working hardware on a
+hunch. It logs `garmin.obfuscated` once and the support dump carries a
+`garmin link` row, since "the Garmin rows are just not there" is otherwise
+indistinguishable from the feature never having shipped.
+`plugins/withR8Memory.js` raises the Gradle heap because R8
 OOMs at the template's 2 GB; release stack traces are obfuscated, but AGP embeds
 the mapping in the AAB itself
 (`BUNDLE-METADATA/com.android.tools.build.obfuscation/proguard.map`), so Play
 deobfuscates crashes with no upload step. **A green build proves nothing here** —
 a missing keep rule fails at
 runtime, so launch the minified APK and exercise BLE / camera / Health Connect /
-IAP / widgets before shipping.
+IAP / widgets / the Garmin setup card before shipping.

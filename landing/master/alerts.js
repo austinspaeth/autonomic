@@ -2,28 +2,51 @@
  *
  * The page auto-refreshes every 5 minutes while it is visible, on every view
  * (app.js), and this is what makes that worth doing: the difference between one
- * ping report and the next is announced rather than silently redrawn. Four
+ * ping report and the next is announced rather than silently redrawn. Five
  * events, in ascending order of how much they matter:
  *
- *   visitors    someone opened the app         soft blip, nothing else
+ *   visitors    someone opened the app         soft blip, THREE SECONDS of
+ *               (returning: a first run is       house-coloured glitter
+ *               counted as a download, not
+ *               as a return)
+ *   readings    an install saved a reading      soft tap, a card + a toast + a
+ *               TODAY (any reading, not the      notification naming the
+ *               first)                           sensor. No canvas.
  *   activations an install saved its FIRST      soft chime, a card + a toast +
  *               HRV reading                     a notification naming the
- *                                               sensor. NO confetti.
- *   downloads   a first run the counter had     two-note chime, confetti falling
- *               never seen (a new install)      from the top, a card + a toast +
- *                                               a notification naming the store
- *   sales       a subscribe ping                fanfare, TEN SECONDS of confetti
- *                                               from the top and the bottom, a
+ *                                               sensor. No canvas.
+ *   downloads   a first run the counter had     two-note chime, TEN SECONDS of
+ *               never seen (a new install)      SILVER glitter falling from the
+ *                                               top, a card + a toast + a
+ *                                               notification naming the store
+ *   sales       a subscribe ping                fanfare, TWENTY SECONDS of
+ *                                               GOLD glitter from both edges, a
  *                                               card + a toast + a notification
  *                                               naming the store that paid
  *
- * **Confetti is for ARRIVALS, never for usage.** A new install and a purchase
- * are people joining and people paying; everything else here is somebody using
- * the app they already have. That is the event this dashboard hopes to see all
- * day, every day, and confetti for it would be confetti more or less
- * permanently — which is the fastest way to make confetti mean nothing when a
- * sale finally lands. Activations get the full card / toast / notification
- * treatment and no canvas at all.
+ * **The canvas ranks nothing; only the SOUND does.** All three celebrations run
+ * at once, so a refresh carrying a sale, a new install and somebody coming back
+ * shows gold, silver and colour together — that is the news, and drawing only
+ * the loudest of the three threw two thirds of it away. One cue is still played
+ * per refresh, the best outcome that happened (pay > sign up > return), because
+ * three simultaneous sounds are a noise where three simultaneous emitters are a
+ * party. Count STACKS at a decayed rate, halving each time: two sales are 20s
+ * plus 10s, three are 20 + 10 + 5. See `celebrate`.
+ *
+ * **The metal is the news, and the duration is the ranking.** Gold for money,
+ * silver for a new install, house colours for somebody coming back — told apart
+ * across a room with the sound off. An earlier version of this file reserved
+ * the canvas for arrivals and gave usage nothing, on the argument that a
+ * celebration for the event the dashboard hopes to see all day would run
+ * permanently and leave a sale's confetti meaning nothing. That argument was
+ * about duration, not about the canvas: three seconds is over before it reads
+ * as an interruption, where a sale holds the screen for twenty. An activation
+ * is the one event that still gets no canvas at all — it lands in the same
+ * refresh as the download that caused it often enough that its own puff would
+ * only ever be read as part of that one, and the reading counter beside it is
+ * the same event one rung quieter: the app being USED, which is the thing this
+ * dashboard hopes to see all day and therefore the last thing that may hold the
+ * screen. Both are told, neither is celebrated.
  *
  * Everything here is fed by the PING COUNTER, which is the only source on this
  * page that changes on its own. Store downloads and the sales ledger are hand
@@ -66,10 +89,10 @@
   /* Cards and copy speak store names; the report speaks letters. */
   var STORE = { I: 'iOS', A: 'Android', U: 'unknown store' };
 
-  /* The second letter an activation ping carries: which sensor took the first
-     reading. Lower case because it reads inside a sentence ("1 chest strap"),
-     unlike a store name. */
-  var SENSOR = { W: 'Apple Watch', B: 'chest strap', F: 'phone camera' };
+  /* The second letter a READING ping carries — activations and daily readings
+     both do: which sensor took it. Lower case because it reads inside a
+     sentence ("1 chest strap"), unlike a store name. */
+  var SENSOR = { W: 'Apple Watch', B: 'chest strap', F: 'phone camera', G: 'Garmin watch' };
 
   function storeName(letter) { return STORE[letter] || STORE.U; }
   function letterOf(p) { return (p === 'I' || p === 'A') ? p : 'U'; }
@@ -81,8 +104,9 @@
   /**
    * Fold a PINGS report into the three running totals we alert on.
    *
-   *   { opens, downloads, sales, activations,
-   *     downloadsBy: {I,A,U}, salesBy: {I,A,U}, activationsBy: {W,B,F,?} }
+   *   { opens, downloads, sales, activations, readings,
+   *     downloadsBy: {I,A,U}, salesBy: {I,A,U},
+   *     activationsBy: {W,G,B,F,?}, readingsBy: {W,G,B,F,?} }
    *
    * `activationsBy` is keyed by SENSOR rather than by store, because that is
    * the fact the activation route carries that nothing else does — which store
@@ -95,11 +119,15 @@
    * counter whose only job is to be compared with its own previous value.
    */
   function snapshot(report) {
-    var out = { opens: 0, downloads: 0, sales: 0, activations: 0, downloadsBy: {}, salesBy: {}, activationsBy: {}, days: {} };
+    var out = {
+      opens: 0, downloads: 0, sales: 0, activations: 0, readings: 0,
+      downloadsBy: {}, salesBy: {}, activationsBy: {}, readingsBy: {}, days: {},
+    };
 
     function day(d) {
       return out.days[d] || (out.days[d] = {
-        opens: 0, downloads: 0, sales: 0, activations: 0, downloadsBy: {}, salesBy: {}, activationsBy: {},
+        opens: 0, downloads: 0, sales: 0, activations: 0, readings: 0,
+        downloadsBy: {}, salesBy: {}, activationsBy: {}, readingsBy: {},
       });
     }
 
@@ -155,6 +183,26 @@
       });
     });
 
+    /* The daily reading counter. Unlike activation this fires again tomorrow,
+       so a row counts install-DAYS rather than people — which is exactly the
+       news it is for: somebody who already has the app used it today. Its
+       sensor letter names that install's FIRST reading of the day, since the
+       counter is capped at one per install per Eastern day. */
+    ((report && report.hrv) || []).forEach(function (row) {
+      if (!row || !row.day) return;
+      var bucket = day(row.day);
+      ((row.cohorts) || []).forEach(function (x) {
+        if (!x || !x.cohort) return;
+        var n = Number(x.count) || 0;
+        if (!(n > 0)) return;
+        var sensor = sensorOf(x.method);
+        out.readings += n;
+        out.readingsBy[sensor] = (out.readingsBy[sensor] || 0) + n;
+        bucket.readings += n;
+        bucket.readingsBy[sensor] = (bucket.readingsBy[sensor] || 0) + n;
+      });
+    });
+
     return out;
   }
 
@@ -195,30 +243,39 @@
    * The totals path is kept for a baseline written before this shipped — a
    * snapshot in localStorage from the previous version has no `days`.
    *
-   * ACTIVATIONS ARE SKIPPED ENTIRELY against a baseline that predates them.
-   * A stored snapshot written before the activation counter existed has no
-   * `activations` field, so every day in it would read as a rise from zero and
-   * the first refresh after the deploy would announce a year of first readings
-   * as news. A baseline is a claim about what you have already been told;
-   * silence about a counter it never knew is the honest reading of it, and the
-   * snapshot it is replaced with knows about them from then on.
+   * A COUNTER THE BASELINE NEVER KNEW IS SKIPPED ENTIRELY. A stored snapshot
+   * written before the activation counter existed has no `activations` field,
+   * so every day in it would read as a rise from zero and the first refresh
+   * after the deploy would announce a year of first readings as news. A
+   * baseline is a claim about what you have already been told; silence about a
+   * counter it never knew is the honest reading of it, and the snapshot it is
+   * replaced with knows about it from then on. The reading counter is newer
+   * still and gets its own gate for the same reason — one flag cannot answer
+   * for two counters that shipped on different days.
    */
   function diff(prev, next) {
     var p = prev || snapshot(null);
     var n = next || snapshot(null);
     var actKnown = typeof p.activations === 'number';
+    var readKnown = typeof p.readings === 'number';
     var d;
 
     if (p.days && n.days) {
-      d = { visitors: 0, downloads: 0, sales: 0, activations: 0, downloadsBy: {}, salesBy: {}, activationsBy: {} };
+      d = { visitors: 0, downloads: 0, sales: 0, activations: 0, readings: 0,
+            downloadsBy: {}, salesBy: {}, activationsBy: {}, readingsBy: {} };
       Object.keys(n.days).forEach(function (key) {
-        var a = p.days[key] || { opens: 0, downloads: 0, sales: 0, activations: 0, downloadsBy: {}, salesBy: {}, activationsBy: {} };
+        var a = p.days[key] || { opens: 0, downloads: 0, sales: 0, activations: 0, readings: 0,
+                                 downloadsBy: {}, salesBy: {}, activationsBy: {}, readingsBy: {} };
         var b = n.days[key];
         d.visitors += rise(a.opens, b.opens);
         d.downloads += rise(a.downloads, b.downloads);
         d.sales += rise(a.sales, b.sales);
         addInto(d.downloadsBy, gain(a.downloadsBy, b.downloadsBy));
         addInto(d.salesBy, gain(a.salesBy, b.salesBy));
+        if (readKnown) {
+          d.readings += rise(a.readings, b.readings);
+          addInto(d.readingsBy, gain(a.readingsBy, b.readingsBy));
+        }
         if (!actKnown) return;
         d.activations += rise(a.activations, b.activations);
         addInto(d.activationsBy, gain(a.activationsBy, b.activationsBy));
@@ -229,13 +286,15 @@
         downloads: rise(p.downloads, n.downloads),
         sales: rise(p.sales, n.sales),
         activations: actKnown ? rise(p.activations, n.activations) : 0,
+        readings: readKnown ? rise(p.readings, n.readings) : 0,
         downloadsBy: gain(p.downloadsBy, n.downloadsBy),
         salesBy: gain(p.salesBy, n.salesBy),
-        activationsBy: actKnown ? gain(p.activationsBy, n.activationsBy) : {}
+        activationsBy: actKnown ? gain(p.activationsBy, n.activationsBy) : {},
+        readingsBy: readKnown ? gain(p.readingsBy, n.readingsBy) : {}
       };
     }
 
-    d.any = d.visitors > 0 || d.downloads > 0 || d.sales > 0 || d.activations > 0;
+    d.any = d.visitors > 0 || d.downloads > 0 || d.sales > 0 || d.activations > 0 || d.readings > 0;
     return d;
   }
 
@@ -248,7 +307,7 @@
 
   /** "1 chest strap · 1 phone camera", in the order the app offers them. */
   function sensorLine(by) {
-    return ['W', 'B', 'F', '?'].filter(function (k) { return (by || {})[k] > 0; })
+    return ['W', 'G', 'B', 'F', '?'].filter(function (k) { return (by || {})[k] > 0; })
       .map(function (k) { return by[k] + ' ' + sensorName(k); })
       .join(' · ');
   }
@@ -418,6 +477,16 @@
     { f: 392.00,  at: 0.085, d: 0.34, type: 'sine',     v: 0.09 }    // G4, body
   ];
 
+  /* A reading is the quietest thing here that still gets said out loud: one
+     struck note with a short body under it, softer than the activation above
+     and unmistakably not it. It is somebody using the app they already have,
+     which is the event this dashboard hopes to see all day — anything with a
+     rise or a ring in it would wear out by lunchtime. */
+  var READING = [
+    { f: 880.00,  at: 0,    d: 0.16, type: 'triangle', v: 0.13 },   // A5
+    { f: 440.00,  at: 0,    d: 0.13, type: 'sine',     v: 0.07 }    // A4, body
+  ];
+
   /* A download ARRIVES, so it is three notes rising to a note that rings, with
      a low sine under the landing to give it weight. */
   var DOWNLOAD = [
@@ -446,27 +515,94 @@
     { f: 130.81,  at: 0.76, d: 1.00, type: 'sine',     v: 0.16 }             // C3
   ];
 
+  /* How loud the whole page is allowed to be. These cues have to carry across
+     a room from a laptop speaker, and the first version summed into the
+     destination at 0.75 — comfortably below the level any other tab plays at,
+     which is why they read as "no sounds" rather than as quiet ones. */
+  var MASTER_GAIN = 2.6;
+
   function play(score) {
     var ctx = audio();
     if (!ctx) return;
     /* One gain stage for the whole cue: the fanfare stacks five voices on its
        last chord, and summing them straight into the destination is how a
-       celebration turns into a crackle. */
+       celebration turns into a crackle.
+       Past unity that crackle is a certainty rather than a risk, so the sum
+       goes through a compressor on its way out. That is what buys the headroom
+       to be loud: peaks are held down and the body of the cue comes up, where
+       simply raising the gain would clip the chord and leave the quiet notes
+       exactly as inaudible as they were. */
     var out = ctx.createGain();
-    out.gain.setValueAtTime(0.75, ctx.currentTime);
-    out.connect(ctx.destination);
+    out.gain.setValueAtTime(MASTER_GAIN, ctx.currentTime);
+
+    var comp = null;
+    try {
+      comp = ctx.createDynamicsCompressor();
+      comp.threshold.setValueAtTime(-20, ctx.currentTime);
+      comp.knee.setValueAtTime(24, ctx.currentTime);
+      comp.ratio.setValueAtTime(8, ctx.currentTime);
+      comp.attack.setValueAtTime(0.004, ctx.currentTime);
+      comp.release.setValueAtTime(0.22, ctx.currentTime);
+    } catch (e) { comp = null; }
+
+    if (comp) { out.connect(comp); comp.connect(ctx.destination); }
+    else { out.gain.setValueAtTime(1, ctx.currentTime); out.connect(ctx.destination); }
+
     var now = ctx.currentTime + 0.02;
     score.forEach(function (n) { note(ctx, now + n.at, n, out); });
   }
 
-  /* ------------------------------------------------------------ confetti
+  /* ------------------------------------------------------------ glitter
    *
    * One canvas, one RAF loop, and no loop at all while the screen is empty —
    * an idle animation frame every 16ms for the whole session is exactly the
    * kind of thing that turns a dashboard left open into a warm laptop.
+   *
+   * **Each event has its own metal, and the metal IS the news.** Told apart
+   * across a room and with the sound off:
+   *
+   *   sale      GOLD    20 seconds, bursting from both edges
+   *   download  SILVER  10 seconds, falling from the top
+   *   visitor   COLOUR   3 seconds, a light puff from the top
+   *
+   * They run TOGETHER when they arrive together, each on its own emitter and
+   * its own clock, sharing one shard list and one RAF loop.
+   *
+   * The colour puff is a deliberate reversal of the older rule
+   * here, which was that the canvas belonged to arrivals only and that any
+   * celebration of ordinary usage would run more or less permanently. That
+   * argument was about DURATION, and it still holds: what makes the puff safe
+   * is that it is over before it registers as an interruption, where a sale
+   * runs for twenty seconds. The three durations are the ranking, so a glance
+   * at the screen tells you which of the three happened without reading a word.
+   *
+   * Glitter rather than paper: the shards are small, they catch a highlight
+   * along one edge, and each one twinkles on its own phase. A metallic palette
+   * drawn as flat rectangles reads as grey confetti, not as silver.
    */
 
-  var COLORS = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#9085e9', '#ffffff'];
+  var PALETTES = {
+    /* Gold, from deep amber up to a near-white specular. The lightest two are
+       rare on purpose — they are the glint, and a glint every third shard is
+       just a pale palette. */
+    sale: ['#8a5a00', '#b8860b', '#d4a017', '#e8c252', '#f5d97a', '#fff6d5', '#ffffff'],
+    /* Silver, same shape: cold greys under two near-whites. */
+    download: ['#6b7280', '#8b94a3', '#adb5bd', '#ced4da', '#e9ecef', '#f8f9fa', '#ffffff'],
+    /* The house colours, for the puff that says somebody came back. */
+    visit: ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#9085e9', '#ffffff']
+  };
+
+  /* How long the canvas keeps emitting, per event. Duration is the ranking:
+     twenty seconds for money, ten for a new install, three for somebody coming
+     back. */
+  var DURATION = { sale: 20000, download: 10000, visit: 3000 };
+  /* How often a wave leaves the emitter, and how big a wave is. A sale runs
+     the longest at the lowest density per wave, or twenty seconds of it would
+     be a wall rather than glitter. The three can now run AT ONCE, so each one's
+     density is also its share of a crowded canvas. */
+  var WAVE_MS = { sale: 620, download: 400, visit: 300 };
+  var WAVE_N  = { sale: 24,  download: 40,  visit: 18 };
+
   var canvas = null, cctx = null, bits = [], raf = 0;
 
   /* The pure half of this file is unit-tested in a `window`-only sandbox with
@@ -496,33 +632,53 @@
     cctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
-  function piece(x, y, vx, vy) {
+  /**
+   * One shard.
+   *
+   * `twinkle` is the per-shard phase offset that stops the field pulsing in
+   * unison — the single thing that separates glitter from a swarm of coloured
+   * rectangles. `flip` is how fast it tumbles edge-on, which is what makes a
+   * shard vanish to a line and come back.
+   */
+  function piece(pal, x, y, vx, vy) {
+    var w = 3 + Math.random() * 5;
     return {
       x: x, y: y, vx: vx, vy: vy,
-      w: 5 + Math.random() * 6, h: 8 + Math.random() * 6,
-      rot: Math.random() * Math.PI, spin: (Math.random() - 0.5) * 0.35,
-      color: COLORS[(Math.random() * COLORS.length) | 0],
-      life: 0
+      w: w, h: w * (0.5 + Math.random() * 0.7),
+      rot: Math.random() * Math.PI, spin: (Math.random() - 0.5) * 0.5,
+      flip: 0.10 + Math.random() * 0.22,
+      phase: Math.random() * Math.PI * 2,
+      color: pal[(Math.random() * pal.length) | 0],
+      life: 0, max: 260 + Math.random() * 220
     };
   }
 
   /** Falling from the top edge — the download celebration. */
-  function rain(n) {
+  function rain(pal, n) {
     var w = window.innerWidth;
     for (var i = 0; i < n; i++) {
-      bits.push(piece(Math.random() * w, -20 - Math.random() * 120,
+      bits.push(piece(pal, Math.random() * w, -20 - Math.random() * 120,
         (Math.random() - 0.5) * 1.4, 2 + Math.random() * 2.6));
     }
   }
 
   /** Shot from both edges toward the middle — the sale celebration. */
-  function burst(n) {
+  function burst(pal, n) {
     var w = window.innerWidth, h = window.innerHeight;
     for (var i = 0; i < n; i++) {
-      bits.push(piece(w * (0.15 + Math.random() * 0.7), -10,
+      bits.push(piece(pal, w * (0.15 + Math.random() * 0.7), -10,
         (Math.random() - 0.5) * 7, 4 + Math.random() * 5));
-      bits.push(piece(w * (0.15 + Math.random() * 0.7), h + 10,
+      bits.push(piece(pal, w * (0.15 + Math.random() * 0.7), h + 10,
         (Math.random() - 0.5) * 7, -(9 + Math.random() * 5)));
+    }
+  }
+
+  /** A light puff across the top — the visitor cue. */
+  function puff(pal, n) {
+    var w = window.innerWidth;
+    for (var i = 0; i < n; i++) {
+      bits.push(piece(pal, Math.random() * w, -12 - Math.random() * 40,
+        (Math.random() - 0.5) * 2.2, 3 + Math.random() * 3.4));
     }
   }
 
@@ -536,13 +692,30 @@
       b.x += b.vx;
       b.y += b.vy;
       b.rot += b.spin;
-      if (b.y > h + 40 || b.life > 480) return false;
+      if (b.y > h + 40 || b.life > b.max) return false;
+
+      /* Tumble: the shard is drawn at its true width scaled by how edge-on it
+         currently is, so it narrows to a line and opens out again. `catchLight`
+         peaks at the same moment the face is square to the viewer, which is
+         when a real flake would flash. */
+      var face = Math.cos(b.life * b.flip + b.phase);
+      var open = Math.abs(face);
+      var catchLight = open * open;
+      var fade = b.life > b.max - 90 ? Math.max(0, (b.max - b.life) / 90) : 1;
+
       cctx.save();
       cctx.translate(b.x, b.y);
       cctx.rotate(b.rot);
-      cctx.globalAlpha = b.life > 300 ? Math.max(0, 1 - (b.life - 300) / 120) : 1;
+      cctx.globalAlpha = fade * (0.45 + 0.55 * open);
       cctx.fillStyle = b.color;
-      cctx.fillRect(-b.w / 2, -b.h / 2, b.w, b.h);
+      cctx.fillRect(-b.w / 2 * open, -b.h / 2, Math.max(0.6, b.w * open), b.h);
+      /* The specular edge. Cheap, and it is the whole reason the palette above
+         reads as metal rather than as beige and grey. */
+      if (catchLight > 0.55) {
+        cctx.globalAlpha = fade * (catchLight - 0.55) * 2.0;
+        cctx.fillStyle = '#ffffff';
+        cctx.fillRect(-b.w / 2 * open, -b.h / 2, Math.max(0.6, b.w * open), Math.max(0.6, b.h * 0.3));
+      }
       cctx.restore();
       return true;
     });
@@ -551,51 +724,77 @@
   }
 
   /**
-   * Celebrate `count` of something.
+   * Celebrate `kind`.
    *
-   * A download is a wave per item, 320ms apart and capped at `MAX_WAVES`, so
-   * three at once is a few seconds of falling rather than the same one-second
-   * puff three times over — which is not distinguishable from one. The cap is
-   * what stops a backfill of fifty pings burying the dashboard for half a
-   * minute.
+   * **The three kinds run AT ONCE.** Gold from the edges, silver down the
+   * middle and a puff of house colour are three different pictures, and a
+   * refresh that carried a sale, a new install and somebody coming back should
+   * show all three of them — that IS the news, and picking one to draw threw
+   * two thirds of it away. Only the SOUND still ranks (see `announce`): three
+   * simultaneous cues are a noise, three simultaneous emitters are a party.
    *
-   * A SALE runs for ten seconds flat, and the difference is deliberate. This is
-   * the event the whole page exists for; a second and a half of confetti for
-   * somebody deciding to pay for the thing you built is the same celebration as
-   * for a visitor opening the app, only slightly longer. Ten seconds is long
-   * enough to walk back to the desk for. It is a DURATION and not a wave count,
-   * so five sales in one refresh is still ten seconds rather than fifty — the
-   * news is "someone paid", and the number of them is on the card. The waves
-   * are spaced further apart and are individually smaller than a download's, or
-   * a sustained run would be a wall rather than confetti.
+   * So each kind owns its own emitter — its own clock, its own wave interval,
+   * its own palette — and they share only the shard list and the one RAF loop
+   * that draws it.
+   *
+   * **Count stacks at a decayed rate, halving every time.** Two sales are
+   * twenty seconds plus ten, three are twenty plus ten plus five: more money is
+   * visibly more celebration, and the series converges (to twice the base) so a
+   * hundred of them can never wedge the canvas on for an hour. The decay
+   * carries ACROSS refreshes while an emitter is still running — a second sale
+   * arriving inside the first one's twenty seconds is the second sale of that
+   * celebration, not a fresh one — and `seen` resets once the emitter falls
+   * silent.
    */
-  var WAVE_MS = 320;
-  var MAX_WAVES = 8;
-  var SALE_MS = 10000;
-  var SALE_WAVE_MS = 640;
-  var waveTimer = 0;
+  var EMITTERS = {};        // kind -> { until, timer, seen, boost }
+
+  function emitterFor(kind) {
+    return EMITTERS[kind] || (EMITTERS[kind] = { until: 0, timer: 0, seen: 0, boost: 1 });
+  }
+
+  /* base + base/2 + base/4 … for `n` more events, starting from however many
+     this run has already counted. */
+  function stackedMs(base, already, n) {
+    var add = 0;
+    for (var i = 0; i < n; i++) add += base / Math.pow(2, already + i);
+    return add;
+  }
 
   function celebrate(kind, count) {
     if (reducedMotion()) return;
     if (!surface()) return;
     sizeCanvas();
 
-    var sale = kind === 'sale';
-    var every = sale ? SALE_WAVE_MS : WAVE_MS;
-    var waves = sale
-      ? Math.round(SALE_MS / SALE_WAVE_MS)
-      : Math.max(1, Math.min(MAX_WAVES, Math.round(count) || 1));
-    var fired = 0;
+    var pal = PALETTES[kind] || PALETTES.visit;
+    var base = DURATION[kind] || DURATION.visit;
+    var n = Math.max(1, Math.round(count) || 1);
+    var e = emitterFor(kind);
+    var now = Date.now();
+
+    if (e.until <= now) { e.seen = 0; e.until = now; }
+    e.until += stackedMs(base, e.seen, n);
+    e.seen += n;
+    /* Density bonus on top of the duration, capped: three downloads at once are
+       heavier as well as longer. */
+    e.boost = Math.min(2.2, 1 + (e.seen - 1) * 0.25);
+
     var shoot = function () {
-      if (sale) burst(22); else rain(90);
+      var w = Math.round((WAVE_N[kind] || WAVE_N.visit) * e.boost);
+      if (kind === 'sale') burst(pal, w);
+      else if (kind === 'download') rain(pal, w);
+      else puff(pal, w);
       if (!raf) raf = window.requestAnimationFrame(step);
-      fired += 1;
-      if (fired >= waves) { window.clearInterval(waveTimer); waveTimer = 0; }
+      if (Date.now() >= e.until) {
+        window.clearInterval(e.timer);
+        e.timer = 0;
+        e.seen = 0;
+        e.boost = 1;
+      }
     };
+
     shoot();
-    if (waves > 1) {
-      window.clearInterval(waveTimer);
-      waveTimer = window.setInterval(shoot, every);
+    if (!e.timer && e.until > Date.now() + 60) {
+      e.timer = window.setInterval(shoot, WAVE_MS[kind] || WAVE_MS.visit);
     }
   }
 
@@ -645,12 +844,84 @@
 
   /* One glyph per kind, so a card is identified before it is read — the left
      edge carries the same distinction in colour (styles.css). */
-  var MARK = { sale: '💸', download: '📲', activation: '💓' };
+  var MARK = { sale: '💸', download: '📲', activation: '💓', reading: '🫀' };
 
-  function card(kind, title, line) {
+  /* ------------------------------------------------------- today's record
+   *
+   * A card is dismissed by pressing it, and until this existed that press was
+   * the only copy: the sale you cleared at nine was gone at noon. So every card
+   * raised is also written to a log of TODAY, which is what the Alerts button
+   * in the header replays — the day's news, in order, re-raised as the same
+   * cards. The log rolls over on the dashboard's own local midnight (this is
+   * "what has this room been told today", not a ping bucket), and it lives in
+   * localStorage for the same reason the baseline does: it is a property of
+   * this browser and neither device should swallow the other's.
+   */
+
+  var LOG_KEY = 'autonomic.master.alertLog';
+  /* The same bound the stack has, deliberately: the day's record is what the
+     stack replays, and a log deeper than the stack would quietly show 40 of 200
+     while the button claimed to be showing the day. */
+  var MAX_LOG = MAX_CARDS;
+
+  function localDay() {
+    var d = new Date();
+    var p = function (n) { return (n < 10 ? '0' : '') + n; };
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+  }
+
+  function readLog() {
+    try {
+      var raw = window.localStorage.getItem(LOG_KEY);
+      if (!raw) return [];
+      var o = JSON.parse(raw);
+      if (!o || o.day !== localDay() || !Array.isArray(o.items)) return [];
+      return o.items;
+    } catch (e) { return []; }
+  }
+
+  function writeLog(items) {
+    try {
+      window.localStorage.setItem(LOG_KEY, JSON.stringify({ day: localDay(), items: items }));
+    } catch (e) { /* private mode, or the quota is full */ }
+  }
+
+  function logCard(kind, title, line) {
+    var items = readLog();
+    items.push({ kind: kind, title: title, line: line || '', at: Date.now() });
+    while (items.length > MAX_LOG) items.shift();
+    writeLog(items);
+  }
+
+  function clockOf(ms) {
+    try {
+      return new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    } catch (e) { return ''; }
+  }
+
+  /**
+   * Re-raise every card today has already produced. The stack is emptied first,
+   * so pressing the button twice shows the same day once rather than two of it.
+   */
+  function showToday() {
+    if (!hasDom()) return 0;
+    var items = readLog();
+    var stack = document.getElementById('alertStack');
+    if (stack) stack.innerHTML = '';
+    syncClear();
+    items.forEach(function (it) {
+      var when = clockOf(it.at);
+      card(it.kind, it.title, it.line + (when ? (it.line ? ' · ' : '') + when : ''), true);
+    });
+    if (!items.length) say('Nothing has happened yet today.');
+    return items.length;
+  }
+
+  function card(kind, title, line, replay) {
     if (!hasDom()) return;
     var stack = document.getElementById('alertStack');
     if (!stack) return;
+    if (!replay) logCard(kind, title, line);
     var el = document.createElement('div');
     el.className = 'alert-card ' + kind;
     el.innerHTML =
@@ -704,10 +975,12 @@
   }
 
   /**
-   * Say what changed. Only ONE sound plays per refresh, the loudest thing that
-   * happened: a fanfare and a chime and a blip fired together is a noise, not
-   * three pieces of news. Cards do stack, because they are read rather than
-   * heard.
+   * Say what changed. Only ONE sound plays per refresh, the best outcome that
+   * happened (pay > sign up > return): a fanfare and a chime and a blip fired
+   * together is a noise, not three pieces of news. Cards do stack, because they
+   * are read rather than heard — and so does the CANVAS, which ranks nothing:
+   * a refresh carrying a sale, a new install and somebody coming back draws
+   * gold, silver and colour at the same time.
    */
   function announce(d) {
     if (d.sales > 0) {
@@ -718,6 +991,7 @@
       play(SALE);
       celebrate('sale', d.sales);
     }
+
     if (d.downloads > 0) {
       var dlTitle = d.downloads + ' new ' + plural(d.downloads, 'download') + '!';
       card('download', dlTitle, storeLine(d.downloadsBy));
@@ -726,9 +1000,10 @@
       if (!d.sales) say(dlTitle + ' ' + storeLine(d.downloadsBy));
       push('📲 ' + dlTitle, storeLine(d.downloadsBy), 'autonomic-download');
       if (!d.sales) play(DOWNLOAD);
-      // Sales already put waves in the air; downloads landing in the same
-      // refresh extend them rather than starting a competing pattern.
-      celebrate(d.sales ? 'sale' : 'download', d.downloads + d.sales);
+      /* Its own silver, alongside a sale's gold rather than instead of it: the
+         two are different pictures and a refresh that carried both should show
+         both. Only the sound ranks. */
+      celebrate('download', d.downloads);
     }
     /* An activation gets every channel a download gets EXCEPT the canvas. It
        is somebody using the app they already have, which is the thing this
@@ -745,11 +1020,36 @@
       }
       push('💓 ' + actTitle, sensorLine(d.activationsBy), 'autonomic-activation');
     }
+    /* Readings get the same three channels and the same missing fourth. This is
+       the app being USED — not an arrival, not a first — so it is the last thing
+       allowed to make a noise and the first to yield when anything above it
+       happened in the same refresh. No exclamation mark either: a sentence that
+       shouts every time somebody takes their morning reading stops being read.
+       An activation in the same refresh is the SAME reading counted twice (a
+       first reading is also a reading of that day), so the count is stated but
+       the sound and the toast defer to it. */
+    if (d.readings > 0) {
+      var readTitle = d.readings + ' ' + plural(d.readings, 'reading') + ' today';
+      card('reading', readTitle, sensorLine(d.readingsBy));
+      if (!d.sales && !d.downloads && !d.activations) {
+        say(readTitle + (sensorLine(d.readingsBy) ? ' · ' + sensorLine(d.readingsBy) : ''));
+        play(READING);
+      }
+      push('🫀 ' + readTitle, sensorLine(d.readingsBy), 'autonomic-reading');
+    }
     /* Visitors stay a sound and nothing else, in every channel. It is the event
        that fires most often and the least worth a line of text — a toast for it
        would be on screen more or less permanently, and a notification for it
        would be the fastest way to have notifications turned back off. */
-    if (!d.sales && !d.downloads && !d.activations && d.visitors > 0) play(VISITOR);
+    if (!d.sales && !d.downloads && !d.activations && !d.readings && d.visitors > 0) {
+      play(VISITOR);
+    }
+    /* Three seconds of house-coloured glitter, and it runs whatever else
+       happened — the canvas ranks nothing, only the sound does. RETURNING
+       users, so the new installs are taken out of it: a first run is also an
+       open, and it already has ten seconds of silver of its own. */
+    var returning = Math.max(0, d.visitors - d.downloads);
+    if (returning > 0) celebrate('visit', returning);
   }
 
   /* ---------------------------------------------------------------- shell */
@@ -784,12 +1084,13 @@
     storedRead = true;   // and don't go and read the stored one instead
   }
 
+  /* The bell still SHOWS whether sound is on, because that is a state worth
+     seeing; it is no longer what turns it off. Pressing it replays the day. */
   function syncButton() {
     var btn = document.getElementById('btnAlerts');
     if (!btn) return;
     btn.dataset.muted = muted ? 'true' : 'false';
-    btn.setAttribute('aria-pressed', muted ? 'false' : 'true');
-    btn.title = muted ? 'Alert sounds are off' : 'Alert sounds are on';
+    btn.title = muted ? "Show today's alerts (sound is off)" : "Show today's alerts";
   }
 
   function init() {
@@ -797,13 +1098,14 @@
     if (clear) clear.addEventListener('click', clearAll);
     syncClear();
 
+    /* Pressing Alerts shows the day, it does not silence it. A button whose one
+       job was muting was a button you pressed by accident and then heard
+       nothing for the rest of the afternoon; the thing actually wanted from
+       that corner is "what have I missed", and every card raised today is
+       already logged for exactly that. Muting survives as `setMuted`, which
+       nothing in the header calls. */
     var btn = document.getElementById('btnAlerts');
-    if (btn) {
-      btn.addEventListener('click', function () {
-        setMuted(!muted);
-        if (!muted) play(VISITOR);   // confirm the thing you just turned on
-      });
-    }
+    if (btn) btn.addEventListener('click', showToday);
     syncButton();
 
     /* Build the audio context on the first gesture of the session. Without it
@@ -823,8 +1125,10 @@
   window.Alerts = {
     // pure
     snapshot: snapshot, diff: diff, storeLine: storeLine, sensorLine: sensorLine,
+    stackedMs: stackedMs, DURATION: DURATION,
     // shell
     init: init, sync: sync, reset: reset, announce: announce, clearAll: clearAll,
+    showToday: showToday,
     isMuted: function () { return muted; }, setMuted: setMuted
   };
 })();

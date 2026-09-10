@@ -184,6 +184,36 @@ Resources:
                 Action:
                   - apigateway:*
                 Resource: '*'
+              # EventBridge, for the `push` function's hourly schedule.
+              #
+              # This is the grant whose absence broke the pipeline: a schedule
+              # event compiles to an AWS::Events::Rule, and CloudFormation
+              # reads the rule back (events:DescribeRule) on EVERY update of
+              # the stack, not only the one that creates it. So the deploy that
+              # introduced the hourly push job failed, and so did every deploy
+              # after it — including the ones that only touched the API — while
+              # the landing-site half of the same build kept succeeding,
+              # because `sls deploy` is the last command in buildspec.yml and
+              # everything before it had already run. That is the shape of this
+              # failure: a live front end talking to a Lambda weeks behind it.
+              #
+              # Scoped to rules this stack owns. Serverless names them
+              # <stack>-<Function>EventsRuleSchedule<N>.
+              - Effect: Allow
+                Action:
+                  - events:PutRule
+                  - events:DescribeRule
+                  - events:DeleteRule
+                  - events:EnableRule
+                  - events:DisableRule
+                  - events:PutTargets
+                  - events:RemoveTargets
+                  - events:ListTargetsByRule
+                  - events:TagResource
+                  - events:UntagResource
+                  - events:ListTagsForResource
+                Resource:
+                  - !Sub 'arn:aws:events:*:${AWS::AccountId}:rule/${SlsStackName}-*'
               - Effect: Allow
                 Action:
                   - dynamodb:CreateTable

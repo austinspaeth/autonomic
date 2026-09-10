@@ -62,23 +62,13 @@ export function scrollJournalToSection(section: string) {
   if (journalScroller && y != null) journalScroller(y);
 }
 
-/* Progress streak (clean-day protocol) card: the home-screen Protocol widget
- * deep-links (autonomic://?open=protocol) asking the app to open the card
- * expanded. The deep-link handler bumps this signal; the StreakCard subscribes
- * and opens itself, while the handler also scrollJournalToSection('protocol'). */
-let expandProtocolSeq = 0;
-const expandProtocolListeners = new Set<() => void>();
-export function requestExpandProtocol() {
-  expandProtocolSeq++;
-  expandProtocolListeners.forEach((l) => l());
-}
-export function useExpandProtocolSignal(): number {
-  return useSyncExternalStore(
-    (cb) => { expandProtocolListeners.add(cb); return () => expandProtocolListeners.delete(cb); },
-    () => expandProtocolSeq,
-    () => expandProtocolSeq,
-  );
-}
+/* NOTE: the clean-day streak card cannot be opened from anywhere but its own
+ * header. A `requestExpandProtocol` signal used to live here so the Protocol
+ * widget's deep link (autonomic://?open=protocol) could land with the card
+ * already expanded; it is gone deliberately. An accordion that opens itself
+ * takes the one piece of state on the Journal the reader had actually set, and
+ * the deep link still does the useful half by scrolling to the card. Do not
+ * reintroduce a way for anything to expand it remotely. */
 
 /* Progress range request: the Journal's Trend card ("your resting HR is down 6
  * bpm since last month") navigates to Progress and asks it to open on Month, so

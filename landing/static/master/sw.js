@@ -28,7 +28,7 @@
 
 /* Bump on any change to this file. The old cache is deleted on activate, so a
    version that is never bumped is a version that never updates. */
-var CACHE = 'autonomic-master-v1';
+var CACHE = 'autonomic-master-v2';
 
 /* The document plus the two files it references by absolute URL. Everything
    else — the stylesheet, every script, the brand mark — is inlined into the
@@ -78,6 +78,73 @@ self.addEventListener('activate', function (ev) {
           list.forEach(function (c) { c.postMessage({ type: 'sw-activated', version: CACHE }); });
         });
       })
+  );
+});
+
+/* ------------------------------------------------------------------- push
+ *
+ * The half of "tell me when a sale lands" that a service worker CAN do.
+ *
+ * It cannot do the other half. A worker runs when its page is open, when a
+ * fetch it controls happens, or when a push arrives, and is killed within
+ * seconds either way; there is no timer here that survives. Periodic
+ * Background Sync would be the API for an hourly self-check and iOS does not
+ * implement it. So the hour is kept on an EventBridge schedule in
+ * `sls/lambdas/push/main.js`, which does the checking and sends one of these.
+ *
+ * iOS 16.4+ delivers this to a PWA that has been added to the home screen,
+ * with the app closed — which is the case the dashboard's old in-page
+ * notification could never reach.
+ *
+ * `userVisibleOnly` is not optional anywhere that matters: a push that shows
+ * no notification is a permission the browser will revoke. So this handler's
+ * ONE job is to always end in a `showNotification`, including when the payload
+ * is missing or unreadable — a silent failure here costs the subscription
+ * itself, not just this one message. */
+self.addEventListener('push', function (ev) {
+  var data = {};
+  try { data = ev.data ? ev.data.json() : {}; } catch (e) { data = {}; }
+
+  var title = data.title || 'Autonomic';
+  var body = data.body || 'Something arrived.';
+
+  ev.waitUntil(self.registration.showNotification(title, {
+    body: body,
+    /* One tag for arrivals, so the hour's news REPLACES last hour's banner
+       rather than stacking beside it on the lock screen. */
+    tag: data.tag || 'autonomic-arrivals',
+    renotify: true,
+    icon: '/web-app-manifest-192x192.png',
+    badge: '/web-app-manifest-192x192.png',
+    data: { url: data.url || '/master/' }
+  }));
+});
+
+/* Tapping the banner. Focus a window that is already open rather than opening
+   a second one — an installed PWA has exactly one, and `openWindow` on top of
+   it gives you two copies of a dashboard whose whole point is a single live
+   view. Navigate the existing one only if it is somewhere else. */
+self.addEventListener('notificationclick', function (ev) {
+  ev.notification.close();
+  var target = (ev.notification.data && ev.notification.data.url) || '/master/';
+
+  ev.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (list) {
+      for (var i = 0; i < list.length; i++) {
+        var c = list[i];
+        if (c.url.indexOf('/master/') >= 0) {
+          return c.focus().then(function (focused) {
+            /* `navigate` is unavailable on some iOS versions; a focused window
+               on the right page is already the outcome that matters. */
+            if (focused && focused.navigate && focused.url !== target) {
+              return focused.navigate(target).catch(function () { return focused; });
+            }
+            return focused;
+          });
+        }
+      }
+      return self.clients.openWindow(target);
+    })
   );
 });
 

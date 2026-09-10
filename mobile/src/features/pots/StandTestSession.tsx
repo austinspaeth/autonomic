@@ -21,6 +21,7 @@ import { ble } from '../../lib/ble/manager';
 import { buildStandTestFields, restingBaseline, type HrPoint } from '../../lib/pots/live';
 import { computeScores } from '../../lib/scoring';
 import { getState } from '../../store/store';
+import { pingPots } from '../../store/ping';
 import { ageFromBirthday, keyOf, pad, uid } from '../../lib/dates';
 import type { Entry } from '../../lib/types';
 import {
@@ -77,6 +78,9 @@ export function StandTestSession({ controls }: { controls: SheetControls }) {
     finishedRef.current = true;
     if (timerRef.current) clearInterval(timerRef.current);
     completionBuzz();
+    // The capture is the event, not the save — the same rule the HRV pair
+    // follows, and the reason a discarded result still counts as one taken.
+    pingPots('stand');
     ble().disconnect().catch(() => {});
 
     const startDate = new Date(testStartRef.current);

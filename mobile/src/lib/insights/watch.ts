@@ -19,7 +19,7 @@
  *
  * Pure: no store, no MMKV, no expo, no React.
  */
-import { TREND_METRICS, TREND_WINDOW_DAYS, WATCH_PRIORITY, compareWindows, metricSeries, type TrendMetricId } from '../trends';
+import { TREND_METRICS, TREND_WINDOW_DAYS, WATCH_PRIORITY, compareWindows, metricSeries, phraseOf, type TrendMetricId } from '../trends';
 import type { ScoreContext } from '../scoring';
 import { scoreSet, type DaysMap } from '../scoring/day';
 import { median } from './stats';
@@ -122,7 +122,7 @@ export function findWatchItems(matrix: DayMatrix, suppressed: boolean): WatchIte
     out.push({
       metric: id,
       title: shortMetric(def),
-      sub: `${capitalize(def.phrase(delta.delta))} vs last month`,
+      sub: `${capitalize(phraseOf(def, delta.delta))} vs last month`,
       value: `${def.fmt(delta.recent)} ${def.unit}`,
       change: dispersion
         ? (delta.direction === 'improving' ? 'Steadier' : 'Less steady')
@@ -190,7 +190,7 @@ export function overallDirection(matrix: DayMatrix): Overall {
     const delta = compareWindows(scores, TREND_WINDOW_DAYS, TREND_WINDOW_DAYS, TREND_METRICS.score);
     if (delta.significant) {
       return verdict(delta.direction === 'improving' ? 'up' : 'down',
-        `daily score ${TREND_METRICS.score.phrase(delta.delta)} vs last month`);
+        `daily score ${phraseOf(TREND_METRICS.score, delta.delta)} vs last month`);
     }
     // A score that is present and genuinely flat is an answer in itself.
     if (delta.direction === 'flat') return verdict('flat', 'daily score level vs last month');
@@ -363,7 +363,9 @@ function comparePartsOf(days: DaysMap, first: string[], last: string[], ctx: Sco
       const readings = (d.readings || []).slice().sort((a, b) => ((a.time as string) || '').localeCompare((b.time as string) || ''));
       const set = scoreSet(readings, d, k, days, ctx);
       if (set.score == null) return;
-      confs.push(set.confidence);
+      // The RAW weight sum, not the percentage — this is the divisor that makes
+      // the parts add up to the headline (see the comment below).
+      confs.push(set.weightSum);
       set.comps.forEach((c) => {
         const cur = out.get(c.label) || { w: c.w, pts: [] };
         cur.pts.push(c.p);
@@ -377,7 +379,7 @@ function comparePartsOf(days: DaysMap, first: string[], last: string[], ctx: Sco
   const b = grade(last);
   // DIVIDE BY THE AVAILABLE WEIGHT, NOT BY 100.
   //
-  // `scoreSet` normalises: score = sum(w * p) / confidence, where confidence is the
+  // `scoreSet` normalises: score = sum(w * p) / weightSum, where weightSum is the
   // weight it actually had. So a day scored from HRV alone has 25% of the weight
   // carrying the whole 0-100 range, and dividing by 100 understated every component
   // by a factor of four — the parts summed to 10 against a headline of 40. Using the

@@ -7,7 +7,7 @@ import { Pressable, Text, TextInput, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { SheetControls, SheetFooter, useSheets } from '../components/Sheet';
 import { FieldLabel, TimeField, onlyNumeric } from '../components/Field';
-import { Button, ProgressBar, Segmented } from '../components/ui';
+import { Button, DaySaveButton, ProgressBar, Segmented } from '../components/ui';
 import { Icon } from '../components/Icon';
 import { GRADE_COLORS, WATER_BLUE, WATER_BLUE_SOFT, fonts, radius, usePalette } from '../theme';
 import { resolveProtocol, waterGoalL } from '../lib/scoring/day';
@@ -106,7 +106,7 @@ function WaterDrawer({ dk, controls }: { dk: string; controls: SheetControls }) 
         onPress={() => openSheet((c) => <WaterGoalCard controls={c} />, { fitContent: true })}
       />
       <SheetFooter>
-        <Button title="Save" variant="primary" onPress={() => { ensureDay(dk).food.water = roundL(liters); save(); controls.closeAll(); }} />
+        <DaySaveButton dk={dk} title="Save" onPress={() => { ensureDay(dk).food.water = roundL(liters); save(); controls.closeAll(); }} />
       </SheetFooter>
     </View>
   );
@@ -253,7 +253,7 @@ function BowelForm({ dk, existing, controls }: { dk: string; existing: Movement 
       />
       <SheetFooter>
         {existing ? <Button title="Delete" variant="danger" onPress={() => { const dig = ensureDay(dk).digestion; dig.movements = dig.movements.filter((x) => x.id !== existing.id); save(); controls.closeAll(); }} /> : null}
-        <Button title="Save" variant="primary" onPress={save2} />
+        <DaySaveButton dk={dk} title="Save" onPress={save2} />
       </SheetFooter>
     </View>
   );

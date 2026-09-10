@@ -8,7 +8,8 @@
  * Lifecycle: startWatchSync() begins a poll for RR-backed readings (heartbeat
  * series + ECGs); status moves syncing → found (with candidates) or an
  * auth/availability error. Each tick scans the WHOLE day so far: readings
- * overlapping the session window (with grace) auto-sync as `candidates`, and
+ * overlapping the session window (with grace) AND long enough to be worth
+ * scoring (MIN_PICK_MS) auto-sync as `candidates`, best match first, and
  * everything else the watch put in Health today is surfaced as `nearby` so the
  * waiting card can offer a manual pick — resilience against watch clock drift,
  * a Breathe session started at the wrong moment, or a reading from earlier in
@@ -18,13 +19,19 @@
 import { health } from '../../lib/health';
 import { requestEcgAuth } from '../../lib/health/ecg';
 import { ecgNative } from '../../../modules/ecg-health';
-import { dayStartMs, isPickable, partitionCandidates, type RrCandidate } from '../../lib/health/rrCandidates';
+import { dayStartMs, isPickable, partitionCandidates, pickSessionCandidate, type RrCandidate } from '../../lib/health/rrCandidates';
 import { findRrCandidates } from '../../lib/health/rrSearch';
 import type { SessionConfig } from './Session';
 
 export type WatchCandidate = RrCandidate;
 
 const POLL_MS = 4000;
+// Once a usable in-window reading appears, keep polling this many more ticks
+// before committing to one. The watch hands its series over a few seconds after
+// anything else it recorded, so the first thing to land is not reliably the
+// session — settling lets a genuine 5-minute Mindfulness series arrive and win
+// on overlap (pickSessionCandidate) instead of losing a race it never entered.
+const SETTLE_TICKS = 2;
 // A reading counts if it overlaps the session window stretched by 3 minutes on
 // each side: the watch clock can drift, hand-off takes a moment, and a Breathe
 // session started just before or after the in-app reading is clearly the one
@@ -101,6 +108,7 @@ export function startWatchSync({ windowStartMs, windowEndMs, config }: {
     const fromMs = windowStartMs - GRACE_MS;
     const toMs = windowEndMs + GRACE_MS;
 
+    let settle = SETTLE_TICKS;
     const tick = async () => {
       if (!live() || state.status !== 'syncing') return;
       set({ waitedSec: state.waitedSec + POLL_MS / 1000 });
@@ -110,12 +118,25 @@ export function startWatchSync({ windowStartMs, windowEndMs, config }: {
       if (!live() || state.status !== 'syncing') return;
       const { inWindow, outside } = partitionCandidates(all, fromMs, toMs);
       // The manual-pick list only offers readings worth evaluating: real
-      // beat-to-beat data, at least 2 minutes long.
+      // beat-to-beat data, at least 4 minutes long (MIN_PICK_MS).
       const nearby = outside.filter(isPickable);
-      if (inWindow.length) {
-        if (timer) { clearInterval(timer); timer = null; }
-        set({ status: 'found', candidates: inWindow, nearby });
-        return;
+      // The same floor decides an AUTO-sync. A short in-window sample is not
+      // the session; it is something the watch happened to record nearby, and
+      // taking it would silently score the day off a reading that resolves no
+      // frequency domain at all. Keep waiting instead.
+      const best = pickSessionCandidate(all, fromMs, toMs);
+      if (best) {
+        if (settle > 0) { settle -= 1; }
+        else {
+          if (timer) { clearInterval(timer); timer = null; }
+          // Every usable in-window reading is still offered — the picker asks
+          // which one when more than one landed — but `best` leads, so the
+          // single-candidate auto-select in WatchSync.tsx can only ever take a
+          // reading long enough to be worth taking.
+          const usable = inWindow.filter(isPickable);
+          set({ status: 'found', candidates: [best, ...usable.filter((c) => c !== best)], nearby });
+          return;
+        }
       }
       if (keysOf(nearby) !== keysOf(state.nearby)) set({ nearby });
     };

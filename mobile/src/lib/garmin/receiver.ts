@@ -1,0 +1,290 @@
+/**
+ * Garmin companion receiver — the JS side of the Connect IQ link.
+ *
+ * Deliberately a thin twin of ../watch/receiver.ts. Payloads from the Garmin
+ * watch use the SAME contract as the Apple Watch (`mapWatchPayload`), so this
+ * file owns transport and acknowledgement only, never a second interpretation
+ * of a reading.
+ *
+ * The write order matters and matches the Apple Watch path exactly: sidecar
+ * first, then the journal entry, then flush to disk, and only THEN ack. An
+ * acked id is dropped from the watch's outbox and never re-sent, so acking
+ * before the write is on disk would lose a reading to a crash in between.
+ *
+ * Unlike WatchConnectivity, `Communications.transmit` on the watch fails
+ * outright when the phone is unreachable — so the watch queues and retries
+ * until we ack. That makes a duplicate delivery normal rather than
+ * exceptional: upserting by id is idempotent, and only a genuinely new
+ * reading notifies listeners.
+ */
+import {
+  GARMIN_URL_SCHEME,
+  garminNative,
+  onGarminDeviceStatus,
+  onGarminMessage,
+  type GarminDevice,
+  type GarminMessage,
+} from '../../../modules/garmin-link';
+import { missingClasses } from '../../../modules/app-env';
+import * as ExpoLinking from 'expo-linking';
+import { flushSave, getState, save, storeWaveform, upsertEntry } from '../../store/store';
+import { pingWristReading } from '../../store/ping';
+import { todayKey } from '../dates';
+import { logError } from '../diagnostics/errorLog';
+import { computeScores } from '../scoring';
+import type { Entry } from '../types';
+import { mapWatchPayload } from '../watch/payload';
+import { GARMIN_RELEASED } from '../watch/release';
+
+export type { GarminDevice };
+
+/**
+ * The Connect IQ classes that must still answer to their own names.
+ *
+ * Garmin Connect replies to us by BROADCAST, and every inbound intent carries
+ * these as Parcelable EXTRAS — which Android unmarshals by looking the
+ * class-name STRING up through our ClassLoader. The SDK ships no consumer
+ * proguard rules, so without a keep rule R8 renames them and
+ * `IQMessageReceiver.onReceive` throws `BadParcelableException` on the main
+ * thread, inside Garmin's own receiver, where nothing of ours can catch it.
+ * The app does not degrade; it dies.
+ *
+ * The outbound half is name-independent (AIDL writes typed parcelables through
+ * `CREATOR`), which is what made this so hard to see: the device list populated
+ * perfectly and only the REPLY was fatal.
+ *
+ * `app.json` keeps them. This is the belt to that braces — a keep rule is a
+ * line in a build config that no test exercises and any refactor can drop, and
+ * the cost of dropping it is a crash on every Android phone that owns a Garmin.
+ */
+const GARMIN_PARCELABLES = [
+  'com.garmin.android.connectiq.IQDevice',
+  'com.garmin.android.connectiq.IQApp',
+  'com.garmin.android.connectiq.IQMessage',
+];
+
+let intact: boolean | undefined;
+
+/**
+ * Can this BUILD actually talk to a Garmin, or did minification break the link?
+ *
+ * Lazy and memoized rather than computed at init, because the surfaces that
+ * read it (the source picker, the setup card, the wizard's last step) can be
+ * built before or after `initGarminReceiver` runs, and a gate that answers
+ * differently depending on when it is asked is not a gate.
+ *
+ * A `false` here is a BUILD defect, never a device state — no user action
+ * causes it and none can fix it — so it is logged once, loudly, with the names
+ * that went missing. It is the one error in this file that is about us rather
+ * than about a watch.
+ */
+export function garminLinkIntact(): boolean {
+  if (intact !== undefined) return intact;
+  const missing = missingClasses(GARMIN_PARCELABLES);
+  intact = missing.length === 0;
+  if (!intact) logError('garmin.obfuscated', new Error(`renamed by R8: ${missing.join(', ')}`));
+  return intact;
+}
+
+let started = false;
+let devices: GarminDevice[] = [];
+
+type ArrivalListener = (dayKey: string, entry: Entry) => void;
+const arrivalListeners = new Set<ArrivalListener>();
+
+export function subscribeGarminArrivals(fn: ArrivalListener): () => void {
+  arrivalListeners.add(fn);
+  return () => { arrivalListeners.delete(fn); };
+}
+
+/** Anything that renders the device list needs to know when it changes — the
+ *  list arrives asynchronously, long after the picker first rendered. */
+type DeviceListener = (list: GarminDevice[]) => void;
+const deviceListeners = new Set<DeviceListener>();
+
+export function subscribeGarminDevices(fn: DeviceListener): () => void {
+  deviceListeners.add(fn);
+  return () => { deviceListeners.delete(fn); };
+}
+
+function setDevices(list: GarminDevice[]) {
+  const gained = !devices.length && list.length > 0;
+  devices = list;
+  // Linking a watch IS choosing it. Persisting the preference means the choice
+  // survives the sheet stack being rebuilt — which it is, because linking
+  // round-trips through Garmin Connect and the app comes back fresh. Setting
+  // only React state left the user looking at "Phone camera" selected moments
+  // after they added a watch.
+  if (gained) {
+    getState().settings.lastHrvSource = 'garmin';
+    save();
+  }
+  deviceListeners.forEach((fn) => fn(list));
+}
+
+export function garminDevices(): GarminDevice[] {
+  // The one read every Garmin surface goes through — the source picker's linked
+  // row, the wizard's, the Setup card's "already linked" check, the sync sheet's
+  // device name. Answering empty while the link is unreleased is what keeps a
+  // watch paired on an earlier build from putting a Garmin row in front of a
+  // user who cannot install the watch app. `initGarminReceiver` already declines
+  // to populate this; both are here because they stop different things (one the
+  // behaviour, one the display) and neither should have to trust the other.
+  if (!GARMIN_RELEASED || !garminLinkIntact()) return [];
+  return devices;
+}
+
+function receive(msg: GarminMessage) {
+  const native = garminNative();
+  if (!native) return;
+  const deviceIdRaw = typeof msg.deviceId === 'string' ? msg.deviceId : null;
+  const mapped = mapWatchPayload(msg as Record<string, unknown>);
+  if (!mapped) {
+    // ACK IT ANYWAY.
+    //
+    // The watch retries until acknowledged, which is right for a reading we
+    // could not store — but wrong for one we will never accept. A capture that
+    // produced no usable beats is not going to become valid on the tenth
+    // attempt, so without this it retries forever, burning radio and battery
+    // over a reading that is already lost.
+    //
+    // Rejection is still recorded: an unmappable payload means the watch and
+    // the phone disagree about the contract, and that is worth knowing.
+    const rejectedId = typeof msg.id === 'string' ? msg.id : null;
+    logError('garmin.rejected', new Error(`unmappable payload ${String(msg.type)}`));
+    if (deviceIdRaw && rejectedId) {
+      native.ackMessage(deviceIdRaw, rejectedId).catch(() => {});
+    }
+    return;
+  }
+
+  const deviceId = deviceIdRaw;
+  // Which watch took it, stamped the way a strap capture stamps its device
+  // name (Results.tsx) — the reading's Details card and the AI prompts both
+  // read `sourceName` first, and "Venu 4" says more than "Garmin watch". The
+  // payload carries no name, so it is resolved from the linked device list by
+  // the id the message arrived on, falling back to the only linked watch.
+  // Fall back to the linked list only when there is ONE watch on it: with two
+  // linked, guessing would put the wrong watch's name on a reading, which is
+  // worse than the generic "Garmin watch" the Details card falls back to.
+  const named = (deviceId ? devices.find((d) => d.id === deviceId) : undefined)
+    ?? (devices.length === 1 ? devices[0] : undefined);
+  if (named?.name && !mapped.entry.sourceName) mapped.entry.sourceName = named.name;
+
+  const existing = getState().days[mapped.dayKey]?.[mapped.section] || [];
+  const fresh = !existing.some((e) => e.id === mapped.entry.id);
+
+  if (mapped.waveform) storeWaveform(mapped.entry.id, mapped.waveform);
+  if (mapped.section === 'readings') {
+    const profile = getState().profile;
+    mapped.entry.scores = computeScores(mapped.entry, { sex: profile?.sex, height: profile?.height });
+  }
+  upsertEntry(mapped.dayKey, mapped.section, mapped.entry);
+  flushSave();
+
+  // Only now is it safe to let the watch forget it. A failed ack simply means
+  // the watch retries and we upsert the same id again.
+  if (deviceId) {
+    native.ackMessage(deviceId, mapped.entry.id).catch(() => {
+      /* watch keeps it queued and retries — nothing to recover here */
+    });
+  }
+
+  if (fresh && mapped.section === 'readings') {
+    // The reading was taken on the wrist, so nothing in `sessionStore` ever ran
+    // and none of the capture counters fired. Counted here instead, and only
+    // for a reading that belongs to TODAY: the watch queues while the phone is
+    // unreachable, so last night's reading can land on this morning's launch.
+    if (mapped.entry.type === 'hrv' && mapped.dayKey === todayKey()) pingWristReading('garmin');
+    arrivalListeners.forEach((fn) => fn(mapped.dayKey, mapped.entry));
+  }
+}
+
+/**
+ * Ask for the device list.
+ *
+ * On iOS this opens Garmin Connect's picker and the chosen devices arrive later
+ * through `handleGarminUrl`. On Android there is no picker — the SDK already
+ * knows the paired devices — so the call is a no-op and `getDevices` answers
+ * immediately. Callers should refresh from `garminDevices()` afterwards rather
+ * than assuming either path.
+ */
+export async function pickGarminDevice(): Promise<GarminDevice[]> {
+  const native = garminNative();
+  if (!native) return [];
+  try {
+    await native.showDeviceSelection();
+    // Android answers immediately; on iOS the real answer arrives later through
+    // the URL callback, so this returns whatever is already known.
+    const list = await native.getDevices();
+    if (list.length) setDevices(list);
+    await Promise.all(list.map((d) => native.startListening(d.id)));
+    return list;
+  } catch (e) {
+    logError('garmin.pick', e);
+    return [];
+  }
+}
+
+/** Feed the URL Garmin Connect returns to us (from expo-linking). */
+export async function handleGarminUrl(url: string): Promise<GarminDevice[]> {
+  const native = garminNative();
+  if (!native || !url.startsWith(`${GARMIN_URL_SCHEME}:`)) return [];
+  try {
+    const found = await native.handleUrl(url);
+    if (found.length) setDevices(found);
+    await Promise.all(found.map((d) => native.startListening(d.id)));
+    return found;
+  } catch (e) {
+    logError('garmin.handleUrl', e);
+    return [];
+  }
+}
+
+/** Call once at app start, alongside initWatchReceiver. No-op without the module. */
+export function initGarminReceiver() {
+  if (started) return;
+  started = true;
+  // Held with the rest of the Garmin surfaces: with no way to install the watch
+  // app there is nothing to listen for, and initializing the link anyway would
+  // claim the URL callback and re-attach to a watch paired on an earlier build.
+  if (!GARMIN_RELEASED) return;
+  // Do not start a link this build cannot finish. Initializing anyway would
+  // register for the very broadcasts that kill the process — the first reading
+  // a watch delivered would take the app down, and the user would report it as
+  // "it crashes when I open it".
+  if (!garminLinkIntact()) return;
+  const native = garminNative();
+  if (!native) return;
+
+  onGarminMessage((msg) => {
+    try {
+      receive(msg);
+    } catch (e) {
+      // A malformed payload must never take down the listener, or every later
+      // reading is lost too.
+      logError('garmin.receive', e);
+    }
+  });
+
+  onGarminDeviceStatus((e) => {
+    setDevices(devices.map((d) => (d.id === e.id ? { ...d, status: e.status, connected: e.connected } : d)));
+  });
+
+  // THE CALLBACK. Garmin Connect returns the chosen devices by opening our URL
+  // scheme; without this listener the selection is simply discarded and the
+  // picker looks like it did nothing at all.
+  void ExpoLinking.getInitialURL().then((url) => { if (url) void handleGarminUrl(url); });
+  ExpoLinking.addEventListener('url', (e) => { void handleGarminUrl(e.url); });
+
+  native
+    .initialize(GARMIN_URL_SCHEME)
+    .then(() => native.getDevices())
+    .then((list) => {
+      setDevices(list);
+      // Re-attach to devices paired in a previous session, so a reading queued
+      // on the watch can drain without the user re-picking.
+      return Promise.all(list.map((d) => native.startListening(d.id)));
+    })
+    .catch((e) => logError('garmin.init', e));
+}

@@ -9,6 +9,14 @@ export const ACCENT_SOFT = 'rgba(224,49,39,0.12)';
 export const WATER_BLUE = '#4a9de0';
 export const WATER_BLUE_SOFT = 'rgba(74,157,224,0.14)';
 
+/** Back-dated editing. Any control that writes into a day other than today
+ *  wears this gold instead of the red accent, so a save can never be read as
+ *  logging the present. The ink is near-black on purpose: white on gold is
+ *  unreadable, and this is the one filled button in the app that isn't dark. */
+export const CAUTION_GOLD = '#eab308';
+export const CAUTION_GOLD_SOFT = 'rgba(234,179,8,0.13)';
+export const CAUTION_INK = '#241d02';
+
 /** Grade / score color scale — identical to SCORE_COLORS in the scoring engine.
  *  Unified with the day-score bands: Excellent → Crash (see SCORE_COLORS). */
 export const GRADE_COLORS = {

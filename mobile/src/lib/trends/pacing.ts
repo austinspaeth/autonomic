@@ -45,7 +45,7 @@ export const TREND_FAMILY_COOLDOWN_DAYS = 30;
  * That is not a dev-only annoyance: an OTA update ships copy fixes to phones
  * holding live claims.
  */
-export const TREND_COPY_VERSION = 2;
+export const TREND_COPY_VERSION = 3;
 
 /** The finding currently (or most recently) on screen. */
 export interface TrendClaim {

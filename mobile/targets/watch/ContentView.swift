@@ -4,18 +4,21 @@ import SwiftUI
  * Mode router + home screen. Deliberately NOT a NavigationStack: once a mode
  * is running there is no back gesture — HR Monitor ends only via the End
  * button on its controls page (one swipe right), the stand test only via its
- * own buttons — so a stray swipe can't abandon a session. Freemium gating is
- * per-feature: the HR Monitor is always free; the two POTS captures follow
- * the phone subscription (`pro` mirrored over applicationContext — true while
- * trialing or subscribed). Locked rows show a lock instead of a chevron and
- * explain how to unlock on tap.
+ * own buttons — so a stray swipe can't abandon a session.
+ *
+ * NOTHING HERE IS GATED. The two POTS captures used to follow the phone
+ * subscription (`pro`, still mirrored over applicationContext for other uses)
+ * and showed a lock instead of a chevron. They no longer do: a stand test and
+ * an episode happen at a moment that cannot be rescheduled around a
+ * subscription, and a watch that refuses to record one loses it for good. The
+ * freemium line sits where every other capture's does — on READING the result
+ * in the phone app (src/features/PotsLock.tsx), which is Pro. The reading is
+ * still captured, synced and saved to the journal on every tier.
  */
 struct ContentView: View {
     enum Mode { case home, hr, pots, orthostatic }
 
     @State private var mode: Mode = .home
-    @State private var showLockAlert = false
-    @EnvironmentObject private var relay: PhoneRelay
     @EnvironmentObject private var workout: WorkoutManager
     @Environment(\.scenePhase) private var scenePhase
 
@@ -61,7 +64,7 @@ struct ContentView: View {
             // the workout and complication session state orphaned).
             guard mode == .home else { return }
             if url.host == "episode" || url.path.contains("episode") {
-                if potsLocked { showLockAlert = true } else { mode = .orthostatic }
+                mode = .orthostatic
             } else if url.host == "hr" || url.path.contains("hr") {
                 mode = .hr
             }
@@ -89,11 +92,11 @@ struct ContentView: View {
                 ) { mode = .hr }
                 modeButton(
                     title: "POTS Test", subtitle: "Lie and stand test",
-                    icon: "figure.stand", tint: DS.blue, locked: potsLocked
+                    icon: "figure.stand", tint: DS.blue
                 ) { mode = .pots }
                 modeButton(
                     title: "POTS Episode", subtitle: "Stairs or other events",
-                    icon: "figure.stairs", tint: DS.purple, locked: potsLocked
+                    icon: "figure.stairs", tint: DS.purple
                 ) { mode = .orthostatic }
                 Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0")")
                     .font(.system(size: 10, weight: .medium))
@@ -101,18 +104,7 @@ struct ContentView: View {
                     .padding(.top, 2)
             }
         }
-        .alert("Subscription required", isPresented: $showLockAlert) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(relay.pro == nil
-                 ? "Open Autonomic on your iPhone to set up."
-                 : "Subscribe in the Autonomic app on your iPhone to unlock POTS readings.")
-        }
     }
-
-    /// POTS captures are Pro (or trial). Locked until the phone has ever told
-    /// us `pro`; then mirrors it live. The HR Monitor is never gated.
-    private var potsLocked: Bool { relay.pro != true }
 
     // MARK: - Permission gate
 
@@ -154,8 +146,8 @@ struct ContentView: View {
         }
     }
 
-    private func modeButton(title: String, subtitle: String, icon: String, tint: Color, locked: Bool = false, action: @escaping () -> Void) -> some View {
-        Button(action: { if locked { showLockAlert = true } else { action() } }) {
+    private func modeButton(title: String, subtitle: String, icon: String, tint: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
             HStack(spacing: 11) {
                 Image(systemName: icon)
                     .font(.system(size: 15))
@@ -169,7 +161,7 @@ struct ContentView: View {
                         .lineLimit(1).minimumScaleFactor(0.8)
                 }
                 Spacer(minLength: 0)
-                Image(systemName: locked ? "lock.fill" : "chevron.right")
+                Image(systemName: "chevron.right")
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(DS.dim.opacity(0.7))
             }

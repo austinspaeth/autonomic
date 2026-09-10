@@ -191,62 +191,175 @@ export function activityGrade(acts?: Entry[]): ScoreCat | null {
 
 export interface CompDetailMetric { label: string; raw: number; bands: Band[] | null; unit?: string; lowerBetter?: boolean }
 export interface CompDetail { value: string; metrics: CompDetailMetric[]; note?: string; maxCat?: ScoreCat }
-export interface ScoreComp { w: number; p: number; label: string; detail: CompDetail }
+export interface ScoreComp {
+  w: number; p: number; label: string; detail: CompDetail;
+  /** How many of the day's readings supplied a value for this component. 1 for
+   *  everything that can only come from a single entry (sleep, activity, BP). */
+  readings?: number;
+}
+
+/** The full input set and what each part is worth. Exported because the
+ *  confidence copy in DaySummary needs the same weights the score uses, and a
+ *  second copy of the table drifts silently the first time one moves. */
+export const SCORE_WEIGHTS: { label: string; w: number }[] = [
+  { label: 'HRV (RMSSD)', w: 25 },
+  { label: 'Total power', w: 15 },
+  { label: 'pNN50', w: 10 },
+  { label: 'VLF power', w: 10 },
+  { label: 'LF peak', w: 10 },
+  { label: 'Blood pressure', w: 8 },
+  { label: 'Resting HR', w: 7 },
+  { label: 'Sleep', w: 8 },
+  { label: 'Activity', w: 2 },
+];
+/** Weight of a fully logged day — what `confidence` is a percentage OF. */
+export const SCORE_TOTAL_WEIGHT = SCORE_WEIGHTS.reduce((s, c) => s + c.w, 0);
+
 export interface ScoreSetResult {
   score: number | null;
+  /** Share of the full input set available today, 0-100. A fully logged day
+   *  reads 100%. NOT the divisor for the headline — see `weightSum`. */
   confidence: number;
+  /** The raw weight actually available (max SCORE_TOTAL_WEIGHT). The score is
+   *  sum(w * p) / weightSum, so anything expressing a component in points of
+   *  the final score must divide by THIS, never by `confidence`. */
+  weightSum: number;
   hasStruct: boolean;
   hasUnstruct: boolean;
   comps: ScoreComp[];
+  /** Trusted training (structured) readings the day held, and the usable-pulse
+   *  seconds of the most recent one that stamped it — what the confidence copy
+   *  needs to tell "nothing captured" apart from "captured, but too short to
+   *  resolve the frequency metrics". Null seconds = an older build's reading,
+   *  which stamped no coverage: unknown, not zero. */
+  structCount: number;
+  lastStructCoverageSec: number | null;
+}
+
+/**
+ * Recency-weighted blend of grade POINTS, oldest to newest.
+ *
+ * Later readings weigh more — the evening is a better description of the day
+ * than the morning — but never 100%, because the morning happened too. A
+ * normalized linear ramp: two readings are 1/3 and 2/3, three are 1/6, 2/6, 3/6.
+ *
+ * POINTS, not raw values: `lfPeak` is a non-monotone LOCATION, so an average of
+ * two frequencies is not a frequency anyone measured, and the same blend is
+ * already what `hrvPts` does across the two HRV kinds at 0.7/0.3.
+ */
+export function recencyBlend(pts: readonly number[]): number | null {
+  if (!pts.length) return null;
+  const denom = (pts.length * (pts.length + 1)) / 2;
+  return pts.reduce((s, v, i) => s + v * (i + 1), 0) / denom;
 }
 
 /**
  * Weighted Autonomic Score from a subset of readings + the day record.
  * Missing components drop out and the weight is redistributed (confidence).
+ *
+ * THE DAY IS AGGREGATED, NOT SAMPLED. Every structured component used to come
+ * from `last(structured)` alone, which conflated two different questions: could
+ * this record RESOLVE the metric, and was the number GOOD. A short evening
+ * reading resolves no frequency domain at all, so taking the last one deleted
+ * Total power, VLF and LF peak that a full morning reading had measured — a
+ * user who took a second reading watched her confidence fall from 77% to 42%
+ * for doing it. Completeness now decides only whether a reading can CONTRIBUTE
+ * a metric; every trusted reading that resolved one contributes it.
+ *
+ * Selection is deliberately blind to the VALUE. A worse-but-complete evening
+ * reading is real data about a worse evening and must drag the day down; there
+ * is no "best reading" anywhere in here. The trade-off being made is that
+ * metrics captured hours apart are combined into one number — the recency ramp
+ * is what keeps that honest, since the day ends where it ended.
  */
 export function scoreSet(readings: Entry[], d: DayRecord, dk: string, days: DaysMap, ctx: ScoreContext = {}): ScoreSetResult {
   const last = <T,>(a: T[]): T | undefined => a[a.length - 1];
   const pts = (cat: ScoreCat | null | undefined): number | null => (cat ? GRADE_PTS[cat] : null);
+  // Chronological, because the blend below is a recency ramp and "later" has to
+  // mean something. Callers pass the day's readings in log order already; this
+  // only makes the assumption explicit rather than load-bearing.
+  const byTime = (a: Entry, b: Entry) => ((a.time as string) || '').localeCompare((b.time as string) || '');
   // Imported HRV that carries too little real RR never scores (hrvQuality.ts).
-  const structured = readings.filter((r) => r.type === 'breathHrv' && isTrustedReading(r));
-  const unstructured = readings.filter((r) => r.type === 'hrv' && isTrustedReading(r));
-  const sStruct = structured.length ? computeScores(last(structured)!, ctx) : null;
-  const sUn = unstructured.length ? computeScores(last(unstructured)!, ctx) : null;
+  const structured = readings.filter((r) => r.type === 'breathHrv' && isTrustedReading(r)).sort(byTime);
+  const unstructured = readings.filter((r) => r.type === 'hrv' && isTrustedReading(r)).sort(byTime);
+  const gStruct = structured.map((r) => computeScores(r, ctx));
+  const gUn = unstructured.map((r) => computeScores(r, ctx));
 
+  // A metric's points across every reading of that kind that RESOLVED it.
+  // computeScores only records a grade it could compute, so a present key IS
+  // "this record resolved it" — a 90-second reading has no `totalPower` key and
+  // therefore contributes nothing to Total power, rather than deleting it.
+  const blendOf = (graded: Record<string, ScoreCat>[], key: string): { p: number | null; n: number } => {
+    const vals = graded.map((g) => (g[key] ? GRADE_PTS[g[key]] : null)).filter((v): v is number => v != null);
+    return { p: recencyBlend(vals), n: vals.length };
+  };
+  /** The most recent reading that resolved `key` — what the explain sheet
+   *  quotes a raw number from, since a blended grade has no raw value. */
+  const lastWith = (list: Entry[], graded: Record<string, ScoreCat>[], key: string): Entry | null => {
+    for (let i = list.length - 1; i >= 0; i--) if (graded[i][key]) return list[i];
+    return null;
+  };
+
+  const rmS = blendOf(gStruct, 'rmssd'), rmU = blendOf(gUn, 'rmssd');
   let hrvPts: number | null = null;
-  if (sStruct && sStruct.rmssd && sUn && sUn.rmssd) hrvPts = 0.7 * pts(sStruct.rmssd)! + 0.3 * pts(sUn.rmssd)!;
-  else if (sStruct && sStruct.rmssd) hrvPts = pts(sStruct.rmssd);
-  else if (sUn && sUn.rmssd) hrvPts = pts(sUn.rmssd);
+  if (rmS.p != null && rmU.p != null) hrvPts = 0.7 * rmS.p + 0.3 * rmU.p;
+  else if (rmS.p != null) hrvPts = rmS.p;
+  else if (rmU.p != null) hrvPts = rmU.p;
+
+  const tp = blendOf(gStruct, 'totalPower');
+  const pn = blendOf(gStruct, 'pnn50');
+  const vlfB = blendOf(gStruct, 'vlf');
+  const lfB = blendOf(gStruct, 'lfPeak');
 
   const bp = last(readings.filter((r) => r.type === 'bp'));
   const bpPts = bp ? pts(computeScores(bp, ctx).bp) : null;
 
-  const rhr = last(readings.filter((r) => r.type === 'restingHr'));
-  let rhrPts = rhr ? pts(computeScores(rhr, ctx).hr) : null;
-  if (rhrPts == null && sStruct) rhrPts = pts(sStruct.hr);
-  if (rhrPts == null && sUn) rhrPts = pts(sUn.avgHr);
+  const rhrs = readings.filter((r) => r.type === 'restingHr').sort(byTime);
+  const rhr = last(rhrs);
+  const rhrBlend = blendOf(rhrs.map((r) => computeScores(r, ctx)), 'hr');
+  let rhrPts = rhrBlend.p;
+  let rhrN = rhrBlend.n;
+  if (rhrPts == null) {
+    const fromStruct = blendOf(gStruct, 'hr');
+    if (fromStruct.p != null) { rhrPts = fromStruct.p; rhrN = fromStruct.n; }
+  }
+  if (rhrPts == null) {
+    const fromUn = blendOf(gUn, 'avgHr');
+    if (fromUn.p != null) { rhrPts = fromUn.p; rhrN = fromUn.n; }
+  }
 
   // ---- Per-component detail (raw values + bands) for the score-explain sheet ----
+  // The grade is blended across the day, so there IS no single raw value behind
+  // it. Each row quotes the most recent reading that resolved the metric and
+  // says how many readings the grade came from, rather than implying the last
+  // number is the whole story.
   const bs = last(structured), bu = last(unstructured);
   const nv = (x: unknown): number | null => { const v = parseFloat(x as string); return isNaN(v) ? null : v; };
-  const rmS = bs ? nv(bs.rmssd) : null, rmU = bu ? nv(bu.rmssd) : null;
+  const fromN = (n: number) => (n > 1 ? `Combined across ${n} readings today, weighted toward the most recent. ` : '');
+  const rmSv = (() => { const e = lastWith(structured, gStruct, 'rmssd'); return e ? nv(e.rmssd) : null; })();
+  const rmUv = (() => { const e = lastWith(unstructured, gUn, 'rmssd'); return e ? nv(e.rmssd) : null; })();
   const hrvMetrics: CompDetailMetric[] = [];
-  if (rmS != null) hrvMetrics.push({ label: 'RMSSD (training)', raw: rmS, bands: BANDS.rmssdS, unit: 'ms' });
-  if (rmU != null) hrvMetrics.push({ label: 'RMSSD (baseline)', raw: rmU, bands: BANDS.rmssdU, unit: 'ms' });
+  if (rmSv != null) hrvMetrics.push({ label: 'RMSSD (training)', raw: rmSv, bands: BANDS.rmssdS, unit: 'ms' });
+  if (rmUv != null) hrvMetrics.push({ label: 'RMSSD (baseline)', raw: rmUv, bands: BANDS.rmssdU, unit: 'ms' });
   const hrvDetail: CompDetail = {
-    value: rmS != null && rmU != null ? `${rmS}/${rmU} ms` : rmS != null ? `${rmS} ms` : rmU != null ? `${rmU} ms` : '',
+    value: rmSv != null && rmUv != null ? `${rmSv}/${rmUv} ms` : rmSv != null ? `${rmSv} ms` : rmUv != null ? `${rmUv} ms` : '',
     metrics: hrvMetrics,
+    note: fromN(rmS.n + rmU.n) || undefined,
   };
 
-  const tpV = bs ? totalPower(bs) : null;
+  const tpE = lastWith(structured, gStruct, 'totalPower');
+  const tpV = tpE ? totalPower(tpE) : null;
   const tpR = tpV != null ? Math.round(tpV) : null;
-  const tpDetail: CompDetail = { value: tpR != null ? `${tpR} ms²` : '', metrics: tpR != null ? [{ label: 'Total power', raw: tpR, bands: BANDS.totalPower, unit: 'ms²' }] : [] };
-  const pnV = bs ? nv(bs.pnn50) : null;
-  const pnDetail: CompDetail = { value: pnV != null ? `${pnV}%` : '', metrics: pnV != null ? [{ label: 'pNN50', raw: pnV, bands: BANDS.pnn50, unit: '%' }] : [] };
-  const vlfV = bs ? nv(bs.vlowPower) : null;
-  const vlfDetail: CompDetail = { value: vlfV != null ? `${vlfV} ms²` : '', metrics: vlfV != null ? [{ label: 'VLF power', raw: vlfV, bands: BANDS.vlf, unit: 'ms²', lowerBetter: true }] : [] };
-  const lfV = bs ? nv(bs.lfPeak) : null;
-  const lfDetail: CompDetail = { value: lfV != null ? `${lfV} Hz` : '', metrics: lfV != null ? [{ label: 'LF peak', raw: lfV, bands: BANDS.lfPeak, unit: 'Hz' }] : [] };
+  const tpDetail: CompDetail = { value: tpR != null ? `${tpR} ms²` : '', metrics: tpR != null ? [{ label: 'Total power', raw: tpR, bands: BANDS.totalPower, unit: 'ms²' }] : [], note: fromN(tp.n) || undefined };
+  const pnE = lastWith(structured, gStruct, 'pnn50');
+  const pnV = pnE ? nv(pnE.pnn50) : null;
+  const pnDetail: CompDetail = { value: pnV != null ? `${pnV}%` : '', metrics: pnV != null ? [{ label: 'pNN50', raw: pnV, bands: BANDS.pnn50, unit: '%' }] : [], note: fromN(pn.n) || undefined };
+  const vlfE = lastWith(structured, gStruct, 'vlf');
+  const vlfV = vlfE ? nv(vlfE.vlowPower) : null;
+  const vlfDetail: CompDetail = { value: vlfV != null ? `${vlfV} ms²` : '', metrics: vlfV != null ? [{ label: 'VLF power', raw: vlfV, bands: BANDS.vlf, unit: 'ms²', lowerBetter: true }] : [], note: fromN(vlfB.n) || undefined };
+  const lfE = lastWith(structured, gStruct, 'lfPeak');
+  const lfV = lfE ? nv(lfE.lfPeak) : null;
+  const lfDetail: CompDetail = { value: lfV != null ? `${lfV} Hz` : '', metrics: lfV != null ? [{ label: 'LF peak', raw: lfV, bands: BANDS.lfPeak, unit: 'Hz' }] : [], note: fromN(lfB.n) || undefined };
 
   const sysV = bp ? nv(bp.sys) : null, diaV = bp ? nv(bp.dia) : null;
   const bpDetail: CompDetail = {
@@ -263,7 +376,7 @@ export function scoreSet(readings: Entry[], d: DayRecord, dk: string, days: Days
     if (rhr.position) rhrLabel = `Resting HR (${rhr.position})`;
   } else if (bs) { rhrV = nv(bs.hr); rhrBands = BANDS.hrBreath; rhrLabel = 'HR (from training HRV)'; }
   else if (bu) { rhrV = nv(bu.avgHr); rhrBands = BANDS.hrBreath; rhrLabel = 'Avg HR (from HRV)'; }
-  const rhrDetail: CompDetail = { value: rhrV != null ? `${rhrV} bpm` : '', metrics: rhrV != null ? [{ label: rhrLabel, raw: rhrV, bands: rhrBands, unit: 'bpm', lowerBetter: true }] : [] };
+  const rhrDetail: CompDetail = { value: rhrV != null ? `${rhrV} bpm` : '', metrics: rhrV != null ? [{ label: rhrLabel, raw: rhrV, bands: rhrBands, unit: 'bpm', lowerBetter: true }] : [], note: fromN(rhrN) || undefined };
 
   const slH = sleepHours(days, dk);
   const slInt = !!(d && d.sleep && d.sleep.quality === 'interrupted');
@@ -280,31 +393,62 @@ export function scoreSet(readings: Entry[], d: DayRecord, dk: string, days: Days
     note: 'Graded on pacing, not volume: a gentle or normal day scores good (the ceiling here); two heavy sessions drop it to ok, and strenuous work or three or more heavy sessions to bad. Match activity to today’s capacity to avoid a later setback.',
   };
 
-  const comps = ([
-    { w: 25, p: hrvPts, label: 'HRV (RMSSD)', detail: hrvDetail },
-    { w: 15, p: sStruct ? pts(sStruct.totalPower) : null, label: 'Total power', detail: tpDetail },
-    { w: 10, p: sStruct ? pts(sStruct.pnn50) : null, label: 'pNN50', detail: pnDetail },
-    { w: 10, p: sStruct ? pts(sStruct.vlf) : null, label: 'VLF power', detail: vlfDetail },
-    { w: 10, p: sStruct ? pts(sStruct.lfPeak) : null, label: 'LF peak', detail: lfDetail },
-    { w: 8, p: bpPts, label: 'Blood pressure', detail: bpDetail },
-    { w: 7, p: rhrPts, label: 'Resting HR', detail: rhrDetail },
-    { w: 8, p: pts(sleepGrade(days, dk)), label: 'Sleep', detail: sleepDetail },
-    { w: 2, p: pts(activityGrade(d.activities)), label: 'Activity', detail: actDetail },
-  ] as { w: number; p: number | null; label: string; detail: CompDetail }[]).filter((c) => c.p != null) as ScoreComp[];
+  // Ordered exactly like SCORE_WEIGHTS, whose weights these are.
+  const byLabel: Record<string, { p: number | null; detail: CompDetail; readings: number }> = {
+    'HRV (RMSSD)': { p: hrvPts, detail: hrvDetail, readings: rmS.n + rmU.n },
+    'Total power': { p: tp.p, detail: tpDetail, readings: tp.n },
+    'pNN50': { p: pn.p, detail: pnDetail, readings: pn.n },
+    'VLF power': { p: vlfB.p, detail: vlfDetail, readings: vlfB.n },
+    'LF peak': { p: lfB.p, detail: lfDetail, readings: lfB.n },
+    'Blood pressure': { p: bpPts, detail: bpDetail, readings: bp ? 1 : 0 },
+    'Resting HR': { p: rhrPts, detail: rhrDetail, readings: rhrN },
+    'Sleep': { p: pts(sleepGrade(days, dk)), detail: sleepDetail, readings: 1 },
+    'Activity': { p: pts(activityGrade(d.activities)), detail: actDetail, readings: 1 },
+  };
+  const comps = SCORE_WEIGHTS
+    .map((c) => ({ w: c.w, label: c.label, ...byLabel[c.label] }))
+    .filter((c) => c.p != null) as ScoreComp[];
 
-  if (!comps.length) return { score: null, confidence: 0, hasStruct: !!sStruct, hasUnstruct: !!unstructured.length, comps: [] };
-  const avail = comps.reduce((s, c) => s + c.w, 0);
+  // The most recent training reading's usable pulse, for the confidence copy —
+  // absent on a reading from before capture quality was stamped, and null there
+  // means UNKNOWN, never zero.
+  const lastCov = bs != null && bs.coverageSec != null ? nv(bs.coverageSec) : null;
+  const base = {
+    hasStruct: !!structured.length, hasUnstruct: !!unstructured.length,
+    structCount: structured.length, lastStructCoverageSec: lastCov,
+  };
+  if (!comps.length) return { score: null, confidence: 0, weightSum: 0, comps: [], ...base };
+  const weightSum = comps.reduce((s, c) => s + c.w, 0);
   const sum = comps.reduce((s, c) => s + c.p * c.w, 0);
-  return { score: Math.round(sum / avail), confidence: Math.round(avail), hasStruct: !!sStruct, hasUnstruct: !!unstructured.length, comps };
+  return {
+    score: Math.round(sum / weightSum),
+    // A percentage of the FULL input set, so a fully logged day reads 100%. The
+    // raw weight it is a percentage of stays available as `weightSum`, which is
+    // what anything converting a component into points of the final score must
+    // divide by — the two were one field, and presenting a 95-point sum as a
+    // percent meant confidence could never reach 100.
+    confidence: Math.round((weightSum / SCORE_TOTAL_WEIGHT) * 100),
+    weightSum,
+    comps, ...base,
+  };
 }
 
-/** Blue-zone flag: high baseline readiness masking a fragile training RMSSD. */
+/**
+ * Blue-zone flag: high baseline readiness masking a fragile training RMSSD.
+ *
+ * Reads the whole day, like `scoreSet` — it asks whether ANY trusted training
+ * reading came back fragile, not whether one particular one did. Picking a
+ * single reading (it used to take the first) made the flag depend on which
+ * reading happened to be first in the array, and a fragile evening reading
+ * behind a strong morning is exactly the case the flag exists for. Still not a
+ * blend: this is a "did it happen at all today" question, not a grade.
+ */
 export function blueZone(readings: Entry[], ctx: ScoreContext = {}): boolean {
   const u = readings.find((r) => r.type === 'hrv' && isTrustedReading(r) && numOr(r.readiness) != null);
-  const s = readings.find((r) => r.type === 'breathHrv' && isTrustedReading(r));
-  if (!u || !s) return false;
-  const rmssd = computeScores(s, ctx).rmssd;
-  return numOr(u.readiness)! >= 90 && (['ok', 'bad', 'crash'] as ScoreCat[]).includes(rmssd);
+  if (!u || numOr(u.readiness)! < 90) return false;
+  const fragile: ScoreCat[] = ['ok', 'bad', 'crash'];
+  return readings.some((r) => r.type === 'breathHrv' && isTrustedReading(r)
+    && fragile.includes(computeScores(r, ctx).rmssd));
 }
 
 /* ---------- Clean Day Streak ---------- */
@@ -315,11 +459,14 @@ export interface Criterion {
 export interface Cleanliness { clean: boolean; criteria: Criterion[] }
 
 /** Baseline protocol a user gets before ever opening the editor: 7h sleep,
- *  2.5 L water, no triggers. Meds/activities start off and empty — users pick
- *  their own meds in the editor (there are no default drugs any more). */
+ *  2.5 L water, no triggers, and an HRV reading. Meds/activities start off and
+ *  empty — users pick their own meds in the editor (there are no default drugs
+ *  any more). HRV is on because taking the reading is the one habit the whole
+ *  app is built around, and a checklist that never asks for it teaches the
+ *  opposite. */
 export const DEFAULT_PROTOCOL: Protocol = {
   triggers: { enabled: true, types: [] },
-  hrv: { enabled: false },
+  hrv: { enabled: true },
   water: { enabled: true, liters: 2.5 },
   meds: { enabled: false, types: [] },
   activities: { enabled: false, types: [] },
@@ -469,6 +616,10 @@ export function streakInfo(days: DaysMap, dk: string, protocol: Protocol = DEFAU
  * summary opened on an older reading charts what was known *then* rather than
  * trailing off into readings taken after it. An id that isn't in `days` (an
  * unsaved live preview) leaves the full history intact.
+ *
+ * It deliberately does NOT aggregate the way `scoreSet` now does: this is the
+ * chart behind a metric, so every reading is a point on it. Combining them here
+ * would hide the very variation the sparkline exists to show.
  *
  * `kind` picks the day array to walk. Activities carry metrics of their own
  * (HR @60s rest on a run), and the workout report charts them the same way a

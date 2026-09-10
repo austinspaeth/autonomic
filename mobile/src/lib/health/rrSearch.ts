@@ -17,7 +17,7 @@ export async function findRrCandidates({ fromMs, toMs }: { fromMs: number; toMs:
   if (hk.available) {
     const sessions = await hk.readHrvSessions({ fromMs, toMs });
     for (const s of sessions) {
-      found.push({ key: `hrv-${s.startMs}`, kind: 'hrv', rr: s.rr, startMs: s.startMs, endMs: s.endMs, avgHr: null, sourceName: s.sourceName });
+      found.push({ key: `hrv-${s.startMs}`, kind: 'hrv', rr: s.rr, segmentStarts: s.segmentStarts, startMs: s.startMs, endMs: s.endMs, avgHr: null, sourceName: s.sourceName });
     }
   }
 

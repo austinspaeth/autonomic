@@ -25,9 +25,16 @@ export interface MDay {
  *  "Up first" checklist keys its tap actions off these. */
 export const STARTERS = {
   hrv: 'Capture your first HRV reading',
-  fullDay: 'Log a full day of entries',
+  fullDay: 'Log everything for one full day',
   protocol: 'Set up your daily protocol',
 } as const;
+
+/** The only starter the journal card offers as a CHECKLIST. The other two stay
+ *  achievements in the tracker, but are not chores a new user needs handed to
+ *  them: the first HRV reading is already the welcome wizard's own last step
+ *  (and `BaselineWaitingCard` holds the Outlook slot until it lands), and the
+ *  protocol is an advanced setting nobody should meet on day one. */
+export const CHECKLIST_STARTERS: readonly string[] = [STARTERS.fullDay];
 
 export interface MilestoneItem { label: string; done: boolean; date: string | null; value: number | string | null }
 export interface MilestoneGroup { title: string; items: MilestoneItem[] }

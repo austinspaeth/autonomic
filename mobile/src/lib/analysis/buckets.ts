@@ -3,7 +3,7 @@
  * family. Buckets days by the active range (day/week/month/year) and averages
  * within each bucket. Pure over a days map + score context.
  */
-import { keyOf } from '../dates';
+import { dateFromKey, fmtSlashShort, keyOf, pad } from '../dates';
 import type { Band, DayRecord, Entry } from '../types';
 import { BANDS, SCORE_COLORS, catFromBands, type ScoreContext } from '../scoring';
 import { SCORE_CATS, scoreSet, blueZone, type DaysMap } from '../scoring/day';
@@ -12,7 +12,37 @@ import { isTrustedReading } from '../hrvQuality';
 export type Mode = 'day' | 'week' | 'month' | 'year';
 export interface Bucket { start: string; end: string; label: string; days: string[] }
 
-export function acRangeLabel(mode: Mode): string {
+/**
+ * A window the user picked by hand, charted at `mode`'s grouping. Day keys,
+ * inclusive both ends. It replaces the range the four tabs describe; the
+ * grouping still travels as `mode`, so everything downstream (bucket labels,
+ * the "for the week of" phrasing, the rolling-average window) keeps working
+ * off the one value it always did.
+ */
+export interface CustomRange { from: string; to: string }
+
+/**
+ * Ceiling on how many buckets a custom range may produce. A window charted at
+ * a grouping too fine for it isn't a chart — a thousand points on a 350pt-wide
+ * line is a smear — so the sheet refuses to apply that combination rather than
+ * silently coarsening the grouping the user asked for.
+ */
+export const MAX_CUSTOM_BUCKETS = 366;
+
+/** How many buckets `from`→`to` would make at this grouping. Pure, so the
+ *  sheet can check the pair before committing to a rebuild. */
+export function customBucketCount(mode: Mode, custom: CustomRange): number {
+  return customRanges(mode, custom).length;
+}
+
+const GROUP_WORD: Record<Mode, string> = {
+  day: 'daily', week: 'weekly average', month: 'monthly average', year: 'yearly average',
+};
+
+export function acRangeLabel(mode: Mode, custom?: CustomRange | null): string {
+  // A custom range names its own two ends: "over the range" is true of the
+  // tabs, where the reader knows what the range is, and meaningless here.
+  if (custom) return `${fmtSlashShort(custom.from)} – ${fmtSlashShort(custom.to)} · ${GROUP_WORD[mode]}`;
   return mode === 'day' ? 'Last 14 days · daily'
     : mode === 'week' ? 'Last 12 weeks · weekly average'
     : mode === 'month' ? 'Last 12 months · monthly average'
@@ -45,11 +75,57 @@ export interface BucketView { label: string; when: string | null }
 export const bucketViews = (buckets: Bucket[], mode: Mode): BucketView[] =>
   buckets.map((b) => ({ label: b.label, when: bucketWhen(mode, b) }));
 
-export function acBuckets(days: DaysMap, mode: Mode): Bucket[] {
+/**
+ * The [start, end] pairs a custom window breaks into at this grouping, clamped
+ * to the window at both ends: a month bucket for a range starting on the 12th
+ * starts on the 12th, so the average it reports covers only days the user
+ * actually asked for. Separate from `acBuckets` so the sheet can count buckets
+ * without touching the journal.
+ */
+function customRanges(mode: Mode, custom: CustomRange): { s: Date; e: Date }[] {
+  // A backwards pair is a picker mishap, not an empty range — read it either way.
+  const lo = custom.from <= custom.to ? custom.from : custom.to;
+  const hi = custom.from <= custom.to ? custom.to : custom.from;
+  const from = dateFromKey(lo), to = dateFromKey(hi);
+  if (isNaN(from.getTime()) || isNaN(to.getTime())) return [];
+  const out: { s: Date; e: Date }[] = [];
+  const clamp = (s: Date, e: Date) => out.push({ s: s < from ? from : s, e: e > to ? to : e });
+  if (mode === 'day') {
+    for (const d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) out.push({ s: new Date(d), e: new Date(d) });
+  } else if (mode === 'week') {
+    // Sunday-aligned, matching the Week tab and the Calendar grid.
+    const s = new Date(from); s.setDate(s.getDate() - s.getDay());
+    for (; s <= to; s.setDate(s.getDate() + 7)) { const e = new Date(s); e.setDate(s.getDate() + 6); clamp(new Date(s), e); }
+  } else if (mode === 'month') {
+    for (const s = new Date(from.getFullYear(), from.getMonth(), 1); s <= to; s.setMonth(s.getMonth() + 1)) {
+      clamp(new Date(s), new Date(s.getFullYear(), s.getMonth() + 1, 0));
+    }
+  } else {
+    for (let y = from.getFullYear(); y <= to.getFullYear(); y++) clamp(new Date(y, 0, 1), new Date(y, 11, 31));
+  }
+  return out;
+}
+
+/** A custom bucket's axis label. Month labels carry the year once the window
+ *  crosses one, or "Jan" appears twice on the same axis meaning two things. */
+function customLabel(mode: Mode, s: Date, spansYears: boolean): string {
+  if (mode === 'year') return String(s.getFullYear());
+  if (mode === 'month') {
+    const m = s.toLocaleDateString(undefined, { month: 'short' });
+    return spansYears ? `${m} '${pad(s.getFullYear() % 100)}` : m;
+  }
+  return `${s.getMonth() + 1}/${s.getDate()}`;
+}
+
+export function acBuckets(days: DaysMap, mode: Mode, custom?: CustomRange | null): Bucket[] {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const mk = (s: Date, e: Date, label: string): Bucket => ({ start: keyOf(s), end: keyOf(e), label, days: [] });
   const buckets: Bucket[] = [];
-  if (mode === 'day') {
+  if (custom) {
+    const ranges = customRanges(mode, custom);
+    const spansYears = ranges.length > 0 && ranges[0].s.getFullYear() !== ranges[ranges.length - 1].e.getFullYear();
+    ranges.forEach(({ s, e }) => buckets.push(mk(s, e, customLabel(mode, s, spansYears))));
+  } else if (mode === 'day') {
     for (let i = 13; i >= 0; i--) { const dt = new Date(today); dt.setDate(today.getDate() - i); buckets.push(mk(dt, dt, `${dt.getMonth() + 1}/${dt.getDate()}`)); }
   } else if (mode === 'week') {
     // Weeks run Sunday → Saturday (matching the Calendar grid), so the last

@@ -5,6 +5,7 @@
  * native imports — unit-tested directly.
  */
 import { keyOf } from '../dates';
+import { computeHrv } from '../hrv';
 import { SYMPTOM_TYPES } from '../registry';
 import type { Entry } from '../types';
 import type { WaveformData } from '../waveforms';
@@ -125,6 +126,56 @@ export function mapSymptomPayload(payload: Record<string, unknown>): { dayKey: s
   return { dayKey: keyOf(date), entry };
 }
 
+
+/**
+ * A live HRV reading captured on a Garmin watch (schema v1).
+ *
+ * Unlike the Apple Watch — which streams nothing off the wrist and only ever
+ * sends summary results — Connect IQ hands us the raw beat-to-beat series, so
+ * this runs the SAME `computeHrv` pipeline a phone-side capture does. The
+ * reading is therefore indistinguishable downstream from one taken with a
+ * strap, which is the point: scoring, Analysis and Insights need no Garmin
+ * special case.
+ *
+ * `durationSec` is stamped from the watch's own elapsed time rather than
+ * inferred from the RR sum, because a shortfall between the two is exactly the
+ * dropped-beat signal `isTrustedReading` exists to catch.
+ */
+export function mapHrvPayload(payload: Record<string, unknown>): { dayKey: string; entry: Entry; waveform: WaveformData | null } | null {
+  if (!payload || payload.type !== 'hrv') return null;
+  const id = payload.id;
+  if (typeof id !== 'string' || !id) return null;
+  const schema = num(payload.schemaVersion);
+  if (schema == null || schema > 1) return null;
+  const date = new Date(String(payload.time));
+  if (isNaN(date.getTime())) return null;
+
+  const rr = Array.isArray(payload.rrMs)
+    ? (payload.rrMs as unknown[]).map(num).filter((v): v is number => v != null)
+    : [];
+  if (rr.length < 2) return null;
+
+  const durationSec = num(payload.elapsedSec) ?? Math.round(rr.reduce((a, b) => a + b, 0) / 1000);
+  const result = computeHrv(rr, { source: 'garmin', durationSec });
+
+  const entry: Entry = {
+    id,
+    type: 'hrv',
+    time: `${pad(date.getHours())}:${pad(date.getMinutes())}`,
+    startedAt: date.toISOString(),
+    period: typeof payload.period === 'string' ? payload.period : 'Other',
+    note: typeof payload.note === 'string' ? payload.note : '',
+    source: 'garmin',
+    durationSec,
+    schemaVersion: schema,
+  };
+  if (result.ok || Object.keys(result.fields).length) Object.assign(entry, result.fields);
+
+  // Waveforms never enter the journal — the raw RR goes to the sidecar, and
+  // rrClean is deliberately not stored (it is re-derived by correctArtifacts).
+  return { dayKey: keyOf(date), entry, waveform: { rrRaw: rr } };
+}
+
 export interface MappedWatch {
   section: 'readings' | 'symptoms';
   dayKey: string;
@@ -140,5 +191,7 @@ export function mapWatchPayload(payload: Record<string, unknown>): MappedWatch |
   if (ortho) return { section: 'readings', dayKey: ortho.dayKey, entry: ortho.entry, waveform: ortho.waveform };
   const sym = mapSymptomPayload(payload);
   if (sym) return { section: 'symptoms', dayKey: sym.dayKey, entry: sym.entry, waveform: null };
+  const hrv = mapHrvPayload(payload);
+  if (hrv) return { section: 'readings', dayKey: hrv.dayKey, entry: hrv.entry, waveform: hrv.waveform };
   return null;
 }

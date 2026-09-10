@@ -187,6 +187,76 @@ check('and does not become an event on their account alone',
 check('the baseline written in its place does see the next one',
   AL.diff(a0, AL.snapshot(ACT_MORE)).activations === 2);
 
+/* ------------------------------------------------------------- readings
+
+   The daily counter: not a first reading, a reading. It fires again tomorrow,
+   so a row counts install-DAYS, and its sensor letter names each install's
+   first reading of that day. Everything the activation counter learned applies
+   again, including the deploy case — and it needs its OWN gate, because the two
+   counters shipped on different days and one flag cannot answer for both. */
+
+const HRV_BASE = Object.assign({}, ACT_BASE, {
+  hrv: [
+    arow(D1, [[D1, 'I', 'G', 2], [D1, 'A', 'F', 1]]),
+    arow(D2, [[D1, 'I', 'B', 4]])
+  ]
+});
+
+const h0 = AL.snapshot(HRV_BASE);
+check('readings are counted whole', h0.readings === 7, String(h0.readings));
+check('and split by sensor, Garmin included',
+  JSON.stringify(h0.readingsBy) === JSON.stringify({ G: 2, F: 1, B: 4 }),
+  JSON.stringify(h0.readingsBy));
+check('a report with no hrv rows has zero readings, not undefined',
+  AL.snapshot(BASE).readings === 0 && JSON.stringify(AL.snapshot(BASE).readingsBy) === '{}');
+check('a reading from a build that predates the sensor letter still counts',
+  AL.snapshot({ open: [], sub: [], hrv: [arow(D1, [[D1, 'I', null, 3]])] }).readingsBy['?'] === 3);
+
+const HRV_MORE = Object.assign({}, HRV_BASE, {
+  hrv: HRV_BASE.hrv.concat([arow(D3, [[D1, 'I', 'W', 3]])])
+});
+const dHrv = AL.diff(h0, AL.snapshot(HRV_MORE));
+check('a new reading day is news', dHrv.readings === 3, String(dHrv.readings));
+check('and names the sensor', AL.sensorLine(dHrv.readingsBy) === '3 Apple Watch',
+  AL.sensorLine(dHrv.readingsBy));
+check('readings alone are enough to be an event', dHrv.any === true);
+check('a lost reading day is never a negative',
+  AL.diff(h0, AL.snapshot(ACT_BASE)).readings === 0);
+
+/* The deploy case, one counter down: a baseline that knows about activations
+   and not about readings must stay silent on readings and keep announcing
+   activations, which a single shared flag could not do. */
+const halfLegacy = AL.snapshot(ACT_BASE);
+delete halfLegacy.readings;
+delete halfLegacy.readingsBy;
+Object.keys(halfLegacy.days).forEach((k) => {
+  delete halfLegacy.days[k].readings;
+  delete halfLegacy.days[k].readingsBy;
+});
+const HALF_NEXT = Object.assign({}, HRV_MORE, { act: ACT_MORE.act });
+const dHalf = AL.diff(halfLegacy, AL.snapshot(HALF_NEXT));
+check('a baseline that predates the reading counter announces no readings',
+  dHalf.readings === 0, String(dHalf.readings));
+check('and still hears the counter it does know about',
+  dHalf.activations === 2, JSON.stringify(dHalf));
+
+/* ------------------------------------------------- confetti arithmetic
+
+   The canvas ranks nothing — all three celebrations run at once — so the only
+   thing left to pin here is how a COUNT becomes a duration. It halves each
+   time: two sales are 20s + 10s, three are 20 + 10 + 5. The series converges,
+   which is what stops a hundred of them wedging the canvas on for an hour. */
+check('a sale is twenty seconds, a new install ten, a return three',
+  AL.DURATION.sale === 20000 && AL.DURATION.download === 10000 && AL.DURATION.visit === 3000,
+  JSON.stringify(AL.DURATION));
+check('one event is its own base duration', AL.stackedMs(20000, 0, 1) === 20000);
+check('two stack at half', AL.stackedMs(20000, 0, 2) === 30000);
+check('three stack at half again', AL.stackedMs(20000, 0, 3) === 35000);
+check('an event landing on a celebration already counting two picks up the decay',
+  AL.stackedMs(20000, 2, 1) === 5000, String(AL.stackedMs(20000, 2, 1)));
+check('and the total can never exceed twice the base, however many arrive',
+  AL.stackedMs(20000, 0, 500) <= 40000, String(AL.stackedMs(20000, 0, 500)));
+
 /* -------------------------------------------------------------- report */
 
 let failed = 0;

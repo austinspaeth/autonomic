@@ -34,7 +34,7 @@
   /* lifecycle stages — validated as a set on the dark surface */
   --stage-trial: #00a08f;  /* green — still inside the free trial */
   --stage-past:  #c98500;  /* gold  — past the trial */
-  --stage-wall:  #c9403f;  /* red   — past the wall */
+  --stage-wall:  #c9403f;  /* red   — past the trial, on the free tier */
 
   /* status (reserved — never used as a series) */
   --good:     #0ca30c;
@@ -262,14 +262,125 @@ input[type="number"] { -moz-appearance: textfield; }
 .tile .value { font-size: 30px; line-height: 1.15; margin: 7px 0 2px; letter-spacing: -0.02em; }
 .tile .value.small { font-size: 24px; }
 .tile .meta { color: var(--text-muted); font-size: 12px; line-height: 1.45; }
-.tile .split { display: flex; gap: 14px; margin-top: 8px; font-size: 12px; color: var(--text-secondary); }
+/* Wraps because a tile can now carry four swatches (the active tile splits its
+   day two ways at once — returning/first-run and iOS/Android). Without the wrap
+   the fourth is squeezed off the end of a narrow tile rather than moving down. */
+.tile .split {
+  display: flex; flex-wrap: wrap; gap: 4px 14px;
+  margin-top: 8px; font-size: 12px; color: var(--text-secondary);
+}
 .tile .split b { font-weight: 600; color: var(--text-primary); }
+/* The stacked comparisons under a day tile: one row per baseline, the
+   percentage in its own column so three arrows line up and the eye can run
+   down them. The labels are muted — the number is the thing being read, the
+   baseline is what it is being read against. */
+.tile .deltas { margin-top: 8px; display: flex; flex-direction: column; gap: 3px; }
+.tile .deltas > div {
+  display: flex; align-items: baseline; gap: 7px;
+  font-size: 11.5px; color: var(--text-muted); line-height: 1.35;
+}
+.tile .deltas .delta { flex: none; min-width: 54px; font-size: 11.5px; }
 .delta { font-size: 12px; }
 .delta.up { color: var(--good); }
 .delta.down { color: var(--critical); }
 .delta.flat { color: var(--text-muted); }
 
+/* An all-time high. Outlined rather than filled: it sits beside the number
+   itself, and a solid block there competes with the one thing on the tile that
+   is meant to be read first. Green because it is unambiguously good news — the
+   same green a rising delta wears, since they are the same kind of statement at
+   two different distances. Deliberately NOT hidden on a condensed phone tile
+   the way the delta is (see below): "the best we have ever had" is the one
+   thing worth seeing without opening the tile. */
+.ath {
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--good);
+  border: 1px solid var(--good);
+  border-radius: 5px;
+  padding: 1px 4px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
 .swatch { width: 9px; height: 9px; border-radius: 3px; flex: none; display: inline-block; }
+
+/* ---------- condensed tiles (phones) ----------
+ *
+ * A stat tile on a phone is its label and its number, two to a row, and
+ * everything under the number is one tap away. The reasoning, and the FLIP that
+ * moves the neighbours out of the way, are in `toggleTile` in app.js — what
+ * lives here is the resting state of each half and the tween between them.
+ *
+ * `.tile-more` folds with an inline `max-height` written by the animation and
+ * cleared when it finishes, so the open state is `none` (free to reflow) and
+ * the closed state is 0. Nothing here may set a max-height an animation would
+ * have to fight.
+ *
+ * `.tiles-still` is the one frame the FLIP needs with no transition running.
+ * It has to beat `prefers-reduced-motion` and every rule below it, hence the
+ * importants: an inverted frame that animates is the animation played
+ * backwards. */
+/* Outside `.label` on purpose: the label is read as text (by the tests, and by
+   anything that treats a tile as a name and a number), and a glyph inside it
+   would become part of that name. */
+.tile-chev { display: none; }
+.tile-more { min-width: 0; }
+.cards.condensed .tile.has-more { position: relative; }
+
+/* The row is the containing block for the tile that leaves it — see
+   `toggleTile`, and the note there for why a tile that grows has to. */
+.cards.condensed { position: relative; }
+.cards.condensed .tile { transition: transform .42s cubic-bezier(.22, .78, .28, 1); }
+/* Out of flow for the length of the tween, and the only element on the page
+   whose box is animated outright. `overflow: hidden` is what turns the height
+   into the reveal: the body is already laid out at the full width underneath. */
+.cards.condensed .tile.tile-flying {
+  overflow: hidden;
+  transition: left .42s cubic-bezier(.22, .78, .28, 1),
+              top .42s cubic-bezier(.22, .78, .28, 1),
+              width .42s cubic-bezier(.22, .78, .28, 1),
+              height .42s cubic-bezier(.22, .78, .28, 1);
+}
+/* The stand-in holding that tile's slot. It draws nothing; its height is what
+   carries the tiles and the charts below the row down as the card opens. */
+.tile-ph { visibility: hidden; }
+.cards.condensed .tile-ph { transition: height .42s cubic-bezier(.22, .78, .28, 1); }
+.cards.condensed .tile.has-more { cursor: pointer; }
+.cards.condensed .tile > .tile-more {
+  overflow: hidden;
+  transition: max-height .42s cubic-bezier(.22, .78, .28, 1), opacity .26s ease;
+}
+.cards.condensed .tile:not(.expanded) > .tile-more { max-height: 0; opacity: 0; }
+.cards.condensed .tile.expanded > .tile-more { opacity: 1; }
+/* The chevron is the only thing that says a tile has a back to it. It turns
+   rather than swapping glyph, so the open and closed states are one object. */
+.cards.condensed .tile.has-more .tile-chev {
+  display: block; position: absolute; right: 11px; top: 11px;
+  color: var(--text-muted); font-size: 17px; line-height: 1;
+  transform: rotate(90deg); transform-origin: 50% 50%;
+  transition: transform .42s cubic-bezier(.22, .78, .28, 1), color .2s ease;
+}
+.cards.condensed .tile.has-more .label { padding-right: 16px; }
+.cards.condensed .tile.expanded .tile-chev { transform: rotate(270deg); color: var(--text-secondary); }
+/* Closed, the tile is a label and a number and nothing else — the inline
+   percentage goes with the rest of the detail, or the "no extra info" half of
+   the design is undone by the one line that sits inside the value. */
+.cards.condensed .tile:not(.expanded) .value { margin-bottom: 0; }
+.cards.condensed .tile:not(.expanded) .value .delta { display: none; }
+.cards.tiles-still .tile,
+.cards.tiles-still .tile-ph,
+.cards.tiles-still .tile > .tile-more,
+.cards.tiles-still .tile .tile-chev { transition: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  /* The fold still works; it simply arrives. */
+  .cards.condensed .tile,
+  .cards.condensed .tile-ph,
+  .cards.condensed .tile > .tile-more,
+  .cards.condensed .tile .tile-chev { transition: none; }
+}
 
 /* ---------- skeleton ----------
  *
@@ -389,6 +500,17 @@ tbody tr:hover { background: var(--surface-2); }
 }
 .section-title { font-size: 13px; font-weight: 600; margin: 0; letter-spacing: 0.02em; }
 .section-note { color: var(--text-muted); font-size: 12px; }
+
+/* A divider INSIDE one settings card, for the case where a card holds two
+   related things that must not be read as one — the Notifications card's
+   in-page half and its background half fail differently, and a reader who
+   merges them will believe a closed phone is covered when it is not. */
+.sub-head {
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+  margin-bottom: 8px;
+}
+.sub-head h3 { font-size: 13px; font-weight: 600; margin: 0; letter-spacing: 0.02em; }
 
 /* "Not knowable yet" is a first-class state and must never look like zero. */
 .na { color: var(--text-muted); }
@@ -600,6 +722,17 @@ code {
    corresponds to rather than a third palette nobody has learned. */
 .pill.green { color: var(--stage-trial); border-color: color-mix(in srgb, var(--stage-trial) 45%, transparent); }
 .pill.red { color: var(--stage-wall); border-color: color-mix(in srgb, var(--stage-wall) 45%, transparent); }
+/* Failure severity. `bad` is a crash — it reached the global handler, so the
+   app went down in front of somebody — and `warn` is "new on the last day",
+   which is the one thing on that table worth reacting to today. Two levels and
+   no more: a crash list where everything is coloured is a crash list nobody
+   reads twice. */
+.pill.bad { color: var(--stage-wall); border-color: color-mix(in srgb, var(--stage-wall) 45%, transparent); }
+.pill.warn { color: var(--warning); border-color: color-mix(in srgb, var(--warning) 45%, transparent); }
+
+/* Right-aligned numeric cells, so a column of counts can be compared down its
+   own edge rather than by reading each one. */
+th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 /* ---------- funnel ---------- */
 
@@ -746,6 +879,9 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { outline: 2px solid var
 .alert-card.sale { border-left: 3px solid var(--series-7); }
 .alert-card.download { border-left: 3px solid var(--series-3); }
 .alert-card.activation { border-left: 3px solid var(--series-6); }
+/* Magenta, the colour App usage gives the daily reading counter — deliberately
+   not the activation green beside it: one is a first, one is a habit. */
+.alert-card.reading { border-left: 3px solid var(--series-5); }
 .alert-mark { font-size: 20px; line-height: 1; flex: none; }
 .alert-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .alert-body b { font-size: 14px; }
@@ -991,14 +1127,51 @@ details.acc > summary .btn { user-select: none; }
   .topbar h1 { font-size: 17px; }
   .topbar .spacer { flex: 0 0 100%; height: 0; }
   .topbar .btn { padding: 6px 11px; font-size: 13.5px; }
-  /* Export anchors the left of the controls row; refresh and Edit data are
-     pushed to the right edge, so the row reads as a pair of groups rather than
-     three buttons drifting left with a gap after them. */
-  #btnRefresh { margin-left: auto; }
-  /* The refresh button drops its label and becomes a round icon: on a phone the
+  /* The alerts bell drops its label and becomes a round icon: on a phone the
      header is already carrying Export, its scope caret and Edit data. */
   .icon-btn { padding: 0; width: 34px; height: 34px; border-radius: 50%; justify-content: center; }
   .icon-btn .icon-btn-label { display: none; }
+  /* The controls row splits: Export owns the left edge, the bell and Edit data
+     are pushed to the right one. Refresh is out of flow down in the corner (see
+     below), so the bell is the first of the pair and carries the gap — left
+     alone the three sat bunched at the left with a ragged void beside them, on
+     a row whose right edge is where a thumb already is. */
+  #btnAlerts { margin-left: auto; }
+
+  /* Refresh leaves the header entirely and becomes a floating action button in
+     the bottom-right corner.
+     It is the most-pressed control on the page and it was the smallest and the
+     furthest from a thumb — a 34px circle in a top corner, on a view you have
+     usually scrolled a long way down. Down here it is reachable without
+     re-scrolling, it is a comfortable 56px target, and it no longer competes
+     for the header row with Export and Edit data. It sits above the alert card
+     stack's corner but below the sheet layer, and it respects the home
+     indicator via `safe-area-inset-bottom`. */
+  #btnRefresh {
+    position: fixed;
+    right: 22px;
+    bottom: calc(26px + env(safe-area-inset-bottom, 0px));
+    z-index: 60;
+    width: 56px; height: 56px;
+    border-radius: 50%;
+    padding: 0;
+    justify-content: center;
+    background: var(--series-1);
+    color: #fff;
+    border: none;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, .45), 0 2px 6px rgba(0, 0, 0, .3);
+  }
+  #btnRefresh .refresh-icon { width: 24px; height: 24px; }
+  #btnRefresh .icon-btn-label { display: none; }
+  /* The disabled/busy state is a spin, and it must not also grey out to the
+     point of vanishing against the page — this button is now the only thing in
+     that corner. */
+  #btnRefresh[data-busy="true"] { color: #fff; opacity: .75; }
+  /* The alert cards dock in the same corner; lift the whole dock clear of the
+     button so a card is never hidden behind it. The dock is the positioned
+     element — `#alertStack` is the scroller inside it and has no offsets of its
+     own, so moving that would have done nothing. */
+  .alert-dock { bottom: calc(94px + env(safe-area-inset-bottom, 0px)); }
   /* Export sits at the right of the header on a desktop and at the left of the
      controls row on a phone, so its popover has to hang the other way — anchored
      right it runs off the left edge of the screen. */
@@ -1041,6 +1214,12 @@ details.acc > summary .btn { user-select: none; }
   .grid { gap: 12px; }
   .tile .value { font-size: 27px; }
   .tile .value.small { font-size: 22px; }
+  /* Two columns, always: the measurement in `layoutTiles` divides the row by
+     this, so a phone gets a pair of tiles per line and a small tablet still
+     gets three or four. */
+  .cards { --tile-min: 148px; }
+  .cards.condensed .tile { padding: 12px 12px 13px; }
+  .cards.condensed .tile:not(.expanded) .label { font-size: 12px; }
 
   .gate { padding: 20px; }
   .gate-code { gap: 8px; }
