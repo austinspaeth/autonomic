@@ -8,8 +8,8 @@ keywords: "nervous system dysregulation, autonomic dysregulation, dysautonomia, 
 date: 2026-09-11
 updated: 2026-09-11
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1506126613408-eca07ce68773?q=80&w=1760&auto=format&fit=crop"
-photoAttribution: "Jared Rice / Unsplash"
+photoLocation: "https://images.unsplash.com/photo-1517669375942-946a1f02d705?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb&dl=christopher-lemercier-12yvdCiLaVE-unsplash.jpg&w=1920"
+photoAttribution: "Christopher Lemercier / Unsplash"
 tldr: "Nervous system dysregulation means your autonomic nervous system spends too much time in the sympathetic 'fight or flight' state and does not swing back to parasympathetic 'rest and digest' the way it should. You cannot feel the balance directly, but you can measure it: low and unstable HRV, an elevated resting heart rate, and a big heart-rate jump on standing all point the same way. It is common after viral illness and in POTS, it is not a personality flaw or 'just anxiety', and it tends to settle slowly. Track the weekly trend, not any single reading, and discuss changes with a clinician."
 categories:
   - basics
