@@ -31,7 +31,8 @@
   $: primaryCat = meta.categories?.[0];
   // Canonical is always the primary-topic URL, matching every link to this article.
   $: canonical = `https://autonomic.care/insights/${primaryCat ?? 'basics'}/${meta.slug}/`;
-  $: ogImage = meta.photoLocation || 'https://autonomic.care/og.png';
+  // Scrapers need an absolute og:image, so a cover served from this site gets the origin.
+  $: ogImage = meta.photoLocation ? (meta.photoLocation.startsWith('/') ? `https://autonomic.care${meta.photoLocation}` : meta.photoLocation) : 'https://autonomic.care/og.png';
   $: authorSlug = writerSlug(meta.author);
   $: bio = getWriter(authorSlug)?.about;
   $: extraCats = (meta.categories ?? []).slice(1);
