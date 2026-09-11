@@ -27,6 +27,9 @@ import { SafeAreaInsetsContext } from 'react-native-safe-area-context';
 import { getState, getWaveform, blankDay, __devSwapState } from '../../src/store/store';
 import { MED_TYPES } from '../../src/lib/registry';
 import { addDays, fmtDateLong, todayKey } from '../../src/lib/dates';
+import { buildBudget } from '../../src/lib/budget';
+import { BudgetSheet } from '../../src/features/budget/BudgetSheet';
+import { SheetPill, SheetPillButton } from '../../src/components/Sheet';
 import { scoreSet, scoreCat, OUTLOOK_GUIDE } from '../../src/lib/scoring/day';
 import type { Protocol, AppState } from '../../src/lib/types';
 import { radius, usePalette } from '../../src/theme';
@@ -170,6 +173,58 @@ export function SleepNightScreen() {
             <Text style={{ color: p.textDim, fontSize: 14 }}>No night recorded. Import the journal first.</Text>
           )}
         </ScrollView>
+      </View>
+    </View>
+  );
+}
+
+/* ---------- Scene · the pacing sheet, open over today ---------- */
+
+/**
+ * The app's own `BudgetSheet` over the same shifted journal as the hero scene,
+ * inside the sleep scene's sheet stand-in. The budget is built exactly as the
+ * Journal builds it, with two asks taken out of the frame: steps count as
+ * granted (a simulator has no Health permission to read back) and the
+ * notification card is cleared by granting the simulator's permission.
+ */
+export function PacingSheetScreen() {
+  const p = usePalette();
+  const { dk, ready } = useDayAsToday(HERO_DK);
+  const budget = useMemo(() => {
+    if (!ready) return null;
+    const s = getState();
+    return buildBudget(s, dk, { sex: s.profile?.sex, height: s.profile?.height }, {
+      now: new Date(), addDays, downturn: false, strain: null, past: false, stepsGranted: true,
+    });
+  }, [ready, dk]);
+
+  return (
+    <View style={{ width: DESIGN_W, height: DESIGN_H, backgroundColor: p.bg }}>
+      <StatusBar />
+      <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: p.overlay }} />
+      <View style={{
+        position: 'absolute', left: 0, right: 0, bottom: 0, top: 52,
+        backgroundColor: p.surface, borderColor: p.border, borderWidth: StyleSheet.hairlineWidth,
+        borderTopLeftRadius: 18, borderTopRightRadius: 18, overflow: 'hidden',
+      }}>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ padding: 18, paddingTop: 24, paddingBottom: 40 }}
+          showsVerticalScrollIndicator={false}
+          scrollEnabled={false}
+        >
+          {budget ? (
+            <BudgetSheet
+              dk={dk}
+              budget={budget}
+              markHint="The white mark is where you are in the day. Short, energy in reserve. Past, running out."
+            />
+          ) : null}
+        </ScrollView>
+        {/* The sheet's own close pill, at the sheet's own offsets (headerPill). */}
+        <SheetPill lone style={{ position: 'absolute', top: 10, right: 14 }}>
+          <SheetPillButton icon="x" size={18} onPress={() => {}} label="Close" />
+        </SheetPill>
       </View>
     </View>
   );
@@ -472,16 +527,16 @@ function JournalNavBar({ active = 'Journal' }: { active?: string }) {
 
 /**
  * Scene 1 · "See your nervous system recover" — the REAL Journal day view over
- * the user's OWN journal, on the day it reads best: Sat 8 Aug 2026.
+ * the user's OWN journal, on the day of the latest export: Thu 10 Sep 2026.
  *
  * Unlike the crafted scenes below, nothing here is authored. The imported
- * journal is swapped in with every day key SHIFTED forward so 8 Aug lands on
+ * journal is swapped in with every day key SHIFTED forward so 10 Sep lands on
  * today, which is the only way the Journal can show it as "Today" — the score,
  * the streak, the trend card and the milestone count all recompute from real
  * history rather than being posed. Days after 8 Aug are dropped, so nothing on
  * screen depends on data the shifted "today" would not have had.
  */
-const HERO_DK = '2026-08-08';
+const HERO_DK = '2026-09-10';
 
 /**
  * Swap the journal so `sourceDk` reads as today: every day key shifts forward by

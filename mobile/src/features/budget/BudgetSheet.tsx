@@ -157,7 +157,7 @@ function NotifyCard({ dk }: { dk: string }) {
  * 1. Today
  * ------------------------------------------------------------------ */
 
-function TodayCard({ dk, budget }: { dk: string; budget: BudgetView }) {
+function TodayCard({ dk, budget, markHint }: { dk: string; budget: BudgetView; markHint?: string }) {
   const p = usePalette();
   const { openSheet } = useSheets();
   const state = useAppState();
@@ -274,7 +274,7 @@ function TodayCard({ dk, budget }: { dk: string; budget: BudgetView }) {
             }} />
           </View>
           <Text style={{ flex: 1, fontSize: 12.5, lineHeight: 18, color: p.textDim }}>
-            The white mark is where you are in the day. Short of it, energy in reserve. Past it, running out.
+            {markHint ?? 'The white mark is where you are in the day. Short of it, energy in reserve. Past it, running out.'}
           </Text>
         </View>
       ) : null}
@@ -634,7 +634,11 @@ function footerLine(budget: BudgetView): string {
 
 
 
-export function BudgetSheet({ dk, budget }: { dk: string; budget: BudgetView; controls?: SheetControls }) {
+export function BudgetSheet({ dk, budget, markHint }: {
+  dk: string; budget: BudgetView; controls?: SheetControls;
+  /** Screenshot scenes only: replaces the pace-mark explainer line. */
+  markHint?: string;
+}) {
   const p = usePalette();
   const isToday = dk === todayKey();
   const sub = isToday ? `${fmtDateLong(dk).split(',')[0]}, ${clock(nowMin())}` : fmtDateLong(dk);
@@ -665,7 +669,7 @@ export function BudgetSheet({ dk, budget }: { dk: string; budget: BudgetView; co
         </InsightCard>
       ) : (
         <>
-          <TodayCard dk={dk} budget={budget} />
+          <TodayCard dk={dk} budget={budget} markHint={markHint} />
           {budget.state !== 'suppressed' ? <SpendCard dk={dk} budget={budget} /> : null}
           <WhyCard dk={dk} budget={budget} />
         </>

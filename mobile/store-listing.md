@@ -10,70 +10,93 @@ Console *configuration* (products, offers, price changes) is not here — that i
 
 ## Submission checklist — 1.28.0
 
-What changed since the listings were last written (1.25.1): **the pacing budget**
-(1.28), the redesigned Outlook card and free POTS captures (1.27), and wider
-Garmin watch support (1.26). None of it is in the live listings, and the pacing
-budget is the first feature since Insights that is worth rewriting the top of
-the description for, so both descriptions below are rewritten rather than
-patched.
+**Where the stores stood when this was written (checked 2026-09-10):** the App
+Store is on **1.27.0** as "Autonomic: HRV & POTS Tracker". Google Play shows
+"Autonomic Journal: HRV & POTS" with the short description "HRV, POTS & symptom
+journal for long covid recovery. Private and on device." Build 75 (1.28.0) is
+uploaded to App Store Connect, and the Android 1.28.0 bundle (versionCode 40) is
+in `mobile/dist/`.
 
-**Check what actually shipped before pasting the release notes.** The notes
-below cover 1.26 through 1.28 as one release, which is right if the store is
-still on 1.25.x. If 1.26 or 1.27 went out, delete the bullets that already
-went with them.
+**What this revision is for.** Pacing is now a core part of the product and the
+thing we compete on, so both listings are rewritten around it for search, not
+patched to mention it. Two store facts decide where each word goes:
 
-**App Store Connect** — needs a version submission, so it rides the 1.28.0 build:
+- **Apple indexes only the name, the subtitle, the keyword field and in-app
+  purchase display names.** The description is never searched; it only persuades
+  somebody who has already opened the page. So pacing terms go in the subtitle
+  and keywords, and the App Store description is written to convert.
+- **Google Play indexes the title, the short description and the full
+  description.** Pacing terms have to appear naturally in all three. The Play
+  description says "pacing" 8 times, "long covid" and "ME/CFS" 3 times each, and
+  "PEM", "energy" and "dysautonomia" twice each. Play penalises keyword stuffing,
+  so do not push those counts higher.
 
-- [ ] **Description** → replace wholesale with the block below (3,965/4,000).
-      **The Terms of Use / Privacy Policy lines at the end are not optional and
-      never get trimmed for space.** 1.25.1 was rejected (Guideline 3.1.2) by
-      Apple's automated metadata check because a wholesale description paste
-      dropped them: the app sells auto-renewable subscriptions, so a functional
-      EULA link must be in the App Description itself. In-app links on the
-      paywall and in Settings do not satisfy the check, and neither does the
-      Privacy Policy URL field. Trim a bullet instead.
-- [ ] **Keywords** → replace (98/100). `chest,strap` out, `pem,fatigue` in — see
-      the note under the keyword block. Keywords only change with a version
-      submission, and this is the submission.
-- [ ] **What's New** → the 1.28 block below.
-- [ ] **Promotional text** (165/170) — rewritten around the budget. Updatable any
-      time without review, so it can go up the moment the copy is agreed.
+**Never name a competitor in any listing field.** Apple rejects other apps'
+names in metadata (Guideline 2.3.7) and Play's metadata policy bans them too.
+The copy positions against Visible without naming it: "no armband to buy", "not
+a points score", "the watch you already own". Their name belongs in Apple Search
+Ads keywords and on the website's comparison table, never here.
+
+**App Store Connect** (rides the 1.28.0 build):
+
+- [ ] **Before changing anything, write down the current subtitle and keyword
+      field.** Neither is recorded in the repo, and a ranking drop can only be
+      traced and reversed against what was there.
+- [ ] **Subtitle** → `Pacing for Long COVID & ME/CFS` (30/30). The biggest single ASO change in
+      this revision; see the note under it.
+- [ ] **Keywords** → set A (97/100) if the subtitle changes, set B (95/100) if it
+      does not. Keywords only change with a version submission, and this is one.
+- [ ] **Name** → unchanged: `Autonomic: HRV & POTS Tracker` (29/30).
+- [ ] **Description** → replace wholesale (3,957/4,000). **The Terms of Use /
+      Privacy Policy lines at the end are not optional and never get trimmed for
+      space.** 1.25.1 was rejected under Guideline 3.1.2 by Apple's automated
+      metadata check because a wholesale paste dropped them: the app sells
+      auto-renewable subscriptions, so a functional EULA link must be in the App
+      Description itself. Trim a bullet instead.
+- [ ] **What's New** → the 1.28 block below. 1.27 is already live, so it no
+      longer repeats the Outlook, free POTS capture and Garmin bullets.
+- [ ] **Promotional text** (151/170). Updatable any time without review, so it
+      can go up now.
+- [ ] **In-App Event** "New: Your Pacing Budget" (see Promotion). Events show in search
+      results, which the description never does.
+- [ ] **App Review notes** → the block below.
+- [ ] **Screenshots and app preview** → the plan below. The first three phone
+      shots and the first watch shot are new work.
 - [ ] **App Information → License Agreement** → unchanged: `mobile/EULA.md` as a
       Custom License Agreement for all countries, `[LEGAL NAME]` /
       `[MAILING ADDRESS]` / `[PHONE]` filled in.
-- [ ] **App Review notes** → the block below, updated for the pacing budget and
-      its one-week window (a reviewer on a fresh install sees the budget live,
-      which is what you want them to see, but the note has to say why).
-- [ ] **Screenshots** → see the plan at the end of this section. Three new
-      phone shots and one new watch shot; this is the part with real work in it.
 
-**Google Play** — the listing needs no binary, so it can go up before or after:
+**Google Play** (listing text needs no binary, so it can go up before or after):
 
-- [ ] **Short description** → replace (80/80). Names pacing, keeps ME/CFS,
-      carries no price or promotional wording (Play rejected a previous line for
-      the word "Free").
-- [ ] **Full description** → replace wholesale (3,965/4,000).
-- [ ] **Release notes** → the 1.28 Play variant below (497/500).
-- [ ] **Feature graphic** → optional, but the current one predates the budget.
+- [ ] **Title** → `Autonomic: HRV, POTS & Pacing` (29/30). Read the note under it first.
+- [ ] **Short description** → replace (76/80).
+- [ ] **Full description** → replace wholesale (3,986/4,000).
+- [ ] **Release notes** → the 1.28 Play variant below (463/500).
+- [ ] **Feature graphic** → redo around the pacing bar (plan below).
+- [ ] **Custom store listing** for pacing searches (see Promotion).
 
-**Unchanged, don't touch:** app name, subtitle, prices, privacy labels /
-data-safety answers (the app still collects nothing), and the Health Connect
-justification at the end of this file. **Steps changed nothing there**: the
-pacing budget reads steps through the existing HealthKit / Health Connect
-grants, `READ_TYPES` in `src/lib/health/healthConnect.ts` already covered them,
-and nothing is written back that was not written back before.
+**Unchanged, don't touch:** prices, privacy labels / data-safety answers (the app
+still collects nothing), and the Health Connect justification at the end of this
+file. Steps and stand time are read through the existing HealthKit / Health
+Connect grants, and nothing is written back that was not written back before.
 
-**Two claims in this copy are load-bearing and must stay true in the app** (they
-are the same boundary `CLAUDE.md` says five places state, so moving one moves
-all of them):
+**Claims in this copy that must stay true in the app** (the same boundary
+`CLAUDE.md` says five places state, so moving one moves all of them):
 
-- **"Every install gets a free week of the pacing budget."** That is
-  `src/lib/pacingTrial.ts`: ONE seven-day window per install, stamped lazily at
-  the first launch where the tier is actually free. If that window is ever
-  removed, this sentence comes out of both descriptions and the App Review note
-  on the same day.
+- **"14 days of full access on install, then one more free week of pacing."**
+  14 days is `TRIAL_DAYS` (`src/lib/tier.ts`). The week is
+  `src/lib/pacingTrial.ts`: ONE seven-day window per install, stamped at the
+  first launch where the tier is actually free, which for a new install is the
+  day the 14 days end. If either changes, both descriptions, the What's New and
+  the App Review note change the same day.
 - **Nothing here promises unlimited capture as a Pro benefit.** Capture is free
   on every tier; Pro is what the app makes of the readings.
+- **Pacing alerts are Pro** (`isPacingUnlocked` in `src/store/pacingAlerts.ts`)
+  and are local notifications. The copy calls them optional and never promises
+  they arrive the instant something happens: a locked iPhone reads Health as
+  empty, so on iOS an alert usually lands after the next unlock.
+- **"On a day that reads as a downturn, no number is published"** is the
+  suppression rule in `src/lib/budget/`. If it is ever relaxed, that bullet goes.
 
 **Not a listing change, but must be true before the build is live** — see
 `STORE_SETUP.md`:
@@ -109,45 +132,93 @@ updated anytime (they go through a short content review, no binary needed).
 
 # App Store (iOS + watchOS)
 
-## Promotional text (165/170 chars)
+## Name (29/30 chars) — unchanged
 
-For long covid, POTS and dysautonomia. Take a 5-minute HRV reading, then let it set your pacing budget for the day, in minutes of effort, fitted to your own history.
+Autonomic: HRV & POTS Tracker
 
-## Keywords (98/100 chars)
+Keep it. "HRV", "POTS" and "tracker" are the words it already ranks on, and "pots
+tracker" is one of the searches the marketing plan targets. Pacing goes in the
+subtitle rather than pushing one of those out.
 
-long,covid,hrv,heart,rate,variability,pots,dysautonomia,orthostatic,watch,rmssd,pacing,pem,fatigue
+## Subtitle (30/30 chars)
 
-Changed for 1.28: `chest,strap` out, `pem,fatigue` in. The strap is a thing this
-app WORKS WITH, and nobody looking for help searches for it — where "pacing",
-"PEM" and "fatigue" are what the people this release is for actually type. The
-rest is unchanged and still covers the intent that matters.
+Pacing for Long COVID & ME/CFS
 
-Standing notes: single words, not phrases (ASC recombines them and spaces waste
-chars); any word already in the App Store *name* or *subtitle* is indexed from
-there and is wasted here (on Play the app name is
-"Autonomic Journal: HRV & POTS", so `hrv` and `pots` would be dead weight in an
-equivalent field); do **not** add "free", Apple indexes the price separately.
-The next terms worth buying if space frees up are `cfs`, `vagus` and `energy`.
+After the name, the subtitle carries the most search weight, and it is the line
+printed under the name in search results: the one sentence a stranger reads
+before deciding to tap. This puts the words the pacing audience actually types
+("pacing", "long covid", "ME/CFS") in the second-strongest field, and frees
+about 20 characters of the keyword field for new terms. Apple splits "ME/CFS"
+into "me" and "cfs".
 
-## What's New (1.28, App Store — 1,203/4,000 chars)
+If the current subtitle carries "dysautonomia", nothing it ranks for is lost:
+keyword set A below already includes it.
+
+**Alternative**, if long covid should stay out of the subtitle:
+`Energy Pacing & Dysautonomia` (28/30), paired with keyword set B.
+
+## Keywords (100 chars max)
+
+**Set A, with the new subtitle (97/100):**
+
+dysautonomia,orthostatic,pem,fatigue,energy,spoons,crash,heart,rate,variability,garmin,tachycardia
+
+**Set B, if the subtitle is not changed (95/100):**
+
+long,covid,pacing,pem,cfs,dysautonomia,orthostatic,fatigue,energy,spoons,heart,rate,variability
+
+Set B assumes the current subtitle does not already contain those words. Delete
+any word it does contain and spend the space on `crash` or `watch`.
+
+What changed from the 1.25 field, and why:
+
+- `pacing` and `long,covid` move up into the subtitle (set A), where they rank
+  harder than they ever could here.
+- `energy`, `spoons` and `crash` are new. They are how people with ME/CFS and
+  long covid describe the problem pacing answers ("spoon theory", "energy
+  envelope", "push and crash"), and none of them is in the name or subtitle.
+- `tachycardia` is new, for POTS searches. `orthostatic`, `dysautonomia`, `pem`,
+  `fatigue`, `watch` and `heart,rate,variability` stay.
+- `rmssd` is out: almost nobody searches for it, and HRV searches already match
+  `hrv` in the name.
+
+Standing notes: single words, no spaces (Apple combines them with the name and
+subtitle, so `heart,rate,variability` also matches "heart rate variability");
+never repeat a word from the name or subtitle; never add "free" (Apple indexes the
+price separately) or a competitor's name (Guideline 2.3.7).
+
+## Promotional text (151/170 chars)
+
+New: a daily pacing budget for long covid, ME/CFS and POTS. Your morning readings set how much today can take, in minutes of effort. No armband to buy.
+
+Not indexed for search, but it is the first paragraph on the product page and
+changes any time without review. After the launch month, swap to an evergreen
+line: `Pacing, HRV and POTS testing in one private journal. Your readings set a daily budget in minutes of effort, fitted to you. No armband, no account.` (146/170).
+
+## What's New (1.28, App Store — 1,090/4,000 chars)
 
 NEW: your daily pacing budget.
 
-Your readings set a budget for today in minutes of effort, fitted to your own history rather than to a textbook number. It counts the whole day, not just what you log: workouts, steps, time on your feet, and the minutes your heart spends above your own exertion line. Legs up and breathwork buy minutes back.
+Your readings set a budget for today in minutes of effort, fitted to your own history rather than a textbook number or a points score. It counts the whole day, not just what you log: workouts, steps, time on your feet, and the minutes your heart spends above your own exertion line. Legs up and breathwork buy minutes back.
 
-A pace marker on your Outlook card shows where you are in the day, so what is left means something at 9am and at 6pm. It tells you how often its estimate held, week by week, so you can judge it for yourself. And on a day it reads as a downturn it publishes no number at all, because a small budget on a bad day is still an invitation to spend it.
+A pace marker on your Outlook card shows where an even day would be by now, so what is left means something at 9am and at 6pm. Tap it to see where the minutes went. Because PEM arrives late, every estimate is checked against how the next two days went, and the app shows you how often it held. On a day that reads as a downturn, it publishes no number at all.
 
-It is on your Journal, in two new home screen widgets, and on your Apple Watch. Every install gets a free week of it.
+Optional pacing alerts tell you when you are running ahead of pace, nearly spent, over budget, or when your heart rate stays high.
 
-Also in this release:
-• A redesigned Autonomic Outlook card: your score now shows how it is trending against your own recent days
-• POTS stand tests and episode captures are now part of the free plan. Reading the graded result stays part of Pro
-• Wider Garmin watch support: the companion app now runs on a much wider range of Garmin watches
-• Faster Progress and Insights, and fixes throughout
+It is on your Journal, in two new home screen widgets, and on your Apple Watch. The pacing budget is part of Autonomic Pro, and every install gets a free week of it.
 
-### Play Store variant (1.28, Android, 497/500 chars)
+Also in this release: faster Progress and Insights, and fixes throughout.
 
-NEW: your daily pacing budget. Your readings set a budget for today in minutes of effort, fitted to your own history. It counts the whole day: workouts, steps, time on your feet, and minutes above your own exertion line. Legs up and breathwork buy minutes back, and a pace marker shows where you are in the day. On your Journal and in two new home screen widgets.
+### Play Store variant (1.28, Android, 463/500 chars)
+
+New: your daily pacing budget. Your readings set a budget for today in minutes of effort, fitted to your own history. It counts the whole day: workouts, steps, time on your feet, and minutes above your own exertion line. Legs up and breathwork buy minutes back, a pace marker shows where you are in the day, and optional alerts tell you when you are ahead of pace, nearly spent or over. On your Journal and in two new home screen widgets.
+
+Also: fixes throughout.
+
+If Play is still on 1.26 or earlier when this ships, it has not announced the
+1.27 changes either. Then use this instead (497/500):
+
+New: your daily pacing budget. Your readings set a budget for today in minutes of effort, fitted to your own history. It counts the whole day: workouts, steps, time on your feet, and minutes above your own exertion line. Legs up and breathwork buy minutes back, and a pace marker shows where you are in the day. On your Journal and in two new home screen widgets.
 
 Also: a redesigned Outlook card, POTS stand tests and episodes free on every plan, wider Garmin watch support, and fixes throughout.
 
@@ -219,78 +290,83 @@ Also:
 • Medication doses accept units again
 • Keyboard and Progress scrolling fixes
 
-## Description (3,965/4,000 chars)
+## Description (3,957/4,000 chars)
 
-See your nervous system actually recover.
+Written to convert, not to rank: Apple never indexes it. Only the first three
+lines show before "more", so they carry the pacing pitch, who it is for, and the
+no-armband, no-account promise.
 
-Autonomic turns a chest strap, your Apple Watch, or your finger over the camera into a full HRV lab, grades every reading against published thresholds, and turns what it learns into a daily pacing budget fitted to you.
+Know how much today can take.
 
-Built for the long haul: long covid and post viral recovery, POTS and dysautonomia, ME/CFS, and anyone rebuilding their nervous system.
+Autonomic sets a daily pacing budget for long covid, ME/CFS, POTS and dysautonomia from your own morning readings and history, and turns a chest strap, Apple Watch, Garmin or your phone's camera into a full HRV lab graded against published thresholds.
 
-Free to use, no account, no ads, no tracking. 14 days of full access on install, then the core stays free forever.
+No armband to buy, no account, no ads, no tracking. 14 days of full access on install, then the journal and live HRV stay free forever.
 
 
-NEW: YOUR DAILY PACING BUDGET
+YOUR DAILY PACING BUDGET
 
-• A budget for today in minutes of effort, fitted to your own readings and history, never a textbook number
-• It counts the whole day, not just what you log: workouts, steps, time on your feet, and minutes above your own exertion line
+• Think spoons, but measured: a budget for today in minutes of effort, fitted to your own history, not a points score
+• It counts the whole day, not just what you log: workouts, steps, time upright, and minutes above your own exertion line
+• Standing still counts too, read from your own stand test, because upright time costs most with POTS
 • Legs up and breathwork buy minutes back
-• A pace marker shows where you are in the day, so what is left means something at 9am and at 6pm
-• It goes quiet when it should: on a day that reads as a downturn, no number is published at all
-• It tells you how often its estimate held, week by week, and it is on your widgets and your Apple Watch too
+• A pace marker shows where an even day would be by now, so you can ease off before the day runs out
+• Optional alerts when you run ahead of pace, nearly spend your budget, go over, or your heart rate stays high
+• PEM arrives late, so every estimate is checked against the next two days, and you see how often it held
+• On a day that reads as a downturn, no number is published at all
+• On your Journal, widgets, Apple Watch, and in the report you take to your doctor
 
 
 LIVE 5-MINUTE HRV, DONE RIGHT
 
-• Capture beat-to-beat RR intervals from a chest strap, Apple Watch, Garmin, or your finger on the camera
-• A guided 5:00 session with paced breathing (4/6 resonance), live heart rate, SDNN and your beat-to-beat trace as it runs
-• Every metric computed on-device: SDNN, RMSSD, pNN50, PNS & SNS index, Baevsky stress index, LF/HF, coherence and more
-• Artifacts are flagged and corrected, and a noisy reading refuses to fake a score
+• Beat-to-beat RR intervals from a chest strap, Apple Watch, Garmin, or your finger on the camera
+• A guided 5:00 session with paced breathing, live heart rate, SDNN and your beat-to-beat trace
+• Computed on-device: SDNN, RMSSD, pNN50, PNS & SNS index, stress index, LF/HF, coherence and more
+• Artifacts are corrected, and a noisy reading refuses to fake a score
 
 
 EVERY NUMBER GRADED, NO BLACK BOX
 
 • Every number scored great / good / ok / warning / crash against real thresholds
-• One daily Autonomic Score that rolls up HRV, sleep, symptoms, blood pressure and more
-• A plain-language outlook: what your body is ready for, from a full workout to a rest day
-• An early heads-up when your own markers drift: slower heart-rate recovery, a higher resting or overnight heart rate, a bigger standing rise
+• One daily Autonomic Score across HRV, sleep, symptoms, blood pressure and more
+• A plain-language outlook, from a full workout to a rest day
+• An early heads-up when your own markers drift: slower heart rate recovery, a higher resting or overnight heart rate, a bigger standing rise
 
 
-POTS TESTING ON YOUR WRIST: THE APPLE WATCH APP
+POTS TESTING ON YOUR WRIST
 
-• A guided lie-and-stand test: rest, stand when it taps you, and watch your live delta against baseline
-• One tap from the watch face captures a POTS Episode: baseline, the climb, and 60 seconds of recovery
+• A guided lie-and-stand test on your Apple Watch or a chest strap, with your live delta against baseline
+• One tap captures a POTS episode: baseline, the climb, and 60 seconds of recovery
 
 
 TRACK EVERYTHING, KEEP YOUR STREAK
 
-• Water, meals and food triggers, meds and supplements, symptoms, activities, sleep, blood pressure, stand tests and digestion
-• Define your own "clean day" (hydration, sleep, meds, triggers) and build a streak, with your longest run and a 30 day consistency rate
-• Tap a night for its full sleep report: stages, overnight heart rate and breathing, and how it compares with recent nights
+• Water, meals and triggers, meds and supplements, symptoms, activities, sleep, blood pressure and digestion
+• Your own "clean day" streak, with your longest run and 30 day consistency
+• A sleep report for every night: stages, overnight heart rate and breathing
 
 
 FIND WHAT HELPS OR HURTS
 
-• Insights: an on-device read of your own log that finds what is linked to what, and how sure it is
+• Insights reads your log on-device to find what is linked to what, and how sure it is
 
 
 YOUR DATA NEVER LEAVES YOUR PHONE
 
-• 100% offline-first: no account, no cloud, no ads. You own your data and can export it anytime
-• Reads HRV, resting HR, sleep, workouts and blood pressure from Apple Health, and writes back only what you ask
+• Offline-first: no account, no cloud, no ads. Export everything anytime
+• Reads HRV, heart rate, steps, sleep, workouts and blood pressure from Apple Health, and writes back only what you ask
 
 
 WHAT'S FREE, WHAT'S PRO
 
-Free forever: unlimited live HRV captures, POTS stand tests and episodes, journaling, manual readings, your daily score and outlook, the Apple Watch HR monitor, 14 days of charts and full export. Every install also gets one free week of the pacing budget.
+Free forever: unlimited live HRV captures, POTS stand tests and episodes, journaling, manual readings, your daily score and outlook, the Apple Watch HR monitor, 14 days of charts and full export.
 
-Autonomic Pro adds the pacing budget, week / month / year progress, full historical analysis, Insights, POTS results and AI doctor reports. It is $7.99/month or $49.99/year, billed to your Apple ID and renewing automatically until cancelled. Cancel anytime in your App Store settings.
+Autonomic Pro adds the pacing budget and pacing alerts, week / month / year progress, full history, Insights, POTS results and AI doctor reports. Every install starts with 14 days of full access, then one more free week of pacing. Pro is $7.99/month or $49.99/year, billed to your Apple ID and renewing automatically until cancelled. Cancel anytime in your App Store settings.
 
 Terms of Use: https://autonomic.care/terms-of-service/
 Privacy Policy: https://autonomic.care/privacy-policy/
 
 
-IMPORTANT: Autonomic is a personal journal and education tool, not a medical device. It does not diagnose or treat any disease. Always discuss protocol or medication changes with your doctor.
+IMPORTANT: Autonomic is a personal journal and education tool, not a medical device. It does not diagnose or treat any disease, and the pacing budget is an estimate from your own data, not an activity prescription. Always discuss protocol or medication changes with your doctor.
 
 ## App Review notes (freemium submission)
 
@@ -316,6 +392,10 @@ IMPORTANT: Autonomic is a personal journal and education tool, not a medical dev
 > and it is presented as a personal journal estimate, not medical advice or an
 > activity prescription.
 >
+> Pacing alerts (Settings → Notifications) are local notifications raised on the
+> device from the same estimate. Nothing is sent to a server, and they only run
+> while the pacing budget is unlocked (Pro, the install trial, or its free week).
+>
 > No demo account is needed. HRV capture works without hardware via the camera
 > (finger over the rear lens); a chest strap, Apple Watch or Garmin watch is
 > optional.
@@ -325,61 +405,180 @@ IMPORTANT: Autonomic is a personal journal and education tool, not a medical dev
 The scenes that produce these live on the `screenshots` branch
 (`mobile/app/screenshots/`, dev only): journal, breathing (+ a Play cut with no
 Apple Watch), measure, insights, sleep, plan, trust, payoff, understand, live.
-**There is no pacing scene yet** — that is the one piece of new work here.
-Shoot the phone shots on an iPhone 17 Pro Max simulator, which captures at
-1320 × 2868 (the required 6.9" size).
+**There are no pacing scenes yet**: phone shots 1, 2, 3 and 5 and the first two
+watch shots are new work. Build them from the demo journal's numbers, never real
+personal data.
 
-**Three new phone shots, and they carry this release:**
+**The first three shots carry the listing.** App Store search results show only
+the first three portrait screenshots, and on Play the first two or three are
+what a scrolling visitor sees. Between them they have to say: pacing, the whole
+day counted, and that it works without opening the app. Each caption is a short
+headline plus an optional smaller line, in the app's type over the brand
+background. Captions reuse the words from the subtitle and keywords (pacing,
+energy, POTS, long covid); Apple has been reported to read caption text for
+search since 2025, and whether or not it does, the captions are what converts.
 
-1. **The Outlook card with the pacing strip, mid-afternoon.** Shoot the AHEAD
-   (gold) state, not green and not over: gold is the only one where the pace
-   marker is doing visible work, and the fill sitting past the mark is the whole
-   idea in one picture. Caption: "Your day, in minutes of effort." Never shoot
-   the red/over state as a hero — the first thing a stranger sees should not be
-   the app telling somebody off.
-2. **The pacing sheet.** Budget bar with the marker, "1h 41m spent of 2h 10m",
-   the three tiles, and "Where Budget Went" below with three or four real rows
-   (a workout, steps, time on your feet). Caption: "It counts the whole day,
-   not just what you log."
-3. **The widgets.** The small Pacing and the medium PacingDetail on a home
-   screen, over the brand background. Caption: "On your home screen." This is
-   also the shot that says the feature is not something you have to open the app
-   for.
+Keep every caption free of outcome promises ("prevent crashes", "stop PEM"):
+both stores treat those as medical claims.
 
-Then the existing carousel, reordered so the new work is above the fold (the
-first three tiles are what show in search results):
+### iPhone (6.9", 1320 × 2868, up to 10)
 
-4. Live HRV session (current hero — it stays, it is what the app IS)
-5. Autonomic Score / Outlook
-6. Insights
-7. Sleep report
-8. Watch panel: watch mockups, caption "POTS testing on your wrist"
-9. Privacy
+No iPad set is needed: `supportsTablet` is false. Shoot on an iPhone 17 Pro Max
+simulator, which captures at the required size.
 
-**Apple Watch screenshots are REQUIRED** now that the bundle contains a watchOS
-app. Capture on the largest watch simulator (Ultra 49mm or Series 10 46mm,
-Cmd+S saves a correctly sized PNG); the largest size covers the smaller slots.
+1. **Pacing hero: the Outlook card with the pacing strip, mid-afternoon, AHEAD
+   of pace (gold).** Gold is the one state where the pace marker is visibly
+   doing work, and the fill sitting past the mark is the whole idea in one
+   picture. Never the red over state here: the first thing a stranger sees
+   should not be the app telling somebody off.
+   Caption: **"Know how much today can take"** / "A daily pacing budget, in
+   minutes of effort"
+2. **Where it went: the pacing sheet.** The bar and marker, the Budget / Spent /
+   Left tiles, and "Where Budget Went" with four rows: minutes above the heart
+   rate line, upright time, a logged walk, and recovery time giving minutes back
+   in green.
+   Caption: **"It counts your whole day"** / "Steps, time upright, heart rate
+   and workouts"
+3. **Outside the app: the home screen with the Pacing (small) and Pacing Detail
+   (medium) widgets, and a pacing alert banner at the top** ("Budget nearly
+   spent").
+   Caption: **"Pace without opening the app"** / "Widgets, alerts and your Apple
+   Watch"
+4. **Live HRV session** (the current hero; it stays in the top five, it is what
+   the app is).
+   Caption: **"A 5-minute HRV reading, done right"**
+5. **The trust shot: the budget sheet's "how often it held" readout, beside an
+   Upright time drill-in with its hourly bars.** This is the direct answer to
+   "why would I believe a number about my energy".
+   Caption: **"It shows you how often it held"** / "Checked against the next
+   two days"
+6. **Autonomic Score / Outlook** with graded metrics.
+   Caption: **"Every number graded"**
+7. **POTS stand test**, standing phase.
+   Caption: **"POTS testing on your wrist"**
+8. **Insights.** Caption: **"Find what helps or hurts"**
+9. **Sleep report.** Caption: **"Every night, fully read"**
+10. **Privacy.** Caption: **"Your data never leaves your phone"** / "No
+    account, no cloud, no ads"
 
-Watch carousel (in order — the pacing view is new and goes FIRST, because it is
-the only wrist screen you look at without having decided to test something):
+Shots 4 and 6 to 10 reuse existing scenes: reorder and re-caption them.
 
-1. **Pacing on the wrist** — the bar with its marker and the Spent / Budget
-   tiles. Shoot it in the same gold state as the phone hero so the two read as
-   one feature.
-2. Stand test, standing phase — big live delta (stage ~+34, orange/red) with countdown
-3. POTS Episode picker (Stairs / Sit to stand / Lay to stand)
-4. Episode 60s recovery screen with live delta
-5. HR Monitor — big number + 2-min average + delta
-6. Home screen with the three modes
+### App preview video (optional, strongly recommended)
 
-**Play phone shots** are the same list minus the Apple Watch panel, with the
-Play cut of the breathing scene (no watch in frame). The feature graphic
-(1024×500) predates the budget; if it is being redone, the pacing bar is the
-one graphic element in this app that reads at that size.
+One portrait preview, 20 to 30 seconds, 886 × 1920, recorded from the simulator
+(no people, no hands): a morning reading finishes → the Outlook card shows
+today's budget → the bar fills through the day and crosses the pace marker →
+tap into Where Budget Went → a pacing alert arrives → the widget on the home
+screen. A preview autoplays muted in search results in place of the first
+screenshot, so the pacing bar must be on screen in the first three seconds, with
+"Know how much today can take" burned in as text.
 
-**Audit anything still live** for captions reading "7-day free trial" (it is 14
-days now), a "1 / day" capture row (the cap is gone), or a locked POTS capture
-(captures are free on every tier since 1.27).
+### Apple Watch (required: the bundle ships a watch app)
+
+Capture on the largest watch simulator (Ultra 49mm, or Series 46mm); Cmd+S
+saves a correctly sized PNG, and the largest size covers the smaller slots. No
+captions: there is no room, and phone shot 3 names the watch. Pacing goes first
+because it is the wrist screen people check without deciding to test anything.
+
+1. **Pacing on the wrist**: bar, marker, Spent and Budget tiles, in the same gold
+   state as the phone hero so the two read as one feature.
+2. **Watch home** with Pacing as the first row and today's figure under it.
+3. Stand test, standing phase: big live delta (~+34, orange/red) with the
+   countdown.
+4. POTS Episode picker (Stairs / Sit to stand / Lay to stand).
+5. Episode 60s recovery screen with live delta.
+6. HR Monitor: big number, 2-minute average, delta.
+
+### Google Play phone (up to 8, 9:16, 1080 × 1920 or larger)
+
+At least four screenshots at 1080 px or more on the short side keep the listing
+eligible for Play's larger promotional placements. **No Apple Watch or iPhone
+may appear in any Play image**; use the Play cut of the breathing scene.
+
+1. Pacing hero (iPhone 1)
+2. Where it went (iPhone 2)
+3. **An Android home screen with the Pacing and Pacing Detail widgets, and a
+   pacing alert in the notification shade.** Caption: **"Pace without opening
+   the app"** / "Widgets and alerts"
+4. Live HRV from a strap or the camera, no watch in frame
+5. How often it held (iPhone 5)
+6. Autonomic Score
+7. POTS stand test with a chest strap
+8. Privacy
+
+Insights and the sleep report drop off Play for space; the description still
+covers them.
+
+### Google Play feature graphic (1024 × 500, required)
+
+The pacing bar with its white pace marker, large, over the brand background,
+with the wordmark and one line: "Know how much today can take". No screenshot,
+no device frame, and nothing important within about 15% of any edge (Play crops
+it and draws a play button over the middle when a promo video is set). No "new",
+"free" or "best" in it either: Play's metadata policy covers text in graphics.
+
+### Audit anything already live
+
+Captions reading "7-day free trial" (it is 14 days), a "1 / day" capture row (the
+cap is gone), a locked POTS capture (captures have been free since 1.27), and any
+Apple device in a Play screenshot.
+
+---
+
+## Promotion (both stores)
+
+### App Store In-App Event: the pacing launch
+
+Events appear in App Store search results and on the product page, and Apple can
+feature them, so this puts pacing in front of people searching who never opened
+the page. Type **Major Update**, priority High, from release for up to 31 days.
+
+- Event name (23/30): `New: Your Pacing Budget`
+- Short description (40/50): `Know how much today can take, in minutes`
+- Long description (108/120): `Your morning readings set a daily pacing budget for long covid, ME/CFS and POTS, fitted to your own history.`
+- Event card media 1920 × 1080 and details media 1080 × 1920: the pacing hero,
+  with no text over it (Apple overlays the event name).
+- Deep link: none. The budget is on the Journal, which is where the app opens.
+
+### Custom Product Pages (App Store) and custom store listings (Play)
+
+- **App Store custom product page "Pacing"**: phone shots 1, 2, 3 and 5 first,
+  the launch promotional text. Link it to the keywords `pacing`, `energy`, `pem`,
+  `spoons` and `crash` so organic searches for those land on it, and use it as
+  the page behind the pacing Search Ads group.
+- **App Store custom product page "POTS"**: stand test, episode capture, the
+  watch panel, the Outlook. Link it to `pots`, `orthostatic`, `tachycardia` and
+  `dysautonomia`.
+- **Play custom store listing "Pacing"**, targeted at pacing search keywords, with
+  the same screenshots.
+
+### Experiments (one variable at a time, at least 7 days each)
+
+- **App Store Product Page Optimization**: the new pacing-first screenshot order
+  against the old HRV-first order.
+- **Play store listing experiment**, short description A (the default above)
+  against B, `Energy pacing, HRV & POTS symptom journal for long covid & ME/CFS. Private.` (75/80).
+
+### Apple Search Ads
+
+Exact match, one ad group per theme; the pacing group uses the "Pacing" custom
+product page.
+
+- **Pacing:** `pacing app`, `energy pacing`, `pem`, `me cfs app`, `long covid
+  app`, `spoon theory`, `heart rate pacing`
+- **Competitor:** `visible app`, `visible pacing`, `welltory`, `bearable`. Bidding
+  on a competitor's name is allowed in Search Ads. The ad text is generated from
+  our own metadata, so nothing we write names them.
+- **POTS** (existing): `pots tracker`, `pots app`, `dysautonomia`, `orthostatic`
+
+### In-app purchase display names (App Store, indexed for search)
+
+Subscription display names are indexed and show on the product page. If they are
+plain "Monthly" / "Yearly", rename them to carry pacing, for example
+`Pro Yearly: Pacing & Insights` (29/30) and `Pro Monthly: Pacing & Insights` (30/30), in
+App Store Connect → Subscriptions → each product → Localization. The change is
+reviewed with the next version; read `STORE_SETUP.md` before touching the
+subscription group.
 
 ---
 
@@ -392,88 +591,94 @@ blank-line breaks renders most reliably.
 
 ## App name (29/30 chars)
 
-Autonomic Journal: HRV & POTS
+**Recommended:** Autonomic: HRV, POTS & Pacing
 
-## Short description (80/80 chars)
+**Currently live:** Autonomic Journal: HRV & POTS
 
-HRV, POTS and pacing journal for long covid, ME/CFS and dysautonomia. On-device.
+The title is the heaviest ranking signal on Play, and pacing is the one core term
+not in it. The swap drops "Journal", which stays in the short description and
+appears six times in the full description, so "hrv journal" and "pots journal"
+searches still match. Expect a week or two of ranking movement after any Play
+title change, so make it together with the new short and full description and
+let it happen once. It also brings the Play name close to the App Store's
+"Autonomic: HRV & POTS Tracker".
 
-Play's metadata policy bars promotional or price wording from the listing
-fields — the previous version was rejected for the word "Free" — and the word is
-not needed anyway: Play labels the app Free on the install button and the
-subscription price is stated in the full description, which is where Play wants
-it. This line trades "symptom journal" for "pacing" and "ME/CFS", the two terms
-this release is worth being found for.
+## Short description (76/80 chars)
 
-## Full description (3,965/4,000 chars)
+Pacing, HRV & POTS journal for long covid, ME/CFS & dysautonomia. On-device.
 
-See your nervous system actually recover.
+Replaces the live "HRV, POTS & symptom journal for long covid recovery. Private
+and on device." It adds pacing, ME/CFS and dysautonomia. "Symptom" moves to the
+full description (four times) and so does "private". No price or promotional
+wording: Play's metadata policy bars it from the listing fields, and a previous
+version was rejected for the word "Free". The B variant for an experiment is
+under Promotion.
 
-Autonomic turns a Bluetooth heart rate strap, or just your finger over your phone's camera, into a full HRV lab, grades every reading against published thresholds, and turns what it learns into a daily pacing budget fitted to you.
+## Full description (3,986/4,000 chars)
 
-Built for the long haul: long covid and post viral recovery, POTS and dysautonomia, ME/CFS, and anyone rebuilding their nervous system.
+Section breaks are single blank lines here, unlike the App Store copy; Play
+renders them the same, and it is what fits the limit.
 
-Free to use, no account, no ads, no tracking. 14 days of full access on install, then the core stays free forever.
+Know how much today can take.
 
+Autonomic is a pacing app and HRV journal for long covid, ME/CFS, POTS and dysautonomia. Your morning readings and history set a daily pacing budget in minutes of effort, and a Bluetooth heart rate strap, Garmin watch or your phone's camera becomes a full HRV lab graded against published thresholds.
 
-NEW: YOUR DAILY PACING BUDGET
+No armband to buy, no account, no ads, no tracking. 14 days of full access on install, then the journal and live HRV stay free forever.
 
-• A budget for today in minutes of effort, fitted to your own readings and history, never a textbook number
-• It counts the whole day, not just what you log: workouts, steps, time on your feet, and minutes above your own exertion line
+ENERGY PACING FOR PEM, LONG COVID AND ME/CFS
+
+• Think spoons, but measured: a budget for today in minutes of effort, fitted to your own history, not a points score
+• It counts the whole day, not just what you log: workouts, steps, time upright, and minutes above your own exertion line
+• Standing still counts too, read from your own stand test, because upright time costs most with POTS and dysautonomia
 • Legs up and breathwork buy minutes back
-• A pace marker shows where you are in the day, so what is left means something at 9am and at 6pm
-• It goes quiet when it should: on a day that reads as a downturn, no number is published at all
-• It tells you how often its estimate held, week by week, and it is on your home screen widgets too
-
+• A pace marker shows where an even day would be by now, so you can stay inside your energy envelope
+• Optional pacing alerts when you run ahead of pace, nearly spend your budget, go over, or your heart rate stays high
+• PEM arrives late, so every estimate is checked against the next two days, and you see how often it held
+• On a day that reads as a downturn, no number is published at all
+• On your Journal, home screen widgets, and in your doctor report
 
 LIVE 5-MINUTE HRV, DONE RIGHT
 
-• Capture beat-to-beat RR intervals from a Bluetooth chest strap, your Garmin watch, or your phone's camera using your finger
-• A guided 5:00 session with paced breathing (4/6 resonance), live heart rate, SDNN and your beat-to-beat trace as it runs
-• Every metric computed on-device: SDNN, RMSSD, pNN50, PNS & SNS index, Baevsky stress index, LF/HF, coherence and more
-• Artifacts are flagged and corrected, and a noisy reading refuses to fake a score
-
+• Beat-to-beat RR intervals from a Bluetooth chest strap, Garmin watch, or your finger on the camera
+• A guided 5:00 session with paced breathing, live heart rate, SDNN and your beat-to-beat trace
+• Every HRV metric computed on-device: SDNN, RMSSD, pNN50, PNS & SNS index, stress index, LF/HF, coherence and more
+• Artifacts are corrected, and a noisy reading refuses to fake a score
 
 EVERY NUMBER GRADED, NO BLACK BOX
 
 • Every number scored great / good / ok / warning / crash against real thresholds
-• One daily Autonomic Score that rolls up HRV, sleep, symptoms, blood pressure and more
-• A plain-language outlook: what your body is ready for, from a full workout to a rest day
-• An early heads-up when your own markers drift: slower heart-rate recovery, a higher resting or overnight heart rate, a bigger standing rise
-
+• One daily Autonomic Score across HRV, sleep, symptoms, blood pressure and more
+• A plain-language outlook, from a full workout to a rest day
+• An early heads-up when your own markers drift: slower heart rate recovery, a higher resting or overnight heart rate, a bigger standing rise
 
 POTS AND ORTHOSTATIC TESTING
 
-• A guided lie-and-stand test with a chest strap: rest, stand when it tells you, and watch your live delta against baseline
-• Capture a POTS Episode the moment one starts: baseline, the climb, and 60 seconds of recovery
+• A guided lie-and-stand test with a chest strap and your live heart rate delta
+• Capture a POTS episode the moment it starts: baseline, the climb, and 60 seconds of recovery
 
+SYMPTOM JOURNAL AND STREAKS
 
-TRACK EVERYTHING, KEEP YOUR STREAK
-
-• Water, meals and food triggers, meds and supplements, symptoms, activities, sleep, blood pressure, stand tests and digestion
-• Define your own "clean day" (hydration, sleep, meds, triggers) and build a streak, with your longest run and a 30 day consistency rate
-• Tap a night for its full sleep report: stages, overnight heart rate and breathing, and how it compares with recent nights
-• Milestones, so recovery actually adds up
-
+• Water, meals and triggers, meds and supplements, symptoms, activities, sleep, blood pressure and digestion
+• Your own "clean day" streak, with your longest run and 30 day consistency
+• A sleep report for every night: stages, overnight heart rate and breathing
+• Milestones, so recovery from long covid or ME/CFS adds up
 
 FIND WHAT HELPS OR HURTS
 
-• Insights: an on-device read of your own log that finds what is linked to what, and how sure it is
-
+• Insights reads your log on-device to find what is linked to what, and how sure it is
 
 YOUR DATA NEVER LEAVES YOUR PHONE
 
-• 100% offline-first: no account, no cloud, no ads. You own your data and can export it anytime
-• Reads HRV, resting HR, sleep, workouts and blood pressure from Health Connect, and writes back only what you ask
-
+• Offline-first: no account, no cloud, no ads. Export everything anytime
+• Reads HRV, heart rate, steps, sleep, workouts and blood pressure from Health Connect, and writes back only what you ask
 
 WHAT'S FREE, WHAT'S PRO
 
-Free forever: unlimited live HRV captures, POTS stand tests and episodes from a chest strap, journaling, manual readings, your daily Autonomic Score and outlook, 14 days of progress charts, and backup and export. Every install also gets one free week of the pacing budget.
+Free forever: unlimited live HRV captures, POTS stand tests and episodes from a chest strap, the symptom journal, manual readings, your daily Autonomic Score and outlook, 14 days of charts, backup and export.
 
-Autonomic Pro adds the pacing budget, week / month / year progress, full historical analysis, Insights, POTS results and AI doctor reports. It is $7.99 per month or $49.99 per year, billed through Google Play. Subscriptions renew automatically until cancelled; manage or cancel anytime in Google Play > Subscriptions.
+Autonomic Pro adds the pacing budget and pacing alerts, week / month / year progress, full history, Insights, POTS results and AI doctor reports. Every install starts with 14 days of full access, then one more free week of pacing. Pro is $7.99 per month or $49.99 per year, billed through Google Play. It renews automatically until cancelled in Google Play > Subscriptions.
 
-IMPORTANT: Autonomic is a personal journal and education tool, not a medical device. It does not diagnose or treat any disease. Always discuss protocol or medication changes with your doctor.
+IMPORTANT: Autonomic is a personal journal and education tool, not a medical device. It does not diagnose or treat any disease, and the pacing budget is an estimate from your own data, not an activity prescription. Always discuss protocol or medication changes with your doctor.
 
 ## Play graphics checklist
 

@@ -1,0 +1,78 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Autonomic, pacing launch event media</title>
+<!--
+  In-App Event (App Store) and Promotional content (Play) media for the pacing
+  launch. Same picture as feature-graphic-pacing.html, minus every word: both
+  stores forbid text in event images, and Apple draws the event name over the
+  card itself.
+
+  One file, three sizes, chosen by query string: ?w=1920&h=1080 (Apple card +
+  Play primary), ?w=1080&h=1920 (Apple details page), ?w=1080&h=1080 (Play
+  square). The bar sits above centre so it clears Play's 20% bottom safe zone
+  and the title Apple overlays on the lower part of the card.
+
+  Bar geometry is the feature graphic's, scaled by one factor: the AHEAD state
+  of src/features/budget/Bar.tsx, gold (#eab308) past the white pace marker.
+-->
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { overflow: hidden; background: #0b0b0c; }
+  .wrap { position: relative; overflow: hidden; background: #0b0b0c; }
+  .glow { position: absolute; inset: 0; }
+  .bar { position: absolute; left: 50%; }
+  .track { position: absolute; inset: 0; border-radius: 999px; background: rgba(255, 255, 255, 0.09); }
+  .fill { position: absolute; left: 0; top: 0; bottom: 0; width: 58%; border-radius: 999px; background: #eab308; }
+  .mark { position: absolute; left: 46%; border-radius: 999px; background: #f2f2f5; z-index: 2; }
+  .caret { position: absolute; left: 46%; z-index: 2; width: 0; height: 0; border-left-color: transparent; border-right-color: transparent; border-style: solid; border-top-width: 0; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="glow"></div>
+    <div class="bar" aria-hidden="true">
+      <div class="track"></div>
+      <div class="fill"></div>
+      <div class="mark"></div>
+      <div class="caret"></div>
+    </div>
+  </div>
+<script>
+  const q = new URLSearchParams(location.search);
+  const W = +q.get('w') || 1920, H = +q.get('h') || 1080;
+  const px = (n) => n + 'px';
+  const $ = (s) => document.querySelector(s);
+
+  // Wider share of the frame when the frame is narrow, so the bar reads at
+  // the same weight on a phone-shaped details page as on the landscape card.
+  const share = W > H ? 0.56 : W === H ? 0.7 : 0.76;
+  const barW = Math.round(W * share);
+  const s = barW / 560; // the feature graphic's bar is 560 x 14
+
+  document.documentElement.style.width = document.body.style.width = px(W);
+  document.documentElement.style.height = document.body.style.height = px(H);
+  Object.assign($('.wrap').style, { width: px(W), height: px(H) });
+
+  const cy = Math.round(H * 0.42);
+  const unit = Math.max(W, H) / 1024;
+  $('.glow').style.background =
+    `radial-gradient(${px(620 * unit)} ${px(320 * unit)} at 50% ${px(cy)}, rgba(234, 179, 8, 0.11), rgba(234, 179, 8, 0) 70%),` +
+    `radial-gradient(${px(700 * unit)} ${px(380 * unit)} at 50% ${px(H * 0.08)}, rgba(224, 49, 39, 0.07), rgba(224, 49, 39, 0) 70%)`;
+
+  const barH = 14 * s;
+  Object.assign($('.bar').style, { width: px(barW), height: px(barH), marginLeft: px(-barW / 2), top: px(cy - barH / 2) });
+  $('.fill').style.boxShadow = `0 0 0 ${px(4 * s)} rgba(234, 179, 8, 0.16), 0 0 ${px(22 * s)} rgba(234, 179, 8, 0.45)`;
+  Object.assign($('.mark').style, {
+    top: px(-7 * s), bottom: px(-7 * s), width: px(4 * s), marginLeft: px(-2 * s),
+    boxShadow: `0 0 0 ${px(1 * s)} rgba(11, 11, 12, 0.35)`,
+  });
+  Object.assign($('.caret').style, {
+    top: px(19 * s), marginLeft: px(-9 * s),
+    borderLeftWidth: px(9 * s), borderRightWidth: px(9 * s), borderBottomWidth: px(10 * s),
+    borderBottomColor: '#f2f2f5',
+  });
+</script>
+</body>
+</html>
