@@ -105,6 +105,116 @@ users are actively looking for a home and pacing is now a reason to be it.
 **Standing rule from the plan, unchanged: never name a competitor in ad
 creative.** Bidding the brand is fine; a comparison page is the landing surface.
 
+## 3a. Five more ad groups, ranked by what they're likely to return
+
+Pacing is the release, but it isn't the only pool the app can honestly answer
+and isn't the only one sitting undefended. These are in descending order of
+expected value, not of volume — the top two are the ones to open next.
+
+### A. Orthostatic testing at home — the best pool in this document
+
+```
+nasa lean test
+poor mans tilt table test
+tilt table test at home
+stand test pots
+standing test heart rate
+orthostatic vitals
+orthostatic intolerance
+orthostatic hypotension app
+heart rate when standing up
+```
+
+`nasa lean test` and `poor mans tilt table test` are what the POTS and ME
+communities actually call the thing, they are typed by someone mid-diagnosis
+with nowhere to record the result, and the app does exactly this on a watch or a
+strap. Nobody is bidding on them because they don't look like app queries. This
+is the closest thing here to free money.
+
+### B. Device owners — Welltory's proven pool
+
+```
+polar h10 app
+polar h10 hrv
+polar h10 hrv app
+garmin hrv app
+hrv app for garmin
+apple watch hrv app
+hrv app for apple watch
+chest strap hrv app
+hrv monitor app
+```
+
+`COMPETITOR_INTEL.md` §1 records Welltory running programmatic device landing
+pages (`/devices/garmin-hrv-app`, `/devices/apple-watch-hrv-app`). They built
+those because the pool converts: somebody who owns an H10 has already bought the
+hardware and is looking for software. Autonomic supports all three sources and
+1.26 widened Garmin substantially, so the claim is true.
+
+### C. No wearable required — the camera
+
+```
+hrv app without watch
+measure hrv with phone
+hrv camera app
+heart rate variability app iphone
+hrv app no chest strap
+```
+
+The counter-position to Visible, whose own users call the free tier "pretty
+useless without the armband" (`COMPETITOR_INTEL.md` §2) — and to every HRV app
+that assumes a wearable. Cheap, and the landing story is one screenshot.
+
+### D. Nervous system & vagus — high volume, soft intent
+
+```
+vagus nerve app
+vagal tone
+vagal tone app
+nervous system regulation app
+dysregulated nervous system
+nervous system reset
+polyvagal app
+hrv biofeedback
+resonance breathing
+coherent breathing
+```
+
+Bigger pool, vaguer intent, more wellness tourists — so cap bids low and judge
+it purely on cost-per-trial. `hrv biofeedback` and `resonance breathing` are the
+two with real intent, and the 4/6 paced session answers them literally.
+
+### E. Comorbid & adjacent conditions
+
+```
+mcas
+mcas tracker
+eds app
+ehlers danlos app
+hypermobility tracker
+chronic illness tracker
+chronic illness symptom tracker
+symptom tracker for doctor
+```
+
+`mcas` and `eds` are already nominated in the plan's organic keyword field and
+the comorbidity overlap with POTS is large. `symptom tracker for doctor` is
+worth its own line because the doctor report is a Pro feature and that query is
+somebody with an appointment booked.
+
+### F. Brand defence — do this regardless
+
+```
+autonomic
+autonomic app
+autonomic journal
+autonomic tracker
+```
+
+`WEEK_1.md` §1.4 already makes this case: near-zero cost because nobody else
+bids your name, and it pins the #1 slot above the unrelated apps that currently
+outrank you on your own word while organic catches up.
+
 ## 4. Discovery
 
 Keep one Discovery / search-match campaign at ~10% of spend, as the plan says.
@@ -148,6 +258,12 @@ The three that will do real damage if left out:
   the advertising budget behind it.
 
 Also negative `free`, `hack`, `mod` as a matter of course.
+
+**Add the `pacer` block as EXACT negatives, not broad, and scope them to the
+pacing campaign.** A broad negative on `pacer` also blocks `breathing pacer`,
+and a broad `pedometer` or `step counter` collides with nothing today but will
+the moment the step-based pool in §3a is worth testing. Exact negatives kill the
+pedometer traffic without taking the adjacent terms with them.
 
 ---
 
@@ -206,7 +322,13 @@ Two blind spots to know about before reading any of it:
   books churn on the cancellation date, which will overstate it for exactly as
   long as it takes someone to change their mind. When one reverses, clear the
   `cancelled` date on that row rather than adding a second purchase — a new row
-  double-counts the payer.
+  double-counts the payer. **Proceeds are what tell the two apart**: a reversed
+  cancel bills at the original renewal date, a resubscribe after expiry bills
+  immediately. A reactivation with money attached is the second kind, and it is
+  the better one — somebody lost access, felt it, and paid again.
+
+**The date to compare is the EXPIRY, not the cancellation.** They can be a month
+apart, and everything below keys off the expiry.
 
 What the app *can* tell you is which offer did it: an `oac` ping with the annual
 letter on the day of a reactivation means the half-price annual card closed it,
@@ -241,3 +363,37 @@ do for free. If reactivations turn out to be a repeating pattern rather than a
 coincidence, a lapse-triggered offer is a new module beside `annual.ts` and
 `founder.ts` with its own trigger, per the rule in `CLAUDE.md` — not a fifth
 milestone bolted onto this one.
+
+---
+
+## 10. 1.28 manufactures a seven-day cancel-to-return loop. Watch for it.
+
+`src/lib/pacingTrial.ts` stamps its seven-day window at **the first launch where
+the tier is actually free** — which for a lapsing subscriber is the day they
+lapse. So from 1.28 onward the shape of a churned user is:
+
+> expire → seven days of the pacing budget, free → it locks → decide.
+
+**A reactivation exactly seven days after an expiry is that window closing**, not
+a coincidence, and it is the one gap length with a mechanical cause. Any other
+gap is a person.
+
+Two consequences for reading the numbers over the next fortnight:
+
+1. **The first wave arrives in a clump.** Free installs get the window on the
+   launch that brings them the build, so everybody who updates in the same few
+   days expires in the same few days. Expect a step up in pacing paywall hits
+   about a week after the release goes live, and do not read it as the feature
+   failing — it is the trial cohort landing together. It decays into a trickle
+   as updates spread out.
+2. **The counter that shows it is `pay` letter `B`.** The pacing paywall surface
+   sends `B`, capped once per install per Eastern day, so a spike in `pay/B`
+   seven days after release is the window closing en masse. **This only works if
+   the ping lambda is deployed** — `B` is a new letter and a decoder that
+   predates it drops the ping outright rather than degrading, which looks
+   identical to nobody hitting the wall. That item is still unticked in
+   `../mobile/store-listing.md`.
+
+Worth stating plainly because it cuts the other way too: a reactivation that
+happens *before* 1.28 is live on a store cannot be this. Check the release date
+against the expiry before crediting the feature with a win it wasn't there for.
