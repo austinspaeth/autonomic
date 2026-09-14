@@ -246,9 +246,16 @@ async function dropSubscription(sub) {
 /* --------------------------------------------------------------- the sending */
 
 /** Send one notification to every subscription, dropping the dead ones.
- *  Returns `{ sent, dropped, failed }`. Never throws: one bad endpoint must not
- *  cost the others their notification, or a single stale device would silence
- *  the phone that is still listening. */
+ *  Returns `{ sent, dropped, failed, statuses }`. Never throws: one bad
+ *  endpoint must not cost the others their notification, or a single stale
+ *  device would silence the phone that is still listening.
+ *
+ *  `statuses` is the distinct set of rejection codes, and it exists because
+ *  the counters cannot say WHY. A 403 (the keypair does not match what this
+ *  device subscribed against) and a 400 (a malformed request) are different
+ *  problems with different fixes, and "failed: 1" sends whoever is holding the
+ *  phone to CloudWatch to learn which — for a feature whose entire diagnostic
+ *  surface is meant to be the settings card. */
 async function sendToAll(subs, payload) {
   const keys = await loadKeys();
   if (!keys) return { sent: 0, dropped: 0, failed: 0, unconfigured: true };
@@ -260,6 +267,7 @@ async function sendToAll(subs, payload) {
   webpush.setVapidDetails(keys.subject, keys.publicKey, keys.privateKey);
 
   let sent = 0; let dropped = 0; let failed = 0;
+  const statuses = new Set();
   const body = JSON.stringify(payload);
 
   await Promise.all(subs.map(async (sub) => {
@@ -282,11 +290,12 @@ async function sendToAll(subs, payload) {
         return;
       }
       failed += 1;
+      statuses.add(status || (err && err.message) || 'unknown');
       console.error('push send failed', status || (err && err.message));
     }
   }));
 
-  return { sent, dropped, failed };
+  return { sent, dropped, failed, statuses: [...statuses] };
 }
 
 /* ------------------------------------------------------------------ handler */

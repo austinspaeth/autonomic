@@ -717,6 +717,32 @@ const pushTest = async (email, payload = {}) => {
     tag: 'autonomic-test',
     url: '/master/',
   });
+
+  /* A rejection is reported with its CODE. The counters say a send failed;
+     only the code says what to do about it, and a card that makes its reader
+     open CloudWatch to find out is not a diagnostic. */
+  if (!result.sent && result.dropped) {
+    return {
+      ...result,
+      ok: false,
+      targeted: !!wanted,
+      devices: all.length,
+      error: 'The push service says this device is gone, so its registration has been removed. Turn background alerts on again here.',
+    };
+  }
+  if (!result.sent && result.failed) {
+    const code = result.statuses[0];
+    return {
+      ...result,
+      ok: false,
+      targeted: !!wanted,
+      devices: all.length,
+      error: code === 403
+        ? 'The push service rejected the signature (403). This device subscribed against a different keypair than the server now holds — turn background alerts off and on again here.'
+        : `The push service rejected it (${code}).`,
+    };
+  }
+
   return { ok: result.sent > 0, targeted: !!wanted, devices: all.length, ...result };
 };
 
