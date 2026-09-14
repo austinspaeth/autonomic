@@ -102,3 +102,55 @@ export function stampImportedHrvCoverage(
   }
   return stamped;
 }
+
+/* ---------- how good an imported sample was ---------- */
+
+/**
+ * The quality of the beat series behind an imported HRV sample.
+ *
+ * `computeHrv` already runs at import time (that is where the sample's metrics
+ * come from), so the artifact rate and its verdict are free at exactly the
+ * moment they are worth having. They ride the candidate to the offer sheet and
+ * are then stamped on the entry, the same three numbers a live capture keeps.
+ *
+ * Absent means UNKNOWN, never clean: an SDNN-only sample carries no series to
+ * grade, and a candidate built by a build before this shipped carries nothing.
+ */
+export interface ImportedHrvQuality {
+  /** % of beats the artifact correction had to replace. */
+  artifactPct: number;
+  confidence: 'high' | 'fair' | 'low';
+  /** Clean beats behind the numbers. */
+  beatCount: number;
+}
+
+/**
+ * Artifact rate above which an importable reading is called poor quality.
+ *
+ * Deliberately the `confidence` ladder's own 'fair' bar rather than the capture
+ * gate (15% camera / 30% strap): capture REFUSES a reading over that, and an
+ * import is not refused at all — the sample is already in the health store and
+ * the user may well want it. So this is a warning, not a bar, and it is set
+ * where the app already stops calling a reading trustworthy.
+ */
+export const POOR_IMPORT_ARTIFACT_PCT = 10;
+
+/**
+ * Should this candidate be tagged poor quality in the import sheet?
+ *
+ * A watch reading taken while walking, or a Breathe session with a loose band,
+ * comes back with a third of its beats reconstructed — the numbers still
+ * compute, and nothing downstream refuses them, so the only place the user can
+ * learn this is the moment they choose whether to keep it. Unknown quality is
+ * never reported as poor.
+ */
+export function isPoorImport(q: ImportedHrvQuality | undefined | null): boolean {
+  if (!q) return false;
+  return q.confidence === 'low' || q.artifactPct > POOR_IMPORT_ARTIFACT_PCT;
+}
+
+/** The reason, in the results card's own words ("23% artifacts"), for the row's
+ *  sub-line. Null when there is no series to grade. */
+export function importQualityNote(q: ImportedHrvQuality | undefined | null): string | null {
+  return q ? `${Math.round(q.artifactPct)}% artifacts` : null;
+}

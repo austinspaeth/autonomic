@@ -20,7 +20,8 @@
  */
 import { Linking, Platform } from 'react-native';
 import type { Entry, SleepStages } from '../types';
-import { computeHrv } from '../hrv';
+import { computeHrv, type HrvResult } from '../hrv';
+import type { ImportedHrvQuality } from '../hrvQuality';
 import { keyOf } from '../dates';
 import {
   hasAskedAuth, markAskedAuth, markPromptedThisLaunch, promptedThisLaunch, shareAuthRequest,
@@ -167,6 +168,10 @@ export interface ImportedReading {
   fields: Record<string, string>;
   rr?: number[];        // beat-to-beat RR (ms), when derived from a heartbeat series
   rrClean?: number[];
+  /** How good that series was (src/lib/hrvQuality) — absent means there was no
+   *  series to grade, never that it was clean. Drives the "Poor quality" tag on
+   *  the import offer, and is stamped on the entry that gets written. */
+  quality?: ImportedHrvQuality;
   ownApp: boolean;      // true when this app authored the sample (skip on import)
 }
 
@@ -473,6 +478,15 @@ const rrFromSeries = (hb: HeartbeatSeries): { rr: number[]; segmentStarts: numbe
   }
   return { rr, segmentStarts };
 };
+
+/** The quality stamp for a sample whose metrics came from a beat series. Only
+ *  ever built from a real `computeHrv` result, so a sample with no series
+ *  carries none — absent is UNKNOWN, not clean (src/lib/hrvQuality). */
+const qualityOf = (res: HrvResult): ImportedHrvQuality => ({
+  artifactPct: Math.round(res.artifactPct * 10) / 10,
+  confidence: res.confidence,
+  beatCount: res.rrClean.length,
+});
 
 const QID = {
   restingHr: 'HKQuantityTypeIdentifierRestingHeartRate',
@@ -829,7 +843,7 @@ function makeReal(mod: HkModule): HealthApi {
           const res = computeHrv(rr, { segmentStarts });
           if (!res.time || !Object.keys(res.fields).length) continue;
           hrvSeriesTimes.push(hb.startDate.getTime());
-          out.push({ type: 'hrv', time: hhmm(hb.startDate), startMs: hb.startDate.getTime(), ownApp: isOwnSample(hb.sourceRevision), fields: res.fields, rr, rrClean: res.rrClean });
+          out.push({ type: 'hrv', time: hhmm(hb.startDate), startMs: hb.startDate.getTime(), ownApp: isOwnSample(hb.sourceRevision), fields: res.fields, rr, rrClean: res.rrClean, quality: qualityOf(res) });
         }
       } catch { /* series unavailable */ }
 
@@ -897,7 +911,7 @@ function makeReal(mod: HkModule): HealthApi {
           out.readings.push({
             type: 'hrv', time: hhmm(hb.startDate), startMs: hb.startDate.getTime(),
             ownApp: isOwnSample(hb.sourceRevision), dayKey: keyOf(hb.startDate),
-            fields: res.fields, rr, rrClean: res.rrClean,
+            fields: res.fields, rr, rrClean: res.rrClean, quality: qualityOf(res),
           });
         }
       } catch { /* heartbeat series unavailable */ }

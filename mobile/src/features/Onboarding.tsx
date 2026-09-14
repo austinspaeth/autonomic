@@ -142,7 +142,16 @@ async function importHealthHistory(onProgress?: (p: HistoryProgress) => void): P
       };
       // How much real RR the sample covered — the trust gate downstream reads
       // this, so a short one can never re-enter the averages (hrvQuality.ts).
-      if (r.type === 'hrv') entry.durationSec = rrCoverageSec(r.rr);
+      if (r.type === 'hrv') {
+        entry.durationSec = rrCoverageSec(r.rr);
+        // And how good its beats were, when there was a series to grade — same
+        // stamp the daily import and a live capture write.
+        if (r.quality) {
+          entry.artifactPct = r.quality.artifactPct;
+          entry.confidence = r.quality.confidence;
+          entry.beatCount = r.quality.beatCount;
+        }
+      }
       // RR series goes to the waveform sidecar, never inline on the entry
       // (rrClean is derived — recomputed on view, not stored).
       if (r.rr) storeWaveform(entry.id as string, { rrRaw: r.rr });

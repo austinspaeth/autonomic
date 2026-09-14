@@ -3,8 +3,8 @@
  *
  * The pill floats above the tab bar (same treatment as WatchSyncPill) and
  * appears only while a quiet check is running or after it found something.
- * The check runs on launch, at most hourly on foreground, and on demand from
- * the Journal's pull-to-refresh (`requestHealthUpdateCheck` — ignored while
+ * The check runs on launch, on every foreground, and on demand from the
+ * Journal's pull-to-refresh (`requestHealthUpdateCheck` — ignored while
  * the pill or its card is already up). Nothing is shown for an empty result —
  * the pill just fades away. Checking and found are the SAME pill: one fixed-height
  * container whose two content layers cross-fade while its width tweens from the
@@ -28,14 +28,15 @@ import { SheetControls, useSheets } from '../components/Sheet';
 import { useToast } from '../components/Toast';
 import { Button } from '../components/ui';
 import { Icon, IconName } from '../components/Icon';
-import { radius, usePalette } from '../theme';
+import { CAUTION_GOLD, CAUTION_GOLD_SOFT, radius, usePalette } from '../theme';
 import { health, healthAppName } from '../lib/health';
 import {
-  allItemKeys, checkHealthUpdates, checkHealthUpdatesLast24h, dueForAutoCheck,
+  allItemKeys, checkHealthUpdates, checkHealthUpdatesLast24h,
   filterDeclined, filterSeen, getDeclinedKeys, getSeenKeys, importUpdates,
-  markAutoChecked, markSeenKeys, updateCount, type HealthUpdateSet,
+  markSeenKeys, updateCount, type HealthUpdateSet,
 } from '../lib/health/updates';
 import type { Entry } from '../lib/types';
+import { importQualityNote, isPoorImport } from '../lib/hrvQuality';
 import { workoutCurveFor } from '../components/summary';
 import { openWorkoutReport } from './forms';
 import { ACTIVITY_TYPES } from '../lib/registry';
@@ -60,7 +61,7 @@ let importSheetOpen = false;
 
 // Manual check requests (Journal pull-to-refresh) → the mounted pill.
 const checkRequests = new Set<() => void>();
-/** Ask the pill to run a check now (ignores the hourly pacing). No-ops while
+/** Ask the pill to run a check now. No-ops while
  *  the pill or the import card is already showing in any state. */
 export function requestHealthUpdateCheck(): void {
   checkRequests.forEach((l) => l());
@@ -76,7 +77,6 @@ export async function runHealthUpdateCheck(
   toast: (msg: string) => void,
 ): Promise<void> {
   const sets = await checkHealthUpdatesLast24h();
-  markAutoChecked();
   if (!sets.length) {
     toast(`Nothing new to import from ${healthAppName()}`);
     return;
@@ -175,7 +175,6 @@ export function HealthUpdatePill() {
     const s = getState();
     if (!health().available || !s.settings.healthEnabled) return;
     running.current = true;
-    markAutoChecked();
     checkOp.setValue(1);
     foundOp.setValue(0);
     setPhase('checking');
@@ -206,14 +205,13 @@ export function HealthUpdatePill() {
     }
   };
 
-  const maybeCheck = () => { if (dueForAutoCheck()) void runCheck(); };
-
   useEffect(() => {
-    maybeCheck();
-    // Hourly cadence rides on foregrounds — there's no background execution,
-    // so "hasn't checked in an hour" is evaluated whenever the app returns.
-    const appSub = AppState.addEventListener('change', (st) => { if (st === 'active') maybeCheck(); });
-    // Journal pull-to-refresh: check now, pacing aside (runCheck still no-ops
+    void runCheck();
+    // Coming back to the app IS the request, so every foreground checks. There
+    // is no background execution here, so a foreground is the only moment a
+    // check can happen at all; runCheck itself refuses to stack.
+    const appSub = AppState.addEventListener('change', (st) => { if (st === 'active') void runCheck(); });
+    // Journal pull-to-refresh: check now, debounce aside (runCheck still no-ops
     // while the pill or card is visible).
     const onRequest = () => { void runCheck(); };
     checkRequests.add(onRequest);
@@ -333,12 +331,25 @@ const styles = StyleSheet.create({
   label: { color: '#fff', fontSize: 14, fontWeight: '600' },
   badge: { minWidth: 21, height: 21, borderRadius: 999, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center' },
   badgeText: { color: '#fff', fontSize: 12, fontWeight: '800' },
+  tag: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    backgroundColor: CAUTION_GOLD_SOFT, borderWidth: 1, borderColor: 'rgba(234,179,8,0.4)',
+    borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2,
+  },
+  tagText: { color: CAUTION_GOLD, fontSize: 10.5, fontWeight: '800', letterSpacing: 0.2 },
   dismiss: { width: 24, height: 24, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' },
 });
 
 /* ---------- the grouped import sheet ---------- */
 
-interface SheetItem { key: string; icon: IconName; title: string; sub: string }
+interface SheetItem {
+  key: string; icon: IconName; title: string; sub: string;
+  /** A warning chip beside the title. Only the HRV rows carry one today: a
+   *  sample the health store kept but whose beats were mostly reconstructed
+   *  (see lib/hrvQuality). Nothing refuses it downstream, so the moment the
+   *  user chooses whether to keep it is the only place they can be told. */
+  tag?: string;
+}
 interface SheetGroup { key: string; label: string; tint: string; icon: IconName; items: SheetItem[] }
 
 /** Merge one or more day-sets (Settings passes yesterday + today) into the
@@ -362,7 +373,17 @@ function groupsOf(sets: HealthUpdateSet[]): SheetGroup[] {
         sub: `${fmtTime12(set.sleep.bed)} to ${fmtTime12(set.sleep.wake)}${set.sleep.interrupted ? ' · interrupted' : ''}`,
       });
     }
-    readings.push(...set.readings.map((r) => ({ key: r.key, icon: iconFor[r.type], title: r.title, sub: tag(set, r.sub) })));
+    readings.push(...set.readings.map((r) => {
+      // A poor series says so twice: the chip is the verdict, the sub-line the
+      // number behind it, in the results card's own words.
+      const poor = isPoorImport(r.quality);
+      const why = poor ? importQualityNote(r.quality) : null;
+      return {
+        key: r.key, icon: iconFor[r.type], title: r.title,
+        sub: tag(set, why ? `${r.sub} · ${why}` : r.sub),
+        ...(poor ? { tag: 'Poor quality' } : {}),
+      };
+    }));
     workouts.push(...set.workouts.map((w) => ({ key: w.key, icon: (ACTIVITY_TYPES[w.type]?.icon || 'activity') as IconName, title: w.label, sub: tag(set, w.sub) })));
     meds.push(...set.meds.map((m) => ({ key: m.key, icon: 'pill' as IconName, title: m.title, sub: tag(set, m.sub) })));
   }
@@ -456,7 +477,15 @@ export function HealthUpdatesSheet({ sets, controls, onImported }: {
                     </View>
                     <Icon name={it.icon} size={20} color={g.tint} />
                     <View style={{ flex: 1 }}>
-                      <Text style={{ color: p.text, fontSize: 15.5, fontWeight: '600' }}>{it.title}</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={{ color: p.text, fontSize: 15.5, fontWeight: '600' }}>{it.title}</Text>
+                        {it.tag ? (
+                          <View style={styles.tag}>
+                            <Icon name="alert" size={11} color={CAUTION_GOLD} />
+                            <Text style={styles.tagText}>{it.tag}</Text>
+                          </View>
+                        ) : null}
+                      </View>
                       <Text style={{ color: p.textDim, fontSize: 12.5, marginTop: 1 }}>{it.sub}</Text>
                     </View>
                   </Pressable>

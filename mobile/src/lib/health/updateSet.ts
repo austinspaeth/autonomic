@@ -23,6 +23,7 @@
  */
 import type { DayRecord, TypeDef } from '../types';
 import { fmtTime12 } from '../dates';
+import type { ImportedHrvQuality } from '../hrvQuality';
 import type { ImportedMed, ImportedReading, ImportedWorkout, SleepImport } from './index';
 import { workoutCandidateOf, type WorkoutCandidate } from './workoutCandidate';
 
@@ -41,6 +42,9 @@ export interface UpdateReading {
   sub: string;                         // "6:52 AM · 5 min"
   fields: Record<string, string>;      // prefilled entry fields
   rr?: number[];                       // beat-to-beat RR, destined for the sidecar
+  /** HRV only: how good the beat series behind it was, so the offer can say so
+   *  before it is accepted (src/lib/hrvQuality). Absent = nothing to grade. */
+  quality?: ImportedHrvQuality;
 }
 
 export interface UpdateMed {
@@ -203,7 +207,7 @@ export function buildUpdateSet(
         key: `hrv-${im.startMs}`, type: 'hrv', time: im.time,
         title: ms != null ? `HRV ${ms} ms` : 'HRV reading',
         sub: `${fmtTime12(im.time)} · ${Math.round(rrTotalMs(im.rr) / 60000)} min`,
-        fields: im.fields, rr: im.rr,
+        fields: im.fields, rr: im.rr, quality: im.quality,
       });
     } else if (im.type === 'restingHr') {
       // Apple's resting HR is ~one derived sample a day; a same-value or

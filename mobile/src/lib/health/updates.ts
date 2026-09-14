@@ -110,7 +110,18 @@ export function importUpdates(set: HealthUpdateSet, selected: Set<string> | null
     const entry: Entry = { id: uid(), type: r.type, time: r.time, note, source, imported: true, healthKey: r.key, ...r.fields };
     // RR coverage rides on the entry: it's what decides, forever after, whether
     // this imported reading is long enough to trust (src/lib/hrvQuality.ts).
-    if (r.type === 'hrv') entry.durationSec = rrCoverageSec(r.rr);
+    if (r.type === 'hrv') {
+      entry.durationSec = rrCoverageSec(r.rr);
+      // How good the beats behind it were — the same three the results card
+      // stamps on a live capture, so an imported reading can still be judged on
+      // its own quality once this sheet is gone. Only when there was a series
+      // to grade: absent means UNKNOWN, never clean.
+      if (r.quality) {
+        entry.artifactPct = r.quality.artifactPct;
+        entry.confidence = r.quality.confidence;
+        entry.beatCount = r.quality.beatCount;
+      }
+    }
     if (r.rr) storeWaveform(entry.id, { rrRaw: r.rr });
     entry.scores = computeScores(entry, ctx);
     upsertEntry(set.dk, 'readings', entry);
@@ -202,15 +213,13 @@ export function markSeenKeys(keys: string[]): void {
 
 /* ---------- auto-check pacing ---------- */
 
-const CHECK_INTERVAL_MS = 60 * 60 * 1000;
-// Module-scoped on purpose: a fresh launch always checks ("on mount if it
-// hasn't checked in a while" — a new process hasn't), then foregrounds
-// re-check at most hourly. Not worth a persisted timestamp.
-let lastAutoCheck = 0;
-
-export function dueForAutoCheck(now = Date.now()): boolean {
-  return now - lastAutoCheck >= CHECK_INTERVAL_MS;
-}
-export function markAutoChecked(now = Date.now()): void {
-  lastAutoCheck = now;
-}
+// There is none, deliberately. EVERY foreground runs a check: opening the app
+// IS the request to bring it up to date, and there is no background execution
+// here, so a foreground is the only moment a check can happen at all. It used
+// to be throttled to an hour, which meant a reading taken minutes ago was
+// invisible unless the user remembered to pull the Journal down.
+//
+// Nothing is needed to keep that cheap. The check is silent unless it finds
+// something the user has not already been offered (filterSeen / filterDeclined),
+// and the pill's own runCheck refuses to start while a check is running or
+// while the pill or the import card is on screen, so foregrounds cannot stack.

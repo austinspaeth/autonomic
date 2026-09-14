@@ -1,6 +1,6 @@
 import {
-  IMPORTED_HRV_MIN_SEC, hasHrvReading, isTrustedReading, rrCoverageSec,
-  stampImportedHrvCoverage, trustedReadings,
+  IMPORTED_HRV_MIN_SEC, POOR_IMPORT_ARTIFACT_PCT, hasHrvReading, importQualityNote,
+  isPoorImport, isTrustedReading, rrCoverageSec, stampImportedHrvCoverage, trustedReadings,
 } from '../hrvQuality';
 import { defaultState, blankDay } from '../migrate';
 import { scoreSet, metricHistory } from '../scoring/day';
@@ -141,5 +141,34 @@ describe('has this journal got a baseline yet', () => {
       '2026-07-01': [hrv({ imported: true, durationSec: 60 })],
       '2026-07-02': [hrv({ id: 'r2', imported: true, durationSec: IMPORTED_HRV_MIN_SEC })],
     }))).toBe(true);
+  });
+});
+
+describe('poor-quality import tag', () => {
+  const q = (artifactPct: number, confidence: 'high' | 'fair' | 'low' = 'fair') =>
+    ({ artifactPct, confidence, beatCount: 300 });
+
+  it('says nothing about a sample with no series to grade', () => {
+    // Unknown is never reported as poor: an SDNN-only sample, or a candidate
+    // built before the stamp existed, carries no verdict at all.
+    expect(isPoorImport(undefined)).toBe(false);
+    expect(isPoorImport(null)).toBe(false);
+    expect(importQualityNote(undefined)).toBeNull();
+  });
+
+  it('leaves a clean series untagged', () => {
+    expect(isPoorImport(q(2, 'high'))).toBe(false);
+    expect(isPoorImport(q(POOR_IMPORT_ARTIFACT_PCT, 'fair'))).toBe(false);
+  });
+
+  it('tags a series the correction had to rebuild', () => {
+    expect(isPoorImport(q(POOR_IMPORT_ARTIFACT_PCT + 0.5, 'fair'))).toBe(true);
+    expect(isPoorImport(q(34, 'low'))).toBe(true);
+    // The ladder's own verdict is enough on its own, whatever the rate.
+    expect(isPoorImport(q(1, 'low'))).toBe(true);
+  });
+
+  it('states the reason in the results card\'s words', () => {
+    expect(importQualityNote(q(23.4))).toBe('23% artifacts');
   });
 });
