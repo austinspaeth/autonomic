@@ -54,6 +54,11 @@ describe('budgetSeries', () => {
         now: new Date(`${dk}T23:59:00`), addDays, downturn: false, strain: null, brief: true,
       });
       expect(row.spendMin).toBeCloseTo(full.burn.effortMin, 5);
+      // The BUDGET too, not just the spend. Progress used to grade each day
+      // against `capacityBaseline`, the raw ceiling before the correction,
+      // that morning's readings and yesterday's carry-over, so a margin here
+      // could disagree with the card that day actually showed.
+      expect(row.envelopeMin).toBe(full.envelope.effortMin);
       if (full.state === 'suppressed') expect(row.envelopeMin).toBeNull();
     });
   });

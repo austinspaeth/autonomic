@@ -248,7 +248,9 @@ describe('buildBurn', () => {
     });
     const row = b.rows.find((r) => r.source === 'hr')!;
     expect(row.label).toBe('Minutes HR above 95 bpm');
-    expect(row.detail).toBe('In 3 stretches');
+    // The row's own minutes LEAD. Naming only the stretches described two
+            // sub-quantities of a total the row never stated.
+    expect(row.detail).toBe('48m above, in 3 stretches');
   });
 
   it('charges upright time and names what it measured', () => {
@@ -399,7 +401,7 @@ describe('heart-rate intensity', () => {
       day: day({ load: load({ hrAboveMin: 70, hrBands: [40, 10, 20], hrCoverageMin: 800, lineBpm: 95, hrStretches: 2 }) }),
       types: TYPES, lineBpm: 95,
     });
-    expect(b.rows.find((r) => r.source === 'hr')!.detail).toBe('In 2 stretches, 30m well above');
+    expect(b.rows.find((r) => r.source === 'hr')!.detail).toBe('1h 10m above, in 2 stretches, 30m well above');
   });
 
   it('nets a logged workout off the TOP bands, never the cheapest', () => {
@@ -417,5 +419,58 @@ describe('heart-rate intensity', () => {
     const hr = withRun.rows.find((r) => r.source === 'hr')!;
     // 20 minutes left, all of them in the cheapest band.
     expect(hr.effortMin).toBeCloseTo(hrBandEffort([20, 0, 0])! * HR_PER_MIN, 5);
+  });
+});
+
+/**
+ * The drill-in draws the row's own arithmetic and never a second extraction of
+ * the day. These pin the property that made the old sheet wrong: the parts
+ * have to SUM to the row they open.
+ */
+describe('a row explains itself', () => {
+  const sum = (row: { parts?: { effortMin: number }[] }) =>
+    (row.parts || []).reduce((a, b) => a + b.effortMin, 0);
+
+  it('upright parts sum to the upright row, net of a logged walk', () => {
+    const b = buildBurn({
+      day: day({
+        activities: [{ id: 'a1', type: 'walk', duration: 30 }],
+        load: load({ walkingMin: 119, stillUprightMin: 238 }),
+      }),
+      types: TYPES, lineBpm: null,
+    });
+    const row = b.rows.find((r) => r.source === 'upright')!;
+    expect(sum(row)).toBeCloseTo(row.effortMin, 5);
+    // The subtraction is a LINE, not a silent adjustment.
+    expect(row.parts!.some((p) => /already charged/.test(p.label))).toBe(true);
+  });
+
+  it('heart-rate parts are the NET bands, so a logged workout is not added back', () => {
+    const b = buildBurn({
+      day: day({
+        activities: [{ id: 'a1', type: 'run', duration: 20, avgHr: 130 }],
+        load: load({ hrAboveMin: 70, hrBands: [40, 10, 20], hrCoverageMin: 800, lineBpm: 95, hrStretches: 2 }),
+      }),
+      types: TYPES, lineBpm: 95,
+    });
+    const row = b.rows.find((r) => r.source === 'hr')!;
+    expect(sum(row)).toBeCloseTo(row.effortMin, 5);
+    // 20 minutes came off the top band, so the top band cannot still be listed
+    // at its stored size.
+    expect(row.parts!.some((p) => p.label.includes('20m at 120+ bpm'))).toBe(false);
+  });
+});
+
+describe('Apple Stand Time is a floor, not a verdict', () => {
+  it('never charges less upright time than the day demonstrably walked', () => {
+    // The shape that shipped wrong: a watch credits a stand hour from a short
+    // burst and writes 34m for a day holding 1h 59m of measured walking.
+    const up = uprightMinutes(load({ standMin: 34, walkingMin: 119, stillUprightMin: 238 }));
+    expect(up).toEqual({ min: 357, source: 'walk+still' });
+  });
+
+  it('still prefers stand time when it saw more of the day', () => {
+    expect(uprightMinutes(load({ standMin: 220, walkingMin: 70, stillUprightMin: 60 })))
+      .toEqual({ min: 220, source: 'stand' });
   });
 });

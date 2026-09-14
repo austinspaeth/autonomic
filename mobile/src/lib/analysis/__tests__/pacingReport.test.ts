@@ -39,12 +39,16 @@ describe('the pacing budget reaches the exports', () => {
   it('is in the raw data export, in effort minutes, framed as a ceiling', () => {
     const out = buildDataExport(st, {}, 'month', dk);
     expect(out).toContain('PACING BUDGET (effort minutes)');
-    expect(out).toContain('a ceiling the app fits from their own history, not a target');
+    expect(out).toContain('a CEILING fitted from this person\'s own history, not a target');
     expect(out).toMatch(new RegExp(`\\[${observed}\\] Budget: \\d+m \\| Cost: \\d+m`));
-    // The passive measurements ride along with the day they describe.
-    expect(out).toContain('Steps: 4210');
-    expect(out).toContain('Minutes above own exertion line: 38');
-    expect(out).toContain('Minutes standing still (estimated): 45');
+    // The passive measurements ride along with the day they describe, in
+    // their own units, beside the charges they produced — the arithmetic has
+    // to be checkable by the reader or an effort minute is unfalsifiable.
+    expect(out).toContain('4210 steps');
+    expect(out).toContain('38m above 95 bpm');
+    expect(out).toContain('45m standing still (inferred from heart rate, estimate)');
+    expect(out).toMatch(/Charged: .*Upright time \+\d+m/);
+    expect(out).toContain('Coverage: full day of heart rate');
   });
 
   it('omits a day it had no way to observe rather than calling it free', () => {

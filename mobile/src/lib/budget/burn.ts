@@ -115,6 +115,9 @@ export const MULTIPLIER_CAP = 1.25;
  *  A watch on the charger must never read as a restful afternoon. */
 export const HR_GAP_MIN = 5;
 
+/** Minutes a run above the line must last before it is called a stretch. */
+export const STRETCH_MIN_MIN = 2;
+
 /** Minutes of series a day needs before its heart-rate row is trusted at all. */
 export const HR_MIN_COVERAGE = 120;
 /** ...and before it is called full coverage rather than partial. */
@@ -135,6 +138,23 @@ export interface SpendMember {
   assumed: boolean;
 }
 
+/**
+ * One line of a row's own arithmetic, in the units the row charged.
+ *
+ * The drill-in used to re-derive these from `DayLoad` itself, which is a
+ * SECOND extraction of the same day and drifted from the first the moment the
+ * two disagreed about anything: the upright row charges ONE source and the
+ * sheet listed all three, so a row reading "34m upright, 7m" opened on
+ * 1h 59m + 3h 58m + 34m. Same rule ../insights/detail.ts follows — the sheet
+ * draws the columns the claim was computed from, never a fresh pass over the
+ * data. These are built where the charge is made, and they sum to the row.
+ */
+export interface SpendPart {
+  label: string;
+  /** The effort minutes this part contributed. Signed like the row. */
+  effortMin: number;
+}
+
 export interface SpendRow {
   source: SpendSource;
   label: string;
@@ -144,6 +164,8 @@ export interface SpendRow {
   /** 0..1 against the largest row, for the row's own share bar. */
   share: number;
   members?: SpendMember[];
+  /** The row's own arithmetic, summing to `effortMin`. */
+  parts?: SpendPart[];
 }
 
 export type BurnCoverage = 'full' | 'partial' | 'logged-only' | 'none';
@@ -208,6 +230,11 @@ export function hrMinutesAbove(
     if (runStart == null) return;
     const span = { startMin: Math.round(runStart / 60), endMin: Math.round(endSec / 60) };
     if (!longest || span.endMin - span.startMin > longest.endMin - longest.startMin) longest = span;
+    // A "stretch" has to last long enough to be one. Counting every crossing
+    // reported 73 of them on a day holding 47 minutes above the line, which is
+    // not 73 exertions, it is a heart hovering at its own line while a watch
+    // samples it every forty seconds. The word promises duration.
+    if (span.endMin - span.startMin >= STRETCH_MIN_MIN) stretches++;
     runStart = null;
   };
 
@@ -228,10 +255,7 @@ export function hrMinutesAbove(
     if (mid > lineBpm) {
       aboveMin += gapMin;
       bands[hrBandOf(mid - lineBpm)] += gapMin;
-      if (runStart == null) {
-        runStart = pts[i - 1].t;
-        stretches++;
-      }
+      if (runStart == null) runStart = pts[i - 1].t;
     } else {
       closeRun(pts[i - 1].t);
     }
@@ -451,12 +475,21 @@ function activityParts(day: DayRecord | undefined, types: Record<string, TypeDef
 /** The upright minutes and where they came from, best source first. */
 export function uprightMinutes(load: DayLoad | undefined | null): { min: number; source: 'stand' | 'walk+still' | 'walk' } | null {
   if (!load) return null;
-  if (load.standMin != null) return { min: load.standMin, source: 'stand' };
-  if (load.walkingMin != null && load.stillUprightMin != null) {
-    return { min: load.walkingMin + load.stillUprightMin, source: 'walk+still' };
-  }
-  if (load.walkingMin != null) return { min: load.walkingMin, source: 'walk' };
-  return null;
+  const stand = load.standMin;
+  const walk = load.walkingMin;
+  const still = load.stillUprightMin;
+  const own = walk != null && still != null ? { min: walk + still, source: 'walk+still' as const }
+    : walk != null ? { min: walk, source: 'walk' as const }
+      : null;
+  if (stand == null) return own;
+  // Apple Stand Time is a FLOOR, not a verdict. The watch credits a stand hour
+  // from a short burst of upright motion and writes nothing for the rest of
+  // it, so a day holding 1h 59m of measured walking can carry 34m of stand
+  // time — and preferring the smaller number charged that day 7m of upright
+  // instead of 71m. Whichever source saw more of the day wins; a person cannot
+  // have been upright for less time than they were demonstrably walking.
+  if (own && own.min > stand) return own;
+  return { min: stand, source: 'stand' };
 }
 
 /**
@@ -483,21 +516,78 @@ export function daySpend(input: BurnInput): number {
  * two are always created together.
  */
 export type SpendLookup = (dk: string) => number;
+export type BurnLookup = (dk: string) => Burn | null;
+
+/** The whole burn for a day, memoized. `makeSpendLookup` is built on this
+ *  rather than beside it, because they are the same `buildBurn` call — the
+ *  same reason ./outcome's score lookup is built on its set lookup. */
+export function makeBurnLookup(
+  days: Record<string, DayRecord | undefined>,
+  types: Record<string, TypeDef>,
+  lineBpm: number | null,
+): BurnLookup {
+  const cache = new Map<string, Burn | null>();
+  return (dk: string) => {
+    if (cache.has(dk)) return cache.get(dk) as Burn | null;
+    const d = days[dk];
+    const v = d ? buildBurn({ day: d, types, lineBpm, past: true }) : null;
+    cache.set(dk, v);
+    return v;
+  };
+}
 
 export function makeSpendLookup(
   days: Record<string, DayRecord | undefined>,
   types: Record<string, TypeDef>,
   lineBpm: number | null,
+  burnAt: BurnLookup = makeBurnLookup(days, types, lineBpm),
 ): SpendLookup {
-  const cache = new Map<string, number>();
-  return (dk: string) => {
-    const hit = cache.get(dk);
-    if (hit != null) return hit;
-    const d = days[dk];
-    const v = d ? daySpend({ day: d, types, lineBpm }) : 0;
-    cache.set(dk, v);
-    return v;
-  };
+  return (dk: string) => burnAt(dk)?.effortMin ?? 0;
+}
+
+/** The heart-rate row's own arithmetic: one line per intensity band, at the
+ *  multiplier that band was charged at. Falls back to a single flat line for a
+ *  day stored before bands existed, which was charged flat. */
+function hrParts(bands: number[] | null, net: number, lineBpm: number | null): SpendPart[] {
+  const lo = lineBpm != null ? Math.round(lineBpm) : null;
+  if (!bands) {
+    return [{ label: lo != null ? `${hm(net)} above ${lo} bpm` : `${hm(net)} above your line`, effortMin: net * HR_PER_MIN }];
+  }
+  const out: SpendPart[] = [];
+  bands.forEach((min, i) => {
+    if (min < 1) return;
+    const from = lo != null ? lo + HR_BAND_EDGES[i] : null;
+    const to = HR_BAND_EDGES[i + 1] != null && lo != null ? lo + HR_BAND_EDGES[i + 1] : null;
+    const where = from == null ? `band ${i + 1}`
+      : to != null ? `${from} to ${to} bpm` : `${from}+ bpm`;
+    out.push({ label: `${hm(min)} at ${where}`, effortMin: min * hrBoostFor(HR_BAND_OFFSETS[i] ?? 0) * HR_PER_MIN });
+  });
+  return out;
+}
+
+/** The upright row's own arithmetic. The logged-walk subtraction is a LINE
+ *  rather than a silent adjustment, or the parts cannot sum to the row on any
+ *  day the user logged a walk. */
+function uprightParts(
+  load: DayLoad,
+  up: { min: number; source: 'stand' | 'walk+still' | 'walk' },
+  net: number,
+): SpendPart[] {
+  const out: SpendPart[] = [];
+  const line = (label: string, min: number) => out.push({ label: `${hm(min)} ${label}`, effortMin: min * UPRIGHT_PER_MIN });
+  if (up.source === 'stand') {
+    line('standing or walking, from your watch', up.min);
+  } else {
+    // Measured walking and inferred standing are separate claims and are said
+    // separately, so the estimate can be judged on its own size.
+    if (load.walkingMin != null) line('walking', load.walkingMin);
+    if (up.source === 'walk+still' && load.stillUprightMin != null) line('standing, estimated', load.stillUprightMin);
+  }
+  const removed = up.min - net;
+  if (removed >= 1) {
+    out.push({ label: `Less ${hm(removed)} already charged as a logged activity`, effortMin: -removed * UPRIGHT_PER_MIN });
+  }
+  return out;
 }
 
 export function buildBurn(input: BurnInput): Burn {
@@ -524,15 +614,25 @@ export function buildBurn(input: BurnInput): Burn {
       // The arithmetic has to stay checkable: once minutes and effort minutes
       // can differ, the row says how much of the time was the expensive kind.
       const hardMin = bands ? bands.slice(1).reduce((a, b) => a + b, 0) : 0;
-      const base = stretches > 1 ? `In ${stretches} stretches` : 'In one stretch';
+      // The TOTAL leads. A detail of "In 73 stretches, 14m well above" named
+      // two sub-quantities of a number it never stated, so the row's own
+      // minutes appeared nowhere on it and the drill-in looked like a
+      // different measurement.
+      const runs = stretches > 1 ? `, in ${stretches} stretches` : stretches === 1 ? ', in one stretch' : '';
+      const hard = hardMin >= 5 ? `, ${hm(hardMin)} well above` : '';
       rows.push({
         source: 'hr',
         // The threshold IS the title. "Minutes above your line" made the
         // reader open the row to find out what the line was.
         label: load.lineBpm != null ? `Minutes HR above ${Math.round(load.lineBpm)} bpm` : 'Minutes above your line',
-        detail: hardMin >= 5 ? `${base}, ${hm(hardMin)} well above` : base,
+        detail: `${hm(net)} above${runs}${hard}`,
         effortMin: hrEffort,
         share: 0,
+        // The NET bands, never the stored ones: minutes a logged workout
+        // already paid for came off the top above, and a drill-in listing the
+        // stored bands would add back exactly what was removed to stop the
+        // hard part being billed twice.
+        parts: hrParts(bands, net, load.lineBpm ?? null),
       });
     }
   }
@@ -549,7 +649,13 @@ export function buildBurn(input: BurnInput): Burn {
           : `${hm(net)} walking`;
     uprightEffort = net * UPRIGHT_PER_MIN;
     if (uprightEffort >= 1) {
-      rows.push({ source: 'upright', label: 'Upright time', detail, effortMin: uprightEffort, share: 0 });
+      rows.push({
+        source: 'upright', label: 'Upright time', detail, effortMin: uprightEffort, share: 0,
+        // Only the source that was CHARGED, already net of logged walks. The
+        // sheet listing every source the day happened to hold is what made a
+        // 7m row open on 79m of components.
+        parts: load ? uprightParts(load, up, net) : undefined,
+      });
     }
   }
 

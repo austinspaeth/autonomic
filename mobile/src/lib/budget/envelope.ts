@@ -27,8 +27,8 @@ import type { Entry, TypeDef } from '../types';
 import { hm } from './format';
 import { ceilingAt } from './calibrate';
 import { capacityBaseline } from './baseline';
-import { makeScoreLookup, type ScoreLookup } from './outcome';
-import { makeSpendLookup, type SpendLookup } from './burn';
+import { compValue, makeScoreLookup, makeSetLookup, type ScoreLookup, type SetLookup } from './outcome';
+import { makeBurnLookup, makeSpendLookup, type BurnLookup, type SpendLookup } from './burn';
 
 /** The most a good morning may add, and the most a bad one may take. */
 const FACTOR_MAX = 1.1;
@@ -186,6 +186,7 @@ export interface EnvelopeOpts {
    *  full day of heart rate and must not be presented as one. */
   coverage: 'full' | 'partial' | 'logged-only' | 'none';
   scoreAt?: ScoreLookup;
+  setAt?: SetLookup;
   spendAt?: SpendLookup;
   /** A finished day. The arithmetic is identical; only the tense changes. */
   past?: boolean;
@@ -194,7 +195,8 @@ export interface EnvelopeOpts {
 export function buildEnvelope(opts: EnvelopeOpts): Envelope {
   const { days, dk, ctx, addDays, types, lineBpm, downturn, strain, coverage } = opts;
   const past = !!opts.past;
-  const scoreAt = opts.scoreAt || makeScoreLookup(days, ctx);
+  const setAt = opts.setAt || makeSetLookup(days, ctx);
+  const scoreAt = opts.scoreAt || makeScoreLookup(days, ctx, setAt);
   const spendAt = opts.spendAt || makeSpendLookup(days, types, lineBpm);
 
   const base = capacityBaseline(days, dk, ctx, addDays, types, lineBpm, scoreAt, spendAt);
@@ -202,12 +204,25 @@ export function buildEnvelope(opts: EnvelopeOpts): Envelope {
 
   /* ---- the morning inputs, each against the user's own recent history ---- */
   const histKeys = keyRange(addDays(dk, -1), 42, addDays);
-  const hist = metricSeries(days, histKeys, ['rmssd', 'restingHr', 'sleepDuration', 'sleepingHr'], ctx);
-  const today = metricSeries(days, [dk], ['rmssd', 'restingHr', 'sleepDuration', 'sleepingHr'], ctx);
+  const hist = metricSeries(days, histKeys, ['restingHr', 'sleepDuration', 'sleepingHr'], ctx);
+  const today = metricSeries(days, [dk], ['restingHr', 'sleepDuration', 'sleepingHr'], ctx);
   const vals = (xs: (number | null)[]) => xs.filter((v): v is number => v != null);
 
+  /**
+   * HRV comes out of the SCORE, not the trends registry.
+   *
+   * Both today's figure and the 42 days it is compared against, or the
+   * comparison would be a training-weighted number against a set of means. The
+   * registry averages TRAINING and BASELINE RMSSD into one value, and those are
+   * graded on different bands precisely because a paced reading runs higher —
+   * so the budget quoted a figure the Journal's own HRV tile, one card above
+   * it, contradicted. `compValue` reads the same component the tile does.
+   */
+  const hrvOf = (k: string) => compValue(setAt(k), 'HRV (RMSSD)');
+  const hrvHist = histKeys.map(hrvOf).filter((v): v is number => v != null);
+
   const inputs: EnvelopeInput[] = [
-    makeInput('hrv', past ? 'HRV that morning' : 'HRV this morning', 'ms', today.rmssd[0], vals(hist.rmssd), 'up', (v) => String(Math.round(v)), 8, past),
+    makeInput('hrv', past ? 'HRV that morning' : 'HRV this morning', 'ms', hrvOf(dk), hrvHist, 'up', (v) => String(Math.round(v)), 8, past),
     makeInput('restingHr', 'Resting heart rate', 'bpm', today.restingHr[0], vals(hist.restingHr), 'down', (v) => String(Math.round(v)), 6, past),
     makeInput('sleep', past ? 'Sleep the night before' : 'Sleep last night', '', today.sleepDuration[0], vals(hist.sleepDuration), 'band', (v) => hm(v * 60), 1.5, past),
     makeInput('sleepingHr', 'Overnight low', 'bpm', today.sleepingHr[0], vals(hist.sleepingHr), 'down', (v) => String(Math.round(v)), 6, past),
@@ -301,6 +316,63 @@ export function buildEnvelope(opts: EnvelopeOpts): Envelope {
     heldDays: base.heldDays,
     earlyMove: base.earlyMove,
     ceilingMin: ceiling.effortMin,
+  };
+}
+
+/**
+ * The envelope a PAST day was actually judged against, memoized.
+ *
+ * Everything that grades a finished day has to grade it against the number the
+ * app put on the screen that morning, not against an earlier stage of the same
+ * pipeline. The accuracy strip and the Progress margin chart both used
+ * `capacityBaseline`, which is the ceiling BEFORE the correction, before that
+ * morning's readings and before yesterday's overspend carried in — so a day the
+ * card called under budget at the time could turn up as an "over budget" cell
+ * in the strip a week later, and the two were describing different ceilings
+ * with no way for the reader to tell.
+ *
+ * ./calibrate is the one place that deliberately stays on the raw baseline, and
+ * it has to: the correction is an input to this envelope, so judging its own
+ * days against the corrected number would recurse for ever. Its counts are
+ * internal and never rendered, so nothing the reader sees disagrees.
+ *
+ * `downturn` and `strain` are not reconstructed for a past day — both are
+ * caller-supplied for today and cost a walk of their own — so a day suppressed
+ * by one of those reads here as the number it would otherwise have published.
+ * That is the behaviour these callers already had; the crash-grade suppression,
+ * which is the common case by far, is computed inside `buildEnvelope` and is
+ * honoured.
+ */
+export type EnvelopeLookup = (dk: string) => Envelope;
+
+export function makeEnvelopeLookup(opts: {
+  days: DaysMap;
+  ctx: ScoreContext;
+  addDays: (k: string, n: number) => string;
+  types: Record<string, TypeDef>;
+  lineBpm: number | null;
+  scoreAt?: ScoreLookup;
+  setAt?: SetLookup;
+  spendAt?: SpendLookup;
+  burnAt?: BurnLookup;
+}): EnvelopeLookup {
+  const { days, ctx, addDays, types, lineBpm } = opts;
+  const setAt = opts.setAt || makeSetLookup(days, ctx);
+  const scoreAt = opts.scoreAt || makeScoreLookup(days, ctx, setAt);
+  const burnAt = opts.burnAt || makeBurnLookup(days, types, lineBpm);
+  const spendAt = opts.spendAt || makeSpendLookup(days, types, lineBpm, burnAt);
+  const cache = new Map<string, Envelope>();
+  return (dk: string) => {
+    const hit = cache.get(dk);
+    if (hit) return hit;
+    const v = buildEnvelope({
+      days, dk, ctx, addDays, types, lineBpm,
+      downturn: false, strain: null,
+      coverage: burnAt(dk)?.coverage || 'none',
+      scoreAt, setAt, spendAt, past: true,
+    });
+    cache.set(dk, v);
+    return v;
   };
 }
 

@@ -26,7 +26,7 @@
 import type { ScoreContext } from '../scoring';
 import type { DaysMap } from '../scoring/day';
 import type { TypeDef } from '../types';
-import { capacityBaseline } from './baseline';
+import { makeEnvelopeLookup, type EnvelopeLookup } from './envelope';
 import { makeSpendLookup, type SpendLookup } from './burn';
 import { makeScoreLookup, outcomeOf, type ScoreLookup } from './outcome';
 
@@ -37,6 +37,9 @@ export const STRIP_DAYS = 13;
 /** Days scanned for the readout. */
 export const ACCURACY_DAYS = 42;
 
+/** `pending` covers both "the window has not played out" and "that day
+ *  published no budget", which are the same answer: there is no claim here to
+ *  have been right or wrong about. */
 export type CellOutcome = 'held' | 'dipped' | 'over' | 'pending';
 
 export interface AccuracyCell {
@@ -86,6 +89,7 @@ export function buildAccuracy(
   lineBpm: number | null,
   scoreAt: ScoreLookup = makeScoreLookup(days, ctx),
   spendAt: SpendLookup = makeSpendLookup(days, types, lineBpm),
+  envelopeAt: EnvelopeLookup = makeEnvelopeLookup({ days, ctx, addDays, types, lineBpm, scoreAt, spendAt }),
 ): Accuracy {
   const cells: AccuracyCell[] = [];
   let held = 0;
@@ -96,7 +100,11 @@ export function buildAccuracy(
     const k = addDays(dk, -i);
     const d = days[k];
     if (!d) continue;
-    const envelope = capacityBaseline(days, k, ctx, addDays, types, lineBpm, scoreAt, spendAt).effortMin;
+    // The number that day actually PUBLISHED, not the raw baseline behind it.
+    // Judging the strip against a ceiling the reader was never shown let a day
+    // the card called under budget turn up here as an "over budget" cell.
+    const envelope = envelopeAt(k).effortMin;
+    if (envelope == null) { cells.push({ dk: k, outcome: 'pending' }); continue; }
     const spend = spendAt(k);
     if (spend > envelope) { cells.push({ dk: k, outcome: 'over' }); continue; }
     const outcome = outcomeOf(days, k, ctx, addDays, scoreAt);

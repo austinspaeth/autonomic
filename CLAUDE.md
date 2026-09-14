@@ -114,10 +114,18 @@ old web app so old `export.json` files import directly.
   reaches the persisted journal.
 - **Imports** record `meta.lastImport` (`{ name, at }`) before calling `save()`.
 - **Periodic health-store import pill.** With Health connected, the app quietly
-  checks today's Apple Health / Health Connect data on launch, at most hourly on
-  foreground, and on the Journal's pull-to-refresh (iOS: custom overscroll brand
+  checks today's Apple Health / Health Connect data on launch, on EVERY
+  foreground and on the Journal's pull-to-refresh (iOS: custom overscroll brand
   mark; Android: RefreshControl) — `<HealthUpdatePill/>` in the root layout +
-  `src/features/HealthUpdates.tsx`. Every check calls `HealthApi.requestAuth()`
+  `src/features/HealthUpdates.tsx`. **There is no throttle on the foreground
+  check and that is deliberate**: opening the app IS the request to bring it up
+  to date, there is no background execution here so a foreground is the only
+  moment a check can happen at all, and the hourly pacing it used to carry meant
+  a reading taken minutes ago was invisible unless the user remembered to pull
+  the Journal down. Nothing is needed to keep it cheap — the check is silent
+  unless it finds something not already offered, and `runCheck` refuses to start
+  while one is running or while the pill or import card is up, so foregrounds
+  cannot stack. Every check calls `HealthApi.requestAuth()`
   first — a permission we never asked for otherwise reads back as "nothing new"
   forever. That request is self-gating (`src/lib/health/askedAuth.ts`): silent
   when the platform has nothing left to ask, at most one prompt per app launch
@@ -178,8 +186,17 @@ old web app so old `export.json` files import directly.
   artifact rate there would be a quality claim about a measurement we never saw.
   Capture-time gating is unchanged and is stricter for the camera already
   (`maxArtifactPct` 15 vs 30, plus beat repair and segment triage in `lib/hrv`), so
-  these say how MARGINAL a kept reading was, not whether to keep it. **Nothing
-  de-weights on them yet** — they are recorded first so there is something to
+  these say how MARGINAL a kept reading was, not whether to keep it. **An IMPORTED
+  reading now carries the same stamp, and says so before it is accepted**:
+  `computeHrv` already runs inside `readImports` / `readHistory`, so the candidate
+  rides its `quality` (artifact rate, confidence, beat count) to the import sheet,
+  where `isPoorImport` (`lib/hrvQuality.ts`, pure + tested) puts a gold "Poor
+  quality" chip beside the row and the artifact rate in its sub-line, and the same
+  three land on the entry. The bar is the `confidence` ladder's own 'fair' edge
+  (10% artifacts), NOT the capture gate (15/30%): capture REFUSES a reading over
+  that, an import refuses nothing, so this is a warning at the only moment the user
+  chooses. Unknown is never reported as poor — an SDNN-only sample has no series to
+  grade. **Nothing de-weights on them yet** — they are recorded first so there is something to
   decide with, and a reading from an older build carries none of them, so every
   consumer must read `undefined` as UNKNOWN rather than as clean.
 - **Progress falls back to demo data on an empty journal. Insights does NOT.** `src/lib/demo.ts`
@@ -364,8 +381,18 @@ old web app so old `export.json` files import directly.
   is registered but iOS runs it mostly overnight. HealthKit reads EMPTY while the
   phone is locked, which the evidence guards turn into "write nothing", so on iOS an
   alert usually lands shortly after the next unlock. `syncPacingBackground()`
-  registers only while Health is on, pacing is unlocked, an alert is on and
-  notifications are granted, and undoes it otherwise. The pacing sheet shows a "Turn
+  registers only while Health is on and pacing is unlocked, and undoes it
+  otherwise. **It is deliberately NOT gated on the alerts or on notification
+  permission**: the same wake-up refreshes the pacing widgets and the wrist, and
+  gating it that way gave a user who never granted notifications, or who simply
+  switched the alerts off, a widget that only moved when the app was opened with
+  nothing on screen to say why. A widget is not a notification.
+  `checkPacingAlerts` asks every part of its own question (unlocked, enabled,
+  granted) and is caught separately inside the wake-up, so the half the user
+  switched off can never cost the widgets their refresh.
+  `pacingBackgroundStatus()` reports the registration, HealthKit delivery and
+  the live observers into the support dump, because every gate here fails
+  silently and "my widget never changes" is otherwise unanswerable. The pacing sheet shows a "Turn
   on pacing alerts" card under the steps ask while permission is missing. Turning one
   on sends `not` letter `P`. None of this is OTA-able: it needs a native build.
 - **The store review ask is earned, never scheduled.** `src/lib/review/` decides
@@ -832,7 +859,25 @@ old web app so old `export.json` files import directly.
   different day; the journal cannot hold the curve, so `DayLoad.hrBands` keeps
   the minutes in three bands, `null` there means UNKNOWN and is charged FLAT,
   and `backfillHrBands` re-prices older days from the sidecar curve because the
-  ceiling medians graded and flat days together); **steps are a FLOOR, never a sum** (a day with
+  ceiling medians graded and flat days together); **a spend row explains ITSELF**
+  (`SpendRow.parts`, built where the charge is made): the drill-in draws the
+  row's own arithmetic and never a second extraction of `DayLoad`, which is how
+  a 7m Upright row came to open on 1h 59m + 3h 58m + 34m of components and the
+  heart-rate bands listed the STORED minutes rather than the ones left after a
+  logged workout came off the top; a test pins that the parts SUM to the row.
+  **Apple Stand Time is a FLOOR, not a verdict** — the watch credits a stand
+  hour from a short burst and wrote 34m for a day holding 1h 59m of measured
+  walking, so `uprightMinutes` takes whichever source saw more of the day
+  rather than always preferring the watch. **A stretch has to last
+  `STRETCH_MIN_MIN`**, or "73 stretches" is a heart hovering at its own line
+  while a watch samples it every forty seconds; the row's own total minutes
+  lead its detail line, since naming only the sub-quantities described a number
+  the row never stated. **The envelope's morning readings come out of the
+  SCORE** (`compValue` over a shared `makeSetLookup`), never the trends
+  registry: the registry averages TRAINING and BASELINE RMSSD into one figure
+  graded on one band's scale, so the budget sheet's "HRV this morning"
+  contradicted the Journal's own HRV tile one card above it — the same bug
+  DaySummary's key figures already fixed. **steps are a FLOOR, never a sum** (a day with
   nothing logged still shows a number, and on iOS the total must come from a
   statistics query, since a paired watch writes the same minutes as the phone
   and summing the samples double-counts them); **the ember is the only CONTINUOUS
@@ -888,7 +933,17 @@ old web app so old `export.json` files import directly.
   switch that stopped every read. The strip and the OPEN sheet both read
   `useStepsMissing`, because the sheet is opened with a snapshot of the view
   and the Connect button lives inside it.
-  **Held-day spend is a LOWER BOUND on capacity, never an estimate of
+  **A finished day is graded against what it PUBLISHED**
+  (`makeEnvelopeLookup` in `budget/envelope.ts`, memoized and sharing every
+  other lookup): the accuracy strip, the Progress margin chart and the export
+  all read the corrected ceiling as narrowed by that morning's readings and by
+  an overspent day before it, because grading against `capacityBaseline` — the
+  raw ceiling two stages upstream — let a day the card called under budget turn
+  up later as an "over budget" cell. `calibrate.ts` is the ONE deliberate
+  exception and must stay one: the correction is an input to that envelope, so
+  judging its own days against the published number would recurse for ever, and
+  its counts are internal and never rendered. A day that published nothing is a
+  `pending` cell, not a verdict. **Held-day spend is a LOWER BOUND on capacity, never an estimate of
   it**: it may only RAISE the ceiling, and lowering needs a DIP as its reason
   (`calibrate.ts`). Letting a quiet week pull it down was this model's first real
   bug — run against the demo journal it collapsed a two-month recovery arc to a
@@ -1000,21 +1055,34 @@ old web app so old `export.json` files import directly.
   numbers `sleepGradeParts` demotes on, so the picture and the grade cannot
   tell different stories. **Nights imported before this shipped have no
   series** and fall back to the min/max tiles.
-- **The half-off annual offer is the one offer that isn't a rotating surface.**
-  `src/lib/upsell/annual.ts` (pure + tested) + `annualMemory.ts` (flags MMKV):
-  at 30 / 90 / 180 / 365 **calendar days since install** — not engaged days, the
-  deliberate difference from the surfaces above — a free user gets one 24-hour
-  window offering a year of Pro at half price (`PROMO_YEARLY_SKU`, a SEPARATE
-  product because Apple can only target a price cut through server-signed
-  promotional offers; it therefore RENEWS at the discount, see `STORE_SETUP.md`
-  Part 6). The same window unlocks Pro: `src/store/tier.ts` layers it over
-  `deriveTier` and reports `'trial'`, never `'pro'` — nobody paid, and it ends.
-  A window is spent when it OPENS (`startOffer` consumes every milestone at or
-  below it), so a user returning on day 200 gets one offer, not four. It is not
-  opened on a crash-alert day or during a downturn: the milestone stays due and
-  fires on a calmer open rather than being wasted. `<AnnualOfferCard/>` renders
-  it under the Journal's Outlook, accordion-collapsible with no ✕ (it expires on
-  its own), and stamps the shared pacing clock via `noteAnnualOfferPacing()`.
+- **The half-off annual offer is the one offer that isn't a rotating surface,
+  and it is a NOTE rather than a pitch.** `src/lib/upsell/annual.ts` (pure +
+  tested) + `annualMemory.ts` (flags MMKV): at 30 / 90 / 180 / 365 **calendar
+  days since install** — not engaged days, the deliberate difference from the
+  surfaces above — a free user is asked once to pay for the app, at half price
+  (`PROMO_YEARLY_SKU`, a SEPARATE product because Apple can only target a price
+  cut through server-signed promotional offers; it therefore RENEWS at the
+  discount, see `STORE_SETUP.md` Part 6). **It STANDS until it is answered**:
+  the ✕ is the only thing that takes it down (`dismissOffer` clears the standing
+  milestone), and the next milestone is what brings it back. It used to be a
+  24-hour window that ALSO unlocked Pro for the day, and both are gone — an
+  unlock that has to be spent before the card expires is a countdown wearing a
+  gift's clothes, and a card that took itself down overnight was never seen by
+  the user who was too unwell to read it that day. `src/store/tier.ts` therefore
+  grants nothing here; `accessMsLeft` is the install trial and nothing else. A
+  milestone is spent when the card is RAISED (`startOffer` consumes every
+  milestone at or below it), so a user returning on day 200 gets one ask, not
+  four. It is not raised on a crash-alert day or during a downturn: the
+  milestone stays due and lands on a calmer open rather than being wasted.
+  `<AnnualOfferCard/>` renders it under the Journal's Outlook and stamps the
+  shared pacing clock. The card itself is Austin's own first-person note, two
+  paragraphs, over a yearly/monthly plan picker whose button goes STRAIGHT to
+  the store (`subscribe(sku, 'annual')`), never to the paywall — the plan was
+  already chosen on the card. **Every number on it is derived from the two
+  prices the store returned**: the discount claim (`discountPct`, and "half off"
+  only when the rounding really is 48-52%), the exact per-month division beside
+  the yearly row, and the rounded one in the sentence, which is why that one
+  says "about".
 - **The founding-member offer is the other one, and it lives for a single day.**
   `src/lib/upsell/founder.ts` (pure + tested) + `founderMemory.ts` (flags MMKV),
   rendered by `<FounderOfferCard/>` under the Journal's Outlook. It fires on the
@@ -1057,14 +1125,18 @@ old web app so old `export.json` files import directly.
   reading can be minimized, restored and finished from three different places),
   `/ping/pay/D{MMDDYY}{P}{S}` when a locked surface raises the paywall
   (`pingPaywall`, from `usePaywall()`), plus `not` (a notification turned on),
-  `pot` (a POTS capture finished), `see` (a gated view opened), `err` (something
+  `pot` (a POTS capture finished), `see` (a gated view opened — `I` Insights, `P`
+  Progress, `B` the pacing strip tapped while locked, which opens the pitch card;
+  with `use` `B` and `pay` `B` that is one funnel for the one surface, read down
+  the column), `err` (something
   failed), `osh`/`odm`/`oac` (an offer shown, dismissed, accepted), and four
   routes for what people DO in the app, all per-letter capped: `log` (logged BY
   HAND — `S` sleep once bed and wake are both set, `A` activity, `M` med, `Y`
   symptom, `W` water, `B` bowel movement, `P` blood pressure, `R` resting HR;
   `pingLogged`, fired only for NEW entries, never an edit, a live capture or a
   health-store import, and sending nothing for a reading type with no letter),
-  `use` (`M` Milestones sheet opened, `P` protocol saved), `fnd` (a finding's
+  `use` (`M` Milestones sheet opened, `P` protocol saved, `B` the pacing budget
+  sheet opened), `fnd` (a finding's
   deep dive opened, fired from `CorrelationSheet` / `ChangeSheet` themselves:
   `E` early, `U` unconfirmed, `C` biggest change, `R` correlation) and `rpt`
   (`D` data for prompt, `H` full health report, `C` doctor summary, counted when

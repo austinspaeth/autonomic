@@ -1,7 +1,7 @@
 /**
  * The pacing sheet: one card per question.
  *
- * Today · Where it went · Why today is 5h 30m · How well this holds. Each
+ * Today · Where it went · What makes up your budget · How accurate is my budget. Each
  * opens with a plain sentence before any figure, the pattern the sleep report
  * already uses, and every row goes somewhere.
  *
@@ -399,13 +399,19 @@ function SpendRowView({ row, onPress }: { row: SpendRow; onPress: () => void }) 
 
 function WhyCard({ dk, budget }: { dk: string; budget: BudgetView }) {
   const p = usePalette();
-  const env = budget.envelope.effortMin;
-  const size = budget.state === 'low' || budget.learning
-    ? budget.figureSub.replace(/^left of |^of /, '')
-    : hm(env || 0);
+  /**
+   * The title names the QUESTION, never the answer.
+   *
+   * It used to state the size, scraped out of `figureSub` — which is not a
+   * size at all on the states that do not carry one, so before anything was
+   * spent the card read "Why is your budget to spend today". Putting the
+   * figure back in correctly is no better: the number is already the largest
+   * thing on the strip this card opened from, and repeating it in a title
+   * spends the one line that could say what the rows below are.
+   */
   const title = budget.state === 'suppressed'
     ? (budget.past ? 'Why the budget was paused' : 'Why your budget is paused')
-    : budget.past ? `Why that day's budget was ${size}` : `Why is your budget ${size}`;
+    : budget.past ? "What made up that day's budget" : 'What makes up your budget';
 
   return (
     <InsightCard
@@ -465,11 +471,11 @@ function WhyCard({ dk, budget }: { dk: string; budget: BudgetView }) {
 }
 
 /* ------------------------------------------------------------------ *
- * 4. How well this holds
+ * 4. How accurate is my budget
  * ------------------------------------------------------------------ */
 
 /**
- * How well this holds — the trust anchor, and the only card that answers "is
+ * How accurate is my budget — the trust anchor, and the only card that answers "is
  * this getting smarter".
  *
  * Weekly bars once there are four weeks of verdicts, because the question is a
@@ -525,7 +531,7 @@ function AccuracyCard({ budget }: { budget: BudgetView }) {
 
   return (
     <InsightCard
-      title={learning ? 'How it is learning' : 'How well this holds'}
+      title={learning ? 'How it is learning' : 'How accurate is my budget'}
       helpText={BUDGET_HELP.accuracy}
       desc={trend
         ? 'How often the budget has been right, week by week, as it learns your log.'
@@ -539,7 +545,11 @@ function AccuracyCard({ budget }: { budget: BudgetView }) {
               <Text style={{ fontFamily: fonts.numHeavy, fontSize: 34, lineHeight: 34, color: p.text, fontVariant: ['tabular-nums'] }}>
                 {a.held}
               </Text>
-              <Text style={{ fontSize: 14, color: p.textDim }}>{`of ${a.of} this fortnight`}</Text>
+              {/* Not a window claim: this counts the last six weeks of
+                  evaluated days while the bars behind it draw five, and the
+                  copy said "fortnight", which was neither of those and is not
+                  how anyone says two weeks anyway. */}
+              <Text style={{ fontSize: 14, color: p.textDim }}>{`of ${a.of} days checked`}</Text>
             </View>
             {a.widenedMin != null ? (
               <View style={{ alignItems: 'flex-end' }}>

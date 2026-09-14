@@ -31,12 +31,12 @@ import type { DaysMap } from '../scoring/day';
 import { typesFor } from '../typeResolve';
 import { about, clock, hm } from './format';
 import { exertionLine, LEARN_DAYS } from './baseline';
-import { buildEnvelope, wakeMinutes, type Envelope } from './envelope';
-import { buildBurn, makeSpendLookup, type Burn, type BudgetMultiplier } from './burn';
+import { buildEnvelope, makeEnvelopeLookup, wakeMinutes, type Envelope } from './envelope';
+import { buildBurn, makeBurnLookup, makeSpendLookup, type Burn, type BudgetMultiplier } from './burn';
 import { paceAt, type Pace } from './pace';
 import { buildAccuracy, type Accuracy } from './accuracy';
 import { ceilingMove } from './calibrate';
-import { makeScoreLookup } from './outcome';
+import { makeScoreLookup, makeSetLookup } from './outcome';
 import { nextRecommendation, type Recommendation } from './recommend';
 import { uprightSignature } from './upright';
 
@@ -159,27 +159,34 @@ export function buildBudgetAt(
   const days: DaysMap = state.days;
   const { addDays } = opts;
   const types: Record<string, TypeDef> = typesFor(state, 'activities');
-  const scoreAt = makeScoreLookup(days, ctx);
+  // One scoreSet per day, shared by every pass below AND by the envelope's
+  // morning readings, which quote components out of the same result.
+  const setAt = makeSetLookup(days, ctx);
+  const scoreAt = makeScoreLookup(days, ctx, setAt);
 
   const lineBpm = exertionLine(days, dk, ctx, addDays);
   // Created ONCE and handed to every pass below. The accuracy strip alone
   // computes a ceiling for each of 42 days, and each of those walks 42 days of
   // its own; without these two caches that is thousands of repeated scores and
   // spends on the Journal's render path.
-  const spendAt = makeSpendLookup(days, types, lineBpm);
+  const burnAt = makeBurnLookup(days, types, lineBpm);
+  const spendAt = makeSpendLookup(days, types, lineBpm, burnAt);
+  // What each PAST day published, for the passes that grade one. Shares every
+  // cache above, so the accuracy strip's 42 days cost one envelope each.
+  const envelopeAt = makeEnvelopeLookup({ days, ctx, addDays, types, lineBpm, scoreAt, setAt, spendAt, burnAt });
   // The burn is built FIRST: its coverage is an input to the envelope's
   // confidence, and it needs nothing from the envelope in return (the credit
   // cap is a share of the day's own gross spend, not of the budget).
   const burn = buildBurn({ day: days[dk], types, lineBpm, multiplier: opts.multiplier, past: !!opts.past });
   const envelope = buildEnvelope({
     days, dk, ctx, addDays, types, lineBpm,
-    downturn: opts.downturn, strain: opts.strain, coverage: burn.coverage, scoreAt, spendAt,
+    downturn: opts.downturn, strain: opts.strain, coverage: burn.coverage, scoreAt, setAt, spendAt,
     past: !!opts.past,
   });
 
   const accuracy = opts.brief
     ? { ready: false, held: 0, of: 0, missed: 0, strip: [], needed: 21, weeks: [], widenedMin: null }
-    : buildAccuracy(days, dk, ctx, addDays, types, lineBpm, scoreAt, spendAt);
+    : buildAccuracy(days, dk, ctx, addDays, types, lineBpm, scoreAt, spendAt, envelopeAt);
 
   const wake = wakeMinutes(days, dk);
   const learning = envelope.learning < 1;

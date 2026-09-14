@@ -16,9 +16,8 @@ import type { Band, ScoreCat } from '../../lib/types';
 import { GRADE_COLORS, fonts, usePalette } from '../../theme';
 import { clock, hm, type BudgetView, type SpendRow } from '../../lib/budget';
 import { BAND_FRACTION } from '../../lib/budget/upright';
-import { HR_BAND_EDGES, HR_BAND_OFFSETS, HR_MIN_COVERAGE, HOURS, minutesByHour, uprightHours } from '../../lib/budget/burn';
+import { HR_BAND_EDGES, HR_MIN_COVERAGE, HOURS, minutesByHour, uprightHours } from '../../lib/budget/burn';
 import { minutesOf } from '../../lib/budget/pace';
-import { hrBoostFor } from '../../lib/budget/load';
 import { getWaveform, useAppState } from '../../store/store';
 import { loadWaveformId } from '../../lib/waveforms';
 import type { OpenSheet } from '../forms';
@@ -187,7 +186,20 @@ export function SpendSheet({ dk, budget, row }: { dk: string; budget: BudgetView
 
   let sentence = '';
   let body: React.ReactNode = null;
-  const whyRows: { label: string; value: string; good?: boolean }[] = [];
+  /**
+   * The row's OWN arithmetic, as `buildBurn` charged it.
+   *
+   * Never a second pass over `DayLoad`. The sheet used to re-derive these and
+   * the two drifted the moment they disagreed about anything: the upright row
+   * charges one source and this listed all three, so a 7m row opened on
+   * 1h 59m + 3h 58m + 34m, and the heart-rate rows listed the STORED bands
+   * rather than the ones left after a logged workout came off the top.
+   */
+  const whyRows: { label: string; value: string; good?: boolean }[] = (row.parts || []).map((part) => ({
+    label: part.label,
+    value: part.effortMin < 0 ? `-${hm(part.effortMin)}` : hm(part.effortMin),
+    good: part.effortMin < 0,
+  }));
 
   if (row.source === 'hr') {
     const line = load?.lineBpm;
@@ -201,23 +213,6 @@ export function SpendSheet({ dk, budget, row }: { dk: string; budget: BudgetView
         {line ? <Legend lineBpm={line} /> : null}
       </>
     );
-    // One row per intensity band, so the minutes and the effort minutes can be
-    // reconciled by hand. A day stored before bands existed keeps the single
-    // flat row it was charged as, rather than being split up after the fact.
-    if (load?.hrBands && line) {
-      const lo = Math.round(line);
-      load.hrBands.forEach((min, i) => {
-        if (min < 1) return;
-        const from = lo + HR_BAND_EDGES[i];
-        const to = HR_BAND_EDGES[i + 1] != null ? lo + HR_BAND_EDGES[i + 1] : null;
-        whyRows.push({
-          label: `${hm(min)} at ${to != null ? `${from} to ${to}` : `${from}+`} bpm`,
-          value: hm(min * hrBoostFor(HR_BAND_OFFSETS[i])),
-        });
-      });
-    } else if (load?.hrAboveMin != null && line) {
-      whyRows.push({ label: `${hm(load.hrAboveMin)} above ${Math.round(line)} bpm`, value: hm(load.hrAboveMin) });
-    }
     if (load?.longestStretch) {
       const s = load.longestStretch;
       whyRows.push({ label: `Longest stretch, ${clock(s.startMin)} to ${clock(s.endMin)}`, value: hm(s.endMin - s.startMin) });
@@ -237,9 +232,6 @@ export function SpendSheet({ dk, budget, row }: { dk: string; budget: BudgetView
     if (hours?.walk) series.push({ label: 'Walking', noun: 'walking', color: hexA(p.text, 0.75), values: hours.walk });
     if (hours?.still) series.push({ label: 'Standing, estimated', noun: 'standing', color: hexA(p.text, 0.35), values: hours.still });
     body = <HourBars series={series} />;
-    if (load?.walkingMin != null) whyRows.push({ label: `${hm(load.walkingMin)} walking`, value: hm(load.walkingMin * 0.2) });
-    if (load?.stillUprightMin != null) whyRows.push({ label: `${hm(load.stillUprightMin)} standing, estimated`, value: hm(load.stillUprightMin * 0.2) });
-    if (load?.standMin != null) whyRows.push({ label: `${hm(load.standMin)} standing or walking`, value: hm(load.standMin * 0.2) });
   } else if (row.source === 'activities' || row.source === 'credits') {
     sentence = row.source === 'credits'
       ? `Restorative entries give minutes back, up to a quarter of what the day ${budget.past ? 'cost' : 'has cost'}.`

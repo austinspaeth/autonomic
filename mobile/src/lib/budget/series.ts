@@ -16,12 +16,12 @@
  */
 import type { ScoreContext } from '../scoring';
 import type { DaysMap } from '../scoring/day';
-import { scoreCat } from '../scoring/day';
 import type { AppState, TypeDef } from '../types';
 import { typesFor } from '../typeResolve';
-import { exertionLine, capacityBaseline } from './baseline';
-import { makeSpendLookup } from './burn';
-import { makeScoreLookup, outcomeOf, type DayOutcome } from './outcome';
+import { exertionLine } from './baseline';
+import { makeBurnLookup, makeSpendLookup } from './burn';
+import { makeEnvelopeLookup } from './envelope';
+import { makeScoreLookup, makeSetLookup, outcomeOf, type DayOutcome } from './outcome';
 
 export interface BudgetDay {
   dk: string;
@@ -51,40 +51,47 @@ export function budgetSeries(
 ): BudgetDay[] {
   const days: DaysMap = state.days;
   const types: Record<string, TypeDef> = typesFor(state, 'activities');
-  const scoreAt = makeScoreLookup(days, ctx);
+  const setAt = makeSetLookup(days, ctx);
+  const scoreAt = makeScoreLookup(days, ctx, setAt);
 
   // The line moves slowly (a 42-day median of resting HR), so it is taken once
   // at the range's end rather than per day. Recomputing it 365 times would
   // dominate the whole build and move the answer by a beat or two.
   const lineBpm = keys.length ? exertionLine(days, keys[keys.length - 1], ctx, addDays) : null;
 
-  const spendOf = makeSpendLookup(days, types, lineBpm);
+  const burnAt = makeBurnLookup(days, types, lineBpm);
+  const spendOf = makeSpendLookup(days, types, lineBpm, burnAt);
+  // Each day against the ceiling it actually published — the corrected one,
+  // narrowed by that morning's readings and by an overspent day before it.
+  // This used to read `capacityBaseline`, the raw ceiling two stages upstream,
+  // so a margin here could disagree with the card that day had shown.
+  const envelopeAt = makeEnvelopeLookup({ days, ctx, addDays, types, lineBpm, scoreAt, setAt, spendAt: spendOf, burnAt });
 
   const out: BudgetDay[] = [];
   keys.forEach((dk) => {
     const d = days[dk];
     if (!d) return;
-    const score = scoreAt(dk);
-    // The same suppression rule the strip follows. A crash day publishes no
-    // number, so it contributes nothing to a margin chart either — the
-    // alternative is a huge fake overspend on the worst day of the month.
-    const suppressed = score != null && scoreCat(score).short === 'Crash';
+    // The same suppression rule the strip follows, and now literally the same
+    // code: a crash day publishes no number, so it contributes nothing to a
+    // margin chart either — the alternative is a huge fake overspend on the
+    // worst day of the month.
+    const envelope = envelopeAt(dk);
+    const suppressed = envelope.effortMin == null;
     // A finished day with no logged activity and no health read has an
     // UNKNOWN spend, not a spend of zero — and a margin computed from it would
     // report the whole budget as room the user had left over, which is a claim
     // about a day the app never saw. Today is the exception the strip handles:
     // there, spend genuinely starts at zero and accrues through the day.
     const known = (d.activities || []).length > 0 || d.load?.readAt != null;
-    const base = capacityBaseline(days, dk, ctx, addDays, types, lineBpm, scoreAt, spendOf);
     const spend = spendOf(dk);
     const blank = suppressed || !known;
     out.push({
       dk,
-      envelopeMin: suppressed ? null : base.effortMin,
+      envelopeMin: envelope.effortMin,
       spendMin: spend,
-      marginMin: blank ? null : base.effortMin - spend,
+      marginMin: blank ? null : (envelope.effortMin as number) - spend,
       outcome: outcomeOf(days, dk, ctx, addDays, scoreAt),
-      learning: base.learning < 1,
+      learning: envelope.learning < 1,
       known,
     });
   });

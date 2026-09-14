@@ -14,6 +14,9 @@ import { estimatedHrMax, hrZones, timeInZones } from '../workoutZones';
 import { isTrustedReading } from '../hrvQuality';
 import { TREND_METRICS, median as trendMedian, metricSeries, type TrendMetricId } from '../trends';
 import { budgetSeries } from '../budget/series';
+import { buildBurn } from '../budget/burn';
+import { exertionLine } from '../budget/baseline';
+import { typesFor } from '../typeResolve';
 
 export type ReportRange = 'day' | 'week' | 'month' | 'year' | 'all';
 
@@ -145,24 +148,58 @@ const secOrthostatic = (days: DaysMap, keys: string[]) => orNone(eachEntry(days,
  *   is the only evidence in the report that a given day's spend was actually
  *   affordable, which is why it is worth a column of its own.
  */
+/**
+ * The pacing section, and the only section that has to teach its own model.
+ *
+ * Every other section here is a list of things the user measured: a blood
+ * pressure is a blood pressure. An "effort minute" is a quantity this app
+ * invented, and a reader handed a column of them with no model behind them
+ * cannot tell a wrong number from an unfamiliar one — which is exactly what
+ * happened when the first version of this section went out. So the header is a
+ * SPEC, and every day carries the figures its own cost was computed from, so
+ * the arithmetic can be checked line by line rather than taken on trust.
+ */
 function secPacing(state: AppState, keys: string[], ctx: ScoreContext) {
   const rows = budgetSeries(state, keys, ctx, addDays).filter((r) => r.known);
   if (!rows.length) return '(none recorded)';
   const sign = (v: number) => (v > 0 ? `+${v}` : String(v));
+  const types = typesFor(state, 'activities');
+  const lineBpm = exertionLine(state.days, keys[keys.length - 1], ctx, addDays);
+
   const lines = rows.map((r) => {
-    const load = state.days[r.dk]?.load;
+    const day = state.days[r.dk];
+    const load = day?.load;
     const parts: string[] = [
       `Budget: ${r.envelopeMin == null ? 'not published (crash-grade day)' : `${Math.round(r.envelopeMin)}m`}`,
       `Cost: ${Math.round(r.spendMin)}m`,
     ];
     if (r.marginMin != null) parts.push(`Margin: ${sign(Math.round(r.marginMin))}m`);
     parts.push(`Next 2 days: ${r.outcome === 'unknown' ? 'not yet known' : r.outcome}`);
-    if (load?.steps != null) parts.push(`Steps: ${Math.round(load.steps)}`);
-    if (load?.hrAboveMin != null) parts.push(`Minutes above own exertion line: ${Math.round(load.hrAboveMin)}`);
-    if (load?.stillUprightMin != null) parts.push(`Minutes standing still (estimated): ${Math.round(load.stillUprightMin)}`);
+    // The cost, itemised exactly as the app charged it. Without this the
+    // effort-minute total is unfalsifiable: a reader cannot tell 250m of
+    // upright time from 250m of logged exercise, and the two mean opposite
+    // things about the day.
+    const burn = buildBurn({ day, types, lineBpm, past: true });
+    const items = burn.rows.map((row) => `${row.label} ${row.effortMin < 0 ? '-' : '+'}${Math.abs(Math.round(row.effortMin))}m (${row.detail})`);
+    if (items.length) parts.push(`Charged: ${items.join('; ')}`);
+    // The raw observations behind those charges, in their own units.
+    const obs: string[] = [];
+    if (load?.steps != null) obs.push(`${Math.round(load.steps)} steps`);
+    if (load?.hrAboveMin != null) obs.push(`${Math.round(load.hrAboveMin)}m above ${load.lineBpm != null ? `${Math.round(load.lineBpm)} bpm` : 'own line'}`);
+    if (load?.hrBelowMin != null) obs.push(`${Math.round(load.hrBelowMin)}m settled below own recovery line`);
+    if (load?.walkingMin != null) obs.push(`${Math.round(load.walkingMin)}m walking`);
+    if (load?.stillUprightMin != null) obs.push(`${Math.round(load.stillUprightMin)}m standing still (inferred from heart rate, estimate)`);
+    if (load?.standMin != null) obs.push(`${Math.round(load.standMin)}m watch stand time`);
+    if (load?.hrCoverageMin != null) obs.push(`heart rate covered ${Math.round(load.hrCoverageMin)}m of the day`);
+    if (obs.length) parts.push(`Observed: ${obs.join(', ')}`);
+    parts.push(`Coverage: ${burn.coverage === 'full' ? 'full day of heart rate'
+      : burn.coverage === 'partial' ? 'partial heart-rate day'
+        : burn.coverage === 'logged-only' ? 'logged activities and steps only'
+          : 'nothing measured'}`);
     if (r.learning) parts.push('ceiling still being fitted');
     return `[${r.dk}] ${parts.join(' | ')}`;
   });
+
   const scored = rows.filter((r) => r.marginMin != null);
   const over = scored.filter((r) => (r.marginMin as number) < 0).length;
   const under = scored.filter((r) => (r.marginMin as number) >= 0);
@@ -177,7 +214,25 @@ function secPacing(state: AppState, keys: string[], ctx: ScoreContext) {
     avg != null ? `average margin ${sign(avg)}m` : '',
     checked.length ? `stayed steady over the following two days on ${held} of ${checked.length} under-budget days` : '',
   ].filter(Boolean).join(' | ');
-  return `Effort minutes: one minute of moderate effort costs one, and time above this person's own exertion line costs more. The budget is a ceiling the app fits from their own history, not a target, a goal or a prescribed limit. "Next 2 days" is whether the daily autonomic score held over the following two days, which is the delayed window post-exertional symptoms appear in. Days the app had no way to observe are omitted rather than reported as costing nothing.
+
+  return `HOW TO READ THIS SECTION. These figures come from this app's pacing model. Do not map them onto calories, METs, exercise minutes or any fitness metric; they are none of those, and treating them as such will produce wrong conclusions.
+
+THE UNIT. One "effort minute" is one minute of moderate effort. A minute of a light activity costs 0.6, moderate 1.0, heavy 1.6, strenuous 2.2, and a minute of restorative activity (lying with legs up, breathwork) gives 0.35 back. The spread is deliberately compressed: for this population the cost of being upright and stressed is comparable to the cost of exercise, so standing in a queue and cycling are much closer together here than a metabolic-equivalent table would put them.
+
+WHAT CHARGES A DAY, all in effort minutes, summed:
+  1. Logged activities: duration x the weight above, raised by up to 1.5x when the session's average heart rate ran above this person's own exertion line.
+  2. Minutes the heart sat above that exertion line, priced by how far above it sat. The line is this person's own 42-day median resting heart rate plus 25 bpm, NOT a fitness zone or a percentage of max: in this population a resting rate of 95 is ordinary, and a textbook threshold would call their whole day a workout. Minutes already inside a logged workout are removed from the top intensity bands first, so nothing is billed twice.
+  3. Upright time at 0.2 per minute, which is the real limiter in POTS and what no fitness metric bills for. Measured walking (from step timestamps, overlapping device records merged, never summed) plus, where a heart-rate series exists, standing still INFERRED from the heart sitting in this person's own standing band with no steps. Inferred standing is an estimate and is labelled as one.
+  4. A floor from step count, never a sum: if 0.011 per step exceeds everything above, the difference is added so a phone-only day still shows a number.
+  5. Restorative entries and minutes the heart spent settled below this person's own recovery line REFUND, capped at a quarter of what the day cost. Sleep is excluded.
+Gaps in the heart-rate series longer than 5 minutes are treated as UNOBSERVED, never as rest, and a day with under 2 hours of series is not charged a heart-rate row at all.
+
+THE BUDGET is a CEILING fitted from this person's own history, not a target, a goal, a prescription or a recommendation from a clinician. It starts from a prior set by that day's own autonomic grade and is then pulled toward the 75th percentile of what they have actually absorbed on days that were FOLLOWED by a non-declining window. Held-day spend can only RAISE it; lowering it requires evidence of a dip. It is then corrected slowly against their own record (days under budget that dipped anyway pull it down 5% each, days over budget that held push it up 3%, bounded to 0.7-1.15x), narrowed by that morning's readings against their own 42-day usual, and narrowed further when the previous day ran over. The figure in the Budget column below is the number the app actually showed them that day, after all of that.
+
+"NEXT 2 DAYS" is the verdict: whether the daily autonomic score held over the following two days, which is the delayed window post-exertional symptoms appear in. A verdict read off the next day alone would clear a Tuesday that put this person on the floor on Thursday. "held" means it did not fall more than 10 points and did not reach crash grade; "dipped" means it did.
+
+Crash-grade days publish no budget at all, by design. Days the app had no way to observe are omitted rather than reported as costing nothing, so an absent day is missing data, never a rest day.
+
 SUMMARY: ${summary}
 ${lines.join('\n')}`;
 }

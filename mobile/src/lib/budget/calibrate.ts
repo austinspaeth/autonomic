@@ -84,6 +84,13 @@ export function ceilingAt(
     const outcome = outcomeOf(days, k, ctx, addDays, scoreAt);
     if (outcome === 'unknown') continue;
     const spend = spendAt(k);
+    // NOTE the ceiling judged against here is the raw baseline, NOT the number
+    // that day published. It has to be: the correction is an input to the
+    // published envelope, so grading its own days against the published number
+    // would recurse for ever. Everything the READER sees — the accuracy strip,
+    // the Progress margin, the export — grades against what was published
+    // (./envelope's `makeEnvelopeLookup`), so these counts can differ from the
+    // strip's by a day or two without anything on screen contradicting itself.
     const over = spend > base.effortMin;
     if (!over && outcome === 'dipped') underDipped++;
     else if (over && outcome === 'held') overHeld++;
