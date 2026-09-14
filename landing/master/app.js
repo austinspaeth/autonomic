@@ -9425,7 +9425,14 @@
     host.textContent = NOTE_COPY[st] || NOTE_COPY.unsupported;
     var enable = document.getElementById('ntEnable');
     var test = document.getElementById('ntTest');
-    if (enable) enable.disabled = st === 'granted' || st === 'denied' || st === 'unsupported';
+    if (enable) {
+      enable.disabled = st === 'granted' || st === 'denied' || st === 'unsupported';
+      /* The LABEL carries the state, as it does on the background button below.
+         Disabling alone left a button reading "Enable notifications" sitting
+         under a line reading "On." — which reads as a button that has stopped
+         working rather than as one whose job is done. */
+      enable.textContent = st === 'granted' ? 'Notifications are on' : 'Enable notifications';
+    }
     /* A test button that only works in a window you are not looking at would
        be untestable, so the test passes `force` — it is the one notification
        allowed to appear over the page that asked for it. */
@@ -9600,10 +9607,24 @@
       /* Through the SERVER, not through `Pwa.notify`. A local notification
          proves the permission and nothing else; the failure this button exists
          to catch is a keypair that does not match the stored subscription, and
-         only a real encrypted send from the sender can surface that. */
-      window.Api.call('PUSH_TEST').then(function (r) {
-        if (r.ok) bgSay('Sent. It should arrive within a few seconds — lock the screen to see it as a banner.');
-        else bgSay('Not sent: ' + (r.error || 'the push service rejected it.'));
+         only a real encrypted send from the sender can surface that.
+         THIS DEVICE'S endpoint goes with it, so the answer is about the device
+         holding the button. Without it the server tested every device on the
+         account and reported success if any one of them took the push — so a
+         laptop that received it answered for a phone that did not, under a
+         line telling the reader to lock their screen. */
+      window.Pwa.currentSubscription().then(function (sub) {
+        return window.Api.call('PUSH_TEST', { endpoint: (sub && sub.endpoint) || '' });
+      }).then(function (r) {
+        if (!r.ok) { bgSay('Not sent: ' + (r.error || 'the push service rejected it.')); return; }
+        /* A push service that ACCEPTED it and a device that then shows nothing
+           is the one outcome this card must not paper over: Apple returns the
+           same 201 for a payload it cannot decrypt as for one it can, so
+           "accepted" is the honest word and the next move belongs to the
+           reader. */
+        bgSay('Accepted by the push service for this device — it should arrive within a few seconds; ' +
+          'lock the screen to see it as a banner. If nothing arrives, this device’s subscription is stale: ' +
+          'turn these off and on again here.');
       }).catch(function (e) {
         bgSay('Not sent: ' + ((e && e.message) || 'the request failed.'));
       });
