@@ -111,26 +111,39 @@ check('the two are told apart by class, not only by copy',
   cards().some((c) => c.classList.contains('sale')) && cards().some((c) => c.classList.contains('download')),
   cards().map((c) => c.className).join(' | '));
 
+/* R2 also carries one open from an older cohort, which is somebody coming back.
+   It gets a card like the other two, because it is the event that fires most
+   often and a toast it usually loses is not a record of anything. */
+check('a returning open raises a card too', /1 returning visitor/.test(text()), text());
+check('and that card names the store it came back on', /1 returning visitor1 on iOS/.test(text()), text());
+check('it is told apart by class as well',
+  cards().some((c) => c.classList.contains('visit')), cards().map((c) => c.className).join(' | '));
+
 /* Cards do not expire. The whole point of the stack is to still be there when
    you come back to the laptop, so the only thing that removes one is a press. */
 await new Promise((r) => setTimeout(r, 1200));
-check('cards do not clear themselves', cards().length === 2, text());
+check('cards do not clear themselves', cards().length === 3, text());
 
 cards()[0].click();
 await new Promise((r) => setTimeout(r, 400));
-check('a card can be dismissed', cards().length === 1, text());
+check('a card can be dismissed', cards().length === 2, text());
 
 // The same report again is not news.
 AL.sync(R2);
 await new Promise((r) => setTimeout(r, 30));
-check('an unchanged report raises nothing', cards().length === 1, text());
+check('an unchanged report raises nothing', cards().length === 2, text());
 
 /* "Clear all" appears once there is more than one thing to clear, and empties
    the stack in one press. */
-check('one card needs no clear-all', $('alertClear').classList.contains('hidden'));
+check('two cards bring out clear-all', !$('alertClear').classList.contains('hidden'));
+$('alertClear').click();
+await new Promise((r) => setTimeout(r, 400));
 AL.announce({ visitors: 0, downloads: 1, sales: 0, downloadsBy: { A: 1 }, salesBy: {} });
 await new Promise((r) => setTimeout(r, 30));
-check('a second card brings out clear-all', !$('alertClear').classList.contains('hidden'));
+check('a lone card keeps clear-all away', $('alertClear').classList.contains('hidden'));
+AL.announce({ visitors: 0, downloads: 1, sales: 0, downloadsBy: { A: 1 }, salesBy: {} });
+await new Promise((r) => setTimeout(r, 30));
+check('a second card brings it out', !$('alertClear').classList.contains('hidden'));
 $('alertClear').click();
 await new Promise((r) => setTimeout(r, 400));
 check('clear-all empties the stack', cards().length === 0, text());
@@ -202,21 +215,43 @@ AL.announce({
 await new Promise((r) => setTimeout(r, 30));
 check('a new install still does', canvasEl.width > 0, String(canvasEl.width));
 
-/* A returning visit gets a toast naming the install age, and no card. */
+/* A returning visit gets BOTH a card and a toast, and the line on each names
+   the store and how old the installs are — the same two facts a download card
+   carries, because a bare count has nobody behind it. */
 const cardsBeforeVisit = cards().length;
 AL.announce({
-  visitors: 3, downloads: 0, sales: 0, activations: 0, readings: 0,
-  downloadsBy: {}, salesBy: {}, activationsBy: {}, readingsBy: {},
+  visitors: 3, downloads: 0, returns: 3, sales: 0, activations: 0, readings: 0,
+  downloadsBy: {}, returnsBy: { I: 2, A: 1 }, salesBy: {}, activationsBy: {}, readingsBy: {},
   who: { returns: { '2026-08-01': { n: 3, age: 12, day: '2026-08-13' } } },
 });
 await new Promise((r) => setTimeout(r, 30));
-check('a returning visit toasts how old the installs are',
-  $('toast').textContent === '3 returning visitors · installed Aug 1, 12 days ago', $('toast').textContent);
-check('and raises no card', cards().length === cardsBeforeVisit, text());
+check('a returning visit toasts the store and how old the installs are',
+  $('toast').textContent === '3 returning visitors · 2 on iOS · 1 on Android · installed Aug 1, 12 days ago',
+  $('toast').textContent);
+check('and raises a card saying the same thing', cards().length === cardsBeforeVisit + 1 &&
+  /3 returning visitors2 on iOS · 1 on Android · installed Aug 1, 12 days ago/.test(text()), text());
+
+/* And it OUTRANKS a reading for the one toast slot, which is the reordering
+   that makes it visible at all: a refresh carrying a single morning reading
+   used to swallow every return in it. The reading still gets its card. */
+AL.announce({
+  visitors: 2, downloads: 0, returns: 2, sales: 0, activations: 0, readings: 2,
+  downloadsBy: {}, returnsBy: { I: 2 }, salesBy: {}, activationsBy: {}, readingsBy: { W: 2 },
+  who: {
+    returns: { '2026-08-02': { n: 2, age: 11, day: '2026-08-13' } },
+    readings: { '2026-08-10': { n: 2, age: 3, day: '2026-08-13' } },
+  },
+});
+await new Promise((r) => setTimeout(r, 30));
+check('a return takes the toast from a reading in the same refresh',
+  $('toast').textContent === '2 returning visitors · 2 on iOS · installed Aug 2, 11 days ago',
+  $('toast').textContent);
+check('and the reading still keeps its card',
+  /2 readings today2 Apple Watch · installed Aug 10, 3 days ago/.test(text()), text());
 
 AL.announce({
-  visitors: 0, downloads: 0, sales: 0, activations: 0, readings: 2,
-  downloadsBy: {}, salesBy: {}, activationsBy: {}, readingsBy: { W: 2 },
+  visitors: 0, downloads: 0, returns: 0, sales: 0, activations: 0, readings: 2,
+  downloadsBy: {}, returnsBy: {}, salesBy: {}, activationsBy: {}, readingsBy: { W: 2 },
   who: { readings: { '2026-08-10': { n: 2, age: 3, day: '2026-08-13' } } },
 });
 await new Promise((r) => setTimeout(r, 30));

@@ -112,6 +112,33 @@ const RETURNS = {
 const back = AL.diff(s0, AL.snapshot(RETURNS));
 check('returning traffic pings as visitors and nothing else',
   back.visitors === 5 && back.downloads === 0 && back.sales === 0, JSON.stringify(back));
+/* And is counted in its OWN right, which is what carries the platform: the old
+   `visitors - downloads` subtraction agrees on the number and throws the store
+   away, and a store is half of what makes a return readable. */
+check('a return is counted as a return, not inferred from a subtraction',
+  back.returns === 5, String(back.returns));
+/* All five came back on iOS: the Android cohort in that row is unchanged from
+   the baseline, so it is not a rise and is not news. */
+check('and keeps the store it came back on',
+  JSON.stringify(back.returnsBy) === JSON.stringify({ I: 5 }), JSON.stringify(back.returnsBy));
+check('which reads as a store line',
+  AL.storeLine(back.returnsBy) === '5 on iOS', AL.storeLine(back.returnsBy));
+/* A first run is an open too, and must never be counted twice. */
+check('a fresh install is a download and never also a return',
+  AL.snapshot(RETURNS).days[D2].returns === 11 && AL.snapshot(RETURNS).days[D2].downloads === 1,
+  JSON.stringify(AL.snapshot(RETURNS).days[D2]));
+
+/* A baseline stored before returns were counted separately. The count survives
+   as the subtraction it always was; only the store split is unavailable, and an
+   empty map renders as no store line rather than as a wrong one. */
+const noRet = AL.snapshot(BASE);
+delete noRet.returns;
+Object.keys(noRet.days).forEach((k) => { delete noRet.days[k].returns; delete noRet.days[k].returnsBy; });
+const dNoRet = AL.diff(noRet, AL.snapshot(RETURNS));
+check('an older baseline still reports the returns it can infer',
+  dNoRet.returns === dNoRet.visitors - dNoRet.downloads && dNoRet.returns > 0, JSON.stringify(dNoRet));
+check('but claims no store for them',
+  AL.storeLine(dNoRet.returnsBy) === '', JSON.stringify(dNoRet.returnsBy));
 
 /* -------------------------------------------------------------- baseline */
 

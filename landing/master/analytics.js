@@ -200,13 +200,13 @@ window.Analytics = (function () {
      one. */
   var NOTIFY_NAME = { M: 'Morning reminder', C: 'Crash warning', P: 'Pacing alerts' };
   var POTS_NAME = { T: 'Stand test', E: 'Episode' };
-  var VIEW_NAME = { I: 'Insights', P: 'Progress' };
+  var VIEW_NAME = { I: 'Insights', P: 'Progress', B: 'Pacing budget (locked)' };
   var OFFER_NAME = { A: 'Half-off annual', F: 'Founding member' };
   var LOG_NAME = {
     S: 'Sleep', A: 'Activity', M: 'Med or supplement', Y: 'Symptom',
     W: 'Water', B: 'Bowel movement', P: 'Blood pressure', R: 'Resting heart rate'
   };
-  var FEATURE_NAME = { M: 'Milestones opened', P: 'Protocol saved' };
+  var FEATURE_NAME = { M: 'Milestones opened', P: 'Protocol saved', B: 'Pacing budget opened' };
   var FINDING_NAME = { E: 'Early signal', U: 'Unconfirmed pattern', C: 'Biggest change', R: 'Correlation' };
   var REPORT_NAME = { D: 'Data for prompt', H: 'Full health report', C: 'Doctor summary' };
 
@@ -227,10 +227,10 @@ window.Analytics = (function () {
   var SLOT_ORDER = {
     act: METHOD_ORDER, cap: METHOD_ORDER, hrv: METHOD_ORDER,
     pay: SURFACE_ORDER,
-    not: ['M', 'C', '?'], pot: ['T', 'E', '?'], see: ['I', 'P', '?'],
+    not: ['M', 'C', 'P', '?'], pot: ['T', 'E', '?'], see: ['I', 'P', 'B', '?'],
     osh: ['A', 'F', '?'], odm: ['A', 'F', '?'], oac: ['A', 'F', '?'],
     log: ['S', 'A', 'M', 'Y', 'W', 'B', 'P', 'R', '?'],
-    use: ['M', 'P', '?'], fnd: ['E', 'U', 'C', 'R', '?'], rpt: ['D', 'H', 'C', '?']
+    use: ['M', 'P', 'B', '?'], fnd: ['E', 'U', 'C', 'R', '?'], rpt: ['D', 'H', 'C', '?']
   };
 
   /* Every route the report can carry, in the order the UI reads them. `open`,

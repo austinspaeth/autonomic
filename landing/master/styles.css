@@ -882,6 +882,9 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { outline: 2px solid var
 /* Magenta, the colour App usage gives the daily reading counter — deliberately
    not the activation green beside it: one is a first, one is a habit. */
 .alert-card.reading { border-left: 3px solid var(--series-5); }
+/* House blue, the same colour its confetti puff is drawn in: somebody who
+   already had the app opening it again. */
+.alert-card.visit { border-left: 3px solid var(--series-1); }
 .alert-mark { font-size: 20px; line-height: 1; flex: none; }
 .alert-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .alert-body b { font-size: 14px; }

@@ -366,10 +366,10 @@ camera and a formality for the watches; read the watch letters on `hrv` as a
 headcount, which is what that route is for, and not against `cap`.
 
 **Beyond those, ten routes with a different cap.** `not` (a notification turned
-on), `pot` (a POTS capture finished), `see` (a gated view opened), the three
+on), `pot` (a POTS capture finished), `see` (a gated view opened: Insights, Progress, or the pacing budget tapped while locked), the three
 offer routes, and the four journal-and-feature routes — `log` (something logged
 by hand: sleep, activity, med, symptom, water, bowel movement, blood pressure,
-resting HR), `use` (Milestones opened, protocol saved), `fnd` (an Insights
+resting HR), `use` (Milestones opened, protocol saved, the pacing budget opened), `fnd` (an Insights
 finding opened into its deep dive) and `rpt` (which AI report was built), drawn
 on *What they log* and *What they dig into* — are capped once per install per
 day **per letter**, not per route.
@@ -882,11 +882,22 @@ a CSV paste would be an alert about your own typing.
 
 | Event | Definition | Reaction |
 |---|---|---|
-| Visitors | a rise in open pings, minus that day's first runs — somebody **coming back** | two-note blip, **three seconds** of house-coloured glitter, and a toast saying how old the returning installs are (only when nothing louder toasted). No card, no notification |
+| Visitors | a rise in open pings from cohorts older than the day — somebody **coming back**, counted in its own right so the store letter survives | two-note blip, **three seconds** of house-coloured glitter, a card + a toast naming the store(s) and how old the returning installs are. The toast yields only to a sale or a download; the blip still yields to everything. No notification |
 | Activations | a rise in activation pings — an install saved its **first HRV reading** | two-note settling chime, a card + a toast + a notification naming the sensor(s). **No confetti.** |
 | Readings | a rise in daily reading pings — an install measured **today** | one struck note, a card + a toast + a notification naming the sensor(s). **No confetti**, and it yields every channel to anything above it in this table — it is the app being used, which is what this dashboard hopes to see all day |
 | Downloads | a rise in **first runs** — an open ping whose cohort key IS the day it arrived on | three-note rising chime, **ten seconds** of SILVER glitter falling from the top, a card + a toast + a notification naming the store(s) |
 | Sales | a rise in subscribe pings | brass fanfare, **twenty seconds** of GOLD glitter from the top AND the bottom, a card + a toast + a notification naming the store(s) that paid |
+
+A return gets a CARD because it is the event that fires most often, which used to
+mean it was announced only in a slot it almost never won: one toast element
+replaces itself, so a refresh carrying a single morning reading swallowed every
+return in it and the news was gone with a toast that never appeared. A card stays
+until it is pressed and is replayed by the Alerts button, which is where a
+frequent event belongs. Its toast now outranks the activation and reading toasts
+for the same reason, and that costs nothing — both of those already hold the same
+sentence on a card of their own. A notification still is not raised for it: that
+one leaves the page, and a push for every open is the fastest way to have pushes
+turned back off.
 
 The five cues are meant to be told apart across a room with your back to the
 screen, so they differ in SHAPE and not only in pitch — two notes, one struck

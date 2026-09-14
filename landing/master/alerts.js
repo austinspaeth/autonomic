@@ -5,10 +5,11 @@
  * ping report and the next is announced rather than silently redrawn. Five
  * events, in ascending order of how much they matter:
  *
- *   visitors    someone opened the app         soft blip, a toast saying how
- *               (returning: a first run is       old the installs are, THREE
- *               counted as a download, not       SECONDS of house-coloured
- *               as a return)                     glitter
+ *   visitors    someone opened the app         soft blip, a card + a toast
+ *               (returning: a first run is       naming the store and how old
+ *               counted as a download, not       the installs are, THREE
+ *               as a return)                     SECONDS of house-coloured
+ *                                                glitter. No notification.
  *   readings    an install saved a reading      soft tap, a card + a toast + a
  *               TODAY (any reading, not the      notification naming the
  *               first)                           sensor. No canvas.
@@ -138,8 +139,8 @@
    */
   function snapshot(report) {
     var out = {
-      opens: 0, downloads: 0, sales: 0, activations: 0, readings: 0,
-      downloadsBy: {}, salesBy: {}, activationsBy: {}, readingsBy: {}, days: {},
+      opens: 0, downloads: 0, returns: 0, sales: 0, activations: 0, readings: 0,
+      downloadsBy: {}, returnsBy: {}, salesBy: {}, activationsBy: {}, readingsBy: {}, days: {},
     };
 
     /* The newest day in the report, which is what "recent" is measured from
@@ -154,8 +155,8 @@
     function day(d) {
       if (out.days[d]) return out.days[d];
       var bucket = out.days[d] = {
-        opens: 0, downloads: 0, sales: 0, activations: 0, readings: 0,
-        downloadsBy: {}, salesBy: {}, activationsBy: {}, readingsBy: {},
+        opens: 0, downloads: 0, returns: 0, sales: 0, activations: 0, readings: 0,
+        downloadsBy: {}, returnsBy: {}, salesBy: {}, activationsBy: {}, readingsBy: {},
       };
       /* WHO arrived, by install day, so a toast can say how old they are. Only
          kept for recent days: this snapshot is the stored baseline, a year of
@@ -189,6 +190,15 @@
           bucket.downloads += n;
           bucket.downloadsBy[p] = (bucket.downloadsBy[p] || 0) + n;
         } else {
+          /* Somebody the counter had heard from before. Counted in its own
+             right rather than left as `opens - downloads`: the platform is on
+             the ping's own cohort key and is thrown away by a subtraction, and
+             it is the half of a return that a store name makes readable. */
+          var rp = letterOf(x.platform);
+          out.returns += n;
+          out.returnsBy[rp] = (out.returnsBy[rp] || 0) + n;
+          bucket.returns += n;
+          bucket.returnsBy[rp] = (bucket.returnsBy[rp] || 0) + n;
           bump(bucket.who && bucket.who.returns, x.cohort, n);
         }
       });
@@ -318,15 +328,20 @@
     var n = next || snapshot(null);
     var actKnown = typeof p.activations === 'number';
     var readKnown = typeof p.readings === 'number';
+    /* A baseline written before returns were counted in their own right. It
+       still knows every open and every download, so the COUNT survives as the
+       subtraction it always was; only the platform split is unavailable, and an
+       empty `returnsBy` renders as no store line rather than as a wrong one. */
+    var retKnown = typeof p.returns === 'number';
     var d;
 
     if (p.days && n.days) {
-      d = { visitors: 0, downloads: 0, sales: 0, activations: 0, readings: 0,
-            downloadsBy: {}, salesBy: {}, activationsBy: {}, readingsBy: {},
+      d = { visitors: 0, downloads: 0, returns: 0, sales: 0, activations: 0, readings: 0,
+            downloadsBy: {}, returnsBy: {}, salesBy: {}, activationsBy: {}, readingsBy: {},
             who: { returns: {}, sales: {}, activations: {}, readings: {} } };
       Object.keys(n.days).forEach(function (key) {
-        var a = p.days[key] || { opens: 0, downloads: 0, sales: 0, activations: 0, readings: 0,
-                                 downloadsBy: {}, salesBy: {}, activationsBy: {}, readingsBy: {} };
+        var a = p.days[key] || { opens: 0, downloads: 0, returns: 0, sales: 0, activations: 0, readings: 0,
+                                 downloadsBy: {}, returnsBy: {}, salesBy: {}, activationsBy: {}, readingsBy: {} };
         var b = n.days[key];
         /* Who arrived. A baseline day that exists but carries no cohort map
            (written before this shipped, or too old to keep one) would make every
@@ -344,6 +359,10 @@
         d.sales += rise(a.sales, b.sales);
         addInto(d.downloadsBy, gain(a.downloadsBy, b.downloadsBy));
         addInto(d.salesBy, gain(a.salesBy, b.salesBy));
+        if (retKnown) {
+          d.returns += rise(a.returns, b.returns);
+          addInto(d.returnsBy, gain(a.returnsBy, b.returnsBy));
+        }
         if (readKnown) {
           d.readings += rise(a.readings, b.readings);
           addInto(d.readingsBy, gain(a.readingsBy, b.readingsBy));
@@ -356,16 +375,24 @@
       d = {
         visitors: rise(p.opens, n.opens),
         downloads: rise(p.downloads, n.downloads),
+        returns: retKnown ? rise(p.returns, n.returns) : 0,
         sales: rise(p.sales, n.sales),
         activations: actKnown ? rise(p.activations, n.activations) : 0,
         readings: readKnown ? rise(p.readings, n.readings) : 0,
         downloadsBy: gain(p.downloadsBy, n.downloadsBy),
+        returnsBy: retKnown ? gain(p.returnsBy, n.returnsBy) : {},
         salesBy: gain(p.salesBy, n.salesBy),
         activationsBy: actKnown ? gain(p.activationsBy, n.activationsBy) : {},
         readingsBy: readKnown ? gain(p.readingsBy, n.readingsBy) : {},
         who: { returns: {}, sales: {}, activations: {}, readings: {} }
       };
     }
+
+    /* What "returning" means, in one place. A counted return where the
+       baseline knew about them; otherwise the subtraction this file always did,
+       which is the same number without a store behind it. Never negative: a
+       download is also an open, and a day's opens can be re-stated. */
+    if (!retKnown) d.returns = Math.max(0, d.visitors - d.downloads);
 
     d.any = d.visitors > 0 || d.downloads > 0 || d.sales > 0 || d.activations > 0 || d.readings > 0;
     return d;
@@ -954,7 +981,7 @@
 
   /* One glyph per kind, so a card is identified before it is read — the left
      edge carries the same distinction in colour (styles.css). */
-  var MARK = { sale: '💸', download: '📲', activation: '💓', reading: '🫀' };
+  var MARK = { sale: '💸', download: '📲', activation: '💓', reading: '🫀', visit: '👋' };
 
   /* ------------------------------------------------------- today's record
    *
@@ -1155,18 +1182,41 @@
       push('🫀 ' + readTitle, readLine, 'autonomic-reading');
     }
     /* RETURNING users, so the new installs are taken out of it: a first run is
-       also an open, and it already has ten seconds of silver of its own. */
-    var returning = Math.max(0, d.visitors - d.downloads);
-    /* Visitors get a sound and a TOAST saying how old the returning installs
-       are, and never a card or a notification. It is the event that fires most
-       often: a card for it would bury the stack, and a notification for it
-       would be the fastest way to have notifications turned back off. The toast
-       is one line that clears itself, and yields to any louder toast. */
+       also an open, and it already has ten seconds of silver of its own. The
+       diff counts them in their own right now, which is what carries the store
+       letter — a subtraction has no platform. */
+    var returning = d.returns || 0;
+    /* A return gets a CARD and a TOAST, and still no notification. The card is
+       the part that cannot be lost: it is the event that fires most often, so
+       it used to be the one thing announced only in a slot it almost never won
+       — a refresh carrying a single morning reading swallowed every return in
+       it, and the news that somebody came back was gone with the toast that
+       never appeared. A card stays until it is pressed and is replayed by the
+       Alerts button, which is where a frequent event belongs. A notification
+       still is not: that one leaves the page, and a push for every open is the
+       fastest way to have pushes turned back off.
+
+       The LINE says which store and how old the installs are, the same two
+       facts a download card carries, because "3 returning visitors" on its own
+       is a number with nobody behind it.
+
+       Its TOAST yields only to the two ARRIVALS above (a sale, a new install).
+       It deliberately outranks the activation and reading toasts, which is a
+       reordering rather than a new interruption: there is one toast element and
+       it replaces itself, so the question is only which single line is worth
+       reading, and those two already have cards of their own holding the same
+       sentence. Nothing is lost by letting the return speak. */
+    if (returning > 0) {
+      var visTitle = returning + ' returning ' + plural(returning, 'visitor');
+      var visLine = joinLine(storeLine(d.returnsBy), cohortLine(who.returns));
+      card('visit', visTitle, visLine);
+      if (!d.sales && !d.downloads) say(joinLine(visTitle, visLine));
+    }
+    /* The blip is still the quietest cue there is and still yields to
+       everything, returns included: a sound is an interruption where a card is
+       not, and this is the event that happens all day. */
     if (!d.sales && !d.downloads && !d.activations && !d.readings && d.visitors > 0) {
       play(VISITOR);
-      if (returning > 0) {
-        say(joinLine(returning + ' returning ' + plural(returning, 'visitor'), cohortLine(who.returns)));
-      }
     }
     /* Three seconds of house-coloured glitter, and it runs whatever else
        happened — the canvas ranks nothing, only the sound does. */

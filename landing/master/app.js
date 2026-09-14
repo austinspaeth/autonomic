@@ -3690,10 +3690,16 @@
   var EVENT_LINES = [
     { kind: 'see', slot: 'I', name: 'Opened Insights', color: COLOR.s7 },
     { kind: 'see', slot: 'P', name: 'Opened Progress', color: COLOR.s1 },
+    /* The locked half of a pacing tap. Its unlocked half is on the usage card
+       next door as "Opened the pacing budget", and the two are deliberately not
+       on one line: together they are just "somebody tapped the strip", which is
+       the one thing about the pacing trial that was never in question. */
+    { kind: 'see', slot: 'B', name: 'Pacing budget, locked', color: COLOR.s5 },
     { kind: 'pot', slot: 'T', name: 'Stand test', color: COLOR.s3 },
     { kind: 'pot', slot: 'E', name: 'POTS episode', color: COLOR.s8 },
     { kind: 'not', slot: 'M', name: 'Reminder on', color: COLOR.s4 },
-    { kind: 'not', slot: 'C', name: 'Crash warning on', color: COLOR.s2 }
+    { kind: 'not', slot: 'C', name: 'Crash warning on', color: COLOR.s2 },
+    { kind: 'not', slot: 'P', name: 'Pacing alerts on', color: COLOR.s6 }
   ];
 
   function renderEvents(ix, days) {
@@ -3782,6 +3788,7 @@
   var DIG_LINES = [
     { kind: 'use', slot: 'M', name: 'Opened Milestones', color: COLOR.s1 },
     { kind: 'use', slot: 'P', name: 'Saved their protocol', color: COLOR.s3 },
+    { kind: 'use', slot: 'B', name: 'Opened the pacing budget', color: COLOR.s5 },
     { kind: 'fnd', slot: 'E', name: 'Opened an early signal', color: COLOR.s7 },
     { kind: 'fnd', slot: 'U', name: 'Opened an unconfirmed pattern', color: COLOR.s8 },
     { kind: 'fnd', slot: 'C', name: 'Opened the biggest change', color: COLOR.s5 },
