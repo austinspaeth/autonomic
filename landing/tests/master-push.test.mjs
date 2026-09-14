@@ -262,11 +262,45 @@ async function signIn(window) {
      else; the failure this button exists to catch is a keypair that does not
      match the stored subscription. */
   $('bgTest').click();
-  await wait(150);
+  await wait(200);
+  const testCall = calls.find((c) => c.action === 'PUSH_TEST');
   check('the test goes through the real sender, not a local notification',
-    calls.some((c) => c.action === 'PUSH_TEST'), JSON.stringify(calls.map((c) => c.action)));
+    !!testCall, JSON.stringify(calls.map((c) => c.action)));
+
+  /* It has to test THIS device. Sending to every device on the account and
+     reporting success if any one took it lets a laptop answer for a phone,
+     under a line telling the reader to lock their screen. */
+  check('and it names this device’s own endpoint, so the answer is about this device',
+    testCall && testCall.payload && testCall.payload.endpoint === SUBSCRIPTION.endpoint,
+    JSON.stringify(testCall && testCall.payload));
+
+  /* Apple returns the same 201 for a payload it cannot decrypt as for one it
+     can, so the push service ACCEPTING it is not the same claim as it having
+     arrived, and the line must not make the stronger one. */
+  check('a success says the push service accepted it, not that it arrived',
+    /accepted/i.test($('bgStatus').textContent) && !/^Sent\./.test($('bgStatus').textContent),
+    $('bgStatus').textContent);
+  check('and names the next move when nothing shows up',
+    /off and on again/i.test($('bgStatus').textContent), $('bgStatus').textContent);
 
   check('no page errors', errors.length === 0, errors[0]);
+}
+
+/* ------------------------------ 3b. the in-page button carries its own state */
+
+{
+  const { window } = boot({ push: {} });
+  await signIn(window);
+  await wait(200);
+  const $ = (id) => window.document.getElementById(id);
+
+  /* Disabling alone left a button reading "Enable notifications" under a line
+     reading "On." — which reads as a button that has stopped working rather
+     than as one whose job is done. The background button below it already put
+     the state in the label; this is the same rule. */
+  check('a granted permission is said in the button, not only in the status line',
+    /notifications are on/i.test($('ntEnable').textContent), $('ntEnable').textContent);
+  check('and the spent button is not clickable', $('ntEnable').disabled === true);
 }
 
 /* ------------------------------------ 4. a device that is already on says so */
