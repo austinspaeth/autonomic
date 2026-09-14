@@ -93,15 +93,36 @@ const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({}), {
  * a genuinely unexpected failure is logged, and even then the answer is the
  * same — behave as if unconfigured rather than throw, because the alternative
  * is an hourly job that alarms in CloudWatch about a feature nobody turned on.
+ *
+ * A HIT is cached for the container's life; a MISS for a minute and no longer,
+ * and that asymmetry is the whole point. The lookup used to be memoised once
+ * either way, so the first call on a cold container decided the answer for that
+ * container's whole life — and the `api` container is warm exactly when someone
+ * is setting the feature up, because the dashboard polls it every five minutes.
+ * Creating the parameter therefore left the settings card still reading "no
+ * push keys set" until the container happened to recycle, which is
+ * indistinguishable from a parameter that did not take, and is why that copy
+ * used to send its reader off to redeploy. serverless.yml promises that
+ * creating the parameter turns the feature on with no redeploy; re-checking
+ * while dark is what makes that promise true. It costs one GetParameter a
+ * minute per warm container, only while the feature is off, and stops the
+ * moment it is on.
+ *
+ * Re-checking a HIT would buy nothing: a keypair only changes in a rotation,
+ * and a rotation invalidates every stored subscription anyway (see README), so
+ * it is already a "turn it on again on each device" event rather than something
+ * a running container should try to follow.
  */
 const VAPID_PARAM = String(process.env.VAPID_PARAM || '').trim();
 const DEFAULT_SUBJECT = 'mailto:austinspaeth@msn.com';
+const DARK_RECHECK_MS = 60_000;
 
-let keysPromise = null;
+let keysPromise = null;  // the last lookup, in flight or settled
+let keysFound = false;   // it settled on a keypair — never look again
+let checkedAt = 0;       // when that lookup was STARTED
 
-function loadKeys() {
-  if (keysPromise) return keysPromise;
-  keysPromise = (async () => {
+function fetchKeys() {
+  return (async () => {
     if (!VAPID_PARAM) return null;
     try {
       // Required lazily so this module still loads where the SDK is absent.
@@ -128,6 +149,18 @@ function loadKeys() {
       return null;
     }
   })();
+}
+
+function loadKeys() {
+  /* An in-flight lookup is shared rather than raced: concurrent callers on a
+     cold start want one GetParameter between them, not one each. */
+  const usable = keysPromise && (keysFound || Date.now() - checkedAt < DARK_RECHECK_MS);
+  if (usable) return keysPromise;
+  checkedAt = Date.now();
+  keysPromise = fetchKeys().then((keys) => {
+    if (keys) keysFound = true;
+    return keys;
+  });
   return keysPromise;
 }
 
@@ -213,9 +246,16 @@ async function dropSubscription(sub) {
 /* --------------------------------------------------------------- the sending */
 
 /** Send one notification to every subscription, dropping the dead ones.
- *  Returns `{ sent, dropped, failed }`. Never throws: one bad endpoint must not
- *  cost the others their notification, or a single stale device would silence
- *  the phone that is still listening. */
+ *  Returns `{ sent, dropped, failed, statuses }`. Never throws: one bad
+ *  endpoint must not cost the others their notification, or a single stale
+ *  device would silence the phone that is still listening.
+ *
+ *  `statuses` is the distinct set of rejection codes, and it exists because
+ *  the counters cannot say WHY. A 403 (the keypair does not match what this
+ *  device subscribed against) and a 400 (a malformed request) are different
+ *  problems with different fixes, and "failed: 1" sends whoever is holding the
+ *  phone to CloudWatch to learn which — for a feature whose entire diagnostic
+ *  surface is meant to be the settings card. */
 async function sendToAll(subs, payload) {
   const keys = await loadKeys();
   if (!keys) return { sent: 0, dropped: 0, failed: 0, unconfigured: true };
@@ -227,6 +267,7 @@ async function sendToAll(subs, payload) {
   webpush.setVapidDetails(keys.subject, keys.publicKey, keys.privateKey);
 
   let sent = 0; let dropped = 0; let failed = 0;
+  const statuses = new Set();
   const body = JSON.stringify(payload);
 
   await Promise.all(subs.map(async (sub) => {
@@ -249,11 +290,12 @@ async function sendToAll(subs, payload) {
         return;
       }
       failed += 1;
+      statuses.add(status || (err && err.message) || 'unknown');
       console.error('push send failed', status || (err && err.message));
     }
   }));
 
-  return { sent, dropped, failed };
+  return { sent, dropped, failed, statuses: [...statuses] };
 }
 
 /* ------------------------------------------------------------------ handler */

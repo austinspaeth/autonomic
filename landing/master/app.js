@@ -6658,6 +6658,12 @@
     /* Permission can be revoked in the browser's own settings while the page
        is open, so the line is re-read on arrival rather than written once. */
     syncNotifyUI();
+    /* The background half is re-read on arrival for the same reason, plus one
+       of its own: the VAPID parameter can be CREATED while the page is open,
+       and that is precisely what somebody following the "no push keys set"
+       line has just gone off to do. Wiring it once meant the card that told
+       them what to do could not notice them doing it. */
+    bgRefresh();
   }
 
   /* ------------------------------------------------------ view: forecast */
@@ -9426,7 +9432,14 @@
     host.textContent = NOTE_COPY[st] || NOTE_COPY.unsupported;
     var enable = document.getElementById('ntEnable');
     var test = document.getElementById('ntTest');
-    if (enable) enable.disabled = st === 'granted' || st === 'denied' || st === 'unsupported';
+    if (enable) {
+      enable.disabled = st === 'granted' || st === 'denied' || st === 'unsupported';
+      /* The LABEL carries the state, as it does on the background button below.
+         Disabling alone left a button reading "Enable notifications" sitting
+         under a line reading "On." — which reads as a button that has stopped
+         working rather than as one whose job is done. */
+      enable.textContent = st === 'granted' ? 'Notifications are on' : 'Enable notifications';
+    }
     /* A test button that only works in a window you are not looking at would
        be untestable, so the test passes `force` — it is the one notification
        allowed to appear over the page that asked for it. */
@@ -9443,17 +9456,24 @@
    *   this browser cannot           a desktop tab, or iOS Safari not installed
    *   subscribed / not subscribed   the only two that are about a choice
    *
-   * `bgKey` is fetched once and cached for the session. It is the VAPID PUBLIC
-   * key — the thing `pushManager.subscribe` signs against, meant to be handed
-   * to the browser — and asking for it again on every render would be a
-   * round trip per settings open for a value that changes when the keypair is
-   * rotated and never otherwise.
+   * A CONFIGURED `bgKey` is fetched once and cached for the session. It is the
+   * VAPID PUBLIC key — the thing `pushManager.subscribe` signs against, meant
+   * to be handed to the browser — and asking for it again on every render would
+   * be a round trip per settings open for a value that changes when the keypair
+   * is rotated and never otherwise.
+   *
+   * An UNCONFIGURED answer is not cached, for the same reason the lambda
+   * re-reads the parameter while it is dark: "there are no keys" is the one
+   * answer that goes stale the moment somebody acts on the line below it. A
+   * session that cached it would keep telling its reader to set the parameter
+   * they had just set, and the only way out would be a reload — which is how a
+   * card that is merely behind gets read as a parameter that did not take.
    */
-  var bgKey = null;          // { configured, publicKey } once loaded
+  var bgKey = null;          // { configured, publicKey } — the last answer
   var bgSubscribed = false;  // does THIS browser hold a subscription
 
   function bgLoadKey() {
-    if (bgKey) return Promise.resolve(bgKey);
+    if (bgKey && bgKey.configured) return Promise.resolve(bgKey);
     return window.Api.call('PUSH_KEY').then(function (r) {
       bgKey = { configured: !!r.configured, publicKey: r.publicKey || '' };
       return bgKey;
@@ -9500,7 +9520,7 @@
       enable.disabled = true;
       test.classList.add('hidden');
       off.classList.add('hidden');
-      bgSay('The server has no push keys set, so nothing can subscribe yet. See sls/README.md — one SSM parameter and a redeploy.');
+      bgSay('The server has no push keys set, so nothing can subscribe yet. See sls/README.md — one SSM parameter, no redeploy. Come back to Edit data a minute after setting it.');
       return;
     }
     if (st === 'denied') {
@@ -9594,10 +9614,24 @@
       /* Through the SERVER, not through `Pwa.notify`. A local notification
          proves the permission and nothing else; the failure this button exists
          to catch is a keypair that does not match the stored subscription, and
-         only a real encrypted send from the sender can surface that. */
-      window.Api.call('PUSH_TEST').then(function (r) {
-        if (r.ok) bgSay('Sent. It should arrive within a few seconds — lock the screen to see it as a banner.');
-        else bgSay('Not sent: ' + (r.error || 'the push service rejected it.'));
+         only a real encrypted send from the sender can surface that.
+         THIS DEVICE'S endpoint goes with it, so the answer is about the device
+         holding the button. Without it the server tested every device on the
+         account and reported success if any one of them took the push — so a
+         laptop that received it answered for a phone that did not, under a
+         line telling the reader to lock their screen. */
+      window.Pwa.currentSubscription().then(function (sub) {
+        return window.Api.call('PUSH_TEST', { endpoint: (sub && sub.endpoint) || '' });
+      }).then(function (r) {
+        if (!r.ok) { bgSay('Not sent: ' + (r.error || 'the push service rejected it.')); return; }
+        /* A push service that ACCEPTED it and a device that then shows nothing
+           is the one outcome this card must not paper over: Apple returns the
+           same 201 for a payload it cannot decrypt as for one it can, so
+           "accepted" is the honest word and the next move belongs to the
+           reader. */
+        bgSay('Accepted by the push service for this device — it should arrive within a few seconds; ' +
+          'lock the screen to see it as a banner. If nothing arrives, this device’s subscription is stale: ' +
+          'turn these off and on again here.');
       }).catch(function (e) {
         bgSay('Not sent: ' + ((e && e.message) || 'the request failed.'));
       });

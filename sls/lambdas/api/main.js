@@ -678,18 +678,72 @@ const pushUnsubscribe = async (email, payload) => {
 
 /* The "Send a test" button's server half. It goes all the way through the real
    sender on purpose: the failure this is here to catch is a key that does not
-   match the subscription, and only a real encrypted send can tell you that. */
-const pushTest = async (email) => {
+   match the subscription, and only a real encrypted send can tell you that.
+ *
+ * It takes the CALLER'S OWN endpoint and tests that one subscription. It used
+ * to send to every device on the account and report `ok: sent > 0`, which is a
+ * different question from the one the button asks — the card beside it says
+ * "lock the screen to see it as a banner", a first-person claim about the
+ * device you are holding. On a laptop and a phone that is exactly the shape
+ * that misleads: the laptop takes the push, `sent` is 1, the card says "Sent",
+ * and the phone that never received anything is not mentioned. A test whose
+ * green answer can come from a different device is worse than no test.
+ *
+ * No endpoint (an older page, mid-deploy) falls back to the old behaviour, but
+ * says how many it reached rather than claiming a bare success. */
+const pushTest = async (email, payload = {}) => {
   if (!(await pushConfigured())) return { ok: false, error: 'No VAPID keys are configured on the server.' };
-  const subs = (await listSubscriptions()).filter((s) => s.email === email);
-  if (!subs.length) return { ok: false, error: 'This device is not registered for background alerts.' };
+
+  const wanted = typeof payload.endpoint === 'string' ? payload.endpoint.trim() : '';
+  const all = (await listSubscriptions()).filter((s) => s.email === email);
+  const subs = wanted ? all.filter((s) => s.endpoint === wanted) : all;
+
+  if (!subs.length) {
+    /* Told apart on purpose: a browser holding a subscription the server never
+       stored looks identical from here to one that was never turned on, and
+       only the first is a bug worth chasing. */
+    return {
+      ok: false,
+      devices: all.length,
+      error: wanted && all.length
+        ? 'This device is not in the server’s list, though other devices are. Turn background alerts off and on again here.'
+        : 'This device is not registered for background alerts.',
+    };
+  }
+
   const result = await sendToAll(subs, {
     title: '\u{1F44B} Autonomic',
     body: 'Background alerts are working.',
     tag: 'autonomic-test',
     url: '/master/',
   });
-  return { ok: result.sent > 0, ...result };
+
+  /* A rejection is reported with its CODE. The counters say a send failed;
+     only the code says what to do about it, and a card that makes its reader
+     open CloudWatch to find out is not a diagnostic. */
+  if (!result.sent && result.dropped) {
+    return {
+      ...result,
+      ok: false,
+      targeted: !!wanted,
+      devices: all.length,
+      error: 'The push service says this device is gone, so its registration has been removed. Turn background alerts on again here.',
+    };
+  }
+  if (!result.sent && result.failed) {
+    const code = result.statuses[0];
+    return {
+      ...result,
+      ok: false,
+      targeted: !!wanted,
+      devices: all.length,
+      error: code === 403
+        ? 'The push service rejected the signature (403). This device subscribed against a different keypair than the server now holds — turn background alerts off and on again here.'
+        : `The push service rejected it (${code}).`,
+    };
+  }
+
+  return { ok: result.sent > 0, targeted: !!wanted, devices: all.length, ...result };
 };
 
 /* --------------------------------------------------------------- handler */
@@ -749,7 +803,7 @@ const handler = async (event) => {
       case 'PUSH_UNSUBSCRIBE':
         return json(200, await pushUnsubscribe(email, payload));
       case 'PUSH_TEST':
-        return json(200, await pushTest(email));
+        return json(200, await pushTest(email, payload));
       /* Campaign links publish themselves on save. This is the button for the
          cases where that is not enough — a lost object, a template change. */
       case 'LINKS_REPUBLISH':
