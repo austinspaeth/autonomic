@@ -36,9 +36,7 @@
  * HealthKit observers still run.
  */
 import { AppState as RNAppState, Platform } from 'react-native';
-import * as Notifications from 'expo-notifications';
 import { holdBackgroundTime } from '../../modules/app-env';
-import { alertsEnabled } from '../lib/budget/alerts';
 import { todayKey } from '../lib/dates';
 import { logError } from '../lib/diagnostics/errorLog';
 import { healthKitAsked } from '../lib/health';
@@ -106,14 +104,22 @@ function healthKit(): HkBackground | null {
 }
 
 /**
- * Is there any reason to wake up? The budget reads Health, pacing is unlocked,
- * and at least one alert is on. Permission is checked separately (it is async).
+ * Is there any reason to wake up? The budget reads Health and pacing is
+ * unlocked, so a read can move today's load, and with it the pacing widgets
+ * and the wrist.
+ *
+ * Deliberately NOT a question about alerts or about notification permission.
+ * Widget freshness used to ride both, which meant a user who had never granted
+ * notifications, or who had simply switched the pacing alerts off, got a widget
+ * that only ever moved when the app was opened and nothing on screen to say
+ * why. A widget is not a notification. Whether to POST an alert is
+ * `checkPacingAlerts`'s own question, and it asks every part of it itself
+ * (unlocked, enabled, granted), so the wake-up does not have to.
  */
 export function pacingBackgroundWanted(): boolean {
   const s = getState();
   if (!s.settings?.healthEnabled) return false;
-  if (!isPacingUnlocked()) return false;
-  return Object.values(alertsEnabled(s.settings)).some(Boolean);
+  return isPacingUnlocked();
 }
 
 let running: Promise<void> | null = null;
@@ -128,7 +134,14 @@ export function runPacingBackgroundCheck(): Promise<void> {
     try {
       if (!pacingBackgroundWanted()) return;
       await refreshDayLoad(todayKey(), { maxAgeMin: BG_STALE_MIN, requireEvidence: true });
-      await checkPacingAlerts();
+      // Caught separately: the push below is the whole reason a phone with the
+      // alerts off still wakes up, and it must not be lost to a throw from the
+      // half of the job that phone switched off.
+      try {
+        await checkPacingAlerts();
+      } catch (e) {
+        logError('pacing.alert', e);
+      }
       await syncWidgetsNow();
       // The debounce timer may never fire before the process is suspended.
       flushSave();
@@ -173,15 +186,62 @@ async function observeHealthKit(): Promise<void> {
   }
 }
 
+/** What the last delivery reconcile achieved, for the support dump below. */
+let deliveryState = 'not attempted';
+
 async function setHealthKitDelivery(on: boolean): Promise<void> {
   const hk = healthKit();
   if (!hk) return;
+  const ok: string[] = [];
+  const failed: string[] = [];
   for (const t of HK_TYPES) {
     try {
-      if (on) await hk.enableBackgroundDelivery?.(t.id, t.frequency);
-      else await hk.disableBackgroundDelivery?.(t.id);
-    } catch { /* not authorised for this type */ }
+      if (on) {
+        const done = await hk.enableBackgroundDelivery?.(t.id, t.frequency);
+        (done === false ? failed : ok).push(t.scope);
+      } else {
+        await hk.disableBackgroundDelivery?.(t.id);
+      }
+    } catch { failed.push(t.scope); /* not authorised for this type */ }
   }
+  deliveryState = on
+    ? `on: ${ok.join(', ') || 'none'}${failed.length ? ` / REFUSED: ${failed.join(', ')}` : ''}`
+    : 'off';
+}
+
+/**
+ * The OS registrations, as they actually stand. "The widget never changes" and
+ * "the alerts never fire" are the same report from outside the app, and neither
+ * is answerable without knowing whether the job is registered and whether
+ * HealthKit agreed to wake us — both of which fail silently by design.
+ *
+ * READS ONLY, like everything else in the support dump: no permission is
+ * requested and no registration is made or undone to find out.
+ */
+export async function pacingBackgroundStatus(): Promise<Record<string, string>> {
+  const mods = taskModules();
+  let registered = 'n/a';
+  let availability = 'n/a';
+  if (!mods) {
+    registered = 'MISSING — this build carries no background task module';
+  } else {
+    try {
+      registered = (await mods.tm.isTaskRegisteredAsync(PACING_TASK)) ? 'registered' : 'NOT registered';
+      const st = await mods.bt.getStatusAsync();
+      availability = st === mods.bt.BackgroundTaskStatus.Available ? 'available' : `unavailable (${String(st)})`;
+    } catch {
+      registered = 'unreadable';
+    }
+  }
+  return {
+    'pacing background': pacingBackgroundWanted() ? 'wanted' : 'not wanted (Health off or pacing locked)',
+    'pacing task': registered,
+    'background tasks': availability,
+    'health delivery': Platform.OS === 'ios' ? deliveryState : 'n/a (Android reads on the job)',
+    'health observers': Platform.OS !== 'ios'
+      ? 'n/a'
+      : (observing.size ? [...observing].map((id) => id.replace('HKQuantityTypeIdentifier', '')).join(', ') : 'none'),
+  };
 }
 
 let defined = false;
@@ -209,14 +269,14 @@ export function definePacingBackground(): void {
 }
 
 /**
- * Reconcile the OS registrations with what the user wants: register the job
- * and enable delivery when an alert could fire, undo both when none can.
- * Launch, foreground and every alert toggle call it; each step is idempotent.
+ * Reconcile the OS registrations with what the user wants: register the job and
+ * enable delivery when a background read could change today's budget, undo both
+ * when it could not. Launch, foreground and every alert toggle call it; each
+ * step is idempotent.
  */
 export async function syncPacingBackground(): Promise<void> {
   try {
-    const granted = (await Notifications.getPermissionsAsync()).granted;
-    const want = granted && pacingBackgroundWanted();
+    const want = pacingBackgroundWanted();
     const mods = taskModules();
     if (mods) {
       const registered = await mods.tm.isTaskRegisteredAsync(PACING_TASK);

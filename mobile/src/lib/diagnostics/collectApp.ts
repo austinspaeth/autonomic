@@ -26,7 +26,7 @@ import { getIapState } from '../../store/iap';
 import { getTier, getTrialDaysLeft } from '../../store/tier';
 import { pacingTrial } from '../../store/pacingTrial';
 import { reviewMemory } from '../review';
-import { formatMsLeft, offerMsLeft } from '../upsell/annual';
+import { liveOffer } from '../upsell/annual';
 import { annualMemory } from '../upsell/annualMemory';
 import { getDeclinedKeys } from '../health/declined';
 import { health, healthAppName } from '../health';
@@ -199,13 +199,14 @@ function distributionRows(): Rows {
   };
 }
 
-/** "day-30, 21h left" / "day-30, closed" / "none" — see src/lib/upsell/annual. */
+/** "day-30, on screen" / "day-30, dismissed" / "none" — see src/lib/upsell/annual.
+ *  The card no longer expires, so what a reader needs from this row is whether
+ *  it is still standing or was answered. */
 function annualOfferRow(): string {
   const m = annualMemory();
   const spent = m.consumed.length ? `day-${Math.max(...m.consumed)}` : null;
   if (!spent) return 'none';
-  const left = offerMsLeft(Date.now(), m);
-  return left > 0 ? `${spent}, ${formatMsLeft(left)} left` : `${spent}, closed`;
+  return liveOffer(m) ? `${spent}, on screen` : `${spent}, dismissed`;
 }
 
 /** Notification permission + what is actually on the OS schedule. The gap
@@ -320,6 +321,13 @@ async function capabilityRows(): Promise<Rows> {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     return require('react-native-android-widget') ? 'loaded' : 'MISSING';
   });
+  // The pacing budget with the app closed, and with it the only thing that
+  // refreshes a widget while the app is shut. Every gate below fails silently.
+  Object.assign(rows, await safe(async () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { pacingBackgroundStatus } = require('../../store/pacingBackground') as typeof import('../../store/pacingBackground');
+    return await pacingBackgroundStatus();
+  }, { 'pacing background': 'unreadable' }));
   rows['store review'] = await safeText(async () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const SR = require('expo-store-review');
@@ -437,6 +445,17 @@ function buildNotes(d: Omit<AppDiagnostics, 'notes'>): string[] {
   }
   if (typeof d.capabilities['garmin link'] === 'string' && String(d.capabilities['garmin link']).startsWith('BROKEN')) {
     notes.push('This build lost its Connect IQ keep rules, so every Garmin surface is switched off deliberately — a reply from Garmin Connect would kill the app. It is a build defect, not anything this user can fix: they need the next release.');
+  }
+  // "My widget only changes when I open the app" is the report this answers.
+  const bg = d.capabilities['pacing background'];
+  const task = String(d.capabilities['pacing task'] ?? '');
+  if (bg === 'wanted' && task.startsWith('MISSING')) {
+    notes.push('The pacing budget wants to run in the background but this build predates the background-task module, so nothing runs with the app closed and the pacing widgets only ever move when the app is opened. It needs a new native build, not an update.');
+  } else if (bg === 'wanted' && task === 'NOT registered') {
+    notes.push('The background job is wanted and available but is NOT registered, so nothing refreshes the budget or the widgets while the app is shut. syncPacingBackground() should have reconciled this at launch.');
+  }
+  if (bg === 'wanted' && String(d.capabilities['health delivery']).includes('REFUSED')) {
+    notes.push('HealthKit refused background delivery for at least one type, so those samples will not wake the app. Usually the read was never authorised for that type.');
   }
   if (d.bluetooth['native module'] === true && d.bluetooth['can scan now'] === false) {
     notes.push(`Bluetooth cannot scan right now: adapter is ${d.bluetooth['adapter state']}.`);
