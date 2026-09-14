@@ -21,7 +21,7 @@ import { ageFromBirthday, keyOf } from '../lib/dates';
 import { DATE_KEY_RE, assertImportVersion, isPlainObject } from '../lib/migrate';
 import { useIap, manageSubscription, restore, priceOf, storeName, MONTHLY_SKU, YEARLY_SKU } from '../store/iap';
 import { getTrialDaysLeft, useTier } from '../store/tier';
-import { usePaywall } from './Paywall';
+import { StoreError, StoreOkNotice, usePaywall } from './Paywall';
 import { healthAppName } from '../lib/health';
 import { DevicesScreen } from './Devices';
 import { HealthScreen } from './Health';
@@ -118,7 +118,7 @@ export function MenuSheet({ controls }: { controls: SheetControls }) {
       {item('heart', healthAppName(), 'Read & write health data', () => openSheet(() => <HealthScreen />), !!state.settings.healthEnabled)}
       {item('star', 'Subscription', 'Manage plan or restore', () => openSheet((c) => <SubscriptionSheet controls={c} />),
         tier === 'trial' ? { text: 'Trial', color: p.accent } : tier === 'pro' ? { text: 'Pro', color: '#22c55e' } : undefined)}
-      {item('download', 'Export data', 'Download everything as JSON', () => exportData(toast))}
+      {item('download', 'Export data', 'Download everything as JSON', () => exportData())}
       {item('upload', 'Import data', 'Replace everything from a JSON file', () => importData(controls, toast))}
       {item('trash', 'Clear all data', 'Erase everything on this device', () => openSheet((c) => <ClearDataSheet controls={c} />, { fitContent: true }))}
       {item('sparkles', 'Show welcome screen', 'Replay the first-run guide', () => { controls.closeAll(); showWelcomeAgain(); })}
@@ -174,7 +174,6 @@ function ProfileSheet({ controls }: { controls: SheetControls }) {
 
 function SubscriptionSheet({ controls }: { controls: SheetControls }) {
   const p = usePalette();
-  const toast = useToast();
   const { isPro, products, activeSku } = useIap();
   const tier = useTier();
   const openPaywall = usePaywall('settings');
@@ -183,12 +182,19 @@ function SubscriptionSheet({ controls }: { controls: SheetControls }) {
   const price = active ? priceOf(active, activeSku ?? YEARLY_SKU) : undefined;
   const period = activeSku === MONTHLY_SKU ? 'month' : 'year';
   const daysLeft = getTrialDaysLeft();
+  // Reported INSIDE the sheet, never by toast: the sheet stack is one RN Modal
+  // painted above the ToastProvider, so a toast raised from here is invisible
+  // and Restore reads as a dead button (see CLAUDE.md). It is the one control
+  // that needs the positive case said out loud too — restoring the
+  // subscription you already hold changes nothing else on this screen.
+  const [restored, setRestored] = useState<'ok' | 'none' | null>(null);
   const onRestore = async () => {
     if (busy) return;
     setBusy(true);
+    setRestored(null);
     const ok = await restore();
     setBusy(false);
-    toast(ok ? 'Subscription restored' : 'No active subscription found');
+    setRestored(ok ? 'ok' : 'none');
   };
   const status = isPro ? 'Subscription active'
     : tier === 'trial' ? `Free trial · ${daysLeft} day${daysLeft === 1 ? '' : 's'} left`
@@ -210,6 +216,10 @@ function SubscriptionSheet({ controls }: { controls: SheetControls }) {
         {!isPro ? <Button title="Upgrade to Pro" variant="primary" onPress={() => { controls.close(); openPaywall(); }} /> : null}
         <Button title={`Manage in ${storeName()}`} variant={isPro ? 'primary' : 'default'} onPress={() => manageSubscription()} />
         <Button title={busy ? 'Restoring…' : 'Restore purchase'} variant="default" disabled={busy} onPress={onRestore} />
+        {restored === 'ok' ? <StoreOkNotice text="Subscription restored." /> : null}
+        {restored === 'none' ? (
+          <StoreError text={`No active subscription found on this ${storeName()} account.`} />
+        ) : null}
       </View>
       <View style={{ height: 20 }} />
     </View>
@@ -273,7 +283,7 @@ function ClearDataSheet({ controls }: { controls: SheetControls }) {
         {/* Both neutral: the accent IS red in this theme, so a primary Export
             button would read as destructive next to the real one. */}
         <Button title="Cancel" variant="default" onPress={controls.close} />
-        <Button title="Export data first" variant="default" onPress={() => exportData(toast)} />
+        <Button title="Export data first" variant="default" onPress={() => exportData()} />
       </View>
       <Button title={busy ? 'Clearing…' : 'Delete everything'} variant="danger" disabled={busy} onPress={onDelete} />
       <Text style={{ fontSize: 13, textAlign: 'center', marginTop: 10, color: taps ? '#d63b3b' : p.textDim }}>
@@ -284,16 +294,25 @@ function ClearDataSheet({ controls }: { controls: SheetControls }) {
   );
 }
 
-/* ---------- import / export ---------- */
-async function exportData(toast: (m: string) => void) {
+/* ---------- import / export ----------
+ *
+ * The SUCCESS paths below toast, and may: each one calls `controls.closeAll()`
+ * first, so the sheet stack is empty by the time the toast is raised. The
+ * FAILURE paths cannot, because the sheet is still open underneath and the
+ * stack is one RN Modal painted above the ToastProvider — a toast there is
+ * invisible, and an export that silently does nothing is indistinguishable
+ * from a dead button (see CLAUDE.md). They use Alert, which is a native
+ * dialog and paints above the Modal, and which this file already uses for the
+ * import confirm. */
+async function exportData() {
   const uri = `${FileSystem.cacheDirectory}autonomic-journal-${keyOf(new Date())}.json`;
   try {
     const json = serializeState(true);
     await FileSystem.writeAsStringAsync(uri, json);
     if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(uri, { mimeType: 'application/json', dialogTitle: 'Export Autonomic data' });
-    else toast('Sharing unavailable');
-  } catch {
-    toast('Export failed');
+    else Alert.alert('Sharing unavailable', 'This device has no way to share the exported file.');
+  } catch (e) {
+    Alert.alert('Export failed', (e as Error).message || 'The file could not be written.');
   } finally {
     // The exported file is the user's full plaintext journal; don't leave it in cache.
     await FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
@@ -320,6 +339,6 @@ async function importData(controls: SheetControls, toast: (m: string) => void) {
       { text: 'Replace', style: 'destructive', onPress: () => { replaceState(parsed, asset.name); controls.closeAll(); toast('Imported'); } },
     ]);
   } catch (e) {
-    toast('Import failed: ' + (e as Error).message);
+    Alert.alert('Import failed', (e as Error).message);
   }
 }

@@ -417,6 +417,15 @@ attempt lands on an `OFFERFAIL` row (`<day>#<offer>#<outcome>#<hash>`, 400-day T
 Eastern day) moves the `PING#OFL` day counter, so `ofl / oac` is a share of people.
 Read back as `ofl` and `offerFailures` on the report.
 
+**`OFL` speaks one letter more than `OAC`, and it must be divided per letter.**
+`A` and `F` are the two offer cards. `P` is the ordinary paywall, which is not an
+offer card: nothing shows it on the app's initiative and nothing accepts it, so it
+has no `oac` term and `ofl / oac` is undefined for it. Its denominator is the `PAY`
+route (a paywall was raised), which has its own cap and shape, so the two cannot
+simply be divided. `P` exists because without it the app's main purchase door
+reported no failures at all. `OAC`'s alphabet stays a strict subset of `OFL`'s,
+pinned by a test.
+
 **Accepted means the card's own buy button was tapped.** Whether the purchase
 then went through is `/ping/sub`'s question, and the gap between the two is the
 store sheet being abandoned or the payment declining. Keeping them apart is what

@@ -29,6 +29,7 @@ import {
   type ExpoPurchaseError,
 } from 'expo-iap';
 import { isSideloadedAndroidBuild, isTestFlightBuild } from '../../modules/app-env';
+import { blockedMessage, classifyPlayCode } from '../lib/billingCodes';
 import { logError } from '../lib/diagnostics/errorLog';
 import { describeError } from '../lib/diagnostics/format';
 import type { PurchaseOutcome } from '../lib/ping';
@@ -262,9 +263,14 @@ const NOT_READY = new Set(['service-error', 'service-disconnected', 'connection-
  *  ("Failed to query product"), and the response code that actually says which
  *  rides alongside as `responseCode`. So a dropped binding reached `withBilling`
  *  wearing a code that isn't in NOT_READY, the reconnect never fired, and all
- *  three launch attempts failed identically against the same dead client. These
- *  two are the reconnectable ones: SERVICE_DISCONNECTED and SERVICE_UNAVAILABLE. */
-const PLAY_RECONNECTABLE = new Set([-1, 2]);
+ *  three launch attempts failed identically against the same dead client.
+ *
+ *  WHICH codes those are is `classifyPlayCode` (src/lib/billingCodes.ts, pure
+ *  + tested), because that mapping IS the diagnosis and it was short by two:
+ *  SERVICE_TIMEOUT and NETWORK_ERROR fell through as terminal, so a phone with
+ *  no signal spent all three launch attempts against a client it never
+ *  reconnected. Note NETWORK_ERROR is 12, whose Play `debugMessage` reads "An
+ *  internal error occurred." — the obvious guess from the text is wrong. */
 const responseCodeOf = (e: unknown): number | undefined => {
   const c = (e as { responseCode?: unknown } | undefined)?.responseCode;
   return typeof c === 'number' ? c : undefined;
@@ -272,34 +278,31 @@ const responseCodeOf = (e: unknown): number | undefined => {
 
 const isDisconnected = (e: unknown) =>
   NOT_READY.has(codeOf(e))
-  || PLAY_RECONNECTABLE.has(responseCodeOf(e) ?? NaN)
+  || classifyPlayCode(responseCodeOf(e)) === 'transient'
   || /not ready|disconnect/i.test(String((e as Error)?.message ?? ''));
 
-/** Play's FEATURE_NOT_SUPPORTED, arriving as `query-product` with a
- *  debugMessage of "Client does not support ProductDetails." It means the
- *  GOOGLE PLAY STORE APP on the device is too old to serve the ProductDetails
- *  API that Billing 5+ queries through, so `fetchProducts` can never return
- *  anything here. Nothing on our side reaches it: not a reconnect, not a
- *  console change, not a retry a minute later. It is deliberately NOT in
- *  PLAY_RECONNECTABLE for that reason.
+/** A terminal store refusal, arriving as `query-product` with a response code
+ *  that says this device or account can never complete a purchase as things
+ *  stand. TWO codes reach here, and they are different obstacles with
+ *  different remedies (`blockedMessage` in src/lib/billingCodes.ts):
+ *  FEATURE_NOT_SUPPORTED is a Play Store app too old to serve the
+ *  ProductDetails API, BILLING_UNAVAILABLE is an account that cannot buy.
+ *  Neither is reachable from our side: not a reconnect, not a console change,
+ *  not a retry a minute later.
  *
  *  It has to be its own state rather than another `error` string because of
  *  what it does to the funnel. The paywall and both offer cards fall back to
- *  FALLBACK_PRICE, so a device that can return no products still draws a
- *  complete, healthy-looking card with a live button; the tap fires the
- *  accepted-offer ping and then dies in `loadProducts` before `requestPurchase`
- *  is ever reached. That is an offer recorded as accepted that could not have
- *  converted. Knowing before the tap is what lets the button be replaced by the
- *  remedy instead of refused after it. */
-const PLAY_FEATURE_NOT_SUPPORTED = -2;
-
-/** Said in full because the remedy is the whole point: for most of these
- *  devices this IS fixable, by updating an app the user already has. For the
- *  rest (a stubbed Play Store, microG, an emulator with no Play) it at least
- *  names the real obstacle, which "try again shortly" did not. */
-const BLOCKED_MSG =
-  'Your Google Play Store app is out of date, so it can’t show subscriptions. '
-  + 'Open the Play Store, go to Settings, About, and tap Update Play Store, then come back.';
+ *  FALLBACK_PRICE, which is the REAL price list, so a device that can return
+ *  no products still draws a complete, healthy-looking card with a live
+ *  button; the tap fires the accepted-offer ping and then dies in
+ *  `loadProducts` before `requestPurchase` is ever reached. That is an offer
+ *  recorded as accepted that could not have converted. Knowing before the tap
+ *  is what lets the button be replaced by the remedy instead of refused after
+ *  it.
+ *
+ *  BILLING_UNAVAILABLE was missing here for the whole of 1.26–1.28, which is
+ *  the largest live signature in the fault report: those users met a paywall
+ *  at the correct prices whose button could not work, and were told nothing. */
 
 /** Latch a terminal store refusal. Returns true if this error was one.
  *  Logged ONCE per session under its own tag: it repeats on every launch of an
@@ -307,13 +310,22 @@ const BLOCKED_MSG =
  *  support log and inflate the fault report's occurrence count off a handful of
  *  devices. */
 function noteBlocked(e: unknown): boolean {
-  if (responseCodeOf(e) !== PLAY_FEATURE_NOT_SUPPORTED) return false;
+  const msg = blockedMessage(responseCodeOf(e));
+  if (!msg) return false;
   if (!state.blocked) {
     logError('iap.storeIncapable', iapDetail(e));
-    set({ blocked: BLOCKED_MSG, ready: true });
+    blockedFault = e;
+    set({ blocked: msg, ready: true });
   }
   return true;
 }
+
+/** The store's own answer at the moment we latched `blocked`, kept so a later
+ *  tap can be settled with the code that ACTUALLY refused rather than a
+ *  hardcoded one. The two blocking codes are different faults, and
+ *  `/ping/ofl` groups by exactly these fields, so mislabelling one as the
+ *  other would merge two unrelated problems into one row. */
+let blockedFault: unknown;
 
 /** What `describeError` cannot see, folded into the message so the fault report
  *  carries the diagnosis instead of the same opaque line every time. Play's
@@ -508,7 +520,8 @@ function purchaseMessage(e: unknown): string {
   // which is bucketed below with the genuinely transient "not live yet" cases
   // and answered "try again shortly" — the one thing that is definitely false
   // here, since no amount of retrying updates the Play Store app.
-  if (responseCodeOf(e) === PLAY_FEATURE_NOT_SUPPORTED) return BLOCKED_MSG;
+  const terminal = blockedMessage(responseCodeOf(e));
+  if (terminal) return terminal;
   switch (codeOf(e)) {
     case 'network-error':
     case 'service-timeout':
@@ -557,8 +570,13 @@ export const clearIapError = () => { if (state.error) set({ error: undefined });
  * error listener AND `requestPurchase` rejecting) and whichever lands first owns
  * it. A listener rather than an import, because ./ping already imports this. */
 
-/** The offer card a purchase was started from, when one was. */
-export type PurchaseOrigin = 'annual' | 'founder';
+/** Where a purchase was started from.
+ *
+ *  'paywall' is the ordinary one and was missing here for a long time, which
+ *  meant `reportOfferOutcome` dropped every attempt made from the app's MAIN
+ *  purchase door: it reports only attempts carrying an origin. So the one path
+ *  most purchases take was the one path with no failure reporting at all. */
+export type PurchaseOrigin = 'annual' | 'founder' | 'paywall';
 export type PurchaseOutcomeEvent = {
   sku: string; origin?: PurchaseOrigin; outcome: PurchaseOutcome; error?: unknown;
 };
@@ -594,11 +612,7 @@ export async function subscribe(sku: string = YEARLY_SKU, origin?: PurchaseOrigi
   // Already known impossible on this device. Say so without touching the store,
   // so the answer is the remedy rather than another failed round trip.
   if (state.blocked) {
-    settleAttempt('unstarted', {
-      code: 'feature-not-supported',
-      responseCode: PLAY_FEATURE_NOT_SUPPORTED,
-      message: 'Play Store app too old to sell subscriptions',
-    });
+    settleAttempt('unstarted', blockedFault ?? { code: 'store-blocked', message: state.blocked });
     set({ error: state.blocked });
     return false;
   }

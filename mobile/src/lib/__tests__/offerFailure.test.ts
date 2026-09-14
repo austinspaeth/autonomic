@@ -1,10 +1,20 @@
 import { offerCode, offerFailureBody, pingUrl } from '../ping';
 
 describe('offer fall-through report', () => {
-  it('names the two offers and nothing else', () => {
+  it('names the two offers and the paywall, and nothing else', () => {
     expect(offerCode('annual')).toBe('A');
     expect(offerCode('founder')).toBe('F');
-    expect(offerCode('paywall')).toBeUndefined();
+    // The paywall used to be excluded here on the grounds that it is not an
+    // offer card, which is true and was the wrong call: `reportOfferOutcome`
+    // reports only attempts carrying an origin, so excluding it left the app's
+    // MAIN purchase door as the one path with no failure reporting at all.
+    // It is a failure that is not an offer's failure, so it takes a letter on
+    // this route and has no `osh`/`odm`/`oac` counterpart — which is why its
+    // denominator is `pay` and `ofl / oac` stays a rate only for A and F.
+    expect(offerCode('paywall')).toBe('P');
+    // The set is still closed: anything else takes no letter rather than
+    // fragmenting the route on a string nobody decided on.
+    expect(offerCode('settings')).toBeUndefined();
     expect(offerCode(undefined)).toBeUndefined();
   });
 

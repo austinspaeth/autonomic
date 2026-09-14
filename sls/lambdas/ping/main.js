@@ -234,6 +234,25 @@ const VIEWS = { I: 'insights', P: 'progress', B: 'pacing' };
  *  the three counts are directly comparable per offer. */
 const OFFERS = { A: 'annual-half-off', F: 'founding-member' };
 
+/**
+ * The OFL route speaks a WIDER alphabet than the three offer routes above it,
+ * and the extra letter is deliberate.
+ *
+ * `osh`/`odm`/`oac` are about the two cards the app raises on its own
+ * initiative, so their alphabet is exactly those two. A purchase can also fall
+ * through from the ORDINARY PAYWALL, which is not an offer card: nothing shows
+ * it, nothing dismisses it, and it has no `oac` to be read against. It was
+ * reported by nothing at all until this letter existed, which is why a store
+ * that could not sell to a whole population of Android phones moved no counter
+ * for months.
+ *
+ * So `P` is a failure that is not an offer's failure, and the consequence for
+ * a consumer is that **`ofl / oac` is only meaningful per letter, for A and F**.
+ * `P`'s denominator is `pay` (a paywall was raised), which is a different
+ * route with a different cap, so the two cannot simply be divided.
+ */
+const OFFER_FAILS = { ...OFFERS, P: 'paywall' };
+
 /** What was logged by hand — the LOG route. New, user-entered entries only;
  *  edits, captures and health-store imports send nothing. */
 const LOGS = {
@@ -265,7 +284,7 @@ const REPORTS = { D: 'data-for-prompt', H: 'full-health-report', C: 'doctor-summ
 const ALPHABET = {
   ACT: METHODS, CAP: METHODS, HRV: METHODS,
   PAY: SURFACES, NOT: NOTIFY, POT: POTS, SEE: VIEWS,
-  OSH: OFFERS, ODM: OFFERS, OAC: OFFERS, OFL: OFFERS,
+  OSH: OFFERS, ODM: OFFERS, OAC: OFFERS, OFL: OFFER_FAILS,
   LOG: LOGS, USE: FEATURES, FND: FINDINGS, RPT: REPORTS,
 };
 

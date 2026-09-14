@@ -97,6 +97,15 @@ test('each route validates the slot against ITS OWN alphabet', () => {
   assert.deepEqual(ALPHABET.OSH, ALPHABET.ODM);
   assert.deepEqual(ALPHABET.OSH, ALPHABET.OAC);
 
+  // OFL does NOT share it, and that asymmetry is the point. A purchase can fall
+  // through from the ordinary paywall, which is not an offer card: nothing
+  // shows it and nothing accepts it, so `P` exists on the failure route and on
+  // no other. A consumer dividing ofl by oac must therefore do it per letter —
+  // P's denominator is the PAY route, which has its own cap and shape.
+  assert.ok(speaks('OFL', 'A') && speaks('OFL', 'F') && speaks('OFL', 'P'));
+  assert.ok(!speaks('OAC', 'P'));
+  assert.ok(!speaks('OSH', 'P'));
+
   // The journal-and-feature routes: each its own alphabet, and a letter shared
   // by spelling (M, P, C, R) means something different on each.
   assert.ok(['S', 'A', 'M', 'Y', 'W', 'B', 'P', 'R'].every((l) => speaks('LOG', l)));

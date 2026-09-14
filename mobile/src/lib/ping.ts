@@ -216,13 +216,26 @@ export type PotsCode = 'T' | 'E';
  */
 export type ViewCode = 'I' | 'P' | 'B';
 
-/** Which offer: `A` the half-off annual window, `F` the founding-member card. */
-export type OfferCode = 'A' | 'F';
+/** Which offer: `A` the half-off annual window, `F` the founding-member card,
+ *  `P` the ordinary paywall.
+ *
+ *  `P` rides the FAILURE route only. The paywall is not an offer card — nothing
+ *  raises it on the app's initiative, so it has no `osh`/`odm`/`oac` — but a
+ *  purchase started there can fall through exactly like one started on a card,
+ *  and until this letter existed nothing reported when it did. That is how a
+ *  store which could not sell to a large share of Android phones moved no
+ *  counter for months: the only instrumented purchase paths were the two cards.
+ *
+ *  The consequence for a consumer: **`ofl / oac` is a rate only for A and F**.
+ *  `P`'s denominator is the `pay` route, which has its own cap and shape, so
+ *  the two must not simply be divided. */
+export type OfferCode = 'A' | 'F' | 'P';
 
-/** Map an offer card's name onto its marker. */
+/** Map a purchase origin onto its marker. */
 export function offerCode(offer: string | undefined): OfferCode | undefined {
   if (offer === 'annual') return 'A';
   if (offer === 'founder') return 'F';
+  if (offer === 'paywall') return 'P';
   return undefined;
 }
 

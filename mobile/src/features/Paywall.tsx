@@ -65,11 +65,25 @@ export function StoreBlockedNotice({ text }: { text: string }) {
 /** A store failure has to be reported INSIDE the sheet: the sheet stack is one
  *  RN Modal painted above the ToastProvider, so a toast here is invisible and
  *  the tap reads as a dead button (see CLAUDE.md). */
-function StoreError({ text }: { text: string }) {
+export function StoreError({ text }: { text: string }) {
   const p = usePalette();
   return (
     <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 9, padding: 12, borderRadius: radius.control, borderWidth: 1, borderColor: 'rgba(214,59,59,0.45)', backgroundColor: 'rgba(214,59,59,0.10)' }}>
       <Icon name="alert" size={16} color="#d63b3b" />
+      <Text style={{ flex: 1, color: p.text, fontSize: 13, lineHeight: 19 }}>{text}</Text>
+    </View>
+  );
+}
+
+/** The same rule's other half: an action that SUCCEEDED inside a sheet has to
+ *  say so inside it too. Restore is the case that needs it — a restore which
+ *  finds the subscription you already hold changes nothing on screen, so
+ *  without this the button is indistinguishable from a dead one. */
+export function StoreOkNotice({ text }: { text: string }) {
+  const p = usePalette();
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 9, padding: 12, borderRadius: radius.control, borderWidth: 1, borderColor: 'rgba(34,197,94,0.45)', backgroundColor: 'rgba(34,197,94,0.10)' }}>
+      <Icon name="check" size={16} color="#22c55e" />
       <Text style={{ flex: 1, color: p.text, fontSize: 13, lineHeight: 19 }}>{text}</Text>
     </View>
   );
@@ -259,7 +273,7 @@ export function PaywallCard({ controls, initialSku = YEARLY_SKU }: { controls: S
             title={purchasing ? 'Starting…' : trial ? `Start ${freeFor(trialDays).toLowerCase()}` : 'Upgrade to Pro'}
             variant="primary"
             disabled={purchasing}
-            onPress={() => subscribe(sku)}
+            onPress={() => subscribe(sku, 'paywall')}
           />
         )}
         {purchasing ? <ActivityIndicator color={p.accent} /> : null}
@@ -403,7 +417,7 @@ export function FreeVsProCard({ controls }: { controls: SheetControls }) {
           {blocked ? <StoreBlockedNotice text={blocked} /> : (
             <>
               <Pressable
-                onPress={() => subscribe(MONTHLY_SKU)}
+                onPress={() => subscribe(MONTHLY_SKU, 'paywall')}
                 disabled={purchasing}
                 style={({ pressed }) => [{ height: 52, borderRadius: 14, backgroundColor: p.accent, alignItems: 'center', justifyContent: 'center' }, (pressed || purchasing) && { opacity: 0.8 }]}
               >

@@ -86,7 +86,23 @@ test('identical fall-throughs share a row and different ones do not', () => {
   assert.match(offerFailKey('2026-09-10', 'F', a), /^2026-09-10#F#failed#[0-9a-f]{8}$/);
 });
 
-test('the day counter speaks the same alphabet as the accept it is read against', () => {
+test('every accept letter has a failure letter, but not the reverse', () => {
   assert.equal(KINDS.ofl, 'OFL');
-  assert.deepEqual(ALPHABET.OFL, ALPHABET.OAC);
+  // This used to assert the two alphabets were IDENTICAL, so that `ofl / oac`
+  // was a rate on every letter. It is now a SUPERSET relation, and the
+  // difference is the whole point: a purchase can fall through from the
+  // ordinary paywall, which no offer card shows and no `oac` counts. Excluding
+  // it kept the invariant tidy and left the app's main purchase door as the one
+  // path reporting no failures at all.
+  //
+  // What survives is the half that makes the rate safe: every letter `oac` can
+  // count must exist on `ofl`, or an accepted offer could fail into a letter
+  // the failure route cannot spell.
+  Object.keys(ALPHABET.OAC).forEach((letter) => {
+    assert.ok(ALPHABET.OFL[letter], `oac letter ${letter} has no ofl counterpart`);
+  });
+  // And the extra letters are exactly the ones with no accept to be divided by,
+  // so a consumer must take the rate PER LETTER rather than over the route.
+  const extra = Object.keys(ALPHABET.OFL).filter((l) => !ALPHABET.OAC[l]);
+  assert.deepEqual(extra, ['P']);
 });

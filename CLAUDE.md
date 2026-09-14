@@ -1146,12 +1146,21 @@ old web app so old `export.json` files import directly.
   the one ping with a BODY** (`reportOfferOutcome`, fed by `onPurchaseOutcome`
   in `store/iap.ts`, which settles each `subscribe(sku, origin)` attempt ONCE as
   purchased / cancelled / failed / pending / unstarted / timeout; only attempts
-  an offer card started are reported). The body is `offerFailureBody` in
+  carrying an ORIGIN are reported, which for a long time meant only the two
+  offer cards — so the ordinary paywall, the door most purchases go through,
+  was the one path reporting no failures at all, and a store that could not
+  sell to a large share of Android moved no counter for months. The paywall now
+  passes `'paywall'` and takes the letter `P`). The body is `offerFailureBody` in
   `lib/ping.ts`: expo-iap's `code`, Play's `response` and `sub` codes, and the
   store's message + debugMessage redacted with the fault rules (again in the
   lambda). Every attempt lands on an `OFFERFAIL` row; `d` rides the first per
   offer per Eastern day and alone moves `PING#OFL`, so `ofl / oac` is a
-  headcount. Unlike every other ping it is QUEUED (`pingOflQueue`) and retried on
+  headcount — **per letter, and only for `A` and `F`**: `P` has no `oac` to be
+  divided by (nothing SHOWS a paywall on the app's initiative), so its
+  denominator is the `pay` route, which carries its own cap. `OAC`'s alphabet is
+  a strict subset of `OFL`'s and a test pins it: every letter an accept can
+  carry must exist on the failure route, or an accepted offer could fail into a
+  letter that route cannot spell. Unlike every other ping it is QUEUED (`pingOflQueue`) and retried on
   foreground, since `network-error` is a likely reason the purchase failed at
   all. Read back as `ofl` + `offerFailures` on the report; the dashboard does not
   draw it yet.
