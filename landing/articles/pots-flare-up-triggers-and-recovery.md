@@ -8,8 +8,7 @@ keywords: "POTS flare, POTS flare up, how to recover from a POTS flare, POTS fla
 date: 2026-09-14
 updated: 2026-09-14
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1519643381401-22c77e60520e?q=80&w=1760&auto=format&fit=crop"
-photoAttribution: "Kinga Howard / Unsplash"
+photoLocation: "https://images.unsplash.com/photo-1495197359483-d092478c170a?q=80&w=1065&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
 tldr: "A POTS flare is a temporary period, usually hours to days, where orthostatic symptoms climb well above your normal. It is not a new permanent worsening. Common triggers stack: heat, dehydration, illness, hormonal shifts, poor sleep and overexertion. Recovery is mostly about catching it early, resting before you are forced to, loading fluids and salt, staying cooler and more horizontal, and re-expanding activity only as your resting heart rate and HRV drift back toward baseline. Discuss recurring or severe flares with a clinician."
 categories:
   - pots
