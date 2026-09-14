@@ -1,35 +1,35 @@
 /**
  * Persistence for the half-off annual offer (./annual).
  *
- * Its own file rather than part of ./index on purpose: src/store/tier.ts has to
- * read this stamp to grant the 24-hour unlock, and ./index already imports
- * src/store/tier for `getTier()`. Folding this in would close that loop into an
- * import cycle. Everything here depends only on MMKV and the pure ./annual, so
- * both sides can import it safely.
+ * Its own file rather than part of the card on purpose: ./pacingMemory reads
+ * this stamp to backfill the shared offer clock, and the card itself imports
+ * src/store/tier. Keeping the persistence in a leaf that depends only on MMKV
+ * and the pure ./annual is what stops those references closing into a cycle.
  *
  * Same storage rules as the rest of src/lib/upsell: the plaintext
  * `autonomic.flags` MMKV, alongside the trial stamp and the review stamps. It
  * isn't health data, it must never ride export/import, and it has to survive
  * "Clear all data" — an offer already spent must not come back by erasing the
- * journal. What's written is four integers.
+ * journal. What's written is a list of spent milestones, the standing one, and
+ * when it was raised.
  */
 import { MMKV } from 'react-native-mmkv';
-import { emptyAnnualMemory, startOffer, type AnnualOfferMemory } from './annual';
+import { dismissOffer, emptyAnnualMemory, startOffer, type AnnualOfferMemory } from './annual';
 
-/** TEMP (dev only): pin the due milestone so the card and its 24h unlock fire
- *  on the next render, whatever the install date says. Leave null in committed
- *  code. Mirrors FORCE_TIER (src/store/tier.ts) and FORCE_UPSELL (./index). */
+/** TEMP (dev only): pin the due milestone so the card is raised on the next
+ *  render, whatever the install date says. Leave null in committed code.
+ *  Mirrors FORCE_TIER (src/store/tier.ts). */
 export const FORCE_ANNUAL_OFFER: number | null = null;
 
 /**
- * TEMP (dev only): on the next launch, rewind the stored window by N days, as
- * if the offer had opened that long ago. Set to 11 to land 10 days past a
- * lapsed 24-hour window — the state where the card is gone, the unlock has
- * ended, and the generic upsell's MIN_DAYS_BETWEEN_PROMPTS has just cleared.
- * It rewrites storage ONCE and then persists, so put it back to null after one
- * launch. Leave null in committed code.
+ * TEMP (dev only): on the next launch, rewind the stored stamp by N days, as if
+ * the card had been raised that long ago. The card itself no longer expires, so
+ * this only ages the shared offer clock — use it to reach the state where the
+ * next milestone is free to fire. It rewrites storage ONCE and then persists,
+ * so put it back to null after one launch. Leave null in committed code.
  */
 const FORCE_OFFER_AGE_DAYS: number | null = null;
+
 
 const FLAGS_ID = 'autonomic.flags';
 const KEY = 'annualOffer';
@@ -58,7 +58,6 @@ export function annualMemory(): AnnualOfferMemory {
       consumed: Array.isArray(parsed.consumed) ? parsed.consumed.filter((n) => Number.isFinite(n)) : [],
       startedAtMs: parsed.startedAtMs,
       milestone: parsed.milestone,
-      collapsed: parsed.collapsed,
     };
   } catch {
     return emptyAnnualMemory();
@@ -71,7 +70,7 @@ function write(m: AnnualOfferMemory): void {
   try { store()?.set(KEY, raw); } catch { /* in-memory only this session */ }
 }
 
-/** Open the window. Returns the memory it wrote, so the caller can render from
+/** Raise the card. Returns the memory it wrote, so the caller can render from
  *  the same value it just persisted rather than reading back. */
 export function noteAnnualOfferStarted(milestone: number, nowMs = Date.now()): AnnualOfferMemory {
   const next = startOffer(annualMemory(), milestone, nowMs);
@@ -79,10 +78,9 @@ export function noteAnnualOfferStarted(milestone: number, nowMs = Date.now()): A
   return next;
 }
 
-/** Remember the accordion state, so a card the user folded away stays folded
- *  for the rest of the window instead of springing open on every launch. */
-export function noteAnnualOfferCollapsed(collapsed: boolean): void {
-  write({ ...annualMemory(), collapsed });
+/** The ✕. Permanent for this milestone: the card comes back at the next one. */
+export function noteAnnualOfferDismissed(): void {
+  write(dismissOffer(annualMemory()));
 }
 
 /* Dev time machine — see FORCE_OFFER_AGE_DAYS. Runs once at import, moving both
@@ -92,7 +90,7 @@ export function noteAnnualOfferCollapsed(collapsed: boolean): void {
 if (__DEV__ && FORCE_OFFER_AGE_DAYS) {
   const shift = FORCE_OFFER_AGE_DAYS * 86_400_000;
   const m = annualMemory();
-  if (m.startedAtMs) write({ ...m, startedAtMs: m.startedAtMs - shift, collapsed: undefined });
+  if (m.startedAtMs) write({ ...m, startedAtMs: m.startedAtMs - shift });
   try {
     const raw = store()?.getString(KEY_UPSELL);
     if (raw) {

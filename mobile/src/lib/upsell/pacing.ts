@@ -5,21 +5,23 @@
  * There are exactly two proactive offers (./annual, ./founder) and each owns
  * its own trigger, but "when may an offer be raised AT ALL" is not a question
  * either of them can answer alone: each one only knows about itself. The result
- * shipped: the annual card's 24-hour window reports 'trial' (src/store/tier.ts
- * grants the unlock), the founding-member card fires inside a trial, so opening
- * the annual offer immediately made the founder card due and the Journal showed
- * a half-price year with "join us early" stacked underneath it. Two offers at
- * once is worse than either offer alone.
+ * shipped: the annual card used to unlock Pro for 24 hours, which reports
+ * 'trial', and the founding-member card fires inside a trial — so opening the
+ * annual offer immediately made the founder card due and the Journal showed a
+ * half-price year with "join us early" stacked underneath it. That unlock is
+ * gone, but the clock stays: two offers at once is worse than either alone, and
+ * nothing else stops both being due on the same launch.
  *
  * So the two share ONE clock. An offer may only OPEN when nothing else has been
  * raised in the last `OFFER_COOLDOWN_MS`, and opening one stamps it. This is a
- * gate on STARTING, never on rendering: a card that has already claimed its
- * window (the annual card's live 24 hours, the founder card's claimed day) goes
- * on drawing itself against its own memory, or the clock it set would retire it
- * a frame after it appeared.
+ * gate on STARTING, never on rendering: a card that has already been raised
+ * (the annual card standing until it is dismissed, the founder card's claimed
+ * day) goes on drawing itself against its own memory, or the clock it set would
+ * retire it a frame after it appeared.
  *
  * Blocked is DEFERRED, not spent — the same rule both offers already follow for
- * a crash-alert day. The annual milestone stays due and fires a week later; the
+ * a crash-alert day. The annual milestone stays due and is raised a week later;
+ * the
  * founder card, which lives for a single day, simply is not due yet.
  *
  * Pure: no store, no MMKV, no expo. ./pacingMemory supplies the persistence.

@@ -1,6 +1,6 @@
 import {
-  OFFER_MILESTONE_DAYS, OFFER_WINDOW_MS, daysSinceInstall, dueMilestone,
-  emptyAnnualMemory, formatMsLeft, liveOffer, offerMsLeft, startOffer,
+  OFFER_MILESTONE_DAYS, daysSinceInstall, dismissOffer, dueMilestone,
+  emptyAnnualMemory, liveOffer, startOffer,
 } from '../annual';
 
 const DAY = 86_400_000;
@@ -38,24 +38,27 @@ describe('dueMilestone', () => {
     expect(dueMilestone(T0, at(400), fresh)).toBe(365);
   });
 
-  it('is null while a window is already live', () => {
+  it('is null while a card is already standing', () => {
     const m = startOffer(fresh, 30, at(30));
     expect(dueMilestone(T0, at(30, DAY / 2), m)).toBeNull();
+    // Still standing days later: the card does not expire on its own.
+    expect(dueMilestone(T0, at(45), m)).toBeNull();
+    expect(dueMilestone(T0, at(120), m)).toBeNull();
   });
 
-  it('does not re-fire a milestone once its window has lapsed', () => {
-    const m = startOffer(fresh, 30, at(30));
+  it('does not re-fire a milestone once its card has been dismissed', () => {
+    const m = dismissOffer(startOffer(fresh, 30, at(30)));
     expect(dueMilestone(T0, at(31), m)).toBeNull();
     expect(dueMilestone(T0, at(60), m)).toBeNull();
   });
 
-  it('moves on to the next milestone when it arrives', () => {
-    const m = startOffer(fresh, 30, at(30));
+  it('moves on to the next milestone once the card is dismissed', () => {
+    const m = dismissOffer(startOffer(fresh, 30, at(30)));
     expect(dueMilestone(T0, at(90), m)).toBe(90);
   });
 
   it('spends every milestone at or below the one awarded', () => {
-    const m = startOffer(fresh, 180, at(200));
+    const m = dismissOffer(startOffer(fresh, 180, at(200)));
     expect(m.consumed).toEqual([30, 90, 180]);
     // Only 365 is left, and not until it is reached.
     expect(dueMilestone(T0, at(300), m)).toBeNull();
@@ -64,44 +67,24 @@ describe('dueMilestone', () => {
 
   it('has nothing left after the last milestone', () => {
     let m = emptyAnnualMemory();
-    for (const d of OFFER_MILESTONE_DAYS) m = startOffer(m, d, at(d));
+    for (const d of OFFER_MILESTONE_DAYS) m = dismissOffer(startOffer(m, d, at(d)));
     expect(dueMilestone(T0, at(1000), m)).toBeNull();
   });
 });
 
-describe('offerMsLeft / liveOffer', () => {
-  it('is zero with no window ever opened', () => {
-    expect(offerMsLeft(at(30), emptyAnnualMemory())).toBe(0);
-    expect(liveOffer(at(30), emptyAnnualMemory())).toBeNull();
+describe('liveOffer / dismissOffer', () => {
+  it('is null with no card ever raised', () => {
+    expect(liveOffer(emptyAnnualMemory())).toBeNull();
   });
 
-  it('runs for exactly 24 hours', () => {
-    const m = startOffer(emptyAnnualMemory(), 30, at(30));
-    expect(offerMsLeft(at(30), m)).toBe(OFFER_WINDOW_MS);
-    expect(offerMsLeft(at(30, 6 * 3600_000), m)).toBe(18 * 3600_000);
-    expect(offerMsLeft(at(31), m)).toBe(0);
-    expect(offerMsLeft(at(31, 1), m)).toBe(0);
-  });
-
-  it('reports the milestone it belongs to while live', () => {
+  it('stands indefinitely once raised', () => {
     const m = startOffer(emptyAnnualMemory(), 90, at(90));
-    expect(liveOffer(at(90, 3600_000), m)).toEqual({ milestone: 90, msLeft: 23 * 3600_000 });
-    expect(liveOffer(at(91), m)).toBeNull();
+    expect(liveOffer(m)).toEqual({ milestone: 90 });
   });
 
-  it('cannot be held open by winding the clock back behind the stamp', () => {
-    const m = startOffer(emptyAnnualMemory(), 30, at(30));
-    // Device now reports a time before the window opened: the window is treated
-    // as starting now, so it still closes 24h later rather than never.
-    expect(offerMsLeft(at(20), m)).toBe(OFFER_WINDOW_MS);
-  });
-});
-
-describe('formatMsLeft', () => {
-  it('reads as hours and padded minutes, then minutes alone', () => {
-    expect(formatMsLeft(21 * 3600_000 + 4 * 60_000)).toBe('21h 04m');
-    expect(formatMsLeft(48 * 60_000)).toBe('48m');
-    expect(formatMsLeft(0)).toBe('0m');
-    expect(formatMsLeft(-5)).toBe('0m');
+  it('is taken down by the dismissal, which keeps the milestone spent', () => {
+    const m = dismissOffer(startOffer(emptyAnnualMemory(), 30, at(30)));
+    expect(liveOffer(m)).toBeNull();
+    expect(m.consumed).toEqual([30]);
   });
 });

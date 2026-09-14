@@ -202,12 +202,19 @@ export function notifyCode(kind: string | undefined): NotifyCode | undefined {
 export type PotsCode = 'T' | 'E';
 
 /**
- * Which gated view was opened: `I` Insights, `P` Progress. The two Pro surfaces
- * a free user can see the shape of but not the contents of, so "how many people
- * go looking" is the demand side of the same question the paywall counter asks
- * from the supply side.
+ * Which gated view was opened: `I` Insights, `P` Progress, `B` the pacing
+ * budget. The Pro surfaces a free user can reach for but not read, so "how many
+ * people go looking" is the demand side of the same question the paywall
+ * counter asks from the supply side.
+ *
+ * `B` is the one that is not a VIEW: tapping the pacing strip while it is
+ * locked opens a pitch card rather than a masked document, and it shares the
+ * paywall route's letter on purpose — `see` B, `pay` B and `oac` are then one
+ * funnel for the same surface, read straight down the column. The unlocked half
+ * of the same tap is `use` B, which is the only way to tell "went looking" from
+ * "actually uses it".
  */
-export type ViewCode = 'I' | 'P';
+export type ViewCode = 'I' | 'P' | 'B';
 
 /** Which offer: `A` the half-off annual window, `F` the founding-member card. */
 export type OfferCode = 'A' | 'F';
@@ -256,15 +263,23 @@ export function logCode(kind: LogKind | string | undefined, type?: string): LogC
 
 /**
  * Which feature was used: `M` the Milestones sheet was opened, `P` the
- * clean-day protocol was saved. Neither is gated, which is why they are not on
- * the `see` route — that one means "a Pro view", and a free user opening
+ * clean-day protocol was saved, `B` the pacing budget sheet was opened by
+ * somebody who can read it. The first two are not gated, which is why they are
+ * not on the `see` route — that one means "a Pro view", and a free user opening
  * Milestones is not demand for anything.
+ *
+ * `B` is the exception and is deliberately on BOTH routes, split by what the
+ * tap actually got: `use` B is the budget opened, `see` B is the pitch card a
+ * locked tap opens instead. One letter and the two counts would be
+ * indistinguishable, which is the one comparison the pacing trial exists to be
+ * judged on.
  */
-export type FeatureCode = 'M' | 'P';
+export type FeatureCode = 'M' | 'P' | 'B';
 
 export function featureCode(feature: string | undefined): FeatureCode | undefined {
   if (feature === 'milestones') return 'M';
   if (feature === 'protocol') return 'P';
+  if (feature === 'pacing') return 'B';
   return undefined;
 }
 

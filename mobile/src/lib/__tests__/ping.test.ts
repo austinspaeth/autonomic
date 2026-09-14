@@ -128,6 +128,11 @@ describe('cohort ping wire format', () => {
   it('names the feature, the finding and the AI report', () => {
     expect(featureCode('milestones')).toBe('M');
     expect(featureCode('protocol')).toBe('P');
+    // The pacing budget, opened by somebody who can read it. The locked half of
+    // that same tap is `see` B, and the two must stay separate letters on
+    // separate routes: pooled they are only "somebody tapped the strip", which
+    // is the one thing about the pacing trial nobody was asking.
+    expect(featureCode('pacing')).toBe('B');
     expect(featureCode('settings')).toBeUndefined();
     expect(findingCode('early')).toBe('E');
     expect(findingCode('unconfirmed')).toBe('U');

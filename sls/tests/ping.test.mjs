@@ -84,6 +84,11 @@ test('each route validates the slot against ITS OWN alphabet', () => {
   assert.ok(speaks('PAY', 'R'));
   assert.ok(!speaks('PAY', 'G'));
   assert.ok(speaks('NOT', 'M') && speaks('POT', 'T') && speaks('SEE', 'I'));
+  // The pacing budget is on THREE routes under one letter, split by what the
+  // tap got: SEE B is the pitch card a locked tap opens, USE B is the budget
+  // itself, PAY B is the paywall raised from the pitch. One funnel, read down
+  // the column; pooled into one letter on one route it would say nothing.
+  assert.ok(speaks('SEE', 'B') && speaks('USE', 'B') && speaks('PAY', 'B'));
   assert.ok(speaks('NOT', 'P'));      // pacing alerts
   assert.ok(!speaks('NOT', 'T'));     // a POTS letter is not a notification
 

@@ -484,8 +484,9 @@ export function pingPots(kind: 'stand' | 'episode'): void {
  * Per-letter cap: somebody who opens both in a day is counted for both, so each
  * letter's count is a headcount for that view.
  */
-export function pingViewOpened(view: 'insights' | 'progress'): void {
-  const slot: ViewCode | undefined = view === 'insights' ? 'I' : view === 'progress' ? 'P' : undefined;
+export function pingViewOpened(view: 'insights' | 'progress' | 'pacing'): void {
+  const slot: ViewCode | undefined =
+    view === 'insights' ? 'I' : view === 'progress' ? 'P' : view === 'pacing' ? 'B' : undefined;
   pingDaily('see', slotKey(KEY_LAST_SEE, slot), slot);
 }
 
@@ -519,9 +520,10 @@ export function pingLogged(kind: LogKind, type?: string): void {
   pingPerLetter('log', KEY_LAST_LOG, logCode(kind, type));
 }
 
-/** A feature was used: `'milestones'` (the sheet opened) or `'protocol'` (the
- *  clean-day protocol saved). */
-export function pingFeature(feature: 'milestones' | 'protocol'): void {
+/** A feature was used: `'milestones'` (the sheet opened), `'protocol'` (the
+ *  clean-day protocol saved) or `'pacing'` (the budget sheet opened by somebody
+ *  who can read it — the locked half of that same tap is `pingViewOpened`). */
+export function pingFeature(feature: 'milestones' | 'protocol' | 'pacing'): void {
   pingPerLetter('use', KEY_LAST_USE, featureCode(feature));
 }
 

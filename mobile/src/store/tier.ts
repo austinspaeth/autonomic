@@ -18,8 +18,6 @@ import { useSyncExternalStore } from 'react';
 import { AppState as RNAppState } from 'react-native';
 import { MMKV } from 'react-native-mmkv';
 import { deriveTier, trialMsLeft, type Tier } from '../lib/tier';
-import { offerMsLeft } from '../lib/upsell/annual';
-import { annualMemory } from '../lib/upsell/annualMemory';
 import { getIapState, subscribeIap } from './iap';
 
 export type { Tier };
@@ -75,12 +73,12 @@ function effectiveIsPro(): boolean {
 }
 
 /**
- * Milliseconds of full access left from either window — the 14-day install trial
- * or the 24-hour unlock that rides with the half-off annual offer
- * (src/lib/upsell/annual). Whichever runs longer is the one that matters.
+ * Milliseconds of full access left, which is the 14-day install trial and
+ * nothing else. The half-off annual offer used to layer a 24-hour unlock in
+ * here; it no longer grants access of any kind (src/lib/upsell/annual).
  */
 function accessMsLeft(now: number): number {
-  return Math.max(trialMsLeft(now, trialStartedAtMs()), offerMsLeft(now, annualMemory()));
+  return trialMsLeft(now, trialStartedAtMs());
 }
 
 function armExpiryTimer(tier: Tier) {
@@ -98,17 +96,10 @@ function recheck(): Tier {
   const now = Date.now();
   const iap = getIapState();
   if (iap.ready) writeFlag(KEY_WAS_PRO, iap.isPro ? '1' : '0');
-  // FORCE_TIER pins the DERIVED tier, and the offer unlock below can still lift
-  // it — not an early return. Pinning the final answer would make the 24h unlock
-  // untestable in a dev build: the only configuration in which the offer card
-  // appears at all is FORCE_TIER = 'free' (the dev bypass otherwise reports
-  // 'pro'), and an early return there would hold the app at 'free' while the
-  // window it just opened was supposed to be granting access.
-  const base = (__DEV__ && FORCE_TIER) || deriveTier(now, trialStartedAtMs(), effectiveIsPro());
-  // The annual offer's 24h unlock reports 'trial', never 'pro': nobody paid for
-  // it, and it ends. Layered here rather than inside deriveTier so the pure
-  // module (and its tests) stay about the one thing they were written for.
-  const next = base === 'free' && offerMsLeft(now, annualMemory()) > 0 ? 'trial' : base;
+  // FORCE_TIER pins the tier outright. The only configuration in which the
+  // annual offer card appears at all is FORCE_TIER = 'free' — the dev bypass
+  // otherwise reports 'pro'.
+  const next = (__DEV__ && FORCE_TIER) || deriveTier(now, trialStartedAtMs(), effectiveIsPro());
   armExpiryTimer(next);
   if (next !== current) { current = next; emit(); }
   return current;
@@ -152,9 +143,9 @@ export function getInstalledAtMs(): number | null {
   return trialStartedAtMs();
 }
 
-/** Whole days of full access remaining (0 outside both windows) — Settings copy.
- *  Counts the annual offer's 24h unlock too, so an unlocked user can never be
- *  shown "Free trial · 0 days left" while the app is treating them as 'trial'. */
+/** Whole days of the install trial remaining (0 once it has lapsed) — Settings
+ *  copy. The annual offer used to extend this with its 24h unlock; it grants no
+ *  access at all now, so the trial is the only window left. */
 export function getTrialDaysLeft(): number {
   return Math.ceil(accessMsLeft(Date.now()) / 86_400_000);
 }

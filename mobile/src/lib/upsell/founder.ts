@@ -74,17 +74,19 @@ export interface FounderInput {
   downturn?: boolean;
   /**
    * Another offer was raised inside the shared cool-down (./pacing). The app
-   * shows ONE offer at a time — and the annual card's 24h unlock reports
-   * 'trial', so without this it made THIS card due the moment it appeared.
+   * shows ONE offer at a time. It was load-bearing in a second way while the
+   * annual card unlocked Pro for 24 hours: that unlock reported 'trial', which
+   * is exactly the state this card waits for, so raising one made the other due.
    */
   offerCooldown?: boolean;
   /**
-   * The half-off annual window is running right now (./annual). Suppresses this
-   * card outright — INCLUDING on a day it had already claimed, which is the one
-   * thing the cool-down can't reach, because a claimed day renders from memory
-   * and never asks again. That's how a phone already holding both offers gets
-   * back to showing one: the live window wins, since it is the offer the user
-   * can currently act on and it is over within a day.
+   * The half-off annual card is standing on the Journal right now (./annual).
+   * Suppresses this card outright — INCLUDING on a day it had already claimed,
+   * which is the one thing the cool-down can't reach, because a claimed day
+   * renders from memory and never asks again. That's how a phone already
+   * holding both offers gets back to showing one: the standing card wins, since
+   * it is the ask the user has not answered yet, and this one's single day is
+   * spent either way.
    */
   annualOfferLive?: boolean;
 }

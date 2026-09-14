@@ -224,8 +224,11 @@ const NOTIFY = { M: 'morning-reminder', C: 'crash-warning', P: 'pacing-alerts' }
 /** Which POTS capture finished — the POT route. */
 const POTS = { T: 'stand-test', E: 'episode' };
 
-/** Which gated view was opened — the SEE route. */
-const VIEWS = { I: 'insights', P: 'progress' };
+/** Which gated view was opened — the SEE route. `B` is the pacing budget
+ *  tapped while locked, which opens a pitch card rather than a masked view; it
+ *  shares the PAY route's letter so `see`/`pay`/`oac` read as one funnel for
+ *  that surface, and its unlocked half is USE `B`. */
+const VIEWS = { I: 'insights', P: 'progress', B: 'pacing' };
 
 /** Which offer — the OSH / ODM / OAC routes, one alphabet across all three so
  *  the three counts are directly comparable per offer. */
@@ -238,9 +241,10 @@ const LOGS = {
   W: 'water', B: 'bowel-movement', P: 'blood-pressure', R: 'resting-heart-rate',
 };
 
-/** Which feature was used — the USE route. Not gated, which is why these are
- *  not on SEE. */
-const FEATURES = { M: 'milestones-opened', P: 'protocol-saved' };
+/** Which feature was used — the USE route. The first two are not gated, which
+ *  is why they are not on SEE; `B` is the pacing budget actually opened, and is
+ *  on both routes split by what the tap got (see VIEWS). */
+const FEATURES = { M: 'milestones-opened', P: 'protocol-saved', B: 'pacing-budget-opened' };
 
 /** Which Insights finding was opened into its deep dive — the FND route. */
 const FINDINGS = { E: 'early-signal', U: 'unconfirmed-pattern', C: 'biggest-change', R: 'correlation' };

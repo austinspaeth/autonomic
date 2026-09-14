@@ -7,22 +7,36 @@
  * (`annual_founder_first_year` on iOS, the promo year on Play — see
  * FOUNDER_SKU in src/store/iap.ts).
  *
+ * The card LEADS WITH THE PRICE. The old version opened with a paragraph and
+ * put the number in the last line of it, which asked the reader to work out
+ * what was being offered before they could tell whether they wanted it. Here
+ * the discounted year is the biggest thing on the card, struck through against
+ * the full price, over three lines naming what Pro actually unlocks.
+ *
  * Two departures from the design: the ✕ is drawn at full size rather than as a
- * 12px glyph in a 44pt target, and the secondary "Maybe later" is gone. Both
+ * 12px glyph in a 38pt target, and the secondary "Maybe later" is gone. Both
  * because there is no "later" here — the card lives for one calendar day and
  * never returns, so a control that implies a rain check would be a lie. The ✕
  * is the whole dismissal, and it is permanent; a second grey button saying the
  * same thing only gave the card two ways to say no and pushed the price line
  * off the fold.
  *
+ * EVERY NUMBER ON IT COMES FROM THE STORE. The strike-through, the "half price"
+ * claim and the button's own price are all derived from the two localized
+ * prices StoreKit / Play returned (see `discountPct`), so a user who isn't
+ * eligible meets a card that simply states the price rather than one claiming a
+ * discount it can't give them.
+ *
  * All the decisions live in src/lib/upsell/founder.ts (pure, tested); this file
  * asks once per mount, stamps the day it claimed, and renders it.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
+import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { Icon } from '../components/Icon';
 import { useSheets } from '../components/Sheet';
-import { radius, usePalette } from '../theme';
+import { ACCENT, fonts, usePalette } from '../theme';
+import { hexA, mixHex } from '../lib/color';
 import { useAppState } from '../store/store';
 import { useTier } from '../store/tier';
 import { FOUNDER_SKU, YEARLY_SKU, priceOf, subscribe, useIap } from '../store/iap';
@@ -34,9 +48,28 @@ import { detectStrain } from '../lib/scoring/strain';
 import { discountPct, founderVerdict } from '../lib/upsell/founder';
 import { FORCE_FOUNDER_OFFER, founderMemory, noteFounderDismissed, noteFounderShown } from '../lib/upsell/founderMemory';
 import { noteOfferShown, offerPacingClear } from '../lib/upsell/pacingMemory';
-import { offerMsLeft } from '../lib/upsell/annual';
+import { liveOffer } from '../lib/upsell/annual';
 import { annualMemory } from '../lib/upsell/annualMemory';
 import { pingOfferAccepted, pingOfferDismissed, pingOfferShown } from '../store/ping';
+
+/**
+ * What the money buys, in the reader's terms. Three lines, because the card has
+ * to be legible in one glance under the Outlook — the full boundary is the
+ * Free-vs-Pro sheet's job. Each line states the Pro side of a line that really
+ * is drawn in src/lib/gating.ts: capture is never metered, so nothing here may
+ * promise a measurement the free tier already takes (a POTS capture runs on
+ * every tier — it's the RESULT that's locked, and that's what this says).
+ */
+/** The accent, lightened enough to read as small bold type over the dark
+ *  surface. The raw accent at 11px is a red smudge; this is the same colour the
+ *  eye still reads as the app's red. */
+const ACCENT_LIGHT = mixHex('#ffffff', ACCENT, 0.42);
+
+const UNLOCKS = [
+  'Your full history, not just the last 14 days',
+  'The pacing budget and your POTS results',
+  'Correlations, insights and the AI reports',
+];
 
 export function FounderOfferCard() {
   const p = usePalette();
@@ -50,13 +83,15 @@ export function FounderOfferCard() {
    *  over within a day, so it wins the slot outright — see `annualOfferLive`
    *  in ../lib/upsell/founder. Read on every render rather than latched,
    *  because this card must come back when that window closes. */
-  const annualOfferLive = offerMsLeft(Date.now(), annualMemory()) > 0;
+  const annualOfferLive = liveOffer(annualMemory()) != null;
 
   // Resolve an already-claimed day during the first render (a pure read), the
   // same reason AnnualOfferCard does: settling it a frame later pops the card
   // in under the Outlook on launch and shoves the rest of the Journal down.
   const [live, setLive] = useState(() => founderMemory().shownDk === dk && !founderMemory().dismissed);
   const [dismissed, setDismissed] = useState(false);
+  // The top glow is an SVG, so it needs the card's own width.
+  const [size, setSize] = useState({ w: 0, h: 0 });
 
   // Ask once per mount, then hold. Re-entering would re-evaluate a decision
   // this very card just persisted.
@@ -80,11 +115,9 @@ export function FounderOfferCard() {
       sheetOpen: depth > 0,
       crashAlertFiredToday: state.settings.crashAlert?.lastFired === dk,
       downturn,
-      // One offer at a time, then a week of quiet (../lib/upsell/pacing). This
-      // is also what keeps the annual card's 24h unlock from making this card
-      // due: that unlock reports 'trial', which is otherwise exactly the state
-      // this offer waits for. Asked only on the claim path — a day already
-      // claimed is handled above, by the memory.
+      // One offer at a time, then a week of quiet (../lib/upsell/pacing). Asked
+      // only on the claim path — a day already claimed is handled above, by the
+      // memory.
       offerCooldown: !offerPacingClear(),
       annualOfferLive,
     });
@@ -140,77 +173,121 @@ export function FounderOfferCard() {
   if (!live || dismissed || tier !== 'trial' || annualOfferLive) return null;
 
   return (
-    <View style={{
-      borderWidth: 1, borderColor: p.border, borderRadius: radius.card,
-      backgroundColor: p.surface, marginBottom: 12, padding: 16, paddingTop: 15,
-    }}>
-      {/* Full-size ✕ in its own 44pt target, sitting in the card's corner. */}
-      <Pressable
-        onPress={end}
-        hitSlop={6}
-        style={({ pressed }) => [
-          { position: 'absolute', top: 4, right: 4, width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-          pressed && { opacity: 0.6 },
-        ]}
-      >
-        <Icon name="x" size={20} color={p.textDim} strokeWidth={2.4} />
-      </Pressable>
-
-      <View style={{ alignSelf: 'flex-start', borderWidth: 1, borderColor: p.border, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 4, marginBottom: 12, marginRight: 44 }}>
-        <Text style={{ fontSize: 10.5, fontWeight: '700', letterSpacing: 1.3, color: p.textDim }}>JOIN US EARLY</Text>
-      </View>
-
-      <Text style={{ fontSize: 19, fontWeight: '700', letterSpacing: -0.3, color: p.text, marginBottom: 8 }}>
-        Five days down. The trend starts here.
-      </Text>
-
-      <Text style={{ fontSize: 13.5, lineHeight: 21, color: p.textDim, marginBottom: 16 }}>
-        {/* The percentage is DERIVED from the two prices the store returned, so
-            it stays true in every currency and disappears entirely when this
-            user isn't eligible for the introductory price. */}
-        {/* The offer's one-day life is stated here, in the sentence that makes
-            the price claim, rather than as its own coloured line under the
-            button: an offer that quietly expires reads as a bug the next
-            morning, but a red banner saying so turned the card into a
-            countdown ad. */}
-        Pro shows you your full history and every trend, so you can see what days like today are made of.
-        {pct ? ' Sign up now and you keep ' : ' '}
-        {pct ? <Text style={{ color: p.text, fontWeight: '600' }}>{`${pct}% off`}</Text> : null}
-        {pct ? ' for as long as you stay. Offer is only available today.' : 'Sign up now at the founding member price. Offer is only available today.'}
-      </Text>
-
-      {/* No button when the store has told us this device can never complete a
-          purchase: the tap would fire `oac` and then die in loadProducts before
-          requestPurchase, recording an offer as accepted that could not
-          convert. */}
-      {blocked ? <StoreBlockedNotice text={blocked} /> : (
-        <Pressable
-          onPress={() => { pingOfferAccepted('founder'); subscribe(FOUNDER_SKU, 'founder'); }}
-          disabled={purchasing}
-          style={({ pressed }) => [
-            { height: 50, borderRadius: 14, backgroundColor: p.accent, alignItems: 'center', justifyContent: 'center' },
-            (pressed || purchasing) && { opacity: 0.8 },
-          ]}
-        >
-          <Text style={{ color: '#fff', fontSize: 15.5, fontWeight: '700' }}>
-            {purchasing ? 'Starting…' : 'Join at the early price'}
-          </Text>
-        </Pressable>
+    <View
+      onLayout={(e) => { const { width, height } = e.nativeEvent.layout; setSize({ w: width, h: height }); }}
+      style={{
+        borderWidth: 1, borderColor: hexA(p.accent, 0.27), borderRadius: 22,
+        backgroundColor: p.sunk, marginBottom: 12, overflow: 'hidden',
+      }}
+    >
+      {/* Light spilling in over the top edge. The same trick the Outlook's
+          GradientBorderCard uses (an SVG radial under the content, never a tint
+          over it), lit from the top CENTRE rather than a corner: this card sits
+          directly under that one and a matching lit corner would read as the
+          same object continued. */}
+      {size.w > 0 && (
+        <View style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 90 }} pointerEvents="none">
+          <Svg width={size.w} height={90}>
+            <Defs>
+              <RadialGradient id="fo-glow" cx={size.w / 2} cy={-6} rx={size.w * 0.42} ry={78} gradientUnits="userSpaceOnUse">
+                <Stop offset="0" stopColor={p.accent} stopOpacity={0.4} />
+                <Stop offset="0.45" stopColor={p.accent} stopOpacity={0.13} />
+                <Stop offset="1" stopColor={p.accent} stopOpacity={0} />
+              </RadialGradient>
+            </Defs>
+            <Rect x={0} y={0} width={size.w} height={90} fill="url(#fo-glow)" />
+          </Svg>
+        </View>
       )}
 
-      {/* A store failure has to be said out loud here, or the button just
-          flashes "Starting…" and reverts (see src/store/iap.ts). */}
-      {error && !blocked ? (
-        <Text style={{ color: '#d63b3b', fontSize: 12, lineHeight: 17, textAlign: 'center', marginTop: 9 }}>{error}</Text>
-      ) : null}
+      {/* Header: what this is, and the one way out of it. The ✕ keeps its full
+          44pt target and 20px glyph; the row is padded to sit it in the corner
+          without the absolute positioning the old card needed. */}
+      <View style={{
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+        paddingLeft: 17, paddingRight: 6, paddingVertical: 8,
+        borderBottomWidth: 1, borderBottomColor: hexA(p.text, 0.05),
+      }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 }}>
+          <Icon name="star" size={14} color={p.accent} strokeWidth={2.4} />
+          <Text numberOfLines={1} style={{ fontSize: 11, fontWeight: '800', letterSpacing: 1.4, color: ACCENT_LIGHT }}>
+            TODAY ONLY · GET PRO EARLY
+          </Text>
+        </View>
+        <Pressable
+          onPress={end}
+          hitSlop={6}
+          style={({ pressed }) => [
+            { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+            pressed && { opacity: 0.6 },
+          ]}
+        >
+          <Icon name="x" size={20} color={p.textDim} strokeWidth={2.4} />
+        </Pressable>
+      </View>
 
-      <Text style={{ fontSize: 12, color: p.textDim, textAlign: 'center', marginTop: 11 }}>
-        {/* The price the subscription actually renews at. It said "$X first
-            year, then $49.99/yr" while this was an iOS introductory offer;
-            a separate SKU renews at its own price, so that sentence would now
-            be a false claim about what the user will be charged. */}
-        {`${offerPrice || full}/yr, cancel anytime`}
-      </Text>
+      <View style={{ paddingHorizontal: 17, paddingTop: 16, paddingBottom: 17 }}>
+        {/* The price, at the size of the thing it is. Manrope's tabular figures
+            are what the Progress readouts use, so the number reads as one of
+            this app's numbers rather than as an ad. */}
+        <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 11, marginBottom: 5 }}>
+          <Text style={{ fontFamily: fonts.numBold, fontSize: 42, lineHeight: 44, letterSpacing: -1, color: p.text }}>
+            {offerPrice || full}
+          </Text>
+          <View style={{ paddingBottom: 4 }}>
+            {/* Only struck through when the store really did return two prices
+                and the cheaper one is ours to offer. */}
+            {pct ? (
+              <Text style={{ fontFamily: fonts.numMed, fontSize: 15, color: p.textDim, textDecorationLine: 'line-through' }}>{full}</Text>
+            ) : null}
+            <Text style={{ fontSize: 13, color: p.textDim, marginTop: 1 }}>per year</Text>
+          </View>
+        </View>
+        <Text style={{ fontSize: 14, fontWeight: '600', color: ACCENT_LIGHT, marginBottom: 16 }}>
+          {pct ? `Locked at ${pct}% off for as long as you're subscribed` : "The founding member price, for as long as you're subscribed"}
+        </Text>
+
+        <View style={{ borderTopWidth: 1, borderTopColor: hexA(p.text, 0.05), paddingTop: 12, marginBottom: 16 }}>
+          {UNLOCKS.map((u) => (
+            <View key={u} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 5 }}>
+              <Icon name="check" size={14} color={p.accent} strokeWidth={2.8} />
+              <Text style={{ fontSize: 14, color: p.text, flexShrink: 1 }}>{u}</Text>
+            </View>
+          ))}
+        </View>
+
+        {/* No button when the store has told us this device can never complete a
+            purchase: the tap would fire `oac` and then die in loadProducts before
+            requestPurchase, recording an offer as accepted that could not
+            convert. */}
+        {blocked ? <StoreBlockedNotice text={blocked} /> : (
+          <Pressable
+            onPress={() => { pingOfferAccepted('founder'); subscribe(FOUNDER_SKU, 'founder'); }}
+            disabled={purchasing}
+            style={({ pressed }) => [
+              { height: 52, borderRadius: 15, backgroundColor: p.accent, alignItems: 'center', justifyContent: 'center' },
+              (pressed || purchasing) && { opacity: 0.8 },
+            ]}
+          >
+            <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>
+              {purchasing ? 'Starting…' : `Unlock Pro for ${offerPrice || full}/yr`}
+            </Text>
+          </Pressable>
+        )}
+
+        {/* A store failure has to be said out loud here, or the button just
+            flashes "Starting…" and reverts (see src/store/iap.ts). */}
+        {error && !blocked ? (
+          <Text style={{ color: '#d63b3b', fontSize: 12, lineHeight: 17, textAlign: 'center', marginTop: 9 }}>{error}</Text>
+        ) : null}
+
+        {/* The card's one day, said in the quietest line on it. It used to be a
+            clause inside the price paragraph; with the paragraph gone it sits
+            beside the other thing the reader needs to know about a subscription. */}
+        <Text style={{ fontSize: 12.5, color: p.textDim, textAlign: 'center', marginTop: 10 }}>
+          Today only · cancel anytime
+        </Text>
+      </View>
     </View>
   );
 }
