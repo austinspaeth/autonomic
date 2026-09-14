@@ -59,7 +59,6 @@ const GRADE_PILL_H = 26;
 
 /** Grades whose gauge burns. Compromised and below: the point at which the
  *  card stops describing a day and starts flagging one. */
-const EMBER_GRADES = new Set(['Compromised', 'Bad', 'Crash']);
 
 
 // Status-color highlight on one top border edge, fading down the sides into
@@ -752,10 +751,7 @@ function ScoredHero({ dk, readings, d, all, ctx, trend, budget, pulse, onExplain
         </View>
       </View>
       <View style={{ alignItems: 'center', marginVertical: 8 }}>
-        {/* The ember runs on a Compromised day or worse, in that day's own
-            grade colour. It is the same motion as the over-budget pacing bar
-            below, deliberately: one card, one way of saying "running hot". */}
-        <ScoreGauge score={all.score!} color={cat.color} ember={EMBER_GRADES.has(cat.short)}>
+        <ScoreGauge score={all.score!} color={cat.color}>
           <Text style={{ fontSize: 57, fontFamily: fonts.numHeavy, color: p.text, fontVariant: ['tabular-nums'], letterSpacing: -1, lineHeight: 62, marginTop: 13 }}>{all.score}</Text>
           <GaugeDeltas trend={trend} amDelta={delta} />
         </ScoreGauge>
@@ -1177,10 +1173,7 @@ function ScoreExplain({ all, dk }: { all: ScoreSetResult; dk: string }) {
           </View>
         </View>
         <View style={{ alignItems: 'center', marginVertical: 8 }}>
-          {/* The ember runs on a Compromised day or worse, in that day's own
-            grade colour. It is the same motion as the over-budget pacing bar
-            below, deliberately: one card, one way of saying "running hot". */}
-        <ScoreGauge score={all.score!} color={cat.color} ember={EMBER_GRADES.has(cat.short)}>
+          <ScoreGauge score={all.score!} color={cat.color}>
             <Text style={{ fontSize: 57, fontFamily: fonts.numHeavy, color: p.text, fontVariant: ['tabular-nums'], letterSpacing: -1, lineHeight: 62, marginTop: 13 }}>{all.score}</Text>
           </ScoreGauge>
         </View>

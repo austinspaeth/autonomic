@@ -6,14 +6,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { LayoutChangeEvent, Pressable, Text as RNText, View } from 'react-native';
 import Svg, {
-  Circle, Defs, G, Line, LinearGradient, Mask, Path, Rect, Stop, Text as SvgText,
+  Circle, Defs, G, Line, LinearGradient, Path, Rect, Stop, Text as SvgText,
 } from 'react-native-svg';
-import Reanimated, {
-  Easing as REasing2, useAnimatedProps, useAnimatedStyle, useSharedValue, withRepeat, withTiming,
-} from 'react-native-reanimated';
-import {
-  EMBER_GLOW_MAX, EMBER_GLOW_MIN, EMBER_GLOW_MS, EMBER_MS, emberStops,
-} from '../lib/ember';
 import { fmtNum, fmtShort } from '../lib/dates';
 import { GRADE_COLORS, TAIL_STYLE, fonts, radius, readoutTail, usePalette } from '../theme';
 import { hexA } from '../lib/color';
@@ -209,24 +203,15 @@ export function Sparkline({ points, bands, height = 92, onSelect, showReadout = 
 /* ---------- Score gauge (270° arc) ---------- */
 // `track` overrides the ring behind the score arc. The default reads as a well
 // on a status-tinted card; the unscored card has no tint, so it passes a grey.
-/** An SVG rect whose x can be driven from the UI thread. The ember's drift is
- *  one animated attribute; everything else about the gauge stays static. */
-const AnimatedRect = Reanimated.createAnimatedComponent(Rect);
-
-export function ScoreGauge({ score, color, size = 176, track, marker, ember, children }: {
+/* The gauge is deliberately STATIC: nothing on it ever animates. It carried the
+ * pacing bar's ember on a Compromised day or worse, which put a second slow
+ * motion on the Outlook card and read as decoration rather than as a state. The
+ * grade is said by the arc's colour and the badge beside it. */
+export function ScoreGauge({ score, color, size = 176, track, marker, children }: {
   score: number;
   color: string;
   size?: number;
   track?: string;
-  /**
-   * Run the pacing bar's ember along the arc.
-   *
-   * Reserved for a Compromised day or worse. It is the same object in the same
-   * card as the over-budget bar below it, so it has to be the same motion at
-   * the same speed in the day's own colour: two different slow animations on
-   * one card would read as decoration rather than as a state.
-   */
-  ember?: boolean;
   /**
    * A tick across the ring at `score`. Used by the Insights day-one explainer to show
    * where the comparison started, so the arc carries both numbers instead of the sheet
@@ -258,71 +243,18 @@ export function ScoreGauge({ score, color, size = 176, track, marker, ember, chi
   const [mx0, my0] = mAt(r - sw / 2 - 3);
   const [mx1, my1] = mAt(r + sw / 2 + 3);
 
-  /* The ember. Same rules as the pacing bar's (see ./ember): the pattern is
-     doubled and periodic, and it travels EXACTLY one period before snapping
-     back, so the loop has no seam. Here the period is the gauge's own width,
-     which is known rather than measured. The drifting rectangle is clipped to
-     the arc by a mask, so the arc's own shape and cap stay authoritative. */
-  const shift = useSharedValue(0);
-  const glow = useSharedValue(1);
-  useEffect(() => {
-    if (!ember) { shift.value = 0; glow.value = 1; return; }
-    shift.value = 0;
-    shift.value = withRepeat(withTiming(1, { duration: EMBER_MS, easing: REasing2.linear }), -1, false);
-    glow.value = EMBER_GLOW_MIN;
-    glow.value = withRepeat(
-      withTiming(EMBER_GLOW_MAX, { duration: EMBER_GLOW_MS, easing: REasing2.inOut(REasing2.quad) }),
-      -1, true,
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ember]);
-  const emberProps = useAnimatedProps(() => ({ x: -shift.value * size }));
-  const glowStyle = useAnimatedStyle(() => ({ opacity: glow.value }));
-  const uid = React.useMemo(() => Math.random().toString(36).slice(2, 8), []);
-  const gid = `gaugeEmber${uid}`;
-  const mid = `gaugeMask${uid}`;
-  const stops = React.useMemo(() => emberStops(color), [color]);
-
   const glowArc = (
     <Path d={arc(frac)} fill="none" stroke={color} strokeWidth={sw + 7} strokeLinecap="round" opacity={0.16} />
   );
 
   return (
     <View style={{ width: size, height: size }} pointerEvents="none">
-      {/* The halo, lifted out of the static Svg only when it has to breathe.
-          Same figure either way — a wider, low-alpha copy of the arc. */}
-      {ember && frac > 0 ? (
-        <Reanimated.View style={[{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }, glowStyle]}>
-          <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>{glowArc}</Svg>
-        </Reanimated.View>
-      ) : null}
       <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
         <Path d={arc(1)} fill="none" stroke={track || p.gaugeTrack} strokeWidth={sw} strokeLinecap="round" />
         {frac > 0 ? (
           <>
-            {ember ? null : glowArc}
+            {glowArc}
             <Path d={arc(frac)} fill="none" stroke={color} strokeWidth={sw} strokeLinecap="round" />
-            {ember ? (
-              <>
-                <Defs>
-                  <LinearGradient id={gid} x1="0" y1="0" x2="1" y2="0">
-                    {stops.map((st) => <Stop key={st.offset} offset={st.offset} stopColor={st.color} />)}
-                  </LinearGradient>
-                  <Mask id={mid} maskUnits="userSpaceOnUse" x={0} y={0} width={size} height={size}>
-                    <Path d={arc(frac)} fill="none" stroke="#fff" strokeWidth={sw} strokeLinecap="round" />
-                  </Mask>
-                </Defs>
-                <G mask={`url(#${mid})`}>
-                  <AnimatedRect
-                    animatedProps={emberProps}
-                    y={0}
-                    width={size * 2}
-                    height={size}
-                    fill={`url(#${gid})`}
-                  />
-                </G>
-              </>
-            ) : null}
           </>
         ) : null}
         {marker ? (

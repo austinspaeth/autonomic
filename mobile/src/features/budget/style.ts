@@ -37,8 +37,14 @@ export const PULSE_GROW_MS = 850;
  *  because a red chip appearing on a bar that is otherwise green said "this
  *  much of you is bad" about minutes that are simply spent. */
 export const PULSE_TINT_MS = 620;
-/** How long the phrase naming the movement holds once the bar has arrived. */
-export const PULSE_HOLD_MS = 1100;
+/** How long the phrase naming the movement holds once the bar has arrived.
+ *  Long, on purpose: the phrase is the only explanation of a figure that moved
+ *  on its own, and a reader who glanced away for a second came back to a
+ *  bigger number with nothing beside it. Held so the phrase is legible for a
+ *  full five seconds at full opacity (it arrives PULSE_TEXT_OUT_MS +
+ *  PULSE_TEXT_IN_MS after the gesture starts and begins leaving
+ *  PULSE_TEXT_IN_MS before PULSE_COLOR_MS). */
+export const PULSE_HOLD_MS = 4900;
 /** And how long the gesture takes to finish after that: the phrase leaves and
  *  the subtext steps back in. */
 export const PULSE_FADE_MS = 700;
