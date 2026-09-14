@@ -6651,6 +6651,12 @@
     /* Permission can be revoked in the browser's own settings while the page
        is open, so the line is re-read on arrival rather than written once. */
     syncNotifyUI();
+    /* The background half is re-read on arrival for the same reason, plus one
+       of its own: the VAPID parameter can be CREATED while the page is open,
+       and that is precisely what somebody following the "no push keys set"
+       line has just gone off to do. Wiring it once meant the card that told
+       them what to do could not notice them doing it. */
+    bgRefresh();
   }
 
   /* ------------------------------------------------------ view: forecast */
@@ -9436,17 +9442,24 @@
    *   this browser cannot           a desktop tab, or iOS Safari not installed
    *   subscribed / not subscribed   the only two that are about a choice
    *
-   * `bgKey` is fetched once and cached for the session. It is the VAPID PUBLIC
-   * key — the thing `pushManager.subscribe` signs against, meant to be handed
-   * to the browser — and asking for it again on every render would be a
-   * round trip per settings open for a value that changes when the keypair is
-   * rotated and never otherwise.
+   * A CONFIGURED `bgKey` is fetched once and cached for the session. It is the
+   * VAPID PUBLIC key — the thing `pushManager.subscribe` signs against, meant
+   * to be handed to the browser — and asking for it again on every render would
+   * be a round trip per settings open for a value that changes when the keypair
+   * is rotated and never otherwise.
+   *
+   * An UNCONFIGURED answer is not cached, for the same reason the lambda
+   * re-reads the parameter while it is dark: "there are no keys" is the one
+   * answer that goes stale the moment somebody acts on the line below it. A
+   * session that cached it would keep telling its reader to set the parameter
+   * they had just set, and the only way out would be a reload — which is how a
+   * card that is merely behind gets read as a parameter that did not take.
    */
-  var bgKey = null;          // { configured, publicKey } once loaded
+  var bgKey = null;          // { configured, publicKey } — the last answer
   var bgSubscribed = false;  // does THIS browser hold a subscription
 
   function bgLoadKey() {
-    if (bgKey) return Promise.resolve(bgKey);
+    if (bgKey && bgKey.configured) return Promise.resolve(bgKey);
     return window.Api.call('PUSH_KEY').then(function (r) {
       bgKey = { configured: !!r.configured, publicKey: r.publicKey || '' };
       return bgKey;
@@ -9493,7 +9506,7 @@
       enable.disabled = true;
       test.classList.add('hidden');
       off.classList.add('hidden');
-      bgSay('The server has no push keys set, so nothing can subscribe yet. See sls/README.md — one SSM parameter and a redeploy.');
+      bgSay('The server has no push keys set, so nothing can subscribe yet. See sls/README.md — one SSM parameter, no redeploy. Come back to Edit data a minute after setting it.');
       return;
     }
     if (st === 'denied') {

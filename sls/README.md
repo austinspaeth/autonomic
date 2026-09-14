@@ -774,7 +774,14 @@ aws ssm put-parameter --region us-west-2 \
 `subject` is required by RFC 8292 — Apple rejects a VAPID JWT without a contact
 it can use if the sender starts misbehaving.
 
-No redeploy is needed: the next cold start picks the parameter up. Then, on the
+No redeploy is needed, and no cold start either. A function that has found the
+keypair caches it for the container's life, but one that has **not** re-reads
+the parameter at most once a minute — so a warm `api`, which is exactly what a
+dashboard polling every five minutes keeps alive, picks the new parameter up
+within a minute rather than whenever it happens to recycle. The settings card
+re-asks on every arrival at *Edit data*, for the same reason, so leaving that
+view and coming back to it a minute later is the whole of the confirmation:
+the line stops saying "no push keys set" and the button comes to life. Then, on the
 phone: open `/master/` in Safari, **Share → Add to Home Screen**, open it from
 the home screen, and use *Edit data → Notifications → Background alerts*. Each
 device subscribes separately — a subscription is a device, not an account.

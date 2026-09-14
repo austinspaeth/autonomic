@@ -179,10 +179,15 @@ async function signIn(window) {
 /* ------------------------------------------- 2. the server has no keys yet */
 
 {
-  const { window } = boot({ push: {}, key: { configured: false, publicKey: '' } });
+  /* The fixture is MUTATED below, not re-booted: the state worth pinning is a
+     parameter created while this page is open, which is what the reader of the
+     line does the moment they read it. */
+  const key = { configured: false, publicKey: '' };
+  const { window, calls } = boot({ push: {}, key });
   await signIn(window);
   await wait(200);
   const $ = (id) => window.document.getElementById(id);
+  const keyCalls = () => calls.filter((c) => c.action === 'PUSH_KEY').length;
 
   check('an unconfigured server disables the button', $('bgEnable').disabled === true);
   /* "Not configured" is a state of the DEPLOY, not a fault, and the line has
@@ -190,6 +195,30 @@ async function signIn(window) {
   check('and the status names the fix rather than reporting an error',
     /no push keys/i.test($('bgStatus').textContent) && /sls\/README/.test($('bgStatus').textContent),
     $('bgStatus').textContent);
+  /* It must not send them off to redeploy. The lambda reads the parameter at
+     run time and re-reads it while dark, so a redeploy is a ten-minute
+     pipeline run that changes nothing — and a line that asks for one teaches
+     its reader that the cheap fix did not work. */
+  check('and does not ask for a redeploy the server does not need',
+    !/redeploy/i.test($('bgStatus').textContent.replace(/no redeploy/i, '')),
+    $('bgStatus').textContent);
+
+  const before = keyCalls();
+  key.configured = true;
+  key.publicKey = 'BPublicKeyBase64Url';
+
+  /* Arriving at the Data view re-reads it. A session that cached "there are no
+     keys" would keep telling its reader to set the parameter they had just
+     set, and only a reload would clear it — which is how a card that is merely
+     behind gets read as a parameter that did not take. */
+  window.document.getElementById('goData').click();
+  await wait(250);
+
+  check('the dark answer is never cached, so the card can notice the fix',
+    keyCalls() > before, `PUSH_KEY calls: ${before} -> ${keyCalls()}`);
+  check('and the button comes to life without a reload', $('bgEnable').disabled === false);
+  check('with the line no longer accusing the server',
+    !/no push keys/i.test($('bgStatus').textContent), $('bgStatus').textContent);
 }
 
 /* ---------------------------------------------------- 3. subscribing works */
