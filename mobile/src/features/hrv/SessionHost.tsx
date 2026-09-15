@@ -26,6 +26,8 @@ import { fonts, usePalette } from '../../theme';
 import { BreathBars } from './BreathingViz';
 import { HrvSession } from './Session';
 import { HrvResults } from './Results';
+import { openCapture } from './Setup';
+import { TroubleSheet } from './Trouble';
 import { GarminSyncSheet } from './GarminSync';
 import { startGarminSync, stopGarminSync } from './garminSyncStore';
 import { garminDevices, subscribeGarminArrivals } from '../../lib/garmin/receiver';
@@ -34,10 +36,25 @@ import { startWatchSync } from './watchSyncStore';
 import { setPillSlotClaim } from '../../store/pillSlot';
 import {
   endSession, getSessionSnapshot, restoreSession, streamsLive, useSession,
+  type SessionConfig,
 } from './sessionStore';
 
 export function HrvSessionHost() {
-  const { openSheet, depth } = useSheets();
+  const { openSheet, closeAll, depth } = useSheets();
+  /**
+   * "Try again" from the trouble card: close the whole stack, then open the
+   * capture the same way the picker and the welcome wizard do.
+   *
+   * Deferred because the teardown is driven by the stack emptying — closeAll
+   * has to reach depth 0 so `endSession` runs and the store goes idle, or
+   * `startSession` would find a session already in progress and return without
+   * doing anything. The delay is the sheet's own exit.
+   */
+  const retry = React.useCallback((config: SessionConfig) => {
+    closeAll();
+    setTimeout(() => openCapture(config, openSheet), 320);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openSheet]);
   const status = useSession((s) => s.status);
   // Opened once per reading; the flag also stops a re-render from raising a
   // second results card while the first is still animating in.
@@ -67,7 +84,30 @@ export function HrvSessionHost() {
     if (handed.current) return;
     handed.current = true;
     const s = getSessionSnapshot();
-    if (!s.config || !s.result) return;
+    if (!s.config) return;
+
+    // The reading was abandoned rather than finished: `hopelessCoverage` worked
+    // out it could not reach the bar, or the user said they were having
+    // trouble. There is no result to show, so the trouble card takes the
+    // results card's place — raised from HERE for the same reason Results is,
+    // since the session card is not the thing that ends a reading.
+    if (s.stopReason) {
+      const cfg = s.config;
+      const stopped = s.stopReason === 'signal'
+        ? { elapsedSec: s.elapsed, usableSec: s.usableSec }
+        : null;
+      // No `fitContent`: that path renders the card as a plain View capped at
+      // 92% of the screen with NO scroll view, so a six-tip list would simply
+      // have its buttons clipped off the bottom. The default path measures
+      // content against the viewport and enables scrolling only when it does
+      // not fit, which is what a card of advice needs.
+      openSheet((c) => (
+        <TroubleSheet config={cfg} stopped={stopped} controls={c} onRetry={() => retry(cfg)} />
+      ));
+      return;
+    }
+
+    if (!s.result) return;
 
     // Apple Watch path: the wearer took a reading on the watch (Mindfulness
     // breathing HRV or ECG) during the session. Stack a syncing card that pulls
@@ -104,7 +144,8 @@ export function HrvSessionHost() {
     openSheet((c) => (
       <HrvResults
         rr={rr} segmentStarts={segmentStarts} hrSamples={hrSamples} sdnnSamples={sdnnSamples}
-        config={config} durationSec={durationSec} watchFallback={null} controls={c}
+        config={config} durationSec={durationSec} watchFallback={null}
+        onRetry={() => retry(config)} controls={c}
       />
     ), { hideClose: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps

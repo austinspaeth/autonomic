@@ -202,6 +202,9 @@ const SEGMENT_MEDIAN_DEV = 0.2;
 export interface SegmentTriage {
   kept: number[][];
   keptStarts: number[];
+  /** Each KEPT segment's own artifact rate, index-aligned to `kept`. The
+   *  reading's rate is charged over these and nothing else — see `computeHrv`. */
+  keptArtifactPct: number[];
   dropped: number;
   droppedBeats: number;
 }
@@ -210,6 +213,7 @@ export function triageSegments(cleaned: { clean: number[]; artifactPct: number }
   const recordMed = median(cleaned.flatMap((c) => c.clean));
   const kept: number[][] = [];
   const keptStarts: number[] = [];
+  const keptArtifactPct: number[] = [];
   let dropped = 0, droppedBeats = 0, cursor = 0;
   for (const c of cleaned) {
     const segMed = median(c.clean);
@@ -222,8 +226,9 @@ export function triageSegments(cleaned: { clean: number[]; artifactPct: number }
     keptStarts.push(cursor);
     cursor += c.clean.length;
     kept.push(c.clean);
+    keptArtifactPct.push(c.artifactPct);
   }
-  return { kept, keptStarts, dropped, droppedBeats };
+  return { kept, keptStarts, keptArtifactPct, dropped, droppedBeats };
 }
 
 /* ---------- time-domain ---------- */
@@ -439,6 +444,16 @@ export function psdCurve(rr: number[]): { freqs: number[]; psd: number[] } | nul
 /* ---------- top-level: full result ---------- */
 export interface HrvResult {
   ok: boolean;
+  /**
+   * The reading failed a gate, but the numbers it produced are still a noisy
+   * version of the truth rather than unrelated to it — so the user may choose
+   * to keep it (see {@link SALVAGE_MAX_ARTIFACT_PCT}).
+   *
+   * Never true alongside `ok`, and never true when there was nothing to
+   * compute: it means exactly "refused, and offerable", which is the one
+   * question the results card asks that `ok` cannot answer.
+   */
+  salvageable: boolean;
   reason?: string;
   artifactPct: number;
   rrClean: number[];
@@ -500,7 +515,77 @@ export function readingCompleteness(sec: number): ReadingCompleteness {
 /** A stable reading needs a floor of clean beats behind its statistics. */
 const MIN_CLEAN_BEATS = 30;
 /** Fraction of the attempted reading that must survive cleaning to be trusted. */
-const MIN_COVERAGE_RATIO = 0.5;
+export const MIN_COVERAGE_RATIO = 0.5;
+
+/* ---------- refused, but offerable ---------- */
+
+/**
+ * The band between "clean enough to keep without asking" and "not a measurement
+ * at all".
+ *
+ * A reading over `maxArt` is REFUSED: it is not clean enough for the app to
+ * file on the user's behalf. That used to be the end of it, and on a phone
+ * camera it routinely was — twenty minutes of sitting still producing nothing
+ * at all, which is the state a real review described. But a refusal is not the
+ * same fact as "these numbers are meaningless", and between the two there is a
+ * range where the statistics are a noisy version of the truth and the person
+ * who just sat through three minutes is the right one to decide.
+ *
+ * Above `SALVAGE_MAX_ARTIFACT_PCT` there is nothing to decide: at 30% of beats
+ * replaced, SDNN is mostly made of interpolated intervals, so the number is not
+ * a worse estimate of their variability, it is an estimate of our own
+ * interpolation. 30 is the app's existing word for that — it is
+ * `SEGMENT_MAX_ARTIFACT`, the rate at which a whole stretch is thrown away, and
+ * the strap's own capture ceiling — so nothing new is being claimed here.
+ *
+ * `SALVAGE_MIN_COVERAGE_SEC` is the other axis: a minute of real pulse is the
+ * floor at which a time-domain statistic settles enough to be worth keeping.
+ * (The frequency bands have their own, much higher, floors and drop out on
+ * their own — see {@link MIN_SEC_LFHF}.)
+ */
+export const SALVAGE_MAX_ARTIFACT_PCT = 30;
+export const SALVAGE_MIN_COVERAGE_SEC = 60;
+
+/**
+ * Seconds a camera reading gets before its coverage is judged at all, and the
+ * share of elapsed time its pulse has to be arriving at.
+ *
+ * The camera-setup card hands over with the pulse already locked, and
+ * `ppgBridge` emits no beats at all from a window that does not read as a
+ * steady pulse — so a reading 45 seconds in with almost no usable pulse is not
+ * warming up, it is a finger in the wrong place or pressed too hard.
+ */
+export const TROUBLE_GRACE_SEC = 45;
+export const TROUBLE_MIN_RATE = 0.2;
+
+/**
+ * Can this reading still reach the coverage bar, and is it worth carrying on?
+ *
+ * Two questions, and only the first is a proof. `best` is the most coverage the
+ * remaining time could possibly add, so a reading whose best case still misses
+ * {@link MIN_COVERAGE_RATIO} is arithmetically finished — carrying on spends
+ * the user's minutes on a verdict already decided. The second is a judgement
+ * and is labelled as one: a pulse arriving at under a fifth of the clock is not
+ * going to become one arriving at half of it.
+ *
+ * A reading that already holds enough pulse to be SALVAGEABLE is never stopped,
+ * whatever the arithmetic says — the user would lose a reading they could have
+ * chosen to keep, which is the opposite of the point.
+ *
+ * Pure so the stop rule is testable without a camera; called from the session
+ * store's own clock.
+ */
+export function hopelessCoverage(o: {
+  usableSec: number; elapsedSec: number; durationSec: number;
+  graceSec?: number; minRate?: number;
+}): boolean {
+  const grace = o.graceSec ?? TROUBLE_GRACE_SEC;
+  if (!(o.durationSec > 0) || o.elapsedSec < grace) return false;
+  if (o.usableSec >= SALVAGE_MIN_COVERAGE_SEC) return false;
+  const best = o.usableSec + Math.max(0, o.durationSec - o.elapsedSec);
+  if (best < MIN_COVERAGE_RATIO * o.durationSec) return true;
+  return o.usableSec / o.elapsedSec < (o.minRate ?? TROUBLE_MIN_RATE);
+}
 
 export function computeHrv(
   rrRaw: number[],
@@ -525,14 +610,28 @@ export function computeHrv(
   });
   const repairPct = rrRaw.length ? (repaired / rrRaw.length) * 100 : 0;
 
-  const { kept, keptStarts, dropped, droppedBeats } = triageSegments(cleaned);
+  const { kept, keptStarts, keptArtifactPct, dropped } = triageSegments(cleaned);
   const clean = kept.flat();
 
-  // Artifact rate is charged over everything we started with — beats thrown out
-  // with a discarded segment count against the reading, they don't vanish.
-  const analyzedBeats = clean.length + droppedBeats;
-  const flaggedBeats = cleaned.reduce((s, c) => s + (c.artifactPct / 100) * c.clean.length, 0);
-  const artifactPct = analyzedBeats ? ((flaggedBeats + droppedBeats) / analyzedBeats) * 100 : 0;
+  // Artifact rate is charged over the beats the statistics are actually built
+  // from: "of what we used, how much had to be corrected". That is what the
+  // results card claims it is, what the entry's `artifactPct` stamp is read as
+  // downstream, and what `maxArt` below is priced for.
+  //
+  // It used to be charged over the dropped beats too, and charged them TWICE —
+  // once through `flaggedBeats`, which summed every cleaned segment including
+  // the discarded ones, and again as `droppedBeats` in the numerator. So a
+  // camera reading that lost the finger three times could blow a 15% ceiling
+  // while every beat it kept was pristine, and the reading was refused for a
+  // dropout the pipeline had ALREADY handled by throwing the stretch away. Two
+  // mechanisms were doing one job and the second was priced for a continuous
+  // strap trace.
+  //
+  // Dropouts are not thereby hidden: they are `segmentsDropped`, `coverageSec`
+  // and the `thin` gate below, all of which the card shows, and `confidence`
+  // still refuses 'high' to any reading that dropped a segment at all.
+  const flaggedBeats = kept.reduce((s, seg, i) => s + (keptArtifactPct[i] / 100) * seg.length, 0);
+  const artifactPct = clean.length ? (flaggedBeats / clean.length) * 100 : 0;
 
   const time = timeDomainSegments(kept);
   // The bands need an unbroken stretch: Welch over a tachogram stitched across
@@ -561,7 +660,10 @@ export function computeHrv(
       ? 'Not enough clean beats to compute HRV. Try a longer, steadier reading.'
       : 'Not enough clean data to compute HRV.';
     return {
-      ok: false, reason, artifactPct,
+      // Nothing was computed, so there is nothing to offer: `salvageable` is
+      // about a reading the app declines to FILE, not about one that does not
+      // exist. The results card shows no Save anyway button here, correctly.
+      ok: false, salvageable: false, reason, artifactPct,
       rrClean: clean, time: time as TimeDomain, freq: freq as FrequencyDomain, fields: {},
       coverageSec, longestCleanSec, cleanSegmentStarts: keptStarts,
       segmentsUsed: kept.length, segmentsDropped: dropped, repairPct, confidence: 'low',
@@ -606,8 +708,16 @@ export function computeHrv(
       ? `Only ${Math.round(coverageSec)}s of usable pulse out of ${Math.round(durationSec)}s. Keep your finger still and fully covering the lens, then try again.`
       : undefined;
 
+  const ok = !noisy && !thin;
   return {
-    ok: !noisy && !thin,
+    ok,
+    // Refused, and still worth offering. Both bars have to hold: the artifact
+    // rate says the numbers are a noisy version of this person's variability
+    // rather than of our interpolation, and the coverage says there is enough
+    // pulse behind them for a time-domain statistic to have settled.
+    salvageable: !ok
+      && artifactPct <= SALVAGE_MAX_ARTIFACT_PCT
+      && coverageSec >= SALVAGE_MIN_COVERAGE_SEC,
     reason,
     artifactPct, rrClean: clean, time, freq, fields,
     coverageSec, longestCleanSec, cleanSegmentStarts: keptStarts,

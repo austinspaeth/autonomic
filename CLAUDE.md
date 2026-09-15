@@ -199,6 +199,88 @@ old web app so old `export.json` files import directly.
   grade. **Nothing de-weights on them yet** — they are recorded first so there is something to
   decide with, and a reading from an older build carries none of them, so every
   consumer must read `undefined` as UNKNOWN rather than as clean.
+- **A REFUSED reading is offered, stopped early, and explained — a camera
+  capture used to fail silently and expensively.** A review (Galaxy A54)
+  described twenty to thirty minutes of attempts where "every recording has too
+  much artifact to be saved", and every part of that was the app's doing. Five
+  changes, and their order is the argument.
+  (1) **Artifacts are charged over the beats the statistics are BUILT from.**
+  `computeHrv` charged them over the dropped beats too, and charged those TWICE
+  (once through `flaggedBeats`, which summed every cleaned segment including the
+  discarded ones, and again as `droppedBeats`), so a reading that lost the finger
+  three times could blow a 15% ceiling with every kept beat pristine — refused
+  for a dropout `triageSegments` had ALREADY handled by throwing the stretch
+  away. Two mechanisms doing one job, the second priced for a continuous strap
+  trace. Dropouts are still reported, as `segmentsDropped` / `coverageSec` / the
+  `thin` gate, and `confidence` still refuses 'high' to a reading that dropped
+  one.
+  (2) **`salvageable` is a first-class verdict beside `ok`**: refused, and the
+  numbers are still a noisy version of the truth rather than of our own
+  interpolation. Both bars hold or it is false — `SALVAGE_MAX_ARTIFACT_PCT` (30,
+  which is already `SEGMENT_MAX_ARTIFACT` and the strap's own ceiling: past it
+  SDNN is mostly interpolated intervals) and `SALVAGE_MIN_COVERAGE_SEC` (60).
+  `Results` then does not auto-save but ASKS, once, on the reading in front of
+  the user with the artifact rate in the sentence above the button; the entry
+  carries `degraded: true`, the journal row wears the gold alert mark and the
+  summary opens on a `CautionNote`. **It COUNTS** — day score, trends, insights,
+  like any other reading — because a reading that saves and silently buys the
+  user nothing is a worse answer to "I cannot get a reading" than the refusal
+  was. The ONE behavioural difference is that it is not published to Apple
+  Health / Health Connect, which have nowhere to carry the mark. **There is
+  deliberately no "less strict mode"**: a setting flipped once in frustration
+  degrades every later reading with nobody remembering it is on, and `trends/` /
+  `insights/` would build claims about somebody's body on the result.
+  Per-reading, no memory, or not at all.
+  (3) **A reading that cannot get there is STOPPED where it is.**
+  `hopelessCoverage` (pure + tested, beside the floors in `lib/hrv`) is half
+  proof and half judgement and says which: the best coverage the remaining time
+  could add still missing `MIN_COVERAGE_RATIO` is arithmetic, and a pulse
+  arriving at under `TROUBLE_MIN_RATE` of the clock after `TROUBLE_GRACE_SEC` is
+  a call. It never stops a reading already holding enough pulse to be
+  salvageable. The session store's own clock runs it — camera only, since a
+  strap's answer is `rrSupport` and is known before the reading starts — and
+  calls `abandonSession('signal')`, which writes NO result and fires neither
+  `pingCaptureCompleted` nor `pingActivation`: the gap between `cap` and `hrv` is
+  the only place an abandoned capture exists in the counters, and crediting one
+  would close it.
+  (4) **The advice is real, and it arrives at the moment of failure.**
+  `lib/ppg/tips.ts` (pure + tested) is ordered by how often each thing is the
+  CAUSE, which is why pressure leads — pressing occludes the capillaries whose
+  pulsation IS the measurement, so the harder somebody tries the worse their
+  reading gets, and that sentence was nowhere in the app. `leadTipId` promotes
+  one tip from what `ppgTrace` actually saw ("frames arrived, lens never covered"
+  and "locked, then lost repeatedly" have different answers) and returns null
+  rather than guessing; the promoted row is labelled MOST LIKELY in words and
+  still wears its number, because the list IS an ordered set of things to try.
+  `features/hrv/Trouble.tsx` renders it and is raised four ways — by the app on
+  an early stop, from `Having issues?` on the reading card (which ABANDONS: a
+  user saying they have trouble is saying this reading is no good), from the same
+  button on the camera setup card after `TROUBLE_WAIT_SEC` of no pulse lock (20s,
+  not 10 — a good lock routinely takes 8-12s, and a help link that appears on
+  successful attempts teaches the reader to distrust every one), and from the
+  refusal card. **It must not be opened `fitContent`**: that path is a plain View
+  capped at 92% with NO ScrollView, so a six-tip list has its buttons clipped
+  off. Its `onRetry` is INJECTED rather than reaching for `openCapture`, which
+  would close a require cycle (Setup → CameraSetup → Trouble; and
+  Setup → HealthImport → WatchSync → Results, which is why `HrvResults.onRetry`
+  exists too). The camera setup card's first step carries `CAMERA_PREP_TIPS` —
+  the `prep` subset, as four brief lines — because warming your hands or taking a
+  case off can only be acted on BEFORE the reading, while the rest is diagnosis,
+  and six paragraphs in front of a new user's first reading is what the welcome
+  wizard deleted a whole step to avoid.
+  (5) **A refusal is REPORTED.** `logError` was the wrong tool: it spends the
+  once-per-install `/ping/err` population counter and would conflate a fingertip
+  placement problem with a phone worth asking for a support dump. So `Results`
+  calls `reportFault` directly with `hrv.refused` (and `hrv.salvaged` when the
+  user keeps one), over `lib/hrv/refusal.ts` — pure + tested, and BANDED, because
+  the message IS the fault signature and a raw artifact rate would file every
+  refusal as its own bug. That buys occurrences beside install-days, split by
+  platform / build / tier and ranked by breadth in the dashboard's Failures tab,
+  with no new route, no lambda change and no deploy ordering. Before this,
+  `finishSession` fired `pingCaptureCompleted` and `pingActivation` BEFORE
+  anything judged the beats, so a phone that could never get a reading read as
+  activated with a full set of completed captures, and `hrv / cap` — the
+  completion rate — counted every refusal as a completion.
 - **Progress falls back to demo data on an empty journal. Insights does NOT.** `src/lib/demo.ts`
   generates a deterministic **60-day** sample history (`DEMO_DAYS`; seeded PRNG, keyed
   off today so it lands in the Analysis buckets and report ranges) that arcs from crash
@@ -254,7 +336,11 @@ old web app so old `export.json` files import directly.
   field edits the saved entry in place, and its one button is Done. Undoing is a
   DELETE, which is a real thing the user can see and reverse-engineer, and it
   lives on the card's own trash button. The single exception is a reading with no
-  usable data, which is never written: there is nothing to keep.
+  usable data, which is never written: there is nothing to keep. **The other
+  exception is a reading the app REFUSES, which is offered** — see the
+  refused-reading bullet above. That is not the old Save/Discard pair returning:
+  a reading that passes is still filed with no question asked, and the offer
+  exists only where the app has declined to file one on the user's behalf.
 - **Every entry CARD carries edit, delete and close, in that order.**
   `SheetOptions.destructive` (`components/Sheet.tsx`) puts a red trash button in
   the header pill, furthest from the ✕ so the two taps that end the card are

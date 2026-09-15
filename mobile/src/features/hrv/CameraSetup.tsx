@@ -55,7 +55,9 @@ import { PPG_ATTEMPTS, formatCameraDiagnostics, ppgTrace } from '../../lib/ppg/d
 import { collectCameraDiagnostics } from '../../lib/ppg/collect';
 import type { CameraModuleShape } from '../../lib/types';
 import { PromptSheet } from '../PromptSheet';
+import { CAMERA_PREP_TIPS, TROUBLE_WAIT_SEC } from '../../lib/ppg/tips';
 import { HrvSession, type SessionConfig } from './Session';
+import { TroubleSheet } from './Trouble';
 
 /** Sheet content is inset 18/24 (padding/topPad); its floating ✕ pill sits at
  *  14/10 on the sheet itself. These pull the back pill out to the same spot so
@@ -292,6 +294,27 @@ export function CameraSetup({ config, controls: _controls }: { config: SessionCo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signal.locked, step]);
 
+  // Waiting for a pulse that is not coming.
+  //
+  // This is the failure the app was worst at: the wait step's hint said
+  // "Waiting for a steady pulse…" for as long as the user was willing to hold
+  // still, and a reading that never locks never starts, so none of the
+  // downstream machinery — the stop rule, the results card, the salvage offer —
+  // ever gets a chance to explain anything. The user simply sat there.
+  //
+  // Armed on the wait step and cancelled by a lock, so it can only fire when
+  // there is genuinely nothing happening. See TROUBLE_WAIT_SEC for why 20s.
+  const [stuck, setStuck] = useState(false);
+  useEffect(() => {
+    if (step !== 'wait' || signal.locked || fault) { setStuck(false); return; }
+    const t = setTimeout(() => setStuck(true), TROUBLE_WAIT_SEC * 1000);
+    return () => clearTimeout(t);
+  }, [step, signal.locked, fault]);
+
+  // No onRetry: the user is already standing on the placement screen with the
+  // torch lit, so "try again" is just dismissing the tips.
+  const openTips = () => openSheet((c) => <TroubleSheet config={config} controls={c} />);
+
   const pickShape = (s: CameraModuleShape) => { setShape(s); setStep('flash'); };
 
   // Remember the layout as soon as it's complete — later camera readings skip
@@ -434,6 +457,17 @@ export function CameraSetup({ config, controls: _controls }: { config: SessionCo
         <PlacementCard visible={step === 'wait'} hint={signal.quality === 'weak' ? 'Hold still, finding your pulse…' : 'Waiting for a steady pulse…'} />
       ) : null}
 
+      {/* Twenty seconds of nothing happening, so this is not a hint any more —
+          it is the action. A filled primary, same words as the reading card's
+          own door to the same place: two routes into one card should not read
+          as two different offers. No chevron; it opens a card, it does not
+          navigate. */}
+      {step === 'wait' && stuck && !fault ? (
+        <Animated.View entering={FadeIn.duration(320)} style={{ alignSelf: 'stretch', marginTop: 10 }}>
+          <Button title="Having issues?" variant="primary" onPress={openTips} />
+        </Animated.View>
+      ) : null}
+
       {step === 'warn' ? (
         <SheetFooter>
           <Button title="I understand, continue" variant="primary" onPress={() => setStep('shape')} />
@@ -478,6 +512,24 @@ function HeadsUp() {
         Movement, finger pressure and stray light all affect the signal, so quality varies from reading to reading.
         If a number looks off, take the reading again.
       </Text>
+
+      {/* The four things a reader can still act on while they are setting up.
+          A SUBSET of the trouble card's list on purpose — that one is diagnosis
+          ("why did that one fail") and belongs at the moment of failure, where
+          the lead cause can be named from what actually happened. Six
+          paragraphs here would be a wall of advice between a new user and their
+          first reading, for a problem they have not met yet. These four are
+          preparation: read them at 2:30 into a failing reading and there is
+          nothing left to do about them. */}
+      <View style={{ padding: 15, borderRadius: radius.card, borderCurve: 'continuous', borderWidth: 1, borderColor: p.border, backgroundColor: p.sunk, gap: 9 }}>
+        <Text style={{ color: p.text, fontSize: 14, fontWeight: '700' }}>Before you start</Text>
+        {CAMERA_PREP_TIPS.map((t) => (
+          <View key={t.id} style={{ flexDirection: 'row', gap: 9, alignItems: 'flex-start' }}>
+            <View style={{ width: 5, height: 5, borderRadius: 999, backgroundColor: p.accent, marginTop: 7 }} />
+            <Text style={{ flex: 1, color: p.textDim, fontSize: 13, lineHeight: 19 }}>{t.brief}</Text>
+          </View>
+        ))}
+      </View>
 
       <View style={{ flexDirection: 'row', gap: 12, padding: 15, borderRadius: radius.card, borderCurve: 'continuous', borderWidth: 1, borderColor: p.border, backgroundColor: p.sunk }}>
         <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(74,157,224,0.12)', alignItems: 'center', justifyContent: 'center' }}>

@@ -38,7 +38,7 @@ import { PromptSheet } from '../features/PromptSheet';
 import { BalanceChart, OrthoHrChart, PowerSpectrum, Sparkline, StandHrChart, Tachogram, WorkoutHrChart, ZonesToggle, balanceCat } from './charts';
 import { Icon } from './Icon';
 import { SheetFooter, useSheets, type SheetControls } from './Sheet';
-import { HelpDot, ScoreDot } from './ui';
+import { CautionNote, HelpDot, ScoreDot } from './ui';
 
 const hexA = (hex: string, a: number) => {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex);
@@ -543,6 +543,14 @@ function HrvSummaryBody({ r, days, ctx, type }: SummaryProps & { type: 'breathHr
   const hasDetails = !!sourceLabel || !!legacyStyle || !!r.period || capture.length > 0;
   return (
     <>
+      {/* A reading the user chose to keep after the app declined to file it.
+          The mark travels WITH the reading rather than living only on the
+          results card, so somebody opening this entry a month later meets the
+          caveat rather than a bare number that looks like every other one. */}
+      {r.degraded ? (
+        <CautionNote text="You saved this reading after we flagged it as low quality. It counts like any other reading, but treat it as a rough figure." />
+      ) : null}
+
       <Section cat={overall}>
         <SectionHead
           title="Autonomic score" help={HRV_HELP.score}

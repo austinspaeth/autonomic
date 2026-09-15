@@ -108,6 +108,26 @@ export interface LiveHrvExtras {
    *  one from a build before 1.26. */
   segmentsUsed?: number;
   segmentsDropped?: number;
+  /**
+   * The user chose to keep a reading the app would have refused.
+   *
+   * A record of the DECISION, not a second quality number — `artifactPct`,
+   * `coverageSec` and `confidence` above already say how good the capture was.
+   * It exists so the caveat travels with the reading: the journal row and the
+   * summary both read it, so somebody meeting this entry a month later meets
+   * the mark too, rather than a bare SDNN that looks like every other one.
+   *
+   * It does NOT de-weight anything. A degraded reading is in the day score,
+   * the trends and the insights sweep like any other, because a reading that
+   * saves and silently counts for nothing is a worse answer to "I cannot get a
+   * reading" than refusing it was. The one behavioural difference is that it
+   * is not published to Apple Health / Health Connect, which have nowhere to
+   * carry the mark (see `features/hrv/Results.tsx`).
+   *
+   * Absent on every reading the app filed on its own, which is almost all of
+   * them, and on every reading from a build before this shipped.
+   */
+  degraded?: boolean;
 }
 
 export interface Meal {

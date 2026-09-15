@@ -400,20 +400,39 @@ export function DaySaveButton({ dk, title, pastTitle, onPress, disabled, style }
 }
 
 /**
+ * A gold caution line: alert mark, one sentence, nothing else.
+ *
+ * The app's one treatment for "this is not wrong, but you should know" — the
+ * same gold as the back-dated Save button and the import sheet's "Poor quality"
+ * chip. Stated once here rather than inlined at each site, because there are
+ * now three of them and they must not drift apart.
+ */
+export function CautionNote({ text, children, style }: {
+  text?: string; children?: React.ReactNode; style?: StyleProp<ViewStyle>;
+}) {
+  const p = usePalette();
+  return (
+    <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: CAUTION_GOLD_SOFT, borderWidth: 1, borderColor: 'rgba(234,179,8,0.4)', borderRadius: radius.control, paddingVertical: 10, paddingHorizontal: 12, marginBottom: 14 }, style]}>
+      <Icon name="alert" size={16} color={CAUTION_GOLD} />
+      {children ?? (
+        <Text style={{ flex: 1, color: p.text, fontSize: 13, lineHeight: 18 }}>{text}</Text>
+      )}
+    </View>
+  );
+}
+
+/**
  * The same warning as a line of text, for a sheet whose fields commit AS THEY
  * CHANGE (the sleep editor) and so have no Save button to re-dress. Renders
  * nothing on today.
  */
 export function PastDayNotice({ dk, text, style }: { dk: string; text?: string; style?: StyleProp<ViewStyle> }) {
-  const p = usePalette();
   if (!isPastDay(dk)) return null;
   return (
-    <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: CAUTION_GOLD_SOFT, borderWidth: 1, borderColor: 'rgba(234,179,8,0.4)', borderRadius: radius.control, paddingVertical: 10, paddingHorizontal: 12, marginBottom: 14 }, style]}>
-      <Icon name="alert" size={16} color={CAUTION_GOLD} />
-      <Text style={{ flex: 1, color: p.text, fontSize: 13, lineHeight: 18 }}>
-        {text ?? `You're editing ${fmtDateLong(dk)}, not today. Changes are saved to that day.`}
-      </Text>
-    </View>
+    <CautionNote
+      style={style}
+      text={text ?? `You're editing ${fmtDateLong(dk)}, not today. Changes are saved to that day.`}
+    />
   );
 }
 

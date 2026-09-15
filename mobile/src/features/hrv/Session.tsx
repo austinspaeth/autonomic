@@ -45,9 +45,10 @@ import { LiveStats } from './LiveStats';
 import { GarminIcon } from './GarminIcon';
 import { MindfulnessIcon } from './MindfulnessIcon';
 import {
-  beginCollection, canMinimize, endSession, finishSession, minimizeSession,
+  abandonSession, beginCollection, canMinimize, endSession, finishSession, minimizeSession,
   setSessionHidden, startSession, useSession, type SessionConfig, type SessionSnapshot,
 } from './sessionStore';
+import { troubleSourceFor } from '../../lib/ppg/tips';
 
 export { BREATH_STYLE, styleTitle };
 export { durationFor } from './sessionStore';
@@ -135,6 +136,9 @@ function SessionCard({ controls }: { controls: SheetControls }) {
   // anything, so the button that would spend them is unavailable rather than
   // tappable-and-refused-later.
   const strapUseless = s.rrSupport === 'absent';
+  // Only the two sensors the user holds against themselves can be noisy in a
+  // way advice helps with. A wrist reading is taken on the wrist.
+  const troubleSource = troubleSourceFor(config.source);
   const phaseWord = finished ? 'Done' : s.phase === 'in' ? 'Breathe in' : s.phase === 'out' ? 'Breathe out' : 'Hold';
 
   return (
@@ -215,7 +219,22 @@ function SessionCard({ controls }: { controls: SheetControls }) {
       ) : (
         <SheetFooter>
           {started ? (
-            <Button title="Finish now" variant="primary" onPress={() => void finishSession()} />
+            <>
+              {/* The user's own door to the tips, beside the one that keeps the
+                  reading — same words as the camera setup card's, since they
+                  open the same card. It ABANDONS rather than finishes:
+                  somebody who says they are having trouble is saying this
+                  reading is no good,
+                  and handing them a results card for it would be the app
+                  disagreeing. Nothing is saved and no completion is counted.
+                  The app raises the same card by itself when the arithmetic
+                  gets there first (`hopelessCoverage`); this is for the case
+                  where the user knows before we do. */}
+              {troubleSource ? (
+                <Button title="Having issues?" variant="ghost" onPress={() => void abandonSession('user')} />
+              ) : null}
+              <Button title="Finish now" variant="primary" onPress={() => void finishSession()} />
+            </>
           ) : (
             <>
               <Button title="Cancel" variant="ghost" onPress={() => { endSession(); controls.close(); }} />

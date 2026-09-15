@@ -9,7 +9,7 @@ import { Icon } from '../components/Icon';
 import { TimeField } from '../components/Field';
 import { useSheets, SheetFooter, type SheetControls } from '../components/Sheet';
 import { useToast } from '../components/Toast';
-import { WATER_BLUE, fonts, radius, usePalette } from '../theme';
+import { CAUTION_GOLD, WATER_BLUE, fonts, radius, usePalette } from '../theme';
 import {
   READING_TYPES,
   bmLabel, readingLabel, readingRowValue, summarizeFields,
@@ -57,7 +57,11 @@ export function JournalSections({ dk }: { dk: string }) {
             // (a ≥30 bpm drop below baseline flags the blue warning zone).
             const curve = r.type === 'orthostatic' ? getWaveform(String(r.id))?.sampledHr : undefined;
             const cat = r.type === 'orthostatic' ? orthoDeltaCat(orthoMaxDelta(r, curve)) : rowScoreCategory(r, ctx);
-            return <Row key={r.id} icon={def.icon as never} title={readingLabel(r)} right={<View style={{ flexDirection: 'row', alignItems: 'center' }}><RowValue text={readingRowValue(r, curve)} cat={cat} />{r.time ? <Pill text={fmtTime12(r.time)} /> : null}</View>} onPress={() => forms.openReadingSummary(r)} />;
+            return <Row key={r.id} icon={def.icon as never} title={readingLabel(r)} right={<View style={{ flexDirection: 'row', alignItems: 'center' }}>{/* A reading kept after the app flagged it: the gold alert mark, so the
+                  caveat is visible in the list and not only inside the entry.
+                  It rides the value slot rather than the title, which keeps
+                  `Row`'s string API alone. */}
+              {r.degraded ? <View style={{ marginRight: 6 }}><Icon name="alert" size={14} color={CAUTION_GOLD} /></View> : null}<RowValue text={readingRowValue(r, curve)} cat={cat} />{r.time ? <Pill text={fmtTime12(r.time)} /> : null}</View>} onPress={() => forms.openReadingSummary(r)} />;
           })}
           <View style={{ gap: 8, marginTop: 6 }}>
             {/* Live HRV capture only makes sense on today — a live reading

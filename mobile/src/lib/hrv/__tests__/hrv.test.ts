@@ -6,7 +6,8 @@
  * artifacts. See makeFixture() below for the exact construction.
  */
 import {
-  computeHrv, correctArtifacts, fft, frequencyDomain,
+  SALVAGE_MAX_ARTIFACT_PCT, SALVAGE_MIN_COVERAGE_SEC, TROUBLE_GRACE_SEC,
+  computeHrv, correctArtifacts, fft, frequencyDomain, hopelessCoverage,
   parseHeartRateMeasurement, readingCompleteness, repairBeats, resampleTachogram, splitSegments, std,
   timeDomain, timeDomainSegments,
 } from '../index';
@@ -497,5 +498,94 @@ describe('a gappy watch series is segmented, not stitched', () => {
     const camera = computeHrv(gappy, { segmentStarts: starts, durationSec: 600, source: 'camera' });
     expect(camera.ok).toBe(false);
     expect(camera.reason).toMatch(/usable pulse/);
+  });
+});
+
+describe('a refused reading that is still worth offering', () => {
+  /** `n` beats of clean, respiring pulse at ~70 bpm. */
+  const good = (n: number, base = 860) => Array.from({ length: n }, (_, i) => base + 25 * Math.sin(i));
+
+  it('does not charge a discarded stretch to the artifact rate', () => {
+    // A clean 120-beat take plus a stretch the detector was clearly not
+    // tracking a pulse in. Triage throws the second one away, so the rate is
+    // about the beats that survived — which is what the results card claims it
+    // is. Charging the dropout here too (and twice over) was refusing camera
+    // readings for a dropout the pipeline had already handled.
+    const r = computeHrv([...good(120), ...good(60, 430)], { source: 'camera', segmentStarts: [120] });
+    expect(r.segmentsDropped).toBe(1);
+    expect(r.rrClean.length).toBe(120);
+    expect(r.artifactPct).toBeLessThan(5);
+    // The dropout is still reported, just not as an artifact rate.
+    expect(r.confidence).not.toBe('high');
+  });
+
+  it('offers a noisy camera reading rather than refusing it outright', () => {
+    // 5 minutes of pulse with every sixth beat corrupted: over the camera's
+    // 15% gate, under the 30% at which the numbers stop being about the person.
+    // 1300 ms is deliberately NOT a doubled beat — `repairBeats` would split
+    // one of those back into two and the reading would come out clean.
+    const rr = good(360);
+    for (let i = 0; i < rr.length; i += 6) rr[i] = 1300;
+    const r = computeHrv(rr, { source: 'camera', durationSec: 300 });
+    expect(r.ok).toBe(false);
+    expect(r.artifactPct).toBeGreaterThan(15);
+    expect(r.artifactPct).toBeLessThanOrEqual(SALVAGE_MAX_ARTIFACT_PCT);
+    expect(r.salvageable).toBe(true);
+    // The numbers it would save are real numbers.
+    expect(r.fields.rmssd).toBeDefined();
+  });
+
+  it('keeps a clean reading out of the salvage path entirely', () => {
+    const r = computeHrv(makeFixture(), { source: 'polar', durationSec: 330 });
+    expect(r.ok).toBe(true);
+    expect(r.salvageable).toBe(false);
+  });
+
+  it('offers nothing when there was nothing to compute', () => {
+    const r = computeHrv(good(10), { source: 'camera', durationSec: 180 });
+    expect(r.ok).toBe(false);
+    expect(r.salvageable).toBe(false);
+    expect(r.fields.rmssd).toBeUndefined();
+  });
+
+  it('offers nothing built on less than a minute of pulse', () => {
+    // 40 beats is ~34 s: enough to compute, not enough to have settled.
+    const r = computeHrv(good(40), { source: 'camera', segmentStarts: [20], durationSec: 180 });
+    expect(r.ok).toBe(false);
+    expect(r.coverageSec).toBeLessThan(SALVAGE_MIN_COVERAGE_SEC);
+    expect(r.salvageable).toBe(false);
+  });
+});
+
+describe('stopping a reading that cannot get there', () => {
+  const D = 180;
+
+  it('gives every reading a grace period before judging it', () => {
+    expect(hopelessCoverage({ usableSec: 0, elapsedSec: TROUBLE_GRACE_SEC - 1, durationSec: D })).toBe(false);
+  });
+
+  it('stops a reading whose pulse is barely arriving at all', () => {
+    expect(hopelessCoverage({ usableSec: 3, elapsedSec: 45, durationSec: D })).toBe(true);
+  });
+
+  it('stops a reading that can no longer reach the coverage bar', () => {
+    // 100 s in with 5 s of pulse: even a perfect remaining 80 s lands at 85 of
+    // the 90 it needs. Arithmetically finished.
+    expect(hopelessCoverage({ usableSec: 5, elapsedSec: 100, durationSec: D })).toBe(true);
+  });
+
+  it('leaves a reading alone while its pulse is keeping up', () => {
+    expect(hopelessCoverage({ usableSec: 40, elapsedSec: 60, durationSec: D })).toBe(false);
+    expect(hopelessCoverage({ usableSec: 120, elapsedSec: 150, durationSec: D })).toBe(false);
+  });
+
+  it('never stops a reading that already holds enough pulse to be offered', () => {
+    // Arithmetically finished (65 + 10 = 75 < 90) but past the salvage floor:
+    // stopping here would throw away a reading the user could have kept.
+    expect(hopelessCoverage({ usableSec: 65, elapsedSec: 170, durationSec: D })).toBe(false);
+  });
+
+  it('is inert without a duration to judge against', () => {
+    expect(hopelessCoverage({ usableSec: 0, elapsedSec: 300, durationSec: 0 })).toBe(false);
   });
 });
