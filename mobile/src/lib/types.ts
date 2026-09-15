@@ -221,6 +221,13 @@ export interface DayLoad {
   hrBelowMin: number | null;
   /** Minutes the series actually covered, so a charger gap reads as unknown. */
   hrCoverageMin: number | null;
+  /** Minutes between this day's heart-rate readings (budget/burn.ts
+   *  `typicalGapMin`). A chest strap reads a fiftieth of a minute and a
+   *  background wrist reads several, so this is what says WHICH INSTRUMENT
+   *  watched the day, and it is what `capacityBaseline` compares before
+   *  treating two days' spend as the same measurement. Null on a day read
+   *  before it was kept, which is read as unknown and never as fine. */
+  hrSampleGapMin: number | null;
   /** Contiguous runs above the line ("in three stretches"). */
   hrStretches: number | null;
   /** The longest such run, minutes past midnight. */

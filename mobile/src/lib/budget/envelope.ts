@@ -28,7 +28,7 @@ import { hm } from './format';
 import { ceilingAt } from './calibrate';
 import { capacityBaseline } from './baseline';
 import { compValue, makeScoreLookup, makeSetLookup, type ScoreLookup, type SetLookup } from './outcome';
-import { makeBurnLookup, makeSpendLookup, type BurnLookup, type SpendLookup } from './burn';
+import { HR_FULL_COVERAGE, HR_MIN_COVERAGE, makeBurnLookup, makeSpendLookup, type BurnLookup, type SpendLookup } from './burn';
 
 /** The most a good morning may add, and the most a bad one may take. */
 const FACTOR_MAX = 1.1;
@@ -68,6 +68,44 @@ const COVERAGE_CAP: Record<'full' | 'partial' | 'logged-only' | 'none', number> 
   'logged-only': 0.6,
   none: 0.4,
 };
+
+/**
+ * The same weights, as a RAMP rather than four steps.
+ *
+ * `burn.coverage` is a four-value word because the sheet has to name the day
+ * in English, but reading confidence straight off it made a cliff out of a
+ * threshold: a day holding 119 minutes of heart-rate coverage was weighted
+ * 0.6 and one holding 121 was weighted 0.9, and which side of that line a day
+ * landed on came down to whether the watch was on the charger over lunch. Two
+ * days that saw almost the same amount of a life were reported with very
+ * different certainty.
+ *
+ * So coverage moves the weight continuously between the anchors it already
+ * had. Each class ramps from its own weight up to the next class's, and never
+ * past it, so nothing is ever weighted MORE than the word beside it claims and
+ * a day with no series at all keeps exactly the figure it always had.
+ */
+export function coverageFactor(
+  coverage: 'full' | 'partial' | 'logged-only' | 'none',
+  hrCoverageMin: number | null | undefined,
+): number {
+  const cap = COVERAGE_CAP[coverage];
+  // No series read at all: there is nothing to ramp along, and the word is the
+  // whole of what we know.
+  if (hrCoverageMin == null || !Number.isFinite(hrCoverageMin)) return cap;
+  const lerp = (a: number, b: number, t: number) => a + (b - a) * Math.min(1, Math.max(0, t));
+  if (coverage === 'partial') {
+    return lerp(COVERAGE_CAP.partial, COVERAGE_CAP.full,
+      (hrCoverageMin - HR_MIN_COVERAGE) / Math.max(1, HR_FULL_COVERAGE - HR_MIN_COVERAGE));
+  }
+  if (coverage === 'logged-only') {
+    return lerp(COVERAGE_CAP['logged-only'], COVERAGE_CAP.partial, hrCoverageMin / HR_MIN_COVERAGE);
+  }
+  // 'full' is already the top of the scale, and 'none' is a day with no steps
+  // and nothing logged, where a heart-rate series is not the thing that was
+  // missing. Both keep their own weight.
+  return cap;
+}
 
 export type Confidence = 'low' | 'medium' | 'high';
 
@@ -303,7 +341,8 @@ export function buildEnvelope(opts: EnvelopeOpts): Envelope {
   // The ceiling's own maturity caps confidence, but never below half: a
   // day-one user with a full set of morning readings has GOOD inputs and an
   // unfitted ceiling, and the strip says which of those two it is.
-  const raw = (known / total) * Math.max(CONF_LOW, base.learning) * COVERAGE_CAP[coverage];
+  const raw = (known / total) * Math.max(CONF_LOW, base.learning)
+    * coverageFactor(coverage, days[dk]?.load?.hrCoverageMin);
   const confidence: Confidence = raw < CONF_LOW ? 'low' : raw < CONF_MED ? 'medium' : 'high';
 
   return {

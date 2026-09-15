@@ -83,6 +83,38 @@ export const EVIDENCE_PCT = 0.75;
 export const MIN_EVIDENCE_DAYS = 3;
 
 /**
+ * How much more finely sampled than usual a day may be and still be read as
+ * evidence of capacity.
+ *
+ * The ceiling is fitted from spend, and spend is a LOWER BOUND set by how much
+ * of the day the app saw. That is fine while every day is watched the same
+ * way, because the whole scale is then self-consistent: a journal that
+ * undercounts every day by the same share fits a ceiling that undercounts by
+ * the same share, and the bar still fills at the right rate.
+ *
+ * It is NOT fine on a mixed journal, and the asymmetry is what makes it bite.
+ * `personal` only applies when it EXCEEDS the prior, so a well-instrumented day
+ * that reads high and holds RAISES the ceiling for good, while the forty
+ * background days that read low can never pull it back. Wear a chest strap one
+ * day in ten and the ceiling drifts toward the strap days, and every ordinary
+ * day is then graded against an instrument the user was not wearing and reads
+ * comfortably under budget. For this population that is the dangerous
+ * direction: the app telling somebody they have room when the truth is it was
+ * not watching.
+ *
+ * The comparison is the day's SAMPLING CADENCE, not its coverage. Coverage was
+ * the obvious candidate and is now the wrong one: ./burn's gap tolerance meets
+ * whatever cadence a day was sampled at, so a strap day and a background wrist
+ * day both report most of the day as covered. What still separates them is how
+ * often the sensor spoke, which is `DayLoad.hrSampleGapMin`.
+ *
+ * So a day sampled more than this multiple finer than the journal's own usual
+ * is not evidence about an ordinary day. It is excluded from the statistic
+ * only, never from the journal, the strip or its own outcome.
+ */
+export const RESOLUTION_OUTLIER_RATIO = 2;
+
+/**
  * Where a brand new journal starts, in effort minutes, by the day's own grade.
  *
  * Low for the population on purpose. These are starting points, not claims:
@@ -131,6 +163,29 @@ export function recoveryLine(days: DaysMap, dk: string, ctx: ScoreContext, addDa
   return Math.round(median(vals) - RECOVERY_BELOW_RESTING);
 }
 
+
+/**
+ * The sampling cadence a day in this journal usually gets, in minutes between
+ * heart-rate readings.
+ *
+ * The MEDIAN over COMPLETE days holding a load record, so it is a fact about
+ * how this person is normally watched rather than about today. Deliberately
+ * not today's own cadence: today is still being sampled, so a rule keyed on it
+ * would re-decide which days count as evidence every few minutes and walk the
+ * ceiling across the morning.
+ *
+ * Null when no day in the window carries a series at all, which is the
+ * phone-only user. Nothing is excluded for them: every day is measured the
+ * same way, so every day is comparable.
+ */
+export function typicalResolution(days: DaysMap, dk: string, addDays: (k: string, n: number) => string): number | null {
+  const vals: number[] = [];
+  keyRange(addDays(dk, -1), BASELINE_DAYS, addDays).forEach((k) => {
+    const g = days[k]?.load?.hrSampleGapMin;
+    if (g != null && Number.isFinite(g) && g > 0) vals.push(g);
+  });
+  return vals.length ? median(vals) : null;
+}
 
 /** The value at `p` through a sorted sample, linearly interpolated. */
 function percentile(xs: number[], p: number): number {
@@ -181,6 +236,19 @@ export function capacityBaseline(
 
   // Walk the complete days behind today, oldest first, collecting verdicts.
   const keys = keyRange(addDays(dk, -1), BASELINE_DAYS, addDays);
+  // A day sampled far more finely than this journal's usual is not evidence
+  // about an ordinary day: see RESOLUTION_OUTLIER_RATIO. The bar is null for a
+  // journal with no heart-rate series anywhere, where every day is comparable,
+  // and a day stored before the cadence was kept reads as UNKNOWN rather than
+  // as fine, so nothing already in a journal is retroactively thrown away.
+  const typical = typicalResolution(days, dk, addDays);
+  const comparable = (k: string): boolean => {
+    if (typical == null) return true;
+    const g = days[k]?.load?.hrSampleGapMin;
+    if (g == null || !(g > 0)) return true;
+    return g * RESOLUTION_OUTLIER_RATIO >= typical;
+  };
+
   const held: number[] = [];
   const verdicts: { dk: string; spend: number; outcome: 'held' | 'dipped' }[] = [];
   keys.forEach((k) => {
@@ -190,7 +258,9 @@ export function capacityBaseline(
     if (outcome === 'unknown') return;
     const spend = spendAt(k);
     verdicts.push({ dk: k, spend, outcome });
-    if (outcome === 'held') held.push(spend);
+    // The verdict still counts for the early-days fitting below, which follows
+    // the journal's own order and would skip days if this filtered it too.
+    if (outcome === 'held' && comparable(k)) held.push(spend);
   });
 
   // Early days move the prior directly, so a new user watches it fit itself.

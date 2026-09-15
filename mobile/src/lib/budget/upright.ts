@@ -31,8 +31,9 @@
  *   streaming continuously offered all 1,440 and every one of them merged into
  *   a run. The same body on the same afternoon read as twenty minutes upright
  *   or as the five-hour cap depending only on the sensor. It now integrates
- *   over the gaps between samples, capped at HR_GAP_MIN, which is the rule
- *   ./burn's hrMinutesAbove has always used and for exactly this reason.
+ *   over the gaps between samples, capped at the day's own `gapToleranceFor`,
+ *   which is the rule ./burn's hrMinutesAbove has always used and for exactly
+ *   this reason.
  *
  *   THE BAND HAD NOTHING TO RISE FROM. Its floor was the user's LAYING resting
  *   rate plus a fraction of their stand-test rise, and nobody sits at their
@@ -52,7 +53,7 @@ import { median } from '../trends/compare';
 import { keyRange, metricSeries } from '../trends/series';
 import type { Entry } from '../types';
 import { BASELINE_DAYS, MIN_LINE_READINGS } from './baseline';
-import { HR_GAP_MIN, type Span } from './burn';
+import { gapToleranceFor, type Span } from './burn';
 
 /** Where in the stand-test rise the standing band starts. Standing quietly
  *  settles well below the test's peak, so the floor sits at a fraction of it;
@@ -222,17 +223,18 @@ export function stillUprightMinutes(
   const steps = (stepSpans || []).filter((s) =>
     Number.isFinite(s.startMin) && Number.isFinite(s.endMin) && s.endMin > s.startMin);
 
-  // Cut the day into covered intervals. A gap longer than HR_GAP_MIN is
-  // UNCOVERED: it contributes to neither the coverage nor the count, and it
-  // breaks any run across it, because an unwatched hour is unknown and never
-  // standing. An interval that touches a step span or an excluded window is
-  // kept but marked ineligible, so it still breaks runs and still reports its
-  // time as covered without ever being charged.
+  // Cut the day into covered intervals. A gap longer than this day's own
+  // tolerance is UNCOVERED: it contributes to neither the coverage nor the
+  // count, and it breaks any run across it, because an unwatched hour is
+  // unknown and never standing. An interval that touches a step span or an
+  // excluded window is kept but marked ineligible, so it still breaks runs and
+  // still reports its time as covered without ever being charged.
+  const gapMax = gapToleranceFor(pts);
   const slices: Slice[] = [];
   let coverageMin = 0;
   for (let i = 1; i < pts.length; i++) {
     const lenMin = (pts[i].t - pts[i - 1].t) / 60;
-    if (lenMin <= 0 || lenMin > HR_GAP_MIN) continue;
+    if (lenMin <= 0 || lenMin > gapMax) continue;
     coverageMin += lenMin;
     const startMin = pts[i - 1].t / 60;
     const endMin = pts[i].t / 60;
@@ -262,6 +264,16 @@ export function stillUprightMinutes(
     quiet == null ? sig.floorBpm : quiet + sig.riseBpm * BAND_FRACTION,
   ));
 
+  // Band membership is decided on the interval's own mean, not interpolated
+  // the way ./burn crosses a single line: a band has two edges and splitting an
+  // interval across both would be guessing at a shape from two samples. The
+  // cost is that the entry and exit slices of each stand read as half sitting
+  // and are dropped, so a sparsely sampled day UNDER-claims: measured against
+  // one fixed day resampled, 105 minutes of standing reads as 78 to 89 at
+  // wrist cadences against 105 at a strap's. That is the direction to be wrong
+  // in here. The row already calls itself an estimate, a minute upright costs a
+  // fifth of a moderate one, and over-claiming standing is the failure this
+  // module has already shipped once.
   const spans: { startMin: number; endMin: number; kind: 'still' }[] = [];
   let runStart: number | null = null;
   let runEnd = 0;

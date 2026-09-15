@@ -25,7 +25,7 @@ import { health, type HealthAuthStatus } from '../lib/health';
 import { stepsAskDue } from '../lib/budget/stepsAsk';
 import { logError } from '../lib/diagnostics/errorLog';
 import { exertionLine, hrMinutesAbove, stillUprightMinutes, uprightSignature, walkingMinutes } from '../lib/budget';
-import { UPRIGHT_SPANS_MAX, hrMinutesBelow, hrMinutesBelowByHour, minutesByHour, thinHrCurve } from '../lib/budget/burn';
+import { UPRIGHT_SPANS_MAX, hrMinutesBelow, hrMinutesBelowByHour, minutesByHour, thinHrCurve, typicalGapMin } from '../lib/budget/burn';
 import { BASELINE_DAYS, recoveryLine } from '../lib/budget/baseline';
 import { loadWaveformId } from '../lib/waveforms';
 import { RECOVERY_MIN } from '../lib/budget/upright';
@@ -191,6 +191,7 @@ export async function refreshDayLoad(
         hrBelowMin: settled,
         hrBelowByHour: hrMinutesBelowByHour(read.hr, restLine, excluded),
         hrCoverageMin: above ? above.coverageMin : null,
+        hrSampleGapMin: typicalGapMin(read.hr),
         hrStretches: above ? above.stretches : null,
         longestStretch: above?.longest ?? null,
         peakBpm: above?.peak ?? null,

@@ -1047,8 +1047,12 @@ old web app so old `export.json` files import directly.
   offered a few hundred candidate minutes a day and a strap offered all 1,440,
   and the same afternoon read as twenty minutes upright or as the five-hour cap
   depending only on the device. It now integrates over the gaps between samples
-  capped at `HR_GAP_MIN`, which is `hrMinutesAbove`'s own rule and exists for
-  this reason. And the band's floor was the user's LAYING resting rate plus a
+  capped at `gapToleranceFor`, which is `hrMinutesAbove`'s own rule and exists
+  for this reason. Band membership is still decided on an interval's own mean
+  rather than interpolated (a band has two edges), so a sparse day UNDER-claims
+  standing by a fifth or so; that is the direction to be wrong in, since
+  over-claiming is the bug this module already shipped once. And the band's
+  floor was the user's LAYING resting rate plus a
   fraction of their stand-test rise, which nobody sits at: an ordinary desk
   afternoon runs ten to twenty beats above it, so a strap streaming through one
   charged the cap to somebody who never got up. The floor now also has to clear
@@ -1069,7 +1073,50 @@ old web app so old `export.json` files import directly.
   background readings charges nothing, which used to happen in silence; the
   coverage sentence now names what was seen and `peakBpm` — computed and stored
   since the first release and rendered nowhere — is the honest answer to "did my
-  heart go over the line at all". The drill-ins for Upright time and Recovery
+  heart go over the line at all".
+  **THE GAP TOLERANCE IS FITTED TO THE DAY, and `HR_GAP_MIN` is now only its
+  FLOOR** (`gapToleranceFor` in `budget/burn.ts`). A fixed five minutes was
+  priced for a strap, and a wrist sampling in the background sits right on top
+  of it: at an eight-minute cadence EVERY interval exceeded the threshold, so a
+  fully worn watch reported a day the app could not see, the burn dropped its
+  heart-rate row and its recovery credit, and the envelope called it low
+  confidence. The tolerance is now the day's own cadence (`GAP_PCT` of its gaps,
+  times `GAP_TOLERANCE_K`) clamped to `[HR_GAP_MIN, HR_GAP_MAX]`, so a strap day
+  is byte-identical to what it was and a background day goes from under two
+  hours of coverage to the whole waking day. A charger break is an hour and is
+  still unknown. **Widening it forced the charge to be INTERPOLATED**: an
+  interval used to be billed whole whenever its two samples AVERAGED above the
+  line, which is a step function on an estimate and biases upward as samples
+  spread out — against one fixed day resampled at every rate it ran 15 to 31%
+  over at wrist cadences, and linear interpolation of the crossing holds it
+  inside a couple of per cent. `hrMinutesBelow` interpolates the same way or the
+  two sides of the line would disagree about where it was.
+  **The ceiling is fitted only from COMPARABLE days.** Spend is a lower bound
+  set by how much of the day the app saw, which is fine while every day is
+  watched alike — the whole scale is then self-consistent and the bar fills at
+  the right rate even if the minutes are low. It is not fine on a mixed journal,
+  and `capacityBaseline` is asymmetric: `personal` only applies when it EXCEEDS
+  the prior, so a strap day that reads high and holds RAISES the ceiling for
+  good while forty background days can never pull it back. Wear a strap one day
+  in ten and every ordinary day is then graded against an instrument the user
+  was not wearing and reads comfortably under budget, which for this population
+  is the dangerous direction. So a day sampled more than
+  `RESOLUTION_OUTLIER_RATIO` finer than `typicalResolution` (the median cadence
+  over complete days) is excluded from the evidence statistic — never from the
+  journal, the strip or its own outcome. **The comparison is CADENCE, not
+  coverage**: coverage was the obvious candidate and the tolerance fix retired
+  it, since a strap day and a wrist day now both report most of the day as
+  covered. What still separates them is `DayLoad.hrSampleGapMin`, and a day
+  stored before it was kept reads as UNKNOWN rather than as fine, so no existing
+  journal is retroactively thrown away.
+  **Coverage moves confidence as a RAMP** (`coverageFactor` in
+  `budget/envelope.ts`): `burn.coverage` stays a four-value word because the
+  sheet has to name the day in English, but reading the weight straight off it
+  made a cliff out of a threshold — 119 minutes weighted 0.6 and 121 weighted
+  0.9, decided by whether the watch was charging over lunch. Each class now
+  ramps to the next class's anchor and never past it, so nothing is weighted
+  more than the word beside it claims and a day with no series keeps exactly the
+  figure it always had. The drill-ins for Upright time and Recovery
   time draw WHEN, never heart rate: minutes per clock hour as stacked bars,
   from `DayLoad.uprightByHour` (walking, estimated standing, or Apple Stand
   Time) and `hrBelowByHour`, counted at read time from the same spans and

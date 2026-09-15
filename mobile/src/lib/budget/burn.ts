@@ -111,9 +111,84 @@ export const STEP_EFFORT = 0.011;
 /** The most a named correlation may multiply a day's cost by. */
 export const MULTIPLIER_CAP = 1.25;
 
-/** Gaps in the heart-rate series longer than this are UNCOVERED, not rest.
- *  A watch on the charger must never read as a restful afternoon. */
+/**
+ * The FLOOR under the gap tolerance, not the tolerance itself. See
+ * `gapToleranceFor`, which is what every consumer actually asks.
+ *
+ * Gaps longer than the tolerance are UNCOVERED, not rest: a watch on the
+ * charger must never read as a restful afternoon.
+ */
 export const HR_GAP_MIN = 5;
+
+/** The tolerance can never stretch past this, however sparse the day. Beyond
+ *  twenty minutes nobody can say what a heart was doing, and a day whose
+ *  samples are further apart than this should read as barely watched. */
+export const HR_GAP_MAX = 20;
+
+/** How many typical gaps a run of missing samples may span before the stretch
+ *  is called uncovered. Three, so an ordinary cadence tolerates a couple of
+ *  dropped readings and nothing like a charger break. */
+export const GAP_TOLERANCE_K = 3;
+
+/** Where in the day's own gap distribution the typical spacing is read. High
+ *  rather than middling, so a day that is PART continuous strap and part
+ *  background wrist is tolerant enough for the wrist half; the few enormous
+ *  gaps that matter (a charger break) sit far above it either way. */
+export const GAP_PCT = 0.75;
+
+/**
+ * How long a gap in THIS day's series may be and still count as covered.
+ *
+ * A fixed five minutes was priced for a continuous strap trace, and a wrist
+ * sampling in the background sits right on top of it: Apple writes a passive
+ * reading every few minutes, so whether each interval counted was decided by
+ * sampling jitter rather than by anything about the day. A whole background
+ * day could come back with almost no coverage, which the burn then read as a
+ * day it could not see and the envelope read as low confidence, and the honest
+ * answer was simply that the threshold belonged to a different sensor.
+ *
+ * So the tolerance is read off the day's own cadence, the same way the
+ * standing band is now read off the day's own quiet level. A strap day's
+ * typical gap is a second, so the FLOOR holds it at exactly what it was. A
+ * background day's is a few minutes, so it stretches to cover them. Neither
+ * can reach `HR_GAP_MAX`, and a charger break is an hour and stays unknown.
+ *
+ * Pure and deterministic, so the three consumers that ask it about one series
+ * cannot disagree about what "covered" means for that day.
+ */
+export function gapToleranceFor(series: { t: number; bpm: number }[] | null | undefined): number {
+  const typical = typicalGapMin(series);
+  if (typical == null) return HR_GAP_MIN;
+  return Math.min(HR_GAP_MAX, Math.max(HR_GAP_MIN, typical * GAP_TOLERANCE_K));
+}
+
+/**
+ * The day's own sampling cadence, in minutes between readings. Null when the
+ * series is too short to have one.
+ *
+ * Kept UNCLAMPED and stored on the day, because it is the only honest record
+ * of which instrument watched it. Coverage used to serve that purpose and no
+ * longer can: now that the tolerance meets the cadence, a chest strap and a
+ * background wrist both report most of the day as covered, which is the point
+ * of the change and also the end of coverage as a proxy for resolution. A
+ * strap reads a fiftieth of a minute here and a wrist reads six, and the ratio
+ * between them is exactly the thing ./baseline needs to know before it treats
+ * two days' spend as the same measurement.
+ */
+export function typicalGapMin(series: { t: number; bpm: number }[] | null | undefined): number | null {
+  if (!series || series.length < 3) return null;
+  const pts = series
+    .filter((p) => Number.isFinite(p.t) && Number.isFinite(p.bpm) && p.bpm > 0)
+    .sort((a, b) => a.t - b.t);
+  const gaps: number[] = [];
+  for (let i = 1; i < pts.length; i++) {
+    const g = (pts[i].t - pts[i - 1].t) / 60;
+    if (g > 0) gaps.push(g);
+  }
+  if (gaps.length < 2) return null;
+  gaps.sort((a, b) => a - b);
+  return gaps[Math.min(gaps.length - 1, Math.floor((gaps.length - 1) * GAP_PCT))];
+}
 
 /** Minutes a run above the line must last before it is called a stretch. */
 export const STRETCH_MIN_MIN = 2;
@@ -204,9 +279,10 @@ export interface HrAboveResult {
  * Minutes the heart spent above `lineBpm`, integrated over the gaps between
  * samples so an irregular sampling rate does not change the answer.
  *
- * A gap longer than HR_GAP_MIN contributes nothing to coverage OR to the
- * count. That asymmetry is the point: we would rather under-report a day than
- * invent one, and the sheet states its coverage so a thin day looks thin.
+ * A gap longer than this day's own tolerance (`gapToleranceFor`) contributes
+ * nothing to coverage OR to the count. That asymmetry is the point: we would
+ * rather under-report a day than invent one, and the sheet states its coverage
+ * so a thin day looks thin.
  */
 export function hrMinutesAbove(
   series: { t: number; bpm: number }[] | null | undefined,
@@ -217,6 +293,7 @@ export function hrMinutesAbove(
     .filter((p) => Number.isFinite(p.t) && Number.isFinite(p.bpm) && p.bpm > 0)
     .sort((a, b) => a.t - b.t);
   if (pts.length < 2) return null;
+  const gapMax = gapToleranceFor(series);
 
   let aboveMin = 0;
   const bands = HR_BAND_EDGES.map(() => 0);
@@ -243,19 +320,42 @@ export function hrMinutesAbove(
     if (i === 0) continue;
     const gapMin = (pts[i].t - pts[i - 1].t) / 60;
     if (gapMin <= 0) continue;
-    if (gapMin > HR_GAP_MIN) {
+    if (gapMin > gapMax) {
       // Uncovered. Close any open run at the last sample we actually saw.
       closeRun(pts[i - 1].t);
       continue;
     }
     coverageMin += gapMin;
-    // The interval is charged when its own two samples average above the line,
-    // which is the same rule the drill-in's trace colours each segment by.
-    const mid = (pts[i - 1].bpm + pts[i].bpm) / 2;
-    if (mid > lineBpm) {
-      aboveMin += gapMin;
-      bands[hrBandOf(mid - lineBpm)] += gapMin;
-      if (runStart == null) runStart = pts[i - 1].t;
+    // The SHARE of the interval above the line, by linear interpolation
+    // between its two samples, and the instant it crossed.
+    //
+    // This used to charge the whole interval whenever the two samples AVERAGED
+    // above the line, which is a step function on an estimate and biases
+    // upward exactly as the samples spread out: a four-minute walk caught
+    // between two readings eight minutes apart was billed for both intervals
+    // it touched. Against one fixed day resampled at every rate, the step rule
+    // ran 15 to 31% over the truth on wrist cadences while interpolation holds
+    // inside a couple of per cent. That matters more now that the tolerance
+    // widens to meet those cadences.
+    const a = pts[i - 1].bpm;
+    const b = pts[i].bpm;
+    const frac = a > lineBpm && b > lineBpm ? 1
+      : a <= lineBpm && b <= lineBpm ? 0
+        : Math.abs((a > lineBpm ? a : b) - lineBpm) / Math.abs(a - b);
+    if (frac > 0) {
+      const charged = gapMin * frac;
+      aboveMin += charged;
+      // The band is read off the mean of the part that was actually above,
+      // which for a crossing is the midpoint between the line and the peak
+      // end, never the midpoint of an interval half of which sat below it.
+      const hi = Math.max(a, b);
+      bands[hrBandOf((frac === 1 ? (a + b) / 2 : (lineBpm + hi) / 2) - lineBpm)] += charged;
+      // A run opens and closes at the CROSSING, not at the samples either
+      // side, so the longest stretch is not padded by the approach to it. The
+      // above part of an entry sits at the interval's end and of an exit at
+      // its start, which is what picks the two instants apart.
+      if (runStart == null) runStart = a > lineBpm ? pts[i - 1].t : pts[i].t - charged * 60;
+      if (b <= lineBpm) closeRun(pts[i - 1].t + charged * 60);
     } else {
       closeRun(pts[i - 1].t);
     }
@@ -354,15 +454,24 @@ function belowByHour(
     .sort((a, b) => a.t - b.t);
   if (pts.length < 2) return null;
   const out = (m: number) => exclude.some((e) => m >= e.startMin && m < e.endMin);
+  const gapMax = gapToleranceFor(series);
 
   const below: number[] = new Array(HOURS).fill(0);
   for (let i = 1; i < pts.length; i++) {
     const gapMin = (pts[i].t - pts[i - 1].t) / 60;
-    if (gapMin <= 0 || gapMin > HR_GAP_MIN) continue;
+    if (gapMin <= 0 || gapMin > gapMax) continue;
     const midMin = (pts[i - 1].t + pts[i].t) / 120;
     if (out(midMin)) continue;
-    if ((pts[i - 1].bpm + pts[i].bpm) / 2 < lineBpm) {
-      below[Math.min(HOURS - 1, Math.max(0, Math.floor(midMin / 60)))] += gapMin;
+    // Interpolated, the same way `hrMinutesAbove` charges its side of the
+    // line: the two have to agree about where the crossing was, or a wide
+    // interval could be counted as a whole minute of both or of neither.
+    const a = pts[i - 1].bpm;
+    const b = pts[i].bpm;
+    const frac = a < lineBpm && b < lineBpm ? 1
+      : a >= lineBpm && b >= lineBpm ? 0
+        : Math.abs((a < lineBpm ? a : b) - lineBpm) / Math.abs(a - b);
+    if (frac > 0) {
+      below[Math.min(HOURS - 1, Math.max(0, Math.floor(midMin / 60)))] += gapMin * frac;
     }
   }
   return below;

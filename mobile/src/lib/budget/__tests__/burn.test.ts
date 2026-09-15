@@ -1,7 +1,7 @@
 import { ACTIVITY_TYPES } from '../../registry';
 import {
-  HR_BAND_EDGES, HR_MIN_COVERAGE, HR_PER_MIN, STEP_EFFORT, UPRIGHT_PER_MIN,
-  buildBurn, hrBandEffort, hrBandsLess, hrMinutesAbove, hrMinutesBelow, hrMinutesBelowByHour, minutesByHour,
+  HR_BAND_EDGES, HR_FULL_COVERAGE, HR_GAP_MAX, HR_GAP_MIN, HR_MIN_COVERAGE, HR_PER_MIN, STEP_EFFORT, UPRIGHT_PER_MIN,
+  buildBurn, gapToleranceFor, hrBandEffort, hrBandsLess, hrMinutesAbove, hrMinutesBelow, hrMinutesBelowByHour, minutesByHour,
   thinHrCurve, uprightHours, uprightMinutes, walkingMinutes,
 } from '../burn';
 import { HR_BOOST_CAP } from '../load';
@@ -19,7 +19,7 @@ const day = (over: Partial<DayRecord>): DayRecord => ({
 
 const load = (over: Partial<DayLoad>): DayLoad => ({
   steps: null, walkingMin: null, standMin: null, stillUprightMin: null, stillFloorBpm: null,
-  uprightSpans: null, uprightByHour: null, hrAboveMin: null, hrBands: null, hrBelowMin: null, hrBelowByHour: null, hrCoverageMin: null, hrStretches: null,
+  uprightSpans: null, uprightByHour: null, hrAboveMin: null, hrBands: null, hrBelowMin: null, hrBelowByHour: null, hrCoverageMin: null, hrSampleGapMin: null, hrStretches: null,
   longestStretch: null, peakBpm: null, lineBpm: null, readAt: null,
   ...over,
 });
@@ -500,5 +500,85 @@ describe('thinHrCurve', () => {
   it('leaves a series that already fits alone', () => {
     const small = [{ t: 0, bpm: 60 }, { t: 60, bpm: 90 }];
     expect(thinHrCurve(small, 400)).toEqual(small);
+  });
+});
+
+describe('the gap tolerance is read off the day, not off one sensor', () => {
+  /** A day sampled every `everyMin` minutes with jitter, over 16 waking hours. */
+  const sampleDay = (everyMin: number, jitterMin = 0, bpm: (sec: number) => number = () => 74) => {
+    let seed = 11;
+    const rnd = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
+    const out: { t: number; bpm: number }[] = [];
+    for (let t = 6 * 3600; t < 22 * 3600; t += (everyMin + (rnd() * 2 - 1) * jitterMin) * 60) {
+      out.push({ t, bpm: bpm(t) });
+    }
+    return out;
+  };
+
+  it('leaves a continuous strap day at exactly the old threshold', () => {
+    // The floor is what makes this change safe: nothing about a day that was
+    // already covered end to end may move.
+    expect(gapToleranceFor(sampleDay(1 / 60))).toBe(HR_GAP_MIN);
+    expect(gapToleranceFor(sampleDay(1))).toBe(HR_GAP_MIN);
+  });
+
+  it('stretches to meet a background wrist, and never past the cap', () => {
+    expect(gapToleranceFor(sampleDay(3, 1))).toBeGreaterThan(HR_GAP_MIN);
+    expect(gapToleranceFor(sampleDay(8, 3))).toBe(HR_GAP_MAX);
+    // Even a day of four readings cannot buy more than the cap.
+    expect(gapToleranceFor([{ t: 0, bpm: 70 }, { t: 3 * 3600, bpm: 70 }, { t: 9 * 3600, bpm: 70 }, { t: 15 * 3600, bpm: 70 }]))
+      .toBe(HR_GAP_MAX);
+  });
+
+  it('gives a background day real coverage where it used to have almost none', () => {
+    // The whole point. At an eight-minute cadence every single interval used
+    // to exceed a fixed five-minute threshold, so a fully worn watch reported
+    // a day the app could not see and the burn dropped its heart-rate row.
+    const s = sampleDay(8, 3);
+    const r = hrMinutesAbove(s, 90)!;
+    expect(r.coverageMin).toBeGreaterThan(HR_FULL_COVERAGE);
+    let oldCoverage = 0;
+    for (let i = 1; i < s.length; i++) {
+      const g = (s[i].t - s[i - 1].t) / 60;
+      if (g > 0 && g <= HR_GAP_MIN) oldCoverage += g;
+    }
+    expect(oldCoverage).toBeLessThan(HR_MIN_COVERAGE);
+  });
+
+  it('still calls a charger break unknown', () => {
+    // A tolerance fitted to the day must never swallow the case it exists to
+    // catch: hours with the watch off are not a restful afternoon.
+    const s = [...sampleDay(6, 2).filter((p) => p.t < 10 * 3600), ...sampleDay(6, 2).filter((p) => p.t > 16 * 3600)];
+    const r = hrMinutesAbove(s, 90)!;
+    expect(r.coverageMin).toBeLessThan(10 * 60);
+  });
+
+  it('answers ONE day the same at every sampling rate', () => {
+    // A fixed day with four walks over the line, totalling 71 minutes,
+    // resampled from a strap's cadence down to a lazy wrist's. Before the
+    // crossing was interpolated the sparse rates ran 15 to 31% over, because
+    // an interval was charged whole whenever its two samples AVERAGED above.
+    const LINE = 90;
+    const walks: [number, number][] = [[8 * 60, 8 * 60 + 25], [11 * 60, 11 * 60 + 4], [14 * 60, 14 * 60 + 40], [18 * 60, 18 * 60 + 2]];
+    const truth = walks.reduce((s, [a, b]) => s + (b - a), 0);
+    const bpm = (sec: number) => (walks.some(([a, b]) => sec / 60 >= a && sec / 60 < b) ? 112 : 74);
+    ([[1 / 60, 0], [1, 0], [3, 1], [5, 2], [8, 3], [10, 4]] as [number, number][]).forEach(([every, jit]) => {
+      const r = hrMinutesAbove(sampleDay(every, jit, bpm), LINE)!;
+      expect(Math.abs(r.aboveMin - truth) / truth).toBeLessThan(0.15);
+    });
+  });
+
+  it('charges only the part of an interval that was above the line', () => {
+    // A ten-minute cadence with one reading of 120 in the middle of a quiet
+    // day. The line is three quarters of the way from 80 to 120, so each of
+    // the two intervals touching the spike was above it for a quarter of its
+    // length going up and a quarter coming down: 15 minutes, not the 20 the
+    // old whole-interval rule charged, and not the 0 a five-minute threshold
+    // would have seen.
+    const s: { t: number; bpm: number }[] = [];
+    for (let i = 0; i < 40; i++) s.push({ t: i * 600, bpm: i === 20 ? 120 : 80 });
+    const r = hrMinutesAbove(s, 90)!;
+    expect(r.aboveMin).toBe(15);
+    expect(r.peak).toBe(120);
   });
 });
