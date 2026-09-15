@@ -31,6 +31,7 @@ import { loadWaveformId } from '../lib/waveforms';
 import { RECOVERY_MIN } from '../lib/budget/upright';
 import { noteStepsSeen, stepsEverSeen } from '../lib/budget/stepsMemory';
 import { RESTORE_MAX_ATTEMPTS, erasedLoadDays, readHasEvidence, readLosesEvidence } from '../lib/budget/restore';
+import { CURVE_MAX, PRICE_VERSION, repriceAction } from '../lib/budget/reprice';
 import { noteRestoreAttempt, restoreAttempts } from '../lib/budget/restoreMemory';
 import type { DayLoad, Entry } from '../lib/types';
 import { blankDay } from '../lib/migrate';
@@ -61,8 +62,6 @@ export const LOAD_FOCUS_STALE_MIN = 0.5;
 
 /** How often the day is re-read while the app is open and being looked at. */
 export const LOAD_TICK_MS = 3 * 60_000;
-/** Points kept in the sidecar curve, matching the night series. */
-const CURVE_MAX = 400;
 
 let inFlight: Promise<void> | null = null;
 
@@ -192,6 +191,7 @@ export async function refreshDayLoad(
         hrBelowByHour: hrMinutesBelowByHour(read.hr, restLine, excluded),
         hrCoverageMin: above ? above.coverageMin : null,
         hrSampleGapMin: typicalGapMin(read.hr),
+        pricedVersion: PRICE_VERSION,
         hrStretches: above ? above.stretches : null,
         longestStretch: above?.longest ?? null,
         peakBpm: above?.peak ?? null,
@@ -433,6 +433,75 @@ export function backfillHrBands(dk: string = todayKey()): void {
 }
 
 /**
+ * Charge the stored days again under the current pricing rules.
+ *
+ * See lib/budget/reprice for WHY and for the CURVE_MAX rule that decides which
+ * days can be re-priced at all. This half is only the plumbing: read each day's
+ * curve out of the sidecar, run the same functions `refreshDayLoad` runs, write
+ * the result back.
+ *
+ * Two things it deliberately does NOT touch. **The exertion line** is the one
+ * stored on the day: a day's minutes were counted against the line that was
+ * current then, and re-deriving it here would let a later baseline shift
+ * silently re-mean a stored count. **Standing** is left exactly as it was,
+ * because `stillUprightMinutes` needs the day's step spans to tell walking from
+ * standing and those were never stored; re-running it without them would call
+ * every walk a stand. So a past day's upright minutes keep whatever the old
+ * sample-counting rule gave them, and only the heart-rate half moves.
+ *
+ * Silent and best-effort, like `backfillHrBands` beside it: this is a repair.
+ */
+export function repriceStoredDays(dk: string = todayKey()): void {
+  try {
+    const state = getState();
+    const todo: { k: string; next: Partial<DayLoad> }[] = [];
+    for (let i = 0; i <= BASELINE_DAYS; i++) {
+      const k = addDays(dk, -i);
+      const load = state.days[k]?.load;
+      const curve = load ? getWaveform(loadWaveformId(k))?.sampledHr : null;
+      const action = repriceAction(load, curve ? curve.length : null);
+      if (action === 'done' || !load) continue;
+
+      // A lossy curve still carries its SPACING, which is all the cadence is,
+      // and a curve pinned at the cap is itself evidence the day was sampled
+      // finely. That is enough for ./baseline to tell the instruments apart.
+      if (action === 'stamp') {
+        todo.push({ k, next: { hrSampleGapMin: load.hrSampleGapMin ?? typicalGapMin(curve), pricedVersion: PRICE_VERSION } });
+        continue;
+      }
+
+      const above = hrMinutesAbove(curve, load.lineBpm);
+      const excluded = excludedWindows(k);
+      const restLine = recoveryLine(state.days, k, {}, addDays);
+      todo.push({
+        k,
+        next: {
+          hrAboveMin: above ? above.aboveMin : null,
+          hrBands: above ? above.bands : null,
+          hrCoverageMin: above ? above.coverageMin : null,
+          hrStretches: above ? above.stretches : null,
+          longestStretch: above?.longest ?? null,
+          peakBpm: above?.peak ?? null,
+          hrBelowMin: hrMinutesBelow(curve, restLine, excluded),
+          hrBelowByHour: hrMinutesBelowByHour(curve, restLine, excluded),
+          hrSampleGapMin: typicalGapMin(curve),
+          pricedVersion: PRICE_VERSION,
+        },
+      });
+    }
+    if (!todo.length) return;
+    mutate((st) => {
+      todo.forEach(({ k, next }) => {
+        const l = st.days[k]?.load;
+        if (l) Object.assign(l, next);
+      });
+    });
+  } catch (e) {
+    logError('budget.reprice', e);
+  }
+}
+
+/**
  * Launch, foreground and a slow tick while the app is open. Today, plus the
  * one closing read of yesterday (see `sealYesterday`).
  *
@@ -444,6 +513,10 @@ export function backfillHrBands(dk: string = todayKey()): void {
  * the background would be a read nobody is looking at.
  */
 export function initBudgetSync(): () => void {
+  // Before the bands backfill, which skips a day that already holds bands: the
+  // re-pricing writes them, so running it second would leave the two arguing
+  // about which pass owns a day.
+  repriceStoredDays();
   backfillHrBands();
   void refreshDayLoad(undefined, { maxAgeMin: LOAD_FOCUS_STALE_MIN }).then(() => sealYesterday()).then(() => restoreErasedDays());
 

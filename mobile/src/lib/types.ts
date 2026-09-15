@@ -228,6 +228,11 @@ export interface DayLoad {
    *  treating two days' spend as the same measurement. Null on a day read
    *  before it was kept, which is read as unknown and never as fine. */
   hrSampleGapMin: number | null;
+  /** Which pricing rules charged this day (budget/reprice.ts `PRICE_VERSION`).
+   *  Absent means 1, the rules before the gap tolerance was fitted to the day.
+   *  It lives on the DAY rather than in the flags store so an imported journal
+   *  is re-priced too, where a device-level "already done" would skip it. */
+  pricedVersion: number | null;
   /** Contiguous runs above the line ("in three stretches"). */
   hrStretches: number | null;
   /** The longest such run, minutes past midnight. */

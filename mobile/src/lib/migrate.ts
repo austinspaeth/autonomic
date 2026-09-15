@@ -213,6 +213,7 @@ function cleanLoad(v: unknown): DayLoad | undefined {
     hrBelowByHour: hours(v.hrBelowByHour),
     hrCoverageMin: n(v.hrCoverageMin),
     hrSampleGapMin: n(v.hrSampleGapMin),
+    pricedVersion: n(v.pricedVersion),
     hrStretches: n(v.hrStretches),
     longestStretch: longest,
     peakBpm: n(v.peakBpm),

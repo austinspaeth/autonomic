@@ -1091,6 +1091,29 @@ old web app so old `export.json` files import directly.
   over at wrist cadences, and linear interpolation of the crossing holds it
   inside a couple of per cent. `hrMinutesBelow` interpolates the same way or the
   two sides of the line would disagree about where it was.
+  **And the stored days are RE-PRICED, because a rule change that reaches only
+  future days puts today on one scale and the ceiling's forty-two on another**
+  (`lib/budget/reprice.ts` pure + tested, `repriceStoredDays` in
+  `store/budget.ts`, run from `initBudgetSync` BEFORE `backfillHrBands`, which
+  skips a day that already holds bands). It re-charges each day from the sidecar
+  curve, which is where `backfillHrBands` already reads. **`CURVE_MAX` is what
+  stops it making things worse**: a curve is thinned to that many points at
+  write time, so a day UNDER the cap was never thinned and its curve is exactly
+  what was read, while a day sitting AT it had more and what survives is a lossy
+  copy whose stored figures — computed from the raw series at read time — are
+  the better answer. That constant therefore lives in `reprice.ts` and is
+  imported by the shell that writes curves, or the writer and the re-pricer
+  would drift. Happily the days it CANNOT re-price are the densely sampled ones
+  and the days the tolerance broke are the sparse ones, so the repair lands
+  where it is needed; a lossy day is still stamped with the cadence its spacing
+  implies, which is enough for the ceiling filter above. Two things it does not
+  touch: the EXERTION LINE is the one stored on the day (re-deriving it would
+  let a later baseline shift re-mean a stored count), and STANDING is left
+  alone, since `stillUprightMinutes` needs step spans to tell walking from
+  standing and those were never stored. `DayLoad.pricedVersion` is the guard and
+  lives on the DAY rather than in the flags store, so an imported journal is
+  re-priced too; **bump `PRICE_VERSION` whenever a change to `burn.ts` or
+  `upright.ts` would give a stored day a different answer from the same curve.**
   **The ceiling is fitted only from COMPARABLE days.** Spend is a lower bound
   set by how much of the day the app saw, which is fine while every day is
   watched alike — the whole scale is then self-consistent and the bar fills at

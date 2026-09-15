@@ -20,7 +20,7 @@ const day = (over: Partial<DayRecord>): DayRecord => ({
 const load = (over: Partial<DayLoad>): DayLoad => ({
   steps: null, walkingMin: null, standMin: null, stillUprightMin: null, stillFloorBpm: null,
   uprightSpans: null, uprightByHour: null, hrAboveMin: null, hrBands: null, hrBelowMin: null, hrBelowByHour: null, hrCoverageMin: null, hrSampleGapMin: null, hrStretches: null,
-  longestStretch: null, peakBpm: null, lineBpm: null, readAt: null,
+  longestStretch: null, peakBpm: null, lineBpm: null, readAt: null, pricedVersion: null,
   ...over,
 });
 

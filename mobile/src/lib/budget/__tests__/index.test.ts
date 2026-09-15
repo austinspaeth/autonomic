@@ -51,7 +51,7 @@ const act = (type: string, duration: string): Entry =>
 const seen = (over: Partial<DayLoad> = {}): DayLoad => ({
   steps: 3000, walkingMin: 30, standMin: null, stillUprightMin: null, stillFloorBpm: null,
   uprightSpans: null, uprightByHour: null, hrAboveMin: 0, hrBands: null, hrBelowMin: null, hrBelowByHour: null, hrCoverageMin: 800, hrSampleGapMin: null, hrStretches: 0,
-  longestStretch: null, peakBpm: 90, lineBpm: 100, readAt: null,
+  longestStretch: null, peakBpm: 90, lineBpm: 100, readAt: null, pricedVersion: null,
   ...over,
 });
 
