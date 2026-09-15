@@ -2,7 +2,7 @@ import { ACTIVITY_TYPES } from '../../registry';
 import {
   HR_BAND_EDGES, HR_MIN_COVERAGE, HR_PER_MIN, STEP_EFFORT, UPRIGHT_PER_MIN,
   buildBurn, hrBandEffort, hrBandsLess, hrMinutesAbove, hrMinutesBelow, hrMinutesBelowByHour, minutesByHour,
-  uprightHours, uprightMinutes, walkingMinutes,
+  thinHrCurve, uprightHours, uprightMinutes, walkingMinutes,
 } from '../burn';
 import { HR_BOOST_CAP } from '../load';
 import type { DayLoad, DayRecord, Entry } from '../../types';
@@ -18,7 +18,7 @@ const day = (over: Partial<DayRecord>): DayRecord => ({
 } as DayRecord);
 
 const load = (over: Partial<DayLoad>): DayLoad => ({
-  steps: null, walkingMin: null, standMin: null, stillUprightMin: null,
+  steps: null, walkingMin: null, standMin: null, stillUprightMin: null, stillFloorBpm: null,
   uprightSpans: null, uprightByHour: null, hrAboveMin: null, hrBands: null, hrBelowMin: null, hrBelowByHour: null, hrCoverageMin: null, hrStretches: null,
   longestStretch: null, peakBpm: null, lineBpm: null, readAt: null,
   ...over,
@@ -472,5 +472,33 @@ describe('Apple Stand Time is a floor, not a verdict', () => {
   it('still prefers stand time when it saw more of the day', () => {
     expect(uprightMinutes(load({ standMin: 220, walkingMin: 70, stillUprightMin: 60 })))
       .toEqual({ min: 220, source: 'stand' });
+  });
+});
+
+describe('thinHrCurve', () => {
+  /** A quiet day at 70 with one short climb to 128, sampled every second. */
+  const dayWithSpike = () => {
+    const out: { t: number; bpm: number }[] = [];
+    for (let t = 0; t < 8 * 3600; t++) out.push({ t, bpm: t >= 4000 && t < 4120 ? 128 : 70 });
+    return out;
+  };
+
+  it('keeps a spike that a stride decimation would drop', () => {
+    const thin = thinHrCurve(dayWithSpike(), 400);
+    expect(thin.length).toBeLessThanOrEqual(400);
+    // The whole point: the drill-in draws this curve under a row counted from
+    // the raw series, so the peak has to survive at its own height.
+    expect(Math.max(...thin.map((p) => p.bpm))).toBe(128);
+    expect(Math.min(...thin.map((p) => p.bpm))).toBe(70);
+  });
+
+  it('keeps the curve in clock order', () => {
+    const thin = thinHrCurve(dayWithSpike(), 400);
+    thin.forEach((p, i) => { if (i) expect(p.t).toBeGreaterThanOrEqual(thin[i - 1].t); });
+  });
+
+  it('leaves a series that already fits alone', () => {
+    const small = [{ t: 0, bpm: 60 }, { t: 60, bpm: 90 }];
+    expect(thinHrCurve(small, 400)).toEqual(small);
   });
 });

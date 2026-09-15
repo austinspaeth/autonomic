@@ -40,6 +40,7 @@ import { CELL_H, CELL_RADIUS, FIGURE_SIZE, TILE_FIGURE } from './style';
 import { openSpendSheet } from './SpendSheet';
 import { runBudgetAction } from './actions';
 import type { SheetControls } from '../../components/Sheet';
+import type { DayLoad } from '../../lib/types';
 import { useSheets } from '../../components/Sheet';
 
 /** The app's own primary button. Every action in this sheet is one of these:
@@ -297,7 +298,7 @@ function TodayCard({ dk, budget }: { dk: string; budget: BudgetView }) {
       ) : null}
 
       <Text style={{ fontSize: 12, lineHeight: 18, color: p.textDim, marginTop: 13 }}>
-        {coverageLine(budget, load?.steps ?? null)}
+        {coverageLine(budget, load ?? null)}
       </Text>
 
     </InsightCard>
@@ -310,23 +311,47 @@ function nowMin(): number {
   return d.getHours() * 60 + d.getMinutes();
 }
 
-function coverageLine(budget: BudgetView, steps: number | null): string {
+function coverageLine(budget: BudgetView, load: DayLoad | null): string {
+  const steps = load?.steps ?? null;
   const acts = budget.burn.rows.find((r) => r.source === 'activities')?.members?.length || 0;
   const parts: string[] = [];
   if (acts) parts.push(`${acts} logged ${acts === 1 ? 'activity' : 'activities'}`);
   if (steps != null) parts.push(`${Math.round(steps).toLocaleString('en-US')} steps`);
   if (budget.burn.coverage === 'full' || budget.burn.coverage === 'partial') parts.push('your heart rate');
+  const thin = thinHrLine(budget, load);
   if (!parts.length) {
-    return budget.past
+    return (budget.past
       ? 'Nothing was connected that day, so this is a starting estimate.'
-      : 'Nothing connected yet, so this is a starting estimate.';
+      : 'Nothing connected yet, so this is a starting estimate.') + thin;
   }
   if (steps == null) {
-    return budget.past
+    return (budget.past
       ? `Built from ${joinList(parts)}. No steps were read that day.`
-      : `Built from ${joinList(parts)}. Steps are not connected.`;
+      : `Built from ${joinList(parts)}. Steps are not connected.`) + thin;
   }
-  return `Built from ${joinList(parts)}.`;
+  return `Built from ${joinList(parts)}.${thin}`;
+}
+
+/**
+ * What to say when a heart-rate series arrived but was too thin to price.
+ *
+ * Minutes are counted by integrating between samples, and a gap wider than a
+ * few minutes is treated as unwatched rather than as quiet, so a day of
+ * scattered background readings charges nothing at all. That is the right call
+ * and it used to be made in silence, which read as a claim: a user whose watch
+ * caught three climbs over their line saw a day with no heart-rate row, went
+ * to the health app, found the climbs, and reasonably concluded the readings
+ * had not been imported. The coverage and the peak are both known. Say them.
+ */
+function thinHrLine(budget: BudgetView, load: DayLoad | null): string {
+  if (!load || budget.burn.coverage === 'full' || budget.burn.coverage === 'partial') return '';
+  const cov = load.hrCoverageMin;
+  if (cov == null) return '';
+  const when = budget.past ? 'that day' : 'today';
+  const peak = load.peakBpm != null
+    ? ` The highest reading in it was ${Math.round(load.peakBpm)} bpm.`
+    : '';
+  return ` Your heart rate was only recorded for ${hm(cov)} of ${when}, which is too scattered to count minutes from, so none are charged here.${peak}`;
 }
 
 const joinList = (xs: string[]) =>

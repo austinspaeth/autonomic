@@ -1038,9 +1038,38 @@ old web app so old `export.json` files import directly.
   with no logged activity and no health read has an UNKNOWN margin on Progress,
   not a full one. **Standing still is INFERRED, and says so** (`upright.ts`): a
   run of minutes with no steps, outside sleep and outside a workout's recovery
-  tail, where the heart sits in the user's own stand-test band. It needs a
+  tail, where the heart sits in the user's own standing band. It needs a
   heart-rate series, caps at five hours, is dropped under six hours of coverage,
-  and the row reads "estimated". The drill-ins for Upright time and Recovery
+  and the row reads "estimated". **It is measured in TIME, not in samples, and
+  its band has something to rise FROM** — both learned from one day wearing a
+  chest strap. It used to call a minute standing when a sample landed in it and
+  read in band, so the answer scaled with how often the sensor spoke: a watch
+  offered a few hundred candidate minutes a day and a strap offered all 1,440,
+  and the same afternoon read as twenty minutes upright or as the five-hour cap
+  depending only on the device. It now integrates over the gaps between samples
+  capped at `HR_GAP_MIN`, which is `hrMinutesAbove`'s own rule and exists for
+  this reason. And the band's floor was the user's LAYING resting rate plus a
+  fraction of their stand-test rise, which nobody sits at: an ordinary desk
+  afternoon runs ten to twenty beats above it, so a strap streaming through one
+  charged the cap to somebody who never got up. The floor now also has to clear
+  the DAY's own quiet level (`QUIET_PCT` of its awake, unstepped, sub-line
+  intervals) plus the same fraction of the rise. It may only RAISE the floor, so
+  a day with no quiet level to read is charged exactly as it was, and the
+  resolved threshold is stored as `DayLoad.stillFloorBpm` and stated in the
+  drill-in, because "why does it think I was standing" is otherwise
+  unanswerable. **The stored curve is thinned peak-first** (`thinHrCurve` in
+  `budget/burn.ts`, NOT `thinSeries`): the drill-in draws that curve under a row
+  counted from the RAW series and `backfillHrBands` re-prices old days from it,
+  and a stride decimation dropped four of every five samples of a two-minute
+  climb, so the row said "14m well above" over a trace that never left green and
+  the reader found the spikes in Apple Health and concluded they had not been
+  imported. It buckets the day and keeps each bucket's lowest AND highest
+  sample. **A thin day says so rather than reading as a quiet one**: minutes are
+  integrated between samples and a wider gap is unwatched, so a day of scattered
+  background readings charges nothing, which used to happen in silence; the
+  coverage sentence now names what was seen and `peakBpm` — computed and stored
+  since the first release and rendered nowhere — is the honest answer to "did my
+  heart go over the line at all". The drill-ins for Upright time and Recovery
   time draw WHEN, never heart rate: minutes per clock hour as stacked bars,
   from `DayLoad.uprightByHour` (walking, estimated standing, or Apple Stand
   Time) and `hrBelowByHour`, counted at read time from the same spans and

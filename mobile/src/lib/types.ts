@@ -194,6 +194,11 @@ export interface DayLoad {
    *  signature (src/lib/budget/upright.ts). Null without a heart-rate series;
    *  never claimed from steps alone. */
   stillUprightMin: number | null;
+  /** The heart rate the standing band's floor sat at for this day, which is
+   *  the user's signature floor raised to clear the day's own quiet level.
+   *  Stored so the drill-in can state the threshold the estimate used, and so
+   *  a later baseline shift cannot silently re-mean a stored count. */
+  stillFloorBpm: number | null;
   /** Walking and standing stretches, for the drill-in's shading. */
   uprightSpans: { startMin: number; endMin: number; kind: 'walk' | 'still' }[] | null;
   /** Upright minutes per clock hour (each array 24 long), counted from the

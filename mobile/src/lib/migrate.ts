@@ -204,6 +204,7 @@ function cleanLoad(v: unknown): DayLoad | undefined {
     walkingMin: n(v.walkingMin),
     standMin: n(v.standMin),
     stillUprightMin: n(v.stillUprightMin),
+    stillFloorBpm: n(v.stillFloorBpm),
     uprightSpans: spans(v.uprightSpans, true),
     uprightByHour: byHour,
     hrAboveMin: n(v.hrAboveMin),

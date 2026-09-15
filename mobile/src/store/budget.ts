@@ -25,9 +25,8 @@ import { health, type HealthAuthStatus } from '../lib/health';
 import { stepsAskDue } from '../lib/budget/stepsAsk';
 import { logError } from '../lib/diagnostics/errorLog';
 import { exertionLine, hrMinutesAbove, stillUprightMinutes, uprightSignature, walkingMinutes } from '../lib/budget';
-import { UPRIGHT_SPANS_MAX, hrMinutesBelow, hrMinutesBelowByHour, minutesByHour } from '../lib/budget/burn';
+import { UPRIGHT_SPANS_MAX, hrMinutesBelow, hrMinutesBelowByHour, minutesByHour, thinHrCurve } from '../lib/budget/burn';
 import { BASELINE_DAYS, recoveryLine } from '../lib/budget/baseline';
-import { thinSeries } from '../lib/sleep/night';
 import { loadWaveformId } from '../lib/waveforms';
 import { RECOVERY_MIN } from '../lib/budget/upright';
 import { noteStepsSeen, stepsEverSeen } from '../lib/budget/stepsMemory';
@@ -182,6 +181,7 @@ export async function refreshDayLoad(
         walkingMin: walkMin,
         standMin: read.standMin,
         stillUprightMin: still ? still.stillMin : null,
+        stillFloorBpm: still ? still.floorBpm : null,
         uprightSpans: spans.length ? spans.slice(0, UPRIGHT_SPANS_MAX) : null,
         uprightByHour: walkHours || stillHours || read.standByHour
           ? { walk: walkHours, still: stillHours, stand: read.standByHour }
@@ -206,8 +206,11 @@ export async function refreshDayLoad(
       // The curve goes to the sidecar BEFORE the journal write, the same order
       // storeWaveform requires everywhere else: an entry that references a
       // curve which is not there yet is a reading with a missing trace.
+      // Peak-preserving, not a stride: the drill-in draws this curve under a
+      // row counted from the RAW series, and a decimation that drops the
+      // spikes makes the chart contradict the number above it.
       if (read.hr && read.hr.length) {
-        storeWaveform(loadWaveformId(dk), { sampledHr: thinSeries(read.hr.map((p) => ({ t: p.t, bpm: p.bpm })), CURVE_MAX) });
+        storeWaveform(loadWaveformId(dk), { sampledHr: thinHrCurve(read.hr.map((p) => ({ t: p.t, bpm: p.bpm })), CURVE_MAX) });
       }
 
       // ensureDay, not a guard: a user who has logged nothing today still has

@@ -273,6 +273,47 @@ export function hrMinutesAbove(
 }
 
 /**
+ * Thin an all-day heart-rate series for storage, KEEPING ITS EXTREMES.
+ *
+ * The sidecar curve is what the drill-in draws and what `backfillHrBands`
+ * re-prices an old day from, so it has to be a faithful picture of the series
+ * the minutes were counted from. A stride decimation (`thinSeries`, which the
+ * night curve uses) keeps every Nth sample and drops everything between, and a
+ * strap streaming all day writes ten thousand samples into a four-hundred
+ * point curve: a two-minute climb to 120 bpm is five samples, and four of
+ * every five are thrown away. The row said "14m well above" over a trace that
+ * never left green, and the user reading it went to Apple Health, found the
+ * spikes there, and concluded the app had not imported them.
+ *
+ * So the day is cut into buckets and each bucket keeps its LOWEST and HIGHEST
+ * sample, in clock order. A peak survives at its own height whatever the
+ * compression, the quiet stretches stay as flat as they were, and the result
+ * still integrates to the same minutes because the pairs sit where they fell.
+ */
+export function thinHrCurve<T extends { t: number; bpm: number }>(rows: readonly T[], max: number): T[] {
+  if (rows.length <= max) return [...rows];
+  const buckets = Math.max(1, Math.floor(max / 2));
+  const stride = rows.length / buckets;
+  const out: T[] = [];
+  for (let b = 0; b < buckets; b++) {
+    const from = Math.floor(b * stride);
+    const to = Math.min(rows.length, Math.floor((b + 1) * stride));
+    if (to <= from) continue;
+    let lo = from;
+    let hi = from;
+    for (let i = from + 1; i < to; i++) {
+      if (rows[i].bpm < rows[lo].bpm) lo = i;
+      if (rows[i].bpm > rows[hi].bpm) hi = i;
+    }
+    const first = Math.min(lo, hi);
+    const second = Math.max(lo, hi);
+    out.push(rows[first]);
+    if (second !== first) out.push(rows[second]);
+  }
+  return out;
+}
+
+/**
  * Minutes the heart spent settled BELOW `lineBpm`, excluding the windows the
  * caller says do not count.
  *
