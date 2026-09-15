@@ -8,8 +8,8 @@ keywords: "POTS in teenagers, adolescent POTS, teenage POTS, POTS in teens, pedi
 date: 2026-09-15
 updated: 2026-09-15
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1519643381401-22c77e60520e?q=80&w=1760&auto=format&fit=crop"
-photoAttribution: "Kinga Howard / Unsplash"
+photoLocation: "https://images.unsplash.com/photo-1524601500432-1e1a4c71d692?q=80&w=1760&auto=format&fit=crop"
+photoAttribution: "Unsplash"
 tldr: "POTS commonly starts in adolescence, often after a viral illness, a fast growth spurt, or a concussion. For ages 12 to 19, the stand-test threshold is a sustained heart-rate rise of at least 40 bpm within ten minutes of standing (higher than the adult 30 bpm), without a big blood-pressure drop, with chronic symptoms. The outlook for teenagers is generally more hopeful than for adults: many improve substantially over months to a few years, especially post-viral cases, and the daily work is salt, fluids, recumbent-first exercise, sleep, and school accommodations. Track the standing rise at home and bring the trend to a pediatric clinician."
 categories:
   - pots
