@@ -93,19 +93,68 @@ export function classifyPlayCode(code: number | undefined): StoreVerdict {
  * terminal refusal.
  *
  * Said in full because the remedy is the whole point: for most of these
- * devices this IS fixable by the person holding it. Each message names the one
- * obstacle its code actually describes — the old copy said "update your Play
- * Store" for both, which is the right instruction for FEATURE_NOT_SUPPORTED
- * and simply false for an account that cannot buy.
+ * devices this IS fixable by the person holding it. The copy has now been
+ * wrong in BOTH directions, and the shape of the fix is the lesson.
+ *
+ * It first said "update your Play Store" for both codes, which is right for
+ * FEATURE_NOT_SUPPORTED and simply false for an account that cannot buy. The
+ * correction gave BILLING_UNAVAILABLE an account-only message, which was the
+ * opposite over-correction: Google lists an out-of-date Play Store as the FIRST
+ * cause of code 3, ahead of the country, the enterprise policy and the card
+ * that cannot be charged. So the user most likely to be reading it was the one
+ * cause the message no longer mentioned.
+ *
+ * The difference between the two codes is not WHICH obstacle, it is how many.
+ * FEATURE_NOT_SUPPORTED has exactly one and can name it. BILLING_UNAVAILABLE
+ * is five conditions wearing one number, and no amount of reading the code
+ * tells us which — so it names the ones the user can act on, most likely
+ * first, rather than picking one and sounding certain.
  */
 export function blockedMessage(code: number | undefined): string | null {
   if (code === PLAY_CODE.FEATURE_NOT_SUPPORTED) {
     return 'Your Google Play Store app is out of date, so it can’t show subscriptions. '
-      + 'Open the Play Store, go to Settings, About, and tap Update Play Store, then come back.';
+      + 'Open the Play Store, go to Settings, About, and tap Update Play Store, then try again.';
   }
   if (code === PLAY_CODE.BILLING_UNAVAILABLE) {
     return 'Google Play can’t sell subscriptions on this device right now. '
-      + 'Check that the Play Store is signed in to an account that can make purchases, then come back.';
+      + 'The usual causes are a Play Store app that needs updating (Play Store, Settings, About, '
+      + 'Update Play Store), an account that isn’t signed in or can’t make purchases, or a country '
+      + 'where Google Play doesn’t sell subscriptions. Once you’ve checked, try again.';
   }
   return null;
+}
+
+/* ---------- would a ONE-TIME product sell where a subscription cannot? ----------
+ *
+ * The question this answers is whether a device refusing `subs` would accept an
+ * `in-app` product, because that is the difference between a fixable funnel and
+ * a dead one, and it cannot be read off the response code.
+ *
+ * The obvious probe, `isFeatureSupported(SUBSCRIPTIONS)`, is not available:
+ * expo-iap 4.7 doesn't expose it, and adding it is a native change that can't
+ * ship over the air. So the probe is the real call instead — query the same
+ * SKUs as `in-app` and see what Play says. That is strictly better evidence
+ * anyway: it tests the exact API a one-time product would have to go through,
+ * rather than a feature flag that stands next to it.
+ *
+ * THE SUBTLE PART IS THAT AN EMPTY LIST IS A PASS. No one-time product exists
+ * in the Play Console, so a perfectly healthy device answers this query with
+ * nothing at all. What is being measured is whether the ProductDetails call
+ * REACHED Play, not whether it found anything, so every outcome except a second
+ * blocking code reads as 'ok'. Getting this backwards would report every device
+ * as terminal and hide the entire population the probe exists to find.
+ */
+
+/** Reading of an `in-app` ProductDetails probe on a device that just refused
+ *  `subs`. 'ok' means a one-time product would have been served. */
+export type InappVerdict = 'ok' | 'blocked' | 'timeout';
+
+export function inappVerdict(
+  outcome: { threw: boolean; code?: number; timedOut?: boolean },
+): InappVerdict {
+  if (outcome.timedOut) return 'timeout';
+  if (!outcome.threw) return 'ok';
+  // Threw, but not with a code that refuses the device. An empty product list,
+  // an unknown SKU, a developer error: all of them are Play ANSWERING.
+  return classifyPlayCode(outcome.code) === 'blocked' ? 'blocked' : 'ok';
 }

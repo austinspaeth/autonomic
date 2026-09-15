@@ -29,7 +29,7 @@ import {
   type ExpoPurchaseError,
 } from 'expo-iap';
 import { isSideloadedAndroidBuild, isTestFlightBuild } from '../../modules/app-env';
-import { blockedMessage, classifyPlayCode } from '../lib/billingCodes';
+import { blockedMessage, classifyPlayCode, inappVerdict } from '../lib/billingCodes';
 import { logError } from '../lib/diagnostics/errorLog';
 import { describeError } from '../lib/diagnostics/format';
 import type { PurchaseOutcome } from '../lib/ping';
@@ -316,8 +316,98 @@ function noteBlocked(e: unknown): boolean {
     logError('iap.storeIncapable', iapDetail(e));
     blockedFault = e;
     set({ blocked: msg, ready: true });
+    void probeOneTime(e);
   }
   return true;
+}
+
+/* ---------- is this device subs-blocked, or store-blocked? ----------
+ *
+ * `iap.storeIncapable` counts phones that cannot buy a SUBSCRIPTION. It cannot
+ * say whether a one-time product would have sold, and that is the whole
+ * question behind "should we offer a year as a single purchase": the answer is
+ * a population size, and nothing we log today carries it.
+ *
+ * So on the launch that latches `blocked`, ask. `inappVerdict` reads the answer
+ * (src/lib/billingCodes.ts, pure + tested, and note that an EMPTY list is a
+ * pass there — no one-time product exists in the console, so a healthy device
+ * finds nothing and that is not a refusal).
+ *
+ * It reports on its OWN tag rather than as a field on the existing one, for two
+ * reasons. The fault report ranks by breadth, so a device a one-time product
+ * would recover becomes a row that can be read directly as a headcount in
+ * install-days, instead of a substring inside the message of a bigger row. And
+ * `iap.storeIncapable` still fires SYNCHRONOUSLY, exactly as before: folding
+ * the probe into that message would have made the report wait on a store call,
+ * and an app killed in between would have lost the signature altogether on
+ * precisely the phones having the worst time.
+ *
+ * Runs at most once per session — the answer cannot change under us, and a
+ * manual retry must not spend another round trip re-asking it.
+ */
+let probed = false;
+const PROBE_TIMEOUT_MS = 6_000;
+
+async function probeOneTime(blockedBy: unknown): Promise<void> {
+  if (probed || Platform.OS !== 'android') return;
+  probed = true;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    // Deliberately NOT through `withBilling`: the connection is demonstrably up
+    // (Play just answered it with a response code), and a blocking code is
+    // never transient, so a reconnect here would be churn on a device that has
+    // already given its answer.
+    const probe = fetchProducts({ skus: PRO_SKUS, type: 'in-app' })
+      .then(() => inappVerdict({ threw: false }))
+      .catch((err) => inappVerdict({ threw: true, code: responseCodeOf(err) }));
+    const timeout = new Promise<'timeout'>((resolve) => {
+      timer = setTimeout(() => resolve('timeout'), PROBE_TIMEOUT_MS);
+    });
+    const verdict = await Promise.race([probe, timeout]);
+    if (verdict !== 'ok') return;
+    // The finding: subscriptions are refused, one-time products are not.
+    logError('iap.subsOnlyBlocked', iapDetail(blockedBy, 'in-app products served'));
+  } catch { /* a probe must never break the paywall it is diagnosing */ } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+/**
+ * Take the latch off and ask the store again.
+ *
+ * Google's own guidance for BILLING_UNAVAILABLE is that an automatic retry is
+ * pointless but a MANUAL one is not, because the user can go and fix the thing
+ * the code is complaining about: update the Play Store, sign in, switch to an
+ * account that can buy. Every one of those is a trip out of the app and back.
+ *
+ * Until now there was no way back. `blocked` was latched at launch, nothing
+ * ever cleared it, `ensureIapReady` returned early on it and `subscribe` refused
+ * without touching the store, so a user who did exactly what the notice told
+ * them to returned to the same dead card and could only fix it by force-killing
+ * the app. The notice named a remedy the app then ignored.
+ *
+ * Resolves true when products came back, i.e. the card can show a real button.
+ */
+export async function retryBlockedStore(): Promise<boolean> {
+  if (!state.blocked) return true;
+  set({ blocked: undefined, error: undefined });
+  blockedFault = undefined;
+  // The latch is also what made the connection unreachable, so rebuild it:
+  // whatever the user just changed (an updated Play Store, a different account)
+  // happened underneath a binding established before it.
+  connected = false;
+  set({ products: [] });
+  try {
+    await reconnect();
+    await loadProducts();
+    await refreshEntitlement();
+  } catch (e) {
+    if (!noteBlocked(e)) {
+      logError('iap.retryBlocked', iapDetail(e));
+      set({ error: purchaseMessage(e) });
+    }
+  }
+  return !state.blocked && state.products.length > 0;
 }
 
 /** The store's own answer at the moment we latched `blocked`, kept so a later
@@ -331,12 +421,13 @@ let blockedFault: unknown;
  *  carries the diagnosis instead of the same opaque line every time. Play's
  *  `query-product` is the whole reason this exists: the code names the CALL that
  *  failed, never the reason, and the reason is a number in a sibling field. */
-function iapDetail(e: unknown): unknown {
+function iapDetail(e: unknown, note?: string): unknown {
   const d = e as { responseCode?: number; debugMessage?: string; isEmptyProductList?: boolean } | undefined;
   const bits = [
     d?.responseCode != null ? `response ${d.responseCode}` : '',
     d?.isEmptyProductList ? 'no products returned' : '',
     d?.debugMessage ? String(d.debugMessage) : '',
+    note || '',
   ].filter(Boolean);
   if (!bits.length) return e;
   return Object.assign(new Error(`${describeError(e)} [${bits.join('; ')}]`), { code: codeOf(e) });
