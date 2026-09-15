@@ -20,7 +20,7 @@ import { notePaywallSeen } from '../lib/review';
 import { pingPaywall } from '../store/ping';
 import {
   useIap, subscribe, restore, refreshEntitlement, ensureIapReady, clearIapError,
-  YEARLY_SKU, MONTHLY_SKU, priceOf, hasTrial, trialDaysOf,
+  retryBlockedStore, YEARLY_SKU, MONTHLY_SKU, priceOf, hasTrial, trialDaysOf,
 } from '../store/iap';
 
 const TERMS_URL = 'https://autonomic.care/terms-of-service/';
@@ -51,13 +51,49 @@ const numeric = (s: string) => parseFloat(s.replace(/[^0-9.]/g, '')) || 0;
  * Caution gold rather than the red of `StoreError`: nothing has failed, and
  * nothing the user did caused it. It is a condition on the device with one
  * thing to do about it.
+ *
+ * And it carries the way BACK. Every message here ends by sending the user out
+ * of the app to fix something (update the Play Store, sign in, switch account),
+ * and until this button existed there was nothing to return to: the latch was
+ * set at launch and only a force-kill cleared it, so the card went on refusing
+ * a device that had already been fixed. A notice that names a remedy and then
+ * ignores it is worse than one that names none. The retry is manual and never
+ * automatic, which is also Google's own guidance for these codes.
  */
 export function StoreBlockedNotice({ text }: { text: string }) {
   const p = usePalette();
+  const [retrying, setRetrying] = useState(false);
+  // Survives the retry: `blocked` re-latches with the same copy, so without
+  // saying so the tap looks like it did nothing at all.
+  const [failed, setFailed] = useState(false);
+  const onRetry = async () => {
+    setRetrying(true);
+    setFailed(false);
+    const ok = await retryBlockedStore();
+    // On success this component is unmounted by its parent (the real buy button
+    // takes its place), so only the failure needs to land anywhere.
+    setRetrying(false);
+    if (!ok) setFailed(true);
+  };
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 9, padding: 12, borderRadius: radius.control, borderWidth: 1, borderColor: 'rgba(234,179,8,0.4)', backgroundColor: CAUTION_GOLD_SOFT }}>
-      <Icon name="alert" size={16} color={CAUTION_GOLD} />
-      <Text style={{ flex: 1, color: p.text, fontSize: 13, lineHeight: 19 }}>{text}</Text>
+    <View style={{ gap: 10, padding: 12, borderRadius: radius.control, borderWidth: 1, borderColor: 'rgba(234,179,8,0.4)', backgroundColor: CAUTION_GOLD_SOFT }}>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 9 }}>
+        <Icon name="alert" size={16} color={CAUTION_GOLD} />
+        <Text style={{ flex: 1, color: p.text, fontSize: 13, lineHeight: 19 }}>{text}</Text>
+      </View>
+      {failed ? (
+        <Text style={{ color: p.textDim, fontSize: 12, lineHeight: 18, paddingLeft: 25 }}>
+          Google Play still won’t sell subscriptions on this device.
+        </Text>
+      ) : null}
+      <View style={{ borderRadius: radius.control, borderWidth: 1, borderColor: 'rgba(234,179,8,0.45)' }}>
+        <Button
+          title={retrying ? 'Checking…' : 'Try again'}
+          variant="ghost"
+          disabled={retrying}
+          onPress={() => { void onRetry(); }}
+        />
+      </View>
     </View>
   );
 }

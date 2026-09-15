@@ -1,4 +1,4 @@
-import { PLAY_CODE, blockedMessage, classifyPlayCode } from '../billingCodes';
+import { PLAY_CODE, blockedMessage, classifyPlayCode, inappVerdict } from '../billingCodes';
 
 describe('classifyPlayCode', () => {
   it('reconnects on a dropped or unavailable binding', () => {
@@ -44,15 +44,34 @@ describe('classifyPlayCode', () => {
 });
 
 describe('blockedMessage', () => {
-  it('names the obstacle each code actually describes', () => {
+  it('names the one obstacle FEATURE_NOT_SUPPORTED actually describes', () => {
     const old = blockedMessage(PLAY_CODE.FEATURE_NOT_SUPPORTED)!;
-    const acct = blockedMessage(PLAY_CODE.BILLING_UNAVAILABLE)!;
     expect(old).toMatch(/out of date/i);
     expect(old).toMatch(/Update Play Store/i);
-    // The bug this fixes: an account that cannot buy was told to update an app
-    // that is already current, which is both useless and false.
-    expect(acct).not.toMatch(/out of date/i);
+    // One cause, so it may not hedge about accounts or countries.
+    expect(old).not.toMatch(/signed in|country/i);
+  });
+
+  // BILLING_UNAVAILABLE is five conditions wearing one number, and the copy has
+  // now been wrong in both directions: first it named only the Play Store
+  // version, then the correction named only the account. Google lists the
+  // out-of-date Play Store FIRST, so dropping it sent the likeliest reader away
+  // with the one instruction that would have worked missing.
+  it('names every cause of BILLING_UNAVAILABLE the user can act on', () => {
+    const acct = blockedMessage(PLAY_CODE.BILLING_UNAVAILABLE)!;
+    expect(acct).toMatch(/updating|update/i);
     expect(acct).toMatch(/signed in/i);
+    expect(acct).toMatch(/country/i);
+  });
+
+  // Both messages send the user out of the app to change something, so both
+  // have to end somewhere they can come back to. The retry is a real control
+  // (StoreBlockedNotice), and copy that said "come back" pointed at nothing.
+  it('ends each message on the retry the notice actually offers', () => {
+    for (const c of Object.values(PLAY_CODE)) {
+      const m = blockedMessage(c);
+      if (m) expect(m).toMatch(/try again/i);
+    }
   });
 
   it('says nothing for a code that is not terminal', () => {
@@ -74,5 +93,38 @@ describe('blockedMessage', () => {
     for (const c of Object.values(PLAY_CODE)) {
       expect(blockedMessage(c) ?? '').not.toMatch(/—/);
     }
+  });
+});
+
+describe('inappVerdict', () => {
+  // THE ONE THAT MATTERS. No one-time product exists in the Play Console, so a
+  // healthy device answers the probe with nothing at all. If an empty list read
+  // as a refusal, every device would report as terminal and the population the
+  // probe exists to measure would be invisible.
+  it('reads an empty product list as served', () => {
+    expect(inappVerdict({ threw: false })).toBe('ok');
+    expect(inappVerdict({ threw: true, code: PLAY_CODE.OK })).toBe('ok');
+    expect(inappVerdict({ threw: true, code: undefined })).toBe('ok');
+  });
+
+  it('reads a second blocking code as blocked', () => {
+    expect(inappVerdict({ threw: true, code: PLAY_CODE.FEATURE_NOT_SUPPORTED })).toBe('blocked');
+    expect(inappVerdict({ threw: true, code: PLAY_CODE.BILLING_UNAVAILABLE })).toBe('blocked');
+  });
+
+  // Play answering at all is the finding, whatever it answered. Only the two
+  // codes that refuse the DEVICE mean a one-time product wouldn't sell either.
+  it('treats any other failure as Play having answered', () => {
+    for (const c of [PLAY_CODE.ITEM_UNAVAILABLE, PLAY_CODE.DEVELOPER_ERROR,
+      PLAY_CODE.ERROR, PLAY_CODE.NETWORK_ERROR]) {
+      expect(inappVerdict({ threw: true, code: c })).toBe('ok');
+    }
+  });
+
+  // Never guess from a probe that never came back: an unanswered probe is not
+  // evidence that one-time products would work.
+  it('never reports a timeout as served', () => {
+    expect(inappVerdict({ threw: false, timedOut: true })).toBe('timeout');
+    expect(inappVerdict({ threw: true, code: PLAY_CODE.OK, timedOut: true })).toBe('timeout');
   });
 });
