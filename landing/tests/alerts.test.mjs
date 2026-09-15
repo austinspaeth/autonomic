@@ -395,8 +395,25 @@ const A1 = {
 const dA = AL.diff(AL.snapshot(A0), AL.snapshot(A1));
 check('an ambiguous platform+tier group attributes no build to any of its rows',
   dA.rows.returns.every((r) => r.version === null), JSON.stringify(dA.rows.returns.map((r) => r.version)));
+/* The note is an ADMISSION and has to read as one: "builds: 1.25.2 · 1.26.0"
+   on a card about one returning visitor read as a claim that the install was
+   on two builds at once. It leads with what happened, and joins the
+   candidates with "or" because they are alternatives for one install. */
 check('and the card footers the candidates instead',
-  dA.notes.returns === 'builds: 1.25.2 · 1.26.0', dA.notes.returns);
+  dA.notes.returns === 'Build not identified — 1.25.2 or 1.26.0', dA.notes.returns);
+check('a build too old to name itself is named in words, not as a symbol',
+  AL.buildNote({ open: { 'I|F': { '?': 2, '1.26.0': 1 } } }, 'open',
+    [{ platform: 'I', tier: 'F', version: null }]) === 'Build not identified — an older build or 1.26.0',
+  AL.buildNote({ open: { 'I|F': { '?': 2, '1.26.0': 1 } } }, 'open',
+    [{ platform: 'I', tier: 'F', version: null }]));
+check('past three candidates it counts them instead of listing them',
+  AL.buildNote({ open: { 'I|F': { '1.26.0': 1, '1.25.2': 1, '1.24.0': 1, '1.23.0': 1 } } }, 'open',
+    [{ platform: 'I', tier: 'F', version: null }]) === 'Build not identified — 4 builds pinged',
+  AL.buildNote({ open: { 'I|F': { '1.26.0': 1, '1.25.2': 1, '1.24.0': 1, '1.23.0': 1 } } }, 'open',
+    [{ platform: 'I', tier: 'F', version: null }]));
+check('a card whose rows all got a build says nothing at all',
+  AL.buildNote({ open: { 'I|F': { '1.26.0': 1 } } }, 'open',
+    [{ platform: 'I', tier: 'F', version: '1.26.0' }]) === '');
 check('a row with no build contributes nothing to the build line',
   AL.buildLine(dA.rows.returns) === '', AL.buildLine(dA.rows.returns));
 

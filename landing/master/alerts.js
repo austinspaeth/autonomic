@@ -486,9 +486,26 @@
     return keys[0] === '?' ? '' : keys[0];
   }
 
-  /** "builds: 1.26.0 x2 · 1.25.2" — what a card says when at least one of its
-   *  rows could not be given a build. Every fact present, none of them falsely
-   *  attached to an install. Empty when nothing was ambiguous. */
+  /**
+   * What a card says when at least one of its rows could not be given a build.
+   *
+   * It is an ADMISSION, and it has to read as one. It used to say
+   * "builds: 1.26.0 · 1.28.0", which is true and reads as a claim about the
+   * install on the card — one returning visitor cannot be on two builds, so
+   * the line looked like a bug. It now leads with the thing that actually
+   * happened: the build was not identified, and here is what it was one of.
+   *
+   * The usual cause is two events sharing one group. Versions are counted
+   * against store x tier and downloads and returns share the `open` route, so
+   * a first run on the build you just shipped and a return on the one before
+   * it — both iOS, both Trial — put two versions in one group, and neither
+   * card can say which ping was which. A new install is almost certainly on
+   * the newer build; "almost certainly" is not something this dashboard
+   * prints.
+   *
+   * Past three candidates the list stops being worth reading and the count is
+   * the honest summary.
+   */
   function buildNote(bd, kind, rows) {
     var pool = {}, seen = {}, any = false;
     (rows || []).forEach(function (r) {
@@ -501,12 +518,16 @@
       Object.keys(g).forEach(function (v) { if (g[v] > 0) pool[v] = (pool[v] || 0) + g[v]; });
     });
     if (!any) return '';
-    var list = Object.keys(pool).sort(function (a, b) {
+    var names = Object.keys(pool).sort(function (a, b) {
       return (pool[b] - pool[a]) || (a < b ? -1 : a > b ? 1 : 0);
-    }).map(function (v) {
-      return (v === '?' ? 'unknown' : v) + (pool[v] > 1 ? ' \u00d7' + pool[v] : '');
-    });
-    return list.length ? 'builds: ' + list.join(' \u00b7 ') : '';
+    }).map(function (v) { return v === '?' ? 'an older build' : v; });
+    if (!names.length) return '';
+    if (names.length > 3) return 'Build not identified \u2014 ' + names.length + ' builds pinged';
+    /* "or", not a middot: the candidates are alternatives for ONE install, not
+       a list of things that all happened. */
+    var last = names.pop();
+    return 'Build not identified \u2014 ' +
+      (names.length ? names.join(', ') + ' or ' + last : last);
   }
 
   /**
