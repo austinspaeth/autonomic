@@ -9159,11 +9159,35 @@
     });
   }
 
+  /**
+   * Back to the top, and make it stick.
+   *
+   * `renderAll()` has just replaced the document, so the page is a different
+   * height a millisecond after the scroll is asked for — and a smooth scroll
+   * started against the OLD height is clamped against the new one and lands
+   * somewhere down the page, which is how changing tab from halfway down a
+   * long view could leave you halfway down a short one. The second call, one
+   * frame later, runs against the height that is actually there.
+   *
+   * Animated unless the reader has asked for less motion, where a jump is the
+   * whole point.
+   */
+  function scrollToTop() {
+    var reduce = false;
+    try { reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { /* older browser */ }
+    var opts = { top: 0, left: 0, behavior: reduce ? 'auto' : 'smooth' };
+    var go = function () {
+      try { window.scrollTo(opts); } catch (e) { window.scrollTo(0, 0); }
+    };
+    go();
+    window.requestAnimationFrame(go);
+  }
+
   function setView(v) {
     if (v === 'data' && state.view !== 'data') state.lastView = state.view;
     state.view = v; saveUI();
     renderAll();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    scrollToTop();
   }
 
   /* ---------------------------------------------------------------- I/O */
