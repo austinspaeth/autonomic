@@ -272,8 +272,17 @@ check('and still hears the counter it does know about',
    Every announcement says how old the installs behind it are. The age is
    measured from the cohort (install) day to the day the ping ARRIVED. */
 
+/* The map is keyed per INSTALL — cohort, store, tier, sensor — because that is
+   what a card draws one row per. A cohort that pinged from two stores is two
+   entries here and two rows on the card; under the old cohort-only key it was
+   one row that could not say which store was which. */
 check('a returning visit knows which cohort came back, and how old it was',
-  JSON.stringify(back.who.returns) === JSON.stringify({ '2026-08-01': { n: 5, age: 12, day: D2 } }),
+  JSON.stringify(back.who.returns) === JSON.stringify({
+    '2026-08-01|I|?|?': {
+      n: 5, age: 12, day: D2,
+      cohort: '2026-08-01', platform: 'I', tier: '?', slot: '?', version: '',
+    },
+  }),
   JSON.stringify(back.who));
 check('which reads as one install day and an age',
   AL.cohortLine(back.who.returns) === 'installed Aug 1, 12 days ago', AL.cohortLine(back.who.returns));
@@ -332,6 +341,136 @@ check('an event landing on a celebration already counting two picks up the decay
   AL.stackedMs(20000, 2, 1) === 5000, String(AL.stackedMs(20000, 2, 1)));
 check('and the total can never exceed twice the base, however many arrive',
   AL.stackedMs(20000, 0, 500) <= 40000, String(AL.stackedMs(20000, 0, 500)));
+
+/* ------------------------------------------- the per-install breakdown
+
+   A card lists the installs behind its count. Tier and store ride inside the
+   ping's own cohort key and so belong to the install that pinged; the VERSION
+   does not, and everything below is about not pretending otherwise. */
+
+/* A report row carrying the tier letter, and the separate `builds` map the
+   lambda counts versions in (platform x tier x version). */
+const trow = (day, cohorts, builds) => ({
+  day,
+  total: cohorts.reduce((a, c) => a + c[2], 0),
+  cohorts: cohorts.map(([cohort, platform, count, tier, method]) =>
+    ({ cohort, platform, count, tier, method })),
+  builds: (builds || []).map(([platform, tier, version, count]) => ({ platform, tier, version, count })),
+});
+
+const T0 = {
+  open: [trow(D2, [['2026-08-01', 'I', 2, 'F'], ['2026-08-05', 'A', 1, 'P']],
+               [['I', 'F', '1.26.0', 2], ['A', 'P', '1.26.0', 1]])],
+};
+const T1 = {
+  open: [trow(D2, [['2026-08-01', 'I', 3, 'F'], ['2026-08-05', 'A', 1, 'P'], ['2026-08-01', 'I', 1, 'P']],
+               [['I', 'F', '1.26.0', 3], ['A', 'P', '1.26.0', 1], ['I', 'P', '1.25.2', 1]])],
+};
+const dT = AL.diff(AL.snapshot(T0), AL.snapshot(T1));
+const tRows = dT.rows.returns;
+
+check('a row is raised per install, not per cohort',
+  tRows.length === 2, JSON.stringify(tRows));
+check('and carries the tier the ping was sent on',
+  tRows.map((r) => r.tier).sort().join(',') === 'F,P', JSON.stringify(tRows.map((r) => r.tier)));
+check('the same cohort on two tiers is two rows, not one',
+  tRows.every((r) => r.cohort === '2026-08-01'), JSON.stringify(tRows.map((r) => r.cohort)));
+check('a build is attributed when its platform+tier group ran exactly one version',
+  tRows.find((r) => r.tier === 'P').version === '1.25.2',
+  JSON.stringify(tRows.map((r) => [r.tier, r.version])));
+check('the tier split reads with Pro spelled the way the app spells it',
+  AL.tierLine(tRows) === '1 Pro · 1 free', AL.tierLine(tRows));
+check('and the build line names what was attributed',
+  AL.buildLine(tRows) === '1.25.2 · 1.26.0', AL.buildLine(tRows));
+
+/* Two versions inside ONE platform+tier group. Which of them a given install
+   ran is simply not in the data — the lambda counts versions against
+   platform x tier and never against the cohort — so the row must say nothing
+   rather than pick the bigger one. */
+const A0 = { open: [trow(D2, [['2026-08-01', 'I', 1, 'F']], [['I', 'F', '1.26.0', 1]])] };
+const A1 = {
+  open: [trow(D2, [['2026-08-01', 'I', 2, 'F'], ['2026-08-02', 'I', 1, 'F']],
+               [['I', 'F', '1.26.0', 2], ['I', 'F', '1.25.2', 1]])],
+};
+const dA = AL.diff(AL.snapshot(A0), AL.snapshot(A1));
+check('an ambiguous platform+tier group attributes no build to any of its rows',
+  dA.rows.returns.every((r) => r.version === null), JSON.stringify(dA.rows.returns.map((r) => r.version)));
+check('and the card footers the candidates instead',
+  dA.notes.returns === 'builds: 1.25.2 · 1.26.0', dA.notes.returns);
+check('a row with no build contributes nothing to the build line',
+  AL.buildLine(dA.rows.returns) === '', AL.buildLine(dA.rows.returns));
+
+/* A ping from a build older than the tier and version tokens. Unknown is
+   reported as unknown, never folded into free or into a version. */
+const U0 = { open: [trow(D2, [['2026-08-01', 'I', 1]], [])] };
+const U1 = { open: [trow(D2, [['2026-08-01', 'I', 2]], [])] };
+const dU = AL.diff(AL.snapshot(U0), AL.snapshot(U1));
+check('a ping with no tier letter is unknown, not free',
+  dU.rows.returns[0].tier === '?', JSON.stringify(dU.rows.returns[0]));
+check('and reads as unknown in the tier line',
+  AL.tierLine(dU.rows.returns) === '1 tier unknown', AL.tierLine(dU.rows.returns));
+check('a build that cannot name itself is an empty version, never a guess',
+  dU.rows.returns[0].version === '', JSON.stringify(dU.rows.returns[0].version));
+
+/* A baseline in the old key shape keeps its COUNTS and is skipped for detail,
+   so the first refresh after the deploy cannot announce a month of history as
+   a month of rows. */
+const legacyShape = AL.snapshot(T0);
+delete legacyShape.v;
+const dOldKeys = AL.diff(legacyShape, AL.snapshot(T1));
+check('an older baseline still counts what arrived',
+  dOldKeys.returns === 2, String(dOldKeys.returns));
+check('but draws no rows for it, rather than rows from nothing',
+  dOldKeys.rows.returns.length === 0, JSON.stringify(dOldKeys.rows.returns));
+
+/* -------------------------------------------- first readings fold in
+
+   `act` fires once per install ever and `hrv` once per install per Eastern
+   day, both the moment a reading completes — so an install's first reading
+   raises both, and announcing them separately announces one event twice. */
+
+const FR = (day, hrv, act) => ({
+  hrv: [trow(day, hrv, [])],
+  act: [trow(day, act, [])],
+});
+const f0 = AL.snapshot(FR(D2, [['2026-08-12', 'I', 1, 'F', 'B']], [['2026-08-12', 'I', 0, 'F', 'B']]));
+const f1 = AL.snapshot(FR(D2, [['2026-08-12', 'I', 2, 'F', 'B']], [['2026-08-12', 'I', 1, 'F', 'B']]));
+const dF = AL.diff(f0, f1);
+const m1 = AL.mergeFirsts(dF.rows.readings, dF.rows.activations);
+check('a reading that is also an activation is tagged, not announced twice',
+  m1.rows.length === 1 && m1.rows[0].first === true && m1.rows[0].n === 1 && m1.extra === 0,
+  JSON.stringify(m1));
+
+/* Two readings in one group, one of them a first. With `hrv` capped once per
+   install per day those are two different installs, so the group SPLITS. */
+const g0 = AL.snapshot(FR(D2, [['2026-08-12', 'I', 0, 'F', 'B']], [['2026-08-12', 'I', 0, 'F', 'B']]));
+const g1 = AL.snapshot(FR(D2, [['2026-08-12', 'I', 2, 'F', 'B']], [['2026-08-12', 'I', 1, 'F', 'B']]));
+const m2 = AL.mergeFirsts(AL.diff(g0, g1).rows.readings, AL.diff(g0, g1).rows.activations);
+check('a part-first group splits rather than claiming all of it was a first',
+  m2.rows.length === 2 &&
+  m2.rows.filter((r) => r.first).reduce((a, r) => a + r.n, 0) === 1 &&
+  m2.rows.filter((r) => !r.first).reduce((a, r) => a + r.n, 0) === 1,
+  JSON.stringify(m2.rows));
+check('and the first is listed above the one that is not',
+  m2.rows[0].first === true, JSON.stringify(m2.rows.map((r) => r.first)));
+
+/* An activation whose reading ping did not land in the same diff. The reading
+   happened; it is kept, and counted, rather than shown above a headline that
+   does not cover it. */
+const h1 = AL.snapshot(FR(D2, [['2026-08-12', 'I', 0, 'F', 'B']], [['2026-08-12', 'I', 1, 'F', 'B']]));
+const dH = AL.diff(g0, h1);
+const m3 = AL.mergeFirsts(dH.rows.readings, dH.rows.activations);
+check('an activation with no reading beside it is kept and counted as extra',
+  m3.rows.length === 1 && m3.rows[0].first === true && m3.extra === 1, JSON.stringify(m3));
+check('nothing at all merges to nothing, not to a crash',
+  AL.mergeFirsts(null, null).rows.length === 0 && AL.mergeFirsts(null, null).extra === 0);
+
+/* ---------------------------------------------------- history headings */
+
+check('a day heading reads as a date a person would write',
+  AL.dayHeading('2026-09-01') === 'September 1, 2026', AL.dayHeading('2026-09-01'));
+check('an unreadable day key is passed through rather than guessed at',
+  AL.dayHeading('') === '' && AL.dayHeading('nope') === 'nope');
 
 /* -------------------------------------------------------------- report */
 

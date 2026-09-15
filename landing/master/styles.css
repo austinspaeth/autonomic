@@ -69,6 +69,39 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; }
 
 .app { max-width: 1440px; margin: 0 auto; padding: 20px 24px 64px; }
 
+/* ---------- the sticky head ----------
+   The title row and the tab row as ONE bar that stays at the top of the
+   screen. It has to bleed to the window's edges or the page would show
+   through the .app gutter beside it as the content scrolled under, so it
+   cancels .app's side padding with a negative margin and puts it back as its
+   own — which is also what lets the blur run edge to edge.
+
+   The glass is a dark wash plus a blur rather than a solid fill: a solid bar
+   reads as a second page pinned over the first, where a wash keeps the chart
+   you are scrolling visible underneath and so keeps the bar attached to it.
+   `backdrop-filter` is not everywhere, so the wash alone is already opaque
+   enough to read against — the blur is an improvement on it, never the thing
+   that makes the text legible. */
+.app-head {
+  position: sticky;
+  top: 0;
+  z-index: 120;
+  margin: -20px -24px 16px;
+  padding: calc(20px + env(safe-area-inset-top, 0px)) 24px 0;
+  background: rgba(13, 13, 13, 0.82);
+  border-bottom: 1px solid var(--border);
+}
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .app-head {
+    background: rgba(13, 13, 13, 0.62);
+    -webkit-backdrop-filter: blur(16px) saturate(150%);
+    backdrop-filter: blur(16px) saturate(150%);
+  }
+}
+/* The tab row's own rule and gap belong to the bar now, or they would sit
+   inside the glass with a stripe of page under them. */
+.app-head .tabs { border-bottom: 0; margin-bottom: 0; }
+
 .topbar {
   display: flex;
   align-items: baseline;
@@ -863,12 +896,20 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { outline: 2px solid var
   scrollbar-width: thin;
 }
 
+/* A card is a HEADER and, under it, one sub-card per install behind the count.
+   The header is the sentence the card has always shown; the rows are what the
+   ping already knew and the old one-line card threw away — which store, which
+   tier, which build, and how old that install is. Two sales read as two events
+   rather than as "2 new sales · 1 on iOS · 1 on Android".
+
+   Figures are tabular so the ages and the ×counts line up down the stack. */
 .alert-card {
   pointer-events: auto; cursor: pointer; flex: none;
-  display: flex; align-items: center; gap: 11px;
-  padding: 12px 14px; border-radius: 12px;
+  display: flex; flex-direction: column; gap: 9px;
+  padding: 11px 12px 12px; border-radius: 12px;
   background: var(--surface-2); border: 1px solid var(--border-strong);
   box-shadow: 0 14px 40px rgba(0,0,0,.65);
+  font-variant-numeric: tabular-nums;
   opacity: 0; transform: translateY(10px) scale(.97);
   transition: opacity .22s ease, transform .22s ease;
 }
@@ -885,15 +926,167 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { outline: 2px solid var
 /* House blue, the same colour its confetti puff is drawn in: somebody who
    already had the app opening it again. */
 .alert-card.visit { border-left: 3px solid var(--series-1); }
-.alert-mark { font-size: 20px; line-height: 1; flex: none; }
-.alert-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.alert-body b { font-size: 14px; }
-.alert-body span { color: var(--text-secondary); font-size: 12.5px; }
+.alert-head { display: flex; align-items: center; gap: 10px; }
+.alert-mark { font-size: 19px; line-height: 1; flex: none; }
+.alert-title { font-size: 14px; font-weight: 700; min-width: 0; flex: 1 1 auto; }
+/* Only a card REPLAYED by the Alerts button carries a clock: on a live card
+   the time is now. */
+.alert-when {
+  flex: none; font-size: 11px; color: var(--text-muted);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+}
 .alert-x {
-  margin-left: auto; flex: none; background: none; border: 0; cursor: pointer;
-  color: var(--text-muted); font-size: 17px; line-height: 1; padding: 2px 4px;
+  flex: none; background: none; border: 0; cursor: pointer;
+  color: var(--text-muted); font-size: 17px; line-height: 1; padding: 0 2px;
 }
 .alert-x:hover { color: var(--text-primary); }
+
+/* The fallback: a card with no rows to draw — one refresh after a deploy, or a
+   caller with counts and nothing else — is the card this file used to be. */
+.alert-line { color: var(--text-secondary); font-size: 12.5px; }
+
+/* ---- the card inside the card ---- */
+.alert-rows { display: flex; flex-direction: column; gap: 6px; }
+.alert-row {
+  background: var(--surface-1); border: 1px solid var(--border);
+  border-radius: 8px; padding: 7px 9px 8px;
+  display: flex; flex-direction: column; gap: 5px;
+}
+.alert-row-top { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.alert-row-sub {
+  font-size: 11.5px; color: var(--text-muted); line-height: 1.45;
+  display: flex; flex-wrap: wrap; gap: 4px 7px; align-items: baseline;
+}
+.alert-row-sub .sep { color: #56554f; }
+.alert-build {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11px; color: var(--text-secondary);
+}
+/* A build that is known to be unnameable says so in words, so it cannot be
+   mistaken for a version string. */
+.alert-build.unknown { font-family: inherit; font-size: 11.5px; font-style: italic; color: var(--text-muted); }
+.alert-n {
+  margin-left: auto; flex: none;
+  font-size: 11.5px; font-weight: 600; color: var(--text-secondary);
+  background: var(--surface-3); border-radius: 5px; padding: 1px 6px;
+}
+/* What is left over once the rows are capped, plus the build candidates when
+   a row could not be given one. */
+.alert-more { font-size: 11.5px; color: var(--text-muted); padding: 1px 2px 0; }
+
+/* ---- chips: store, tier, sensor ----
+   Three facts about one install, told apart by treatment rather than by
+   position: the store carries a coloured dot (the same two colours the App
+   usage view gives them), the tier carries a fill, the sensor is plain. */
+.alert-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11.5px; font-weight: 500; line-height: 1;
+  padding: 3px 7px; border-radius: 5px;
+  border: 1px solid transparent; white-space: nowrap;
+}
+.alert-chip i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none; }
+.alert-chip.plat { color: var(--text-secondary); background: rgba(255,255,255,.055); border-color: var(--border); }
+.alert-chip.plat.ios i { background: var(--ios); }
+.alert-chip.plat.and i { background: var(--android); }
+.alert-chip.plat.unk i { background: var(--text-muted); }
+.alert-chip.sensor { color: var(--text-secondary); background: rgba(255,255,255,.055); border-color: var(--border); }
+
+/* Violet is Pro everywhere else on this page, and the trial teal is the same
+   --stage-trial the lifecycle charts use. Free is an outline: it is the
+   default state and should not compete with the two that are news. An
+   unreadable tier wears a dashed outline — a ping from a build older than the
+   tier token is unknown, never free. */
+.alert-chip.tier { font-weight: 600; }
+.alert-chip.tier.pro   { color: #b7afff; background: rgba(144,133,233,.16); border-color: rgba(144,133,233,.42); }
+.alert-chip.tier.trial { color: #4fd3c2; background: rgba(0,160,143,.15); border-color: rgba(0,160,143,.45); }
+.alert-chip.tier.free  { color: var(--text-muted); border-color: var(--border); }
+.alert-chip.tier.unk   { color: var(--text-muted); border-color: var(--border); border-style: dashed; font-weight: 500; }
+
+/* The install's first reading ever. Green, because that is the colour this
+   page has always given activation — it used to be the left edge of a card of
+   its own, and the card is gone but the fact is not. */
+.alert-chip.first {
+  color: #4fc04f; background: rgba(0, 131, 0, .20); border-color: rgba(0, 131, 0, .55);
+  font-weight: 600; letter-spacing: .03em; text-transform: uppercase; font-size: 10.5px;
+}
+
+/* ---------- the alerts history drawer ----------
+   alerts.js. Pressing Alerts opens this from the right: every alert this
+   browser has been told about, newest first, under a heading per day.
+
+   It is a DRAWER and not the corner stack for two reasons. The stack is where
+   live news arrives and is dismissed, and a record you are reading does not
+   belong in the same slot as news you have not read yet; and the stack is
+   today only, where the question "what have I missed" reaches back further
+   than that. On a phone it takes the whole screen, because a 380px panel over
+   a 390px viewport is a modal wearing a drawer's clothes. */
+
+.drawer-scrim {
+  position: fixed; inset: 0; z-index: 170;
+  background: rgba(0, 0, 0, 0.55);
+  opacity: 0; transition: opacity .2s ease;
+}
+.drawer-scrim.open { opacity: 1; }
+
+.drawer {
+  position: fixed; z-index: 171;
+  top: 0; right: 0; bottom: 0;
+  width: min(420px, 100vw);
+  display: flex; flex-direction: column;
+  background: var(--surface-1);
+  border-left: 1px solid var(--border-strong);
+  box-shadow: -24px 0 60px rgba(0, 0, 0, .6);
+  transform: translateX(100%);
+  transition: transform .26s cubic-bezier(.22, .61, .36, 1);
+}
+.drawer.open { transform: none; }
+
+/* Pinned, not scrolled away: the list is longer than the screen and the way
+   out must not be something you scroll back up to find. */
+.drawer-head {
+  flex: none; position: sticky; top: 0; z-index: 1;
+  display: flex; align-items: center; gap: 12px;
+  padding: calc(14px + env(safe-area-inset-top, 0px)) 14px 12px 18px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-1);
+}
+.drawer-head h2 { margin: 0; font-size: 16px; font-weight: 600; flex: 1 1 auto; }
+.drawer-x {
+  flex: none; background: var(--surface-2); border: 1px solid var(--border-strong);
+  color: var(--text-secondary); cursor: pointer;
+  width: 32px; height: 32px; border-radius: 50%;
+  font-size: 19px; line-height: 1; padding: 0;
+  display: grid; place-items: center;
+}
+.drawer-x:hover { color: var(--text-primary); background: var(--surface-3); }
+
+.drawer-body {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto;
+  padding: 14px 14px calc(22px + env(safe-area-inset-bottom, 0px));
+  display: flex; flex-direction: column; gap: 16px;
+  scrollbar-width: thin;
+}
+.drawer-day { display: flex; flex-direction: column; gap: 8px; }
+/* The date a group happened on. Sticky inside the scroller so the heading is
+   still there when you are four cards into a busy Tuesday. */
+.drawer-date {
+  position: sticky; top: -14px; z-index: 1;
+  margin: 0 -14px; padding: 8px 14px 7px;
+  background: var(--surface-1);
+  font-size: 12.5px; font-weight: 600; color: var(--text-secondary);
+}
+.drawer-empty { color: var(--text-muted); font-size: 13px; padding: 6px 2px; }
+
+/* History is read, not dismissed, so a card in here takes no click and keeps
+   no hover: same object, different verb. */
+.drawer .alert-card {
+  width: auto; cursor: default; opacity: 1; transform: none;
+  box-shadow: none; background: var(--surface-2);
+}
+
+@media (max-width: 700px) {
+  .drawer { width: 100vw; border-left: 0; }
+}
 
 /* The bell shows the state it is IN, not the state pressing it would reach:
    a crossed-out bell means muted, the same way it does everywhere else. */
@@ -1117,12 +1310,16 @@ details.acc > summary .btn { user-select: none; }
 
 @media (max-width: 900px) {
   .app { padding: 18px 16px 56px; }
+  /* The sticky bar cancels .app's side padding, so it has to be re-cancelled
+     wherever that padding changes. */
+  .app-head { margin: -18px -16px 14px; padding: calc(18px + env(safe-area-inset-top, 0px)) 16px 0; }
   .funnel-step { grid-template-columns: 150px 1fr 112px; }
   .funnel-gap { padding-left: 162px; }
 }
 
 @media (max-width: 700px) {
   .app { padding: 14px 12px 48px; }
+  .app-head { margin: -14px -12px 12px; padding: calc(14px + env(safe-area-inset-top, 0px)) 12px 0; }
 
   /* Title and sync state on one line, the controls on the next: the spacer
      becomes a full-width flex break instead of an elastic gap. */

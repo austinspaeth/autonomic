@@ -89,6 +89,13 @@ check('signed in', !window.document.body.classList.contains('gated'));
 const AL = window.Alerts;
 const cards = () => [...$('alertStack').querySelectorAll('.alert-card')];
 const text = () => cards().map((c) => c.textContent.replace(/\s+/g, ' ')).join(' || ');
+/* One kind of card, as text. A card is a header plus one sub-card per install
+   now, so the useful assertion is "this card says X" rather than "something in
+   the stack says X". */
+const cardText = (kind) => cards().filter((c) => c.classList.contains(kind))
+  .map((c) => c.textContent.replace(/\s+/g, ' ')).join(' || ');
+const drawerCards = () => [...$('alertDrawerBody').querySelectorAll('.alert-card')];
+const drawerText = () => $('alertDrawerBody').textContent.replace(/\s+/g, ' ');
 
 check('the module is inlined and running', !!AL && typeof AL.sync === 'function');
 check('the confetti surface and the card stack both exist', !!$('confetti') && !!$('alertStack'));
@@ -102,10 +109,19 @@ check('the first report of a session announces nothing', cards().length === 0, t
 AL.sync(R2);
 await new Promise((r) => setTimeout(r, 30));
 check('a new first run raises a download card', /1 new download/.test(text()), text());
-check('and the card names the store it came from', /1 on Android/.test(text()), text());
+/* The store is a CHIP on the install's own row now, not a clause in a shared
+   line: two downloads from two stores are two rows rather than "1 on iOS · 1
+   on Android", which is the same number and none of the news. */
+check('and the card names the store it came from', /Android/.test(cardText('download')), cardText('download'));
 check('a subscribe ping raises a sale card of its own', /1 new sale/.test(text()), text());
-check('and that card names the store that paid', /1 on iOS/.test(text()), text());
-check('and how old the install that paid is', /1 on iOS · installed .+, yesterday/.test(text()), text());
+check('and that card names the store that paid', /iOS/.test(cardText('sale')), cardText('sale'));
+check('and how old the install that paid is',
+  /Installed .+ · yesterday/.test(cardText('sale')), cardText('sale'));
+/* These fixtures predate the tier and version tokens, which is the case worth
+   pinning: unknown is drawn as unknown and never folded into Free or into a
+   version number. */
+check('a ping with no tier or version says so rather than guessing',
+  /Tier unknown/.test(cardText('sale')) && /build unknown/.test(cardText('sale')), cardText('sale'));
 check('the sale toast says the install age too', /installed .+, yesterday/.test($('toast').textContent), $('toast').textContent);
 check('the two are told apart by class, not only by copy',
   cards().some((c) => c.classList.contains('sale')) && cards().some((c) => c.classList.contains('download')),
@@ -115,7 +131,7 @@ check('the two are told apart by class, not only by copy',
    It gets a card like the other two, because it is the event that fires most
    often and a toast it usually loses is not a record of anything. */
 check('a returning open raises a card too', /1 returning visitor/.test(text()), text());
-check('and that card names the store it came back on', /1 returning visitor1 on iOS/.test(text()), text());
+check('and that card names the store it came back on', /iOS/.test(cardText('visit')), cardText('visit'));
 check('it is told apart by class as well',
   cards().some((c) => c.classList.contains('visit')), cards().map((c) => c.className).join(' | '));
 
@@ -149,23 +165,53 @@ await new Promise((r) => setTimeout(r, 400));
 check('clear-all empties the stack', cards().length === 0, text());
 check('and takes itself away with the cards', $('alertClear').classList.contains('hidden'));
 
-/* The Alerts button is NOT a mute. Cards are dismissed by pressing them, so
-   pressing Alerts is how the day comes back: every card raised today, re-raised
-   in order, however many of them have since been cleared. */
+/* The Alerts button is NOT a mute. It opens the HISTORY: a drawer from the
+   right holding every alert this browser has been told about, under a heading
+   per day. Deliberately not the corner stack, which is where live news arrives
+   and is dismissed — a record you are reading does not belong in the slot that
+   news you have not read yet arrives in. */
 check('sound is on by default', AL.isMuted() === false && $('btnAlerts').dataset.muted === 'false');
+check('the drawer starts closed', $('alertDrawer').classList.contains('hidden'));
 $('btnAlerts').click();
 check('pressing Alerts does not silence the dashboard', AL.isMuted() === false);
 await new Promise((r) => setTimeout(r, 40));
-check('it replays the day instead — including cards already dismissed',
-  /1 new download/.test(text()) && /1 new sale/.test(text()), text());
-check('and a replayed card is stamped with the time it happened',
-  cards().length > 0 && cards().every((c) => /\d:\d\d/.test(c.textContent)), text());
-const replayed = cards().length;
+check('it opens the history drawer instead',
+  $('alertDrawer').classList.contains('open') && !$('alertDrawer').classList.contains('hidden'),
+  $('alertDrawer').className);
+check('which holds every alert raised, including ones already dismissed',
+  /1 new download/.test(drawerText()) && /1 new sale/.test(drawerText()), drawerText());
+check('grouped under a heading naming the day they happened',
+  /^[A-Z][a-z]+ \d{1,2}, \d{4}$/.test($('alertDrawerBody').querySelector('.drawer-date').textContent.trim()),
+  $('alertDrawerBody').querySelector('.drawer-date').textContent);
+check('and every entry in it is stamped with the time it happened',
+  drawerCards().length > 0 && drawerCards().every((c) => /\d:\d\d/.test(c.textContent)), drawerText());
+/* History is read, not dismissed: the × that clears a card in the corner has
+   no meaning on a record of something that already happened. */
+check('a card in the history carries no dismiss button',
+  drawerCards().every((c) => !c.querySelector('.alert-x')), drawerText());
+check('opening the history leaves the live stack alone',
+  $('alertStack').querySelectorAll('.alert-card').length === 0, text());
+const inDrawer = drawerCards().length;
+$('btnAlerts').click();
+await new Promise((r) => setTimeout(r, 340));
+check('pressing it again closes the drawer rather than stacking a second one',
+  !$('alertDrawer').classList.contains('open'), $('alertDrawer').className);
 $('btnAlerts').click();
 await new Promise((r) => setTimeout(r, 40));
-check('pressing it twice does not show the day twice', cards().length === replayed, text());
-$('alertClear').click();
-await new Promise((r) => setTimeout(r, 400));
+check('and reopening shows the same day once, not twice',
+  drawerCards().length === inDrawer, String(drawerCards().length) + ' vs ' + inDrawer);
+$('alertDrawerClose').click();
+await new Promise((r) => setTimeout(r, 340));
+check('the close button closes it', !$('alertDrawer').classList.contains('open'));
+check('and it is hidden once it has finished leaving', $('alertDrawer').classList.contains('hidden'));
+
+/* The header and the tab row travel together and stay put on the way down the
+   page, so changing tab from three screens into a chart does not mean
+   scrolling back up to reach the nav. */
+check('the header and the tabs are one sticky bar',
+  !!$('appHead') && $('appHead').contains($('btnAlerts')) &&
+  !!$('appHead').querySelector('.tabs'),
+  $('appHead') ? $('appHead').className : 'no appHead');
 
 /* Muted means silent, not blind: the cards are the record of what happened and
    they keep coming. */
@@ -193,18 +239,55 @@ canvasEl.getContext = () => ({
 canvasEl.width = 0;
 AL.setMuted(true);   // the sound is not what is under test here
 
+/* A first reading no longer has a card of its own. `act` fires once per
+   install ever and `hrv` once per install per Eastern day, both the moment a
+   reading completes, so a first reading raised BOTH — two cards and two
+   notifications for one measurement. It is the reading card with a FIRST tag
+   on the rows that were one. */
+const firstRow = (cohort, platform, tier, slot, n, age) =>
+  ({ cohort, platform, tier, slot, n, age, day: T(0), version: '1.26.0' });
 AL.announce({
-  visitors: 0, downloads: 0, sales: 0, activations: 3,
-  downloadsBy: {}, salesBy: {}, activationsBy: { B: 2, F: 1 },
+  visitors: 0, downloads: 0, sales: 0, activations: 3, readings: 3,
+  downloadsBy: {}, salesBy: {}, activationsBy: { B: 2, F: 1 }, readingsBy: { B: 2, F: 1 },
+  rows: {
+    downloads: [], returns: [], sales: [],
+    activations: [firstRow('2026-08-01', 'I', 'P', 'B', 2, 3), firstRow('2026-08-05', 'A', 'F', 'F', 1, 1)],
+    readings: [firstRow('2026-08-01', 'I', 'P', 'B', 2, 3), firstRow('2026-08-05', 'A', 'F', 'F', 1, 1)],
+  },
 });
 await new Promise((r) => setTimeout(r, 30));
-check('an activation raises a card of its own', /3 first readings/.test(text()), text());
-check('and the card names the sensors those readings used',
-  /2 chest strap/.test(text()) && /1 phone camera/.test(text()), text());
-check('it is told apart from the other two by class',
-  cards().some((c) => c.classList.contains('activation')),
+check('a refresh whose readings are all firsts raises ONE card, not two',
+  cards().filter((c) => c.classList.contains('reading')).length === 1 &&
+  !cards().some((c) => c.classList.contains('activation')),
   cards().map((c) => c.className).join(' | '));
+check('and it says so in the headline', /3 first readings!/.test(cardText('reading')), cardText('reading'));
+check('the rows that were a first are tagged',
+  (cardText('reading').match(/First/g) || []).length === 2, cardText('reading'));
+check('and each row still names its store, tier and build',
+  /iOS/.test(cardText('reading')) && /Pro/.test(cardText('reading')) &&
+  /Android/.test(cardText('reading')) && /Free/.test(cardText('reading')) &&
+  /1\.26\.0/.test(cardText('reading')),
+  cardText('reading'));
 check('and it never sets off the confetti', canvasEl.width === 0, String(canvasEl.width));
+
+/* A mixed refresh: two readings from one install group, one of them a first.
+   The group splits, because with `hrv` capped daily those are two installs. */
+$('alertClear').click();
+await new Promise((r) => setTimeout(r, 400));
+AL.announce({
+  visitors: 0, downloads: 0, sales: 0, activations: 1, readings: 2,
+  downloadsBy: {}, salesBy: {}, activationsBy: { B: 1 }, readingsBy: { B: 2 },
+  rows: {
+    downloads: [], returns: [], sales: [],
+    activations: [firstRow('2026-08-01', 'I', 'P', 'B', 1, 3)],
+    readings: [firstRow('2026-08-01', 'I', 'P', 'B', 2, 3)],
+  },
+});
+await new Promise((r) => setTimeout(r, 30));
+check('a partly-first refresh counts them all and tags only the first',
+  /2 readings today, 1 a first/.test(cardText('reading')) &&
+  (cardText('reading').match(/First/g) || []).length === 1,
+  cardText('reading'));
 
 /* The same fake surface, so the negative above is a real one: an arrival still
    celebrates on exactly this page. */
@@ -229,7 +312,7 @@ check('a returning visit toasts the store and how old the installs are',
   $('toast').textContent === '3 returning visitors · 2 on iOS · 1 on Android · installed Aug 1, 12 days ago',
   $('toast').textContent);
 check('and raises a card saying the same thing', cards().length === cardsBeforeVisit + 1 &&
-  /3 returning visitors2 on iOS · 1 on Android · installed Aug 1, 12 days ago/.test(text()), text());
+  /3 returning visitors×2 on iOS · 1 on Android · installed Aug 1, 12 days ago/.test(text()), text());
 
 /* And it OUTRANKS a reading for the one toast slot, which is the reordering
    that makes it visible at all: a refresh carrying a single morning reading
@@ -247,7 +330,7 @@ check('a return takes the toast from a reading in the same refresh',
   $('toast').textContent === '2 returning visitors · 2 on iOS · installed Aug 2, 11 days ago',
   $('toast').textContent);
 check('and the reading still keeps its card',
-  /2 readings today2 Apple Watch · installed Aug 10, 3 days ago/.test(text()), text());
+  /2 readings today×2 Apple Watch · installed Aug 10, 3 days ago/.test(text()), text());
 
 AL.announce({
   visitors: 0, downloads: 0, returns: 0, sales: 0, activations: 0, readings: 2,
