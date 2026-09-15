@@ -22,6 +22,29 @@
  * the long-run corrective — if inferred upright time does not predict this
  * user's dips, the ceiling moves around it.
  *
+ * TWO THINGS THIS GOT WRONG, and both were reported by the same day.
+ *
+ *   IT COUNTED SAMPLES, NOT TIME. A minute used to be standing when a sample
+ *   landed IN it and read in the band, so the answer scaled with how often the
+ *   sensor spoke: a watch that samples every few minutes offered a few hundred
+ *   candidate minutes a day and almost no runs of three, while a strap
+ *   streaming continuously offered all 1,440 and every one of them merged into
+ *   a run. The same body on the same afternoon read as twenty minutes upright
+ *   or as the five-hour cap depending only on the sensor. It now integrates
+ *   over the gaps between samples, capped at the day's own `gapToleranceFor`,
+ *   which is the rule ./burn's hrMinutesAbove has always used and for exactly
+ *   this reason.
+ *
+ *   THE BAND HAD NOTHING TO RISE FROM. Its floor was the user's LAYING resting
+ *   rate plus a fraction of their stand-test rise, and nobody sits at their
+ *   laying rate: an ordinary sedentary afternoon at a desk sits ten to twenty
+ *   beats above it, which is inside the band. With continuous sampling that is
+ *   a whole day of "standing" logged by somebody who did not get up. Standing
+ *   is a RISE, so it needs something to rise FROM, and the honest reference is
+ *   the day's own quiet level (below) rather than a reading taken lying down
+ *   three weeks ago. The signature floor stays as a floor under that, so a day
+ *   we cannot read a quiet level off is charged exactly as it was before.
+ *
  * Pure: no store, no native, no React.
  */
 import type { ScoreContext } from '../scoring';
@@ -30,7 +53,7 @@ import { median } from '../trends/compare';
 import { keyRange, metricSeries } from '../trends/series';
 import type { Entry } from '../types';
 import { BASELINE_DAYS, MIN_LINE_READINGS } from './baseline';
-import type { Span } from './burn';
+import { gapToleranceFor, type Span } from './burn';
 
 /** Where in the stand-test rise the standing band starts. Standing quietly
  *  settles well below the test's peak, so the floor sits at a fraction of it;
@@ -58,6 +81,27 @@ export const STILL_CAP_MIN = 300;
 /** Minutes of heart-rate coverage a day needs before any of this is claimed.
  *  Four hours of watch time cannot describe a day. */
 export const STILL_MIN_COVERAGE = 360;
+
+/**
+ * Where in the day's own distribution its QUIET level is read.
+ *
+ * The quiet level is where this person's heart sits when they are awake, not
+ * walking and not exercising, which for almost everybody in this population is
+ * sitting. A low percentile rather than a median, because a day holding a lot
+ * of standing would drag a median up into the very band it is meant to define;
+ * a quarter of the covered day is a bar even a heavily upright day clears,
+ * since STILL_CAP_MIN already refuses to claim more than five hours of one.
+ */
+export const QUIET_PCT = 0.25;
+
+/**
+ * Covered intervals needed before the day's own quiet level is trusted.
+ *
+ * Below it the band keeps the signature floor alone, which is what every day
+ * used before this existed. The rule only ever RAISES the floor, so a day it
+ * cannot read is charged exactly as it was.
+ */
+export const QUIET_MIN_SLICES = 30;
 
 export interface UprightSignature {
   /** The user's own resting rate. */
@@ -121,9 +165,36 @@ export interface StillResult {
   stillMin: number;
   spans: { startMin: number; endMin: number; kind: 'still' }[];
   coverageMin: number;
+  /** The band's floor as this day resolved it, which is the signature floor
+   *  raised to clear the day's own quiet level. Stored and shown, because
+   *  "why does it think I was standing" is otherwise unanswerable. */
+  floorBpm: number;
 }
 
 const overlaps = (a: Span, b: Span) => a.startMin < b.endMin && b.startMin < a.endMin;
+
+/** The value at `p` through a sorted sample, linearly interpolated. */
+function percentile(sorted: number[], p: number): number {
+  if (!sorted.length) return 0;
+  if (sorted.length === 1) return sorted[0];
+  const i = (sorted.length - 1) * p;
+  const lo = Math.floor(i);
+  const hi = Math.ceil(i);
+  return lo === hi ? sorted[lo] : sorted[lo] + (sorted[hi] - sorted[lo]) * (i - lo);
+}
+
+/** One covered interval between two samples: the unit everything here is
+ *  measured in, so the answer depends on the CLOCK and not on how talkative
+ *  the sensor was. */
+interface Slice {
+  startMin: number;
+  endMin: number;
+  lenMin: number;
+  /** The interval's own level, the mean of the two samples bounding it. */
+  bpm: number;
+  /** Awake, not walking, not inside a logged activity or a capture. */
+  eligible: boolean;
+}
 
 /**
  * Minutes standing still.
@@ -143,54 +214,94 @@ export function stillUprightMinutes(
 ): StillResult | null {
   if (!hr || !hr.length || !sig) return null;
 
-  // One value per minute of the day, and a record of which minutes we saw.
-  const bpmAt = new Map<number, number[]>();
-  hr.forEach((p) => {
-    if (!Number.isFinite(p.t) || !Number.isFinite(p.bpm) || p.bpm <= 0) return;
-    const m = Math.floor(p.t / 60);
-    const arr = bpmAt.get(m);
-    if (arr) arr.push(p.bpm); else bpmAt.set(m, [p.bpm]);
-  });
-  const coverageMin = bpmAt.size;
+  const pts = hr
+    .filter((p) => Number.isFinite(p.t) && Number.isFinite(p.bpm) && p.bpm > 0)
+    .sort((a, b) => a.t - b.t);
+  if (pts.length < 2) return null;
+
+  const ceiling = lineBpm == null ? Infinity : lineBpm;
+  const steps = (stepSpans || []).filter((s) =>
+    Number.isFinite(s.startMin) && Number.isFinite(s.endMin) && s.endMin > s.startMin);
+
+  // Cut the day into covered intervals. A gap longer than this day's own
+  // tolerance is UNCOVERED: it contributes to neither the coverage nor the
+  // count, and it breaks any run across it, because an unwatched hour is
+  // unknown and never standing. An interval that touches a step span or an
+  // excluded window is kept but marked ineligible, so it still breaks runs and
+  // still reports its time as covered without ever being charged.
+  const gapMax = gapToleranceFor(pts);
+  const slices: Slice[] = [];
+  let coverageMin = 0;
+  for (let i = 1; i < pts.length; i++) {
+    const lenMin = (pts[i].t - pts[i - 1].t) / 60;
+    if (lenMin <= 0 || lenMin > gapMax) continue;
+    coverageMin += lenMin;
+    const startMin = pts[i - 1].t / 60;
+    const endMin = pts[i].t / 60;
+    const span = { startMin, endMin };
+    slices.push({
+      startMin,
+      endMin,
+      lenMin,
+      bpm: (pts[i - 1].bpm + pts[i].bpm) / 2,
+      eligible: !steps.some((s) => overlaps(span, s)) && !exclude.some((e) => overlaps(span, e)),
+    });
+  }
   // A day the watch spent mostly on the charger cannot describe a day.
   if (coverageMin < STILL_MIN_COVERAGE) return null;
 
-  const ceiling = lineBpm == null ? Infinity : lineBpm;
-  const stepped = new Set<number>();
-  (stepSpans || []).forEach((s) => {
-    for (let m = Math.floor(s.startMin); m < Math.ceil(s.endMin); m++) stepped.add(m);
-  });
+  // The day's own quiet level, and the band floor it argues for. Only the
+  // eligible sub-line intervals: sleep and workouts are already carved out of
+  // `eligible`, and anything at or above the line is exercise, which would
+  // pull the reference up toward the thing it is meant to exclude.
+  const quietPool = slices
+    .filter((s) => s.eligible && s.bpm < ceiling)
+    .map((s) => s.bpm)
+    .sort((a, b) => a - b);
+  const quiet = quietPool.length >= QUIET_MIN_SLICES ? percentile(quietPool, QUIET_PCT) : null;
+  const floorBpm = Math.round(Math.max(
+    sig.floorBpm,
+    quiet == null ? sig.floorBpm : quiet + sig.riseBpm * BAND_FRACTION,
+  ));
 
-  const inBand = (m: number) => {
-    const vals = bpmAt.get(m);
-    if (!vals || !vals.length) return false;             // a gap is never upright
-    if (stepped.has(m)) return false;                    // that is walking, not standing
-    const v = vals.reduce((a, b) => a + b, 0) / vals.length;
-    return v >= sig.floorBpm && v < ceiling;
-  };
-
-  const excluded = (m: number) => exclude.some((e) => overlaps({ startMin: m, endMin: m + 1 }, e));
-
+  // Band membership is decided on the interval's own mean, not interpolated
+  // the way ./burn crosses a single line: a band has two edges and splitting an
+  // interval across both would be guessing at a shape from two samples. The
+  // cost is that the entry and exit slices of each stand read as half sitting
+  // and are dropped, so a sparsely sampled day UNDER-claims: measured against
+  // one fixed day resampled, 105 minutes of standing reads as 78 to 89 at
+  // wrist cadences against 105 at a strap's. That is the direction to be wrong
+  // in here. The row already calls itself an estimate, a minute upright costs a
+  // fifth of a moderate one, and over-claiming standing is the failure this
+  // module has already shipped once.
   const spans: { startMin: number; endMin: number; kind: 'still' }[] = [];
-  const minutes = Array.from(bpmAt.keys()).sort((a, b) => a - b);
-  const last = minutes.length ? minutes[minutes.length - 1] : 0;
-
   let runStart: number | null = null;
-  const close = (endM: number) => {
-    if (runStart == null) return;
-    if (endM - runStart >= STILL_MIN_RUN) spans.push({ startMin: runStart, endMin: endM, kind: 'still' });
+  let runEnd = 0;
+  let runMin = 0;
+  const close = () => {
+    if (runStart != null && runMin >= STILL_MIN_RUN) {
+      spans.push({ startMin: Math.round(runStart), endMin: Math.round(runEnd), kind: 'still' });
+    }
     runStart = null;
+    runMin = 0;
   };
 
-  for (let m = 0; m <= last; m++) {
-    if (inBand(m) && !excluded(m)) {
-      if (runStart == null) runStart = m;
-    } else {
-      close(m);
-    }
-  }
-  close(last + 1);
+  slices.forEach((s) => {
+    if (!s.eligible || s.bpm < floorBpm || s.bpm >= ceiling) { close(); return; }
+    // Contiguity is checked against the clock, not against the loop index: the
+    // slices either side of an uncovered gap are neighbours in this array and
+    // are not neighbours in the day.
+    if (runStart == null || Math.abs(s.startMin - runEnd) > 1e-6) { close(); runStart = s.startMin; }
+    runEnd = s.endMin;
+    runMin += s.lenMin;
+  });
+  close();
 
-  const stillMin = Math.min(STILL_CAP_MIN, spans.reduce((s, sp) => s + (sp.endMin - sp.startMin), 0));
-  return { stillMin, spans, coverageMin };
+  const total = spans.reduce((s, sp) => s + (sp.endMin - sp.startMin), 0);
+  return {
+    stillMin: Math.round(Math.min(STILL_CAP_MIN, total)),
+    spans,
+    coverageMin: Math.round(coverageMin),
+    floorBpm,
+  };
 }

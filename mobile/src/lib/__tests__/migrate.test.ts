@@ -360,6 +360,9 @@ describe('migrate: day load', () => {
     walkingMin: 74,
     standMin: null,
     stillUprightMin: 121,
+    stillFloorBpm: 96,
+    hrSampleGapMin: 5.5,
+    pricedVersion: 2,
     uprightSpans: [{ startMin: 540, endMin: 560, kind: 'walk' }, { startMin: 700, endMin: 760, kind: 'still' }],
     uprightByHour: {
       walk: [0, 0, 0, 0, 0, 0, 0, 0, 0, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],

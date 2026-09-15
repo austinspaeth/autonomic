@@ -217,10 +217,18 @@ export function SpendSheet({ dk, budget, row }: { dk: string; budget: BudgetView
       const s = load.longestStretch;
       whyRows.push({ label: `Longest stretch, ${clock(s.startMin)} to ${clock(s.endMin)}`, value: hm(s.endMin - s.startMin) });
     }
+    // The peak is the one figure that is true whatever the coverage was, and
+    // it is the answer to "did my heart go over the line at all". A day of
+    // sporadic samples charges no minutes, which used to leave the reader with
+    // no way to tell an unread day from a quiet one.
+    if (load?.peakBpm != null) {
+      whyRows.push({ label: 'Highest reading', value: `${Math.round(load.peakBpm)} bpm` });
+    }
   } else if (row.source === 'upright') {
     const estimated = load?.stillUprightMin != null && load?.standMin == null;
+    const floor = load?.stillFloorBpm;
     sentence = estimated
-      ? `Minutes your heart sat in your own standing band with no steps, plus minutes walking. Estimated, so say below if ${budget.past ? 'that day' : 'today'} was not like that.`
+      ? `Minutes your heart sat ${floor != null ? `at or above ${Math.round(floor)} bpm` : 'in your own standing band'} with no steps, plus minutes walking. That threshold is fitted to how far standing lifts your own heart rate, above where it sat when you were quiet ${budget.past ? 'that day' : 'today'}. Estimated, so say below if ${budget.past ? 'that day' : 'today'} was not like that.`
       : load?.standMin != null
         ? 'Standing and walking minutes, as your watch recorded them.'
         : 'Minutes holding steps, from your phone. Standing still is not counted without a heart-rate series.';

@@ -194,6 +194,11 @@ export interface DayLoad {
    *  signature (src/lib/budget/upright.ts). Null without a heart-rate series;
    *  never claimed from steps alone. */
   stillUprightMin: number | null;
+  /** The heart rate the standing band's floor sat at for this day, which is
+   *  the user's signature floor raised to clear the day's own quiet level.
+   *  Stored so the drill-in can state the threshold the estimate used, and so
+   *  a later baseline shift cannot silently re-mean a stored count. */
+  stillFloorBpm: number | null;
   /** Walking and standing stretches, for the drill-in's shading. */
   uprightSpans: { startMin: number; endMin: number; kind: 'walk' | 'still' }[] | null;
   /** Upright minutes per clock hour (each array 24 long), counted from the
@@ -216,6 +221,18 @@ export interface DayLoad {
   hrBelowMin: number | null;
   /** Minutes the series actually covered, so a charger gap reads as unknown. */
   hrCoverageMin: number | null;
+  /** Minutes between this day's heart-rate readings (budget/burn.ts
+   *  `typicalGapMin`). A chest strap reads a fiftieth of a minute and a
+   *  background wrist reads several, so this is what says WHICH INSTRUMENT
+   *  watched the day, and it is what `capacityBaseline` compares before
+   *  treating two days' spend as the same measurement. Null on a day read
+   *  before it was kept, which is read as unknown and never as fine. */
+  hrSampleGapMin: number | null;
+  /** Which pricing rules charged this day (budget/reprice.ts `PRICE_VERSION`).
+   *  Absent means 1, the rules before the gap tolerance was fitted to the day.
+   *  It lives on the DAY rather than in the flags store so an imported journal
+   *  is re-priced too, where a device-level "already done" would skip it. */
+  pricedVersion: number | null;
   /** Contiguous runs above the line ("in three stretches"). */
   hrStretches: number | null;
   /** The longest such run, minutes past midnight. */
