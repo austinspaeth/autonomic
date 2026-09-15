@@ -754,6 +754,72 @@ await new Promise((r) => setTimeout(r, 700));
 check('the refreshed data rendered', $('pgHeat').innerHTML.length > 0);
 window.fetch = beforeFetch;
 
+/* ----------------------------------------------------- the day cursor
+
+   A control in the filter row that moves the day the counters describe. It is
+   the App usage view's alone, it always names a day, and it starts on the
+   counter's newest — there is no "all days" state, because there is no such
+   thing as ping data with no day attached.
+
+   The whole of it is one clamp on `ix.last`, which is already what every
+   today-tile reads, so the test that matters is that a step moves the TILES
+   and not just the label. */
+
+window.document.querySelector('.tab[data-view="ping"]').click();
+await new Promise((r) => setTimeout(r, 300));
+
+const dayLabel = () => $('dayLabel').textContent;
+const todayTiles = () => $('pgTilesToday').textContent.replace(/\s+/g, ' ');
+
+check('the day cursor is on the App usage view', !$('fgDay').classList.contains('hidden'));
+check('and starts on the newest day, saying so as well as naming it',
+  /^Today · /.test(dayLabel()), dayLabel());
+check('with nowhere forward to go', $('dayFwd').disabled === true);
+check('and no way-back chip until there is a way back',
+  $('dayToday').classList.contains('hidden'));
+
+const atNewest = todayTiles();
+check('whose tiles are about the newest day',
+  atNewest.indexOf('Active on') !== -1, atNewest.slice(0, 60));
+
+$('dayBack').click();
+await new Promise((r) => setTimeout(r, 200));
+check('stepping back names the day it landed on, with its weekday',
+  /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun) /.test(dayLabel()), dayLabel());
+check('and the forward arrow comes alive', $('dayFwd').disabled === false);
+check('and the way back appears', !$('dayToday').classList.contains('hidden'));
+/* The point of the whole feature: the VIEW moved, not just the control. */
+check('the tiles move with it rather than only the label',
+  todayTiles() !== atNewest, todayTiles().slice(0, 60));
+
+$('dayFwd').click();
+await new Promise((r) => setTimeout(r, 200));
+check('stepping forward onto the newest day is "today" again, not a pinned date',
+  /^Today · /.test(dayLabel()) && $('dayToday').classList.contains('hidden'), dayLabel());
+check('and the tiles are exactly what they were', todayTiles() === atNewest);
+
+/* The far end. The counter's window is finite and the back arrow stops at it
+   rather than walking into empty space for ever. */
+for (let i = 0; i < 60 && !$('dayBack').disabled; i += 1) {
+  $('dayBack').click();
+  await new Promise((r) => setTimeout(r, 12));
+}
+check('the back arrow stops at the counter\'s first day', $('dayBack').disabled === true, dayLabel());
+check('and says which day that is', /First day/.test($('dayNote').textContent), $('dayNote').textContent);
+
+$('dayToday').click();
+await new Promise((r) => setTimeout(r, 200));
+check('the way-back chip returns to the newest day in one press',
+  /^Today · /.test(dayLabel()) && todayTiles() === atNewest, dayLabel());
+
+/* It moves the PING counters, so it has no business on a view built from the
+   store's ledger or the cost sheet — absent there rather than ignored. */
+window.document.querySelector('.tab[data-view="sales"]').click();
+await new Promise((r) => setTimeout(r, 200));
+check('and it is absent from every other view', $('fgDay').classList.contains('hidden'));
+window.document.querySelector('.tab[data-view="ping"]').click();
+await new Promise((r) => setTimeout(r, 300));
+
 let failed = 0;
 results.forEach((r) => {
   if (!r.ok) failed += 1;

@@ -203,9 +203,16 @@
      shape below changes. */
   var SNAP_V = 2;
 
-  /* How many rows a card will draw before it stops and counts the rest. A busy
-     refresh must not produce a card taller than the dock it lives in. */
-  var MAX_ROWS = 4;
+  /* How many rows a card in the CORNER STACK draws before it stops and counts
+     the rest. The dock is a fixed corner of the screen holding several cards at
+     once, so a card there has to be bounded.
+
+     The HISTORY DRAWER is not bounded — it is a scroller whose whole job is to
+     be read — so it draws every row (`rowsHtml` with no limit). A morning
+     carrying 59 returns and 31 readings is exactly when you want the
+     breakdown, and "+34 more" in a panel with room to scroll was throwing away
+     the answer to the question the drawer was opened to ask. */
+  var MAX_ROWS = 8;
 
   var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -479,9 +486,26 @@
     return keys[0] === '?' ? '' : keys[0];
   }
 
-  /** "builds: 1.26.0 x2 · 1.25.2" — what a card says when at least one of its
-   *  rows could not be given a build. Every fact present, none of them falsely
-   *  attached to an install. Empty when nothing was ambiguous. */
+  /**
+   * What a card says when at least one of its rows could not be given a build.
+   *
+   * It is an ADMISSION, and it has to read as one. It used to say
+   * "builds: 1.26.0 · 1.28.0", which is true and reads as a claim about the
+   * install on the card — one returning visitor cannot be on two builds, so
+   * the line looked like a bug. It now leads with the thing that actually
+   * happened: the build was not identified, and here is what it was one of.
+   *
+   * The usual cause is two events sharing one group. Versions are counted
+   * against store x tier and downloads and returns share the `open` route, so
+   * a first run on the build you just shipped and a return on the one before
+   * it — both iOS, both Trial — put two versions in one group, and neither
+   * card can say which ping was which. A new install is almost certainly on
+   * the newer build; "almost certainly" is not something this dashboard
+   * prints.
+   *
+   * Past three candidates the list stops being worth reading and the count is
+   * the honest summary.
+   */
   function buildNote(bd, kind, rows) {
     var pool = {}, seen = {}, any = false;
     (rows || []).forEach(function (r) {
@@ -494,12 +518,16 @@
       Object.keys(g).forEach(function (v) { if (g[v] > 0) pool[v] = (pool[v] || 0) + g[v]; });
     });
     if (!any) return '';
-    var list = Object.keys(pool).sort(function (a, b) {
+    var names = Object.keys(pool).sort(function (a, b) {
       return (pool[b] - pool[a]) || (a < b ? -1 : a > b ? 1 : 0);
-    }).map(function (v) {
-      return (v === '?' ? 'unknown' : v) + (pool[v] > 1 ? ' \u00d7' + pool[v] : '');
-    });
-    return list.length ? 'builds: ' + list.join(' \u00b7 ') : '';
+    }).map(function (v) { return v === '?' ? 'an older build' : v; });
+    if (!names.length) return '';
+    if (names.length > 3) return 'Build not identified \u2014 ' + names.length + ' builds pinged';
+    /* "or", not a middot: the candidates are alternatives for ONE install, not
+       a list of things that all happened. */
+    var last = names.pop();
+    return 'Build not identified \u2014 ' +
+      (names.length ? names.join(', ') + ' or ' + last : last);
   }
 
   /**
@@ -1382,11 +1410,29 @@
   var PLAT_CLASS = { I: 'ios', A: 'and', U: 'unk' };
   var TIER_CLASS = { P: 'pro', T: 'trial', F: 'free' };
 
-  /** "Installed today" / "Installed Aug 29 · 17 days old", for one row. */
+  /** "Today" / "Aug 29 · day 17", for one row.
+   *
+   *  Short, because a row is one LINE and this shares it with three chips, a
+   *  build and a count. "Installed 17 days old" spelled out pushed every row
+   *  onto a second line, and on a busy morning — 31 readings, 59 returns —
+   *  that is the difference between a card you can read and a card that is
+   *  mostly "+34 more".
+   *
+   *  "day 17" rather than a bare "17d" because a row on a READING card sits
+   *  beside a sensor and a time, and a bare date there reads as the date of
+   *  the reading. "day 17" can only be the install's age, which is the one
+   *  thing it is. The full sentence is on the row's hover title. */
   function installedText(r) {
+    if (r.age === 0) return 'Today';
+    return dateLabel(r.cohort, r.day) + ' \u00b7 day ' + r.age;
+  }
+
+  /** The same fact spelled out, for the row's hover title — the short form on
+   *  the row is what fits, this is what it means. */
+  function installedTitle(r) {
     if (r.age === 0) return 'Installed today';
-    return 'Installed ' + dateLabel(r.cohort, r.day) + ' \u00b7 ' +
-      (r.age === 1 ? 'yesterday' : r.age + ' days old');
+    return 'Installed ' + dateLabel(r.cohort, r.day) + ', ' +
+      (r.age === 1 ? 'yesterday' : r.age + ' days ago');
   }
 
   /**
@@ -1403,35 +1449,39 @@
    * a fact worth seeing and is not the same as silence.
    */
   function rowHtml(r) {
-    var chips =
-      '<span class="alert-chip plat ' + (PLAT_CLASS[r.platform] || 'unk') + '">' +
-        '<i aria-hidden="true"></i>' + esc(storeChip(r.platform)) + '</span>' +
-      '<span class="alert-chip tier ' + (TIER_CLASS[r.tier] || 'unk') + '">' +
-        esc(tierName(r.tier)) + '</span>' +
-      (SENSOR_CHIP[r.slot] ? '<span class="alert-chip sensor">' + esc(SENSOR_CHIP[r.slot]) + '</span>' : '') +
-      (r.first ? '<span class="alert-chip first">First</span>' : '') +
-      (r.n > 1 ? '<span class="alert-n">\u00d7' + r.n + '</span>' : '');
+    var build = '';
+    if (r.version) build = '<span class="alert-build">' + esc(r.version) + '</span>';
+    else if (r.version === '') build = '<span class="alert-build unknown">build unknown</span>';
+    // r.version === null is AMBIGUOUS: the row says nothing and the card's
+    // footer names the candidates. See `versionFor`.
 
-    var sub = '<span>' + esc(installedText(r)) + '</span>';
-    if (r.version) {
-      sub += '<span class="sep" aria-hidden="true">\u00b7</span>' +
-        '<span class="alert-build">' + esc(r.version) + '</span>';
-    } else if (r.version === '') {
-      sub += '<span class="sep" aria-hidden="true">\u00b7</span>' +
-        '<span class="alert-build unknown">build unknown</span>';
-    }
-
-    return '<div class="alert-row">' +
-      '<div class="alert-row-top">' + chips + '</div>' +
-      '<div class="alert-row-sub">' + sub + '</div>' +
+    return '<div class="alert-row" title="' + esc(installedTitle(r)) + '">' +
+      '<div class="alert-row-main">' +
+        '<span class="alert-chip plat ' + (PLAT_CLASS[r.platform] || 'unk') + '">' +
+          '<i aria-hidden="true"></i>' + esc(storeChip(r.platform)) + '</span>' +
+        '<span class="alert-chip tier ' + (TIER_CLASS[r.tier] || 'unk') + '">' +
+          esc(tierName(r.tier)) + '</span>' +
+        (SENSOR_CHIP[r.slot] ? '<span class="alert-chip sensor">' + esc(SENSOR_CHIP[r.slot]) + '</span>' : '') +
+        (r.first ? '<span class="alert-chip first">First</span>' : '') +
+        /* The install date and the build travel together: when a row is too
+           wide to fit, it has to break between the CHIPS and the meta, never
+           between the date and the build — a stranded "1.26.0" on a line of
+           its own reads as a fault. */
+        '<span class="alert-meta">' +
+          '<span class="alert-inst">' + esc(installedText(r)) + '</span>' + build +
+        '</span>' +
+      '</div>' +
+      (r.n > 1 ? '<span class="alert-n">\u00d7' + r.n + '</span>' : '') +
       '</div>';
   }
 
-  /** The rows of one card, capped, with whatever is left counted in a tail. */
-  function rowsHtml(rows, note) {
+  /** The rows of one card, with whatever is left over counted in a tail.
+   *  `limit` is 0 for "draw them all" — see MAX_ROWS. */
+  function rowsHtml(rows, note, limit) {
     if (!rows || !rows.length) return '';
-    var shown = rows.slice(0, MAX_ROWS);
-    var rest = rows.slice(MAX_ROWS).reduce(function (a, r) { return a + r.n; }, 0);
+    var cap = limit > 0 ? limit : rows.length;
+    var shown = rows.slice(0, cap);
+    var rest = rows.slice(cap).reduce(function (a, r) { return a + r.n; }, 0);
     var tail = [];
     if (rest) tail.push('+' + rest + ' more');
     if (note) tail.push(note);
@@ -1617,7 +1667,7 @@
           return '<article class="alert-card ' + it.kind + ' on">' +
             cardHtml(it.kind, {
               title: it.title, line: it.line, rows: it.rows, note: it.note, when: clockOf(it.at),
-            }, false) +
+            }, false, 0) +
             '</article>';
         }).join('') +
         '</section>';
@@ -1683,8 +1733,8 @@
    * part that changes, because everything else about the event is the same
    * event.
    */
-  function cardHtml(kind, info, dismissible) {
-    var rows = rowsHtml(info.rows, info.note);
+  function cardHtml(kind, info, dismissible, limit) {
+    var rows = rowsHtml(info.rows, info.note, limit);
     return '<div class="alert-head">' +
         '<span class="alert-mark" aria-hidden="true">' + MARK[kind] + '</span>' +
         '<span class="alert-title">' + esc(info.title) + '</span>' +
@@ -1701,7 +1751,7 @@
     if (!replay) logCard(kind, info);
     var el = document.createElement('div');
     el.className = 'alert-card ' + kind;
-    el.innerHTML = cardHtml(kind, info, true);
+    el.innerHTML = cardHtml(kind, info, true, MAX_ROWS);
     stack.appendChild(el);
     // One frame later, so the transition has a state to leave from.
     window.requestAnimationFrame(function () { el.classList.add('on'); });

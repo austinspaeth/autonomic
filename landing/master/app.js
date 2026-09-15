@@ -103,6 +103,10 @@
     ovMode: 'daily',
     cohGrain: 'day',
     dowMetric: 'downloads',
+    /* The App-usage day cursor: an ISO day, or '' for the counter's newest.
+       Empty rather than today's date, so a dashboard left open overnight rolls
+       forward with the counter instead of pinning itself to yesterday. */
+    pingDay: '',
     exportN: 1,
     exportUnit: 'days',
     lastView: 'overview',
@@ -1793,7 +1797,13 @@
     var retry = document.getElementById('pgRetry');
     if (retry) retry.addEventListener('click', function () { pingLoad(true); });
 
-    var ix = A.index(pings.report, pingPlatform());
+    var full = A.index(pings.report, pingPlatform());
+    /* Everything below reads the index AS OF the cursor day, which is the
+       counter's newest until somebody steps back. `full` is kept only for the
+       cursor control itself, which has to know where the ends of the road are.
+       */
+    syncDayCursor(full);
+    var ix = asOfCursor(full);
     /* Anything we hold is worth drawing, whatever the fetch is doing now: a
        failed refresh should leave the last good read on screen under its error,
        not replace a working page with an empty one. */
@@ -1834,9 +1844,19 @@
         : '';
     }
 
+    /* The heading names the day the tiles under it are about. "Today" is only
+       true while the cursor is on the counter's newest day — stepped back, the
+       section is about a specific Saturday and saying "Today" over six tiles
+       that each read "on Sep 12" is the heading contradicting its own
+       contents. */
+    var todayTitle = document.getElementById('pgTodayTitle');
+    if (todayTitle) {
+      todayTitle.textContent = (blank || !state.pingDay) ? 'Today' : labelFull(ix.last);
+    }
     var todayNote = document.getElementById('pgTodayNote');
     if (todayNote) {
       todayNote.textContent = blank ? ''
+        : state.pingDay ? 'Stepped back — everything below is as of this day'
         : ix.last === today() ? labelDay(ix.last) + ' — still running, so it is a partial day'
         : 'Newest day with pings: ' + labelFull(ix.last);
     }
@@ -1909,6 +1929,103 @@
     var out = {};
     for (var k in ix) out[k] = ix[k];
     out.cohorts = cohorts;
+    return out;
+  }
+
+  /**
+   * The index as it stood at the end of the cursor day.
+   *
+   * This is the WHOLE of the day cursor, and it is one function on purpose.
+   * `ix.last` is already "the day the today-tiles describe" everywhere in this
+   * view — *Active on*, *Installs on*, *Measured on*, the deltas beside them,
+   * and `pingRange`'s own window all read it — so moving that one field moves
+   * the entire view to that day with no second implementation to drift from
+   * the first. Days after the cursor are dropped, and so are cohorts born
+   * after it: an "as of Sep 12" view that knew about an install from Sep 14
+   * would be answering a question nobody asked.
+   *
+   * It is a shallow copy, the same shape `scopeToRange` makes, so the route
+   * maps underneath are shared rather than rebuilt on every render.
+   */
+  /**
+   * Draw the cursor control, and keep it inside the road.
+   *
+   * `full` is the UNCLAMPED index, because this is the one thing that has to
+   * know both ends: you cannot step forward past the newest day the counter
+   * holds, and you cannot step back before its first. Both arrows are DISABLED
+   * at their end rather than tappable-then-refused, which is the same rule the
+   * strap picker follows in the app.
+   *
+   * A day inside the window with nothing in it is a different thing and stays
+   * steppable — the view says so, because "no pings recorded" is a fact about
+   * that day and not a failure to load.
+   */
+  function syncDayCursor(full) {
+    var group = document.getElementById('fgDay');
+    if (!group) return;
+    var newest = (full && full.last) || '';
+    var oldest = (full && full.first) || '';
+    /* A cursor beyond either end is nonsense to keep: the counter's window
+       slides, so a day pinned three weeks ago can fall off the back of it. */
+    if (state.pingDay && (!newest || state.pingDay >= newest || (oldest && state.pingDay < oldest))) {
+      if (!newest || state.pingDay >= newest) state.pingDay = '';
+      else state.pingDay = oldest;
+      saveUI();
+    }
+    var day = state.pingDay || newest;
+    var onNewest = !state.pingDay;
+
+    var label = document.getElementById('dayLabel');
+    if (label) {
+      /* On the newest day the label says so AND gives the date: the control
+         reads as "you are here" rather than as a date somebody chose. */
+      label.textContent = !day ? '—'
+        : onNewest ? 'Today \u00b7 ' + labelDay(day)
+        : WD[dow(day)] + ' ' + labelDay(day);
+    }
+    var back = document.getElementById('dayBack');
+    var fwd = document.getElementById('dayFwd');
+    if (back) back.disabled = !day || !oldest || day <= oldest;
+    if (fwd) fwd.disabled = onNewest;
+    var today = document.getElementById('dayToday');
+    if (today) today.classList.toggle('hidden', onNewest);
+
+    /* One line of context, and only when there is something to say: which end
+       of the road you are on, or that this day recorded nothing at all. */
+    var note = document.getElementById('dayNote');
+    if (note) {
+      var txt = '';
+      if (day && !onNewest) {
+        if (day <= oldest) txt = 'First day the counter recorded';
+        else if (full && full.days.indexOf(day) === -1) txt = 'No pings recorded';
+      }
+      note.textContent = txt;
+      note.classList.toggle('hidden', !txt);
+    }
+  }
+
+  /** Step the cursor by `n` days, clamped to the counter's own window. */
+  function stepDay(n, full) {
+    var ix = full || A.index(pings.report, pingPlatform());
+    var newest = ix.last, oldest = ix.first;
+    if (!newest) return;
+    var day = addDays(state.pingDay || newest, n);
+    if (!oldest || day < oldest) day = oldest;
+    /* Landing on or past the newest day means you are back on "today", which
+       is the empty cursor rather than today's date — see `state.pingDay`. */
+    state.pingDay = day >= newest ? '' : day;
+    saveUI();
+    renderPing();
+  }
+
+  function asOfCursor(ix) {
+    var day = state.pingDay;
+    if (!day || !ix || !ix.last || day >= ix.last) return ix;
+    var out = {};
+    for (var k in ix) out[k] = ix[k];
+    out.days = ix.days.filter(function (d) { return d <= day; });
+    out.cohorts = (ix.cohorts || []).filter(function (c) { return c <= day; });
+    out.last = out.days.length ? out.days[out.days.length - 1] : ix.first;
     return out;
   }
 
@@ -8419,6 +8536,12 @@
        always reads both combined, so the filter is hidden rather than ignored. */
     var platGroup = document.getElementById('fgPlatform');
     if (platGroup) platGroup.classList.toggle('hidden', state.view === 'costs');
+    /* The day cursor moves the day the PING counters describe, which is a
+       question only App usage asks. Everywhere else it would be a control that
+       silently reshapes a view built from a different source — the store's
+       ledger, the cost sheet — so it is absent rather than ignored. */
+    var dayGroup = document.getElementById('fgDay');
+    if (dayGroup) dayGroup.classList.toggle('hidden', state.view !== 'ping');
     document.getElementById('btnEditData').textContent =
       state.view === 'data' ? '← Back' : 'Edit data';
     syncExportUI();
@@ -9744,6 +9867,31 @@
     document.querySelector('.tabs').addEventListener('click', function (ev) {
       var t = ev.target.closest('.tab');
       if (t) setView(t.dataset.view);
+    });
+
+    /* The day cursor. Arrows step; the chip jumps back to the newest day, which
+       stepping forward would also reach and which is exactly why one tap has
+       to exist. The arrow KEYS work too, but only while App usage is the view
+       and only when the press is not going into a field — a dashboard that
+       swallows Left and Right inside a date input is worse than one with no
+       shortcut at all. */
+    var dayBack = document.getElementById('dayBack');
+    if (dayBack) dayBack.addEventListener('click', function () { stepDay(-1); });
+    var dayFwd = document.getElementById('dayFwd');
+    if (dayFwd) dayFwd.addEventListener('click', function () { stepDay(1); });
+    var dayToday = document.getElementById('dayToday');
+    if (dayToday) dayToday.addEventListener('click', function () {
+      state.pingDay = ''; saveUI(); renderPing();
+    });
+    window.addEventListener('keydown', function (ev) {
+      if (state.view !== 'ping') return;
+      if (ev.key !== 'ArrowLeft' && ev.key !== 'ArrowRight') return;
+      if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
+      var t = ev.target;
+      var tag = t && t.tagName;
+      if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || (t && t.isContentEditable)) return;
+      ev.preventDefault();
+      stepDay(ev.key === 'ArrowLeft' ? -1 : 1);
     });
 
     var rangeSel = document.getElementById('fRange');

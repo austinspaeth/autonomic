@@ -159,6 +159,22 @@
       </span>
     </div>
 
+    <!-- The day cursor. App usage only, and hidden everywhere else — it moves
+         the day the ping counters describe, which is a question only that view
+         asks. It always names a day and starts on the counter's newest, so
+         there is no "off" state: there is no such thing as ping data with no
+         day attached. See `syncDayCursor` in app.js. -->
+    <div class="filtergroup hidden" id="fgDay">
+      <label for="dayBack">Day</label>
+      <span class="stepper">
+        <button id="dayBack" aria-label="Previous day" title="Previous day">&lsaquo;</button>
+        <span class="stepper-day" id="dayLabel" aria-live="polite">Today</span>
+        <button id="dayFwd" aria-label="Next day" title="Next day">&rsaquo;</button>
+      </span>
+      <button class="day-today hidden" id="dayToday" title="Back to the newest day">Today &#8617;</button>
+      <span class="note hidden" id="dayNote"></span>
+    </div>
+
     <div class="filtergroup" id="fgPlatform">
       <label>Platform</label>
       <div class="segmented" id="fPlatform">
@@ -351,7 +367,7 @@
          partial count, and every comparison on this screen would otherwise
          read it as a fall. -->
     <div class="section-head">
-      <h2 class="section-title">Today</h2>
+      <h2 class="section-title" id="pgTodayTitle">Today</h2>
       <span class="section-note" id="pgTodayNote"></span>
     </div>
     <div class="grid cards">
