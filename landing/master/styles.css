@@ -947,17 +947,26 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { outline: 2px solid var
 
 /* ---- the card inside the card ---- */
 .alert-rows { display: flex; flex-direction: column; gap: 6px; }
+/* ONE line per install, wrapping only when it has to.
+   It was two — chips over a sub-line — which is fine for a card holding two
+   rows and ruinous for one holding twelve: a morning with 59 returns and 31
+   readings turned into four rows and a "+34 more". Everything a row says is
+   short, so it all sits on one line and the card gets three times the depth
+   for the same height. A row with a sensor chip on it wraps, which is the
+   right row to spend a second line on. */
 .alert-row {
   background: var(--surface-1); border: 1px solid var(--border);
-  border-radius: 8px; padding: 7px 9px 8px;
-  display: flex; flex-direction: column; gap: 5px;
+  border-radius: 8px; padding: 6px 8px;
+  display: flex; align-items: center; gap: 8px;
 }
-.alert-row-top { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.alert-row-sub {
-  font-size: 11.5px; color: var(--text-muted); line-height: 1.45;
-  display: flex; flex-wrap: wrap; gap: 4px 7px; align-items: baseline;
+.alert-row-main {
+  flex: 1 1 auto; min-width: 0;
+  display: flex; align-items: center; flex-wrap: wrap; gap: 5px 6px;
 }
-.alert-row-sub .sep { color: #56554f; }
+/* When the install date and the build do wrap, they wrap together rather than
+   leaving the build stranded on a line of its own. */
+.alert-meta { display: inline-flex; align-items: baseline; gap: 6px; white-space: nowrap; }
+.alert-inst { font-size: 11.5px; color: var(--text-muted); }
 .alert-build {
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 11px; color: var(--text-secondary);
@@ -965,8 +974,10 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { outline: 2px solid var
 /* A build that is known to be unnameable says so in words, so it cannot be
    mistaken for a version string. */
 .alert-build.unknown { font-family: inherit; font-size: 11.5px; font-style: italic; color: var(--text-muted); }
+/* Pinned to the right of the row rather than pushed by the content, so the
+   counts line up down a card however much each row carries. */
 .alert-n {
-  margin-left: auto; flex: none;
+  flex: none; align-self: center;
   font-size: 11.5px; font-weight: 600; color: var(--text-secondary);
   background: var(--surface-3); border-radius: 5px; padding: 1px 6px;
 }

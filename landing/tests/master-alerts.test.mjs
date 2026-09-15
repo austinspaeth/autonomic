@@ -115,8 +115,15 @@ check('a new first run raises a download card', /1 new download/.test(text()), t
 check('and the card names the store it came from', /Android/.test(cardText('download')), cardText('download'));
 check('a subscribe ping raises a sale card of its own', /1 new sale/.test(text()), text());
 check('and that card names the store that paid', /iOS/.test(cardText('sale')), cardText('sale'));
+/* A row is ONE line, so the install reads as "Sep 14 · day 1" rather than a
+   spelled-out sentence — "day N" because a bare date on a reading row would
+   read as the date of the reading. The full phrase is the row's hover title. */
 check('and how old the install that paid is',
-  /Installed .+ · yesterday/.test(cardText('sale')), cardText('sale'));
+  /· day 1(?!\d)/.test(cardText('sale')), cardText('sale'));
+check('with the spelled-out version on hover',
+  /Installed .+, yesterday/.test(
+    cards().find((c) => c.classList.contains('sale')).querySelector('.alert-row').getAttribute('title') || ''),
+  cards().find((c) => c.classList.contains('sale')).querySelector('.alert-row').getAttribute('title'));
 /* These fixtures predate the tier and version tokens, which is the case worth
    pinning: unknown is drawn as unknown and never folded into Free or into a
    version number. */
@@ -343,6 +350,39 @@ check('a reading card and toast carry the install age',
   $('toast').textContent === '2 readings today · 2 Apple Watch · installed Aug 10, 3 days ago',
   text() + ' | toast: ' + $('toast').textContent);
 AL.setMuted(false);
+
+/* ---------------------------------------------- a busy morning fits
+
+   The corner stack is a bounded corner of the screen, so a card there caps its
+   rows. The history drawer is a scroller whose whole job is to be read, so it
+   draws every one — "+34 more" in a panel with room to scroll was throwing
+   away the answer it was opened to give. */
+$('alertClear').click();
+await new Promise((r) => setTimeout(r, 400));
+const many = [];
+for (let i = 0; i < 14; i += 1) {
+  many.push({ cohort: '2026-08-' + (i < 9 ? '0' : '') + (i + 1), platform: i % 2 ? 'A' : 'I',
+              tier: 'F', slot: '?', n: i + 1, age: 40 - i, day: T(0), version: '1.26.0' });
+}
+AL.announce({
+  visitors: 105, downloads: 0, returns: 105, sales: 0, activations: 0, readings: 0,
+  downloadsBy: {}, returnsBy: { I: 60, A: 45 }, salesBy: {}, activationsBy: {}, readingsBy: {},
+  rows: { downloads: [], sales: [], activations: [], readings: [], returns: many },
+  notes: {},
+});
+await new Promise((r) => setTimeout(r, 30));
+const stackRows = cards().find((c) => c.classList.contains('visit')).querySelectorAll('.alert-row');
+check('a card in the corner caps its rows and counts the rest',
+  stackRows.length === 8 && /\+\d+ more/.test(cardText('visit')),
+  String(stackRows.length) + ' | ' + cardText('visit'));
+$('btnAlerts').click();
+await new Promise((r) => setTimeout(r, 60));
+const histRows = drawerCards()[0].querySelectorAll('.alert-row');
+check('the same card in the history draws every row instead',
+  histRows.length === 14 && !/\+\d+ more/.test(drawerCards()[0].textContent),
+  String(histRows.length));
+$('alertDrawerClose').click();
+await new Promise((r) => setTimeout(r, 340));
 
 check('no page errors', errors.length === 0, errors.join(' | '));
 
