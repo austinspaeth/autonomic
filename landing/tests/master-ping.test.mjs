@@ -590,6 +590,30 @@ check('a boundary beyond the axis is not drawn',
 check('and no boundary label is printed with it',
   !/trial ends/.test($('pgCurve').textContent), $('pgCurve').textContent.slice(0, 80));
 
+/* -------------------------------------------- attendance vs survival
+
+   The card that exists because the curve above answers a narrower question
+   than it gets read as. Its two lines must be drawn over the SAME ages — a
+   window curve reaches (win - 1) days less far, and letting the dashed
+   attendance line run on past it would read as attendance surviving longer
+   than survival, which is the exact confusion the card is for. */
+check('the attendance-vs-survival chart rendered', !!$('pgPresence').querySelector('svg'));
+const presLegend = $('pgPresence').textContent;
+check('it names both questions rather than one "retention"',
+  /Still alive/.test(presLegend) && /exactly that day/.test(presLegend), presLegend.slice(0, 160));
+
+const presNote = $('pgPresenceNote').textContent;
+check('the note either quantifies the gap or says it cannot yet',
+  /a day off/.test(presNote) || /Not enough aged cohorts/.test(presNote), presNote.slice(0, 160));
+check('and when it does quantify it, it says the alive line is a floor',
+  !/a day off/.test(presNote) || /floor/.test(presNote), presNote.slice(0, 200));
+
+const intens = $('pgIntensity').textContent;
+check('the decomposition row explains what it separates',
+  /more often/.test(intens) && /keeps more people/.test(intens), intens.slice(0, 200));
+check('and every age band either carries a figure or says why not',
+  /\/ 7 days/.test(intens) || /not enough aged cohorts/.test(intens), intens.slice(0, 200));
+
 /* ------------------------------------------------------ timeline tab */
 
 window.document.querySelector('.tab[data-view="timeline"]').click();

@@ -1478,7 +1478,24 @@ old web app so old `export.json` files import directly.
   day*), an **Opened vs measured** card and **The habit curve** — retention and
   measuring on one axis by install age, where the GAP between the two lines is
   the finding — plus a Readings bar on the weekday chart and its own route in the
-  raw Pings tab. The paywall counter gets **Opened vs paywalled** and **Which
+  raw Pings tab.
+  **The retention curve counts opens on EXACTLY day N, which is attendance and
+  not survival** — a skipped day reads as churn and the return reads as
+  resurrection, which is where the curve's right-hand upturn and the flickering
+  `0, 2, 0, 0, 2` cohort rows come from, and why a release that makes the same
+  people open more often raises it without retaining anybody. **Still here, or
+  here today?** answers the other question: `presenceAt` takes each cohort's
+  busiest single day over days N…N+6 as a FLOOR on how many were alive that week
+  (`peakOver`'s no-summing rule, applied per cohort and per AGE), and
+  `intensity` = `dayCount / (alive × win)` decomposes the two — the chart moves
+  when a release RETAINS more people, the row moves when it makes the same
+  people open MORE OFTEN. Three invariants, all pinned in
+  `landing/tests/analytics.test.mjs`: maturity is measured at the END of the
+  window (a cohort that has not lived all of it is excluded, not truncated); the
+  day-exact line comes from `dayOnePct` inside the same sweep and NEVER from
+  `retentionAt`, whose eligible-cohort set is different and can therefore plot
+  attendance above survival; and the curve ends `win - 1` days short rather than
+  padding. The paywall counter gets **Opened vs paywalled** and **Which
   wall they meet first**, and the two new fields get **Who is in the app** (the
   tier split, with a Pro share read off three different counters side by side)
   and **What they are running** (version adoption); all four are pinned by

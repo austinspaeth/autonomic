@@ -724,9 +724,49 @@ the UI, each of them deliberate:
   the same subject. Three headings, three tile blocks, and every card filed
   under the scope it actually answers in.
 
+- **The retention curve is ATTENDANCE, not survival, and one card exists to say
+  so.** `retentionAt` counts installs that opened on EXACTLY day N, so somebody
+  who opens on D2 and D5 but not D3 reads as churned at D3 and back from the
+  dead at D5. That single fact explains three shapes that otherwise look like
+  data problems: a curve that goes back UP at the right-hand end, a single
+  cohort's row flickering `0, 2, 0, 0, 2`, and a number that moves when a
+  release makes the app more habit-forming **without retaining one extra
+  person** — open five days a week instead of two and day-N attendance more than
+  doubles over the same survivors.
+
+  **Still here, or here today?** draws the other question beside it.
+  `presenceAt` takes each cohort's busiest single day over days N…N+6: a FLOOR
+  on how many were alive that week, because anyone who only opened on a quieter
+  day is missed and nobody is invented. That is the no-summing rule (`peakOver`,
+  rule 1 in `analytics.js`) applied per cohort and per AGE rather than per date.
+  The gap between the two lines is people who are still here and did not open
+  *that day*.
+
+  Three things it gets right and that are easy to get wrong:
+  **maturity is measured at the END of the window** — a cohort old enough for
+  day N but not N+6 would contribute a truncated window whose maximum is short
+  by the days it has not lived, so it is excluded and counted in `immature`,
+  the same "immature is not zero" rule one level up. **The day-exact line is
+  counted INSIDE the same sweep** (`dayOnePct`), never fetched from
+  `retentionAt`, because the two disagree about which cohorts are eligible and
+  comparing across two denominators can plot attendance ABOVE survival — which
+  is arithmetically impossible for the same installs and reads as a bug in the
+  data. Since the window's maximum includes its own first day,
+  `alivePct >= dayOnePct` holds by construction; a test pins it at every age.
+  And **the window costs `win - 1` days of reach**, so this curve ends six days
+  before the one above it rather than padding the end.
+
+  Underneath, `intensity` is the decomposition: `dayCount / (alive × win)`, or
+  how often an install that is still here actually opens. **A release that
+  retains more people moves the chart; one that makes the same people open more
+  often moves the row.** Both are wins, they are different wins, and the day-N
+  curve adds them together and calls the total retention — which is the whole
+  reason the card is not just a smoothed version of the one above it.
+
   **All installs is not a third nicety, it is the reason the split is not two.**
   A retention curve, a cohort heatmap, purchase and activation timing, the habit
-  curve and the sensor-mix-by-age card ignore the date range entirely — they
+  curve, the sensor-mix-by-age card and the attendance/survival pair ignore the
+  date range entirely — they
   pool every cohort old enough to have reached the day being asked about. Filing
   them under "This range" would be a claim they do not make, which is the same
   class of error as summing daily actives.

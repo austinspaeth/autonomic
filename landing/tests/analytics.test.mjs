@@ -214,6 +214,64 @@ check('returning excludes installs born that day',
 const floor = A.peakOver(ix, [C1], C1, LAST);
 check('a window floor is a max, not a sum', floor === 100, String(floor));
 
+/* ------------------------------------------- attendance vs survival
+ *
+ * `retentionAt` counts installs that opened on EXACTLY day N, so a cohort whose
+ * members each open a couple of days a week reads as a sawtooth and every
+ * trough reads as churn. A purpose-built cohort with exactly that shape:
+ * 20 installs, then 3, 0, 4, 1, 0, 2, 3 opens across D1..D7. Nobody left — they
+ * are taking days off — and the two functions have to say different things
+ * about it. */
+const X = '2026-06-01', Y = '2026-06-28', XLAST = '2026-06-30';
+const flick = {};
+put(flick, X, X, 20);
+[3, 0, 4, 1, 0, 2, 3].forEach((n, i) => { if (n) put(flick, A.addDays(X, i + 1), X, n); });
+put(flick, Y, Y, 10);                 // 2 days old: too young for a whole window
+put(flick, XLAST, X, 1);              // pins `last` so maturity is well defined
+const fx = A.index({ open: shape(flick) });
+
+const w1 = A.presenceAt(fx, [X], 1);
+check('the alive floor is a MAX over the window, never a sum',
+  w1.alive === 4 && w1.dayCount === 13, JSON.stringify(w1));
+check('...and it reads as a share of the cohort', near(w1.alivePct, 20), String(w1.alivePct));
+check('day-exact retention sees only the one day and reports less',
+  near(A.retentionAt(fx, [X], 1).pct, 15), String(A.retentionAt(fx, [X], 1).pct));
+check('so survival is strictly above attendance for a cohort taking days off',
+  w1.alivePct > w1.dayOnePct, `${w1.alivePct} vs ${w1.dayOnePct}`);
+
+/* Day N is counted INSIDE the sweep rather than fetched from `retentionAt`,
+   because the two disagree about which cohorts are eligible — this one needs
+   the whole window, that one only needs day N. Comparing them across different
+   denominators can put attendance ABOVE survival, which is arithmetically
+   impossible for the same installs and read as a bug in the data. Since the
+   window's maximum includes its own first day, this can never invert. */
+check('the day-exact figure is measured over the window-eligible cohorts',
+  near(w1.dayOnePct, 15), String(w1.dayOnePct));
+check('and survival can never plot below attendance, at any age',
+  A.presenceCurve(fx, [X], 60).every((p) => p.alivePct >= p.dayOnePct));
+const mixedAges = A.presenceCurve(ix, ix.cohorts, 30);
+check('...including over a fixture with cohorts of several different ages',
+  mixedAges.length > 0 && mixedAges.every((p) => p.alivePct >= p.dayOnePct));
+check('intensity is opens per alive install per window day',
+  near(w1.intensity, 13 / (4 * 7)), String(w1.intensity));
+check('the day share is the smoothed version of the day-exact number',
+  near(w1.dayPct, (13 / (20 * 7)) * 100), String(w1.dayPct));
+
+/* Maturity is measured at the END of the window. A cohort old enough for day 0
+   but not for day 6 would contribute a truncated window whose max is short by
+   the days it has not lived — excluded, and counted, never averaged in. */
+const w0 = A.presenceAt(fx, [X, Y], 0);
+check('a cohort too young for the WHOLE window is excluded, not truncated',
+  w0.cohorts === 1 && w0.immature === 1 && w0.of === 20, JSON.stringify(w0));
+
+/* The window costs (win - 1) days of reach at the end. Stated, not padded. */
+const pc = A.presenceCurve(fx, [X], 60), rc = A.curve(fx, [X], 60);
+check('the window curve ends 6 days before the day-exact one',
+  rc.length - pc.length === A.PRESENCE_WINDOW - 1,
+  `curve ${rc.length} vs presence ${pc.length}`);
+check('and every point on it carries its own denominator',
+  pc.every((p) => p.of === 20 && p.cohorts === 1));
+
 /* ------------------------------------------------------------- funnel */
 
 const f = A.funnel([
