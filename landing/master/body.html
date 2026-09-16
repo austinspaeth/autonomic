@@ -595,6 +595,27 @@
       </div>
     </div>
 
+    <!-- ---------- 3c. attendance vs survival ----------
+         The curve above counts installs that opened on EXACTLY day N, which is
+         attendance, not survival: somebody who opens on D2 and D5 but not D3 is
+         counted gone at D3 and back at D5. That is why it can go back up, why a
+         single cohort's row flickers 0,2,0,0,2, and why it moves when the app
+         gets more habit-forming without retaining one extra person. A window
+         answers the other question, and the pair decomposes the two. -->
+    <div class="card" style="margin-bottom:14px">
+      <header><h2>Still here, or here today?</h2><span class="spacer"></span>
+        <div class="segmented" id="pgPresenceMode">
+          <button data-v="gap" aria-pressed="true">Attendance vs survival</button>
+          <button data-v="split" aria-pressed="false">Recent vs earlier</button>
+        </div>
+        <button class="btn sm" data-table-toggle="pgPresence">Table</button></header>
+      <p class="hint">The retention curve counts installs that opened on <b>exactly</b> day N. Someone who opens on D2 and D5 but not D3 reads as churned at D3 and back from the dead at D5 — so that curve is <b>attendance</b>, and reading it as survival is the mistake this page invites. <b>Still alive</b> instead asks how many opened at least once in the week starting at day N, taken as each cohort's busiest single day in it: a <b>floor</b>, never an estimate, because installs that only opened on some other day are missed and never invented. The gap between the two lines is people who are still here and simply did not open <em>that day</em>. Each point needs its whole week to have happened, so this curve ends <b>6 days earlier</b> than the one above rather than padding the end.</p>
+      <div id="pgPresence"></div>
+      <div id="pgPresence-table" class="hidden" style="margin-top:12px"></div>
+      <div id="pgPresenceNote"></div>
+      <div id="pgIntensity"></div>
+    </div>
+
     <div class="card" style="margin-bottom:14px">
       <header><h2>Cohort retention</h2><span class="spacer"></span>
         <div class="segmented" id="pgHeatGrain">

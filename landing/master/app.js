@@ -1547,7 +1547,7 @@
       try { localStorage.removeItem(PING_KEY); } catch (e2) { /* ignore */ }
     }
   }
-  var pingUI = { tlMode: 'usage', tlMetric: 'active', curveMode: 'all', heatGrain: 'week', cohort: null, event: null, editing: null, rawKind: 'all', fltSort: 'installs' };
+  var pingUI = { tlMode: 'usage', tlMetric: 'active', curveMode: 'all', presenceMode: 'gap', heatGrain: 'week', cohort: null, event: null, editing: null, rawKind: 'all', fltSort: 'installs' };
 
   var PC = {
     fresh: COLOR.green,        // first run — an install the counter had not seen
@@ -1864,7 +1864,7 @@
     if (blank) {
       document.getElementById('pgHeat').innerHTML =
         '<div class="empty">No pings yet. The counter starts filling the first time a build carrying it is opened.</div>';
-      ['pgTimeline', 'pgCurve', 'pgSurvival', 'pgActiveCohort', 'pgPurchaseAge',
+      ['pgTimeline', 'pgCurve', 'pgSurvival', 'pgPresence', 'pgActiveCohort', 'pgPurchaseAge',
         'pgActivationAge', 'pgMethods', 'pgMeasureDaily', 'pgMeasureCurve', 'pgReadMethods',
         'pgPayDaily', 'pgSurfaces', 'pgTiers', 'pgBuilds', 'pgBuildShare',
         'pgFunnel', 'pgOffers', 'pgEvents', 'pgLogs', 'pgDig',
@@ -1883,6 +1883,7 @@
     renderTimeline(scoped, days, marks);
     renderCurve(scoped);
     renderSurvival(scoped);
+    renderPresence(scoped);
     renderHeat(scoped);
     renderActiveByCohort(scoped, r);
     renderPurchases(scoped, r);
@@ -2728,6 +2729,116 @@
         return note;
       }
     });
+  }
+
+  /* -------------------------------------------- 3c. attendance vs survival
+   *
+   * Two questions the retention curve above cannot tell apart, drawn so the
+   * difference between them is the thing you see first.
+   *
+   * ATTENDANCE (what that curve reports): opened on exactly day N. It falls
+   * when people leave AND when people simply skip a day, and it rises again
+   * when a skipper comes back — which is where the curve's "smile" comes from
+   * and why one cohort's row reads 0, 2, 0, 0, 2.
+   *
+   * SURVIVAL (this one): opened at least once in the week from day N, taken as
+   * the cohort's busiest single day in that week. A FLOOR — anyone who only
+   * opened on a day that was not the busiest is missed, and nobody is invented.
+   *
+   * The gap is the reason to draw both. It is not error; it is the share of
+   * still-present installs who did not open on the day the other chart asked
+   * about, and on this product it is most of the difference between a D3 that
+   * reads 12% and a userbase that is actually there.
+   */
+  function renderPresence(ix) {
+    var B = A.BOUNDARIES;
+    var W = A.PRESENCE_WINDOW;
+    var maxN = 45;
+    var series = [], len = 0, split = false;
+
+    if (pingUI.presenceMode === 'split' && ix.cohorts.length >= 4) {
+      // Same median split the retention curve uses, so the two cards answer
+      // "is this improving?" over identical groups of installs.
+      split = true;
+      var half = Math.ceil(ix.cohorts.length / 2);
+      var pE = A.presenceCurve(ix, ix.cohorts.slice(0, half), maxN);
+      var pR = A.presenceCurve(ix, ix.cohorts.slice(half), maxN);
+      len = Math.max(pE.length, pR.length);
+      series.push({ key: 'e', name: 'Earlier cohorts · alive', color: COLOR.muted, type: 'line', dashed: true,
+        values: pE.map(function (p) { return p.alivePct; }) });
+      series.push({ key: 'r', name: 'Recent cohorts · alive', color: PC.fresh, type: 'line',
+        values: pR.map(function (p) { return p.alivePct; }) });
+    } else {
+      var pres = A.presenceCurve(ix, ix.cohorts, maxN);
+      len = pres.length;
+      /* Attendance is drawn over the SAME ages the window curve covers, not its
+         own longer reach — two lines that stop in different places read as one
+         of them falling off, and the comparison is the whole point of the card. */
+      series.push({ key: 'alive', name: 'Still alive (opened that week)', color: PC.fresh, type: 'area',
+        values: pres.map(function (p) { return p.alivePct; }) });
+      /* Day N read off the SAME sweep, not from `retentionAt` — that one counts
+         cohorts merely old enough for day N, this one needs the whole window, so
+         the two have different denominators and the dashed line could plot
+         ABOVE the solid one. `dayOnePct` cannot: the window's max includes its
+         own first day. */
+      series.push({ key: 'day', name: 'Opened on exactly that day', color: COLOR.muted, type: 'line', dashed: true,
+        values: pres.map(function (p) { return p.dayOnePct; }) });
+    }
+
+    var x = [];
+    for (var i = 0; i < len; i++) x.push({ label: 'D' + i, full: 'Day ' + i });
+
+    drawChart('pgPresence', {
+      x: x, series: series, height: 300, format: fmtPct, xLabel: 'Days since install',
+      emptyText: 'No cohort has lived through a whole ' + W + '-day window yet.',
+      guides: [{ index: B.trialLastDay, label: 'trial ends', color: PC.trial }],
+      tooltipNote: function (i) {
+        var p = A.presenceAt(ix, ix.cohorts, i);
+        if (!p.available) return 'no cohort has a whole week at that age yet';
+        var bits = [fmtInt(p.alive) + ' of ' + fmtInt(p.of) + ' still here',
+                    'over ' + p.cohorts + ' cohort' + (p.cohorts === 1 ? '' : 's')];
+        if (p.intensity != null) bits.push('each opening ~' + (p.intensity * W).toFixed(1) + ' of ' + W + ' days');
+        if (p.immature) bits.push(p.immature + ' too young for the whole window');
+        return bits.join(' · ');
+      }
+    });
+
+    /* The sentence the card exists to make sayable: how much of the drop in the
+       dashed line is people leaving, and how much is people skipping a day. */
+    var host = document.getElementById('pgPresenceNote');
+    var at3 = A.presenceAt(ix, ix.cohorts, 3);
+    if (!at3.available || at3.dayOnePct === null) {
+      host.innerHTML = '<p class="note" style="margin-top:10px">Not enough aged cohorts yet to compare the two. ' +
+        'Each point needs a cohort that has lived a full ' + W + ' days past it.</p>';
+    } else {
+      host.innerHTML = '<p class="note" style="margin-top:10px">At <b>D3</b>, ' +
+        fmtPct(at3.dayOnePct) + ' opened the app that exact day — but <b>' + fmtPct(at3.alivePct) +
+        '</b> opened at least once that week' +
+        (at3.alivePct && at3.dayOnePct ? ' (' + (at3.alivePct / at3.dayOnePct).toFixed(1) + '× as many)' : '') +
+        '. The difference is not churn, it is a day off.</p>' +
+        '<p class="hint" style="margin:8px 0 0">The alive line is a <b>floor</b>: it counts each cohort\'s busiest ' +
+        'single day in the window, so anyone who opened only on a quieter day is missed. True survival sits ' +
+        'somewhere at or above it, never below.</p>';
+    }
+
+    /* ---- the decomposition. A release that RETAINS more people moves the
+       alive line above; one that makes the same people open MORE OFTEN moves
+       this. Both are wins and they are different wins, and the day-N curve
+       reports either as the other — which is the trap this whole card is for. */
+    var bands = [[1, 'D1-D7'], [8, 'D8-D14'], [15, 'D15-D21'], [22, 'D22-D28']];
+    var rows = bands.map(function (b) {
+      var p = A.presenceAt(ix, ix.cohorts, b[0]);
+      if (!p.available || p.intensity == null) {
+        return '<div><span>' + b[1] + '</span><b>–</b><span class="note">not enough aged cohorts</span></div>';
+      }
+      return '<div><span>' + b[1] + '</span><b>' + (p.intensity * W).toFixed(1) + ' / ' + W + ' days</b>' +
+        '<span class="note">' + fmtInt(p.alive) + ' still here, ' + fmtInt(p.dayCount) + ' opens between them</span></div>';
+    }).join('');
+    document.getElementById('pgIntensity').innerHTML =
+      '<p class="hint" style="margin:14px 0 6px"><b>How often an install that is still here actually opens.</b> ' +
+      'This is the other half: a change that makes the same people open more often moves this row, and a change ' +
+      'that keeps more people moves the chart above. The day-N curve adds them together and calls the total ' +
+      'retention.</p><div class="mini-rows">' + rows + '</div>';
   }
 
   /* ---------------------------------------------------------- 3b. survival */
@@ -4462,6 +4573,7 @@
     }
     segment('pgTlMode', 'tlMode', renderPing);
     segment('pgCurveMode', 'curveMode', renderPing);
+    segment('pgPresenceMode', 'presenceMode', renderPing);
     segment('pgHeatGrain', 'heatGrain', function () { pingUI.cohort = null; renderPing(); });
     segment('tlMetric', 'tlMetric', renderTimelineView);
     segment('pgRawKind', 'rawKind', renderPings);

@@ -1434,6 +1434,103 @@ window.Analytics = (function () {
     return out;
   }
 
+  /* --------------------------------------------- presence: attendance vs survival
+   *
+   * `retentionAt` asks a NARROWER question than the one it gets read as. It
+   * counts the installs from a cohort that opened the app on EXACTLY day N.
+   * Somebody who opens on D2 and D5 but not D3 is counted as gone at D3 and
+   * back again at D5 — so the curve is attendance, not survival, and reading it
+   * as survival is the most natural mistake this page invites.
+   *
+   * Three symptoms, all of which look like data problems and are not:
+   * a curve that goes back UP (later days collect the people who skipped an
+   * earlier one), single-cohort rows that flicker 0, 2, 0, 0, 2, and a number
+   * that moves when the app gets more habit-forming WITHOUT retaining one extra
+   * person — open five days a week instead of two and day-N attendance more
+   * than doubles over the same survivors.
+   *
+   * The fix is a WINDOW instead of a day. Over days N..N+6 a cohort's busiest
+   * single day is a FLOOR on how many of it were still alive that week: every
+   * one of those installs existed, and any who only opened on a different day
+   * are missed, never invented. That is `peakOver`'s rule (rule 1 in this
+   * file's header) applied per cohort and per age rather than per date.
+   *
+   * The two numbers together decompose the thing neither can answer alone:
+   *
+   *   alive      = busiest day in the window      -> how many are still here
+   *   dayShare   = every install-day in it        -> how much the app is used
+   *   intensity  = dayShare / alive               -> how often an alive install opens
+   *
+   * A release that RETAINS more people moves `alive`. One that makes the same
+   * people open more often moves `intensity`. Both are good and they are not
+   * the same outcome, and `retentionAt` alone reports either as the other.
+   *
+   * MATURITY IS MEASURED AT THE END OF THE WINDOW, not its start. A cohort old
+   * enough for day N but not for day N+6 would contribute a truncated window,
+   * whose maximum is biased downward by exactly the days it has not lived yet —
+   * the same "immature is not zero" rule, one level up. Such a cohort is
+   * excluded and counted in `immature`.
+   */
+  var PRESENCE_WINDOW = 7;
+
+  function presenceAt(ix, cohorts, n, win) {
+    var w = win || PRESENCE_WINDOW;
+    var alive = 0, dayCount = 0, dayOne = 0, of = 0, eligible = 0, immature = 0;
+    (cohorts || []).forEach(function (c) {
+      // The whole window has to have happened, or the max is short by the days
+      // this cohort has not lived through yet.
+      if (!isMature(ix, c, n + w - 1)) { immature += 1; return; }
+      var size = cohortSize(ix, c);
+      if (!size) return;
+      var peak = 0;
+      for (var k = 0; k < w; k++) {
+        var got = countOn(ix, addDays(c, n + k), c);
+        dayCount += got;
+        if (!k) dayOne = dayOne + got;
+        if (got > peak) peak = got;
+      }
+      alive += peak;
+      of += size;
+      eligible += 1;
+    });
+    return {
+      day: n, win: w,
+      alive: alive, of: of, dayCount: dayCount, dayOne: dayOne,
+      // A floor on the share of the cohort still around in this window.
+      alivePct: of ? (alive / of) * 100 : null,
+      /* `retentionAt(n)` over the SAME cohorts — day N alone, counted inside
+         this sweep rather than fetched, because the two functions do not agree
+         on which cohorts are eligible: this one needs the whole window to have
+         happened and that one only needs day N, so comparing them directly
+         compares different denominators and can invert the answer. Since the
+         window's maximum includes day N, `alivePct >= dayOnePct` is guaranteed
+         by construction rather than by hope. */
+      dayOnePct: of ? (dayOne / of) * 100 : null,
+      // Share of the cohort's install-DAYS in the window that carried an open.
+      // Never a headcount — it is the quantity `retentionAt` reports, smoothed.
+      dayPct: of ? (dayCount / (of * w)) * 100 : null,
+      // Days an alive install opened, out of the window's days. Read as
+      // "roughly N days a week"; null when nobody was alive to divide by.
+      intensity: alive ? dayCount / (alive * w) : null,
+      cohorts: eligible, immature: immature,
+      small: of > 0 && of < SMALL_COHORT,
+      available: eligible > 0
+    };
+  }
+
+  /** Presence at every age 0..maxN, stopping where no cohort has lived through
+   *  a whole window. Ends EARLIER than `curve` by (win - 1) days, which is the
+   *  price of the window and is stated rather than padded. */
+  function presenceCurve(ix, cohorts, maxN, win) {
+    var out = [];
+    for (var n = 0; n <= (maxN === undefined ? 90 : maxN); n++) {
+      var r = presenceAt(ix, cohorts, n, win);
+      if (!r.available) break;
+      out.push(r);
+    }
+    return out;
+  }
+
   /** The heatmap's columns for one cohort: a cell per milestone. */
   function milestoneRow(ix, cohort, cols) {
     var size = cohortSize(ix, cohort);
@@ -2324,6 +2421,7 @@ window.Analytics = (function () {
 
     // retention
     retentionAt: retentionAt, curve: curve, milestoneRow: milestoneRow,
+    presenceAt: presenceAt, presenceCurve: presenceCurve, PRESENCE_WINDOW: PRESENCE_WINDOW,
     weeklyCohorts: weeklyCohorts, weekRetentionAt: weekRetentionAt, weekMilestones: weekMilestones,
 
     // lifecycle + money
