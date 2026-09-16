@@ -4099,12 +4099,25 @@
    * Newest day first: the range can be ninety rows long and the day being asked
    * about is almost always the last one.
    *
+   * It arrives COLLAPSED, whatever its length. Two offers over a ninety-day
+   * range is a couple of hundred rows of mostly ones and zeroes sitting
+   * between the reader and the next card, and everything it says in aggregate
+   * is already said above it — this is the evidence behind those rows, opened
+   * when a number up there needs checking. That is the one difference from the
+   * purchase list, which opens on arrival while it is short: a purchase is
+   * rare enough that every one of them is worth reading, and an offer shown is
+   * not.
+   *
    * Its letters are its OWN, not the funnel rows' above: those are the two
    * offers the app raises, and this walks the whole alphabet the route can
    * speak so that a card from a build sending a letter this dashboard does not
    * know still gets a row. Otherwise the rows would silently fail to add up to
    * the chart's bars, which pool every letter.
    */
+  /* Which way the disclosure is facing, for this session only — the same call
+     `purchaseRowsOpen` makes, and deliberately not in `state`. */
+  var offerDaysOpen = false;
+
   function renderOfferDays(host, ix, days) {
     if (!host) return;
     var letters = A.slotOrder('osh').filter(function (k) {
@@ -4131,7 +4144,11 @@
     });
     if (!rows.length) { host.innerHTML = ''; return; }
     host.innerHTML =
-      '<div class="sub-head" style="margin-top:16px"><h3>Day by day, per offer</h3></div>' +
+      '<div class="sub-head with-action" style="margin-top:16px"><h3>Day by day, per offer</h3>' +
+        '<button class="btn sm" id="pgOfferDaysToggle">' + (offerDaysOpen ? 'Hide' : 'Show') + ' all ' +
+          fmtInt(rows.length) + ' ' + (rows.length === 1 ? 'row' : 'rows') + '</button>' +
+      '</div>' +
+      '<div id="pgOfferDaysTable" class="' + (offerDaysOpen ? '' : 'hidden') + '">' +
       '<div class="table-scroll"><table><thead><tr><th>Day</th><th>Offer</th><th>Shown</th>' +
       '<th>Accepted</th><th>Dismissed</th><th>Ignored</th></tr></thead><tbody>' +
       rows.join('') + '</tbody></table></div>' +
@@ -4145,7 +4162,16 @@
           'offers than were raised on the day, which is that crossing happening: ignored is not a count ' +
           'on those and is left blank rather than shown as zero.'
         : '') +
-      ' Range totals are above, where the crossings cancel out.</p>';
+      ' Range totals are above, where the crossings cancel out.</p>' +
+      '</div>';
+
+    var btn = document.getElementById('pgOfferDaysToggle');
+    if (btn) {
+      btn.addEventListener('click', function () {
+        offerDaysOpen = document.getElementById('pgOfferDaysTable').classList.contains('hidden');
+        renderOfferDays(host, ix, days);
+      });
+    }
   }
 
   /* The remaining per-letter routes on one axis. They are drawn together

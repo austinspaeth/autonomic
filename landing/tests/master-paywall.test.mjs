@@ -387,6 +387,23 @@ check('accepted is not described as a purchase',
 
 /* ---------------------------------------------------- offers, day by day */
 
+/* It arrives COLLAPSED. Two offers over a ninety-day range is a couple of
+   hundred rows of ones and zeroes between the reader and the next card, and
+   everything it says in aggregate is already said above it. The rows are
+   BUILT either way — this is a disclosure, not a lazy render — so the
+   assertions below read them straight out of the hidden table. */
+check('the day-by-day table starts collapsed',
+  $('pgOfferDaysTable').classList.contains('hidden'));
+check('...behind a button that says how much is behind it',
+  /Show all \d+ rows/.test($('pgOfferDaysToggle').textContent), $('pgOfferDaysToggle').textContent);
+
+$('pgOfferDaysToggle').click();
+check('...and one press opens it', !$('pgOfferDaysTable').classList.contains('hidden'));
+check('...and the button turns around', /Hide all/.test($('pgOfferDaysToggle').textContent),
+  $('pgOfferDaysToggle').textContent);
+$('pgOfferDaysToggle').click();
+check('...and closes it again', $('pgOfferDaysTable').classList.contains('hidden'));
+
 const offerRows = [...$('pgOfferDays').querySelectorAll('tbody tr')]
   .map((tr) => [...tr.querySelectorAll('td')].map((td) => td.textContent.trim()));
 

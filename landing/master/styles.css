@@ -603,6 +603,10 @@ tbody tr:hover { background: var(--surface-2); }
   margin-bottom: 8px;
 }
 .sub-head h3 { font-size: 13px; font-weight: 600; margin: 0; letter-spacing: 0.02em; }
+/* A sub-head that carries its own disclosure: the title keeps its place and
+   the button sits at the far end, the way a card header's does. */
+.sub-head.with-action { display: flex; align-items: center; gap: 12px; }
+.sub-head.with-action h3 { margin-right: auto; }
 
 /* "Not knowable yet" is a first-class state and must never look like zero. */
 .na { color: var(--text-muted); }
