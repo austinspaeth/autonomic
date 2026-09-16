@@ -8,8 +8,8 @@ keywords: "HRV standing, HRV lying down vs standing, does HRV drop when standing
 date: 2026-09-16
 updated: 2026-09-16
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1545205597-3d9d02c29597?q=80&w=1760&auto=format&fit=crop"
-photoAttribution: "Bruce Mars / Unsplash"
+photoLocation: "https://images.unsplash.com/photo-1758599878236-47f6a918aed2?q=80&w=1632&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+photoAttribution: "Unsplash"
 tldr: "Heart rate variability drops sharply when you stand up because standing pools blood in your legs, venous return falls, and your nervous system responds by withdrawing vagal (parasympathetic) tone and adding sympathetic drive. That vagal withdrawal is normal and expected. In POTS and orthostatic intolerance the response is exaggerated, so standing HRV falls further and heart rate rises more. Because posture moves HRV so much, the most important rule for a readable trend is to measure in the same position, at the same time, every day."
 categories:
   - hrv
