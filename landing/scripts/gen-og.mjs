@@ -10,6 +10,13 @@
 //
 //   npm run og            build what is missing or stale
 //   npm run og -- --force rebuild everything
+//   npm run og -- --soft  never fail (this is what `npm run build` runs)
+//
+// It also runs as npm's `prebuild`, so a deploy can never ship an article whose
+// card was never generated. That path is --soft: a page with no card falls back
+// to the site-wide image and still renders, so Unsplash being unreachable must
+// not be able to stop the site from shipping. tests/og.test.mjs is the strict
+// half, and is where a missing card should be caught.
 //
 // A card is rebuilt when its source URL changes or when the overlay does (the
 // manifest stores a hash of each), so a design change to the strip is
@@ -33,6 +40,7 @@ export const OG_WIDTH = 1200;
 export const OG_HEIGHT = 630;
 
 const force = process.argv.includes('--force');
+const soft = process.argv.includes('--soft');
 
 /** Slug + cover out of an article's YAML frontmatter. Deliberately not a YAML
  *  parser: these two keys are single-line scalars in every article. */
@@ -113,7 +121,7 @@ async function main() {
   console.log(`\nog: ${built} built, ${skipped} up to date, ${failed.length} failed`);
   if (failed.length) {
     for (const f of failed) console.error(`  ! ${f}`);
-    process.exitCode = 1;
+    if (!soft) process.exitCode = 1;
   }
 }
 

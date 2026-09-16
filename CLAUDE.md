@@ -21,7 +21,8 @@ See `mobile/README.md` for a fuller map. This file is the quick orientation.
 | Path | Purpose |
 | --- | --- |
 | `mobile/` | The app — Expo / React Native |
-| `landing/` | Marketing landing page (separate from the app) |
+| `landing/` | Marketing landing page (separate from the app), plus the articles at `/insights` |
+| `landing/static/og/` | One 1200x630 social-share card per article, **committed**: the article's own cover with the brand strip along the bottom. Built by `npm run og` (`landing/scripts/gen-og.mjs`) and by npm's `prebuild`, so a deploy cannot ship an article with no card; `og:image` points here while the page still renders `photoLocation` untouched. Redesigning the strip is `npm run og:overlay && npm run og -- --force`. `landing/tests/og.test.mjs` is the strict check |
 | `landing/master/` | Private store-analytics dashboard served at `/master/` — framework-free HTML/CSS/JS, inlined into one prerendered page by `landing/src/routes/master/`, signed in via Cognito. Installs as a PWA (manifest + service worker in `landing/static/master/`), paints from its localStorage cache and refreshes every 5 minutes. See `MASTER_DASHBOARD.md` |
 | `sls/` | The `/master` dashboard's API + DynamoDB table. **Nothing the mobile app uses** |
 | `infrastructure/` | CodePipeline / CodeBuild stack; `buildspec.yml` at the root drives it |
