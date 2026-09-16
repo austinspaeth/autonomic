@@ -3268,41 +3268,14 @@
       }
     });
 
-    renderOlderInstalls(ix);
-  }
-
-  /**
-   * Installs older than the counter get their own list rather than a footnote.
-   *
-   * They are the most-established users the app has, and on a counter that is
-   * days old they are most of what there is to look at. Everything here is
-   * genuinely known — the install date rode in on the ping — so the only thing
-   * withheld is the retention percentage, which has no denominator and never
-   * will: nobody counted how many installed that day.
-   */
-  function renderOlderInstalls(ix) {
-    var host = document.getElementById('pgOlderInstalls');
-    if (!host) return;
-    var rows = A.preTrackingCohorts(ix);
-    if (!rows.length) { host.innerHTML = ''; return; }
-
-    var B = A.BOUNDARIES;
-    host.innerHTML =
-      '<p class="hint" style="margin:12px 0 6px"><b>Installed before the counter existed.</b> ' +
-      'Their install date arrived with the ping, so their age is exact. Their cohort size was never ' +
-      'observed, so they carry no retention percentage and are left out of every rate above.</p>' +
-      '<div class="table-scroll"><table><thead><tr><th>Installed</th><th>Age</th><th>Stage</th>' +
-      '<th>Active on ' + esc(labelDay(ix.last)) + '</th><th>Days seen</th><th>Last seen</th></tr></thead><tbody>' +
-      rows.map(function (r) {
-        var stage = r.age <= B.trialLastDay ? '<span class="pill trial">In trial</span>'
-          : '<span class="pill past14">Past trial</span>';
-        return '<tr><td>' + esc(labelFull(r.cohort)) + '</td>' +
-          '<td>D' + r.age + '</td>' +
-          '<td style="text-align:left">' + stage + '</td>' +
-          '<td>' + fmtInt(r.activeLatest) + '</td>' +
-          '<td>' + fmtInt(r.days) + '</td>' +
-          '<td>' + (r.lastSeen ? esc(labelDay(r.lastSeen)) : '–') + '</td></tr>';
-      }).join('') + '</tbody></table></div>';
+    /* The pre-counter installs used to be listed in a table under this chart,
+       because the chart had no room for them: it kept the 24 youngest cohorts
+       and they were always the ones cut. They are ordinary bars now, at their
+       true age, and the tooltip says what is withheld about them — their
+       cohort size was never observed, so they carry no retention percentage.
+       A second listing of rows already on the chart is not a disclosure, it is
+       a duplicate. `A.preTrackingCohorts` stays: `activeByCohort` still needs
+       to know which cohorts are unmeasurable. */
   }
 
   /* ----------------------------------------------------- 6. purchase timing */
